@@ -7967,7 +7967,8 @@ The limit and the kill end inside the 30,000 ms shutdown budget, so the suite re
 budget. Measured closes: 0.25 s alone, 0.28 to 2.03 s beside two GPU suites and ten CPU hogs; the close's own
 bounded waits add up to about 7 s. Before the limit a close past the budget threw but left the host and its
 browser running and the host referenced, so a suite that went on after the error never exited. Firefox and WebKit
-run without a host and close the ordinary way, inside the 30,000 ms budget, with no kill.
+run without a host and close the ordinary way, inside the 30,000 ms budget, with no kill. `check:readme-run` closes each example's browser after the example's 20 s deadline,
+under this limit, and fails the example only when the close itself fails (2026-11-21, docs/known-bugs.md KB1703).
 
 ## GLSL programs as materials, push 1 (`@margoengine/shader/glsl-material`, 2026-11-15)
 

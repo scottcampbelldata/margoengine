@@ -126,6 +126,43 @@ test('a browser that arrives after its page deadline is closed without creating 
   assert.equal(closed, true);
 });
 
+/** A launch whose browser passes every check and whose close settles `ms` later, the way `settle` says. */
+const slowTeardown = (ms, settle) => async () => ({
+  newPage: async () => ({
+    goto: async () => {},
+    waitForFunction: async () => {},
+    waitForTimeout: async () => {},
+    evaluate: async () => [],
+    close: async () => {},
+  }),
+  close: () => new Promise((resolve, reject) => setTimeout(() => settle(resolve, reject), ms)),
+});
+
+test('a browser the OS tears down after the example deadline does not fail an example whose checks passed', async () => {
+  // Under load Windows finishes with an ended Chromium seconds late (KB1703); the old runner counted that against the
+  // example's own deadline and failed it "while closing browser". The close has its own bounded limit instead.
+  const pages = { origin: 'http://example.test' };
+  const result = await runInPage({ id: 'runner-test/slow-teardown', code: 'export {}' }, pages, {
+    timeout: 50,
+    launch: slowTeardown(200, (resolve) => resolve()),
+  });
+  assert.equal(result.result, 'pass', result.reason);
+  assert.equal(pages.failed, undefined, 'a slow teardown does not stop the run');
+});
+
+test('a browser close that hangs past its own limit fails the example and names what was killed', async () => {
+  const pages = { origin: 'http://example.test' };
+  const killed = Object.assign(new Error('browser close passed its 20000 ms limit; killed browser host 11 and browser 12'), {
+    code: 'SHUTDOWN_TIMEOUT',
+  });
+  const result = await runInPage({ id: 'runner-test/hung-teardown', code: 'export {}' }, pages, {
+    timeout: 50,
+    launch: slowTeardown(100, (_, reject) => reject(killed)),
+  });
+  assert.equal(result.result, 'fail');
+  assert.match(result.reason, /Every check passed; closing its browser failed: .*killed browser host 11 and browser 12/);
+});
+
 test('loader rendering and resolver examples choose one host, and OBJ examples fetch mesh bytes', () => {
   const examples = readmeEntries(readFileSync('packages/loaders/README.md', 'utf8')),
     render = examples.find(({ heading }) => heading === 'Optional vertex color and opacity rendering');
