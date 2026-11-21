@@ -18,7 +18,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-upscale/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5345, strictPort: true, watch: null },
+  server: { host: '127.0.0.1', port: 5345, strictPort: true, watch: null, hmr: false },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5345 });
@@ -139,7 +139,12 @@ try {
   const split = await page.evaluate(() => {
     const camera = window.t.engine.camera;
     try {
-      window.t.engine.render({ views: [{ camera, viewport: [0, 0, 0.5, 1] }, { camera, viewport: [0.5, 0, 0.5, 1] }] });
+      window.t.engine.render({
+        views: [
+          { camera, viewport: [0, 0, 0.5, 1] },
+          { camera, viewport: [0.5, 0, 0.5, 1] },
+        ],
+      });
       return 'drawn';
     } catch (error) {
       return String(error.message);

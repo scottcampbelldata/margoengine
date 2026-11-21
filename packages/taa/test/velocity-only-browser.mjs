@@ -19,7 +19,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-velocity-only/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5346, strictPort: true, watch: null },
+  server: { host: '127.0.0.1', port: 5346, strictPort: true, watch: null, hmr: false },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5346 });

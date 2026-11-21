@@ -15,23 +15,31 @@ const fixtures = {
   '/image.png': [resolve(root, '../physics2d/tests/fixtures/outline/donut.png'), 'image/png'],
   '/font.woff2': [resolve(root, '../../site/fonts/SourceSans3-latin.woff2'), 'font/woff2'],
 };
-const resourceServer=createHTTPServer(async(request,response)=>{
-  response.setHeader('Access-Control-Allow-Origin','*');
-  if(request.url==='/fonts.css'||request.url==='/nested/fonts.css') {
-    response.setHeader('Content-Type','text/css');
-    response.end(request.url==='/fonts.css'?'@import url("nested/fonts.css");':
-      '@font-face {font-family:InlineSource;src:url("../font.woff2") format("woff2");font-weight:100 900;}');
-  } else if(fixtures[request.url]) {
-    const [file,type]=fixtures[request.url];response.setHeader('Content-Type',type);response.end(await readFile(file));
-  } else {response.statusCode=404;response.end();}
+const resourceServer = createHTTPServer(async (request, response) => {
+  response.setHeader('Access-Control-Allow-Origin', '*');
+  if (request.url === '/fonts.css' || request.url === '/nested/fonts.css') {
+    response.setHeader('Content-Type', 'text/css');
+    response.end(
+      request.url === '/fonts.css'
+        ? '@import url("nested/fonts.css");'
+        : '@font-face {font-family:InlineSource;src:url("../font.woff2") format("woff2");font-weight:100 900;}',
+    );
+  } else if (fixtures[request.url]) {
+    const [file, type] = fixtures[request.url];
+    response.setHeader('Content-Type', type);
+    response.end(await readFile(file));
+  } else {
+    response.statusCode = 404;
+    response.end();
+  }
 });
-await new Promise(resolve=>resourceServer.listen(0,'127.0.0.1',resolve));
+await new Promise((resolve) => resourceServer.listen(0, '127.0.0.1', resolve));
 await mkdir(results, { recursive: true });
 const server = await createServer({
   plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
-  server: { port: 0 },
+  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
 });
 await server.listen();
 let browser;
@@ -44,7 +52,9 @@ try {
   const page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 });
   page.setDefaultTimeout(120000);
   if (compatRun()) await page.addInitScript(compatShim, compatUrl());
-  await page.addInitScript(url=>{window.htmlResourceOrigin=url;},`http://127.0.0.1:${resourceServer.address().port}`);
+  await page.addInitScript((url) => {
+    window.htmlResourceOrigin = url;
+  }, `http://127.0.0.1:${resourceServer.address().port}`);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -59,8 +69,11 @@ try {
   const report = await page.evaluate(() => window.runHTMLTests());
   report.browser = browser.version();
   assert.deepEqual(errors, []);
-  await writeFile(resolve(results, compatRun() ? 'html-browser-compat.json' : 'html-browser.json'), JSON.stringify(report, null, 2));
+  await writeFile(
+    resolve(results, compatRun() ? 'html-browser-compat.json' : 'html-browser.json'),
+    JSON.stringify(report, null, 2),
+  );
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await closeAll({ browser, servers: [server,resourceServer] });
+  await closeAll({ browser, servers: [server, resourceServer] });
 }

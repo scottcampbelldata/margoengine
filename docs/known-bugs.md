@@ -5582,7 +5582,7 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   test:gpu:flare's own arguments and of --record, and the script's text; no GPU), which fails on the old script.
 - **Landed:** fe59e4dbe.
 
-### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
+### Fixed 2026-11-20: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 
 - **Repro:** on the AMD mini PC, with two other helpers testing, `decoders test:browser` (packages/decoders/scripts/test-browser.js)
   failed once with page console errors only: `WebSocket connection to 'ws://127.0.0.1:61962/?token=...' failed: ...
@@ -5594,10 +5594,11 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   `createServer` with HMR on) is in the browser scripts of audio, bvh, controls (3), creative, decoders (4), environment,
   exporters (3), html, labels, lines, loaders (2), mesh-edit, mixer, physics (2), points, post (4), taa (8) and text (3);
   `scripts/browser.js` keeps its socket on purpose (it counts full reloads).
-- **Fix (not landed):** `server: { host: '127.0.0.1', port: 0, hmr: false, watch: null }` as cache's, the README runner's
-  and the visual suites' servers have, with a root check that every package browser script's Vite server turns HMR off.
-  Blocked on this machine: a decoders change runs decoders' AVIF and Draco `cargo test`, which need the MSVC linker
-  (the landing notes); the fix and its check go together, so they land on the workstation or after Build Tools are installed here.
+- **Fix:** every package browser script that starts a Vite server (44 of them, found by a search of `packages/`) now passes
+  `server: { host: '127.0.0.1', port: ..., hmr: false, watch: null }`, as cache's, the README runner's and the visual suites'
+  servers have; `scripts/browser.js` keeps its socket on purpose and is not touched.
+- **Regression:** `tests/vite-test-servers-no-hmr.test.js` fails on any package script that imports Vite's `createServer`
+  without `hmr: false`.
 
 ### Fixed 2026-11-12: Radeon 680M, biomes flythrough on the WebGL2 layer took 0.5 to 0.75 s a frame (AMD GPU hunt row 34)
 

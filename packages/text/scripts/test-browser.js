@@ -14,7 +14,7 @@ await mkdir(results, { recursive: true });
 const server = await createServer({
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
-  server: { port: 0 },
+  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
   // No file watcher: a rebuild of a served dist (core, loaders, text) mid-suite would reload the page.
   plugins: [noFileWatcher()],
 });
