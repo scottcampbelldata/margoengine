@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-20: the sheen albedo test needed a commit that only the private history has (KB-SHEEN-HISTORY1, materials)
+
+- **Repro (before):** `node --test packages/materials/test/sheen-albedo-fit.test.js` failed on public main in every
+  checkout: "the GPU check reference is the pinned closed form the table replaced" ran
+  `git show 5cef0a120^:packages/shared/sheen.js`, and that commit is not in the public repository (public main
+  arrived as a squashed sync).
+- **Cause:** the test read its reference out of git history, which a repository's own tests cannot rely on.
+- **Fix:** the test holds a literal copy of the closed-form albedo the table replaced and compares
+  `closedFormAlbedoWGSL` (scripts/sheen-albedo-fit.mjs) with it, byte for byte as before; the other assertions
+  (the shipped table differs from it, the GPU check takes no reference from history) are unchanged. No tolerance moved.
+  The other tests that run `git show` use `HEAD` or commits present here.
+- **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
+  or is swapped for another revision.
+
 ### Open 2026-11-19: ambient occlusion no longer darkens the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter, post, scenes)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (WebGPU or `MARGO_COMPAT=1`) fails
