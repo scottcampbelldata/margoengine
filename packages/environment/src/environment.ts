@@ -1011,7 +1011,8 @@ export class Environment implements EnginePlugin {
       if (source.texture.width !== this.settings.size)
         throw new RangeError('Environment setSource texture changed size; create a new Environment for the new size');
       const device = target ? deviceOf(target) : this.engine?.gpu;
-      if (!device) throw new MargoError('state', 'Environment setSource needs the device to use; pass it as the target');
+      if (!device)
+        throw new MargoError('state', 'Environment setSource needs the device to use; pass it as the target');
       this.source = source;
       relend(this.cubeSlot, source.texture, device);
       if (this.resources?.device === device) return this.refresh();

@@ -80,7 +80,11 @@ try {
     out.lostTwice = { reported: reported.length, device: environment.device };
     environment.dispose();
     // A live source: its texture is the current device's.
-    const live = { get texture() { return (live.on === engine.gpu ? live.t : (live.t = cube((live.on = engine.gpu)))); } };
+    const live = {
+      get texture() {
+        return live.on === engine.gpu ? live.t : (live.t = cube((live.on = engine.gpu)));
+      },
+    };
     const alive = await Environment.attach(engine, live);
     await restore();
     out.live = { problems: [...problems], reported: reported.length, device: alive.device === engine.gpu };
@@ -88,7 +92,11 @@ try {
     return out;
   });
   assert.equal(report.first, true, 'the environment is built on its device');
-  assert.deepEqual(report.lost.problems, [], 'nothing of the lost texture is used: no validation error, no thrown frame');
+  assert.deepEqual(
+    report.lost.problems,
+    [],
+    'nothing of the lost texture is used: no validation error, no thrown frame',
+  );
   assert.equal(report.lost.reported.length, 1, `reported once: ${JSON.stringify(report.lost.reported)}`);
   assert.match(report.lost.reported[0], /^state Environment source texture lost with the device; .*#borrowed-lost/);
   assert.equal(report.lost.device, null, 'the environment reads as restoring, so lighting binds none');
