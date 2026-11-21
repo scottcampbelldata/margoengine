@@ -19,7 +19,7 @@ export interface AutoExposure {
         y?: number;
         radius?: number;
     };
-    mask?: GPUTexture;
+    mask?: GPUTexture | ((device: GPUDevice) => GPUTexture);
 }
 
 export interface CubeLUT {
