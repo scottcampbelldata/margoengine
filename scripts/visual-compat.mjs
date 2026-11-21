@@ -210,7 +210,7 @@ async function writeDoc(rows, environment) {
       old,
       rows.map((r) => r.id),
       only.length > 0,
-      `Last recorded ${day} at ${environment.commit} on ${environment.gpu} (${environment.browser}); a row not rerun then keeps the numbers of its last run on the same machine; a row with its own stamp in the last column was rerun alone, later.`,
+      `Last recorded ${day} at ${environment.commit} on ${environment.gpu} (${environment.browser}); a row not rerun then keeps the numbers of its last run on the same machine; a row with its own stamp in the last two columns was rerun alone, later (pixels and frames each have their own stamp).`,
       stamp,
     );
   });
