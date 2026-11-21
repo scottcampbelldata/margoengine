@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17380137,
+  "total": 17381220,
   "history": [
     {
       "date": "2026-10-24",
@@ -11277,6 +11277,12 @@
       "commit": "edca72555",
       "reason": "KB-ENVDECODERS2: the decoders are separate files (hdr, exr, ultrahdr, parse-image, load) so loadEnvironmentImage loads one; exr and ultrahdr each bundle their own toBytes and MAX_PIXELS, so the root grew 32,706 to 33,335 B and /loaders 11,713 to 11,985 B. New /load entry 11,567 B counts all three lazy decoders; an app loading one format requests 1,069 B plus that decoder (hdr 8,772 B, exr 23,708 B, ultrahdr 5,600 B raw). A shared chunk would make a .hdr load fetch the others' common code.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "8811bda81",
+      "reason": "react named-Scene bindings (GAP-REACT-SCENEPLUGINS): react root 11,246 to 11,302 B (+56, a Scene makes its own shadows), react/post 4,243 to 4,365 B (+122, the stack, effects, DepthTexture and SceneTargets attach inside the enclosing scene and skip the default scene models), react/ui 2,992 to 3,045 B (+53, SpriteLayer and Figure attach inside the scene); each is a few lines per binding, a split would cost more than it saves",
+      "grew": 3
     }
   ],
   "items": {
@@ -12136,7 +12142,7 @@
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
-    "@margoengine/react": 11246,
+    "@margoengine/react": 11642,
     "@margoengine/react/accumulative-shadows": 4230,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
@@ -12166,7 +12172,7 @@
     "@margoengine/react/physics": 6462,
     "@margoengine/react/points": 1460,
     "@margoengine/react/portals": 3977,
-    "@margoengine/react/post": 4243,
+    "@margoengine/react/post": 4621,
     "@margoengine/react/sampler": 4377,
     "@margoengine/react/selection": 1412,
     "@margoengine/react/shadows": 4484,
@@ -12177,7 +12183,7 @@
     "@margoengine/react/text": 4383,
     "@margoengine/react/textures": 4940,
     "@margoengine/react/tonemap": 1156,
-    "@margoengine/react/ui": 2992,
+    "@margoengine/react/ui": 3301,
     "@margoengine/react/viewcube": 1288,
     "@margoengine/react/voxel": 2200,
     "@margoengine/react/xr": 4415,

@@ -335,3 +335,50 @@ test('FBX load errors report through both component and Canvas callbacks without
   assert.deepEqual(errors, [failure, failure]);
   assert.match(view.getByRole('alert').textContent, /Invalid native FBX/);
 });
+
+test('Shadows inside a named <Scene> shadow that scene, apart from the Canvas shadows, and leave with it', async () => {
+  const made = [];
+  mock.module('@margoengine/shadows', {
+    namedExports: {
+      Shadows: class {
+        static attach(engine) {
+          const effect = new this();
+          effect.owner = engine;
+          effect.name = 'shadows:' + made.length;
+          effect.options = {};
+          effect.disposed = false;
+          engine.use(effect);
+          made.push(effect);
+          return effect;
+        }
+        dispose() {
+          this.disposed = true;
+        }
+      },
+    },
+  });
+  const { Scene } = await import('@margoengine/react');
+  const { Shadows } = await import('@margoengine/react/shadows');
+  const view = render(
+    React.createElement(
+      StrictMode,
+      null,
+      React.createElement(
+        Canvas,
+        null,
+        React.createElement(Scene, { name: 'item' }, React.createElement(Shadows, { mapSize: 512 })),
+      ),
+    ),
+  );
+  await flush();
+  await flush();
+  const engine = engines.at(-1),
+    item = worlds.findLast((value) => value.name === 'item');
+  assert.equal(made.length, 1, 'one shadows, for the Scene alone');
+  assert.ok(item.plugins.get(made[0].name) === made[0], 'the shadows are in the named scene');
+  assert.ok(!engine.plugins.has(made[0].name), 'the default scene does not hold them');
+  assert.equal(made[0].options.mapSize, 512, 'its options apply');
+  view.unmount();
+  await flush();
+  assert.equal(made[0].disposed, true, 'unmount disposes them');
+});

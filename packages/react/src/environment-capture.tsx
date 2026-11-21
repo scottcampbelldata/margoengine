@@ -7,6 +7,7 @@ import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cu
 import { descendant } from './cube-camera.js';
 import { LightformerPending } from './lightformer.js';
 import { live, report, useMesh, useScene } from './internal.js';
+import { sceneOwner } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 
 // Loaded by `<Environment>` only when it has children (import() in environment.tsx), so an app with an Environment
@@ -128,7 +129,7 @@ export function EnvironmentCapture({
             creating = false;
             if (!active || scene.engine.disposed) return value.dispose();
             environment = value;
-            scene.engine.use(value as unknown as EnginePlugin);
+            sceneOwner(scene).use(value as unknown as EnginePlugin);
             publish({ environment: value, api: module });
           })
           .catch((error) => {
@@ -157,7 +158,7 @@ export function EnvironmentCapture({
       scene.frames.callbacks.delete(frame);
       publish(null);
       if (environment) {
-        if (!scene.engine.disposed && scene.engine.hasPlugin(environment.name)) scene.engine.removePlugin(environment.name);
+        if (!scene.engine.disposed && sceneOwner(scene).plugins.has(environment.name)) sceneOwner(scene).removePlugin(environment.name);
         environment.dispose();
       }
       cube?.dispose();

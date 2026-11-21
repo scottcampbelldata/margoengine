@@ -13255,7 +13255,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   scene, not the default one").
 - **Follow-up:** the other plugin bindings are fixed under GAP-REACT-SCENEPLUGINS, next entry.
 
-### Fixed 2026-11-20: react bindings other than models attached to the default scene inside `<Scene>`, `<Hud>` and `<RenderTexture>` (GAP-REACT-SCENEPLUGINS, react)
+### Fixed 2026-11-21: react bindings other than models attached to the default scene inside `<Scene>`, `<Hud>` and `<RenderTexture>` (GAP-REACT-SCENEPLUGINS, react)
 
 - **Repro (before):** `<Sky>`, `<Clouds>`, `<Text>`, `<BatchedMesh>`, `<Voxels>` or another binding that called
   `engine.use` or `X.attach(engine)` directly, placed inside `<Scene name="item">`, landed in the default scene, so the
@@ -13270,11 +13270,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/react/tests/kit-helpers.test.js ("Sky and Text inside a named <Scene>"),
   packages/react/tests/extras.test.js ("BatchedMesh and Voxels inside a <Scene>") and
   packages/react/tests/clouds.test.js ("Clouds inside a named <Scene>", on a real core scene).
-- **Still open (left on the engine on purpose or for a separate change):** the Canvas-wide bindings (Shadows, the post
-  stack and its targets, Html, devtools, picking, XR pointers, the audio listener, SpriteLayer, Figure, GizmoHelper's
-  ViewCube, CameraShake) and the environment bindings (`<Environment>`, CubeCamera, environment capture), which another
-  change is editing for KB-REACT-ENVDECODERS1. ContactShadows, AmbientShadows, Caustics, outlines, Animation, Physics and
-  the Clouds depth have no named-scene test of their own; they use the helpers the three tests above cover.
+- **Second change (2026-11-21), the rest:** `<Environment>` (its lighting, background, captured children and the
+  default sun and ambient it writes), `<CubeCamera>` (its `envMap` background and private fog) and the environment
+  capture attach to, and write the lighting of, the enclosing scene (`sceneOwner`), and leave the Canvas's glTF models
+  alone inside a named Scene. `<DepthTexture>`, `<SceneTargets>`, the `<EffectComposer>` stack and its effects,
+  `<SpriteLayer>` and `<Figure>` attach with `inScene`. `<Shadows>` and `<SoftShadows>` inside a `<Scene>` make that
+  scene's own cascaded shadows (`useSceneShadows`, packages/react/src/scene-shadows.ts); a mesh's `castShadow` and
+  `receiveShadow` in that scene go to them, where they went to the default scene's shadows before.
+- **Canvas-wide on purpose (documented in the react README, "Views and scenes"):** `<Html>` is one DOM overlay per
+  canvas; the devtools (`<Stats>`, the inspector) read the engine, not one scene; picking and XR pointers route one
+  pointer to whichever scene's mesh it hits (`engine.meshes` holds every scene's meshes, so XR pointers and Controller
+  already reach a mesh in a named Scene); the audio listener is one per canvas and follows the camera; the ViewCube is
+  an overlay of one camera; `<CameraShake>` moves the Canvas camera. None of these draws into or reads a single scene.
+- **Regression (second change):** packages/react/tests/lightformer.test.js ("Environment inside a named <Scene>"),
+  cube-camera.test.js ("CubeCamera inside a named <Scene>", private fog), extras.test.js ("DepthTexture and
+  SceneTargets inside a <Scene>", "SpriteLayer and Figure inside a <Scene>"), post.test.js ("an EffectComposer inside a
+  <Scene>") and scene-loaders.test.js ("Shadows inside a named <Scene>").
+- **Still open:** nothing. ContactShadows, AccumulativeShadows, Caustics, outlines, Animation and Physics have no
+  named-scene test of their own; they use the helpers the tests above cover.
 
 ### Fixed 2026-11-16: `AmbientLight`, `HemisphereLight` and `Fog` inside a `<Scene>` lit the default scene (KB-REACT-SCENELIGHT1, react)
 

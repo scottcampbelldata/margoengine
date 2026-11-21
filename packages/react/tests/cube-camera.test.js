@@ -148,3 +148,30 @@ test('CubeCamera refuses a frame count that is not a positive integer', async ()
   for (const frames of [0, 1.5, -1])
     assert.throws(() => render(tree(h(CubeCamera, { frames }))), /CubeCamera frames must be a positive integer or Infinity/);
 });
+
+test('CubeCamera inside a named <Scene> leaves its group out of its cube and keeps its private fog in that scene', async () => {
+  const { scene, engine, errors, tree } = await context();
+  const world = engine.createScene('item');
+  scene.world = world;
+  const view = render(
+    tree(
+      h(CubeCamera, { resolution: 64, frames: 1, fog: { far: 20 } }, () =>
+        h(Mesh, { position: [0, 1, 0] }, h(BoxGeometry)),
+      ),
+    ),
+  );
+  await settle();
+  await settle();
+  await act(async () => advanceFrames(scene.frames, engine, 1 / 60));
+  await settle();
+  assert.deepEqual(errors, []);
+  const native = made.find((c) => !c.disposed);
+  assert.equal(native.updates.length, 1, 'the cube captures a frame');
+  assert.equal(native.updates[0].exclude.length, 2, 'the group and its child, both in the named scene, are left out');
+  const fogs = (plugins) => [...plugins.values()].filter((p) => p.name?.startsWith('cube-camera-fog'));
+  assert.equal(fogs(world.plugins).length, 1, 'the private fog is in the named scene');
+  assert.equal(fogs(engine.scene.plugins).length, 0, 'not in the default scene');
+  view.unmount();
+  await settle();
+  assert.equal(fogs(world.plugins).length, 0, 'unmount removes it');
+});

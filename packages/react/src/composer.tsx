@@ -15,6 +15,7 @@ import type { FXAA as FXAAEffect } from '@margoengine/post/fxaa';
 import type { Glitch as GlitchEffect, GlitchOptions } from '@margoengine/post/glitch';
 import type { Afterimage as AfterimageEffect, AfterimageOptions } from '@margoengine/post/afterimage';
 import type { PostStack } from '@margoengine/post/stack';
+import { inScene } from './scene-owner.js';
 import { useScene, useCommit, useResourceEffect, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { fault, typeError } from '../../shared/errors.js';
@@ -303,7 +304,8 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
           binding.remove();
           record.sources.delete(model);
         } else binding.refresh?.();
-      for (const model of scene.resources.models)
+      // The Canvas's models stay in the default scene, so a named Scene's effects take none.
+      for (const model of scene.world ? [] : scene.resources.models)
         if (!model.disposed && !record.sources.has(model)) {
           if (kind !== 'taa')
             record.sources.set(model, {
@@ -456,9 +458,11 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
             made.push({ pass, effect: new Effect(options as never), options, sources: new Map(), stacked: true });
           }
           attaching = undefined;
-          stack = Stack!.attach(
-            scene.engine as unknown as EngineKernel,
-            made.map((r) => r.effect),
+          stack = inScene(scene, () =>
+            Stack!.attach(
+              scene.engine as unknown as EngineKernel,
+              made.map((r) => r.effect),
+            ),
           );
         } catch (failure) {
           for (const record of made) record.effect.dispose();
@@ -472,7 +476,9 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
           record = records.get(pass.kind);
         if (record) update(record, pass, options);
         else {
-          const effect = classes.get(pass.kind)!.attach(scene.engine as unknown as EngineKernel, options as never);
+          const effect = inScene(scene, () =>
+            classes.get(pass.kind)!.attach(scene.engine as unknown as EngineKernel, options as never),
+          );
           created({ pass, effect, options, sources: new Map() });
         }
       }

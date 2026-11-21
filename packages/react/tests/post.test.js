@@ -868,3 +868,43 @@ test('post components require their composer and composer requires a scene', () 
   assert.throws(() => renderToString(h(Bloom)), /require <EffectComposer>/);
   assert.throws(() => renderToString(h(EffectComposer)), /require <Canvas>/);
 });
+
+test('an EffectComposer inside a <Scene> attaches its effects to that scene and leaves the default scene models alone', async () => {
+  const value = scene(),
+    engine = value.engine,
+    base = { use: engine.use, removePlugin: engine.removePlugin, hasPlugin: engine.hasPlugin },
+    world = { plugins: new Map() };
+  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
+  let active = null;
+  engine.use = (effect) => (active ? active.use(effect) : base.use.call(engine, effect));
+  engine.hasPlugin = (name) => base.hasPlugin(name) || world.plugins.has(name);
+  engine.removePlugin = (name) => (base.hasPlugin(name) ? base.removePlugin(name) : world.removePlugin(name));
+  Object.assign(world, {
+    use(effect) {
+      this.plugins.set(effect.name, effect);
+      const outer = active;
+      active = this;
+      try {
+        effect.setup?.(engine);
+      } finally {
+        active = outer;
+      }
+      return this;
+    },
+    removePlugin(name) {
+      const effect = this.plugins.get(name);
+      this.plugins.delete(name);
+      effect?.dispose?.();
+    },
+  });
+  value.world = world;
+  value.resources.models.add(model());
+  const view = render(tree(value, [h(Bloom, { key: 'b' }), h(SSAO, { key: 's' })]));
+  await flush();
+  assert.equal(engine.plugins.size, 0, 'nothing in the default scene');
+  assert.deepEqual([...world.plugins.keys()].sort(), ['bloom', 'post:stack', 'ssao'], 'the stack and its effects are in the named scene');
+  assert.equal(world.plugins.get('ssao').sources.size, 0, 'the default scene models are left alone');
+  view.unmount();
+  await flush();
+  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
+});

@@ -418,3 +418,95 @@ test('Voxels attaches the renderer and lighting, updates light from the frame lo
   assert.equal(lightings.at(-1), lighting, 'lighting: false attaches none');
   assert.equal(value.frames.callbacks.size, 0);
 });
+
+test('DepthTexture and SceneTargets inside a <Scene> attach to that scene and leave the default scene models alone', async () => {
+  const value = scene(),
+    world = owner({ engine: value.engine }),
+    base = value.engine.use;
+  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
+  let active = null;
+  value.engine.use = (effect) => (active ? active.use(effect) : base.call(value.engine, effect));
+  const use = world.use;
+  world.use = (effect) => {
+    const outer = active;
+    active = world;
+    try {
+      use(effect);
+      effect.setup?.(value.engine);
+    } finally {
+      active = outer;
+    }
+  };
+  world.removePlugin = (name) => {
+    const effect = world.plugins.get(name);
+    world.plugins.delete(name);
+    effect?.dispose?.();
+  };
+  value.world = world;
+  value.resources.models.add({ disposed: false });
+  const view = render(
+    tree(value, [
+      h(DepthTexture, { key: 'd' }),
+      h(SceneTargets, { key: 't', outputs: ['normal'] }),
+    ]),
+  );
+  await flush();
+  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
+  const inWorld = [...world.plugins.values()];
+  assert.deepEqual(
+    inWorld.map((plugin) => plugin.kind),
+    ['depth', 'targets'],
+    'both in the named scene',
+  );
+  for (const plugin of inWorld) assert.equal(plugin.sources.size, 0, 'the default scene models are left alone');
+  view.unmount();
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
+});
+
+test('SpriteLayer and Figure inside a <Scene> draw in that scene, not the default one', async () => {
+  mock.module('@margoengine/sprites', { namedExports: { SpriteLayer: plugin('sprites') } });
+  mock.module('@margoengine/sciviz', { namedExports: { Figure: plugin('figure', { ready: async () => {} }) } });
+  const { SpriteLayer, Figure } = await import('@margoengine/react/ui');
+  const value = scene(),
+    world = owner({ engine: value.engine }),
+    base = value.engine.use;
+  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
+  let active = null;
+  value.engine.use = (effect) => (active ? active.use(effect) : base.call(value.engine, effect));
+  const use = world.use;
+  world.use = (effect) => {
+    const outer = active;
+    active = world;
+    try {
+      use(effect);
+      effect.setup?.(value.engine);
+    } finally {
+      active = outer;
+    }
+  };
+  world.removePlugin = (name) => {
+    const effect = world.plugins.get(name);
+    world.plugins.delete(name);
+    effect?.dispose?.();
+  };
+  value.world = world;
+  const view = render(
+    tree(value, [
+      h(SpriteLayer, { key: 's', atlas: { width: 1, height: 1, data: new Uint8Array(4) } }),
+      h(Figure, { key: 'f' }),
+    ]),
+  );
+  await flush();
+  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
+  assert.deepEqual(
+    [...world.plugins.values()].map((plugin) => plugin.kind),
+    ['sprites', 'figure'],
+    'both in the named scene',
+  );
+  view.unmount();
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
+});
