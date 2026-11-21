@@ -1,7 +1,7 @@
 import { createContext, forwardRef, useContext, useEffect, useRef } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { Lightformer as NativeLightformer, LightformerForm } from '@margoengine/environment/lightformer';
-import type { ColorInput } from '@margoengine/environment';
+import type { ColorInput } from '@margoengine/environment/main';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { live, report, useMesh, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';

@@ -2,8 +2,8 @@ import { Children, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import type { EngineKernel } from '@margoengine/core';
 import type { EnginePlugin } from '@margoengine/core/extension';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf/pbr';
-import type * as EnvironmentModule from '@margoengine/environment';
-import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
+import type * as EnvironmentModule from '@margoengine/environment/main';
+import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment/main';
 import { preloadAsset, retainAsset } from './assets.js';
 import { environmentAsset } from './environment-asset.js';
 import { Mesh } from './components.js';

@@ -1307,7 +1307,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,938 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,942 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -13219,19 +13219,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that scene, not the default one"), and on a real GPU, natively and with MARGO_COMPAT=1,
   `npm run test:browser:reflections --workspace @margoengine/react -- --mode=scene-fog` (centre green; grey before).
 
-### Open 2026-11-16: react's lazy environment bindings fetch the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
+### Fixed 2026-11-20: react's lazy environment bindings fetched the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
 
 - **Repro:** build an app with Vite from the workspace that renders `<AmbientLight>`, `<Fog>`, `<CubeCamera>` or an
-  `<Environment>` with children and no `src` (`@margoengine/react/environment`). Vite prints
-  `INEFFECTIVE_DYNAMIC_IMPORT` for `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load holds
-  the Radiance HDR, OpenEXR and UltraHDR decoders (environment `dist/loaders.js`, 36 KB raw) although none of them reads
-  an image file. A packed install prints no warning but builds the same chunk.
-- **Cause:** each binding loads the whole environment root, `import('@margoengine/environment')`, whose `index.js`
-  re-exports `loaders.js` beside `main.js`. Taking the namespace keeps every export, so the decoders join the chunk and
-  `EnvironmentLighting.load`'s own `import('./loaders.js')` split cannot happen. Only `<Environment src>` needs them.
-- **Fix needed:** a path to the environment classes without the decoders for the bindings that read no file (an entry
-  of the environment package, or imports the bundler can trim), then drop the expected warning in react
-  `tests/subpaths.test.js` ("an Environment without children ..."), which fails once the warning is gone.
+  `<Environment>` with children and no `src` (`@margoengine/react/environment`). Vite printed
+  `INEFFECTIVE_DYNAMIC_IMPORT` for `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load held
+  the Radiance HDR, OpenEXR and UltraHDR decoders (36 KB raw) although none of them reads an image file.
+- **Cause:** each binding loaded the whole environment root, `import('@margoengine/environment')`, whose `index.js`
+  re-exports `loaders.js` beside `main.js`. Taking the namespace keeps every export, so the decoders joined the chunk.
+- **Fix:** the environment package exports its two built files, `@margoengine/environment/main` (all but the decoders) and
+  `/loaders` (the decoders); react's bindings import `/main`, and only the `src` load (`environment-asset.ts`) also
+  imports `/loaders`. The `margoengine` umbrella and kits mirror both entries (`scripts/umbrella.mjs`).
+- **Test:** react `tests/subpaths.test.js` "the bindings that read no environment file bundle none of the image
+  decoders" (fails on the old imports: decoders in the build, plus the warning), and "an Environment without children
+  ..." now runs with no expected warning and checks the decoders stay off the initial chunk graph.
 
 ### Fixed 2026-11-16: an `<Environment>` app bundled CubeCamera, Lightformer and the children capture up front (KB-REACT-PURE1, react)
 

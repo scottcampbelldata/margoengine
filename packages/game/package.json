@@ -1211,6 +1211,14 @@
       "types": "./dist/environment/exr-codecs.d.ts",
       "import": "./dist/environment/exr-codecs.js"
     },
+    "./environment/main": {
+      "types": "./dist/environment/main.d.ts",
+      "import": "./dist/environment/main.js"
+    },
+    "./environment/loaders": {
+      "types": "./dist/environment/loaders.d.ts",
+      "import": "./dist/environment/loaders.js"
+    },
     "./fsm": {
       "types": "./dist/fsm.d.ts",
       "import": "./dist/fsm.js"

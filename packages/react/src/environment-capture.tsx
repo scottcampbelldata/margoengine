@@ -1,8 +1,8 @@
 import { useContext, useEffect, useRef } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { EnginePlugin, Mesh as EngineMesh } from '@margoengine/core/extension';
-import type * as EnvironmentModule from '@margoengine/environment';
-import type { ColorBackground, Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
+import type * as EnvironmentModule from '@margoengine/environment/main';
+import type { ColorBackground, Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment/main';
 import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cube-camera';
 import { descendant } from './cube-camera.js';
 import { LightformerPending } from './lightformer.js';
@@ -54,7 +54,7 @@ export function EnvironmentCapture({
     let active = true,
       value: CaptureBackground | undefined;
     if (wantsSource && !source) return;
-    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment'))
+    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main'))
       .then((api) => {
         if (!active) return;
         value = source
@@ -141,7 +141,7 @@ export function EnvironmentCapture({
     };
     void Promise.all([
       optionalPeer('@margoengine/environment', () => import('@margoengine/environment/cube-camera')),
-      optionalPeer('@margoengine/environment', () => import('@margoengine/environment')),
+      optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main')),
     ])
       .then(([cubeApi, environmentApi]) => {
         if (!active || scene.engine.disposed) return;

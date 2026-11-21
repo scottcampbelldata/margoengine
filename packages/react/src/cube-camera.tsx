@@ -2,8 +2,8 @@ import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cube-camera';
-import type * as EnvironmentModule from '@margoengine/environment';
-import type { EnvironmentBackground, Fog as FogPlugin, FogOptions } from '@margoengine/environment';
+import type * as EnvironmentModule from '@margoengine/environment/main';
+import type { EnvironmentBackground, Fog as FogPlugin, FogOptions } from '@margoengine/environment/main';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { live, report, useMesh, useResourceEffect, useScene, type Scene } from './internal.js';
 import { retainAsset } from './assets.js';
@@ -157,7 +157,7 @@ function CubeBinding({ settings, publish }: { settings: Settings; publish: (text
   useEffect(() => {
     if (!wantsFog) return;
     let active = true;
-    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment'))
+    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main'))
       .then((api) => {
         if (active) fogApi.current = api;
       })

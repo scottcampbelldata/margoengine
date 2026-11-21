@@ -604,11 +604,6 @@ test('an Environment without children loads none of the capture binding, CubeCam
         `import {createElement as h} from 'react';
   import {Environment${children ? ',Lightformer' : ''}} from '@margoengine/react/environment';
   export const App=()=>h(Environment,{src:'studio.hdr'}${children ? ',h(Lightformer)' : ''});`,
-        // Open in docs/known-bugs.md: the environment root re-exports its decoders, so react's lazy import of it
-        // keeps them with it. This fails once that is fixed; then drop the expectation.
-        [
-          '[INEFFECTIVE_DYNAMIC_IMPORT] environment/dist/loaders.js is dynamically imported by environment/dist/main.js but also statically imported by environment/dist/index.js, dynamic import will not move module into another chunk.',
-        ],
       );
       const initial = staticChunks(outputs)
           .map((chunk) => chunk.code)
@@ -618,7 +613,38 @@ test('an Environment without children loads none of the capture binding, CubeCam
         assert.equal(initial.includes(marker), false, `${name}: ${marker} stays off the initial chunk graph`);
       assert.ok(code.includes('function EnvironmentCapture('), `${name}: the capture binding is a lazy chunk`);
       assert.equal(code.includes('function Lightformer('), children, `${name}: Lightformer is emitted only when used`);
+      // The src file needs a decoder, but only on demand: none is on the initial chunk graph.
+      assert.ok(code.includes('Invalid HDR: '), `${name}: the src environment loads its decoders`);
+      assert.equal(initial.includes('Invalid HDR: '), false, `${name}: the decoders stay off the initial chunk graph`);
     }
+  }));
+
+test('the bindings that read no environment file bundle none of the image decoders (KB-REACT-ENVDECODERS1)', async () =>
+  temporary(async (directory) => {
+    // Each binding took the whole environment root, which re-exports the Radiance HDR, OpenEXR and UltraHDR decoders
+    // (36 KB raw), so a build kept them (and Vite warned) for an app that lights from colours alone. They load
+    // @margoengine/environment/main now; bundle() fails on any warning, which covers the ineffective dynamic import.
+    const outputs = await bundle(
+      directory,
+      'environment-no-file',
+      `import {createElement as h} from 'react';
+  import {Environment,CubeCamera,Lightformer,AmbientLight,Fog} from '@margoengine/react/environment';
+  export const App=()=>h(Environment,null,h(Lightformer),h(CubeCamera),h(AmbientLight),h(Fog));`,
+    );
+    // The decoders stay a chunk of their own (EnvironmentLighting.load imports it on a first URL, which none of
+    // these bindings calls): no initial chunk and no chunk of the environment classes holds them.
+    const decoders = outputs.filter((chunk) => chunk.type === 'chunk' && chunk.code.includes('Invalid HDR: '));
+    assert.ok(decoders.length > 0, 'the decoders are emitted as a lazy chunk');
+    assert.equal(
+      decoders.some((chunk) => chunk.code.includes('is disposed; create a new one')),
+      false,
+      'the decoders share no chunk with the environment classes',
+    );
+    assert.equal(
+      staticChunks(outputs).some((chunk) => decoders.includes(chunk)),
+      false,
+      'the decoders are on no initial chunk graph',
+    );
   }));
 
 test('module-level React factories carry a pure annotation, so unused components tree-shake', async () => {

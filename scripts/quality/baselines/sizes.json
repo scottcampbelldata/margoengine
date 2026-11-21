@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17319717,
+  "total": 17363123,
   "history": [
     {
       "date": "2026-10-24",
@@ -11247,6 +11247,12 @@
       "commit": "26db1ddf2",
       "reason": "KB-RESTORE-BORROWED1: materials Texture GPU sources, envMap and setSource take the Borrowed GPU objects rule (a function per device; a lost plain object dropped and reported once). materials 67960 to 68681 B, batched 39949 to 40027, mips 11875 to 12471, skin 15686 to 15894, soot 11377 to 11861, settings 20493 to 20747. The Texture class ships in each entry so the bytes repeat; a split would cost a second Texture class and break instanceof.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "fa9dd5ee7",
+      "reason": "new entries @margoengine/environment/main (the root minus the image decoders, 32,035 B) and /loaders (the decoders, 11,371 B): the root re-exported both, so no new code; react's bindings import /main so the decoders leave their build (KB-REACT-ENVDECODERS1)",
+      "grew": 2
     }
   ],
   "items": {
@@ -11571,6 +11577,8 @@
     "@margoengine/environment/gi": 19467,
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/lightformer": 4556,
+    "@margoengine/environment/loaders": 11713,
+    "@margoengine/environment/main": 32997,
     "@margoengine/environment/prefiltered": 4263,
     "@margoengine/environment/probes": 19322,
     "@margoengine/environment/reflector": 12251,

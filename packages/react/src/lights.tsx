@@ -5,13 +5,13 @@ import type {
   Fog as FogPlugin,
   FogOptions,
   HemisphereLight as HemispherePlugin,
-} from '@margoengine/environment';
+} from '@margoengine/environment/main';
 import { useCommit, useCreated, useModelSources, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { attachBinding } from './package-binding.js';
 
-type EnvironmentApi = typeof import('@margoengine/environment');
-const load = () => optionalPeer('@margoengine/environment', () => import('@margoengine/environment'));
+type EnvironmentApi = typeof import('@margoengine/environment/main');
+const load = () => optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main'));
 interface ErrorProps {
   /** Loading `@margoengine/environment` or attaching failed (these lights need WebGPU). */
   onError?: (error: unknown) => void;
