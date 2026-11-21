@@ -13721,7 +13721,7 @@ buffers gained COPY_SRC) to the byte, and checks each list is in ascending insta
 lod.test.js checks the three entry points and no atomics. lod-check also gained a compat branch (the WebGL2 layer draws
 every shown instance at the first level by design, so core's side does too and "every level drew" is skipped).
 
-## Batch 132 audit: input (fixed and open)
+## Batch 132 audit: input (fixed)
 
 Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on the code before the fix):
 - Chorded mouse buttons. `Input` set and cleared button bits only on `pointerdown` and `pointerup` (index.ts:179-187
@@ -13747,7 +13747,7 @@ Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on
   Caveat: the same specification's informative vehicle example gives a turn about y as `gamma`; the normative getter
   steps were followed. Not yet checked on a real phone.
 
-Open (not fixed in the audit):
+Formerly open (all closed since the audit):
 - Closed, lane L (2026-11-10): on the M6, `packages/input/test/input-browser.mjs` (and `packages/worker/tests/browser-check.mjs`)
   failed before their pixel steps because Chromium rejected `requestPointerLock` with `WrongDocumentError`. Root cause
   is outside Margo: the Mac's console was locked (`ioreg` CGSSessionScreenIsLocked true, front app
