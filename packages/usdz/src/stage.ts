@@ -376,17 +376,13 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
    */
   const byOrigin = (a: Node, b: Node) => (a.implied && b.implied && a.of && b.of ? before(a.of, b.of) : 0);
   /**
-   * Namespace depth as sibling nodes rank by it. Seen on OpenUSD (black-box prim indexes, KB1942c), the specification
-   * does not say: below the index root, a class arc authored at its node counts from that node's prim in its own stack,
-   * and one implied from an arc under a reference or payload of this prim counts from that reference's depth, also when
-   * the arc hangs from a variant that reference holds in its own stack (KB1942c part 28).
+   * Namespace depth as sibling nodes rank by it. Seen on OpenUSD (black-box prim indexes, KB1942c parts 23 and 29), the
+   * specification does not say which namespace: below the index root, a class arc, authored or implied, counts the
+   * depth of its parent node's path (variant selections left out) when it was placed there, which a node carried down
+   * to a child prim keeps. That is the depth in the parent node's own stack, not the stage prim's: an inherit implied
+   * into a stack a payload brought in at `/R/a/c/b` (4) hangs from that payload's `/M/a` and counts 2.
    */
-  const ns = (n: Node) => {
-    const o = holderOf(n.of?.parent);
-    if (!isClass(n) || !n.parent?.parent) return n.depth;
-    if (!n.implied) return n.anc ? n.depth : Math.max(n.depth, depthOf(n.parent.path));
-    return !n.anc && o && (o.kind === 'reference' || o.kind === 'payload') ? Math.max(n.depth, o.depth) : n.depth;
-  };
+  const ns = (n: Node) => (isClass(n) && n.parent?.parent ? (n.intro ?? n.depth) : n.depth);
   function attach(parent: Node, node: Node) {
     node.parent = parent;
     parent.children.push(node);
