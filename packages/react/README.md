@@ -913,7 +913,7 @@ export function Crates({ count }: { count: number }) {
 }
 ```
 
-`<RenderView>` draws the Canvas through a camera into part of it (split screen, a four-view layout, a minimap) or into a texture: `camera` (a core `Camera`; default the Canvas camera), `viewport` (fractions from the top left), `scissor`, `clear`, `layers`, `target`, `id` and `order`. With one or more views the Canvas draws only those; picking follows the view under the pointer. `<Scene name>` holds meshes drawn only by the views that name it (`<RenderView scene="hud">`), such as a HUD overlay or an item preview; `background={null}` keeps what is below. `<Mesh layers={mask}>` (a `layerMask(...)` from `@margoengine/cameras/layers`) limits which views draw a mesh. Views and scenes work on WebGPU and WebGL2.
+`<RenderView>` draws the Canvas through a camera into part of it (split screen, a four-view layout, a minimap) or into a texture: `camera` (a core `Camera`; default the Canvas camera), `viewport` (fractions from the top left), `scissor`, `clear`, `layers`, `target`, `id` and `order`. With one or more views the Canvas draws only those; picking follows the view under the pointer. `<Scene name>` holds meshes drawn only by the views that name it (`<RenderView scene="hud">`), such as a HUD overlay or an item preview; `background={null}` keeps what is below. `<Mesh layers={mask}>` (a `layerMask(...)` from `@margoengine/cameras/layers`) limits which views draw a mesh. A `<Model>`, `<Gltf>` or `<Fbx>` inside a `<Scene>` (or a `<Hud>` or `<RenderTexture>`) is built and drawn in that scene, not the default one. Views and scenes work on WebGPU and WebGL2.
 
 ```tsx
 import { Camera } from '@margoengine/core';

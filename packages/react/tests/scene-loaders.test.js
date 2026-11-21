@@ -6,8 +6,42 @@ import React, { StrictMode, Suspense } from 'react';
 
 const engines = [],
   models = [],
-  requests = [];
+  requests = [],
+  worlds = [];
 let deferred = false;
+// A named <Scene>'s world: its plugins' setup runs while it is the active scene, as core's scene plugins do.
+let active = null;
+function world(engine, name) {
+  const scene = {
+    name,
+    engine,
+    plugins: new Map(),
+    background: null,
+    disposed: false,
+    use(plugin) {
+      this.plugins.set(plugin.name, plugin);
+      const outer = active;
+      active = this;
+      try {
+        plugin.setup?.(engine);
+      } finally {
+        active = outer;
+      }
+      return this;
+    },
+    removePlugin(key) {
+      const plugin = this.plugins.get(key);
+      this.plugins.delete(key);
+      plugin?.dispose?.();
+    },
+    dispose() {
+      this.disposed = true;
+      for (const key of [...this.plugins.keys()]) this.removePlugin(key);
+    },
+  };
+  worlds.push(scene);
+  return scene;
+}
 function mesh(engine) {
   const node = {
     engine,
@@ -38,7 +72,8 @@ function mesh(engine) {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement,
+    assertCore,
+    coreRequirement,
     Engine: {
       async create(canvas) {
         const engine = {
@@ -55,6 +90,8 @@ mock.module('@margoengine/core/extension', {
             return () => this.callbacks.delete(callback);
           },
           use(plugin) {
+            // Inside a scene's setup, core adds the plugin to that scene.
+            if (active) return active.use(plugin);
             assert.ok(!this.plugins.has(plugin.name));
             this.plugins.set(plugin.name, plugin);
             return this;
@@ -73,6 +110,9 @@ mock.module('@margoengine/core/extension', {
           createMesh() {
             return mesh(this);
           },
+          createScene(name) {
+            return world(this, name);
+          },
         };
         engines.push(engine);
         return engine;
@@ -89,6 +129,8 @@ function model(engine, asset = { doc: { images: [] } }) {
   const result = {
     name: 'loader:' + models.length,
     asset,
+    // The scene the model was built in (null: the default scene), as core's meshes and plugins are.
+    scene: active,
     root: mesh(engine),
     nodes: [],
     primitives: [],
@@ -101,7 +143,7 @@ function model(engine, asset = { doc: { images: [] } }) {
       if (this.disposed) return;
       this.disposed = true;
       this.disposals++;
-      engine.removePlugin(this.name);
+      (this.scene ?? engine).removePlugin(this.name);
       this.root.dispose();
     },
   };
@@ -157,6 +199,53 @@ afterEach(async () => {
   await flush();
   assert.ok(models.every((value) => value.disposals === 1));
   assert.ok(engines.every((value) => value.disposed && value.meshes.size === 0 && value.plugins.size === 0));
+  assert.ok(worlds.every((value) => value.disposed && value.plugins.size === 0));
+});
+
+test('instantiateModel builds the model and its draw plugin in the scene it is given', async () => {
+  const { instantiateModel } = await import('../dist/model-assets.js');
+  const engine = {
+    next: 0,
+    meshes: new Map(),
+    plugins: new Map(),
+    createMesh() {
+      return mesh(this);
+    },
+    use(plugin) {
+      if (active) return active.use(plugin);
+      this.plugins.set(plugin.name, plugin);
+      return this;
+    },
+    removePlugin(name) {
+      const plugin = this.plugins.get(name);
+      this.plugins.delete(name);
+      plugin?.dispose?.();
+    },
+  };
+  const PBRModel = class {
+    constructor(engine, asset) {
+      return model(engine, asset);
+    }
+  };
+  const source = () => ({ api: { PBRModel }, asset: { doc: { images: [] } }, images: [], first: null });
+  const scene = world(engine, 'item');
+  const inScene = await instantiateModel(source(), engine, scene);
+  assert.equal(inScene.scene, scene, 'created while the named scene is active');
+  assert.deepEqual([...scene.plugins.values()], [inScene], 'its draw plugin joins the named scene');
+  assert.equal(engine.plugins.size, 0, 'nothing reaches the default scene');
+  const atDefault = await instantiateModel(source(), engine);
+  assert.equal(atDefault.scene, null, 'no scene given: the default scene');
+  assert.deepEqual([...engine.plugins.values()], [atDefault]);
+  // A first model built in the default scene cannot serve a named scene: it is disposed and a new one is built.
+  const first = model(engine, { doc: { images: [] } });
+  engine.use(first);
+  const replaced = await instantiateModel({ ...source(), first }, engine, scene);
+  assert.equal(first.disposals, 1, 'the default-scene first model is disposed');
+  assert.equal(replaced.scene, scene);
+  inScene.dispose();
+  replaced.dispose();
+  atDefault.dispose();
+  scene.dispose();
 });
 
 test('Gltf keeps the existing Model identity and native FBX loader suspends once in StrictMode', async () => {

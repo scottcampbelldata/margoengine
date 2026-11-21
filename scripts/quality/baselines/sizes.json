@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17311489,
+  "total": 17311749,
   "history": [
     {
       "date": "2026-10-24",
@@ -11229,6 +11229,12 @@
       "commit": "a6ecacf84b",
       "reason": "KB-COMPAT-CPUBUDGET1: shadows waits for its WebGL2 nearest-depth route instead of running the CPU-tier kernel past the layer's work budget; +25 B gzip (21,392 to 21,417) for the wait flag and the rejected-load fallback, inside the existing entry because it is the reduction's own state",
       "grew": 1
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "e2177dc6e",
+      "reason": "react/fbx entry 4128 -> 4132 B gzip: model build runs in the enclosing Scene (sceneScope import, fixes GAP-REACT-SCENEMODELS); splitting it out would cost a separate entry for 4 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -12097,7 +12103,7 @@
     "@margoengine/react/dof": 1157,
     "@margoengine/react/effects-extra": 9591,
     "@margoengine/react/environment": 7857,
-    "@margoengine/react/fbx": 4128,
+    "@margoengine/react/fbx": 4388,
     "@margoengine/react/geometry": 8198,
     "@margoengine/react/gltf": 4108,
     "@margoengine/react/helpers": 6666,

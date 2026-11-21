@@ -13167,19 +13167,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/react/tests/textures.test.js ("an inline colour or emissive array with the same values
   keeps the material mesh; a new value replaces it").
 
-### Open 2026-11-16: a glTF or FBX `<Model>` inside a named `<Scene>` is drawn in the default scene (GAP-REACT-SCENEMODELS, react)
+### Fixed 2026-11-20: a glTF or FBX `<Model>` inside a named `<Scene>` is drawn in the default scene (GAP-REACT-SCENEMODELS, react)
 
-- **Repro:** `<RenderView scene="item" /><Scene name="item"><Gltf src="a.glb" /></Scene>`: the model joins the default
+- **Repro (before):** `<RenderView scene="item" /><Scene name="item"><Gltf src="a.glb" /></Scene>`: the model joins the default
   scene, so the item view does not show it; under a `<Mesh>` inside that Scene the load fails with core's
   `Foreign parent` TypeError, reported through `onError`.
-- **Cause:** `instantiateModel` (packages/react/src/model-assets.ts) builds the gltf/pbr model on the engine, whose
-  root mesh and draw plugin belong to the default scene; the model binding has no scene argument to pass on.
-  React Three Fiber's portals take any object. Plugins other than the lights, Fog, Line, Points, Outline and Splat
-  bindings also stay in the default scene; the same holds inside `<Hud>` and `<RenderTexture>`
-  (packages/react/src/portals.tsx), whose proxied engine still hands `use` the default scene, although Hud's TSDoc
-  says models and plugins render in its overlay scene.
-- **Next:** create the model inside the enclosing Scene (gltf/pbr then has to place its root and plugin there) and
-  add a named-scene case to the model tests.
+- **Cause:** `instantiateModel` (packages/react/src/model-assets.ts) built the gltf/pbr model on the engine outside any
+  scene, so its root mesh and draw plugin belonged to the default scene; the model binding had no scene to pass on.
+- **Fix:** `instantiateModel` takes the enclosing Scene's world and builds the PBRModel and its `engine.use` inside
+  `sceneScope(engine, world)`, the scope gltf/pbr uses for its own loads. The first model a load builds in the default
+  scene is disposed for a named scene, and `Model` reloads when its world changes. `<Hud>` and `<RenderTexture>` pass their
+  portal world the same way; that path has no test of its own yet. FBX uses the same path.
+- **Regression:** packages/react/tests/scene-loaders.test.js ("a Model inside a named <Scene> is built and drawn in that
+  scene, not the default one").
+- **Still open:** the other plugin bindings outside the scene-aware list, see the next entry.
+
+### Open 2026-11-20: react bindings other than models still attach to the default scene inside `<Scene>`, `<Hud>` and `<RenderTexture>` (GAP-REACT-SCENEPLUGINS, react)
+
+- **Repro:** a binding outside the scene-aware list (Line, Points, Outline, Splat, AmbientLight, HemisphereLight and Fog are
+  inside it) placed inside `<Scene name="item">` lands in the default scene, so the item view does not draw it.
+- **Cause:** bindings that call `engine.use` or `X.attach(engine)` directly, rather than `attachBinding(scene, ...)`
+  (packages/react/src/package-binding.ts), use the engine's default scene. Hud's TSDoc says its plugins render in its overlay scene.
+- **Next:** route each such binding through `attachBinding` or `scene.world`, one at a time, with a named-scene test per binding.
 
 ### Fixed 2026-11-16: `AmbientLight`, `HemisphereLight` and `Fog` inside a `<Scene>` lit the default scene (KB-REACT-SCENELIGHT1, react)
 

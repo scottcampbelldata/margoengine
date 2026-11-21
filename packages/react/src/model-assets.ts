@@ -12,6 +12,8 @@ import {
   type ModelSource,
 } from './assets.js';
 import { optionalPeer } from './optional.js';
+import type { World } from './internal.js';
+import { sceneScope } from '../../shared/scene-scope.js';
 
 /** Loads a model file into a gltf/pbr model: gltf/pbr's `loadGLTF`, or the FBX loader the `<Fbx>` binding passes. */
 export type ModelLoader = (
@@ -80,18 +82,30 @@ async function loadModel(
     throw error;
   }
 }
-export async function instantiateModel(source: ModelSource, engine: EngineKernel): Promise<PBRModel> {
+/**
+ * A new model in `world`, the enclosing `<Scene>`'s (null: the default scene). Its root, nodes and draw plugin are created
+ * while that scene is set up, so they draw and light there.
+ */
+export async function instantiateModel(
+  source: ModelSource,
+  engine: EngineKernel,
+  world: World | null = null,
+): Promise<PBRModel> {
   if (source.first) {
     const model = source.first;
     source.first = null;
-    return model;
+    // The first model was built in the default scene, so it serves only that scene.
+    if (!world) return model;
+    model.dispose();
   }
   const images = await copyImages(source.images);
   let model: PBRModel | undefined;
   try {
-    model = new source.api.PBRModel(engine, source.asset, images);
-    engine.use(model);
-    return model;
+    sceneScope(engine, world ?? undefined).run(() => {
+      model = new source.api.PBRModel(engine, source.asset, images);
+      engine.use(model);
+    });
+    return model!;
   } catch (error) {
     if (model) model.dispose();
     else closeImages(images);
