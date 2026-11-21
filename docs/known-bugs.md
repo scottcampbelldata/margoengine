@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: a full budget run had no provenance of its own in the WebGL2 demos table (KB-COMPAT-FRAMELINE1, webgl2-compat)
+
+- **Repro (before):** run `npm run visual:compat -- --write` on one machine, then a full `npm run visual:compat:budget -- --write`
+  on another machine or day: the frame column was rewritten but the table's one "Last recorded" line still named the
+  pixel run, so the frame numbers read as measured where the pixels were.
+- **Cause:** both full runs shared the single whole-table line, which only the pixel run wrote
+  (scripts/support/visual-compat-doc.js).
+- **Fix:** a full budget run writes its own "Frames last recorded <date> at <commit> on <gpu> (<browser>)" line, a full
+  pixel run writes only the "Last recorded" line, and neither touches the other; per-row stamps are unchanged and a doc
+  without the frame line still parses. The frame numbers now in docs/webgl2-compat-demos.md got the provenance of the
+  line they were recorded under.
+- **Regression:** tests/visual-compat-status.test.js ("a full frame run writes its own whole-table line and a full
+  pixel run leaves it alone").
 ### Fixed 2026-11-21: the web starter exceeded its bundle ceiling (create-margo)
 
 - **Repro:** on public main at `5ff5dc647f`, build packages and run `node --test --test-name-pattern="the web template" tests/create-margo.test.js`. The web template builds to 84,025 B gzip against a limit of 83,000 B. Its bundle does not load Water.

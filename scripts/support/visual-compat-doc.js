@@ -21,15 +21,18 @@ export function parseTable(doc) {
       [m[1], ...m[2].split(' | ').map((c) => c.trim())],
     ]),
   );
-  return { rows, recorded: body.split(/\r?\n/).find((line) => line.startsWith('Last recorded')) ?? '' };
+  const lines = body.split(/\r?\n/),
+    find = (prefix) => lines.find((line) => line.startsWith(prefix)) ?? '';
+  return { rows, recorded: find('Last recorded'), framesRecorded: find('Frames last recorded') };
 }
 
 /** Joins rows and the "Last recorded" line back into the doc's text between its two markers. */
-export function formatTable(doc, rows, recorded) {
+export function formatTable(doc, rows, recorded, framesRecorded = '') {
   const [before, rest] = doc.split(start),
     after = rest.split(end)[1];
   const table = [
     recorded,
+    ...(framesRecorded ? [framesRecorded] : []),
     '',
     ...header,
     ...[...rows.entries()]
@@ -40,17 +43,19 @@ export function formatTable(doc, rows, recorded) {
 }
 
 /**
- * Rewrites the table: `update(rows)` changes the rows in place and returns a new "Last recorded" line, or undefined to
- * keep the old one.
+ * Rewrites the table: `update(rows)` changes the rows in place and returns a new whole-table line, or undefined to
+ * keep the old one. `line` says which: 'recorded' (pixel run, the default) or 'framesRecorded' (budget run); the other
+ * line is never touched.
  */
-export async function rewriteTable(update) {
+export async function rewriteTable(update, line = 'recorded') {
   const doc = await readFile(docPath, 'utf8'),
-    { rows, recorded } = parseTable(doc);
-  await writeFile(docPath, formatTable(doc, rows, update(rows) ?? recorded));
+    lines = parseTable(doc);
+  lines[line] = update(lines.rows) ?? lines[line];
+  await writeFile(docPath, formatTable(doc, lines.rows, lines.recorded, lines.framesRecorded));
 }
 
 /**
- * Stamps a run's provenance in the row cell `col` (5 pixels, 6 frames; '-' = the "Last recorded" line covers it). A full
+ * Stamps a run's provenance in the row cell `col` (5 pixels, 6 frames; '-' = the column's whole-table line covers it). A full
  * run owns the line and clears every row's stamp in that column; a partial run (--only) leaves the line and the other
  * rows alone and stamps the rows it reran, so whole-table provenance is never rewritten by a few rows. Returns the
  * line to keep.

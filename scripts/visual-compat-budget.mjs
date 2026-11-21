@@ -134,15 +134,15 @@ if (!deferSpeedEntry(import.meta.url, 'scripts/visual-compat-budget.mjs')) {
         }
         const gpu = measured.find((r) => r.gpu)?.gpu ?? 'unknown gpu',
           commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-        // A partial run (--only) stamps only the rows it wrote and a full run clears the stamps; the "Last recorded" line stays.
+        // A partial run (--only) stamps only the rows it wrote and a full run clears the stamps; a full run writes its own "Frames last recorded" line.
         return stampFrames(
           rows,
           measured.map((r) => r.id),
           only.length > 0,
-          undefined,
+          `Frames last recorded ${new Date().toISOString().slice(0, 10)} at ${commit} on ${gpu} (${browserName})`,
           `${new Date().toISOString().slice(0, 10)}, ${commit}, ${gpu}, ${browserName}`,
         );
-      });
+      }, 'framesRecorded');
     }
   }
 }
