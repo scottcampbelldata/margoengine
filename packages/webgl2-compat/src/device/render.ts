@@ -233,24 +233,21 @@ export class LinkedProgram {
    * thread (Edge 157, RTX A6000: a 4-output program linked in 64 ms and its first draw took 67 ms more; the 26 programs
    * of the staged voxel path tracer linked in 65 s and their first 8 x 8 image then took 206 s, KB-VPT-LOBES-COMPAT).
    * A 1-output program pays it too: on an Intel Arc 140V a 1-output program reported its link complete after 58 to
-   * 74 ms and its first draw took 194 to 346 ms more (KB6016e), where the RTX A6000 had shown 2 ms. So every program
-   * with a colour target there draws once, rasterizer discard on, into 1 x 1 targets bound at the same attachment
-   * points its passes use, so that compile happens before an async pipeline resolves (WebGPU,
-   * createRenderPipelineAsync: the pipeline is ready to use without a stall). Nothing is rasterized, so no output or
-   * resource is read; the targets are deleted at once. Any other backend, or a program with no colour target: true at
-   * once.
+   * 74 ms and its first draw took 194 to 346 ms more (KB6016e), where the RTX A6000 had shown 2 ms; and so does a
+   * program with no colour output (a depth-only pass whose fragment stage discards or writes depth: link 45 to 53 ms,
+   * first draw 128 to 174 ms more). A draw with rasterizer discard on does not compile it there (a warmed 1-output
+   * program still took 131 to 152 ms at its first real draw; drawn rasterizing, its first draw took 1 to 2 ms). So
+   * every program there draws once, rasterizing, into 1 x 1 throwaway targets bound at the same attachment points its
+   * passes use (a 1 x 1 depth-stencil buffer when it has no colour target), so that compile happens before an async
+   * pipeline resolves (WebGPU, createRenderPipelineAsync: the pipeline is ready to use without a stall). Only those
+   * targets are written, no resource is read, and the targets are deleted at once. Any other backend: true at once.
    */
   warmed(targets: readonly (TargetState | null)[]): boolean {
     const device = this.device,
       gl = device.gl;
     if (this.warmFence === undefined) {
       const colours = targets.flatMap((t, i) => (t ? [i] : []));
-      if (
-        this.refusal !== '' ||
-        device.destroyed ||
-        colours.length === 0 ||
-        !/Direct3D|D3D11/.test(device.adapter.capabilities.renderer)
-      ) {
+      if (this.refusal !== '' || device.destroyed || !/Direct3D|D3D11/.test(device.adapter.capabilities.renderer)) {
         this.warmFence = null;
         return true;
       }
@@ -281,9 +278,16 @@ export class LinkedProgram {
       gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, texture, 0);
       textures.push(texture);
     }
+    // With no colour target the framebuffer needs another attachment to be complete (WebGL 2.0, 4.4.4).
+    const depth = colours.length ? null : (gl.createRenderbuffer() as WebGLRenderbuffer);
+    if (depth) {
+      gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, 1, 1);
+      gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, depth);
+    }
     const buffers: number[] = [];
     for (let i = 0; i < count; i++) buffers.push(colours.includes(i) ? gl.COLOR_ATTACHMENT0 + i : gl.NONE);
-    gl.drawBuffers(buffers);
+    gl.drawBuffers(buffers.length ? buffers : [gl.NONE]);
     // Every uniform block gets a buffer of its size and every texture unit nothing (an incomplete texture reads 0), as
     // the draw validation of WebGL 2.0 requires; a disabled attribute reads a constant of its own base type.
     const size = this.uniforms.reduce((n, u) => Math.max(n, u.size), 0),
@@ -302,9 +306,13 @@ export class LinkedProgram {
       else gl.vertexAttribI4i(a.location, 0, 0, 0, 0);
     }
     s.useProgram(this.program);
-    s.enable(gl.RASTERIZER_DISCARD, true);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // Rasterizing, over the whole 1 x 1 target, with every colour channel written: the compile happens at such a draw.
     s.enable(gl.RASTERIZER_DISCARD, false);
+    s.enable(gl.SCISSOR_TEST, false);
+    s.viewport(0, 0, 1, 1);
+    if (s.changed(S.colorMask, 1, 15)) gl.colorMask(true, true, true, true);
+    s.forget(S.colorMaskAt, 8);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
     const sync = fence(gl);
     s.bindVertexArray(null);
     s.bindDrawFramebuffer(null);
@@ -314,6 +322,7 @@ export class LinkedProgram {
       s.forgetTexture(texture);
       gl.deleteTexture(texture);
     }
+    if (depth) gl.deleteRenderbuffer(depth);
     if (ubo) gl.deleteBuffer(ubo);
     return sync;
   }

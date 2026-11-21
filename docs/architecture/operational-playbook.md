@@ -2649,11 +2649,20 @@ a pipeline with one colour target is warmed the same way: on an Intel Arc 140V (
 program reported its link complete after 58 to 74 ms and its first draw then took 194 to 346 ms more, so the compile
 came after `ready`. The GPU check there, before the change: no warm draw before a 1-output async pipeline resolved
 (it fails); after: one, the same pixels, and its first draw 5.3 ms against 10.7 ms for an unwarmed pipeline of the
-same small shader (one loaded run, printed only, not asserted).
-Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js` (CPU, stand-in context) and
-`packages/webgl2-compat/test/first-draw-browser.mjs` (in `test:gpu`: a count of warm draws before the pipeline
-resolves, and the same pixels as an unwarmed pipeline). Missing: depth-only pipelines (no colour target) are not
-warmed; whether that back end compiles them at first draw too is not measured. `:mesh-pbr-lobes` now passes there in
+same small shader (one loaded run, printed only, not asserted). Later the same day a probe on that laptop (a 256-step
+loop, new shader text each run, three runs a kind) showed two more things. First, a program with a fragment stage and
+no colour output (a depth-only pass that discards) also compiles at its first draw: link 45 to 53 ms, first draw 128
+to 174 ms more (with no fragment stage, 1 to 4 ms). Second, the rasterizer-discard warm draw compiled nothing on that
+backend: a warmed 1-output pipeline still took 131 to 152 ms at its first real draw. (The KB-VPT-LOBES-COMPAT probe on
+the RTX A6000 had found that a discard draw compiles there.) The warm draw now rasterizes into its 1 x 1 throwaway
+targets (scissor test off, viewport 1 x 1, every colour channel written), and every program on ANGLE Direct3D is
+warmed, one with no colour target into a 1 x 1 depth-stencil buffer. After the change: link to `ready` 179 to 205 ms
+for both kinds, first draw 1.2 to 2.1 ms.
+Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js` (CPU, stand-in context: the warm draw rasterizes, and a
+depth-only pipeline is warmed) and `packages/webgl2-compat/test/first-draw-browser.mjs` (in `test:gpu`: a count of
+rasterizing warm draws before a 1-output and a depth-only pipeline resolve, and the same pixels as an unwarmed
+pipeline). Both fail on the code before the change. Missing: the rasterizing warm draw has not been rerun on the
+RTX A6000, and no other Direct3D GPU has been measured. `:mesh-pbr-lobes` now passes there in
 3 min 53 s (420 s limit); `:mesh-pbr` (376 s) and `:mesh-lights` (383 s) pass their checks but still run past their
 300 s step limits on the cold compiles themselves. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
 `coverage` kernel's 64-ray loop around `closest()` never finished its first compile in 22 minutes (89.4 s for the whole

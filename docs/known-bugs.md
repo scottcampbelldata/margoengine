@@ -3519,6 +3519,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `KHR_parallel_shader_compile`; Khronos WebGL 2.0, draw validation (uniform blocks, fragment output types).
 - **Regression:** packages/webgl2-compat/test/d3d11-warm.test.js (fails without the fix: the pipeline resolved at
   link with no warm draw), and `MARGO_COMPAT=1 npm run test:gpu:mesh-pbr-lobes -w @margoengine/voxel-pathtracer`.
+- **Later (2026-11-21, KB6016e):** on an Intel Arc 140V (Edge, ANGLE Direct3D 11) a draw with rasterizer discard on
+  compiled nothing: a warmed 1-output pipeline still paid 131 to 152 ms at its first real draw. The warm draw now
+  rasterizes into the 1 x 1 targets (scissor test off, viewport 1 x 1, all colour channels written), and a program
+  with no colour target is warmed too, into a 1 x 1 depth-stencil buffer. Its own entry, KB6016e, has the figures.
 
 ### Fixed 2026-11-15: a Tonemap removed by its scene kept its LocalExposure textures (KB-OWN-TONE1, tonemap)
 
@@ -6089,6 +6093,16 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
     first frame after it (regression: packages/webgl2-compat/test/d3d11-warm.test.js and
     packages/webgl2-compat/test/first-draw-browser.mjs). This moves compiles, it adds none, so this entry's total is
     unchanged.
+  - Depth-only programs, measured later on 2026-11-21 (same laptop, a probe of a 256-step loop, new shader text each
+    run, three runs a kind): a program with a fragment stage and no colour output (it discards) reported its link
+    complete after 45 to 53 ms and its first draw then took 128 to 174 ms more; a program with no fragment stage took
+    1 to 4 ms at its first draw. The same probe found the warm draw itself compiled nothing here: with rasterizer
+    discard on, a warmed 1-output pipeline still took 131 to 152 ms at its first real draw. Fixed the same day: the
+    warm draw rasterizes into its 1 x 1 throwaway targets, and every program is warmed there, a program with no
+    colour target into a 1 x 1 depth-stencil buffer. After it the link-to-ready time is 179 to 205 ms for both kinds
+    and the first draw 1.2 to 2.1 ms (regression: packages/webgl2-compat/test/d3d11-warm.test.js and
+    packages/webgl2-compat/test/first-draw-browser.mjs, which count rasterizing warm draws). This also moves
+    compiles and adds none.
   - So at this rate the 32 subsets need about 85 minutes against the 12 minute limit, about 7 times over. Nothing
     hangs: each compile finishes, and every subset that rendered passed its checks. No Margo-side defect was found
     beyond the program sizes the entry already names.

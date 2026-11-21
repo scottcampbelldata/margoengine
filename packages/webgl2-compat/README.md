@@ -149,8 +149,9 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   `antialias: false`, so exact-pixel rendering stays exact; it multisamples itself when a pipeline asks for 4
   samples. Buffers, textures (2D, 2D array, 3D, cube, 4x multisampled, depth and stencil formats), samplers, bind
   groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`, and on ANGLE Direct3D 11 for one
-  draw with rasterizer discard into a pipeline's own colour targets, one target or several: that back end compiles
-  the pixel shader for them at the first draw, so a first frame would otherwise wait for it), render passes with clears,
+  draw into 1 x 1 throwaway copies of a pipeline's own colour targets, or a 1 x 1 depth-stencil buffer when it has
+  none: that back end compiles the pixel shader at the first draw that rasterizes, so a first frame would otherwise
+  wait for it), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, `onSubmittedWorkDone` (a fence that signals on the next poll, also when no frame
   is shown; each poll yields a port task and a 1 ms timer, about 2 ms in Chrome), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or
