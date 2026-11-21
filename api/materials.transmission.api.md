@@ -28,7 +28,7 @@ export interface TransmissionOptions extends TransmissionPassOptions {
     factor?: number;
     ior?: number;
     dispersion?: number;
-    opaqueColor?: GPUTextureView;
+    opaqueColor?: Borrowable<GPUTextureView>;
     transmissionTexture?: ClearcoatTexture;
     volume?: VolumeOptions;
 }
@@ -68,6 +68,8 @@ export function validateTransmission(options: TransmissionOptions): {
 };
 
 // Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 
 interface ClearcoatTexture extends MaterialExtensionTexture {
     texCoord?: 0 | 1 | 2 | 3;

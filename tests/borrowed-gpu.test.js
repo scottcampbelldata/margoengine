@@ -11,7 +11,7 @@ import { borrowedSites, readRegistry } from '../scripts/borrowed-sites.mjs';
 // stopped the frame loop, a console warning, silence, a stand-in) grew because each site was fixed on its own.
 const root = resolve(import.meta.dirname, '..');
 // Lowered by each push that rules a package's rows; it never rises, so a new option cannot land as pending.
-const PENDING_AT_MOST = 12;
+const PENDING_AT_MOST = 4;
 
 test('every member that can hold a caller GPU object is in the registry, and every row still exists', () => {
   const sites = borrowedSites(root),

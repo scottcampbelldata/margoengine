@@ -141,6 +141,7 @@ class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
+    setSource(source: GPUTexture | CubeTarget | ((device: GPUDevice) => GPUTexture | CubeTarget)): void;
     sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
@@ -169,7 +170,7 @@ interface TextureRegion {
     depth?: number;
 }
 
-type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource;
+type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource | ((device: GPUDevice) => GPUTexture | CubeTarget);
 
 interface TranscodedMip {
     data: Uint8Array;

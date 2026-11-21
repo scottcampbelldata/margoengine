@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17312283,
+  "total": 17319717,
   "history": [
     {
       "date": "2026-10-24",
@@ -11241,6 +11241,12 @@
       "commit": "721728e1d",
       "reason": "react/outlines entry 1648 -> 2182 B gzip (measured on a fresh build, main and this branch alike): <Outlines> inside a <Model> attaches ModelOutlines so a skinned or morphed model keeps its line in every pose (GAP-OUTLINES-INSTANCED, e3badb692, which landed without this raise); the toon outline entries stay behind import(), and splitting the model path into its own react entry would cost users a second import for the common case",
       "grew": 1
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "26db1ddf2",
+      "reason": "KB-RESTORE-BORROWED1: materials Texture GPU sources, envMap and setSource take the Borrowed GPU objects rule (a function per device; a lost plain object dropped and reported once). materials 67960 to 68681 B, batched 39949 to 40027, mips 11875 to 12471, skin 15686 to 15894, soot 11377 to 11861, settings 20493 to 20747. The Texture class ships in each entry so the bytes repeat; a split would cost a second Texture class and break instanceof.",
+      "grew": 6
     }
   ],
   "items": {
@@ -11861,22 +11867,22 @@
     "@margoengine/machinery/spatial": 16699,
     "@margoengine/machinery/surface": 14297,
     "@margoengine/machinery/telemetry": 13829,
-    "@margoengine/materials": 67960,
+    "@margoengine/materials": 70742,
     "@margoengine/materials/alpha-hash": 1615,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 39949,
+    "@margoengine/materials/batched": 41228,
     "@margoengine/materials/eye": 4661,
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 4112,
     "@margoengine/materials/layered": 3230,
-    "@margoengine/materials/mips": 11875,
+    "@margoengine/materials/mips": 12846,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/presets": 532,
     "@margoengine/materials/serialization": 45773,
-    "@margoengine/materials/settings": 20493,
-    "@margoengine/materials/skin": 15686,
-    "@margoengine/materials/soot": 11377,
+    "@margoengine/materials/settings": 21370,
+    "@margoengine/materials/skin": 16371,
+    "@margoengine/materials/soot": 12217,
     "@margoengine/materials/stochastic": 2802,
     "@margoengine/materials/transmission": 8673,
     "@margoengine/materials/transmission-layers": 5464,

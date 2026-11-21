@@ -1610,6 +1610,31 @@ filter only on a device with `float32-filterable` (request it in `Engine.create(
 elsewhere with a `MargoError('unsupported')` and a WgslMaterial reads them with `textureLoad`. A borrowed GPUTexture
 source (`new Texture(gpuTexture, {dimension})`) binds as it is and stays its owner's.
 
+## After a device restore
+
+A plain GPU object belongs to the device that made it. `envMap` (a six-layer GPUTexture, a `{texture, view}` target or an
+Environment-shaped literal), a `Texture` made from a GPUTexture or a `CubeTarget`, and the `opaqueColor` view of
+`transmission()` and node materials therefore also take `(device) => object`, called once per device and again after
+`engine.rebootDevice()`: with it nothing is lost and nothing is reported. A plain object held at a restore is dropped
+and reported once through `engine.onError` (`'state'`, [borrowed-lost](https://margoengine.com/errors#borrowed-lost))
+while the frame keeps drawing: a lost `envMap` reflects black, a lost map reads as no map, a lost `opaqueColor` reads
+white. Give a new one with `material.envMap = ...` or `texture.setSource(...)`. A `Texture`, an Environment and a
+`CubeCamera` are live objects that remake their own GPU objects, so they need no function. A function-made Texture
+reads size 0 until its first device has made it, and needs `dimension` unless it is 2D.
+
+```ts
+import {Texture as BorrowedTexture, UnlitMaterial as MirrorMaterial} from 'margoengine/materials';
+const borrowedCube = (device: GPUDevice) => {
+  const texture = device.createTexture({size: [4, 4, 6], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING});
+  return {texture, view: texture.createView({dimension: 'cube'})};
+};
+const mirror = new MirrorMaterial({envMap: borrowedCube, combine: 'mix'});
+const flatTexture = new BorrowedTexture((device: GPUDevice) =>
+  device.createTexture({size: [4, 4], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING}),
+);
+flatTexture.setSource(flatTexture.source as () => GPUTexture); // a new object (or function) after a restore dropped a plain one
+```
+
 ## Batched meshes (`@margoengine/materials/batched`)
 
 `BatchedMesh` draws many different geometries as one materials mesh: one draw call in the main pass and one per
