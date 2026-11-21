@@ -156,15 +156,36 @@ function compose(inner: Pair[], outer: Pair[]): Pair[] {
   return out;
 }
 const composed = new WeakMap<Step[], Pair[]>();
-/** A path through the steps of a node, or nothing when it has no place in the root namespace. */
-function mapPath(steps: Step[], path: string): string | undefined {
-  if (!steps.length) return stripVariants(path);
+/** The steps of a node, nearest arc first, as one map function. */
+function pairsFor(steps: Step[]): Pair[] {
   let pairs = composed.get(steps);
   if (!pairs) {
     pairs = steps.slice(1).reduce((f, step) => compose(f, pairsOf(step)), pairsOf(steps[0]));
     composed.set(steps, pairs);
   }
-  return mapBy(pairs, stripVariants(path));
+  return pairs;
+}
+/** A path through the steps of a node, or nothing when it has no place in the root namespace. */
+const mapPath = (steps: Step[], path: string): string | undefined =>
+  steps.length ? mapBy(pairsFor(steps), stripVariants(path)) : stripVariants(path);
+/** A path of the root namespace back through the steps of a node, or nothing when the node has no place for it. */
+const unmapPath = (steps: Step[], path: string): string | undefined =>
+  steps.length ? mapBy(pairsFor(steps), path, 1) : path;
+/** The ancestor of `path` with `k` prim names, variant selections on the way kept: `/M{vs=x}c` and 1 give `/M{vs=x}`. */
+function ancestorAt(path: string, k: number): string {
+  if (k === 0) return '/';
+  let names = 0;
+  for (let i = 1; i < path.length; i++) {
+    if (path[i] === '{') {
+      i = path.indexOf('}', i);
+      if (i < 0) break;
+      continue;
+    }
+    if (path[i] === '/' || (path[i - 1] !== '/' && path[i - 1] !== '}')) continue;
+    if (names === k) return path.slice(0, path[i - 1] === '/' ? i - 1 : i);
+    names++;
+  }
+  return path;
 }
 
 /** Index one layer's spec map: children and properties by prim, variant paths included. */
@@ -543,6 +564,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     walk(top);
   }
   const building = new Set<string>();
+  /** Whether no index of `path` in `stack` is being built, so one may be composed now. */
+  const unbuilt = (stack: Stack, path: string) =>
+    !building.has(stack.id + '\0' + path) && !building.has(stack.id + '\0' + path + '\0v');
   const trees = new Map<string, Node>();
   /**
    * The prim index of `path` in `stack`, its arcs followed, with steps up to that stack's namespace. With `ctx`, its
@@ -1000,28 +1024,16 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
    * and the nodes of other stacks in the index of the stage prim A maps to. At the index root it is A's own index there,
    * when that stack holds the layer that authored the arc; the node that stands for this same arc there does not count.
    */
-  function ancestral(placed: Node, near: Node, arc: Node) {
+  function carriedContext(near: Node, arc: Node): Node[] {
     const step = arc.steps[0],
       site = stripVariants(arc.path),
-      b = build!;
-    // Seen on OpenUSD (black-box prim indexes, KB1942c): an implied inherit that stands for an implied arc, the chain
-    // ending in an arc carried down from prim A, reads the selections at its class's parent in each other stack of
-    // that chain, nearest first.
-    let origin = arc;
-    while (origin.implied && origin.of) origin = origin.of;
-    if (!step || !arc.parent) return;
-    const chain = arc.kind === 'inherit' && !!arc.implied && !arc.anc && !!origin.anc && !origin.implied;
-    if (!chain && (!arc.anc || arc.implied || !under(site, step.from) || site === step.from)) return;
-    const hop = arc.parent.steps.slice(0, Math.max(0, arc.parent.steps.length - near.steps.length)),
+      b = build!,
+      ctx: Node[] = [];
+    if (!arc.anc || !under(site, step.from) || site === step.from) return ctx;
+    const hop = arc.parent!.steps.slice(0, Math.max(0, arc.parent!.steps.length - near.steps.length)),
       authored = mapPath(hop, step.to) ?? step.to,
-      counterpart = (n: Node) => n.kind === arc.kind && n.stack === near.stack && stripVariants(n.path) === site,
-      open = (stack: Stack, path: string) =>
-        !building.has(stack.id + '\0' + path) && !building.has(stack.id + '\0' + path + '\0v');
-    const ctx: Node[] = [];
-    if (chain) {
-      for (let n: Node | undefined = arc; n; n = n.implied ? n.of : undefined)
-        if (n.stack !== near.stack) ctx.push({ ...n, path: parentOf(n.path) });
-    } else if (near.parent) {
+      counterpart = (n: Node) => n.kind === arc.kind && n.stack === near.stack && stripVariants(n.path) === site;
+    if (near.parent) {
       let into = near;
       while (into.parent && into.parent.stack === into.stack) into = into.parent;
       const by = into.parent,
@@ -1036,13 +1048,52 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
             .join('/'),
         });
       const up = mapPath(near.steps, authored);
-      if (up !== undefined && open(b.top.stack, up))
+      if (up !== undefined && unbuilt(b.top.stack, up))
         for (const n of strength(tree(b.top.stack, up, true)))
           if (n.stack !== by?.stack && !counterpart(n)) ctx.push(n);
-    } else if (near.stack.layers.some((e) => e.layer === arc.stack.root) && open(near.stack, authored))
+    } else if (near.stack.layers.some((e) => e.layer === arc.stack.root) && unbuilt(near.stack, authored))
       for (const n of strength(tree(near.stack, authored, true))) if (!counterpart(n)) ctx.push(n);
-    const parent = parentOf(site);
-    if (!ctx.length || !open(near.stack, parent)) return;
+    return ctx;
+  }
+  /**
+   * Seen on OpenUSD (black-box prim indexes, KB1942c parts 14 and 30), the specification does not say: an implied class
+   * arc that stands for another implied arc reads the selections for its class's parent across the prim index built so
+   * far, itself in its place among them, strongest first. The parent maps to the root namespace through the new arc's
+   * own map function (`/C/a` to `/Q/a/b` when the pair `/C/a` to `/M` came up the chain with it), and each node reads at
+   * the path that maps back into it; the arcs of that chain read at their class's parent. Class arcs off the chain are
+   * not read: an inherit carried down from `/R` to `/C`, whose `/C/b` selects `vs = "x"`, gives no `/C{vs=x}a`, where a
+   * payload's `l2.usda /M/b` selecting `vs = "y"` does. A parent that only the root namespace's identity maps reads none.
+   */
+  function chainContext(placed: Node, near: Node, arc: Node): Node[] {
+    const parent = parentOf(stripVariants(placed.path)),
+      up = mapPath(placed.steps, parent),
+      ctx: Node[] = [];
+    if (up === undefined || up === parent) return ctx;
+    const chain = new Set<Node>();
+    for (let n: Node | undefined = arc; n; n = n.implied ? n.of : undefined) chain.add(n);
+    // The index so far with the new arc in the place it takes: put there for the reading, then taken out again.
+    const kids = near.children.slice();
+    attach(near, placed);
+    const nodes = strength(build!.top);
+    near.children = kids;
+    placed.parent = undefined;
+    for (const n of nodes) {
+      if (n === placed || chain.has(n)) ctx.push({ ...n, path: parentOf(n.path) });
+      else if (!isClass(n)) {
+        const at = unmapPath(n.steps, up);
+        if (at !== undefined)
+          ctx.push({ ...n, path: under(stripVariants(n.path), at) ? ancestorAt(n.path, depthOf(at)) : at });
+      }
+    }
+    return ctx;
+  }
+  /** The ancestral variants of an implied class arc `placed` on `near` that stands for `arc`, read in its context. */
+  function ancestral(placed: Node, near: Node, arc: Node) {
+    if (!arc.steps[0] || !arc.parent) return;
+    const site = stripVariants(arc.path),
+      ctx = arc.implied ? (arc.anc ? [] : chainContext(placed, near, arc)) : carriedContext(near, arc),
+      parent = parentOf(site);
+    if (!ctx.length || !unbuilt(near.stack, parent)) return;
     // The class site's parent composed with those selections first: its variants, carried down to the site.
     const from = tree(near.stack, parent, true, ctx),
       name = site.slice(site.lastIndexOf('/') + 1),

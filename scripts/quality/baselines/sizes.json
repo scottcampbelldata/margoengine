@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17381220,
+  "total": 17382053,
   "history": [
     {
       "date": "2026-10-24",
@@ -11283,6 +11283,12 @@
       "commit": "8811bda81",
       "reason": "react named-Scene bindings (GAP-REACT-SCENEPLUGINS): react root 11,246 to 11,302 B (+56, a Scene makes its own shadows), react/post 4,243 to 4,365 B (+122, the stack, effects, DepthTexture and SceneTargets attach inside the enclosing scene and skip the default scene models), react/ui 2,992 to 3,045 B (+53, SpriteLayer and Figure attach inside the scene); each is a few lines per binding, a split would cost more than it saves",
       "grew": 3
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "bb5f62ac2",
+      "reason": "KB1942c parts 29 and 30: USD composition counts a class arc's namespace depth from its parent node and reads an implied class arc's ancestral variant selections across the prim index, as OpenUSD does on the stress stages. Measured min+gzip: @margoengine/usdz/clips 27,015 to 26,968 B after part 29 and 27,152 B after part 30 (compose 23,265 to 23,406 B); clips bundles the composer. The bytes are the selection rule in the composer every composed stage runs; a split would put it behind an import() on every stage with an implied class arc.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12597,7 +12603,7 @@
     "@margoengine/usdz": 12918,
     "@margoengine/usdz dist/workers/usdz.js": 158216,
     "@margoengine/usdz/anim": 6436,
-    "@margoengine/usdz/clips": 27134,
+    "@margoengine/usdz/clips": 27967,
     "@margoengine/usdz/compose": 23890,
     "@margoengine/usdz/curves": 3523,
     "@margoengine/usdz/instancer": 2451,
