@@ -959,6 +959,7 @@
       "materialLobes",
       "materialShader",
       "nodeMaterial",
+      "noteEngine",
       "packAtlas",
       "packGeometry",
       "padTileGrid",

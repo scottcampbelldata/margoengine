@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17365960,
+  "total": 17380137,
   "history": [
     {
       "date": "2026-10-24",
@@ -11271,6 +11271,12 @@
       "commit": "09838ea0a",
       "reason": "clustered/bounce 13,928 to 13,998 B gzip (+70): each visibility texel keeps its surface normal code and the receiver-plane test checks the texel holds the receiver's own surface (KB-BOUNCE-SHADOWSNOW1 concave corner); it is one function in the entry's hot loop, a split would add an import() for 70 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "edca72555",
+      "reason": "KB-ENVDECODERS2: the decoders are separate files (hdr, exr, ultrahdr, parse-image, load) so loadEnvironmentImage loads one; exr and ultrahdr each bundle their own toBytes and MAX_PIXELS, so the root grew 32,706 to 33,335 B and /loaders 11,713 to 11,985 B. New /load entry 11,567 B counts all three lazy decoders; an app loading one format requests 1,069 B plus that decoder (hdr 8,772 B, exr 23,708 B, ultrahdr 5,600 B raw). A shared chunk would make a .hdr load fetch the others' common code.",
+      "grew": 3
     }
   ],
   "items": {
@@ -11584,7 +11590,7 @@
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/environment": 32706,
+    "@margoengine/environment": 34336,
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 6181,
@@ -11595,7 +11601,8 @@
     "@margoengine/environment/gi": 19467,
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/lightformer": 4556,
-    "@margoengine/environment/loaders": 11713,
+    "@margoengine/environment/load": 11915,
+    "@margoengine/environment/loaders": 12345,
     "@margoengine/environment/main": 32997,
     "@margoengine/environment/prefiltered": 4263,
     "@margoengine/environment/probes": 19322,

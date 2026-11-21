@@ -1307,7 +1307,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,942 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,944 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -13258,6 +13258,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/react/tests/extras.test.js ("AmbientLight, HemisphereLight and Fog inside a <Scene> light
   that scene, not the default one"), and on a real GPU, natively and with MARGO_COMPAT=1,
   `npm run test:browser:reflections --workspace @margoengine/react -- --mode=scene-fog` (centre green; grey before).
+
+### Fixed 2026-11-20: loading one environment format pulled all three image decoders (KB-ENVDECODERS2, environment)
+
+- **Repro:** bundle `import { loadEnvironmentImage } from '@margoengine/environment/loaders'` with Vite and load a
+  `.hdr` file: the build held the Radiance HDR, OpenEXR and UltraHDR decoders together.
+- **Cause:** `load.ts` imported `parseHDR`, `parseEXR` and `decodeUltraHDR` statically, and `dist/loaders.js` was
+  one file with all three inside, so no bundler could leave an unused one out.
+- **Fix:** `loadEnvironmentImage` picks the decoder from the file signature and `import()`s it, from its own built
+  file (`hdr.js`, `exr.js`, `ultrahdr.js`). It lives in a new entry, `@margoengine/environment/load`, with no static
+  decoder import: Vite's bundler keeps a module in the entry chunk once any static import reaches it, even an unused
+  re-export, so `/loaders` (which re-exports the decoders) cannot be lazy. `/loaders` and the root re-export the same
+  function; results, signatures, errors and the direct decoder exports are unchanged. The synchronous
+  `parseEnvironmentImage` moved to its own file and keeps the HDR and EXR parsers. `@margoengine/react`'s
+  `<Environment src>` still imports `/loaders`: its `EnvironmentSource` type (in the locked react test and xr-pointer
+  reports) names the root module, so moving it to `/load` is an api/breaks.json change that needs Scott's yes.
+- **Regression:** environment `tests/lazy-decoders.test.js` (a Vite build of an app that loads files through `/load`
+  keeps each decoder in its own lazy chunk; fails without the entry and on a static decoder import).
 
 ### Fixed 2026-11-20: react's lazy environment bindings fetched the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
 

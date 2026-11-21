@@ -1323,6 +1323,10 @@
       "types": "./dist/environment/loaders.d.ts",
       "import": "./dist/environment/loaders.js"
     },
+    "./environment/load": {
+      "types": "./dist/environment/load.d.ts",
+      "import": "./dist/environment/load.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"

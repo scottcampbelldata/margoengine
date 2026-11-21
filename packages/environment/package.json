@@ -138,6 +138,10 @@
     "./loaders": {
       "types": "./dist/loaders.d.ts",
       "import": "./dist/loaders.js"
+    },
+    "./load": {
+      "types": "./dist/load.d.ts",
+      "import": "./dist/load.js"
     }
   },
   "files": [
