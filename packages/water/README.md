@@ -58,19 +58,22 @@ The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D text
 
 Pass an `Environment` as `reflectionEnvironment` to use the same longitude, live rotation, and HDR radiance scale as `EnvironmentBackground`. The water filters its reflection across both angular axes using a lobe widened by the screen footprint of the wave normals and uses the sky at the horizon for below-horizon reflections. The HDR sky also lights the water body and refracted seabed through a cosine-weighted irradiance estimate. Keep the `() => sky.reflectionTexture` form for the procedural `Sky` package.
 
-For example, render open water under a shared HDR environment:
+The same HDR environment lights the surface and appears in Snell's window below it through `@margoengine/water/underwater`.
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {Environment, EnvironmentBackground} from 'margoengine/environment';
 import {Water} from 'margoengine/water';
+import {Underwater} from 'margoengine/water/underwater';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const sky = await Environment.attach(engine, {
   width: 2, height: 1,
   data: new Float32Array([0.3, 0.4, 0.6, 1, 0.8, 0.7, 0.6, 1]),
 }, {float32: false});
 EnvironmentBackground.attach(engine, sky);
-Water.attach(engine, {size: [200, 200], horizon: true, reflectionEnvironment: sky});
+const surface = Water.attach(engine, {size: [200, 200], horizon: true, reflectionEnvironment: sky});
+Underwater.attach(engine, {surface, skyEnvironment: sky});
+engine.render({delta: 0});
 ```
 
 `water.depthTexture` exposes borrowed viewport depth including opaque geometry and
