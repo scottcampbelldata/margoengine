@@ -465,7 +465,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     list(tree);
     for (let more = true; more; ) {
       more = false;
-      for (const n of implied) if (!dropped.has(n) && dropped.has(n.of!)) (drop(n), (more = true));
+      for (const n of implied) if (!dropped.has(n) && dropped.has(n.of!)) drop(n), (more = true);
     }
     const copy = (node: Node, top: boolean): Node => {
       const out: Node = {
@@ -656,7 +656,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         const bare = !!b.pending && !!from && !!start.inert && start.kind === 'specialize' && !from.family;
         weak = bare;
         weakBorn = start.born;
-        weakBare = !specsBelow(start) || !!start.parent?.children.some((c) => c.kind === 'specialize' && !c.anc && !c.implied);
+        weakBare =
+          !specsBelow(start) || !!start.parent?.children.some((c) => c.kind === 'specialize' && !c.anc && !c.implied);
         implied(start, b.depth);
         weak = false;
         if (b.pending) keepPending(b, start);
@@ -683,7 +684,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   function unhold(b: Build) {
     const pending = new Set<Node>();
     const walk = (n: Node) => {
-      if (n.kind === 'inherit' && n.implied && !n.inert && n.parent && n.parent !== b.top && carriedFrom.has(n)) pending.add(n);
+      if (n.kind === 'inherit' && n.implied && !n.inert && n.parent && n.parent !== b.top && carriedFrom.has(n))
+        pending.add(n);
       n.children.forEach(walk);
     };
     walk(b.top);
@@ -702,7 +704,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     drop(n);
     for (let more = true; more; ) {
       more = false;
-      for (const p of allNodes(b.top)) if (!gone.has(p) && p.of && gone.has(p.of) && carriedFrom.has(p)) (drop(p), (more = true));
+      for (const p of allNodes(b.top))
+        if (!gone.has(p) && p.of && gone.has(p.of) && carriedFrom.has(p)) drop(p), (more = true);
     }
     for (const x of gone) {
       b.pending!.delete(x);
@@ -780,7 +783,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // The implied arcs that stand for a dropped one go with it.
     for (let more = true; more; ) {
       more = false;
-      for (const n of all) if (n.of && !gone.has(n) && gone.has(n.of)) (drop(n), (more = true));
+      for (const n of all) if (n.of && !gone.has(n) && gone.has(n.of)) drop(n), (more = true);
     }
     for (const n of all) {
       n.children = n.children.filter((c) => !gone.has(c));
@@ -933,7 +936,12 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // Seen on OpenUSD (black-box prim indexes, KB1942c), the specification does not say: the first live node made for a
     // site holds it in the index. A later inherit to it makes no node; a later specializes leaves an inert placeholder,
     // which still implies its arc upward unless it was itself implied.
-    if (b.held.has(node.stack.id + '\0' + path) || [...(b.pending ?? [])].some((p) => (fresh || stays(p)) && p.stack === node.stack && stripVariants(p.path) === path)) {
+    if (
+      b.held.has(node.stack.id + '\0' + path) ||
+      [...(b.pending ?? [])].some(
+        (p) => (fresh || stays(p)) && p.stack === node.stack && stripVariants(p.path) === path,
+      )
+    ) {
       if (kind === 'inherit') return undefined;
       const placeholder = stub();
       if (!implied) queue(placeholder, false);
@@ -962,7 +970,10 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     if (implied && stands) placed.of = stands;
     if (stands) ancestral(placed, node, stands);
     attach(node, placed);
-    if (build!.pending && !fresh) for (const p of [...build!.pending]) if (!stays(p) && build!.pending.has(p) && p !== placed && siteKey(p) === siteKey(placed)) dropPending(build!, p);
+    if (build!.pending && !fresh)
+      for (const p of [...build!.pending])
+        if (!stays(p) && build!.pending.has(p) && p !== placed && siteKey(p) === siteKey(placed))
+          dropPending(build!, p);
     queuePlaced(placed, !implied);
     return placed;
   }
@@ -1285,7 +1296,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
      * The pairs an implied arc keeps from the arc it stands for. Seen on OpenUSD (KB1942b): when the authored arc
      * reaches its prim through an ancestor's class arc, the ancestor's pair goes up with it, its prim mapped by the arcs
      * on the way where they can and left as authored where they cannot. A target under the class root then maps to the
-     * ancestor's path, and one under the ancestor, which mapping back would not give again, drops.
+     * ancestor's path, and one under the ancestor, which mapping back would not give again, drops. The arc it stands for
+     * may itself be implied, carried down from an ancestor prim: its own pair goes up the same way (KB1942c part 25).
      */
     const carried = (near: Node, arc: Node): [string, string][] => {
       const step = arc.steps[0];
@@ -1294,7 +1306,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         up = ([from, to]: [string, string]): [string, string] => [from, mapPath(hop, to) ?? to];
       const own = (step.also ?? []).map(up);
       // The first step of a site reached through an ancestor's class arc is that ancestor's pair.
-      if (arc.implied || stripVariants(arc.parent.path) === step.to) return own;
+      if (stripVariants(arc.parent.path) === step.to) return own;
       return [...own, up([step.from, step.to])];
     };
     /** Places arc on near and on every stack above it, and the same for the class arcs that class has in turn. */
