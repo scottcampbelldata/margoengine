@@ -13402,6 +13402,21 @@ Cause: the table was left out of KB6016 because it moves every image-based-light
 environment budget (already 1 over, KB3574), which needs a re-record ruling. Fix to build: integrate G2 in the table
 (Heitz 2014 eq. 99), recapture the environment proofs and re-record the IBL budget under a ruling.
 
+**Status (2026-11-20):** The fix is ready to make. In `packages/environment/src/shaders.ts`, `brdfLut` replaces
+`let g = smithG1(nv, a2) * smithG1(l.z, a2);` with core's height-correlated G2 (`packages/core/src/shaders.ts` line 28,
+the same as `smithGCorrelatedFloat` in `packages/shared/light-terms.js`), and the `smithG1` helper is removed. The
+table's format and size do not change. With it, `tests/smith-shaders.test.js` drops its exception
+`'packages/environment/src/shaders.ts': 1`, and the f64 LUT reference in `packages/environment/tests/environment-browser.js`
+moves to G2. Measured effect (f64 integration of the table with both G): scale plus bias rises by +4.3% / +0.3% at
+roughness 0.5 (NdotV 0.1 / 0.5), +13.7% / +2.4% at roughness 0.75, +36.3% / +10.2% at roughness 1.0. Every
+image-based-lighting picture and the multiple-scattering compensation change. It waits on two things: a re-record of
+the batch 160 environment budgets (`docs/whitepaper/results/batch-160-environment.json` and
+`batch-160-environment-decomposition.json`, pinned by `tests/reference-environment.test.js`, checked by
+`scripts/reference-rendering/environment.mjs`), and a proof recapture (`proofs/capture.mjs`) of the stories that carry
+the LUT shader text (likely environment-hemisphere, probes-decals, gltf-pbr-lighting-hooks, binding-limit). Both need
+Scott's ruling and the NVIDIA RTX A6000 workstation, which is not available as of 2026-11-20. The code, tests, docs,
+budgets and proofs land in one commit there. The entry stays Open.
+
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 
 Base dab36e5f9, Apple silicon Mac. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
