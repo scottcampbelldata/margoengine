@@ -9057,9 +9057,27 @@ camera moves. Drawn last, the depth rejects no blended blade, so the colour and 
 KB-SCATTER-SUBPIXEL1. Post is unchanged. Evidence (Intel Arc 140V): scatter test/grass.test.js (the depth stage);
 test/grass-pixel.browser.mjs on WebGPU and the WebGL2 layer (0 ppm speckle on WebGPU, means within 0.4 codes of the
 supersampled view); scenes test/dune-coast-still.mjs camp view on the WebGL2 layer, mean 177.0 with occlusion against
-180.6 without and 10.5 percent of pixels darker (before: 181.1 against 180.7, 0.4 percent). Missing: the camp view on
-native WebGPU (it hangs the device on this GPU before and after the change, KB-SCENES-DUNE-ARCHANG1), other GPUs, the
-cost of the extra draw (speed phase deferred), and the grass itself darkened (it is not in the ambient replay).
+180.6 without and 10.5 percent of pixels darker (before: 181.1 against 180.7, 0.4 percent); on native WebGPU
+(2026-11-21, adapter `intel` `xe-2lpg`, once KB-SCENES-DUNE-ARCHANG1 below let it run) 177.2 against 180.6 and 10.2
+percent darker. Missing: other GPUs, the cost of the extra draw (speed phase deferred), and the grass itself darkened
+(it is not in the ambient replay).
+
+**No submission of the coastal flow's set-up holds the GPU for seconds (KB-SCENES-DUNE-ARCHANG1, 2026-11-21, GPU
+behaviour).** The dune coast hung the device on a laptop GPU (DXGI_ERROR_DEVICE_HUNG within 3 s, three runs of three).
+Timestamp queries on every pass of the page's frames found one compute pass of 4,403 ms on the first frame: `Water`'s
+coastal flow recorded its whole first-step set-up (initial state, connectivity, the surf field's width + height
+relaxation sweeps, the 40 s spin-up of 3,600 flow dispatches; about 4,600 grid dispatches on a 512 x 512 map) into the
+frame's one command buffer. Windows resets a GPU that cannot complete or preempt one DMA packet within 2 s (Microsoft,
+"Timeout detection and recovery (TDR)" and "TdrDelay", Windows driver documentation), so it hung whenever the scheduler
+asked to preempt it. `CoastalFlow.setUp` now records the same commands in order into command buffers of at most
+`SETUP_WORKGROUPS` (2^18 workgroups, 64 dispatches of a 512 x 512 grid), one `queue.submit` each (Dawn merges the
+buffers of one submit into one D3D12 command list), ahead of the frame's commands; the frame keeps its own three
+substeps. The rule for any package: one-time GPU work of thousands of dispatches is submitted in bounded pieces, never in
+the frame's command buffer. Evidence (adapter `intel` `xe-2lpg`, native WebGPU): 74 set-up submissions of at most 84 ms,
+4.4 to 4.8 s of GPU time in all as before; water test/surf.browser.mjs (no first-frame submission over 2^18 workgroups,
+at least the set-up's workgroups in all, run-up 0.126 m as before; fails before with one submission of 18,986,279) and
+scenes test/dune-coast-still.mjs camp view passing. Missing: other GPUs, and a bound in time rather than workgroups (a
+GPU 25 times slower than this one could still pass 2 s on one piece).
 
 **SSAO's ambient replay binds every pass binding (KB-POST-GTAO-TERRAINLOOK1, 2026-11-18, GPU behaviour).** The replay
 that gives SSAO and GTAO the ambient light to darken cut the lit shader from `let direct=` and bound a hand-picked

@@ -244,12 +244,12 @@ fn store(base:u32,source:vec2f,tau:f32){put(base,bitcast<u32>(source.x));put(bas
 fn load(base:u32)->vec3f {return vec3f(bitcast<f32>(word(base)),bitcast<f32>(word(base+1u)),bitcast<f32>(word(base+2u)));}
 fn edge(p:vec2i)->bool {let s=vec2i(textureDimensions(terrain));return p.x==0||p.y==0||p.x==s.x-1||p.y==s.y-1;}
 ${
-    atomic
-      ? `@compute @workgroup_size(8,8) fn deepest(@builtin(global_invocation_id) id:vec3u){
+  atomic
+    ? `@compute @workgroup_size(8,8) fn deepest(@builtin(global_invocation_id) id:vec3u){
  let s=textureDimensions(terrain);if(any(id.xy>=s)){return;}let p=vec2i(id.xy);
  if(edge(p)&&root(p)==0u&&depthAt(p)>0.0){atomicMax(&cells[cellCount()*9u+2u],bitcast<u32>(depthAt(p)));}
 }`
-      : `@compute @workgroup_size(8,8) fn seed(@builtin(global_invocation_id) id:vec3u){
+    : `@compute @workgroup_size(8,8) fn seed(@builtin(global_invocation_id) id:vec3u){
  let s=textureDimensions(terrain);if(any(id.xy>=s)){return;}let p=vec2i(id.xy);let n=cellCount();
  let d=depthAt(p);let deepest=bitcast<f32>(word(n*9u+2u));
  let source=root(p)==0u&&(d>=3.14159265/fieldK()||(edge(p)&&d>=0.7*deepest));
@@ -277,7 +277,7 @@ fn relax(id:vec3u,fromField:u32,toField:u32){
 @compute @workgroup_size(1) fn spinEnd(){let at=cellCount()*9u+3u;put(at,0u);put(at+1u,0u);}
 @compute @workgroup_size(8,8) fn forward(@builtin(global_invocation_id) id:vec3u){let n=cellCount();relax(id,n+1u,n*5u+1u);}
 @compute @workgroup_size(8,8) fn backward(@builtin(global_invocation_id) id:vec3u){let n=cellCount();relax(id,n*5u+1u,n+1u);}`
-  }
+}
 `;
 
 /** Builds the surf field of a coastal grid in the flow's `connected` buffer, once, on the flow's first step. */
@@ -288,7 +288,10 @@ export class SurfFieldBuilder {
     const atomic = device.createShaderModule({ code: surfFieldShader(waterFrame, true) }),
       plain = device.createShaderModule({ code: surfFieldShader(waterFrame, false) });
     this.pipelines = ['deepest', 'seed', 'forward', 'backward', 'spinStart', 'spinTick', 'spinEnd'].map((entryPoint) =>
-      device.createComputePipeline({ layout: 'auto', compute: { module: entryPoint === 'deepest' ? atomic : plain, entryPoint } }),
+      device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: entryPoint === 'deepest' ? atomic : plain, entryPoint },
+      }),
     );
     // The clock's kernels read no frame: their groups hold only the heightmap and the buffer.
     this.groups = this.pipelines.map((pipeline, i) =>
@@ -303,28 +306,26 @@ export class SurfFieldBuilder {
           }),
     );
   }
-  /**
-   * Records the build into `pass`: the deepest edge, the sources, then relaxation sweeps, as many as the grid has
-   * cells along both sides (no ray is longer), in an even count so the result ends in field A.
-   */
   /** Records the spin-up clock's start (0), one frame's advance (1) or its end (2) into `pass`. */
   clock(pass: GPUComputePassEncoder, phase: 0 | 1 | 2): void {
     pass.setPipeline(this.pipelines[4 + phase]);
     pass.setBindGroup(0, this.groups[4 + phase]);
     pass.dispatchWorkgroups(1);
   }
-  build(pass: GPUComputePassEncoder, width: number, height: number): void {
+  /**
+   * Records the build, each dispatch into the pass `next` gives (coastal.ts `NextPass`): the deepest edge, the
+   * sources, then relaxation sweeps, as many as the grid has cells along both sides (no ray is longer), in an even
+   * count so the result ends in field A.
+   */
+  build(next: (groups?: number) => GPUComputePassEncoder, width: number, height: number): void {
     const x = Math.ceil(width / 8),
-      y = Math.ceil(height / 8);
-    for (let i = 0; i < 2; i++) {
-      pass.setPipeline(this.pipelines[i]);
-      pass.setBindGroup(0, this.groups[i]);
-      pass.dispatchWorkgroups(x, y);
-    }
-    const sweeps = (width + height + 1) & ~1;
-    for (let i = 0; i < sweeps; i++) {
-      pass.setPipeline(this.pipelines[2 + (i & 1)]);
-      pass.setBindGroup(0, this.groups[2 + (i & 1)]);
+      y = Math.ceil(height / 8),
+      sweeps = (width + height + 1) & ~1;
+    for (let i = 0; i < 2 + sweeps; i++) {
+      const pass = next(x * y),
+        k = i < 2 ? i : 2 + (i & 1);
+      pass.setPipeline(this.pipelines[k]);
+      pass.setBindGroup(0, this.groups[k]);
       pass.dispatchWorkgroups(x, y);
     }
   }

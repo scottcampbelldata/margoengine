@@ -20,17 +20,46 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
   or is swapped for another revision.
 
-### Open 2026-11-20: on an Intel Arc 140V the dune coast's camp view hangs the WebGPU device (KB-SCENES-DUNE-ARCHANG1, scenes)
+### Open 2026-11-21: the surge check brings in 17 percent more water, not the 20 percent it asks (KB-WATER-SURGEVOL1, water)
 
-- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (native WebGPU, Intel Arc 140V
-  laptop GPU, adapter `intel` `xe-2lpg`): within about 3 s of the page's start "the page's WebGPU device was lost
-  (DXGI_ERROR_DEVICE_HUNG)", the restore's `requestDevice` then fails with DXGI_ERROR_DEVICE_REMOVED and the frame is
-  black. Three runs out of three, with the scatter change of KB-SCENES-DUNE-GTAO1 and without it; small WebGPU pages
-  between them (`packages/post/test/gtao-sky-browser.mjs`, `packages/scatter/test/grass-pixel.browser.mjs`) passed,
-  and the same view passes on the WebGL2 layer (`MARGO_COMPAT=1`).
-- **Cause:** not found yet. The device hangs on the scene's own GPU work (the loss comes first, the failed restore
-  after it) and no driver reset is logged, so one submission most likely runs past the Windows GPU timeout on this
-  GPU while four agents share it; which pass is not isolated.
+- **Repro:** `node packages/water/test/surge.browser.mjs` (native WebGPU, adapter `intel` `xe-2lpg`) fails "the surge
+  brings water in from the sea": volume 1,679.1 m^3 at the peak against 1,430.8 calm (1.17 times; it asks over 1.2),
+  while the beach floods to 0.607 m at ground 0.45 m (within the 0.55 +- 0.1 it asks) and drains to 0.008 m. The same
+  numbers, bit for bit, on the code before KB-SCENES-DUNE-ARCHANG1's change; the WebGL2 layer passes.
+- **Cause:** not found yet. The calm volume is read after the coastal flow's 40 s surf spin-up (KB-WATER-SWASH1), which
+  may hold more water at rest than the test's 1.2 ratio was set for; not checked.
+
+### Fixed 2026-11-21: the dune coast's camp view hung the WebGPU device on a laptop GPU (KB-SCENES-DUNE-ARCHANG1, water)
+
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (native WebGPU, laptop
+  GPU, adapter `intel` `xe-2lpg`): within about 3 s of the page's start "the page's WebGPU device was lost
+  (DXGI_ERROR_DEVICE_HUNG)", the restore's `requestDevice` then failed with DXGI_ERROR_DEVICE_REMOVED and the frame was
+  black. Three runs out of three on 2026-11-20 (with and without KB-SCENES-DUNE-GTAO1's scatter change); small WebGPU
+  pages passed between them, and the WebGL2 layer ran the view.
+- **Cause:** found by timing every render and compute pass of the page's frames with timestamp queries: on the first
+  frame one compute pass, the `Water` coastal flow's `step` (`packages/water/src/coastal.ts`), ran 4,403 ms; every other
+  pass was under 61 ms, and later frames' `step` 7 ms. On its first step the flow records its whole set-up into the
+  frame's one command buffer: the initial state and the sea's connectivity, the surf field's 2 + 1,024 relaxation sweeps
+  of the 512 x 512 shore grid and the 40 s spin-up (600 frames of 3 substeps, 3,600 flow dispatches), about 4,600 grid
+  dispatches. Windows resets a GPU that cannot finish or preempt one DMA packet within 2 s (Microsoft, "Timeout
+  detection and recovery (TDR)", https://learn.microsoft.com/windows-hardware/drivers/display/timeout-detection-and-recovery,
+  and "TdrDelay", https://learn.microsoft.com/windows-hardware/drivers/display/tdr-registry-keys), so the packet hung
+  the device whenever the scheduler asked to preempt it (another process's GPU work, the desktop) and it could not yield.
+  A quiet run of the page can survive it, as one probe run here did; the scene's check did not.
+- **Fix:** `CoastalFlow.setUp` (`packages/water/src/coastal.ts`, with `SurfFieldBuilder.build` in `surf.ts`) records
+  the same set-up commands in the same order, but into command buffers of at most `SETUP_WORKGROUPS` (2^18, 64 grid
+  dispatches of a 512 x 512 map) workgroups, each submitted on its own (Dawn records the buffers of one submit into one
+  D3D12 command list) ahead of the frame's commands; the frame's own three substeps stay in the frame. On this GPU the
+  first frame is now 74 submissions of the set-up, none over 84 ms, 4.4 to 4.8 s of GPU time in all as before. The
+  set-up reads the heightmap and the uniform as the queue holds them when the step runs (the upload, and the uniform
+  written just before), not a heightmap the same frame's encoder writes earlier on the GPU; no package feeds Water one.
+- **After:** the camp check passes on native WebGPU on this GPU ("dune coast still check passed": ground sRGB 154, 141,
+  110; occlusion mean 177.2 against 180.6 open, 10.2 percent of pixels darker), which finishes verifying
+  KB-SCENES-DUNE-GTAO1 there. `packages/water/test/surf.browser.mjs` gives the same swash run-up as before (0.126 m, in
+  the first wave period too).
+- **Regression:** `packages/water/test/surf.browser.mjs` counts the compute workgroups of every queue submission of the
+  first frame: none holds more than 2^18 and all of them hold at least the set-up's (fails on the code before: one
+  submission of 18,986,279 workgroups).
 
 ### Fixed 2026-11-20: ambient occlusion no longer darkened the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter)
 
@@ -54,7 +83,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   colour and the anti-aliasing are unchanged: `packages/scatter/test/grass-pixel.browser.mjs` still reads 0 ppm speckle,
   mean luma 184.54 against 184.90 (diffuse) and 185.12 against 185.41 (PBR) on WebGPU. The camp check on the WebGL2
   layer now reads mean 177.0 against 180.6 open and 10.5 percent of pixels darker; the open frame is the same as before
-  (180.6 against 180.7). On native WebGPU this machine could not run the view (KB-SCENES-DUNE-ARCHANG1).
+  (180.6 against 180.7). On native WebGPU, once KB-SCENES-DUNE-ARCHANG1 let the view run (2026-11-21, adapter `intel`
+  `xe-2lpg`): mean 177.2 against 180.6 open, 10.2 percent of pixels darker.
 - **Regression:** `packages/scatter/test/grass.test.js` ("coverCode depth: ...", fails on the code before: no depth
   stage) and `packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (fails on the code before, above).
 - **Limit:** a pixel the depth pass leaves bare keeps the ground's depth, and the grass is not in GTAO's ambient replay,

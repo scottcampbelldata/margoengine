@@ -114,7 +114,11 @@ numerical wave maker), and the flow carries the bores up the sand: it carries th
 2003) and drags on the sand (Manning n 0.02), so a 1 m, 60 m swell on a 1:50 beach runs 0.126 m up it on 0.78 m cells,
 near Hunt's 0.155 m for regular waves (more on finer cells), and a solitary wave runs up within 1.5% of Synolakis 1987.
 The flow spins up over the surf's last 40 s before its first frame, so the swash and the wet sand are there from the
-first frame (about 0.4 s more on the first frame on WebGPU for a 512 x 82 map, 3 s on the WebGL2 layer). Still water
+first frame (about 0.4 s more on the first frame on WebGPU for a 512 x 82 map, 3 s on the WebGL2 layer; about 4.5 s of
+GPU time for a 512 x 512 map on a laptop GPU). That set-up goes to the GPU ahead of the frame in pieces of at most
+2^18 workgroups, each its own submission, so no single submission runs past the 2 s after which Windows resets the GPU
+(KB-SCENES-DUNE-ARCHANG1). It reads the heightmap as uploaded; a heightmap you write on the GPU in the same frame's
+command encoder is not ready for it, so write it in an earlier frame or submission. Still water
 (`still`) and `water/rivers` get no surf field. The surf follows the train with the most height (the peak of the sea), so a wind sea (`wind`, no `waves`) breaks
 too; until 2026-11-17 its near-empty long trains set the field and its waves never broke (KB-WATER-SURFFIELD1).
 
