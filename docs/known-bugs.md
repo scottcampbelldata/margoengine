@@ -1243,13 +1243,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that drives its height and flux. Papers are cited in `src/surf.ts`. Regression: packages/water/test/surf.browser.mjs
   (breaking in the surf zone, none and no foam deeper than 3 m, shoaling, the depth cap, the bores reaching dry sand).
 
-### Open 2026-11-17: gltf/pbr's model nodes and the facade's meshes are two Mesh types, so parenting one to the other needs a cast (KB-GLTF-MESHTYPE1, gltf, core)
+### Fixed 2026-11-20: gltf/pbr's model nodes and the facade's meshes were two Mesh types, so parenting one to the other needed a cast (KB-GLTF-MESHTYPE1, gltf)
 
-- **Repro:** `const model = await loadGLTF(engine, url); model.root.setParent(engine.createMesh());` fails to type-check
+- **Repro:** `const model = await loadGLTF(engine, url); model.root.setParent(engine.createMesh());` failed to type-check
   (TS2740: the facade's `Mesh` lacks `engine`, `id`, `scene`, `born` and 4 more of the engine's internal `Mesh`).
-- **Cause:** `PBRModel.root` and `nodes` are typed with `core/dist/engine`'s `Mesh`, `engine.createMesh` returns
-  `core/dist/api`'s; at run time both are the same object.
-- **Workaround:** a cast, as `examples/kitty-hawk/main.ts` does. Fix: type the model's nodes with the public `Mesh`.
+- **Cause:** `PBRModel.root` and `nodes` were typed with `core/dist/engine`'s `Mesh`, whose `setParent` takes that
+  internal type; `engine.createMesh` returns `core/dist/api`'s. At run time both are the same object.
+- **Fix:** no core change and no change to a locked export: `PBRModel.root` and `nodes` in `@margoengine/gltf` are typed
+  `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
+  lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
 
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 

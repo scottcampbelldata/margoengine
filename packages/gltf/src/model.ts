@@ -19,6 +19,7 @@ import {
   type PassContext,
   type Mesh,
 } from '@margoengine/core/extension';
+import type { Mesh as FacadeMesh } from '@margoengine/core';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { splitNodeMatrix } from './node-matrix.js';
 import { pipelineGroup } from './group.js';
@@ -2255,8 +2256,9 @@ export class PBRModel implements EnginePlugin {
     for (const model of models ?? []) model.draw(context, 'beauty', context.color, context.depth, 'blend');
   }
   readonly name = 'gltf/pbr:' + modelId++;
-  readonly root: Mesh;
-  readonly nodes: Mesh[] = [];
+  /** The model's root and nodes are also the facade's public `Mesh`, so `model.root.setParent(engine.createMesh())` needs no cast. */
+  readonly root: Mesh & FacadeMesh;
+  readonly nodes: (Mesh & FacadeMesh)[] = [];
   readonly primitives: PBRPrimitive[] = [];
   /**
    * The nodes that draw the model's triangle `primitives`, each once, in primitive order: the meshes `@margoengine/gltf`'s

@@ -112,3 +112,21 @@ export const solve = solveSkeletonIK;
     '',
   );
 });
+
+test('regression: KB-GLTF-MESHTYPE1 a loaded model parents to and from the facade meshes with no cast', () => {
+  assert.equal(
+    errors(
+      'gltf-mesh',
+      `import type { EngineKernel } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+declare const engine: EngineKernel;
+const model = await loadGLTF(engine, 'model.glb');
+model.root.setParent(engine.createMesh());
+engine.createMesh().setParent(model.root);
+engine.createMesh().setParent(model.nodes[0]);
+export const parented = model.root.setParent(null);
+`,
+    ),
+    '',
+  );
+});
