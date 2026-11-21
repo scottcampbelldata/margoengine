@@ -13324,7 +13324,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/html/test/texture.test.js` ("reports a failed raster through engine.onError"; failing on
   the old code with an uncaught exception).
 
-### Open 2026-11-16: `npm run measure:size` prints different core + stage bytes on macOS and on Windows for one commit (scripts)
+### Fixed 2026-11-20: `npm run measure:size` printed different core + stage bytes on macOS and on Windows for one commit (scripts)
 
 - **Repro:** at fea5924d5, `npm run build:packages` then `npm run measure:size` on an Apple M6 (macOS, Node 26.13.0)
   prints core + stage 24,859 B gzip / 61,056 B raw and core alone 22,208 B, while the Windows workstation measured
@@ -13332,11 +13332,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `examples/package-benchmarks/results/entry-sizes.json` as committed by 073f98cb9 and afc7f204d). The record measured
   on macOS in c6dbebe9f says 24,859, so `tests/public-size-claims.test.js` fails on whichever machine did not write the
   public figures (README, docs/limits.md, site/index.html and the rest still say 24,841).
-- **Cause, not yet found:** the raw bytes differ too (10 B), so it is the bundle, not gzip. Ruled out on macOS: the
-  embedded kernel (its raw deflate in `packages/core/src/wasm.ts` is byte-identical when recompressed here) and line
-  endings (core, stage, shared and math sources converted to CRLF build to the same 61,056 / 24,859 bytes). Left to
-  check on the workstation: the two bundles side by side (`measureCoreStage()` output), to find the differing bytes.
-  Until then the public figures are not changed from one machine.
+- **Cause:** `compactPackage` (`scripts/compact-package.js`, run by `build:packages` for core and the stage) took its
+  bundler entries from `readdir` of dist and used that order as given. NTFS lists names sorted; APFS does not, so the
+  entry order, and with it the order of the shared-helper imports and of the code in the shared chunks, differed
+  between the machines. Shown on Windows by listing the entries in reverse: raw 60,984 B became 60,987 B and gzip
+  24,797 B became 24,831 B for the same sources. Line endings, the embedded kernel and gzip were ruled out earlier.
+- **Fix:** the entry list is sorted, so the bundle no longer depends on the file system. The Windows figure is
+  unchanged (24,797 B gzip, 60,984 B raw), so no public figure moves. A macOS rerun of `npm run build:packages` and
+  `npm run measure:size` should confirm it prints the same bytes.
+- **Regression:** `tests/compact-package.test.js` ("compaction output is the same whatever order readdir lists the
+  entries in"; failing on the old code with a different import order in the compacted entries).
 
 ### Fixed 2026-11-20: `Outlines` drew nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
 

@@ -18,7 +18,8 @@ export async function compactPackage(name, directory = `packages/${name}`, dist 
     // an import. A fixed list once missed the stage's glTF route and lights helpers.
     sharedDir = real(resolve(directory, '../shared')),
     isShared = (path) => dirname(real(path)) === sharedDir,
-    files = (await readdir(root)).filter((file) => file.endsWith('.js'));
+    // Sorted: readdir order is the file system's (APFS is not alphabetical), and the entry order decides chunk layout.
+    files = (await readdir(root)).filter((file) => file.endsWith('.js')).sort();
   for (const file of files)
     await writeFile(
       `${root}/${file}`,
@@ -43,8 +44,7 @@ export async function compactPackage(name, directory = `packages/${name}`, dist 
       },
       rollupOptions: {
         external: (id, importer) =>
-          !!importer &&
-          ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
+          !!importer && ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
         output: { ...compactOutput, comments: { annotation: true } },
       },
     },
