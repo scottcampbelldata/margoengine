@@ -63,7 +63,8 @@ function mesh(engine) {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement,
+    assertCore,
+    coreRequirement,
     Engine: {
       async create(canvas, options) {
         const engine = {
@@ -202,7 +203,7 @@ mock.module('@margoengine/gltf/pbr', {
     },
   },
 });
-mock.module('@margoengine/environment', {
+const environmentMock = {
   namedExports: {
     async loadEnvironmentImage(src, { signal }) {
       imageRequests.push({ src, signal });
@@ -292,7 +293,10 @@ mock.module('@margoengine/environment', {
       }
     },
   },
-});
+};
+// The bindings import /main and /loaders (KB-REACT-ENVDECODERS1); mock every specifier they may use.
+for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders'])
+  mock.module(id, environmentMock);
 // The real controls' shape: defaults (a prop removed again restores them), events, profiles and key listening.
 class MockControls {
   enabled = true;
@@ -465,12 +469,29 @@ function tree(children, props = {}) {
 }
 test('10000 meshes rerender without enumerating or copying their props into handler records', async () => {
   let enumerations = 0;
-  const CountedMesh = React.forwardRef((props, ref) => Mesh.render(new Proxy(props, {
-    ownKeys(target) { enumerations++; return Reflect.ownKeys(target); },
-  }), ref));
-  const scene = (turn) => tree(Array.from({ length: 10000 }, (_, i) => React.createElement(CountedMesh, {
-    key: i, position: [i / 8, -i / 4, i % 7], rotation: [0, turn, -0], scale: [1, 2, 0.5],
-  })), { capacity: 10016 });
+  const CountedMesh = React.forwardRef((props, ref) =>
+    Mesh.render(
+      new Proxy(props, {
+        ownKeys(target) {
+          enumerations++;
+          return Reflect.ownKeys(target);
+        },
+      }),
+      ref,
+    ),
+  );
+  const scene = (turn) =>
+    tree(
+      Array.from({ length: 10000 }, (_, i) =>
+        React.createElement(CountedMesh, {
+          key: i,
+          position: [i / 8, -i / 4, i % 7],
+          rotation: [0, turn, -0],
+          scale: [1, 2, 0.5],
+        }),
+      ),
+      { capacity: 10016 },
+    );
   const view = render(scene(0));
   await flush();
   const engine = engines.at(-1);
@@ -478,7 +499,8 @@ test('10000 meshes rerender without enumerating or copying their props into hand
   const before = enumerations;
   view.rerender(scene(0.25));
   await flush();
-  const actual = new Float64Array(10000 * 9), expected = new Float64Array(actual.length);
+  const actual = new Float64Array(10000 * 9),
+    expected = new Float64Array(actual.length);
   let i = 0;
   for (const node of engine.meshes.values()) {
     actual.set([...node.position, ...node.rotation, ...node.scale], i * 9);

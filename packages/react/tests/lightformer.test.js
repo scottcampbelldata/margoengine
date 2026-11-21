@@ -90,7 +90,7 @@ class FakeLighting {
     this.disposed = true;
   }
 }
-mock.module('@margoengine/environment', {
+const environmentMock = {
   namedExports: {
     EnvironmentBackground: FakeBackground,
     ColorBackground: FakeColorBackground,
@@ -116,7 +116,10 @@ mock.module('@margoengine/environment', {
       },
     },
   },
-});
+};
+// The bindings import /main and /loaders (KB-REACT-ENVDECODERS1); mock every specifier they may use.
+for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders'])
+  mock.module(id, environmentMock);
 
 const { render, act, cleanup } = await import('@testing-library/react');
 const { Engine, TransformStore } = await import('@margoengine/core/extension');

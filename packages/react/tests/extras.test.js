@@ -89,7 +89,7 @@ Depth.prototype.onResize = function (listener) {
 };
 mock.module('@margoengine/post/depth', { namedExports: { DepthTexture: Depth } });
 mock.module('@margoengine/post/mrt', { namedExports: { SceneTargets: plugin('targets') } });
-mock.module('@margoengine/environment', {
+const environmentMock = {
   namedExports: {
     AmbientLight: plugin('ambient', { color: '#ffffff', intensity: 1 }),
     HemisphereLight: plugin('hemisphere', { sky: '#ffffff', ground: undefined, intensity: 1 }),
@@ -103,7 +103,10 @@ mock.module('@margoengine/environment', {
       enabled: true,
     }),
   },
-});
+};
+// The bindings import /main and /loaders (KB-REACT-ENVDECODERS1); mock every specifier they may use.
+for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders'])
+  mock.module(id, environmentMock);
 const Renderer = plugin('voxels', { daylight: 1, blockLightColor: [1, 0.8, 0.6], lightmap: undefined });
 const lightings = [];
 mock.module('@margoengine/voxel/render', { namedExports: { VoxelRenderer: Renderer } });
