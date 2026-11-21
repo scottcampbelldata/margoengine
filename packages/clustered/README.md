@@ -1056,7 +1056,10 @@ fragment marches a short ray toward each light through the previous frame's scen
 of that light (default 0.8; `setStrengths` sets it per light index, 0 turns a light off). Options: `distance` (0.3),
 `thickness` (0.1), `steps` (12), `bias` (0.01) and `depth`, the scene's single-sample depth texture or a callback for
 it; omitted, it shares the scene-depth capture water and HTML panels use, which SSAO and depth of field refuse (pass
-their stack's `depthTexture` then). It works with or without shadow maps and adds binding 145. It reads one frame late
+their stack's `depthTexture` then). A callback is read every frame, so it gives the new device's texture after a device
+restore by itself; a plain texture belongs to the device that made it, so after a restore it is dropped, `engine.onError`
+hears of it once ([#borrowed-lost](https://margoengine.com/errors#borrowed-lost)) and the march stays off until
+`contact.options.depth = newTexture`. It works with or without shadow maps and adds binding 145. It reads one frame late
 (a moving caster's contact trails it by a frame), only what is on screen casts, and receivers added with
 `receiveShadow: false` skip it.
 

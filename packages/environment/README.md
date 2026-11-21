@@ -701,7 +701,13 @@ engine.start();
   so the main view keeps its own (drei's CubeCamera `envMap`). `version` changes when a device restore replaces `texture`. Structurally a
   `{texture, view}` cube map. `Environment.create(engine, cube)` copies its level 0 and processes it like `CubeFaces`
   (mips, prefiltered specular, SH, BRDF LUT); `environment.refresh()` reprocesses an updated capture into the same
-  textures, so bind groups stay valid (`version` unchanged).
+  textures, so bind groups stay valid (`version` unchanged). After a device restore a `CubeCamera` source gives the new
+  device's texture and the environment is rebuilt from it. A plain `{ texture }` belongs to the device that made it: it is
+  dropped, `engine.onError` hears of it once ([#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), the
+  environment reads as restoring (`device` is null, so `EnvironmentLighting` binds none) and the frame keeps drawing;
+  `await environment.setSource({ texture: newCube })` (second argument: the device or engine, default the engine it is
+  attached to) processes the new texture. A source object whose `texture` getter returns the current device's texture
+  works the same as a `CubeCamera`.
 - **Layers**: `layers` is a 32-bit mask read from `@margoengine/cameras/layers` (`setRenderLayers`); meshes outside it,
   and `exclude`d meshes, are hidden (`mesh.visible`) for the capture only. Without that module every mesh is on layer 0.
 - **Cost**: each capture is a full scene render (shadow maps included) at the capture size; a cube camera is six.

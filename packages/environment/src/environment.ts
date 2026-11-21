@@ -8,6 +8,7 @@ import { evaluateSH } from './sh.js';
 import * as wgsl from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { lostRebuild, reportRestore } from './restore-report.js';
+import { type BorrowSlot, borrow, lend, relend } from '../../shared/borrowed.js';
 
 declare const GPUBufferUsage: {
   MAP_READ: number;
@@ -689,6 +690,9 @@ export class Environment implements EnginePlugin {
   protected resources?: Resources;
   private readonly settings: Settings;
   private source?: EnvironmentSource;
+  // The GPU cube of a CubeTextureSource, with the device it was last processed on (shared/borrowed.js): a plain texture
+  // is lost with that device; a live source (a CubeCamera) gives a texture of the new device and is read again.
+  private cubeSlot?: BorrowSlot<GPUTexture, GPUTexture>;
   private restoring?: { device: GPUDevice; promise: Promise<void> };
   private refreshing?: Promise<void>;
   // Aborted by dispose: a rebuild or refresh still running releases its resources then, not when its GPU work ends.
@@ -710,6 +714,8 @@ export class Environment implements EnginePlugin {
     this.resources = resources;
     this.settings = settings;
     this.source = source;
+    if (source && isTexture(source))
+      this.cubeSlot = borrow(source.texture, 'Environment source texture', 'environment.setSource()', resources.device);
     this.name = options.name ?? 'environment';
     this.rotationValue = options.rotation ?? 0;
     this.intensityValue = options.intensity ?? 1;
@@ -932,6 +938,17 @@ export class Environment implements EnginePlugin {
       return Promise.reject(
         new MargoError('state', 'Environment cannot be restored without keepSource; create it with keepSource true'),
       );
+    if (this.cubeSlot && isTexture(this.source)) {
+      // A live source (a CubeCamera) gives the new device's texture; a plain texture is the old device's, lost with it.
+      const current = this.sourceTexture(this.source);
+      if (current !== undefined && current !== this.cubeSlot.value) relend(this.cubeSlot, current, device);
+      if (lend(this.cubeSlot, device, this.engine) === undefined) {
+        destroy(this.resources);
+        this.resources = undefined;
+        this.restoring = undefined;
+        return Promise.resolve();
+      }
+    }
     destroy(this.resources);
     this.resources = undefined;
     const promise = build(
@@ -967,6 +984,41 @@ export class Environment implements EnginePlugin {
     watchLost(device);
     this.restoring = { device, promise };
     return promise;
+  }
+
+  /** The texture of a GPU cube source now; undefined when the source cannot give one (the build then reports why). */
+  private sourceTexture(source: CubeTextureSource): GPUTexture | undefined {
+    try {
+      return source.texture;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Gives an environment made from a GPU cube a new source texture, after a device restore reported
+   * `Environment source texture lost with the device` (a plain texture belongs to the device that made it; a `CubeCamera`
+   * source is made again by itself). The texture must be on the device now in use (`target`, default the engine the
+   * environment is attached to) and as valid as `Environment.create` asks; the environment is processed again from it.
+   * Rejects with MargoError `state` when the environment has no GPU cube source, and with RangeError when the size changed.
+   */
+  setSource(source: CubeTextureSource, target?: GPUDevice | EngineKernel): Promise<void> {
+    try {
+      if (this.disposed) throw new MargoError('disposed', 'Environment is disposed; create a new Environment');
+      if (!this.cubeSlot)
+        throw new MargoError('state', 'Environment setSource needs an environment made from a GPU cube');
+      validateSource(source);
+      if (source.texture.width !== this.settings.size)
+        throw new RangeError('Environment setSource texture changed size; create a new Environment for the new size');
+      const device = target ? deviceOf(target) : this.engine?.gpu;
+      if (!device) throw new MargoError('state', 'Environment setSource needs the device to use; pass it as the target');
+      this.source = source;
+      relend(this.cubeSlot, source.texture, device);
+      if (this.resources?.device === device) return this.refresh();
+      return this.restore(device);
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   /**
