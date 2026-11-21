@@ -7232,8 +7232,12 @@ resource paths. Moving them behind separate entries would duplicate that work. C
 ## Web template bundle
 
 The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must stay below
-83,000 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). It measured 82,837 B on 09a33b8dd9.
-The bound moved from 82,000 to 83,000 B (2026-11-16) for 1,246 B of shadow and controls fixes and features, measured
+85,000 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). Scott approved the increase from
+83,000 B on 2026-11-21. The starter measures 84,025 B on public main at 5ff5dc647f and after this budget correction.
+The current Environment module graph accounts for 11,659 B of lazy loader code in the measured bundle. The starter
+does not load Water, and this correction changes no runtime code or core and stage size. It measured 82,837 B on
+09a33b8dd9.
+The earlier bound moved from 82,000 to 83,000 B (2026-11-16) for 1,246 B of shadow and controls fixes and features, measured
 per commit by rebuilding the template's packages at each commit that touched its dependency closure (81,591 B on
 9de40842c5): `add(group or model root)` casts every mesh below it +570 B (c0667a30ae; the group walk sits in the
 shadows chunk that Shadows and VirtualShadows share, so the page carries it whether or not it adds a group; the commit's

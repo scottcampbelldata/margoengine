@@ -6,11 +6,11 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open: the web starter exceeds its bundle ceiling (create-margo)
+### Fixed 2026-11-21: the web starter exceeded its bundle ceiling (create-margo)
 
 - **Repro:** on public main at `5ff5dc647f`, build packages and run `node --test --test-name-pattern="the web template" tests/create-margo.test.js`. The web template builds to 84,025 B gzip against a limit of 83,000 B. Its bundle does not load Water.
 - **Cause:** the template's Environment graph reaches all the lazy HDR image formats despite using a generated lighting image. The total test counts the initial bundle and all lazy chunks, including 11,659 B of loader code. Changing just the template import to the Environment main subpath still produces 83,954 B.
-- **Owner:** `create-margo` and its Environment dependency. Keep the size limit while diagnosing how to keep the template's lighting and reduce its installer output.
+- **Fix:** Scott approved an 85,000 B ceiling for the starter. The same test measures every lazy chunk and continues to enforce the limit.
 
 ### Fixed 2026-11-21: planar water captures ended in a hard line (water)
 

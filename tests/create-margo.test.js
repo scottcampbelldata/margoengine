@@ -124,7 +124,8 @@ for (const [template, { main, imports }] of Object.entries(templates))
     // alphaHash() (tests/alpha-hash-free-imports.test.js), 81,613 B, and the bound is back at 82,000. 83,000 since
     // 09a33b8dd9 (82,837 B): shadow group casters, PCSS options, device-restore and frame-time fixes and controls help
     // links, +1,246 B, each commit measured in docs/limits.md.
-    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 83_000, `unexpected bundle size ${gzip}`);
+    // Scott, 2026-11-21: 85,000 B for the 84,025 B public-main starter with the current Environment graph.
+    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 85_000, `unexpected bundle size ${gzip}`);
     else assert.ok(gzip > 10_000, `unexpected bundle size ${gzip}`);
     // WGSL comments are documentation for the source, not bytes for the user: they once cost the web template 698 B.
     if (template === 'web')
