@@ -1314,6 +1314,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       const kind = arc.kind as 'inherit' | 'specialize',
         placed = placeClass(near, depth, kind, path, near.children.length, true, carried(near, arc), arc);
       if (!placed) return;
+      // Seen on OpenUSD (black-box prim indexes, KB1942c part 26), the specification does not say: an implied arc that
+      // reaches a placeholder which itself implies nothing (its site held by an inherit of its stack) stops there.
+      if (placed.inert && !blocked.has(placed) && inert(placed) && !near.children.some(active)) return;
       arc.family ??= {};
       if (placed.implied) {
         placed.of ??= arc;
