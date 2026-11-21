@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import {
   assertPackageRecordsCurrent,
+  catalogExportProblems,
   foldersInNoProject,
   packageRecordProblems,
 } from '../scripts/support/package-records.mjs';
@@ -50,4 +51,17 @@ test('a package added without its records is reported, each with the command tha
   );
   assert.match(problems[1], /sizes\.html cannot be built: .*no sizes for @margoengine\/new-scene.*entry-sizes\.mjs/);
   assert.match(problems[2], /examples\/new-scene is in no type-check project: add it in scripts\/support\/example-projects/);
+});
+
+test('a catalog entry missing an export its api report declares is reported with the command to run', (t) => {
+  const fake = mkdtempSync(join(tmpdir(), 'catalog-exports-'));
+  t.after(() => rmSync(fake, { recursive: true, force: true }));
+  mkdirSync(join(fake, 'docs'));
+  mkdirSync(join(fake, 'api'));
+  writeFileSync(join(fake, 'docs/catalog.json'), JSON.stringify([{ id: 'demo', exports: ['a'] }]));
+  writeFileSync(join(fake, 'api/demo.api.md'), 'export function a(): void;\nexport function noteEngine(): void;\nexport interface T {}\n');
+  const problems = catalogExportProblems(fake);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /demo lacks exports noteEngine.*npm run build:packages/);
+  assert.deepEqual(catalogExportProblems(root), []);
 });
