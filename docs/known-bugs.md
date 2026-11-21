@@ -5974,8 +5974,33 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
 - **Later on 2026-11-19, again:** each subset's light program `sample` takes an instance's two transforms from one
   motion rotation and the guided `post` builds its guide boxes once (KB-L5a-10's fourth progress note: with every
   feature `sample` 30.6 to 25.3 s of fxc).
+- **Reproduced 2026-11-21 on a laptop** (Intel Arc 140V, Edge 157, ANGLE Direct3D 11 as the run printed it; three
+  other agents' jobs on the machine, so the seconds are loaded figures) on fa9dd5ee7, with
+  `MARGO_COMPAT=1 node scripts/run-with-timeout.mjs -- node packages/voxel-pathtracer/tests/compose-browser.mjs
+  --backend=native`:
+  - The default run (8 subsets at once, the native default, since the leg is not the script's own layer leg): subsets
+    0 to 3 started together and rendered at 635 s; the media subsets 4 to 7 waited inside
+    `ComposedVoxelPathTracer.create` until then, and their programs were still compiling at 1,226 s. About 160 s a
+    subset.
+  - `--parallel=1 --phase=ids`, the layer's own default: subsets 0, 1 and 2 took 104, 206 and 210 s; the run stopped at
+    its 10 minute limit in subset 3. About the same rate, so choosing 1 for this leg would not close the gap and was
+    not changed.
+  - Where the time goes: every subset's programs (`ids`, the nine loop programs, the census) become ready one after
+    another, never side by side, with the page idle between. A probe page (one 160-step loop program, the shader text
+    new each time) showed this backend's pattern: the link reports complete after 58 to 74 ms and the first draw then
+    takes 194 to 346 ms more (later draws 2 to 4 ms), for 1 and for 4 colour outputs alike, and binding the 4-target
+    framebuffer before `linkProgram` changed nothing (draw 264 to 339 ms against 268 to 336 ms). So the shader compile
+    that counts runs at first use on the browser's GPU thread, one program at a time, whatever the layer binds at link.
+    The probe also shows that here a 1-output program pays that compile at its first draw too, which
+    `LinkedProgram.warmed` (packages/webgl2-compat/src/device/render.ts) does not warm, as it assumes only programs with
+    2 or more colour targets compile again. That moves a compile after `ready` rather than adding one; not changed here.
+  - So at this rate the 32 subsets need about 85 minutes against the 12 minute limit, about 7 times over. Nothing
+    hangs: each compile finishes, and every subset that rendered passed its checks. No Margo-side defect was found
+    beyond the program sizes the entry already names.
 - **Next:** cut the compile work per program further (`surface`, `hit`, `shadow`, `vertex`) and prove it with a
-  program-size or call-site count, then rerun the repro. The test and its limits stay as they are.
+  program-size or call-site count, then rerun the repro. The test and its limits stay as they are. A gap of about 7
+  times will not close by trimming alone, so changing the step's scope or limit on Direct3D 11 is a decision for
+  Scott (escalated 2026-11-21).
 
 ### Fixed 2026-11-11: a git that Windows could not start stopped the dev server with a bare "Command failed" (KB-L5a-6)
 
