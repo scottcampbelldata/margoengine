@@ -19,10 +19,14 @@ function errors(name, code) {
       join(folder, 'tsconfig.json'),
       JSON.stringify({ compilerOptions: README_OPTIONS, include: ['program.ts'] }),
     );
-    const run = spawnSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', folder, '--pretty', 'false'], {
-      encoding: 'utf8',
-      timeout: 120_000,
-    });
+    const run = spawnSync(
+      process.execPath,
+      [join(root, 'node_modules/typescript/bin/tsc'), '-p', folder, '--pretty', 'false'],
+      {
+        encoding: 'utf8',
+        timeout: 120_000,
+      },
+    );
     return run.stdout;
   } finally {
     rmSync(folder, { recursive: true, force: true });
