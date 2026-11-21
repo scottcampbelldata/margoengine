@@ -965,8 +965,8 @@ class PBRModel implements EnginePlugin {
     static cancelOpaquePass(context: Context): void;
     static endOpaquePass(context: Context): void;
     readonly name: string;
-    readonly root: Mesh;
-    readonly nodes: Mesh[];
+    readonly root: Mesh & FacadeMesh;
+    readonly nodes: (Mesh & FacadeMesh)[];
     readonly primitives: PBRPrimitive[];
     get meshes(): readonly Mesh[];
     prepareDeformation?: (context: PBRDeformationContext) => void;

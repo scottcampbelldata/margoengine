@@ -4,7 +4,7 @@
 
 ```ts
 import { Audio, AudioListener } from "@margoengine/audio";
-import { EngineKernel } from "@margoengine/core";
+import { EngineKernel, Mesh } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, TranscodedKTX2Result } from "@margoengine/decoders";
 import { Splats } from "@margoengine/splats";
@@ -943,8 +943,8 @@ class PBRModel implements EnginePlugin {
     static cancelOpaquePass(context: Context): void;
     static endOpaquePass(context: Context): void;
     readonly name: string;
-    readonly root: Mesh;
-    readonly nodes: Mesh[];
+    readonly root: Mesh & FacadeMesh;
+    readonly nodes: (Mesh & FacadeMesh)[];
     readonly primitives: PBRPrimitive[];
     get meshes(): readonly Mesh[];
     prepareDeformation?: (context: PBRDeformationContext) => void;
