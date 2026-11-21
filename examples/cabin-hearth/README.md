@@ -28,7 +28,8 @@ with the repository's Vite dev server.
   The glass sits 0.2 m into the wall in four lites, its cross of glazing bars (`lites: [2, 2]`, 45 by 50 mm) in the
   glass's plane, so the bars read dark against the frost; the frost glows brightest just under the lantern and
   dimmest in the far corner, as the lantern's inverse square and cosine give it, with the bars' shadows on it
-  (KB-CABIN-FROST2).
+  (KB-CABIN-FROST2). The window's light is set back in its frame (`recess` and `sill`), so the snow right under the
+  sill, which sees the glass only past the sill, stays dimmer, and so does its bounce onto the logs (KB-BOUNCE-REVEAL1).
   Through clear glass (`glazing=clear`) the lantern's beam falls on the snow as a firelight-orange patch crossed by
   the bars' shadows, running out as its inverse square says (KB-CABIN-LANTERN1).
 - **The hearth.** One package call, `Fire.attach` (`@margoengine/vfx/fire`), places the kit's fire on the fuel's

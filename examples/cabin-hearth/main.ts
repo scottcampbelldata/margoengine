@@ -22,7 +22,14 @@
 import { createStage } from 'margoengine';
 import { type Mesh, PbrMaterial } from '@margoengine/core';
 import { UnlitMaterial } from '@margoengine/materials';
-import { castIron, hearthstone, soot, tarnishedCopper, weatheredWood, type MaterialPreset } from '@margoengine/materials/presets';
+import {
+  castIron,
+  hearthstone,
+  soot,
+  tarnishedCopper,
+  weatheredWood,
+  type MaterialPreset,
+} from '@margoengine/materials/presets';
 import {
   type GeometryData,
   boxGeometry,
@@ -123,7 +130,8 @@ const stage = await createStage('#viewport', {
   backend: 'webgpu',
   controls: false,
   autoStart: false,
-  label: 'A snowbound log cabin at night: snow falls past one warm lit window; inside, a fire burns in a stone hearth and a kettle steams',
+  label:
+    'A snowbound log cabin at night: snow falls past one warm lit window; inside, a fire burns in a stone hearth and a kettle steams',
   camera: { ...view, fov: params.get('view') === 'hearth' ? 55 : 40, near: 0.05, far: 600 },
   onError: (value) => {
     error.textContent = String(value);
@@ -141,7 +149,11 @@ TAA.attach(engine, { depth: () => stack.depthTexture, reactive: () => falling.we
 
 const sky = Sky.attach(engine, structuredClone(kit.sky) as typeof kit.sky, { preetham, night, reflection, lighting });
 // The moonlit snow lights the cabin from below: the eaves, the sills and the logs' undersides that face the snow.
-const bounce = HemisphereLight.attach(engine, { sky: [...kit.bounce.sky], ground: [...kit.bounce.ground], intensity: kit.bounce.intensity });
+const bounce = HemisphereLight.attach(engine, {
+  sky: [...kit.bounce.sky],
+  ground: [...kit.bounce.ground],
+  intensity: kit.bounce.intensity,
+});
 // Shadow map sizes come from the quality tier's preset (@margoengine/quality).
 const shadows = Shadows.attach(engine, { distance: 60, lightSize: 0.02 });
 // The local lights' shadows: the fire's flame line and the lantern, each a point light with six cube faces. The fire
@@ -226,9 +238,18 @@ add(backWall, logs, [0, 0, -depth / 2]);
 for (const x of [-width / 2, width / 2]) add(sideWall, logs, [x, 0, 0], quat([0, 1, 0], -Math.PI / 2));
 // Window frame, a sill outside that gathers snow, the door's planks.
 const frame = material('#5a4330', 0.75);
-block([windowX[1] - windowX[0] + 0.16, 0.08, 0.42], frame, [(windowX[0] + windowX[1]) / 2, windowY[0] - 0.02, depth / 2 + 0.05]);
-block([windowX[1] - windowX[0] + 0.16, 0.08, 0.34], frame, [(windowX[0] + windowX[1]) / 2, windowY[1] + 0.02, depth / 2]);
-for (const x of [windowX[0] - 0.04, windowX[1] + 0.04]) block([0.08, windowY[1] - windowY[0], 0.34], frame, [x, (windowY[0] + windowY[1]) / 2, depth / 2]);
+block([windowX[1] - windowX[0] + 0.16, 0.08, 0.42], frame, [
+  (windowX[0] + windowX[1]) / 2,
+  windowY[0] - 0.02,
+  depth / 2 + 0.05,
+]);
+block([windowX[1] - windowX[0] + 0.16, 0.08, 0.34], frame, [
+  (windowX[0] + windowX[1]) / 2,
+  windowY[1] + 0.02,
+  depth / 2,
+]);
+for (const x of [windowX[0] - 0.04, windowX[1] + 0.04])
+  block([0.08, windowY[1] - windowY[0], 0.34], frame, [x, (windowY[0] + windowY[1]) / 2, depth / 2]);
 // The window's glass and its cross of glazing bars (@margoengine/procedural `generateWindowPane`), set 0.2 m into the
 // wall: four lites, the bars 45 mm wide and 50 mm deep in the glass's plane. It is a winter night, and the glass has
 // frosted over inside (KB-CABIN-EDGE-SOFT2, Scott 2026-11-16); `glazing=clear` shows it as it was before (no glass
@@ -300,17 +321,33 @@ add(
   kettleAt,
 );
 const spoutTip: Vec3 = [kettleAt[0] + 0.2, kettleAt[1] + 0.15, kettleAt[2]];
-add(cylinderGeometry(0.012, 0.025, 0.17, 10), copper, [kettleAt[0] + 0.15, kettleAt[1] + 0.1, kettleAt[2]], quat([0, 0, 1], -0.95));
+add(
+  cylinderGeometry(0.012, 0.025, 0.17, 10),
+  copper,
+  [kettleAt[0] + 0.15, kettleAt[1] + 0.1, kettleAt[2]],
+  quat([0, 0, 1], -0.95),
+);
 add(torusGeometry(0.09, 0.008, 8, 24, Math.PI), iron, [kettleAt[0], kettleAt[1] + 0.2, kettleAt[2]]);
 block([1.6, 0.012, 1.1], fabric, [hx + 0.1, 0.16, hz + 1.25]);
 const cx = hx - 1.25;
 block([0.5, 0.05, 0.5], planks, [cx, 0.6, hz + 1.3]);
-for (const [dx, dz] of [[-0.21, -0.21], [0.21, -0.21], [-0.21, 0.21], [0.21, 0.21]])
+for (const [dx, dz] of [
+  [-0.21, -0.21],
+  [0.21, -0.21],
+  [-0.21, 0.21],
+  [0.21, 0.21],
+])
   block([0.05, 0.45, 0.05], planks, [cx + dx, 0.37, hz + 1.3 + dz]);
 block([0.5, 0.55, 0.05], planks, [cx, 0.9, hz + 1.53]);
 // A table by the window with a mug.
 block([1.2, 0.05, 0.7], planks, [1.2, 0.85, 1.6]);
-for (const [dx, dz] of [[-0.5, -0.27], [0.5, -0.27], [-0.5, 0.27], [0.5, 0.27]]) block([0.06, 0.7, 0.06], planks, [1.2 + dx, 0.48, 1.6 + dz]);
+for (const [dx, dz] of [
+  [-0.5, -0.27],
+  [0.5, -0.27],
+  [-0.5, 0.27],
+  [0.5, 0.27],
+])
+  block([0.06, 0.7, 0.06], planks, [1.2 + dx, 0.48, 1.6 + dz]);
 add(cylinderGeometry(0.045, 0.04, 0.1, 16), material('#c9c2b0', 0.4), [1.45, 0.925, 1.5]);
 
 const cabin = built.length;
@@ -323,14 +360,19 @@ const lanternAt: Vec3 = [1.2, 1.875, 1.95],
 add(cylinderGeometry(0.006, 0.006, 0.62, 6), iron, [lanternAt[0], 2.31, lanternAt[2]]);
 add(coneGeometry(0.07, 0.06, 12), iron, [lanternAt[0], lanternAt[1] + 0.115, lanternAt[2]]);
 add(cylinderGeometry(0.06, 0.06, 0.03, 16), brass, [lanternAt[0], lanternAt[1] - 0.095, lanternAt[2]]);
-for (const [dx, dz] of [[-0.045, -0.045], [0.045, -0.045], [-0.045, 0.045], [0.045, 0.045]])
+for (const [dx, dz] of [
+  [-0.045, -0.045],
+  [0.045, -0.045],
+  [-0.045, 0.045],
+  [0.045, 0.045],
+])
   add(cylinderGeometry(0.005, 0.005, 0.18, 6), iron, [lanternAt[0] + dx, lanternAt[1] - 0.005, lanternAt[2] + dz]);
 // Spruces round the clearing (@margoengine/procedural/tree: branch whorls and the needles' measured colour), seeded so
 // every load and every shot is the same. The wireframe view draws each tree's own geometry as created (a spruce near
 // the camera shows its shoots, and each trunk its flare at its height).
 const wireTrees = params.get('debug') === 'wireframe';
 let seed = 12345;
-const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 for (let i = 0; i < 70; i++) {
   const angle = random() * Math.PI * 2,
     radius = 11 + random() * 45,
@@ -348,7 +390,10 @@ for (let i = 0; i < 70; i++) {
         positions.set(vertices.subarray(v * 2, v * 2 + 3), v);
         normals.set(vertices.subarray(v * 2 + 3, v * 2 + 6), v);
       }
-      built.push({ mesh, data: geometryData(positions, normals, new Float32Array((positions.length / 3) * 2), indices) });
+      built.push({
+        mesh,
+        data: geometryData(positions, normals, new Float32Array((positions.length / 3) * 2), indices),
+      });
     }
 }
 
@@ -368,10 +413,21 @@ const snow = on('cover') ? Snow.attach(engine, { ...kit.cover }) : undefined;
 // snow below the window, and the window's bars cast its shadow.
 for (const { mesh } of built.slice(1, cabin)) localShadows.add(mesh);
 const fire = on('fire')
-  ? Fire.attach(engine, { position: fuelTop, lights: groups, depth: () => stack.depthTexture, steam: on('steam') ? spoutTip : undefined })
+  ? Fire.attach(engine, {
+      position: fuelTop,
+      lights: groups,
+      depth: () => stack.depthTexture,
+      steam: on('steam') ? spoutTip : undefined,
+    })
   : undefined;
 const { flicker: lampFlicker, ...lamp } = kit.hearth.lamp;
-const lantern = { ...lamp, color: [...lamp.color] as Vec3, position: [...lanternAt] as Vec3, castShadow: true, flicker: { ...lampFlicker } };
+const lantern = {
+  ...lamp,
+  color: [...lamp.color] as Vec3,
+  position: [...lanternAt] as Vec3,
+  castShadow: true,
+  flicker: { ...lampFlicker },
+};
 // Its flame (@margoengine/clustered/flicker `flameEmission`): an emitter at the lamp's own radiance, its intensity over
 // its 11 mm flame's projected area (17,000 cd/m2), flickering with it, so it glows through the kit's bloom. The
 // ellipsoid, 16.5 mm across and 29 mm tall, shows that area, pi 0.011^2, from the side.
@@ -386,7 +442,9 @@ const stopFlicker = animateFlicker(engine, groups.group('lamp'), [lantern], { em
 // the lantern, with the bars dark across it and their shadows on the frost (KB-CABIN-FROST2), and the patch on the snow
 // is a soft glow with no window-bar lines in it. The pane stops the lights' beams in their shadow maps; its faces and
 // the light it sends out come from the same opening, on the glass's outdoor face. Behind the frost the frame's sides
-// reach 0.118 m into the room (to z 2.33), the reveal that can shade it.
+// reach 0.118 m into the room (to z 2.33), the reveal that can shade it. Outside, the frame's sides and head stand
+// 0.218 m in front of the opening (to z 2.67) and the sill 0.09 m further (to z 2.76): the light's `recess` and `sill`,
+// so the snow and logs it lights see it only past them (KB-BOUNCE-REVEAL1).
 const inner = { width: width - log, depth: depth - log, height: wallTop - 0.075 - 0.15 },
   walls = 2 * (inner.width + inner.depth) * inner.height - (windowX[1] - windowX[0]) * (windowY[1] - windowY[0]),
   opening = {
@@ -402,6 +460,8 @@ const inner = { width: width - log, depth: depth - log, height: wallTop - 0.075 
     glazing,
     ...sash,
     reveal: paneAt[2] - 0.002 - (depth / 2 - 0.17),
+    recess: depth / 2 + 0.17 - (paneAt[2] + 0.002),
+    sill: 0.09,
   } as const;
 const windowLight = AreaLights.attach(engine, { lights });
 const roomLight = openingLight(opening);
@@ -411,7 +471,10 @@ if (glazing === 'frosted') {
   // and the bars give it.
   const look = glazingSurface(opening),
     glow = new Texture(look.emissiveMap, { wrapS: 'clamp', wrapT: 'clamp' }),
-    glass = createMesh(engine, pane.frosted, [new SurfaceMaterial({ ...look.outside, emissiveMap: glow }), new SurfaceMaterial(look.inside)]);
+    glass = createMesh(engine, pane.frosted, [
+      new SurfaceMaterial({ ...look.outside, emissiveMap: glow }),
+      new SurfaceMaterial(look.inside),
+    ]);
   glass.root.setPosition(paneAt);
   localShadows.add(glass);
   lights.add(glass);
@@ -421,7 +484,10 @@ if (glazing === 'frosted') {
 // light is the room's light leaving it, counted once (the package's README), captured from in front of the bars (their
 // lites and depth). Every shadowed light bounces by default.
 const lightBounce = on('bounce')
-  ? LightBounce.attach(engine, { lights, openings: [{ light: roomLight, glazing, lites: sash.lites, barDepth: sash.barDepth }] })
+  ? LightBounce.attach(engine, {
+      lights,
+      openings: [{ light: roomLight, glazing, lites: sash.lites, barDepth: sash.barDepth }],
+    })
   : undefined;
 
 // The fog's froxel grid comes from the quality tier's preset.
@@ -439,7 +505,8 @@ if (params.get('debug') === 'wireframe') {
   const lines = new Lines();
   engine.use(lines);
   const edge = new LineMaterial({ color: '#7fd4ff', width: 1 });
-  for (const { mesh, data } of built) lines.add(new Line({ mode: 'segments', positions: wireframePositions(data), material: edge, mesh }));
+  for (const { mesh, data } of built)
+    lines.add(new Line({ mode: 'segments', positions: wireframePositions(data), material: edge, mesh }));
 }
 
 // Orbit with the mouse, except when the shot tool drives the camera (`ui=0`).

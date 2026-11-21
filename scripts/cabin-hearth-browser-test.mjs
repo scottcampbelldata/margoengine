@@ -45,7 +45,21 @@ const tag = process.env.MARGO_COMPAT === '1' ? 'compat' : 'native';
  * on WebGPU over three runs each, and failed its bound once (KB-CABIN-RUG-RATIO1); held steady it reads 3.60 on both.
  * `hdr` (world points) also reads the frame in float there (`hdrRead`).
  */
-async function frame(query, name, { linear = false, exposure = 0, lamp = true, fire = true, windowLight = true, flame = 'steady', bloom = true, camera, hdr } = {}) {
+async function frame(
+  query,
+  name,
+  {
+    linear = false,
+    exposure = 0,
+    lamp = true,
+    fire = true,
+    windowLight = true,
+    flame = 'steady',
+    bloom = true,
+    camera,
+    hdr,
+  } = {},
+) {
   await ctx.page.goto(`http://127.0.0.1:${port}/examples/cabin-hearth/index.html?ui=0&${query}`);
   await ctx.page.waitForSelector('#viewport[data-ready="true"]', { timeout: 180000 });
   await ctx.page.addStyleTag({ content: 'h1,#hint,nav,#status,#error{visibility:hidden!important}' });
@@ -56,21 +70,32 @@ async function frame(query, name, { linear = false, exposure = 0, lamp = true, f
         if (!windowLight) page.windowLight.setLights([]);
         if (!bloom) page.bloom.options.strength = 0;
         if (camera) Object.assign(page.engine.camera, { position: [...camera.position], target: [...camera.target] });
-        if (linear) Object.assign(page.tonemap.options, { curve: 'linear', exposure, contrast: 1, temperature: 6500, vignette: 0 });
+        if (linear)
+          Object.assign(page.tonemap.options, {
+            curve: 'linear',
+            exposure,
+            contrast: 1,
+            temperature: 6500,
+            vignette: 0,
+          });
         if (lamp !== true) {
           const group = page.groups.group('lamp'),
             light = group.lights[0];
           group.dispose();
-          if (lamp === 'steady') page.groups.group('lamp-steady').setLights([{ ...light, intensity: page.kit.hearth.lamp.intensity * 0.9 }]);
+          if (lamp === 'steady')
+            page.groups.group('lamp-steady').setLights([{ ...light, intensity: page.kit.hearth.lamp.intensity * 0.9 }]);
           // The flicker stopped with its group; the flame's emitter holds the lamp's mean radiance, I / (pi r^2) x 0.9.
           const { intensity, radius } = page.kit.hearth.lamp;
           page.flame.emissiveIntensity = flame === 'steady' ? (intensity / (Math.PI * radius ** 2)) * 0.9 : flame;
         }
         if (fire === 'steady' && page.fire) {
           page.groups.group('fire').dispose();
-          page.groups.group('fire-steady').setLights(page.fire.lights.map((l) => ({ ...l, intensity: l.intensity * 0.75 })));
+          page.groups
+            .group('fire-steady')
+            .setLights(page.fire.lights.map((l) => ({ ...l, intensity: l.intensity * 0.75 })));
         }
-        const read = () => page.groups.names.flatMap((group) => page.groups.group(group).lights.map((l) => l.intensity));
+        const read = () =>
+          page.groups.names.flatMap((group) => page.groups.group(group).lights.map((l) => l.intensity));
         let n = 0,
           first;
         const tick = () => {
@@ -83,7 +108,9 @@ async function frame(query, name, { linear = false, exposure = 0, lamp = true, f
   );
   const matrix = await ctx.page.evaluate(() => [...window.cabinHearth.engine.camera.matrix]),
     firePoints = await ctx.page.evaluate(() => window.cabinHearth.fire?.lights.map((l) => [...l.position]) ?? []);
-  const image = await decodePNG(await ctx.page.locator('canvas').screenshot({ path: `test-results/cabin-hearth-${name}-${tag}.png` }));
+  const image = await decodePNG(
+    await ctx.page.locator('canvas').screenshot({ path: `test-results/cabin-hearth-${name}-${tag}.png` }),
+  );
   return { image, matrix, firePoints, intensities, hdr: hdr && (await hdrRead(matrix, hdr, image)) };
 }
 /**
@@ -115,8 +142,15 @@ async function hdrRead(matrix, points, image) {
         if (f) await new Promise((done) => requestAnimationFrame(done));
         const encoder = device.createCommandEncoder();
         for (const { u, v } of at) {
-          const buffer = device.createBuffer({ size: 256 * 5, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-          encoder.copyTextureToBuffer({ texture: stack.sceneTexture, origin: [u, v] }, { buffer, bytesPerRow: 256, rowsPerImage: 5 }, [5, 5]);
+          const buffer = device.createBuffer({
+            size: 256 * 5,
+            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+          });
+          encoder.copyTextureToBuffer(
+            { texture: stack.sceneTexture, origin: [u, v] },
+            { buffer, bytesPerRow: 256, rowsPerImage: 5 },
+            [5, 5],
+          );
           copies.push(buffer);
         }
         device.queue.submit([encoder.finish()]);
@@ -131,7 +165,8 @@ async function hdrRead(matrix, points, image) {
         await copies[i].mapAsync(GPUMapMode.READ);
         const h = new Uint16Array(copies[i].getMappedRange());
         for (let t = 0; t < 25; t++)
-          for (let k = 0; k < 3; k++) blocks[i % at.length][t * 3 + k] += half(h[Math.floor(t / 5) * 128 + (t % 5) * 4 + k]) / 8;
+          for (let k = 0; k < 3; k++)
+            blocks[i % at.length][t * 3 + k] += half(h[Math.floor(t / 5) * 128 + (t % 5) * 4 + k]) / 8;
         copies[i].unmap();
         copies[i].destroy();
       }
@@ -192,8 +227,20 @@ function colour({ image, matrix: m }, points, r = 3) {
   const c = sum.map((s) => s / n),
     max = Math.max(...c),
     span = max - Math.min(...c),
-    hue = !span ? 0 : max === c[0] ? ((c[1] - c[2]) / span + 6) % 6 : max === c[1] ? (c[2] - c[0]) / span + 2 : (c[0] - c[1]) / span + 4;
-  return { lin: lin.map((s) => s / n), hue: hue * 60, sat: max ? span / max : 0, value: max, Y: 0.2126 * toLinear(c[0]) + 0.7152 * toLinear(c[1]) + 0.0722 * toLinear(c[2]) };
+    hue = !span
+      ? 0
+      : max === c[0]
+        ? ((c[1] - c[2]) / span + 6) % 6
+        : max === c[1]
+          ? (c[2] - c[0]) / span + 2
+          : (c[0] - c[1]) / span + 4;
+  return {
+    lin: lin.map((s) => s / n),
+    hue: hue * 60,
+    sat: max ? span / max : 0,
+    value: max,
+    Y: 0.2126 * toLinear(c[0]) + 0.7152 * toLinear(c[1]) + 0.0722 * toLinear(c[2]),
+  };
 }
 /**
  * KB-CABIN-LANTERN1: the radiance a kerosene hurricane lantern gives white snow, from physics alone, for every pixel of
@@ -217,7 +264,11 @@ function lanternOnSnow({ matrix, image }, points) {
     x = -0.2661239e9 / T ** 3 - 0.2343589e6 / T ** 2 + 0.8776956e3 / T + 0.17991,
     y = -1.1063814 * x ** 3 - 1.3481102 * x ** 2 + 2.18555832 * x - 0.20219683,
     [X, Z] = [x / y, (1 - x - y) / y],
-    rgb = [3.2404542 * X - 1.5371385 - 0.4985314 * Z, -0.969266 * X + 1.8760108 + 0.041556 * Z, 0.0556434 * X - 0.2040259 + 1.0572252 * Z].map((c) => Math.max(0, c)),
+    rgb = [
+      3.2404542 * X - 1.5371385 - 0.4985314 * Z,
+      -0.969266 * X + 1.8760108 + 0.041556 * Z,
+      0.0556434 * X - 0.2040259 + 1.0572252 * Z,
+    ].map((c) => Math.max(0, c)),
     candela = 82 / (4 * Math.PI),
     flame = rgb.map((c) => (c * candela) / (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2])),
     lantern = [1.2, 1.875, 1.95],
@@ -227,13 +278,25 @@ function lanternOnSnow({ matrix, image }, points) {
     // The window's cross bar, mullion (generateWindowPane's bars, 45 mm by 50 mm, centred on the glass at z 2.45) and
     // sill, [min, max] corners.
     bars = [
-      [[0.6, 1.4775, 2.425], [1.8, 1.5225, 2.475]],
-      [[1.1775, 0.95, 2.425], [1.2225, 2.05, 2.475]],
-      [[0.52, 0.89, 2.34], [1.88, 0.97, 2.76]],
+      [
+        [0.6, 1.4775, 2.425],
+        [1.8, 1.5225, 2.475],
+      ],
+      [
+        [1.1775, 0.95, 2.425],
+        [1.2225, 2.05, 2.475],
+      ],
+      [
+        [0.52, 0.89, 2.34],
+        [1.88, 0.97, 2.76],
+      ],
     ],
     vertex = (vx, vz) => snowDepthAt(vx, vz, 1, 1, { depth: 0.12, variation: 0.5, drift: 3 }),
     height = (px, pz) => {
-      const ix = Math.floor(px), iz = Math.floor(pz), u = px - ix, w = pz - iz,
+      const ix = Math.floor(px),
+        iz = Math.floor(pz),
+        u = px - ix,
+        w = pz - iz,
         [h00, h10, h01, h11] = [vertex(ix, iz), vertex(ix + 1, iz), vertex(ix, iz + 1), vertex(ix + 1, iz + 1)];
       return u + w <= 1 ? h00 + u * (h10 - h00) + w * (h01 - h00) : h11 + (1 - u) * (h01 - h11) + (1 - w) * (h10 - h11);
     },
@@ -301,6 +364,71 @@ function lanternOnSnow({ matrix, image }, points) {
   }
   return { radiance: sum.map((c) => c / n), lit: open[0] ? sum[0] / open[0] : 1 };
 }
+// The window's geometry outside its glass: the cross bar, the mullion and the sill (main.ts), as boxes [lo, hi].
+const windowBars = [
+    [
+      [0.6, 1.4775, 2.425],
+      [1.8, 1.5225, 2.475],
+    ],
+    [
+      [1.1775, 0.95, 2.425],
+      [1.2225, 2.05, 2.475],
+    ],
+    [
+      [0.52, 0.89, 2.34],
+      [1.88, 0.97, 2.76],
+    ],
+  ],
+  windowSill = windowBars[2],
+  // The opening light's rectangle at z 2.452 (1.2 x 1.1 m), 840 patches of equal area.
+  panePatches = [];
+for (let a = 0; a < 30; a++)
+  for (let b = 0; b < 28; b++) panePatches.push([0.6 + ((a + 0.5) * 1.2) / 30, 0.95 + ((b + 0.5) * 1.1) / 28, 2.452]);
+/** Whether the segment from p to q crosses the box [lo, hi] (the slab test). */
+function crossesBox(p, q, [lo, hi]) {
+  let t0 = 0,
+    t1 = 1;
+  for (let k = 0; k < 3; k++) {
+    if (Math.abs(q[k] - p[k]) < 1e-12) {
+      if (p[k] < lo[k] || p[k] > hi[k]) return false;
+      continue;
+    }
+    let a = (lo[k] - p[k]) / (q[k] - p[k]),
+      b = (hi[k] - p[k]) / (q[k] - p[k]);
+    if (a > b) [a, b] = [b, a];
+    t0 = Math.max(t0, a);
+    t1 = Math.min(t1, b);
+  }
+  return t0 <= t1;
+}
+/** Whether the segment from snow point p to q (inside) passes the window's opening (x 0.6 to 1.8, y 0.97 to 2.05) at depth z. */
+function inOpening(p, q, z) {
+  const t = (z - p[2]) / (q[2] - p[2]),
+    x = p[0] + t * (q[0] - p[0]),
+    y = p[1] + t * (q[1] - p[1]);
+  return x >= 0.6 && x <= 1.8 && y >= 0.97 && y <= 2.05;
+}
+/**
+ * The window's form factor from a point outside (unit normal `n`), sum cos_p cos_q dA / (pi r^2) over the pane's 840
+ * patches by midpoint quadrature: `shaded` (default) lets a patch count only where the segment to it leaves through the
+ * opening's outer face (the frame, z 2.67) and passes over the sill, as physics does; without it every patch in front of
+ * the receiver counts, the bare rectangle (Lambert's polygon form). KB-BOUNCE-REVEAL1: the opening light clips its
+ * rectangle the same way (`recess`, `sill`), so what it lights outside is held to this.
+ */
+function paneFormFactor(p, n, { shaded = true } = {}) {
+  let sum = 0;
+  for (const q of panePatches) {
+    const d = q.map((c, k) => c - p[k]),
+      d2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2],
+      l = Math.sqrt(d2),
+      cosP = (n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / l,
+      cosQ = -d[2] / l;
+    if (cosP <= 0 || cosQ <= 0) continue;
+    if (shaded && (!inOpening(p, q, 2.67) || crossesBox(p, q, windowSill))) continue;
+    sum += (cosP * cosQ * ((1.2 * 1.1) / panePatches.length)) / d2;
+  }
+  return sum / Math.PI;
+}
 /**
  * KB-CABIN-SNOWBOUNCE1: the one bounce off the snow onto the outward crest of the log at (0.3, 1.35, 2.65), normal +z,
  * per unit of the source, by midpoint quadrature over the snow surface of `lanternOnSnow` (the ground's 1 m grid lifted
@@ -309,56 +437,25 @@ function lanternOnSnow({ matrix, image }, points) {
  * 'lantern': a point at the lantern of unit intensity, by the inverse square law, the range window (1 - (d / 18)^4)^2
  * and the cosine, through the window's opening (x 0.6 to 1.8, y 0.97 to 2.05 from its inner face at z 2.33 to its outer
  * face at z 2.67) past the cross bar, mullion and sill of `lanternOnSnow`; 2 cm elements.
- * 'pane': the window's opening at z 2.452 (1.2 x 1.1 m) of unit radiance, 840 patches; `shaded` (default) lets a patch
- * light a snow element only through the opening's outer face and past the sill, as physics does; without it every patch
- * lights every element in front of the pane, as the opening light (no shadow) does; 4 cm elements. `centre` (a point,
- * with `shaded: false`) is LightBounce's own model of the frosted scene: the opening's capture looks out from in front
- * of its glazing bars, so the snow it reflects is what that point sees through the opening's outer face and past the sill,
- * and each such element takes the bare rectangle's irradiance (`rectIrradiance`, the opening light's unshadowed light).
+ * 'pane': the window's opening at z 2.452 (1.2 x 1.1 m) of unit radiance, E_in = pi `paneFormFactor`; `shaded`
+ * (default) lets the pane light a snow element only through the opening's outer face and past the sill, as physics
+ * does; without it, as the bare rectangle does; 4 cm elements.
  * The plan's 0.096 R for the lantern is this quadrature on the unlifted ground (y = 0): 0.0986 R; the scene's snow
  * lies on drifts lifted by `snowDepthAt`, nearer the lantern and the crest.
  */
-function bounceQuadrature(kind, { shaded = true, centre } = {}) {
+function bounceQuadrature(kind, { shaded = true } = {}) {
   const lantern = [1.2, 1.875, 1.95],
     crest = [0.3, 1.35, 2.65],
     albedo = [0.9, 0.92, 0.95],
-    bars = [
-      [[0.6, 1.4775, 2.425], [1.8, 1.5225, 2.475]],
-      [[1.1775, 0.95, 2.425], [1.2225, 2.05, 2.475]],
-      [[0.52, 0.89, 2.34], [1.88, 0.97, 2.76]],
-    ],
-    sill = bars[2],
     vertex = (vx, vz) => snowDepthAt(vx, vz, 1, 1, { depth: 0.12, variation: 0.5, drift: 3 }),
     height = (px, pz) => {
-      const ix = Math.floor(px), iz = Math.floor(pz), u = px - ix, w = pz - iz,
+      const ix = Math.floor(px),
+        iz = Math.floor(pz),
+        u = px - ix,
+        w = pz - iz,
         [h00, h10, h01, h11] = [vertex(ix, iz), vertex(ix + 1, iz), vertex(ix, iz + 1), vertex(ix + 1, iz + 1)];
       return u + w <= 1 ? h00 + u * (h10 - h00) + w * (h01 - h00) : h11 + (1 - u) * (h01 - h11) + (1 - w) * (h10 - h11);
-    },
-    crosses = (p, q, [lo, hi]) => {
-      let t0 = 0,
-        t1 = 1;
-      for (let k = 0; k < 3; k++) {
-        if (Math.abs(q[k] - p[k]) < 1e-12) {
-          if (p[k] < lo[k] || p[k] > hi[k]) return false;
-          continue;
-        }
-        let a = (lo[k] - p[k]) / (q[k] - p[k]),
-          b = (hi[k] - p[k]) / (q[k] - p[k]);
-        if (a > b) [a, b] = [b, a];
-        t0 = Math.max(t0, a);
-        t1 = Math.min(t1, b);
-      }
-      return t0 <= t1;
-    },
-    // Whether the segment from snow point p to q (inside) passes the opening's face at depth z.
-    inOpening = (p, q, z) => {
-      const t = (z - p[2]) / (q[2] - p[2]),
-        x = p[0] + t * (q[0] - p[0]),
-        y = p[1] + t * (q[1] - p[1]);
-      return x >= 0.6 && x <= 1.8 && y >= 0.97 && y <= 2.05;
-    },
-    patches = [];
-  for (let a = 0; a < 30; a++) for (let b = 0; b < 28; b++) patches.push([0.6 + ((a + 0.5) * 1.2) / 30, 0.95 + ((b + 0.5) * 1.1) / 28, 2.452]);
+    };
   const step = kind === 'lantern' ? 0.02 : 0.04,
     e = [0, 0, 0];
   for (let x = -4; x < 7; x += step)
@@ -372,23 +469,18 @@ function bounceQuadrature(kind, { shaded = true, centre } = {}) {
       if (cosS <= 0 || cosC <= 0) continue;
       let lit = 0;
       if (kind === 'lantern') {
-        if (!inOpening(p, lantern, 2.33) || !inOpening(p, lantern, 2.67) || bars.some((b) => crosses(p, lantern, b))) continue;
+        if (
+          !inOpening(p, lantern, 2.33) ||
+          !inOpening(p, lantern, 2.67) ||
+          windowBars.some((b) => crossesBox(p, lantern, b))
+        )
+          continue;
         const l = lantern.map((c, k) => c - p[k]),
           d = Math.hypot(...l);
         lit = (Math.max(0, 1 - (d / 18) ** 4) ** 2 * (l[1] / d)) / (d * d);
       } else {
         if (p[2] > 12) continue;
-        if (centre && (!inOpening(p, centre, 2.67) || crosses(p, centre, sill))) continue;
-        for (const q of patches) {
-          const d = q.map((c, k) => c - p[k]),
-            d2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2],
-            l = Math.sqrt(d2),
-            up = d[1] / l,
-            out = -d[2] / l;
-          if (up <= 0 || out <= 0) continue;
-          if (shaded && (!inOpening(p, q, 2.67) || crosses(p, q, sill))) continue;
-          lit += (up * out * ((1.2 * 1.1) / patches.length)) / d2;
-        }
+        lit = Math.PI * paneFormFactor(p, [0, 1, 0], { shaded });
       }
       for (let k = 0; k < 3; k++) e[k] += (albedo[k] * lit * cosS * cosC * step * step) / (Math.PI * r * r);
     }
@@ -402,7 +494,10 @@ function snowHits({ matrix, image }, points) {
   const cam = [5.2, 1.7, 13.5],
     vertex = (vx, vz) => snowDepthAt(vx, vz, 1, 1, { depth: 0.12, variation: 0.5, drift: 3 }),
     height = (px, pz) => {
-      const ix = Math.floor(px), iz = Math.floor(pz), u = px - ix, w = pz - iz,
+      const ix = Math.floor(px),
+        iz = Math.floor(pz),
+        u = px - ix,
+        w = pz - iz,
         [h00, h10, h01, h11] = [vertex(ix, iz), vertex(ix + 1, iz), vertex(ix, iz + 1), vertex(ix + 1, iz + 1)];
       return u + w <= 1 ? h00 + u * (h10 - h00) + w * (h01 - h00) : h11 + (1 - u) * (h01 - h11) + (1 - w) * (h10 - h11);
     },
@@ -439,25 +534,45 @@ try {
   const lit = await frame('view=hearth&bounce=0', 'hearth', { lamp: 'steady', fire: 'steady' }),
     dark = await frame('view=hearth&fire=0&bounce=0', 'hearth-no-fire', { lamp: 'steady' });
   // Both hearth frames hold the fire and the lantern at their means: no light changed while they settled.
-  for (const f of [lit, dark]) assert.deepEqual(f.intensities.last, f.intensities.first, 'the lights hold still while the frame settles');
+  for (const f of [lit, dark])
+    assert.deepEqual(f.intensities.last, f.intensities.first, 'the lights hold still while the frame settles');
   // The hearthstone top (y 0.2), in rows from the firebox's mouth toward the room.
   const row = (z) => [0.55, 0.75, 1.15, 1.35].map((x) => [x, 0.201, z]),
     mouth = colour(lit, row(-1.8)),
     mid = colour(lit, row(-1.6)),
     front = colour(lit, row(-1.43)),
-    jamb = colour(lit, [[0.281, 0.4, -2.0], [0.281, 0.7, -2.0], [0.281, 1.0, -2.0]]);
+    jamb = colour(lit, [
+      [0.281, 0.4, -2.0],
+      [0.281, 0.7, -2.0],
+      [0.281, 1.0, -2.0],
+    ]);
   console.log(JSON.stringify({ mouth: show(mouth), mid: show(mid), front: show(front), jamb: show(jamb) }));
-  for (const [name, s] of [['mouth', mouth], ['middle', mid], ['front', front], ['left jamb', jamb]]) {
+  for (const [name, s] of [
+    ['mouth', mouth],
+    ['middle', mid],
+    ['front', front],
+    ['left jamb', jamb],
+  ]) {
     assert.ok(s.hue >= 15 && s.hue <= 35, `${name} ${show(s)}: firelight orange`);
     assert.ok(s.sat >= 0.48, `${name} ${show(s)} is saturated, not AgX's desaturated tan`);
   }
-  assert.ok(mouth.value > mid.value && mid.value > front.value, `the stone falls off: ${show(mouth)} ${show(mid)} ${show(front)}`);
-  assert.ok(front.value / mouth.value <= 0.7, `front / mouth ${(front.value / mouth.value).toFixed(2)}: the light falls off toward the room`);
+  assert.ok(
+    mouth.value > mid.value && mid.value > front.value,
+    `the stone falls off: ${show(mouth)} ${show(mid)} ${show(front)}`,
+  );
+  assert.ok(
+    front.value / mouth.value <= 0.7,
+    `front / mouth ${(front.value / mouth.value).toFixed(2)}: the light falls off toward the room`,
+  );
   assert.ok(mouth.value <= 0.74, `mouth ${show(mouth)} is smoke-dark stone, not a flat bright tan`);
   // The fire's own light: without it the same stone is far darker.
   assert.ok(colour(dark, row(-1.8)).Y * 4 < mouth.Y, 'the fire, not the room, lights the hearthstone');
   // Flames over the logs: the frame with the fire is much brighter just over the fuel's top than without it.
-  const flames = [[0.85, 0.6, -2.15], [0.95, 0.65, -2.15], [1.05, 0.6, -2.15]];
+  const flames = [
+    [0.85, 0.6, -2.15],
+    [0.95, 0.65, -2.15],
+    [1.05, 0.6, -2.15],
+  ];
   assert.ok(colour(lit, flames).value - colour(dark, flames).value >= 0.3, 'the flames draw over the logs');
   // The rug before the hearth is lit by the fire and stays red (it was 0.39 in value on the A6000 with the hand rig).
   // Both frames hold the lights at their means, so the ratio is the light's, not the flickers' phases (KB-CABIN-RUG-RATIO1).
@@ -466,7 +581,11 @@ try {
   // against off) and the lantern's 6.5 cd 0.25 lux, against 0.11 lux from the old 4.5 cd lamp in its 6 m window and
   // 0.29 lux from the 12 cd one (c904862f57). Steady, the display ratio is 3.60 on WebGPU and the WebGL2 layer alike
   // (fire-lit 0.0503, unlit 0.0140, RTX A6000), so the lantern's light leaves the bound standing.
-  const rugAt = [[0.6, 0.167, -1.2], [1.2, 0.167, -1.0], [1.5, 0.167, -1.3]],
+  const rugAt = [
+      [0.6, 0.167, -1.2],
+      [1.2, 0.167, -1.0],
+      [1.5, 0.167, -1.3],
+    ],
     rug = colour(lit, rugAt),
     rugDark = colour(dark, rugAt);
   console.log(JSON.stringify({ rug: show(rug), rugNoFire: show(rugDark) }));
@@ -476,7 +595,10 @@ try {
   // sees it past the left jamb (x 0.06 to 0.28, y 0.15 to 1.25, z -2.425 to -1.875), so the room is lit by the fire.
   const { firePoints } = lit,
     corner = [-1.6, 0.15, -1.0],
-    jambBox = [[0.06, 0.15, -2.425], [0.28, 1.25, -1.875]],
+    jambBox = [
+      [0.06, 0.15, -2.425],
+      [0.28, 1.25, -1.875],
+    ],
     seen = firePoints.filter((q) => {
       let t0 = 0,
         t1 = 1;
@@ -490,7 +612,10 @@ try {
       }
       return t0 > t1;
     });
-  assert.ok(firePoints.length >= 2 && seen.length >= 1, `a fire point lights the back corner past the jamb (${JSON.stringify(firePoints)})`);
+  assert.ok(
+    firePoints.length >= 2 && seen.length >= 1,
+    `a fire point lights the back corner past the jamb (${JSON.stringify(firePoints)})`,
+  );
 
   const outside = await frame('view=outside', 'outside');
   // The moon stands in front of the cabin, 17 to 45 degrees up, and every outside shot looks away from it, so the walls
@@ -499,15 +624,31 @@ try {
     [mx, my, mz] = moon.map((c) => c / Math.hypot(...moon));
   assert.ok(mz > 0.4, `the moon faces the front wall (z ${mz.toFixed(2)})`);
   assert.ok(my > 0.3 && my < 0.7, `the moon stands 17 to 45 degrees up (y ${my.toFixed(2)})`);
-  for (const id of ['cabin-window-snow', 'cabin-push-in', 'cabin-wireframe', 'cabin-bare', 'cabin-long-establish',
-    'cabin-long-window', 'cabin-long-wireframe', 'cabin-long-orbit', 'cabin-long-chimney', 'cabin-long-final',
-    'cabin-long-layers-all']) {
-    const key = JSON.parse(readFileSync(`tools/shot/shots/${id}.json`, 'utf8')).tracks.find((t) => t.type === 'camera').keys[0],
+  for (const id of [
+    'cabin-window-snow',
+    'cabin-push-in',
+    'cabin-wireframe',
+    'cabin-bare',
+    'cabin-long-establish',
+    'cabin-long-window',
+    'cabin-long-wireframe',
+    'cabin-long-orbit',
+    'cabin-long-chimney',
+    'cabin-long-final',
+    'cabin-long-layers-all',
+  ]) {
+    const key = JSON.parse(readFileSync(`tools/shot/shots/${id}.json`, 'utf8')).tracks.find((t) => t.type === 'camera')
+        .keys[0],
       look = key.target.map((t, i) => t - key.position[i]);
     assert.ok((look[0] * mx + look[1] * my + look[2] * mz) / Math.hypot(...look) < 0, `${id} looks away from the moon`);
   }
   // The front log wall away from the window, lit by the moon (the logs' weathered wood reflects it).
-  const wall = colour(outside, [[-2.6, 2.2, 2.65], [-2.6, 1.0, 2.65], [2.6, 1.0, 2.65], [2.6, 2.2, 2.65]]);
+  const wall = colour(outside, [
+    [-2.6, 2.2, 2.65],
+    [-2.6, 1.0, 2.65],
+    [2.6, 1.0, 2.65],
+    [2.6, 2.2, 2.65],
+  ]);
   assert.ok(wall.value >= 0.12, `the moonlit log wall ${show(wall)} is not black`);
   // The snow in front of the window is warmer than the snow in front of the bare wall beside it. The lantern (behind
   // the window at x 1.2, y 1.875, z 1.95) lights the snow past the sill's shadow, which ends about 3.6 m out (the ray
@@ -515,22 +656,43 @@ try {
   // mullion's shadow runs out along x 1.2, so the patch is sampled beside it. The points are given on y 0.05, but the
   // camera's low ray through them meets the snow, lifted about 0.15 m, at z 4.7 to 5.1, x 1.8 to 2.3: in the upper
   // pane's light, 0.2 m or more past that line and 3.5 m from the lantern. At these depths x -1.7 to -1.9 is past the opening's reach.
-  const patchAt = [[1.6, 0.05, 4.2], [1.8, 0.05, 4.2], [2.0, 0.05, 4.2], [1.6, 0.05, 4.3], [1.8, 0.05, 4.3], [2.0, 0.05, 4.3]],
+  const patchAt = [
+      [1.6, 0.05, 4.2],
+      [1.8, 0.05, 4.2],
+      [2.0, 0.05, 4.2],
+      [1.6, 0.05, 4.3],
+      [1.8, 0.05, 4.3],
+      [2.0, 0.05, 4.3],
+    ],
     patch = colour(outside, patchAt),
-    beside = colour(outside, [[-1.7, 0.05, 4.0], [-1.9, 0.05, 4.0], [-1.7, 0.05, 4.1], [-1.9, 0.05, 4.1]]);
+    beside = colour(outside, [
+      [-1.7, 0.05, 4.0],
+      [-1.9, 0.05, 4.0],
+      [-1.7, 0.05, 4.1],
+      [-1.9, 0.05, 4.1],
+    ]);
   console.log(JSON.stringify({ wall: show(wall), patch: show(patch), beside: show(beside) }));
-  assert.ok(patch.Y > beside.Y * 1.2, `the lantern lights the snow before the window: ${show(patch)} (Y ${patch.Y.toFixed(3)}) against ${show(beside)} (Y ${beside.Y.toFixed(3)})`);
+  assert.ok(
+    patch.Y > beside.Y * 1.2,
+    `the lantern lights the snow before the window: ${show(patch)} (Y ${patch.Y.toFixed(3)}) against ${show(beside)} (Y ${beside.Y.toFixed(3)})`,
+  );
   // It is warmer than the moonlit snow beside it (less blue for its red), and reads as firelight orange, not mauve
   // (KB-CABIN-LANTERN1: hue 322 at the kit's 4.5 cd, 3,000 K lamp; 15 at 12 cd; 10 at a hurricane lantern's 6.5 cd,
   // 1,900 K, saturation 0.39, on an RTX A6000). A lower saturation than the blue snow's stood for "warmer" until the
   // patch became a saturated orange.
-  assert.ok(patch.lin[2] / patch.lin[0] < beside.lin[2] / beside.lin[0] && (patch.hue > 270 || patch.hue < 60), `the lantern's light warms the snow: ${show(patch)} against ${show(beside)}`);
+  assert.ok(
+    patch.lin[2] / patch.lin[0] < beside.lin[2] / beside.lin[0] && (patch.hue > 270 || patch.hue < 60),
+    `the lantern's light warms the snow: ${show(patch)} against ${show(beside)}`,
+  );
   // Through clear glass (the window before it frosted over, `glazing=clear`) the lantern's beam itself lies on that
   // snow and reads as firelight orange. Through the scene's frosted pane the snow there takes the pane's diffuse glow,
   // weaker than the beam it spreads, mixed with the moon's blue: warmer than the snow beside it, as checked above.
   const outsideClear = await frame('view=outside&glazing=clear', 'outside-clear'),
     patchClear = colour(outsideClear, patchAt);
-  assert.ok(patchClear.hue < 45, `the lantern's patch through clear glass reads as firelight orange: ${show(patchClear)}`);
+  assert.ok(
+    patchClear.hue < 45,
+    `the lantern's patch through clear glass reads as firelight orange: ${show(patchClear)}`,
+  );
   // The lantern's own light on the snow, in the linear HDR frame (no fog or falling snow in the way): the frame with it
   // less the frame without it, against the physics above, 0.2310, 0.0547, 0 against 0.2319, 0.0546, 0 on an RTX A6000,
   // natively and on the WebGL2 layer (KB-LANTERN-SHADOW-DIM1). The patch lies 0.2 m or more past the cross bar's shadow
@@ -564,7 +726,11 @@ try {
     clearGlass = `${bare}&glazing=clear`,
     withLantern = await frame(clearGlass, 'outside-linear-clear', { linear: true, lamp: 'steady', hdr: profilePoints }),
     clearOpening = await ctx.page.evaluate(() => window.cabinHearth.windowLight.list[0]),
-    withoutLantern = await frame(clearGlass, 'outside-linear-clear-no-lantern', { linear: true, lamp: false, hdr: profilePoints }),
+    withoutLantern = await frame(clearGlass, 'outside-linear-clear-no-lantern', {
+      linear: true,
+      lamp: false,
+      hdr: profilePoints,
+    }),
     litPatch = colour(withLantern, patchAt).lin,
     unlitPatch = colour(withoutLantern, patchAt).lin,
     measured = [0, 1, 2].map((k) => litPatch[k] - unlitPatch[k]),
@@ -575,7 +741,9 @@ try {
       return (s <= 0.04045 ? 1 / 12.92 : (2.4 * ((s + 0.055) / 1.055) ** 1.4) / 1.055) / 510;
     };
   const fmt = (c) => c.map((v) => v.toFixed(4)).join(', ');
-  console.log(JSON.stringify({ lantern: { measured: fmt(measured), predicted: fmt(predicted), lit: physics.lit.toFixed(4) } }));
+  console.log(
+    JSON.stringify({ lantern: { measured: fmt(measured), predicted: fmt(predicted), lit: physics.lit.toFixed(4) } }),
+  );
   assert.equal(physics.lit, 1, 'no window bar shadows the patch');
   for (let k = 0; k < 3; k++)
     assert.ok(
@@ -613,7 +781,9 @@ try {
         n = shoulder.length,
         mx = shoulder.reduce((a, [s]) => a + s / n, 0),
         my = shoulder.reduce((a, [, v]) => a + v / n, 0),
-        slope = shoulder.reduce((a, [s, v]) => a + (s - mx) * (v - my), 0) / shoulder.reduce((a, [s]) => a + (s - mx) ** 2, 0),
+        slope =
+          shoulder.reduce((a, [s, v]) => a + (s - mx) * (v - my), 0) /
+          shoulder.reduce((a, [s]) => a + (s - mx) ** 2, 0),
         lit = (s) => my + slope * (s - mx),
         crossing = (level) => {
           for (let i = 1; i < points.length; i++) {
@@ -629,51 +799,68 @@ try {
     },
     { plateau, rise } = risen(profile),
     penumbra = (0.687 * 2 * 0.011 * (hr - reach)) / reach;
-  console.log(JSON.stringify({ edge: { measured: rise.toFixed(4), measured8: risen(profile8).rise.toFixed(4), predicted: penumbra.toFixed(4), plateau: plateau.toFixed(4) } }));
+  console.log(
+    JSON.stringify({
+      edge: {
+        measured: rise.toFixed(4),
+        measured8: risen(profile8).rise.toFixed(4),
+        predicted: penumbra.toFixed(4),
+        plateau: plateau.toFixed(4),
+      },
+    }),
+  );
   // Sub-pixel phase (KB-CABIN-EDGEPHASE1): the same line read at three interleaved sets of every third step, 15 mm
   // apart and 5 mm out of step, is the same edge. The float reads agree to 5 mm; the 8-bit pixel picks spread 0.0623
   // to 0.1017 m with the old mean-of-a-stretch level (the shoulder's line spreads them 0.0063 m).
   const phases = [0, 1, 2].map((o) => risen(profile.filter((_, i) => i % 3 === o)).rise),
     phases8 = [0, 1, 2].map((o) => risen(profile8.filter((_, i) => i % 3 === o)).rise),
     spread = (v) => Math.max(...v) - Math.min(...v);
-  console.log(JSON.stringify({ edgePhase: { spread: spread(phases).toFixed(4), spread8: spread(phases8).toFixed(4) } }));
-  assert.ok(spread(phases) < 0.005, `the edge's rise does not depend on the pixel phase (${phases.map((v) => v.toFixed(4))})`);
+  console.log(
+    JSON.stringify({ edgePhase: { spread: spread(phases).toFixed(4), spread8: spread(phases8).toFixed(4) } }),
+  );
+  assert.ok(
+    spread(phases) < 0.005,
+    `the edge's rise does not depend on the pixel phase (${phases.map((v) => v.toFixed(4))})`,
+  );
   assert.ok(plateau > 0.02, `the patch is lit before its right edge (${plateau.toFixed(4)})`);
-  assert.ok(rise >= 0.7 * penumbra && rise <= 1.3 * penumbra, `the patch's right edge rises over ${rise.toFixed(4)} m, a 22 mm flame's ${penumbra.toFixed(4)} m`);
+  assert.ok(
+    rise >= 0.7 * penumbra && rise <= 1.3 * penumbra,
+    `the patch's right edge rises over ${rise.toFixed(4)} m, a 22 mm flame's ${penumbra.toFixed(4)} m`,
+  );
 
   // KB-CABIN-WINDOWGLOW1: the room's light leaves through the window (clustered/area `openingLight`, its radiance the
   // room's integrating-sphere mean, and through the frosted pane also the lamps' light the frost lets through, checked
   // in packages/clustered/test/opening-light.test.js). Its light on the snow just under the window, where the wall and
-  // the sill keep the lantern's own light off: the frame with it less the frame without it, against Lambert's polygon
-  // form factor F from each snow point to the window (diffuse albedo x radiance x F; the snow's specular adds under 10%
-  // at this roughness). Before, nothing lit that snow but the moon.
+  // the sill keep the lantern's own light off: the frame with it less the frame without it, against the form factor F
+  // from each snow point to the part of the window it sees past the frame and the sill (`paneFormFactor`, traced;
+  // KB-BOUNCE-REVEAL1), diffuse albedo x radiance x F; the snow's specular adds under 10% at this roughness. Before,
+  // nothing lit that snow but the moon.
   const frostedLit = await frame(bare, 'outside-linear', { linear: true, lamp: 'steady' }),
     frostedUnlit = await frame(bare, 'outside-linear-no-lantern', { linear: true, lamp: false }),
     [opening] = await ctx.page.evaluate(() => window.cabinHearth.windowLight.list),
     noWindow = await frame(bare, 'outside-linear-no-window', { linear: true, lamp: false, windowLight: false }),
-    underAt = [[0.9, 3.9], [1.2, 3.9], [1.5, 3.9], [0.9, 4.05], [1.2, 4.05], [1.5, 4.05]].map(([x, z]) => [x, 0.05, z]),
+    underAt = [
+      [0.9, 3.9],
+      [1.2, 3.9],
+      [1.5, 3.9],
+      [0.9, 4.05],
+      [1.2, 4.05],
+      [1.5, 4.05],
+    ].map(([x, z]) => [x, 0.05, z]),
     lift = [0, 1, 2].map((k) => colour(frostedUnlit, underAt).lin[k] - colour(noWindow, underAt).lin[k]),
-    corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [
-      opening.position[0] + (a * opening.width) / 2,
-      opening.position[1] + (b * opening.height) / 2,
-      opening.position[2],
-    ]),
-    formFactor = (p) => {
-      let sum = 0;
-      for (let i = 0; i < 4; i++) {
-        const a = corners[i].map((c, k) => c - p[k]),
-          b = corners[(i + 1) % 4].map((c, k) => c - p[k]),
-          cross = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
-          angle = Math.acos(Math.min(1, Math.max(-1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b)))));
-        sum += (angle * cross[1]) / Math.hypot(...cross);
-      }
-      return Math.abs(sum) / (2 * Math.PI);
-    },
+    formFactor = (p) => paneFormFactor(p, [0, 1, 0]),
     hits = snowHits(noWindow, underAt),
     F = hits.reduce((a, p) => a + formFactor(p) / hits.length, 0),
     expected = [0, 1, 2].map((k) => 0.9 * opening.color[k] * opening.intensity * F);
-  console.log(JSON.stringify({ window: { radiance: fmt(opening.color), F: F.toFixed(4), measured: fmt(lift), predicted: fmt(expected) } }));
-  assert.ok(lift[0] >= 0.8 * expected[0] - halfCode(0.013) && lift[0] <= 1.25 * expected[0] + halfCode(0.013), `the window's room light on the snow under it, ${fmt(lift)}, is its ${fmt(expected)}`);
+  console.log(
+    JSON.stringify({
+      window: { radiance: fmt(opening.color), F: F.toFixed(4), measured: fmt(lift), predicted: fmt(expected) },
+    }),
+  );
+  assert.ok(
+    lift[0] >= 0.8 * expected[0] - halfCode(0.013) && lift[0] <= 1.25 * expected[0] + halfCode(0.013),
+    `the window's room light on the snow under it, ${fmt(lift)}, is its ${fmt(expected)}`,
+  );
   assert.ok(expected[0] > 0.002, `the room's light under the window is more than a trace (${fmt(expected)})`);
 
   // KB-CABIN-EDGE-SOFT2 (Scott 2026-11-16, "Frosted window glass"): the window has frosted over inside. The frosted pane
@@ -683,14 +870,17 @@ try {
   const beam = [0, 1, 2].map((k) => colour(frostedLit, patchAt).lin[k] - colour(frostedUnlit, patchAt).lin[k]);
   console.log(JSON.stringify({ frosted: { beam: fmt(beam), radiance: fmt(opening.color) } }));
   for (let k = 0; k < 3; k++)
-    assert.ok(Math.abs(beam[k]) <= 3 * 0.0001 + 2 * halfCode(colour(frostedLit, patchAt).lin[k]), `no lantern beam crosses the frosted pane: ${fmt(beam)}`);
+    assert.ok(
+      Math.abs(beam[k]) <= 3 * 0.0001 + 2 * halfCode(colour(frostedLit, patchAt).lin[k]),
+      `no lantern beam crosses the frosted pane: ${fmt(beam)}`,
+    );
   // The frost sends the light out instead, diffusely, as the window's radiance (clustered/area `openingLight` with
   // frosted glazing, tau_d E / pi). The patch on the snow is now that light, and its edge where the clear window's right
   // jamb cut the beam (the line above, 3.5 m out, where clear glass gave a 22 mm flame's 4 cm penumbra) is as soft as a
   // Lambertian rectangle the pane's size makes it. Edge width here is the light over its slope across the line, both
   // from a least-squares line through the profile's 7 x 7 px boxes 2 cm apart over 0.8 m: for a light that falls off
-  // smoothly, the distance over which it would fall to nothing. The window's light at each point is Lambert's polygon
-  // form factor F times its radiance, so the predicted width is F's over F's slope over the same points; the minimum is
+  // smoothly, the distance over which it would fall to nothing. The window's light at each point is the form factor F
+  // of the part of the pane it sees past the frame and sill (`paneFormFactor`) times its radiance, so the predicted width is F's over F's slope over the same points; the minimum is
   // half that. The clear window's crisp edge reads a quarter of a metre or less this way.
   const near = 3.5,
     nearAt = [lampAt[0] + along[0] * near, lampAt[1] + along[1] * near],
@@ -704,15 +894,30 @@ try {
       const n = pairs.length,
         mx = pairs.reduce((a, [x]) => a + x / n, 0),
         my = pairs.reduce((a, [, y]) => a + y / n, 0),
-        slope = pairs.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) / pairs.reduce((a, [x]) => a + (x - mx) ** 2, 0);
+        slope =
+          pairs.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) / pairs.reduce((a, [x]) => a + (x - mx) ** 2, 0);
       return { mean: my, slope, width: my / Math.abs(slope) };
     },
     glow = fit(line.map(([s, p]) => [s, colour(frostedLit, [p]).lin[0] - colour(noWindow, [p]).lin[0]])),
-    form = fit(line.map(([s, p]) => [s, snowHits(noWindow, [p]).reduce((a, q, _, all) => a + formFactor(q) / all.length, 0)])),
+    form = fit(
+      line.map(([s, p]) => [s, snowHits(noWindow, [p]).reduce((a, q, _, all) => a + formFactor(q) / all.length, 0)]),
+    ),
     minimum = form.width / 2;
-  console.log(JSON.stringify({ frostedEdge: { width: glow.width.toFixed(3), predicted: form.width.toFixed(3), level: glow.mean.toFixed(4), predictedLevel: (0.9 * opening.color[0] * form.mean).toFixed(4) } }));
+  console.log(
+    JSON.stringify({
+      frostedEdge: {
+        width: glow.width.toFixed(3),
+        predicted: form.width.toFixed(3),
+        level: glow.mean.toFixed(4),
+        predictedLevel: (0.9 * opening.color[0] * form.mean).toFixed(4),
+      },
+    }),
+  );
   assert.ok(glow.mean > 0.005, `the frosted window lights the snow where its beam did (${glow.mean.toFixed(4)})`);
-  assert.ok(glow.width >= minimum, `the frosted window's patch edge is ${glow.width.toFixed(3)} m wide, at least half a diffuse pane's ${form.width.toFixed(3)} m`);
+  assert.ok(
+    glow.width >= minimum,
+    `the frosted window's patch edge is ${glow.width.toFixed(3)} m wide, at least half a diffuse pane's ${form.width.toFixed(3)} m`,
+  );
   // KB-CABIN-FROST2: the frosted pane itself, close up from outside (the camera 1.9 m out, in the linear frame 4 stops
   // down, read 16 times up; its peak, 14, is past what 3 stops down holds). Physics alone predicts it: the frost on the glass's room face (z 2.448) sends out
   // L(x) = tau_d E(x) / pi, E(x) the lantern's and the fire's light at x by the inverse square law and the cosine, where
@@ -732,12 +937,22 @@ try {
         lamp = page.kit.hearth.lamp;
       return [
         { position: [1.2, 1.875, 1.95], intensity: lamp.intensity * 0.9, color: [...lamp.color] },
-        ...(page.fire?.lights ?? []).map((l) => ({ position: [...l.position], intensity: l.intensity * (l.flicker?.curve === 'fire' ? 0.75 : l.flicker?.curve === 'candle' ? 0.9 : 1), color: [...(l.color ?? [1, 1, 1])] })),
+        ...(page.fire?.lights ?? []).map((l) => ({
+          position: [...l.position],
+          intensity: l.intensity * (l.flicker?.curve === 'fire' ? 0.75 : l.flicker?.curve === 'candle' ? 0.9 : 1),
+          color: [...(l.color ?? [1, 1, 1])],
+        })),
       ];
     }),
     barBoxes = [
-      [[0.6, 1.4775, 2.425], [1.8, 1.5225, 2.475]],
-      [[1.1775, 0.95, 2.425], [1.2225, 2.05, 2.475]],
+      [
+        [0.6, 1.4775, 2.425],
+        [1.8, 1.5225, 2.475],
+      ],
+      [
+        [1.1775, 0.95, 2.425],
+        [1.2225, 2.05, 2.475],
+      ],
     ],
     paneRadiance = (x, y) => {
       const p = [x, y, frostZ],
@@ -766,7 +981,13 @@ try {
       return L.map((c, k) => tauD * (c / Math.PI + roomL[k]));
     },
     close = { position: [1.35, 1.5, 4.3], target: [1.2, 1.5, 2.45] },
-    paneClose = await frame(bare, 'outside-linear-pane', { linear: true, exposure: -4, lamp: 'steady', bloom: false, camera: close }),
+    paneClose = await frame(bare, 'outside-linear-pane', {
+      linear: true,
+      exposure: -4,
+      lamp: 'steady',
+      bloom: false,
+      camera: close,
+    }),
     read = (f, x, y, z = 2.452, r = 3) => colour(f, [[x, y, z]], r).lin.map((c) => 16 * c);
   let peak = [0, 0, 0],
     peakAt;
@@ -792,7 +1013,8 @@ try {
     paneWall = read(paneClose, 0.3, 1.5, 2.65)[0],
     reflection = (0.292 / 0.258) * paneWall,
     codeShare = (v, top) => (2.4 * (0.5 / 255)) / ((v / top) ** (1 / 2.4) + 0.055),
-    allow = (measured, predicted) => 16 * halfCode(measured / 16) + predicted * codeShare(predicted, peak[0]) + reflection;
+    allow = (measured, predicted) =>
+      16 * halfCode(measured / 16) + predicted * codeShare(predicted, peak[0]) + reflection;
   console.log(
     JSON.stringify({
       paneClose: {
@@ -812,43 +1034,84 @@ try {
     }),
   );
   assert.ok(hotP[0] >= 0.98 * peak[0], `the read beside the mullion is the pane's brightest, ${hotP[0]} of ${peak[0]}`);
-  for (const [name, m, p] of [['brightest', hot, hotP], ['centre', centre, centreP], ['corner', cornerRead, cornerP]])
-    assert.ok(m[0] >= p[0] - allow(m[0], p[0]) + reflection && m[0] <= p[0] + allow(m[0], p[0]), `the frost's ${name} radiance, ${fmt(m)}, is tau_d E / pi, ${fmt(p)}`);
+  for (const [name, m, p] of [
+    ['brightest', hot, hotP],
+    ['centre', centre, centreP],
+    ['corner', cornerRead, cornerP],
+  ])
+    assert.ok(
+      m[0] >= p[0] - allow(m[0], p[0]) + reflection && m[0] <= p[0] + allow(m[0], p[0]),
+      `the frost's ${name} radiance, ${fmt(m)}, is tau_d E / pi, ${fmt(p)}`,
+    );
   // The pane is brightest nearest the lamp and dimmest in its far corner, as the inverse square law and the cosine say;
   // the even card it was until 2026-11-16 read 1 here.
   const ratio = centre[0] / cornerRead[0],
     low = (centreP[0] - allow(centre[0], centreP[0]) + reflection) / (cornerP[0] + allow(cornerRead[0], cornerP[0])),
     high = (centreP[0] + allow(centre[0], centreP[0])) / (cornerP[0] - allow(cornerRead[0], cornerP[0]) + reflection);
-  assert.ok(ratio >= low && ratio <= high && low > 1.3, `the pane's centre over its corner, ${ratio.toFixed(3)}, is ${(centreP[0] / cornerP[0]).toFixed(3)} (${low.toFixed(3)} to ${high.toFixed(3)})`);
+  assert.ok(
+    ratio >= low && ratio <= high && low > 1.3,
+    `the pane's centre over its corner, ${ratio.toFixed(3)}, is ${(centreP[0] / cornerP[0]).toFixed(3)} (${low.toFixed(3)} to ${high.toFixed(3)})`,
+  );
   // The bars (KB-CABIN-FROST2): in the glass's plane, dark against the backlit frost, as the scene shows them, bloom on.
   // A bar's outdoor face is the frame's wood (#5a4330, linear red 0.102) lit by the night outside, at most 0.102 / 0.258
   // of the log wall's radiance; the glow spreads at most the kit's bloom strength times the pane's light above the
   // bloom threshold onto it (the glow of a texel of light E sums to strength x E, so no pixel gets more). So the frost beside a bar is at least its predicted radiance over that sum times
   // the bar's light. Read 3 x 3 px at each bar's middle, which the frame shows 9 px wide or more.
-  const barsFrame = await frame(bare, 'outside-linear-bars', { linear: true, exposure: -4, lamp: 'steady', camera: close }),
+  const barsFrame = await frame(bare, 'outside-linear-bars', {
+      linear: true,
+      exposure: -4,
+      lamp: 'steady',
+      camera: close,
+    }),
     projectBar = (m, p) => {
       const cx = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
         cy = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
         cw = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
       return [(cx / cw / 2 + 0.5) * barsFrame.image.width, (0.5 - cy / cw / 2) * barsFrame.image.height];
     },
-    barPx = Math.abs(projectBar(barsFrame.matrix, [1.2225, 1.75, 2.475])[0] - projectBar(barsFrame.matrix, [1.1775, 1.75, 2.475])[0]),
+    barPx = Math.abs(
+      projectBar(barsFrame.matrix, [1.2225, 1.75, 2.475])[0] - projectBar(barsFrame.matrix, [1.1775, 1.75, 2.475])[0],
+    ),
     barWall = read(barsFrame, 0.3, 1.5, 2.65)[0],
     kitBloom = await ctx.page.evaluate(() => ({ ...window.cabinHearth.kit.bloom })),
     bloomGlow = kitBloom.strength * Math.max(0, peak[0] - kitBloom.threshold);
   assert.ok(barPx >= 9, `a bar is ${barPx.toFixed(1)} px wide in the close frame`);
   for (const [bar, beside] of [
-    [[1.2, 1.75], [1.27, 1.75]],
-    [[0.9, 1.5], [0.9, 1.44]],
-    [[1.5, 1.5], [1.5, 1.44]],
+    [
+      [1.2, 1.75],
+      [1.27, 1.75],
+    ],
+    [
+      [0.9, 1.5],
+      [0.9, 1.44],
+    ],
+    [
+      [1.5, 1.5],
+      [1.5, 1.44],
+    ],
   ]) {
     const b = read(barsFrame, ...bar, 2.475, 1)[0],
       f = read(barsFrame, ...beside)[0],
       fP = paneRadiance(...beside)[0],
       barBound = (0.102 / 0.258) * barWall + bloomGlow + 16 * halfCode(b / 16),
       derived = (fP - allow(f, fP) + reflection) / barBound;
-    console.log(JSON.stringify({ bar: { at: bar.join(', '), bar: b.toFixed(4), bound: barBound.toFixed(4), frost: f.toFixed(4), ratio: (f / b).toFixed(2), derived: derived.toFixed(2), px: barPx.toFixed(1) } }));
-    assert.ok(derived > 1.5 && f / b >= derived, `the bar at [${bar}] reads ${b.toFixed(4)}, the frost beside it ${f.toFixed(4)}: ${(f / b).toFixed(2)} times, at least ${derived.toFixed(2)}`);
+    console.log(
+      JSON.stringify({
+        bar: {
+          at: bar.join(', '),
+          bar: b.toFixed(4),
+          bound: barBound.toFixed(4),
+          frost: f.toFixed(4),
+          ratio: (f / b).toFixed(2),
+          derived: derived.toFixed(2),
+          px: barPx.toFixed(1),
+        },
+      }),
+    );
+    assert.ok(
+      derived > 1.5 && f / b >= derived,
+      `the bar at [${bar}] reads ${b.toFixed(4)}, the frost beside it ${f.toFixed(4)}: ${(f / b).toFixed(2)} times, at least ${derived.toFixed(2)}`,
+    );
   }
 
   // KB-CABIN-BLOOM1: the lantern's flame glows. It is an emitter at the lamp's radiance (its 6.5 cd mean over its
@@ -878,7 +1141,10 @@ try {
     // Pixels per metre at the flame: 1 cm square to the camera's ray, level.
     sight = flameAt.map((c, k) => c - lamp.eye[k]),
     square = [-sight[2], 0, sight[0]].map((c) => c / Math.hypot(sight[0], sight[2])),
-    [gu, gv] = project(withLantern, flameAt.map((c, k) => c + 0.01 * square[k])),
+    [gu, gv] = project(
+      withLantern,
+      flameAt.map((c, k) => c + 0.01 * square[k]),
+    ),
     perMetre = Math.hypot(gu - fu, gv - fv) / 0.01,
     area = Math.PI * lamp.radius ** 2 * perMetre ** 2,
     radiance = lamp.color.map((c) => ((c * lamp.intensity) / (Math.PI * lamp.radius ** 2)) * 0.9),
@@ -914,9 +1180,20 @@ try {
           v0 = Math.round(fv) - 1;
         for (let v = v0; v < v0 + 2; v++)
           for (let u = u0; u < u0 + 2; u++) data.set([...energy.map((e) => half(e / 4)), half(1)], (v * width + u) * 4);
-        const input = device.createTexture({ size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST }),
-          output = device.createTexture({ size: [width, height], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC }),
-          read = device.createBuffer({ size: width * height * 8, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+        const input = device.createTexture({
+            size: [width, height],
+            format: 'rgba16float',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          }),
+          output = device.createTexture({
+            size: [width, height],
+            format: 'rgba16float',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+          }),
+          read = device.createBuffer({
+            size: width * height * 8,
+            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+          }),
           bloom = new Bloom({ ...window.cabinHearth.kit.bloom });
         device.queue.writeTexture({ texture: input }, data, { bytesPerRow: width * 8 }, [width, height]);
         const encoder = device.createCommandEncoder();
@@ -946,10 +1223,21 @@ try {
       },
       { fu, fv, energy, width: withLantern.image.width, height: withLantern.image.height },
     );
-  console.log(JSON.stringify({ flame: { px: [fu.toFixed(1), fv.toFixed(1)], area: area.toFixed(2), energy: fmt(energy), ring: fmt(flameGlow), predicted: fmt(ringPredicted) } }));
+  console.log(
+    JSON.stringify({
+      flame: {
+        px: [fu.toFixed(1), fv.toFixed(1)],
+        area: area.toFixed(2),
+        energy: fmt(energy),
+        ring: fmt(flameGlow),
+        predicted: fmt(ringPredicted),
+      },
+    }),
+  );
   for (const k of [0, 1])
     assert.ok(
-      flameGlow[k] >= 0.8 * ringPredicted[k] - 2 * halfCode(ringPredicted[k]) && flameGlow[k] <= 1.25 * ringPredicted[k] + 2 * halfCode(ringPredicted[k]),
+      flameGlow[k] >= 0.8 * ringPredicted[k] - 2 * halfCode(ringPredicted[k]) &&
+        flameGlow[k] <= 1.25 * ringPredicted[k] + 2 * halfCode(ringPredicted[k]),
       `the flame's glow round the lantern, ${fmt(flameGlow)}, is its kit bloom's ${fmt(ringPredicted)}`,
     );
   assert.ok(ringPredicted[0] > 0.01, `the flame's glow is more than a trace (${fmt(ringPredicted)})`);
@@ -965,11 +1253,10 @@ try {
   // the bounce); the snow beside the lantern's patch changes by under
   // 0.0005. Frosted (the scene as it is): the lantern's beam stops at the frost, so its bounce outside is under 2% of the
   // window's (the dark room's bound: counted once, by the window's light); the window's light (the pane's tau_d E / pi as the opening's mean radiance) bounces off
-  // the snow it lights, and its twin lies between the quadrature with the window's reveal and sill shading the snow
-  // (physics) and without them (what the opening light, which casts no shadow, puts on the snow; KB-BOUNCE-REVEAL1), and
-  // within 15% of the quadrature of LightBounce's own model of it (`centre`: the snow the opening's capture sees from
-  // in front of its glazing bars, KB-BOUNCE-CAPEYE1, lit by the bare rectangle), so its excess over physics is the
-  // opening model's, not the GPU's. Every
+  // the snow it lights, and its twin is within 15% of the quadrature with the window's frame and sill shading the snow
+  // (physics; KB-BOUNCE-REVEAL1: the opening light's `recess` and `sill` clip its rectangle to what each point sees past
+  // them, in AreaLights and in the bounce's capture, which looks out from the frame's mouth). The bare quadrature, what
+  // an opening light with no reveal puts on the snow, is reported beside it. Every
   // check above that holds a light to physics runs with `bounce=0`. Before KB-BOUNCE-VPL-BURIED1 the snow's VPLs sat
   // under their own drifts and the crest got 0.0020 R.
   const stops = 3,
@@ -984,10 +1271,22 @@ try {
     wood = weatheredWood.color.slice(0, 3),
     crestRead = async (glazing) => {
       const query = `view=outside&fog=0&snow=0&fire=0${glazing === 'clear' ? '&glazing=clear' : ''}`,
-        on = await frame(query, `outside-linear-bounce-${glazing}`, { linear: true, exposure: stops, lamp: 'steady', bloom: false, hdr: [crest, shadowed] }),
+        on = await frame(query, `outside-linear-bounce-${glazing}`, {
+          linear: true,
+          exposure: stops,
+          lamp: 'steady',
+          bloom: false,
+          hdr: [crest, shadowed],
+        }),
         data = new Float32Array(await ctx.page.evaluate(() => [...window.cabinHearth.lightBounce.data])),
         stats = await ctx.page.evaluate(() => window.cabinHearth.lightBounce.stats),
-        off = await frame(`${query}&bounce=0`, `outside-linear-no-bounce-${glazing}`, { linear: true, exposure: stops, lamp: 'steady', bloom: false, hdr: [crest, shadowed] }),
+        off = await frame(`${query}&bounce=0`, `outside-linear-no-bounce-${glazing}`, {
+          linear: true,
+          exposure: stops,
+          lamp: 'steady',
+          bloom: false,
+          hdr: [crest, shadowed],
+        }),
         change = (at) => [0, 1, 2].map((k) => (colour(on, at, 1).lin[k] - colour(off, at, 1).lin[k]) / gain),
         float = (key, i = 0) => [0, 1, 2].map((k) => on.hdr[i][key][k] - off.hdr[i][key][k]),
         // The sources in their order: the lantern (the only shadowed light with the fire off), then the window.
@@ -1015,39 +1314,59 @@ try {
     lanternQuad = bounceQuadrature('lantern').map((e, k) => e * clear.scales[0][k]),
     frosted = await crestRead('frosted'),
     paneShaded = bounceQuadrature('pane').map((e, k) => e * frosted.scales[1][k]),
-    paneBare = bounceQuadrature('pane', { shaded: false }).map((e, k) => e * frosted.scales[1][k]),
-    // Where the opening's capture looks out from (KB-BOUNCE-CAPEYE1): the glass's outdoor face (main.ts
-    // `opening.position`, z 2.452) moved out past the bars (0.05 deep, centred on the glass) by half their depth and the
-    // capture camera's near plane (0.05 m), z 2.527.
-    paneModel = bounceQuadrature('pane', { shaded: false, centre: [1.2, 1.5, 2.527] }).map((e, k) => e * frosted.scales[1][k]);
+    paneBare = bounceQuadrature('pane', { shaded: false }).map((e, k) => e * frosted.scales[1][k]);
   console.log(
     JSON.stringify({
       crest: {
-        clear: { measured: fmt(clear.measured), box: fmt(clear.box), measured8: fmt(clear.measured8), twin: fmt(clear.twin), twinLantern: fmt(clear.lantern), quadrature: fmt(lanternQuad), shadowChange: fmt(clear.shadowChange), shadowChange8: fmt(clear.shadowChange8), stats: clear.stats },
-        frosted: { measured: fmt(frosted.measured), box: fmt(frosted.box), measured8: fmt(frosted.measured8), twin: fmt(frosted.twin), twinLantern: fmt(frosted.lantern), twinWindow: fmt(frosted.window), model: fmt(paneModel), shaded: fmt(paneShaded), bare: fmt(paneBare), stats: frosted.stats },
+        clear: {
+          measured: fmt(clear.measured),
+          box: fmt(clear.box),
+          measured8: fmt(clear.measured8),
+          twin: fmt(clear.twin),
+          twinLantern: fmt(clear.lantern),
+          quadrature: fmt(lanternQuad),
+          shadowChange: fmt(clear.shadowChange),
+          shadowChange8: fmt(clear.shadowChange8),
+          stats: clear.stats,
+        },
+        frosted: {
+          measured: fmt(frosted.measured),
+          box: fmt(frosted.box),
+          measured8: fmt(frosted.measured8),
+          twin: fmt(frosted.twin),
+          twinLantern: fmt(frosted.lantern),
+          twinWindow: fmt(frosted.window),
+          shaded: fmt(paneShaded),
+          bare: fmt(paneBare),
+          stats: frosted.stats,
+        },
       },
     }),
   );
   for (const k of [0, 1])
-    assert.ok(Math.abs(clear.lantern[k] / lanternQuad[k] - 1) < 0.15, `the twin's lantern bounce at the crest, ${fmt(clear.lantern)}, is the quadrature's ${fmt(lanternQuad)}`);
+    assert.ok(
+      Math.abs(clear.lantern[k] / lanternQuad[k] - 1) < 0.15,
+      `the twin's lantern bounce at the crest, ${fmt(clear.lantern)}, is the quadrature's ${fmt(lanternQuad)}`,
+    );
   for (const r of [clear, frosted]) {
-    assert.ok(Math.abs(r.measured[0] / r.twin[0] - 1) < 0.02, `the frame's bounce at the crest, ${fmt(r.measured)}, is its twin's ${fmt(r.twin)}`);
+    assert.ok(
+      Math.abs(r.measured[0] / r.twin[0] - 1) < 0.02,
+      `the frame's bounce at the crest, ${fmt(r.measured)}, is its twin's ${fmt(r.twin)}`,
+    );
     assert.ok(r.measured[0] > 0.005, `the snow warms the logs (${fmt(r.measured)})`);
   }
-  assert.ok(clear.shadowChange.every((c) => Math.abs(c) < 0.0005), `the shadowed snow keeps its light (${fmt(clear.shadowChange)})`);
+  assert.ok(
+    clear.shadowChange.every((c) => Math.abs(c) < 0.0005),
+    `the shadowed snow keeps its light (${fmt(clear.shadowChange)})`,
+  );
   assert.ok(
     frosted.lantern.every((c) => c <= 0.02 * frosted.window[0]),
     `behind the frost the lantern bounces under 2% of the window's light outside (${fmt(frosted.lantern)} of ${fmt(frosted.window)})`,
   );
   for (const k of [0, 1])
     assert.ok(
-      frosted.window[k] >= paneShaded[k] && frosted.window[k] <= paneBare[k],
-      `the window's bounce at the crest, ${fmt(frosted.window)}, lies between the shaded ${fmt(paneShaded)} and bare ${fmt(paneBare)} quadratures`,
-    );
-  for (const k of [0, 1])
-    assert.ok(
-      Math.abs(frosted.window[k] / paneModel[k] - 1) < 0.15,
-      `the window's bounce at the crest, ${fmt(frosted.window)}, is the quadrature of LightBounce's opening model's ${fmt(paneModel)}`,
+      Math.abs(frosted.window[k] / paneShaded[k] - 1) < 0.15,
+      `the window's bounce at the crest, ${fmt(frosted.window)}, is the quadrature's with the frame and sill shading the snow, ${fmt(paneShaded)} (bare ${fmt(paneBare)})`,
     );
 
   // The hearth view with the fire's and the lantern's bounce, against without (both lights steady): reported, the look
@@ -1057,11 +1376,27 @@ try {
     meanY = ({ image }) => {
       let sum = 0;
       for (let i = 0; i < image.data.length; i += 4)
-        sum += 0.2126 * toLinear(image.data[i] / 255) + 0.7152 * toLinear(image.data[i + 1] / 255) + 0.0722 * toLinear(image.data[i + 2] / 255);
+        sum +=
+          0.2126 * toLinear(image.data[i] / 255) +
+          0.7152 * toLinear(image.data[i + 1] / 255) +
+          0.0722 * toLinear(image.data[i + 2] / 255);
       return sum / (image.data.length / 4);
     },
-    hearthRead = { on: meanY(hearthOn), off: meanY(hearthOff), rugOn: colour(hearthOn, rugAt).Y, rugOff: colour(hearthOff, rugAt).Y };
-  console.log(JSON.stringify({ hearth: { meanY: [hearthRead.off.toFixed(4), hearthRead.on.toFixed(4)], ratio: (hearthRead.on / hearthRead.off).toFixed(3), rugY: [hearthRead.rugOff.toFixed(4), hearthRead.rugOn.toFixed(4)] } }));
+    hearthRead = {
+      on: meanY(hearthOn),
+      off: meanY(hearthOff),
+      rugOn: colour(hearthOn, rugAt).Y,
+      rugOff: colour(hearthOff, rugAt).Y,
+    };
+  console.log(
+    JSON.stringify({
+      hearth: {
+        meanY: [hearthRead.off.toFixed(4), hearthRead.on.toFixed(4)],
+        ratio: (hearthRead.on / hearthRead.off).toFixed(3),
+        rugY: [hearthRead.rugOff.toFixed(4), hearthRead.rugOn.toFixed(4)],
+      },
+    }),
+  );
   assert.ok(hearthRead.on > hearthRead.off, 'the bounce brightens the hearth view');
   assert.deepEqual(errors, []);
 } finally {
