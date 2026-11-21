@@ -170,14 +170,45 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
   or is swapped for another revision.
 
-### Open 2026-11-21: the surge check brings in 17 percent more water, not the 20 percent it asks (KB-WATER-SURGEVOL1, water)
+### Open 2026-11-21: Blender's TANH math node gives NaN for large inputs on native WebGPU (KB-BLENDER-TANH1, blender)
 
-- **Repro:** `node packages/water/test/surge.browser.mjs` (native WebGPU, adapter `intel` `xe-2lpg`) fails "the surge
-  brings water in from the sea": volume 1,679.1 m^3 at the peak against 1,430.8 calm (1.17 times; it asks over 1.2),
-  while the beach floods to 0.607 m at ground 0.45 m (within the 0.55 +- 0.1 it asks) and drains to 0.008 m. The same
-  numbers, bit for bit, on the code before KB-SCENES-DUNE-ARCHANG1's change; the WebGL2 layer passes.
-- **Cause:** not found yet. The calm volume is read after the coastal flow's 40 s surf spin-up (KB-WATER-SWASH1), which
-  may hold more water at rest than the test's 1.2 ratio was set for; not checked.
+- **Repro:** a WGSL compute shader writing `tanh(x)` for runtime x on native WebGPU (adapter `intel` `xe-2lpg`): 1 at
+  x = 50, NaN at x = 100, 395 and -100 (sinh and cosh return infinity there; found under KB-WATER-SURGEVOL1).
+  `packages/blender/src/nodes-wgsl.ts` maps the math node's `TANH` to a bare `tanh(a)`, so a node graph that feeds it a
+  value over about 88.7 in size gets NaN where Blender gives +-1. Not yet run through a node graph.
+- **Cause:** the GPU's tanh overflows f32 in sinh or cosh for |x| over about 88.7. The fix is the one water took:
+  `tanh(clamp(a,-10.0,10.0))`, exact in f32 (tanh rounds to +-1 above 9.01), with a regression test in the blender
+  package.
+
+### Fixed 2026-11-21: the surge check's sea held half its water on native WebGPU (KB-WATER-SURGEVOL1, water)
+
+- **Repro (before):** `node packages/water/test/surge.browser.mjs` (native WebGPU, adapter `intel` `xe-2lpg`) failed
+  "the surge brings water in from the sea": volume 1,679.1 m^3 at the peak against 1,430.8 calm (1.17 times; it asked
+  over 1.2). The same numbers, bit for bit, on the code before KB-SCENES-DUNE-ARCHANG1's change; the WebGL2 layer
+  passed.
+- **The physics:** the beach (64 rows, ground -2.95 + 0.1 i m) at rest at level L holds 64 x sum (L - ground) over the
+  cells below L: 2,880 m^3 at 0 and 5,120 m^3 at 1 m, a ratio of 1.78 (the 5 mm swell adds under 0.3%). The WebGL2
+  layer measured 2,880.2 and 5,133.9, and test/coast-reference.js (the flow in float64, no surf) 2,880 at rest. So 1.2
+  was a loose bound, not a wrong one: native WebGPU had lost half the sea at rest, and the beach probe alone (0.607 m at
+  ground 0.45 m) still passed.
+- **Cause:** the surf's WGSL (`packages/water/src/surf.ts`) took tanh of unbounded arguments, and native WebGPU on this
+  GPU returns NaN for tanh(x) once sinh and cosh overflow f32 (measured: 1 at x = 50, NaN at x = 100). The Ruessink et
+  al. 2012 wave phase `tanh(0.815 / Ur^0.672)` passes x = 89 where the Ursell number is under about 1e-3, as under the
+  test's 5 mm, 20 m swell in water 2.4 m deep or more. There `surfSea` returned NaN; the integrate kernel's relaxation target `max(0, sea - ground)`
+  read 0, so the open sea next to the map's deep edge relaxed toward empty (the edge column held 0 m over 2.95 m of
+  ground) and the beach cells sloshed meters deep. Found by writing `surfSea` into the state's spare channels: NaN in
+  the six columns 2.45 m deep or more, finite beyond. Fenton and McKee's `tanh((k0 d)^0.75)` (in `surfK` and the field
+  builder's `waveK`) would do the same at k0 d over 397, a 20 m swell over 1.26 km of water.
+- **Fix:** every tanh in the surf's WGSL takes `min(x, 10.0)`. For x over 9.01, 1 - tanh x = 2 / (e^2x + 1) is under
+  2^-25, half an f32 ulp below 1, so tanh x rounds to 1 (IEEE 754-2019 round to nearest) and the clamp changes no
+  correctly rounded value; the Ruessink phase then reads 0, the symmetric wave of its Ur -> 0 limit. The water surface
+  and the wave queries share this WGSL, so a calm deep sea's surface no longer reads NaN there either.
+- **After:** native WebGPU and the WebGL2 layer give the same volumes to six digits: 2,880.15 m^3 at rest, 5,133.87 at
+  the peak, 2,881.35 after the fall; the beach floods to 0.606 m and drains to 0.008 m.
+- **Regression:** `packages/water/test/surge.browser.mjs` now asks for the still-water volumes themselves (within 1% at
+  rest and 2% at the peak, in place of the 1.2 ratio; the drained run's 1,430.8 fails it), and
+  `packages/water/test/coast-runup.test.js` fails on any tanh in water's sources whose argument is not bounded by `min(`
+  or `clamp(` (it lists the three bare ones before the fix).
 
 ### Fixed 2026-11-21: the dune coast's camp view hung the WebGPU device on a laptop GPU (KB-SCENES-DUNE-ARCHANG1, water)
 

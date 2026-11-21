@@ -9130,6 +9130,19 @@ at least the set-up's workgroups in all, run-up 0.126 m as before; fails before 
 scenes test/dune-coast-still.mjs camp view passing. Missing: other GPUs, and a bound in time rather than workgroups (a
 GPU 25 times slower than this one could still pass 2 s on one piece).
 
+**No tanh in shader code takes an unbounded argument (KB-WATER-SURGEVOL1, 2026-11-21, GPU maths).** Native WebGPU on
+an Intel xe-2lpg laptop GPU returns NaN for WGSL `tanh(x)` once sinh and cosh overflow f32 (measured: 1 at x = 50, NaN
+at 100 and -100), while the WebGL2 layer ran the same surf without NaN. The surf's Ruessink et al. 2012 phase `tanh(0.815 / Ur^0.672)`
+passes that in calm deep water (Ursell number under about 1e-3), so `surfSea` returned NaN, the open sea's relaxation
+target `max(0, NaN)` read 0 and the sea next to the map's deep edge drained: water test/surge.browser.mjs held 1,431 of
+the beach's 2,880 m^3 at rest. Every tanh in the surf's WGSL now takes `min(x, 10.0)`, which is exact in f32 (for x
+over 9.01, 1 - tanh x is under 2^-25, so tanh rounds to 1; IEEE 754-2019 round to nearest). The rule for any package:
+clamp a tanh argument to +-10 (or use an overflow-free form, as compute's `preciseTanh`); the WGSL implementation may
+overflow inside. Evidence (adapter `intel` `xe-2lpg`): water test/surge.browser.mjs gives 2,880.15 m^3 at rest and
+5,133.87 at a 1 m surge on native WebGPU and the WebGL2 layer alike, against the still-water 2,880 and 5,120 it now
+asks for; water test/coast-runup.test.js fails on a bare tanh in water's sources. Open: blender's TANH math node
+(KB-BLENDER-TANH1). Missing: other GPUs.
+
 **SSAO's ambient replay binds every pass binding (KB-POST-GTAO-TERRAINLOOK1, 2026-11-18, GPU behaviour).** The replay
 that gives SSAO and GTAO the ambient light to darken cut the lit shader from `let direct=` and bound a hand-picked
 subset of the pass bindings (TAA's camera 18, sky ambient 8, the hemisphere light 144). A plugin binding read above

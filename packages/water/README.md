@@ -244,8 +244,9 @@ very small cells require more substeps.
 without rebuilding anything. With terrain coupling the flow's map edge and open-sea cells follow it, so a level raised
 slowly floods the land below it from the sea and a fall drains it again: a storm surge or a tide. The open sea, the surf
 and the wave queries ride on the new level. `test/surge.browser.mjs` raises a beach's sea by 1 m over 10 s: a cell at
-0.45 m floods to 0.55 m within 0.1 m, ground at 1.45 m stays dry, and after the fall the beach drains to under 0.02 m
-and the sea returns to its volume within 2%, on WebGPU and the WebGL2 layer.
+0.45 m floods to 0.55 m within 0.1 m, ground at 1.45 m stays dry, the sea holds its still-water volume at rest (within
+1%) and at the raised level (within 2%), and after the fall the beach drains to under 0.02 m and the sea returns to its
+volume within 2%, on WebGPU and the WebGL2 layer.
 
 ```ts
 import {Water} from 'margoengine/water';

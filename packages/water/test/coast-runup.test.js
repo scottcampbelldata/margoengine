@@ -3,7 +3,7 @@
 // The GPU's run-up on a beach under a real swell is pinned by test/surf.browser.mjs against Stockdon et al. 2006.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { coastStep } from './coast-reference.js';
 import { riverModel } from './rivers-reference.js';
 import { solitary, solitaryRunup, stoker } from './flood-analytic.js';
@@ -33,6 +33,24 @@ test('the coast step is the one the shader runs', () => {
     'const COAST_MANNING=0.02;',
   ])
     assert.ok(coastal.includes(line), `coastal.ts lost: ${line}`);
+});
+
+test("every tanh in Water's WGSL takes a bounded argument (KB-WATER-SURGEVOL1)", () => {
+  // Native WebGPU on an Intel xe-2lpg returns NaN for tanh(x) once sinh and cosh overflow f32 (x over about 88.7); the
+  // surf's Ruessink phase passed that in calm deep water and drained the sea (test/surge.browser.mjs). f32 tanh is
+  // already 1 at x = 9.01, so min(x, 10) or clamp(x, ...) changes no value.
+  const src = new URL('../src/', import.meta.url),
+    bare = [];
+  for (const name of readdirSync(src).filter((n) => n.endsWith('.ts'))) {
+    // The code only: comments (TypeScript's and WGSL's) may name tanh(x).
+    const text = readFileSync(new URL(name, src), 'utf8').replace(/\/\/.*$/gm, '');
+    for (const m of text.matchAll(/(?<![\w.])tanh\(/g)) {
+      const after = text.slice(m.index + 5, m.index + 12);
+      if (!after.startsWith('min(') && !after.startsWith('clamp('))
+        bare.push(`${name}: ${text.slice(m.index, m.index + 40)}`);
+    }
+  }
+  assert.deepEqual(bare, []);
 });
 
 test('a solitary wave runs up a plane beach as Synolakis 1987 gives (NOAA canonical case) within 5%', (t) => {
@@ -94,8 +112,11 @@ test('a dam break on a wet bed makes the bore of Stoker 1957: its depth and spee
       break;
     }
   const speed = (front - x0) / elapsed,
-    middle = m.depth[row(m, Math.round((x0 + elapsed * 0.5 * (2 * Math.sqrt(G) - 3 * Math.sqrt(G * s.hm) + s.shock)) / dx))];
-  t.diagnostic(`bore ${speed.toFixed(3)} m/s, depth ${middle.toFixed(4)} m; Stoker ${s.shock.toFixed(3)} m/s, ${s.hm.toFixed(4)} m`);
+    middle =
+      m.depth[row(m, Math.round((x0 + elapsed * 0.5 * (2 * Math.sqrt(G) - 3 * Math.sqrt(G * s.hm) + s.shock)) / dx))];
+  t.diagnostic(
+    `bore ${speed.toFixed(3)} m/s, depth ${middle.toFixed(4)} m; Stoker ${s.shock.toFixed(3)} m/s, ${s.hm.toFixed(4)} m`,
+  );
   assert.ok(Math.abs(speed / s.shock - 1) < 0.03, `bore speed ${speed.toFixed(3)} m/s against ${s.shock.toFixed(3)}`);
   assert.ok(Math.abs(middle / s.hm - 1) < 0.03, `middle depth ${middle.toFixed(4)} m against ${s.hm.toFixed(4)}`);
 });
@@ -108,7 +129,8 @@ test('a lake at rest over steps and an island stays at rest, and a closed basin 
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const island = Math.hypot(x - 12, y - 8) < 3;
-      ground[y * width + x] = x === 0 || y === 0 || x === width - 1 || y === height - 1 ? 5 : island ? 1.5 : (x % 4) * 0.25 - 0.5;
+      ground[y * width + x] =
+        x === 0 || y === 0 || x === width - 1 || y === height - 1 ? 5 : island ? 1.5 : (x % 4) * 0.25 - 0.5;
     }
   const m = riverModel({ ground, width, height, cell: 0.5 });
   for (let i = 0; i < ground.length; i++) m.depth[i] = Math.max(0, 1 - ground[i]);
