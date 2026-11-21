@@ -13196,15 +13196,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   portal world the same way; that path has no test of its own yet. FBX uses the same path.
 - **Regression:** packages/react/tests/scene-loaders.test.js ("a Model inside a named <Scene> is built and drawn in that
   scene, not the default one").
-- **Still open:** the other plugin bindings outside the scene-aware list, see the next entry.
+- **Follow-up:** the other plugin bindings are fixed under GAP-REACT-SCENEPLUGINS, next entry.
 
-### Open 2026-11-20: react bindings other than models still attach to the default scene inside `<Scene>`, `<Hud>` and `<RenderTexture>` (GAP-REACT-SCENEPLUGINS, react)
+### Fixed 2026-11-20: react bindings other than models attached to the default scene inside `<Scene>`, `<Hud>` and `<RenderTexture>` (GAP-REACT-SCENEPLUGINS, react)
 
-- **Repro:** a binding outside the scene-aware list (Line, Points, Outline, Splat, AmbientLight, HemisphereLight and Fog are
-  inside it) placed inside `<Scene name="item">` lands in the default scene, so the item view does not draw it.
-- **Cause:** bindings that call `engine.use` or `X.attach(engine)` directly, rather than `attachBinding(scene, ...)`
-  (packages/react/src/package-binding.ts), use the engine's default scene. Hud's TSDoc says its plugins render in its overlay scene.
-- **Next:** route each such binding through `attachBinding` or `scene.world`, one at a time, with a named-scene test per binding.
+- **Repro (before):** `<Sky>`, `<Clouds>`, `<Text>`, `<BatchedMesh>`, `<Voxels>` or another binding that called
+  `engine.use` or `X.attach(engine)` directly, placed inside `<Scene name="item">`, landed in the default scene, so the
+  item view did not draw it.
+- **Cause:** those bindings used the engine's default scene (`engine.use`, `engine.removePlugin`) instead of the
+  enclosing scene's world, as `attachBinding` (packages/react/src/package-binding.ts) does.
+- **Fix:** `sceneOwner(scene)` (the world, else the engine) adds and removes the plugins the bindings build themselves
+  (Sky, ContactShadows, the shared Text renderer, now one per scene, Animation, Physics), and `inScene(scene, work)` runs
+  `X.attach(engine, ...)` inside `sceneScope`, the scope `instantiateModel` uses (Clouds and its soft-particle depth,
+  BatchedMesh, Voxels, AmbientShadows, Caustics, ModelOutlines and MeshOutline). `useCreated` recreates its object when
+  the world changes. `<Hud>` and `<RenderTexture>` pass their world the same way.
+- **Regression:** packages/react/tests/kit-helpers.test.js ("Sky and Text inside a named <Scene>"),
+  packages/react/tests/extras.test.js ("BatchedMesh and Voxels inside a <Scene>") and
+  packages/react/tests/clouds.test.js ("Clouds inside a named <Scene>", on a real core scene).
+- **Still open (left on the engine on purpose or for a separate change):** the Canvas-wide bindings (Shadows, the post
+  stack and its targets, Html, devtools, picking, XR pointers, the audio listener, SpriteLayer, Figure, GizmoHelper's
+  ViewCube, CameraShake) and the environment bindings (`<Environment>`, CubeCamera, environment capture), which another
+  change is editing for KB-REACT-ENVDECODERS1. ContactShadows, AmbientShadows, Caustics, outlines, Animation, Physics and
+  the Clouds depth have no named-scene test of their own; they use the helpers the three tests above cover.
 
 ### Fixed 2026-11-16: `AmbientLight`, `HemisphereLight` and `Fog` inside a `<Scene>` lit the default scene (KB-REACT-SCENELIGHT1, react)
 

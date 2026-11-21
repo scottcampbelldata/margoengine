@@ -7,6 +7,7 @@ import { composeMatrix } from '@margoengine/math/mat4';
 import { eulerToQuaternion } from '@margoengine/math/quat';
 import { useBakedShadows } from './bake-shadows.js';
 import { useCommit, useCreated, useScene } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { fault } from '../../shared/errors.js';
 
@@ -47,12 +48,14 @@ export const BatchedMesh = /* @__PURE__ */ forwardRef<Batch, BatchedMeshProps>(f
           optionalPeer('@margoengine/materials', () => import('@margoengine/materials')),
         ]),
       create: ([api, materials]) =>
-        api.BatchedMesh.attach(scene.engine as unknown as EngineKernel, material ?? new materials.Material(), {
-          maxItems,
-          maxVertices,
-          maxIndices,
-          renderOrder,
-        }),
+        inScene(scene, () =>
+          api.BatchedMesh.attach(scene.engine as unknown as EngineKernel, material ?? new materials.Material(), {
+            maxItems,
+            maxVertices,
+            maxIndices,
+            renderOrder,
+          }),
+        ),
       dispose: (value) => value.dispose(),
       ref,
       onError,

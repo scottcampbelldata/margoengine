@@ -3,6 +3,7 @@ import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { useScene, useMesh, report } from './internal.js';
 import { ContactGround, type ContactGroundOptions } from './kit-contact.js';
 import { loadShadows } from './shadows-loader.js';
+import { sceneOwner } from './scene-owner.js';
 
 interface ErrorProps {
   onError?: (error: unknown) => void;
@@ -20,16 +21,16 @@ function ContactBinding({ onError, ...options }: ContactGroundOptions & ErrorPro
     if (!scene.shadows) return;
     const ground = new ContactGround(registry, scene.shadows, () => latest.current.options);
     try {
-      scene.engine.use(ground);
+      sceneOwner(scene).use(ground);
     } catch (error) {
       report(scene, error, latest.current.onError);
       return;
     }
     return () => {
-      scene.engine.removePlugin(ground.name);
+      sceneOwner(scene).removePlugin(ground.name);
       ground.dispose();
     };
-  }, [scene.engine, registry, scene.shadows]);
+  }, [scene.engine, scene.world, registry, scene.shadows]);
   return null;
 }
 /** A transparent ground that draws only the existing shadow map's occlusion. */

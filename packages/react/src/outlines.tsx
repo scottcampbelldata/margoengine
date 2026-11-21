@@ -5,6 +5,7 @@ import type { Mesh as MeshHandle } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { MeshOutline, MeshOutlineOptions } from '@margoengine/toon/outline';
 import { colorKey, live, ModelContext, report, useMesh, useScene } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { subscribeFrame } from './frame-priority.js';
 import { rangeError } from '../../shared/errors.js';
@@ -78,13 +79,15 @@ function ModelOutline({ model, onReady, onError, ...props }: OutlinesProps & { m
       .then((api) => {
         if (!active || scene.engine.disposed) return;
         const { color, thickness, angle } = latest.current.props;
-        outline = plugin.current = api.ModelOutlines.attach(scene.engine, {
-          models: [model],
-          color: outlineRGB(color),
-          // drei's default width is 0.05 world units; the pixel variant keeps its own default of 3.
-          ...(thickness !== undefined ? { outline: thickness } : screenspace ? {} : { outline: 0.05 }),
-          smooth: angle !== 0,
-        });
+        outline = plugin.current = inScene(scene, () =>
+          api.ModelOutlines.attach(scene.engine, {
+            models: [model],
+            color: outlineRGB(color),
+            // drei's default width is 0.05 world units; the pixel variant keeps its own default of 3.
+            ...(thickness !== undefined ? { outline: thickness } : screenspace ? {} : { outline: 0.05 }),
+            smooth: angle !== 0,
+          }),
+        );
         latest.current.onReady?.(outline as unknown as MeshOutline);
       })
       .catch((error) => {
@@ -157,7 +160,7 @@ function MeshOutlines({ onReady, onError, ...props }: OutlinesProps): null {
         }
       for (const m of meshes)
         if (!each.has(m)) {
-          const o = api.MeshOutline.attach(scene.engine, options(m, true));
+          const o = inScene(scene, () => api!.MeshOutline.attach(scene.engine, options(m, true)));
           each.set(m, o);
           latest.current.onReady?.(o);
         }
@@ -176,7 +179,7 @@ function MeshOutlines({ onReady, onError, ...props }: OutlinesProps): null {
         .then((api) => {
           if (!active || mesh !== target || scene.engine.disposed) return;
           if (registry.instanceMeshes) return follow();
-          outline = plugin.current = api.MeshOutline.attach(scene.engine, options(target, false));
+          outline = plugin.current = inScene(scene, () => api.MeshOutline.attach(scene.engine, options(target, false)));
           latest.current.onReady?.(outline);
         })
         .catch(fail);

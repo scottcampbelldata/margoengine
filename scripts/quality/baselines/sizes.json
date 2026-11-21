@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17363123,
+  "total": 17363696,
   "history": [
     {
       "date": "2026-10-24",
@@ -11253,6 +11253,12 @@
       "commit": "fa9dd5ee7",
       "reason": "new entries @margoengine/environment/main (the root minus the image decoders, 32,035 B) and /loaders (the decoders, 11,371 B): the root re-exported both, so no new code; react's bindings import /main so the decoders leave their build (KB-REACT-ENVDECODERS1)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "051f36fa5",
+      "reason": "react bindings join the enclosing Scene: accumulative-shadows 3914 to 3974 B gzip (+60 B, inScene and the scene scope it runs the attach in), lines 2403 to 2404 B (+1 B, useCreated recreates its object when the scene world changes)",
+      "grew": 2
     }
   ],
   "items": {
@@ -12112,7 +12118,7 @@
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
     "@margoengine/react": 11246,
-    "@margoengine/react/accumulative-shadows": 3914,
+    "@margoengine/react/accumulative-shadows": 4230,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/caustics": 3429,
@@ -12131,7 +12137,7 @@
     "@margoengine/react/instances": 3671,
     "@margoengine/react/jsx-dev-runtime": 3272,
     "@margoengine/react/jsx-runtime": 3272,
-    "@margoengine/react/lines": 2403,
+    "@margoengine/react/lines": 2660,
     "@margoengine/react/lod": 3020,
     "@margoengine/react/marching-cubes": 4743,
     "@margoengine/react/materials": 8741,

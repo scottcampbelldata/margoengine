@@ -275,7 +275,7 @@ export function useCreated<A, T>(scene: Scene, options: Created<A, T>, keys: rea
       setValue((state) => (state === made ? null : state));
       latest.current.dispose(made);
     };
-  }, [scene.engine, ...keys]);
+  }, [scene.engine, scene.world, ...keys]);
   const { ref } = options;
   useCommit(() => {
     if (!ref || value === null) return;

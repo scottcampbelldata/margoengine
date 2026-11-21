@@ -8,6 +8,7 @@ import { Mesh, type MeshProps } from './components.js';
 import { casters } from './casters.js';
 import { subscribeFrame } from './frame-priority.js';
 import { live, report, useMesh, useScene, type Registry } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { rangeError } from '../../shared/errors.js';
 
@@ -245,7 +246,7 @@ function Binding({
         optionalPeer('@margoengine/studio', () => import('@margoengine/studio/accumulate-ambient'))
           .then((api) => {
             if (!active || scene.engine.disposed) return;
-            const made = api.AmbientShadows.attach(scene.engine, options);
+            const made = inScene(scene, () => api.AmbientShadows.attach(scene.engine, options));
             shadows = control.shadows = made;
             seen = key;
             control.reset = false;

@@ -310,23 +310,71 @@ test('AmbientLight, HemisphereLight and Fog inside a <Scene> light that scene, n
     lights = [React.createRef(), React.createRef(), React.createRef()];
   value.resources.models.add(model);
   render(
-    tree(
-      { ...value, world },
-      [
-        h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
-        h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
-        h(Fog, { key: 'f', ref: lights[2], far: 50 }),
-      ],
-    ),
+    tree({ ...value, world }, [
+      h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
+      h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
+      h(Fog, { key: 'f', ref: lights[2], far: 50 }),
+    ]),
   );
   await flush();
   assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
-  assert.deepEqual([...world.plugins.values()], lights.map((ref) => ref.current), 'each in the named scene');
-  for (const ref of lights) assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
+  assert.deepEqual(
+    [...world.plugins.values()],
+    lights.map((ref) => ref.current),
+    'each in the named scene',
+  );
+  for (const ref of lights)
+    assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
   assert.equal(lights[0].current.intensity, 0.4, 'live props still apply');
   cleanup();
   await flush();
   assert.equal(world.plugins.size, 0, 'unmount detaches them from the named scene');
+});
+
+test('BatchedMesh and Voxels inside a <Scene> attach their plugin to that scene, not the default one', async () => {
+  const value = scene(),
+    world = owner({ engine: value.engine }),
+    base = value.engine.use,
+    batch = React.createRef(),
+    voxels = React.createRef();
+  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
+  let active = null;
+  value.engine.use = (effect) => (active ? active.use(effect) : base.call(value.engine, effect));
+  const use = world.use;
+  world.use = (effect) => {
+    const outer = active;
+    active = world;
+    try {
+      use(effect);
+      effect.setup?.(value.engine);
+    } finally {
+      active = outer;
+    }
+  };
+  world.removePlugin = (name) => {
+    const effect = world.plugins.get(name);
+    world.plugins.delete(name);
+    effect?.dispose?.();
+  };
+  value.world = world;
+  render(
+    tree(value, [
+      h(BatchedMesh, { key: 'b', ref: batch, maxItems: 2, maxVertices: 9 }),
+      h(Voxels, {
+        key: 'v',
+        ref: voxels,
+        world: { name: 'voxel world' },
+        textures: { name: 'textures' },
+        lighting: false,
+      }),
+    ]),
+  );
+  await flush();
+  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
+  assert.deepEqual([...world.plugins.values()], [batch.current, voxels.current], 'both in the named scene');
+  cleanup();
+  await flush();
+  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
 });
 
 test('Voxels attaches the renderer and lighting, updates light from the frame loop, and keeps them through live props', async () => {

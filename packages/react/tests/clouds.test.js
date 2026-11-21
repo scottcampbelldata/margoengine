@@ -37,7 +37,14 @@ async function scene() {
     { position: [0, 0, 4], target: [0, 0, 0] },
     null,
   );
-  const value = { engine, world: null, registry: null, shadows: null, pointerHandlers: new Map(), frames: { callbacks: new Set() } };
+  const value = {
+    engine,
+    world: null,
+    registry: null,
+    shadows: null,
+    pointerHandlers: new Map(),
+    frames: { callbacks: new Set() },
+  };
   scenes.push(value);
   return value;
 }
@@ -71,7 +78,11 @@ test('Clouds draws every child Cloud with one native Clouds; options, seeds and 
   const view = render(ui(3, 8, '#ff0000'));
   await frames(s);
   const clouds = ready.at(-1);
-  assert.equal([...s.engine.plugins.values()].filter((p) => p.name.startsWith('clouds:')).length, 1, 'one native Clouds');
+  assert.equal(
+    [...s.engine.plugins.values()].filter((p) => p.name.startsWith('clouds:')).length,
+    1,
+    'one native Clouds',
+  );
   assert.equal(clouds.options.limit, 50);
   assert.equal(clouds.options.shading, 'unlit');
   assert.equal(clouds.clouds.length, 2);
@@ -113,7 +124,10 @@ test('a texture URL draws nothing until it decodes; softness adds the scene dept
   globalThis.fetch = mock.fn(async () => ({ ok: true, blob: async () => 'blob' }));
   globalThis.createImageBitmap = mock.fn(() => new Promise((r) => (resolve = r)));
   render(
-    tree(s, h(Clouds, { texture: '/puff.png', softness: 0.5, onReady: (c) => ready.push(c) }, h(Cloud, { segments: 3 }))),
+    tree(
+      s,
+      h(Clouds, { texture: '/puff.png', softness: 0.5, onReady: (c) => ready.push(c) }, h(Cloud, { segments: 3 })),
+    ),
   );
   await frames(s);
   const clouds = ready.at(-1);
@@ -129,4 +143,18 @@ test('a texture URL draws nothing until it decodes; softness adds the scene dept
   assert.equal(clouds.options.depth(), live[0].texture);
   delete globalThis.fetch;
   delete globalThis.createImageBitmap;
+});
+
+test('Clouds inside a named <Scene> attaches its native Clouds to that scene, not the default one', async () => {
+  const s = await scene(),
+    world = s.engine.createScene('item'),
+    ready = [];
+  s.world = world;
+  render(tree(s, h(Clouds, { onReady: (c) => ready.push(c) }, h(Cloud, {}))));
+  await frames(s);
+  const named = (plugins) => [...plugins.values()].filter((p) => p.name.startsWith('clouds:'));
+  assert.equal(named(world.plugins).length, 1, 'the native Clouds is in the named scene');
+  assert.equal(named(s.engine.plugins).length, 0, 'none in the default scene');
+  cleanup();
+  assert.equal(named(world.plugins).length, 0, 'unmount removes it from the named scene');
 });

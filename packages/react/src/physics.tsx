@@ -14,6 +14,7 @@ import type {
 import { Mesh, type MeshProps } from './components.js';
 import { splitPointerHandlers } from './events.js';
 import { useScene, useCommit, useResourceEffect, type Scene, type Registry } from './internal.js';
+import { sceneOwner } from './scene-owner.js';
 import { descendants, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
 import { rotateByQuaternion } from '@margoengine/math/quat';
 import { optionalPeer } from './optional.js';
@@ -41,7 +42,8 @@ export function Physics({
   timeScale = 1,
   ...options
 }: PhysicsProps) {
-  const { engine } = useScene(),
+  const scene = useScene(),
+    { engine } = scene,
     [world, setWorld] = useState<PhysicsWorld | null>(null),
     sync = useMemo(() => new Set<() => void>(), [engine]);
   const latest = useRef({ onReady, onError, gravity, paused, timeScale });
@@ -58,15 +60,17 @@ export function Physics({
           const instance = current;
           // The wrapper's update runs after the solver's step, before the engine ticks transforms.
           // The engine owns the wrapper, not the world, so unmount removes the wrapper from its scene.
-          engine.use((plugin = {
-            name: instance.name,
-            setup: () => instance.setup(engine as unknown as EngineKernel),
-            onPreUpdate(delta) {
-              instance.update(delta);
-              for (const update of sync) update();
-            },
-            dispose: () => instance.dispose(),
-          }));
+          sceneOwner(scene).use(
+            (plugin = {
+              name: instance.name,
+              setup: () => instance.setup(engine as unknown as EngineKernel),
+              onPreUpdate(delta) {
+                instance.update(delta);
+                for (const update of sync) update();
+              },
+              dispose: () => instance.dispose(),
+            }),
+          );
           setWorld(instance);
           latest.current.onReady?.(instance);
         })
@@ -89,6 +93,7 @@ export function Physics({
     },
     [
       engine,
+      scene.world,
       sync,
       options.name,
       options.fixedTimestep,
@@ -149,23 +154,12 @@ interface BodyState {
 const BodyContext = /* @__PURE__ */ createContext<BodyState | null>(null);
 
 /** One body drives a transform group; children retain their local transforms. */
-export function RigidBody({
-  children,
-  position,
-  rotation,
-  scale,
-  ...props
-}: RigidBodyProps) {
+export function RigidBody({ children, position, rotation, scale, ...props }: RigidBodyProps) {
   const [events, options] = splitPointerHandlers(props);
   const binding = useMemo<BodyState>(() => ({ requests: new Set(), refresh: () => {} }), []);
   return (
     <BodyContext.Provider value={binding}>
-      <Mesh
-        position={position}
-        rotation={rotation}
-        scale={scale}
-        {...events}
-      >
+      <Mesh position={position} rotation={rotation} scale={scale} {...events}>
         <BodyBinding {...options} transform={{ position, rotation, scale }} />
         {children}
       </Mesh>
@@ -195,7 +189,10 @@ function fitCollider(
   const point = (world: Triple) => {
     const p = rotateByQuaternion([world[0] - position[0], world[1] - position[1], world[2] - position[2]], inverse);
     if (p.some((value) => !Number.isFinite(value)))
-      throw rangeError('RigidBody: collider geometry contains non-finite positions; fix the mesh data or pass an explicit collider', 'react-arguments');
+      throw rangeError(
+        'RigidBody: collider geometry contains non-finite positions; fix the mesh data or pass an explicit collider',
+        'react-arguments',
+      );
     for (let axis = 0; axis < 3; axis++) {
       min[axis] = Math.min(min[axis], p[axis]);
       max[axis] = Math.max(max[axis], p[axis]);

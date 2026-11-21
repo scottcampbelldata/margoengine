@@ -5,6 +5,7 @@ import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Vec3 } from '@margoengine/core/extension';
 import { useCommit, useResourceEffect, useScene } from './internal.js';
 import { ModelContext } from './internal.js';
+import { sceneOwner } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
@@ -233,7 +234,7 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
         validate(latest.current);
         const api = await optionalPeer('@margoengine/animation', () => import('@margoengine/animation'));
         if (!lease.active || scene.engine.disposed || model.disposed) return;
-        if (scene.engine.hasPlugin('animation:' + model.name))
+        if (sceneOwner(scene).plugins.has('animation:' + model.name))
           throw fault('attached', 'Animation: this model already has an animation plugin; mount one <Animation> per model', 'react-usage');
         const animation = new api.Animation(model, { loop: latest.current.loop ?? true });
         const rest = pose(model);
@@ -268,7 +269,7 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
           watchFinish();
         };
         // Native setup owns deformation buffers and the picking preparation hook.
-        scene.engine.use(animation);
+        sceneOwner(scene).use(animation);
         let preparing: Promise<void> | undefined;
         playback.prepareMixer = () => {
           if (preparing || playback.animator) return;
@@ -301,9 +302,9 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
             } finally {
               restore(model, visual);
             }
-            if (scene.engine.hasPlugin(animator.name))
+            if (sceneOwner(scene).plugins.has(animator.name))
               throw fault('attached', 'Animation: this model already has an animator plugin; mount one <Animation> per model', 'react-usage');
-            scene.engine.use(animator);
+            sceneOwner(scene).use(animator);
             playback.animator = animator;
             const advance = animator.onPreUpdate.bind(animator);
             playback.resample = () => advance(0);
@@ -355,7 +356,7 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
       });
       return release;
     },
-    [scene.engine, model],
+    [scene.engine, scene.world, model],
   );
   useCommit(() => {
     if (current.current) {

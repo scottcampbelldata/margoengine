@@ -560,6 +560,46 @@ test('shape color, roughness and metalness props reach the attached material and
   assert.equal(mesh.material.options.color, '#ff0000');
 });
 
+// A named <Scene>'s world: plugins added to it are drawn in its views only, as core's scene plugins are.
+function namedWorld() {
+  return {
+    plugins: new Map(),
+    use(plugin) {
+      this.plugins.set(plugin.name, plugin);
+      plugin.setup?.();
+    },
+    removePlugin(name) {
+      const plugin = this.plugins.get(name);
+      this.plugins.delete(name);
+      plugin?.dispose?.();
+    },
+  };
+}
+test('Sky and Text inside a named <Scene> attach to that scene, not the default one, and leave it on unmount', async () => {
+  const scene = makeScene(),
+    world = namedWorld(),
+    sky = createRef();
+  scene.world = world;
+  const view = render(
+    tree(scene, [
+      React.createElement(Sky, { key: 'sky', ref: sky }),
+      React.createElement(Text, { key: 'text', text: 'in the item' }),
+    ]),
+  );
+  await flush();
+  assert.equal(scene.engine.plugins.size, 0, 'nothing in the default scene');
+  assert.equal(world.plugins.get('sky'), sky.current, 'the sky is in the named scene');
+  assert.equal(
+    [...world.plugins.values()].filter((plugin) => plugin === renderers.at(-1)).length,
+    1,
+    'the text renderer is in the named scene',
+  );
+  view.unmount();
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.plugins.size, 0, 'unmount removes both from the named scene');
+});
+
 test('Sky dynamically owns one plugin in StrictMode and updates its options without reattaching', async () => {
   const scene = makeScene(),
     ref = createRef(),
