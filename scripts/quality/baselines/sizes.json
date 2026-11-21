@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17365000,
+  "total": 17365470,
   "history": [
     {
       "date": "2026-10-24",
@@ -11259,6 +11259,12 @@
       "commit": "051f36fa5",
       "reason": "react bindings join the enclosing Scene: accumulative-shadows 3914 to 3974 B gzip (+60 B, inScene and the scene scope it runs the attach in), lines 2403 to 2404 B (+1 B, useCreated recreates its object when the scene world changes)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "0f6d29295",
+      "reason": "clustered/contact 6158 to 6372 B (+214): a plain options.depth texture is held in a borrowed-object slot (KB-RESTORE-BORROWED1), so a device restore drops it and reports once instead of binding the lost texture; a split into another entry would add an import and a second chunk for the same 214 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -11429,7 +11435,7 @@
     "@margoengine/clustered/area-texture": 4349,
     "@margoengine/clustered/bounce": 13928,
     "@margoengine/clustered/budget": 723,
-    "@margoengine/clustered/contact": 6158,
+    "@margoengine/clustered/contact": 6628,
     "@margoengine/clustered/cube-projector": 4716,
     "@margoengine/clustered/directional": 2535,
     "@margoengine/clustered/flicker": 2062,
