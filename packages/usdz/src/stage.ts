@@ -793,8 +793,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   }
   /** Whether an arc to `path` in `stack` from `node` would lead back to a site on the way up. */
   const loops = (node: Node, stack: Stack, path: string) => {
-    for (let up: Node | undefined = node; up; up = up.parent)
-      if (up.stack === stack && stripVariants(up.path) === path) return true;
+    for (let up: Node | undefined = node; up; up = up.parent) {
+      if (up.stack !== stack) continue;
+      // An arc to an ancestor or a descendant of a site on the way up is a cycle too: `/M/a` referencing `/M` would
+      // bring `/M/a` back under itself, one prim deeper each time. OpenUSD (black box) reports such an arc as a cycle
+      // and composes the prim without it.
+      const at = stripVariants(up.path);
+      if (under(at, path) || under(path, at)) return true;
+    }
     return false;
   };
   /**
