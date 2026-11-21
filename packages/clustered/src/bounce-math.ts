@@ -18,7 +18,10 @@
 // "Shadow Mapping for Hemispherical and Omnidirectional Light Sources", CGI 2002) of a point sampling of the scene,
 // each point splatted with its own footprint. The points are the captures' texels: every surface a bouncing source
 // sees, which holds every VPL and every surface between a lit surface and what it lights round the source. A receiver
-// is read with a normal offset (Holbert 2011, as the local shadows).
+// is compared at its tangent plane (adaptive depth bias, Dou et al. 2014) only where the texel holds its own surface:
+// each texel keeps its surface's normal beside its depth, as an object-ID shadow buffer keeps which surface it holds
+// (J. C. Hourcade and A. Nicolas, "Algorithms for Antialiased Cast Shadows", Computers & Graphics 9(3), 1985,
+// doi:10.1016/0097-8493(85)90046-2), so a concave corner does not light what stands behind its wall.
 // Openings (`openingLight` of `@margoengine/clustered/area`) count the room's light once: see `BounceOpening`.
 
 /** A square view of a capture: an eye, its unit forward and up, and the tangent of half its field of view. */
@@ -143,7 +146,11 @@ type V3 = readonly number[];
 const WHITE = [1, 1, 1] as const;
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
   sub = (a: V3, b: V3): [number, number, number] => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
-  cross = (a: V3, b: V3): [number, number, number] => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  cross = (a: V3, b: V3): [number, number, number] => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ],
   unit = (a: V3): [number, number, number] => {
     const l = Math.hypot(a[0], a[1], a[2]) || 1;
     return [a[0] / l, a[1] / l, a[2] / l];
@@ -151,12 +158,30 @@ const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
 
 /** The six cube faces (+X, -X, +Y, -Y, +Z, -Z) as forward and up, in the order of core's cube cameras. */
 export const CUBE_FACES: readonly (readonly [V3, V3])[] = [
-  [[1, 0, 0], [0, 1, 0]],
-  [[-1, 0, 0], [0, 1, 0]],
-  [[0, 1, 0], [0, 0, -1]],
-  [[0, -1, 0], [0, 0, 1]],
-  [[0, 0, 1], [0, 1, 0]],
-  [[0, 0, -1], [0, 1, 0]],
+  [
+    [1, 0, 0],
+    [0, 1, 0],
+  ],
+  [
+    [-1, 0, 0],
+    [0, 1, 0],
+  ],
+  [
+    [0, 1, 0],
+    [0, 0, -1],
+  ],
+  [
+    [0, -1, 0],
+    [0, 0, 1],
+  ],
+  [
+    [0, 0, 1],
+    [0, 1, 0],
+  ],
+  [
+    [0, 0, -1],
+    [0, 1, 0],
+  ],
 ];
 /**
  * Where an opening's capture looks out from (KB-BOUNCE-CAPEYE1): its centre moved out along its normal past its glazing
@@ -188,7 +213,9 @@ export function bounceViews(source: BounceSource): BounceView[] {
     if (!axis) return true;
     // A face sees the cone (or the half space) unless the whole face lies behind it: its nearest ray to the axis.
     const c = dot(forward, unit(axis));
-    return source.kind === 'rect' ? c > -0.5 : Math.acos(Math.min(1, c)) - Math.atan(Math.SQRT2) < Math.acos(source.cosOuter ?? -1);
+    return source.kind === 'rect'
+      ? c > -0.5
+      : Math.acos(Math.min(1, c)) - Math.atan(Math.SQRT2) < Math.acos(source.cosOuter ?? -1);
   }).map(([forward, up]) => ({ eye, forward, up, tan: 1 }));
 }
 /** The unit ray through texel (i, j) of `view` at `resolution`, row 0 at the top. */
@@ -235,7 +262,12 @@ export function pointFalloff(source: BouncePointSource, x: V3): number {
  * point inside the opening (z up to `recess`) sees the whole light, one beside it sees none, and one under the sill
  * behind its front edge sees none. `AreaLights`' shader (`@margoengine/clustered/area`) is its twin.
  */
-export function apertureWindow(q: readonly [number, number], z: number, recess: number, sill: number): [number, number, number, number] | null {
+export function apertureWindow(
+  q: readonly [number, number],
+  z: number,
+  recess: number,
+  sill: number,
+): [number, number, number, number] | null {
   let x0 = -1,
     y0 = -1,
     x1 = 1,
@@ -267,7 +299,15 @@ export function rectIrradiance(source: BounceRectSource | BounceOpening, x: V3, 
   if (z <= 0) return 0;
   const recess = source.recess ?? 0,
     sill = source.sill ?? 0,
-    clip = recess > 0 || sill > 0 ? apertureWindow([dot(w, source.u) / dot(source.u, source.u), dot(w, source.v) / dot(source.v, source.v)], z, recess, sill) : [-1, -1, 1, 1];
+    clip =
+      recess > 0 || sill > 0
+        ? apertureWindow(
+            [dot(w, source.u) / dot(source.u, source.u), dot(w, source.v) / dot(source.v, source.v)],
+            z,
+            recess,
+            sill,
+          )
+        : [-1, -1, 1, 1];
   if (!clip) return 0;
   const [x0, y0, x1, y1] = clip;
   let poly: number[][] = [
@@ -275,7 +315,12 @@ export function rectIrradiance(source: BounceRectSource | BounceOpening, x: V3, 
     [x1, y0],
     [x1, y1],
     [x0, y1],
-  ].map(([a, b]) => sub([0, 1, 2].map((k) => c[k] + a * source.u[k] + b * source.v[k]), x));
+  ].map(([a, b]) =>
+    sub(
+      [0, 1, 2].map((k) => c[k] + a * source.u[k] + b * source.v[k]),
+      x,
+    ),
+  );
   // Sutherland-Hodgman against the plane n.p = 0.
   const out: number[][] = [];
   for (let i = 0; i < poly.length; i++) {
@@ -308,8 +353,13 @@ export function crossesOpening(opening: BounceOpening, a: V3, b: V3): boolean {
     db = dot(sub(b, opening.position), opening.normal);
   if (da > 0 === db > 0 || da === db) return false;
   const t = da / (da - db),
-    p = sub([0, 1, 2].map((k) => a[k] + t * (b[k] - a[k])), opening.position);
-  return Math.abs(dot(p, opening.u)) <= dot(opening.u, opening.u) && Math.abs(dot(p, opening.v)) <= dot(opening.v, opening.v);
+    p = sub(
+      [0, 1, 2].map((k) => a[k] + t * (b[k] - a[k])),
+      opening.position,
+    );
+  return (
+    Math.abs(dot(p, opening.u)) <= dot(opening.u, opening.u) && Math.abs(dot(p, opening.v)) <= dot(opening.v, opening.v)
+  );
 }
 /**
  * Weight of a texel's offset from a cluster's plane in the reduction's distance, against its distance along the plane
@@ -318,7 +368,8 @@ export function crossesOpening(opening: BounceOpening, a: V3, b: V3): boolean {
  */
 const PLANE = 8;
 /** 1 - cos of the angle between two steps: 0 when they run straight on. */
-const bend = (a: V3, b: V3): number => 1 - dot(a, b) / Math.max(Math.hypot(a[0], a[1], a[2]) * Math.hypot(b[0], b[1], b[2]), 1e-30);
+const bend = (a: V3, b: V3): number =>
+  1 - dot(a, b) / Math.max(Math.hypot(a[0], a[1], a[2]) * Math.hypot(b[0], b[1], b[2]), 1e-30);
 /** Morton (Z-order) index of (x, y), 16 bits each. */
 const morton = (x: number, y: number): number => {
   const spread = (v: number) => {
@@ -349,12 +400,14 @@ export function reduceBounce(
   for (let i = 0; i < res * res; i++) order.push(i);
   order.sort((a, b) => keys[a] - keys[b]);
   const points: BouncePoint[] = [],
-    lit: { p: [number, number, number]; n: [number, number, number]; flux: number[]; area: number; weight: number }[] = [],
+    lit: { p: [number, number, number]; n: [number, number, number]; flux: number[]; area: number; weight: number }[] =
+      [],
     reflected: [number, number, number] = [0, 0, 0];
   const frosted = source.kind === 'point' ? openings.filter((o) => o.frosted) : [];
   capture.views.forEach((view, face) => {
     const base = face * res * res,
-      distance = (i: number, j: number) => (i < 0 || j < 0 || i >= res || j >= res ? 0 : texels[(base + j * res + i) * 4 + 3]),
+      distance = (i: number, j: number) =>
+        i < 0 || j < 0 || i >= res || j >= res ? 0 : texels[(base + j * res + i) * 4 + 3],
       at = (i: number, j: number, d: number) => {
         const r = texelRay(view, res, i, j);
         return [0, 1, 2].map((k) => view.eye[k] + r[k] * d);
@@ -397,7 +450,8 @@ export function reduceBounce(
         area = (d * d * texelSolidAngle(view.tan, res, i, j)) / Math.max(cos, 0.1);
       points.push({ position: p, normal: n as [number, number, number], area, ray });
       if (frosted.some((o) => crossesOpening(o, view.eye, p))) continue;
-      const irradiance = source.kind === 'point' ? pointFalloff(source, p) * Math.max(cos, 0) : rectIrradiance(source, p, n);
+      const irradiance =
+        source.kind === 'point' ? pointFalloff(source, p) * Math.max(cos, 0) : rectIrradiance(source, p, n);
       if (!(irradiance > 0)) continue;
       // The light the source really sends this way (KB-BOUNCE-TERMS1): its IES profile, projector image and layers.
       const tint = source.kind === 'point' && source.emission ? source.emission(p) : WHITE,
@@ -427,7 +481,11 @@ export function reduceBounce(
     member[t] = each ? t : seeds;
     sum += lit[t].weight;
     if (sum >= (total * (seeds + 1)) / count && seeds < count - 1) seeds++;
-    scale += Math.hypot(lit[t].p[0] - source.position[0], lit[t].p[1] - source.position[1], lit[t].p[2] - source.position[2]);
+    scale += Math.hypot(
+      lit[t].p[0] - source.position[0],
+      lit[t].p[1] - source.position[1],
+      lit[t].p[2] - source.position[2],
+    );
   }
   const k = each ? lit.length : lit.length ? member[lit.length - 1] + 1 : 0,
     s2 = (scale / Math.max(lit.length, 1)) ** 2,
@@ -468,7 +526,12 @@ export function reduceBounce(
           dy = e.p[1] - centre[c * 3 + 1],
           dz = e.p[2] - centre[c * 3 + 2],
           off = dx * normal[c * 3] + dy * normal[c * 3 + 1] + dz * normal[c * 3 + 2],
-          d = dx * dx + dy * dy + dz * dz + PLANE * off * off + s2 * (1 - (e.n[0] * normal[c * 3] + e.n[1] * normal[c * 3 + 1] + e.n[2] * normal[c * 3 + 2]));
+          d =
+            dx * dx +
+            dy * dy +
+            dz * dz +
+            PLANE * off * off +
+            s2 * (1 - (e.n[0] * normal[c * 3] + e.n[1] * normal[c * 3 + 1] + e.n[2] * normal[c * 3 + 2]));
         if (d < bestD) {
           bestD = d;
           best = c;
@@ -492,7 +555,9 @@ export function reduceBounce(
     area[c] += e.area;
     lift[c] = Math.max(
       lift[c],
-      (e.p[0] - centre[c * 3]) * normal[c * 3] + (e.p[1] - centre[c * 3 + 1]) * normal[c * 3 + 1] + (e.p[2] - centre[c * 3 + 2]) * normal[c * 3 + 2],
+      (e.p[0] - centre[c * 3]) * normal[c * 3] +
+        (e.p[1] - centre[c * 3 + 1]) * normal[c * 3 + 1] +
+        (e.p[2] - centre[c * 3 + 2]) * normal[c * 3 + 2],
     );
   }
   for (let c = 0; c < k; c++)
@@ -536,6 +601,38 @@ function texelCentre(x: number, y: number, res: number, n: V3, t: V3, b: V3): nu
 }
 /** The biggest finite distance a visibility map stores: nothing seen in that direction. */
 export const OPEN = 65504;
+/**
+ * A texel's surface normal as one float holding an integer below 2^24, exact in float32 and on the GPU: 0 for no
+ * surface, else 1 + 4095 qx + qy, (qx, qy) the hemi-octahedral coordinates of the normal turned into z >= 0 (a map's
+ * surface is two-sided) at 4,095 levels each, under 0.06 degrees apart (Q. Meyer, J. Suessmuth, G. Sussner,
+ * M. Stamminger and G. Greiner, "On Floating-Point Normal Vectors", EGSR 2010, doi:10.1111/j.1467-8659.2010.01737.x;
+ * Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A Survey of Efficient Representations for
+ * Independent Unit Vectors", JCGT 3(2), 2014).
+ */
+const normalCode = (n: V3): number => {
+  const s = (Math.abs(n[0]) + Math.abs(n[1]) + Math.abs(n[2])) * (n[2] < 0 ? -1 : 1) || 1,
+    q = (c: number) => Math.round(((c / s) * 0.5 + 0.5) * 4094);
+  return 1 + q(n[0]) * 4095 + q(n[1]);
+};
+/** The unit normal of a code of {@link normalCode} above 0, in z >= 0. */
+const decodeNormal = (code: number): [number, number, number] => {
+  const c = code - 1,
+    u = (Math.floor(c / 4095) / 4094) * 2 - 1,
+    v = ((c % 4095) / 4094) * 2 - 1;
+  return unit([u, v, 1 - Math.abs(u) - Math.abs(v)]);
+};
+/**
+ * When a receiver x (normal n) lies past a texel's depth, the texel's surface point H (normal m, turned to the VPL) is
+ * the receiver's own surface only if one flat or convex surface can join them (KB-BOUNCE-SHADOWSNOW1,
+ * {@link bounceIrradiance}): the chord of such a surface from x to H runs between its tangents at the two points, so H
+ * lies behind x's tangent plane by at most |H - x| sin(angle(m, n)), here plus TOUCH metres, and the surface bends by at
+ * most acos(BEND), 60 degrees, within a texel. Only the receiver's own plane is used for the offset: a captured texel's
+ * normal comes from its neighbours and can be 9 degrees off on a faceted log, which over 0.2 m would move H's plane by
+ * 3 cm. A log 0.15 m in radius bends 39 degrees across the texel of a VPL on the snow 1.8 m away and passes; the wall at
+ * a concave corner (90 degrees) and a floor 5 cm under the receiver's plane (parallel normals) do not.
+ */
+const BEND = 0.5,
+  TOUCH = 0.02;
 /** Side of the tiles {@link buildVisibility} skips whole, in texels. */
 const TILE = 4;
 /** {@link sampleSurfaces} settings. */
@@ -565,7 +662,11 @@ export interface SampleOptions {
  * circumradius, so it covers them all. Surfaces no VPL faces
  * are left out; past `budget` the cells double. Same input, same output.
  */
-export function sampleSurfaces(meshes: readonly BounceMesh[], vpls: readonly BounceVpl[], { resolution, budget = 16384 }: SampleOptions): BouncePoint[] {
+export function sampleSurfaces(
+  meshes: readonly BounceMesh[],
+  vpls: readonly BounceVpl[],
+  { resolution, budget = 16384 }: SampleOptions,
+): BouncePoint[] {
   const vp = Float64Array.from(vpls.flatMap((v) => [...v.position, ...v.normal])),
     worlds = meshes.map((mesh) => {
       const v = mesh.vertices,
@@ -616,7 +717,8 @@ export function sampleSurfaces(meshes: readonly BounceMesh[], vpls: readonly Bou
             twice = Math.sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
           if (!(twice > 0)) continue;
           let r2 = 0;
-          for (let c = 0; c < 9; c += 3) r2 = Math.max(r2, (t[c] - gx) ** 2 + (t[c + 1] - gy) ** 2 + (t[c + 2] - gz) ** 2);
+          for (let c = 0; c < 9; c += 3)
+            r2 = Math.max(r2, (t[c] - gx) ** 2 + (t[c + 1] - gy) ** 2 + (t[c + 2] - gz) ** 2);
           const r = Math.sqrt(r2);
           let d = far ? near : Infinity;
           if (!far)
@@ -628,7 +730,10 @@ export function sampleSurfaces(meshes: readonly BounceMesh[], vpls: readonly Bou
               if (l >= d) continue;
               // In front: a vertex above the VPL's plane.
               for (let c = 0; c < 9; c += 3)
-                if ((t[c] - vp[j]) * vp[j + 3] + (t[c + 1] - vp[j + 1]) * vp[j + 4] + (t[c + 2] - vp[j + 2]) * vp[j + 5] > 1e-3 * (l + r)) {
+                if (
+                  (t[c] - vp[j]) * vp[j + 3] + (t[c + 1] - vp[j + 1]) * vp[j + 4] + (t[c + 2] - vp[j + 2]) * vp[j + 5] >
+                  1e-3 * (l + r)
+                ) {
                   d = l;
                   break;
                 }
@@ -665,10 +770,19 @@ export function sampleSurfaces(meshes: readonly BounceMesh[], vpls: readonly Bou
     if (out.length + acc.length / 7 > budget) continue;
     const first = out.length;
     for (let o = 0; o < acc.length; o += 7)
-      out.push({ position: [acc[o + 1] / acc[o], acc[o + 2] / acc[o], acc[o + 3] / acc[o]], normal: unit(acc.slice(o + 4, o + 7)), area: acc[o], reach: 0 });
+      out.push({
+        position: [acc[o + 1] / acc[o], acc[o + 2] / acc[o], acc[o + 3] / acc[o]],
+        normal: unit(acc.slice(o + 4, o + 7)),
+        area: acc[o],
+        reach: 0,
+      });
     for (let i = 0; i < merged.length; i += 5) {
       const p = out[first + merged[i + 4]] as { position: number[]; reach: number };
-      p.reach = Math.max(p.reach, Math.hypot(merged[i] - p.position[0], merged[i + 1] - p.position[1], merged[i + 2] - p.position[2]) + merged[i + 3]);
+      p.reach = Math.max(
+        p.reach,
+        Math.hypot(merged[i] - p.position[0], merged[i + 1] - p.position[1], merged[i + 2] - p.position[2]) +
+          merged[i + 3],
+      );
     }
     return out;
   }
@@ -677,7 +791,8 @@ export function sampleSurfaces(meshes: readonly BounceMesh[], vpls: readonly Bou
  * Imperfect shadow maps (Ritschel et al. 2008): one paraboloid depth map of `resolution`^2 per VPL, the nearest
  * surfel per texel centre ray. At most `budget` points (an even subset, each standing for the area of the points it
  * replaces), each an ellipse along the ray it was seen by (a disc without one). Openings a VPL must not light
- * through are drawn exactly, as the rectangle's distance per texel ray. Returns `vpls.length` maps in one array.
+ * through are drawn exactly, as the rectangle's distance per texel ray. Returns `vpls.length` maps of depths in one
+ * array, then as many of the texels' surface normals (one float each, {@link normalCode}; 0 where nothing is).
  */
 export function buildVisibility(
   vpls: readonly BounceVpl[],
@@ -697,10 +812,11 @@ export function buildVisibility(
     stats?: { rays: number };
   },
 ): Float32Array {
-  const maps = new Float32Array(vpls.length * res * res).fill(OPEN),
+  const texels = res * res,
+    normals = vpls.length * texels,
+    maps = new Float32Array(2 * normals).fill(OPEN, 0, normals),
     stride = Math.max(1, Math.ceil(points.length / budget)),
     count = Math.ceil(points.length / stride),
-    texels = res * res,
     // Each VPL's texel centre rays (texelCentre's values, made once a VPL), and the map's tiles of TILE^2 texels,
     // each its rays' mean direction and the longest chord from it to one of them.
     rays = new Float64Array(texels * 3),
@@ -793,7 +909,11 @@ export function buildVisibility(
           N1 = cross(v2, v0),
           N2 = cross(v0, v1),
           V = dot(v0, N0),
-          sense = Math.abs(V) > 1e-9 * Math.hypot(v0[0], v0[1], v0[2]) * Math.hypot(v1[0], v1[1], v1[2]) * Math.hypot(v2[0], v2[1], v2[2]) ? Math.sign(V) : 0,
+          sense =
+            Math.abs(V) >
+            1e-9 * Math.hypot(v0[0], v0[1], v0[2]) * Math.hypot(v1[0], v1[1], v1[2]) * Math.hypot(v2[0], v2[1], v2[2])
+              ? Math.sign(V)
+              : 0,
           sum = Math.hypot(N0[0] + N1[0] + N2[0], N0[1] + N1[1] + N2[1], N0[2] + N1[2] + N2[2]),
           l0 = Math.hypot(N0[0], N0[1], N0[2]),
           l1 = Math.hypot(N1[0], N1[1], N1[2]),
@@ -801,7 +921,8 @@ export function buildVisibility(
           slack = 1.01e-6 * sum,
           m0 = slack + 1e-5 * (l0 + sum),
           m1 = slack + 1e-5 * (l1 + sum),
-          m2 = slack + 1e-5 * (l2 + sum);
+          m2 = slack + 1e-5 * (l2 + sum),
+          code = normalCode(cross(e1, e2));
         for (let ty = Math.floor(y0 / TILE); ty <= Math.floor(y1 / TILE); ty++)
           for (let tx = Math.floor(x0 / TILE); tx <= Math.floor(x1 / TILE); tx++) {
             if (sense !== 0) {
@@ -838,7 +959,10 @@ export function buildVisibility(
                   k = map + y * res + x;
                 // The map's near plane, 0.02 m, the receiver's own slack: a VPL stands for a patch of texels, and a step
                 // of a few millimetres beside its point (a sash against its frame) is no occluder of the patch.
-                if (depth > 0.02 && depth < maps[k]) maps[k] = depth;
+                if (depth > 0.02 && depth < maps[k]) {
+                  maps[k] = depth;
+                  maps[normals + k] = code;
+                }
               }
           }
         continue;
@@ -859,7 +983,12 @@ export function buildVisibility(
         // would, so receivers can be compared at their own plane (bounceIrradiance).
         reach = point.reach ?? 1.5 * Math.sqrt((point.area * stride) / Math.PI),
         pn = point.normal,
-        along = point.ray ? sub(point.ray, pn.map((c) => c * dot(point.ray as V3, pn))) : undefined,
+        along = point.ray
+          ? sub(
+              point.ray,
+              pn.map((c) => c * dot(point.ray as V3, pn)),
+            )
+          : undefined,
         span = along ? Math.hypot(along[0], along[1], along[2]) : 0,
         // span = sin of the ray to the surface normal; cos = sqrt(1 - span^2).
         e = 1 / Math.max(Math.sqrt(Math.max(0, 1 - span * span)), 0.1),
@@ -870,7 +999,8 @@ export function buildVisibility(
         x0 = Math.max(0, Math.floor(((u - radius) * 0.5 + 0.5) * res)),
         x1 = Math.min(res - 1, Math.floor(((u + radius) * 0.5 + 0.5) * res)),
         y0 = Math.max(0, Math.floor(((v - radius) * 0.5 + 0.5) * res)),
-        y1 = Math.min(res - 1, Math.floor(((v + radius) * 0.5 + 0.5) * res));
+        y1 = Math.min(res - 1, Math.floor(((v + radius) * 0.5 + 0.5) * res)),
+        code = normalCode(pn);
       for (let y = y0; y <= y1; y++)
         for (let x = x0; x <= x1; x++) {
           const c = ray(y * res + x),
@@ -887,11 +1017,13 @@ export function buildVisibility(
               q = hx * hx + hy * hy + hz * hz - sa * sa;
             if ((sa * sa) / (long * long) + q / (short * short) > 1) continue;
           } else if (hx * hx + hy * hy + hz * hz > reach * reach) continue;
-          if (depth < maps[k]) maps[k] = depth;
+          maps[k] = depth;
+          maps[normals + k] = code;
         }
     }
     for (const o of openings) {
-      const room = dot(sub(origin, o.position), o.normal) < 0;
+      const room = dot(sub(origin, o.position), o.normal) < 0,
+        code = normalCode(o.normal);
       if (!room && !o.frosted) continue;
       // Each texel's centre ray against the rectangle's plane.
       for (let y = 0; y < res; y++)
@@ -901,10 +1033,16 @@ export function buildVisibility(
           if (Math.abs(denom) < 1e-9) continue;
           const along = dot(sub(o.position, origin), o.normal) / denom;
           if (!(along > 0)) continue;
-          const hit = sub([0, 1, 2].map((k) => origin[k] + d[k] * along), o.position);
+          const hit = sub(
+            [0, 1, 2].map((k) => origin[k] + d[k] * along),
+            o.position,
+          );
           if (Math.abs(dot(hit, o.u)) > dot(o.u, o.u) || Math.abs(dot(hit, o.v)) > dot(o.v, o.v)) continue;
           const k = j * res * res + y * res + x;
-          if (along < maps[k]) maps[k] = along;
+          if (along < maps[k]) {
+            maps[k] = along;
+            maps[normals + k] = code;
+          }
         }
     }
   });
@@ -914,7 +1052,8 @@ export function buildVisibility(
 /**
  * Lays the bounce out as the lit shader reads it (one array of vec4f): a header (sources, VPLs, map resolution,
  * 1 / resolution), each source's rgb scale (colour x intensity of a light, the radiance of an opening), each VPL as
- * three vec4f (position and source index; normal and area; flux), then the visibility maps, four depths a vec4f.
+ * three vec4f (position and source index; normal and area; flux), then the visibility maps' depths, four a vec4f, then
+ * their normal codes in the same order ({@link buildVisibility}; 0 where `maps` holds depths alone).
  */
 export function packBounce(
   scales: readonly (readonly number[])[],
@@ -922,16 +1061,19 @@ export function packBounce(
   maps: Float32Array,
   resolution: number,
 ): Float32Array {
-  const texels = resolution * resolution,
+  const texels = vpls.length * resolution * resolution,
     head = 1 + scales.length + vpls.length * 3,
-    data = new Float32Array((head + Math.ceil((vpls.length * texels) / 4)) * 4);
+    layer = Math.ceil(texels / 4),
+    data = new Float32Array((head + 2 * layer) * 4);
   data.set([scales.length, vpls.length, resolution, 1 / resolution]);
   scales.forEach((s, i) => data.set([s[0], s[1], s[2], 0], (1 + i) * 4));
   vpls.forEach((v, j) => {
     const o = (1 + scales.length + j * 3) * 4;
     data.set([...v.position, v.source, ...v.normal, v.area, ...v.flux, 0], o);
   });
-  data.set(maps.subarray(0, vpls.length * texels), head * 4);
+  data.set(maps.subarray(0, texels), head * 4);
+  // Depths alone (an unblocked fill of OPEN): normal codes 0, the surfaces unknown.
+  if (maps.length >= 2 * texels) data.set(maps.subarray(texels, 2 * texels), (head + layer) * 4);
   return data;
 }
 /** Writes each source's current scale into packed data, in place. */
@@ -941,7 +1083,9 @@ export function setBounceScales(data: Float32Array, scales: readonly (readonly n
 /**
  * The bounce's irradiance at `x` (unit normal `n`) from packed data, the JS twin of the lit shader's
  * `clusterBounceLighting` (which multiplies it by the diffuse albedo over pi): per VPL the disc form factor at `x`, if
- * the receiver's plane along the map texel's centre ray is no farther than the map's depth plus 2 cm and 2%.
+ * the receiver's plane along the map texel's centre ray is no farther than the map's depth plus 2 cm and 2%, and, when
+ * the receiver itself is farther than that, one flat or convex surface can join the receiver to the texel's surface
+ * point (`BEND`, `TOUCH`).
  */
 export function bounceIrradiance(data: Float32Array, x: V3, n: V3): [number, number, number] {
   const sources = data[0],
@@ -949,6 +1093,7 @@ export function bounceIrradiance(data: Float32Array, x: V3, n: V3): [number, num
     res = data[2],
     start = 1 + sources,
     maps = (start + count * 3) * 4,
+    normals = maps + Math.ceil((count * res * res) / 4) * 4,
     e: [number, number, number] = [0, 0, 0];
   for (let j = 0; j < count; j++) {
     const o = (start + j * 3) * 4,
@@ -969,8 +1114,25 @@ export function bounceIrradiance(data: Float32Array, x: V3, n: V3): [number, num
       k = paraboloidTexel(d, nj, t, b, res),
       c = texelCentre(k % res, Math.floor(k / res), res, nj, t, b),
       den = dot(c, n),
-      plane = den < -1e-3 ? Math.min(r, Math.max(0, dot(w, n) / den)) : r;
-    if (plane > data[maps + j * res * res + k] * 1.02 + 0.02) continue;
+      plane = den < -1e-3 ? Math.min(r, Math.max(0, dot(w, n) / den)) : r,
+      depth = data[maps + j * res * res + k];
+    if (plane > depth * 1.02 + 0.02) continue;
+    // The receiver plane stands in for the receiver only where the map's surface is the receiver's own
+    // (KB-BOUNCE-SHADOWSNOW1): past its own depth, a receiver is hidden unless one flat or convex surface can join it
+    // to the texel's surface point (BEND, TOUCH). At a concave corner the plane runs on through the wall at its foot, so
+    // the texel holds the wall, or the floor beyond it under the plane, while the receiver stands behind the wall.
+    if (r > depth * 1.02 + 0.02) {
+      const code = data[normals + j * res * res + k];
+      if (code > 0) {
+        let m = decodeNormal(code);
+        if (dot(m, c) > 0) m = [-m[0], -m[1], -m[2]];
+        const h = [c[0] * depth - w[0], c[1] * depth - w[1], c[2] * depth - w[2]],
+          bend = dot(m, n),
+          behind = -dot(h, n);
+        if (bend < BEND || behind > Math.hypot(h[0], h[1], h[2]) * Math.sqrt(Math.max(0, 1 - bend * bend)) + TOUCH)
+          continue;
+      }
+    }
     const f = (cj * ci) / (Math.PI * r * r + a);
     for (let c = 0; c < 3; c++) e[c] += data[s + c] * data[o + 8 + c] * f;
   }
@@ -984,6 +1146,7 @@ export function bounceWgsl(group: number, binding = BOUNCE_BINDING): string {
 @group(${group}) @binding(${binding}) var<storage,read> clusterBounce:array<vec4f>;
 fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {
   let head=clusterBounce[0];let res=u32(head.z);let start=1u+u32(head.x);let count=u32(head.y);let maps=start+count*3u;
+  let normals=maps+(count*res*res+3u)/4u;
   var e=vec3f(0);
   for(var j=0u;j<count;j++){
     let a=clusterBounce[start+j*3u];let b=clusterBounce[start+j*3u+1u];
@@ -996,7 +1159,17 @@ fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {
     let k=j*res*res+ij.y*res+ij.x;let cu=(vec2f(ij)+0.5)/f32(res)*2.0-1.0;let q=dot(cu,cu);
     let c=(2.0*cu.x*t+2.0*cu.y*bt+(1.0-q)*b.xyz)/(1.0+q);let den=dot(c,n);
     let plane=select(r,min(r,max(0.0,dot(w,n)/den)),den< -0.001);
-    if(plane>clusterBounce[maps+k/4u][k%4u]*1.02+0.02){continue;}
+    let depth=clusterBounce[maps+k/4u][k%4u];
+    if(plane>depth*1.02+0.02){continue;}
+    if(r>depth*1.02+0.02){
+      let code=clusterBounce[normals+k/4u][k%4u];
+      if(code>0.5){
+        let qi=u32(code+0.5)-1u;let o=vec2f(f32(qi/4095u),f32(qi%4095u))/4094.0*2.0-1.0;
+        var m=normalize(vec3f(o,1.0-abs(o.x)-abs(o.y)));if(dot(m,c)>0.0){m=-m;}
+        let h=c*depth-w;let bend=dot(m,n);
+        if(bend<${BEND}||-dot(h,n)>length(h)*sqrt(max(0.0,1.0-bend*bend))+${TOUCH}){continue;}
+      }
+    }
     e+=clusterBounce[1u+u32(a.w)].rgb*clusterBounce[start+j*3u+2u].rgb*(cj*ci/(3.14159265*r*r+b.w));
   }
   return base*(1.0-metal)*0.318309886*e;

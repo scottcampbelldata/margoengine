@@ -9135,7 +9135,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   forbids people and suit work, so nobody is on it. The script's final `process.exit(0)` stays on the KB-OWN-EXIT2 owed
   list until this passes.
 
-### Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16, open: the concave-corner receiver plane)
+### Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16, open: a receiver level with a floor behind the wall)
 
 - **Repro:** `node scripts/cabin-hearth-browser-test.mjs` (WebGPU or `MARGO_COMPAT=1`) fails "the shadowed snow keeps
   its light" once the crest check before it passes (KB-BOUNCE-FRAMETWIN1): clear glazing, at (-1.2, 0.05, 4.0) the
@@ -9198,7 +9198,33 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   texel; it needs more map resolution near walls or a receiver-side corner test. The capture-point subset (at most
   4,096) no longer matters for core meshes, which are drawn exactly; surfaces a vertex hook displaces (Snow) and
   claimed batches still occlude only through the captured points.
-- **Needed to close:** the concave-corner receiver plane above.
+  4. **The texel's surface (fixed 2026-11-21, the wall or a lower floor).** Measured per VPL, the corner leaks are
+     receivers past the texel's depth whose plane test passes while the texel holds another surface: the wall's foot
+     where the plane meets it (the table room's (0.3, 4.4): the centre ray meets the wall at y 0.05, the true ray at
+     y 0.17), or the floor 5 cm under the plane past it. `buildVisibility` now keeps each texel's surface normal beside
+     its depth (one float, hemi-octahedral at 4,095 levels: Meyer, Suessmuth, Sussner, Stamminger and Greiner, "On
+     Floating-Point Normal Vectors", EGSR 2010; Cigolle, Donow, Evangelakos, Mara, McGuire and Meyer, JCGT 3(2) 2014),
+     as an object-ID shadow buffer keeps which surface it holds (Hourcade and Nicolas, "Algorithms for Antialiased
+     Cast Shadows", Computers & Graphics 9(3), 1985), and a receiver past the depth is lit only if one flat or convex
+     surface can join it to the texel's point H: normals within 60 degrees, H behind the receiver's plane by at most
+     |H - x| sin(angle) + 2 cm (a convex chord runs between its tangents). The test of the normal alone (within 26
+     degrees, H within 2 cm of the plane) hid 29% of the window's bounce at Cabin Hearth's log crest, whose texel
+     holds the log's lower face 39 degrees round; an offset from H's own plane hid 10% of a faceted log's crest, its
+     captured normal 9 degrees off. Tests (packages/clustered/test/bounce.test.js): the table room outside the wall at
+     y 0.05, flat and on a drift tilted 20 degrees, 0% to 0.09% of unblocked at (2, 4.2), (0.3, 4.4), (0.6, 4.6),
+     (5.7, 4.3) (0.9%, 5.5%, 4.0%, 3.8% flat and up to 1.5% tilted with depths alone); the floor inside within 10% of
+     the traced visibility; a 0.15 m log's crest over lit snow within 10% of traced for three lights. Cabin Hearth:
+     the crest checks as before (see the playbook entry of 2026-11-21).
+  Still open (a receiver level with a floor behind the wall, one depth per texel): Cabin Hearth's snow 0.2 to 0.3 m
+  from the front wall, (-1.5, 0.163, 3.0) and (-2.5, 0.172, 2.9), still takes 0.0013 R and 0.0007 R (twin, albedo
+  0.9 / pi) where the cast gives 0.00003 R. Its texels from the back wall's VPLs hold the cabin's plank floor at
+  y 0.15 (z 2.06 to 2.08), 1.3 to 2.2 cm under the snow and parallel to it, 0.85 to 0.94 m from the receiver: by the
+  map the snow's own plane, and no single depth there places the 0.3 m wall between. The table room level with its
+  floor (y 0) keeps 1.9% to 5.8% at (0.3, 4.4), (5.7, 4.3), (3, 4.1); a receiver within the 2 cm and 2% depth slack
+  behind a zero-thickness wall ((3, 0.05, 4.05), 43%) is the same slack. The shadowed-snow check at (-2.0, 0.05,
+  3.2) passes (0.0000 R float).
+- **Needed to close:** the level-floor case above: more map resolution near walls, or a second sample that sees the
+  wall in the texel beside.
 
 ### Fixed 2026-11-20: an opening light cast no shadow of its reveal and sill, and its bounce followed (clustered, KB-BOUNCE-REVEAL1, found 2026-11-16)
 

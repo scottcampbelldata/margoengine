@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17365470,
+  "total": 17365960,
   "history": [
     {
       "date": "2026-10-24",
@@ -11265,6 +11265,12 @@
       "commit": "0f6d29295",
       "reason": "clustered/contact 6158 to 6372 B (+214): a plain options.depth texture is held in a borrowed-object slot (KB-RESTORE-BORROWED1), so a device restore drops it and reports once instead of binding the lost texture; a split into another entry would add an import and a second chunk for the same 214 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "09838ea0a",
+      "reason": "clustered/bounce 13,928 to 13,998 B gzip (+70): each visibility texel keeps its surface normal code and the receiver-plane test checks the texel holds the receiver's own surface (KB-BOUNCE-SHADOWSNOW1 concave corner); it is one function in the entry's hot loop, a split would add an import() for 70 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -11433,7 +11439,7 @@
     "@margoengine/clustered/area": 14883,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
-    "@margoengine/clustered/bounce": 13928,
+    "@margoengine/clustered/bounce": 14418,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6628,
     "@margoengine/clustered/cube-projector": 4716,

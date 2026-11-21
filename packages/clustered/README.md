@@ -525,7 +525,18 @@ The method, from four papers:
    faces are skipped, triangles nearer a VPL than 0.02 m are its own patch (the map's near plane), and meshes a
    package draws itself (`@margoengine/materials` glass, gltf-pro, terrain) occlude only through the captures. A receiver is compared where its own
    tangent plane meets the texel's centre ray (adaptive depth bias, Dou et al. 2014), so a floor does not shadow
-   itself and a 0.3 m wall keeps a lit room's bounce out of the next.
+   itself and a 0.3 m wall keeps a lit room's bounce out of the next. That plane stands in for the receiver only
+   where the texel holds the receiver's own surface: each texel keeps its surface's normal beside its depth (one
+   float, hemi-octahedral, Meyer et al. 2010; Cigolle et al. 2014), as an object-ID shadow buffer keeps which surface
+   it holds (Hourcade and Nicolas 1985), and a receiver past the texel's depth is lit only if one flat or convex
+   surface can join it to the texel's surface point: the two normals within 60 degrees, and that point behind the
+   receiver's tangent plane by no more than the chord times the sine of the angle between them, plus 2 cm (a convex
+   surface's chord runs between its two tangents). A 0.15 m log's crest keeps the snow's bounce its own lower face
+   stands in for; at a concave corner, snow 0.2 to 0.6 m outside a wall's foot, the plane runs on through the wall
+   into the room and the texel holds the wall (90 degrees) or the floor under that plane (parallel, 5 cm down), so the
+   snow no longer takes the room's bounce through the wall (KB-BOUNCE-SHADOWSNOW1). A receiver within 2 cm of level
+   with a floor on the other side of the wall, or within the 2 cm and 2% depth slack behind a wall, still takes some:
+   one depth a texel cannot place the wall there (docs/known-bugs.md).
 
 `sampleSurfaces(meshes, vpls, {resolution, budget})` is the occluder sampling on its own (`LightBounce` calls it with
 the frame's batches): vertices in core's layout (position, normal), a column-major world matrix, and `budget` 16384
