@@ -170,6 +170,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
   or is swapped for another revision.
 
+### Open 2026-11-21: the flood film check gave another flood state once on the WebGL2 layer (KB-WATER-FLOODFILM-COMPAT1, water)
+
+- **Repro:** `MARGO_COMPAT=1 node packages/water/test/flood-film.browser.mjs` (WebGL2 layer, Intel Arc 140V through
+  ANGLE D3D11) failed once in four runs, under load (four agents and a `test:changed` run on the 8-core machine): the
+  two 30 fps runs hashed c9b4539d (volume 4,535.639080 m^3) and the 60 fps run 2859cbf7 (4,535.639329), so "1,200
+  frames at 60 fps equal 600 at 30 fps" failed. The other three runs, two of them on the code before
+  KB-WATER-SURGEVOL1's change and one after, hashed eee49ae9 (4,535.639200) for every run and the seek. The flood's
+  kernels take no surf WGSL (dist/flood.js imports swell-wgsl only), and the same tree gave eee49ae9 in a later run.
+- **Cause:** not found. Every hash of that run differs, not only the 60 fps one, so a flood state that depends on
+  something outside its inputs on this layer (a read of a buffer before its write lands, or the CPU tier's order of
+  work under load) is the lead; not checked. Native WebGPU passed in the same suite.
+
 ### Open 2026-11-21: Blender's TANH math node gives NaN for large inputs on native WebGPU (KB-BLENDER-TANH1, blender)
 
 - **Repro:** a WGSL compute shader writing `tanh(x)` for runtime x on native WebGPU (adapter `intel` `xe-2lpg`): 1 at
