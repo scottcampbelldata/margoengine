@@ -5828,6 +5828,14 @@ regressions on the affected platform; batch 160 jobs 4/5 cannot land as passing
 and the list row stays open. tests/reference-blend-repeat.test.js verifies the
 fixture's uint32 indices, all retained triangles and atomic concurrent downloads.
 
+Section 5 evidence, second vendor (2026-11-21): on an Intel Arc 140V under the same default ANGLE D3D11 backend the
+WebGL2 layer's 4x resolves are repeatable. The dispersion grid (`--backend=compat`, 278 of 278), geo-lod restore,
+atmosphere restoration, the SSAO resolve control (12 of 12 byte-identical) and the raw KB3508 page (0 of 299 frames
+changed at 640x480 and 1024x768) are all exact. The layer's resolve path has no vendor branch (only the capability tier changes formats; this run was the full
+tier), so this places the
+"two versions of one MSAA-resolved texture" row (docs/known-bugs.md) in the NVIDIA D3D driver path. Still missing: a
+self-contained replay that fails on the A6000, for the NVIDIA report.
+
 ### Batch 99 spectral transport and section 5 evidence
 
 The optional voxel-pathtracer/spectral subclass generates its own tracing kernel through the existing

@@ -18,7 +18,7 @@ the owner files them.
 | KB2426 | `KB2426` | NVIDIA | evidence only, no trigger |
 | KB2481 | `KB2481` | Intel, NVIDIA | NVIDIA half yes; Intel half needs an Arc |
 | KB3497 | `KB3497` | NVIDIA (via KB3508) | link to KB3508 not proven |
-| KB3508 | `KB3508` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (WebGPU and WebGL2 on ANGLE D3D11) |
+| KB3508 | `KB3508` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (WebGPU and WebGL2 on ANGLE D3D11); exact on an Intel Arc 140V, ANGLE D3D11 (2026-11-21) |
 | KB5185b | `KB5185b` | ANGLE, NVIDIA | draft only, no standalone repro |
 | KB5247d | `KB5247d` | ANGLE, NVIDIA | draft only, no standalone repro |
 | KB5700f | `KB5700f` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (fold-blend-repeat.html, D3D12 and ANGLE D3D11); exact on AMD and Apple |

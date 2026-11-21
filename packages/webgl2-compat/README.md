@@ -176,7 +176,10 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
   flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back with a texel-fetch
   draw of its own (exact, one texel a pixel), not `blitFramebuffer` (see `docs/known-bugs.md`, "ANGLE D3D11 flipped
-  blit").
+  blit"). A multisampled `resolveTarget` resolves with one `blitFramebuffer` at the end of the pass. On NVIDIA under
+  ANGLE D3D11 the same resolve can read back as two images one float16 step apart; it is exact on Intel and AMD under
+  the same backend and on ANGLE Vulkan, so it is recorded as a driver defect (`docs/known-bugs.md`, "two versions of
+  the same MSAA-resolved HDR texture").
 - **GLSL back end** (`margoengine/webgl2-compat/glsl`): `translateWGSL({ vertex, fragment })` turns a render
   pipeline's WGSL stages into GLSL ES 3.00 and the table the device binds resources by; `translateStage` translates one
   entry point alone. Uniform buffers are read in WGSL's own memory layout (exact for every struct, `@size`, `@align`

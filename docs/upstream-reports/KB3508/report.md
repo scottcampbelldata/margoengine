@@ -50,6 +50,9 @@ and with `max` blending the frames are stable. Recorded frames of a real scene r
 Reproduces (table above, 2026-11-11, Edge 157). Not reproducing on the AMD iGPU, on ANGLE Vulkan or on ANGLE D3D11on12, which narrows it to the
 NVIDIA D3D11/D3D12 path of this driver.
 
+Second control (2026-11-21): Intel Arc 140V laptop, Edge 157.0.4341.46, default ANGLE D3D11: `?api=webgl2&frames=300` gives 0 of 299
+frames changed and 1 image at 640x480 and at 1024x768.
+
 ## Files
 
 `msaa-blend-repeat.html` (the repro, no libraries, both APIs), `../run-page.mjs` (optional Playwright driver).
