@@ -33364,6 +33364,7 @@ This first scene needs no model or texture files. For a reader moving from anoth
 - `examples/khronos-gallery.html`: Khronos glTF sample assets
 - `examples/gallery/index.html`: The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md))
 - `examples/kinematics-constraints.html`: Arm clearance check with the kinematics package
+- `examples/hud-preview.html`: A HUD scene and an item-preview scene over a main scene
 - `examples/minimap.html`: A second camera view as a minimap
 - `examples/robot-expressive.html`: The same character study as a standalone page
 - `examples/scene-targets.html`: Several render targets with named outputs
