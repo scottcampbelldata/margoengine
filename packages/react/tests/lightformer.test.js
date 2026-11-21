@@ -117,8 +117,8 @@ const environmentMock = {
     },
   },
 };
-// The bindings import /main and /loaders (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders'])
+// The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
+for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders', '@margoengine/environment/load'])
   mock.module(id, environmentMock);
 
 const { render, act, cleanup } = await import('@testing-library/react');

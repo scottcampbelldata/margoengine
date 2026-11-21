@@ -644,6 +644,35 @@ test('the bindings that read no environment file bundle none of the image decode
     );
   }));
 
+test('<Environment src> keeps the decoders a file does not need in lazy chunks it never requests (KB-ENVDECODERS2)', async () =>
+  temporary(async (directory) => {
+    // It imported @margoengine/environment/loaders, which holds all three decoders in one chunk, so loading x.hdr
+    // fetched the OpenEXR and UltraHDR decoders too. /load imports only the decoder a file's signature names.
+    const outputs = await bundle(
+      directory,
+      'environment-src',
+      `import {createElement as h} from 'react';
+  import {Environment} from '@margoengine/react/environment';
+  export const App=()=>h(Environment,{src:'x.hdr'});`,
+    );
+    const chunks = outputs.filter((chunk) => chunk.type === 'chunk'),
+      initial = staticChunks(outputs);
+    const markers = { hdr: 'Invalid HDR: ', exr: 'Invalid EXR', ultrahdr: 'no hdrgm gain-map metadata' };
+    for (const [name, text] of Object.entries(markers)) {
+      const holders = chunks.filter((chunk) => chunk.code.includes(text));
+      assert.ok(holders.length > 0, `the ${name} decoder is emitted`);
+      assert.equal(
+        holders.some((chunk) => initial.includes(chunk)),
+        false,
+        `the ${name} decoder is on no initial chunk graph`,
+      );
+    }
+    for (const chunk of chunks) {
+      const held = Object.entries(markers).filter(([, text]) => chunk.code.includes(text));
+      assert.ok(held.length <= 1, `a chunk holds ${held.map(([name]) => name).join(' and ')} together`);
+    }
+  }));
+
 test('module-level React factories carry a pure annotation, so unused components tree-shake', async () => {
   // A bundler keeps a call it cannot prove pure. `export const X = forwardRef(...)` (or createContext, memo, lazy)
   // without /* @__PURE__ */ stays in every build that imports anything else from its module.
