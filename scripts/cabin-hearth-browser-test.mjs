@@ -1268,6 +1268,14 @@ try {
     // by the same cast, which is physics; the bounce now gives it that (0.0032 R before the scene's triangles were
     // occluders, the rest the room's walls lighting it through the front wall).
     shadowed = [-2.0, 0.05, 3.2],
+    // Snow 0.25 to 0.35 m in front of the front wall and 1.3 to 2.2 cm over the cabin's plank floor (y 0.15) behind it:
+    // the same cast gives each 0.00003 R. The texels of the back wall's VPLs there held the floor just inside the wall,
+    // to one depth sample the snow's own plane, and the bounce took 0.0013 R and 0.0007 R (the twin, albedo 0.9 / pi)
+    // through the wall until the texel beside, which holds the wall, was asked too (KB-BOUNCE-SHADOWSNOW1).
+    nearWall = [
+      [-1.5, 0.163, 3.0],
+      [-2.5, 0.172, 2.9],
+    ],
     wood = weatheredWood.color.slice(0, 3),
     crestRead = async (glazing) => {
       const query = `view=outside&fog=0&snow=0&fire=0${glazing === 'clear' ? '&glazing=clear' : ''}`,
@@ -1276,7 +1284,7 @@ try {
           exposure: stops,
           lamp: 'steady',
           bloom: false,
-          hdr: [crest, shadowed],
+          hdr: [crest, shadowed, ...nearWall],
         }),
         data = new Float32Array(await ctx.page.evaluate(() => [...window.cabinHearth.lightBounce.data])),
         stats = await ctx.page.evaluate(() => window.cabinHearth.lightBounce.stats),
@@ -1285,7 +1293,7 @@ try {
           exposure: stops,
           lamp: 'steady',
           bloom: false,
-          hdr: [crest, shadowed],
+          hdr: [crest, shadowed, ...nearWall],
         }),
         change = (at) => [0, 1, 2].map((k) => (colour(on, at, 1).lin[k] - colour(off, at, 1).lin[k]) / gain),
         float = (key, i = 0) => [0, 1, 2].map((k) => on.hdr[i][key][k] - off.hdr[i][key][k]),
@@ -1307,6 +1315,8 @@ try {
         scales: [[...data.slice(4, 7)], [...data.slice(8, 11)]],
         shadowChange: float('at', 1),
         shadowChange8: change([shadowed]),
+        nearWallChange: nearWall.map((_, i) => float('at', 2 + i)),
+        nearWallTwin: nearWall.map((p) => bounceIrradiance(data, p, [0, 1, 0]).map((e) => (0.9 / Math.PI) * e)),
         stats,
       };
     },
@@ -1327,6 +1337,8 @@ try {
           quadrature: fmt(lanternQuad),
           shadowChange: fmt(clear.shadowChange),
           shadowChange8: fmt(clear.shadowChange8),
+          nearWallChange: clear.nearWallChange.map(fmt),
+          nearWallTwin: clear.nearWallTwin.map(fmt),
           stats: clear.stats,
         },
         frosted: {
@@ -1358,6 +1370,13 @@ try {
   assert.ok(
     clear.shadowChange.every((c) => Math.abs(c) < 0.0005),
     `the shadowed snow keeps its light (${fmt(clear.shadowChange)})`,
+  );
+  nearWall.forEach((p, i) =>
+    assert.ok(
+      clear.nearWallChange[i].every((c) => Math.abs(c) < 0.0005) &&
+        clear.nearWallTwin[i].every((c) => Math.abs(c) < 0.0005),
+      `the snow at ${p} by the wall keeps its light (frame ${fmt(clear.nearWallChange[i])}, twin ${fmt(clear.nearWallTwin[i])})`,
+    ),
   );
   assert.ok(
     frosted.lantern.every((c) => c <= 0.02 * frosted.window[0]),

@@ -9480,7 +9480,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   forbids people and suit work, so nobody is on it. The script's final `process.exit(0)` stays on the KB-OWN-EXIT2 owed
   list until this passes.
 
-### Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16, open: a receiver level with a floor behind the wall)
+### Fixed 2026-11-21: Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16)
 
 - **Repro:** `node scripts/cabin-hearth-browser-test.mjs` (WebGPU or `MARGO_COMPAT=1`) fails "the shadowed snow keeps
   its light" once the crest check before it passes (KB-BOUNCE-FRAMETWIN1): clear glazing, at (-1.2, 0.05, 4.0) the
@@ -9560,16 +9560,34 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
      (5.7, 4.3) (0.9%, 5.5%, 4.0%, 3.8% flat and up to 1.5% tilted with depths alone); the floor inside within 10% of
      the traced visibility; a 0.15 m log's crest over lit snow within 10% of traced for three lights. Cabin Hearth:
      the crest checks as before (see the playbook entry of 2026-11-21).
-  Still open (a receiver level with a floor behind the wall, one depth per texel): Cabin Hearth's snow 0.2 to 0.3 m
-  from the front wall, (-1.5, 0.163, 3.0) and (-2.5, 0.172, 2.9), still takes 0.0013 R and 0.0007 R (twin, albedo
-  0.9 / pi) where the cast gives 0.00003 R. Its texels from the back wall's VPLs hold the cabin's plank floor at
-  y 0.15 (z 2.06 to 2.08), 1.3 to 2.2 cm under the snow and parallel to it, 0.85 to 0.94 m from the receiver: by the
-  map the snow's own plane, and no single depth there places the 0.3 m wall between. The table room level with its
-  floor (y 0) keeps 1.9% to 5.8% at (0.3, 4.4), (5.7, 4.3), (3, 4.1); a receiver within the 2 cm and 2% depth slack
-  behind a zero-thickness wall ((3, 0.05, 4.05), 43%) is the same slack. The shadowed-snow check at (-2.0, 0.05,
-  3.2) passes (0.0000 R float).
-- **Needed to close:** the level-floor case above: more map resolution near walls, or a second sample that sees the
-  wall in the texel beside.
+  5. **The floor level with the snow behind the wall (fixed 2026-11-21).** Cabin Hearth's snow 0.25 to 0.35 m from the
+     front wall, (-1.5, 0.163, 3.0) and (-2.5, 0.172, 2.9), took 0.0013 R and 0.0007 R (twin, albedo 0.9 / pi) where
+     the cast gives 0.00003 R: the texels of the back wall's VPLs held the plank floor at y 0.15 just inside the wall,
+     1.3 to 2.2 cm under the snow and parallel to it, so by one depth the snow's own plane, and the joined-surface test
+     passed. The ray to the snow passes the wall about 2 degrees above its foot, under a third of a 32-texel map's 7, so
+     finer maps near walls (adaptive shadow maps, Fernando, Fernandez, Bala and Greenberg, SIGGRAPH 2001,
+     doi:10.1145/383259.383302; logarithmic perspective shadow maps, Lloyd, Govindaraju, Quammen, Molnar and Manocha,
+     ACM TOG 27(4) 2008, doi:10.1145/1409625.1409628) would need some 16 times the texels round every wall and still
+     place the edge to a texel. Instead, once the centre texel's surface joins the receiver, `bounceIrradiance` and
+     `clusterBounceLighting` (one WGSL for WebGPU and the WebGL2 layer) ask the texel beside it on each axis, toward
+     the ray to the receiver: where the two texels' points form a valley (each in front of the other's plane by over
+     2 cm: the floor and the wall standing on it) and the receiver lies over 2 cm behind the second one's plane, the
+     ray meets that wall between them. The two planes place the edge inside the texel pair, as shadow silhouette maps
+     store an edge inside a texel (Sen, Cammarano and Hanrahan, ACM TOG 22(3) 2003,
+     https://graphics.stanford.edu/papers/silmap/); the taps are percentage-closer filtering's (Reeves, Salesin and
+     Cook, SIGGRAPH 1987) but decide visibility only for a valley, since every tap of a 2 x 2 block as an occluder had
+     darkened the floor under a table by 14%. A convex edge is never a valley, so a log's crest keeps its bounce. Test
+     (packages/clustered/test/bounce.test.js): Cabin Hearth's front wall, door, floor and snow with VPLs over its back
+     and side walls: 0 at both points where the traced visibility is 0 (5.5% of unblocked at (-1.5, 3.0) before), the
+     snow along the wall 0.06% of unblocked, the floor and the wall's foot inside within 10% of traced. The table room
+     level with its floor, (0.3, 4.4), (5.7, 4.3) and (3, 4.1): 0%, 0% and 2.8% (1.9% to 5.8% before). Cabin Hearth
+     (scripts/cabin-hearth-browser-test.mjs, both points added to its shadowed-snow check, bound 0.0005): see the
+     playbook entry of 2026-11-21.
+  What is left is the depth bias every shadow map has, recorded in docs/limits.md, not a defect: a receiver behind a
+  surface thinner than 2 cm and 2% of its distance (the table room's zero-thickness wall: (3, 0.05, 4.05) 5 cm behind
+  it, 43%, and (3, 4.1) 10 cm behind, 2.8%) lies within that slack of the texel's depth and is lit; a wall thicker than
+  the slack, as every wall of Cabin Hearth is, hides it. On the lit side a receiver within about one texel's footprint of a concave corner loses some (one texel of edge
+  placement, the same with depths alone).
 
 ### Fixed 2026-11-20: an opening light cast no shadow of its reveal and sill, and its bounce followed (clustered, KB-BOUNCE-REVEAL1, found 2026-11-16)
 

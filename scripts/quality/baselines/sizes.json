@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17383463,
+  "total": 17383960,
   "history": [
     {
       "date": "2026-10-24",
@@ -11295,6 +11295,12 @@
       "commit": "5ff5dc647f",
       "reason": "Water 30644 to 31356 B gzip and water/underwater 8754 to 9087 B gzip. HDR sky orientation, irradiance, and reflection filtering share the current draws and the waterline blends partial pixel coverage. A separate entry would duplicate the surface and volume capture paths.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "6859a6736",
+      "reason": "clustered/bounce 13,998 to 14,480 B gzip (+482): the joined-surface test asks the texel beside on each axis for a wall standing on that surface, in the JS twin and the lit shader's WGSL (KB-BOUNCE-SHADOWSNOW1 cause 5); the WGSL string and its twin are the entry's own hot loop, read by every page with bounce light, so a lazy split would only add an import() and a chunk to each of them",
+      "grew": 1
     }
   ],
   "items": {
@@ -11463,7 +11469,7 @@
     "@margoengine/clustered/area": 14883,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
-    "@margoengine/clustered/bounce": 14418,
+    "@margoengine/clustered/bounce": 14915,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6628,
     "@margoengine/clustered/cube-projector": 4716,

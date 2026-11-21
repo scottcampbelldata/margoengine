@@ -633,6 +633,27 @@ const decodeNormal = (code: number): [number, number, number] => {
  */
 const BEND = 0.5,
   TOUCH = 0.02;
+/**
+ * The second sample of the joined-surface test: H (normal m) is the texel's point the receiver x joins, G (normal g)
+ * the point of the texel beside it toward x's ray, both relative to x and turned to the VPL. A valley, each point in
+ * front of the other's plane by more than TOUCH, is two surfaces that meet between the texels (the floor and the wall
+ * standing on it), and x behind G's plane by more than TOUCH lies under that wall: the ray to x meets the wall between
+ * the floor and G. A floor 1 to 2 cm under the snow outside a cabin's wall is one depth sample from the snow's own
+ * plane, so the centre alone lit the snow through the wall (KB-BOUNCE-SHADOWSNOW1). The two texels' planes place the
+ * edge between them, as shadow silhouette maps store an edge inside a texel for a piecewise-linear boundary in place of
+ * the depth map's piecewise-constant one (P. Sen, M. Cammarano and P. Hanrahan, "Shadow Silhouette Maps", ACM TOG
+ * 22(3), 2003, https://graphics.stanford.edu/papers/silmap/), and as each texel's plane gives the adaptive depth bias
+ * (Dou et al. 2014); the taps are those of percentage-closer filtering (W. T. Reeves, D. H. Salesin and R. L. Cook,
+ * "Rendering Antialiased Shadows with Depth Maps", SIGGRAPH 1987), but only past the texel's depth and only for a
+ * valley: every tap of a 2 x 2 block as an occluder darkened the floor under a table by 14%. A convex edge (each point behind the other's plane) is never
+ * a valley, so a log's crest keeps its bounce. Finer maps near walls (R. Fernando, S. Fernandez, K. Bala and
+ * D. P. Greenberg, "Adaptive Shadow Maps", SIGGRAPH 2001, doi:10.1145/383259.383302; B. Lloyd, N. K. Govindaraju,
+ * C. Quammen, S. E. Molnar and D. Manocha, "Logarithmic Perspective Shadow Maps", ACM TOG 27(4), 2008,
+ * doi:10.1145/1409625.1409628) still place the edge to a texel: the ray to snow 1.3 cm over the floor passes the wall
+ * 2 degrees above its foot, under a third of a 32-texel map's 7, so the texels round walls would grow 16-fold.
+ */
+const besideWall = (h: V3, m: V3, g: V3, m2: V3): boolean =>
+  dot(sub(h, g), m2) > -TOUCH && dot(sub(g, h), m) > TOUCH && dot(g, m2) > TOUCH;
 /** Side of the tiles {@link buildVisibility} skips whole, in texels. */
 const TILE = 4;
 /** {@link sampleSurfaces} settings. */
@@ -1131,6 +1152,29 @@ export function bounceIrradiance(data: Float32Array, x: V3, n: V3): [number, num
           behind = -dot(h, n);
         if (bend < BEND || behind > Math.hypot(h[0], h[1], h[2]) * Math.sqrt(Math.max(0, 1 - bend * bend)) + TOUCH)
           continue;
+        // The joining surface must run on past the texel unbroken: the texel beside it on each axis, toward the ray to
+        // x, may hold a wall standing on that surface ({@link besideWall}).
+        const fx = ((dot(d, t) / (1 + cj)) * 0.5 + 0.5) * res,
+          fy = ((dot(d, b) / (1 + cj)) * 0.5 + 0.5) * res,
+          ix = k % res,
+          iy = (k - ix) / res;
+        let wall = false;
+        for (const [qx, qy] of [
+          [ix + (fx < ix + 0.5 ? -1 : 1), iy],
+          [ix, iy + (fy < iy + 0.5 ? -1 : 1)],
+        ]) {
+          if (qx < 0 || qy < 0 || qx >= res || qy >= res) continue;
+          const q = j * res * res + qy * res + qx,
+            code2 = data[normals + q];
+          if (!(code2 > 0)) continue;
+          const c2 = texelCentre(qx, qy, res, nj, t, b),
+            d2 = data[maps + q];
+          let m2 = decodeNormal(code2);
+          if (dot(m2, c2) > 0) m2 = [-m2[0], -m2[1], -m2[2]];
+          const g = [c2[0] * d2 - w[0], c2[1] * d2 - w[1], c2[2] * d2 - w[2]];
+          if (besideWall(h, m, g, m2)) wall = true;
+        }
+        if (wall) continue;
       }
     }
     const f = (cj * ci) / (Math.PI * r * r + a);
@@ -1140,10 +1184,21 @@ export function bounceIrradiance(data: Float32Array, x: V3, n: V3): [number, num
 }
 /** The lit-shader hook binding of the bounce data. */
 export const BOUNCE_BINDING = 164;
-/** The WGSL of the bounce in the lit shader: `clusterBounceLighting` in bind group `group`. */
+/**
+ * The WGSL of the bounce in the lit shader: `clusterBounceLighting` in bind group `group`. After the joined-surface
+ * test its loop over `i` reads the texel beside on each axis, toward the ray to the receiver, for a wall standing on
+ * the joining surface ({@link besideWall}).
+ */
 export function bounceWgsl(group: number, binding = BOUNCE_BINDING): string {
   return /* wgsl */ `
 @group(${group}) @binding(${binding}) var<storage,read> clusterBounce:array<vec4f>;
+fn clusterBounceRay(x:u32,y:u32,res:u32,t:vec3f,bt:vec3f,n:vec3f)->vec3f {
+  let cu=(vec2f(f32(x),f32(y))+0.5)/f32(res)*2.0-1.0;let q=dot(cu,cu);return (2.0*cu.x*t+2.0*cu.y*bt+(1.0-q)*n)/(1.0+q);
+}
+fn clusterBounceNormal(code:f32,c:vec3f)->vec3f {
+  let qi=u32(code+0.5)-1u;let o=vec2f(f32(qi/4095u),f32(qi%4095u))/4094.0*2.0-1.0;
+  let m=normalize(vec3f(o,1.0-abs(o.x)-abs(o.y)));return select(m,-m,dot(m,c)>0.0);
+}
 fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {
   let head=clusterBounce[0];let res=u32(head.z);let start=1u+u32(head.x);let count=u32(head.y);let maps=start+count*3u;
   let normals=maps+(count*res*res+3u)/4u;
@@ -1156,18 +1211,26 @@ fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {
     let t=vec3f(1.0+s*b.x*b.x*ba,s*bb,-s*b.x);let bt=vec3f(bb,s+b.y*b.y*ba,-b.y);
     let uv=vec2f(dot(d,t),dot(d,bt))/(1.0+cj);
     let ij=vec2u(clamp(floor((uv*0.5+0.5)*f32(res)),vec2f(0),vec2f(f32(res-1u))));
-    let k=j*res*res+ij.y*res+ij.x;let cu=(vec2f(ij)+0.5)/f32(res)*2.0-1.0;let q=dot(cu,cu);
-    let c=(2.0*cu.x*t+2.0*cu.y*bt+(1.0-q)*b.xyz)/(1.0+q);let den=dot(c,n);
+    let k=j*res*res+ij.y*res+ij.x;let c=clusterBounceRay(ij.x,ij.y,res,t,bt,b.xyz);let den=dot(c,n);
     let plane=select(r,min(r,max(0.0,dot(w,n)/den)),den< -0.001);
     let depth=clusterBounce[maps+k/4u][k%4u];
     if(plane>depth*1.02+0.02){continue;}
     if(r>depth*1.02+0.02){
       let code=clusterBounce[normals+k/4u][k%4u];
       if(code>0.5){
-        let qi=u32(code+0.5)-1u;let o=vec2f(f32(qi/4095u),f32(qi%4095u))/4094.0*2.0-1.0;
-        var m=normalize(vec3f(o,1.0-abs(o.x)-abs(o.y)));if(dot(m,c)>0.0){m=-m;}
-        let h=c*depth-w;let bend=dot(m,n);
+        let m=clusterBounceNormal(code,c);let h=c*depth-w;let bend=dot(m,n);
         if(bend<${BEND}||-dot(h,n)>length(h)*sqrt(max(0.0,1.0-bend*bend))+${TOUCH}){continue;}
+        let f=(uv*0.5+0.5)*f32(res)-vec2f(ij)-0.5;var wall=false;
+        for(var i=0u;i<2u;i++){
+          let p=vec2i(ij)+select(vec2i(0,select(1,-1,f.y<0.0)),vec2i(select(1,-1,f.x<0.0),0),i==0u);
+          if(any(p<vec2i(0))||any(p>=vec2i(i32(res)))){continue;}
+          let kk=j*res*res+u32(p.y)*res+u32(p.x);let code2=clusterBounce[normals+kk/4u][kk%4u];
+          if(code2<0.5){continue;}
+          let c2=clusterBounceRay(u32(p.x),u32(p.y),res,t,bt,b.xyz);let m2=clusterBounceNormal(code2,c2);
+          let g=c2*clusterBounce[maps+kk/4u][kk%4u]-w;
+          if(dot(h-g,m2)> -${TOUCH}&&dot(g-h,m)>${TOUCH}&&dot(g,m2)>${TOUCH}){wall=true;}
+        }
+        if(wall){continue;}
       }
     }
     e+=clusterBounce[1u+u32(a.w)].rgb*clusterBounce[start+j*3u+2u].rgb*(cj*ci/(3.14159265*r*r+b.w));

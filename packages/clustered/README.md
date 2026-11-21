@@ -534,9 +534,14 @@ The method, from four papers:
    surface's chord runs between its two tangents). A 0.15 m log's crest keeps the snow's bounce its own lower face
    stands in for; at a concave corner, snow 0.2 to 0.6 m outside a wall's foot, the plane runs on through the wall
    into the room and the texel holds the wall (90 degrees) or the floor under that plane (parallel, 5 cm down), so the
-   snow no longer takes the room's bounce through the wall (KB-BOUNCE-SHADOWSNOW1). A receiver within 2 cm of level
-   with a floor on the other side of the wall, or within the 2 cm and 2% depth slack behind a wall, still takes some:
-   one depth a texel cannot place the wall there (docs/known-bugs.md).
+   snow no longer takes the room's bounce through the wall (KB-BOUNCE-SHADOWSNOW1). Snow 1 to 2 cm above a floor on
+   the other side of the wall is, to that one depth, on the floor's own plane, so the joined surface is checked to run
+   on unbroken: the texel beside it on each axis, toward the ray to the receiver, is asked too, and where the two
+   texels' points form a valley (each in front of the other's plane by over 2 cm: the floor and the wall standing on
+   it) and the receiver lies over 2 cm behind the second one's plane, the ray meets that wall between them, as a
+   silhouette map places an edge inside a texel (Sen, Cammarano and Hanrahan 2003). A convex edge is never a valley,
+   so the crest keeps its bounce. A receiver within the 2 cm and 2% depth slack behind a surface still takes it, as
+   any shadow map's bias lets through (docs/limits.md).
 
 `sampleSurfaces(meshes, vpls, {resolution, budget})` is the occluder sampling on its own (`LightBounce` calls it with
 the frame's batches): vertices in core's layout (position, normal), a column-major world matrix, and `budget` 16384
