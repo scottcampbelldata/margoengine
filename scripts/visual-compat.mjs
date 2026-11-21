@@ -19,7 +19,7 @@ import { resolve } from 'node:path';
 import { decodePNG } from '../tests/support/png.js';
 import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { rewriteTable } from './support/visual-compat-doc.js';
+import { rewriteTable, stampPixels } from './support/visual-compat-doc.js';
 import { openCase, selectCases, startServers, withQuery } from './support/visual-compat-pages.js';
 import { gateProblems, record, SAME, verdict } from './support/visual-compat-status.js';
 import { compare, downsample, encodePNG } from './support/visual-image.js';
@@ -204,6 +204,14 @@ async function writeDoc(rows, environment) {
         : '-';
       old.set(r.id, [r.id, r.view, result, noise, old.get(r.id)?.[4] ?? '-']);
     }
-    return `Last recorded ${environment.date.slice(0, 10)} at ${environment.commit} on ${environment.gpu} (${environment.browser}); a row not rerun then keeps the numbers of its last run on the same machine.`;
+    const day = environment.date.slice(0, 10),
+      stamp = `${day}, ${environment.commit}, ${environment.gpu}, ${environment.browser}`;
+    return stampPixels(
+      old,
+      rows.map((r) => r.id),
+      only.length > 0,
+      `Last recorded ${day} at ${environment.commit} on ${environment.gpu} (${environment.browser}); a row not rerun then keeps the numbers of its last run on the same machine; a row with its own stamp in the last column was rerun alone, later.`,
+      stamp,
+    );
   });
 }
