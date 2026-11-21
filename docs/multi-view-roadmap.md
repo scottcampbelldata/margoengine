@@ -137,4 +137,5 @@ so rapid clicks in different views each get their own result.
   into 1x textures against a 1x reference) at 1x and 4x MSAA with device restore; then the demos (picks through
   each view, layers a view leaves out, frame time).
 - Visual check: `split-screen`, `minimap` and `hud-preview` at high, light and phone.
+- WebGL2 compatibility layer (M8 of the [WebGL2 roadmap](webgl2-compat-roadmap.md)): `npm run visual:compat -- --only=hud-preview` ran on 2026-11-21 (Intel Xe-2 LPG, msedge over ANGLE) with no page errors, HUD and item preview both drawn: same pixels as native (d > 2 on 0.00%, mean d 0.000318, max d 3; native run-to-run noise zero, so recorded exact). Its frame column in [webgl2-compat-demos.md](webgl2-compat-demos.md) is empty until `visual:compat:budget` runs on an idle GPU.
 - `npm run proofs -- --current`: without views, core emits what it emitted before.
