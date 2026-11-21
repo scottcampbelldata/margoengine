@@ -24942,7 +24942,7 @@ Cause: packages/stage/src/controls.ts `orbit` and `pan` work in Y-up spherical c
 a view along Y. The README does not say Y up. Fix to build: build the orbit frame from `camera.up` (or document Y up
 and refuse another up).
 
-## Batch 132 audit: cache (fixed and open)
+## Batch 132 audit: cache (fixed)
 
 Fixed in this commit (regressions in packages/cache/test/audit-132.test.js, each failing before its fix): `delete`
 and `clear` of AssetCache and `clear` of RangeCache ran before writes already queued, so a file answered just before
@@ -24953,7 +24953,7 @@ asctime dates were read as local time (RFC 9110 5.6.7, RFC 9111 5.3); `If-Range`
 `Prefetcher.settle()` hung while paused; `AssetBundles.load` kept downloading every file after one failed; HashedAssets
 and AssetBundles dropped a `Request` input's signal and headers; `throttle` left one abort listener per chunk.
 
-### Open: cache findings not fixed in the audit
+### Fixed: cache findings not fixed in the audit
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
@@ -24993,7 +24993,7 @@ materials `test:gpu:features`, compatibility pass, failed "a triangle edge chose
 ### Fixed: J6 product implicit-sampler footprint
 The red 121 versus 120 product probe came from webgl2-compat replacing implicit textureSample footprint selection with a Euclidean derivative LOD estimate. The first resolved scene HDR red was binary16 0x3329 on native and 0x3321 on both ANGLE backends. Keeping hardware implicit sampling repairs the owning emitter; explicit mip interpolation stays unchanged. The glsl.test.js regression fails before repair; the oblique implicitFootprint GPU case changes from native 0x3e99f89a versus old compatibility 0x3ed98258 to 0x3e99f89a on all three paths. Product's existing exact cross-backend and restoration probes now pass, with zero tracked allocations after disposal. Intermediate HDR bit equality is not claimed. Reproduction and raw centre copies: docs/integration-product.md.
 
-## Batch 132 audit: sprites (fixed and open)
+## Batch 132 audit: sprites (fixed; accepted difference)
 
 Fixed with regressions in `packages/sprites/tests/audit-132.test.js` (all 8 fail on the code before the fix):
 `SpriteLayer`, `BillboardLayer` and `SkeletalLayer` `dispose()` removed the active scene's plugin of the same name
@@ -25007,7 +25007,7 @@ frame; they compare `Math.fround(value)`. A linked Aseprite cel took the z-index
 orders by each cel's own z). A Spine IK key without `mix` kept the setup mix (0 stayed 0; the JSON export format
 says assume 1) and one without `softness` interpolated toward 1 (format: assume 0).
 
-### Open: sprites findings not fixed in the audit
+### Fixed (multiply two-draw cost accepted): sprites findings not fixed in the audit
 
 - Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
   because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
@@ -25034,7 +25034,7 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
   so full-opacity groups need no image). Regression: packages/sprites/tests/aseprite.test.js (KB6013d case); doc:
   packages/sprites/README.md.
 
-## Batch 132 audit: behavior (fixed and open)
+## Batch 132 audit: behavior (fixed)
 
 Fixed with regressions in `packages/behavior/tests/audit-132.test.js` (all 3 fail on the code before the fix):
 `FlowField.stamp` undo wrote back the costs it saw when it was placed, so overlapping stamps undone oldest first left
@@ -25050,7 +25050,7 @@ steps keeps x[0] === x[1]); Reynolds 1987 gives no direction for a zero offset, 
 row-order independence `flock` promises. `avoidObstacles` scales its push by `1 + (reach - along) / reach` and
 `min(1, clearance / radius + 0.5)`, Margo's own heuristic with no source or measurement behind the 0.5.
 
-## Batch 132 audit: culling (fixed and open)
+## Batch 132 audit: culling (fixed)
 
 Fixed with regressions in `packages/culling/test/audit-132.test.js` (all 7 fail on the code before the fix):
 `CulledInstances`, `DynamicInstances`, `LodInstances`, `CulledMeshes`, `CulledModels`, `FrontToBack` and
@@ -25130,7 +25130,7 @@ Open (not fixed in the audit):
   action's size matches across browsers. Regression: packages/input/test/input.test.js (wheel deltaMode test).
 - Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.
 
-## Batch 132 audit: net (fixed and open)
+## Batch 132 audit: net (fixed)
 
 Fixed with a regression in `packages/netcode/tests/interpolation-audit-132.test.js` (fails on the code before the fix): `SnapshotBuffer.sample`
 drew the cubic Hermite position but returned the straight blend of the two snapshots' velocities, so the velocity was
@@ -25153,7 +25153,7 @@ Fixed with a regression in `packages/gltf/test/audit-132.test.js` (fails on the 
 accessor had no bufferView failed to load. It now reads as zeros; a sparse accessor without a view is still refused
 as unsupported by the light loader.
 
-## Batch 132 audit: oit (fixed and open)
+## Batch 132 audit: oit (fixed)
 
 - Fixed: `TransparentPass.dispose` (packages/oit/src/pass.ts:137, so `OIT`, `ExactOIT`, `PeelOIT`, `PreciseOIT`,
   `MomentOIT`) and `TransparentDepth.dispose` (depth.ts:180) called `engine.removePlugin(this.name)`, which acts on the
@@ -25378,7 +25378,7 @@ frame-graph passes gated on `backend` with no `requireWebGPU` refusal in setup a
 refuse in setup through `requireWebGPU` (b061399b78). `node scripts/check-preview-contract.mjs` reports all 162 owners
 refusing during setup or holding a tested preview route.
 
-## Batch 132 audit: gltf/pbr (fixed and open)
+## Batch 132 audit: gltf/pbr (fixed)
 
 - Fixed: `applyGLTFLightExtensions` (packages/gltf/src/lights.ts, the aimed-profile cache) keyed fixtures by profile format + profile name + aim. Two EXT_lights_ies profiles with the default name "" and the same LM-63 first line, on nodes aimed alike, shared the first profile: input `LightProfile.ies` (peak 8500 cd) and a second profile peaking at 5250 cd; the second fixture drew at 8500 cd with the first one's beam. Cause: the name is optional and not unique. Fix: the loop is now `placeIESLights`, keyed by the parsed profile object (one per `lights` index) and the aim. Regression: packages/gltf/test/lights.test.js, "two unnamed profiles of one format aimed alike keep their own candela" (fails with the old key).
 - Settled 2026-11-11 (KB6284a): EXT_lights_image_based says each saved image "must be flipped about its vertical axis"; the reader swaps rows (a flip about the horizontal axis). The real EnvironmentTest decides it: its mip-0 cube projected onto the real SH basis (Ramamoorthi and Hanrahan 2001) has the sign of all 9 l = 1 values and all 9 xy, yz and xz values the file states only with rows swapped; read as saved, with columns swapped, or with both, 6 or more of those signs are wrong. The l = 1 magnitudes are 1.84 to 2.17 times ours, so the file's scale is still unknown and `irradianceCoefficients` stays data. Regression: packages/gltf/test/lights.test.js, "KB6284a" (fails for each of the other three readings).
