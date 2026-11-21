@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17311749,
+  "total": 17312283,
   "history": [
     {
       "date": "2026-10-24",
@@ -11235,6 +11235,12 @@
       "commit": "e2177dc6e",
       "reason": "react/fbx entry 4128 -> 4132 B gzip: model build runs in the enclosing Scene (sceneScope import, fixes GAP-REACT-SCENEMODELS); splitting it out would cost a separate entry for 4 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-21",
+      "commit": "721728e1d",
+      "reason": "react/outlines entry 1648 -> 2182 B gzip (measured on a fresh build, main and this branch alike): <Outlines> inside a <Model> attaches ModelOutlines so a skinned or morphed model keeps its line in every pose (GAP-OUTLINES-INSTANCED, e3badb692, which landed without this raise); the toon outline entries stay behind import(), and splitting the model path into its own react entry would cost users a second import for the common case",
+      "grew": 1
     }
   ],
   "items": {
@@ -12116,7 +12122,7 @@
     "@margoengine/react/marching-cubes": 4743,
     "@margoengine/react/materials": 8741,
     "@margoengine/react/offscreen": 1423,
-    "@margoengine/react/outlines": 1648,
+    "@margoengine/react/outlines": 2182,
     "@margoengine/react/performance": 4787,
     "@margoengine/react/physics": 6462,
     "@margoengine/react/points": 1460,
