@@ -2650,6 +2650,7 @@ export const entries = [
       'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}',
       'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>',
       'AdaptiveDpr requires the WebGPU renderer or WebGL2 compatibility layer; use one of those renderers',
+      "Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry's MappedPbrMaterial",
       'Animation requires a parent <Gltf>, <Model>, or <Fbx>; render it inside one',
       'Animation: this model already has an animation plugin; mount one <Animation> per model',
       'Animation: this model already has an animator plugin; mount one <Animation> per model',

@@ -1883,12 +1883,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   check on the workstation: the two bundles side by side (`measureCoreStage()` output), to find the differing bytes.
   Until then the public figures are not changed from one machine.
 
-### Open 2026-11-16: `Outlines` draws nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
+### Fixed 2026-11-20: `Outlines` drew nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
 
-- **Repro:** `<Outlines />` inside a node of a skinned `Model`: no line. drei outlines `skinnedMesh` parents.
+- **Repro:** `<Model src="hero.glb"><Outlines /></Model>` (a skinned model): no line, or an error without a `<Mesh>`. drei
+  outlines `skinnedMesh` parents.
 - **Cause:** `MeshOutline` (`@margoengine/toon/outline`) draws one hull from the core mesh's matrix and CPU geometry;
   it does not read a deformer's vertices of the frame. `ModelOutlines` (`@margoengine/toon/models`) already does for
-  whole models; the React binding does not route a skinned node to it yet.
+  whole models; the React binding did not route a model to it.
+- **Fix:** `<Outlines>` inside a `<Model>` (and no nearer `<Mesh>`) attaches one `ModelOutlines` for that model
+  (`ModelOutlines` of `@margoengine/toon/screen-outline` with `screenspace`), live in `thickness`, `color` and `angle`
+  (0 turns `smooth` off), released on unmount. `Mesh` records the model it sits in on its registry so a nearer
+  `<Mesh>` keeps its mesh outline. Toon itself is unchanged.
+- **Regression:** `packages/react/tests/outlines.test.js` ("Outlines inside a Model outlines the whole model through
+  ModelOutlines"; fails on the old code).
 
 ### Fixed 2026-11-16: `Outlines` drew nothing inside `<Instances>` (react)
 

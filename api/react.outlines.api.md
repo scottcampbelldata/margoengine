@@ -4,8 +4,9 @@
 
 ```ts
 import { MeshOutline, MeshOutlineOptions } from "@margoengine/toon/outline";
+import { ReactElement } from "react";
 
-export function Outlines(_arg0: OutlinesProps): null;
+export function Outlines(props: OutlinesProps): ReactElement;
 
 export interface OutlinesProps extends Omit<MeshOutlineOptions, 'mesh' | 'geometry' | 'color'> {
     color?: string | readonly [number, number, number];

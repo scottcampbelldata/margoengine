@@ -465,8 +465,12 @@ order among outlines) and `angle` (the crease angle, pi: copies of a vertex whos
 so pi closes the hull over hard edges and 0 lets it part at every crease). It follows the mesh's transform, geometry
 and visibility, and a mirrored scale. Inside `<Instances>` (drei's instancedMesh parent) every drawn instance gets its
 own outline, following instances as they mount, unmount, hide or pass `limit`. `onReady` gets each native outline. Needs WebGPU or the WebGL2 compatibility
-layer. Instanced and skinned parents are not outlined yet (docs/known-bugs.md); a loaded model takes
-`ModelOutlines` of `@margoengine/toon/models`.
+layer. Inside a `<Model>` (drei's skinnedMesh parent) the outline is the whole model's, one `ModelOutlines` of
+`@margoengine/toon/models` (`@margoengine/toon/screen-outline` with `screenspace`) drawn from the vertices the
+skeleton or morph targets wrote this frame, so it follows every pose; of the props it takes `color`, `thickness`
+(default 0.05 world units; 3 pixels with `screenspace`) and `angle` (0: no seam-free smoothing), and the rest
+(`opacity`, `transparent`, `toneMapped`, `polygonOffset`, `renderOrder`) are mesh-only. A `<Mesh>` inside the model
+keeps its own mesh outline.
 
 ```tsx
 import { Canvas } from '@margoengine/react';
