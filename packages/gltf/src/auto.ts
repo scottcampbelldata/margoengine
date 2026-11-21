@@ -212,11 +212,15 @@ async function choose(
           !doc || uses(doc, 'EXT_mesh_gpu_instancing')
             ? { instancing: (await import('@margoengine/gltf/pbr-instancing')).instancing }
             : undefined;
-      return {
-        loader: 'gltf/pbr',
-        model: await scope.run(() => pro.loadGLTF(engine, target, decoders ? { ...options, decoders } : options)),
-        reason,
-      };
+      let model: PBRModel;
+      try {
+        model = await scope.run(() => pro.loadGLTF(engine, target, decoders ? { ...options, decoders } : options));
+      } catch (error) {
+        // With no GPU device gltf/pbr can only say it needs one; the caller also needs the reason the light loader gave.
+        if (engine.gpu || !(error instanceof MargoError) || error.code !== 'unsupported') throw error;
+        throw new MargoError('unsupported', `${reason}; gltf/pbr also refused: ${error.message}`);
+      }
+      return { loader: 'gltf/pbr', model, reason };
     };
   let data: Uint8Array;
   try {
