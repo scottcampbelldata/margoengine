@@ -11512,6 +11512,109 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** compute the derivative on the bounded contact field. With the same fixture the deep block leaves zero foam pixels and a block near the surface leaves 4,289.
 - **Regression:** `packages/water/test/contact-foam.browser.mjs` checks the GPU foam target at both depths.
 
+### Fixed 2026-11-21: a --only budget run made other rows' frame numbers look measured on its machine (KB-COMPAT-BUDGETSTAMP1, webgl2-compat)
+
+- **Repro (before):** `scripts/visual-compat-budget.mjs --only <demo>` (one demo, or a run on another machine) wrote
+  frame numbers into docs/webgl2-compat-demos.md, and the table's Last recorded line then claimed every row's frame
+  numbers for that machine and date.
+- **Cause:** the frame column was attributed to the machine and date on the table's single Last recorded line, so a
+  partial run changed what that line said about rows it never wrote.
+- **Fix:** 5ff5dc647. Frame stamps live in a seventh column; a `--only` run stamps only the rows it wrote, a full run
+  clears them and the global line is untouched. The commit also formats the test with biome.
+- **Regression:** tests/visual-compat-status.test.js
+
+### Fixed 2026-11-21: a --only visual:compat pixel run rewrote the whole table's Last recorded line (KB-COMPAT-PIXELSTAMP1, webgl2-compat)
+
+- **Repro (before):** a `--only` pixel run of `scripts/visual-compat.mjs` rewrote the Last recorded line of
+  docs/webgl2-compat-demos.md for the whole table, though it measured only its own rows.
+- **Cause:** the doc writer stamped the global line on every run, partial or full.
+- **Fix:** fb45900a9. A `--only` run stamps its own rows and leaves the line alone; the doc restores the 2026-11-16
+  nvidia line and gives hud-preview its own stamp (2026-11-21, 0e11055b5, intel xe-2lpg, msedge 157.0.4341.46).
+- **Regression:** tests/visual-compat-status.test.js
+
+### Fixed 2026-11-21: the example type check printed hundreds of TS2307 on an unbuilt checkout (KB-EXAMPLES-NOTBUILT1, examples)
+
+- **Repro (before):** on a checkout whose packages were not built (or built before the last pull) the example type
+  check printed one TS2307 per import, hundreds for the all-entries project.
+- **Cause:** not a resolution bug: a fresh checkout after `npm ci` and `npm run build:packages` passes every project,
+  so the report was a skipped build step that the check did not name.
+- **Fix:** e66d9f84b. When every error is such an import, the check prints one `EXAMPLE_TYPES_PACKAGES_NOT_BUILT`
+  line with the fix.
+- **Regression:** tests/check-example-types.test.js
+
+### Fixed 2026-11-21: a stale docs/catalog.json export list was caught by no fast check (KB-HYGIENE-CATALOGSTALE1, hygiene)
+
+- **Repro (before):** materials gained `noteEngine` and docs/catalog.json (its export lists come from dist) was left
+  stale, so every `npm run build:packages` rewrote the tracked file.
+- **Cause:** nothing compared a catalog entry with the exports its api report declares before the build.
+- **Fix:** 5ff16b2b2. hygiene reports a catalog entry missing an export its api report declares and names
+  `npm run build:packages`. The stale entry itself was committed in 5067bd189.
+- **Regression:** tests/package-records.test.js
+
+### Fixed 2026-11-21: ContactLights depth and an Environment GPU cube source broke the frame after a device restore (rows of KB-RESTORE-BORROWED1, clustered, environment)
+
+- **Repro (before):** after a device restore, a plain depth texture given to ContactLights, or a plain `{ texture }`
+  cube source of an Environment, was bound on the new device: a validation error from the depth copy, or a failed
+  rebuild. Two more rows of KB-RESTORE-BORROWED1 (see that entry for the rule).
+- **Cause:** such a texture belongs to the device that made it, and the old code did not follow the borrowed-object rule.
+- **Fix:** 8cde748ff. Each is dropped, reported once through `engine.onError` (#borrowed-lost) and the frame goes on;
+  a callback depth and a live cube source (CubeCamera) are read again by themselves; `options.depth = texture` and the
+  additive `Environment.setSource(source, target?)` bring a new one back.
+- **Regression:** packages/clustered/test/contact-borrowed-restore-browser.mjs and
+  packages/environment/tests/cube-source-restore-browser.mjs
+
+### Fixed 2026-11-21: the nature AO probe's shader replace matched nothing after positiveColor renamed the fragment parameter (KB-TESTS-NATUREPROBE1, tests)
+
+- **Repro (before):** `tests/nature.browser.mjs` failed on main with the WGSL error "unresolved call target
+  'lighting'".
+- **Cause:** positiveColor (scatter instances.ts) renames the fragment entry's parameter from `i` to `varyings`, so
+  the probe's text replace of `@fragment fn fragment(i:Output,...)` matched nothing and `lighting()` was never declared.
+- **Fix:** 8a443f7ea. The probe matches the entry under either parameter name and throws if it finds none, so a
+  renamed entry fails with that message instead of an unrelated WGSL error.
+- **Regression:** tests/nature.browser.mjs
+
+### Fixed 2026-11-21: the sheen albedo test kept the old history-reading case beside its replacement (KB-SHEEN-HISTORY2, materials)
+
+- **Repro (before):** `node --test packages/materials/test/sheen-albedo-fit.test.js` threw a ReferenceError on every
+  checkout (follow-up to KB-SHEEN-HISTORY1).
+- **Cause:** cd727fe31 added the in-repo closed-form reference case but left the old case that read a private-only
+  commit out of git history, after removing that case's `closedFormAlbedoCommit` and `execFileSync` imports; it also
+  reformatted the file to double quotes against the repo's style.
+- **Fix:** ddb0109a2. The old case is removed (the new one keeps the same assertions), the unused import goes and
+  biome restores the style. All 6 cases pass.
+- **Regression:** packages/materials/test/sheen-albedo-fit.test.js
+
+### Fixed 2026-11-21: environment/main and /loaders had no importing test, so quality tests failed on main (KB-ENV-ENTRYTEST1, environment)
+
+- **Repro (before):** the quality tests gate failed on main with 2 new unimported entries.
+- **Cause:** bd916175a (KB-REACT-ENVDECODERS1) added `@margoengine/environment/main` and `/loaders` with no test
+  importing either.
+- **Fix:** a6e0fe9f8. A new test imports both entries and holds the split's promise: /loaders holds the image
+  decoders, /main holds none of them, and the root re-exports exactly the two entries' objects.
+- **Regression:** packages/environment/tests/entries.test.js
+
+### Fixed 2026-11-21: the react subpaths build check failed under load on rolldown's plugin-timings report (KB-REACT-PLUGINTIMINGS1, react)
+
+- **Repro (before):** packages/react/tests/subpaths.test.js, which asserts the Vite build prints no warnings, passed or
+  failed with machine load: on a loaded machine rolldown added a `[PLUGIN_TIMINGS]` note (plugin callbacks took 61% of
+  the build).
+- **Cause:** that note reports build speed, not the code under test.
+- **Fix:** d9cb43729. `checks.pluginTimings` is off in the test's build; every other warning, Vite's and the
+  bundler's, stays asserted.
+- **Regression:** packages/react/tests/subpaths.test.js
+
+### Fixed 2026-11-21: react tests mocked only @margoengine/environment after the bindings moved to /main and /loaders (KB-REACT-ENVMOCK1, react)
+
+- **Repro (before):** 16 react tests failed on main, e.g. "addLighting is not a function" and
+  "this.engine?.sceneOf is not a function".
+- **Cause:** bd916175a moved react's environment bindings to `@margoengine/environment/main` and `/loaders`, but five
+  test files still mocked only `@margoengine/environment`, so their fakes no longer applied and the real environment
+  code ran against the tests' fake models.
+- **Fix:** 286e420cc. Each mock is one object registered under all three specifiers, so a binding moving between the
+  entries keeps the tests valid. An unused import in cube-camera-capture.test.js goes too. React's full suite: 381
+  pass, 0 fail.
+- **Regression:** packages/react/tests/extras.test.js
+
 ### Fixed 2026-11-20: the sheen albedo test needed a commit that only the private history has (KB-SHEEN-HISTORY1, materials)
 
 - **Repro (before):** `node --test packages/materials/test/sheen-albedo-fit.test.js` failed on public main in every
