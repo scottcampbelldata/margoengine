@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
+import { borrow, lend, relend } from '../../shared/borrowed.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -230,6 +231,13 @@ export class Tonemap implements EnginePlugin {
   private balanceTint = NaN;
   private readonly meterValues = new Float32Array(16);
   private meterMask?: GPUTexture;
+  /** The caller's `autoExposure.mask` and the device it belongs to (docs/conventions.md, "Borrowed GPU objects"). */
+  private readonly maskSlot = borrow(
+    undefined,
+    'Tonemap autoExposure mask',
+    'tonemap.options.autoExposure.mask = a new texture',
+  );
+  private maskGiven?: unknown;
   private blankMask?: GPUTexture;
 
   constructor(readonly options: TonemapOptions = {}) {
@@ -704,7 +712,11 @@ export class Tonemap implements EnginePlugin {
         usage: GPUTextureUsage.TEXTURE_BINDING,
       });
     }
-    const mask = a.metering === 'mask' ? a.mask! : this.blankMask!;
+    // Read the mask whatever the metering, so a texture assigned under another mode is tied to the device it was given on.
+    if (this.maskGiven !== a.mask) relend(this.maskSlot, (this.maskGiven = a.mask), c.device);
+    const mask: GPUTexture =
+      (a.metering === 'mask' ? (lend(this.maskSlot, c.device, this.engine) as GPUTexture | undefined) : undefined) ??
+      this.blankMask!;
     if (!this.meterGroup || this.meterMask !== mask) {
       this.meterMask = mask;
       this.meterGroup = c.device.createBindGroup({

@@ -35,8 +35,13 @@ export interface AutoExposure {
   metering?: 'average' | 'center' | 'spot' | 'mask';
   /** The spot of `'spot'` metering: centre `x`, `y` as fractions of the view (default 0.5) and `radius` as a fraction of its shorter side (default 0.05). */
   spot?: { x?: number; y?: number; radius?: number };
-  /** Weight texture of `'mask'` metering (any size, filterable float or unorm; red channel 0 to 1). */
-  mask?: GPUTexture;
+  /**
+   * Weight texture of `'mask'` metering (any size, filterable float or unorm; red channel 0 to 1), or
+   * `(device) => texture`, called once per device. A plain texture is the caller's and belongs to the device it was
+   * first used on: after a device restore it is dropped and reported once through `engine.onError`
+   * (margoengine.com/errors#borrowed-lost), the meter keeps its last exposure, and assigning a new one brings it back.
+   */
+  mask?: GPUTexture | ((device: GPUDevice) => GPUTexture);
 }
 
 const METHODS = ['mean', 'histogram'],
@@ -54,7 +59,9 @@ export function validMetering(a: AutoExposure): boolean {
       (Array.isArray(p) && p.length === 2 && inside(p[0], 0, 1) && inside(p[1], 0, 1) && p[0] < p[1])) &&
     (s === undefined ||
       (typeof s === 'object' && inside(s.x, 0, 1) && inside(s.y, 0, 1) && inside(s.radius, 1e-3, 1))) &&
-    (a.metering !== 'mask' || typeof (a.mask as { createView?: unknown } | undefined)?.createView === 'function')
+    (a.metering !== 'mask' ||
+      typeof a.mask === 'function' ||
+      typeof (a.mask as { createView?: unknown } | undefined)?.createView === 'function')
   );
 }
 

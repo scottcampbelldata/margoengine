@@ -14020,5 +14020,14 @@
     "reason": "Borrowed GPU objects rule 2: also takes a (device) => object form, made once per device; every existing caller still compiles (KB-RESTORE-BORROWED1)",
     "date": "2026-11-20",
     "approved": "Scott 2026-11-20: \"I said widen our keep it do what's best practices\" (left widen or keep to the agent; widened per rule 2)"
+  },
+  {
+    "entry": "@margoengine/tonemap",
+    "symbol": "AutoExposure.mask",
+    "change": "signature",
+    "was": "ce065ffe",
+    "reason": "Borrowed GPU objects rule 2: the mask also takes a (device) => GPUTexture form, made once per device; every existing GPUTexture caller still compiles (KB-RESTORE-BORROWED1)",
+    "date": "2026-11-20",
+    "approved": "Scott 2026-11-20: \"I said widen our keep it do what's best practices\" (left widen or keep to the agent; widened per rule 2)"
   }
 ]

@@ -88,6 +88,21 @@ const tonemap = Tonemap.attach(stage.engine, {autoExposure: {method: 'histogram'
 tonemap.options.autoExposure = {metering: 'spot', spot: {x: 0.5, y: 0.4, radius: 0.08}}; // meter the face
 stage.dispose();
 ```
+
+`mask` is a texture you made, or `(device) => texture`, called once per device. A plain texture belongs to the device it was first used on: after a device restore (`engine.rebootDevice()`) it is dropped and reported once through `engine.onError` (`'state'`, linking margoengine.com/errors#borrowed-lost), the frame keeps drawing, the meter keeps its last exposure, and assigning a new `autoExposure.mask` brings it back. The function form needs nothing after a restore:
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const weights = (device: GPUDevice) => {
+  const texture = device.createTexture({size: [1, 1], format: 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+  device.queue.writeTexture({texture}, new Uint8Array([255]), {bytesPerRow: 256}, [1, 1]); // weight 1 everywhere
+  return texture;
+};
+const tonemap = Tonemap.attach(stage.engine, {autoExposure: {metering: 'mask', mask: weights}});
+stage.dispose();
+```
 - `temperature` is the colour temperature of the scene's light (1667-25000 K, default 6500 = no change): 3200 cools tungsten light to neutral. `tint` runs from -1 (green) to 1 (magenta). It is a chromatic adaptation, as photo editors and cameras do it: a von Kries scaling in the Bradford cone space from the Planckian white of `temperature` to the 6500 K one, applied as one 3x3 matrix in the shader, so it holds over the whole range (a grey card lit by an 1800 K candle comes out neutral). The card keeps its luminance; colours the correction pushes outside Rec.709 clip at 0 before the curve. `whiteBalanceMatrix(temperature, tint)` returns the matrix.
 - `vignette` 0-1 with `vignetteRadius` and `vignetteSoftness` (fractions of the distance to the corner; defaults 0.5). Per view when the engine draws several.
 - `vignetteColor` (linear Rec.709 0-1, default `[0, 0, 0]`), `vignetteCenter` (fractions of the view, x from the left

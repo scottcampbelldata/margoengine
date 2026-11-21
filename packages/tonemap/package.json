@@ -81,6 +81,7 @@
     "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs",
     "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs",
     "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs",
+    "test:gpu:borrowed-restore": "cd ../.. && node packages/tonemap/tests/borrowed-restore-browser.mjs",
     "test:gpu:local": "cd ../.. && node packages/tonemap/tests/local-browser.mjs",
     "test:gpu:dither-vignette": "cd ../.. && node packages/tonemap/tests/dither-vignette-browser.mjs",
     "test:gpu:hue": "cd ../.. && node packages/tonemap/tests/hue-browser.mjs",
