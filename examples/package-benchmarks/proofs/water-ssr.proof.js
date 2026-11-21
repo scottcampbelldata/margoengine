@@ -4,13 +4,13 @@
 // shadow source, light edits, a wave-height change, device restoration and disposal. Each frame runs onPreUpdate and
 // then the passes, as the engine does, so the wave time (values[20]) is the same whichever of the two moves the clock.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/water-ssr.proof.js [ref] [pin] [--current]
-// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: 1faee7666e (the coastal flow's first-step set-up in submissions of at most 2^18 workgroups, KB-SCENES-DUNE-ARCHANG1; 8e9572277b, the coast flow's momentum step and the surf's 40 s spin-up, KB-WATER-SWASH1; 8f03a1c435, the surf field's sweeps in a plain-word module of their own, KB-WATER-SURFCPU1, and the surf field's wavenumber from the tallest train, KB-WATER-SURFFIELD1; 7ca35c286f, the flood's foam, breaker and record pass, and breaker spray at any depth, disaster water push 7; 1aad5eb0b4, the flood's film clock, disaster water push 4; ab5edc5194, the glitter, foam softness and shallow band rows and their 560 B frame uniform, KB-PROOF-WATERSSR3; b4be8f6045, flow-driven wall jets in the spray shader, disaster water push 1; 47249ef410, the default sea of a 6 m/s wind; 58db723060, foam, glitter and body light from the wind, elements step 4; c5c012ed5d, the default
+// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: c82e6722a (HDR optics shader); previously 1faee7666e (the coastal flow's first-step set-up in submissions of at most 2^18 workgroups, KB-SCENES-DUNE-ARCHANG1; 8e9572277b, the coast flow's momentum step and the surf's 40 s spin-up, KB-WATER-SWASH1; 8f03a1c435, the surf field's sweeps in a plain-word module of their own, KB-WATER-SURFCPU1, and the surf field's wavenumber from the tallest train, KB-WATER-SURFFIELD1; 7ca35c286f, the flood's foam, breaker and record pass, and breaker spray at any depth, disaster water push 7; 1aad5eb0b4, the flood's film clock, disaster water push 4; ab5edc5194, the glitter, foam softness and shallow band rows and their 560 B frame uniform, KB-PROOF-WATERSSR3; b4be8f6045, flow-driven wall jets in the spray shader, disaster water push 1; 47249ef410, the default sea of a 6 m/s wind; 58db723060, foam, glitter and body light from the wind, elements step 4; c5c012ed5d, the default
 // beach surf, KB-WATER-SURF1; 7ffd4a64ca before it) against the working tree.
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('6c20076d', '49f3e971', '1faee7666e');
+const { ref, pin } = refs('6c20076d', '49f3e971', 'c82e6722a');
 await coreAt(pin); // water imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('water', ref, undefined, pin);
 
