@@ -280,7 +280,7 @@ of native frame time on the desktop GPU. M7 replaces these with measured numbers
 | --- | --- |
 | Translator semantics drift (integer division by zero, shifts, NaN handling, uniformity) | Corpus parity tests; generated guards where WGSL defines a result GLSL leaves undefined. |
 | Texture-unit limit (16 per stage minimum) on rich materials | Per-material unit budget at pipeline creation; documented lobe drop order. |
-| Program compile stalls on first use | `KHR_parallel_shader_compile`, async pipeline creation, warm-up of the demo's pipelines behind the loading screen. |
+| Program compile stalls on first use | `KHR_parallel_shader_compile`, async pipeline creation, warm-up of the demo's pipelines behind the loading screen. On ANGLE Direct3D 11, where a program compiles its pixel shader at its first draw, an async render pipeline with any colour target resolves only after one rasterizer-discard draw into its own targets (`LinkedProgram.warmed`; since 2026-11-21 also for one target, KB6016e). |
 | Synchronous readbacks for GPU-produced indirect arguments | Packages that hit it every frame take their compat path; the layer counts stalls and `@margoengine/stats` shows them. |
 | CPU compute too slow on phones | Tier-B budget per frame; packages lower their counts on compat devices. |
 | Mobile precision (`highp` support in fragment shaders) | Required; devices without it are refused with a clear message. |

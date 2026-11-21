@@ -2,8 +2,8 @@
 // only and compiles it again, synchronously on the browser's GPU thread, at the first draw into more colour targets. An
 // async pipeline resolved at link, so the first frame of the staged voxel path tracer (26 programs with several targets)
 // waited 206 s for those compiles inside its render signal, which fired late with the page's thread held. An async
-// pipeline with more than one colour target there now draws once, rasterizer discard on, into its own target layout, and
-// resolves when the GPU has passed that draw.
+// pipeline with a colour target there now draws once, rasterizer discard on, into its own target layout, and resolves
+// when the GPU has passed that draw.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMPAT_LIMITS } from '../dist/index.js';
@@ -71,11 +71,16 @@ const code = `
 struct O {@location(0) a:vec4u, @location(2) b:vec4f}
 @vertex fn v()->@builtin(position) vec4f {return vec4f(0,0,0,1);}
 @fragment fn f()->O {var o:O; o.a=vec4u(1); o.b=vec4f(1); return o;}
-@fragment fn one()->@location(0) vec4f {return vec4f(1);}`;
+@fragment fn one()->@location(0) vec4f {return vec4f(1);}
+@fragment fn none() {}`;
 
 const pipeline = (d, entryPoint, targets) => {
   const module = d.createShaderModule({ code });
-  return d.createRenderPipelineAsync({ layout: 'auto', vertex: { module, entryPoint: 'v' }, fragment: { module, entryPoint, targets } });
+  return d.createRenderPipelineAsync({
+    layout: 'auto',
+    vertex: { module, entryPoint: 'v' },
+    fragment: { module, entryPoint, targets },
+  });
 };
 const turns = (n) => new Promise((resolve) => setTimeout(resolve, n));
 
@@ -108,15 +113,45 @@ test('on ANGLE Direct3D 11 an async pipeline with two colour targets compiles it
   }
 });
 
-test('a single colour target, or another backend, resolves at link with no warm draw', async () => {
+// KB6016e (2026-11-21): the same back end pays the compile at the first draw for a single colour output too (link
+// complete after 58 to 74 ms, the first draw 194 to 346 ms more), so a 1-output program is warmed as well.
+test('on ANGLE Direct3D 11 an async pipeline with one colour target compiles its draw before it resolves', async () => {
+  const { device: d, log, state } = await device(D3D11);
+  try {
+    let resolved = false;
+    const made = pipeline(d, 'one', [{ format: 'rgba8unorm' }]).then((p) => {
+      resolved = true;
+      return p;
+    });
+    await turns(30);
+    assert.equal(resolved, false, 'the pipeline waits for the GPU to pass its warm draw');
+    assert.deepEqual(log, [
+      ['texStorage2D', GL.RGBA8],
+      ['attach', GL.COLOR_ATTACHMENT0],
+      ['drawBuffers', GL.COLOR_ATTACHMENT0],
+      ['draw', true, GL.TRIANGLES, 0, 3],
+    ]);
+    state.signalled = true;
+    assert.ok(await made);
+  } finally {
+    d.destroy();
+  }
+});
+
+test('another backend, or a pipeline with no colour target, resolves at link with no warm draw', async () => {
   for (const [renderer, entryPoint, targets] of [
-    [D3D11, 'one', [{ format: 'rgba8unorm' }]],
+    [VULKAN, 'one', [{ format: 'rgba8unorm' }]],
     [VULKAN, 'f', [{ format: 'rgba32uint' }, null, { format: 'rgba16float' }]],
+    [D3D11, 'none', [null]],
   ]) {
     const { device: d, log } = await device(renderer);
     try {
       assert.ok(await pipeline(d, entryPoint, targets));
-      assert.deepEqual(log.filter(([name]) => name === 'draw'), [], `${renderer} ${entryPoint}`);
+      assert.deepEqual(
+        log.filter(([name]) => name === 'draw'),
+        [],
+        `${renderer} ${entryPoint}`,
+      );
     } finally {
       d.destroy();
     }

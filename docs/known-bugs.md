@@ -6019,8 +6019,12 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
     framebuffer before `linkProgram` changed nothing (draw 264 to 339 ms against 268 to 336 ms). So the shader compile
     that counts runs at first use on the browser's GPU thread, one program at a time, whatever the layer binds at link.
     The probe also shows that here a 1-output program pays that compile at its first draw too, which
-    `LinkedProgram.warmed` (packages/webgl2-compat/src/device/render.ts) does not warm, as it assumes only programs with
-    2 or more colour targets compile again. That moves a compile after `ready` rather than adding one; not changed here.
+    `LinkedProgram.warmed` (packages/webgl2-compat/src/device/render.ts) did not warm, as it assumed only programs with
+    2 or more colour targets compile again (measured on an RTX A6000, where a 1-output first draw took 2 ms). Fixed
+    2026-11-21: every program with a colour target is warmed there, so its compile falls before `ready`, not in the
+    first frame after it (regression: packages/webgl2-compat/test/d3d11-warm.test.js and
+    packages/webgl2-compat/test/first-draw-browser.mjs). This moves compiles, it adds none, so this entry's total is
+    unchanged.
   - So at this rate the 32 subsets need about 85 minutes against the 12 minute limit, about 7 times over. Nothing
     hangs: each compile finishes, and every subset that rendered passed its checks. No Margo-side defect was found
     beyond the program sizes the entry already names.

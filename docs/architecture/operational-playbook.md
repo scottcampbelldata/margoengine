@@ -2644,7 +2644,16 @@ scripts), and the reference takes about 449 s; the denoise steps, `:stall`, `:me
 `:mesh-pbr-lobes` still did not. Since 2026-11-18 (KB-VPT-LOBES-COMPAT) an async render pipeline with more than one
 colour target on ANGLE Direct3D resolves only after one rasterizer-discard draw into its own targets: that back end
 compiles the pixel shader at link for the first output only and again at the first MRT draw, on the GPU thread, which
-had put 206 s of compiles inside the first 8 x 8 image of the staged tracer. `:mesh-pbr-lobes` now passes there in
+had put 206 s of compiles inside the first 8 x 8 image of the staged tracer. Since 2026-11-21 (KB6016e side finding)
+a pipeline with one colour target is warmed the same way: on an Intel Arc 140V (ANGLE Direct3D 11, Edge) a 1-output
+program reported its link complete after 58 to 74 ms and its first draw then took 194 to 346 ms more, so the compile
+came after `ready`. The GPU check there, before the change: no warm draw before a 1-output async pipeline resolved
+(it fails); after: one, the same pixels, and its first draw 5.3 ms against 10.7 ms for an unwarmed pipeline of the
+same small shader (one loaded run, printed only, not asserted).
+Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js` (CPU, stand-in context) and
+`packages/webgl2-compat/test/first-draw-browser.mjs` (in `test:gpu`: a count of warm draws before the pipeline
+resolves, and the same pixels as an unwarmed pipeline). Missing: depth-only pipelines (no colour target) are not
+warmed; whether that back end compiles them at first draw too is not measured. `:mesh-pbr-lobes` now passes there in
 3 min 53 s (420 s limit); `:mesh-pbr` (376 s) and `:mesh-lights` (383 s) pass their checks but still run past their
 300 s step limits on the cold compiles themselves. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
 `coverage` kernel's 64-ray loop around `closest()` never finished its first compile in 22 minutes (89.4 s for the whole
