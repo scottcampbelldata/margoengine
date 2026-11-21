@@ -356,6 +356,18 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // An implied arc from deeper in the same stack ranks here as the placeholder it passes on the way up would.
     if (Y.implied && Y.of && isClass(Y) && !isClass(X) && X.stack === at.stack) return before(a, Y.of);
     if (X.implied && X.of && isClass(X) && !isClass(Y) && Y.stack === at.stack) return before(X.of, b);
+    // Seen on OpenUSD (black-box prim indexes, KB1942c part 28), the specification does not say: a class arc under a
+    // variant of this node's own stack implies an inert placeholder on this node on its way up, and the arcs implied
+    // from it rank as that placeholder does among this node's class arcs.
+    const viaVariant = (n: Node, V: Node) =>
+      V.kind === 'variant' && V.stack === at.stack && isClass(n) && n.stack === at.stack && holderOf(n.parent) === at;
+    const asPlaceholder = (p: Node, q: Node) =>
+      ORDER[p.kind] - ORDER[q.kind] ||
+      ns(q) - ns(p) ||
+      1 - +!!q.implied ||
+      at.children.indexOf(X) - at.children.indexOf(Y);
+    if (isClass(Y) && viaVariant(a, X)) return asPlaceholder(a, Y);
+    if (isClass(X) && viaVariant(b, Y)) return -asPlaceholder(b, X);
     return at.children.indexOf(X) - at.children.indexOf(Y);
   };
   /**
@@ -366,10 +378,11 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   /**
    * Namespace depth as sibling nodes rank by it. Seen on OpenUSD (black-box prim indexes, KB1942c), the specification
    * does not say: below the index root, a class arc authored at its node counts from that node's prim in its own stack,
-   * and one implied from an arc under a reference or payload of this prim counts from that reference's depth.
+   * and one implied from an arc under a reference or payload of this prim counts from that reference's depth, also when
+   * the arc hangs from a variant that reference holds in its own stack (KB1942c part 28).
    */
   const ns = (n: Node) => {
-    const o = n.of?.parent;
+    const o = holderOf(n.of?.parent);
     if (!isClass(n) || !n.parent?.parent) return n.depth;
     if (!n.implied) return n.anc ? n.depth : Math.max(n.depth, depthOf(n.parent.path));
     return !n.anc && o && (o.kind === 'reference' || o.kind === 'payload') ? Math.max(n.depth, o.depth) : n.depth;
