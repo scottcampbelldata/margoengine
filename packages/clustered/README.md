@@ -549,7 +549,7 @@ In Cabin Hearth (`examples/cabin-hearth`, `scripts/cabin-hearth-browser-test.mjs
 A6000, fire off, the lantern steady: with clear glazing the lantern's bounce is 0.1274 R, 0.0302 G irradiance, 10% over
 a quadrature over the test's snow surface (0.1155, 0.0274: the lantern's 6.5 cd through the window's opening, bars and
 sill, albedo 0.9 / 0.92 / 0.95, the form factor to the crest); with the scene's frosted glass the lantern bounces
-nothing outside and the window's light, set back in its frame (`recess` 0.218, `sill` 0.09), gives 0.0624 R, 3.6%
+nothing outside and the window's light, set back in its frame (`recess` 0.218, `sill` 0.09), gives 0.0624 R (measured 2026-11-20 on an Intel Arc 140V laptop GPU, WebGPU and the WebGL2 layer alike), 3.6%
 under the quadrature with the frame and sill shading the snow (0.0647; 0.1196 with no shading, what the bare
 rectangle would put on the snow; docs/known-bugs.md KB-BOUNCE-REVEAL1). Read in float at the crest's own point (the HDR capture
 over TAA's 8-frame jitter cycle, bilinear between pixel centres), the frame equals the JS twin to 0.1% (0.9989 clear,
