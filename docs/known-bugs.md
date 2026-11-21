@@ -20,18 +20,45 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
   or is swapped for another revision.
 
-### Open 2026-11-19: ambient occlusion no longer darkens the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter, post, scenes)
+### Open 2026-11-20: on an Intel Arc 140V the dune coast's camp view hangs the WebGPU device (KB-SCENES-DUNE-ARCHANG1, scenes)
 
-- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (WebGPU or `MARGO_COMPAT=1`) fails
-  "the occluded camp view is darker: mean 193.8 against 193.3": with the default `occlusion` 1.5, 0.7 percent of the
-  camp view's pixels are darker than with `occlusion: 0`; before, 186.4 against 193.2 and 20 percent.
-- **Cause:** found by bisecting scenes, post, sky, terrain, environment, shadows, core, shared, water and scatter
-  between 598fd47113 (passes) and 3452515cd6: the first bad commit is 9af8d017af (KB-SCATTER-SUBPIXEL1), which draws
-  grass blades by their prefiltered pixel coverage, blended over the scene. Blended blades write no depth (only the near
-  ring's opaque cores do) and are not lit through the ambient replay GTAO reads, so the grass is neither an occluder nor
-  occluded: the dark grass feet and the shade the clumps cast on the sand, most of the darkening the check measured,
-  are gone. The fix needs a design choice in scatter and post (an occlusion term the blended blades take, or a coverage
-  depth the GTAO pass reads), so it is left to a dedicated change.
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (native WebGPU, Intel Arc 140V
+  laptop GPU, adapter `intel` `xe-2lpg`): within about 3 s of the page's start "the page's WebGPU device was lost
+  (DXGI_ERROR_DEVICE_HUNG)", the restore's `requestDevice` then fails with DXGI_ERROR_DEVICE_REMOVED and the frame is
+  black. Three runs out of three, with the scatter change of KB-SCENES-DUNE-GTAO1 and without it; small WebGPU pages
+  between them (`packages/post/test/gtao-sky-browser.mjs`, `packages/scatter/test/grass-pixel.browser.mjs`) passed,
+  and the same view passes on the WebGL2 layer (`MARGO_COMPAT=1`).
+- **Cause:** not found yet. The device hangs on the scene's own GPU work (the loss comes first, the failed restore
+  after it) and no driver reset is logged, so one submission most likely runs past the Windows GPU timeout on this
+  GPU while four agents share it; which pass is not isolated.
+
+### Fixed 2026-11-20: ambient occlusion no longer darkened the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter)
+
+- **Repro (before):** `MARGO_COMPAT=1 node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` failed
+  "the occluded camp view is darker: mean 181.1 against 180.7": with the default `occlusion` 1.5, 0.4 percent of the
+  camp view's pixels were darker than with `occlusion: 0` (on 2026-11-19, 193.8 against 193.3 and 0.7 percent; before
+  KB-SCATTER-SUBPIXEL1, 186.4 against 193.2 and 20 percent).
+- **Cause:** found by bisecting scenes, post, sky, terrain, environment, shadows, core, shared, water and scatter: the
+  first bad commit was KB-SCATTER-SUBPIXEL1's, which draws grass blades by their prefiltered pixel coverage, blended
+  over the scene. Blended blades wrote no depth (only the near ring's opaque cores did), and GTAO finds occluders only
+  in the depth buffer (Jimenez, Wu, Pesce and Jarabo 2016), so the grass did not occlude: the dark grass feet and the
+  shade the clumps cast on the sand were gone.
+- **Fix:** `packages/scatter/src/index.ts` and `cover.ts`: after all the blended draws a depth-only pass draws every
+  covered ring again with the same pose (`coverCode(code, lit, at, true)`, colour write mask 0) and keeps a fragment
+  whose coverage passes the pose's threshold, `scatterCover.w` (now a `vec4f`; 0.5 by default). `GrassScatter` sets it
+  to a hash of the blade (`grass.ts`), an object-space hashed alpha test of the coverage (Wyman and McGuire, "Hashed
+  Alpha Testing", I3D 2017; the alpha-tested depth pass of blended hair: Nguyen and Donnelly, GPU Gems 2, 2005), so a
+  pixel keeps depth with the chance of its coverage and overlapping blades leave it bare with the chance over leaves
+  its colour bare (stochastic transparency: Enderton, Sintorn, Shirley and Luebke, I3D 2010), and the pattern holds
+  still on the blade as the camera moves. Drawn after the blending, the depth hides no blade that blends later, so the
+  colour and the anti-aliasing are unchanged: `packages/scatter/test/grass-pixel.browser.mjs` still reads 0 ppm speckle,
+  mean luma 184.54 against 184.90 (diffuse) and 185.12 against 185.41 (PBR) on WebGPU. The camp check on the WebGL2
+  layer now reads mean 177.0 against 180.6 open and 10.5 percent of pixels darker; the open frame is the same as before
+  (180.6 against 180.7). On native WebGPU this machine could not run the view (KB-SCENES-DUNE-ARCHANG1).
+- **Regression:** `packages/scatter/test/grass.test.js` ("coverCode depth: ...", fails on the code before: no depth
+  stage) and `packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (fails on the code before, above).
+- **Limit:** a pixel the depth pass leaves bare keeps the ground's depth, and the grass is not in GTAO's ambient replay,
+  so it occludes the sand but is not darkened itself; recorded in `docs/limits.md`.
 
 ### Fixed 2026-11-19: on the WebGL2 layer a page's first frames with a large shadow map threw "stopped at its work budget" (KB-COMPAT-CPUBUDGET1, shadows)
 

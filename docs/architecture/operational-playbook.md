@@ -9035,6 +9035,21 @@ Wu, Pesce and Jarabo 2016 (slices and the arc integral); Bavoil, Sainz and Dimit
 space); Max 1988 (a horizon over a height field, the height above the tangent plane as what occludes). Missing: other
 GPUs.
 
+**Covered scatter rings write coverage depth (KB-SCENES-DUNE-GTAO1, 2026-11-20, rendering).** Since
+KB-SCATTER-SUBPIXEL1 `GrassScatter` blends its blades by prefiltered coverage with no depth write, and GTAO and SSAO
+find occluders only in the depth buffer, so the grass stopped occluding the sand. Scatter now draws every covered ring
+once more after all its blended draws, depth only (colour write mask 0, the same pose), keeping a fragment whose
+coverage passes `scatterCover.w`; `GrassScatter` sets that to a hash of the blade, an object-space hashed alpha test of
+the coverage (Wyman and McGuire 2017), so depth is present with the chance of the coverage and overlapping blades leave
+a pixel bare with the chance over leaves its colour bare (Enderton, Sintorn, Shirley and Luebke 2010), stable as the
+camera moves. Drawn last, the depth rejects no blended blade, so the colour and anti-aliasing are those of
+KB-SCATTER-SUBPIXEL1. Post is unchanged. Evidence (Intel Arc 140V): scatter test/grass.test.js (the depth stage);
+test/grass-pixel.browser.mjs on WebGPU and the WebGL2 layer (0 ppm speckle on WebGPU, means within 0.4 codes of the
+supersampled view); scenes test/dune-coast-still.mjs camp view on the WebGL2 layer, mean 177.0 with occlusion against
+180.6 without and 10.5 percent of pixels darker (before: 181.1 against 180.7, 0.4 percent). Missing: the camp view on
+native WebGPU (it hangs the device on this GPU before and after the change, KB-SCENES-DUNE-ARCHANG1), other GPUs, the
+cost of the extra draw (speed phase deferred), and the grass itself darkened (it is not in the ambient replay).
+
 **SSAO's ambient replay binds every pass binding (KB-POST-GTAO-TERRAINLOOK1, 2026-11-18, GPU behaviour).** The replay
 that gives SSAO and GTAO the ambient light to darken cut the lit shader from `let direct=` and bound a hand-picked
 subset of the pass bindings (TAA's camera 18, sky ambient 8, the hemisphere light 144). A plugin binding read above

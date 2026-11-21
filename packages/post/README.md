@@ -425,6 +425,11 @@ gtao.options.slices = 1;        // options and `enabled` are read every frame
   specular occlusion cone: the IBL specular is darkened by the same factor as the diffuse, as with SSAO. Up to 4 slices
   and 16 steps per side; options `radius` (0, 100], `slices` 1-4, `steps` 1-16 (`RangeError` otherwise). It runs only in
   a `PostStack` (`MargoError` code `state` when attached alone with `engine.use`). GPU cost not measured yet. WebGPU only.
+- **Blended surfaces.** GTAO finds occluders only in the depth buffer, so a surface drawn blended with no depth write
+  does not occlude. `@margoengine/scatter` grass, drawn by prefiltered coverage, writes its depth in a depth-only pass
+  after the blending where each blade covers (a hashed alpha test of its coverage), so GTAO sees it and its shade on
+  the ground (KB-SCENES-DUNE-GTAO1). The grass itself is not darkened: only core meshes and `gtao.add` sources are in
+  the ambient replay.
 
 ## Screen-space global illumination: `SSGI`
 

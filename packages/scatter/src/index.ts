@@ -754,7 +754,12 @@ export class Scatter implements EnginePlugin {
     this.reach = this.values[35];
     this.values[35] = this.reach * (options.wind ? 2 : 1); // applyReach, which a subclass overrides, is not callable before its fields exist
     const states = options.states;
-    if (states !== undefined && (typeof states?.poseCode !== 'function' || typeof states.entries !== 'function' || typeof states.update !== 'function'))
+    if (
+      states !== undefined &&
+      (typeof states?.poseCode !== 'function' ||
+        typeof states.entries !== 'function' ||
+        typeof states.update !== 'function')
+    )
       throw new TypeError('Scatter states must be a source from PlantStates.plant() in @margoengine/scatter/states');
     const { variation, clusters = 0 } = options;
     if (variation !== undefined && (typeof variation !== 'object' || variation === null))
@@ -926,7 +931,8 @@ export class Scatter implements EnginePlugin {
   }
   set wind(value: ScatterWind | undefined) {
     if (value !== undefined) validateWind(value);
-    this.options.wind = value && (value.length === 4 ? [value[0], value[1], value[2], value[3]] : [value[0], value[1], value[2]]);
+    this.options.wind =
+      value && (value.length === 4 ? [value[0], value[1], value[2], value[3]] : [value[0], value[1], value[2]]);
   }
   /** Albedo lost at the blade root, 0-1 (`blades.rootShade`); read every frame. Throws when built without `blades`. */
   get rootShade(): number {
@@ -984,10 +990,18 @@ export class Scatter implements EnginePlugin {
     this.setTint(this.tint[0], value);
   }
   private setTint(hue: number, value: number): void {
-    if (typeof hue !== 'number' || typeof value !== 'number' || !(hue >= 0 && hue <= 0.5) || !(value >= 0 && value <= 1))
+    if (
+      typeof hue !== 'number' ||
+      typeof value !== 'number' ||
+      !(hue >= 0 && hue <= 0.5) ||
+      !(value >= 0 && value <= 1)
+    )
       throw new RangeError('Scatter variation needs hue 0-0.5 and value 0-1; pass numbers in those ranges');
     if ((hue > 0 || value > 0) && !this.options.material)
-      throw new MargoError('state', 'Scatter variation shades through a material; build the Scatter with material: new PbrMaterial()');
+      throw new MargoError(
+        'state',
+        'Scatter variation shades through a material; build the Scatter with material: new PbrMaterial()',
+      );
     this.tint = [hue, value];
     this.options.variation = { ...this.options.variation, hue, value };
   }
@@ -999,7 +1013,10 @@ export class Scatter implements EnginePlugin {
     if (typeof value !== 'number' || !(value >= 0 && value <= 100000))
       throw new RangeError('Scatter clusters must be a cell size from 0 to 100000; pass 0 to turn it off');
     if (value > 0 && !this.options.material)
-      throw new MargoError('state', 'Scatter clusters shade through a material; build the Scatter with material: new PbrMaterial()');
+      throw new MargoError(
+        'state',
+        'Scatter clusters shade through a material; build the Scatter with material: new PbrMaterial()',
+      );
     this.options.clusters = value;
     this.values[75] = value;
   }
@@ -1185,6 +1202,8 @@ export class Scatter implements EnginePlugin {
    * The colour pipeline, its instance groups per ring and its lighting group for one `part` of a ring: 'opaque', or
    * 'cover' blended by each vertex's coverage and writing no depth (undefined when the stage cannot carry it; see
    * `coverCode`), or the two halves of a split ring, 'body' (opaque) and 'tip' (covered), marked `splitDeclaration`.
+   * `depth` makes a covered part's coverage-depth stage instead: the same pose, writing depth and no colour where the
+   * coverage passes the pose's threshold (`coverCode` with `depth`), drawn after every blended part.
    */
   private colourPipeline(
     c: ScatterPassContext,
@@ -1193,9 +1212,11 @@ export class Scatter implements EnginePlugin {
     culled: boolean,
     own: boolean,
     part: 'opaque' | 'cover' | 'body' | 'tip',
+    depth = false,
   ): { pipeline: GPURenderPipeline; groups: GPUBindGroup[]; lighting?: GPUBindGroup } | undefined {
     const cover = part === 'cover' || part === 'tip',
-      id = key + (part === 'opaque' ? '' : ':' + part);
+      blend = cover && !depth,
+      id = key + (part === 'opaque' ? '' : ':' + part) + (depth ? ':depth' : '');
     let pipeline = this.pipelines.get(id);
     if (!pipeline) {
       const blades = this.values[78] > 0,
@@ -1247,7 +1268,12 @@ export class Scatter implements EnginePlugin {
       }
       if (lit && this.uvs) code = texturedFragment(code, this.cut, coreNormal);
       if (cover) {
-        const covered = coverCode(code, lit, lit ? freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? '') : 0);
+        const covered = coverCode(
+          code,
+          lit,
+          lit ? freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? '') : 0,
+          depth,
+        );
         if (!covered) return undefined;
         code = covered;
       }
@@ -1273,14 +1299,14 @@ export class Scatter implements EnginePlugin {
         fragment: {
           module,
           entryPoint: 'fragment',
-          targets: [{ format: c.format, ...(cover ? { blend: coverBlend } : {}) }],
+          targets: [{ format: c.format, ...(blend ? { blend: coverBlend } : {}), ...(depth ? { writeMask: 0 } : {}) }],
           ...(own ? { constants: { C: 1 } } : {}),
         },
         ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
         multisample: c.descriptor.multisample,
         depthStencil: {
           format: c.descriptor.depthStencil!.format,
-          depthWriteEnabled: !cover,
+          depthWriteEnabled: !blend,
           depthCompare: 'greater-equal',
         },
       });
@@ -1369,8 +1395,12 @@ export class Scatter implements EnginePlugin {
       opaque = this.colourPipeline(c, key, lit, culled, own, 'opaque')!,
       cover = parts.includes('cover') ? this.colourPipeline(c, key, lit, culled, own, 'cover') : undefined,
       tip = parts.includes('split') ? this.colourPipeline(c, key, lit, culled, own, 'tip') : undefined,
-      body = tip && this.colourPipeline(c, key, lit, culled, own, 'body')!;
-    // Opaque parts first, near to far, writing depth; then the covered parts far to near, blended over them. A stage
+      body = tip && this.colourPipeline(c, key, lit, culled, own, 'body')!,
+      coverDepth = cover && this.colourPipeline(c, key, lit, culled, own, 'cover', true),
+      tipDepth = tip && this.colourPipeline(c, key, lit, culled, own, 'tip', true);
+    // Opaque parts first, near to far, writing depth; then the covered parts far to near, blended over them; then the
+    // covered parts' depth where they cover (KB-SCENES-DUNE-GTAO1), after all the blending, so no blade's depth hides a
+    // blade behind it that blends later, and ambient occlusion, depth of field and later meshes see the grass. A stage
     // that cannot carry coverage (see `coverCode`) draws its rings opaque.
     const draws: [number, NonNullable<typeof cover>][] = [];
     for (let i = 0; i < 3; i++) {
@@ -1382,6 +1412,10 @@ export class Scatter implements EnginePlugin {
     for (let i = 2; i >= 0; i--) {
       if (parts[i] === 'cover' && cover) draws.push([i, cover]);
       else if (parts[i] === 'split' && tip) draws.push([i, tip]);
+    }
+    for (let i = 2; i >= 0; i--) {
+      if (parts[i] === 'cover' && coverDepth) draws.push([i, coverDepth]);
+      else if (parts[i] === 'split' && tipDepth) draws.push([i, tipDepth]);
     }
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
@@ -1406,11 +1440,12 @@ export class Scatter implements EnginePlugin {
   }
   /**
    * How the colour pass draws LOD ring `ring` (default 'opaque'). 'cover' draws it with partial coverage: blended over
-   * what is drawn by the alpha its pose gives in `scatterCover`, writing no depth, so blades thinner than a pixel add
-   * their share of colour instead of whole pixels. 'split' draws it twice, both stages marked `splitDeclaration`: an
-   * opaque one writing depth (the pose draws there only what its covered stage covers fully), then the covered one
-   * over it. Covered
-   * parts draw after the opaque ones and after core's meshes (the ground), far rings first.
+   * what is drawn by the alpha its pose gives in `scatterCover`, writing no depth while it blends, so blades thinner
+   * than a pixel add their share of colour instead of whole pixels. 'split' draws it twice, both stages marked
+   * `splitDeclaration`: an opaque one writing depth (the pose draws there only what its covered stage covers fully),
+   * then the covered one over it. Covered parts draw after the opaque ones and after core's meshes (the ground), far
+   * rings first; after them a depth-only pass writes each covered part's depth where its coverage passes the pose's
+   * threshold (`scatterCover.w`, see `coverCode`), so screen-space ambient occlusion and later meshes see it.
    */
   protected coverRing(_ring: number): 'opaque' | 'cover' | 'split' {
     return 'opaque';
