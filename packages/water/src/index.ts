@@ -27,6 +27,14 @@ import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { seaState, whitecapCoverage } from './sea-state.js';
 import { publishSurfaceDepth } from '../../shared/surface-depth.js';
+import {
+  skyCoordinates,
+  skyTexture,
+  validWaterSky,
+  writeSkySampling,
+  type WaterSkyEnvironment,
+} from './sky-radiance.js';
+export type { WaterSkyEnvironment } from './sky-radiance.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -135,6 +143,8 @@ export interface WaterOptions {
   still?: boolean;
   /** Borrowed sky texture (sampleable `rgba16float`), e.g. `() => sky.reflectionTexture`. Omitted: a sky gradient. */
   reflection?: () => GPUTexture | undefined;
+  /** Borrowed HDR Environment with live rotation and radiance scale. Takes precedence over reflection. */
+  reflectionEnvironment?: WaterSkyEnvironment;
   /** Borrowed viewport-sized `rgba16float` scene colour with COPY_SRC, for refraction. Omitted: an approximate seabed. */
   sceneColor?: () => GPUTexture | undefined;
   /** Up to two directional lights for glints, e.g. `sky.lights`; read every frame. Default: the engine light. */
@@ -388,11 +398,26 @@ fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
  let g=nv/(nv*(1.0-k)+k)*nl/max(0.001,nl*(1.0-k)+k);
  return light.radiance.rgb*light.direction.w*d*g*fresnel(vh)/max(0.004,4.0*nv);
 }
-// Open water reflects the horizon when a wave would otherwise sample uncharted ground.
+// Resolve the reflected lobe over a solid angle for a detailed photographic sky. Raw Sky textures keep their
+// established azimuthal sampling. Below-horizon rays see the horizon instead of the HDRI's photographed ground.
+${skyCoordinates}
+fn skyTap(direction:vec3f)->vec3f {
+ let d=normalize(vec3f(direction.x,max(0.0,direction.y),direction.z));
+ return textureSampleLevel(environment,skySampler,seaSkyUv(d,hdrSkyTurn()),0.0).rgb;
+}
+fn hdrSky(direction:vec3f,rough:f32)->vec3f {
+ let r=normalize(vec3f(direction.x,max(1e-6,direction.y),direction.z));
+ let across=normalize(cross(select(vec3f(0,1,0),vec3f(1,0,0),r.y>0.999),r));
+ let up=cross(r,across);
+ let width=rough*rough*1.41421356;
+ let sum=skyTap(r)*0.5+(skyTap(r+across*width)+skyTap(r-across*width)+skyTap(r+up*width)+skyTap(r-up*width))*0.125;
+ return sum*hdrSkyScale();
+}
 fn reflectionRay(r:vec3f)->vec3f {return normalize(vec3f(r.x,max(0.02,r.y),r.z));}
-fn skyColor(direction:vec3f,rough:f32)->vec3f {
+fn skyColorBase(direction:vec3f,rough:f32)->vec3f {
+ if(frame.color.w>0.5&&hdrSkyScale()>0.0){return hdrSky(direction,rough);}
  let r=reflectionRay(direction);
- if(frame.color.w>0.5){let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,0.0,1.0))/3.14159265);let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
+ if(frame.color.w>0.5){let uv=seaSkyUv(r,0.0);let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
  return mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(max(0.0,r.y)))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));
 }
 // How much of a clear day's sky light the sky above the sea gives, 0 to 1: the luminance of the sky in two directions
@@ -400,14 +425,24 @@ fn skyColor(direction:vec3f,rough:f32)->vec3f {
 // The sea's body is lit by this light, so a night sky, however its ambient is set, lights it only as much as it lights
 // the sky the sea reflects (a sea that glowed above the sky it mirrors was the night-sea bug).
 fn skyAmbient()->f32 {
- let a=skyColor(vec3f(0.866,0.5,0),0.4);let b=skyColor(vec3f(0.5,0.866,0),0.4);
+ let a=skyColorBase(vec3f(0.866,0.5,0),0.4);let b=skyColorBase(vec3f(0.5,0.866,0),0.4);
  return clamp(dot((a+b)*0.5,vec3f(0.2126,0.7152,0.0722))/0.02,0.0,1.0);
 }
 fn foamSky()->vec3f {
  var sum=vec3f(0);
- for(var k=0u;k<8u;k++){let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);sum+=skyColor(vec3f(cos(a)*side,up,sin(a)*side),0.4);}
+ for(var k=0u;k<8u;k++){let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);sum+=skyColorBase(vec3f(cos(a)*side,up,sin(a)*side),0.4);}
  return sum*0.125;
 }
+// Eight equally weighted samples in the cosine-weighted hemisphere, stratified in squared radius and azimuth.
+fn hdrDiffuse()->vec3f {
+ var sum=vec3f(0);
+ for(var k=0u;k<8u;k++){
+  let up=sqrt(select(0.25,0.75,(k&1u)==1u));let side=sqrt(1.0-up*up);let a=f32(k)*0.78539816;
+  sum+=skyTap(vec3f(cos(a)*side,up,sin(a)*side));
+ }
+ return sum*(0.125*hdrSkyScale());
+}
+fn skyColor(direction:vec3f,rough:f32)->vec3f {return skyColorBase(direction,rough);}
 struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
 ${displayShader}
 @fragment fn fragment(i:Output)->Result{
@@ -421,10 +456,11 @@ ${displayShader}
   gap=mix(gap,min(gap,bed),select(sample.ocean,1.0,isCoast));
   if(isCoast){dry=select(v.x<0.003,sample.edge<=0.0,STILL);gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;open=1.0-sample.blend.z;}
  }
- let footprint=max(length(dpdx(i.world.xz)),length(dpdy(i.world.xz)));let edge=max(0.015,fwidth(gap)*1.5);
+ let footprint=max(length(dpdx(i.world.xz)),length(dpdy(i.world.xz)));
+ // A depth discontinuity outside the contact band is not a shoreline.
+ let contactRadius=max(0.03,frame.settings.z);
+ let edge=clamp(fwidth(min(gap,contactRadius))*1.5,0.015,contactRadius*0.5);
  let normalWidth=length(fwidth(i.normal));
- // Shoreline quads need their helper lanes until all screen derivatives have been evaluated.
- if(dry){discard;}
  let grainDetail=1.0-smoothstep(0.25,1.0,footprint*2.4);var grain=0.5;
  // Gradient noise is centred on zero with the same 0.21 spread as the former 0..1 value noise.
  if(grainDetail>0){grain=0.5+noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x*grainDetail;}
@@ -468,27 +504,44 @@ ${displayShader}
  let agitated=slope*(1.0+3.0*chop)+windSea*chop;
  ripple=vec3f(-agitated.x,0,-agitated.y)*(1.0-shown);
  }
- let n=normalize(i.normal+ripple);let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
+ let n=normalize(i.normal+ripple);
+ // A box pixel over a locally linear normal field has variance (dx^2 + dy^2)/12.
+ // Fold it into the squared microfacet width so the sky and SSR share the same filtered lobe.
+ let normalDx=dpdx(n);let normalDy=dpdy(n);
+ let variance=(dot(normalDx,normalDx)+dot(normalDy,normalDy))/12.0;
+ // Keep all quad lanes alive until the derivatives of both the shoreline and water normal have been read.
+ if(dry){discard;}
+ let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
  // Sand the swell lifts off the bed hangs in the water: a grey, nearly flat extinction of up to 1.4 per metre over
  // clear water's (murk, from surf.ts), so a surf zone reads as turbid green-grey water, not a clear lagoon over sand.
  let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-(vec3f(0.38,0.10,0.045)+vec3f(1.4,1.3,1.5)*murk)*optical);
- let ambient=frame.eye.w*skyAmbient();
- var bottom=vec3f(0.28,0.25,0.17)*(ambient+frame.radiance.rgb*frame.sun.w*0.12);
+ let hdr=hdrSkyScale()>0.0;
+ var irradiance=vec3f(0);
+ var ambient=frame.eye.w;
+ if(hdr){irradiance=hdrDiffuse();ambient*=clamp(dot(irradiance,vec3f(0.2126,0.7152,0.0722))/0.02,0.0,1.0);}
+ else{ambient*=skyAmbient();}
+ // HDR water body and seabed use the sky's RGB irradiance relative to an 18% grey reference exposure.
+ let diffuse=select(vec3f(ambient),irradiance*(frame.eye.w/0.18),hdr);
+ var bottom=vec3f(0.28,0.25,0.17)*(diffuse+frame.radiance.rgb*frame.sun.w*0.12);
  if(frame.radiance.w>0.5){
   let size=vec2f(textureDimensions(opaque));let bent=refract(-v,n,0.75187970);let seen=frame.camera*vec4f(i.world+bent*(gap/max(0.05,-bent.y)),1);
   let q=clamp(vec2i((seen.xy/max(0.0001,seen.w)*vec2f(0.5,-0.5)+0.5)*size),vec2i(0),vec2i(size)-1);let d=textureLoad(depth,q,0);
   if(d>0&&d<=i.clip.z){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}
  }
- let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);let rough=clamp(max(frame.foam.w,0.12+normalWidth*0.6+footprint*0.025),frame.foam.w,max(0.4,frame.foam.w));
+ let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);
+ let baseRough=clamp(max(frame.foam.w,0.12+normalWidth*0.6+footprint*0.025),frame.foam.w,max(0.4,frame.foam.w));
+ let alpha=baseRough*baseRough;
+ let rough=min(sqrt(sqrt(alpha*alpha+2.0*variance)),max(0.55,frame.foam.w));
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
  // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
  var shade=1.0;if(foam>0.002||max(glint.x,max(glint.y,glint.z))>0.002){shade=waterShadow(i.world);}
  let shallowBand=select(0.0,1.0-smoothstep(0.0,frame.shallow.w,gap),frame.shallow.w>0.0);
- let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*(ambient+frame.radiance.rgb*nl*frame.sun.w*0.12)+(frame.shallow.rgb-frame.color.rgb)*shallowBand*(vec3f(1)-transmission)*(ambient+frame.radiance.rgb*nl*frame.sun.w*0.12);
+ let bodyLight=diffuse+frame.radiance.rgb*nl*frame.sun.w*0.12;
+ let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*bodyLight+(frame.shallow.rgb-frame.color.rgb)*shallowBand*(vec3f(1)-transmission)*bodyLight;
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
  // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
  // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
- var skyLight=vec3f(0);if(frame.grid.z>0.0){skyLight=foamSky();}
+ var skyLight=vec3f(0);if(frame.grid.z>0.0){if(hdr){skyLight=irradiance;}else{skyLight=foamSky();}}
  color=mix(color,vec3f(0.72,0.77,0.74)*(ambient+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265+skyLight),shown*0.95);
  if(frame.cameraData.w<0.5){color=toDisplay(color);}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
@@ -701,6 +754,12 @@ export class Water implements EnginePlugin {
     this.foamFollowsWind = options.whitecaps === undefined && !!this.windSea;
     if (
       (options.reflection !== undefined && typeof options.reflection !== 'function') ||
+      (options.reflectionEnvironment !== undefined && !validWaterSky(options.reflectionEnvironment))
+    )
+      throw new TypeError(
+        'Invalid water optics; pass a Sky texture callback as reflection or an HDR Environment as reflectionEnvironment',
+      );
+    if (
       (options.sceneColor !== undefined && typeof options.sceneColor !== 'function') ||
       (options.spray !== undefined && typeof options.spray !== 'boolean') ||
       (options.spray && !options.terrain) ||
@@ -712,7 +771,7 @@ export class Water implements EnginePlugin {
       (options.horizon !== undefined && typeof options.horizon !== 'boolean')
     )
       throw new TypeError(
-        'Invalid water optics or spray options; reflection, sceneColor and horizon take functions or booleans, spray needs options.terrain, and sprayCount is a multiple of 64 from 64 to 65536',
+        'Invalid water optics or spray options; sceneColor takes a function and horizon takes a boolean, spray needs options.terrain, and sprayCount is a multiple of 64 from 64 to 65536',
       );
     if (
       options.shadows !== undefined &&
@@ -973,8 +1032,16 @@ export class Water implements EnginePlugin {
    * frame; RangeError for a colour outside 0-1 or a depth outside 0-100.
    */
   setShallow(color: readonly [number, number, number], depth: number): this {
-    if (color.length !== 3 || color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) || !Number.isFinite(depth) || depth < 0 || depth > 100)
-      throw new RangeError('Invalid water shallow band; use a colour of three numbers from 0 to 1 and a depth from 0 to 100');
+    if (
+      color.length !== 3 ||
+      color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) ||
+      !Number.isFinite(depth) ||
+      depth < 0 ||
+      depth > 100
+    )
+      throw new RangeError(
+        'Invalid water shallow band; use a colour of three numbers from 0 to 1 and a depth from 0 to 100',
+      );
     this.values.set(color, 136);
     this.values[139] = depth;
     return this;
@@ -1001,7 +1068,8 @@ export class Water implements EnginePlugin {
     const terrain = this.options.terrain;
     if (!terrain?.heights) return [];
     const waves = [];
-    for (let i = 0; i < this.values[23]!; i++) waves.push({ amplitude: this.values[34 + i * 8]!, wavenumber: this.values[35 + i * 8]! });
+    for (let i = 0; i < this.values[23]!; i++)
+      waves.push({ amplitude: this.values[34 + i * 8]!, wavenumber: this.values[35 + i * 8]! });
     const depth = breakerDepth(waves),
       level = this.values[21]! - depth,
       held = this.breakers;
@@ -1206,9 +1274,10 @@ export class Water implements EnginePlugin {
       !(depth.usage & GPUTextureUsage.TEXTURE_BINDING)
     )
       throw new MargoError('state', 'Water needs viewport-sized sampleable scene depth; return one from options.depth');
-    const reflection = this.options.reflection?.();
+    const source = this.options.reflectionEnvironment ?? this.options.reflection;
+    const reflection = skyTexture(source);
     if (
-      this.options.reflection &&
+      source &&
       (!reflection ||
         reflection.dimension !== '2d' ||
         reflection.sampleCount !== 1 ||
@@ -1218,7 +1287,7 @@ export class Water implements EnginePlugin {
     )
       throw new MargoError(
         'state',
-        'Water reflection needs a sampleable rgba16float sky texture; return one from options.reflection',
+        'Water reflection needs a sampleable rgba16float sky texture from Sky or Environment',
       );
     if (this.reflected !== reflection) {
       this.reflected = reflection;
@@ -1495,6 +1564,7 @@ export class Water implements EnginePlugin {
       }
       this.values[100] = Math.min(Math.max(c.delta, 0), 1 / 15) / 3;
     }
+    writeSkySampling(source, this.values, 119, 127, 0);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.coastal?.step(c.encoder);
     this.spray?.step(c.encoder);

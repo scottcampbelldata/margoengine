@@ -6,6 +6,40 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: the web starter exceeds its bundle ceiling (create-margo)
+
+- **Repro:** on public main at `5ff5dc647f`, build packages and run `node --test --test-name-pattern="the web template" tests/create-margo.test.js`. The web template builds to 84,025 B gzip against a limit of 83,000 B. Its bundle does not load Water.
+- **Cause:** the template's Environment graph reaches all the lazy HDR image formats despite using a generated lighting image. The total test counts the initial bundle and all lazy chunks, including 11,659 B of loader code. Changing just the template import to the Environment main subpath still produces 83,954 B.
+- **Owner:** `create-margo` and its Environment dependency. Keep the size limit while diagnosing how to keep the template's lighting and reduce its installer output.
+
+### Fixed 2026-11-21: planar water captures ended in a hard line (water)
+
+- **Repro:** aim a planar capture so that the bounds of its image cross water near a reflective object. The image ends abruptly where the warped UV leaves the capture.
+- **Cause:** the blend used a binary texture bound. Its warp also used the absolute world ray, and the planar image was sampled for ambient sky light.
+- **Fix:** feather the capture bounds over the filter footprint, project the change in reflected direction into the capture, and use sky radiance for ambient and foam lighting. The underwater camera uses the sky once it passes below the capture plane.
+- **Regression:** `packages/water/test/reflector.browser.mjs` verifies a full interior, partial edge, and unchanged exterior.
+
+### Fixed 2026-11-21: HDR overcast seas lost cloud light in wave troughs (water)
+
+- **Repro:** use a bright overcast HDR environment with deep-blue water and sloping waves. The sky lights their reflections while the troughs remain dark.
+- **Cause:** the legacy sky tint was reduced to two luminance samples and clamped, so the diffuse body stopped responding to HDR illumination beyond the clamp.
+- **Fix:** estimate cosine-weighted HDR irradiance from the same sky as the reflection and use it to illuminate the water body.
+- **Regression:** `packages/water/test/sky-radiance.browser.mjs` isolates body radiance by subtracting a black-water frame at two HDR light levels.
+
+### Fixed 2026-11-21: HDR ocean reflected a different sky direction (water)
+
+- **Repro:** use the same asymmetric HDR photograph for EnvironmentBackground and Water. The surface can reflect another quadrant, creating a colour discontinuity at the horizon.
+- **Cause:** Environment equirectangular maps are centred on -Z and have a live rotation and radiance scale. The water lookup assumed the +X convention of the procedural Sky callback.
+- **Fix:** pass the Environment through Water's `reflectionEnvironment` and Underwater's `skyEnvironment`. The package applies the source convention and live transform. The same stage also resolves partial pixel coverage at the camera's near-plane waterline.
+- **Regression:** `packages/water/test/sky-radiance.browser.mjs` and `packages/water/test/underwater.browser.mjs`.
+
+### Fixed 2026-11-21: contact foam outlined fully submerged geometry (water)
+
+- **Repro:** a flat sea and a fully submerged block made the block's screen silhouette leave 360 pixels in the foam mask.
+- **Cause:** a derivative of the full depth gap could span the block and open sea, expanding the contact threshold by metres.
+- **Fix:** compute the derivative on the bounded contact field. With the same fixture the deep block leaves zero foam pixels and a block near the surface leaves 4,289.
+- **Regression:** `packages/water/test/contact-foam.browser.mjs` checks the GPU foam target at both depths.
+
 ### Fixed 2026-11-20: the sheen albedo test needed a commit that only the private history has (KB-SHEEN-HISTORY1, materials)
 
 - **Repro (before):** `node --test packages/materials/test/sheen-albedo-fit.test.js` failed on public main in every

@@ -105,6 +105,53 @@ try {
   };
   const redGain = red(images[1]) - red(images[0]);
   assert.ok(redGain > 3, 'offscreen red object appears at its independent mirrored projection: ' + redGain);
+  // Shift a constant capture so its right edge lands at the middle of the water. The reflection has full
+  // strength in the interior and approaches the sky across the filter's footprint.
+  const edgeFrame = async (capture) => {
+    await page.evaluate((capture) => {
+      const t = window.reflectTest;
+      t.adapter.dispose();
+      let source = t.mirror;
+      if (capture) {
+        const gpu = t.engine.gpu;
+        const texture = gpu.createTexture({ size: [32, 32], format: 'rgba16float', usage: 6 });
+        const data = new Uint16Array(32 * 32 * 4);
+        for (let n = 0; n < data.length; n += 4) data.set([0x3c00, 0, 0, 0x3c00], n);
+        gpu.queue.writeTexture({ texture }, data, { bytesPerRow: 256 }, [32, 32]);
+        const textureMatrix = t.engine.camera.matrix.slice();
+        for (let i = 0; i < 16; i += 4) textureMatrix[i] += textureMatrix[i + 3];
+        source = { texture, textureMatrix };
+        t.edgeTexture = texture;
+      } else {
+        source = { texture: undefined, textureMatrix: undefined };
+      }
+      t.adapter = t.WaterReflection.attach(t.engine, { surface: t.water, reflector: source });
+      t.engine.render({ delta: 0 });
+    }, capture);
+    return decodePNG(await page.locator('canvas').screenshot());
+  };
+  const skyOnly = await edgeFrame(false);
+  const edge = await edgeFrame(true);
+  const lift = (x) => {
+    let sum = 0;
+    for (let y = 160; y < 178; y++) {
+      const i = (y * edge.width + x) * 4;
+      sum += edge.data[i] - skyOnly.data[i];
+    }
+    return sum / 18;
+  };
+  const interior = lift(98);
+  const boundary = lift(120);
+  const outside = lift(132);
+  assert.ok(interior > 10, `interior reflection is missing: ${interior}`);
+  assert.ok(boundary > 0 && boundary < interior * 0.45, `capture edge does not fade: ${boundary} vs ${interior}`);
+  assert.equal(outside, 0, 'the sky is unchanged outside the borrowed capture');
+  await page.evaluate(() => {
+    const t = window.reflectTest;
+    t.adapter.dispose();
+    t.edgeTexture.destroy();
+    t.adapter = t.WaterReflection.attach(t.engine, { surface: t.water, reflector: t.mirror });
+  });
   // Exercise SSR capture, with independently owned MRT targets, at the scene's actual sample count.
   const lifecycle = await page.evaluate(async () => {
     const t = window.reflectTest,
@@ -190,7 +237,18 @@ try {
   });
   assert.deepEqual(lifecycle, { captured: true, restoredFilter: true, sharedSurvives: true, validation: undefined });
   assert.deepEqual(errors, []);
-  const report = { hardware, first, lifecycle, redGain, visibleChange: true, unreadyExact: true, windBearing: wind };
+  const report = {
+    hardware,
+    first,
+    lifecycle,
+    redGain,
+    interior,
+    boundary,
+    outside,
+    visibleChange: true,
+    unreadyExact: true,
+    windBearing: wind,
+  };
   console.log(JSON.stringify(report));
   await writeFile(
     `test-results/water-reflector-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,

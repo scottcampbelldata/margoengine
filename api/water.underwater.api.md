@@ -34,6 +34,7 @@ export interface UnderwaterOptions {
     raySteps?: number;
     thickness?: number;
     environment?: () => GPUTexture | undefined;
+    skyEnvironment?: WaterSkyEnvironment;
     skyHorizon?: readonly [number, number, number];
     skyZenith?: readonly [number, number, number];
     enabled?: boolean;
@@ -174,6 +175,7 @@ interface WaterOptions {
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;
     reflection?: () => GPUTexture | undefined;
+    reflectionEnvironment?: WaterSkyEnvironment;
     sceneColor?: () => GPUTexture | undefined;
     lights?: readonly WaterLight[];
     spray?: boolean;
@@ -189,6 +191,12 @@ interface WaterShadowSource {
         readonly declarations: string;
     };
     bindings(): GPUBindGroupEntry[];
+}
+
+interface WaterSkyEnvironment {
+    readonly equirectTexture: GPUTexture | undefined;
+    readonly rotation?: number;
+    readonly radianceScale?: number;
 }
 
 interface WaterTerrain {

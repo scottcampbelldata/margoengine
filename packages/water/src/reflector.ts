@@ -32,9 +32,9 @@ export interface WaterReflectionOptions {
   reflector: WaterPlanarCapture;
   /** Fraction of planar colour versus existing sky, 0..1. Default 1. */
   strength?: number;
-  /** Reflection-ray XZ distortion in texture fractions, 0..0.1. Default 0 for calm water. */
+  /** Strength of the water-normal distortion in the capture's projection, 0..0.1. Default 0. */
   distortion?: number;
-  /** Cross-filter blur, 0..1 (up to eight capture texels). Default 0. */
+  /** Cross-filter blur, 0..1, modulated by the local surface roughness. Default 0. */
   roughness?: number;
   /** Nonnegative linear RGB multiplier, each 0..100. Default [1,1,1]. */
   color?: readonly [number, number, number];
@@ -80,17 +80,30 @@ struct PlanarWaterFrame { projection:mat4x4f, settings:vec4f, tint:vec4f }
 var<private> planarWaterWorld:vec3f;
 fn skyColor(direction:vec3f,rough:f32)->vec3f {
  let fallback=skyColorBase(direction,rough);
- if(planarWater.settings.x<0.5){return fallback;}
+ // A capture from above the mean plane is unusable after the camera goes under it.
+ if(planarWater.settings.x<0.5||frame.eye.y<=frame.settings.y){return fallback;}
  let clip=planarWater.projection*vec4f(planarWaterWorld,1);
  if(clip.w<=0.000001){return fallback;}
- let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5+direction.xz*planarWater.settings.z;
- if(any(uv<vec2f(0))||any(uv>vec2f(1))){return fallback;}
+ let incident=normalize(planarWaterWorld-frame.eye.xyz);
+ let calm=reflect(incident,vec3f(0,1,0));
+ // Project the difference from a flat mirror into the capture's own view, so calm water never slides the image.
+ let bend=planarWater.projection*vec4f(direction-calm,0);
+ let uv=(clip.xy/clip.w+bend.xy*planarWater.settings.z)*vec2f(0.5,-0.5)+0.5;
+ let edge=min(uv,1.0-uv);
+ if(any(edge<=vec2f(0))){return fallback;}
+ let texel=1.0/vec2f(textureDimensions(planarWaterImage));
+ let blur=planarWater.settings.w*(8.0+16.0*rough*rough);
+ let offset=texel*blur;
+ // A plane capture has no local geometry at the infinite ocean horizon. Feather its contribution over the
+ // capture filter's vertical footprint in angular units to keep the procedural or HDR sky continuous there.
+ let angularTexel=texel.y*2.0/length(vec3f(planarWater.projection[0].y,planarWater.projection[1].y,planarWater.projection[2].y));
+ let horizon=smoothstep(0.0,angularTexel*max(3.0,blur),calm.y);
+ let fade=smoothstep(vec2f(0),texel*max(3.0,blur),edge);
  var color=textureSampleLevel(planarWaterImage,planarWaterSampler,uv,0).rgb;
- if(planarWater.settings.w>0.0){
-  let offset=vec2f(planarWater.settings.w*8.0)/vec2f(textureDimensions(planarWaterImage));
+ if(blur>0.0){
   color=color*0.5+(textureSampleLevel(planarWaterImage,planarWaterSampler,uv+vec2f(offset.x,0),0).rgb+textureSampleLevel(planarWaterImage,planarWaterSampler,uv-vec2f(offset.x,0),0).rgb+textureSampleLevel(planarWaterImage,planarWaterSampler,uv+vec2f(0,offset.y),0).rgb+textureSampleLevel(planarWaterImage,planarWaterSampler,uv-vec2f(0,offset.y),0).rgb)*0.125;
  }
- return mix(fallback,color*planarWater.tint.rgb,planarWater.settings.y);
+ return mix(fallback,color*planarWater.tint.rgb,planarWater.settings.y*fade.x*fade.y*horizon);
 }
 `;
 
@@ -165,8 +178,10 @@ export class WaterReflection implements EnginePlugin {
       count: 3,
       shader: (code, binding) =>
         code
-          .replace('fn skyColor(direction:vec3f,rough:f32)', 'fn skyColorBase(direction:vec3f,rough:f32)')
-          .replace('struct Result', declarations(binding) + '\nstruct Result')
+          .replace(
+            'fn skyColor(direction:vec3f,rough:f32)->vec3f {return skyColorBase(direction,rough);}',
+            declarations(binding),
+          )
           .replace(
             '@fragment fn fragment(i:Output)->Result{',
             '@fragment fn fragment(i:Output)->Result{\nplanarWaterWorld=i.world;',

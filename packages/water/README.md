@@ -56,6 +56,23 @@ Water.attach(engine, {
 
 The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
 
+Pass an `Environment` as `reflectionEnvironment` to use the same longitude, live rotation, and HDR radiance scale as `EnvironmentBackground`. The water filters its reflection across both angular axes using a lobe widened by the screen footprint of the wave normals and uses the sky at the horizon for below-horizon reflections. The HDR sky also lights the water body and refracted seabed through a cosine-weighted irradiance estimate. Keep the `() => sky.reflectionTexture` form for the procedural `Sky` package.
+
+For example, render open water under a shared HDR environment:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Environment, EnvironmentBackground} from 'margoengine/environment';
+import {Water} from 'margoengine/water';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const sky = await Environment.attach(engine, {
+  width: 2, height: 1,
+  data: new Float32Array([0.3, 0.4, 0.6, 1, 0.8, 0.7, 0.6, 1]),
+}, {float32: false});
+EnvironmentBackground.attach(engine, sky);
+Water.attach(engine, {size: [200, 200], horizon: true, reflectionEnvironment: sky});
+```
+
 `water.depthTexture` exposes borrowed viewport depth including opaque geometry and
 the water surface for subsequent effects, such as `Sky` distance fog. It is
 undefined before the first draw and after disposal/restoration until drawing
@@ -76,7 +93,9 @@ strength. Pass `shadows: shadows` (a `Shadows` from `@margoengine/shadows` attac
 to the same engine) to darken glints and foam where the engine light is blocked.
 Water binds the cascades at group 1 and samples them with the same PCSS filter as
 the scene, only where a glint or foam shows. All glint lights take that one shadow
-map, as the scene's single blended light does.
+map, as the scene's single blended light does. The depth-based contact band uses
+`foamDistance` in metres. Screen-space edge filtering is restricted to that
+local band, so a deeply submerged object's silhouette produces no contact foam.
 
 `whitecaps` (0 to 1, default 0) breaks steep crests into white foam: where the summed slope of a crest's
 components passes a threshold that falls as the amount rises, read a little ahead of the crest where spilling foam

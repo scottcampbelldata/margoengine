@@ -9,6 +9,9 @@ struct Wave {wave:vec4f,shape:vec4f}
 struct Light {direction:vec4f,radiance:vec4f}
 struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>,grid:vec4f,foam:vec4f,shallow:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
+// Use the unused alpha of each light's RGB radiance for the shared HDR sky transform.
+fn hdrSkyTurn()->f32 {return frame.lights[0].radiance.w;}
+fn hdrSkyScale()->f32 {return frame.lights[1].radiance.w;}
 `;
 // Margo's swell (swell-wgsl.ts) on the frame's wave clock.
 export const oceanWaves =

@@ -1,3 +1,37 @@
+### Section 5 evidence: HDR ocean reflection and the camera waterline (2026-11-21)
+
+Water and Underwater borrow an HDR Environment through `reflectionEnvironment` and `skyEnvironment`. They use its azimuth convention, live rotation
+and radiance scale, so the reflected and refracted sky match the camera's background. The callback used by procedural
+Sky keeps its original orientation. Water smooths the rough HDR reflection over a tangent-plane footprint in both
+angular axes. The local change in the rippled normal contributes to the specular lobe width shared by the sky and SSR. Underwater blends partial wet and dry coverage within one pixel of the near-plane intersection.
+
+The HDR water body and seabed use eight stratified cosine-weighted sky samples relative to 18% grey. The estimate keeps cloud light in the troughs when their normals reflect away from the horizon. Foam reuses this estimate. The initial procedural sky and its low-light behaviour retain their ambient model.
+
+Planar water applies the wave's change from the flat reflected ray in capture space, fades to the sky over the filter footprint at the capture boundary and far horizon, and keeps sky lighting independent of the captured geometry. The reflector fixture measures a red-channel change of 11.17 codes in the capture interior, 1 at its feathered edge and 0 outside.
+
+The GPU sky witness compares the colour of the visible background with grazing water before and after a 90-degree
+environment rotation. The underwater witness checks subpixel coverage, an unchanged dry region, and the scale of the
+Snell-window radiance. The feature uses the existing water capture and does not change core.
+
+- Eric Bruneton, Fabrice Neyret, and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless Transitions from Geometry to BRDF](https://www-evasion.imag.fr/Publications/2010/BNH10/), 2010. The reflection footprint grows with the unresolved roughness.
+- Curtis D. Mobley, [Estimation of the remote-sensing reflectance from above-surface measurements](https://misclab.umeoce.maine.edu/ftp/classes/OO2015/Readings/Mobley1999.pdf), 1999. Above-water radiance includes light emerging from the water body and Fresnel-reflected sky.
+- Charles Cox and Walter Munk, [Measurement of the Roughness of the Sea Surface from Photographs of the Sun’s Glitter](https://opg.optica.org/josa/abstract.cfm?URI=josa-44-11-838), 1954. Wind-driven surface slopes broaden reflected light.
+- Yusuke Tokuyoshi and Anton S. Kaplanyan, [Improved Geometric Specular Antialiasing](https://doi.org/10.1145/3306131.3317026), 2019. The box-pixel variance supplements the intrinsic lobe width.
+- W3C GPU for the Web Working Group, [WebGPU Shading Language, derivative built-in functions](https://www.w3.org/TR/WGSL/#derivative-builtin-functions). The waterline uses the local screen derivative for pixel coverage.
+
+### Section 5 evidence: water contact foam at depth discontinuities (2026-11-21)
+
+Shoreline filtering uses derivatives of the depth gap clipped to the contact
+band. A local fragment quad that spans open water and a deeply submerged
+surface therefore cannot widen the foam band. The GPU regression reads the
+foam target directly. On the RTX A6000, a submerged block fell from 360 foam
+pixels to zero while 4,289 pixels remained over a near-surface block. This
+applies to the main Water WebGPU shader and its SSR variant.
+
+- Yusuke Tokuyoshi and Anton S. Kaplanyan, [Improved Geometric Specular Antialiasing](https://doi.org/10.1145/3306131.3317026), 2019. The box-pixel variance supplements the intrinsic lobe width.
+- W3C GPU for the Web Working Group, [WebGPU Shading Language, derivative built-in functions](https://www.w3.org/TR/WGSL/#derivative-builtin-functions).
+- Charles Loop and Jim Blinn, [Resolution Independent Curve Rendering Using Programmable Graphics Hardware](https://www.microsoft.com/en-us/research/publication/resolution-independent-curve-rendering-using-programmable-graphics-hardware/), 2005. Local derivative-based filtering informs the contact edge.
+
 ### Section 5 evidence: scatter texture maps, cut-out shadows and the cotangent frame (KB-SCATTER-TEX1, 2026-11-17)
 
 `ScatterOptions.textures` patches core's lit fragment stage (base colour, alpha MASK, occlusion-roughness-metal, a

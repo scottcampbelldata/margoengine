@@ -152,7 +152,9 @@ try {
     // Row of the near-plane point at height 0: project (0, 0, -near) through the camera's own matrix.
     const clip = [1, 3].map((r) => m[4 + r] * 0 + m[8 + r] * -0.1 + m[12 + r]);
     const lineRow = (0.5 - (clip[0] / clip[1]) * 0.5) * line[0].height;
-    const unchangedAbove = worst(line, [0, Math.floor(lineRow) - 1]);
+    const edgeRow = Math.floor(lineRow);
+    const unchangedAbove = worst(line, [0, edgeRow - 1]);
+    const edgeBlend = Math.abs(at(line[0], cx, edgeRow)[0] - at(line[1], cx, edgeRow)[0]);
     let changedBelow = 0;
     for (let y = Math.ceil(lineRow) + 1; y < line[0].height; y++)
       if (Math.abs(at(line[0], cx, y)[0] - at(line[1], cx, y)[0]) > 1e-4) changedBelow++;
@@ -244,19 +246,26 @@ try {
     );
     options.environment = () => environment;
     const [, environmentFrame] = await frame();
+    options.skyEnvironment = { equirectTexture: environment, radianceScale: 2 };
+    const [, hdrEnvironmentFrame] = await frame();
     let environmentError = 0;
+    let hdrScaleError = 0;
     for (let y = 1; y < underside.height - 1; y++)
       for (let x = 1; x < underside.width - 1; x++) {
         // Baseline already checked against Fresnel: reuse its transmission fraction.
         const baseline = at(underside, x, y),
-          actual = at(environmentFrame, x, y);
-        for (let k = 0; k < 3; k++)
+          actual = at(environmentFrame, x, y),
+          scaled = at(hdrEnvironmentFrame, x, y);
+        for (let k = 0; k < 3; k++) {
           environmentError = Math.max(
             environmentError,
             Math.abs(actual[k] - (baseline[k] / options.skyHorizon[k]) * [0.25, 0.5, 1][k]),
           );
+          hdrScaleError = Math.max(hdrScaleError, Math.abs(scaled[k] - 2 * actual[k]));
+        }
       }
     options.environment = undefined;
+    options.skyEnvironment = undefined;
     environment.destroy();
     // 6. An FFT ocean drives the same stage.
     stack.dispose();
@@ -340,6 +349,7 @@ try {
       aboveWorst,
       lineRow,
       unchangedAbove,
+      edgeBlend,
       changedBelow,
       belowRows,
       finite,
@@ -358,6 +368,7 @@ try {
       fftOpticalError,
       matchedIndexError,
       environmentError,
+      hdrScaleError,
       single,
       validation: validation?.message,
     };
@@ -374,6 +385,7 @@ try {
   assert.equal(result.aboveWorst, 0);
   assert.ok(result.lineRow > 4 && result.lineRow < 60, `waterline row ${result.lineRow}`);
   assert.equal(result.unchangedAbove, 0);
+  assert.ok(result.edgeBlend > 0.001, `waterline intersection misses subpixel wet coverage: ${result.edgeBlend}`);
   assert.equal(result.changedBelow, result.belowRows);
   assert.equal(result.finite, true);
   assert.ok(result.litMin > 0, `in-scatter ${result.litMin}`);
@@ -391,6 +403,7 @@ try {
   assert.ok(result.fftOpticalError < 0.002, `FFT dielectric underside ${result.fftOpticalError}`);
   assert.ok(result.matchedIndexError < 0.001, `matched IOR ${result.matchedIndexError}`);
   assert.ok(result.environmentError < 0.002, `borrowed environment ${result.environmentError}`);
+  assert.ok(result.hdrScaleError < 0.002, `HDR environment radiance scale ${result.hdrScaleError}`);
   await mkdir('test-results', { recursive: true });
   await writeFile(
     `test-results/water-underwater-${browser.hardware?.compat ? 'compat' : 'webgpu'}${result.single ? '-single' : ''}.json`,
