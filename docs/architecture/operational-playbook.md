@@ -9450,3 +9450,13 @@ WebGPU and the WebGL2 layer. Biomes' distant trees use that image, the placement
 Regional and tile queries return curvature in the same signed integer units before conversion to inverse metres.
 The worker cover regression proves the distant mask matches the main-thread mask and loads the existing graph part
 only when a canopy request supplies a graph.
+
+### Scene sections with lighting providers
+
+The Machinery section pass reserves mesh-shader binding 232 before the shadow and lighting passes run. Those
+passes can read the same section planes for clipped shadows. Choosing a slot from the current entry count allowed
+the shadow sampler and the clustered-light frame to share binding 4. WGSL requires distinct group and binding
+pairs for distinct resources. The real-adapter `packages/machinery/test/section-open-check.mjs` proof attaches
+both providers and verifies that the closed solid is capped and the open sheet stays open. The binding rules are in the
+[W3C WGSL resource interface](https://www.w3.org/TR/WGSL/#resource-interface) and
+[W3C WebGPU pipeline layout](https://www.w3.org/TR/webgpu/#pipeline-layout).

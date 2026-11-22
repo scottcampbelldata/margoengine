@@ -19,6 +19,9 @@ import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; INDIRECT: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
+// Reserve a scene-shader slot outside the lighting ranges. The clip pass runs before shadow and light passes,
+// so the number of bindings already present cannot tell it which binding numbers later passes will use.
+const SCENE_SECTION_BINDING = 232;
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
 type Pipelines = {
   back: GPURenderPipeline;
@@ -174,15 +177,14 @@ export class SectionPlanes implements EnginePlugin {
       if (context.backend !== 'webgpu') return;
       this.validate();
       this.base = context.shader.split('@fragment')[0];
-      const binding = context.bindings.length + 1;
       this.active = this.enabled && !this.warming.has(this.capKey);
       context.shader =
-        declaration(binding) +
+        declaration(SCENE_SECTION_BINDING) +
         context.shader.replace(
           'let facing=',
           `for(var p=0u;p<u32(section.settings.x);p++){if(dot(section.planes[p].xyz,i.position)+section.planes[p].w<0){discard;}}\nlet facing=`,
         );
-      context.bindings.push({ binding, resource: this.bindings[0][0].resource });
+      context.bindings.push({ binding: SCENE_SECTION_BINDING, resource: this.bindings[0][0].resource });
       this.upload(context);
     };
     graph.add({ name: 'sections:clip', order: -30, execute: clip, prepare: clip });

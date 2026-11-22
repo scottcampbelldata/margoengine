@@ -20,22 +20,27 @@ try {
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
   const result = await page.evaluate(() => window.check.run()),
     image = await decodePNG(await page.locator('canvas').screenshot());
+  await page.locator('canvas').screenshot({ path: `test-results/section-open-${base ? 'base' : 'current'}.png` });
+  await page.evaluate(() => window.check.lightOff());
+  const unlit = await decodePNG(await page.locator('canvas').screenshot());
   // The camera looks along +z, so world +x (the sheet) is on the left of the screen and the box (x = -0.8) on the right.
   let sheet = 0,
-    box = 0;
+    box = 0,
+    lit = 0;
   for (let y = 0; y < image.height; y++)
     for (let x = 0; x < image.width; x++) {
       const o = (y * image.width + x) * 4,
         [r, g, b] = image.data.subarray(o, o + 3);
       if (g > 100 && r < 70 && b < 70) x < image.width / 2 ? sheet++ : box++;
+      if (r >= unlit.data[o] + 8) lit++;
     }
-  await page.locator('canvas').screenshot({ path: `test-results/section-open-${base ? 'base' : 'current'}.png` });
-  console.log(JSON.stringify({ base: base ?? 'current', capPixels: { box, sheet } }));
+  console.log(JSON.stringify({ base: base ?? 'current', capPixels: { box, sheet }, litPixels: lit }));
   assert.deepEqual(result.errors, []);
   assert.deepEqual(pageErrors, []);
   if (!base) {
     assert.ok(box > 500, 'the closed box is capped');
     assert.equal(sheet, 0, 'the open sheet is not capped');
+    assert.ok(lit > 500, 'the clustered light still changes surface illumination');
     console.log('section open-shell check passed');
   }
 } finally {
