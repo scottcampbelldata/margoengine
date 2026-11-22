@@ -144,7 +144,8 @@ export class LeakWatch {
     for (const series of this.series.values())
       if (series.read) {
         const value = series.read();
-        if (!Number.isFinite(value)) throw new RangeError('A watched number must be finite; make its read function return one.');
+        if (!Number.isFinite(value))
+          throw new RangeError('A watched number must be finite; make its read function return one.');
         this.push(series, value);
       }
     this.samples++;
