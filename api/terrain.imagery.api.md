@@ -246,6 +246,7 @@ interface TerrainOptions {
     cellSize?: number;
     resolution?: number;
     levels?: number;
+    readonly clipmapAnchor?: readonly [number, number] | 'camera';
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
 }

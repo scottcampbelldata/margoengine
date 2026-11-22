@@ -9,7 +9,7 @@
 // entry costs nothing until it is used.
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
-import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
+import type { Terrain, TerrainColorOptions, TerrainOptions } from '@margoengine/terrain';
 import type { WetGround, WetGroundLook } from '@margoengine/terrain/wet-ground';
 import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -48,7 +48,13 @@ export interface BiomeViewOptions {
   /** Clipmap settings passed to the terrain. Default cell 1 m, 64 cells per ring, and as many rings as the world and
    * `radius` need (`clipmapLevels`: 9 for a 4 km world). Explicit settings that reach less than `radius` are a
    * RangeError. */
-  readonly clipmap?: { readonly cellSize?: number; readonly resolution?: number; readonly levels?: number };
+  readonly clipmap?: {
+    readonly cellSize?: number;
+    readonly resolution?: number;
+    readonly levels?: number;
+    /** World XZ centre for terrain and horizon. Defaults to the starting camera XZ. Use `'camera'` for a moving window. */
+    readonly anchor?: TerrainOptions['clipmapAnchor'];
+  };
   /**
    * How far tree crowns darken the ground, 0 to 1: a material `'canopy'` (its look in `MATERIALS`) takes this share of
    * the ground weight times `canopyCover`, on far hills and on the forest floor, and `materials` lists it last. Nothing
@@ -931,13 +937,25 @@ export class BiomeView implements Disposable {
       () => new Uint8Array(this.#width * this.#depth * 4),
     );
     const view = this;
+    const anchor = options.clipmap?.anchor ?? ([engine.camera.position[0], engine.camera.position[2]] as const);
+    const extent =
+      anchor === 'camera' || options.clipmap?.levels !== undefined
+        ? this.#radius
+        : Math.max(
+            this.#radius,
+            Math.abs(anchor[0] - x0),
+            Math.abs(anchor[0] - x1),
+            Math.abs(anchor[1] - z0),
+            Math.abs(anchor[1] - z1),
+          );
     this.terrain = terrainModule.Terrain.attach(engine, {
       origin: [x0, z0],
       size: [x1 - x0, z1 - z0],
       heightScale: 1,
       cellSize: options.clipmap?.cellSize ?? 1,
       resolution: options.clipmap?.resolution ?? 64,
-      levels: clipmapLevels(world.bounds, this.#radius, options.clipmap),
+      levels: clipmapLevels(world.bounds, extent, options.clipmap),
+      clipmapAnchor: anchor,
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
@@ -989,8 +1007,11 @@ export class BiomeView implements Disposable {
     if (horizon !== true && horizon !== false && horizon !== 'auto')
       throw typeError("BiomeView horizon must be true, false or 'auto'", 'biomes');
     // The ring takes the world's edge weights, so it is made when the overview weights are in.
-    if (horizon)
-      this.#makeHorizon = () => this.#horizonTerrain(world, horizon, terrainModule, layerKeys, looks, pixels);
+    if (horizon) {
+      const horizonAnchor = anchor === 'camera' ? anchor : ([anchor[0], anchor[1]] as const);
+      this.#makeHorizon = () =>
+        this.#horizonTerrain(world, horizon, terrainModule, layerKeys, looks, pixels, horizonAnchor);
+    }
     // A world change repaints the tint over its rectangle too (the world's region fields are rebuilt before it tells
     // listeners, and reading them there is allowed); each `seasons.set` repaints all of it.
     this.#off = world.onChange((rect) => {
@@ -1818,6 +1839,7 @@ export class BiomeView implements Disposable {
     layerKeys: readonly string[],
     looks: readonly MaterialLook[],
     pixels: readonly Uint8Array[][],
+    anchor: NonNullable<TerrainOptions['clipmapAnchor']>,
   ): Terrain | undefined {
     const sea = world.climate.sea / 1000, // float division: mm to metres
       w = this.#width,
@@ -1862,6 +1884,7 @@ export class BiomeView implements Disposable {
       cellSize: 8,
       resolution: 64,
       levels,
+      clipmapAnchor: anchor,
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
         const scale = 1 / far.texel; // float division: one repeat per ring texel

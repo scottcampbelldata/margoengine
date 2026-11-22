@@ -221,7 +221,17 @@ location 6 in the standard PBR shader. No core changes are required. Physical
 regression on WebGPU and the WebGL2 layer: `node packages/terrain/test/wetness.browser.mjs`
 from the repository root after building the packages (MARGO_COMPAT=1 for the layer).
 
-Optional geometry clipmaps with vertex texture height/normal sampling and 4 to 16 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams ([seams.browser.mjs](test/seams.browser.mjs): rough ground seen from above at 200 camera offsets that step through fractions of a cell draws 0 clear-colour pixels on WebGPU and the WebGL2 layer). Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
+Optional geometry clipmaps with vertex texture height and normal sampling and 4 to 16 terrain layers. Fixed grids form a centre and concentric rings. Inner edges align to the finer grid and outer-edge vertices collapse onto the next coarser lattice to close seams. In moving-window mode, [seams.browser.mjs](test/seams.browser.mjs) checks 200 camera offsets for clear pixels through the ground on WebGPU and the WebGL2 layer. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting and normalized slope and height weights blend an sRGB texture array.
+
+The rings anchor at the main camera's world XZ on the first render. Camera motion then preserves the terrain triangles,
+ridge silhouettes, and static shadow cache. Pass `clipmapAnchor: [x, z]` for a fixed centre you choose. Set `levels`,
+`resolution`, or `cellSize` so the outer ring spans the terrain in view. For a route that exceeds the fixed outer ring,
+pass `clipmapAnchor: 'camera'` to select a moving window on the same world lattice. `TerrainStream` defaults to that mode.
+The fixed ring origin remains in world coordinates with `floatingOrigin` and survives rebases and device restoration.
+[The rendered regression](test/clipmap-anchor.browser.mjs) checks a subpixel camera move across a clipmap boundary.
+The clipmap lattice and seam treatment follow Frank Losasso and Hugues Hoppe,
+[Geometry Clipmaps](https://hhoppe.com/geomclipmap.pdf) (2004), and Arul Asirvatham and Hugues Hoppe,
+[Terrain Rendering Using GPU-Based Geometry Clipmaps](https://hhoppe.com/gpugcm.pdf) (2005).
 Each ring's 176-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
 differ from the last upload to that buffer, so a still camera under unchanged light uploads nothing; buffers made
 after a device restore always get their first write.

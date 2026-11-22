@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { PlantStates } from "@margoengine/scatter/states";
-import { Terrain, TerrainColorOptions } from "@margoengine/terrain";
+import { Terrain, TerrainColorOptions, TerrainOptions } from "@margoengine/terrain";
 import { WetGround, WetGroundLook } from "@margoengine/terrain/wet-ground";
 import { Water, WaterLight, WaterOptions } from "@margoengine/water";
 
@@ -82,6 +82,7 @@ export interface BiomeViewOptions {
         readonly cellSize?: number;
         readonly resolution?: number;
         readonly levels?: number;
+        readonly anchor?: TerrainOptions['clipmapAnchor'];
     };
     readonly canopy?: number;
     readonly far?: false | {

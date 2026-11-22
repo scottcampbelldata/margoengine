@@ -118,6 +118,13 @@ const plain = erode(grid);
 console.log(young.outflow, worn.outflow, plain.outflow);
 ```
 
+## Anchored terrain and horizon
+
+`BiomeView` anchors both terrain and horizon rings at the starting camera's world XZ. The surface keeps its
+triangulation as the camera pulls back, while plant and material streaming still follow the camera. Give
+`clipmap.anchor` an explicit `[x, z]` when the shot needs another centre. Use `clipmap.anchor: 'camera'` when
+the camera must travel beyond the fixed outer ring and `clipmap.levels` limits its size.
+
 ## Look families for the ground: `@margoengine/biomes/view`
 
 `BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad

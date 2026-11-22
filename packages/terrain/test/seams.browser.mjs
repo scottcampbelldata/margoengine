@@ -46,6 +46,7 @@ await runSuite(
         heightScale: 100,
         cellSize: 0.37,
         resolution: 32,
+        clipmapAnchor: 'camera',
         layers: Array.from({ length: 4 }, () => ({ height: [-100, 100], slope: [0, 1], scale: 0.25 })),
         textures(gpu) {
           const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 }),

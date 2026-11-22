@@ -8380,3 +8380,10 @@ The optional `@margoengine/procedural/fir-sprays` entry accepts a height from 0.
 of the height, a radius from 0.01 to 100 m, and one to 64 normalized atlas regions. It returns three CPU geometry
 levels with consistent main branch directions. Texture pixels and tree placement are supplied by the caller.
 The optional entry measures 1,468 B gzip. Core and stage remain at 24,797 B gzip.
+
+## Fixed terrain clipmap anchors
+
+Terrain rings keep a world XZ anchor by default. Their outer extent is set by `cellSize`, `resolution`, and the ring
+count, up to 12 levels. Choose an anchor and extent that cover the visible ground on a bounded camera route.
+`BiomeView` shares one anchor for the world and horizon. Streaming terrain defaults to a moving selection on the world
+lattice. Height data updates still change the surface by design.

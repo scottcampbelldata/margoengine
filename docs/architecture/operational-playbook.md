@@ -9430,3 +9430,13 @@ The proofs are the turning camera in `packages/sky/test/fog-motion-check.html` a
 inside the layer in `packages/sky/test/volumetric-check.html`. These compare automatic depth with an explicit live
 capture and check the explicit unavailable-source behavior. The optical sources are Schneider and Vos (2015) and
 Hillaire (2016), linked from the sky README.
+
+### Fixed world-space terrain rings
+
+Camera-driven clipmap snaps can replace ridge triangles without appreciable camera motion. Bounded `Terrain` and
+`BiomeView` now keep a fixed world XZ anchor. `BiomeView` uses it for both terrain and horizon, while `TerrainStream`
+selects a moving window on the fixed world lattice as tiles arrive. Both colour and shadow passes use the same ring
+plan. A fixed anchor preserves static terrain shadows across camera moves. A rebase still updates local coordinates.
+The terrain GPU regression in `packages/terrain/test/clipmap-anchor.browser.mjs` crosses a ring boundary with a
+two-millimetre camera move. The legacy moving window changed 1,315 colour pixels beyond 16 code values and 786
+silhouette pixels. Anchored terrain changed zero by either measure on WebGPU and the WebGL2 compatibility layer.
