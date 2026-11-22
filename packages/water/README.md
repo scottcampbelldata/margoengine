@@ -1026,6 +1026,8 @@ console.log(panel.roughness, coast.surgeAt());
     0.49. Above that it narrows as `wakeAngle(Fr)` (Rabaud and Moisy 2013), about 1 / (2 sqrt(2 pi) Fr).
   - The bow wave follows `bowWave(speed, hull)` (Noblesse et al. 2008) and never passes the stagnation head U^2 / 2g.
     Its crest sweeps aft away from the hull as it loses height. Breaking foam follows that crest, including when the ship turns.
+    The moving hull lifts a lower band of water along both shoulders, with a shallow trough just outside it. This motion
+    follows the current hull, fades toward the stern, and uses the same `bowWave` multiplier as the crest.
   - Foam runs along the waterline, in the turbulent wake and where the bow wave breaks. The turbulent trail follows
     where the stern has passed. Fresh foam spreads and decays downstream with `foamLife`, even on long hulls at low speed.
   - Ships' and shore lamps leave glints on a night sea.

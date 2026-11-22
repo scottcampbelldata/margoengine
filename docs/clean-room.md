@@ -1,5 +1,15 @@
 # Clean room
 
+### Ship side wash in Water (2026-11-21)
+
+Gabriel D. Weymouth and Dick K. P. Yue, [Physics-Based Learning Models for Ship Hydrodynamics](https://doi.org/10.5957/JOSR.57.1.120005), 2013, compare at-speed waterline elevation along a Wigley hull using tank measurements and potential flow. Douglas G. Dommermuth, Thomas T. O'Shea, Donald C. Wyatt, Mark Sussman, Gabriel D. Weymouth, Dick K. P. Yue, Paul Adams and Randall Hand, [The Numerical Simulation of Ship Waves Using Cartesian-Grid and Volume-of-Fluid Methods](https://arxiv.org/abs/1410.1937), 2006, resolve run-up and local breaking from the body boundary. Donald C. Wyatt, Thomas C. Fu, Genevieve L. Taylor, Eric J. Terrill, Tao Xing, Shanti Bhushan, Thomas T. O'Shea and Douglas G. Dommermuth, [A Comparison of Full-Scale Experimental Measurements and Computational Predictions of the Transom-Stern Wave of the R/V Athena I](https://arxiv.org/abs/1410.1810), 2008, document whole-vessel effects that extend into the stern wake.
+
+Margo uses a compact approximation alongside the waterplane. The transverse section `(1-q)²(1-4q)` for normalized
+distance `q ∈ [0,1]` integrates to zero. Its width is `min(0.30 beam, max(0.17 beam, 2 crest))`. The section reaches at most
+45% of the bow height at contact. It ramps in behind the bow crest and decays toward the transom. The profile, width and
+coefficients are Margo's. The two full-flow studies establish the role of hull shape and wave breaking, which the reduced
+heightfield cannot resolve. The drawdown depth and longitudinal profile are approximations and have not been fit to a specific hull.
+
 ### Swept bow crest in Water (2026-11-21)
 
 Francis Noblesse, Gérard Delhommeau, Michel Guilbaud, Dane Hendrix and Chi Yang, [Simple analytical relations for ship bow waves](https://doi.org/10.1017/S0022112008000220), 2008, give the contact-curve crest height and location used here. Francis Noblesse, Gérard Delhommeau, Hua Liu, De-cheng Wan and Chi Yang, [Ship bow waves](https://dcwan.sjtu.edu.cn/userfiles/2013-4%20Shipbowwaves.pdf), 2013, compare the longitudinal profile and present examples of how the bow wave develops alongside the hull. Clément Caplier, Germain Rousseaux, Damien Calluaud and Laurent David, [Energy distribution in shallow water ship wakes from a spectral analysis of the wave field](https://doi.org/10.1063/1.4964923), 2016, measure the hull-bound bow rise separately from the trailing wave system.

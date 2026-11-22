@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17384367,
+  "total": 17384774,
   "history": [
     {
       "date": "2026-10-24",
@@ -11307,6 +11307,12 @@
       "commit": "40df5bc561",
       "reason": "water/ships 9,598 B recorded to 9,993 B gzip. Stern foam stores age and location on the existing bow trail buffer. A split would duplicate its shader and ownership.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "29fa69d082",
+      "reason": "water/ships 10,128 to 10,388 B gzip. Side displacement is part of the existing wake height and query shader. A split would repeat the hull mask and sampling paths.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12769,7 +12775,7 @@
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,
     "@margoengine/water/settings": 6675,
-    "@margoengine/water/ships": 10293,
+    "@margoengine/water/ships": 10700,
     "@margoengine/water/splash": 5779,
     "@margoengine/water/underwater": 9360,
     "@margoengine/weather": 8467,

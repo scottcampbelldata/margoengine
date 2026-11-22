@@ -81,8 +81,8 @@ try {
 
       // Read fixed 1/8 m grid points around an isolated bow so ambient waves cannot hide the crest's path.
       const bowSea = Water.attach(engine, {
-        size: [16, 16],
-        segments: 128,
+        size: [24, 24],
+        segments: 192,
         waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
       });
       const bowWakes = ShipWakes.attach(engine, {
@@ -103,6 +103,12 @@ try {
         [2.125, -0.875],
         [4.75, -0.875],
       ].map(([x, z]) => bowQuery.heightAt(x, z));
+      // Move the hull forward to put the station 18 m aft of the stem on the grid's centre row.
+      bowWakes.ships[0].setPose({ position: [0, 0, -16], heading: 0, speed: 3 });
+      bowWakes.setTime(1);
+      engine.render({ delta: 0 });
+      const sideQuery = await WaveQuery.capture(bowSea);
+      const sideWash = [6.875, -6.875, 7.875, 11].map((x) => sideQuery.heightAt(x, 0));
       bowWakes.dispose();
       bowSea.dispose();
 
@@ -245,7 +251,7 @@ try {
       });
       const lamps = ShipWakes.attach(engine, { surface: night, lamps: [{ position: [0, 10, -80], intensity: 3000 }] });
       window.shipsTest = { engine, lamps, night };
-      return { open, early, onFlood, ride, sternFoam, bowCrest };
+      return { open, early, onFlood, ride, sternFoam, bowCrest, sideWash };
     },
     { WIDTH, HEIGHT },
   );
@@ -294,6 +300,10 @@ try {
   assert.ok(stem > 0.42 && swept > 0.26, 'missing bow rise or swept crest: ' + result.bowCrest);
   assert.ok(Math.abs(stripe) < 0.12 && Math.abs(outboard) < 1e-6, 'a straight ridge remains: ' + result.bowCrest);
   console.log('bow height in metres at stem, swept crest, old stripe and outboard:', result.bowCrest);
+  const [starboard, port, drawdown, beyond] = result.sideWash;
+  assert.ok(starboard > 0.07 && Math.abs(starboard - port) < 1e-6, 'missing lift on both sides: ' + result.sideWash);
+  assert.ok(drawdown < -0.03 && Math.abs(beyond) < 1e-6, 'bad side wash cross section: ' + result.sideWash);
+  console.log('side wash in metres at starboard, port, drawdown and outboard:', result.sideWash);
   const [fresh, aged, forward, offAxis] = result.sternFoam;
   assert.ok(fresh > 0.35, 'fresh foam must start at the stern: ' + result.sternFoam);
   assert.ok(aged > 0.07 && aged < fresh * 0.6, 'stern foam must fade with its own age: ' + result.sternFoam);

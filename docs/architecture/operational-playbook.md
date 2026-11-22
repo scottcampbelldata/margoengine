@@ -1,3 +1,14 @@
+### Section 5 evidence: water displacement alongside a ship (2026-11-21)
+
+`ShipWakes` models the surface outside the current hull as a smooth lift and drawdown behind the bow crest. The added
+section has zero signed integral across the water on each side. It is evaluated in the existing CPU and WGSL height paths,
+so the drawn surface, normals and queries agree. The speed-dependent bow height scales both effects. The new term uses the
+existing hull dimensions, uniforms and draw. See the [clean-room record](../clean-room.md#ship-side-wash-in-water-2026-11-21).
+
+At 18 m aft of the stem on a 68 m hull moving at 3 m/s, both backends read 0.101 m of rise on each side, −0.051 m in the
+drawdown, and zero farther out. The CPU test also checks that the lift weakens at half speed and vanishes at rest. The new
+shape is a heightfield approximation. It needs Water grid cells small enough to resolve the near-hull band.
+
 ### Section 5 evidence: bow wave planform (2026-11-21)
 
 The near-field bow crest and its breaking foam use current hull coordinates. The existing bow contact profile sweeps aft and fades as the distance from the hull increases. The compact support ends the near-field crest before it carries on across open water. Kelvin height still uses the recorded bow trajectory.

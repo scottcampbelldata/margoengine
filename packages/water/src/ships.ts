@@ -168,6 +168,18 @@ function ridge(s: number, outside: number, crest: number, beam: number): number 
         : Math.exp(-(sigma - 1) * (sigma - 1)) * Math.cos(1.2 * (sigma - 1));
   return along * (1 - smoothstep(0, width, off));
 }
+/** A compact lift and drawdown alongside the hull, per unit bow height. */
+function sideWash(s: number, outside: number, crest: number, length: number, beam: number): number {
+  const station = s / length;
+  const fromCrest = (s - crest) / length;
+  if (crest <= 0 || fromCrest <= 0.02 || station >= 0.97) return 0;
+  const width = Math.min(0.3 * beam, Math.max(0.17 * beam, 2 * crest));
+  const q = Math.max(0, outside) / width;
+  if (q >= 1) return 0;
+  // The section's positive shoulder and negative drawdown have equal area over q = 0..1.
+  const section = (1 - q) * (1 - q) * (1 - 4 * q);
+  return 0.45 * smoothstep(0.02, 0.14, fromCrest) * (1 - smoothstep(0.22, 0.97, station)) * section;
+}
 /** Signed distance from the waterline of a hull (positive outside), s behind the stem and y to the side. */
 function hullDistance(s: number, y: number, l: number, b: number, tanE: number): number {
   const half = b / 2,
@@ -476,6 +488,14 @@ fn shipRidge(s:f32,outside:f32,crest:f32,beam:f32)->f32 {
  if(sigma>=0.0&&sigma<=1.0){along=sigma*(2.0-sigma);}else if(sigma>1.0){along=exp(-(sigma-1.0)*(sigma-1.0))*cos(1.2*(sigma-1.0));}
  return along*(1.0-shipSmooth(0.0,width,off));
 }
+fn shipSideWash(s:f32,outside:f32,crest:f32,l:f32,b:f32)->f32 {
+ let station=s/l;let fromCrest=(s-crest)/l;
+ if(crest<=0.0||fromCrest<=0.02||station>=0.97){return 0.0;}
+ let width=min(0.3*b,max(0.17*b,2.0*crest));let q=max(0.0,outside)/width;
+ if(q>=1.0){return 0.0;}
+ let section=(1.0-q)*(1.0-q)*(1.0-4.0*q);
+ return 0.45*shipSmooth(0.02,0.14,fromCrest)*(1.0-shipSmooth(0.22,0.97,station))*section;
+}
 fn shipHullDistance(s:f32,y:f32,l:f32,b:f32,tanE:f32)->f32 {
  let half=b*0.5;let ay=abs(y);
  if(s<0.0){return length(vec2f(s,ay));}
@@ -525,8 +545,9 @@ fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
   let a0=0.25*ship.c.x*ship.c.w*shipData.look.x;
   let waves=a0*(shipWaveAt(s,y,u,l,d)-shipData.look.y*shipWaveAt(s-l,y,u,l,d))*fade;
   let crestRidge=shipRidge(bowS,hull,ship.c.y,b);
-  let bow=ship.c.x*ship.c.w*shipData.look.w*crestRidge;
-  height+=(waves+bow)*mask;
+  let side=shipSideWash(bowS,hull,ship.c.y,l,b);
+  let nearHull=ship.c.x*ship.c.w*shipData.look.w*(crestRidge+side);
+  height+=(waves+nearHull)*mask;
   if(!sampleFoam){continue;}
   let speed=ship.b.x;let fr=speed/sqrt(9.81*l);
   let band=shipData.foam.x*(0.5+min(fr,1.0));
@@ -803,7 +824,9 @@ export class ShipWakes implements EnginePlugin {
       const a0 = 0.25 * v[o + 8] * v[o + 11] * v[4];
       const waves = a0 * (waveAt(s, y, u, l, d) - v[5] * waveAt(s - l, y, u, l, d)) * fade;
       const crestRidge = ridge(bowS, hull, v[o + 9], b);
-      height += (waves + v[o + 8] * v[o + 11] * v[7] * crestRidge) * mask;
+      const side = sideWash(bowS, hull, v[o + 9], l, b);
+      const nearHull = v[o + 8] * v[o + 11] * v[7] * (crestRidge + side);
+      height += (waves + nearHull) * mask;
       const speed = v[o + 4],
         fr = speed / Math.sqrt(G * l),
         band = v[8] * (0.5 + Math.min(fr, 1));

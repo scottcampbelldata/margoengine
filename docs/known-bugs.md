@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: the bow displacement faded before it reached the sides (water/ships)
+
+- **Repro:** advance a 68 m, 15.5 m beam hull at 3 m/s in calm water. With Kelvin height off, sample 0.25 m outboard at a station 18 m aft of the stem. The height is effectively zero.
+- **Cause:** the near-field displacement ended at the bow. The rest of the waterline had foam and the deep-water wake, with no hull-following displacement.
+- **Fix:** extend the speed-dependent surface rise behind the crest, with a narrow outboard trough and a smooth fade toward the stern.
+- **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check lift on both sides, outboard drawdown and a quiet surface farther from the hull.
+
 ### Open: standalone PostProcessing grades and presents the whole canvas for every view (KB-CREATIVE-POSTVIEW1, creative)
 
 - **Repro:** `PostProcessing.attach(engine)` (or `new PostStack([new PostProcessing()])`) and render two views with different scissors (`engine.render({views: [...]})`): the present pass clears the full target and draws a full-canvas triangle, so pixels outside the second view's scissor change (the owner harness reports "no pixel writes outside either view scissor", on both). With atmosphere or focus on, the world position is also rebuilt from a uv over the whole canvas rather than the view's rectangle.

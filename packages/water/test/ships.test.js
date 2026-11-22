@@ -148,6 +148,34 @@ test('the bow crest sweeps aft off the hull and its foam ends before it becomes 
   assert.ok(Math.abs(at(-overhang, peak.aft).height - peak.height) < 1e-7);
 });
 
+test('a moving hull lifts water at its shoulders on both sides, with drawdown just outboard', () => {
+  const hull = { length: 68, beam: 15.5, draft: 7, entrance: 28 };
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeHeight: 0, waterlineFoam: 0, turbulentWake: 0 },
+    ships: [{ hull, pose: { position: [0, 0, 0], heading: 0, speed: 3 } }],
+  });
+  const at = (aft, off, side = 1) => {
+    const reach = Math.min(1, (aft * Math.tan((hull.entrance * Math.PI) / 180)) / hull.beam);
+    const x = (hull.beam * 0.5 * reach * (2 - reach) + off) * side;
+    return wakes.sample(x, hull.length * 0.5 - aft).height;
+  };
+  const shoulder = at(18, 0.25);
+  assert.ok(shoulder > 0.07, 'the bow wave leaves no lift beside the hull');
+  assert.ok(Math.abs(shoulder - at(18, 0.25, -1)) < 1e-7);
+  assert.ok(at(18, 1.3) < -0.03, 'the surface has no drawdown outside the shoulder');
+  assert.ok(at(34, 0.25) > 0.03 && at(34, 0.25) < shoulder);
+  assert.equal(at(18, 4), 0);
+  assert.equal(at(69, 0.25), 0);
+
+  wakes.ships[0].setPose({ position: [0, 0, 0], heading: 0, speed: 1.5 });
+  wakes.setTime(1);
+  assert.ok(at(18, 0.25) > 0 && at(18, 0.25) < 0.35 * shoulder);
+  wakes.ships[0].setPose({ position: [0, 0, 0], heading: 0, speed: 0 });
+  wakes.setTime(2);
+  assert.equal(at(18, 0.25), 0);
+});
+
 test('the wake fades with age, follows a turning ship, and draws foam on the waterline and in the turbulent wake', () => {
   const hull = { length: 30, beam: 6, draft: 2 };
   const turn = (t) => [100 * Math.sin(t / 20), 100 * (1 - Math.cos(t / 20))];
