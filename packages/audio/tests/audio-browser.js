@@ -5,10 +5,10 @@ import { runEventTests } from './events-browser.js';
 import { runMusicTests } from './music-browser.js';
 import { runZoneTests } from './zones-browser.js';
 import { runAmbisonicTests } from './ambisonics-browser.js';
-import {runPanTests} from './pan-browser.js';
-import {runBinauralTests} from './binaural-browser.js';
-import {runVoiceManagerTests} from './voice-manager-browser.js';
-import {runSpriteTests} from './sprites-browser.js';
+import { runPanTests } from './pan-browser.js';
+import { runBinauralTests } from './binaural-browser.js';
+import { runVoiceManagerTests } from './voice-manager-browser.js';
+import { runSpriteTests } from './sprites-browser.js';
 import {
   AudioListener,
   Audio,
@@ -137,7 +137,10 @@ window.runOfflineTests = async () => {
     const right = await renderPositional({ buffer: noise, position: [3, -1, 0], options, forward });
     const left = await renderPositional({ buffer: noise, position: [-3, -1, 0], options, forward });
     measurements.topView = { right, left };
-    assert(right[1] > right[0] * 2 && left[0] > left[1] * 2, `Top view: left/right lost ${JSON.stringify(measurements.topView)}`);
+    assert(
+      right[1] > right[0] * 2 && left[0] > left[1] * 2,
+      `Top view: left/right lost ${JSON.stringify(measurements.topView)}`,
+    );
   }
   checks.push('Looking straight down with up +Y keeps a right axis: +X stays on the right');
 
@@ -213,7 +216,8 @@ window.runOfflineTests = async () => {
   checks.push('The cone reduces gain behind the source to coneOuterGain and interpolates between the cones');
 
   // Analyser on a 1 kHz tone, read mid-render through OfflineAudioContext.suspend.
-  if (!window.offlinePause()) notRun.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
+  if (!window.offlinePause())
+    notRun.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
   else {
     const context = new OfflineAudioContext(2, rate / 2, rate),
       listener = new AudioListener({ context, autoResume: false });
@@ -238,7 +242,8 @@ window.runOfflineTests = async () => {
       `Analyser data ${JSON.stringify(reading)}`,
     );
   }
-  if (window.offlinePause()) checks.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
+  if (window.offlinePause())
+    checks.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
 
   // Offset, duration and loop points render where expected (a ramp buffer encodes the read position).
   {
@@ -267,7 +272,10 @@ window.runOfflineTests = async () => {
     });
     new Audio(listenerEnd, { loop: true, loopStart: 0.1 }).setBuffer(short).play();
     const outEnd = (await contextEnd.startRendering()).getChannelData(0);
-    assert(near(outEnd[Math.round(0.28 * rate)], 0.13, 2e-3), `Loop start with loopEnd 0 ${outEnd[Math.round(0.28 * rate)]}`);
+    assert(
+      near(outEnd[Math.round(0.28 * rate)], 0.13, 2e-3),
+      `Loop start with loopEnd 0 ${outEnd[Math.round(0.28 * rate)]}`,
+    );
     const context2 = new OfflineAudioContext(1, seconds * rate, rate),
       listener2 = new AudioListener({ context: context2, autoResume: false });
     let ended = 0;
@@ -281,31 +289,35 @@ window.runOfflineTests = async () => {
     // Seeking while playing: one source reads on from the new position (two would sum), and seeking past the end of
     // a non-looping buffer ends it. Suspend times sit on render-quantum boundaries.
     if (window.offlinePause()) {
-    const context3 = new OfflineAudioContext(1, seconds * rate, rate),
-      listener3 = new AudioListener({ context: context3, autoResume: false }),
-      first = (128 * 20) / rate,
-      second = (128 * 60) / rate;
-    let ended3 = 0;
-    const seeking = new Audio(listener3, { onEnded: () => ended3++ }).setBuffer(ramp).play();
-    void context3.suspend(first).then(() => {
-      seeking.seek(0.8);
-      return context3.resume();
-    });
-    void context3.suspend(second).then(() => {
-      seeking.seek(5);
-      return context3.resume();
-    });
-    const out3 = (await context3.startRendering()).getChannelData(0),
-      at = (time) => out3[Math.round(time * rate)];
-    for (let i = 0; i < 50 && !ended3; i++) await sleep(10);
-    assert(
-      near(at(0.03), 0.03, 1e-3) && near(at(0.1), 0.8 + 0.1 - first, 1e-3) && at(0.2) === 0 && ended3 === 1,
-      `Seek ${at(0.03)} ${at(0.1)} ${at(0.2)} ended=${ended3}`,
-    );
+      const context3 = new OfflineAudioContext(1, seconds * rate, rate),
+        listener3 = new AudioListener({ context: context3, autoResume: false }),
+        first = (128 * 20) / rate,
+        second = (128 * 60) / rate;
+      let ended3 = 0;
+      const seeking = new Audio(listener3, { onEnded: () => ended3++ }).setBuffer(ramp).play();
+      void context3.suspend(first).then(() => {
+        seeking.seek(0.8);
+        return context3.resume();
+      });
+      void context3.suspend(second).then(() => {
+        seeking.seek(5);
+        return context3.resume();
+      });
+      const out3 = (await context3.startRendering()).getChannelData(0),
+        at = (time) => out3[Math.round(time * rate)];
+      for (let i = 0; i < 50 && !ended3; i++) await sleep(10);
+      assert(
+        near(at(0.03), 0.03, 1e-3) && near(at(0.1), 0.8 + 0.1 - first, 1e-3) && at(0.2) === 0 && ended3 === 1,
+        `Seek ${at(0.03)} ${at(0.1)} ${at(0.2)} ended=${ended3}`,
+      );
     }
   }
-  checks.push('Offset, duration and loop points select the right samples (loopEnd 0 keeps loopStart); onEnded fires at the natural end');
-  (window.offlinePause() ? checks : notRun).push('Seeking while playing reads on from the new position on one source; past the end it ends');
+  checks.push(
+    'Offset, duration and loop points select the right samples (loopEnd 0 keeps loopStart); onEnded fires at the natural end',
+  );
+  (window.offlinePause() ? checks : notRun).push(
+    'Seeking while playing reads on from the new position on one source; past the end it ends',
+  );
 
   // Fade-in ramp from silence.
   {
@@ -400,11 +412,14 @@ window.runEngineTests = async () => {
   audio.source.start();
   const analyser = new AudioAnalyser(audio, 256);
   engine.render();
-  const read = () => l.positionX ? ({
-    position: [l.positionX.value, l.positionY.value, l.positionZ.value],
-    forward: [l.forwardX.value, l.forwardY.value, l.forwardZ.value],
-    up: [l.upX.value, l.upY.value, l.upZ.value],
-  }) : { ...written };
+  const read = () =>
+    l.positionX
+      ? {
+          position: [l.positionX.value, l.positionY.value, l.positionZ.value],
+          forward: [l.forwardX.value, l.forwardY.value, l.forwardZ.value],
+          up: [l.upX.value, l.upY.value, l.upZ.value],
+        }
+      : { ...written };
   await sleep(60);
   let pose = read();
   assert(

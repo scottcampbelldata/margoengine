@@ -7,7 +7,8 @@ const FORMATS = { pcm8: 8, pcm16: 16, pcm24: 24, pcm32: 32, float32: 32, float64
 const ascii = (bytes, at) => String.fromCharCode(...bytes.subarray(at, at + 4));
 const u32 = (bytes, at) => new DataView(bytes.buffer, bytes.byteOffset).getUint32(at, true);
 const u16 = (bytes, at) => new DataView(bytes.buffer, bytes.byteOffset).getUint16(at, true);
-const coded = (code) => (error) => error.name === 'MargoError' && error.code === code && /errors#wav/.test(error.message);
+const coded = (code) => (error) =>
+  error.name === 'MargoError' && error.code === code && /errors#wav/.test(error.message);
 const text = (s) => [...Buffer.from(s, 'latin1')];
 
 test('a 16-bit mono file has the 44-byte header of the Microsoft PCM layout', () => {
@@ -109,7 +110,10 @@ test('decodeWav accepts a view into a larger buffer and an ArrayBuffer', () => {
   const big = new Uint8Array(file.length + 10);
   big.set(file, 7);
   assert.deepEqual([...decodeWav(big.subarray(7, 7 + file.length)).channels[0]], [0.5]);
-  assert.deepEqual([...decodeWav(file.buffer.slice(file.byteOffset, file.byteOffset + file.length)).channels[0]], [0.5]);
+  assert.deepEqual(
+    [...decodeWav(file.buffer.slice(file.byteOffset, file.byteOffset + file.length)).channels[0]],
+    [0.5],
+  );
 });
 
 test('the shared 4-channel recording reads as 4 channels, and writing it back changes no sample', () => {
@@ -124,7 +128,10 @@ test('the shared 4-channel recording reads as 4 channels, and writing it back ch
 
 test('files it cannot read are named, with a help link', () => {
   const good = encodeWav({ sampleRate: 8000, channels: [[0]] });
-  assert.throws(() => decodeWav('nope'), (error) => error instanceof TypeError && /errors#wav/.test(error.message));
+  assert.throws(
+    () => decodeWav('nope'),
+    (error) => error instanceof TypeError && /errors#wav/.test(error.message),
+  );
   assert.throws(() => decodeWav(new Uint8Array(4)), coded('failed'));
   assert.throws(() => decodeWav(Uint8Array.of(...text('RIFX'), 0, 0, 0, 0, ...text('WAVE'))), coded('failed'));
   assert.throws(() => decodeWav(Uint8Array.of(...text('RF64'), 0, 0, 0, 0, ...text('WAVE'))), coded('unsupported'));

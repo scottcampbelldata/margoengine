@@ -1,16 +1,17 @@
 import { Engine, box } from '@margoengine/core';
-import {measureLiveDoppler} from './doppler-live-browser.js';
+import { measureLiveDoppler } from './doppler-live-browser.js';
 import { AudioListener, PositionalAudio } from '@margoengine/audio';
 import { AudioDoppler } from '@margoengine/audio/doppler';
 
-const assert = (ok, message) => { if (!ok) throw new Error(message); };
+const assert = (ok, message) => {
+  if (!ok) throw new Error(message);
+};
 function frequency(data, start, end) {
   const crossings = [];
   for (let i = start; i < end - 1; i++)
-    if (data[i] <= 0 && data[i + 1] > 0)
-      crossings.push(i - data[i] / (data[i + 1] - data[i]));
+    if (data[i] <= 0 && data[i + 1] > 0) crossings.push(i - data[i] / (data[i + 1] - data[i]));
   assert(crossings.length > 100, 'Tone must have measurable nonzero samples');
-  return (crossings.length - 1) * 48000 / (crossings.at(-1) - crossings[0]);
+  return ((crossings.length - 1) * 48000) / (crossings.at(-1) - crossings[0]);
 }
 
 export async function runDopplerTests() {
@@ -23,9 +24,11 @@ export async function runDopplerTests() {
     document.body.append(canvas);
     let engine;
     try {
-      const fallback = backend === 'webgl2' ? (await import('@margoengine/webgl2-compat/preview')).webglRenderer : undefined;
+      const fallback =
+        backend === 'webgl2' ? (await import('@margoengine/webgl2-compat/preview')).webglRenderer : undefined;
       engine = await Engine.create(canvas, {
-        backend: backend === 'webgl2' ? 'webgl2' : 'webgpu', fallback,
+        backend: backend === 'webgl2' ? 'webgl2' : 'webgpu',
+        fallback,
         camera: { position: [0, 0, 0], target: [0, 0, -1] },
       });
       if (compat) {
@@ -50,7 +53,9 @@ export async function runDopplerTests() {
           mesh.setPosition([0, 0, -20]);
           const sound = new PositionalAudio(listener, { mesh, rolloffFactor: 0, panningModel: 'equalpower' });
           const buffer = context.createBuffer(1, 48000, 48000);
-          buffer.getChannelData(0).forEach((_, i, a) => { a[i] = 0.3 * Math.sin(2 * Math.PI * 1000 * i / 48000); });
+          buffer.getChannelData(0).forEach((_, i, a) => {
+            a[i] = 0.3 * Math.sin((2 * Math.PI * 1000 * i) / 48000);
+          });
           sound.setBuffer(buffer).play();
           const doppler = new AudioDoppler(sound);
           engine.render();
@@ -62,7 +67,10 @@ export async function runDopplerTests() {
           engine.camera.position = [0, 0, -listenerVelocity * dt];
           engine.camera.target = [0, 0, -100];
           engine.render();
-          assert(Math.abs(doppler.ratio - expectedRatio) < 2e-7, `${name}: wrong transform-derived ratio ${doppler.ratio}`);
+          assert(
+            Math.abs(doppler.ratio - expectedRatio) < 2e-7,
+            `${name}: wrong transform-derived ratio ${doppler.ratio}`,
+          );
           await context.resume();
           const pcm = await rendered;
           const data = pcm.getChannelData(0);
@@ -71,7 +79,9 @@ export async function runDopplerTests() {
           // Linear crossing interpolation of a sampled sine at these rates has <0.1 Hz error.
           assert(Math.abs(measuredHz - expectedRatio * 1000) < 0.1, `${name}: ${measuredHz} Hz`);
           cases.push({ name, ratio: doppler.ratio, expectedHz: expectedRatio * 1000, measuredHz });
-        } finally { engine.removePlugin(listener.name); }
+        } finally {
+          engine.removePlugin(listener.name);
+        }
       }
       assert(gpuErrors.length === 0, `GPU errors: ${gpuErrors}`);
       reports.push({ backend, cases, gpuErrors });
@@ -81,5 +91,9 @@ export async function runDopplerTests() {
       compat?.uninstall();
     }
   }
-  return { fixture: 'Generated 1 kHz sine and engine mesh motion, stand-ins', reports, live: await measureLiveDoppler() };
+  return {
+    fixture: 'Generated 1 kHz sine and engine mesh motion, stand-ins',
+    reports,
+    live: await measureLiveDoppler(),
+  };
 }

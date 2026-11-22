@@ -112,7 +112,10 @@ export class AudioOcclusion {
   /** Recompute after current world matrices and sound/listener poses. Called automatically by listener.update(). */
   update(engine: EngineKernel | null = this.sound.listener.attachedEngine): void {
     if (this.disposed) throw fault('disposed', 'AudioOcclusion is disposed; create a new controller');
-    if (this.sound.isDisposed) { this.dispose(); return; }
+    if (this.sound.isDisposed) {
+      this.dispose();
+      return;
+    }
     if (!engine || engine.disposed) return;
     const p = this.sound.worldPosition,
       l = this.sound.listener.position;

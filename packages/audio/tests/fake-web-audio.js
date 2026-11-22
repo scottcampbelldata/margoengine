@@ -148,7 +148,13 @@ export class FakeAudioContext extends EventTarget {
   createBuffer(channels, length, sampleRate) {
     // Each channel holds its samples, as AudioBuffer.getChannelData hands them out (weather fills its noise beds there).
     const data = Array.from({ length: channels }, () => new Float32Array(length));
-    return { numberOfChannels: channels, length, sampleRate, duration: length / sampleRate, getChannelData: (c) => data[c] };
+    return {
+      numberOfChannels: channels,
+      length,
+      sampleRate,
+      duration: length / sampleRate,
+      getChannelData: (c) => data[c],
+    };
   }
   createAnalyser() {
     return new FakeAnalyser(this);
