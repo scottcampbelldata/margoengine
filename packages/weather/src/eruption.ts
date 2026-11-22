@@ -270,7 +270,8 @@ export function validateEruption(o: EruptionOptions): void {
     if (v === undefined) continue;
     if (!Array.isArray(v) || v.length !== 3 || !v.every((x) => typeof x === 'number' && Number.isFinite(x)))
       throw new TypeError(`Eruption ${name} must be three finite numbers`);
-    if (name !== 'vent' && !v.every((x) => x >= 0 && x <= 1)) throw new RangeError(`Eruption ${name} must be from 0 to 1`);
+    if (name !== 'vent' && !v.every((x) => x >= 0 && x <= 1))
+      throw new RangeError(`Eruption ${name} must be from 0 to 1`);
   }
   if (o.seed !== undefined && !Number.isInteger(o.seed)) throw new RangeError('Eruption seed must be an integer');
 }
@@ -437,7 +438,8 @@ export class Eruption {
   }
   /** Moves film time on by `delta` real seconds times `timeScale`. */
   update(delta: number): void {
-    if (!(delta >= 0) || !Number.isFinite(delta)) throw new RangeError('Eruption update needs a finite delta, 0 or more');
+    if (!(delta >= 0) || !Number.isFinite(delta))
+      throw new RangeError('Eruption update needs a finite delta, 0 or more');
     this.seek(this.film + delta * (this.options.timeScale ?? 1));
   }
   /** Goes to film second `t`; going back fires no lightning again. */
@@ -476,7 +478,7 @@ export class Eruption {
       r = Math.min(a, rise),
       h = Math.min(Math.max(a - rise, 0), hold),
       w = Math.min(Math.max(a - rise - hold, 0), wane);
-    return this.peakRate() * (0.5 * (r * r) / rise + h + w - (0.5 * w * w) / wane);
+    return this.peakRate() * ((0.5 * (r * r)) / rise + h + w - (0.5 * w * w) / wane);
   }
   /** Film second the vent stops. */
   get end(): number {
@@ -505,7 +507,20 @@ export class Eruption {
     const o = this.options,
       [wx, wz] = this.windNow(),
       V10 = Math.hypot(wx, wz),
-      key = [rate, V10, o.ventAltitude, o.vent?.[1], o.exitVelocity, o.exitTemperature, o.gasFraction, o.entrainment, o.windEntrainment, o.airTemperature, o.tropopause, o.frontSpeed].join();
+      key = [
+        rate,
+        V10,
+        o.ventAltitude,
+        o.vent?.[1],
+        o.exitVelocity,
+        o.exitTemperature,
+        o.gasFraction,
+        o.entrainment,
+        o.windEntrainment,
+        o.airTemperature,
+        o.tropopause,
+        o.frontSpeed,
+      ].join();
     const hit = this.cache.get(key);
     if (hit) return hit;
     const ground = o.ventAltitude ?? o.vent?.[1] ?? 0,
@@ -640,7 +655,8 @@ export class Eruption {
   column(): EruptionColumn {
     const rate = this.peakRate() * this.envelope(),
       since = this.film - (this.options.start ?? 0);
-    if (!(rate > 0)) return { massRate: 0, top: 0, steadyTop: 0, buoyantFrom: null, neutral: null, collapse: false, samples: [] };
+    if (!(rate > 0))
+      return { massRate: 0, top: 0, steadyTop: 0, buoyantFrom: null, neutral: null, collapse: false, samples: [] };
     const p = this.profile(rate),
       samples: ColumnSample[] = [];
     let top = 0;
@@ -648,9 +664,24 @@ export class Eruption {
       if (p.time[i]! > since) break;
       top = p.z[i]!;
       if (i % Math.max(1, Math.floor(p.s.length / 256)) === 0 || i === p.s.length - 1)
-        samples.push({ position: this.world(p.x[i]!, p.z[i]!), radius: p.b[i]!, speed: p.u[i]!, density: p.rho[i]!, airDensity: p.air[i]!, temperature: p.T[i]! });
+        samples.push({
+          position: this.world(p.x[i]!, p.z[i]!),
+          radius: p.b[i]!,
+          speed: p.u[i]!,
+          density: p.rho[i]!,
+          airDensity: p.air[i]!,
+          temperature: p.T[i]!,
+        });
     }
-    return { massRate: rate, top, steadyTop: p.top, buoyantFrom: p.buoyantFrom, neutral: p.collapse ? null : p.neutral, collapse: p.collapse, samples };
+    return {
+      massRate: rate,
+      top,
+      steadyTop: p.top,
+      buoyantFrom: p.buoyantFrom,
+      neutral: p.collapse ? null : p.neutral,
+      collapse: p.collapse,
+      samples,
+    };
   }
 
   /** The umbrella cloud now, or null before the top first reaches the neutral level (or when the column collapses). */
@@ -663,8 +694,16 @@ export class Eruption {
     if (t <= t0) return null;
     const i = peak.neutralIndex,
       zB = peak.z[i]!,
-      [Ta] = standardAtmosphere((o.ventAltitude ?? o.vent?.[1] ?? 0) + zB, o.airTemperature ?? 288.15, o.tropopause ?? 11000),
-      [Tb] = standardAtmosphere((o.ventAltitude ?? o.vent?.[1] ?? 0) + zB + 100, o.airTemperature ?? 288.15, o.tropopause ?? 11000),
+      [Ta] = standardAtmosphere(
+        (o.ventAltitude ?? o.vent?.[1] ?? 0) + zB,
+        o.airTemperature ?? 288.15,
+        o.tropopause ?? 11000,
+      ),
+      [Tb] = standardAtmosphere(
+        (o.ventAltitude ?? o.vent?.[1] ?? 0) + zB + 100,
+        o.airTemperature ?? 288.15,
+        o.tropopause ?? 11000,
+      ),
       // Buoyancy frequency: N^2 = (g / T)(dT/dz + g / c_p).
       N = Math.sqrt(Math.max(1e-6, (G / Ta) * ((Tb - Ta) / 100 + G / C_AIR))),
       lambda = o.umbrellaSpread ?? 0.2,
@@ -699,7 +738,25 @@ export class Eruption {
   private classes(): FallClass[] {
     const o = this.options,
       [wx, wz] = this.windNow(),
-      key = [this.peakRate(), Math.hypot(wx, wz), o.grainSize, o.grainSorting, o.ashDensity, o.diffusion, o.ventAltitude, o.vent?.[1], o.exitVelocity, o.exitTemperature, o.gasFraction, o.entrainment, o.windEntrainment, o.airTemperature, o.tropopause, o.frontSpeed, o.umbrellaSpread].join();
+      key = [
+        this.peakRate(),
+        Math.hypot(wx, wz),
+        o.grainSize,
+        o.grainSorting,
+        o.ashDensity,
+        o.diffusion,
+        o.ventAltitude,
+        o.vent?.[1],
+        o.exitVelocity,
+        o.exitTemperature,
+        o.gasFraction,
+        o.entrainment,
+        o.windEntrainment,
+        o.airTemperature,
+        o.tropopause,
+        o.frontSpeed,
+        o.umbrellaSpread,
+      ].join();
     if (key === this.fallKey) return this.fall;
     const p = this.profile(this.peakRate()),
       mean = o.grainSize ?? 2,
@@ -814,7 +871,7 @@ export class Eruption {
       const flux = k.share * this.peakRate() * this.envelope(this.film - k.delay);
       if (!(flux > 0)) continue;
       const r2 = (s - k.along) ** 2 + c * c;
-      conc += (flux / (2 * Math.PI * k.sigma * k.sigma)) * Math.exp(-r2 / (2 * k.sigma * k.sigma)) / k.speed;
+      conc += ((flux / (2 * Math.PI * k.sigma * k.sigma)) * Math.exp(-r2 / (2 * k.sigma * k.sigma))) / k.speed;
     }
     return conc;
   }
@@ -843,10 +900,19 @@ export class Eruption {
    * Fallen ash thickness over a grid, metres: `width` by `depth` samples `cellSize` apart from world `origin` [x, z],
    * row by row (a `GroundGrid` of `@margoengine/terrain/ground-change` fits it).
    */
-  ashGrid(grid: { readonly width: number; readonly depth: number; readonly cellSize: number; readonly origin: readonly [number, number] }): Float32Array {
+  ashGrid(grid: {
+    readonly width: number;
+    readonly depth: number;
+    readonly cellSize: number;
+    readonly origin: readonly [number, number];
+  }): Float32Array {
     const out = new Float32Array(grid.width * grid.depth);
     for (let j = 0; j < grid.depth; j++)
-      for (let i = 0; i < grid.width; i++) out[j * grid.width + i] = this.ashThickness(grid.origin[0] + i * grid.cellSize, grid.origin[1] + j * grid.cellSize);
+      for (let i = 0; i < grid.width; i++)
+        out[j * grid.width + i] = this.ashThickness(
+          grid.origin[0] + i * grid.cellSize,
+          grid.origin[1] + j * grid.cellSize,
+        );
     return out;
   }
 
@@ -931,7 +997,13 @@ export class Eruption {
           // Vent discharges in the lowest tenth of the column; plume lightning above it, up to the top reached.
           i = vent ? Math.floor(h(3) * Math.max(1, last * 0.1)) : Math.floor(last * (0.1 + 0.9 * h(3))),
           spread = p.b[i]! * (2 * h(4) - 1);
-        out.push({ time, ground: this.world(p.x[i]!, 0, spread), height: p.z[i]!, kind: vent ? 'vent' : 'plume', strength: vent ? 0.3 + 0.3 * h(5) : 0.6 + 0.4 * h(5) });
+        out.push({
+          time,
+          ground: this.world(p.x[i]!, 0, spread),
+          height: p.z[i]!,
+          kind: vent ? 'vent' : 'plume',
+          strength: vent ? 0.3 + 0.3 * h(5) : 0.6 + 0.4 * h(5),
+        });
       }
     }
     return out.sort((a, b) => a.time - b.time);
@@ -965,7 +1037,16 @@ export class Eruption {
       col = this.column(),
       live = new Set<string>(),
       seed = o.seed ?? 1;
-    const place = (id: string, options: Record<string, unknown>, opacity: number, x: number, y: number, z: number, sx: number, sy: number): void => {
+    const place = (
+      id: string,
+      options: Record<string, unknown>,
+      opacity: number,
+      x: number,
+      y: number,
+      z: number,
+      sx: number,
+      sy: number,
+    ): void => {
       live.add(id);
       let c = this.puffs.get(id);
       if (!c) {
@@ -993,7 +1074,14 @@ export class Eruption {
           len = Math.max(r, b.position[1] - a.position[1]);
         place(
           `c${k}`,
-          { seed: seed * 97 + k, segments: puffs, bounds: [2, 1, 2], volume: 1.6, color: [...(o.color ?? [0.3, 0.28, 0.26])], concentrate: 'inside' },
+          {
+            seed: seed * 97 + k,
+            segments: puffs,
+            bounds: [2, 1, 2],
+            volume: 1.6,
+            color: [...(o.color ?? [0.3, 0.28, 0.26])],
+            concentrate: 'inside',
+          },
           1,
           0.5 * (a.position[0] + b.position[0]),
           0.5 * (a.position[1] + b.position[1]),
@@ -1007,7 +1095,14 @@ export class Eruption {
     if (u && u.radius > 0)
       place(
         'u',
-        { seed: seed * 97 + 1000, segments: puffs * 2, bounds: [2, 1, 2], volume: 1.2, color: [...(o.umbrellaColor ?? [0.52, 0.5, 0.47])], concentrate: 'inside' },
+        {
+          seed: seed * 97 + 1000,
+          segments: puffs * 2,
+          bounds: [2, 1, 2],
+          volume: 1.2,
+          color: [...(o.umbrellaColor ?? [0.52, 0.5, 0.47])],
+          concentrate: 'inside',
+        },
         Math.min(1, Math.max(0.05, u.opacity)),
         u.centre[0],
         u.centre[1],
@@ -1027,5 +1122,4 @@ export class Eruption {
     for (const c of this.puffs.values()) this.target?.remove(c);
     this.puffs.clear();
   }
-
 }

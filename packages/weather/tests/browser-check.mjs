@@ -40,7 +40,10 @@ const checks = {
     // Flat stones ignore the sun; the scene behind them changes a little with it, so their light moves only by that.
     assert.ok(Math.abs(r.flatFront / r.flatBack - 1) < 0.15, `flat stones: ${r.flatFront} and ${r.flatBack}`);
     assert.ok(r.splashChanged > 30, `splash chips: ${r.splashChanged} pixels`);
-    assert.ok(r.splashLow > 0.8 * r.splashChanged, `chips stay near the ground: ${r.splashLow} of ${r.splashChanged} low`);
+    assert.ok(
+      r.splashLow > 0.8 * r.splashChanged,
+      `chips stay near the ground: ${r.splashLow} of ${r.splashChanged} low`,
+    );
     return `hail lit ${(r.litFront / r.litBack).toFixed(2)}x, flat ${(r.flatFront / r.flatBack).toFixed(3)}, chips ${r.splashChanged}; ${r.hailChanged} pixels, moves ${r.movesWithTime}, surface worst ${r.surface.worst}`;
   },
   puddles(r) {
@@ -68,7 +71,10 @@ const checks = {
     assert.ok(r.maths.cases >= 2000 && r.maths.worst < 1e-4, `WGSL snow differs from JavaScript by ${r.maths.worst}`);
     assert.ok(r.maths.partial > 100, `cases on the snow line: ${r.maths.partial}`);
     assert.equal(r.noneChanged, 0, 'cover 0 changes no pixel');
-    assert.ok(r.groundWhite > 0.95 * r.groundPixels, `full cover whitens the ground: ${r.groundWhite} of ${r.groundPixels}`);
+    assert.ok(
+      r.groundWhite > 0.95 * r.groundPixels,
+      `full cover whitens the ground: ${r.groundWhite} of ${r.groundPixels}`,
+    );
     assert.equal(r.wallChanged, 0, 'a wall stays bare');
     assert.ok(r.withPuddles > 0, 'puddles still act on the snow-hooked shader');
     assert.equal(r.afterDispose, 0, 'disposed hooks leave no trace');
@@ -92,20 +98,35 @@ const checks = {
     for (const c of r.columns) {
       // The skyline is found to the pixel row, within a row and a row of coverage of where the camera puts it.
       assert.ok(Math.abs(c.before - c.expectedBefore) <= 1.5, `x ${c.x} bare ${c.before} vs ${c.expectedBefore}`);
-      assert.ok(Math.abs(c.after - c.expectedAfter) <= 1.5, `x ${c.x} snowed ${c.after} vs ${c.expectedAfter} (depth ${c.depth})`);
+      assert.ok(
+        Math.abs(c.after - c.expectedAfter) <= 1.5,
+        `x ${c.x} snowed ${c.after} vs ${c.expectedAfter} (depth ${c.depth})`,
+      );
     }
     const crest = r.columns.find((c) => c.x === 40),
       lee = r.columns.reduce((a, c) => (c.depth > a.depth ? c : a));
-    assert.ok(crest.depth < 0.05 && Math.abs(crest.after - crest.before) <= 1, `the scoured crest stays: ${crest.before} -> ${crest.after}`);
-    assert.ok(lee.x > 40 && lee.before - lee.after >= 4, `the lee drift lifts the skyline ${lee.before - lee.after} rows at x ${lee.x}`);
+    assert.ok(
+      crest.depth < 0.05 && Math.abs(crest.after - crest.before) <= 1,
+      `the scoured crest stays: ${crest.before} -> ${crest.after}`,
+    );
+    assert.ok(
+      lee.x > 40 && lee.before - lee.after >= 4,
+      `the lee drift lifts the skyline ${lee.before - lee.after} rows at x ${lee.x}`,
+    );
     assert.ok(r.versionMoved && r.later > 50, `a later time draws new snow: ${r.later} pixels`);
     assert.ok(r.cornices > 0 && r.corniceChanged > 20, `cornices ${r.cornices}, ${r.corniceChanged} pixels`);
     return `snow-drift maths worst ${r.maths.worst}, lee lift ${lee.before - lee.after} rows (depth ${lee.depth.toFixed(2)} m), cornice ${r.corniceChanged} px`;
   },
   eruption(r) {
-    assert.ok(r.rising > 1000 && r.columnChanged > 100, `the rising column draws: ${r.rising} m, ${r.columnChanged} pixels`);
+    assert.ok(
+      r.rising > 1000 && r.columnChanged > 100,
+      `the rising column draws: ${r.rising} m, ${r.columnChanged} pixels`,
+    );
     assert.equal(r.sameTwice, 0, 'the same frame twice is the same');
-    assert.ok(r.umbrella > 2000 && r.umbrellaChanged > 200, `the umbrella draws: ${r.umbrella} m, ${r.umbrellaChanged} pixels`);
+    assert.ok(
+      r.umbrella > 2000 && r.umbrellaChanged > 200,
+      `the umbrella draws: ${r.umbrella} m, ${r.umbrellaChanged} pixels`,
+    );
     assert.equal(r.seekBack, 0, 'a seek back draws the earlier column again');
     assert.equal(r.cleared, 0, 'clearPlume leaves the picture as it was');
     return `eruption column ${r.columnChanged} px, umbrella ${Math.round(r.umbrella)} m ${r.umbrellaChanged} px`;
@@ -113,23 +134,65 @@ const checks = {
   lava(r) {
     assert.equal(r.validation, null);
     assert.deepEqual(r.errors, []);
-    assert.ok(r.flowChanged > 200 && r.glowEarly > 100, `the flow draws and glows: ${r.flowChanged} px, ${r.glowEarly} glowing`);
+    assert.ok(
+      r.flowChanged > 200 && r.glowEarly > 100,
+      `the flow draws and glows: ${r.flowChanged} px, ${r.glowEarly} glowing`,
+    );
     assert.equal(r.sameTwice, 0, 'the same frame twice is the same');
-    assert.ok(r.grew > 100 && r.glowLater > 50, `the flow grows down the slope: ${r.grew} px, ${r.glowLater} glowing, front ${r.front} m`);
+    assert.ok(
+      r.grew > 100 && r.glowLater > 50,
+      `the flow grows down the slope: ${r.grew} px, ${r.glowLater} glowing, front ${r.front} m`,
+    );
     assert.equal(r.seekBack, 0, 'a seek back draws the earlier lava again');
-    assert.ok(r.clots > 100 && r.bombs > 20 && r.blobsChanged > 50 && r.glowBlobs > 20, `clots ${r.clots} and bombs ${r.bombs} draw: ${r.blobsChanged} px, ${r.glowBlobs} more glowing`);
+    assert.ok(
+      r.clots > 100 && r.bombs > 20 && r.blobsChanged > 50 && r.glowBlobs > 20,
+      `clots ${r.clots} and bombs ${r.bombs} draw: ${r.blobsChanged} px, ${r.glowBlobs} more glowing`,
+    );
     assert.equal(r.blobsCleared, 0, 'no instances, no change');
     assert.equal(r.lightsError, undefined, `glow lights: ${r.lightsError}`);
-    assert.ok(r.lights > 1 && r.litGain > 1 && r.lit20 > 200 && r.litChanged > 500 && r.brighter, `the glow lights the ground: ${r.lights} lights ${r.lightList}, x${r.litGain}, ${r.lit20} px a fifth brighter, ${r.litChanged} px`);
+    assert.ok(
+      r.lights > 1 && r.litGain > 1 && r.lit20 > 200 && r.litChanged > 500 && r.brighter,
+      `the glow lights the ground: ${r.lights} lights ${r.lightList}, x${r.litGain}, ${r.lit20} px a fifth brighter, ${r.litChanged} px`,
+    );
     assert.equal(r.lightsCleared, 0, 'dispose clears the lights');
     assert.equal(r.cleared, 0, 'removing the ground change leaves the picture as it was');
-    assert.ok(r.runOn[1] > 2 * r.runOn[0] && r.runOn[2] > 0, `a tube feeds the front on: ${r.runOn[1]} m against ${r.runOn[0]} m open`);
-    assert.ok(r.glowFed > 100 && r.glowOpen === 0 && r.runDiff > 100, `the run-on glows past the open stop: ${r.glowFed} px against ${r.glowOpen} px, ${r.runDiff} px differ`);
-    assert.ok(r.joins.includes('joined') && !r.apartStops.includes('joined'), `the island's arms meet with joins and not without: ${r.joins} / ${r.apartStops}`);
-    assert.ok(r.glowMerged > 500 && r.glowMerged > r.glowApart * 1.2 && r.joinDiff > 500, `the joined channel below the island glows wider than the arms apart: ${r.glowMerged} against ${r.glowApart}, ${r.joinDiff} px differ`);
-    assert.ok(r.breakout && r.glowBurst > 300 && r.glowBurst > 3 * r.glowStill && r.burstDiff > 300, `a breakout lobe glows beside the stalled flow: ${r.glowBurst} against ${r.glowStill} (${JSON.stringify(r.breakout)})`);
-    assert.ok(r.roofBurst && r.roofBurst[1] < r.roofBurst[2] - 1 && r.roofBurst[3] && r.glowRoof > 300 && r.glowRoof > 3 * r.glowShut && r.roofDiff > 300, `a blocked tube bursts a roof behind the front and its lobe glows: ${r.glowRoof} against ${r.glowShut} (${JSON.stringify(r.roofBurst)})`);
-    assert.ok(!r.braids.includes('joined') && r.bareStops.includes('joined') && r.glowBraid > 300 && r.glowBraid > 1.2 * r.glowBare && r.braidDiff > 300, `braided arms glow as two channels side by side: ${r.glowBraid} against ${r.glowBare} joined (${r.braids} / ${r.bareStops})`);
+    assert.ok(
+      r.runOn[1] > 2 * r.runOn[0] && r.runOn[2] > 0,
+      `a tube feeds the front on: ${r.runOn[1]} m against ${r.runOn[0]} m open`,
+    );
+    assert.ok(
+      r.glowFed > 100 && r.glowOpen === 0 && r.runDiff > 100,
+      `the run-on glows past the open stop: ${r.glowFed} px against ${r.glowOpen} px, ${r.runDiff} px differ`,
+    );
+    assert.ok(
+      r.joins.includes('joined') && !r.apartStops.includes('joined'),
+      `the island's arms meet with joins and not without: ${r.joins} / ${r.apartStops}`,
+    );
+    assert.ok(
+      r.glowMerged > 500 && r.glowMerged > r.glowApart * 1.2 && r.joinDiff > 500,
+      `the joined channel below the island glows wider than the arms apart: ${r.glowMerged} against ${r.glowApart}, ${r.joinDiff} px differ`,
+    );
+    assert.ok(
+      r.breakout && r.glowBurst > 300 && r.glowBurst > 3 * r.glowStill && r.burstDiff > 300,
+      `a breakout lobe glows beside the stalled flow: ${r.glowBurst} against ${r.glowStill} (${JSON.stringify(r.breakout)})`,
+    );
+    assert.ok(
+      r.roofBurst &&
+        r.roofBurst[1] < r.roofBurst[2] - 1 &&
+        r.roofBurst[3] &&
+        r.glowRoof > 300 &&
+        r.glowRoof > 3 * r.glowShut &&
+        r.roofDiff > 300,
+      `a blocked tube bursts a roof behind the front and its lobe glows: ${r.glowRoof} against ${r.glowShut} (${JSON.stringify(r.roofBurst)})`,
+    );
+    assert.ok(
+      !r.braids.includes('joined') &&
+        r.bareStops.includes('joined') &&
+        r.glowBraid > 300 &&
+        r.glowBraid > 1.2 * r.glowBare &&
+        r.braidDiff > 300,
+      `braided arms glow as two channels side by side: ${r.glowBraid} against ${r.glowBare} joined (${r.braids} / ${r.bareStops})`,
+    );
     return `lava flow ${r.flowChanged} px (${r.glowEarly} -> ${r.glowLater} glowing), clots ${r.clots} bombs ${r.bombs} ${r.blobsChanged} px, ${r.lights} lights brighten ${r.lit20} ground px by a fifth, run-on ${r.glowFed} px glowing (open ${r.glowOpen}), joined ${r.glowMerged} px (apart ${r.glowApart}), breakout ${r.glowBurst} px (stalled ${r.glowStill}), roof burst ${r.glowRoof} px (shut ${r.glowShut}), braided ${r.glowBraid} px (joined ${r.glowBare})`;
   },
   avalanche(r) {
@@ -138,15 +201,24 @@ const checks = {
     assert.equal(r.sameTwice, 0, 'the same frame twice is the same');
     assert.ok(r.versionMoved && r.later > 50, `a later time draws the new flow: ${r.later} pixels`);
     assert.ok(r.heightWorst < 1e-3, `plant heightmap against the snow surface: ${r.heightWorst} m`);
-    assert.ok(r.densityWorst < 1e-6 && r.broken > 20, `plant density against plantsKept: ${r.densityWorst}, ${r.broken} broken`);
-    assert.ok(r.parcels > 0 && r.cloudChanged > 100, `the powder cloud draws: ${r.parcels} parcels, ${r.cloudChanged} pixels`);
+    assert.ok(
+      r.densityWorst < 1e-6 && r.broken > 20,
+      `plant density against plantsKept: ${r.densityWorst}, ${r.broken} broken`,
+    );
+    assert.ok(
+      r.parcels > 0 && r.cloudChanged > 100,
+      `the powder cloud draws: ${r.parcels} parcels, ${r.cloudChanged} pixels`,
+    );
     return `avalanche cover ${r.coverChanged} px, flow ${r.flowChanged} px, ${r.broken} broken, cloud ${r.parcels} parcels ${r.cloudChanged} px`;
   },
   drive(r) {
     assert.equal(r.clearSettings.coverage, 0.05);
     assert.equal(r.sheet, 0.9, "the sky's cloud sheet takes the overcast cover");
     assert.equal(r.overcastCoverage, 0.9, 'the cloud layer takes it');
-    assert.ok(r.overcast.sky > 0.3 * r.overcast.third, `overcast covers the sky: ${r.overcast.sky} of ${r.overcast.third}`);
+    assert.ok(
+      r.overcast.sky > 0.3 * r.overcast.third,
+      `overcast covers the sky: ${r.overcast.sky} of ${r.overcast.third}`,
+    );
     assert.equal(r.back.sky + r.back.ground, 0, 'back to clear draws the clear frame again');
     assert.ok(r.fogDensity > 10 * r.clearFog, `fog density ${r.fogDensity} against ${r.clearFog}`);
     assert.ok(r.fog.ground > 0.5 * r.fog.third, `fog over the ground: ${r.fog.ground} of ${r.fog.third}`);

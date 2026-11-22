@@ -12,7 +12,9 @@ const BEAUFORT_LIMITS = [0.3, 1.5, 3.3, 5.4, 7.9, 10.7, 13.8, 17.1, 20.7, 24.4, 
  */
 export function beaufort(speed: number): number {
   if (typeof speed !== 'number' || !(speed >= 0) || !Number.isFinite(speed))
-    throw new RangeError('Beaufort speed must be a finite number of metres per second, 0 or more; got ' + String(speed));
+    throw new RangeError(
+      'Beaufort speed must be a finite number of metres per second, 0 or more; got ' + String(speed),
+    );
   let force = 0;
   while (force < 12 && speed >= BEAUFORT_LIMITS[force]!) force++;
   return force;
@@ -27,8 +29,11 @@ export function beaufort(speed: number): number {
  */
 export function windProfile(speed10: number, z: number): number {
   if (typeof speed10 !== 'number' || !(speed10 >= 0) || !Number.isFinite(speed10))
-    throw new RangeError('Wind profile speed must be a finite number of metres per second, 0 or more; got ' + String(speed10));
-  if (typeof z !== 'number' || !Number.isFinite(z)) throw new RangeError('Wind profile height must be a finite number of metres; got ' + String(z));
+    throw new RangeError(
+      'Wind profile speed must be a finite number of metres per second, 0 or more; got ' + String(speed10),
+    );
+  if (typeof z !== 'number' || !Number.isFinite(z))
+    throw new RangeError('Wind profile height must be a finite number of metres; got ' + String(z));
   return speed10 * (Math.max(z, 1) / 10) ** (1 / 7);
 }
 
@@ -77,12 +82,26 @@ export function snowExtinction(snow: number): number {
  * {@link visibility} inverts. Dust adds {@link dustExtinction}, smoke {@link smokeExtinction}, ash {@link ashExtinction} and sea spray
  * {@link sprayExtinction} (a state without them has none, and 0 adds exactly 0).
  */
-export function airExtinction(state: Pick<WeatherState, 'fog' | 'rain' | 'snow'> & { readonly dust?: number; readonly smoke?: number; readonly ash?: number; readonly spray?: number }): number {
+export function airExtinction(
+  state: Pick<WeatherState, 'fog' | 'rain' | 'snow'> & {
+    readonly dust?: number;
+    readonly smoke?: number;
+    readonly ash?: number;
+    readonly spray?: number;
+  },
+): number {
   const fog = 0.0002 * (100 ** Math.min(1, Math.max(0, state.fog)) - 1),
     rain = 3.65e-4 * rainRate(state) ** 0.63,
     snow = snowExtinction(state.snow);
   return (
-    CLEAR_AIR_EXTINCTION + fog + rain + snow + dustExtinction(state.dust ?? 0) + smokeExtinction(state.smoke ?? 0) + ashExtinction(state.ash ?? 0) + sprayExtinction(state.spray ?? 0)
+    CLEAR_AIR_EXTINCTION +
+    fog +
+    rain +
+    snow +
+    dustExtinction(state.dust ?? 0) +
+    smokeExtinction(state.smoke ?? 0) +
+    ashExtinction(state.ash ?? 0) +
+    sprayExtinction(state.spray ?? 0)
   );
 }
 
@@ -90,7 +109,14 @@ export function airExtinction(state: Pick<WeatherState, 'fog' | 'rain' | 'snow'>
  * Visibility in metres of a state: the distance at which a black object keeps 2 percent contrast, 3.912 over
  * {@link airExtinction} (Koschmieder). 23 km in clear air, about 200 m at `fog` 1, 1.3 km in 25 mm/h rain.
  */
-export function visibility(state: Pick<WeatherState, 'fog' | 'rain' | 'snow'> & { readonly dust?: number; readonly smoke?: number; readonly ash?: number; readonly spray?: number }): number {
+export function visibility(
+  state: Pick<WeatherState, 'fog' | 'rain' | 'snow'> & {
+    readonly dust?: number;
+    readonly smoke?: number;
+    readonly ash?: number;
+    readonly spray?: number;
+  },
+): number {
   return KOSCHMIEDER / airExtinction(state);
 }
 
@@ -100,10 +126,26 @@ export function visibility(state: Pick<WeatherState, 'fog' | 'rain' | 'snow'> & 
  * 0 when the rain and snow alone leave less than that visibility, 1 when even full fog leaves more (about 196 m in clear air).
  * @throws RangeError for a visibility that is not a positive finite number of metres.
  */
-export function fogForVisibility(metres: number, state: Pick<WeatherState, 'rain' | 'snow'> & { readonly dust?: number; readonly smoke?: number; readonly ash?: number; readonly spray?: number }): number {
+export function fogForVisibility(
+  metres: number,
+  state: Pick<WeatherState, 'rain' | 'snow'> & {
+    readonly dust?: number;
+    readonly smoke?: number;
+    readonly ash?: number;
+    readonly spray?: number;
+  },
+): number {
   if (typeof metres !== 'number' || !(metres > 0) || !Number.isFinite(metres))
     throw new RangeError('Visibility must be a positive finite number of metres; got ' + String(metres));
-  const rest = airExtinction({ fog: 0, rain: state.rain, snow: state.snow, dust: state.dust, smoke: state.smoke, ash: state.ash, spray: state.spray }),
+  const rest = airExtinction({
+      fog: 0,
+      rain: state.rain,
+      snow: state.snow,
+      dust: state.dust,
+      smoke: state.smoke,
+      ash: state.ash,
+      spray: state.spray,
+    }),
     fog = KOSCHMIEDER / metres - rest;
   return fog <= 0 ? 0 : Math.min(1, Math.log(1 + fog / 0.0002) / Math.log(100));
 }
@@ -156,7 +198,9 @@ export function dustConcentration(dust: number): number {
  */
 export function dustVisibility(pm10: number): number {
   if (typeof pm10 !== 'number' || !(pm10 >= 0) || !Number.isFinite(pm10))
-    throw new RangeError('Dust PM10 must be a finite concentration of 0 or more micrograms per cubic metre; got ' + String(pm10));
+    throw new RangeError(
+      'Dust PM10 must be a finite concentration of 0 or more micrograms per cubic metre; got ' + String(pm10),
+    );
   return pm10 === 0 ? Infinity : 1000 * (pm10 / DUST_PM10_AT_1KM) ** (-1 / DUST_PM10_EXPONENT);
 }
 
@@ -204,9 +248,13 @@ export const SAND_THRESHOLD = 6.6;
  */
 export function dustFromWind(speed: number, threshold: number = SAND_THRESHOLD): number {
   if (typeof speed !== 'number' || !(speed >= 0) || !Number.isFinite(speed))
-    throw new RangeError('Dust wind speed must be a finite number of metres per second, 0 or more; got ' + String(speed));
+    throw new RangeError(
+      'Dust wind speed must be a finite number of metres per second, 0 or more; got ' + String(speed),
+    );
   if (typeof threshold !== 'number' || !(threshold > 0) || !Number.isFinite(threshold))
-    throw new RangeError('Dust threshold must be a positive finite speed in metres per second; got ' + String(threshold));
+    throw new RangeError(
+      'Dust threshold must be a positive finite speed in metres per second; got ' + String(threshold),
+    );
   const r = speed / threshold;
   return r <= 1 ? 0 : DUST_FROM_SAND_MAX * (1 - Math.exp((-1.5 * (r * r * r - r)) / 6));
 }
@@ -258,7 +306,9 @@ export function smokeConcentration(smoke: number): number {
  */
 export function smokeExtinctionOf(pm25: number): number {
   if (typeof pm25 !== 'number' || !Number.isFinite(pm25) || pm25 < 0)
-    throw new RangeError('Smoke PM2.5 must be a finite concentration of 0 or more micrograms per cubic metre; got ' + String(pm25));
+    throw new RangeError(
+      'Smoke PM2.5 must be a finite concentration of 0 or more micrograms per cubic metre; got ' + String(pm25),
+    );
   return SMOKE_MASS_EXTINCTION * 1e-6 * pm25;
 }
 
@@ -318,7 +368,9 @@ export function smokeSunTransmittance(smoke: number, elevation: number): [number
  */
 export function smokeFromEmission(emission: number, wind: number, width = 2000): number {
   if (typeof emission !== 'number' || !Number.isFinite(emission) || emission < 0)
-    throw new RangeError('Smoke emission must be a finite number of grams per second, 0 or more; got ' + String(emission));
+    throw new RangeError(
+      'Smoke emission must be a finite number of grams per second, 0 or more; got ' + String(emission),
+    );
   if (typeof wind !== 'number' || !Number.isFinite(wind) || wind < 0)
     throw new RangeError('Smoke wind must be a finite speed in metres per second, 0 or more; got ' + String(wind));
   if (typeof width !== 'number' || !Number.isFinite(width) || !(width > 0))
@@ -393,12 +445,15 @@ export function ashConcentration(ash: number): number {
  */
 export function coarseExtinction(micrograms: number, radius: number, density: number): number {
   if (typeof micrograms !== 'number' || !Number.isFinite(micrograms) || micrograms < 0)
-    throw new RangeError('Particle concentration must be a finite number of 0 or more micrograms per cubic metre; got ' + String(micrograms));
+    throw new RangeError(
+      'Particle concentration must be a finite number of 0 or more micrograms per cubic metre; got ' +
+        String(micrograms),
+    );
   if (typeof radius !== 'number' || !Number.isFinite(radius) || !(radius > 0))
     throw new RangeError('Particle radius must be a finite number of metres above 0; got ' + String(radius));
   if (typeof density !== 'number' || !Number.isFinite(density) || !(density > 0))
     throw new RangeError('Particle density must be a finite number of kg/m3 above 0; got ' + String(density));
-  return ((LARGE_PARTICLE_EFFICIENCY * 0.75) * micrograms * 1e-9) / (density * radius);
+  return (LARGE_PARTICLE_EFFICIENCY * 0.75 * micrograms * 1e-9) / (density * radius);
 }
 
 /** Extinction per metre the ash of a state adds ({@link coarseExtinction} of {@link ashConcentration}); 0 for `ash` 0. */
@@ -495,7 +550,10 @@ export function sprayColor(): [number, number, number] {
  * degrees. Exactly [1, 1, 1] with no smoke, ash or spray.
  * @throws RangeError for an elevation that is not a finite number of radians.
  */
-export function sunTransmittance(state: { readonly smoke?: number; readonly ash?: number; readonly spray?: number }, elevation: number): [number, number, number] {
+export function sunTransmittance(
+  state: { readonly smoke?: number; readonly ash?: number; readonly spray?: number },
+  elevation: number,
+): [number, number, number] {
   const t = smokeSunTransmittance(state.smoke ?? 0, elevation),
     tau = ashExtinction(state.ash ?? 0) * ASH_LAYER_DEPTH + sprayExtinction(state.spray ?? 0) * SPRAY_LAYER_DEPTH;
   if (tau === 0) return t;
@@ -527,7 +585,10 @@ function slabTransmission(tau: number, w: number, g: number): number {
  * as it is not in {@link sunTransmittance}.
  * @throws RangeError for an elevation that is not a finite number of radians.
  */
-export function hazeLight(state: { readonly smoke?: number; readonly ash?: number; readonly spray?: number }, elevation: number): [number, number, number] {
+export function hazeLight(
+  state: { readonly smoke?: number; readonly ash?: number; readonly spray?: number },
+  elevation: number,
+): [number, number, number] {
   const t = sunTransmittance(state, elevation),
     smoke = smokeOpticalDepth(state.smoke ?? 0),
     ash = ashExtinction(state.ash ?? 0) * ASH_LAYER_DEPTH,
@@ -537,7 +598,11 @@ export function hazeLight(state: { readonly smoke?: number; readonly ash?: numbe
     const s = smoke * (nm / 550) ** -SMOKE_ANGSTROM,
       tau = s + ash + spray,
       scatter = s * SMOKE_ALBEDO[i]! + ash * ASH_ALBEDO[i]! + spray * SPRAY_ALBEDO[i]!,
-      g = (s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY + ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY + spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) / scatter;
+      g =
+        (s * SMOKE_ALBEDO[i]! * SMOKE_ASYMMETRY +
+          ash * ASH_ALBEDO[i]! * ASH_ASYMMETRY +
+          spray * SPRAY_ALBEDO[i]! * SPRAY_ASYMMETRY) /
+        scatter;
     return t[i]! + (1 - t[i]!) * slabTransmission(tau, scatter / tau, g);
   }) as [number, number, number];
 }

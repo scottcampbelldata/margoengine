@@ -12,7 +12,15 @@ import {
   weatherSettingDefaults,
   weatherStateOf,
 } from '../dist/settings.js';
-import { WEATHER_PRESETS, WeatherMachine, beaufort, fogForVisibility, rainRate, visibility, windBend } from '../dist/index.js';
+import {
+  WEATHER_PRESETS,
+  WeatherMachine,
+  beaufort,
+  fogForVisibility,
+  rainRate,
+  visibility,
+  windBend,
+} from '../dist/index.js';
 import { VFX } from '../../vfx/dist/index.js';
 import { Water } from '../../water/dist/index.js';
 
@@ -27,7 +35,8 @@ test('every row is a live number; every row but storm and windDirection follows 
     assert.equal(row.kind, 'number');
     assert.equal(row.live, true, row.name);
     assert.ok(row.about.length > 20 && row.unit !== undefined && row.max > row.min && row.step > 0, row.name);
-    if (row.name === 'storm' || row.name === 'windDirection') assert.ok(!row.nullable && typeof row.default === 'number');
+    if (row.name === 'storm' || row.name === 'windDirection')
+      assert.ok(!row.nullable && typeof row.default === 'number');
     else assert.ok(row.nullable && row.default === null && row.weather === 'storm', row.name);
   }
   assert.match(WEATHER_SETTINGS.find((r) => r.name === 'wind').about, /Beaufort/);
@@ -54,7 +63,17 @@ test("a value replaces the storm level's number; null follows it again", () => {
 
 test('unknown names throw TypeError, out of range or wrong kind RangeError, null only where nullable', () => {
   assert.throws(() => weatherStateOf({ windspeed: 5 }), TypeError);
-  for (const bad of [{ wind: -1 }, { wind: 61 }, { storm: 1.1 }, { storm: null }, { windDirection: null }, { visibility: 100 }, { rainRate: 81 }, { gust: NaN }, { fog: '0.5' }])
+  for (const bad of [
+    { wind: -1 },
+    { wind: 61 },
+    { storm: 1.1 },
+    { storm: null },
+    { windDirection: null },
+    { visibility: 100 },
+    { rainRate: 81 },
+    { gust: NaN },
+    { fog: '0.5' },
+  ])
     assert.throws(() => weatherStateOf(bad), RangeError, JSON.stringify(bad));
   assert.throws(() => applyWeatherSettings({ set() {} }, { windDirection: 361 }), RangeError);
 });
@@ -79,7 +98,30 @@ test("a rain rate in mm/h is the state's rain, and the visibility asked is the o
 
 test('the named looks are values of the rows and mean what they say', () => {
   const names = Object.keys(WEATHER_LOOKS);
-  assert.deepEqual(names, ['natural', 'calm', 'breeze', 'gale', 'storm', 'hurricane', 'fog', 'drizzle', 'downpour', 'dustHaze', 'sandstorm', 'haboob', 'smokeHaze', 'wildfireSmoke', 'blackDay', 'ashfall', 'ashDarkness', 'seaSpray', 'surfHaze', 'blizzard', 'redFlag', 'animatedFeature']);
+  assert.deepEqual(names, [
+    'natural',
+    'calm',
+    'breeze',
+    'gale',
+    'storm',
+    'hurricane',
+    'fog',
+    'drizzle',
+    'downpour',
+    'dustHaze',
+    'sandstorm',
+    'haboob',
+    'smokeHaze',
+    'wildfireSmoke',
+    'blackDay',
+    'ashfall',
+    'ashDarkness',
+    'seaSpray',
+    'surfHaze',
+    'blizzard',
+    'redFlag',
+    'animatedFeature',
+  ]);
   const state = Object.fromEntries(names.map((n) => [n, weatherStateOf(WEATHER_LOOKS[n])]));
   assert.equal(beaufort(state.calm.wind), 0);
   assert.equal(beaufort(state.breeze.wind), 3);
@@ -112,13 +154,33 @@ test('vane: with every package at its default, one wind slider moves sea, grass,
     rain = { name: 'weather', options: { intensity: 0 } },
     volume = { name: 'volumetric-fog', options: { density: 0.0002 } },
     engine = { plugins: new Map(), use: () => {}, removePlugin: () => {} };
-  for (const [name, plugin] of [[sea.name, sea], [smoke.name, smoke], [fire.name, fire], ['scatter:1', scatter], ['grass-field:1', grass], ['weather', rain], ['volumetric-fog', volume]])
+  for (const [name, plugin] of [
+    [sea.name, sea],
+    [smoke.name, smoke],
+    [fire.name, fire],
+    ['scatter:1', scatter],
+    ['grass-field:1', grass],
+    ['weather', rain],
+    ['volumetric-fog', volume],
+  ])
     engine.plugins.set(name, plugin);
   const drive = WeatherDrive.attach(engine, { weather: machine });
   drive.setup(engine);
   const seen = [];
-  for (const [speed, azimuth] of [[3, 70], [10, 70], [20, 70], [10, 250]]) {
-    applyWeatherSettings(machine, { storm: 0.5, rainRate: 20, wind: speed, windDirection: azimuth, gust: 0, visibility: 4000 - speed * 100 });
+  for (const [speed, azimuth] of [
+    [3, 70],
+    [10, 70],
+    [20, 70],
+    [10, 250],
+  ]) {
+    applyWeatherSettings(machine, {
+      storm: 0.5,
+      rainRate: 20,
+      wind: speed,
+      windDirection: azimuth,
+      gust: 0,
+      visibility: 4000 - speed * 100,
+    });
     for (let i = 0; i < 4; i++) drive.update(0.5);
     const w = machine.wind.sample(0, 0, 0, machine.time),
       toward = heading(w[0], w[2]),
@@ -132,14 +194,23 @@ test('vane: with every package at its default, one wind slider moves sea, grass,
       fire: heading(...fire.options.wind),
       rain: heading(...rain.options.wind),
     };
-    for (const [name, d] of Object.entries(dirs)) assert.ok(off(d, toward) < 5, `${name} follows the wind at ${speed} m/s`);
-    assert.ok(off(heading(sea.windSea.direction[0], sea.windSea.direction[1]), mean) < 5, 'the sea runs with the mean wind');
+    for (const [name, d] of Object.entries(dirs))
+      assert.ok(off(d, toward) < 5, `${name} follows the wind at ${speed} m/s`);
+    assert.ok(
+      off(heading(sea.windSea.direction[0], sea.windSea.direction[1]), mean) < 5,
+      'the sea runs with the mean wind',
+    );
     near(sea.windSea.speed, speed, 1e-6);
     near(Math.hypot(...smoke.options.wind), Math.hypot(w[0], w[2]));
     near(scatter.options.wind[2], windBend(Math.hypot(w[0], w[2])));
     assert.equal(rain.options.precipitation, 'rain');
     assert.ok(Math.abs(rain.options.rainRate - 20) < 0.1);
-    seen.push({ speed, swell: Math.max(...Array.from({ length: sea.values[23] }, (_, i) => sea.values[34 + i * 8])), bend: scatter.options.wind[2], fog: volume.options.density });
+    seen.push({
+      speed,
+      swell: Math.max(...Array.from({ length: sea.values[23] }, (_, i) => sea.values[34 + i * 8])),
+      bend: scatter.options.wind[2],
+      fog: volume.options.density,
+    });
   }
   // A stronger wind raises the sea and bends harder.
   assert.ok(seen[0].swell < seen[1].swell && seen[1].swell < seen[2].swell, JSON.stringify(seen));
@@ -168,7 +239,14 @@ test('a sea built with its own waves is left alone by the drive, and one with a 
   const machine = new WeatherMachine('storm'),
     fixed = new Water({ waves: [{ direction: [1, 0], amplitude: 0.5, wavelength: 20 }] }),
     windy = new Water({ wind: 1 }),
-    engine = { plugins: new Map([[fixed.name, fixed], [windy.name, windy]]), use() {}, removePlugin() {} };
+    engine = {
+      plugins: new Map([
+        [fixed.name, fixed],
+        [windy.name, windy],
+      ]),
+      use() {},
+      removePlugin() {},
+    };
   let calls = 0;
   const real = windy.setWind.bind(windy);
   windy.setWind = (wind) => (calls++, real(wind));
@@ -199,7 +277,10 @@ test('a wind given to a particle effect (its settings rows, or a Fire) overrides
   applyVfxSettings(effect, { 'wind.x': null, 'wind.z': null });
   drive.update(0.5);
   const again = machine.wind.sample(0, 0, 0, machine.time);
-  assert.ok(Math.abs(effect.options.wind[0] - again[0]) < 1e-9 && effect.options.wind[0] !== 7, 'null follows the weather again');
+  assert.ok(
+    Math.abs(effect.options.wind[0] - again[0]) < 1e-9 && effect.options.wind[0] !== 7,
+    'null follows the weather again',
+  );
   const given = new VFX({ capacity: 8, wind: [3, 3] });
   engine.plugins.set(given.name, given);
   drive.update(0.5);

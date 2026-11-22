@@ -70,7 +70,13 @@ export function hailSettings(state: WeatherState, wind?: readonly [number, numbe
  */
 export function fogDensity(state: WeatherState): number {
   const thickness = Math.min(1, state.fog + 0.15 * Math.max(state.rain, state.snow, state.hail));
-  return 0.0002 * (0.02 / 0.0002) ** thickness + dustExtinction(state.dust) + smokeExtinction(state.smoke) + ashExtinction(state.ash) + sprayExtinction(state.spray);
+  return (
+    0.0002 * (0.02 / 0.0002) ** thickness +
+    dustExtinction(state.dust) +
+    smokeExtinction(state.smoke) +
+    ashExtinction(state.ash) +
+    sprayExtinction(state.spray)
+  );
 }
 
 /** Horizontal wind `[x, z]` at world position `(x, z)` and time `t` from a field, for {@link skyWeather}. */

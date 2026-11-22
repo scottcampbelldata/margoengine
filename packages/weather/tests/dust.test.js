@@ -46,7 +46,11 @@ test('the visibility dust leaves is the Jugder et al. relation inverted, within 
   assert.throws(() => dustVisibility(-1), RangeError);
   assert.throws(() => dustVisibility(NaN), RangeError);
   // The state: dust 0.2, 0.5 and 0.9 leave about 6 km, 570 m and 130 m of dust alone, and the clear air shortens each a little.
-  for (const [dust, metres] of [[0.2, 6056], [0.5, 565], [0.9, 126]]) {
+  for (const [dust, metres] of [
+    [0.2, 6056],
+    [0.5, 565],
+    [0.9, 126],
+  ]) {
     const alone = dustVisibility(dustConcentration(dust));
     assert.ok(rel(alone, metres) < 0.02, `dust ${dust}: ${alone} m`);
     const total = visibility({ fog: 0, rain: 0, snow: 0, dust });
@@ -92,7 +96,7 @@ test('the dust colour is a yellow-brown from the single-scattering albedos of de
   const [r, g, b] = dustColor();
   // (1 - s) / (1 + s), s = sqrt((1 - w) / (1 - 0.75 w)) at w = 0.96, 0.94, 0.92.
   near(r, 0.4512, 2e-3);
-  near(g, 0.3790, 2e-3);
+  near(g, 0.379, 2e-3);
   near(b, 0.3257, 2e-3);
   assert.ok(r > g && g > b && b > 0);
 });
@@ -145,7 +149,12 @@ test('with every package at null the drive writes the weather into a BlownSand: 
     engine = { plugins: new Map([[sand.name, sand]]), use: () => {}, removePlugin: () => {} },
     drive = WeatherDrive.attach(engine, { weather: machine });
   drive.setup(engine);
-  for (const [speed, azimuth] of [[4, 20], [12, 100], [25, 250], [9, 310]]) {
+  for (const [speed, azimuth] of [
+    [4, 20],
+    [12, 100],
+    [25, 250],
+    [9, 310],
+  ]) {
     applyWeatherSettings(machine, { wind: speed, windDirection: azimuth, gust: 0.4 });
     drive.update(0.5);
     const w = sand.options.wind;
@@ -172,7 +181,14 @@ test('wind over the sand raises the dust and the sky fog turns dust coloured; no
   const sky = { name: 'sky', options: { fog: { density: 0.01, falloff: 'exp' } } },
     sand = new BlownSand({ ground: () => 0, wind: { speed: 0 } }),
     machine = new WeatherMachine('clear', { seed: 5 });
-  const withSand = { plugins: new Map([['sky', sky], [sand.name, sand]]), use: () => {}, removePlugin: () => {} },
+  const withSand = {
+      plugins: new Map([
+        ['sky', sky],
+        [sand.name, sand],
+      ]),
+      use: () => {},
+      removePlugin: () => {},
+    },
     drive = WeatherDrive.attach(withSand, { weather: machine });
   drive.setup(withSand);
   applyWeatherSettings(machine, { wind: 3 });

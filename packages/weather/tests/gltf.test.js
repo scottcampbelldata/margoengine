@@ -21,15 +21,32 @@ test('imported surfaces share wetness, puddle rings and snow functions after tex
 });
 
 test('uniforms track weather, model attachment is reversible, and restoration releases buffers', () => {
-  const written = [], destroyed = [];
-  const engine = { gpu: { createBuffer: () => ({ destroy() { destroyed.push(1); } }), queue: {
-    writeBuffer: (_b, _o, data) => written.push([...data]),
-  } }, sceneOf() {} };
+  const written = [],
+    destroyed = [];
+  const engine = {
+    gpu: {
+      createBuffer: () => ({
+        destroy() {
+          destroyed.push(1);
+        },
+      }),
+      queue: {
+        writeBuffer: (_b, _o, data) => written.push([...data]),
+      },
+    },
+    sceneOf() {},
+  };
   const weather = { wetness: 0.4, state: { rain: 0.7 }, snowCover: 0.8 };
   const effect = new GLTFWeather({ puddles: { weather }, snow: { weather } });
   effect.setup(engine);
   let attached = 0;
-  const model = { addLighting(e) { assert.equal(e, effect); attached++; return () => attached--; } };
+  const model = {
+    addLighting(e) {
+      assert.equal(e, effect);
+      attached++;
+      return () => attached--;
+    },
+  };
   const remove = effect.add(model);
   assert.equal(effect.add(model), remove);
   assert.equal(attached, 1);

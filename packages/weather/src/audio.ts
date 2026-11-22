@@ -263,7 +263,11 @@ export class WeatherAudio {
       rate = 1;
     if (buffer) rate = Math.min(4, Math.max(0.25, buffer.duration / seconds));
     else {
-      const data = weatherNoise(context.sampleRate, streamSeed(this.options.seed ?? 1, 3 + this.rumbles.size), seconds).thunder;
+      const data = weatherNoise(
+        context.sampleRate,
+        streamSeed(this.options.seed ?? 1, 3 + this.rumbles.size),
+        seconds,
+      ).thunder;
       buffer = context.createBuffer(1, data.length, context.sampleRate);
       buffer.getChannelData(0).set(data);
     }

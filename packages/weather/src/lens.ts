@@ -38,45 +38,75 @@ const smooth = (a: number, b: number, x: number): number => {
 };
 
 function validate(o: LensDropsOptions): void {
-  if (typeof o !== 'object' || o === null) throw new TypeError('LensDrops options must be an object; pass {} for defaults');
+  if (typeof o !== 'object' || o === null)
+    throw new TypeError('LensDrops options must be an object; pass {} for defaults');
   for (const [key, lo, hi] of [
-    ['wetness',0,1],['radius',0.002,0.06],['speed',0,1],['distortion',0,2],
-    ['streaks',0,1],['seed',0,16777215],['time',0,1000000],
+    ['wetness', 0, 1],
+    ['radius', 0.002, 0.06],
+    ['speed', 0, 1],
+    ['distortion', 0, 2],
+    ['streaks', 0, 1],
+    ['seed', 0, 16777215],
+    ['time', 0, 1000000],
   ] as const) {
     const n = o[key];
     if (n !== undefined && (typeof n !== 'number' || !Number.isFinite(n) || n < lo || n > hi))
       throw new RangeError(`LensDrops ${key} must be finite in ${lo}..${hi}; pass a value in range`);
   }
-  if (o.seed !== undefined && !Number.isInteger(o.seed)) throw new RangeError('LensDrops seed must be an integer; pass 0..16777215');
-  if (o.enabled !== undefined && typeof o.enabled !== 'boolean') throw new TypeError('LensDrops enabled must be a boolean; pass true or false');
-  if (o.weather !== undefined && (!o.weather || !Number.isFinite(o.weather.wetness) || o.weather.wetness < 0 || o.weather.wetness > 1))
+  if (o.seed !== undefined && !Number.isInteger(o.seed))
+    throw new RangeError('LensDrops seed must be an integer; pass 0..16777215');
+  if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
+    throw new TypeError('LensDrops enabled must be a boolean; pass true or false');
+  if (
+    o.weather !== undefined &&
+    (!o.weather || !Number.isFinite(o.weather.wetness) || o.weather.wetness < 0 || o.weather.wetness > 1)
+  )
     throw new RangeError('LensDrops weather.wetness must be finite in 0..1; pass a wetness source');
 }
 
 /** Droplet mask and refracting slope at height-normalised screen (x,y), for inspection and GPU parity. */
-export function lensField(x: number, y: number, time: number, options: LensDropsOptions = {}): readonly [number, number, number] {
+export function lensField(
+  x: number,
+  y: number,
+  time: number,
+  options: LensDropsOptions = {},
+): readonly [number, number, number] {
   validate(options);
-  if (![x,y,time].every(Number.isFinite)) throw new RangeError('Lens field coordinates and time must be finite; pass screen coordinates and seconds');
-  const wet = options.enabled === false ? 0 : options.weather?.wetness ?? options.wetness ?? 0.6;
-  const radius = options.radius ?? 0.025, spacing = 6 * radius, seed = options.seed ?? 1;
-  let nx = 0, ny = 0, mask = 0;
+  if (![x, y, time].every(Number.isFinite))
+    throw new RangeError('Lens field coordinates and time must be finite; pass screen coordinates and seconds');
+  const wet = options.enabled === false ? 0 : (options.weather?.wetness ?? options.wetness ?? 0.6);
+  const radius = options.radius ?? 0.025,
+    spacing = 6 * radius,
+    seed = options.seed ?? 1;
+  let nx = 0,
+    ny = 0,
+    mask = 0;
   for (let layer = 0; layer < 2; layer++) {
-    const py = y - (layer ? time * (options.speed ?? 0.08) : 0), cx = Math.floor(x / spacing), cy = Math.floor(py / spacing);
-    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-      const a = cx+i, b = cy+j, k = seed+layer*3;
-      const activation = smooth(lattice(a,b,k),lattice(a,b,k)+0.12,wet);
-      const r = radius * (0.55+0.45*lattice(a,b,k+1)) * (layer ? 1 : 0.55);
-      const qx = (x-(a+0.2+0.6*lattice(a,b,k+2))*spacing)/r;
-      const qy = (py-(b+0.2+0.6*lattice(a+17,b,k+2))*spacing)/r;
-      const dome = Math.max(0,1-qx*qx-qy*qy), head = smooth(0,0.18,dome);
-      const length = (options.streaks ?? 0.65)*4;
-      const trail = layer && qy<0 && qy> -1-length ? (1-smooth(0.08,0.22,Math.abs(qx)))*smooth(-1-length,-0.8-length,qy) : 0;
-      nx += (qx*Math.sqrt(dome)*head + qx*trail)*activation;
-      ny += qy*Math.sqrt(dome)*head*activation;
-      mask = Math.max(mask,Math.max(head,trail)*activation);
-    }
+    const py = y - (layer ? time * (options.speed ?? 0.08) : 0),
+      cx = Math.floor(x / spacing),
+      cy = Math.floor(py / spacing);
+    for (let j = -1; j <= 1; j++)
+      for (let i = -1; i <= 1; i++) {
+        const a = cx + i,
+          b = cy + j,
+          k = seed + layer * 3;
+        const activation = smooth(lattice(a, b, k), lattice(a, b, k) + 0.12, wet);
+        const r = radius * (0.55 + 0.45 * lattice(a, b, k + 1)) * (layer ? 1 : 0.55);
+        const qx = (x - (a + 0.2 + 0.6 * lattice(a, b, k + 2)) * spacing) / r;
+        const qy = (py - (b + 0.2 + 0.6 * lattice(a + 17, b, k + 2)) * spacing) / r;
+        const dome = Math.max(0, 1 - qx * qx - qy * qy),
+          head = smooth(0, 0.18, dome);
+        const length = (options.streaks ?? 0.65) * 4;
+        const trail =
+          layer && qy < 0 && qy > -1 - length
+            ? (1 - smooth(0.08, 0.22, Math.abs(qx))) * smooth(-1 - length, -0.8 - length, qy)
+            : 0;
+        nx += (qx * Math.sqrt(dome) * head + qx * trail) * activation;
+        ny += qy * Math.sqrt(dome) * head * activation;
+        mask = Math.max(mask, Math.max(head, trail) * activation);
+      }
   }
-  return [nx,ny,mask];
+  return [nx, ny, mask];
 }
 
 /**
@@ -84,13 +114,28 @@ export function lensField(x: number, y: number, time: number, options: LensDrops
  * time * speed, is split in double precision into whole drop cells (u32 bits in b.w) and a remainder below one
  * cell (a.y, with a.w = 1), so the shader keeps full f32 precision at any time up to 1000000 seconds.
  */
-export function lensSettings(options: LensDropsOptions, time: number, out: Float32Array = new Float32Array(8)): Float32Array {
+export function lensSettings(
+  options: LensDropsOptions,
+  time: number,
+  out: Float32Array = new Float32Array(8),
+): Float32Array {
   validate(options);
-  if (!Number.isFinite(time) || time < 0) throw new RangeError('Lens time must be finite and nonnegative; pass seconds');
-  const radius = options.radius ?? 0.025, spacing = 6 * radius, travel = time * (options.speed ?? 0.08);
+  if (!Number.isFinite(time) || time < 0)
+    throw new RangeError('Lens time must be finite and nonnegative; pass seconds');
+  const radius = options.radius ?? 0.025,
+    spacing = 6 * radius,
+    travel = time * (options.speed ?? 0.08);
   const cells = Math.floor(travel / spacing);
-  out.set([options.enabled === false ? 0 : options.weather?.wetness ?? options.wetness ?? 0.6, travel - cells * spacing, radius, 1,
-    options.distortion ?? 0.7, options.streaks ?? 0.65, options.seed ?? 1, 0]);
+  out.set([
+    options.enabled === false ? 0 : (options.weather?.wetness ?? options.wetness ?? 0.6),
+    travel - cells * spacing,
+    radius,
+    1,
+    options.distortion ?? 0.7,
+    options.streaks ?? 0.65,
+    options.seed ?? 1,
+    0,
+  ]);
   new Uint32Array(out.buffer, out.byteOffset + 28, 1)[0] = cells >>> 0;
   return out;
 }
@@ -159,7 +204,12 @@ export class LensDrops implements EnginePlugin {
     // The scene active now, kept across the await: the drops join its stack, not the stack of whichever scene is active
     // when the import settles.
     let scene!: NonNullable<ReturnType<Engine['sceneOf']>>;
-    const probe = { name: `weather-lens:attach:${attachments++}`, setup() { scene = runtime.sceneOf(probe)!; } };
+    const probe = {
+      name: `weather-lens:attach:${attachments++}`,
+      setup() {
+        scene = runtime.sceneOf(probe)!;
+      },
+    };
     runtime.use(probe);
     scene.removePlugin(probe.name);
     const { PostStack } = await import('@margoengine/post/stack');
@@ -167,7 +217,16 @@ export class LensDrops implements EnginePlugin {
     const lens = new LensDrops(options);
     try {
       let thrown: unknown;
-      const join = { name: probe.name, setup() { try { lens.stack = PostStack.join(engine, lens); } catch (error) { thrown = error; } } };
+      const join = {
+        name: probe.name,
+        setup() {
+          try {
+            lens.stack = PostStack.join(engine, lens);
+          } catch (error) {
+            thrown = error;
+          }
+        },
+      };
       scene.use(join);
       scene.removePlugin(join.name);
       if (thrown !== undefined) throw thrown;
@@ -188,27 +247,35 @@ export class LensDrops implements EnginePlugin {
   private readonly values = new Float32Array(8);
   private readonly pipelines = new Map<string, GPURenderPipeline>();
 
-  constructor(readonly options: LensDropsOptions = {}) { validate(options); }
+  constructor(readonly options: LensDropsOptions = {}) {
+    validate(options);
+  }
 
   private joinStack(_host: StackHost): StackStage {
-    if (this.stacked || this.disposed) throw new MargoError('attached', 'LensDrops is already used; create a new LensDrops');
+    if (this.stacked || this.disposed)
+      throw new MargoError('attached', 'LensDrops is already used; create a new LensDrops');
     this.stacked = true;
-    return {kind:'hdr',render:(c,input,output)=>this.draw(c,input,output)};
+    return { kind: 'hdr', render: (c, input, output) => this.draw(c, input, output) };
   }
 
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'LensDrops is disposed; create a new LensDrops');
     if (!this.stacked) throw new MargoError('state', 'Add LensDrops to a PostStack before setup');
-    if (!engine.gpu) throw new MargoError('unsupported', 'LensDrops requires WebGPU or its WebGL2 compatibility device');
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'LensDrops requires WebGPU or its WebGL2 compatibility device');
     this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({size:32,usage:64|8});
-    this.sampler = engine.gpu.createSampler({minFilter:'linear',magFilter:'linear'});
+    this.uniform = engine.gpu.createBuffer({ size: 32, usage: 64 | 8 });
+    this.sampler = engine.gpu.createSampler({ minFilter: 'linear', magFilter: 'linear' });
   }
 
   /** Seconds on the drops' own clock (used when `options.time` is not set). */
-  get time(): number { return this.clock; }
+  get time(): number {
+    return this.clock;
+  }
 
-  onPreUpdate(delta: number): void { this.advanceTime(delta); }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
 
   /**
    * Moves the drops' clock by `delta` seconds without drawing: all of a frame update. `seek` from
@@ -217,34 +284,55 @@ export class LensDrops implements EnginePlugin {
   advanceTime(delta: number): void {
     if (this.disposed) throw new MargoError('disposed', 'LensDrops is disposed; create a new LensDrops');
     validate(this.options);
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('LensDrops delta must be finite and nonnegative; pass seconds');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('LensDrops delta must be finite and nonnegative; pass seconds');
     this.clock += delta;
   }
 
   private draw(c: Context, input: GPUTextureView, output: StageOutput): void {
-    const o=this.options;
+    const o = this.options;
     validate(o);
-    lensSettings(o,o.time??this.clock,this.values);
-    c.device.queue.writeBuffer(this.uniform!,0,this.values);
-    const key=output.format+':'+(output.multisample?.count??1)+':'+output.hdr;
-    let pipeline=this.pipelines.get(key);
-    if (!pipeline) {pipeline=render(c.device,shader(output.hdr),output.format,{multisample:output.multisample});this.pipelines.set(key,pipeline);}
-    const bindings=group(c.device,pipeline,[{buffer:this.uniform!},input,this.sampler!]);
-    const pass=c.encoder.beginRenderPass({colorAttachments:[{view:output.view,loadOp:viewLoadOp(c,'clear'),storeOp:'store'}]});
-    try {pass.setPipeline(pipeline);pass.setBindGroup(0,bindings);applyView(pass,c);pass.draw(3);} finally {pass.end();}
+    lensSettings(o, o.time ?? this.clock, this.values);
+    c.device.queue.writeBuffer(this.uniform!, 0, this.values);
+    const key = output.format + ':' + (output.multisample?.count ?? 1) + ':' + output.hdr;
+    let pipeline = this.pipelines.get(key);
+    if (!pipeline) {
+      pipeline = render(c.device, shader(output.hdr), output.format, { multisample: output.multisample });
+      this.pipelines.set(key, pipeline);
+    }
+    const bindings = group(c.device, pipeline, [{ buffer: this.uniform! }, input, this.sampler!]);
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: output.view, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
+    });
+    try {
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindings);
+      applyView(pass, c);
+      pass.draw(3);
+    } finally {
+      pass.end();
+    }
   }
 
   onDeviceRestored(engine: Engine): void {
-    this.uniform?.destroy();this.pipelines.clear();this.setup(engine);
+    this.uniform?.destroy();
+    this.pipelines.clear();
+    this.setup(engine);
   }
 
   dispose(): void {
-    if(this.disposed)return;
-    this.disposed=true;
+    if (this.disposed) return;
+    this.disposed = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
-    this.stack?.removeEffect(this);this.stack=undefined;
-    this.uniform?.destroy();this.uniform=undefined;this.sampler=undefined;this.pipelines.clear();
+    this.stack?.removeEffect(this);
+    this.stack = undefined;
+    this.uniform?.destroy();
+    this.uniform = undefined;
+    this.sampler = undefined;
+    this.pipelines.clear();
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {this.dispose();}
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

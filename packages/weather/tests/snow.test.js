@@ -76,10 +76,7 @@ test('options are checked by name and range', () => {
 test('the hooks lift the vertex and change the surface, and chain with puddles', () => {
   const snow = new Snow(),
     once = snow.patch(coreShader);
-  assert.match(
-    once,
-    /var p=model\*vec4f\(i\.position,1\);p\.y\+=weather_snow_depth\(p\.xz,1\.0,weatherSnow\);/,
-  );
+  assert.match(once, /var p=model\*vec4f\(i\.position,1\);p\.y\+=weather_snow_depth\(p\.xz,1\.0,weatherSnow\);/);
   // A lift by each vertex's own normal raised a flat-shaded box's top face off its sides (a gap seen side on): the
   // lift reads only the vertex's place, so vertices that share a place rise together.
   assert.doesNotMatch(once, /weather_snow_depth\(p\.xz,wn\.y/);

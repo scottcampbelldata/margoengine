@@ -34,7 +34,9 @@ try {
       assert.ok(r.wetness > 0.1, `the ground is wet: ${r.wetness}`);
       assert.ok(r.fresh > 0, 'a fresh frame without the seek differs from the continuous one');
     }
-    console.log(`ok weather seek n = ${n}: ${r.values} values equal, fresh start differs in ${r.fresh}, stones ${r.stones}, wetness ${r.wetness.toFixed(3)}, not replayed ${r.unseekable}`);
+    console.log(
+      `ok weather seek n = ${n}: ${r.values} values equal, fresh start differs in ${r.fresh}, stones ${r.stones}, wetness ${r.wetness.toFixed(3)}, not replayed ${r.unseekable}`,
+    );
   }
   assert.deepEqual(pageErrors, []);
   console.log('weather seek check passed');
