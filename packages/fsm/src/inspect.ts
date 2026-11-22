@@ -47,22 +47,36 @@ export class MachineView<C> {
     this.capacity = capacity;
     this.element = doc.createElement('div');
     this.element.dataset.margoMachineView = '';
-    if (!options.parent) this.element.style.cssText = 'position:fixed;left:12px;bottom:12px;width:min(480px,calc(100vw - 24px));z-index:10002';
+    if (!options.parent)
+      this.element.style.cssText =
+        'position:fixed;left:12px;bottom:12px;width:min(480px,calc(100vw - 24px));z-index:10002';
     this.element.setAttribute('role', 'region');
     this.element.setAttribute('aria-label', 'State machine');
     const root = this.element.attachShadow({ mode: 'open' });
     const style = doc.createElement('style');
-    style.textContent = ':host{display:block;box-sizing:border-box;background:#151b24;color:#e7edf5;font:12px/1.5 ui-monospace,monospace;max-width:520px;max-height:70vh;overflow:auto;border:1px solid #405064;border-radius:6px;padding:14px}h2{font:600 15px system-ui;margin:0 0 10px}h3{font:600 12px system-ui;color:#a5b8cd;margin:16px 0 6px}ol{padding-left:22px;margin:0}li{padding:2px 0;overflow-wrap:anywhere}button,input{font:inherit;color:inherit;background:#222e3e;border:1px solid #53677e;border-radius:3px;padding:4px 7px}input{width:140px;margin-left:8px}[aria-current=true]{color:#85edc8;font-weight:bold}pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}.state{border-left:2px solid #405064;padding-left:10px;margin:4px 0}.active{border-color:#85edc8}.muted{color:#9aacbf}summary{cursor:pointer}';
-    const title = doc.createElement('h2'); title.textContent = 'State machine';
+    style.textContent =
+      ':host{display:block;box-sizing:border-box;background:#151b24;color:#e7edf5;font:12px/1.5 ui-monospace,monospace;max-width:520px;max-height:70vh;overflow:auto;border:1px solid #405064;border-radius:6px;padding:14px}h2{font:600 15px system-ui;margin:0 0 10px}h3{font:600 12px system-ui;color:#a5b8cd;margin:16px 0 6px}ol{padding-left:22px;margin:0}li{padding:2px 0;overflow-wrap:anywhere}button,input{font:inherit;color:inherit;background:#222e3e;border:1px solid #53677e;border-radius:3px;padding:4px 7px}input{width:140px;margin-left:8px}[aria-current=true]{color:#85edc8;font-weight:bold}pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}.state{border-left:2px solid #405064;padding-left:10px;margin:4px 0}.active{border-color:#85edc8}.muted{color:#9aacbf}summary{cursor:pointer}';
+    const title = doc.createElement('h2');
+    title.textContent = 'State machine';
     const bar = doc.createElement('div');
-    const refresh = doc.createElement('button'); refresh.type = 'button'; refresh.textContent = 'Refresh';
+    const refresh = doc.createElement('button');
+    refresh.type = 'button';
+    refresh.textContent = 'Refresh';
     const onRefresh = () => this.refresh(filter.value);
     refresh.addEventListener('click', onRefresh);
-    const filter = doc.createElement('input'); filter.type = 'search'; filter.placeholder = 'Filter states';
+    const filter = doc.createElement('input');
+    filter.type = 'search';
+    filter.placeholder = 'Filter states';
     filter.setAttribute('aria-label', 'Filter states');
-    const onFilter = () => { this.signature = ''; this.refresh(filter.value); };
+    const onFilter = () => {
+      this.signature = '';
+      this.refresh(filter.value);
+    };
     filter.addEventListener('input', onFilter);
-    this.unlisten = () => { refresh.removeEventListener('click', onRefresh); filter.removeEventListener('input', onFilter); };
+    this.unlisten = () => {
+      refresh.removeEventListener('click', onRefresh);
+      filter.removeEventListener('input', onFilter);
+    };
     bar.append(refresh, filter);
     this.content = doc.createElement('div');
     root.append(style, title, bar, this.content);
@@ -70,13 +84,19 @@ export class MachineView<C> {
     this.trace = options.trace ?? this.owned!;
     const stop = () => this.dispose();
     this.detach = () => options.signal?.removeEventListener('abort', stop);
-    if (options.signal?.aborted) { this.dispose(); return; }
+    if (options.signal?.aborted) {
+      this.dispose();
+      return;
+    }
     options.signal?.addEventListener('abort', stop, { once: true });
-    const mount = !options.parent && options.inspector ? parent.shadowRoot ?? parent : parent;
+    const mount = !options.parent && options.inspector ? (parent.shadowRoot ?? parent) : parent;
     mount.append(this.element);
     this.refresh();
     if (options.live !== false && this.window?.requestAnimationFrame) {
-      const tick = () => { this.refresh(filter.value); if (!this.disposed) this.frame = this.window!.requestAnimationFrame(tick); };
+      const tick = () => {
+        this.refresh(filter.value);
+        if (!this.disposed) this.frame = this.window!.requestAnimationFrame(tick);
+      };
       this.frame = this.window.requestAnimationFrame(tick);
     }
   }
@@ -87,31 +107,45 @@ export class MachineView<C> {
     const configurations: { name: string; machine: StateMachine<C>; path: string[] }[] = [];
     const visit = (machine: StateMachine<C>, name: string) => {
       const path: string[] = [];
-      for (let at: string | undefined = machine.state; at !== undefined; at = machine.states[at]?.parent) path.unshift(at);
+      for (let at: string | undefined = machine.state; at !== undefined; at = machine.states[at]?.parent)
+        path.unshift(at);
       configurations.push({ name, machine, path });
-      for (const [state, spec] of Object.entries(machine.states)) if (spec.regions)
-        for (const [region, child] of Object.entries(spec.regions.machines)) visit(child, `${name}/${state}/${region}`);
+      for (const [state, spec] of Object.entries(machine.states))
+        if (spec.regions)
+          for (const [region, child] of Object.entries(spec.regions.machines))
+            visit(child, `${name}/${state}/${region}`);
     };
     visit(this.machine, 'root');
-    const signature = JSON.stringify([filter, configurations.map(c => [c.name, c.path, [...c.machine.memory]]),
-      records.map(({ machine, clock, from, to, event, after }) => [machine, clock, from, to, event, after])]);
+    const signature = JSON.stringify([
+      filter,
+      configurations.map((c) => [c.name, c.path, [...c.machine.memory]]),
+      records.map(({ machine, clock, from, to, event, after }) => [machine, clock, from, to, event, after]),
+    ]);
     // Payloads may be cyclic; only ordinary TraceRecord fields are rendered and compared.
     if (signature === this.signature) return;
     this.signature = signature;
     const doc = this.element.ownerDocument;
     const nodes: HTMLElement[] = [];
-    const present = new Set(configurations.map(c => c.machine));
+    const present = new Set(configurations.map((c) => c.machine));
     for (const machine of this.disclosures.keys()) if (!present.has(machine)) this.disclosures.delete(machine);
-    const heading = (text: string) => { const h = doc.createElement('h3'); h.textContent = text; nodes.push(h); };
+    const heading = (text: string) => {
+      const h = doc.createElement('h3');
+      h.textContent = text;
+      nodes.push(h);
+    };
     for (const { name, machine, path } of configurations) {
       heading(`${name}: ${path.join(' > ')}`);
-      const tree = doc.createElement('div'); tree.dataset.machine = name;
+      const tree = doc.createElement('div');
+      tree.dataset.machine = name;
       let rows = this.disclosures.get(machine);
-      if (!rows) this.disclosures.set(machine, rows = new Map());
+      if (!rows) this.disclosures.set(machine, (rows = new Map()));
       for (const state of rows.keys()) if (!Object.hasOwn(machine.states, state)) rows.delete(state);
-      const transitions = (machine as StateMachine<C> & {
-        readonly transitionDefinitions?: readonly FinalTransition<C>[];
-      }).transitionDefinitions ?? machine.transitions;
+      const transitions =
+        (
+          machine as StateMachine<C> & {
+            readonly transitionDefinitions?: readonly FinalTransition<C>[];
+          }
+        ).transitionDefinitions ?? machine.transitions;
       for (const [state, spec] of Object.entries(machine.states)) {
         if (filter && !state.toLowerCase().includes(filter.toLowerCase())) continue;
         let row = rows.get(state);
@@ -128,17 +162,28 @@ export class MachineView<C> {
         for (let at = spec.parent; at !== undefined; at = machine.states[at]?.parent) depth++;
         row.style.marginLeft = `${depth * 16}px`;
         row.children[0].textContent = state;
-        row.children[1].textContent = transitions.filter(t => t.from === state)
-          .map(t => `${'always' in t && t.always ? 'always' : t.event?.startsWith('\0') ? 'internal' : t.event ?? `after ${t.after}s`} -> ${t.to}`).join('\n') || 'No outgoing transitions';
+        row.children[1].textContent =
+          transitions
+            .filter((t) => t.from === state)
+            .map(
+              (t) =>
+                `${'always' in t && t.always ? 'always' : t.event?.startsWith('\0') ? 'internal' : (t.event ?? `after ${t.after}s`)} -> ${t.to}`,
+            )
+            .join('\n') || 'No outgoing transitions';
         tree.append(row);
       }
       nodes.push(tree);
-      const history = doc.createElement('pre'); history.dataset.history = name;
-      history.textContent = [...machine.memory].map(([state, remembered]) => `${state}: ${remembered}`).join('\n') || 'No remembered history';
-      heading(`${name} history`); nodes.push(history);
+      const history = doc.createElement('pre');
+      history.dataset.history = name;
+      history.textContent =
+        [...machine.memory].map(([state, remembered]) => `${state}: ${remembered}`).join('\n') ||
+        'No remembered history';
+      heading(`${name} history`);
+      nodes.push(history);
     }
     heading('Recent transitions');
-    const list = doc.createElement('ol'); list.dataset.trace = '';
+    const list = doc.createElement('ol');
+    list.dataset.trace = '';
     for (const record of records) {
       const row = doc.createElement('li');
       row.textContent = `${record.clock}s ${record.machine || 'root'}: ${record.from ?? '(start)'} -> ${record.to ?? '(stop)'} [${record.event ?? (record.after === null ? 'goto / always' : `after ${record.after}s`)}]`;
@@ -152,9 +197,14 @@ export class MachineView<C> {
     if (this.disposed) return;
     this.disposed = true;
     if (this.frame !== undefined) this.window?.cancelAnimationFrame(this.frame);
-    this.detach(); this.unlisten(); this.owned?.dispose(); this.element.remove();
+    this.detach();
+    this.unlisten();
+    this.owned?.dispose();
+    this.element.remove();
     this.disclosures.clear();
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

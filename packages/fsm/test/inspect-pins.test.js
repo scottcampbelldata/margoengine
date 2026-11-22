@@ -20,7 +20,11 @@ test('capacity is a whole number from 1 to 10,000, checked by the view itself, d
   using trace = new MachineTrace(m, { capacity: 20000 });
   const parent = dom.window.document.body;
   for (const capacity of [0, 10001, 1.5, NaN, Infinity, -1])
-    assert.throws(() => new MachineView(m, { parent, trace, capacity, live: false }), /Invalid view capacity/, String(capacity));
+    assert.throws(
+      () => new MachineView(m, { parent, trace, capacity, live: false }),
+      /Invalid view capacity/,
+      String(capacity),
+    );
   for (const capacity of [1, 10000]) new MachineView(m, { parent, trace, capacity, live: false }).dispose();
   for (let i = 0; i < 40; i++) m.send('go');
   using view = new MachineView(m, { parent, trace, live: false });
@@ -67,14 +71,23 @@ test('live: false never asks for a frame; live refresh asks for the next frame o
 
 test('state rows: the summary is the name, nesting indents 16px a level, and triggers read as authored', () => {
   const dom = page();
-  const m = new FinalMachine({ top: { initial: 'mid' }, mid: { parent: 'top', initial: 'leaf' }, leaf: { parent: 'mid' }, other: {} }, 'top', {}, [
-    { from: 'leaf', to: 'other', event: 'go', always: undefined },
-  ]);
+  const m = new FinalMachine(
+    { top: { initial: 'mid' }, mid: { parent: 'top', initial: 'leaf' }, leaf: { parent: 'mid' }, other: {} },
+    'top',
+    {},
+    [{ from: 'leaf', to: 'other', event: 'go', always: undefined }],
+  );
   using view = new MachineView(m, { parent: dom.window.document.body, live: false });
   const root = view.element.shadowRoot;
   const row = (name) => root.querySelector(`[data-state=${name}]`);
-  assert.deepEqual(['top', 'mid', 'leaf'].map((n) => [row(n).querySelector('summary').textContent, row(n).style.marginLeft]),
-    [['top', '0px'], ['mid', '16px'], ['leaf', '32px']]);
+  assert.deepEqual(
+    ['top', 'mid', 'leaf'].map((n) => [row(n).querySelector('summary').textContent, row(n).style.marginLeft]),
+    [
+      ['top', '0px'],
+      ['mid', '16px'],
+      ['leaf', '32px'],
+    ],
+  );
   assert.equal(row('leaf').querySelector('pre').textContent, 'go -> other');
   assert.equal(row('other').querySelector('pre').textContent, 'No outgoing transitions');
   m.send('go');

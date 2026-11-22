@@ -10,7 +10,11 @@ const NS = 'xmlns="http://www.w3.org/2005/07/scxml" xmlns:m="urn:margoengine:fsm
 const xml = (content, attrs = '') => `<scxml ${NS} version="1.0"${attrs}>${content}</scxml>`;
 const ok = (text) => importSCXML(text);
 const bad = (text, what) =>
-  assert.throws(() => importSCXML(text), (e) => e instanceof TypeError && /^Unsupported SCXML/.test(e.message), what);
+  assert.throws(
+    () => importSCXML(text),
+    (e) => e instanceof TypeError && /^Unsupported SCXML/.test(e.message),
+    what,
+  );
 const bytes = (s) => new TextEncoder().encode(s).byteLength;
 
 test('size: exactly 1 MiB of characters or of bytes is accepted, one more is refused', () => {
@@ -72,16 +76,24 @@ test('datamodel: null and ecmascript are accepted, others refused', () => {
 
 test('initial: attribute plus element, two elements, a bad marker or a bad transition list is refused', () => {
   const kids = '<state id="a"/><state id="b"/>';
-  assert.equal(ok(xml(`<state id="p"><initial><transition target="b"/></initial>${kids}</state>`)).states.p.initial, 'b');
+  assert.equal(
+    ok(xml(`<state id="p"><initial><transition target="b"/></initial>${kids}</state>`)).states.p.initial,
+    'b',
+  );
   bad(xml(`<state id="p" initial="a"><initial><transition target="b"/></initial>${kids}</state>`), 'both');
   bad(
-    xml(`<state id="p"><initial><transition target="a"/></initial><initial><transition target="b"/></initial>${kids}</state>`),
+    xml(
+      `<state id="p"><initial><transition target="a"/></initial><initial><transition target="b"/></initial>${kids}</state>`,
+    ),
     'two',
   );
   bad(xml(`<state id="p" m:initial="first">${kids}</state>`), 'marker');
   assert.equal(ok(xml(`<state id="p" m:initial="none">${kids}</state>`)).states.p.initial, undefined);
   assert.equal(ok(xml(`<state id="p">${kids}</state>`)).states.p.initial, 'a', 'first child inferred');
-  bad(xml(`<state id="p"><initial><transition target="a"/><transition target="b"/></initial>${kids}</state>`), 'two edges');
+  bad(
+    xml(`<state id="p"><initial><transition target="a"/><transition target="b"/></initial>${kids}</state>`),
+    'two edges',
+  );
   bad(xml(`<state id="p"><initial></initial>${kids}</state>`), 'no edge');
   bad(xml(`<state id="p"><initial><onentry/></initial>${kids}</state>`), 'not a transition');
 });
@@ -89,12 +101,23 @@ test('initial: attribute plus element, two elements, a bad marker or a bad trans
 test('history: two, a bad native kind or a default with other than one transition is refused', () => {
   const kids = '<state id="a"/><state id="b"/>';
   const h = (id, body) => `<history id="${id}">${body}</history>`;
-  assert.equal(ok(xml(`<state id="p" initial="a">${h('h', '<transition target="a"/>')}${kids}</state>`)).states.p.history, 'shallow');
-  bad(xml(`<state id="p" initial="a">${h('h', '<transition target="a"/>')}${h('k', '<transition target="a"/>')}${kids}</state>`), 'two');
+  assert.equal(
+    ok(xml(`<state id="p" initial="a">${h('h', '<transition target="a"/>')}${kids}</state>`)).states.p.history,
+    'shallow',
+  );
+  bad(
+    xml(
+      `<state id="p" initial="a">${h('h', '<transition target="a"/>')}${h('k', '<transition target="a"/>')}${kids}</state>`,
+    ),
+    'two',
+  );
   bad(xml(`<state id="p" initial="a" m:history="all">${kids}</state>`), 'native kind');
   assert.equal(ok(xml(`<state id="p" initial="a" m:history="deep">${kids}</state>`)).states.p.history, 'deep');
   bad(xml(`<state id="p" initial="a">${h('h', '')}${kids}</state>`), 'no default');
-  bad(xml(`<state id="p" initial="a">${h('h', '<transition target="a"/><transition target="a"/>')}${kids}</state>`), 'two defaults');
+  bad(
+    xml(`<state id="p" initial="a">${h('h', '<transition target="a"/><transition target="a"/>')}${kids}</state>`),
+    'two defaults',
+  );
   bad(xml(`<state id="p" initial="a">${h('h', '<onentry/>')}${kids}</state>`), 'not a transition');
 });
 
@@ -122,10 +145,21 @@ test('events and order: empty, listed or wildcard events and a non-integer order
 test('root content other than states and one initial is refused; stay needs an internal self or ancestor target', () => {
   bad(xml('<state id="a"/><onentry/>'), 'onentry at the root');
   bad(xml('<state id="a"/><transition target="a"/>'), 'transition at the root');
-  bad(xml('<state id="p" initial="a"><state id="a"><transition event="e" target="p" m:stay="true"/></state></state>'), 'external stay');
-  assert.ok(ok(xml('<state id="p" initial="a"><state id="a"><transition event="e" type="internal" target="p" m:stay="true"/></state></state>')));
   bad(
-    xml('<state id="p" initial="a"><state id="a"><transition event="e" type="internal" target="b" m:stay="true"/></state><state id="b"/></state>'),
+    xml('<state id="p" initial="a"><state id="a"><transition event="e" target="p" m:stay="true"/></state></state>'),
+    'external stay',
+  );
+  assert.ok(
+    ok(
+      xml(
+        '<state id="p" initial="a"><state id="a"><transition event="e" type="internal" target="p" m:stay="true"/></state></state>',
+      ),
+    ),
+  );
+  bad(
+    xml(
+      '<state id="p" initial="a"><state id="a"><transition event="e" type="internal" target="b" m:stay="true"/></state><state id="b"/></state>',
+    ),
     'stay to a sibling',
   );
 });

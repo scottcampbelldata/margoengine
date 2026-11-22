@@ -47,25 +47,47 @@ export class InvokeMachine<C> extends FinalMachine<C> {
   /** Latest invocation for each id, including finished and cancelled records. */
   readonly invocations = new Map<string, Invocation>();
   /** Build, settle initial transitions, then start services belonging to active nonfinal states. */
-  constructor(states: Readonly<Record<string, InvokeState<C>>>, initial: string, context: C,
-    transitions: readonly FinalTransition<C>[] = [], options: InvokeOptions = {}) {
+  constructor(
+    states: Readonly<Record<string, InvokeState<C>>>,
+    initial: string,
+    context: C,
+    transitions: readonly FinalTransition<C>[] = [],
+    options: InvokeOptions = {},
+  ) {
     const ids = new Set<string>();
     for (const state of Object.values(states)) {
       const tasks = state.invoke === undefined ? [] : Array.isArray(state.invoke) ? state.invoke : [state.invoke];
       for (const task of tasks) {
-        if (!task || typeof task.id !== 'string' || !task.id.length || ids.has(task.id) || typeof task.run !== 'function' || state.final)
-          throw new TypeError('Invalid invoked task; give each service a unique non-empty id and run function on a nonfinal state');
+        if (
+          !task ||
+          typeof task.id !== 'string' ||
+          !task.id.length ||
+          ids.has(task.id) ||
+          typeof task.run !== 'function' ||
+          state.final
+        )
+          throw new TypeError(
+            'Invalid invoked task; give each service a unique non-empty id and run function on a nonfinal state',
+          );
         ids.add(task.id);
       }
     }
     let leaving: (name: string) => void = () => {};
-    const adapted = Object.fromEntries(Object.entries(states).map(([name, state]) => [name, {
-      ...state,
-      exit: (c: C, data: unknown) => { state.exit?.(c, data); leaving(name); },
-    }]));
+    const adapted = Object.fromEntries(
+      Object.entries(states).map(([name, state]) => [
+        name,
+        {
+          ...state,
+          exit: (c: C, data: unknown) => {
+            state.exit?.(c, data);
+            leaving(name);
+          },
+        },
+      ]),
+    );
     super(adapted, initial, context, transitions);
     this.services = states;
-    leaving = name => {
+    leaving = (name) => {
       for (const [id, { record }] of this.live) if (record.state === name) this.cancel(id);
     };
     const stop = () => this.dispose();
@@ -84,7 +106,9 @@ export class InvokeMachine<C> extends FinalMachine<C> {
     for (const id of [...this.live.keys()]) this.cancel(id);
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
   /** Closed runtimes no longer accept events. */
   override plan(event: string, data?: unknown): (() => void) | null {
     return this.closed ? null : super.plan(event, data);
@@ -98,8 +122,10 @@ export class InvokeMachine<C> extends FinalMachine<C> {
     for (let at: string | undefined = this.state; at !== undefined; at = this.states[at].parent) path.unshift(at);
     for (const state of path) {
       const spec = this.services[state].invoke;
-      const tasks: readonly InvokedTask<C>[] = spec === undefined ? [] : Array.isArray(spec) ? spec : [spec as InvokedTask<C>];
-      for (const task of tasks) if (!this.live.has(task.id) && this.matches(state) && !this.closed) this.start(state, task, data);
+      const tasks: readonly InvokedTask<C>[] =
+        spec === undefined ? [] : Array.isArray(spec) ? spec : [spec as InvokedTask<C>];
+      for (const task of tasks)
+        if (!this.live.has(task.id) && this.matches(state) && !this.closed) this.start(state, task, data);
     }
   }
   private cancel(id: string): void {
@@ -110,27 +136,41 @@ export class InvokeMachine<C> extends FinalMachine<C> {
   }
   private start(state: string, task: InvokedTask<C>, data: unknown): void {
     const abort = new AbortController();
-    const record: Invocation = { state, id: task.id, signal: abort.signal, status: 'running', settled: Promise.resolve() };
+    const record: Invocation = {
+      state,
+      id: task.id,
+      signal: abort.signal,
+      status: 'running',
+      settled: Promise.resolve(),
+    };
     const run = { record, abort };
     this.live.set(task.id, run);
     this.invocations.set(task.id, record);
     let cancel!: () => void;
-    const cancelled = new Promise<void>(resolve => { cancel = resolve; });
-    const onAbort = () => { if (record.status === 'cancelled') cancel(); };
+    const cancelled = new Promise<void>((resolve) => {
+      cancel = resolve;
+    });
+    const onAbort = () => {
+      if (record.status === 'cancelled') cancel();
+    };
     abort.signal.addEventListener('abort', onAbort, { once: true });
-    const result = new Promise<unknown>(resolve => resolve(task.run(this.context, abort.signal, data)));
+    const result = new Promise<unknown>((resolve) => resolve(task.run(this.context, abort.signal, data)));
     const delivered = result.then(
-      output => {
+      (output) => {
         if (this.live.get(task.id) !== run || abort.signal.aborted) return;
-        record.status = 'done'; record.output = output;
+        record.status = 'done';
+        record.output = output;
         this.send(`done.invoke.${task.id}`, { output });
       },
-      error => {
+      (error) => {
         if (this.live.get(task.id) !== run || abort.signal.aborted) return;
-        record.status = 'error'; record.error = error;
+        record.status = 'error';
+        record.error = error;
         this.send(`error.invoke.${task.id}`, { error });
       },
     );
-    record.settled = Promise.race([delivered, cancelled]).finally(() => abort.signal.removeEventListener('abort', onAbort));
+    record.settled = Promise.race([delivered, cancelled]).finally(() =>
+      abort.signal.removeEventListener('abort', onAbort),
+    );
   }
 }

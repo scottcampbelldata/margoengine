@@ -229,7 +229,11 @@ function buildRegion<C>(
  * Build a machine from a document. Its `enter` hooks run, as for `new StateMachine`.
  * @throws TypeError listing every issue of {@link validateMachine}.
  */
-export function loadMachine<C>(document: MachineDocument, context: C, bindings: MachineBindings<C> = {}): StateMachine<C> {
+export function loadMachine<C>(
+  document: MachineDocument,
+  context: C,
+  bindings: MachineBindings<C> = {},
+): StateMachine<C> {
   const issues = validateMachine(document, bindings);
   if (issues.length)
     throw new TypeError(`Invalid machine; ${issues.map(({ path, message }) => `${path}: ${message}`).join('; ')}`);
@@ -265,10 +269,12 @@ function saveRegion<C>(
       }
       if (options.history) out.regionHistory = true;
     } else {
-      if (state.plan) throw new TypeError(`Unsupported plan hook on state ${name}; a document holds only named hooks and regions`);
+      if (state.plan)
+        throw new TypeError(`Unsupported plan hook on state ${name}; a document holds only named hooks and regions`);
       for (const hook of HOOKS) {
         const value = state[hook];
-        if (value) out[hook] = nameOf(bindings.hooks, value as (context: C, delta: number) => void, `${hook} of ${name}`);
+        if (value)
+          out[hook] = nameOf(bindings.hooks, value as (context: C, delta: number) => void, `${hook} of ${name}`);
       }
     }
     saved[name] = out;
