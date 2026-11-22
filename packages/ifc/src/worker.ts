@@ -83,7 +83,9 @@ export async function* streamIFCInWorker(
   let end: { error?: unknown } | undefined,
     wake: (() => void) | undefined,
     timer: ReturnType<typeof setTimeout> | undefined;
-  const worker = new Worker(new URL(/* @vite-ignore */ './workers/ifc-stream.js?no-inline', import.meta.url), { name: 'margoengine-parser' });
+  const worker = new Worker(new URL(/* @vite-ignore */ './workers/ifc-stream.js?no-inline', import.meta.url), {
+    name: 'margoengine-parser',
+  });
   const finish = (state: { error?: unknown }) => {
     if (end) return;
     end = state;

@@ -12,7 +12,14 @@ try {
   const errors = [];
   browser.page.on('pageerror', (e) => errors.push(e.message));
   const result = await browser.page.evaluate(async () => {
-    const [{ Engine }, { readPixels, createHeadlessCanvas }, { createIFCScene }, { HitDetails }, { IFCSectionView }, { Lines, Line }] = await Promise.all([
+    const [
+      { Engine },
+      { readPixels, createHeadlessCanvas },
+      { createIFCScene },
+      { HitDetails },
+      { IFCSectionView },
+      { Lines, Line },
+    ] = await Promise.all([
       import('/packages/core/dist/index.js'),
       import('/packages/headless/dist/index.js'),
       import('/packages/ifc/dist/scene.js'),
@@ -43,7 +50,12 @@ try {
         { element: 20, geometry: 2, matrix: t(0, 3), color: [0.8, 0.8, 0.8, 1] },
         { element: 30, geometry: 2, matrix: t(4, 3), color: [1, 1, 0, 0.4] },
       ];
-    const scene = createIFCScene(engine, { schema: 'IFC4', origin: [0, 0, 0], geometries: sceneGeometries, placements });
+    const scene = createIFCScene(engine, {
+      schema: 'IFC4',
+      origin: [0, 0, 0],
+      geometries: sceneGeometries,
+      placements,
+    });
     const frame = async () => {
       engine.render();
       await device.queue.onSubmittedWorkDone();
@@ -60,7 +72,12 @@ try {
         b = 0,
         at;
       for (let i = 0; i < data.length; i += 4)
-        if (Math.abs(data[i] - background[i]) + Math.abs(data[i + 1] - background[i + 1]) + Math.abs(data[i + 2] - background[i + 2]) > 24) {
+        if (
+          Math.abs(data[i] - background[i]) +
+            Math.abs(data[i + 1] - background[i + 1]) +
+            Math.abs(data[i + 2] - background[i + 2]) >
+          24
+        ) {
           n++;
           r += data[i];
           g += data[i + 1];
@@ -107,7 +124,8 @@ try {
       differs = (a) => {
         let n = 0;
         for (let i = 0; i < a.length; i += 4)
-          if (Math.abs(a[i] - whole[i]) + Math.abs(a[i + 1] - whole[i + 1]) + Math.abs(a[i + 2] - whole[i + 2]) > 6) n++;
+          if (Math.abs(a[i] - whole[i]) + Math.abs(a[i + 1] - whole[i + 1]) + Math.abs(a[i + 2] - whole[i + 2]) > 6)
+            n++;
         return n;
       };
     out.stream = { first: differs(first), last: differs(last), draws: streamed.meshes.length };
@@ -128,7 +146,12 @@ try {
         const u = (axis + 1) % 3,
           v = (axis + 2) % 3,
           base = cube.positions.length / 3;
-        for (const [a, b] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+        for (const [a, b] of [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ]) {
           const p = [0, 0, 0],
             n = [0, 0, 0];
           p[axis] = side ? 1 : -1;
@@ -138,17 +161,35 @@ try {
           cube.positions.push(p[0], p[1], p[2] * 0.5);
           cube.normals.push(...n);
         }
-        cube.indices.push(...(side ? [base, base + 1, base + 2, base, base + 2, base + 3] : [base, base + 2, base + 1, base, base + 3, base + 2]));
+        cube.indices.push(
+          ...(side
+            ? [base, base + 1, base + 2, base, base + 2, base + 3]
+            : [base, base + 2, base + 1, base, base + 3, base + 2]),
+        );
       }
     const box = createIFCScene(engine, {
       origin: [0, 0, 0],
-      geometries: new Map([[1, { positions: new Float32Array(cube.positions), normals: new Float32Array(cube.normals), indices: new Uint32Array(cube.indices) }]]),
+      geometries: new Map([
+        [
+          1,
+          {
+            positions: new Float32Array(cube.positions),
+            normals: new Float32Array(cube.normals),
+            indices: new Uint32Array(cube.indices),
+          },
+        ],
+      ]),
       placements: [{ element: 40, geometry: 1, matrix: t(2.5, 2.5), color: [1, 0, 0, 1] }],
     });
     const far = Array.from({ length: 8 }, (_, i) => [Math.cos(i), Math.sin(i), 0, 50]);
     box.clippingPlanes = [...far, [0, 0, -1, 0]];
     const lines = Lines.attach(engine),
-      view = new IFCSectionView(engine, box, { capColor: [0, 0, 1], edges: { lines, Line }, edgeColor: [1, 1, 1], edgeWidth: 3 });
+      view = new IFCSectionView(engine, box, {
+        capColor: [0, 0, 1],
+        edges: { lines, Line },
+        edgeColor: [1, 1, 1],
+        edgeWidth: 3,
+      });
     out.capped = await look();
     const data = await frame(),
       centre = (size / 2) * size * 4 + (size / 2) * 4;
@@ -169,22 +210,48 @@ try {
   console.log(JSON.stringify(result));
   assert.equal(result.error, undefined);
   assert.deepEqual(errors, []);
-  const { all, red, yellow, green, batched, pane, ghost, cut, picked, capped, uncapped, white, cuts, capCentre, bareCentre } = result;
-  for (const one of [red, green, batched, pane]) assert.ok(one.n > 50 && one.n < all.n, `an isolated element draws alone: ${one.n} of ${all.n}`);
+  const {
+    all,
+    red,
+    yellow,
+    green,
+    batched,
+    pane,
+    ghost,
+    cut,
+    picked,
+    capped,
+    uncapped,
+    white,
+    cuts,
+    capCentre,
+    bareCentre,
+  } = result;
+  for (const one of [red, green, batched, pane])
+    assert.ok(one.n > 50 && one.n < all.n, `an isolated element draws alone: ${one.n} of ${all.n}`);
   assert.ok(red.mean[0] > 2 * red.mean[1] && red.mean[0] > 2 * red.mean[2], `the instance keeps its red: ${red.mean}`);
   assert.ok(green.mean[1] > 2 * green.mean[0], `the second instance keeps its green: ${green.mean}`);
-  assert.ok(yellow.mean[1] > 2 * red.mean[1] && yellow.n === red.n, `a colour override tints the instance: ${yellow.mean}`);
+  assert.ok(
+    yellow.mean[1] > 2 * red.mean[1] && yellow.n === red.n,
+    `a colour override tints the instance: ${yellow.mean}`,
+  );
   assert.ok(Math.abs(batched.mean[0] - batched.mean[2]) < 24, `the batched quad keeps its grey: ${batched.mean}`);
   assert.ok(ghost.n > red.n, `ghosts draw around the isolated element: ${ghost.n} > ${red.n}`);
   assert.ok(cut.n < all.n && cut.n > red.n, `the section box cuts the right-hand elements away: ${cut.n} of ${all.n}`);
   assert.deepEqual(picked, [12, 20, 30]);
   assert.equal(cuts, 1, 'one plane of nine cuts the box');
   assert.ok(capCentre[2] > 60 && capCentre[2] > 4 * capCentre[0], `the cap closes the cut in its colour: ${capCentre}`);
-  assert.ok(bareCentre[0] > 60 && bareCentre[0] > 4 * bareCentre[2], `without the cap the red inside shows: ${bareCentre}`);
+  assert.ok(
+    bareCentre[0] > 60 && bareCentre[0] > 4 * bareCentre[2],
+    `without the cap the red inside shows: ${bareCentre}`,
+  );
   assert.ok(capped.n >= uncapped.n, `cap and edges cover the cut box: ${capped.n} >= ${uncapped.n}`);
   assert.ok(white > 40, `white cut edges ring the cap: ${white} pixels`);
   const { stream, streamPicked } = result;
-  assert.ok(stream.first > 50, `the first chunk draws before the rest arrives: ${stream.first} pixels short of the whole model`);
+  assert.ok(
+    stream.first > 50,
+    `the first chunk draws before the rest arrives: ${stream.first} pixels short of the whole model`,
+  );
   assert.equal(stream.last, 0, 'the streamed scene draws the same pixels as the whole load');
   assert.equal(stream.draws, 3, 'one instance group, one opaque and one translucent batch, as a whole load');
   assert.deepEqual(streamPicked, [10, 12, 20, 30], 'picking ids survive the move into the group');

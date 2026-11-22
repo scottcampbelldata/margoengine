@@ -5,10 +5,16 @@
 export type RawValue = string | number | boolean | null | RawValue[];
 // biome-ignore lint/suspicious/noExplicitAny: web-ifc lines are untyped JSON
 export type Raw = any;
-export const refOf = (v: Raw): number | undefined => (v && v.type === 5 && typeof v.value === 'number' ? v.value : undefined);
+export const refOf = (v: Raw): number | undefined =>
+  v && v.type === 5 && typeof v.value === 'number' ? v.value : undefined;
 export const refsOf = (v: Raw): number[] =>
-  Array.isArray(v) ? v.map(refOf).filter((x): x is number => x !== undefined) : refOf(v) !== undefined ? [refOf(v)!] : [];
-export const text = (v: Raw): string | undefined => (v && typeof v.value === 'string' && v.type !== 5 ? v.value : undefined);
+  Array.isArray(v)
+    ? v.map(refOf).filter((x): x is number => x !== undefined)
+    : refOf(v) !== undefined
+      ? [refOf(v)!]
+      : [];
+export const text = (v: Raw): string | undefined =>
+  v && typeof v.value === 'string' && v.type !== 5 ? v.value : undefined;
 export const decode = (v: Raw): RawValue | undefined => {
   if (v === null || v === undefined) return null;
   if (Array.isArray(v)) return v.map(decode).filter((x): x is RawValue => x !== undefined);

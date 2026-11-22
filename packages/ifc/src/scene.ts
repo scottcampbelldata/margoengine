@@ -59,7 +59,13 @@ export interface IFCStoreyPlan {
   elevation: number;
   cut: number;
   clippingPlanes: number[][];
-  camera: { type: 'orthogonal'; position: [number, number, number]; target: [number, number, number]; up: [number, number, number]; height: number };
+  camera: {
+    type: 'orthogonal';
+    position: [number, number, number];
+    target: [number, number, number];
+    up: [number, number, number];
+    height: number;
+  };
 }
 
 type RGB = [number, number, number];
@@ -98,7 +104,11 @@ function rgbOf(c: readonly number[] | undefined, what: string, fallback: RGB): R
   return [c[0], c[1], c[2]];
 }
 const unit = (v: number | undefined, what: string, fallback: number) =>
-  v === undefined ? fallback : Number.isFinite(v) && v >= 0 && v <= 1 ? v : fail('range', `${what} must be a number from 0 to 1`);
+  v === undefined
+    ? fallback
+    : Number.isFinite(v) && v >= 0 && v <= 1
+      ? v
+      : fail('range', `${what} must be a number from 0 to 1`);
 
 /** BatchedMeshes of one material: the last batch grows (twice its size, up to `limit`) before a new one opens. */
 class Batches {
@@ -109,7 +119,12 @@ class Batches {
     private readonly material: Material,
     readonly limit: number,
   ) {}
-  add(make: () => MeshGeometry, matrix: Float32Array, color: RGB, want: { vertices: number; indices: number; items: number }): Item {
+  add(
+    make: () => MeshGeometry,
+    matrix: Float32Array,
+    color: RGB,
+    want: { vertices: number; indices: number; items: number },
+  ): Item {
     const geometry = make(),
       vertices = geometry.positions.length / 3,
       indices = geometry.indices!.length;
@@ -154,7 +169,11 @@ class Batches {
    * The last batch rebuilt with room for `vertices` and `indices` more (its live items packed, their matrices, tints
    * and visibility kept), or undefined when that would pass the limits. Streamed chunks fill one batch, not one each.
    */
-  private grow(vertices: number, indices: number, want: { vertices: number; indices: number; items: number }): BatchedMesh | undefined {
+  private grow(
+    vertices: number,
+    indices: number,
+    want: { vertices: number; indices: number; items: number },
+  ): BatchedMesh | undefined {
     const old = this.list.at(-1);
     if (!old) return;
     const live = this.owners.get(old)!;
@@ -171,7 +190,11 @@ class Batches {
     );
     for (const item of live) {
       const id = item.item;
-      item.item = batch.add(item.make(), { matrix: old.getMatrix(id), color: Array.from(old.getColor(id)) as RGB, visible: old.isVisible(id) });
+      item.item = batch.add(item.make(), {
+        matrix: old.getMatrix(id),
+        color: Array.from(old.getColor(id)) as RGB,
+        visible: old.isVisible(id),
+      });
       item.batch = batch;
       this.owners.get(batch)!.add(item);
     }
@@ -261,7 +284,10 @@ export class IFCScene {
     for (const p of meshes.placements)
       list.push({
         p,
-        g: meshes.geometries.get(p.geometry) ?? this.known.get(p.geometry) ?? fail('range', `placement of #${p.element} names missing geometry ${p.geometry}`),
+        g:
+          meshes.geometries.get(p.geometry) ??
+          this.known.get(p.geometry) ??
+          fail('range', `placement of #${p.element} names missing geometry ${p.geometry}`),
       });
     for (const [key, g] of meshes.geometries) {
       if (this.known.get(key) !== g) this.uses.delete(key);
@@ -281,7 +307,11 @@ export class IFCScene {
       if (p.color[3] >= 1 && ((this.instancing > 0 && u.uses >= this.instancing) || n > limit)) {
         if (!u.group) {
           const white: MeshGeometry = { positions: g.positions, normals: g.normals, indices: g.indices },
-            group: Group = { mesh: createInstancedMesh(this.engine, white, this.materials.opaque, u.uses), slots: [], white };
+            group: Group = {
+              mesh: createInstancedMesh(this.engine, white, this.materials.opaque, u.uses),
+              slots: [],
+              white,
+            };
           group.mesh.instances.count = 0;
           this.groups.push(group);
           u.group = group;
@@ -309,7 +339,12 @@ export class IFCScene {
           w = translucent ? wantT : want,
           n = g.positions.length / 3,
           alpha = p.color[3];
-        part.item = (translucent ? this.translucent : this.opaque).add(() => this.copy(g, slot, alpha), part.matrix, [color[0], color[1], color[2]], w);
+        part.item = (translucent ? this.translucent : this.opaque).add(
+          () => this.copy(g, slot, alpha),
+          part.matrix,
+          [color[0], color[1], color[2]],
+          w,
+        );
         if (!translucent) this.uses.get(p.geometry)!.batched.push(part);
         w.vertices -= n;
         w.indices -= g.indices.length;
@@ -324,7 +359,15 @@ export class IFCScene {
   /** The state of an element, or undefined when it has no geometry here. */
   stateOf(id: number): IFCElementState | undefined {
     const s = this.slots.get(id);
-    return s && { hidden: s.hidden, ghosted: s.ghosted, selected: s.selected, ...(s.srgb && { color: [...s.srgb] as RGB }), ...(s.opacity !== undefined && { opacity: s.opacity }) };
+    return (
+      s && {
+        hidden: s.hidden,
+        ghosted: s.ghosted,
+        selected: s.selected,
+        ...(s.srgb && { color: [...s.srgb] as RGB }),
+        ...(s.opacity !== undefined && { opacity: s.opacity }),
+      }
+    );
   }
   /** Shows or hides elements. IDs without geometry are skipped. */
   setVisible(ids: Iterable<number>, visible: boolean): this {
@@ -392,12 +435,16 @@ export class IFCScene {
    * The element a pick hit: an instanced mesh by its `instanceId`, a batch by the element slot in UV0 (pick with
    * `@margoengine/selection/hit-details`, whose hits carry `uv`). Undefined for a hit on anything else.
    */
-  elementAt(hit: { model?: unknown; mesh?: unknown; instanceId?: number; uv?: readonly number[] } | null | undefined): number | undefined {
+  elementAt(
+    hit: { model?: unknown; mesh?: unknown; instanceId?: number; uv?: readonly number[] } | null | undefined,
+  ): number | undefined {
     if (!hit) return;
     const owner = hit.model ?? hit.mesh;
     const group = this.groups.find((g) => g.mesh === owner || (g.mesh as { root?: unknown }).root === owner);
     if (group) return hit.instanceId === undefined ? undefined : this.order[group.slots[hit.instanceId]]?.id;
-    const batched = [...this.opaque.list, ...this.translucent.list].some((b) => b.mesh === owner || b.mesh.root === owner);
+    const batched = [...this.opaque.list, ...this.translucent.list].some(
+      (b) => b.mesh === owner || b.mesh.root === owner,
+    );
     if (!batched || !hit.uv) return;
     return this.order[Math.round(hit.uv[0])]?.id;
   }
@@ -412,14 +459,22 @@ export class IFCScene {
   set clippingPlanes(planes: readonly (readonly number[])[]) {
     this.live();
     if (!Array.isArray(planes) || planes.length > 16)
-      fail('range', `clippingPlanes holds at most 16 planes (got ${Array.isArray(planes) ? planes.length : 'none'}); pass fewer`);
+      fail(
+        'range',
+        `clippingPlanes holds at most 16 planes (got ${Array.isArray(planes) ? planes.length : 'none'}); pass fewer`,
+      );
     this.materials.opaque.clippingPlanes = planes;
     this.materials.translucent.clippingPlanes = planes;
     this.planes = planes.map((p) => [...p]);
   }
   /** Cuts away everything outside the box from `min` to `max` (engine axes, meters) and returns its six planes. */
   sectionBox(min: readonly number[], max: readonly number[]): number[][] {
-    if (![...min, ...max].every(Number.isFinite) || min.length !== 3 || max.length !== 3 || min.some((v, i) => v > max[i]))
+    if (
+      ![...min, ...max].every(Number.isFinite) ||
+      min.length !== 3 ||
+      max.length !== 3 ||
+      min.some((v, i) => v > max[i])
+    )
       fail('range', 'sectionBox takes finite min and max corners with min <= max');
     const planes = [0, 1, 2].flatMap((axis) => {
       const lo = [0, 0, 0, -min[axis]],
@@ -435,7 +490,9 @@ export class IFCScene {
    * The placed geometries of element `id` (none for an unknown id): its triangles, its placement in the scene's
    * coordinates (rebased by `origin`) and its file colour (linear RGB and alpha). Read-only views of the scene's data.
    */
-  placementsOf(id: number): readonly { geometry: IFCMeshGeometry; matrix: Float32Array; color: readonly [number, number, number, number] }[] {
+  placementsOf(
+    id: number,
+  ): readonly { geometry: IFCMeshGeometry; matrix: Float32Array; color: readonly [number, number, number, number] }[] {
     return (this.slots.get(id)?.parts ?? []).map((p) => ({ geometry: p.geometry, matrix: p.matrix, color: p.color }));
   }
   /** The world box [minX, minY, minZ, maxX, maxY, maxZ] of `ids` (default every shown element); empty is all Infinity. */
@@ -460,16 +517,21 @@ export class IFCScene {
    * top-down orthographic camera over it. Needs the `data` option.
    */
   storeyPlan(storey: number, options: { cutHeight?: number; elevation?: number } = {}): IFCStoreyPlan {
-    const data = this.data ?? fail('range', 'storeyPlan needs the model data; pass createIFCScene(engine, meshes, { data })');
+    const data =
+      this.data ?? fail('range', 'storeyPlan needs the model data; pass createIFCScene(engine, meshes, { data })');
     const element = data.elements.get(storey);
-    if (!element || element.type.toUpperCase() !== 'IFCBUILDINGSTOREY') fail('range', `#${storey} is not an IfcBuildingStorey of this model`);
+    if (!element || element.type.toUpperCase() !== 'IFCBUILDINGSTOREY')
+      fail('range', `#${storey} is not an IfcBuildingStorey of this model`);
     const raw = element!.attributes.Elevation,
       scale = data.units.byType.LENGTHUNIT?.scale ?? 1;
     const elevation =
       options.elevation ??
-      (typeof raw === 'number' ? raw * scale - this.origin[1] : fail('range', `storey #${storey} has no Elevation; pass elevation`));
+      (typeof raw === 'number'
+        ? raw * scale - this.origin[1]
+        : fail('range', `storey #${storey} has no Elevation; pass elevation`));
     const height = options.cutHeight ?? 1.2;
-    if (!Number.isFinite(elevation) || !Number.isFinite(height)) fail('range', 'elevation and cutHeight must be finite');
+    if (!Number.isFinite(elevation) || !Number.isFinite(height))
+      fail('range', 'elevation and cutHeight must be finite');
     const ids = [...data.elements.values()].filter((e) => e.storey === storey).map((e) => e.id);
     this.isolate(ids);
     const cut = elevation + height,
@@ -484,7 +546,13 @@ export class IFCScene {
       elevation,
       cut,
       clippingPlanes: planes,
-      camera: { type: 'orthogonal', position: [cx, cut + 1, cz], target: [cx, elevation, cz], up: [0, 0, -1], height: Math.max(size, 1e-3) },
+      camera: {
+        type: 'orthogonal',
+        position: [cx, cut + 1, cz],
+        target: [cx, elevation, cz],
+        up: [0, 0, -1],
+        height: Math.max(size, 1e-3),
+      },
     };
   }
 
@@ -494,7 +562,8 @@ export class IFCScene {
    */
   applyBCFView(view: BCFView): BCFView['camera'] {
     this.live();
-    if (view.clippingPlanes.length > 16) fail('range', `the viewpoint has ${view.clippingPlanes.length} section planes; a scene clips with at most 16`);
+    if (view.clippingPlanes.length > 16)
+      fail('range', `the viewpoint has ${view.clippingPlanes.length} section planes; a scene clips with at most 16`);
     const hidden = new Set(view.hidden),
       selected = new Set(view.selected);
     this.each(this.elements, (s) => {
@@ -545,7 +614,12 @@ export class IFCScene {
   private reserve(group: Group, count: number): void {
     const old = group.mesh.instances;
     if (count <= old.capacity) return;
-    const mesh = createInstancedMesh(this.engine, group.white, this.materials.opaque, Math.min(1_000_000, Math.max(count, old.capacity * 2)));
+    const mesh = createInstancedMesh(
+      this.engine,
+      group.white,
+      this.materials.opaque,
+      Math.min(1_000_000, Math.max(count, old.capacity * 2)),
+    );
     mesh.instances.data.set(old.data.subarray(0, old.count * 24));
     mesh.instances.count = old.count;
     mesh.instances.needsUpdate = true;
@@ -596,7 +670,9 @@ export class IFCScene {
     if (part.item) part.item.batch.setVisible(part.item.item, shown).setColor(part.item.item, [rgb[0], rgb[1], rgb[2]]);
     else if (part.instance) {
       const { group, index } = part.instance;
-      group.mesh.instances.setMatrixAt(index, shown ? part.matrix : ZERO).setColorAt(index, [rgb[0], rgb[1], rgb[2], 1]);
+      group.mesh.instances
+        .setMatrixAt(index, shown ? part.matrix : ZERO)
+        .setColorAt(index, [rgb[0], rgb[1], rgb[2], 1]);
     }
   }
   private overlay(s: Slot): void {
@@ -616,11 +692,13 @@ export class IFCScene {
     }
     for (const p of s.parts) {
       const tint = rgb ?? ([p.color[0], p.color[1], p.color[2]] as RGB);
-      s.overlay.push(this.translucent.add(() => this.copy(p.geometry, s, alpha), p.matrix, tint, {
+      s.overlay.push(
+        this.translucent.add(() => this.copy(p.geometry, s, alpha), p.matrix, tint, {
           vertices: Math.max(need.vertices, 65_536),
           indices: Math.max(need.indices, 196_608),
           items: Math.max(need.items, 4_096),
-        }));
+        }),
+      );
     }
   }
 }

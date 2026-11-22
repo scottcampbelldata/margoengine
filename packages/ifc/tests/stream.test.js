@@ -90,9 +90,16 @@ test("ordering: 'envelope' streams walls and slabs first, 'file' in expressID or
     rank = (id) => (/^IFC(WALL|SLAB|ROOF|CURTAINWALL)/.test(typeOf(model, id)) ? 0 : 1);
   assert.equal(rank(envelope[0]), 0, 'the first element is part of the shell');
   const ranks = envelope.map(rank);
-  assert.deepEqual(ranks, ranks.slice().sort((a, b) => a - b), 'every shell element comes before the rest');
+  assert.deepEqual(
+    ranks,
+    ranks.slice().sort((a, b) => a - b),
+    'every shell element comes before the rest',
+  );
   const file = order(readIFCMeshes(model, { order: 'file' }));
-  assert.deepEqual(file, file.slice().sort((a, b) => a - b));
+  assert.deepEqual(
+    file,
+    file.slice().sort((a, b) => a - b),
+  );
   assert.deepEqual(file.slice().sort(), envelope.slice().sort());
   const pick = [file[3], file[1], file[1], 999_999_999];
   const subset = await collect(streamIFCMeshes(model, { elements: pick, chunk: 1, order: 'file' }));
@@ -166,7 +173,12 @@ const at = (x) => Float64Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0
 const place = (element, geometry, x, alpha = 1) => ({ element, geometry, matrix: at(x), color: [1, 1, 1, alpha] });
 
 test('add: a geometry placed again in a later chunk moves into one instance group, batches grow instead of multiplying', async () => {
-  const scene = createIFCScene(await engine(), { schema: 'IFC4', origin: [0, 0, 0], geometries: new Map([[1, quad]]), placements: [place(10, 1, 0)] });
+  const scene = createIFCScene(await engine(), {
+    schema: 'IFC4',
+    origin: [0, 0, 0],
+    geometries: new Map([[1, quad]]),
+    placements: [place(10, 1, 0)],
+  });
   assert.equal(scene.meshes.length, 1, 'placed once: batched');
   // The next chunk places geometry 1 again without sending it: the first part moves from the batch into a group.
   scene.add({ geometries: new Map(), placements: [place(11, 1, 2)] });
@@ -189,7 +201,10 @@ test('add: a geometry placed again in a later chunk moves into one instance grou
   assert.equal(group.instances.data[0], 0, 'the hidden instance stays hidden');
   // One distinct geometry per chunk, each placed once: every chunk lands in the same opaque batch.
   for (let i = 0; i < 20; i++)
-    scene.add({ geometries: new Map([[100 + i, { ...quad, positions: quad.positions.slice() }]]), placements: [place(100 + i, 100 + i, i)] });
+    scene.add({
+      geometries: new Map([[100 + i, { ...quad, positions: quad.positions.slice() }]]),
+      placements: [place(100 + i, 100 + i, i)],
+    });
   const batches = scene.meshes.filter((m) => !m.instances);
   assert.equal(batches.length, 1, 'chunks share one batch');
   assert.equal(scene.elementAt({ model: batches[0], uv: [scene.elements.indexOf(119), 0] }), 119);
@@ -200,10 +215,25 @@ test('add: a geometry placed again in a later chunk moves into one instance grou
 });
 
 test('add counts placements per geometry key, so two keys sharing one geometry object are not instanced together', async () => {
-  const scene = createIFCScene(await engine(), { schema: 'IFC4', origin: [0, 0, 0], geometries: new Map([[1, quad], [2, quad]]), placements: [place(1, 1, 0), place(2, 2, 2)] });
-  assert.deepEqual(scene.meshes.map((m) => !!m.instances), [false], 'each key placed once: both batched');
+  const scene = createIFCScene(await engine(), {
+    schema: 'IFC4',
+    origin: [0, 0, 0],
+    geometries: new Map([
+      [1, quad],
+      [2, quad],
+    ]),
+    placements: [place(1, 1, 0), place(2, 2, 2)],
+  });
+  assert.deepEqual(
+    scene.meshes.map((m) => !!m.instances),
+    [false],
+    'each key placed once: both batched',
+  );
   // Another model's geometry under a key this scene knows starts its own count.
-  scene.add({ geometries: new Map([[1, { ...quad, positions: quad.positions.slice() }]]), placements: [place(3, 1, 4)] });
+  scene.add({
+    geometries: new Map([[1, { ...quad, positions: quad.positions.slice() }]]),
+    placements: [place(3, 1, 4)],
+  });
   assert.equal(scene.meshes.filter((m) => m.instances).length, 0);
   scene.dispose();
 });
@@ -212,18 +242,28 @@ test('add counts placements per geometry key, so two keys sharing one geometry o
 async function inProcess(message) {
   const code = await readFile(new URL('../dist/workers/ifc-stream.js', import.meta.url), 'utf8');
   const replies = [];
-  const self = { importScripts: () => (self.WebIFC = require('web-ifc')), postMessage: (data) => replies.push(structuredClone(data)) };
+  const self = {
+    importScripts: () => (self.WebIFC = require('web-ifc')),
+    postMessage: (data) => replies.push(structuredClone(data)),
+  };
   new Function('self', code)(self);
   await self.onmessage({ data: structuredClone(message) });
   return replies;
 }
 
 test('the stream worker posts the chunks streamIFCMeshes yields, then done', async () => {
-  const replies = await inProcess({ buffer: big.slice().buffer, webIfc: 'web-ifc-api-iife.js', options: { chunk: 32 } });
+  const replies = await inProcess({
+    buffer: big.slice().buffer,
+    webIfc: 'web-ifc-api-iife.js',
+    options: { chunk: 32 },
+  });
   assert.deepEqual(replies.at(-1), { done: true });
   using model = openIFC(api, big);
   const direct = await collect(streamIFCMeshes(model, { chunk: 32 }));
-  assert.deepEqual(replies.slice(0, -1).map((r) => r.chunk), direct);
+  assert.deepEqual(
+    replies.slice(0, -1).map((r) => r.chunk),
+    direct,
+  );
   const [bad] = await inProcess({ buffer: new TextEncoder().encode('nope').buffer, webIfc: 'x.js', options: {} });
   assert.equal(bad.error.name, 'LoaderError');
   assert.equal(bad.error.code, 'header');
@@ -256,12 +296,22 @@ function fakeWorker(script) {
 
 test('streamIFCInWorker yields chunks in order and terminates its worker on end, break, abort and silence', async () => {
   const saved = globalThis.Worker,
-    chunk = (loaded) => ({ schema: 'IFC4', origin: [0, 0, 0], geometries: new Map(), placements: [], loaded, total: 3 }),
+    chunk = (loaded) => ({
+      schema: 'IFC4',
+      origin: [0, 0, 0],
+      geometries: new Map(),
+      placements: [],
+      loaded,
+      total: 3,
+    }),
     options = { webIfc: 'https://app.test/web-ifc-api-iife.js' };
   try {
     let made = fakeWorker([{ chunk: chunk(1) }, { chunk: chunk(2) }, { chunk: chunk(3) }, { done: true }]);
     const all = await collect(streamIFCInWorker(big.slice(), { ...options, elements: new Set([5, 6]), chunk: 2 }));
-    assert.deepEqual(all.map((c) => c.loaded), [1, 2, 3]);
+    assert.deepEqual(
+      all.map((c) => c.loaded),
+      [1, 2, 3],
+    );
     assert.deepEqual(made[0].message.options.elements, [5, 6], 'elements cross as an array');
     assert.equal(made[0].terminated, true);
     made = fakeWorker([{ chunk: chunk(1) }, { chunk: chunk(2) }, { chunk: chunk(3) }, { done: true }]);
@@ -271,17 +321,27 @@ test('streamIFCInWorker yields chunks in order and terminates its worker on end,
     const stop = new AbortController();
     await assert.rejects(
       (async () => {
-        for await (const c of streamIFCInWorker(big.slice(), { ...options, signal: stop.signal })) stop.abort(new Error('user'));
+        for await (const c of streamIFCInWorker(big.slice(), { ...options, signal: stop.signal }))
+          stop.abort(new Error('user'));
       })(),
       /user/,
     );
     assert.equal(made[0].terminated, true, 'abort terminates the worker');
     made = fakeWorker([{ chunk: chunk(1) }]);
-    await assert.rejects(collect(streamIFCInWorker(big.slice(), { ...options, timeoutMs: 30 })), (e) => e.code === 'limit' && /nothing for 30 ms/.test(e.message));
+    await assert.rejects(
+      collect(streamIFCInWorker(big.slice(), { ...options, timeoutMs: 30 })),
+      (e) => e.code === 'limit' && /nothing for 30 ms/.test(e.message),
+    );
     assert.equal(made[0].terminated, true, 'a silent worker is terminated');
     made = fakeWorker([{ error: { name: 'LoaderError', message: 'IFC: syntax', format: 'IFC', code: 'syntax' } }]);
-    await assert.rejects(collect(streamIFCInWorker(big.slice(), options)), (e) => e instanceof LoaderError && e.code === 'syntax');
-    await assert.rejects(collect(streamIFCInWorker(big.slice(), { ...options, timeoutMs: 0 })), (e) => e.code === 'range');
+    await assert.rejects(
+      collect(streamIFCInWorker(big.slice(), options)),
+      (e) => e instanceof LoaderError && e.code === 'syntax',
+    );
+    await assert.rejects(
+      collect(streamIFCInWorker(big.slice(), { ...options, timeoutMs: 0 })),
+      (e) => e.code === 'range',
+    );
   } finally {
     globalThis.Worker = saved;
   }
