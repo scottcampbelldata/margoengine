@@ -28,15 +28,17 @@ function fakeGPU(t) {
 test('a frame longer than the time limit that leaves nothing pending is ready after its confirming frame', async (t) => {
   fakeGPU(t);
   let frames = 0;
-  // The stand-in of the slow first frame: all its work is synchronous, no pipeline starts or stays compiling.
+  let clock = 0;
+  t.mock.method(performance, 'now', () => clock);
   const ms = await waitForPipelines(
-    async () => {
-      if (frames++ === 0) await sleep(80);
+    () => {
+      // A slow first frame runs past the deadline without starting any pipelines.
+      if (frames++ === 0) clock += 80;
     },
     { timeoutMs: 30 },
   );
   assert.equal(frames, 2, 'the slow calm frame and one confirming frame');
-  assert.ok(ms >= 80);
+  assert.equal(ms, 80);
 });
 
 test('a pipeline that never compiles still fails, with its label', async (t) => {

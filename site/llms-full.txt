@@ -11548,7 +11548,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   The limit and the two-frame rule are unchanged. A frame that never returns is still caught by the caller's hard
   time limit. After the fix, sky-radiance passed 3 of 3 runs and contact-foam 2 of 2 under the same load. The long
   first frame on the layer is work, not a wait, and stays a speed-phase item.
-- **Regression:** `tests/gpu-ready.test.js` uses a stand-in frame that takes longer than the limit with nothing pending
+- **Regression:** `tests/gpu-ready.test.js` uses a simulated clock to put a frame beyond the limit with nothing pending
   (it fails on the old code with `not ready after 95 ms: 0 pipelines compiling`). It also covers a pipeline that never
   compiles (fails, naming its label), a page that starts a pipeline every frame, and a `ready()` that stays false.
 

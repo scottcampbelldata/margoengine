@@ -4,6 +4,8 @@ One folder per known-bugs row whose cause is in a browser, driver or library. Ea
 environment, steps, expected, actual, the result on the workstation) and the smallest page or script that shows it, written without Margo code. Nothing here has been filed or sent;
 the owner files them.
 
+Use the known-bugs ID for the folder and both ID cells in the table. IDs can include hyphens.
+
 `run-page.mjs` is an optional Playwright driver for the pages: `node docs/upstream-reports/run-page.mjs docs/upstream-reports/<id>/<page>.html --browser=edge|chrome|firefox|webkit [--query=...] [--luid=high,low]`.
 
 | Row | Folder | Goes to | Still reproduces (2026-11-11) |
