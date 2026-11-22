@@ -47,7 +47,13 @@ export class PhysicalLens implements Required<PhysicalLensOptions> {
   fStop: number;
   focusDistance: number;
   /** @throws RangeError for nonphysical settings; see {@link PhysicalLensOptions}. */
-  constructor({ focalLength = 50, filmGauge = 36, sensorFit = 'auto', fStop = 2.8, focusDistance = 5 }: PhysicalLensOptions = {}) {
+  constructor({
+    focalLength = 50,
+    filmGauge = 36,
+    sensorFit = 'auto',
+    fStop = 2.8,
+    focusDistance = 5,
+  }: PhysicalLensOptions = {}) {
     this.focalLength = focalLength;
     this.filmGauge = filmGauge;
     this.sensorFit = sensorFit;
@@ -61,7 +67,9 @@ export class PhysicalLens implements Required<PhysicalLensOptions> {
       focus <= this.focalLength / 1000 ||
       !['auto', 'horizontal', 'vertical'].includes(this.sensorFit)
     )
-      throw new RangeError(`Invalid physical lens; use positive finite settings, a valid sensorFit and focus beyond focal length. ${help}`);
+      throw new RangeError(
+        `Invalid physical lens; use positive finite settings, a valid sensorFit and focus beyond focal length. ${help}`,
+      );
   }
   /** Vertical FOV in degrees for this sensor and view. @throws RangeError for invalid mutable settings or aspect. */
   fov(aspect = 16 / 9): number {

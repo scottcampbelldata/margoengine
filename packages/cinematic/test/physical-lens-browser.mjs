@@ -11,14 +11,21 @@ try {
     const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
     const canvas = document.createElement('canvas');
     document.body.replaceChildren(canvas);
-    const engine = await Engine.create(canvas, { backend: 'webgpu', exactSize: [256, 128],
-      camera: { position: [0, 0, 0], target: [0, 0, -1] } });
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      exactSize: [256, 128],
+      camera: { position: [0, 0, 0], target: [0, 0, -1] },
+    });
     engine.stop();
-    const gpu = engineRuntime(engine).gpu, errors = [];
+    const gpu = engineRuntime(engine).gpu,
+      errors = [];
     gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
     try {
       engine.scene.background = '#000000';
-      const mesh = engine.createMesh().setGeometry(box(2, 2, 0.05)).setPosition([0, 0, -6]);
+      const mesh = engine
+        .createMesh()
+        .setGeometry(box(2, 2, 0.05))
+        .setPosition([0, 0, -6]);
       mesh.material.set({ color: [1, 1, 1], unlit: true });
       const lens = new PhysicalLens({ focalLength: 85, filmGauge: 36, focusDistance: 2, fStop: 1 });
       lens.apply({ camera: engine.camera, aspect: 2 });
@@ -38,17 +45,28 @@ try {
         bitmap.close();
         const pixels = flat.getImageData(0, 0, 256, 128).data;
         const row = Array.from({ length: 256 }, (_, x) => pixels[(64 * 256 + x) * 4]);
-        const peak = Math.max(...row), low = Math.min(...row);
-        rows.push({ fStop, peak, middle: row.filter((v) => v > low + (peak - low) * 0.1 && v < low + (peak - low) * 0.9).length,
-          bright: row.filter((v) => v >= peak * 0.9).length, fov: engine.camera.fov, focalLength: dof.focalLength,
-          focus: dof.options.focalDistance, aperture: dof.options.aperture });
+        const peak = Math.max(...row),
+          low = Math.min(...row);
+        rows.push({
+          fStop,
+          peak,
+          middle: row.filter((v) => v > low + (peak - low) * 0.1 && v < low + (peak - low) * 0.9).length,
+          bright: row.filter((v) => v >= peak * 0.9).length,
+          fov: engine.camera.fov,
+          focalLength: dof.focalLength,
+          focus: dof.options.focalDistance,
+          aperture: dof.options.aperture,
+        });
       }
       lens.focalLength = 35;
       lens.apply({ camera: engine.camera, dof, aspect: 2 });
       engine.render({ delta: 0 });
       await gpu.queue.onSubmittedWorkDone();
       return { rows, zoom: engine.camera.fov, focalLength: dof.focalLength, errors };
-    } finally { engine.dispose(); canvas.remove(); }
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
   });
   console.log(JSON.stringify(result));
   assert.deepEqual(result.errors, []);
@@ -57,11 +75,13 @@ try {
   assert.ok(stopped.bright > 20, 'the card rendered');
   for (const row of result.rows) {
     assert.ok(row.peak > 150, 'white diagnostic card rendered');
-    assert.ok(Math.abs(row.fov - 2 * Math.atan(18 / 170) * 180 / Math.PI) < 1e-9);
+    assert.ok(Math.abs(row.fov - (2 * Math.atan(18 / 170) * 180) / Math.PI) < 1e-9);
     assert.ok(Math.abs(row.focalLength - 0.085) < 1e-6);
     assert.equal(row.focus, 2);
     assert.equal(row.aperture, row.fStop);
   }
   assert.ok(result.zoom > wide.fov);
   assert.ok(Math.abs(result.focalLength - 0.035) < 1e-6);
-} finally { await context.close(); }
+} finally {
+  await context.close();
+}

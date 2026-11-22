@@ -21,7 +21,12 @@ function world() {
       blend: { duration: 1.5 },
     }),
     wide = brain.add({ name: 'wide', priority: 1, position: [0, 4, 12], stages: [new FocusTracker(subject)] }),
-    close = brain.add({ name: 'close', priority: 0, position: [3, 1.6, 4], stages: [new FocusTracker(subject, { size: 1 })] }),
+    close = brain.add({
+      name: 'close',
+      priority: 0,
+      position: [3, 1.6, 4],
+      stages: [new FocusTracker(subject, { size: 1 })],
+    }),
     noise = new CameraNoise(handheld),
     events = [];
   brain.stages.push(noise);
@@ -38,10 +43,21 @@ function world() {
   return { brain, camera, noise, events, film };
 }
 const plain = (w) => ({
-  pose: { ...w.brain.pose, position: [...w.brain.pose.position], target: [...w.brain.pose.target], up: [...w.brain.pose.up] },
+  pose: {
+    ...w.brain.pose,
+    position: [...w.brain.pose.position],
+    target: [...w.brain.pose.target],
+    up: [...w.brain.pose.up],
+  },
   live: w.brain.live?.name,
   blending: w.brain.blending,
-  cameras: w.brain.list.map((c) => [c.name, [...c.pose.position], [...c.pose.target], c.pose.fov, c.pose.focusDistance]),
+  cameras: w.brain.list.map((c) => [
+    c.name,
+    [...c.pose.position],
+    [...c.pose.target],
+    c.pose.fov,
+    c.pose.focusDistance,
+  ]),
   noise: w.noise.time,
   camera: JSON.parse(JSON.stringify(w.camera)),
 });

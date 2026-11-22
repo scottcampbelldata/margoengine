@@ -48,9 +48,20 @@ test('dolly fits points exactly to the padded frame, from any angle', () => {
         random() * 40 - 20,
       ]),
       group = new GroupFraming(points, { padding: 0.1, minDistance: 0.001 }),
-      p = createPose({ position: [random() * 20 - 10, 10 + random() * 5, 20], target: [0, 0, 0], fov: 30 + random() * 40 });
+      p = createPose({
+        position: [random() * 20 - 10, 10 + random() * 5, 20],
+        target: [0, 0, 0],
+        fov: 30 + random() * 40,
+      });
     group.update(p, 0, context);
-    near(reach(p, points.map((center) => ({ center }))), 0.8, 1e-9);
+    near(
+      reach(
+        p,
+        points.map((center) => ({ center })),
+      ),
+      0.8,
+      1e-9,
+    );
   }
 });
 
@@ -93,22 +104,47 @@ test('zoom holds the camera still and finds the field of view that fits', () => 
     p = pose();
   group.update(p, 0, context);
   assert.deepEqual([...p.position], [0, 6, 20]);
-  near(reach(p, points.map((center) => ({ center }))), 0.8, 1e-9);
+  near(
+    reach(
+      p,
+      points.map((center) => ({ center })),
+    ),
+    0.8,
+    1e-9,
+  );
   assert.equal(group.fits, true);
 });
 
 test('zoom stops at its limits and says so', () => {
-  const wide = new GroupFraming([[-100, 0, 0], [100, 0, 0]], { mode: 'zoom', maxFov: 40 }),
+  const wide = new GroupFraming(
+      [
+        [-100, 0, 0],
+        [100, 0, 0],
+      ],
+      { mode: 'zoom', maxFov: 40 },
+    ),
     p = pose();
   wide.update(p, 0, context);
   assert.equal(p.fov, 40);
   assert.equal(wide.fits, false);
-  const tight = new GroupFraming([[0, 0, 0], [0.01, 0, 0]], { mode: 'zoom', minFov: 20 }),
+  const tight = new GroupFraming(
+      [
+        [0, 0, 0],
+        [0.01, 0, 0],
+      ],
+      { mode: 'zoom', minFov: 20 },
+    ),
     q = pose();
   tight.update(q, 0, context);
   assert.equal(q.fov, 20);
   assert.equal(tight.fits, true);
-  const behind = new GroupFraming([[0, 0, 0], [0, 0, 100]], { mode: 'zoom' }),
+  const behind = new GroupFraming(
+      [
+        [0, 0, 0],
+        [0, 0, 100],
+      ],
+      { mode: 'zoom' },
+    ),
     r = pose();
   behind.update(r, 0, context);
   assert.equal(r.fov, 100, 'a member behind the camera needs all the lens there is');
@@ -116,7 +152,13 @@ test('zoom stops at its limits and says so', () => {
 });
 
 test('dolly stops at its limits and says so', () => {
-  const far = new GroupFraming([[-100, 0, 0], [100, 0, 0]], { maxDistance: 30 }),
+  const far = new GroupFraming(
+      [
+        [-100, 0, 0],
+        [100, 0, 0],
+      ],
+      { maxDistance: 30 },
+    ),
     p = pose();
   far.update(p, 0, context);
   near(Math.hypot(...[0, 1, 2].map((i) => p.position[i] - p.target[i])), 30);
@@ -142,7 +184,14 @@ test('both moves first and zooms only for what the limit left', () => {
   held.update(b, 0, context);
   assert.ok(b.fov > 50);
   near(Math.hypot(...[0, 1, 2].map((i) => b.position[i] - b.target[i])), 25);
-  near(reach(b, points.map((center) => ({ center }))), 0.8, 1e-9);
+  near(
+    reach(
+      b,
+      points.map((center) => ({ center })),
+    ),
+    0.8,
+    1e-9,
+  );
   assert.equal(held.fits, true);
 });
 
@@ -169,10 +218,7 @@ test('the shot follows at its rate at any frame rate, and reset snaps', () => {
 });
 
 test('a member of weight 0 leaves the shot, and with nobody left the pose stands', () => {
-  const group = new GroupFraming([
-      { target: [0, 0, 0] },
-      { target: [1000, 0, 0], weight: 0 },
-    ]),
+  const group = new GroupFraming([{ target: [0, 0, 0] }, { target: [1000, 0, 0], weight: 0 }]),
     p = pose();
   group.update(p, 0, context);
   assert.deepEqual([...p.target], [0, 0, 0]);
@@ -184,12 +230,18 @@ test('a member of weight 0 leaves the shot, and with nobody left the pose stands
 });
 
 test('a view along up and a camera on its target still work', () => {
-  const group = new GroupFraming([[-5, 0, 0], [5, 0, 0]]),
+  const group = new GroupFraming([
+      [-5, 0, 0],
+      [5, 0, 0],
+    ]),
     p = createPose({ position: [0, 20, 0], target: [0, 0, 0], fov: 50 });
   group.update(p, 0, context);
   assert.ok(p.position.every(Number.isFinite));
   assert.ok(p.position[1] > 0);
-  const flat = new GroupFraming([[-5, 0, 0], [5, 0, 0]]),
+  const flat = new GroupFraming([
+      [-5, 0, 0],
+      [5, 0, 0],
+    ]),
     q = createPose({ position: [0, 0, 0], target: [0, 0, 0], fov: 50 });
   flat.update(q, 0, context);
   assert.ok(q.position[2] > 0, 'it backs off along +z');
