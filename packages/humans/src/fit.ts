@@ -40,9 +40,23 @@ import { detectSkeleton, humanoidBones, type HumanoidBone } from '@margoengine/r
 import { invertMatrix, multiplyMatrices, composeMatrix } from '@margoengine/math/mat4';
 import { GLB_BIN, GLB_JSON, GLB_MAGIC } from '../../shared/glb.js';
 import { sceneScope } from '../../shared/scene-scope.js';
-import { applySettings, checkSettings, numberSetting, settingDefaults, type SettingRow } from '../../shared/settings.js';
+import {
+  applySettings,
+  checkSettings,
+  numberSetting,
+  settingDefaults,
+  type SettingRow,
+} from '../../shared/settings.js';
 import { crownRows, crownTaper } from './crown.js';
-import { OUTFITS, RING_STEPS, garmentMaterial, type CastBody, type GarmentSpec, type Outfit, type OutfitName } from './cast.js';
+import {
+  OUTFITS,
+  RING_STEPS,
+  garmentMaterial,
+  type CastBody,
+  type GarmentSpec,
+  type Outfit,
+  type OutfitName,
+} from './cast.js';
 
 type V3 = [number, number, number];
 
@@ -100,19 +114,27 @@ const PRIMITIVE_STRIDE = 20;
  * @throws TypeError when no named primitive is skinned.
  */
 export function riggedBody(model: PBRModel, materials: readonly string[] = BODY_MATERIALS): RiggedBody {
-  if (!model || !Array.isArray(model.primitives) || !model.asset) throw new TypeError('riggedBody needs a loaded gltf/pbr model');
-  if (!Array.isArray(materials) || materials.some((m) => typeof m !== 'string')) throw new TypeError('riggedBody materials must be an array of material names');
+  if (!model || !Array.isArray(model.primitives) || !model.asset)
+    throw new TypeError('riggedBody needs a loaded gltf/pbr model');
+  if (!Array.isArray(materials) || materials.some((m) => typeof m !== 'string'))
+    throw new TypeError('riggedBody materials must be an array of material names');
   const doc = model.asset.doc as unknown as Doc,
     nameOf = (p: Primitive) => (p.material as { name?: string } | undefined)?.name ?? '',
     skinned = (p: Primitive) => doc.nodes[p.nodeIndex]?.skin,
     picked = model.primitives.filter((p) => isBody(doc, p, materials) && skinned(p) !== undefined && !p.topology);
   if (!picked.length)
-    throw new TypeError(`riggedBody found no skinned primitive with a material, node or mesh named ${materials.slice(0, 6).join(', ')} ...; pass the body's names`);
+    throw new TypeError(
+      `riggedBody found no skinned primitive with a material, node or mesh named ${materials.slice(0, 6).join(', ')} ...; pass the body's names`,
+    );
   const skeleton = bodySkeleton(model, picked),
     bones: RiggedBone[] = skeleton.nodes.map((node, i) => {
       let up = skeleton.parentOf.get(node);
       while (up !== undefined && !skeleton.index.has(up)) up = skeleton.parentOf.get(up);
-      return { name: doc.nodes[node]?.name ?? `bone${i}`, parent: up === undefined ? -1 : skeleton.index.get(up)!, bind: skeleton.binds[i] };
+      return {
+        name: doc.nodes[node]?.name ?? `bone${i}`,
+        parent: up === undefined ? -1 : skeleton.index.get(up)!,
+        bind: skeleton.binds[i],
+      };
     });
   const pos: number[] = [],
     nor: number[] = [],
@@ -144,8 +166,12 @@ export function riggedBody(model: PBRModel, materials: readonly string[] = BODY_
   }
   for (const p of model.primitives)
     if (/hair/i.test(nameOf(p)) && !/brow|lash/i.test(nameOf(p)) && skeleton.remap.has(skinned(p)!))
-      for (let k = 0; k < p.vertices.length; k += PRIMITIVE_STRIDE) hair.push(p.vertices[k], p.vertices[k + 1], p.vertices[k + 2]);
-  if (!ix.length) throw new TypeError('riggedBody: the body primitives carry no JOINTS_0 and WEIGHTS_0; export the body with its skin weights');
+      for (let k = 0; k < p.vertices.length; k += PRIMITIVE_STRIDE)
+        hair.push(p.vertices[k], p.vertices[k + 1], p.vertices[k + 2]);
+  if (!ix.length)
+    throw new TypeError(
+      'riggedBody: the body primitives carry no JOINTS_0 and WEIGHTS_0; export the body with its skin weights',
+    );
   return {
     positions: new Float32Array(pos),
     normals: new Float32Array(nor),
@@ -204,7 +230,10 @@ function bodySkeleton(model: PBRModel, picked: readonly Primitive[]): BodySkelet
         if (known !== undefined) return known;
         const inverse = ibm ? ibm.subarray(i * 16, i * 16 + 16) : identity(),
           bind = invertMatrix(inverse);
-        if (!bind) throw new RangeError(`riggedBody: bone ${doc.nodes[node]?.name ?? node} has a singular inverse bind matrix; export the skin with invertible bind matrices`);
+        if (!bind)
+          throw new RangeError(
+            `riggedBody: bone ${doc.nodes[node]?.name ?? node} has a singular inverse bind matrix; export the skin with invertible bind matrices`,
+          );
         return add(node, bind, inverse);
       }),
     );
@@ -235,7 +264,16 @@ export const BODY_MATERIALS: readonly string[] = [
   'Underwear',
 ];
 type Doc = {
-  nodes: { name?: string; children?: number[]; mesh?: number; skin?: number; translation?: number[]; rotation?: number[]; scale?: number[]; matrix?: number[] }[];
+  nodes: {
+    name?: string;
+    children?: number[];
+    mesh?: number;
+    skin?: number;
+    translation?: number[];
+    rotation?: number[];
+    scale?: number[];
+    matrix?: number[];
+  }[];
   skins?: { joints: number[]; inverseBindMatrices?: number; skeleton?: number }[];
   meshes?: { name?: string }[];
   scenes?: { nodes?: number[] }[];
@@ -246,21 +284,29 @@ type Primitive = PBRModel['primitives'][number];
 function isBody(doc: Doc, p: Primitive, names: readonly string[]): boolean {
   const node = doc.nodes[p.nodeIndex],
     material = (p.material as { name?: string } | undefined)?.name;
-  return [material, node?.name, node?.mesh === undefined ? undefined : doc.meshes?.[node.mesh]?.name].some((n) => n !== undefined && names.includes(n));
+  return [material, node?.name, node?.mesh === undefined ? undefined : doc.meshes?.[node.mesh]?.name].some(
+    (n) => n !== undefined && names.includes(n),
+  );
 }
 /** The matrix from node `node`'s space to the scene root's, from the file's rest transforms. */
 function nodeToRoot(doc: Doc, node: number): Float64Array {
   const parentOf = new Map<number, number>();
   doc.nodes.forEach((n, i) => n.children?.forEach((c) => parentOf.set(c, i)));
   let m = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-  for (let at: number | undefined = node, guard = 0; at !== undefined && guard < 1024; at = parentOf.get(at), guard++) m = multiplyMatrices(localMatrix(doc.nodes[at]), m);
+  for (let at: number | undefined = node, guard = 0; at !== undefined && guard < 1024; at = parentOf.get(at), guard++)
+    m = multiplyMatrices(localMatrix(doc.nodes[at]), m);
   return m;
 }
 function localMatrix(n: Doc['nodes'][number]): Float64Array {
   if (n.matrix) return new Float64Array(n.matrix);
   const q = n.rotation ?? [0, 0, 0, 1],
     l = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
-  return composeMatrix(n.translation ?? [0, 0, 0], q.map((c) => c / l), n.scale ?? [1, 1, 1], new Float64Array(16));
+  return composeMatrix(
+    n.translation ?? [0, 0, 0],
+    q.map((c) => c / l),
+    n.scale ?? [1, 1, 1],
+    new Float64Array(16),
+  );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -317,7 +363,19 @@ interface Analysis {
   pose: RestPose;
   armAngle: number;
   joint: (h: HumanoidBone) => V3;
-  heights: { stature: number; crotch: number; hip: number; waist: number; chest: number; axilla: number; shoulder: number; neck: number; knee: number; ankle: number; top: number };
+  heights: {
+    stature: number;
+    crotch: number;
+    hip: number;
+    waist: number;
+    chest: number;
+    axilla: number;
+    shoulder: number;
+    neck: number;
+    knee: number;
+    ankle: number;
+    top: number;
+  };
   axes: Record<string, Axis>;
   points: Record<string, PartPoints>;
   neck: NeckFrame;
@@ -330,7 +388,10 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
   checkBody(body);
   const names = body.bones.map((b) => b.name),
     match = detectSkeleton(names);
-  if (!match) throw new TypeError(`fitOutfit needs a humanoid skeleton (Character Creator, Mixamo, Godot, Roblox ...); bones ${names.slice(0, 8).join(', ')} ... name no hips and head`);
+  if (!match)
+    throw new TypeError(
+      `fitOutfit needs a humanoid skeleton (Character Creator, Mixamo, Godot, Roblox ...); bones ${names.slice(0, 8).join(', ')} ... name no hips and head`,
+    );
   const map = humanoidBones(names, match.preset),
     boneSegment = new Uint8Array(body.bones.length);
   body.bones.forEach((_, i) => {
@@ -353,9 +414,12 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
       toModel[2] * p[o] + toModel[6] * p[o + 1] + toModel[10] * p[o + 2] + toModel[14],
     ];
   const required: HumanoidBone[] = ['hips', 'head'];
-  for (const s of ['left', 'right']) for (const b of ['UpperArm', 'LowerArm', 'Hand', 'UpperLeg', 'LowerLeg', 'Foot']) required.push(`${s}${b}` as HumanoidBone);
+  for (const s of ['left', 'right'])
+    for (const b of ['UpperArm', 'LowerArm', 'Hand', 'UpperLeg', 'LowerLeg', 'Foot'])
+      required.push(`${s}${b}` as HumanoidBone);
   const missing = required.filter((h) => !map.has(h));
-  if (missing.length) throw new TypeError(`fitOutfit needs these bones in the ${match.preset} rig: ${missing.join(', ')}`);
+  if (missing.length)
+    throw new TypeError(`fitOutfit needs these bones in the ${match.preset} rig: ${missing.join(', ')}`);
   const jointModel = (h: HumanoidBone) => model(body.bones[map.get(h)!].bind, 12);
   // Vertex parts by the part whose bones carry most of each vertex's weight.
   const n = body.positions.length / 3,
@@ -383,8 +447,19 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     high = Math.max(high, p[1]);
   }
   const height = high - low,
-    unit = unitOption ?? (height > 0.3 && height < 3 ? 1 : height > 30 && height < 300 ? 0.01 : height > 300 && height < 3000 ? 0.001 : NaN);
-  if (!(unit > 0)) throw new RangeError(`fitOutfit could not tell the body's unit from its height ${height}; pass unit (metres per body unit)`);
+    unit =
+      unitOption ??
+      (height > 0.3 && height < 3
+        ? 1
+        : height > 30 && height < 300
+          ? 0.01
+          : height > 300 && height < 3000
+            ? 0.001
+            : NaN);
+  if (!(unit > 0))
+    throw new RangeError(
+      `fitOutfit could not tell the body's unit from its height ${height}; pass unit (metres per body unit)`,
+    );
   // Forward is where the feet point: from each ankle to the middle of its foot's vertices.
   let fx = 0,
     fz = 0;
@@ -451,8 +526,16 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
   };
   // Joint lines.
   const J = (h: HumanoidBone) => fitJoint(h),
-    legLine = [0, 1].map((s) => [J(s ? 'rightUpperLeg' : 'leftUpperLeg'), J(s ? 'rightLowerLeg' : 'leftLowerLeg'), J(s ? 'rightFoot' : 'leftFoot')]),
-    armLine = [0, 1].map((s) => [J(s ? 'rightUpperArm' : 'leftUpperArm'), J(s ? 'rightLowerArm' : 'leftLowerArm'), J(s ? 'rightHand' : 'leftHand')]);
+    legLine = [0, 1].map((s) => [
+      J(s ? 'rightUpperLeg' : 'leftUpperLeg'),
+      J(s ? 'rightLowerLeg' : 'leftLowerLeg'),
+      J(s ? 'rightFoot' : 'leftFoot'),
+    ]),
+    armLine = [0, 1].map((s) => [
+      J(s ? 'rightUpperArm' : 'leftUpperArm'),
+      J(s ? 'rightLowerArm' : 'leftLowerArm'),
+      J(s ? 'rightHand' : 'leftHand'),
+    ]);
   const knee = (legLine[0][1][1] + legLine[1][1][1]) / 2,
     ankle = (legLine[0][2][1] + legLine[1][2][1]) / 2,
     hipJoint = (legLine[0][0][1] + legLine[1][0][1]) / 2;
@@ -462,7 +545,16 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     const x = pos[k * 3],
       y = pos[k * 3 + 1];
     stature = Math.max(stature, y);
-    if (Math.abs(x) < 0.012 && y > knee && y < hipJoint + 0.1 && seg[k] !== ARM && seg[k] !== ARM + 1 && seg[k] !== HAND && seg[k] !== HAND + 1) crotch = Math.min(crotch, y);
+    if (
+      Math.abs(x) < 0.012 &&
+      y > knee &&
+      y < hipJoint + 0.1 &&
+      seg[k] !== ARM &&
+      seg[k] !== ARM + 1 &&
+      seg[k] !== HAND &&
+      seg[k] !== HAND + 1
+    )
+      crotch = Math.min(crotch, y);
   }
   if (!Number.isFinite(crotch)) crotch = hipJoint - 0.08 * (stature / 1.72);
   const armDir = [0, 1].map((s) => {
@@ -474,7 +566,8 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     armAngle = (armDir[0] + armDir[1]) / 2,
     pose: RestPose = armAngle > (65 * Math.PI) / 180 ? 'T' : armAngle > (20 * Math.PI) / 180 ? 'A' : 'down';
   // Axes. The trunk's centre line follows the middle of its slices (smoothed); the limbs follow their joint lines.
-  const trunkSet = (k: number) => seg[k] === TRUNK || ((seg[k] === LEG || seg[k] === LEG + 1) && pos[k * 3 + 1] >= crotch);
+  const trunkSet = (k: number) =>
+    seg[k] === TRUNK || ((seg[k] === LEG || seg[k] === LEG + 1) && pos[k * 3 + 1] >= crotch);
   const neckY = map.has('neck') ? J('neck')[1] : J('head')[1] - 0.06 * (stature / 1.72);
   const samples = Math.ceil((neckY + 0.1) / 0.01) + 1,
     cxs = new Float64Array(samples),
@@ -537,12 +630,18 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     for (let i = 1; i < line.length; i++)
       if (y >= line[i][1]) {
         const t = (line[i - 1][1] - y) / Math.max(line[i - 1][1] - line[i][1], 1e-9);
-        return [line[i - 1][0] + (line[i][0] - line[i - 1][0]) * t, y, line[i - 1][2] + (line[i][2] - line[i - 1][2]) * t];
+        return [
+          line[i - 1][0] + (line[i][0] - line[i - 1][0]) * t,
+          y,
+          line[i - 1][2] + (line[i][2] - line[i - 1][2]) * t,
+        ];
       }
     const e = line[line.length - 1];
     return [e[0], y, e[2]];
   };
-  const legAxis = [0, 1].map((s): Axis => ({ centre: (y) => polylineAtY(legLine[s], y), side: () => X, front: () => Z }));
+  const legAxis = [0, 1].map(
+    (s): Axis => ({ centre: (y) => polylineAtY(legLine[s], y), side: () => X, front: () => Z }),
+  );
   // Arms: distance along shoulder, elbow, wrist; before the shoulder the first segment runs on.
   const armAxis = [0, 1].map((s): Axis & { length: number; project(p: ArrayLike<number>, o: number): number } => {
     const line = armLine[s],
@@ -591,7 +690,13 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
   let top = stature;
   for (let k = 1; k < hairFit.length; k += 3) top = Math.max(top, hairFit[k]);
   // Part points.
-  const collect = (keep: (k: number) => boolean, axis: (k: number) => number, centre: Axis, extra?: number[], src: Float64Array = pos) => {
+  const collect = (
+    keep: (k: number) => boolean,
+    axis: (k: number) => number,
+    centre: Axis,
+    extra?: number[],
+    src: Float64Array = pos,
+  ) => {
     const at: number[] = [],
       u: number[] = [],
       v: number[] = [];
@@ -607,7 +712,11 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     for (let k = 0; k < n; k++) if (keep(k)) add1(src[k * 3], src[k * 3 + 1], src[k * 3 + 2], axis(k));
     if (extra) for (let k = 0; k < extra.length; k += 3) add1(extra[k], extra[k + 1], extra[k + 2], extra[k + 1]);
     const order = at.map((_, i) => i).sort((a, b) => at[a] - at[b]);
-    return { at: Float64Array.from(order, (i) => at[i]), u: Float64Array.from(order, (i) => u[i]), v: Float64Array.from(order, (i) => v[i]) };
+    return {
+      at: Float64Array.from(order, (i) => at[i]),
+      u: Float64Array.from(order, (i) => u[i]),
+      v: Float64Array.from(order, (i) => v[i]),
+    };
   };
   const headCentre: V3 = [headJoint[0], 0, headJoint[2]];
   {
@@ -663,13 +772,27 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     const name = s ? 'R' : 'L',
       sign = s ? -1 : 1;
     points[`leg${name}`] = collect(
-      (k) => seg[k] === LEG + s || seg[k] === FOOT + s || (seg[k] === TRUNK && pos[k * 3] * sign > 0 && pos[k * 3 + 1] < crotch + 0.03),
+      (k) =>
+        seg[k] === LEG + s ||
+        seg[k] === FOOT + s ||
+        (seg[k] === TRUNK && pos[k * 3] * sign > 0 && pos[k * 3 + 1] < crotch + 0.03),
       y,
       legAxis[s],
     );
-    points[`arm${name}`] = collect((k) => seg[k] === ARM + s, (k) => armAxis[s].project(pos, k * 3), armAxis[s]);
+    points[`arm${name}`] = collect(
+      (k) => seg[k] === ARM + s,
+      (k) => armAxis[s].project(pos, k * 3),
+      armAxis[s],
+    );
   }
-  const axes: Record<string, Axis> = { trunk: trunkAxis, head: headAxis, legL: legAxis[0], legR: legAxis[1], armL: armAxis[0], armR: armAxis[1] };
+  const axes: Record<string, Axis> = {
+    trunk: trunkAxis,
+    head: headAxis,
+    legL: legAxis[0],
+    legR: legAxis[1],
+    armL: armAxis[0],
+    armR: armAxis[1],
+  };
   // Heights.
   const shoulder = (armLine[0][0][1] + armLine[1][0][1]) / 2;
   const girthAt = (yy: number) => perimeterOf(profileOf(points.trunk, yy));
@@ -686,7 +809,14 @@ function analyse(body: RiggedBody, unitOption: number | undefined): Analysis {
     const g = girthAt(yy);
     if (g > most) [most, chest] = [g, yy];
   }
-  const neck = neckFrame(map.has('neck') ? J('neck') : [headJoint[0], neckY, headJoint[2]], headJoint, shoulder, (k) => seg[k] === TRUNK || seg[k] === HEAD, pos, collect);
+  const neck = neckFrame(
+    map.has('neck') ? J('neck') : [headJoint[0], neckY, headJoint[2]],
+    headJoint,
+    shoulder,
+    (k) => seg[k] === TRUNK || seg[k] === HEAD,
+    pos,
+    collect,
+  );
   const upperArmRadius = Math.max(0.02, perimeterOf(profileOf(points.armL, 0.1 * armAxis[0].length)) / (2 * Math.PI));
   let diagonal = 0;
   {
@@ -739,7 +869,8 @@ function checkBody(b: RiggedBody) {
   if (!(b.indices?.length >= 3) || b.indices.length % 3) throw new TypeError('RiggedBody indices need 3 a triangle');
   if (!Array.isArray(b.bones) || !b.bones.length) throw new TypeError('RiggedBody needs its bones');
   for (let i = 0; i < b.joints.length; i++)
-    if (!(b.joints[i] >= 0 && b.joints[i] < b.bones.length) || !(b.weights[i] >= 0)) throw new RangeError('RiggedBody joints must index its bones and weights must be 0 or more');
+    if (!(b.joints[i] >= 0 && b.joints[i] < b.bones.length) || !(b.weights[i] >= 0))
+      throw new RangeError('RiggedBody joints must index its bones and weights must be 0 or more');
 }
 
 /**
@@ -788,7 +919,10 @@ function neckFrame(
   const across = sub([1, 0, 0], scale(axis, axis[0])),
     side = scale(across, 1 / (norm(across) || 1)),
     front = cross(side, axis),
-    along = (k: number) => (pos[k * 3] - neckJoint[0]) * axis[0] + (pos[k * 3 + 1] - neckJoint[1]) * axis[1] + (pos[k * 3 + 2] - neckJoint[2]) * axis[2],
+    along = (k: number) =>
+      (pos[k * 3] - neckJoint[0]) * axis[0] +
+      (pos[k * 3 + 1] - neckJoint[1]) * axis[1] +
+      (pos[k * 3 + 2] - neckJoint[2]) * axis[2],
     tLo = Math.min(0, (clavicleY - neckJoint[1]) / axis[1]),
     tHi = Math.max(tLo + 0.04, dot3(sub(headJoint, neckJoint), axis)),
     line: Axis = { centre: (t) => add(neckJoint, scale(axis, t)), side: () => side, front: () => front },
@@ -830,7 +964,10 @@ function neckFrame(
   girths.forEach((g, i) => {
     if (g > 0 && (low < 0 || g < girths[low])) low = i;
   });
-  if (low < 0) throw new RangeError('fitOutfit found no neck between the shoulder joints and the head joint; the body needs a neck under its head');
+  if (low < 0)
+    throw new RangeError(
+      'fitOutfit found no neck between the shoulder joints and the head joint; the body needs a neck under its head',
+    );
   let base = low,
     top = low;
   while (base > 0 && girths[base - 1] <= NECK_SPREAD * girths[low]) base--;
@@ -859,7 +996,12 @@ function neckFrame(
         const i0 = lowerBound(pts.at, t - half),
           i1 = lowerBound(pts.at, t + half);
         if (i1 - i0 < 6) continue;
-        return hullRadii(hull(Float64Array.from(pts.u.subarray(i0, i1), (u) => u - du), Float64Array.from(pts.v.subarray(i0, i1), (v) => v - dv)));
+        return hullRadii(
+          hull(
+            Float64Array.from(pts.u.subarray(i0, i1), (u) => u - du),
+            Float64Array.from(pts.v.subarray(i0, i1), (v) => v - dv),
+          ),
+        );
       }
       return new Float64Array(R);
     },
@@ -877,7 +1019,8 @@ const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[
 function hull(xs: ArrayLike<number>, ys: ArrayLike<number>, count = xs.length): number[] {
   const order = Array.from({ length: count }, (_, i) => i).sort((a, b) => xs[a] - xs[b] || ys[a] - ys[b]);
   if (count < 3) return order.flatMap((i) => [xs[i], ys[i]]);
-  const turn = (o: number, a: number, b: number) => (xs[a] - xs[o]) * (ys[b] - ys[o]) - (ys[a] - ys[o]) * (xs[b] - xs[o]);
+  const turn = (o: number, a: number, b: number) =>
+    (xs[a] - xs[o]) * (ys[b] - ys[o]) - (ys[a] - ys[o]) * (xs[b] - xs[o]);
   const lower: number[] = [],
     upper: number[] = [];
   for (const i of order) {
@@ -1110,7 +1253,11 @@ class Mesh {
       e2: V3 = [P[c * 3] - P[a * 3], P[c * 3 + 1] - P[a * 3 + 1], P[c * 3 + 2] - P[a * 3 + 2]],
       g = cross(e1, e2),
       N = this.n,
-      m: V3 = [N[a * 3] + N[b * 3] + N[c * 3], N[a * 3 + 1] + N[b * 3 + 1] + N[c * 3 + 1], N[a * 3 + 2] + N[b * 3 + 2] + N[c * 3 + 2]];
+      m: V3 = [
+        N[a * 3] + N[b * 3] + N[c * 3],
+        N[a * 3 + 1] + N[b * 3 + 1] + N[c * 3 + 1],
+        N[a * 3 + 2] + N[b * 3 + 2] + N[c * 3 + 2],
+      ];
     if (dot3(g, m) < 0) this.ix.push(a, c, b);
     else this.ix.push(a, b, c);
     this.face.push(face);
@@ -1235,7 +1382,7 @@ function lerp2(line: readonly (readonly [number, number])[], i: number, f: numbe
 /** The angle of ring angle `k` from the centre front, radians, 0 to pi. */
 function fromFront(k: number): number {
   const x = (2 * Math.PI * k) / R - Math.PI / 2;
-  return Math.abs(((((x % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI));
+  return Math.abs((((x % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
 }
 /** The height of a station's inner face at ring angle `k`. */
 function rowY(s: Station, k: number): number {
@@ -1305,7 +1452,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       here = ax.centre(at),
       side = ax.side(at),
       front = ax.front(at),
-      moved = (g: Ring, k: number) => (g.outer[k] > 0 ? g.outer[k] + dot3(sub(g.c, here), add(scale(side, COS[k]), scale(front, SIN[k]))) : 0);
+      moved = (g: Ring, k: number) =>
+        g.outer[k] > 0 ? g.outer[k] + dot3(sub(g.c, here), add(scale(side, COS[k]), scale(front, SIN[k]))) : 0;
     const byGarment = new Map<number, Ring[]>();
     rings.forEach((g) => {
       if (g.part === part) (byGarment.get(g.garment) ?? byGarment.set(g.garment, []).get(g.garment)!).push(g);
@@ -1321,7 +1469,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       for (let k = 0; k < R; k++) most[k] = Math.max(most[k], moved(A, k) + (moved(B, k) - moved(A, k)) * f);
       // A straight run of cloth between two of this garment's rings (at most a ring spacing apart) clears the rings of
       // the cloth beneath within that spacing too, not only where the two tubes' rings meet: a boot's toe ring.
-      for (const g of list) if (Math.abs(g.at - at) <= FLOOR_REACH) for (let k = 0; k < R; k++) most[k] = Math.max(most[k], moved(g, k));
+      for (const g of list)
+        if (Math.abs(g.at - at) <= FLOOR_REACH) for (let k = 0; k < R; k++) most[k] = Math.max(most[k], moved(g, k));
     }
     return most;
   };
@@ -1340,7 +1489,14 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
   };
   const station = (part: string, at: number, r: Float64Array): Station => {
     const ax = a.axes[part];
-    return { at, c: ax.centre(at), side: ax.side(at), front: ax.front(at), r, b: bodyAt(part, part === 'head' ? Math.min(at, a.heights.stature) : Math.max(at, 0)) };
+    return {
+      at,
+      c: ax.centre(at),
+      side: ax.side(at),
+      front: ax.front(at),
+      r,
+      b: bodyAt(part, part === 'head' ? Math.min(at, a.heights.stature) : Math.max(at, 0)),
+    };
   };
   const span = (from: number, to: number, step = STEP) => {
     const rows = Math.max(2, Math.ceil(Math.abs(to - from) / step) + 1);
@@ -1395,7 +1551,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       }),
       e = st.map((s, i) => {
         const by = new Float64Array(R);
-        for (const l of lowers) if (Math.abs(l.y - s.at) <= reach) for (let k = 0; k < R; k++) by[k] = Math.max(by[k], l.by[k]);
+        for (const l of lowers)
+          if (Math.abs(l.y - s.at) <= reach) for (let k = 0; k < R; k++) by[k] = Math.max(by[k], l.by[k]);
         return recentre({ ...s, r: s.r.map((x, k) => x - by[k]) }, at[i]);
       }),
       res = st.map((s) => ({ ...s, r: s.r.slice(), need: s.r.slice() })),
@@ -1453,7 +1610,7 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         const dx = a.pos[v * 3] - c0[0],
           dz = a.pos[v * 3 + 2] - c0[2],
           bin = Math.round((Math.atan2(dz, dx) / (2 * Math.PI)) * R);
-        for (const b of [bin - 1, bin, bin + 1]) bins[(((b % R) + R) % R)].push(dx, dz, a.pos[v * 3 + 1]);
+        for (const b of [bin - 1, bin, bin + 1]) bins[((b % R) + R) % R].push(dx, dz, a.pos[v * 3 + 1]);
       }
     const wedge = Math.tan((2 * Math.PI) / R);
     return Array.from({ length: R }, (_, k) => {
@@ -1488,7 +1645,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           if (i === iE) break;
         }
       const arc = [0];
-      for (let i = 1; i < chain.length; i++) arc.push(arc[i - 1] + Math.hypot(chain[i][0] - chain[i - 1][0], chain[i][1] - chain[i - 1][1]));
+      for (let i = 1; i < chain.length; i++)
+        arc.push(arc[i - 1] + Math.hypot(chain[i][0] - chain[i - 1][0], chain[i][1] - chain[i - 1][1]));
       return { chain, arc };
     });
   };
@@ -1496,7 +1654,18 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
   /** The rows over the shoulders from the ring `top` under the arms to the neck ring `neckR` (radii round the base centre). */
   const yokeRows = (top: Station, neckR: Float64Array): Station[] => {
     const ch = (chains ??= meridianChains()),
-      rows: Station[] = Array.from({ length: YOKE_ROWS }, () => ({ at: NaN, c: top.c, side: top.side, front: top.front, r: new Float64Array(R), b: new Float64Array(R), pts: [], dirs: [], anchors: [], seamK: new Uint8Array(R) }));
+      rows: Station[] = Array.from({ length: YOKE_ROWS }, () => ({
+        at: NaN,
+        c: top.c,
+        side: top.side,
+        front: top.front,
+        r: new Float64Array(R),
+        b: new Float64Array(R),
+        pts: [],
+        dirs: [],
+        anchors: [],
+        seamK: new Uint8Array(R),
+      }));
     const edge = (p: [number, number], q: [number, number]): [number, number] => {
       const dx = q[0] - p[0],
         dy = q[1] - p[1],
@@ -1521,7 +1690,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         normal.push([nx, ny]);
       });
       const clothArc = [0];
-      for (let i = 1; i < cloth.length; i++) clothArc.push(clothArc[i - 1] + Math.hypot(cloth[i][0] - cloth[i - 1][0], cloth[i][1] - cloth[i - 1][1]));
+      for (let i = 1; i < cloth.length; i++)
+        clothArc.push(clothArc[i - 1] + Math.hypot(cloth[i][0] - cloth[i - 1][0], cloth[i][1] - cloth[i - 1][1]));
       // The chain lies in the column's plane; the neck ring is round the neck's own centre: bend into it toward the top.
       const last = cloth[cloth.length - 1],
         lastBody = chain[chain.length - 1],
@@ -1554,7 +1724,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       ts = Array.from({ length: count + 1 }, (_, i) => N.tBase + ((tEnd - N.tBase) * i) / Math.max(1, count)),
       raw = ts.map((t, i) => (i === 0 ? baseRadii : N.radii(t))),
       reach = raw.map((r) => r.slice());
-    for (let i = ts.length - 2; i >= 0; i--) for (let k = 0; k < R; k++) reach[i][k] = Math.max(reach[i][k], reach[i + 1][k]);
+    for (let i = ts.length - 2; i >= 0; i--)
+      for (let k = 0; k < R; k++) reach[i][k] = Math.max(reach[i][k], reach[i + 1][k]);
     const inner = ts.map((t, i) => {
       const f = neckFloor(t);
       return reach[i].map((x, k) => Math.max(x + ease, f[k] > 0 ? f[k] + o.layerGap : 0));
@@ -1582,7 +1753,15 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
     return add(add(N.centre(t), scale(N.axis, Math.min(0, h))), scale(d, radius + lift));
   };
   /** The shirt under a tie: its collar, cloth thickness and outer face, from the first top with a standing collar. */
-  let shirt: { collar: ReturnType<typeof neckRings>; th: number; height: number; points: number; onCloth: ReturnType<typeof surfaceOf> } | undefined;
+  let shirt:
+    | {
+        collar: ReturnType<typeof neckRings>;
+        th: number;
+        height: number;
+        points: number;
+        onCloth: ReturnType<typeof surfaceOf>;
+      }
+    | undefined;
   /** A small mesh's normals from its own triangles, each turned to face `out` (per vertex). */
   const ownNormals = (mesh: Mesh, verts: number[], tris: number[][], out: (v: number) => V3) => {
     const acc = new Map<number, V3>(verts.map((v) => [v, [0, 0, 0]]));
@@ -1612,7 +1791,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         yV = yBreak + (ys[neckRow] - yBreak) * (off / GORGE);
       let j = 0;
       while (j < ys.length && ys[j] < yV) j++;
-      cut[k] = j === 0 ? 0 : j >= ys.length ? ys.length - 1 : j - 1 + (yV - ys[j - 1]) / Math.max(ys[j] - ys[j - 1], 1e-9);
+      cut[k] =
+        j === 0 ? 0 : j >= ys.length ? ys.length - 1 : j - 1 + (yV - ys[j - 1]) / Math.max(ys[j] - ys[j - 1], 1e-9);
     }
     return { cut, yBreak };
   };
@@ -1626,7 +1806,14 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       offset = ease,
       th = spec.thickness,
       cut = spec.cut;
-    const PART: Record<string, number> = { trunk: TRUNK, head: HEAD, armL: ARM, armR: ARM + 1, legL: LEG, legR: LEG + 1 };
+    const PART: Record<string, number> = {
+      trunk: TRUNK,
+      head: HEAD,
+      armL: ARM,
+      armR: ARM + 1,
+      legL: LEG,
+      legR: LEG + 1,
+    };
     // Every ring rests on the cloth already there: its inner face sits its ease outside their outer face.
     const settle = (partName: string, given: Station[]) =>
       given.map((s) => {
@@ -1731,7 +1918,11 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
               next = first + row * cols + ((k + 1) % R),
               up = first + Math.min(rows - 1, row + 1) * cols + j,
               dn = first + Math.max(0, row - 1) * cols + j,
-              t1: V3 = [P[next * 3] - P[prev * 3], P[next * 3 + 1] - P[prev * 3 + 1], P[next * 3 + 2] - P[prev * 3 + 2]],
+              t1: V3 = [
+                P[next * 3] - P[prev * 3],
+                P[next * 3 + 1] - P[prev * 3 + 1],
+                P[next * 3 + 2] - P[prev * 3 + 2],
+              ],
               t2: V3 = [P[up * 3] - P[dn * 3], P[up * 3 + 1] - P[dn * 3 + 1], P[up * 3 + 2] - P[dn * 3 + 2]],
               out1 = radial[row][k];
             let nn = cross(t1, t2);
@@ -1756,13 +1947,23 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       stations.forEach((s, row) => {
         if (s.pts || !Number.isFinite(s.at)) return;
         const keep = (k: number) => !(cutAt && row > cutAt[k]);
-        rings.push({ part: partName, at: s.at, c: s.c, inner: s.r.map((x, k) => (keep(k) ? x : 0)), outer: s.r.map((x, k) => (keep(k) ? x + th : 0)), garment });
+        rings.push({
+          part: partName,
+          at: s.at,
+          c: s.c,
+          inner: s.r.map((x, k) => (keep(k) ? x : 0)),
+          outer: s.r.map((x, k) => (keep(k) ? x + th : 0)),
+          garment,
+        });
       });
       // Hem bands join the two faces at each open end; a closed end gets a cap instead (a sole, a crown).
       for (const end of [0, rows - 1]) {
         const s = stations[end],
           isTop = end === rows - 1,
-          along = sub(stations[Math.min(rows - 1, end + (isTop ? 0 : 1))].c, stations[Math.max(0, end - (isTop ? 1 : 0))].c),
+          along = sub(
+            stations[Math.min(rows - 1, end + (isTop ? 0 : 1))].c,
+            stations[Math.max(0, end - (isTop ? 1 : 0))].c,
+          ),
           // Rows over the shoulders share one centre: a neckline's band faces up the neck.
           outward = norm(along) > 1e-9 ? scale(along, (isTop ? 1 : -1) / norm(along)) : scale(N.axis, isTop ? 1 : -1);
         if ((close === 'bottom' && end === 0) || (close === 'top' && isTop)) {
@@ -1770,7 +1971,16 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
             rim: number[] = [];
           for (let k = 0; k < R; k++) {
             const d = add(scale(s.side, COS[k]), scale(s.front, SIN[k]));
-            rim.push(mesh.vert(add(s.c, scale(d, s.r[k] + th)), outward, 0.5 + COS[k] / 2, 0.5 + SIN[k] / 2, 0, add(s.c, scale(d, s.b[k]))));
+            rim.push(
+              mesh.vert(
+                add(s.c, scale(d, s.r[k] + th)),
+                outward,
+                0.5 + COS[k] / 2,
+                0.5 + SIN[k] / 2,
+                0,
+                add(s.c, scale(d, s.b[k])),
+              ),
+            );
           }
           for (let k = 0; k < R; k++) mesh.tri(centre, rim[k], rim[(k + 1) % R], FACE.trim);
           continue;
@@ -1781,8 +1991,26 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         for (let k = 0; k < R; k++) {
           const ao = mesh.anchor.slice((o1 + k) * 3, (o1 + k) * 3 + 3) as V3;
           mesh.anchored = mesh.direct[o1 + k] === 1;
-          band.push(mesh.vert([mesh.p[(o1 + k) * 3], mesh.p[(o1 + k) * 3 + 1], mesh.p[(o1 + k) * 3 + 2]], outward, k / R, 0, mesh.seam[o1 + k], ao));
-          band.push(mesh.vert([mesh.p[(i1 + k) * 3], mesh.p[(i1 + k) * 3 + 1], mesh.p[(i1 + k) * 3 + 2]], outward, k / R, 1, mesh.seam[i1 + k], ao));
+          band.push(
+            mesh.vert(
+              [mesh.p[(o1 + k) * 3], mesh.p[(o1 + k) * 3 + 1], mesh.p[(o1 + k) * 3 + 2]],
+              outward,
+              k / R,
+              0,
+              mesh.seam[o1 + k],
+              ao,
+            ),
+          );
+          band.push(
+            mesh.vert(
+              [mesh.p[(i1 + k) * 3], mesh.p[(i1 + k) * 3 + 1], mesh.p[(i1 + k) * 3 + 2]],
+              outward,
+              k / R,
+              1,
+              mesh.seam[i1 + k],
+              ao,
+            ),
+          );
         }
         mesh.anchored = false;
         for (let k = 0; k < R; k++) {
@@ -1809,7 +2037,15 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         sack = sleeves > 0 && buttons > 0;
       let st = settle(
         'trunk',
-        span(y0, y1).map((yy) => station('trunk', yy, yy < H.crotch ? aroundLegs(yy, addOffset(bodyAt('trunk', yy), offset), 0.004 + ease, true) : addOffset(bodyAt('trunk', yy), offset))),
+        span(y0, y1).map((yy) =>
+          station(
+            'trunk',
+            yy,
+            yy < H.crotch
+              ? aroundLegs(yy, addOffset(bodyAt('trunk', yy), offset), 0.004 + ease, true)
+              : addOffset(bodyAt('trunk', yy), offset),
+          ),
+        ),
       );
       if (sack) st = hang(st);
       let neckRow = -1,
@@ -1819,7 +2055,16 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         collar = neckRings(spec.collar ?? 0, ease);
         st = [...st, ...yokeRows(st[st.length - 1], collar.inner[0])];
         neckRow = st.length - 1;
-        for (let i = 1; i < collar.ts.length; i++) st.push({ at: NaN, c: N.centre(collar.ts[i]), side: N.side, front: N.front, r: collar.inner[i], b: collar.raw[i], seamK: new Uint8Array(R) });
+        for (let i = 1; i < collar.ts.length; i++)
+          st.push({
+            at: NaN,
+            c: N.centre(collar.ts[i]),
+            side: N.side,
+            front: N.front,
+            r: collar.inner[i],
+            b: collar.raw[i],
+            seamK: new Uint8Array(R),
+          });
         if (spec.opening !== undefined) opening = neckline(st, spec.opening, neckRow);
       }
       // A wing collar: the fronts part from the stud at the base, and each top corner is cut off on the diagonal where
@@ -1835,7 +2080,12 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         const above = collar!.ts.length - 1;
         for (let k = 0; k < R; k++) {
           const off = fromFront(k),
-            h = off < gapAngle ? ((height - points) * off) / gapAngle : off < gapAngle + pointAngle ? height - points + (points * (off - gapAngle)) / pointAngle : Infinity;
+            h =
+              off < gapAngle
+                ? ((height - points) * off) / gapAngle
+                : off < gapAngle + pointAngle
+                  ? height - points + (points * (off - gapAngle)) / pointAngle
+                  : Infinity;
           if (h < height) pointCut[k] = neckRow + (above * h) / height;
         }
       }
@@ -1846,11 +2096,22 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       // own ring. Standing out only, they once hung the back 1.8 cm further out than the plumb line all the way down.
       const flutes = (s: Station, k: number) => {
         if (s.pts || !Number.isFinite(s.at) || s.at >= H.chest || garment !== lastTop) return 0;
-        const h = FOLD.flute * smoothstep(H.chest, H.waist, s.at) * smoothstep(FOLD.fluteFrom, FOLD.fluteFrom + 0.4, fromFront(k)),
+        const h =
+            FOLD.flute *
+            smoothstep(H.chest, H.waist, s.at) *
+            smoothstep(FOLD.fluteFrom, FOLD.fluteFrom + 0.4, fromFront(k)),
           wave = h * (crest((fromFront(k) * FOLD.flutes) / (2 * Math.PI), 1) - 0.5);
         return Math.max(wave, s.need ? s.need[k] - s.r[k] : 0);
       };
-      const built = tube('trunk', st, [0, R / 2, ...(buttons > 0 ? [R / 4] : [])], trunkZone, undefined, opening?.cut ?? pointCut, sack ? flutes : undefined);
+      const built = tube(
+        'trunk',
+        st,
+        [0, R / 2, ...(buttons > 0 ? [R / 4] : [])],
+        trunkZone,
+        undefined,
+        opening?.cut ?? pointCut,
+        sack ? flutes : undefined,
+      );
       if (collar) collars.push({ ts: collar.ts, outer: collar.inner.map((r) => r.map((x) => x + th)) });
       mesh.current = TRUNK;
       const outerAt = (row: number, k: number): V3 => {
@@ -1901,7 +2162,11 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           }
           const tris: number[][] = [];
           for (let i = 0; i + 1 < strip.length; i++)
-            for (let j = 0; j + 1 < strip[i].length; j++) tris.push([strip[i][j], strip[i][j + 1], strip[i + 1][j]], [strip[i][j + 1], strip[i + 1][j + 1], strip[i + 1][j]]);
+            for (let j = 0; j + 1 < strip[i].length; j++)
+              tris.push(
+                [strip[i][j], strip[i][j + 1], strip[i + 1][j]],
+                [strip[i][j + 1], strip[i + 1][j + 1], strip[i + 1][j]],
+              );
           ownNormals(mesh, [...clothN.keys()], tris, (v) => clothN.get(v)!);
           for (const [p, q, r] of tris) mesh.tri(p, q, r, FACE.trim);
         }
@@ -1932,7 +2197,8 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           for (let a = 0; a < steps; a++)
             for (let b = 0; a + b < steps; b++) {
               tris.push([index.get(`${a},${b}`)!, index.get(`${a + 1},${b}`)!, index.get(`${a},${b + 1}`)!]);
-              if (a + b + 1 < steps) tris.push([index.get(`${a + 1},${b}`)!, index.get(`${a + 1},${b + 1}`)!, index.get(`${a},${b + 1}`)!]);
+              if (a + b + 1 < steps)
+                tris.push([index.get(`${a + 1},${b}`)!, index.get(`${a + 1},${b + 1}`)!, index.get(`${a},${b + 1}`)!]);
             }
           ownNormals(mesh, [...dirs.keys()], tris, (v) => dirs.get(v)!);
           for (const [p, q, r] of tris) mesh.tri(p, q, r, FACE.trim);
@@ -1952,7 +2218,11 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
             B = onCloth(add(sub(T, scale(N.axis, spec.collar! + 0.02)), scale(dir, 0.025)), 1.5 * th).p,
             M = add(scale(add(T, B), 0.5), add(scale(dir, 0.006), scale(N.axis, 0.002))),
             n = add(scale(dir, 0.8), scale(N.axis, 0.6));
-          strip.push([mesh.vert(add(T, scale(dir, 0.0008)), n, i / R, 0), mesh.vert(M, n, i / R, 0.5), mesh.vert(B, n, i / R, 1)]);
+          strip.push([
+            mesh.vert(add(T, scale(dir, 0.0008)), n, i / R, 0),
+            mesh.vert(M, n, i / R, 0.5),
+            mesh.vert(B, n, i / R, 1),
+          ]);
         }
         for (let i = 0; i + 1 < strip.length; i++)
           for (let j = 0; j < 2; j++) {
@@ -1965,7 +2235,11 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           topY = opening ? opening.yBreak - 0.015 : 0,
           lowY = opening ? H.waist - (sack ? 0.07 : 0.03) : 0;
         for (let b = 0; b < buttons; b++) {
-          const yy = opening ? (buttons > 1 ? topY - ((topY - lowY) * b) / (buttons - 1) : topY) : H.waist + ((H.axilla - H.waist) * (b + 0.5)) / buttons;
+          const yy = opening
+            ? buttons > 1
+              ? topY - ((topY - lowY) * b) / (buttons - 1)
+              : topY
+            : H.waist + ((H.axilla - H.waist) * (b + 0.5)) / buttons;
           let j = 0;
           while (j < column.length - 2 && column[j + 1][1] < yy) j++;
           const A = column[j],
@@ -1980,18 +2254,40 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           [1, 'armR'],
         ] as const) {
           const length = a.armLength[s] * sleeves;
-          const elbow = norm(sub(a.joint(s ? 'rightLowerArm' : 'leftLowerArm'), a.joint(s ? 'rightUpperArm' : 'leftUpperArm'))),
+          const elbow = norm(
+              sub(a.joint(s ? 'rightLowerArm' : 'leftLowerArm'), a.joint(s ? 'rightUpperArm' : 'leftUpperArm')),
+            ),
             folds = (st: Station, k: number) =>
               garment !== lastTop
                 ? 0
-                : FOLD.crease * near(st.at, elbow, FOLD.creaseReach) * Math.max(0, SIN[k]) * crest(st.at - elbow, FOLD.creasePeriod) +
-                  FOLD.cuff * smoothstep(length - FOLD.cuffReach, length, st.at) * crest(length - st.at, FOLD.cuffPeriod);
-          const start = SLEEVE_START - SLEEVE_LAP * sorted.slice(0, garment).filter((x) => x.cut === 'top' && (x.sleeves ?? 0) > 0).length;
-          tube(name, span(start, length, SLEEVE_LAP).map((d) => station(name, d, addOffset(bodyAt(name, d), offset))), [], shoulderZone, undefined, undefined, folds);
+                : FOLD.crease *
+                    near(st.at, elbow, FOLD.creaseReach) *
+                    Math.max(0, SIN[k]) *
+                    crest(st.at - elbow, FOLD.creasePeriod) +
+                  FOLD.cuff *
+                    smoothstep(length - FOLD.cuffReach, length, st.at) *
+                    crest(length - st.at, FOLD.cuffPeriod);
+          const start =
+            SLEEVE_START -
+            SLEEVE_LAP * sorted.slice(0, garment).filter((x) => x.cut === 'top' && (x.sleeves ?? 0) > 0).length;
+          tube(
+            name,
+            span(start, length, SLEEVE_LAP).map((d) => station(name, d, addOffset(bodyAt(name, d), offset))),
+            [],
+            shoulderZone,
+            undefined,
+            undefined,
+            folds,
+          );
         }
     } else if (cut === 'legs') {
       const topY = spec.bib ? H.chest : H.waist;
-      tube('trunk', span(H.crotch - 0.01, topY).map((yy) => station('trunk', yy, addOffset(bodyAt('trunk', yy), offset))), [0, R / 2], trunkZone);
+      tube(
+        'trunk',
+        span(H.crotch - 0.01, topY).map((yy) => station('trunk', yy, addOffset(bodyAt('trunk', yy), offset))),
+        [0, R / 2],
+        trunkZone,
+      );
       const hemY = Math.max(spec.hem ?? 0.02, H.ankle + 0.01),
         // Trousers hang from the thigh to a knee and a bottom cut to the seat (TROUSER_KNEE), never inside the leg.
         seat = perimeterOf(bodyAt('trunk', H.hip)),
@@ -2011,14 +2307,29 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           const own = addOffset(r, offset);
           if (yy > thighY) return station(name, yy, own);
           const from = (thigh ??= own),
-            f = yy > H.knee ? (thighY - yy) / Math.max(thighY - H.knee, 1e-6) : (H.knee - yy) / Math.max(H.knee - hemY, 1e-6);
-          return station(name, yy, own.map((x, k) => Math.max(x, yy > H.knee ? from[k] + (kneeR - from[k]) * f : kneeR + (bottomR - kneeR) * f)));
+            f =
+              yy > H.knee
+                ? (thighY - yy) / Math.max(thighY - H.knee, 1e-6)
+                : (H.knee - yy) / Math.max(H.knee - hemY, 1e-6);
+          return station(
+            name,
+            yy,
+            own.map((x, k) =>
+              Math.max(x, yy > H.knee ? from[k] + (kneeR - from[k]) * f : kneeR + (bottomR - kneeR) * f),
+            ),
+          );
         });
         const folds = (s: Station, k: number) =>
           spec.fitted || spec.bib || garment !== lastLegs
             ? 0
-            : FOLD.break * smoothstep(hemY + FOLD.breakReach, hemY, s.at) * (0.3 + 0.7 * Math.max(0, SIN[k])) * crest(s.at - hemY, FOLD.breakPeriod) +
-              FOLD.crease * near(s.at, H.knee, FOLD.creaseReach) * Math.max(0, -SIN[k]) * crest(s.at - H.knee, FOLD.creasePeriod);
+            : FOLD.break *
+                smoothstep(hemY + FOLD.breakReach, hemY, s.at) *
+                (0.3 + 0.7 * Math.max(0, SIN[k])) *
+                crest(s.at - hemY, FOLD.breakPeriod) +
+              FOLD.crease *
+                near(s.at, H.knee, FOLD.creaseReach) *
+                Math.max(0, -SIN[k]) *
+                crest(s.at - H.knee, FOLD.creasePeriod);
         tube(name, st, [0, R / 2], crotchZone, undefined, undefined, folds);
       }
     } else if (cut === 'skirt') {
@@ -2034,7 +2345,13 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       const topY = spec.top ?? 0.3,
         bottom = cut === 'boots' ? -th : H.ankle + 0.01;
       for (const name of ['legL', 'legR'])
-        tube(name, span(bottom, topY).map((yy) => station(name, yy, addOffset(bodyAt(name, Math.max(yy, 0)), offset))), [], noSeam, cut === 'boots' ? 'bottom' : undefined);
+        tube(
+          name,
+          span(bottom, topY).map((yy) => station(name, yy, addOffset(bodyAt(name, Math.max(yy, 0)), offset))),
+          [],
+          noSeam,
+          cut === 'boots' ? 'bottom' : undefined,
+        );
     } else if (cut === 'tie') {
       // A necktie on the shirt: the knot at the collar's front over the stud, and a four-in-hand's blade down the shirt
       // front to the waist (or a bow's wings round the collar). Faces toward the neck are its inner face.
@@ -2047,18 +2364,31 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
       const loft = (sections: V3[][]) => {
         const S = sections.length,
           first = mesh.p.length / 3,
-          mid = sections.map((ring) => scale(ring.reduce((s, p) => add(s, p), [0, 0, 0] as V3), 1 / ring.length));
+          mid = sections.map((ring) =>
+            scale(
+              ring.reduce((s, p) => add(s, p), [0, 0, 0] as V3),
+              1 / ring.length,
+            ),
+          );
         sections.forEach((ring, s) =>
           ring.forEach((p, m) => {
             const out = sub(p, mid[s]);
-            let n = cross(sub(ring[(m + 1) % M], ring[(m + M - 1) % M]), sub(sections[Math.min(S - 1, s + 1)][m], sections[Math.max(0, s - 1)][m]));
+            let n = cross(
+              sub(ring[(m + 1) % M], ring[(m + M - 1) % M]),
+              sub(sections[Math.min(S - 1, s + 1)][m], sections[Math.max(0, s - 1)][m]),
+            );
             if (norm(n) < 1e-12) n = out;
             if (dot3(n, out) < 0) n = scale(n, -1);
             mesh.vert(p, n, m / M, s / (S - 1));
           }),
         );
         const kind = (...vs: number[]) => {
-          const f = vs.reduce((s, v) => s + mesh.n[v * 3] * N.front[0] + mesh.n[v * 3 + 1] * N.front[1] + mesh.n[v * 3 + 2] * N.front[2], 0) / vs.length;
+          const f =
+            vs.reduce(
+              (s, v) =>
+                s + mesh.n[v * 3] * N.front[0] + mesh.n[v * 3 + 1] * N.front[1] + mesh.n[v * 3 + 2] * N.front[2],
+              0,
+            ) / vs.length;
           return f > 0.3 ? FACE.outer : f < -0.3 ? FACE.inner : FACE.band;
         };
         for (let s = 0; s + 1 < S; s++)
@@ -2095,7 +2425,17 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
             return section(collarPoint(c, h0, phi, lift0), N.axis, radial(h0, phi), tall, 0.006);
           };
         for (const side of [1, -1]) loft(Array.from({ length: 7 }, (_, i) => wingAt(side, i / 6)));
-        loft(Array.from({ length: 5 }, (_, i) => section(collarPoint(c, h0 - 0.011 + (0.022 * i) / 4, Math.PI / 2, lift0 + 0.004), N.side, N.front, 0.02, 0.012)));
+        loft(
+          Array.from({ length: 5 }, (_, i) =>
+            section(
+              collarPoint(c, h0 - 0.011 + (0.022 * i) / 4, Math.PI / 2, lift0 + 0.004),
+              N.side,
+              N.front,
+              0.02,
+              0.012,
+            ),
+          ),
+        );
       } else {
         const top = Math.max(0.012, Math.min(height - 0.004, height - (shirt?.points ?? 0) + 0.006)),
           S = 8,
@@ -2109,8 +2449,21 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
             // Its back clears the collar across its whole width, the turned points' stand included (a neck wider than
             // it is deep sets the collar further forward beside the centre than at it).
             let stand = lift0;
-            for (let i = 0; i <= 6; i++) stand = Math.max(stand, dot3(sub(collarPoint(c, h, Math.PI / 2 - ((i / 6 - 0.5) * w) / frontR, lift0 + POINTS.stand), base), out));
-            return section(add(base, scale(out, stand)), N.side, out, w, (TIE.depthBottom + (TIE.depthTop - TIE.depthBottom) * u) * crown);
+            for (let i = 0; i <= 6; i++)
+              stand = Math.max(
+                stand,
+                dot3(
+                  sub(collarPoint(c, h, Math.PI / 2 - ((i / 6 - 0.5) * w) / frontR, lift0 + POINTS.stand), base),
+                  out,
+                ),
+              );
+            return section(
+              add(base, scale(out, stand)),
+              N.side,
+              out,
+              w,
+              (TIE.depthBottom + (TIE.depthTop - TIE.depthBottom) * u) * crown,
+            );
           });
         loft(knot);
         // The blade: from under the knot down the shirt front, walked down the shirt's surface in 5 mm steps (a point
@@ -2121,7 +2474,9 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           cols = 5,
           surf = (q: V3, lift: number) => {
             const front = ax.front(q[1]);
-            return shirt ? shirt.onCloth(q, lift) : { p: add(q, scale(front, ease + lift)), n: front, anchor: q, direct: false };
+            return shirt
+              ? shirt.onCloth(q, lift)
+              : { p: add(q, scale(front, ease + lift)), n: front, anchor: q, direct: false };
           },
           walk: { p: V3; side: V3; s: number }[] = [];
         let at = surf(collarPoint(c, 0, Math.PI / 2, 0), 0),
@@ -2168,7 +2523,11 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
               n = scale(walk[row].side, dir),
               band = [o, i, o + cols, i + cols].map((v) => {
                 mesh.anchored = mesh.direct[v] === 1;
-                const b = mesh.vert([mesh.p[v * 3], mesh.p[v * 3 + 1], mesh.p[v * 3 + 2]], n, j, row, 0, [mesh.anchor[v * 3], mesh.anchor[v * 3 + 1], mesh.anchor[v * 3 + 2]]);
+                const b = mesh.vert([mesh.p[v * 3], mesh.p[v * 3 + 1], mesh.p[v * 3 + 2]], n, j, row, 0, [
+                  mesh.anchor[v * 3],
+                  mesh.anchor[v * 3 + 1],
+                  mesh.anchor[v * 3 + 2],
+                ]);
                 mesh.anchored = false;
                 return b;
               });
@@ -2187,16 +2546,28 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         st = crownRows(dome).map((f) => {
           const yy = base + crown * f,
             above = bodyAt('head', Math.min(yy, H.top));
-          return station('head', yy, band.map((b, k) => Math.max(b * crownTaper(f, dome), above[k] + offset)));
+          return station(
+            'head',
+            yy,
+            band.map((b, k) => Math.max(b * crownTaper(f, dome), above[k] + offset)),
+          );
         });
       tube('head', st, [], noSeam, 'top');
-      brim(mesh, a.axes.head.centre(base), band.map((b) => b + th), spec.brim ?? 0.06, th);
+      brim(
+        mesh,
+        a.axes.head.centre(base),
+        band.map((b) => b + th),
+        spec.brim ?? 0.06,
+        th,
+      );
     }
     out.push({ spec, mesh, offset });
   });
   // The body under the cloth, ring by ring: below the crotch the trunk's ring spans both legs.
   const under = (part: string, at: number) =>
-    part === 'trunk' && at < H.crotch ? aroundLegs(at, bodyAt('trunk', at), 0) : bodyAt(part, part === 'head' ? Math.min(at, H.stature) : Math.max(at, 0));
+    part === 'trunk' && at < H.crotch
+      ? aroundLegs(at, bodyAt('trunk', at), 0)
+      : bodyAt(part, part === 'head' ? Math.min(at, H.stature) : Math.max(at, 0));
   return { garments: out, under };
 }
 /** A flat disc facing +z, radius r, thickness t: a button. */
@@ -2221,7 +2592,9 @@ function disc(m: Mesh, c: V3, r: number, t: number) {
 /** A flat brim at height c[1]: from the band radii out by `width`, `t` thick, faces up, down and its rim. */
 function brim(m: Mesh, c: V3, inner: Float64Array, width: number, t: number) {
   const ring = (r: (k: number) => number, y: number, n: V3 | null, v: number) =>
-    Array.from({ length: R }, (_, k) => m.vert([c[0] + r(k) * COS[k], y, c[2] + r(k) * SIN[k]], n ?? [COS[k], 0, SIN[k]], k / R, v));
+    Array.from({ length: R }, (_, k) =>
+      m.vert([c[0] + r(k) * COS[k], y, c[2] + r(k) * SIN[k]], n ?? [COS[k], 0, SIN[k]], k / R, v),
+    );
   const topIn = ring((k) => inner[k], c[1] + t, [0, 1, 0], 0),
     topOut = ring((k) => inner[k] + width, c[1] + t, [0, 1, 0], 1),
     botIn = ring((k) => inner[k], c[1], [0, -1, 0], 0),
@@ -2325,7 +2698,8 @@ class TriangleGrid {
         return [this.index(mn, d), this.index(mx, d)];
       });
       boxes.push(...box);
-      for (let x = box[0]; x <= box[1]; x++) for (let y = box[2]; y <= box[3]; y++) for (let z = box[4]; z <= box[5]; z++) counts[this.key(x, y, z) + 1]++;
+      for (let x = box[0]; x <= box[1]; x++)
+        for (let y = box[2]; y <= box[3]; y++) for (let z = box[4]; z <= box[5]; z++) counts[this.key(x, y, z) + 1]++;
     }
     for (let i = 1; i < counts.length; i++) counts[i] += counts[i - 1];
     this.start = counts.slice();
@@ -2334,7 +2708,9 @@ class TriangleGrid {
     const fill = counts.slice();
     for (let i = 0; i < list.length; i++) {
       const box = boxes.slice(i * 6, i * 6 + 6);
-      for (let x = box[0]; x <= box[1]; x++) for (let y = box[2]; y <= box[3]; y++) for (let z = box[4]; z <= box[5]; z++) this.items[fill[this.key(x, y, z)]++] = list[i];
+      for (let x = box[0]; x <= box[1]; x++)
+        for (let y = box[2]; y <= box[3]; y++)
+          for (let z = box[4]; z <= box[5]; z++) this.items[fill[this.key(x, y, z)]++] = list[i];
     }
   }
   index(v: number, d: number) {
@@ -2346,7 +2722,9 @@ class TriangleGrid {
   /** The closest triangle to p within `limit`: its index, barycentrics in `bary`, the squared distance; -1 for none. */
   closest(p: V3, limit: number, bary: Float64Array): { tri: number; d2: number } {
     // A point further than `limit` outside the grid's box has no triangle in reach.
-    for (let d = 0; d < 3; d++) if (p[d] < this.lo[d] - limit || p[d] > this.lo[d] + this.dims[d] * this.cell + limit) return { tri: -1, d2: limit * limit };
+    for (let d = 0; d < 3; d++)
+      if (p[d] < this.lo[d] - limit || p[d] > this.lo[d] + this.dims[d] * this.cell + limit)
+        return { tri: -1, d2: limit * limit };
     const cx = this.index(p[0], 0),
       cy = this.index(p[1], 1),
       cz = this.index(p[2], 2),
@@ -2375,7 +2753,11 @@ class TriangleGrid {
                 B: V3 = [P[T[t * 3 + 1] * 3], P[T[t * 3 + 1] * 3 + 1], P[T[t * 3 + 1] * 3 + 2]],
                 C: V3 = [P[T[t * 3 + 2] * 3], P[T[t * 3 + 2] * 3 + 1], P[T[t * 3 + 2] * 3 + 2]];
               closestOnTriangle(p, A, B, C, tmp);
-              const q: V3 = [A[0] * tmp[0] + B[0] * tmp[1] + C[0] * tmp[2], A[1] * tmp[0] + B[1] * tmp[1] + C[1] * tmp[2], A[2] * tmp[0] + B[2] * tmp[1] + C[2] * tmp[2]],
+              const q: V3 = [
+                  A[0] * tmp[0] + B[0] * tmp[1] + C[0] * tmp[2],
+                  A[1] * tmp[0] + B[1] * tmp[1] + C[1] * tmp[2],
+                  A[2] * tmp[0] + B[2] * tmp[1] + C[2] * tmp[2],
+                ],
                 d2 = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2;
               if (d2 < bestD2) {
                 bestD2 = d2;
@@ -2477,7 +2859,8 @@ function weightLattice(
   const fixed = matched.slice();
   if (!fixed.some((f) => f)) fixed.fill(1);
   const bones = new Map<number, number>();
-  for (let x = 0; x < nodes; x++) if (fixed[x]) for (const b of nearest[x].keys()) if (!bones.has(b)) bones.set(b, bones.size);
+  for (let x = 0; x < nodes; x++)
+    if (fixed[x]) for (const b of nearest[x].keys()) if (!bones.has(b)) bones.set(b, bones.size);
   const B = Math.max(1, bones.size),
     W = new Float64Array(nodes * B);
   for (let x = 0; x < nodes; x++)
@@ -2497,7 +2880,12 @@ function weightLattice(
     for (const x of free) {
       const j = Math.floor(x / R),
         k = x % R,
-        nb = [j * R + ((k + 1) % R), j * R + ((k + R - 1) % R), ...(j > 0 ? [x - R] : []), ...(j < rows - 1 ? [x + R] : [])];
+        nb = [
+          j * R + ((k + 1) % R),
+          j * R + ((k + R - 1) % R),
+          ...(j > 0 ? [x - R] : []),
+          ...(j < rows - 1 ? [x + R] : []),
+        ];
       row.fill(0);
       for (const y of nb) for (let b = 0; b < B; b++) row[b] += W[y * B + b];
       for (let b = 0; b < B; b++) {
@@ -2516,7 +2904,15 @@ function weightLattice(
  * no single part's lattice holds its weights. Every layer of one row and column shares the anchor, so the layers move
  * alike. Returns whether the anchor lies within MATCH of the body.
  */
-function anchorWeights(body: RiggedBody, grid: TriangleGrid, reach: number, anchors: readonly number[], v: number, joints: Uint16Array, weights: Float32Array): boolean {
+function anchorWeights(
+  body: RiggedBody,
+  grid: TriangleGrid,
+  reach: number,
+  anchors: readonly number[],
+  v: number,
+  joints: Uint16Array,
+  weights: Float32Array,
+): boolean {
   const bary = new Float64Array(3),
     hit = grid.closest([anchors[v * 3], anchors[v * 3 + 1], anchors[v * 3 + 2]], reach, bary),
     w = new Map<number, number>();
@@ -2536,7 +2932,15 @@ function anchorWeights(body: RiggedBody, grid: TriangleGrid, reach: number, anch
   return hit.d2 <= MATCH * MATCH;
 }
 /** A garment vertex's weights from its part's lattice, by its place along the part and its angle around it. */
-function latticeWeights(lat: Lattice, ax: Axis, p: ArrayLike<number>, o: number, joints: Uint16Array, weights: Float32Array, v: number): boolean {
+function latticeWeights(
+  lat: Lattice,
+  ax: Axis,
+  p: ArrayLike<number>,
+  o: number,
+  joints: Uint16Array,
+  weights: Float32Array,
+  v: number,
+): boolean {
   const at = ax.project ? ax.project(p, o) : p[o + 1],
     c = ax.centre(at),
     d: V3 = [p[o] - c[0], p[o + 1] - c[1], p[o + 2] - c[2]],
@@ -2587,11 +2991,17 @@ function latticeWeights(lat: Lattice, ax: Axis, p: ArrayLike<number>, o: number,
  */
 export function fitOutfit(body: RiggedBody, outfit: Outfit | OutfitName, options: FitOptions = {}): FittedOutfit {
   const o = typeof outfit === 'string' ? (OUTFITS as Record<string, Outfit>)[outfit] : outfit;
-  if (!o || !Array.isArray(o.garments) || !o.garments.length) throw new TypeError(`fitOutfit needs an outfit: one of ${Object.keys(OUTFITS).join(', ')}, or an Outfit`);
+  if (!o || !Array.isArray(o.garments) || !o.garments.length)
+    throw new TypeError(`fitOutfit needs an outfit: one of ${Object.keys(OUTFITS).join(', ')}, or an Outfit`);
   const opts = { fit: options.fit ?? 1, ease: options.ease ?? 0.003, layerGap: options.layerGap ?? 0.002 };
-  if (!(opts.fit >= 0 && opts.fit <= 4) || !(opts.ease >= 0 && opts.ease <= 0.1) || !(opts.layerGap >= 0 && opts.layerGap <= 0.05))
+  if (
+    !(opts.fit >= 0 && opts.fit <= 4) ||
+    !(opts.ease >= 0 && opts.ease <= 0.1) ||
+    !(opts.layerGap >= 0 && opts.layerGap <= 0.05)
+  )
     throw new RangeError('fitOutfit fit must be 0 to 4, ease 0 to 0.1 m and layerGap 0 to 0.05 m');
-  if (options.unit !== undefined && !(options.unit > 0 && Number.isFinite(options.unit))) throw new RangeError('fitOutfit unit must be a positive number of metres');
+  if (options.unit !== undefined && !(options.unit > 0 && Number.isFinite(options.unit)))
+    throw new RangeError('fitOutfit unit must be a positive number of metres');
   const a = analyse(body, options.unit),
     { garments: built, under } = fitGarments(a, o, opts);
   // Body triangles in the fit frame for the weight match.
@@ -2602,7 +3012,18 @@ export function fitOutfit(body: RiggedBody, outfit: Outfit | OutfitName, options
   // One weight lattice per body part, over the reach of every garment on it.
   const reach = new Map<string, [number, number]>(),
     PARTS = ['trunk', 'head', 'armL', 'armR', 'legL', 'legR'],
-    partName = (id: number) => (id === TRUNK ? 'trunk' : id === HEAD ? 'head' : id === ARM ? 'armL' : id === ARM + 1 ? 'armR' : id === LEG ? 'legL' : 'legR');
+    partName = (id: number) =>
+      id === TRUNK
+        ? 'trunk'
+        : id === HEAD
+          ? 'head'
+          : id === ARM
+            ? 'armL'
+            : id === ARM + 1
+              ? 'armR'
+              : id === LEG
+                ? 'legL'
+                : 'legR';
   for (const { mesh } of built)
     for (let v = 0; v < mesh.p.length / 3; v++) {
       const name = partName(mesh.part[v]),
@@ -2611,7 +3032,12 @@ export function fitOutfit(body: RiggedBody, outfit: Outfit | OutfitName, options
         r = reach.get(name) ?? [Infinity, -Infinity];
       reach.set(name, [Math.min(r[0], at), Math.max(r[1], at)]);
     }
-  const lattices = new Map(PARTS.filter((n) => reach.has(n)).map((n) => [n, weightLattice(body, a, grid, normals, n, reach.get(n)![0], reach.get(n)![1], under)]));
+  const lattices = new Map(
+    PARTS.filter((n) => reach.has(n)).map((n) => [
+      n,
+      weightLattice(body, a, grid, normals, n, reach.get(n)![0], reach.get(n)![1], under),
+    ]),
+  );
   const garments = built.map(({ spec, mesh }): FittedGarment => {
     const count = mesh.p.length / 3,
       joints = new Uint16Array(count * 4),
@@ -2621,7 +3047,12 @@ export function fitOutfit(body: RiggedBody, outfit: Outfit | OutfitName, options
     let matchedCount = 0;
     for (let v = 0; v < count; v++) {
       const name = partName(mesh.part[v]);
-      if (mesh.direct[v] ? anchorWeights(body, grid, a.diagonal, mesh.anchor, v, joints, weights) : latticeWeights(lattices.get(name)!, a.axes[name], mesh.p, v * 3, joints, weights, v)) matchedCount++;
+      if (
+        mesh.direct[v]
+          ? anchorWeights(body, grid, a.diagonal, mesh.anchor, v, joints, weights)
+          : latticeWeights(lattices.get(name)!, a.axes[name], mesh.p, v * 3, joints, weights, v)
+      )
+        matchedCount++;
     }
     const matched = matchedCount / Math.max(1, count);
     for (let v = 0; v < count; v++) {
@@ -2701,7 +3132,12 @@ export interface FitPenetration {
   /** Deepest vertex of one garment through another (an outer layer under an inner one, or the reverse). */
   readonly layers: number;
   /** Which garment reaches deepest into the body and where (body space), and which pair crosses deepest and where. */
-  readonly worst: { readonly body: string; readonly bodyAt: readonly number[]; readonly layers: string; readonly layersAt: readonly number[] };
+  readonly worst: {
+    readonly body: string;
+    readonly bodyAt: readonly number[];
+    readonly layers: string;
+    readonly layersAt: readonly number[];
+  };
 }
 /**
  * How far the fitted garments reach into the body and through each other, with the body and garments skinned by
@@ -2715,7 +3151,8 @@ export interface FitPenetration {
  */
 export function fitPenetration(body: RiggedBody, fit: FittedOutfit, skin?: ArrayLike<number>): FitPenetration {
   checkBody(body);
-  if (skin !== undefined && skin.length !== body.bones.length * 16) throw new RangeError('fitPenetration skin needs 16 numbers for each bone');
+  if (skin !== undefined && skin.length !== body.bones.length * 16)
+    throw new RangeError('fitPenetration skin needs 16 numbers for each bone');
   const pose = (pos: ArrayLike<number>, joints: ArrayLike<number>, weights: ArrayLike<number>) => {
     const out = new Float64Array(pos.length);
     for (let v = 0; v < pos.length / 3; v++) {
@@ -2781,16 +3218,26 @@ export function fitPenetration(body: RiggedBody, fit: FittedOutfit, skin?: Array
       return norm(cross(e1, e2)) / (Math.max(norm(e1), norm(e2), norm(sub(e2, e1))) || 1);
     };
     for (let t = 0; t < g.faces.length; t++)
-      if ((g.faces[t] === FACE.outer || g.faces[t] === FACE.inner) && !(g.seams[g.indices[t * 3]] && g.seams[g.indices[t * 3 + 1]] && g.seams[g.indices[t * 3 + 2]]) && height(t) > 1e-6 / unit) {
+      if (
+        (g.faces[t] === FACE.outer || g.faces[t] === FACE.inner) &&
+        !(g.seams[g.indices[t * 3]] && g.seams[g.indices[t * 3 + 1]] && g.seams[g.indices[t * 3 + 2]]) &&
+        height(t) > 1e-6 / unit
+      ) {
         const part = g.parts[g.indices[t * 3]];
         (byPart.get(part) ?? byPart.set(part, []).get(part)!).push(t);
       }
     const n = vertexNormals(p, g.indices, p.length / 3);
-    return { g, p, n, grids: new Map([...byPart].map(([part, list]) => [part, new TriangleGrid(p, g.indices, list, cell)])) };
+    return {
+      g,
+      p,
+      n,
+      grids: new Map([...byPart].map(([part, list]) => [part, new TriangleGrid(p, g.indices, list, cell)])),
+    };
   });
   // Layers are compared part by part: a sleeve with the same arm's sleeves, a leg with the same leg and the trunk (coat
   // tails over trousers), the trunk with the trunk and both legs. A sleeve beside the trunk is no layer of it.
-  const facing = (a: number, b: number) => a === b || (a === TRUNK && (b === LEG || b === LEG + 1)) || (b === TRUNK && (a === LEG || a === LEG + 1));
+  const facing = (a: number, b: number) =>
+    a === b || (a === TRUNK && (b === LEG || b === LEG + 1)) || (b === TRUNK && (a === LEG || a === LEG + 1));
   let deepBody = 0,
     deepLayers = 0,
     worstBody = '',
@@ -2817,20 +3264,25 @@ export function fitPenetration(body: RiggedBody, fit: FittedOutfit, skin?: Array
         if (A.g.seams[v]) continue;
         const q: V3 = [A.p[v * 3], A.p[v * 3 + 1], A.p[v * 3 + 2]];
         for (const [part, grid] of B.grids) {
-        if (!facing(A.g.parts[v], part)) continue;
-        const hit = grid.closest(q, reach, bary);
-        if (hit.tri < 0) continue;
-        const side = over(q, B.p, B.n, B.g.indices, hit.tri);
-        if (Number.isNaN(side)) continue;
-        // The outer face points away from the body, the inner face toward it. An outer layer must lie past B's outer
-        // face; an inner layer under B's inner face. Depth is how far it reaches the wrong way.
-        const innerFace = B.g.faces[hit.tri] === FACE.inner,
-          depth = outer ? (innerFace ? th + side : -side) : innerFace ? -side : th + side;
-        if (depth > deepLayers) [deepLayers, worstLayers, layersAt] = [depth, `${A.g.spec.name} through ${B.g.spec.name}`, [...q]];
+          if (!facing(A.g.parts[v], part)) continue;
+          const hit = grid.closest(q, reach, bary);
+          if (hit.tri < 0) continue;
+          const side = over(q, B.p, B.n, B.g.indices, hit.tri);
+          if (Number.isNaN(side)) continue;
+          // The outer face points away from the body, the inner face toward it. An outer layer must lie past B's outer
+          // face; an inner layer under B's inner face. Depth is how far it reaches the wrong way.
+          const innerFace = B.g.faces[hit.tri] === FACE.inner,
+            depth = outer ? (innerFace ? th + side : -side) : innerFace ? -side : th + side;
+          if (depth > deepLayers)
+            [deepLayers, worstLayers, layersAt] = [depth, `${A.g.spec.name} through ${B.g.spec.name}`, [...q]];
         }
       }
     }
-  return { body: deepBody * unit, layers: deepLayers * unit, worst: { body: worstBody, bodyAt, layers: worstLayers, layersAt } };
+  return {
+    body: deepBody * unit,
+    layers: deepLayers * unit,
+    worst: { body: worstBody, bodyAt, layers: worstLayers, layersAt },
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -2845,9 +3297,15 @@ export function fitPenetration(body: RiggedBody, fit: FittedOutfit, skin?: Array
  * @example
  * const glb = fittedOutfitGLB(model, fitOutfit(riggedBody(model), 'townsman-1910'));
  */
-export function fittedOutfitGLB(model: PBRModel, fit: FittedOutfit, materials: readonly string[] = BODY_MATERIALS): Uint8Array {
+export function fittedOutfitGLB(
+  model: PBRModel,
+  fit: FittedOutfit,
+  materials: readonly string[] = BODY_MATERIALS,
+): Uint8Array {
   const doc = model.asset.doc as unknown as Doc,
-    picked = model.primitives.filter((p) => isBody(doc, p, materials) && doc.nodes[p.nodeIndex]?.skin !== undefined && !p.topology);
+    picked = model.primitives.filter(
+      (p) => isBody(doc, p, materials) && doc.nodes[p.nodeIndex]?.skin !== undefined && !p.topology,
+    );
   if (!picked.length) throw new TypeError('fittedOutfitGLB needs the model the fit was made from');
   const skeleton = bodySkeleton(model, picked),
     host = skeleton.host;
@@ -2862,8 +3320,20 @@ export function fittedOutfitGLB(model: PBRModel, fit: FittedOutfit, materials: r
     if (data.byteLength & 3) chunks.push(new Uint8Array(4 - (data.byteLength & 3)));
     return bufferViews.length - 1;
   };
-  const acc = (data: Float32Array | Uint32Array | Uint16Array, type: string, count: number, target?: number, extra = {}) => {
-    accessors.push({ bufferView: view(data, target), componentType: data instanceof Float32Array ? 5126 : data instanceof Uint16Array ? 5123 : 5125, count, type, ...extra });
+  const acc = (
+    data: Float32Array | Uint32Array | Uint16Array,
+    type: string,
+    count: number,
+    target?: number,
+    extra = {},
+  ) => {
+    accessors.push({
+      bufferView: view(data, target),
+      componentType: data instanceof Float32Array ? 5126 : data instanceof Uint16Array ? 5123 : 5125,
+      count,
+      type,
+      ...extra,
+    });
     return accessors.length - 1;
   };
   const materialsOut: object[] = [],
@@ -2879,9 +3349,22 @@ export function fittedOutfitGLB(model: PBRModel, fit: FittedOutfit, materials: r
     const lobes = garmentMaterial(g.spec);
     materialsOut.push({
       name: g.spec.name,
-      pbrMetallicRoughness: { baseColorFactor: [...lobes.baseColor, 1], metallicFactor: 0, roughnessFactor: lobes.roughness },
+      pbrMetallicRoughness: {
+        baseColorFactor: [...lobes.baseColor, 1],
+        metallicFactor: 0,
+        roughnessFactor: lobes.roughness,
+      },
       doubleSided: true,
-      ...(lobes.sheenColor.some((c) => c > 0) ? { extensions: { KHR_materials_sheen: { sheenColorFactor: [...lobes.sheenColor], sheenRoughnessFactor: lobes.sheenRoughness } } } : {}),
+      ...(lobes.sheenColor.some((c) => c > 0)
+        ? {
+            extensions: {
+              KHR_materials_sheen: {
+                sheenColorFactor: [...lobes.sheenColor],
+                sheenRoughnessFactor: lobes.sheenRoughness,
+              },
+            },
+          }
+        : {}),
     });
     primitives.push({
       attributes: {
@@ -2905,7 +3388,9 @@ export function fittedOutfitGLB(model: PBRModel, fit: FittedOutfit, materials: r
     ...(n.scale ? { scale: [...n.scale] } : {}),
     ...(i === host ? { mesh: 0, skin: 0 } : {}),
   }));
-  const roots = doc.scenes?.[doc.scene ?? 0]?.nodes ?? doc.nodes.map((_, i) => i).filter((i) => !doc.nodes.some((n) => n.children?.includes(i)));
+  const roots =
+    doc.scenes?.[doc.scene ?? 0]?.nodes ??
+    doc.nodes.map((_, i) => i).filter((i) => !doc.nodes.some((n) => n.children?.includes(i)));
   const bin = new Uint8Array(length);
   let at = 0;
   for (const c of chunks) {
@@ -3010,15 +3495,24 @@ export async function dressPerson(
     dressed.root.setParent(model.root);
     const sheen = install(dressed);
     cleanups.push(() => sheen.dispose());
-    const animation = new Animation(dressed, { skeleton: model, ...(options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }) });
+    const animation = new Animation(dressed, {
+      skeleton: model,
+      ...(options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }),
+    });
     kernel.use(animation, into);
     cleanups.push(() => animation.dispose());
-    const pick = (value: OutfitReceiver | false | undefined, fromScene: OutfitReceiver | undefined) => (value === false ? undefined : (value ?? fromScene));
-    const shadows = pick(options.shadows, options.scene?.parts.shadows ?? (kernel.sceneOf(model as never)?.plugins.get('shadows') as OutfitReceiver | undefined)),
+    const pick = (value: OutfitReceiver | false | undefined, fromScene: OutfitReceiver | undefined) =>
+      value === false ? undefined : (value ?? fromScene);
+    const shadows = pick(
+        options.shadows,
+        options.scene?.parts.shadows ??
+          (kernel.sceneOf(model as never)?.plugins.get('shadows') as OutfitReceiver | undefined),
+      ),
       occlusion = pick(options.occlusion, options.scene?.parts.occlusion);
     for (const r of [shadows, occlusion]) {
       if (!r) continue;
-      if (typeof r.add !== 'function') throw new TypeError('dressPerson shadows and occlusion must have an add() method or be false');
+      if (typeof r.add !== 'function')
+        throw new TypeError('dressPerson shadows and occlusion must have an add() method or be false');
       const off = r.add(dressed as never);
       if (typeof off === 'function') cleanups.push(off as () => void);
     }
@@ -3041,9 +3535,39 @@ export async function dressPerson(
 
 /** The fit's slider rows: ease scale, ease over the body and the gap between layers. All refit the garments. */
 export const FIT_SETTINGS: readonly SettingRow[] = [
-  numberSetting('fit', 'fit', 1, 0, 4, 0.05, '', "Every garment's ease (its gap to the layer beneath) times this.", false),
-  numberSetting('ease', 'fit', 0.003, 0, 0.1, 0.0005, 'm', 'Added to every ease over the body: covers its triangles and its skinning.', false),
-  numberSetting('layerGap', 'fit', 0.002, 0, 0.05, 0.0005, 'm', 'Added between a garment and the garment under it.', false),
+  numberSetting(
+    'fit',
+    'fit',
+    1,
+    0,
+    4,
+    0.05,
+    '',
+    "Every garment's ease (its gap to the layer beneath) times this.",
+    false,
+  ),
+  numberSetting(
+    'ease',
+    'fit',
+    0.003,
+    0,
+    0.1,
+    0.0005,
+    'm',
+    'Added to every ease over the body: covers its triangles and its skinning.',
+    false,
+  ),
+  numberSetting(
+    'layerGap',
+    'fit',
+    0.002,
+    0,
+    0.05,
+    0.0005,
+    'm',
+    'Added between a garment and the garment under it.',
+    false,
+  ),
 ];
 /** The row defaults. */
 export const fitSettingDefaults = (): Record<string, unknown> => settingDefaults(FIT_SETTINGS);

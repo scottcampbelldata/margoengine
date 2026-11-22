@@ -71,23 +71,42 @@ const hash = (n: number): number => {
  * engine.onUpdate((dt) => { crowd.update(dt); walkers.update(dt); });
  */
 export function walkCrowd(crowd: WalkingCrowd, drawer: WalkerDrawer, options: WalkCrowdOptions): CrowdWalkers {
-  if (!crowd || !Array.isArray(crowd.agents)) throw new TypeError('walkCrowd needs a navmesh Crowd; pass new Crowd(navMesh)');
+  if (!crowd || !Array.isArray(crowd.agents))
+    throw new TypeError('walkCrowd needs a navmesh Crowd; pass new Crowd(navMesh)');
   if (!drawer || typeof drawer.add !== 'function' || typeof drawer.set !== 'function')
-    throw new TypeError('walkCrowd needs a VATCrowd or SkinnedCrowd to draw with; pass one from @margoengine/animation');
+    throw new TypeError(
+      'walkCrowd needs a VATCrowd or SkinnedCrowd to draw with; pass one from @margoengine/animation',
+    );
   const clips = drawer.vat?.clips?.length ?? 0,
-    { walk = 0, stride, standBelow = 0.05, turnRate = 4, seed = 1, variants = [] } = options ?? ({} as WalkCrowdOptions),
+    {
+      walk = 0,
+      stride,
+      standBelow = 0.05,
+      turnRate = 4,
+      seed = 1,
+      variants = [],
+    } = options ?? ({} as WalkCrowdOptions),
     stand = options?.stand ?? walk;
   for (const [v, label] of [
     [walk, 'walk'],
     [stand, 'stand'],
   ] as const)
     if (!Number.isInteger(v) || v < 0 || v >= clips)
-      throw new RangeError(`walkCrowd ${label} must be a clip index from 0 to ${clips - 1}; pass the clip's place in the bake`);
+      throw new RangeError(
+        `walkCrowd ${label} must be a clip index from 0 to ${clips - 1}; pass the clip's place in the bake`,
+      );
   if (!(stride > 0) || !Number.isFinite(stride))
-    throw new RangeError('walkCrowd stride must be the ground the walk clip covers in a second, above 0; pass about 1.4 for a person');
+    throw new RangeError(
+      'walkCrowd stride must be the ground the walk clip covers in a second, above 0; pass about 1.4 for a person',
+    );
   if (!(standBelow >= 0) || !(turnRate > 0) || !Number.isFinite(standBelow + turnRate))
-    throw new RangeError('walkCrowd standBelow must be 0 or more and turnRate above 0, finite; pass the defaults 0.05 and 4');
-  const s = typeof options.scale === 'number' || options.scale === undefined ? [options.scale ?? 1, options.scale ?? 1, options.scale ?? 1] : options.scale;
+    throw new RangeError(
+      'walkCrowd standBelow must be 0 or more and turnRate above 0, finite; pass the defaults 0.05 and 4',
+    );
+  const s =
+    typeof options.scale === 'number' || options.scale === undefined
+      ? [options.scale ?? 1, options.scale ?? 1, options.scale ?? 1]
+      : options.scale;
   if (s.length !== 3 || !s.every((k) => k > 0 && Number.isFinite(k)))
     throw new RangeError('walkCrowd scale must be a number above 0 or three of them; pass 1');
   const instances: number[] = [],
@@ -122,7 +141,8 @@ export function walkCrowd(crowd: WalkingCrowd, drawer: WalkerDrawer, options: Wa
       return headings;
     },
     update(dt: number) {
-      if (!(dt >= 0) || !Number.isFinite(dt)) throw new RangeError('walkers update needs a finite dt of 0 or more seconds');
+      if (!(dt >= 0) || !Number.isFinite(dt))
+        throw new RangeError('walkers update needs a finite dt of 0 or more seconds');
       grow();
       const agents = crowd.agents;
       for (let i = 0; i < instances.length && i < agents.length; i++) {
@@ -143,7 +163,24 @@ export function walkCrowd(crowd: WalkingCrowd, drawer: WalkerDrawer, options: Wa
         const c = Math.cos(headings[i]),
           n = Math.sin(headings[i]);
         // Column-major: rotation about +Y (+Z forward turned to (sin, 0, cos)), scale, then translation.
-        matrix.set([c * s[0], 0, -n * s[0], 0, 0, s[1], 0, 0, n * s[2], 0, c * s[2], 0, a.position[0], a.position[1], a.position[2], 1]);
+        matrix.set([
+          c * s[0],
+          0,
+          -n * s[0],
+          0,
+          0,
+          s[1],
+          0,
+          0,
+          n * s[2],
+          0,
+          c * s[2],
+          0,
+          a.position[0],
+          a.position[1],
+          a.position[2],
+          1,
+        ]);
         // Walking: the cycle at its own phase. Standing: the stand clip plays at its own pace from a phase of its own, or
         // with no stand clip the walk holds where it stopped.
         drawer.set(

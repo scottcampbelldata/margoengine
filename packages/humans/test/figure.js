@@ -8,10 +8,19 @@ export function figure({ skinned = false } = {}) {
   const accessor = (data, type, extra = {}) => {
     buffers.push(new Uint8Array(data.buffer));
     bufferViews.push({ buffer: buffers.length - 1, byteLength: data.byteLength });
-    accessors.push({ bufferView: bufferViews.length - 1, componentType: 5126, count: data.length / { VEC4: 4, VEC3: 3, SCALAR: 1 }[type], type, ...extra });
+    accessors.push({
+      bufferView: bufferViews.length - 1,
+      componentType: 5126,
+      count: data.length / { VEC4: 4, VEC3: 3, SCALAR: 1 }[type],
+      type,
+      ...extra,
+    });
     return accessors.length - 1;
   };
-  const position = accessor(new Float32Array([0, 0, 0, 0.1, 0, 0, 0, 0.1, 0]), 'VEC3', { min: [0, 0, 0], max: [0.1, 0.1, 0] }),
+  const position = accessor(new Float32Array([0, 0, 0, 0.1, 0, 0, 0, 0.1, 0]), 'VEC3', {
+      min: [0, 0, 0],
+      max: [0.1, 0.1, 0],
+    }),
     times = accessor(new Float32Array([0, 1]), 'SCALAR', { min: [0], max: [1] }),
     skin = skinned
       ? {
@@ -21,13 +30,21 @@ export function figure({ skinned = false } = {}) {
       : {};
   const clip = (name, angle) => {
     const output = accessor(new Float32Array([0, 0, 0, 1, 0, 0, Math.sin(angle / 2), Math.cos(angle / 2)]), 'VEC4');
-    return { name, samplers: [{ input: times, output }], channels: [{ sampler: 0, target: { node: 1, path: 'rotation' } }] };
+    return {
+      name,
+      samplers: [{ input: times, output }],
+      channels: [{ sampler: 0, target: { node: 1, path: 'rotation' } }],
+    };
   };
   const doc = {
     asset: { version: '2.0' },
     scene: 0,
     scenes: [{ nodes: [0, 2] }],
-    nodes: [{ name: 'root', children: [1] }, { name: 'arm', translation: [0, 1, 0] }, { name: 'body', mesh: 0, ...(skinned ? { skin: 0 } : {}) }],
+    nodes: [
+      { name: 'root', children: [1] },
+      { name: 'arm', translation: [0, 1, 0] },
+      { name: 'body', mesh: 0, ...(skinned ? { skin: 0 } : {}) },
+    ],
     ...(skinned ? { skins: [{ joints: [1] }] } : {}),
     meshes: [{ primitives: [{ attributes: { POSITION: position, ...skin }, material: 0 }] }],
     materials: [{ name: 'Suit' }],
@@ -50,7 +67,11 @@ export function figureGLB(edit, options) {
   });
   const bin = new Uint8Array(offset);
   buffers.forEach((b, i) => bin.set(b, views[i]));
-  const json = { ...doc, buffers: [{ byteLength: offset }], bufferViews: doc.bufferViews.map((v, i) => ({ ...v, buffer: 0, byteOffset: views[i] })) };
+  const json = {
+    ...doc,
+    buffers: [{ byteLength: offset }],
+    bufferViews: doc.bufferViews.map((v, i) => ({ ...v, buffer: 0, byteOffset: views[i] })),
+  };
   let text = new TextEncoder().encode(JSON.stringify(json));
   const padded = new Uint8Array((text.length + 3) & ~3).fill(0x20);
   padded.set(text);
