@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: formatting moved the visual scorch division annotation (biomes)
+
+- **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` flagged the float division in `disturbanceStates` after `5757affe45`.
+- **Cause:** the annotation was attached to the end of a render-state object. Formatting put the annotated division and the comment on different lines.
+- **Fix:** name the scorch height calculation and keep its float-division annotation on the same line. The formula still runs only during the burn window.
+- **Regression:** the existing no-raw-division test checks the formatted source and still rejects unannotated variable division.
+
 ### Fixed 2026-11-21: Water's WebGL2 browser suite could exhaust one GPU step (water tests)
 
 - **Repro:** run `npm run check:gpu-packages -- --select=water/test:gpu --no-build` with `MARGO_COMPAT=1` on the RTX A6000 workstation. The old step reached the surf check and was ended at 600 s.
