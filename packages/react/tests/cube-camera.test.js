@@ -71,7 +71,11 @@ async function context() {
   };
   engine.onError = (error) => errors.push(error);
   const tree = (child) =>
-    h(StrictMode, null, h(Context.Provider, { value: scene }, h(TextureProvider, null, h(Suspense, { fallback: null }, child))));
+    h(
+      StrictMode,
+      null,
+      h(Context.Provider, { value: scene }, h(TextureProvider, null, h(Suspense, { fallback: null }, child))),
+    );
   return { scene, engine, errors, tree };
 }
 const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
@@ -106,13 +110,23 @@ test('CubeCamera captures at its group, leaves its children out, hands the textu
   const cubeCamera = (props) =>
     h(
       CubeCamera,
-      { position: [1, 2, 3], resolution: 64, near: 0.5, far: 50, mips: true, onCreated: (c) => created.push(c), ...props },
+      {
+        position: [1, 2, 3],
+        resolution: 64,
+        near: 0.5,
+        far: 50,
+        mips: true,
+        onCreated: (c) => created.push(c),
+        ...props,
+      },
       (texture) => {
         seen.push(texture);
         return h(Mesh, { position: [0, 1, 0] }, h(BoxGeometry));
       },
     );
-  const view = render(tree(h(StrictMode, null, cubeCamera({ frames: 2 }), h(Mesh, { position: [5, 0, 0] }, h(BoxGeometry)))));
+  const view = render(
+    tree(h(StrictMode, null, cubeCamera({ frames: 2 }), h(Mesh, { position: [5, 0, 0] }, h(BoxGeometry)))),
+  );
   await settle();
   await settle();
   assert.deepEqual(errors, []);
@@ -140,13 +154,19 @@ test('CubeCamera captures at its group, leaves its children out, hands the textu
   assert.equal(seen.at(-1).label, 'restored');
   view.unmount();
   await settle();
-  assert.ok(made.every((c) => c.disposed), 'unmount disposes the native cube camera');
+  assert.ok(
+    made.every((c) => c.disposed),
+    'unmount disposes the native cube camera',
+  );
 });
 
 test('CubeCamera refuses a frame count that is not a positive integer', async () => {
   const { tree } = await context();
   for (const frames of [0, 1.5, -1])
-    assert.throws(() => render(tree(h(CubeCamera, { frames }))), /CubeCamera frames must be a positive integer or Infinity/);
+    assert.throws(
+      () => render(tree(h(CubeCamera, { frames }))),
+      /CubeCamera frames must be a positive integer or Infinity/,
+    );
 });
 
 test('CubeCamera inside a named <Scene> leaves its group out of its cube and keeps its private fog in that scene', async () => {

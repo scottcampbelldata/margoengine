@@ -32,7 +32,8 @@ export const DepthTexture = /* @__PURE__ */ forwardRef<DepthPlugin, DepthTexture
     scene,
     {
       load: () => optionalPeer('@margoengine/post/depth', () => import('@margoengine/post/depth')),
-      create: (api) => inScene(scene, () => api.DepthTexture.attach(scene.engine as unknown as EngineKernel, { order })),
+      create: (api) =>
+        inScene(scene, () => api.DepthTexture.attach(scene.engine as unknown as EngineKernel, { order })),
       dispose: (value) => value.dispose(),
       ref,
       onError,

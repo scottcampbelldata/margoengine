@@ -462,7 +462,11 @@ test('adding or removing an effect changes the live PostStack in place, so only 
   const fxaa = value.engine.plugins.get('fxaa');
   assert.equal(effects.length, built + 1);
   assert.deepEqual(stack.effects, [ssao, bloom, tone, fxaa]);
-  assert.deepEqual(stack.calls.slice(3), [['remove', 'smaa'], ['remove', 'dof'], ['add', 'fxaa', 3]]);
+  assert.deepEqual(stack.calls.slice(3), [
+    ['remove', 'smaa'],
+    ['remove', 'dof'],
+    ['add', 'fxaa', 3],
+  ]);
   assert.equal(dof.disposals, 1);
   assert.equal(smaa.disposals, 1);
   // A remounted Bloom (a new key) is a new effect in the same place; an option change on the others builds nothing.
@@ -475,7 +479,10 @@ test('adding or removing an effect changes the live PostStack in place, so only 
   assert.equal(bloom2.options.strength, 0.3);
   assert.equal(effects.length, built + 1);
   assert.deepEqual(stack.effects, [ssao, bloom2, tone, fxaa]);
-  assert.deepEqual(stack.calls.slice(6), [['remove', 'bloom'], ['add', 'bloom', 1]]);
+  assert.deepEqual(stack.calls.slice(6), [
+    ['remove', 'bloom'],
+    ['add', 'bloom', 1],
+  ]);
   for (const effect of [ssao, tone, fxaa, taa]) assert.equal(effect.disposals, 0, effect.name + ' is kept');
   assert.equal(stack.disposals, 0);
   assert.equal(taa.resets, 0, 'TAA keeps its history');
@@ -491,7 +498,9 @@ test('an effect the live PostStack refuses is disposed and reported once, and th
   const stack = value.engine.plugins.get('post:stack');
   stack.refuse = 'bloom';
   const before = effects.length;
-  view.rerender(tree(value, [h(DepthOfField, { key: 'dof' }), h(Tonemap, { key: 'tone' }), h(Bloom, { key: 'bloom' })], props));
+  view.rerender(
+    tree(value, [h(DepthOfField, { key: 'dof' }), h(Tonemap, { key: 'tone' }), h(Bloom, { key: 'bloom' })], props),
+  );
   await flush();
   assert.equal(effects.length, before + 1);
   assert.equal(effects.at(-1).disposals, 1, 'the refused Bloom is disposed');
@@ -902,7 +911,11 @@ test('an EffectComposer inside a <Scene> attaches its effects to that scene and 
   const view = render(tree(value, [h(Bloom, { key: 'b' }), h(SSAO, { key: 's' })]));
   await flush();
   assert.equal(engine.plugins.size, 0, 'nothing in the default scene');
-  assert.deepEqual([...world.plugins.keys()].sort(), ['bloom', 'post:stack', 'ssao'], 'the stack and its effects are in the named scene');
+  assert.deepEqual(
+    [...world.plugins.keys()].sort(),
+    ['bloom', 'post:stack', 'ssao'],
+    'the stack and its effects are in the named scene',
+  );
   assert.equal(world.plugins.get('ssao').sources.size, 0, 'the default scene models are left alone');
   view.unmount();
   await flush();

@@ -192,7 +192,11 @@ function velocitySource(scene: Scene, model: Model) {
           input.deformed ||
           input.vertices.byteLength !== primitive.vertex.size
         )
-          throw fault('state', 'TAA requires matching static PBR vertex data or a storage-capable deformed buffer; remove TAA or use static meshes', 'react-usage');
+          throw fault(
+            'state',
+            'TAA requires matching static PBR vertex data or a storage-capable deformed buffer; remove TAA or use static meshes',
+            'react-usage',
+          );
         used.add(primitive.vertex);
         let copy = copies.get(primitive.vertex);
         if (copy && copy.vertices !== input.vertices) {
@@ -334,15 +338,28 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     const kinds = new Set<Kind>();
     for (const pass of desired) {
       if (kinds.has(pass.kind))
-        throw fault('state', `EffectComposer cannot attach duplicate ${pass.kind} passes; keep one of each kind`, 'react-usage');
+        throw fault(
+          'state',
+          `EffectComposer cannot attach duplicate ${pass.kind} passes; keep one of each kind`,
+          'react-usage',
+        );
       kinds.add(pass.kind);
     }
     if (kinds.has('smaa') && kinds.has('fxaa'))
-      throw typeError('EffectComposer takes one anti-aliasing effect; keep <SMAA> or <FXAA>, not both', 'react-arguments');
+      throw typeError(
+        'EffectComposer takes one anti-aliasing effect; keep <SMAA> or <FXAA>, not both',
+        'react-arguments',
+      );
     if (kinds.has('ssao') && kinds.has('gtao'))
-      throw typeError('EffectComposer takes one ambient occlusion effect; keep <SSAO> or <GTAO>, not both', 'react-arguments');
+      throw typeError(
+        'EffectComposer takes one ambient occlusion effect; keep <SSAO> or <GTAO>, not both',
+        'react-arguments',
+      );
     if (desired.some((pass) => pass.kind === 'motionBlur' && !pass.options.velocity) && !kinds.has('taa'))
-      throw typeError('MotionBlur reads TAA motion vectors; add <TAA> to the same EffectComposer or pass velocity', 'react-arguments');
+      throw typeError(
+        'MotionBlur reads TAA motion vectors; add <TAA> to the same EffectComposer or pass velocity',
+        'react-arguments',
+      );
   };
   const update = (record: RecordEntry, pass: Pass, options: Options) => {
     record.pass = pass;
@@ -383,7 +400,11 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     let attaching: Pass | undefined;
     try {
       if (desired.length && (scene.engine.backend !== 'webgpu' || !scene.engine.gpu))
-        throw fault('unsupported', 'EffectComposer requires WebGPU; use an engine created with a WebGPU backend', 'react-usage');
+        throw fault(
+          'unsupported',
+          'EffectComposer requires WebGPU; use an engine created with a WebGPU backend',
+          'react-usage',
+        );
       validate(desired);
       const effects = desired.filter((pass) => pass.kind !== 'taa'),
         stacked = effects.length > 1;
@@ -414,7 +435,9 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
       // Tonemap reads `source` once, when it is created, so a new source means a new Tonemap.
       const replaced = (kind: Kind, record: RecordEntry) => {
         const next = desired.find((pass) => pass.kind === kind);
-        return !next || next !== record.pass || (kind === 'tonemap' && record.options.source !== optionsFor(next).source);
+        return (
+          !next || next !== record.pass || (kind === 'tonemap' && record.options.source !== optionsFor(next).source)
+        );
       };
       // With one effect or none left the stack goes. A live stack that stays drops, through removeEffect, each effect
       // whose pass left or changed; the others keep their pipelines and targets.

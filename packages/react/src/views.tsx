@@ -118,7 +118,11 @@ export function RenderView({
       queueMicrotask(() => {
         if (views.entries.has(key) && !views.scenes.has(scene) && !engine.disposed)
           engine.onError(
-            fault('state', `<RenderView scene="${scene}"> names no <Scene name="${scene}"> in this Canvas; add that <Scene>`, 'react-usage'),
+            fault(
+              'state',
+              `<RenderView scene="${scene}"> names no <Scene name="${scene}"> in this Canvas; add that <Scene>`,
+              'react-usage',
+            ),
           );
       });
       return;

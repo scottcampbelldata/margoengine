@@ -10,7 +10,11 @@ const PNG = [0x89, 0x50, 0x4e, 0x47],
 function mimeOf(bytes: Uint8Array): 'image/png' | 'image/jpeg' {
   if (PNG.every((byte, i) => bytes[i] === byte)) return 'image/png';
   if (JPEG.every((byte, i) => bytes[i] === byte)) return 'image/jpeg';
-  throw fault('unsupported', 'Textured shape: the map is neither PNG nor JPEG; convert it to one of the two, or use a glTF <Model> for KTX2 and WebP textures', 'react-usage');
+  throw fault(
+    'unsupported',
+    'Textured shape: the map is neither PNG nor JPEG; convert it to one of the two, or use a glTF <Model> for KTX2 and WebP textures',
+    'react-usage',
+  );
 }
 export async function bytesOf(source: TextureSource, fetcher: typeof fetch, signal: AbortSignal): Promise<Uint8Array> {
   if (source instanceof ArrayBuffer) return new Uint8Array(source);
@@ -18,7 +22,11 @@ export async function bytesOf(source: TextureSource, fetcher: typeof fetch, sign
   if (typeof Blob !== 'undefined' && source instanceof Blob) return new Uint8Array(await source.arrayBuffer());
   const response = await fetcher(source as string | URL, { signal });
   if (!response.ok)
-    throw fault('failed', `Textured shape: ${String(source)} answered HTTP ${response.status}; check the map URL, or pass the image bytes`, 'react-usage');
+    throw fault(
+      'failed',
+      `Textured shape: ${String(source)} answered HTTP ${response.status}; check the map URL, or pass the image bytes`,
+      'react-usage',
+    );
   return new Uint8Array(await response.arrayBuffer());
 }
 
@@ -91,4 +99,3 @@ export function texturedDocument(
   };
   return { doc, buffer };
 }
-

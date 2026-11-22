@@ -8,9 +8,16 @@ export async function createScene({ canvas, data, attach }: SceneContext) {
   if (settings.compat && !(globalThis as { __margoCompat?: boolean }).__margoCompat) {
     await installCompat({ force: true });
   }
-  const engine = await Engine.create(canvas, { backend: 'webgpu', exactSize: true, camera: { position: [0, 0, 3], target: [0, 0, 0] } });
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: true,
+    camera: { position: [0, 0, 3], target: [0, 0, 0] },
+  });
   attach(engine);
-  engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: settings.color }));
+  engine
+    .createMesh()
+    .setGeometry(box())
+    .setMaterial(new PbrMaterial({ color: settings.color }));
   engine.start();
   engine.render({ delta: 0 });
   if ((await engine.pick(64, 64))?.id !== 0) throw new Error('Shared scene did not render and pick its box');

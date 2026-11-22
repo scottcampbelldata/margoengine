@@ -76,7 +76,18 @@ test('MeshReflectorMaterial fits a MeshReflector to its plane and passes its pro
   const floor = (props, geometry = h(PlaneGeometry, { args: [4, 2] })) =>
     tree(h(Mesh, { rotation: [-Math.PI / 2, 0, 0] }, geometry, h(MeshReflectorMaterial, props)));
   const view = render(
-    floor({ resolution: 32, mixStrength: 40, blur: 300, mixBlur: 1, roughness: 0.5, mirror: 0.25, depthScale: 2, reflectorOffset: -0.1, color: '#ffffff', metalness: 1 }),
+    floor({
+      resolution: 32,
+      mixStrength: 40,
+      blur: 300,
+      mixBlur: 1,
+      roughness: 0.5,
+      mirror: 0.25,
+      depthScale: 2,
+      reflectorOffset: -0.1,
+      color: '#ffffff',
+      metalness: 1,
+    }),
   );
   await settle();
   await settle();
@@ -96,12 +107,19 @@ test('MeshReflectorMaterial fits a MeshReflector to its plane and passes its pro
   );
   view.rerender(floor({}));
   await frame();
-  assert.deepEqual([r.resolution, r.mixStrength, r.blurSize, r.mixBlur, r.mirror, r.f0], [2, 1, [0, 0], 1, 0, [0.04, 0.04, 0.04]], 'defaults (256 px on a 64 px canvas is the 2x cap)');
+  assert.deepEqual(
+    [r.resolution, r.mixStrength, r.blurSize, r.mixBlur, r.mirror, r.f0],
+    [2, 1, [0, 0], 1, 0, [0.04, 0.04, 0.04]],
+    'defaults (256 px on a 64 px canvas is the 2x cap)',
+  );
   view.rerender(floor({}, h(BoxGeometry)));
   await frame();
   assert.equal(r.node.visible, false, 'hidden on a geometry that is not flat');
   assert.match(String(errors.at(-1)?.message), /flat geometry in its local XY plane/);
   view.unmount();
   await settle();
-  assert.ok(made.every((m) => m.disposed), 'unmount disposes it');
+  assert.ok(
+    made.every((m) => m.disposed),
+    'unmount disposes it',
+  );
 });

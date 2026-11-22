@@ -97,7 +97,8 @@ export function BatchedItem({
   visible = true,
 }: BatchedItemProps): null {
   const batch = useContext(BatchContext);
-  if (!batch) throw fault('state', 'BatchedItem is outside a BatchedMesh; render it inside <BatchedMesh>', 'react-usage');
+  if (!batch)
+    throw fault('state', 'BatchedItem is outside a BatchedMesh; render it inside <BatchedMesh>', 'react-usage');
   const id = useRef<number | null>(null),
     transform = (): ArrayLike<number> =>
       matrix ?? composeMatrix(position, eulerToQuaternion(rotation[0], rotation[1], rotation[2]), scale, scratch);

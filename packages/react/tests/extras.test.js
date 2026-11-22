@@ -105,7 +105,12 @@ const environmentMock = {
   },
 };
 // The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders', '@margoengine/environment/load'])
+for (const id of [
+  '@margoengine/environment',
+  '@margoengine/environment/main',
+  '@margoengine/environment/loaders',
+  '@margoengine/environment/load',
+])
   mock.module(id, environmentMock);
 const Renderer = plugin('voxels', { daylight: 1, blockLightColor: [1, 0.8, 0.6], lightmap: undefined });
 const lightings = [];
@@ -444,12 +449,7 @@ test('DepthTexture and SceneTargets inside a <Scene> attach to that scene and le
   };
   value.world = world;
   value.resources.models.add({ disposed: false });
-  const view = render(
-    tree(value, [
-      h(DepthTexture, { key: 'd' }),
-      h(SceneTargets, { key: 't', outputs: ['normal'] }),
-    ]),
-  );
+  const view = render(tree(value, [h(DepthTexture, { key: 'd' }), h(SceneTargets, { key: 't', outputs: ['normal'] })]));
   await flush();
   assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
   const inWorld = [...world.plugins.values()];

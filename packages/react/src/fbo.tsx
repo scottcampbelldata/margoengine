@@ -40,7 +40,10 @@ export function useFBO(a?: number | FBOOptions, b?: number, c?: FBOOptions): FBO
   const [width, height, options] = typeof a === 'object' ? [undefined, undefined, a] : [a, b, c];
   for (const size of [width, height])
     if (size !== undefined && (!Number.isSafeInteger(size) || size < 1))
-      throw rangeError('useFBO sizes must be positive integers; pass texel sizes or omit them for the canvas size', 'react-arguments');
+      throw rangeError(
+        'useFBO sizes must be positive integers; pass texel sizes or omit them for the canvas size',
+        'react-arguments',
+      );
   const scene = useScene(),
     [fbo, setFBO] = useState<FBO | null>(null),
     resize = useRef<(() => void) | null>(null),
@@ -67,18 +70,25 @@ export function useFBO(a?: number | FBOOptions, b?: number, c?: FBOOptions): FBO
           const make = (force: boolean) => {
             const device = engine.gpu;
             if (!device)
-              throw fault('unsupported', 'useFBO requires a WebGPU or compatibility device; use the WebGL2 compatibility device entry', 'react-usage');
+              throw fault(
+                'unsupported',
+                'useFBO requires a WebGPU or compatibility device; use the WebGL2 compatibility device entry',
+                'react-usage',
+              );
             const w = width ?? Math.max(1, engine.canvas.width),
               h = height ?? Math.max(1, engine.canvas.height),
               limit = device.limits.maxTextureDimension2D;
-            if (w > limit || h > limit) throw rangeError('useFBO exceeds device limits; reduce width or height', 'react-arguments');
-            if (!force && current && current.device === device && current.fbo.width === w && current.fbo.height === h) return;
+            if (w > limit || h > limit)
+              throw rangeError('useFBO exceeds device limits; reduce width or height', 'react-arguments');
+            if (!force && current && current.device === device && current.fbo.width === w && current.fbo.height === h)
+              return;
             const color = device.createTexture({ size: [w, h], format, usage: COLOR_USAGE });
             let texture: Texture, depthTexture: GPUTexture | undefined;
             try {
               if (depth) {
                 const shape = engine.renderTarget;
-                if (!shape) throw fault('unsupported', 'useFBO depth needs the WebGPU canvas pass; omit depth', 'react-usage');
+                if (!shape)
+                  throw fault('unsupported', 'useFBO depth needs the WebGPU canvas pass; omit depth', 'react-usage');
                 depthTexture = device.createTexture({
                   size: [w, h],
                   format: shape.depthFormat,
@@ -93,7 +103,12 @@ export function useFBO(a?: number | FBOOptions, b?: number, c?: FBOOptions): FBO
               throw error;
             }
             const previous = current?.fbo,
-              made: FBO = { texture, target: depthTexture ? { color, depth: depthTexture } : { color }, width: w, height: h };
+              made: FBO = {
+                texture,
+                target: depthTexture ? { color, depth: depthTexture } : { color },
+                width: w,
+                height: h,
+              };
             current = { fbo: made, device };
             setFBO(made);
             // The old target may still be bound to a view drawing this frame; free it once React has moved on.

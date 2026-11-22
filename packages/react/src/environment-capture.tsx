@@ -2,7 +2,11 @@ import { useContext, useEffect, useRef } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { EnginePlugin, Mesh as EngineMesh } from '@margoengine/core/extension';
 import type * as EnvironmentModule from '@margoengine/environment/main';
-import type { ColorBackground, Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment/main';
+import type {
+  ColorBackground,
+  Environment as IBLEnvironment,
+  EnvironmentBackground,
+} from '@margoengine/environment/main';
 import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cube-camera';
 import { descendant } from './cube-camera.js';
 import { LightformerPending } from './lightformer.js';
@@ -158,7 +162,8 @@ export function EnvironmentCapture({
       scene.frames.callbacks.delete(frame);
       publish(null);
       if (environment) {
-        if (!scene.engine.disposed && sceneOwner(scene).plugins.has(environment.name)) sceneOwner(scene).removePlugin(environment.name);
+        if (!scene.engine.disposed && sceneOwner(scene).plugins.has(environment.name))
+          sceneOwner(scene).removePlugin(environment.name);
         environment.dispose();
       }
       cube?.dispose();

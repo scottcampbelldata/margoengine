@@ -68,31 +68,30 @@ export interface HemisphereLightProps extends ErrorProps {
  * HemisphereLight) on core meshes and models. Live; the ref is the live light. Inside a `<Scene>` it lights that
  * scene's meshes. WebGPU only.
  */
-export const HemisphereLight = /* @__PURE__ */ forwardRef<HemispherePlugin, HemisphereLightProps>(function HemisphereLight(
-  { sky = '#ffffff', ground, intensity = 1, onError },
-  ref,
-) {
-  const scene = useScene();
-  const light = useCreated<EnvironmentApi, HemispherePlugin>(
-    scene,
-    {
-      load,
-      create: (api) => attachBinding(scene, new api.HemisphereLight()),
-      dispose: (value) => value.dispose(),
-      ref,
-      onError,
-    },
-    [scene.world],
-  );
-  useModelSources(scene, scene.world ? null : light);
-  useCommit(() => {
-    if (!light) return;
-    light.sky = sky;
-    light.ground = ground;
-    light.intensity = intensity;
-  });
-  return null;
-});
+export const HemisphereLight = /* @__PURE__ */ forwardRef<HemispherePlugin, HemisphereLightProps>(
+  function HemisphereLight({ sky = '#ffffff', ground, intensity = 1, onError }, ref) {
+    const scene = useScene();
+    const light = useCreated<EnvironmentApi, HemispherePlugin>(
+      scene,
+      {
+        load,
+        create: (api) => attachBinding(scene, new api.HemisphereLight()),
+        dispose: (value) => value.dispose(),
+        ref,
+        onError,
+      },
+      [scene.world],
+    );
+    useModelSources(scene, scene.world ? null : light);
+    useCommit(() => {
+      if (!light) return;
+      light.sky = sky;
+      light.ground = ground;
+      light.intensity = intensity;
+    });
+    return null;
+  },
+);
 
 /** Props of `<Fog>`: linear (`near`, `far`), exponential-squared (`density`) and height fog, all live. */
 export interface FogProps extends Omit<FogOptions, 'name'>, ErrorProps {

@@ -118,7 +118,12 @@ const environmentMock = {
   },
 };
 // The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of ['@margoengine/environment', '@margoengine/environment/main', '@margoengine/environment/loaders', '@margoengine/environment/load'])
+for (const id of [
+  '@margoengine/environment',
+  '@margoengine/environment/main',
+  '@margoengine/environment/loaders',
+  '@margoengine/environment/load',
+])
   mock.module(id, environmentMock);
 
 const { render, act, cleanup } = await import('@testing-library/react');
@@ -311,7 +316,11 @@ test('Environment inside a named <Scene> lights and backs that scene only, with 
   await settle();
   assert.deepEqual([...engine.scene.lighting.direction], before.direction, 'the default scene keeps its sun');
   assert.deepEqual([...engine.scene.lighting.radiance], before.radiance, 'and its ambient');
-  assert.deepEqual([...world.lighting.radiance], [2, 2, 2, Math.fround(0.3)], 'the named scene takes the Environment lighting');
+  assert.deepEqual(
+    [...world.lighting.radiance],
+    [2, 2, 2, Math.fround(0.3)],
+    'the named scene takes the Environment lighting',
+  );
   bare.unmount();
   await settle();
   assert.deepEqual([...world.lighting.radiance], before.radiance, 'unmount restores the named scene lighting');

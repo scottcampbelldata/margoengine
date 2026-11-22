@@ -120,7 +120,11 @@ export const Sound = /* @__PURE__ */ forwardRef<AudioObject, SoundProps>(functio
     [loaded, setLoaded] = useState<AudioBuffer | null>(null);
   latest.current = props;
   if (positional && !registry)
-    throw fault('state', 'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}', 'react-usage');
+    throw fault(
+      'state',
+      'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}',
+      'react-usage',
+    );
   const sound = useCreated<typeof AudioModule, { sound: AudioObject; release: () => void }>(
     scene,
     {
@@ -327,7 +331,9 @@ export const Figure = /* @__PURE__ */ forwardRef<FigureObject, FigureProps>(func
     {
       load: () => optionalPeer('@margoengine/sciviz', () => import('@margoengine/sciviz')),
       create: (api) => {
-        const made = inScene(scene, () => api.Figure.attach(scene.engine as unknown as EngineKernel, latest.current.options));
+        const made = inScene(scene, () =>
+          api.Figure.attach(scene.engine as unknown as EngineKernel, latest.current.options),
+        );
         made.ready().then(
           () => latest.current.onReady?.(made),
           (error) => report(scene, error, latest.current.onError),
@@ -402,7 +408,10 @@ export interface LinePlotProps extends ErrorProps {
   options?: LineLayerOptions;
 }
 /** `figure.line(data, options)` of the enclosing `<Figure>`. The ref is the layer. */
-export const LinePlot = /* @__PURE__ */ forwardRef<LineLayer, LinePlotProps>(function LinePlot({ data, options, onError }, ref) {
+export const LinePlot = /* @__PURE__ */ forwardRef<LineLayer, LinePlotProps>(function LinePlot(
+  { data, options, onError },
+  ref,
+) {
   usePlot('LinePlot', (figure) => figure.line(data, options), [data, byValue(options)], ref, onError);
   return null;
 });

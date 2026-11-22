@@ -43,12 +43,7 @@ const options = <T,>(value: boolean | T): T | undefined => (typeof value === 'ob
  * Render it anywhere inside `<Canvas>`. A mesh without a `name` shows the components that made it, such as
  * "Box in Car" (React 19 in development; other meshes keep "Entity 12").
  */
-export function DevTools({
-  enabled = panelsByDefault,
-  inspector = true,
-  stats = true,
-  onError,
-}: DevToolsProps) {
+export function DevTools({ enabled = panelsByDefault, inspector = true, stats = true, onError }: DevToolsProps) {
   const scene = useScene(),
     latest = useRef({ inspector, stats, onError });
   latest.current = { inspector, stats, onError };

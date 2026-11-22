@@ -27,8 +27,7 @@ export function useSceneShadows(engine: Engine, world: World | null) {
     if (!world || !enabled) return;
     let cancelled = false,
       effect: Shadows | undefined;
-    loader
-      .current!()
+    loader.current!()
       .then(({ Shadows }) => {
         if (cancelled || engine.disposed) return;
         effect = sceneScope(engine, world).run(() => Shadows.attach(engine as unknown as EngineKernel));
