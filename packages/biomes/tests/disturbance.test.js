@@ -358,7 +358,25 @@ test('disturbanceStates marks a plant state map from a history: fresh burn, old 
   d.flood[9] = 100; // corner (1, 1): only the 100-year flood
   d.flood[10] = 1; // corner (2, 1): open water
   const cells = new Map();
-  disturbanceStates(world, d, { markEach: (at) => { for (const [x, z] of [[1, 1], [11, 1], [21, 1], [1, 11], [11, 11], [21, 11], [35, 35]]) cells.set(`${x},${z}`, at(x, z)); } }, { intensity: 1000 });
+  disturbanceStates(
+    world,
+    d,
+    {
+      markEach: (at) => {
+        for (const [x, z] of [
+          [1, 1],
+          [11, 1],
+          [21, 1],
+          [1, 11],
+          [11, 11],
+          [21, 11],
+          [35, 35],
+        ])
+          cells.set(`${x},${z}`, at(x, z));
+      },
+    },
+    { intensity: 1000 },
+  );
   const fresh = cells.get('1,1'),
     scorch = (4.665 * 1000 ** (7 / 6)) / (35 * Math.sqrt(1000 + 38.7 * 8));
   assert.ok(Math.abs(fresh.scorch - scorch) < 1e-9, `Van Wagner's scorch ${fresh.scorch}`);
@@ -372,11 +390,19 @@ test('disturbanceStates marks a plant state map from a history: fresh burn, old 
   assert.equal(cells.get('21,11'), undefined, 'open water carries no plants');
   assert.equal(cells.get('35,35'), undefined);
   const fn = new Map();
-  disturbanceStates(world, d, { markEach: (at) => fn.set('a', at(1, 1)) }, { intensity: (x) => 500 + x, floodMark: 1, burnYears: 20 });
+  disturbanceStates(
+    world,
+    d,
+    { markEach: (at) => fn.set('a', at(1, 1)) },
+    { intensity: (x) => 500 + x, floodMark: 1, burnYears: 20 },
+  );
   assert.equal(fn.get('a').intensity, 0.501);
   assert.throws(() => disturbanceStates(world, d, { markEach: () => {} }, { burnYears: 0 }), RangeError);
   assert.throws(() => disturbanceStates(world, d, { markEach: () => {} }, { charYears: 0, burnYears: 5 }), RangeError);
   assert.throws(() => disturbanceStates(world, d, {}), TypeError);
-  assert.throws(() => disturbanceStates({ ...world, region: { ...grid, nx: 4 } }, d, { markEach: () => {} }), RangeError);
+  assert.throws(
+    () => disturbanceStates({ ...world, region: { ...grid, nx: 4 } }, d, { markEach: () => {} }),
+    RangeError,
+  );
   assert.throws(() => disturbanceStates(world, d, { markEach: (at) => at(1, 1) }, { intensity: () => 0 }), RangeError);
 });

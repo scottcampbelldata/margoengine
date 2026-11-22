@@ -368,7 +368,11 @@ export const chaparralPresets: Readonly<Record<ChaparralPresetId, BiomeDefinitio
   'oak-woodland': freeze<BiomeDefinition>({
     id: 'oak-woodland',
     climate: { moisture: [0.36, null], coldest: [0, null], slope: [null, 35] },
-    ground: [{ material: 'dry-grass' }, { material: 'leaf-litter', moisture: [0.6, null] }, { material: 'rock', slope: [30, null] }],
+    ground: [
+      { material: 'dry-grass' },
+      { material: 'leaf-litter', moisture: [0.6, null] },
+      { material: 'rock', slope: [30, null] },
+    ],
     plants: [
       { ...tree('coast-live-oak', 'broadleaf', 60, 5, 0.6, true, 'FM9'), stands: { scale: 200, cover: 0.55 } },
       tree('blue-oak', 'broadleaf', 35, 4, 0.3, false, 'FM2'),

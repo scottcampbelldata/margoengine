@@ -25,7 +25,14 @@ await runSuite(
     assert.ok(r.changed[0] > 0.1, `near view: share of pixels the conifers change ${r.changed[0]}`);
     assert.ok(r.changed[1] > 0.02, `far view (imposters): share of pixels the conifers change ${r.changed[1]}`);
     assert.ok(r.wind > 0.002, `pixels the wind moves in 3 s: ${r.wind}`);
-    console.log('ok conifers:', r.objects, 'objects, changed', r.changed.map((c) => c.toFixed(3)).join(' / '), 'wind', r.wind.toFixed(4));
+    console.log(
+      'ok conifers:',
+      r.objects,
+      'objects, changed',
+      r.changed.map((c) => c.toFixed(3)).join(' / '),
+      'wind',
+      r.wind.toFixed(4),
+    );
   },
   () => context.close(),
 );

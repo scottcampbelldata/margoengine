@@ -117,13 +117,23 @@ test('the named looks are only row values, in range, and each changes the height
 });
 
 test('disturbance rows: build-time only, defaults are those of disturbanceStates, ranges and the year rules are enforced', async () => {
-  const { DISTURBANCE_SETTINGS, DISTURBANCE_LIVE_SETTINGS, disturbanceOptions, disturbanceSettingDefaults } = await import('../dist/settings.js');
+  const { DISTURBANCE_SETTINGS, DISTURBANCE_LIVE_SETTINGS, disturbanceOptions, disturbanceSettingDefaults } =
+    await import('../dist/settings.js');
   assert.equal(DISTURBANCE_SETTINGS.length, 8);
   assert.ok(DISTURBANCE_SETTINGS.every((r) => r.live === false) && DISTURBANCE_LIVE_SETTINGS.length === 0);
   const names = DISTURBANCE_SETTINGS.map((r) => r.name);
   assert.equal(new Set(names).size, 8);
   assert.deepEqual(Object.keys(disturbanceSettingDefaults()), names);
-  assert.deepEqual(disturbanceOptions(), { intensity: 2000, ambient: 25, wind: 2, burnYears: 1, charYears: 30, floodPeriod: 10, floodMark: 0.5, cell: 8 });
+  assert.deepEqual(disturbanceOptions(), {
+    intensity: 2000,
+    ambient: 25,
+    wind: 2,
+    burnYears: 1,
+    charYears: 30,
+    floodPeriod: 10,
+    floodMark: 0.5,
+    cell: 8,
+  });
   assert.equal(disturbanceOptions({ 'disturbance.intensity': 6000 }).intensity, 6000);
   assert.throws(() => disturbanceOptions({ 'disturbance.nope': 1 }), TypeError);
   for (const row of DISTURBANCE_SETTINGS) {

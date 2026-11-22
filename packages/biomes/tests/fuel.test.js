@@ -295,8 +295,10 @@ test('defineBiome accepts fuel names and rejects other values', () => {
 test('the southern California presets: chaparral is model 4, sage scrub and brush gaps model 6, oak litter 9, open oak grass 2 (Anderson 1982)', async () => {
   assert.deepEqual(Object.keys(chaparralPresets), ['chaparral', 'coastal-sage-scrub', 'oak-woodland']);
   const fuel = Object.fromEntries(Object.values(chaparralPresets).flatMap((b) => b.plants.map((p) => [p.id, p.fuel])));
-  for (const id of ['chamise', 'bigberry-manzanita', 'hoaryleaf-ceanothus', 'scrub-oak']) assert.equal(fuel[id], 'FM4', id);
-  for (const id of ['california-sagebrush', 'black-sage', 'california-buckwheat', 'toyon']) assert.equal(fuel[id], 'FM6', id);
+  for (const id of ['chamise', 'bigberry-manzanita', 'hoaryleaf-ceanothus', 'scrub-oak'])
+    assert.equal(fuel[id], 'FM4', id);
+  for (const id of ['california-sagebrush', 'black-sage', 'california-buckwheat', 'toyon'])
+    assert.equal(fuel[id], 'FM6', id);
   assert.equal(fuel['coast-live-oak'], 'FM9');
   assert.equal(fuel['blue-oak'], 'FM2');
   assert.equal(chaparralPresets.chaparral.openFuel, 'FM6');
@@ -305,7 +307,8 @@ test('the southern California presets: chaparral is model 4, sage scrub and brus
   for (const b of Object.values(chaparralPresets)) {
     assert.ok(Object.isFrozen(b) && Object.isFrozen(b.climate), b.id);
     assert.deepEqual(defineBiome(JSON.parse(JSON.stringify(b))), b, `${b.id} round-trips through JSON`);
-    for (const name of [b.openFuel, ...b.plants.map((p) => p.fuel)]) assert.ok(FUEL_MODELS[name], `${b.id}: ${name} is a fire-front model`);
+    for (const name of [b.openFuel, ...b.plants.map((p) => p.fuel)])
+      assert.ok(FUEL_MODELS[name], `${b.id}: ${name} is a fire-front model`);
   }
   // Anderson's rates at 5 mi/h: chaparral (4) outruns brush (6), and grass (1) outruns oak litter (9).
   const rate = (name) => fireBehaviour(FUEL_MODELS[name], { moisture: 0.06, wind: 2.2352 }).rate;
@@ -322,7 +325,8 @@ test('the southern California presets: chaparral is model 4, sage scrub and brus
       const id = w.sampleRegion(x, z).biomes[0];
       share.set(id, (share.get(id) ?? 0) + 1);
     }
-  for (const id of Object.keys(chaparralPresets)) assert.ok(share.get(id) > 40, `${id}: ${share.get(id)} of 15,625 corners`);
+  for (const id of Object.keys(chaparralPresets))
+    assert.ok(share.get(id) > 40, `${id}: ${share.get(id)} of 15,625 corners`);
   const m = fuelMap(w, { models: FUEL_MODELS }),
     n = tally(m);
   for (const name of ['FM4', 'FM6', 'FM1']) assert.ok(n[name] > 20, `${name} burns somewhere: ${JSON.stringify(n)}`);

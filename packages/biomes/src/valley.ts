@@ -85,7 +85,14 @@ export interface MountainValley {
    * cells draining through each (itself included), and the D8 direction each drains to (0 is +x, then clockwise seen from
    * above with +z down the grid), -1 on the floor.
    */
-  readonly grid: Readonly<{ height: Int32Array; flow: Int32Array; direction: Int8Array; nx: number; nz: number; step: number }>;
+  readonly grid: Readonly<{
+    height: Int32Array;
+    flow: Int32Array;
+    direction: Int8Array;
+    nx: number;
+    nz: number;
+    step: number;
+  }>;
 }
 
 /** The options of a mountain valley with defaults filled in, lengths in mm, rates in Q16. */
@@ -172,8 +179,7 @@ export function mountainValleySettings(
   if (rail !== false && fallQ > gradeQ) throw bad();
   // The creek keeps inside 0.6 of the narrowest floor; the rail sits at half the floor on the other side, 10 m clear of the creek's banks.
   if (Math.floor((narrow * 2) / 5) < creekReach) throw bad();
-  if (rail !== false && Math.floor((narrow * 13) / 20) - Math.floor(mm(rw) / 2) - creekReach < 10_000)
-    throw bad();
+  if (rail !== false && Math.floor((narrow * 13) / 20) - Math.floor(mm(rw) / 2) - creekReach < 10_000) throw bad();
   const vertical = outlet === 'north' || outlet === 'south',
     along = vertical ? size[0] : size[1],
     across = vertical ? size[1] : size[0];
@@ -184,8 +190,7 @@ export function mountainValleySettings(
     if (!(o.step >= 4 && o.step <= 256)) throw bad();
     step = mm(o.step);
   }
-  if ((1 - divFloor(-size[0], step)) * (1 - divFloor(-size[1], step)) > MAX_CELLS)
-    throw bad();
+  if ((1 - divFloor(-size[0], step)) * (1 - divFloor(-size[1], step)) > MAX_CELLS) throw bad();
   return {
     outlet,
     center: Math.floor(along * center),
@@ -312,7 +317,24 @@ function route(g: Grid, seed: number): void {
 const LX = [1, 1, 0, -1, -1, -1, 0, 1, 2, 1, -1, -2, -2, -1, 1, 2],
   LZ = [0, 1, 1, 1, 0, -1, -1, -1, 1, 2, 2, 1, -1, -2, -2, -1];
 /** Run of each of the 16 moves in Q16 cells: 1, sqrt(2) and sqrt(5). */
-const LRUN = [ONE, ROOT2, ONE, ROOT2, ONE, ROOT2, ONE, ROOT2, 146543, 146543, 146543, 146543, 146543, 146543, 146543, 146543];
+const LRUN = [
+  ONE,
+  ROOT2,
+  ONE,
+  ROOT2,
+  ONE,
+  ROOT2,
+  ONE,
+  ROOT2,
+  146543,
+  146543,
+  146543,
+  146543,
+  146543,
+  146543,
+  146543,
+  146543,
+];
 
 /**
  * Lowers every free cell to at most a neighbour (of 16) plus its critical rise over the run (`rise` per cell side, per
@@ -490,7 +512,9 @@ export function buildMountainValley(
       } else {
         // The starting surface: a ramp up from the floor over a distance warped by noise at the gulch spacing, so the
         // water running down it gathers into side gulches.
-        const warp = Math.floor(((fbm(seed + 34, lattice(x, s.gulches), lattice(z, s.gulches), 4) - 32768) * amp) / 32768);
+        const warp = Math.floor(
+          ((fbm(seed + 34, lattice(x, s.gulches), lattice(z, s.gulches), 4) - 32768) * amp) / 32768,
+        );
         g.h[c] = floorAt(u) + 1 + Math.max(0, q16(out + warp, ramp));
       }
     }
@@ -583,10 +607,14 @@ export function buildMountainValley(
         // toward the channels.
         const fx = divFloor((x - ox) * ONE, step),
           fz = divFloor((z - oz) * ONE, step),
-          t = q16(smooth(clampInt(divFloor((out - margin) * ONE, 2 * step), 0, ONE)), clampInt(bilinear(hill, nx, nz, fx, fz), 0, ONE));
+          t = q16(
+            smooth(clampInt(divFloor((out - margin) * ONE, 2 * step), 0, ONE)),
+            clampInt(bilinear(hill, nx, nz, fx, fz), 0, ONE),
+          );
         if (t > 0)
           h += Math.floor(
-            (Math.floor(((fbm(seed + 35, lattice(x, 48_000), lattice(z, 48_000), 3) - 32768) * 1500) / 32768) * t) / ONE,
+            (Math.floor(((fbm(seed + 35, lattice(x, 48_000), lattice(z, 48_000), 3) - 32768) * 1500) / 32768) * t) /
+              ONE,
           );
         return h;
       }

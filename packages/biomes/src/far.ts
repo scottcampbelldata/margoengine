@@ -97,31 +97,31 @@ export class FarForest implements Disposable {
     });
     held.run(() =>
       cover.kinds.forEach((_, kind) => {
-      if (!totals[kind]) return;
-      const shape = standin.generateTreeStandIn(CANOPY_KINDS[kind]),
-        part: Far = { kind };
-      part.scatter = modules.scatter.Scatter.attach(
-        engine,
-        new modules.core.Geometry(shape.positions, shape.normals, shape.indices),
-        {
-          count: Math.max(1, Math.round((count * totals[kind]) / all)), // float division: all is above 0 here
-          area: [2 * radius, 2 * radius],
-          follow: true,
-          bounds,
-          heightmap,
-          densityMap: () => far.#texture(part),
-          lod: [radius * 0.5, radius * 0.75, radius],
-          lodFade: 0,
-          edgeShrink: radius * 0.1,
-          inner,
-          innerFade: fade,
-          scale: [0.8, 1.8],
-          maxSlope: 90,
-          material: new modules.core.PbrMaterial({ color: COLORS[kind], roughness: 0.85 }),
-          variation: { hue: 0.06, value: 0.15 },
-        },
-      );
-      far.#parts.push(part);
+        if (!totals[kind]) return;
+        const shape = standin.generateTreeStandIn(CANOPY_KINDS[kind]),
+          part: Far = { kind };
+        part.scatter = modules.scatter.Scatter.attach(
+          engine,
+          new modules.core.Geometry(shape.positions, shape.normals, shape.indices),
+          {
+            count: Math.max(1, Math.round((count * totals[kind]) / all)), // float division: all is above 0 here
+            area: [2 * radius, 2 * radius],
+            follow: true,
+            bounds,
+            heightmap,
+            densityMap: () => far.#texture(part),
+            lod: [radius * 0.5, radius * 0.75, radius],
+            lodFade: 0,
+            edgeShrink: radius * 0.1,
+            inner,
+            innerFade: fade,
+            scale: [0.8, 1.8],
+            maxSlope: 90,
+            material: new modules.core.PbrMaterial({ color: COLORS[kind], roughness: 0.85 }),
+            variation: { hue: 0.06, value: 0.15 },
+          },
+        );
+        far.#parts.push(part);
       }),
     );
     return far;
@@ -154,10 +154,12 @@ export class FarForest implements Disposable {
   #upload(part: Far, cover: CanopyCover): void {
     const { texture, device } = part;
     if (!texture || !device) return;
-    device.queue.writeTexture({ texture }, cover.kinds[part.kind] as Uint8Array<ArrayBuffer>, { bytesPerRow: cover.width }, [
-      cover.width,
-      cover.depth,
-    ]);
+    device.queue.writeTexture(
+      { texture },
+      cover.kinds[part.kind] as Uint8Array<ArrayBuffer>,
+      { bytesPerRow: cover.width },
+      [cover.width, cover.depth],
+    );
   }
 
   async #refresh(): Promise<void> {

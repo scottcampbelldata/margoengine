@@ -31,10 +31,19 @@ await runSuite(
     assert.ok(r.objects > 1000, `objects streamed: ${r.objects}`);
     // The never-wet east half draws as before, with and without the plants' flood.
     for (const k of ['wet', 'ground'])
-      assert.ok(Math.abs(r[k].east.luma / r.plain.east.luma - 1) < 0.03, `east luma ${k} ${JSON.stringify([r.plain.east, r[k].east])}`);
+      assert.ok(
+        Math.abs(r[k].east.luma / r.plain.east.luma - 1) < 0.03,
+        `east luma ${k} ${JSON.stringify([r.plain.east, r[k].east])}`,
+      );
     // The flooded west half: the ground alone darkens it, and the mud-coated plants darken it further.
-    assert.ok(r.ground.west.luma < r.plain.west.luma * 0.95, `west ground ${JSON.stringify([r.plain.west, r.ground.west])}`);
-    assert.ok(r.wet.west.luma < r.ground.west.luma * 0.99, `west plants ${JSON.stringify([r.ground.west, r.wet.west])}`);
+    assert.ok(
+      r.ground.west.luma < r.plain.west.luma * 0.95,
+      `west ground ${JSON.stringify([r.plain.west, r.ground.west])}`,
+    );
+    assert.ok(
+      r.wet.west.luma < r.ground.west.luma * 0.99,
+      `west plants ${JSON.stringify([r.ground.west, r.wet.west])}`,
+    );
     console.log('ok biomes wetness');
   },
   () => context.close(),
