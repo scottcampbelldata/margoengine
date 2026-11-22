@@ -31,7 +31,10 @@ export function readPalette(colors: readonly PaletteColor[]): [number, number, n
           ? color.map((v) => v / 255)
           : undefined;
     if (!rgb)
-      throw rangeError(`Invalid palette colour at index ${index}: use #rrggbb or three RGB bytes in [0, 255]`, 'pixel-palette');
+      throw rangeError(
+        `Invalid palette colour at index ${index}: use #rrggbb or three RGB bytes in [0, 255]`,
+        'pixel-palette',
+      );
     return rgb as [number, number, number];
   });
 }
@@ -272,8 +275,7 @@ const SIDES: Record<string, number> = { none: 0, bayer2: 2, bayer4: 4, bayer8: 8
 /** The threshold matrix of a dither mode and its side, or undefined for `'none'`. @throws RangeError for another mode. */
 export function ditherMatrix(mode: PaletteDither): { size: number; values: Float32Array } | undefined {
   const size = SIDES[mode];
-  if (!(size >= 0))
-    throw rangeError('Invalid dither: use none, bayer2, bayer4, bayer8 or blue-noise', 'pixel-palette');
+  if (!(size >= 0)) throw rangeError('Invalid dither: use none, bayer2, bayer4, bayer8 or blue-noise', 'pixel-palette');
   return size ? { size, values: size > 8 ? blueNoise() : bayerMatrix(size as 2 | 4 | 8) } : undefined;
 }
 

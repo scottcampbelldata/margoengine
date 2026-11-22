@@ -93,9 +93,20 @@ const reference = (vw, vh, filter, fitMode = 'contain', under = [0, 0, 0, 0]) =>
     nx = SW * grid,
     ny = SH * grid,
     cell = (jx, jy) => {
-      const bx = Math.min(nx-1,Math.max(0,jx)), by = Math.min(ny-1,Math.max(0,jy));
-      return grid >= 3 ? xbrCell(texel,Math.floor(bx/grid),Math.floor(by/grid),
-        (bx%grid+0.5)/grid,(by%grid+0.5)/grid,grid) : grid === 2 ? doubled(bx,by) : texel(jx,jy);
+      const bx = Math.min(nx - 1, Math.max(0, jx)),
+        by = Math.min(ny - 1, Math.max(0, jy));
+      return grid >= 3
+        ? xbrCell(
+            texel,
+            Math.floor(bx / grid),
+            Math.floor(by / grid),
+            ((bx % grid) + 0.5) / grid,
+            ((by % grid) + 0.5) / grid,
+            grid,
+          )
+        : grid === 2
+          ? doubled(bx, by)
+          : texel(jx, jy);
     },
     out = new Float64Array(vw * vh * 4),
     exact = new Uint8Array(vw * vh);
@@ -121,7 +132,7 @@ const reference = (vw, vh, filter, fitMode = 'contain', under = [0, 0, 0, 0]) =>
             top = mix(cell(lx - 1, ly - 1), cell(lx, ly - 1), kx),
             bottom = mix(cell(lx - 1, ly), cell(lx, ly), kx);
           c = mix(top, bottom, ky);
-          if (grid >= 3 && c.some(v => !Number.isInteger(v))) exact[y * vw + x] = 0;
+          if (grid >= 3 && c.some((v) => !Number.isInteger(v))) exact[y * vw + x] = 0;
           if ((kx > 0 && kx < 1) || (ky > 0 && ky < 1)) exact[y * vw + x] = 0;
         }
         // Premultiplied over what was there.
@@ -174,12 +185,12 @@ window.check = {
     await into('sharp-bilinear at 2x', 14, 10, {});
     // Below 2x 'edge' covers the plain texels, as sharp-bilinear does.
     await into('edge below 2x', 10, 8, { filter: 'edge' });
-    await into('xbr3 at 3x',21,15,{filter:'xbr3'});
-    await into('xbr4 at 4x',28,20,{filter:'xbr4'});
-    await into('xbr3 fractional',27,21,{filter:'xbr3'});
-    await into('xbr4 fractional stretch',39,29,{filter:'xbr4',fit:'stretch'});
-    await into('xbr3 below room',14,10,{filter:'xbr3'});
-    await into('xbr4 below room',21,15,{filter:'xbr4'});
+    await into('xbr3 at 3x', 21, 15, { filter: 'xbr3' });
+    await into('xbr4 at 4x', 28, 20, { filter: 'xbr4' });
+    await into('xbr3 fractional', 27, 21, { filter: 'xbr3' });
+    await into('xbr4 fractional stretch', 39, 29, { filter: 'xbr4', fit: 'stretch' });
+    await into('xbr3 below room', 14, 10, { filter: 'xbr3' });
+    await into('xbr4 below room', 21, 15, { filter: 'xbr4' });
 
     // The live filter, and the canvas: the picture over the background, letterboxed in the middle.
     {

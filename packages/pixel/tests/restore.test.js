@@ -30,7 +30,8 @@ function device(tag) {
     },
     createBuffer: () => ({ destroy() {} }),
     createBindGroup: (group) => (d.groups.push(group), group),
-    createTexture: (descriptor) => texture(d, descriptor.format ?? 'rgba8unorm', descriptor.size[0], descriptor.size[1]),
+    createTexture: (descriptor) =>
+      texture(d, descriptor.format ?? 'rgba8unorm', descriptor.size[0], descriptor.size[1]),
     queue: { writeBuffer() {}, writeTexture() {} },
   };
   return d;
