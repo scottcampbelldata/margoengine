@@ -131,7 +131,14 @@ function multiplyConjugate(
   out[o + 3] = aw * bw - ax * bx - ay * by - az * bz;
 }
 // out = a * conj(b)
-export function multiplyByConjugate(out: Float64Array, o: number, a: Float64Array, ao: number, b: Float64Array, bo: number) {
+export function multiplyByConjugate(
+  out: Float64Array,
+  o: number,
+  a: Float64Array,
+  ao: number,
+  b: Float64Array,
+  bo: number,
+) {
   const ax = a[ao],
     ay = a[ao + 1],
     az = a[ao + 2],
