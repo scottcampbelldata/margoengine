@@ -123,7 +123,10 @@ test('generated meshes match the recorded path queries on plane, hole and L-corr
       [path.at(-1), e],
     ])
       if (clearance(scene, query[0], query[2]) >= radius * OPTIONS.cs)
-        assert.ok(Math.hypot(point.x - query[0], point.z - query[2]) < 1e-9, `${label}: the agent fits at the query point`);
+        assert.ok(
+          Math.hypot(point.x - query[0], point.z - query[2]) < 1e-9,
+          `${label}: the agent fits at the query point`,
+        );
     const measured = length(path);
     assert.ok(Math.abs(measured - recorded) <= 0.03 * recorded + 1e-9, `${label}: length ${measured} vs ${recorded}`);
     // Every segment stays on the floor, eroded by the radius (measured from the drop since KB2604b, no ledge cell

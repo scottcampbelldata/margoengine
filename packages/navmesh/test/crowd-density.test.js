@@ -40,7 +40,11 @@ function walk(rho, density) {
     middle = [];
   for (let x = 5 + spacing / 2; x < 35; x += spacing)
     for (let z = 0.3 + spacing / 2; z < 5.7; z += spacing) {
-      const at = [x + (next() - 0.5) * spacing * 0.5, 0, Math.min(5.75, Math.max(0.25, z + (next() - 0.5) * spacing * 0.5))],
+      const at = [
+          x + (next() - 0.5) * spacing * 0.5,
+          0,
+          Math.min(5.75, Math.max(0.25, z + (next() - 0.5) * spacing * 0.5)),
+        ],
         agent = crowd.addAgent({ position: at, radius: 0.2, maxSpeed: 1.34, maxAcceleration: 6 });
       agent.setTarget([79.5, 0, at[2]]);
       if (x > 15 && x < 25) middle.push(agent);
@@ -58,7 +62,10 @@ test("a dense crowd walks at Weidmann's measured speeds", () => {
   for (const rho of [0.5, 1, 1.5, 2]) {
     const got = walk(rho, true),
       want = weidmann(rho);
-    assert.ok(Math.abs(got - want) <= 0.15 * want + 0.03, `at ${rho} people/m^2: ${got.toFixed(3)} m/s, Weidmann ${want.toFixed(3)}`);
+    assert.ok(
+      Math.abs(got - want) <= 0.15 * want + 0.03,
+      `at ${rho} people/m^2: ${got.toFixed(3)} m/s, Weidmann ${want.toFixed(3)}`,
+    );
   }
 });
 

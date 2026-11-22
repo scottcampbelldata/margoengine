@@ -252,7 +252,7 @@ export class Crowd {
     this.neighborDistance = positive(options.neighborDistance, 5, 'Crowd neighborDistance');
     const density = options.density;
     if (density !== undefined && typeof density !== 'boolean' && (typeof density !== 'object' || density === null))
-      throw new TypeError('Crowd density must be true, false or {gamma, jam, radius}; pass true for Weidmann\'s fit');
+      throw new TypeError("Crowd density must be true, false or {gamma, jam, radius}; pass true for Weidmann's fit");
     if (density) {
       const fit = density === true ? {} : density;
       this.density = {

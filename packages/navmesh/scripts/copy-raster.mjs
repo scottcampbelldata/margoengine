@@ -18,7 +18,4 @@ assert.equal(
   binaryHash(readFileSync(new URL('../src/navmesh-raster.wasm', import.meta.url))),
   'Raster artifact changed; rebuild the kernel',
 );
-copyFileSync(
-  new URL('../src/navmesh-raster.wasm', import.meta.url),
-  join(dist, 'navmesh-raster.wasm'),
-);
+copyFileSync(new URL('../src/navmesh-raster.wasm', import.meta.url), join(dist, 'navmesh-raster.wasm'));

@@ -4,7 +4,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Army, FORMATION_SHAPES, SKIRMISH_GAP, formationSlots } from '../dist/formations.js';
-import { FORMATION_SETTINGS, chargeOptionsFromSettings, formationOptionsFromSettings, formationSettingDefaults } from '../dist/formation-settings.js';
+import {
+  FORMATION_SETTINGS,
+  chargeOptionsFromSettings,
+  formationOptionsFromSettings,
+  formationSettingDefaults,
+} from '../dist/formation-settings.js';
 import { FlowField } from '../../behavior/dist/flowfield.js';
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -13,7 +18,12 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 function minGap(members) {
   const seg = (m) => {
     const h = Math.max(0, m.length / 2 - m.radius);
-    return [m.x - Math.sin(m.heading) * h, m.z - Math.cos(m.heading) * h, m.x + Math.sin(m.heading) * h, m.z + Math.cos(m.heading) * h];
+    return [
+      m.x - Math.sin(m.heading) * h,
+      m.z - Math.cos(m.heading) * h,
+      m.x + Math.sin(m.heading) * h,
+      m.z + Math.cos(m.heading) * h,
+    ];
   };
   const pointSeg = (px, pz, s) => {
     const dx = s[2] - s[0],
@@ -32,7 +42,12 @@ function minGap(members) {
         sb = seg(b),
         // Closest distance between two segments: the least of the four end-to-segment distances (they do not cross
         // when bodies do not overlap, and a crossing gives a negative gap here through the endpoint checks).
-        d = Math.min(pointSeg(sa[0], sa[1], sb), pointSeg(sa[2], sa[3], sb), pointSeg(sb[0], sb[1], sa), pointSeg(sb[2], sb[3], sa));
+        d = Math.min(
+          pointSeg(sa[0], sa[1], sb),
+          pointSeg(sa[2], sa[3], sb),
+          pointSeg(sb[0], sb[1], sa),
+          pointSeg(sb[2], sb[3], sa),
+        );
       gap = Math.min(gap, d - a.radius - b.radius);
     }
   return gap;
@@ -53,7 +68,8 @@ test('slots: line, column, square, wedge and skirmish', () => {
     assert.ok(s[0] * out[0] + s[1] * out[1] > 0, 'every slot faces away from the centre');
   }
   for (let i = 0; i < square.length; i++)
-    for (let j = i + 1; j < square.length; j++) assert.ok(Math.hypot(square[i][0] - square[j][0], square[i][1] - square[j][1]) > 0.55);
+    for (let j = i + 1; j < square.length; j++)
+      assert.ok(Math.hypot(square[i][0] - square[j][0], square[i][1] - square[j][1]) > 0.55);
   // A wedge: 1, 3, 5 ... riders a rank, the point leading.
   const wedge = formationSlots('wedge', 25, { distance: 3.4 }),
     ranks = new Map();
@@ -77,7 +93,8 @@ test('march: a two-deep line of 80 holds its files and ranks within 10 percent o
       const right = foot.slots.findIndex((o) => o[1] === s[1] && Math.abs(o[0] - (s[0] - 0.56)) < 1e-9);
       if (right >= 0) worst = Math.max(worst, Math.abs(dist(m[foot.members[k]], m[foot.members[right]]) - 0.56) / 0.56);
       const behind = foot.slots.findIndex((o) => o[0] === s[0] && Math.abs(o[1] - (s[1] - 1.32)) < 1e-9);
-      if (behind >= 0) worst = Math.max(worst, Math.abs(dist(m[foot.members[k]], m[foot.members[behind]]) - 1.32) / 1.32);
+      if (behind >= 0)
+        worst = Math.max(worst, Math.abs(dist(m[foot.members[k]], m[foot.members[behind]]) - 1.32) / 1.32);
     }
   }
   assert.ok(worst < 0.1, `spacing off by up to ${(worst * 100).toFixed(1)} percent`);
@@ -98,7 +115,8 @@ test('wheel: a line wheels 90 degrees on its left flank, outer flank at marching
     army.advanceTime(1 / 30);
     t += 1 / 30;
     const m = army.members;
-    for (let k = 0; k < 19; k++) worst = Math.max(worst, Math.abs(dist(m[foot.members[k]], m[foot.members[k + 1]]) - 0.56) / 0.56);
+    for (let k = 0; k < 19; k++)
+      worst = Math.max(worst, Math.abs(dist(m[foot.members[k]], m[foot.members[k + 1]]) - 0.56) / 0.56);
     for (const x of m) fastest = Math.max(fastest, x.speed);
   }
   assert.ok(Math.abs(t - expected) < 0.1, `wheel took ${t.toFixed(2)} s, expected ${expected.toFixed(2)}`);
@@ -121,7 +139,10 @@ test('re-forming: line to square and column, everyone reaches a slot', () => {
   for (let k = 0; k < 96; k++) {
     const [x, z, h] = foot.slot(k),
       m = army.members[foot.members[k]];
-    assert.ok(Math.hypot(m.x - x, m.z - z) < 0.3, `member ${k} is ${Math.hypot(m.x - x, m.z - z).toFixed(2)} m off its slot`);
+    assert.ok(
+      Math.hypot(m.x - x, m.z - z) < 0.3,
+      `member ${k} is ${Math.hypot(m.x - x, m.z - z).toFixed(2)} m off its slot`,
+    );
     assert.ok(Math.abs(Math.atan2(Math.sin(m.heading - h), Math.cos(m.heading - h))) < 0.1, 'faces out of the square');
   }
   assert.equal(new Set(foot.members).size, 96);
@@ -148,7 +169,10 @@ test('no interpenetration: a cavalry wedge charges through a gap and two columns
         [-6, 0],
         [6, 0],
       ])
-        inside = Math.max(inside, 1.5 + m.radius - Math.hypot(m.x - ox, m.z - oz) - Math.max(0, m.length / 2 - m.radius));
+        inside = Math.max(
+          inside,
+          1.5 + m.radius - Math.hypot(m.x - ox, m.z - oz) - Math.max(0, m.length / 2 - m.radius),
+        );
   }
   // A horse ploughing into a man pinned against others resolves to within 2 cm in a step (40 projection passes).
   assert.ok(gap > -0.02, `bodies overlap by ${(-gap).toFixed(3)} m`);
@@ -158,7 +182,12 @@ test('no interpenetration: a cavalry wedge charges through a gap and two columns
 });
 
 test('flow field: a formation marches round a wall down a continuum-crowds field to its goal', () => {
-  const field = new FlowField({ size: [60, 60], cell: 1, min: [-30, -10], cost: (x, z) => (z > 10 && z < 12 && x < 15 ? 255 : 1) });
+  const field = new FlowField({
+    size: [60, 60],
+    cell: 1,
+    min: [-30, -10],
+    cost: (x, z) => (z > 10 && z < 12 && x < 15 ? 255 : 1),
+  });
   field.setGoal([0, 0, 40]);
   const army = new Army(),
     foot = army.add({ count: 12, shape: 'column', position: [0, 0] });
@@ -189,9 +218,15 @@ test('film time: seek gives exactly what playing gives, forward and back', () =>
   const played = build().advanceTime(7),
     seeker = build();
   seeker.seek(12);
-  assert.deepEqual(seeker.members.map((m) => [m.x, m.z, m.heading, m.distance]), played.members.map((m) => [m.x, m.z, m.heading, m.distance]));
+  assert.deepEqual(
+    seeker.members.map((m) => [m.x, m.z, m.heading, m.distance]),
+    played.members.map((m) => [m.x, m.z, m.heading, m.distance]),
+  );
   seeker.seek(4).seek(12);
-  assert.deepEqual(seeker.members.map((m) => [m.x, m.z, m.heading]), played.members.map((m) => [m.x, m.z, m.heading]));
+  assert.deepEqual(
+    seeker.members.map((m) => [m.x, m.z, m.heading]),
+    played.members.map((m) => [m.x, m.z, m.heading]),
+  );
   // An order given after a seek back replaces what came after it (a re-shot from there).
   seeker.seek(3);
   seeker.formations[0].halt();
@@ -203,16 +238,23 @@ test('film time: seek gives exactly what playing gives, forward and back', () =>
 test('formation settings: rows on the shared shape map to Army.add options', () => {
   assert.equal(new Set(FORMATION_SETTINGS.map((r) => r.name)).size, FORMATION_SETTINGS.length);
   assert.equal(formationSettingDefaults().shape, 'line');
-  assert.deepEqual(formationOptionsFromSettings({ kind: 'cavalry', shape: 'wedge', count: 31, interval: 1.1, ranks: 0 }), {
-    count: 31,
-    kind: 'cavalry',
-    shape: 'wedge',
-    interval: 1.1,
-  });
+  assert.deepEqual(
+    formationOptionsFromSettings({ kind: 'cavalry', shape: 'wedge', count: 31, interval: 1.1, ranks: 0 }),
+    {
+      count: 31,
+      kind: 'cavalry',
+      shape: 'wedge',
+      interval: 1.1,
+    },
+  );
   assert.throws(() => formationOptionsFromSettings({ size: 3 }), TypeError);
   assert.throws(() => formationOptionsFromSettings({ count: 0 }), RangeError);
   assert.equal(formationSettingDefaults().gap, SKIRMISH_GAP);
-  assert.deepEqual(formationOptionsFromSettings({ shape: 'skirmish', gap: 3 }), { count: 80, shape: 'skirmish', gap: 3 });
+  assert.deepEqual(formationOptionsFromSettings({ shape: 'skirmish', gap: 3 }), {
+    count: 80,
+    shape: 'skirmish',
+    gap: 3,
+  });
   assert.deepEqual(chargeOptionsFromSettings({ chargeSpeed: 9, chargeAcceleration: 0 }), { speed: 9 });
   assert.deepEqual(chargeOptionsFromSettings({}), {});
   assert.throws(() => chargeOptionsFromSettings({ chargeSpeed: 30 }), RangeError);
@@ -222,7 +264,8 @@ test('skirmish: one rank in extended order, two paces apart, held on the march',
   const slots = formationSlots('skirmish', 40, { interval: 0.56 });
   assert.equal(new Set(slots.map((s) => s[1])).size, 1, 'one rank');
   const xs = slots.map((s) => s[0]).sort((a, b) => a - b);
-  for (let i = 1; i < xs.length; i++) assert.ok(Math.abs(xs[i] - xs[i - 1] - (0.56 + 1.524)) < 1e-9, 'a file front plus two paces');
+  for (let i = 1; i < xs.length; i++)
+    assert.ok(Math.abs(xs[i] - xs[i - 1] - (0.56 + 1.524)) < 1e-9, 'a file front plus two paces');
   // A second rank stands in the gaps of the first.
   const two = formationSlots('skirmish', 20, { interval: 0.56, distance: 1.32, ranks: 2 });
   const front = two.filter((s) => s[1] === 0).map((s) => s[0]),
@@ -267,7 +310,10 @@ test('charge: the speed builds at its rate, horses go through their gaits, the l
   assert.ok(Math.max(...speeds) > 6.5, 'the riders reach a gallop');
   // Riders keep up: once at full speed the mean speed tracks the charge within 10 percent.
   const full = speeds.slice(16, 22);
-  assert.ok(full.every((v) => Math.abs(v - 7) < 0.7), `riders at ${full.map((v) => v.toFixed(2))}`);
+  assert.ok(
+    full.every((v) => Math.abs(v - 7) < 0.7),
+    `riders at ${full.map((v) => v.toFixed(2))}`,
+  );
   assert.equal(horse.mode, 'halt', 'the charge halts at its goal');
   assert.ok(Math.abs(horse.anchor[1] - 160) < horse.distance + 0.2);
   assert.ok(Math.abs(horse.speed - 1.7) < 1e-9, 'and takes up the walk again');
@@ -287,5 +333,8 @@ test('charge: the speed builds at its rate, horses go through their gaits, the l
   };
   const played = build().advanceTime(9),
     sought = build().seek(10);
-  assert.deepEqual(sought.members.map((m) => [m.x, m.z, m.heading, m.speed]), played.members.map((m) => [m.x, m.z, m.heading, m.speed]));
+  assert.deepEqual(
+    sought.members.map((m) => [m.x, m.z, m.heading, m.speed]),
+    played.members.map((m) => [m.x, m.z, m.heading, m.speed]),
+  );
 });

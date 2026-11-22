@@ -118,8 +118,23 @@ interface MemberState {
 
 type Command =
   | { at: number; formation: number; kind: 'form'; shape: FormationShape; files?: number; ranks?: number; gap?: number }
-  | { at: number; formation: number; kind: 'charge'; goal?: readonly [number, number]; speed: number; acceleration: number }
-  | { at: number; formation: number; kind: 'march'; path?: readonly (readonly [number, number])[]; field?: DirectionField; goal?: readonly [number, number]; speed?: number }
+  | {
+      at: number;
+      formation: number;
+      kind: 'charge';
+      goal?: readonly [number, number];
+      speed: number;
+      acceleration: number;
+    }
+  | {
+      at: number;
+      formation: number;
+      kind: 'march';
+      path?: readonly (readonly [number, number])[];
+      field?: DirectionField;
+      goal?: readonly [number, number];
+      speed?: number;
+    }
   | { at: number; formation: number; kind: 'wheel'; angle: number; pivot: 'left' | 'right' }
   | { at: number; formation: number; kind: 'face'; heading: number }
   | { at: number; formation: number; kind: 'halt' };
@@ -130,8 +145,10 @@ export function formationSlots(
   count: number,
   options: { files?: number; ranks?: number; interval?: number; distance?: number; gap?: number } = {},
 ): [number, number, number][] {
-  if (!FORMATION_SHAPES.includes(shape)) throw new RangeError(`Formation shape must be one of ${FORMATION_SHAPES.join(', ')}`);
-  if (!(Number.isInteger(count) && count >= 1 && count <= 4096)) throw new RangeError('A formation needs 1 to 4096 members');
+  if (!FORMATION_SHAPES.includes(shape))
+    throw new RangeError(`Formation shape must be one of ${FORMATION_SHAPES.join(', ')}`);
+  if (!(Number.isInteger(count) && count >= 1 && count <= 4096))
+    throw new RangeError('A formation needs 1 to 4096 members');
   const iv = options.interval ?? 0.56,
     d = options.distance ?? 1.32;
   if (!(iv > 0) || !(d > 0)) throw new RangeError('Formation interval and distance must be above 0 metres');
@@ -141,9 +158,11 @@ export function formationSlots(
     const gap = options.gap ?? SKIRMISH_GAP,
       ranks = options.ranks ?? 1;
     if (!(gap >= 0 && gap <= 50)) throw new RangeError('Skirmish gap must be 0 to 50 metres');
-    if (!(Number.isInteger(ranks) && ranks >= 1)) throw new RangeError('Formation ranks must be a whole number, 1 or more');
+    if (!(Number.isInteger(ranks) && ranks >= 1))
+      throw new RangeError('Formation ranks must be a whole number, 1 or more');
     const files = options.files ?? Math.ceil(count / ranks);
-    if (!(Number.isInteger(files) && files >= 1)) throw new RangeError('Formation files must be a whole number, 1 or more');
+    if (!(Number.isInteger(files) && files >= 1))
+      throw new RangeError('Formation files must be a whole number, 1 or more');
     for (let i = 0; i < count; i++) {
       const r = Math.floor(i / files),
         c = i % files,
@@ -154,8 +173,10 @@ export function formationSlots(
   } else if (shape === 'line' || shape === 'column') {
     const ranks = shape === 'line' ? (options.ranks ?? 2) : undefined,
       files = options.files ?? (shape === 'column' ? 4 : Math.ceil(count / ranks!));
-    if (!(Number.isInteger(files) && files >= 1)) throw new RangeError('Formation files must be a whole number, 1 or more');
-    if (ranks !== undefined && !(Number.isInteger(ranks) && ranks >= 1)) throw new RangeError('Formation ranks must be a whole number, 1 or more');
+    if (!(Number.isInteger(files) && files >= 1))
+      throw new RangeError('Formation files must be a whole number, 1 or more');
+    if (ranks !== undefined && !(Number.isInteger(ranks) && ranks >= 1))
+      throw new RangeError('Formation ranks must be a whole number, 1 or more');
     for (let i = 0; i < count; i++) {
       const r = Math.floor(i / files),
         c = i % files,
@@ -194,8 +215,26 @@ export function formationSlots(
 }
 
 const KIND_DEFAULTS = {
-  infantry: { interval: 0.56, distance: 1.32, speed: 1.524, maxSpeed: 2.743, radius: 0.25, length: 0, turnRate: 4, acceleration: 1 },
-  cavalry: { interval: 0.95, distance: 3.4, speed: 1.7, maxSpeed: 7, radius: 0.33, length: 2.2, turnRate: 1.6, acceleration: 0.6 },
+  infantry: {
+    interval: 0.56,
+    distance: 1.32,
+    speed: 1.524,
+    maxSpeed: 2.743,
+    radius: 0.25,
+    length: 0,
+    turnRate: 4,
+    acceleration: 1,
+  },
+  cavalry: {
+    interval: 0.95,
+    distance: 3.4,
+    speed: 1.7,
+    maxSpeed: 7,
+    radius: 0.33,
+    length: 2.2,
+    turnRate: 1.6,
+    acceleration: 0.6,
+  },
 };
 
 /** A formation in an {@link Army}: give it orders; they are kept on the film timeline. */
@@ -263,7 +302,13 @@ export class Formation {
     this.mode = 'halt';
     this.path = this.field = this.goal = undefined;
     this.members.length = 0;
-    this.slots = formationSlots(this.shape, options.count, { files: this.files, ranks: this.ranks, interval: this.interval, distance: this.distance, gap: this.gap });
+    this.slots = formationSlots(this.shape, options.count, {
+      files: this.files,
+      ranks: this.ranks,
+      interval: this.interval,
+      distance: this.distance,
+      gap: this.gap,
+    });
   }
   /** Width of the front, m. */
   get front(): number {
@@ -284,18 +329,35 @@ export class Formation {
   }
   /** Re-forms into another shape; members take the nearest new slots. `gap` opens a skirmish line wider or closer. */
   form(shape: FormationShape, options: { files?: number; ranks?: number; gap?: number } = {}): this {
-    formationSlots(shape, this.options.count, { ...options, interval: this.interval, distance: this.distance, gap: options.gap ?? this.gap });
+    formationSlots(shape, this.options.count, {
+      ...options,
+      interval: this.interval,
+      distance: this.distance,
+      gap: options.gap ?? this.gap,
+    });
     return this.army.order({ at: this.army.time, formation: this.index, kind: 'form', shape, ...options }), this;
   }
   /**
    * Marches: along `path` (`[x, z]` points, such as a navmesh path), down a direction `field` until within a rank of
    * `goal`, or straight ahead when given neither.
    */
-  march(options: { path?: readonly (readonly [number, number])[]; field?: DirectionField; goal?: readonly [number, number]; speed?: number } = {}): this {
-    if (options.path !== undefined && (!Array.isArray(options.path) || options.path.some((p) => !(Number.isFinite(p?.[0]) && Number.isFinite(p?.[1])))))
+  march(
+    options: {
+      path?: readonly (readonly [number, number])[];
+      field?: DirectionField;
+      goal?: readonly [number, number];
+      speed?: number;
+    } = {},
+  ): this {
+    if (
+      options.path !== undefined &&
+      (!Array.isArray(options.path) || options.path.some((p) => !(Number.isFinite(p?.[0]) && Number.isFinite(p?.[1]))))
+    )
       throw new RangeError('march path must be [x, z] points');
-    if (options.field !== undefined && typeof options.field?.direction !== 'function') throw new TypeError('march field needs a direction(position) method');
-    if (options.speed !== undefined && !(options.speed > 0 && options.speed <= 25)) throw new RangeError('march speed must be above 0 and at most 25 m/s');
+    if (options.field !== undefined && typeof options.field?.direction !== 'function')
+      throw new TypeError('march field needs a direction(position) method');
+    if (options.speed !== undefined && !(options.speed > 0 && options.speed <= 25))
+      throw new RangeError('march speed must be above 0 and at most 25 m/s');
     return this.army.order({ at: this.army.time, formation: this.index, kind: 'march', ...options }), this;
   }
   /** Wheels by `angle` radians (positive to the left) on the `pivot` flank; the outer flank keeps the marching speed. */
@@ -322,8 +384,19 @@ export class Formation {
     if (options.goal !== undefined && !(Number.isFinite(options.goal?.[0]) && Number.isFinite(options.goal?.[1])))
       throw new RangeError('charge goal must be [x, z]');
     if (!(speed > 0 && speed <= 25)) throw new RangeError('charge speed must be above 0 and at most 25 m/s');
-    if (!(acceleration > 0 && acceleration <= 20)) throw new RangeError('charge acceleration must be above 0 and at most 20 m/s^2');
-    return this.army.order({ at: this.army.time, formation: this.index, kind: 'charge', goal: options.goal, speed, acceleration }), this;
+    if (!(acceleration > 0 && acceleration <= 20))
+      throw new RangeError('charge acceleration must be above 0 and at most 20 m/s^2');
+    return (
+      this.army.order({
+        at: this.army.time,
+        formation: this.index,
+        kind: 'charge',
+        goal: options.goal,
+        speed,
+        acceleration,
+      }),
+      this
+    );
   }
   halt(): this {
     return this.army.order({ at: this.army.time, formation: this.index, kind: 'halt' }), this;
@@ -378,7 +451,8 @@ export class Army {
     this.ground = options.ground ?? (() => 0);
     if (!(this.step > 0 && this.step <= 0.1)) throw new RangeError('Army step must be above 0 and at most 0.1 s');
     if (!(this.horizon > 0 && this.horizon < Infinity)) throw new RangeError('Army horizon must be above 0 seconds');
-    if (!(Number.isInteger(this.neighbours) && this.neighbours >= 1 && this.neighbours <= 64)) throw new RangeError('Army neighbours must be 1 to 64');
+    if (!(Number.isInteger(this.neighbours) && this.neighbours >= 1 && this.neighbours <= 64))
+      throw new RangeError('Army neighbours must be 1 to 64');
     if (typeof this.ground !== 'function') throw new TypeError('Army ground must be a function (x, z) => height');
   }
   /** Film time, seconds. */
@@ -401,7 +475,13 @@ export class Army {
         const p = this.previous,
           o = i * 5,
           dh = Math.atan2(Math.sin(s.heading - p[o + 2]!), Math.cos(s.heading - p[o + 2]!));
-        return { ...s, x: s.x + (s.x - p[o]!) * a, z: s.z + (s.z - p[o + 1]!) * a, heading: s.heading + dh * a, distance: s.distance + (s.distance - p[o + 3]!) * a };
+        return {
+          ...s,
+          x: s.x + (s.x - p[o]!) * a,
+          z: s.z + (s.z - p[o + 1]!) * a,
+          heading: s.heading + dh * a,
+          distance: s.distance + (s.distance - p[o + 3]!) * a,
+        };
       });
       this.viewAt = this.clock;
     }
@@ -413,14 +493,19 @@ export class Army {
   }
   /** Adds a formation at its start position, members on their slots. Formations are added before time runs. */
   add(options: FormationOptions): Formation {
-    if (this.clock > 0 || this.ticks > 0) throw new RangeError('Add formations at time 0, before advanceTime or seek moves the army');
+    if (this.clock > 0 || this.ticks > 0)
+      throw new RangeError('Add formations at time 0, before advanceTime or seek moves the army');
     const kind = options?.kind ?? 'infantry';
-    if (kind !== 'infantry' && kind !== 'cavalry') throw new RangeError("Formation kind must be 'infantry' or 'cavalry'");
+    if (kind !== 'infantry' && kind !== 'cavalry')
+      throw new RangeError("Formation kind must be 'infantry' or 'cavalry'");
     const k = KIND_DEFAULTS[kind];
     for (const key of ['interval', 'distance', 'speed', 'maxSpeed', 'radius', 'turnRate'] as const)
-      if (options[key] !== undefined && !(options[key]! > 0 && options[key]! < 1000)) throw new RangeError(`Formation ${key} must be a positive number`);
-    if (options.length !== undefined && !(options.length >= 0 && options.length < 20)) throw new RangeError('Formation length must be 0 to 20 metres');
-    if (options.gap !== undefined && !(options.gap >= 0 && options.gap <= 50)) throw new RangeError('Skirmish gap must be 0 to 50 metres');
+      if (options[key] !== undefined && !(options[key]! > 0 && options[key]! < 1000))
+        throw new RangeError(`Formation ${key} must be a positive number`);
+    if (options.length !== undefined && !(options.length >= 0 && options.length < 20))
+      throw new RangeError('Formation length must be 0 to 20 metres');
+    if (options.gap !== undefined && !(options.gap >= 0 && options.gap <= 50))
+      throw new RangeError('Skirmish gap must be 0 to 50 metres');
     const f = new Formation(this, this.formations.length, { ...options });
     this.formations.push(f);
     this.place(f, k);
@@ -428,7 +513,8 @@ export class Army {
   }
   /** A disc nobody enters (a tree, a wall post), `[x, z]` and radius. Added before time runs. */
   addObstacle(position: readonly [number, number], radius: number): void {
-    if (!(Number.isFinite(position?.[0]) && Number.isFinite(position?.[1]) && radius > 0)) throw new RangeError('addObstacle needs [x, z] and a radius above 0');
+    if (!(Number.isFinite(position?.[0]) && Number.isFinite(position?.[1]) && radius > 0))
+      throw new RangeError('addObstacle needs [x, z] and a radius above 0');
     this.obstacles.push({ x: position[0], z: position[1], radius });
   }
   private place(f: Formation, k: (typeof KIND_DEFAULTS)[FormationKind]): void {
@@ -462,7 +548,8 @@ export class Army {
     this.commands.push(c);
     // On the grid the order takes effect now (so its state shows at once); between steps it waits for the next step,
     // exactly as a replay applies it.
-    if (Math.abs(c.at - this.ticks * this.step) < 1e-9 && this.next === this.commands.length - 1) this.apply(this.commands[this.next++]!);
+    if (Math.abs(c.at - this.ticks * this.step) < 1e-9 && this.next === this.commands.length - 1)
+      this.apply(this.commands[this.next++]!);
   }
   private apply(c: Command): void {
     const f = this.formations[c.formation]!;
@@ -471,7 +558,13 @@ export class Army {
       f.files = c.files;
       f.ranks = c.ranks;
       if (c.gap !== undefined) f.gap = c.gap;
-      f.slots = formationSlots(c.shape, f.options.count, { files: c.files, ranks: c.ranks, interval: f.interval, distance: f.distance, gap: f.gap });
+      f.slots = formationSlots(c.shape, f.options.count, {
+        files: c.files,
+        ranks: c.ranks,
+        interval: f.interval,
+        distance: f.distance,
+        gap: f.gap,
+      });
       // Nearest free slot for each member, members in slot order: deterministic.
       const free = new Set(f.slots.map((_, i) => i)),
         order = [...f.members];
@@ -679,7 +772,8 @@ export class Army {
   /** Steps the whole army by one fixed step. */
   private tick(dt: number): void {
     const start = this.ticks * this.step;
-    while (this.next < this.commands.length && this.commands[this.next]!.at <= start + 1e-9) this.apply(this.commands[this.next++]!);
+    while (this.next < this.commands.length && this.commands[this.next]!.at <= start + 1e-9)
+      this.apply(this.commands[this.next++]!);
     if (this.previous.length !== this.states.length * 5) this.previous = new Float64Array(this.states.length * 5);
     this.states.forEach((s, i) => this.previous.set([s.x, s.z, s.heading, s.distance, s.speed], i * 5));
     this.moveAnchors(dt);
@@ -702,13 +796,21 @@ export class Army {
         found: [number, number][] = [];
       for (let a = -1; a <= 1; a++)
         for (let b = -1; b <= 1; b++)
-          for (const j of grid.get(key(ix + a, iz + b)) ?? []) if (j !== i) found.push([j, (states[j]!.x - s.x) ** 2 + (states[j]!.z - s.z) ** 2]);
+          for (const j of grid.get(key(ix + a, iz + b)) ?? [])
+            if (j !== i) found.push([j, (states[j]!.x - s.x) ** 2 + (states[j]!.z - s.z) ** 2]);
       found.sort((p, q) => p[1] - q[1] || p[0] - q[0]);
       return found.map((f) => f[0]);
     };
     // Preferred velocities: the slot's own velocity fed forward plus arrival on the slot error.
     const next = new Float64Array(2 * n),
-      agents: Agent[] = states.map((s, i) => ({ id: i, position: [s.x, s.z], velocity: [s.vx, s.vz], preferred: [0, 0], radius: s.radius, maxSpeed: s.surge }));
+      agents: Agent[] = states.map((s, i) => ({
+        id: i,
+        position: [s.x, s.z],
+        velocity: [s.vx, s.vz],
+        preferred: [0, 0],
+        radius: s.radius,
+        maxSpeed: s.surge,
+      }));
     for (const f of this.formations) {
       const moving = f.mode !== 'halt',
         c = Math.cos(f.heading),
@@ -736,12 +838,21 @@ export class Army {
       }
     }
     const out = new Float64Array(2),
-      obstacleAgents = this.obstacles.map((o, k) => ({ id: -1 - k, position: [o.x, o.z] as [number, number], velocity: [0, 0] as [number, number], preferred: [0, 0] as [number, number], radius: o.radius, maxSpeed: 0, reciprocal: false }));
+      obstacleAgents = this.obstacles.map((o, k) => ({
+        id: -1 - k,
+        position: [o.x, o.z] as [number, number],
+        velocity: [0, 0] as [number, number],
+        preferred: [0, 0] as [number, number],
+        radius: o.radius,
+        maxSpeed: 0,
+        reciprocal: false,
+      }));
     for (let i = 0; i < n; i++) {
       const nb = near(i)
         .slice(0, this.neighbours)
         .map((j) => agents[j]!);
-      for (const o of obstacleAgents) if (Math.hypot(o.position[0] - states[i]!.x, o.position[1] - states[i]!.z) < reach + o.radius) nb.push(o);
+      for (const o of obstacleAgents)
+        if (Math.hypot(o.position[0] - states[i]!.x, o.position[1] - states[i]!.z) < reach + o.radius) nb.push(o);
       avoid(agents[i]!, nb, dt, this.horizon, out);
       next[2 * i] = out[0]!;
       next[2 * i + 1] = out[1]!;
@@ -818,7 +929,8 @@ export class Army {
   }
   /** Moves film time forward by `delta` seconds in fixed steps (the last step is shortened to land on time). */
   advanceTime(delta: number): this {
-    if (!(delta >= 0 && delta < Infinity)) throw new RangeError('advanceTime needs a finite number of seconds, 0 or more');
+    if (!(delta >= 0 && delta < Infinity))
+      throw new RangeError('advanceTime needs a finite number of seconds, 0 or more');
     // Float drift from many small advances is snapped to the microsecond, so they land on the time one seek reaches; a
     // time that is not near a microsecond (a third) is left as it is.
     const end = this.clock + delta,
