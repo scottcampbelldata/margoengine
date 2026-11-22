@@ -305,7 +305,10 @@ export function addFace(animation: Animator['animation'], options: AddFaceOption
     apply();
   };
   if (faced.has(model))
-    throw new MargoError('state', 'This model already has a face from addFace; dispose that face before adding another');
+    throw new MargoError(
+      'state',
+      'This model already has a face from addFace; dispose that face before adding another',
+    );
   const name = `face:${model.root.id}`;
   let remove: (() => void) | null;
   if (animator) remove = animator.addSolver(update);

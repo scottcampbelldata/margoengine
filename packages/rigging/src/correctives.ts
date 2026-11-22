@@ -99,7 +99,8 @@ function solve(matrix: Float64Array, rhs: Float64Array, n: number, columns: numb
     if (Math.abs(matrix[pivot * n + k]) < 1e-12)
       throw new RangeError('Pose samples repeat; give each sample a different rotation');
     if (pivot !== k) {
-      for (let c = 0; c < n; c++) [matrix[k * n + c], matrix[pivot * n + c]] = [matrix[pivot * n + c], matrix[k * n + c]];
+      for (let c = 0; c < n; c++)
+        [matrix[k * n + c], matrix[pivot * n + c]] = [matrix[pivot * n + c], matrix[k * n + c]];
       for (let c = 0; c < columns; c++)
         [rhs[k * columns + c], rhs[pivot * columns + c]] = [rhs[pivot * columns + c], rhs[k * columns + c]];
     }
@@ -182,7 +183,8 @@ export class Correctives {
       const { cone = null, start = 0, curve = 'linear', amount = 1 } = shape;
       if (cone !== null && !(cone > 0 && cone < Infinity)) throw new RangeError('Corrective cone must be above 0');
       if (!(start >= 0 && start < 1)) throw new RangeError('Corrective start must be from 0 to below 1');
-      if (curve !== 'linear' && curve !== 'smooth') throw new RangeError("Corrective curve must be 'linear' or 'smooth'");
+      if (curve !== 'linear' && curve !== 'smooth')
+        throw new RangeError("Corrective curve must be 'linear' or 'smooth'");
       if (!(amount >= 0 && amount <= 1)) throw new RangeError('Corrective amount must be from 0 to 1');
     }
   }
@@ -199,11 +201,7 @@ export class Correctives {
     let value = clamp((along - start) / (1 - start));
     if (curve === 'smooth') value = value * value * (3 - 2 * value);
     if (cone !== null) {
-      const off = Math.hypot(
-        now[0] - pose[0] * along,
-        now[1] - pose[1] * along,
-        now[2] - pose[2] * along,
-      );
+      const off = Math.hypot(now[0] - pose[0] * along, now[1] - pose[1] * along, now[2] - pose[2] * along);
       const fade = clamp(1 - off / cone);
       value *= fade * fade * (3 - 2 * fade);
     }

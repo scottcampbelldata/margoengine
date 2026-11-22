@@ -77,7 +77,8 @@ export function parentOrder(parents: readonly number[], label: string): number[]
     order.push(bone);
     for (const child of children[bone]) stack.push(child);
   }
-  if (order.length !== n) throw new RangeError(`${label} parents form a cycle; every joint must reach a root (parent -1)`);
+  if (order.length !== n)
+    throw new RangeError(`${label} parents form a cycle; every joint must reach a root (parent -1)`);
   return order;
 }
 
@@ -102,7 +103,9 @@ export function worldFrames(
       q: [number, number, number, number] = [local[l + 3], local[l + 4], local[l + 5], local[l + 6]],
       t = [local[l], local[l + 1], local[l + 2]];
     // The local rotation-and-scale columns R * S.
-    const columns = [0, 1, 2].map((a) => rotateByQuaternion([a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0], q).map((v) => v * local[l + 7 + a]));
+    const columns = [0, 1, 2].map((a) =>
+      rotateByQuaternion([a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0], q).map((v) => v * local[l + 7 + a]),
+    );
     if (p < 0) {
       position.set(t, b * 3);
       rotation.set(q, b * 4);

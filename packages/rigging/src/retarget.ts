@@ -86,7 +86,15 @@ const AIM: Partial<Record<HumanoidBone, readonly HumanoidBone[]>> = {
  * them as the target has them (aiming them along a motion-capture skeleton's leaning trunk or rising collarbones would
  * hunch and shrug the target); it turns the limbs, hands and fingers, where T-pose and A-pose rigs differ.
  */
-const LAYOUT: ReadonlySet<HumanoidBone> = new Set(['hips', 'spine', 'chest', 'upperChest', 'neck', 'leftShoulder', 'rightShoulder']);
+const LAYOUT: ReadonlySet<HumanoidBone> = new Set([
+  'hips',
+  'spine',
+  'chest',
+  'upperChest',
+  'neck',
+  'leftShoulder',
+  'rightShoulder',
+]);
 
 /** Each preset's name for each humanoid bone it has (others are absent). */
 const PRESETS: Record<SkeletonPreset, Partial<Record<HumanoidBone, string>>> = {
@@ -219,7 +227,10 @@ const PRESETS: Record<SkeletonPreset, Partial<Record<HumanoidBone, string>>> = {
         [`${s}ThumbProximal`, `${S}Thumb2`],
         [`${s}ThumbDistal`, `${S}Thumb3`],
         ...FINGERS.flatMap((f) =>
-          PHALANGES.map((p, i) => [`${s}${f}${p}`, `${S}${f === 'Little' ? 'Pinky' : f === 'Middle' ? 'Mid' : f}${i + 1}`]),
+          PHALANGES.map((p, i) => [
+            `${s}${f}${p}`,
+            `${S}${f === 'Little' ? 'Pinky' : f === 'Middle' ? 'Mid' : f}${i + 1}`,
+          ]),
         ),
         [`${s}UpperLeg`, `${S}Thigh`],
         [`${s}LowerLeg`, `${S}Calf`],
@@ -465,7 +476,9 @@ function alignRestPose(
     if (!from || !to) continue; // a flat parent scale: nothing below it can be aimed
     const l = t * 10 + 3;
     rest.set(
-      normalizeQuaternion(multiplyQuaternions(rotationBetween(from, to), [rest[l], rest[l + 1], rest[l + 2], rest[l + 3]])),
+      normalizeQuaternion(
+        multiplyQuaternions(rotationBetween(from, to), [rest[l], rest[l + 1], rest[l + 2], rest[l + 3]]),
+      ),
       l,
     );
   }

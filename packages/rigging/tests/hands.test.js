@@ -37,11 +37,11 @@ const NAMES = {
     ({ hips: 'Hips', spine: 'Spine', head: 'Head' }[part] ??
       `${s === 'left' ? 'Left' : 'Right'}${{ arm: 'Arm', fore: 'ForeArm', hand: 'Hand' }[part] ?? part.replace(/^(\w+)(\d)$/, (_, f, n) => `Hand${{ thumb: 'Thumb', index: 'Index', middle: 'Middle', ring: 'Ring', little: 'Pinky' }[f]}${n}`)}`),
   vrm: (s, part) =>
-    ({ hips: 'hips', spine: 'spine', head: 'head' }[part] ??
-      `${s}${{ arm: 'UpperArm', fore: 'LowerArm', hand: 'Hand' }[part] ?? part.replace(/^(\w+)(\d)$/, (_, f, n) => (f === 'thumb' ? `Thumb${['Metacarpal', 'Proximal', 'Distal'][n - 1]}` : `${f[0].toUpperCase()}${f.slice(1)}${['Proximal', 'Intermediate', 'Distal'][n - 1]}`))}`),
+    ({ hips: 'hips', spine: 'spine', head: 'head' })[part] ??
+    `${s}${{ arm: 'UpperArm', fore: 'LowerArm', hand: 'Hand' }[part] ?? part.replace(/^(\w+)(\d)$/, (_, f, n) => (f === 'thumb' ? `Thumb${['Metacarpal', 'Proximal', 'Distal'][n - 1]}` : `${f[0].toUpperCase()}${f.slice(1)}${['Proximal', 'Intermediate', 'Distal'][n - 1]}`))}`,
   mpfb: (s, part) =>
-    ({ hips: 'root', spine: 'spine05', head: 'head' }[part] ??
-      `${{ arm: 'upperarm01', fore: 'lowerarm01', hand: 'wrist' }[part] ?? part.replace(/^(\w+)(\d)$/, (_, f, n) => `finger${FINGERS.indexOf(f) + 1}-${n}`)}.${s === 'left' ? 'L' : 'R'}`),
+    ({ hips: 'root', spine: 'spine05', head: 'head' })[part] ??
+    `${{ arm: 'upperarm01', fore: 'lowerarm01', hand: 'wrist' }[part] ?? part.replace(/^(\w+)(\d)$/, (_, f, n) => `finger${FINGERS.indexOf(f) + 1}-${n}`)}.${s === 'left' ? 'L' : 'R'}`,
 };
 const qmul = (a, b) => [
   a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
@@ -97,7 +97,13 @@ function makeRig(naming, seed = 7) {
   names.forEach((_, i) => {
     const [p, q] = world[i],
       parent = parents[i];
-    const local = parent < 0 ? p : rot(p.map((v, k) => v - world[parent][0][k]), conj(world[parent][1]));
+    const local =
+      parent < 0
+        ? p
+        : rot(
+            p.map((v, k) => v - world[parent][0][k]),
+            conj(world[parent][1]),
+          );
     const lq = parent < 0 ? q : qmul(conj(world[parent][1]), q);
     rest.set([...local, ...lq, 1, 1, 1], i * 10);
   });
@@ -111,7 +117,10 @@ function forward(rig, rotations = new Map()) {
       t = [rig.rest[o], rig.rest[o + 1], rig.rest[o + 2]],
       q = rotations.get(i) ?? [rig.rest[o + 3], rig.rest[o + 4], rig.rest[o + 5], rig.rest[o + 6]],
       parent = rig.parents[i];
-    out[i] = parent < 0 ? { p: t, q } : { p: out[parent].p.map((v, k) => v + rot(t, out[parent].q)[k]), q: qmul(out[parent].q, q) };
+    out[i] =
+      parent < 0
+        ? { p: t, q }
+        : { p: out[parent].p.map((v, k) => v + rot(t, out[parent].q)[k]), q: qmul(out[parent].q, q) };
   });
   return out;
 }
@@ -184,11 +193,17 @@ test('grip(0.03) wraps a 30 mm bar: every fingertip within 2 mm of it, no finger
           reach = 0.015 + thickness,
           joints = [...f.bones.map((b) => frames[b].p), tip(rig, frames, f)];
         const gap = fromAxis(joints[3]) - reach;
-        assert.ok(gap <= 0.002 && gap >= -0.001, `${naming} ${side} ${name} fingertip ${(gap * 1000).toFixed(2)} mm from the bar`);
+        assert.ok(
+          gap <= 0.002 && gap >= -0.001,
+          `${naming} ${side} ${name} fingertip ${(gap * 1000).toFixed(2)} mm from the bar`,
+        );
         for (let k = 0; k < 3; k++)
           for (let s = 0; s <= 20; s++) {
             const p = joints[k].map((v, i) => v + (joints[k + 1][i] - v) * (s / 20));
-            assert.ok(fromAxis(p) >= reach - 0.001, `${naming} ${side} ${name} segment ${k} is ${((reach - fromAxis(p)) * 1000).toFixed(2)} mm into the bar`);
+            assert.ok(
+              fromAxis(p) >= reach - 0.001,
+              `${naming} ${side} ${name} segment ${k} is ${((reach - fromAxis(p)) * 1000).toFixed(2)} mm into the bar`,
+            );
           }
       }
     }
@@ -210,7 +225,9 @@ test('the same pose gives the same hand on Mixamo, VRM and MPFB namings', () => 
     const mixamo = tips('mixamo', pose);
     assert.equal(mixamo.length, 30);
     for (const naming of ['vrm', 'mpfb'])
-      tips(naming, pose).forEach((v, i) => assert.ok(Math.abs(v - mixamo[i]) < 1e-9, `${naming} ${pose.name} coordinate ${i}`));
+      tips(naming, pose).forEach((v, i) =>
+        assert.ok(Math.abs(v - mixamo[i]) < 1e-9, `${naming} ${pose.name} coordinate ${i}`),
+      );
   }
   // A VRM's humanoid section names the bones when the node names follow no preset.
   const rig = makeRig('vrm'),
@@ -227,7 +244,12 @@ function animated(rig, clips) {
   const accessor = (data, type) => {
     buffers.push(new Uint8Array(data.buffer));
     bufferViews.push({ buffer: buffers.length - 1, byteLength: data.byteLength });
-    accessors.push({ bufferView: bufferViews.length - 1, componentType: 5126, count: data.length / { VEC4: 4, VEC3: 3, SCALAR: 1 }[type], type });
+    accessors.push({
+      bufferView: bufferViews.length - 1,
+      componentType: 5126,
+      count: data.length / { VEC4: 4, VEC3: 3, SCALAR: 1 }[type],
+      type,
+    });
     if (type === 'SCALAR') Object.assign(accessors.at(-1), { min: [data[0]], max: [data.at(-1)] });
     return accessors.length - 1;
   };
@@ -305,7 +327,14 @@ async function animator(t, clips, initial) {
 }
 
 test('a clip with flat fingers comes out at 20 degrees mean or more; a clip that keys its fingers is left as keyed', async (t) => {
-  const run = await animator(t, [{ name: 'wave', turn: 6 }, { name: 'hold', turn: 50 }], 'wave');
+  const run = await animator(
+    t,
+    [
+      { name: 'wave', turn: 6 },
+      { name: 'hold', turn: 50 },
+    ],
+    'wave',
+  );
   const hands = addHands(run.a);
   assert.deepEqual(hands.flat, { left: ['wave'], right: ['wave'] });
   const hand = measureHands(run.rig).right;
@@ -357,7 +386,8 @@ test('a digit a pose leaves out fades back to the clip: relaxed to grip brings t
   const run = await animator(t, [{ name: 'wave', turn: 6 }], 'wave'),
     hands = addHands(run.a, { auto: false }),
     thumb = measureHands(run.rig).right.fingers.thumb.bones,
-    thumbTurn = () => thumb.reduce((s, i) => s + turnFromRest(run.rotationOf(i), run.a.restRotation(i)), 0) / thumb.length;
+    thumbTurn = () =>
+      thumb.reduce((s, i) => s + turnFromRest(run.rotationOf(i), run.a.restRotation(i)), 0) / thumb.length;
   hands.right.keys = [
     { time: 0, pose: relaxed(), blend: 0 },
     { time: 0.5, pose: grip(0.03), blend: 0.4 },

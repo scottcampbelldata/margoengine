@@ -258,9 +258,20 @@ test('rest alignment turns the limbs only: a source whose trunk and collarbones 
   source.rest.set([0.1, 0.05, 0], at('lhumerus')); // the collarbone rising to the shoulder
   const target = humanoid(mixamo, { pose: 'A' }),
     prepared = prepareRetarget(source, target);
-  for (const bone of ['mixamorig:Hips', 'mixamorig:Spine', 'mixamorig:Spine1', 'mixamorig:Spine2', 'mixamorig:Neck', 'mixamorig:LeftShoulder']) {
+  for (const bone of [
+    'mixamorig:Hips',
+    'mixamorig:Spine',
+    'mixamorig:Spine1',
+    'mixamorig:Spine2',
+    'mixamorig:Neck',
+    'mixamorig:LeftShoulder',
+  ]) {
     const b = target.names.indexOf(bone) * 10 + 3;
-    assert.deepEqual(Array.from(prepared.target.rest.subarray(b, b + 4)), Array.from(target.rest.subarray(b, b + 4)), bone);
+    assert.deepEqual(
+      Array.from(prepared.target.rest.subarray(b, b + 4)),
+      Array.from(target.rest.subarray(b, b + 4)),
+      bone,
+    );
   }
   // The A-pose arm is still aimed along the source's level upper arm.
   const arm = target.names.indexOf('mixamorig:LeftArm') * 10 + 3,
@@ -272,10 +283,22 @@ test("Character Creator's CC3+ skeleton is detected and takes Mixamo clips", () 
   // The names as a CC4 export writes them, twist and share bones beside the limbs (wilbur.fbx, 2026-11-18).
   const cc = (bone) =>
     ({ hips: 'CC_Base_Hip', spine: 'CC_Base_Waist', chest: 'CC_Base_Spine01', upperChest: 'CC_Base_Spine02' })[bone] ??
-    ({ neck: 'CC_Base_NeckTwist01', head: 'CC_Base_Head' })[bone] ??
-    bone.replace(/^(left|right)(.*)$/, (_, s, part) =>
-      `CC_Base_${s === 'left' ? 'L' : 'R'}_` +
-      { Shoulder: 'Clavicle', UpperArm: 'Upperarm', LowerArm: 'Forearm', Hand: 'Hand', MiddleProximal: 'Mid1', UpperLeg: 'Thigh', LowerLeg: 'Calf', Foot: 'Foot', Toes: 'ToeBase' }[part],
+    { neck: 'CC_Base_NeckTwist01', head: 'CC_Base_Head' }[bone] ??
+    bone.replace(
+      /^(left|right)(.*)$/,
+      (_, s, part) =>
+        `CC_Base_${s === 'left' ? 'L' : 'R'}_` +
+        {
+          Shoulder: 'Clavicle',
+          UpperArm: 'Upperarm',
+          LowerArm: 'Forearm',
+          Hand: 'Hand',
+          MiddleProximal: 'Mid1',
+          UpperLeg: 'Thigh',
+          LowerLeg: 'Calf',
+          Foot: 'Foot',
+          Toes: 'ToeBase',
+        }[part],
     );
   const target = humanoid(cc, { extraRoot: 'CC_Base_BoneRoot' });
   target.names.push('CC_Base_L_UpperarmTwist01', 'CC_Base_Pelvis');

@@ -91,7 +91,7 @@ test('the same motion looks the same at 30, 60 and 144 frames a second', () => {
       pose.local.set([0, 0, 0, 1], 3);
       for (let b = 1; b < 4; b++) pose.local.set([0, 0, 0, 1], b * 10 + 3);
       springs.stepPose(pose, 1 / rate);
-      if (frame % (rate / 2 | 0 || 1) === 0 && Number.isInteger(time * 2)) samples.push(positions(pose)[3]);
+      if (frame % ((rate / 2) | 0 || 1) === 0 && Number.isInteger(time * 2)) samples.push(positions(pose)[3]);
     }
     return samples;
   };
@@ -414,7 +414,10 @@ test('bad input is refused with a way out', () => {
   assert.throws(() => make({ chains: [{ joints: [0, 1], center: 3 }] }), /center/);
   assert.throws(() => make({ chains: [{ joints: [0, 1], drag: 2 }] }), /drag/);
   assert.throws(() => make({ chains: [{ joints: [0, 1], stiffness: -1 }] }), /stiffness/);
-  assert.throws(() => make({ chains: [{ joints: [0, 1], gravity: 1, gravityDirection: [0, 0, 0] }] }), /gravityDirection/);
+  assert.throws(
+    () => make({ chains: [{ joints: [0, 1], gravity: 1, gravityDirection: [0, 0, 0] }] }),
+    /gravityDirection/,
+  );
   assert.throws(() => make({ chains: [{ joints: [0, 1], colliders: [0] }] }), /collider/);
   assert.throws(() => make({ colliders: [{ radius: 0 }] }), /radius/);
   assert.throws(() => make({ jiggles: [{ joint: 1, frequency: 90 }] }), /frequency/);

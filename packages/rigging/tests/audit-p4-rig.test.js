@@ -109,10 +109,7 @@ test('R5: solvePoseIK reports the posed skeleton, not the FABRIK points, under a
 test('R7: cyclic parents are refused instead of looping', () => {
   const local = Float64Array.from([...bone(), ...bone([0, 1, 0]), ...bone([0, 1, 0]), ...bone([0, 1, 0])]);
   // Bones 2 and 3 parent each other: their ancestors never reach a root.
-  assert.throws(
-    () => solvePoseIK({ parents: [-1, 0, 3, 2], local }, { joints: [2, 3], target: [0, 1, 0] }),
-    /cycle/,
-  );
+  assert.throws(() => solvePoseIK({ parents: [-1, 0, 3, 2], local }, { joints: [2, 3], target: [0, 1, 0] }), /cycle/);
   const names = ['hips', 'spine', 'chest', 'head'],
     rest = Float64Array.from([...bone(), ...bone([0, 1, 0]), ...bone([0, 1, 0]), ...bone([0, 1, 0])]),
     good = { names, parents: [-1, 0, 1, 2], rest };
