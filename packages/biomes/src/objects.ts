@@ -35,7 +35,15 @@ export interface BiomeObjectsOptions {
    * Trees beyond `radius`, out to `far.radius` metres: a 12-triangle stand-in per tree over the world's `canopyCover`, up
    * to `far.count` of them (default 300,000), lit by the engine light, no shadows. Default none.
    */
-  readonly far?: { readonly radius: number; readonly count?: number; readonly world: BiomeWorld };
+  readonly far?: {
+    readonly radius: number;
+    readonly count?: number;
+    readonly world: BiomeWorld;
+    /** Drawn surface heights for the distant forest. Defaults to the objects' heightmap. */
+    readonly heightmap?: () => GPUTexture | undefined;
+    /** Density rules shared with the placed forest. */
+    readonly graph?: import('./graph.js').PlacementGraph;
+  };
   /**
    * Seasons from `@margoengine/biomes/seasons` over the placement's world: the foliage of species with `color.seasonal`
    * (and of every species and detail of a biome with `tint.seasonal`) takes `seasonalColor` of its base colour under the
@@ -447,7 +455,13 @@ export class BiomeObjects implements Disposable {
         FarForest.attach(
           engine,
           { scatter, core },
-          { ...far, heightmap: options.heightmap, bounds: b, inner: Math.max(0, r - side), fade: side },
+          {
+            ...far,
+            heightmap: far.heightmap ?? options.heightmap,
+            bounds: b,
+            inner: Math.max(0, r - side),
+            fade: side,
+          },
         ),
       );
     }

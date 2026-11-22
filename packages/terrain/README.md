@@ -232,6 +232,13 @@ The fixed ring origin remains in world coordinates with `floatingOrigin` and sur
 The clipmap lattice and seam treatment follow Frank Losasso and Hugues Hoppe,
 [Geometry Clipmaps](https://hhoppe.com/geomclipmap.pdf) (2004), and Arul Asirvatham and Hugues Hoppe,
 [Terrain Rendering Using GPU-Based Geometry Clipmaps](https://hhoppe.com/gpugcm.pdf) (2005).
+
+Set `captureSurfaceHeight: true` when an object-placement pass needs the heights of the triangles on screen.
+`terrain.surfaceHeightTexture` becomes available when the first frame prepares the terrain. The texture shares
+the source heightmap's UVs and stores world metres in R. It refreshes on changes to the clipmap or source heights,
+so call `terrain.invalidate()` after editing samples. The target is capped at 2,049 texels per side. It uses R32F
+on WebGPU and the full compatibility tier, RGBA16F on the half-float tier. The LDR tier cannot render the float target.
+[The height regression](test/surface-height.browser.mjs) checks a fine source peak that the coarse rendered triangles omit.
 Each ring's 176-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
 differ from the last upload to that buffer, so a still camera under unchanged light uploads nothing; buffers made
 after a device restore always get their first write.

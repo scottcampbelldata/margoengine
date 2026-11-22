@@ -50,12 +50,12 @@ async function shotEngine(position,target){
  e.gpu.addEventListener('uncapturederror',ev=>errs.push(ev.error.message));
  const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
  return {canvas,e,sky,errs,
-  async pixels(world,options={}){
+  async pixels(world,options={},inspect){
    const view=await BiomeView.attach(e,world,{objects:false,sky,...options});
    await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
    e.render({delta:1/60});
    const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);
-   view.dispose();return c.getImageData(0,0,canvas.width,canvas.height).data;
+   inspect?.(view);view.dispose();return c.getImageData(0,0,canvas.width,canvas.height).data;
   },
   ray(px,py){
    const p=position,f=norm(target.map((v,i)=>v-p[i])),r=norm([-f[2],0,f[0]]),u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]],t=Math.tan(Math.PI/6),a=canvas.width/canvas.height;
@@ -216,8 +216,9 @@ async function farForest(){
  const position=[bx+300,world.heightAt(bx+300,bz+300)+60,bz+300],target=[bx+2300,world.heightAt(bx+2300,bz+2300),bz+2300];
  const s=await shotEngine(position,target),W=s.canvas.width,H=s.canvas.height;
  const green=(d)=>{let g=0,n=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=hit(world,position,s.ray(x,y));if(!p)continue;const dist=Math.hypot(p[0]-position[0],p[2]-position[2]);if(dist<1200||dist>2400)continue;n++;const k=(y*W+x)*4;if(d[k+1]>d[k]*1.05&&d[k+1]>d[k+2]*1.05)g++;}return {share:g/Math.max(1,n),n};};
- const off=await s.pixels(world,{objects:true,far:false,canopy:0,radius:1000}),on=await s.pixels(world,{objects:true,far:{radius:2500},canopy:0,radius:1000}),both=await s.pixels(world,{objects:true,radius:1000});
- const out={off:green(off),on:green(on),both:green(both),errors:s.errs.splice(0)};
+ let surfaceFormat,farCount;
+ const off=await s.pixels(world,{objects:true,far:false,canopy:0,radius:1000}),on=await s.pixels(world,{objects:true,far:{radius:2500},canopy:0,radius:1000}),both=await s.pixels(world,{objects:true,radius:1000},view=>{surfaceFormat=view.terrain.surfaceHeightTexture?.format;farCount=view.objects.farCount;});
+ const out={off:green(off),on:green(on),both:green(both),surfaceFormat,farCount,errors:s.errs.splice(0)};
  s.dispose();world.dispose();return out;
 }
 window.check={

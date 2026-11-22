@@ -150,6 +150,13 @@ curvature and exposure as artistic proxies for shelter. The pattern draws on Geo
 [Alpine Treeline of Western North America](https://www.fs.usda.gov/pnw/pubs/journals/pnw_2007_malanson001.pdf) (2007),
 and the National Park Service's observations of krummholz at [Rocky Mountain National Park](https://www.nps.gov/romo/learn/nature/subalpine_ecosystem2.htm).
 
+Distant trees use the same placement graph, sampled over the regional canopy cover. Set a custom tree's `canopyKind`
+to `conifer`, `broadleaf`, or `palm` to select its distant silhouette. `BiomeView` gives the distant forest its drawn
+terrain heights, so its roots follow the coarse triangles visible on screen. The distant materials use the average
+colour of the lit foliage and shaded crown. The terrain height image uses the format and precision supported by the
+device. Placement on drawn terrain triangles follows Dimitris Papavasiliou,
+[Real-Time Grass (and Other Procedural Objects) on Terrain](https://jcgt.org/published/0004/01/02/) (2015).
+
 ## Look families for the ground: `@margoengine/biomes/view`
 
 `BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad

@@ -50,6 +50,8 @@ export interface BiomeObjectsOptions {
         readonly radius: number;
         readonly count?: number;
         readonly world: BiomeWorld;
+        readonly heightmap?: () => GPUTexture | undefined;
+        readonly graph?: import('./graph.js').PlacementGraph;
     };
     readonly seasons?: BiomeSeasons;
     readonly meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>;
@@ -131,6 +133,7 @@ interface BiomeSample {
     height: number;
     slope: number;
     aspect: number;
+    curvature?: number;
     temperature: number;
     coldest: number;
     warmest: number;
@@ -641,6 +644,7 @@ type SizeDistribution = {
 interface SpeciesRule {
     readonly id: string;
     readonly mesh: string;
+    readonly canopyKind?: 'broadleaf' | 'conifer' | 'palm';
     readonly density: number;
     readonly radius: number;
     readonly size?: SizeDistribution;

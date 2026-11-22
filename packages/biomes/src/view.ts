@@ -762,6 +762,7 @@ export class BiomeView implements Disposable {
   /** CPU copies of the weight textures, 4 bytes per texel each. */
   readonly #weights: Uint8Array[];
   readonly #radius: number;
+  readonly #farEnabled: boolean;
   /** Share of the ground the canopy material takes under full crowns (0: no canopy material). */
   readonly #canopy: number;
   readonly #cover?: typeof import('@margoengine/biomes/cover');
@@ -857,6 +858,7 @@ export class BiomeView implements Disposable {
     this.#world = world;
     this.#signal = combineSignals(this.#lifetime.signal, options.signal);
     this.#radius = options.radius ?? 1000;
+    this.#farEnabled = (options.objects ?? true) && options.far !== false && (!!options.far || this.#radius < 2500);
     this.#lookahead = options.lookahead ?? 3;
     this.#budget = options.budget ?? 0.25;
     this.#maxSteps = options.maxSteps;
@@ -959,6 +961,7 @@ export class BiomeView implements Disposable {
       resolution: options.clipmap?.resolution ?? 64,
       levels: clipmapLevels(world.bounds, extent, options.clipmap),
       clipmapAnchor: anchor,
+      captureSurfaceHeight: this.#farEnabled,
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
@@ -1214,9 +1217,17 @@ export class BiomeView implements Disposable {
             ...(seasons ? { seasons } : {}),
             ...(options.meshes ? { meshes: options.meshes } : {}),
             ...(view.#statesOf ? { states: view.#statesOf } : options.states ? { states: options.states } : {}),
-            ...(options.far === false || (!options.far && view.#radius >= 2500)
-              ? {}
-              : { far: { radius: 2500, ...options.far, world } }),
+            ...(view.#farEnabled && options.far !== false
+              ? {
+                  far: {
+                    radius: 2500,
+                    ...options.far,
+                    world,
+                    graph: options.graph,
+                    heightmap: () => view.terrain.surfaceHeightTexture ?? view.#textures?.height,
+                  },
+                }
+              : {}),
           }),
         );
         view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));

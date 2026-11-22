@@ -1983,6 +1983,7 @@ export const entries = [
       'Set a valid treeline elevation, width 12..400 m, patchSize 20..2000 m and int32 seed',
       'Provide at least one selector for both mature and stunted trees',
       'Treeline cohorts require distinct, nonempty species selectors',
+      'A species canopyKind must be broadleaf, conifer or palm',
       'Biome cells are exact only within 137,000 km',
       'BiomeObjects states must be a function (key, kind) returning a PlantStates.plant() response or undefined',
       'disturbance height must be an Int32Array of nx x nz millimetre values',

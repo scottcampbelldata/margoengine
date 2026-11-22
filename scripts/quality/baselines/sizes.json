@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17391161,
+  "total": 17393929,
   "history": [
     {
       "date": "2026-10-24",
@@ -11325,6 +11325,12 @@
       "commit": "e601576b25",
       "reason": "Add the 4407-byte optional Biomes treeline entry. It returns a validated placement graph and shares the existing graph evaluator. A separate graph validator would duplicate that code. Core and stage remain at 24797 bytes gzip.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "3ebc6f28fb",
+      "reason": "Ground and classify distant trees from the drawn terrain. Terrain gzip 16671 to 17402, stream 13366 to 14072, Biomes cover 3089 to 3539 and far 3849 to 4331. A split would still need the same prepared rings and buffers for rasterizing height. Core and stage stay at 24797 bytes.",
+      "grew": 4
     }
   ],
   "items": {
@@ -11399,14 +11405,14 @@
     "@margoengine/biomes dist/workers/biomes-valley.js": 4192,
     "@margoengine/biomes dist/workers/biomes-zones.js": 2056,
     "@margoengine/biomes dist/workers/biomes.js": 41860,
-    "@margoengine/biomes/cover": 3341,
+    "@margoengine/biomes/cover": 3795,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 6282,
     "@margoengine/biomes/ecosystem": 3466,
     "@margoengine/biomes/editor": 4010,
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/erosion-wasm": 2649,
-    "@margoengine/biomes/far": 4020,
+    "@margoengine/biomes/far": 4587,
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
@@ -12535,7 +12541,7 @@
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 9666,
     "@margoengine/taa/upscale-velocity": 21840,
-    "@margoengine/terrain": 17067,
+    "@margoengine/terrain": 17925,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 5488,
     "@margoengine/terrain/displace": 4342,
@@ -12556,7 +12562,7 @@
     "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/settings": 2711,
-    "@margoengine/terrain/stream": 13606,
+    "@margoengine/terrain/stream": 14495,
     "@margoengine/terrain/wet-ground": 3443,
     "@margoengine/text": 17967,
     "@margoengine/text/animate": 12826,

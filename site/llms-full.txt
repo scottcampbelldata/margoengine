@@ -11520,6 +11520,18 @@ to 400 m, and world-space shelter patches from 20 to 2,000 m. Its density multip
 species and biome envelopes. The artist supplies the local elevation and the cohort meshes.
 The optional entry measures 4,407 B gzip with graph construction and validation. Core and stage remain at 24,797 B.
 
+## Distant vegetation surface height
+
+`BiomeView` keeps its distant forest and supplies a world-height raster of the actual terrain triangles. Its dimensions
+match the source UVs and cap at 2,049 texels per side. The R32F target costs at most about 16 MiB. The half-float
+compatibility tier uses RGBA16F at most about 32 MiB, with the precision of that format. LDR hardware uses the original
+height field. Texels outside the drawn mesh retain the source height. The canopy density graph uses the world region grid.
+
+Measured gzip before and after the grounding fix is 16,671 to 17,402 B for `@margoengine/terrain`, 13,366 to
+14,072 B for `@margoengine/terrain/stream`, 3,089 to 3,539 B for `@margoengine/biomes/cover`, and 3,849 to 4,331 B
+for `@margoengine/biomes/far`. Terrain's optional height capture reuses the active rings and their GPU buffers.
+Biomes shares the placement graph evaluator between the near and far forests. Core and stage remain at 24,797 B.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

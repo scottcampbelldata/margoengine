@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateGraph } from '../dist/graph.js';
+import { BiomeWorld, defineBiome } from '../dist/index.js';
+import { canopyCover } from '../dist/cover.js';
+import { definePlacementGraph, evaluateGraph } from '../dist/graph.js';
 import { alpineTreelineGraph } from '../dist/treeline.js';
 
 const options = {
@@ -58,4 +60,33 @@ test('the alpine transition validates its extents and cohort selectors', () => {
   assert.throws(() => alpineTreelineGraph({ ...options, patchSize: 11 }), RangeError);
   assert.throws(() => alpineTreelineGraph({ ...options, mature: [] }), RangeError);
   assert.throws(() => alpineTreelineGraph({ ...options, young: options.mature }), RangeError);
+});
+
+test('distant canopy preserves the custom species silhouette and placement density graph', async () => {
+  const biome = defineBiome({
+    id: 'fir-forest',
+    climate: {},
+    ground: [{ material: 'grass' }],
+    plants: [{ id: 'fir', mesh: 'library:surveyed-tree', canopyKind: 'conifer', density: 150, radius: 3 }],
+  });
+  const world = await BiomeWorld.create({
+    size: [256, 256],
+    workers: false,
+    biomes: [biome],
+    height: { field: () => 120 },
+  });
+  try {
+    const unmasked = canopyCover(world, 16);
+    assert.ok(unmasked.kinds[1].some((cell) => cell > 0));
+    assert.ok(unmasked.kinds[0].every((cell) => cell === 0));
+    const graph = definePlacementGraph({
+      nodes: [{ id: 'too-high', op: 'range', field: 'height', range: [null, 80] }],
+      outputs: { 'fir-forest/fir': 'too-high' },
+    });
+    const masked = canopyCover(world, 16, graph);
+    assert.ok(masked.data.every((cell) => cell === 0));
+    assert.ok(masked.kinds[1].every((cell) => cell === 0));
+  } finally {
+    world.dispose();
+  }
 });

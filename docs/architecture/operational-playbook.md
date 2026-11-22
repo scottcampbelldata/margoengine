@@ -9440,3 +9440,10 @@ plan. A fixed anchor preserves static terrain shadows across camera moves. A reb
 The terrain GPU regression in `packages/terrain/test/clipmap-anchor.browser.mjs` crosses a ring boundary with a
 two-millimetre camera move. The legacy moving window changed 1,315 colour pixels beyond 16 code values and 786
 silhouette pixels. Anchored terrain changed zero by either measure on WebGPU and the WebGL2 compatibility layer.
+
+### Distant forest contact
+
+The Terrain prepare pass can rasterize its drawn triangles from above before Scatter reads their height. The image
+uses the original heightmap UVs and is rebuilt when the ring plan or elevation data changes. With a source peak of
+154 m between coarse vertices, `packages/terrain/test/surface-height.browser.mjs` reads 104 m at that point on
+WebGPU and the WebGL2 layer. Biomes' distant trees use that image, the placement graph and the chosen canopy kind.
