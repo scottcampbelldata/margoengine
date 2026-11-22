@@ -192,7 +192,10 @@ test('a recording with no encoded frame rejects, in WebM and in MP4', async () =
   const { canvas, video, restore } = setup();
   const supported = Recorder.isTypeSupported;
   try {
-    for (const [format, head] of [['webm', WEBM_HEAD], ['mp4', MP4_HEAD]]) {
+    for (const [format, head] of [
+      ['webm', WEBM_HEAD],
+      ['mp4', MP4_HEAD],
+    ]) {
       Recorder.final = Uint8Array.from(head);
       await assert.rejects(
         recordCanvas(canvas, { format }).stop(),
