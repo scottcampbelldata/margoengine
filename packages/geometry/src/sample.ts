@@ -105,7 +105,11 @@ export class MeshSurfaceSampler {
       throw new TypeError('MeshSurfaceSampler random must be a function; pass () => number in [0, 1)');
     if (!Number.isFinite(seed))
       throw new RangeError(`MeshSurfaceSampler seed ${seed} is invalid; pass a finite number`);
-    for (const [name, list] of [['uvs', data.uvs], ['normals', data.normals], ['colors', colors]] as const)
+    for (const [name, list] of [
+      ['uvs', data.uvs],
+      ['normals', data.normals],
+      ['colors', colors],
+    ] as const)
       if (list)
         for (let i = 0; i < list.length; i++)
           if (!Number.isFinite(list[i]))

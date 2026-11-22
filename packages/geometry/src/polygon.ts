@@ -387,9 +387,7 @@ function nextArc(arc: Arc, leaving: readonly Arc[]): Arc | undefined {
     half = (a: Arc) => (rx * (a.y1 - a.y0) - ry * (a.x1 - a.x0) > 0 ? 1 : 0);
   let best = open[0];
   for (const a of open) {
-    const order =
-      half(a) - half(best) ||
-      (a.x1 - a.x0) * (best.y1 - best.y0) - (a.y1 - a.y0) * (best.x1 - best.x0);
+    const order = half(a) - half(best) || (a.x1 - a.x0) * (best.y1 - best.y0) - (a.y1 - a.y0) * (best.x1 - best.x0);
     if (order < 0) best = a;
   }
   return best;
@@ -537,7 +535,8 @@ function boolean(
   keep: (inA: boolean, inB: boolean) => boolean,
 ): Polygon[] {
   const { fillRule = 'positive', curveSegments = 12 } = options;
-  if (!(fillRule in fills)) throw new RangeError(`Unknown polygon fill rule: ${String(fillRule)}; pass 'positive', 'nonzero' or 'evenodd'`);
+  if (!(fillRule in fills))
+    throw new RangeError(`Unknown polygon fill rule: ${String(fillRule)}; pass 'positive', 'nonzero' or 'evenodd'`);
   return combine(collect(a, fillRule, curveSegments, []), collect(b, fillRule, curveSegments, []), fillRule, keep);
 }
 
@@ -599,8 +598,10 @@ interface Corners {
 
 function cornerOptions(options: PolygonOffsetOptions & { cap?: PolygonCap }, radius: number): Corners {
   const { join = 'miter', miterLimit = 4, arcTolerance = radius / 500, cap = 'butt' } = options;
-  if (join !== 'miter' && join !== 'round' && join !== 'bevel') throw new RangeError(`Unknown polygon join: ${join}; pass 'miter', 'round' or 'bevel'`);
-  if (cap !== 'butt' && cap !== 'round' && cap !== 'square') throw new RangeError(`Unknown polygon cap: ${cap}; pass 'butt', 'round' or 'square'`);
+  if (join !== 'miter' && join !== 'round' && join !== 'bevel')
+    throw new RangeError(`Unknown polygon join: ${join}; pass 'miter', 'round' or 'bevel'`);
+  if (cap !== 'butt' && cap !== 'round' && cap !== 'square')
+    throw new RangeError(`Unknown polygon cap: ${cap}; pass 'butt', 'round' or 'square'`);
   if (!(miterLimit >= 1)) throw new RangeError('Invalid miterLimit; pass a number of at least 1');
   if (!(arcTolerance > 0)) throw new RangeError('Invalid arcTolerance; pass a positive number');
   return { join, miterLimit, arcTolerance, cap };
@@ -632,7 +633,14 @@ function offsetCurve(ring: readonly MutableVec2[], distance: number, corners: Co
         curve.push([b[0] + o1[0] - o1[1], b[1] + o1[1] + o1[0]], [b[0] - o1[0] - o1[1], b[1] - o1[1] + o1[0]]);
     } else if (turn * distance > 0) {
       if (join === 'round')
-        addArc(curve, b, o1, Math.atan2((o1[0] * o2[1] - o1[1] * o2[0]) / (radius * radius), dot), radius, arcTolerance);
+        addArc(
+          curve,
+          b,
+          o1,
+          Math.atan2((o1[0] * o2[1] - o1[1] * o2[0]) / (radius * radius), dot),
+          radius,
+          arcTolerance,
+        );
       else if (join === 'miter' && Math.SQRT2 / Math.sqrt(1 + dot) <= miterLimit)
         curve.push([b[0] + (o1[0] + o2[0]) / (1 + dot), b[1] + (o1[1] + o2[1]) / (1 + dot)]);
     }

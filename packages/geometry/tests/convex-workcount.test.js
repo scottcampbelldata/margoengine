@@ -13,7 +13,8 @@ const random = (seed) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 const ball = (seed, n) => {
-  const pick = random(seed), points = [];
+  const pick = random(seed),
+    points = [];
   while (points.length < n * 3) {
     const p = [pick() * 2 - 1, pick() * 2 - 1, pick() * 2 - 1];
     if (p[0] ** 2 + p[1] ** 2 + p[2] ** 2 <= 1) points.push(...p);
@@ -21,17 +22,36 @@ const ball = (seed, n) => {
   return Float32Array.from(points);
 };
 const sphere = (seed, n) => {
-  const pick = random(seed), points = [];
+  const pick = random(seed),
+    points = [];
   for (let i = 0; i < n; i++) {
-    const z = pick() * 2 - 1, a = pick() * Math.PI * 2, r = Math.sqrt(1 - z * z);
+    const z = pick() * 2 - 1,
+      a = pick() * Math.PI * 2,
+      r = Math.sqrt(1 - z * z);
     points.push([r * Math.cos(a), r * Math.sin(a), z]);
   }
   return points;
 };
 const grid = [];
 for (let x = 0; x < 5; x++) for (let y = 0; y < 5; y++) for (let z = 0; z < 5; z++) grid.push([x, y, z], [x, y, z]);
-const ties = [[0, 0, 0], [2, 0, 0], [0, 2, 0], [0, 0, 2], [2, 2, 2], [2, 2, -2], [-2, 2, 2], [2, -2, 2], [1, 1, 1]];
-const inputs = { ball: ball(29, 20000), sphere: sphere(7, 3000), grid, ties, offset: sphere(11, 500).map(([x, y, z]) => [x * 1e6 + 3e8, y * 1e5, z * 1e6]) };
+const ties = [
+  [0, 0, 0],
+  [2, 0, 0],
+  [0, 2, 0],
+  [0, 0, 2],
+  [2, 2, 2],
+  [2, 2, -2],
+  [-2, 2, 2],
+  [2, -2, 2],
+  [1, 1, 1],
+];
+const inputs = {
+  ball: ball(29, 20000),
+  sphere: sphere(7, 3000),
+  grid,
+  ties,
+  offset: sphere(11, 500).map(([x, y, z]) => [x * 1e6 + 3e8, y * 1e5, z * 1e6]),
+};
 // Parent digests of every output stream, captured before the change.
 const expected = {
   ball: 'a559f82e5351de7e5dba06162c4e15548d847c372e06c5b9ccaf53d4c7e952ef',

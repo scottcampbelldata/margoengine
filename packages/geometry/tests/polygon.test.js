@@ -447,7 +447,11 @@ test('a round offset holds exactly the points at that distance, on random outlin
           y = next() * 28 - 14,
           signed = ringDistance(ring, x, y) * (inRing(ring, x, y) ? -1 : 1);
         if (Math.abs(signed - distance) < slack) continue;
-        assert.equal(inPolygons(result, x, y), signed < distance, `seed ${seed} d ${distance} at ${x}, ${y}: ${signed}`);
+        assert.equal(
+          inPolygons(result, x, y),
+          signed < distance,
+          `seed ${seed} d ${distance} at ${x}, ${y}: ${signed}`,
+        );
       }
     }
   }
