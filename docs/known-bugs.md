@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: Water's WebGL2 browser suite could exhaust one GPU step (water tests)
+
+- **Repro:** run `npm run check:gpu-packages -- --select=water/test:gpu --no-build` with `MARGO_COMPAT=1` on the RTX A6000 workstation. The old step reached the surf check and was ended at 600 s.
+- **Cause:** the GPU runner assigned one ten-minute limit to all 49 browser launches. The elapsed time included WebGL2 shader compilation, browser startup and teardown for each check.
+- **Fix:** run the same checks in three package scripts of 16, 16 and 17 checks. The runner still gives each script ten minutes. The preview script keeps its separate slot.
+- **Regression:** `packages/water/test/browser-root.test.js` checks that each browser command appears exactly once across the groups, including both underwater modes.
+
 ### Fixed 2026-11-21: the bow wave extended sideways in a straight line (water/ships)
 
 - **Repro:** a 68 m hull at 3 m/s leaves a raised stripe at the same distance aft of the stem across the near-field bow wave.

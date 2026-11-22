@@ -301,9 +301,9 @@ so optional sky moonlight produces cool reflections without daytime-white surf.
 The water body uses the scene's ambient floor; a borrowed sky environment carries
 the matching night sky into Fresnel reflections.
 
-Physical WebGPU all-shore run-up/recession, beach surf (shoaling, depth-limited breaking, foam), deep isolated-basin retention, curved-crest/normal, zero-amplitude, channel, spray, whitecaps and chop, triangle-order, coastal-seam,
-refraction and device-restoration checks: npm run test:gpu --workspace @margoengine/water
-(build core, post and terrain packages first).
+Run Water's browser checks from the repository root with `npm run check:gpu-packages -- --only="water test:gpu"`.
+The runner builds the packages and gives each group its own ten-minute limit. Set `MARGO_COMPAT=1` to run the same
+checks on the WebGL2 compatibility layer.
 
 ## A sea from the wind
 
