@@ -358,10 +358,19 @@ window.check.formats = async () => {
     return { width, height, data };
   };
   out.lossless = [];
-  for (const [w, h] of [[1, 1], [37, 21], [101, 3], [64, 64]]) {
+  for (const [w, h] of [
+    [1, 1],
+    [37, 21],
+    [101, 3],
+    [64, 64],
+  ]) {
     const source = paint(w, h),
       seen = await decodedWithAlpha(engine.gpu, await encodeWebP(source), 'image/webp');
-    out.lossless.push({ size: seen.size, want: [w, h], ...distance(premultiplied(seen.data), premultiplied(source.data)) });
+    out.lossless.push({
+      size: seen.size,
+      want: [w, h],
+      ...distance(premultiplied(seen.data), premultiplied(source.data)),
+    });
   }
   const opaque = await decoded(await encodeWebP(pixels), 'image/webp');
   out.opaque = distance(opaque.data, pixels.data);

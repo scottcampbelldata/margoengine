@@ -553,7 +553,9 @@ export class StreamedWebM {
       const head = [webmInfo(), webmTracks(this.#track, this.#sound, sample.data), webmTags(this.#track.provenance)];
       this.#at = head.reduce((sum, part) => sum + part.length, 0);
       // An unknown size is all ones (RFC 9559 6.2); 8 bytes, as live writers give it.
-      out.push(concat([ebmlHeader(), elementId(SEGMENT), Uint8Array.of(1, 255, 255, 255, 255, 255, 255, 255), ...head]));
+      out.push(
+        concat([ebmlHeader(), elementId(SEGMENT), Uint8Array.of(1, 255, 255, 255, 255, 255, 255, 255), ...head]),
+      );
     }
     if (sample.key) {
       this.#filling.hear(ms(sample.timestamp));
@@ -744,23 +746,7 @@ function soundTrak(sound: SoundTrack, position: number): Uint8Array {
       u32(0),
     ),
     // ISO/IEC 14496-12 edit list: the presentation starts `leadIn` samples into the media, so the sound plays on time.
-    ...(leadIn
-      ? [
-          box(
-            'edts',
-            fullBox(
-              'elst',
-              0,
-              0,
-              u32(1),
-              u32(milliseconds),
-              u32(leadIn),
-              u16(1),
-              u16(0),
-            ),
-          ),
-        ]
-      : []),
+    ...(leadIn ? [box('edts', fullBox('elst', 0, 0, u32(1), u32(milliseconds), u32(leadIn), u16(1), u16(0)))] : []),
     box(
       'mdia',
       fullBox('mdhd', 0, 0, u32(0), u32(0), u32(sampleRate), u32(end), u16(0x55c4), u16(0)),
@@ -789,8 +775,7 @@ function soundTrak(sound: SoundTrack, position: number): Uint8Array {
             u32(2),
             u32(1),
             u16(
-              0x10000 -
-                (sound.codec === 'aac' ? 1 : Math.max(1, Math.ceil(3840 / Math.max(1, durations[0] ?? 960)))),
+              0x10000 - (sound.codec === 'aac' ? 1 : Math.max(1, Math.ceil(3840 / Math.max(1, durations[0] ?? 960)))),
             ),
           ),
           fullBox('sbgp', 0, 0, text('roll'), u32(1), u32(samples.length), u32(1)),
@@ -1059,7 +1044,22 @@ export class FragmentedMP4 {
       soundTrak = [
         box(
           'trak',
-          fullBox('tkhd', 0, 3, u32(0), u32(0), u32(2), u32(0), u32(0), new Uint8Array(12), u16(0x100), u16(0), UNITY_MATRIX, u32(0), u32(0)),
+          fullBox(
+            'tkhd',
+            0,
+            3,
+            u32(0),
+            u32(0),
+            u32(2),
+            u32(0),
+            u32(0),
+            new Uint8Array(12),
+            u16(0x100),
+            u16(0),
+            UNITY_MATRIX,
+            u32(0),
+            u32(0),
+          ),
           // The edit starts the presentation `cut` samples into the media; a duration of 0 in a fragmented file runs it
           // to the end of the media, however many fragments follow (14496-12 8.6.6.3).
           ...(cut ? [box('edts', fullBox('elst', 0, 0, u32(1), u32(0), u32(cut), u16(1), u16(0)))] : []),
@@ -1081,10 +1081,37 @@ export class FragmentedMP4 {
     const moov = box(
       'moov',
       ...(track.provenance ? [box('udta', box('marg', text(JSON.stringify(track.provenance))))] : []),
-      fullBox('mvhd', 0, 0, u32(0), u32(0), u32(1000), u32(0), u32(0x10000), u16(0x100), new Uint8Array(10), UNITY_MATRIX, new Uint8Array(24), u32(sound ? 3 : 2)),
+      fullBox(
+        'mvhd',
+        0,
+        0,
+        u32(0),
+        u32(0),
+        u32(1000),
+        u32(0),
+        u32(0x10000),
+        u16(0x100),
+        new Uint8Array(10),
+        UNITY_MATRIX,
+        new Uint8Array(24),
+        u32(sound ? 3 : 2),
+      ),
       box(
         'trak',
-        fullBox('tkhd', 0, 3, u32(0), u32(0), u32(1), u32(0), u32(0), new Uint8Array(16), UNITY_MATRIX, u32(track.width * 0x10000), u32(track.height * 0x10000)),
+        fullBox(
+          'tkhd',
+          0,
+          3,
+          u32(0),
+          u32(0),
+          u32(1),
+          u32(0),
+          u32(0),
+          new Uint8Array(16),
+          UNITY_MATRIX,
+          u32(track.width * 0x10000),
+          u32(track.height * 0x10000),
+        ),
         box(
           'mdia',
           fullBox('mdhd', 0, 0, u32(0), u32(0), u32(this.#timescale), u32(0), u16(0x55c4), u16(0)),

@@ -146,9 +146,12 @@ test('step refuses a delta core would refuse, and a step from inside a step, bef
     frames = [];
   stage.onTick((delta) => ticks.push(delta));
   stage.engine.onFrame((_engine, delta) => frames.push(delta));
-  for (const delta of [-0.5, NaN, Infinity, 1.5, '0.1'])
-    assert.throws(() => stage.step(delta), RangeError);
-  assert.deepEqual([ticks, frames, seen.engine.log], [[], [], []], 'a refused delta reaches no callback and draws nothing');
+  for (const delta of [-0.5, NaN, Infinity, 1.5, '0.1']) assert.throws(() => stage.step(delta), RangeError);
+  assert.deepEqual(
+    [ticks, frames, seen.engine.log],
+    [[], [], []],
+    'a refused delta reaches no callback and draws nothing',
+  );
   const off = stage.onTick(() => assert.throws(() => stage.step(0), { code: 'state' }));
   stage.step(0.5);
   off();
@@ -211,12 +214,15 @@ test('importing the entry sets nothing', () => {
 });
 
 test('onError guidance names its type and rejects before GPU installation or engine creation', async (t) => {
-  const create = t.mock.method(Engine, 'create', async () => { throw new Error('must not create an engine'); });
+  const create = t.mock.method(Engine, 'create', async () => {
+    throw new Error('must not create an engine');
+  });
   const previous = Object.getOwnPropertyDescriptor(navigator, 'gpu');
   for (const onError of [null, false, 0, 1, 'callback', {}]) {
     await assert.rejects(createHeadlessStage({ gpu, width: 1, height: 1, onError }), {
       name: 'TypeError',
-      message: 'Invalid stage onError: expected a function or undefined; pass an error callback or omit onError; see https://margoengine.com/errors#arguments',
+      message:
+        'Invalid stage onError: expected a function or undefined; pass an error callback or omit onError; see https://margoengine.com/errors#arguments',
     });
     assert.deepEqual(Object.getOwnPropertyDescriptor(navigator, 'gpu'), previous);
   }

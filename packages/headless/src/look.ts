@@ -117,16 +117,23 @@ export const LOOK_CHECKS: Readonly<Record<LookCheckName, { bound: [number, numbe
     penumbra: { bound: [0, 0.7], unit: 'code', about: 'noise standard deviation inside the shadow penumbra mask' },
     stairs: { bound: [0, 1], unit: '%', about: 'strong luma edges that are one pixel stair steps' },
     colourEdges: { bound: [0, 10], unit: '%', about: 'strong colour edges one pixel wide, which 4:2:0 smears' },
-    shimmerMoving: { bound: [0, 0.5], unit: '%', about: 'pixels off by over 6 codes after the camera motion is undone' },
+    shimmerMoving: {
+      bound: [0, 0.5],
+      unit: '%',
+      about: 'pixels off by over 6 codes after the camera motion is undone',
+    },
     motionBlur: { bound: [0, 5], unit: '%', about: 'fast edges narrower than half their travel in a frame' },
     silhouette: { bound: [80, 100], unit: '%', about: 'subject outline with at least 15 L* against what is behind' },
     silhouetteShape: { bound: [70, 100], unit: '%', about: 'subject mask in one of three values at 320 x 180' },
     bounce: { bound: [10, 35], unit: '%', about: 'shadowed ground luminance as a share of the lit ground' },
-    shadowTint: { bound: [3, 100], unit: 'b*', about: 'how much lower in b* the shadowed ground is than the lit ground' },
+    shadowTint: {
+      bound: [3, 100],
+      unit: 'b*',
+      about: 'how much lower in b* the shadowed ground is than the lit ground',
+    },
     nightLuma: { bound: [24, 255], unit: 'code', about: 'mean luma of a night frame' },
     nightPeak: { bound: [180, 255], unit: 'code', about: 'luma reached by the brightest 1% of a night frame' },
   });
-
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
@@ -927,7 +934,8 @@ export function nan(frame: FloatFrame, { bound }: { bound?: LookBound } = {}): L
   const { width, height, data } = frame ?? ({} as FloatFrame);
   if (!(data instanceof Float32Array || data instanceof Uint16Array))
     throw typeError('The float frame holds a Float32Array, or a Uint16Array of half floats', 'headless');
-  if (data.length !== width * height * 4) throw rangeError("The float frame's data does not match its size", 'headless');
+  if (data.length !== width * height * 4)
+    throw rangeError("The float frame's data does not match its size", 'headless');
   const half = data instanceof Uint16Array;
   let count = 0,
     first = -1;
@@ -1259,10 +1267,8 @@ export function checkProbe(
   run('blocks', null, () => blocks(frame, { pitch, bound: b('blocks') }));
   // The horizon is only a horizon where the sky meets it: an interior's line runs across walls (Cabin Hearth's mantel
   // measured a 15.8-code "seam"), so with no sky mask there is nothing to measure.
-  run(
-    'horizonSeam',
-    !probe.viewProjection ? 'the camera view-projection' : !sky ? 'the sky mask' : null,
-    () => horizonSeam(frame, { viewProjection: probe.viewProjection!, sky, bound: b('horizonSeam') }),
+  run('horizonSeam', !probe.viewProjection ? 'the camera view-projection' : !sky ? 'the sky mask' : null, () =>
+    horizonSeam(frame, { viewProjection: probe.viewProjection!, sky, bound: b('horizonSeam') }),
   );
   run('waterSeam', masks.water ? null : 'the water mask', () =>
     waterSeam(frame, { water: masks.water, bound: b('waterSeam') }),
@@ -1290,10 +1296,12 @@ export function checkProbe(
   // shaded ground has no outline, edge or ratio to read, so the check cannot run (it read 0 % before, a false failure
   // for silhouette and a false pass for penumbra; KB-LOOK-EMPTYMASK1).
   const marked = (name: string): string | null =>
-    !masks[name] ? `the ${name} mask` : maskBits(frame, masks[name], name).includes(1) ? null : `${name} pixels (the ${name} mask is empty)`;
-  run('penumbra', marked('penumbra'), () =>
-    penumbra(frame, { mask: masks.penumbra, bound: b('penumbra') }),
-  );
+    !masks[name]
+      ? `the ${name} mask`
+      : maskBits(frame, masks[name], name).includes(1)
+        ? null
+        : `${name} pixels (the ${name} mask is empty)`;
+  run('penumbra', marked('penumbra'), () => penumbra(frame, { mask: masks.penumbra, bound: b('penumbra') }));
   run('stairs', null, () => stairs(frame, { bound: b('stairs') }));
   run('colourEdges', null, () => colourEdges(frame, { bound: b('colourEdges') }));
   run('shimmerMoving', probe.moving ? null : 'the next frame and its motion', () =>
@@ -1302,9 +1310,7 @@ export function checkProbe(
   run('motionBlur', probe.moving ? null : 'the next frame and its motion', () =>
     motionBlur(frame, probe.moving!.motion, { bound: b('motionBlur') }),
   );
-  run('silhouette', marked('subject'), () =>
-    silhouette(frame, { subject: masks.subject, bound: b('silhouette') }),
-  );
+  run('silhouette', marked('subject'), () => silhouette(frame, { subject: masks.subject, bound: b('silhouette') }));
   run('silhouetteShape', marked('subject'), () =>
     silhouetteShape(frame, { subject: masks.subject, bound: b('silhouetteShape') }),
   );
@@ -1707,7 +1713,10 @@ export const LOOK_FAMILY_BOUNDS: Readonly<Record<string, Readonly<Record<string,
  * The share of its fine detail a master frame must keep after a platform re-encode (T7, `detailKept` of the shot tool's
  * master check), per look family: 0.5 for `natural`, 0.6 for `animatedFeature`.
  */
-export const LOOK_FAMILY_DETAIL_KEPT: Readonly<Record<string, number>> = Object.freeze({ natural: 0.5, animatedFeature: 0.6 });
+export const LOOK_FAMILY_DETAIL_KEPT: Readonly<Record<string, number>> = Object.freeze({
+  natural: 0.5,
+  animatedFeature: 0.6,
+});
 
 /** The `detailKept` floor of a look family (a missing or null family is `natural`). @throws RangeError for an unknown family. */
 export function detailKeptFloor(family?: string | null): number {
@@ -1752,7 +1761,8 @@ function labPlanes(frame: LookImage): [Float32Array, Float32Array, Float32Array]
     L = new Float32Array(n),
     A = new Float32Array(n),
     B = new Float32Array(n);
-  for (let i = 0, j = 0; i < n; i++, j += 4) [L[i], A[i], B[i]] = lab(frame.data[j], frame.data[j + 1], frame.data[j + 2]);
+  for (let i = 0, j = 0; i < n; i++, j += 4)
+    [L[i], A[i], B[i]] = lab(frame.data[j], frame.data[j + 1], frame.data[j + 2]);
   return [L, A, B];
 }
 
@@ -2018,7 +2028,8 @@ export function depthFromDistance(
   options: { water?: ArrayLike<number>; plane?: number; far?: number } = {},
 ): Float32Array {
   if (distance.length !== width * height) throw rangeError('The distance holds one float per pixel', 'headless');
-  if (eye.length !== 3 || !Array.from(eye).every(Number.isFinite)) throw rangeError('The eye is three numbers', 'headless');
+  if (eye.length !== 3 || !Array.from(eye).every(Number.isFinite))
+    throw rangeError('The eye is three numbers', 'headless');
   const inv = invert4(viewProjection);
   if (!inv) throw rangeError('The view-projection is singular', 'headless');
   const m = viewProjection,
@@ -2099,8 +2110,7 @@ export function motionBlur(
       if (high - low <= 24) continue;
       const mid = (low + high) / 2;
       let cross = -1;
-      for (let k = 1; k < profile.length && cross < 0; k++)
-        if ((profile[k - 1] < mid) !== (profile[k] < mid)) cross = k;
+      for (let k = 1; k < profile.length && cross < 0; k++) if (profile[k - 1] < mid !== profile[k] < mid) cross = k;
       if (cross < 0 || Math.abs(cross - 0.5 - steps / 2) * spacing > 1) continue;
       edges++;
       const from = low + 0.1 * (high - low),
@@ -2176,7 +2186,7 @@ export function silhouetteShape(frame: LookImage, { subject, bound }: Silhouette
   let total = 0;
   for (let k = 0; k < w * h; k++) {
     if (!count[k] || cover[k] / count[k] < 0.5) continue;
-    levels[Math.min(2, Math.floor((sum[k] / count[k]) / (100 / 3)))]++;
+    levels[Math.min(2, Math.floor(sum[k] / count[k] / (100 / 3)))]++;
     total++;
   }
   return result('silhouetteShape', percent(Math.max(...levels), total), bound, { pixels: total });
@@ -2199,7 +2209,10 @@ function meanLab(frame: LookImage, mask: LookMask, what: string) {
   for (let i = 0, j = 0; i < inside.length; i++, j += 4) {
     if (!inside[i]) continue;
     n++;
-    Y += 0.2126729 * srgbToLinear(frame.data[j]) + 0.7151522 * srgbToLinear(frame.data[j + 1]) + 0.072175 * srgbToLinear(frame.data[j + 2]);
+    Y +=
+      0.2126729 * srgbToLinear(frame.data[j]) +
+      0.7151522 * srgbToLinear(frame.data[j + 1]) +
+      0.072175 * srgbToLinear(frame.data[j + 2]);
     b += lab(frame.data[j], frame.data[j + 1], frame.data[j + 2])[2];
   }
   return { n, Y: n ? Y / n : 0, b: n ? b / n : 0 };
@@ -2213,7 +2226,11 @@ export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions):
   const l = meanLab(frame, lit, 'lit'),
     s = meanLab(frame, shadow, 'shadow');
   if (!l.n || !s.n || !l.Y)
-    return { ...result('bounce', Number.NaN, bound, { lit: l.n, shadow: s.n }), pass: false, missing: 'lit and shadowed ground pixels' };
+    return {
+      ...result('bounce', Number.NaN, bound, { lit: l.n, shadow: s.n }),
+      pass: false,
+      missing: 'lit and shadowed ground pixels',
+    };
   return result('bounce', (100 * s.Y) / l.Y, bound, { lit: l.n, shadow: s.n });
 }
 
@@ -2222,7 +2239,11 @@ export function shadowTint(frame: LookImage, { lit, shadow, bound }: BounceOptio
   const l = meanLab(frame, lit, 'lit'),
     s = meanLab(frame, shadow, 'shadow');
   if (!l.n || !s.n)
-    return { ...result('shadowTint', Number.NaN, bound, { lit: l.n, shadow: s.n }), pass: false, missing: 'lit and shadowed ground pixels' };
+    return {
+      ...result('shadowTint', Number.NaN, bound, { lit: l.n, shadow: s.n }),
+      pass: false,
+      missing: 'lit and shadowed ground pixels',
+    };
   return result('shadowTint', l.b - s.b, bound, { lit: l.n, shadow: s.n });
 }
 
@@ -2243,7 +2264,12 @@ export function nightPeak(frame: LookImage, { mask, bound }: RegionOptions = {})
     values: number[] = [];
   for (let i = 0; i < y.length; i++) if (inside[i]) values.push(y[i]);
   values.sort((p, q) => p - q);
-  return result('nightPeak', values.length ? values[Math.min(values.length - 1, Math.floor(values.length * 0.99))] : 0, bound, {
-    pixels: values.length,
-  });
+  return result(
+    'nightPeak',
+    values.length ? values[Math.min(values.length - 1, Math.floor(values.length * 0.99))] : 0,
+    bound,
+    {
+      pixels: values.length,
+    },
+  );
 }

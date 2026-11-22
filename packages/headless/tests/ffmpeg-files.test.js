@@ -38,7 +38,13 @@ const TS = 15360,
  * k / 30 s), stored either in sample tables or, with `fragmented`, in one movie fragment. Every sample decodes STEP
  * ticks after the one before, presents (k + 1) * STEP ticks in, and the edit list starts the track at STEP.
  */
-function mp4(frames, { fragmented = false, avcC = [1, 100, 0, 31, 0xff, 0xe1, 0, 4, 0x67, 0x64, 0, 31, 1, 0, 4, 0x68, 0xee, 0x3c, 0x80] } = {}) {
+function mp4(
+  frames,
+  {
+    fragmented = false,
+    avcC = [1, 100, 0, 31, 0xff, 0xe1, 0, 4, 0x67, 0x64, 0, 31, 1, 0, 4, 0x68, 0xee, 0x3c, 0x80],
+  } = {},
+) {
   const offsets = frames.map(([k], i) => (k + 1) * STEP - i * STEP),
     keys = frames.flatMap(([, key], i) => (key ? [i + 1] : [])),
     entry = box('avc1', Buffer.alloc(78), box('avcC', Buffer.from(avcC))),
@@ -76,17 +82,41 @@ function mp4(frames, { fragmented = false, avcC = [1, 100, 0, 31, 0xff, 0xe1, 0,
             'traf',
             full('tfhd', 0, 0x20, u32(7, 0x10000)),
             full('tfdt', 1, 0, Buffer.alloc(8)),
-            full('trun', 0, 0x1 | 0x100 | 0x400 | 0x800, u32(frames.length, 0), ...frames.map(([, key], i) => u32(STEP, key ? 0 : 0x10000, offsets[i]))),
+            full(
+              'trun',
+              0,
+              0x1 | 0x100 | 0x400 | 0x800,
+              u32(frames.length, 0),
+              ...frames.map(([, key], i) => u32(STEP, key ? 0 : 0x10000, offsets[i])),
+            ),
           ),
         )
       : Buffer.alloc(0);
-  return Buffer.concat([box('ftyp', Buffer.from('isom'), u32(0x200), Buffer.from('isomavc1')), moov, moof, box('mdat', Buffer.alloc(16))]);
+  return Buffer.concat([
+    box('ftyp', Buffer.from('isom'), u32(0x200), Buffer.from('isomavc1')),
+    moov,
+    moof,
+    box('mdat', Buffer.alloc(16)),
+  ]);
 }
 
 // Closed GOPs of three with B-frames: decode order K0 P2 B1 K3 P5 B4.
-const CLOSED = [[0, true], [2, false], [1, false], [3, true], [5, false], [4, false]],
+const CLOSED = [
+    [0, true],
+    [2, false],
+    [1, false],
+    [3, true],
+    [5, false],
+    [4, false],
+  ],
   // An open GOP: the key frame at 3 is followed in decode order by a frame shown before it.
-  OPEN = [[0, true], [1, false], [3, true], [2, false], [4, false]];
+  OPEN = [
+    [0, true],
+    [1, false],
+    [3, true],
+    [2, false],
+    [4, false],
+  ];
 
 const folder = async () => mkdtemp(join(tmpdir(), 'margo-ffmpeg-files-'));
 
@@ -124,9 +154,15 @@ test('checkSpan: a span copies only from a key frame, whole, with no frame decod
     assert.deepEqual(await checkSpan(closed, { start: 0.1, frames: 3, fps: 30 }), { ok: true });
     assert.deepEqual(await checkSpan(closed, { start: 0, frames: 6, fps: 30 }), { ok: true });
     assert.match((await checkSpan(closed, { start: 1 / 30, frames: 2, fps: 30 })).reason, /not on a key frame/);
-    assert.match((await checkSpan(closed, { start: 0, frames: 2, fps: 30 })).reason, /next key frame is not at its end/);
+    assert.match(
+      (await checkSpan(closed, { start: 0, frames: 2, fps: 30 })).reason,
+      /next key frame is not at its end/,
+    );
     assert.match((await checkSpan(closed, { start: 0.1, frames: 4, fps: 30 })).reason, /ends before/);
-    assert.match((await checkSpan(closed, { start: 0, frames: 3, fps: 25, timescale: 12800 })).reason, /next key frame|off the/);
+    assert.match(
+      (await checkSpan(closed, { start: 0, frames: 3, fps: 25, timescale: 12800 })).reason,
+      /next key frame|off the/,
+    );
     assert.match((await checkSpan(open, { start: 0.1, frames: 2, fps: 30 })).reason, /open GOP/);
     await assert.rejects(checkSpan(closed, { start: -1, frames: 3, fps: 30 }), RangeError);
     assert.equal(mp4Timescale(30), 15360);
@@ -170,8 +206,15 @@ test('copySpan: the stream copy of a checked span, re-tagged to the engine colou
     assert.equal(given[given.indexOf('-bsf:v') + 1], H264_COLOUR_TAGS);
     assert.equal(given[given.indexOf('-video_track_timescale') + 1], '15360');
     assert.deepEqual(given.slice(given.indexOf('-c'), given.indexOf('-c') + 2), ['-c', 'copy']);
-    await assert.rejects(copySpan(input, join(dir, 'no.mp4'), { start: 1 / 30, frames: 2, fps: 30, ffmpeg }), (e) => e.code === 'unsupported' && /key frame/.test(e.message));
-    assert.deepEqual((await readdir(dir)).filter((f) => f.startsWith('no') || f.includes('.part')), [], 'nothing written for a refused span');
+    await assert.rejects(
+      copySpan(input, join(dir, 'no.mp4'), { start: 1 / 30, frames: 2, fps: 30, ffmpeg }),
+      (e) => e.code === 'unsupported' && /key frame/.test(e.message),
+    );
+    assert.deepEqual(
+      (await readdir(dir)).filter((f) => f.startsWith('no') || f.includes('.part')),
+      [],
+      'nothing written for a refused span',
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -196,10 +239,16 @@ test('joinVideos: concat by stream copy, avc1 when the parameter sets agree and 
     assert.equal(given[given.indexOf('-tag:v') + 1], 'avc3');
     assert.equal(await joinVideos([a, c], output, { ffmpeg, sampleEntry: 'avc1' }), 'avc1');
     process.env.MARGO_STAND_IN = 'fail';
-    await assert.rejects(joinVideos([a, b], join(dir, 'failed.mp4'), { ffmpeg }), (e) => e.code === 'failed' && /Invalid data/.test(e.cause));
+    await assert.rejects(
+      joinVideos([a, b], join(dir, 'failed.mp4'), { ffmpeg }),
+      (e) => e.code === 'failed' && /Invalid data/.test(e.cause),
+    );
     delete process.env.MARGO_STAND_IN;
     const left = await readdir(dir);
-    assert.ok(!left.includes('failed.mp4') && !left.some((f) => f.includes('.part') || f.endsWith('.ffconcat')), left.join());
+    assert.ok(
+      !left.includes('failed.mp4') && !left.some((f) => f.includes('.part') || f.endsWith('.ffconcat')),
+      left.join(),
+    );
     await assert.rejects(joinVideos([], output, { ffmpeg }), TypeError);
   } finally {
     delete process.env.MARGO_STAND_IN;
@@ -213,8 +262,22 @@ test('addSound: the picture copied, the sound encoded (AAC for MP4, Opus for Web
     const { ffmpeg, args } = await standIn(dir);
     await addSound('film.mp4', 'mix.wav', join(dir, 'out.mp4'), { ffmpeg, offset: 0.5, shortest: true });
     let { args: given } = await args();
-    assert.deepEqual(given.slice(given.indexOf('-i'), given.indexOf('-i') + 6), ['-i', 'film.mp4', '-itsoffset', '0.5', '-i', 'mix.wav']);
-    assert.deepEqual(given.slice(given.indexOf('-c:v'), given.indexOf('-c:v') + 6), ['-c:v', 'copy', '-c:a', 'aac', '-b:a', '192000']);
+    assert.deepEqual(given.slice(given.indexOf('-i'), given.indexOf('-i') + 6), [
+      '-i',
+      'film.mp4',
+      '-itsoffset',
+      '0.5',
+      '-i',
+      'mix.wav',
+    ]);
+    assert.deepEqual(given.slice(given.indexOf('-c:v'), given.indexOf('-c:v') + 6), [
+      '-c:v',
+      'copy',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '192000',
+    ]);
     assert.ok(given.includes('-shortest') && given.includes('+faststart'));
     await addSound('film.webm', 'mix.wav', join(dir, 'out.webm'), { ffmpeg });
     ({ args: given } = await args());
@@ -245,7 +308,12 @@ test('encoderArguments: each encoder with the engine colour chain, tags and VUI 
     for (const tag of ['-colorspace', '-color_primaries', '-color_trc', '-color_range', '-chroma_sample_location'])
       assert.equal(args[args.indexOf(tag) + 1], defaults[defaults.indexOf(tag) + 1], `${encoder} ${tag}`);
   }
-  assert.deepEqual(encoderArguments('x264', { quality: 17, preset: 'medium' }).slice(-8, -4), ['-preset', 'medium', '-crf', '17']);
+  assert.deepEqual(encoderArguments('x264', { quality: 17, preset: 'medium' }).slice(-8, -4), [
+    '-preset',
+    'medium',
+    '-crf',
+    '17',
+  ]);
   assert.ok(encoderArguments('nvenc', { quality: 23 }).join(' ').includes('-preset p5 -tune hq -rc vbr -cq 23 -b:v 0'));
   assert.throws(() => encoderArguments('vaapi'), RangeError);
   assert.throws(() => encoderArguments('x264', { quality: 0 }), RangeError);
@@ -259,10 +327,24 @@ test('encodeWithFFmpeg layers: one encode lays clips over the frames, then the s
       { input: 'talk.mp4', rect: { x: 400, y: 200, width: 224, height: 144 }, start: 1, duration: 2, in: 5, speed: 2 },
       { input: 'logo.png', rect: { x: 0, y: 0, width: 64, height: 64 }, fit: 'cover' },
     ],
-    args = ffmpegArguments(640, 360, { output: 'x.mp4', fps: 30, layers, audio: { channels: [new Float32Array(10)], sampleRate: 48000 } }),
+    args = ffmpegArguments(640, 360, {
+      output: 'x.mp4',
+      fps: 30,
+      layers,
+      audio: { channels: [new Float32Array(10)], sampleRate: 48000 },
+    }),
     graph = args[args.indexOf('-filter_complex') + 1];
   assert.ok(!args.includes('-vf'), 'the -vf moves into the graph');
-  assert.deepEqual(args.slice(args.indexOf('pipe:3') + 1, args.indexOf('-filter_complex')), ['-ss', '5', '-t', '5', '-i', 'talk.mp4', '-i', 'logo.png']);
+  assert.deepEqual(args.slice(args.indexOf('pipe:3') + 1, args.indexOf('-filter_complex')), [
+    '-ss',
+    '5',
+    '-t',
+    '5',
+    '-i',
+    'talk.mp4',
+    '-i',
+    'logo.png',
+  ]);
   assert.equal(
     graph,
     [
@@ -274,16 +356,39 @@ test('encodeWithFFmpeg layers: one encode lays clips over the frames, then the s
     ].join(';'),
   );
   assert.deepEqual(args.slice(args.indexOf('-map'), args.indexOf('-map') + 4), ['-map', '[v]', '-map', '1:a:0']);
-  for (const tag of ['-colorspace', '-color_trc', '-c:v', '-crf']) assert.equal(args[args.indexOf(tag) + 1], plain[plain.indexOf(tag) + 1], tag);
+  for (const tag of ['-colorspace', '-color_trc', '-c:v', '-crf'])
+    assert.equal(args[args.indexOf(tag) + 1], plain[plain.indexOf(tag) + 1], tag);
   // Arguments without a -vf: the graph ends in a pass-through.
-  const custom = ffmpegArguments(64, 64, { output: 'x.mkv', args: ['-c:v', 'ffv1'], layers: [{ input: 'a.mp4', rect: { x: 0, y: 0, width: 8, height: 8 } }] });
+  const custom = ffmpegArguments(64, 64, {
+    output: 'x.mkv',
+    args: ['-c:v', 'ffv1'],
+    layers: [{ input: 'a.mp4', rect: { x: 0, y: 0, width: 8, height: 8 } }],
+  });
   assert.match(custom[custom.indexOf('-filter_complex') + 1], /\[b1\]null\[v\]$/);
   assert.deepEqual(custom.slice(-4), ['-an', '-c:v', 'ffv1', 'x.mkv']);
-  for (const bad of [{ x: -2, y: 0, width: 8, height: 8 }, { x: 60, y: 0, width: 8, height: 8 }, { x: 0, y: 0, width: 1.5, height: 8 }])
-    assert.throws(() => ffmpegArguments(64, 64, { output: 'x.mp4', layers: [{ input: 'a.mp4', rect: bad }] }), RangeError);
-  assert.throws(() => ffmpegArguments(64, 64, { output: 'x.mp4', layers: [{ input: 'a.mp4', rect: { x: 0, y: 0, width: 8, height: 8 }, speed: 0 }] }), RangeError);
+  for (const bad of [
+    { x: -2, y: 0, width: 8, height: 8 },
+    { x: 60, y: 0, width: 8, height: 8 },
+    { x: 0, y: 0, width: 1.5, height: 8 },
+  ])
+    assert.throws(
+      () => ffmpegArguments(64, 64, { output: 'x.mp4', layers: [{ input: 'a.mp4', rect: bad }] }),
+      RangeError,
+    );
+  assert.throws(
+    () =>
+      ffmpegArguments(64, 64, {
+        output: 'x.mp4',
+        layers: [{ input: 'a.mp4', rect: { x: 0, y: 0, width: 8, height: 8 }, speed: 0 }],
+      }),
+    RangeError,
+  );
   await assert.rejects(
-    encodeWithFFmpeg([{ width: 4, height: 4, data: new Uint8Array(64) }], { output: 'x.mp4', ffmpeg: 'never-run', layers: [{ input: '', rect: { x: 0, y: 0, width: 2, height: 2 } }] }),
+    encodeWithFFmpeg([{ width: 4, height: 4, data: new Uint8Array(64) }], {
+      output: 'x.mp4',
+      ffmpeg: 'never-run',
+      layers: [{ input: '', rect: { x: 0, y: 0, width: 2, height: 2 } }],
+    }),
     TypeError,
   );
 });

@@ -57,7 +57,8 @@ export function spsWithRange(nal: Uint8Array, fullRange: boolean): Uint8Array | 
     },
     ue = (): number => {
       let zeros = 0;
-      while (!bit()) if (++zeros > 31) throw new RangeError('Exp-Golomb code too long; the SPS is left as the encoder wrote it');
+      while (!bit())
+        if (++zeros > 31) throw new RangeError('Exp-Golomb code too long; the SPS is left as the encoder wrote it');
       return 2 ** zeros - 1 + bits(zeros);
     },
     skipScalingList = (size: number): void => {
@@ -80,8 +81,7 @@ export function spsWithRange(nal: Uint8Array, fullRange: boolean): Uint8Array | 
       ue(); // bit_depth_luma_minus8
       ue(); // bit_depth_chroma_minus8
       bit(); // qpprime_y_zero_transform_bypass_flag
-      if (bit())
-        for (let i = 0; i < (chroma === 3 ? 12 : 8); i++) if (bit()) skipScalingList(i < 6 ? 16 : 64);
+      if (bit()) for (let i = 0; i < (chroma === 3 ? 12 : 8); i++) if (bit()) skipScalingList(i < 6 ? 16 : 64);
     }
     ue(); // log2_max_frame_num_minus4
     const order = ue();
