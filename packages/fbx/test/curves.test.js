@@ -31,7 +31,10 @@ test('a 3ds Max spline passes through every point of the line Max made from it',
 
 test('the three forms Maya writes close as they say, and stay on the circle Maya drew', async () => {
   const list = await curves('maya_nurbs_curve_form_7700_binary.fbx');
-  assert.deepEqual(list.map((c) => c.record.form), ['Open', 'Closed', 'Periodic']);
+  assert.deepEqual(
+    list.map((c) => c.record.form),
+    ['Open', 'Closed', 'Periodic'],
+  );
   for (const { record } of list.slice(1)) {
     const p = record.polyline,
       n = p.length;

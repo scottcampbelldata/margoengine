@@ -28,7 +28,10 @@ export class SceneBudget {
   private steps = 0;
   private samples = 0;
   private morphBytes = 0;
-  constructor(private readonly signal?: AbortSignal, readonly limits: Readonly<FBXImportLimits> = defaultLimits) {}
+  constructor(
+    private readonly signal?: AbortSignal,
+    readonly limits: Readonly<FBXImportLimits> = defaultLimits,
+  ) {}
   reserve(bytes: number): void {
     this.signal?.throwIfAborted();
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.limits.sceneBytes - this.bytes)
@@ -191,7 +194,9 @@ export function localParts(
   }
   try {
     const local = fbxLocalTransform(model, overrides);
-    return decomposeTRS(sampling ? multiply(multiply(ctx.basis, local), ctx.basisInverse) : convertedMatrix(ctx, local));
+    return decomposeTRS(
+      sampling ? multiply(multiply(ctx.basis, local), ctx.basisInverse) : convertedMatrix(ctx, local),
+    );
   } catch (error) {
     throw new TypeError(
       `FBX model ${objectName(model)}: ${error instanceof Error ? error.message : String(error)}; fix the model or remove it before export`,
@@ -293,7 +298,9 @@ function preflight(ctx: SceneContext, source: FBXNode): void {
     color = Math.min(count('LayerElementColor'), 2) * 4;
   const vertices = Math.min(indices.length, ctx.budget.limits.vertices);
   // The build's peak: its typed working arrays and the final attribute arrays (geometryBytes says what each holds).
-  ctx.budget.reserve(geometryBytes(positions.length / 3, indices.length, triangles, vertices, 6 + uv + tangent + color));
+  ctx.budget.reserve(
+    geometryBytes(positions.length / 3, indices.length, triangles, vertices, 6 + uv + tangent + color),
+  );
   ctx.budget.work(triangles * 32);
 }
 
@@ -416,7 +423,9 @@ export function buildScene(ctx: SceneContext): void {
     }
   }
   // A clip file has a skeleton and curves but no mesh: Unity's `Name@Clip.fbx` files are this.
-  let kept = vertices > 0 || (ctx.models.size > 0 && [...ctx.document.objects.values()].some((n) => n.name === 'AnimationCurve'));
+  let kept =
+    vertices > 0 ||
+    (ctx.models.size > 0 && [...ctx.document.objects.values()].some((n) => n.name === 'AnimationCurve'));
   for (const extension of ctx.extensions) if (extension.scene?.(ctx)) kept = true;
   if (!kept) throw new RangeError('FBX has no mesh geometry; clean up the source model before export');
 }

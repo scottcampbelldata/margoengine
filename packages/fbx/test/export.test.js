@@ -336,7 +336,10 @@ function readRecords(fbx) {
 }
 const child = (node, name) => node.children.find((c) => c.name === name);
 const named = (node, name) => node.children.filter((c) => c.name === name);
-const setting = (node, name) => child(node, 'Properties70').children.find((p) => p.props[0] === name)?.props.slice(4);
+const setting = (node, name) =>
+  child(node, 'Properties70')
+    .children.find((p) => p.props[0] === name)
+    ?.props.slice(4);
 const plain = (value) => Array.from(value, Number);
 
 test('the bytes of the file hold the scene, read with no importer', async () => {
@@ -352,7 +355,14 @@ test('the bytes of the file hold the scene, read with no importer', async () => 
       animations: [
         {
           name: 'Walk',
-          channels: [{ node, path: 'translation', times: new Float32Array([0, 1]), values: new Float32Array([1, 2, 3, 4, 5, 6]) }],
+          channels: [
+            {
+              node,
+              path: 'translation',
+              times: new Float32Array([0, 1]),
+              values: new Float32Array([1, 2, 3, 4, 5, 6]),
+            },
+          ],
         },
       ],
     }),
@@ -367,23 +377,43 @@ test('the bytes of the file hold the scene, read with no importer', async () => 
     [material] = named(objects, 'Material');
   assert.equal(model.props[1], 'Quad\0\x01Model');
   assert.equal(model.props[2], 'Mesh');
-  assert.deepEqual(setting(model, 'Lcl Translation'), [100, 200, 300], 'metres in the scene are centimetres in the file');
+  assert.deepEqual(
+    setting(model, 'Lcl Translation'),
+    [100, 200, 300],
+    'metres in the scene are centimetres in the file',
+  );
   assert.deepEqual(setting(model, 'Lcl Scaling'), [2, 2, 2]);
   assert.deepEqual(plain(child(geometry, 'Vertices').props[0]), [0, 0, 0, 100, 0, 0, 100, 100, 0, 0, 100, 0]);
-  assert.deepEqual(plain(child(geometry, 'PolygonVertexIndex').props[0]), [0, 1, -3, 0, 2, -4], 'a polygon ends on a negated index');
+  assert.deepEqual(
+    plain(child(geometry, 'PolygonVertexIndex').props[0]),
+    [0, 1, -3, 0, 2, -4],
+    'a polygon ends on a negated index',
+  );
   const normals = child(geometry, 'LayerElementNormal'),
     uvs = child(geometry, 'LayerElementUV');
   assert.equal(child(normals, 'MappingInformationType').props[0], 'ByPolygonVertex');
   assert.deepEqual(plain(child(normals, 'Normals').props[0]), [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
   assert.deepEqual(plain(child(normals, 'NormalsIndex').props[0]), [0, 1, 2, 0, 2, 3]);
-  assert.deepEqual(plain(child(uvs, 'UV').props[0]), [0, 0, 1, 0, 1, 1, 0, 1], 'V runs up in the file and down in glTF');
+  assert.deepEqual(
+    plain(child(uvs, 'UV').props[0]),
+    [0, 0, 1, 0, 1, 1, 0, 1],
+    'V runs up in the file and down in glTF',
+  );
   assert.deepEqual(plain(child(uvs, 'UVIndex').props[0]), [0, 1, 2, 0, 2, 3]);
   assert.equal(material.props[1], 'Red\0\x01Material');
   assert.deepEqual(setting(material, 'DiffuseColor'), [1, 0.5, 0]);
   const curves = named(objects, 'AnimationCurve');
   assert.equal(curves.length, 3);
-  for (const curve of curves) assert.deepEqual([...child(curve, 'KeyTime').props[0]], [0n, seconds], 'one second in FBX ticks');
-  assert.deepEqual(curves.map((curve) => plain(child(curve, 'KeyValueFloat').props[0])), [[100, 400], [200, 500], [300, 600]]);
+  for (const curve of curves)
+    assert.deepEqual([...child(curve, 'KeyTime').props[0]], [0n, seconds], 'one second in FBX ticks');
+  assert.deepEqual(
+    curves.map((curve) => plain(child(curve, 'KeyValueFloat').props[0])),
+    [
+      [100, 400],
+      [200, 500],
+      [300, 600],
+    ],
+  );
   // Each link by id: the file's own graph, not the order the writer happened to use.
   const id = (object) => object.props[0],
     links = section('Connections').children.map((c) => c.props),
@@ -413,7 +443,12 @@ test('a skin in the bytes: each cluster lists its points and weights and hangs f
     skinned = {
       name: 'Skinned',
       geometry,
-      skin: { joints: [bone, other], inverseBindMatrices: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -2, 0, 1]) },
+      skin: {
+        joints: [bone, other],
+        inverseBindMatrices: new Float32Array([
+          1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -2, 0, 1,
+        ]),
+      },
     },
     { fbx } = await exportFBX({ nodes: [bone, other, skinned] }),
     top = readRecords(fbx),
@@ -735,11 +770,24 @@ test('cameras and lights keep their projection and aim through the file', async 
           name: 'rig',
           rotation: quatY(90),
           children: [
-            { name: 'view', camera: { type: 'perspective', perspective: { yfov: 0.7, znear: 0.5, zfar: 80, aspectRatio: 1.5 } } },
-            { name: 'plan', camera: { type: 'orthographic', orthographic: { xmag: 4, ymag: 2, znear: 0.25, zfar: 30 } } },
+            {
+              name: 'view',
+              camera: { type: 'perspective', perspective: { yfov: 0.7, znear: 0.5, zfar: 80, aspectRatio: 1.5 } },
+            },
+            {
+              name: 'plan',
+              camera: { type: 'orthographic', orthographic: { xmag: 4, ymag: 2, znear: 0.25, zfar: 30 } },
+            },
             {
               name: 'lamp',
-              light: { type: 'spot', color: [1, 0.5, 0.25], intensity: 3, range: 12, innerConeAngle: 0.2, outerConeAngle: 0.6 },
+              light: {
+                type: 'spot',
+                color: [1, 0.5, 0.25],
+                intensity: 3,
+                range: 12,
+                innerConeAngle: 0.2,
+                outerConeAngle: 0.6,
+              },
             },
             { name: 'sun', light: { type: 'directional', color: [1, 1, 1], intensity: 2 } },
             { name: 'bulb', light: { type: 'point', color: [0, 1, 0], intensity: 0.5 } },
@@ -845,7 +893,8 @@ test('ASCII names with quotes and backslashes come back as they were written', a
 
 test('animation keys that are not finite or a zero rotation are refused at export', async () => {
   const node = { geometry: quad() },
-    bad = (path, values) => exportFBX({ nodes: [node], animations: [{ channels: [{ node, path, times: [0, 1], values }] }] });
+    bad = (path, values) =>
+      exportFBX({ nodes: [node], animations: [{ channels: [{ node, path, times: [0, 1], values }] }] });
   await assert.rejects(bad('translation', [0, 0, 0, NaN, 0, 0]), /not finite/);
   await assert.rejects(bad('scale', [1, 1, 1, 1, Infinity, 1]), /not finite/);
   await assert.rejects(bad('rotation', [0, 0, 0, 1, 0, 0, 0, 0]), /zero quaternion/);
@@ -860,7 +909,9 @@ test('a camera that leaves out its lens properties gets the FbxCamera class defa
     text = new TextDecoder()
       .decode(fbx)
       .split('\n')
-      .filter((line) => !/"(FieldOfView|FieldOfViewX|FieldOfViewY|FocalLength|FilmWidth|FilmHeight|ApertureMode)"/.test(line))
+      .filter(
+        (line) => !/"(FieldOfView|FieldOfViewX|FieldOfViewY|FocalLength|FilmWidth|FilmHeight|ApertureMode)"/.test(line),
+      )
       .join('\n'),
     { json } = readGLB(await convertFBX(new TextEncoder().encode(text), { extensions: [sceneExtras] })),
     yfov = json.cameras[0].perspective.yfov;

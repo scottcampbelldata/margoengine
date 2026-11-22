@@ -102,7 +102,9 @@ export function posed(buffer, time, clip = 0, capture) {
       const binds = accessor(skin.inverseBindMatrices),
         joints = accessor(primitive.attributes.JOINTS_0),
         amounts = accessor(primitive.attributes.WEIGHTS_0),
-        matrices = skin.joints.map((joint, k) => multiply(world[joint], Array.from(binds.subarray(k * 16, k * 16 + 16))));
+        matrices = skin.joints.map((joint, k) =>
+          multiply(world[joint], Array.from(binds.subarray(k * 16, k * 16 + 16))),
+        );
       capture?.({ matrices, joints, weights: amounts, positions });
       for (let v = 0; v * 3 < positions.length; v++) {
         const sum = [0, 0, 0];

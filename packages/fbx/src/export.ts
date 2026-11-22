@@ -628,7 +628,14 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     return id;
   };
 
-  const attach = (name: string, kind: string, rotation: number[], properties: Rec[], parentId: bigint, inherit: boolean) => {
+  const attach = (
+    name: string,
+    kind: string,
+    rotation: number[],
+    properties: Rec[],
+    parentId: bigint,
+    inherit: boolean,
+  ) => {
     const id = add('Model', name, 'Model', kind, [
       ['Version', [int(232)]],
       [
@@ -688,9 +695,23 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     // A glTF camera and light look down -Z, an FBX camera down +X and an FBX light down -Y. A child model turns one into
     // the other: the node keeps its own transform, curves and children, and may hold a mesh as well.
     if (node.camera)
-      attach(node.camera.name ?? `${node.name ?? 'Node'} camera`, 'Camera', [0, 90, 0], cameraProperties(node.camera), id, passOn);
+      attach(
+        node.camera.name ?? `${node.name ?? 'Node'} camera`,
+        'Camera',
+        [0, 90, 0],
+        cameraProperties(node.camera),
+        id,
+        passOn,
+      );
     if (node.light)
-      attach(node.light.name ?? `${node.name ?? 'Node'} light`, 'Light', [90, 0, 0], lightProperties(node.light), id, passOn);
+      attach(
+        node.light.name ?? `${node.name ?? 'Node'} light`,
+        'Light',
+        [90, 0, 0],
+        lightProperties(node.light),
+        id,
+        passOn,
+      );
     for (const child of node.children) visit(child, id, passOn);
   };
   for (const root of roots) visit(root, 0n, false);
