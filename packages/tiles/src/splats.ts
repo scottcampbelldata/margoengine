@@ -268,29 +268,31 @@ export const splats: TilesModelDrawer = async (
   // The model is built after the imports: it goes in the scene this drawer was started in (the renderer's own).
   const scope = captureScene(host.engine),
     [{ parseGLTFAsync }, { readGaussianSplats }] = await Promise.all([
-    import('@margoengine/gltf/pbr'),
-    import('@margoengine/gltf/splats'),
-  ]);
+      import('@margoengine/gltf/pbr'),
+      import('@margoengine/gltf/splats'),
+    ]);
   const matrix: TileMatrix = host.contentMatrix(tile, content.type === 'b3dm' ? content.rtcCenter : undefined, true);
   const read: Promise<PlacedSplats>[] = [];
-  const model: SplatModel = await scope.run(() => parseGLTFAsync(host.engine, content.gltf, {
-    signal,
-    decoders: {
-      // gltf/pbr hands each splat primitive with its node's matrix in the model; the tile's float64 matrix goes first.
-      splats: {
-        async attach(_engine, asset, primitives, readSignal) {
-          for (const { primitive, matrix: node } of primitives)
-            read.push(
-              readGaussianSplats(asset, primitive, { signal: readSignal }).then((data) =>
-                placeSplats(data, multiply(matrix, node)),
-              ),
-            );
-          await Promise.all(read);
-          return [];
+  const model: SplatModel = await scope.run(() =>
+    parseGLTFAsync(host.engine, content.gltf, {
+      signal,
+      decoders: {
+        // gltf/pbr hands each splat primitive with its node's matrix in the model; the tile's float64 matrix goes first.
+        splats: {
+          async attach(_engine, asset, primitives, readSignal) {
+            for (const { primitive, matrix: node } of primitives)
+              read.push(
+                readGaussianSplats(asset, primitive, { signal: readSignal }).then((data) =>
+                  placeSplats(data, multiply(matrix, node)),
+                ),
+              );
+            await Promise.all(read);
+            return [];
+          },
         },
       },
-    },
-  }));
+    }),
+  );
   let placed: PlacedSplats[];
   try {
     placed = await Promise.all(read);
