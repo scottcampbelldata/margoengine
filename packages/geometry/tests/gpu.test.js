@@ -23,6 +23,7 @@ function fakeEngine(gpu = true) {
     plugins = [],
     engine = {
       gpu: gpu ? device : null,
+      sceneOf: () => undefined,
       use(plugin) {
         plugin.setup(engine);
         plugins.push(plugin);
@@ -193,6 +194,18 @@ test('dispose stops generating and frees what the item owns', () => {
   assert.equal(log.destroyed, 5);
   assert.throws(() => generator.sphere(), /not attached/);
   assert.ok(other);
+});
+
+test('disposing the generator takes its plugin out of the scene, once (KB-GEOMETRY-GENDISPOSE1)', () => {
+  const { engine } = fakeEngine(),
+    generator = GeometryGenerator.attach(engine),
+    removed = [],
+    scene = { removePlugin: (name) => (removed.push(name), generator.dispose()) };
+  engine.sceneOf = (plugin) => (plugin === generator ? scene : undefined);
+  generator.sphere();
+  generator.dispose();
+  generator.dispose();
+  assert.deepEqual(removed, [generator.name]);
 });
 
 test('setPoints takes arrays or flat values and refuses the wrong size', () => {
