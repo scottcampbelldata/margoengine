@@ -155,7 +155,8 @@ interface Channel {
 const channel = (): Channel => ({ times: [], values: [] });
 const push = (into: Channel, time: number, value: number[], what: string): void => {
   const first = into.values[0];
-  if (first && first.length !== value.length) throw new RangeError(`Take sample ${what} changed its length; give the same number of values every tick`);
+  if (first && first.length !== value.length)
+    throw new RangeError(`Take sample ${what} changed its length; give the same number of values every tick`);
   into.times.push(time);
   into.values.push(value);
 };
@@ -277,7 +278,11 @@ export class TakeRecorder {
         // q and -q are one rotation; keep neighbours on one side so a slerp takes the short way.
         const flip =
           before &&
-          before[0] * quaternion[0] + before[1] * quaternion[1] + before[2] * quaternion[2] + before[3] * quaternion[3] < 0;
+          before[0] * quaternion[0] +
+            before[1] * quaternion[1] +
+            before[2] * quaternion[2] +
+            before[3] * quaternion[3] <
+            0;
         push(entry.rotation, at, flip ? quaternion.map((x) => -x) : [...quaternion], 'rotation');
       }
     }
@@ -285,12 +290,18 @@ export class TakeRecorder {
       const value = entry.read();
       entry.scalar = typeof value === 'number';
       const parts = typeof value === 'number' ? [value] : [...value];
-      if (!parts.every(Number.isFinite)) throw new RangeError(`Take property ${entry.target}.${entry.property} must be finite`);
+      if (!parts.every(Number.isFinite))
+        throw new RangeError(`Take property ${entry.target}.${entry.property} must be finite`);
       push(entry.data, at, parts, `${entry.target}.${entry.property}`);
     }
     if (this.cameraRead) {
       const seen = this.cameraRead();
-      push(this.cameraData, at, [...list(seen.position, 'camera position'), ...list(seen.target, 'camera target')], 'camera');
+      push(
+        this.cameraData,
+        at,
+        [...list(seen.position, 'camera position'), ...list(seen.target, 'camera target')],
+        'camera',
+      );
       push(this.cameraFov, at, [seen.fov ?? 60], 'fov');
       push(this.cameraRoll, at, [seen.roll ?? 0], 'roll');
     }
@@ -316,14 +327,24 @@ export class TakeRecorder {
       const track = this.transformTrack(name, entry);
       if (track) {
         tracks.push(track);
-        note(track.id, entry.position.times.length || entry.rotation.times.length || entry.scale.times.length, track.keys.length);
+        note(
+          track.id,
+          entry.position.times.length || entry.rotation.times.length || entry.scale.times.length,
+          track.keys.length,
+        );
       }
     }
     for (const [id, entry] of this.properties) {
       const { times, values } = entry.data,
         indices = thin(times, values, this.tolerance.value, lerp, widest),
         keys = indices.map((i): PropertyKey => ({ time: times[i], value: entry.scalar ? values[i][0] : values[i] }));
-      tracks.push({ type: 'property', id, target: entry.target, property: entry.property, keys } satisfies PropertyTrack);
+      tracks.push({
+        type: 'property',
+        id,
+        target: entry.target,
+        property: entry.property,
+        keys,
+      } satisfies PropertyTrack);
       note(id, times.length, keys.length);
     }
     for (const { recorder, start, target } of this.inputs)
@@ -465,10 +486,10 @@ export function appendTake(
     copy.tracks.push(moved);
   }
   if (take.markers.length)
-    copy.markers = [...(copy.markers ?? []), ...take.markers.map((marker) => ({ ...marker, time: marker.time + at }))].sort(
-      (a, b) => a.time - b.time,
-    );
+    copy.markers = [
+      ...(copy.markers ?? []),
+      ...take.markers.map((marker) => ({ ...marker, time: marker.time + at })),
+    ].sort((a, b) => a.time - b.time);
   copy.duration = Math.max(copy.duration, at + Math.max(take.duration, ONE_TICK));
   return copy;
 }
-

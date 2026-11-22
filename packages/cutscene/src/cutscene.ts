@@ -212,7 +212,11 @@ const catmull = (
 };
 
 /** World +Y made perpendicular to the view and rotated by `roll` about it (Rodrigues' rotation formula). */
-export function rolledUp(position: readonly number[], target: readonly number[], roll: number): [number, number, number] {
+export function rolledUp(
+  position: readonly number[],
+  target: readonly number[],
+  roll: number,
+): [number, number, number] {
   let fx = target[0] - position[0],
     fy = target[1] - position[1],
     fz = target[2] - position[2];
@@ -400,7 +404,6 @@ interface Later {
   local: number;
   path: string;
 }
-
 
 /** Set an own data property, so a key such as `__proto__` stays a plain entry and never reaches a prototype. */
 function define<T>(object: Record<string, T>, key: string, value: T): void {

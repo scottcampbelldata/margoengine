@@ -4,10 +4,27 @@ import { keyTransform, ViewportKeying } from '../dist/viewport.js';
 import { TimelineModel } from '../dist/editor.js';
 const document = () => ({ format: 'margo-cutscene', version: 1, duration: 10, tracks: [] });
 test('viewport attachment checks cancellation before loading or owning resources', async () => {
-  const controller = new AbortController(); controller.abort(new Error('cancel attach'));
+  const controller = new AbortController();
+  controller.abort(new Error('cancel attach'));
   await assert.rejects(ViewportKeying.attach(null, null, null, { signal: controller.signal }), /cancel attach/);
   let disposed = false;
-  await assert.rejects(ViewportKeying.attach({}, {}, {}, { gizmo: { engine: {}, inspector: {}, dispose() { disposed = true; } } }), /belong/);
+  await assert.rejects(
+    ViewportKeying.attach(
+      {},
+      {},
+      {},
+      {
+        gizmo: {
+          engine: {},
+          inspector: {},
+          dispose() {
+            disposed = true;
+          },
+        },
+      },
+    ),
+    /belong/,
+  );
   assert.equal(disposed, false, 'a refused borrowed gizmo is never disposed');
 });
 test('viewport keying creates, inserts, replaces exact times and undoes each whole key', () => {
@@ -48,12 +65,26 @@ test('dispose is a prototype method and abort still disposes the attached viewpo
   assert.equal(typeof ViewportKeying.prototype.dispose, 'function');
   const { JSDOM } = await import('jsdom');
   const dom = new JSDOM('<div id="editor"></div>');
-  const engine = { canvas: new dom.window.EventTarget() }, editor = { element: dom.window.document.querySelector('#editor') }, inspector = {};
-  const listeners = new Map(), controller = new AbortController();
-  const gizmo = { engine, inspector, controls: {
-    addEventListener(type, listener) { listeners.set(type, listener); },
-    removeEventListener(type, listener) { if (listeners.get(type) === listener) listeners.delete(type); },
-  }, dispose() { assert.fail('borrowed gizmo stays alive'); } };
+  const engine = { canvas: new dom.window.EventTarget() },
+    editor = { element: dom.window.document.querySelector('#editor') },
+    inspector = {};
+  const listeners = new Map(),
+    controller = new AbortController();
+  const gizmo = {
+    engine,
+    inspector,
+    controls: {
+      addEventListener(type, listener) {
+        listeners.set(type, listener);
+      },
+      removeEventListener(type, listener) {
+        if (listeners.get(type) === listener) listeners.delete(type);
+      },
+    },
+    dispose() {
+      assert.fail('borrowed gizmo stays alive');
+    },
+  };
   // DOM and Node AbortSignal implementations must match when listeners are installed.
   const Original = globalThis.AbortController;
   globalThis.AbortController = dom.window.AbortController;
@@ -64,5 +95,8 @@ test('dispose is a prototype method and abort still disposes the attached viewpo
     assert.equal(tool.element.isConnected, false);
     assert.equal(listeners.size, 0);
     tool[Symbol.dispose]();
-  } finally { globalThis.AbortController = Original; dom.window.close(); }
+  } finally {
+    globalThis.AbortController = Original;
+    dom.window.close();
+  }
 });

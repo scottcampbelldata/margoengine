@@ -12,8 +12,24 @@ const document_ = () => ({
   version: 1,
   duration: 10,
   tracks: [
-    { type: 'event', id: 'events', events: [{ time: 2.5, name: 'a' }, { time: 3.5, name: 'b' }] },
-    { type: 'property', id: 'opacity', target: 'screen', property: 'opacity', keys: [{ time: 0, value: 0 }, { time: 8, value: 1 }] },
+    {
+      type: 'event',
+      id: 'events',
+      events: [
+        { time: 2.5, name: 'a' },
+        { time: 3.5, name: 'b' },
+      ],
+    },
+    {
+      type: 'property',
+      id: 'opacity',
+      target: 'screen',
+      property: 'opacity',
+      keys: [
+        { time: 0, value: 0 },
+        { time: 8, value: 1 },
+      ],
+    },
   ],
 });
 
@@ -29,11 +45,21 @@ function scroller() {
   }
   const frames = new Set();
   const view = Object.assign(new EventTarget(), {
-    requestAnimationFrame: (fn) => { frames.add(fn); return frames.size; },
+    requestAnimationFrame: (fn) => {
+      frames.add(fn);
+      return frames.size;
+    },
     cancelAnimationFrame: () => frames.clear(),
   });
-  const source = Object.assign(new EventTarget(), { scrollTop: 0, scrollLeft: 0, scrollHeight: 400, scrollWidth: 40,
-    clientHeight: 40, clientWidth: 40, ownerDocument: { defaultView: view } });
+  const source = Object.assign(new EventTarget(), {
+    scrollTop: 0,
+    scrollLeft: 0,
+    scrollHeight: 400,
+    scrollWidth: 40,
+    clientHeight: 40,
+    clientWidth: 40,
+    ownerDocument: { defaultView: view },
+  });
   return { source, frames, done() {} };
 }
 
@@ -46,54 +72,63 @@ export async function fixtures(load = (entry) => import(entry)) {
       // A play() and an events() stream both wait on the app's signal: disposal settles both and lets the signal go.
       name: 'CutscenePlayer',
       create({ scene }) {
-        const controller = new AbortController(), player = new CutscenePlayer(document_());
+        const controller = new AbortController(),
+          player = new CutscenePlayer(document_());
         const finished = player.play({ signal: controller.signal });
         const stream = player.events({ signal: controller.signal })[Symbol.asyncIterator]();
         const ended = stream.next();
         let settled = null;
         finished.then((done) => (settled = done));
-        return ownedByEngine(scene, 'CutscenePlayer', () => player.dispose(), { async check({ phase }) {
-          if (phase !== 'disposed') return;
-          await Promise.resolve();
-          if (settled !== false) lifetimeFault('a disposed player leaves its play() promise pending');
-          if (!(await ended).done) lifetimeFault('a disposed player leaves its events() stream open');
-        } });
+        return ownedByEngine(scene, 'CutscenePlayer', () => player.dispose(), {
+          async check({ phase }) {
+            if (phase !== 'disposed') return;
+            await Promise.resolve();
+            if (settled !== false) lifetimeFault('a disposed player leaves its play() promise pending');
+            if (!(await ended).done) lifetimeFault('a disposed player leaves its events() stream open');
+          },
+        });
       },
     },
     {
       // A range borrows the player; its play() waits on the app's signal, and the player stays usable after it goes.
       name: 'RangePlayback',
       create({ scene }) {
-        const controller = new AbortController(), player = new CutscenePlayer(document_());
+        const controller = new AbortController(),
+          player = new CutscenePlayer(document_());
         const range = new RangePlayback(player, { range: [2, 4], iterationCount: Infinity });
         range.play({ signal: controller.signal }).catch(() => {});
         range.update(0.1);
         // The harness cleans up more than once; the borrowed player is checked and released the first time.
         let checked = false;
-        return ownedByEngine(scene, 'RangePlayback', () => range.dispose(), { cleanup() {
-          if (checked) return;
-          checked = true;
-          player.seek(1);
-          if (player.time !== 1) lifetimeFault('a disposed range leaves its borrowed player unusable');
-          player.dispose();
-        } });
+        return ownedByEngine(scene, 'RangePlayback', () => range.dispose(), {
+          cleanup() {
+            if (checked) return;
+            checked = true;
+            player.seek(1);
+            if (player.time !== 1) lifetimeFault('a disposed range leaves its borrowed player unusable');
+            player.dispose();
+          },
+        });
       },
     },
     {
       // Scroll and resize listeners, a smoothing frame and a listener on the app's signal, all gone at disposal.
       name: 'ScrollPlayback',
       create({ scene }) {
-        const { source, frames, done } = scroller(), controller = new AbortController();
+        const { source, frames, done } = scroller(),
+          controller = new AbortController();
         const player = new CutscenePlayer(document_());
         const link = new ScrollPlayback(player, { source, scrub: 0.2, signal: controller.signal });
         source.scrollTop = 120;
         source.dispatchEvent(new Event('scroll'));
-        return ownedByEngine(scene, 'ScrollPlayback', () => link.dispose(), { cleanup() {
-          done();
-          if (frames?.size) lifetimeFault('a disposed scroll binding leaves an animation frame queued');
-          if (controller.signal.aborted) lifetimeFault('a scroll binding aborts the app signal');
-          player.dispose();
-        } });
+        return ownedByEngine(scene, 'ScrollPlayback', () => link.dispose(), {
+          cleanup() {
+            done();
+            if (frames?.size) lifetimeFault('a disposed scroll binding leaves an animation frame queued');
+            if (controller.signal.aborted) lifetimeFault('a scroll binding aborts the app signal');
+            player.dispose();
+          },
+        });
       },
     },
     {
@@ -101,12 +136,24 @@ export async function fixtures(load = (entry) => import(entry)) {
       name: 'seek',
       async create({ engine, scene }) {
         const controller = new AbortController();
-        const clock = { name: 'owner-lifetime:seek-clock', time: 0, setup() {}, advanceTime(delta) { this.time += delta; } };
+        const clock = {
+          name: 'owner-lifetime:seek-clock',
+          time: 0,
+          setup() {},
+          advanceTime(delta) {
+            this.time += delta;
+          },
+        };
         scene.use(clock);
         const result = await seek(engine, 40, { scenes: [scene], signal: controller.signal });
         if (result.steps !== 2400 || !result.clocks.includes(clock.name)) lifetimeFault('a seek steps the scene clock');
         if (controller.signal.aborted) lifetimeFault('a seek aborts the app signal');
-        return { plugin: clock, dispose() { if (scene.plugins.get(clock.name) === clock) scene.removePlugin(clock.name); } };
+        return {
+          plugin: clock,
+          dispose() {
+            if (scene.plugins.get(clock.name) === clock) scene.removePlugin(clock.name);
+          },
+        };
       },
     },
   ];
@@ -117,26 +164,34 @@ export async function fixtures(load = (entry) => import(entry)) {
     // A panel listens on its own elements; the curve and nested panels also listen on the page's window and on the
     // timeline panel they extend, which the app made (a dependency) and which outlives them. Each panel must leave the
     // page as it found it.
-    const panel = (name, make) => entries.push({ name, create({ scene, dependency }) {
-      const host = document.createElement('div');
-      document.body.append(host);
-      const made = make(host, dependency);
-      return ownedByEngine(scene, name, made.release, { cleanup() {
-        if (host.querySelector(made.selector)) lifetimeFault(`a disposed ${name} leaves its panel mounted`);
-        made.cleanup?.();
-        host.remove();
-      } });
-    } });
+    const panel = (name, make) =>
+      entries.push({
+        name,
+        create({ scene, dependency }) {
+          const host = document.createElement('div');
+          document.body.append(host);
+          const made = make(host, dependency);
+          return ownedByEngine(scene, name, made.release, {
+            cleanup() {
+              if (host.querySelector(made.selector)) lifetimeFault(`a disposed ${name} leaves its panel mounted`);
+              made.cleanup?.();
+              host.remove();
+            },
+          });
+        },
+      });
     panel('TimelineEditor', (parent) => {
       const editor = new TimelineEditor(document_(), { parent });
       return { selector: '*', release: () => editor.dispose() };
     });
     panel('CurveEditor', (parent, dependency) => {
-      const editor = dependency(() => new TimelineEditor(document_(), { parent })), graph = new CurveEditor(editor, { parent });
+      const editor = dependency(() => new TimelineEditor(document_(), { parent })),
+        graph = new CurveEditor(editor, { parent });
       return { selector: '.margo-curve-editor', release: () => graph.dispose(), cleanup: () => editor.dispose() };
     });
     panel('NestedTimelineEditor', (parent, dependency) => {
-      const editor = dependency(() => new TimelineEditor(document_(), { parent })), nested = new NestedTimelineEditor(editor, { parent });
+      const editor = dependency(() => new TimelineEditor(document_(), { parent })),
+        nested = new NestedTimelineEditor(editor, { parent });
       return { selector: '.margo-nested-editor', release: () => nested.dispose(), cleanup: () => editor.dispose() };
     });
   }

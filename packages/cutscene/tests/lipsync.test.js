@@ -49,7 +49,9 @@ test('phonemes map to visemes, with stress digits and in either case', () => {
   assert.equal(visemeOf('kk'), 'kk');
   assert.equal(visemeOf('xx'), null);
   // Every ARPAbet symbol of the CMU dictionary has a mouth.
-  for (const symbol of 'AA AE AH AO AW AY B CH D DH EH ER EY F G HH IH IY JH K L M N NG OW OY P R S SH T TH UH UW V W Y Z ZH'.split(' '))
+  for (const symbol of 'AA AE AH AO AW AY B CH D DH EH ER EY F G HH IH IY JH K L M N NG OW OY P R S SH T TH UH UW V W Y Z ZH'.split(
+    ' ',
+  ))
     assert.ok(VISEMES.includes(visemeOf(symbol)), symbol);
 });
 
@@ -95,19 +97,41 @@ test('weights never sum past 1 and move without a jump', () => {
 });
 
 test('weight and gain scale the mouth, and end leaves a gap of rest', () => {
-  const clip = line([{ time: 0, end: 0.5, phoneme: 'aa', weight: 0.5 }, { time: 1, phoneme: 'ih' }], { gain: 0.5 });
+  const clip = line(
+    [
+      { time: 0, end: 0.5, phoneme: 'aa', weight: 0.5 },
+      { time: 1, phoneme: 'ih' },
+    ],
+    { gain: 0.5 },
+  );
   assert.deepEqual(visemesAt(clip, 0.25), { aa: 0.25 });
   assert.deepEqual(visemesAt(clip, 0.75), {});
   assert.deepEqual(visemesAt(clip, 1.5), { ih: 0.5 });
 });
 
 test('a long sound starting early is still found, past shorter ones after it', () => {
-  const clip = line([{ time: 0, end: 1.9, phoneme: 'aa' }, { time: 0.1, end: 0.2, phoneme: 'ih' }]);
+  const clip = line([
+    { time: 0, end: 1.9, phoneme: 'aa' },
+    { time: 0.1, end: 0.2, phoneme: 'ih' },
+  ]);
   assert.deepEqual(visemesAt(clip, 1.5), { aa: 1 });
 });
 
 test('the track puts the mouth on the state, and scrubbing gives what playing gives', () => {
-  const cutscene = build([track([line([{ time: 0, phoneme: 'aa' }, { time: 1, phoneme: 'uw' }], { start: 1 })], { blend: 0.2 })]);
+  const cutscene = build([
+    track(
+      [
+        line(
+          [
+            { time: 0, phoneme: 'aa' },
+            { time: 1, phoneme: 'uw' },
+          ],
+          { start: 1 },
+        ),
+      ],
+      { blend: 0.2 },
+    ),
+  ]);
   assert.deepEqual(mouthOf(cutscene.evaluate(0.5), 'ada'), {});
   assert.deepEqual(mouthOf(cutscene.evaluate(1.5), 'ada'), { aa: 1 });
   assert.deepEqual(mouthOf(cutscene.evaluate(1.5), 'bob'), {});
@@ -117,7 +141,10 @@ test('the track puts the mouth on the state, and scrubbing gives what playing gi
   assert.deepEqual(player.state, cutscene.evaluate(player.time));
   assert.deepEqual(
     cutscene.instants.filter((event) => event.type === 'lipsync').map((event) => [event.kind, event.name, event.time]),
-    [['enter', 'ada', 1], ['exit', 'ada', 3]],
+    [
+      ['enter', 'ada', 1],
+      ['exit', 'ada', 3],
+    ],
   );
 });
 
@@ -129,7 +156,9 @@ test('two tracks on one character add up, within 1', () => {
 
 test('a nested timeline carries dialogue', () => {
   const timelines = { scene: { duration: 2, tracks: [track([line([{ time: 0, phoneme: 'aa' }])])] } };
-  const cutscene = build([{ type: 'timeline', id: 'act', clips: [{ start: 1, duration: 2, timeline: 'scene' }] }], { timelines });
+  const cutscene = build([{ type: 'timeline', id: 'act', clips: [{ start: 1, duration: 2, timeline: 'scene' }] }], {
+    timelines,
+  });
   assert.deepEqual(mouthOf(cutscene.evaluate(2), 'ada'), { aa: 1 });
 });
 
@@ -148,10 +177,15 @@ test('weights become the blend shapes of each set', () => {
 
 test('every bad line is reported with its path', () => {
   const issues = (bad) =>
-    validateCutscene(doc([bad]), new Set(), new Map([['lipsync', lipSyncTrack()]])).map((issue) => `${issue.path}: ${issue.message}`);
+    validateCutscene(doc([bad]), new Set(), new Map([['lipsync', lipSyncTrack()]])).map(
+      (issue) => `${issue.path}: ${issue.message}`,
+    );
   const expect = (bad, pattern) => {
     const found = issues(bad);
-    assert.ok(found.some((row) => pattern.test(row)), `${pattern} in ${found.join(' | ')}`);
+    assert.ok(
+      found.some((row) => pattern.test(row)),
+      `${pattern} in ${found.join(' | ')}`,
+    );
   };
   assert.deepEqual(issues(track([line([{ time: 0, phoneme: 'aa' }])])), []);
   expect({ ...track([]), target: '' }, /target/);
@@ -160,7 +194,15 @@ test('every bad line is reported with its path', () => {
   expect(track([line([{ time: 0, phoneme: 'qq' }])]), /phonemes\[0\]\.phoneme: unknown phoneme "qq"/);
   expect(track([line([{ time: 1, end: 0.5, phoneme: 'aa' }])]), /end: must not come before/);
   expect(track([line([{ time: 0, phoneme: 'aa', weight: 2 }])]), /weight: must be from 0 to 1/);
-  expect(track([line([{ time: 1, phoneme: 'aa' }, { time: 0, phoneme: 'aa' }])]), /phonemes\[1\]\.time: is earlier/);
+  expect(
+    track([
+      line([
+        { time: 1, phoneme: 'aa' },
+        { time: 0, phoneme: 'aa' },
+      ]),
+    ]),
+    /phonemes\[1\]\.time: is earlier/,
+  );
   expect(track([line(3)]), /phonemes: must be an array/);
 });
 
@@ -227,7 +269,10 @@ test('analyseSpeech on real speech: finds silence and speech, and beats always n
 });
 
 test('analyseSpeech on silence and at another rate', () => {
-  assert.deepEqual(analyseSpeech(new Float32Array(16_000), 16_000).map((key) => key.phoneme), ['sil']);
+  assert.deepEqual(
+    analyseSpeech(new Float32Array(16_000), 16_000).map((key) => key.phoneme),
+    ['sil'],
+  );
   assert.deepEqual(analyseSpeech(new Float32Array(10), 16_000), []);
   const { samples, rate } = readWAV('arctic_a0001');
   // The same recording at three times the rate, each sample repeated: the sounds should land in the same places.
@@ -255,14 +300,20 @@ test('a line opens into its first sound and closes after its last, with no jump 
   near(open(3), 0.5);
   near(open(3 + blend), 0);
   // The ramp is 1 / blend per second, so a millisecond moves the weight by at most 1 / 100.
-  for (let t = 0.8; t < 3.2; t += 0.001) assert.ok(Math.abs(open(t + 0.001) - open(t)) <= 0.001 / blend + 1e-9, `at ${t}`);
+  for (let t = 0.8; t < 3.2; t += 0.001)
+    assert.ok(Math.abs(open(t + 0.001) - open(t)) <= 0.001 / blend + 1e-9, `at ${t}`);
 });
 
 test('real speech through a real document: the mouth is shut in the labelled pauses and open in the vowels', () => {
   const { samples, rate } = readWAV('arctic_a0001'),
     labels = readLabels('arctic_a0001.lab'),
     duration = samples.length / rate,
-    document = { format: 'margo-cutscene', version: 1, duration, tracks: [track([{ start: 0, duration, phonemes: analyseSpeech(samples, rate) }])] },
+    document = {
+      format: 'margo-cutscene',
+      version: 1,
+      duration,
+      tracks: [track([{ start: 0, duration, phonemes: analyseSpeech(samples, rate) }])],
+    },
     cutscene = new Cutscene(JSON.stringify(document), { tracks: [lipSyncTrack()] });
   let from = 0,
     shut = 0,
@@ -290,7 +341,9 @@ test('real speech through a real document: the mouth is shut in the labelled pau
 });
 
 test('the shapes reach a real avatar and the face entry: Seed-san moves its own morph targets', () => {
-  const avatar = readVRM(new Uint8Array(readFileSync(new URL('../../../examples/assets/vrm/Seed-san.vrm', import.meta.url)))),
+  const avatar = readVRM(
+      new Uint8Array(readFileSync(new URL('../../../examples/assets/vrm/Seed-san.vrm', import.meta.url))),
+    ),
     expressions = new VRMExpressions(avatar),
     { morphTargetBinds } = avatar.expressions.preset.aa,
     { samples, rate } = readWAV('arctic_a0002'),
@@ -314,5 +367,6 @@ test('the shapes reach a real avatar and the face entry: Seed-san moves its own 
   assert.ok(weights.filter((weight) => weight > 0).length > weights.length / 4, 'on and off through the sentence');
   // Every ARKit shape is a name a tracker frame of @margoengine/rigging/face takes, so a frame can go straight to addFace.
   for (const viseme of VISEMES)
-    for (const shape of Object.keys(mouthShapes({ [viseme]: 1 }, 'arkit'))) assert.ok(FACE_SHAPES.includes(shape), shape);
+    for (const shape of Object.keys(mouthShapes({ [viseme]: 1 }, 'arkit')))
+      assert.ok(FACE_SHAPES.includes(shape), shape);
 });

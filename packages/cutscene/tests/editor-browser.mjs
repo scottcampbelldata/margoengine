@@ -65,9 +65,15 @@ try {
   await page.locator(item('door', 2)).click({ modifiers: ['Shift'] });
   assert.equal(await panel('selected'), 2);
   await page.keyboard.press('ArrowRight');
-  assert.deepEqual((await panel('times', 'door')).map((t) => Number(t.toFixed(6))), [1.1, 3, 6.1]);
+  assert.deepEqual(
+    (await panel('times', 'door')).map((t) => Number(t.toFixed(6))),
+    [1.1, 3, 6.1],
+  );
   await page.keyboard.press('Shift+ArrowLeft');
-  assert.deepEqual((await panel('times', 'door')).map((t) => Number(t.toFixed(6))), [0.1, 3, 5.1]);
+  assert.deepEqual(
+    (await panel('times', 'door')).map((t) => Number(t.toFixed(6))),
+    [0.1, 3, 5.1],
+  );
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+z');
   assert.equal(await panel('selected'), 0, 'undo clears a selection whose places are gone');
@@ -121,14 +127,20 @@ try {
   near(widened.width, 3 * was * 1.25, 1, 'clips widen with the zoom');
 
   // Export: a real download, and a real Cutscene reads the file.
-  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.mtl-bar button', { hasText: 'Export' }).click()]);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('.mtl-bar button', { hasText: 'Export' }).click(),
+  ]);
   assert.equal(download.suggestedFilename(), 'cutscene.json');
   // The browser is connected over a socket (scripts/lib/browser.mjs): a download has no local path, so read its stream.
   const chunks = [];
   for await (const chunk of await download.createReadStream()) chunks.push(chunk);
   const text = Buffer.concat(chunks).toString('utf8');
   assert.equal(JSON.parse(text).format, 'margo-cutscene');
-  assert.deepEqual(JSON.parse(text).tracks[0].keys.map((key) => key.time), [1, 3, 6]);
+  assert.deepEqual(
+    JSON.parse(text).tracks[0].keys.map((key) => key.time),
+    [1, 3, 6],
+  );
   assert.equal(await panel('reads', text), true);
 
   // A phone: the page itself does not scroll sideways; the timeline does, inside the panel.

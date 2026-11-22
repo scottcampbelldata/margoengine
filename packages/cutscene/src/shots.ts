@@ -211,7 +211,13 @@ function swing(a: readonly number[], b: readonly number[], u: number): number[] 
 }
 
 /** Blends two cameras. At `u` 0 and 1 it gives them exactly, so a blend starts and ends without a step. */
-function blendCameras(a: CameraState, b: CameraState, u: number, style: 'direct' | 'orbit', track: string): CameraState {
+function blendCameras(
+  a: CameraState,
+  b: CameraState,
+  u: number,
+  style: 'direct' | 'orbit',
+  track: string,
+): CameraState {
   if (u <= 0) return { ...a, track };
   if (u >= 1) return { ...b, track };
   const roll = a.roll + (b.roll - a.roll) * u;

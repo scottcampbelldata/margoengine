@@ -58,7 +58,14 @@ export interface SnapOptions {
 }
 
 type Data = Record<string, unknown> & { time?: number; start?: number; duration?: number };
-type TrackData = Record<string, unknown> & { id: string; type: string; target?: string; keys?: Data[]; events?: Data[]; clips?: Data[] };
+type TrackData = Record<string, unknown> & {
+  id: string;
+  type: string;
+  target?: string;
+  keys?: Data[];
+  events?: Data[];
+  clips?: Data[];
+};
 type Listener = (label: string) => void;
 
 /** Times stay readable in the saved file: sums of steps pick up rounding. */
@@ -90,7 +97,9 @@ export class TimelineModel {
   private scopeName?: string;
   private get doc(): CutsceneDocument {
     if (!this.root) return this.data;
-    const root = this.root.doc, spec = root.timelines && Object.hasOwn(root.timelines, this.scopeName!) ? root.timelines[this.scopeName!] : undefined;
+    const root = this.root.doc,
+      spec =
+        root.timelines && Object.hasOwn(root.timelines, this.scopeName!) ? root.timelines[this.scopeName!] : undefined;
     if (!spec) throw new MargoError('state', 'Nested timeline was removed; reopen an existing timeline');
     return { format: 'margo-cutscene', version: 1, ...spec, timelines: root.timelines };
   }
@@ -106,7 +115,10 @@ export class TimelineModel {
   private readonly listeners = new Set<Listener>();
   private open: { label: string; before: string } | null = null;
   /** @throws TypeError naming the first problem of a document that is not valid. */
-  constructor(document: CutsceneDocument | string | unknown, { tracks = [], history = new EditHistory(200, 0) }: TimelineModelOptions = {}) {
+  constructor(
+    document: CutsceneDocument | string | unknown,
+    { tracks = [], history = new EditHistory(200, 0) }: TimelineModelOptions = {},
+  ) {
     this.types = tracks;
     this.checks = new Map(tracks.map((type) => [type.type, type]));
     this.data = JSON.parse(JSON.stringify(new Cutscene(document, { tracks }).document)) as CutsceneDocument;
@@ -135,22 +147,36 @@ export class TimelineModel {
   /** Calls `listener` with the edit's label after every change, undo and redo included. Returns an unsubscribe function. */
   on(event: 'change', listener: Listener): () => void {
     if (event !== 'change') throw new RangeError(`TimelineModel has no '${String(event)}' event; use 'change'`);
-    if (this.root) return this.root.on(event, label => { const timelines = this.root!.doc.timelines; if (timelines && Object.hasOwn(timelines, this.scopeName!)) listener(label); });
+    if (this.root)
+      return this.root.on(event, (label) => {
+        const timelines = this.root!.doc.timelines;
+        if (timelines && Object.hasOwn(timelines, this.scopeName!)) listener(label);
+      });
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
   }
   /** A live editing view of a named nested definition. It shares root validation, subscriptions and undo history. */
   nested(name: string): TimelineModel {
-    const root = this.root ?? this, timelines = root.doc.timelines, spec = timelines && Object.hasOwn(timelines, name) ? timelines[name] : undefined;
+    const root = this.root ?? this,
+      timelines = root.doc.timelines,
+      spec = timelines && Object.hasOwn(timelines, name) ? timelines[name] : undefined;
     if (!spec) throw new RangeError(`No nested timeline '${name}'; choose a timeline clip's definition`);
     const child = new TimelineModel({ ...root.document, ...spec }, { tracks: this.types, history: root.history });
-    child.root = root; child.scopeName = name; return child;
+    child.root = root;
+    child.scopeName = name;
+    return child;
   }
   /** Sets a named definition atomically, validating all its placements and refusing cycles. */
   setTimeline(name: string, timeline: TimelineSpec): boolean {
-    const root = this.root ?? this, value = JSON.parse(JSON.stringify(timeline)) as TimelineSpec;
+    const root = this.root ?? this,
+      value = JSON.parse(JSON.stringify(timeline)) as TimelineSpec;
     return root.edit('Set nested timeline', false, () => {
-      Object.defineProperty(root.doc.timelines ??= {}, name, { value, writable: true, enumerable: true, configurable: true });
+      Object.defineProperty((root.doc.timelines ??= {}), name, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     });
   }
   /** Every top-level track, then the markers. A timeline clip moves as one clip; what is inside it is not shown. */
@@ -162,14 +188,16 @@ export class TimelineModel {
         type: track.type,
         label: track.target ?? track.id,
         keyable: track.type === 'event' || (kind === 'key' && !!list),
-        items: (list ?? []).map((item, index): TimelineItem => ({
-          track: track.id,
-          index,
-          kind,
-          time: timeOf(item),
-          duration: kind === 'clip' ? (item.duration as number) : 0,
-          label: kind === 'clip' ? clipName(item) : kind === 'event' ? String(item.name) : '',
-        })),
+        items: (list ?? []).map(
+          (item, index): TimelineItem => ({
+            track: track.id,
+            index,
+            kind,
+            time: timeOf(item),
+            duration: kind === 'clip' ? (item.duration as number) : 0,
+            label: kind === 'clip' ? clipName(item) : kind === 'event' ? String(item.name) : '',
+          }),
+        ),
       };
     });
     rows.push({
@@ -197,7 +225,8 @@ export class TimelineModel {
    */
   addKey(track: string, time: number, fields: Record<string, unknown> = {}): ItemRef {
     finite(time, 'Key time');
-    if (time < 0 || time > this.duration) throw new RangeError(`Key time ${time} is outside the timeline; pass 0 to its duration`);
+    if (time < 0 || time > this.duration)
+      throw new RangeError(`Key time ${time} is outside the timeline; pass 0 to its duration`);
     if (track === MARKERS || this.track(track).type === 'event')
       return this.addItem(track, { name: track === MARKERS ? 'marker' : 'event', ...fields, time });
     const data = this.track(track);
@@ -223,7 +252,9 @@ export class TimelineModel {
   /** Adds a whole track as one validated undo step. Duplicate ids or invalid fields throw without changing the document. */
   addTrack(track: Track): void {
     const fresh = JSON.parse(JSON.stringify(track)) as Track;
-    this.edit('Add track', true, () => { this.doc.tracks.push(fresh); });
+    this.edit('Add track', true, () => {
+      this.doc.tracks.push(fresh);
+    });
   }
   /**
    * Moves items together by `delta` seconds, stopping at the ends of the timeline as a group.
@@ -290,17 +321,25 @@ export class TimelineModel {
   /** Sets the length of the timeline. False when something would fall outside it, which is then not done. */
   setDuration(seconds: number): boolean {
     finite(seconds, 'Duration');
-    return this.edit('Set duration', false, () => { this.doc = { ...this.doc, duration: seconds }; });
+    return this.edit('Set duration', false, () => {
+      this.doc = { ...this.doc, duration: seconds };
+    });
   }
   /** Starts a run of edits that undo as one, such as a drag; {@link commit} ends it. */
   begin(label: string): void {
-    if (this.root) { this.root.begin(label); return; }
+    if (this.root) {
+      this.root.begin(label);
+      return;
+    }
     if (this.open) throw new MargoError('state', 'An edit is already open; call commit() before begin()');
     this.open = { label, before: this.snapshot() };
   }
   /** Ends the run {@link begin} started. A run that changed nothing leaves no undo step. */
   commit(): void {
-    if (this.root) { this.root.commit(); return; }
+    if (this.root) {
+      this.root.commit();
+      return;
+    }
     if (!this.open) throw new MargoError('state', 'No edit is open; call begin() first');
     const { label, before } = this.open;
     this.open = null;
@@ -366,7 +405,8 @@ export class TimelineModel {
       return { position, target, fov, roll };
     }
     if (track.type === 'transform') return { ...state.transforms[track.target as string] };
-    if (track.type === 'property') return { value: state.properties[track.target as string]?.[track.property as string] };
+    if (track.type === 'property')
+      return { value: state.properties[track.target as string]?.[track.property as string] };
     return this.checks.get(track.type)?.sampleKey?.(track, time) ?? {};
   }
   private snapshot(): string {
@@ -390,7 +430,8 @@ export class TimelineModel {
   }
   /** Runs one change; keeps it only if the document stays valid. `strict` reports a refusal as a RangeError. */
   private edit(label: string, strict: boolean, change: () => void): boolean {
-    const owner = this.root ?? this, before = owner.snapshot();
+    const owner = this.root ?? this,
+      before = owner.snapshot();
     try {
       change();
     } catch (error) {
@@ -400,7 +441,10 @@ export class TimelineModel {
     const issues = validateCutscene(owner.doc, EASING_NAMES, owner.checks);
     if (issues.length) {
       owner.doc = JSON.parse(before) as CutsceneDocument;
-      if (strict) throw new RangeError(`${label} refused: ${issues[0].path}: ${issues[0].message}; use a value the document allows`);
+      if (strict)
+        throw new RangeError(
+          `${label} refused: ${issues[0].path}: ${issues[0].message}; use a value the document allows`,
+        );
       return false;
     }
     if (!owner.open) owner.remember(label, before);
@@ -513,7 +557,8 @@ export class TimelineEditor {
   private playhead = 0;
   private picked: ItemRef[] = [];
   private row: string;
-  private drag: { pointer: number; kind: 'items' | 'scrub'; from: number; origin: number; applied: number } | null = null;
+  private drag: { pointer: number; kind: 'items' | 'scrub'; from: number; origin: number; applied: number } | null =
+    null;
   /** True while a move is under way: the rows wait for the selection's new places. */
   private holding = false;
   private disposed = false;
@@ -521,7 +566,8 @@ export class TimelineEditor {
   private readonly abort = new AbortController();
   constructor(document: CutsceneDocument | string | unknown, options: TimelineEditorOptions = {}) {
     const { parent, zoom = 100, step = 0.1, snap = true, fileName = 'cutscene.json', ...model } = options;
-    if (!(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM)) throw new RangeError(`Timeline zoom must be ${MIN_ZOOM} to ${MAX_ZOOM}; pass pixels a second`);
+    if (!(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM))
+      throw new RangeError(`Timeline zoom must be ${MIN_ZOOM} to ${MAX_ZOOM}; pass pixels a second`);
     if (!(step > 0) || !Number.isFinite(step)) throw new RangeError('Timeline step must be above 0; pass seconds');
     this.model = document instanceof TimelineModel ? document : new TimelineModel(document, model);
     this.pixels = zoom;
@@ -530,7 +576,11 @@ export class TimelineEditor {
     this.fileName = fileName;
     this.row = this.model.rows.find((row) => row.keyable)?.track ?? MARKERS;
 
-    const tag = <K extends keyof HTMLElementTagNameMap>(name: K, className: string, into?: HTMLElement): HTMLElementTagNameMap[K] => {
+    const tag = <K extends keyof HTMLElementTagNameMap>(
+      name: K,
+      className: string,
+      into?: HTMLElement,
+    ): HTMLElementTagNameMap[K] => {
       const made = window.document.createElement(name);
       made.className = className;
       into?.append(made);
@@ -596,7 +646,8 @@ export class TimelineEditor {
     return this.playhead;
   }
   set time(seconds: number) {
-    if (!Number.isFinite(seconds)) throw new RangeError('Timeline time must be a finite number of seconds; pass a number');
+    if (!Number.isFinite(seconds))
+      throw new RangeError('Timeline time must be a finite number of seconds; pass a number');
     this.playhead = Math.min(this.model.duration, Math.max(0, seconds));
     this.place();
   }
@@ -638,7 +689,8 @@ export class TimelineEditor {
     this.dispose();
   }
   private emit<K extends keyof TimelineEditorEvents>(event: K, value: TimelineEditorEvents[K]): void {
-    for (const listener of [...(this.listeners.get(event) ?? [])]) (listener as (value: TimelineEditorEvents[K]) => void)(value);
+    for (const listener of [...(this.listeners.get(event) ?? [])])
+      (listener as (value: TimelineEditorEvents[K]) => void)(value);
   }
   private toolbar(): void {
     (this.bar.undo as HTMLButtonElement).disabled = !this.model.history.undoCount;
@@ -701,7 +753,10 @@ export class TimelineEditor {
           element.textContent = item.label;
         }
         element.setAttribute('aria-pressed', String(picked.has(`${item.track}\0${item.index}`)));
-        element.setAttribute('aria-label', `${item.kind} ${item.label} at ${item.time.toFixed(2)} seconds on ${row.label}`.replace('  ', ' '));
+        element.setAttribute(
+          'aria-label',
+          `${item.kind} ${item.label} at ${item.time.toFixed(2)} seconds on ${row.label}`.replace('  ', ' '),
+        );
         lane.append(element);
       }
       lanes.append(lane);
@@ -723,7 +778,12 @@ export class TimelineEditor {
   private snapped(time: number, ignore: readonly ItemRef[] = []): number {
     if (!this.snapping) return time;
     // Eight pixels of pull, however far in or out the view is.
-    return this.model.snap(time, { step: this.step, reach: 8 / this.pixels, ignore, times: ignore.length ? [this.playhead] : [] });
+    return this.model.snap(time, {
+      step: this.step,
+      reach: 8 / this.pixels,
+      ignore,
+      times: ignore.length ? [this.playhead] : [],
+    });
   }
   /** Seeks the playhead and emits seek, as a ruler gesture does. Setting time alone emits no event. */
   seek(time: number): void {
@@ -745,10 +805,14 @@ export class TimelineEditor {
       const ref = { track: item.dataset.track!, index: Number(item.dataset.index) },
         known = this.picked.some((other) => other.track === ref.track && other.index === ref.index);
       if (event.shiftKey || event.ctrlKey || event.metaKey)
-        this.selection = known ? this.picked.filter((other) => other.track !== ref.track || other.index !== ref.index) : [...this.picked, ref];
+        this.selection = known
+          ? this.picked.filter((other) => other.track !== ref.track || other.index !== ref.index)
+          : [...this.picked, ref];
       else if (!known) this.selection = [ref];
       if (!this.picked.length) return;
-      const lead = this.model.rows.flatMap((row) => row.items).find((one) => one.track === ref.track && one.index === ref.index)!;
+      const lead = this.model.rows
+        .flatMap((row) => row.items)
+        .find((one) => one.track === ref.track && one.index === ref.index)!;
       this.grab(event, 'items', this.timeAt(event), lead.time);
       this.model.begin('Move');
       this.itemElement(ref)?.focus();
