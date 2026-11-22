@@ -63,9 +63,14 @@ console.log(gaitFor(body, 7), s.length.toFixed(2), s.duty.toFixed(2), hoovesDown
 buffers)`; `horseGLB(options)` returns a `.glb` file. Five materials (`Coat` with vertex colours for points and markings,
 `Hoof`, `Mane`, `Tail`, `Eye`), a skin of 32 joints (the fore limb swings from the scapula, the hind from the pelvis),
 a `saddle` node on the trunk, and the clips `stand`, `walk`, `trot`, `canter` and `gallop`, each one stride long at its
-speed (`speeds` sets them). The legs are posed by two-bone inverse kinematics: a stance hoof keeps still while the body
-passes over it, the hoof breaks over its toe in the last fifth of the stance, a swing hoof lifts and folds at the
-fetlock. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
+speed (`speeds` sets them). A pair of planar inverse-kinematic solves places each elbow or stifle and then the
+lower-leg hinge. The fore carpus stays nearly straight through loaded stance and flexes in early swing. The hind
+hock folds on the opposite side of the limb and extends toward landing. Through late stance and lift-off the hoof
+rolls about the toe and transitions continuously to the swing arc. The kinematics follow the swing and support
+phases described in [The forelimb in walking horses, Hodson, Clayton and Lanovaz (2000)](https://pubmed.ncbi.nlm.nih.gov/10952376/),
+[The hindlimb in walking horses, Hodson, Clayton and Lanovaz (2001)](https://doi.org/10.2746/042516401776767485), and
+[Forelimb kinematics and net joint moments during the swing phase of the trot, Lanovaz, Clayton, Colborne and Schamhardt (1999)](https://doi.org/10.1111/j.2042-3306.1999.tb05225.x).
+The gait curves are approximations of these patterns. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
 
 | Option | Default |
 | --- | --- |

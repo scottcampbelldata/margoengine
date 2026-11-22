@@ -197,6 +197,45 @@ test('model: stance hooves stay planted and swing hooves lift, every gait, type 
   }
 });
 
+test('model: each limb travels continuously through lift-off and follows its anatomical hinge', () => {
+  const bend = (points, start) => {
+    const [a, b, c] = points.slice(start, start + 3);
+    const incoming = Math.atan2(b[2] - a[2], b[1] - a[1]);
+    const outgoing = Math.atan2(c[2] - b[2], c[1] - b[1]);
+    return Math.atan2(Math.sin(outgoing - incoming), Math.cos(outgoing - incoming));
+  };
+  for (const type of HORSE_TYPES) {
+    const b = horseBody({ type }),
+      sk = horseSkeleton(b);
+    for (const gait of GAITS) {
+      const cycle = stride(b, preferredSpeed(b, gait), gait);
+      const count = 1000;
+      let previous = poseJoints(sk, horsePose(sk, cycle, 0));
+      for (let frame = 1; frame <= count; frame++) {
+        const phase = frame / count;
+        const joints = poseJoints(sk, horsePose(sk, cycle, phase));
+        for (const [hoof, leg] of sk.legs.entries()) {
+          const label = `${type} ${gait}, hoof ${hoof}, phase ${phase}`;
+          for (const i of leg) {
+            const jump = Math.hypot(...joints[i].map((v, axis) => v - previous[i][axis]));
+            assert.ok(jump < 0.024 * b.withers, `${label}: ${sk.joints[i].name} jumps ${jump.toFixed(3)} m`);
+          }
+          const hinge = bend(
+            leg.map((i) => joints[i]),
+            2,
+          );
+          const fore = hoof % 2 === 1;
+          assert.ok(fore ? hinge >= -1e-8 : hinge <= 1e-8, `${label}: reversed hinge`);
+          const step = hoofPhase(cycle, hoof, phase);
+          if (fore && step.stance && step.t > 0.25 && step.t < 0.72)
+            assert.ok(hinge < 0.17, `${label}: carpus buckles while bearing weight`);
+        }
+        previous = joints;
+      }
+    }
+  }
+});
+
 test('model: the rig, the standing pose and the document', () => {
   const b = horseBody(),
     sk = horseSkeleton(b);

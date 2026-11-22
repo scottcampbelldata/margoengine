@@ -11436,7 +11436,8 @@ shot naming a family fails its master below the floor (`tools/shot/encode.mjs`);
   (riding 488, cavalry 459, draft 859 kg); stride length from Alexander and Jayes inside measured horse ranges; gait by
   Froude number; footfall order, pairs, duty factors and suspensions per gait; trunk rises twice a stride at walk and
   trot and once at canter and gallop; a stance hoof keeps within 3 cm of where it struck, and rises under 3.5 cm before
-  breakover, through every gait and type at 0.8 to 1.25 times the clip speed; the rider seat keeps segment lengths and
+  breakover, through every gait and type at 0.8 to 1.25 times the clip speed; across each stride the tested limb joints
+  follow continuous paths with the expected carpus and hock bend directions; the rider seat keeps segment lengths and
   clears the barrel; the rider hip follows the saddle damped and a little behind; speed eases, the gait changes with
   hysteresis and `seek(t)` equals playing. On the GPU (`test/horses-check.mjs`, WebGPU and the WebGL2 layer): a horse
   covers 17 percent of the frame, the saddle rises 0.058 m through a stride, seeking equals playing in chunks, and 60
@@ -31613,27 +31614,14 @@ console.log(gaitFor(body, 7), s.length.toFixed(2), s.duty.toFixed(2), hoovesDown
 buffers)`; `horseGLB(options)` returns a `.glb` file. Five materials (`Coat` with vertex colours for points and markings,
 `Hoof`, `Mane`, `Tail`, `Eye`), a skin of 32 joints (the fore limb swings from the scapula, the hind from the pelvis),
 a `saddle` node on the trunk, and the clips `stand`, `walk`, `trot`, `canter` and `gallop`, each one stride long at its
-speed (`speeds` sets them). The legs are posed by two-bone inverse kinematics: a stance hoof keeps still while the body
-passes over it, the hoof breaks over its toe in the last fifth of the stance, a swing hoof lifts and folds at the
-fetlock. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
-
-| Option | Default |
-| --- | --- |
-| `type`, `withers`, `condition` | `'riding'`, the group mean, 1 |
-| `coat` | `'bay'` (`bay`, `chestnut`, `black`, `grey`, `dun`, `brown`) |
-| `markings` | none: `{socks: [LH, LF, RH, RF] heights in m, blaze: true}` |
-| `maneLength`, `tailLength` | 0.11 and 0.55 times the withers height |
-| `speeds` | each gait's preferred speed for this horse |
-| `detail` | 2 |
-| `atlas` | false: texture coordinates into the crowd coat atlas |
-
-```ts
-import {horseDocument, horseGLB} from 'margoengine/horses/model';
-const {doc, clips} = horseDocument({type: 'draft', coat: 'grey', detail: 1});
-console.log(clips.map((c) => c.name).join(' '), horseGLB({detail: 0}).byteLength > 0); // stand walk trot canter gallop true
-```
-
-## `addHorse`
+speed (`speeds` sets them). A pair of planar inverse-kinematic solves places each elbow or stifle and then the
+lower-leg hinge. The fore carpus stays nearly straight through loaded stance and flexes in early swing. The hind
+hock folds on the opposite side of the limb and extends toward landing. Through late stance and lift-off the hoof
+rolls about the toe and transitions continuously to the swing arc. The kinematics follow the swing and support
+phases described in [The forelimb in walking horses, Hodson, Clayton and Lanovaz (2000)](https://pubmed.ncbi.nlm.nih.gov/10952376/),
+[The hindlimb in walking horses, Hodson, Clayton and Lanovaz (2001)](https://doi.org/10.2746/042516401776767485), and
+[Forelimb kinematics and net joint moments during the swing phase of the trot, Lanovaz, Clayton, Colborne and Schamhardt (1999)](https://doi.org/10.1111/j.2042-3306.1999.tb05225.x).
+The gait curves are approximations of these patterns. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
 
 [README continues: https://margoengine.com/llms/packages/horses.md]
 

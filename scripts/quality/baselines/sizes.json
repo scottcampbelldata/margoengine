@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17399825,
+  "total": 17400858,
   "history": [
     {
       "date": "2026-10-24",
@@ -11337,6 +11337,12 @@
       "commit": "1a585ae1cc",
       "reason": "Optional lines/flow adds 5640 B min+gzip for seekable dashes, an optional guide and arc-length endpoint fades. One entry shares the two layers and their disposal. Details are in the Lines README and docs/limits.md.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "f6cd74c55f",
+      "reason": "Continuous, anatomically aligned horse gait: root 11,667 to 11,882 B gzip and crowd 10,602 to 10,826 B gzip. Both entries use the solver to pose every horse. A lazy chunk adds a request and still loads for every horse or herd.",
+      "grew": 2
     }
   ],
   "items": {
@@ -11805,9 +11811,9 @@
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,
     "@margoengine/headless/video": 12819,
-    "@margoengine/horses": 11749,
+    "@margoengine/horses": 12239,
     "@margoengine/horses/anatomy": 1097,
-    "@margoengine/horses/crowd": 10608,
+    "@margoengine/horses/crowd": 11151,
     "@margoengine/horses/gaits": 1467,
     "@margoengine/horses/model": 9833,
     "@margoengine/horses/seat": 1758,

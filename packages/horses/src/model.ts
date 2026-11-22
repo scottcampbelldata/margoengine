@@ -168,7 +168,9 @@ export function poseJoints(skeleton: HorseSkeleton, pose: HorsePose): [number, n
 /** World rotation of every joint in a pose. */
 function worldRotations(skeleton: HorseSkeleton, pose: HorsePose): Q[] {
   const world: Q[] = [];
-  skeleton.joints.forEach((j, i) => world.push(j.parent < 0 ? (pose.rotations[i] as Q) : qmul(world[j.parent]!, pose.rotations[i] as Q)));
+  skeleton.joints.forEach((j, i) =>
+    world.push(j.parent < 0 ? (pose.rotations[i] as Q) : qmul(world[j.parent]!, pose.rotations[i] as Q)),
+  );
   return world;
 }
 
@@ -186,7 +188,10 @@ export function poseHooves(skeleton: HorseSkeleton, pose: HorsePose): [number, n
 }
 
 /** The saddle seat in a pose: its position and the trunk's rotation (model space). */
-export function poseSaddle(skeleton: HorseSkeleton, pose: HorsePose): { position: [number, number, number]; rotation: [number, number, number, number] } {
+export function poseSaddle(
+  skeleton: HorseSkeleton,
+  pose: HorsePose,
+): { position: [number, number, number]; rotation: [number, number, number, number] } {
   const at = poseJoints(skeleton, pose),
     world = worldRotations(skeleton, pose),
     b = skeleton.index('body'),
@@ -195,8 +200,50 @@ export function poseSaddle(skeleton: HorseSkeleton, pose: HorsePose): { position
   return { position: [at[b]![0] + off[0], at[b]![1] + off[1], at[b]![2] + off[2]], rotation: world[b]! };
 }
 
+const signedAngle = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
+const clamp = (n: number, low: number, high: number): number => Math.min(high, Math.max(low, n));
+
+/** The elbow or stifle sits where the upper chain can reach and the lower chain can achieve its hinge angle. */
+function limbPivot(
+  top: readonly number[],
+  end: V3,
+  guideY: number,
+  guideZ: number,
+  upperMin: number,
+  upperMax: number,
+  lowerMin: number,
+  lowerMax: number,
+  desired: number,
+): [number, number] {
+  const distance = Math.hypot(top[1]! - end[1], top[2]! - end[2]);
+  // Both chains' reach annuli must intersect. Use the desired lower reach wherever it can.
+  const min = Math.max(lowerMin, distance - upperMax, upperMin - distance);
+  const max = Math.min(lowerMax, distance + upperMax);
+  // Leave the limb's pivot away from the tangency of the two reach circles when the gait has slack.
+  const reserve = Math.min(Math.max(0, max - min) / 4, upperMax * 0.025);
+  const reach = clamp(desired, min + reserve, max);
+  const axis = ang(top[1]! - end[1], top[2]! - end[2]);
+  const guide = signedAngle(ang(guideY - end[1], guideZ - end[2]) - axis);
+  const angleAt = (radius: number) =>
+    Math.acos(clamp((distance * distance + reach * reach - radius * radius) / (2 * distance * reach), -1, 1));
+  // Keep the limb on its rest side of the reach axis when the guide crosses it.
+  const direction = axis + clamp(guide, angleAt(upperMin), angleAt(upperMax));
+  return [end[1] + Math.cos(direction) * reach, end[2] + Math.sin(direction) * reach];
+}
+
+/** A fast onset and measured early peak, then extension back into foot strike. */
+function swingFlex(t: number, peak: number): number {
+  return t < peak ? smooth(t / peak) : 1 - smooth((t - peak) / (1 - peak));
+}
+
 /** Two-bone IK in the YZ plane: absolute segment angles reaching from `root` to `target`, bending by `bend` (+1/-1). */
-function twoBone(root: readonly number[], target: readonly number[], a: number, b: number, bend: number): [number, number] {
+function twoBone(
+  root: readonly number[],
+  target: readonly number[],
+  a: number,
+  b: number,
+  bend: number,
+): [number, number] {
   const dy = target[1]! - root[1]!,
     dz = target[2]! - root[2]!,
     d = Math.min(a + b - 1e-6, Math.max(Math.abs(a - b) + 1e-6, Math.hypot(dy, dz))),
@@ -226,7 +273,9 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
     H = body.withers,
     J = skeleton.joints,
     rotations: Q[] = J.map(() => [0, 0, 0, 1]),
-    trunk = s ? trunkMotion(body, s, phase) : { rise: 0.002 * H * Math.sin((2 * Math.PI * time) / 4), pitch: 0, nod: 0 },
+    trunk = s
+      ? trunkMotion(body, s, phase)
+      : { rise: 0.002 * H * Math.sin((2 * Math.PI * time) / 4), pitch: 0, nod: 0 },
     bodyIndex = skeleton.index('body'),
     bodyRest = J[bodyIndex]!.rest,
     // Nose-down pitch is a rotation about +X.
@@ -254,6 +303,9 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
       pastern = [0, j[n - 1]![1] - j[n - 2]![1], j[n - 1]![2] - j[n - 2]![2]],
       hoofVec = [0, g0[1] - j[n - 1]![1], g0[2] - j[n - 1]![2]];
     let lift = 0;
+    const restHinge = Math.abs(signedAngle(restAng(j[3]!, j[4]!) - restAng(j[2]!, j[3]!)));
+    let hinge = restHinge;
+    const rollAtLift = fore ? 0.64 : 0.49;
     if (!s) target = [...g0] as V3;
     else {
       const h = hoofPhase(s, i, phase),
@@ -262,31 +314,40 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
         target = [g0[0], 0, g0[2] + sweep / 2 - sweep * h.t];
         sink = (s.gait === 'walk' ? 0.12 : s.gait === 'trot' ? 0.25 : 0.32) * Math.sin(Math.PI * h.t);
         // Breakover: over the last fifth of the stance the heel lifts and the hoof rolls over its toe.
-        if (h.t > BREAKOVER) breakover = 1.1 * smooth((h.t - BREAKOVER) / (1 - BREAKOVER));
+        if (h.t > BREAKOVER) breakover = rollAtLift * smooth((h.t - BREAKOVER) / (1 - BREAKOVER));
+        // Under load the carpus is a near-straight strut. The hind tarsus keeps its rest bend.
+        hinge += (fore ? 0.06 : 0.04) * Math.sin(Math.PI * h.t) ** 2 + 0.31 * breakover;
       } else {
         const e = smooth(h.t);
         target = [g0[0], 0, g0[2] - sweep / 2 + sweep * e];
-        lift = s.pattern.lift[fore ? 0 : 1] * H * Math.sin(Math.PI * Math.min(1, h.t * 1.15));
-        flex = (fore ? 1.9 : 1.5) * Math.sin(Math.PI * Math.min(1, h.t * 1.1));
+        lift = s.pattern.lift[fore ? 0 : 1] * H * Math.sin(Math.PI * h.t);
+        breakover = rollAtLift * (1 - smooth(Math.min(1, h.t / 0.37)));
+        const hingeFlex = swingFlex(h.t, fore ? 0.34 : 0.38);
+        flex = (fore ? 0.76 : 0.57) * swingFlex(h.t, 0.47);
+        hinge += (fore ? 1.3 : 0.56) * hingeFlex + 0.31 * breakover;
       }
     }
     const G = toBody(target);
     // Pastern flattens (sink) under load and folds back (flex) in the swing; the hoof stays flat on the ground.
     const pAng = -pitch - sink + flex + breakover,
-      hAng = flex > 0 ? pAng + 0.3 * flex : -pitch + breakover,
+      hAng = -pitch + breakover + 0.9 * flex,
       // In breakover the toe, a little ahead of the ground point, stays put while the hoof turns about it.
       toe = [0, 0, TOE * H],
-      tv = qrot(qx(hAng), [0, hoofVec[1]! + toe[1]!, hoofVec[2]! + toe[2]!]),
-      ph = breakover > 0 ? [0, tv[1] - toe[1]!, tv[2] - toe[2]!] : qrot(qx(hAng), hoofVec),
+      rotation = qx(hAng),
+      ph = qrot(rotation, hoofVec),
+      rolledToe = qrot(rotation, toe),
+      toeWeight = breakover / rollAtLift,
       pp = qrot(qx(pAng), pastern),
-      fetlock: V3 = [G[0], G[1] - ph[1]! - pp[1] + lift, G[2] - ph[2]! - pp[2]];
+      fetlock: V3 = [
+        G[0],
+        G[1] - ph[1] - toeWeight * rolledToe[1] - pp[1] + lift,
+        G[2] - ph[2] - toeWeight * (rolledToe[2] - toe[2]!) - pp[2],
+      ];
     // Limb protraction: the angle of the whole limb from its top joint to the hoof, against rest.
     const top = j[0]!,
-      beta = ang(G[1] - top[1], G[2] - top[2]) - ang(g0[1] - top[1], g0[2] - top[2]),
+      beta = signedAngle(ang(G[1] - top[1], G[2] - top[2]) - ang(g0[1] - top[1], g0[2] - top[2])),
       deltas: number[] = [];
     {
-      // Scapula and arm (pelvis and thigh): the elbow goes where the forearm and cannon can reach the fetlock from, then two two-bone solves
-      // (shoulder joint forward of the scapula-elbow line, knee forward of the elbow-fetlock line).
       const ls = len2(j[0]!, j[1]!),
         lh = len2(j[1]!, j[2]!),
         la = len2(j[2]!, j[3]!),
@@ -294,26 +355,32 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
         c = Math.cos((fore ? 0.5 : 0.7) * beta),
         sn = Math.sin((fore ? 0.5 : 0.7) * beta),
         ry = j[2]![1] - top[1],
-        rz = j[2]![2] - top[2];
-      let ey = top[1] + ry * c - rz * sn,
-        ez = top[2] + ry * sn + rz * c;
-      const reach = 0.97 * (la + lb),
-        fd = Math.hypot(fetlock[1] - ey, fetlock[2] - ez);
-      if (fd > reach) {
-        ey = fetlock[1] + ((ey - fetlock[1]) * reach) / fd;
-        ez = fetlock[2] + ((ez - fetlock[2]) * reach) / fd;
-      }
-      const sd = Math.hypot(ey - top[1], ez - top[2]),
-        most = 0.985 * (ls + lh);
-      if (sd > most) {
-        ey = top[1] + ((ey - top[1]) * most) / sd;
-        ez = top[2] + ((ez - top[2]) * most) / sd;
-      }
-      const [s1, s2] = twoBone(top, [0, ey, ez], ls, lh, fore ? -1 : 1),
+        rz = j[2]![2] - top[2],
+        guideY = top[1] + ry * c - rz * sn,
+        guideZ = top[2] + ry * sn + rz * c,
+        desired = Math.sqrt(la * la + lb * lb + 2 * la * lb * Math.cos(hinge)),
+        upperMax = Math.sqrt(ls * ls + lh * lh + 2 * ls * lh * Math.cos(0.3)),
+        [ey, ez] = limbPivot(
+          top,
+          fetlock,
+          guideY,
+          guideZ,
+          Math.abs(ls - lh) + 1e-6,
+          upperMax,
+          Math.abs(la - lb) + 1e-6,
+          la + lb - 1e-6,
+          desired,
+        ),
+        [s1, s2] = twoBone(top, [0, ey, ez], ls, lh, fore ? -1 : 1),
         jy = top[1] + ls * Math.cos(s1) + lh * Math.cos(s2),
         jz = top[2] + ls * Math.sin(s1) + lh * Math.sin(s2),
         [a1, a2] = twoBone([0, jy, jz], fetlock, la, lb, fore ? -1 : 1);
-      deltas.push(s1 - restAng(j[0]!, j[1]!), s2 - restAng(j[1]!, j[2]!), a1 - restAng(j[2]!, j[3]!), a2 - restAng(j[3]!, j[4]!));
+      deltas.push(
+        s1 - restAng(j[0]!, j[1]!),
+        s2 - restAng(j[1]!, j[2]!),
+        a1 - restAng(j[2]!, j[3]!),
+        a2 - restAng(j[3]!, j[4]!),
+      );
     }
     // Absolute pastern and hoof angles against their rest, in the body frame; locals are differences down the chain.
     deltas.push(pAng, hAng);
@@ -417,7 +484,12 @@ class Part {
     readonly material: string,
     readonly doubleSided = false,
   ) {}
-  vertex(p: readonly number[], uv: readonly number[], color: readonly number[], skin: readonly [number, number][]): number {
+  vertex(
+    p: readonly number[],
+    uv: readonly number[],
+    color: readonly number[],
+    skin: readonly [number, number][],
+  ): number {
     this.positions.push(p[0]!, p[1]!, p[2]!);
     this.uvs.push(uv[0]!, uv[1]!);
     this.colors.push(color[0]!, color[1]!, color[2]!);
@@ -486,9 +558,15 @@ function spline(values: readonly number[], t: number): number {
     p1 = values[i]!,
     p2 = values[i + 1]!,
     p3 = values[Math.min(n - 1, i + 2)]!;
-  return 0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f);
+  return (
+    0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f)
+  );
 }
-const mix3 = (a: readonly number[], b: readonly number[], t: number): V3 => [a[0]! + (b[0]! - a[0]!) * t, a[1]! + (b[1]! - a[1]!) * t, a[2]! + (b[2]! - a[2]!) * t];
+const mix3 = (a: readonly number[], b: readonly number[], t: number): V3 => [
+  a[0]! + (b[0]! - a[0]!) * t,
+  a[1]! + (b[1]! - a[1]!) * t,
+  a[2]! + (b[2]! - a[2]!) * t,
+];
 /** Distance from p to segment ab. */
 function segmentDistance(p: readonly number[], a: readonly number[], b: readonly number[]): number {
   const ab = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!],
@@ -547,9 +625,11 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
     markings = options.markings ?? {},
     maneLength = options.maneLength ?? 0.11 * H,
     tailLength = options.tailLength ?? 0.55 * H;
-  if (!colors || !Object.hasOwn(COAT_COLORS, coat)) throw new TypeError(`horseDocument coat must be one of ${HORSE_COATS.join(', ')}`);
+  if (!colors || !Object.hasOwn(COAT_COLORS, coat))
+    throw new TypeError(`horseDocument coat must be one of ${HORSE_COATS.join(', ')}`);
   if (detail !== 0 && detail !== 1 && detail !== 2) throw new RangeError('horseDocument detail must be 0, 1 or 2');
-  if (!(maneLength >= 0.02 && maneLength <= 0.8)) throw new RangeError('horseDocument maneLength must be 0.02 to 0.8 m');
+  if (!(maneLength >= 0.02 && maneLength <= 0.8))
+    throw new RangeError('horseDocument maneLength must be 0.02 to 0.8 m');
   if (!(tailLength >= 0.1 && tailLength <= 1.6)) throw new RangeError('horseDocument tailLength must be 0.1 to 1.6 m');
   const socks = markings.socks ?? [0, 0, 0, 0];
   if (!Array.isArray(socks) || socks.length !== 4 || socks.some((h) => !(h >= 0 && h <= H)))
@@ -613,12 +693,24 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   ];
   const neckBase = at('neck1'),
     poll = at('head'),
-    stations: { c: V3; hh: number; hw: number }[] = trunk.map(([z, t, b, w]) => ({ c: [0, (t + b) / 2, z], hh: (t - b) / 2, hw: w }));
+    stations: { c: V3; hh: number; hw: number }[] = trunk.map(([z, t, b, w]) => ({
+      c: [0, (t + b) / 2, z],
+      hh: (t - b) / 2,
+      hw: w,
+    }));
   for (const s of [0.25, 0.5, 0.75, 1.0]) {
     const c = mix3(neckBase, poll, s);
     stations.push({ c, hh: 0.14 * H * (1 - s) + 0.07 * H * s, hw: 0.092 * H * (1 - s) + 0.05 * H * s });
   }
-  const loft = (part: Part, st: typeof stations, cands: ReturnType<typeof segs>, uFrom: number, uTo: number, color: (p: V3, f: number, k: number) => V3, row = 'body' as 'body' | 'points') => {
+  const loft = (
+    part: Part,
+    st: typeof stations,
+    cands: ReturnType<typeof segs>,
+    uFrom: number,
+    uTo: number,
+    color: (p: V3, f: number, k: number) => V3,
+    row = 'body' as 'body' | 'points',
+  ) => {
     const n = (st.length - 1) * along + 1,
       start = part.count,
       cy = st.map((s) => s.c[1]),
@@ -673,12 +765,21 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   ];
   const headUp = [HEAD_DIR[2], -HEAD_DIR[1]] as const; // perpendicular to the head axis in YZ, toward the forehead
   const hst = headStations.map(([s, h, w, drop]) => ({
-    c: [0, poll[1] + HEAD_DIR[1] * s * body.headLength + headUp[0] * drop * H, poll[2] + HEAD_DIR[2] * s * body.headLength + headUp[1] * drop * H] as V3,
+    c: [
+      0,
+      poll[1] + HEAD_DIR[1] * s * body.headLength + headUp[0] * drop * H,
+      poll[2] + HEAD_DIR[2] * s * body.headLength + headUp[1] * drop * H,
+    ] as V3,
     hh: h * H,
     hw: w * H,
   }));
   loft(coatPart, hst, segs(['head']), 0.8, 1, (p, f, k) => {
-    const blazed = markings.blaze === true && f > 0.25 && f < 0.95 && Math.abs(p[0]) < 0.25 * 0.05 * H && Math.sin((2 * Math.PI * k) / around) > 0;
+    const blazed =
+      markings.blaze === true &&
+      f > 0.25 &&
+      f < 0.95 &&
+      Math.abs(p[0]) < 0.25 * 0.05 * H &&
+      Math.sin((2 * Math.PI * k) / around) > 0;
     return (blazed ? WHITE : f > 0.84 ? colors.points.map((v, i) => (v + colors.body[i]!) / 2) : colors.body) as V3;
   });
 
@@ -687,8 +788,22 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
     const fore = li === 1 || li === 3,
       pts = [...leg.map((k) => J[k]!.rest), skeleton.ground[li]!],
       radii = fore
-        ? [[0.05, 0.06], [0.085, 0.065], [0.062, 0.036], [body.cannon / (2 * Math.PI) / H + 0.004, body.cannon / (2 * Math.PI) / H], [0.03, 0.024], [0.03, 0.037]]
-        : [[0.05, 0.08], [0.11, 0.075], [0.058, 0.038], [body.cannon / (2 * Math.PI) / H + 0.006, body.cannon / (2 * Math.PI) / H + 0.002], [0.03, 0.024], [0.03, 0.037]],
+        ? [
+            [0.05, 0.06],
+            [0.085, 0.065],
+            [0.062, 0.036],
+            [body.cannon / (2 * Math.PI) / H + 0.004, body.cannon / (2 * Math.PI) / H],
+            [0.03, 0.024],
+            [0.03, 0.037],
+          ]
+        : [
+            [0.05, 0.08],
+            [0.11, 0.075],
+            [0.058, 0.038],
+            [body.cannon / (2 * Math.PI) / H + 0.006, body.cannon / (2 * Math.PI) / H + 0.002],
+            [0.03, 0.024],
+            [0.03, 0.037],
+          ],
       sock = socks[li]!;
     const segments = leg.length;
     for (let sgi = 0; sgi < segments; sgi++) {
@@ -713,11 +828,33 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
         const blend = f < 0.15 ? 0.5 * (1 - f / 0.15) : 0;
         for (let k = 0; k < around; k++) {
           const ang2 = (2 * Math.PI * k) / around,
-            p: V3 = [a[0] + Math.cos(ang2) * rad * knob * (fore ? 0.92 : 1), y + n[0]! * Math.sin(ang2) * rad * knob, z + n[1]! * Math.sin(ang2) * rad * knob],
+            p: V3 = [
+              a[0] + Math.cos(ang2) * rad * knob * (fore ? 0.92 : 1),
+              y + n[0]! * Math.sin(ang2) * rad * knob,
+              z + n[1]! * Math.sin(ang2) * rad * knob,
+            ],
             low = p[1] < (fore ? body.knee : body.hock) - 0.02 * H,
-            color: V3 = hoof ? (sock > 0 ? [0.32, 0.27, 0.2] : [0.05, 0.045, 0.04]) : p[1] < sock ? WHITE : low ? (colors.points as V3) : (colors.body as V3),
+            color: V3 = hoof
+              ? sock > 0
+                ? [0.32, 0.27, 0.2]
+                : [0.05, 0.045, 0.04]
+              : p[1] < sock
+                ? WHITE
+                : low
+                  ? (colors.points as V3)
+                  : (colors.body as V3),
             uv = atlas ? atlasUV(hoof ? 'hoof' : low ? 'points' : 'body') : [f, k / around];
-          part.vertex(p, uv, color, blend > 0 ? [[leg[sgi]!, 1 - blend], [parent, blend]] : [[leg[sgi]!, 1]]);
+          part.vertex(
+            p,
+            uv,
+            color,
+            blend > 0
+              ? [
+                  [leg[sgi]!, 1 - blend],
+                  [parent, blend],
+                ]
+              : [[leg[sgi]!, 1]],
+          );
         }
       }
       part.grid(start, rings + (hoof ? 1 : 0), around, true, true);
@@ -755,13 +892,28 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
           ph = (2 * Math.PI * k) / lon,
           // The eye looks out to its side (+X on the left): v=0 at the pupil.
           d: V3 = [side * Math.cos(th), Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph)];
-        eyePart.vertex([center[0] + d[0] * er, center[1] + d[1] * er, center[2] + d[2] * er], atlas ? atlasUV('mane') : [k / lon, i / lat], [0.02, 0.015, 0.012], [[headJ, 1]]);
+        eyePart.vertex(
+          [center[0] + d[0] * er, center[1] + d[1] * er, center[2] + d[2] * er],
+          atlas ? atlasUV('mane') : [k / lon, i / lat],
+          [0.02, 0.015, 0.012],
+          [[headJ, 1]],
+        );
       }
     eyePart.grid(es, lat + 1, lon, true, side < 0);
   }
 
   // ----- hair cards: mane and forelock (neck and head), tail (dock) -----
-  const card = (part: Part, root: V3, dir: V3, side: V3, length: number, width: number, bend: V3, skin: (f: number) => [number, number][], color: V3) => {
+  const card = (
+    part: Part,
+    root: V3,
+    dir: V3,
+    side: V3,
+    length: number,
+    width: number,
+    bend: V3,
+    skin: (f: number) => [number, number][],
+    color: V3,
+  ) => {
     const segsN = detail === 0 ? 2 : 4,
       start = part.count;
     for (let r = 0; r <= segsN; r++) {
@@ -774,7 +926,12 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
         w = width * (1 - 0.6 * f);
       for (const k of [0, 1]) {
         const o = (k - 0.5) * w;
-        part.vertex([c[0] + side[0] * o, c[1] + side[1] * o, c[2] + side[2] * o], atlas ? atlasUV('mane') : [k, f], color, skin(f));
+        part.vertex(
+          [c[0] + side[0] * o, c[1] + side[1] * o, c[2] + side[2] * o],
+          atlas ? atlasUV('mane') : [k, f],
+          color,
+          skin(f),
+        );
       }
     }
     part.grid(start, segsN + 1, 2, false);
@@ -789,11 +946,40 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
       root: V3 = [-0.01 * H, c[1] + 0.06 * H * s - 0.01 * H, c[2]],
       ln = maneLength * (0.8 + 0.4 * Math.sin(i * 12.9898) ** 2);
     // The mane falls to the off (right) side.
-    card(manePart, root, [-0.45, -0.89, 0], [0, 0.3, 0.95], ln, ((L * 0.6) / maneCards) * 1.8, [-0.1, -0.05, -0.05], () => (s < 0.5 ? [[n1, 1 - s], [n2, s]] : [[n2, 1.5 - s], [headJ, s - 0.5]]), colors.mane as V3);
+    card(
+      manePart,
+      root,
+      [-0.45, -0.89, 0],
+      [0, 0.3, 0.95],
+      ln,
+      ((L * 0.6) / maneCards) * 1.8,
+      [-0.1, -0.05, -0.05],
+      () =>
+        s < 0.5
+          ? [
+              [n1, 1 - s],
+              [n2, s],
+            ]
+          : [
+              [n2, 1.5 - s],
+              [headJ, s - 0.5],
+            ],
+      colors.mane as V3,
+    );
   }
   for (let i = 0; i < [2, 4, 6][detail]!; i++) {
     const x = (i / 5 - 0.5) * 0.04 * H;
-    card(manePart, [x, poll[1] + 0.07 * H, poll[2] + 0.01 * H], [0, HEAD_DIR[1] + 0.2 * HEAD_DIR[2], HEAD_DIR[2] - 0.2 * HEAD_DIR[1]] as V3, [1, 0, 0], maneLength * 1.1, 0.03 * H, [0, -0.15, 0.05], () => [[headJ, 1]], colors.mane as V3);
+    card(
+      manePart,
+      [x, poll[1] + 0.07 * H, poll[2] + 0.01 * H],
+      [0, HEAD_DIR[1] + 0.2 * HEAD_DIR[2], HEAD_DIR[2] - 0.2 * HEAD_DIR[1]] as V3,
+      [1, 0, 0],
+      maneLength * 1.1,
+      0.03 * H,
+      [0, -0.15, 0.05],
+      () => [[headJ, 1]],
+      colors.mane as V3,
+    );
   }
   const tailCards = [10, 24, 44][detail]!,
     t1 = at('tail1'),
@@ -808,7 +994,17 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
       l = Math.hypot(...dir),
       ln = tailLength * (1 - 0.45 * s) * (0.85 + 0.3 * Math.sin(i * 78.233) ** 2);
     const k = Math.min(2, Math.floor(s * 3));
-    card(tailPart, root, [dir[0] / l, dir[1] / l, dir[2] / l], [Math.cos(a + Math.PI / 2), 0, Math.sin(a + Math.PI / 2)], ln, 0.045 * H, [Math.cos(a) * 0.08, 0, -0.06], (f) => (f < 0.3 ? [[tj[k]!, 1]] : [[tj[2]!, 1]]), colors.mane as V3);
+    card(
+      tailPart,
+      root,
+      [dir[0] / l, dir[1] / l, dir[2] / l],
+      [Math.cos(a + Math.PI / 2), 0, Math.sin(a + Math.PI / 2)],
+      ln,
+      0.045 * H,
+      [Math.cos(a) * 0.08, 0, -0.06],
+      (f) => (f < 0.3 ? [[tj[k]!, 1]] : [[tj[2]!, 1]]),
+      colors.mane as V3,
+    );
   }
 
   // ----- clips -----
@@ -826,7 +1022,13 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   const buffers: Uint8Array[] = [],
     bufferViews: object[] = [],
     accessors: object[] = [];
-  const accessor = (data: Float32Array | Uint16Array | Uint32Array, type: string, componentType: number, extra: object = {}, target?: number) => {
+  const accessor = (
+    data: Float32Array | Uint16Array | Uint32Array,
+    type: string,
+    componentType: number,
+    extra: object = {},
+    target?: number,
+  ) => {
     buffers.push(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     bufferViews.push({ buffer: buffers.length - 1, byteLength: data.byteLength, ...(target ? { target } : {}) });
     const comps = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[type]!;
@@ -836,8 +1038,16 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   const materials = [
     { name: 'Coat', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.62 } },
     { name: 'Hoof', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.55 } },
-    { name: 'Mane', doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
-    { name: 'Tail', doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
+    {
+      name: 'Mane',
+      doubleSided: true,
+      pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.5 },
+    },
+    {
+      name: 'Tail',
+      doubleSided: true,
+      pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.5 },
+    },
     { name: 'Eye', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.08 } },
   ];
   const parts = [coatPart, hoofPart, manePart, tailPart, eyePart],
@@ -869,12 +1079,19 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   });
   const nodes: Record<string, unknown>[] = J.map((j) => {
     const p = j.parent >= 0 ? J[j.parent]!.rest : [0, 0, 0];
-    return { name: j.name, translation: [j.rest[0] - p[0]!, j.rest[1] - p[1]!, j.rest[2] - p[2]!], children: [] as number[] };
+    return {
+      name: j.name,
+      translation: [j.rest[0] - p[0]!, j.rest[1] - p[1]!, j.rest[2] - p[2]!],
+      children: [] as number[],
+    };
   });
   J.forEach((j, i) => j.parent >= 0 && (nodes[j.parent]!.children as number[]).push(i));
   const bodyRest = at('body'),
     saddleNode = nodes.length;
-  nodes.push({ name: 'saddle', translation: [skeleton.saddle[0] - bodyRest[0], skeleton.saddle[1] - bodyRest[1], skeleton.saddle[2] - bodyRest[2]] });
+  nodes.push({
+    name: 'saddle',
+    translation: [skeleton.saddle[0] - bodyRest[0], skeleton.saddle[1] - bodyRest[1], skeleton.saddle[2] - bodyRest[2]],
+  });
   (nodes[jid('body')]!.children as number[]).push(saddleNode);
   for (const n of nodes) if ((n.children as number[] | undefined)?.length === 0) delete n.children;
   const meshNode = nodes.length;
@@ -892,7 +1109,14 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
       times[k] = f * clip.duration;
       const pose = s ? horsePose(skeleton, s, f) : horsePose(skeleton, null, 0, f * clip.duration);
       pose.rotations.forEach((q, i) => rot[i]!.set(q, k * 4));
-      tr.set([bodyRest[0] + pose.bodyOffset[0], bodyRest[1] - J[0]!.rest[1] + pose.bodyOffset[1], bodyRest[2] + pose.bodyOffset[2]], k * 3);
+      tr.set(
+        [
+          bodyRest[0] + pose.bodyOffset[0],
+          bodyRest[1] - J[0]!.rest[1] + pose.bodyOffset[1],
+          bodyRest[2] + pose.bodyOffset[2],
+        ],
+        k * 3,
+      );
     }
     const input = accessor(times, 'SCALAR', 5126, { min: [0], max: [clip.duration] }),
       samplers: object[] = [],
@@ -904,7 +1128,12 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
     });
     samplers.push({ input, output: accessor(tr, 'VEC3', 5126) });
     channels.push({ sampler: samplers.length - 1, target: { node: jid('body'), path: 'translation' } });
-    return { name: clip.name, samplers, channels, extras: { speed: clip.speed, strideLength: clip.strideLength, duty: clip.duty } };
+    return {
+      name: clip.name,
+      samplers,
+      channels,
+      extras: { speed: clip.speed, strideLength: clip.strideLength, duty: clip.duty },
+    };
   });
 
   const doc = {
@@ -956,4 +1185,3 @@ export function horseGLB(options: HorseModelOptions = {}): Uint8Array {
   out.set(bin, 28 + text.length);
   return out;
 }
-

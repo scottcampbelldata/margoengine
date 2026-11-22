@@ -8311,7 +8311,8 @@ shot naming a family fails its master below the floor (`tools/shot/encode.mjs`);
   (riding 488, cavalry 459, draft 859 kg); stride length from Alexander and Jayes inside measured horse ranges; gait by
   Froude number; footfall order, pairs, duty factors and suspensions per gait; trunk rises twice a stride at walk and
   trot and once at canter and gallop; a stance hoof keeps within 3 cm of where it struck, and rises under 3.5 cm before
-  breakover, through every gait and type at 0.8 to 1.25 times the clip speed; the rider seat keeps segment lengths and
+  breakover, through every gait and type at 0.8 to 1.25 times the clip speed; across each stride the tested limb joints
+  follow continuous paths with the expected carpus and hock bend directions; the rider seat keeps segment lengths and
   clears the barrel; the rider hip follows the saddle damped and a little behind; speed eases, the gait changes with
   hysteresis and `seek(t)` equals playing. On the GPU (`test/horses-check.mjs`, WebGPU and the WebGL2 layer): a horse
   covers 17 percent of the frame, the saddle rises 0.058 m through a stride, seeking equals playing in chunks, and 60
