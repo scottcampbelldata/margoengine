@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17384774,
+  "total": 17386498,
   "history": [
     {
       "date": "2026-10-24",
@@ -11313,6 +11313,12 @@
       "commit": "29fa69d082",
       "reason": "water/ships 10,128 to 10,388 B gzip. Side displacement is part of the existing wake height and query shader. A split would repeat the hull mask and sampling paths.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "e3b40d430d",
+      "reason": "Add the 1468-byte optional fir spray mesh entry. It shares one deterministic whorl layout across all foliage levels; separate entries would duplicate it. Core and stage remain at 24797 bytes gzip.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12141,6 +12147,7 @@
     "@margoengine/procedural/conifers": 6159,
     "@margoengine/procedural/dungeon": 1479,
     "@margoengine/procedural/expression": 4718,
+    "@margoengine/procedural/fir-sprays": 1724,
     "@margoengine/procedural/flyer": 5016,
     "@margoengine/procedural/gears": 2188,
     "@margoengine/procedural/harbour": 8604,

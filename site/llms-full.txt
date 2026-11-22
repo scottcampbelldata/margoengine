@@ -1307,7 +1307,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,944 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,946 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -11494,6 +11494,17 @@ loop of constant start and bound (up to 64 trips) unrolled, and at most 2 copies
 and an array of its own (`packages/webgl2-compat/test/corpus-inline.test.js`, counted by
 `scripts/support/wgsl-inline.mjs`). Cold links after KB-COMPAT-FXCTIME1 (RTX A6000, Edge, busy): robot-planning's
 clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.9 s.
+
+## Sky depth and fir spray geometry
+
+Automatic sky depth requires an active sampleable scene capture. An explicit callback selects another pass. Clouds
+use the empty-sky depth test when no source is available. Fog needs a surface depth. Masked foliage participates
+through its main-pass depth writes, including during a camera turn.
+
+The optional `@margoengine/procedural/fir-sprays` entry accepts a height from 0.1 to 250 m, a crown base up to 95%
+of the height, a radius from 0.01 to 100 m, and one to 64 normalized atlas regions. It returns three CPU geometry
+levels with consistent main branch directions. Texture pixels and tree placement are supplied by the caller.
+The optional entry measures 1,468 B gzip. Core and stage remain at 24,797 B gzip.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

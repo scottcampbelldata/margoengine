@@ -304,6 +304,8 @@ const checks = {
     assert.equal(r.pillar.changed, 0, `clouds drew over the near pillar: ${JSON.stringify(r.pillar)}`);
     // The block 160 m ahead of a camera inside dense cloud is veiled by the cloud in between.
     assert.ok(r.block.changed > r.block.total * 0.9, `cloud in front of the block: ${JSON.stringify(r.block)}`);
+    assert.equal(r.automaticDepth.same, 0, 'automatic cloud depth matches the explicit live capture');
+    assert.equal(r.automaticDepth.override, 0, 'an explicit unavailable depth leaves the foreground block clear');
     assert.equal(
       r.noDepth.pillar.changed,
       0,

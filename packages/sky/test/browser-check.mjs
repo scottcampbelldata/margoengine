@@ -88,6 +88,8 @@ try {
     assert.deepEqual(r.errors, []);
     assert.ok(r.fogged > 1000, `fog drew too little: ${JSON.stringify(r)}`);
     assert.ok(r.moved > 100, `the turn moved too little: ${JSON.stringify(r)}`);
+    assert.equal(r.matchesExplicit, true, `${samples}x automatic fog differs from the live depth callback`);
+    assert.equal(r.overrideUnavailable, true, 'an explicit unavailable depth keeps fog off');
     assert.equal(r.differing, 0, `${samples}x fog lags a turning view: ${JSON.stringify(r)}`);
     console.log(`ok ${samples}x fog while turning: 0 of ${r.pixels} pixels differ from the still frame`);
   }

@@ -3299,6 +3299,10 @@
       "types": "./dist/procedural/conifers.d.ts",
       "import": "./dist/procedural/conifers.js"
     },
+    "./procedural/fir-sprays": {
+      "types": "./dist/procedural/fir-sprays.d.ts",
+      "import": "./dist/procedural/fir-sprays.js"
+    },
     "./procedural/conifer-settings": {
       "types": "./dist/procedural/conifer-settings.d.ts",
       "import": "./dist/procedural/conifer-settings.js"

@@ -166,9 +166,8 @@ export interface VolumetricCloudOptions {
    */
   groundAlbedo?: number;
   /**
-   * The scene's reversed-Z depth each frame (for example `bloom.depthTexture`). With it the clouds stop at scene
-   * surfaces, so a camera that flies into the layer sees cloud in front of nearby objects; without it they draw only
-   * over the empty sky.
+   * Override the active scene capture's reversed-Z depth. Omit to use the current frame from PostStack or another
+   * scene capture. Clouds stop at that frame's surfaces. Without sampleable depth they draw over the empty sky.
    */
   depth?: () => GPUTexture | undefined;
   /**
@@ -1037,7 +1036,7 @@ export class VolumetricClouds implements EnginePlugin {
     this.volumes!.fill(c.device, c.encoder);
     this.skyLight(c);
     this.environment(c);
-    const depth = this.options.depth ? sceneDepth(c, this.options.depth, 'VolumetricClouds') : undefined,
+    const depth = sceneDepth(c, this.options.depth, 'VolumetricClouds'),
       samples = c.descriptor.multisample?.count ?? 1,
       key = `${c.format}:${samples}:${depth?.samples ?? 0}:${c.descriptor.depthStencil?.format}`;
     if (this.key !== key) {

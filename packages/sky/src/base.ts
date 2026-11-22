@@ -135,8 +135,11 @@ export interface SkyCloudOptions {
  * throw RangeError.
  */
 export interface SkyFogOptions {
-  /** Returns the scene's sampleable depth texture each frame (no fog while it returns undefined). */
-  depth: () => GPUTexture | undefined;
+  /**
+   * Override the active scene capture's sampleable depth. Omit to read the current frame from a PostStack or other
+   * scene capture. There is no fog when the chosen source has no depth texture.
+   */
+  depth?: () => GPUTexture | undefined;
   /** Density per metre, 0..1 (0 turns fog off). Default 0.01. */
   density?: number;
   /** Distance from the camera, in metres, where fog starts, >= 0. Default 40. */

@@ -1172,6 +1172,34 @@ buttress most).
   and `procedural:burnt-trunk` with these levels; the rockies presets use the `/pole` keys. Each part takes the wind and
   the burnt and flooded plant states like any other.
 
+### Textured fir foliage
+
+`@margoengine/procedural/fir-sprays` builds near, middle and far foliage meshes around a fir's stem. Give the generator
+normalized rectangles from a needle-spray atlas and use that atlas as a masked material. UVs run from the stem at the
+bottom to the tip at the top of each rectangle. The rings share whorl heights and main branch directions. A denser near
+mesh adds side sprays and curved sections. The far ring thins the lower whorls and keeps the crown tip.
+
+```ts
+import { generateFirSprayLevels } from '@margoengine/procedural/fir-sprays';
+
+const [near, middle, far] = generateFirSprayLevels({
+  height: 12,
+  crownBase: 3.5,
+  radius: 2.1,
+  regions: [[0, 0, 0.5, 1], [0.5, 0, 1, 1]],
+});
+console.log(near.uvs.length, middle.indices.length, far.indices.length);
+```
+
+Dimensions are in metres. The defaults are 18.64 m tall with a 5.5 m crown base and 3.29 m radius.
+Base and radius scale with height when omitted. The seed (default 730956) sets the branch directions and atlas
+selection. A missing atlas layout uses the full texture. The entry creates geometry and leaves textures and placement
+to the caller. Its branching follows the whorled fir growth descriptions in Burns and Honkala,
+[Silvics of North America](https://www.srs.fs.usda.gov/pubs/misc/ag_654/table_of_contents.htm) (1990).
+The textured levels draw on Fabrice Neyret's
+[Rendering Forest Scenes in Real-Time](https://doi.org/10.2312/EGWR/EGSR04/093-102) (2004) and Éric Bruneton and
+Fabrice Neyret's [Real-Time Realistic Rendering and Lighting of Forests](https://doi.org/10.1111/j.1467-8659.2012.03016.x) (2012).
+
 ```ts
 import {coniferLevels, generateConiferMesh, parseConiferKey} from 'margoengine/procedural/conifers';
 const fir = generateConiferMesh('douglas-fir', {age: 'mature'});

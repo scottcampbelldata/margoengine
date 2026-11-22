@@ -130,6 +130,10 @@
       "types": "./dist/conifers.d.ts",
       "import": "./dist/conifers.js"
     },
+    "./fir-sprays": {
+      "types": "./dist/fir-sprays.d.ts",
+      "import": "./dist/fir-sprays.js"
+    },
     "./conifer-settings": {
       "types": "./dist/conifer-settings.d.ts",
       "import": "./dist/conifer-settings.js"

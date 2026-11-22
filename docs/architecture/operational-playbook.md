@@ -9417,3 +9417,16 @@ margin sits at v 0.03 to 0.09 across the eye, at the corners 0.16 to 0.5; after 
 0.01 of v 0 across the middle 16 of 24 columns. Missing: the corner bins keep up to 0.46 (the top shadow narrows to nothing there
 by its Arc); the rest of the photograph's darkening (the ball's own shading, the lashes) is left to the eye material
 and the lash cards, judged on the film's frames.
+
+## Sky and cloud depth in a live capture
+
+Sky fog and the volumetric cloud march use the active scene capture's depth by default. Terrain, masked canopies and
+other depth-writing surfaces stop the sky effects at their current silhouettes. A separately registered depth prepass
+can omit meshes, so an explicit depth callback still selects that pass. At 4x the sky reads the current multisampled
+depth attachment before it resolves. When the selected depth is unavailable, clouds use the empty-sky depth test and
+fog has no surface to shade.
+
+The proofs are the turning camera in `packages/sky/test/fog-motion-check.html` and the foreground pillar and block
+inside the layer in `packages/sky/test/volumetric-check.html`. These compare automatic depth with an explicit live
+capture and check the explicit unavailable-source behavior. The optical sources are Schneider and Vos (2015) and
+Hillaire (2016), linked from the sky README.

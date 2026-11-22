@@ -9,13 +9,19 @@ export interface SceneDepth {
   samples: number;
 }
 /**
- * The provider's reversed-Z scene depth, checked against the frame (`owner` names the effect in the error). A 4x
+ * Explicit reversed-Z depth, or the active scene capture's depth when the provider is omitted. The texture is checked
+ * against the frame (`owner` names the effect in the error). A 4x
  * capture resolves its 1x depth only when it presents, after these passes, so its own multisampled depth is read
  * instead, as the sky's fog does. Undefined while the provider returns nothing.
  * @throws RangeError when the texture does not match the viewport or sample count, or is not sampleable depth.
  */
-export function sceneDepth(c: Context, provider: () => GPUTexture | undefined, owner: string): SceneDepth | undefined {
-  const depth = provider();
+export function sceneDepth(
+  c: Context,
+  provider: (() => GPUTexture | undefined) | undefined,
+  owner: string,
+): SceneDepth | undefined {
+  const target = sceneTarget(c);
+  const depth = provider ? provider() : target?.resolvedDepth;
   if (!depth) return undefined;
   const samples = c.descriptor.multisample?.count ?? 1;
   if (
@@ -30,8 +36,7 @@ export function sceneDepth(c: Context, provider: () => GPUTexture | undefined, o
     throw new RangeError(
       `${owner} requires sampleable scene depth matching the viewport; pass the scene's depth texture`,
     );
-  const target = sceneTarget(c),
-    live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined;
+  const live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined;
   return live
     ? { resource: live, texture: live, samples: 4 }
     : { resource: depth.createView({ aspect: 'depth-only' }), texture: depth, samples: depth.sampleCount };
