@@ -11,10 +11,15 @@ import { matrixRotation, matrixScale, worldMatrix, type TransformStoreLike } fro
 import type { PhysicsBody } from './body.js';
 
 /** Where a body on `mesh` starts. A child mesh gives its world pose, and its world scale for fitting colliders. */
-export function meshPose(mesh: Mesh, engine: EngineKernel | null): { position: Vec3; rotation: Quat; fitScale?: [number, number, number] } {
+export function meshPose(
+  mesh: Mesh,
+  engine: EngineKernel | null,
+): { position: Vec3; rotation: Quat; fitScale?: [number, number, number] } {
   mesh.check();
   if (mesh instanceof CoreMesh && engine && meshRuntime(mesh).engine !== engine)
-    throw new TypeError('Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.');
+    throw new TypeError(
+      'Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.',
+    );
   if (parentOf(mesh) === -1)
     return {
       position: [mesh.position.x, mesh.position.y, mesh.position.z],
@@ -235,7 +240,10 @@ export class MeshSync {
       if (parent !== -1) this.toLocal(store, parent, position, out);
       else root = runtime.engine;
     } else if (parentOf(mesh) !== -1)
-      throw new MargoError('state', 'Non-core physics bodies need root-level meshes; use a core Mesh for child meshes.');
+      throw new MargoError(
+        'state',
+        'Non-core physics bodies need root-level meshes; use a core Mesh for child meshes.',
+      );
     for (let i = 0; i < 4; i++)
       if (!Number.isFinite(Math.fround(out[i])) || (i < 3 && !Number.isFinite(Math.fround(position[i]))))
         throw new RangeError('A physics body pose must be finite; check the body for NaN or Infinity.');
@@ -281,11 +289,13 @@ export class MeshSync {
   private toLocal(store: TransformStoreLike, parent: number, position: number[], rotation: number[]): void {
     const m = worldMatrix(store, parent, this.parentScratch),
       inverse = invertMatrix(m, this.inverseScratch);
-    if (!inverse) throw new RangeError('Physics body parent has a singular world transform; give the parent a non-zero scale.');
+    if (!inverse)
+      throw new RangeError('Physics body parent has a singular world transform; give the parent a non-zero scale.');
     const x = position[0],
       y = position[1],
       z = position[2];
-    for (let r = 0; r < 3; r++) position[r] = inverse[r] * x + inverse[4 + r] * y + inverse[8 + r] * z + inverse[12 + r];
+    for (let r = 0; r < 3; r++)
+      position[r] = inverse[r] * x + inverse[4 + r] * y + inverse[8 + r] * z + inverse[12 + r];
     const q = this.parentRotation;
     matrixRotation(m, q);
     // conjugate(q) * rotation

@@ -246,8 +246,14 @@ export function createColliderDesc(
         border = options.borderRadius ?? 0;
       if (!(border >= 0) || !Number.isFinite(border))
         throw new RangeError(`${name} borderRadius must be 0 or more and finite (got ${border}).`);
-      if (options.shape === 'cone') desc = border > 0 ? R.ColliderDesc.roundCone(halfHeight, radius, border) : R.ColliderDesc.cone(halfHeight, radius);
-      else desc = border > 0 ? R.ColliderDesc.roundCylinder(halfHeight, radius, border) : R.ColliderDesc.cylinder(halfHeight, radius);
+      if (options.shape === 'cone')
+        desc =
+          border > 0 ? R.ColliderDesc.roundCone(halfHeight, radius, border) : R.ColliderDesc.cone(halfHeight, radius);
+      else
+        desc =
+          border > 0
+            ? R.ColliderDesc.roundCylinder(halfHeight, radius, border)
+            : R.ColliderDesc.cylinder(halfHeight, radius);
       break;
     }
     case 'convexHull': {
@@ -365,7 +371,9 @@ export function createColliderDesc(
     case 'voxels': {
       const { cells, size = [1, 1, 1] } = options;
       if (!(cells instanceof Int32Array) || cells.length % 3)
-        throw new TypeError('A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.');
+        throw new TypeError(
+          'A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.',
+        );
       checkVec(size, 'Voxel size');
       if (!shapeSupported(R, 'voxels'))
         throw new MargoError(

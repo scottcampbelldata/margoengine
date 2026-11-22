@@ -72,9 +72,16 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
     hashes = [],
     hull = world.addHull(OCTAHEDRON, OCTAHEDRON_FACES);
   const spawn = () => {
-    const kind = ['dynamic', 'dynamic', 'dynamic', 'dynamic', 'dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'][
-        random.below(8)
-      ],
+    const kind = [
+        'dynamic',
+        'dynamic',
+        'dynamic',
+        'dynamic',
+        'dynamic',
+        'fixed',
+        'kinematicPosition',
+        'kinematicVelocity',
+      ][random.below(8)],
       row = world.addBody(kind),
       density = kind === 'dynamic' ? 1 + random.below(8) : 0;
     switch (random.below(5)) {
@@ -263,7 +270,13 @@ export function physicsScene(Physics, steps = REPLAY_STEPS) {
   for (let i = 0; i < 4; i++) {
     const points = [];
     for (let k = 0; k < 40; k++) points.push(...vector(0.6));
-    bodies.push(physics.addBody(null, { position: vector(2), linearVelocity: vector(), colliders: { shape: 'convexHull', points } }));
+    bodies.push(
+      physics.addBody(null, {
+        position: vector(2),
+        linearVelocity: vector(),
+        colliders: { shape: 'convexHull', points },
+      }),
+    );
   }
   for (let i = 0; i < steps; i++) {
     if (i % 512 === 0) {

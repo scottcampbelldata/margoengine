@@ -18,7 +18,14 @@ function boxes(list) {
   for (const [x0, y0, z0, x1, y1, z1] of list) {
     const base = vertices.length / 3;
     for (let i = 0; i < 8; i++) vertices.push(i & 4 ? x1 : x0, i & 2 ? y1 : y0, i & 1 ? z1 : z0);
-    for (const [a, b, c, d] of [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]])
+    for (const [a, b, c, d] of [
+      [0, 2, 3, 1],
+      [4, 5, 7, 6],
+      [0, 1, 5, 4],
+      [2, 6, 7, 3],
+      [0, 4, 6, 2],
+      [1, 3, 7, 5],
+    ])
       indices.push(base + a, base + b, base + c, base + a, base + c, base + d);
   }
   return { vertices, indices };
@@ -45,7 +52,12 @@ function cells(filled, scale = 1) {
           w = (a + 2) % 3,
           base = [...cell];
         if (s > 0) base[a] += 1;
-        const q = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([du, dw]) => {
+        const q = [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ].map(([du, dw]) => {
           const p = [...base];
           p[u] += du;
           p[w] += dw;
@@ -78,11 +90,14 @@ function torus(nu = 48, nv = 24) {
 }
 
 function knight() {
-  const words = readFileSync(new URL('../../loaders/tests/fixtures/decimated-knight.off', import.meta.url), 'utf8').split(/\s+/).filter(Boolean);
+  const words = readFileSync(new URL('../../loaders/tests/fixtures/decimated-knight.off', import.meta.url), 'utf8')
+    .split(/\s+/)
+    .filter(Boolean);
   const count = +words[1],
     vertices = words.slice(4, 4 + count * 3).map(Number),
     indices = [];
-  for (let f = 0, i = 4 + count * 3; f < +words[2]; f++, i += 4) indices.push(+words[i + 1], +words[i + 2], +words[i + 3]);
+  for (let f = 0, i = 4 + count * 3; f < +words[2]; f++, i += 4)
+    indices.push(+words[i + 1], +words[i + 2], +words[i + 3]);
   return { vertices, indices };
 }
 
@@ -90,12 +105,19 @@ const ring = (n, h, scale) => {
   const filled = [];
   for (let i = 0; i < n; i++)
     for (let k = 0; k < n; k++)
-      for (let j = 0; j < h; j++) if (i === 0 || i === n - 1 || k === 0 || k === n - 1 || (scale && j === 0)) filled.push([i, j, k]);
+      for (let j = 0; j < h; j++)
+        if (i === 0 || i === n - 1 || k === 0 || k === n - 1 || (scale && j === 0)) filled.push([i, j, k]);
   return cells(filled, scale || 1);
 };
 const meshes = {
   'tube (paper Fig. 9)': ring(4, 4, 0),
-  'cup, five slabs': boxes([[-1, 0, -1, 1, 0.1, 1], [-1, 0, -1, -0.9, 1, 1], [0.9, 0, -1, 1, 1, 1], [-1, 0, -1, 1, 1, -0.9], [-1, 0, 0.9, 1, 1, 1]]),
+  'cup, five slabs': boxes([
+    [-1, 0, -1, 1, 0.1, 1],
+    [-1, 0, -1, -0.9, 1, 1],
+    [0.9, 0, -1, 1, 1, 1],
+    [-1, 0, -1, 1, 1, -0.9],
+    [-1, 0, 0.9, 1, 1, 1],
+  ]),
   'cup, one closed surface': ring(10, 10, 0.2),
   torus: torus(),
   'libigl knight': knight(),
@@ -105,7 +127,10 @@ function volume(v, t) {
   let six = 0;
   for (let i = 0; i < t.length; i += 3) {
     const [a, b, c] = [t[i] * 3, t[i + 1] * 3, t[i + 2] * 3];
-    six += v[a] * (v[b + 1] * v[c + 2] - v[b + 2] * v[c + 1]) + v[a + 1] * (v[b + 2] * v[c] - v[b] * v[c + 2]) + v[a + 2] * (v[b] * v[c + 1] - v[b + 1] * v[c]);
+    six +=
+      v[a] * (v[b + 1] * v[c + 2] - v[b + 2] * v[c + 1]) +
+      v[a + 1] * (v[b + 2] * v[c] - v[b] * v[c + 2]) +
+      v[a + 2] * (v[b] * v[c + 1] - v[b + 1] * v[c]);
   }
   return Math.abs(six / 6);
 }
@@ -117,12 +142,15 @@ function hullVolume(points) {
   for (const f of faces)
     for (let i = 1; i + 1 < f.length; i++) {
       const [a, b, c] = [vertices[f[0]], vertices[f[i]], vertices[f[i + 1]]].map((p) => p.map((x, k) => x - o[k]));
-      six += a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+      six +=
+        a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
     }
   return six / 6;
 }
 
-console.log('| Mesh | Rapier parts | Own parts | Rapier ms | Own ms | Rapier Eq. 10 | Own Eq. 10 | Rapier hulls / mesh | Own hulls / mesh |');
+console.log(
+  '| Mesh | Rapier parts | Own parts | Rapier ms | Own ms | Rapier Eq. 10 | Own Eq. 10 | Rapier hulls / mesh | Own hulls / mesh |',
+);
 console.log('| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
 for (const [name, mesh] of Object.entries(meshes)) {
   const v = new Float32Array(mesh.vertices),

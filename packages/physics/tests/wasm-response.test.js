@@ -9,15 +9,18 @@ import { emptyWasm, lookAlikeWasm } from './wasm-fixtures.js';
 const wasm = await readFile(new URL('../dist/rapier3d.wasm', import.meta.url));
 const respond = (body, type) => new Response(body, { headers: { 'content-type': type } });
 
-test('a Response holding foreign Wasm or an error status is refused; Rapier\'s Wasm loads under any content type', async () => {
+test("a Response holding foreign Wasm or an error status is refused; Rapier's Wasm loads under any content type", async () => {
   for (const body of [emptyWasm, lookAlikeWasm])
     for (const type of ['application/wasm', 'application/octet-stream'])
       await assert.rejects(Physics.load({ wasm: respond(body, type) }), { name: 'MargoError', code: 'failed' });
-  await assert.rejects(Physics.load({ wasm: new Response('gone', { status: 404, statusText: 'Not Found' }) }), (error) => {
-    assert.equal(error.code, 'failed');
-    assert.match(error.message, /404 Not Found/);
-    return true;
-  });
+  await assert.rejects(
+    Physics.load({ wasm: new Response('gone', { status: 404, statusText: 'Not Found' }) }),
+    (error) => {
+      assert.equal(error.code, 'failed');
+      assert.match(error.message, /404 Not Found/);
+      return true;
+    },
+  );
   assert.throws(() => new Physics(null), { code: 'state' }, 'nothing loaded yet');
 
   await Physics.load({ wasm: respond(wasm, 'application/octet-stream') });

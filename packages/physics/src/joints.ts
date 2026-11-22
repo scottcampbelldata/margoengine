@@ -131,12 +131,14 @@ export class PhysicsJoint {
   }
   private spherical(): SphericalImpulseJoint {
     if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+    if (this.type !== 'spherical')
+      throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
     return this.axes();
   }
   private generic(dof: JointDof): number {
     if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'generic') throw new TypeError('Axis limits and motors need a generic joint; use setLimits or setMotor.');
+    if (this.type !== 'generic')
+      throw new TypeError('Axis limits and motors need a generic joint; use setLimits or setMotor.');
     const axis = DOFS.indexOf(dof);
     if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
     return axis;
@@ -272,9 +274,14 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
           throw new TypeError('A joint takes an axis, or frameA and frameB together; pass one or the other.');
         for (const frame of [frameA, frameB])
           if (frame.length !== 4 || !frame.every(Number.isFinite) || !Math.hypot(...frame))
-            throw new RangeError('Joint frames must be four finite numbers, not all zero; pass a quaternion [x, y, z, w].');
+            throw new RangeError(
+              'Joint frames must be four finite numbers, not all zero; pass a quaternion [x, y, z, w].',
+            );
         if (typeof R.ImpulseJoint?.prototype.setLocalFrame1 !== 'function')
-          throw new MargoError('unsupported', 'Joint frames need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.');
+          throw new MargoError(
+            'unsupported',
+            'Joint frames need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.',
+          );
       }
       const given: Vec3 | undefined = options.axis ?? (frameA ? [1, 0, 0] : undefined);
       checkVec(given, 'Joint axis');
@@ -293,11 +300,15 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
     }
     case 'generic': {
       if (!R.JointData.generic || !R.JointAxis)
-        throw new MargoError('unsupported', 'Generic joints need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.');
+        throw new MargoError(
+          'unsupported',
+          'Generic joints need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.',
+        );
       let locked = 0;
       for (const dof of options.locked ?? []) {
         const axis = DOFS.indexOf(dof);
-        if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+        if (axis < 0)
+          throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
         locked |= 1 << axis;
       }
       return R.JointData.generic(vec(anchorA), vec(anchorB), vec([1, 0, 0]), locked);

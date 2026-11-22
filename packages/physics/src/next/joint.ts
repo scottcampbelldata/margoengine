@@ -2,7 +2,16 @@
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
 import type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
-import { JOINT_CONE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
+import {
+  JOINT_CONE,
+  JOINT_CONTACTS,
+  JOINT_DISTANCE,
+  JOINT_LIMIT,
+  JOINT_LOCK,
+  JOINT_MOTOR_FORCE,
+  JOINT_MOTOR_ON,
+  type KernelWorld,
+} from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
 
@@ -50,14 +59,15 @@ const locks: Readonly<Partial<Record<JointType | 'cone', number>>> = {
   spherical: JOINT_LOCK * LINEAR,
   revolute: JOINT_LOCK * (LINEAR | (6 << 3)),
   prismatic: JOINT_LOCK * (6 | ANGULAR),
-  cone: JOINT_LOCK * LINEAR | JOINT_CONE | (JOINT_LIMIT << SWING),
+  cone: (JOINT_LOCK * LINEAR) | JOINT_CONE | (JOINT_LIMIT << SWING),
   // The first axis of these two is the line between the anchors, and what it reads is their distance.
   rope: JOINT_DISTANCE | (JOINT_LIMIT << SLIDE),
   spring: JOINT_DISTANCE | (JOINT_MOTOR_ON << SLIDE) | (JOINT_MOTOR_FORCE << SLIDE),
 };
 
 function checkLimits(min: number, max: number): void {
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) throw new RangeError('Joint limits need finite min <= max');
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
+    throw new RangeError('Joint limits need finite min <= max');
 }
 function swingLimits(swing: number | readonly [number, number]): readonly [number, number] {
   const [y, z] = typeof swing === 'number' ? [swing, swing] : swing;
@@ -130,7 +140,9 @@ export class PhysicsJoint {
     const axis = this.unit(),
       { row } = this,
       columns = this.owner.kernel.columns;
-    return columns.jointFlags[row] & (JOINT_LIMIT << axis) ? [columns[`jointMin${axis}`][row], columns[`jointMax${axis}`][row]] : null;
+    return columns.jointFlags[row] & (JOINT_LIMIT << axis)
+      ? [columns[`jointMin${axis}`][row], columns[`jointMax${axis}`][row]]
+      : null;
   }
   /** A cone's limits: its swing and, with `twist` given, its twist. With no `twist` the joint twists freely. */
   setCone(swing: number | readonly [number, number], twist?: readonly [number, number]): this {
@@ -146,7 +158,9 @@ export class PhysicsJoint {
     columns[`jointMax${ELLIPSE}`][row] = z;
     columns[`jointMin${TWIST}`][row] = twist ? twist[0] : 0;
     columns[`jointMax${TWIST}`][row] = twist ? twist[1] : 0;
-    columns.jointFlags[row] = twist ? columns.jointFlags[row] | (JOINT_LIMIT << TWIST) : columns.jointFlags[row] & ~(JOINT_LIMIT << TWIST);
+    columns.jointFlags[row] = twist
+      ? columns.jointFlags[row] | (JOINT_LIMIT << TWIST)
+      : columns.jointFlags[row] & ~(JOINT_LIMIT << TWIST);
     this.wake();
     return this;
   }
@@ -177,14 +191,16 @@ export class PhysicsJoint {
     columns[`jointDamping${axis}`][row] = motor.damping ?? (position === undefined ? 1 : 0);
     columns[`jointCap${axis}`][row] = cap;
     const force = JOINT_MOTOR_FORCE << axis;
-    columns.jointFlags[row] = (columns.jointFlags[row] & ~force) | (JOINT_MOTOR_ON << axis) | (motor.model === 'force' ? force : 0);
+    columns.jointFlags[row] =
+      (columns.jointFlags[row] & ~force) | (JOINT_MOTOR_ON << axis) | (motor.model === 'force' ? force : 0);
     this.wake();
     return this;
   }
   /** A generic joint's axis by name, one it does not lock. */
   private free(dof: JointDof): number {
     if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'generic') throw new TypeError('Axis limits and motors need a generic joint; use setLimits or setMotor.');
+    if (this.type !== 'generic')
+      throw new TypeError('Axis limits and motors need a generic joint; use setLimits or setMotor.');
     const axis = DOFS.indexOf(dof);
     if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
     if (this.owner.kernel.columns.jointFlags[this.row] & (JOINT_LOCK << axis))
@@ -200,7 +216,8 @@ export class PhysicsJoint {
    */
   setRotationMotor(rotation: Quat, motor: RotationMotorOptions = {}): this {
     if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+    if (this.type !== 'spherical')
+      throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
     const [x, y, z, w] = rotation;
     const squared = x * x + y * y + z * z + w * w;
     if (!(squared > 0.998 && squared < 1.002))
@@ -222,7 +239,8 @@ export class PhysicsJoint {
       columns[`jointStiffness${axis}`][row] = motor.stiffness ?? 1;
       columns[`jointDamping${axis}`][row] = motor.damping ?? 0;
       columns[`jointCap${axis}`][row] = cap;
-      columns.jointFlags[row] = (columns.jointFlags[row] & ~force) | (JOINT_MOTOR_ON << axis) | (motor.model === 'force' ? force : 0);
+      columns.jointFlags[row] =
+        (columns.jointFlags[row] & ~force) | (JOINT_MOTOR_ON << axis) | (motor.model === 'force' ? force : 0);
     }
     this.wake();
     return this;
@@ -278,11 +296,18 @@ export class PhysicsJoint {
  * Puts a joint on two bodies in the kernel.
  * @throws MargoError (`unsupported`) for a kind the own solver does not hold yet.
  */
-export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint {
+export function createJoint(
+  owner: JointOwner,
+  bodyA: PhysicsBody,
+  bodyB: PhysicsBody,
+  options: NextJointOptions,
+): PhysicsJoint {
   const { type, anchorA = [0, 0, 0], anchorB = [0, 0, 0] } = options,
     locked = type === 'generic' ? genericLocks(options.locked ?? []) : locks[type];
   if (locked === undefined)
-    throw new TypeError(`Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring or generic.`);
+    throw new TypeError(
+      `Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring or generic.`,
+    );
   checkVec(anchorA, 'anchorA');
   checkVec(anchorB, 'anchorB');
   const { frameA, frameB } = options as { frameA?: Quat; frameB?: Quat };
@@ -350,8 +375,10 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
     joint.setCone(options.swing, options.twist);
   }
   if (type === 'generic') {
-    for (const [dof, range] of Object.entries(options.limits ?? {})) if (range) joint.setAxisLimits(dof as JointDof, range[0], range[1]);
-    for (const [dof, motor] of Object.entries(options.motors ?? {})) if (motor) joint.setAxisMotor(dof as JointDof, motor);
+    for (const [dof, range] of Object.entries(options.limits ?? {}))
+      if (range) joint.setAxisLimits(dof as JointDof, range[0], range[1]);
+    for (const [dof, motor] of Object.entries(options.motors ?? {}))
+      if (motor) joint.setAxisMotor(dof as JointDof, motor);
   }
   return joint;
 }

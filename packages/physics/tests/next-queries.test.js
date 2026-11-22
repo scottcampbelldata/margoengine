@@ -33,7 +33,11 @@ const scene = (physics) => {
       { shape: 'box', halfExtents: [0.5, 0.3, 0.8] },
       { shape: 'capsule', radius: 0.3, halfHeight: 0.6 },
       { shape: 'convexHull', points: Float32Array.from([0, 1, 0, 1, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, -1, 0, -1, 0]) },
-      { shape: 'trimesh', vertices: Float32Array.from([-1, 0, -1, 1, 0, -1, 0, 0.5, 1, 0, -0.5, 0]), indices: Uint32Array.from([0, 1, 2, 0, 3, 1]) },
+      {
+        shape: 'trimesh',
+        vertices: Float32Array.from([-1, 0, -1, 1, 0, -1, 0, 0.5, 1, 0, -0.5, 0]),
+        indices: Uint32Array.from([0, 1, 2, 0, 3, 1]),
+      },
       { shape: 'heightfield', rows: 4, columns: 4, heights, scale: [3, 1, 3] },
       { shape: 'voxels', cells: Int32Array.from([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1]), size: [0.4, 0.4, 0.4] },
     ],
@@ -41,7 +45,10 @@ const scene = (physics) => {
     bodies = [];
   for (let i = 0; i < 28; i++) {
     const colliders = { ...shapes[i % shapes.length], sensor: i % 9 === 4 },
-      type = colliders.shape === 'trimesh' || colliders.shape === 'heightfield' || colliders.shape === 'voxels' ? 'fixed' : kinds[i % 3];
+      type =
+        colliders.shape === 'trimesh' || colliders.shape === 'heightfield' || colliders.shape === 'voxels'
+          ? 'fixed'
+          : kinds[i % 3];
     bodies.push(physics.addBody(null, { type, position: at(), rotation: turn(), gravityScale: 0, colliders }));
   }
   physics instanceof Physics ? physics.step() : physics.update(1 / 60);
@@ -65,7 +72,11 @@ const close = (a, b, tolerance, what) => assert.ok(Math.abs(a - b) <= tolerance,
  */
 const confirmed = (rapier, rapierBodies, index, hit) => {
   const from = hit.point.map((v, k) => v + hit.normal[k] * 0.01),
-    back = rapier.raycastAll(from, hit.normal.map((v) => -v), { maxDistance: 0.02, predicate: (body) => rapierBodies.indexOf(body) === index });
+    back = rapier.raycastAll(
+      from,
+      hit.normal.map((v) => -v),
+      { maxDistance: 0.02, predicate: (body) => rapierBodies.indexOf(body) === index },
+    );
   return back.length === 1 && Math.abs(back[0].distance - 0.01) < 1e-4;
 };
 /** The own list without the hits Rapier misses but confirms; how many it dropped goes to `missed`. */
@@ -73,7 +84,10 @@ const agreed = (own, ownBodies, rapier, rapierBodies, theirs, missed) =>
   own.filter((hit) => {
     const index = ownBodies.indexOf(hit.body);
     if (theirs.some((other) => rapierBodies.indexOf(other.body) === index)) return true;
-    assert.ok(confirmed(rapier, rapierBodies, index, hit), `own hit on body ${index} at ${hit.point} that Rapier does not confirm`);
+    assert.ok(
+      confirmed(rapier, rapierBodies, index, hit),
+      `own hit on body ${index} at ${hit.point} that Rapier does not confirm`,
+    );
     missed.count++;
     return false;
   });
@@ -89,11 +103,19 @@ test('raycast finds the hit Rapier finds on every shape: the body, distance, poi
     for (const [origin, direction] of rays()) {
       const b = rapier.raycast(origin, direction, { solid, maxDistance: 30 });
       let a = own.raycast(origin, direction, { solid, maxDistance: 30 });
-      if (a && (!b || b.distance > a.distance + 1e-4) && confirmed(rapier, rapierBodies, ownBodies.indexOf(a.body), a)) {
+      if (
+        a &&
+        (!b || b.distance > a.distance + 1e-4) &&
+        confirmed(rapier, rapierBodies, ownBodies.indexOf(a.body), a)
+      ) {
         // Rapier missed this one; its next hit must be the own solver's next one.
         missed.count++;
         const index = ownBodies.indexOf(a.body);
-        a = own.raycast(origin, direction, { solid, maxDistance: 30, predicate: (body) => ownBodies.indexOf(body) !== index });
+        a = own.raycast(origin, direction, {
+          solid,
+          maxDistance: 30,
+          predicate: (body) => ownBodies.indexOf(body) !== index,
+        });
       }
       assert.equal(!!a, !!b, `hit or miss from ${origin} along ${direction}`);
       if (!a) continue;
@@ -102,7 +124,8 @@ test('raycast finds the hit Rapier finds on every shape: the body, distance, poi
       close(a.distance, b.distance, 1e-4, 'distance');
       for (let k = 0; k < 3; k++) close(a.point[k], b.point[k], 1e-3, 'point');
       // Rapier gives a solid start inside a ball the ray's reverse, and other shapes no normal; the own solver none.
-      if (a.distance > 0) for (let k = 0; k < 3; k++) close(a.normal[k], b.normal[k], 1e-3, `normal of ${a.collider.shape ?? ''}`);
+      if (a.distance > 0)
+        for (let k = 0; k < 3; k++) close(a.normal[k], b.normal[k], 1e-3, `normal of ${a.collider.shape ?? ''}`);
     }
   assert.ok(hits > 150, `enough hits to mean anything: ${hits}`);
   assert.ok(missed.count <= 4, `hits Rapier misses: ${missed.count}`);
@@ -158,7 +181,9 @@ test('the query filter leaves out what each option names, as on Rapier', () => {
     };
     for (const [origin, direction] of rays()) {
       const b = rapier.raycastAll(origin, direction, pick(rapierBodies)),
-        a = agreed(own.raycastAll(origin, direction, pick(ownBodies)), ownBodies, rapier, rapierBodies, b, { count: 0 });
+        a = agreed(own.raycastAll(origin, direction, pick(ownBodies)), ownBodies, rapier, rapierBodies, b, {
+          count: 0,
+        });
       assert.deepEqual(
         a.map((hit) => ownBodies.indexOf(hit.body)),
         b.map((hit) => rapierBodies.indexOf(hit.body)),
@@ -166,15 +191,26 @@ test('the query filter leaves out what each option names, as on Rapier', () => {
       );
       const first = own.raycast(origin, direction, pick(ownBodies)),
         all = own.raycastAll(origin, direction, pick(ownBodies));
-      assert.equal(first ? ownBodies.indexOf(first.body) : -1, all.length ? ownBodies.indexOf(all[0].body) : -1, 'raycast is the first of raycastAll');
+      assert.equal(
+        first ? ownBodies.indexOf(first.body) : -1,
+        all.length ? ownBodies.indexOf(all[0].body) : -1,
+        'raycast is the first of raycastAll',
+      );
     }
   }
   // The flags Rapier has that the root entry does not name: solids out, and one kind only.
   const sensors = own.raycastAll([0, 0, -20], [0, 0, 1], { excludeSolids: true });
   assert.ok(sensors.every((hit) => hit.collider.isSensor()));
-  for (const [flag, type] of [['onlyDynamic', 'dynamic'], ['onlyFixed', 'fixed'], ['onlyKinematic', 'kinematicPosition']])
+  for (const [flag, type] of [
+    ['onlyDynamic', 'dynamic'],
+    ['onlyFixed', 'fixed'],
+    ['onlyKinematic', 'kinematicPosition'],
+  ])
     for (const [origin, direction] of rays().slice(0, 100))
-      assert.ok(own.raycastAll(origin, direction, { [flag]: true }).every((hit) => hit.body.type === type), flag);
+      assert.ok(
+        own.raycastAll(origin, direction, { [flag]: true }).every((hit) => hit.body.type === type),
+        flag,
+      );
 });
 
 test('a ray refuses a zero or not finite direction', () => {

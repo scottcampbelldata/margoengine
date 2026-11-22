@@ -9,7 +9,11 @@ await Physics.load();
 
 const near = (got, want, within, what) => assert.ok(Math.abs(got - want) <= within, `${what}: ${got} against ${want}`);
 const ground = (physics, options = {}) =>
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20], ...options } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [20, 0.5, 20], ...options },
+  });
 const run = (physics, seconds) => {
   for (let i = 0; i < seconds * 60; i++) physics.step();
 };
@@ -48,7 +52,11 @@ test('sensors fire intersection start and end events and push nothing', () => {
 
 test('sensors also fire for kinematic bodies such as characters', () => {
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', position: [3, 1, 0], colliders: { shape: 'box', halfExtents: [0.5, 1, 1], sensor: true } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [3, 1, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 1, 1], sensor: true },
+  });
   const character = physics.addBody(null, {
       type: 'kinematicPosition',
       position: [0, 1, 0],
@@ -71,17 +79,26 @@ test('contact events name both sides, and a collider with events off stays quiet
     box = physics.addBody(null, { position: [0, 0.6, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } }),
     log = listen(physics);
   run(physics, 0.5);
-  assert.deepEqual(log.map((event) => event.type), ['contactstart']);
+  assert.deepEqual(
+    log.map((event) => event.type),
+    ['contactstart'],
+  );
   assert.deepEqual(new Set([log[0].bodyA, log[0].bodyB]), new Set([floor, box]));
   box.setPosition([0, 5, 0]);
   physics.step();
-  assert.deepEqual(log.map((event) => event.type), ['contactstart', 'contactend']);
+  assert.deepEqual(
+    log.map((event) => event.type),
+    ['contactstart', 'contactend'],
+  );
   physics.dispose();
 
   const quiet = new Physics(null),
     calm = [];
   ground(quiet, { events: false });
-  quiet.addBody(null, { position: [0, 0.6, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], events: false } });
+  quiet.addBody(null, {
+    position: [0, 0.6, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], events: false },
+  });
   quiet.addBody(null, { position: [3, 0.6, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
   quiet.on('contactstart', (event) => calm.push(event));
   run(quiet, 0.5);
@@ -123,7 +140,10 @@ test('collision groups decide who collides, solver groups who is solved', () => 
   assert.ok(ghost.position[1] < -1, 'group-filtered body falls through the ground');
   near(heavy.position[1], 0.5, 0.01, 'grouped body rests');
   assert.ok(unsolved.position[1] < -1, 'a pair not solved does not hold');
-  assert.ok(log.some((event) => event.type === 'contactstart' && (event.bodyA === unsolved || event.bodyB === unsolved)), 'it says so');
+  assert.ok(
+    log.some((event) => event.type === 'contactstart' && (event.bodyA === unsolved || event.bodyB === unsolved)),
+    'it says so',
+  );
   assert.ok(!log.some((event) => event.bodyA === ghost || event.bodyB === ghost));
   const collider = heavy.colliders[0],
     groups = collisionGroups(1, 2);
@@ -143,10 +163,17 @@ test('a contact filter decides pair by pair', () => {
     },
   });
   ground(physics);
-  const passer = physics.addBody(null, { position: [0, 1, 0], userData: 'ghost', colliders: { shape: 'sphere', radius: 0.5 } }),
+  const passer = physics.addBody(null, {
+      position: [0, 1, 0],
+      userData: 'ghost',
+      colliders: { shape: 'sphere', radius: 0.5 },
+    }),
     lander = physics.addBody(null, { position: [2, 1, 0], colliders: { shape: 'sphere', radius: 0.5 } });
   run(physics, 1);
-  assert.ok(filtered > 0 && passer.position[1] < -1 && Math.abs(lander.position[1] - 0.5) < 0.02, 'contact filter lets the ghost through');
+  assert.ok(
+    filtered > 0 && passer.position[1] < -1 && Math.abs(lander.position[1] - 0.5) < 0.02,
+    'contact filter lets the ghost through',
+  );
   physics.dispose();
 });
 
@@ -160,7 +187,8 @@ test('a filter sees true bodies though the step grew the world, and may not step
       },
     });
   ground(physics);
-  for (let i = 0; i < 40; i++) physics.addBody(null, { position: [i % 8, 1 + (i >> 3), 0], colliders: { shape: 'sphere', radius: 0.5 } });
+  for (let i = 0; i < 40; i++)
+    physics.addBody(null, { position: [i % 8, 1 + (i >> 3), 0], colliders: { shape: 'sphere', radius: 0.5 } });
   run(physics, 0.5);
   assert.ok(seen.size > 4, 'it read poses in the step');
   physics.dispose();
@@ -204,7 +232,11 @@ test('a higher dominance is a wall to a lower one, and nothing to a floor', () =
 
   const standing = new Physics(null);
   ground(standing);
-  const box = standing.addBody(null, { position: [0, 0.5, 0], dominance: 5, colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  const box = standing.addBody(null, {
+    position: [0, 0.5, 0],
+    dominance: 5,
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
   run(standing, 1);
   near(box.position[1], 0.5, 0.01, 'the floor still holds it');
   standing.dispose();
@@ -222,7 +254,10 @@ test('a disabled body leaves the world and comes back; a disabled collider touch
   lower.enabled = false;
   assert.equal(lower.enabled, false);
   physics.step();
-  assert.deepEqual(log.map((event) => event.type), ['contactend', 'contactend']);
+  assert.deepEqual(
+    log.map((event) => event.type),
+    ['contactend', 'contactend'],
+  );
   const held = lower.position;
   run(physics, 1);
   assert.deepEqual(lower.position, held, 'it stays');

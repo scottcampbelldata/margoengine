@@ -396,7 +396,9 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
       const t = queue.pop()!;
       if (region[t] >= 0) continue;
       if (
-        normal[t * 3] * normal[seed * 3] + normal[t * 3 + 1] * normal[seed * 3 + 1] + normal[t * 3 + 2] * normal[seed * 3 + 2] <=
+        normal[t * 3] * normal[seed * 3] +
+          normal[t * 3 + 1] * normal[seed * 3 + 1] +
+          normal[t * 3 + 2] * normal[seed * 3 + 2] <=
         0.5
       )
         continue;

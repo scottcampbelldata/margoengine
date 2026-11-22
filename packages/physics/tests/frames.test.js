@@ -90,7 +90,10 @@ test('a frame is given with the other and not with an axis', () => {
     b = physics.addBody(null, { colliders: [] });
   assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: IDENTITY }), TypeError);
   assert.throws(() => physics.addJoint(a, b, { type: 'prismatic', frameB: IDENTITY }), TypeError);
-  assert.throws(() => physics.addJoint(a, b, { type: 'revolute', axis: [0, 1, 0], frameA: IDENTITY, frameB: IDENTITY }), TypeError);
+  assert.throws(
+    () => physics.addJoint(a, b, { type: 'revolute', axis: [0, 1, 0], frameA: IDENTITY, frameB: IDENTITY }),
+    TypeError,
+  );
   assert.throws(() => physics.addJoint(a, b, { type: 'revolute' }), TypeError);
   physics.dispose();
 });
@@ -99,7 +102,11 @@ test('a frame is a quaternion', () => {
   const physics = new Physics(null),
     a = physics.addBody(null, { colliders: [] }),
     b = physics.addBody(null, { colliders: [] });
-  for (const frame of [[0, 0, 0, 0], [0, 0, 1], [0, 0, NaN, 1]])
+  for (const frame of [
+    [0, 0, 0, 0],
+    [0, 0, 1],
+    [0, 0, NaN, 1],
+  ])
     assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: frame, frameB: IDENTITY }), RangeError);
   physics.dispose();
 });
@@ -112,7 +119,9 @@ test('a solver without joint frames refuses them with a coded error', () => {
     { setLocalFrame1 } = prototype;
   prototype.setLocalFrame1 = undefined;
   try {
-    assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: IDENTITY, frameB: IDENTITY }), { code: 'unsupported' });
+    assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: IDENTITY, frameB: IDENTITY }), {
+      code: 'unsupported',
+    });
   } finally {
     prototype.setLocalFrame1 = setLocalFrame1;
   }
@@ -148,7 +157,11 @@ test('the force and torque left on a body read back until they are reset', () =>
 
 test('contact points name where the solver pushes on a body', () => {
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [5, 0.5, 5] }, position: [0, -0.5, 0] });
+  physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+    position: [0, -0.5, 0],
+  });
   const box = physics.addBody(null, {
       canSleep: false,
       position: [1, 0.49, 2],
@@ -163,10 +176,12 @@ test('contact points name where the solver pushes on a body', () => {
   physics.step();
   const corners = physics.contactPoints(box);
   assert.equal(corners.length, 4, 'a box on a floor stands on four corners');
-  assert.deepEqual(
-    corners.map(([x, , z]) => `${Math.round(x * 2) / 2} ${Math.round(z * 2) / 2}`).sort(),
-    ['0.5 1.5', '0.5 2.5', '1.5 1.5', '1.5 2.5'],
-  );
+  assert.deepEqual(corners.map(([x, , z]) => `${Math.round(x * 2) / 2} ${Math.round(z * 2) / 2}`).sort(), [
+    '0.5 1.5',
+    '0.5 2.5',
+    '1.5 1.5',
+    '1.5 2.5',
+  ]);
   for (const [, y] of corners) near(y, 0, 0.02, 'on the floor');
   assert.deepEqual(physics.contactPoints(high), [], 'a body in the air has none');
   assert.deepEqual(physics.contactPoints(ghost), [], 'nor has a sensor');

@@ -72,7 +72,11 @@ test('a body that leaves the numbers stops the world and says why', () => {
   // r'' = w^2 r on a free rail: the true path grows without end, and no answer past the end of f32 is right.
   const physics = new Physics(null, { gravity: [0, 0, 0] }),
     hub = physics.addBody(null, { type: 'kinematicVelocity', angularVelocity: [0, 8, 0], colliders: [] }),
-    bead = physics.addBody(null, { position: [1, 0, 0], angularVelocity: [0, 8, 0], colliders: { shape: 'sphere', radius: 0.1 } });
+    bead = physics.addBody(null, {
+      position: [1, 0, 0],
+      angularVelocity: [0, 8, 0],
+      colliders: { shape: 'sphere', radius: 0.1 },
+    });
   physics.addJoint(hub, bead, { type: 'prismatic', axis: [1, 0, 0], contactsEnabled: false });
   let steps = 0;
   assert.throws(
@@ -182,9 +186,18 @@ test('wrong input says what to pass', () => {
   assert.throws(() => physics.addJoint(a, a, { type: 'fixed' }), { code: 'state', message: /two different bodies/ });
   assert.throws(() => physics.addJoint(a, b, { type: 'twisty' }), /Unknown joint type twisty/);
   assert.throws(() => physics.addJoint(a, b, { type: 'revolute', axis: [0, 0, 0] }), /axis must be nonzero/);
-  assert.throws(() => physics.addJoint(a, b, { type: 'revolute', axis: [1, 0, 0], limits: [1, 0] }), /finite min <= max/);
-  assert.throws(() => physics.addJoint(a, b, { type: 'revolute', axis: [1, 0, 0], frameA: [0, 0, 0, 1] }), /one or the other/);
-  assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: [0, 0, 0, 0], frameB: [0, 0, 0, 1] }), /not all zero/);
+  assert.throws(
+    () => physics.addJoint(a, b, { type: 'revolute', axis: [1, 0, 0], limits: [1, 0] }),
+    /finite min <= max/,
+  );
+  assert.throws(
+    () => physics.addJoint(a, b, { type: 'revolute', axis: [1, 0, 0], frameA: [0, 0, 0, 1] }),
+    /one or the other/,
+  );
+  assert.throws(
+    () => physics.addJoint(a, b, { type: 'revolute', frameA: [0, 0, 0, 0], frameB: [0, 0, 0, 1] }),
+    /not all zero/,
+  );
   assert.throws(() => physics.addJoint(a, b, { type: 'fixed', anchorA: [Number.NaN, 0, 0] }), /anchorA/);
   const joint = physics.addJoint(a, b, { type: 'spherical' });
   assert.throws(() => joint.setLimits(0, 1), /need a revolute or prismatic joint/);
@@ -243,16 +256,38 @@ test('a cone stops a swing at its edge and a twist at its limit', () => {
   const physics = new Physics(null);
   physics.gravity = [0, 0, 0];
   const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    rod = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
-    joint = physics.addJoint(top, rod, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4] });
-  assert.deepEqual(joint.cone.twist.map((value) => Math.round(value * 100) / 100), [-0.4, 0.4]);
+    rod = physics.addBody(null, {
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 },
+    }),
+    joint = physics.addJoint(top, rod, {
+      type: 'cone',
+      anchorB: [0, 0.5, 0],
+      axis: [0, -1, 0],
+      swing: 0.5,
+      twist: [-0.4, 0.4],
+    });
+  assert.deepEqual(
+    joint.cone.twist.map((value) => Math.round(value * 100) / 100),
+    [-0.4, 0.4],
+  );
   rod.setLinearVelocity([3, 0, 0]);
   rod.setAngularVelocity([0, 0, 6]);
   for (let i = 0; i < 120; i++) physics.step();
   near(2 * Math.abs(Math.atan2(rod.rotation[2], rod.rotation[3])), 0.5, 1e-3, 'swing');
   near(rod.angularVelocity[2], 0, 1e-3, 'rest on the edge');
-  const spun = physics.addBody(null, { position: [3, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } });
-  physics.addJoint(top, spun, { type: 'cone', anchorA: [3, 0, 0], anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4] });
+  const spun = physics.addBody(null, {
+    position: [3, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 },
+  });
+  physics.addJoint(top, spun, {
+    type: 'cone',
+    anchorA: [3, 0, 0],
+    anchorB: [0, 0.5, 0],
+    axis: [0, -1, 0],
+    swing: 0.5,
+    twist: [-0.4, 0.4],
+  });
   spun.setAngularVelocity([0, 4, 0]);
   for (let i = 0; i < 120; i++) physics.step();
   near(2 * Math.abs(Math.atan2(spun.rotation[1], spun.rotation[3])), 0.4, 1e-3, 'twist');
@@ -264,7 +299,10 @@ test('a cone twists freely without a twist, and refuses what it cannot be', () =
   const physics = new Physics(null);
   physics.gravity = [0, 0, 0];
   const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    rod = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
+    rod = physics.addBody(null, {
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 },
+    }),
     joint = physics.addJoint(top, rod, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: [0.3, 0.8] });
   assert.equal(joint.cone.twist, null);
   rod.setAngularVelocity([0, 1, 0]);
@@ -280,7 +318,9 @@ test('a cone twists freely without a twist, and refuses what it cannot be', () =
 /** A rod of `mass` kg and length 1 m on a spherical joint at the world origin, reaching along +x, centre at 0.5 m. */
 function ballRod(physics, mass = 2) {
   const anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    rod = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass } });
+    rod = physics.addBody(null, {
+      colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass },
+    });
   return { rod, joint: physics.addJoint(anchor, rod, { type: 'spherical' }), inertia: (mass * 1) / 3 };
 }
 const turned = (q) => 2 * Math.acos(Math.min(1, Math.abs(q[3])));
@@ -357,7 +397,9 @@ test('maxForce caps a motor at the torque it names, on a ball joint and on a hin
     const held = (cap) => {
       const physics = new Physics(null, { gravity: [0, -9.81, 0] }),
         anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
-        rod = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass: 2 } }),
+        rod = physics.addBody(null, {
+          colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass: 2 },
+        }),
         gains = { model: 'force', stiffness: 4000, damping: 400, maxForce: cap },
         joint = hinge
           ? physics.addJoint(anchor, rod, { type: 'revolute', axis: [0, 0, 1], motor: { targetPosition: 0, ...gains } })
@@ -426,7 +468,13 @@ test('rope and spring joints refuse what they cannot be', () => {
     b = physics.addBody(null, { colliders: [] });
   assert.throws(() => physics.addJoint(a, b, { type: 'rope', length: 0 }), /positive finite number/);
   assert.throws(() => physics.addJoint(a, b, { type: 'spring', restLength: -1, stiffness: 1 }), /restLength/);
-  assert.throws(() => physics.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: -1 }), /stiffness and damping/);
-  assert.throws(() => physics.addJoint(a, b, { type: 'rope', length: 1 }).setLimits(0, 1), /need a revolute or prismatic joint/);
+  assert.throws(
+    () => physics.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: -1 }),
+    /stiffness and damping/,
+  );
+  assert.throws(
+    () => physics.addJoint(a, b, { type: 'rope', length: 1 }).setLimits(0, 1),
+    /need a revolute or prismatic joint/,
+  );
   physics.dispose();
 });

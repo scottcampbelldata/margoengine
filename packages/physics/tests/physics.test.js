@@ -580,7 +580,12 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
   );
   const heights = new Float32Array(5 * 5).fill(0.5);
   near(rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20] }), 0.5, 0.02, 'heightfield');
-  near(rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20], fixInternalEdges: true }), 0.5, 0.02, 'heightfield, internal edges fixed');
+  near(
+    rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20], fixInternalEdges: true }),
+    0.5,
+    0.02,
+    'heightfield, internal edges fixed',
+  );
   // Geometry-derived colliders take the mesh scale.
   const physics = create();
   const body = physics.addBody(
@@ -945,7 +950,14 @@ rtest('dispose removes the world from its own scene, not the active one', async 
     other.use({ name: 'loader', setup: () => (physics = new Physics(engine, { rapier: RAPIER })) });
     other.removePlugin('loader');
     assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
-    const bystander = { name: 'physics', disposed: 0, setup() {}, dispose() { this.disposed++; } };
+    const bystander = {
+      name: 'physics',
+      disposed: 0,
+      setup() {},
+      dispose() {
+        this.disposed++;
+      },
+    };
     engine.use(bystander);
     physics.dispose();
     assert.ok(physics.isDisposed);

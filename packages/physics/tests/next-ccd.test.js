@@ -20,7 +20,11 @@ const random = (seed) => () => {
 };
 const walls = {
   box: { shape: 'box', halfExtents: [0.01, 6, 6] },
-  trimesh: { shape: 'trimesh', vertices: Float32Array.from([0, -6, -6, 0, 6, -6, 0, 6, 6, 0, -6, 6]), indices: Uint32Array.from([0, 1, 2, 0, 2, 3]) },
+  trimesh: {
+    shape: 'trimesh',
+    vertices: Float32Array.from([0, -6, -6, 0, 6, -6, 0, 6, 6, 0, -6, 6]),
+    indices: Uint32Array.from([0, 1, 2, 0, 2, 3]),
+  },
   heightfield: { shape: 'heightfield', rows: 4, columns: 4, heights: new Float32Array(25), scale: [12, 1, 12] },
 };
 const bullets = {
@@ -40,7 +44,12 @@ const shoot = (World, wall, bullet, ccd) => {
     next = random(5),
     bodies = [];
   // The height field's up axis is turned from y to -x, so it stands across x = 10 like the others.
-  physics.addBody(null, { type: 'fixed', position: [10, 0, 0], rotation: wall.shape === 'heightfield' ? [0, 0, s, s] : [0, 0, 0, 1], colliders: wall });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [10, 0, 0],
+    rotation: wall.shape === 'heightfield' ? [0, 0, s, s] : [0, 0, 0, 1],
+    colliders: wall,
+  });
   for (let i = 0; i < 1000; i++) {
     const q = [next() - 0.5, next() - 0.5, next() - 0.5, next() - 0.5],
       l = Math.hypot(...q);
@@ -70,7 +79,8 @@ const shoot = (World, wall, bullet, ccd) => {
       ])
         if (before[0] < plane && now[0] >= plane) {
           const t = (plane - before[0]) / (now[0] - before[0]);
-          if (Math.abs(before[1] + t * (now[1] - before[1])) < 6 && Math.abs(before[2] + t * (now[2] - before[2])) < 6) set.add(i);
+          if (Math.abs(before[1] + t * (now[1] - before[1])) < 6 && Math.abs(before[2] + t * (now[2] - before[2])) < 6)
+            set.add(i);
         }
       was[i] = [...now];
     });
@@ -83,7 +93,11 @@ test('1,000 bullets at 300 m/s never pass a thin wall, a mesh or a height field 
   const record = [];
   for (const [wallName, wall] of Object.entries(walls))
     for (const [bulletName, bullet] of Object.entries(bullets)) {
-      assert.deepEqual(shoot(Physics, wall, bullet, true), { crossed: 0, through: 0 }, `${bulletName} through ${wallName}`);
+      assert.deepEqual(
+        shoot(Physics, wall, bullet, true),
+        { crossed: 0, through: 0 },
+        `${bulletName} through ${wallName}`,
+      );
       const theirs = shoot(RapierPhysics, wall, bullet, true);
       record.push(`${bulletName} at ${wallName}: Rapier crossed ${theirs.crossed}, through ${theirs.through}`);
     }
@@ -117,7 +131,9 @@ test('ccd stops bullets on a moving kinematic wall and on a free dynamic plate',
     for (let step = 0; step < 20; step++) {
       physics.step();
       const plane = wall.position[0];
-      bodies.forEach((body, i) => assert.ok(body.position[0] < plane, `${type} wall: bullet ${i} at step ${step} is past the wall's middle`));
+      bodies.forEach((body, i) =>
+        assert.ok(body.position[0] < plane, `${type} wall: bullet ${i} at step ${step} is past the wall's middle`),
+      );
     }
     physics.dispose();
   }
@@ -131,8 +147,18 @@ test('without ccd some bullets pass, so the scene can fail', () => {
 test('ccd on a slow body changes nothing, and ccdActive says when the pass checked a body', () => {
   const run = (ccd) => {
     const physics = new Physics(null);
-    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [50, 0.5, 50] } });
-    const body = physics.addBody(null, { position: [0, 2, 0], rotation: [0.1, 0.2, 0.05, 0.97], linearVelocity: [2, 0, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] }, ccd }),
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [50, 0.5, 50] },
+    });
+    const body = physics.addBody(null, {
+        position: [0, 2, 0],
+        rotation: [0.1, 0.2, 0.05, 0.97],
+        linearVelocity: [2, 0, 0],
+        colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+        ccd,
+      }),
       poses = [];
     for (let i = 0; i < 240; i++) {
       physics.step();

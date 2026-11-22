@@ -2,7 +2,14 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from '../kernel.js';
 import { checkVec, type Vec3 } from '../math.js';
-import { bounds, geometryPositions, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
+import {
+  bounds,
+  geometryPositions,
+  type ColliderGeometry,
+  type ColliderOptions,
+  type CompoundPart,
+  type ShapeOptions,
+} from '../shapes.js';
 import { buildHull } from './hull.js';
 
 const PI = 3.141592653589793;
@@ -65,7 +72,8 @@ function arctan(x: number): number {
  * `revolved_mass` adds them up.
  */
 function revolvedVolume(cone: boolean, r: number, h: number, b: number): number {
-  if (!cone) return 2 * PI * (h * r * r + 2 * h * b * (r + b / 2) + r * r * b + ((PI * b * b) / 2) * (r + (4 * b) / (3 * PI)));
+  if (!cone)
+    return 2 * PI * (h * r * r + 2 * h * b * (r + b / 2) + r * r * b + ((PI * b * b) / 2) * (r + (4 * b) / (3 * PI)));
   // The slanted side's length, its outward normal (nr, ny) and that normal's angle above the base.
   const length = root(4 * h * h + r * r),
     nr = (2 * h) / length,
@@ -94,7 +102,9 @@ function volume(shape: KernelShape, size: readonly number[], hullVolume: (row: n
  */
 function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelCompoundPart[] {
   if (!Array.isArray(parts) || !parts.length)
-    throw new RangeError("A compound collider needs at least one part: {shape: 'compound', parts: [{shape: 'box', halfExtents: [1, 1, 1]}]}");
+    throw new RangeError(
+      "A compound collider needs at least one part: {shape: 'compound', parts: [{shape: 'box', halfExtents: [1, 1, 1]}]}",
+    );
   return parts.map((part) => {
     if (!CONVEX_PARTS.includes(part?.shape))
       throw new TypeError(
@@ -104,17 +114,21 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
     checkVec(offset, 'Compound part offset');
     const placed = { position: [offset[0], offset[1], offset[2]] as [number, number, number], rotation: part.rotation };
     if (part.shape === 'box') {
-      if (!part.halfExtents) throw new TypeError('A compound box part needs halfExtents; parts are never fitted to the mesh.');
+      if (!part.halfExtents)
+        throw new TypeError('A compound box part needs halfExtents; parts are never fitted to the mesh.');
       checkVec(part.halfExtents, 'Compound box halfExtents');
       return { shape: 'box', size: [...part.halfExtents], ...placed };
     }
     if (part.shape === 'sphere') {
-      if (part.radius === undefined) throw new TypeError('A compound sphere part needs a radius; parts are never fitted to the mesh.');
+      if (part.radius === undefined)
+        throw new TypeError('A compound sphere part needs a radius; parts are never fitted to the mesh.');
       return { shape: 'ball', size: [part.radius], ...placed };
     }
     if (part.shape === 'capsule') return { shape: 'capsule', size: [part.radius, part.halfHeight], ...placed };
-    if (part.shape === 'cylinder' || part.shape === 'cone') return { shape: part.shape, size: revolvedSize(part), ...placed };
-    if (!part.points) throw new TypeError('A compound convexHull part needs points; parts are never fitted to the mesh.');
+    if (part.shape === 'cylinder' || part.shape === 'cone')
+      return { shape: part.shape, size: revolvedSize(part), ...placed };
+    if (!part.points)
+      throw new TypeError('A compound convexHull part needs points; parts are never fitted to the mesh.');
     const { vertices, faces } = buildHull(Float32Array.from(part.points));
     return { shape: 'hull', size: [hulls.addHull(vertices, faces)], ...placed };
   });
@@ -124,7 +138,9 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
 function revolvedSize(options: { radius: number; halfHeight: number; borderRadius?: number }): number[] {
   const { radius, halfHeight, borderRadius = 0 } = options;
   if (!(borderRadius >= 0) || !Number.isFinite(borderRadius))
-    throw new RangeError(`A border radius is 0 or more and finite (got ${borderRadius}); it rounds the shape's edges outside its radius and half height.`);
+    throw new RangeError(
+      `A border radius is 0 or more and finite (got ${borderRadius}); it rounds the shape's edges outside its radius and half height.`,
+    );
   return [radius, halfHeight, borderRadius];
 }
 
@@ -148,7 +164,13 @@ export interface HullRows {
   addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
   hullVolume(row: number): number;
   addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean): number;
-  addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: Vec3, fixInternalEdges: boolean): number;
+  addHeightfield(
+    rows: number,
+    columns: number,
+    heights: ArrayLike<number>,
+    scale: Vec3,
+    fixInternalEdges: boolean,
+  ): number;
   addVoxels(cells: Int32Array, size: Vec3): number;
 }
 
@@ -178,13 +200,12 @@ export function kernelCollider(
       `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
-      if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
+      if (!fit.geometry)
+        throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
       return geometryPositions(fit.geometry, fit.scale);
     },
     center = [0, 0, 0];
-  let size: number[],
-    parts: KernelCompoundPart[] | undefined,
-    voxels: number | undefined;
+  let size: number[], parts: KernelCompoundPart[] | undefined, voxels: number | undefined;
   if (options.shape === 'box') {
     let half = options.halfExtents;
     if (!half) {
@@ -209,11 +230,17 @@ export function kernelCollider(
     size = [hulls.addHull(vertices, faces)];
   } else if (options.shape === 'trimesh') {
     const source = options.geometry ?? (options.vertices ? null : fit.geometry),
-      vertices = options.vertices ? Float32Array.from(options.vertices) : source ? geometryPositions(source, fit.scale) : fitted(),
+      vertices = options.vertices
+        ? Float32Array.from(options.vertices)
+        : source
+          ? geometryPositions(source, fit.scale)
+          : fitted(),
       indexSource = options.indices ?? source?.indices;
     if (!indexSource) throw new TypeError('A trimesh needs indices; pass indices or a geometry that has them.');
     if (!indexSource.length || indexSource.length % 3 || vertices.length % 3)
-      throw new RangeError('A trimesh needs whole triangles; pass three indices per triangle and three numbers per vertex.');
+      throw new RangeError(
+        'A trimesh needs whole triangles; pass three indices per triangle and three numbers per vertex.',
+      );
     for (let i = 0; i < vertices.length; i++)
       if (!Number.isFinite(vertices[i])) throw new RangeError('Trimesh vertices must be finite Float32 values.');
     if (options.mass !== undefined || options.density !== undefined)
@@ -227,7 +254,15 @@ export function kernelCollider(
         'A heightfield has no volume, so no mass or density; make its body fixed, or give the body its mass with setMassProperties.',
       );
     checkVec(options.scale, 'Heightfield scale');
-    size = [hulls.addHeightfield(options.rows, options.columns, options.heights, options.scale, options.fixInternalEdges ?? false)];
+    size = [
+      hulls.addHeightfield(
+        options.rows,
+        options.columns,
+        options.heights,
+        options.scale,
+        options.fixInternalEdges ?? false,
+      ),
+    ];
   } else if (options.shape === 'compound') {
     parts = compoundParts(options.parts, hulls);
     size = [];
@@ -243,25 +278,33 @@ export function kernelCollider(
   } else if (options.shape === 'voxels') {
     const { cells, size: cell = [1, 1, 1] } = options;
     if (!(cells instanceof Int32Array) || cells.length % 3)
-      throw new TypeError('A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.');
+      throw new TypeError(
+        'A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.',
+      );
     checkVec(cell, 'Voxel size');
     for (const value of cell)
-      if (!(value > 0)) throw new RangeError(`Voxel size must be above zero on every axis (got ${cell.join(', ')}); pass one cell's size in metres.`);
+      if (!(value > 0))
+        throw new RangeError(
+          `Voxel size must be above zero on every axis (got ${cell.join(', ')}); pass one cell's size in metres.`,
+        );
     voxels = voxelVolume(cells, cell);
     size = [hulls.addVoxels(cells, cell)];
   } else
-    throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels.`);
+    throw new TypeError(
+      `Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels.`,
+    );
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   const whole = (): number =>
       parts
         ? parts.reduce((sum, part) => sum + volume(part.shape, part.size, hulls.hullVolume), 0)
         : (voxels ?? volume(shape as KernelShape, size, hulls.hullVolume)),
-    density = options.massless || (shape === 'trimesh' && voxels === undefined)
-      ? 0
-      : options.mass !== undefined
-        ? options.mass / whole()
-        : (options.density ?? 1);
+    density =
+      options.massless || (shape === 'trimesh' && voxels === undefined)
+        ? 0
+        : options.mass !== undefined
+          ? options.mass / whole()
+          : (options.density ?? 1);
   return {
     name: options.shape,
     shape,
@@ -292,7 +335,8 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
     return { shape: 'box', size: [...options.halfExtents] };
   }
   if (options.shape === 'capsule') return { shape: 'capsule', size: [options.radius, options.halfHeight] };
-  if (options.shape === 'cylinder' || options.shape === 'cone') return { shape: options.shape, size: revolvedSize(options) };
+  if (options.shape === 'cylinder' || options.shape === 'cone')
+    return { shape: options.shape, size: revolvedSize(options) };
   if (options.shape === 'convexHull' && options.points) {
     const { vertices, faces } = buildHull(options.points);
     return { shape: 'hull', size: [hulls.addHull(vertices, faces)] };
