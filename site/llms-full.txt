@@ -11488,6 +11488,15 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: the upstream-reports README check rejected a hyphenated report id (KB-UPSTREAM-IDS1, tests)
+
+- **Repro (before):** after bfa6c541b added docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1, `node --test tests/upstream-reports.test.js`
+  failed "the README table lists exactly the report folders": the folder was on disk and in the README, but the table regex missed it.
+- **Cause:** the test matched README rows with `KB\w+`, which stops at a hyphen, while docs/known-bugs.md uses both KB1042f-style and
+  KB-AREA-NAME1-style ids.
+- **Fix:** the row pattern is `KB[\w-]+` (the coordinator, 2026-11-21).
+- **Regression:** tests/upstream-reports.test.js (fails on the old pattern with the KB-WATER-FLOODFILM-COMPAT1 folder present).
+
 ### Fixed 2026-11-21: a submerged ledge cast a bright silhouette through Water (KB-WATER-REFRACTDEPTH1, water)
 - **Repro:** run `node packages/water/test/refraction-depth.browser.mjs` on the previous shader. A slab in the straight view ray changes the water color where the bent ray hits only the seabed.
 - **Cause:** Water used the straight ray's depth gap for attenuation and for the first bent lookup. The opaque depth at the bent lookup could belong to a different surface.
