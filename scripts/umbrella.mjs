@@ -14,9 +14,17 @@ export const UMBRELLA = 'margoengine';
  * all of its optional entries.
  */
 export const KIT_MEMBERS = {
-  game: 'stage core animation animator materials geometry shadows clustered environment sky controls input physics navmesh audio vfx text tween post tonemap ecs fsm netcode behavior save cutscene cinematic cameras terrain water weather biomes creative procedural wfc road splines tilemap sprites pixel lighting2d ui rigging ragdoll mixer transitions toon lod culling oit cache scene worker gltf decoders loaders bvh selection quality stats studio lightmap shader compute'.split(' '),
-  'kit-web': 'stage core environment controls shadows html labels tween post tonemap geometry materials gltf decoders animation loaders exporters selection studio cameras quality stats text video transitions shader lod culling oit cache scene worker bvh lightmap'.split(' '),
-  'kit-viz': 'stage core points sciviz compute lines splats terrain text labels html controls cameras environment tween stats post tonemap geometry materials loaders exporters gltf decoders selection viewcube bvh lod culling oit cache scene worker tiles splines'.split(' '),
+  game: 'stage core animation animator materials geometry shadows clustered environment sky controls input physics navmesh audio vfx text tween post tonemap ecs fsm netcode behavior save cutscene cinematic cameras terrain water weather biomes creative procedural wfc road splines tilemap sprites pixel lighting2d ui rigging ragdoll mixer transitions toon lod culling oit cache scene worker gltf decoders loaders bvh selection quality stats studio lightmap shader compute'.split(
+    ' ',
+  ),
+  'kit-web':
+    'stage core environment controls shadows html labels tween post tonemap geometry materials gltf decoders animation loaders exporters selection studio cameras quality stats text video transitions shader lod culling oit cache scene worker bvh lightmap'.split(
+      ' ',
+    ),
+  'kit-viz':
+    'stage core points sciviz compute lines splats terrain text labels html controls cameras environment tween stats post tonemap geometry materials loaders exporters gltf decoders selection viewcube bvh lod culling oit cache scene worker tiles splines'.split(
+      ' ',
+    ),
 };
 /** React and Next apps use a web profile with the declarative bindings and their sky entry. */
 KIT_MEMBERS['kit-react'] = [...KIT_MEMBERS['kit-web'], 'react', 'sky'];
@@ -167,7 +175,9 @@ export const isUmbrellaAlias = (name, subpath) =>
 
 const manifests = (root) =>
   readdirSync(join(root, 'packages'))
-    .filter((dir) => dir !== UMBRELLA && !(dir in KIT_MEMBERS) && existsSync(join(root, 'packages', dir, 'package.json')))
+    .filter(
+      (dir) => dir !== UMBRELLA && !(dir in KIT_MEMBERS) && existsSync(join(root, 'packages', dir, 'package.json')),
+    )
     .sort()
     .map((dir) => ({ dir, manifest: JSON.parse(readFileSync(join(root, 'packages', dir, 'package.json'), 'utf8')) }));
 
@@ -268,14 +278,22 @@ export interface LocalImportMapOptions {
  * rebaseImportMap({imports: {margoengine: 'https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/index.js'}}, '/node_modules/');
  * // {imports: {margoengine: '/node_modules/margoengine/dist/index.js'}}
  */
-export function rebaseImportMap(map: ImportMap, base = '/node_modules/', options: LocalImportMapOptions = {}): ImportMap {
-  if (typeof base !== 'string' || base === '') throw new TypeError(\`The import map base must be a non-empty string; \${help}\`);
+export function rebaseImportMap(
+  map: ImportMap,
+  base = '/node_modules/',
+  options: LocalImportMapOptions = {},
+): ImportMap {
+  if (typeof base !== 'string' || base === '')
+    throw new TypeError(\`The import map base must be a non-empty string; \${help}\`);
   if (!map || typeof map.imports !== 'object' || map.imports === null)
     throw new TypeError(\`rebaseImportMap needs an import map with an "imports" object; \${help}\`);
   const root = base.endsWith('/') ? base : \`\${base}/\`,
     only = options.only,
     keep = (specifier: string) =>
-      !only || only.some((name) => (name.endsWith('/') ? specifier.startsWith(name) || specifier === name.slice(0, -1) : specifier === name));
+      !only ||
+      only.some((name) =>
+        name.endsWith('/') ? specifier.startsWith(name) || specifier === name.slice(0, -1) : specifier === name,
+      );
   const imports: Record<string, string> = {};
   for (const [specifier, url] of Object.entries(map.imports)) {
     if (!keep(specifier)) continue;
@@ -283,7 +301,12 @@ export function rebaseImportMap(map: ImportMap, base = '/node_modules/', options
     imports[specifier] = match ? \`\${root}\${match[1]}/\${match[2]}\` : url;
   }
   if (only) {
-    const missing = only.filter((name) => !Object.keys(imports).some((key) => (name.endsWith('/') ? key.startsWith(name) || key === name.slice(0, -1) : key === name)));
+    const missing = only.filter(
+      (name) =>
+        !Object.keys(imports).some((key) =>
+          name.endsWith('/') ? key.startsWith(name) || key === name.slice(0, -1) : key === name,
+        ),
+    );
     if (missing.length) throw new RangeError(\`No import map entry for \${missing.join(', ')}; \${help}\`);
   }
   return { imports };
@@ -301,14 +324,21 @@ export async function localImportMap(base = '/node_modules/', options: LocalImpo
   let text: string;
   if (url.protocol === 'file:') {
     const read = 'node:fs/promises';
-    text = await ((await import(/* @vite-ignore */ read)) as {readFile(url: URL, encoding: 'utf8'): Promise<string>}).readFile(url, 'utf8');
+    text = await (
+      (await import(/* @vite-ignore */ read)) as { readFile(url: URL, encoding: 'utf8'): Promise<string> }
+    ).readFile(url, 'utf8');
   } else {
     const response = await fetch(url);
     if (!response.ok)
-      throw Object.assign(new Error(\`Could not read \${url.href} (\${response.status}); serve margoengine/dist next to margoengine/importmap; \${help}\`), {
-        name: 'MargoError',
-        code: 'failed',
-      });
+      throw Object.assign(
+        new Error(
+          \`Could not read \${url.href} (\${response.status}); serve margoengine/dist next to margoengine/importmap; \${help}\`,
+        ),
+        {
+          name: 'MargoError',
+          code: 'failed',
+        },
+      );
     text = await response.text();
   }
   return rebaseImportMap(JSON.parse(text) as ImportMap, base, options);
@@ -384,9 +414,10 @@ export function umbrellaFiles(root = repository) {
     // The stage root is normally the umbrella root; also expose it explicitly in install kits.
     aliases.push({ subpath: './stage', file: 'stage', source: '@margoengine/stage' });
     const kitExports = { '.': { types: './dist/index.d.ts', import: './dist/index.js' } };
-    files[`${directory}/src/index.ts`] = kit === 'kit-react'
-      ? `${banner}${['', '/controls', '/environment', '/html', '/shadows', '/sky', '/text', '/geometry', '/post', '/tonemap', '/lod', '/selection', '/cameras', '/instances', '/controls-extra', '/portals', '/offscreen', '/marching-cubes', '/caustics', '/sampler', '/clouds'].map((entry) => `export * from '@margoengine/react${entry}';`).join('\n')}\n`
-      : files[`packages/margoengine/src/${KIT_ROOT[kit]}.ts`];
+    files[`${directory}/src/index.ts`] =
+      kit === 'kit-react'
+        ? `${banner}${['', '/controls', '/environment', '/html', '/shadows', '/sky', '/text', '/geometry', '/post', '/tonemap', '/lod', '/selection', '/cameras', '/instances', '/controls-extra', '/portals', '/offscreen', '/marching-cubes', '/caustics', '/sampler', '/clouds'].map((entry) => `export * from '@margoengine/react${entry}';`).join('\n')}\n`
+        : files[`packages/margoengine/src/${KIT_ROOT[kit]}.ts`];
     for (const { subpath, file, source } of aliases) {
       files[`${directory}/src/${file}.ts`] = `${banner}export * from '${source}';\n`;
       kitExports[subpath] = { types: `./dist/${file}.d.ts`, import: `./dist/${file}.js` };
@@ -395,42 +426,72 @@ export function umbrellaFiles(root = repository) {
     for (const { manifest: member } of selected)
       for (const [name, range] of Object.entries(member.peerDependencies ?? {}))
         if (!name.startsWith('@margoengine/')) kitPeers[name] = range;
-    files[`${directory}/package.json`] = `${JSON.stringify({
-      name: `@margoengine/${kit}`, version: current.version,
-      description: kit === 'kit-react' ? 'Install profile. React and Next.js web apps' : `Install profile. ${KITS[KIT_ROOT[kit]].about}`,
-      type: 'module', license: 'Apache-2.0', author: 'Scott Campbell',
-      homepage: current.homepage, bugs: current.bugs,
-      repository: { ...current.repository, directory },
-      publishConfig: { access: 'public' }, sideEffects: false, files: ['dist', 'NOTICE'],
-      scripts: { test: 'node --test --test-timeout=120000 tests/*.test.js', prepack: 'npm --prefix ../.. run build:packages' },
-      exports: kitExports,
-      dependencies: sorted(Object.fromEntries(selected.map(({ manifest: member }) => [member.name, `^${member.version}`]))),
-      peerDependencies: sorted(kitPeers),
-      peerDependenciesMeta: sorted(Object.fromEntries(Object.keys(kitPeers).map((name) => [name, { optional: true }]))),
-    }, null, 2)}\n`;
-    files[`${directory}/tsconfig.json`] = readFileSync(join(root, 'packages/margoengine/tsconfig.json'), 'utf8').replace(/\r\n/g, '\n');
+    files[`${directory}/package.json`] = `${JSON.stringify(
+      {
+        name: `@margoengine/${kit}`,
+        version: current.version,
+        description:
+          kit === 'kit-react'
+            ? 'Install profile. React and Next.js web apps'
+            : `Install profile. ${KITS[KIT_ROOT[kit]].about}`,
+        type: 'module',
+        license: 'Apache-2.0',
+        author: 'Scott Campbell',
+        homepage: current.homepage,
+        bugs: current.bugs,
+        repository: { ...current.repository, directory },
+        publishConfig: { access: 'public' },
+        sideEffects: false,
+        files: ['dist', 'NOTICE'],
+        scripts: {
+          test: 'node --test --test-timeout=120000 tests/*.test.js',
+          prepack: 'npm --prefix ../.. run build:packages',
+        },
+        exports: kitExports,
+        dependencies: sorted(
+          Object.fromEntries(selected.map(({ manifest: member }) => [member.name, `^${member.version}`])),
+        ),
+        peerDependencies: sorted(kitPeers),
+        peerDependenciesMeta: sorted(
+          Object.fromEntries(Object.keys(kitPeers).map((name) => [name, { optional: true }])),
+        ),
+      },
+      null,
+      2,
+    )}\n`;
+    files[`${directory}/tsconfig.json`] = readFileSync(
+      join(root, 'packages/margoengine/tsconfig.json'),
+      'utf8',
+    ).replace(/\r\n/g, '\n');
     // npm tarballs require a package description. Examples are deliberately owed until the README phase.
-    files[`${directory}/README.md`] = `# @margoengine/${kit}\n\nInstall profile. ${kit === 'kit-react' ? 'The web profile with React bindings and sky.' : KITS[KIT_ROOT[kit]].about + '.'}\n\nIt holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.\nThe root contains common exports; member subpaths expose the complete installed member APIs.\nAll packages release together at one version. Optional third-party peers remain app choices.\n\nSee the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,\nmodel-loading entries and measured package counts.\n\n${kit === 'kit-react' ? 'With a \`<div id="root"></div>\` in the page:' : 'With a \`<div id="viewport" style="height:400px"></div>\` in the page:'}\n\n\`\`\`${kit === 'kit-react' ? 'tsx' : 'ts'}\n${KIT_EXAMPLES[kit]}\n\`\`\`\n\nModel loading is a separate import: \`import {loadGLTF} from '@margoengine/${kit}/gltf/pbr'\`.\n${kit === 'game' ? "Physics is one too: \`import {Physics} from '@margoengine/game/physics'\`. A game without it ships no solver Wasm.\n" : ''}`;
+    files[`${directory}/README.md`] =
+      `# @margoengine/${kit}\n\nInstall profile. ${kit === 'kit-react' ? 'The web profile with React bindings and sky.' : KITS[KIT_ROOT[kit]].about + '.'}\n\nIt holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.\nThe root contains common exports; member subpaths expose the complete installed member APIs.\nAll packages release together at one version. Optional third-party peers remain app choices.\n\nSee the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,\nmodel-loading entries and measured package counts.\n\n${kit === 'kit-react' ? 'With a \`<div id="root"></div>\` in the page:' : 'With a \`<div id="viewport" style="height:400px"></div>\` in the page:'}\n\n\`\`\`${kit === 'kit-react' ? 'tsx' : 'ts'}\n${KIT_EXAMPLES[kit]}\n\`\`\`\n\nModel loading is a separate import: \`import {loadGLTF} from '@margoengine/${kit}/gltf/pbr'\`.\n${kit === 'game' ? "Physics is one too: \`import {Physics} from '@margoengine/game/physics'\`. A game without it ships no solver Wasm.\n" : ''}`;
   }
   // The kits' contents in docs/guides/kits.md, between its markers.
   const guide = 'docs/guides/kits.md',
     text = readFileSync(join(root, guide), 'utf8').replace(/\r\n/g, '\n'),
     [before, rest] = text.split('<!-- kits:start -->\n'),
     after = rest.slice(rest.indexOf('<!-- kits:end -->'));
-  const profiles = Object.entries(KIT_MEMBERS).map(([kit, members]) =>
-    `### Install profile \`@margoengine/${kit}\`\n\n${members.map((name) => `\`${name}\``).join(', ')}. Every exported subpath of each member is available as \`@margoengine/${kit}/<member>[/<entry>]\`.\n`,
-  ).join('\n');
-  const contents = profiles + '\n' + Object.entries(KITS)
+  const profiles = Object.entries(KIT_MEMBERS)
     .map(
-      ([kit, { about, from }]) =>
-        `### \`margoengine/${kit}\`\n\n${about}.\n\n| From | Names |\n| --- | --- |\n${from
-          .map(
-            ([source, names]) =>
-              `| \`margoengine${source.slice('@margoengine'.length).replace('/stage', '')}\` | ${names.map((n) => `\`${n}\``).join(', ')} |`,
-          )
-          .join('\n')}\n`,
+      ([kit, members]) =>
+        `### Install profile \`@margoengine/${kit}\`\n\n${members.map((name) => `\`${name}\``).join(', ')}. Every exported subpath of each member is available as \`@margoengine/${kit}/<member>[/<entry>]\`.\n`,
     )
     .join('\n');
+  const contents =
+    profiles +
+    '\n' +
+    Object.entries(KITS)
+      .map(
+        ([kit, { about, from }]) =>
+          `### \`margoengine/${kit}\`\n\n${about}.\n\n| From | Names |\n| --- | --- |\n${from
+            .map(
+              ([source, names]) =>
+                `| \`margoengine${source.slice('@margoengine'.length).replace('/stage', '')}\` | ${names.map((n) => `\`${n}\``).join(', ')} |`,
+            )
+            .join('\n')}\n`,
+      )
+      .join('\n');
   files[guide] = `${before}<!-- kits:start -->\n${contents}${after}`;
   // docs/guides/imports.md states how many entries the import map (importMap, written by the build) has. The figure
   // is written here from the manifests, this umbrella's as generated above, so a lane that adds an entry anywhere

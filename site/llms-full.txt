@@ -11505,6 +11505,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: the umbrella generator disagreed with its formatted import map (tools)
+
+- **Repro:** `node scripts/umbrella.mjs --check` reports `packages/margoengine/src/importmap.ts` as stale after `2428ebbafc`.
+- **Cause:** formatting changed the generated TypeScript while the template still emitted the earlier layout.
+- **Fix:** emit the checked-in TypeScript layout directly from the template.
+- **Regression:** `tests/umbrella.test.js` checks that all generated files match the generator output.
+
 ### Fixed 2026-11-21: the bow displacement faded before it reached the sides (water/ships)
 
 - **Repro:** advance a 68 m, 15.5 m beam hull at 3 m/s in calm water. With Kelvin height off, sample 0.25 m outboard at a station 18 m aft of the stem. The height is effectively zero.
