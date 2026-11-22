@@ -299,7 +299,11 @@ test('Autofocus on a world point uses its distance along the view with no read',
 test('Autofocus ignores a target behind the camera or outside the frame and reads the depth at its point', () => {
   // A film page kept the focus on its subject while the camera looked away from it: the clip w behind the camera is
   // negative, so the focus fell to the near limit and the whole view blurred.
-  for (const target of [[0, 0, 8], [100, 0, -8], [0, -100, -8]]) {
+  for (const target of [
+    [0, 0, 8],
+    [100, 0, -8],
+    [0, -100, -8],
+  ]) {
     const h = gpuHarness();
     h.engine.canvas = { clientWidth: 128, clientHeight: 96, width: 128, height: 96 };
     let copies = 0;
