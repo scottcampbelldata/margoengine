@@ -259,7 +259,10 @@ try {
     assert.deepEqual(t.errors, []);
     assert.equal(t.fitted.quads, t.fit * 196608, 'every chunk that fits the default pool is drawn');
     assert.equal(t.fitted.poolFull, false);
-    assert.ok(t.over.poolFull && t.over.pending > 0 && t.over.chunks === t.fit, 'the chunk past the pool waits, flagged');
+    assert.ok(
+      t.over.poolFull && t.over.pending > 0 && t.over.chunks === t.fit,
+      'the chunk past the pool waits, flagged',
+    );
     assert.ok(!t.freed.poolFull && t.freed.chunks === t.fit, 'and is drawn once a chunk frees its pages');
     console.log(`ok scale: ${t.fitted.quads} quads in the default ${t.limit}-byte pool ${JSON.stringify(t)}`);
   }

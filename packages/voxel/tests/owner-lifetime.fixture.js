@@ -31,15 +31,37 @@ export async function fixtures(load = (entry) => import(entry)) {
     // The block textures belong to the caller, not the renderer: the fixture disposes them with it.
     return { w, textures, plugin: render.VoxelRenderer.attach(engine, options) };
   };
-  const entries = [{ name: 'VoxelRenderer.attach', create({ engine }) {
-    const { plugin, textures } = renderer(engine);
-    return { plugin, dispose() { plugin.dispose(); textures.dispose(); } };
-  } }];
-  entries.push({ name: 'VoxelColorLight', create({ engine }) {
-    const { w, plugin, textures } = renderer(engine);
-    const light = VoxelColorLight.attach(engine, { world: w, extent: [32, 32, 32], colors: { lamp: [1, 0.5, 0.2] } });
-    const remove = plugin.addLighting(light);
-    return { plugin, dispose() { remove(); light.dispose(); plugin.dispose(); textures.dispose(); } };
-  } });
+  const entries = [
+    {
+      name: 'VoxelRenderer.attach',
+      create({ engine }) {
+        const { plugin, textures } = renderer(engine);
+        return {
+          plugin,
+          dispose() {
+            plugin.dispose();
+            textures.dispose();
+          },
+        };
+      },
+    },
+  ];
+  entries.push({
+    name: 'VoxelColorLight',
+    create({ engine }) {
+      const { w, plugin, textures } = renderer(engine);
+      const light = VoxelColorLight.attach(engine, { world: w, extent: [32, 32, 32], colors: { lamp: [1, 0.5, 0.2] } });
+      const remove = plugin.addLighting(light);
+      return {
+        plugin,
+        dispose() {
+          remove();
+          light.dispose();
+          plugin.dispose();
+          textures.dispose();
+        },
+      };
+    },
+  });
   return entries;
 }

@@ -16,7 +16,8 @@ export function originPoint(origin: VoxelOrigin | null | undefined, who: string)
   if (!o) return p;
   for (let a = 0; a < 3; a++) {
     const v = +o[a];
-    if (!Number.isFinite(v)) throw new RangeError(`${who} origin[${a}] ${o[a]} is not a finite number; pass three finite numbers`);
+    if (!Number.isFinite(v))
+      throw new RangeError(`${who} origin[${a}] ${o[a]} is not a finite number; pass three finite numbers`);
     p[a] = v;
   }
   return p;

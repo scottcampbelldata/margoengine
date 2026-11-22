@@ -157,7 +157,9 @@ try {
     assert.ok(seams.lit > 5000, `${samples}x the lump fills the view: ${seams.lit} pixels`);
     assert.ok(seams.without > 50, `${samples}x without borders only ${seams.without} pixels differ`);
     assert.ok(seams.differ <= 2, `${samples}x ${seams.differ} pixels differ between eight chunks and one`);
-    console.log(`ok ${samples}x seams: eight chunks draw as one (${seams.differ} pixels differ, ${seams.without} without borders)`);
+    console.log(
+      `ok ${samples}x seams: eight chunks draw as one (${seams.differ} pixels differ, ${seams.without} without borders)`,
+    );
   }
   assert.deepEqual(pageErrors, []);
 } finally {
