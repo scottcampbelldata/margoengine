@@ -54,7 +54,6 @@ interface Shape {
 
 let attachSerial = 0;
 
-
 /** Waits for `work`, but rejects with the signal's reason the moment it aborts (the work then ends unobserved). */
 async function untilOrAborted(work: Promise<unknown>, signal: AbortSignal | undefined): Promise<void> {
   if (!signal) {
@@ -79,7 +78,8 @@ async function untilOrAborted(work: Promise<unknown>, signal: AbortSignal | unde
 /** The canvas's content box in CSS pixels: its bounding rectangle less any border and padding the drawing never covers. */
 function contentRect(canvas: HTMLCanvasElement): { width: number; height: number } {
   const rect = canvas.getBoundingClientRect();
-  if (typeof Element === 'undefined' || !(canvas instanceof Element) || typeof getComputedStyle !== 'function') return rect;
+  if (typeof Element === 'undefined' || !(canvas instanceof Element) || typeof getComputedStyle !== 'function')
+    return rect;
   const style = getComputedStyle(canvas),
     px = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0;
   return {

@@ -95,37 +95,90 @@ test('depth conventions, invalid input, font changes, abort and atlas exhaustion
 });
 
 test('attach waits for fonts, registers once, detaches and leaves no registration on abort', async () => {
-  const plugins = new Map(), engine = {
-    use(layer) { if (!layer.name.startsWith('gpu-labels:attach:')) assert.equal(loaded, true); plugins.set(layer.name, layer); layer.setup(this); },
-    sceneOf(layer) { return plugins.get(layer.name) === layer ? this : undefined; },
-    removePlugin(name) { const layer = plugins.get(name); plugins.delete(name); layer?.dispose?.(); },
-  };
+  const plugins = new Map(),
+    engine = {
+      use(layer) {
+        if (!layer.name.startsWith('gpu-labels:attach:')) assert.equal(loaded, true);
+        plugins.set(layer.name, layer);
+        layer.setup(this);
+      },
+      sceneOf(layer) {
+        return plugins.get(layer.name) === layer ? this : undefined;
+      },
+      removePlugin(name) {
+        const layer = plugins.get(name);
+        plugins.delete(name);
+        layer?.dispose?.();
+      },
+    };
   let loaded = false;
-  const layer = await GPULabelLayer.attach(engine, { font: { ...font, async load() { loaded = true; } } });
+  const layer = await GPULabelLayer.attach(engine, {
+    font: {
+      ...font,
+      async load() {
+        loaded = true;
+      },
+    },
+  });
   assert.equal(plugins.get(layer.name), layer);
   layer[Symbol.dispose]();
   layer.dispose();
   assert.equal(plugins.size, 0);
   const abort = new AbortController();
-  await assert.rejects(GPULabelLayer.attach(engine, { font: { ...font, async load() { abort.abort(); } }, signal: abort.signal }), { name: 'AbortError' });
+  await assert.rejects(
+    GPULabelLayer.attach(engine, {
+      font: {
+        ...font,
+        async load() {
+          abort.abort();
+        },
+      },
+      signal: abort.signal,
+    }),
+    { name: 'AbortError' },
+  );
   assert.equal(plugins.size, 0);
 });
 
 test('attach joins the scene that was active when it was called, not the one active after the font loads', async () => {
-  const scenes = [], make = (name) => {
-    const scene = { name, plugins: new Map(), use(plugin) { this.plugins.set(plugin.name, plugin); plugin.setup?.(engine); },
-      removePlugin(key) { this.plugins.delete(key); } };
-    scenes.push(scene);
-    return scene;
-  };
-  const first = make('first'), second = make('second');
+  const scenes = [],
+    make = (name) => {
+      const scene = {
+        name,
+        plugins: new Map(),
+        use(plugin) {
+          this.plugins.set(plugin.name, plugin);
+          plugin.setup?.(engine);
+        },
+        removePlugin(key) {
+          this.plugins.delete(key);
+        },
+      };
+      scenes.push(scene);
+      return scene;
+    };
+  const first = make('first'),
+    second = make('second');
   let active = first;
   const engine = {
-    use(plugin) { active.use(plugin); },
-    sceneOf(plugin) { return scenes.find((scene) => scene.plugins.get(plugin.name) === plugin); },
-    removePlugin(name) { active.removePlugin(name); },
+    use(plugin) {
+      active.use(plugin);
+    },
+    sceneOf(plugin) {
+      return scenes.find((scene) => scene.plugins.get(plugin.name) === plugin);
+    },
+    removePlugin(name) {
+      active.removePlugin(name);
+    },
   };
-  const pending = GPULabelLayer.attach(engine, { font: { ...font, async load() { active = second; } } });
+  const pending = GPULabelLayer.attach(engine, {
+    font: {
+      ...font,
+      async load() {
+        active = second;
+      },
+    },
+  });
   const layer = await pending;
   assert.equal(first.plugins.get(layer.name), layer);
   assert.equal(second.plugins.size, 0);
@@ -139,7 +192,10 @@ test('create stops waiting for a font that is still loading the moment its signa
   await new Promise((resolve) => setTimeout(resolve, 5));
   abort.abort();
   const outcome = await Promise.race([
-    pending.then(() => 'resolved', (error) => error.name),
+    pending.then(
+      () => 'resolved',
+      (error) => error.name,
+    ),
     new Promise((resolve) => setTimeout(() => resolve('still waiting'), 500)),
   ]);
   assert.equal(outcome, 'AbortError');
@@ -154,7 +210,12 @@ test('the layer sizes labels to the canvas content box, not its bordered boundin
   }
   const saved = { Element: globalThis.Element, getComputedStyle: globalThis.getComputedStyle };
   globalThis.Element = FakeElement;
-  const widths = { 'border-left-width': '10px', 'border-right-width': '10px', 'border-top-width': '5px', 'border-bottom-width': '5px' };
+  const widths = {
+    'border-left-width': '10px',
+    'border-right-width': '10px',
+    'border-top-width': '5px',
+    'border-bottom-width': '5px',
+  };
   globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => widths[name] ?? '0px' });
   try {
     const layer = await GPULabelLayer.create({ font });
