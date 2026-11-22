@@ -27,7 +27,11 @@ export async function bankedRoad(curve: Spline, options: BankingOptions = {}): P
     throw invalid();
   const closed = curve.closed;
   if (closed && banks[0] !== banks[banks.length - 1])
-    throw fault('failed', 'Closed-road bank endpoints must match; repeat the first angle at the end of the bank list', 'geometry');
+    throw fault(
+      'failed',
+      'Closed-road bank endpoints must match; repeat the first angle at the end of the bank list',
+      'geometry',
+    );
   const result = road(curve, options);
   const source = result.geometry.vertices,
     positions = new Float32Array(source.length / 2);
