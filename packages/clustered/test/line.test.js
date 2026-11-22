@@ -9,7 +9,10 @@ import { animateFlicker } from '../dist/flicker.js';
 // Abramowitz and Stegun, Table 25.4: nodes and weights of the 2-, 3- and 5-point rules.
 const table = {
   2: [[0.5773502691896257], [1]],
-  3: [[0, 0.7745966692414834], [0.8888888888888888, 0.5555555555555556]],
+  3: [
+    [0, 0.7745966692414834],
+    [0.8888888888888888, 0.5555555555555556],
+  ],
   5: [
     [0, 0.5384693101056831, 0.906179845938664],
     [0.5688888888888889, 0.4786286704993665, 0.2369268850561891],
@@ -47,12 +50,22 @@ test('gaussLegendre matches the tabulated rules and integrates polynomials up to
 test('lineLights: a 0.62 m flame line is two points at +-L / (2 sqrt 3), half the power each, soft shadows that merge', () => {
   // The Cabin Hearth fire: flames along the logs, about 0.62 m end to end, 0.6 m up.
   const flame = 0.62,
-    lights = lineLights({ start: [-0.31, 0.6, -2.15], end: [0.31, 0.6, -2.15], range: 6, intensity: 9, color: [1, 0.6, 0.3] });
+    lights = lineLights({
+      start: [-0.31, 0.6, -2.15],
+      end: [0.31, 0.6, -2.15],
+      range: 6,
+      intensity: 9,
+      color: [1, 0.6, 0.3],
+    });
   assert.equal(lights.length, 2, 'two points by default');
   const [a, b] = lights,
     spacing = Math.hypot(...a.position.map((v, i) => v - b.position[i]));
   assert.ok(Math.abs(spacing / 2 - flame / (2 * Math.sqrt(3))) < 1e-12, `node offset ${spacing / 2} m`);
-  assert.deepEqual(a.position.map((v, i) => (v + b.position[i]) / 2), [0, 0.6, -2.15], 'centred on the line');
+  assert.deepEqual(
+    a.position.map((v, i) => (v + b.position[i]) / 2),
+    [0, 0.6, -2.15],
+    'centred on the line',
+  );
   for (const light of lights) {
     assert.ok(Math.abs(light.intensity - 4.5) < 1e-12, `half the power each: ${light.intensity}`);
     assert.deepEqual(light.color, [1, 0.6, 0.3]);
@@ -81,7 +94,10 @@ test('lineLights: the default radius merges neighbouring shadows for every sampl
       lights = lineLights({ start: [0, 0, 0], end: [length, 0, 0], range: 10, intensity: 3, samples: n }),
       r = lineShadowRadius(length, n);
     assert.equal(lights.length, n);
-    assert.ok(Math.abs(lights.reduce((s, l) => s + l.intensity, 0) - 3) < 1e-12, `n ${n}: intensities sum to the line's`);
+    assert.ok(
+      Math.abs(lights.reduce((s, l) => s + l.intensity, 0) - 3) < 1e-12,
+      `n ${n}: intensities sum to the line's`,
+    );
     assert.ok(r >= length / (2 * n) - 1e-12, `n ${n}: at least each point's share`);
     for (let i = 1; i < n; i++) {
       const gap = lights[i].position[0] - lights[i - 1].position[0];
@@ -106,7 +122,13 @@ test('lineLights: options, one shared flicker, unshadowed and hard variants, and
     assert.equal(l.decay, 1.5);
   }
   assert.ok(Math.abs(plain.reduce((s, l) => s + l.intensity, 0) - 1) < 1e-12, 'intensity defaults to 1');
-  const hard = lineLights({ start: [0, 1, 0], end: [1, 1, 0], range: 4, radius: 0, shadow: { near: 0.1, resolution: 256 } });
+  const hard = lineLights({
+    start: [0, 1, 0],
+    end: [1, 1, 0],
+    range: 4,
+    radius: 0,
+    shadow: { near: 0.1, resolution: 256 },
+  });
   for (const l of hard) {
     assert.deepEqual(l.shadow, { near: 0.1, resolution: 256, radius: 0 });
     assert.equal(l.radius, 0, 'radius 0: point lights, hard shadows');
@@ -127,7 +149,10 @@ test('lineLights: options, one shared flicker, unshadowed and hard variants, and
   const dot = lineLights({ start: [1, 2, 3], end: [1, 2, 3], range: 4 });
   for (const l of dot) assert.deepEqual([l.position, l.shadow.radius], [[1, 2, 3], 0]);
   // Each call returns new objects.
-  assert.notEqual(lineLights({ start: [0, 0, 0], end: [1, 0, 0], range: 1 })[0], lineLights({ start: [0, 0, 0], end: [1, 0, 0], range: 1 })[0]);
+  assert.notEqual(
+    lineLights({ start: [0, 0, 0], end: [1, 0, 0], range: 1 })[0],
+    lineLights({ start: [0, 0, 0], end: [1, 0, 0], range: 1 })[0],
+  );
   const base = { start: [0, 0, 0], end: [1, 0, 0], range: 4 };
   assert.throws(() => lineLights({ ...base, start: [0, 0] }), TypeError);
   assert.throws(() => lineLights({ ...base, end: [0, NaN, 0] }), TypeError);

@@ -123,7 +123,9 @@ test('a real type B file: its planes meet at H = 90, and H as latitude gives the
     let sum = 0;
     for (let h = 0; h + 1 < columns; h++)
       for (let v = 0; v + 1 < rows; v++)
-        sum += ((at(v, h) + at(v + 1, h) + at(v, h + 1) + at(v + 1, h + 1)) / 4) * weight(vertical[v], vertical[v + 1], horizontal[h], horizontal[h + 1]);
+        sum +=
+          ((at(v, h) + at(v + 1, h) + at(v, h + 1) + at(v + 1, h + 1)) / 4) *
+          weight(vertical[v], vertical[v + 1], horizontal[h], horizontal[h + 1]);
     return sum;
   };
   const sine = (a, b) => Math.sin(b * radians) - Math.sin(a * radians),
@@ -141,7 +143,8 @@ test('a real type B file: its planes meet at H = 90, and H as latitude gives the
   // The whole sphere of the parsed grid: 1 degree steps over a table of 2.5 degrees, read linearly, cost it 0.05 percent.
   let parsed = 0;
   for (let theta = 0.5; theta < 180; theta++)
-    for (let phi = 0.5; phi < 360; phi++) parsed += iesCandela(profile, theta, phi) * Math.sin(theta * radians) * radians * radians;
+    for (let phi = 0.5; phi < 360; phi++)
+      parsed += iesCandela(profile, theta, phi) * Math.sin(theta * radians) * radians * radians;
   assert.ok(Math.abs(parsed / stated - 1) < 1e-3, `${parsed} lm`);
 });
 

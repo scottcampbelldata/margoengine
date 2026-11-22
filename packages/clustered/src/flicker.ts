@@ -72,7 +72,10 @@ export function flickerAt(curve: FlickerCurve, time: number, seed = 0): number {
  * value noise, and value noise averages 0.5, so 0.9 and 0.75. A flickering light of intensity I gives I x mean on
  * average, which is what a photometer measures of a real flame.
  */
-export const flameFlickerMean: { readonly candle: number; readonly fire: number } = Object.freeze({ candle: 0.9, fire: 0.75 });
+export const flameFlickerMean: { readonly candle: number; readonly fire: number } = Object.freeze({
+  candle: 0.9,
+  fire: 0.75,
+});
 /** {@link flameLight} options. */
 export interface FlameLightOptions {
   /** Colour temperature in Kelvin, 1,667 to 25,000 (`blackbodyColor` from `@margoengine/math/color`). */
@@ -118,7 +121,9 @@ export function flameLight(options: FlameLightOptions): FlameLight {
     !(radius >= 0 && Number.isFinite(radius)) ||
     !(curve in flameFlickerMean)
   )
-    throw new RangeError('Invalid flame light; give lumens of 0 or more, a range above 0, a radius of 0 or more and the candle or fire curve.');
+    throw new RangeError(
+      'Invalid flame light; give lumens of 0 or more, a range above 0, a radius of 0 or more and the candle or fire curve.',
+    );
   const color = blackbodyColor(kelvin) as unknown as Vec3,
     y = 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2];
   return Object.freeze({
@@ -207,7 +212,9 @@ export function flameEmission(
   area = Math.PI * (light.radius ?? 0) ** 2,
 ): FlameEmission {
   if (!(area > 0 && Number.isFinite(area)) || !(light.intensity >= 0 && Number.isFinite(light.intensity)))
-    throw new RangeError('Invalid flame emission; give a light with a radius above 0 (or an area above 0, m2) and an intensity of 0 or more.');
+    throw new RangeError(
+      'Invalid flame emission; give a light with a radius above 0 (or an area above 0, m2) and an intensity of 0 or more.',
+    );
   return Object.freeze({
     emissive: [light.color[0], light.color[1], light.color[2]] as Vec3,
     emissiveIntensity: light.intensity / area,

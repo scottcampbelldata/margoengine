@@ -38,9 +38,15 @@ test('cube cookies and stochastic shadows compose with distinct shader and resou
     cookies = CubeProjectorLights.attach(h.engine, { lights }),
     stochastic = StochasticLights.attach(h.engine, { lights, quad: false });
   lights.setLights([{ position: [0, 2, 0], range: 6, castShadow: true }]);
-  cookies.setCubes([{ faces: Array.from({ length: 6 }, () => ({
-    width: 1, height: 1, data: new Uint8Array([128, 128, 128, 255]),
-  })) }]);
+  cookies.setCubes([
+    {
+      faces: Array.from({ length: 6 }, () => ({
+        width: 1,
+        height: 1,
+        data: new Uint8Array([128, 128, 128, 255]),
+      })),
+    },
+  ]);
   try {
     h.frame();
     const entries = lights.bindings().map((entry) => entry.binding);
@@ -75,7 +81,10 @@ test('contact shadows and stochastic shadows compose: both hooks bind, and sampl
     const declarations = lights.pbr(0).declarations;
     assert.match(declarations, /clusterStochastic:ClusterStochastic/);
     assert.match(declarations, /@binding\(145\) var<storage,read> clusterContactData/);
-    assert.ok(declarations.includes('*clusterContact(index,light,l,position,n,pixel)'), 'the radiance carries the contact factor');
+    assert.ok(
+      declarations.includes('*clusterContact(index,light,l,position,n,pixel)'),
+      'the radiance carries the contact factor',
+    );
     assert.ok(!lights.bindings(false).some((b) => b.binding === 145), 'receiveShadow false: no contact binding');
   } finally {
     contact.dispose();
