@@ -71,12 +71,23 @@ test('an adapter only on a full-tier context; below it, null and the context is 
 });
 
 /** A stand-in pipeline's per-program cache, the shape CompatRenderPipeline.cache has. */
-const programCache = () => ({ baseVertex: -1, baseInstance: -1, element: -1, pointerBuffers: [], pointerOffsets: [],
-  levels: new Map(), sizes: new Map(), mips: new Map(), modes: new Map(), info: new Map() });
+const programCache = () => ({
+  baseVertex: -1,
+  baseInstance: -1,
+  element: -1,
+  pointerBuffers: [],
+  pointerOffsets: [],
+  levels: new Map(),
+  sizes: new Map(),
+  mips: new Map(),
+  modes: new Map(),
+  info: new Map(),
+});
 
 // Exercise the actual replay/cache with a recording GL context, without compiling or drawing on a GPU.
 async function offsetDevice(withClamp) {
-  const calls = [], requested = [];
+  const calls = [],
+    requested = [];
   const context = fakeContext();
   const get = context.getExtension.bind(context);
   context.getExtension = (name) => {
@@ -85,32 +96,60 @@ async function offsetDevice(withClamp) {
       return withClamp ? { polygonOffsetClampEXT: (...args) => calls.push(['clamp', ...args]) } : null;
     return get(name);
   };
-  const constants = ['DITHER', 'SCISSOR_TEST', 'CULL_FACE', 'DEPTH_TEST', 'STENCIL_TEST',
-    'POLYGON_OFFSET_FILL', 'SAMPLE_ALPHA_TO_COVERAGE', 'ALWAYS', 'TRIANGLES', 'CW', 'FRONT', 'BACK',
-    'EQUAL', 'NOTEQUAL', 'KEEP', 'REPLACE'];
-  constants.forEach((name, i) => { context[name] = i + 1; });
+  const constants = [
+    'DITHER',
+    'SCISSOR_TEST',
+    'CULL_FACE',
+    'DEPTH_TEST',
+    'STENCIL_TEST',
+    'POLYGON_OFFSET_FILL',
+    'SAMPLE_ALPHA_TO_COVERAGE',
+    'ALWAYS',
+    'TRIANGLES',
+    'CW',
+    'FRONT',
+    'BACK',
+    'EQUAL',
+    'NOTEQUAL',
+    'KEEP',
+    'REPLACE',
+  ];
+  constants.forEach((name, i) => {
+    context[name] = i + 1;
+  });
   context.polygonOffset = (...args) => calls.push(['plain', ...args]);
   context.stencilFuncSeparate = (...args) => calls.push(['stencil', ...args]);
-  const gl = new Proxy(context, { get: (target, key) => key in target ? target[key] : () => ({}) });
+  const gl = new Proxy(context, { get: (target, key) => (key in target ? target[key] : () => ({})) });
   const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
   const device = await adapter.requestDevice();
   const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth' } } } } } };
   const apply = (bias, slope, clamp) => {
-    device.replayer.applyPipeline({
-      program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [], targetGL: [], sameTargets: true,
-      depthStencil: { depthBias: bias, depthBiasSlopeScale: slope, depthBiasClamp: clamp },
-    }, pass);
+    device.replayer.applyPipeline(
+      {
+        program: null,
+        vao: null,
+        cull: 0,
+        frontFace: gl.CW,
+        targets: [],
+        targetGL: [],
+        sameTargets: true,
+        depthStencil: { depthBias: bias, depthBiasSlopeScale: slope, depthBiasClamp: clamp },
+      },
+      pass,
+    );
   };
   return { device, gl, calls, requested, apply };
 }
 
 test('indexed replay detaches the old element binding before selecting a replacement, and caches unchanged draws', async () => {
-  const { device, gl } = await offsetDevice(false), calls = [];
+  const { device, gl } = await offsetDevice(false),
+    calls = [];
   gl.ELEMENT_ARRAY_BUFFER = 0x8893;
   gl.bindBuffer = (...args) => calls.push(['bind', ...args]);
   gl.drawElementsInstanced = (...args) => calls.push(['draw', ...args]);
   const pipeline = { mode: 1, cache: { element: -1 } },
-    a = { id: 1, element: {}, drain() {} }, b = { id: 2, element: {}, drain() {} },
+    a = { id: 1, element: {}, drain() {} },
+    b = { id: 2, element: {}, drain() {} },
     replay = device.replayer;
   replay.ready = () => pipeline;
   try {
@@ -120,31 +159,56 @@ test('indexed replay detaches the old element binding before selecting a replace
     }
     const draw = ['draw', 1, 10, 0x1405, 8, 2];
     assert.deepEqual(calls, [
-      ['bind', gl.ELEMENT_ARRAY_BUFFER, null], ['bind', gl.ELEMENT_ARRAY_BUFFER, a.element], draw, draw,
-      ['bind', gl.ELEMENT_ARRAY_BUFFER, null], ['bind', gl.ELEMENT_ARRAY_BUFFER, b.element], draw, draw,
-      ['bind', gl.ELEMENT_ARRAY_BUFFER, null], ['bind', gl.ELEMENT_ARRAY_BUFFER, a.element], draw,
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, null],
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, a.element],
+      draw,
+      draw,
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, null],
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, b.element],
+      draw,
+      draw,
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, null],
+      ['bind', gl.ELEMENT_ARRAY_BUFFER, a.element],
+      draw,
     ]);
-  } finally { device.destroy(); }
+  } finally {
+    device.destroy();
+  }
 });
 
 test('stencil replay masks uint32 references before GL signed clamping and caches both faces by effective value', async () => {
   const { device, gl, calls } = await offsetDevice(false);
   const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth-stencil' } } } } } };
-  const pipeline = { program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [], targetGL: [], sameTargets: true,
-    depthStencil: { stencilFront: { compare: 'equal', passOp: 'replace' },
-      stencilBack: { compare: 'not-equal', passOp: 'replace' }, stencilReadMask: 0xf3 } };
+  const pipeline = {
+    program: null,
+    vao: null,
+    cull: 0,
+    frontFace: gl.CW,
+    targets: [],
+    targetGL: [],
+    sameTargets: true,
+    depthStencil: {
+      stencilFront: { compare: 'equal', passOp: 'replace' },
+      stencilBack: { compare: 'not-equal', passOp: 'replace' },
+      stencilReadMask: 0xf3,
+    },
+  };
   try {
     for (const reference of [0x1000005, 0x80000005, 0xffffffff, 0, 0x80000005]) {
       device.replayer.pass = pass;
       device.replayer.setStencilReference(reference);
       device.replayer.applyPipeline(pipeline, pass);
     }
-    assert.deepEqual(calls.filter(([op]) => op === 'stencil'),
+    assert.deepEqual(
+      calls.filter(([op]) => op === 'stencil'),
       [5, 255, 0, 5].flatMap((ref) => [
         ['stencil', gl.FRONT, device.compare('equal'), ref, 0xf3],
         ['stencil', gl.BACK, device.compare('not-equal'), ref, 0xf3],
-      ]));
-  } finally { device.destroy(); }
+      ]),
+    );
+  } finally {
+    device.destroy();
+  }
 });
 
 test('polygon offset loads its extension and caches the signed clamp, including reset to zero', async () => {
@@ -159,19 +223,27 @@ test('polygon offset loads its extension and caches the signed clamp, including 
     apply(0, 0, 0);
     apply(100000, 2, 1e-6);
     assert.deepEqual(calls, [
-      ['clamp', 2, 100000, 1e-6], ['clamp', 2, 100000, -1e-6],
-      ['clamp', 2, 100000, 0], ['clamp', 2, 100000, 1e-6],
+      ['clamp', 2, 100000, 1e-6],
+      ['clamp', 2, 100000, -1e-6],
+      ['clamp', 2, 100000, 0],
+      ['clamp', 2, 100000, 1e-6],
     ]);
-  } finally { device.destroy(); }
+  } finally {
+    device.destroy();
+  }
 });
 
 test('without polygon offset clamp, nonzero clamp refuses sync and async pipelines before compilation', async () => {
   const { device, calls, apply } = await offsetDevice(false);
   try {
     for (const depthBiasClamp of [1e-6, -1e-6]) {
-      const descriptor = { layout: 'auto', vertex: { module: {} },
-        depthStencil: { format: 'depth32float', depthBiasClamp } };
-      const refusal = (e) => e.code === 'unsupported' && /EXT_polygon_offset_clamp/.test(e.message) && /https:/.test(e.message);
+      const descriptor = {
+        layout: 'auto',
+        vertex: { module: {} },
+        depthStencil: { format: 'depth32float', depthBiasClamp },
+      };
+      const refusal = (e) =>
+        e.code === 'unsupported' && /EXT_polygon_offset_clamp/.test(e.message) && /https:/.test(e.message);
       assert.throws(() => device.createRenderPipeline(descriptor), refusal);
       await assert.rejects(device.createRenderPipelineAsync(descriptor), refusal);
     }
@@ -179,7 +251,9 @@ test('without polygon offset clamp, nonzero clamp refuses sync and async pipelin
     apply(100000, 2, 0);
     apply(100000, 2, undefined);
     assert.deepEqual(calls, [['plain', 2, 100000]]);
-  } finally { device.destroy(); }
+  } finally {
+    device.destroy();
+  }
 });
 
 test('limits come from the context, never above WebGPU defaults except storage bindings and buffers (what a data texture holds); vertex strides stop at WebGL 255 bytes', async () => {
@@ -268,7 +342,10 @@ test('createBuffer refuses a size past the device maxBufferSize, as WebGPU does'
   allocated.length = 0;
   device.pushErrorScope('validation');
   const over = device.createBuffer({ size: most + 4, usage: 0x80 | 0x8, label: 'big' });
-  assert.match((await device.popErrorScope())?.message ?? '', /createBuffer 'big': 268435460 bytes is over this device's maxBufferSize of 268435456/);
+  assert.match(
+    (await device.popErrorScope())?.message ?? '',
+    /createBuffer 'big': 268435460 bytes is over this device's maxBufferSize of 268435456/,
+  );
   assert.equal(over.size, most + 4, 'an invalid buffer keeps the size asked for');
   assert.deepEqual(allocated, [], 'nothing is allocated for it');
   over.destroy();
@@ -281,7 +358,7 @@ test('array layer capacity is advertised from GL and negotiated independently fo
   for (const capacity of [256, 2048, 4096]) {
     const fresh = async () => {
       const context = fakeContext({ limits: { MAX_ARRAY_TEXTURE_LAYERS: capacity } });
-      const gl = new Proxy(context, { get: (target, key) => key in target ? target[key] : () => ({}) });
+      const gl = new Proxy(context, { get: (target, key) => (key in target ? target[key] : () => ({})) });
       return createCompatGPU({ createContext: () => gl }).requestAdapter();
     };
     const plainAdapter = await fresh();
@@ -299,12 +376,17 @@ test('array layer capacity is advertised from GL and negotiated independently fo
     assert.equal(below.limits.maxTextureArrayLayers, 256, 'a lower request never reduces the default');
     below.destroy();
     const refused = await fresh();
-    assert.throws(() => new CompatDevice({}, refused, new Set(), {
-      requiredLimits: { maxTextureArrayLayers: capacity + 1 },
-    }), { name: 'RangeError', message: /use adapter\.limits\.maxTextureArrayLayers or fewer layers/ },
-    'direct construction refuses before touching GL and gives the remedy');
-    await assert.rejects(refused.requestDevice({ requiredLimits: { maxTextureArrayLayers: capacity + 1 } }),
-      { name: 'OperationError' });
+    assert.throws(
+      () =>
+        new CompatDevice({}, refused, new Set(), {
+          requiredLimits: { maxTextureArrayLayers: capacity + 1 },
+        }),
+      { name: 'RangeError', message: /use adapter\.limits\.maxTextureArrayLayers or fewer layers/ },
+      'direct construction refuses before touching GL and gives the remedy',
+    );
+    await assert.rejects(refused.requestDevice({ requiredLimits: { maxTextureArrayLayers: capacity + 1 } }), {
+      name: 'OperationError',
+    });
     const recovered = await refused.requestDevice({ requiredLimits: { maxTextureArrayLayers: capacity } });
     assert.equal(recovered.limits.maxTextureArrayLayers, capacity, 'an invalid request does not consume the adapter');
     recovered.destroy();
@@ -571,7 +653,11 @@ test('createBindGroup refuses a storage binding over maxStorageBufferBindingSize
   assert.equal(device.limits.maxStorageBufferBindingSize, 64 * 1024 * 1024);
   const layout = (count) =>
     device.createBindGroupLayout({
-      entries: Array.from({ length: count }, (_, binding) => ({ binding, visibility: 4, buffer: { type: 'read-only-storage' } })),
+      entries: Array.from({ length: count }, (_, binding) => ({
+        binding,
+        visibility: 4,
+        buffer: { type: 'read-only-storage' },
+      })),
     });
   const buffer = device.createBuffer({ size: 64 * 1024 * 1024 + 16, usage: 0x80 | 0x8 });
   const errorOf = (count, entries) => {
@@ -580,14 +666,20 @@ test('createBindGroup refuses a storage binding over maxStorageBufferBindingSize
     return device.popErrorScope().then((error) => ({ error, group }));
   };
   const over = await errorOf(1, [{ binding: 0, resource: { buffer } }]);
-  assert.match(over.error?.message ?? '', /storage binding is 67108880 bytes, over this device's maxStorageBufferBindingSize of 67108864/);
+  assert.match(
+    over.error?.message ?? '',
+    /storage binding is 67108880 bytes, over this device's maxStorageBufferBindingSize of 67108864/,
+  );
   assert.ok(over.group.invalid);
   const half = 40 * 1024 * 1024,
     two = await errorOf(2, [
       { binding: 0, resource: { buffer, size: half } },
       { binding: 1, resource: { buffer: device.createBuffer({ size: half, usage: 0x80 | 0x8 }) } },
     ]);
-  assert.match(two.error?.message ?? '', /storage bindings total 83886080 bytes, over the 67108864 bytes one WebGL2 data texture/);
+  assert.match(
+    two.error?.message ?? '',
+    /storage bindings total 83886080 bytes, over the 67108864 bytes one WebGL2 data texture/,
+  );
   const fine = await errorOf(1, [{ binding: 0, resource: { buffer, size: 64 * 1024 * 1024 } }]);
   assert.equal(fine.error, null);
   assert.equal(fine.group.invalid, null);
@@ -627,15 +719,32 @@ test('a bind group whose storage bindings pass 2,048 x maxTextureDimension2D row
   // made first; texture copies of its buffers' own data textures may follow it.)
   assert.equal(data.shift, 12);
   assert.deepEqual(storage[made], [4096, 5494]);
-  assert.deepEqual([...data.rows], [[0, 0], [1, 7_500_000], [2, 15_000_000]]);
+  assert.deepEqual(
+    [...data.rows],
+    [
+      [0, 0],
+      [1, 7_500_000],
+      [2, 15_000_000],
+    ],
+  );
   // Past maxTextureDimension2D squared rows (1 GiB here) a group still cannot be held.
   const big = device.createBuffer({ size: 128 * 1024 * 1024, usage: 0x80 | 0x8 }),
     nine = device.createBindGroupLayout({
-      entries: Array.from({ length: 9 }, (_, binding) => ({ binding, visibility: 4, buffer: { type: 'read-only-storage' } })),
+      entries: Array.from({ length: 9 }, (_, binding) => ({
+        binding,
+        visibility: 4,
+        buffer: { type: 'read-only-storage' },
+      })),
     });
   device.pushErrorScope('validation');
-  device.createBindGroup({ layout: nine, entries: Array.from({ length: 9 }, (_, binding) => ({ binding, resource: { buffer: big } })) });
-  assert.match((await device.popErrorScope())?.message ?? '', /storage bindings total 1207959552 bytes, over the 1073741824 bytes/);
+  device.createBindGroup({
+    layout: nine,
+    entries: Array.from({ length: 9 }, (_, binding) => ({ binding, resource: { buffer: big } })),
+  });
+  assert.match(
+    (await device.popErrorScope())?.message ?? '',
+    /storage bindings total 1207959552 bytes, over the 1073741824 bytes/,
+  );
   device.destroy();
 });
 
@@ -646,14 +755,26 @@ test('mapAsync and getMappedRange keep to the mapped range, aligned and without 
   const device = await (await createCompatGPU({ createContext: () => gl }).requestAdapter()).requestDevice();
   const read = device.createBuffer({ size: 64, usage: 0x1 | 0x8 });
   device.pushErrorScope('validation');
-  for (const [mode, offset, size] of [[1, 4], [1, 8, 6], [1, 32, 64], [2, 0], [3, 0]])
+  for (const [mode, offset, size] of [
+    [1, 4],
+    [1, 8, 6],
+    [1, 32, 64],
+    [2, 0],
+    [3, 0],
+  ])
     await assert.rejects(read.mapAsync(mode, offset, size), { name: 'OperationError' }, `${mode} ${offset} ${size}`);
   assert.match((await device.popErrorScope())?.message ?? '', /^mapAsync: /);
   assert.equal(read.mapState, 'unmapped');
   const made = device.createBuffer({ size: 64, usage: 0x8, mappedAtCreation: true });
   const first = made.getMappedRange(8, 16);
   assert.equal(first.byteLength, 16);
-  for (const [offset, size] of [[4, 8], [8, 8], [16, 8], [56, 16], [8, 6]])
+  for (const [offset, size] of [
+    [4, 8],
+    [8, 8],
+    [16, 8],
+    [56, 16],
+    [8, 6],
+  ])
     assert.throws(() => made.getMappedRange(offset, size), { name: 'OperationError' }, `${offset} ${size}`);
   assert.equal(made.getMappedRange(24).byteLength, 40);
   made.unmap();
@@ -752,7 +873,8 @@ test('compact installer diagnostics retain unavailable APIs, missing capabilitie
 });
 test('texture replay selects stencil aspects, restores depth and isolates simultaneous aspects', async () => {
   const { device, gl, requested } = await offsetDevice(false);
-  const modes = [], aliases = [];
+  const modes = [],
+    aliases = [];
   gl.TEXTURE_2D = 0x0de1;
   gl.DEPTH_COMPONENT = 0x1902;
   gl.texParameteri = (_target, pname, value) => modes.push([pname, value]);
@@ -760,17 +882,45 @@ test('texture replay selects stencil aspects, restores depth and isolates simult
   // levels 0: base and max level already 0 (levelRange(0, 0)).
   const stores = [0, 1].map((id) => ({ gl: { id }, target: gl.TEXTURE_2D, levels: 0 }));
   const texture = {
-    info: { kind: 'depth-stencil' }, renderbuffer: null,
-    sampled(_view, alias = 0) { aliases.push(alias); return stores[alias]; },
+    info: { kind: 'depth-stencil' },
+    renderbuffer: null,
+    sampled(_view, alias = 0) {
+      aliases.push(alias);
+      return stores[alias];
+    },
     read() {},
   };
-  const view = (aspect) => ({ texture, aspect, baseMipLevel: 0, mipLevelCount: 1, baseArrayLayer: 0, arrayLayerCount: 1 });
+  const view = (aspect) => ({
+    texture,
+    aspect,
+    baseMipLevel: 0,
+    mipLevelCount: 1,
+    baseArrayLayer: 0,
+    arrayLayerCount: 1,
+  });
   const bind = (aspects) => {
-    const pipeline = { program: {}, finish() {}, uniforms: [], storage: [], attributes: [], cache: programCache(),
-      textures: aspects.map((_a, binding) => ({ group: 0, binding, unit: binding, modes: [], sizes: [], levels: [] })) };
-    device.replayer.pass = { pipeline, desc: {}, groups: [{ group: {
-      layout: { dynamic: [] }, entries: new Map(aspects.map((aspect, i) => [i, { kind: 'view', view: view(aspect) }])) },
-      offsets: [] }] };
+    const pipeline = {
+      program: {},
+      finish() {},
+      uniforms: [],
+      storage: [],
+      attributes: [],
+      cache: programCache(),
+      textures: aspects.map((_a, binding) => ({ group: 0, binding, unit: binding, modes: [], sizes: [], levels: [] })),
+    };
+    device.replayer.pass = {
+      pipeline,
+      desc: {},
+      groups: [
+        {
+          group: {
+            layout: { dynamic: [] },
+            entries: new Map(aspects.map((aspect, i) => [i, { kind: 'view', view: view(aspect) }])),
+          },
+          offsets: [],
+        },
+      ],
+    };
     device.replayer.draw(3, 1, 0, 0);
   };
   device.replayer.applyPipeline = () => {};
@@ -779,15 +929,23 @@ test('texture replay selects stencil aspects, restores depth and isolates simult
     bind(['stencil-only']);
     bind(['depth-only']);
     bind(['depth-only', 'stencil-only']);
-    assert.deepEqual(modes.filter(([p]) => p === 0x90ea).map(([, v]) => v), [0x1901, 0x1902, 0x1902, 0x1901]);
+    assert.deepEqual(
+      modes.filter(([p]) => p === 0x90ea).map(([, v]) => v),
+      [0x1901, 0x1902, 0x1902, 0x1901],
+    );
     assert.deepEqual(aliases, [0, 0, 0, 0, 1], 'simultaneous aspects need separate GL texture state');
     texture.info.kind = 'stencil';
     bind(['all']);
     assert.equal(modes.at(-1)[1], 0x1901, 'stencil8 uses its physical packed stencil aspect by default');
     texture.info.kind = 'depth-stencil';
     device.ext.stencilTexturing = null;
-    assert.throws(() => bind(['stencil-only']), (error) => error.code === 'unsupported' && /WEBGL_stencil_texturing/.test(error.message));
-  } finally { device.destroy(); }
+    assert.throws(
+      () => bind(['stencil-only']),
+      (error) => error.code === 'unsupported' && /WEBGL_stencil_texturing/.test(error.message),
+    );
+  } finally {
+    device.destroy();
+  }
 });
 
 test('explicit render layouts must declare every statically used resource with stage visibility', async () => {
@@ -814,7 +972,11 @@ test('explicit render layouts must declare every statically used resource with s
       );
       assert.equal(await device.popErrorScope(), null, 'async validation is delivered through pipeline rejection');
       device.pushErrorScope('validation');
-      device.createRenderPipeline({layout, vertex:{module,entryPoint:'v'}, fragment:{module,entryPoint:'f',targets:[{format:'rgba8unorm'}]}});
+      device.createRenderPipeline({
+        layout,
+        vertex: { module, entryPoint: 'v' },
+        fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+      });
       assert.match((await device.popErrorScope()).message, /layout omits/);
     }
   } finally {
@@ -910,7 +1072,9 @@ struct P { params: vec4f }
     // An explicit layout without the phony-read uniform fails as on WebGPU (every statically used resource declared).
     const layout = device.createPipelineLayout({
       bindGroupLayouts: [
-        device.createBindGroupLayout({ entries: [{ binding: 6, visibility: 1, buffer: { type: 'read-only-storage' } }] }),
+        device.createBindGroupLayout({
+          entries: [{ binding: 6, visibility: 1, buffer: { type: 'read-only-storage' } }],
+        }),
         device.createBindGroupLayout({
           entries: [
             { binding: 0, visibility: 2, texture: {} },
@@ -1081,7 +1245,10 @@ test('allocations share one getError per task or out-of-memory scope, each error
   device.createBuffer({ label: 'inside', size: 256, usage: 0x80 | 0x8 });
   assert.equal(await device.popErrorScope(), null);
   await task();
-  assert.deepEqual(uncaptured.map((e) => e.message), ["WebGL2 is out of memory for buffer 'before' (256 bytes)"]);
+  assert.deepEqual(
+    uncaptured.map((e) => e.message),
+    ["WebGL2 is out of memory for buffer 'before' (256 bytes)"],
+  );
   errors.push(0x0505);
   device.pushErrorScope('out-of-memory');
   device.createBuffer({ label: 'a', size: 256, usage: 0x80 | 0x8 });
@@ -1107,6 +1274,9 @@ test('allocations share one getError per task or out-of-memory scope, each error
   await task();
   await task();
   assert.equal(uncaptured[0]?.name, 'GPUOutOfMemoryError');
-  assert.deepEqual(uncaptured.map((e) => e.name), ['GPUOutOfMemoryError', 'GPUValidationError']);
+  assert.deepEqual(
+    uncaptured.map((e) => e.name),
+    ['GPUOutOfMemoryError', 'GPUValidationError'],
+  );
   device.destroy();
 });

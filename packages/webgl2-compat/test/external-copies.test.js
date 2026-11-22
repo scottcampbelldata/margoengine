@@ -6,18 +6,30 @@ import assert from 'node:assert/strict';
 import { ExternalCopies, SPARE_EXTERNALS } from '../dist/device.js';
 
 function copies() {
-  const made = [], ends = [];
-  const pool = new ExternalCopies((width, height) => {
-    const copy = { width, height, destroyed: false, destroy() { this.destroyed = true; } };
-    made.push(copy);
-    return copy;
-  }, (end) => ends.push(end));
+  const made = [],
+    ends = [];
+  const pool = new ExternalCopies(
+    (width, height) => {
+      const copy = {
+        width,
+        height,
+        destroyed: false,
+        destroy() {
+          this.destroyed = true;
+        },
+      };
+      made.push(copy);
+      return copy;
+    },
+    (end) => ends.push(end),
+  );
   const endTask = () => ends.splice(0).forEach((end) => end());
   return { pool, made, endTask, live: () => made.filter((c) => !c.destroyed).length };
 }
 
 test('a copy serves its source for the task, and a steady video reuses it every frame', () => {
-  const { pool, made, endTask } = copies(), video = {};
+  const { pool, made, endTask } = copies(),
+    video = {};
   const first = pool.take(video, 8, 4);
   assert.equal(pool.take(video, 8, 4), first, 'the same task imports the same copy again');
   for (let frame = 0; frame < 10; frame++) {
@@ -28,7 +40,8 @@ test('a copy serves its source for the task, and a steady video reuses it every 
 });
 
 test('a copy does not outlive its importer while the source object stays alive', () => {
-  const { pool, endTask, live } = copies(), kept = {};
+  const { pool, endTask, live } = copies(),
+    kept = {};
   pool.take(kept, 8, 4);
   endTask();
   // Other videos of other sizes play on; the first source is still referenced by the caller but imported no more.
@@ -41,7 +54,8 @@ test('a copy does not outlive its importer while the source object stays alive',
 });
 
 test('a size change and device destruction release the old copies', () => {
-  const { pool, made, endTask, live } = copies(), video = {};
+  const { pool, made, endTask, live } = copies(),
+    video = {};
   pool.take(video, 8, 4);
   pool.take(video, 16, 8);
   assert.equal(made.length, 2);

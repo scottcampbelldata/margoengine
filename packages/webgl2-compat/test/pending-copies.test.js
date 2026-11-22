@@ -54,7 +54,9 @@ test('vertex, uniform and index readers apply a copy from a texture that still w
 test('a bind group that copied a storage buffer copies it again after a waiting copy into it, without a CPU readback', async () => {
   const { gl, device } = await loggingDevice(),
     storage = device.createBuffer({ size: 16, usage: B.STORAGE | B.COPY_DST }),
-    layout = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: 1, buffer: { type: 'read-only-storage' } }] }),
+    layout = device.createBindGroupLayout({
+      entries: [{ binding: 0, visibility: 1, buffer: { type: 'read-only-storage' } }],
+    }),
     group = device.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer: storage } }] });
   group.storageTexture();
   await copied(device, [storage]);
@@ -65,11 +67,15 @@ test('a bind group that copied a storage buffer copies it again after a waiting 
   assert.equal(storage.readbacks.length, 0, 'the waiting copy landed');
   assert.ok(names.includes('copyTexSubImage2D') || names.includes('texSubImage2D'), 'the group copied the new rows');
   // drain applies the writes only: the whole buffer is not read back into its CPU copy on the way.
-  assert.equal(names.filter((n) => n === 'getBufferSubData').length, 1, 'one read: the copy itself, from its pack buffer');
+  assert.equal(
+    names.filter((n) => n === 'getBufferSubData').length,
+    1,
+    'one read: the copy itself, from its pack buffer',
+  );
   device.destroy();
 });
 
-test('a buffer destroyed while a copy from a texture waits frees the copy\'s pixel pack buffer and fence', async () => {
+test("a buffer destroyed while a copy from a texture waits frees the copy's pixel pack buffer and fence", async () => {
   const { gl, device } = await loggingDevice(),
     buffer = device.createBuffer({ size: 16, usage: B.VERTEX | B.COPY_DST });
   const from = gl.calls.length;
@@ -84,13 +90,19 @@ test('a buffer destroyed while a copy from a texture waits frees the copy\'s pix
   buffer.destroy();
   const freed = gl.calls.slice(before);
   assert.equal(buffer.readbacks.length, 0);
-  assert.ok(freed.some((c) => c[0] === 'deleteBuffer' && c[1] === pack), 'the pixel pack buffer is deleted');
-  assert.ok(freed.some((c) => c[0] === 'deleteSync'), 'the fence is deleted');
+  assert.ok(
+    freed.some((c) => c[0] === 'deleteBuffer' && c[1] === pack),
+    'the pixel pack buffer is deleted',
+  );
+  assert.ok(
+    freed.some((c) => c[0] === 'deleteSync'),
+    'the fence is deleted',
+  );
   assert.equal(freed.filter((c) => c[0] === 'bufferSubData').length, 0, 'the copy is not applied');
   device.destroy();
 });
 
-test('a waiting copy landing in a vertex and index buffer while a draw is set up leaves the draw\'s vertex array bound', async () => {
+test("a waiting copy landing in a vertex and index buffer while a draw is set up leaves the draw's vertex array bound", async () => {
   const { gl, device } = await loggingDevice(),
     buffer = device.createBuffer({ size: 16, usage: B.VERTEX | B.INDEX | B.COPY_DST });
   await copied(device, [buffer]);
@@ -99,8 +111,11 @@ test('a waiting copy landing in a vertex and index buffer while a draw is set up
   const from = gl.calls.length;
   assert.ok(buffer.gl, 'the vertex binding reads the GL buffer');
   const binds = gl.calls.slice(from).filter((c) => c[0] === 'bindVertexArray');
-  assert.ok(gl.calls.slice(from).some((c) => c[0] === 'bufferSubData' && c[1] === gl.ELEMENT_ARRAY_BUFFER), 'the copy reached the element buffer');
+  assert.ok(
+    gl.calls.slice(from).some((c) => c[0] === 'bufferSubData' && c[1] === gl.ELEMENT_ARRAY_BUFFER),
+    'the copy reached the element buffer',
+  );
   assert.equal(device.state.vertexArray, vao);
-  assert.equal(binds.at(-1)?.[1], vao, 'the draw\'s vertex array is bound again');
+  assert.equal(binds.at(-1)?.[1], vao, "the draw's vertex array is bound again");
   device.destroy();
 });

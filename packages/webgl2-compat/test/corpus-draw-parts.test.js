@@ -29,7 +29,9 @@ test('every distinct corpus pipeline is drawn in exactly one part, and no part i
   assert.equal(work.records.length, render.size);
   assert.equal(work.computes.length + work.outOfScope, compute.size);
   assert.equal(work.outOfScope, pathTracer);
-  const ids = [...work.records, ...work.computes].map((r) => `${r.part} ${JSON.stringify([r.vertex, r.fragment, r.compute, r.primitive, r.depthStencil, r.multisample])}`);
+  const ids = [...work.records, ...work.computes].map(
+    (r) => `${r.part} ${JSON.stringify([r.vertex, r.fragment, r.compute, r.primitive, r.depthStencil, r.multisample])}`,
+  );
   assert.equal(new Set(ids).size, ids.length, 'a pipeline is listed twice');
   for (const part of PARTS)
     assert.ok(
@@ -45,7 +47,11 @@ test('every distinct corpus pipeline is drawn in exactly one part, and no part i
   // A package of its own parts: one kernel in each, as many kernels as it says.
   for (const [name, count] of Object.entries(OWN_COMPUTE_PART)) {
     const kernels = work.computes.filter((r) => r.id.startsWith(`${name} `));
-    assert.equal(kernels.length, count, `${name} records ${kernels.length} compute kernels; OWN_COMPUTE_PART says ${count}`);
+    assert.equal(
+      kernels.length,
+      count,
+      `${name} records ${kernels.length} compute kernels; OWN_COMPUTE_PART says ${count}`,
+    );
     assert.equal(new Set(kernels.map((r) => r.part)).size, count);
   }
 });
@@ -54,7 +60,9 @@ test('each part has its own package script running corpus-draw-browser.mjs on th
   for (const part of PARTS) {
     const script = scripts[scriptOf(part)];
     assert.ok(script, `package.json has no "${scriptOf(part)}"`);
-    const runs = [...script.matchAll(/corpus-draw-browser\.mjs((?:\s+--[\w-]+(?:=[\w,-]+)?)*)/g)].map((m) => m[1].trim());
+    const runs = [...script.matchAll(/corpus-draw-browser\.mjs((?:\s+--[\w-]+(?:=[\w,-]+)?)*)/g)].map((m) =>
+      m[1].trim(),
+    );
     assert.deepEqual(runs, [`--part=${part}`], scriptOf(part));
   }
   // No other script draws the corpus, so no part runs twice in a GPU check.

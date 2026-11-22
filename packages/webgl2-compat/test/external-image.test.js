@@ -17,7 +17,10 @@ test('every ImageBitmap copy takes the GPU copy with its region, flip, destinati
     for (const target of [1, 2, 3])
       for (const [origin, size] of [
         [undefined, [61, 23]],
-        [[2, 1], [4, 3]],
+        [
+          [2, 1],
+          [4, 3],
+        ],
       ])
         for (const flipY of [false, true])
           for (const premultipliedAlpha of [false, true]) {
@@ -55,7 +58,15 @@ test('every ImageBitmap copy takes the GPU copy with its region, flip, destinati
             );
             assert.deepEqual(uploads, [], 'no direct upload: WebGL would ignore the flip and alpha flags');
             assert.deepEqual(copies, [
-              [image, [...(origin ?? [0, 0]), ...size], flipY, texture, 0, [3, 4, target === 1 ? 0 : 1], premultipliedAlpha],
+              [
+                image,
+                [...(origin ?? [0, 0]), ...size],
+                flipY,
+                texture,
+                0,
+                [3, 4, target === 1 ? 0 : 1],
+                premultipliedAlpha,
+              ],
             ]);
             assert.equal(texture.initialized, true);
           }

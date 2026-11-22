@@ -2457,7 +2457,9 @@ export class StageEmitter {
             return;
           case 'frag_depth':
             fragDepth = true;
-            sets.push(this.pinned ? `gl_FragDepth = gl_FragCoord.w > 0.0 ? ${code} : _dk.x;` : `gl_FragDepth = ${code};`);
+            sets.push(
+              this.pinned ? `gl_FragDepth = gl_FragCoord.w > 0.0 ? ${code} : _dk.x;` : `gl_FragDepth = ${code};`,
+            );
             return;
           case 'sample_mask':
             this.notes.add('@builtin(sample_mask) output is dropped on WebGL2');
@@ -2518,7 +2520,8 @@ export class StageEmitter {
     } else {
       body.push(...sets);
       // No output to carry the pin: a derivative can still decide a discard, so the pin decides one that never runs.
-      if (this.pinned && !sets.length && this.mayDiscard(fn)) body.push('if (gl_FragCoord.w <= 0.0 && _dk != vec4(0.0)) discard;');
+      if (this.pinned && !sets.length && this.mayDiscard(fn))
+        body.push('if (gl_FragCoord.w <= 0.0 && _dk != vec4(0.0)) discard;');
     }
     if (this.baseVertex) declarations.push('uniform highp uint _bv;');
     if (this.baseInstance) declarations.push('uniform highp uint _bi;');

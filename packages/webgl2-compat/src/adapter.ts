@@ -33,7 +33,9 @@ const floatTypes: Record<string, string> = {
  * makes such a binding `unfilterable-float`, which a depth texture may bind to. One that a sampler also reads stays.
  */
 function floatDepthLoads(code: string): string {
-  for (const [declaration, name, type] of code.matchAll(/var\s+(\w+)\s*:\s*(texture_depth_(?:multisampled_2d|2d_array|2d))\b/g)) {
+  for (const [declaration, name, type] of code.matchAll(
+    /var\s+(\w+)\s*:\s*(texture_depth_(?:multisampled_2d|2d_array|2d))\b/g,
+  )) {
     const load = new RegExp(`\\btextureLoad\\s*\\(\\s*${name}\\s*,`, 'g'),
       starts = [...code.matchAll(load)].map((m) => m.index + m[0].length);
     if (!starts.length || new RegExp(`\\btexture(?:Sample|Gather)\\w*\\s*\\(\\s*${name}\\s*,`).test(code)) continue;
@@ -41,7 +43,7 @@ function floatDepthLoads(code: string): string {
     for (const start of starts.reverse()) {
       let depth = 1,
         at = start;
-      while (depth) depth += code[at] === '(' ? 1 : code[at] === ')' ? -1 : 0, at++;
+      while (depth) (depth += code[at] === '(' ? 1 : code[at] === ')' ? -1 : 0), at++;
       code = code.slice(0, at) + '.x' + code.slice(at);
     }
     code = code.replace(declaration, declaration.replace(type, floatTypes[type]));
@@ -93,8 +95,14 @@ const prepare = (adapter: GPUAdapter | null): GPUAdapter | null => {
  */
 export function allowCompatibilityAdapters({ force = false }: CompatibilityAdapterOptions = {}): CompatibilityAdapters {
   const gpu = (globalThis as { navigator?: { gpu?: GPU } }).navigator?.gpu;
-  if (!gpu) throw fault('unsupported', 'allowCompatibilityAdapters needs navigator.gpu; check for WebGPU first', 'compatibility-layer');
-  if (active) throw fault('state', 'Compatibility adapters are already allowed; dispose the first call', 'compatibility-layer');
+  if (!gpu)
+    throw fault(
+      'unsupported',
+      'allowCompatibilityAdapters needs navigator.gpu; check for WebGPU first',
+      'compatibility-layer',
+    );
+  if (active)
+    throw fault('state', 'Compatibility adapters are already allowed; dispose the first call', 'compatibility-layer');
   const native = gpu.requestAdapter,
     compatibility = async (options?: GPURequestAdapterOptions) =>
       prepare(await native.call(gpu, { ...options, featureLevel: 'compatibility' } as GPURequestAdapterOptions));

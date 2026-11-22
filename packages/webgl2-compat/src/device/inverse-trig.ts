@@ -69,7 +69,10 @@ export function inverseTrigInaccurate(gl: WebGL2RenderingContext): boolean {
 
 /** The verdict of {@link inverseTrigInaccurate} on the probe's results (four float32 values a pixel). @internal */
 export function inverseTrigVerdict(results: ArrayLike<number>): boolean {
-  return inverseTrigError(results, INVERSE_TRIG_SMOOTH) < INVERSE_TRIG_IMPLAUSIBLE && inverseTrigError(results) > INVERSE_TRIG_TOLERANCE;
+  return (
+    inverseTrigError(results, INVERSE_TRIG_SMOOTH) < INVERSE_TRIG_IMPLAUSIBLE &&
+    inverseTrigError(results) > INVERSE_TRIG_TOLERANCE
+  );
 }
 
 /** An error no driver's acos, asin or atan reaches: the probe read something else (zeros from a stand-in). @internal */
@@ -83,7 +86,10 @@ function probeInverseTrig(gl: WebGL2RenderingContext): Float32Array | null {
     framebuffer = gl.createFramebuffer(),
     program = gl.createProgram(),
     shaders = [
-      [gl.VERTEX_SHADER, 'void main() { gl_Position = vec4(vec2(gl_VertexID == 1 ? 3 : -1, gl_VertexID == 2 ? 3 : -1), 0, 1); }'],
+      [
+        gl.VERTEX_SHADER,
+        'void main() { gl_Position = vec4(vec2(gl_VertexID == 1 ? 3 : -1, gl_VertexID == 2 ? 3 : -1), 0, 1); }',
+      ],
       [
         gl.FRAGMENT_SHADER,
         `precision highp float;\nprecision highp int;\nuniform vec3 u[${n}];\nout uvec4 o;\n` +

@@ -30,13 +30,19 @@ try {
       checks++;
       return wait.apply(this, args);
     };
-    const target = device.createTexture({ size: [64, 32], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+    const target = device.createTexture({
+      size: [64, 32],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
     const counts = [];
     for (let i = 0; i < 7; i++) {
       const encoder = device.createCommandEncoder();
       encoder
         .beginRenderPass({
-          colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [i / 7, 0, 0, 1] }],
+          colorAttachments: [
+            { view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [i / 7, 0, 0, 1] },
+          ],
         })
         .end();
       device.queue.submit([encoder.finish()]);

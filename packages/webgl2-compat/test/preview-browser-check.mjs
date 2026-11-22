@@ -11,7 +11,10 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/preview-browser-check.html', port: 'free' }),
+const context = await openBrowser({
+    startPath: '/packages/webgl2-compat/test/preview-browser-check.html',
+    port: 'free',
+  }),
   { page } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -97,7 +100,14 @@ try {
     const { HoverHighlight, Picking } = await import('/packages/selection/dist/index.js');
     const picking = Picking.attach(engine);
     out.tool = name((await picking.pick(52, 64))?.mesh);
-    out.many = (await picking.pickMany([[52, 64], [140, 64], [4, 4], [-1, 4]])).map((hit) => name(hit?.mesh));
+    out.many = (
+      await picking.pickMany([
+        [52, 64],
+        [140, 64],
+        [4, 4],
+        [-1, 4],
+      ])
+    ).map((hit) => name(hit?.mesh));
     let hover;
     const hovered = new Promise((done) => {
       hover = HoverHighlight.attach(engine, { picking, onHover: (mesh) => done(name(mesh)) });
@@ -213,9 +223,7 @@ try {
       extension = context.getExtension('WEBGL_lose_context'),
       // A macrotask later: Chromium decides whether a restore is allowed only once the event has finished dispatching.
       wait = (name) =>
-        new Promise((resolve) =>
-          second.addEventListener(name, () => setTimeout(resolve), { once: true }),
-        ),
+        new Promise((resolve) => second.addEventListener(name, () => setTimeout(resolve), { once: true })),
       image = () => {
         live.render();
         const pixels = new Uint8Array(96 * 64 * 4);
@@ -345,10 +353,14 @@ try {
     ).catch((error) => [error.code, runs]);
     // Any other failure is the app's own: no second try.
     runs = 0;
-    out.other = await autoEngine(document.createElement('canvas'), () => {
-      runs++;
-      throw new TypeError('app bug');
-    }, { loadCompat }).catch((error) => [error.name, runs]);
+    out.other = await autoEngine(
+      document.createElement('canvas'),
+      () => {
+        runs++;
+        throw new TypeError('app bug');
+      },
+      { loadCompat },
+    ).catch((error) => [error.name, runs]);
     out.stillPreview = !files().some((path) => path.endsWith('/webgl2-compat/dist/index.js'));
     // A refused package: same page element position, on the layer, with the whole scene.
     runs = 0;
@@ -374,9 +386,7 @@ try {
       willReadFrequently: true,
     });
     flat.drawImage(engine.canvas, 0, 0);
-    out.centre = [
-      ...flat.getImageData(engine.canvas.width >> 1, engine.canvas.height >> 1, 1, 1).data,
-    ];
+    out.centre = [...flat.getImageData(engine.canvas.width >> 1, engine.canvas.height >> 1, 1, 1).data];
     engine.dispose();
     return out;
   }, `(${fetched})`);
@@ -401,7 +411,10 @@ try {
   assert.ok(auto.centre[0] > 60 && auto.centre[0] > 2 * auto.centre[2], `the layer draws the box: ${auto.centre}`);
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/webgl2-preview-browser.json', `${JSON.stringify({ picks, restore, native, auto }, null, 2)}\n`);
+  await writeFile(
+    'test-results/webgl2-preview-browser.json',
+    `${JSON.stringify({ picks, restore, native, auto }, null, 2)}\n`,
+  );
   console.log('WebGL2 preview browser check passed');
 } finally {
   await context.close();

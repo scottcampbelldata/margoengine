@@ -16,7 +16,9 @@ async function device() {
       getExtension: (name) => (name === 'EXT_color_buffer_float' ? {} : null),
       getParameter: (p) => values.get(p) ?? '',
       getShaderPrecisionFormat: (_s, type) =>
-        type === 0x8df2 ? { precision: 23, rangeMin: 127, rangeMax: 127 } : { precision: 0, rangeMin: 31, rangeMax: 30 },
+        type === 0x8df2
+          ? { precision: 23, rangeMin: 127, rangeMax: 127 }
+          : { precision: 0, rangeMin: 31, rangeMax: 30 },
     },
     gl = new Proxy(context, { get: (t, k) => (k in t ? t[k] : () => ({})) });
   return (await createCompatGPU({ createContext: () => gl }).requestAdapter()).requestDevice();
