@@ -9057,6 +9057,16 @@ and scissor (fixed in packages/machinery/src; the browser leaf is the regression
 (scripts/umbrella.mjs) with no code of their own, so each is in OWNER_EXCLUSIONS and `tests/owner-exclusions.test.js` fails if a
 kit source line is anything but a comment or a re-export; the lifetimes they hand out belong to the packages they re-export.
 
+Batch owners-b11 (2026-11-21) gated voxel-edit and voxel-pathtracer. voxel-edit: GpuGrid (every queued edit kind, a shader brush, a
+write and a read-back) and ShaderBrush; the editing, format and collab entries are typed-array work. voxel-pathtracer: the tracer and
+its Resampled, Guided, Media and Spectral subclasses (after `ready` and one off-screen image), MeshPathTracer and the composed tracer
+with every feature and with the glTF PBR feature (a mesh kernel takes 20 to 60 s to compile cold, past the 20 s the harness gives a
+frame, so the first of each is awaited in the fixture, and every case replaces its scene once), and DenoiseML. The trace kernel takes 100
+to 270 s to compile on the Direct3D 11 route of the WebGL2 layer (tests/compat-d3d11-case-seconds.json), past a leaf's 180 s, so the
+voxel-pathtracer fixture exports `compatAngle = 'vulkan'`, which scripts/check-owner-lifetime-browser.mjs reads to launch its
+compatibility leaf on the Vulkan route on Windows, as the package's compose-browser.mjs does; a case then takes seconds. Native WebGPU
+legs are unchanged. All pass on the CPU model, native WebGPU and the WebGL2 layer, with device loss attached and detached.
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,
