@@ -30,7 +30,7 @@ for (const model of ['preetham', 'bruneton']) {
   }
   assert.doesNotMatch(singleShaders[model], /@builtin\(sample_index\)/);
 }
-const dayCalls = { bruneton: 'color=lookup(scattering,', preetham: 'color=preetham(w,s);' };
+const dayCalls = { bruneton: 'color=brunetonSky(scattering,', preetham: 'color=preetham(w,s);' };
 for (const [model, other] of [
   ['bruneton', 'preetham'],
   ['preetham', 'bruneton'],
