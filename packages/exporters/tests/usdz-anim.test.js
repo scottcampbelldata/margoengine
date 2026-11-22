@@ -171,8 +171,14 @@ test('a channel with no key times, or times out of order, is refused rather than
   // glTF 2.0 3.11: animation input times are strictly increasing.
   for (const [times, values] of [
     [[], []],
-    [[0.5, 0.25], [0, 0, 0, 1, 0, 0]],
-    [[0, NaN], [0, 0, 0, 1, 0, 0]],
+    [
+      [0.5, 0.25],
+      [0, 0, 0, 1, 0, 0],
+    ],
+    [
+      [0, NaN],
+      [0, 0, 0, 1, 0, 0],
+    ],
   ]) {
     const node = { name: 'box', geometry: quad };
     await assert.rejects(
@@ -408,7 +414,9 @@ test('a skin in another space than the world rests in the world and still moves 
     normal = numbers(/normal3f\[\] normals = (\[[^\]]*\])/.exec(text)[1]);
   // Sizes here are up to 400, so a Float32 step is about 3e-5, over a few steps.
   want.forEach((point, v) => point.forEach((value, r) => near(got[v][r], value, 2e-3, `vertex ${v}`)));
-  apply(rigWorld, [...geometry.positions.subarray(6, 9)]).forEach((value, r) => near(points[6 + r], value, 1e-3, 'rest'));
+  apply(rigWorld, [...geometry.positions.subarray(6, 9)]).forEach((value, r) =>
+    near(points[6 + r], value, 1e-3, 'rest'),
+  );
   [0, -1, 0].forEach((value, r) => near(normal[r], value, 1e-6, 'normal turned with the points'));
 });
 

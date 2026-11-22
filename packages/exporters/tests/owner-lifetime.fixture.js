@@ -29,24 +29,48 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Material, Texture, createMesh } = await load('../../materials/dist/index.js');
   const entries = [];
   // A core mesh the app owns, exported from the engine: the exporter must leave the scene and the signal as it found them.
-  const coreScene = (name, run) => entries.push({ name, async create({ engine, scene }) {
-    const scope = captureScene(engine), mesh = scene.createMesh().setGeometry(box(1, 1, 1));
-    const meshes = scene.meshes.size;
-    const bytes = await run(engine, scope);
-    if (!(bytes instanceof Uint8Array) || !bytes.byteLength) throw new Error(`OWNER_FIXTURE: ${name} wrote nothing`);
-    if (scene.meshes.size !== meshes) throw new Error(`OWNER_LIFETIME: ${name} changed the scene's meshes`);
-    return ownedByEngine(scene, name, () => mesh.dispose());
-  } });
+  const coreScene = (name, run) =>
+    entries.push({
+      name,
+      async create({ engine, scene }) {
+        const scope = captureScene(engine),
+          mesh = scene.createMesh().setGeometry(box(1, 1, 1));
+        const meshes = scene.meshes.size;
+        const bytes = await run(engine, scope);
+        if (!(bytes instanceof Uint8Array) || !bytes.byteLength)
+          throw new Error(`OWNER_FIXTURE: ${name} wrote nothing`);
+        if (scene.meshes.size !== meshes) throw new Error(`OWNER_LIFETIME: ${name} changed the scene's meshes`);
+        return ownedByEngine(scene, name, () => mesh.dispose());
+      },
+    });
   coreScene('exportGLB', (engine, scope) => scope.run(() => exportGLB(engine)));
-  coreScene('compressMeshopt', async (engine, scope) =>
-    (await compressMeshopt(scope.run(() => exportGLB(engine)), { signal: signal() })).glb);
-  coreScene('optimizeGLB', async (engine, scope) =>
-    (await optimizeGLB(scope.run(() => exportGLB(engine)), { signal: signal() })).glb);
+  coreScene(
+    'compressMeshopt',
+    async (engine, scope) =>
+      (
+        await compressMeshopt(
+          scope.run(() => exportGLB(engine)),
+          { signal: signal() },
+        )
+      ).glb,
+  );
+  coreScene(
+    'optimizeGLB',
+    async (engine, scope) =>
+      (
+        await optimizeGLB(
+          scope.run(() => exportGLB(engine)),
+          { signal: signal() },
+        )
+      ).glb,
+  );
   // encodeGIF draws nothing: the frames are the app's pixels; only the signal subscription is under test.
   coreScene('encodeGIF', () => encodeGIF(3, async (index) => frame(index), { signal: signal(), fps: 10 }));
 
   // exportModel reads the live materials mesh, its material and its texture (no encoded bytes, so it is PNG-encoded).
-  entries.push({ name: 'exportModel', warmUp: "materials' 1x1 default textures, made once per device",
+  entries.push({
+    name: 'exportModel',
+    warmUp: "materials' 1x1 default textures, made once per device",
     async create({ engine }) {
       const scope = captureScene(engine),
         texture = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 }),
@@ -59,10 +83,15 @@ export async function fixtures(load = (entry) => import(entry)) {
       const glb = await exportModel(mesh, { binary: true });
       if (!(glb instanceof Uint8Array) || !glb.byteLength) throw new Error('OWNER_FIXTURE: exportModel wrote nothing');
       const nodes = [mesh.root, ...mesh.nodes].filter(Boolean);
-      return { plugin: mesh, dispose: () => mesh.destroy(), check({ phase }) {
-        if (phase === 'disposed' && nodes.some((m) => m.engine.meshes.get(m.id) === m))
-          throw new Error('OWNER_LIFETIME: a disposed exported mesh leaves meshes in the scene');
-      } };
-    } });
+      return {
+        plugin: mesh,
+        dispose: () => mesh.destroy(),
+        check({ phase }) {
+          if (phase === 'disposed' && nodes.some((m) => m.engine.meshes.get(m.id) === m))
+            throw new Error('OWNER_LIFETIME: a disposed exported mesh leaves meshes in the scene');
+        },
+      };
+    },
+  });
   return entries;
 }

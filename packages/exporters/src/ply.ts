@@ -1,6 +1,16 @@
 import { LinearToSRGB as toSrgb } from '@margoengine/math/color';
 // PLY writer: one merged world-space mesh, with a loaded model's points as vertices and its lines as edges.
-import { byte, collect, drawables, num, standZUp, toWorld, turnsToZUp, type ExportSource, type SceneOptions } from './scene.js';
+import {
+  byte,
+  collect,
+  drawables,
+  num,
+  standZUp,
+  toWorld,
+  turnsToZUp,
+  type ExportSource,
+  type SceneOptions,
+} from './scene.js';
 
 /** Options of exportPLY: binary or ASCII output and per-vertex colours. */
 export interface PLYOptions extends SceneOptions {
@@ -32,7 +42,8 @@ export function exportPLY(source: ExportSource, options: PLYOptions = {}): Uint8
   const items = drawables(collect(source, options, undefined, 'shape', ['points', 'lines']), true).map((item) => {
     const { positions, normals, indices } = toWorld(item),
       // A point is a vertex of its own, in point order; other vertices are written as the geometry holds them.
-      order = item.geometry.topology === 'points' ? indices : Uint32Array.from({ length: item.geometry.count }, (_, i) => i);
+      order =
+        item.geometry.topology === 'points' ? indices : Uint32Array.from({ length: item.geometry.count }, (_, i) => i);
     return turn
       ? { positions: standZUp(positions), normals: standZUp(normals), indices, item, order }
       : { positions, normals, indices, item, order };
@@ -74,9 +85,7 @@ export function exportPLY(source: ExportSource, options: PLYOptions = {}): Uint8
   // An edge takes its first vertex's colour, as the vertex lines write it.
   const edgeColor = (item: (typeof items)[number]['item'], vertex: number): number[] => {
     const g = item.geometry;
-    return g.colors
-      ? [0, 1, 2].map((c) => byte(toSrgb(g.colors![vertex * g.colorSize + c])))
-      : flat(item);
+    return g.colors ? [0, 1, 2].map((c) => byte(toSrgb(g.colors![vertex * g.colorSize + c]))) : flat(item);
   };
   if (!binary) {
     const lines = [header.trimEnd()];
@@ -106,7 +115,9 @@ export function exportPLY(source: ExportSource, options: PLYOptions = {}): Uint8
     for (const { indices, item, order } of items) {
       if (item.geometry.topology === 'lines')
         for (let i = 0; i < indices.length; i += 2)
-          lines.push(`${indices[i] + base} ${indices[i + 1] + base}${colors ? ' ' + edgeColor(item, indices[i]).join(' ') : ''}`);
+          lines.push(
+            `${indices[i] + base} ${indices[i + 1] + base}${colors ? ' ' + edgeColor(item, indices[i]).join(' ') : ''}`,
+          );
       base += order.length;
     }
     lines.push('');

@@ -185,14 +185,17 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
         lines.push(line);
       }
       const lineUVs = geo.topology === 'lines' ? uvs : undefined;
-      if (lineUVs) for (let i = 0; i < geo.count; i++) lines.push(`vt ${num(lineUVs[i * 2])} ${num(1 - lineUVs[i * 2 + 1])}`);
+      if (lineUVs)
+        for (let i = 0; i < geo.count; i++) lines.push(`vt ${num(lineUVs[i * 2])} ${num(1 - lineUVs[i * 2 + 1])}`);
       const t = uvBase - vertexBase;
       if (geo.topology === 'points')
         for (let i = 0; i < indices.length; i += 32)
           lines.push(`p ${Array.from(indices.subarray(i, i + 32), (v) => v + vertexBase).join(' ')}`);
       else
         for (const polyline of polylines(indices))
-          lines.push(`l ${polyline.map((v) => (lineUVs ? `${v + vertexBase}/${v + vertexBase + t}` : v + vertexBase)).join(' ')}`);
+          lines.push(
+            `l ${polyline.map((v) => (lineUVs ? `${v + vertexBase}/${v + vertexBase + t}` : v + vertexBase)).join(' ')}`,
+          );
       vertexBase += geo.count;
       if (lineUVs) uvBase += geo.count;
       continue;
@@ -227,8 +230,11 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     }
     // OBJ texture coordinates have v up; glTF and Margo Engine have v down. MTL has no rotation, so a texture
     // transform goes into the coordinates: the glTF matrix, offset * rotation * scale.
-    const { offset = [0, 0], scale: repeat = [1, 1], rotation = 0 } =
-        (withTextures && item.material?.baseColorTextureTransform) || {},
+    const {
+        offset = [0, 0],
+        scale: repeat = [1, 1],
+        rotation = 0,
+      } = (withTextures && item.material?.baseColorTextureTransform) || {},
       cos = Math.cos(rotation),
       sin = Math.sin(rotation);
     if (uvs)
@@ -286,7 +292,10 @@ export async function writeTextures(result: OBJResult, options: { signal?: Abort
     if (held instanceof URL) {
       const response = await fetch(held, { signal: options.signal });
       if (!response.ok)
-        throw new MargoError('failed', `Could not fetch ${held.href} (${response.status}); keep the image beside the model`);
+        throw new MargoError(
+          'failed',
+          `Could not fetch ${held.href} (${response.status}); keep the image beside the model`,
+        );
       bytes = new Uint8Array(await response.arrayBuffer());
     } else bytes = held;
     const format = imageFormat(bytes);

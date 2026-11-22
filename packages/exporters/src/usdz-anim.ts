@@ -576,7 +576,9 @@ export async function exportAnimatedUSDZ(
     const data = Float32Array.from(times);
     // glTF 2.0 3.11: key times are finite and strictly increasing; at least one sets the clip's length.
     if (!data.length || data.some((t, i) => !Number.isFinite(t) || (i > 0 && !(t > data[i - 1]!))))
-      throw new RangeError(`Animation channel of ${target.name ?? 'a node'} needs finite, strictly increasing key times`);
+      throw new RangeError(
+        `Animation channel of ${target.name ?? 'a node'} needs finite, strictly increasing key times`,
+      );
     if (!tracks.has(node)) tracks.set(node, {});
     tracks.get(node)![PATHS[path]] = { times: data, values: Float32Array.from(values), interpolation };
     duration = Math.max(duration, data[data.length - 1]);

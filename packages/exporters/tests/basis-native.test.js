@@ -212,7 +212,10 @@ test('the external encoder gets room for every block of a long one-texel strip a
   // Every 4x4 block costs UASTC 16 bytes however few texels it holds, so a 16384 x 1 strip with its 15 mips needs
   // 8,193 blocks (131,088 bytes). The output was sized from the pixel count (2 bytes a texel + 64 KiB = 98,304).
   const input = { width: 16384, height: 1, data: new Uint8Array(16384 * 4).fill(200) },
-    expected = await encodeKTX2(image(4, 4, () => [72, 143, 208, 255]), { mode: 'uastc', mipmaps: false }),
+    expected = await encodeKTX2(
+      image(4, 4, () => [72, 143, 208, 255]),
+      { mode: 'uastc', mipmaps: false },
+    ),
     prefix = fileURLToPath(new URL('../.basis-strip-', import.meta.url)),
     folder = mkdtempSync(prefix),
     at = (name) => new URL(name, pathToFileURL(folder + '/'));
@@ -260,7 +263,10 @@ test('a worker encode refuses a signal that is already aborted and leaves no lis
   };
   try {
     const request = { kind: 'basis-native', wrapperURL: '', wasmURL: '', job: {} };
-    await assert.rejects(inWorker([request], () => [], AbortSignal.abort()), { name: 'AbortError' });
+    await assert.rejects(
+      inWorker([request], () => [], AbortSignal.abort()),
+      { name: 'AbortError' },
+    );
     assert.equal(posted.length, 0);
     const controller = new AbortController(),
       live = new Set(),

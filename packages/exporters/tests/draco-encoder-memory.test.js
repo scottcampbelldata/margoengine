@@ -13,17 +13,28 @@ function grid(side) {
     indices = new Uint32Array((side - 1) * (side - 1) * 6);
   for (let y = 0, v = 0; y < side; y++)
     for (let x = 0; x < side; x++, v++)
-      position.set([x * 0.01, (Math.sin(x * 0.031) * Math.cos(y * 0.027) * 4 + Math.sin(x * 0.4 + y * 0.3) * 0.2) * 0.01, y * 0.01], v * 3);
+      position.set(
+        [
+          x * 0.01,
+          (Math.sin(x * 0.031) * Math.cos(y * 0.027) * 4 + Math.sin(x * 0.4 + y * 0.3) * 0.2) * 0.01,
+          y * 0.01,
+        ],
+        v * 3,
+      );
   for (let y = 0, i = 0; y < side - 1; y++)
     for (let x = 0; x < side - 1; x++, i += 6) {
       const a = y * side + x;
       indices.set([a, a + side, a + 1, a + 1, a + side, a + side + 1], i);
     }
-  const attributes = [{ semantic: 'POSITION', kind: 'POSITION', values: position, width: 3, normalized: false, bits: 14 }];
+  const attributes = [
+    { semantic: 'POSITION', kind: 'POSITION', values: position, width: 3, normalized: false, bits: 14 },
+  ];
   return { points, indices, attributes, encodeSpeed: 5, decodeSpeed: 5 };
 }
 
-test('the input ceiling times the measured peak per input byte fits 90% of the encoder\'s 4 GiB', { timeout: 120000 }, async () => {
+test("the input ceiling times the measured peak per input byte fits 90% of the encoder's 4 GiB", {
+  timeout: 120000,
+}, async () => {
   const encoder = await loadNativeEncoder(wasm),
     job = grid(708), // 999,698 triangles, 18,011,568 B packed
     input = 16 + job.indices.byteLength + 8 + job.attributes[0].values.byteLength;
@@ -58,8 +69,13 @@ test('a 10M-triangle scan with float normals and UVs passes the ceiling; one byt
 test('the encoder frees the packet it read: the wrapper does not, and memory stays bounded', async () => {
   const encoder = await loadNativeEncoder(wasm),
     freed = [],
-    counted = { ...encoder, memory: encoder.memory, encoder_free: (p, n) => (freed.push(n), encoder.encoder_free(p, n)) };
-  for (const name of Object.keys(encoder)) if (typeof encoder[name] === 'function' && name !== 'encoder_free') counted[name] = encoder[name];
+    counted = {
+      ...encoder,
+      memory: encoder.memory,
+      encoder_free: (p, n) => (freed.push(n), encoder.encoder_free(p, n)),
+    };
+  for (const name of Object.keys(encoder))
+    if (typeof encoder[name] === 'function' && name !== 'encoder_free') counted[name] = encoder[name];
   const job = grid(40);
   for (let i = 0; i < 10; i++) encodeNativeMesh(counted, job);
   const memory = encoder.memory.buffer.byteLength;

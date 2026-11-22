@@ -20,7 +20,10 @@ for (const [name, entry] of [
     assert.match(text, /endTree\(child\.pid\)/);
     assert.doesNotMatch(text, /execFileSync\(/, 'a sync timeout signals cargo alone and leaves rustc running');
     assert.match(text, /WebAssembly\.validate\(/);
-    assert.match(text, new RegExp(`writeRecord\\(BLUEPRINTS\\.find\\(\\(entry\\) => entry\\.name === '${entry}'\\)\\)`));
+    assert.match(
+      text,
+      new RegExp(`writeRecord\\(BLUEPRINTS\\.find\\(\\(entry\\) => entry\\.name === '${entry}'\\)\\)`),
+    );
     const blueprint = BLUEPRINTS.find((item) => item.name === entry);
     assert.deepEqual(staleBlueprints(undefined, [blueprint]), []);
   });

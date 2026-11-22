@@ -37,8 +37,7 @@ function side(value: number): number {
 function size(width: number, height: number): void {
   side(width);
   side(height);
-  if (width * height > LIMIT)
-    throw new RangeError('Texture exceeds 16777216 pixels; resize in smaller stages');
+  if (width * height > LIMIT) throw new RangeError('Texture exceeds 16777216 pixels; resize in smaller stages');
 }
 
 function kernel(x: number, filter: TextureFilter): number {
@@ -46,25 +45,29 @@ function kernel(x: number, filter: TextureFilter): number {
   if (filter === 'bilinear') return Math.max(0, 1 - a);
   if (a >= 3) return 0;
   if (a < 1e-12) return 1;
-  return (Math.sin(Math.PI * x) * Math.sin(Math.PI * x / 3)) / (Math.PI * Math.PI * x * x / 3);
+  return (Math.sin(Math.PI * x) * Math.sin((Math.PI * x) / 3)) / ((Math.PI * Math.PI * x * x) / 3);
 }
 
 // Pixel centres lie at i + 0.5. Box weights integrate the exact source-pixel footprint;
 // the other kernels widen with the reduction ratio, preventing point-sampled aliasing.
 function weights(source: number, target: number, filter: TextureFilter): { at: number[]; w: number[] }[] {
-  const ratio = source / target, scale = Math.max(1, ratio), radius = filter === 'lanczos' ? 3 : 1;
+  const ratio = source / target,
+    scale = Math.max(1, ratio),
+    radius = filter === 'lanczos' ? 3 : 1;
   return Array.from({ length: target }, (_, j) => {
-    const centre = (j + 0.5) * ratio - 0.5, map = new Map<number, number>();
+    const centre = (j + 0.5) * ratio - 0.5,
+      map = new Map<number, number>();
     const lo = filter === 'box' ? j * ratio : centre - radius * scale;
     const hi = filter === 'box' ? (j + 1) * ratio : centre + radius * scale;
     for (let i = Math.floor(lo); i <= Math.ceil(hi); i++) {
-      const w = filter === 'box' ? Math.max(0, Math.min(hi, i + 1) - Math.max(lo, i)) : kernel((i - centre) / scale, filter);
+      const w =
+        filter === 'box' ? Math.max(0, Math.min(hi, i + 1) - Math.max(lo, i)) : kernel((i - centre) / scale, filter);
       if (!w) continue;
       const at = Math.min(source - 1, Math.max(0, i));
       map.set(at, (map.get(at) ?? 0) + w);
     }
     const total = [...map.values()].reduce((a, b) => a + b, 0);
-    return { at: [...map.keys()], w: [...map.values()].map(v => v / total) };
+    return { at: [...map.keys()], w: [...map.values()].map((v) => v / total) };
   });
 }
 
@@ -86,8 +89,10 @@ export function resizeTexture(source: RGBAImage, options: ResizeTextureOptions =
     throw new RangeError('Texture filter or colorSpace is unknown; use box/bilinear/lanczos and srgb/linear');
   let width = options.width === undefined ? source.width : side(options.width);
   let height = options.height === undefined ? source.height : side(options.height);
-  if (options.width !== undefined && options.height === undefined) height = Math.max(1, Math.round(width * source.height / source.width));
-  if (options.height !== undefined && options.width === undefined) width = Math.max(1, Math.round(height * source.width / source.height));
+  if (options.width !== undefined && options.height === undefined)
+    height = Math.max(1, Math.round((width * source.height) / source.width));
+  if (options.height !== undefined && options.width === undefined)
+    width = Math.max(1, Math.round((height * source.width) / source.height));
   if (options.maxSize !== undefined) {
     const factor = Math.min(1, side(options.maxSize) / Math.max(width, height));
     width = Math.max(1, Math.round(width * factor));
@@ -96,17 +101,22 @@ export function resizeTexture(source: RGBAImage, options: ResizeTextureOptions =
   size(width, height);
   if (width === source.width && height === source.height) return { width, height, data: source.data.slice() };
   size(width, source.height);
-  const horizontal = weights(source.width, width, filter), vertical = weights(source.height, height, filter);
-  const middle = new Float64Array(width * source.height * 4), data = new Uint8Array(width * height * 4);
+  const horizontal = weights(source.width, width, filter),
+    vertical = weights(source.height, height, filter);
+  const middle = new Float64Array(width * source.height * 4),
+    data = new Uint8Array(width * height * 4);
   // Convert just the 256 possible channel values once, rather than per tap.
-  const lut = Float64Array.from({ length: 256 }, (_, i) => colorSpace === 'srgb' ? linear(i / 255) : i / 255);
+  const lut = Float64Array.from({ length: 256 }, (_, i) => (colorSpace === 'srgb' ? linear(i / 255) : i / 255));
   for (let y = 0; y < source.height; y++) {
     options.signal?.throwIfAborted();
     for (let x = 0; x < width; x++) {
-      const { at, w } = horizontal[x], to = (y * width + x) * 4;
+      const { at, w } = horizontal[x],
+        to = (y * width + x) * 4;
       for (let k = 0; k < at.length; k++) {
-        const from = (y * source.width + at[k]) * 4, alpha = source.data[from + 3] / 255;
-        for (let c = 0; c < 3; c++) middle[to + c] += lut[source.data[from + c]] * (premultiplyAlpha ? alpha : 1) * w[k];
+        const from = (y * source.width + at[k]) * 4,
+          alpha = source.data[from + 3] / 255;
+        for (let c = 0; c < 3; c++)
+          middle[to + c] += lut[source.data[from + c]] * (premultiplyAlpha ? alpha : 1) * w[k];
         middle[to + 3] += alpha * w[k];
       }
     }
@@ -115,7 +125,8 @@ export function resizeTexture(source: RGBAImage, options: ResizeTextureOptions =
     options.signal?.throwIfAborted();
     const { at, w } = vertical[y];
     for (let x = 0; x < width; x++) {
-      const sum = [0, 0, 0, 0], to = (y * width + x) * 4;
+      const sum = [0, 0, 0, 0],
+        to = (y * width + x) * 4;
       for (let k = 0; k < at.length; k++) {
         const from = (at[k] * width + x) * 4;
         for (let c = 0; c < 4; c++) sum[c] += middle[from + c] * w[k];

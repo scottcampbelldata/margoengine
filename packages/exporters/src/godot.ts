@@ -192,7 +192,9 @@ function helpers(document: Json, nodes: Json[], parents: number[], ids: unknown,
     if (i === undefined) throw new TypeError(`${label} is missing from this GLB; list only exported extras.id values`);
     const node = nodes[i];
     if (!hiddenConvex.has(i))
-      throw new TypeError(`${label} needs a hidden mesh node named *-convcol (or _convcol, $convcol); export it with retainedVisibility false`);
+      throw new TypeError(
+        `${label} needs a hidden mesh node named *-convcol (or _convcol, $convcol); export it with retainedVisibility false`,
+      );
     const mesh = meshes[index(node.mesh, meshes.length, `${label} mesh`)];
     const primitives = records(mesh.primitives, 'Godot helper primitives');
     if (!primitives.length) throw new TypeError(`${label} has no mesh primitives; export its geometry`);
@@ -307,7 +309,11 @@ export async function createGodotImportBundle(
   let parts = splitGLB(owned);
   // Morph targets are written sparse by default; the profile carries only ordinary accessors, so densify them first
   // (every accessor index and logical value is kept). A GLB without sparse accessors is used byte for byte.
-  if ((Array.isArray(parts.json.accessors) ? (parts.json.accessors as unknown[]) : []).some((accessor) => isObject(accessor) && accessor.sparse !== undefined)) {
+  if (
+    (Array.isArray(parts.json.accessors) ? (parts.json.accessors as unknown[]) : []).some(
+      (accessor) => isObject(accessor) && accessor.sparse !== undefined,
+    )
+  ) {
     const { denseGLB } = await import('./sparse.js');
     owned = denseGLB(owned);
     parts = splitGLB(owned);

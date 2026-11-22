@@ -1013,7 +1013,10 @@ export async function verifyRobloxChunkGLB<S extends PrecisionScene>(
       const corrected = face!.worldBakedTriangles[ordinal]!.map(
         (corner) => emittedWorldPoints[chosen.indexOf(corner)]!,
       );
-      const geometric = emittedTriangleNormal(corrected, `Face ${faceId} on object ${objectId} after emitted precision`);
+      const geometric = emittedTriangleNormal(
+        corrected,
+        `Face ${faceId} on object ${objectId} after emitted precision`,
+      );
       for (const emittedNormal of emittedWorldNormals)
         if (emittedNormal.reduce((dot, n, axis) => dot + n * geometric[axis]!, 0) <= 0)
           fail(`Face ${faceId} changed normal front orientation after emitted precision`);

@@ -29,7 +29,8 @@ const gather = (values, width, map) => {
 function close(actual, expected, label, eps = 1e-6) {
   assert.equal(actual.length, expected.length, `${label}: length`);
   for (let i = 0; i < actual.length; i++)
-    if (!(Math.abs(actual[i] - expected[i]) <= eps)) assert.fail(`${label}: element ${i} is ${actual[i]}, expected ${expected[i]}`);
+    if (!(Math.abs(actual[i] - expected[i]) <= eps))
+      assert.fail(`${label}: element ${i} is ${actual[i]}, expected ${expected[i]}`);
 }
 /** Every exported primitive k holds part k's joints, weights and morph deltas. */
 function checkParts(json, bin, model, grid) {
