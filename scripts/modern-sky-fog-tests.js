@@ -102,6 +102,7 @@ try {
     try {
       sky.setup({
         gpu: d,
+        camera,
         removePlugin() {},
         sceneOf() {
           return this;
