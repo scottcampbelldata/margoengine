@@ -7,7 +7,10 @@ import { readFileSync } from 'node:fs';
 import { translateGLSLTransition } from '../dist/glsl.js';
 import { glslFixtures } from './glsl-fixtures.js';
 const golden = JSON.parse(readFileSync(new URL('./snapshots/glsl-transition-wgsl.json', import.meta.url), 'utf8'));
-const options = (g) => ({ ...(g.uniforms ? { uniforms: g.uniforms } : {}), ...(g.flipY === undefined ? {} : { flipY: g.flipY }) });
+const options = (g) => ({
+  ...(g.uniforms ? { uniforms: g.uniforms } : {}),
+  ...(g.flipY === undefined ? {} : { flipY: g.flipY }),
+});
 test('every recorded GLSL source translates to the byte-identical WGSL (or the same error)', () => {
   assert.ok(golden.length >= 79, 'the snapshot holds the recorded sources');
   for (const g of golden) {
