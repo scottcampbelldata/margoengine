@@ -71,14 +71,20 @@ test('the coarse far level keeps the shoots coverage, colour and snow from every
           plainWorst = Math.max(plainWorst, Math.abs(each.plain[key] / each.near[key] - 1));
         }
         const label = `detail ${detail}, elevation ${ELEVATIONS[e]}, ${key}`;
-        assert.ok(worst <= own, `${label}: coarse differs by ${(worst * 100).toFixed(2)}%, a 45 degree turn by ${(own * 100).toFixed(2)}%`);
+        assert.ok(
+          worst <= own,
+          `${label}: coarse differs by ${(worst * 100).toFixed(2)}%, a 45 degree turn by ${(own * 100).toFixed(2)}%`,
+        );
         // The plain sprays fail the same bound many times over: what the coarse level replaces.
         assert.ok(plainWorst > 4 * own, `${label}: plain sprays differ by ${(plainWorst * 100).toFixed(1)}%`);
       });
     }
     // The coarse level costs under a sixth of the shoots' triangles at detail 2 (its laterals 1.5 times as far apart),
     // under 40 percent at detail 1 (the shoots' own laterals without their needle teeth).
-    assert.ok(coarse.indices.length < near.indices.length / (detail === 2 ? 6 : 2.5), `detail ${detail}: ${coarse.indices.length / 3} triangles`);
+    assert.ok(
+      coarse.indices.length < near.indices.length / (detail === 2 ? 6 : 2.5),
+      `detail ${detail}: ${coarse.indices.length / 3} triangles`,
+    );
   }
   assert.throws(() => generateTreeMesh('conifer', { branches: true, shoots: 'far' }), RangeError);
 });
@@ -91,7 +97,10 @@ function sideGap(canopy, envelopeOf, k) {
   for (let i = 0; i < ep.length; i += 3) {
     const y = ep[i + 1],
       band = Math.floor(y / 0.05);
-    radius.set(band, Math.max(radius.get(band) ?? 0, Math.hypot(ep[i] - y * y * 0.008, ep[i + 2] - Math.sin(y * 0.7) * 0.1)));
+    radius.set(
+      band,
+      Math.max(radius.get(band) ?? 0, Math.hypot(ep[i] - y * y * 0.008, ep[i + 2] - Math.sin(y * 0.7) * 0.1)),
+    );
   }
   let cells = 0,
     covered = 0,
@@ -132,9 +141,15 @@ test('the shoots leave the gaps a measured spruce crown leaves', () => {
     low = sideGap(near, plain, Math.max(...densities)).poisson,
     high = sideGap(near, plain, Math.min(...densities)).poisson;
   assert.ok(low > 0.2 && high < 0.5, `the measured range ${low.toFixed(3)} to ${high.toFixed(3)}`);
-  for (const [name, canopy] of [['shoots', near], ['coarse', coarse]]) {
+  for (const [name, canopy] of [
+    ['shoots', near],
+    ['coarse', coarse],
+  ]) {
     const { gap } = sideGap(canopy, plain, densities[0]);
-    assert.ok(gap >= low && gap <= high, `${name}: side gap ${gap.toFixed(3)} against ${low.toFixed(3)} to ${high.toFixed(3)}`);
+    assert.ok(
+      gap >= low && gap <= high,
+      `${name}: side gap ${gap.toFixed(3)} against ${low.toFixed(3)} to ${high.toFixed(3)}`,
+    );
   }
   // The plain sprays are far denser than any measured crown.
   assert.ok(sideGap(plain, plain, densities[0]).gap < low);
@@ -187,7 +202,10 @@ test('a placed spruce stands on the stem Näslund height curve gives its height'
       measured = diameterAt(tree.trunk.geometry, 1.3 / scale) * scale,
       want = spruceDiameter(height ?? top);
     // Trunks are shared to the millimetre of the mesh and the breast-height ring to the centimetre.
-    assert.ok(Math.abs(measured / want - 1) < 0.03, `${height ?? top} m: ${measured.toFixed(4)} m against ${want.toFixed(4)} m`);
+    assert.ok(
+      Math.abs(measured / want - 1) < 0.03,
+      `${height ?? top} m: ${measured.toFixed(4)} m against ${want.toFixed(4)} m`,
+    );
   }
   // The default tree: under 9 cm, where the historical mesh trunk was 0.55 m.
   using standard = createTree(engine, 'conifer');
@@ -198,12 +216,15 @@ test('a placed spruce stands on the stem Näslund height curve gives its height'
   engine.store.tick();
   const s = engine.store.matrices[thick.root.id * 16 + 5];
   assert.ok(Math.abs(diameterAt(thick.trunk.geometry, 1.3 / s) * s - 0.3) < 0.005);
-  for (const diameter of [0, 4, NaN, '0.2']) assert.throws(() => createTree(engine, 'conifer', { diameter }), { code: 'failed' });
+  for (const diameter of [0, 4, NaN, '0.2'])
+    assert.throws(() => createTree(engine, 'conifer', { diameter }), { code: 'failed' });
   const mesh = generateTreeMesh('conifer', { flare: 1.3, breastDiameter: 0.1 }).trunk;
   const pts = { vertices: new Float32Array((mesh.positions.length / 3) * 6) };
-  for (let i = 0; i < mesh.positions.length / 3; i++) pts.vertices.set(mesh.positions.subarray(i * 3, i * 3 + 3), i * 6);
+  for (let i = 0; i < mesh.positions.length / 3; i++)
+    pts.vertices.set(mesh.positions.subarray(i * 3, i * 3 + 3), i * 6);
   assert.ok(Math.abs(diameterAt(pts, 1.3) - 0.1) < 0.001);
-  for (const breastDiameter of [0.001, 5]) assert.throws(() => generateTreeMesh('conifer', { breastDiameter }), RangeError);
+  for (const breastDiameter of [0.001, 5])
+    assert.throws(() => generateTreeMesh('conifer', { breastDiameter }), RangeError);
   using oak = createTree(engine, 'broadleaf');
   assert.equal(oak.trunk.geometry.vertices.length / 6, generateTreeMesh('broadleaf').trunk.positions.length / 3);
 });

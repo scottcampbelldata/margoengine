@@ -205,7 +205,9 @@ export async function createTextureBaker(
     } catch (error) {
       options.signal?.throwIfAborted();
       if (error instanceof Error && error.name === 'MargoError') throw error;
-      throw Object.assign(fault('failed', 'WebGL2 texture pipeline could not load or compile', 'procedural'), { cause: error });
+      throw Object.assign(fault('failed', 'WebGL2 texture pipeline could not load or compile', 'procedural'), {
+        cause: error,
+      });
     }
   }
   const device = 'backend' in source ? source.gpu : source;

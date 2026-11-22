@@ -34,10 +34,22 @@ try {
       onError: (e) => errors.push(String(e?.message ?? e)),
     });
     const hex = (c) =>
-      '#' + c.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)).toString(16).padStart(2, '0')).join('');
+      '#' +
+      c
+        .map((v) =>
+          Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('');
     const place = (v, position) => {
       for (const [name, g] of Object.entries(v.parts))
-        stage.mesh(toGeometry(g), { color: hex(v.palette[name].color), roughness: v.palette[name].roughness, metalness: v.palette[name].metalness, position });
+        stage.mesh(toGeometry(g), {
+          color: hex(v.palette[name].color),
+          roughness: v.palette[name].roughness,
+          metalness: v.palette[name].metalness,
+          position,
+        });
     };
     // The train: engine and tender, then cars coupled behind (each car's length over its couplers).
     const engine = V.generateLocomotive();
@@ -54,10 +66,22 @@ try {
     place(V.generateKeiTruck(), [-20, 0, 7]);
     place(V.generateVendingMachine(), [-8, 0, 8]);
     const views = [
-      [[-21, 6, 24], [-21, 1.5, 0]],
-      [[8, 3, 8], [2, 2.2, 0]],
-      [[-30, 2.2, 12], [-34, 1, 7]],
-      [[-16, 2, 11.5], [-19, 1, 7]],
+      [
+        [-21, 6, 24],
+        [-21, 1.5, 0],
+      ],
+      [
+        [8, 3, 8],
+        [2, 2.2, 0],
+      ],
+      [
+        [-30, 2.2, 12],
+        [-34, 1, 7],
+      ],
+      [
+        [-16, 2, 11.5],
+        [-19, 1, 7],
+      ],
     ];
     window.view = async (i) => {
       stage.engine.camera.position = views[i][0];
@@ -71,7 +95,9 @@ try {
   });
   assert.deepEqual(result.errors, []);
   const shot = await browser.page.locator('canvas').screenshot();
-  const dir = fileURLToPath(new URL(`../../../test-results/vehicles-browser${compatRun() ? '-compat' : ''}/`, import.meta.url));
+  const dir = fileURLToPath(
+    new URL(`../../../test-results/vehicles-browser${compatRun() ? '-compat' : ''}/`, import.meta.url),
+  );
   await mkdir(dir, { recursive: true });
   await writeFile(dir + 'train.png', shot);
   for (let i = 1; i < 4; i++) {

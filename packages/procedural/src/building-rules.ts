@@ -198,7 +198,9 @@ export interface Building {
   /** A material for each part the style suggests. */
   readonly palette: Readonly<Record<BuildingPart, BuildingMaterial>>;
   /** The options after the style's defaults were applied. */
-  readonly options: Readonly<Required<Omit<BuildingRuleOptions, 'origin'>>> & { readonly origin: readonly [number, number, number] };
+  readonly options: Readonly<Required<Omit<BuildingRuleOptions, 'origin'>>> & {
+    readonly origin: readonly [number, number, number];
+  };
   /** Each floor's level above the ground, metres (local, from the origin's y). */
   readonly floors: readonly number[];
   /** Wall top (eaves) above the ground, metres. */
@@ -456,70 +458,72 @@ export const BUILDING_STYLE_SETS: Readonly<Record<BuildingStyle, Readonly<StyleS
   },
 };
 
-const PALETTES: Record<'japan' | 'concrete' | 'warehouse' | 'frame' | 'brick', Record<BuildingPart, BuildingMaterial>> =
-  (() => {
-    const m = (color: [number, number, number], roughness: number, metalness = 0): BuildingMaterial => ({
-      color,
-      roughness,
-      metalness,
-    });
-    const common = {
-      interior: m([0.55, 0.52, 0.47], 0.9),
-      furniture: m([0.26, 0.17, 0.1], 0.55),
-      glass: m([0.02, 0.025, 0.03], 0.05),
-      base: m([0.32, 0.31, 0.29], 0.9),
-      chimney: m([0.28, 0.1, 0.06], 0.9),
-      gutters: m([0.2, 0.2, 0.2], 0.4, 0.8),
-      awning: m([0.35, 0.07, 0.05], 0.85),
-    };
-    return {
-      japan: {
-        ...common,
-        walls: m([0.56, 0.53, 0.47], 0.8),
-        trim: m([0.6, 0.6, 0.58], 0.6),
-        roof: m([0.05, 0.055, 0.06], 0.45),
-        frames: m([0.55, 0.55, 0.55], 0.35, 0.9),
-        doors: m([0.18, 0.12, 0.08], 0.6),
-        porch: m([0.6, 0.6, 0.6], 0.4, 0.8),
-      },
-      concrete: {
-        ...common,
-        walls: m([0.5, 0.49, 0.46], 0.85),
-        trim: m([0.55, 0.54, 0.51], 0.8),
-        roof: m([0.25, 0.25, 0.24], 0.9),
-        frames: m([0.6, 0.6, 0.6], 0.35, 0.9),
-        doors: m([0.6, 0.6, 0.6], 0.35, 0.9),
-        porch: m([0.5, 0.49, 0.46], 0.85),
-      },
-      warehouse: {
-        ...common,
-        walls: m([0.42, 0.45, 0.47], 0.5, 0.7),
-        trim: m([0.3, 0.32, 0.33], 0.5, 0.7),
-        roof: m([0.3, 0.33, 0.36], 0.45, 0.8),
-        frames: m([0.45, 0.45, 0.45], 0.4, 0.9),
-        doors: m([0.38, 0.4, 0.42], 0.5, 0.8),
-        porch: m([0.3, 0.32, 0.33], 0.5, 0.7),
-      },
-      frame: {
-        ...common,
-        walls: m([0.7, 0.68, 0.62], 0.75),
-        trim: m([0.75, 0.74, 0.7], 0.7),
-        roof: m([0.2, 0.17, 0.14], 0.9),
-        frames: m([0.75, 0.74, 0.7], 0.7),
-        doors: m([0.22, 0.13, 0.07], 0.65),
-        porch: m([0.45, 0.4, 0.33], 0.85),
-      },
-      brick: {
-        ...common,
-        walls: m([0.3, 0.11, 0.06], 0.9),
-        trim: m([0.55, 0.5, 0.42], 0.85),
-        roof: m([0.12, 0.12, 0.12], 0.9),
-        frames: m([0.12, 0.1, 0.08], 0.7),
-        doors: m([0.15, 0.09, 0.05], 0.65),
-        porch: m([0.45, 0.4, 0.33], 0.85),
-      },
-    };
-  })();
+const PALETTES: Record<
+  'japan' | 'concrete' | 'warehouse' | 'frame' | 'brick',
+  Record<BuildingPart, BuildingMaterial>
+> = (() => {
+  const m = (color: [number, number, number], roughness: number, metalness = 0): BuildingMaterial => ({
+    color,
+    roughness,
+    metalness,
+  });
+  const common = {
+    interior: m([0.55, 0.52, 0.47], 0.9),
+    furniture: m([0.26, 0.17, 0.1], 0.55),
+    glass: m([0.02, 0.025, 0.03], 0.05),
+    base: m([0.32, 0.31, 0.29], 0.9),
+    chimney: m([0.28, 0.1, 0.06], 0.9),
+    gutters: m([0.2, 0.2, 0.2], 0.4, 0.8),
+    awning: m([0.35, 0.07, 0.05], 0.85),
+  };
+  return {
+    japan: {
+      ...common,
+      walls: m([0.56, 0.53, 0.47], 0.8),
+      trim: m([0.6, 0.6, 0.58], 0.6),
+      roof: m([0.05, 0.055, 0.06], 0.45),
+      frames: m([0.55, 0.55, 0.55], 0.35, 0.9),
+      doors: m([0.18, 0.12, 0.08], 0.6),
+      porch: m([0.6, 0.6, 0.6], 0.4, 0.8),
+    },
+    concrete: {
+      ...common,
+      walls: m([0.5, 0.49, 0.46], 0.85),
+      trim: m([0.55, 0.54, 0.51], 0.8),
+      roof: m([0.25, 0.25, 0.24], 0.9),
+      frames: m([0.6, 0.6, 0.6], 0.35, 0.9),
+      doors: m([0.6, 0.6, 0.6], 0.35, 0.9),
+      porch: m([0.5, 0.49, 0.46], 0.85),
+    },
+    warehouse: {
+      ...common,
+      walls: m([0.42, 0.45, 0.47], 0.5, 0.7),
+      trim: m([0.3, 0.32, 0.33], 0.5, 0.7),
+      roof: m([0.3, 0.33, 0.36], 0.45, 0.8),
+      frames: m([0.45, 0.45, 0.45], 0.4, 0.9),
+      doors: m([0.38, 0.4, 0.42], 0.5, 0.8),
+      porch: m([0.3, 0.32, 0.33], 0.5, 0.7),
+    },
+    frame: {
+      ...common,
+      walls: m([0.7, 0.68, 0.62], 0.75),
+      trim: m([0.75, 0.74, 0.7], 0.7),
+      roof: m([0.2, 0.17, 0.14], 0.9),
+      frames: m([0.75, 0.74, 0.7], 0.7),
+      doors: m([0.22, 0.13, 0.07], 0.65),
+      porch: m([0.45, 0.4, 0.33], 0.85),
+    },
+    brick: {
+      ...common,
+      walls: m([0.3, 0.11, 0.06], 0.9),
+      trim: m([0.55, 0.5, 0.42], 0.85),
+      roof: m([0.12, 0.12, 0.12], 0.9),
+      frames: m([0.12, 0.1, 0.08], 0.7),
+      doors: m([0.15, 0.09, 0.05], 0.65),
+      porch: m([0.45, 0.4, 0.33], 0.85),
+    },
+  };
+})();
 const paletteOf = (style: BuildingStyle) =>
   style === 'japan-2011-house'
     ? PALETTES.japan
@@ -532,15 +536,16 @@ const paletteOf = (style: BuildingStyle) =>
           : PALETTES.frame;
 
 // Roof courses: exposure (course height up the slope), lip height, roll height and tile width.
-const ROOFING: Record<BuildingRoofing, { thickness: number; course: number; lip: number; roll: number; tile: number }> = {
-  // JIS A 5208 J-shape 53A: about 265 mm wide by 235 mm exposed; the roll rises about 30 mm.
-  tile: { thickness: 0.06, course: 0.235, lip: 0.04, roll: 0.03, tile: 0.265 },
-  // Cedar shingles laid 5 in to the weather.
-  shingle: { thickness: 0.05, course: 0.127, lip: 0.012, roll: 0, tile: 0 },
-  // Standing seam: seams every 0.45 m.
-  metal: { thickness: 0.04, course: 0, lip: 0, roll: 0, tile: 0.45 },
-  membrane: { thickness: 0.25, course: 0, lip: 0, roll: 0, tile: 0 },
-};
+const ROOFING: Record<BuildingRoofing, { thickness: number; course: number; lip: number; roll: number; tile: number }> =
+  {
+    // JIS A 5208 J-shape 53A: about 265 mm wide by 235 mm exposed; the roll rises about 30 mm.
+    tile: { thickness: 0.06, course: 0.235, lip: 0.04, roll: 0.03, tile: 0.265 },
+    // Cedar shingles laid 5 in to the weather.
+    shingle: { thickness: 0.05, course: 0.127, lip: 0.012, roll: 0, tile: 0 },
+    // Standing seam: seams every 0.45 m.
+    metal: { thickness: 0.04, course: 0, lip: 0, roll: 0, tile: 0.45 },
+    membrane: { thickness: 0.25, course: 0, lip: 0, roll: 0, tile: 0 },
+  };
 
 function fail(name: string, want: string): never {
   throw new RangeError(`Invalid building ${name}; pass ${want}.`);
@@ -565,7 +570,14 @@ function pick<T extends string>(o: Record<string, unknown>, name: string, choice
   if (!choices.includes(v as T)) fail(name, choices.map((c) => `'${c}'`).join(' or '));
   return v as T;
 }
-function tuple(o: Record<string, unknown>, name: string, n: number, lo: number, hi: number, fallback: readonly number[]) {
+function tuple(
+  o: Record<string, unknown>,
+  name: string,
+  n: number,
+  lo: number,
+  hi: number,
+  fallback: readonly number[],
+) {
   const v = o[name];
   if (v === undefined) return fallback;
   if (!Array.isArray(v) || v.length !== n || !v.every((x) => typeof x === 'number' && x >= lo && x <= hi))
@@ -728,31 +740,76 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
             dh = Math.min(o.door[1], h - 0.25);
           holes.push({ kind: 'door', side: si, floor: k, a0: c - dw / 2, a1: c + dw / 2, y0: fy, y1: fy + dh });
           if (o.storefront && dh + 0.6 < h - 0.2)
-            holes.push({ kind: 'transom', side: si, floor: k, a0: c - dw / 2, a1: c + dw / 2, y0: fy + dh + 0.1, y1: fy + h - 0.6 });
+            holes.push({
+              kind: 'transom',
+              side: si,
+              floor: k,
+              a0: c - dw / 2,
+              a1: c + dw / 2,
+              y0: fy + dh + 0.1,
+              y1: fy + h - 0.6,
+            });
           continue;
         }
         if (si === 0 && k === 0 && o.storefront) {
           const top = fy + h - 0.9,
             m = Math.min(0.25, bw * 0.1);
-          holes.push({ kind: 'shop', side: si, floor: k, a0: c - bw / 2 + m, a1: c + bw / 2 - m, y0: fy + 0.5, y1: top });
+          holes.push({
+            kind: 'shop',
+            side: si,
+            floor: k,
+            a0: c - bw / 2 + m,
+            a1: c + bw / 2 - m,
+            y0: fy + 0.5,
+            y1: top,
+          });
           if (top + 0.15 < fy + h - 0.35)
-            holes.push({ kind: 'transom', side: si, floor: k, a0: c - bw / 2 + m, a1: c + bw / 2 - m, y0: top + 0.1, y1: fy + h - 0.35 });
+            holes.push({
+              kind: 'transom',
+              side: si,
+              floor: k,
+              a0: c - bw / 2 + m,
+              a1: c + bw / 2 - m,
+              y0: top + 0.1,
+              y1: fy + h - 0.35,
+            });
           continue;
         }
         if (!windows) continue;
         // A balcony door (full height sash) where the balcony meets this bay.
         const wx = s.start[0] + s.dir[0] * c;
-        if (si === 0 && balconyOn && k === o.balconyFloor && Math.abs(wx) + Math.min(o.window[0], bw - 0.6) / 2 <= balconySpan) {
+        if (
+          si === 0 &&
+          balconyOn &&
+          k === o.balconyFloor &&
+          Math.abs(wx) + Math.min(o.window[0], bw - 0.6) / 2 <= balconySpan
+        ) {
           const ww = Math.min(o.window[0], bw - 0.6),
             wh = Math.min(2.03, h - 0.4);
-          holes.push({ kind: 'balcony-door', side: si, floor: k, a0: c - ww / 2, a1: c + ww / 2, y0: fy + 0.05, y1: fy + 0.05 + wh });
+          holes.push({
+            kind: 'balcony-door',
+            side: si,
+            floor: k,
+            a0: c - ww / 2,
+            a1: c + ww / 2,
+            y0: fy + 0.05,
+            y1: fy + 0.05 + wh,
+          });
           continue;
         }
         const ww = o.windowKind === 'strip' ? bw - 0.4 : Math.min(o.window[0], bw - 0.6),
           sill = Math.min(o.sill, h - 0.6),
           wh = Math.min(o.window[1], h - sill - 0.3);
         if (ww < 0.3 || wh < 0.3) continue;
-        holes.push({ kind: 'window', side: si, floor: k, a0: c - ww / 2, a1: c + ww / 2, y0: fy + sill, y1: fy + sill + wh });
+        holes.push({
+          kind: 'window',
+          side: si,
+          floor: k,
+          a0: c - ww / 2,
+          a1: c + ww / 2,
+          y0: fy + sill,
+          y1: fy + sill + wh,
+        });
       }
     }
   }
@@ -782,7 +839,10 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
         const b0 = Math.max(a0, th),
           b1 = Math.min(a1, Ls - th);
         if (b1 - b0 > 1e-6)
-          parts.interior.poly([at(s, b0, y0, -th), at(s, b1, y0, -th), at(s, b1, y1, -th), at(s, b0, y1, -th)], scale(s.out, -1));
+          parts.interior.poly(
+            [at(s, b0, y0, -th), at(s, b1, y0, -th), at(s, b1, y1, -th), at(s, b0, y1, -th)],
+            scale(s.out, -1),
+          );
       }
     // Reveals through the wall.
     for (const h of mine) {
@@ -837,8 +897,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
 
   // Interior floors: one slab per storey (and a ceiling under a pitched roof).
   const levels = flat ? floors : [...floors, eaves];
-  for (const fy of levels)
-    parts.interior.box([0, fy - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
+  for (const fy of levels) parts.interior.box([0, fy - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
   if (flat) parts.roof.box([0, eaves - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
   const inside = buildInterior(parts, o, sides, holes, floors, eaves);
   // Base: the foundation from below the ground to the floor, slightly proud of the walls.
@@ -860,7 +919,13 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     if (step > 0) box(s.length * 0.2, s.length * 0.8, low, ft);
     if (o.cornice && !far) {
       const corn = (a0: number, a1: number, yy: number) => {
-        parts.trim.box(at(s, (a0 + a1) / 2, yy - 0.18, 0.1), [(a1 - a0) / 2 + 0.1, 0.18, 0.1 + th / 2], s.dir, UP, s.out);
+        parts.trim.box(
+          at(s, (a0 + a1) / 2, yy - 0.18, 0.1),
+          [(a1 - a0) / 2 + 0.1, 0.18, 0.1 + th / 2],
+          s.dir,
+          UP,
+          s.out,
+        );
         if (near) dentils(parts.trim, s, at, a0, a1, yy - 0.42);
       };
       corn(0, s.length, low);
@@ -873,7 +938,13 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
   // Parapet coping and cornice, floor bands, corner boards.
   if (flat && o.parapet > 0 && !far)
     for (const s of sides)
-      parts.trim.box(at(s, s.length / 2, wallTop + 0.04, -th / 2), [s.length / 2 + 0.03, 0.04, th / 2 + 0.03], s.dir, UP, s.out);
+      parts.trim.box(
+        at(s, s.length / 2, wallTop + 0.04, -th / 2),
+        [s.length / 2 + 0.03, 0.04, th / 2 + 0.03],
+        s.dir,
+        UP,
+        s.out,
+      );
   if (flat && o.cornice && !far)
     for (const s of sides) {
       const yy = eaves + Math.min(0.3, o.parapet * 0.3);
@@ -883,10 +954,22 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
   if (o.bands && !far)
     for (const s of sides)
       for (let k = 1; k < floors.length; k++)
-        parts.trim.box(at(s, s.length / 2, floors[k] - 0.05, 0.03), [s.length / 2 + 0.03, 0.12, 0.03], s.dir, UP, s.out);
+        parts.trim.box(
+          at(s, s.length / 2, floors[k] - 0.05, 0.03),
+          [s.length / 2 + 0.03, 0.12, 0.03],
+          s.dir,
+          UP,
+          s.out,
+        );
   if (o.cornerBoards && !far)
     for (const s of sides)
-      parts.trim.box(at(s, 0.05, (o.plinth + eaves) / 2, 0.012), [0.065, (eaves - o.plinth) / 2, 0.012], s.dir, UP, s.out);
+      parts.trim.box(
+        at(s, 0.05, (o.plinth + eaves) / 2, 0.012),
+        [0.065, (eaves - o.plinth) / 2, 0.012],
+        s.dir,
+        UP,
+        s.out,
+      );
 
   // Porch, stoops, balcony, awning.
   const steps: { rise: number; tread: number; count: number }[] = [],
@@ -943,7 +1026,18 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
 type At = (s: Side, a: number, y: number, off?: number) => V3;
 
 // Lap siding: sawtooth courses, each board's bottom edge proud of the one above.
-function lapCells(m: MeshBuilder, s: Side, at: At, a0: number, a1: number, y0: number, y1: number, base: number, e: number, lip: number) {
+function lapCells(
+  m: MeshBuilder,
+  s: Side,
+  at: At,
+  a0: number,
+  a1: number,
+  y0: number,
+  y1: number,
+  base: number,
+  e: number,
+  lip: number,
+) {
   let k = Math.floor((y0 - base) / e);
   for (;;) {
     const c0 = base + k * e,
@@ -954,7 +1048,8 @@ function lapCells(m: MeshBuilder, s: Side, at: At, a0: number, a1: number, y0: n
       off = (yy: number) => lip * (1 - (yy - c0) / e);
     if (hi - lo > 1e-6) {
       m.poly([at(s, a0, lo, off(lo)), at(s, a1, lo, off(lo)), at(s, a1, hi, off(hi)), at(s, a0, hi, off(hi))], s.out);
-      if (Math.abs(lo - c0) < 1e-6) m.poly([at(s, a0, lo, 0), at(s, a1, lo, 0), at(s, a1, lo, lip), at(s, a0, lo, lip)], [0, -1, 0]);
+      if (Math.abs(lo - c0) < 1e-6)
+        m.poly([at(s, a0, lo, 0), at(s, a1, lo, 0), at(s, a1, lo, lip), at(s, a0, lo, lip)], [0, -1, 0]);
     }
     k++;
   }
@@ -974,7 +1069,10 @@ function corrugatedCell(m: MeshBuilder, s: Side, at: At, a0: number, a1: number,
       c1 = Math.min(a1, (k + 1) * q);
     if (c0 >= a1 - 1e-6) break;
     if (c1 - c0 > 1e-6)
-      m.poly([at(s, c0, y0, prof(c0)), at(s, c1, y0, prof(c1)), at(s, c1, y1, prof(c1)), at(s, c0, y1, prof(c0))], s.out);
+      m.poly(
+        [at(s, c0, y0, prof(c0)), at(s, c1, y0, prof(c1)), at(s, c1, y1, prof(c1)), at(s, c0, y1, prof(c0))],
+        s.out,
+      );
     k++;
   }
 }
@@ -1011,7 +1109,13 @@ function buildFrame(
         p1 = c(a1, y1);
       // Offset half the frame depth out from the glass so it reads round the pane.
       const off = scale(s.out, 0.005);
-      m.box(add(lerp(p0, p1, 0.5), off), [Math.abs(a1 - a0) / 2 + f / 2, Math.abs(y1 - y0) / 2 + f / 2, d / 2], s.dir, UP, s.out);
+      m.box(
+        add(lerp(p0, p1, 0.5), off),
+        [Math.abs(a1 - a0) / 2 + f / 2, Math.abs(y1 - y0) / 2 + f / 2, d / 2],
+        s.dir,
+        UP,
+        s.out,
+      );
     };
   beam(h.a0 + f / 2, h.y0 + f / 2, h.a1 - f / 2, h.y0 + f / 2);
   beam(h.a0 + f / 2, h.y1 - f / 2, h.a1 - f / 2, h.y1 - f / 2);
@@ -1093,7 +1197,13 @@ interface RoofResult {
   frontFill(): void;
   otherFills(): void;
 }
-function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves: number, near: boolean, far: boolean): RoofResult {
+function buildRoof(
+  parts: Record<BuildingPart, MeshBuilder>,
+  o: Resolved,
+  eaves: number,
+  near: boolean,
+  far: boolean,
+): RoofResult {
   const W = o.width,
     D = o.depth,
     th = o.wall,
@@ -1102,8 +1212,7 @@ function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves:
     // The slab sits at the eaves; with no parapet it overhangs as a canopy.
     const ov = o.parapet > 0 ? 0 : o.overhang,
       tt = spec.thickness;
-    if (o.parapet === 0)
-      parts.roof.box([0, eaves + tt / 2, 0], [W / 2 + ov, tt / 2, D / 2 + ov]);
+    if (o.parapet === 0) parts.roof.box([0, eaves + tt / 2, 0], [W / 2 + ov, tt / 2, D / 2 + ov]);
     else parts.roof.box([0, eaves + 0.02, 0], [W / 2 - th, 0.02, D / 2 - th]);
     const h = eaves + (o.parapet === 0 ? tt : 0.04);
     return {
@@ -1194,7 +1303,12 @@ function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves:
     const cap = o.roofing === 'tile' ? [0.24, 0.16] : o.roofing === 'metal' ? [0.22, 0.05] : [0.18, 0.05];
     const lift = (p: V3, dy: number): V3 => [p[0], p[1] + dy, p[2]];
     if (shed) {
-      parts.roof.beam(lift(map([-L2, y0 + 2 * d2 * t, d2]), spec.thickness), lift(map([L2, y0 + 2 * d2 * t, d2]), spec.thickness), cap[0] * 0.6, cap[1]);
+      parts.roof.beam(
+        lift(map([-L2, y0 + 2 * d2 * t, d2]), spec.thickness),
+        lift(map([L2, y0 + 2 * d2 * t, d2]), spec.thickness),
+        cap[0] * 0.6,
+        cap[1],
+      );
     } else {
       const cut = (q: V3): V3 => [q[0], q[1], Math.min(q[2], front)],
         r0 = cut(map([-L2 + inset, H, 0])),
@@ -1205,21 +1319,43 @@ function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves:
           for (const sz of [1, -1]) {
             const a = map([sx * L2, y0, sz * d2]),
               b = map([sx * (L2 - inset), hInset, sz * (d2 - inset)]);
-            parts.roof.beam(lift(a, spec.thickness + cap[1] / 3), lift(b, spec.thickness + cap[1] / 3), cap[0] * 0.8, cap[1]);
+            parts.roof.beam(
+              lift(a, spec.thickness + cap[1] / 3),
+              lift(b, spec.thickness + cap[1] / 3),
+              cap[0] * 0.8,
+              cap[1],
+            );
           }
     }
   }
   // Gutters along the level eaves, with a downspout at each end.
   if (o.gutters && !far) {
     const eaveLines: [V3, V3][] = shed
-      ? [[[-L2, y0, -d2], [L2, y0, -d2]]]
+      ? [
+          [
+            [-L2, y0, -d2],
+            [L2, y0, -d2],
+          ],
+        ]
       : [
-          [[-L2, y0, -d2], [L2, y0, -d2]],
-          [[-L2, y0, d2], [L2, y0, d2]],
+          [
+            [-L2, y0, -d2],
+            [L2, y0, -d2],
+          ],
+          [
+            [-L2, y0, d2],
+            [L2, y0, d2],
+          ],
           ...(inset > 1e-6
             ? ([
-                [[L2, y0, -d2], [L2, y0, d2]],
-                [[-L2, y0, -d2], [-L2, y0, d2]],
+                [
+                  [L2, y0, -d2],
+                  [L2, y0, d2],
+                ],
+                [
+                  [-L2, y0, -d2],
+                  [-L2, y0, d2],
+                ],
               ] as [V3, V3][])
             : []),
         ];
@@ -1249,7 +1385,12 @@ function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves:
           foot = map([x, eaves - Math.min(1, ov * 0.7), sz * (d / 2 + 0.05)]),
           head = map([x, eaves - ov * 0.75 * t, sz * (d / 2 + ov * 0.75)]);
         parts.trim.beam(foot, head, 0.09, 0.14);
-        parts.trim.beam(map([x, eaves - 0.12, sz * (d / 2 + 0.05)]), map([x, eaves - ov * t, sz * (d / 2 + ov)]), 0.09, 0.12);
+        parts.trim.beam(
+          map([x, eaves - 0.12, sz * (d / 2 + 0.05)]),
+          map([x, eaves - ov * t, sz * (d / 2 + ov)]),
+          0.09,
+          0.12,
+        );
       }
   }
   // Roof height in local x, z (covering top).
@@ -1258,7 +1399,7 @@ function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves:
     if (shed) return y0 + (Z + d2) * t + spec.thickness;
     const zs = (d2 - Math.abs(Z)) * t,
       xs = (L2 - Math.abs(X)) * t,
-      e = inset > 1e-6 && (L2 - Math.abs(X)) < inset ? xs : Infinity;
+      e = inset > 1e-6 && L2 - Math.abs(X) < inset ? xs : Infinity;
     return y0 + Math.min(zs, e) + spec.thickness;
   };
   const height = (x: number, z: number) => {
@@ -1268,23 +1409,55 @@ function buildRoof(parts: Record<BuildingPart, MeshBuilder>, o: Resolved, eaves:
   // Fills: gable triangles (or the shed's high wall) under the roof, in local terms split into front and the rest.
   const fills: { poly: V3[]; toward: V3; depth: number }[] = [];
   if (shed) {
-    fills.push({ poly: [[-L / 2, eaves, d / 2], [L / 2, eaves, d / 2], [L / 2, eaves + d * t, d / 2], [-L / 2, eaves + d * t, d / 2]], toward: [0, 0, 1], depth: th });
+    fills.push({
+      poly: [
+        [-L / 2, eaves, d / 2],
+        [L / 2, eaves, d / 2],
+        [L / 2, eaves + d * t, d / 2],
+        [-L / 2, eaves + d * t, d / 2],
+      ],
+      toward: [0, 0, 1],
+      depth: th,
+    });
     for (const sx of [1, -1])
-      fills.push({ poly: [[sx * L / 2, eaves, -d / 2], [sx * L / 2, eaves, d / 2], [sx * L / 2, eaves + d * t, d / 2]], toward: [sx, 0, 0], depth: th });
+      fills.push({
+        poly: [
+          [(sx * L) / 2, eaves, -d / 2],
+          [(sx * L) / 2, eaves, d / 2],
+          [(sx * L) / 2, eaves + d * t, d / 2],
+        ],
+        toward: [sx, 0, 0],
+        depth: th,
+      });
   } else if (o.roof === 'gable') {
     for (const sx of [1, -1])
-      fills.push({ poly: [[sx * L / 2, eaves, -d / 2], [sx * L / 2, eaves, d / 2], [sx * L / 2, eaves + (d / 2) * t, 0]], toward: [sx, 0, 0], depth: th });
+      fills.push({
+        poly: [
+          [(sx * L) / 2, eaves, -d / 2],
+          [(sx * L) / 2, eaves, d / 2],
+          [(sx * L) / 2, eaves + (d / 2) * t, 0],
+        ],
+        toward: [sx, 0, 0],
+        depth: th,
+      });
   } else if (o.roof === 'hip-gable') {
     for (const sx of [1, -1])
       fills.push({
-        poly: [[sx * (L2 - inset), hInset, -(d2 - inset)], [sx * (L2 - inset), hInset, d2 - inset], [sx * (L2 - inset), H, 0]],
+        poly: [
+          [sx * (L2 - inset), hInset, -(d2 - inset)],
+          [sx * (L2 - inset), hInset, d2 - inset],
+          [sx * (L2 - inset), H, 0],
+        ],
         toward: [sx, 0, 0],
         depth: 0.05,
       });
   }
   const mapped = fills.map((f) => ({ poly: f.poly.map(map), toward: map(f.toward), depth: f.depth }));
   const isFront = (f: { toward: V3 }) => f.toward[2] > 0.5;
-  const frontTop = Math.max(...[0, ...mapped.filter(isFront).flatMap((f) => f.poly.map((p) => p[1]))], height(0, D / 2 - 1e-6) || eaves);
+  const frontTop = Math.max(
+    ...[0, ...mapped.filter(isFront).flatMap((f) => f.poly.map((p) => p[1]))],
+    height(0, D / 2 - 1e-6) || eaves,
+  );
   const all = slopes.flatMap((s) => s.poly.map((p) => p[1] + spec.thickness));
   return {
     top: Math.max(...all) + (o.roofing === 'tile' ? 0.16 : 0.05),
@@ -1318,7 +1491,10 @@ function courses(m: MeshBuilder, poly: V3[], n: V3, roofing: BuildingRoofing, ne
   if (roofing === 'metal') {
     for (let k = Math.ceil((umin + 0.05) / spec.tile); k * spec.tile < umax - 0.05; k++) {
       const uk = k * spec.tile,
-        band = clip(clip(poly, (p) => pu(p) - (uk - 0.01)), (p) => uk + 0.01 - pu(p));
+        band = clip(
+          clip(poly, (p) => pu(p) - (uk - 0.01)),
+          (p) => uk + 0.01 - pu(p),
+        );
       if (band.length < 3) continue;
       const bv = band.map(pv),
         a = add(add(o, scale(u, uk)), scale(v, Math.min(...bv))),
@@ -1333,7 +1509,10 @@ function courses(m: MeshBuilder, poly: V3[], n: V3, roofing: BuildingRoofing, ne
   for (let k = 0; vmin + k * e < vmax - 1e-6; k++) {
     const v0 = vmin + k * e,
       v1 = v0 + e;
-    const band = clip(clip(poly, (p) => pv(p) - v0), (p) => v1 - pv(p));
+    const band = clip(
+      clip(poly, (p) => pv(p) - v0),
+      (p) => v1 - pv(p),
+    );
     if (band.length < 3) continue;
     const liftOf = (p: V3) => lip * (1 - (pv(p) - v0) / e);
     if (near && spec.roll > 0) {
@@ -1342,12 +1521,22 @@ function courses(m: MeshBuilder, poly: V3[], n: V3, roofing: BuildingRoofing, ne
         offset = (k % 2) * spec.tile * 0.5;
       for (let j = Math.floor((umin - offset) / w); offset + j * w < umax; j++) {
         const a0 = offset + j * w,
-          strip = clip(clip(band, (p) => pu(p) - a0), (p) => a0 + w - pu(p));
+          strip = clip(
+            clip(band, (p) => pu(p) - a0),
+            (p) => a0 + w - pu(p),
+          );
         if (strip.length < 3) continue;
         const r = j % 4 === 1 || j % 4 === 2 ? spec.roll : 0;
-        m.poly(strip.map((p) => add(p, scale(n, liftOf(p) + r * (1 - (pv(p) - v0) / e) + r * 0.3))), n);
+        m.poly(
+          strip.map((p) => add(p, scale(n, liftOf(p) + r * (1 - (pv(p) - v0) / e) + r * 0.3))),
+          n,
+        );
       }
-    } else m.poly(band.map((p) => add(p, scale(n, liftOf(p)))), n);
+    } else
+      m.poly(
+        band.map((p) => add(p, scale(n, liftOf(p)))),
+        n,
+      );
     // The lip along the course's lower edge.
     const low = band.filter((p) => Math.abs(pv(p) - v0) < 1e-6);
     if (low.length >= 2) {
@@ -1426,16 +1615,26 @@ function buildFrontage(
       [pw + 0.15, roofEdge - drop * (0.3 / (o.porch + 0.3)), z1 + 0.3],
       [-pw - 0.15, roofEdge - drop * (0.3 / (o.porch + 0.3)), z1 + 0.3],
     ];
-    parts.roof.slab(rp.map((p) => add(p, [0, 0.06, 0])), 0.08, UP);
+    parts.roof.slab(
+      rp.map((p) => add(p, [0, 0.06, 0])),
+      0.08,
+      UP,
+    );
     if (!far) {
       let n = unit(cross(sub(rp[1], rp[0]), sub(rp[3], rp[0])));
       if (n[1] < 0) n = scale(n, -1);
-      courses(parts.roof, rp.map((p) => add(p, [0, 0.06, 0])), n, o.roofing, near);
+      courses(
+        parts.roof,
+        rp.map((p) => add(p, [0, 0.06, 0])),
+        n,
+        o.roofing,
+        near,
+      );
     }
     // Railing along the front between the posts, open at the door.
     const door = doors[0];
     if (deck > 0.3) {
-      const dx = door ? s.start[0] + s.dir[0] * (door.a0 + door.a1) / 2 : 0;
+      const dx = door ? s.start[0] + (s.dir[0] * (door.a0 + door.a1)) / 2 : 0;
       const gap = 0.75;
       railing([-pw + 0.17, deck, z1 - 0.12], [dx - gap, deck, z1 - 0.12], 0.9, false);
       railing([dx + gap, deck, z1 - 0.12], [pw - 0.17, deck, z1 - 0.12], 0.9, false);
@@ -1718,7 +1917,14 @@ function buildInterior(
           rz1 = zs[r + 1] - (r + 1 < zs.length - 1 ? pt / 2 : 0),
           mx = (rx0 + rx1) / 2,
           mz = (rz0 + rz1) / 2;
-        rooms.push({ floor: k, min: [rx0, rz0], max: [rx1, rz1], level: fy, height: cy - fy, area: (rx1 - rx0) * (rz1 - rz0) });
+        rooms.push({
+          floor: k,
+          min: [rx0, rz0],
+          max: [rx1, rz1],
+          level: fy,
+          height: cy - fy,
+          area: (rx1 - rx0) * (rz1 - rz0),
+        });
         const placed: BuildingFurniture[] = [];
         // A block fits when it is inside the room, clear of the others, of every doorway's approach (0.9 m each side)
         // and of each outer door (1.2 m), and lower than the sill of any window it stands within 0.9 m of.
@@ -1737,7 +1943,8 @@ function buildInterior(
                   : Math.min(Math.abs(ax - s.plane), Math.abs(bx - s.plane)),
               [lo, hi] = s.axis === 'z' ? [ax, bx] : [az, bz],
               door = s.h.kind === 'door' || s.h.kind === 'balcony-door';
-            if (lo < s.hi + 0.1 && hi > s.lo - 0.1 && near < (door ? 1.2 : 0.9) && (door || top > s.h.y0 - 0.05)) return false;
+            if (lo < s.hi + 0.1 && hi > s.lo - 0.1 && near < (door ? 1.2 : 0.9) && (door || top > s.h.y0 - 0.05))
+              return false;
           }
           return true;
         };
@@ -1767,7 +1974,12 @@ function buildInterior(
           }
         };
         const legs = (cx: number, cz: number, hx: number, hz: number, top: number, leg: number) => {
-          for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
+          for (const [sx, sz] of [
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, 1],
+          ])
             box(f, cx + sx * hx - leg, cx + sx * hx + leg, fy, top, cz + sz * hz - leg, cz + sz * hz + leg);
         };
         if (use === 'store') {

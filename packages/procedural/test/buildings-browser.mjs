@@ -35,8 +35,16 @@ try {
       onError: (e) => errors.push(String(e?.message ?? e)),
     });
     const hex = (c) =>
-      '#' + c.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)).toString(16).padStart(2, '0')).join('');
-    const add = (g, m) => stage.mesh(toGeometry(g), { color: hex(m.color), roughness: m.roughness, metalness: m.metalness });
+      '#' +
+      c
+        .map((v) =>
+          Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('');
+    const add = (g, m) =>
+      stage.mesh(toGeometry(g), { color: hex(m.color), roughness: m.roughness, metalness: m.metalness });
     let x = -40;
     for (const style of BUILDING_STYLES) {
       const probe = generateBuilding({ style });
@@ -51,8 +59,17 @@ try {
       stage.mesh(m, { color: hex(concrete.color), roughness: 0.9, position: [-45, 0, 18] });
     }
     const boat = H.generateFishingBoat();
-    const boatColors = { hull: [0.8, 0.8, 0.78], bottom: [0.35, 0.05, 0.04], deck: [0.4, 0.42, 0.4], cabin: [0.85, 0.85, 0.83], glass: [0.02, 0.03, 0.04], metal: [0.3, 0.3, 0.3], trim: [0.1, 0.1, 0.1] };
-    for (const [k, g] of Object.entries(boat.parts)) stage.mesh(toGeometry(g), { color: hex(boatColors[k]), roughness: 0.5, position: [40, 0, 32] });
+    const boatColors = {
+      hull: [0.8, 0.8, 0.78],
+      bottom: [0.35, 0.05, 0.04],
+      deck: [0.4, 0.42, 0.4],
+      cabin: [0.85, 0.85, 0.83],
+      glass: [0.02, 0.03, 0.04],
+      metal: [0.3, 0.3, 0.3],
+      trim: [0.1, 0.1, 0.1],
+    };
+    for (const [k, g] of Object.entries(boat.parts))
+      stage.mesh(toGeometry(g), { color: hex(boatColors[k]), roughness: 0.5, position: [40, 0, 32] });
     // Settled tetrapod armour on a short slope: every instance matrix baked into one mesh.
     const armour = H.placeTetrapods({ mass: 4, length: 18, crest: 1.5, toe: -1, slope: 1.5 }),
       tg = armour.tetrapod.geometry,
@@ -67,17 +84,36 @@ try {
         const [x, y, z] = tg.positions.subarray(3 * v, 3 * v + 3),
           [a, b, c] = tg.normals.subarray(3 * v, 3 * v + 3),
           o = 3 * (u * nv + v);
-        pos.set([m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]], o);
+        pos.set(
+          [
+            m[0] * x + m[4] * y + m[8] * z + m[12],
+            m[1] * x + m[5] * y + m[9] * z + m[13],
+            m[2] * x + m[6] * y + m[10] * z + m[14],
+          ],
+          o,
+        );
         nrm.set([m[0] * a + m[4] * b + m[8] * c, m[1] * a + m[5] * b + m[9] * c, m[2] * a + m[6] * b + m[10] * c], o);
       }
       uvs.set(tg.uvs, u * nv * 2);
       for (let i = 0; i < tg.indices.length; i++) idx[u * tg.indices.length + i] = tg.indices[i] + u * nv;
     }
     if (armour.placement !== 'settled' || !(armour.settling.minGap >= 0) || armour.count < 20)
-      errors.push(`settled armour: ${armour.placement} ${armour.count} units, least clearance ${armour.settling?.minGap}`);
-    stage.mesh(toGeometry({ positions: pos, normals: nrm, uvs, indices: idx }), { color: hex(concrete.color), roughness: 0.9, position: [-30, 0, 22] });
+      errors.push(
+        `settled armour: ${armour.placement} ${armour.count} units, least clearance ${armour.settling?.minGap}`,
+      );
+    stage.mesh(toGeometry({ positions: pos, normals: nrm, uvs, indices: idx }), {
+      color: hex(concrete.color),
+      roughness: 0.9,
+      position: [-30, 0, 22],
+    });
     // A second street at near detail, out of the first view, for close looks.
-    const nearStyles = ['japan-2011-house', 'western-1910-house', 'western-1910-false-front', 'western-1910-brick', 'japan-2011-warehouse'];
+    const nearStyles = [
+      'japan-2011-house',
+      'western-1910-house',
+      'western-1910-false-front',
+      'western-1910-brick',
+      'japan-2011-warehouse',
+    ];
     let nx = 0;
     for (const style of nearStyles) {
       const probe = generateBuilding({ style });
@@ -86,11 +122,26 @@ try {
       nx += probe.options.width + 6;
     }
     const views = [
-      [[20, 26, 70], [20, 4, 0]],
-      [[-6, 6, -284], [4.5, 4, -300]],
-      [[12, 6, -282], [20, 5, -300]],
-      [[36, 8, -280], [43, 6, -300]],
-      [[60, 14, -270], [56, 6, -305]],
+      [
+        [20, 26, 70],
+        [20, 4, 0],
+      ],
+      [
+        [-6, 6, -284],
+        [4.5, 4, -300],
+      ],
+      [
+        [12, 6, -282],
+        [20, 5, -300],
+      ],
+      [
+        [36, 8, -280],
+        [43, 6, -300],
+      ],
+      [
+        [60, 14, -270],
+        [56, 6, -305],
+      ],
     ];
     window.view = async (i) => {
       stage.engine.camera.position = views[i][0];
@@ -104,7 +155,9 @@ try {
   });
   assert.deepEqual(result.errors, []);
   const shot = await browser.page.locator('canvas').screenshot();
-  const dir = fileURLToPath(new URL(`../../../test-results/buildings-browser${compatRun() ? '-compat' : ''}/`, import.meta.url));
+  const dir = fileURLToPath(
+    new URL(`../../../test-results/buildings-browser${compatRun() ? '-compat' : ''}/`, import.meta.url),
+  );
   await mkdir(dir, { recursive: true });
   await writeFile(dir + 'street.png', shot);
   for (let i = 1; i < 5; i++) {

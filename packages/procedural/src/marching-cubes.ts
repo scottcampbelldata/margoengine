@@ -392,7 +392,11 @@ function extract(
       z = az[cell[2]];
     if (evaluate && t > 0 && t < 1) {
       const at =
-        axis === 0 ? (v: number) => evaluate(v, y, z) : axis === 1 ? (v: number) => evaluate(x, v, z) : (v: number) => evaluate(x, y, v);
+        axis === 0
+          ? (v: number) => evaluate(v, y, z)
+          : axis === 1
+            ? (v: number) => evaluate(x, v, z)
+            : (v: number) => evaluate(x, y, v);
       s = edgeRoot(at, c0, values[p], c1, values[q]);
       t = (s - c0) / (c1 - c0);
     }

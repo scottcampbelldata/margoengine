@@ -111,14 +111,66 @@ export class MeshBuilder {
     const corner = (sx: number, sy: number, sz: number): V3 =>
       add(c, add(scale(ax, sx * h[0]), add(scale(ay, sy * h[1]), scale(az, sz * h[2]))));
     const faces: [V3, [number, number, number][]][] = [
-      [ax, [[1, -1, -1], [1, 1, -1], [1, 1, 1], [1, -1, 1]]],
-      [scale(ax, -1), [[-1, -1, 1], [-1, 1, 1], [-1, 1, -1], [-1, -1, -1]]],
-      [ay, [[-1, 1, -1], [-1, 1, 1], [1, 1, 1], [1, 1, -1]]],
-      [scale(ay, -1), [[-1, -1, 1], [-1, -1, -1], [1, -1, -1], [1, -1, 1]]],
-      [az, [[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]],
-      [scale(az, -1), [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1]]],
+      [
+        ax,
+        [
+          [1, -1, -1],
+          [1, 1, -1],
+          [1, 1, 1],
+          [1, -1, 1],
+        ],
+      ],
+      [
+        scale(ax, -1),
+        [
+          [-1, -1, 1],
+          [-1, 1, 1],
+          [-1, 1, -1],
+          [-1, -1, -1],
+        ],
+      ],
+      [
+        ay,
+        [
+          [-1, 1, -1],
+          [-1, 1, 1],
+          [1, 1, 1],
+          [1, 1, -1],
+        ],
+      ],
+      [
+        scale(ay, -1),
+        [
+          [-1, -1, 1],
+          [-1, -1, -1],
+          [1, -1, -1],
+          [1, -1, 1],
+        ],
+      ],
+      [
+        az,
+        [
+          [-1, -1, 1],
+          [1, -1, 1],
+          [1, 1, 1],
+          [-1, 1, 1],
+        ],
+      ],
+      [
+        scale(az, -1),
+        [
+          [1, -1, -1],
+          [-1, -1, -1],
+          [-1, 1, -1],
+          [1, 1, -1],
+        ],
+      ],
     ];
-    for (const [nrm, cs] of faces) this.poly(cs.map(([x, y, z]) => corner(x, y, z)), nrm);
+    for (const [nrm, cs] of faces)
+      this.poly(
+        cs.map(([x, y, z]) => corner(x, y, z)),
+        nrm,
+      );
   }
   /** A box between two points with a square-ish section: width along `side`, height along the rest. */
   beam(a: V3, b: V3, w: number, h: number, up: V3 = [0, 1, 0]): void {
@@ -211,7 +263,7 @@ export function clip(p: readonly V3[], f: (q: V3) => number): V3[] {
       fa = f(a),
       fb = f(b);
     if (fa >= 0) out.push(a);
-    if ((fa >= 0) !== (fb >= 0)) out.push(lerp(a, b, fa / (fa - fb)));
+    if (fa >= 0 !== fb >= 0) out.push(lerp(a, b, fa / (fa - fb)));
   }
   return out;
 }

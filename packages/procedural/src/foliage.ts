@@ -492,7 +492,22 @@ function sprayWhorl(
       halfWidth = upright ? across : len * Math.tan((Math.PI / count) * 0.75),
       first = positions.length / 3;
     if (shoot) {
-      branchShoots(positions, uvs, indices, cx, cy, cz, dx, dz, len, halfWidth, droop, shoot, (n) => hash(b * 131 + n), upright);
+      branchShoots(
+        positions,
+        uvs,
+        indices,
+        cx,
+        cy,
+        cz,
+        dx,
+        dz,
+        len,
+        halfWidth,
+        droop,
+        shoot,
+        (n) => hash(b * 131 + n),
+        upright,
+      );
       continue;
     }
     const columns = upright ? 2 : across;
@@ -517,9 +532,7 @@ function sprayWhorl(
         indices.push(a, a + 1, c, c, a + 1, c + 1);
       }
   }
-  const data = computeVertexNormals(
-    geometryData(positions, new Array<number>(positions.length).fill(0), uvs, indices),
-  );
+  const data = computeVertexNormals(geometryData(positions, new Array<number>(positions.length).fill(0), uvs, indices));
   const n = data.normals,
     p = data.positions;
   for (let i = 0; i < p.length; i += 3) {
@@ -666,7 +679,11 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
         options?.shoots === true
           ? near
           : options?.shoots === 'coarse'
-            ? { spacing: near.spacing * coarseFactor, tooth: 0.15, coarse: { widen: detail === 2 ? 1.55 : 1, ratio: coarseFactor } }
+            ? {
+                spacing: near.spacing * coarseFactor,
+                tooth: 0.15,
+                coarse: { widen: detail === 2 ? 1.55 : 1, ratio: coarseFactor },
+              }
             : undefined;
     for (let tier = 0; tier < 6; tier++) {
       const y = 1.8 + tier * 0.9,
@@ -675,7 +692,9 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
         at = (h: number): [number, number, number] => [h * h * 0.008, h, Math.sin(h * 0.7) * 0.1];
       leaves.push(sprayWhorl(...at(top), reach, 7, tier * 2.399963, reach * 0.62, along, across, shoot));
       if (detail === 2)
-        leaves.push(sprayWhorl(...at(top - 0.45), reach * 0.82, 5, tier * 2.399963 + 0.45, reach * 0.55, along, across, shoot));
+        leaves.push(
+          sprayWhorl(...at(top - 0.45), reach * 0.82, 5, tier * 2.399963 + 0.45, reach * 0.55, along, across, shoot),
+        );
     }
     // The crown's top: the youngest whorl, where the next tier's would stand, the whorl between (detail 2), and the
     // leader above them. Their reach closes the crown from the last tier's to the leader's tip.
@@ -687,7 +706,18 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
     leaves.push(sprayWhorl(...at(whorl), reachAt(whorl), 5, 6 * 2.399963, reachAt(whorl) * 0.62, along, across, shoot));
     if (detail === 2) {
       const between = whorl - 0.45;
-      leaves.push(sprayWhorl(...at(between), reachAt(between), 5, 6 * 2.399963 + 0.45, reachAt(between) * 0.55, along, across, shoot));
+      leaves.push(
+        sprayWhorl(
+          ...at(between),
+          reachAt(between),
+          5,
+          6 * 2.399963 + 0.45,
+          reachAt(between) * 0.55,
+          along,
+          across,
+          shoot,
+        ),
+      );
     }
     leaves.push(sprayWhorl(...at(whorl), LEADER, 2, 0.3, 0, along, LEADER_HALF, shoot, true));
   } else if (kind === 'conifer') {

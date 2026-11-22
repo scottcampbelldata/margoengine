@@ -19,7 +19,15 @@
 import type { GeometryData } from '@margoengine/geometry/utils';
 import { MeshBuilder, add, dot, len, lerp, random, scale, sub, unit, type V3 } from './mesh-builder.js';
 
-function num(what: string, o: Record<string, unknown>, name: string, lo: number, hi: number, fallback: number, int = false) {
+function num(
+  what: string,
+  o: Record<string, unknown>,
+  name: string,
+  lo: number,
+  hi: number,
+  fallback: number,
+  int = false,
+) {
   const v = o[name];
   if (v === undefined) return fallback;
   if (typeof v !== 'number') throw new TypeError(`Invalid ${what} ${name}; pass a number from ${lo} to ${hi}.`);
@@ -86,7 +94,10 @@ export function generateTetrapod(options: TetrapodOptions = {}): Tetrapod {
     centre = l / 3 + LEG.tip * l * s8,
     // A polygon of n sides with the same area as the circle.
     k = 1 / Math.sqrt((segments / (2 * Math.PI)) * Math.sin((2 * Math.PI) / segments)),
-    axes: V3[] = [[0, 1, 0], ...[0, 1, 2].map((i): V3 => [s8 * Math.cos((2 * Math.PI * i) / 3), -1 / 3, s8 * Math.sin((2 * Math.PI * i) / 3)])],
+    axes: V3[] = [
+      [0, 1, 0],
+      ...[0, 1, 2].map((i): V3 => [s8 * Math.cos((2 * Math.PI * i) / 3), -1 / 3, s8 * Math.sin((2 * Math.PI * i) / 3)]),
+    ],
     m = new MeshBuilder(),
     c: V3 = [0, centre, 0];
   for (const a of axes) {
@@ -189,7 +200,13 @@ export function placeTetrapods(options: TetrapodArmourOptions = {}): TetrapodArm
     as = extent / ns;
   const spots: { x: number; z: number; R: number[]; alt: number[][]; shifts: [number, number][] }[] = [];
   // Small shifts tried at each spot, along x and up and down the slope.
-  const shifts: [number, number][] = [[0, 0], [0.25 * a, 0], [-0.25 * a, 0], [0, 0.2 * a], [0, -0.2 * a]];
+  const shifts: [number, number][] = [
+    [0, 0],
+    [0.25 * a, 0],
+    [-0.25 * a, 0],
+    [0, 0.2 * a],
+    [0, -0.2 * a],
+  ];
   for (let layer = 0; layer < layers; layer++) {
     const shift = layer % 2 ? 0.5 : 0;
     // Settled armour is placed from the toe up the slope.
@@ -217,8 +234,15 @@ export function placeTetrapods(options: TetrapodArmourOptions = {}): TetrapodArm
           // leg down between the units under it; of each, four turns about that leg (ours, chosen so units interlock).
           const tilt = Math.atan2(n[2], n[1]),
             alt: number[][] = [];
-          for (const flip of [0, Math.PI]) for (let k = 0; k < 4; k++) alt.push(rotation(0, tilt + flip, spin + (k * Math.PI) / 6));
-          spots.push({ x: px, z: pz, R: alt[layer % 2 ? 4 : 0], alt: alt.filter((_, i) => i !== (layer % 2 ? 4 : 0)), shifts });
+          for (const flip of [0, Math.PI])
+            for (let k = 0; k < 4; k++) alt.push(rotation(0, tilt + flip, spin + (k * Math.PI) / 6));
+          spots.push({
+            x: px,
+            z: pz,
+            R: alt[layer % 2 ? 4 : 0],
+            alt: alt.filter((_, i) => i !== (layer % 2 ? 4 : 0)),
+            shifts,
+          });
           continue;
         }
         const t = sub(base, mul(R, [0, tetrapod.centre, 0]));
@@ -229,7 +253,16 @@ export function placeTetrapods(options: TetrapodArmourOptions = {}): TetrapodArm
   if (placement === 'settled') {
     // The bed: below the crest level and the armour slope, or below the sea bed at the toe level.
     const cs = dot(nrmSlope, [0, crest, z0]),
-      bed: Bed = { cap: cot > 0 ? [{ n: [0, 1, 0], d: crest }, { n: nrmSlope, d: cs }] : [{ n: [0, 1, 0], d: crest }], floor: toe },
+      bed: Bed = {
+        cap:
+          cot > 0
+            ? [
+                { n: [0, 1, 0], d: crest },
+                { n: nrmSlope, d: cs },
+              ]
+            : [{ n: [0, 1, 0], d: crest }],
+        floor: toe,
+      },
       bedTop = (_x: number, z: number) => (cot > 0 && z > z0 ? Math.max(toe, crest - (z - z0) / cot) : crest);
     const { centres, rotations, placed, work } = settle(tetrapod, spots, bed, bedTop);
     centres.forEach((c, i) => {
@@ -239,7 +272,10 @@ export function placeTetrapods(options: TetrapodArmourOptions = {}): TetrapodArm
     });
     settling = measureSettled(tetrapod, placed, bed, work, {
       plane: (c) => (cot > 0 && c[2] > z0 ? { n: nrmSlope, d: cs } : { n: [0, 1, 0], d: crest }),
-      middle: (c) => c[0] > 0.2 * length && c[0] < 0.8 * length && (cot > 0 ? c[2] > z0 + 0.25 * run && c[2] < z0 + 0.75 * run : true),
+      middle: (c) =>
+        c[0] > 0.2 * length &&
+        c[0] < 0.8 * length &&
+        (cot > 0 ? c[2] > z0 + 0.25 * run && c[2] < z0 + 0.75 * run : true),
       area: 0.6 * length * (cot > 0 ? 0.5 * slopeLen : crestWidth),
       cell: Dn,
     });
@@ -249,7 +285,7 @@ export function placeTetrapods(options: TetrapodArmourOptions = {}): TetrapodArm
     matrices: Float32Array.from(mats),
     count: mats.length / 16,
     area,
-    density: (mats.length / 16) / area,
+    density: mats.length / 16 / area,
     thickness,
     placement,
     settling,
@@ -261,7 +297,8 @@ function rotation(yaw: number, tilt: number, spin: number): number[] {
     rx = (a: number) => [1, 0, 0, 0, Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a)],
     m3 = (A: number[], B: number[]) => {
       const C = new Array(9).fill(0);
-      for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) C[c * 3 + r] += A[k * 3 + r] * B[c * 3 + k];
+      for (let c = 0; c < 3; c++)
+        for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) C[c * 3 + r] += A[k * 3 + r] * B[c * 3 + k];
       return C;
     };
   return m3(ry(yaw), m3(rx(tilt), ry(spin)));
@@ -414,7 +451,10 @@ interface Bed {
 function planeLine(l: Leg, p: Plane): [number, number] {
   const ne = p.n[0] * l.ex + p.n[1] * l.ey + p.n[2] * l.ez,
     sin = Math.sqrt(Math.max(0, 1 - ne * ne));
-  return [p.n[0] * l.ax + p.n[1] * l.ay + p.n[2] * l.az - p.d - l.ra * sin, p.n[0] * l.fx + p.n[1] * l.fy + p.n[2] * l.fz - p.d - l.rb * sin];
+  return [
+    p.n[0] * l.ax + p.n[1] * l.ay + p.n[2] * l.az - p.d - l.ra * sin,
+    p.n[0] * l.fx + p.n[1] * l.fy + p.n[2] * l.fz - p.d - l.rb * sin,
+  ];
 }
 const UP: V3 = [0, 1, 0];
 // Exact least clearance of a leg from the bed: min(max(caps), floor) of lines in s, least at an end or a crossing.
@@ -473,7 +513,8 @@ class UnitGrid {
       out: Placed[] = [];
     for (let di = -1; di <= 1; di++)
       for (let dj = -1; dj <= 1; dj++)
-        for (const p of this.cells.get(this.key(i + di, j + dj)) ?? []) if (Math.hypot(p.c[0] - x, p.c[2] - z) <= r) out.push(p);
+        for (const p of this.cells.get(this.key(i + di, j + dj)) ?? [])
+          if (Math.hypot(p.c[0] - x, p.c[2] - z) <= r) out.push(p);
     return out;
   }
 }
@@ -645,7 +686,8 @@ export function generateSeaWall(options: SeaWallOptions = {}): SeaWall {
     toeT = o.toeTetrapods === undefined || o.toeTetrapods === 0 ? 0 : num('sea wall', o, 'toeTetrapods', 0.5, 100, 1),
     detail = (o.detail ?? 'mid') as string,
     seed = num('sea wall', o, 'seed', -0x80000000, 0xffffffff, 1, true);
-  if (!['far', 'mid', 'near'].includes(detail)) throw new RangeError("Invalid sea wall detail; pass 'far', 'mid' or 'near'.");
+  if (!['far', 'mid', 'near'].includes(detail))
+    throw new RangeError("Invalid sea wall detail; pass 'far', 'mid' or 'near'.");
   const p = parts(['concrete', 'trim', 'stairs', 'rails'] as const),
     far = detail === 'far',
     zs = crown / 2,
@@ -662,7 +704,11 @@ export function generateSeaWall(options: SeaWallOptions = {}): SeaWall {
     [0, toe, seaToe],
     [0, base, seaToe],
   ];
-  p.concrete.slab(section.map((q) => [L, q[1], q[2]] as V3), L, [1, 0, 0]);
+  p.concrete.slab(
+    section.map((q) => [L, q[1], q[2]] as V3),
+    L,
+    [1, 0, 0],
+  );
   if (recurve) {
     // A wave return lip: three facets curling seaward and up from 1.2 m below the crest.
     const r = 0.45;
@@ -725,7 +771,16 @@ export function generateSeaWall(options: SeaWallOptions = {}): SeaWall {
   let armour: TetrapodArmour | undefined;
   if (toeT > 0) {
     const size = generateTetrapod({ mass: toeT }).height;
-    armour = placeTetrapods({ mass: toeT, length: L, slope: 0, crestWidth: size * 2.2, crest: toe, z: seaToe + size * 2.2, layers: 1, seed });
+    armour = placeTetrapods({
+      mass: toeT,
+      length: L,
+      slope: 0,
+      crestWidth: size * 2.2,
+      crest: toe,
+      z: seaToe + size * 2.2,
+      layers: 1,
+      seed,
+    });
   }
   return { parts: finish(p), crest, seaward: [zs, seaToe], armour };
 }
@@ -766,8 +821,7 @@ export function generateQuay(options: QuayOptions = {}): {
     p = parts(['concrete', 'kerb', 'bollards', 'fenders', 'ladders'] as const);
   p.concrete.box([L / 2, (crest + bottom - 1) / 2, -Wd / 2], [L / 2, (crest - bottom + 1) / 2, Wd / 2]);
   // Block courses on the face (a step each 1.5 m) at mid detail.
-  if (!far)
-    for (let y = crest - 1.5; y > bottom; y -= 1.5) p.kerb.box([L / 2, y, 0.005], [L / 2, 0.015, 0.01]);
+  if (!far) for (let y = crest - 1.5; y > bottom; y -= 1.5) p.kerb.box([L / 2, y, 0.005], [L / 2, 0.015, 0.01]);
   p.kerb.box([L / 2, crest + 0.125, -0.3], [L / 2, 0.125, 0.3]);
   const bollards: [number, number, number][] = [];
   if (bs > 0)
@@ -777,12 +831,13 @@ export function generateQuay(options: QuayOptions = {}): {
       p.bollards.frustum([x, crest + 0.06, -0.9], [x, crest + 0.5, -0.9], 0.17, 0.14, 16);
       p.bollards.frustum([x, crest + 0.5, -0.9], [x, crest + 0.6, -0.9], 0.24, 0.24, 16);
     }
-  if (fs > 0)
-    for (let x = fs / 2; x < L; x += fs) p.fenders.box([x, crest - 0.7, 0.15], [0.25, 0.6, 0.15]);
+  if (fs > 0) for (let x = fs / 2; x < L; x += fs) p.fenders.box([x, crest - 0.7, 0.15], [0.25, 0.6, 0.15]);
   if (ls > 0 && !far)
     for (let x = ls / 2 + 1; x < L; x += ls) {
-      for (const dx of [-0.22, 0.22]) p.ladders.beam([x + dx, crest + 0.9, 0.12], [x + dx, Math.max(bottom, -2.5), 0.12], 0.04, 0.04, [1, 0, 0]);
-      for (let y = crest - 0.3; y > Math.max(bottom, -2.5); y -= 0.3) p.ladders.beam([x - 0.22, y, 0.12], [x + 0.22, y, 0.12], 0.03, 0.03);
+      for (const dx of [-0.22, 0.22])
+        p.ladders.beam([x + dx, crest + 0.9, 0.12], [x + dx, Math.max(bottom, -2.5), 0.12], 0.04, 0.04, [1, 0, 0]);
+      for (let y = crest - 0.3; y > Math.max(bottom, -2.5); y -= 0.3)
+        p.ladders.beam([x - 0.22, y, 0.12], [x + 0.22, y, 0.12], 0.03, 0.03);
     }
   return { parts: finish(p), crest, bollards };
 }
@@ -840,7 +895,17 @@ export function generateBreakwater(options: BreakwaterOptions = {}): {
     ];
   p.core.slab(section, L, [1, 0, 0]);
   if (wall > 0) p.crown.box([L / 2, crest + wall / 2 - 0.3, -cw / 2 + 1.2], [L / 2, (wall + 0.6) / 2, 1]);
-  const armour = placeTetrapods({ mass, length: L, slope: cot, crest, toe: bottom, crestWidth: Math.max(0, cw / 2 - 0.2), z: seaTop, layers: 2, seed });
+  const armour = placeTetrapods({
+    mass,
+    length: L,
+    slope: cot,
+    crest,
+    toe: bottom,
+    crestWidth: Math.max(0, cw / 2 - 0.2),
+    z: seaTop,
+    layers: 2,
+    seed,
+  });
   return { parts: finish(p), armour, crest };
 }
 
@@ -878,7 +943,8 @@ export function generateSlipway(options: SlipwayOptions = {}): {
     w,
     [1, 0, 0],
   );
-  for (const sx of [1, -1]) p.concrete.beam([sx * (w / 2 + 0.15), top + 0.2, 0], [sx * (w / 2 + 0.15), foot + 0.2, run], 0.3, 0.8);
+  for (const sx of [1, -1])
+    p.concrete.beam([sx * (w / 2 + 0.15), top + 0.2, 0], [sx * (w / 2 + 0.15), foot + 0.2, run], 0.3, 0.8);
   if (o.detail === 'near')
     for (let z = 0.3; z < run; z += 0.3) {
       const y = top - z / g;
@@ -888,7 +954,9 @@ export function generateSlipway(options: SlipwayOptions = {}): {
 }
 
 /** A timber or steel mooring post standing from the sea bed, with a cap; origin at its foot. */
-export function generateMooringPost(options: { height?: number; radius?: number; segments?: number } = {}): GeometryData {
+export function generateMooringPost(
+  options: { height?: number; radius?: number; segments?: number } = {},
+): GeometryData {
   const o = obj(options, 'mooring post'),
     h = num('mooring post', o, 'height', 1, 30, 7),
     r = num('mooring post', o, 'radius', 0.05, 1, 0.18),
@@ -950,8 +1018,14 @@ export function generateFishingBoat(options: FishingBoatOptions = {}): FishingBo
     p = parts(['hull', 'bottom', 'deck', 'cabin', 'glass', 'metal', 'trim'] as const);
   // Lines as functions of s, 0 at the transom and 1 at the stem.
   const half = (s: number) =>
-    (B / 2) * (s < 0.5 ? 0.86 + 0.14 * Math.sin((s / 0.5) * (Math.PI / 2)) : Math.pow(Math.cos(((s - 0.5) / 0.5) * (Math.PI / 2)), 0.75));
-  const keel = (s: number) => (s < 0.72 ? -T * (1 - 0.15 * s) : -T * 0.89 * (1 - Math.pow((s - 0.72) / 0.28, 1.6)) + F * 0.35 * Math.pow((s - 0.72) / 0.28, 2.5));
+    (B / 2) *
+    (s < 0.5
+      ? 0.86 + 0.14 * Math.sin((s / 0.5) * (Math.PI / 2))
+      : Math.pow(Math.cos(((s - 0.5) / 0.5) * (Math.PI / 2)), 0.75));
+  const keel = (s: number) =>
+    s < 0.72
+      ? -T * (1 - 0.15 * s)
+      : -T * 0.89 * (1 - Math.pow((s - 0.72) / 0.28, 1.6)) + F * 0.35 * Math.pow((s - 0.72) / 0.28, 2.5);
   const sheer = (s: number) => F + hb + 0.35 * F * s * s + 0.1 * F * (1 - s) * (1 - s);
   const deadrise = (s: number) => ((12 + 38 * s * s) * Math.PI) / 180;
   const x = (s: number) => -L / 2 + s * L;
@@ -980,7 +1054,7 @@ export function generateFishingBoat(options: FishingBoatOptions = {}): FishingBo
       for (let j = 0; j + 1 < rows[i].length; j++) {
         const q = [P(i, j, side), P(i + 1, j, side), P(i + 1, j + 1, side), P(i, j + 1, side)],
           mid = scale(add(add(q[0], q[1]), add(q[2], q[3])), 0.25),
-          toward: V3 = [0, mid[1] < (keel(i / N) + 0.01) ? -1 : 0, side];
+          toward: V3 = [0, mid[1] < keel(i / N) + 0.01 ? -1 : 0, side];
         // Split at the waterline.
         const below = clipY(q, -1),
           above = clipY(q, 1);
@@ -1029,9 +1103,19 @@ export function generateFishingBoat(options: FishingBoatOptions = {}): FishingBo
         ],
         [0, 0, -side],
       );
-      p.trim.beam([x(s0), sheer(s0) + 0.03, side * (half(s0) - 0.03)], [x(s1), sheer(s1) + 0.03, side * (half(s1) - 0.03)], 0.1, 0.06);
+      p.trim.beam(
+        [x(s0), sheer(s0) + 0.03, side * (half(s0) - 0.03)],
+        [x(s1), sheer(s1) + 0.03, side * (half(s1) - 0.03)],
+        0.1,
+        0.06,
+      );
       // Rubbing strake at deck level.
-      p.trim.beam([x(s0), deckY(s0) - 0.05, side * (half(s0) + 0.03)], [x(s1), deckY(s1) - 0.05, side * (half(s1) + 0.03)], 0.08, 0.1);
+      p.trim.beam(
+        [x(s0), deckY(s0) - 0.05, side * (half(s0) + 0.03)],
+        [x(s1), deckY(s1) - 0.05, side * (half(s1) + 0.03)],
+        0.08,
+        0.1,
+      );
     }
   }
   // Wheelhouse.
@@ -1078,7 +1162,14 @@ export function generateFishingBoat(options: FishingBoatOptions = {}): FishingBo
       const aft: V3 = [x(0.08), sheer(0.08) + 1.6, 0],
         fore: V3 = [cx + cl * 0.2, top - 0.8, 0];
       p.metal.beam(aft, fore, 0.01, 0.01);
-      for (let k = 1; k < 12; k++) p.glass.frustum(add(lerp(aft, fore, k / 12), [0, -0.12, 0]), add(lerp(aft, fore, k / 12), [0, -0.38, 0]), 0.06, 0.12, 8);
+      for (let k = 1; k < 12; k++)
+        p.glass.frustum(
+          add(lerp(aft, fore, k / 12), [0, -0.12, 0]),
+          add(lerp(aft, fore, k / 12), [0, -0.38, 0]),
+          0.06,
+          0.12,
+          8,
+        );
     }
   }
   // A hand rail round the wheelhouse roof.
@@ -1104,7 +1195,7 @@ function clipY(q: V3[], side: number): V3[] {
       fa = side * a[1],
       fb = side * b[1];
     if (fa >= 0) out.push(a);
-    if ((fa >= 0) !== (fb >= 0)) out.push(lerp(a, b, fa / (fa - fb)));
+    if (fa >= 0 !== fb >= 0) out.push(lerp(a, b, fa / (fa - fb)));
   }
   return out;
 }

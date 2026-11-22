@@ -110,7 +110,8 @@ export interface WrightFlyerMesh {
 }
 
 function positive(name: string, v: number, lo: number, hi: number): number {
-  if (!Number.isFinite(v) || v < lo || v > hi) throw new RangeError(`generateWrightFlyer: ${name} ${v} is outside ${lo} to ${hi}; pass a value in that range`);
+  if (!Number.isFinite(v) || v < lo || v > hi)
+    throw new RangeError(`generateWrightFlyer: ${name} ${v} is outside ${lo} to ${hi}; pass a value in that range`);
   return v;
 }
 
@@ -125,15 +126,31 @@ function beam(a: V3, b: V3, w: number, h: number): GeometryData {
   const d: V3 = [dx / len, dy / len, dz / len];
   // A helper not parallel to d, then u = helper x d, v = d x u.
   const helper: V3 = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-  let u: V3 = [helper[1] * d[2] - helper[2] * d[1], helper[2] * d[0] - helper[0] * d[2], helper[0] * d[1] - helper[1] * d[0]];
+  let u: V3 = [
+    helper[1] * d[2] - helper[2] * d[1],
+    helper[2] * d[0] - helper[0] * d[2],
+    helper[0] * d[1] - helper[1] * d[0],
+  ];
   const ul = Math.hypot(u[0], u[1], u[2]);
   u = [u[0] / ul, u[1] / ul, u[2] / ul];
   const v: V3 = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]];
   const m = [
-    u[0] * w, u[1] * w, u[2] * w, 0,
-    d[0] * len, d[1] * len, d[2] * len, 0,
-    v[0] * h, v[1] * h, v[2] * h, 0,
-    (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, 1,
+    u[0] * w,
+    u[1] * w,
+    u[2] * w,
+    0,
+    d[0] * len,
+    d[1] * len,
+    d[2] * len,
+    0,
+    v[0] * h,
+    v[1] * h,
+    v[2] * h,
+    0,
+    (a[0] + b[0]) / 2,
+    (a[1] + b[1]) / 2,
+    (a[2] + b[2]) / 2,
+    1,
   ];
   return applyMatrix4(boxGeometry(1, 1, 1), m);
 }
@@ -285,7 +302,14 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
         const ya = y0 - droop * (xs[i] / half),
           yb = y0 - droop * (xs[i + 1] / half);
         frame.push(beam([xa, ya + 0.004, lead], [xb, yb + 0.004, lead], 0.03, 0.03));
-        frame.push(beam([xa, ya + camberY(lead - chord + 0.01), lead - chord + 0.01], [xb, yb + camberY(lead - chord + 0.01), lead - chord + 0.01], 0.012, 0.012));
+        frame.push(
+          beam(
+            [xa, ya + camberY(lead - chord + 0.01), lead - chord + 0.01],
+            [xb, yb + camberY(lead - chord + 0.01), lead - chord + 0.01],
+            0.012,
+            0.012,
+          ),
+        );
       }
     }
   // Skids: two runners under the centre, from behind the rear spar forward and up to the elevator.
@@ -350,15 +374,53 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
     engineParts.push(zAxis(0.03, 0.04, cx, ey, ez + 0.35, 8)); // head plug
   }
   // Radiator: eleven flat vertical tubes between a top and a bottom header.
-  for (let i = 0; i < 11; i++) engineParts.push(box(right * 0.05, yLow + 0.55, 0.15 - 0.19 + i * 0.038, 0.06, 0.82, 0.012));
-  engineParts.push(box(right * 0.05, yLow + 0.98, 0.15, 0.08, 0.05, 0.44), box(right * 0.05, yLow + 0.12, 0.15, 0.08, 0.05, 0.44));
+  for (let i = 0; i < 11; i++)
+    engineParts.push(box(right * 0.05, yLow + 0.55, 0.15 - 0.19 + i * 0.038, 0.06, 0.82, 0.012));
+  engineParts.push(
+    box(right * 0.05, yLow + 0.98, 0.15, 0.08, 0.05, 0.44),
+    box(right * 0.05, yLow + 0.12, 0.15, 0.08, 0.05, 0.44),
+  );
   engineParts.push(zAxis(0.055, 0.28, right * 0.05, yUp - 0.12, 0.55, 14)); // fuel tank under the upper wing
   const engine = mergeGeometries([
     ...engineParts,
     beam([ex, yLow + 0.3, -0.35], [propX, propY, propZ + 0.05], 0.05, 0.05),
     beam([ex, yLow + 0.3, -0.35], [-propX, propY, propZ + 0.05], 0.05, 0.05),
-    applyMatrix4(cylinderGeometry(0.03, 0.03, 0.5, 8), [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, propX, propY, propZ + 0.25, 1]),
-    applyMatrix4(cylinderGeometry(0.03, 0.03, 0.5, 8), [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, -propX, propY, propZ + 0.25, 1]),
+    applyMatrix4(cylinderGeometry(0.03, 0.03, 0.5, 8), [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      -1,
+      0,
+      0,
+      propX,
+      propY,
+      propZ + 0.25,
+      1,
+    ]),
+    applyMatrix4(cylinderGeometry(0.03, 0.03, 0.5, 8), [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      -1,
+      0,
+      0,
+      -propX,
+      propY,
+      propZ + 0.25,
+      1,
+    ]),
   ]);
 
   // Ribs: a cambered strip over and under each wing every 0.31 m (about a foot), the fabric's pockets showing them.
@@ -405,17 +467,49 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
   const sprocket: V3 = [ex, yLow + 0.3, -0.3];
   for (const sx of [propX, -propX]) {
     for (const dy of [0.07, -0.07]) wire([sprocket[0], sprocket[1] + dy, sprocket[2]], [sx, propY + dy, propZ + 0.12]);
-    wires.push(applyMatrix4(cylinderGeometry(0.08, 0.08, 0.02, 16), [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, sx, propY, propZ + 0.12, 1]));
+    wires.push(
+      applyMatrix4(cylinderGeometry(0.08, 0.08, 0.02, 16), [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -1,
+        0,
+        0,
+        sx,
+        propY,
+        propZ + 0.12,
+        1,
+      ]),
+    );
   }
   const px = -right * 0.45; // the pilot and his hip cradle, left of centre
-  const cradle = mergeGeometries([box(px, yLow + 0.12, -0.15, 0.36, 0.06, 0.5), beam([px, yLow + 0.1, 0.1], [px, yLow + 0.1, 0.9], 0.04, 0.04)]);
+  const cradle = mergeGeometries([
+    box(px, yLow + 0.12, -0.15, 0.36, 0.06, 0.5),
+    beam([px, yLow + 0.1, 0.1], [px, yLow + 0.1, 0.9], 0.04, 0.04),
+  ]);
 
   const elevator = {
     geometry: mergeGeometries([
       cambered(elevSpan, elevChord, elevY - elevGap / 2, elevZ + elevChord / 2, 0.05, 0, 0.03, 16),
       cambered(elevSpan, elevChord, elevY + elevGap / 2, elevZ + elevChord / 2, 0.05, 0, 0.03, 16),
-      beam([-elevSpan / 2 + 0.05, elevY - elevGap / 2, elevZ], [-elevSpan / 2 + 0.05, elevY + elevGap / 2, elevZ], 0.025, 0.025),
-      beam([elevSpan / 2 - 0.05, elevY - elevGap / 2, elevZ], [elevSpan / 2 - 0.05, elevY + elevGap / 2, elevZ], 0.025, 0.025),
+      beam(
+        [-elevSpan / 2 + 0.05, elevY - elevGap / 2, elevZ],
+        [-elevSpan / 2 + 0.05, elevY + elevGap / 2, elevZ],
+        0.025,
+        0.025,
+      ),
+      beam(
+        [elevSpan / 2 - 0.05, elevY - elevGap / 2, elevZ],
+        [elevSpan / 2 - 0.05, elevY + elevGap / 2, elevZ],
+        0.025,
+        0.025,
+      ),
       beam([-0.6, elevY - elevGap / 2, elevZ], [-0.6, elevY + elevGap / 2, elevZ], 0.025, 0.025),
       beam([0.6, elevY - elevGap / 2, elevZ], [0.6, elevY + elevGap / 2, elevZ], 0.025, 0.025),
     ]),
@@ -429,7 +523,11 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
   }
   rudPlanes.push(beam([0.3, rudY + 0.05, rudZ], [-0.3, rudY + 0.05, rudZ], 0.03, 0.03));
   rudPlanes.push(beam([0.3, rudY + rudH - 0.05, rudZ], [-0.3, rudY + rudH - 0.05, rudZ], 0.03, 0.03));
-  const rudder = { geometry: mergeGeometries(rudPlanes), pivot: [0, rudY + rudH / 2, rudZ + rudChord / 2] as V3, axis: [0, 1, 0] as V3 };
+  const rudder = {
+    geometry: mergeGeometries(rudPlanes),
+    pivot: [0, rudY + rudH / 2, rudZ + rudChord / 2] as V3,
+    axis: [0, 1, 0] as V3,
+  };
 
   // The elevator lever: an upright stick at the pilot's left hand ahead of the cradle, its foot on a block on the lower
   // wing, a short cross grip at the top (Jakab 1990: the pilot worked the elevator with his left hand).
@@ -438,7 +536,12 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
   const lever = {
     geometry: mergeGeometries([
       beam(leverFoot, [leverFoot[0], leverFoot[1] + leverH, leverFoot[2]], 0.03, 0.03),
-      beam([leverFoot[0] - 0.05, leverFoot[1] + leverH, leverFoot[2]], [leverFoot[0] + 0.05, leverFoot[1] + leverH, leverFoot[2]], 0.035, 0.035),
+      beam(
+        [leverFoot[0] - 0.05, leverFoot[1] + leverH, leverFoot[2]],
+        [leverFoot[0] + 0.05, leverFoot[1] + leverH, leverFoot[2]],
+        0.035,
+        0.035,
+      ),
       box(leverFoot[0], leverFoot[1] - 0.01, leverFoot[2], 0.12, 0.03, 0.08),
     ]),
     pivot: [leverFoot[0], leverFoot[1], leverFoot[2]] as V3,
@@ -449,7 +552,8 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
   const blades = propellerBlades(prop / 2);
   // The blades are pitched to drive the air toward -Z (thrust toward +Z) when turning +1 about +Z; the -1 propeller gets their
   // mirror image, as the Wrights carved a left-hand and a right-hand pair.
-  const placeProp = (x: number, spin: 1 | -1) => applyMatrix4(blades, [spin, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, propY, propZ, 1]);
+  const placeProp = (x: number, spin: 1 | -1) =>
+    applyMatrix4(blades, [spin, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, propY, propZ, 1]);
   const propellers: [FlyerPropeller, FlyerPropeller] = [
     { geometry: placeProp(-right * propX, -1), pivot: [-right * propX, propY, propZ], axis: [0, 0, 1], spin: -1 },
     { geometry: placeProp(right * propX, 1), pivot: [right * propX, propY, propZ], axis: [0, 0, 1], spin: 1 },
@@ -461,7 +565,8 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
     const kept = ribs.filter((g) => !(g.positions[0] < -1.2 && wreck.rand() < 0.35));
     ribs.length = 0;
     ribs.push(...kept);
-    for (let i = 0; i < frame.length; i++) if (frame[i].positions[0] < -2.5 && wreck.rand() < 0.3) frame[i] = applyMatrix4(frame[i], wreck.snap(frame[i]));
+    for (let i = 0; i < frame.length; i++)
+      if (frame[i].positions[0] < -2.5 && wreck.rand() < 0.3) frame[i] = applyMatrix4(frame[i], wreck.snap(frame[i]));
   }
   const out: WrightFlyerMesh = {
     wings,
@@ -476,7 +581,11 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
     restraint,
     propellers,
     pilot: { hips: [px, yLow + 0.1, -0.2], head: [px, yLow + 0.18, 1.1] },
-    size: [span, rudY + rudH + 0.1 > yUp + 0.2 ? rudY + rudH + 0.1 : yUp + 0.2, elevZ + elevChord / 2 - (rudZ - rudChord / 2)],
+    size: [
+      span,
+      rudY + rudH + 0.1 > yUp + 0.2 ? rudY + rudH + 0.1 : yUp + 0.2,
+      elevZ + elevChord / 2 - (rudZ - rudChord / 2),
+    ],
   };
   if (wreck) {
     out.wings = wreck.crush(out.wings);
@@ -487,9 +596,29 @@ export function generateWrightFlyer(options: WrightFlyerOptions = {}): WrightFly
     // chain guide tubes that run from it to the propeller shafts.
     const c = Math.cos(0.24),
       s = Math.sin(0.24);
-    out.engine = applyMatrix4(engine, [1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, yLow - c * yLow + s * ez, ez - s * yLow - c * ez - 0.08, 1]);
+    out.engine = applyMatrix4(engine, [
+      1,
+      0,
+      0,
+      0,
+      0,
+      c,
+      s,
+      0,
+      0,
+      -s,
+      c,
+      0,
+      0,
+      yLow - c * yLow + s * ez,
+      ez - s * yLow - c * ez - 0.08,
+      1,
+    ]);
     const right = out.propellers[1];
-    out.propellers = [out.propellers[0], { ...right, geometry: applyMatrix4(right.geometry, wreck.snap(right.geometry)) }];
+    out.propellers = [
+      out.propellers[0],
+      { ...right, geometry: applyMatrix4(right.geometry, wreck.snap(right.geometry)) },
+    ];
   }
   return out;
 }
@@ -516,7 +645,10 @@ function wrecker(half: number, yLow: number, seed: number) {
         const u = Math.min(1, (-x - 1.2) / (half - 1.2)),
           fold = u * u,
           above = Math.max(0, p[i + 1] - yLow);
-        p[i + 1] = Math.max(0.03, p[i + 1] - fold * (0.55 * above + 0.35 * k) + 0.04 * u * Math.sin(x * 7.3 + p[i + 2] * 3.1));
+        p[i + 1] = Math.max(
+          0.03,
+          p[i + 1] - fold * (0.55 * above + 0.35 * k) + 0.04 * u * Math.sin(x * 7.3 + p[i + 2] * 3.1),
+        );
         p[i + 2] += 0.35 * fold * k + 0.08 * u * Math.sin(p[i + 1] * 5);
       }
       return geometryData(p, g.normals, g.uvs, g.indices);
@@ -541,9 +673,23 @@ function wrecker(half: number, yLow: number, seed: number) {
  * 0 pulls it taut (held before release); 1 lets it hang loose, sagging an eighth of its length at the middle (let go),
  * lying on the sand where it would go below `ground` (the sand's height there; default no floor).
  */
-export function restrainingWire(tie: readonly number[], stake: readonly number[], slack = 0, ground = -Infinity, segments = 16): GeometryData {
-  if (tie.length !== 3 || stake.length !== 3 || ![...tie, ...stake, slack].every(Number.isFinite) || Number.isNaN(ground) || !(segments >= 1))
-    throw new RangeError('restrainingWire: pass tie and stake as finite [x, y, z], a finite slack, a ground height and 1 or more segments');
+export function restrainingWire(
+  tie: readonly number[],
+  stake: readonly number[],
+  slack = 0,
+  ground = -Infinity,
+  segments = 16,
+): GeometryData {
+  if (
+    tie.length !== 3 ||
+    stake.length !== 3 ||
+    ![...tie, ...stake, slack].every(Number.isFinite) ||
+    Number.isNaN(ground) ||
+    !(segments >= 1)
+  )
+    throw new RangeError(
+      'restrainingWire: pass tie and stake as finite [x, y, z], a finite slack, a ground height and 1 or more segments',
+    );
   const sl = Math.min(1, Math.max(0, slack)),
     len = Math.hypot(stake[0] - tie[0], stake[1] - tie[1], stake[2] - tie[2]),
     floor = ground + 0.003,
@@ -556,7 +702,8 @@ export function restrainingWire(tie: readonly number[], stake: readonly number[]
   }
   const parts: GeometryData[] = [];
   for (let i = 0; i < n; i++)
-    if (Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]) > 1e-6) parts.push(beam(pts[i], pts[i + 1], 0.006, 0.006));
+    if (Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]) > 1e-6)
+      parts.push(beam(pts[i], pts[i + 1], 0.006, 0.006));
   return mergeGeometries(parts);
 }
 
@@ -595,13 +742,16 @@ export interface WrightGustRollOptions {
  * behind it) and slewing a little. Draw the wrecked Flyer ({@link WrightFlyerOptions.wrecked}) once it rests.
  */
 export function wrightGustRoll(t: number, options: WrightGustRollOptions = {}): WrightGustRollPose {
-  if (!Number.isFinite(t)) throw new RangeError('wrightGustRoll: t is not finite; pass seconds after the gust as a finite number');
+  if (!Number.isFinite(t))
+    throw new RangeError('wrightGustRoll: t is not finite; pass seconds after the gust as a finite number');
   const turns = options.turns ?? 1,
     seconds = options.seconds ?? 4,
     lift = options.lift ?? 1.2,
     half = (options.span ?? 40 * FT + 4 * 0.0254) / 2;
   if (!(turns > 0 && turns <= 4 && seconds > 0 && lift >= 0 && half > 0))
-    throw new RangeError('wrightGustRoll: pass turns above 0 to 4, seconds above 0, lift 0 or more and a positive span');
+    throw new RangeError(
+      'wrightGustRoll: pass turns above 0 to 4, seconds above 0, lift 0 or more and a positive span',
+    );
   const duration = lift + seconds,
     tip = 0.35;
   let roll = 0,
@@ -620,7 +770,11 @@ export function wrightGustRoll(t: number, options: WrightGustRollOptions = {}): 
   }
   const along = Math.min(1, Math.max(0, t / duration));
   return {
-    position: [(roll * half) / Math.PI + 0, Math.max(0, (half - 0.35) * Math.abs(Math.sin(roll))), along > 0 ? -2.5 * along : 0],
+    position: [
+      (roll * half) / Math.PI + 0,
+      Math.max(0, (half - 0.35) * Math.abs(Math.sin(roll))),
+      along > 0 ? -2.5 * along : 0,
+    ],
     pitch: 0.12 * Math.sin(-roll),
     roll,
     yaw: 0.3 * along,
@@ -691,7 +845,8 @@ export interface WrightFlightPose {
 export function wrightFlightPose(n: number, t: number, options: WrightFlightOptions = {}): WrightFlightPose {
   const flight = WRIGHT_FLIGHTS_1903.find((f) => f.n === n);
   if (!flight) throw new RangeError(`wrightFlightPose: flight ${n} is not one of the four; pass 1, 2, 3 or 4`);
-  if (!Number.isFinite(t)) throw new RangeError('wrightFlightPose: t is not finite; pass seconds after release as a finite number');
+  if (!Number.isFinite(t))
+    throw new RangeError('wrightFlightPose: t is not finite; pass seconds after release as a finite number');
   const wind = options.wind ?? (27 * 1609.344) / 3600;
   const railTop = options.railTop ?? 0.2;
   const rpm = options.rpm ?? 350;
@@ -721,7 +876,8 @@ export function wrightFlightPose(n: number, t: number, options: WrightFlightOpti
     const h = height(u, ta);
     const dt = 0.02;
     const vz = (height((ta + dt) / flight.seconds, ta + dt) - height((ta - dt) / flight.seconds, ta - dt)) / (2 * dt);
-    const az = (height((ta + dt) / flight.seconds, ta + dt) - 2 * h + height((ta - dt) / flight.seconds, ta - dt)) / (dt * dt);
+    const az =
+      (height((ta + dt) / flight.seconds, ta + dt) - 2 * h + height((ta - dt) / flight.seconds, ta - dt)) / (dt * dt);
     // Lift off from the rail top, blending its height into the climb over the first second.
     const blend = Math.min(1, ta / 1);
     const y = railTop * (1 - blend) + h + railTop * blend * (1 - u);
