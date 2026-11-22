@@ -21,6 +21,7 @@ import { horizonHeights } from './horizon.js';
 export { horizonHeights, HORIZON_SKIRT, type HorizonHeights, type HorizonSource } from './horizon.js';
 import type { PlantStates, PlantStateSource } from '@margoengine/scatter/states';
 import type { DisturbanceStatesOptions } from './disturbance.js';
+import type { PlacementGraph } from './graph.js';
 import type { PlacedTile } from './placement.js';
 import type { BiomeSample } from './sample.js';
 import type { BiomeSeasons } from './seasons.js';
@@ -134,6 +135,8 @@ export interface BiomeViewOptions {
    * `layoutSettlements(...).exclusions` and `pathExclusions(paths)`). Default none.
    */
   readonly exclusions?: readonly import('./placement.js').Exclusion[];
+  /** Density rules for the view's placed species. Default none. Load the graph entry or use a graph builder. */
+  readonly graph?: PlacementGraph;
   /**
    * Meshes by key drawn in place of the procedural ones (`BiomeObjectsOptions.meshes`): library plants and rocks drawn
    * by the key their species name. Default none.
@@ -1192,7 +1195,7 @@ export class BiomeView implements Disposable {
           ]),
           t = view.textureResolution / 2,
           [x0, z0, x1, z1] = world.bounds;
-        const placement = BiomePlacement.attach(world, options.exclusions ? { exclusions: options.exclusions } : {}),
+        const placement = BiomePlacement.attach(world, { exclusions: options.exclusions, graph: options.graph }),
           bounds = [x0 - t, z0 - t, x1 + t, z1 + t] as const;
         view.#placement = placement;
         // Detail maps start at the terrain's texel and coarsen by halves until they fit the budget and the device.

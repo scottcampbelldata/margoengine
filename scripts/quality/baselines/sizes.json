@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17386498,
+  "total": 17391161,
   "history": [
     {
       "date": "2026-10-24",
@@ -11319,6 +11319,12 @@
       "commit": "e3b40d430d",
       "reason": "Add the 1468-byte optional fir spray mesh entry. It shares one deterministic whorl layout across all foliage levels; separate entries would duplicate it. Core and stage remain at 24797 bytes gzip.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "e601576b25",
+      "reason": "Add the 4407-byte optional Biomes treeline entry. It returns a validated placement graph and shares the existing graph evaluator. A separate graph validator would duplicate that code. Core and stage remain at 24797 bytes gzip.",
+      "grew": 1
     }
   ],
   "items": {
@@ -11420,6 +11426,7 @@
     "@margoengine/biomes/splines": 2870,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
+    "@margoengine/biomes/treeline": 4663,
     "@margoengine/biomes/valley": 5060,
     "@margoengine/biomes/view": 14880,
     "@margoengine/biomes/workers": 2878,

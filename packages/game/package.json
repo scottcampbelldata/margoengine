@@ -383,6 +383,10 @@
       "types": "./dist/biomes/graph.d.ts",
       "import": "./dist/biomes/graph.js"
     },
+    "./biomes/treeline": {
+      "types": "./dist/biomes/treeline.d.ts",
+      "import": "./dist/biomes/treeline.js"
+    },
     "./biomes/ecosystem": {
       "types": "./dist/biomes/ecosystem.d.ts",
       "import": "./dist/biomes/ecosystem.js"

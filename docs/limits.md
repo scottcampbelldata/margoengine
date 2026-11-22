@@ -8387,3 +8387,10 @@ Terrain rings keep a world XZ anchor by default. Their outer extent is set by `c
 count, up to 12 levels. Choose an anchor and extent that cover the visible ground on a bounded camera route.
 `BiomeView` shares one anchor for the world and horizon. Streaming terrain defaults to a moving selection on the world
 lattice. Height data updates still change the surface by design.
+
+## Alpine treeline placement
+
+The optional Biomes treeline graph supports nominal elevations from -500 to 9,000 m, vertical transitions from 12
+to 400 m, and world-space shelter patches from 20 to 2,000 m. Its density multipliers apply within the selected
+species and biome envelopes. The artist supplies the local elevation and the cohort meshes.
+The optional entry measures 4,407 B gzip with graph construction and validation. Core and stage remain at 24,797 B.

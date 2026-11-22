@@ -125,6 +125,31 @@ triangulation as the camera pulls back, while plant and material streaming still
 `clipmap.anchor` an explicit `[x, z]` when the shot needs another centre. Use `clipmap.anchor: 'camera'` when
 the camera must travel beyond the fixed outer ring and `clipmap.levels` limits its size.
 
+## Alpine treelines
+
+The optional `@margoengine/biomes/treeline` entry builds a placement graph with mature, young and wind-stunted
+cohorts. Trees thin on exposed ground and extend higher in some sheltered hollows. The seeded patches stay in
+world coordinates across tile boundaries. Set the elevation for the local mountain and give each cohort a biome and
+species range wide enough to include the transition. Supply the graph as `BiomeView`'s `graph` or directly to
+`BiomePlacement`.
+
+```ts
+import { alpineTreelineGraph } from '@margoengine/biomes/treeline';
+
+const graph = alpineTreelineGraph({
+  elevation: 3450,
+  mature: ['fir'],
+  young: ['young-fir'],
+  stunted: ['krummholz'],
+});
+console.log(graph.outputs.krummholz); // stunted
+```
+
+The vertical transition defaults to 140 m, the shelter patch size to 160 m, and the seed to 0. The graph uses terrain
+curvature and exposure as artistic proxies for shelter. The pattern draws on George P. Malanson and colleagues,
+[Alpine Treeline of Western North America](https://www.fs.usda.gov/pnw/pubs/journals/pnw_2007_malanson001.pdf) (2007),
+and the National Park Service's observations of krummholz at [Rocky Mountain National Park](https://www.nps.gov/romo/learn/nature/subalpine_ecosystem2.htm).
+
 ## Look families for the ground: `@margoengine/biomes/view`
 
 `BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad
