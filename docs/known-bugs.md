@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: Lines and vector Text duplicated frame uniform setup (lines, text)
+
+- **Repro:** `npm run quality -- --gate=duplicates` reports `lines | text` after the formatted renderers line up. Make LineBatches' device throw while creating its frame bind group to isolate a buffer left by a failed setup.
+- **Cause:** both renderers allocated and bound the same kind of frame uniform inline. The group could fail after the buffer was allocated.
+- **Fix:** share the buffer-and-group setup. Retire the just-created buffer when making its group throws.
+- **Regression:** the duplicate gate finds the original block, and `packages/lines/tests/batch.test.js` checks failure cleanup.
+
 ### Fixed 2026-11-21: the umbrella generator disagreed with its formatted import map (tools)
 
 - **Repro:** `node scripts/umbrella.mjs --check` reports `packages/margoengine/src/importmap.ts` as stale after `2428ebbafc`.

@@ -39,6 +39,31 @@ const colour = (batch, segment, which) => Array.from(new Uint8Array(batch.data, 
 const draws = (log) => log.filter((e) => e[0] === 'pass.draw');
 const writes = (log, size) => log.filter((e) => e[0] === 'writeBuffer' && e[3].length === size * 2);
 
+test('line setup releases its frame uniform if the GPU rejects the bind group', () => {
+  const gpu = mockGPU();
+  const create = gpu.device.createBuffer.bind(gpu.device);
+  const failure = new Error('bind group rejected');
+  let destroyed = false;
+  gpu.device.createBuffer = (descriptor) => {
+    const buffer = create(descriptor);
+    const destroy = buffer.destroy.bind(buffer);
+    buffer.destroy = () => {
+      destroyed = true;
+      destroy();
+    };
+    return buffer;
+  };
+  gpu.device.createBindGroup = () => {
+    throw failure;
+  };
+  const batches = new LineBatches();
+  assert.throws(
+    () => batches.setup({ backend: 'webgpu', gpu: gpu.device }),
+    (error) => error === failure,
+  );
+  assert.equal(destroyed, true);
+});
+
 test('segments pack as two ends of position and rgba8, white by default', () => {
   const batch = new LineBatch({ positions: two });
   assert.equal(batch.count, 2);

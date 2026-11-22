@@ -9,6 +9,7 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 import { overlayPass } from '../../shared/pass.js';
+import { createFrameUniform } from '../../shared/frame-uniform.js';
 import { GlyphFieldFont, type GlyphFieldFontLoadOptions, type GlyphFieldFontOptions } from './outline.js';
 import { Text } from './text.js';
 import { toQuadratics, VectorGlyphStore, type VectorGlyph } from './vector-glyph.js';
@@ -262,11 +263,7 @@ export class VectorTextRenderer implements EnginePlugin {
     });
     this.layouts = { frame, block, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, block] }) };
     this.module = device.createShaderModule({ code: vectorTextShader });
-    this.frameBuffer = device.createBuffer({ size: FRAME_BYTES, usage: UNIFORM_COPY });
-    this.frameGroup = device.createBindGroup({
-      layout: frame,
-      entries: [{ binding: 0, resource: { buffer: this.frameBuffer } }],
-    });
+    [this.frameBuffer, this.frameGroup] = createFrameUniform(device, frame, FRAME_BYTES, UNIFORM_COPY);
   }
 
   registerPasses(graph: FrameGraph): void {
