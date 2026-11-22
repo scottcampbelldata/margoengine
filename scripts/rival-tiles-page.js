@@ -42,10 +42,7 @@ function depthsOf(paths) {
 function planeSide(planes, sample) {
   for (let i = 0; i < 6; i++) {
     const signed =
-      planes[i * 4] * sample[0] +
-      planes[i * 4 + 1] * sample[1] +
-      planes[i * 4 + 2] * sample[2] +
-      planes[i * 4 + 3];
+      planes[i * 4] * sample[0] + planes[i * 4 + 1] * sample[1] + planes[i * 4 + 2] * sample[2] + planes[i * 4 + 3];
     if (signed < -1e-3) return false;
   }
   return true;
@@ -72,12 +69,7 @@ try {
   if (tileset.progress.failed !== 0) throw new Error(`margo failed loads ${tileset.progress.failed}`);
   const margoPaths = frame.selected.map((tile) => tilePath(tile.id));
 
-  const perspective = new THREE.PerspectiveCamera(
-    camera.fov,
-    camera.width / camera.height,
-    camera.near,
-    camera.far,
-  );
+  const perspective = new THREE.PerspectiveCamera(camera.fov, camera.width / camera.height, camera.near, camera.far);
   perspective.position.set(camera.position[0], camera.position[1], camera.position[2]);
   perspective.up.set(camera.up[0], camera.up[1], camera.up[2]);
   perspective.lookAt(camera.target[0], camera.target[1], camera.target[2]);
@@ -97,13 +89,16 @@ try {
   const rival = new TilesRenderer(`${base}tileset.json`);
   rival.errorTarget = TILES_SCENE.maximumScreenSpaceError;
   rival.setCamera(perspective);
-  if (rival.setResolution(perspective, camera.width, camera.height) !== true) throw new Error('setResolution returned false');
+  if (rival.setResolution(perspective, camera.width, camera.height) !== true)
+    throw new Error('setResolution returned false');
   const root = new THREE.Scene();
   root.add(rival.group);
   const loadErrors = [];
   let loading = 0;
   rival.addEventListener('load-error', (event) => {
-    loadErrors.push(`${event.url ?? ''} ${event.error && event.error.message ? event.error.message : event.error ?? ''}`);
+    loadErrors.push(
+      `${event.url ?? ''} ${event.error && event.error.message ? event.error.message : (event.error ?? '')}`,
+    );
   });
   rival.addEventListener('tiles-load-start', () => {
     loading++;
@@ -126,7 +121,10 @@ try {
     if (stable >= 10 && performance.now() - started > 500) break;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  if (stable < 10) throw new Error(`rival selection did not settle; visible ${lastCount} loading ${loading}; errors ${loadErrors.slice(0, 3).join(' | ')}`);
+  if (stable < 10)
+    throw new Error(
+      `rival selection did not settle; visible ${lastCount} loading ${loading}; errors ${loadErrors.slice(0, 3).join(' | ')}`,
+    );
   if (loadErrors.length) throw new Error(`rival load errors: ${loadErrors.slice(0, 5).join(' | ')}`);
 
   const rivalPaths = [];

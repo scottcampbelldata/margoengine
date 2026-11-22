@@ -65,7 +65,11 @@ try {
         // Weights over joints by distance to each joint's x: a wide, smooth falloff.
         const reach = eight ? 2.6 : 1,
           raw = Array.from({ length: JOINTS }, (_, j) => Math.max(0, 1 - Math.abs(x - j) / reach)),
-          used = raw.map((w, j) => [w, j]).filter(([w]) => w > 0).sort((a, b) => b[0] - a[0]).slice(0, 8);
+          used = raw
+            .map((w, j) => [w, j])
+            .filter(([w]) => w > 0)
+            .sort((a, b) => b[0] - a[0])
+            .slice(0, 8);
         for (let s = 0; s < SIDES; s++) {
           const a = (s / SIDES) * Math.PI * 2;
           positions.push(x, Math.cos(a), Math.sin(a));
@@ -139,7 +143,14 @@ try {
       return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(h)];
     };
 
-    const report = { checks: 0, worstPosition: 0, worstNormal: 0, dqRadius: Infinity, linearRadius: Infinity, failure: null };
+    const report = {
+      checks: 0,
+      worstPosition: 0,
+      worstNormal: 0,
+      dqRadius: Infinity,
+      linearRadius: Infinity,
+      failure: null,
+    };
     for (const eight of [false, true]) {
       const { doc, buffers } = tube(eight),
         dqModel = parseGLTF(engine, doc, buffers);

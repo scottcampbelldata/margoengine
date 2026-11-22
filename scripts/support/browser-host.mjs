@@ -43,7 +43,8 @@ function alive(pid) {
 async function pollGone(pids, waitMs) {
   const begun = Date.now();
   let left = pids;
-  while ((left = left.filter(alive)).length && Date.now() - begun < waitMs) await new Promise((resolve) => setTimeout(resolve, 10));
+  while ((left = left.filter(alive)).length && Date.now() - begun < waitMs)
+    await new Promise((resolve) => setTimeout(resolve, 10));
   return left;
 }
 
@@ -55,7 +56,16 @@ async function pollGone(pids, waitMs) {
  * `reapMs`, then the server's own cleanup (its WebSocket server and temporary profile). `settled` resolves to the pids
  * still present at the bound.
  */
-export function endOwned(server, children, { reapMs = REAP_MS, end = endTree, settle = process.platform === 'win32' ? waitSignaled : pollGone, log = console.error } = {}) {
+export function endOwned(
+  server,
+  children,
+  {
+    reapMs = REAP_MS,
+    end = endTree,
+    settle = process.platform === 'win32' ? waitSignaled : pollGone,
+    log = console.error,
+  } = {},
+) {
   // The wall clock start goes to `settle`, which compares it with process start times; the bound itself is measured on
   // the monotonic clock (KB-BH-REAP1).
   const begun = Date.now();
@@ -197,7 +207,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             event,
             exitCode: child.current.exitCode,
             signalCode: child.current.signalCode,
-            pipes: child.current.stdio?.map((pipe) => pipe && { destroyed: pipe.destroyed, closed: pipe.closed, readable: pipe.readable, writable: pipe.writable }),
+            pipes: child.current.stdio?.map(
+              (pipe) =>
+                pipe && {
+                  destroyed: pipe.destroyed,
+                  closed: pipe.closed,
+                  readable: pipe.readable,
+                  writable: pipe.writable,
+                },
+            ),
           })}`,
         );
       child.current.once('exit', () => record('exit'));

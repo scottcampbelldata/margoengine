@@ -100,7 +100,13 @@ try {
       }),
       passes = {};
     try {
-      sky.setup({ gpu: d, removePlugin() {}, sceneOf() { return this; } });
+      sky.setup({
+        gpu: d,
+        removePlugin() {},
+        sceneOf() {
+          return this;
+        },
+      });
       sky.registerPasses({
         add(pass) {
           passes[pass.name] = pass;

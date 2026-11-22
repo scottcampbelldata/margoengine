@@ -91,7 +91,9 @@ export function readSkips(file = skipFile) {
   const skips = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   for (const [id, reason] of Object.entries(skips))
     if (typeof reason !== 'string' || !/^hardware: \S/.test(reason))
-      throw new Error(`${id}: a skipped example names the hardware it needs ("hardware: ..."); put any other failure on the known list`);
+      throw new Error(
+        `${id}: a skipped example names the hardware it needs ("hardware: ..."); put any other failure on the known list`,
+      );
   return skips;
 }
 
@@ -448,7 +450,14 @@ try {
 </script>`;
 
 /** CommonJS React entries reached by documented bindings must be prebundled before serving native ESM. */
-export const readmeReactDependencies = ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client', 'react-dom/test-utils'];
+export const readmeReactDependencies = [
+  'react',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+  'react-dom',
+  'react-dom/client',
+  'react-dom/test-utils',
+];
 
 async function startPages(samples, examples) {
   const programs = new Map(examples.map((example) => [`/${example.id}/example.tsx`, example]));
@@ -464,7 +473,8 @@ async function startPages(samples, examples) {
       include: readmeReactDependencies,
     },
     oxc: { jsx: { runtime: 'automatic' } },
-    plugins: [noFileWatcher(),
+    plugins: [
+      noFileWatcher(),
       {
         name: 'readme-samples',
         configureServer(vite) {
@@ -567,7 +577,10 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT, launch =
     return result;
   })();
   const expired = Symbol('deadline');
-  const firstLine = (error) => String(error?.message ?? error).split('\n')[0].slice(0, 300);
+  const firstLine = (error) =>
+    String(error?.message ?? error)
+      .split('\n')[0]
+      .slice(0, 300);
   let outcome;
   try {
     // The deadline bounds the example's own work, its page close included, never the browser's teardown after it:
@@ -718,7 +731,8 @@ async function run() {
   }
   for (const { id, place, reason } of fresh) console.error(`${id} (${place}): ${reason}`);
   for (const id of gone) console.error(goneLine(id, report));
-  for (const id of unknownSkips) console.error(`${id}: no such example, still on the skip list (scripts/support/readme-run-skip.json)`);
+  for (const id of unknownSkips)
+    console.error(`${id}: no such example, still on the skip list (scripts/support/readme-run-skip.json)`);
   console.log(
     `${passed} of ${report.length - skipped} examples ran: ${inNode} in Node, ${passed - inNode} in a page; ${failed.length} failed, ${fresh.length} not on the known list; ${skipped} skipped for hardware`,
   );

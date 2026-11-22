@@ -20,7 +20,9 @@ const sameFile = (a, b) => existsSync(a) && existsSync(b) && readFileSync(a).equ
  * it cleaned, each with what it removed and whether the folder is gone.
  */
 export function removeStalePackageOutputs(repository, workspaces) {
-  const kept = new Set(workspaces.filter((dir) => dir.startsWith('packages/')).map((dir) => dir.slice('packages/'.length)));
+  const kept = new Set(
+    workspaces.filter((dir) => dir.startsWith('packages/')).map((dir) => dir.slice('packages/'.length)),
+  );
   const cleaned = [];
   for (const entry of readdirSync(join(repository, 'packages'), { withFileTypes: true })) {
     if (!entry.isDirectory() || kept.has(entry.name)) continue;

@@ -10,7 +10,15 @@ export const WASM_TARGET = 'wasm32-unknown-unknown';
 export const WASM_RUSTFLAGS = '-C target-feature=+simd128';
 
 /** The cargo arguments of a crate's Wasm build as shipped: release, the Wasm target, the lock file as committed. */
-export const wasmBuildArgs = (manifest) => ['build', '--locked', '--release', '--target', WASM_TARGET, '--manifest-path', manifest];
+export const wasmBuildArgs = (manifest) => [
+  'build',
+  '--locked',
+  '--release',
+  '--target',
+  WASM_TARGET,
+  '--manifest-path',
+  manifest,
+];
 
 /** Where `wasmBuildArgs` puts a crate's module (the crate's own target folder); `text` is its Cargo.toml. */
 export const wasmModule = (manifest, text) =>

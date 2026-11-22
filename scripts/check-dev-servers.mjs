@@ -77,7 +77,10 @@ function viteArgs(command) {
 }
 
 const privateIPv4 = () =>
-  Object.values(networkInterfaces()).flat().find((a) => a.family === 'IPv4' && !a.internal && /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address))?.address;
+  Object.values(networkInterfaces())
+    .flat()
+    .find((a) => a.family === 'IPv4' && !a.internal && /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address))
+    ?.address;
 
 const packages = new Map(); // relative package.json path -> { dir, manifest }
 const servers = [];
@@ -104,12 +107,30 @@ for (const file of packageFiles(root)) {
       const open = openAt >= 0 && args[openAt + 1]?.startsWith('/') ? args[openAt + 1] : undefined;
       const withoutOpen = open ? args.filter((_, i) => i !== openAt && i !== openAt + 1) : args;
       // The check picks the host and port itself.
-      const rest = withoutOpen.filter((arg, i) => !['--host', '--port', '--strictPort'].includes(arg) && !['--host', '--port'].includes(withoutOpen[i - 1]));
+      const rest = withoutOpen.filter(
+        (arg, i) =>
+          !['--host', '--port', '--strictPort'].includes(arg) && !['--host', '--port'].includes(withoutOpen[i - 1]),
+      );
       const directory = rest.find((arg, i) => !arg.startsWith('-') && rest[i - 1] !== '--config');
-      servers.push({ kind: 'vite', label, command, cwd: directory ? resolve(dir, directory) : dir, args: rest.filter((arg) => arg !== directory), open });
+      servers.push({
+        kind: 'vite',
+        label,
+        command,
+        cwd: directory ? resolve(dir, directory) : dir,
+        args: rest.filter((arg) => arg !== directory),
+        open,
+      });
     } else if (/^next (dev|start)\b/.test(last)) {
       const build = manifest.scripts?.build;
-      servers.push({ kind: 'next', mode: last.split(/\s+/)[1], label, command, cwd: dir, args: last.split(/\s+/).slice(2), build });
+      servers.push({
+        kind: 'next',
+        mode: last.split(/\s+/)[1],
+        label,
+        command,
+        cwd: dir,
+        args: last.split(/\s+/).slice(2),
+        build,
+      });
     } else if (/^node /.test(last)) {
       servers.push({ kind: 'node', label, command, cwd: dir, config: NODE_SERVERS[label] });
     } else if (!/^npm run /.test(last)) {
@@ -119,11 +140,17 @@ for (const file of packageFiles(root)) {
 }
 
 const runnable = servers.filter((server) => server.kind !== 'unknown' && (!only || server.label.includes(only)));
-const checked = new Set([...templateServers, ...servers.filter((server) => server.kind !== 'unknown' && !(server.kind === 'node' && !server.config)).map((server) => server.label)]);
+const checked = new Set([
+  ...templateServers,
+  ...servers
+    .filter((server) => server.kind !== 'unknown' && !(server.kind === 'node' && !server.config))
+    .map((server) => server.label),
+]);
 
 function firstPage(server) {
   if (server.open) return server.open;
-  for (const sub of ['', 'examples/', 'docs/']) if (existsSync(join(server.cwd, sub, 'index.html'))) return `/${sub}${sub ? 'index.html' : ''}`;
+  for (const sub of ['', 'examples/', 'docs/'])
+    if (existsSync(join(server.cwd, sub, 'index.html'))) return `/${sub}${sub ? 'index.html' : ''}`;
   return '/';
 }
 
@@ -143,7 +170,9 @@ async function runServer(server, report) {
   if (server.kind === 'next') {
     const next = join(packageDir('next'), 'dist', 'bin', 'next');
     const env = { ...humanEnv(), NEXT_TELEMETRY_DISABLED: '1' };
-    const withoutPort = server.args.filter((arg, i) => !['--port', '-p'].includes(arg) && !['--port', '-p'].includes(server.args[i - 1]));
+    const withoutPort = server.args.filter(
+      (arg, i) => !['--port', '-p'].includes(arg) && !['--port', '-p'].includes(server.args[i - 1]),
+    );
     if (server.mode === 'start') {
       // `next start` serves what `next build` wrote; both must be clean.
       const buildCommand = server.build?.split(/\s+/).slice(1) ?? [];
@@ -151,10 +180,22 @@ async function runServer(server, report) {
       if (built.problems.length) return { problems: built.problems.map((p) => `build: ${p}`), lines: built.lines };
     }
     const assigned = await freePort();
-    return probe({ command: process.execPath, args: [next, server.mode, ...withoutPort, '--port', String(assigned)], cwd: server.cwd, env, page: `http://127.0.0.1:${assigned}/` });
+    return probe({
+      command: process.execPath,
+      args: [next, server.mode, ...withoutPort, '--port', String(assigned)],
+      cwd: server.cwd,
+      env,
+      page: `http://127.0.0.1:${assigned}/`,
+    });
   }
   const config = server.config;
-  if (!config) return { problems: [`no NODE_SERVERS row in scripts/check-dev-servers.mjs for \`${server.command}\`; add one so this server is started and checked`], lines: [] };
+  if (!config)
+    return {
+      problems: [
+        `no NODE_SERVERS row in scripts/check-dev-servers.mjs for \`${server.command}\`; add one so this server is started and checked`,
+      ],
+      lines: [],
+    };
   let lan = '';
   if (config.needsLan) {
     lan = privateIPv4();
@@ -174,7 +215,8 @@ async function runServer(server, report) {
   }
   const ports = [];
   for (let i = 0; i < config.ports; i += 1) ports.push(await freePort(lan || '127.0.0.1'));
-  if (new Set(ports).size !== ports.length) return { problems: [`the operating system gave the same free port twice: ${ports.join(', ')}`], lines: [] };
+  if (new Set(ports).size !== ports.length)
+    return { problems: [`the operating system gave the same free port twice: ${ports.join(', ')}`], lines: [] };
   return probe({
     command: process.execPath,
     args: [script, ...config.args(ports)],
@@ -199,12 +241,17 @@ function markdownFiles(dir, out = []) {
   return out;
 }
 
-const COMMAND = /^(?:\$\s*)?((?:npm (?:run|start|create|init|exec)\b|npx\b|pnpm\b|yarn\b|bun\b|vite(?:\s|$)|next (?:dev|start|build)\b).*?)(?:\s+#.*)?$/;
+const COMMAND =
+  /^(?:\$\s*)?((?:npm (?:run|start|create|init|exec)\b|npx\b|pnpm\b|yarn\b|bun\b|vite(?:\s|$)|next (?:dev|start|build)\b).*?)(?:\s+#.*)?$/;
 
 function docCommands() {
   const found = [];
   for (const file of markdownFiles(root)) {
-    if (/(^|\/)docs\/(known-bugs|clean-room|limits)\.md$/.test(slash(relative(root, file))) || /whitepaper|handoffs/.test(file)) continue;
+    if (
+      /(^|\/)docs\/(known-bugs|clean-room|limits)\.md$/.test(slash(relative(root, file))) ||
+      /whitepaper|handoffs/.test(file)
+    )
+      continue;
     let inFence = false;
     for (const [index, line] of readFileSync(file, 'utf8').split(/\r?\n/).entries()) {
       if (/^\s*```/.test(line)) {
@@ -222,7 +269,8 @@ function docCommands() {
 /** The workspace (by name or path) a command names, or the package that sits beside the Markdown file, or the root. */
 function packageFor(file, workspaceName) {
   if (workspaceName) {
-    for (const [path, { manifest }] of packages) if (manifest.name === workspaceName || dirname(path) === workspaceName.replace(/\/$/, '')) return path;
+    for (const [path, { manifest }] of packages)
+      if (manifest.name === workspaceName || dirname(path) === workspaceName.replace(/\/$/, '')) return path;
     return null;
   }
   const beside = slash(relative(root, join(dirname(file), 'package.json')));
@@ -276,8 +324,13 @@ function checkDocs() {
       continue;
     }
     // npx vite, vite, next dev, pnpm dev ...: a server start in a project of the reader's own.
-    if (/^(npx |pnpm |yarn |bun |vite\b|next\b|npm (create|init|exec))/.test(text) && /\b(vite|next|dev|start|serve|preview)\b/.test(text)) {
-      problems.push(`${where}: \`${text}\` starts a server that no check covers; map it in DOC_COMMANDS_ELSEWHERE with the check that owns it`);
+    if (
+      /^(npx |pnpm |yarn |bun |vite\b|next\b|npm (create|init|exec))/.test(text) &&
+      /\b(vite|next|dev|start|serve|preview)\b/.test(text)
+    ) {
+      problems.push(
+        `${where}: \`${text}\` starts a server that no check covers; map it in DOC_COMMANDS_ELSEWHERE with the check that owns it`,
+      );
     }
   }
   return { problems, commands };
@@ -286,7 +339,8 @@ function checkDocs() {
 // ---- Main ----
 
 if (listOnly) {
-  for (const server of servers) console.log(`${server.label}: ${server.command}${server.kind === 'node' && !server.config ? '  (NO ROW)' : ''}`);
+  for (const server of servers)
+    console.log(`${server.label}: ${server.command}${server.kind === 'node' && !server.config ? '  (NO ROW)' : ''}`);
 } else {
   let failures = 0;
   const report = { notRun: [] };
@@ -305,7 +359,9 @@ if (listOnly) {
   }
   for (const server of servers.filter((s) => s.kind === 'unknown')) {
     failures += 1;
-    console.error(`FAIL ${server.label}: \`${server.command}\` is a server script this check does not know how to start`);
+    console.error(
+      `FAIL ${server.label}: \`${server.command}\` is a server script this check does not know how to start`,
+    );
   }
   const docs = checkDocs();
   if (docs.problems.length) {

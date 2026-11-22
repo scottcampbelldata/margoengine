@@ -124,7 +124,10 @@ export const TARGETS = {
     mathTests,
     {
       vector2: equiv(ZERO_VECTOR, [115, '1', '2']).concat(
-        equiv('a is 0 here, and the wrapped value 0 + 2 pi is returned as 0 by the next line, so the same 0 comes out', [123, '>=', '>']),
+        equiv(
+          'a is 0 here, and the wrapped value 0 + 2 pi is returned as 0 by the next line, so the same 0 comes out',
+          [123, '>=', '>'],
+        ),
       ),
       vector3: equiv(ZERO_VECTOR, [157, '1', '2']).concat(
         equiv(AT_BOUNDARY + ' (lengthSq equal to 1e-290: sqrt and hypot agree on 1e-145)', [150, '>', '>=']),
@@ -134,8 +137,16 @@ export const TARGETS = {
         equiv(AT_BOUNDARY + ' (lengthSq equal to 1e-290: sqrt and hypot agree)', [102, '>', '>=']),
       ),
       quaternion: equiv(ZERO_VECTOR, [148, '1', '2']).concat(
-        equiv(AT_BOUNDARY + ' (1 + dot equal to 1e-8 exactly: the half turn and the half-way vector are the same rotation there)', [102, '<', '<=']),
-        equiv(AT_BOUNDARY + ' (sin squared equal to Number.EPSILON: the straight line and the arc differ by less than 1e-16)', [208, '<=', '<']),
+        equiv(
+          AT_BOUNDARY +
+            ' (1 + dot equal to 1e-8 exactly: the half turn and the half-way vector are the same rotation there)',
+          [102, '<', '<='],
+        ),
+        equiv(
+          AT_BOUNDARY +
+            ' (sin squared equal to Number.EPSILON: the straight line and the arc differ by less than 1e-16)',
+          [208, '<=', '<'],
+        ),
       ),
       matrix3: equiv(OUT_OF_RANGE, [86, '<', '<='], [86, '9', '10'], [157, '<', '<='], [157, '9', '10']),
       matrix4: equiv(
@@ -182,10 +193,18 @@ export const TARGETS = {
         [126, '<=', '<'],
         [127, '<=', '<'],
       ).concat(
-        equiv('at equality the scale factor, or the step, is exactly 1 or 0, so the result is the same either way', [90, '>', '>='], [115, '>', '>=']),
+        equiv(
+          'at equality the scale factor, or the step, is exactly 1 or 0, so the result is the same either way',
+          [90, '>', '>='],
+          [115, '>', '>='],
+        ),
       ),
       plane: equiv(ZERO_VECTOR, [70, '1', '2'], [78, '1', '2'], [95, '1', '2']).concat(
-        equiv('a determinant of exactly 0 gives a zero cofactor normal, which negating leaves as zero', [117, '<', '<=']),
+        equiv('a determinant of exactly 0 gives a zero cofactor normal, which negating leaves as zero', [
+          117,
+          '<',
+          '<=',
+        ]),
       ),
       frustum: equiv(
         'the plane normal component is non-zero inside this branch, so the changed comparison is the same test as before',
@@ -198,8 +217,17 @@ export const TARGETS = {
         [142, '<', '<='],
         [142, '3', '4'],
       ).concat(
-        equiv('assigning an equal value, or swapping two equal values, changes nothing', [155, '>', '>='], [160, '>', '>='], [161, '>', '>='], [162, '<', '<=']),
-        equiv('u above 1 with v at least 0 gives u + v above 1, which the next line rejects, and v below 0 is rejected too', [193, '1', '2']),
+        equiv(
+          'assigning an equal value, or swapping two equal values, changes nothing',
+          [155, '>', '>='],
+          [160, '>', '>='],
+          [161, '>', '>='],
+          [162, '<', '<='],
+        ),
+        equiv(
+          'u above 1 with v at least 0 gives u + v above 1, which the next line rejects, and v below 0 is rejected too',
+          [193, '1', '2'],
+        ),
       ),
       line3: equiv('equal clamp bounds return the same value from either side', [6, '<', '<='], [6, '>', '>=']).concat(
         equiv(
@@ -209,7 +237,8 @@ export const TARGETS = {
           [109, '0', '1'],
         ),
         equiv(
-          AT_BOUNDARY + ' (a parallel pair on the exact limit, or t exactly 0 or 1, where the re-clamped s equals the first s)',
+          AT_BOUNDARY +
+            ' (a parallel pair on the exact limit, or t exactly 0 or 1, where the re-clamped s equals the first s)',
           [117, '>', '>='],
           [119, '<', '<='],
           [122, '>', '>='],
@@ -238,7 +267,8 @@ export const TARGETS = {
           [191, '0', '1'],
         ),
         equiv(
-          AT_BOUNDARY + ' (a projection exactly on an edge belongs to that edge in both branches, and tied edges share the nearest vertex)',
+          AT_BOUNDARY +
+            ' (a projection exactly on an edge belongs to that edge in both branches, and tied edges share the nearest vertex)',
           [176, '>', '>='],
           [179, '>=', '>'],
           [179, '<=', '<'],
@@ -253,7 +283,11 @@ export const TARGETS = {
           [249, '1', '2'],
         ),
       ),
-      mathutils: equiv('at x equal to min or max the formula already gives exactly 0 or 1', [24, '>=', '>'], [31, '>=', '>']).concat(
+      mathutils: equiv(
+        'at x equal to min or max the formula already gives exactly 0 or 1',
+        [24, '>=', '>'],
+        [31, '>=', '>'],
+      ).concat(
         equiv('0x9e3779b9 is odd, so OR-ing it with 1 leaves the start state unchanged', [89, '0', '1']),
         equiv(
           'the second correction only runs for 0 and Infinity, where p / 2, p / 3 and p are the same value, because Math.log2 never rounds across a power of two (mathutils-log2.test.js pins it at every power and 4096 steps either side)',
@@ -321,18 +355,33 @@ export const TARGETS = {
         ),
         equiv('at end equal to due, due is set to the value it already holds', [263, '<', '<=']),
         equiv('when the re-arm time equals the entry time both branches return the same number', [286, '>', '>=']),
-        equiv('path[length + 1] and path[length] are undefined, which matches no transition from a state name, so the scan finds the same transition', [290, '-', '+']),
+        equiv(
+          'path[length + 1] and path[length] are undefined, which matches no transition from a state name, so the scan finds the same transition',
+          [290, '-', '+'],
+        ),
         equiv('the only caller tests index < 0, so -1 and -2 mean the same', [300, '1', '2']),
       ),
-      inspect: equiv('an AbortSignal fires abort once, and dispose removes the listener, so once changes nothing', [74, 'true', 'false']),
-      invoke: equiv('an AbortSignal fires abort once, and dispose or settling removes the listener, so once changes nothing', [75, 'true', 'false'], [120, 'true', 'false']).concat(
+      inspect: equiv('an AbortSignal fires abort once, and dispose removes the listener, so once changes nothing', [
+        74,
+        'true',
+        'false',
+      ]),
+      invoke: equiv(
+        'an AbortSignal fires abort once, and dispose or settling removes the listener, so once changes nothing',
+        [75, 'true', 'false'],
+        [120, 'true', 'false'],
+      ).concat(
         equiv(
           'a run leaves live only through cancel, which also aborts it, and is aborted only there, so both tests are true together or false together',
           [124, '||', '&&'],
           [129, '||', '&&'],
         ),
       ),
-      parallel: equiv('the loop ends only with an empty queue, so clearing it again changes nothing', [202, 'true', 'false']),
+      parallel: equiv('the loop ends only with an empty queue, so clearing it again changes nothing', [
+        202,
+        'true',
+        'false',
+      ]),
       scxml: equiv(
         'regionXML is called with depth 0 from the root and with depth + level + 2 from write, which has already refused depth + level + 3 above 128, so depth is at most 127 here and this check never fires (scxml-export-pins.test.js pins the 126 and 62 level limits)',
         [249, '>', '>='],
@@ -573,7 +622,10 @@ export async function runTests(cwd, files, { timeoutMs = 240_000, parallel = fal
         // `node --test` runs each file in a child process of its own: end the whole tree, or a child keeps the folder busy.
         if (child.exitCode !== null) done(value);
         else if (process.platform === 'win32')
-          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('close', () => done(value));
+          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on(
+            'close',
+            () => done(value),
+          );
         else {
           child.kill('SIGKILL');
           done(value);
@@ -588,7 +640,8 @@ export async function runTests(cwd, files, { timeoutMs = 240_000, parallel = fal
       child.on('error', () => finish({ passed: false, reason: 'spawn' }));
       child.on('close', (code) => finish(code === 0 ? { passed: true } : { passed: false, reason: `exit ${code}` }));
     });
-    if (!outcome.passed) return { ...outcome, file: group.length === 1 ? group[0] : 'one of ' + group.length + ' files' };
+    if (!outcome.passed)
+      return { ...outcome, file: group.length === 1 ? group[0] : 'one of ' + group.length + ' files' };
   }
   return { passed: true };
 }
@@ -721,7 +774,12 @@ async function main(argv) {
     });
     const s = scoreOf(results);
     const equivalent = results.filter((r) => r.status === 'equivalent').length;
-    report[targetName] = { generated: all, ...s, equivalent, survivors: results.filter((r) => r.status === 'survived') };
+    report[targetName] = {
+      generated: all,
+      ...s,
+      equivalent,
+      survivors: results.filter((r) => r.status === 'survived'),
+    };
     if (!argv.includes('--list'))
       console.log(
         `${name}/${targetName}: killed ${s.killed} / ${s.total} = ${(s.score * 100).toFixed(1)} %, survivors ${s.survived}, equivalent ${equivalent}`,

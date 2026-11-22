@@ -25,9 +25,17 @@ function serverCommand(app, script, port) {
     command = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).scripts[script],
     page = `http://127.0.0.1:${port}/`;
   if (/^next (dev|start)\b/.test(command))
-    return { command: process.execPath, args: [next, command.split(' ')[1], '--hostname', '127.0.0.1', '--port', String(port)], page };
+    return {
+      command: process.execPath,
+      args: [next, command.split(' ')[1], '--hostname', '127.0.0.1', '--port', String(port)],
+      page,
+    };
   if (/^vite( preview)?$/.test(command))
-    return { command: process.execPath, args: [vite, ...command.split(' ').slice(1), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], page };
+    return {
+      command: process.execPath,
+      args: [vite, ...command.split(' ').slice(1), '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
+      page,
+    };
   throw new Error(`template script ${script} runs \`${command}\`, which this check does not know how to start`);
 }
 /**
@@ -45,9 +53,11 @@ function viteOutputProblems(name, app) {
   for (const file of files.filter((f) => /\.m?js$/.test(f))) {
     const size = statSync(join(dist, file)).size;
     const limit = WARN_LIMITS[name] ?? 500_000;
-    if (size > limit) problems.push(`${name}: build emitted ${file} of ${size} bytes, over its ${limit / 1000} kB warning size`);
+    if (size > limit)
+      problems.push(`${name}: build emitted ${file} of ${size} bytes, over its ${limit / 1000} kB warning size`);
   }
-  if (name === 'game' && !files.some((f) => f.endsWith('.wasm'))) problems.push('game: build emitted no .wasm asset (Rapier)');
+  if (name === 'game' && !files.some((f) => f.endsWith('.wasm')))
+    problems.push('game: build emitted no .wasm asset (Rapier)');
   return problems;
 }
 const root = resolve(import.meta.dirname, '..'),
@@ -101,10 +111,16 @@ try {
     }
     const built = await run('npm', ['run', 'build'], { cwd: app, env, seconds: 400 });
     writeFileSync(join(results, `${name}-build.log`), built);
-    for (const line of built.split(/\r?\n/)) if (BAD_LINE.test(line)) serverProblems.push(`${name}: build output: ${line.trim().slice(0, 240)}`);
+    for (const line of built.split(/\r?\n/))
+      if (BAD_LINE.test(line)) serverProblems.push(`${name}: build output: ${line.trim().slice(0, 240)}`);
     serverProblems.push(...viteOutputProblems(name, app));
     for (const script of serverScripts(manifest)) {
-      const { problems } = await probe({ ...serverCommand(app, script, await freePort()), cwd: app, env: { ...humanEnv(env), NEXT_TELEMETRY_DISABLED: '1' }, limitMs: 150_000 });
+      const { problems } = await probe({
+        ...serverCommand(app, script, await freePort()),
+        cwd: app,
+        env: { ...humanEnv(env), NEXT_TELEMETRY_DISABLED: '1' },
+        limitMs: 150_000,
+      });
       for (const problem of problems) serverProblems.push(`${name} npm run ${script}: ${problem}`);
       console.log(`${name}: npm run ${script} ${problems.length ? 'FAILED' : 'started clean'}`);
     }
@@ -117,8 +133,12 @@ try {
 } finally {
   registry.close();
   if (cleanup)
-    spawn(process.execPath, ['-e', `require('node:fs').rmSync(${JSON.stringify(work)}, { recursive: true, force: true, maxRetries: 5 })`], {
-      detached: true,
-      stdio: 'ignore',
-    }).unref();
+    spawn(
+      process.execPath,
+      ['-e', `require('node:fs').rmSync(${JSON.stringify(work)}, { recursive: true, force: true, maxRetries: 5 })`],
+      {
+        detached: true,
+        stdio: 'ignore',
+      },
+    ).unref();
 }

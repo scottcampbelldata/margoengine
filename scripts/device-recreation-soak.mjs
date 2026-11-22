@@ -69,15 +69,25 @@ await runSuite(
       engine.onError = (error) => errors.push(String(error?.message ?? error));
       Shadows.attach(engine, { resolution: 256, cascades: 2, distance: 20 });
       const lod = LODSystem.attach(engine),
-        ground = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#c8c8c8' }));
+        ground = engine
+          .createMesh()
+          .setGeometry(box())
+          .setMaterial(new PbrMaterial({ color: '#c8c8c8' }));
       ground.setScale([6, 0.1, 6]).setPosition([0, -0.05, 0]);
-      const anchor = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#d04030' }));
+      const anchor = engine
+        .createMesh()
+        .setGeometry(box())
+        .setMaterial(new PbrMaterial({ color: '#d04030' }));
       anchor.setPosition([0, 0.8, 0]);
       lod.add(anchor, [
         { object: anchor, distance: 0 },
         { object: box(), distance: 30 },
       ]);
-      engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#3060d0' })).setPosition([1.2, 0.5, -0.6]);
+      engine
+        .createMesh()
+        .setGeometry(box())
+        .setMaterial(new PbrMaterial({ color: '#3060d0' }))
+        .setPosition([1.2, 0.5, -0.6]);
       const shot = () => {
         engine.render({ delta: 1 / 60 });
         const c = new OffscreenCanvas(size, size).getContext('2d');
@@ -109,14 +119,21 @@ await runSuite(
         if (cycle === 1 || cycle === cycles) {
           const image = await settle(),
             { buffers, textures, kinds } = live.get(engine.gpu);
-          const named = [...kinds].filter(([, n]) => n).map(([kind, n]) => `${n} ${kind}`).sort();
+          const named = [...kinds]
+            .filter(([, n]) => n)
+            .map(([kind, n]) => `${n} ${kind}`)
+            .sort();
           states.push({ cycle, buffers, textures, kinds: named, image: Array.from(image) });
         }
       }
       const [first, last] = states;
       let differ = 0;
       for (let i = 0; i < first.image.length; i += 4)
-        if (first.image[i] !== last.image[i] || first.image[i + 1] !== last.image[i + 1] || first.image[i + 2] !== last.image[i + 2])
+        if (
+          first.image[i] !== last.image[i] ||
+          first.image[i + 1] !== last.image[i + 1] ||
+          first.image[i + 2] !== last.image[i + 2]
+        )
           differ++;
       const corner = first.image.slice(0, 3);
       let lit = 0;

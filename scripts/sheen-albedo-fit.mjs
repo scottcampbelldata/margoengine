@@ -24,7 +24,6 @@ import { gzipSync } from 'node:zlib';
 import { sheenAlbedoGrid, sheenAlbedoTable, sheenAlbedoWGSL } from '../packages/shared/sheen.js';
 import { wgslModule } from '../tests/support/wgsl-eval.js';
 
-
 const ROUGHNESS_FLOOR = 1e-4; // materialLobesSheenBRDF uses max(roughness, 0.0001)
 
 /**

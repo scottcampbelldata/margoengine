@@ -47,7 +47,8 @@ try {
   /** Floor points (normal up) around the centre, out to `reach` in x and z. */
   const floor = (reach) => {
     const points = [];
-    for (let i = -8; i <= 8; i++) for (let k = -8; k <= 8; k++) points.push([(i / 8) * reach, 0, (k / 8) * reach, 0, 1, 0]);
+    for (let i = -8; i <= 8; i++)
+      for (let k = -8; k <= 8; k++) points.push([(i / 8) * reach, 0, (k / 8) * reach, 0, 1, 0]);
     return points;
   };
   async function shade(lights, roughness, points, view = eye) {
@@ -57,41 +58,56 @@ try {
   }
   const results = [];
   for (const degrees of [0, 45, 70, 85])
-  for (const radius of [0.155, 0.02])
-    for (const ratio of [0.25, 0.5, 1, 1.5, 2, 4, 10, 40])
-      for (const roughness of [0, 0.1, 0.32, 0.6]) {
-        const d = radius * ratio,
-          c = Math.cos((degrees * Math.PI) / 180),
-          s = Math.sin((degrees * Math.PI) / 180),
-          light = { position: [-d * s, d * c, 0], range: 0, intensity: INTENSITY, radius },
-          view = [1000 * s, 1000 * c, 0],
-          reach = Math.max(radius, d) * 2,
-          points = floor(reach).map((p) => [p[0] / c, 0, p[2], 0, 1, 0]),
-          values = await shade([light], roughness, points, view),
-          fresnel = copper.map((f) => f + (1 - f) * (1 - c) ** 5),
-          bound = fresnel.map((f) => (f * INTENSITY) / (Math.PI * radius * radius));
-        let worst = 0;
-        values.forEach((rgb) => rgb.forEach((v, k) => (worst = Math.max(worst, v / bound[k]))));
-        const a = Math.max(roughness, 0.045) ** 2,
-          a2 = a * a,
-          spread = radius / (2 * d),
-          ax = Math.max(Math.min(a + spread, 1), spread),
-          ay = Math.max(Math.min(a + spread / c, 1), spread / c),
-          g = c / Math.sqrt(a2 + (1 - a2) * c * c),
-          centre = values[(points.length - 1) / 2],
-          expected = fresnel.map((f) => (g * f * INTENSITY) / (4 * Math.PI * ax * ay * c * Math.max(d * d, 2 ** -12))),
-          error = Math.max(...centre.map((v, k) => Math.abs(v / expected[k] - 1))),
-          row = { degrees, radius, distance: +d.toFixed(5), roughness, peakOverBound: +worst.toFixed(5), centreError: error };
-        if (ratio === 1 && roughness === 0 && degrees === 0) {
-          const pointPeak = await shade([{ ...light, radius: 0 }], roughness, points, view);
-          row.pointLightOverBound = +Math.max(...pointPeak.flatMap((rgb) => rgb.map((v, c) => v / bound[c]))).toFixed(1);
-          check(`r ${radius}: a point light at d = r exceeds the sphere's bound (what the radius fixes)`, row.pointLightOverBound > 10, row);
+    for (const radius of [0.155, 0.02])
+      for (const ratio of [0.25, 0.5, 1, 1.5, 2, 4, 10, 40])
+        for (const roughness of [0, 0.1, 0.32, 0.6]) {
+          const d = radius * ratio,
+            c = Math.cos((degrees * Math.PI) / 180),
+            s = Math.sin((degrees * Math.PI) / 180),
+            light = { position: [-d * s, d * c, 0], range: 0, intensity: INTENSITY, radius },
+            view = [1000 * s, 1000 * c, 0],
+            reach = Math.max(radius, d) * 2,
+            points = floor(reach).map((p) => [p[0] / c, 0, p[2], 0, 1, 0]),
+            values = await shade([light], roughness, points, view),
+            fresnel = copper.map((f) => f + (1 - f) * (1 - c) ** 5),
+            bound = fresnel.map((f) => (f * INTENSITY) / (Math.PI * radius * radius));
+          let worst = 0;
+          values.forEach((rgb) => rgb.forEach((v, k) => (worst = Math.max(worst, v / bound[k]))));
+          const a = Math.max(roughness, 0.045) ** 2,
+            a2 = a * a,
+            spread = radius / (2 * d),
+            ax = Math.max(Math.min(a + spread, 1), spread),
+            ay = Math.max(Math.min(a + spread / c, 1), spread / c),
+            g = c / Math.sqrt(a2 + (1 - a2) * c * c),
+            centre = values[(points.length - 1) / 2],
+            expected = fresnel.map(
+              (f) => (g * f * INTENSITY) / (4 * Math.PI * ax * ay * c * Math.max(d * d, 2 ** -12)),
+            ),
+            error = Math.max(...centre.map((v, k) => Math.abs(v / expected[k] - 1))),
+            row = {
+              degrees,
+              radius,
+              distance: +d.toFixed(5),
+              roughness,
+              peakOverBound: +worst.toFixed(5),
+              centreError: error,
+            };
+          if (ratio === 1 && roughness === 0 && degrees === 0) {
+            const pointPeak = await shade([{ ...light, radius: 0 }], roughness, points, view);
+            row.pointLightOverBound = +Math.max(...pointPeak.flatMap((rgb) => rgb.map((v, c) => v / bound[c]))).toFixed(
+              1,
+            );
+            check(
+              `r ${radius}: a point light at d = r exceeds the sphere's bound (what the radius fixes)`,
+              row.pointLightOverBound > 10,
+              row,
+            );
+          }
+          results.push(row);
+          const label = `${degrees} deg, r ${radius} d ${row.distance} roughness ${roughness}`;
+          check(`${label}: peak <= F I / (pi r^2)`, worst <= 1 + ROUNDING, row);
+          check(`${label}: centre = G F I / (4 pi alpha_x alpha_y (n.v) d^2)`, error <= 1e-3, row);
         }
-        results.push(row);
-        const label = `${degrees} deg, r ${radius} d ${row.distance} roughness ${roughness}`;
-        check(`${label}: peak <= F I / (pi r^2)`, worst <= 1 + ROUNDING, row);
-        check(`${label}: centre = G F I / (4 pi alpha_x alpha_y (n.v) d^2)`, error <= 1e-3, row);
-      }
   // Diffuse (KB-FIRE-WALLHOT1): a white Lambert surface with no specular (F0 = F90 = 0), radiance = I E / pi, E the
   // sphere's irradiance per unit intensity (packages/clustered/test/sphere-irradiance-reference.js: the cap form factor
   // of Snyder 1996, horizon included, the hemisphere inside the sphere). Planes through floor points, tilted from 0 to
@@ -144,11 +160,19 @@ try {
         await call('scene', { meshes: ['floor'], local: false, points: [{ ...light, radius: 0 }] });
         await call('render', 1);
         row.pointLightOverBound = +((await call('probe', points.slice(0, 1), surface))[0][0] / bound).toFixed(1);
-        check(`diffuse r ${radius}: a point light at a tenth of the radius exceeds the sphere's bound`, row.pointLightOverBound > 1, row);
+        check(
+          `diffuse r ${radius}: a point light at a tenth of the radius exceeds the sphere's bound`,
+          row.pointLightOverBound > 1,
+          row,
+        );
       }
       diffuse.push(row);
       check(`diffuse r ${radius} d ${row.distance}: E <= pi L = I / r^2`, worst <= 1 + ROUNDING, row);
-      check(`diffuse r ${radius} d ${row.distance}: E = the sphere's cap form factor, horizon included`, error <= 1e-4, row);
+      check(
+        `diffuse r ${radius} d ${row.distance}: E = the sphere's cap form factor, horizon included`,
+        error <= 1e-4,
+        row,
+      );
     }
   // Radius 0 is a point light, bit for bit: alone, and in a list where another light has a radius (the sized shader
   // and 20-float records), with that light out of range of the probed points.
@@ -180,43 +204,51 @@ try {
   const compiled = await call('compile');
   check('WGSL compiles without errors or warnings', !compiled.core.length && !compiled.probe.length, compiled);
   // VolumetricFog's froxel shader over the sized records, on its own engine (Tonemap capture, Clustered).
-  const fog = await page.evaluate(async (lights) => {
-    const { EngineKernel } = await import('/packages/core/dist/index.js'),
-      { engineRuntime } = await import('/packages/core/dist/extension.js'),
-      { Tonemap } = await import('/packages/tonemap/dist/index.js'),
-      { VolumetricFog } = await import('/packages/environment/dist/volumetric.js'),
-      { Clustered } = await import('/packages/clustered/dist/index.js');
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width:64px;height:64px';
-    document.body.append(canvas);
-    const instance = await EngineKernel.create(canvas, { backend: 'webgpu', camera: { position: [0, 2, 6], target: [0, 1, 0] } }),
-      gpu = engineRuntime(instance).gpu,
-      create = gpu.createShaderModule.bind(gpu),
-      codes = [];
-    instance.stop();
-    gpu.createShaderModule = (descriptor) => {
-      if (descriptor.code.includes('fn inject')) codes.push(descriptor.code);
-      return create(descriptor);
-    };
-    gpu.pushErrorScope('validation');
-    Tonemap.attach(instance);
-    const clustered = Clustered.attach(instance);
-    clustered.setLights(lights);
-    VolumetricFog.attach(instance, { lights: clustered });
-    instance.render();
-    await gpu.queue.onSubmittedWorkDone();
-    const validation = await gpu.popErrorScope(),
-      module = codes.length ? gpu.createShaderModule({ code: codes[0] }) : undefined,
-      messages = module ? (await module.getCompilationInfo()).messages.filter((m) => m.type === 'error') : [];
-    instance.dispose();
-    canvas.remove();
-    return {
-      modules: codes.length,
-      sized: codes.some((code) => code.includes('params:vec4f,size:vec4f}')),
-      validation: validation?.message ?? null,
-      errors: messages.map((m) => m.message),
-    };
-  }, [{ ...plain, position: [0, 1.5, 0], radius: 0.2 }, plain]).catch((error) => ({ error: String(error) }));
+  const fog = await page
+    .evaluate(
+      async (lights) => {
+        const { EngineKernel } = await import('/packages/core/dist/index.js'),
+          { engineRuntime } = await import('/packages/core/dist/extension.js'),
+          { Tonemap } = await import('/packages/tonemap/dist/index.js'),
+          { VolumetricFog } = await import('/packages/environment/dist/volumetric.js'),
+          { Clustered } = await import('/packages/clustered/dist/index.js');
+        const canvas = document.createElement('canvas');
+        canvas.style.cssText = 'width:64px;height:64px';
+        document.body.append(canvas);
+        const instance = await EngineKernel.create(canvas, {
+            backend: 'webgpu',
+            camera: { position: [0, 2, 6], target: [0, 1, 0] },
+          }),
+          gpu = engineRuntime(instance).gpu,
+          create = gpu.createShaderModule.bind(gpu),
+          codes = [];
+        instance.stop();
+        gpu.createShaderModule = (descriptor) => {
+          if (descriptor.code.includes('fn inject')) codes.push(descriptor.code);
+          return create(descriptor);
+        };
+        gpu.pushErrorScope('validation');
+        Tonemap.attach(instance);
+        const clustered = Clustered.attach(instance);
+        clustered.setLights(lights);
+        VolumetricFog.attach(instance, { lights: clustered });
+        instance.render();
+        await gpu.queue.onSubmittedWorkDone();
+        const validation = await gpu.popErrorScope(),
+          module = codes.length ? gpu.createShaderModule({ code: codes[0] }) : undefined,
+          messages = module ? (await module.getCompilationInfo()).messages.filter((m) => m.type === 'error') : [];
+        instance.dispose();
+        canvas.remove();
+        return {
+          modules: codes.length,
+          sized: codes.some((code) => code.includes('params:vec4f,size:vec4f}')),
+          validation: validation?.message ?? null,
+          errors: messages.map((m) => m.message),
+        };
+      },
+      [{ ...plain, position: [0, 1.5, 0], radius: 0.2 }, plain],
+    )
+    .catch((error) => ({ error: String(error) }));
   check(
     'VolumetricFog builds and runs over the sized light records',
     fog.modules > 0 && fog.sized && !fog.validation && !fog.errors?.length && !fog.error,
@@ -227,10 +259,20 @@ try {
   check('no GPU validation or engine errors', fixtureErrors.length === 0, { fixtureErrors });
   const worst = results.reduce((w, r) => Math.max(w, r.peakOverBound), 0),
     report = `${folder}/gpu${compatRun() ? '-compat' : ''}.json`;
-  await writeFile(report, JSON.stringify({ hardware: browser.hardware, worst, results, diffuse, checks, failures }, null, 2) + '\n');
+  await writeFile(
+    report,
+    JSON.stringify({ hardware: browser.hardware, worst, results, diffuse, checks, failures }, null, 2) + '\n',
+  );
   console.log(
     JSON.stringify(
-      { hardware: browser.hardware.webgpu, worst, pointLight: results.filter((r) => r.pointLightOverBound), diffuse, failures, report },
+      {
+        hardware: browser.hardware.webgpu,
+        worst,
+        pointLight: results.filter((r) => r.pointLightOverBound),
+        diffuse,
+        failures,
+        report,
+      },
       null,
       2,
     ),

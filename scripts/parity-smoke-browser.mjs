@@ -27,7 +27,10 @@ const engines = o.engines.split(',');
 if (o.standard !== undefined && !Object.hasOwn(STANDARD, o.standard))
   throw new RangeError(`Unknown standard suite ${o.standard}`);
 const external = externalEngines(resolve(o['engine-bench']));
-const known = o.standard === undefined ? ['margo', 'three-webgpu-parity', 'three-webgl-parity'] : ['margo', ...Object.keys(external)];
+const known =
+  o.standard === undefined
+    ? ['margo', 'three-webgpu-parity', 'three-webgl-parity']
+    : ['margo', ...Object.keys(external)];
 if (engines.some((e) => !known.includes(e))) throw new RangeError('Unknown smoke engine');
 const filters = o.cases?.split(',');
 const cases = (o.standard === undefined ? parityCases(SCENES) : STANDARD[o.standard]).filter(

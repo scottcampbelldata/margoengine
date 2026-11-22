@@ -48,8 +48,12 @@ if (process.argv.includes('--capture-reference')) {
       copyFileSync(join(candidate, 'mitsuba-' + mode + suffix), join(out, 'mitsuba-' + mode + suffix));
 }
 const decomposition = existsSync(decompositionPath) ? JSON.parse(readFileSync(decompositionPath)) : undefined;
-assert.ok(!measureDecomposition || !decomposition, '--measure-decomposition cannot replace an established decomposition');
-if (decompose && !measureDecomposition) assert.ok(decomposition, 'Record the decomposition with --measure-decomposition');
+assert.ok(
+  !measureDecomposition || !decomposition,
+  '--measure-decomposition cannot replace an established decomposition',
+);
+if (decompose && !measureDecomposition)
+  assert.ok(decomposition, 'Record the decomposition with --measure-decomposition');
 if (process.argv.includes('--capture-decomposition')) {
   // CUDA Mitsuba; validated against the frozen hashes before any file is replaced.
   const candidate = join(out, `decomposition-${Date.now()}-${process.pid}`);
@@ -96,7 +100,13 @@ try {
   }
   let split;
   if (decompose) {
-    const frozen = readPathReference(out, 'mitsuba-direct', settings.width, settings.height, baseline?.rows.direct).image;
+    const frozen = readPathReference(
+      out,
+      'mitsuba-direct',
+      settings.width,
+      settings.height,
+      baseline?.rows.direct,
+    ).image;
     split = { frozen: { ...rows.direct.metrics, ...edgeSplit(actual, frozen, frozen) } };
     for (const name of decompositionNames) {
       const reference = readPathReference(

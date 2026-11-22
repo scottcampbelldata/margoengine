@@ -37,7 +37,8 @@ export function foldersInNoProject(root) {
     );
 }
 
-const RUNTIME_EXPORT = /^export (?:declare )?(?:abstract )?(?:async )?(?:function|class|const|let|var|enum)\s+([\w$]+)/gm;
+const RUNTIME_EXPORT =
+  /^export (?:declare )?(?:abstract )?(?:async )?(?:function|class|const|let|var|enum)\s+([\w$]+)/gm;
 
 /**
  * Runtime exports that a package's api/<id>.api.md declares but its docs/catalog.json entry does not list.

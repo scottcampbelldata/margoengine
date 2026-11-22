@@ -85,7 +85,10 @@ struct In {position:vec4f,normal:vec4f,j0:vec4u,j1:vec4u,w0:vec4f,w1:vec4f}
         words.set(bake.joints.subarray(v * 8, v * 8 + 8), v * 24 + 8);
         floats.set(bake.weights.subarray(v * 8, v * 8 + 8), v * 24 + 16);
       }
-      const vertices = device.createBuffer({ size: input.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }),
+      const vertices = device.createBuffer({
+          size: input.byteLength,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        }),
         size = count * members.length * 16,
         output = device.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
         staging = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
@@ -131,7 +134,8 @@ struct In {position:vec4f,normal:vec4f,j0:vec4u,j1:vec4u,w0:vec4f,w1:vec4f}
         for (let v = 0; v < count; v++)
           for (let c = 0; c < 3; c++) {
             const d = Math.abs(actual[(m * count + v) * 4 + c] - expected[v * 3 + c]);
-            if (d > 1e-5 && !failure) failure = { m, v, c, actual: actual[(m * count + v) * 4 + c], expected: expected[v * 3 + c] };
+            if (d > 1e-5 && !failure)
+              failure = { m, v, c, actual: actual[(m * count + v) * 4 + c], expected: expected[v * 3 + c] };
             worst = Math.max(worst, d);
             checks++;
           }
@@ -150,7 +154,12 @@ struct In {position:vec4f,normal:vec4f,j0:vec4u,j1:vec4u,w0:vec4f,w1:vec4f}
       const covered = (image, background) => {
         const out = new Uint8Array(256 * 256);
         for (let i = 0; i < out.length; i++)
-          out[i] = +(Math.abs(image[i * 4] - background[i * 4]) + Math.abs(image[i * 4 + 1] - background[i * 4 + 1]) + Math.abs(image[i * 4 + 2] - background[i * 4 + 2]) > 12);
+          out[i] = +(
+            Math.abs(image[i * 4] - background[i * 4]) +
+              Math.abs(image[i * 4 + 1] - background[i * 4 + 1]) +
+              Math.abs(image[i * 4 + 2] - background[i * 4 + 2]) >
+            12
+          );
         return out;
       };
       // Half way through 'bend', on a frame row: the crowd's pose there is the model's.
@@ -193,7 +202,10 @@ struct In {position:vec4f,normal:vec4f,j0:vec4u,j1:vec4u,w0:vec4f,w1:vec4f}
   assert.ok(result.checks >= 70 * 66 * 3, 'every vertex of every member checked');
   assert.ok(result.worst < 1e-5, `the GPU pose differs from poseBones by ${result.worst}`);
   assert.ok(result.drawn > 500, `the strip should cover pixels, drew ${result.drawn}`);
-  assert.ok(result.differ / result.drawn < 0.01, `crowd and model differ on ${result.differ} of ${result.drawn} pixels`);
+  assert.ok(
+    result.differ / result.drawn < 0.01,
+    `crowd and model differ on ${result.differ} of ${result.drawn} pixels`,
+  );
 } finally {
   await browser.close();
 }
