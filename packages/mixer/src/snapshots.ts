@@ -37,15 +37,32 @@ function validate(snapshot: MixerSnapshot): void {
     throw new TypeError('Mixer snapshot needs version 1 and a buses array; use captureSnapshot(mixer)');
   const names = new Set<string>();
   for (const bus of snapshot.buses) {
-    if (!bus || typeof bus.name !== 'string' || !bus.name || names.has(bus.name) ||
-      (bus.gain !== null && (typeof bus.gain !== 'number' || !Number.isFinite(bus.gain) || !Number.isFinite(Math.fround(dbToGain(bus.gain))))) ||
-      typeof bus.muted !== 'boolean' || typeof bus.solo !== 'boolean')
-      throw new TypeError('Mixer snapshot bus needs a unique name, finite gain (or null), muted and solo booleans; recapture the snapshot');
+    if (
+      !bus ||
+      typeof bus.name !== 'string' ||
+      !bus.name ||
+      names.has(bus.name) ||
+      (bus.gain !== null &&
+        (typeof bus.gain !== 'number' ||
+          !Number.isFinite(bus.gain) ||
+          !Number.isFinite(Math.fround(dbToGain(bus.gain))))) ||
+      typeof bus.muted !== 'boolean' ||
+      typeof bus.solo !== 'boolean'
+    )
+      throw new TypeError(
+        'Mixer snapshot bus needs a unique name, finite gain (or null), muted and solo booleans; recapture the snapshot',
+      );
     names.add(bus.name);
     if (!Array.isArray(bus.effects)) throw new TypeError('Snapshot effects needs an array; recapture the snapshot');
     for (const effect of bus.effects) {
-      if (!effect || typeof effect.kind !== 'string' || !effect.params || typeof effect.params !== 'object' ||
-        Array.isArray(effect.params) || Object.values(effect.params).some((value) => typeof value !== 'number' || !Number.isFinite(value)))
+      if (
+        !effect ||
+        typeof effect.kind !== 'string' ||
+        !effect.params ||
+        typeof effect.params !== 'object' ||
+        Array.isArray(effect.params) ||
+        Object.values(effect.params).some((value) => typeof value !== 'number' || !Number.isFinite(value))
+      )
         throw new TypeError('Snapshot effect needs kind and finite numeric params; recapture the snapshot');
     }
   }
@@ -56,8 +73,12 @@ export function captureSnapshot(mixer: Mixer): MixerSnapshot {
   const snapshot: MixerSnapshot = {
     version: 1,
     buses: mixer.buses().map((bus) => ({
-      name: bus.name, gain: bus.gain === -Infinity ? null : bus.gain, muted: bus.muted, solo: bus.solo,
-      effects: bus.effects.map((effect) => ({ kind: effect.kind,
+      name: bus.name,
+      gain: bus.gain === -Infinity ? null : bus.gain,
+      muted: bus.muted,
+      solo: bus.solo,
+      effects: bus.effects.map((effect) => ({
+        kind: effect.kind,
         params: Object.fromEntries(Object.entries(effect.params).map(([name, param]) => [name, param.value])),
       })),
     })),
@@ -85,9 +106,17 @@ export function recallSnapshot(mixer: Mixer, snapshot: MixerSnapshot, options: R
         if (!Object.hasOwn(live.params, name))
           throw new TypeError('Snapshot effect parameter is unknown; recapture the snapshot');
         const ranges: Record<string, [number, number]> = {
-          frequency: [10, mixer.context.sampleRate / 2], q: [-40, 1000], gain: [-40, 40],
-          wet: [0, 1], dry: [0, 1], feedback: [0, 0.95], threshold: [-100, 0], knee: [0, 40],
-          ratio: [1, 20], attack: [0, 1], release: [live.kind === 'limiter' ? 0.001 : 0, 1],
+          frequency: [10, mixer.context.sampleRate / 2],
+          q: [-40, 1000],
+          gain: [-40, 40],
+          wet: [0, 1],
+          dry: [0, 1],
+          feedback: [0, 0.95],
+          threshold: [-100, 0],
+          knee: [0, 40],
+          ratio: [1, 20],
+          attack: [0, 1],
+          release: [live.kind === 'limiter' ? 0.001 : 0, 1],
         };
         const range = ranges[name.replace(/\d+$/, '')];
         if (!range) throw new TypeError('Snapshot parameter is unsupported; recapture a mixer built-in effect');
@@ -106,26 +135,43 @@ export function recallSnapshot(mixer: Mixer, snapshot: MixerSnapshot, options: R
 
 /** Interpolate two snapshots in linear amplitude, with mute/solo choosing the nearer endpoint; t is 0..1. */
 export function blendSnapshots(a: MixerSnapshot, b: MixerSnapshot, t: number): MixerSnapshot {
-  validate(a); validate(b);
+  validate(a);
+  validate(b);
   bounded(t, 0, 1, 'Snapshot blend');
   const byName = new Map(b.buses.map((bus) => [bus.name, bus]));
   if (a.buses.length !== b.buses.length || a.buses.some((bus) => !byName.has(bus.name)))
     throw new TypeError('Snapshot blend needs the same bus names; capture both states from the same mixer layout');
-  return { version: 1, buses: a.buses.map((from) => {
-    const to = byName.get(from.name)!;
-    if (from.effects.length !== to.effects.length)
-      throw new TypeError('Snapshot blend needs matching effect chains; recapture both states from one layout');
-    const effects = from.effects.map((effect, i) => {
-      const other = to.effects[i];
-      if (effect.kind !== other.kind || Object.keys(effect.params).length !== Object.keys(other.params).length ||
-        Object.keys(effect.params).some((name) => !Object.hasOwn(other.params, name)))
-        throw new TypeError('Snapshot blend needs matching effect parameters; recapture both states from one layout');
-      return { kind: effect.kind, params: Object.fromEntries(Object.entries(effect.params).map(([name, value]) =>
-        [name, t === 0 ? value : t === 1 ? other.params[name] : value * (1 - t) + other.params[name] * t])) };
-    });
-    const gain = t === 0 ? from.gain : t === 1 ? to.gain : gainToDb(
-      dbToGain(from.gain ?? -Infinity) * (1 - t) + dbToGain(to.gain ?? -Infinity) * t,
-    );
-    return { ...(t < 0.5 ? from : to), effects, gain: gain === -Infinity ? null : gain };
-  }) };
+  return {
+    version: 1,
+    buses: a.buses.map((from) => {
+      const to = byName.get(from.name)!;
+      if (from.effects.length !== to.effects.length)
+        throw new TypeError('Snapshot blend needs matching effect chains; recapture both states from one layout');
+      const effects = from.effects.map((effect, i) => {
+        const other = to.effects[i];
+        if (
+          effect.kind !== other.kind ||
+          Object.keys(effect.params).length !== Object.keys(other.params).length ||
+          Object.keys(effect.params).some((name) => !Object.hasOwn(other.params, name))
+        )
+          throw new TypeError('Snapshot blend needs matching effect parameters; recapture both states from one layout');
+        return {
+          kind: effect.kind,
+          params: Object.fromEntries(
+            Object.entries(effect.params).map(([name, value]) => [
+              name,
+              t === 0 ? value : t === 1 ? other.params[name] : value * (1 - t) + other.params[name] * t,
+            ]),
+          ),
+        };
+      });
+      const gain =
+        t === 0
+          ? from.gain
+          : t === 1
+            ? to.gain
+            : gainToDb(dbToGain(from.gain ?? -Infinity) * (1 - t) + dbToGain(to.gain ?? -Infinity) * t);
+      return { ...(t < 0.5 ? from : to), effects, gain: gain === -Infinity ? null : gain };
+    }),
+  };
 }
