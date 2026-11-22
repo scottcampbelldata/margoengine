@@ -390,9 +390,10 @@ test('distance fog borrows scene depth, caches resources and rebinds after resiz
   old.destroy();
   depth.destroy();
   assert.ok(h.resources.every((r) => r.destroyed));
+  assert.doesNotThrow(() => new Sky({ fog: {} }));
   for (const fog of [
     null,
-    {},
+    { depth: null },
     { depth: 0 },
     { depth: () => undefined, density: -1 },
     { depth: () => undefined, density: NaN },
@@ -405,7 +406,7 @@ test('distance fog borrows scene depth, caches resources and rebinds after resiz
   assert.throws(() => new Sky({ fog: { depth: () => undefined, color: [1, NaN, 0] } }), /Fog color/);
 });
 
-test('fog over a 4x capture reads this frame: the capture samples, not its 1x depth, which resolves after the fog', () => {
+test('fog automatically reads the live samples of a 4x capture before its single-sample depth resolves', () => {
   const h = optionalGPU(),
     depth = Object.assign(
       h.engine.gpu.createTexture({
@@ -416,7 +417,7 @@ test('fog over a 4x capture reads this frame: the capture samples, not its 1x de
       { depthOrArrayLayers: 1 },
     ),
     samples = { label: 'this frame' },
-    sky = new Sky({ fog: { depth: () => depth, density: 0.008, start: 45 } });
+    sky = new Sky({ fog: { density: 0.008, start: 45 } });
   h.engine.use(sky);
   // What a capture (Bloom, a PostStack) leaves on the pass context between its begin() and its resolve.
   h.engine.use({

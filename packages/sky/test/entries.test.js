@@ -29,15 +29,16 @@ test('sky/bruneton precomputes its scattering tables and adds the lookup shader'
   assert.equal(typeof bruneton.create, 'function');
 });
 
-test('sky/fog validates its options and draws only when a scene depth is given', () => {
+test('sky/fog accepts the default scene depth and validates explicit options', () => {
   const depth = () => undefined;
   assert.doesNotThrow(() => fog.validate({ depth, density: 0.02, start: 10, falloff: 'exp2' }));
+  assert.doesNotThrow(() => fog.validate({ density: 0.01 }));
   for (const bad of [
     { depth, density: 2 },
     { depth, density: -1 },
     { depth, falloff: 'linear' },
     { depth, start: -1 },
-    { density: 0.01 },
+    { depth: null },
   ])
     assert.throws(() => fog.validate(bad), /Invalid sky fog/, JSON.stringify(bad));
   const h = trace(Sky, 'preetham-clouds-fog', { preetham, clouds, fog });
