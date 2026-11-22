@@ -13,9 +13,11 @@ test('UiRenderer sets up on a headless canvas with its default input and mirror'
 });
 
 test('a canvas with event listeners still gets input, and its listeners go on dispose', () => {
-  const added = [], removed = [],
+  const added = [],
+    removed = [],
     canvas = {
-      width: 64, height: 32,
+      width: 64,
+      height: 32,
       addEventListener: (type) => added.push(type),
       removeEventListener: (type) => removed.push(type),
       hasAttribute: () => false,

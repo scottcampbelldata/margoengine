@@ -10,18 +10,24 @@ test('a wrapping row moves children that do not fit onto new lines, separated by
     root = node({ direction: 'row', wrap: true, gap: [10, 6], align: 'start' }, kids);
   arrange(root, screen);
   // 3 x 100 + 2 gaps of 10 = 320 fits in 330; a fourth would need 430.
-  assert.deepEqual(kids.map((k) => [k.rect.x, k.rect.y]), [
-    [0, 0],
-    [110, 0],
-    [220, 0],
-    [0, 36], // the first line is 30 tall (its tallest child) plus the row gap of 6
-    [110, 36],
-  ]);
+  assert.deepEqual(
+    kids.map((k) => [k.rect.x, k.rect.y]),
+    [
+      [0, 0],
+      [110, 0],
+      [220, 0],
+      [0, 36], // the first line is 30 tall (its tallest child) plus the row gap of 6
+      [110, 36],
+    ],
+  );
   near(root.contentHeight, 30 + 6 + 40, 'content height is both lines and the gap');
   // Without wrap the same five children stay on one line and shrink to fit.
   const flat = [box(100, 20), box(100, 30), box(100, 20), box(100, 40), box(100, 20)];
   arrange(node({ direction: 'row', gap: 10 }, flat), screen);
-  assert.ok(flat.every((k) => k.rect.y > 0 && k.rect.width < 100), 'one shrunk line, centred across');
+  assert.ok(
+    flat.every((k) => k.rect.y > 0 && k.rect.width < 100),
+    'one shrunk line, centred across',
+  );
 });
 
 test('each line shares its own free space, justifies itself and aligns its children within its height', () => {
@@ -64,7 +70,10 @@ test('an auto-height panel measures its wrapped lines, and Labels reflow when th
   assert.ok(lines.size > 1, `the tags wrap onto ${lines.size} lines`);
   const bottom = Math.max(...tags.map((t) => t.rect.y + t.rect.height));
   near(bar.rect.height, bottom - bar.rect.y, 'the panel is as tall as its lines');
-  assert.ok(tags.every((t) => t.rect.x + t.rect.width <= bar.rect.x + 200 + 1e-6), 'no tag past the right edge');
+  assert.ok(
+    tags.every((t) => t.rect.x + t.rect.width <= bar.rect.x + 200 + 1e-6),
+    'no tag past the right edge',
+  );
   bar.setStyle({ width: 400 });
   ui.update(0);
   assert.equal(new Set(tags.map((t) => t.rect.y)).size, 1, 'wide enough: one line again');

@@ -74,9 +74,11 @@ export class VirtualList extends Panel {
       ...rest
     } = options;
     super({ background: 'surface', border: true, padding: 4, gap: 2, overflow: 'scroll', ...rest });
-    if (typeof row !== 'function') throw typeError('row is a function from an index to a label or a { label } entry', 'ui');
+    if (typeof row !== 'function')
+      throw typeError('row is a function from an index to a label or a { label } entry', 'ui');
     if (!(Number.isFinite(rowHeight) && rowHeight > 0)) throw rangeError('rowHeight must be a number above 0', 'ui');
-    if (!Number.isInteger(overscan) || overscan < 0) throw rangeError('overscan must be a whole number, 0 or more', 'ui');
+    if (!Number.isInteger(overscan) || overscan < 0)
+      throw rangeError('overscan must be a whole number, 0 or more', 'ui');
     this.role = 'listbox';
     this.source = row;
     this._rowHeight = rowHeight;
@@ -196,7 +198,8 @@ export class VirtualList extends Panel {
   private view(): number {
     const [top, , bottom] = edges(this.style.padding),
       height = this.style.height;
-    const box = this.rect.height > 0 ? this.rect.height : typeof height === 'number' ? height : (this.ui?.height ?? 720);
+    const box =
+      this.rect.height > 0 ? this.rect.height : typeof height === 'number' ? height : (this.ui?.height ?? 720);
     return Math.max(0, box - top - bottom);
   }
 
