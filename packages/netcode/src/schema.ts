@@ -380,11 +380,7 @@ interface Node {
 
 const step = (a: unknown, b: unknown, t: number): unknown => (t >= 1 ? b : a);
 const lerpOf = (mode: FieldInterpolation): ((a: number, b: number, t: number) => number) =>
-  mode === 'linear'
-    ? (a, b, t) => a + (b - a) * t
-    : mode === 'angle'
-      ? blendAngle
-      : (a, b, t) => (t >= 1 ? b : a);
+  mode === 'linear' ? (a, b, t) => a + (b - a) * t : mode === 'angle' ? blendAngle : (a, b, t) => (t >= 1 ? b : a);
 
 const number = (path: string, v: unknown): number => {
   if (typeof v !== 'number') throw new TypeError(`${path} must be a number, not ${v === null ? 'null' : typeof v}`);

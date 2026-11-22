@@ -200,7 +200,8 @@ export class RollbackRelay {
       r.need(length);
       const frame = first + i,
         bytes = data.subarray(r.at, (r.at += length));
-      if (frame > this.complete && frame <= this.complete + AHEAD && !inputs.has(frame)) inputs.set(frame, bytes.slice());
+      if (frame > this.complete && frame <= this.complete + AHEAD && !inputs.has(frame))
+        inputs.set(frame, bytes.slice());
     }
     r.end();
     this.advance();
@@ -247,7 +248,11 @@ export class RollbackRelay {
 
   private watch(connection: Connection): void {
     if (this.spectators.size >= this.maxSpectators)
-      return this.refuse(connection, CloseCode.full, `the relay holds ${this.maxSpectators} spectators (maxSpectators)`);
+      return this.refuse(
+        connection,
+        CloseCode.full,
+        `the relay holds ${this.maxSpectators} spectators (maxSpectators)`,
+      );
     if (this.base > 0)
       return this.refuse(connection, CloseCode.full, 'the session passed the history; raise history to watch it');
     const w = new Writer(32);
@@ -299,7 +304,10 @@ export interface RelayPeersOptions {
  * });
  * ```
  */
-export function relayPeers(link: Connection, { players, local, token = '' }: RelayPeersOptions): Map<number, Connection> {
+export function relayPeers(
+  link: Connection,
+  { players, local, token = '' }: RelayPeersOptions,
+): Map<number, Connection> {
   if (!link || typeof link.send !== 'function')
     throw new TypeError('relayPeers needs a connection to the relay; pass one');
   if (!players?.includes(local)) throw new TypeError(`relayPeers local player ${local} is not in players; add it`);

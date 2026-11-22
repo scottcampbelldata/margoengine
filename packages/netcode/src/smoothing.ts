@@ -261,7 +261,9 @@ export class CorrectionSmoother<State, Input = unknown> {
     this.last = now;
     this.largest = 0;
     if (this.offset !== undefined) this.offset = this.shrink(type, this.offset, ms, this.keep(0, ms));
-    return this.offset === undefined ? this.client.predicted : (this.add(type, this.client.predicted, this.offset) as State);
+    return this.offset === undefined
+      ? this.client.predicted
+      : (this.add(type, this.client.predicted, this.offset) as State);
   }
 
   /** Clears what is left to blend, so the next frame draws the exact prediction. */

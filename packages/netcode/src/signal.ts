@@ -268,7 +268,9 @@ export class SignalClient {
         if (message?.kind === 'joined' && Number.isInteger(message.id) && Array.isArray(message.peers))
           return resolve(new SignalClient(connection, message.id as number, message.peers as number[]));
         if (message?.kind === 'refused')
-          return reject(fault('failed', `Signal join refused: ${String(message.reason)}; check the room name and token`));
+          return reject(
+            fault('failed', `Signal join refused: ${String(message.reason)}; check the room name and token`),
+          );
         // Bytes that are not a signal reply close the link; the error must not escape into the transport.
         connection.close(CloseCode.protocol, 'not a signal reply');
         reject(fault('failed', 'Signal server sent something that is not a join reply; check the server version'));

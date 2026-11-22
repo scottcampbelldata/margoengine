@@ -181,7 +181,8 @@ export class AdaptiveDelay {
       return true;
     }
     this.addGap(gap);
-    const measured = this.sorted[Math.min(this.gapCount - 1, Math.ceil(this.quantile * this.gapCount) - 1)] - this.floor;
+    const measured =
+      this.sorted[Math.min(this.gapCount - 1, Math.ceil(this.quantile * this.gapCount) - 1)] - this.floor;
     this.target = this.clamp((this.gapCount < WARM ? Math.max(this.initial, measured) : measured) + this.margin);
     return true;
   }
@@ -193,7 +194,8 @@ export class AdaptiveDelay {
    * @throws RangeError for a time that is not finite.
    */
   renderTime(now: number): number {
-    if (!Number.isFinite(now)) throw new RangeError(`AdaptiveDelay.renderTime got ${now}; pass a finite time in seconds`);
+    if (!Number.isFinite(now))
+      throw new RangeError(`AdaptiveDelay.renderTime got ${now}; pass a finite time in seconds`);
     if (!this.transitCount) return Number.NaN;
     const wanted = now - this.floor - this.target;
     if (Number.isNaN(this.rendered)) {

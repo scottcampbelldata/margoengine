@@ -282,7 +282,10 @@ test('a player who joins and leaves within one tick leaves no ghost in the state
   const server = new GameServer(game, { now: () => 0 });
   const connection = { send() {}, close() {}, onmessage: null, onclose: null };
   server.accept(connection);
-  connection.onmessage(encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: game.schema.hash }), 'reliable');
+  connection.onmessage(
+    encodeEnvelope({ kind: 'hello', version: ENVELOPE_VERSION, schema: game.schema.hash }),
+    'reliable',
+  );
   connection.onclose(1000, 'gone');
   server.step();
   assert.deepEqual(server.players, []);

@@ -100,7 +100,8 @@ function plans(fields: FieldSpecs): { plans: Plan[]; floats: number } {
     }
     if (spec.type === 'time' && spec.clip !== undefined) {
       const other = list.find((p) => p.name === spec.clip);
-      if (other?.type !== 'step' || other.size !== 1) throw fault(plan.name, `needs clip '${spec.clip}' to be a step field`);
+      if (other?.type !== 'step' || other.size !== 1)
+        throw fault(plan.name, `needs clip '${spec.clip}' to be a step field`);
       plan.clip = other.offset;
     }
   });
@@ -145,10 +146,7 @@ export class FieldBuffer<const F extends FieldSpecs> {
    * @throws TypeError for a field that does not fit {@link FieldSpec}.
    * @throws RangeError for an option out of range.
    */
-  constructor(
-    fields: F,
-    { capacity = 32, maxPrediction = 0.25 }: { capacity?: number; maxPrediction?: number } = {},
-  ) {
+  constructor(fields: F, { capacity = 32, maxPrediction = 0.25 }: { capacity?: number; maxPrediction?: number } = {}) {
     if (!(maxPrediction >= 0 && maxPrediction <= 10))
       throw new RangeError(`FieldBuffer maxPrediction is ${maxPrediction}; pass 0 to 10 seconds`);
     const planned = plans(fields);
@@ -191,7 +189,9 @@ export class FieldBuffer<const F extends FieldSpecs> {
         continue;
       }
       if (plan.scalar ? typeof value !== 'number' : typeof value === 'number' || value.length !== plan.size)
-        throw new TypeError(`FieldBuffer field '${plan.name}' needs ${plan.scalar ? 'a number' : `${plan.size} numbers`}`);
+        throw new TypeError(
+          `FieldBuffer field '${plan.name}' needs ${plan.scalar ? 'a number' : `${plan.size} numbers`}`,
+        );
       for (let i = 0; i < plan.size; i++) {
         const number = plan.scalar ? (value as number) : (value as ArrayLike<number>)[i];
         if (!Number.isFinite(number)) throw new RangeError(`FieldBuffer field '${plan.name}' must be finite`);
@@ -241,7 +241,8 @@ export class FieldBuffer<const F extends FieldSpecs> {
           row[at] = this.time(plan, a, b, u, ahead);
           break;
         default:
-          for (let i = 0; i < plan.size; i++) row[at + i] = rows[a + at + i] + (rows[b + at + i] - rows[a + at + i]) * u;
+          for (let i = 0; i < plan.size; i++)
+            row[at + i] = rows[a + at + i] + (rows[b + at + i] - rows[a + at + i]) * u;
       }
     }
     const result = output as Record<string, number | Float64Array>;

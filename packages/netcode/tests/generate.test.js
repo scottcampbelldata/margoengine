@@ -129,7 +129,15 @@ test('structs named like the globals and runtime classes the module uses still g
   writeFileSync(
     join(dir, 'tsconfig.json'),
     JSON.stringify({
-      compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', noEmit: true, lib: ['ES2022', 'DOM'], types: [] },
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        noEmit: true,
+        lib: ['ES2022', 'DOM'],
+        types: [],
+      },
       include: ['protocol.ts'],
     }),
   );
@@ -148,12 +156,18 @@ test('structs named like the globals and runtime classes the module uses still g
       error: { code: 2 },
     };
   assert.ok(equalBytes(module.encodeState(value), named.encode('State', value)));
-  assert.deepEqual(module.decodeState(named.encode('State', value)), named.decode('State', named.encode('State', value)));
+  assert.deepEqual(
+    module.decodeState(named.encode('State', value)),
+    named.decode('State', named.encode('State', value)),
+  );
 });
 
 test('generateTypeScript refuses two structs whose generated function names collide', async () => {
   const { defineSchema } = await import('../dist/index.js');
   const clash = defineSchema({ types: { Player: { x: 'f32' }, PlayerDelta: { y: 'f32' } } });
   // encodePlayerDelta would be both the delta encoder of Player and the encoder of PlayerDelta.
-  assert.throws(() => generateTypeScript(clash), (error) => error instanceof TypeError && /PlayerDelta/.test(error.message));
+  assert.throws(
+    () => generateTypeScript(clash),
+    (error) => error instanceof TypeError && /PlayerDelta/.test(error.message),
+  );
 });

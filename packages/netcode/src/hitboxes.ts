@@ -41,7 +41,8 @@ interface Kept {
   halfExtents: number[] | undefined;
 }
 
-const numbers = (v: unknown, n: number): v is number[] => Array.isArray(v) && v.length === n && v.every(Number.isFinite);
+const numbers = (v: unknown, n: number): v is number[] =>
+  Array.isArray(v) && v.length === n && v.every(Number.isFinite);
 
 function keep(id: number, shape: RewindShape): Kept {
   const s = shape as Partial<RewindBox & RewindCapsule>,
@@ -214,7 +215,8 @@ export class HitboxRewind {
   ): RewindHit | undefined {
     if (!numbers(origin, 3) || !numbers(direction, 3))
       throw new RangeError('HitboxRewind raycast needs origin and direction of 3 finite numbers; fix them');
-    if (!(Math.hypot(...direction) > 0)) throw new RangeError('HitboxRewind raycast direction is zero; pass a direction');
+    if (!(Math.hypot(...direction) > 0))
+      throw new RangeError('HitboxRewind raycast direction is zero; pass a direction');
     const skip = (id: number) => (typeof ignore === 'number' ? id === ignore : ignore?.has(id) === true);
     let best: RewindHit | undefined;
     for (const [id, shape] of this.shapes(tick)) {

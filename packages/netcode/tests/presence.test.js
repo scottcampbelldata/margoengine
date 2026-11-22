@@ -217,7 +217,10 @@ test('SQLite adapter finds keys under a namespace with characters outside the BM
   try {
     using a = await openSqlitePresence(resolve(folder, 'store.sqlite'), { namespace: 'arena-\u{1F3AE}' });
     await a.publish({ processId: 'a', endpoint: 'ws://a', rooms: [] }, 10000);
-    assert.deepEqual((await a.processes()).map((p) => p.processId), ['a']);
+    assert.deepEqual(
+      (await a.processes()).map((p) => p.processId),
+      ['a'],
+    );
   } finally {
     rmSync(folder, { recursive: true });
   }

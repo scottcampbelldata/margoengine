@@ -403,9 +403,9 @@ export abstract class Room<State = unknown> {
     const run = hook();
     if (!(run instanceof Promise)) return run;
     const settled: Promise<void> = run.then(
-        () => this.forget(client, settled),
-        () => this.forget(client, settled),
-      );
+      () => this.forget(client, settled),
+      () => this.forget(client, settled),
+    );
     this.hooks.set(client, settled);
     return run;
   }
