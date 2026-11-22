@@ -21,7 +21,11 @@ for (const name of ['InvalidStateError', 'OperationError'])
           if (++calls === 1) throw error;
         },
       });
-      assert.throws(() => engine.render(), (thrown) => thrown === error, 'the error reaches the caller');
+      assert.throws(
+        () => engine.render(),
+        (thrown) => thrown === error,
+        'the error reaches the caller',
+      );
       await settle();
       const submits = gpu.devices[0].submits;
       engine.render();

@@ -34,7 +34,8 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [noFileWatcher(),
+  plugins: [
+    noFileWatcher(),
     {
       name: 'core-scale-page',
       configureServer(s) {
@@ -88,7 +89,10 @@ const cases = {
       }),
       errors = [];
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
-    window.mesh = engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({ color: '#ff8000' }));
+    window.mesh = engine
+      .createMesh()
+      .setGeometry(geometry)
+      .setMaterial(new PbrMaterial({ color: '#ff8000' }));
     window.frame = async (visible) => {
       window.mesh.visible = visible;
       engine.render();
@@ -156,7 +160,10 @@ const cases = {
       const css = wide ? [wide, 1440] : [Math.round(limit * 1.25), 16];
       canvas.style.width = `${css[0]}px`;
       canvas.style.height = `${css[1]}px`;
-      engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#ff8000' }));
+      engine
+        .createMesh()
+        .setGeometry(box())
+        .setMaterial(new PbrMaterial({ color: '#ff8000' }));
       engine.render();
       await engine.gpu.queue.onSubmittedWorkDone();
       results.push({ css, limit, backing: [canvas.width, canvas.height], dpr: devicePixelRatio, errors });
@@ -180,7 +187,11 @@ const checks = {
     const empty = await shot(page);
     let same = 0;
     for (let k = 0; k < drawn.data.length; k += 4)
-      if (drawn.data[k] === empty.data[k] && drawn.data[k + 1] === empty.data[k + 1] && drawn.data[k + 2] === empty.data[k + 2])
+      if (
+        drawn.data[k] === empty.data[k] &&
+        drawn.data[k + 1] === empty.data[k + 1] &&
+        drawn.data[k + 2] === empty.data[k + 2]
+      )
         same++;
     result.uncovered = same;
     assert.equal(same, 0, 'every pixel shows the plane');
@@ -205,7 +216,11 @@ const checks = {
     assert.equal(wide.dpr, 1);
     assert.ok(wide.limit >= 8192, `a device allowing 8192 (${wide.limit})`);
     assert.deepEqual(wide.backing, [5120, 1440], 'a 5120 x 1440 canvas is not reduced');
-    assert.deepEqual(past.backing, [past.limit, Math.round((16 * past.limit) / past.css[0])], 'cut to the limit, aspect kept');
+    assert.deepEqual(
+      past.backing,
+      [past.limit, Math.round((16 * past.limit) / past.css[0])],
+      'cut to the limit, aspect kept',
+    );
     assert.deepEqual([...wide.errors, ...past.errors], []);
   },
 };

@@ -116,7 +116,10 @@ try {
   // Float32 rounding of the cross product's components leaves about 1e-4 of D; the cancelling form was off by more
   // than 10 % at roughness 0.03.
   for (const [roughness, w] of Object.entries(worst))
-    assert.ok(w.error < 0.002, `core GGX D at roughness ${roughness}: relative error ${w.error} (${w.got} vs ${w.want})`);
+    assert.ok(
+      w.error < 0.002,
+      `core GGX D at roughness ${roughness}: relative error ${w.error} (${w.got} vs ${w.want})`,
+    );
   console.log(`core GGX D matches f64 within 0.2 % at roughness 0.03, 0.05 and 0.1 over ${cases.length} cases`);
 } finally {
   await browser.close();
