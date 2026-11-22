@@ -27,6 +27,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `dispose()` freed the items' buffers and cleared the engine and device but never called `removePlugin`, unlike every other plugin's `dispose` (Scatter, SculptView). It also kept the read-back copy pipeline of the old device.
 - **Fix:** `dispose()` clears its fields, then removes the plugin from its scene (the repeated dispose that `removePlugin` triggers finds nothing to do) and drops the copy pipeline.
 - **Regression:** `packages/geometry/tests/gpu.test.js` "disposing the generator takes its plugin out of the scene, once"; `npm run check:owners -- --packages=geometry` on WebGPU and the WebGL2 layer.
+
 ### Fixed 2026-11-21: a closed WebSocket or data-channel connection kept its listeners on the socket and channels (KB-NETCODE-LISTENERS1, netcode)
 
 - **Repro:** `openWebSocket` a socket (or `dataChannelConnection` two channels), close the connection, count the listeners on the socket or
