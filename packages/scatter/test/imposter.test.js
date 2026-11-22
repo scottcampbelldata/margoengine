@@ -35,7 +35,10 @@ test('imposterRingCode reads the scatter ring in place of the matrix buffer and 
   assert.ok(code.includes('fn scatterTurn(') && code.includes('fn scatterGround('), "the mesh pose's turn");
   assert.ok(code.includes('fn lodVisible('));
   const fragment = code.slice(code.indexOf('@fragment fn fragment('));
-  assert.match(fragment, /^@fragment fn fragment\(i:Out\)->Pixel \{\n if\(!lodVisible\(i\.clip\.xy,ring\[i\.id\]\.rotation\.zw\)\)\{discard;\}/);
+  assert.match(
+    fragment,
+    /^@fragment fn fragment\(i:Out\)->Pixel \{\n if\(!lodVisible\(i\.clip\.xy,ring\[i\.id\]\.rotation\.zw\)\)\{discard;\}/,
+  );
   assert.throws(() => imposterRingCode('@vertex fn vertex(){}'), TypeError);
   assert.throws(() => imposterRingCode(imposterRingCode(imposterShader)), TypeError);
 });

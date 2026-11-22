@@ -6,7 +6,8 @@ import { Geometry, PbrMaterial } from '../../core/dist/index.js';
 import { Scatter } from '../dist/index.js';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
-const card = () => new Geometry([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2, 0, 2, 3]);
+const card = () =>
+  new Geometry([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2, 0, 2, 3]);
 const uvs = [0, 1, 1, 1, 1, 0, 0, 0];
 const options = (textures) => ({ count: 4, material: new PbrMaterial({ color: [1, 1, 1] }), textures });
 const bytes = (hex) => Uint8Array.from(Buffer.from(hex.split(':').pop(), 'hex'));
@@ -38,9 +39,7 @@ test('a textured scatter uploads 32-byte vertices with uvs and a full mip chain 
     [0, 1, 2, 3, 0, 0],
     '8 x 8 base colour makes 4 levels; the normal and occlusion-roughness-metal defaults one each',
   );
-  const baseLevels = writes
-    .slice(0, 4)
-    .map((c) => bytes(c[2]));
+  const baseLevels = writes.slice(0, 4).map((c) => bytes(c[2]));
   const share = (level) => {
     let n = 0;
     for (let i = 3; i < level.length; i += 4) if (level[i] >= 128) n++;

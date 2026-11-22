@@ -79,7 +79,11 @@ export function trampledPoseCode(code: string, group: number, binding: number): 
     trampleCode(group, binding) +
     code
       .slice(at)
-      .replace(posed, posed + 'let push=tramplePush(position.xz);if(dot(push,push)>0.0){world=position.xyz+trampleTurn(world-position.xyz,push);}')
+      .replace(
+        posed,
+        posed +
+          'let push=tramplePush(position.xz);if(dot(push,push)>0.0){world=position.xyz+trampleTurn(world-position.xyz,push);}',
+      )
       .replace(normal, 'windNormal(trampleTurn(scatterTurn(n,c,s,up),push),bend,wind)')
   );
 }
@@ -161,7 +165,8 @@ export class TrampledScatter extends Scatter {
       throw rangeError('A trample resolution is an integer from 8 to 1024', 'scatter');
     if (!(gpuPositive(size) && gpuPositive(resolution / size)))
       throw rangeError('A trample size and its cells per unit must fit positive normal GPU floats', 'scatter');
-    if (!(Number.isFinite(recover) && recover > 0)) throw rangeError('A trample recover time is seconds above 0', 'scatter');
+    if (!(Number.isFinite(recover) && recover > 0))
+      throw rangeError('A trample recover time is seconds above 0', 'scatter');
     if (!(gpuPositive(bend) && bend <= Math.PI / 2))
       throw rangeError('A trample bend must fit a positive normal GPU float, at most pi / 2 radians', 'scatter');
     this.#size = size;
@@ -196,7 +201,8 @@ export class TrampledScatter extends Scatter {
       const { position: p, radius, strength = 1 } = m;
       if (![p[0], p[1], p[2]].every(gpuFloat))
         throw rangeError('An interactor position is three finite GPU float numbers', 'scatter');
-      if (!gpuPositive(radius)) throw rangeError('An interactor radius must fit a positive normal GPU float', 'scatter');
+      if (!gpuPositive(radius))
+        throw rangeError('An interactor radius must fit a positive normal GPU float', 'scatter');
       if (!(Number.isFinite(strength) && strength >= 0 && strength <= 1))
         throw rangeError('An interactor strength is a number from 0 to 1', 'scatter');
     }
@@ -244,17 +250,25 @@ export class TrampledScatter extends Scatter {
     this.#origin = origin;
     floats.set([origin[0] / cells, origin[1] / cells]);
     // Once a shift reaches the field's side there is no overlap. Clamp before Int32 conversion, which would wrap.
-    words.set(origin.map((v, i) => Math.max(-n, Math.min(n, v - last[i]))), 2);
+    words.set(
+      origin.map((v, i) => Math.max(-n, Math.min(n, v - last[i]))),
+      2,
+    );
     floats[4] = cells;
     words[5] = n;
     floats[6] = Math.exp((-3 * this.#delta) / this.#recover);
     words[7] = this.#count;
     floats[8] = this.#bend;
     floats[9] = this.values[30];
-    floats.set(this.options.bounds ?? [
-      this.values[22] - this.values[20] / 2, this.values[23] - this.values[21] / 2,
-      this.values[22] + this.values[20] / 2, this.values[23] + this.values[21] / 2,
-    ], 12);
+    floats.set(
+      this.options.bounds ?? [
+        this.values[22] - this.values[20] / 2,
+        this.values[23] - this.values[21] / 2,
+        this.values[22] + this.values[20] / 2,
+        this.values[23] + this.values[21] / 2,
+      ],
+      12,
+    );
     this.#delta = 0;
     if (!this.#moverBuffer || this.#moverBuffer.size < this.#movers.byteLength) {
       this.#moverBuffer?.destroy();
@@ -264,7 +278,13 @@ export class TrampledScatter extends Scatter {
       });
       this.#group = undefined;
     }
-    d.queue.writeBuffer(this.#moverBuffer, 0, this.#movers as Float32Array<ArrayBuffer>, 0, Math.max(8, this.#count * 8));
+    d.queue.writeBuffer(
+      this.#moverBuffer,
+      0,
+      this.#movers as Float32Array<ArrayBuffer>,
+      0,
+      Math.max(8, this.#count * 8),
+    );
     this.#uniform ??= d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     d.queue.writeBuffer(this.#uniform, 0, this.#words);
     this.#kernel ??= compute(d, update);
@@ -288,7 +308,10 @@ export class TrampledScatter extends Scatter {
     if (!this.#field) {
       const d = this.engine!.gpu!,
         size = (HEAD + this.#n * this.#n) * 8;
-      this.#field = d.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+      this.#field = d.createBuffer({
+        size,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      });
       this.#next = d.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
       // Before the first update: an empty field at the origin.
       d.queue.writeBuffer(this.#field, 0, new Float32Array([0, 0, this.#n / this.#size, this.#n, this.#bend, 0]));

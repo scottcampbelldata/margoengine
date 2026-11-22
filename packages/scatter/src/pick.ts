@@ -212,13 +212,24 @@ export class InstancePicker {
       size += Math.max(w[i * 6 + 3] - w[i * 6], w[i * 6 + 5] - w[i * 6 + 2]);
     }
     if (!live) {
-      this.#grid = { x0: 0, z0: 0, cell: 1, nx: 1, nz: 1, y0: 1, y1: 0, start: new Uint32Array(2), items: new Uint32Array(0) };
+      this.#grid = {
+        x0: 0,
+        z0: 0,
+        cell: 1,
+        nx: 1,
+        nz: 1,
+        y0: 1,
+        y1: 0,
+        start: new Uint32Array(2),
+        items: new Uint32Array(0),
+      };
       this.#dirty = false;
       return;
     }
     // The world boxes are float32: widen the grid's view of them a little, so rounding never drops a cell a box
     // reaches (the hit test itself is exact, in local space).
-    const pad = 1e-5 * (Math.max(Math.abs(x0), Math.abs(x1), Math.abs(z0), Math.abs(z1), Math.abs(y0), Math.abs(y1)) + 1);
+    const pad =
+      1e-5 * (Math.max(Math.abs(x0), Math.abs(x1), Math.abs(z0), Math.abs(z1), Math.abs(y0), Math.abs(y1)) + 1);
     x0 -= pad;
     z0 -= pad;
     y0 -= pad;
@@ -260,7 +271,11 @@ export class InstancePicker {
     const px = o[0] - v[q + 9],
       py = o[1] - v[q + 10],
       pz = o[2] - v[q + 11];
-    const lo = [v[q] * px + v[q + 1] * py + v[q + 2] * pz, v[q + 3] * px + v[q + 4] * py + v[q + 5] * pz, v[q + 6] * px + v[q + 7] * py + v[q + 8] * pz];
+    const lo = [
+      v[q] * px + v[q + 1] * py + v[q + 2] * pz,
+      v[q + 3] * px + v[q + 4] * py + v[q + 5] * pz,
+      v[q + 6] * px + v[q + 7] * py + v[q + 8] * pz,
+    ];
     const ld = [
       v[q] * d[0] + v[q + 1] * d[1] + v[q + 2] * d[2],
       v[q + 3] * d[0] + v[q + 4] * d[1] + v[q + 5] * d[2],
@@ -418,7 +433,11 @@ export class InstancePicker {
       return best;
     });
     if (index < 0) return null;
-    return { index, distance: best, point: [origin[0] + d[0] * best, origin[1] + d[1] * best, origin[2] + d[2] * best] };
+    return {
+      index,
+      distance: best,
+      point: [origin[0] + d[0] * best, origin[1] + d[1] * best, origin[2] + d[2] * best],
+    };
   }
 
   /** Every instance the ray hits within `maxDistance`, nearest first. */

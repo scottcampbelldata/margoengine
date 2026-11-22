@@ -186,7 +186,10 @@ test('translucent blades add the sun seen through them, and translucency 0 leave
   const blade = new Geometry([-0.04, 0, 0, 0.04, 0, 0, 0, 0.5, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]);
   const build = (blades) => {
     const h = optionalGPU();
-    h.engine.lighting = { direction: new Float32Array([-1, 0.13, 0, 1]), radiance: new Float32Array([1, 0.8, 0.54, 0.18]) };
+    h.engine.lighting = {
+      direction: new Float32Array([-1, 0.13, 0, 1]),
+      radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+    };
     h.context.shader = wgsl;
     h.context.bindings = [];
     const effect = new Scatter(blade, { count: 4, blades, material: new PbrMaterial({ doubleSided: true }) });
@@ -212,7 +215,10 @@ test('translucent blades add the sun seen through them, and translucency 0 leave
   assert.doesNotMatch(plain, /foliageTranslucency/);
   assert.equal(zero, plain);
   for (const translucency of [-0.1, 1.5, NaN])
-    assert.throws(() => new Scatter(blade, { blades: { translucency } }), { name: 'RangeError', message: /translucency 0-1/ });
+    assert.throws(() => new Scatter(blade, { blades: { translucency } }), {
+      name: 'RangeError',
+      message: /translucency 0-1/,
+    });
 });
 
 test('variation and clusters tint lit instances and cluster their shading only when asked', () => {
@@ -282,7 +288,11 @@ test('scatter frustum bounds include geometry displaced from its local origin', 
 
 test('GPU paths follow the rectangles in the exclusion buffer, their segment count above the fade bits (GAP-FILM-LOOK)', () => {
   const h = optionalGPU(),
-    points = [[-10, 0], [0, 0], [10, 10]],
+    points = [
+      [-10, 0],
+      [0, 0],
+      [10, 10],
+    ],
     effect = new Scatter(box(), { count: 1, exclusions: [[-3, -2, 1, 4]], paths: [{ points, width: 4 }] });
   points[0][0] = 100;
   h.engine.use(effect);

@@ -44,23 +44,133 @@ export interface ScatterSettingTarget {
   clusters: number;
   readonly options: { readonly blades?: object; readonly material?: object };
 }
-const n = (name: string, group: ScatterSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string, live = true) =>
-  numberSetting(name, group, value, min, max, step, unit, about, live) as ScatterSetting;
+const n = (
+  name: string,
+  group: ScatterSettingGroup,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  unit: string,
+  about: string,
+  live = true,
+) => numberSetting(name, group, value, min, max, step, unit, about, live) as ScatterSetting;
 
 /** Every scatter look control, in panel order. Defaults are the values a Scatter uses without the option. */
 export const SCATTER_SETTINGS: readonly ScatterSetting[] = [
-  n('scatter.density', 'scatter', 1, 0, 1, 0.01, '', 'Fraction of the candidate instances kept. The kept ones are the same instances each time (a hash of the candidate), so lowering it only thins the field.'),
-  colorSetting('scatter.color', 'scatter', [0.12, 0.35, 0.08], 0, 1, 'Diffuse colour in linear RGB, used when the Scatter has no PBR material.') as ScatterSetting,
-  n('wind.directionX', 'wind', 1, -1, 1, 0.01, '', 'X of the wind direction (it is normalised with directionZ; both 0 is refused).'),
+  n(
+    'scatter.density',
+    'scatter',
+    1,
+    0,
+    1,
+    0.01,
+    '',
+    'Fraction of the candidate instances kept. The kept ones are the same instances each time (a hash of the candidate), so lowering it only thins the field.',
+  ),
+  colorSetting(
+    'scatter.color',
+    'scatter',
+    [0.12, 0.35, 0.08],
+    0,
+    1,
+    'Diffuse colour in linear RGB, used when the Scatter has no PBR material.',
+  ) as ScatterSetting,
+  n(
+    'wind.directionX',
+    'wind',
+    1,
+    -1,
+    1,
+    0.01,
+    '',
+    'X of the wind direction (it is normalised with directionZ; both 0 is refused).',
+  ),
   n('wind.directionZ', 'wind', 0, -1, 1, 0.01, '', 'Z of the wind direction.'),
-  n('wind.strength', 'wind', 0, 0, 1, 0.01, '', 'Rooted bend strength. 0 removes the wind (the cull reach is then not doubled), as a Scatter built with no wind.'),
-  n('wind.speed', 'wind', 0, 0, 100, 0.1, 'm/s', 'Mean wind at 10 m: from 5.4 m/s (the top of Beaufort 3) the sway and leaf flutter run speed / 5.4 times faster, so a gale (17.2 m/s, force 8) thrashes the plants 3.2 times as fast. 0 keeps their own sway.'),
-  n('blades.rootShade', 'blades', 0.5, 0, 1, 0.01, '', 'Albedo lost at the blade root: blades darken from the tip (1) to the root (1 minus this). Needs a Scatter built with `blades`.'),
-  n('blades.widen', 'blades', 1, 0, 10, 0.05, '', 'Extra blade width at the last LOD distance as a fraction (1 is twice as wide), growing with distance from the camera; the cull reach follows. Needs a Scatter built with `blades`.'),
-  n('blades.translucency', 'blades', 0, 0, 1, 0.01, '', 'Sunlight seen through the blades (wrapped back-light, Barre-Brisebois and Bouchard 2011). Moving it off 0 or back to 0 builds another lit pipeline once; between nonzero values it is live. Needs a Scatter built with `blades`.', false),
-  n('variation.hue', 'variation', 0, 0, 0.5, 0.005, 'turn', 'Hue turn of up to this either way, from a hash of each instance position. Moving it off 0 builds another lit pipeline once. Needs a Scatter built with a `material`.', false),
-  n('variation.value', 'variation', 0, 0, 1, 0.01, '', 'Brightness change of up to this either way per instance (and per cluster). Moving it off 0 builds another lit pipeline once. Needs a Scatter built with a `material`.', false),
-  n('variation.clusters', 'variation', 0, 0, 100000, 0.1, 'mesh units', 'Leaf-cluster cell size: the mesh shades as clumps (0 is off). Turning it on from 0 builds another lit pipeline once. Needs a Scatter built with a `material`.', false),
+  n(
+    'wind.strength',
+    'wind',
+    0,
+    0,
+    1,
+    0.01,
+    '',
+    'Rooted bend strength. 0 removes the wind (the cull reach is then not doubled), as a Scatter built with no wind.',
+  ),
+  n(
+    'wind.speed',
+    'wind',
+    0,
+    0,
+    100,
+    0.1,
+    'm/s',
+    'Mean wind at 10 m: from 5.4 m/s (the top of Beaufort 3) the sway and leaf flutter run speed / 5.4 times faster, so a gale (17.2 m/s, force 8) thrashes the plants 3.2 times as fast. 0 keeps their own sway.',
+  ),
+  n(
+    'blades.rootShade',
+    'blades',
+    0.5,
+    0,
+    1,
+    0.01,
+    '',
+    'Albedo lost at the blade root: blades darken from the tip (1) to the root (1 minus this). Needs a Scatter built with `blades`.',
+  ),
+  n(
+    'blades.widen',
+    'blades',
+    1,
+    0,
+    10,
+    0.05,
+    '',
+    'Extra blade width at the last LOD distance as a fraction (1 is twice as wide), growing with distance from the camera; the cull reach follows. Needs a Scatter built with `blades`.',
+  ),
+  n(
+    'blades.translucency',
+    'blades',
+    0,
+    0,
+    1,
+    0.01,
+    '',
+    'Sunlight seen through the blades (wrapped back-light, Barre-Brisebois and Bouchard 2011). Moving it off 0 or back to 0 builds another lit pipeline once; between nonzero values it is live. Needs a Scatter built with `blades`.',
+    false,
+  ),
+  n(
+    'variation.hue',
+    'variation',
+    0,
+    0,
+    0.5,
+    0.005,
+    'turn',
+    'Hue turn of up to this either way, from a hash of each instance position. Moving it off 0 builds another lit pipeline once. Needs a Scatter built with a `material`.',
+    false,
+  ),
+  n(
+    'variation.value',
+    'variation',
+    0,
+    0,
+    1,
+    0.01,
+    '',
+    'Brightness change of up to this either way per instance (and per cluster). Moving it off 0 builds another lit pipeline once. Needs a Scatter built with a `material`.',
+    false,
+  ),
+  n(
+    'variation.clusters',
+    'variation',
+    0,
+    0,
+    100000,
+    0.1,
+    'mesh units',
+    'Leaf-cluster cell size: the mesh shades as clumps (0 is off). Turning it on from 0 builds another lit pipeline once. Needs a Scatter built with a `material`.',
+    false,
+  ),
 ];
 /** The rows that can change every frame without building anything. */
 export const SCATTER_LIVE_SETTINGS: readonly ScatterSetting[] = liveSettings(SCATTER_SETTINGS) as ScatterSetting[];
@@ -98,14 +208,23 @@ export function applyScatterSettings(scatter: ScatterSettingTarget, values: Scat
     strength = v('wind.strength') as number,
     speed = v('wind.speed') as number;
   if (strength > 0 && !Math.hypot(x, z))
-    throw new RangeError('Invalid scatter setting wind.directionX; use a direction other than 0 and 0 while wind.strength is above 0');
+    throw new RangeError(
+      'Invalid scatter setting wind.directionX; use a direction other than 0 and 0 while wind.strength is above 0',
+    );
   const shade = v('blades.rootShade') as number;
-  if (scatter.options.blades === undefined && 'blades.rootShade' in values && shade !== BY_NAME.get('blades.rootShade')!.default)
+  if (
+    scatter.options.blades === undefined &&
+    'blades.rootShade' in values &&
+    shade !== BY_NAME.get('blades.rootShade')!.default
+  )
     throw new TypeError('Setting blades.rootShade needs a Scatter built with the blades option');
   const bladed = scatter.options.blades !== undefined,
     widen = v('blades.widen') as number,
     translucency = v('blades.translucency') as number;
-  for (const [name, value] of [['blades.widen', widen], ['blades.translucency', translucency]] as const)
+  for (const [name, value] of [
+    ['blades.widen', widen],
+    ['blades.translucency', translucency],
+  ] as const)
     if (!bladed && name in values && value !== BY_NAME.get(name)!.default)
       throw new TypeError(`Setting ${name} needs a Scatter built with the blades option`);
   const look = ['variation.hue', 'variation.value', 'variation.clusters'].map((name) => v(name) as number);
