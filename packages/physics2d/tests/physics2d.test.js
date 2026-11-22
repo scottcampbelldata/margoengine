@@ -495,7 +495,14 @@ test('dispose removes the world from its own scene, not the active one', async (
     other.use({ name: 'loader', setup: () => (physics = new Physics2D(engine, { rapier: RAPIER })) });
     other.removePlugin('loader');
     assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
-    const bystander = { name: physics.name, disposed: 0, setup() {}, dispose() { this.disposed++; } };
+    const bystander = {
+      name: physics.name,
+      disposed: 0,
+      setup() {},
+      dispose() {
+        this.disposed++;
+      },
+    };
     engine.use(bystander);
     physics.dispose();
     assert.equal(physics.isDisposed, true);

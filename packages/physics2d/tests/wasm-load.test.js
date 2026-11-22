@@ -30,7 +30,10 @@ test('the package ships the Wasm as a file of its own, beside a solver chunk tha
   for (const name of await readdir(new URL('../dist/', import.meta.url))) {
     if (!name.endsWith('.js')) continue;
     const size = (await stat(new URL(`../dist/${name}`, import.meta.url))).size;
-    assert.ok(size < 500_000, `${name} is ${size} bytes; a JavaScript file over 500 kB means the Wasm was inlined again`);
+    assert.ok(
+      size < 500_000,
+      `${name} is ${size} bytes; a JavaScript file over 500 kB means the Wasm was inlined again`,
+    );
     // The app's bundler emits the file only when it sees a plain `new URL(literal, import.meta.url)`: an ignore
     // comment left in front of it would make Vite skip the asset and the app 404 on the Wasm.
     const code = await readFile(new URL(`../dist/${name}`, import.meta.url), 'utf8');

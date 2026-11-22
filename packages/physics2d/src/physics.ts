@@ -179,9 +179,15 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   /** @throws MargoError (`state`) before {@link Physics2D.load} has finished. */
   constructor(engine: EngineKernel | null, options: Physics2DOptions = {}) {
     const R = options.rapier ?? solver.value;
-    if (!R) throw new MargoError('state', 'Physics2D is not loaded; call await Physics2D.load() once before new Physics2D().');
+    if (!R)
+      throw new MargoError(
+        'state',
+        'Physics2D is not loaded; call await Physics2D.load() once before new Physics2D().',
+      );
     if (typeof R.World !== 'function' || !R.ColliderDesc)
-      throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics2D.load().');
+      throw new TypeError(
+        'The rapier option needs the initialized module; leave it out and call await Physics2D.load().',
+      );
     this.rapier = R;
     this.name = options.name ?? 'physics2d';
     const ppm = options.pixelsPerMeter ?? 32;
