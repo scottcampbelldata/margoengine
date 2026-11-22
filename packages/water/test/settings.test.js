@@ -14,10 +14,10 @@ import {
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const byName = new Map(WATER_SETTINGS.map((s) => [s.name, s]));
-// The uniform a frame writes: 560 B of the Water's values.
+// The uniform a frame writes: 576 B of the Water's values.
 // Index 20 is the wave clock, which every frame advances; the rest is what the settings write.
 const frameValues = (h) => {
-  const v = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 560).data).slice();
+  const v = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 576).data).slice();
   v[20] = 0;
   return v;
 };

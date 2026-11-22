@@ -6,6 +6,12 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: a submerged ledge cast a bright silhouette through Water (KB-WATER-REFRACTDEPTH1, water)
+- **Repro:** run `node packages/water/test/refraction-depth.browser.mjs` on the previous shader. A slab in the straight view ray changes the water color where the bent ray hits only the seabed.
+- **Cause:** Water used the straight ray's depth gap for attenuation and for the first bent lookup. The opaque depth at the bent lookup could belong to a different surface.
+- **Fix:** intersect the bent ray with sampled depth and require the hit to project to the same texel. The validated hit supplies both color and path length. The direct depth gap still feeds contact foam.
+- **Regression:** `packages/water/test/refraction-depth.browser.mjs` on WebGPU and with `--compat` for the WebGL2 layer.
+
 ### Fixed 2026-11-21: a full budget run had no provenance of its own in the WebGL2 demos table (KB-COMPAT-FRAMELINE1, webgl2-compat)
 
 - **Repro (before):** run `npm run visual:compat -- --write` on one machine, then a full `npm run visual:compat:budget -- --write`

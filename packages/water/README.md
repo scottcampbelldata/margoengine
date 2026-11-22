@@ -54,6 +54,13 @@ Water.attach(engine, {
 });
 ```
 
+With `sceneColor`, Water traces the Snell-bent ray against opaque depth in the
+current view. The sampled color and attenuation use the same intersection.
+A ray that misses the capture uses the fallback seabed and water-body color.
+`foamDistance` uses the local contact depth to place foam at the shore or hull.
+See [screen-space water refraction](../../docs/limits.md#above-water-screen-space-refraction)
+for the capture limits.
+
 The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
 
 Pass an `Environment` as `reflectionEnvironment` to use the same longitude, live rotation, and HDR radiance scale as `EnvironmentBackground`. The water filters its reflection across both angular axes using a lobe widened by the screen footprint of the wave normals and uses the sky at the horizon for below-horizon reflections. The HDR sky also lights the water body and refracted seabed through a cosine-weighted irradiance estimate. Keep the `() => sky.reflectionTexture` form for the procedural `Sky` package.

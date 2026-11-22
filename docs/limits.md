@@ -7217,6 +7217,16 @@ Batch 175 job 3 measured optional entry: sciviz/aggregate 0 -> 28201 B gzip, cei
 - Batch 174 job 6: optional sciviz/views absent to 4786 B min+gzip, ceiling 5042 B. Current sciviz root 60851 B; this job changes no root source. Core + stage remains 24209 B. Each FigureLayout cell owns one engine and canvas; there is no shared GPU-resource or single-canvas claim. Defaults: ceil(sqrt(count)) columns, 320px cell height, 12px gap; labels default View N. Links default to 3D cameras or 2D x/y physical ranges, with first-figure initial state; selected axes, programmatic sync and AbortSignal are supported. Polling follows changes on the next active engine frame; call sync for stopped engines. All linked figures must have the same dimensionality. Camera projection overrides are borrowed functions. ComparativeGrid uses independent FilterPipeline caches with a shared registry; complete node params replace per-cell params, time defaults to zero, and all outputs are released by the owning pipeline's operator contracts. VolumeQuad owns three orthographic nearest-sample heatmaps and a 3D volume plus three slice planes. It clamps and snaps the crosshair to exact sample centres, retains voxel IDs/orientation, and keeps physical screen scale isotropic across resize. Source CPU samples are borrowed, dimensions must each be >=2, and total voxel count must fit uint32 provenance IDs. Default colormap gray; one shared colour range comes from the 3D volume. Box extent/spacing is axis aligned; no oblique reslicing or patient-space registration is added. Layouts/controllers are disposable; individual setCrosshair signals cancel unpublished work and ready accepts an abortable wait. No timing or clinical claim.
 
 
+## Above-water screen-space refraction
+With a borrowed scene color texture, Water traces up to 50 m along the
+refracted ray inside the active viewport. It refines the intersection in at
+most five depth-plane steps. If needed, it checks up to eight increasingly
+spaced intervals for depth crossings, bisecting each candidate up to ten
+times before validation. This bounded first-layer depth approximation cannot
+see hidden or offscreen geometry or resolve every narrow crossing. On an
+open-water miss the body uses the 50 m deep-water fallback. A terrain-coupled
+Water can use its modeled gap. The Water frame uniform is 576 B.
+
 ## HDR open water and partial camera waterline
 
 Water estimates diffuse sky light with eight cosine-weighted directions. Sharp solar illumination remains the direct

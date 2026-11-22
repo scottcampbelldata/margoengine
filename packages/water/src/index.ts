@@ -212,9 +212,8 @@ const seaOf = (wind: number | WaterWind) => {
 // Khronos PBR Neutral then sRGB (IEC 61966-2-1). Absorption (0.38, 0.10, 0.045) /m is Margo art of the order of
 // pure-water absorption (Pope & Fry 1997); seabed, foam and scatter colours, the sky blur, the roughness constants and
 // the ripple layers are Margo tuning.
-// Refraction reads the opaque colour where the Snell-bent ray (water 1.33) meets the bed, projected to the screen: along
-// the unbent eye ray a grazing view would read ground tens of metres off, whose light could only leave the water outside
-// Snell's window, so it never reaches the eye (total internal reflection).
+// Refraction follows the Snell-bent ray in the opaque depth image, with attenuation over the same path as the sample.
+// See docs/clean-room.md (above-water refraction) for the depth intersection and the optical fallback.
 // Whitecaps (frame.grid.z, 0 draws none; whitecap()): a crest breaks where its components' summed slope a*k*sin, read a
 // little ahead of the crest where spilling foam runs down the face, passes a threshold that falls as the amount rises;
 // gradient noise breaks it into patches, densest and whitest where the crest stands furthest past the threshold and
@@ -334,6 +333,53 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location
  let v=surface(xz,sampleWidth);var clip=frame.camera*vec4f(v.position,1);if(HORIZON){clip.z=max(clip.z,0.000001*clip.w);}return Output(clip,v.normal,v.position,v.crest,xz);
 }
 fn linear(d:f32)->f32 {return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
+fn refractionPixel(clip:vec4f)->vec2i {
+ if(clip.w<=0.000001||any(abs(clip.xy)>=vec2f(clip.w))){return vec2i(-1);}
+ let p=vec2i(frame.viewport.xy+(clip.xy/clip.w*vec2f(0.5,-0.5)+0.5)*frame.viewport.zw);
+ if(any(p>=vec2i(frame.viewport.xy+frame.viewport.zw))){return vec2i(-1);}
+ return p;
+}
+// Intersect the bent ray with the view-depth plane of a sampled texel. Reproject the intersection and only accept
+// the sample if it belongs to that texel. Keep the search bounded at depth discontinuities and off-screen edges.
+fn refractedScene(a:vec4f,b:vec4f,initial:f32)->vec4f {
+ var p=refractionPixel(a+b*initial);
+ for(var step=0;step<5;step++){
+  if(p.x<0){break;}
+  let d=textureLoad(depth,p,0);let denominator=b.z-d*b.w;
+  if(d<=0.0||abs(denominator)<0.00000001){break;}
+  let distance=(d*a.w-a.z)/denominator;
+  if(distance<=0.0||distance>50.0){break;}
+  let next=refractionPixel(a+b*distance);
+  if(all(next==p)){return vec4f(textureLoad(opaque,p,0).rgb,distance);}
+  p=next;
+ }
+ return vec4f(0,0,0,-1);
+}
+fn refractionBehind(clip:vec4f,p:vec2i)->bool {
+ if(p.x<0){return false;}
+ return textureLoad(depth,p,0)>clip.z/clip.w;
+}
+fn refractionCrossing(a:vec4f,b:vec4f)->vec4f {
+ var lower=0.0;var upper=0.08;var wasBehind=false;
+ for(var step=0;step<8;step++){
+  let clip=a+b*upper;let p=refractionPixel(clip);
+  if(p.x<0){break;}
+  let behind=refractionBehind(clip,p);
+  if(behind&&!wasBehind){
+   var lo=lower;var hi=upper;
+   for(var j=0;j<10;j++){
+    let t=(lo+hi)*0.5;let at=a+b*t;
+    if(refractionBehind(at,refractionPixel(at))){hi=t;}else{lo=t;}
+   }
+   // A sign change at a silhouette is not a hit. The hit still needs a depth-checked texel on the refracted ray.
+   let hit=refractedScene(a,b,hi);
+   if(hit.w>=lower&&hit.w<=upper){return hit;}
+  }
+  if(upper>=50.0){break;}
+  wasBehind=behind;lower=upper;upper=min(50.0,upper*2.8);
+ }
+ return vec4f(0,0,0,-1);
+}
 // Ripple noise: 2D gradient noise (K. Perlin, "Improving Noise", SIGGRAPH 2002). Every lattice corner holds a random
 // unit gradient whose angle is the PCG hash (Jarzynski and Olano, JCGT 9(3), 2020) of the corner's cell, so the field
 // has no axis bias and works for negative and far cells alike.
@@ -514,7 +560,7 @@ ${displayShader}
  let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
  // Sand the swell lifts off the bed hangs in the water: a grey, nearly flat extinction of up to 1.4 per metre over
  // clear water's (murk, from surf.ts), so a surf zone reads as turbid green-grey water, not a clear lagoon over sand.
- let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-(vec3f(0.38,0.10,0.045)+vec3f(1.4,1.3,1.5)*murk)*optical);
+ var optical=min(50.0,gap/max(0.15,abs(v.y)));var opticalGap=gap;
  let hdr=hdrSkyScale()>0.0;
  var irradiance=vec3f(0);
  var ambient=frame.eye.w;
@@ -523,11 +569,20 @@ ${displayShader}
  // HDR water body and seabed use the sky's RGB irradiance relative to an 18% grey reference exposure.
  let diffuse=select(vec3f(ambient),irradiance*(frame.eye.w/0.18),hdr);
  var bottom=vec3f(0.28,0.25,0.17)*(diffuse+frame.radiance.rgb*frame.sun.w*0.12);
- if(frame.radiance.w>0.5){
-  let size=vec2f(textureDimensions(opaque));let bent=refract(-v,n,0.75187970);let seen=frame.camera*vec4f(i.world+bent*(gap/max(0.05,-bent.y)),1);
-  let q=clamp(vec2i((seen.xy/max(0.0001,seen.w)*vec2f(0.5,-0.5)+0.5)*size),vec2i(0),vec2i(size)-1);let d=textureLoad(depth,q,0);
-  if(d>0&&d<=i.clip.z){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}
+ if(frame.radiance.w>0.5&&refraction>0.0){
+  let bent=refract(-v,n,0.75187970);
+  let a=frame.camera*vec4f(i.world,1);let b=frame.camera*vec4f(bent,0);
+  var hit=refractedScene(a,b,min(50.0,gap/max(0.05,-bent.y)));
+  if(hit.w<0.0){hit=refractionCrossing(a,b);}
+  if(hit.w>0.0){
+   bottom=mix(bottom,hit.rgb,refraction);
+   optical=mix(optical,hit.w,refraction);opticalGap=mix(gap,max(0.0,-bent.y*hit.w),refraction);
+  }else if(frame.flow.w<0.5){
+   // In uncharted water the straight ray's depth says nothing about a missing bent ray's bottom.
+   optical=50.0;opticalGap=50.0;
+  }
  }
+ let transmission=exp(-(vec3f(0.38,0.10,0.045)+vec3f(1.4,1.3,1.5)*murk)*optical);
  let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);
  let baseRough=clamp(max(frame.foam.w,0.12+normalWidth*0.6+footprint*0.025),frame.foam.w,max(0.4,frame.foam.w));
  let alpha=baseRough*baseRough;
@@ -535,7 +590,7 @@ ${displayShader}
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
  // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
  var shade=1.0;if(foam>0.002||max(glint.x,max(glint.y,glint.z))>0.002){shade=waterShadow(i.world);}
- let shallowBand=select(0.0,1.0-smoothstep(0.0,frame.shallow.w,gap),frame.shallow.w>0.0);
+ let shallowBand=select(0.0,1.0-smoothstep(0.0,frame.shallow.w,opticalGap),frame.shallow.w>0.0);
  let bodyLight=diffuse+frame.radiance.rgb*nl*frame.sun.w*0.12;
  let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*bodyLight+(frame.shallow.rgb-frame.color.rgb)*shallowBand*(vec3f(1)-transmission)*bodyLight;
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
@@ -696,7 +751,7 @@ export class Water implements EnginePlugin {
   private pipeline?: GPURenderPipeline;
   private format = '';
   private seconds = 0;
-  private readonly values = new Float32Array(140);
+  private readonly values = new Float32Array(144);
   private fogSource: FogLike | null = null;
   private fogBuffer?: GPUBuffer;
   private readonly fogData = new Float32Array(12);
@@ -1493,6 +1548,7 @@ export class Water implements EnginePlugin {
     this.values[29] = c.camera.far;
     this.values[30] = c.delta;
     this.values[31] = +linearHdr(c.format);
+    this.values.set(c.view?.viewport ?? [0, 0, c.width, c.height], 140);
     const lighting = this.engine!.lighting;
     this.values[19] = lighting?.radiance[3] ?? 0.15;
     if (lighting) {

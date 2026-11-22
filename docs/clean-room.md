@@ -10957,3 +10957,13 @@ Written from the papers, tables and archive records below; no other engine's or 
   derbies with 2 inch brims and crowns 4 1/2 to 5 1/2 inches. A secondary source; the townsman's 5 1/4 inch crown,
   2 inch brim and a crown rounding over from 0.6 of its height (`GarmentSpec.dome`) are read from it and from the
   Library of Congress photographs of the Wrights in town.
+
+### Above-water refraction depth (2026-11-21)
+- Tiago Sousa, [Generic Refraction Simulation](https://developer.nvidia.com/gpugems/gpugems2/part-ii-shading-lighting-and-shadows/chapter-19-generic-refraction-simulation), 2005. Validate a sample in the displaced scene image to avoid foreground silhouette bleed.
+- Morgan McGuire and Michael Mara, [Efficient GPU Screen-Space Ray Tracing](https://jcgt.org/published/0003/04/04/), 2014. Compare projected ray depth to the framebuffer and bound the ray search.
+- Chris Wyman, [An Approximate Image-Space Approach for Interactive Refraction](https://cwyman.org/papers/sig05_approxISRefr.pdf), 2005. Follow the direction changed by the refractive interface to find the color received by the eye.
+Margo intersects a homogeneous ray with each candidate depth plane and
+checks the resulting texel. The wide-step crossing search supplies fallback
+seeds where a depth discontinuity defeats the first estimate. It uses the
+existing Water snapshots, depth convention and Snell normal. The shader and
+regression were written from these descriptions and analytic geometry.

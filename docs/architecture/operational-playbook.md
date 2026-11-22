@@ -1,3 +1,17 @@
+### Section 5 evidence: above-water refraction depth (2026-11-21)
+Water uses the existing opaque color and reversed depth snapshots. It solves
+the intersection of a Snell-bent ray with a sampled texel's depth plane in
+homogeneous clip space. A hit must reproject to the same texel. When the
+initial estimate cannot converge, bounded depth probes bracket a crossing
+and validate it with the same intersection. Optical attenuation uses the
+hit distance. Shore foam keeps its separate straight depth comparison. The
+active viewport occupies one four-float row in the Water uniform.
+The GPU regression puts a submerged slab in front of the straight ray,
+outside the bent ray, then removes it. The mean RGB in the 7 × 7 witness
+region is identical in both frames on the RTX A6000 in WebGPU and the
+WebGL2 layer. A dark seabed changes the bent-ray sample on both backends.
+See the [clean-room research](../clean-room.md#above-water-refraction-depth-2026-11-21).
+
 ### Section 5 evidence: HDR ocean reflection and the camera waterline (2026-11-21)
 
 Water and Underwater borrow an HDR Environment through `reflectionEnvironment` and `skyEnvironment`. They use its azimuth convention, live rotation
