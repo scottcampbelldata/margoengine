@@ -113,11 +113,7 @@ test('fitBox centres a box seen from above on its looser axis (KB-FITBOX-CENTRE1
   // A flat plate at 25 degrees elevation: its near and far edges sit at different depths, so equal slack at the top and
   // bottom frustum planes put its screen centre 24.8 px above the middle of a 1280x720 frame.
   const plate = [-1, 0, -1, 1, 0.05, 1],
-    view = (az, el, r) => [
-      r * Math.cos(el) * Math.sin(az),
-      0.025 + r * Math.sin(el),
-      r * Math.cos(el) * Math.cos(az),
-    ];
+    view = (az, el, r) => [r * Math.cos(el) * Math.sin(az), 0.025 + r * Math.sin(el), r * Math.cos(el) * Math.cos(az)];
   for (const [az, el, bounds] of [
     [45, 25, plate],
     [10, 60, plate],
