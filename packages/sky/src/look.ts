@@ -96,7 +96,11 @@ export function extendSky(code: string, full: boolean): string {
   if (!full) return c;
   c = swap(c, 'fn daySky(direction:vec3f)->vec3f {', 'fn physicalDaySky(direction:vec3f)->vec3f {');
   c = swap(c, 'fn nightSky(w:vec3f,footprint:f32)->vec3f {', 'fn physicalNightSky(w:vec3f,footprint:f32)->vec3f {');
-  c = swap(c, 'celestialProfile(w,s,SUN_RADIUS,footprint)', 'celestialProfile(w,s,SUN_RADIUS*frame.lookSun.w,max(footprint,2.0*SUN_RADIUS*frame.lookSun.w*frame.lookShape.w))');
+  c = swap(
+    c,
+    'celestialProfile(w,s,SUN_RADIUS,footprint)',
+    'celestialProfile(w,s,SUN_RADIUS*frame.lookSun.w,max(footprint,2.0*SUN_RADIUS*frame.lookSun.w*frame.lookShape.w))',
+  );
   c = swap(
     c,
     '*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*(1.0-frame.sun.w);',
@@ -125,8 +129,7 @@ export function extendSky(code: string, full: boolean): string {
   return c + lookCode;
 }
 const isNumber = (v: unknown, lo: number, hi: number) => typeof v === 'number' && v >= lo && v <= hi;
-const isColor = (v: unknown, hi: number) =>
-  Array.isArray(v) && v.length === 3 && v.every((x) => isNumber(x, 0, hi));
+const isColor = (v: unknown, hi: number) => Array.isArray(v) && v.length === 3 && v.every((x) => isNumber(x, 0, hi));
 // [name, low, high] of each number, [name, high] of each colour, per option.
 const AIR_NUMBERS: [keyof SkyAtmosphereOptions, number, number][] = [
   ['sunIntensity', 0, 100],

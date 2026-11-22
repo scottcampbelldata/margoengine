@@ -36,14 +36,31 @@ try {
       console.log(name, r.mode, r.frames.map((f) => `${f.digest}:${f.mid.toFixed(2)}`).join(' '));
     }
     for (const [i, f] of add.frames.entries()) {
-      assert.notEqual(none.frames[i].mid, empty.frames[i].mid, `${name}: the model shows on frame ${i} left out of the sky`);
+      assert.notEqual(
+        none.frames[i].mid,
+        empty.frames[i].mid,
+        `${name}: the model shows on frame ${i} left out of the sky`,
+      );
       assert.notEqual(f.mid, empty.frames[i].mid, `${name}: the model shows on frame ${i} with sky.add`);
       assert.notEqual(f.digest, none.frames[i].digest, `${name}: sky.add changes the model's light on frame ${i}`);
     }
-    assert.deepEqual(add.frames.map((f) => f.digest), again.frames.map((f) => f.digest), `${name}: two fresh pages draw the same frames`);
+    assert.deepEqual(
+      add.frames.map((f) => f.digest),
+      again.frames.map((f) => f.digest),
+      `${name}: two fresh pages draw the same frames`,
+    );
     // KB-GLTF-SCENESKY1: with no sky.add the model joins its scene's sky by itself, from frame 0.
-    assert.deepEqual(auto.frames.map((f) => f.digest), add.frames.map((f) => f.digest), `${name}: the model joins its scene's sky without sky.add`);
-    if (!extra) assert.deepEqual(add.frames.map((f) => f.digest), add.frames.map(() => add.frames[5].digest), 'frame 0 is drawn as every later frame of the same instant');
+    assert.deepEqual(
+      auto.frames.map((f) => f.digest),
+      add.frames.map((f) => f.digest),
+      `${name}: the model joins its scene's sky without sky.add`,
+    );
+    if (!extra)
+      assert.deepEqual(
+        add.frames.map((f) => f.digest),
+        add.frames.map(() => add.frames[5].digest),
+        'frame 0 is drawn as every later frame of the same instant',
+      );
   }
   assert.deepEqual(pageErrors, []);
   console.log('sky add glTF check passed');

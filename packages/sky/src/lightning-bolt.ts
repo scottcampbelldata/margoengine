@@ -111,7 +111,9 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
   finiteVector(end, 3, 'Lightning channel end');
   const range = (v: number, lo: number, hi: number, name: string, whole = false) => {
     if (!(v >= lo && v <= hi) || (whole && !Number.isInteger(v)))
-      throw new RangeError(`Lightning channel ${name} must be ${whole ? 'a whole number ' : ''}from ${lo} to ${hi}; got ${String(v)}`);
+      throw new RangeError(
+        `Lightning channel ${name} must be ${whole ? 'a whole number ' : ''}from ${lo} to ${hi}; got ${String(v)}`,
+      );
   };
   range(detail, 8, 400, 'detail');
   range(spread, 5, 85, 'spread');
@@ -120,7 +122,8 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
   range(candidates, 2, 32, 'candidates', true);
   range(eta, 0, 8, 'eta');
   range(maxSegments, 8, MAX_CHANNEL_SEGMENTS, 'maxSegments', true);
-  if (!(start[1] > end[1])) throw new RangeError('Lightning channel start must be above its end; give the cloud end first');
+  if (!(start[1] > end[1]))
+    throw new RangeError('Lightning channel start must be above its end; give the cloud end first');
   const random = generator(seed),
     length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]),
     step = length / detail,
@@ -142,7 +145,11 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
       const theta = cone * Math.sqrt(random()),
         phi = random() * Math.PI * 2,
         up = Math.abs(pref[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0],
-        u = norm([pref[1] * up[2] - pref[2] * up[1], pref[2] * up[0] - pref[0] * up[2], pref[0] * up[1] - pref[1] * up[0]]),
+        u = norm([
+          pref[1] * up[2] - pref[2] * up[1],
+          pref[2] * up[0] - pref[0] * up[2],
+          pref[0] * up[1] - pref[1] * up[0],
+        ]),
         v = [pref[1] * u[2] - pref[2] * u[1], pref[2] * u[0] - pref[0] * u[2], pref[0] * u[1] - pref[1] * u[0]],
         sin = Math.sin(theta),
         cos = Math.cos(theta),
@@ -187,7 +194,8 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
   trunk = out.length / CHANNEL_STRIDE;
   // Forks, generation by generation: from a channel point downward and to one side, shorter each time.
   let parents: { at: number[]; dir: number[] }[] = [];
-  for (let i = 0; i < trunk; i++) parents.push({ at: [out[i * 8 + 4], out[i * 8 + 5], out[i * 8 + 6]], dir: trunkDirs[i] });
+  for (let i = 0; i < trunk; i++)
+    parents.push({ at: [out[i * 8 + 4], out[i * 8 + 5], out[i * 8 + 6]], dir: trunkDirs[i] });
   for (let order = 1; order <= orders && out.length / CHANNEL_STRIDE < maxSegments; order++) {
     const made: { at: number[]; dir: number[] }[] = [],
       chance = branching * 0.6 ** (order - 1),
@@ -237,7 +245,8 @@ export function channelLightPoints(
 ): { position: Vec3; weight: number; radius: number }[] {
   if (!Number.isInteger(count) || count < 1 || count > 8)
     throw new RangeError('Lightning channel light count must be a whole number from 1 to 8');
-  if (!(decay > 0) || !Number.isFinite(decay)) throw new RangeError('Lightning channel light decay must be above 0 metres');
+  if (!(decay > 0) || !Number.isFinite(decay))
+    throw new RangeError('Lightning channel light decay must be above 0 metres');
   const s = channel.segments,
     lengths: number[] = [];
   let total = 0;
@@ -269,7 +278,12 @@ export function channelLightPoints(
 }
 
 /** The brightness of a stroke train `seconds` after the flash started: each stroke rises in 8 ms and falls with time constant `tau`. */
-export function strokeLevel(seconds: number, offsets: readonly number[], amplitudes: readonly number[], tau: number): number {
+export function strokeLevel(
+  seconds: number,
+  offsets: readonly number[],
+  amplitudes: readonly number[],
+  tau: number,
+): number {
   let level = 0;
   for (let i = 0; i < offsets.length; i++) {
     const t = seconds - offsets[i];
@@ -281,7 +295,8 @@ export function strokeLevel(seconds: number, offsets: readonly number[], amplitu
 
 /** The weather a {@link LightningBolt} draws. A `Weather` from `@margoengine/sky/weather` is one. */
 export interface LightningBoltSource {
-  readonly options: { readonly lightning?: {
+  readonly options: {
+    readonly lightning?: {
       readonly bolt?: LightningBoltOptions;
       readonly hold?: number;
       readonly seed?: number;
@@ -383,7 +398,12 @@ export class LightningBolt implements EnginePlugin {
   private uploaded = '';
 
   constructor(readonly options: LightningBoltAttachOptions) {
-    if (typeof options !== 'object' || options === null || typeof options.weather !== 'object' || options.weather === null)
+    if (
+      typeof options !== 'object' ||
+      options === null ||
+      typeof options.weather !== 'object' ||
+      options.weather === null
+    )
       throw new TypeError('LightningBolt needs a Weather; pass {weather}');
     for (const [k, v] of [
       ['coreRadiance', options.coreRadiance],
@@ -485,12 +505,17 @@ export class LightningBolt implements EnginePlugin {
     if (!this.storage || this.capacity < need) {
       this.storage?.destroy();
       this.capacity = Math.max(need, 2 * 16 * 512 * MAX_BOLTS);
-      this.storage = device.createBuffer({ size: this.capacity, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.storage = device.createBuffer({
+        size: this.capacity,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
       this.bind = undefined;
       this.uploaded = '';
     }
     // The segments only when the bolts drawn (or their channels) change: one upload for the whole flash.
-    const sig = bolts.map((x, i) => x.strike.id + ':' + channels[i].count + ':' + (channels[i].segments[0] + channels[i].segments[5])).join('|');
+    const sig = bolts
+      .map((x, i) => x.strike.id + ':' + channels[i].count + ':' + (channels[i].segments[0] + channels[i].segments[5]))
+      .join('|');
     if (sig !== this.uploaded) {
       const data = new Float32Array(total * CHANNEL_STRIDE);
       let at = 0;

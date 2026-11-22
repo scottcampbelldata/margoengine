@@ -243,7 +243,13 @@ const lantern = () => {
  * 114 lm averaged over it, the luminous output it had before its colour was corrected (intensity 16 at the 3,450 K
  * colour [1, 0.56, 0.24], luminance 0.630; KB-FIRE-GLOW-CCT1). A Margo design value: one lamp seen through a blizzard.
  */
-const WINDOW_LAMP = flameLight({ kelvin: 1900, lumens: 16 * 0.63046 * 0.9 * 4 * Math.PI, range: 10, speed: 0.5, seed: 7 });
+const WINDOW_LAMP = flameLight({
+  kelvin: 1900,
+  lumens: 16 * 0.63046 * 0.9 * 4 * Math.PI,
+  range: 10,
+  speed: 0.5,
+  seed: 7,
+});
 /** The flames' colour at birth, their brightest. */
 const FLAME_BIRTH: Vec3 = [1, 0.5, 0.12];
 /**
@@ -280,7 +286,9 @@ export function snowNight(options: SnowNightOptions = {}): SnowNightKit {
     focalDistance = range('focalDistance', options.focalDistance ?? 10, 0.3, 1e6),
     m = options.moonDirection ?? [-0.45, 0.42, -1];
   if (!Array.isArray(m) || m.length !== 3 || !m.every(Number.isFinite) || m[1] <= 0)
-    throw new RangeError('Invalid snowNight moonDirection; give [x, y, z] with y above 0 (the moon above the horizon).');
+    throw new RangeError(
+      'Invalid snowNight moonDirection; give [x, y, z] with y above 0 (the moon above the horizon).',
+    );
   const length = Math.hypot(m[0], m[1], m[2]),
     moonDirection: Vec3 = [m[0] / length, m[1] / length, m[2] / length],
     { visibility, intensity } = SNOWFALL[snowfall],
@@ -358,11 +366,7 @@ export function snowNight(options: SnowNightOptions = {}): SnowNightKit {
     // black (eaves, sills, the logs' lower faces), as on a real snowy night.
     bounce: {
       sky: [0, 0, 0] as Vec3,
-      ground: snowBounce(
-        moon.color.map((c) => c * moon.intensity) as unknown as Vec3,
-        moonDirection,
-        nightAmbient,
-      ),
+      ground: snowBounce(moon.color.map((c) => c * moon.intensity) as unknown as Vec3, moonDirection, nightAmbient),
       intensity: 1,
     },
     // The eye's own glare round the lantern and the fire (KB-CABIN-BLOOM1): the Stiles-Holladay veiling luminance

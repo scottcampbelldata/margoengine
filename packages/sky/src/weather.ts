@@ -198,7 +198,11 @@ export const LIGHTNING_COLOR: Vec3 = [0.3623, 0.4973, 1];
  * light (`weight`, summing to 1) and the size of the line it stands for. Set by `LightningBolt` on `Weather.channelSource`.
  */
 export interface LightningChannelSource {
-  lights(strike: LightningStrike, count: number, decay: number): readonly { position: Vec3; weight: number; radius: number }[];
+  lights(
+    strike: LightningStrike,
+    count: number,
+    decay: number,
+  ): readonly { position: Vec3; weight: number; radius: number }[];
 }
 
 /** A strike whose light has not died away: {@link Weather.liveStrikes}. */
@@ -357,7 +361,8 @@ export function snowflakeBokeh(
   depth: number,
   lens: { scale: number; focus: number; focalLength: number },
 ): { radius: number; alpha: number } {
-  const coc = lens.scale === 0 ? 0 : (lens.scale * Math.abs(depth - lens.focus)) / (depth * (lens.focus - lens.focalLength)),
+  const coc =
+      lens.scale === 0 ? 0 : (lens.scale * Math.abs(depth - lens.focus)) / (depth * (lens.focus - lens.focalLength)),
     radius = Math.max(Math.hypot(pixels, coc), 1);
   return { radius, alpha: (pixels * pixels) / (radius * radius) };
 }
@@ -749,7 +754,8 @@ function validate(o: WeatherOptions): void {
       throw new TypeError('Weather flakeSizes needs [smallest, largest] in millimetres; pass an array of two numbers');
     number(o.flakeSizes[0], 'flakeSizes[0]', 0.5, 30);
     number(o.flakeSizes[1], 'flakeSizes[1]', 0.5, 30);
-    if (o.flakeSizes[0] > o.flakeSizes[1]) throw new RangeError('Weather flakeSizes smallest must not exceed largest; swap them');
+    if (o.flakeSizes[0] > o.flakeSizes[1])
+      throw new RangeError('Weather flakeSizes smallest must not exceed largest; swap them');
   }
   if (o.brightness !== undefined) number(o.brightness, 'brightness', 0, 1e6);
   if (o.opacity !== undefined) number(o.opacity, 'opacity', 0, 1);
@@ -768,7 +774,8 @@ function validate(o: WeatherOptions): void {
       throw new TypeError('Weather nearFade needs [start, end] in metres; pass an array of two numbers');
     number(o.nearFade[0], 'nearFade[0]', 0, 1000);
     number(o.nearFade[1], 'nearFade[1]', 0, 1000);
-    if (o.nearFade[0] > o.nearFade[1]) throw new RangeError('Weather nearFade start must not exceed its end; swap them');
+    if (o.nearFade[0] > o.nearFade[1])
+      throw new RangeError('Weather nearFade start must not exceed its end; swap them');
   }
   if (o.wind !== undefined) {
     if (!Array.isArray(o.wind) || o.wind.length !== 2)
@@ -825,7 +832,8 @@ function validate(o: WeatherOptions): void {
       throw new TypeError('Weather lightning.light.line must be true or false');
     if (l.light.segments !== undefined) {
       number(l.light.segments, 'lightning.light.segments', 1, 8);
-      if (!Number.isInteger(l.light.segments)) throw new RangeError('Weather lightning.light.segments must be a whole number from 1 to 8');
+      if (!Number.isInteger(l.light.segments))
+        throw new RangeError('Weather lightning.light.segments must be a whole number from 1 to 8');
     }
     const shadow = l.light.shadow;
     if (shadow !== undefined && typeof shadow !== 'boolean') {
@@ -995,13 +1003,17 @@ export class Weather implements EnginePlugin {
    * Its intensity is in candela, as {@link Weather.lightningLight}: the deck matches the scene's lights when the sky is lit
    * in lux (`lighting.intensity: SUN_ILLUMINANCE`).
    */
-  readonly cloudFlash: { position: [number, number, number]; intensity: number; color: [number, number, number]; radius: number } =
-    {
-      position: [0, LIGHTNING_CLOUD_BASE + LIGHTNING_LIGHT_HEIGHT, 1000],
-      intensity: 0,
-      color: [...LIGHTNING_COLOR],
-      radius: 200,
-    };
+  readonly cloudFlash: {
+    position: [number, number, number];
+    intensity: number;
+    color: [number, number, number];
+    radius: number;
+  } = {
+    position: [0, LIGHTNING_CLOUD_BASE + LIGHTNING_LIGHT_HEIGHT, 1000],
+    intensity: 0,
+    color: [...LIGHTNING_COLOR],
+    radius: 200,
+  };
   /** How wet surfaces are, 0..1: rises under rain (about 20 s), dries when it stops (about 90 s). Drive roughness with it. */
   get wetness(): number {
     return this.wet;
@@ -1149,7 +1161,8 @@ export class Weather implements EnginePlugin {
       throw new RangeError('Invalid weather delta; pass a finite delta of 0 or more seconds.');
     const o = this.options,
       precipitation = o.precipitation ?? 'rain',
-      target = precipitation === 'none' ? 0 : (o.intensity ?? (o.rainRate === undefined ? 0.5 : rainIntensity(o.rainRate))),
+      target =
+        precipitation === 'none' ? 0 : (o.intensity ?? (o.rainRate === undefined ? 0.5 : rainIntensity(o.rainRate))),
       fade = o.fadeSeconds ?? 4;
     this.seconds += delta;
     if (this.engine) this.listener.set(this.engine.camera.position);
@@ -1272,7 +1285,8 @@ export class Weather implements EnginePlugin {
           this.linkedFogs.add(fog);
         } else if (!wantFog && this.linkedFogs.delete(fog)) {
           if (fog.lightning?.light === this.lightningLight) delete fog.lightning;
-        } else if (this.linkedFogs.has(fog) && fog.lightning?.light !== this.lightningLight) this.linkedFogs.delete(fog);
+        } else if (this.linkedFogs.has(fog) && fog.lightning?.light !== this.lightningLight)
+          this.linkedFogs.delete(fog);
       }
     }
     this.deckBottom = bottom === Infinity ? LIGHTNING_CLOUD_BASE : bottom;
@@ -1292,7 +1306,7 @@ export class Weather implements EnginePlugin {
     if (!wanted || !groups || groups.isDisposed || groups.clustered.isDisposed) return;
     const light = this.lightningLight,
       list = this.lineLights.length ? this.lineLights : [light],
-      main = list.reduce((a, b) => ((b.intensity > a.intensity) ? b : a), list[0]),
+      main = list.reduce((a, b) => (b.intensity > a.intensity ? b : a), list[0]),
       shadow = this.options.lightning?.light?.shadow,
       far = typeof shadow === 'object' ? (shadow.far ?? 3000) : 3000,
       near = typeof shadow === 'object' ? (shadow.near ?? 1) : 1,
@@ -1302,7 +1316,9 @@ export class Weather implements EnginePlugin {
     for (const x of list) if (x !== main) delete x.shadow;
     if (lit && shadow !== false) {
       const slots = groups.clustered.shadowSlots ?? 0,
-        used = groups.list.filter((x) => !list.includes(x as LightningLight) && x.shadow !== undefined && x.shadow !== false).length;
+        used = groups.list.filter(
+          (x) => !list.includes(x as LightningLight) && x.shadow !== undefined && x.shadow !== false,
+        ).length;
       if (slots > used) main.shadow = { near, far: Math.min(far, main.range) };
       else delete main.shadow;
     } else delete main.shadow;
@@ -1323,7 +1339,8 @@ export class Weather implements EnginePlugin {
 
   // Takes the flash out of every plugin it was wired into.
   private unlink(): void {
-    for (const deck of this.linkedClouds as Set<{ flash?: unknown }>) if (deck.flash === this.cloudFlash) delete deck.flash;
+    for (const deck of this.linkedClouds as Set<{ flash?: unknown }>)
+      if (deck.flash === this.cloudFlash) delete deck.flash;
     for (const fog of this.linkedFogs as Set<{ lightning?: { light?: unknown } }>)
       if (fog.lightning?.light === this.lightningLight) delete fog.lightning;
     this.linkedClouds.clear();
@@ -1371,7 +1388,8 @@ export class Weather implements EnginePlugin {
       light.position[2] = at.position[2];
     }
     light.position[1] = o?.height ?? LIGHTNING_LIGHT_HEIGHT;
-    light.range = o?.range ?? 1.5 * Math.max(1000, this.options.lightning?.maxDistance ?? lightningDefaults.maxDistance);
+    light.range =
+      o?.range ?? 1.5 * Math.max(1000, this.options.lightning?.maxDistance ?? lightningDefaults.maxDistance);
     const luminance = 0.2126 * light.color[0] + 0.7152 * light.color[1] + 0.0722 * light.color[2],
       peak = (o?.peak ?? LIGHTNING_PEAK_CANDELA) * (o?.scale ?? 1);
     light.intensity = (this.lightLevel * peak) / luminance;
@@ -1387,8 +1405,7 @@ export class Weather implements EnginePlugin {
     cloud.color[1] = light.color[1];
     cloud.color[2] = light.color[2];
     cloud.radius = k?.radius ?? 200;
-    cloud.intensity =
-      (this.lightLevel * (k?.peak ?? peak * lightningCloudShare(base)) * (k?.scale ?? 1)) / luminance;
+    cloud.intensity = (this.lightLevel * (k?.peak ?? peak * lightningCloudShare(base)) * (k?.scale ?? 1)) / luminance;
   }
 
   setup(engine: Engine): void {

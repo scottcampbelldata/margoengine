@@ -18,7 +18,13 @@ test('the deck lights level ground with the two-stream share of the light above 
       const n = 4000;
       for (let i = 0; i < n; i++) {
         const h = ((i + 0.5) / n) * (Math.PI / 2);
-        e += overcastDeck([1, 1, 1], sunUp, Math.sin(h), depth)[1] * Math.sin(h) * Math.cos(h) * 2 * Math.PI * (Math.PI / 2 / n);
+        e +=
+          overcastDeck([1, 1, 1], sunUp, Math.sin(h), depth)[1] *
+          Math.sin(h) *
+          Math.cos(h) *
+          2 *
+          Math.PI *
+          (Math.PI / 2 / n);
       }
       const want = cloudTransmission(depth) * DECK_ABOVE * sunUp;
       assert.ok(Math.abs(e / Math.PI / want - 1) < 1e-4, `depth ${depth}, sun ${sunUp}: ${e / Math.PI} vs ${want}`);
@@ -36,7 +42,8 @@ test('the deck follows the CIE overcast sky: the horizon a third of the zenith, 
   assert.ok(DECK_VARIATION > 0 && DECK_VARIATION <= 0.15, 'gentle variation');
 });
 test('clouds.depth is checked and has a slider row', () => {
-  for (const depth of [0.5, 201, NaN]) assert.throws(() => clouds.validate({ coverage: 1, depth }), RangeError, String(depth));
+  for (const depth of [0.5, 201, NaN])
+    assert.throws(() => clouds.validate({ coverage: 1, depth }), RangeError, String(depth));
   clouds.validate({ coverage: 1, depth: 1 });
   clouds.validate({ coverage: 1, depth: 200 });
   const row = SKY_SETTINGS.find((s) => s.name === 'clouds.depth');
@@ -53,7 +60,11 @@ test('the engine sun fades out with the deck: none under a full overcast, untouc
   const light = (coverage) => {
     const h = optionalGPU();
     h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
-    const sky = new Sky({ sunDirection: [0, Math.SQRT1_2, -Math.SQRT1_2], clouds: { coverage }, lighting: { intensity: 5 } });
+    const sky = new Sky({
+      sunDirection: [0, Math.SQRT1_2, -Math.SQRT1_2],
+      clouds: { coverage },
+      lighting: { intensity: 5 },
+    });
     try {
       h.engine.use(sky);
       sky.onPreUpdate(0);
@@ -111,5 +122,8 @@ test('the look tints the deck with its cloud colour', () => {
   } finally {
     sky.dispose();
   }
-  assert.ok(codes.some((c) => c.includes('*T)*frame.lookCloud.rgb;')), 'the deck is tinted');
+  assert.ok(
+    codes.some((c) => c.includes('*T)*frame.lookCloud.rgb;')),
+    'the deck is tinted',
+  );
 });

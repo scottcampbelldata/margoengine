@@ -859,7 +859,8 @@ test("lighting.ambient yields core's ambient to an explicit environment: one mar
       if (!explicit) return;
       c.shader = c.shader.replace(
         /let linear=([^;]+);/,
-        (_, terms) => `let margoAmbient=iblShade(n,v);let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
+        (_, terms) =>
+          `let margoAmbient=iblShade(n,v);let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
       );
       c.bindings.push({ binding: 40, resource: {} });
     },
@@ -887,8 +888,14 @@ test("lighting.ambient yields core's ambient to an explicit environment: one mar
   explicit = false;
   frame();
   assert.equal(h.context.shader.split('let margoAmbient=').length, 2);
-  assert.match(h.context.shader, /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/);
-  assert.deepEqual(h.context.bindings.map((e) => e.binding).sort((a, b) => a - b), [8, 10, 11]);
+  assert.match(
+    h.context.shader,
+    /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/,
+  );
+  assert.deepEqual(
+    h.context.bindings.map((e) => e.binding).sort((a, b) => a - b),
+    [8, 10, 11],
+  );
   // A HemisphereLight (also order -1) puts its sky term where core's constant ambient was: the sky's light joins it,
   // as when the sky patched first.
   h.engine.frameGraph.add({
@@ -1069,7 +1076,13 @@ test('coverage records the pixels the sky draws only while asked, at the frame s
     begin = h.context.encoder.beginRenderPass,
     passes = [];
   h.context.encoder.beginRenderPass = (descriptor) => (passes.push(descriptor), begin(descriptor));
-  globalThis.GPUTextureUsage = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+  globalThis.GPUTextureUsage = {
+    COPY_SRC: 1,
+    COPY_DST: 2,
+    TEXTURE_BINDING: 4,
+    STORAGE_BINDING: 8,
+    RENDER_ATTACHMENT: 16,
+  };
   const sky = new Sky({ hours: 12, timeScale: 0 });
   h.engine.use(sky);
   h.frame();
@@ -1137,17 +1150,33 @@ test('the sky light map is taken into the engine sun units, in proportion to lig
     for (const intensity of [1, 3]) {
       const h = optionalGPU();
       h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.18]) };
-      const sky = new Sky({ hours: 12, timeScale: 0, model, lighting: { intensity, ambient: { day: [0, 0, 0], night: [0, 0, 0] } } });
+      const sky = new Sky({
+        hours: 12,
+        timeScale: 0,
+        model,
+        lighting: { intensity, ambient: { day: [0, 0, 0], night: [0, 0, 0] } },
+      });
       h.engine.use(sky);
       sky.onPreUpdate(h.context.delta);
       h.context.shader = wgsl;
       h.context.bindings = [];
       h.engine.frameGraph.execute(h.context);
-      assert.ok(Math.abs(sky.lightScale - intensity / unit) < 1e-6 * sky.lightScale, `${model} ${intensity}: ${sky.lightScale}`);
+      assert.ok(
+        Math.abs(sky.lightScale - intensity / unit) < 1e-6 * sky.lightScale,
+        `${model} ${intensity}: ${sky.lightScale}`,
+      );
       // The 160-byte light buffer carries it in its last float, beside the ambient floor.
       const buffer = h.context.bindings.find((e) => e.binding === 8).resource.buffer;
-      assert.equal(new Float32Array(buffer.data)[39], Math.fround(sky.lightScale), `${model} ${intensity}: skyLight[9].w`);
-      assert.match(h.context.shader, /n\.x\*n\.x-n\.y\*n\.y\)\)\*skyLight\[9\]\.w,skyLight\[9\]\.rgb\)/, 'diffuse scaled, floor not');
+      assert.equal(
+        new Float32Array(buffer.data)[39],
+        Math.fround(sky.lightScale),
+        `${model} ${intensity}: skyLight[9].w`,
+      );
+      assert.match(
+        h.context.shader,
+        /n\.x\*n\.x-n\.y\*n\.y\)\)\*skyLight\[9\]\.w,skyLight\[9\]\.rgb\)/,
+        'diffuse scaled, floor not',
+      );
       assert.match(h.context.shader, /rough\*3\.0\)\.rgb\*skyLight\[9\]\.w\*specular/, 'reflections scaled');
       sky.dispose();
     }

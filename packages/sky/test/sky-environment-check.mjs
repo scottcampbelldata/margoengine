@@ -30,10 +30,19 @@ try {
     auto = await run('auto'),
     off = await run('off');
   for (const r of [sky, env, auto, off]) {
-    console.log(r.mode, r.frames.map((f) => `${f.digest} core ${f.core.map((v) => v.toFixed(1))} gltf ${f.gltf.map((v) => v.toFixed(1))}`).join(' | '));
+    console.log(
+      r.mode,
+      r.frames
+        .map((f) => `${f.digest} core ${f.core.map((v) => v.toFixed(1))} gltf ${f.gltf.map((v) => v.toFixed(1))}`)
+        .join(' | '),
+    );
     assert.deepEqual(r.errors, [], `${r.mode}: GPU errors`);
     // Frames at one instant are the same frame.
-    assert.deepEqual(r.frames.map((f) => f.digest), r.frames.map(() => r.frames[3].digest), `${r.mode}: stable frames`);
+    assert.deepEqual(
+      r.frames.map((f) => f.digest),
+      r.frames.map(() => r.frames[3].digest),
+      `${r.mode}: stable frames`,
+    );
   }
   const s = sky.frames[3],
     e = env.frames[3];
@@ -44,7 +53,11 @@ try {
   }
   // KB-GLTF-SCENESKY1: without sky.add the glTF box is lit by its scene's sky all the same, from the first frame; with
   // sceneSky false it keeps the built-in ambient (what every model had before).
-  assert.deepEqual(auto.frames.map((f) => f.digest), sky.frames.map((f) => f.digest), "a glTF model joins its scene's sky by itself");
+  assert.deepEqual(
+    auto.frames.map((f) => f.digest),
+    sky.frames.map((f) => f.digest),
+    "a glTF model joins its scene's sky by itself",
+  );
   assert.deepEqual(off.frames[3].core, s.core, 'the core box is lit the same with the model left out');
   assert.notDeepEqual(off.frames[3].gltf, s.gltf, 'sceneSky false leaves the glTF box out of the sky');
   // The environment takes the ambient: both boxes change from the sky-only frame, and both stay lit.

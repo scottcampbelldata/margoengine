@@ -19,7 +19,13 @@ import {
   snowflakeFallSpeed,
   LIGHTNING_CLOUD_BASE,
   lightningCloudShare,
-  rainDropDiameter, rainFallSpeed, rainFall, rainSlant, rainIntensity, rainDropCount, RAIN_FALL_DEFAULT,
+  rainDropDiameter,
+  rainFallSpeed,
+  rainFall,
+  rainSlant,
+  rainIntensity,
+  rainDropCount,
+  RAIN_FALL_DEFAULT,
 } from '@margoengine/sky/weather';
 import { snowNight } from '@margoengine/sky/scene-kits';
 import { MargoError } from '@margoengine/math/errors';
@@ -303,7 +309,11 @@ test('the uniform carries the camera, the box, the wrapped drift, the colour and
   weather.options.precipitation = 'snow';
   h.frame();
   assert.equal(uniform(h)[36], 1);
-  assert.equal(uniform(h)[41], Math.fround(0.8), 'Flakes fall at 0.8 D^0.16 m/s, each at its own size (KB-SNOW-FALLSPEED1)');
+  assert.equal(
+    uniform(h)[41],
+    Math.fround(0.8),
+    'Flakes fall at 0.8 D^0.16 m/s, each at its own size (KB-SNOW-FALLSPEED1)',
+  );
 });
 
 /** The snow shader the rig compiles, from its shader modules. */
@@ -331,8 +341,14 @@ test('snow sways on a phase of its own, so the flakes stay evenly spread instead
   // z * 2.7), so x -> x + 0.35 sin(t + 3.1 x) folded the snow into sheets of x = constant (slope 1 + 1.085 cos, which
   // passes zero) that showed as a column of flakes whenever one passed the camera. The phase is now drawn per flake.
   const code = snowShader({ precipitation: 'snow', intensity: 1, fadeSeconds: 0, wind: [5, 17] });
-  assert.ok(code.includes(' let ph=pcg(pcg(ii*4u+3u+bitcast<u32>(w.params.z)));\n'), 'One hash per flake for its phases');
-  assert.ok(code.includes(' let phase=vec2f(f32(ph&0xffffu),f32(ph>>16u))*9.5873799e-5;\n'), 'Two 16-bit phases, 0 to 2 pi');
+  assert.ok(
+    code.includes(' let ph=pcg(pcg(ii*4u+3u+bitcast<u32>(w.params.z)));\n'),
+    'One hash per flake for its phases',
+  );
+  assert.ok(
+    code.includes(' let phase=vec2f(f32(ph&0xffffu),f32(ph>>16u))*9.5873799e-5;\n'),
+    'Two 16-bit phases, 0 to 2 pi',
+  );
   assert.ok(code.includes('if(snow){q+=vec3f(sin(w.drift.w+phase.x),0.0,cos(w.drift.w*0.8+phase.y))*0.35;}'));
   assert.ok(code.includes('let sway=vec3f(cos(w.drift.w+phase.x)*1.3,0.0,-sin(w.drift.w*0.8+phase.y)*1.04)*0.35;'));
   assert.doesNotMatch(code, /start\.[xz]\*/, 'No phase follows the place along the swing');
@@ -386,7 +402,10 @@ test('a swept flake shades the time average of the moving disc, so sub-frame cap
   ].join('\n');
   assert.ok(code.includes(body), 'The fragment integrates the disc along the sweep');
   assert.ok(code.includes('if(w.params.x>0.5){a*=flake(i.uv,i.sweep);}'));
-  assert.ok(code.includes(' out.alpha=fade*sharp*sharp/(px*px);'), 'No light share for the sweep: the average keeps it');
+  assert.ok(
+    code.includes(' out.alpha=fade*sharp*sharp/(px*px);'),
+    'No light share for the sweep: the average keeps it',
+  );
   assert.doesNotMatch(code, /1\.596/);
   // The twin of flake(): consecutive capsules (8 sub-frames) of one flake add up to within 1.5 % of even along the
   // middle of the streak, and each keeps the still disc's light, 1.596 radii squared.
@@ -426,7 +445,8 @@ test('a swept flake shades the time average of the moving disc, so sub-frame cap
       assert.ok(high / low < 1.015, `Sweep ${sweep}, x ${x}: an even streak (${low.toFixed(4)} to ${high.toFixed(4)})`);
     }
     let area = 0;
-    for (let x = -1; x <= 1; x += 0.01) for (let y = -1.5; y < sweep + 1.5; y += 0.01) area += flake(x, y, sweep) * 1e-4;
+    for (let x = -1; x <= 1; x += 0.01)
+      for (let y = -1.5; y < sweep + 1.5; y += 0.01) area += flake(x, y, sweep) * 1e-4;
     assert.ok(Math.abs(area - 1.596) < 0.01, `Sweep ${sweep}: the disc's light (${area.toFixed(4)})`);
   }
 });
@@ -434,7 +454,14 @@ test('a swept flake shades the time average of the moving disc, so sub-frame cap
 test('a wind that changes moves the particles on from where they are (gusts do not jump the snow)', () => {
   // Regression (lane SC3, Whiteout Pass): the drift was wind * time, so a gust after 37 s of snow moved every flake by
   // the change of wind times 37 s in one frame; it is now the running sum of wind times delta.
-  const { h, weather } = rig({ precipitation: 'snow', intensity: 1, fadeSeconds: 0, radius: 50, height: 8, wind: [3, 0] });
+  const { h, weather } = rig({
+    precipitation: 'snow',
+    intensity: 1,
+    fadeSeconds: 0,
+    radius: 50,
+    height: 8,
+    wind: [3, 0],
+  });
   h.context.delta = 37;
   h.frame();
   const before = uniform(h)[24];
@@ -538,7 +565,8 @@ test('a strike lights the scene: a point light of a measured first stroke, at th
   // spectrum weighted by Wyman, Sloan and Shirley's (JCGT 2013) photopic fit, over that band, recomputed here.
   const g = (x, m, a, b) => Math.exp(-0.5 * ((x - m) * (x < m ? a : b)) ** 2),
     Y = (l) => 0.821 * g(l, 568.8, 0.0213, 0.0247) + 0.286 * g(l, 530.9, 0.0613, 0.0322),
-    X = (l) => 1.056 * g(l, 599.8, 0.0264, 0.0323) + 0.362 * g(l, 442.0, 0.0624, 0.0374) - 0.065 * g(l, 501.1, 0.049, 0.0382),
+    X = (l) =>
+      1.056 * g(l, 599.8, 0.0264, 0.0323) + 0.362 * g(l, 442.0, 0.0624, 0.0374) - 0.065 * g(l, 501.1, 0.049, 0.0382),
     Z = (l) => 1.217 * g(l, 437.0, 0.0845, 0.0278) + 0.681 * g(l, 459.0, 0.0385, 0.0725),
     planck = (l) => 1 / ((l * 1e-9) ** 5 * (Math.exp(1.4387769e-2 / (l * 1e-9 * 30000)) - 1));
   let x = 0,
@@ -599,7 +627,12 @@ test('a strike lights the scene: a point light of a measured first stroke, at th
   assert.ok(Math.abs(light.intensity * luminance(light.color) - 0.5e9) < 1);
   assert.equal(light.position[1], 420);
   assert.equal(light.range, 5000);
-  for (const bad of [{ hold: 2 }, { light: { peak: -1 } }, { light: { color: [0, 0, 0] } }, { light: { height: -1 } }]) {
+  for (const bad of [
+    { hold: 2 },
+    { light: { peak: -1 } },
+    { light: { color: [0, 0, 0] } },
+    { light: { height: -1 } },
+  ]) {
     w.options.lightning = bad;
     assert.throws(() => w.onPreUpdate(0.01), RangeError);
   }
@@ -647,12 +680,23 @@ test('flakes off the focal plane draw as the lens blurs them, their light spread
 
   // The shader draws the same disc: the uniform carries the lens and the near fade, and the vertex stage adds the
   // circle of confusion in quadrature and divides the light by the disc's area.
-  const code = snowShader({ precipitation: 'snow', intensity: 1, fadeSeconds: 0, lens: { focalDistance: 14.9, aperture: 1.4 } });
+  const code = snowShader({
+    precipitation: 'snow',
+    intensity: 1,
+    fadeSeconds: 0,
+    lens: { focalDistance: 14.9, aperture: 1.4 },
+  });
   assert.ok(code.includes('let coc=w.lens.x*abs(c.w-w.lens.y)/(c.w*w.eye.w);'));
   assert.ok(code.includes('let px=max(sqrt(sharp*sharp+coc*coc),1.0);'));
   assert.ok(code.includes(' out.alpha=fade*sharp*sharp/(px*px);'), 'Light over the disc: true area over drawn area');
   assert.ok(code.includes('smoothstep(w.lens.z,w.lens.w,nearDistance)'));
-  const { h, weather } = rig({ precipitation: 'snow', intensity: 1, fadeSeconds: 0, lens: { focalDistance: 14.9, aperture: 1.4 }, nearFade: [0.6, 3] });
+  const { h, weather } = rig({
+    precipitation: 'snow',
+    intensity: 1,
+    fadeSeconds: 0,
+    lens: { focalDistance: 14.9, aperture: 1.4 },
+    nearFade: [0.6, 3],
+  });
   h.frame();
   const u = uniform(h),
     camera = h.engine.camera,
@@ -668,7 +712,14 @@ test('flakes off the focal plane draw as the lens blurs them, their light spread
   h.frame();
   assert.deepEqual([uniform(h)[46], uniform(h)[47]], [Math.fround(Math.max(0.4, camera.near)), 2]);
   weather.dispose();
-  for (const bad of [{ lens: 1 }, { lens: { aperture: 0.1 } }, { lens: { focalDistance: 0.1 } }, { lens: { filmGauge: 0 } }, { nearFade: [2, 1] }, { nearFade: [1] }])
+  for (const bad of [
+    { lens: 1 },
+    { lens: { aperture: 0.1 } },
+    { lens: { focalDistance: 0.1 } },
+    { lens: { filmGauge: 0 } },
+    { nearFade: [2, 1] },
+    { nearFade: [1] },
+  ])
     assert.throws(() => new Weather(bad), /lens|nearFade/);
 });
 
@@ -721,7 +772,10 @@ test('flakes take the measured sizes of aggregate snowflakes, Gunn and Marshall 
     }
     const mean = s1 / n,
       spread = Math.sqrt(s2 / n - mean * mean);
-    assert.ok(Math.abs(mean - want.mean) < 2e-3 * want.mean, `${rate} mm/h: mean ${mean.toFixed(4)} mm, the papers' ${want.mean.toFixed(4)}`);
+    assert.ok(
+      Math.abs(mean - want.mean) < 2e-3 * want.mean,
+      `${rate} mm/h: mean ${mean.toFixed(4)} mm, the papers' ${want.mean.toFixed(4)}`,
+    );
     assert.ok(
       Math.abs(spread - want.spread) < 5e-3 * want.spread,
       `${rate} mm/h: spread ${spread.toFixed(4)} mm, the papers' ${want.spread.toFixed(4)}`,
@@ -738,7 +792,13 @@ test('flakes take the measured sizes of aggregate snowflakes, Gunn and Marshall 
   assert.ok(code.includes(' let melted=w.volume.w-log(1.0-rnd(ii,3u)*w.extra.w)/w.params.y;'));
   assert.ok(code.includes(' let sizeMeters=0.0005*pow(7.172586*melted*melted*melted,0.71428571);'));
   assert.ok(Math.abs(7.172586 - Math.PI / (6 * 0.073)) < 1e-6);
-  const { h, weather } = rig({ precipitation: 'snow', intensity: 1, fadeSeconds: 0, snowfallRate: 2, flakeSizes: [3, 12] });
+  const { h, weather } = rig({
+    precipitation: 'snow',
+    intensity: 1,
+    fadeSeconds: 0,
+    snowfallRate: 2,
+    flakeSizes: [3, 12],
+  });
   h.frame();
   const law = snowflakeSizeLaw(2, [3, 12]),
     u = uniform(h);
@@ -747,7 +807,13 @@ test('flakes take the measured sizes of aggregate snowflakes, Gunn and Marshall 
   h.frame();
   assert.deepEqual([uniform(h)[37], uniform(h)[23]], [Math.fround(0.035), 0], 'Rain: its streak seconds');
   weather.dispose();
-  for (const bad of [{ snowfallRate: 0 }, { snowfallRate: 31 }, { flakeSizes: [10, 2] }, { flakeSizes: [0.1, 2] }, { flakeSizes: [2] }])
+  for (const bad of [
+    { snowfallRate: 0 },
+    { snowfallRate: 31 },
+    { flakeSizes: [10, 2] },
+    { flakeSizes: [0.1, 2] },
+    { flakeSizes: [2] },
+  ])
     assert.throws(() => new Weather(bad), /snowfallRate|flakeSizes/);
 });
 
@@ -763,7 +829,10 @@ test('a flake under a pixel is drawn a pixel wide with alpha its true area over 
       const drawn = snowflakeBokeh(pixels, depth, l);
       assert.ok(drawn.radius >= 1, 'At least a pixel wide');
       // Light is opacity times disc area: the drawn flake's equals the true flake's.
-      assert.ok(Math.abs(drawn.alpha * drawn.radius ** 2 - pixels ** 2) < 1e-9, `${pixels} px at ${depth} m: light kept`);
+      assert.ok(
+        Math.abs(drawn.alpha * drawn.radius ** 2 - pixels ** 2) < 1e-9,
+        `${pixels} px at ${depth} m: light kept`,
+      );
     }
   }
   assert.deepEqual(snowflakeBokeh(0.25, 20, sharp), { radius: 1, alpha: 0.0625 });
@@ -816,9 +885,14 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
   assert.ok(Math.abs(snowflakeFallSpeed(0.002) - 0.894) < 1e-3 && Math.abs(snowflakeFallSpeed(0.01) - 1.156) < 1e-3);
   // The shader: each flake's speed from its own sampled size, the size the disc is drawn at.
   const code = snowShader({ precipitation: 'snow', intensity: 1, fadeSeconds: 0 });
-  assert.ok(code.includes(' let k=u32(round(w.extra.y*pow(sizeMeters*2000.0,0.16)*512.0));'), 'Speed from the flake size');
+  assert.ok(
+    code.includes(' let k=u32(round(w.extra.y*pow(sizeMeters*2000.0,0.16)*512.0));'),
+    'Speed from the flake size',
+  );
   assert.ok(code.includes(' let fall=select(w.extra.y,f32(k)*0.001953125,flakes);'));
-  assert.ok(code.includes(' let fallen=select(w.drift.y,-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y,flakes);'));
+  assert.ok(
+    code.includes(' let fallen=select(w.drift.y,-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y,flakes);'),
+  );
   assert.ok(code.includes(' let rel=fract((start+vec3f(w.drift.x,fallen,w.drift.z)-w.eye.xyz)/size)-0.5;'));
   // Twin over the flakes the shader draws (hash seed 1): every flake's speed is the law at its size, to half a step.
   const rnd = (i, k) => (pcg((i * 4 + k + 1) >>> 0) >>> 8) * 5.9604645e-8;
@@ -827,7 +901,10 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
   for (let i = 0; i < 20000; i++) {
     const D = snowflakeDiameter(rnd(i, 3)),
       v = fallSteps(D) / FALL_STEP;
-    assert.ok(Math.abs(v - fallLaw(D)) <= 0.5 / FALL_STEP + 1e-6, `flake ${i}: ${v} m/s against ${fallLaw(D)} at ${D * 1000} mm`);
+    assert.ok(
+      Math.abs(v - fallLaw(D)) <= 0.5 / FALL_STEP + 1e-6,
+      `flake ${i}: ${v} m/s against ${fallLaw(D)} at ${D * 1000} mm`,
+    );
     slowest = Math.min(slowest, v);
     fastest = Math.max(fastest, v);
   }
@@ -844,13 +921,19 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
   assert.ok(Number.isInteger(bits) && Math.abs(bits - Math.floor((phase % 1) * 2 ** 24)) <= 1, `Fall phase ${bits}`);
   for (const k of [458, 512, 592]) {
     const fallen = (Math.imul(k, bits) & 0xffffff) * 5.9604645e-8 * 16,
-      want = (((k / FALL_STEP) * 1000.3) % 16 + 16) % 16;
-    assert.ok(Math.abs(fallen - want) < 2e-3, `${k / FALL_STEP} m/s for 1000.3 s: ${fallen} m of the box, want ${want}`);
+      want = ((((k / FALL_STEP) * 1000.3) % 16) + 16) % 16;
+    assert.ok(
+      Math.abs(fallen - want) < 2e-3,
+      `${k / FALL_STEP} m/s for 1000.3 s: ${fallen} m of the box, want ${want}`,
+    );
   }
   weather.options.precipitation = 'rain';
   h.frame();
   assert.equal(uniform(h)[41], 9, 'Rain keeps its 9 m/s');
-  assert.ok(Math.abs(uniform(h)[25] - ((((-9 * 2000.6) % 16) + 16) % 16)) < 1e-3, 'Rain keeps its float drift, 9 m/s times the time');
+  assert.ok(
+    Math.abs(uniform(h)[25] - ((((-9 * 2000.6) % 16) + 16) % 16)) < 1e-3,
+    'Rain keeps its float drift, 9 m/s times the time',
+  );
   weather.dispose();
 });
 
@@ -858,7 +941,8 @@ test('the mean fall speed at the kit default is within the measured 0.89 to 1.16
   const p = snowNight().precipitation,
     n = 100000;
   let sum = 0;
-  for (let i = 0; i < n; i++) sum += snowflakeFallSpeed(snowflakeDiameter((i + 0.5) / n, p.snowfallRate ?? 1, p.flakeSizes ?? [2, 10]));
+  for (let i = 0; i < n; i++)
+    sum += snowflakeFallSpeed(snowflakeDiameter((i + 0.5) / n, p.snowfallRate ?? 1, p.flakeSizes ?? [2, 10]));
   const mean = sum / n;
   // Locatelli and Hobbs's aggregates of dendrites, 2 to 10 mm: 0.89 to 1.16 m/s; about 1 m/s at the mean 4.2 mm flake.
   assert.ok(mean > 0.89 && mean < 1.16, `Mean ${mean.toFixed(3)} m/s`);
@@ -877,7 +961,10 @@ test('the shutter streak is each flake speed times the exposure, projected (KB-S
     small = streak(0.002),
     large = streak(0.01);
   assert.ok(Math.abs(small - (fallLaw(0.002) * T * focalPixels) / d) < 0.01, `2 mm: ${small} px`);
-  assert.ok(Math.abs(large / small - (10 / 2) ** 0.16) < 3e-3, `10 mm streaks ${(large / small).toFixed(3)} times a 2 mm one`);
+  assert.ok(
+    Math.abs(large / small - (10 / 2) ** 0.16) < 3e-3,
+    `10 mm streaks ${(large / small).toFixed(3)} times a 2 mm one`,
+  );
 });
 
 test('no flake near the lens reads as a disc bigger than a real flake, and distant snow keeps its density (KB-SNOW-NEARCAM2)', () => {
@@ -907,9 +994,13 @@ test('no flake near the lens reads as a disc bigger than a real flake, and dista
       for (let u = 0.0005; u < 1; u += 0.001)
         worstNew = Math.max(worstNew, reads(fade, (snowflakeDiameter(u) / 2) * (focalPixels / d), coc));
       // The flakes as drawn before: 12 mm times 0.6 to 1.4 in radius.
-      for (let k = 0.6; k <= 1.4; k += 0.01) worstOld = Math.max(worstOld, reads(fade, (0.012 * k * focalPixels) / d, coc));
+      for (let k = 0.6; k <= 1.4; k += 0.01)
+        worstOld = Math.max(worstOld, reads(fade, (0.012 * k * focalPixels) / d, coc));
     }
-    assert.ok(worstNew <= bound, `focus ${focus} m: the largest near disc is ${worstNew.toFixed(2)} px, at most ${bound.toFixed(2)}`);
+    assert.ok(
+      worstNew <= bound,
+      `focus ${focus} m: the largest near disc is ${worstNew.toFixed(2)} px, at most ${bound.toFixed(2)}`,
+    );
     assert.ok(worstOld > 4 * bound, `focus ${focus} m: the 24 mm flakes read as ${worstOld.toFixed(1)} px discs`);
   }
 
@@ -929,7 +1020,8 @@ test('no flake near the lens reads as a disc bigger than a real flake, and dista
           y = (rnd(i, 1) - 0.5) * height,
           z = (rnd(i, 2) - 0.5) * 2 * radius,
           depth = -z;
-        if (depth < 0.1 || Math.hypot(x, y, z) < nearFull || Math.abs(x) > halfX * depth || Math.abs(y) > halfY * depth) continue;
+        if (depth < 0.1 || Math.hypot(x, y, z) < nearFull || Math.abs(x) > halfX * depth || Math.abs(y) > halfY * depth)
+          continue;
         sum += flakeLight(i, depth);
       }
       return sum;
@@ -965,7 +1057,10 @@ test('cloudFlash: the stroke light given off above the cloud base, one decay len
   w.options.lightning = { hold: 0.5, cloud: { base: 650 } };
   w.onPreUpdate(0.01);
   assert.equal(cloud.position[1], 1350);
-  assert.ok(Math.abs(cloud.intensity * luminance(cloud.color) - 0.5 * LIGHTNING_PEAK_CANDELA * 0.39505) < 0.5e-4 * LIGHTNING_PEAK_CANDELA);
+  assert.ok(
+    Math.abs(cloud.intensity * luminance(cloud.color) - 0.5 * LIGHTNING_PEAK_CANDELA * 0.39505) <
+      0.5e-4 * LIGHTNING_PEAK_CANDELA,
+  );
   w.options.lightning = { hold: 1, cloud: { peak: 2e6, radius: 300 } };
   w.onPreUpdate(0.01);
   assert.ok(Math.abs(cloud.intensity * luminance(cloud.color) - 2e6) < 1e-3);
@@ -1027,7 +1122,10 @@ test('the rain streak slants by atan(wind / fall) within 2 degrees, the fall spe
 
 // Lightning that lights, with no wiring (lightning.link): the cloud deck from inside, the fog under it and the ground and
 // scene through the lights, found by plugin name in the scene.
-function stormScene(options, { slots = 4, groups = true, fog = true, deck = { weather: { cloud: 1, rain: 1, lightning: 1 } } } = {}) {
+function stormScene(
+  options,
+  { slots = 4, groups = true, fog = true, deck = { weather: { cloud: 1, rain: 1, lightning: 1 } } } = {},
+) {
   const r = rig({ intensity: 0.9, lightning: { seed: 3, ...options } }),
     scene = { deck: { name: 'sky:volumetric-clouds', options: deck, setup() {} } };
   r.h.engine.use(scene.deck);
@@ -1158,11 +1256,19 @@ test("the deck's flash sits in the linked deck: its base from the weather's clou
     flashFor(weather);
     return weather.cloudFlash.position[1];
   };
-  assert.equal(at({ weather: { cloud: 1, rain: 1, lightning: 1 } }), 600 + LIGHTNING_LIGHT_HEIGHT, 'a storm deck: base 600 m');
+  assert.equal(
+    at({ weather: { cloud: 1, rain: 1, lightning: 1 } }),
+    600 + LIGHTNING_LIGHT_HEIGHT,
+    'a storm deck: base 600 m',
+  );
   assert.equal(at({ weather: { cloud: 1 } }), 900, 'stratus 300 to 900 m: the flash stays under the tops');
   assert.equal(at({ bottom: 2000, top: 6000 }), 2000 + LIGHTNING_LIGHT_HEIGHT, "the deck's own bottom");
   assert.equal(at({}), LIGHTNING_CLOUD_BASE + LIGHTNING_LIGHT_HEIGHT, 'the default deck');
-  assert.equal(at({ bottom: 2000 }, { cloud: { base: 500 } }), 500 + LIGHTNING_LIGHT_HEIGHT, 'lightning.cloud.base wins');
+  assert.equal(
+    at({ bottom: 2000 }, { cloud: { base: 500 } }),
+    500 + LIGHTNING_LIGHT_HEIGHT,
+    'lightning.cloud.base wins',
+  );
 });
 
 test("the scales multiply the stroke's light and the deck's flash", () => {
@@ -1173,7 +1279,10 @@ test("the scales multiply the stroke's light and the deck's flash", () => {
   };
   const [light, deck] = read({});
   const [light3, deck3] = read({ light: { scale: 3 } });
-  assert.ok(Math.abs(light3 / light - 3) < 1e-9 && Math.abs(deck3 / deck - 3) < 1e-9, 'the light scale carries into the deck');
+  assert.ok(
+    Math.abs(light3 / light - 3) < 1e-9 && Math.abs(deck3 / deck - 3) < 1e-9,
+    'the light scale carries into the deck',
+  );
   const [light4, deck4] = read({ cloud: { scale: 4 } });
   assert.equal(light4, light);
   assert.ok(Math.abs(deck4 / deck - 4) < 1e-9);

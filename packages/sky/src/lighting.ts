@@ -93,7 +93,13 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       throw new RangeError(
         "Invalid sky night options; give moon and ambient as objects, with a finite moon intensity of 0 or more, a moon extinction from 0 to 2, a moon brightness from 0 to 10000 or 'bright' or 'dim', a moon color of linear RGB or 'blood' or 'reddened', and a moon cloudCover from 0 to 1.",
       );
-    for (const color of [l.color, l.sunset, typeof l.moon?.color === 'string' ? undefined : l.moon?.color, l.ambient?.day, l.ambient?.night])
+    for (const color of [
+      l.color,
+      l.sunset,
+      typeof l.moon?.color === 'string' ? undefined : l.moon?.color,
+      l.ambient?.day,
+      l.ambient?.night,
+    ])
       if (color !== undefined) {
         finiteVector(color, 3, 'Sky color');
         if (color.some((v) => v < 0)) throw new RangeError('Invalid sky color; use non-negative RGB components.');
