@@ -9047,6 +9047,16 @@ native WebGPU and the WebGL2 layer, with device loss attached and detached. The 
 GeometryGenerator.dispose never removed its plugin from the scene (fixed in packages/geometry/src/gpu.ts, regression in
 packages/geometry/tests/gpu.test.js).
 
+Batch owners-b10 (2026-11-21) gated machinery and recorded the three install kits as exclusions. machinery: Kinematics, ExplodedView,
+SurfacePhysics and TelemetryChannel (Wasm memory, socket listener), Dimensions, FeatureEdges, SectionPlanes (WebGPU only),
+EngineeringAnnotations (an SVG overlay) and the AssemblyIndex and AssemblyBVH indexes tied to a plugin registration
+(`ownedByEngine`); the metrology, clearance and anchor entries and the Rust kernel's queries are numbers and typed arrays. The fixture
+found KB-MACHINERY-DISPOSE1: seven plugins' dispose never removed them from their scene (regression in
+packages/machinery/test/scene.test.js), and KB-MACHINERY-VIEWPORT1: FeatureEdges and the section caps ignored the view's viewport
+and scissor (fixed in packages/machinery/src; the browser leaf is the regression). kit-react, kit-viz and kit-web are generated files of re-exports
+(scripts/umbrella.mjs) with no code of their own, so each is in OWNER_EXCLUSIONS and `tests/owner-exclusions.test.js` fails if a
+kit source line is anything but a comment or a re-export; the lifetimes they hand out belong to the packages they re-export.
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,

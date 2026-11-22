@@ -22,6 +22,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the row pattern is `KB[\w-]+` (the coordinator, 2026-11-21).
 - **Regression:** tests/upstream-reports.test.js (fails on the old pattern with the KB-WATER-FLOODFILM-COMPAT1 folder present).
 
+### Fixed 2026-11-21: FeatureEdges and the SectionPlanes caps ignored the view's viewport and scissor (KB-MACHINERY-VIEWPORT1, machinery)
+- **Repro:** render a view with a viewport smaller than the canvas with FeatureEdges (or SectionPlanes with caps) attached; the owner fixture `packages/machinery/test/owner-lifetime.fixture.js` failed in the browser leaf with "draw restores the current viewport".
+- **Cause:** their render passes never set the pass viewport and scissor, so edges and cap fills were drawn over the whole target instead of the view's rectangle.
+- **Fix:** both passes set `context.view`'s viewport and scissor the way core's own draw does.
+- **Regression:** `npm run check:owners -- --packages=machinery` on WebGPU and the WebGL2 layer (the harness checks every draw's viewport and scissor).
+
+### Fixed 2026-11-21: disposing a machinery plugin left it registered in its scene (KB-MACHINERY-DISPOSE1, machinery)
+- **Repro:** `const view = ExplodedView.attach(engine, parts); view.dispose();` then `engine.sceneOf(view)` still returned the scene; the same for Kinematics, SurfacePhysics, TelemetryChannel, FeatureEdges, SectionPlanes and EngineeringAnnotations. The new owner fixture `packages/machinery/test/owner-lifetime.fixture.js` failed with "releases its registration" for each. Dimensions removed its plugins from the active scene, not the one it was attached to.
+- **Cause:** `dispose()` cleared the plugin's own fields but never called `removePlugin`, unlike Scatter and SculptView; Dimensions called `engine.removePlugin(name)`, which uses the active scene.
+- **Fix:** each `dispose()` clears its fields, then removes the plugin from its own scene (the repeated dispose that `removePlugin` triggers finds nothing to do). FeatureEdges and SectionPlanes keep their device-restore path on a private release that does not unregister.
+- **Regression:** `packages/machinery/test/scene.test.js` "disposing Kinematics, ExplodedView, SurfacePhysics or TelemetryChannel takes the plugin out of its scene"; `npm run check:owners -- --packages=machinery` on WebGPU and the WebGL2 layer.
+
 ### Fixed 2026-11-21: disposing a GeometryGenerator left its plugin and frame pass in the scene (KB-GEOMETRY-GENDISPOSE1, geometry)
 - **Repro:** `const generator = GeometryGenerator.attach(engine); generator.dispose();` then `engine.sceneOf(generator)` still returned the scene and its compute pass stayed registered; the new owner fixture `packages/geometry/tests/owner-lifetime.fixture.js` failed with "releases its registration" in every direct-disposal case.
 - **Cause:** `dispose()` freed the items' buffers and cleared the engine and device but never called `removePlugin`, unlike every other plugin's `dispose` (Scatter, SculptView). It also kept the read-back copy pipeline of the old device.
