@@ -496,11 +496,7 @@ export function loadGLTFProgressive(
       do {
         if (jobs.length && jobs[0]()) jobs.shift();
         steps++;
-      } while (
-        jobs.length &&
-        !finished &&
-        (maxJobs === undefined ? clock() - start < frameBudget : steps < maxJobs)
-      );
+      } while (jobs.length && !finished && (maxJobs === undefined ? clock() - start < frameBudget : steps < maxJobs));
     } catch (error) {
       fail(error);
       return;

@@ -53,7 +53,10 @@ test('a bare material reads position, normal and vertex colour only', () => {
     assert.deepEqual(locations, [0, 1, 4]);
     assert.doesNotMatch(code, /i\.tangent|i\.uv|\buv\(i,|o\.uv|o\.tangent/);
     assert.match(code, /s\.n=normalize\(n\);/);
-    assert.match(code, /struct Input \{\s*@location\(0\) position:vec4f, @location\(1\) normal:vec4f, @location\(4\) color:vec4f\s*\}/);
+    assert.match(
+      code,
+      /struct Input \{\s*@location\(0\) position:vec4f, @location\(1\) normal:vec4f, @location\(4\) color:vec4f\s*\}/,
+    );
   }
 });
 
@@ -84,7 +87,8 @@ test('a shader whose vertex entry has another name is left alone', () => {
 });
 
 test('a helper above the structs that opens like the tangent frame does not take them with it', () => {
-  const helper = '\nfn margoNode(i:Out,n:vec3f)->vec3f {\n  var t=i.tangent.xyz-n*dot(n,i.tangent.xyz);var b=cross(n,t);\n  return b;\n}\n',
+  const helper =
+      '\nfn margoNode(i:Out,n:vec3f)->vec3f {\n  var t=i.tangent.xyz-n*dot(n,i.tangent.xyz);var b=cross(n,t);\n  return b;\n}\n',
     { code, locations } = vertexInputs(helper + bare(pbrShader));
   assert.match(code, /struct Input \{/);
   assert.match(code, /fn margoNode/);
@@ -93,7 +97,10 @@ test('a helper above the structs that opens like the tangent frame does not take
 });
 
 test('a vertex stage that reads an input keeps it, and one that passes the input on keeps all', () => {
-  const displaced = bare(pbrShader).replace('let p=f.model*vec4f(i.position.xyz,1);', 'let p=f.model*vec4f(i.position.xyz+i.uv.xyz,1);');
+  const displaced = bare(pbrShader).replace(
+    'let p=f.model*vec4f(i.position.xyz,1);',
+    'let p=f.model*vec4f(i.position.xyz+i.uv.xyz,1);',
+  );
   assert.deepEqual(vertexInputs(displaced).locations, [0, 1, 3, 4]);
   const whole = bare(pbrShader).replace('let p=f.model*vec4f(i.position.xyz,1);', 'let p=f.model*margoMove(i);');
   assert.deepEqual(vertexInputs(whole).locations, [0, 1, 2, 3, 4]);
@@ -169,9 +176,16 @@ test('createInstancedMesh boxes (bare material, colours on): 48 B and 6 instance
   assert.equal(instanceLayout.attributes.length, 6);
   const rows = instanceInputs(white.code, instanceLayout);
   assert.equal(rows.arrayStride, instanceLayout.arrayStride);
-  assert.deepEqual(rows.attributes.map((a) => a.shaderLocation), [5, 6, 7, 8, 9]);
+  assert.deepEqual(
+    rows.attributes.map((a) => a.shaderLocation),
+    [5, 6, 7, 8, 9],
+  );
   assert.equal(instanceInputs(white.code, instanceLayout), rows, 'one layout object per kept set');
-  assert.equal(instanceInputs(instancedShader(pbrShader), instanceLayout), instanceLayout, 'a UV-reading shader keeps it');
+  assert.equal(
+    instanceInputs(instancedShader(pbrShader), instanceLayout),
+    instanceLayout,
+    'a UV-reading shader keeps it',
+  );
 });
 
 test('white only replaces vertex-stage reads, and a stage that hands the input on whole keeps every input', () => {
@@ -182,13 +196,18 @@ test('white only replaces vertex-stage reads, and a stage that hands the input o
   assert.equal(code.slice(code.indexOf('struct Surface')), source.slice(source.indexOf('struct Surface')));
   const whole = bare(pbrShader).replace('let p=f.model*vec4f(i.position.xyz,1);', 'let p=f.model*margoMove(i);');
   assert.deepEqual(vertexInputs(whole, true), { code: whole, locations: [0, 1, 2, 3, 4], narrow: [] });
-  const w = bare(pbrShader).replace('let p=f.model*vec4f(i.position.xyz,1);', 'let p=f.model*vec4f(i.position.xyz,i.position.w);');
+  const w = bare(pbrShader).replace(
+    'let p=f.model*vec4f(i.position.xyz,1);',
+    'let p=f.model*vec4f(i.position.xyz,i.position.w);',
+  );
   assert.deepEqual(vertexInputs(w).narrow, [1], 'a stage that reads w fetches all four');
 });
 
 test('an instanced glTF primitive without COLOR_0 builds the trimmed pipeline; written colours bring the fetch back', async () => {
   const { gpu, engine, store, view } = await scene(),
-    model = parseGLTF(engine, ...Object.values(instancedGLTF([{ t: [0, 0, 0] }, { t: [1, 0, 0] }])), [], { instancing });
+    model = parseGLTF(engine, ...Object.values(instancedGLTF([{ t: [0, 0, 0] }, { t: [1, 0, 0] }])), [], {
+      instancing,
+    });
   store.tick(false);
   const made = [],
     create = gpu.device.createRenderPipeline.bind(gpu.device);
@@ -200,24 +219,19 @@ test('an instanced glTF primitive without COLOR_0 builds the trimmed pipeline; w
     return made.find((desc) => desc.vertex.buffers[1]?.stepMode === 'instance');
   };
   const white = draw();
-  assert.deepEqual(white.vertex.buffers[0].attributes.map((a) => `${a.shaderLocation}:${a.format}`), [
-    '0:float32x3',
-    '1:float32x3',
-    '2:float32x4',
-    '3:float32x4',
-  ]);
+  assert.deepEqual(
+    white.vertex.buffers[0].attributes.map((a) => `${a.shaderLocation}:${a.format}`),
+    ['0:float32x3', '1:float32x3', '2:float32x4', '3:float32x4'],
+  );
   assert.equal(fetched(white.vertex.buffers[0]), 56, 'was 80: five float32x4');
   const p = model.primitives[0],
     vertices = p.vertices.slice();
   vertices[16] = 0.5;
   model.writeGeometry([{ vertices, indices: p.indices }]);
   const coloured = draw();
-  assert.deepEqual(coloured.vertex.buffers[0].attributes.map((a) => `${a.shaderLocation}:${a.format}`), [
-    '0:float32x3',
-    '1:float32x3',
-    '2:float32x4',
-    '3:float32x4',
-    '4:float32x4',
-  ]);
+  assert.deepEqual(
+    coloured.vertex.buffers[0].attributes.map((a) => `${a.shaderLocation}:${a.format}`),
+    ['0:float32x3', '1:float32x3', '2:float32x4', '3:float32x4', '4:float32x4'],
+  );
   model.dispose();
 });

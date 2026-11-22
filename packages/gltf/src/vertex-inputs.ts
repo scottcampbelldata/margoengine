@@ -44,7 +44,9 @@ function dropOutput(code: string, field: string): string {
     written = code.slice(start, end).replace(new RegExp(`\\s*o\\.${field}=[^;]*;`), '');
   if (new RegExp(`\\.${field}\\b|\\b${field}\\(i,`).test(outside + written)) return code;
   // The field leaves `Out` too: a constant written to it would still pass between the stages.
-  const head = code.slice(0, start).replace(new RegExp(`(struct Out \\{[^}]*?),?\\s*@location\\(\\d+\\) ${field}:vec4f`), '$1');
+  const head = code
+    .slice(0, start)
+    .replace(new RegExp(`(struct Out \\{[^}]*?),?\\s*@location\\(\\d+\\) ${field}:vec4f`), '$1');
   return (head + written + code.slice(end)).replace(field === 'uv' ? coordinates : '', '');
 }
 
@@ -67,7 +69,10 @@ export function laterUVShader(code: string): string {
       .replaceAll(/select\(i\.uv\.xy,i\.uv\.zw,([^;)]*?)>0\.5\)/g, 'margoUVSet(i,$1)')
       .replace(/struct Input \{([^}]*?)\s*\}/, 'struct Input {$1, @location(11) uvs:vec4f}')
       .replace(/(struct Out \{[^}]*?)\n\}/, '$1, @location(15) uvs:vec4f\n}')
-      .replace(/\bo\.uv=([^;]*);/, (write, value: string) => `${write} o.uvs=${value.replace(/\bi\.uv\b/g, 'i.uvs')};`) +
+      .replace(
+        /\bo\.uv=([^;]*);/,
+        (write, value: string) => `${write} o.uvs=${value.replace(/\bi\.uv\b/g, 'i.uvs')};`,
+      ) +
     '\nfn margoUVSet(i:Out,k:f32)->vec2f {return select(select(i.uv.xy,i.uv.zw,k>0.5),select(i.uvs.xy,i.uvs.zw,k>2.5),k>1.5);}\n'
   );
 }
@@ -177,7 +182,10 @@ export function vertexInputs(source: string, white = false): VertexInputs {
     // A built-in such as a node graph's vertex index costs no fetch, so it stays beside the kept attributes.
     code:
       kept.length < 5
-        ? code.replace(declared[1], [...kept, ...declared[1].matchAll(/@builtin\(\w+\) \w+:\w+/g)].map((field) => field[0]).join(', '))
+        ? code.replace(
+            declared[1],
+            [...kept, ...declared[1].matchAll(/@builtin\(\w+\) \w+:\w+/g)].map((field) => field[0]).join(', '),
+          )
         : code,
     locations: kept.map((field) => +field[1]),
     // Every read of the input takes `.xyz` (position's w is 1 and normal's 0 in the buffer; neither is read).

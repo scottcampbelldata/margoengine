@@ -52,7 +52,8 @@ export const meshopt: GLTFExtension = {
         length = integer(source.byteLength, 'meshopt length', 1),
         count = integer(source.count, 'meshopt count', 1),
         stride = integer(source.byteStride, 'meshopt stride', 1);
-      if (!data || start + length > data.length) throw new RangeError('glTF meshopt data is outside its buffer; re-export the file');
+      if (!data || start + length > data.length)
+        throw new RangeError('glTF meshopt data is outside its buffer; re-export the file');
       total += count * stride;
       if (total > budget)
         throw new RangeError('glTF meshopt data decodes past 64 MiB; load a smaller file or split it');

@@ -34,7 +34,10 @@ const open = () =>
     canvas.style.cssText = `position:fixed;left:0;top:0;width:${size}px;height:${size}px`;
     canvas.width = canvas.height = size;
     document.body.append(canvas);
-    const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0] } });
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [0, 0, 3], target: [0, 0, 0] },
+    });
     engine.gpu.addEventListener?.('uncapturederror', (event) => console.error(event.error.message));
     engine.gpu.pushErrorScope('validation');
     window.check = { engine };
@@ -244,9 +247,14 @@ async function scatterQuad(extensions, { base = [1, 1, 1], installed = false } =
           scene: 0,
           scenes: [{ nodes: [0] }],
           nodes: [{ mesh: 0 }],
-          meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3, material: 0 }] }],
+          meshes: [
+            { primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3, material: 0 }] },
+          ],
           materials: [
-            { pbrMetallicRoughness: { baseColorFactor: [...base, 1], metallicFactor: 0, roughnessFactor: 0.6 }, extensions },
+            {
+              pbrMetallicRoughness: { baseColorFactor: [...base, 1], metallicFactor: 0, roughnessFactor: 0.6 },
+              extensions,
+            },
           ],
           buffers: [{ byteLength: bytes.byteLength }],
           bufferViews: [view(0, 48), view(48, 48), view(96, 32), view(128, 12)],
@@ -414,7 +422,9 @@ function texturedQuad(image, tail = new Uint8Array(0), at = 92) {
       scenes: [{ nodes: [0] }],
       nodes: [{ mesh: 0 }],
       meshes: [{ primitives: [{ attributes: { POSITION: 0, TEXCOORD_0: 1 }, indices: 2, material: 0 }] }],
-      materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0 }, emissiveFactor: [0, 0, 0] }],
+      materials: [
+        { pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0 }, emissiveFactor: [0, 0, 0] },
+      ],
       textures: [{ extensions: { KHR_texture_basisu: { source: 0 } } }],
       images: [image],
       accessors: [
@@ -507,7 +517,9 @@ const checks = {
           { bufferView: 3, componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] },
           { bufferView: 4, componentType: 5126, count: 2, type: 'VEC3' },
         ],
-        animations: [{ samplers: [{ input: 3, output: 4 }], channels: [{ sampler: 0, target: { node: 0, path: 'translation' } }] }],
+        animations: [
+          { samplers: [{ input: 3, output: 4 }], channels: [{ sampler: 0, target: { node: 0, path: 'translation' } }] },
+        ],
         bufferViews: views,
         buffers: [{ byteLength: bytes.length }],
         extensions: {
@@ -531,7 +543,11 @@ const checks = {
                   { op: 'pointer/set' },
                 ],
                 nodes: [
-                  { declaration: 0, configuration: { nodeIndex: { value: [0] } }, flows: { out: { node: 1, socket: 'in' } } },
+                  {
+                    declaration: 0,
+                    configuration: { nodeIndex: { value: [0] } },
+                    flows: { out: { node: 1, socket: 'in' } },
+                  },
                   {
                     declaration: 1,
                     configuration: { pointer: { value: ['/materials/0/emissiveFactor'] }, type: { value: [0] } },
@@ -562,11 +578,19 @@ const checks = {
     const middle = size / 2,
       before = await pixels();
     assert.equal(await page.evaluate(() => window.check.behaviour.rejected ?? null), null);
-    assert.ok(before.at(middle, middle)[0] > 200 && before.at(middle, middle)[1] < 40, `red before: ${before.at(middle, middle)}`);
+    assert.ok(
+      before.at(middle, middle)[0] > 200 && before.at(middle, middle)[1] < 40,
+      `red before: ${before.at(middle, middle)}`,
+    );
     await page.mouse.click(middle, middle);
-    await page.waitForFunction(() => window.check.model.primitives[0].material.emission[1] === 1, null, { timeout: 10000 });
+    await page.waitForFunction(() => window.check.model.primitives[0].material.emission[1] === 1, null, {
+      timeout: 10000,
+    });
     const after = await pixels();
-    assert.ok(after.at(middle, middle)[1] > 200 && after.at(middle, middle)[0] < 40, `green after: ${after.at(middle, middle)}`);
+    assert.ok(
+      after.at(middle, middle)[1] > 200 && after.at(middle, middle)[0] < 40,
+      `green after: ${after.at(middle, middle)}`,
+    );
     assert.deepEqual(await page.evaluate(() => window.check.behaviour.notes), []);
     assert.equal(await page.evaluate(() => window.check.model.nodes[0].position.x), 0, 'the clip did not start itself');
     await page.evaluate(() => window.check.behaviour.dispose());
@@ -609,7 +633,11 @@ const checks = {
     const file = new Uint8Array(readFileSync(streamFile)),
       quad = texturedQuad({ uri: 'lamp.ktx2' }),
       doc = { ...quad.doc, buffers: [{ ...quad.doc.buffers[0], uri: 'quad.bin' }] },
-      host = await rangeServer({ 'quad.gltf': new TextEncoder().encode(JSON.stringify(doc)), 'quad.bin': quad.bytes, 'lamp.ktx2': file });
+      host = await rangeServer({
+        'quad.gltf': new TextEncoder().encode(JSON.stringify(doc)),
+        'quad.bin': quad.bytes,
+        'lamp.ktx2': file,
+      });
     await open();
     await streamed(`${host.url}quad.gltf`, {}, { position: [0, 0, 400], target: [0, 0, 0] });
     const far = await settle({ position: [0, 0, 400], target: [0, 0, 0] }),
@@ -617,7 +645,10 @@ const checks = {
       [distant] = far.textures,
       // The quad is 2 wide; one unit at distance d is size / 2 / (d tan 30) pixels.
       across = (d) => (2 * size) / 2 / ((d - Math.SQRT2) * Math.tan(Math.PI / 6));
-    assert.ok(distant.pixels > 0 && Math.abs(distant.pixels / across(400) - 1) < 1e-3, 'on-screen size from the camera');
+    assert.ok(
+      distant.pixels > 0 && Math.abs(distant.pixels / across(400) - 1) < 1e-3,
+      'on-screen size from the camera',
+    );
     const near = await settle({ position: [0, 0, 2], target: [0, 0, 0] }),
       [close1] = near.textures;
     assert.ok(close1.level < distant.level, 'a closer camera loads finer levels');
@@ -655,7 +686,11 @@ const checks = {
     const file = new Uint8Array(readFileSync(streamFile)),
       quad = texturedQuad({ uri: 'lamp.ktx2' }),
       doc = { ...quad.doc, buffers: [{ ...quad.doc.buffers[0], uri: 'quad.bin' }] },
-      host = await rangeServer({ 'quad.gltf': new TextEncoder().encode(JSON.stringify(doc)), 'quad.bin': quad.bytes, 'lamp.ktx2': file });
+      host = await rangeServer({
+        'quad.gltf': new TextEncoder().encode(JSON.stringify(doc)),
+        'quad.bin': quad.bytes,
+        'lamp.ktx2': file,
+      });
     await open();
     await streamed(`${host.url}quad.gltf`, {}, { position: [0, 0, 2], target: [0, 0, 0] });
     const held = await settle({ position: [0, 0, 2], target: [0, 0, 0] });
@@ -681,7 +716,11 @@ const checks = {
       await open();
       await streamed(`${host.url}quad.glb`, {}, { position: [0, 0, 400], target: [0, 0, 0] });
       const far = await settle({ position: [0, 0, 400], target: [0, 0, 0] });
-      if (ranges) assert.ok(host.served.spans.every(([, to]) => to < bytes.length - 4), 'the largest level stays on the server');
+      if (ranges)
+        assert.ok(
+          host.served.spans.every(([, to]) => to < bytes.length - 4),
+          'the largest level stays on the server',
+        );
       const near = await settle({ position: [0, 0, 2], target: [0, 0, 0] });
       assert.ok(near.textures[0].level < far.textures[0].level);
       await pixels();
@@ -694,7 +733,9 @@ const checks = {
     const folder = externalAssetRoot();
     requireExternalAssets('helmet/');
     const names = readdirSync(join(folder, 'helmet')),
-      files = Object.fromEntries(names.map((name) => [name, new Uint8Array(readFileSync(join(folder, 'helmet', name)))])),
+      files = Object.fromEntries(
+        names.map((name) => [name, new Uint8Array(readFileSync(join(folder, 'helmet', name)))]),
+      ),
       total = Object.values(files).reduce((sum, bytes) => sum + bytes.length, 0),
       host = await rangeServer(files);
     await open();
@@ -704,11 +745,16 @@ const checks = {
     const near = await settle({ position: [0, 0.35, 0.7], target: [0, 0.3, 0] }),
       nearBytes = host.served.bytes,
       image = await pixels();
-    console.log(`FlightHelmet: ${names.length} files, ${total} B; far ${farBytes} B, ${far.used} B on the GPU; near ${nearBytes} B, ${near.used} B on the GPU`);
+    console.log(
+      `FlightHelmet: ${names.length} files, ${total} B; far ${farBytes} B, ${far.used} B on the GPU; near ${nearBytes} B, ${near.used} B on the GPU`,
+    );
     assert.equal(far.textures.length, 15);
     assert.ok(farBytes < total / 2, 'far away, under half the files are read');
     assert.ok(near.used > far.used);
-    assert.ok(new Set(Array.from({ length: 16 }, (_, i) => String(image.at(size / 2, 16 * i + 8)))).size > 4, 'the helmet draws');
+    assert.ok(
+      new Set(Array.from({ length: 16 }, (_, i) => String(image.at(size / 2, 16 * i + 8)))).size > 4,
+      'the helmet draws',
+    );
     await close();
     host.close();
   },
@@ -742,7 +788,11 @@ const checks = {
     assert.ok(Math.abs(ring[1] / lambert(1.155, 1) - 1) < 0.05, `the file's candela at 30 degrees: ${ring}`);
     // color is 0.181, 0.485, 0: the green over red of the tint, whatever the candela.
     assert.ok(Math.abs(ring[0] / ring[1] - 0.181 / 0.485) < 0.1, `the file's tint: ${ring}`);
-    for (const point of [[0.728, 1], [1.155, 1], [0, 2]]) {
+    for (const point of [
+      [0.728, 1],
+      [1.155, 1],
+      [0, 2],
+    ]) {
       const [px, py] = wallPixel(...point);
       assert.deepEqual(view.at(px, py), wall.at(px, py), `bufferView against uri at ${point}`);
     }
@@ -771,7 +821,10 @@ const checks = {
       behind = await cubeQuad(cubeDocument(colors, { rotation: [0, 1, 0, 0] })),
       doubled = await cubeQuad(cubeDocument(colors, { intensity: 2 }));
     console.log(`cube: facing ${facing}, side ${side}, behind ${behind}, intensity 2 ${doubled}`);
-    assert.ok(facing[0] > side[0] + 10 && side[0] >= behind[0], 'the bright face is in front, then beside, then behind');
+    assert.ok(
+      facing[0] > side[0] + 10 && side[0] >= behind[0],
+      'the bright face is in front, then beside, then behind',
+    );
     assert.ok(doubled[0] > facing[0] + 5, 'intensity scales it');
   },
   // Adobe Stock licence: stays out of the repository, read from MARGO_SPLAT_SAMPLES/ibl when it is there.
@@ -779,7 +832,9 @@ const checks = {
     const folder = externalAssetRoot();
     requireExternalAssets('ibl/');
     await page.route('**/ibl-sample/**', (route) =>
-      route.fulfill({ body: readFileSync(join(folder, 'ibl', new URL(route.request().url()).pathname.split('/ibl-sample/')[1])) }),
+      route.fulfill({
+        body: readFileSync(join(folder, 'ibl', new URL(route.request().url()).pathname.split('/ibl-sample/')[1])),
+      }),
     );
     const draw = async (light) => {
         await open();
@@ -839,7 +894,10 @@ const checks = {
     for (let k = 0; k < 3; k++) {
       const [w] = scatterShares(scatterExtinction(0.5, 1), color[k], 0, 1),
         expected = low[k] + w * (high[k] - low[k]);
-      assert.ok(Math.abs(seen[k] - expected) <= 1.5 * Math.abs(next[k] - seen[k]), `channel ${k}: ${seen} against ${expected}`);
+      assert.ok(
+        Math.abs(seen[k] - expected) <= 1.5 * Math.abs(next[k] - seen[k]),
+        `channel ${k}: ${seen} against ${expected}`,
+      );
     }
   },
   // Milky glass through install: dense, nothing of the black page comes through and the lobe is all there is. IOR 1
@@ -904,7 +962,9 @@ const checks = {
     delete without.materials[0].extensions.KHR_materials_volume_scatter;
     const scattered = mean(await draw(json)),
       plain = mean(await draw(without));
-    console.log(`skull: ${scattered.count} pixels lit, mean ${scattered.mean.map((v) => v.toFixed(1))}; no scatter ${plain.mean.map((v) => v.toFixed(1))}`);
+    console.log(
+      `skull: ${scattered.count} pixels lit, mean ${scattered.mean.map((v) => v.toFixed(1))}; no scatter ${plain.mean.map((v) => v.toFixed(1))}`,
+    );
     assert.ok(scattered.count > 5000, 'the skull draws');
     // The file's colour is 0.17, 0.53, 0.59.
     assert.ok(scattered.mean[2] > scattered.mean[0] + 10, `blue over red: ${scattered.mean}`);
@@ -974,12 +1034,20 @@ const checks = {
           row = Buffer.from(new Float32Array([0, 0, 0]).buffer);
         edited.buffers[0].byteLength = Math.ceil(bin.length / 4) * 4 + row.length;
         edited.bufferViews.push({ buffer: 0, byteOffset: Math.ceil(bin.length / 4) * 4, byteLength: row.length });
-        edited.accessors.push({ bufferView: edited.bufferViews.length - 1, componentType: 5126, count: 1, type: 'VEC3' });
+        edited.accessors.push({
+          bufferView: edited.bufferViews.length - 1,
+          componentType: 5126,
+          count: 1,
+          type: 'VEC3',
+        });
         edited.nodes[0].extensions = {
           EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: edited.accessors.length - 1 } },
         };
         edited.extensionsUsed = [...(edited.extensionsUsed ?? []), 'EXT_mesh_gpu_instancing'];
-        return { json: edited, bin: Buffer.concat([Buffer.alloc(Math.ceil(bin.length / 4) * 4, 0).fill(bin, 0, bin.length), row]) };
+        return {
+          json: edited,
+          bin: Buffer.concat([Buffer.alloc(Math.ceil(bin.length / 4) * 4, 0).fill(bin, 0, bin.length), row]),
+        };
       };
     const draw = (doc, instances) => drawGLB(glb(doc.json, doc.bin), instances);
     assert.equal(difference(await draw(instanced(file), true), await draw(file)), 0, 'one instance at the origin');
@@ -1073,12 +1141,16 @@ const checks = {
     assert.equal(result.count, 27);
     assert.equal(result.drawn, 0, 'the splat primitive is not drawn as points too');
     // The payload's cube spans -50 to 50; the file's node matrix turns it and moves it to (50, -50, 50).
-    result.bounds.forEach((v, i) => assert.ok(Math.abs(v - [0, -100, 0, 100, 0, 100][i]) < 1e-3, `bounds ${result.bounds}`));
+    result.bounds.forEach((v, i) =>
+      assert.ok(Math.abs(v - [0, -100, 0, 100, 0, 100][i]) < 1e-3, `bounds ${result.bounds}`),
+    );
     assert.ok(lit(await pixels()) > 200, 'the splats draw');
-    await page.evaluate(() => {
-      window.check.model.dispose();
-      if (window.check.model.splats[0].cloud.gpuState) throw new Error('a disposed cloud still has GPU state');
-    }).catch((error) => assert.match(error.message, /disposed|attach/i));
+    await page
+      .evaluate(() => {
+        window.check.model.dispose();
+        if (window.check.model.splats[0].cloud.gpuState) throw new Error('a disposed cloud still has GPU state');
+      })
+      .catch((error) => assert.match(error.message, /disposed|attach/i));
     await close();
   },
   async 'splats: the real tower capture draws'() {
@@ -1148,7 +1220,9 @@ const checks = {
           accessor(6, 4, 'VEC3'),
           { bufferView: 7, componentType: 5123, count: 6, type: 'SCALAR' },
         ],
-        materials: [{ pbrMetallicRoughness: { baseColorFactor: [1, 0, 0, 1] }, extensions: { KHR_materials_unlit: {} } }],
+        materials: [
+          { pbrMetallicRoughness: { baseColorFactor: [1, 0, 0, 1] }, extensions: { KHR_materials_unlit: {} } },
+        ],
         meshes: [
           {
             primitives: [

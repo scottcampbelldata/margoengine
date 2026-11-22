@@ -110,7 +110,8 @@ test('more than 1,000,000 vertices in one primitive (refused before parts) load 
       model.primitives.reduce((n, p) => n + p.indices.length, 0),
       1_000_002 - (1_000_002 % 3),
     );
-    for (const p of model.primitives) assert.ok(p.vertices.length / 20 <= 262_144 && p.part.count === model.primitives.length);
+    for (const p of model.primitives)
+      assert.ok(p.vertices.length / 20 <= 262_144 && p.part.count === model.primitives.length);
   }));
 
 test('an accessor gltf/pbr cannot decode names mesh, primitive, attribute and accessor', () =>

@@ -20,12 +20,18 @@ async function material(volume, transmissionFactor = 0.5) {
     const fixture = animatedTriangle();
     fixture.doc.materials[0].pbrMetallicRoughness.baseColorFactor = [0.5, 0.75, 1, 1];
     fixture.doc.materials[0].extensions = {
-      ...(transmissionFactor === null ? {} : {
-        KHR_materials_transmission: transmissionFactor === 'default' ? {} : { transmissionFactor },
-      }),
+      ...(transmissionFactor === null
+        ? {}
+        : {
+            KHR_materials_transmission: transmissionFactor === 'default' ? {} : { transmissionFactor },
+          }),
       KHR_materials_volume: volume,
     };
-    const { tint, volume: values, opticalDepth } = parseGLTF(engine, fixture.doc, fixture.buffers, [], {
+    const {
+      tint,
+      volume: values,
+      opticalDepth,
+    } = parseGLTF(engine, fixture.doc, fixture.buffers, [], {
       materials: extendedMaterials,
     }).primitives[0].material;
     return { tint: tint?.slice(), volume: values?.slice(), opticalDepth };
@@ -74,7 +80,13 @@ test('native volume retains optical depth before binary32 or binary64 transmitta
 });
 
 test('native optical depth preserves white, black, empty and unattenuated medium limits', async () => {
-  assert.deepEqual((await material({ thicknessFactor: 1, attenuationColor: [0, 0.5, 1], attenuationDistance: 1 })).opticalDepth, [Infinity, Math.log(2), 0]);
-  assert.deepEqual((await material({ thicknessFactor: 0, attenuationColor: [0, 0.5, 1], attenuationDistance: 1 })).opticalDepth, [0, 0, 0]);
+  assert.deepEqual(
+    (await material({ thicknessFactor: 1, attenuationColor: [0, 0.5, 1], attenuationDistance: 1 })).opticalDepth,
+    [Infinity, Math.log(2), 0],
+  );
+  assert.deepEqual(
+    (await material({ thicknessFactor: 0, attenuationColor: [0, 0.5, 1], attenuationDistance: 1 })).opticalDepth,
+    [0, 0, 0],
+  );
   assert.deepEqual((await material({ thicknessFactor: 1, attenuationColor: [0, 0.5, 1] })).opticalDepth, [0, 0, 0]);
 });

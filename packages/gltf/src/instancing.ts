@@ -8,14 +8,17 @@ import type { GLTFExtension, GLTFFile } from './index.js';
 
 const NAME = 'EXT_mesh_gpu_instancing',
   invalid = (what: string) =>
-    new TypeError(`Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`);
+    new TypeError(
+      `Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
+    );
 
 // The EXT_mesh_gpu_instancing README allows FLOAT TRANSLATION and SCALE and FLOAT or normalized BYTE or SHORT ROTATION;
 // KHR_mesh_quantization's tables do not name instance attributes. This also reads integer TRANSLATION and SCALE
 // (as quantizing exporters write them), decoded as the accessor says, without requiring either extension.
 const scalar = (a: GLTFAccessor) => a.type === 'VEC3' && [5126, 5120, 5121, 5122, 5123].includes(a.componentType),
   turn = (a: GLTFAccessor) =>
-    a.type === 'VEC4' && (a.componentType === 5126 || (a.normalized === true && [5120, 5122].includes(a.componentType)));
+    a.type === 'VEC4' &&
+    (a.componentType === 5126 || (a.normalized === true && [5120, 5122].includes(a.componentType)));
 function column(
   file: GLTFFile,
   id: number | undefined,
@@ -28,7 +31,12 @@ function column(
   return values;
 }
 /** The instance nodes of `node`, and that node without its mesh and extension. */
-function expand(file: GLTFFile, node: GLTFNode, first: number, limit: number): { node: GLTFNode; instances: GLTFNode[] } {
+function expand(
+  file: GLTFFile,
+  node: GLTFNode,
+  first: number,
+  limit: number,
+): { node: GLTFNode; instances: GLTFNode[] } {
   const { attributes } = node.extensions![NAME] as { attributes?: Record<string, number> };
   if (node.mesh === undefined || !attributes) throw invalid('instanced node');
   const translation = column(file, attributes.TRANSLATION, 3, scalar),

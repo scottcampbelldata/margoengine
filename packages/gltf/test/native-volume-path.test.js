@@ -6,8 +6,17 @@ import { wgslFunction } from '../../../tests/support/wgsl-eval.js';
 import { wgslModule } from '../../materials/tests/support/wgsl-subset.js';
 
 const source = surfaceTintPBR(transmissiveShader(physicalShader()));
-function tint(matrix, { normal = [0, 0, 1], direction = [0, 0, -1], ior = 1.5, attenuation = [0.25, 0.5, 1], opticalDepth = attenuation.map(c => -Math.log(c)) } = {}) {
-  const depth = opticalDepth.map(c => c === Infinity ? -1 : c);
+function tint(
+  matrix,
+  {
+    normal = [0, 0, 1],
+    direction = [0, 0, -1],
+    ior = 1.5,
+    attenuation = [0.25, 0.5, 1],
+    opticalDepth = attenuation.map((c) => -Math.log(c)),
+  } = {},
+) {
+  const depth = opticalDepth.map((c) => (c === Infinity ? -1 : c));
   const shader = wgslModule(wgslFunction(source, 'margoVolumeTint'), {
     f: { eye: [0, 0, 0, 1], ext: [0, ior, depth[2], 0], coordsB: [0, 0, depth[0], depth[1]] },
   });
@@ -28,7 +37,10 @@ test('native volume attenuation converts mesh thickness to world length', () => 
 
 test('native volume exponentiates after a world scale recovers an underflowed mesh-space tint', () => {
   for (const thickness of [200, 1200])
-    close(tint(matrix(1, 1, 1 / thickness), { opticalDepth: [Math.log(4) * thickness, Math.log(2) * thickness, 0] }), [0.25, 0.5, 1]);
+    close(
+      tint(matrix(1, 1, 1 / thickness), { opticalDepth: [Math.log(4) * thickness, Math.log(2) * thickness, 0] }),
+      [0.25, 0.5, 1],
+    );
 });
 
 test('native volume attenuation follows a refracted slab path, including rotations, shear and reflection', () => {

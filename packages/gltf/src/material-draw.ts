@@ -27,7 +27,11 @@ export function setMaterialDraw(model: PBRModel, adapter: MaterialDrawAdapter): 
       'Material draw adapter must be a synchronous function; see https://margoengine.com/errors#material',
     );
   if (materialDrawAdapters.has(model))
-    throw fault('attached', 'A material draw adapter is already installed; remove it before installing another', 'material');
+    throw fault(
+      'attached',
+      'A material draw adapter is already installed; remove it before installing another',
+      'material',
+    );
   let unsubscribe: (() => void) | undefined;
   const remove = () => {
     if (materialDrawAdapters.get(model) === adapter) materialDrawAdapters.delete(model);
