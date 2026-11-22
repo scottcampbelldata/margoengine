@@ -92,6 +92,11 @@ export function samplePoint(
     north = at(region.height, 0, -ONE),
     gx = east - west,
     gz = south - north,
+    curvature = clampInt(
+      divFloor((4 * e - east - west - south - north) * 10_000_000, region.step * region.step),
+      -32768,
+      32767,
+    ),
     tan = Math.min(32767, divFloor(isqrt(Math.min(68719476736, gx * gx + gz * gz) * 65536), 2 * region.step)),
     angle = gx === 0 && gz === 0 ? 0 : atan2(-gx, gz),
     rain = Math.max(0, at(region.rain)),
@@ -116,7 +121,7 @@ export function samplePoint(
   out.height = e / 1000;
   out.slope = tan / 256;
   out.aspect = (((angle >> 16) * 360) / 65536 + 360) % 360;
-  out.curvature = ((4 * e - east - west - south - north) * 1000) / (region.step * region.step);
+  out.curvature = curvature * 0.0001;
   out.temperature = c[0] / 100;
   out.coldest = c[1] / 100;
   out.warmest = c[2] / 100;
@@ -134,7 +139,7 @@ export function samplePoint(
       height: e,
       slope: tan,
       aspect: angle >> 16,
-      curvature: 0,
+      curvature,
       tpi: 0,
       temperature: c[0],
       coldest: c[1],
@@ -184,6 +189,7 @@ export function readCell(
   out.height = value('height');
   out.slope = value('slope');
   out.aspect = (value('aspect') + 360) % 360;
+  out.curvature = value('curvature');
   out.temperature = value('temperature');
   out.coldest = value('coldest');
   out.warmest = value('warmest');

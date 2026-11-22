@@ -8406,3 +8406,8 @@ Measured gzip before and after the grounding fix is 16,671 to 17,402 B for `@mar
 14,072 B for `@margoengine/terrain/stream`, 3,089 to 3,539 B for `@margoengine/biomes/cover`, and 3,849 to 4,331 B
 for `@margoengine/biomes/far`. Terrain's optional height capture reuses the active rings and their GPU buffers.
 Biomes shares the placement graph evaluator between the near and far forests. Core and stage remain at 24,797 B.
+
+The Biomes worker measures 40,935 B gzip and 108,708 B raw, up from the last recorded 40,763 and 108,185 B.
+The extra bytes keep regional curvature and tile curvature in the same integer units and let the canopy task load
+the existing graph part on first use. Keeping those calls in another part would still require the same sampler and
+worker dispatch. The graph evaluator stays in its existing optional worker file.

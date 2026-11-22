@@ -9447,3 +9447,6 @@ The Terrain prepare pass can rasterize its drawn triangles from above before Sca
 uses the original heightmap UVs and is rebuilt when the ring plan or elevation data changes. With a source peak of
 154 m between coarse vertices, `packages/terrain/test/surface-height.browser.mjs` reads 104 m at that point on
 WebGPU and the WebGL2 layer. Biomes' distant trees use that image, the placement graph and the chosen canopy kind.
+Regional and tile queries return curvature in the same signed integer units before conversion to inverse metres.
+The worker cover regression proves the distant mask matches the main-thread mask and loads the existing graph part
+only when a canopy request supplies a graph.
