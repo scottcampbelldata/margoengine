@@ -31,7 +31,7 @@ export class UpViewCube extends ViewCube {
   }
   constructor(engine: EngineKernel, { up = 'z', front, ...options }: UpViewCubeOptions = {}) {
     const axes = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] } as const,
-      y = unit(typeof up === 'string' ? axes[up] ?? [] : up),
+      y = unit(typeof up === 'string' ? (axes[up] ?? []) : up),
       hint = unit(front ?? (Math.abs(y[2]) < 0.9 ? [0, 0, 1] : [0, -1, 0])),
       projected = hint.map((x, i) => x - dot(hint, y) * y[i]);
     if (Math.hypot(...projected) < 1e-10) throw new RangeError('Front must not be parallel to up');
@@ -39,7 +39,9 @@ export class UpViewCube extends ViewCube {
       x: Vector = [y[1] * z[2] - y[2] * z[1], y[2] * z[0] - y[0] * z[2], y[0] * z[1] - y[1] * z[0]];
     super(engine, options);
     this.frame = [x, y, z];
-    const projection = options.projection ?? (engine as unknown as { plugins?: ReadonlyMap<string, { up?: number[] }> }).plugins?.get('cameras');
+    const projection =
+      options.projection ??
+      (engine as unknown as { plugins?: ReadonlyMap<string, { up?: number[] }> }).plugins?.get('cameras');
     if (projection && 'up' in projection) projection.up = z.map((v) => -v) as [number, number, number];
     // Own only navigation up, as the base cube does for poles and roll. The world frame is stable
     // even when a controller supplies another screen-up direction.
@@ -58,6 +60,8 @@ export class UpViewCube extends ViewCube {
   }
   /** Maps a cube direction to world space. */
   override world(direction: readonly number[]): readonly number[] {
-    return this.frame ? [0, 1, 2].map((i) => this.frame!.reduce((s, axis, j) => s + axis[i] * direction[j], 0)) : direction;
+    return this.frame
+      ? [0, 1, 2].map((i) => this.frame!.reduce((s, axis, j) => s + axis[i] * direction[j], 0))
+      : direction;
   }
 }

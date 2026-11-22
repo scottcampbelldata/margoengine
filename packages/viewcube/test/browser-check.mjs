@@ -171,7 +171,9 @@ try {
   near(compassDrag.direction, [Math.cos(0.5), 0, Math.sin(0.5)], 'compass turntable');
   console.log('ok compass, keyboard/context menu, Home, projection and turntable drag');
   await east.click({ button: 'right' });
-  await page.screenshot({ path: `test-results/viewcube-compass-${hardware.webgpu.vendor === 'margo-webgl2' ? 'compat' : 'native'}.png` });
+  await page.screenshot({
+    path: `test-results/viewcube-compass-${hardware.webgpu.vendor === 'margo-webgl2' ? 'compat' : 'native'}.png`,
+  });
   await page.keyboard.press('Escape');
   assert.deepEqual(pageErrors, []);
   console.log('viewcube browser check passed');
