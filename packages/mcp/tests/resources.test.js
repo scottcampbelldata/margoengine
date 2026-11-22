@@ -81,7 +81,11 @@ test('the server serves resources over JSON-RPC: capability, paging with an opaq
   const read = await server.handle(rpc(5, 'resources/read', { uri: 'margo://docs/conventions' }));
   assert.equal(read.result.contents[0].text, corpus.docs[0].text);
   const missing = await server.handle(rpc(6, 'resources/read', { uri: 'margo://docs/nothing' }));
-  assert.deepEqual(missing.error, { code: -32002, message: 'Resource not found', data: { uri: 'margo://docs/nothing' } });
+  assert.deepEqual(missing.error, {
+    code: -32002,
+    message: 'Resource not found',
+    data: { uri: 'margo://docs/nothing' },
+  });
   assert.equal((await server.handle(rpc(7, 'resources/read', {}))).error.code, -32602);
 });
 
@@ -103,10 +107,13 @@ test('the starter prompts name the tools to use and put the arguments in; missin
   using server = createMcpServer({ tools: [], prompts });
   const listed = await server.handle(rpc(1, 'prompts/list'));
   const port = listed.result.prompts.find((p) => p.name === 'port_code');
-  assert.deepEqual(port.arguments.map((a) => [a.name, a.required ?? false]), [
-    ['code', true],
-    ['from', false],
-  ]);
+  assert.deepEqual(
+    port.arguments.map((a) => [a.name, a.required ?? false]),
+    [
+      ['code', true],
+      ['from', false],
+    ],
+  );
   assert.equal(listed.result.nextCursor, undefined);
   const scene = await server.handle(rpc(2, 'prompts/get', { name: 'start_scene' }));
   assert.equal(scene.result.messages[0].role, 'user');
@@ -120,7 +127,9 @@ test('the starter prompts name the tools to use and put the arguments in; missin
   const fix = await server.handle(rpc(4, 'prompts/get', { name: 'fix_error', arguments: { error: 'Mesh disposed' } }));
   assert.match(fix.result.messages[0].content.text, /explain_error/);
   assert.doesNotMatch(fix.result.messages[0].content.text, /```ts/, 'no code block without code');
-  const feature = await server.handle(rpc(5, 'prompts/get', { name: 'add_feature', arguments: { feature: 'shadows' } }));
+  const feature = await server.handle(
+    rpc(5, 'prompts/get', { name: 'add_feature', arguments: { feature: 'shadows' } }),
+  );
   assert.match(feature.result.messages[0].content.text, /^Add shadows to this Margo Engine project\./);
   const lacking = await server.handle(rpc(6, 'prompts/get', { name: 'port_code', arguments: { code: '  ' } }));
   assert.deepEqual(lacking.error, { code: -32602, message: 'Missing required argument: code' });

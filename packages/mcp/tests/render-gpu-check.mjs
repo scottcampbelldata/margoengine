@@ -31,7 +31,7 @@ const png = await decodePNG(new Uint8Array(Buffer.from(image.data, 'base64')));
 assert.deepEqual([png.width, png.height], [320, 200]);
 const drawn = result.structuredContent.drawnPixels;
 assert.ok(drawn > 1000, `the box covers more than 1,000 pixels (${drawn})`);
-const centre = ((100 * 320 + 160) * 4),
+const centre = (100 * 320 + 160) * 4,
   [r, g, b] = png.data.slice(centre, centre + 3);
 assert.ok(g > r + 40 && g > b, `the centre pixel is the green box (${r}, ${g}, ${b})`);
 console.log(text.text);

@@ -324,7 +324,8 @@ async function khronosAsset(
   const meta = record(await context.json(`${KHR}${id}/metadata.json`));
   const legal = Array.isArray(meta.legal) ? (meta.legal as unknown[]).map(record) : [];
   const spdx = [...new Set(legal.map((l) => String(l.spdx ?? l.license ?? '')))];
-  if (!legal.length || !spdx.every(Boolean) || (accepted && !spdx.every((s) => context.licenses.has(s)))) return undefined;
+  if (!legal.length || !spdx.every(Boolean) || (accepted && !spdx.every((s) => context.licenses.has(s))))
+    return undefined;
   const license = spdx.join(' AND ');
   return {
     provider: 'khronos',
@@ -447,7 +448,11 @@ export class AssetLibrary {
     if (!Number.isSafeInteger(this.max) || this.max < 1 || !Number.isSafeInteger(this.timeout) || this.timeout < 1)
       throw rangeError('maxBytes and timeoutMs must be positive safe integers', 'mcp');
     const licenses = options.licenses ?? ['CC0-1.0'];
-    if (!Array.isArray(licenses) || !licenses.length || !licenses.every((l) => typeof l === 'string' && /^[A-Za-z0-9.+-]+$/.test(l)))
+    if (
+      !Array.isArray(licenses) ||
+      !licenses.length ||
+      !licenses.every((l) => typeof l === 'string' && /^[A-Za-z0-9.+-]+$/.test(l))
+    )
       throw typeError('licenses must be SPDX identifiers, such as CC0-1.0', 'mcp');
     this.licenses = new Set(licenses);
     for (const source of [polyHaven, ambientCG, khronos, ...(options.sources ?? [])]) {
@@ -613,7 +618,11 @@ export class AssetLibrary {
     return job;
   }
   /** The complete download in `directory`, or undefined when it is missing, partial or changed. */
-  private async complete(asset: CatalogAsset, variant: string, directory: string): Promise<DownloadedAsset | undefined> {
+  private async complete(
+    asset: CatalogAsset,
+    variant: string,
+    directory: string,
+  ): Promise<DownloadedAsset | undefined> {
     const manifest = join(directory, 'margo-asset.json');
     let saved: Data;
     try {
@@ -627,7 +636,12 @@ export class AssetLibrary {
       try {
         const path = safePath(directory, String(file.path));
         if ((await stat(path)).size !== file.bytes) return undefined;
-        if (createHash('sha256').update(await readFile(path)).digest('hex') !== file.sha256) return undefined;
+        if (
+          createHash('sha256')
+            .update(await readFile(path))
+            .digest('hex') !== file.sha256
+        )
+          return undefined;
       } catch {
         return undefined;
       }
