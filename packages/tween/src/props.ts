@@ -4,7 +4,9 @@ import { linear, type Easing } from './index.js';
 /** A numeric destination or relative displacement. */
 export type PropertyValue = number | `+=${number}` | `-=${number}` | `*=${number}` | `/=${number}`;
 /** Numeric writable properties; lists give explicit evenly spaced keyframes. */
-export type PropertyValues<T extends object> = { [K in keyof T as T[K] extends number ? K : never]?: PropertyValue | readonly PropertyValue[] };
+export type PropertyValues<T extends object> = {
+  [K in keyof T as T[K] extends number ? K : never]?: PropertyValue | readonly PropertyValue[];
+};
 /** A keyframe at a normalized offset; missing offsets are evenly distributed between explicit offsets. */
 export interface PropertyKeyframe<T extends object> {
   /** Values at this key; omitted properties carry their previous value. */
@@ -16,7 +18,8 @@ export interface PropertyKeyframe<T extends object> {
 }
 type Channel = { key: string; values: number[]; offsets: number[]; easings: Easing[] };
 function numeric(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw new RangeError('Property tween values must be finite numbers');
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    throw new RangeError('Property tween values must be finite numbers');
   return value;
 }
 function relative(value: PropertyValue, base: number): number {
@@ -24,7 +27,15 @@ function relative(value: PropertyValue, base: number): number {
   const match = /^([+\-*/])=([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)$/i.exec(value);
   if (!match) throw new RangeError('Relative values need +=, -=, *= or /= and a finite number');
   const amount = numeric(Number(match[2]));
-  return numeric(match[1] === '+' ? base + amount : match[1] === '-' ? base - amount : match[1] === '*' ? base * amount : base / amount);
+  return numeric(
+    match[1] === '+'
+      ? base + amount
+      : match[1] === '-'
+        ? base - amount
+        : match[1] === '*'
+          ? base * amount
+          : base / amount,
+  );
 }
 const record = (target: object) => target as Record<string, unknown>;
 
@@ -59,7 +70,12 @@ class PropertyOperation implements PropertyTween {
   /** One iteration in seconds, without delay/repeat. */
   readonly duration: number;
   /** Compile with the factory functions to, from, fromTo or keyframes. */
-  constructor(readonly target: object, channels: Channel[], options: AsyncTweenOptions, immediate: boolean) {
+  constructor(
+    readonly target: object,
+    channels: Channel[],
+    options: AsyncTweenOptions,
+    immediate: boolean,
+  ) {
     this.keys = Object.freeze(channels.map((channel) => channel.key));
     this.duration = options.duration;
     const apply = (progress: number) => {
@@ -71,35 +87,65 @@ class PropertyOperation implements PropertyTween {
         const phase = span ? Math.max(0, Math.min(1, (progress - offsets[index]) / span)) : 1;
         const t = phase === 0 || phase === 1 ? phase : easings[index](phase);
         if (!Number.isFinite(t)) throw new RangeError('Property easing must return a finite number');
-        record(target)[key] = t === 0 ? values[index] : t === 1 ? values[index + 1] : values[index] * (1 - t) + values[index + 1] * t;
+        record(target)[key] =
+          t === 0 ? values[index] : t === 1 ? values[index + 1] : values[index] * (1 - t) + values[index + 1] * t;
       }
     };
     this.task = this.driver.custom(apply, { ...options, easing: linear });
     if (immediate && !options.signal?.aborted) apply(0);
   }
   /** Promise for this operation. Cancellation rejects it. */
-  get finished(): Promise<void> { return this.task.finished; }
+  get finished(): Promise<void> {
+    return this.task.finished;
+  }
   /** Playback multiplier >= 0; zero holds the value. Default 1. */
-  get speed(): number { return this.scale; }
-  set speed(value: number) { if (!Number.isFinite(value) || value < 0) throw new RangeError('speed must be finite and >= 0'); this.scale = value; }
+  get speed(): number {
+    return this.scale;
+  }
+  set speed(value: number) {
+    if (!Number.isFinite(value) || value < 0) throw new RangeError('speed must be finite and >= 0');
+    this.scale = value;
+  }
   /** Advance by nonnegative finite seconds unless paused. */
   update(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('delta must be finite and >= 0');
     if (!this.paused && this.scale > 0) this.driver.update(delta * this.scale);
   }
   /** Pause only this operation. */
-  pause(): this { this.paused = true; return this; }
+  pause(): this {
+    this.paused = true;
+    return this;
+  }
   /** Resume from the current value. */
-  play(): this { this.paused = false; return this; }
+  play(): this {
+    this.paused = false;
+    return this;
+  }
   /** Cancel with AbortError by default, preserving current values. */
-  cancel(reason?: unknown): void { this.task.cancel(reason); }
-  then<TResult1 = void, TResult2 = never>(onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null, onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null): Promise<TResult1 | TResult2> { return this.finished.then(onfulfilled, onrejected); }
+  cancel(reason?: unknown): void {
+    this.task.cancel(reason);
+  }
+  then<TResult1 = void, TResult2 = never>(
+    onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return this.finished.then(onfulfilled, onrejected);
+  }
   /** Cancel unfinished work. */
-  [Symbol.dispose](): void { this.cancel(); }
+  [Symbol.dispose](): void {
+    this.cancel();
+  }
 }
 
-function compile<T extends object>(target: T, values: PropertyValues<T>, mode: 'to' | 'from' | 'fromTo', options: AsyncTweenOptions, start?: PropertyValues<T>): PropertyTween {
-  if (options.easing !== undefined && typeof options.easing !== 'function') throw new RangeError('Property easing must be a function');
+function compile<T extends object>(
+  target: T,
+  values: PropertyValues<T>,
+  mode: 'to' | 'from' | 'fromTo',
+  options: AsyncTweenOptions,
+  start?: PropertyValues<T>,
+): PropertyTween {
+  if (options.easing !== undefined && typeof options.easing !== 'function')
+    throw new RangeError('Property easing must be a function');
   const channels: Channel[] = [];
   const ends = values as Record<string, PropertyValue | readonly PropertyValue[]>;
   const starts = start as Record<string, PropertyValue | readonly PropertyValue[]> | undefined;
@@ -120,22 +166,48 @@ function compile<T extends object>(target: T, values: PropertyValues<T>, mode: '
       const end = relative(value as PropertyValue, base);
       points = mode === 'from' ? [end, current] : [base, end];
     }
-    channels.push({ key, values: points, offsets: points.map((_, i) => i / (points.length - 1)), easings: points.map(() => options.easing ?? linear) });
+    channels.push({
+      key,
+      values: points,
+      offsets: points.map((_, i) => i / (points.length - 1)),
+      easings: points.map(() => options.easing ?? linear),
+    });
   }
   if (!channels.length) throw new RangeError('A property tween needs at least one numeric property');
   return new PropertyOperation(target, channels, options, mode !== 'to' || Object.values(ends).some(Array.isArray));
 }
 /** Animate object/vector properties to destinations, relative values or explicit keyframe lists. */
-export function to<T extends object>(target: T, values: PropertyValues<T>, options: AsyncTweenOptions): PropertyTween { return compile(target, values, 'to', options); }
+export function to<T extends object>(target: T, values: PropertyValues<T>, options: AsyncTweenOptions): PropertyTween {
+  return compile(target, values, 'to', options);
+}
 /** Animate from supplied values to the target's current values; renders the start immediately. */
-export function from<T extends object>(target: T, values: PropertyValues<T>, options: AsyncTweenOptions): PropertyTween { return compile(target, values, 'from', options); }
+export function from<T extends object>(
+  target: T,
+  values: PropertyValues<T>,
+  options: AsyncTweenOptions,
+): PropertyTween {
+  return compile(target, values, 'from', options);
+}
 /** Animate explicit start and end values; renders the start immediately. */
-export function fromTo<T extends object>(target: T, start: PropertyValues<T>, end: PropertyValues<T>, options: AsyncTweenOptions): PropertyTween { return compile(target, end, 'fromTo', options, start); }
+export function fromTo<T extends object>(
+  target: T,
+  start: PropertyValues<T>,
+  end: PropertyValues<T>,
+  options: AsyncTweenOptions,
+): PropertyTween {
+  return compile(target, end, 'fromTo', options, start);
+}
 /** Animate a list of multi-property keys, including offsets and per-segment easing. */
-export function keyframes<T extends object>(target: T, frames: readonly PropertyKeyframe<T>[], options: AsyncTweenOptions): PropertyTween {
-  if (options.easing !== undefined && typeof options.easing !== 'function') throw new RangeError('Property easing must be a function');
+export function keyframes<T extends object>(
+  target: T,
+  frames: readonly PropertyKeyframe<T>[],
+  options: AsyncTweenOptions,
+): PropertyTween {
+  if (options.easing !== undefined && typeof options.easing !== 'function')
+    throw new RangeError('Property easing must be a function');
   if (frames.length < 2) throw new RangeError('Keyframes need at least two frames');
-  if (frames.some((frame) => frame.easing !== undefined && typeof frame.easing !== 'function')) throw new RangeError('Keyframe easing must be a function');
+  if (frames.some((frame) => frame.easing !== undefined && typeof frame.easing !== 'function'))
+    throw new RangeError('Keyframe easing must be a function');
   const offsets = frames.map((frame) => frame.offset);
   offsets[0] ??= 0;
   offsets[offsets.length - 1] ??= 1;
@@ -143,10 +215,13 @@ export function keyframes<T extends object>(target: T, frames: readonly Property
   for (let i = 0; i < offsets.length; i++) {
     const offset = offsets[i];
     if (offset === undefined) continue;
-    if (!Number.isFinite(offset) || offset < 0 || offset > 1 || offset < offsets[previous]!) throw new RangeError('Keyframe offsets must be ordered in 0..1');
-    for (let j = previous + 1; j < i; j++) offsets[j] = offsets[previous]! + (offset - offsets[previous]!) * (j - previous) / (i - previous);
+    if (!Number.isFinite(offset) || offset < 0 || offset > 1 || offset < offsets[previous]!)
+      throw new RangeError('Keyframe offsets must be ordered in 0..1');
+    for (let j = previous + 1; j < i; j++)
+      offsets[j] = offsets[previous]! + ((offset - offsets[previous]!) * (j - previous)) / (i - previous);
     previous = i;
-    if (frames[i].easing !== undefined && typeof frames[i].easing !== 'function') throw new RangeError('Keyframe easing must be a function');
+    if (frames[i].easing !== undefined && typeof frames[i].easing !== 'function')
+      throw new RangeError('Keyframe easing must be a function');
   }
   const keys = new Set(frames.flatMap((frame) => Object.keys(frame.values)));
   const channels: Channel[] = [];

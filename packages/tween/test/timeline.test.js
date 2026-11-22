@@ -6,7 +6,9 @@ const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-10, `${a} vs ${b}`);
 test('replaying a finished yoyo timeline runs forward with its full repeat budget again', () => {
   const o = { x: 0 };
   let done = 0;
-  const timeline = new Timeline({ repeat: 1, yoyo: true, onComplete: () => done++ }).to(o, 'x', 10, { duration: 1 }).play();
+  const timeline = new Timeline({ repeat: 1, yoyo: true, onComplete: () => done++ })
+    .to(o, 'x', 10, { duration: 1 })
+    .play();
   timeline.update(1);
   near(o.x, 10);
   timeline.update(1);
