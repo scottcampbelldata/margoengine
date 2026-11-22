@@ -11654,15 +11654,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   something outside its inputs on this layer (a read of a buffer before its write lands, or the CPU tier's order of
   work under load) is the lead; not checked. Native WebGPU passed in the same suite.
 
-### Open 2026-11-21: Blender's TANH math node gives NaN for large inputs on native WebGPU (KB-BLENDER-TANH1, blender)
+### Fixed 2026-11-21: Blender's TANH math node gave NaN for large inputs on native WebGPU (KB-BLENDER-TANH1, blender)
 
-- **Repro:** a WGSL compute shader writing `tanh(x)` for runtime x on native WebGPU (adapter `intel` `xe-2lpg`): 1 at
+- **Fix:** `TANH` is `tanh(clamp(a,-10.0,10.0))`. For |x| over 9.01, 1 - |tanh x| = 2 / (e^2|x| + 1) is under 2^-25, so
+  f32 tanh rounds to +-1 (IEEE 754-2019 round to nearest) and the clamp changes no correctly rounded value. It is the
+  only tanh the blender package emits.
+- **Regression:** `packages/blender/tests/nodes.test.js` fails on a bare tanh in the emitted WGSL;
+  `packages/blender/tests/nodes-browser.mjs` renders TANH of 100, -100 and 395 and expects +-1, not NaN.
+- **Repro (before):** a WGSL compute shader writing `tanh(x)` for runtime x on native WebGPU (adapter `intel` `xe-2lpg`): 1 at
   x = 50, NaN at x = 100, 395 and -100 (sinh and cosh return infinity there; found under KB-WATER-SURGEVOL1).
-  `packages/blender/src/nodes-wgsl.ts` maps the math node's `TANH` to a bare `tanh(a)`, so a node graph that feeds it a
-  value over about 88.7 in size gets NaN where Blender gives +-1. Not yet run through a node graph.
-- **Cause:** the GPU's tanh overflows f32 in sinh or cosh for |x| over about 88.7. The fix is the one water took:
-  `tanh(clamp(a,-10.0,10.0))`, exact in f32 (tanh rounds to +-1 above 9.01), with a regression test in the blender
-  package.
+  `packages/blender/src/nodes-wgsl.ts` mapped the math node's `TANH` to a bare `tanh(a)`, so a node graph feeding it a
+  value over about 88.7 in size got NaN where Blender gives +-1.
+- **Cause:** the GPU's tanh overflows f32 in sinh or cosh for |x| over about 88.7.
 
 ### Fixed 2026-11-21: the surge check's sea held half its water on native WebGPU (KB-WATER-SURGEVOL1, water)
 
