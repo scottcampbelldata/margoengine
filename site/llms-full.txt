@@ -11681,18 +11681,38 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
   or is swapped for another revision.
 
-### Open 2026-11-21: the flood film check gave another flood state once on the WebGL2 layer (KB-WATER-FLOODFILM-COMPAT1, water)
+### Open (below Margo): the WebGL2 layer on ANGLE Direct3D 11 gives the flood film another state from one browser launch to the next (KB-WATER-FLOODFILM-COMPAT1, water, 2026-11-21)
 
 - **Repro:** `MARGO_COMPAT=1 node packages/water/test/flood-film.browser.mjs` (WebGL2 layer, Intel Arc 140V through
   ANGLE D3D11) failed once in four runs, under load (four agents and a `test:changed` run on the 8-core machine): the
   two 30 fps runs hashed c9b4539d (volume 4,535.639080 m^3) and the 60 fps run 2859cbf7 (4,535.639329), so "1,200
   frames at 60 fps equal 600 at 30 fps" failed. The other three runs, two of them on the code before
   KB-WATER-SURGEVOL1's change and one after, hashed eee49ae9 (4,535.639200) for every run and the seek. The flood's
-  kernels take no surf WGSL (dist/flood.js imports swell-wgsl only), and the same tree gave eee49ae9 in a later run.
-- **Cause:** not found. Every hash of that run differs, not only the 60 fps one, so a flood state that depends on
-  something outside its inputs on this layer (a read of a buffer before its write lands, or the CPU tier's order of
-  work under load) is the lead; not checked. Native WebGPU passed in the same suite.
-
+  kernels take no surf WGSL (dist/flood.js imports swell-wgsl only). The check stays bit for bit as it is.
+- **Cause:** below Margo, in what the browser's WebGL2 stack (ANGLE's Direct3D 11 back end, the HLSL compiler or the
+  driver) makes of the same GLSL and the same inputs. Upstream draft: `docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1/report.md`.
+  Evidence (2026-11-21, renderer string `ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11
+  vs_5_0 ps_5_0, D3D11)`, the check's scene with each 4 s reading hashed too, up to four GPU runs at once on the
+  8-core machine):
+  - The state is not the same from one launch to the next. In 32 WebGL2 launches the first 30 fps run ended at
+    eee49ae9 (26), c9b4539d (4), d9a15081 (1) and a1e8cf94 (1); the 10 s restore leg at 362bba19 (28), 867ef247 (3)
+    and 92525196 (1). The launches already differ at the first reading, 4 s in. 20 of 20 native WebGPU launches in
+    the same hours gave 43f2d001 (restore 2e640161) exactly.
+  - Inside a launch the legs agree in 31 of 32: the two 30 fps runs, the 60 fps run, the seek and the device restore.
+    In one launch the first 30 fps run (a1e8cf94) differed from the rest (eee49ae9), as the logged run's 60 fps leg did.
+  - What Margo hands WebGL2 is the same in every launch: the GLSL of the stage, first and record kernels compared equal
+    across launches; ANGLE's translated HLSL of the stage's two programs (WEBGL_debug_shaders, Edge started with
+    `--enable-privileged-webgl-extensions`) hashed daee9534 and 4db8f6b2 in all 7 launches captured; the uniform ring's
+    bytes (2,886 writes), the float texture uploads and the kernels' size uniforms hashed the same in all 7 launches
+    measured. No clock, timer or random number reaches the flood, Water or core (none in their sources), and the stage
+    is a gather that writes only its own texel of render targets no draw also reads, so no read can race a write in
+    GL's in-order command stream.
+  - Gap: the 6 varying launches were the first 6 after the build; every launch after them gave eee49ae9, including all
+    those with the HLSL and GL-stream probes, so no HLSL or GL-stream capture exists yet from inside a varying launch.
+    Which layer gives the other rounding (ANGLE's pixel executable, the HLSL compiler or the driver's compile) is not
+    known, and GLSL ES 3.00 has no `precise` to pin it.
+- **Fix condition:** an ANGLE or driver change that compiles the same GLSL to the same rounding in every launch, or a
+  standalone page that shows the varying launch and names the layer; until then the check can fail on this layer.
 ### Fixed 2026-11-21: Blender's TANH math node gave NaN for large inputs on native WebGPU (KB-BLENDER-TANH1, blender)
 
 - **Fix:** `TANH` is `tanh(clamp(a,-10.0,10.0))`. For |x| over 9.01, 1 - |tanh x| = 2 / (e^2|x| + 1) is under 2^-25, so
