@@ -180,10 +180,13 @@ export class EngineeringAnnotations implements EnginePlugin {
     });
   }
   dispose(): void {
+    const engine = this.engine;
     this.svg?.remove();
     this.svg = undefined;
     this.records = [];
     this.engine = undefined;
+    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

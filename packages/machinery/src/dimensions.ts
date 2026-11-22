@@ -393,9 +393,10 @@ export class Dimensions implements EnginePlugin {
     const e = this.engine;
     if (!e) return;
     this.engine = undefined;
-    e.removePlugin(this.lines.name);
-    e.removePlugin(this.text.name);
-    e.removePlugin(this.name);
+    const scene = e.sceneOf(this);
+    scene?.removePlugin(this.lines.name);
+    scene?.removePlugin(this.text.name);
+    scene?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
