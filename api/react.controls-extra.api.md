@@ -95,7 +95,10 @@ export interface ScrollState {
     visible(from: number, length: number, margin?: number): boolean;
 }
 
-export function useKeyboardControls<T extends string = string>(): [KeyboardSubscribe<T>, () => KeyboardControlsState<T>];
+export function useKeyboardControls<T extends string = string>(): [
+    KeyboardSubscribe<T>,
+    () => KeyboardControlsState<T>
+];
 export function useKeyboardControls<T extends string = string, V = boolean>(selector: (state: KeyboardControlsState<T>) => V): V;
 
 export function useMotion(): MotionState;

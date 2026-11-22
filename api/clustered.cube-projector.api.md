@@ -13,7 +13,14 @@ export interface CubeProjectorEntry {
 }
 
 export interface CubeProjectorImage {
-    readonly faces: readonly [ProjectorImage, ProjectorImage, ProjectorImage, ProjectorImage, ProjectorImage, ProjectorImage];
+    readonly faces: readonly [
+        ProjectorImage,
+        ProjectorImage,
+        ProjectorImage,
+        ProjectorImage,
+        ProjectorImage,
+        ProjectorImage
+    ];
 }
 
 export class CubeProjectorLights extends ProjectorLights {
