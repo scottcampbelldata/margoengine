@@ -12,30 +12,49 @@ import { lifetimeFault } from '../../../tests/support/owner-shell.js';
 
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const pose = (z) => ({
-  transform: { matrix: identity(), inverse: { matrix: identity() }, position: { x: 0, y: 1, z, w: 1 },
-    orientation: { x: 0, y: 0, z: 0, w: 1 } },
+  transform: {
+    matrix: identity(),
+    inverse: { matrix: identity() },
+    position: { x: 0, y: 1, z, w: 1 },
+    orientation: { x: 0, y: 0, z: 0, w: 1 },
+  },
   emulatedPosition: false,
 });
 const JOINTS = 25;
 // One controller and one tracked hand, so XRModels builds both kinds of model.
 const sources = () => [
-  { handedness: 'right', targetRayMode: 'tracked-pointer', targetRaySpace: { ray: true }, gripSpace: { grip: true },
-    profiles: ['generic-trigger'], gamepad: { mapping: 'xr-standard', buttons: [{ value: 1, pressed: true, touched: true }], axes: [] } },
-  { handedness: 'left', targetRayMode: 'tracked-pointer', targetRaySpace: { ray: true },
-    hand: new Map(Array.from({ length: JOINTS }, (_, i) => [`joint-${i}`, { joint: i }])), profiles: [] },
+  {
+    handedness: 'right',
+    targetRayMode: 'tracked-pointer',
+    targetRaySpace: { ray: true },
+    gripSpace: { grip: true },
+    profiles: ['generic-trigger'],
+    gamepad: { mapping: 'xr-standard', buttons: [{ value: 1, pressed: true, touched: true }], axes: [] },
+  },
+  {
+    handedness: 'left',
+    targetRayMode: 'tracked-pointer',
+    targetRaySpace: { ray: true },
+    hand: new Map(Array.from({ length: JOINTS }, (_, i) => [`joint-${i}`, { joint: i }])),
+    profiles: [],
+  },
 ];
 class Session extends EventTarget {
   inputSources = sources();
   frames = new Map();
   next = 0;
   ended = false;
-  async requestReferenceSpace() { return { space: true }; }
+  async requestReferenceSpace() {
+    return { space: true };
+  }
   updateRenderState() {}
   requestAnimationFrame(fn) {
     this.frames.set(++this.next, fn);
     return this.next;
   }
-  cancelAnimationFrame(id) { this.frames.delete(id); }
+  cancelAnimationFrame(id) {
+    this.frames.delete(id);
+  }
   async end() {
     if (this.ended) return;
     this.ended = true;
@@ -44,26 +63,59 @@ class Session extends EventTarget {
   tick(time) {
     const callbacks = [...this.frames.values()];
     this.frames.clear();
-    const frame = { session: this, getViewerPose: () => ({ ...pose(3), views: [] }), getPose: () => pose(-0.5),
-      getJointPose: (joint) => ({ ...pose(-0.4 - joint.joint * 0.01), radius: 0.01 }) };
+    const frame = {
+      session: this,
+      getViewerPose: () => ({ ...pose(3), views: [] }),
+      getPose: () => pose(-0.5),
+      getJointPose: (joint) => ({ ...pose(-0.4 - joint.joint * 0.01), radius: 0.01 }),
+    };
     for (const fn of callbacks) fn(time, frame);
   }
 }
 // The recording system and, where needed, the inert XR device, in place while any entry lives.
-let users = 0, undo = [];
+let users = 0,
+  undo = [];
 // Synchronous: XR.create captures the scene it was called for before its first await.
 function enter(host, { compatTier, installXR }) {
   if (users++) return;
-  const xr = { sessions: [], isSessionSupported: async (mode) => mode === 'inline',
-    async requestSession() { const s = new Session(); xr.sessions.push(s); return s; } };
-  const nav = globalThis.navigator, own = Object.getOwnPropertyDescriptor(nav, 'xr');
+  const xr = {
+    sessions: [],
+    isSessionSupported: async (mode) => mode === 'inline',
+    async requestSession() {
+      const s = new Session();
+      xr.sessions.push(s);
+      return s;
+    },
+  };
+  const nav = globalThis.navigator,
+    own = Object.getOwnPropertyDescriptor(nav, 'xr');
   Object.defineProperty(nav, 'xr', { configurable: true, value: xr });
-  undo.push(() => { if (own) Object.defineProperty(nav, 'xr', own); else delete nav.xr; });
+  undo.push(() => {
+    if (own) Object.defineProperty(nav, 'xr', own);
+    else delete nav.xr;
+  });
   if (!nav.gpu) {
-    const device = () => Object.assign(new EventTarget(), { features: new Set(), limits: {}, queue: {},
-      lost: new Promise(() => {}), destroyed: false, destroy() { this.destroyed = true; } });
-    Object.defineProperty(nav, 'gpu', { configurable: true, value: { requestAdapter: async () =>
-      ({ features: new Set(), info: { vendor: 'inert' }, requestDevice: async () => device() }) } });
+    const device = () =>
+      Object.assign(new EventTarget(), {
+        features: new Set(),
+        limits: {},
+        queue: {},
+        lost: new Promise(() => {}),
+        destroyed: false,
+        destroy() {
+          this.destroyed = true;
+        },
+      });
+    Object.defineProperty(nav, 'gpu', {
+      configurable: true,
+      value: {
+        requestAdapter: async () => ({
+          features: new Set(),
+          info: { vendor: 'inert' },
+          requestDevice: async () => device(),
+        }),
+      },
+    });
     undo.push(() => delete nav.gpu);
   }
   if (compatTier(host.engine.gpu) === 'webgl2') {
@@ -87,19 +139,28 @@ export async function fixtures(load = (entry) => import(entry)) {
     async create({ engine, host }) {
       enter(host, { compatTier, installXR });
       let left = false;
-      const cleanup = () => { if (!left) { left = true; leave(); } };
+      const cleanup = () => {
+        if (!left) {
+          left = true;
+          leave();
+        }
+      };
       try {
         const made = await make(engine);
         const { xr, session } = made;
         return {
           plugin: xr,
-          dispose: () => { made.release?.(); xr.dispose(); },
+          dispose: () => {
+            made.release?.();
+            xr.dispose();
+          },
           cleanup,
           check({ phase }) {
             if (phase !== 'disposed') return;
             if (xr.session) lifetimeFault(`${name} keeps its session after disposal`);
             if (session && !session.ended) lifetimeFault(`${name} leaves its session running`);
-            if (session?.frames.size) lifetimeFault(`${name} leaves ${session.frames.size} XR frame callback(s) queued`);
+            if (session?.frames.size)
+              lifetimeFault(`${name} leaves ${session.frames.size} XR frame callback(s) queued`);
             made.check?.();
           },
         };
@@ -123,14 +184,19 @@ export async function fixtures(load = (entry) => import(entry)) {
       const made = await inline(engine);
       const models = XRModels.attach(made.xr, engine);
       made.session.tick(32);
-      const meshes = [...(models.controllerMeshes(made.session.inputSources[0]) ?? []),
-        ...(models.handMeshes(made.session.inputSources[1])?.joints ?? [])];
+      const meshes = [
+        ...(models.controllerMeshes(made.session.inputSources[0]) ?? []),
+        ...(models.handMeshes(made.session.inputSources[1])?.joints ?? []),
+      ];
       if (!meshes.length) throw new Error('OWNER_FIXTURE: XRModels made no model');
-      return { ...made, release: () => models.dispose(),
+      return {
+        ...made,
+        release: () => models.dispose(),
         check() {
           const left = meshes.filter((m) => m.scene.meshes.get(m.id) === m);
           if (left.length) lifetimeFault(`XRModels leaves ${left.length} mesh(es) after disposal`);
-        } };
+        },
+      };
     }),
   ];
 }

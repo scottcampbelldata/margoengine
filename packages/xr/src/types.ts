@@ -96,8 +96,8 @@ export interface XRNativeSession extends EventTarget {
     /** The projection layer, and with the WebXR Layers module any composition layers around it. */
     layers?: readonly object[];
     baseLayer?: unknown;
-  /** Runtime foveation, from zero to one; null or absent when unsupported. */
-  fixedFoveation?: number | null;
+    /** Runtime foveation, from zero to one; null or absent when unsupported. */
+    fixedFoveation?: number | null;
     depthNear?: number;
     depthFar?: number;
   }): void;

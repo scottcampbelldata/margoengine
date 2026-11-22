@@ -279,12 +279,19 @@ async function fixture(t) {
 for (const secondary of [false, true])
   for (const remove of [false, true])
     test(`XR ${secondary ? 'secondary' : 'default'} ${remove ? 'owner removal' : 'direct disposal'} releases only its owner`, async (t) => {
-      const f = await fixture(t), scene = secondary ? f.engine.createScene('xr-owner') : f.engine.scene;
+      const f = await fixture(t),
+        scene = secondary ? f.engine.createScene('xr-owner') : f.engine.scene;
       // Exercise the actual plugin lifetime independently of the asynchronous device factory.
       const xr = new XR(f.device);
       scene.use(xr);
       let primaryDisposals = 0;
-      const primary = { name: xr.name, setup() {}, dispose() { primaryDisposals++; } };
+      const primary = {
+        name: xr.name,
+        setup() {},
+        dispose() {
+          primaryDisposals++;
+        },
+      };
       if (secondary) f.engine.use(primary);
       await xr.requestSession('inline');
       assert.equal(f.engine.sceneOf(xr), scene);
@@ -305,27 +312,45 @@ for (const secondary of [false, true])
     });
 
 test('manual XR frame rendering keeps both tracked eyes and suppresses only the automatic draw', async (t) => {
-  const f = await fixture(t), xr = await XR.create(f.engine);
-  assert.throws(() => xr.renderFrame(), (error) => error.code === 'state');
+  const f = await fixture(t),
+    xr = await XR.create(f.engine);
+  assert.throws(
+    () => xr.renderFrame(),
+    (error) => error.code === 'state',
+  );
   let mode = 'auto';
-  await xr.requestSession('immersive-vr', { onFrame() {
-    if (mode === 'manual') xr.renderFrame();
-    if (mode !== 'auto') return false;
-  } });
-  const viewer = { ...pose(0), views: [
-    { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
-    { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
-  ] };
-  f.passes.length = 0; f.session.tick(100, viewer);
+  await xr.requestSession('immersive-vr', {
+    onFrame() {
+      if (mode === 'manual') xr.renderFrame();
+      if (mode !== 'auto') return false;
+    },
+  });
+  const viewer = {
+    ...pose(0),
+    views: [
+      { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
+      { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
+    ],
+  };
+  f.passes.length = 0;
+  f.session.tick(100, viewer);
   assert.equal(f.passes.length, 6, 'automatic two-eye output');
-  mode = 'manual'; f.passes.length = 0; f.session.tick(116, viewer);
+  mode = 'manual';
+  f.passes.length = 0;
+  f.session.tick(116, viewer);
   assert.equal(f.passes.length, 6, 'explicit two-eye output, no duplicate');
-  mode = 'empty'; f.passes.length = 0; f.session.tick(132, viewer);
+  mode = 'empty';
+  f.passes.length = 0;
+  f.session.tick(132, viewer);
   assert.equal(f.passes.length, 0, 'a render owner may choose to draw nothing');
   assert.equal(f.session.handles.size, 1, 'takeover does not stop the XR clock');
-  mode = 'auto'; f.session.tick(148, viewer);
+  mode = 'auto';
+  f.session.tick(148, viewer);
   assert.equal(f.passes.length, 6, 'automatic output resumes');
-  assert.throws(() => xr.renderFrame(), (error) => error.code === 'state');
+  assert.throws(
+    () => xr.renderFrame(),
+    (error) => error.code === 'state',
+  );
   assert.deepEqual(f.errors, []);
   await xr.end();
 });
@@ -358,10 +383,13 @@ for (const glass of [true, false])
     };
     setMeshSource(f.engine.createMesh(), { model });
     await xr.requestSession('immersive-vr');
-    const viewer = { ...pose(0), views: [
-      { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
-      { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
-    ] };
+    const viewer = {
+      ...pose(0),
+      views: [
+        { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
+        { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
+      ],
+    };
     f.passes.length = 0;
     f.session.tick(100, viewer);
     assert.equal(calls.length, 2, 'one PBR draw per eye');
@@ -928,31 +956,65 @@ test('createXREngine without WebGPU says what is needed', async () => {
   }
 });
 
-
 test('eye effects run per eye before submission and unsubscribe deterministically', async (t) => {
-  const f=await fixture(t),xr=await XR.create(f.engine),seen=[];
+  const f = await fixture(t),
+    xr = await XR.create(f.engine),
+    seen = [];
   await xr.requestSession();
-  const stop=xr.onEye(target=>seen.push({eye:target.view.eye,index:target.index,submits:f.device.submitted??0}));
-  const viewer={...pose(0),views:['left','right'].map(eye=>({eye,projectionMatrix:identity(),transform:pose(0).transform}))};
-  f.session.tick(10,viewer);
-  assert.deepEqual(seen.map(x=>[x.eye,x.index]),[['left',0],['right',1]]);
-  assert.equal(seen[0].submits,seen[1].submits);
-  assert.ok(f.device.submitted>seen[0].submits);
-  stop();f.session.tick(20,viewer);assert.equal(seen.length,2);
-  assert.throws(()=>xr.onEye(null),TypeError);
-  xr.dispose();assert.throws(()=>xr.onEye(()=>{}),/disposed/);
+  const stop = xr.onEye((target) =>
+    seen.push({ eye: target.view.eye, index: target.index, submits: f.device.submitted ?? 0 }),
+  );
+  const viewer = {
+    ...pose(0),
+    views: ['left', 'right'].map((eye) => ({ eye, projectionMatrix: identity(), transform: pose(0).transform })),
+  };
+  f.session.tick(10, viewer);
+  assert.deepEqual(
+    seen.map((x) => [x.eye, x.index]),
+    [
+      ['left', 0],
+      ['right', 1],
+    ],
+  );
+  assert.equal(seen[0].submits, seen[1].submits);
+  assert.ok(f.device.submitted > seen[0].submits);
+  stop();
+  f.session.tick(20, viewer);
+  assert.equal(seen.length, 2);
+  assert.throws(() => xr.onEye(null), TypeError);
+  xr.dispose();
+  assert.throws(() => xr.onEye(() => {}), /disposed/);
 });
 
 test('disposing XR in an eye hook stops later hooks and GPU submission', async (t) => {
-  const f=await fixture(t),xr=await XR.create(f.engine),seen=[];
+  const f = await fixture(t),
+    xr = await XR.create(f.engine),
+    seen = [];
   await xr.requestSession();
-  xr.onEye(()=>{seen.push('dispose');xr.dispose();});
-  xr.onEye(()=>seen.push('later'));
-  const viewer={...pose(0),views:['left','right'].map(eye=>({eye,projectionMatrix:identity(),transform:pose(0).transform}))};
-  f.session.tick(10,viewer);
-  assert.deepEqual(seen,['dispose']);assert.deepEqual(f.errors,[]);
+  xr.onEye(() => {
+    seen.push('dispose');
+    xr.dispose();
+  });
+  xr.onEye(() => seen.push('later'));
+  const viewer = {
+    ...pose(0),
+    views: ['left', 'right'].map((eye) => ({ eye, projectionMatrix: identity(), transform: pose(0).transform })),
+  };
+  f.session.tick(10, viewer);
+  assert.deepEqual(seen, ['dispose']);
+  assert.deepEqual(f.errors, []);
 });
-test('framebuffer scale reaches native layer creation and rejects invalid values before negotiation',async t=>{const f=await fixture(t),xr=await XR.create(f.engine);for(const framebufferScale of [0,-1,NaN,Infinity,1e308,1e-100])await assert.rejects(xr.requestSession('immersive-vr',{framebufferScale}),RangeError);assert.equal(f.requests.length,0);await xr.requestSession('immersive-vr',{framebufferScale:.625});assert.equal(xr.projectionLayer.init.scaleFactor,.625);await xr.end();assert.equal(xr.projectionLayer,undefined);});
+test('framebuffer scale reaches native layer creation and rejects invalid values before negotiation', async (t) => {
+  const f = await fixture(t),
+    xr = await XR.create(f.engine);
+  for (const framebufferScale of [0, -1, NaN, Infinity, 1e308, 1e-100])
+    await assert.rejects(xr.requestSession('immersive-vr', { framebufferScale }), RangeError);
+  assert.equal(f.requests.length, 0);
+  await xr.requestSession('immersive-vr', { framebufferScale: 0.625 });
+  assert.equal(xr.projectionLayer.init.scaleFactor, 0.625);
+  await xr.end();
+  assert.equal(xr.projectionLayer, undefined);
+});
 
 // A reaction on device.lost cannot be removed: one made per XR kept every disposed XR on the engine's device alive as long
 // as the device (docs/known-bugs.md). The device now has one reaction over the XRs still on it.
@@ -996,7 +1058,11 @@ test("xr.layers filters what both eyes of the 'separate' route draw, and is chec
       { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
     ],
   };
-  const sceneDraws = () => f.passes.splice(0).filter((_, i) => i % 3 === 0).map((pass) => pass.draws);
+  const sceneDraws = () =>
+    f.passes
+      .splice(0)
+      .filter((_, i) => i % 3 === 0)
+      .map((pass) => pass.draws);
   f.session.tick(100, viewer);
   assert.deepEqual(sceneDraws(), [1, 1], 'the box is on layer 0, which the mask holds');
   setRenderLayers(f.mesh, 1 << 30);

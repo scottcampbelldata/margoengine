@@ -164,7 +164,15 @@ export class EyeViews {
   }
 
   /** Draws this frame's eyes and puts them in `layer`. `delta` in seconds; `ar` keeps the real world behind the scene. */
-  render(binding: XRBinding, layer: XRProjectionLayer, viewer: XRViewerPose, delta: number, ar: boolean, onEye?: (target: XREyeTarget) => boolean | void, layers?: number): void {
+  render(
+    binding: XRBinding,
+    layer: XRProjectionLayer,
+    viewer: XRViewerPose,
+    delta: number,
+    ar: boolean,
+    onEye?: (target: XREyeTarget) => boolean | void,
+    layers?: number,
+  ): void {
     const views = this.views,
       images = [];
     views.length = 0;
@@ -233,8 +241,10 @@ export class EyeViews {
       depth.draw(3);
       depth.end();
     }
-    if (onEye) for (let i = 0; i < images.length; i++)
-      if (onEye({ index: i, device: this.device, encoder, image: images[i], view: viewer.views[i] }) === false) return;
+    if (onEye)
+      for (let i = 0; i < images.length; i++)
+        if (onEye({ index: i, device: this.device, encoder, image: images[i], view: viewer.views[i] }) === false)
+          return;
     this.device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
   }
