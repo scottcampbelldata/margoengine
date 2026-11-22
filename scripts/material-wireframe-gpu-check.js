@@ -54,9 +54,8 @@ try {
     );
     // Replacing disposed 12-index reference buffers with 10-index edge buffers used to retain reference storage
     // on ANGLE D3D11. Alternating allocations exposes both the missing edge and duplicate-edge alpha failure.
-    // fixed-wait: not a wait; three replacement rounds, each compared, repeat the buffer swap the bug needed
     for (const mirror of [false, true])
-      for (let round = 0; round < 3; round++) {
+      for (const round of [0, 1, 2]) {
         const options = { mirror, material: { transparent: true, opacity: 0.5, depthWrite: false } },
           label = `replacement-${mirror ? 'mirrored' : 'plain'}-${round}`,
           expected = await render(label + '-explicit', { ...options, reference: true, deduplicated: true }),
