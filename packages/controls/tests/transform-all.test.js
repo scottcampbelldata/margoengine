@@ -167,7 +167,11 @@ test('fixed false: size is the gizmo length in world units at any distance', asy
 });
 
 test('axisColors, hoveredColor and lineWidth reach the drawn handles; bad values throw', async () => {
-  const { engine, gizmo } = await rig({ axisColors: ['#f80', [0, 1, 1], [0.5, 0.5, 0.5, 0.25]], hoveredColor: '#fff', lineWidth: 6 });
+  const { engine, gizmo } = await rig({
+    axisColors: ['#f80', [0, 1, 1], [0.5, 0.5, 0.5, 0.25]],
+    hoveredColor: '#fff',
+    lineWidth: 6,
+  });
   const prim = (name) => gizmo.handles().find((h) => h.name === name).prims[0];
   closeVec([...prim('X').colors[0]], [1, 0x88 / 255, 0, 1], 1e-9);
   closeVec([...prim('Y').colors[0]], [0, 1, 1, 1], 1e-9);
@@ -178,7 +182,9 @@ test('axisColors, hoveredColor and lineWidth reach the drawn handles; bad values
   closeVec([...prim('Y').colors[0]], [1, 1, 1, 1], 1e-9);
   // Each names its fix and links to its entry on the error help page.
   const linked = (kind, field) => (error) =>
-    error instanceof kind && error.message.includes(field) && error.message.endsWith('; see https://margoengine.com/errors#controls-transform');
+    error instanceof kind &&
+    error.message.includes(field) &&
+    error.message.endsWith('; see https://margoengine.com/errors#controls-transform');
   assert.throws(() => (gizmo.axisColors = ['red', '#000', '#000']), linked(TypeError, 'axisColors'));
   assert.throws(() => (gizmo.axisColors = ['#000']), linked(TypeError, 'axisColors'));
   assert.throws(() => (gizmo.hoveredColor = [2, 0, 0]), linked(TypeError, 'hoveredColor'));

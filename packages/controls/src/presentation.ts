@@ -151,7 +151,8 @@ export class PresentationControls extends Controls {
       const p = this.local(e),
         r = ray(rollFrame(this.camera), p.x, p.y, this.element.clientWidth, this.element.clientHeight);
       this.picker.set(r.origin, r.direction);
-      const runtime = engineRuntime(this.engine!), root = meshRuntime(this.object).id;
+      const runtime = engineRuntime(this.engine!),
+        root = meshRuntime(this.object).id;
       const products = [...runtime.meshes.values()].filter((mesh) => {
         for (let id = mesh.id; id !== -1; id = runtime.store.parents[id]) if (id === root) return true;
         return false;
@@ -264,7 +265,8 @@ export class ScrollArea {
     if (!Number.isFinite(pages) || pages < 1 || !Number.isFinite(distance) || distance <= 0)
       throw rangeError('ScrollArea needs finite pages >= 1 and distance > 0; pass valid options', 'controls-arguments');
     const parent = canvas.parentElement;
-    if (!parent) throw typeError('ScrollArea needs a mounted canvas; append it to a parent first', 'controls-arguments');
+    if (!parent)
+      throw typeError('ScrollArea needs a mounted canvas; append it to a parent first', 'controls-arguments');
     this.parent = parent;
     this.previous = parent.style.position;
     this.positioned = (canvas.ownerDocument.defaultView?.getComputedStyle(parent).position || 'static') === 'static';
@@ -384,7 +386,8 @@ export class ScrollControls extends Controls {
    */
   setProgress(progress: number, immediate = false): void {
     if (this.dead) throw new MargoError('disposed', 'Scroll controls are disposed; create new controls');
-    if (!Number.isFinite(progress)) throw rangeError('Scroll progress must be finite; pass normalized progress', 'controls-arguments');
+    if (!Number.isFinite(progress))
+      throw rangeError('Scroll progress must be finite; pass normalized progress', 'controls-arguments');
     this.goal = this.infinite ? this.current + ((((progress - this.offset + 0.5) % 1) + 1) % 1) - 0.5 : clamp(progress);
     if (immediate) {
       this.current = this.goal;

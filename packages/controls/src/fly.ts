@@ -15,7 +15,6 @@ export { Controls };
 // Shift multiplies the flight speed by this (public, documented on `movementSpeedMultiplier`).
 const SLOW = 0.1;
 
-
 /**
  * Free flight. W/S fly forward and back along the view, A/D strafe, R/F rise and sink along the screen up axis, the
  * arrow keys yaw and pitch, and the pointer's offset from the element centre steers (proportionally, 1 at the edge).

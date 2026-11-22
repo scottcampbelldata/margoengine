@@ -173,10 +173,7 @@ test('gizmo: three rings and an outline at the size of the ball, the far halves 
     const middle = (ring.points[i * 2][2] + ring.points[i * 2 + 1][2]) / 2;
     close(c[3], middle >= 0 ? bright : bright * 0.25, 1e-12, `segment ${i}`);
   });
-  assert.ok(
-    tessellate(prims, engine.camera.matrix, 800, 600).length > 0,
-    'the lines tessellate for the overlay',
-  );
+  assert.ok(tessellate(prims, engine.camera.matrix, 800, 600).length > 0, 'the lines tessellate for the overlay');
   gizmo.dispose();
   control.dispose();
   engine.dispose();
@@ -192,7 +189,10 @@ test('gizmo: follows the target and the distance; needs an engine; removes its p
   engine.camera.target = [3, 0, 0];
   close(gizmo.radius(), near * 2, 1e-9);
   closeVec(
-    gizmo.prims()[3].points.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0]).map((v) => v / 128),
+    gizmo
+      .prims()[3]
+      .points.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0])
+      .map((v) => v / 128),
     [3, 0, 0],
     1e-9,
     'centred on the target',
@@ -220,7 +220,11 @@ test('gizmo: a drag on a ring turns about its axis alone and the point stays und
   control.rotate([1, 0, 0], -0.5);
   control.update(1);
   // Its near point, straight below the centre of the screen.
-  const at = gizmo.prims()[1].points.map((p) => p).filter((p) => p[2] > 0).sort((a, b) => b[2] - a[2])[0],
+  const at = gizmo
+      .prims()[1]
+      .points.map((p) => p)
+      .filter((p) => p[2] > 0)
+      .sort((a, b) => b[2] - a[2])[0],
     { x, y } = project(gizmo, at, centre, r);
   pointer(el, 'pointerdown', x, y);
   assert.equal(control.state, 'rotate');

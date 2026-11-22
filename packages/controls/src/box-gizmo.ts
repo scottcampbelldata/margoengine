@@ -69,7 +69,10 @@ const validateOptions = (handleSize: number, scaleSnap: number | null, rotationS
     handleSize <= 0 ||
     [scaleSnap, rotationSnap].some((v) => v !== null && (!Number.isFinite(v) || v <= 0))
   )
-    throw rangeError('BoxGizmo options must be positive finite numbers; use null to disable snapping', 'controls-arguments');
+    throw rangeError(
+      'BoxGizmo options must be positive finite numbers; use null to disable snapping',
+      'controls-arguments',
+    );
 };
 const corner = (i: number, lo: V3, hi: V3): V3 => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]];
 
@@ -135,7 +138,10 @@ export class BoxGizmo extends Controls {
     if (this.dead) throw new MargoError('disposed', 'BoxGizmo is disposed; create a new gizmo');
     const runtime = engineRuntime(this.engine!);
     if (runtime.meshes.get(meshRuntime(mesh).id) !== mesh || !mesh.geometry?.vertices.length)
-      throw typeError('BoxGizmo needs a live mesh with geometry from its engine; attach such a mesh', 'controls-arguments');
+      throw typeError(
+        'BoxGizmo needs a live mesh with geometry from its engine; attach such a mesh',
+        'controls-arguments',
+      );
     this.detach();
     this.mesh = mesh;
     this.refreshBounds();

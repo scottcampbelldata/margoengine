@@ -106,7 +106,8 @@ export class ThirdPersonControls extends Controls {
 
   constructor(engine: EngineKernel, subject: FollowSubject, options: ThirdPersonControlsOptions = {}) {
     super(engine, options.element);
-    if (!subject) throw typeError('ThirdPersonControls needs a subject: a mesh, a model or a function', 'controls-arguments');
+    if (!subject)
+      throw typeError('ThirdPersonControls needs a subject: a mesh, a model or a function', 'controls-arguments');
     this.subject = subject;
     this.pivotOffset = options.pivotOffset ?? [0, 1.5, 0];
     this.shoulder = options.shoulder ?? 0;
@@ -178,7 +179,10 @@ export class ThirdPersonControls extends Controls {
   update(delta = 1 / 60): boolean {
     finiteInput('Third-person update step', delta);
     if (delta < 0)
-      throw rangeError(`Third-person update step must be 0 or more; pass a finite number of seconds, not ${delta}`, 'controls-arguments');
+      throw rangeError(
+        `Third-person update step must be 0 or more; pass a finite number of seconds, not ${delta}`,
+        'controls-arguments',
+      );
     const camera = this.camera,
       before = [...camera.position, ...camera.target],
       dt = delta;

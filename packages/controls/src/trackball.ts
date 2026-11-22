@@ -249,7 +249,10 @@ export class TrackballControls extends Controls {
   update(delta = 1 / 60): boolean {
     finiteInput('Trackball update step', delta);
     if (delta < 0)
-      throw rangeError(`Trackball update step must be 0 or more; pass a finite number of seconds, not ${delta}`, 'controls-arguments');
+      throw rangeError(
+        `Trackball update step must be 0 or more; pass a finite number of seconds, not ${delta}`,
+        'controls-arguments',
+      );
     const camera = this.camera,
       before = [...camera.position, ...camera.target],
       frames = 60 * delta,
