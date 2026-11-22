@@ -4,8 +4,34 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { HORSE_TYPES, handsToMetres, horseBody, horseMass } from '../dist/anatomy.js';
-import { GAITS, GAIT_PATTERNS, froude, gaitFor, hoofPhase, hoovesDown, preferredSpeed, speedAtFroude, stride, strideFrequency, strideLength, trunkMotion } from '../dist/gaits.js';
-import { BREAKOVER, COAT_COLORS, HORSE_COATS, coatAtlas, coatAtlasUV, horseDocument, horseGLB, horsePose, horseSkeleton, poseHooves, poseJoints, poseSaddle } from '../dist/model.js';
+import {
+  GAITS,
+  GAIT_PATTERNS,
+  froude,
+  gaitFor,
+  hoofPhase,
+  hoovesDown,
+  preferredSpeed,
+  speedAtFroude,
+  stride,
+  strideFrequency,
+  strideLength,
+  trunkMotion,
+} from '../dist/gaits.js';
+import {
+  BREAKOVER,
+  COAT_COLORS,
+  HORSE_COATS,
+  coatAtlas,
+  coatAtlasUV,
+  horseDocument,
+  horseGLB,
+  horsePose,
+  horseSkeleton,
+  poseHooves,
+  poseJoints,
+  poseSaddle,
+} from '../dist/model.js';
 import { SeatFollower, mountRider, riderSeat } from '../dist/seat.js';
 import { HORSE_SETTINGS, horseOptionsFromSettings, horseSettingDefaults } from '../dist/settings.js';
 import { HorseMotion, blendPoses } from '../dist/index.js';
@@ -58,7 +84,10 @@ test('gaits: stride length follows Alexander and Jayes and lands in the measured
 
 test('gaits: the gait follows speed by Froude number, so a bigger horse changes gait at a higher speed', () => {
   const b = horseBody();
-  assert.deepEqual([1.5, 3.5, 6, 12].map((v) => gaitFor(b, v)), ['walk', 'trot', 'canter', 'gallop']);
+  assert.deepEqual(
+    [1.5, 3.5, 6, 12].map((v) => gaitFor(b, v)),
+    ['walk', 'trot', 'canter', 'gallop'],
+  );
   // Walk-trot near Froude 0.4 (Alexander 1989): about 2 m/s for this horse.
   const wt = speedAtFroude(b, 0.4);
   assert.ok(wt > 1.9 && wt < 2.3, `walk to trot at ${wt.toFixed(2)} m/s`);
@@ -154,7 +183,11 @@ test('model: stance hooves stay planted and swing hooves lift, every gait, type 
             slide = Math.max(slide, Math.abs(z - first));
             high = Math.max(high, p[1]);
           }
-          for (let i = 1; i < 20; i++) lift = Math.max(lift, poseHooves(sk, horsePose(sk, s, (s.strike[h] + s.duty + ((1 - s.duty) * i) / 20) % 1))[h][1]);
+          for (let i = 1; i < 20; i++)
+            lift = Math.max(
+              lift,
+              poseHooves(sk, horsePose(sk, s, (s.strike[h] + s.duty + ((1 - s.duty) * i) / 20) % 1))[h][1],
+            );
           const label = `${type} ${g} x${k} hoof ${h}`;
           assert.ok(slide < 0.03, `${label} slides ${slide.toFixed(3)} m in stance`);
           assert.ok(high < 0.035, `${label} rises ${high.toFixed(3)} m in stance`);
@@ -176,12 +209,22 @@ test('model: the rig, the standing pose and the document', () => {
   // The withers and croup tops stand at their measured heights; the saddle sits just behind the withers.
   const saddle = poseSaddle(sk, stand).position;
   assert.ok(Math.abs(saddle[1] - 0.99 * b.withers) < 1e-9 && saddle[2] > 0);
-  assert.deepEqual(horsePose(sk, stride(b, 4), 0.3), horsePose(sk, stride(b, 4), 0.3), 'a pose is a pure function of the phase');
+  assert.deepEqual(
+    horsePose(sk, stride(b, 4), 0.3),
+    horsePose(sk, stride(b, 4), 0.3),
+    'a pose is a pure function of the phase',
+  );
   assert.equal(poseJoints(sk, stand).length, 32);
   const full = horseDocument(),
     { doc } = full;
-  assert.deepEqual(doc.materials.map((m) => m.name), ['Coat', 'Hoof', 'Mane', 'Tail', 'Eye']);
-  assert.deepEqual(doc.animations.map((a) => a.name), ['stand', 'walk', 'trot', 'canter', 'gallop']);
+  assert.deepEqual(
+    doc.materials.map((m) => m.name),
+    ['Coat', 'Hoof', 'Mane', 'Tail', 'Eye'],
+  );
+  assert.deepEqual(
+    doc.animations.map((a) => a.name),
+    ['stand', 'walk', 'trot', 'canter', 'gallop'],
+  );
   assert.equal(doc.skins[0].joints.length, 32);
   assert.ok(doc.nodes.some((n) => n.name === 'saddle'));
   // Model height: the poll stands above the withers, the muzzle reaches past the chest, nothing below the ground.
@@ -198,7 +241,10 @@ test('model: the rig, the standing pose and the document', () => {
     assert.ok(j.every((x) => x < 32));
   }
   // Detail levels fall away for a far crowd; clips last one stride at their speed.
-  assert.ok(horseDocument({ detail: 0 }).vertices < horseDocument({ detail: 1 }).vertices && horseDocument({ detail: 1 }).vertices < full.vertices);
+  assert.ok(
+    horseDocument({ detail: 0 }).vertices < horseDocument({ detail: 1 }).vertices &&
+      horseDocument({ detail: 1 }).vertices < full.vertices,
+  );
   for (const c of full.clips.slice(1)) assert.ok(Math.abs(c.duration - c.strideLength / c.speed) < 1e-12);
   const glb = horseGLB({ detail: 0 });
   assert.equal(new DataView(glb.buffer).getUint32(0, true), 0x46546c67);
@@ -237,7 +283,10 @@ test('seat: rider joints keep their segment lengths and the knee angle, and the 
     assert.ok(Math.abs(d(seat.hips[s], seat.knees[s]) - 0.245 * 1.8) < 1e-9);
     const shank = d(seat.knees[s], seat.ankles[s]);
     assert.ok(Math.abs(shank - 0.246 * 1.8) < 0.002);
-    assert.ok(Math.abs(Math.abs(seat.knees[s][0]) - (0.21 * 1.63 + 0.06)) < 1e-9, 'the knee lies outside the barrel and saddle');
+    assert.ok(
+      Math.abs(Math.abs(seat.knees[s][0]) - (0.21 * 1.63 + 0.06)) < 1e-9,
+      'the knee lies outside the barrel and saddle',
+    );
     assert.ok(seat.stirrups[s][1] < seat.knees[s][1] && seat.hands[s][1] > seat.hip[1]);
     const t = seat.knees[s].map((v, k) => seat.hips[s][k] - v),
       u = seat.ankles[s].map((v, k) => v - seat.knees[s][k]),
@@ -306,7 +355,10 @@ test('motion: speed eases, the gait follows with hysteresis, and replays are exa
   assert.deepEqual(a.log, b2.log, 'the same commands give the same motion');
   assert.ok(a.log[1][1] <= (3 * 241) / 240 + 1e-9, 'acceleration is limited to 3 m/s^2');
   const seen = [...new Set(a.log.map((r) => r[0]))];
-  assert.ok(seen.indexOf('trot') < seen.indexOf('canter') && seen.indexOf('canter') < seen.indexOf('gallop'), seen.join(' '));
+  assert.ok(
+    seen.indexOf('trot') < seen.indexOf('canter') && seen.indexOf('canter') < seen.indexOf('gallop'),
+    seen.join(' '),
+  );
   assert.ok(a.log.some((r) => r[0] === 'gallop'));
   assert.equal(a.m.gait, 'walk');
   // Hysteresis: holding a speed just over the walk-trot boundary after slowing from a trot stays a trot.
@@ -325,9 +377,20 @@ test('motion: speed eases, the gait follows with hysteresis, and replays are exa
 test('settings: rows on the shared shape map to addHorse, motion and mount options', () => {
   const names = HORSE_SETTINGS.map((r) => r.name);
   assert.equal(new Set(names).size, names.length);
-  for (const r of HORSE_SETTINGS) assert.ok(typeof r.about === 'string' && 'default' in r && typeof r.live === 'boolean');
+  for (const r of HORSE_SETTINGS)
+    assert.ok(typeof r.about === 'string' && 'default' in r && typeof r.live === 'boolean');
   assert.equal(horseSettingDefaults().coat, 'bay');
-  const o = horseOptionsFromSettings({ type: 'draft', withers: 1.8, coat: 'grey', blaze: 'yes', socks: 0.3, speed: 5, gait: 'trot', knee: 2, followFrequency: 7 });
+  const o = horseOptionsFromSettings({
+    type: 'draft',
+    withers: 1.8,
+    coat: 'grey',
+    blaze: 'yes',
+    socks: 0.3,
+    speed: 5,
+    gait: 'trot',
+    knee: 2,
+    followFrequency: 7,
+  });
   assert.equal(o.options.type, 'draft');
   assert.equal(o.options.withers, 1.8);
   assert.deepEqual(o.options.markings, { blaze: true, socks: [0.3, 0, 0.3, 0] });
@@ -349,13 +412,17 @@ test('crowd: bad options are refused before the loader or a GPU is touched', asy
 
 test('crowd: each horse carries a saddle frame read back from the bone texture, on the back the GPU draws', async () => {
   const { Engine, TransformStore } = await import('../../core/dist/extension.js');
-  const engine = new Engine({ width: 64, height: 64, clientWidth: 64, clientHeight: 64 }, await TransformStore.create(4096), {
-    backend: 'webgl2',
-    add() {},
-    remove() {},
-    render() {},
-    dispose() {},
-  });
+  const engine = new Engine(
+    { width: 64, height: 64, clientWidth: 64, clientHeight: 64 },
+    await TransformStore.create(4096),
+    {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    },
+  );
   // The crowd draw needs WebGPU; here it is only recorded, so the bake and the saddle read-back run on the CPU.
   engine.use = () => engine;
   const herd = await addHorseCrowd(engine, { type: 'cavalry', capacity: 8 }),
@@ -395,6 +462,39 @@ test('crowd: each horse carries a saddle frame read back from the bone texture, 
   }
   const rise = Math.max(...ys) - Math.min(...ys);
   assert.ok(rise > 0.02 && rise < 0.15, `the trot moves the saddle ${rise.toFixed(3)} m`);
-  assert.equal(saddleFrame([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], [0, 1.5, 0.2], { x: 1, y: 0.5, z: 2, heading: 0 })[13], 2);
+  assert.equal(
+    saddleFrame([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], [0, 1.5, 0.2], { x: 1, y: 0.5, z: 2, heading: 0 })[13],
+    2,
+  );
   herd.dispose();
+});
+
+test('crowd: the coat atlas goes with the draw however the draw is let go, once', async () => {
+  const { Engine, TransformStore } = await import('../../core/dist/extension.js');
+  const engine = new Engine(
+    { width: 64, height: 64, clientWidth: 64, clientHeight: 64 },
+    await TransformStore.create(4096),
+    {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    },
+  );
+  engine.use = () => engine;
+  // A scene or engine disposal disposes the draw plugin and never reaches the herd's own dispose.
+  const herd = await addHorseCrowd(engine, { capacity: 2 }),
+    map = herd.crowd.map,
+    real = map.dispose.bind(map);
+  let released = 0;
+  map.dispose = () => {
+    released++;
+    real();
+  };
+  herd.crowd.dispose();
+  assert.equal(released, 1, 'the atlas is released with the draw alone');
+  herd.dispose();
+  herd.crowd.dispose();
+  assert.equal(released, 1, 'and not again by the herd or a repeated disposal');
 });

@@ -11,6 +11,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { SkinnedCrowd, SkinnedCrowdInstance } from '@margoengine/animation/instanced-skin';
 import type { VATCrowd, VATCrowdOptions } from '@margoengine/animation/vat';
+import { captureScene } from '../../shared/scene-scope.js';
 import type { PersonBake } from './bake.js';
 
 /** A member's level: not drawn (off the frustum, too small or over budget). */
@@ -74,12 +75,18 @@ const DEFAULTS = { near: 128, far: 16384, vertices: 8_000_000, nearScreen: 0.08,
 /** Checks a budget and fills in the defaults. */
 export function crowdBudget(budget: CrowdBudget = {}): Required<CrowdBudget> {
   const b = { ...DEFAULTS, ...budget };
-  if (!(Number.isInteger(b.near) && b.near >= 0 && b.near <= 65536)) throw new RangeError('Crowd budget near must be a whole number from 0 to 65536');
-  if (!(Number.isInteger(b.far) && b.far >= 0 && b.far <= 1048576)) throw new RangeError('Crowd budget far must be a whole number from 0 to 1048576');
-  if (!(b.vertices >= 0 && Number.isFinite(b.vertices))) throw new RangeError('Crowd budget vertices must be 0 or more');
-  if (!(b.nearScreen > 0 && b.nearScreen <= 10)) throw new RangeError('Crowd budget nearScreen must be above 0 and at most 10');
-  if (!(b.cullScreen >= 0 && b.cullScreen < b.nearScreen)) throw new RangeError('Crowd budget cullScreen must be 0 or more and below nearScreen');
-  if (!(b.hysteresis >= 0 && b.hysteresis < 1)) throw new RangeError('Crowd budget hysteresis must be 0 or more and below 1');
+  if (!(Number.isInteger(b.near) && b.near >= 0 && b.near <= 65536))
+    throw new RangeError('Crowd budget near must be a whole number from 0 to 65536');
+  if (!(Number.isInteger(b.far) && b.far >= 0 && b.far <= 1048576))
+    throw new RangeError('Crowd budget far must be a whole number from 0 to 1048576');
+  if (!(b.vertices >= 0 && Number.isFinite(b.vertices)))
+    throw new RangeError('Crowd budget vertices must be 0 or more');
+  if (!(b.nearScreen > 0 && b.nearScreen <= 10))
+    throw new RangeError('Crowd budget nearScreen must be above 0 and at most 10');
+  if (!(b.cullScreen >= 0 && b.cullScreen < b.nearScreen))
+    throw new RangeError('Crowd budget cullScreen must be 0 or more and below nearScreen');
+  if (!(b.hysteresis >= 0 && b.hysteresis < 1))
+    throw new RangeError('Crowd budget hysteresis must be 0 or more and below 1');
   return b;
 }
 
@@ -122,7 +129,8 @@ export function planCrowd(
     let inside = true;
     if (planes)
       for (let p = 0; p < 6 && inside; p++)
-        inside = planes[p * 4]! * m.x + planes[p * 4 + 1]! * m.y + planes[p * 4 + 2]! * m.z + planes[p * 4 + 3]! >= -m.radius;
+        inside =
+          planes[p * 4]! * m.x + planes[p * 4 + 1]! * m.y + planes[p * 4 + 2]! * m.z + planes[p * 4 + 3]! >= -m.radius;
     // Projected height of the bounding sphere as a fraction of the viewport (an eye inside it fills the view).
     screen[i] = d > m.radius ? (2 * m.radius) / (2 * d * t) : Infinity;
     if (inside && screen[i]! >= b.cullScreen) order.push(i);
@@ -182,13 +190,25 @@ export class PersonCrowd {
    */
   static async attach(engine: EngineKernel, bake: PersonBake, options: PersonCrowdOptions = {}): Promise<PersonCrowd> {
     if (!bake?.near || !bake.far || !bake.farBones) throw new TypeError('PersonCrowd needs a bake from bakePerson');
-    const budget = crowdBudget(options),
-      look: VATCrowdOptions = { color: options.color, map: options.map, roughness: options.roughness, metalness: options.metalness },
-      [{ SkinnedCrowd }, { VATCrowd }] = await Promise.all([import('@margoengine/animation/instanced-skin'), import('@margoengine/animation/vat')]);
+    // The scene this call was made for, kept across the lazy imports: both draws belong to it.
+    const scope = captureScene(engine),
+      budget = crowdBudget(options),
+      look: VATCrowdOptions = {
+        color: options.color,
+        map: options.map,
+        roughness: options.roughness,
+        metalness: options.metalness,
+      },
+      [{ SkinnedCrowd }, { VATCrowd }] = await Promise.all([
+        import('@margoengine/animation/instanced-skin'),
+        import('@margoengine/animation/vat'),
+      ]);
     const near = new SkinnedCrowd(bake.near, look),
       far = new VATCrowd(bake.far, look);
-    engine.use(near as never);
-    engine.use(far as never);
+    scope.run(() => {
+      engine.use(near as never);
+      engine.use(far as never);
+    });
     return new PersonCrowd(engine, bake, near, far, budget);
   }
   /**
@@ -202,7 +222,8 @@ export class PersonCrowd {
     if (typeof view.update === 'function') {
       const canvas = this.engine.canvas,
         a = aspect ?? (canvas?.width && canvas.height ? canvas.width / canvas.height : 1);
-      if (!(a > 0 && Number.isFinite(a))) throw new RangeError('PersonCrowd update aspect must be a finite number above 0');
+      if (!(a > 0 && Number.isFinite(a)))
+        throw new RangeError('PersonCrowd update aspect must be a finite number above 0');
       view.update(a, this.engine.backend === 'webgpu');
     }
     const n = people.length,
@@ -221,7 +242,13 @@ export class PersonCrowd {
       s[i]!.radius = 0.55 * h;
     }
     const previous = this.levels;
-    this.levels = planCrowd(s.slice(0, n), view, this.budget, { near: this.bake.near.vertexCount, far: this.bake.far.vertexCount }, previous);
+    this.levels = planCrowd(
+      s.slice(0, n),
+      view,
+      this.budget,
+      { near: this.bake.near.vertexCount, far: this.bake.far.vertexCount },
+      previous,
+    );
     let near = 0,
       far = 0;
     const instance: SkinnedCrowdInstance & { matrix?: ArrayLike<number> } = {};
@@ -246,7 +273,13 @@ export class PersonCrowd {
       } else {
         // The far level plays one clip: the one with more weight.
         const second = blend > 0.5 && p.blendClip !== undefined,
-          far1 = { matrix: p.matrix, clip: second ? p.blendClip! : p.clip, offset: second ? (p.blendOffset ?? p.offset) : p.offset, speed: 0, uvTransform: p.uvTransform ?? WHOLE };
+          far1 = {
+            matrix: p.matrix,
+            clip: second ? p.blendClip! : p.clip,
+            offset: second ? (p.blendOffset ?? p.offset) : p.offset,
+            speed: 0,
+            uvTransform: p.uvTransform ?? WHOLE,
+          };
         if (far < this.far.count) this.far.set(far, far1);
         else this.far.add(far1);
         far++;

@@ -14,6 +14,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { VATCrowdOptions } from '@margoengine/animation/vat';
 import type { HorseCrowd, HorseCrowdOptions } from '@margoengine/horses/crowd';
+import { captureScene } from '../../shared/scene-scope.js';
 import type { PersonBake } from './bake.js';
 import { PersonCrowd, crowdBudget, type CrowdBudget, type CrowdPerson, type CrowdView } from './lod.js';
 import { riderMatrix, type RiderPlacement } from './riders.js';
@@ -133,15 +134,22 @@ export interface Gaits {
  * Resolves the clip names of `options` against the bake's clips and checks the gait numbers.
  * @throws RangeError for a clip the bake lacks (by index) or numbers out of range.
  */
-export function armyGaits(bake: Pick<PersonBake, 'clips'>, options: Pick<AddArmyOptions, 'clips' | 'strides' | 'runAbove' | 'blendBand' | 'standBelow'> = {}): Gaits {
+export function armyGaits(
+  bake: Pick<PersonBake, 'clips'>,
+  options: Pick<AddArmyOptions, 'clips' | 'strides' | 'runAbove' | 'blendBand' | 'standBelow'> = {},
+): Gaits {
   const clips = bake.clips,
     find = (want: string | number | undefined, name: string): number | undefined => {
       if (typeof want === 'number') {
-        if (!(Number.isInteger(want) && want >= 0 && want < clips.length)) throw new RangeError(`addArmy clips.${name} must be a clip index below ${clips.length}`);
+        if (!(Number.isInteger(want) && want >= 0 && want < clips.length))
+          throw new RangeError(`addArmy clips.${name} must be a clip index below ${clips.length}`);
         return want;
       }
       const i = clips.findIndex((c) => c.name === (want ?? name));
-      if (i < 0 && want !== undefined) throw new RangeError(`addArmy clips.${name}: the bake has no clip named ${want}; it has ${clips.map((c) => c.name).join(', ')}`);
+      if (i < 0 && want !== undefined)
+        throw new RangeError(
+          `addArmy clips.${name}: the bake has no clip named ${want}; it has ${clips.map((c) => c.name).join(', ')}`,
+        );
       return i < 0 ? undefined : i;
     },
     c = options.clips ?? {},
@@ -154,10 +162,26 @@ export function armyGaits(bake: Pick<PersonBake, 'clips'>, options: Pick<AddArmy
     runAbove = options.runAbove ?? 2,
     blendBand = options.blendBand ?? 0.4,
     standBelow = options.standBelow ?? 0.1;
-  if (!(walkStride > 0 && walkStride < 20) || !(runStride > 0 && runStride < 20)) throw new RangeError('addArmy strides must be above 0 and below 20 m');
-  if (!(runAbove > 0 && runAbove < 20) || !(blendBand >= 0 && blendBand < runAbove) || !(standBelow >= 0 && standBelow < runAbove))
+  if (!(walkStride > 0 && walkStride < 20) || !(runStride > 0 && runStride < 20))
+    throw new RangeError('addArmy strides must be above 0 and below 20 m');
+  if (
+    !(runAbove > 0 && runAbove < 20) ||
+    !(blendBand >= 0 && blendBand < runAbove) ||
+    !(standBelow >= 0 && standBelow < runAbove)
+  )
     throw new RangeError('addArmy runAbove must be 0 to 20 m/s, blendBand and standBelow 0 or more and below it');
-  return { stand, walk, run, ride, durations: clips.map((x) => x.duration), walkStride, runStride, runAbove, blendBand, standBelow };
+  return {
+    stand,
+    walk,
+    run,
+    ride,
+    durations: clips.map((x) => x.duration),
+    walkStride,
+    runStride,
+    runAbove,
+    blendBand,
+    standBelow,
+  };
 }
 
 const frac = (x: number) => x - Math.floor(x);
@@ -168,10 +192,21 @@ const frac = (x: number) => x - Math.floor(x);
  * `phase` (0 in step). Standing plays the stand clip on the film clock from `idle` (a fraction of it), so a halted line
 does not sway as one.
  */
-export function stepPose(g: Gaits, speed: number, distance: number, scale: number, phase: number, time: number, idle = 0): StepPose {
+export function stepPose(
+  g: Gaits,
+  speed: number,
+  distance: number,
+  scale: number,
+  phase: number,
+  time: number,
+  idle = 0,
+): StepPose {
   if (speed < g.standBelow) {
     const clip = g.stand >= 0 ? g.stand : g.walk,
-      offset = g.stand >= 0 ? frac(time / g.durations[clip]! + idle) * g.durations[clip]! : frac(distance / (g.walkStride * scale) + phase) * g.durations[clip]!;
+      offset =
+        g.stand >= 0
+          ? frac(time / g.durations[clip]! + idle) * g.durations[clip]!
+          : frac(distance / (g.walkStride * scale) + phase) * g.durations[clip]!;
     return { clip, offset, blendClip: clip, blendOffset: offset, blend: 0 };
   }
   const walk = frac(distance / (g.walkStride * scale) + phase) * g.durations[g.walk]!,
@@ -193,7 +228,8 @@ export function stepPose(g: Gaits, speed: number, distance: number, scale: numbe
  * @throws TypeError for a missing army or person; RangeError for options out of range.
  */
 export async function addArmy(engine: EngineKernel, army: MarchingArmy, options: AddArmyOptions): Promise<ArmyCrowd> {
-  if (!army || !Array.isArray(army.formations) || typeof army.heightAt !== 'function') throw new TypeError('addArmy needs a @margoengine/navmesh/formations Army');
+  if (!army || !Array.isArray(army.formations) || typeof army.heightAt !== 'function')
+    throw new TypeError('addArmy needs a @margoengine/navmesh/formations Army');
   if (!options?.person?.near) throw new TypeError('addArmy needs options.person, a bake from bakePerson');
   const person = options.person,
     gaits = armyGaits(person, options),
@@ -204,18 +240,31 @@ export async function addArmy(engine: EngineKernel, army: MarchingArmy, options:
     route = (options.step ?? 'cadence') === 'route',
     variants = options.variants ?? [];
   if (!(stature >= 0 && stature <= 0.3)) throw new RangeError('addArmy stature must be 0 to 0.3 of the mean height');
-  if (options.step !== undefined && options.step !== 'cadence' && options.step !== 'route') throw new RangeError("addArmy step must be 'cadence' or 'route'");
-  if (!Number.isFinite(facing) || !Number.isFinite(seed)) throw new RangeError('addArmy facing and seed must be finite');
-  if (!Array.isArray(variants) || variants.some((v) => v?.offset?.length !== 2 || v?.scale?.length !== 2)) throw new RangeError('addArmy variants must be atlas regions {offset: [u, v], scale: [u, v]}');
+  if (options.step !== undefined && options.step !== 'cadence' && options.step !== 'route')
+    throw new RangeError("addArmy step must be 'cadence' or 'route'");
+  if (!Number.isFinite(facing) || !Number.isFinite(seed))
+    throw new RangeError('addArmy facing and seed must be finite');
+  if (!Array.isArray(variants) || variants.some((v) => v?.offset?.length !== 2 || v?.scale?.length !== 2))
+    throw new RangeError('addArmy variants must be atlas regions {offset: [u, v], scale: [u, v]}');
   const rider = { height: person.height || 1.75, ...options.rider, facing };
   riderMatrix(new Float32Array(16), 0, 1, rider);
-  const cavalry = army.formations.some((f) => f.kind === 'cavalry'),
-    people = await PersonCrowd.attach(engine, person, { ...budget, color: options.color, map: options.map, roughness: options.roughness, metalness: options.metalness });
+  // The scene this call was made for, kept across the awaits: the people and the herd belong to it.
+  const scope = captureScene(engine),
+    cavalry = army.formations.some((f) => f.kind === 'cavalry'),
+    people = await PersonCrowd.attach(engine, person, {
+      ...budget,
+      color: options.color,
+      map: options.map,
+      roughness: options.roughness,
+      metalness: options.metalness,
+    });
   let horses: HorseCrowd | null = null;
   try {
     if (cavalry && options.horses !== false) {
       const { addHorseCrowd } = await import('@margoengine/horses/crowd');
-      horses = await addHorseCrowd(engine as never, { ground: (x, z) => army.heightAt(x, z), ...(options.horses || {}) });
+      horses = await scope.run(() =>
+        addHorseCrowd(engine as never, { ground: (x, z) => army.heightAt(x, z), ...(options.horses || {}) }),
+      );
     }
   } catch (error) {
     people.dispose();
@@ -225,12 +274,14 @@ export async function addArmy(engine: EngineKernel, army: MarchingArmy, options:
     mounted: ArmyMember[] = [],
     mountedIndex: number[] = [],
     scaleOf = (i: number) => 1 + stature * armyNormal(seed * 7919 + i),
-    regionOf = (i: number) => (variants.length ? variants[Math.floor(armyHash(seed * 15485863 + i) * variants.length)] : undefined),
+    regionOf = (i: number) =>
+      variants.length ? variants[Math.floor(armyHash(seed * 15485863 + i) * variants.length)] : undefined,
     phaseOf = (i: number) => (route ? armyHash(seed * 104729 + i) : 0),
     cf = Math.cos(facing),
     sf = Math.sin(facing);
   const person0 = (k: number): CrowdPerson & { matrix: Float32Array } => {
-    while (persons.length <= k) persons.push({ matrix: new Float32Array(16), clip: 0, offset: 0 } as CrowdPerson & { matrix: Float32Array });
+    while (persons.length <= k)
+      persons.push({ matrix: new Float32Array(16), clip: 0, offset: 0 } as CrowdPerson & { matrix: Float32Array });
     return persons[k]!;
   };
   let disposed = false;
@@ -273,7 +324,9 @@ export async function addArmy(engine: EngineKernel, army: MarchingArmy, options:
         p.uvTransform = regionOf(i);
       }
       if (horses && mounted.length) {
-        horses.update(mounted.map((m) => ({ x: m.x, z: m.z, heading: m.heading, speed: m.speed, distance: m.distance })));
+        horses.update(
+          mounted.map((m) => ({ x: m.x, z: m.z, heading: m.heading, speed: m.speed, distance: m.distance })),
+        );
         mounted.forEach((m, j) => {
           const i = mountedIndex[j]!,
             s = scaleOf(i),

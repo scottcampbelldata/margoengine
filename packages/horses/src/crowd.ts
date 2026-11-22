@@ -9,7 +9,16 @@
 import type { Engine } from '@margoengine/core';
 import type { BoneBake, SkinnedCrowd } from '@margoengine/animation/instanced-skin';
 import { GAITS, GAIT_PATTERNS, froude, type Gait } from './gaits.js';
-import { HORSE_COATS, coatAtlas, horseDocument, type HorseClip, type HorseCoat, type HorseModelOptions, type HorseSkeleton } from './model.js';
+import {
+  HORSE_COATS,
+  coatAtlas,
+  horseDocument,
+  type HorseClip,
+  type HorseCoat,
+  type HorseModelOptions,
+  type HorseSkeleton,
+} from './model.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import type { HorseBody } from './anatomy.js';
 
 /** One horse for {@link HorseCrowd.update}: an Army member fits. */
@@ -47,7 +56,10 @@ export interface HorseCrowd {
   /** Horses drawn now. */
   readonly count: number;
   /** The clip and blend a horse at this speed and distance draws, as `SkinnedCrowd` instance fields. */
-  pose(speed: number, distance: number): { clip: number; offset: number; blendClip: number; blendOffset: number; blend: number };
+  pose(
+    speed: number,
+    distance: number,
+  ): { clip: number; offset: number; blendClip: number; blendOffset: number; blend: number };
   /** Places every horse: one per entry, in order, and their saddles. Horses past the list are hidden. */
   update(horses: readonly CrowdHorse[]): this;
   /**
@@ -117,8 +129,11 @@ export async function addHorseCrowd(engine: Engine, options: HorseCrowdOptions =
   if (!Array.isArray(coats) || !coats.length || coats.some((c) => !HORSE_COATS.includes(c)))
     throw new TypeError(`addHorseCrowd coats must be a list of ${HORSE_COATS.join(', ')}`);
   if (!(fps >= 10 && fps <= 120)) throw new RangeError('addHorseCrowd fps must be 10 to 120');
-  if (!(Number.isInteger(capacity) && capacity >= 1 && capacity <= 65536)) throw new RangeError('addHorseCrowd capacity must be 1 to 65536');
+  if (!(Number.isInteger(capacity) && capacity >= 1 && capacity <= 65536))
+    throw new RangeError('addHorseCrowd capacity must be 1 to 65536');
   if (typeof ground !== 'function') throw new TypeError('addHorseCrowd ground must be a function (x, z) => height');
+  // The scene this call was made for, kept across the lazy imports: the crowd draws belong to it.
+  const scope = captureScene(engine);
   // The loader, the bake and the crowd draw load on the first crowd, so importing this entry stays light.
   const [{ parseGLTFAsync }, { Animation }, { bakeBones, SkinnedCrowd, poseBone }, { Texture }] = await Promise.all([
     import('@margoengine/gltf/pbr'),
@@ -127,20 +142,34 @@ export async function addHorseCrowd(engine: Engine, options: HorseCrowdOptions =
     import('@margoengine/materials'),
   ]);
   const doc = horseDocument({ ...options, coat: 'bay', detail: 0, atlas: true }),
-    model = await parseGLTFAsync(engine as never, doc.doc, doc.buffers),
+    model = await scope.run(() => parseGLTFAsync(engine as never, doc.doc, doc.buffers)),
     animation = new Animation(model as never),
     bake = bakeBones(animation, { fps });
   animation.dispose?.();
   (model as unknown as { dispose?(): void }).dispose?.();
   const map = new Texture(coatAtlas(), { mipmaps: false, colorSpace: 'srgb' } as never),
-    crowd = SkinnedCrowd.attach(engine as never, bake, { map, roughness: 0.6 }),
+    // The coat atlas is the herd's own, so it goes with the draw however the draw is let go: by the herd, or by its scene or
+    // engine being disposed (which dispose the plugin and never reach the herd).
+    Herd = class extends SkinnedCrowd {
+      override dispose(): void {
+        const done = this.disposed;
+        super.dispose();
+        if (!done) (map as unknown as { dispose?(): void }).dispose?.();
+      }
+    },
+    crowd = scope.run(() => {
+      const draw = new Herd(bake, { map, roughness: 0.6 });
+      engine.use(draw as never);
+      return draw;
+    }),
     clipIndex = new Map(doc.clips.map((c, i) => [c.name, i])),
     bay = HORSE_COATS.indexOf('bay');
   let count = 0;
   const saddles = new Float32Array(capacity * 16),
     trunkBone = doc.skeleton.index('body'),
     trunk = new Float32Array(12);
-  if (!(trunkBone >= 0 && trunkBone < bake.bones)) throw new RangeError('addHorseCrowd needs the trunk bone in the bake; bake the horse of horseDocument');
+  if (!(trunkBone >= 0 && trunkBone < bake.bones))
+    throw new RangeError('addHorseCrowd needs the trunk bone in the bake; bake the horse of horseDocument');
   const hidden = { matrix: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1e6, 0, 1] };
   const at = (gait: Gait | 'stand', distance: number, time: number) => {
     const c = doc.clips[clipIndex.get(gait)!]!;
@@ -149,7 +178,8 @@ export async function addHorseCrowd(engine: Engine, options: HorseCrowdOptions =
     return { clip: clipIndex.get(gait)!, offset: (p - Math.floor(p)) * c.duration };
   };
   const pose = (speed: number, distance: number) => {
-    if (!(speed >= 0) || !Number.isFinite(distance)) throw new RangeError('A crowd horse needs a speed of 0 or more and a finite distance');
+    if (!(speed >= 0) || !Number.isFinite(distance))
+      throw new RangeError('A crowd horse needs a speed of 0 or more and a finite distance');
     if (speed < 0.05) {
       const a = at('stand', 0, distance);
       return { clip: a.clip, offset: a.offset, blendClip: a.clip, blendOffset: a.offset, blend: 0 };
@@ -179,7 +209,6 @@ export async function addHorseCrowd(engine: Engine, options: HorseCrowdOptions =
     if (disposed) return;
     disposed = true;
     crowd.dispose?.();
-    map.dispose?.();
   };
   const herd: HorseCrowd = {
     crowd,

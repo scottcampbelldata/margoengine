@@ -11,9 +11,18 @@ import type { PBRModel } from '@margoengine/gltf/pbr-model';
 import type { Animation } from '@margoengine/animation';
 import type { MaterialInstallation } from '@margoengine/materials';
 import type { hair as hairFeature, HairOptions } from '@margoengine/materials/hair';
+import { captureScene } from '../../shared/scene-scope.js';
 import type { HorseBody } from './anatomy.js';
 import { GAIT_PATTERNS, froude, stride, type Gait, type Stride } from './gaits.js';
-import { horseDocument, horsePose, poseSaddle, type HorseClip, type HorseModelOptions, type HorsePose, type HorseSkeleton } from './model.js';
+import {
+  horseDocument,
+  horsePose,
+  poseSaddle,
+  type HorseClip,
+  type HorseModelOptions,
+  type HorsePose,
+  type HorseSkeleton,
+} from './model.js';
 
 /** Anything a horse can join for shadows or ambient occlusion: `Shadows`, a `GTAO` pass, a scene's `parts`. */
 export interface HorseReceiver {
@@ -142,7 +151,13 @@ export class HorseMotion {
   private readonly start = new Map<string, number>();
   constructor(
     readonly body: HorseBody,
-    readonly options: { position?: readonly [number, number]; heading?: number; acceleration?: number; turnRate?: number; fade?: number } = {},
+    readonly options: {
+      position?: readonly [number, number];
+      heading?: number;
+      acceleration?: number;
+      turnRate?: number;
+      fade?: number;
+    } = {},
   ) {
     this.x = options.position?.[0] ?? 0;
     this.z = options.position?.[1] ?? 0;
@@ -156,8 +171,8 @@ export class HorseMotion {
       now = this.gait;
     const order: Gait[] = ['walk', 'trot', 'canter', 'gallop'];
     let g: Gait = 'gallop';
+    // Leave a gait upward only past 1.05 of its top, drop into it from above only below 0.95 of its top.
     for (const k of order)
-      // Leave a gait upward only past 1.05 of its top, drop into it from above only below 0.95 of its top.
       if (fr < GAIT_PATTERNS[k].froude[1] * (now === 'stand' || order.indexOf(now) <= order.indexOf(k) ? 1.05 : 0.95)) {
         g = k;
         break;
@@ -212,13 +227,17 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     acceleration = options.acceleration ?? 3,
     turnRate = options.turnRate ?? 1.2,
     fade = options.fade ?? 0.3;
-  if (!(acceleration > 0 && acceleration < Infinity)) throw new RangeError('addHorse acceleration must be above 0 m/s^2');
-  if (!(turnRate > 0 && turnRate < Infinity)) throw new RangeError('addHorse turnRate must be above 0 radians a second');
+  if (!(acceleration > 0 && acceleration < Infinity))
+    throw new RangeError('addHorse acceleration must be above 0 m/s^2');
+  if (!(turnRate > 0 && turnRate < Infinity))
+    throw new RangeError('addHorse turnRate must be above 0 radians a second');
   if (!(fade >= 0 && fade < Infinity)) throw new RangeError('addHorse fade must be 0 or more seconds');
   const ground = options.ground ?? (() => 0);
   if (typeof ground !== 'function') throw new TypeError('addHorse ground must be a function (x, z) => height');
   const explicitShadows = receiver(options.shadows, 'shadows'),
-    occlusion = receiver(options.occlusion, 'occlusion');
+    occlusion = receiver(options.occlusion, 'occlusion'),
+    // The scene this call was made for, kept across the lazy imports: the model and everything it brings belong to it.
+    scope = captureScene(engine);
   // The loader, skinning and hair shading load on the first horse, so importing this entry costs only the horse maths.
   const [{ parseGLTFAsync }, { Animation }, { dualQuaternionSkinning }, { install }, { hair }] = await Promise.all([
     import('@margoengine/gltf/pbr'),
@@ -227,13 +246,16 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     import('@margoengine/materials'),
     import('@margoengine/materials/hair'),
   ]);
-  const model = (await parseGLTFAsync(engine as never, doc.doc, doc.buffers)) as PBRModel,
+  const model = (await scope.run(() => parseGLTFAsync(engine as never, doc.doc, doc.buffers))) as PBRModel,
     shadows =
       options.shadows === undefined
-        ? ((engine as unknown as EngineKernel).sceneOf(model as never)?.plugins.get('shadows') as HorseReceiver | undefined)
+        ? ((engine as unknown as EngineKernel).sceneOf(model as never)?.plugins.get('shadows') as
+            | HorseReceiver
+            | undefined)
         : explicitShadows,
     features: Record<string, ReturnType<typeof hairFeature>[]> = {};
-  if (options.coatHair !== false) features.Coat = [hair({ direction: 'u', strands: 400, specular: 0.45, ...(options.coatHair || {}) })];
+  if (options.coatHair !== false)
+    features.Coat = [hair({ direction: 'u', strands: 400, specular: 0.45, ...(options.coatHair || {}) })];
   if (options.maneHair !== false) {
     features.Mane = [hair({ strands: 1024, ...(options.maneHair || {}) })];
     features.Tail = [hair({ strands: 1024, ...(options.maneHair || {}) })];
@@ -286,11 +308,18 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
   const apply = () => {
     const v = shown();
     computePose(v.distance);
-    const nodes = model.nodes as unknown as { setQuaternion(q: readonly number[]): unknown; setPosition(p: readonly number[]): unknown }[],
+    const nodes = model.nodes as unknown as {
+        setQuaternion(q: readonly number[]): unknown;
+        setPosition(p: readonly number[]): unknown;
+      }[],
       bodyIndex = skeleton.index('body'),
       rest = skeleton.joints[bodyIndex]!.rest;
     pose.rotations.forEach((q, i) => i > 0 && nodes[i]?.setQuaternion(q));
-    nodes[bodyIndex]?.setPosition([rest[0] + pose.bodyOffset[0], rest[1] + pose.bodyOffset[1], rest[2] + pose.bodyOffset[2]]);
+    nodes[bodyIndex]?.setPosition([
+      rest[0] + pose.bodyOffset[0],
+      rest[1] + pose.bodyOffset[1],
+      rest[2] + pose.bodyOffset[2],
+    ]);
     model.root.setPosition([v.x, ground(v.x, v.z), v.z]);
     model.root.setQuaternion([0, Math.sin(v.heading / 2), 0, Math.cos(v.heading / 2)]);
   };
@@ -323,7 +352,8 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     // A later set at the same time replaces the earlier one; sets after now are cut (a re-shot from here). The set
     // takes effect at the next fixed step, as it does in a replay.
     for (let i = commands.length - 1; i >= 0; i--)
-      if (commands[i]!.at > time + 1e-9 || (commands[i]!.at >= time - 1e-9 && commands[i]!.key === key && i >= next)) commands.splice(i, 1);
+      if (commands[i]!.at > time + 1e-9 || (commands[i]!.at >= time - 1e-9 && commands[i]!.key === key && i >= next))
+        commands.splice(i, 1);
     next = Math.min(next, commands.length);
     commands.push({ at: time, key, value });
   };
@@ -366,7 +396,8 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       return asked('gait') as Gait | 'auto';
     },
     set gait(v: Gait | 'auto') {
-      if (v !== 'auto' && !strides.has(v as Gait)) throw new RangeError("Horse gait must be 'auto', 'walk', 'trot', 'canter' or 'gallop'");
+      if (v !== 'auto' && !strides.has(v as Gait))
+        throw new RangeError("Horse gait must be 'auto', 'walk', 'trot', 'canter' or 'gallop'");
       record('gait', v);
     },
     get currentSpeed() {
@@ -391,12 +422,17 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       return {
         position: [v.x, y, v.z],
         heading: h,
-        saddle: [v.x + c * s.position[0] + sn * s.position[2], y + s.position[1], v.z - sn * s.position[0] + c * s.position[2]],
+        saddle: [
+          v.x + c * s.position[0] + sn * s.position[2],
+          y + s.position[1],
+          v.z - sn * s.position[0] + c * s.position[2],
+        ],
         saddleRotation: qmul([0, Math.sin(h / 2), 0, Math.cos(h / 2)], s.rotation),
       };
     },
     advanceTime(delta: number) {
-      if (!(delta >= 0 && delta < Infinity)) throw new RangeError('advanceTime needs a finite number of seconds, 0 or more');
+      if (!(delta >= 0 && delta < Infinity))
+        throw new RangeError('advanceTime needs a finite number of seconds, 0 or more');
       stepTo(time + delta);
       return horse;
     },
