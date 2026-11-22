@@ -138,6 +138,7 @@ await runSuite(
           heightScale: 1,
           cellSize: 4,
           levels: 10,
+          clipmapAnchor: [x0, z0],
           layers: rules,
           textures: (gpu) => {
             const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
