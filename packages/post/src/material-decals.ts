@@ -342,8 +342,7 @@ export class MaterialDecals implements EnginePlugin {
     const atlas = o.atlas === undefined ? this.flat : lend(this.slot, device, this.engine),
       surface = atlas && (o.enabled ?? true) && this.count ? o.targets?.() : undefined;
     if (!surface && output.hdr) return input;
-    const
-      depth = this.host!.depthTexture!,
+    const depth = this.host!.depthTexture!,
       v = this.values,
       { direction, radiance, ambient } = this.engine!.lighting;
     if (!invertMatrixStable(c.camera.matrix, v.subarray(0, 16), this.workspace))

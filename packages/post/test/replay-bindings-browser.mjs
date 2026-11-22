@@ -54,9 +54,13 @@ await postBrowser(
                   )
                   .replace('let direct=', 'if(testTint.a<0.0){discard;}let direct=')
                   .replace('let linear=direct*', 'let linear=testGain.rgb*direct*');
-                if (patched === c.shader || !patched.includes('testGain.rgb*direct')) throw new Error('test plugin did not patch');
+                if (patched === c.shader || !patched.includes('testGain.rgb*direct'))
+                  throw new Error('test plugin did not patch');
                 c.shader = patched;
-                c.bindings.push({ binding: 41, resource: { buffer: tint } }, { binding: 42, resource: { buffer: gain } });
+                c.bindings.push(
+                  { binding: 41, resource: { buffer: tint } },
+                  { binding: 42, resource: { buffer: gain } },
+                );
               },
             });
           },
@@ -84,9 +88,17 @@ await postBrowser(
           TerrainColors.attach(engine, ground);
         } else {
           engine.use(tintPlugin());
-          engine.createMesh().setGeometry(box(20, 0.2, 20)).setPosition([0, -0.1, 0]).setMaterial(grey);
+          engine
+            .createMesh()
+            .setGeometry(box(20, 0.2, 20))
+            .setPosition([0, -0.1, 0])
+            .setMaterial(grey);
         }
-        engine.createMesh().setGeometry(box(1.5, 1.5, 1.5)).setPosition([0, 0.75, 0]).setMaterial(grey);
+        engine
+          .createMesh()
+          .setGeometry(box(1.5, 1.5, 1.5))
+          .setPosition([0, 0.75, 0])
+          .setMaterial(grey);
         attach(engine);
         for (let i = 0; i < 6; i++) engine.render({ delta: 1 / 60 });
         await engine.gpu.queue.onSubmittedWorkDone();
@@ -114,7 +126,13 @@ await postBrowser(
     const rows = {};
     for (const name of ['ssao', 'gtao', 'ssgi', 'ssr', 'sceneTargets', 'stack']) rows[name] = await run(name, false);
     rows.terrainGtao = await run('gtao', true);
-    console.log(JSON.stringify(Object.fromEntries(Object.entries(rows).map(([k, r]) => [k, { errors: r.errors.length, lit: +r.lit.toFixed(3) }]))));
+    console.log(
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(rows).map(([k, r]) => [k, { errors: r.errors.length, lit: +r.lit.toFixed(3) }]),
+        ),
+      ),
+    );
     for (const [name, r] of Object.entries(rows)) {
       assert.deepEqual(r.errors, [], `${name}: no GPU error with a material plugin's bindings`);
       assert.ok(r.lit > 0.2, `${name}: the lit scene is drawn (${(100 * r.lit).toFixed(1)} % of pixels lit)`);

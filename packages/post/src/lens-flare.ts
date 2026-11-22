@@ -121,14 +121,18 @@ const TINTS=array<vec3f,6>(vec3f(1.0,0.8,0.5),vec3f(0.5,0.8,1.0),vec3f(1.0,0.55,
 @fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
 let q=vec2i(frag.xy);let s=textureLoad(scene,q,0);var c=s.rgb;let v=visible[0];let sun=sunPosition();
 if(v>0.0&&sun.valid&&f.size.w>0.5){
-${layout ? elementLight(layout) : `let h=f.size.y;let p=frag.xy;let centre=f.size.xy*0.5;let axis=sun.pixel-centre;let d=distance(p,sun.pixel);
+${
+  layout
+    ? elementLight(layout)
+    : `let h=f.size.y;let p=frag.xy;let centre=f.size.xy*0.5;let axis=sun.pixel-centre;let d=distance(p,sun.pixel);
 var light=(exp(-d/(0.012*h))*0.8+exp(-d/(0.08*h))*0.2)*vec3f(1.0);
 let ring=distance(p,centre);let side=max(dot(normalize(p-centre+vec2f(1e-4)),normalize(axis+vec2f(1e-4))),0.0);
 light+=vec3f(0.5,0.7,1.0)*0.08*exp(-pow((ring-0.42*h)/(0.012*h),2.0))*side*side;
 for(var i=0;i<6;i++){
 let g=GHOSTS[i];let r=g.y*h;let e=distance(p,centre+axis*g.x)/r;
 light+=TINTS[i]*g.z*(1.0-smoothstep(0.8,1.0,e))*(0.6+0.4*e*e);
-}`}
+}`
+}
 c+=light*f.color.rgb*f.sun.w*v;
 }
 return vec4f(${hdr ? 'c' : 'toDisplay(c)'},s.a);
@@ -190,7 +194,8 @@ export class LensFlare implements EnginePlugin {
     const o = this.options,
       i = o.intensity ?? 1,
       r = o.occlusionRadius ?? 12,
-      rgb = (c?: readonly number[]) => c === undefined || (c.length === 3 && c.every((v) => v >= 0 && Number.isFinite(v))),
+      rgb = (c?: readonly number[]) =>
+        c === undefined || (c.length === 3 && c.every((v) => v >= 0 && Number.isFinite(v))),
       elements = o.elements;
     if (
       (o.sun !== undefined && typeof o.sun !== 'function') ||
@@ -208,7 +213,9 @@ export class LensFlare implements EnginePlugin {
               !((e?.size ?? 0) > 0 && e.size <= 8192) ||
               !Number.isFinite(e.distance ?? 0) ||
               !rgb(e.color) ||
-              (e.texture !== undefined && typeof e.texture !== 'function' && typeof e.texture?.createView !== 'function'),
+              (e.texture !== undefined &&
+                typeof e.texture !== 'function' &&
+                typeof e.texture?.createView !== 'function'),
           )))
     )
       throw new RangeError(

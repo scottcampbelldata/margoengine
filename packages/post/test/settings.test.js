@@ -43,7 +43,15 @@ const rig = () => ({
 // A new effect built over the options an effect holds runs the effect's own range check (each frame checks the same).
 const revalidate = (targets) => {
   const classes = { bloom: Bloom, lens: Lens, lensFlare: LensFlare, anamorphic: Anamorphic, gtao: GTAO, ssao: SSAO };
-  for (const [key, C] of Object.entries({ ...classes, ssgi: SSGI, ssr: SSR, contactShadows: ContactShadows, heatHaze: HeatHaze, smaa: SMAA, dof: DOF }))
+  for (const [key, C] of Object.entries({
+    ...classes,
+    ssgi: SSGI,
+    ssr: SSR,
+    contactShadows: ContactShadows,
+    heatHaze: HeatHaze,
+    smaa: SMAA,
+    dof: DOF,
+  }))
     new C({ ...targets[key].options });
   new MotionBlur({ ...targets.motionBlur.options });
 };
@@ -59,7 +67,8 @@ test('every row is well formed: a unique name in its group, a default in range, 
     assert.equal(typeof row.live, 'boolean', `${row.name} has live`);
     assert.ok(row.about.length > 20, `${row.name} says what it does`);
     if (row.nullable) assert.equal(row.default, null, `${row.name} is null by default`);
-    else if (row.kind === 'number') assert.ok(row.default >= row.min && row.default <= row.max, `${row.name} default in range`);
+    else if (row.kind === 'number')
+      assert.ok(row.default >= row.min && row.default <= row.max, `${row.name} default in range`);
     else if (row.kind === 'choice') assert.ok(row.choices.includes(row.default), `${row.name} default is a choice`);
     if (row.kind === 'number') assert.ok(row.min < row.max && row.step > 0, `${row.name} has a range and a step`);
   }
@@ -68,8 +77,25 @@ test('every row is well formed: a unique name in its group, a default in range, 
     ['bloom.radius', 'motionBlur.maxBlur', 'dof.temporal', 'ssgi.multiBounce', 'ssr.stochastic'],
   );
   assert.equal(POST_LIVE_SETTINGS.length, POST_SETTINGS.length - 5);
-  for (const g of ['bloom', 'lens', 'lensFlare', 'anamorphic', 'motionBlur', 'dof', 'gtao', 'ssao', 'ssgi', 'ssr', 'contactShadows', 'heatHaze', 'smaa'])
-    assert.ok(POST_SETTINGS.some((row) => row.group === g), `${g} has rows`);
+  for (const g of [
+    'bloom',
+    'lens',
+    'lensFlare',
+    'anamorphic',
+    'motionBlur',
+    'dof',
+    'gtao',
+    'ssao',
+    'ssgi',
+    'ssr',
+    'contactShadows',
+    'heatHaze',
+    'smaa',
+  ])
+    assert.ok(
+      POST_SETTINGS.some((row) => row.group === g),
+      `${g} has rows`,
+    );
 });
 
 test('the defaults written leave every effect valid and meaning what it means with no options', () => {
@@ -125,10 +151,19 @@ test('rows write the option they name, the angle becomes the share, off becomes 
 test('a value outside its row throws RangeError, an unknown name TypeError, a missing effect TypeError', () => {
   const targets = rig();
   for (const row of POST_SETTINGS.filter((r) => r.kind === 'number')) {
-    assert.throws(() => applyPostSettings(targets, { [row.name]: row.max + row.step }), RangeError, `${row.name} above its max`);
-    assert.throws(() => applyPostSettings(targets, { [row.name]: row.min - row.step }), RangeError, `${row.name} below its min`);
+    assert.throws(
+      () => applyPostSettings(targets, { [row.name]: row.max + row.step }),
+      RangeError,
+      `${row.name} above its max`,
+    );
+    assert.throws(
+      () => applyPostSettings(targets, { [row.name]: row.min - row.step }),
+      RangeError,
+      `${row.name} below its min`,
+    );
     assert.throws(() => applyPostSettings(targets, { [row.name]: NaN }), RangeError, `${row.name} NaN`);
-    if (!row.nullable) assert.throws(() => applyPostSettings(targets, { [row.name]: null }), RangeError, `${row.name} is not nullable`);
+    if (!row.nullable)
+      assert.throws(() => applyPostSettings(targets, { [row.name]: null }), RangeError, `${row.name} is not nullable`);
   }
   for (const row of POST_SETTINGS.filter((r) => r.kind === 'choice'))
     assert.throws(() => applyPostSettings(targets, { [row.name]: 'sideways' }), RangeError, `${row.name} choice`);
@@ -136,11 +171,22 @@ test('a value outside its row throws RangeError, an unknown name TypeError, a mi
   assert.throws(() => applyPostSettings(targets, { 'anamorphic.tint': [2, 0, 0] }), RangeError);
   for (const name of ['gtao.slices', 'ssgi.rays', 'motionBlur.samples', 'dof.maxRadius', 'smaa.maxSearchSteps'])
     assert.throws(() => applyPostSettings(targets, { [name]: 2.5 }), RangeError, `${name} whole`);
-  assert.throws(() => applyPostSettings(targets, { 'ssao.radius': 0.2, 'ssao.bias': 0.3 }), RangeError, 'bias above radius');
-  assert.throws(() => applyPostSettings(targets, { 'dof.focalDistance': 0.04 }), RangeError, 'focus inside the focal length');
+  assert.throws(
+    () => applyPostSettings(targets, { 'ssao.radius': 0.2, 'ssao.bias': 0.3 }),
+    RangeError,
+    'bias above radius',
+  );
+  assert.throws(
+    () => applyPostSettings(targets, { 'dof.focalDistance': 0.04 }),
+    RangeError,
+    'focus inside the focal length',
+  );
   assert.throws(() => applyPostSettings({}, { 'bloom.strength': 1 }), /needs targets.bloom/);
   assert.throws(() => applyPostSettings({ bloom: targets.bloom }, { 'lens.distortion': 0.2 }), /needs targets.lens/);
-  assert.doesNotThrow(() => applyPostSettings({ bloom: targets.bloom }, { 'bloom.strength': 0.8 }), 'a default needs no target');
+  assert.doesNotThrow(
+    () => applyPostSettings({ bloom: targets.bloom }, { 'bloom.strength': 0.8 }),
+    'a default needs no target',
+  );
 });
 
 test('a refused call writes nothing', () => {
@@ -152,7 +198,14 @@ test('a refused call writes nothing', () => {
 
 test('named looks are only row values, in range, and the effects accept them', () => {
   const index = new Map(POST_SETTINGS.map((row) => [row.name, row]));
-  assert.deepEqual(Object.keys(POST_LOOKS), ['natural', 'cinematic', 'dream', 'animatedFeature', 'documentary', 'nightGlow']);
+  assert.deepEqual(Object.keys(POST_LOOKS), [
+    'natural',
+    'cinematic',
+    'dream',
+    'animatedFeature',
+    'documentary',
+    'nightGlow',
+  ]);
   assert.deepEqual(POST_LOOKS.natural, {});
   for (const [name, look] of Object.entries(POST_LOOKS)) {
     for (const key of Object.keys(look)) assert.ok(index.has(key), `${name} names the row ${key}`);

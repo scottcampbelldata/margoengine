@@ -124,7 +124,11 @@ export class ContactShadows implements EnginePlugin {
 
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'ContactShadows is disposed; create a new ContactShadows');
-    if (!this.stacked) throw new MargoError('state', 'ContactShadows runs inside a PostStack; use ContactShadows.attach(engine) or add it to a PostStack');
+    if (!this.stacked)
+      throw new MargoError(
+        'state',
+        'ContactShadows runs inside a PostStack; use ContactShadows.attach(engine) or add it to a PostStack',
+      );
     if (!engine.gpu)
       throw new MargoError('unsupported', 'ContactShadows requires WebGPU; it does not run on the WebGL2 fallback');
     this.engine = engine;

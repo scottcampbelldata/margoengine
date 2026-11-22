@@ -332,12 +332,20 @@ test('a second PostStack.attach on a scene names addEffect and join, and leaves 
     ssao = new SSAO();
   assert.throws(
     () => PostStack.attach(h.engine, [ssao]),
-    (e) => e.code === 'attached' && /already has a PostStack; add effects to it with addEffect or PostStack.join/.test(e.message),
+    (e) =>
+      e.code === 'attached' &&
+      /already has a PostStack; add effects to it with addEffect or PostStack.join/.test(e.message),
   );
   assert.equal(h.plugins.get('post:stack'), first);
-  assert.deepEqual(first.effects.map((e) => e.name), ['bloom']);
+  assert.deepEqual(
+    first.effects.map((e) => e.name),
+    ['bloom'],
+  );
   first.addEffect(ssao, 0);
-  assert.deepEqual(first.effects.map((e) => e.name), ['ssao', 'bloom']);
+  assert.deepEqual(
+    first.effects.map((e) => e.name),
+    ['ssao', 'bloom'],
+  );
 });
 
 test('FXAA alone wraps the finished frame, nests around another effect and restores and disposes cleanly', async () => {

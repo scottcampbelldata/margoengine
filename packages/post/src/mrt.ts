@@ -45,7 +45,13 @@ export type TargetValue =
  * penumbra pixel and `groundFacing` of a ground pixel (a grazing sun puts no clear shadow down), `ground` the least
  * up component of a ground normal (45 degrees).
  */
-export const TARGET_MASK_LIMITS = Object.freeze({ partial: [0.02, 0.98], full: 0.02, facing: 0.05, groundFacing: 0.2, ground: 0.7071 });
+export const TARGET_MASK_LIMITS = Object.freeze({
+  partial: [0.02, 0.98],
+  full: 0.02,
+  facing: 0.05,
+  groundFacing: 0.2,
+  ground: 0.7071,
+});
 /** One named output: a built-in `value` or a `wgsl` expression, and its texture format. */
 export interface TargetOutput {
   /** Built-in value written. Default 'albedo' when `wgsl` is unset. */
