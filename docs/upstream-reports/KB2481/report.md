@@ -32,7 +32,7 @@ same target written by plain masked writes instead of additive discs (`source=re
 
 In Margo the same fault moves `SurfelPlugin`'s 4x frame by up to 33 of 255 from frame to frame at the full feature level, where the
 sums of the last frame are bit for bit the same at every pixel that moved (known-bugs entry "surfels at 4x on a compatibility-level
-WebGPU device").
+WebGPU device"). Margo works around it there since 2026-11-21 by resolving with the masked per-sample draws, which repeat.
 
 ## Intel half, 2026-10-30: no standalone page then
 

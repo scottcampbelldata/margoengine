@@ -2509,7 +2509,15 @@ frame within 2 of 255. Sky fog, the VolumetricFog composite and water spray also
 sample index and a one-sample mask (`perSample` in `packages/shared/msaa.js`, 2026-11-11), proved by the adapter check's
 4x cases and its fogged frame. Surfels at 4x (2026-11-11) pack their front depth into rgba8unorm and add their sums in
 two rg16float targets (r, g and b, weight: the full level's half floats), resolved by a masked draw per sample; the
-adapter check's surfel frame is within 4 of 255 of the full level's. On the WebGL2 layer below its full tier surfels pack
+adapter check's surfel frame is within 4 of 255 of the full level's. Since 2026-11-21 (KB2481) native WebGPU at 4x takes
+the same masked resolve at the full level, reading the one rgba16float sum target per sample: on the Intel Arc 140V the
+one `sample_index` draw over 4x additive sums did not repeat itself (up to 33 of 255 frame to frame over PostStack), a
+driver fault. Cost: the resolve is 4 draws in place of 1 (with their 4 pipelines), passes unchanged (3 per frame); the
+adapter check's surfel frame on that laptop went from 33 to 4 of 255 apart, and one engine's frame repeats bit for bit
+(`surfelRepeat` in packages/points/tests/features-browser.js, which fails on the old route there). Same pixels where the
+old route was exact is the arithmetic (each sample shaded from its own sums, blended over its own destination, either
+way); it is not measured on another GPU yet (no software WebGPU adapter on that laptop). The WebGL2 layer, which ignores
+sample masks, keeps the one draw. On the WebGL2 layer below its full tier surfels pack
 the front depth the same way (that tier stores r32float as r16float) and refuse LDR; the tier check's half-float surfel
 frame equals the full tier's. Eye-dome lighting packs its depth target the same way below the full tier (tier cases
 `points edl` and `points edl 4x`). A lone Bloom at 4x and the float-target test

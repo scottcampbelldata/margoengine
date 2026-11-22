@@ -138,6 +138,44 @@ async function surfels() {
   return `Surfels close a jittered surface (${holes.toFixed(4)} holes against ${plainHoles.toFixed(3)}) and blend colours across a seam (${mixed.toFixed(2)} against ${plainMixed.toFixed(2)})`;
 }
 
+/**
+ * KB2481: one engine draws an unchanged surfel sheet eight times and every frame is bit for bit its first. On the Intel
+ * Arc 140V the full level's one sample_index resolve over the 4x additive sums moved the frame by up to 71 of 255 from
+ * frame to frame; the masked draw per sample repeats exactly.
+ */
+async function surfelRepeat() {
+  const { PointCloud } = await import('@margoengine/points');
+  const { SurfelPlugin } = await import('../dist/surfels.js');
+  const positions = [];
+  for (let z = -40; z <= 40; z++)
+    for (let x = -40; x <= 40; x++) positions.push(x / 20, Math.sin(x / 3) * Math.cos(z / 4) * 0.3, z / 20);
+  const colors = positions.map((value, i) =>
+      i % 3 === 0 ? +(value < 0) : i % 3 === 2 ? +(positions[i - 2] >= 0) : 0.3,
+    ),
+    { engine, frame, end } = await rig({ position: [0, 3, 4], target: [0, 0, 0] });
+  SurfelPlugin.attach(engine, { overlap: 2 }).add(
+    new PointCloud({ positions, colors, material: { size: 0.06, sizeUnits: 'world' } }),
+  );
+  const first = (await frame()).bytes,
+    moved = [];
+  for (let i = 1; i < 8; i++) {
+    const bytes = (await frame()).bytes;
+    let count = 0,
+      largest = 0;
+    for (let j = 0; j < bytes.length; j++) {
+      const difference = Math.abs(bytes[j] - first[j]);
+      count += +(difference > 0);
+      largest = Math.max(largest, difference);
+    }
+    if (count) moved.push({ frame: i, count, largest });
+  }
+  const lit = first.reduce((sum, value, i) => sum + +(i % 4 === 0 && value > 60), 0);
+  await end();
+  assert(lit > 3000, `the surfels reach the frame: ${lit}`);
+  assert(!moved.length, `every surfel frame is bit for bit the first: ${JSON.stringify(moved)}`);
+  return `One engine draws the same surfel frame eight times, bit for bit (${lit} lit pixels)`;
+}
+
 /** A red surface in front of a blue one, nearer than the disc size, and a mesh in front of surfels. */
 async function surfelDepth() {
   const { PointCloud } = await import('@margoengine/points');
@@ -489,6 +527,7 @@ window.runFeatures = async () => {
   for (const check of [
     adaptiveSize,
     surfels,
+    surfelRepeat,
     surfelDepth,
     potree,
     octreeTransform,
