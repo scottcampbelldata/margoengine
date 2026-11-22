@@ -15,19 +15,41 @@ try {
       const { engineRuntime } = await import('/packages/core/dist/extension.js');
       const { sphere } = await import('/packages/stage/dist/index.js');
       const { AvoidanceSolver } = await import('/packages/kinematics-constraints/dist/index.js');
-      const { JointLimitSet, jointLimitPredicate } = await import('/packages/kinematics-constraints/dist/joint-limits.js');
+      const { JointLimitSet, jointLimitPredicate } = await import(
+        '/packages/kinematics-constraints/dist/joint-limits.js'
+      );
       const limits = new JointLimitSet([{ type: 'hinge', axis: [1, 0, 0], min: 0.4, max: 1 }]);
-      const predicate = jointLimitPredicate(limits, (_r, _e, _t, angle) => [[Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)]]);
+      const predicate = jointLimitPredicate(limits, (_r, _e, _t, angle) => [
+        [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)],
+      ]);
       const solver = new AvoidanceSolver([], { minClearance: 0, complianceMargin: 0 });
-      const pose = solver.solve([0, 0, 0], [1.4, 0, 0], [1.4, 0, 0], 1, 1, 0.03, 0.03, 1,
+      const pose = solver.solve(
+        [0, 0, 0],
+        [1.4, 0, 0],
+        [1.4, 0, 0],
+        1,
+        1,
+        0.03,
+        0.03,
+        1,
         (_root, target, angle, out) => {
-          const half = target[0] / 2, height = Math.sqrt(1 - half * half);
+          const half = target[0] / 2,
+            height = Math.sqrt(1 - half * half);
           out.set([half, height * Math.cos(angle), height * Math.sin(angle)]);
-        }, { acceptPose: predicate, searchBudget: 64 });
+        },
+        { acceptPose: predicate, searchBudget: 64 },
+      );
       const canvas = document.createElement('canvas');
       document.body.replaceChildren(canvas);
-      const engine = engineRuntime(await EngineKernel.create(canvas, { backend: 'webgpu', exactSize: [128, 128], camera: { position: [2, 2, 4], target: [0.7, 0.1, 0] } }));
-      for (const point of [[0, 0, 0], pose.elbow, pose.target]) engine.createMesh().setGeometry(sphere(0.1, 12)).setPosition(point);
+      const engine = engineRuntime(
+        await EngineKernel.create(canvas, {
+          backend: 'webgpu',
+          exactSize: [128, 128],
+          camera: { position: [2, 2, 4], target: [0.7, 0.1, 0] },
+        }),
+      );
+      for (const point of [[0, 0, 0], pose.elbow, pose.target])
+        engine.createMesh().setGeometry(sphere(0.1, 12)).setPosition(point);
       await engine.render({ delta: 0 });
       window.limitEngine = engine;
       return { resolved: pose.resolved, angle: pose.poleAngle };

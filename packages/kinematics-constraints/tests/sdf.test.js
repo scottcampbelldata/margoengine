@@ -82,17 +82,25 @@ test('MeshVolume: point and segment distances match the closed form of a torus, 
 });
 
 test('MeshVolume: a placed mesh measures in the world, scale included, and a skewed matrix is refused', () => {
-  const placed = new MeshVolume({ bvh: MeshBVH.build(torus(1, 0.3)), matrix: [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 5, 0, 0, 1] }),
+  const placed = new MeshVolume({
+      bvh: MeshBVH.build(torus(1, 0.3)),
+      matrix: [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 5, 0, 0, 1],
+    }),
     tolerance = 2 * facets(1, 0.3);
   // Twice the size, centred at x = 5: the axis of the hole stands 1.4 from the tube.
   assert.ok(Math.abs(placed.segmentClearance([5, 0, -3], [5, 0, 3], 0) - 1.4) < tolerance);
-  assert.ok(Math.abs(placed.setTransform(translate(5, 0, 0)).segmentClearance([5, 0, -3], [5, 0, 3], 0) - 0.7) < tolerance);
+  assert.ok(
+    Math.abs(placed.setTransform(translate(5, 0, 0)).segmentClearance([5, 0, -3], [5, 0, 3], 0) - 0.7) < tolerance,
+  );
   assert.throws(() => placed.setTransform([2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]), /uniform scale/);
 });
 
 test('MeshVolume: an open sheet has no inside, and reads the plain distance on either side', () => {
   const positions = new Float32Array([-2, -2, 0, 2, -2, 0, 2, 2, 0, -2, 2, 0]),
-    sheet = new MeshVolume({ bvh: MeshBVH.build({ positions, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) }), solid: false });
+    sheet = new MeshVolume({
+      bvh: MeshBVH.build({ positions, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) }),
+      solid: false,
+    });
   assert.ok(Math.abs(sheet.segmentClearance([0, 0, 1], [1, 0, 1], 0.25) - 0.75) < 1e-6);
   assert.ok(Math.abs(sheet.segmentClearance([0, 0, -1], [1, 0, -1], 0.25) - 0.75) < 1e-6);
   const s = new Float64Array(3),
@@ -109,7 +117,8 @@ test('hulls: a box in the hole of a ring is clear of the mesh, one on the tube i
     field = new SDFVolume({ field: { distance: (p) => trueDistance(1, 0.3, p) }, precision: 1e-3 }),
     cube = (x, y, z, half) => {
       const points = [];
-      for (const a of [-half, half]) for (const b of [-half, half]) for (const c of [-half, half]) points.push(x + a, y + b, z + c);
+      for (const a of [-half, half])
+        for (const b of [-half, half]) for (const c of [-half, half]) points.push(x + a, y + b, z + c);
       return new ConvexHullVolume({ points });
     },
     tolerance = facets(1, 0.3),
@@ -149,7 +158,8 @@ test('SDFVolume: a baked field never reads a larger gap than the mesh leaves, wi
     if (volume.evaluate(p, s, n) > truth) overstated++;
     // Inside the grid a raw reading lies within one cell's diagonal of the truth, by the argument on `margin`.
     const inGrid = p.every((value, k) => value >= field.min[k] && value <= field.max[k]);
-    if (inGrid) assert.ok(Math.abs(raw.evaluate(p, s, n) - trueDistance(major, minor, p)) < cell + 2 * facets(major, minor));
+    if (inGrid)
+      assert.ok(Math.abs(raw.evaluate(p, s, n) - trueDistance(major, minor, p)) < cell + 2 * facets(major, minor));
   }
   assert.equal(overstated, 0);
   // A far point outside the grid must not read as a collision.
@@ -174,9 +184,13 @@ test('a link passes through the hole of a ring; its convex proxy blocks the same
   const ring = torus(1, 0.2),
     bvh = MeshBVH.build(ring),
     points = [];
-  for (let i = 0; i < ring.positions.length; i += 3 * 37) points.push(ring.positions[i], ring.positions[i + 1], ring.positions[i + 2]);
+  for (let i = 0; i < ring.positions.length; i += 3 * 37)
+    points.push(ring.positions[i], ring.positions[i + 1], ring.positions[i + 2]);
   const proxy = new ConvexHullVolume({ points, maxPoints: points.length }),
-    link = (z) => [[0, 0, z], [0, 0, z + 0.5]],
+    link = (z) => [
+      [0, 0, z],
+      [0, 0, z + 0.5],
+    ],
     from = link(-3),
     to = link(3);
   assert.equal(sweepChain(from, to, [proxy], { radius: 0.1 }).clear, false, 'the proxy fills the hole');
@@ -184,7 +198,10 @@ test('a link passes through the hole of a ring; its convex proxy blocks the same
   const field = new SDFVolume({ field: bakeSDF(bvh, { resolution: 40 }) });
   assert.equal(sweepChain(from, to, [field], { radius: 0.1, minClearance: 0.01 }).clear, true);
   // Off the axis by the ring's radius it meets the tube, on the mesh, on the field and at the same height.
-  const ball = (z) => [[1, 0, z], [1, 0, z]],
+  const ball = (z) => [
+      [1, 0, z],
+      [1, 0, z],
+    ],
     onMesh = sweepChain(ball(-3), ball(3), [new MeshVolume({ bvh })], { radius: 0.1, tolerance: 1e-4 }),
     onField = sweepChain(ball(-3), ball(3), [field], { radius: 0.1, tolerance: 1e-4 });
   assert.equal(onMesh.clear, false);
@@ -257,7 +274,18 @@ test('the solvers take them as they are: a target is pushed out of a bowl mesh, 
   assert.equal(SolveStatus.Success, 0);
   // Into the bowl, where a convex proxy would stand in the way: the capsule's tip stops its radius plus the gap above the
   // bottom, facets aside.
-  const drop = sweepChain([[0, 0, 1], [0, 0, 3]], [[0, 0, -1.5], [0, 0, 0.5]], [bowl], { radius: 0.05, minClearance: 0.02 });
+  const drop = sweepChain(
+    [
+      [0, 0, 1],
+      [0, 0, 3],
+    ],
+    [
+      [0, 0, -1.5],
+      [0, 0, 0.5],
+    ],
+    [bowl],
+    { radius: 0.05, minClearance: 0.02 },
+  );
   assert.equal(drop.clear, false);
   assert.ok(Math.abs(1 - 2.5 * drop.time - (-1 + 0.07)) < 0.01);
 });
@@ -278,10 +306,18 @@ function glbTriangles(bytes) {
         size = Type.BYTES_PER_ELEMENT;
       for (let i = 0; i < copy.length; i++) {
         const at = offset + i * size;
-        copy[i] = size === 4 ? (Type === Float32Array ? view.getFloat32(at, true) : view.getUint32(at, true)) : view.getUint16(at, true);
+        copy[i] =
+          size === 4
+            ? Type === Float32Array
+              ? view.getFloat32(at, true)
+              : view.getUint32(at, true)
+            : view.getUint16(at, true);
       }
       return copy;
     },
     kind = json.accessors[primitive.indices].componentType === 5125 ? Uint32Array : Uint16Array;
-  return { positions: read(primitive.attributes.POSITION, Float32Array), indices: Uint32Array.from(read(primitive.indices, kind)) };
+  return {
+    positions: read(primitive.attributes.POSITION, Float32Array),
+    indices: Uint32Array.from(read(primitive.indices, kind)),
+  };
 }
