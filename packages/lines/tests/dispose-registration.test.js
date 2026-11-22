@@ -15,11 +15,20 @@ for (const [name, make, fill] of [
   test(`${name}.dispose leaves its scene and frame graph, and can be attached again`, async () => {
     const adapter = await nodeLifetimeAdapter();
     try {
-      const host = await adapter.create(), { engine } = host;
+      const host = await adapter.create(),
+        { engine } = host;
       // Counts the runs of every pass registered from here on: the plugin's draw pass among them.
-      const graph = engine.scene.frameGraph, add = graph.add.bind(graph);
+      const graph = engine.scene.frameGraph,
+        add = graph.add.bind(graph);
       let runs = 0;
-      graph.add = (pass) => add({ ...pass, execute(context) { runs++; return pass.execute(context); } });
+      graph.add = (pass) =>
+        add({
+          ...pass,
+          execute(context) {
+            runs++;
+            return pass.execute(context);
+          },
+        });
       const frame = () => host.render([{ camera: engine.camera, viewport: [0, 0, 64, 32], pixels: true }]);
       const plugin = make();
       fill(plugin);

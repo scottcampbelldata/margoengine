@@ -21,36 +21,63 @@ export async function fixtures(load = (entry) => import(entry)) {
     lines.add(new Stroke({ positions: strip(0.3), width: 4 }));
     const texture = new LineTexture(2, 2, new Uint8Array(16).fill(255));
     lines.add(new TexturedLine({ positions: strip(-0.3), width: 4, texture }));
-    lines.add(new Trail({ lifetime: 1 })).moveTo(0, 0, 0).moveTo(0.2, 0.1, 0).moveTo(0.4, 0, 0);
+    lines
+      .add(new Trail({ lifetime: 1 }))
+      .moveTo(0, 0, 0)
+      .moveTo(0.2, 0.1, 0)
+      .moveTo(0.4, 0, 0);
     lines.add(new EdgesHelper(quad, { stride: 3 }));
     lines.add(new GridHelper({ size: 1, divisions: 2 }));
     lines.add(new AxesHelper({ size: 0.5 }));
     lines.add(new ArcLine([0, 0, 0], [0.5, 0.5, 0]));
     return lines;
   };
-  const batch = (plugin) => plugin.add(new LineBatch({ positions: [0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0], color: '#fc0' }));
+  const batch = (plugin) =>
+    plugin.add(new LineBatch({ positions: [0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0], color: '#fc0' }));
   const entries = [];
-  const own = (name, make) => entries.push({ name, create({ engine }) {
-    const plugin = make(engine);
-    return { plugin, dispose: () => plugin.dispose() };
-  } });
+  const own = (name, make) =>
+    entries.push({
+      name,
+      create({ engine }) {
+        const plugin = make(engine);
+        return { plugin, dispose: () => plugin.dispose() };
+      },
+    });
   own('Lines', () => fill(new Lines()));
   own('Lines.attach', (engine) => fill(Lines.attach(engine)));
-  own('LineBatches', () => { const plugin = new LineBatches(); batch(plugin); return plugin; });
-  own('LineBatches.attach', (engine) => { const plugin = LineBatches.attach(engine); batch(plugin); return plugin; });
+  own('LineBatches', () => {
+    const plugin = new LineBatches();
+    batch(plugin);
+    return plugin;
+  });
+  own('LineBatches.attach', (engine) => {
+    const plugin = LineBatches.attach(engine);
+    batch(plugin);
+    return plugin;
+  });
   own('DebugLines', () => new DebugLines().drawLine([0, 0, 0], [1, 1, 0]).drawArc([0, 0, 0], [1, 0, 0]));
   // LinePicking registers with Selection's Picking (a dependency the caller installs) and makes one stand-in mesh per
   // line. In a browser a real pick draws the lines into the pick tile, so its pick buffers and pipelines are made too.
-  entries.push({ name: 'LinePicking', create({ engine, scene, dependency }) {
-    const picking = new Picking();
-    dependency(() => scene.use(picking));
-    const plugin = fill(Lines.attach(engine));
-    const lines = LinePicking.attach(picking, plugin);
-    return { plugin, dependencies: [picking],
-      async check({ phase }) {
-        if (phase === 'render' && globalThis.document && engine.backend === 'webgpu') await picking.pick(16, 16);
-      },
-      dispose: () => { lines.dispose(); plugin.dispose(); }, cleanup: () => picking.dispose() };
-  } });
+  entries.push({
+    name: 'LinePicking',
+    create({ engine, scene, dependency }) {
+      const picking = new Picking();
+      dependency(() => scene.use(picking));
+      const plugin = fill(Lines.attach(engine));
+      const lines = LinePicking.attach(picking, plugin);
+      return {
+        plugin,
+        dependencies: [picking],
+        async check({ phase }) {
+          if (phase === 'render' && globalThis.document && engine.backend === 'webgpu') await picking.pick(16, 16);
+        },
+        dispose: () => {
+          lines.dispose();
+          plugin.dispose();
+        },
+        cleanup: () => picking.dispose(),
+      };
+    },
+  });
   return entries;
 }

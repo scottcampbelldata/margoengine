@@ -28,7 +28,9 @@ test('a solid head draws before the arrow, writes depth and costs a helper witho
 
 test('the cone closes on the tip and base, follows the arrow and uploads only when it moves', () => {
   const { lines, frame } = rig(),
-    arrow = lines.add(new ArrowHelper({ direction: [0, 1, 0], length: 2, headLength: 0.5, headWidth: 0.5, solidHead: true }));
+    arrow = lines.add(
+      new ArrowHelper({ direction: [0, 1, 0], length: 2, headLength: 0.5, headWidth: 0.5, solidHead: true }),
+    );
   frame();
   const cone = arrow.fill;
   assert.equal(cone.length, 12 * 24);
@@ -77,7 +79,9 @@ test('a fill shader keeps the plain fragment apart from dashes, and its buffer g
   const { gpu, lines, frame } = rig(),
     arrow = lines.add(new ArrowHelper({ solidHead: true, dashed: true }));
   const log = frame(),
-    code = named(log, 'module').map((e) => e[2].code).find((text) => text.includes('fillVertex'));
+    code = named(log, 'module')
+      .map((e) => e[2].code)
+      .find((text) => text.includes('fillVertex'));
   assert.match(code, /if\(false\)\{\s+let dash=/);
   const before = gpu.record(() => lines.remove(arrow));
   assert.equal(named(before, 'destroy').length, 4, 'style, points, colours and fill');
