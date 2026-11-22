@@ -128,7 +128,9 @@ export class HTMLSurface {
   private readonly observer?: MutationObserver;
   private readonly cancellation = new AbortController();
   /** @internal Cancels resource preparation when this surface is removed. */
-  get signal(): AbortSignal { return this.cancellation.signal; }
+  get signal(): AbortSignal {
+    return this.cancellation.signal;
+  }
   /** @internal A raster waiting for the holder canvas's next paint event (HTML-in-canvas draws only there). */
   painting?: () => void;
   private readonly mark = () => this.invalidate();
@@ -441,7 +443,10 @@ export class HTMLTexture {
       });
       surface.group = undefined;
     }
-    device.queue.copyExternalImageToTexture({ source }, { texture: surface.texture, premultipliedAlpha: true }, [width, height]);
+    device.queue.copyExternalImageToTexture({ source }, { texture: surface.texture, premultipliedAlpha: true }, [
+      width,
+      height,
+    ]);
   }
   private async rasterize(
     surface: HTMLSurface,
