@@ -24,14 +24,22 @@ export interface LocalImportMapOptions {
  * rebaseImportMap({imports: {margoengine: 'https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/index.js'}}, '/node_modules/');
  * // {imports: {margoengine: '/node_modules/margoengine/dist/index.js'}}
  */
-export function rebaseImportMap(map: ImportMap, base = '/node_modules/', options: LocalImportMapOptions = {}): ImportMap {
-  if (typeof base !== 'string' || base === '') throw new TypeError(`The import map base must be a non-empty string; ${help}`);
+export function rebaseImportMap(
+  map: ImportMap,
+  base = '/node_modules/',
+  options: LocalImportMapOptions = {},
+): ImportMap {
+  if (typeof base !== 'string' || base === '')
+    throw new TypeError(`The import map base must be a non-empty string; ${help}`);
   if (!map || typeof map.imports !== 'object' || map.imports === null)
     throw new TypeError(`rebaseImportMap needs an import map with an "imports" object; ${help}`);
   const root = base.endsWith('/') ? base : `${base}/`,
     only = options.only,
     keep = (specifier: string) =>
-      !only || only.some((name) => (name.endsWith('/') ? specifier.startsWith(name) || specifier === name.slice(0, -1) : specifier === name));
+      !only ||
+      only.some((name) =>
+        name.endsWith('/') ? specifier.startsWith(name) || specifier === name.slice(0, -1) : specifier === name,
+      );
   const imports: Record<string, string> = {};
   for (const [specifier, url] of Object.entries(map.imports)) {
     if (!keep(specifier)) continue;
@@ -39,7 +47,12 @@ export function rebaseImportMap(map: ImportMap, base = '/node_modules/', options
     imports[specifier] = match ? `${root}${match[1]}/${match[2]}` : url;
   }
   if (only) {
-    const missing = only.filter((name) => !Object.keys(imports).some((key) => (name.endsWith('/') ? key.startsWith(name) || key === name.slice(0, -1) : key === name)));
+    const missing = only.filter(
+      (name) =>
+        !Object.keys(imports).some((key) =>
+          name.endsWith('/') ? key.startsWith(name) || key === name.slice(0, -1) : key === name,
+        ),
+    );
     if (missing.length) throw new RangeError(`No import map entry for ${missing.join(', ')}; ${help}`);
   }
   return { imports };
@@ -57,14 +70,21 @@ export async function localImportMap(base = '/node_modules/', options: LocalImpo
   let text: string;
   if (url.protocol === 'file:') {
     const read = 'node:fs/promises';
-    text = await ((await import(/* @vite-ignore */ read)) as {readFile(url: URL, encoding: 'utf8'): Promise<string>}).readFile(url, 'utf8');
+    text = await (
+      (await import(/* @vite-ignore */ read)) as { readFile(url: URL, encoding: 'utf8'): Promise<string> }
+    ).readFile(url, 'utf8');
   } else {
     const response = await fetch(url);
     if (!response.ok)
-      throw Object.assign(new Error(`Could not read ${url.href} (${response.status}); serve margoengine/dist next to margoengine/importmap; ${help}`), {
-        name: 'MargoError',
-        code: 'failed',
-      });
+      throw Object.assign(
+        new Error(
+          `Could not read ${url.href} (${response.status}); serve margoengine/dist next to margoengine/importmap; ${help}`,
+        ),
+        {
+          name: 'MargoError',
+          code: 'failed',
+        },
+      );
     text = await response.text();
   }
   return rebaseImportMap(JSON.parse(text) as ImportMap, base, options);
