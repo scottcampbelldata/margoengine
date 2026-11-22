@@ -38,7 +38,9 @@ for (const [model, other] of [
   assert.ok(singleShaders[model].includes(dayCalls[model]), `${model} reference shader lacks its day model`);
   assert.ok(!singleShaders[model].includes(dayCalls[other]), `${model} reference shader also calls ${other}`);
 }
-const browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5198 }),
+// This reference seeds individual samples using native sample_index. The layer's resolved frames are checked by
+// packages/sky/test/browser-check.mjs, since WebGL2 exposes no sample_index for this fixture to write.
+const browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5198, compat: false }),
   errors = [];
 browser.page.on('pageerror', (error) => errors.push(error.message));
 browser.page.on('console', (message) => {
