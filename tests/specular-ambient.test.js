@@ -32,6 +32,11 @@ test('every shipped hook passes the Fresnel ends and no lighting term keeps a fi
     ['clustered/src/index.ts', 's.metal,s.f0,s.sw)'],
   ])
     assert.ok(source(path).includes(call), path);
-  for (const path of ['environment/src/ibl.ts', 'sky/src/lighting.ts', 'clustered/src/shader.ts', 'clustered/src/area.ts'])
+  for (const path of [
+    'environment/src/ibl.ts',
+    'sky/src/lighting.ts',
+    'clustered/src/shader.ts',
+    'clustered/src/area.ts',
+  ])
     assert.ok(!/mix\(vec3f\(0\.04\),\s*(base|baseColor),\s*(metal|metalness)\)/.test(source(path)), path);
 });

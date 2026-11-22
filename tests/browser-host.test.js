@@ -65,7 +65,10 @@ test('endOwned ends the browser through its handle and acknowledges before the e
   assert.equal(pid, child.pid);
   assert.deepEqual(listed, []);
   assert.equal(child.killed, true, 'told to end before endOwned returned');
-  assert.ok(child.stdio.every((pipe) => pipe.destroyed), 'every owned pipe is released at once');
+  assert.ok(
+    child.stdio.every((pipe) => pipe.destroyed),
+    'every owned pipe is released at once',
+  );
   assert.deepEqual(await settled, []);
   assert.equal(kills, 1);
   assert.equal(alive(child.pid), false);
@@ -81,11 +84,16 @@ test('endOwned ends each listed child by pid and waits for them through the nati
     assert.ok(since <= Date.now());
     return [];
   };
-  const { listed, settled } = endOwned({ process: () => child, kill: async () => {} }, [other.pid, child.pid, 0], { reapMs: 5000, settle });
+  const { listed, settled } = endOwned({ process: () => child, kill: async () => {} }, [other.pid, child.pid, 0], {
+    reapMs: 5000,
+    settle,
+  });
   assert.deepEqual(listed, [other.pid], 'the browser itself and invalid pids are left out of the list');
   assert.deepEqual(await settled, []);
   assert.deepEqual(waited, [[other.pid]]);
-  await new Promise((resolve) => (other.exitCode === null && other.signalCode === null ? other.once('exit', resolve) : resolve()));
+  await new Promise((resolve) =>
+    other.exitCode === null && other.signalCode === null ? other.once('exit', resolve) : resolve(),
+  );
   assert.equal(alive(other.pid), false);
 });
 
@@ -144,15 +152,33 @@ test('hostBrowser speaks the protocol: ready, then the acknowledgement at once, 
     const input = new PassThrough(),
       output = new PassThrough();
     const lines = [];
-    output.on('data', (chunk) => lines.push(...String(chunk).trim().split('\n').map((line) => JSON.parse(line))));
+    output.on('data', (chunk) =>
+      lines.push(
+        ...String(chunk)
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line)),
+      ),
+    );
     const server = { process: () => child, wsEndpoint: () => 'ws://127.0.0.1:1/x', kill: async () => {} };
-    const run = hostBrowser({ settings: {}, launchServer: async () => server, input, output, reapMs: 10_000, settle: null, log: () => {} });
+    const run = hostBrowser({
+      settings: {},
+      launchServer: async () => server,
+      input,
+      output,
+      reapMs: 10_000,
+      settle: null,
+      log: () => {},
+    });
     await new Promise((resolve) => output.once('data', resolve));
     assert.deepEqual(lines, [{ ready: true, wsEndpoint: 'ws://127.0.0.1:1/x', pid: child.pid }]);
     if (how === 'request') input.write(`not json\n${JSON.stringify({ end: true, children: [] })}\n`);
     else input.end();
     assert.equal(await run, 0);
-    assert.deepEqual(lines.slice(1), [{ terminated: { browser: child.pid, children: [] } }, { done: true, survivors: [], elapsedMs: lines[2].elapsedMs }]);
+    assert.deepEqual(lines.slice(1), [
+      { terminated: { browser: child.pid, children: [] } },
+      { done: true, survivors: [], elapsedMs: lines[2].elapsedMs },
+    ]);
     assert.equal(alive(child.pid), false);
     // Regression (2026-11-19, KB-OWN-EXIT2): the host kept reading its input after the end request, so a host process
     // could not end by its event loop and needed process.exit.
@@ -176,7 +202,9 @@ test('hostBrowser reports a failed launch and ends', async () => {
   assert.deepEqual(JSON.parse(text), { error: 'browserType.launchServer: no such browser' });
 });
 
-test('startHost runs a real host: end is acknowledged at once and the host proves everything gone, then ends', { timeout: 30_000 }, async () => {
+test('startHost runs a real host: end is acknowledged at once and the host proves everything gone, then ends', {
+  timeout: 30_000,
+}, async () => {
   const host = await startHost({ name: 'round trip' }, { hostPath: fixture });
   assert.equal(host.wsEndpoint, 'ws://127.0.0.1:1/fake');
   assert.ok(alive(host.pid), 'the fake browser runs under the host');
@@ -190,7 +218,9 @@ test('startHost runs a real host: end is acknowledged at once and the host prove
   assert.equal(alive(host.process.pid), false);
 });
 
-test('startHost keeps a result that arrives before finished() is called: a host that answers and ends early is not HOST_GONE', { timeout: 30_000 }, async () => {
+test('startHost keeps a result that arrives before finished() is called: a host that answers and ends early is not HOST_GONE', {
+  timeout: 30_000,
+}, async () => {
   // launchBrowser's close awaits Playwright's own close beside end(); a host that ends the browser first sends its
   // result and exits while nobody waits on it yet. That result used to be dropped, and the later finished() failed with
   // HOST_GONE although the host had answered (shadows test:gpu, a closed browser on a loaded Mac).
@@ -204,7 +234,9 @@ test('startHost keeps a result that arrives before finished() is called: a host 
   host.release();
 });
 
-test('startHost: a browser the kernel never finishes with is logged as a survivor at the bound, in the host, not the suite', { timeout: 30_000 }, async () => {
+test('startHost: a browser the kernel never finishes with is logged as a survivor at the bound, in the host, not the suite', {
+  timeout: 30_000,
+}, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'browser-host-'));
   try {
     const logFile = join(dir, 'survivors.log');
@@ -217,7 +249,10 @@ test('startHost: a browser the kernel never finishes with is logged as a survivo
     assert.ok(result.elapsedMs >= 200);
     host.release();
     assert.equal(await exit, 3);
-    assert.match(await readFile(logFile, 'utf8'), /still present \d+ ms after they were ended: 4000000 \(browser 4000000; listed 4000001\)/);
+    assert.match(
+      await readFile(logFile, 'utf8'),
+      /still present \d+ ms after they were ended: 4000000 \(browser 4000000; listed 4000001\)/,
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -225,12 +260,15 @@ test('startHost: a browser the kernel never finishes with is logged as a survivo
 
 // The hang itself, end to end: a launched browser whose exit never arrives (the kernel still tearing it down after
 // TerminateProcess) is handed off at the grace, the close resolves, and the host alone records the survivor.
-test('launchBrowser: a browser the kernel never finishes with is handed off at the grace, logged by the host, and the suite moves on', { timeout: 30_000 }, async (t) => {
+test('launchBrowser: a browser the kernel never finishes with is handed off at the grace, logged by the host, and the suite moves on', {
+  timeout: 30_000,
+}, async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'browser-host-'));
   try {
     const logFile = join(dir, 'survivors.log');
     let host;
-    const hosting = async (settings) => (host = await startHost({ ...settings, stuck: true, reapMs: 2500, logFile }, { hostPath: fixture }));
+    const hosting = async (settings) =>
+      (host = await startHost({ ...settings, stuck: true, reapMs: 2500, logFile }, { hostPath: fixture }));
     const reported = [];
     // The bounded close reports to console.error, bound when the browser is launched: watch it from before the launch.
     const graceLines = [];
@@ -253,7 +291,8 @@ test('launchBrowser: a browser the kernel never finishes with is handed off at t
     await browser.close();
     t.mock.restoreAll();
     assert.equal(
-      graceLines.filter((line) => /was ended but the kernel had not finished tearing it down 2000 ms later/.test(line)).length,
+      graceLines.filter((line) => /was ended but the kernel had not finished tearing it down 2000 ms later/.test(line))
+        .length,
       1,
       `the close moved on at the grace: ${graceLines.join(' | ')}`,
     );
@@ -264,15 +303,21 @@ test('launchBrowser: a browser the kernel never finishes with is handed off at t
   }
 });
 
-test('startHost: a launch that fails in the host rejects with its message, and a host that dies is HOST_GONE', { timeout: 30_000 }, async () => {
-  await assert.rejects(startHost({ fail: true }, { hostPath: fixture }), { message: 'browserType.launchServer: no such browser' });
+test('startHost: a launch that fails in the host rejects with its message, and a host that dies is HOST_GONE', {
+  timeout: 30_000,
+}, async () => {
+  await assert.rejects(startHost({ fail: true }, { hostPath: fixture }), {
+    message: 'browserType.launchServer: no such browser',
+  });
   const host = await startHost({}, { hostPath: fixture });
   host.process.kill('SIGKILL');
   await assert.rejects(host.end([]), { code: 'HOST_GONE' });
   host.release();
 });
 
-test('startHost: end() on a host that already exited fails with a coded HOST_GONE, not a bare write EPIPE (KB-NA1b)', { timeout: 30_000 }, async () => {
+test('startHost: end() on a host that already exited fails with a coded HOST_GONE, not a bare write EPIPE (KB-NA1b)', {
+  timeout: 30_000,
+}, async () => {
   const host = await startHost({ name: 'gone before end' }, { hostPath: fixture });
   const exit = new Promise((resolve) => host.process.once('exit', resolve));
   host.process.kill('SIGKILL');
@@ -285,7 +330,9 @@ test('startHost: end() on a host that already exited fails with a coded HOST_GON
   host.release();
 });
 
-test('startHost: end() on a host whose stdin is closed fails with HOST_GONE (KB-NA1b)', { timeout: 30_000 }, async () => {
+test('startHost: end() on a host whose stdin is closed fails with HOST_GONE (KB-NA1b)', {
+  timeout: 30_000,
+}, async () => {
   const host = await startHost({ name: 'stdin closed' }, { hostPath: fixture });
   host.process.stdin.destroy();
   await assert.rejects(host.end([]), { code: 'HOST_GONE' });

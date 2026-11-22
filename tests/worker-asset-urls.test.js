@@ -27,7 +27,11 @@ test('parser workers do not inline Draco or KTX2', () => {
     assert.doesNotMatch(code, /data:application\/wasm|data:text\/javascript/, path);
     // An import of the decoders package (a classic worker cannot resolve it); a message that names an entry for the
     // caller to load, such as TIFF's loadTIFFCodecs hint, is text, not an import.
-    assert.doesNotMatch(code, /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'`]@margoengine\/decoders(?!\/meshopt)/, path);
+    assert.doesNotMatch(
+      code,
+      /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'`]@margoengine\/decoders(?!\/meshopt)/,
+      path,
+    );
     assert.equal(existsSync(join(root, path, '..', 'decoder.worker.js')), false, path);
   }
   assert.match(text('packages/gltf/dist/workers/gltf.js'), /EXT_meshopt_compression/);

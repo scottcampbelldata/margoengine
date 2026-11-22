@@ -99,7 +99,11 @@ test('the shared GGX D is a2 / pi where the half vector faces away, and the text
       ggxDOf: shaderExpression(terms.ggxDOf('s.n', 'q'), ['s', 'q', 'nh', 'a2']),
     },
     n = [0, 0, 1];
-  assert.equal(terms.ggxD, terms.ggxDOf('n', 'h'), 'ggxD is ggxDOf over n and h, written as a literal so bundles drop it unused');
+  assert.equal(
+    terms.ggxD,
+    terms.ggxDOf('n', 'h'),
+    'ggxD is ggxDOf over n and h, written as a literal so bundles drop it unused',
+  );
   for (const [name, d] of Object.entries(forms)) {
     const call = (h, nh, a2) => (name === 'ggxDOf' ? d({ n }, h, nh, a2) : d(n, h, nh, a2));
     for (const c of [-0.999, -0.9, -0.5, -0.1, -1e-6, 0.3, 0.9, 0.999])
@@ -133,7 +137,10 @@ test('every G2 text keeps the exact value on smooth surfaces at grazing angles, 
       for (const nv of [1e-4, 0.001, 0.01, 0.5])
         for (const a2 of [1e-10, 1e-8, 1e-6, 1e-4]) {
           const want = correlatedG2(nl, nv, a2);
-          assert.ok(Math.abs(g(nl, nv, a2) / want - 1) < 1e-9, `${name} at nl ${nl}, nv ${nv}, a2 ${a2}: ${g(nl, nv, a2)} vs ${want}`);
+          assert.ok(
+            Math.abs(g(nl, nv, a2) / want - 1) < 1e-9,
+            `${name} at nl ${nl}, nv ${nv}, a2 ${a2}: ${g(nl, nv, a2)} vs ${want}`,
+          );
         }
     assert.equal(g(0, 0.5, 0), 0, `${name} at nl = a2 = 0`);
   }

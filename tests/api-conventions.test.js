@@ -11,9 +11,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 // Not engine features although they have `setup()` or take the engine: never attached by users.
-const NOT_FEATURES = new Map([
-  ['PBRModel', 'created by gltf/pbr loadGLTF'],
-]);
+const NOT_FEATURES = new Map([['PBRModel', 'created by gltf/pbr loadGLTF']]);
 
 const isClass = (value) => typeof value === 'function' && /^class\b/.test(Function.prototype.toString.call(value));
 
@@ -21,7 +19,10 @@ function reportAttachProblems(text) {
   // A bundled declaration can keep an inherited factory in a local, unexported base.
   const classes = new Map(
     [...text.matchAll(/^(export )?(?:declare )?(?:abstract )?class (\w+)([^\n]*)\{\n([\s\S]*?)^\}/gm)].map(
-      ([, exported, name, head, body]) => [name, { exported: Boolean(exported), base: head.match(/extends (\w+)/)?.[1], body }],
+      ([, exported, name, head, body]) => [
+        name,
+        { exported: Boolean(exported), base: head.match(/extends (\w+)/)?.[1], body },
+      ],
     ),
   );
   const hasAttach = (name, seen = new Set()) => {
@@ -30,9 +31,15 @@ function reportAttachProblems(text) {
     const { body, base } = classes.get(name);
     return /^ {4}static (?:async )?attach[(<]/m.test(body) || hasAttach(base, seen);
   };
-  return [...classes].filter(([name, { body, exported }]) => exported &&
-    /^ {4}constructor\((?:engine|instance|source|readonly engine): (?:Camera \| )?EngineKernel\b/m.test(body) &&
-    !NOT_FEATURES.has(name) && !hasAttach(name)).map(([name]) => name);
+  return [...classes]
+    .filter(
+      ([name, { body, exported }]) =>
+        exported &&
+        /^ {4}constructor\((?:engine|instance|source|readonly engine): (?:Camera \| )?EngineKernel\b/m.test(body) &&
+        !NOT_FEATURES.has(name) &&
+        !hasAttach(name),
+    )
+    .map(([name]) => name);
 }
 
 test('report audit follows local bases while still rejecting missing and cyclic factories', () => {
@@ -110,7 +117,10 @@ test('the frozen exemption covers re-exported core and stage classes by identity
   // A package class that only shares a frozen class's name is not exempt.
   const lookalike = class Stage {};
   assert.equal(frozen.has(lookalike), false);
-  assert.equal([...(await packageClasses()).keys()].some((value) => frozen.has(value)), false);
+  assert.equal(
+    [...(await packageClasses()).keys()].some((value) => frozen.has(value)),
+    false,
+  );
 });
 
 test('every package class follows the attach / dispose / Symbol.dispose conventions', async () => {

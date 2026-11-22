@@ -151,7 +151,13 @@ test('summaryOf takes the first prose paragraph after the title', () => {
 });
 
 test('hygiene fails on a stale llms file and names the command that regenerates it (KB-L4-llms)', () => {
-  assert.throws(() => assertLlmsCurrent('.', () => ['site/llms-full.txt']), /site\/llms-full\.txt stale: run node scripts\/build-llms\.mjs/);
+  assert.throws(
+    () => assertLlmsCurrent('.', () => ['site/llms-full.txt']),
+    /site\/llms-full\.txt stale: run node scripts\/build-llms\.mjs/,
+  );
   assert.doesNotThrow(() => assertLlmsCurrent('.', () => []));
-  assert.match(readFileSync(new URL('../scripts/hygiene.js', import.meta.url), 'utf8'), /^assertLlmsCurrent\(root\);$/m);
+  assert.match(
+    readFileSync(new URL('../scripts/hygiene.js', import.meta.url), 'utf8'),
+    /^assertLlmsCurrent\(root\);$/m,
+  );
 });

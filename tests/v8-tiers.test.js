@@ -29,7 +29,9 @@ test('each forced tier reads as itself', () => {
 test('a function that loses its optimized code reads as unoptimized again', () => {
   const { isOptimized } = v8Tiers(),
     f = fresh();
-  new Function('f', '%PrepareFunctionForOptimization(f); f(1, 2); f(2, 3); %OptimizeFunctionOnNextCall(f); f(3, 4);')(f);
+  new Function('f', '%PrepareFunctionForOptimization(f); f(1, 2); f(2, 3); %OptimizeFunctionOnNextCall(f); f(3, 4);')(
+    f,
+  );
   assert.equal(isOptimized(f), true);
   new Function('f', '%DeoptimizeFunction(f);')(f);
   assert.equal(isOptimized(f), false);

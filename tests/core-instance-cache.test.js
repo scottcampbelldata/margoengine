@@ -112,7 +112,10 @@ test('100 flips among 1,000 boxes: 2 map lookups, 24 floats and at most one writ
   try {
     const geometry = box(),
       meshes = Array.from({ length: 1000 }, (_, i) =>
-        engine.createMesh().setGeometry(geometry).setPosition([i % 40, Math.floor(i / 40), 0]),
+        engine
+          .createMesh()
+          .setGeometry(geometry)
+          .setPosition([i % 40, Math.floor(i / 40), 0]),
       );
     engine.render({ culling: false });
     assert.equal(frames.at(-1).floats, 24_000);

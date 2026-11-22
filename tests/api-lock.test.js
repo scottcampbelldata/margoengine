@@ -15,7 +15,12 @@ import {
 
 const root = resolve(import.meta.dirname, '..');
 test('api:update enrolls new packages without moving locked packages or mutating the existing lock', () => {
-  const original = { locked: ['@margoengine/core'], watch: ['@margoengine/kit-web'], internal: ['packages/shared'], ticked: {} };
+  const original = {
+    locked: ['@margoengine/core'],
+    watch: ['@margoengine/kit-web'],
+    internal: ['packages/shared'],
+    ticked: {},
+  };
   const next = enrollWatch(original, ['@margoengine/game', '@margoengine/core', '@margoengine/kit-web']);
   assert.deepEqual(next.watch, ['@margoengine/game', '@margoengine/kit-web']);
   assert.deepEqual(original.watch, ['@margoengine/kit-web']);
@@ -24,8 +29,17 @@ test('api:update enrolls new packages without moving locked packages or mutating
   assert.deepEqual(enrollWatch(next, ['@margoengine/game']), next);
 });
 test('api:update drops a watched name that is no longer a package (a rename leaves no stale entry)', () => {
-  const original = { locked: ['@margoengine/core'], watch: ['@margoengine/old', '@margoengine/game'], internal: [], ticked: {} };
-  const next = enrollWatch(original, ['@margoengine/new'], ['@margoengine/core', '@margoengine/game', '@margoengine/new']);
+  const original = {
+    locked: ['@margoengine/core'],
+    watch: ['@margoengine/old', '@margoengine/game'],
+    internal: [],
+    ticked: {},
+  };
+  const next = enrollWatch(
+    original,
+    ['@margoengine/new'],
+    ['@margoengine/core', '@margoengine/game', '@margoengine/new'],
+  );
   assert.deepEqual(next.watch, ['@margoengine/game', '@margoengine/new']);
   assert.deepEqual(original.watch, ['@margoengine/old', '@margoengine/game']);
 });
@@ -60,7 +74,10 @@ test('removals, renames, parameter edits, aliases, consts and local types are br
     // Type literals and tuples in parameter types are types, not binding patterns.
     ['export function f(x: { a: number }): void;', 'export function f(x: { a: string }): void;'],
     ['export function f(x: [number]): void;', 'export function f(x: [string]): void;'],
-    ['export function f(x: Map<{ a: number }, { b: number }>): void;', 'export function f(x: Map<{ a: number }, { b: string }>): void;'],
+    [
+      'export function f(x: Map<{ a: number }, { b: number }>): void;',
+      'export function f(x: Map<{ a: number }, { b: string }>): void;',
+    ],
     ['export function f({ a }: { a: number }): void;', 'export function f({ a }: { a: string }): void;'],
   ])
     assert.ok(compare(a, b).breaking.length, `${a} -> ${b}`);
@@ -98,7 +115,10 @@ test('exports, members, enum values, overloads, optional relaxations and local t
     ['export function f(): void;', 'export function f(x?: number): void;'],
     ['type Local = number;', 'export type Local = number;'],
     // A binding pattern names locals, not types: a property added to it changes nothing a caller sees.
-    ['export class C { static load({ signal }?: O): Promise<void>; }', 'export class C { static load({ signal, wasm }?: O): Promise<void>; }'],
+    [
+      'export class C { static load({ signal }?: O): Promise<void>; }',
+      'export class C { static load({ signal, wasm }?: O): Promise<void>; }',
+    ],
     ['export function f({ a }: O, [b]: T): void;', 'export function f({ a, b }: O, [c, d]: T): void;'],
     ['import { A } from "a"; export type T = A;', 'import { A } from "b"; export type T = A;'],
   ])
@@ -166,7 +186,11 @@ test('api:check fails on exports or members added without api:update, even in a 
   ]) {
     const changes = compare(a, b);
     assert.equal(assessChange(lock, [], watchedEntry, watchedEntry, changes).fail, true, `${a} -> ${b}`);
-    assert.equal(assessChange(lock, [], watchedEntry, watchedEntry, changes, true).fail, false, 'api:update still passes');
+    assert.equal(
+      assessChange(lock, [], watchedEntry, watchedEntry, changes, true).fail,
+      false,
+      'api:update still passes',
+    );
   }
   // Relaxations and breaks of a watched package keep warning only.
   const relaxation = compare('export function f(x: number): void;', 'export function f(x: number, y?: number): void;');

@@ -540,46 +540,47 @@ function outputBatchFixture(t, { fullScan = false, archives = 128, capBytes = In
   return { store, output, bytes };
 }
 
-for (const atCap of [false, true]) test(`Windows output enumeration eliminates per-archive stats ${atCap ? 'at' : 'under'} cap with identical bytes`, (t) => {
-  const { statSync: stat, readFileSync: read } = fs,
-    counts = [],
-    retained = [];
-  t.after(() => {
-    fs.statSync = stat;
-    fs.readFileSync = read;
-    syncBuiltinESMExports();
+for (const atCap of [false, true])
+  test(`Windows output enumeration eliminates per-archive stats ${atCap ? 'at' : 'under'} cap with identical bytes`, (t) => {
+    const { statSync: stat, readFileSync: read } = fs,
+      counts = [],
+      retained = [];
+    t.after(() => {
+      fs.statSync = stat;
+      fs.readFileSync = read;
+      syncBuiltinESMExports();
+    });
+    for (const fullScan of [true, false]) {
+      const { store, output, bytes } = outputBatchFixture(t, { fullScan });
+      if (atCap) store.capBytes = bytes.length * 128;
+      let statted = 0,
+        archiveBytesRead = 0;
+      fs.statSync = (path, ...rest) => {
+        if (dirname(String(path)) === join(store.dir, 'dist')) statted++;
+        return stat(path, ...rest);
+      };
+      fs.readFileSync = (path, ...rest) => {
+        const bytes = read(path, ...rest);
+        if (dirname(String(path)) === join(store.dir, 'dist')) archiveBytesRead += bytes.length;
+        return bytes;
+      };
+      syncBuiltinESMExports();
+      for (let i = 0; i < 12; i++) store.storeOutput(`build-${i}`, output);
+      counts.push({ statted, archiveBytesRead });
+      fs.statSync = stat;
+      fs.readFileSync = read;
+      syncBuiltinESMExports();
+      retained.push(readdirSync(join(store.dir, 'dist')).map((name) => [name, read(join(store.dir, 'dist', name))]));
+      assert.equal(store.restoreOutput('build-11', output), true);
+      assert.equal(readFileSync(join(output, 'value.txt'), 'utf8'), 'identical output bytes');
+    }
+    const oldStats = atCap ? 1548 : 1614;
+    assert.deepEqual(counts, [
+      { statted: oldStats, archiveBytesRead: 0 },
+      { statted: process.platform === 'win32' ? 0 : oldStats, archiveBytesRead: 0 },
+    ]);
+    assert.deepEqual(retained[1], retained[0]);
   });
-  for (const fullScan of [true, false]) {
-    const { store, output, bytes } = outputBatchFixture(t, { fullScan });
-    if (atCap) store.capBytes = bytes.length * 128;
-    let statted = 0,
-      archiveBytesRead = 0;
-    fs.statSync = (path, ...rest) => {
-      if (dirname(String(path)) === join(store.dir, 'dist')) statted++;
-      return stat(path, ...rest);
-    };
-    fs.readFileSync = (path, ...rest) => {
-      const bytes = read(path, ...rest);
-      if (dirname(String(path)) === join(store.dir, 'dist')) archiveBytesRead += bytes.length;
-      return bytes;
-    };
-    syncBuiltinESMExports();
-    for (let i = 0; i < 12; i++) store.storeOutput(`build-${i}`, output);
-    counts.push({ statted, archiveBytesRead });
-    fs.statSync = stat;
-    fs.readFileSync = read;
-    syncBuiltinESMExports();
-    retained.push(readdirSync(join(store.dir, 'dist')).map((name) => [name, read(join(store.dir, 'dist', name))]));
-    assert.equal(store.restoreOutput('build-11', output), true);
-    assert.equal(readFileSync(join(output, 'value.txt'), 'utf8'), 'identical output bytes');
-  }
-  const oldStats = atCap ? 1548 : 1614;
-  assert.deepEqual(counts, [
-    { statted: oldStats, archiveBytesRead: 0 },
-    { statted: process.platform === 'win32' ? 0 : oldStats, archiveBytesRead: 0 },
-  ]);
-  assert.deepEqual(retained[1], retained[0]);
-});
 
 test('native eviction sees other lanes, fresh touch ordering, ties and per-write capacity decisions', (t) => {
   const results = [];

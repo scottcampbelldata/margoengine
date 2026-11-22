@@ -72,7 +72,8 @@ test('writePoses writes the bits setPosition and setQuaternion write, Euler lane
       assert.deepEqual(pose(bulk, bulkMeshes[k].id), pose(single, singleMeshes[k].id), `round ${round} row ${k}`);
     bulk.render();
     single.render();
-    for (let k = 0; k < count; k++) assert.deepEqual(bulkMeshes[k].matrix, singleMeshes[k].matrix, `round ${round} matrix ${k}`);
+    for (let k = 0; k < count; k++)
+      assert.deepEqual(bulkMeshes[k].matrix, singleMeshes[k].matrix, `round ${round} matrix ${k}`);
   }
   // A Float32Array source and a count below its length.
   const floats = new Float32Array([1, 2, 3, 0, 0, 1, 1, 9, 9, 9, 0, 0, 0, 1]);
@@ -102,7 +103,10 @@ test('a bad row writes nothing, and the error names it', async (t) => {
     [[a.id, b.id], good, RangeError, /Invalid poses/],
   ];
   for (const [ids, poses, type, message] of cases) {
-    assert.throws(() => engine.writePoses(ids, poses), (error) => error instanceof type && message.test(error.message));
+    assert.throws(
+      () => engine.writePoses(ids, poses),
+      (error) => error instanceof type && message.test(error.message),
+    );
     assert.deepEqual(before(), start, `nothing written for ${message}`);
   }
   engine.writePoses([a.id], good);

@@ -23,7 +23,10 @@ test('quality inventory excludes disposable React bundles while retaining new so
     rmSync(temporary, { recursive: true });
     // Reproduce cleanup between the inventory and the detector's reads.
     assert.deepEqual(cleanRoomGate({ root, files, packages: [] }).items, {});
-    assert.deepEqual(files.filter((file) => file.startsWith('packages/')), ['packages/react/tests/new-source.test.js']);
+    assert.deepEqual(
+      files.filter((file) => file.startsWith('packages/')),
+      ['packages/react/tests/new-source.test.js'],
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

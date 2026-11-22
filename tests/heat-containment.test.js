@@ -305,7 +305,9 @@ test("a profile exclusion holds for any step that runs an excluded package's fil
     const compat = all.filter((s) => s.id.startsWith('webgl2-compat/test:gpu#'));
     assert.ok(compat.length > 1, `${name}: webgl2-compat test:gpu still runs as short steps`);
     // The step is named by what it runs, never by its position: a new step before it shifts every later number.
-    const pathTracer = compat.filter((s) => /node packages\/voxel-pathtracer\/tests\/browser-check\.mjs --compat/.test(s.command));
+    const pathTracer = compat.filter((s) =>
+      /node packages\/voxel-pathtracer\/tests\/browser-check\.mjs --compat/.test(s.command),
+    );
     assert.equal(pathTracer.length, 1, `${name}: webgl2-compat test:gpu has exactly one path tracer step`);
     assert.deepEqual(
       compat.filter((s) => s.excluded).map((s) => s.id),

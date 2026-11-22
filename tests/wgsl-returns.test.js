@@ -20,11 +20,17 @@ test('a function that ends in a loop left only by return is a gap (the KB-FF1 sh
     ),
     ['root'],
   );
-  assert.deepEqual(names('fn root(index:u32)->u32 { var p=index; loop { if (p==0u) { break; } p=p-1u; } return p; }'), []);
+  assert.deepEqual(
+    names('fn root(index:u32)->u32 { var p=index; loop { if (p==0u) { break; } p=p-1u; } return p; }'),
+    [],
+  );
 });
 
 test('if needs an else on every branch, switch needs every clause, for and while never end a function', () => {
-  assert.deepEqual(names('fn a(x:f32)->f32 { if x>0. { return 1.; } else if (x<0.) { return -1.; } else { return 0.; } }'), []);
+  assert.deepEqual(
+    names('fn a(x:f32)->f32 { if x>0. { return 1.; } else if (x<0.) { return -1.; } else { return 0.; } }'),
+    [],
+  );
   assert.deepEqual(names('fn a(x:f32)->f32 { if x>0. { return 1.; } else if (x<0.) { return -1.; } }'), ['a']);
   assert.deepEqual(names('fn a(x:i32)->i32 { switch x { case 1, 2: { return 1; } default { return 0; } } }'), []);
   assert.deepEqual(names('fn a(x:i32)->i32 { switch (x) { case 1 { return 1; } case 2, default { } } }'), ['a']);
@@ -83,10 +89,20 @@ test('the source scan finds gaps in .wgsl files and written-out functions, and s
       join(root, 'packages', 'pond', 'src', 'a.ts'),
       'export const code = `\nfn root(i:u32)->u32 { loop { return i; } }\nfn piece(i:u32)->u32 { ${"loop { return i; }"} }\n`;\n',
     );
-    writeFileSync(join(root, 'packages', 'pond', 'shaders', 'b.wgsl'), 'fn s(x: f32) -> f32 {\n if x > 0. { return x; }\n}\n');
-    writeFileSync(join(root, 'packages', 'shared', 'c.js'), 'export const c = `fn t()->f32 { while true { return 1.; } }`;\n');
+    writeFileSync(
+      join(root, 'packages', 'pond', 'shaders', 'b.wgsl'),
+      'fn s(x: f32) -> f32 {\n if x > 0. { return x; }\n}\n',
+    );
+    writeFileSync(
+      join(root, 'packages', 'shared', 'c.js'),
+      'export const c = `fn t()->f32 { while true { return 1.; } }`;\n',
+    );
     const { gaps } = findWgslReturnGaps(root);
-    assert.deepEqual(gaps.sort(), ['packages/pond/shaders/b.wgsl:1 s', 'packages/pond/src/a.ts:2 root', 'packages/shared/c.js:1 t']);
+    assert.deepEqual(gaps.sort(), [
+      'packages/pond/shaders/b.wgsl:1 s',
+      'packages/pond/src/a.ts:2 root',
+      'packages/shared/c.js:1 t',
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

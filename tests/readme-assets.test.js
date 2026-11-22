@@ -187,13 +187,22 @@ test('the USDZ composition and voxel-file READMEs resolve real files of their ow
   const teapot = await parseUSDFiles('teapot.usd', (id) => readFileSync(readmeFixture(`/teapot/${id}`).path));
   assert.equal(teapot.meshes.length, 1);
   assert.equal(teapot.meshes[0].positions.length, 3 * 7416);
-  assert.ok(teapot.issues.every(({ code }) => code === 'unsupported'), 'only its subdivision scheme is noted');
+  assert.ok(
+    teapot.issues.every(({ code }) => code === 'unsupported'),
+    'only its subdivision scheme is noted',
+  );
   // The variant pick: a Margo stand-in whose shadingVariant set turns its quad red.
   const model = (variants) =>
     parseUSDFiles('model.usd', () => readFileSync(readmeFixture('/model.usd').path), { variants });
-  assert.deepEqual([...(await model()).meshes[0].colors.subarray(0, 3)].map((c) => Math.round(c * 10)), [1, 2, 9]);
+  assert.deepEqual(
+    [...(await model()).meshes[0].colors.subarray(0, 3)].map((c) => Math.round(c * 10)),
+    [1, 2, 9],
+  );
   const red = await model({ '/Model': { shadingVariant: 'red' } });
-  assert.deepEqual([...red.meshes[0].colors.subarray(0, 3)].map((c) => Math.round(c * 10)), [9, 1, 1]);
+  assert.deepEqual(
+    [...red.meshes[0].colors.subarray(0, 3)].map((c) => Math.round(c * 10)),
+    [9, 1, 1],
+  );
   const qb = parseQB(readFileSync(readmeFixture('/models/robot.qb').path));
   assert.deepEqual(
     qb.models.map(({ name }) => name),
@@ -308,7 +317,11 @@ test('real HTTP byte-range reads return exactly the requested file bytes', async
 
 test('a served script or Wasm file carries its media type, so a worker can importScripts it; data stays octet-stream', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'readme-types-'));
-  const files = { 'runtime.js': 'text/javascript', 'runtime.wasm': 'application/wasm', 'model.ifc': 'application/octet-stream' };
+  const files = {
+    'runtime.js': 'text/javascript',
+    'runtime.wasm': 'application/wasm',
+    'model.ifc': 'application/octet-stream',
+  };
   for (const name of Object.keys(files)) writeFileSync(join(folder, name), 'x');
   const server = createServer((request, response) =>
     serveSample(request, response, join(folder, new URL(request.url, 'http://x').pathname.slice(1))),
@@ -316,7 +329,9 @@ test('a served script or Wasm file carries its media type, so a worker can impor
   try {
     await new Promise((done) => server.listen(0, '127.0.0.1', done));
     for (const [name, type] of Object.entries(files)) {
-      const response = await fetch(`http://127.0.0.1:${server.address().port}/${name}`, { signal: AbortSignal.timeout(5000) });
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/${name}`, {
+        signal: AbortSignal.timeout(5000),
+      });
       assert.equal(response.headers.get('content-type'), type, name);
       await response.arrayBuffer();
     }

@@ -22,14 +22,17 @@ function unreadOptions(links, source) {
   for (const query of links)
     for (const [key, value] of query) {
       const keyRead = quoted(key),
-        valueRead = value === '' || /^-?[0-9.]+$/.test(value) || quoted(value) || new RegExp(`[{,\\s]${value}\\s*:`).test(source);
+        valueRead =
+          value === '' || /^-?[0-9.]+$/.test(value) || quoted(value) || new RegExp(`[{,\\s]${value}\\s*:`).test(source);
       if (!keyRead || !valueRead) missing.push(`${key}=${value}`);
     }
   return [...new Set(missing)];
 }
 
 test('unreadOptions finds a linked value the script never reads', () => {
-  const links = optionLinks('<a href="?view=outside&amp;debug=wireframe">W</a><a href="?view=outside&amp;debug=layers">L</a>');
+  const links = optionLinks(
+    '<a href="?view=outside&amp;debug=wireframe">W</a><a href="?view=outside&amp;debug=layers">L</a>',
+  );
   const source = "const views = { outside: 1 }; params.get('view'); if (params.get('debug') === 'wireframe') {}";
   assert.deepEqual(unreadOptions(links, source), ['debug=layers']);
   assert.deepEqual(unreadOptions(links, source + " if (params.get('debug') === 'layers') {}"), []);
@@ -48,7 +51,11 @@ test('every same-page option link on an example page is read by its scripts', ()
       .filter((file) => /\.(ts|js|mjs)$/.test(file))
       .map((file) => readFileSync(join(dir, file), 'utf8'))
       .join('\n');
-    assert.deepEqual(unreadOptions(links, source), [], `examples/${entry.name}/index.html links options its scripts never read`);
+    assert.deepEqual(
+      unreadOptions(links, source),
+      [],
+      `examples/${entry.name}/index.html links options its scripts never read`,
+    );
   }
   assert.ok(pages >= 1, 'no example page with option links found; the check reads nothing');
 });

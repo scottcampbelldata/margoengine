@@ -77,7 +77,10 @@ test('copyDepth from a single-sample target reads its resolved depth', () => {
     device = h.engine.gpu,
     scene = target(h, 1),
     out = device.createTexture({ size: [128, 96], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
-  const groups = [], codes = [], make = device.createBindGroup, compile = device.createShaderModule;
+  const groups = [],
+    codes = [],
+    make = device.createBindGroup,
+    compile = device.createShaderModule;
   device.createBindGroup = function (descriptor) {
     groups.push(descriptor);
     return make.call(this, descriptor);
@@ -89,9 +92,12 @@ test('copyDepth from a single-sample target reads its resolved depth', () => {
   try {
     scene.copyDepth(h.context.encoder, out.createView(), 1, 'depth32float');
     assert.ok(groups.length > 0, 'the copy binds its source');
-    for (const g of groups) for (const e of g.entries) assert.notEqual(e.resource, undefined, 'every bound resource exists');
+    for (const g of groups)
+      for (const e of g.entries) assert.notEqual(e.resource, undefined, 'every bound resource exists');
     // The source has one sample: a multisampled binding fails WebGPU validation on a real device.
-    assert.ok(codes.length > 0 && codes.every((code) => code.includes('texture_depth_2d') && !code.includes('multisampled')));
+    assert.ok(
+      codes.length > 0 && codes.every((code) => code.includes('texture_depth_2d') && !code.includes('multisampled')),
+    );
   } finally {
     device.createBindGroup = make;
     device.createShaderModule = compile;

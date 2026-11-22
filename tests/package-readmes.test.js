@@ -12,7 +12,9 @@ import { undocumentedEntries } from '../scripts/readme-entries.mjs';
 
 const root = join(import.meta.dirname, '..');
 const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
-const folders = readdirSync(join(root, 'packages')).filter((name) => existsSync(join(root, 'packages', name, 'package.json')));
+const folders = readdirSync(join(root, 'packages')).filter((name) =>
+  existsSync(join(root, 'packages', name, 'package.json')),
+);
 const scripts = Object.fromEntries(folders.map((name) => [name, json(`packages/${name}/package.json`)]));
 const byName = Object.fromEntries(Object.entries(scripts).map(([folder, pkg]) => [pkg.name, folder]));
 const rootScripts = json('package.json').scripts;
@@ -49,7 +51,9 @@ test('every npm script a package README names exists', () => {
           const target = workspace && (byName[workspace] ?? workspace.replace(/^packages\//, ''));
           const available = workspace ? scripts[target]?.scripts : { ...rootScripts, ...scripts[folder].scripts };
           if (!available?.[script])
-            wrong.push(`${file}:${index + 1} npm script "${script}" ${workspace ? `in ${workspace}` : 'in the package or the root'}`);
+            wrong.push(
+              `${file}:${index + 1} npm script "${script}" ${workspace ? `in ${workspace}` : 'in the package or the root'}`,
+            );
         }
       });
   }
@@ -71,7 +75,9 @@ test('every package entry is named in its README, or listed as owed', () => {
 });
 
 test('the command finder reads workspace flags and ignores prose', () => {
-  assert.deepEqual(commandsOf('Run `npm run test:gpu --workspace @margoengine/save.` then'), [{ script: 'test:gpu', workspace: '@margoengine/save' }]);
+  assert.deepEqual(commandsOf('Run `npm run test:gpu --workspace @margoengine/save.` then'), [
+    { script: 'test:gpu', workspace: '@margoengine/save' },
+  ]);
   assert.deepEqual(commandsOf('npm test -w packages/stage'), [{ script: 'test', workspace: 'packages/stage' }]);
   assert.deepEqual(commandsOf('npm run build:packages: then'), [{ script: 'build:packages', workspace: undefined }]);
   assert.deepEqual(commandsOf('npm install @margoengine/core'), []);
@@ -112,7 +118,8 @@ test('package READMEs and guides carry no internal work-tracking labels', () => 
     const base = join('packages', folder);
     if (existsSync(join(root, base, 'README.md'))) docs.push(join(base, 'README.md'));
     const guides = join(root, base, 'docs');
-    if (existsSync(guides)) for (const name of readdirSync(guides)) if (name.endsWith('.md')) docs.push(join(base, 'docs', name));
+    if (existsSync(guides))
+      for (const name of readdirSync(guides)) if (name.endsWith('.md')) docs.push(join(base, 'docs', name));
   }
   const found = [];
   for (const file of docs) {

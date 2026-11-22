@@ -251,7 +251,14 @@ test('reorder puts opaque triangles in cache order and leaves a BLEND primitive 
         },
       ],
       accessors: [
-        { bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3', min: [0, 0, 0], max: [n, n, 0] },
+        {
+          bufferView: 0,
+          componentType: 5126,
+          count: positions.length / 3,
+          type: 'VEC3',
+          min: [0, 0, 0],
+          max: [n, n, 0],
+        },
         { bufferView: 1, componentType: 5125, count: indices.length, type: 'SCALAR' },
       ],
       bufferViews: [

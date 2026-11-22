@@ -14,14 +14,22 @@ function firefoxRenderer(drawn) {
   let target = null;
   const codes = [],
     clears = [],
-    pass = new Proxy({}, { get: (_, key) => (key === 'drawIndexed' ? () => drawn !== null && (target = drawn) : () => {}) }),
+    pass = new Proxy(
+      {},
+      { get: (_, key) => (key === 'drawIndexed' ? () => drawn !== null && (target = drawn) : () => {}) },
+    ),
     pipeline = { getBindGroupLayout: () => ({}) },
     device = {
       createShaderModule: (d) => (codes.push(d.code), {}),
       createRenderPipeline: () => pipeline,
       createBindGroup: () => ({}),
       createTexture: () => ({ createView: () => ({}), destroy() {} }),
-      createBuffer: () => ({ destroy() {}, async mapAsync() {}, getMappedRange: () => new Uint32Array([target]).buffer, unmap() {} }),
+      createBuffer: () => ({
+        destroy() {},
+        async mapAsync() {},
+        getMappedRange: () => new Uint32Array([target]).buffer,
+        unmap() {},
+      }),
       lost: new Promise(() => {}),
       addEventListener() {},
       destroy() {},
@@ -64,10 +72,20 @@ test('a pick over no mesh is null where integer clears go through float32', asyn
   empty.renderer.add(geometry, 1);
   assert.equal(await empty.renderer.pick(new Camera(), light, [batch], new FrameGraph(), 1, 1), null);
   // The clear survives float32 exactly, whatever the browser does with it.
-  assert.ok(empty.clears.every((v) => Math.fround(v) === v && v < 2 ** 24), `pick clears ${empty.clears}`);
+  assert.ok(
+    empty.clears.every((v) => Math.fround(v) === v && v < 2 ** 24),
+    `pick clears ${empty.clears}`,
+  );
   // The pick shader writes the id one up, so mesh 0 reads 1 and the clear of 0 means none.
-  assert.match(empty.codes.find((c) => c.includes('o.id=')), /o\.id=u32\(i\.factors\.w\)\+1u;/);
+  assert.match(
+    empty.codes.find((c) => c.includes('o.id=')),
+    /o\.id=u32\(i\.factors\.w\)\+1u;/,
+  );
   const covered = firefoxRenderer(1);
   covered.renderer.add(geometry, 1);
-  assert.equal(await covered.renderer.pick(new Camera(), light, [batch], new FrameGraph(), 1, 1), 0, 'mesh 0 under the pixel');
+  assert.equal(
+    await covered.renderer.pick(new Camera(), light, [batch], new FrameGraph(), 1, 1),
+    0,
+    'mesh 0 under the pixel',
+  );
 });

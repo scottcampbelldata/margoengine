@@ -50,7 +50,8 @@ test('every other line still fails on Firefox 157, near copies included', () => 
 });
 
 // Firefox (c): the layer probe's deliberate loseContext() is counted, not ignored, so an unplanned loss still fails.
-const LOST = '[JavaScript Warning: "WebGL context was lost." {file: "http://127.0.0.1:5219/packages/webgl2-compat/dist/index.js" line: 99}]';
+const LOST =
+  '[JavaScript Warning: "WebGL context was lost." {file: "http://127.0.0.1:5219/packages/webgl2-compat/dist/index.js" line: 99}]';
 
 test('Firefox context-loss lines are recognised exactly, on Firefox only', () => {
   assert.equal(firefoxContextLost(LOST, firefox('157.0')), true);

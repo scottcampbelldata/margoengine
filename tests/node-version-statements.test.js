@@ -16,7 +16,8 @@ test('engines names a Node 24 minimum', () => {
 });
 
 test('README and CONTRIBUTING state the contributor Node minimum from engines', () => {
-  const readme = read('README.md'), contributing = read('CONTRIBUTING.md');
+  const readme = read('README.md'),
+    contributing = read('CONTRIBUTING.md');
   assert.ok(readme.includes(`Node.js ${minimum} or newer`), 'README quick start');
   assert.ok(readme.includes(`You need Node.js ${minimum}+`), 'README build from source');
   assert.ok(contributing.includes(`Node.js ${minimum}+`), 'CONTRIBUTING');

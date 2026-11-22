@@ -53,7 +53,15 @@ const checkScripts = () =>
     });
 
 test('the case list is read from the check itself and holds every known case', () => {
-  for (const name of ['agx', 'glassfurnace', 'convergence', 'denoise-materials', 'denoise-caustics', 'denoisehistory', 'native4k'])
+  for (const name of [
+    'agx',
+    'glassfurnace',
+    'convergence',
+    'denoise-materials',
+    'denoise-caustics',
+    'denoisehistory',
+    'native4k',
+  ])
     assert.ok(cases.includes(name), `${name} is a case`);
   assert.ok(cases.length >= 36, `${cases.length} cases`);
 });
@@ -124,14 +132,19 @@ test('every split script fits its time limit with the cases measured cold on Dir
   const measured = JSON.parse(readFileSync(join(root, dir, 'tests/compat-d3d11-case-seconds.json'), 'utf8')).seconds;
   // Only the cases browser-check.mjs runs on the WebGL2 layer were measured there; the denoise and viewport scripts run
   // on WebGPU-only paths or have their own longer limits, so they are not summed here.
-  for (const s of checkScripts().filter((x) => ['test:gpu', 'test:gpu:light-transport', 'test:gpu:convergence'].includes(x.script))) {
+  for (const s of checkScripts().filter((x) =>
+    ['test:gpu', 'test:gpu:light-transport', 'test:gpu:convergence'].includes(x.script),
+  )) {
     const missing = s.cases.filter((c) => !(c in measured));
     assert.deepEqual(missing, [], `${s.script}: every case has a measured Direct3D 11 time`);
     const total = s.cases.reduce((sum, c) => sum + measured[c], 0),
       limit = pkg.margo.gpuTestTimeoutMinutes[s.script] * 60;
     // A quarter of the limit is kept free: each script is its own page, which compiles its first programs cold again
     // (agx and groundprecision waited 77 to 79 s for the GPU), and the GPU is shared with other lanes.
-    assert.ok(total <= 0.75 * limit, `${s.script}: ${total.toFixed(1)} s of Direct3D 11 case time against a ${limit} s limit`);
+    assert.ok(
+      total <= 0.75 * limit,
+      `${s.script}: ${total.toFixed(1)} s of Direct3D 11 case time against a ${limit} s limit`,
+    );
   }
   for (const c of cases.filter((n) => n in measured))
     assert.equal(checkScripts().filter((s) => SPLIT.includes(s.script) && s.cases.includes(c)).length, 1, c);

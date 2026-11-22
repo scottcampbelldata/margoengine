@@ -16,26 +16,49 @@ export function ownedByEngine(scene, name, release, extra = {}) {
   };
 }
 
-export const lifetimeFault = (message) => { throw new Error(`OWNER_LIFETIME: ${message}`); };
+export const lifetimeFault = (message) => {
+  throw new Error(`OWNER_LIFETIME: ${message}`);
+};
 
 // One recorder for the whole page or process, installed on first use and left in place: a timer is cleared a few
 // microtasks after a disposal, long after any scope has ended, and that clear must still be seen.
 const armed = new Map();
-let current = null, installed = false;
+let current = null,
+  installed = false;
 function installTimerRecorder() {
   if (installed) return;
   installed = true;
   // Bound: a browser's timer functions throw when called with any other `this` than the window.
-  const real = Object.fromEntries(['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval']
-    .map((name) => [name, globalThis[name].bind(globalThis)]));
-  const arm = (id) => { if (current) armed.set(id, current); return id; };
+  const real = Object.fromEntries(
+    ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'].map((name) => [
+      name,
+      globalThis[name].bind(globalThis),
+    ]),
+  );
+  const arm = (id) => {
+    if (current) armed.set(id, current);
+    return id;
+  };
   globalThis.setTimeout = (fn, ms, ...args) => {
-    const id = real.setTimeout((...a) => { armed.delete(id); return fn(...a); }, ms, ...args);
+    const id = real.setTimeout(
+      (...a) => {
+        armed.delete(id);
+        return fn(...a);
+      },
+      ms,
+      ...args,
+    );
     return arm(id);
   };
   globalThis.setInterval = (...args) => arm(real.setInterval(...args));
-  globalThis.clearTimeout = (id) => { armed.delete(id); return real.clearTimeout(id); };
-  globalThis.clearInterval = (id) => { armed.delete(id); return real.clearInterval(id); };
+  globalThis.clearTimeout = (id) => {
+    armed.delete(id);
+    return real.clearTimeout(id);
+  };
+  globalThis.clearInterval = (id) => {
+    armed.delete(id);
+    return real.clearInterval(id);
+  };
 }
 
 /**
@@ -49,8 +72,22 @@ export function watchTimers() {
   const scope = (fn) => {
     const previous = current;
     current = token;
-    try { return fn(); } finally { current = previous; }
+    try {
+      return fn();
+    } finally {
+      current = previous;
+    }
   };
-  const pending = { get size() { return [...armed.values()].filter((t) => t === token).length; } };
-  return { scope, pending, expectNone(what) { if (pending.size) lifetimeFault(`${what} leaves ${pending.size} timer(s) armed`); } };
+  const pending = {
+    get size() {
+      return [...armed.values()].filter((t) => t === token).length;
+    },
+  };
+  return {
+    scope,
+    pending,
+    expectNone(what) {
+      if (pending.size) lifetimeFault(`${what} leaves ${pending.size} timer(s) armed`);
+    },
+  };
 }

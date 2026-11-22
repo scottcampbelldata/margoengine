@@ -10,10 +10,12 @@ import { dirname, join } from 'node:path';
 import { isBrowserFile, testUniverse, unrunBrowserFiles } from '../scripts/gpu-package-tests.mjs';
 
 const files = {
-  'packages/demo/test/a-browser.mjs': "import { launchBrowser } from '../../../scripts/lib/browser.mjs';\nawait launchBrowser();",
+  'packages/demo/test/a-browser.mjs':
+    "import { launchBrowser } from '../../../scripts/lib/browser.mjs';\nawait launchBrowser();",
   'packages/demo/test/b.browser.mjs': "import { run } from './harness.mjs';\nawait run('page');",
   // A harness that names a check only in a comment does not run it: a-browser.mjs.
-  'packages/demo/test/harness.mjs': '// Like a-browser.mjs, but for pages.\nexport const run = (name) => go(`/packages/demo/test/${name}.html`);',
+  'packages/demo/test/harness.mjs':
+    '// Like a-browser.mjs, but for pages.\nexport const run = (name) => go(`/packages/demo/test/${name}.html`);',
   'packages/demo/test/page.html': '<script type="module" src="./page-browser.js"></script>',
   'packages/demo/test/page-browser.js': 'window.check = () => 1;',
   'packages/demo/scripts/test-browser.js':
@@ -22,7 +24,8 @@ const files = {
   'packages/demo/tests/gi-browser.js': 'window.runTests = () => [];',
   'packages/demo/tests/ground.html': '<script type="module" src="ground-browser.js"></script>',
   'packages/demo/tests/ground-browser.js': 'window.runTests = () => [];',
-  'packages/demo/tests/shot-browser.mjs': "import { launchBrowser } from '../../../scripts/lib/browser.mjs';\nawait launchBrowser();",
+  'packages/demo/tests/shot-browser.mjs':
+    "import { launchBrowser } from '../../../scripts/lib/browser.mjs';\nawait launchBrowser();",
   'packages/demo/tests/unit.test.js': "import { launchBrowser } from 'x';",
 };
 const read = (file) => files[file];
@@ -39,9 +42,9 @@ test('a browser test file is one named for the browser or driving one, outside n
   assert.equal(isBrowserFile('packages/demo/tests/gi-browser.js', ''), true);
   assert.equal(isBrowserFile('packages/demo/test/b.browser.mjs', ''), true);
   assert.equal(isBrowserFile('packages/demo/tests/browser-check.js', ''), true);
-  assert.equal(isBrowserFile('packages/demo/tests/rig.mjs', "await launchBrowser();"), true);
+  assert.equal(isBrowserFile('packages/demo/tests/rig.mjs', 'await launchBrowser();'), true);
   assert.equal(isBrowserFile('packages/demo/tests/rig.mjs', 'export const x = 1;'), false);
-  assert.equal(isBrowserFile('packages/demo/tests/unit.test.js', "await launchBrowser();"), false);
+  assert.equal(isBrowserFile('packages/demo/tests/unit.test.js', 'await launchBrowser();'), false);
   assert.equal(isBrowserFile('packages/demo/tests/fixtures/x-browser.js', ''), false);
 });
 

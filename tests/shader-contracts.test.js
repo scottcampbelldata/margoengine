@@ -86,7 +86,11 @@ const contracts = [
   ['lod/src/imposter.ts', 'gltf', /@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/],
   ['lod/src/fade.ts', 'core', '@location(3) material:vec4f }'],
   ['lod/src/fade.ts', 'core', 'o.color=i.color.rgb;'],
-  ['lod/src/fade.ts', 'core', /@fragment fn fragment\(i:Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f \{/],
+  [
+    'lod/src/fade.ts',
+    'core',
+    /@fragment fn fragment\(i:Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f \{/,
+  ],
 ];
 const sources = new Map();
 const source = (file) => {

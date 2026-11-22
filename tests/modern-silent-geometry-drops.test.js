@@ -88,11 +88,7 @@ for (const fixture of loadedPBRFixtures) {
         mesh.setParent(null);
         const body = physics.addBody(mesh, { colliders: { shape: 'capsule', halfHeight: 0.4, radius: 0.15 } });
         assert.equal(body.colliders.length, 1);
-        assert.equal(
-          body.colliders[0].body,
-          body,
-          'explicit collider belongs to the loaded mesh body',
-        );
+        assert.equal(body.colliders[0].body, body, 'explicit collider belongs to the loaded mesh body');
         close([body.colliders[0].halfHeight(), body.colliders[0].radius()], [0.4, 0.15], 'explicit capsule dimensions');
         assert.equal(mesh.geometry, null, 'explicit collision does not attach a second core Geometry');
       } finally {

@@ -10,7 +10,16 @@
 // Bundles with Rolldown (Vite's bundler) with nothing external; needs `npm run build:packages` (packages resolve to dist).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 import { rolldown } from 'rolldown';
@@ -73,7 +82,10 @@ async function bundle(source, options = {}, planted = {}) {
 function importedBindings(code) {
   const bindings = [];
   for (const [, names, source] of code.matchAll(/^import \{([^}]*)\} from "([^"]+)";$/gm))
-    for (const item of names.split(',').map((n) => n.trim()).filter(Boolean))
+    for (const item of names
+      .split(',')
+      .map((n) => n.trim())
+      .filter(Boolean))
       bindings.push(`${source} ${item.split(/\s+as\s+/)[0]}`);
   for (const [, source] of code.matchAll(/^import "([^"]+)";$/gm)) bindings.push(`${source} (side effect)`);
   return bindings.sort();
@@ -123,7 +135,10 @@ async function orderProblems(packages, planted = {}) {
   const names = Object.keys(a.files).sort();
   if (JSON.stringify(Object.keys(b.files).sort()) !== JSON.stringify(names)) problems.push('different modules');
   for (const name of names)
-    if (b.files[name] && JSON.stringify(importedBindings(b.files[name])) !== JSON.stringify(importedBindings(a.files[name])))
+    if (
+      b.files[name] &&
+      JSON.stringify(importedBindings(b.files[name])) !== JSON.stringify(importedBindings(a.files[name]))
+    )
       problems.push(`${name}: different imported bindings`);
   if (b.output !== a.output) problems.push(`different output: ${a.output} | ${b.output}`);
   // packages/shared keeps state that every bundled copy of it must share under Symbol.for('margoengine.<name>') keys on
@@ -137,7 +152,8 @@ test('every contract group names real public packages, and each group has two or
   const grouped = CONTRACT_GROUPS.flatMap((g) => g.packages);
   assert.equal(new Set(grouped).size, grouped.length, 'a package in two groups');
   for (const name of [...grouped, ...Object.keys(LEFT_OUT)]) assert.ok(manifests.has(name), `${name} is no package`);
-  for (const group of CONTRACT_GROUPS) assert.ok(group.packages.length >= 2, `${group.name}: a group needs two packages`);
+  for (const group of CONTRACT_GROUPS)
+    assert.ok(group.packages.length >= 2, `${group.name}: a group needs two packages`);
 });
 
 test('the order check catches packages whose state depends on import order or that add a global', async () => {
@@ -146,7 +162,10 @@ test('the order check catches packages whose state depends on import order or th
     'planted-b': "globalThis.__margoFirst ??= 'b';\nexport const first = globalThis.__margoFirst;\n",
   };
   const problems = await orderProblems(['planted-a', 'planted-b'], planted);
-  assert.ok(problems.some((p) => p.startsWith('different output')), problems.join('\n'));
+  assert.ok(
+    problems.some((p) => p.startsWith('different output')),
+    problems.join('\n'),
+  );
   assert.ok(problems.includes('globals added: __margoFirst'), problems.join('\n'));
   const clean = { 'planted-a': 'export const a = 1;\n', 'planted-b': "export const b = 'two';\n" };
   assert.deepEqual(await orderProblems(['planted-a', 'planted-b'], clean), []);
@@ -230,7 +249,10 @@ process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(all).map((
   const [single] = await bundle(source, { codeSplitting: false });
   const copies = single.moduleIds.filter((id) => ownerOf(id) === '@margoengine/core').map((id) => relative(root, id));
   assert.equal(new Set(copies).size, copies.length, 'a core module bundled twice');
-  assert.ok(copies.some((id) => id.endsWith(join('dist', 'engine.js'))), 'the bundle holds core');
+  assert.ok(
+    copies.some((id) => id.endsWith(join('dist', 'engine.js'))),
+    'the bundle holds core',
+  );
   const want = JSON.stringify({ root: true, extension: true, stage: true, umbrella: true, umbrellaCore: true });
   assert.equal(run(single.code, 'engine'), want, 'bundled: every path gives the same Engine class');
   // Unbundled, as Node resolves the same imports: still one class.

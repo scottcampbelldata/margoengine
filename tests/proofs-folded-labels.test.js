@@ -7,7 +7,10 @@ import { test } from 'node:test';
 import { foldedLabels } from '../examples/package-benchmarks/proofs/compare.js';
 
 test('a pre-fold baseline label reads as the label the same GPU object has since the fold', () => {
-  const stored = [['buffer', { label: 'gltf-pro uniform arena', size: 65536 }], ['module', { code: 'gltf-pro' }]];
+  const stored = [
+    ['buffer', { label: 'gltf-pro uniform arena', size: 65536 }],
+    ['module', { code: 'gltf-pro' }],
+  ];
   assert.deepEqual(foldedLabels(stored), [
     ['buffer', { label: 'gltf/pbr uniform arena', size: 65536 }],
     ['module', { code: 'gltf-pro' }],

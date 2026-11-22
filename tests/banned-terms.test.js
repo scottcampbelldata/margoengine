@@ -145,7 +145,8 @@ test('the name of the block game is reported alone, possessive, and inside a hyp
 // read (another process writing it) was skipped unscanned. Every non-zero exit now names its reason on both streams.
 test('every failure of the check names its reason on stdout and stderr; an unreadable file fails, a deleted one is skipped', () => {
   const run = (scanAll) => {
-    const log = [], error = [];
+    const log = [],
+      error = [];
     const code = main({ scanAll, log: (line) => log.push(line), error: (line) => error.push(line) });
     return { code, log: log.join('\n'), error: error.join('\n') };
   };

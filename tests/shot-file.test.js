@@ -116,7 +116,8 @@ test('every header field is checked, each issue at its path', () => {
     [{ page: null }, 'shot.page'],
   ];
   for (const [header, path] of cases) assert.deepEqual(paths(shot(header)), [path], JSON.stringify(header));
-  const page = (fields) => paths(shot({ page: { path: 'examples/storm-light/index.html', engine: 'stormLight.engine', ...fields } }));
+  const page = (fields) =>
+    paths(shot({ page: { path: 'examples/storm-light/index.html', engine: 'stormLight.engine', ...fields } }));
   assert.deepEqual(page({ path: '../outside.html' }), ['shot.page.path']);
   assert.deepEqual(page({ path: 'examples/storm-light/main.ts' }), ['shot.page.path']);
   assert.deepEqual(page({ engine: 'window["x"]' }), ['shot.page.engine'], 'the engine is a dotted path, never code');
@@ -176,7 +177,12 @@ test('probes land on the frame at or just after their time', () => {
 });
 
 test('compareRenders finds the first differing frame, or null when identical', () => {
-  const render = (hashes, extra = {}) => ({ size: [1080, 1920], warmup: 60, frames: hashes.map((sha256) => ({ sha256 })), ...extra });
+  const render = (hashes, extra = {}) => ({
+    size: [1080, 1920],
+    warmup: 60,
+    frames: hashes.map((sha256) => ({ sha256 })),
+    ...extra,
+  });
   assert.equal(compareRenders(render(['a', 'b', 'c']), render(['a', 'b', 'c'])), null);
   const difference = compareRenders(render(['a', 'b', 'c', 'd']), render(['a', 'x', 'c', 'y']));
   assert.equal(difference.reason, 'pixels');
@@ -187,7 +193,11 @@ test('compareRenders finds the first differing frame, or null when identical', (
   assert.equal(compareRenders(render(['a']), render(['a'], { warmup: 61 })).reason, 'warmup');
   assert.equal(compareRenders(render(['a']), render(['a'], { size: [1920, 1080] })).reason, 'size');
   // Renders that kept some frames only (a production render's probes) name frames by their record's index.
-  const probes = (hashes) => ({ size: [1080, 1920], warmup: 60, frames: hashes.map((sha256, i) => ({ index: [0, 240, 479][i], sha256 })) });
+  const probes = (hashes) => ({
+    size: [1080, 1920],
+    warmup: 60,
+    frames: hashes.map((sha256, i) => ({ index: [0, 240, 479][i], sha256 })),
+  });
   const probe = compareRenders(probes(['a', 'b', 'c']), probes(['a', 'b', 'x']));
   assert.deepEqual([probe.frame, probe.frames], [479, [479]]);
   assert.match(probe.message, /1 of 3 frames differ between the two renders, first frame 479/);
@@ -207,12 +217,19 @@ test('compareRenders checks the masks too: a mask that differs while the frames 
   assert.match(difference.message, /the sky mask differs in 1 of 3 frames between the two renders, first frame 1/);
   const both = render(['a']);
   both.frames[0].sha256 = 'other';
-  assert.equal(compareRenders(render(['a']), both).reason, 'pixels', 'a frame that differs is a pixel difference first');
+  assert.equal(
+    compareRenders(render(['a']), both).reason,
+    'pixels',
+    'a frame that differs is a pixel difference first',
+  );
 });
 
 test('masks: names, the horizon the sky and water masks need, geometry under them and the page hook', () => {
   const page = { path: 'examples/storm-light/index.html', engine: 'stormLight.engine', aovs: 'stormLight.aovs' };
-  assert.deepEqual(validateShot(shot({ aovs: ['geometry', 'depth', 'sky', 'water', 'foam'], horizon: { y: 0 }, page })), []);
+  assert.deepEqual(
+    validateShot(shot({ aovs: ['geometry', 'depth', 'sky', 'water', 'foam'], horizon: { y: 0 }, page })),
+    [],
+  );
   assert.deepEqual(parseShot(shot()).shot.aovs, [], 'no masks by default');
   assert.equal(parseShot(shot()).shot.horizon, null);
   const cases = [
@@ -227,7 +244,8 @@ test('masks: names, the horizon the sky and water masks need, geometry under the
     [{ aovs: ['depth'] }, 'shot.page.aovs'],
     [{ aovs: ['depth'], page: { ...page, aovs: 'stormLight.aovs()' } }, 'shot.page.aovs'],
   ];
-  for (const [header, path] of cases) assert.ok(paths(shot(header)).includes(path), `${JSON.stringify(header)} flags ${path}`);
+  for (const [header, path] of cases)
+    assert.ok(paths(shot(header)).includes(path), `${JSON.stringify(header)} flags ${path}`);
 });
 
 test('the Storm Light tour shot in the repository is valid', () => {
@@ -247,7 +265,11 @@ test('the Storm Light tour shot in the repository is valid', () => {
     gallery: { lights: [1, 4] },
     west: { lights: [2, 4] },
   });
-  assert.match(JSON.parse(readFileSync(resolve(root, 'tools/shot/shots/storm-light-tour.json'), 'utf8')).shot.probeLookBoundsReason, /gallery sees one real lantern/);
+  assert.match(
+    JSON.parse(readFileSync(resolve(root, 'tools/shot/shots/storm-light-tour.json'), 'utf8')).shot
+      .probeLookBoundsReason,
+    /gallery sees one real lantern/,
+  );
 });
 
 test('the Cabin Hearth shots are valid, vertical, one MSAA sample, with probes and look bounds', () => {
@@ -260,7 +282,10 @@ test('the Cabin Hearth shots are valid, vertical, one MSAA sample, with probes a
     assert.equal(file.shot.page.path, 'examples/cabin-hearth/index.html');
     assert.equal(file.shot.page.query.ui, 0, `${id} turns the mouse orbit off`);
     assert.ok(Object.keys(file.shot.probes).length >= 3, `${id} names its probes`);
-    assert.ok(Object.values(file.shot.probes).every((t) => t >= 0 && t < file.shot.seconds), `${id} probes inside the shot`);
+    assert.ok(
+      Object.values(file.shot.probes).every((t) => t >= 0 && t < file.shot.seconds),
+      `${id} probes inside the shot`,
+    );
     assert.ok(Object.keys(file.shot.lookBounds).length > 0, `${id} sets look bounds`);
   }
 });
@@ -278,7 +303,10 @@ test('Cabin Hearth push-in: the camera goes through one window pane, clear of th
   for (let z = 2.34; z <= 2.76; z += 0.01) {
     const t = (z - before.position[2]) / (after.position[2] - before.position[2]),
       [x, y] = [0, 1].map((i) => before.position[i] + t * (after.position[i] - before.position[i]));
-    assert.ok(margin(x, y) >= 0.15, `at z ${z.toFixed(2)} the camera is ${margin(x, y).toFixed(3)} m from a bar or frame`);
+    assert.ok(
+      margin(x, y) >= 0.15,
+      `at z ${z.toFixed(2)} the camera is ${margin(x, y).toFixed(3)} m from a bar or frame`,
+    );
   }
 });
 
@@ -287,11 +315,22 @@ test('Cabin Hearth push-in: the camera goes through one window pane, clear of th
 function assertExposure(file, id) {
   const { fps, subframes = 1, shutter = 180 } = file.shot;
   const share = shutter / 360 / fps / subframes;
-  assert.ok(Math.abs(file.shot.page.query.exposure - share) < 1e-6, `${id} exposure ${file.shot.page.query.exposure}, its share ${share}`);
+  assert.ok(
+    Math.abs(file.shot.page.query.exposure - share) < 1e-6,
+    `${id} exposure ${file.shot.page.query.exposure}, its share ${share}`,
+  );
 }
 
 test('the Whiteout Pass shots are valid, vertical, one MSAA sample, with probes and look bounds', () => {
-  const ids = ['whiteout-window', 'whiteout-walk-in', 'whiteout-window-close', 'whiteout-clearing', 'whiteout-wireframe', 'whiteout-wind', 'whiteout-bare'];
+  const ids = [
+    'whiteout-window',
+    'whiteout-walk-in',
+    'whiteout-window-close',
+    'whiteout-clearing',
+    'whiteout-wireframe',
+    'whiteout-wind',
+    'whiteout-bare',
+  ];
   for (const id of ids) {
     const file = parseShot(readFileSync(resolve(root, `tools/shot/shots/${id}.json`), 'utf8'));
     assert.equal(file.shot.id, id);
@@ -300,7 +339,10 @@ test('the Whiteout Pass shots are valid, vertical, one MSAA sample, with probes 
     assert.equal(file.shot.page.path, 'examples/whiteout-pass/index.html');
     assert.equal(file.shot.page.query.ui, 0, `${id} turns the mouse orbit off`);
     assert.ok(Object.keys(file.shot.probes).length >= 3, `${id} names its probes`);
-    assert.ok(Object.values(file.shot.probes).every((t) => t >= 0 && t < file.shot.seconds), `${id} probes inside the shot`);
+    assert.ok(
+      Object.values(file.shot.probes).every((t) => t >= 0 && t < file.shot.seconds),
+      `${id} probes inside the shot`,
+    );
     assert.ok(Object.keys(file.shot.lookBounds).length > 0, `${id} sets look bounds`);
     assertExposure(file, id);
   }
@@ -308,7 +350,10 @@ test('the Whiteout Pass shots are valid, vertical, one MSAA sample, with probes 
   const clearing = parseShot(readFileSync(resolve(root, 'tools/shot/shots/whiteout-clearing.json'), 'utf8'));
   assert.equal(clearing.shot.page.apply, 'whiteoutPass.apply');
   const track = clearing.tracks.find((t) => t.type === 'property');
-  assert.deepEqual([track.target, track.property, track.keys[0].value, track.keys.at(-1).value], ['weather', 'storm', 1, 0]);
+  assert.deepEqual(
+    [track.target, track.property, track.keys[0].value, track.keys.at(-1).value],
+    ['weather', 'storm', 1, 0],
+  );
 });
 
 test('the Whiteout Pass long footage: the seven shots as long kind, 1920 x 1080 at 30 fps, with a probe in the last second', () => {
@@ -321,7 +366,10 @@ test('the Whiteout Pass long footage: the seven shots as long kind, 1920 x 1080 
     assert.equal(file.shot.seconds, short.shot.seconds * 1.5, `${id} runs half again as long as its short`);
     assert.equal(file.shot.page.path, 'examples/whiteout-pass/index.html');
     // A production render checks only the probes, so one near the end covers the whole shot.
-    assert.ok(Object.values(file.shot.probes).some((t) => t >= file.shot.seconds - 1 && t < file.shot.seconds), `${id} probes its end`);
+    assert.ok(
+      Object.values(file.shot.probes).some((t) => t >= file.shot.seconds - 1 && t < file.shot.seconds),
+      `${id} probes its end`,
+    );
     assertExposure(file, id);
   }
 });
@@ -353,10 +401,26 @@ test('output: one folder per day, the frames in <id>/, the master and caption na
 });
 
 test('the Event Horizon shots are valid, one MSAA sample, with probes, and drive the hole through eventHorizon.apply', () => {
-  const long = ['approach', 'inclinations', 'spin', 'accretion', 'geodesics', 'redshift', 'beaming', 'orders', 'before-after', 'jet', 'rim', 'plunge'];
+  const long = [
+    'approach',
+    'inclinations',
+    'spin',
+    'accretion',
+    'geodesics',
+    'redshift',
+    'beaming',
+    'orders',
+    'before-after',
+    'jet',
+    'rim',
+    'plunge',
+  ];
   const short = ['approach', 'fix', 'maps'];
   let seconds = 0;
-  for (const [kind, ids] of [['long', long], ['short', short]])
+  for (const [kind, ids] of [
+    ['long', long],
+    ['short', short],
+  ])
     for (const name of ids) {
       const id = `eh-${kind}-${name}`,
         file = parseShot(readFileSync(resolve(root, `tools/shot/shots/${id}.json`), 'utf8'));
@@ -367,7 +431,10 @@ test('the Event Horizon shots are valid, one MSAA sample, with probes, and drive
       assert.equal(file.shot.page.apply, 'eventHorizon.apply');
       assert.equal(file.shot.page.query.ui, 0, `${id} hides the panel`);
       assert.ok(Object.keys(file.shot.probes).length >= 3, `${id} names its probes`);
-      assert.ok(Object.values(file.shot.probes).every((t) => t >= 0 && t < file.shot.seconds), `${id} probes inside the shot`);
+      assert.ok(
+        Object.values(file.shot.probes).every((t) => t >= 0 && t < file.shot.seconds),
+        `${id} probes inside the shot`,
+      );
       for (const track of file.tracks.filter((t) => t.type === 'property')) assert.equal(track.target, 'hole', id);
       if (kind === 'long') seconds += file.shot.seconds;
     }
@@ -380,9 +447,13 @@ test('the Event Horizon shot files match what examples/event-horizon/make-shots.
     execFileSync(process.execPath, [resolve(root, 'examples/event-horizon/make-shots.mjs'), dir]);
     const made = readdirSync(dir).sort();
     assert.equal(made.length, 15);
+    // Compared as data: a Windows checkout may turn the line ends into CRLF.
     for (const name of made)
-      // Compared as data: a Windows checkout may turn the line ends into CRLF.
-      assert.deepEqual(JSON.parse(readFileSync(join(dir, name), 'utf8')), JSON.parse(readFileSync(resolve(root, 'tools/shot/shots', name), 'utf8')), name);
+      assert.deepEqual(
+        JSON.parse(readFileSync(join(dir, name), 'utf8')),
+        JSON.parse(readFileSync(resolve(root, 'tools/shot/shots', name), 'utf8')),
+        name,
+      );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -396,15 +467,27 @@ test('a shot header may name a catalogue scene and settings; each is checked, th
   assert.deepEqual(paths(shot({ scene: 'dune-coast', settings: 5, page })), ['shot.settings']);
   // dune-coast lists no targets, so a target of it is refused with the names it has (none).
   assert.deepEqual(paths(shot({ scene: 'dune-coast', settings: { weather: {} }, page })), ['shot.settings.weather']);
-  assert.deepEqual(paths(shot({ scene: 'dune-coast', settings: { weather: {} } })), ['shot.settings.weather', 'shot.page.settings']);
+  assert.deepEqual(paths(shot({ scene: 'dune-coast', settings: { weather: {} } })), [
+    'shot.settings.weather',
+    'shot.page.settings',
+  ]);
   assert.deepEqual(paths(shot({ page: { ...page, settings: 'not a name' } })), ['shot.page.settings']);
 });
 
-test('shot settings are checked against the packages\' tables, evaluated per time from the shot start, and written from info.shots', async () => {
+test("shot settings are checked against the packages' tables, evaluated per time from the shot start, and written from info.shots", async () => {
   const { checkShotFileSettings, shotValuesAt, shotFilesFromScene } = await import('../tools/shot/scene-settings.mjs');
   const { TONEMAP_SETTINGS } = await import('@margoengine/tonemap/settings');
   const info = { name: 'demo', targets: { tonemap: '@margoengine/tonemap/settings' } };
-  const settings = { tonemap: { 'tonemap.exposure': { keys: [{ time: 0, value: -1 }, { time: 2, value: 1 }] } } };
+  const settings = {
+    tonemap: {
+      'tonemap.exposure': {
+        keys: [
+          { time: 0, value: -1 },
+          { time: 2, value: 1 },
+        ],
+      },
+    },
+  };
   const page = { path: 'examples/storm-light/index.html', engine: 'stormLight.engine', settings: 'margoShot.settings' };
   // dune-coast lists no targets, so the header is parsed without them and the settings joined after (the check takes its own info).
   const parsed = { ...parseShot(shot({ scene: 'dune-coast', page }, { duration: 6, tracks: [] })).shot, settings };
@@ -415,30 +498,80 @@ test('shot settings are checked against the packages\' tables, evaluated per tim
   assert.equal(shotValuesAt(from, tables, 3).tonemap['tonemap.exposure'], 0);
   assert.equal(shotValuesAt(from, null, 3), null);
   assert.equal(await checkShotFileSettings({ ...parsed, settings: undefined }, info), null);
-  await assert.rejects(() => checkShotFileSettings({ ...parsed, settings: { tonemap: { 'tonemap.exposure': 99 } } }, info), { name: 'RangeError', message: /tonemap.exposure/ });
-  await assert.rejects(() => checkShotFileSettings({ ...parsed, settings: { tonemap: { 'tonemap.exposure': { keys: [{ time: 0, value: 0 }, { time: 9, value: 1 }] } } } }, info), RangeError);
-  await assert.rejects(() => checkShotFileSettings({ ...parsed, settings: { weather: {} } }, info), { name: 'TypeError', message: /no target weather/ });
-  const made = shotFilesFromScene({ ...info, shots: [{ name: 'one', seconds: 2, camera: ['a'], settings, about: 'x' }] }, { page, tracks: { one: [] }, kind: 'long' });
+  await assert.rejects(
+    () => checkShotFileSettings({ ...parsed, settings: { tonemap: { 'tonemap.exposure': 99 } } }, info),
+    { name: 'RangeError', message: /tonemap.exposure/ },
+  );
+  await assert.rejects(
+    () =>
+      checkShotFileSettings(
+        {
+          ...parsed,
+          settings: {
+            tonemap: {
+              'tonemap.exposure': {
+                keys: [
+                  { time: 0, value: 0 },
+                  { time: 9, value: 1 },
+                ],
+              },
+            },
+          },
+        },
+        info,
+      ),
+    RangeError,
+  );
+  await assert.rejects(() => checkShotFileSettings({ ...parsed, settings: { weather: {} } }, info), {
+    name: 'TypeError',
+    message: /no target weather/,
+  });
+  const made = shotFilesFromScene(
+    { ...info, shots: [{ name: 'one', seconds: 2, camera: ['a'], settings, about: 'x' }] },
+    { page, tracks: { one: [] }, kind: 'long' },
+  );
   assert.equal(made.length, 1);
-  assert.deepEqual(validateShot(made[0]).map((i) => i.path), ['shot.scene'], 'a scene outside the catalogue is refused when the file is checked');
+  assert.deepEqual(
+    validateShot(made[0]).map((i) => i.path),
+    ['shot.scene'],
+    'a scene outside the catalogue is refused when the file is checked',
+  );
   assert.equal(made[0].shot.id, 'demo-one');
   assert.deepEqual(made[0].shot.settings, settings);
-  assert.throws(() => shotFilesFromScene({ ...info, shots: [{ name: 'two', seconds: 1, camera: [], about: 'x' }] }, { page, tracks: {} }), /No tracks for shot two/);
+  assert.throws(
+    () =>
+      shotFilesFromScene(
+        { ...info, shots: [{ name: 'two', seconds: 1, camera: [], about: 'x' }] },
+        { page, tracks: {} },
+      ),
+    /No tracks for shot two/,
+  );
 });
 
 test('--seconds keeps the authored length, so a settings key past the cut is checked against the whole shot (KB-SHOT-SECONDS-KEYS1)', async () => {
   const { checkShotFileSettings } = await import('../tools/shot/scene-settings.mjs');
   const json = JSON.parse(readFileSync(resolve(root, 'tools/shot/shots/timber-valley-ridge-smoke.json'), 'utf8')),
-    keys = Object.values(json.shot.settings).flatMap((rows) => Object.values(rows)).flatMap((row) => row?.keys ?? []);
-  assert.ok(keys.some((key) => key.time > 1.1), 'the shot keys a row past 1.1 s');
+    keys = Object.values(json.shot.settings)
+      .flatMap((rows) => Object.values(rows))
+      .flatMap((row) => row?.keys ?? []);
+  assert.ok(
+    keys.some((key) => key.time > 1.1),
+    'the shot keys a row past 1.1 s',
+  );
   const cut = parseShot(firstSeconds(json, 1.1)).shot;
   assert.equal(cut.seconds, 1.1);
   assert.equal(cut.fullSeconds, json.shot.seconds);
   assert.ok(await checkShotFileSettings(cut), 'the keys are checked against the authored length');
   // Cut without its authored length (the old --seconds), the same keys leave the shot.
-  await assert.rejects(() => checkShotFileSettings({ ...cut, fullSeconds: undefined }), { name: 'RangeError', message: /key times must be seconds inside the shot/ });
+  await assert.rejects(() => checkShotFileSettings({ ...cut, fullSeconds: undefined }), {
+    name: 'RangeError',
+    message: /key times must be seconds inside the shot/,
+  });
   assert.equal(firstSeconds(json, 99).shot.fullSeconds, undefined, 'a cut past the end changes nothing');
-  assert.deepEqual(validateShot({ ...json, shot: { ...json.shot, fullSeconds: 1 } }).map((i) => i.path), ['shot.fullSeconds']);
+  assert.deepEqual(
+    validateShot({ ...json, shot: { ...json.shot, fullSeconds: 1 } }).map((i) => i.path),
+    ['shot.fullSeconds'],
+  );
   assert.throws(() => firstSeconds(json, 0), /above 0/);
 });
 
@@ -450,8 +583,11 @@ test('an entry with several settings tables gives the one named after its packag
   assert.equal(tables.weather, WEATHER_SETTINGS, 'weather/settings exports five tables; WEATHER_SETTINGS is its own');
   const named = await loadShotTables(shot, { targets: { weather: '@margoengine/weather/settings#SNOW_SETTINGS' } });
   assert.equal(named.weather, SNOW_SETTINGS);
-  await assert.rejects(() => loadShotTables(shot, { targets: { weather: '@margoengine/weather/settings#NONE_SETTINGS' } }), {
-    name: 'TypeError',
-    message: /name one as @margoengine\/weather\/settings#NAME/,
-  });
+  await assert.rejects(
+    () => loadShotTables(shot, { targets: { weather: '@margoengine/weather/settings#NONE_SETTINGS' } }),
+    {
+      name: 'TypeError',
+      message: /name one as @margoengine\/weather\/settings#NAME/,
+    },
+  );
 });

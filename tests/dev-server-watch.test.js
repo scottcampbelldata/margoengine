@@ -20,7 +20,9 @@ test('a suite dev server watches no files, whatever the root Vite config says', 
   }
 });
 
-test('a page keeps its execution context when a module it loaded is rewritten on disk', { timeout: 5 * 60_000 }, async () => {
+test('a page keeps its execution context when a module it loaded is rewritten on disk', {
+  timeout: 5 * 60_000,
+}, async () => {
   // Not under test-results/, which Vite never watches: a package's dist is where a rebuild lands.
   const dir = `tests/.dev-server-watch-${process.pid}`;
   mkdirSync(dir, { recursive: true });
@@ -79,7 +81,12 @@ test('noFileWatcher turns the watcher off for a server built from a package Vite
 
 // KB-DEVWATCH-ALL1: the same watcher was in every suite and harness that called Vite's createServer itself.
 test('every Vite createServer call in the repository passes noFileWatcher()', () => {
-  const roots = ['scripts', 'tests', 'examples', ...readdirSync('packages').flatMap((p) => ['scripts', 'tests', 'test'].map((d) => join('packages', p, d)))],
+  const roots = [
+      'scripts',
+      'tests',
+      'examples',
+      ...readdirSync('packages').flatMap((p) => ['scripts', 'tests', 'test'].map((d) => join('packages', p, d))),
+    ],
     files = [],
     walk = (dir) => {
       if (!existsSync(dir)) return;
@@ -102,7 +109,8 @@ test('every Vite createServer call in the repository passes noFileWatcher()', ()
     for (const match of source.matchAll(call)) {
       calls++;
       const options = source.slice(match.index, source.indexOf('});', match.index));
-      if (!options.includes('noFileWatcher()')) missing.push(`${file}:${source.slice(0, match.index).split('\n').length}`);
+      if (!options.includes('noFileWatcher()'))
+        missing.push(`${file}:${source.slice(0, match.index).split('\n').length}`);
     }
   }
   assert.ok(calls > 40, `found ${calls} createServer calls; the scan lost its files`);

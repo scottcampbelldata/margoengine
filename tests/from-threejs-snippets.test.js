@@ -28,10 +28,7 @@ for (const file of guides)
           code: match[1],
           line: doc.slice(0, match.index).split('\n').length + 1,
         }));
-    assert.ok(
-      snippets.length >= 1,
-      `expected the guide's snippets, found ${snippets.length}`,
-    );
+    assert.ok(snippets.length >= 1, `expected the guide's snippets, found ${snippets.length}`);
     for (const { code, line } of snippets)
       for (const [, from] of code.matchAll(/from '([^']+)'/g))
         assert.match(

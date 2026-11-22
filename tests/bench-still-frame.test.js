@@ -14,5 +14,9 @@ test('the parity still frame waits an animation frame between its two renders', 
   const between = code.slice(first, second);
   assert.match(between, /await app\.idle\(\);/, 'the first still render finishes before the second');
   assert.match(between, /await raf\(\);/, 'the second still render is in the next animation frame');
-  assert.match(code.slice(second), /^app\.render\(0\);\s*await app\.idle\(\);\s*await raf\(\);/, 'the screenshot waits for it');
+  assert.match(
+    code.slice(second),
+    /^app\.render\(0\);\s*await app\.idle\(\);\s*await raf\(\);/,
+    'the screenshot waits for it',
+  );
 });

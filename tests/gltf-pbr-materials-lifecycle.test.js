@@ -10,9 +10,18 @@ test('material GPU suite preserves its check failure when browser teardown also 
   t.mock.module('../scripts/browser.js', {
     namedExports: {
       openBrowser: async () => ({
-        page: { on() {}, waitForSelector: async () => {}, evaluate: async () => { throw checkError; } },
+        page: {
+          on() {},
+          waitForSelector: async () => {},
+          evaluate: async () => {
+            throw checkError;
+          },
+        },
         hardware: {},
-        close: async () => { closes++; throw closeError; },
+        close: async () => {
+          closes++;
+          throw closeError;
+        },
       }),
     },
   });

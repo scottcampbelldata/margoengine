@@ -24,7 +24,8 @@ async function rig(curve, extra = {}) {
 const gap = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 function nearest(spline, point) {
   let best = Infinity;
-  for (let i = 0; i <= 4000; i++) best = Math.min(best, gap(Array.from(spline.atDistance((i / 4000) * spline.length)), point));
+  for (let i = 0; i <= 4000; i++)
+    best = Math.min(best, gap(Array.from(spline.atDistance((i / 4000) * spline.length)), point));
   return best;
 }
 const arc = (angle, radius = 0.5, count = 33) =>
@@ -36,7 +37,11 @@ const lengthsKept = (places, bone = BONE) =>
   places.slice(1).forEach((place, i) => assert.ok(Math.abs(gap(place, places[i]) - bone) < 1e-4, `bone ${i}`));
 
 test('a curve along the chain leaves the chain as it is', async (t) => {
-  const f = await rig([[0, 1, 0], [0, 1.6, 0], [0, 2.2, 0]]);
+  const f = await rig([
+    [0, 1, 0],
+    [0, 1.6, 0],
+    [0, 2.2, 0],
+  ]);
   t.after(() => f.release());
   f.step();
   JOINTS.forEach((name, i) => assert.ok(gap(f.world(name), [0, 1 + i * BONE, 0]) < 1e-5, name));
@@ -45,7 +50,13 @@ test('a curve along the chain leaves the chain as it is', async (t) => {
 });
 
 test('every joint lands on the curve and bones keep their lengths', async (t) => {
-  const points = [[0, 1, 0], [0.4, 1.3, 0.1], [0.3, 1.7, 0.4], [-0.1, 1.9, 0.3], [-0.5, 2.1, 0]],
+  const points = [
+      [0, 1, 0],
+      [0.4, 1.3, 0.1],
+      [0.3, 1.7, 0.4],
+      [-0.1, 1.9, 0.3],
+      [-0.5, 2.1, 0],
+    ],
     f = await rig(points),
     spline = new Spline(points);
   t.after(() => f.release());
@@ -55,7 +66,15 @@ test('every joint lands on the curve and bones keep their lengths', async (t) =>
 });
 
 test('a Spline of any kind is taken as it is', async (t) => {
-  const spline = new Spline([[0, 1, 0], [0.6, 1.2, 0], [0.6, 1.8, 0], [0, 2.2, 0]], { kind: 'bezier' }),
+  const spline = new Spline(
+      [
+        [0, 1, 0],
+        [0.6, 1.2, 0],
+        [0.6, 1.8, 0],
+        [0, 2.2, 0],
+      ],
+      { kind: 'bezier' },
+    ),
     f = await rig(spline);
   t.after(() => f.release());
   f.step();
@@ -81,11 +100,18 @@ test('a curl past half a turn does not flip the chain: every frame of a growing 
   assert.ok(worst < 0.2, `a bone's side axis jumped ${worst} in a frame`);
   const places = f.places();
   assert.ok(Math.abs(places[5][1] - places[0][1]) < 0.5);
-  for (const axis of last) assert.ok(Math.abs(axis[2]) < 1e-4 || Math.abs(axis[2]) > 0.999, 'the side axis stays in or across the curl');
+  for (const axis of last)
+    assert.ok(Math.abs(axis[2]) < 1e-4 || Math.abs(axis[2]) > 0.999, 'the side axis stays in or across the curl');
 });
 
 test('a hairpin: a joint takes the first place along the curve, though the curve comes back near it', async (t) => {
-  const points = [[0, 1, 0], [0, 1.6, 0], [0.05, 1.7, 0], [0.1, 1.6, 0], [0.1, 1, 0]],
+  const points = [
+      [0, 1, 0],
+      [0, 1.6, 0],
+      [0.05, 1.7, 0],
+      [0.1, 1.6, 0],
+      [0.1, 1, 0],
+    ],
     f = await rig(points),
     spline = new Spline(points);
   t.after(() => f.release());
@@ -96,7 +122,10 @@ test('a hairpin: a joint takes the first place along the curve, though the curve
 });
 
 test('past the end of the curve the chain carries on straight and says how far', async (t) => {
-  const f = await rig([[0, 1, 0], [0.5, 1, 0]]);
+  const f = await rig([
+    [0, 1, 0],
+    [0.5, 1, 0],
+  ]);
   t.after(() => f.release());
   f.step();
   const places = f.places();
@@ -106,7 +135,14 @@ test('past the end of the curve the chain carries on straight and says how far',
 });
 
 test("anchor 'root' keeps the first joint where it was and moves the curve to it", async (t) => {
-  const f = await rig([[3, 0, 0], [3.5, 0.2, 0], [4, 0, 0]], { anchor: 'root' });
+  const f = await rig(
+    [
+      [3, 0, 0],
+      [3.5, 0.2, 0],
+      [4, 0, 0],
+    ],
+    { anchor: 'root' },
+  );
   t.after(() => f.release());
   f.step();
   assert.ok(gap(f.world('B0'), [0, 1, 0]) < 1e-5);
@@ -115,7 +151,11 @@ test("anchor 'root' keeps the first joint where it was and moves the curve to it
 });
 
 test("anchor 'curve' moves the first joint to the curve, and offset slides the chain along it", async (t) => {
-  const points = [[1, 0, 0], [1, 1, 0], [1, 2, 0]],
+  const points = [
+      [1, 0, 0],
+      [1, 1, 0],
+      [1, 2, 0],
+    ],
     f = await rig(points, { offset: 0.5 });
   t.after(() => f.release());
   f.step();
@@ -127,7 +167,10 @@ test("anchor 'curve' moves the first joint to the curve, and offset slides the c
 });
 
 test('twist turns the chain about itself from the first joint to the last, leaving the places alone', async (t) => {
-  const straight = [[0, 1, 0], [0, 2.2, 0]],
+  const straight = [
+      [0, 1, 0],
+      [0, 2.2, 0],
+    ],
     f = await rig(straight, { twist: [0, 1] });
   t.after(() => f.release());
   f.step();
@@ -153,8 +196,15 @@ test('weight blends from the animated chain, and 0 is the animated chain', async
   lengthsKept(f.places());
 });
 
-test('a curve in a node\'s space travels with the node', async (t) => {
-  const f = await rig([[0, 0, 0], [0.5, 0.5, 0], [0.5, 1.2, 0]], {}),
+test("a curve in a node's space travels with the node", async (t) => {
+  const f = await rig(
+      [
+        [0, 0, 0],
+        [0.5, 0.5, 0],
+        [0.5, 1.2, 0],
+      ],
+      {},
+    ),
     space = f.node('Root');
   t.after(() => f.release());
   f.chain.space = space;
@@ -167,7 +217,11 @@ test('a curve in a node\'s space travels with the node', async (t) => {
 });
 
 test('a curve of points may be rewritten every frame', async (t) => {
-  const points = [[0, 1, 0], [0.5, 1.5, 0], [0.5, 2, 0]],
+  const points = [
+      [0, 1, 0],
+      [0.5, 1.5, 0],
+      [0.5, 2, 0],
+    ],
     f = await rig(points);
   t.after(() => f.release());
   f.step();
@@ -221,6 +275,12 @@ test('Fox.glb: the real tail lies along a curve while the real walk plays', asyn
     assert.ok(Math.abs(gap(places[1], places[0]) - lengths[0]) < 1e-3, `frame ${frame} bone 0`);
     assert.ok(Math.abs(gap(places[2], places[1]) - lengths[1]) < 1e-3, `frame ${frame} bone 1`);
     for (const place of places)
-      assert.ok(nearest(spline, place.map((v, c) => v - shift[c])) < 0.02, `frame ${frame}: ${place} is off the curve`);
+      assert.ok(
+        nearest(
+          spline,
+          place.map((v, c) => v - shift[c]),
+        ) < 0.02,
+        `frame ${frame}: ${place} is off the curve`,
+      );
   }
 });

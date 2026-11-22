@@ -14,10 +14,24 @@ test('shutdown tracing distinguishes concurrent waits and preserves their values
   const pending = Promise.withResolvers();
   const closing = traceShutdown('client close', () => pending.promise, report);
   const failure = new Error('server refused kill');
-  await assert.rejects(traceShutdown('server kill', () => { throw failure; }, report), error => error === failure);
-  assert.deepEqual(entries.map(({ name, outcome }) => [name, outcome]), [
-    ['client close', 'start'], ['server kill', 'start'], ['server kill', 'error: server refused kill'],
-  ]);
+  await assert.rejects(
+    traceShutdown(
+      'server kill',
+      () => {
+        throw failure;
+      },
+      report,
+    ),
+    (error) => error === failure,
+  );
+  assert.deepEqual(
+    entries.map(({ name, outcome }) => [name, outcome]),
+    [
+      ['client close', 'start'],
+      ['server kill', 'start'],
+      ['server kill', 'error: server refused kill'],
+    ],
+  );
   pending.resolve(42);
   assert.equal(await closing, 42);
   assert.equal(entries.at(-1).name, 'client close');
@@ -31,9 +45,22 @@ test('shutdown tracing distinguishes concurrent waits and preserves their values
 
 test('disabled shutdown tracing returns the original wait without changing its scheduling', () => {
   const wait = Promise.resolve(42);
-  assert.equal(traceShutdown('disabled', () => wait, null), wait);
+  assert.equal(
+    traceShutdown('disabled', () => wait, null),
+    wait,
+  );
   const failure = new Error('synchronous failure');
-  assert.throws(() => traceShutdown('disabled', () => { throw failure; }, null), error => error === failure);
+  assert.throws(
+    () =>
+      traceShutdown(
+        'disabled',
+        () => {
+          throw failure;
+        },
+        null,
+      ),
+    (error) => error === failure,
+  );
 });
 
 // A server that answers with headers and never ends the body (an event stream, an HMR socket): a non-idle connection.
@@ -188,7 +215,6 @@ test('watchExit never holds a suite that ends cleanly', async () => {
   assert.ok(ms < 5000, `took ${ms} ms`);
 });
 
-
 test('a native process waiter that cannot start or fails proves no process has exited', async () => {
   for (const error of [{ code: 'ENOENT' }, { code: 1 }, { killed: true }]) {
     const result = await waitSignaled([11, 12], 50, Date.now(), (_file, _args, options, callback) => {
@@ -197,9 +223,11 @@ test('a native process waiter that cannot start or fails proves no process has e
     });
     assert.deepEqual(result, [11, 12], 'an empty failed response must not mean all processes exited');
   }
-  assert.deepEqual(await waitSignaled([11, 12], 50, Date.now(), (_f, _a, _o, callback) => callback(null, '12\r\n')), [12]);
+  assert.deepEqual(
+    await waitSignaled([11, 12], 50, Date.now(), (_f, _a, _o, callback) => callback(null, '12\r\n')),
+    [12],
+  );
 });
-
 
 test('a native waiter reports an already absent process as successful completion', { timeout: 10000 }, async () => {
   if (process.platform !== 'win32') return;

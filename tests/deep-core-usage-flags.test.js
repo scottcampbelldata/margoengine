@@ -9,7 +9,16 @@ import { Camera } from '../packages/core/dist/camera.js';
 import { box } from '../packages/core/dist/geometry.js';
 
 // The values the WebGPU specification gives each flag (GPUBufferUsage, GPUTextureUsage, GPUMapMode).
-const Buffer = { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256 },
+const Buffer = {
+    MAP_READ: 1,
+    COPY_SRC: 4,
+    COPY_DST: 8,
+    INDEX: 16,
+    VERTEX: 32,
+    UNIFORM: 64,
+    STORAGE: 128,
+    INDIRECT: 256,
+  },
   Texture = { COPY_SRC: 1, RENDER_ATTACHMENT: 16 },
   MapMode = { READ: 1 };
 

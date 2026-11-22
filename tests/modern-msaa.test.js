@@ -323,7 +323,8 @@ test('a scene pass that stores for a later pass does not resolve as well', async
     graph.add({
       name: 'package',
       order: 1,
-      execute: (c) => c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] }).end(),
+      execute: (c) =>
+        c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] }).end(),
     });
     frame(graph);
     assert.equal(passes.length, 3);
