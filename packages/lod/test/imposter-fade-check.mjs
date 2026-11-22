@@ -31,8 +31,12 @@ try {
   assert.equal(r.toMesh.proxies, 1, 'outgoing imposter has a pick proxy');
   assert.ok(r.toNull.quarter.green > r.toNull.late.green);
   assert.deepEqual(r.toNull.end, { red: 0, green: 0, blue: 0 });
-  assert.ok(r.playback.leftGreen>500&&r.playback.rightBlue>500,'shared first images retain independent sequence playback');
-  assert.equal(r.playback.leftBlue,0);assert.equal(r.playback.rightGreen,0);
+  assert.ok(
+    r.playback.leftGreen > 500 && r.playback.rightBlue > 500,
+    'shared first images retain independent sequence playback',
+  );
+  assert.equal(r.playback.leftBlue, 0);
+  assert.equal(r.playback.rightGreen, 0);
 } finally {
   clearTimeout(timer);
   await c.close();

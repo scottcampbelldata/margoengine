@@ -38,8 +38,12 @@ const EMPTY = { normal: [128, 128, 255, 255], ao: [255, 255, 255, 255] } as cons
 export function bakeOptions(bake: boolean | AutoLODBake | undefined): AutoLODBake | undefined {
   if (bake === undefined || bake === false) return undefined;
   if (bake === true) return {};
-  if (typeof bake !== 'object' || bake === null) throw new TypeError('autoLOD bake must be true, false or an options object');
-  if (bake.maps !== undefined && (!Array.isArray(bake.maps) || !bake.maps.length || bake.maps.some((m) => m !== 'normal' && m !== 'ao')))
+  if (typeof bake !== 'object' || bake === null)
+    throw new TypeError('autoLOD bake must be true, false or an options object');
+  if (
+    bake.maps !== undefined &&
+    (!Array.isArray(bake.maps) || !bake.maps.length || bake.maps.some((m) => m !== 'normal' && m !== 'ao'))
+  )
     throw new TypeError("autoLOD bake maps must list 'normal', 'ao' or both; choose from those");
   return bake;
 }

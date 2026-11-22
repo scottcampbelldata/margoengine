@@ -20,9 +20,15 @@ try {
   const r = await page.evaluate(() => window.check.run());
   console.log(JSON.stringify(r));
   assert.deepEqual(r.errors, []);
-  for (const [name, model] of [['Fox', r.fox], ['MorphStressTest', r.morph]]) {
+  for (const [name, model] of [
+    ['Fox', r.fox],
+    ['MorphStressTest', r.morph],
+  ]) {
     const [a, b] = model.levels;
-    assert.ok(a.triangles < model.before * 0.65 && b.triangles < a.triangles, `${name} levels shrink: ${a.triangles}, ${b.triangles}`);
+    assert.ok(
+      a.triangles < model.before * 0.65 && b.triangles < a.triangles,
+      `${name} levels shrink: ${a.triangles}, ${b.triangles}`,
+    );
     for (const level of model.levels) {
       assert.ok(level.followers > 0, `${name}: the level deforms`);
       assert.equal(level.mapped, level.vertices, `${name}: every vertex of a level is one of the source's`);
