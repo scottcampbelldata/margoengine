@@ -5,6 +5,7 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { SRGBToLinear } from '@margoengine/math/color';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Figure } from './figure.js';
+import { inSceneOf } from './scene-owner.js';
 import { extent, rangeOption, resolveColormap, toScene, type Bounds, type ColormapSource } from './layer.js';
 import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import { prepareGeoVectors, type GeoVectorGeometry, type GeoVectorPrepareOptions } from './geo-vector-data.js';
@@ -224,10 +225,12 @@ export class GeoVectorLayer implements Drawable {
       ]);
       options.signal?.throwIfAborted();
       if (this.#disposed) throw fault('disposed', 'Vector layer disposed while loading labels', 'sciviz');
-      this.#labels = LabelRenderer.attach(this.#figure.engine, {
-        name: `sciviz-geo-vector:${serial++}`,
-        layout: options.declutter === false ? undefined : new Declutter(),
-      });
+      this.#labels = inSceneOf(this.#figure.engine, this.#figure.renderer, () =>
+        LabelRenderer.attach(this.#figure.engine, {
+          name: `sciviz-geo-vector:${serial++}`,
+          layout: options.declutter === false ? undefined : new Declutter(),
+        }),
+      );
       for (const anchor of this.geometry.labels) {
         const feature = this.geometry.source.features[anchor.feature];
         const text =

@@ -3233,7 +3233,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21, machinery too; kit-react, kit-viz and kit-web are excluded as re-export bundles; voxel-edit, voxel-pathtracer and voxel-net gained fixtures the same day). Core, math, splines, kinematics-constraints, brep and the physics
+  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21, machinery too; kit-react, kit-viz and kit-web are excluded as re-export bundles; voxel-edit, voxel-pathtracer, voxel-net and sciviz gained fixtures the same day; the sciviz one covers the layer families listed under owners-b11 in docs/architecture/operational-playbook.md, not every layer). Core, math, splines, kinematics-constraints, brep and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`; the pure ones are
   read by `tests/owner-exclusions.test.js`, which fails when one gains anything with a lifetime.
 - inspector, scene, compute and netcode (2026-11-21) have fixtures although none is a plain engine plugin: each entry's object hangs
@@ -11525,6 +11525,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** the foam used the time at which the bow passed each point. The newest churning water was treated as roughly 24 seconds old. Stationary samples in a path also fell back to a due-north heading and could put a false turn in the wake near the berth.
 - **Fix:** sample the position and time of the stern as it passed. Keep the bow trajectory for the Kelvin and bow wave systems. Carry the last moving heading through stationary history samples.
 - **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check fresh and aging foam and reject points outside the trail. The CPU test also checks that an eastbound ship leaves no diagonal wake at its starting berth.
+
+### Fixed 2026-11-21: a Figure in a scene of its own put its lines, points, label and depth plugins in the engine's scene (KB-SCIVIZ-SCENE1, sciviz)
+- **Repro:** make a scene with `engine.createScene()`, add `Figure.attach(engine)` to it from a plugin's `setup`, add a line or scatter layer and wait for `figure.ready()`: `engine.sceneOf(figure.renderer)` was the new scene, but the lines plugin, the points plugin, the axes' label renderer (and, for a volume, the depth capture) were in the engine's own scene, so disposing the scene left them behind. The new owner fixture `packages/sciviz/tests/owner-lifetime.fixture.js` failed "async factory retains its originating scene" and "releases its registration".
+- **Cause:** those plugins are made after a dynamic `import()` has settled, when the engine's active scene is the default one again, and `Lines.attach(engine)` joins the active scene. `SciRenderer.dispose` also removed itself from the active scene instead of the scene it joined, so a figure disposed from outside its scene stayed registered there.
+- **Fix:** `packages/sciviz/src/scene-owner.ts` `inSceneOf(engine, owner, make)` runs the attach with the owner's scene active; the figure, its axes, point clouds, geo-vector labels and the progressive controller use it, the depth capture is one per scene, and the renderer leaves the scene `engine.sceneOf(this)` names.
+- **Regression:** `packages/sciviz/tests/scene-owner.test.js` (the scene a made plugin joins, the capture per scene); `npm run check:owners -- --packages=sciviz` on the CPU model, WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: disposing a Figure left its lines and points plugins, and an engine that removed its renderer left the figure running (KB-SCIVIZ-PLUGINS1, sciviz)
+- **Repro:** `const figure = Figure.attach(engine); await figure.line(...); figure.dispose();`: the lines plugin stayed registered on the engine (and the points plugin after a scatter, the depth capture after the last volume). A 2D figure whose renderer the engine or scene removed (`engine.removePlugin(figure.renderer.name)`, `scene.dispose()`) kept `engine.views` and the camera's `project` hook, because only `Figure.dispose` undid them.
+- **Cause:** `Figure.dispose` freed its layers, axes and panels but never the plugins it had added, and nothing tied the figure to its renderer's removal.
+- **Fix:** the figure keeps the lines and points plugins it makes and removes them when it is disposed (one that finishes loading afterwards goes at once); an idle depth capture leaves its scene (`VolumeDepthCapture.release`); the figure registers a hidden drawable on its renderer, whose disposal disposes the figure.
+- **Regression:** `packages/sciviz/tests/scene-owner.test.js` (`release` of an idle capture); the owner fixture's `Figure.2d` and 3D entries in every disposal mode.
+
+### Fixed 2026-11-21: a Figure disposed while its axes were loading ended in an unhandled "Engine disposed" rejection (KB-SCIVIZ-AXESDISPOSE1, sciviz)
+- **Repro:** add a graph layer (its bounds queue an axes update), then dispose the engine before the axes' dynamic imports finish: the queued update rejected with `MargoError disposed` from `Lines.attach`, which nothing awaited, and Node ended the process.
+- **Cause:** `Axes.update` awaited the plugin loads and rethrew whatever they threw, also after the axes had been disposed.
+- **Fix:** an update whose axes were disposed while the plugins loaded draws nothing and does not reject.
+- **Regression:** the owner fixture's `graphLayer` entry (the `cycles` case failed the run); `packages/sciviz/tests/axes-dispose.test.js` still passes.
 
 ### Fixed 2026-11-21: connectVoxelNet left its listeners on a socket that had closed (KB-VOXELNET-WSLISTENERS1, voxel-net)
 - **Repro:** `const client = connectVoxelNet(url, world); client.close();` and wait for `onClose`: the closed WebSocket still held its `open`, `message` and `close` listeners, and each of them kept the client, the world and the resume loop reachable from the socket. The new owner fixture `packages/voxel-net/tests/owner-lifetime.fixture.js` (`connectVoxelNet`, `VoxelShardClient`) failed with "no leaked event listeners (3: open on WebSocket, message on WebSocket, close on WebSocket)" in every case.

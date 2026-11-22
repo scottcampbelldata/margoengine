@@ -9081,6 +9081,16 @@ connection the caller owns, and the Bun and Deno hosts need those runtimes, so t
 KB-VOXELNET-WSLISTENERS1: connectVoxelNet never removed its listeners from a closed socket (fixed in packages/voxel-net/src/client.ts,
 regression in packages/voxel-net/tests/on-close.test.js).
 
+Batch owners-b11 also gated sciviz (2026-11-21): a Figure on 3D and 2D charts with every layer family that holds engine resources
+(scatter, line, quiver, streamlines, bar, histogram, heatmap, timeline, colour bar, surface, volume with its quality and cinematic variants, density,
+isosurface, multi-volume, mesh, graph, AMR, glyph).
+The readers and writers, the data maths and the network readers hold no engine resource of their own and are not entries; progressive
+rendering brackets a frame with a begin and a present pass that swap `context.view`, which the harness's per-pass view check cannot
+express (its own tests cover it). The fixture found KB-SCIVIZ-SCENE1, KB-SCIVIZ-PLUGINS1 and KB-SCIVIZ-AXESDISPOSE1 (a Figure's plugins
+went to the wrong scene and were never removed, and a disposal during axes loading ended in an unhandled rejection), fixed in
+packages/sciviz/src with packages/sciviz/tests/scene-owner.test.js. More sciviz layers (molecule, tetrahedral and curvilinear volumes,
+flow particles, LIC, tiles, point clouds, parallel coordinates) remain to be added to the fixture.
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,

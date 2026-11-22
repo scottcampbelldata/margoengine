@@ -108,7 +108,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21, machinery too; kit-react, kit-viz and kit-web are excluded as re-export bundles; voxel-edit, voxel-pathtracer and voxel-net gained fixtures the same day). Core, math, splines, kinematics-constraints, brep and the physics
+  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21, machinery too; kit-react, kit-viz and kit-web are excluded as re-export bundles; voxel-edit, voxel-pathtracer, voxel-net and sciviz gained fixtures the same day; the sciviz one covers the layer families listed under owners-b11 in docs/architecture/operational-playbook.md, not every layer). Core, math, splines, kinematics-constraints, brep and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`; the pure ones are
   read by `tests/owner-exclusions.test.js`, which fails when one gains anything with a lifetime.
 - inspector, scene, compute and netcode (2026-11-21) have fixtures although none is a plain engine plugin: each entry's object hangs
