@@ -58,7 +58,10 @@ window.drawRealFile = async () => {
   const { copy, pixels } = snapshot();
   let changed = 0;
   for (let i = 0; i < pixels.length; i += 4)
-    if (Math.abs(pixels[i] - empty[i]) + Math.abs(pixels[i + 1] - empty[i + 1]) + Math.abs(pixels[i + 2] - empty[i + 2]) > 30)
+    if (
+      Math.abs(pixels[i] - empty[i]) + Math.abs(pixels[i + 1] - empty[i + 1]) + Math.abs(pixels[i + 2] - empty[i + 2]) >
+      30
+    )
       changed++;
   const png = copy.toDataURL('image/png');
   release();

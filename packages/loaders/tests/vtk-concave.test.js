@@ -19,11 +19,13 @@ const signedAreas = ({ positions: p, indices }) => {
 const covers = (mesh, label) => {
   const areas = signedAreas(mesh);
   assert.equal(areas.length, 3, label);
-  assert.ok(areas.every((a) => a > 0), `${label}: every triangle keeps the polygon's turn: ${areas}`);
+  assert.ok(
+    areas.every((a) => a > 0),
+    `${label}: every triangle keeps the polygon's turn: ${areas}`,
+  );
   assert.ok(Math.abs(areas.reduce((s, a) => s + a, 0) - 10) < 1e-9, `${label}: the triangles cover it exactly`);
 };
-const legacy = (cells) =>
-  text(`# vtk DataFile Version 3.0\nconcave\nASCII\nDATASET ${cells}`);
+const legacy = (cells) => text(`# vtk DataFile Version 3.0\nconcave\nASCII\nDATASET ${cells}`);
 
 test('regression: a concave POLYGONS cell is ear-clipped by parseVTK and parseVTKLegacy', () => {
   const file = legacy(`POLYDATA\nPOINTS 5 float\n${POINTS}\nPOLYGONS 1 6\n5 0 1 2 3 4\n`);

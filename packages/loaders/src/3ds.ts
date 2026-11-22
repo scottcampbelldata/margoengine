@@ -82,7 +82,9 @@ export interface ThreeDSNode {
   parent: number;
   /** The pivot, in the object's coordinates. */
   pivot: [number, number, number];
-  tracks: { [K in 'position' | 'rotation' | 'scale' | 'fov' | 'roll' | 'color' | 'hotspot' | 'falloff']?: ThreeDSTrack };
+  tracks: {
+    [K in 'position' | 'rotation' | 'scale' | 'fov' | 'roll' | 'color' | 'hotspot' | 'falloff']?: ThreeDSTrack;
+  };
 }
 
 /** The keyframer's data of a {@link ThreeDSResult}. */
@@ -446,7 +448,13 @@ export function parse3DS(input: BinaryInput, options: ThreeDSOptions = {}): Thre
   walk(6, length, 0);
 
   // Materials can follow the meshes that use them, so the groups are built last.
-  const emit = (name: string, base: number, faces: Uint32Array, members: Iterable<number>, materialName?: string): void => {
+  const emit = (
+    name: string,
+    base: number,
+    faces: Uint32Array,
+    members: Iterable<number>,
+    materialName?: string,
+  ): void => {
     const start = indices.length;
     for (const face of members) {
       if (indices.length / 3 >= maxTriangles)
@@ -484,7 +492,7 @@ export function parse3DS(input: BinaryInput, options: ThreeDSOptions = {}): Thre
   if (ambient) result.ambient = ambient;
   if (keyframer) result.keyframes = keyframer;
   if (textured) {
-    while (uvs.length < result.positions.length / 3 * 2) uvs.push(0);
+    while (uvs.length < (result.positions.length / 3) * 2) uvs.push(0);
     result.uvs = uvs.result();
   }
   return result;

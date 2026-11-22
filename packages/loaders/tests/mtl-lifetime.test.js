@@ -61,7 +61,8 @@ mock.module('@margoengine/materials', {
 });
 const { loadOBJ } = await import('../dist/mtl.js');
 const files = {
-  '/models/quad.obj': 'mtllib quad.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nusemtl Painted\nf 1/1 2/2 3/3\n',
+  '/models/quad.obj':
+    'mtllib quad.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nusemtl Painted\nf 1/1 2/2 3/3\n',
   '/models/quad.mtl': 'newmtl Painted\nKd 0.8 0.6 0.4\nmap_Kd paint.png\n',
 };
 const fetch = async (input) => new Response(files[new URL(String(input)).pathname]);
@@ -82,17 +83,35 @@ for (const [how, remove] of [
     try {
       const scene = engine.createScene('b');
       let started;
-      scene.use({ name: 'loader', setup: () => (started = loadOBJ(engine, 'https://assets.example/models/quad.obj', { fetch, loadTexture })) });
+      scene.use({
+        name: 'loader',
+        setup: () => (started = loadOBJ(engine, 'https://assets.example/models/quad.obj', { fetch, loadTexture })),
+      });
       scene.removePlugin('loader');
       const loaded = await started;
       assert.equal(made.length, 2, 'one MTL material and the fallback');
       assert.equal(textures.length, 1);
       remove(engine, loaded);
-      assert.deepEqual(made.map((m) => m.disposed), [1, 1], 'the materials loadOBJ made are disposed');
-      assert.deepEqual(textures.map((t) => t.disposed), [1], 'the texture loadOBJ loaded is disposed');
+      assert.deepEqual(
+        made.map((m) => m.disposed),
+        [1, 1],
+        'the materials loadOBJ made are disposed',
+      );
+      assert.deepEqual(
+        textures.map((t) => t.disposed),
+        [1],
+        'the texture loadOBJ loaded is disposed',
+      );
       loaded.dispose();
-      assert.deepEqual(made.map((m) => m.disposed), [1, 1], 'a later dispose() releases nothing twice');
-      assert.deepEqual(textures.map((t) => t.disposed), [1]);
+      assert.deepEqual(
+        made.map((m) => m.disposed),
+        [1, 1],
+        'a later dispose() releases nothing twice',
+      );
+      assert.deepEqual(
+        textures.map((t) => t.disposed),
+        [1],
+      );
     } finally {
       engine.dispose();
     }

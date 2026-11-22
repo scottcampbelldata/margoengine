@@ -293,13 +293,33 @@ function read(
       if (table) free(table);
       return complete;
     };
-    if (list(mesh.normals?.(), ([x, y, z]) => normals.push3(x, y, z), () => normals.push3(0, 0, 0))) hasNormals = true;
+    if (
+      list(
+        mesh.normals?.(),
+        ([x, y, z]) => normals.push3(x, y, z),
+        () => normals.push3(0, 0, 0),
+      )
+    )
+      hasNormals = true;
     const uv = (u: number, v: number): void => {
       uvs.push(u);
       uvs.push(v);
     };
-    if (list(mesh.textureCoordinates?.(), ([u, v]) => uv(u, 1 - v), () => uv(0, 0))) hasUVs = true;
-    if (list(mesh.vertexColors?.(), (c) => colors.push3(c.r / 255, c.g / 255, c.b / 255), () => colors.push3(1, 1, 1)))
+    if (
+      list(
+        mesh.textureCoordinates?.(),
+        ([u, v]) => uv(u, 1 - v),
+        () => uv(0, 0),
+      )
+    )
+      hasUVs = true;
+    if (
+      list(
+        mesh.vertexColors?.(),
+        (c) => colors.push3(c.r / 255, c.g / 255, c.b / 255),
+        () => colors.push3(1, 1, 1),
+      )
+    )
       hasColors = true;
   };
 
@@ -319,7 +339,12 @@ function read(
         return { countU, countV, points, weights };
       }),
       base = positions.length / 3,
-      { positions: at, normals: facing, uvs: coordinates, indices: order } = tessellateNurbsSurface(
+      {
+        positions: at,
+        normals: facing,
+        uvs: coordinates,
+        indices: order,
+      } = tessellateNurbsSurface(
         {
           degreeU: surface.degree(0),
           degreeV: surface.degree(1),
@@ -379,7 +404,8 @@ function read(
       // draws from its surface, so nothing shows past a trim.
       if (!any && geometry.isSurface && faces.count === 1)
         using(faces.get(0), (face) => {
-          const nurbs = face.underlyingSurface && using(face.underlyingSurface(), (surface) => surface.toNurbsSurface());
+          const nurbs =
+            face.underlyingSurface && using(face.underlyingSurface(), (surface) => surface.toNurbsSurface());
           if (!nurbs) return;
           using(nurbs, (surface) => addSurface(surface, face.orientationIsReversed === true));
           any = true;
@@ -409,7 +435,8 @@ function read(
           if (layer !== undefined) group.layer = layer;
           if (attributes.materialIndex !== undefined) group.material = attributes.materialIndex;
           const drawn = attributes.drawColor?.(document) ?? onLayer?.color;
-          if (drawn) group.color = Array.isArray(drawn) ? [...drawn] as ThreeDMGroup['color'] : unit(drawn as RhinoColor);
+          if (drawn)
+            group.color = Array.isArray(drawn) ? ([...drawn] as ThreeDMGroup['color']) : unit(drawn as RhinoColor);
           groups.push(group);
         }),
       );

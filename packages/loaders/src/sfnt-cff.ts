@@ -208,9 +208,13 @@ export class CFFOutlines {
       else if (format === 3 || format === 4) {
         const wide = format === 4,
           n = wide ? r.u32() : r.u16();
-        const ranges = Array.from({ length: n }, () => ({ first: wide ? r.u32() : r.u16(), fd: wide ? r.u16() : r.u8() }));
+        const ranges = Array.from({ length: n }, () => ({
+          first: wide ? r.u32() : r.u16(),
+          fd: wide ? r.u16() : r.u8(),
+        }));
         const sentinel = wide ? r.u32() : r.u16();
-        if (!n || ranges[0].first !== 0 || sentinel !== this.glyphCount) fontError('the CFF2 FDSelect range is invalid');
+        if (!n || ranges[0].first !== 0 || sentinel !== this.glyphCount)
+          fontError('the CFF2 FDSelect range is invalid');
         for (let i = 0; i < n; i++) {
           const end = i + 1 < n ? ranges[i + 1].first : sentinel;
           if (end <= ranges[i].first || end > this.glyphCount) fontError('the CFF2 FDSelect ranges are out of order');
@@ -317,11 +321,13 @@ export class CFFOutlines {
       const b = r.u8();
       if (cff2 && b === 23) {
         const n = stack.pop()!;
-        const weights = this.store?.weights(Number(dict.get(22) ?? 0)) ?? fontError('a CFF2 DICT blends with no variation store');
+        const weights =
+          this.store?.weights(Number(dict.get(22) ?? 0)) ?? fontError('a CFF2 DICT blends with no variation store');
         const start = stack.length - n * (weights.length + 1);
         if (!Number.isInteger(n) || n < 1 || start < 0) fontError('a CFF2 DICT blend operand count is invalid');
         for (let i = 0; i < n; i++)
-          for (let j = 0; j < weights.length; j++) stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
+          for (let j = 0; j < weights.length; j++)
+            stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
         stack.length = start + n;
       } else if (b <= (cff2 ? 25 : 21)) {
         const op = b === 12 ? 0x0c00 + r.u8() : b;
@@ -443,7 +449,8 @@ export class CFFOutlines {
           const start = stack.length - n * (weights.length + 1);
           if (!Number.isInteger(n) || n < 1 || start < 0) fontError('a CFF2 blend operand count is invalid');
           for (let i = 0; i < n; i++)
-            for (let j = 0; j < weights.length; j++) stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
+            for (let j = 0; j < weights.length; j++)
+              stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
           stack.length = start + n;
         } else if (b === 10 || b === 29) {
           const subrs = (b === 10 ? (fontDict ? fontDict.subrs : this.localSubrs) : this.globalSubrs) ?? [];
@@ -489,7 +496,9 @@ export class CFFOutlines {
             out.push(...first);
             for (const cmd of second)
               out.push(
-                cmd[0] === 'Z' ? cmd : (cmd.map((v, i) => (i === 0 ? v : (v as number) + (i % 2 ? dx : dy))) as OutlineCommand),
+                cmd[0] === 'Z'
+                  ? cmd
+                  : (cmd.map((v, i) => (i === 0 ? v : (v as number) + (i % 2 ? dx : dy))) as OutlineCommand),
               );
           } else if (stack.length) fontError('a Type 2 endchar has the wrong operand count');
           close();
@@ -556,7 +565,8 @@ export class CFFOutlines {
             }
           } else if (op === 20 || op === 21) {
             const i = pop();
-            if (!Number.isInteger(i) || i < 0 || i >= 32) fontError('a Type 2 transient array index is outside 0 to 31');
+            if (!Number.isInteger(i) || i < 0 || i >= 32)
+              fontError('a Type 2 transient array index is outside 0 to 31');
             if (op === 20) transient[i] = pop();
             else stack.push(transient[i]);
           } else if (op === 22) {
@@ -603,7 +613,8 @@ export class CFFOutlines {
             for (let i = 0; i < n; i += 2) line(v[i], v[i + 1]);
           } else if (b === 6 || b === 7) {
             valid(n >= 1);
-            for (let i = 0; i < n; i++) line((i % 2 === 0) === (b === 6) ? v[i] : 0, (i % 2 === 0) === (b === 7) ? v[i] : 0);
+            for (let i = 0; i < n; i++)
+              line((i % 2 === 0) === (b === 6) ? v[i] : 0, (i % 2 === 0) === (b === 7) ? v[i] : 0);
           } else if (b === 8) {
             valid(n >= 6 && n % 6 === 0);
             for (let i = 0; i < n; i += 6) curve(...(v.slice(i, i + 6) as Six));
@@ -638,7 +649,12 @@ export class CFFOutlines {
             }
           } else fontError(`Type 2 operator ${b} is unknown`, 'unsupported');
         }
-        if (stack.length > (cff2 ? 513 : 48) || stack.some((v) => !Number.isFinite(v)) || !Number.isFinite(x) || !Number.isFinite(y))
+        if (
+          stack.length > (cff2 ? 513 : 48) ||
+          stack.some((v) => !Number.isFinite(v)) ||
+          !Number.isFinite(x) ||
+          !Number.isFinite(y)
+        )
           fontError(`a Type 2 operand is not finite, or the stack exceeds ${cff2 ? 513 : 48}`);
       }
       if (cff2) {

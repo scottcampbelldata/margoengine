@@ -11,7 +11,18 @@ const codes = [...union.matchAll(/'(\w+)'/g)].map((m) => m[1]);
 const page = readFileSync(new URL('../../../site/errors.html', import.meta.url), 'utf8');
 
 test('the source lists every loader error code', () => {
-  assert.deepEqual(codes.toSorted(), ['aborted', 'fetch', 'header', 'limit', 'range', 'syntax', 'truncated', 'unsupported', 'url', 'zip']);
+  assert.deepEqual(codes.toSorted(), [
+    'aborted',
+    'fetch',
+    'header',
+    'limit',
+    'range',
+    'syntax',
+    'truncated',
+    'unsupported',
+    'url',
+    'zip',
+  ]);
 });
 
 for (const code of codes) {
@@ -25,6 +36,9 @@ for (const code of codes) {
     const anchor = error.message.match(/errors#([a-z-]+)$/)[1];
     assert.ok(page.includes(`<section id="${anchor}">`), `site/errors.html has no #${anchor}`);
     const entry = entries.find((e) => e.id === anchor);
-    assert.ok(entry && entry.cause.length > 40 && entry.fix.length > 40, `entry ${anchor} explains the cause and the fix`);
+    assert.ok(
+      entry && entry.cause.length > 40 && entry.fix.length > 40,
+      `entry ${anchor} explains the cause and the fix`,
+    );
   });
 }

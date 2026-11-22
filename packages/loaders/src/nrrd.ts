@@ -292,7 +292,10 @@ function float(word: string): number {
 
 /** A per-axis list of doubles; infinite entries are refused (spacings, axis mins and axis maxs never hold one). */
 function doubles(value: string, name: string, dimension: number): number[] {
-  const parts = value.trim().split(/[ \t]+/).map(float);
+  const parts = value
+    .trim()
+    .split(/[ \t]+/)
+    .map(float);
   if (parts.length !== dimension)
     throw new LoaderError(F, 'syntax', `${name} has ${parts.length} entries for ${dimension} axes`);
   if (parts.some((part) => part === Infinity || part === -Infinity))
@@ -546,7 +549,8 @@ async function gunzip(body: Uint8Array, size: number, signal?: AbortSignal): Pro
       p++;
     }
     if (flags & 2) {
-      if ((crc32(body.subarray(at, p)) & 0xffff) !== (body[p] | (body[p + 1] << 8))) throw corrupt('the header fails its CRC-16');
+      if ((crc32(body.subarray(at, p)) & 0xffff) !== (body[p] | (body[p + 1] << 8)))
+        throw corrupt('the header fails its CRC-16');
       p += 2;
     }
     if (p >= body.length) throw corrupt('the stream ends early');
@@ -656,7 +660,10 @@ function layout(
     if (directions.length !== dimension)
       throw new LoaderError(F, 'syntax', `space directions has ${directions.length} entries for ${dimension} axes`);
   }
-  const kinds = fields.kinds?.trim().toLowerCase().split(/[ \t]+/);
+  const kinds = fields.kinds
+    ?.trim()
+    .toLowerCase()
+    .split(/[ \t]+/);
   if (kinds && kinds.length !== dimension)
     throw new LoaderError(F, 'syntax', `kinds has ${kinds.length} entries for ${dimension} axes`);
   kinds?.forEach((kind, axis) => {
@@ -759,7 +766,8 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
     { fields, known, meta } = header;
   const missing = ['type', 'dimension', 'sizes', 'encoding'].find((name) => !(name in known));
   if (missing) throw new LoaderError(F, 'header', `the required field "${missing}" is missing`);
-  if (fields.type.toLowerCase() === 'block') throw new LoaderError(F, 'unsupported', 'the block type has no array form');
+  if (fields.type.toLowerCase() === 'block')
+    throw new LoaderError(F, 'unsupported', 'the block type has no array form');
   const type = TYPES[fields.type.toLowerCase()];
   if (!type) throw new LoaderError(F, 'header', `unknown type "${fields.type.slice(0, 32)}"`);
   const named = fields.encoding.toLowerCase();

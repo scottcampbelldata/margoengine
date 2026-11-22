@@ -56,7 +56,12 @@ const find = (element: XMLElement, name: string): XMLElement | undefined => {
   }
   return undefined;
 };
-const all = (element: XMLElement, name: string, out: [XMLElement, XMLElement | undefined][], owner?: XMLElement): void => {
+const all = (
+  element: XMLElement,
+  name: string,
+  out: [XMLElement, XMLElement | undefined][],
+  owner?: XMLElement,
+): void => {
   for (const child of element.children) {
     if (child.name === name) out.push([child, owner]);
     all(child, name, out, child.name === 'Placemark' ? child : owner);
@@ -135,16 +140,7 @@ function placed(model: KMZModel, origin: { longitude: number; latitude: number; 
     rotation = times(curve, times(turn, times(pitch, lean))),
     // KML's y scale is the scene's z, and its z the scene's y.
     scaled = [sx, sz, sy].map((size, i) => rotation[i].map((value) => value * size));
-  return [
-    ...scaled[0],
-    0,
-    ...scaled[1],
-    0,
-    ...scaled[2],
-    0,
-    ...base.axes.map((axis) => dot(axis, offset)),
-    1,
-  ];
+  return [...scaled[0], 0, ...scaled[1], 0, ...scaled[2], 0, ...base.axes.map((axis) => dot(axis, offset)), 1];
 }
 
 /**
@@ -179,7 +175,12 @@ export async function parseKMZ(input: BinaryInput, options: KMZOptions = {}): Pr
     byPath = new Map<string, ZipEntry>();
   for (const entry of entries) byPath.set(entry.name.replaceAll('\\', '/').toLowerCase(), entry);
   const read = async (path: string): Promise<Uint8Array> => {
-    const entry = byPath.get(path.replaceAll('\\', '/').replace(/^\.?\/+/, '').toLowerCase());
+    const entry = byPath.get(
+      path
+        .replaceAll('\\', '/')
+        .replace(/^\.?\/+/, '')
+        .toLowerCase(),
+    );
     if (!entry) throw new LoaderError(F, 'syntax', `"${path.slice(0, 128)}" is not in the archive`);
     return readZipEntry(bytes, entry, options);
   };
@@ -192,8 +193,8 @@ export async function parseKMZ(input: BinaryInput, options: KMZOptions = {}): Pr
   const models: KMZModel[] = [];
   if (document) {
     const tree = readXMLTree(decodeXML(await readZipEntry(bytes, document, options)), F, {
-      external: options.external,
-    }),
+        external: options.external,
+      }),
       found: [XMLElement, XMLElement | undefined][] = [];
     all(tree, 'Model', found);
     for (const [model, placemark] of found) {

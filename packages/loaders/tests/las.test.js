@@ -99,7 +99,17 @@ function las({
   return out;
 }
 
-const POINT = { x: 150, y: -250, z: 300, intensity: 700, returnNumber: 2, returnCount: 3, classification: 6, gps: 12.5, rgb: [65535, 0, 32768] };
+const POINT = {
+  x: 150,
+  y: -250,
+  z: 300,
+  intensity: 700,
+  returnNumber: 2,
+  returnCount: 3,
+  classification: 6,
+  gps: 12.5,
+  rgb: [65535, 0, 32768],
+};
 
 test('every point format gives positions, returns and classification; each extra field where it exists', async () => {
   for (let format = 0; format <= 10; format++) {
@@ -124,7 +134,9 @@ test('extra bytes per point move the stride, not the fields', async () => {
 
 test('survey coordinates keep their centimetres, with offset or without, relative to origin', async () => {
   const far = { x: 12345, y: 0, z: 0 };
-  const withOffset = await parseLAS(las({ points: [far], offset: [500000, 4000000, 100], min: [500000, 4000000, 100] }));
+  const withOffset = await parseLAS(
+    las({ points: [far], offset: [500000, 4000000, 100], min: [500000, 4000000, 100] }),
+  );
   assert.deepEqual(withOffset.origin, [500000, 4000000, 100]);
   assert.ok(Math.abs(withOffset.positions[0] - 123.45) < 1e-4);
   const noOffset = await parseLAS(las({ points: [{ x: 50012345, y: 0, z: 0 }], min: [500000, 0, 0] }));
@@ -141,7 +153,9 @@ test('colours scale from 16 bits, or from 8 when a file fills only the low byte'
 });
 
 test('the header reads, including the writer and a 64-bit point count', async () => {
-  const cloud = await parseLAS(las({ minor: 4, format: 6, points: [POINT, POINT], min: [1, 2, 3], scale: [0.1, 0.2, 0.5] }));
+  const cloud = await parseLAS(
+    las({ minor: 4, format: 6, points: [POINT, POINT], min: [1, 2, 3], scale: [0.1, 0.2, 0.5] }),
+  );
   assert.deepEqual(cloud.header.version, [1, 4]);
   assert.equal(cloud.header.pointCount, 2);
   assert.equal(cloud.header.generator, 'margo test');
@@ -185,7 +199,10 @@ const expected = JSON.parse(readFileSync(new URL('laz/records.json', fixtures)))
 const USGS = 'USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz';
 const real = (name) => new Uint8Array(readFileSync(new URL(name === USGS ? name : `laz/${name}`, fixtures)));
 const digest = (a) =>
-  createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex').slice(0, 32);
+  createHash('sha256')
+    .update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength))
+    .digest('hex')
+    .slice(0, 32);
 
 /** The fields of a cloud under the names of records.json. */
 function fieldsOf(cloud) {
@@ -287,7 +304,13 @@ test('a real waveform file gives its packets, descriptor and sample reader', asy
 test('a decompress option replaces the built-in decoder, and LASzip 1.0 coding is refused by name', async () => {
   const plain = las({ format: 1, points: [POINT] });
   const pointBytes = plain.subarray(227);
-  const file = las({ format: 1, points: [POINT], compressed: true, body: new Uint8Array(5), vlrs: [{ user: 'laszip encoded', id: 22204, data: new Uint8Array(4) }] });
+  const file = las({
+    format: 1,
+    points: [POINT],
+    compressed: true,
+    body: new Uint8Array(5),
+    vlrs: [{ user: 'laszip encoded', id: 22204, data: new Uint8Array(4) }],
+  });
   // The count in the header stays the file's own, whatever the compressed size is.
   new DataView(file.buffer).setUint32(107, 1, true);
   await refuses(parseLAS(file), 'header');
@@ -313,7 +336,10 @@ test('a damaged LAZ stream is a named error, and a hook that fails keeps its own
   const cut = real('point-time.laz').slice(0, 9000);
   await refuses(parseLAS(cut), 'truncated');
   const broken = new Error('my decoder failed');
-  await assert.rejects(parseLAS(real('point-time.laz'), { decompress: () => Promise.reject(broken) }), (e) => e === broken);
+  await assert.rejects(
+    parseLAS(real('point-time.laz'), { decompress: () => Promise.reject(broken) }),
+    (e) => e === broken,
+  );
 });
 
 /** Every module a file reaches by static imports, following `@margoengine/` names and relative paths. */
@@ -333,7 +359,10 @@ test('a plain LAS file never pays for the decoder: laz.js is only reached by the
     graph = [...staticGraph(entry)],
     reader = graph.find((file) => /points[\\/]dist[\\/]las\.js$/.test(file));
   assert.ok(reader, 'loaders/las goes through the points reader');
-  assert.deepEqual(graph.filter((file) => /laz\.js$/.test(file)), []);
+  assert.deepEqual(
+    graph.filter((file) => /laz\.js$/.test(file)),
+    [],
+  );
   assert.match(readFileSync(reader, 'utf8'), /import\("\.\/laz\.js"\)/);
 });
 

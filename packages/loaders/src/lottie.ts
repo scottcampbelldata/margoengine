@@ -264,7 +264,9 @@ function alongCurve(key: Key, start: number[], end: number[], share: number): nu
       const u = 1 - t;
       return start.map((p0, n) => {
         const p3 = end[n] ?? p0;
-        return u * u * u * p0 + 3 * u * u * t * (p0 + (out[n] ?? 0)) + 3 * u * t * t * (p3 + (back[n] ?? 0)) + t * t * t * p3;
+        return (
+          u * u * u * p0 + 3 * u * u * t * (p0 + (out[n] ?? 0)) + 3 * u * t * t * (p3 + (back[n] ?? 0)) + t * t * t * p3
+        );
       });
     };
   let lengths = key.lengths;

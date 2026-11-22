@@ -4,7 +4,10 @@ import test from 'node:test';
 import { decodeXML, readXML, readXMLTree } from '../dist/xml.js';
 
 test('readXMLTree gives the elements under a nameless root, prefixes gone and entities read', () => {
-  const root = readXMLTree('<?xml version="1.0"?><!-- note --><a:robot name="x &amp; y"><link/>text<link id="2"/></a:robot>', 'T');
+  const root = readXMLTree(
+    '<?xml version="1.0"?><!-- note --><a:robot name="x &amp; y"><link/>text<link id="2"/></a:robot>',
+    'T',
+  );
   assert.equal(root.name, '');
   const robot = root.children[0];
   assert.equal(robot.name, 'robot');
@@ -62,8 +65,18 @@ test('line ends and attribute whitespace are normalized; character references mu
 });
 
 test('decodeXML follows the encoding of the XML declaration (4.3.3)', () => {
-  const latin = new Uint8Array([...new TextEncoder().encode('<?xml version="1.0" encoding="ISO-8859-1"?><a>'), 0xe9, ...new TextEncoder().encode('</a>')]);
+  const latin = new Uint8Array([
+    ...new TextEncoder().encode('<?xml version="1.0" encoding="ISO-8859-1"?><a>'),
+    0xe9,
+    ...new TextEncoder().encode('</a>'),
+  ]);
   assert.equal(readXMLTree(decodeXML(latin), 'T').children[0].text, 'é');
-  assert.equal(decodeXML(new TextEncoder().encode("<?xml version='1.0' encoding='UTF-8'?><a>é</a>")).endsWith('é</a>'), true);
-  assert.throws(() => decodeXML(new TextEncoder().encode('<?xml version="1.0" encoding="x-no-such"?><a/>')), /cannot be decoded/);
+  assert.equal(
+    decodeXML(new TextEncoder().encode("<?xml version='1.0' encoding='UTF-8'?><a>é</a>")).endsWith('é</a>'),
+    true,
+  );
+  assert.throws(
+    () => decodeXML(new TextEncoder().encode('<?xml version="1.0" encoding="x-no-such"?><a/>')),
+    /cannot be decoded/,
+  );
 });

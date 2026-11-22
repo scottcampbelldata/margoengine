@@ -334,7 +334,11 @@ test('OBJ and MTL: malformed input names the line; limits', async () => {
 
 test('OBJ: p and l elements without faces index the v list; polylines become segments; bad ones name the line', async () => {
   const obj = await parseOBJ(
-    text(['v 0 0 0 1 0 0', 'v 1 0 0 0 1 0', 'v 1 1 0 0 0 1', 'v 0 1 0', 'p 1 -1', 'vt 0 0', 'l 1 2 3', 'l 4/1 1', ''].join('\n')),
+    text(
+      ['v 0 0 0 1 0 0', 'v 1 0 0 0 1 0', 'v 1 1 0 0 0 1', 'v 0 1 0', 'p 1 -1', 'vt 0 0', 'l 1 2 3', 'l 4/1 1', ''].join(
+        '\n',
+      ),
+    ),
   );
   assert.equal(obj.kind, 'points');
   assert.equal(obj.positions.length, 12);

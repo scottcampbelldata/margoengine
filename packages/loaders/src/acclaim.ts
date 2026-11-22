@@ -329,7 +329,11 @@ export function parseAMC(input: BinaryInput | string, skeleton: ASFSkeleton, opt
   }
   const flush = () => {
     if ((frames + 1) * tracks.length > maxKeys)
-      throw new LoaderError(M, 'limit', `${frames + 1} frames of ${tracks.length} tracks exceed the limit of ${maxKeys} keys`);
+      throw new LoaderError(
+        M,
+        'limit',
+        `${frames + 1} frames of ${tracks.length} tracks exceed the limit of ${maxKeys} keys`,
+      );
     const time = frames * frameTime;
     for (const i of listed) {
       const d = data[i],
