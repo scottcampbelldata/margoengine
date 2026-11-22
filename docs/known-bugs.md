@@ -13,6 +13,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** sample the position and time of the stern as it passed. Keep the bow trajectory for the Kelvin and bow wave systems. Carry the last moving heading through stationary history samples.
 - **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check fresh and aging foam and reject points outside the trail. The CPU test also checks that an eastbound ship leaves no diagonal wake at its starting berth.
 
+### Fixed 2026-11-21: connectVoxelNet left its listeners on a socket that had closed (KB-VOXELNET-WSLISTENERS1, voxel-net)
+- **Repro:** `const client = connectVoxelNet(url, world); client.close();` and wait for `onClose`: the closed WebSocket still held its `open`, `message` and `close` listeners, and each of them kept the client, the world and the resume loop reachable from the socket. The new owner fixture `packages/voxel-net/tests/owner-lifetime.fixture.js` (`connectVoxelNet`, `VoxelShardClient`) failed with "no leaked event listeners (3: open on WebSocket, message on WebSocket, close on WebSocket)" in every case.
+- **Cause:** `open()` in `packages/voxel-net/src/client.ts` added three anonymous listeners to each socket and never removed them, neither when the socket closed nor when a resume replaced it.
+- **Fix:** the three listeners are named, and the `close` listener (the last event a socket delivers) removes all three before it tells the client, so a client's `onClose` finds the socket released; a replaced socket's own close does the same.
+- **Regression:** `packages/voxel-net/tests/on-close.test.js` "connectVoxelNet takes its listeners off a socket once it closed, before onClose" (fails on the old code with 3 listeners left); `npm run check:owners -- --packages=voxel-net` on the CPU model, WebGPU and the WebGL2 layer.
+
 ### Fixed 2026-11-21: the upstream-reports README check rejected a hyphenated report id (KB-UPSTREAM-IDS1, tests)
 
 - **Repro (before):** after bfa6c541b added docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1, `node --test tests/upstream-reports.test.js`

@@ -9067,6 +9067,14 @@ voxel-pathtracer fixture exports `compatAngle = 'vulkan'`, which scripts/check-o
 compatibility leaf on the Vulkan route on Windows, as the package's compose-browser.mjs does; a case then takes seconds. Native WebGPU
 legs are unchanged. All pass on the CPU model, native WebGPU and the WebGL2 layer, with device loss attached and detached.
 
+Batch owners-b11 also gated voxel-net (2026-11-21): the server (listening, with a connection, and with a file and a SQLite store),
+connectVoxelNet, VoxelBot and VoxelShardClient against a bare WebSocket endpoint (a joined player makes a real server start generator
+worker threads, whose own message ports carry the runtime's listeners), and every server add-on (entities, chat, inventories, rewind,
+shard, recorder, lobby); the browser leaf runs the client entries that work in a page. The WebTransport and WebRTC entries wrap a
+connection the caller owns, and the Bun and Deno hosts need those runtimes, so they are not entries. The voxel-net fixture found
+KB-VOXELNET-WSLISTENERS1: connectVoxelNet never removed its listeners from a closed socket (fixed in packages/voxel-net/src/client.ts,
+regression in packages/voxel-net/tests/on-close.test.js).
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,
