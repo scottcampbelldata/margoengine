@@ -28,9 +28,12 @@ function harness() {
 // Records what a shadow pass is asked to do.
 const recorder = () => {
   const calls = [];
-  return new Proxy({ calls }, {
-    get: (t, k) => (k === 'calls' ? calls : (...a) => void calls.push([k, ...a])),
-  });
+  return new Proxy(
+    { calls },
+    {
+      get: (t, k) => (k === 'calls' ? calls : (...a) => void calls.push([k, ...a])),
+    },
+  );
 };
 const matrices = (n) => new Float32Array(n * 16);
 const drawn = (pass, name) => pass.calls.filter((c) => c[0] === name);
@@ -43,9 +46,16 @@ test('each cascade of each batch draws through its own list and indirect argumen
   parts.prepareShadow({ context: h.context, matrices: matrices(3), cascades: 3 });
   const pass = recorder();
   parts.drawShadow({ context: h.context, pass, matrix: new Float32Array(16), cascade: 2 });
-  assert.deepEqual(drawn(pass, 'drawIndexedIndirect').map((c) => c[2]), [(2 * 2 + 0) * 20, (2 * 2 + 1) * 20]);
+  assert.deepEqual(
+    drawn(pass, 'drawIndexedIndirect').map((c) => c[2]),
+    [(2 * 2 + 0) * 20, (2 * 2 + 1) * 20],
+  );
   const lists = drawn(pass, 'setVertexBuffer').filter((c) => c[1] === 1);
-  assert.deepEqual(lists.map((c) => c[3]), [(2 * 4 + 0) * 4, (2 * 4 + 2) * 4], 'stride of all slots, batch start inside');
+  assert.deepEqual(
+    lists.map((c) => c[3]),
+    [(2 * 4 + 0) * 4, (2 * 4 + 2) * 4],
+    'stride of all slots, batch start inside',
+  );
 });
 
 test('a pass with no prepareShadow this frame draws every part, as CulledParts does', () => {

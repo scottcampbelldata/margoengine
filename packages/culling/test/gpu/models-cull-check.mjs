@@ -31,7 +31,9 @@ for (const shadows of [false, true]) {
         if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;
         if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 60) lit++;
       }
-      console.log(`${shadows ? 'shadows' : 'plain'} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${r.drawn} of ${r.total} drawn`);
+      console.log(
+        `${shadows ? 'shadows' : 'plain'} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${r.drawn} of ${r.total} drawn`,
+      );
       assert.equal(differing, 0, `${r.label}: culled frame differs`);
       assert.ok(lit > 500, `${r.label}: scene not visible`);
       drawn.push(r);
@@ -39,7 +41,8 @@ for (const shadows of [false, true]) {
     // The WebGL2 layer culls nothing and every row draws (README, "Loaded models and materials meshes"); readCounts()
     // says so.
     if (compat)
-      for (const r of drawn.slice(0, -1)) assert.equal(r.drawn, r.total, `${r.label}: compat: every row draws (${r.drawn})`);
+      for (const r of drawn.slice(0, -1))
+        assert.equal(r.drawn, r.total, `${r.label}: compat: every row draws (${r.drawn})`);
     else assert.ok(drawn[1].drawn < drawn[1].total / 2, `close up most rows drop (${drawn[1].drawn})`);
     assert.equal(drawn.at(-1).primitives, 0, 'a removed model has no lists');
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);

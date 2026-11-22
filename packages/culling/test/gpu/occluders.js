@@ -37,7 +37,10 @@ const hills = (device) => {
   return { heightmap, layers };
 };
 const scenery = (e) => {
-  const core = e.createMesh().setGeometry(box(30, 16, 1)).setMaterial(new PbrMaterial({ color: '#8d99a6', doubleSided: false }));
+  const core = e
+    .createMesh()
+    .setGeometry(box(30, 16, 1))
+    .setMaterial(new PbrMaterial({ color: '#8d99a6', doubleSided: false }));
   core.setPosition([-16, 6, 12]);
   const model = createMesh(e, boxGeometry(30, 16, 1), new Material({ color: '#6d8fa0' }));
   model.root.setPosition([16, 6, 12]);
@@ -106,10 +109,13 @@ const steps = [
     },
   ],
   ['from behind the crowd, walls edge-on to nothing', () => look([0, 6, -40], [0, 2, 0])],
-  ['removed occluders: the image still matches', () => {
-    parts.removeOccluder(walls[0].core);
-    look([0, 4, 36]);
-  }],
+  [
+    'removed occluders: the image still matches',
+    () => {
+      parts.removeOccluder(walls[0].core);
+      look([0, 4, 36]);
+    },
+  ],
 ];
 async function step(i) {
   const [label, edit] = steps[i];

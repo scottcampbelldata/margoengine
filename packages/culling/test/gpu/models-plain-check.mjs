@@ -30,7 +30,9 @@ for (const scene of ['grid', 'nodes']) {
         if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;
         if (a.data[k] + a.data[k + 1] + a.data[k + 2] > 60) lit++;
       }
-      console.log(`${scene} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${r.drawn} of ${r.primitives} drawn`);
+      console.log(
+        `${scene} step ${i} ${r.label}: ${differing} differ, ${lit} lit, ${r.drawn} of ${r.primitives} drawn`,
+      );
       assert.equal(differing, 0, `${r.label}: culled frame differs`);
       assert.ok(lit > 500, `${r.label}: scene not visible`);
       seen.push(r);
@@ -54,7 +56,10 @@ for (const scene of ['grid', 'nodes']) {
       assert.equal(seen.at(-1).primitives, 0, 'a removed model has no records');
     } else {
       assert.equal(seen[0].primitives, 10000);
-      assert.ok(seen[1].drawn < seen[0].drawn / 2, `close up most primitives drop (${seen[1].drawn} of ${seen[0].drawn})`);
+      assert.ok(
+        seen[1].drawn < seen[0].drawn / 2,
+        `close up most primitives drop (${seen[1].drawn} of ${seen[0].drawn})`,
+      );
       assert.ok(seen.at(-1).drawn > seen[1].drawn, `back out they draw again (${seen.at(-1).drawn})`);
     }
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);

@@ -79,7 +79,13 @@ async function step(i) {
   edit();
   await draw();
   await draw();
-  return { label, kept: await mesh.readTriangles(), total: geometry.indices.length / 3, clusters: mesh.meshlets.count, part: geometry.indices.length / 3 };
+  return {
+    label,
+    kept: await mesh.readTriangles(),
+    total: geometry.indices.length / 3,
+    clusters: mesh.meshlets.count,
+    part: geometry.indices.length / 3,
+  };
 }
 // Three balls as parts of one MeshletMesh, one of them mirrored, against three core meshes.
 const spot = (x, z, flip = 1) => [flip, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, z, 1];
@@ -110,7 +116,8 @@ async function instances() {
     label: 'three parts',
     kept: await mesh.readTriangles(),
     total: (geometry.indices.length / 3) * 3,
-    clusters: mesh.meshlets.count, part: geometry.indices.length / 3,
+    clusters: mesh.meshlets.count,
+    part: geometry.indices.length / 3,
   };
 }
 // A ball with a wall hiding its left half, Hi-Z against none, and the same picture as core.
@@ -141,7 +148,14 @@ async function occlusion() {
   await draw();
   await draw();
   await draw();
-  return { label: 'behind a wall', occlusion: true, kept: await mesh.readTriangles(), total: frustum, clusters: mesh.meshlets.count, part: geometry.indices.length / 3 };
+  return {
+    label: 'behind a wall',
+    occlusion: true,
+    kept: await mesh.readTriangles(),
+    total: frustum,
+    clusters: mesh.meshlets.count,
+    part: geometry.indices.length / 3,
+  };
 }
 // A ball casting on a floor: the shadow frame keeps only clusters in each cascade, and the picture is core's.
 async function shadowed() {
@@ -175,7 +189,8 @@ async function shadowed() {
     label: 'shadow pass',
     kept: await mesh.readShadowTriangles(0),
     total: (geometry.indices.length / 3) * 2,
-    clusters: mesh.meshlets.count, part: geometry.indices.length / 3,
+    clusters: mesh.meshlets.count,
+    part: geometry.indices.length / 3,
   };
 }
 // A square plate facing +z, 16 x 16 quads from -0.5 to 0.5, in a few clusters.
@@ -205,9 +220,11 @@ async function twoPass() {
     material = new PbrMaterial({ color: '#b07040', roughness: 0.6, doubleSided: false }),
     matrices = [];
   for (let y = 0; y < 32; y++)
-    for (let x = 0; x < 48; x++) matrices.push([0.25, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 1, 0, -5.875 + x * 0.25, -3.875 + y * 0.25, 0, 1]);
+    for (let x = 0; x < 48; x++)
+      matrices.push([0.25, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 1, 0, -5.875 + x * 0.25, -3.875 + y * 0.25, 0, 1]);
   for (let y = 0; y < 20; y++)
-    for (let x = 0; x < 32; x++) matrices.push([0.25, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 1, 0, -3.875 + x * 0.25, -2.375 + y * 0.25, -2, 1]);
+    for (let x = 0; x < 32; x++)
+      matrices.push([0.25, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 1, 0, -3.875 + x * 0.25, -2.375 + y * 0.25, -2, 1]);
   const transforms = new Float32Array(matrices.flat()),
     frustum = MeshletMesh.attach(a, [{ geometry: tile, material, transforms }]);
   for (const m of matrices)

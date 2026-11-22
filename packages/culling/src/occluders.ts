@@ -64,7 +64,11 @@ const SLOT = 256;
 const rowLayout: GPUVertexBufferLayout = {
   arrayStride: 96,
   stepMode: 'instance',
-  attributes: [5, 6, 7, 8].map((shaderLocation, i) => ({ shaderLocation, offset: i * 16, format: 'float32x4' as const })),
+  attributes: [5, 6, 7, 8].map((shaderLocation, i) => ({
+    shaderLocation,
+    offset: i * 16,
+    format: 'float32x4' as const,
+  })),
 };
 
 interface Draw {
@@ -92,7 +96,11 @@ export class OccluderList {
   add(input: OccluderInput): void {
     // A public Mesh is the runtime mesh behind a narrower type.
     const source = input as OccluderMesh | OccluderSource;
-    if (!source || typeof source !== 'object' || !('id' in source || 'shadowPrimitives' in source || 'drawOccluder' in source))
+    if (
+      !source ||
+      typeof source !== 'object' ||
+      !('id' in source || 'shadowPrimitives' in source || 'drawOccluder' in source)
+    )
       throw new TypeError('Invalid occluder; pass a core mesh, a model, a materials mesh or a Terrain');
     this.sources.add(source);
   }
@@ -109,7 +117,8 @@ export class OccluderList {
       models: ArrayLike<number>[] = [],
       shown = (node: OccluderPrimitive['node']) => !hiddenInTree(engine.store, node.id) && inView(c, node),
       flipped = (m: ArrayLike<number>) =>
-        m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0;
+        m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) <
+        0;
     for (const source of this.sources) {
       if ('disposed' in source && source.disposed) {
         this.sources.delete(source);

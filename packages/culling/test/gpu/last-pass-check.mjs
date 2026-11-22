@@ -16,9 +16,14 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 const frame = async (query) => {
   await page.goto(new URL(`${page0}?${query}`, page.url()).href);
-  await page.waitForFunction(() => window.ready === true, null, { timeout: 20_000 }).catch((e) => assert.fail(`${query}: ${pageErrors.join('; ') || e.message}`));
+  await page
+    .waitForFunction(() => window.ready === true, null, { timeout: 20_000 })
+    .catch((e) => assert.fail(`${query}: ${pageErrors.join('; ') || e.message}`));
   assert.deepEqual(await page.evaluate(() => window.errors), []);
-  return { image: await decodePNG(await page.locator('canvas').screenshot()), passes: await page.evaluate(() => window.passes) };
+  return {
+    image: await decodePNG(await page.locator('canvas').screenshot()),
+    passes: await page.evaluate(() => window.passes),
+  };
 };
 try {
   // Colour passes a frame: one, or the old way core's clear, the package's pass and core's resolve.
@@ -46,7 +51,8 @@ try {
     assert.equal(passes, last, `${scene}: colour passes`);
     assert.equal(all, tail, `${scene}: colour passes the old way`);
     // 4x blending is not repeatable on the GPU itself (docs/known-bugs.md), so a blended frame may differ on its edges.
-    if (scene === 'pair' || scene === 'blended') assert.ok(differing < lit / 100, `${scene}: ${differing} pixels differ`);
+    if (scene === 'pair' || scene === 'blended')
+      assert.ok(differing < lit / 100, `${scene}: ${differing} pixels differ`);
     else assert.equal(differing, 0, `${scene}: pixels differ`);
     if (scene !== 'none' && scene !== 'before') assert.ok(lit > 2000, `${scene}: the frame is nearly empty (${lit})`);
   }

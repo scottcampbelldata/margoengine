@@ -23,7 +23,11 @@ const look = (position, target = [0, 0, 0]) => {
 const grid = (e) => {
   const boxes = [];
   for (let n = 0; n < side * side; n++) {
-    const mesh = createMesh(e, boxGeometry(1, 1, 1), new Material({ color: [(n % 5) / 4, (n % 3) / 2, 1], roughness: 0.6 }));
+    const mesh = createMesh(
+      e,
+      boxGeometry(1, 1, 1),
+      new Material({ color: [(n % 5) / 4, (n % 3) / 2, 1], roughness: 0.6 }),
+    );
     mesh.root.setPosition([(n % side) * 3 - 16, (n % 7) / 2, Math.floor(n / side) * 3 - 16]);
     boxes.push(mesh);
   }
@@ -31,7 +35,25 @@ const grid = (e) => {
   wall.root.setPosition([0, 0, 500]);
   // Instance rows take the same Hi-Z test.
   const rows = createInstancedMesh(e, boxGeometry(1, 1, 1), new Material({ color: '#50c070', roughness: 0.5 }), 25);
-  for (let n = 0; n < 25; n++) rows.instances.setMatrixAt(n, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (n % 5) * 3 - 6, 3, Math.floor(n / 5) * 3 - 6, 1]);
+  for (let n = 0; n < 25; n++)
+    rows.instances.setMatrixAt(n, [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      (n % 5) * 3 - 6,
+      3,
+      Math.floor(n / 5) * 3 - 6,
+      1,
+    ]);
   rows.instances.count = 25;
   return { boxes, wall, rows };
 };

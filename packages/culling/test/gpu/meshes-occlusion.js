@@ -22,7 +22,10 @@ const fill = (e) => {
     list.push(mesh);
   }
   for (let n = 0; n < 1500; n++) {
-    const mesh = e.createMesh().setGeometry(n % 3 ? small : round).setMaterial(colors[n % 4]);
+    const mesh = e
+      .createMesh()
+      .setGeometry(n % 3 ? small : round)
+      .setMaterial(colors[n % 4]);
     mesh.setPosition([((n % 30) - 15) * 1, ((n * 7) % 5) * 1, -Math.floor(n / 30)]);
     list.push(mesh);
   }

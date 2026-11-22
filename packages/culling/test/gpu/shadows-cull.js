@@ -39,7 +39,10 @@ async function setup() {
   d = await Engine.create(document.getElementById('d'), { camera });
   for (const e of engines()) {
     e.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
-    e.createMesh().setGeometry(box(400, 0.25, 400)).setMaterial(floorColor).setPosition([0, -0.125, 0]);
+    e.createMesh()
+      .setGeometry(box(400, 0.25, 400))
+      .setMaterial(floorColor)
+      .setPosition([0, -0.125, 0]);
   }
   cascadeParts = CascadeParts.attach(a, batches());
   plainParts = CulledParts.attach(b, batches());
