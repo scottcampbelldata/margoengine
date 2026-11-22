@@ -92,7 +92,11 @@ async function streamer(bytes, options = {}, limits = {}) {
       target: 'bc7',
       decode: async (data, { exactTarget }) => transcodeKTX2Layers(module, data, exactTarget, true),
     };
-  return { web, device, streamer: new KTX2Streamer({ device, decoder, fetch: web.fetch, headBytes: 1024, ...options }) };
+  return {
+    web,
+    device,
+    streamer: new KTX2Streamer({ device, decoder, fetch: web.fetch, headBytes: 1024, ...options }),
+  };
 }
 const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -111,10 +115,7 @@ test('a stream shows the smallest levels from the head of the file, then loads b
   assert.equal(device.log.created[0].mipLevelCount, 3);
   const read = web.reads.reduce((total, [a, b]) => total + b - a, 0);
   assert.ok(read < bytes.length / 4, `first picture took ${read} of ${bytes.length} bytes`);
-  assert.deepEqual(
-    device.log.writes.map((w) => w.destination.mipLevel).sort(),
-    [0, 1, 2],
-  );
+  assert.deepEqual(device.log.writes.map((w) => w.destination.mipLevel).sort(), [0, 1, 2]);
   stream.onChange = (texture) => changes.push(texture);
   stream.want(32);
   s.update();
@@ -224,7 +225,10 @@ test('a KTX2 file inside a larger file reads through its offset, with and withou
   s.update();
   await settled();
   assert.equal(stream.residentLevel, 0);
-  assert.ok(web.reads.every(([from, to]) => from >= offset && to <= offset + bytes.length), 'reads stay inside the file');
+  assert.ok(
+    web.reads.every(([from, to]) => from >= offset && to <= offset + bytes.length),
+    'reads stay inside the file',
+  );
   // A server without Range sends the larger file: the stream cuts the KTX2 file out of it.
   const whole = await streamer(outer, { fetch: async () => new Response(outer.slice(), { status: 200 }) }),
     plain = await whole.streamer.open('/model.glb', { offset, length: bytes.length });
@@ -265,7 +269,7 @@ test('a stream larger than the device allows is refused before any texture is ma
 // object (the registry row is exempt). A streamer belongs to the device it was given and makes, replaces and copies
 // every texture on it; after a device loss the caller opens the file again on a streamer for the new device, which
 // makes its textures there and touches nothing of the lost one.
-test('a streamed texture is made on the streamer\'s own device; a streamer for the replacement device makes its own', async () => {
+test("a streamed texture is made on the streamer's own device; a streamer for the replacement device makes its own", async () => {
   const bytes = await fixture('cube-uastc-zstd.ktx2'),
     old = await streamer(bytes),
     first = await old.streamer.open('/cube.ktx2');

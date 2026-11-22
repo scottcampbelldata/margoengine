@@ -456,7 +456,8 @@ export class StreamedKTX2 {
     const last = await this.decodeLevel(this.levels - 1);
     this.format = last.format;
     this.block = formatBlock(last.format)!;
-    if (!this.block) throw decodeFailed(`KTX2: ${last.format} has no WebGPU texture; decode the file with another target`);
+    if (!this.block)
+      throw decodeFailed(`KTX2: ${last.format} has no WebGPU texture; decode the file with another target`);
     const [bw, bh] = this.block;
     let coarsest = this.levels - 1;
     while (coarsest > 0 && (this.size(this.width, coarsest) % bw || this.size(this.height, coarsest) % bh)) coarsest--;

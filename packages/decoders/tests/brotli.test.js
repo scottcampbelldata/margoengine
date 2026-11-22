@@ -5,8 +5,14 @@ import test from 'node:test';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { decodeBrotli } from '../dist/brotli.js';
 
-const { BROTLI_PARAM_LGWIN, BROTLI_PARAM_MODE, BROTLI_PARAM_QUALITY, BROTLI_PARAM_SIZE_HINT, BROTLI_MODE_TEXT, BROTLI_MODE_FONT } =
-  constants;
+const {
+  BROTLI_PARAM_LGWIN,
+  BROTLI_PARAM_MODE,
+  BROTLI_PARAM_QUALITY,
+  BROTLI_PARAM_SIZE_HINT,
+  BROTLI_MODE_TEXT,
+  BROTLI_MODE_FONT,
+} = constants;
 const pack = (data, quality = 11, lgwin = 22, mode = 0) =>
   brotliCompressSync(data, {
     params: {
@@ -48,7 +54,8 @@ test('every window size and mode', () => {
 });
 
 test('small inputs, runs, and streams of many blocks', () => {
-  for (const data of [Buffer.alloc(0), Buffer.from('a'), Buffer.from('time'), Buffer.alloc(100000, 7)]) same(data, pack(data));
+  for (const data of [Buffer.alloc(0), Buffer.from('a'), Buffer.from('time'), Buffer.alloc(100000, 7)])
+    same(data, pack(data));
   const big = Buffer.concat(Array.from({ length: 12 }, (_, i) => (i % 2 ? randomBytes(200000) : ints(50000))));
   same(big, pack(big, 5, 18), 'mixed metablocks and stored blocks');
 });
@@ -62,7 +69,7 @@ test('a corrupt or short stream throws a coded error, never hangs or reads out o
   for (let trial = 0; trial < 300; trial++) {
     const bad = Uint8Array.from(packed);
     seed = (seed * 1103515245 + 12345) % 2 ** 31;
-    bad[seed % bad.length] ^= 1 << (seed >> 8) % 8;
+    bad[seed % bad.length] ^= 1 << ((seed >> 8) % 8);
     try {
       decodeBrotli(bad);
     } catch (e) {

@@ -173,7 +173,14 @@ function native(module: NativeExports, bytes: Uint8Array, request: DracoRequest,
   try {
     new Uint8Array(module.memory.buffer, input, bytes.length).set(bytes);
     // The crate's workspace budget is separate from the requested output budget.
-    output = module.draco_decode(input, bytes.length, limits.maxVertices, limits.maxIndices, DRACO_OUTPUT_LIMIT, flavor);
+    output = module.draco_decode(
+      input,
+      bytes.length,
+      limits.maxVertices,
+      limits.maxIndices,
+      DRACO_OUTPUT_LIMIT,
+      flavor,
+    );
     if (!output) throw decodeFailed('Draco: allocation failed; export a smaller mesh');
     const view = new DataView(module.memory.buffer);
     length = view.getUint32(output, true);

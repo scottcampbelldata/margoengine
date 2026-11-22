@@ -158,6 +158,7 @@ export function parseKTX(bytes: Uint8Array): TextureFile {
     ...(block[3] ? { feature: block[3] } : {}),
     target: 'ktx',
     srgb: format.endsWith('-srgb'),
-    hasAlpha: !expandRGB && !OPAQUE_BC1.has(internal) && /^(rgba|rgb10a2|bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format),
+    hasAlpha:
+      !expandRGB && !OPAQUE_BC1.has(internal) && /^(rgba|rgb10a2|bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format),
   };
 }

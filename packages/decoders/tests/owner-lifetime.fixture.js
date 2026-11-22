@@ -6,7 +6,9 @@
 // A 4x4 RGBA8 DDS with a 2x2 mip: the 128-byte header (DDPF_RGB | DDPF_ALPHAPIXELS, 32 bits, R G B A masks), then the
 // level texels.
 function dds() {
-  const bytes = new Uint8Array(128 + (16 + 4) * 4), view = new DataView(bytes.buffer), u32 = (at, v) => view.setUint32(at, v, true);
+  const bytes = new Uint8Array(128 + (16 + 4) * 4),
+    view = new DataView(bytes.buffer),
+    u32 = (at, v) => view.setUint32(at, v, true);
   u32(0, 0x20534444);
   u32(4, 124);
   u32(8, 0x2100f);
@@ -28,26 +30,34 @@ function dds() {
 export async function fixtures(load = (entry) => import(entry)) {
   const { parseDDS, uploadTexture } = await load('../dist/dds.js');
   const file = parseDDS(dds());
-  return [{ name: 'uploadTexture', visible: false, create() {
-    let engine, texture, disposed = false;
-    const plugin = {
-      name: 'owner-decoders-texture',
-      setup(e) {
-        engine = e;
-        texture = uploadTexture(e.gpu, file, { label: 'owner-decoders' });
+  return [
+    {
+      name: 'uploadTexture',
+      visible: false,
+      create() {
+        let engine,
+          texture,
+          disposed = false;
+        const plugin = {
+          name: 'owner-decoders-texture',
+          setup(e) {
+            engine = e;
+            texture = uploadTexture(e.gpu, file, { label: 'owner-decoders' });
+          },
+          // The old texture went with the lost device; the restored one needs its own.
+          onDeviceRestored(e) {
+            texture = uploadTexture(e.gpu, file, { label: 'owner-decoders' });
+          },
+          dispose() {
+            if (disposed) return;
+            disposed = true;
+            texture?.destroy();
+            texture = undefined;
+            engine?.sceneOf(plugin)?.removePlugin(plugin.name);
+          },
+        };
+        return { plugin, dispose: () => plugin.dispose() };
       },
-      // The old texture went with the lost device; the restored one needs its own.
-      onDeviceRestored(e) {
-        texture = uploadTexture(e.gpu, file, { label: 'owner-decoders' });
-      },
-      dispose() {
-        if (disposed) return;
-        disposed = true;
-        texture?.destroy();
-        texture = undefined;
-        engine?.sceneOf(plugin)?.removePlugin(plugin.name);
-      },
-    };
-    return { plugin, dispose: () => plugin.dispose() };
-  } }];
+    },
+  ];
 }

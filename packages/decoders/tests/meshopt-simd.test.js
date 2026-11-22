@@ -179,14 +179,20 @@ test('without Wasm SIMD, or before ready, the TypeScript decoder runs', async ()
   const fresh = await import(`../dist/meshopt-simd.js?before-ready`),
     [src, count, stride, mode, filter] = compressedViews(new URL('meshopt-simd/knight-ext.glb', fixtures))[0];
   assert.equal(fresh.MeshoptSIMDDecoder.supported, false);
-  assert.deepEqual(fresh.meshoptDecodeGltfBufferSIMD(src, count, stride, mode, filter), plain(src, count, stride, mode, filter));
+  assert.deepEqual(
+    fresh.meshoptDecodeGltfBufferSIMD(src, count, stride, mode, filter),
+    plain(src, count, stride, mode, filter),
+  );
   const validate = WebAssembly.validate;
   WebAssembly.validate = () => false;
   try {
     const none = await import(`../dist/meshopt-simd.js?no-simd`);
     await none.MeshoptSIMDDecoder.ready;
     assert.equal(none.MeshoptSIMDDecoder.supported, false);
-    assert.deepEqual(none.meshoptDecodeGltfBufferSIMD(src, count, stride, mode, filter), plain(src, count, stride, mode, filter));
+    assert.deepEqual(
+      none.meshoptDecodeGltfBufferSIMD(src, count, stride, mode, filter),
+      plain(src, count, stride, mode, filter),
+    );
   } finally {
     WebAssembly.validate = validate;
   }

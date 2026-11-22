@@ -36,7 +36,14 @@ test('every prefix of a stream is refused with a coded error', () => {
 test('damage to a checked file never comes through as data', () => {
   let seed = 21;
   const next = (n) => (seed = (seed * 1664525 + 1013904223) >>> 0) % n;
-  for (const name of ['runs.9.bz2', 'text.multi.bz2', 'floats.crc32.xz', 'floats.crc64.xz', 'floats.sha.xz', 'text.lc2.xz']) {
+  for (const name of [
+    'runs.9.bz2',
+    'text.multi.bz2',
+    'floats.crc32.xz',
+    'floats.crc64.xz',
+    'floats.sha.xz',
+    'text.lc2.xz',
+  ]) {
     const whole = read(name),
       { sha256 } = expected[name];
     for (let i = 0; i < 300; i++) {
@@ -69,7 +76,11 @@ test('damage to an unchecked .lzma ends in a coded error or some output, never a
 });
 
 test('a block whose stored check does not match is refused, for each kind of check', () => {
-  for (const [name, size] of [['floats.crc32.xz', 4], ['floats.crc64.xz', 8], ['floats.sha.xz', 32]]) {
+  for (const [name, size] of [
+    ['floats.crc32.xz', 4],
+    ['floats.crc64.xz', 8],
+    ['floats.sha.xz', 32],
+  ]) {
     const copy = read(name),
       footer = copy.length - 12,
       // The footer's backward size gives where the index starts; the block's check sits just before it.
@@ -85,7 +96,10 @@ test('output stops at maxBytes, and a file that fits exactly passes', () => {
       decode = decoder(name),
       file = read(name);
     assert.equal(decode(file, { maxBytes: bytes }).length, bytes);
-    assert.throws(() => decode(file, { maxBytes: bytes - 1 }), (e) => coded(e) && /maxBytes/.test(e.message));
+    assert.throws(
+      () => decode(file, { maxBytes: bytes - 1 }),
+      (e) => coded(e) && /maxBytes/.test(e.message),
+    );
   }
 });
 
@@ -158,5 +172,9 @@ test('xz sizes in block headers, the index and the footer must match the stream 
     ['footer flags naming another check', (f) => ((f[footer + 9] = 4), resealFooter(f)), /footer flags differ/],
   );
   for (const [what, change, message] of cases)
-    assert.throws(() => decodeXz(damage(change)), (e) => e.code === 'failed' && message.test(e.message), what);
+    assert.throws(
+      () => decodeXz(damage(change)),
+      (e) => e.code === 'failed' && message.test(e.message),
+      what,
+    );
 });

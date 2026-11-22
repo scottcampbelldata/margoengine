@@ -21,7 +21,11 @@ export interface GeoTIFFInfo {
    * `'geocentric'`, or `'unknown'`), `epsg` the ProjectedCSType (3072) or GeographicType (2048) code, or null when the
    * file leaves it unset or user-defined (32767), and `citation` the file's own name for it (`'WGS 84'`), or null.
    */
-  readonly crs: { readonly model: 'projected' | 'geographic' | 'geocentric' | 'unknown'; readonly epsg: number | null; readonly citation: string | null };
+  readonly crs: {
+    readonly model: 'projected' | 'geographic' | 'geocentric' | 'unknown';
+    readonly epsg: number | null;
+    readonly citation: string | null;
+  };
   /** Unit of the heights, from VerticalUnits (4099): metre 9001, foot 9002, US survey foot 9003; null when unset. */
   readonly verticalUnits: 'metre' | 'foot' | 'us-foot' | null;
   /**
@@ -47,7 +51,9 @@ export interface GeoTIFFInfo {
 }
 
 const bad = (problem: string): Error =>
-  decodeFailed(`GeoTIFF ${problem}; pass a page of a valid GeoTIFF file (the GeoTIFF tags of a TIFF written by GDAL or a GIS)`);
+  decodeFailed(
+    `GeoTIFF ${problem}; pass a page of a valid GeoTIFF file (the GeoTIFF tags of a TIFF written by GDAL or a GIS)`,
+  );
 
 const VERTICAL = new Map<number, 'metre' | 'foot' | 'us-foot'>([
   [9001, 'metre'],
@@ -62,7 +68,8 @@ function geoKeys(page: TIFFPage): Map<number, number | string> {
   if (!directory) return keys;
   if (directory.length < 4 || directory[0] !== 1) throw bad('GeoKeyDirectory header is invalid');
   const count = directory[3];
-  if (!Number.isInteger(count) || count < 0 || directory.length < 4 + count * 4) throw bad('GeoKeyDirectory is shorter than its key count');
+  if (!Number.isInteger(count) || count < 0 || directory.length < 4 + count * 4)
+    throw bad('GeoKeyDirectory is shorter than its key count');
   const doubles = page.tags.get(34736),
     text = page.ascii.get(34737);
   for (let k = 0; k < count; k++) {
@@ -107,7 +114,8 @@ export function readGeoTIFF(page: TIFFPage): GeoTIFFInfo {
     transform = [matrix[0], matrix[1], matrix[3], matrix[4], matrix[5], matrix[7]];
   } else if (scale && ties) {
     if (scale.length !== 3 || !scale.every(Number.isFinite)) throw bad('ModelPixelScale needs 3 numbers');
-    if (ties.length < 6 || ties.length % 6 || !ties.every(Number.isFinite)) throw bad('ModelTiepoint needs a multiple of 6 numbers');
+    if (ties.length < 6 || ties.length % 6 || !ties.every(Number.isFinite))
+      throw bad('ModelTiepoint needs a multiple of 6 numbers');
     const [i, j, , x, y] = ties;
     // Raster rows run down, model y runs up: y = tieY + (j - row) * scaleY.
     transform = [scale[0], 0, x - i * scale[0], 0, -scale[1], y + j * scale[1]];

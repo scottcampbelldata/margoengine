@@ -271,7 +271,13 @@ export function readBasisLZ(global: Uint8Array, imageCount: number): BasisLZTabl
  *
  * @throws MargoError `failed` when an index falls outside its codebook.
  */
-export function readETC1SSlice(tables: BasisLZTables, slice: Uint8Array, blocksX: number, blocksY: number, out: Uint32Array): void {
+export function readETC1SSlice(
+  tables: BasisLZTables,
+  slice: Uint8Array,
+  blocksX: number,
+  blocksY: number,
+  out: Uint32Array,
+): void {
   const { predictions, deltas, selectorModel, historyRuns, historySize } = tables,
     endpointCount = tables.endpoints.length,
     selectorCount = tables.selectors.length,
