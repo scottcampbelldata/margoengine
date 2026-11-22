@@ -46,12 +46,13 @@ function assertSamePicks(session, rays) {
     const hit = session.pick(origin, direction),
       want = nearest(mesh, origin, direction);
     if (want === null) assert.equal(hit, null, `ray ${origin} ${direction}`);
-    else assert.ok(hit && Math.abs(hit.distance - want) < 1e-9 * (1 + want), `ray ${origin}: ${hit?.distance}, ${want}`);
+    else
+      assert.ok(hit && Math.abs(hit.distance - want) < 1e-9 * (1 + want), `ray ${origin}: ${hit?.distance}, ${want}`);
   }
 }
 
 let seed = 7;
-const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 const rays = (count, at = [0, 0, 0]) =>
   Array.from({ length: count }, () => {
     const origin = [at[0] + rnd() * 6 - 3, at[1] + rnd() * 6 - 3, at[2] + rnd() * 6 - 3],
@@ -123,7 +124,12 @@ test('a mesh far from the origin, a huge triangle and a vertex dragged far away 
   dragged.dab([0, 0, 5e6]);
   dragged.endStroke();
   assertSamePicks(dragged, rays(60));
-  assertSamePicks(dragged, [[[0, 0, 6e6], [0, 0, -1]]]);
+  assertSamePicks(dragged, [
+    [
+      [0, 0, 6e6],
+      [0, 0, -1],
+    ],
+  ]);
 });
 
 test('work follows the brush and the ray, not the size of the mesh', () => {
@@ -184,7 +190,9 @@ test('a drawing follows the surface: ranges carry every changed float, new trian
   assert.deepEqual(mirror, drawing.vertices, 'nothing changed outside the ranges');
   for (let v = 0; v < count; v++) {
     const o = v * 20;
-    assert.ok(Math.abs(Math.hypot(drawing.vertices[o + 4], drawing.vertices[o + 5], drawing.vertices[o + 6]) - 1) < 1e-3);
+    assert.ok(
+      Math.abs(Math.hypot(drawing.vertices[o + 4], drawing.vertices[o + 5], drawing.vertices[o + 6]) - 1) < 1e-3,
+    );
   }
   const fresh = new MeshSculptSession(session.mesh(), { createId }).drawing();
   fresh.update();

@@ -225,10 +225,7 @@ export function bevelPolygonMesh(mesh: PolygonMesh, amount = 0.12, options: Mesh
     // The strip opposes both inset face edges. Its end edges determine each vertex cap's winding.
     follows.set(sa, fa);
     follows.set(fb, sb);
-    addSurface(
-      [fb, fa, sa, sb],
-      [mesh.faces[first.face].id, mesh.faces[second.face].id],
-    );
+    addSurface([fb, fa, sa, sb], [mesh.faces[first.face].id, mesh.faces[second.face].id]);
   }
   for (const [vi, indices] of atVertex) {
     if (indices.length < 3) continue;
