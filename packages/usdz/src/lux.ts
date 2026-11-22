@@ -43,19 +43,37 @@ export function domeLight(asset: { document: { extras?: unknown } }): USDDomeLig
 }
 
 type Node = { matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[]; children?: number[] };
-const local = ({ matrix, translation: t = [0, 0, 0], rotation: q = [0, 0, 0, 1], scale: k = [1, 1, 1] }: Node): number[] => {
+const local = ({
+  matrix,
+  translation: t = [0, 0, 0],
+  rotation: q = [0, 0, 0, 1],
+  scale: k = [1, 1, 1],
+}: Node): number[] => {
   if (matrix) return matrix;
   const [x, y, z, w] = q;
   return [
-    (1 - 2 * (y * y + z * z)) * k[0], 2 * (x * y + w * z) * k[0], 2 * (x * z - w * y) * k[0], 0,
-    2 * (x * y - w * z) * k[1], (1 - 2 * (x * x + z * z)) * k[1], 2 * (y * z + w * x) * k[1], 0,
-    2 * (x * z + w * y) * k[2], 2 * (y * z - w * x) * k[2], (1 - 2 * (x * x + y * y)) * k[2], 0,
-    t[0], t[1], t[2], 1,
+    (1 - 2 * (y * y + z * z)) * k[0],
+    2 * (x * y + w * z) * k[0],
+    2 * (x * z - w * y) * k[0],
+    0,
+    2 * (x * y - w * z) * k[1],
+    (1 - 2 * (x * x + z * z)) * k[1],
+    2 * (y * z + w * x) * k[1],
+    0,
+    2 * (x * z + w * y) * k[2],
+    2 * (y * z - w * x) * k[2],
+    (1 - 2 * (x * x + y * y)) * k[2],
+    0,
+    t[0],
+    t[1],
+    t[2],
+    1,
   ];
 };
 const times = (a: number[], b: number[]) => {
   const out = new Array<number>(16).fill(0);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return out;
 };
 /** How much each node's world matrix stretches its own x, y and z: sizes in the schema are scene units before the transform stack. */
@@ -63,7 +81,11 @@ function worldScales(nodes: Node[]): Map<number, [number, number, number]> {
   const out = new Map<number, [number, number, number]>(),
     walk = (id: number, parent: number[]) => {
       const world = times(parent, local(nodes[id]));
-      out.set(id, [Math.hypot(world[0], world[1], world[2]), Math.hypot(world[4], world[5], world[6]), Math.hypot(world[8], world[9], world[10])]);
+      out.set(id, [
+        Math.hypot(world[0], world[1], world[2]),
+        Math.hypot(world[4], world[5], world[6]),
+        Math.hypot(world[8], world[9], world[10]),
+      ]);
       for (const child of nodes[id].children ?? []) walk(child, world);
     };
   walk(0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -104,14 +126,24 @@ function scene(read: SceneRead): void {
       cameras.push(
         attr(path, 'projection') === 'orthographic'
           ? // Apertures are in tenths of a scene unit, as the schema has it.
-            { type: 'orthographic', name: path, orthographic: { xmag: (wide / 20) * sx, ymag: (tall / 20) * sy, znear, zfar } }
-          : { type: 'perspective', name: path, perspective: { yfov: 2 * Math.atan(tall / (2 * focal)), aspectRatio: wide / tall, znear, zfar } },
+            {
+              type: 'orthographic',
+              name: path,
+              orthographic: { xmag: (wide / 20) * sx, ymag: (tall / 20) * sy, znear, zfar },
+            }
+          : {
+              type: 'perspective',
+              name: path,
+              perspective: { yfov: 2 * Math.atan(tall / (2 * focal)), aspectRatio: wide / tall, znear, zfar },
+            },
       );
       continue;
     }
     if (typeof type !== 'string' || !/^(Distant|Sphere|Rect|Disk|Cylinder)Light$/.test(type)) {
       if (type === 'DomeLight' || type === 'DomeLight_1') {
-        read.soft(`${path} is a dome light, which punctual lights cannot hold; read it with domeLight() and light the scene with an Environment`);
+        read.soft(
+          `${path} is a dome light, which punctual lights cannot hold; read it with domeLight() and light the scene with an Environment`,
+        );
         const file = attr(path, 'inputs:texture:file');
         doc.extras = {
           usdDomeLight: {
@@ -161,7 +193,12 @@ function scene(read: SceneRead): void {
     }
     // glTF colours stop at 1, and a black body's can pass it: the light's strength takes the rest.
     const largest = Math.max(...color, 1e-9),
-      definition: GLTFLightDefinition = { type: kind, name: path, color: color.map((c) => c / largest), intensity: amount * largest },
+      definition: GLTFLightDefinition = {
+        type: kind,
+        name: path,
+        color: color.map((c) => c / largest),
+        intensity: amount * largest,
+      },
       cone = number(path, 'shaping:cone:angle', 90);
     if (!distant && cone < 90) {
       const softness = Math.min(1, Math.max(0, number(path, 'shaping:cone:softness', 0)));

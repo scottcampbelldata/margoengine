@@ -16,14 +16,20 @@ const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'),
 const reader = (file) => {
   const path = join(fixtures, ...file.split('/')),
     folder = dirname(path);
-  return [path.split(sep).at(-1), (id) => {
-    const at = resolve(folder, id);
-    return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
-  }];
+  return [
+    path.split(sep).at(-1),
+    (id) => {
+      const at = resolve(folder, id);
+      return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
+    },
+  ];
 };
 const open = (file, extensions, options = {}) => parseUSDFiles(...reader(file), { extensions, ...options });
 const text = (usda, extensions, options = {}) =>
-  parseUSDFiles('root.usda', (id) => (id === 'root.usda' ? new TextEncoder().encode(usda) : undefined), { extensions, ...options });
+  parseUSDFiles('root.usda', (id) => (id === 'root.usda' ? new TextEncoder().encode(usda) : undefined), {
+    extensions,
+    ...options,
+  });
 /** The worst distance from a point of `a` to the nearest of `b`, three numbers a point. */
 const reach = (a, b) => {
   const cell = 0.25,
@@ -50,13 +56,17 @@ for (const [file, levels] of Object.entries(truth))
   for (const [level, meshes] of Object.entries(levels))
     test(`points refine as Blender's at level ${level}: ${file}`, async () => {
       const asset = await open(file, [subdivision({ level: +level })]);
-      assert.deepEqual(asset.issues.filter((i) => /subdivision/.test(i.message)), []);
+      assert.deepEqual(
+        asset.issues.filter((i) => /subdivision/.test(i.message)),
+        [],
+      );
       for (const [path, want] of Object.entries(meshes)) {
         const mesh = asset.meshes.find((m) => m.path === path);
         assert.ok(mesh, path);
         assert.ok(reach(mesh.positions, want) < CLOSE, `${path} reaches Blender's points`);
         // Blender has no hole faces: it keeps points the Pyramid's holes leave out.
-        if (!file.includes('Pyramid')) assert.ok(reach(want, mesh.positions) < CLOSE, `${path} covers Blender's points`);
+        if (!file.includes('Pyramid'))
+          assert.ok(reach(want, mesh.positions) < CLOSE, `${path} covers Blender's points`);
       }
     });
 
@@ -146,11 +156,16 @@ test('a hole leaves its faces out and the rest still bends around it', async () 
   // Each quad of the cage is four at level 1 and sixteen at level 2, two triangles each.
   assert.equal(triangles(whole.meshes[0]), 6 * 16 * 2);
   assert.equal(triangles(holed.meshes[0]), 5 * 16 * 2);
-  assert.ok(reach(holed.meshes[0].positions, whole.meshes[0].positions) < 1e-6, 'the points left stay where the whole mesh has them');
+  assert.ok(
+    reach(holed.meshes[0].positions, whole.meshes[0].positions) < 1e-6,
+    'the points left stay where the whole mesh has them',
+  );
 });
 
 test('a hole in a mesh that is not subdivided is left out too', async () => {
-  const asset = await text(cube('uniform token subdivisionScheme = "none"\n    int[] holeIndices = [0, 5]'), [subdivision()]);
+  const asset = await text(cube('uniform token subdivisionScheme = "none"\n    int[] holeIndices = [0, 5]'), [
+    subdivision(),
+  ]);
   assert.equal(triangles(asset.meshes[0]), 8);
 });
 
@@ -173,7 +188,10 @@ const area = ({ positions, indices }) => {
   let signed = 0;
   for (let t = 0; t < list.length; t += 3) {
     const [a, b, c] = [list[t] * 3, list[t + 1] * 3, list[t + 2] * 3];
-    signed += ((positions[b] - positions[a]) * (positions[c + 1] - positions[a + 1]) - (positions[b + 1] - positions[a + 1]) * (positions[c] - positions[a])) / 2;
+    signed +=
+      ((positions[b] - positions[a]) * (positions[c + 1] - positions[a + 1]) -
+        (positions[b + 1] - positions[a + 1]) * (positions[c] - positions[a])) /
+      2;
   }
   return signed;
 };
@@ -207,7 +225,12 @@ def Mesh "Cross"
 });
 
 test('values on a split polygon stay with their corners', async () => {
-  const asset = await text(ARROW('texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 0.25), (0.25, 0.25), (0.25, 1), (0, 1)] (interpolation = "vertex")'), [subdivision()]),
+  const asset = await text(
+      ARROW(
+        'texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 0.25), (0.25, 0.25), (0.25, 1), (0, 1)] (interpolation = "vertex")',
+      ),
+      [subdivision()],
+    ),
     { positions, uvs } = asset.meshes[0];
   for (let v = 0; v < positions.length / 3; v++) {
     assert.ok(Math.abs(uvs[v * 2] - positions[v * 3] / 4) < 1e-6);
@@ -251,7 +274,12 @@ def Material "Red"
 
 test('a refined mesh has smooth normals of its own, sharp across a crease', async () => {
   const soft = (await text(cube(), [subdivision({ level: 2 })])).meshes[0],
-    hard = (await text(cube('int[] creaseIndices = [0, 1]\n    int[] creaseLengths = [2]\n    float[] creaseSharpnesses = [10]'), [subdivision({ level: 2 })])).meshes[0];
+    hard = (
+      await text(
+        cube('int[] creaseIndices = [0, 1]\n    int[] creaseLengths = [2]\n    float[] creaseSharpnesses = [10]'),
+        [subdivision({ level: 2 })],
+      )
+    ).meshes[0];
   const normalsAt = ({ positions, normals }) => {
     const seen = new Map();
     for (let v = 0; v < positions.length / 3; v++) {
@@ -267,14 +295,20 @@ test('a refined mesh has smooth normals of its own, sharp across a crease', asyn
 
 test('the level comes down when the stage would pass maxTriangles, and the issue says so', async () => {
   const asset = await text(cube(), [subdivision({ level: 4 })], { maxTriangles: 200 });
-  assert.ok(asset.issues.some((i) => /subdivision level 4 would pass maxTriangles; the stage uses level 2/.test(i.message)));
+  assert.ok(
+    asset.issues.some((i) => /subdivision level 4 would pass maxTriangles; the stage uses level 2/.test(i.message)),
+  );
   assert.equal(triangles(asset.meshes[0]), 6 * 16 * 2);
 });
 
 test('a chaikin crease method refines by the uniform one and says so', async () => {
   // Batch 132 audit: creaseMethod was never read, so a chaikin mesh refined by the uniform rule without a word.
   const asset = await text(cube('uniform token creaseMethod = "chaikin"'), [subdivision({ level: 1 })]);
-  assert.ok(asset.issues.some((i) => /asks for the chaikin crease method; semi-sharp creases refine by the uniform one/.test(i.message)));
+  assert.ok(
+    asset.issues.some((i) =>
+      /asks for the chaikin crease method; semi-sharp creases refine by the uniform one/.test(i.message),
+    ),
+  );
   const plain = await text(cube(), [subdivision({ level: 1 })]);
   assert.ok(!plain.issues.some((i) => /crease method/.test(i.message)));
 });
@@ -286,8 +320,48 @@ test('a level out of range is refused', () => {
 const icosahedron = () => {
   const t = (1 + Math.sqrt(5)) / 2;
   return {
-    points: [-1, t, 0, 1, t, 0, -1, -t, 0, 1, -t, 0, 0, -1, t, 0, 1, t, 0, -1, -t, 0, 1, -t, t, 0, -1, t, 0, 1, -t, 0, -1, -t, 0, 1],
-    faces: [0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1],
+    points: [
+      -1,
+      t,
+      0,
+      1,
+      t,
+      0,
+      -1,
+      -t,
+      0,
+      1,
+      -t,
+      0,
+      0,
+      -1,
+      t,
+      0,
+      1,
+      t,
+      0,
+      -1,
+      -t,
+      0,
+      1,
+      -t,
+      t,
+      0,
+      -1,
+      t,
+      0,
+      1,
+      -t,
+      0,
+      -1,
+      -t,
+      0,
+      1,
+    ],
+    faces: [
+      0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4,
+      2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
+    ],
   };
 };
 const hookOn = ({ points, faces: list }, level, values) =>
@@ -304,7 +378,7 @@ const hookOn = ({ points, faces: list }, level, values) =>
     soft: () => {},
   });
 
-test('Loop: a point of valence five moves by Loop\'s beta, an edge point by 3/8 and 1/8', () => {
+test("Loop: a point of valence five moves by Loop's beta, an edge point by 3/8 and 1/8", () => {
   const cage = icosahedron(),
     { points } = hookOn(cage, 1, { subdivisionScheme: 'loop' }),
     at = (list, i) => list.slice(i * 3, i * 3 + 3),
@@ -317,26 +391,47 @@ test('Loop: a point of valence five moves by Loop\'s beta, an edge point by 3/8 
     assert.ok(Math.abs(at(points, 0)[d] - want) < 1e-5);
   }
   // Edge 0 to 5 has opposite corners 11 and 1.
-  const want = [0, 1, 2].map((d) => (3 / 8) * (cage.points[d] + cage.points[15 + d]) + (cage.points[33 + d] + cage.points[3 + d]) / 8);
+  const want = [0, 1, 2].map(
+    (d) => (3 / 8) * (cage.points[d] + cage.points[15 + d]) + (cage.points[33 + d] + cage.points[3 + d]) / 8,
+  );
   assert.ok(reach(want, points) < 1e-5);
 });
 
 test('Loop: two levels match the geometry package, a separate build of the same paper', () => {
   const cage = icosahedron(),
     shape = hookOn(cage, 2, { subdivisionScheme: 'loop' }),
-    other = loopSubdivide({ positions: new Float32Array(cage.points), indices: new Uint32Array(cage.faces), normals: new Float32Array(cage.points.length), uvs: new Float32Array((cage.points.length / 3) * 2) }, 2);
+    other = loopSubdivide(
+      {
+        positions: new Float32Array(cage.points),
+        indices: new Uint32Array(cage.faces),
+        normals: new Float32Array(cage.points.length),
+        uvs: new Float32Array((cage.points.length / 3) * 2),
+      },
+      2,
+    );
   assert.equal(shape.faces.length / 3, 20 * 16);
   assert.ok(reach(shape.points, other.positions) < 1e-5);
   assert.ok(reach(other.positions, shape.points) < 1e-5);
 });
 
 test('Loop: a sharp edge stays on its line, a boundary keeps its corners', () => {
-  const sharp = hookOn(icosahedron(), 1, { subdivisionScheme: 'loop', creaseIndices: [0, 5], creaseLengths: [2], creaseSharpnesses: [10] }),
+  const sharp = hookOn(icosahedron(), 1, {
+      subdivisionScheme: 'loop',
+      creaseIndices: [0, 5],
+      creaseLengths: [2],
+      creaseSharpnesses: [10],
+    }),
     cage = icosahedron(),
     mid = [0, 1, 2].map((d) => (cage.points[d] + cage.points[15 + d]) / 2);
   assert.ok(reach(mid, sharp.points) < 1e-5);
-  const open = hookOn({ points: [0, 0, 0, 2, 0, 0, 2, 2, 0, 0, 2, 0], faces: [0, 1, 2, 0, 2, 3] }, 2, { subdivisionScheme: 'loop' });
-  for (const corner of [[2, 0, 0], [0, 2, 0]]) assert.ok(reach(corner, open.points) < 1e-6);
+  const open = hookOn({ points: [0, 0, 0, 2, 0, 0, 2, 2, 0, 0, 2, 0], faces: [0, 1, 2, 0, 2, 3] }, 2, {
+    subdivisionScheme: 'loop',
+  });
+  for (const corner of [
+    [2, 0, 0],
+    [0, 2, 0],
+  ])
+    assert.ok(reach(corner, open.points) < 1e-6);
 });
 
 test('Loop on faces that are not triangles refines as Catmull-Clark and says so', async () => {
@@ -345,8 +440,9 @@ test('Loop on faces that are not triangles refines as Catmull-Clark and says so'
   assert.equal(triangles(asset.meshes[0]), 6 * 4 * 2);
 });
 
-test('bilinear keeps the cage\'s shape', async () => {
-  const { positions } = (await text(cube('uniform token subdivisionScheme = "bilinear"'), [subdivision({ level: 2 })])).meshes[0];
+test("bilinear keeps the cage's shape", async () => {
+  const { positions } = (await text(cube('uniform token subdivisionScheme = "bilinear"'), [subdivision({ level: 2 })]))
+    .meshes[0];
   for (let i = 0; i < positions.length; i++) assert.ok(Math.abs(positions[i]) <= 1 + 1e-6);
   assert.ok(reach([1, 1, 1, 0, 1, 1], positions) < 1e-6);
 });
@@ -422,11 +518,19 @@ test('a refined skin takes its influences from the points it comes from, and ble
 });
 
 test('uniform and vertex primvars reach the refined faces', async () => {
-  const uniform = await text(cube('texCoord2f[] primvars:st = [(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0)] (interpolation = "uniform")'), [subdivision({ level: 1 })]);
+  const uniform = await text(
+    cube('texCoord2f[] primvars:st = [(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0)] (interpolation = "uniform")'),
+    [subdivision({ level: 1 })],
+  );
   const { uvs } = uniform.meshes[0];
   assert.equal(uvs.length / 2, 6 * 4 * 2 * 3);
   for (let t = 0; t < uvs.length; t += 2) assert.equal(uvs[t], Math.floor(t / 2 / (4 * 2 * 3)));
-  const vertex = await text(cube('texCoord2f[] primvars:st = [(-1, -1), (1, -1), (-1, 1), (1, 1), (-1, 1), (1, 1), (-1, -1), (1, -1)] (interpolation = "vertex")'), [subdivision({ level: 1 })]);
+  const vertex = await text(
+    cube(
+      'texCoord2f[] primvars:st = [(-1, -1), (1, -1), (-1, 1), (1, 1), (-1, 1), (1, 1), (-1, -1), (1, -1)] (interpolation = "vertex")',
+    ),
+    [subdivision({ level: 1 })],
+  );
   // Linear in the points' x and y, so the values refine with them.
   const { positions, uvs: smooth } = vertex.meshes[0];
   for (let v = 0; v < positions.length / 3; v++) {

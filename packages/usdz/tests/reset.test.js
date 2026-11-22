@@ -25,7 +25,8 @@ const folder = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'xform'
     ),
   multiply = (a, b) => {
     const out = new Array(16).fill(0);
-    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+    for (let c = 0; c < 4; c++)
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
     return out;
   };
 
@@ -65,7 +66,10 @@ test('a rig that resets skins as OpenUSD skins it', async () => {
       const [x, y, z] = want[corner],
         stage = [0, 1, 2].map((r) => base[r] * x + base[4 + r] * y + base[8 + r] * z + base[12 + r]),
         gap = Math.max(...stage.map((v, r) => Math.abs(v - points[corner][r]))) / unit;
-      assert.ok(gap <= 1e-4 * Math.max(1, Math.abs(x), Math.abs(y), Math.abs(z)), `corner ${corner} at ${time} is ${gap} off`);
+      assert.ok(
+        gap <= 1e-4 * Math.max(1, Math.abs(x), Math.abs(y), Math.abs(z)),
+        `corner ${corner} at ${time} is ${gap} off`,
+      );
     }
   });
 });

@@ -75,7 +75,8 @@ function refine(cage: Cage): { cage: Cage; stencil: Stencil } {
     around[ends[e * 2]].edges.push(e);
     around[ends[e * 2 + 1]].edges.push(e);
   }
-  for (let f = 0; f < counts.length; f++) for (let c = starts[f]; c < starts[f + 1]; c++) around[faces[c]].faces.push(f);
+  for (let f = 0; f < counts.length; f++)
+    for (let c = starts[f]; c < starts[f + 1]; c++) around[faces[c]].faces.push(f);
 
   const rows: number[] = [0],
     parents: number[] = [],
@@ -122,9 +123,7 @@ function refine(cage: Cage): { cage: Cage; stencil: Stencil } {
       staysCorner = linear || corner > 1;
     if (!mine.length) add(v, 1);
     else {
-      const same =
-        isCorner === staysCorner &&
-        Math.min(now.length, 3) === Math.min(next.length, 3);
+      const same = isCorner === staysCorner && Math.min(now.length, 3) === Math.min(next.length, 3);
       if (same || (isCorner && now.length === next.length && staysCorner)) mask(v, now, isCorner, 1);
       else {
         // Between two rules: DeRose, Kass and Truong blend them by the sharpness that runs out at this level.
@@ -147,7 +146,8 @@ function refine(cage: Cage): { cage: Cage; stencil: Stencil } {
     if (s < 1) {
       if (loop) {
         for (const f of [first[e], second[e]])
-          for (let c = starts[f]; c < starts[f + 1]; c++) if (faces[c] !== a && faces[c] !== b) add(faces[c], (1 - s) * 0.125);
+          for (let c = starts[f]; c < starts[f + 1]; c++)
+            if (faces[c] !== a && faces[c] !== b) add(faces[c], (1 - s) * 0.125);
       } else {
         addFace(first[e], soft);
         addFace(second[e], soft);
@@ -183,8 +183,21 @@ function refine(cage: Cage): { cage: Cage; stencil: Stencil } {
   }
   for (const [v, s] of corners) if (s > 1) nextCorners.set(v, s - 1);
   return {
-    cage: { size: total, counts: nextCounts, faces: nextFaces, creases: nextCreases, corners: nextCorners, linear, loop },
-    stencil: { size: total, rows: Uint32Array.from(rows), parents: Uint32Array.from(parents), weights: Float64Array.from(weights) },
+    cage: {
+      size: total,
+      counts: nextCounts,
+      faces: nextFaces,
+      creases: nextCreases,
+      corners: nextCorners,
+      linear,
+      loop,
+    },
+    stencil: {
+      size: total,
+      rows: Uint32Array.from(rows),
+      parents: Uint32Array.from(parents),
+      weights: Float64Array.from(weights),
+    },
   };
 }
 /** A stream of `width` numbers per point, through one level. */
@@ -202,7 +215,11 @@ const numbers = (value: unknown): ArrayLike<number> => (value ?? []) as ArrayLik
 const sharp = (s: number) => (s >= INFINITE ? Infinity : s);
 
 /** Faces of the authored mesh with three or more corners, as a cage with the schema's creases and corners. */
-function authored(read: MeshRead, linear: boolean, wantLoop: boolean): { cage: Cage; source: Uint32Array; cornerOf: Uint32Array; dropped: boolean } {
+function authored(
+  read: MeshRead,
+  linear: boolean,
+  wantLoop: boolean,
+): { cage: Cage; source: Uint32Array; cornerOf: Uint32Array; dropped: boolean } {
   const { counts, faces, points, value } = read,
     size = points.length / 3,
     keptCounts: number[] = [],
@@ -233,9 +250,18 @@ function authored(read: MeshRead, linear: boolean, wantLoop: boolean): { cage: C
     cornerAmounts = numbers(value('cornerSharpnesses'));
   for (let i = 0; i < points2.length; i++) if (cornerAmounts[i] > 0) corners.set(points2[i], sharp(cornerAmounts[i]));
   const loop = wantLoop && keptCounts.every((n) => n === 3);
-  if (wantLoop && !loop) read.soft(`${read.path} asks for Loop subdivision, which takes triangles only; it refines as Catmull-Clark`);
+  if (wantLoop && !loop)
+    read.soft(`${read.path} asks for Loop subdivision, which takes triangles only; it refines as Catmull-Clark`);
   return {
-    cage: { size, counts: Uint32Array.from(keptCounts), faces: Uint32Array.from(keptFaces), creases, corners, linear, loop },
+    cage: {
+      size,
+      counts: Uint32Array.from(keptCounts),
+      faces: Uint32Array.from(keptFaces),
+      creases,
+      corners,
+      linear,
+      loop,
+    },
     source: Uint32Array.from(source),
     cornerOf: Uint32Array.from(cornerOf),
     dropped: keptCounts.length !== counts.length,
@@ -327,7 +353,13 @@ function normalsOf(cage: Cage, points: ArrayLike<number>, flip: number): Float32
   return out;
 }
 /** Splits concave faces into triangles, in the face's own plane. */
-function splitConcave(counts: Uint32Array, faces: Uint32Array, points: ArrayLike<number>, source: Uint32Array, cornerOf: Uint32Array) {
+function splitConcave(
+  counts: Uint32Array,
+  faces: Uint32Array,
+  points: ArrayLike<number>,
+  source: Uint32Array,
+  cornerOf: Uint32Array,
+) {
   const outCounts: number[] = [],
     outFaces: number[] = [],
     outSource: number[] = [],
@@ -372,7 +404,8 @@ function splitConcave(counts: Uint32Array, faces: Uint32Array, points: ArrayLike
       const a = ((c + n - 1) % n) * 2,
         b = c * 2,
         d = ((c + 1) % n) * 2;
-      concave = (flat[b] - flat[a]) * (flat[d + 1] - flat[b + 1]) - (flat[b + 1] - flat[a + 1]) * (flat[d] - flat[b]) < 0;
+      concave =
+        (flat[b] - flat[a]) * (flat[d + 1] - flat[b + 1]) - (flat[b + 1] - flat[a + 1]) * (flat[d] - flat[b]) < 0;
     }
     if (!concave) {
       keep();
@@ -390,7 +423,9 @@ function splitConcave(counts: Uint32Array, faces: Uint32Array, points: ArrayLike
       outSource.push(source[f]);
       // The clipper's turn is its own: triangles go back in the polygon's.
       const [a, b, c] = [triangles[t], triangles[t + 1], triangles[t + 2]],
-        area = (flat[b * 2] - flat[a * 2]) * (flat[c * 2 + 1] - flat[a * 2 + 1]) - (flat[b * 2 + 1] - flat[a * 2 + 1]) * (flat[c * 2] - flat[a * 2]);
+        area =
+          (flat[b * 2] - flat[a * 2]) * (flat[c * 2 + 1] - flat[a * 2 + 1]) -
+          (flat[b * 2 + 1] - flat[a * 2 + 1]) * (flat[c * 2] - flat[a * 2]);
       for (const k of area < 0 ? [a, c, b] : [a, b, c]) {
         outFaces.push(faces[at + k]);
         outCorners.push(cornerOf[at + k]);
@@ -398,7 +433,12 @@ function splitConcave(counts: Uint32Array, faces: Uint32Array, points: ArrayLike
     }
   }
   return split
-    ? { counts: Uint32Array.from(outCounts), faces: Uint32Array.from(outFaces), source: Uint32Array.from(outSource), cornerOf: Uint32Array.from(outCorners) }
+    ? {
+        counts: Uint32Array.from(outCounts),
+        faces: Uint32Array.from(outFaces),
+        source: Uint32Array.from(outSource),
+        cornerOf: Uint32Array.from(outCorners),
+      }
     : undefined;
 }
 const levels = new WeakMap<object, number>();
@@ -424,13 +464,20 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
     holeList = numbers(read.value('holeIndices')),
     smooth = scheme !== 'none',
     level = smooth ? levelFor(read, wanted) : 0;
-  if (read.value('triangleSubdivisionRule') === 'smooth') read.soft(`${read.path} asks for the smooth triangle rule; it refines by the standard one`);
+  if (read.value('triangleSubdivisionRule') === 'smooth')
+    read.soft(`${read.path} asks for the smooth triangle rule; it refines by the standard one`);
   if (smooth && read.value('creaseMethod') === 'chaikin')
     read.soft(`${read.path} asks for the chaikin crease method; semi-sharp creases refine by the uniform one`);
-  const { cage, source: kept, cornerOf: cornersKept, dropped } = authored(read, scheme === 'bilinear', scheme === 'loop'),
+  const {
+      cage,
+      source: kept,
+      cornerOf: cornersKept,
+      dropped,
+    } = authored(read, scheme === 'bilinear', scheme === 'loop'),
     boundary = read.value('interpolateBoundary') ?? 'edgeAndCorner',
     { onBoundary, facesAt } = boundaryPoints(cage);
-  if (smooth && boundary === 'edgeAndCorner') for (const v of onBoundary) if (facesAt[v] === 1) cage.corners.set(v, Infinity);
+  if (smooth && boundary === 'edgeAndCorner')
+    for (const v of onBoundary) if (facesAt[v] === 1) cage.corners.set(v, Infinity);
   const holes = new Set<number>(Array.from(holeList));
   if (smooth && boundary === 'none')
     for (let f = 0, at = 0; f < cage.counts.length; at += cage.counts[f++])
@@ -449,7 +496,8 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
     const { cage: next, stencil } = refine(now),
       expanded = new Uint32Array(next.counts.length);
     let at = 0;
-    for (let f = 0; f < now.counts.length; f++) for (let c = now.loop ? 4 : now.counts[f]; c > 0; c--) expanded[at++] = source[f];
+    for (let f = 0; f < now.counts.length; f++)
+      for (let c = now.loop ? 4 : now.counts[f]; c > 0; c--) expanded[at++] = source[f];
     source = expanded;
     values = apply(stencil, values, 3);
     stencils.push(stencil);
@@ -503,7 +551,15 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
   /** Refined face-varying data: seams between values are boundaries of a cage of their own. */
   const faceVarying = (stream: ArrayLike<number>, width: number, ids: Uint32Array, size: number, varying: boolean) => {
     const rule = varying ? 'all' : (read.value('faceVaryingLinearInterpolation') ?? 'cornersPlus1'),
-      fv: Cage = { size, counts: cage.counts, faces: ids, creases: new Map(), corners: new Map(), linear: rule === 'all' || scheme === 'bilinear', loop: cage.loop },
+      fv: Cage = {
+        size,
+        counts: cage.counts,
+        faces: ids,
+        creases: new Map(),
+        corners: new Map(),
+        linear: rule === 'all' || scheme === 'bilinear',
+        loop: cage.loop,
+      },
       { onBoundary: seam, facesAt: on } = boundaryPoints(fv);
     // These rules cannot make values smoother than the points, as OpenSubdiv's documentation says: the mesh's sharpness holds here too.
     for (let f = 0, at = 0; f < cage.counts.length; at += cage.counts[f++])
@@ -530,7 +586,8 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
           // A seam that ends at this point, and a region across from a lone face's corner.
           dart = values.length === 1 && seam.has(values[0]) && !onBoundary.has(point),
           concave = values.length === 2 && (on[values[0]] === 1 || on[values[1]] === 1);
-        if (values.length > 2 || (rule === 'cornersPlus2' && (dart || concave))) for (const v of values) fv.corners.set(v, Infinity);
+        if (values.length > 2 || (rule === 'cornersPlus2' && (dart || concave)))
+          for (const v of values) fv.corners.set(v, Infinity);
       }
     }
     let walk = fv,
@@ -586,7 +643,13 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
     corners(stream, width, indices, interpolation) {
       const kind =
           interpolation ??
-          (stream.length === pointCount * width ? 'vertex' : stream.length === allCorners * width ? 'faceVarying' : stream.length === width ? 'constant' : 'uniform'),
+          (stream.length === pointCount * width
+            ? 'vertex'
+            : stream.length === allCorners * width
+              ? 'faceVarying'
+              : stream.length === width
+                ? 'constant'
+                : 'uniform'),
         out = new Float32Array((level ? now.faces.length : faces.length) * width);
       if (level === 0) {
         const count = faces.length,
@@ -596,7 +659,14 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
           for (let c = 0; c < counts[f]; c++, corner++) {
             const authoredCorner = cornerOf![corner],
               point = read.faces[authoredCorner],
-              slot = kind === 'constant' ? 0 : kind === 'uniform' ? source[f] : kind === 'faceVarying' ? authoredCorner : point,
+              slot =
+                kind === 'constant'
+                  ? 0
+                  : kind === 'uniform'
+                    ? source[f]
+                    : kind === 'faceVarying'
+                      ? authoredCorner
+                      : point,
               at = indices ? indices[slot] : slot;
             for (let d = 0; d < width; d++) flatOut[corner * width + d] = stream[at * width + d];
           }
@@ -652,7 +722,12 @@ function shape(read: MeshRead, wanted: number): MeshShape | undefined {
  */
 export function subdivision(options: SubdivisionOptions = {}): USDExtension {
   const level = options.level ?? 2;
-  if (!Number.isInteger(level) || level < 0 || level > 6) throw new RangeError(`subdivision level ${level} is invalid; pass a whole number from 0 to 6`);
-  const hook: ExtensionHooks & { options: SubdivisionOptions } = { name: 'subdiv', options, shape: (read) => shape(read, level) };
+  if (!Number.isInteger(level) || level < 0 || level > 6)
+    throw new RangeError(`subdivision level ${level} is invalid; pass a whole number from 0 to 6`);
+  const hook: ExtensionHooks & { options: SubdivisionOptions } = {
+    name: 'subdiv',
+    options,
+    shape: (read) => shape(read, level),
+  };
   return hook;
 }
