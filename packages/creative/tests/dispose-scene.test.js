@@ -55,7 +55,7 @@ const survived = (engine, plugin) => {
   assert.equal(engine.plugins.get(plugin.name), plugin, 'the active scene lost its own same-name plugin');
   assert.equal(plugin.disposed, 0, "the active scene's same-name plugin was disposed");
 };
-import { GrassField, Planet } from '../dist/index.js';
+import { GrassField, Planet, Stars, ToonShading } from '../dist/index.js';
 
 // The GPU set-up needs a real device; the dispose path only needs the engine it records.
 class BareGrass extends GrassField {
@@ -102,3 +102,27 @@ test("Planet.dispose removes it from its own scene, not the active scene's same-
     h.cleanup();
   }
 });
+
+// Disposing ToonShading or Stars took neither out of its scene: the plugin and its frame pass stayed registered and ran
+// on freed buffers (KB-CREATIVE-DISPOSE1).
+for (const [name, make] of [
+  ['ToonShading', (engine) => ToonShading.attach(engine)],
+  ['Stars', (engine) => Stars.attach(engine)],
+])
+  test(`${name}.dispose takes it out of its own scene, once, and not the active scene's same-name plugin`, async () => {
+    const h = optionalGPU(),
+      engine = await realEngine(h);
+    try {
+      const other = engine.createScene('other'),
+        effect = within(other, () => make(engine)),
+        kept = sentinel(engine, effect.name);
+      assert.equal(other.plugins.get(effect.name), effect);
+      effect.dispose();
+      effect.dispose();
+      survived(engine, kept);
+      assert.equal(other.plugins.has(effect.name), false, `the disposed ${name} stayed in its scene`);
+    } finally {
+      engine.dispose();
+      h.cleanup();
+    }
+  });
