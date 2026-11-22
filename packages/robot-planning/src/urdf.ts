@@ -150,9 +150,17 @@ function geometryOf(element: XMLElement | undefined, where: string): URDFGeometr
       return { type: 'box', size: [x, y, z] };
     }
     case 'cylinder':
-      return { type: 'cylinder', radius: number(a.radius, 'cylinder radius'), length: number(a.length, 'cylinder length') };
+      return {
+        type: 'cylinder',
+        radius: number(a.radius, 'cylinder radius'),
+        length: number(a.length, 'cylinder length'),
+      };
     case 'capsule':
-      return { type: 'capsule', radius: number(a.radius, 'capsule radius'), length: number(a.length, 'capsule length') };
+      return {
+        type: 'capsule',
+        radius: number(a.radius, 'capsule radius'),
+        length: number(a.length, 'capsule length'),
+      };
     case 'sphere':
       return { type: 'sphere', radius: number(a.radius, 'sphere radius') };
     case 'mesh': {
@@ -315,11 +323,7 @@ function expand(raw: RawJoint, parent: number | null): RobotJointOptions[] {
       other = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0],
       dot = n[0] * other[0] + n[1] * other[1] + n[2] * other[2],
       u = [other[0] - n[0] * dot, other[1] - n[1] * dot, other[2] - n[2] * dot] as [number, number, number],
-      v: [number, number, number] = [
-        n[1] * u[2] - n[2] * u[1],
-        n[2] * u[0] - n[0] * u[2],
-        n[0] * u[1] - n[1] * u[0],
-      ];
+      v: [number, number, number] = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
     return [
       { name: `${name}_u`, type: 'prismatic', axis: u, parent, origin, ...free },
       { name, type: 'prismatic', axis: v, parent: `${name}_u`, ...free },
@@ -349,8 +353,7 @@ function shapeOf(
   meshes: Record<string, ArrayLike<number>> | undefined,
 ): RobotShapeOptions | null {
   const { geometry: g, origin } = item;
-  if (g.type === 'sphere')
-    return { joint, start: [origin[12], origin[13], origin[14]], radius: g.radius };
+  if (g.type === 'sphere') return { joint, start: [origin[12], origin[13], origin[14]], radius: g.radius };
   if (g.type === 'capsule') {
     const half = g.length / 2,
       at = (sign: number): [number, number, number] => [
@@ -363,7 +366,8 @@ function shapeOf(
   const points: number[] = [];
   if (g.type === 'box') {
     const [x, y, z] = g.size;
-    for (const a of [-x / 2, x / 2]) for (const b of [-y / 2, y / 2]) for (const c of [-z / 2, z / 2]) points.push(a, b, c);
+    for (const a of [-x / 2, x / 2])
+      for (const b of [-y / 2, y / 2]) for (const c of [-z / 2, z / 2]) points.push(a, b, c);
   } else if (g.type === 'cylinder') {
     const reach = g.radius / Math.cos(Math.PI / sides);
     for (let i = 0; i < sides; i++) {
@@ -418,7 +422,8 @@ export function parseURDF(text: string, options?: URDFOptions): URDFModel {
     throw rangeError('Two URDF joints share a name', 'kinematics');
   const moved = new Set<string>();
   for (const { data } of raw) {
-    if (!byName.has(data.parent)) throw rangeError(`URDF joint ${data.name} names no link ${data.parent}`, 'kinematics');
+    if (!byName.has(data.parent))
+      throw rangeError(`URDF joint ${data.name} names no link ${data.parent}`, 'kinematics');
     if (!byName.has(data.child)) throw rangeError(`URDF joint ${data.name} names no link ${data.child}`, 'kinematics');
     if (moved.has(data.child)) throw rangeError(`URDF link ${data.child} has two parents`, 'kinematics');
     moved.add(data.child);
@@ -477,8 +482,15 @@ function resolveMesh(filename: string, base: string, packages: Record<string, st
 }
 
 /** The corners of a mesh's convex hull, or its vertices when they span no volume, as a flat sheet does. */
-async function hullCorners(url: string, bytes: Uint8Array, signal: AbortSignal | undefined): Promise<ArrayLike<number>> {
-  const [loaders, geometry] = await Promise.all([import('@margoengine/loaders'), import('@margoengine/geometry/extras')]);
+async function hullCorners(
+  url: string,
+  bytes: Uint8Array,
+  signal: AbortSignal | undefined,
+): Promise<ArrayLike<number>> {
+  const [loaders, geometry] = await Promise.all([
+    import('@margoengine/loaders'),
+    import('@margoengine/geometry/extras'),
+  ]);
   signal?.throwIfAborted();
   const kind = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(url)?.[1]?.toLowerCase();
   let positions: Float32Array;

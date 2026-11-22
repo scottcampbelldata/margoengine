@@ -60,7 +60,8 @@ function flange(q) {
       sa = Math.sin(alpha),
       step = [ct, -st, 0, a, st * ca, ct * ca, -sa, -d * sa, st * sa, ct * sa, ca, d * ca, 0, 0, 0, 1],
       next = new Array(16).fill(0);
-    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) next[r * 4 + c] += m[r * 4 + k] * step[k * 4 + c];
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) next[r * 4 + c] += m[r * 4 + k] * step[k * 4 + c];
     m = next;
   });
   return [m[3], m[7], m[11]];
@@ -103,7 +104,8 @@ test('Panda: forward kinematics agree with the DH table Franka publishes, on 200
     robot.forward(q);
     const got = robot.pointOn(tip, [0, 0, 0]),
       want = flange(q);
-    for (let k = 0; k < 3; k++) assert.ok(Math.abs(got[k] - want[k]) < 1e-9, `pose ${i} axis ${k}: ${got[k]} ${want[k]}`);
+    for (let k = 0; k < 3; k++)
+      assert.ok(Math.abs(got[k] - want[k]) < 1e-9, `pose ${i} axis ${k}: ${got[k]} ${want[k]}`);
   }
   // Franka's zero pose, by hand from the same table: a 0.088 reach and 0.926 of height.
   robot.forward(new Float64Array(8));
@@ -203,7 +205,11 @@ test('the primitive description of the same arm needs no file, and parseURDF rep
     bare = parseURDF(meshed);
   assert.ok(bare.missingMeshes.length >= 9);
   assert.deepEqual(bare.missingMeshes, bare.meshes);
-  assert.equal(bare.robot.shapeCount, (meshed.match(/<collision/g) ?? []).length - (meshed.match(/<collision>\s*(<origin[^>]*>\s*)?<geometry>\s*<mesh/g) ?? []).length);
+  assert.equal(
+    bare.robot.shapeCount,
+    (meshed.match(/<collision/g) ?? []).length -
+      (meshed.match(/<collision>\s*(<origin[^>]*>\s*)?<geometry>\s*<mesh/g) ?? []).length,
+  );
 });
 
 test('a cylinder holds, a box and a sphere measure, and origins follow roll, pitch, yaw', () => {
@@ -264,13 +270,22 @@ test('a broken document is refused with a reason', () => {
   assert.throws(() => parseURDF(robot('<link name="a"/><link name="b"/>')), /one root link/);
   assert.throws(() => parseURDF(robot(`<link name="a"/>${joint('a', 'z')}`)), /names no link z/);
   assert.throws(() => parseURDF(robot(`<link name="a"/><link name="b"/>${joint('a', 'b', '')}`)), /needs a <limit>/);
-  assert.throws(() => parseURDF(robot(`<link name="a"/><link name="b"/>${joint('a', 'b', '', 'hover')}`)), /unknown type hover/);
   assert.throws(
-    () => parseURDF(robot(`<link name="a"/><link name="b"/><link name="c"/>${joint('a', 'b')}${joint('b', 'a')}${joint('b', 'c')}`)),
+    () => parseURDF(robot(`<link name="a"/><link name="b"/>${joint('a', 'b', '', 'hover')}`)),
+    /unknown type hover/,
+  );
+  assert.throws(
+    () =>
+      parseURDF(
+        robot(`<link name="a"/><link name="b"/><link name="c"/>${joint('a', 'b')}${joint('b', 'a')}${joint('b', 'c')}`),
+      ),
     /two parents|one root link/,
   );
   assert.throws(() => parseURDF(robot('<link name="a"><collision><geometry/></collision></link>')), /no geometry/);
-  assert.throws(() => parseURDF(robot('<link name="a"><collision><geometry><box size="1 2"/></geometry></collision></link>')), /3 numbers/);
+  assert.throws(
+    () => parseURDF(robot('<link name="a"><collision><geometry><box size="1 2"/></geometry></collision></link>')),
+    /3 numbers/,
+  );
 });
 
 /** A one-link robot whose collision is the mesh at `filename`. */

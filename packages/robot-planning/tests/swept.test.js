@@ -51,7 +51,13 @@ test('Robot: a prismatic joint slides, a mimic joint repeats, ranges are read an
     joints: [
       { name: 'slide', type: 'prismatic', axis: [2, 0, 0], lower: -1, upper: 1 },
       { name: 'wheel', type: 'continuous', parent: null },
-      { name: 'follow', type: 'prismatic', axis: [0, 1, 0], parent: 'slide', mimic: { joint: 'slide', multiplier: 2, offset: 0.5 } },
+      {
+        name: 'follow',
+        type: 'prismatic',
+        axis: [0, 1, 0],
+        parent: 'slide',
+        mimic: { joint: 'slide', multiplier: 2, offset: 0.5 },
+      },
     ],
   });
   assert.equal(robot.dof, 2);
@@ -246,7 +252,6 @@ test('sweepRobot: selfCollision finds a link folding through another, and pairs 
   assert.equal(free.selfCollisionPairs.length, 0);
   assert.equal(sweepRobot(free, from, to, [], { selfCollision: true }).clear, true);
 });
-
 
 test('a collider that gives NaN stops the check instead of reading clear', () => {
   const arm = new Robot({ joints: [{ lower: -4, upper: 4 }], shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.01 }] }),

@@ -67,11 +67,29 @@ test('Robot.jacobian: matches finite differences on revolute, prismatic, fixed a
 });
 
 test('a target past a joint stop: the joint stops on its limit, the rest does its best, and the solver names it', () => {
-  const target = tipOf(planar([[-4, 4], [-4, 4]]), [0.3, 1.5]),
-    free = new JointLimitSolver(planar([[-4, 4], [-4, 4]]), { tip: 'tip' }).solve([0, 0.5], { position: target });
+  const target = tipOf(
+      planar([
+        [-4, 4],
+        [-4, 4],
+      ]),
+      [0.3, 1.5],
+    ),
+    free = new JointLimitSolver(
+      planar([
+        [-4, 4],
+        [-4, 4],
+      ]),
+      { tip: 'tip' },
+    ).solve([0, 0.5], { position: target });
   assert.equal(free.reached, true, 'with no limit the target is reachable');
   assert.ok(free.q[1] > 1, 'and needs the elbow past 1');
-  const out = new JointLimitSolver(planar([[-4, 4], [-1, 1]]), { tip: 'tip' }).solve([0, 0.5], { position: target });
+  const out = new JointLimitSolver(
+    planar([
+      [-4, 4],
+      [-1, 1],
+    ]),
+    { tip: 'tip' },
+  ).solve([0, 0.5], { position: target });
   assert.equal(out.reached, false);
   assert.equal(out.q[1], 1);
   assert.deepEqual(out.limited, [1]);
@@ -119,7 +137,10 @@ test('a thin post between the arm and its target: it stops at the closed-form an
     goal = [Math.cos(2), Math.sin(2), 0];
   for (const maxStep of [0.05, 0.2, 3]) {
     const robot = new Robot({
-        joints: [{ lower: -4, upper: 4 }, { name: 'tip', type: 'fixed', origin: translate(1, 0, 0) }],
+        joints: [
+          { lower: -4, upper: 4 },
+          { name: 'tip', type: 'fixed', origin: translate(1, 0, 0) },
+        ],
         shapes: [{ joint: 0, end: [1, 0, 0], radius: r }],
       }),
       out = new JointLimitSolver(robot, { tip: 'tip', colliders: [post], minClearance: gap, maxStep }).solve([0], {
@@ -207,7 +228,10 @@ test('the path from start to result is clear, across seeded scenes on an arm wit
   let reached = 0;
   for (let round = 0; round < 40; round++) {
     const colliders = [
-        new SphereVolume({ center: [rand() * 3 - 1.5, rand() * 3 - 1.5, rand() * 3 - 1.5], radius: 0.1 + rand() * 0.3 }),
+        new SphereVolume({
+          center: [rand() * 3 - 1.5, rand() * 3 - 1.5, rand() * 3 - 1.5],
+          radius: 0.1 + rand() * 0.3,
+        }),
         new ConvexHullVolume({
           points: [-0.2, -0.2, -0.2, 0.2, -0.2, -0.2, -0.2, 0.2, -0.2, -0.2, -0.2, 0.2, 0.2, 0.2, 0.2],
           matrix: translate(rand() * 3 - 1.5, rand() * 3 - 1.5, rand() * 3 - 1.5),
@@ -241,7 +265,10 @@ test('armRobot: the hand reaches a point, and a bent-only elbow stops short of f
 
 test('a pose already inside the gap is pushed out before anything else', () => {
   const robot = new Robot({
-      joints: [{ lower: -4, upper: 4 }, { name: 'tip', type: 'fixed', origin: translate(1, 0, 0) }],
+      joints: [
+        { lower: -4, upper: 4 },
+        { name: 'tip', type: 'fixed', origin: translate(1, 0, 0) },
+      ],
       shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
     }),
     ball = new SphereVolume({ center: [0.8, 0.09, 0], radius: 0.05 });
@@ -281,4 +308,3 @@ test('bad settings are refused with a reason', () => {
   assert.throws(() => solver.solve([0, 0], { position: [0, 0, 0] }), /numbers/);
   assert.throws(() => solver.solve([0], { position: [NaN, 0, 0] }), /finite/);
 });
-
