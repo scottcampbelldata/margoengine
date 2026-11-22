@@ -98,7 +98,9 @@ test('OctreeCloud schedules the default four or the requested positive integer n
       load(node, signal) {
         if (node === tree.root) return tree.load(node);
         pending++;
-        return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+        return new Promise((resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+        );
       },
     };
     const instance = new OctreeCloud(host(), source, { minNodePixels: 1, ...options });

@@ -53,7 +53,8 @@ while (queue.length) {
     queue.push(...node.children.filter(Boolean));
     nodes++;
     points += node.count;
-    if (positions.length !== node.count * 3) throw new Error(`node ${node.id}: ${positions.length / 3} of ${node.count} points`);
+    if (positions.length !== node.count * 3)
+      throw new Error(`node ${node.id}: ${positions.length / 3} of ${node.count} points`);
     for (let i = 0; i < node.count; i++)
       for (let a = 0; a < 3; a++) {
         const v = positions[i * 3 + a],

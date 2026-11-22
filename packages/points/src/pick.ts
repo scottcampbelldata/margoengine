@@ -121,7 +121,8 @@ export class PointPicking {
    * @throws MargoError `state` when `points` is not attached to an engine yet.
    */
   static attach(picking: PointPickHost, points: PointsPlugin): PointPicking {
-    if (!points['engine']) throw new MargoError('state', 'Attach PointsPlugin to the engine before PointPicking.attach');
+    if (!points['engine'])
+      throw new MargoError('state', 'Attach PointsPlugin to the engine before PointPicking.attach');
     const value = new PointPicking(points);
     value.remove = picking.addOverlay(value);
     points['watchers'].add(value);

@@ -16,7 +16,10 @@ function uniformOf(plugin, cloud, scale) {
 
 test('pixel sizes and pixel clamps follow the pixel scale; the material keeps its values', () => {
   const plugin = new PointsPlugin(),
-    cloud = new PointCloud({ positions: new Float32Array(3), material: { size: 10, minPixelSize: 2, maxPixelSize: 64 } });
+    cloud = new PointCloud({
+      positions: new Float32Array(3),
+      material: { size: 10, minPixelSize: 2, maxPixelSize: 64 },
+    });
   assert.deepEqual([...uniformOf(plugin, cloud, 1).subarray(20, 23)], [10, 2, 64]);
   assert.deepEqual([...uniformOf(plugin, cloud, 2).subarray(20, 23)], [20, 4, 128]);
   assert.deepEqual([cloud.material.size, cloud.material.minPixelSize, cloud.material.maxPixelSize], [10, 2, 64]);
@@ -30,4 +33,3 @@ test('world sizes are not pixels: only their pixel clamps scale', () => {
     });
   assert.deepEqual([...uniformOf(plugin, cloud, 2).subarray(20, 23)], [0.5, 2, 64]);
 });
-
