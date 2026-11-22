@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: the bow wave extended sideways in a straight line (water/ships)
+
+- **Repro:** a 68 m hull at 3 m/s leaves a raised stripe at the same distance aft of the stem across the near-field bow wave.
+- **Cause:** the longitudinal contact profile used the same phase at every lateral position. The outboard falloff only reduced its height.
+- **Fix:** sweep the profile aft and fade its height and foam to zero as it leaves the current hull. Use the current hull frame for the waterline mask when a ship turns.
+- **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` test separation of the hull crest, swept shoulder and old transverse line.
+
 ### Fixed 2026-11-21: turbulent foam was already old at the stern (water/ships)
 
 - **Repro:** move a 72 m hull at 3 m/s with a 9.5-second foam life. Sample within one metre aft of the transom after the ship has moved one hull length.

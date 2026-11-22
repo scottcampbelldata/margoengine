@@ -1,3 +1,9 @@
+### Section 5 evidence: bow wave planform (2026-11-21)
+
+The near-field bow crest and its breaking foam use current hull coordinates. The existing bow contact profile sweeps aft and fades as the distance from the hull increases. The compact support ends the near-field crest before it carries on across open water. Kelvin height still uses the recorded bow trajectory.
+
+WebGPU and WebGL2 height readbacks for a 68 m hull at 3 m/s measured 0.458 m at the bow shoulder and 0.344 m at the swept crest. Both measured zero on the old transverse line at that outboard station and zero farther out. See the [clean-room record](../clean-room.md#swept-bow-crest-in-water-2026-11-21).
+
 ### Section 5 evidence: ship wake foam history (2026-11-21)
 
 Water's ships entry reads each turbulent foam sample from the stern's nearest historical segment. Kelvin waves still use the bow track. The two positions and arc lengths share the existing eight-float station layout. Vertex shading continues to evaluate only wave height and slope. The fragment shader uses the stern's time and speed, and rejects samples before the track begins or ahead of the stern. Zero-speed samples on a path retain the nearest newer moving heading so a stationary ship does not leave a false turn at the dock.

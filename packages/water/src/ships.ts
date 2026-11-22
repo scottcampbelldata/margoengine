@@ -152,10 +152,13 @@ function waveAt(x: number, y: number, u: number, l: number, d: number): number {
   }
   return 2 * Math.pow(eps, -0.25) * spread * wave(Math.SQRT1_2) * Math.exp(disc / eps);
 }
-/** The bow ridge along the hull, per unit height, at s metres behind the stem and `outside` metres off the hull side. */
-function ridge(s: number, outside: number, crest: number, width: number): number {
+/** The crest follows the bow shoulder. Its outboard phase sweeps aft as the near-field wave dies away. */
+function ridge(s: number, outside: number, crest: number, beam: number): number {
   if (crest <= 0) return 0;
-  const sigma = s / crest;
+  const width = Math.max(crest, Math.min(0.35 * beam, Math.sqrt(beam * crest)));
+  const off = Math.max(0, outside);
+  if (off >= width) return 0;
+  const sigma = (s - (2 * off * off) / width) / crest;
   // Rising along the stem's parabola to the crest, then Margo's falling shape into a shallow trough.
   const along =
     sigma < 0
@@ -163,7 +166,7 @@ function ridge(s: number, outside: number, crest: number, width: number): number
       : sigma <= 1
         ? sigma * (2 - sigma)
         : Math.exp(-(sigma - 1) * (sigma - 1)) * Math.cos(1.2 * (sigma - 1));
-  return along * Math.exp(-Math.max(outside, 0) / width);
+  return along * (1 - smoothstep(0, width, off));
 }
 /** Signed distance from the waterline of a hull (positive outside), s behind the stem and y to the side. */
 function hullDistance(s: number, y: number, l: number, b: number, tanE: number): number {
@@ -465,10 +468,13 @@ fn shipWaveAt(x:f32,y:f32,u:f32,l:f32,d:f32)->f32 {
  }
  return 2.0*pow(eps,-0.25)*spread*shipWaveTerm(0.70710678,kg,k0,kl,d,x,tau)*exp(disc/eps);
 }
-fn shipRidge(s:f32,outside:f32,crest:f32,width:f32)->f32 {
- if(crest<=0.0){return 0.0;}let sigma=s/crest;var along=0.0;
+fn shipRidge(s:f32,outside:f32,crest:f32,beam:f32)->f32 {
+ if(crest<=0.0){return 0.0;}
+ let width=max(crest,min(0.35*beam,sqrt(beam*crest)));let off=max(0.0,outside);
+ if(off>=width){return 0.0;}
+ let sigma=(s-2.0*off*off/width)/crest;var along=0.0;
  if(sigma>=0.0&&sigma<=1.0){along=sigma*(2.0-sigma);}else if(sigma>1.0){along=exp(-(sigma-1.0)*(sigma-1.0))*cos(1.2*(sigma-1.0));}
- return along*exp(-max(outside,0.0)/width);
+ return along*(1.0-shipSmooth(0.0,width,off));
 }
 fn shipHullDistance(s:f32,y:f32,l:f32,b:f32,tanE:f32)->f32 {
  let half=b*0.5;let ay=abs(y);
@@ -513,16 +519,18 @@ fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
   if(local.x>span){continue;}
   let s=local.x;let y=local.y;let u=local.z;let age=local.w;
   let fade=(1.0-shipSmooth(0.8*span,span,s))*exp(-age/shipData.look.z);
-  let hull=shipHullDistance(s,y,l,b,ship.c.z);let mask=shipSmooth(-0.25*b,0.0,hull);
+  let rel=p-ship.a.xy;let f=ship.a.zw;
+  let bowS=-dot(rel,f);let bowY=f.y*rel.x-f.x*rel.y;
+  let hull=shipHullDistance(bowS,bowY,l,b,ship.c.z);let mask=shipSmooth(-0.25*b,0.0,hull);
   let a0=0.25*ship.c.x*ship.c.w*shipData.look.x;
   let waves=a0*(shipWaveAt(s,y,u,l,d)-shipData.look.y*shipWaveAt(s-l,y,u,l,d))*fade;
-  let width=max(ship.c.y,b*0.25);let crestRidge=shipRidge(s,hull,ship.c.y,width);
+  let crestRidge=shipRidge(bowS,hull,ship.c.y,b);
   let bow=ship.c.x*ship.c.w*shipData.look.w*crestRidge;
   height+=(waves+bow)*mask;
   if(!sampleFoam){continue;}
   let speed=ship.b.x;let fr=speed/sqrt(9.81*l);
   let band=shipData.foam.x*(0.5+min(fr,1.0));
-  var wl=0.0;if(band>0.0&&s<=l+band){wl=(1.0-shipSmooth(0.0,band,hull))*shipSmooth(-0.1*b,0.0,hull)*shipSmooth(0.3,2.0,speed);}
+  var wl=0.0;if(band>0.0&&bowS<=l+band){wl=(1.0-shipSmooth(0.0,band,hull))*shipSmooth(-0.1*b,0.0,hull)*shipSmooth(0.3,2.0,speed);}
   var turbulent=0.0;
   if(shipData.foam.z>0.0){
    let stern=shipLocal(i,p,true);
@@ -532,7 +540,7 @@ fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
       *shipSmooth(0.5,3.0,stern.z)*(1.0-shipSmooth(0.8*span,span,stern.x));
    }
   }
-  var breaking=0.0;if(speed>0.05){breaking=shipSmooth(0.3,0.48,9.81*ship.c.x/(speed*speed))*shipSmooth(0.5,2.0,speed)*max(crestRidge,0.0)*min(shipData.look.w,1.0);}
+  var breaking=0.0;if(speed>0.05){breaking=shipSmooth(0.3,0.48,9.81*ship.c.x/(speed*speed))*shipSmooth(0.5,2.0,speed)*max(crestRidge,0.0)*mask*min(shipData.look.w,1.0);}
   foam=max(foam,max(max(wl,turbulent),breaking));
  }
  return vec2f(height,clamp(foam,0.0,1.0));
@@ -786,17 +794,21 @@ export class ShipWakes implements EnginePlugin {
       const [s, y, u, age] = this.trailAt(x, z, i, false);
       if (s > span) continue;
       const fade = (1 - smoothstep(0.8 * span, span, s)) * Math.exp(-age / v[6]);
-      const hull = hullDistance(s, y, l, b, v[o + 10]),
+      const dx = x - v[o];
+      const dz = z - v[o + 1];
+      const bowS = -dx * v[o + 2] - dz * v[o + 3];
+      const bowY = v[o + 3] * dx - v[o + 2] * dz;
+      const hull = hullDistance(bowS, bowY, l, b, v[o + 10]),
         mask = smoothstep(-0.25 * b, 0, hull);
       const a0 = 0.25 * v[o + 8] * v[o + 11] * v[4];
       const waves = a0 * (waveAt(s, y, u, l, d) - v[5] * waveAt(s - l, y, u, l, d)) * fade;
-      const crestRidge = ridge(s, hull, v[o + 9], Math.max(v[o + 9], b * 0.25));
+      const crestRidge = ridge(bowS, hull, v[o + 9], b);
       height += (waves + v[o + 8] * v[o + 11] * v[7] * crestRidge) * mask;
       const speed = v[o + 4],
         fr = speed / Math.sqrt(G * l),
         band = v[8] * (0.5 + Math.min(fr, 1));
       const wl =
-        band > 0 && s <= l + band
+        band > 0 && bowS <= l + band
           ? (1 - smoothstep(0, band, hull)) * smoothstep(-0.1 * b, 0, hull) * smoothstep(0.3, 2, speed)
           : 0;
       let turbulent = 0;
@@ -817,6 +829,7 @@ export class ShipWakes implements EnginePlugin {
           ? smoothstep(0.3, 0.48, (G * v[o + 8]) / (speed * speed)) *
             smoothstep(0.5, 2, speed) *
             Math.max(crestRidge, 0) *
+            mask *
             Math.min(v[7], 1)
           : 0;
       foam = Math.max(foam, wl, turbulent, breaking);

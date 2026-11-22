@@ -120,6 +120,34 @@ test('the bow wave is Noblesse et al. (2008), never above the stagnation head U^
   assert.ok(Math.abs(drawn - height) < 1e-3, `drawn ${drawn}, Noblesse ${height}`);
 });
 
+test('the bow crest sweeps aft off the hull and its foam ends before it becomes a crosswise stripe', () => {
+  const hull = { length: 68, beam: 15.5, draft: 7, entrance: 28 };
+  const speed = 3;
+  const { height, crest } = bowWave(speed, hull);
+  const reach = (crest * Math.tan((hull.entrance * Math.PI) / 180)) / hull.beam;
+  const atHull = hull.beam * 0.5 * reach * (2 - reach);
+  const overhang = atHull + 0.11 * hull.beam;
+  const outer = atHull + 0.27 * hull.beam;
+  const stem = hull.length * 0.5;
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeHeight: 0, waterlineFoam: 0, turbulentWake: 0 },
+    ships: [{ hull, pose: { position: [0, 0, 0], heading: 0, speed } }],
+  });
+  const at = (x, aft) => wakes.sample(x, stem - aft);
+  assert.ok(Math.abs(at(atHull, crest).height - height) < 0.001);
+  let peak = { aft: crest, height: at(overhang, crest).height };
+  for (let aft = crest; aft < crest + 4; aft += 0.025) {
+    const next = at(overhang, aft);
+    if (next.height > peak.height) peak = { aft, height: next.height };
+  }
+  assert.ok(peak.aft > crest + 0.45, 'the outboard crest stays on the transverse ridge');
+  assert.ok(peak.height > 0.4 * height, 'the swept crest is missing');
+  assert.ok(at(overhang, crest).height < 0.65 * peak.height, 'the original crosswise line is still too strong');
+  assert.equal(at(outer, crest).foam, 0);
+  assert.ok(Math.abs(at(-overhang, peak.aft).height - peak.height) < 1e-7);
+});
+
 test('the wake fades with age, follows a turning ship, and draws foam on the waterline and in the turbulent wake', () => {
   const hull = { length: 30, beam: 6, draft: 2 };
   const turn = (t) => [100 * Math.sin(t / 20), 100 * (1 - Math.cos(t / 20))];

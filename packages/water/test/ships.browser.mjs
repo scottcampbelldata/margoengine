@@ -79,6 +79,33 @@ try {
       wakes.dispose();
       sea.dispose();
 
+      // Read fixed 1/8 m grid points around an isolated bow so ambient waves cannot hide the crest's path.
+      const bowSea = Water.attach(engine, {
+        size: [16, 16],
+        segments: 128,
+        waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
+      });
+      const bowWakes = ShipWakes.attach(engine, {
+        surface: bowSea,
+        ships: [
+          {
+            hull: { length: 68, beam: 15.5, draft: 7, entrance: 28 },
+            pose: { position: [0, 0, -34], heading: 0, speed: 3 },
+          },
+        ],
+        look: { wakeHeight: 0, waterlineFoam: 0, turbulentWake: 0 },
+      });
+      engine.render({ delta: 0 });
+      const bowQuery = await WaveQuery.capture(bowSea);
+      const bowCrest = [
+        [0.5, -0.875],
+        [2.125, -1.75],
+        [2.125, -0.875],
+        [4.75, -0.875],
+      ].map(([x, z]) => bowQuery.heightAt(x, z));
+      bowWakes.dispose();
+      bowSea.dispose();
+
       // At 3 m/s a 72 m hull takes 24 s to pass a point. Fresh foam must still start at the transom.
       engine.camera.position = [0, 47, -15];
       engine.camera.target = [0, 0, -9];
@@ -218,7 +245,7 @@ try {
       });
       const lamps = ShipWakes.attach(engine, { surface: night, lamps: [{ position: [0, 10, -80], intensity: 3000 }] });
       window.shipsTest = { engine, lamps, night };
-      return { open, early, onFlood, ride, sternFoam };
+      return { open, early, onFlood, ride, sternFoam, bowCrest };
     },
     { WIDTH, HEIGHT },
   );
@@ -263,6 +290,10 @@ try {
     JSON.stringify(result.ride),
   );
 
+  const [stem, swept, stripe, outboard] = result.bowCrest;
+  assert.ok(stem > 0.42 && swept > 0.26, 'missing bow rise or swept crest: ' + result.bowCrest);
+  assert.ok(Math.abs(stripe) < 0.12 && Math.abs(outboard) < 1e-6, 'a straight ridge remains: ' + result.bowCrest);
+  console.log('bow height in metres at stem, swept crest, old stripe and outboard:', result.bowCrest);
   const [fresh, aged, forward, offAxis] = result.sternFoam;
   assert.ok(fresh > 0.35, 'fresh foam must start at the stern: ' + result.sternFoam);
   assert.ok(aged > 0.07 && aged < fresh * 0.6, 'stern foam must fade with its own age: ' + result.sternFoam);

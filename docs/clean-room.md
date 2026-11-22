@@ -1,5 +1,12 @@
 # Clean room
 
+### Swept bow crest in Water (2026-11-21)
+
+Francis Noblesse, Gérard Delhommeau, Michel Guilbaud, Dane Hendrix and Chi Yang, [Simple analytical relations for ship bow waves](https://doi.org/10.1017/S0022112008000220), 2008, give the contact-curve crest height and location used here. Francis Noblesse, Gérard Delhommeau, Hua Liu, De-cheng Wan and Chi Yang, [Ship bow waves](https://dcwan.sjtu.edu.cn/userfiles/2013-4%20Shipbowwaves.pdf), 2013, compare the longitudinal profile and present examples of how the bow wave develops alongside the hull. Clément Caplier, Germain Rousseaux, Damien Calluaud and Laurent David, [Energy distribution in shallow water ship wakes from a spectral analysis of the wave field](https://doi.org/10.1063/1.4964923), 2016, measure the hull-bound bow rise separately from the trailing wave system.
+
+Extruding the contact profile transversely produces a horizontal stripe. In Margo's planform approximation the profile starts at its measured along-hull crest location. From the current hull frame, its offset is `2 d² / w` aft at distance `d` outside the waterline and its amplitude fades over width `w = max(crest, min(0.35 beam, sqrt(beam crest)))`. These planform coefficients are Margo's model. The height and breaking foam use the same phase and envelope. Kelvin waves continue to use the path history.
+
+
 ### Stern foam history in Water (2026-11-21)
 
 Yingfei Liu and Ruru Deng, [Ship Wakes in Optical Images](https://doi.org/10.1175/JTECH-D-18-0021.1), 2018, distinguish the bright turbulent region behind a vessel from the Kelvin wave pattern. Vincent G. Johnston and David T. Walker, [Experimentally Observed Features of the Turbulent Near-Wake of a Model Ship](https://deepblue.lib.umich.edu/bitstream/handle/2027.42/116057/39015075172091.pdf?isAllowed=y&sequence=1), 1991, observed a rapidly spreading surface layer and irregular free-surface disturbances aft. Antonio Posa, Riccardo Broglia and Elias Balaras, [The wake flow downstream of a propeller-rudder system](https://doi.org/10.1016/j.ijheatfluidflow.2020.108765), 2021, characterize turbulence and shear downstream of the propeller and rudder.
