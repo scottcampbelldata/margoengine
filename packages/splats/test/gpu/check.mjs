@@ -430,7 +430,9 @@ try {
   // A splat beside the camera (x / depth 30, far outside the view) draws nothing (KB2604f: without the clamped
   // linearisation point its ellipse covered the frame and the Truck capture rendered as a grey blur).
   {
-    const img = await decodePNG(Buffer.from((await page.evaluate(() => window.check.beside())).split(',')[1], 'base64'));
+    const img = await decodePNG(
+      Buffer.from((await page.evaluate(() => window.check.beside())).split(',')[1], 'base64'),
+    );
     let lit = 0;
     for (let i = 0; i < img.data.length; i += 4) if (img.data[i] > 2) lit++;
     report.beside = { lit };

@@ -13,7 +13,7 @@ function cloudOf(count, shCoefficients) {
     colors = new Float32Array(count * 4),
     sh = shCoefficients ? new Float32Array(count * shCoefficients * 3) : undefined;
   let seed = 12345;
-  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
   for (let i = 0; i < count; i++) {
     positions.set([random() * 2 - 1, random() * 2 - 1, random() * 2 - 1], i * 3);
     covariances.set([1e-4, 0, 0, 1e-4, 0, 1e-4], i * 6);

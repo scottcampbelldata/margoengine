@@ -16,6 +16,9 @@ test('Splats.antialias is off by default and live', () => {
 
 test('the projection shader applies the 2D Mip filter behind counts.z', () => {
   const code = typeof project === 'function' ? project() : String(project);
-  assert.match(code, /if\(f\.counts\.z==1u\)\{opacity\*=sqrt\(max\(\(xx-0\.3\)\*\(yy-0\.3\)-xy\*xy,0\.0\)\/max\(xx\*yy-xy\*xy,1e-12\)\);\}/);
+  assert.match(
+    code,
+    /if\(f\.counts\.z==1u\)\{opacity\*=sqrt\(max\(\(xx-0\.3\)\*\(yy-0\.3\)-xy\*xy,0\.0\)\/max\(xx\*yy-xy\*xy,1e-12\)\);\}/,
+  );
   assert.match(code, /ellipse\.center=vec4f\(ndc,opacity\)/, 'the ellipse carries the filtered opacity');
 });

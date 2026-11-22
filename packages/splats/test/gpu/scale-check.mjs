@@ -32,7 +32,9 @@ try {
     let lit = 0;
     for (let k = 0; k < shot.data.length; k += 4) if (shot.data[k] + shot.data[k + 1] + shot.data[k + 2] > 90) lit++;
     const share = lit / (shot.data.length / 4);
-    console.log(`${label}${compat ? ' (compat)' : ''}: wall ${r.wallMs.toFixed(1)} ms (diagnostic), covers ${(share * 100).toFixed(1)}%`);
+    console.log(
+      `${label}${compat ? ' (compat)' : ''}: wall ${r.wallMs.toFixed(1)} ms (diagnostic), covers ${(share * 100).toFixed(1)}%`,
+    );
     assert.equal(r.count, count);
     assert.ok(share > 0.15, `${label}: the cloud is drawn (${share})`);
     assert.deepEqual(await page.evaluate(() => window.check.errors), [], label);
