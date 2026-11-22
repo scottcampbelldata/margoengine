@@ -6,7 +6,10 @@ import { VirtualShadows } from '../dist/virtual.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 // dispose() must leave the scene the plugin lives in, not the engine's active scene.
-for (const [name, make] of [['Shadows', () => new Shadows({ resolution: 64 })], ['VirtualShadows', () => new VirtualShadows()]])
+for (const [name, make] of [
+  ['Shadows', () => new Shadows({ resolution: 64 })],
+  ['VirtualShadows', () => new VirtualShadows()],
+])
   test(`${name}.dispose() removes itself from a non-active scene`, async (t) => {
     const gpu = optionalGPU(),
       engine = new Engine(
@@ -16,8 +19,12 @@ for (const [name, make] of [['Shadows', () => new Shadows({ resolution: 64 })], 
         undefined,
         null,
       );
-    t.after(() => { engine.dispose(); gpu.cleanup(); });
-    const scene = engine.createScene('other'), plugin = make();
+    t.after(() => {
+      engine.dispose();
+      gpu.cleanup();
+    });
+    const scene = engine.createScene('other'),
+      plugin = make();
     scene.use(plugin);
     assert.equal(engine.sceneOf(plugin), scene);
     plugin.dispose();

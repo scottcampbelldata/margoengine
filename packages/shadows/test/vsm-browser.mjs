@@ -21,7 +21,8 @@ const light = (v) => {
   const y = linear(v);
   return y >= 0.04 ? y + 0.04 : 0.4 * Math.sqrt(y);
 };
-const run = async (name, ...args) => assert.deepEqual(await page.evaluate(([n, a]) => window.check[n](...a), [name, args]), []);
+const run = async (name, ...args) =>
+  assert.deepEqual(await page.evaluate(([n, a]) => window.check[n](...a), [name, args]), []);
 const frame = async (setting, open) => {
   await run('edge', setting);
   return ratio(await shot(), open);
@@ -77,7 +78,10 @@ try {
     noise = { variance: grain(variance), soft: grain(soft) };
   console.log(JSON.stringify({ widths, noise }));
   // 16 texels of 1 / 64 world unit on a 512-pixel frame of about 7.5 units: the tent's 10 to 90 percent span is near its radius.
-  assert.ok(widths.wide > widths.narrow * 3, `a blur of 16 gave ${widths.wide} pixels, a blur of 2 gave ${widths.narrow}`);
+  assert.ok(
+    widths.wide > widths.narrow * 3,
+    `a blur of 16 gave ${widths.wide} pixels, a blur of 2 gave ${widths.narrow}`,
+  );
   assert.ok(noise.variance * 4 < noise.soft, `grain ${noise.variance} against PCSS ${noise.soft}`);
   // Live settings and a moved caster reach the blurred map with no new shader.
   const before = edgeAt(variance);

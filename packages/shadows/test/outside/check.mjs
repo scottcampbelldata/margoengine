@@ -60,7 +60,10 @@ try {
     if (only && !c.name.includes(only)) continue;
     assert.deepEqual(await page.evaluate((s) => window.check.scene(s), c.scene), []);
     const open = await shot();
-    assert.deepEqual(await page.evaluate(([k, o, n]) => window.check.shadows(k, o, n), [c.kind, c.options, c.control]), []);
+    assert.deepEqual(
+      await page.evaluate(([k, o, n]) => window.check.shadows(k, o, n), [c.kind, c.options, c.control]),
+      [],
+    );
     const lit = await shot(),
       visibility = await fixture(`${c.reference ?? c.scene}.visibility`),
       mask = await fixture(`${c.reference ?? c.scene}.mask`),
@@ -127,15 +130,19 @@ try {
     if (c.core) {
       // Light deep in the shadow, by what cases.mjs allows: `near` of Cycles, or for a control at least `far` from it.
       const gap = Math.abs(row.ours - row.theirs);
-      if (c.near !== undefined && gap > c.near) failures.push(`${c.name}: ${row.ours} of the light in the shadow, Cycles ${row.theirs}`);
-      if (c.far !== undefined && gap < c.far) failures.push(`${c.name}: the control reached ${row.ours}, Cycles ${row.theirs}`);
-      if (row.meanDifference > c.difference) failures.push(`${c.name}: mean difference ${row.meanDifference}, allowed ${c.difference}`);
+      if (c.near !== undefined && gap > c.near)
+        failures.push(`${c.name}: ${row.ours} of the light in the shadow, Cycles ${row.theirs}`);
+      if (c.far !== undefined && gap < c.far)
+        failures.push(`${c.name}: the control reached ${row.ours}, Cycles ${row.theirs}`);
+      if (row.meanDifference > c.difference)
+        failures.push(`${c.name}: mean difference ${row.meanDifference}, allowed ${c.difference}`);
       continue;
     }
     if (shadowed < c.minShadow) failures.push(`${c.name}: only ${shadowed} shadowed pixels, so nothing is measured`);
     if (c.below !== undefined) {
       // A control: the feature off, so the same comparison has to come out worse, or it proves nothing.
-      if (row.iou >= c.below) failures.push(`${c.name}: the control reached ${row.iou}, so the check cannot see the feature`);
+      if (row.iou >= c.below)
+        failures.push(`${c.name}: the control reached ${row.iou}, so the check cannot see the feature`);
       continue;
     }
     if (row.iou < c.iou) failures.push(`${c.name}: shadow overlap ${row.iou}, needs ${c.iou}`);

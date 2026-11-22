@@ -105,7 +105,13 @@ export function checkSoft(o: SoftShadowOptions): void {
  * blocker and receiver less `focus` (`gap(range)`, with the entry's depth range), `radius` its clamp and `tap` one
  * comparison tap at `offset` (adds to `visibility`).
  */
-export function pcss(p: { start: string; read: string; penumbra(gap: (range: string) => string): string; radius: string; tap: string }): string {
+export function pcss(p: {
+  start: string;
+  read: string;
+  penumbra(gap: (range: string) => string): string;
+  radius: string;
+  tap: string;
+}): string {
   return `
   ${p.start}
   let searchTaps=shadowFrame.soft.y;var blockers=0.0;var sum=0.0;var direction=turn;
@@ -289,7 +295,9 @@ export const effectCalls = (effects: readonly ShadowEffect[]): string =>
 /** `direct` times the shadow `visibility` and the effects give, through the style if an effect has one. */
 export const effectLight = (effects: readonly ShadowEffect[], visibility: string): string => {
   const style = effects.find((effect) => effect.style)?.style;
-  return style ? `direct*${style}(vec3f(1)*${visibility}${effectCalls(effects)})` : `direct*${visibility}${effectCalls(effects)}`;
+  return style
+    ? `direct*${style}(vec3f(1)*${visibility}${effectCalls(effects)})`
+    : `direct*${visibility}${effectCalls(effects)}`;
 };
 /** The effects' bind group entries. */
 export const effectEntries = (effects: readonly ShadowEffect[]): GPUBindGroupEntry[] =>
@@ -312,12 +320,16 @@ export const validEffects = (effects: unknown): readonly ShadowEffect[] => {
   if (effects === undefined) return [];
   if (!Array.isArray(effects) || !effects.every((effect) => typeof effect?.wgsl === 'function'))
     throw new TypeError('Invalid shadow effects; give an array of effects such as cloudShadows(sky)');
-  if (effects.filter((effect) => 'style' in effect).length > 1) throw new TypeError('Invalid shadow effects; give one shadowStyle');
+  if (effects.filter((effect) => 'style' in effect).length > 1)
+    throw new TypeError('Invalid shadow effects; give one shadowStyle');
   return effects;
 };
 /** Moves the effects' declarations in `code` to the bindings `map` gives (a scene's `section` plugin holds their slots). */
 export const moveEffects = (code: string, map: (binding: number) => number): string =>
-  code.replace(/@binding\((\d+)\)( var(?:<[^>]*>)? ?shadowFx)/g, (_, binding, rest) => `@binding(${map(+binding)})${rest}`);
+  code.replace(
+    /@binding\((\d+)\)( var(?:<[^>]*>)? ?shadowFx)/g,
+    (_, binding, rest) => `@binding(${map(+binding)})${rest}`,
+  );
 // Each layer's nearest depth for the PCSS search (shadowFrame.nearest): a workgroup takes the minimum of a 32x32 block,
 // four by four texels per invocation, then one atomicMin per workgroup into the layer's slot. Depths lie in 0..1, where
 // f32 bit patterns order as the values do, so atomicMin on the u32 bits is a float minimum. The frame seeds the slots

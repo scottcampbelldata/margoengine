@@ -19,7 +19,9 @@ export interface ShadowStyle<Context = unknown> extends ShadowEffect<Context> {
  * [0.1, 0.1, 0.4]})]})`. It takes the whole shadow of that light, the map's, tinted casters' and the other effects' together.
  * Lit ground keeps its light exactly. One per `Shadows` or `VirtualShadows`. Out of range values throw RangeError at the frame.
  */
-export function shadowStyle<Context extends { device: GPUDevice }>(options: ShadowStyleOptions = {}): ShadowStyle<Context> {
+export function shadowStyle<Context extends { device: GPUDevice }>(
+  options: ShadowStyleOptions = {},
+): ShadowStyle<Context> {
   const values = new Float32Array(4);
   let binding = 0,
     uniform: GPUBuffer | undefined;
@@ -40,7 +42,8 @@ fn shadowFxStyle${at}(shade:vec3f)->vec3f {return mix(shadowFxStyleFloor${at}.rg
     },
     update(frame: ShadowEffectFrame<Context>) {
       const { intensity = 1, color = [0, 0, 0] } = this.options;
-      if (!(intensity >= 0 && intensity <= 1)) throw new RangeError('Invalid shadow intensity; use a number from 0 to 1');
+      if (!(intensity >= 0 && intensity <= 1))
+        throw new RangeError('Invalid shadow intensity; use a number from 0 to 1');
       if (color.length !== 3 || !color.every((v) => v >= 0 && v <= 1))
         throw new RangeError('Invalid shadow color; use [r, g, b], each from 0 to 1');
       for (let i = 0; i < 3; i++) values[i] = 1 - intensity + intensity * color[i]!;

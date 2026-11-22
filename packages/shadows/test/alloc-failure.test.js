@@ -13,7 +13,15 @@ import { box } from '../../core/dist/index.js';
 // listener, which (KB6434a) reports it once and rebuilds the device; the restore makes the maps again and frames go on.
 // Package containment (scoped maps, a fallback until the device confirms them) was tried on branch core34 and dropped:
 // it drew the first frame after every attach unshadowed (materials browser-check catcherSun).
-globalThis.GPUBufferUsage ??= { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128 };
+globalThis.GPUBufferUsage ??= {
+  MAP_READ: 1,
+  COPY_SRC: 4,
+  COPY_DST: 8,
+  INDEX: 16,
+  VERTEX: 32,
+  UNIFORM: 64,
+  STORAGE: 128,
+};
 globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
 globalThis.GPUOutOfMemoryError ??= class GPUOutOfMemoryError extends Error {};
 
@@ -88,7 +96,8 @@ async function harness() {
   };
 }
 /** The shadow map receivers bind, and whether it is a live texture of `gpu`. */
-const bound = (shadows) => shadows.bindings().find((e) => e.resource?.texture?.format === 'depth32float')?.resource.texture;
+const bound = (shadows) =>
+  shadows.bindings().find((e) => e.resource?.texture?.format === 'depth32float')?.resource.texture;
 
 test('Shadows: the first frame after attach draws the depth passes and binds the real maps (KB-C34g)', async () => {
   const h = await harness(),

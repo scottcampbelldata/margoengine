@@ -11,7 +11,9 @@ const effect = {
   call: 'shadowFxTest.xyz',
   resources: () => [{ buffer: 'a' }, { buffer: 'b' }],
 };
-const sky = { cloudLayer: { field: 'fn cloudOctaves(){cloudNoise();cloudHash();}\n', coverage: 0.4, drift: 3, height: 1500 } };
+const sky = {
+  cloudLayer: { field: 'fn cloudOctaves(){cloudNoise();cloudHash();}\n', coverage: 0.4, drift: 3, height: 1500 },
+};
 
 test('no effects leaves the receiver shader as it was', () => {
   for (const filter of ['soft', 'pcf', 'hard']) {
@@ -19,11 +21,17 @@ test('no effects leaves the receiver shader as it was', () => {
     assert.equal(shadowSampling(2, filter, false, false, false, []), plain);
     assert.ok(!plain.includes('shadowReach'), 'golden GPU proofs pin this text for apps with no effects');
     assert.ok(!plain.includes('shadowFx'));
-    assert.equal(new VirtualShadows({ filter, effects: [] }).pbr(2).declarations, new VirtualShadows({ filter }).pbr(2).declarations);
+    assert.equal(
+      new VirtualShadows({ filter, effects: [] }).pbr(2).declarations,
+      new VirtualShadows({ filter }).pbr(2).declarations,
+    );
   }
 });
 test('an effect multiplies the sun in both shadow classes', () => {
-  for (const code of [shadowSampling(1, 'hard', false, false, false, [effect]), new VirtualShadows({ filter: 'hard', effects: [effect] }).pbr(1).declarations]) {
+  for (const code of [
+    shadowSampling(1, 'hard', false, false, false, [effect]),
+    new VirtualShadows({ filter: 'hard', effects: [effect] }).pbr(1).declarations,
+  ]) {
     assert.ok(code.includes(`@group(1) @binding(${EFFECT_BINDING}) var<uniform> shadowFxTest`));
     assert.ok(code.includes('*shadowFxTest.xyz;}'));
     assert.ok(code.includes('fn shadowReach()->f32'));
@@ -41,7 +49,8 @@ test('a filter effect replaces the named filters', () => {
   assert.ok(!code.includes('shadowGolden'));
 });
 test('moveEffects moves only effect declarations', () => {
-  const code = '@group(0) @binding(40) var<uniform> shadowFxA:vec4f;\n@group(0) @binding(41) var shadowFxMap:texture_2d<f32>;\n@group(0) @binding(2) var shadowMap:texture_depth_2d;';
+  const code =
+    '@group(0) @binding(40) var<uniform> shadowFxA:vec4f;\n@group(0) @binding(41) var shadowFxMap:texture_2d<f32>;\n@group(0) @binding(2) var shadowMap:texture_depth_2d;';
   const moved = moveEffects(code, (binding) => binding + 10);
   assert.ok(moved.includes('@binding(50) var<uniform> shadowFxA'));
   assert.ok(moved.includes('@binding(51) var shadowFxMap'));
@@ -124,7 +133,11 @@ test('lightPattern scrolls by frame time, which the shadows that hold it move on
       }
       assert.equal(shadows.time, 1.5);
       assert.equal(pattern.time, 1.5);
-      assert.deepEqual(values.at(-1), [0.5 + 0.25 * 1.5, -1.5], 'offset + speed * frame time, whatever the wall clock did');
+      assert.deepEqual(
+        values.at(-1),
+        [0.5 + 0.25 * 1.5, -1.5],
+        'offset + speed * frame time, whatever the wall clock did',
+      );
       assert.deepEqual(values.at(-2), values.at(-1), 'two views of one frame draw the same place');
       assert.throws(() => shadows.advanceTime(-1), RangeError);
     }
@@ -136,10 +149,16 @@ test('varianceFilter checks its settings', async () => {
   const { varianceFilter } = await import('../dist/vsm.js');
   assert.throws(() => varianceFilter({ size: 8 }), RangeError);
   const filter = varianceFilter({ blur: 8 });
-  assert.ok(filter.body.includes('shadowFxMomentsAt(uv,layer)'), 'the body is read before wgsl runs, so it names no binding');
+  assert.ok(
+    filter.body.includes('shadowFxMomentsAt(uv,layer)'),
+    'the body is read before wgsl runs, so it names no binding',
+  );
   const code = shadowSampling(1, filter, false, false, false, [filter]);
   assert.ok(code.includes('fn shadowFxMomentsAt('));
-  assert.ok(code.includes('textureSampleCompareLevel(shadowMap,shadowSampler'), "an 'auto' layout must keep the sampler");
+  assert.ok(
+    code.includes('textureSampleCompareLevel(shadowMap,shadowSampler'),
+    "an 'auto' layout must keep the sampler",
+  );
   assert.doesNotThrow(() => new Shadows({ filter }));
   assert.throws(() => new Shadows({ filter: { nope: 1 } }), RangeError);
 });
@@ -151,7 +170,10 @@ test('transmission moves what lets light through to the tint map', async () => {
     glass = { index: 3, tint: [0.9, 0.9, 0.9] };
   const source = transmission({ shadowPrimitives: [leaf, stem], tintPrimitives: [glass] }, { scale: 2 });
   assert.deepEqual(source.shadowPrimitives, [stem]);
-  assert.deepEqual(source.tintPrimitives.map((p) => p.tint), [glass.tint, [0.4, 0.8, 0.2]]);
+  assert.deepEqual(
+    source.tintPrimitives.map((p) => p.tint),
+    [glass.tint, [0.4, 0.8, 0.2]],
+  );
   assert.throws(() => source.addLighting({ options: {} }), TypeError);
   assert.doesNotThrow(() => source.addLighting({ options: { colored: true } }));
   source.options.scale = -1;
@@ -184,7 +206,10 @@ test("an effect's revision composes every receiver again, in both shadow classes
   // 2026-11-17 the shadows kept the first code for good.
   let code = 'shadowFxTest.xyz';
   const late = { ...effect, revision: 0, wgsl: (group, binding) => `// ${code}\n` + effect.wgsl(group, binding) };
-  for (const shadows of [new Shadows({ filter: 'hard', effects: [late] }), new VirtualShadows({ filter: 'hard', effects: [late] })]) {
+  for (const shadows of [
+    new Shadows({ filter: 'hard', effects: [late] }),
+    new VirtualShadows({ filter: 'hard', effects: [late] }),
+  ]) {
     late.revision = 0;
     code = 'before';
     const first = shadows.pbr(1).declarations;

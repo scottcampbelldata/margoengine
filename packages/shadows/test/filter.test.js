@@ -283,7 +283,8 @@ test('at the compatibility level the blocker search loads a float binding of the
   assert.match(level, /@group\(1\) @binding\(30\) var shadowDepth:texture_2d_array<f32>;/);
   assert.match(level, /let d=textureLoad\(shadowDepth,coord,i32\(layer\),0\)\.x;/);
   assert.match(level, /clamp\(penumbra,texel,vec2f\(0\.1\)\)/, 'the anisotropic text still applies');
-  for (const filter of ['pcf', 'hard']) assert.equal(shadowSampling(1, filter, false, false, true), shadowSampling(1, filter));
+  for (const filter of ['pcf', 'hard'])
+    assert.equal(shadowSampling(1, filter, false, false, true), shadowSampling(1, filter));
 });
 
 test('Shadows binds the second view only for a soft filter at the compatibility level', async () => {

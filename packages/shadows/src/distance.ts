@@ -85,7 +85,8 @@ export function distanceShadows<Context extends { device: GPUDevice; encoder: GP
   const { heights, columns, rows, size } = options;
   if (!(heights instanceof Float32Array) || !(columns >= 2) || !(rows >= 2) || heights.length !== columns * rows)
     throw new RangeError('Invalid distance shadow heights; give a Float32Array of columns x rows, each 2 or more');
-  if (!size || !(size[0] > 0) || !(size[1] > 0)) throw new RangeError('Invalid distance shadow size; give [x, z] above 0');
+  if (!size || !(size[0] > 0) || !(size[1] > 0))
+    throw new RangeError('Invalid distance shadow size; give [x, z] above 0');
   const values = new Float32Array(16),
     words = new Uint32Array(values.buffer),
     frame = new Float32Array(16),
@@ -142,7 +143,10 @@ fn shadowFxFar${at}(position:vec3f)->f32 {
     setup(gpu: GPUDevice) {
       free();
       device = gpu;
-      heightBuffer = gpu.createBuffer({ size: heights.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      heightBuffer = gpu.createBuffer({
+        size: heights.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
       shade = gpu.createBuffer({ size: columns * rows * 8, usage: GPUBufferUsage.STORAGE });
       marchUniform = gpu.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       uniform = gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });

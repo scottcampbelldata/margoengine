@@ -132,7 +132,8 @@ fn shadowFxMomentsAt(uv:vec2f,layer:u32)->vec2f {
         gpu = device!;
       if (!Number.isInteger(blur) || blur < 0 || blur > 32)
         throw new RangeError('Invalid variance filter blur; use a whole number from 0 to 32');
-      if (!(bleed >= 0 && bleed < 1)) throw new RangeError('Invalid variance filter bleed; use a number from 0 to under 1');
+      if (!(bleed >= 0 && bleed < 1))
+        throw new RangeError('Invalid variance filter bleed; use a number from 0 to under 1');
       if (!(minVariance >= 0)) throw new RangeError('Invalid variance filter minVariance; use 0 or more');
       values[0] = minVariance;
       values[1] = bleed;

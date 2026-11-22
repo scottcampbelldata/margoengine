@@ -154,7 +154,9 @@ test('samples, blockerSamples and focus reach the frame uniform live and drive t
   const soft = (i) => {
     store.tick(false);
     view.begin(i);
-    const write = gpu.record(() => passes(shadows)(view.c)).find((e) => e[0] === 'writeBuffer' && e[3].length === 384 * 2);
+    const write = gpu
+      .record(() => passes(shadows)(view.c))
+      .find((e) => e[0] === 'writeBuffer' && e[3].length === 384 * 2);
     return [...new Float32Array(Uint8Array.from(Buffer.from(write[3], 'hex')).buffer).subarray(92, 95)];
   };
   try {
@@ -162,7 +164,14 @@ test('samples, blockerSamples and focus reach the frame uniform live and drive t
     assert.deepEqual(soft(0), [32, 16, 0], 'defaults: 32 taps, 16 blocker reads, focus 0');
     Object.assign(shadows.options, { samples: 10, blockerSamples: 10, focus: 0.5 });
     assert.deepEqual(soft(1), [10, 10, 0.5]);
-    for (const bad of [{ samples: 0 }, { samples: 129 }, { blockerSamples: 2.5 }, { samples: NaN }, { focus: -1 }, { focus: Infinity }]) {
+    for (const bad of [
+      { samples: 0 },
+      { samples: 129 },
+      { blockerSamples: 2.5 },
+      { samples: NaN },
+      { focus: -1 },
+      { focus: Infinity },
+    ]) {
       const before = { ...shadows.options };
       Object.assign(shadows.options, bad);
       assert.throws(() => soft(2), RangeError, JSON.stringify(bad));
@@ -237,7 +246,10 @@ test('only an exactly zero direct-light vector bypasses visibility without chang
 test('the PCSS search spans the distance to the nearest caster, reads the own texel first and ignores surfaces behind the receiver', () => {
   for (const anisotropic of [false, true]) {
     const source = shadowSampling(0, 'soft', anisotropic);
-    assert.ok(source.includes(',settings:vec4f,soft:vec4f,nearest:vec4f}'), "the frame carries each layer's nearest depth");
+    assert.ok(
+      source.includes(',settings:vec4f,soft:vec4f,nearest:vec4f}'),
+      "the frame carries each layer's nearest depth",
+    );
     assert.ok(source.includes('max(reference-shadowFrame.nearest[layer],0.0)*shadowFrame.ranges[layer]'));
     assert.doesNotMatch(source, /settings\.x\*reference\*/, 'not the distance to the near plane');
     assert.ok(source.includes('sqrt(f32(j)/searchTaps)*search'), "tap 0 reads the receiver's own texel");

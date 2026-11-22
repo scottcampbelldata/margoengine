@@ -55,7 +55,14 @@ test('VirtualShadows writes samples, blockerSamples and focus to the frame unifo
     assert.deepEqual(soft(0), [32, 16, 0], 'defaults: 32 taps, 16 blocker reads, focus 0');
     Object.assign(shadows.options, { samples: 10, blockerSamples: 10, focus: 0.5 });
     assert.deepEqual(soft(1), [10, 10, 0.5]);
-    for (const bad of [{ samples: 0 }, { samples: 129 }, { blockerSamples: 2.5 }, { samples: NaN }, { focus: -1 }, { focus: Infinity }]) {
+    for (const bad of [
+      { samples: 0 },
+      { samples: 129 },
+      { blockerSamples: 2.5 },
+      { samples: NaN },
+      { focus: -1 },
+      { focus: Infinity },
+    ]) {
       const before = { ...shadows.options };
       Object.assign(shadows.options, bad);
       assert.throws(() => soft(2), RangeError, JSON.stringify(bad));

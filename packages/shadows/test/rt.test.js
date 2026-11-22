@@ -10,9 +10,20 @@ const device = (limits = {}) => {
   const made = [];
   return {
     made,
-    limits: { maxStorageBuffersPerShaderStage: 8, maxStorageBufferBindingSize: 1 << 27, maxBufferSize: 1 << 28, ...limits },
+    limits: {
+      maxStorageBuffersPerShaderStage: 8,
+      maxStorageBufferBindingSize: 1 << 27,
+      maxBufferSize: 1 << 28,
+      ...limits,
+    },
     createBuffer(d) {
-      const b = { ...d, destroyed: false, destroy() { this.destroyed = true; } };
+      const b = {
+        ...d,
+        destroyed: false,
+        destroy() {
+          this.destroyed = true;
+        },
+      };
       made.push(b);
       return b;
     },
@@ -45,7 +56,10 @@ test('setup after a device loss builds on the new device and frees the old', () 
   f.setup(first);
   assert.equal(effectEntries([f]).length, 6);
   f.setup(second);
-  assert.ok(first.made.every((b) => b.destroyed), 'the old device keeps a buffer');
+  assert.ok(
+    first.made.every((b) => b.destroyed),
+    'the old device keeps a buffer',
+  );
   assert.equal(second.made.length, 6);
   f.dispose();
   assert.ok(second.made.every((b) => b.destroyed));

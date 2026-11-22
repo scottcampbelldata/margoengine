@@ -87,7 +87,10 @@ try {
     const got = share((await read(1, 0)).shaded),
       want = disc((2 * 0.5) / (7 * 0.4));
     console.log(JSON.stringify({ rise: got, want }));
-    assert.ok(Math.abs(got - want) < 0.03, `behind a low rise the far wall's horizon gives ${want} of the disc, not ${got}`);
+    assert.ok(
+      Math.abs(got - want) < 0.03,
+      `behind a low rise the far wall's horizon gives ${want} of the disc, not ${got}`,
+    );
   }
 
   // An edited field holds until invalidate(): the shadow stands for the heights last marched.
@@ -104,7 +107,11 @@ try {
   // 100 units from the ground read, past those 38.
   const long = [];
   for (let column = 0; column < 5; column++) long.push([column, 20, 200]);
-  await start({ field: { columns: 5, rows: 33, size: [4, 512], origin: [-2, -256], walls: long }, toLight: [0, 1, 2], options: { sunSize: 0 } });
+  await start({
+    field: { columns: 5, rows: 33, size: [4, 512], origin: [-2, -256], walls: long },
+    toLight: [0, 1, 2],
+    options: { sunSize: 0 },
+  });
   const across = ratio(await read(0, -36));
   console.log(JSON.stringify({ across }));
   assert.ok(across < 0.5, `a march over long cells stopped short: ${across}`);

@@ -78,7 +78,8 @@ export function cloudShadows<Context extends { device: GPUDevice }>(
   sky: CloudLayerSource,
   options: CloudShadowOptions = {},
 ): LightFunction<CloudShadowOptions, Context> {
-  if (!sky || !('cloudLayer' in sky)) throw new TypeError('cloudShadows needs a Sky; pass the sky whose clouds they match');
+  if (!sky || !('cloudLayer' in sky))
+    throw new TypeError('cloudShadows needs a Sky; pass the sky whose clouds they match');
   const uniform = new EffectUniform(8);
   let binding = 0;
   return {
@@ -88,10 +89,9 @@ export function cloudShadows<Context extends { device: GPUDevice }>(
     },
     wgsl(group, at) {
       binding = at;
-      const field = (sky.cloudLayer?.field ?? 'fn cloudOctaves(p:vec2f,footprint:f32,first:u32,last:u32)->f32 {return 0.0;}\n').replace(
-        /\bcloud(Hash|Noise|Octaves)\b/g,
-        `shadowFx$1${at}`,
-      );
+      const field = (
+        sky.cloudLayer?.field ?? 'fn cloudOctaves(p:vec2f,footprint:f32,first:u32,last:u32)->f32 {return 0.0;}\n'
+      ).replace(/\bcloud(Hash|Noise|Octaves)\b/g, `shadowFx$1${at}`);
       // Sky's cloudSky from the ground point towards the sun, with no aerial fade: the sky's shell and the same coverage
       // remap and erosion, so the opacity here is the opacity of that cloud seen against the sun.
       return /* wgsl */ `struct ShadowFxClouds${at} {sun:vec4f,layer:vec4f}
