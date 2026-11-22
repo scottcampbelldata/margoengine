@@ -221,11 +221,10 @@ await runSuite(
       // A red decal 14 m across on the view line, 40% of the way to the target (122 m ahead), laid after the first
       // frames; then removed.
       const spot = [x0 + 48, z0 + 112];
-      let id;
       const decal = await picture({
         virtual: { ...options, decals: decalPictures },
         edit: (rvt) => {
-          id = rvt.addDecal({ center: spot, size: [14, 14], angle: 0.4 });
+          rvt.addDecal({ center: spot, size: [14, 14], angle: 0.4 });
         },
       });
       // Changed pixels: red (the decal), or its edge (a filtered blend of decal and ground within 2 pixels of a red one:
