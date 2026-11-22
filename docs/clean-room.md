@@ -1,5 +1,14 @@
 # Clean room
 
+### Ship wakes at harbor speed (2026-11-21)
+
+Francis Noblesse, Gérard Delhommeau, Michel Guilbaud, Dane Hendrix and Chi Yang, [Simple analytical relations for ship bow waves](https://doi.org/10.1017/S0022112008000220), 2008, supply the existing speed law and crest location. Ravindra Pethiyagoda, Timothy J. Moroney, Christopher J. Lustri and Scott W. McCue, [Kelvin wake pattern at small Froude numbers](https://doi.org/10.1017/jfm.2021.193), 2021, describe why slow flow need not show a strong diverging wave. Donald C. Wyatt, Thomas C. Fu, Genevieve L. Taylor, Eric J. Terrill, Tao Xing, Shanti Bhushan, Thomas T. O'Shea and Douglas G. Dommermuth, [A Comparison of Full-Scale Experimental Measurements and Computational Predictions of the Transom-Stern Wave of the R/V Athena I](https://arxiv.org/abs/1410.1810), 2008, distinguish the near stern elevation and the spatially uneven bubble signature. Their example is at 5.4 m/s.
+
+The minimum modelled bow span `min(0.75 m, 0.065 beam)`, low-speed side-width blend, stern foam's `0.5..2.2 m/s` ramp,
+and a shader mask that concentrates thin foam into patches are Margo's rendering approximations. The wider profile retains
+the analytic crest location and height. The shoreline contact band, the Kelvin-wave law and the stern age decay keep their
+separate inputs. The visual coefficients were checked on calm GPU fixtures and the existing First Wake camera tracks.
+
 ### Ship side wash in Water (2026-11-21)
 
 Gabriel D. Weymouth and Dick K. P. Yue, [Physics-Based Learning Models for Ship Hydrodynamics](https://doi.org/10.5957/JOSR.57.1.120005), 2013, compare at-speed waterline elevation along a Wigley hull using tank measurements and potential flow. Douglas G. Dommermuth, Thomas T. O'Shea, Donald C. Wyatt, Mark Sussman, Gabriel D. Weymouth, Dick K. P. Yue, Paul Adams and Randall Hand, [The Numerical Simulation of Ship Waves Using Cartesian-Grid and Volume-of-Fluid Methods](https://arxiv.org/abs/1410.1937), 2006, resolve run-up and local breaking from the body boundary. Donald C. Wyatt, Thomas C. Fu, Genevieve L. Taylor, Eric J. Terrill, Tao Xing, Shanti Bhushan, Thomas T. O'Shea and Douglas G. Dommermuth, [A Comparison of Full-Scale Experimental Measurements and Computational Predictions of the Transom-Stern Wave of the R/V Athena I](https://arxiv.org/abs/1410.1810), 2008, document whole-vessel effects that extend into the stern wake.

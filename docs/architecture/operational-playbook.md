@@ -1,3 +1,17 @@
+### Section 5 evidence: ship wakes at harbor speed (2026-11-21)
+
+At 1.5 m/s the 68 m test hull's analytic crest is about 0.23 m aft of the stem. The CPU and WGSL profiles broaden the
+support around that crest and widen the side section as the crest scale shrinks. The crest height and centre remain those
+of `bowWave`. The stern foam ramps in at harbor speeds and its density still decays using `foamLife`. The fragment shader
+modulates that density with slow spatial noise so thinning foam breaks into patches. See the
+[clean-room record](../clean-room.md#ship-wakes-at-harbor-speed-2026-11-21).
+
+The WebGPU and WebGL2 readbacks measured 0.103 m at the bow witness and 0.011 m at each side witness at 1.5 m/s, with
+zero outside the band. The new slow stern case reads 0.290 and 0.278 coverage in two lit patches 0.9 and 15 m behind a
+separate hull, with zero forward and off the trail. The CPU decay test checks the underlying density, independently of the
+patch locations. Existing 3 m/s height and foam bounds on both backends still pass. The profile continues to use the hull's
+parametric waterplane. Grid resolution and lighting still affect how much detail resolves in a wide shot.
+
 ### Section 5 evidence: water displacement alongside a ship (2026-11-21)
 
 `ShipWakes` models the surface outside the current hull as a smooth lift and drawdown behind the bow crest. The added

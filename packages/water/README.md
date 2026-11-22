@@ -1028,8 +1028,12 @@ console.log(panel.roughness, coast.surgeAt());
     Its crest sweeps aft away from the hull as it loses height. Breaking foam follows that crest, including when the ship turns.
     The moving hull lifts a lower band of water along both shoulders, with a shallow trough just outside it. This motion
     follows the current hull, fades toward the stern, and uses the same `bowWave` multiplier as the crest.
+    At harbor speeds the bow and side profiles have broader support so the narrow pressure rise remains visible on the
+    Water mesh. Its height falls with speed and is zero at rest.
   - Foam runs along the waterline, in the turbulent wake and where the bow wave breaks. The turbulent trail follows
     where the stern has passed. Fresh foam spreads and decays downstream with `foamLife`, even on long hulls at low speed.
+    The surface shader concentrates faint foam into sparse patches as it disperses. `ShipWakes.sample` reports the
+    underlying foam density before this shading step.
   - Ships' and shore lamps leave glints on a night sea.
   - A ship with a `path` (time to [x, z]) draws the same wake after a seek as after playing to that time. A ship placed
     with `setPose` leaves the trail it has passed through. Either way a turning ship's wake bends with its track.

@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: water displacement and stern foam faded too early at harbor speeds (water/ships)
+
+- **Repro:** advance a 68 m hull at 1.5 m/s. Sample just ahead of the stem and 0.75 m or so outboard at the shoulder. The bow footprint misses the stem samples and the narrow side rise ends before the shoulder sample. The stern trail is hard to distinguish as it ages.
+- **Cause:** the bow support shrank quadratically with speed, the side profile had a narrow fixed beam fraction, and the stern ramp gave slow propulsion little initial foam. The common surface mask spread a low density evenly across each trail section.
+- **Fix:** broaden the slow profiles around the same bow crest, produce stern foam at harbor speed, and concentrate thin foam into patches during shading.
+- **Regression:** `packages/water/test/ships.test.js` checks the slow bow, both sides, decay and rest. `packages/water/test/ships.browser.mjs` reads slow heights and visible foam on both GPU backends.
+
 ### Fixed 2026-11-21: Lines and vector Text duplicated frame uniform setup (lines, text)
 
 - **Repro:** `npm run quality -- --gate=duplicates` reports `lines | text` after the formatted renderers line up. Make LineBatches' device throw while creating its frame bind group to isolate a buffer left by a failed setup.

@@ -109,6 +109,15 @@ try {
       engine.render({ delta: 0 });
       const sideQuery = await WaveQuery.capture(bowSea);
       const sideWash = [6.875, -6.875, 7.875, 11].map((x) => sideQuery.heightAt(x, 0));
+      bowWakes.ships[0].setPose({ position: [0, 0, -16], heading: 0, speed: 1.5 });
+      bowWakes.setTime(2);
+      engine.render({ delta: 0 });
+      const slowSides = await WaveQuery.capture(bowSea);
+      const slowSide = [slowSides.heightAt(7.375, 0), slowSides.heightAt(-7.375, 0), slowSides.heightAt(11.5, 0)];
+      bowWakes.ships[0].setPose({ position: [0, 0, -34], heading: 0, speed: 1.5 });
+      bowWakes.setTime(3);
+      engine.render({ delta: 0 });
+      const slowBow = (await WaveQuery.capture(bowSea)).heightAt(0.125, 0);
       bowWakes.dispose();
       bowSea.dispose();
 
@@ -162,24 +171,34 @@ try {
       });
       const readback = d.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
       const foamData = d.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE });
-      const group = d.createBindGroup({
-        layout: reader.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: calm.view.foam[calm.view.current].createView() },
-          { binding: 1, resource: { buffer: foamData } },
-        ],
-      });
-      const encoder = d.createCommandEncoder();
-      const pass = encoder.beginComputePass();
-      pass.setPipeline(reader);
-      pass.setBindGroup(0, group);
-      pass.dispatchWorkgroups(1);
-      pass.end();
-      encoder.copyBufferToBuffer(foamData, 0, readback, 0, 16);
-      d.queue.submit([encoder.finish()]);
-      await readback.mapAsync(GPUMapMode.READ);
-      const sternFoam = Array.from(new Float32Array(readback.getMappedRange()));
-      readback.unmap();
+      const readFoam = async () => {
+        const group = d.createBindGroup({
+          layout: reader.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: calm.view.foam[calm.view.current].createView() },
+            { binding: 1, resource: { buffer: foamData } },
+          ],
+        });
+        const encoder = d.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        pass.setPipeline(reader);
+        pass.setBindGroup(0, group);
+        pass.dispatchWorkgroups(1);
+        pass.end();
+        encoder.copyBufferToBuffer(foamData, 0, readback, 0, 16);
+        d.queue.submit([encoder.finish()]);
+        await readback.mapAsync(GPUMapMode.READ);
+        const values = Array.from(new Float32Array(readback.getMappedRange()));
+        readback.unmap();
+        return values;
+      };
+      const sternFoam = await readFoam();
+      sternWake.delete(sternWake.ships[0]);
+      sternWake.add({ hull: { length: 72, beam: 8, draft: 4 }, path: (time) => [0, Math.max(0, time) * 1.5] });
+      sternWake.setLook({ foamLife: 9.5 });
+      sternWake.setTime(24);
+      engine.render({ delta: 0 });
+      const slowFoam = await readFoam();
       foamData.destroy();
       readback.destroy();
       sternWake.dispose();
@@ -251,7 +270,7 @@ try {
       });
       const lamps = ShipWakes.attach(engine, { surface: night, lamps: [{ position: [0, 10, -80], intensity: 3000 }] });
       window.shipsTest = { engine, lamps, night };
-      return { open, early, onFlood, ride, sternFoam, bowCrest, sideWash };
+      return { open, early, onFlood, ride, sternFoam, bowCrest, sideWash, slowBow, slowSide, slowFoam };
     },
     { WIDTH, HEIGHT },
   );
@@ -304,12 +323,20 @@ try {
   assert.ok(starboard > 0.07 && Math.abs(starboard - port) < 1e-6, 'missing lift on both sides: ' + result.sideWash);
   assert.ok(drawdown < -0.03 && Math.abs(beyond) < 1e-6, 'bad side wash cross section: ' + result.sideWash);
   console.log('side wash in metres at starboard, port, drawdown and outboard:', result.sideWash);
+  assert.ok(result.slowBow > 0.065, 'the slow bow lost its visible rise');
+  const [slowStarboard, slowPort, slowBeyond] = result.slowSide;
+  assert.ok(slowStarboard > 0.008 && Math.abs(slowStarboard - slowPort) < 1e-6 && Math.abs(slowBeyond) < 1e-6);
+  console.log('harbor speed height at bow and alongside:', result.slowBow, result.slowSide);
   const [fresh, aged, forward, offAxis] = result.sternFoam;
   assert.ok(fresh > 0.35, 'fresh foam must start at the stern: ' + result.sternFoam);
   assert.ok(aged > 0.07 && aged < fresh * 0.6, 'stern foam must fade with its own age: ' + result.sternFoam);
   assert.equal(forward, 0, 'no turbulent foam ahead of the stern');
   assert.equal(offAxis, 0, 'no turbulent foam outside the wake');
   console.log('stern foam fresh, aged, forward, off-axis:', result.sternFoam);
+  const [slowFresh, slowAged, slowForward, slowOffAxis] = result.slowFoam;
+  assert.ok(slowFresh > 0.26 && slowAged > 0.03 && slowAged < slowFresh, 'missing or unfaded harbor foam');
+  assert.ok(slowForward < 0.025 && slowOffAxis < 0.025, 'harbor foam leaves the stern trail');
+  console.log('harbor speed foam fresh, aged, forward, off-axis:', result.slowFoam);
 
   // The glint: luminance added by the lamp, per pixel.
   const luminance = async (bytes) => {

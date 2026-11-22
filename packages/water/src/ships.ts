@@ -155,10 +155,12 @@ function waveAt(x: number, y: number, u: number, l: number, d: number): number {
 /** The crest follows the bow shoulder. Its outboard phase sweeps aft as the near-field wave dies away. */
 function ridge(s: number, outside: number, crest: number, beam: number): number {
   if (crest <= 0) return 0;
-  const width = Math.max(crest, Math.min(0.35 * beam, Math.sqrt(beam * crest)));
+  // Resolve the pressure rise around the stem even when the nominal crest distance is sub-metre.
+  const span = Math.max(crest, Math.min(0.75, 0.065 * beam));
+  const width = Math.max(crest, Math.min(0.35 * beam, Math.sqrt(beam * span)));
   const off = Math.max(0, outside);
   if (off >= width) return 0;
-  const sigma = (s - (2 * off * off) / width) / crest;
+  const sigma = 1 + (s - crest - (2 * off * off) / width) / span;
   // Rising along the stem's parabola to the crest, then Margo's falling shape into a shallow trough.
   const along =
     sigma < 0
@@ -173,7 +175,8 @@ function sideWash(s: number, outside: number, crest: number, length: number, bea
   const station = s / length;
   const fromCrest = (s - crest) / length;
   if (crest <= 0 || fromCrest <= 0.02 || station >= 0.97) return 0;
-  const width = Math.min(0.3 * beam, Math.max(0.17 * beam, 2 * crest));
+  const beamFraction = 0.17 + 0.13 * (1 - smoothstep(0.12, 0.64, crest));
+  const width = Math.min(0.3 * beam, Math.max(beamFraction * beam, 2 * crest));
   const q = Math.max(0, outside) / width;
   if (q >= 1) return 0;
   // The section's positive shoulder and negative drawdown have equal area over q = 0..1.
@@ -482,16 +485,18 @@ fn shipWaveAt(x:f32,y:f32,u:f32,l:f32,d:f32)->f32 {
 }
 fn shipRidge(s:f32,outside:f32,crest:f32,beam:f32)->f32 {
  if(crest<=0.0){return 0.0;}
- let width=max(crest,min(0.35*beam,sqrt(beam*crest)));let off=max(0.0,outside);
+ let span=max(crest,min(0.75,0.065*beam));
+ let width=max(crest,min(0.35*beam,sqrt(beam*span)));let off=max(0.0,outside);
  if(off>=width){return 0.0;}
- let sigma=(s-2.0*off*off/width)/crest;var along=0.0;
+ let sigma=1.0+(s-crest-2.0*off*off/width)/span;var along=0.0;
  if(sigma>=0.0&&sigma<=1.0){along=sigma*(2.0-sigma);}else if(sigma>1.0){along=exp(-(sigma-1.0)*(sigma-1.0))*cos(1.2*(sigma-1.0));}
  return along*(1.0-shipSmooth(0.0,width,off));
 }
 fn shipSideWash(s:f32,outside:f32,crest:f32,l:f32,b:f32)->f32 {
  let station=s/l;let fromCrest=(s-crest)/l;
  if(crest<=0.0||fromCrest<=0.02||station>=0.97){return 0.0;}
- let width=min(0.3*b,max(0.17*b,2.0*crest));let q=max(0.0,outside)/width;
+ let beamFraction=0.17+0.13*(1.0-shipSmooth(0.12,0.64,crest));
+ let width=min(0.3*b,max(beamFraction*b,2.0*crest));let q=max(0.0,outside)/width;
  if(q>=1.0){return 0.0;}
  let section=(1.0-q)*(1.0-q)*(1.0-4.0*q);
  return 0.45*shipSmooth(0.02,0.14,fromCrest)*(1.0-shipSmooth(0.22,0.97,station))*section;
@@ -558,7 +563,7 @@ fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
    if(stern.x>=0.0&&stern.x<span){
     let half=b*0.5*(1.0+0.6*sqrt(stern.x/l));
     turbulent=shipData.foam.z*exp(-stern.w/shipData.foam.y)*(1.0-shipSmooth(0.5*half,half,abs(stern.y)))
-      *shipSmooth(0.5,3.0,stern.z)*(1.0-shipSmooth(0.8*span,span,stern.x));
+      *shipSmooth(0.5,2.2,stern.z)*(1.0-shipSmooth(0.8*span,span,stern.x));
    }
   }
   var breaking=0.0;if(speed>0.05){breaking=shipSmooth(0.3,0.48,9.81*ship.c.x/(speed*speed))*shipSmooth(0.5,2.0,speed)*max(crestRidge,0.0)*mask*min(shipData.look.w,1.0);}
@@ -843,7 +848,7 @@ export class ShipWakes implements EnginePlugin {
             v[10] *
             Math.exp(-sternAge / v[9]) *
             (1 - smoothstep(0.5 * half, half, Math.abs(side))) *
-            smoothstep(0.5, 3, sourceSpeed) *
+            smoothstep(0.5, 2.2, sourceSpeed) *
             (1 - smoothstep(0.8 * span, span, distance));
         }
       }
@@ -949,7 +954,19 @@ ${WAKE_WGSL}`;
   binormal.y+=(shipWake(xz+vec2f(0,e),false).x-shipWake(xz-vec2f(0,e),false).x)/(2.0*e);}}
  ${surfaceReturn}`,
       )
-      .replace(foamLine, `${foamLine}foam=max(foam,shipWake(i.world.xz,true).y*pattern);`)
+      .replace(
+        foamLine,
+        `${foamLine}
+ let wash=shipWake(i.world.xz,true).y;
+ if(wash>0.001){
+  let patternValue=noise(i.world.xz*0.38+vec2f(frame.settings.x*0.035,-frame.settings.x*0.021)).x;
+  let root=sqrt(wash);
+  let threshold=0.37-root;
+  let flecks=smoothstep(threshold,threshold+0.16,patternValue);
+  let islands=(1.0-smoothstep(0.08,0.30,wash))*0.32*root;
+  foam=max(foam,clamp(pattern*(wash*mix(0.40,1.45,flecks)+islands*flecks),0.0,1.0));
+ }`,
+      )
       .replace(colorLine, `${colorLine}color+=shipLamps(i.world,n,v,rough);`)
   );
 }

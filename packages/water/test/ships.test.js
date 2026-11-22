@@ -176,6 +176,44 @@ test('a moving hull lifts water at its shoulders on both sides, with drawdown ju
   assert.equal(at(18, 0.25), 0);
 });
 
+test('a slow vessel retains a resolvable bow and positive side wash', () => {
+  const hull = { length: 68, beam: 15.5, draft: 7, entrance: 28 };
+  const speed = 1.5;
+  const { height } = bowWave(speed, hull);
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeHeight: 0, waterlineFoam: 0, turbulentWake: 0 },
+    ships: [{ hull, pose: { position: [0, 0, -34], heading: 0, speed } }],
+  });
+  const stem = wakes.sample(0.125, 0).height;
+  assert.ok(stem > 0.065 && stem <= height, `unresolved stem rise ${stem}`);
+  assert.ok(wakes.sample(0, 0.25).height > 0.018, 'the leading face needs support ahead of the stem');
+  assert.ok(wakes.sample(7.375, -18).height > 0.008, 'the side rise is too narrow beside a slow vessel');
+  assert.ok(wakes.sample(-7.375, -18).height > 0.008, 'the opposite side lost its rise');
+  assert.equal(wakes.sample(11.5, -18).height, 0);
+  wakes.ships[0].setPose({ position: [0, 0, -34], heading: 0, speed: 0 });
+  wakes.setTime(1);
+  assert.equal(wakes.sample(0.125, 0).height, 0);
+  assert.equal(wakes.sample(7.375, -18).height, 0);
+});
+
+test('stern foam remains visible at harbor speed and decays on the existing clock', () => {
+  const speed = 1.5;
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeHeight: 0, bowWave: 0, waterlineFoam: 0, foamLife: 9.5 },
+    ships: [{ hull: { length: 68, beam: 15.5, draft: 7 }, path: (time) => [0, speed * time] }],
+  });
+  wakes.setTime(60);
+  const stern = 60 * speed - 34;
+  const fresh = wakes.sample(0, stern - 0.25).foam;
+  const aged = wakes.sample(0, stern - 12).foam;
+  assert.ok(fresh > 0.56 && aged > 0.23, `foam disappeared at harbor speed ${fresh}/${aged}`);
+  assert.ok(Math.abs(aged / fresh - Math.exp(-(12 - 0.25) / speed / 9.5)) < 1e-5);
+  assert.equal(wakes.sample(0, stern + 1).foam, 0);
+  assert.equal(wakes.sample(20, stern - 12).foam, 0);
+});
+
 test('the wake fades with age, follows a turning ship, and draws foam on the waterline and in the turbulent wake', () => {
   const hull = { length: 30, beam: 6, draft: 2 };
   const turn = (t) => [100 * Math.sin(t / 20), 100 * (1 - Math.cos(t / 20))];
