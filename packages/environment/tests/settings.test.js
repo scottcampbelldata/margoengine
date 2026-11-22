@@ -221,7 +221,16 @@ test('the named looks are only row values, all in range, and each changes the fo
   const { fog, frame, record } = rig(),
     names = new Set(ENVIRONMENT_SETTINGS.map((s) => s.name)),
     seen = new Set();
-  assert.deepEqual(Object.keys(ENVIRONMENT_LOOKS), ['natural', 'clear', 'haze', 'mist', 'fog', 'smokePall', 'dustHaze', 'animatedFeature']);
+  assert.deepEqual(Object.keys(ENVIRONMENT_LOOKS), [
+    'natural',
+    'clear',
+    'haze',
+    'mist',
+    'fog',
+    'smokePall',
+    'dustHaze',
+    'animatedFeature',
+  ]);
   for (const [name, values] of Object.entries(ENVIRONMENT_LOOKS)) {
     for (const key of Object.keys(values)) assert.ok(names.has(key), `${name}: ${key}`);
     applyEnvironmentSettings({ air: fog }, values);
@@ -244,7 +253,10 @@ test('writing every live row each frame for 60 frames creates no GPU object and 
         if (s.name.startsWith('environment.') || s.name.startsWith('background.') || s.name.startsWith('sceneFog.'))
           continue;
         if (s.kind === 'color')
-          values[s.name] = s.default === null ? [s.max * (0.5 + 0.5 * t), s.max * 0.5, s.max * 0.5] : s.default.map((x) => x * (0.5 + 0.5 * t));
+          values[s.name] =
+            s.default === null
+              ? [s.max * (0.5 + 0.5 * t), s.max * 0.5, s.max * 0.5]
+              : s.default.map((x) => x * (0.5 + 0.5 * t));
         else if (s.kind === 'choice') values[s.name] = i === 30 ? 'off' : 'on';
         else if (s.name === 'air.multipleScattering') values[s.name] = 100 + 100 * t;
         else if (s.name === 'air.visibility') values[s.name] = 300 + 700 * t;

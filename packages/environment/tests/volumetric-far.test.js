@@ -80,7 +80,12 @@ test('visibility sets the extinction by Koschmieder (3.912 / V); the default is 
   const dense = at({ density: 0.02 });
   assert.deepEqual([dense.density, dense.falloff], [Math.fround(0.02), 0]);
   assert.equal(at({ visibility: 500, heightFalloff: 0 }).falloff, 0, 'an explicit falloff wins');
-  for (const bad of [{ visibility: 0 }, { visibility: -5 }, { visibility: Number.NaN }, { visibility: 1000, density: 0.01 }])
+  for (const bad of [
+    { visibility: 0 },
+    { visibility: -5 },
+    { visibility: Number.NaN },
+    { visibility: 1000, density: 0.01 },
+  ])
     assert.throws(() => new VolumetricFog(bad), RangeError, JSON.stringify(bad));
   assert.throws(() => new VolumetricFog({ sky: 'sky' }), RangeError);
 });
@@ -116,10 +121,19 @@ test("the scene's sky lights the fog near and far: its map at bindings 6 and 7 (
   assert.match(wgsl, /let ambient=fogAmbient\(-v\);var light=ambient;/);
   assert.match(wgsl, /textureSampleLevel\(skyMap,skySampler,vec2f\(u,0\.484375\),0\)/);
   const groups = log.filter((e) => e[0] === 'group').map((e) => e[2].entries.map((x) => x.binding));
-  assert.ok(groups.some((b) => b.includes(6) && b.includes(7)), 'inject group binds the map');
-  assert.ok(groups.some((b) => b.includes(4) && b.includes(5) && b.includes(3)), 'composite group binds the map');
+  assert.ok(
+    groups.some((b) => b.includes(6) && b.includes(7)),
+    'inject group binds the map',
+  );
+  assert.ok(
+    groups.some((b) => b.includes(4) && b.includes(5) && b.includes(3)),
+    'composite group binds the map',
+  );
   const samplers = log.filter((e) => e[0] === 'sampler').map((e) => e[2]);
-  assert.ok(samplers.some((s) => s.addressModeU === 'repeat'), 'the map wraps round in azimuth');
+  assert.ok(
+    samplers.some((s) => s.addressModeU === 'repeat'),
+    'the map wraps round in azimuth',
+  );
   // `ambient` given, or `sky: null`: the fog's own light, no map.
   for (const options of [{ ambient: [0.1, 0.1, 0.1] }, { sky: null }]) {
     const other = rig({ plugins: [sky], options }),
@@ -145,7 +159,11 @@ test("KB-FOG-WATERDEPTH1: with no `depth` the composite reads the depth a Water 
       ?.find((x) => x.binding === 3).resource;
   const name = (r) => r?.label ?? r;
   const drawn = rig({ before: (c) => publishSurfaceDepth(c, surface) });
-  assert.equal(name(composite(drawn.record(() => drawn.frame(0)))), surfaceView.label, 'the water surface ends each sea ray');
+  assert.equal(
+    name(composite(drawn.record(() => drawn.frame(0)))),
+    surfaceView.label,
+    'the water surface ends each sea ray',
+  );
   // Published on an earlier frame's encoder only (the water gone or not drawn): never read stale. The recorder keeps
   // one encoder; an engine records each frame on a new one, as here.
   let first;

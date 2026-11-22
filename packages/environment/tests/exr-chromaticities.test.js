@@ -71,7 +71,11 @@ test('parseEXR converts AP1 chromaticities to linear sRGB with the Bradford whit
   );
   assert.equal(image.data[3], 1);
   // The white stays white.
-  close(parseEXR(await pixel([1, 1, 1], AP1)).data, [1, 1, 1].map((v) => v), 'AP1 white');
+  close(
+    parseEXR(await pixel([1, 1, 1], AP1)).data,
+    [1, 1, 1].map((v) => v),
+    'AP1 white',
+  );
 });
 
 test('a file without chromaticities, or with Rec.709 ones, decodes unchanged', async () => {

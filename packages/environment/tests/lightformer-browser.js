@@ -15,12 +15,21 @@ async function drawPass(engine, device, former) {
     format: 'rgba16float',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
-  const depth = device.createTexture({ size: [SIZE, SIZE], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+  const depth = device.createTexture({
+    size: [SIZE, SIZE],
+    format: 'depth32float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
   const encoder = device.createCommandEncoder();
   encoder
     .beginRenderPass({
       colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
-      depthStencilAttachment: { view: depth.createView(), depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: 0 },
+      depthStencilAttachment: {
+        view: depth.createView(),
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+        depthClearValue: 0,
+      },
     })
     .end();
   const passes = [];
@@ -63,7 +72,10 @@ async function forms(report) {
   report.cardHalfWidthPx = edge;
   const at = (image, x, y) => image.at(0, Math.round(half + x), Math.round(half - y));
   let image = await drawPass(engine, device, former);
-  assert(JSON.stringify(at(image, 0, 0).slice(0, 3)) === JSON.stringify([3, 1.5, 0.75]), `rect centre ${at(image, 0, 0)}`);
+  assert(
+    JSON.stringify(at(image, 0, 0).slice(0, 3)) === JSON.stringify([3, 1.5, 0.75]),
+    `rect centre ${at(image, 0, 0)}`,
+  );
   assert(at(image, edge - 2, edge - 2)[0] === 3, 'rect corner covered');
   assert(at(image, edge + 2, 0)[0] === 0, 'outside the card nothing');
   report.checks.push('rect: exactly color x intensity, linear on an HDR target');
@@ -104,7 +116,10 @@ async function capture(report) {
   device.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
   // A 4 x 4 softbox 3 units along +X, facing the origin.
   const former = Lightformer.attach(engine, { intensity: 5 });
-  former.node.setPosition([3, 0, 0]).setRotation([0, -Math.PI / 2, 0]).setScale([4, 4, 1]);
+  former.node
+    .setPosition([3, 0, 0])
+    .setRotation([0, -Math.PI / 2, 0])
+    .setScale([4, 4, 1]);
   const cube = new CubeCamera({ size: 64, near: 0.1, far: 100 });
   engine.use(cube);
   engine.render();

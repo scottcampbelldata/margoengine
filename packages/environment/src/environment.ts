@@ -298,7 +298,8 @@ async function build(
   signal?: AbortSignal,
 ): Promise<Resources> {
   const created: Array<GPUTexture | GPUBuffer> = [];
-  let lut: SharedLut | undefined, released = false;
+  let lut: SharedLut | undefined,
+    released = false;
   const release = () => {
     if (released) return;
     released = true;
@@ -409,7 +410,8 @@ async function build(
       // A source brighter than half floats hold is divided into range here and multiplied back in lighting
       // (paramsBuffer.w), so the rgba16float cube, prefilter and SH stay finite and keep its energy. A GPU cube is
       // rgba16float already.
-      const image = isTexture(source) || isCube(source) ? undefined : fitEquirect(source, device.limits.maxTextureDimension2D);
+      const image =
+        isTexture(source) || isCube(source) ? undefined : fitEquirect(source, device.limits.maxTextureDimension2D);
       radianceScale = image
         ? lightingScale(image.data)
         : isCube(source)

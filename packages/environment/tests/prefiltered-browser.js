@@ -62,9 +62,18 @@ window.runTests = async () => {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
     });
     const fill = (half) =>
-      device.queue.writeTexture({ texture: cubeSource }, new Uint16Array(16 * 16 * 6 * 4).fill(half), { bytesPerRow: 16 * 8, rowsPerImage: 16 }, [16, 16, 6]);
+      device.queue.writeTexture(
+        { texture: cubeSource },
+        new Uint16Array(16 * 16 * 6 * 4).fill(half),
+        { bytesPerRow: 16 * 8, rowsPerImage: 16 },
+        [16, 16, 6],
+      );
     fill(0x3c00); // 1.0
-    const live = await Environment.create(device, { texture: cubeSource }, { specularMips: 3, samples: 16, brdfSize: 16, brdfSamples: 16 });
+    const live = await Environment.create(
+      device,
+      { texture: cubeSource },
+      { specularMips: 3, samples: 16, brdfSize: 16, brdfSamples: 16 },
+    );
     assert(!live.refreshPending, 'no refresh pending after create');
     fill(0x4000); // 2.0
     const refreshed = live.refresh();
@@ -80,7 +89,10 @@ window.runTests = async () => {
     assert(!live.refreshPending, 'refreshPending clears when the refresh settles');
     const saved = await loadPrefilteredEnvironment(device, await savePrefilteredEnvironment(live));
     await compare(device, live, saved);
-    assert(Math.abs(saved.sh.radiance[0] - live.sh.radiance[0]) < 1e-6 && live.sh.radiance[0] > 0, 'refreshed SH saved');
+    assert(
+      Math.abs(saved.sh.radiance[0] - live.sh.radiance[0]) < 1e-6 && live.sh.radiance[0] > 0,
+      'refreshed SH saved',
+    );
     saved.dispose();
     live.dispose();
     cubeSource.destroy();

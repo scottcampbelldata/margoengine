@@ -524,7 +524,10 @@ test('a device restore after readback lights again only the probes the copy held
   h.engine.gpu = fresh.device;
   const restore = fresh.record(() => h.probes.onDeviceRestored(h.engine));
   const header = Buffer.from(restore.find((e) => e[0] === 'writeBuffer' && e[2] === 0)[3], 'hex');
-  assert.ok(restore.some((e) => e[0] === 'writeBuffer' && e[2] === 1088), 'the copy is uploaded again');
+  assert.ok(
+    restore.some((e) => e[0] === 'writeBuffer' && e[2] === 1088),
+    'the copy is uploaded again',
+  );
   assert.equal(header.readUInt32LE(64 + 60), 1, 'the probe captured live lights again from the copy');
   assert.equal(header.readUInt32LE(64 + 64 + 60), 0, 'the probe never captured stays on the fallback');
   h.probes.dispose();
@@ -581,7 +584,6 @@ test('disposing during a readback rejects it as disposed, not with the aborted m
   await assert.rejects(copy, (error) => error.code === 'disposed');
   d.createBuffer = createBuffer;
 });
-
 
 test('a refresh whose prefilter was submitted rejects on dispose and restarts on a device restore before the GPU finishes', async () => {
   // Regression: finishJob() handed the waiters to onSubmittedWorkDone(), out of reach of dispose() and release(), so

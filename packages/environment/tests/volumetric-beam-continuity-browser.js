@@ -37,7 +37,13 @@ window.runTests = async () => {
   const canvas = document.querySelector('#scene');
   const engine = await Engine.create(canvas, {
     backend: 'webgpu',
-    camera: { position: scene.camera.position, target: [0, 1, 0], fov: scene.camera.fov, near: scene.camera.near, far: 100 },
+    camera: {
+      position: scene.camera.position,
+      target: [0, 1, 0],
+      fov: scene.camera.fov,
+      near: scene.camera.near,
+      far: 100,
+    },
   });
   engine.stop();
   const runtime = engineRuntime(engine),

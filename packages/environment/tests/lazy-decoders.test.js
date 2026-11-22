@@ -61,7 +61,10 @@ test('an app that loads environment files keeps every decoder in its own lazy ch
 
 test('loadEnvironmentImage decodes by signature and keeps its errors', async () => {
   const bytes = await readFile(hdr);
-  const serve = (body, status = 200) => async () => new Response(body, { status });
+  const serve =
+    (body, status = 200) =>
+    async () =>
+      new Response(body, { status });
   const loaded = await loadEnvironmentImage('x.hdr', { fetch: serve(bytes) });
   assert.deepEqual(loaded.data, parseEnvironmentImage(bytes).data);
   await assert.rejects(loadEnvironmentImage('x', { fetch: serve(new Uint8Array([1, 2, 3, 4])) }), {
