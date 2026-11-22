@@ -86,7 +86,10 @@ test('MeshOutline transparent blends by opacity and leaves depth unwritten', () 
 });
 
 test('MeshOutline culls back faces under a mirrored matrix and offsets depth on request', () => {
-  const { h } = scene({ polygonOffset: true, polygonOffsetFactor: 2 }, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  const { h } = scene(
+    { polygonOffset: true, polygonOffsetFactor: 2 },
+    [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  );
   h.frame();
   const p = h.pipelines.at(-1),
     reversed = p.depthStencil.depthCompare?.startsWith('greater');

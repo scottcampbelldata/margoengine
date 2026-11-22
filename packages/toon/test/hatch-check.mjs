@@ -72,8 +72,9 @@ try {
   const dotRadius = (share) => {
     let lo = 0,
       hi = Math.SQRT1_2;
-    for (let k = 0; k < 60; k++) if (cellShare((lo + hi) / 2) < share) lo = (lo + hi) / 2;
-    else hi = (lo + hi) / 2;
+    for (let k = 0; k < 60; k++)
+      if (cellShare((lo + hi) / 2) < share) lo = (lo + hi) / 2;
+      else hi = (lo + hi) / 2;
     return (lo + hi) / 2;
   };
   // Dark tones (light below 1 - pi/4) need the clipped disc: a dot sized by pi r^2 alone left the cell corners bare,

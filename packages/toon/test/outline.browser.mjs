@@ -49,10 +49,11 @@ try {
   const solid = await shot({ thickness: 6, screenspace: true }),
     blended = await shot({ thickness: 6, screenspace: true, transparent: true, opacity: 0.5 });
   const edge = (image) => {
-      const y = Math.floor(image.height / 2);
-      for (let i = 0; i < image.width; i++) if (pixel(image, i, y)[1] > 60 && pixel(image, i, y)[0] < 40) return pixel(image, i + 2, y);
-      return null;
-    };
+    const y = Math.floor(image.height / 2);
+    for (let i = 0; i < image.width; i++)
+      if (pixel(image, i, y)[1] > 60 && pixel(image, i, y)[0] < 40) return pixel(image, i + 2, y);
+    return null;
+  };
   const a = edge(solid),
     b = edge(blended);
   console.log({ solid: a, blended: b });
