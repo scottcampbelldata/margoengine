@@ -271,7 +271,9 @@ test('viewer includes resources made before attachment, safely labels metadata a
 });
 
 test('layered captures never publish another capture preview allocation', async () => {
-  const d = device(), first = new TextureCapture({ gpu: null }), second = new TextureCapture({ gpu: null });
+  const d = device(),
+    first = new TextureCapture({ gpu: null }),
+    second = new TextureCapture({ gpu: null });
   first.watchDevice(d);
   second.watchDevice(d);
   const texture = d.createTexture({ label: 'Source', size: [2, 2], format: 'rgba8unorm', usage: 4 });
@@ -279,8 +281,14 @@ test('layered captures never publish another capture preview allocation', async 
   second.onChange(() => changes.push(second.list().map((entry) => entry.label)));
   await first.preview(first.list()[0].id);
   assert.deepEqual(changes, []);
-  assert.deepEqual(first.list().map((entry) => entry.label), ['Source']);
-  assert.deepEqual(second.list().map((entry) => entry.label), ['Source']);
+  assert.deepEqual(
+    first.list().map((entry) => entry.label),
+    ['Source'],
+  );
+  assert.deepEqual(
+    second.list().map((entry) => entry.label),
+    ['Source'],
+  );
   first.dispose();
   second.dispose();
   texture.destroy();
