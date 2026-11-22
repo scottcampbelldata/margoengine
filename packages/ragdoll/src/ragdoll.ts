@@ -188,7 +188,13 @@ const determinant = (m: ArrayLike<number>): number =>
 /** The rotation of a world matrix into `out`, each axis divided by its own scale. */
 const worldTurn = (m: ArrayLike<number>, out: Float64Array): Float64Array =>
   normalizeQuaternion(
-    rotationToQuaternion(m, out, Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])),
+    rotationToQuaternion(
+      m,
+      out,
+      Math.hypot(m[0], m[1], m[2]),
+      Math.hypot(m[4], m[5], m[6]),
+      Math.hypot(m[8], m[9], m[10]),
+    ),
     out,
   );
 const mul = (a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array, at = 0): Float64Array => {
@@ -1005,9 +1011,12 @@ export class Ragdoll implements EnginePlugin {
         y = world[1] - m[13],
         z = world[2] - m[14],
         size = determinant(m);
-      local[0] = (x * (m[5] * m[10] - m[6] * m[9]) + y * (m[8] * m[6] - m[4] * m[10]) + z * (m[4] * m[9] - m[8] * m[5])) / size;
-      local[1] = (x * (m[9] * m[2] - m[1] * m[10]) + y * (m[0] * m[10] - m[8] * m[2]) + z * (m[8] * m[1] - m[0] * m[9])) / size;
-      local[2] = (x * (m[1] * m[6] - m[5] * m[2]) + y * (m[4] * m[2] - m[0] * m[6]) + z * (m[0] * m[5] - m[4] * m[1])) / size;
+      local[0] =
+        (x * (m[5] * m[10] - m[6] * m[9]) + y * (m[8] * m[6] - m[4] * m[10]) + z * (m[4] * m[9] - m[8] * m[5])) / size;
+      local[1] =
+        (x * (m[9] * m[2] - m[1] * m[10]) + y * (m[0] * m[10] - m[8] * m[2]) + z * (m[8] * m[1] - m[0] * m[9])) / size;
+      local[2] =
+        (x * (m[1] * m[6] - m[5] * m[2]) + y * (m[4] * m[2] - m[0] * m[6]) + z * (m[0] * m[5] - m[4] * m[1])) / size;
     }
   }
 
@@ -1127,8 +1136,7 @@ export class Ragdoll implements EnginePlugin {
     }
     if (!any) return;
     for (let i = 0; i < parts.length; i++)
-      if (parts[i].limp)
-        parts[i].body.setAngularVelocity([omega[i * 3], omega[i * 3 + 1], omega[i * 3 + 2]]);
+      if (parts[i].limp) parts[i].body.setAngularVelocity([omega[i * 3], omega[i * 3 + 1], omega[i * 3 + 2]]);
   }
 
   /** Turns `bone`'s body by `angle` radians about the world `axis` through its origin (its joint). */

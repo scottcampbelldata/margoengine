@@ -192,13 +192,17 @@ export class RagdollBalance {
         return part;
       };
     if (!Array.isArray(options?.feet) || options.feet.length !== 2)
-      throw new TypeError('addRagdollBalance needs two feet: addRagdollBalance(ragdoll, motors, {feet: [left, right]}).');
+      throw new TypeError(
+        'addRagdollBalance needs two feet: addRagdollBalance(ragdoll, motors, {feet: [left, right]}).',
+      );
     const leg = (item: Mesh | RagdollPart): Leg => {
       const foot = find(item),
         lower = bones[foot.parent],
         upper = lower && bones[lower.parent];
       if (!upper || upper === hips || lower.spec?.type !== 'hinge')
-        throw new RangeError('Each foot needs a knee hinge and a thigh above it; build the ragdoll with humanoidProfile.');
+        throw new RangeError(
+          'Each foot needs a knee hinge and a thigh above it; build the ragdoll with humanoidProfile.',
+        );
       const hip = upper.body.position,
         knee = lower.body.position,
         ankle = foot.body.position;
@@ -372,7 +376,12 @@ export class RagdollBalance {
     this.holdJoints();
     // Added inertia counts from the first step. A torque given before it would spin a bone by its old, smaller inertia and
     // the solver would carry that spin at the new one: the kick left the floor on RiggedFigure and shook Knight for seconds.
-    if (this.primed) this.carryWeight(dt, this.legs.filter((leg) => !leg.swing), support);
+    if (this.primed)
+      this.carryWeight(
+        dt,
+        this.legs.filter((leg) => !leg.swing),
+        support,
+      );
     this.primed = true;
     this.assist(dt, centre);
   }
@@ -410,7 +419,12 @@ export class RagdollBalance {
       if (leg.swing) {
         const inertia = this.motors.limbInertia(leg.foot);
         leg.foot.joint!.setRotationMotor(
-          multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest) as [number, number, number, number],
+          multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest) as [
+            number,
+            number,
+            number,
+            number,
+          ],
           {
             model: 'force',
             stiffness: inertia * FOOT_FREQUENCY * FOOT_FREQUENCY * strength,
@@ -458,12 +472,19 @@ export class RagdollBalance {
     if (shape.type !== 'hull') return fallback;
     const points: Vec3[] = [];
     for (let i = 0; i + 2 < shape.points.length; i += 3)
-      points.push(rotateByQuaternion([shape.points[i], shape.points[i + 1], shape.points[i + 2]], foot.body.rotation) as Vec3);
+      points.push(
+        rotateByQuaternion([shape.points[i], shape.points[i + 1], shape.points[i + 2]], foot.body.rotation) as Vec3,
+      );
     const lowest = Math.min(...points.map((point) => dot(point, this.up))),
       sole = points.filter((point) => dot(point, this.up) < lowest + foot.length * SOLE_HEIGHT),
       along = sole.map((point) => dot(point, this.forward)),
       across = sole.map((point) => dot(point, side));
-    return { front: Math.max(...along), back: -Math.min(...along), left: Math.max(...across), right: -Math.min(...across) };
+    return {
+      front: Math.max(...along),
+      back: -Math.min(...along),
+      left: Math.max(...across),
+      right: -Math.min(...across),
+    };
   }
 
   /**
@@ -512,7 +533,10 @@ export class RagdollBalance {
       friction = this.ragdoll.settings.friction,
       // Springs and dampers solved implicitly, as a stiff one would ring at this step.
       implicit = (w: number): number => 1 / (1 + 2 * w * dt + w * w * dt * dt),
-      feet = times(stance.reduce((sum, leg) => add(sum, leg.plant), [0, 0, 0] as Vec3), 1 / count),
+      feet = times(
+        stance.reduce((sum, leg) => add(sum, leg.plant), [0, 0, 0] as Vec3),
+        1 / count,
+      ),
       want = dot(feet, this.up) + this.height * this.stanceNow,
       w = HEIGHT_FREQUENCY,
       rise = implicit(w) * (w * w * (want - dot(hips.position, this.up)) - 2 * w * dot(this.hipsSpeed, this.up)),
@@ -539,7 +563,10 @@ export class RagdollBalance {
       // Two feet share the weight by where the centre of mass lies between them; only what lies off their line is the ankles' to hold.
       line = count === 2 ? minus(stance[1].plant, stance[0].plant) : ([0, 0, 0] as Vec3),
       span = minus(line, times(this.up, dot(line, this.up))),
-      along = count === 2 ? Math.min(1, Math.max(0, dot(minus(position, stance[0].plant), span) / Math.max(dot(span, span), 1e-9))) : 0;
+      along =
+        count === 2
+          ? Math.min(1, Math.max(0, dot(minus(position, stance[0].plant), span) / Math.max(dot(span, span), 1e-9)))
+          : 0;
     const wants = stance.map((leg, i) => {
       const part = count === 2 ? (i ? along : 1 - along) : 1,
         weight = times(this.up, lifted * part),
@@ -549,9 +576,15 @@ export class RagdollBalance {
         ankle = leg.foot.body.position,
         thigh = centreOf(leg.upper),
         shin = centreOf(leg.lower),
-        atKnee = add(add(cross(minus(carriedAt, knee), weight), cross(minus(thigh, knee), lift(leg.upper))), cross(minus(hip, knee), shove)),
+        atKnee = add(
+          add(cross(minus(carriedAt, knee), weight), cross(minus(thigh, knee), lift(leg.upper))),
+          cross(minus(hip, knee), shove),
+        ),
         atAnkle = add(
-          add(add(cross(minus(minus(carriedAt, offLine), ankle), weight), cross(minus(thigh, ankle), lift(leg.upper))), cross(minus(shin, ankle), lift(leg.lower))),
+          add(
+            add(cross(minus(minus(carriedAt, offLine), ankle), weight), cross(minus(thigh, ankle), lift(leg.upper))),
+            cross(minus(shin, ankle), lift(leg.lower)),
+          ),
           cross(minus(hip, ankle), shove),
         );
       return { leg, atKnee, atAnkle, foot: load * count * part };
@@ -575,12 +608,21 @@ export class RagdollBalance {
     };
     if (limited)
       for (const { leg, atAnkle, foot } of wants) {
-        share = Math.min(share, room(dot(atAnkle, side), dot(torque, side), -leg.sole.front * foot, leg.sole.back * foot));
-        share = Math.min(share, room(dot(atAnkle, this.forward), dot(torque, this.forward), -leg.sole.right * foot, leg.sole.left * foot));
+        share = Math.min(
+          share,
+          room(dot(atAnkle, side), dot(torque, side), -leg.sole.front * foot, leg.sole.back * foot),
+        );
+        share = Math.min(
+          share,
+          room(dot(atAnkle, this.forward), dot(torque, this.forward), -leg.sole.right * foot, leg.sole.left * foot),
+        );
       }
     const held = times(torque, share),
-      inside = (value: number, low: number, high: number): number => (limited ? Math.max(low, Math.min(high, value)) : value);
-    this.upper.forEach((part, i) => this.give(part, times(cross(times(turn, share), minus(points[i], centre)), part.body.mass / dt), null));
+      inside = (value: number, low: number, high: number): number =>
+        limited ? Math.max(low, Math.min(high, value)) : value;
+    this.upper.forEach((part, i) =>
+      this.give(part, times(cross(times(turn, share), minus(points[i], centre)), part.body.mass / dt), null),
+    );
     // The turn's reaction goes down through hip, knee and ankle to the foot: on the thighs alone the hip motors would cancel it.
     for (const { leg, atKnee, atAnkle, foot } of wants) {
       const axis = rotateByQuaternion((leg.lower.spec as { axis: ArrayLike<number> }).axis, leg.lower.body.rotation),
@@ -614,7 +656,9 @@ export class RagdollBalance {
       strength = size(turn);
     if (strength > cap) for (let k = 0; k < 3; k++) turn[k] *= cap / strength;
     const bones = this.ragdoll.bones,
-      points = this.upper.map((part) => add(part.body.position, rotateByQuaternion(this.massPoints[bones.indexOf(part)], part.body.rotation))),
+      points = this.upper.map((part) =>
+        add(part.body.position, rotateByQuaternion(this.massPoints[bones.indexOf(part)], part.body.rotation)),
+      ),
       centre: Vec3 = [0, 0, 0];
     this.upper.forEach((part, i) => {
       for (let k = 0; k < 3; k++) centre[k] += (points[i][k] * part.body.mass) / this.upperMass;
@@ -646,7 +690,10 @@ export class RagdollBalance {
       inA = this.outside(toA, b.plant),
       inB = this.outside(toB, a.plant),
       // The step that leaves the capture point between the feet; between two as good, the foot left farther behind.
-      first = Math.abs(inA - inB) > this.trigger * CLEARLY_BETTER ? inA < inB : size(minus(toA, a.plant)) >= size(minus(toB, b.plant)),
+      first =
+        Math.abs(inA - inB) > this.trigger * CLEARLY_BETTER
+          ? inA < inB
+          : size(minus(toA, a.plant)) >= size(minus(toB, b.plant)),
       leg = first ? a : b;
     leg.swing = { from: leg.plant, to: first ? toA : toB, t: 0 };
     this.steps++;
@@ -678,7 +725,10 @@ export class RagdollBalance {
       swing.t += dt / this.stepTime;
       const t = Math.min(1, swing.t),
         e = ease(t);
-      target = add(add(times(swing.from, 1 - e), times(swing.to, e)), times(this.up, this.lift * Math.sin(Math.PI * t)));
+      target = add(
+        add(times(swing.from, 1 - e), times(swing.to, e)),
+        times(this.up, this.lift * Math.sin(Math.PI * t)),
+      );
       if (swing.t >= 1) leg.swing = null;
     }
     const line = minus(target, add(hips, leg.hip)),
@@ -686,8 +736,12 @@ export class RagdollBalance {
       distance = Math.min(size(line), (thigh + shin) * 0.999),
       direction = unit(line),
       // Law of cosines for the knee, and for the thigh's angle off the hip-to-foot line.
-      knee = Math.acos(Math.max(-1, Math.min(1, (thigh * thigh + shin * shin - distance * distance) / (2 * thigh * shin)))),
-      lean = Math.acos(Math.max(-1, Math.min(1, (thigh * thigh + distance * distance - shin * shin) / (2 * thigh * distance)))),
+      knee = Math.acos(
+        Math.max(-1, Math.min(1, (thigh * thigh + shin * shin - distance * distance) / (2 * thigh * shin))),
+      ),
+      lean = Math.acos(
+        Math.max(-1, Math.min(1, (thigh * thigh + distance * distance - shin * shin) / (2 * thigh * distance))),
+      ),
       out = rotateByQuaternion(direction, turnAbout(unit(cross(direction, this.forward)), lean)),
       upper = multiplyQuaternions(arc(leg.rest, out), leg.upperRest),
       spec = leg.lower.spec as { axis: ArrayLike<number>; limits: readonly [number, number] },
@@ -710,10 +764,14 @@ export class RagdollBalance {
       weight = this.gravity * dt * this.carry,
       rise = Math.max(
         0,
-        Math.min(share * (v * v * (want - height) - damping * dot(hips.linearVelocity, this.up)) + weight, weight * 1.5),
+        Math.min(
+          share * (v * v * (want - height) - damping * dot(hips.linearVelocity, this.up)) + weight,
+          weight * 1.5,
+        ),
       );
     this.carried = (rise / (this.gravity * dt)) * this.upperShare;
-    if (rise > 0) for (const part of this.upper) part.body.setLinearVelocity(add(part.body.linearVelocity, times(this.up, rise)));
+    if (rise > 0)
+      for (const part of this.upper) part.body.setLinearVelocity(add(part.body.linearVelocity, times(this.up, rise)));
   }
 
   private fall(): void {
@@ -777,6 +835,8 @@ export function addRagdollBalance(
   options: RagdollBalanceOptions,
 ): RagdollBalance {
   if (!ragdoll?.bones || typeof motors?.setTarget !== 'function')
-    throw new TypeError('addRagdollBalance needs a Ragdoll and its motors: addRagdollBalance(ragdoll, motors, {feet}).');
+    throw new TypeError(
+      'addRagdollBalance needs a Ragdoll and its motors: addRagdollBalance(ragdoll, motors, {feet}).',
+    );
   return new RagdollBalance(ragdoll, motors, options);
 }

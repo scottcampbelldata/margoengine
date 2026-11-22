@@ -3,7 +3,12 @@
 // inertia parameters", J. Biomechanics 1996; segment lengths are D. Drillis, R. Contini, "Body Segment Parameters", 1966.
 // The joint ranges are the common published ranges of motion, narrowed to one cone per joint. Our own design.
 import type { Mesh } from '@margoengine/core/extension';
-import { conjugateQuaternion, normalizeQuaternion, rotateByQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
+import {
+  conjugateQuaternion,
+  normalizeQuaternion,
+  rotateByQuaternion,
+  rotationToQuaternion,
+} from '@margoengine/math/quat';
 import { detectSkeleton, humanoidBones, type HumanoidBone } from '@margoengine/rigging/retarget';
 import type { Ragdoll, RagdollBone, RagdollJoint, RagdollOptions, RagdollSettings, RagdollShape } from './ragdoll.js';
 
@@ -116,7 +121,13 @@ const unit = (a: Vec3): Vec3 => {
 function rotationOf(node: Mesh): [number, number, number, number] {
   const m = node.matrix;
   return normalizeQuaternion(
-    rotationToQuaternion(m, [0, 0, 0, 1], Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])),
+    rotationToQuaternion(
+      m,
+      [0, 0, 0, 1],
+      Math.hypot(m[0], m[1], m[2]),
+      Math.hypot(m[4], m[5], m[6]),
+      Math.hypot(m[8], m[9], m[10]),
+    ),
   ) as [number, number, number, number];
 }
 const plainShape = (shape: RagdollShape): RagdollShape =>
@@ -138,7 +149,8 @@ export function saveRagdollProfile(ragdoll: Ragdoll): RagdollProfile {
     bones: ragdoll.bones.map((part) => {
       const { name } = part.node;
       if (!name) throw new RangeError('A ragdoll profile finds bones by name; name every bone node before saving.');
-      if (seen.has(name)) throw new RangeError(`Two ragdoll bones are named "${name}"; rename one, a profile finds bones by name.`);
+      if (seen.has(name))
+        throw new RangeError(`Two ragdoll bones are named "${name}"; rename one, a profile finds bones by name.`);
       seen.add(name);
       return {
         name,
@@ -163,7 +175,10 @@ export function saveRagdollProfile(ragdoll: Ragdoll): RagdollProfile {
 export function ragdollOptions(profile: RagdollProfile, nodes: readonly Mesh[]): RagdollOptions {
   if (!profile || !Array.isArray(nodes))
     throw new TypeError('ragdollOptions needs a profile and the nodes: ragdollOptions(profile, model.nodes).');
-  if (profile.format !== FORMAT) throw new RangeError(`That is not a ragdoll profile: its format is not "${FORMAT}"; pass what saveRagdollProfile made.`);
+  if (profile.format !== FORMAT)
+    throw new RangeError(
+      `That is not a ragdoll profile: its format is not "${FORMAT}"; pass what saveRagdollProfile made.`,
+    );
   if (!(profile.version <= VERSION))
     throw new RangeError(`This profile is version ${profile.version}; this package reads up to ${VERSION}. Update it.`);
   if (!Array.isArray(profile.bones) || !profile.bones.length)
@@ -177,7 +192,8 @@ export function ragdollOptions(profile: RagdollProfile, nodes: readonly Mesh[]):
   const bones = profile.bones.map(({ name, ...bone }): RagdollBone => {
     const node = named.get(name);
     if (!node) throw new RangeError(`The profile's bone "${name}" is not in this skeleton; pass its nodes.`);
-    if (twice.has(name)) throw new RangeError(`Two nodes are named "${name}", so the profile cannot tell them apart; rename one.`);
+    if (twice.has(name))
+      throw new RangeError(`Two nodes are named "${name}", so the profile cannot tell them apart; rename one.`);
     return { node, ...bone };
   });
   return { ...profile.settings, bones };
@@ -192,7 +208,8 @@ export function ragdollOptions(profile: RagdollProfile, nodes: readonly Mesh[]):
  * @throws TypeError without nodes, RangeError for a bad mass or a rig missing hips, a head, or an arm or leg bone.
  */
 export function humanoidProfile(nodes: readonly Mesh[], options: HumanoidProfileOptions = {}): RagdollProfile {
-  if (!Array.isArray(nodes)) throw new TypeError('humanoidProfile needs the skeleton nodes: humanoidProfile(model.nodes).');
+  if (!Array.isArray(nodes))
+    throw new TypeError('humanoidProfile needs the skeleton nodes: humanoidProfile(model.nodes).');
   const total = options.mass ?? 70;
   if (!(total > 0) || total === Infinity) throw new RangeError('Humanoid mass must be positive kilograms, e.g. 70.');
   const rig = options.bones ?? detected(nodes),
