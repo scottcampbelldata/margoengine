@@ -114,7 +114,10 @@ test('the reader indexes every instance, parses parameters on demand and decodes
     'GEOMETRIC_REPRESENTATION_CONTEXT+GLOBAL_UNIT_ASSIGNED_CONTEXT+REPRESENTATION_CONTEXT',
   );
   assert.equal(file.census().get('ORIENTED_EDGE'), 3);
-  assert.throws(() => file.get(999), /^TypeError: Invalid STEP file: #999 is referenced but never defined; export it again from the CAD tool$/);
+  assert.throws(
+    () => file.get(999),
+    /^TypeError: Invalid STEP file: #999 is referenced but never defined; export it again from the CAD tool$/,
+  );
 });
 
 test('a part: one solid in millimetres, its faces, edges, surface and curve census and colour', () => {

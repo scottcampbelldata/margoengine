@@ -102,7 +102,10 @@ export function roundV(s: Surface, loops: readonly (readonly XYZ[])[], name: str
     }
     const ku = Math.round((u - start[0]) / s.uPeriod),
       kv = Math.round((v - start[1]) / s.vPeriod);
-    if (ku && kv) throw new RangeError(`face ${name}: a loop goes round a torus both ways: not supported yet; move one body slightly and try again`);
+    if (ku && kv)
+      throw new RangeError(
+        `face ${name}: a loop goes round a torus both ways: not supported yet; move one body slightly and try again`,
+      );
     if (kv) around = true;
   }
   return around;
@@ -240,7 +243,8 @@ export class FaceUV {
         let g = 0;
         traced.points.forEach((q, i) => {
           points.push(q);
-          while (g < gaps.length && (gaps[g].after || samples.length) === i + 1) points.push(this.near(gaps[g++].point, q));
+          while (g < gaps.length && (gaps[g].after || samples.length) === i + 1)
+            points.push(this.near(gaps[g++].point, q));
         });
         this.loops.push({ ...traced, area: polygonArea(points) });
       } else this.loops.push(slit ? { ...traced, slit } : traced);
@@ -274,17 +278,19 @@ export class FaceUV {
         cut = seam
           ? vRange(seam)[0]
           : wraps
-          ? options.find(
-              (g) =>
-                !inAbove(
-                  this.loops.map((l) => shiftV(l, g, vPeriod)),
-                  this.period,
-                  g,
-                ),
-            )
-          : options[0];
+            ? options.find(
+                (g) =>
+                  !inAbove(
+                    this.loops.map((l) => shiftV(l, g, vPeriod)),
+                    this.period,
+                    g,
+                  ),
+              )
+            : options[0];
       if (cut === undefined)
-        throw new RangeError(`face ${this.face.name}: no circle round its torus's tube cuts it open; move one body slightly and try again`);
+        throw new RangeError(
+          `face ${this.face.name}: no circle round its torus's tube cuts it open; move one body slightly and try again`,
+        );
       this.vCut = cut;
       this.loops.forEach((l, i) => {
         this.loops[i] = shiftV(l, cut, vPeriod);
@@ -510,7 +516,9 @@ export class FaceUV {
     if (!points.length || !this.period) return { points, wrap: 0 };
     const back = this.near(this.at(points[0]), points[points.length - 1]);
     if (this.surface.vPeriod && Math.abs(back[1] - points[0][1]) > this.surface.vPeriod / 2)
-      throw new RangeError(`face ${this.face.name}: a loop goes round a torus both ways: not supported yet; move one body slightly and try again`);
+      throw new RangeError(
+        `face ${this.face.name}: a loop goes round a torus both ways: not supported yet; move one body slightly and try again`,
+      );
     return { points, wrap: Math.round((back[0] - points[0][0]) / this.period) };
   }
 
@@ -711,8 +719,7 @@ function crossings(loop: UVLoop, period: number, u: number, v: number): number {
 
 /** Whether (u, v) lies on the left of a loop: inside a counter-clockwise one, outside a clockwise one, on the side a loop round the period turns to. */
 export function leftOf(loop: UVLoop, period: number, u: number, v: number): boolean {
-  const bias =
-    loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : loop.slit || (loop.area ?? polygonArea(loop.points)) < 0 ? 1 : 0;
+  const bias = loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : loop.slit || (loop.area ?? polygonArea(loop.points)) < 0 ? 1 : 0;
   return crossings(loop, period, u, v) + bias === 1;
 }
 

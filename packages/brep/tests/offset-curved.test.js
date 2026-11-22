@@ -6,8 +6,22 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model } from '../dist/index.js';
 
-const { box, boolean, checkBody, cone, cylinder, draft, frameOf, massProperties, offsetFaces, shell, sphere, sweep, torus, validateBody } =
-  model;
+const {
+  box,
+  boolean,
+  checkBody,
+  cone,
+  cylinder,
+  draft,
+  frameOf,
+  massProperties,
+  offsetFaces,
+  shell,
+  sphere,
+  sweep,
+  torus,
+  validateBody,
+} = model;
 const mm = 0.001;
 
 function close(actual, expected, what, tolerance = 1e-12) {
@@ -26,9 +40,13 @@ function same(body, expected) {
   close(m.volume, e.volume, 'volume');
   if (e.area !== undefined) close(m.area, e.area, 'area');
   const size = Math.cbrt(e.volume);
-  e.centroid.forEach((x, k) => assert.ok(Math.abs(m.centroid[k] - x) <= 1e-12 * size, `centroid ${k}: ${m.centroid[k]} vs ${x}`));
+  e.centroid.forEach((x, k) =>
+    assert.ok(Math.abs(m.centroid[k] - x) <= 1e-12 * size, `centroid ${k}: ${m.centroid[k]} vs ${x}`),
+  );
   const trace = e.inertia[0] + e.inertia[1] + e.inertia[2];
-  e.inertia.forEach((x, k) => assert.ok(Math.abs(m.inertia[k] - x) <= 1e-12 * trace, `inertia ${k}: ${m.inertia[k]} vs ${x}`));
+  e.inertia.forEach((x, k) =>
+    assert.ok(Math.abs(m.inertia[k] - x) <= 1e-12 * trace, `inertia ${k}: ${m.inertia[k]} vs ${x}`),
+  );
 }
 
 const named = (body, end) => body.faces.find((f) => f.name.endsWith(end)).name;
@@ -66,7 +84,10 @@ test('offset: a cylinder, sphere, torus and frustum offset are the primitives of
   const c = cylinder('c', 5 * mm, 20 * mm);
   same(offsetFaces('o', c, [named(c, 'side')], 1 * mm), cylinder('e', 6 * mm, 20 * mm));
   same(offsetFaces('o', c, [named(c, '+z')], 2 * mm), cylinder('e', 5 * mm, 22 * mm));
-  same(offsetFaces('o', c, [named(c, 'side'), named(c, '-z')], -1 * mm), cylinder('e', 4 * mm, 19 * mm, frameOf([0, 0, 1 * mm], [0, 0, 1])));
+  same(
+    offsetFaces('o', c, [named(c, 'side'), named(c, '-z')], -1 * mm),
+    cylinder('e', 4 * mm, 19 * mm, frameOf([0, 0, 1 * mm], [0, 0, 1])),
+  );
   const s = sphere('s', 5 * mm);
   same(offsetFaces('o', s, [s.faces[0].name], 1 * mm), sphere('e', 6 * mm));
   const t = torus('t', 10 * mm, 3 * mm);
@@ -83,10 +104,10 @@ test('shell: a hollow sphere, a thick pipe, and cups out and in', () => {
     hollow = shell('h', sphere('s', R * mm), [], -1 * mm);
   assert.equal(hollow.shells.length, 2, 'a cavity');
   same(hollow, {
-    volume: ((4 / 3) * Math.PI * (R ** 3 - r ** 3)) * mm ** 3,
+    volume: (4 / 3) * Math.PI * (R ** 3 - r ** 3) * mm ** 3,
     area: 4 * Math.PI * (R * R + r * r) * mm ** 2,
     centroid: [0, 0, 0],
-    inertia: [0, 1, 2].map(() => ((8 / 15) * Math.PI * (R ** 5 - r ** 5)) * mm ** 5).concat([0, 0, 0]),
+    inertia: [0, 1, 2].map(() => (8 / 15) * Math.PI * (R ** 5 - r ** 5) * mm ** 5).concat([0, 0, 0]),
   });
   const c = cylinder('c', 5 * mm, 20 * mm),
     pipe = shell('p', c, [named(c, '-z'), named(c, '+z')], -1 * mm),
@@ -112,8 +133,17 @@ test('shell: a hollow sphere, a thick pipe, and cups out and in', () => {
 });
 
 test('offset: a quarter torus swept along an arc, its tube thinned; its end moved off the axis cuts the tube anew', () => {
-  const ring = (r) => ({ name: 'p', start: [11 * mm, 0, 0], normal: [0, 1, 0], segments: [{ kind: 'arc', to: [11 * mm, 0, 0], center: [10 * mm, 0, 0] }] }),
-    q = sweep('q', ring(1), { name: 'path', start: [10 * mm, 0, 0], segments: [{ kind: 'arc', to: [0, 10 * mm, 0], center: [0, 0, 0] }] }),
+  const ring = (r) => ({
+      name: 'p',
+      start: [11 * mm, 0, 0],
+      normal: [0, 1, 0],
+      segments: [{ kind: 'arc', to: [11 * mm, 0, 0], center: [10 * mm, 0, 0] }],
+    }),
+    q = sweep('q', ring(1), {
+      name: 'path',
+      start: [10 * mm, 0, 0],
+      segments: [{ kind: 'arc', to: [0, 10 * mm, 0], center: [0, 0, 0] }],
+    }),
     thin = offsetFaces('o', q, [q.faces.find((f) => f.surface.kind === 'torus').name], -0.5 * mm);
   assert.deepEqual(checkBody(thin), []);
   close(massProperties(thin).volume, (Math.PI / 2) * Math.PI * 0.25 * 10 * mm ** 3, 'thin quarter torus');
@@ -133,7 +163,12 @@ test('offset, shell and draft: a torus and a frustum cut in half by a Boolean th
   // circles and lines, and an edge whose faces move apart into a curve that is no line or circle is traced anew.
   const R = 10 * mm,
     r = 3 * mm,
-    half = boolean('h', 'subtract', torus('t', R, r), box('b', [30 * mm, 15 * mm, 10 * mm], frameOf([-15 * mm, 0, -5 * mm], [0, 0, 1], [1, 0, 0]))),
+    half = boolean(
+      'h',
+      'subtract',
+      torus('t', R, r),
+      box('b', [30 * mm, 15 * mm, 10 * mm], frameOf([-15 * mm, 0, -5 * mm], [0, 0, 1], [1, 0, 0])),
+    ),
     tube = half.faces.find((f) => f.surface.kind === 'torus').name,
     cuts = half.faces.filter((f) => f.surface.kind === 'plane').map((f) => f.name),
     exact = Math.PI ** 2 * R * r * r;
@@ -157,15 +192,32 @@ test('offset, shell and draft: a torus and a frustum cut in half by a Boolean th
   close(valid(shell('s', half, [], -0.5 * mm)), exact - torusPast(R, 2.5 * mm, 0.5 * mm), 'hollow', 1e-9);
   close(valid(shell('s', half, [], 0.5 * mm)), torusPast(R, 3.5 * mm, -0.5 * mm) - exact, 'walled', 1e-9);
   // The cut planes drafted 0.1 rad about the x axis: turned through it, the torus maps onto itself, so the volume stays.
-  close(valid(draft('d', half, cuts, { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], 0.1)), exact, 'drafted', 1e-9);
+  close(
+    valid(draft('d', half, cuts, { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], 0.1)),
+    exact,
+    'drafted',
+    1e-9,
+  );
   // A frustum (radii 5 and 2 mm, 8 mm tall) cut through its axis: its side thinned by 0.5 mm moves both radii by
   // 0.5 / cos(angle); it shells and drafts.
   const turn = [Math.cos(0.5), Math.sin(0.5), 0],
-    frustum = boolean('f', 'subtract', cone('c', 5 * mm, 2 * mm, 8 * mm), box('b', [30 * mm, 15 * mm, 30 * mm], frameOf([-15 * mm * turn[0], -15 * mm * turn[1], -15 * mm], [0, 0, 1], turn))),
+    frustum = boolean(
+      'f',
+      'subtract',
+      cone('c', 5 * mm, 2 * mm, 8 * mm),
+      box(
+        'b',
+        [30 * mm, 15 * mm, 30 * mm],
+        frameOf([-15 * mm * turn[0], -15 * mm * turn[1], -15 * mm], [0, 0, 1], turn),
+      ),
+    ),
     side = frustum.faces.find((f) => f.surface.kind === 'cone').name,
-    k = 0.5 * mm / Math.cos(Math.atan(3 / 8)),
+    k = (0.5 * mm) / Math.cos(Math.atan(3 / 8)),
     halfFrustum = (a, b) => (Math.PI * 8 * mm * (a * a + a * b + b * b)) / 6;
-  assert.deepEqual(frustum.edges.filter((e) => e.curve.kind !== 'line' && e.curve.kind !== 'circle'), []);
+  assert.deepEqual(
+    frustum.edges.filter((e) => e.curve.kind !== 'line' && e.curve.kind !== 'circle'),
+    [],
+  );
   close(valid(offsetFaces('o', frustum, [side], -0.5 * mm)), halfFrustum(5 * mm - k, 2 * mm - k), 'thinner frustum');
   assert.ok(valid(shell('s', frustum, [], -0.5 * mm)) > 0);
   assert.ok(valid(draft('d', frustum, [side], { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], 0.1)) > 0);
@@ -183,26 +235,48 @@ test('draft: a drafted cylinder is the frustum; a drafted hole widens along the 
   );
   // Zero is the identity (a cone of no slope).
   same(draft('d', c, [named(c, 'side')], { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], 0), c);
-  const block = boolean('p', 'subtract', box('a', [20 * mm, 20 * mm, 10 * mm]), cylinder('h', 4 * mm, 12 * mm, frameOf([10 * mm, 10 * mm, -1 * mm], [0, 0, 1]))),
+  const block = boolean(
+      'p',
+      'subtract',
+      box('a', [20 * mm, 20 * mm, 10 * mm]),
+      cylinder('h', 4 * mm, 12 * mm, frameOf([10 * mm, 10 * mm, -1 * mm], [0, 0, 1])),
+    ),
     hole = block.faces.find((f) => f.surface.kind === 'cylinder').name,
     drafted = draft('d', block, [hole], { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], a),
     r1 = 4 + 10 * Math.tan(a);
   assert.deepEqual(checkBody(drafted), []);
-  close(massProperties(drafted).volume, (4000 - (Math.PI * 10 * (16 + 4 * r1 + r1 * r1)) / 3) * mm ** 3, 'drafted hole');
+  close(
+    massProperties(drafted).volume,
+    (4000 - (Math.PI * 10 * (16 + 4 * r1 + r1 * r1)) / 3) * mm ** 3,
+    'drafted hole',
+  );
   // Offset into the material, the hole grows.
   assert.deepEqual(checkBody(offsetFaces('o', block, [hole], -1 * mm)), []);
-  close(massProperties(offsetFaces('o', block, [hole], -1 * mm)).volume, (4000 - Math.PI * 25 * 10) * mm ** 3, 'hole offset');
+  close(
+    massProperties(offsetFaces('o', block, [hole], -1 * mm)).volume,
+    (4000 - Math.PI * 25 * 10) * mm ** 3,
+    'hole offset',
+  );
 });
 
 test('offset and draft refuse curved faces that would vanish, and drafts of an axis off the pull', () => {
   const c = cylinder('c', 5 * mm, 20 * mm);
-  assert.throws(() => offsetFaces('o', c, [named(c, 'side')], -5 * mm), { name: 'RangeError', message: /face c\/face:side would shrink to nothing/ });
+  assert.throws(() => offsetFaces('o', c, [named(c, 'side')], -5 * mm), {
+    name: 'RangeError',
+    message: /face c\/face:side would shrink to nothing/,
+  });
   const t = torus('t', 10 * mm, 3 * mm);
-  assert.throws(() => offsetFaces('o', t, [t.faces[0].name], 7 * mm), { name: 'RangeError', message: /would shrink to nothing/ });
-  assert.throws(() => shell('h', sphere('s', 5 * mm), [], -5 * mm), { name: 'RangeError', message: /would shrink to nothing/ });
+  assert.throws(() => offsetFaces('o', t, [t.faces[0].name], 7 * mm), {
+    name: 'RangeError',
+    message: /would shrink to nothing/,
+  });
+  assert.throws(() => shell('h', sphere('s', 5 * mm), [], -5 * mm), {
+    name: 'RangeError',
+    message: /would shrink to nothing/,
+  });
   const lying = cylinder('x', 5 * mm, 10 * mm, frameOf([0, 0, 0], [1, 0, 0]));
-  assert.throws(
-    () => draft('d', lying, ['x/face:side'], { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], 0.1),
-    { name: 'RangeError', message: /x\/face:side is a cylinder whose axis does not run along the pull/ },
-  );
+  assert.throws(() => draft('d', lying, ['x/face:side'], { origin: [0, 0, 0], normal: [0, 0, 1] }, [0, 0, 1], 0.1), {
+    name: 'RangeError',
+    message: /x\/face:side is a cylinder whose axis does not run along the pull/,
+  });
 });

@@ -20,12 +20,23 @@ function hairpin(extra, bothEnds = false) {
         a = Math.PI * s;
       return [0.05 * Math.sin(a) + 0.00143 * s, 0.015 * (1 - Math.cos(a)) + 0.0019 * s - 0.03 * s, 0];
     }),
-    dangling = (from, k) => Array.from({ length: extra }, (_, i) => from.map((x, c) => x + (c < 2 ? (k * (extra - i)) * 2e-8 : 0))),
+    dangling = (from, k) =>
+      Array.from({ length: extra }, (_, i) => from.map((x, c) => x + (c < 2 ? k * (extra - i) * 2e-8 : 0))),
     points = [...dangling(body[0], -1), ...body, ...(bothEnds ? dangling(body[body.length - 1], 1).reverse() : [])],
     inner = body.length - 4,
     knots = [0, 0, ...Array.from({ length: inner }, (_, i) => (i + 1) / (inner + 1)), 1, ...(bothEnds ? [1] : [])],
     multiplicities = [4, extra, ...Array(inner).fill(1), 4, ...(bothEnds ? [extra] : [])];
-  return { curve: { kind: 'spline', degrees: [3], counts: [points.length], knots: [knots], multiplicities: [multiplicities], points }, body };
+  return {
+    curve: {
+      kind: 'spline',
+      degrees: [3],
+      counts: [points.length],
+      knots: [knots],
+      multiplicities: [multiplicities],
+      points,
+    },
+    body,
+  };
 }
 
 test('a cubic with seven knots at its start is evaluated there, and a point at its start projects to it', () => {

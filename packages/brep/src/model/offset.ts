@@ -40,7 +40,10 @@ function planeOf(face: Face, operation: string): Plane {
 function planeSurface(face: Face, p: Plane): SurfaceDef {
   const frame = (face.surface as { readonly frame: Frame }).frame,
     shift = p.c - dot(p.n, frame.origin);
-  return { kind: 'plane', frame: frameOf(add(frame.origin, scale(p.n, shift)), scale(p.n, face.sense ? 1 : -1), frame.x) };
+  return {
+    kind: 'plane',
+    frame: frameOf(add(frame.origin, scale(p.n, shift)), scale(p.n, face.sense ? 1 : -1), frame.x),
+  };
 }
 
 /** The point where three or more planes meet (least squares over all of them), or undefined when they do not fix one. */
@@ -96,7 +99,9 @@ function offsetSurface(face: Face, d: number, operation: string): SurfaceDef {
     // Along the surface's natural normal (away from the axis, the centre or the tube's centre).
     n = face.sense ? d : -d,
     shrunk = () =>
-      new RangeError(`${operation}: face ${face.name} would shrink to nothing; the offset would change the body's topology`);
+      new RangeError(
+        `${operation}: face ${face.name} would shrink to nothing; the offset would change the body's topology`,
+      );
   switch (s.kind) {
     case 'plane':
       return { kind: 'plane', frame: { ...s.frame, origin: add(s.frame.origin, scale(s.frame.z, n)) } };
@@ -254,7 +259,9 @@ function resurface(name: Name, body: Body, surfaceFor: (face: Face) => SurfaceDe
   const moved = new Map(faces.map((f) => [f, surfaceFor(f)]));
   for (const f of faces)
     if (!analytic(f.surface, moved.get(f)!))
-      throw new RangeError(`${operation}: face ${f.name} cannot turn from a ${f.surface.kind} into a ${moved.get(f)!.kind}; use a smaller offset or a different face`);
+      throw new RangeError(
+        `${operation}: face ${f.name} cannot turn from a ${f.surface.kind} into a ${moved.get(f)!.kind}; use a smaller offset or a different face`,
+      );
   const corners = body.vertices.map((v) => v.point),
     radii = faces.flatMap((f) => {
       const s = f.surface;
@@ -349,7 +356,7 @@ function resurface(name: Name, body: Body, surfaceFor: (face: Face) => SurfaceDe
     if (!e.closed && curve.kind === 'spline') {
       const ta = c.parameter(a.point),
         tb = c.parameter(b.point, ta);
-      if ((tb > ta) !== best.sense) return undefined;
+      if (tb > ta !== best.sense) return undefined;
       curve = sliceCurve(curve, Math.min(ta, tb), Math.max(ta, tb));
     }
     const edge = new Edge(e.name, curve, a, b, best.sense, e.tolerance),
@@ -361,7 +368,8 @@ function resurface(name: Name, body: Body, surfaceFor: (face: Face) => SurfaceDe
   for (const e of body.edges) {
     const a = newVertex.get(e.start)!,
       b = newVertex.get(e.end)!;
-    let curve: CurveDef | undefined, inside: XYZ[] = [];
+    let curve: CurveDef | undefined,
+      inside: XYZ[] = [];
     if (e.curve.kind === 'line') {
       const along = sub(b.point, a.point),
         d = unit(along);
@@ -471,13 +479,15 @@ export function shell(
   thickness: number,
   { history }: { history?: History } = {},
 ): Body {
-  if (!(thickness !== 0 && Number.isFinite(thickness))) throw new RangeError('shell thickness must be non-zero and finite');
+  if (!(thickness !== 0 && Number.isFinite(thickness)))
+    throw new RangeError('shell thickness must be non-zero and finite');
   const t = Math.abs(thickness),
     opening = new Set(open),
     all = (inside: number, atOpen: number) =>
       new Map(body.faces.map((f) => [f.name, opening.has(f.name) ? atOpen : inside] as const));
   for (const n of opening)
-    if (!body.faces.some((f) => f.name === n)) throw new RangeError(`shell ${name}: the body has no face ${n}; name a face of the body`);
+    if (!body.faces.some((f) => f.name === n))
+      throw new RangeError(`shell ${name}: the body has no face ${n}; name a face of the body`);
   let out: Body;
   if (thickness < 0) {
     const inner = offsetBody(`${name}/inner`, body, all(-t, t), `shell ${name}`);
@@ -510,14 +520,16 @@ export function draft(
   const operation = `draft ${name}`,
     p = unit(pull),
     N = unit(neutral.normal);
-  if (!p || !N) throw new RangeError(`${operation}: the pull direction and the neutral plane's normal must not be zero`);
+  if (!p || !N)
+    throw new RangeError(`${operation}: the pull direction and the neutral plane's normal must not be zero`);
   if (!(Math.abs(angle) < Math.PI / 2))
     throw new RangeError(`${operation}: the draft angle must lie inside (-90, 90) degrees`);
   if (!faces.length) throw new RangeError(`${operation}: draft needs at least one face`);
   if (body.kind !== 'solid') throw new RangeError(`${operation}: draft takes a solid; pass a body of kind solid`);
   const chosen = new Set(faces);
   for (const n of chosen)
-    if (!body.faces.some((f) => f.name === n)) throw new RangeError(`${operation}: the body has no face ${n}; name a face of the body`);
+    if (!body.faces.some((f) => f.name === n))
+      throw new RangeError(`${operation}: the body has no face ${n}; name a face of the body`);
   const out = resurface(
     name,
     body,
@@ -535,7 +547,10 @@ export function draft(
           );
         const t = dot(sub(neutral.origin, s.frame.origin), N) / dot(z, N),
           radius = s.kind === 'cylinder' ? s.radius : s.radius + t * Math.tan(s.angle);
-        if (!(radius > 0)) throw new RangeError(`${operation}: face ${f.name} does not reach the neutral plane; draft a face that crosses it`);
+        if (!(radius > 0))
+          throw new RangeError(
+            `${operation}: face ${f.name} does not reach the neutral plane; draft a face that crosses it`,
+          );
         return {
           kind: 'cone',
           frame: { ...s.frame, origin: add(s.frame.origin, scale(z, t)) },
@@ -546,9 +561,15 @@ export function draft(
       const plane = planeOf(f, operation);
       // The hinge: where the face's plane meets the neutral plane.
       const hinge = unit(cross(plane.n, N));
-      if (!hinge) throw new RangeError(`${operation}: face ${f.name} is parallel to the neutral plane; draft a face that crosses it`);
+      if (!hinge)
+        throw new RangeError(
+          `${operation}: face ${f.name} is parallel to the neutral plane; draft a face that crosses it`,
+        );
       const m = unit(sub(plane.n, scale(p, dot(plane.n, p))));
-      if (!m) throw new RangeError(`${operation}: face ${f.name} is square to the pull direction; leave this face out of the draft`);
+      if (!m)
+        throw new RangeError(
+          `${operation}: face ${f.name} is square to the pull direction; leave this face out of the draft`,
+        );
       // A point on the hinge: on both planes, in the span of their normals from the neutral plane's origin.
       const o = neutral.origin,
         a = dot(plane.n, plane.n),
@@ -558,7 +579,11 @@ export function draft(
         den = a * c - b * b,
         x = (bp * c) / den,
         y = (-bp * b) / den,
-        on: XYZ = [o[0] + x * plane.n[0] + y * N[0], o[1] + x * plane.n[1] + y * N[1], o[2] + x * plane.n[2] + y * N[2]],
+        on: XYZ = [
+          o[0] + x * plane.n[0] + y * N[0],
+          o[1] + x * plane.n[1] + y * N[1],
+          o[2] + x * plane.n[2] + y * N[2],
+        ],
         n = unit([
           Math.cos(angle) * m[0] + Math.sin(angle) * p[0],
           Math.cos(angle) * m[1] + Math.sin(angle) * p[1],
@@ -566,7 +591,9 @@ export function draft(
         ])!;
       // The new plane holds the hinge only when its normal is square to it.
       if (Math.abs(dot(n, hinge)) > 1e-12)
-        throw new RangeError(`${operation}: face ${f.name} meets the neutral plane along a line not square to the pull; choose a pull direction square to that line`);
+        throw new RangeError(
+          `${operation}: face ${f.name} meets the neutral plane along a line not square to the pull; choose a pull direction square to that line`,
+        );
       return planeSurface(f, { n, c: dot(n, on) });
     },
     operation,

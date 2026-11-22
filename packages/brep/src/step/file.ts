@@ -382,7 +382,8 @@ export class STEPFile {
         else hi = mid - 1;
       }
       const other = idOf[lo];
-      if (this.starts[lo] <= m.index && m.index < this.ends[lo] && !out.includes(other) && out.push(other) >= most) break;
+      if (this.starts[lo] <= m.index && m.index < this.ends[lo] && !out.includes(other) && out.push(other) >= most)
+        break;
     }
     return out;
   }
@@ -405,7 +406,9 @@ export class STEPFile {
     if (cached) return cached;
     const slot = this.slots.get(id);
     if (id < 0)
-      throw new TypeError('Invalid STEP file: an instance has no reference ($, or a value) where one is needed; export it again from the CAD tool');
+      throw new TypeError(
+        'Invalid STEP file: an instance has no reference ($, or a value) where one is needed; export it again from the CAD tool',
+      );
     if (slot === undefined) {
       const from = this.referrers(id).map((r) => this.describe(r));
       throw new TypeError(

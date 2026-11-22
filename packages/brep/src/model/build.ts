@@ -123,7 +123,9 @@ export function refuseSelfContact(profile: Profile, n: XYZ, tolerance: number) {
       }
       if (gap === 0) continue;
       if (segmentGap(p0, p1, q0, q1) <= tolerance)
-        throw new RangeError(`profile ${profile.name} crosses or touches itself near ${fmt(where(i))}; pass a closed profile that does not cross itself`);
+        throw new RangeError(
+          `profile ${profile.name} crosses or touches itself near ${fmt(where(i))}; pass a closed profile that does not cross itself`,
+        );
     }
   }
 }
@@ -183,9 +185,12 @@ export function extrude(
   if (dot(n, along) < 0) n = scale(n, -1);
   const tolerance = 1e-9 * Math.max(profileSize(profile), 1);
   if (!profile.segments.length || !same(profile.segments[profile.segments.length - 1].to, profile.start, tolerance))
-    throw new RangeError(`profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`);
+    throw new RangeError(
+      `profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`,
+    );
   const area = signedArea(profile, n);
-  if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
+  if (Math.abs(area) <= tolerance * tolerance)
+    throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
   refuseSelfContact(profile, n, tolerance);
   // Counter-clockwise about the extrusion side, so side faces face out.
   const p = area > 0 ? profile : reversed(profile),
@@ -453,9 +458,12 @@ export function revolve(
         }
       : { ...profile, normal: m };
   if (!p.segments.length || !same(p.segments[p.segments.length - 1].to, p.start, tolerance))
-    throw new RangeError(`profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`);
+    throw new RangeError(
+      `profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`,
+    );
   const area = signedArea(p, m);
-  if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
+  if (Math.abs(area) <= tolerance * tolerance)
+    throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
   refuseSelfContact(p, m, tolerance);
   if (area < 0) p = reversed(p);
   const count = p.segments.length,
@@ -467,14 +475,19 @@ export function revolve(
     if (Math.abs(dot(sub(q, o), m)) > tolerance)
       throw new RangeError(`profile ${profile.name} must lie in a plane through the axis`);
   for (const q of points)
-    if (rho(q) < -tolerance) throw new RangeError(`profile ${profile.name} crosses the axis at ${fmt(q)}; keep the profile on one side of the axis`);
+    if (rho(q) < -tolerance)
+      throw new RangeError(
+        `profile ${profile.name} crosses the axis at ${fmt(q)}; keep the profile on one side of the axis`,
+      );
   const onAxis = points.map((q) => rho(q) <= tolerance),
     alongAxis = points.map((_, k) => p.segments[k].kind === 'line' && onAxis[k] && onAxis[(k + 1) % count]);
   // A point on the axis with no segment along the axis next to it is where two faces would meet in that point alone:
   // the solid would pinch to it (not a manifold solid).
   for (let k = 0; k < count; k++)
     if (onAxis[k] && !alongAxis[k] && !alongAxis[(k + count - 1) % count])
-      throw new RangeError(`profile ${profile.name} touches the axis at ${fmt(points[k])} with no segment along it; add a segment along the axis or move the point off it`);
+      throw new RangeError(
+        `profile ${profile.name} touches the axis at ${fmt(points[k])} with no segment along it; add a segment along the axis or move the point off it`,
+      );
   const body = new Body(name, 'solid'),
     shell = body.shell(),
     segName = (k: number) => p.segments[k].name ?? `e${k}`,
@@ -543,11 +556,15 @@ export function revolve(
       if (rho(c) <= tolerance) {
         // Centred on the axis: it must stay on the profile's side, so it turns at most half way round.
         if (Math.abs(sweep) > Math.PI * (1 + 1e-9) || rho(mid) < -tolerance)
-          throw new RangeError(`profile ${profile.name}: an arc crosses the axis; keep the profile on one side of the axis`);
+          throw new RangeError(
+            `profile ${profile.name}: an arc crosses the axis; keep the profile on one side of the axis`,
+          );
         surface = { kind: 'sphere', frame: frameOf(level(c), z, x), radius: r };
-      }
-      else if (rho(c) > r) surface = { kind: 'torus', frame: frameOf(level(c), z, x), major: rho(c), minor: r };
-      else throw new RangeError(`profile ${profile.name}: an arc reaches the axis: not supported yet; keep the profile on one side of the axis`);
+      } else if (rho(c) > r) surface = { kind: 'torus', frame: frameOf(level(c), z, x), major: rho(c), minor: r };
+      else
+        throw new RangeError(
+          `profile ${profile.name}: an arc reaches the axis: not supported yet; keep the profile on one side of the axis`,
+        );
     }
     // Out of the solid: right of the way round a counter-clockwise profile. The face's sense compares it with the
     // surface's own normal there; its loop runs so the face lies left of it seen from outside.

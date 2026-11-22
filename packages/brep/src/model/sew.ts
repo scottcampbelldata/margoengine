@@ -273,7 +273,10 @@ export function sew(
       const matches = new Map<Sewn, { other: Sewn; gap: number }[]>(group.map((e) => [e, []]));
       for (let i = 0; i < group.length; i++)
         for (let j = i + 1; j < group.length; j++) {
-          const gap = Math.max(deviation(probe(group[i]), probe(group[j])), deviation(probe(group[j]), probe(group[i])));
+          const gap = Math.max(
+            deviation(probe(group[i]), probe(group[j])),
+            deviation(probe(group[j]), probe(group[i])),
+          );
           if (gap <= tolerance) {
             matches.get(group[i])!.push({ other: group[j], gap });
             matches.get(group[j])!.push({ other: group[i], gap });
@@ -331,7 +334,10 @@ export function sew(
               members.push(j);
             } else if (want !== flip[j] && !oneSided) {
               oneSided = true;
-              problems.push({ name: u.edge.name, problem: 'the faces round it cannot agree on a side (a one-sided surface)' });
+              problems.push({
+                name: u.edge.name,
+                problem: 'the faces round it cannot agree on a side (a one-sided surface)',
+              });
             }
           }
     }
@@ -392,11 +398,13 @@ export function sew(
         if (!x) uv.set(f, (x = new FaceUV(f)));
         return x;
       },
-      corners = built.flat().flatMap((f) =>
-        f.loops.length
-          ? f.loops.flatMap((l) => l.coedges.map((c) => c.start.point))
-          : [f.surface.kind === 'spline' ? f.surface.points[0] : f.surface.frame.origin],
-      ),
+      corners = built
+        .flat()
+        .flatMap((f) =>
+          f.loops.length
+            ? f.loops.flatMap((l) => l.coedges.map((c) => c.start.point))
+            : [f.surface.kind === 'spline' ? f.surface.points[0] : f.surface.frame.origin],
+        ),
       box = boxOf(corners),
       radii = built.flat().map((f) => {
         const s = f.surface;
@@ -406,7 +414,8 @@ export function sew(
             ? s.major + s.minor
             : 0;
       }),
-      reach = 4 * (Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) + 2 * Math.max(0, ...radii)) + tolerance,
+      reach =
+        4 * (Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) + 2 * Math.max(0, ...radii)) + tolerance,
       // A point of a shell: a vertex, or a point of a face with no edges (a whole sphere or torus).
       pointOf = (faces: Face[]): XYZ => {
         for (const f of faces) for (const l of f.loops) for (const c of l.coedges) return c.start.point;
@@ -445,9 +454,8 @@ export function sew(
   });
   bodyShells.forEach((shell, i) => {
     if (!cavity[i]) return;
-    shell.outer = bodyShells[
-      around[i].filter((j) => !cavity[j]).sort((x, y) => around[y].length - around[x].length)[0]
-    ];
+    shell.outer =
+      bodyShells[around[i].filter((j) => !cavity[j]).sort((x, y) => around[y].length - around[x].length)[0]];
   });
   // Edges and vertices take the gaps they closed as their tolerance (half again, as on import), up to the tolerance.
   measureTolerances(body, tolerance);

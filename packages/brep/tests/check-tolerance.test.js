@@ -116,6 +116,10 @@ test('body check: cylinders overlapping past the tolerances are reported', () =>
   const { body } = fin({ overlap: 0.05 });
   assert.deepEqual(
     checkBody(body).map((p) => `${p.name}: ${p.problem}`),
-    ['T2: 5.00e-5 m off the curve of top-arc2', 'cusp: 5.00e-5 m off the surface of cylinder2', 't: 5.00e-5 m off the surface of cylinder2'],
+    [
+      'T2: 5.00e-5 m off the curve of top-arc2',
+      'cusp: 5.00e-5 m off the surface of cylinder2',
+      't: 5.00e-5 m off the surface of cylinder2',
+    ],
   );
 });

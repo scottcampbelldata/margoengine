@@ -122,7 +122,8 @@ function meshVolume(body) {
     for (let t = 0; t < m.indices.length; t += 3) {
       const [a, b, c] = [at(m.indices[t]), at(m.indices[t + 1]), at(m.indices[t + 2])];
       volume +=
-        (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+        (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
+        6;
     }
   }
   return volume;
@@ -184,7 +185,8 @@ test('STEP import: a plane trimmed with one sense false faces against the plane;
     cap = text.split('\n').find((l) => l.includes("ADVANCED_FACE('c/face:+z'")),
     id = /,#(\d+),\.T\.\);$/.exec(cap)[1],
     plane = /^#\d+=(.*);$/.exec(text.split('\n').find((l) => l.startsWith(`#${id}=`)))[1],
-    trimmed = (add) => `RECTANGULAR_TRIMMED_SURFACE('',${add(plane)},${real(-r)},${real(r)},${real(-r)},${real(r)},.F.,.T.)`,
+    trimmed = (add) =>
+      `RECTANGULAR_TRIMMED_SURFACE('',${add(plane)},${real(-r)},${real(r)},${real(-r)},${real(r)},.F.,.T.)`,
     { body } = imported(rewrite(text, `#${id}`, trimmed, false)),
     top = body.faces.find((f) => f.surface.kind === 'plane' && f.surface.frame.origin[2] > h / 2);
   assert.deepEqual(planeNormal(top), [0, 0, 1]);

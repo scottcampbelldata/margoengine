@@ -56,7 +56,6 @@ const shoelace = (pts) =>
   pts.reduce((a, p, k) => a + (p[0] * pts[(k + 1) % pts.length][1] - pts[(k + 1) % pts.length][0] * p[1]) / 2, 0);
 const corners = (p) => [p.start, ...p.segments.slice(0, -1).map((s) => s.to)].map((q) => [q[0] / mm, q[1] / mm]);
 
-
 /** Valid by both checks, and a closed outward mesh. */
 function clean(body) {
   assert.deepEqual(validateBody(body), []);

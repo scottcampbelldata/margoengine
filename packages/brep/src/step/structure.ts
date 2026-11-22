@@ -194,7 +194,8 @@ export function invert(m: Float64Array): Float64Array {
     B = f * g - d * i,
     C = d * h - e * g,
     det = a * A + b * B + c * C;
-  if (!det || !Number.isFinite(det)) throw new TypeError('Invalid STEP file: a placement has no inverse (zero axes); export it again from the CAD tool');
+  if (!det || !Number.isFinite(det))
+    throw new TypeError('Invalid STEP file: a placement has no inverse (zero axes); export it again from the CAD tool');
   const s = 1 / det,
     r = Float64Array.of(
       A * s,
@@ -265,7 +266,10 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
    * unit read is warned of and left NaN, so what needs one (a cone's half angle) is refused, not taken in radians.
    */
   const context = (id: number | undefined) => {
-    if (id === undefined) throw new TypeError('Invalid STEP file: a representation has no context, so no length unit; export it again from the CAD tool');
+    if (id === undefined)
+      throw new TypeError(
+        'Invalid STEP file: a representation has no context, so no length unit; export it again from the CAD tool',
+      );
     let units = contexts.get(id);
     if (!units) {
       units = { length: NaN, angle: NaN };
@@ -284,7 +288,8 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
           `Invalid STEP file: context ${what} assigns no length unit the reader can read ` +
             '(a GLOBAL_UNIT_ASSIGNED_CONTEXT with a length unit); its sizes are unknown',
         );
-      if (!(units.angle > 0)) warn(`context #${id}: no plane-angle unit the reader can read; angles in it are not read`);
+      if (!(units.angle > 0))
+        warn(`context #${id}: no plane-angle unit the reader can read; angles in it are not read`);
       contexts.set(id, units);
     }
     return units;

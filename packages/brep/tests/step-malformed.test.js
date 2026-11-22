@@ -25,7 +25,7 @@ test('STEP: a reference to an instance never defined is named in a warning; the 
 test('STEP: a face reference never defined leaves the body out rather than short of a face', () => {
   const text = fixture('dangling-shell').replace('#99999', '#131');
   assert.equal(model.bodiesFromSTEP(parseSTEP(text)).problems.length, 0);
-  const step = parseSTEP(text.replace('#131=CLOSED_SHELL(\'\',(#43,', "#131=CLOSED_SHELL('',(#4300,"));
+  const step = parseSTEP(text.replace("#131=CLOSED_SHELL('',(#43,", "#131=CLOSED_SHELL('',(#4300,"));
   assert.deepEqual(step.bodies[0].unresolved, [4300]);
   assert.ok(step.warnings.some((w) => w.includes('#4300') && w.includes('#131 CLOSED_SHELL')));
   assert.equal(model.bodiesFromSTEP(step).bodies[0], undefined);
@@ -46,7 +46,10 @@ test('STEP: a solid in no placed representation is named in a warning', () => {
   // Fuzzed: the representation lists an edge loop where the solid was; the file read as no bodies and no warning.
   const step = parseSTEP(fixture('fuzz-unplaced-solid'));
   assert.equal(step.bodies.length, 0);
-  assert.ok(step.warnings.some((w) => w.includes("#132 MANIFOLD_SOLID_BREP 'Plate'")), JSON.stringify(step.warnings));
+  assert.ok(
+    step.warnings.some((w) => w.includes("#132 MANIFOLD_SOLID_BREP 'Plate'")),
+    JSON.stringify(step.warnings),
+  );
 });
 
 test('STEP: a shell listing itself as a face, and lists nested past any real file, give clean errors', () => {
@@ -74,13 +77,19 @@ test('STEP: a unit context the reader cannot read is refused, never taken as met
   // A length unit the reader cannot read, and a representation with no context: refused the same way.
   const meter = plate.replace('SI_UNIT(.MILLI.,.METRE.)', 'SI_UNIT(.MILLI.,.METER.)');
   assert.throws(() => parseSTEP(meter), /no length unit/);
-  assert.throws(() => parseSTEP(plate.replace("(#136,#132),#141);", '(#136,#132),$);')), /has no context/);
+  assert.throws(() => parseSTEP(plate.replace('(#136,#132),#141);', '(#136,#132),$);')), /has no context/);
   // No plane-angle unit: warned of and left unknown; the plate, which has no angles, reads exactly, and a cone's half
   // angle is refused rather than taken in radians.
-  const noAngle = (text) => text.replace(/GLOBAL_UNIT_ASSIGNED_CONTEXT\(\((#\d+),#\d+(,#\d+)?\)\)/, (m, a, c) =>
-    `GLOBAL_UNIT_ASSIGNED_CONTEXT((${a}${c ?? ''}))`);
+  const noAngle = (text) =>
+    text.replace(
+      /GLOBAL_UNIT_ASSIGNED_CONTEXT\(\((#\d+),#\d+(,#\d+)?\)\)/,
+      (m, a, c) => `GLOBAL_UNIT_ASSIGNED_CONTEXT((${a}${c ?? ''}))`,
+    );
   const step = parseSTEP(noAngle(plate));
-  assert.ok(step.warnings.some((w) => w.includes('context #141: no plane-angle unit')), JSON.stringify(step.warnings));
+  assert.ok(
+    step.warnings.some((w) => w.includes('context #141: no plane-angle unit')),
+    JSON.stringify(step.warnings),
+  );
   assert.ok(Number.isNaN(step.bodies[0].angleUnit));
   const volume = model.massProperties(model.bodiesFromSTEP(step).bodies[0]).volume / 1e-9;
   assert.ok(Math.abs(volume - 32000) < 1e-9 * 32000, `${volume}`);

@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model, parseSTEP } from '../dist/index.js';
 
-const { bodiesFromSTEP, bodiesToSTEP, checkBody, cylinder, massProperties, meshBodies, sweep, torus, validateBody } = model;
+const { bodiesFromSTEP, bodiesToSTEP, checkBody, cylinder, massProperties, meshBodies, sweep, torus, validateBody } =
+  model;
 const mm = 0.001;
 const P = (x, y, z) => [x * mm, y * mm, z * mm];
 
@@ -22,7 +23,6 @@ function disc(c, n, r, x) {
   const s = P(c[0] + r * x[0], c[1] + r * x[1], c[2] + r * x[2]);
   return { name: 'prof', start: s, normal: n, segments: [{ kind: 'arc', to: s, center: P(...c) }] };
 }
-
 
 /** Valid by both checks, and a closed outward mesh. */
 function clean(body) {
@@ -137,10 +137,14 @@ test('sweep: a square along a half turn, and a circle once round a circle equal 
   close(mh.volume, 4 * 10 * Math.PI * mm ** 3, 'half turn volume');
   // Inner and outer half cylinders, top and bottom half annuli, two end squares.
   close(mh.area, (Math.PI * 2 * (9 + 11) + Math.PI * (121 - 81) + 8) * mm ** 2, 'half turn area');
-  assert.deepEqual(
-    half.faces.map((f) => f.surface.kind).sort(),
-    ['cylinder', 'cylinder', 'plane', 'plane', 'plane', 'plane'],
-  );
+  assert.deepEqual(half.faces.map((f) => f.surface.kind).sort(), [
+    'cylinder',
+    'cylinder',
+    'plane',
+    'plane',
+    'plane',
+    'plane',
+  ]);
   const ring = sweep('r', disc([10, 0, 0], [0, 1, 0], 1, [1, 0, 0]), {
       name: 'path',
       start: P(10, 0, 0),
@@ -248,7 +252,11 @@ test('sweep: corners, tight arcs, crossings and misplaced profiles are refused b
   );
   assert.throws(
     () =>
-      sweep('s', d, { name: 'path', start: P(0, 0, 0), segments: [{ kind: 'arc', to: P(0, 0, 0), center: P(5, 0, 0) }] }),
+      sweep('s', d, {
+        name: 'path',
+        start: P(0, 0, 0),
+        segments: [{ kind: 'arc', to: P(0, 0, 0), center: P(5, 0, 0) }],
+      }),
     /needs an axis/,
   );
 });

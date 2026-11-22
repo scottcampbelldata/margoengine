@@ -201,7 +201,8 @@ function describeRound(edge: Edge, name: Name, faces: Face[]): Selected {
 
 /** The ring between a circular edge and its rounding or bevel: the corner's cross-section turned round the axis. */
 function ring(name: Name, s: Selected, how: Blend): Body {
-  if (s.edge.curve.kind !== 'circle') throw new RangeError(`${s.name}: not a circle; pick a circular edge round a cylinder`);
+  if (s.edge.curve.kind !== 'circle')
+    throw new RangeError(`${s.name}: not a circle; pick a circular edge round a cylinder`);
   const { frame } = s.edge.curve,
     e = s.edge.start.point,
     reach = how.kind === 'fillet' ? how.radius : how.distance,
@@ -244,7 +245,9 @@ function strip(name: Name, s: Selected, how: Blend, ends: [number, number], len:
   segments.push({ kind: 'line', to: start, name: 'side2' });
   const length2 = len + ends[0] + ends[1];
   if (!(length2 > 0))
-    throw new RangeError(`${s.name}: too short for this ${how.kind === 'fillet' ? 'radius' : 'distance'}; use a smaller radius or distance`);
+    throw new RangeError(
+      `${s.name}: too short for this ${how.kind === 'fillet' ? 'radius' : 'distance'}; use a smaller radius or distance`,
+    );
   return extrude(name, { name: `${name}/profile`, start, normal: d, segments }, scale(d, length2));
 }
 
@@ -255,7 +258,9 @@ function strip(name: Name, s: Selected, how: Blend, ends: [number, number], len:
 function beyondMitre(name: Name, s: Selected, other: Selected, v: Vertex, big: number): Body {
   const shared = [s.f1, s.f2].find((f) => f === other.f1 || f === other.f2);
   if (!shared)
-    throw new RangeError(`${s.name} and ${other.name} meet at a vertex but share no face: not supported yet; blend the edges one at a time`);
+    throw new RangeError(
+      `${s.name} and ${other.name} meet at a vertex but share no face: not supported yet; blend the edges one at a time`,
+    );
   const d1 = away(s.edge, v),
     d2 = away(other.edge, v),
     n = outward(shared),

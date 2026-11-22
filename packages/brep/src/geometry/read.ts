@@ -32,7 +32,8 @@ export function direction(file: STEPFile, id: number | undefined): XYZ {
 }
 /** VECTOR as direction times magnitude. */
 export function vector(file: STEPFile, id: number | undefined): XYZ {
-  if (id === undefined || !file.is(id, 'VECTOR')) throw new TypeError(`Invalid STEP file: #${id} is not a vector; export it again from the CAD tool`);
+  if (id === undefined || !file.is(id, 'VECTOR'))
+    throw new TypeError(`Invalid STEP file: #${id} is not a vector; export it again from the CAD tool`);
   const [, orientation, magnitude] = file.args(id, 'VECTOR'),
     d = direction(file, ref(orientation)),
     m = num(magnitude, 1);
