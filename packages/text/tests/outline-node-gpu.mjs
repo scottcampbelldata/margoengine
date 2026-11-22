@@ -20,7 +20,28 @@ import { openType } from '@margoengine/loaders/font-opentype';
 
 const FONT = 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.ttf',
   OTF = 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.otf';
-const PAIRS = ['AV', 'VA', 'AT', 'To', 'Ta', 'Te', 'Yo', 'Wa', 'LT', 'LY', 'P.', 'F,', 'r.', 'y.', 'Av', 'ov', 'AY', 'Tr', 'kn', 'OO'];
+const PAIRS = [
+  'AV',
+  'VA',
+  'AT',
+  'To',
+  'Ta',
+  'Te',
+  'Yo',
+  'Wa',
+  'LT',
+  'LY',
+  'P.',
+  'F,',
+  'r.',
+  'y.',
+  'Av',
+  'ov',
+  'AY',
+  'Tr',
+  'kn',
+  'OO',
+];
 const LIMITS = { most: 2, share: 0.001 };
 
 const context = await openBrowser({ startPath: '/packages/text/tests/outline-page.html', port: 'free' }),
@@ -57,7 +78,9 @@ try {
   }
   const share = off / (made.data.length / 4),
     tier = compatRun() ? 'WebGL2 compatibility layer page' : 'native WebGPU page';
-  console.log(`page (${tier}) against Node: largest channel difference ${most}, ${off} pixels (${(share * 100).toFixed(4)} %) off by more than 1, ${ink} ink pixels, field hash ${node.hash.slice(0, 16)}`);
+  console.log(
+    `page (${tier}) against Node: largest channel difference ${most}, ${off} pixels (${(share * 100).toFixed(4)} %) off by more than 1, ${ink} ink pixels, field hash ${node.hash.slice(0, 16)}`,
+  );
   assert.ok(ink > 8000, `the title, caption and small text drew (${ink} ink pixels)`);
   assert.ok(most <= LIMITS.most, `largest channel difference ${most} is within ${LIMITS.most}`);
   assert.ok(share <= LIMITS.share, `${(share * 100).toFixed(4)} % of pixels off by more than 1 is within 0.1 %`);
@@ -66,13 +89,23 @@ try {
   // Kerning: the browser's shaper against the file's GPOS as GlyphFieldFont reads it.
   const reference = {};
   for (const file of [FONT, OTF]) {
-    const measured = await page.evaluate(([url, pairs]) => window.check.browserKerning(url, pairs), [`/${file}`, PAIRS]),
+    const measured = await page.evaluate(
+        ([url, pairs]) => window.check.browserKerning(url, pairs),
+        [`/${file}`, PAIRS],
+      ),
       font = new GlyphFieldFont(await readFile(file), { openType }),
-      ours = Object.fromEntries(PAIRS.map((pair) => [pair, Math.round(font.kerning(pair[0], pair[1]) * font.unitsPerEm)]));
+      ours = Object.fromEntries(
+        PAIRS.map((pair) => [pair, Math.round(font.kerning(pair[0], pair[1]) * font.unitsPerEm)]),
+      );
     assert.deepEqual(ours, measured, `${file}: GlyphFieldFont kerning equals the browser's`);
-    assert.ok(Object.values(ours).some((v) => v !== 0), 'some pairs are kerned');
+    assert.ok(
+      Object.values(ours).some((v) => v !== 0),
+      'some pairs are kerned',
+    );
     reference[file.split('/').pop()] = measured;
-    console.log(`ok kerning ${file.split('/').pop()}: ${PAIRS.length} pairs equal the browser's (${PAIRS.filter((p) => ours[p]).length} kerned)`);
+    console.log(
+      `ok kerning ${file.split('/').pop()}: ${PAIRS.length} pairs equal the browser's (${PAIRS.filter((p) => ours[p]).length} kerned)`,
+    );
   }
   if (process.argv.includes('--write-kerning'))
     await writeFile(

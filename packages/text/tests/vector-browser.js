@@ -130,7 +130,12 @@ function placed(text, font) {
             ys = s.filter((_, i) => i % 2 === 1);
           return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
         });
-        const box = hulls.reduce((b, h) => [Math.min(b[0], h[0]), Math.min(b[1], h[1]), Math.max(b[2], h[2]), Math.max(b[3], h[3])]);
+        const box = hulls.reduce((b, h) => [
+          Math.min(b[0], h[0]),
+          Math.min(b[1], h[1]),
+          Math.max(b[2], h[2]),
+          Math.max(b[3], h[3]),
+        ]);
         out.push({ x: g.x + pen * size, y: g.y, size, segments, hulls, box });
       }
       pen += font.outlines.glyphAdvance(id);
@@ -158,12 +163,7 @@ function reference(glyphs, toLocal) {
   };
   for (let py = 0; py < SIZE; py++)
     for (let px = 0; px < SIZE; px++) {
-      const corners = [
-        toLocal(px, py),
-        toLocal(px + 1, py),
-        toLocal(px, py + 1),
-        toLocal(px + 1, py + 1),
-      ];
+      const corners = [toLocal(px, py), toLocal(px + 1, py), toLocal(px, py + 1), toLocal(px + 1, py + 1)];
       let edge = false,
         any = false;
       for (const g of glyphs) {
@@ -215,7 +215,13 @@ function compare(gpu, ref, rect) {
         at = i;
       }
     }
-  return { mean: sum / Math.max(1, count), inkMean: inkSum / Math.max(1, ink), max, pixels: count, at: [at % SIZE, Math.floor(at / SIZE)] };
+  return {
+    mean: sum / Math.max(1, count),
+    inkMean: inkSum / Math.max(1, ink),
+    max,
+    pixels: count,
+    at: [at % SIZE, Math.floor(at / SIZE)],
+  };
 }
 
 /** Screen rectangle [x0, y0, x1, y1) around placed glyph boxes, one pixel of margin. */
@@ -276,7 +282,9 @@ window.runVectorTests = async () => {
     const fontSize = ppem / PX,
       x0 = -SIZE / 2 / PX + (options.left ?? 3) / PX,
       y0 = options.baseline ?? -0.3 * fontSize;
-    const text = vector.add(new Text({ text: string, font, fontSize, anchorX: 'left', anchorY: 'baseline', position: [x0, y0, 0] }));
+    const text = vector.add(
+      new Text({ text: string, font, fontSize, anchorX: 'left', anchorY: 'baseline', position: [x0, y0, 0] }),
+    );
     const angle = options.angle ?? 0;
     if (angle) text.setTransform([x0, y0, 0], [0, 0, angle]);
     const image = await frame();
@@ -310,7 +318,8 @@ window.runVectorTests = async () => {
               const ex = (wx - x0 - g.x) / fontSize - part.x,
                 ey = (wy - y0 - g.y) / fontSize,
                 b = part.glyph.box;
-              if (ex < b[0] - 2 / ppem || ex > b[2] + 2 / ppem || ey < b[1] - 2 / ppem || ey > b[3] + 2 / ppem) continue;
+              if (ex < b[0] - 2 / ppem || ex > b[2] + 2 / ppem || ey < b[1] - 2 / ppem || ey > b[3] + 2 / ppem)
+                continue;
               const c = vectorCoverage(font.store, part.glyph, ex, ey, ppem, ppem, { rays: vector.rays });
               cov = cov + c - cov * c;
             }
@@ -319,8 +328,13 @@ window.runVectorTests = async () => {
         }
       result.mirror = compare(mirror, ref, rect);
       result.gpuVsMirror = compare(image.green, mirror, rect);
-      let bias = 0, n = 0;
-      for (let i = 0; i < SIZE * SIZE; i++) if (ref[i] > 0 || image.green[i] > 0.002) { bias += image.green[i] - ref[i]; n++; }
+      let bias = 0,
+        n = 0;
+      for (let i = 0; i < SIZE * SIZE; i++)
+        if (ref[i] > 0 || image.green[i] > 0.002) {
+          bias += image.green[i] - ref[i];
+          n++;
+        }
       result.bias = bias / n;
     }
     // Steady frame: nothing re-uploaded but the camera block.
@@ -351,10 +365,17 @@ window.runVectorTests = async () => {
     assert(r.pixels > 20, `${name}: only ${r.pixels} pixels compared`);
     assert(r.mean < 1 / 64, `${name}: mean coverage error ${r.mean.toFixed(4)} is not under 1/64`);
     // f32 against f64: a ray can land on the other side of an edge it passes exactly, so compare means.
-    if (r.gpuVsMirror) assert(r.gpuVsMirror.mean < 0.003, `${name}: GPU differs from the CPU mirror by ${r.gpuVsMirror.mean.toFixed(4)} on average`);
+    if (r.gpuVsMirror)
+      assert(
+        r.gpuVsMirror.mean < 0.003,
+        `${name}: GPU differs from the CPU mirror by ${r.gpuVsMirror.mean.toFixed(4)} on average`,
+      );
     assert(r.max < 0.25, `${name}: max coverage error ${r.max.toFixed(3)} at ${r.at} is not under 0.25`);
     assert(r.steady.drawCalls === 1 && r.steady.bindGroups === 0, `${name}: steady frame ${JSON.stringify(r.steady)}`);
-    assert(r.steady.bufferWrites === 1 && r.steady.bytesWritten === 112, `${name}: steady writes ${JSON.stringify(r.steady)}`);
+    assert(
+      r.steady.bufferWrites === 1 && r.steady.bytesWritten === 112,
+      `${name}: steady writes ${JSON.stringify(r.steady)}`,
+    );
   }
   report.checks.push(
     'Coverage matches a 16x16 supersampled outline (mean under 1/64, max under 0.25): Latin and CJK at 4, 6, 8, 12, 48 and 400 px, 17 degree rotation, 40x zoom',
@@ -367,7 +388,9 @@ window.runVectorTests = async () => {
     const fontSize = ppem / PX,
       x0 = -SIZE / 2 / PX + 3.3 / PX,
       y0 = 0.37 / PX;
-    const text = renderer.add(new Text({ text: 'Hmf', font, fontSize, anchorX: 'left', anchorY: 'baseline', position: [x0, y0, 0] }));
+    const text = renderer.add(
+      new Text({ text: 'Hmf', font, fontSize, anchorX: 'left', anchorY: 'baseline', position: [x0, y0, 0] }),
+    );
     const image = await frame(),
       glyphs = placed(text, latin),
       ref = reference(glyphs, (sx, sy) => {
@@ -429,7 +452,10 @@ window.runVectorTests = async () => {
     assert(v.length >= 6, `${ppem} px stem rows found: ${v.length}`);
     for (const r of v) {
       if (ppem === 6) assert(r.sum > 0.3, `a 6 px stem row has ink ${r.sum.toFixed(3)}, not above 0.3`);
-      assert(Math.abs(r.sum - r.want) < 0.1, `a ${ppem} px stem row has ink ${r.sum.toFixed(3)} where the outline has ${r.want.toFixed(3)}`);
+      assert(
+        Math.abs(r.sum - r.want) < 0.1,
+        `a ${ppem} px stem row has ink ${r.sum.toFixed(3)} where the outline has ${r.want.toFixed(3)}`,
+      );
     }
   }
   report.checks.push(
@@ -439,7 +465,16 @@ window.runVectorTests = async () => {
   // 3. Dilation makes small text darker without moving it; shadows draw offset in their own colour.
   {
     const fontSize = 6 / PX,
-      text = vector.add(new Text({ text: 'Hamburgefonts', font: latin, fontSize, anchorX: 'left', anchorY: 'baseline', position: [-SIZE / 2 / PX + 3 / PX, 0, 0] }));
+      text = vector.add(
+        new Text({
+          text: 'Hamburgefonts',
+          font: latin,
+          fontSize,
+          anchorX: 'left',
+          anchorY: 'baseline',
+          position: [-SIZE / 2 / PX + 3 / PX, 0, 0],
+        }),
+      );
     const total = (img) => img.green.reduce((a, b) => a + b, 0);
     const plain = total(await frame());
     vector.dilation = 0.25;
@@ -447,7 +482,14 @@ window.runVectorTests = async () => {
     vector.dilation = 0;
     assert(bold > plain * 1.1, `dilation 0.25 px raised ink from ${plain.toFixed(1)} to only ${bold.toFixed(1)}`);
     report.dilation = { plain, bold };
-    text.set({ fontSize: 40 / PX, color: '#000000', shadowColor: '#ff0000', shadowOpacity: 1, shadowOffset: [4 / PX, -4 / PX], shadowBlur: 0 });
+    text.set({
+      fontSize: 40 / PX,
+      color: '#000000',
+      shadowColor: '#ff0000',
+      shadowOpacity: 1,
+      shadowOffset: [4 / PX, -4 / PX],
+      shadowBlur: 0,
+    });
     const shadow = await frame();
     assert(vector.stats.drawCalls === 1, 'shadow and fill share one draw');
     let redOnly = 0;
@@ -462,16 +504,33 @@ window.runVectorTests = async () => {
     const line = 'Hamburgefonts '.repeat(80).slice(0, 1076);
     const texts = [];
     for (let i = 0; i < 100; i++)
-      texts.push(vector.add(new Text({ text: line, font: latin, fontSize: 3 / PX, maxWidth: SIZE / PX, anchorX: 'center', anchorY: 'middle', position: [0, 0, -i * 0.01] })));
+      texts.push(
+        vector.add(
+          new Text({
+            text: line,
+            font: latin,
+            fontSize: 3 / PX,
+            maxWidth: SIZE / PX,
+            anchorX: 'center',
+            anchorY: 'middle',
+            position: [0, 0, -i * 0.01],
+          }),
+        ),
+      );
     await frame();
     const first = { ...vector.stats };
     await frame();
     const steady = { ...vector.stats };
     report.scale = { first, steady, storeBytes: latin.store.length * 4 };
     assert(first.glyphs >= 100000, `scale glyphs ${first.glyphs}`);
-    assert(steady.drawCalls === 100 && steady.bindGroups === 0 && steady.bufferWrites === 1, `scale steady ${JSON.stringify(steady)}`);
+    assert(
+      steady.drawCalls === 100 && steady.bindGroups === 0 && steady.bufferWrites === 1,
+      `scale steady ${JSON.stringify(steady)}`,
+    );
     for (const t of texts) vector.remove(t);
-    report.checks.push(`100,000 glyphs in 100 blocks: 100 draws, steady frame ${steady.bufferWrites} write of ${steady.bytesWritten} bytes, ${report.scale.storeBytes} bytes of bands`);
+    report.checks.push(
+      `100,000 glyphs in 100 blocks: 100 draws, steady frame ${steady.bufferWrites} write of ${steady.bytesWritten} bytes, ${report.scale.storeBytes} bytes of bands`,
+    );
   }
 
   // 5. Errors: a Text without a VectorFont is refused; dilation and rays are checked.

@@ -182,7 +182,10 @@ export class FontOutlines {
 }
 
 /** Parses font binary data into a reusable FontOutlines object. */
-export function parseFontOutlines(fontData: ArrayBuffer | ArrayBufferView, options: FontVariationOptions = {}): FontOutlines {
+export function parseFontOutlines(
+  fontData: ArrayBuffer | ArrayBufferView,
+  options: FontVariationOptions = {},
+): FontOutlines {
   if (!fontData || (!(fontData instanceof ArrayBuffer) && !ArrayBuffer.isView(fontData))) {
     throw new TypeError(
       'parseFontOutlines requires an ArrayBuffer or TypedArray view of font bytes; pass a valid buffer',
