@@ -190,7 +190,10 @@ test('a cut-out whose UVs move (MToon UV animation) cuts at the animated UV and 
     assert.equal(s.frame().length, full, 'every frame while its cut-out moves (time changes on the GPU alone)');
     const code = modules.find((c) => c.includes('margoAnimatedUV'));
     assert.match(code, /textureSample(?:Level)?\(\w+,\w+,margoAnimatedUV\(i\.margoRaw\)/);
-    assert.ok(entries.some((list) => [7, 8, 9].every((b) => list.includes(b))), 'bindings 7 to 9');
+    assert.ok(
+      entries.some((list) => [7, 8, 9].every((b) => list.includes(b))),
+      'bindings 7 to 9',
+    );
     delete primitive.animation;
     s.frame();
     assert.deepEqual(s.frame(), ['plane']);

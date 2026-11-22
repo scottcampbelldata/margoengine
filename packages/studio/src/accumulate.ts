@@ -86,7 +86,8 @@ fn shadowed(pixel:vec2i)->f32 {
 
 // Bounded to 11 iterations at the 1024-frame cap; no mesh or image processing on the CPU.
 const radicalInverse = (value: number): number => {
-  let result = 0, weight = 0.5;
+  let result = 0,
+    weight = 0.5;
   while (value > 0) {
     result += (value & 1) * weight;
     value = Math.floor(value / 2);
@@ -114,7 +115,13 @@ export class AccumulatedShadows extends ContactShadows {
    * The current sample's light camera, set by `projection`: unit `light` direction to the light and window axes
    * `e1`, `e2` in the receiver frame (u, up, v), the window half side `size` and map texels `map` (0 = exact).
    */
-  protected window?: { light: readonly number[]; e1: readonly number[]; e2: readonly number[]; size: number; map: number };
+  protected window?: {
+    light: readonly number[];
+    e1: readonly number[];
+    e2: readonly number[];
+    size: number;
+    map: number;
+  };
   private readonly matrix = new Float32Array(16);
 
   /** Validates options before attachment; input is copied, then `options` can be edited live. */
@@ -133,7 +140,9 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   /** Samples in the current history, reset by invalidation, geometry changes or light/receiver edits. */
-  get samples(): number { return this.count; }
+  get samples(): number {
+    return this.count;
+  }
 
   /** Resets history for an in-place geometry or pose edit that has no changed transform/buffer. */
   override invalidate(): void {
@@ -142,7 +151,11 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   override setup(engine: Engine): void {
-    if (!engine.gpu) throw fault('unsupported', 'AccumulatedShadows needs WebGPU or the WebGL2 compatibility layer; select one of those backends');
+    if (!engine.gpu)
+      throw fault(
+        'unsupported',
+        'AccumulatedShadows needs WebGPU or the WebGL2 compatibility layer; select one of those backends',
+      );
     super.setup(engine);
     this.uniform = engine.gpu.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
@@ -158,14 +171,23 @@ export class AccumulatedShadows extends ContactShadows {
     super.dispose();
   }
 
-  protected override coverage(_depth: string): string { return '1'; }
-  protected override casterCutoff(): number { return this.options.alphaTest ?? 0; }
-  protected override coverageScale(): number { return this.count && this.options.blend === undefined ? 1 / this.count : 1; }
+  protected override coverage(_depth: string): string {
+    return '1';
+  }
+  protected override casterCutoff(): number {
+    return this.options.alphaTest ?? 0;
+  }
+  protected override coverageScale(): number {
+    return this.count && this.options.blend === undefined ? 1 / this.count : 1;
+  }
   protected override needsUpdate(_s: ReturnType<AccumulatedShadows['settings']>, changed: boolean): boolean {
     return changed || this.count < (this.options.frames ?? 64);
   }
 
-  protected override changed(draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): boolean {
+  protected override changed(
+    draws: readonly ContactPrimitive[],
+    s: ReturnType<AccumulatedShadows['settings']>,
+  ): boolean {
     this.validate();
     const changed = super.changed(draws, s);
     const key = this.lightingKey(s) + '|' + (this.options.frames ?? 64);
@@ -176,31 +198,41 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   protected override projection(s: ReturnType<AccumulatedShadows['settings']>): Float32Array {
-    const light = this.light(s), center = [s.x,s.ground,s.z];
-    const local = (axis: readonly number[]) => axis.reduce((sum, v, i) => sum + v*(light[i]-center[i]), 0);
+    const light = this.light(s),
+      center = [s.x, s.ground, s.z];
+    const local = (axis: readonly number[]) => axis.reduce((sum, v, i) => sum + v * (light[i] - center[i]), 0);
     const H = local(s.normal);
     const r = (this.options.lightRadius ?? 2) * Math.sqrt(radicalInverse(this.count + 1));
     const angle = (this.count + 1) * Math.PI * (3 - Math.sqrt(5));
-    const x = local(s.u) + r * Math.cos(angle), z = local(s.v) + r * Math.sin(angle);
+    const x = local(s.u) + r * Math.cos(angle),
+      z = local(s.v) + r * Math.sin(angle);
     const m = this.matrix;
     m.fill(0);
-    for (let i=0;i<3;i++) {
-      m[4*i] = 2*(H*s.u[i]-x*s.normal[i])/s.width;
-      m[4*i+1] = 2*(H*s.v[i]-z*s.normal[i])/s.depth;
-      m[4*i+2] = (H-s.height)*s.normal[i]/s.height;
-      m[4*i+3] = -s.normal[i];
+    for (let i = 0; i < 3; i++) {
+      m[4 * i] = (2 * (H * s.u[i] - x * s.normal[i])) / s.width;
+      m[4 * i + 1] = (2 * (H * s.v[i] - z * s.normal[i])) / s.depth;
+      m[4 * i + 2] = ((H - s.height) * s.normal[i]) / s.height;
+      m[4 * i + 3] = -s.normal[i];
     }
-    for (let row=0;row<4;row++) m[12+row] = (row===3?H:0)-center.reduce((sum,v,i)=>sum+m[4*i+row]*v,0);
+    for (let row = 0; row < 4; row++)
+      m[12 + row] = (row === 3 ? H : 0) - center.reduce((sum, v, i) => sum + m[4 * i + row] * v, 0);
     return m;
   }
 
-  protected override update(c: Context, draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): GPUTextureView {
+  protected override update(
+    c: Context,
+    draws: readonly ContactPrimitive[],
+    s: ReturnType<AccumulatedShadows['settings']>,
+  ): GPUTextureView {
     const frames = this.options.frames ?? 64;
     // temporal false: every remaining sample now; otherwise `samples` this frame. Caster uniforms and the sum state go
     // through queue.writeBuffer, so each sample but the last is encoded in its own encoder and submitted before the
     // next one's values are written; queue order then gives each sample its own values, with no extra buffers. The
     // last uses the frame's encoder.
-    const last = this.options.temporal === false && frames !== Infinity ? frames - 1 : Math.min(frames, this.count + (this.options.samples ?? 1)) - 1;
+    const last =
+      this.options.temporal === false && frames !== Infinity
+        ? frames - 1
+        : Math.min(frames, this.count + (this.options.samples ?? 1)) - 1;
     while (this.count < last) {
       const encoder = c.device.createCommandEncoder();
       this.sample(Object.create(c, { encoder: { value: encoder } }) as Context, draws, s);
@@ -210,20 +242,32 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   /** Takes one light sample into the history; holds once `frames` are in. */
-  private sample(c: Context, draws: readonly ContactPrimitive[], s: ReturnType<AccumulatedShadows['settings']>): GPUTextureView {
+  private sample(
+    c: Context,
+    draws: readonly ContactPrimitive[],
+    s: ReturnType<AccumulatedShadows['settings']>,
+  ): GPUTextureView {
     if (this.count >= (this.options.frames ?? 64)) return this.result!;
     const sample = super.update(c, draws, s);
     if (!this.history || this.history.size !== s.resolution) {
       for (const t of this.history?.textures ?? []) t.destroy();
-      const textures = [0,1].map(() => c.device.createTexture({size: [s.resolution,s.resolution], format: 'r16float',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC}));
-      this.history = {size: s.resolution, textures, views: textures.map(t => t.createView())};
+      const textures = [0, 1].map(() =>
+        c.device.createTexture({
+          size: [s.resolution, s.resolution],
+          format: 'r16float',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+        }),
+      );
+      this.history = { size: s.resolution, textures, views: textures.map((t) => t.createView()) };
       this.bindings = undefined;
     }
     this.sums ??= render(c.device, sumShader, 'r16float');
-    this.bindings ??= [0,1].map(i => group(c.device, this.sums!, [{buffer: this.uniform!},sample,this.history!.views[1-i]]));
+    this.bindings ??= [0, 1].map((i) =>
+      group(c.device, this.sums!, [{ buffer: this.uniform! }, sample, this.history!.views[1 - i]]),
+    );
     const blend = this.options.blend;
-    const w = this.window, st = this.state;
+    const w = this.window,
+      st = this.state;
     st.fill(0);
     st[0] = this.count;
     st[1] = blend === undefined ? 0 : 1 / Math.min(this.count + 1, blend);
@@ -240,37 +284,72 @@ export class AccumulatedShadows extends ContactShadows {
     c.device.queue.writeBuffer(this.uniform!, 0, this.state);
     const index = this.count & 1;
     // view-state: offscreen receiver history sum, full local target.
-    const pass = c.encoder.beginRenderPass({colorAttachments: [{view: this.history.views[index],loadOp:'clear',storeOp:'store'}]});
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: this.history.views[index], loadOp: 'clear', storeOp: 'store' }],
+    });
     pass.setPipeline(this.sums);
     pass.setBindGroup(0, this.bindings[index]);
     pass.draw(3);
     pass.end();
     this.count++;
-    return this.result = this.history.views[index];
+    return (this.result = this.history.views[index]);
   }
 
   private validate(): void {
-    const s = this.settings(), o = this.options;
+    const s = this.settings(),
+      o = this.options;
     this.validateLighting(s);
-    const frames = o.frames ?? 64, samples = o.samples ?? 1, alphaTest = o.alphaTest ?? 0;
-    if (!Number.isInteger(samples) || samples < 1 || samples > 1024 || typeof alphaTest !== 'number' || !(alphaTest >= 0 && alphaTest <= 1))
-      throw rangeError('Invalid accumulated shadow options; use samples an integer 1..1024 and alphaTest 0..1', 'arguments');
-    if (!(Number.isInteger(frames) || (frames === Infinity && o.blend !== undefined)) || frames < 1 || (frames > 1024 && frames !== Infinity) ||
+    const frames = o.frames ?? 64,
+      samples = o.samples ?? 1,
+      alphaTest = o.alphaTest ?? 0;
+    if (
+      !Number.isInteger(samples) ||
+      samples < 1 ||
+      samples > 1024 ||
+      typeof alphaTest !== 'number' ||
+      !(alphaTest >= 0 && alphaTest <= 1)
+    )
+      throw rangeError(
+        'Invalid accumulated shadow options; use samples an integer 1..1024 and alphaTest 0..1',
+        'arguments',
+      );
+    if (
+      !(Number.isInteger(frames) || (frames === Infinity && o.blend !== undefined)) ||
+      frames < 1 ||
+      (frames > 1024 && frames !== Infinity) ||
       (o.blend !== undefined && (!Number.isInteger(o.blend) || o.blend < 1)) ||
       (o.temporal !== undefined && typeof o.temporal !== 'boolean') ||
-      s.blur !== 0 || Boolean(o.static) ||
-      ![s.x,s.ground,s.z,s.width,s.depth,s.height].every(v => Math.abs(v) <= 1e6) ||
-      Math.min(s.width,s.depth,s.height) < 1e-6)
-      throw rangeError('Invalid accumulated shadow options; use frames 1..1024 (or Infinity with blend), blend an integer of 1 or more, temporal a boolean, blur 0, static false, receiver sizes 1e-6..1e6 and a finite disk light above the caster height', 'arguments');
+      s.blur !== 0 ||
+      Boolean(o.static) ||
+      ![s.x, s.ground, s.z, s.width, s.depth, s.height].every((v) => Math.abs(v) <= 1e6) ||
+      Math.min(s.width, s.depth, s.height) < 1e-6
+    )
+      throw rangeError(
+        'Invalid accumulated shadow options; use frames 1..1024 (or Infinity with blend), blend an integer of 1 or more, temporal a boolean, blur 0, static false, receiver sizes 1e-6..1e6 and a finite disk light above the caster height',
+        'arguments',
+      );
   }
 
   /** Validates the optional entry's light distribution before rendering or allocation. */
   protected validateLighting(s: ReturnType<AccumulatedShadows['settings']>): void {
-    const light = this.light(s), radius = this.options.lightRadius ?? 2;
-    if (!Array.isArray(light) || light.length !== 3 || ![0,1,2].every(i => Number.isFinite(light[i]) && Math.abs(light[i]) <= 1e6) ||
-      !(Math.fround(s.normal.reduce((sum,v,i)=>sum+v*(light[i]-[s.x,s.ground,s.z][i]),0)) > Math.fround(s.height)) ||
-      !Number.isFinite(radius) || radius < 0 || radius > 1e6)
-      throw rangeError('Invalid accumulated shadow light; use a finite disk above the caster height and radius 0..1e6', 'arguments');
+    const light = this.light(s),
+      radius = this.options.lightRadius ?? 2;
+    if (
+      !Array.isArray(light) ||
+      light.length !== 3 ||
+      ![0, 1, 2].every((i) => Number.isFinite(light[i]) && Math.abs(light[i]) <= 1e6) ||
+      !(
+        Math.fround(s.normal.reduce((sum, v, i) => sum + v * (light[i] - [s.x, s.ground, s.z][i]), 0)) >
+        Math.fround(s.height)
+      ) ||
+      !Number.isFinite(radius) ||
+      radius < 0 ||
+      radius > 1e6
+    )
+      throw rangeError(
+        'Invalid accumulated shadow light; use a finite disk above the caster height and radius 0..1e6',
+        'arguments',
+      );
   }
 
   /** History identity of a light distribution; live edits restart the sum. */
@@ -279,7 +358,7 @@ export class AccumulatedShadows extends ContactShadows {
   }
 
   private light(s: ReturnType<AccumulatedShadows['settings']>): readonly number[] {
-    return this.options.lightPosition ?? s.normal.map(v => 8*v);
+    return this.options.lightPosition ?? s.normal.map((v) => 8 * v);
   }
 
   private releaseHistory(): void {

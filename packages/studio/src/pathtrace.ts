@@ -35,7 +35,10 @@ export class ProgressiveStill implements EnginePlugin {
   private elapsed = 0;
   private disposed = false;
   protected constructor(
-    private tracer: Pick<MeshPathTracer, 'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'>,
+    private tracer: Pick<
+      MeshPathTracer,
+      'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'
+    >,
     idleDelay: number,
   ) {
     this.idleDelay = idleDelay;
@@ -79,7 +82,15 @@ export class ProgressiveStill implements EnginePlugin {
     return still;
   }
   /** Optional still entries select transport without loading it from the ordinary controller. */
-  protected static async createTracer(engine: EngineKernel, options: MeshPathTracerOptions): Promise<Pick<MeshPathTracer, 'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'>> {
+  protected static async createTracer(
+    engine: EngineKernel,
+    options: MeshPathTracerOptions,
+  ): Promise<
+    Pick<
+      MeshPathTracer,
+      'enabled' | 'ready' | 'status' | 'stats' | 'setScene' | 'reset' | 'renderImage' | 'capture' | 'dispose'
+    >
+  > {
     const { MeshPathTracer } = await import('@margoengine/voxel-pathtracer/mesh');
     return MeshPathTracer.create(engine, options);
   }

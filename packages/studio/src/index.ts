@@ -335,10 +335,13 @@ export class ContactShadows implements EnginePlugin {
       throw new RangeError(
         'Invalid contact shadow bounds; pass [minX, minY, minZ, maxX, maxY, maxZ] with min <= max and a spread >= 1',
       );
-    const s = this.settings(), half = [0, 1, 2].map(i => bounds[i + 3] / 2 - bounds[i] / 2);
+    const s = this.settings(),
+      half = [0, 1, 2].map((i) => bounds[i + 3] / 2 - bounds[i] / 2);
     const extent = (axis: readonly number[]) => axis.reduce((sum, v, i) => sum + Math.abs(v) * half[i], 0);
     const h = extent(s.normal);
-    this.options.position = [0, 1, 2].map(i => bounds[i] / 2 + bounds[i + 3] / 2 - s.normal[i] * h) as unknown as Vec3;
+    this.options.position = [0, 1, 2].map(
+      (i) => bounds[i] / 2 + bounds[i + 3] / 2 - s.normal[i] * h,
+    ) as unknown as Vec3;
     this.options.size = Math.max(2 * extent(s.u), 2 * extent(s.v), 1e-6) * spread;
     this.options.height = Math.max(2 * h, 1e-6);
     this.settings();
@@ -386,7 +389,10 @@ export class ContactShadows implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'ContactShadows is disposed; create a new one');
     if (!engine.gpu)
-      throw fault('unsupported', 'ContactShadows needs WebGPU or the WebGL2 compatibility layer; select one of those backends');
+      throw fault(
+        'unsupported',
+        'ContactShadows needs WebGPU or the WebGL2 compatibility layer; select one of those backends',
+      );
     for (const entry of this.entries.values()) if ('mesh' in entry) this.owned(entry.mesh, engine);
     this.engine = engine;
     const device = engine.gpu;
@@ -449,14 +455,20 @@ export class ContactShadows implements EnginePlugin {
     // Scale first: both subnormal and near-MAX_VALUE directions normalize without under/overflow.
     const scale = Math.max(...up.map(Math.abs));
     if (!(scale > 0)) throw rangeError('Invalid contact shadow up; pass a finite nonzero direction', 'arguments');
-    const scaled = up.map(v => v / scale), length = Math.hypot(...scaled);
-    const normal = scaled.map(v => v / length);
+    const scaled = up.map((v) => v / scale),
+      length = Math.hypot(...scaled);
+    const normal = scaled.map((v) => v / length);
     // Project X unless nearly parallel, then Z. This keeps the original X/Z frame for Y-up.
     const axis = Math.abs(normal[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
     const dot = axis.reduce((sum, v, i) => sum + v * normal[i], 0);
-    const tangent = axis.map((v, i) => v - dot * normal[i]), tl = Math.hypot(...tangent);
-    const u = tangent.map(v => v / tl);
-    const v = [u[1]*normal[2]-u[2]*normal[1], u[2]*normal[0]-u[0]*normal[2], u[0]*normal[1]-u[1]*normal[0]];
+    const tangent = axis.map((v, i) => v - dot * normal[i]),
+      tl = Math.hypot(...tangent);
+    const u = tangent.map((v) => v / tl);
+    const v = [
+      u[1] * normal[2] - u[2] * normal[1],
+      u[2] * normal[0] - u[0] * normal[2],
+      u[0] * normal[1] - u[1] * normal[0],
+    ];
     const color = o.color === undefined ? [0, 0, 0] : triple(o.color, 'color');
     let width = 4,
       depth = 4;
@@ -479,11 +491,14 @@ export class ContactShadows implements EnginePlugin {
     if (!Number.isInteger(resolution) || resolution < 16 || resolution > 4096)
       throw optionError('resolution must be an integer in 16..4096');
     if (o.static !== undefined && typeof o.static !== 'boolean') throw optionError('static must be a boolean');
-    if (o.toneMapped !== undefined && typeof o.toneMapped !== 'boolean') throw optionError('toneMapped must be a boolean');
+    if (o.toneMapped !== undefined && typeof o.toneMapped !== 'boolean')
+      throw optionError('toneMapped must be a boolean');
     if (o.colorBlend !== undefined && !(finite(o.colorBlend) && o.colorBlend >= 0))
       throw optionError('colorBlend must be finite and 0 or more');
     return {
-      normal, u, v,
+      normal,
+      u,
+      v,
       x: position[0],
       ground: position[1],
       z: position[2],
@@ -495,7 +510,10 @@ export class ContactShadows implements EnginePlugin {
       color,
       resolution,
       cached: o.static === true,
-      tint: tint(color.map((c) => Math.max(c, 0) * (o.colorBlend ?? 1)), o.toneMapped === true),
+      tint: tint(
+        color.map((c) => Math.max(c, 0) * (o.colorBlend ?? 1)),
+        o.toneMapped === true,
+      ),
     };
   }
 
@@ -642,7 +660,8 @@ export class ContactShadows implements EnginePlugin {
       key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}|${p.displacement?.key ?? displaced}|${clipped}|${animated}|${!!hashed}`;
     let pipeline = this.occluders.get(key);
     if (!pipeline) {
-      let code = stride === 24 ? coreOccluder(this.coverage('clip.z')) : pbrOccluder(transformed, this.coverage('i.clip.z'));
+      let code =
+        stride === 24 ? coreOccluder(this.coverage('clip.z')) : pbrOccluder(transformed, this.coverage('i.clip.z'));
       if (displaced) code = displacedDepth(code, 1, p.displacement);
       if (instanced) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
@@ -673,13 +692,13 @@ export class ContactShadows implements EnginePlugin {
     m.fill(0);
     const p = [s.x, s.ground, s.z];
     for (let i = 0; i < 3; i++) {
-      m[4*i] = 2*s.u[i]/s.width;
-      m[4*i+1] = 2*s.v[i]/s.depth;
-      m[4*i+2] = s.normal[i]/s.height;
+      m[4 * i] = (2 * s.u[i]) / s.width;
+      m[4 * i + 1] = (2 * s.v[i]) / s.depth;
+      m[4 * i + 2] = s.normal[i] / s.height;
     }
-    m[12] = -2*s.u.reduce((sum, v, i) => sum + v*p[i], 0)/s.width;
-    m[13] = -2*s.v.reduce((sum, v, i) => sum + v*p[i], 0)/s.depth;
-    m[14] = -s.normal.reduce((sum, v, i) => sum + v*p[i], 0)/s.height;
+    m[12] = (-2 * s.u.reduce((sum, v, i) => sum + v * p[i], 0)) / s.width;
+    m[13] = (-2 * s.v.reduce((sum, v, i) => sum + v * p[i], 0)) / s.depth;
+    m[14] = -s.normal.reduce((sum, v, i) => sum + v * p[i], 0) / s.height;
     m[15] = 1;
     return m;
   }
@@ -836,9 +855,13 @@ export class ContactShadows implements EnginePlugin {
     p.set(s.tint, 16);
     p[19] = s.opacity;
     for (let i = 0; i < 3; i++) {
-      p[20+i] = center[i] - s.u[i]*s.width/2 - s.v[i]*s.depth/2 + s.normal[i]*PLANE_LIFT*Math.max(s.width,s.depth);
-      p[28+i] = s.u[i]*s.width;
-      p[32+i] = s.v[i]*s.depth;
+      p[20 + i] =
+        center[i] -
+        (s.u[i] * s.width) / 2 -
+        (s.v[i] * s.depth) / 2 +
+        s.normal[i] * PLANE_LIFT * Math.max(s.width, s.depth);
+      p[28 + i] = s.u[i] * s.width;
+      p[32 + i] = s.v[i] * s.depth;
     }
     p[24] = s.width;
     p[25] = s.depth;

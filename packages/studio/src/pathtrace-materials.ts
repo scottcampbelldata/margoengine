@@ -11,7 +11,10 @@ export interface TexturedStillOptions extends Omit<ProgressiveStillOptions, 'sce
 }
 
 /** Convert a loaded glTF to an owned still scene; decoded images and deformed geometry are retained. */
-export async function texturedSceneFromGLTF(model: TraceLoadedGLTF, options: TraceGLTFOptions = {}): Promise<PBRMeshTraceScene> {
+export async function texturedSceneFromGLTF(
+  model: TraceLoadedGLTF,
+  options: TraceGLTFOptions = {},
+): Promise<PBRMeshTraceScene> {
   options.signal?.throwIfAborted();
   const { traceSceneFromGLTF } = await import('@margoengine/voxel-pathtracer/mesh-pbr');
   return traceSceneFromGLTF(model, options);
@@ -23,7 +26,10 @@ export class TexturedStill extends ProgressiveStill {
   static override async attach(engine: EngineKernel, options: TexturedStillOptions): Promise<TexturedStill> {
     return super.attach(engine, options);
   }
-  protected static override async createTracer(engine: EngineKernel, options: MeshPathTracerOptions): Promise<ComposedVoxelPathTracer> {
+  protected static override async createTracer(
+    engine: EngineKernel,
+    options: MeshPathTracerOptions,
+  ): Promise<ComposedVoxelPathTracer> {
     const [{ ComposedVoxelPathTracer }, { meshPBR }] = await Promise.all([
       import('@margoengine/voxel-pathtracer/compose'),
       import('@margoengine/voxel-pathtracer/mesh-pbr'),
