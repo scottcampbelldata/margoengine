@@ -102,7 +102,10 @@ test('a damaged or cut off file is refused with the fix, before allocating', asy
   await assert.rejects(collect(readGeometryCache(encodeGeometryCache(30, [wide]))), /index past its vertices/);
   assert.throws(() => encodeGeometryCache(0, [fan(3, 1)]), /frame rate above 0/);
   assert.throws(() => encodeGeometryCache(30, []), /at least one chunk/);
-  assert.throws(() => encodeGeometryCache(30, [{ frameCount: 2, positions: new Float32Array(9) }]), /Invalid geometry chunk/);
+  assert.throws(
+    () => encodeGeometryCache(30, [{ frameCount: 2, positions: new Float32Array(9) }]),
+    /Invalid geometry chunk/,
+  );
 });
 
 test('an abort stops the read with its reason', async () => {
@@ -205,7 +208,10 @@ test('a chunk of another topology swaps the mesh at its first frame, and the tri
 
 test('the reader stays only `ahead` chunks in front, the clock waits for a late chunk, and played chunks go', async (t) => {
   const { engine, writes } = await gpuEngine(t),
-    file = encodeGeometryCache(10, Array.from({ length: 8 }, (_, i) => fan(3, 2, i * 2))),
+    file = encodeGeometryCache(
+      10,
+      Array.from({ length: 8 }, (_, i) => fan(3, 2, i * 2)),
+    ),
     size = (file.length - 16) / 8,
     gates = [];
   let pulled = 0;
@@ -238,14 +244,21 @@ test('the reader stays only `ahead` chunks in front, the clock waits for a late 
   player.onPreUpdate(0.2);
   near([height(player, writes)], [2], 1e-5);
   await settled();
-  assert.equal(player['chunks'].some((c) => c.firstFrame === 0), false, 'a played chunk is let go');
+  assert.equal(
+    player['chunks'].some((c) => c.firstFrame === 0),
+    false,
+    'a played chunk is let go',
+  );
   player.dispose();
   await player.done;
 });
 
 test('a source that can start again does, for a seek back and a loop; a stream keeps what it read', async (t) => {
   const { engine, writes } = await gpuEngine(t),
-    file = encodeGeometryCache(10, Array.from({ length: 4 }, (_, i) => fan(3, 2, i * 2)));
+    file = encodeGeometryCache(
+      10,
+      Array.from({ length: 4 }, (_, i) => fan(3, 2, i * 2)),
+    );
   let opened = 0;
   const player = await GeometryCachePlayer.attach(
     engine,
@@ -295,7 +308,10 @@ test('a source that can start again does, for a seek back and a loop; a stream k
 
 test('a loop wraps without waiting: the next lap reads while the first chunk plays', async (t) => {
   const { engine, writes } = await gpuEngine(t),
-    file = encodeGeometryCache(8, Array.from({ length: 4 }, (_, i) => fan(3, 2, i * 2)));
+    file = encodeGeometryCache(
+      8,
+      Array.from({ length: 4 }, (_, i) => fan(3, 2, i * 2)),
+    );
   let opened = 0;
   const player = await GeometryCachePlayer.attach(
     engine,

@@ -172,7 +172,8 @@ export class MorphWeightPlayer implements EnginePlugin {
     return removed;
   }
   setup(engine: Engine): void {
-    if (this.disposed) throw new MargoError('disposed', 'MorphWeightPlayer is disposed; create a new player before attaching');
+    if (this.disposed)
+      throw new MargoError('disposed', 'MorphWeightPlayer is disposed; create a new player before attaching');
     requireWebGPU(engine, 'MorphWeightPlayer');
     this.engine = engine;
   }

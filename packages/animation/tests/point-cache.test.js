@@ -16,7 +16,12 @@ const fixture = (name) => new Uint8Array(readFileSync(new URL(`fixtures/${name}`
     for (let n = 0; n < size; n += 3) {
       const [x, y, z] = map(want[n], want[n + 1], want[n + 2]),
         at = Number(frame) * size + n;
-      off = Math.max(off, Math.abs(cache.positions[at] - x), Math.abs(cache.positions[at + 1] - y), Math.abs(cache.positions[at + 2] - z));
+      off = Math.max(
+        off,
+        Math.abs(cache.positions[at] - x),
+        Math.abs(cache.positions[at + 1] - y),
+        Math.abs(cache.positions[at + 2] - z),
+      );
     }
     return off;
   };
@@ -44,7 +49,7 @@ test('zUp turns a Z-up file to Y-up, so both real files agree', () => {
   for (let n = 0; n < mdd.positions.length; n++) assert.ok(Math.abs(mdd.positions[n] - pc2.positions[n]) < 1e-5);
 });
 
-test('a real cache with its mesh\'s triangles reads back through the geometry cache format', async () => {
+test("a real cache with its mesh's triangles reads back through the geometry cache format", async () => {
   const cache = parsePointCache(fixture('ball.pc2')),
     indices = new Uint32Array(truth.indices),
     file = encodeGeometryCache(cache.rate, [{ frameCount: cache.frameCount, positions: cache.positions, indices }]);
@@ -60,7 +65,10 @@ test('a cut, empty, unknown or oversized file is refused with a code', () => {
   const pc2 = fixture('ball.pc2'),
     mdd = fixture('ball.mdd'),
     code = (bytes, wanted, options) =>
-      assert.throws(() => parsePointCache(bytes, options), (error) => error.code === wanted);
+      assert.throws(
+        () => parsePointCache(bytes, options),
+        (error) => error.code === wanted,
+      );
   code(pc2.subarray(0, 20), 'failed');
   code(pc2.subarray(0, pc2.length - 4), 'failed');
   code(mdd.subarray(0, 4), 'failed');
@@ -79,10 +87,13 @@ test('a cut, empty, unknown or oversized file is refused with a code', () => {
 test('a file that is no point cache is refused as one, not as a cache too large for maxFloats', () => {
   // A web page answered for a missing .pc2 reads as an MDD header of about 10^9 frames of 10^9 vertices: the readme run
   // saw "Point cache holds 3418670067845590500 floats, over maxFloats; raise maxFloats", advice no setting could follow.
-  const page = new TextEncoder().encode('<!DOCTYPE html><html><head><title>Not found</title></head><body></body></html>');
+  const page = new TextEncoder().encode(
+    '<!DOCTYPE html><html><head><title>Not found</title></head><body></body></html>',
+  );
   assert.throws(
     () => parsePointCache(page),
-    (error) => error.code === 'failed' && !/maxFloats/.test(error.message) && /not a PC2 or MDD file/.test(error.message),
+    (error) =>
+      error.code === 'failed' && !/maxFloats/.test(error.message) && /not a PC2 or MDD file/.test(error.message),
   );
   // A real file over the limit still names the limit.
   assert.throws(() => parsePointCache(fixture('ball.pc2'), { maxFloats: 10 }), /over maxFloats 10/);

@@ -341,7 +341,8 @@ test('model roots register owned Animation in the model scene, and tolerate mode
 });
 
 test('attach registers a mixer that updates actions and detaches on disposal', async (t) => {
-  const engine = await ownerEngine(t), root = skeleton();
+  const engine = await ownerEngine(t),
+    root = skeleton();
   const mixer = AnimationMixer.attach(engine, root);
   assert.equal(engine.hasPlugin(mixer.name), true);
   mixer.clipAction(clip('move', [0, 0, 0], [10, 0, 0])).play();

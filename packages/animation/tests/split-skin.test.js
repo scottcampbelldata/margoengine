@@ -121,19 +121,19 @@ test('Animation uploads each part its own influences and morph deltas, equal to 
   assert.ok(auto.primitives.length >= 2);
   const blocks = new Set(),
     uploaded = (model) => {
-    const animation = new Animation(model);
-    engine.use(animation);
-    return animation.resources.map(({ slot }) => {
-      blocks.add(slot.influences).add(slot.morphs);
-      const page = slot.page,
-        influences = slot.influences.range,
-        morphs = slot.morphs.range;
-      return {
-        influences: new Uint8Array(page.influences.buffer.data, influences.offset * 16, influences.size * 16).slice(),
-        morphs: new Uint8Array(page.morphs.buffer.data, morphs.offset * 48, morphs.size * 48).slice(),
-      };
-    });
-  };
+      const animation = new Animation(model);
+      engine.use(animation);
+      return animation.resources.map(({ slot }) => {
+        blocks.add(slot.influences).add(slot.morphs);
+        const page = slot.page,
+          influences = slot.influences.range,
+          morphs = slot.morphs.range;
+        return {
+          influences: new Uint8Array(page.influences.buffer.data, influences.offset * 16, influences.size * 16).slice(),
+          morphs: new Uint8Array(page.morphs.buffer.data, morphs.offset * 48, morphs.size * 48).slice(),
+        };
+      });
+    };
   const a = uploaded(auto),
     b = uploaded(hand);
   assert.equal(a.length, auto.primitives.length);
@@ -162,7 +162,11 @@ test('two parts of one primitive with the same vertex count keep their own influ
     b = slots.at(-1);
   assert.notEqual(a.influences, b.influences);
   const words = (slot) =>
-    new Uint32Array(slot.page.influences.buffer.data, slot.influences.range.offset * 16, slot.influences.range.size * 4);
+    new Uint32Array(
+      slot.page.influences.buffer.data,
+      slot.influences.range.offset * 16,
+      slot.influences.range.size * 4,
+    );
   const got = words(b),
     floats = new Float32Array(got.buffer, got.byteOffset, got.length),
     { JOINTS_0: joints, WEIGHTS_0: weights } = small.arrays;
