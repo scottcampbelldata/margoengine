@@ -263,7 +263,8 @@ function onModel(
   // drawing now. A CPU bake uploads again from its pixels (`Texture` keeps one copy per device). A live bake's texture
   // is its baker's device's and went with it: on a restored device the model draws no baked light (a 1 x 1 black
   // texture) until a new baker, made on `engine.gpu`, is applied.
-  let dark: Texture | undefined, bound: { device: GPUDevice; textures: readonly MaterialExtensionTexture[] } | undefined;
+  let dark: Texture | undefined,
+    bound: { device: GPUDevice; textures: readonly MaterialExtensionTexture[] } | undefined;
   const bind = (gpu: GPUDevice): readonly MaterialExtensionTexture[] => {
     const source =
       isLive(baked) && baked.device !== gpu

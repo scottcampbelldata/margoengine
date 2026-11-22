@@ -20,7 +20,8 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [noFileWatcher(),
+  plugins: [
+    noFileWatcher(),
     {
       name: 'lightmap-gpu-page',
       configureServer(s) {
@@ -381,7 +382,16 @@ try {
   console.log('apply', JSON.stringify(drawn));
   assert.deepEqual(drawn.errors, []);
   // With no live light every target is black but where the lightmap lights it.
-  for (const k of ['meshOff', 'meshBack', 'modelOff', 'modelBack', 'coreOff', 'coreBack', 'restoreBack', 'liveModelLost'])
+  for (const k of [
+    'meshOff',
+    'meshBack',
+    'modelOff',
+    'modelBack',
+    'coreOff',
+    'coreBack',
+    'restoreBack',
+    'liveModelLost',
+  ])
     assert.ok(drawn[k][0] < 1 && drawn[k][1] < 1, `${k} is dark: ${drawn[k]}`);
   // The lit left half shows, the dark right half adds nothing.
   for (const k of ['meshOn', 'modelOn', 'coreOn']) {
