@@ -11,7 +11,10 @@ const limits = {
   maxComputeWorkgroupSizeZ: 64,
   maxComputeInvocationsPerWorkgroup: 256,
 };
-function stubGpu(cost, { timestamps = true, info = { vendor: 'acme', architecture: 'x', device: '', description: '' } } = {}) {
+function stubGpu(
+  cost,
+  { timestamps = true, info = { vendor: 'acme', architecture: 'x', device: '', description: '' } } = {},
+) {
   const gpu = {
     runs: [],
     compiled: [],
@@ -223,18 +226,24 @@ test('createCompute refuses a tuning table it cannot run, before any device exis
   await assert.rejects(createCompute({ backend: 'cpu', tuned: { scan: 2048 } }), RangeError);
   await assert.rejects(createCompute({ backend: 'cpu', tuned: { fft: 256 } }), TypeError);
   const cpu = await createCompute({ backend: 'cpu', tuned: { reduce: 128, scan: 64, sort: 512 } });
-  assert.equal(await cpu.array(new Float32Array([1, 2, 3])).sum().item(), 6);
+  assert.equal(
+    await cpu
+      .array(new Float32Array([1, 2, 3]))
+      .sum()
+      .item(),
+    6,
+  );
   cpu.dispose();
 });
 
 test('a table over the device limit is refused, and an owned device goes with it', async () => {
   let destroyed = 0;
   const device = {
-      limits: { maxComputeInvocationsPerWorkgroup: 256 },
-      lost: new Promise(() => {}),
-      features: new Set(),
-      destroy: () => destroyed++,
-    };
+    limits: { maxComputeInvocationsPerWorkgroup: 256 },
+    lost: new Promise(() => {}),
+    features: new Set(),
+    destroy: () => destroyed++,
+  };
   await assert.rejects(createCompute({ device, tuned: { sort: 512 } }), /limit of 256/);
   assert.equal(destroyed, 0, 'a device the caller passed stays open');
 });
@@ -267,7 +276,10 @@ test('tuneCompute keeps the fastest of each kernel, and the table sticks', async
   assert.deepEqual(first.tuned, { reduce: 64, scan: 64, sort: 64 });
   assert.deepEqual(gpu.tuned, first.tuned);
   assert.equal(first.cached, false);
-  assert.deepEqual(first.timings.reduce.map((t) => t.workgroupSize[0]), [256, 128, 64]);
+  assert.deepEqual(
+    first.timings.reduce.map((t) => t.workgroupSize[0]),
+    [256, 128, 64],
+  );
   const runs = gpu.runs.length,
     second = await tuneCompute(gpu, { count: 8, store });
   assert.equal(second.cached, true);

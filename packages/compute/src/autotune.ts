@@ -300,7 +300,8 @@ async function tuneOwn(gpu: ComputeContext, tuner: Tuner, options: TuneComputeOp
  */
 export async function tuneCompute(gpu: ComputeContext, options: TuneComputeOptions = {}): Promise<TuneComputeResult> {
   gpu.check();
-  if (gpu.backend === 'cpu') throw fault('unsupported', 'tuneCompute measures WGSL kernels, which need a GPU', 'compute');
+  if (gpu.backend === 'cpu')
+    throw fault('unsupported', 'tuneCompute measures WGSL kernels, which need a GPU', 'compute');
   if (gpu.kernelRoute)
     throw fault('unsupported', 'tuneCompute measures the default kernels; call it before useSubgroups', 'compute');
   let tuner = tuners.get(gpu);
