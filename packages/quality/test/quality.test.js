@@ -184,7 +184,15 @@ test('on the full tier, sustained slow frames store low and reload once; fast or
 
 // A fake WebGPU for the light-tier reading. `passMs`: each frame's passes by timestamps. `doneMs`: what submit to done would
 // read (the old rule's number): the presenting floor and other work on the machine, which the reading must ignore.
-function fakeGpu({ passMs = 2, doneMs = passMs, passes = 3, encoders = 1, feature = true, zero = false, overlap = false } = {}) {
+function fakeGpu({
+  passMs = 2,
+  doneMs = passMs,
+  passes = 3,
+  encoders = 1,
+  feature = true,
+  zero = false,
+  overlap = false,
+} = {}) {
   const live = new Set(),
     make = (object) => (live.add(object), object);
   let clock = 0;

@@ -36,7 +36,13 @@ try {
       ssao = SSAO.attach(engine),
       // No history, so level 0 gives the same picture however it was reached.
       volumetric = VolumetricFog.attach(engine, { temporal: 0, density: 0.05 });
-    shadows.add(engine.createMesh().setGeometry(box(30, 0.2, 30)).setPosition([0, -1, 0]).setMaterial(material));
+    shadows.add(
+      engine
+        .createMesh()
+        .setGeometry(box(30, 0.2, 30))
+        .setPosition([0, -1, 0])
+        .setMaterial(material),
+    );
     for (let x = -3; x <= 3; x++)
       shadows.add(
         engine
@@ -45,8 +51,7 @@ try {
           .setPosition([x * 2, 0.5, (x % 3) * 2])
           .setMaterial(material),
       );
-    const
-      camera = engine.camera,
+    const camera = engine.camera,
       far = camera.far,
       knobs = featureKnobs({ ssao, shadows, volumetric, camera }),
       shot = async () => (await supersample(engine, { samples: 1 })).data,
