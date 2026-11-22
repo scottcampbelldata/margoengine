@@ -108,7 +108,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (30 of 107 on 2026-11-15). Core, math, splines, kinematics-constraints, brep and the physics
+  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21). Core, math, splines, kinematics-constraints, brep and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`; the pure ones are
   read by `tests/owner-exclusions.test.js`, which fails when one gains anything with a lifetime.
 - The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,

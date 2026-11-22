@@ -15,6 +15,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the row pattern is `KB[\w-]+` (the coordinator, 2026-11-21).
 - **Regression:** tests/upstream-reports.test.js (fails on the old pattern with the KB-WATER-FLOODFILM-COMPAT1 folder present).
 
+### Fixed 2026-11-21: disposing a GeometryGenerator left its plugin and frame pass in the scene (KB-GEOMETRY-GENDISPOSE1, geometry)
+- **Repro:** `const generator = GeometryGenerator.attach(engine); generator.dispose();` then `engine.sceneOf(generator)` still returned the scene and its compute pass stayed registered; the new owner fixture `packages/geometry/tests/owner-lifetime.fixture.js` failed with "releases its registration" in every direct-disposal case.
+- **Cause:** `dispose()` freed the items' buffers and cleared the engine and device but never called `removePlugin`, unlike every other plugin's `dispose` (Scatter, SculptView). It also kept the read-back copy pipeline of the old device.
+- **Fix:** `dispose()` clears its fields, then removes the plugin from its scene (the repeated dispose that `removePlugin` triggers finds nothing to do) and drops the copy pipeline.
+- **Regression:** `packages/geometry/tests/gpu.test.js` "disposing the generator takes its plugin out of the scene, once"; `npm run check:owners -- --packages=geometry` on WebGPU and the WebGL2 layer.
+
 ### Fixed 2026-11-21: a submerged ledge cast a bright silhouette through Water (KB-WATER-REFRACTDEPTH1, water)
 - **Repro:** run `node packages/water/test/refraction-depth.browser.mjs` on the previous shader. A slab in the straight view ray changes the water color where the bent ray hits only the seabed.
 - **Cause:** Water used the straight ray's depth gap for attenuation and for the first bent lookup. The opaque depth at the bent lookup could belong to a different surface.

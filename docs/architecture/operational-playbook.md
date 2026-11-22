@@ -9021,6 +9021,16 @@ attached and detached. It found no leak in road. Batch owners-b8 also ran mixer 
 entries are 221 cases, past the 208 a leaf may hold, which `tests/owner-lifetime.test.js` fails) and moved the biomes
 scene fix (KB-OWN-BIOMES1/2) onto main.
 
+Batch owners-b9 (2026-11-21) gated bvh, geometry, navmesh and mesh-edit, which held lifetimes with no fixture. bvh: GPUMeshBVH
+(upload and raycast), `forShader`, GPUDynamicBVH in build and refit mode, and SceneBVH, each tied to a plugin registration
+(`ownedByEngine`); the worker builds keep their own browser test. geometry: GeometryGenerator.attach with one item of every
+kind, an item disposed early and a read-back. navmesh: NavDebug on a plain and a tiled mesh with a crowd and a route (the Wasm
+worker build refuses without a Worker host and releases its worker, timer and listener in its own `finally`, test/wasm.test.js).
+mesh-edit: SculptView with and without dynamic topology (its other entries are typed-array work). All pass on the CPU model,
+native WebGPU and the WebGL2 layer, with device loss attached and detached. The geometry fixture found KB-GEOMETRY-GENDISPOSE1:
+GeometryGenerator.dispose never removed its plugin from the scene (fixed in packages/geometry/src/gpu.ts, regression in
+packages/geometry/tests/gpu.test.js).
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,
