@@ -15,14 +15,26 @@ test('libraryParts splits a glTF by material with its uvs, texture transform and
   t.set([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
   i.set([0, 1, 2, 0, 1, 2]);
   const view = (byteOffset, byteLength) => ({ buffer: 0, byteOffset, byteLength }),
-    acc = (bufferView, byteOffset, count, type, componentType = 5126) => ({ bufferView, byteOffset, componentType, count, type }),
+    acc = (bufferView, byteOffset, count, type, componentType = 5126) => ({
+      bufferView,
+      byteOffset,
+      componentType,
+      count,
+      type,
+    }),
     doc = {
       asset: { version: '2.0' },
       buffers: [{ uri: 'f.bin', byteLength: bin.byteLength }],
       bufferViews: [view(0, 144), view(144, 48), view(192, 12)],
       accessors: [
-        acc(0, 0, 3, 'VEC3'), acc(0, 36, 3, 'VEC3'), acc(0, 72, 3, 'VEC3'), acc(0, 108, 3, 'VEC3'),
-        acc(1, 0, 3, 'VEC2'), acc(1, 24, 3, 'VEC2'), acc(2, 0, 3, 'SCALAR', 5123), acc(2, 6, 3, 'SCALAR', 5123),
+        acc(0, 0, 3, 'VEC3'),
+        acc(0, 36, 3, 'VEC3'),
+        acc(0, 72, 3, 'VEC3'),
+        acc(0, 108, 3, 'VEC3'),
+        acc(1, 0, 3, 'VEC2'),
+        acc(1, 24, 3, 'VEC2'),
+        acc(2, 0, 3, 'SCALAR', 5123),
+        acc(2, 6, 3, 'SCALAR', 5123),
       ],
       meshes: [
         {
@@ -40,12 +52,19 @@ test('libraryParts splits a glTF by material with its uvs, texture transform and
           alphaCutoff: 0.3,
           pbrMetallicRoughness: {
             baseColorFactor: [0.9, 1, 0.9, 1],
-            baseColorTexture: { index: 2, extensions: { KHR_texture_transform: { offset: [0, 0.5], scale: [2, 0.5] } } },
+            baseColorTexture: {
+              index: 2,
+              extensions: { KHR_texture_transform: { offset: [0, 0.5], scale: [2, 0.5] } },
+            },
           },
         },
       ],
       textures: [{ source: 0 }, { source: 1 }, { source: 2 }],
-      images: [{ uri: 'bark.jpg', mimeType: 'image/jpeg' }, { uri: 'bark_nor.jpg', mimeType: 'image/jpeg' }, { uri: 'twig.png' }],
+      images: [
+        { uri: 'bark.jpg', mimeType: 'image/jpeg' },
+        { uri: 'bark_nor.jpg', mimeType: 'image/jpeg' },
+        { uri: 'twig.png' },
+      ],
       nodes: [{ mesh: 0 }],
       scenes: [{ nodes: [0] }],
     },
@@ -56,7 +75,13 @@ test('libraryParts splits a glTF by material with its uvs, texture transform and
       if (url.endsWith('f.bin')) return { ok: true, status: 200, arrayBuffer: async () => bin };
       return { ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode(url).buffer };
     },
-    decode = async (bytes, mime) => ({ width: 1, height: 1, data: new Uint8Array(4), name: new TextDecoder().decode(bytes), mime }),
+    decode = async (bytes, mime) => ({
+      width: 1,
+      height: 1,
+      data: new Uint8Array(4),
+      name: new TextDecoder().decode(bytes),
+      mime,
+    }),
     [bark, twig] = await libraryParts('/lib/fir/fir.gltf', { fetch, decode });
   assert.equal(bark.name, 'fir_bark');
   assert.equal(bark.kind, 'bark');

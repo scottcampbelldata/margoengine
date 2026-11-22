@@ -53,7 +53,10 @@ const scene = async (skip, check) => {
     await page.evaluate((p) => window.check.family(p, 'natural'), part);
     const back = compare(base, await still());
     rows[part] = { feature: +(100 * feature.share).toFixed(2), back: back.moved, backPeak: back.peak };
-    console.log(part, `animatedFeature moves ${rows[part].feature} % of pixels; natural leaves ${back.moved} moved (peak ${back.peak})`);
+    console.log(
+      part,
+      `animatedFeature moves ${rows[part].feature} % of pixels; natural leaves ${back.moved} moved (peak ${back.peak})`,
+    );
     assert.ok(feature.share > 0.001, `${part}: the family reaches the picture (${feature.moved} pixels moved)`);
     assert.equal(back.moved, 0, `${part}: natural gives back the frame of the defaults (peak ${back.peak})`);
   }
@@ -63,7 +66,9 @@ try {
   // The smoke column: its rows act on the puffs it lets go, so time runs (4 s) on columns that had one family from the
   // start. Two natural columns draw the same; the animatedFeature column draws another.
   const column = async (family) => {
-    await page.goto(`${origin}/packages/scenes/test/look-family-gpu.html?skip=gtao,water,terrain&smokeFamily=${family}`);
+    await page.goto(
+      `${origin}/packages/scenes/test/look-family-gpu.html?skip=gtao,water,terrain&smokeFamily=${family}`,
+    );
     await page.waitForFunction(() => window.ready, null, { timeout: 180000 });
     assert.deepEqual(await page.evaluate(() => window.check.run(120)), [], 'no GPU error');
     return decodePNG(await page.locator('canvas').screenshot());
@@ -72,7 +77,10 @@ try {
     again = compare(plain, await column('natural')),
     feature = compare(plain, await column('animatedFeature'));
   rows.smoke = { feature: +(100 * feature.share).toFixed(2), back: again.moved, backPeak: again.peak };
-  console.log('smoke', `animatedFeature moves ${rows.smoke.feature} % of pixels; a second natural column ${again.moved} moved (peak ${again.peak})`);
+  console.log(
+    'smoke',
+    `animatedFeature moves ${rows.smoke.feature} % of pixels; a second natural column ${again.moved} moved (peak ${again.peak})`,
+  );
   assert.equal(again.moved, 0, 'two natural columns draw the same');
   assert.ok(feature.share > 0.001, `smoke: the family reaches the column (${feature.moved} pixels moved)`);
   assert.deepEqual(Object.keys(rows).sort(), ['environment', 'post', 'sky', 'smoke', 'terrain', 'tonemap', 'water']);
