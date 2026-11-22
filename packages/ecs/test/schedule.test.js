@@ -27,7 +27,10 @@ test('before and after order systems, ties keep the order of add, and forward na
 test('a cycle, a missing name and a frame system before a fixed one are refused by name', () => {
   const noop = () => {};
   const state = (pattern) => (error) => error.code === 'state' && pattern.test(error.message);
-  const cycle = new Schedule().add('a', noop, { after: ['b'] }).add('b', noop, { after: ['a'] }).add('c', noop);
+  const cycle = new Schedule()
+    .add('a', noop, { after: ['b'] })
+    .add('b', noop, { after: ['a'] })
+    .add('c', noop);
   assert.throws(() => cycle.update(0), state(/cycle among a, b/));
   const missing = new Schedule().add('a', noop, { after: ['ghost'] });
   assert.throws(() => missing.order(), state(/ghost/));

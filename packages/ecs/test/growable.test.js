@@ -62,7 +62,10 @@ test('the limit stops growth with an error that says what to change, and freed s
   const world = new GrowableWorld({ capacity: 1, limit: 3 });
   const entities = [world.create(), world.create(), world.create()];
   assert.equal(world.capacity, 3);
-  assert.throws(() => world.create(), (error) => error instanceof RangeError && /higher limit/.test(error.message));
+  assert.throws(
+    () => world.create(),
+    (error) => error instanceof RangeError && /higher limit/.test(error.message),
+  );
   world.destroy(entities[1]);
   const reused = world.create();
   assert.notEqual(reused, entities[1]);
@@ -95,7 +98,10 @@ test('trackers, queries and relations carry on across growth', () => {
   const output = world.allocate(Uint32Array);
   assert.equal(tracker.added(output), 40);
   assert.equal(moving.run(output), 39);
-  assert.equal(moving.forEach(() => {}), 39);
+  assert.equal(
+    moving.forEach(() => {}),
+    39,
+  );
   tracker.clear();
   world.destroy(root);
   assert.equal(tracker.removed(output), 40);
@@ -114,8 +120,17 @@ test('fixed worlds keep their ids, their bound and their error', () => {
 });
 
 test('bad settings say what to pass', () => {
-  for (const options of [{ capacity: 0 }, { capacity: 1.5 }, { limit: 0 }, { limit: 2_000_000 }, { capacity: 8, limit: 4 }])
-    assert.throws(() => new GrowableWorld(options), (error) => error instanceof RangeError && /;/.test(error.message));
+  for (const options of [
+    { capacity: 0 },
+    { capacity: 1.5 },
+    { limit: 0 },
+    { limit: 2_000_000 },
+    { capacity: 8, limit: 4 },
+  ])
+    assert.throws(
+      () => new GrowableWorld(options),
+      (error) => error instanceof RangeError && /;/.test(error.message),
+    );
 });
 
 test('seeded work matches a plain model across growth', () => {
