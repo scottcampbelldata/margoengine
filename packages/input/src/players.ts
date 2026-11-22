@@ -128,7 +128,8 @@ export class LocalPlayers {
     new Input(actions, this.options).dispose();
     for (const [name, scheme] of Object.entries(schemes)) {
       for (const action of Object.keys(scheme))
-        if (!Object.hasOwn(actions, action)) throw new TypeError(`Scheme ${name} binds an unknown action, ${action}; add it to the actions`);
+        if (!Object.hasOwn(actions, action))
+          throw new TypeError(`Scheme ${name} binds an unknown action, ${action}; add it to the actions`);
       new Input(scheme, { target, gamepads }).dispose();
     }
     if (joinAction !== undefined) {
@@ -258,11 +259,16 @@ export class LocalPlayers {
   private check(device: PlayerDevice, player?: Player): void {
     const scheme = /^keyboard:(.+)$/.exec(device)?.[1];
     if (
-      !(scheme !== undefined ? Object.hasOwn(this.schemes, scheme) : /^(keyboard|touch|gamepad:\d+|control:.+)$/.test(device))
+      !(scheme !== undefined
+        ? Object.hasOwn(this.schemes, scheme)
+        : /^(keyboard|touch|gamepad:\d+|control:.+)$/.test(device))
     )
-      throw new TypeError(`Unknown device ${device}; use keyboard, keyboard:<scheme>, gamepad:<n>, control:<id> or touch`);
+      throw new TypeError(
+        `Unknown device ${device}; use keyboard, keyboard:<scheme>, gamepad:<n>, control:<id> or touch`,
+      );
     const owner = this.owners.get(device);
-    if (owner && owner !== player) throw new TypeError(`Player ${owner.index} already owns ${device}; unassign it first`);
+    if (owner && owner !== player)
+      throw new TypeError(`Player ${owner.index} already owns ${device}; unassign it first`);
   }
   private rebuild(player: Player): void {
     const devices = player.devices;

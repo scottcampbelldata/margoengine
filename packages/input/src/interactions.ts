@@ -124,7 +124,9 @@ export class Interactions {
     this.now = now;
     for (const [name, rule] of Object.entries(rules)) {
       if (!name || !rule || !Object.hasOwn(TIMES, rule.type))
-        throw new TypeError("Invalid interaction; use a named rule of type 'tap', 'hold', 'slow-tap' or 'double-press'");
+        throw new TypeError(
+          "Invalid interaction; use a named rule of type 'tap', 'hold', 'slow-tap' or 'double-press'",
+        );
       source.state(rule.action);
       const { binding, time = TIMES[rule.type], gap = 300, count = 2, threshold = 0.5 } = rule;
       if (binding !== undefined && (!Number.isInteger(binding) || binding < 0))
@@ -133,7 +135,8 @@ export class Interactions {
       if (!Number.isFinite(time) || time < 0 || (!instant && time === 0))
         throw new RangeError('Interaction time is in milliseconds; only hold and slow-tap may use 0');
       if (!Number.isFinite(gap) || gap <= 0) throw new RangeError('Interaction gap must be in milliseconds, above 0');
-      if (!Number.isInteger(count) || count < 2) throw new RangeError('Interaction count must be an integer of at least 2');
+      if (!Number.isInteger(count) || count < 2)
+        throw new RangeError('Interaction count must be an integer of at least 2');
       if (!(threshold > 0 && threshold <= 1)) throw new RangeError('Interaction threshold must be above 0 and up to 1');
       const track = new Track(rule.type, rule.action, binding, time, gap, count, threshold);
       this.tracks.set(name, track);

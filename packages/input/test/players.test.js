@@ -313,7 +313,10 @@ test('options, devices and owners are checked', () => {
     () => new LocalPlayers(ACTIONS, { ...options, schemes: { s: { nope: [{ type: 'key', code: 'KeyA' }] } } }),
     TypeError,
   );
-  assert.throws(() => new LocalPlayers(ACTIONS, { ...options, schemes: { s: { jump: [{ type: 'nope' }] } } }), TypeError);
+  assert.throws(
+    () => new LocalPlayers(ACTIONS, { ...options, schemes: { s: { jump: [{ type: 'nope' }] } } }),
+    TypeError,
+  );
   const { party } = rig();
   party.add('keyboard');
   for (const device of ['mouse', 'gamepad:x', 'keyboard:nope', 'gamepad:'])
