@@ -408,9 +408,9 @@ under a stratus deck (share 0.44 at noon) a grey block's sunlit top reads 0.51 o
 read 0.93: the deck's sun light came in again on top of the dimmed engine sun). Coverage 0 or `dispose()` gives the sky
 back its plain maps.
 
-`depth` takes the scene's reversed-Z depth each frame (any effect's scene depth, as the sky's fog does). With it the
-march stops at scene surfaces, so a camera inside the layer sees cloud in front of nearby objects, and a mountain
-in front of the clouds hides them. Without it the clouds draw only over the empty sky.
+The cloud march stops at the nearest surface in the scene depth. A camera inside the layer sees cloud in front of
+nearby objects, and a mountain in front of the clouds hides them. With no sampleable depth the clouds draw only
+over the empty sky.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -433,7 +433,7 @@ in front of the clouds hides them. Without it the clouds draw only over the empt
 | `sunIntensity` | 0.55 | the sun's irradiance on the clouds over 4 pi, in the sky's units: the sun that makes the clear noon sky give 0.165 of the light on level ground, the diffuse fraction of a clear sky (Erbs, Klein and Duffie 1982); 1.6 until 2026-11-17 |
 | `groundAlbedo` | 0.2 | albedo of the ground under the clouds (fresh snow 0.8, grass 0.25, forest 0.1): it sends the share of the sun and sky the deck passes back up into the base; live (the sky's own `groundAlbedo` feeds only its Bruneton tables) |
 | `sunDirection`, `ambient` | [0.3, 0.6, 0.4]; a clear day's above a dark ground | the light without a sky: `ambient` is the light from above and from below (the ground) |
-| `depth` | none | the scene depth each frame |
+| `depth` | active scene capture | optional callback that selects another reversed-Z depth source each frame |
 | `flash` | none | a lightning flash lighting the clouds from inside: `{position, intensity, color?, radius?}` |
 
 **Cloud types from the weather.** `cloudLayerFor(weather)` gives the layer of a weather state, three types blended by
@@ -1016,16 +1016,16 @@ follows the light. Defaults: phase 0.85, `brightness` 1, the moon's own colour.
 
 ## Fog
 
-For lightweight distance haze, provide sampleable reversed-Z scene depth:
+For lightweight distance haze, enable fog with an active scene capture:
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {Sky} from 'margoengine/sky';
 import {Bloom} from 'margoengine/post/bloom';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
-const bloom = Bloom.attach(engine);          // or @margoengine/water's Water: () => water.depthTexture
+Bloom.attach(engine);
 const sky = Sky.attach(engine);
-sky.options.fog = {depth: () => bloom.depthTexture, start: 45, density: 0.008};
+sky.options.fog = {start: 45, density: 0.008};
 ```
 
 A 4x capture resolves `depthTexture` only when it presents, after the fog, so over Bloom or a PostStack the fog reads
@@ -1040,10 +1040,9 @@ With a stylized night it takes the gradient alone, never the stars or the moon.
 It composites after opaque surfaces and water, before VFX and tone mapping,
 without another colour target or blur. Clear sky pixels are untouched, preserving
 sun/moon discs. Both 1x and 4x depth work; multisampled depth must match the scene's
-sample count. The texture must match the viewport, have `TEXTURE_BINDING` usage
-and stay owned by its provider. With no water, use your post effect's scene depth.
-Re-read the provider after resize/device restoration. Omit `fog` to retain the
-existing rendering.
+sample count. When supplying an explicit `depth` callback, use a texture that matches the viewport and has
+`TEXTURE_BINDING` usage. Return the provider's current texture so resize and device restoration pick up the new resource.
+Fog is enabled only while `fog` is set.
 
 Three optional fog fields change the look: `falloff: 'exp'` uses `1 - exp(-optical)` instead of the squared
 default; `height` adds density below y = 0 (optical depth × (1 + height × metres below 0), e.g. 0.065 for a
