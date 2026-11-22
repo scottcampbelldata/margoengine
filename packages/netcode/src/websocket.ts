@@ -28,16 +28,19 @@ class WebSocketConnection implements Connection {
     private readonly dropAbove: number,
   ) {
     socket.binaryType = 'arraybuffer';
-    socket.addEventListener('message', (event) => {
-      if (this.closed) return;
-      if (!(event.data instanceof ArrayBuffer)) {
-        this.close(CloseCode.protocol, 'text frame');
-        return;
-      }
-      this.onmessage?.(new Uint8Array(event.data), 'reliable');
-    });
-    socket.addEventListener('close', (event) => this.finish(event.code, event.reason));
+    socket.addEventListener('message', this.message);
+    socket.addEventListener('close', this.closing);
   }
+  // Fields, so finish() can take them off the socket: a closed connection leaves no listener on it.
+  private readonly message = (event: MessageEvent): void => {
+    if (this.closed) return;
+    if (!(event.data instanceof ArrayBuffer)) {
+      this.close(CloseCode.protocol, 'text frame');
+      return;
+    }
+    this.onmessage?.(new Uint8Array(event.data), 'reliable');
+  };
+  private readonly closing = (event: CloseEvent): void => this.finish(event.code, event.reason);
   get open(): boolean {
     return !this.closed && this.socket.readyState === 1;
   }
@@ -55,6 +58,8 @@ class WebSocketConnection implements Connection {
   private finish(code: number, reason: string): void {
     if (this.closed) return;
     this.closed = true;
+    this.socket.removeEventListener('message', this.message);
+    this.socket.removeEventListener('close', this.closing);
     this.onclose?.(code, reason);
   }
 }

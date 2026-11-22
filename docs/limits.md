@@ -111,6 +111,16 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21). Core, math, splines, kinematics-constraints, brep and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`; the pure ones are
   read by `tests/owner-exclusions.test.js`, which fails when one gains anything with a lifetime.
+- inspector, scene, compute and netcode (2026-11-21) have fixtures although none is a plain engine plugin: each entry's object hangs
+  off an engine plugin registration made by `ownedByEngine` (tests/support/owner-shell.js), so every case checks that the
+  object releases its listeners, timers, DOM, device patches and context arrays. inspector's panels and tools run in the browser
+  leaves only (they need the page's document); its `/gl` entry is WebGL2-only and is covered by test/gl-browser.mjs. scene's
+  `extendMeshes` is a permanent, idempotent prototype patch with nothing to release. compute's fixture queues work and reads
+  nothing back (the package's browser suites check values), and compute's `/autotune`, `/subgroups`, `/decomp`, `/onnx`,
+  `/quant`, `/nn-extra`, `/stream` and `/sparse` solvers hold nothing beyond the arrays of the context. netcode's pure
+  entries (interpolation, extrapolation, smoothing, hitboxes, interest, generate) hold nothing; `serve`, `RoomNode.run` and
+  `GameServer.run` are real-time loops of another instance that re-arm an abort listener while a case is being made, which
+  the observer would count as that case's (covered by transports.test.js and presence.test.js); `PeerMesh` needs a second peer.
 - The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,
   completed in `tests/support/owner-lifetime-node.js` (pipeline layouts, error scopes, texture writes and layer counts,
   limits, the `GPUShaderStage` and `GPUTextureUsage` globals, a canvas context and core's standard lit shader lines). Fixtures never

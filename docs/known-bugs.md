@@ -27,6 +27,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `dispose()` freed the items' buffers and cleared the engine and device but never called `removePlugin`, unlike every other plugin's `dispose` (Scatter, SculptView). It also kept the read-back copy pipeline of the old device.
 - **Fix:** `dispose()` clears its fields, then removes the plugin from its scene (the repeated dispose that `removePlugin` triggers finds nothing to do) and drops the copy pipeline.
 - **Regression:** `packages/geometry/tests/gpu.test.js` "disposing the generator takes its plugin out of the scene, once"; `npm run check:owners -- --packages=geometry` on WebGPU and the WebGL2 layer.
+### Fixed 2026-11-21: a closed WebSocket or data-channel connection kept its listeners on the socket and channels (KB-NETCODE-LISTENERS1, netcode)
+
+- **Repro:** `openWebSocket` a socket (or `dataChannelConnection` two channels), close the connection, count the listeners on the socket or
+  channels: 2 (message and close) on a socket, 4 on the channel pair, still attached. The netcode owner/lifetime fixture (`listenWebSocket` entry, real
+  loopback socket; `dataChannelConnection` entry) failed "no leaked event listeners" in every case.
+- **Cause:** the connections added anonymous arrow listeners in their constructors and never removed them, so a closed connection stayed reachable
+  from its socket or channels until they were collected (and a channel that dispatches `close` synchronously re-entered `close()`).
+- **Fix:** the listeners are fields and `finish()` removes them (`packages/netcode/src/websocket.ts`, `webrtc.ts`); `DataChannelConnection.close()`
+  takes them off before it closes the channels.
+- **Regression:** packages/netcode/tests/connection-listeners.test.js (four cases) and the netcode owner/lifetime fixture.
+
+### Fixed 2026-11-21: RemoteTarget, PackageEditor and ShaderEditor disposal left them registered in their scene (KB-INSPECTOR-REMOTE-OWNER1, inspector)
+
+- **Repro:** `RemoteTarget.attach(engine, { transport })` in a scene, `target.dispose()`: `engine.sceneOf(target)` still returned the scene and
+  `scene.plugins` still held `inspector:remote`; `PackageEditor.dispose()` (`inspector:packages`) and `ShaderEditor.dispose()` (`inspector:shaders`) did the same. The inspector owner/lifetime fixture failed "<entry> releases its registration" for all three.
+- **Cause:** each `dispose()` stopped its timer, transport or panel, but never removed itself from the scene (FrameDebugger, the
+  animation and GL panels, the camera tools, the scene editor and the gizmo do).
+- **Fix:** `dispose()` removes the plugin from the scene that holds it (`engine.sceneOf(this)?.removePlugin(this.name)`), after setting its own
+  disposed flag, so a second call and the engine's own disposal stay harmless (`packages/inspector/src/remote.ts`, `packages.ts`, `shaders.ts`).
+- **Regression:** packages/inspector/test/dispose-scene.test.js (all three, in a scene other than the active one, twice, with a same-name
+  plugin in a third scene), packages/inspector/test/remote.test.js "disposing a target takes it off the scene...", and the inspector
+  owner/lifetime fixture.
 
 ### Fixed 2026-11-21: a submerged ledge cast a bright silhouette through Water (KB-WATER-REFRACTDEPTH1, water)
 - **Repro:** run `node packages/water/test/refraction-depth.browser.mjs` on the previous shader. A slab in the straight view ray changes the water color where the bent ray hits only the seabed.
