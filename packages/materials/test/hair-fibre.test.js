@@ -30,7 +30,7 @@ function furnace(thetaI, options, color = [1, 1, 1]) {
   return out;
 }
 
-test('with no absorption the fibre loses no light: the white furnace of d\'Eon et al. 2011', () => {
+test("with no absorption the fibre loses no light: the white furnace of d'Eon et al. 2011", () => {
   for (const thetaI of [0, 0.4, -0.4, 0.8, -0.8]) {
     const [e] = furnace(thetaI, { absorption: [0, 0, 0] });
     assert.ok(e > 0.95 && e < 1.03, `scattered energy ${e} at theta_i ${thetaI}`);
@@ -92,7 +92,10 @@ test('light through the fibre spreads round it as a smooth fibre bends it (Marsc
   for (const reach of [0.2, 0.4, 0.8]) {
     const got = integral(Math.PI - reach, Math.PI + reach) / all,
       want = share(reach);
-    assert.ok(Math.abs(got - want) < 0.06, `TT within ${reach} rad of the back: ${got}, the smooth fibre gives ${want}`);
+    assert.ok(
+      Math.abs(got - want) < 0.06,
+      `TT within ${reach} rad of the back: ${got}, the smooth fibre gives ${want}`,
+    );
   }
 });
 

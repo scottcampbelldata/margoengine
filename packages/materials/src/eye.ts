@@ -321,8 +321,15 @@ export function eye(options: EyeOptions = {}): EyeFeature {
         'eye',
       );
       out =
-        code(group, !!irisMap, float(chamberIor), float(f0), float(irisMapPupil), float(corneaRadius), float(irisMapRadius)) +
-        out;
+        code(
+          group,
+          !!irisMap,
+          float(chamberIor),
+          float(f0),
+          float(irisMapPupil),
+          float(corneaRadius),
+          float(irisMapRadius),
+        ) + out;
       if (cached.size >= 16) cached.clear();
       cached.set(id, out);
       return out;

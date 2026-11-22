@@ -67,7 +67,11 @@ await runSuite(
     // GAP-FILM-LATE: under an HDR capture the frame read is the frame just drawn.
     for (const row of await browser.page.evaluate(() => window.hdrNesting())) {
       console.log({ hdrNesting: row.effect, samples: row.samples, late: row.after === row.before });
-      assert.notEqual(row.after, row.before, `${row.effect} ${row.samples}x: the blue frame reads blue, not the red one`);
+      assert.notEqual(
+        row.after,
+        row.before,
+        `${row.effect} ${row.samples}x: the blue frame reads blue, not the red one`,
+      );
       assert.equal(row.after, row.again, `${row.effect} ${row.samples}x: one blue frame reads as two`);
     }
     assert.deepEqual(errors, []);

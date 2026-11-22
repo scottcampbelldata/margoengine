@@ -155,7 +155,10 @@ test('Material blendSpace defaults to display, validates, and reaches the PBR re
   assert.ok(out.includes('textureLoad(margoGlassScene,vec2i(i.clip.xy),0)'));
   assert.match(out, /var margoGlassScene:texture_2d<f32>;/);
   assert.throws(() => linearBlendShader(code + '\n' + code), /exactly one/);
-  assert.throws(() => linearBlendShader('@fragment fn other()->@location(0) vec4f {return vec4f(1);}'), /blendSpace 'linear'/);
+  assert.throws(
+    () => linearBlendShader('@fragment fn other()->@location(0) vec4f {return vec4f(1);}'),
+    /blendSpace 'linear'/,
+  );
 });
 
 test('a linear blendSpace material gives the PBR record blendSpace linear and nothing else changes', async () => {

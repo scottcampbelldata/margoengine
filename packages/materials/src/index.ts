@@ -187,7 +187,9 @@ export class MaterialInstallation implements EnginePlugin {
     if (model.disposed)
       throw margoError('disposed', 'Cannot install materials on a disposed model; install them on a live model.');
     if (!options || typeof options !== 'object' || Array.isArray(options))
-      throw new TypeError('Invalid install options; pass an object such as { features: { Skin: [skin()] } } or omit it.');
+      throw new TypeError(
+        'Invalid install options; pass an object such as { features: { Skin: [skin()] } } or omit it.',
+      );
     const features = options.features;
     for (const material of new Set(model.primitives.map((p) => p.material))) {
       const normalized = material.clearcoat !== undefined,
@@ -212,9 +214,7 @@ export class MaterialInstallation implements EnginePlugin {
         'KHR_materials_volume',
       );
       const scatter = definition(
-        volume?.multiscatterColorFactor !== undefined
-          ? volume
-          : material.extensions?.KHR_materials_volume_scatter,
+        volume?.multiscatterColorFactor !== undefined ? volume : material.extensions?.KHR_materials_volume_scatter,
         'KHR_materials_volume_scatter',
       );
       const lobeOptions: MaterialLobeOptions = {},
@@ -432,7 +432,8 @@ export class MaterialInstallation implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     const cleanup = new Cleanup();
-    const engine = this.model.root.engine, scene = engine.sceneOf(this);
+    const engine = this.model.root.engine,
+      scene = engine.sceneOf(this);
     if (scene) cleanup.run(() => engine.removePlugin(this.name, scene));
     this.unsubscribe?.();
     this.unsubscribe = undefined;

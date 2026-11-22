@@ -8,18 +8,24 @@ const direct = /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f \{[^}]*\}/,
   surfaceEnd = /if\((?:margoFaceTest&&)?!facing&&f\.settings\.z<0\.5\)\{discard;\}/g,
   vertex = /let p=f\.model\*vec4f\([^;]*,1\);/;
 const missing = (label: string) =>
-  new TypeError(`${label} needs a PbrMaterial without anisotropy or a thin film, and matching gltf/pbr and materials versions`);
+  new TypeError(
+    `${label} needs a PbrMaterial without anisotropy or a thin film, and matching gltf/pbr and materials versions`,
+  );
 /** `code` whose sun goes through WGSL function `light`, and `statements` run at the end of the surface. */
 export function shaded(code: string, light: string, statements: string, label: string): string {
   if (code.includes('fn margoDirect(') || !direct.test(code)) throw missing(label);
   const out = code
-    .replace(direct, `fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {return ${light}(s.n,v,l,s.base.rgb)*f.radiance.rgb*f.light.w;}`)
+    .replace(
+      direct,
+      `fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {return ${light}(s.n,v,l,s.base.rgb)*f.radiance.rgb*f.light.w;}`,
+    )
     .replace(surfaceEnd, (found) => `${statements}\n  ${found}`);
   if (!out.includes(statements)) throw missing(label);
   return out;
 }
 /** `code`, with its lighting composed, whose clustered lights go through `light` too. */
-export const localShaded = (code: string, light: string): string => code.split(localTerm).join(`result+=${light}(n,v,l,base)*`);
+export const localShaded = (code: string, light: string): string =>
+  code.split(localTerm).join(`result+=${light}(n,v,l,base)*`);
 /**
  * `code` handing the fragment `fields` (`@location` declarations) that `statements` set in the vertex stage, where
  * `margoObjectModel` is the mesh's or the instance's matrix (gltf/pbr's instanced vertex stage turns it into the instance's).
