@@ -93,7 +93,8 @@ const newest = (a: Listed, b: Listed): number =>
   b.slot.savedAt - a.slot.savedAt || b.sequence - a.sequence || (a.slot.id < b.slot.id ? -1 : 1);
 
 /** The place after every listed save. */
-const after = (listed: readonly Listed[]): number => listed.reduce((top, { sequence }) => Math.max(top, sequence), 0) + 1;
+const after = (listed: readonly Listed[]): number =>
+  listed.reduce((top, { sequence }) => Math.max(top, sequence), 0) + 1;
 
 const sniff = (bytes: Uint8Array): string => {
   const head = (at: number, text: string): boolean => [...text].every((c, i) => bytes[at + i] === c.charCodeAt(0));
@@ -123,7 +124,8 @@ export class SaveSlots {
     const { namespace = 'slot', autosaves = 3, now = Date.now, compress, validate } = options;
     if (typeof namespace !== 'string' || !namespace || namespace.includes(':'))
       throw new TypeError("namespace must be a non-empty string with no ':', e.g. 'profile-1'");
-    if (!Number.isInteger(autosaves) || autosaves < 1) throw new RangeError('autosaves must be a whole number of 1 or more');
+    if (!Number.isInteger(autosaves) || autosaves < 1)
+      throw new RangeError('autosaves must be a whole number of 1 or more');
     this.#storage = storage;
     this.#namespace = namespace;
     this.#autosaves = autosaves;
@@ -181,7 +183,13 @@ export class SaveSlots {
       if (key.startsWith(start) && !keep.includes(key)) await this.#storage.delete(key, options);
   }
 
-  async #write(id: string, document: SaveDocument, options: SlotSaveOptions, autosave: boolean, sequence: number): Promise<SlotInfo> {
+  async #write(
+    id: string,
+    document: SaveDocument,
+    options: SlotSaveOptions,
+    autosave: boolean,
+    sequence: number,
+  ): Promise<SlotInfo> {
     const { title, playTime, meta = {}, thumbnail, signal } = options,
       call = { signal },
       generation = await this.#next(id, call),
@@ -189,7 +197,11 @@ export class SaveSlots {
       image = this.#image(id, generation);
     await saveGame(this.#storage, data, document, { ...this.#options, signal });
     const stored = await this.#storage.read(data, call);
-    if (stored === null) throw new MargoError('failed', `Slot '${id}': the storage kept nothing, so the old slot stands; check the storage and save again`);
+    if (stored === null)
+      throw new MargoError(
+        'failed',
+        `Slot '${id}': the storage kept nothing, so the old slot stands; check the storage and save again`,
+      );
     const record: SlotRecord = {
       format: RECORD,
       generation,
@@ -260,7 +272,8 @@ export class SaveSlots {
     options: AutosaveTimerOptions = {},
   ): AutosaveTimer {
     if (!(milliseconds > 0)) throw new RangeError('autosaveEvery: milliseconds must be above 0');
-    if (typeof capture !== 'function') throw new TypeError('autosaveEvery: capture must return a document, e.g. () => captureScene(engine)');
+    if (typeof capture !== 'function')
+      throw new TypeError('autosaveEvery: capture must return a document, e.g. () => captureScene(engine)');
     const { onError, signal, ...how } = options;
     let timer: ReturnType<typeof setTimeout> | undefined,
       stopped = false;
@@ -296,7 +309,10 @@ export class SaveSlots {
         if (record) out.push({ slot: toInfo(id, record), sequence: record.sequence ?? 0 });
       } catch (error) {
         if (!(error instanceof DamagedRecord)) throw error;
-        out.push({ slot: { id, savedAt: 0, autosave: id.startsWith(AUTO), version: 0, bytes: 0, meta: {}, damaged: true }, sequence: 0 });
+        out.push({
+          slot: { id, savedAt: 0, autosave: id.startsWith(AUTO), version: 0, bytes: 0, meta: {}, damaged: true },
+          sequence: 0,
+        });
       }
     }
     return out.sort(newest);
@@ -428,7 +444,8 @@ export async function captureThumbnail(
 ): Promise<Blob> {
   const { width = 320, type = 'image/webp', quality = 0.8 } = options;
   if (!(width > 0)) throw new RangeError('width must be above 0');
-  if (!canvas.width || !canvas.height) throw new RangeError('captureThumbnail needs a canvas with a size; render a frame first');
+  if (!canvas.width || !canvas.height)
+    throw new RangeError('captureThumbnail needs a canvas with a size; render a frame first');
   if (typeof OffscreenCanvas !== 'function' || typeof createImageBitmap !== 'function')
     throw new MargoError('unsupported', 'captureThumbnail needs OffscreenCanvas; pass your own thumbnail bytes here');
   const height = Math.max(1, Math.round((width * canvas.height) / canvas.width)),

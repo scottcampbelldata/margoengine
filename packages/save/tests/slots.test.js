@@ -47,26 +47,35 @@ test('a slot holds a save, a record and a thumbnail, and the list reads records 
     meta: { level: 3 },
     thumbnail: png,
   });
-  assert.deepEqual({ ...info, bytes: 0 }, {
-    id: 'slot-1',
-    savedAt: 1000,
-    autosave: false,
-    version: 2,
-    bytes: 0,
-    meta: { level: 3 },
-    title: 'Chapter 1',
-    playTime: 754,
-    thumbnail: 'image/png',
-  });
+  assert.deepEqual(
+    { ...info, bytes: 0 },
+    {
+      id: 'slot-1',
+      savedAt: 1000,
+      autosave: false,
+      version: 2,
+      bytes: 0,
+      meta: { level: 3 },
+      title: 'Chapter 1',
+      playTime: 754,
+      thumbnail: 'image/png',
+    },
+  );
   assert.ok(info.bytes > 0);
   await slots.save('slot 2/b', save('Two'), { title: 'Other name', playTime: 5 });
   reads.length = 0;
   const list = await slots.list();
-  assert.deepEqual(list.map((s) => [s.id, s.title, s.playTime]), [
-    ['slot 2/b', 'Other name', 5],
-    ['slot-1', 'Chapter 1', 754],
-  ]);
-  assert.ok(reads.every((key) => key.endsWith('.info')), 'no save was read to list them');
+  assert.deepEqual(
+    list.map((s) => [s.id, s.title, s.playTime]),
+    [
+      ['slot 2/b', 'Other name', 5],
+      ['slot-1', 'Chapter 1', 754],
+    ],
+  );
+  assert.ok(
+    reads.every((key) => key.endsWith('.info')),
+    'no save was read to list them',
+  );
   assert.equal((await slots.load('slot-1')).entities[0].components.name, 'Chapter 1');
   const picture = await slots.thumbnail('slot-1');
   assert.equal(picture.type, 'image/png');
@@ -79,7 +88,10 @@ test('a slot holds a save, a record and a thumbnail, and the list reads records 
 
 test('a thumbnail can be a Blob, and bytes name their own type', async () => {
   const slots = new SaveSlots(memoryStorage());
-  assert.equal((await slots.save('a', save('a'), { thumbnail: new Blob([png], { type: 'image/avif' }) })).thumbnail, 'image/avif');
+  assert.equal(
+    (await slots.save('a', save('a'), { thumbnail: new Blob([png], { type: 'image/avif' }) })).thumbnail,
+    'image/avif',
+  );
   const jpeg = new Uint8Array([0xff, 0xd8, 0xff]),
     webp = new TextEncoder().encode('RIFF____WEBP');
   assert.equal((await slots.save('b', save('b'), { thumbnail: jpeg })).thumbnail, 'image/jpeg');
@@ -129,12 +141,15 @@ test('autosaves take turns over the oldest and leave slots alone', async () => {
   await slots.save('slot-1', save('mine'));
   for (let i = 0; i < 7; i++) await slots.autosave(save(`auto ${i}`));
   const list = await slots.list();
-  assert.deepEqual(list.map((s) => [s.id, s.title]), [
-    ['auto-0', 'auto 6'],
-    ['auto-2', 'auto 5'],
-    ['auto-1', 'auto 4'],
-    ['slot-1', 'mine'],
-  ]);
+  assert.deepEqual(
+    list.map((s) => [s.id, s.title]),
+    [
+      ['auto-0', 'auto 6'],
+      ['auto-2', 'auto 5'],
+      ['auto-1', 'auto 4'],
+      ['slot-1', 'mine'],
+    ],
+  );
   assert.ok(list.slice(0, 3).every((s) => s.autosave));
   assert.equal(list[3].autosave, false);
   assert.equal((await slots.latest()).id, 'auto-0');
@@ -149,14 +164,17 @@ test('saves within one millisecond keep their order, and the ring still overwrit
   await slots.save('slot-2', save('mine 2'));
   await slots.save('slot-1', save('mine 1'));
   await slots.copy('slot-2', 'slot-0');
-  assert.deepEqual((await slots.list()).map((s) => [s.id, s.title]), [
-    ['slot-0', 'mine 2'],
-    ['slot-1', 'mine 1'],
-    ['slot-2', 'mine 2'],
-    ['auto-1', 'a5'],
-    ['auto-0', 'a4'],
-    ['auto-2', 'a3'],
-  ]);
+  assert.deepEqual(
+    (await slots.list()).map((s) => [s.id, s.title]),
+    [
+      ['slot-0', 'mine 2'],
+      ['slot-1', 'mine 1'],
+      ['slot-2', 'mine 2'],
+      ['auto-1', 'a5'],
+      ['auto-0', 'a4'],
+      ['auto-2', 'a3'],
+    ],
+  );
   assert.equal((await slots.latest()).id, 'slot-0');
   assert.equal('sequence' in (await slots.info('auto-1')), false, 'the order of saves stays out of SlotInfo');
 });
@@ -166,8 +184,14 @@ test('a failed autosave leaves the ring whole', async () => {
     slots = new SaveSlots(inner, { autosaves: 2, now: clock() });
   await slots.autosave(save('a'));
   await slots.autosave(save('b'));
-  await assert.rejects(new SaveSlots(failing(inner, 1), { autosaves: 2, now: clock(5000) }).autosave(save('c')), /write 1 failed/);
-  assert.deepEqual((await slots.list()).map((s) => s.title), ['b', 'a']);
+  await assert.rejects(
+    new SaveSlots(failing(inner, 1), { autosaves: 2, now: clock(5000) }).autosave(save('c')),
+    /write 1 failed/,
+  );
+  assert.deepEqual(
+    (await slots.list()).map((s) => s.title),
+    ['b', 'a'],
+  );
   assert.equal((await slots.load('auto-0')).meta.title, 'a');
 });
 
@@ -177,10 +201,13 @@ test('writes run in call order, so two saves at once end with the last', async (
   assert.equal((await slots.load('s')).meta.title, '3');
   const ring = new SaveSlots(memoryStorage(), { autosaves: 2, now: clock() });
   await Promise.all([ring.autosave(save('a')), ring.autosave(save('b')), ring.autosave(save('c'))]);
-  assert.deepEqual((await ring.list()).map((s) => [s.id, s.title]), [
-    ['auto-0', 'c'],
-    ['auto-1', 'b'],
-  ]);
+  assert.deepEqual(
+    (await ring.list()).map((s) => [s.id, s.title]),
+    [
+      ['auto-0', 'c'],
+      ['auto-1', 'b'],
+    ],
+  );
 });
 
 test('copy keeps the save, thumbnail and time; delete empties; namespaces stay apart', async () => {
@@ -201,7 +228,10 @@ test('copy keeps the save, thumbnail and time; delete empties; namespaces stay a
   assert.equal(await slots.load('a'), null);
   assert.equal((await slots.load('b')).meta.title, 'A', 'the copy stands alone');
   assert.equal((await other.load('a')).meta.title, 'theirs');
-  assert.deepEqual((await other.list()).map((s) => s.id), ['a']);
+  assert.deepEqual(
+    (await other.list()).map((s) => s.id),
+    ['a'],
+  );
   assert.equal((await storage.keys()).filter((key) => key.startsWith('slot:a')).length, 0);
 });
 
@@ -212,10 +242,13 @@ test('a damaged record is listed, refuses to load, and can be saved over or dele
   await slots.save('bad', save('bad'));
   await storage.write('slot:bad.info', new Uint8Array([0xff, 1]));
   const list = await slots.list();
-  assert.deepEqual(list.map((s) => [s.id, !!s.damaged]), [
-    ['good', false],
-    ['bad', true],
-  ]);
+  assert.deepEqual(
+    list.map((s) => [s.id, !!s.damaged]),
+    [
+      ['good', false],
+      ['bad', true],
+    ],
+  );
   await assert.rejects(slots.load('bad'), { name: 'TypeError', message: /damaged record/ });
   assert.equal((await slots.latest()).id, 'good');
   await storage.write('slot:bad.info', new TextEncoder().encode('{"format":"other"}'));
@@ -266,11 +299,17 @@ test('a key the slots never wrote is left out of the list', async () => {
     slots = new SaveSlots(storage);
   await slots.save('s', save('mine'));
   await storage.write('slot:100%.info', new Uint8Array([1]));
-  assert.deepEqual((await slots.list()).map((s) => s.id), ['s']);
+  assert.deepEqual(
+    (await slots.list()).map((s) => s.id),
+    ['s'],
+  );
 });
 
 test('captureThumbnail says what to do where there is no OffscreenCanvas', async () => {
-  await assert.rejects(captureThumbnail({ width: 4, height: 4 }), (error) => error.code === 'unsupported' && /pass your own/.test(error.message));
+  await assert.rejects(
+    captureThumbnail({ width: 4, height: 4 }),
+    (error) => error.code === 'unsupported' && /pass your own/.test(error.message),
+  );
   await assert.rejects(captureThumbnail({ width: 4, height: 4 }, { width: 0 }), RangeError);
   await assert.rejects(captureThumbnail({ width: 0, height: 4 }), /with a size/);
 });
@@ -327,7 +366,10 @@ test('slots work on files, under the names a file system allows', async () => {
     await slots.save('slot: 1/ü', save('on disk'), { thumbnail: png });
     await slots.autosave(save('auto'));
     const again = new SaveSlots(fileStorage(folder));
-    assert.deepEqual((await again.list()).map((s) => s.id), ['auto-0', 'slot: 1/ü']);
+    assert.deepEqual(
+      (await again.list()).map((s) => s.id),
+      ['auto-0', 'slot: 1/ü'],
+    );
     assert.equal((await again.load('slot: 1/ü')).meta.title, 'on disk');
   } finally {
     await rm(folder, { recursive: true, force: true, maxRetries: 5 });

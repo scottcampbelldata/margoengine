@@ -59,7 +59,9 @@ const loader = (engine, nodes, log = []) => ({
 function worldMatrices(engine) {
   engine.store.tick(false);
   return new Map(
-    [...engine.scene.meshes.values()].filter((mesh) => meshId(mesh)).map((mesh) => [meshId(mesh), Array.from(mesh.matrix)]),
+    [...engine.scene.meshes.values()]
+      .filter((mesh) => meshId(mesh))
+      .map((mesh) => [meshId(mesh), Array.from(mesh.matrix)]),
   );
 }
 
@@ -67,7 +69,8 @@ function assertSameMatrices(a, b) {
   assert.deepEqual([...a.keys()].sort(), [...b.keys()].sort());
   // Restoring normalises each float32 quaternion again, which moves a value by at most two float32 steps at 1 per
   // level of the tree; these scenes are under 4 levels and under 100 units across, so 100 * 3 * 2.4e-7 bounds it.
-  for (const [id, matrix] of a) matrix.forEach((value, i) => assert.ok(Math.abs(value - b.get(id)[i]) <= 7.2e-5, `${id}[${i}]`));
+  for (const [id, matrix] of a)
+    matrix.forEach((value, i) => assert.ok(Math.abs(value - b.get(id)[i]) <= 7.2e-5, `${id}[${i}]`));
 }
 
 const roundTrip = async (document) => decodeSave(await encodeSave(document, { compress: true }));
@@ -121,14 +124,17 @@ test('camera, lighting and background come back; camera: false leaves the view a
   assert.deepEqual(Array.from(engine.scene.lighting.direction), [0.5, 0.25, 0.75, 2]);
   await restoreScene(engine, document);
   const { fov, near, far, position, target, up } = engine.camera;
-  assert.deepEqual({ fov, near, far, position, target, up }, {
-    fov: 40,
-    near: 0.5,
-    far: 80,
-    position: [1, 2, 3],
-    target: [4, 5, 6],
-    up: [0, 0, 1],
-  });
+  assert.deepEqual(
+    { fov, near, far, position, target, up },
+    {
+      fov: 40,
+      near: 0.5,
+      far: 80,
+      position: [1, 2, 3],
+      target: [4, 5, 6],
+      up: [0, 0, 1],
+    },
+  );
 });
 
 test('a model saves as its URL, variant and only the nodes that moved; what hangs from a node stays there', async () => {
@@ -143,10 +149,17 @@ test('a model saves as its URL, variant and only the nodes that moved; what hang
   sword.name = 'sword';
   const document = captureScene(engine),
     entity = (id) => document.entities.find((e) => e.id === id);
-  assert.deepEqual(document.entities.map((e) => e.id), ['knight', 'knight-1', 'sword']);
+  assert.deepEqual(
+    document.entities.map((e) => e.id),
+    ['knight', 'knight-1', 'sword'],
+  );
   assert.equal(entity('knight').components.mesh, 'https://example.test/models/knight.glb');
   assert.equal(entity('knight').components.model.variant, 2);
-  assert.deepEqual(Object.keys(entity('knight').components.model.nodes), ['1'], 'the node at its file pose is not saved');
+  assert.deepEqual(
+    Object.keys(entity('knight').components.model.nodes),
+    ['1'],
+    'the node at its file pose is not saved',
+  );
   assert.deepEqual(entity('knight-1').components.model.nodes, { 0: { visible: false } });
   assert.equal(entity('sword').parent, 'knight');
   assert.equal(entity('sword').components.node, 1);
@@ -201,7 +214,13 @@ class Weather {
 test('a plugin saves through saveState, or its options and accessors, with nothing written by hand', async () => {
   const engine = await fixture(),
     weather = new Weather(),
-    own = { name: 'own', value: 4, setup() {}, saveState: () => ({ value: own.value }), loadState: (s) => (own.value = s.value) },
+    own = {
+      name: 'own',
+      value: 4,
+      setup() {},
+      saveState: () => ({ value: own.value }),
+      loadState: (s) => (own.value = s.value),
+    },
     nothing = { name: 'nothing', setup() {} },
     skipped = [];
   engine.use(weather).use(own).use(nothing);
@@ -223,7 +242,14 @@ test('a binding names public fields, writes into typed arrays, replaces the defa
   const engine = await fixture(),
     weather = new Weather(),
     custom = { name: 'custom', level: 1, setup() {} },
-    left = { name: 'left', get a() { return 1; }, set a(_) {}, setup() {} };
+    left = {
+      name: 'left',
+      get a() {
+        return 1;
+      },
+      set a(_) {},
+      setup() {},
+    };
   engine.use(weather).use(custom).use(left);
   const plugins = {
       weather: { properties: ['rain', 'sun'] },
@@ -239,7 +265,7 @@ test('a binding names public fields, writes into typed arrays, replaces the defa
   custom.level = 2;
   await restoreScene(engine, document, { plugins });
   assert.equal(weather.rain, 0.5);
-  assert.equal(weather.sun, sun, 'the array stays the plugin\'s own');
+  assert.equal(weather.sun, sun, "the array stays the plugin's own");
   assert.deepEqual(Array.from(sun), [1, 0, 0]);
   assert.equal(custom.level, 1);
 });
@@ -288,7 +314,10 @@ test('a failed restore leaves the running scene as it was: models, plugins, came
       return url.includes('broken') ? Promise.reject(new Error('404')) : loader(engine, undefined, log).load(url);
     },
   };
-  await assert.rejects(restoreScene(engine, document, failing), (error) => error.code === 'failed' && error.cause.message === '404');
+  await assert.rejects(
+    restoreScene(engine, document, failing),
+    (error) => error.code === 'failed' && error.cause.message === '404',
+  );
   unchanged();
   document.entities.pop();
   // onEntity throws.
@@ -306,7 +335,10 @@ test('a failed restore leaves the running scene as it was: models, plugins, came
   bad.loadState = () => {
     throw new Error('bad state');
   };
-  await assert.rejects(restoreScene(engine, document, loader(engine, undefined, log)), (error) => error.cause.message === 'bad state');
+  await assert.rejects(
+    restoreScene(engine, document, loader(engine, undefined, log)),
+    (error) => error.cause.message === 'bad state',
+  );
   unchanged();
   bad.loadState = () => {};
   // Aborted while a model loads.
@@ -379,7 +411,10 @@ test('filter leaves a mesh and everything under it out, at capture and at clear'
   world.name = 'world';
   const filter = (mesh) => mesh.name !== 'ui',
     document = captureScene(engine, { filter });
-  assert.deepEqual(document.entities.map((e) => e.id), ['world']);
+  assert.deepEqual(
+    document.entities.map((e) => e.id),
+    ['world'],
+  );
   await restoreScene(engine, document, { filter });
   ui.check();
   child.check();
@@ -394,7 +429,10 @@ test('clear: false adds to the scene; a second scene saves and restores by itsel
   other.createMesh().name = 'there';
   other.lighting.direction.set([0, 0, 1, 3]);
   const document = captureScene(engine, { scene: other });
-  assert.deepEqual(document.entities.map((e) => e.id), ['there']);
+  assert.deepEqual(
+    document.entities.map((e) => e.id),
+    ['there'],
+  );
   await restoreScene(engine, document, { clear: false });
   kept.check();
   assert.equal(engine.scene.meshes.size, 2);
@@ -404,7 +442,7 @@ test('clear: false adds to the scene; a second scene saves and restores by itsel
   assert.equal(other.meshes.size, 1);
 });
 
-test('your components ride along and reach onEntity; the binding\'s names are refused; migrations run first', async () => {
+test("your components ride along and reach onEntity; the binding's names are refused; migrations run first", async () => {
   const engine = await fixture(),
     door = engine.createMesh(),
     key = engine.createMesh();

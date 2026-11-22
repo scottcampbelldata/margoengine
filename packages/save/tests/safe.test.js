@@ -210,10 +210,12 @@ test('a write that fails at any step keeps the last good save', async () => {
   for (let nth = 1; nth <= 4; nth++) {
     const { inner } = await twoCopies();
     let calls = 0;
-    const count = (fn) => (...args) => {
-      if (++calls === nth) return Promise.reject(new Error(`step ${nth} failed`));
-      return fn(...args);
-    };
+    const count =
+      (fn) =>
+      (...args) => {
+        if (++calls === nth) return Promise.reject(new Error(`step ${nth} failed`));
+        return fn(...args);
+      };
     const safe = safeStorage({ ...inner, read: count(inner.read), write: count(inner.write) });
     await safe.write('k', bytes('lost')).catch((error) => assert.match(error.message, /step/));
     const value = text(await safeStorage(inner).read('k'));
@@ -228,7 +230,10 @@ test('a storage that drops or changes a write is caught by the read-back', async
         ...inner,
         write: async (key, bytes, options) => change(key, bytes, (k, b) => inner.write(k, b, options)),
       };
-    await assert.rejects(safeStorage(lying).write('k', bytes('lost')), (error) => error.code === 'failed' && /save again/.test(error.message));
+    await assert.rejects(
+      safeStorage(lying).write('k', bytes('lost')),
+      (error) => error.code === 'failed' && /save again/.test(error.message),
+    );
     assert.equal(text(await safeStorage(inner).read('k')), 'newer save');
   }
   const { inner } = await twoCopies();
@@ -240,7 +245,10 @@ test('a storage that drops or changes a write is caught by the read-back', async
 test('a plain save is refused unless legacy is on, and the first write moves it over', async () => {
   const inner = memoryStorage();
   await inner.write('old', bytes('from before'));
-  await assert.rejects(safeStorage(inner).read('old'), (error) => error.code === 'failed' && /legacy: true/.test(error.message));
+  await assert.rejects(
+    safeStorage(inner).read('old'),
+    (error) => error.code === 'failed' && /legacy: true/.test(error.message),
+  );
   assert.deepEqual(await safeStorage(inner).keys(), ['old']);
   const safe = safeStorage(inner, { legacy: true });
   assert.equal(text(await safe.read('old')), 'from before');
@@ -261,7 +269,12 @@ test('unframed bytes in a copy are damage, with legacy on or off', async () => {
 
 test('calls on a key run in order, and keys with the suffix survive', async () => {
   const safe = safeStorage(memoryStorage());
-  const reads = await Promise.all([safe.write('k', bytes('1')), safe.read('k'), safe.write('k', bytes('2')), safe.read('k')]);
+  const reads = await Promise.all([
+    safe.write('k', bytes('1')),
+    safe.read('k'),
+    safe.write('k', bytes('2')),
+    safe.read('k'),
+  ]);
   assert.equal(text(reads[1]), '1');
   assert.equal(text(reads[3]), '2');
   await safe.write('x~a', bytes('odd name'));
@@ -307,7 +320,9 @@ test('a process killed while it writes real files leaves a whole save, no older 
   try {
     let wrote = 0;
     for (let round = 0; round < 12; round++) {
-      const child = spawn(process.execPath, [writer, folder, String(wrote + 1)], { stdio: ['ignore', 'pipe', 'inherit'] });
+      const child = spawn(process.execPath, [writer, folder, String(wrote + 1)], {
+        stdio: ['ignore', 'pipe', 'inherit'],
+      });
       let done = 0,
         output = '';
       await new Promise((resolve, reject) => {
@@ -317,7 +332,7 @@ test('a process killed while it writes real files leaves a whole save, no older 
           const lines = output.split('\n');
           output = lines.pop();
           for (const line of lines) done = Number(line);
-          if (done > wrote + round % 4) {
+          if (done > wrote + (round % 4)) {
             clearTimeout(limit);
             child.kill('SIGKILL');
           }
@@ -331,7 +346,10 @@ test('a process killed while it writes real files leaves a whole save, no older 
       assert.ok(save, `round ${round}: no save left`);
       const number = new DataView(save.buffer, save.byteOffset).getUint32(0);
       assert.equal(save.length, 1 << 20, `round ${round}`);
-      assert.ok(save.every((byte, i) => i < 4 || byte === ((number + i) & 255)), `round ${round}: a mixed save`);
+      assert.ok(
+        save.every((byte, i) => i < 4 || byte === ((number + i) & 255)),
+        `round ${round}: a mixed save`,
+      );
       assert.ok(number >= done, `round ${round}: save ${number} is older than the acknowledged ${done}`);
       wrote = number;
     }
