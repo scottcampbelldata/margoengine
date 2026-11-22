@@ -14,7 +14,8 @@ export class MaskData {
       if (!mask) return [0, 0, 0, 0, 0, 0, 0, 0];
       const invert = mask.invert ? 1 : 0;
       if (mask.kind === 'rect') return [mask.minX, mask.minY, mask.maxX, mask.maxY, 1, invert, 0, 0];
-      if (mask.kind === 'circle') return [mask.center?.[0] ?? 0, mask.center?.[1] ?? 0, 0, mask.radius ** 2, 2, invert, 0, 0];
+      if (mask.kind === 'circle')
+        return [mask.center?.[0] ?? 0, mask.center?.[1] ?? 0, 0, mask.radius ** 2, 2, invert, 0, 0];
       const start = points.length / 4;
       for (const [x, y] of mask.points) points.push(x, y, 0, 0);
       return [0, 0, 0, 0, 3, invert, start, mask.points.length];
@@ -25,7 +26,10 @@ export class MaskData {
     }
     if (!this.buffer || this.buffer.size < values.byteLength) {
       this.buffer?.destroy();
-      this.buffer = device.createBuffer({ size: values.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.buffer = device.createBuffer({
+        size: values.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
     }
     device.queue.writeBuffer(this.buffer, 0, values);
   }
@@ -38,8 +42,7 @@ export class MaskData {
 }
 
 export const maskShader = (binding: number): string => /* wgsl */ `
-@group(0)@binding(${
-binding}
+@group(0)@binding(${binding}
 )var<storage,read>maskPoints:array<vec4f>;
 fn maskVisible(world:vec2f,bounds:vec4f,info:vec4f)->bool{
 let kind=u32(info.x);

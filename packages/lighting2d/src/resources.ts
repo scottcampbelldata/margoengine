@@ -20,7 +20,10 @@ const part = (entry: GPUBindGroupEntry, k: number): unknown => {
 
 /** Bind groups by name, each made again only when its device, layout or anything it binds changes. */
 export class BindGroups {
-  readonly #made = new Map<string, { device: GPUDevice; layout: GPUBindGroupLayout; parts: unknown[]; group: GPUBindGroup }>();
+  readonly #made = new Map<
+    string,
+    { device: GPUDevice; layout: GPUBindGroupLayout; parts: unknown[]; group: GPUBindGroup }
+  >();
   get(device: GPUDevice, name: string, layout: GPUBindGroupLayout, entries: GPUBindGroupEntry[]): GPUBindGroup {
     const old = this.#made.get(name);
     if (old && old.device === device && old.layout === layout && old.parts.length === entries.length * 4) {

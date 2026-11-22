@@ -123,7 +123,7 @@ export class SDFScene2D implements Disposable {
     this.#sourceOption = new TextureOption(options.source, 'SDFScene2D source', 'assign a new source');
     this.#emissionOption = new TextureOption(options.emission, 'SDFScene2D emission', 'assign a new emission');
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
-    this.alphaThreshold = options.alphaThreshold ?? .5;
+    this.alphaThreshold = options.alphaThreshold ?? 0.5;
     this.emissionIntensity = options.emissionIntensity ?? 1;
     this.#validate();
   }
@@ -149,9 +149,13 @@ export class SDFScene2D implements Disposable {
     this.#emissionOption.set(value, this.#owner?.gpu);
   }
   /** Current rgba32float field: R signed distance in source pixels, G occupancy. Replaced on resize/restore. */
-  get distanceTexture(): GPUTexture | undefined { return this.#field; }
+  get distanceTexture(): GPUTexture | undefined {
+    return this.#field;
+  }
   /** GPU flag for exact source/emission/configuration changes in the current encoded snapshot. */
-  get changeBuffer(): GPUBuffer | undefined { return this.#buffers[5]; }
+  get changeBuffer(): GPUBuffer | undefined {
+    return this.#buffers[5];
+  }
 
   /**
    * Encode the three exact transform passes into the caller's frame; GILighting2D calls this automatically and passes
@@ -163,92 +167,147 @@ export class SDFScene2D implements Disposable {
     this.#validate();
     if (owner) this.#owner = owner;
     if (this.#lastEncoder === encoder && this.#device === device) return true;
-    if (this.#device !== device) { this.#release(); this.#device = device; }
+    if (this.#device !== device) {
+      this.#release();
+      this.#device = device;
+    }
     const source = this.#sourceOption.get(device, this.#owner);
     if (!source) return false;
     // No emission image, or a plain one lost with its device: the source, as when emission is left out.
     const emission = this.#emissionOption.get(device, this.#owner) ?? source;
     for (const image of [source, emission]) {
-      if (image.dimension !== '2d' || image.depthOrArrayLayers !== 1 || image.sampleCount !== 1 ||
-          !(image.usage & 4) || !/^(rgba8unorm(-srgb)?|bgra8unorm(-srgb)?|rgba16float|rgba32float)$/.test(image.format))
-        throw rangeError('SDF images must be single-sample 2D normalized or float RGBA textures with TEXTURE_BINDING', 'pixel-lighting');
+      if (
+        image.dimension !== '2d' ||
+        image.depthOrArrayLayers !== 1 ||
+        image.sampleCount !== 1 ||
+        !(image.usage & 4) ||
+        !/^(rgba8unorm(-srgb)?|bgra8unorm(-srgb)?|rgba16float|rgba32float)$/.test(image.format)
+      )
+        throw rangeError(
+          'SDF images must be single-sample 2D normalized or float RGBA textures with TEXTURE_BINDING',
+          'pixel-lighting',
+        );
     }
     if (source.width !== emission.width || source.height !== emission.height)
       throw rangeError('SDF emission dimensions must match source', 'pixel-lighting');
     const count = source.width * source.height;
     if (count * 32 > device.limits.maxStorageBufferBindingSize || count * 32 > device.limits.maxBufferSize)
       throw rangeError('SDF scratch exceeds device buffer limit', 'pixel-lighting');
-    if (Math.ceil(Math.max(source.width * 2, source.height) / 64) > device.limits.maxComputeWorkgroupsPerDimension ||
-        Math.ceil(Math.max(source.width, source.height) / 8) > device.limits.maxComputeWorkgroupsPerDimension)
+    if (
+      Math.ceil(Math.max(source.width * 2, source.height) / 64) > device.limits.maxComputeWorkgroupsPerDimension ||
+      Math.ceil(Math.max(source.width, source.height) / 8) > device.limits.maxComputeWorkgroupsPerDimension
+    )
       throw rangeError('SDF dispatch exceeds device limit', 'pixel-lighting');
     if (!this.#layout) {
       const visibility = 4;
-      this.#layout = device.createBindGroupLayout({ entries: [
-        { binding: 0, visibility, buffer: { type: 'uniform' } },
-        { binding: 1, visibility, texture: { sampleType: 'unfilterable-float' } },
-        ...[2, 3, 4].map(binding => ({ binding, visibility, buffer: { type: 'storage' as const } })),
-        { binding: 5, visibility, storageTexture: { access: 'write-only', format: 'rgba32float' } },
-        { binding: 6, visibility, texture: { sampleType: 'unfilterable-float' } },
-        ...[7, 8].map(binding => ({ binding, visibility, buffer: { type: 'storage' as const } })),
-      ] });
+      this.#layout = device.createBindGroupLayout({
+        entries: [
+          { binding: 0, visibility, buffer: { type: 'uniform' } },
+          { binding: 1, visibility, texture: { sampleType: 'unfilterable-float' } },
+          ...[2, 3, 4].map((binding) => ({ binding, visibility, buffer: { type: 'storage' as const } })),
+          { binding: 5, visibility, storageTexture: { access: 'write-only', format: 'rgba32float' } },
+          { binding: 6, visibility, texture: { sampleType: 'unfilterable-float' } },
+          ...[7, 8].map((binding) => ({ binding, visibility, buffer: { type: 'storage' as const } })),
+        ],
+      });
       const module = device.createShaderModule({ label: 'exact painted distance transform', code: transformShader });
       const layout = device.createPipelineLayout({ bindGroupLayouts: [this.#layout] });
-      this.#pipelines = ['horizontal', 'vertical', 'finish'].map(entryPoint => device.createComputePipeline({
-        layout, compute: { module, entryPoint },
-      }));
+      this.#pipelines = ['horizontal', 'vertical', 'finish'].map((entryPoint) =>
+        device.createComputePipeline({
+          layout,
+          compute: { module, entryPoint },
+        }),
+      );
     }
     if (!this.#field || this.#field.width !== source.width || this.#field.height !== source.height) {
       this.#field?.destroy();
       for (const buffer of this.#buffers) buffer.destroy();
       this.#historyKey = undefined;
-      this.#buffers = [32, count * 8, count * 16, count * 8, count * 32, 16].map((size, i) => device.createBuffer({
-        size, usage: (i ? 128 : 64) | 8,
-      }));
-      this.#field = device.createTexture({ label: 'painted signed distance', size: [source.width, source.height],
-        format: 'rgba32float', usage: 4 | 8 | 1 });
+      this.#buffers = [32, count * 8, count * 16, count * 8, count * 32, 16].map((size, i) =>
+        device.createBuffer({
+          size,
+          usage: (i ? 128 : 64) | 8,
+        }),
+      );
+      this.#field = device.createTexture({
+        label: 'painted signed distance',
+        size: [source.width, source.height],
+        format: 'rgba32float',
+        usage: 4 | 8 | 1,
+      });
     }
-    this.#source = source; this.#emission = emission;
+    this.#source = source;
+    this.#emission = emission;
     const key = JSON.stringify([this.camera, this.alphaThreshold, this.emissionIntensity]);
     this.#changed[0] = this.#historyKey === key ? 0 : 1;
     device.queue.writeBuffer(this.#buffers[5], 0, this.#changed);
-    this.#settings.set([this.camera.x, this.camera.y, this.camera.zoom, 0, this.alphaThreshold, this.emissionIntensity]);
+    this.#settings.set([
+      this.camera.x,
+      this.camera.y,
+      this.camera.zoom,
+      0,
+      this.alphaThreshold,
+      this.emissionIntensity,
+    ]);
     device.queue.writeBuffer(this.#buffers[0], 0, this.#settings);
     // Kept while the images, the field and the scratch are the same objects: a steady frame makes none.
-    const b = this.#buffers, group = this.#groups.get(device, 'encode', this.#layout, [
-      { binding: 0, resource: { buffer: b[0] } }, { binding: 1, resource: viewOf(source) },
-      { binding: 2, resource: { buffer: b[1] } }, { binding: 3, resource: { buffer: b[2] } },
-      { binding: 4, resource: { buffer: b[3] } }, { binding: 5, resource: viewOf(this.#field) },
-      { binding: 6, resource: viewOf(emission) }, { binding: 7, resource: { buffer: b[4] } },
-      { binding: 8, resource: { buffer: b[5] } },
-    ]);
+    const b = this.#buffers,
+      group = this.#groups.get(device, 'encode', this.#layout, [
+        { binding: 0, resource: { buffer: b[0] } },
+        { binding: 1, resource: viewOf(source) },
+        { binding: 2, resource: { buffer: b[1] } },
+        { binding: 3, resource: { buffer: b[2] } },
+        { binding: 4, resource: { buffer: b[3] } },
+        { binding: 5, resource: viewOf(this.#field) },
+        { binding: 6, resource: viewOf(emission) },
+        { binding: 7, resource: { buffer: b[4] } },
+        { binding: 8, resource: { buffer: b[5] } },
+      ]);
     this.#pipelines.forEach((pipeline, i) => {
-      const pass = encoder.beginComputePass(); pass.setPipeline(pipeline); pass.setBindGroup(0, group);
+      const pass = encoder.beginComputePass();
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, group);
       if (i === 2) pass.dispatchWorkgroups(Math.ceil(source.width / 8), Math.ceil(source.height / 8));
       else pass.dispatchWorkgroups(Math.ceil((i ? source.width * 2 : source.height) / 64));
       pass.end();
     });
-    this.#historyKey = key; this.#lastEncoder = encoder;
+    this.#historyKey = key;
+    this.#lastEncoder = encoder;
     return true;
   }
   /** Bind the encoded field, source and emission for an owning lighting pass; the same group while nothing changed. */
   bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup {
-    if (device !== this.#device || !this.#field) throw fault('state', 'Encode the SDF scene before binding it', 'pixel-lighting');
+    if (device !== this.#device || !this.#field)
+      throw fault('state', 'Encode the SDF scene before binding it', 'pixel-lighting');
     return this.#groups.get(device, 'bind', layout, [
       { binding: 0, resource: { buffer: this.#buffers[0] } },
-      { binding: 1, resource: viewOf(this.#source!) }, { binding: 2, resource: viewOf(this.#emission!) },
+      { binding: 1, resource: viewOf(this.#source!) },
+      { binding: 2, resource: viewOf(this.#emission!) },
       { binding: 3, resource: viewOf(this.#field) },
       { binding: 4, resource: { buffer: this.#buffers[5] } },
     ]);
   }
   #release(): void {
-    this.#field?.destroy(); this.#field = undefined;
+    this.#field?.destroy();
+    this.#field = undefined;
     for (const buffer of this.#buffers) buffer.destroy();
-    this.#buffers = []; this.#pipelines = []; this.#layout = undefined; this.#device = undefined;
+    this.#buffers = [];
+    this.#pipelines = [];
+    this.#layout = undefined;
+    this.#device = undefined;
     this.#source = this.#emission = undefined;
-    this.#historyKey = undefined; this.#lastEncoder = undefined;
+    this.#historyKey = undefined;
+    this.#lastEncoder = undefined;
     this.#groups.clear();
   }
   /** Release owned scratch and field textures; source textures remain borrowed. */
-  dispose(): void { if (!this.#disposed) { this.#disposed = true; this.#release(); } }
-  [Symbol.dispose](): void { this.dispose(); }
+  dispose(): void {
+    if (!this.#disposed) {
+      this.#disposed = true;
+      this.#release();
+    }
+  }
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }
