@@ -6,6 +6,33 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: standalone PostProcessing grades and presents the whole canvas for every view (KB-CREATIVE-POSTVIEW1, creative)
+
+- **Repro:** `PostProcessing.attach(engine)` (or `new PostStack([new PostProcessing()])`) and render two views with different scissors (`engine.render({views: [...]})`): the present pass clears the full target and draws a full-canvas triangle, so pixels outside the second view's scissor change (the owner harness reports "no pixel writes outside either view scissor", on both). With atmosphere or focus on, the world position is also rebuilt from a uv over the whole canvas rather than the view's rectangle.
+- **Cause:** `apply()` (standalone and stacked) and the grade shader work on the whole target and ignore `context.view`.
+- **Needs:** the view rectangle in the grade uniform and shader (uv and clamps relative to it) and the present pass drawn through the view's scissor with `loadOp: 'load'`. Until then PostProcessing is not an owner-lifetime entry (docs/limits.md).
+
+### Fixed 2026-11-21: disposing ToonShading or Stars left them registered, and the starfield ignored the view (KB-CREATIVE-DISPOSE1, creative)
+
+- **Repro:** `ToonShading.attach(engine).dispose()` or `Stars.attach(engine).dispose()`, then `engine.sceneOf(plugin)` still returned the scene and the frame pass kept running on freed buffers (ToonShading's pass then threw on `this.entry!`). With two views, the starfield also drew over the whole target (the harness: "draw restores the current viewport").
+- **Cause:** both `dispose()` freed their buffers and never called `removePlugin`, which `onDeviceRestored` shared with them; Stars' pass never called `applyView`.
+- **Fix:** a private `release()` for the device resources (used by `onDeviceRestored`), and `dispose()` removes the plugin from the scene it was attached to, then releases. Stars and Planet set the view's viewport and scissor.
+- **Regression:** `packages/creative/tests/dispose-scene.test.js` "ToonShading.dispose takes it out of its own scene, once" and the Stars twin; `npm run check:owners -- --packages=creative`.
+
+### Fixed 2026-11-21: GrassField and Planet refused an offscreen target of the other 8-bit canvas format (KB-CREATIVE-TARGETFMT1, creative)
+
+- **Repro:** on a device whose preferred canvas format is `bgra8unorm` (Windows), draw a GrassField or Planet into an `rgba8unorm` texture: "Unsupported grass target format". The owner harness' target is `rgba8unorm`.
+- **Cause:** the variant check allowed only `navigator.gpu.getPreferredCanvasFormat()` and the HDR formats, though the pipeline and shader are the same for both 8-bit formats WebGPU defines for a canvas.
+- **Fix:** `rgba8unorm` and `bgra8unorm` are both accepted (other formats and sample counts are still refused).
+- **Regression:** `tests/modern-grass.test.js` "GrassField builds only its initial variant" (draws both formats); `npm run check:owners -- --packages=creative` on WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: horse crowds and army crowds drew into the active scene and leaked their coat atlas on scene disposal (KB-HORSES-CROWDOWN1, horses, armies)
+
+- **Repro:** `addHorseCrowd`, `addHorse`, `PersonCrowd.attach` and `addArmy`, called from inside a scene (a plugin setup of a non-default scene), put their model and crowd draws into whichever scene was active after the lazy imports finished; the new owner fixtures failed "exercises a real registration". Disposing the owner scene or engine of a horse crowd, with `herd.dispose()` never called, left the coat atlas texture alive ("no leaked GPU buffers, textures or query sets").
+- **Cause:** the calls did not keep the scene they were made for across their awaits (`captureScene` in gltf and blender does); the atlas was owned by the herd handle only, not by the draw plugin the scene disposes.
+- **Fix:** each call captures its scene before the first await and runs the registration in it; the herd's crowd draw is a subclass whose `dispose()` also releases the atlas, once.
+- **Regression:** `packages/horses/test/horses.test.js` "crowd: the coat atlas goes with the draw however the draw is let go, once"; `npm run check:owners -- --packages=horses,armies`.
+
 ### Fixed 2026-11-21: formatting moved the visual scorch division annotation (biomes)
 
 - **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` flagged the float division in `disturbanceStates` after `5757affe45`.

@@ -108,7 +108,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21, machinery too; kit-react, kit-viz and kit-web are excluded as re-export bundles; voxel-edit, voxel-pathtracer, voxel-net and sciviz gained fixtures the same day; the sciviz one covers the layer families listed under owners-b11 in docs/architecture/operational-playbook.md, not every layer). Core, math, splines, kinematics-constraints, brep and the physics
+  pending (30 of 107 on 2026-11-15; bvh, geometry, navmesh and mesh-edit gained fixtures on 2026-11-21, machinery too; kit-react, kit-viz, kit-web and game are excluded as re-export bundles; voxel-edit, voxel-pathtracer, voxel-net and sciviz gained fixtures the same day, the sciviz one covering the layer families listed under owners-b11 in docs/architecture/operational-playbook.md, not every layer; armies, creative and horses gained fixtures after them). Core, math, splines, kinematics-constraints, brep and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`; the pure ones are
   read by `tests/owner-exclusions.test.js`, which fails when one gains anything with a lifetime.
 - inspector, scene, compute and netcode (2026-11-21) have fixtures although none is a plain engine plugin: each entry's object hangs
@@ -121,6 +121,13 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   entries (interpolation, extrapolation, smoothing, hitboxes, interest, generate) hold nothing; `serve`, `RoomNode.run` and
   `GameServer.run` are real-time loops of another instance that re-arm an abort listener while a case is being made, which
   the observer would count as that case's (covered by transports.test.js and presence.test.js); `PeerMesh` needs a second peer.
+- armies, creative and horses (2026-11-21): armies' and horses' entries are async factories (`PersonCrowd.attach`, `addArmy`, `addHorse`,
+  `addHorseCrowd`) called from the owner's scene; the baked person is CPU data made once. game is an install profile of generated
+  re-exports and is excluded (`tests/owner-exclusions.test.js` fails if it gains anything but `export ... from`). creative's
+  `Planet` decodes its maps with `createImageBitmap`, so it is an entry in the browser leaves only; standalone `PostProcessing`
+  (alone or in a `PostStack`) grades the whole canvas for every view and is not an entry until KB-CREATIVE-POSTVIEW1 is fixed
+  (docs/known-bugs.md); creative's `/grass-settings` and shaders hold nothing. creative's CPU leaf gives `navigator.gpu` a
+  `getPreferredCanvasFormat` (`bgra8unorm`) in creative's fixture when the runtime has none.
 - The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,
   completed in `tests/support/owner-lifetime-node.js` (pipeline layouts, error scopes, texture writes and layer counts,
   limits, the `GPUShaderStage` and `GPUTextureUsage` globals, a canvas context and core's standard lit shader lines). Fixtures never

@@ -9091,6 +9091,16 @@ went to the wrong scene and were never removed, and a disposal during axes loadi
 packages/sciviz/src with packages/sciviz/tests/scene-owner.test.js. More sciviz layers (molecule, tetrahedral and curvilinear volumes,
 flow particles, LIC, tiles, point clouds, parallel coordinates) remain to be added to the fixture.
 
+Batch owners-b12 (2026-11-21) gated the last four packages `check:owners` listed as pending, so none is pending. armies: `PersonCrowd.attach`,
+`addArmy` and `addArmy` with cavalry (the horse herd), on a person baked from a body built in code. horses: `addHorse` (with and without
+strand hair) and `addHorseCrowd`. creative: every plugin built with `new` and `attach` (GPU particles, toon shading, grass, terrain grass,
+starfield, orbit atmosphere, the two painterly effects), `Planet` in the browser leaves, and the HDR, texture
+and depth render targets. game is excluded: it is generated re-exports and holds nothing, which `tests/owner-exclusions.test.js` now reads
+and enforces. The fixtures found KB-HORSES-CROWDOWN1 (async crowd and horse calls ignored the scene they were made for; the herd's coat
+atlas outlived its scene), KB-CREATIVE-DISPOSE1 (ToonShading and Stars disposal left them registered; the starfield ignored the view
+rectangle, as did the planet's) and KB-CREATIVE-TARGETFMT1 (GrassField and Planet refused the other 8-bit canvas format), all fixed with regression tests, and one
+open defect, KB-CREATIVE-POSTVIEW1 (PostProcessing, alone or in a stack, is not per view, so it is not an entry).
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,
