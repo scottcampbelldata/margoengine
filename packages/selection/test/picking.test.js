@@ -71,21 +71,37 @@ test('100 captured picks validate the scene once and copy all tiles in one submi
   try {
     h.frame();
     const matrix = h.mesh.matrix;
-    let matrixReads = 0, encoders = 0, submissions = 0, copies = 0;
-    Object.defineProperty(h.mesh, 'matrix', { get() { matrixReads++; return matrix; } });
+    let matrixReads = 0,
+      encoders = 0,
+      submissions = 0,
+      copies = 0;
+    Object.defineProperty(h.mesh, 'matrix', {
+      get() {
+        matrixReads++;
+        return matrix;
+      },
+    });
     const create = h.engine.gpu.createCommandEncoder;
-    h.engine.gpu.createCommandEncoder = () => { encoders++; return create(); };
-    h.engine.gpu.queue.submit = () => { submissions++; };
+    h.engine.gpu.createCommandEncoder = () => {
+      encoders++;
+      return create();
+    };
+    h.engine.gpu.queue.submit = () => {
+      submissions++;
+    };
     h.context.encoder.copyTextureToBuffer = (_source, target, size) => {
       copies++;
       const tile = new Uint32Array(target.buffer.data, target.offset, 192);
       for (let y = 0; y < size[1]; y++) for (let x = 0; x < size[0]; x++) tile[y * 64 + x] = 1;
     };
     h.engine.pick = async (x, y) => h.effect.onPick(x, y);
-    const points = Array.from({ length: 100 }, (_, i) => [2 + i % 100, 2 + i % 80]);
+    const points = Array.from({ length: 100 }, (_, i) => [2 + (i % 100), 2 + (i % 80)]);
     const hits = await h.effect.pickMany(points);
     assert.equal(hits.length, 100);
-    assert.ok(hits.every((hit) => hit?.mesh === h.mesh), 'every tile resolves the original mesh');
+    assert.ok(
+      hits.every((hit) => hit?.mesh === h.mesh),
+      'every tile resolves the original mesh',
+    );
     assert.equal(copies, 100, 'the same 100 neighborhoods are copied');
     assert.equal(matrixReads, 16, 'one complete transform comparison for the unchanged scene');
     assert.equal(encoders, 1, 'one command buffer for the captured IDs');
@@ -110,7 +126,7 @@ test('100 micro picks reject horizontal misses after two exact matrix rows', asy
     });
     h.frame();
     h.engine.pick = async (x, y) => h.effect.onPick(x, y);
-    const points = Array.from({ length: 100 }, (_, i) => [2 + i % 100, 2 + i % 80]);
+    const points = Array.from({ length: 100 }, (_, i) => [2 + (i % 100), 2 + (i % 80)]);
     assert.deepEqual(await h.effect.pickMany(points), Array(100).fill(null));
     assert.equal(h.copies.length, 100, 'every neighborhood is still queried');
     assert.equal(reads, 3200, 'two rows read 32 model components per query, rather than 64');
@@ -291,6 +307,9 @@ test('a pick marked exact reads only the centre pixel, so a world ray never answ
   assert.equal(await h.effect.onPick(64, 48, view), h.mesh, 'a mouse pick keeps its one pixel tolerance');
   assert.equal(await h.effect.onPick(64, 48, { ...view, [Symbol.for('margoengine.selection.exactPick')]: true }), null);
   h.setPixels([[1, 1, 1]]);
-  assert.equal(await h.effect.onPick(64, 48, { ...view, [Symbol.for('margoengine.selection.exactPick')]: true }), h.mesh);
+  assert.equal(
+    await h.effect.onPick(64, 48, { ...view, [Symbol.for('margoengine.selection.exactPick')]: true }),
+    h.mesh,
+  );
   h.effect.dispose();
 });
