@@ -51,8 +51,9 @@ for (const step of [...STARTUP_STEPS.filter((s) => s !== 'adapter'), 'engine'])
       stage.box();
       if (step === 'engine') w.devices[0].lose('lost after createStage');
       const live = step === 'engine' ? w.live() : 0;
-      for (let i = 0; i < 8; i++) (w.refresh(), await flush());
-      if (w.live() === live) w.violate(`createStage after a loss at ${step}: no frame drew on a restored device in 8 refreshes`);
+      for (let i = 0; i < 8; i++) w.refresh(), await flush();
+      if (w.live() === live)
+        w.violate(`createStage after a loss at ${step}: no frame drew on a restored device in 8 refreshes`);
       close(w, stage, element);
     }));
 
@@ -71,7 +72,7 @@ test('stop, start and dispose re-entered from onTick, onError and the controls f
       plan.delete(hook);
       w.step(`${hook}: ${action}`);
       for (const verb of action.split(' '))
-        if (verb === 'stop') (engine.stop(), (model.running = false));
+        if (verb === 'stop') engine.stop(), (model.running = false);
         else if (verb === 'start') {
           if (model.disposed) {
             try {
@@ -80,7 +81,7 @@ test('stop, start and dispose re-entered from onTick, onError and the controls f
             } catch (error) {
               if (error?.code !== 'disposed') w.violate(`start() after dispose threw ${error}`);
             }
-          } else (engine.start(), (model.running = true));
+          } else engine.start(), (model.running = true);
         } else if (verb === 'dispose') {
           stage.dispose();
           model.disposed = true;
@@ -115,8 +116,10 @@ test('stop, start and dispose re-entered from onTick, onError and the controls f
       if (drawn > 1) w.violate(`${drawn} frames drew in one display refresh`);
       const expected = model.running && !model.disposed ? 1 : 0;
       if (w.pending() !== expected)
-        w.violate(`${w.pending()} frame callbacks wait, expected ${expected} (${model.disposed ? 'disposed' : model.running ? 'running' : 'stopped'})`);
-      if (!model.running && !model.disposed && w.rng.chance(0.5)) (engine.start(), (model.running = true));
+        w.violate(
+          `${w.pending()} frame callbacks wait, expected ${expected} (${model.disposed ? 'disposed' : model.running ? 'running' : 'stopped'})`,
+        );
+      if (!model.running && !model.disposed && w.rng.chance(0.5)) engine.start(), (model.running = true);
     }
     if (model.disposed) {
       w.closed = true;
@@ -142,7 +145,7 @@ test('stage picks answer for the mesh under the cursor while stage meshes are ad
         w.disposeMesh(hero);
         hero = stage.box();
       } else if (op === 'render') stage.engine.render();
-      else if (op === 'answer') (w.answer(), await flush(1));
+      else if (op === 'answer') w.answer(), await flush(1);
     }
     close(w, stage, element);
   }));
@@ -164,7 +167,12 @@ test('stage dispose while a pick or a feature load waits rejects or resolves eac
         () => new Promise((resolve) => releases.push(() => resolve({ ok: true }))),
         () => ({ name: `feature${i}`, setup: () => attached++ }),
       );
-      loads.push(load.then(() => 'attached', (error) => (error?.name === 'AbortError' ? 'aborted' : `rejected ${error}`)));
+      loads.push(
+        load.then(
+          () => 'attached',
+          (error) => (error?.name === 'AbortError' ? 'aborted' : `rejected ${error}`),
+        ),
+      );
     }
     for (let i = w.rng.int(3); i--; ) w.pick(stage.engine);
     const dispose = () => {
