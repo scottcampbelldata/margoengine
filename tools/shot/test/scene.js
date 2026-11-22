@@ -91,7 +91,10 @@ const targets = aov
     })
   : null;
 if (look) {
-  const [{ Shadows }, { loadGLTF }] = await Promise.all([import('@margoengine/shadows'), import('@margoengine/gltf/pbr')]);
+  const [{ Shadows }, { loadGLTF }] = await Promise.all([
+    import('@margoengine/shadows'),
+    import('@margoengine/gltf/pbr'),
+  ]);
   const subject = await loadGLTF(engine, '/packages/exporters/tests/fixtures/Box.glb');
   subject.root.setPosition([2, 0.75, 3]);
   subject.root.setScale([1.5, 1.5, 1.5]);

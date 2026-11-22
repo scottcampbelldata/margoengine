@@ -59,7 +59,8 @@ export const SHOT_MSAA = Object.freeze([1, 4]);
 export const MAX_RENDER_SIDE = 8192;
 
 /** The canvas a shot renders at: its size times its supersampling, each side rounded. */
-export const renderSize = (shot) => shot.size.map((side) => Math.round(side * (shot.supersample ?? SHOT_DEFAULTS.supersample)));
+export const renderSize = (shot) =>
+  shot.size.map((side) => Math.round(side * (shot.supersample ?? SHOT_DEFAULTS.supersample)));
 
 const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
@@ -97,10 +98,16 @@ export function validateShot(input) {
     'size' in shot &&
     !(Array.isArray(shot.size) && shot.size.length === 2 && shot.size.every((n) => whole(n, 16) && n <= 8192))
   )
-    add(at('size'), 'must be [width, height] in pixels, whole numbers from 16 to 8192 (a vertical short is [1080, 1920])');
+    add(
+      at('size'),
+      'must be [width, height] in pixels, whole numbers from 16 to 8192 (a vertical short is [1080, 1920])',
+    );
   if ('fps' in shot && !(whole(shot.fps, 1) && shot.fps <= 240)) add(at('fps'), 'must be a whole number from 1 to 240');
   if ('kind' in shot && !Object.hasOwn(SHOT_KINDS, shot.kind))
-    add(at('kind'), `must be one of ${Object.keys(SHOT_KINDS).join(', ')} (a vertical short, or footage for a long video)`);
+    add(
+      at('kind'),
+      `must be one of ${Object.keys(SHOT_KINDS).join(', ')} (a vertical short, or footage for a long video)`,
+    );
   const kind = Object.hasOwn(SHOT_KINDS, shot.kind) ? shot.kind : SHOT_DEFAULTS.kind,
     { maxSeconds } = SHOT_KINDS[kind];
   const fps = whole(shot.fps, 1) ? shot.fps : SHOT_KINDS[kind].fps;
@@ -160,15 +167,20 @@ export function validateShot(input) {
         // frame before tone mapping that the shot tool does not write (the Cabin Hearth shots asked for it).
         else if (!Object.hasOwn(LOOK_CHECKS, name))
           add(`${path}.${name}`, `is not a look check; use one of ${Object.keys(LOOK_CHECKS).join(', ')}`);
-        else if (name === 'nan') add(`${path}.${name}`, 'needs the float frame, which the shot tool does not write; remove it');
+        else if (name === 'nan')
+          add(`${path}.${name}`, 'needs the float frame, which the shot tool does not write; remove it');
       }
   };
   if ('lookBounds' in shot) bounds(at('lookBounds'), shot.lookBounds);
   if ('lookFamily' in shot && shot.lookFamily !== null && !LOOK_FAMILY_NAMES.includes(shot.lookFamily))
-    add(at('lookFamily'), `must be a look family (${LOOK_FAMILY_NAMES.join(', ')}) or null: its bounds apply to every check the probes can run`);
+    add(
+      at('lookFamily'),
+      `must be a look family (${LOOK_FAMILY_NAMES.join(', ')}) or null: its bounds apply to every check the probes can run`,
+    );
   // A probe's own bounds replace the shot's for the checks they name, on that probe only.
   if ('probeLookBounds' in shot) {
-    if (!isRecord(shot.probeLookBounds)) add(at('probeLookBounds'), 'must be an object of probe name: {check name: bound}');
+    if (!isRecord(shot.probeLookBounds))
+      add(at('probeLookBounds'), 'must be an object of probe name: {check name: bound}');
     else
       for (const [name, value] of Object.entries(shot.probeLookBounds)) {
         if (!(isRecord(shot.probes) && Object.hasOwn(shot.probes, name)))
@@ -186,7 +198,10 @@ export function validateShot(input) {
           add(`${at('aovs')}[${i}]`, 'mask names are lower-case letters, digits and dashes (they name folders)');
         else if (shot.aovs.indexOf(name) !== i) add(`${at('aovs')}[${i}]`, `names ${name} twice`);
         else if (name === 'sky-coverage')
-          add(`${at('aovs')}[${i}]`, "sky-coverage is the tool's own mask (the pixels the page's sky drew); leave it out");
+          add(
+            `${at('aovs')}[${i}]`,
+            "sky-coverage is the tool's own mask (the pixels the page's sky drew); leave it out",
+          );
       });
   }
   if ('horizon' in shot && shot.horizon !== null && !(isRecord(shot.horizon) && finite(shot.horizon.y)))
@@ -194,14 +209,21 @@ export function validateShot(input) {
   // The moving look checks (T4 shimmerMoving, T8 motionBlur): each probe also writes the frame after it and its camera motion.
   if ('moving' in shot && shot.moving !== null) {
     if (!(isRecord(shot.moving) && finite(shot.moving.depthScale) && shot.moving.depthScale > 0))
-      add(at('moving'), 'must be {depthScale}, the metres in the page depth mask nearness exp(-distance / depthScale), or null');
+      add(
+        at('moving'),
+        'must be {depthScale}, the metres in the page depth mask nearness exp(-distance / depthScale), or null',
+      );
     else if (!aovs.includes('depth'))
       add(at('aovs'), 'must list depth for shot.moving: the camera motion of each pixel is made from its distance');
-    if (!(isRecord(shot.probes) && Object.keys(shot.probes).length)) add(at('moving'), 'needs probes: the frame after each one is written');
+    if (!(isRecord(shot.probes) && Object.keys(shot.probes).length))
+      add(at('moving'), 'needs probes: the frame after each one is written');
     else if (finite(shot.seconds) && finite(shot.fps))
       for (const [name, time] of Object.entries(shot.probes))
         if (finite(time) && Math.ceil(time * shot.fps - 1e-9) >= Math.round(shot.seconds * shot.fps) - 1)
-          add(`${at('probes')}.${name}`, 'is on the last frame, which has no frame after it for shot.moving; move it earlier');
+          add(
+            `${at('probes')}.${name}`,
+            'is on the last frame, which has no frame after it for shot.moving; move it earlier',
+          );
   }
   const derived = aovs.filter((name) => DERIVED_AOVS.includes(name));
   if (derived.length && !(isRecord(shot.horizon) && finite(shot.horizon.y)))
@@ -214,26 +236,38 @@ export function validateShot(input) {
     add(at('scene'), `must be a scene of the catalogue (${scenes.map((scene) => scene.name).join(', ')})`);
   if ('settings' in shot) {
     const known = scenes.find((scene) => scene.name === shot.scene);
-    if (typeof shot.scene !== 'string') add(at('settings'), 'needs shot.scene: the scene whose targets name the packages');
+    if (typeof shot.scene !== 'string')
+      add(at('settings'), 'needs shot.scene: the scene whose targets name the packages');
     else if (!isRecord(shot.settings) || !Object.values(shot.settings).every(isRecord))
       add(at('settings'), 'must be {target: {row: value or {keys: [{time, value, ease}]}}}');
     else if (known)
       for (const target of Object.keys(shot.settings))
         if (!Object.hasOwn(known.targets ?? {}, target))
-          add(`shot.settings.${target}`, `is not a target of scene ${known.name}; use one of ${Object.keys(known.targets ?? {}).join(', ') || 'none (the scene lists no targets)'}`);
+          add(
+            `shot.settings.${target}`,
+            `is not a target of scene ${known.name}; use one of ${Object.keys(known.targets ?? {}).join(', ') || 'none (the scene lists no targets)'}`,
+          );
     if (!(isRecord(shot.page) && typeof shot.page.settings === 'string'))
-      add('shot.page.settings', 'must name the page function that writes the settings values, for example margoShot.settings, when shot.settings is set');
+      add(
+        'shot.page.settings',
+        'must name the page function that writes the settings values, for example margoShot.settings, when shot.settings is set',
+      );
   }
   const page = shot.page;
-  if (!isRecord(page)) add(at('page'), 'must say what to render: {path, query?, css?, engine, apply?, ready?, canvas?}');
+  if (!isRecord(page))
+    add(at('page'), 'must say what to render: {path, query?, css?, engine, apply?, ready?, canvas?}');
   else {
     if (typeof page.path !== 'string' || !/^[\w][\w./-]*\.html$/.test(page.path) || page.path.includes('..'))
-      add('shot.page.path', 'must be the path of an HTML page in the repository, for example examples/storm-light/index.html');
+      add(
+        'shot.page.path',
+        'must be the path of an HTML page in the repository, for example examples/storm-light/index.html',
+      );
     if ('query' in page) {
       if (!isRecord(page.query)) add('shot.page.query', 'must be an object of name: value');
       else
         for (const [key, value] of Object.entries(page.query)) {
-          if (typeof value !== 'string' && !finite(value)) add(`shot.page.query.${key}`, 'must be a string or a number');
+          if (typeof value !== 'string' && !finite(value))
+            add(`shot.page.query.${key}`, 'must be a string or a number');
           if (key === 'quality') add('shot.page.query.quality', 'is set by shot.tier; leave it out of the query');
         }
     }
@@ -270,7 +304,13 @@ export function parseShot(input) {
       `Invalid shot file; fix ${issues[0].path || 'the file'}: ${issues[0].message}${issues.length > 1 ? ` (and ${issues.length - 1} more)` : ''}`,
     );
   const { size, fps } = SHOT_KINDS[value.shot.kind ?? SHOT_DEFAULTS.kind];
-  value.shot = { ...SHOT_DEFAULTS, size, fps, ...value.shot, page: { query: {}, css: '', canvas: 'canvas', ...value.shot.page } };
+  value.shot = {
+    ...SHOT_DEFAULTS,
+    size,
+    fps,
+    ...value.shot,
+    page: { query: {}, css: '', canvas: 'canvas', ...value.shot.page },
+  };
   return deepFreeze(value);
 }
 
@@ -315,7 +355,9 @@ export function subframeOffsets({ fps, subframes, shutter }) {
 export function probeFrames(file) {
   const { fps, probes, seconds } = file.shot,
     last = Math.round(seconds * fps) - 1;
-  return Object.fromEntries(Object.entries(probes).map(([name, time]) => [name, Math.max(0, Math.min(last, Math.ceil(time * fps - 1e-9)))]));
+  return Object.fromEntries(
+    Object.entries(probes).map(([name, time]) => [name, Math.max(0, Math.min(last, Math.ceil(time * fps - 1e-9)))]),
+  );
 }
 
 /**
@@ -376,8 +418,11 @@ export function firstSeconds(json, seconds) {
   const authored = json.shot?.fullSeconds ?? json.shot?.seconds,
     shot = { ...json.shot, seconds: Math.min(seconds, json.shot?.seconds ?? seconds) };
   if (Number.isFinite(authored) && authored > shot.seconds) shot.fullSeconds = authored;
-  if (shot.probes) shot.probes = Object.fromEntries(Object.entries(shot.probes).filter(([, time]) => time < shot.seconds));
+  if (shot.probes)
+    shot.probes = Object.fromEntries(Object.entries(shot.probes).filter(([, time]) => time < shot.seconds));
   if (shot.probeLookBounds)
-    shot.probeLookBounds = Object.fromEntries(Object.entries(shot.probeLookBounds).filter(([name]) => Object.hasOwn(shot.probes ?? {}, name)));
+    shot.probeLookBounds = Object.fromEntries(
+      Object.entries(shot.probeLookBounds).filter(([name]) => Object.hasOwn(shot.probes ?? {}, name)),
+    );
   return { ...json, shot };
 }

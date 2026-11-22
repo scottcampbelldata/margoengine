@@ -80,15 +80,28 @@ assert.ok(seen.lit.n > 5000, `lit ground fills the floor (${seen.lit.n} px)`);
 assert.ok(seen.shadow.n > 300, `the boxes put shaded ground down (${seen.shadow.n} px)`);
 assert.ok(seen.penumbra.n > 30, `with a soft edge (${seen.penumbra.n} px)`);
 assert.ok(seen.subject.n > 200, `the gltf subject is in view (${seen.subject.n} px)`);
-assert.ok(seen.shadow.luma < 0.7 * seen.lit.luma, `the frame is darker in the shadow mask (${seen.shadow.luma} against ${seen.lit.luma})`);
+assert.ok(
+  seen.shadow.luma < 0.7 * seen.lit.luma,
+  `the frame is darker in the shadow mask (${seen.shadow.luma} against ${seen.lit.luma})`,
+);
 const report = await lookShot(out, manifest),
   rows = Object.fromEntries(report.json.probes[0].results.map((row) => [row.check, row]));
-for (const name of ['penumbra', 'silhouette', 'silhouetteShape', 'bounce', 'shadowTint', 'shimmerMoving', 'motionBlur']) {
+for (const name of [
+  'penumbra',
+  'silhouette',
+  'silhouetteShape',
+  'bounce',
+  'shadowTint',
+  'shimmerMoving',
+  'motionBlur',
+]) {
   assert.ok(rows[name], `${name} runs on the shot's own evidence`);
   assert.equal(rows[name].missing, undefined, `${name} has its input`);
   assert.ok(Number.isFinite(rows[name].value), `${name} measures a value (${rows[name].value})`);
 }
 console.log(
   `ok look masks: lit ${seen.lit.n}, shadow ${seen.shadow.n}, penumbra ${seen.penumbra.n}, subject ${seen.subject.n} px; ` +
-    ['penumbra', 'silhouette', 'silhouetteShape', 'bounce', 'shadowTint'].map((name) => `${name} ${rows[name].value}`).join(', '),
+    ['penumbra', 'silhouette', 'silhouetteShape', 'bounce', 'shadowTint']
+      .map((name) => `${name} ${rows[name].value}`)
+      .join(', '),
 );

@@ -46,8 +46,14 @@ assert.ok(mean > 5, `the camera moves the world by ${mean.toFixed(2)} px on aver
 const motion = (values) => ({ width: frame.width, height: frame.height, data: values }),
   warped = shimmerMoving(frame, { next, motion: motion(data) }),
   still = shimmerMoving(frame, { next, motion: motion(new Float32Array(data.length)) });
-assert.ok(warped.value < 0.6 * still.value, `warped ${warped.value.toFixed(1)} % against ${still.value.toFixed(1)} % unwarped`);
+assert.ok(
+  warped.value < 0.6 * still.value,
+  `warped ${warped.value.toFixed(1)} % against ${still.value.toFixed(1)} % unwarped`,
+);
 const report = await lookShot(out, manifest),
   rows = report.json.probes[0].results.map((row) => row.check);
-for (const name of ['shimmerMoving', 'motionBlur']) assert.ok(rows.includes(name), `${name} runs on the written evidence`);
-console.log(`ok moving: ${mean.toFixed(1)} px mean camera motion, shimmerMoving ${warped.value.toFixed(1)} % warped against ${still.value.toFixed(1)} % unwarped`);
+for (const name of ['shimmerMoving', 'motionBlur'])
+  assert.ok(rows.includes(name), `${name} runs on the written evidence`);
+console.log(
+  `ok moving: ${mean.toFixed(1)} px mean camera motion, shimmerMoving ${warped.value.toFixed(1)} % warped against ${still.value.toFixed(1)} % unwarped`,
+);

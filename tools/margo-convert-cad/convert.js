@@ -241,7 +241,6 @@ function bakeEdges(glb, edges, angle) {
   return writeGLB(json, out);
 }
 
-
 /**
  * Converts STEP, IGES, SAT, XT or JT bytes to a GLB in metres (each format from its own unit). Bodies keep their names
  * and colours (one material per colour), assemblies their tree; every placement of a body shares one mesh.
@@ -262,7 +261,9 @@ export async function convert(data, format, options = {}) {
   if (!['step', 'iges', 'sat', 'xt', 'jt'].includes(format))
     throw new TypeError(`Unknown format ${format}: use step, iges, sat, xt or jt`);
   if ('units' in options)
-    throw new TypeError('The units option was for .brep files, which are no longer read; STEP, IGES, SAT, XT and JT carry their own units');
+    throw new TypeError(
+      'The units option was for .brep files, which are no longer read; STEP, IGES, SAT, XT and JT carry their own units',
+    );
   if (linearDeflection !== undefined && !(linearDeflection > 0 && linearDeflection < Infinity))
     throw new RangeError('linearDeflection must be a positive number of millimetres');
   if (angularDeflection !== undefined && !(angularDeflection > 0 && angularDeflection < 180))
@@ -294,7 +295,10 @@ export async function convert(data, format, options = {}) {
           .join('');
     let out = materials.get(name);
     if (!out)
-      materials.set(name, (out = { name, color: [0, 1, 2].map((k) => linear(srgb[k])), roughness: 0.4, metalness: 0.3 }));
+      materials.set(
+        name,
+        (out = { name, color: [0, 1, 2].map((k) => linear(srgb[k])), roughness: 0.4, metalness: 0.3 }),
+      );
     return out;
   };
 
@@ -310,7 +314,8 @@ export async function convert(data, format, options = {}) {
     if (!byBody) meshed.set(model, (byBody = new Map()));
     if (byBody.has(index)) return /** @type {BodyMesh|null} */ (byBody.get(index));
     let tessellator = tessellators.get(model);
-    if (!tessellator) tessellators.set(model, (tessellator = new Tessellator(model.file, model.faceColors, tessellation)));
+    if (!tessellator)
+      tessellators.set(model, (tessellator = new Tessellator(model.file, model.faceColors, tessellation)));
     const body = model.bodies[index];
     /** @type {BodyMesh|null} */
     let mesh = null;
@@ -338,7 +343,10 @@ export async function convert(data, format, options = {}) {
   const tree = (model, outer, color) => {
     const world = (/** @type {ArrayLike<number>} */ m) => (isIdentity(outer) ? m : multiplyMatrices(outer, m)),
       /** @type {Array<ExportNode & {children: ExportNode[]}>} */
-      occurrences = model.occurrences.map((o) => ({ name: model.products[o.product]?.name || undefined, children: [] })),
+      occurrences = model.occurrences.map((o) => ({
+        name: model.products[o.product]?.name || undefined,
+        children: [],
+      })),
       /** @type {ExportNode[]} */
       roots = [];
     model.occurrences.forEach((o, i) => {
@@ -357,7 +365,14 @@ export async function convert(data, format, options = {}) {
         node = { name: body.name || product || undefined };
       if (!isIdentity(matrix)) Object.assign(node, { matrix });
       (occurrence ? occurrences[instance.occurrence].children : roots).push(node);
-      placements.push({ model, body: instance.body, color: body.color ?? color, name: node.name ?? '', world: world(instance.matrix), node });
+      placements.push({
+        model,
+        body: instance.body,
+        color: body.color ?? color,
+        name: node.name ?? '',
+        world: world(instance.matrix),
+        node,
+      });
     }
     // A part node holding one unmoved body takes the body's mesh itself (as CAD tools write a part).
     for (const node of occurrences)
@@ -366,7 +381,7 @@ export async function convert(data, format, options = {}) {
           placement = placements.find((p) => p.node === only);
         if (placement) {
           placement.node = node;
-          delete (/** @type {ExportNode} */ (node)).children;
+          delete (/** @type {ExportNode} */ (node).children);
         }
       }
     return roots;
@@ -387,7 +402,9 @@ export async function convert(data, format, options = {}) {
       roots.push(node);
     }
     if (!placements.length && jt.parts.some((part) => part.shapes.some((shape) => shape.mesh)))
-      throw new Error('This JT file has triangle LODs but no exact B-rep; margo-convert-cad reads the exact B-rep only');
+      throw new Error(
+        'This JT file has triangle LODs but no exact B-rep; margo-convert-cad reads the exact B-rep only',
+      );
   } else {
     const parse = { step: parseSTEP, iges: parseIGES, sat: parseSAT, xt: parseXT }[format],
       model = parse(data);

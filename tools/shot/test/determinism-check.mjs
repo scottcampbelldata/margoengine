@@ -132,7 +132,10 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
     await renderOnce(browser, file, { out: outDir('test-scene-clock'), label: 'a', write: false });
     const { record, camera } = await browser.page.evaluate(() => ({
       record: globalThis.shotScene.record,
-      camera: { position: [...globalThis.shotScene.engine.camera.position], fov: globalThis.shotScene.engine.camera.fov },
+      camera: {
+        position: [...globalThis.shotScene.engine.camera.position],
+        fov: globalThis.shotScene.engine.camera.fov,
+      },
     }));
     const random = mulberry32(SEED);
     assert.deepEqual(record.random, [random(), random(), random()], 'Math.random is not the seeded stream');
@@ -143,8 +146,15 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
       ...Array.from({ length: FRAMES }, (_, i) => CLOCK_START + (i * 1000) / FPS),
     ];
     assert.deepEqual(record.clock, expected, 'performance.now() is not the shot clock');
-    assert.deepEqual(record.date, expected.map((ms) => CLOCK_EPOCH + ms), 'Date.now() is not the shot clock');
-    assert.ok(record.deltas.slice(0, WARMUP + 1).every((d) => d === 0), 'warm-up frames moved the clock');
+    assert.deepEqual(
+      record.date,
+      expected.map((ms) => CLOCK_EPOCH + ms),
+      'Date.now() is not the shot clock',
+    );
+    assert.ok(
+      record.deltas.slice(0, WARMUP + 1).every((d) => d === 0),
+      'warm-up frames moved the clock',
+    );
     for (const delta of record.deltas.slice(WARMUP + 1)) assert.ok(Math.abs(delta - 1 / FPS) < 1e-9, `delta ${delta}`);
     assert.equal(record.reads, drawn, 'a GPU readback landed after the next frame');
     assert.equal(record.samples, 4, 'the high tier draws four MSAA samples when the shot leaves msaa unset');
@@ -163,15 +173,18 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
   const file = shotFile('test-scene-leak', { leak: 1 }),
     out = outDir('test-scene-leak');
   rmSync(out, { recursive: true, force: true });
-  await assert.rejects(
-    shoot(file, { out, log: quiet }),
-    (error) => {
-      assert.match(error.message, /determinism check failed: \d+ of 30 frames differ between the two renders, first frame \d+/);
-      const difference = error.manifest.determinism.difference;
-      assert.ok(existsSync(join(out, `mismatch/frame_${String(difference.frame).padStart(4, '0')}.b.png`)), 'no mismatch copy');
-      return true;
-    },
-  );
+  await assert.rejects(shoot(file, { out, log: quiet }), (error) => {
+    assert.match(
+      error.message,
+      /determinism check failed: \d+ of 30 frames differ between the two renders, first frame \d+/,
+    );
+    const difference = error.manifest.determinism.difference;
+    assert.ok(
+      existsSync(join(out, `mismatch/frame_${String(difference.frame).padStart(4, '0')}.b.png`)),
+      'no mismatch copy',
+    );
+    return true;
+  });
   console.log('ok 3: a page reading crypto.getRandomValues fails the determinism check');
 }
 // 4. Masks.
@@ -186,26 +199,38 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
   assert.deepEqual(manifest.aovs, names);
   for (const record of manifest.files) {
     assert.deepEqual(Object.keys(record.aovs), names, `frame ${record.index} masks`);
-    for (const name of names) assert.ok(existsSync(join(out, record.aovs[name].file)), `missing ${record.aovs[name].file}`);
+    for (const name of names)
+      assert.ok(existsSync(join(out, record.aovs[name].file)), `missing ${record.aovs[name].file}`);
     const { geometry, sky, water, depth } = record.aovs;
     // Each of sky, water and geometry is 0 or 255 per pixel and they never overlap, so the means add up to 1.
-    assert.ok(Math.abs(geometry.mean + sky.mean + water.mean - 1) < 1e-9, `frame ${record.index}: sky, water and geometry do not split the frame`);
+    assert.ok(
+      Math.abs(geometry.mean + sky.mean + water.mean - 1) < 1e-9,
+      `frame ${record.index}: sky, water and geometry do not split the frame`,
+    );
     for (const [name, mask] of Object.entries({ geometry, sky, water, depth }))
       assert.ok(mask.mean > 0.01 && mask.mean < 0.99, `frame ${record.index}: the ${name} mask is ${mask.mean} full`);
     assert.ok(depth.mean < geometry.mean, 'depth is nearness, below 1 on every surface');
   }
   assert.deepEqual(manifest.probes.late.aovs.water, 'probes/late.water.png');
-  assert.deepEqual(readFileSync(join(out, 'probes/late.water.png')), readFileSync(join(out, 'aovs/water/frame_0024.png')));
+  assert.deepEqual(
+    readFileSync(join(out, 'probes/late.water.png')),
+    readFileSync(join(out, 'aovs/water/frame_0024.png')),
+  );
   const first = manifest.files[0].aovs,
     last = manifest.files.at(-1).aovs;
   assert.notEqual(first.water.sha256, last.water.sha256, 'the water mask does not follow the camera');
-  console.log(`ok 4: masks written and identical, frame 0 sky ${first.sky.mean.toFixed(3)} water ${first.water.mean.toFixed(3)} geometry ${first.geometry.mean.toFixed(3)}`);
+  console.log(
+    `ok 4: masks written and identical, frame 0 sky ${first.sky.mean.toFixed(3)} water ${first.water.mean.toFixed(3)} geometry ${first.geometry.mean.toFixed(3)}`,
+  );
 
   const leaky = shotFile('test-scene-aov-leak', { aov: 'leak' }, { aovs: ['geometry', 'noise'] }),
     leakOut = outDir('test-scene-aov-leak');
   rmSync(leakOut, { recursive: true, force: true });
   await assert.rejects(shoot(leaky, { out: leakOut, log: quiet }), (error) => {
-    assert.match(error.message, /determinism check failed: the noise mask differs in 30 of 30 frames between the two renders, first frame 0/);
+    assert.match(
+      error.message,
+      /determinism check failed: the noise mask differs in 30 of 30 frames between the two renders, first frame 0/,
+    );
     assert.equal(error.manifest.determinism.difference.reason, 'aovs');
     return true;
   });
@@ -215,7 +240,11 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
 {
   const SUBS = 4,
     names = ['geometry', 'depth', 'sky', 'water'],
-    file = shotFile('test-scene-capture', { aov: 1 }, { msaa: 1, supersample: 2, subframes: SUBS, shutter: 180, aovs: names, horizon: { y: 0 } }),
+    file = shotFile(
+      'test-scene-capture',
+      { aov: 1 },
+      { msaa: 1, supersample: 2, subframes: SUBS, shutter: 180, aovs: names, horizon: { y: 0 } },
+    ),
     out = outDir('test-scene-capture');
   rmSync(out, { recursive: true, force: true });
   const manifest = await shoot(file, { out, log: quiet });
@@ -245,13 +274,18 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
     assert.deepEqual(record.canvas.at(-1), [540, 960]);
     const expected = [...Array(WARMUP).fill(CLOCK_START)];
     for (let i = 0; i < FRAMES; i++)
-      for (let k = 0; k < SUBS; k++) expected.push(CLOCK_START + (i * 1000) / FPS + ((k + 0.5) / SUBS) * (0.5 / FPS) * 1000);
+      for (let k = 0; k < SUBS; k++)
+        expected.push(CLOCK_START + (i * 1000) / FPS + ((k + 0.5) / SUBS) * (0.5 / FPS) * 1000);
     assert.equal(record.clock.length, expected.length, 'sub-frames drawn');
-    record.clock.forEach((ms, i) => assert.ok(Math.abs(ms - expected[i]) < 1e-9, `clock ${i}: ${ms}, want ${expected[i]}`));
+    record.clock.forEach((ms, i) =>
+      assert.ok(Math.abs(ms - expected[i]) < 1e-9, `clock ${i}: ${ms}, want ${expected[i]}`),
+    );
   } finally {
     await browser?.close();
   }
-  console.log(`ok 5: one MSAA sample forced, 2x supersampled, ${SUBS} sub-frames over the shutter, two renders identical`);
+  console.log(
+    `ok 5: one MSAA sample forced, 2x supersampled, ${SUBS} sub-frames over the shutter, two renders identical`,
+  );
 }
 // 6. Production: the probes checked on a second render that stops after the last of them.
 {
@@ -266,9 +300,20 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
   let browser;
   try {
     browser = await openShotPage(file);
-    const b = await renderOnce(browser, file, { out: outDir('test-scene-production-b'), label: 'b', write: false, only: new Set([0, 24]) });
-    assert.deepEqual(b.frames.map((frame) => frame.index), [0, 24]);
-    assert.deepEqual(b.frames.map((frame) => frame.sha256), [manifest.files[0].sha256, manifest.files[24].sha256]);
+    const b = await renderOnce(browser, file, {
+      out: outDir('test-scene-production-b'),
+      label: 'b',
+      write: false,
+      only: new Set([0, 24]),
+    });
+    assert.deepEqual(
+      b.frames.map((frame) => frame.index),
+      [0, 24],
+    );
+    assert.deepEqual(
+      b.frames.map((frame) => frame.sha256),
+      [manifest.files[0].sha256, manifest.files[24].sha256],
+    );
     const record = await browser.page.evaluate(() => globalThis.shotScene.record);
     assert.equal(record.clock.length, WARMUP + 25, 'frames drawn: the warm-up and frames 0 to 24');
   } finally {
@@ -279,7 +324,10 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
     leakOut = outDir('test-scene-production-leak');
   rmSync(leakOut, { recursive: true, force: true });
   await assert.rejects(shoot(leak, { out: leakOut, check: 'probes', log: quiet }), (error) => {
-    assert.match(error.message, /determinism check failed: [12] of 2 frames differ between the two renders, first frame (0|24)/);
+    assert.match(
+      error.message,
+      /determinism check failed: [12] of 2 frames differ between the two renders, first frame (0|24)/,
+    );
     assert.equal(error.manifest.determinism.check, 'probes');
     return true;
   });
@@ -287,7 +335,11 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
 }
 // 7. Sky coverage.
 {
-  const file = shotFile('test-scene-sky-coverage', { aov: 1, sky: 1 }, { aovs: ['geometry'], msaa: 1, supersample: 1, lookBounds: { skyClip: 0.5 } }),
+  const file = shotFile(
+      'test-scene-sky-coverage',
+      { aov: 1, sky: 1 },
+      { aovs: ['geometry'], msaa: 1, supersample: 1, lookBounds: { skyClip: 0.5 } },
+    ),
     out = outDir('test-scene-sky-coverage');
   rmSync(out, { recursive: true, force: true });
   const manifest = await shoot(file, { out, log: quiet });
@@ -305,12 +357,18 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
       if (sky.data[i] !== 255 - geometry.data[i]) wrong++;
     }
     assert.equal(wrong, 0, `${name}: ${wrong} pixels where the sky coverage is not the complement of the geometry`);
-    assert.ok(open > 0.05 * sky.width * sky.height && open < 0.95 * sky.width * sky.height, `${name}: sky share ${open}`);
+    assert.ok(
+      open > 0.05 * sky.width * sky.height && open < 0.95 * sky.width * sky.height,
+      `${name}: sky share ${open}`,
+    );
   }
   // Only the probes carry it, and they match between the two renders through the determinism check above.
-  assert.ok(manifest.files.filter((record) => record.aovs?.['sky-coverage']).length === Object.keys(manifest.probes).length);
+  assert.ok(
+    manifest.files.filter((record) => record.aovs?.['sky-coverage']).length === Object.keys(manifest.probes).length,
+  );
   const report = await lookShot(out, manifest);
-  for (const probe of report.json.probes) assert.equal(probe.results.find((row) => row.check === 'skyClip').mask, 'sky-coverage');
+  for (const probe of report.json.probes)
+    assert.equal(probe.results.find((row) => row.check === 'skyClip').mask, 'sky-coverage');
   assert.match(readFileSync(join(out, 'look.md'), 'utf8'), /- skyClip inside `sky-coverage`.*: start, late/);
 
   const bare = shotFile('test-scene-no-sky', {}, { lookBounds: { skyClip: 0.5 } }),
@@ -318,7 +376,10 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
   rmSync(bareOut, { recursive: true, force: true });
   const plain = await shoot(bare, { out: bareOut, runs: 1, log: quiet });
   assert.equal(plain.skyCoverage, false);
-  assert.ok(Object.values(plain.probes).every((probe) => !probe.aovs), 'a page without a sky gets no mask');
+  assert.ok(
+    Object.values(plain.probes).every((probe) => !probe.aovs),
+    'a page without a sky gets no mask',
+  );
   console.log('ok 7: sky coverage on the probes, the complement of the geometry, named by look.md; none without a sky');
 }
 console.log('shot tool determinism check passed');
