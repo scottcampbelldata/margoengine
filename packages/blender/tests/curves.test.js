@@ -15,20 +15,42 @@ const truth = JSON.parse(await readFile(new URL('./fixtures/curves-truth.json', 
 const shapes = decodeMargoCurves(bytes);
 const close = (actual, expected, tolerance, what) => {
   assert.equal(actual.length, expected.length, `${what}: ${actual.length} values against Blender's ${expected.length}`);
-  actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) <= tolerance, `${what} [${i}]: ${v} against Blender's ${expected[i]}`));
+  actual.forEach((v, i) =>
+    assert.ok(Math.abs(v - expected[i]) <= tolerance, `${what} [${i}]: ${v} against Blender's ${expected[i]}`),
+  );
 };
 const apply = (m, [x, y, z]) => [0, 1, 2].map((r) => m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r]);
 
 test('the file holds the floor mesh and every curves object, point cloud and volume by name', () => {
   assert.deepEqual(shapes.curves.map((c) => c.name).sort(), ['Hair', 'Lines', 'Path']);
-  assert.deepEqual(shapes.points.map((p) => p.name), ['Cloud']);
-  assert.deepEqual(shapes.volumes.map((v) => [v.name, v.grids]), [['Smoke', ['density']]]);
+  assert.deepEqual(
+    shapes.points.map((p) => p.name),
+    ['Cloud'],
+  );
+  assert.deepEqual(
+    shapes.volumes.map((v) => [v.name, v.grids]),
+    [['Smoke', ['density']]],
+  );
   assert.equal(shapes.asset.document.meshes.length, 1);
   assert.equal(shapes.asset.document.nodes.find((n) => n.mesh !== undefined).name, 'Floor');
   const path = shapes.curves.find((c) => c.name === 'Path');
-  assert.deepEqual(path.splines.map((s) => [s.type, s.cyclic, s.resolution, s.positions.length / 3]), [['bezier', false, 6, 4], ['bezier', true, 4, 4]]);
+  assert.deepEqual(
+    path.splines.map((s) => [s.type, s.cyclic, s.resolution, s.positions.length / 3]),
+    [
+      ['bezier', false, 6, 4],
+      ['bezier', true, 4, 4],
+    ],
+  );
   const lines = shapes.curves.find((c) => c.name === 'Lines');
-  assert.deepEqual(lines.splines.map((s) => [s.type, s.order, s.knots]), [['poly', 0, undefined], ['nurbs', 4, 'endpoint'], ['nurbs', 3, 'normal'], ['nurbs', 4, 'endpoint']]);
+  assert.deepEqual(
+    lines.splines.map((s) => [s.type, s.order, s.knots]),
+    [
+      ['poly', 0, undefined],
+      ['nurbs', 4, 'endpoint'],
+      ['nurbs', 3, 'normal'],
+      ['nurbs', 4, 'endpoint'],
+    ],
+  );
 });
 
 test('each curves object evaluates to the polyline Blender draws (Bezier, poly, NURBS and Catmull-Rom)', () => {
@@ -36,7 +58,12 @@ test('each curves object evaluates to the polyline Blender draws (Bezier, poly, 
     // Lines' last spline is a cyclic NURBS with Endpoint knots, which evaluateSpline refuses (below): 34 points before it.
     const splines = curves.name === 'Lines' ? curves.splines.slice(0, -1) : curves.splines,
       expected = truth.polylines[curves.name].flat().slice(0, curves.name === 'Lines' ? 34 * 3 : undefined);
-    close(splines.flatMap((spline) => [...evaluateSpline(spline)]), expected, 2e-5, `${curves.name} polyline`);
+    close(
+      splines.flatMap((spline) => [...evaluateSpline(spline)]),
+      expected,
+      2e-5,
+      `${curves.name} polyline`,
+    );
   }
 });
 
@@ -63,7 +90,8 @@ test("the volume's OpenVDB file reads with @margoengine/loaders/vdb as openvdb r
   const density = grids.find((g) => g.name === 'density');
   const expected = truth.volumes.density;
   assert.equal(density.activeVoxels, expected.activeVoxels);
-  for (const [[i, j, k], value] of expected.probes) assert.ok(Math.abs(density.at(i, j, k) - value) < 1e-6, `voxel ${i},${j},${k}`);
+  for (const [[i, j, k], value] of expected.probes)
+    assert.ok(Math.abs(density.at(i, j, k) - value) < 1e-6, `voxel ${i},${j},${k}`);
   expected.probes.forEach(([ijk], index) => {
     const world = apply(density.matrix, ijk);
     close(world, expected.world[index], 1e-5, 'index to object space');
@@ -98,17 +126,68 @@ function edited(change) {
 }
 
 test('corrupt shape records fail by name', () => {
-  assert.throws(() => decodeMargoCurves(edited((d) => { d.curves[0].splines[0].points += 1; })), /Invalid \.margo spline/);
-  assert.throws(() => decodeMargoCurves(edited((d) => { d.curves[0].attributes.position.byteOffset = 1e9; })), /Invalid \.margo shape attribute position/);
-  assert.throws(() => decodeMargoCurves(edited((d) => { d.pointClouds[0].attributes.position.components = 4; })), /Invalid \.margo shape attribute position/);
-  assert.throws(() => decodeMargoCurves(edited((d) => { d.nodes.find((n) => n.volume !== undefined).volume = 7; })), /Invalid \.margo node volume reference/);
-  assert.throws(() => decodeMargoCurves(edited((d) => { d.volumes[0].section = 1; })), /Invalid \.margo shape section reference/);
-  assert.throws(() => decodeMargoCurves(edited((d) => { d.curves[0].splines[0].type = 'hermite'; })), /Invalid \.margo spline/);
+  assert.throws(
+    () =>
+      decodeMargoCurves(
+        edited((d) => {
+          d.curves[0].splines[0].points += 1;
+        }),
+      ),
+    /Invalid \.margo spline/,
+  );
+  assert.throws(
+    () =>
+      decodeMargoCurves(
+        edited((d) => {
+          d.curves[0].attributes.position.byteOffset = 1e9;
+        }),
+      ),
+    /Invalid \.margo shape attribute position/,
+  );
+  assert.throws(
+    () =>
+      decodeMargoCurves(
+        edited((d) => {
+          d.pointClouds[0].attributes.position.components = 4;
+        }),
+      ),
+    /Invalid \.margo shape attribute position/,
+  );
+  assert.throws(
+    () =>
+      decodeMargoCurves(
+        edited((d) => {
+          d.nodes.find((n) => n.volume !== undefined).volume = 7;
+        }),
+      ),
+    /Invalid \.margo node volume reference/,
+  );
+  assert.throws(
+    () =>
+      decodeMargoCurves(
+        edited((d) => {
+          d.volumes[0].section = 1;
+        }),
+      ),
+    /Invalid \.margo shape section reference/,
+  );
+  assert.throws(
+    () =>
+      decodeMargoCurves(
+        edited((d) => {
+          d.curves[0].splines[0].type = 'hermite';
+        }),
+      ),
+    /Invalid \.margo spline/,
+  );
 });
 
 test('NURBS with Bezier knots, cyclic Endpoint knots or too few points are refused by name', () => {
   const spline = { ...shapes.curves.find((c) => c.name === 'Lines').splines[1] };
   assert.throws(() => evaluateSpline({ ...spline, knots: 'bezier' }), /Bezier knots/);
   assert.throws(() => evaluateSpline({ ...spline, order: 6 }), /order 6 needs at least 6 points/);
-  assert.throws(() => evaluateSpline(shapes.curves.find((c) => c.name === 'Lines').splines[3]), /cyclic NURBS with Endpoint knots/);
+  assert.throws(
+    () => evaluateSpline(shapes.curves.find((c) => c.name === 'Lines').splines[3]),
+    /cyclic NURBS with Endpoint knots/,
+  );
 });

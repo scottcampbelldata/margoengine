@@ -6,9 +6,9 @@ import { openBrowser } from '../../../scripts/browser.js';
 const truth = JSON.parse(await readFile(new URL('./fixtures/objects-truth.json', import.meta.url), 'utf8'));
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-extension.html' });
 const errors = [];
-browser.page.on('pageerror', e => errors.push(e.message));
+browser.page.on('pageerror', (e) => errors.push(e.message));
 try {
-  const result = await browser.page.evaluate(async truth => {
+  const result = await browser.page.evaluate(async (truth) => {
     const { Engine } = await import('/packages/core/dist/index.js');
     const { loadMargoObjects } = await import('/packages/blender/dist/objects.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
@@ -20,21 +20,28 @@ try {
     engine.gpu.pushErrorScope('validation');
     const model = await loadMargoObjects(engine, '/packages/blender/tests/fixtures/objects.margo');
     const animation = Animation.attach(model);
-    let worst = 0, compared = 0;
+    let worst = 0,
+      compared = 0;
     for (const clip of model.asset.doc.animations) {
       animation.play(clip.name);
       for (const [frame, expected] of truth.clips[clip.name].entries()) {
         animation.seek(frame / 24);
         engine.render({ culling: false });
         for (const [name, matrix] of Object.entries(expected)) {
-          const id = model.asset.doc.nodes.findIndex(n => n.name === name);
-          matrix.forEach((value, k) => { worst = Math.max(worst, Math.abs(value - model.nodes[id].matrix[k])); compared++; });
+          const id = model.asset.doc.nodes.findIndex((n) => n.name === name);
+          matrix.forEach((value, k) => {
+            worst = Math.max(worst, Math.abs(value - model.nodes[id].matrix[k]));
+            compared++;
+          });
         }
       }
     }
     const b = model.bounds;
     engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]], { duration: 0 });
-    await waitForPipelines(async () => { engine.render({ culling: false }); await engine.gpu.queue.onSubmittedWorkDone(); });
+    await waitForPipelines(async () => {
+      engine.render({ culling: false });
+      await engine.gpu.queue.onSubmittedWorkDone();
+    });
     const validation = (await engine.gpu.popErrorScope())?.message ?? null;
     const image = canvas.toDataURL();
     animation.dispose();
