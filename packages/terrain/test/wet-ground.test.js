@@ -13,7 +13,7 @@ import {
 const terrain = { addLighting: () => () => {} },
   options = { record: () => undefined, origin: [-16, -16], size: [32, 32] };
 
-test('wetness is the record\'s wet flag times exp(-since / dryTime): 1 under water, 1/e at dryTime', () => {
+test("wetness is the record's wet flag times exp(-since / dryTime): 1 under water, 1/e at dryTime", () => {
   const wet = new WetGround(terrain, { ...options, dryTime: 100 });
   assert.equal(wet.wetness(0, 1), 1);
   assert.ok(Math.abs(wet.wetness(100, 1) - 1 / Math.E) < 1e-12);
@@ -49,7 +49,10 @@ test('the shader patch keeps one terrainColor and one fragment entry, so it comp
 });
 
 test('slider rows: the shared shape, every row live, defaults equal to the look without options', () => {
-  assert.deepEqual(WET_GROUND_SETTINGS.map((r) => r.name), ['wet.darkening', 'wet.gloss', 'wet.dryTime']);
+  assert.deepEqual(
+    WET_GROUND_SETTINGS.map((r) => r.name),
+    ['wet.darkening', 'wet.gloss', 'wet.dryTime'],
+  );
   assert.equal(WET_GROUND_LIVE_SETTINGS.length, WET_GROUND_SETTINGS.length);
   for (const row of WET_GROUND_SETTINGS) {
     assert.equal(row.kind, 'number');

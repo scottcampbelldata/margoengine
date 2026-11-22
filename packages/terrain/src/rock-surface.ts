@@ -143,7 +143,8 @@ function styleRow(style: RockStyle | undefined): Float32Array {
   if (style !== undefined && (style === null || typeof style !== 'object'))
     throw new RangeError('Rock style must be an object');
   const type = style?.type ?? 'sandstone';
-  if (!(type in ROCK_TYPES)) throw new RangeError(`Unknown rock type ${String(type)}; use one of ${Object.keys(ROCK_TYPES).join(', ')}`);
+  if (!(type in ROCK_TYPES))
+    throw new RangeError(`Unknown rock type ${String(type)}; use one of ${Object.keys(ROCK_TYPES).join(', ')}`);
   const base = ROCK_TYPES[type],
     color = style?.color ?? base.color,
     color2 = style?.color2 ?? base.color2,
@@ -231,7 +232,7 @@ export class RockSurface implements EnginePlugin {
     const runtime = meshRuntime(mesh);
     runtime.check();
     if (this.engine && runtime.engine !== this.engine)
-      throw new MargoError('attached', 'The mesh belongs to another engine; add meshes of the surface\'s engine');
+      throw new MargoError('attached', "The mesh belongs to another engine; add meshes of the surface's engine");
     this.rows.set(mesh, { id: runtime.id, row: styleRow(style) });
     this.dirty = true;
     return this;
@@ -250,11 +251,22 @@ export class RockSurface implements EnginePlugin {
   private globals(): Float32Array {
     const l = this.look;
     return new Float32Array([
-      l.bump, l.scale, l.cracks, l.variation,
-      l.strata, l.moss, l.tideHeight, l.algae,
-      ...l.mossColor, l.roughness,
-      ...l.algaeColor, l.wetDarkening,
-      l.wetGloss, l.rain ?? 0, 0, 0,
+      l.bump,
+      l.scale,
+      l.cracks,
+      l.variation,
+      l.strata,
+      l.moss,
+      l.tideHeight,
+      l.algae,
+      ...l.mossColor,
+      l.roughness,
+      ...l.algaeColor,
+      l.wetDarkening,
+      l.wetGloss,
+      l.rain ?? 0,
+      0,
+      0,
     ]);
   }
   /**

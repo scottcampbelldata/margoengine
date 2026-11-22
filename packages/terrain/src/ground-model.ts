@@ -381,7 +381,14 @@ const smooth = (a: number, b: number, v: number) => {
 function bad(kind: string, message: string): never {
   throw new RangeError(`Invalid ground ${kind} event; ${message}`);
 }
-function number(e: Record<string, unknown>, key: string, fallback: number, lo: number, hi: number, open = false): number {
+function number(
+  e: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  lo: number,
+  hi: number,
+  open = false,
+): number {
   const v = e[key] ?? fallback;
   if (!finite(v) || v < lo || v > hi || (open && v === lo))
     bad(String(e.kind), `${key} must be a number ${open ? 'above' : 'from'} ${lo}${hi < Infinity ? ` to ${hi}` : ''}.`);
@@ -483,7 +490,9 @@ export function groundNoise(x: number, z: number, seed: number): number {
 }
 /** Two octaves of noise centred on 0, about -0.5 to 0.5. */
 const wobble = (x: number, z: number, scale: number, seed: number) =>
-  (groundNoise(x / scale, z / scale, seed) * 0.67 + groundNoise((x * 2.1) / scale, (z * 2.1) / scale, seed + 7) * 0.33) - 0.5;
+  groundNoise(x / scale, z / scale, seed) * 0.67 +
+  groundNoise((x * 2.1) / scale, (z * 2.1) / scale, seed + 7) * 0.33 -
+  0.5;
 
 /** Progress of a steady event at film time t: 0 before it starts, 1 once done. */
 const progress = (e: ResolvedEvent, t: number) => clamp01((t - e.start) / e.duration);
@@ -584,7 +593,12 @@ export function resolveEvent(event: GroundEvent, order: number, top: number): Re
       o.distance = dist;
       const pad = o.width;
       return make(
-        [Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad],
+        [
+          Math.min(a[0], b[0]) - pad,
+          Math.min(a[1], b[1]) - pad,
+          Math.max(a[0], b[0]) + pad,
+          Math.max(a[1], b[1]) + pad,
+        ],
         end,
         { dir: [(b[0] - a[0]) / dist, (b[1] - a[1]) / dist] },
       );
@@ -627,7 +641,11 @@ export function resolveEvent(event: GroundEvent, order: number, top: number): Re
         list = (key: string, lo: number, hi: number, open: boolean): Float64Array | undefined => {
           const v = e[key];
           if (v === undefined) return undefined;
-          if (!Array.isArray(v) || v.length !== n || !v.every((x) => finite(x) && x >= lo && x <= hi && !(open && x === lo)))
+          if (
+            !Array.isArray(v) ||
+            v.length !== n ||
+            !v.every((x) => finite(x) && x >= lo && x <= hi && !(open && x === lo))
+          )
             bad(kind, `${key} must hold one number ${open ? 'above' : 'from'} ${lo} to ${hi} per path point.`);
           return Float64Array.from(v as number[]);
         },
@@ -649,7 +667,8 @@ export function resolveEvent(event: GroundEvent, order: number, top: number): Re
         pondEnd = -Infinity;
       if (e.pond !== undefined) {
         const pd = e.pond as Record<string, unknown>;
-        if (typeof pd !== 'object' || pd === null || !point(pd.center)) bad(kind, 'pond.center must be an [x, z] point.');
+        if (typeof pd !== 'object' || pd === null || !point(pd.center))
+          bad(kind, 'pond.center must be an [x, z] point.');
         const c = pd.center as GroundPoint,
           ps = number({ ...pd, kind } as Record<string, unknown>, 'start', 0, 0, 1e9),
           pe = number({ ...pd, kind } as Record<string, unknown>, 'end', ps + 1, ps, 1e10, true),
@@ -664,7 +683,12 @@ export function resolveEvent(event: GroundEvent, order: number, top: number): Re
         // Huppert's (1982) radius coefficient: R = K t^(1/2).
         o.pondK = 0.715 * Math.pow((9.80665 * flux ** 3) / (3 * (visc / dens)), 1 / 8);
         const R = o.pondK * Math.sqrt(pe - ps);
-        box = [Math.min(box[0], c[0] - R), Math.min(box[1], c[1] - R), Math.max(box[2], c[0] + R), Math.max(box[3], c[1] + R)];
+        box = [
+          Math.min(box[0], c[0] - R),
+          Math.min(box[1], c[1] - R),
+          Math.max(box[2], c[0] + R),
+          Math.max(box[3], c[1] + R),
+        ];
         pondEnd = pe;
       }
       if (!a) return make(box, Math.max(end, pondEnd) + cool, { line: l, profile });
@@ -724,7 +748,7 @@ function gullyGrowth(e: ResolvedEvent, s: number, p: number): { width: number; d
 }
 /** Volume a slide's scar has lost at progress p: an ellipsoid cap, 2/3 pi a b D. */
 export function slideVolume(e: ResolvedEvent, p: number): number {
-  return ((2 / 3) * Math.PI * (e.o.length / 2) * (e.o.width / 2) * e.o.depth * slideFailure(p));
+  return (2 / 3) * Math.PI * (e.o.length / 2) * (e.o.width / 2) * e.o.depth * slideFailure(p);
 }
 /** The scar fails over the first third of a slide. */
 const slideFailure = (p: number) => smooth(0, 1 / 3, p);
@@ -925,7 +949,9 @@ export function sampleEvent(e: ResolvedEvent, x: number, z: number, t: number, b
         age = Math.max(t - (sky ? (drained < 1e9 ? drained : t) : reached), 0) * o.cooling,
         heat = covered
           ? 0
-          : Math.exp(-crustThickness(age) / o.glowCrust) * smooth(0, 0.1, thick) * (pr.glow ? alongValues(l, pr.glow, q.s) : 1);
+          : Math.exp(-crustThickness(age) / o.glowCrust) *
+            smooth(0, 0.1, thick) *
+            (pr.glow ? alongValues(l, pr.glow, q.s) : 1);
       out[0] += thick;
       cover(out, 'lava', smooth(0, 0.08, thick));
       out[5] = Math.max(out[5] * (1 - smooth(0, 0.08, thick)), heat);

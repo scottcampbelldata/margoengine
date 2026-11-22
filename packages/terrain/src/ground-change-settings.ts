@@ -50,20 +50,49 @@ export const GROUND_CHANGE_SETTINGS: readonly GroundSetting[] = [
   c('char.color', [0.025, 0.022, 0.02], 'Fresh char on burned ground (albedo about 0.02 to 0.04).'),
   c('ashen.color', [0.5, 0.49, 0.47], 'White ash that char ages into after a hot burn.'),
   c('lava.color', [0.04, 0.036, 0.034], 'Cooled lava rock (dark basalt).'),
-  n('lava.glow', 'lava', 12, 0, 100, 0.1, '', 'Brightness of glowing lava at full heat, as linear radiance (the sun is about 1).'),
-  n('lava.cracks', 'lava', 0.7, 0, 1, 0.01, '', 'How much a cooling flow glows only through the cracks of its crust: 0 evenly, 1 cracks only.'),
+  n(
+    'lava.glow',
+    'lava',
+    12,
+    0,
+    100,
+    0.1,
+    '',
+    'Brightness of glowing lava at full heat, as linear radiance (the sun is about 1).',
+  ),
+  n(
+    'lava.cracks',
+    'lava',
+    0.7,
+    0,
+    1,
+    0.01,
+    '',
+    'How much a cooling flow glows only through the cracks of its crust: 0 evenly, 1 cracks only.',
+  ),
   n('lava.crackSize', 'lava', 0.8, 0.05, 100, 0.05, 'm', 'Width of the crust plates between the glowing cracks.'),
   n('wet.darkening', 'wet', 0.55, 0, 1, 0.01, '', 'Albedo of fully wet mud, soil or ash (1 is no darkening).'),
   n('wet.gloss', 'wet', 0.5, 0, 1, 0.01, '', 'Share by which wet ground is smoother (shinier).'),
   {
     ...followsWeather(
-      n('wet.rain', 'wet', 0, 0, 1, 0.01, '', 'Wetness from rain on all cut soil, mud and ash, 0 dry to 1 soaked. Null follows the weather.'),
+      n(
+        'wet.rain',
+        'wet',
+        0,
+        0,
+        1,
+        0.01,
+        '',
+        'Wetness from rain on all cut soil, mud and ash, 0 dry to 1 soaked. Null follows the weather.',
+      ),
       'rainRate',
     ),
   } as GroundSetting,
 ];
 /** The rows that can change every frame (all of them). */
-export const GROUND_CHANGE_LIVE_SETTINGS: readonly GroundSetting[] = liveSettings(GROUND_CHANGE_SETTINGS) as GroundSetting[];
+export const GROUND_CHANGE_LIVE_SETTINGS: readonly GroundSetting[] = liveSettings(
+  GROUND_CHANGE_SETTINGS,
+) as GroundSetting[];
 const BY_NAME = settingIndex(GROUND_CHANGE_SETTINGS) as Map<string, GroundSetting>;
 /** Every setting at its default, as a fresh object to edit (a slider panel's state). */
 export function groundChangeSettingDefaults(): Record<string, GroundSettingValue> {

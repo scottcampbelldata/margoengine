@@ -38,13 +38,20 @@ await runSuite(
       const checker = new Uint8Array(8 * 8 * 4 * 4);
       for (let l = 0; l < 4; l++)
         for (let y = 0; y < 8; y++)
-          for (let x = 0; x < 8; x++) checker.fill((x + y) % 2 ? 235 : 175, ((l * 8 + y) * 8 + x) * 4, ((l * 8 + y) * 8 + x) * 4 + 3);
+          for (let x = 0; x < 8; x++)
+            checker.fill((x + y) % 2 ? 235 : 175, ((l * 8 + y) * 8 + x) * 4, ((l * 8 + y) * 8 + x) * 4 + 3);
       for (let i = 3; i < checker.length; i += 4) checker[i] = 255;
       const half = (h) => {
         const s = h & 0x8000 ? -1 : 1,
           e = (h >> 10) & 31,
           m = h & 1023;
-        return e === 0 ? s * m * 2 ** -24 : e === 31 ? (m ? Number.NaN : s * Infinity) : s * (1 + m / 1024) * 2 ** (e - 15);
+        return e === 0
+          ? s * m * 2 ** -24
+          : e === 31
+            ? m
+              ? Number.NaN
+              : s * Infinity
+            : s * (1 + m / 1024) * 2 ** (e - 15);
       };
       async function readRelief(device, texture) {
         const buffer = device.createBuffer({ size: side * side * 8, usage: 1 | 8 }),
@@ -66,10 +73,20 @@ await runSuite(
           tz = fz - z0,
           at = (i, j) => map[((((j % side) + side) % side) * side + (((i % side) + side) % side)) * 4 + channel];
         return (
-          (at(x0, z0) * (1 - tx) + at(x0 + 1, z0) * tx) * (1 - tz) + (at(x0, z0 + 1) * (1 - tx) + at(x0 + 1, z0 + 1) * tx) * tz
+          (at(x0, z0) * (1 - tx) + at(x0 + 1, z0) * tx) * (1 - tz) +
+          (at(x0, z0 + 1) * (1 - tx) + at(x0 + 1, z0 + 1) * tx) * tz
         );
       };
-      async function frame({ deform, prints = () => {}, heights, weights, sun = [0.7, 0.5, 0.3, 2.5], frames = 2, delta = 1 / 60, then }) {
+      async function frame({
+        deform,
+        prints = () => {},
+        heights,
+        weights,
+        sun = [0.7, 0.5, 0.3, 2.5],
+        frames = 2,
+        delta = 1 / 60,
+        then,
+      }) {
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
         document.body.append(canvas);
@@ -87,7 +104,10 @@ await runSuite(
           layers: rules,
           textures(gpu) {
             const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
-            gpu.queue.writeTexture({ texture: heightmap }, heights ?? new Float32Array(n * n), { bytesPerRow: n * 4 }, [n, n]);
+            gpu.queue.writeTexture({ texture: heightmap }, heights ?? new Float32Array(n * n), { bytesPerRow: n * 4 }, [
+              n,
+              n,
+            ]);
             const layers = gpu.createTexture({ size: [8, 8, 4], format: 'rgba8unorm-srgb', usage: 6 });
             gpu.queue.writeTexture({ texture: layers }, checker, { bytesPerRow: 32, rowsPerImage: 8 }, [8, 8, 4]);
             if (!weights) return { heightmap, layers };
@@ -123,7 +143,11 @@ await runSuite(
           worst = 0;
         for (let p = 0; p < size * size; p++) {
           if (mask && !mask[p]) continue;
-          const d = Math.max(Math.abs(a[p * 4] - b[p * 4]), Math.abs(a[p * 4 + 1] - b[p * 4 + 1]), Math.abs(a[p * 4 + 2] - b[p * 4 + 2]));
+          const d = Math.max(
+            Math.abs(a[p * 4] - b[p * 4]),
+            Math.abs(a[p * 4 + 1] - b[p * 4 + 1]),
+            Math.abs(a[p * 4 + 2] - b[p * 4 + 2]),
+          );
           sum += d;
           count++;
           worst = Math.max(worst, d);
@@ -132,7 +156,8 @@ await runSuite(
       };
       const out = {},
         depth = 0.1,
-        stamp = (d) => d.footprint(0, 0.05, { depth, angle: 0.4 }).track([-0.6, 0.45], [0.6, 0.35], { width: 0.2, depth: 0.05 });
+        stamp = (d) =>
+          d.footprint(0, 0.05, { depth, angle: 0.4 }).track([-0.6, 0.45], [0.6, 0.35], { width: 0.2, depth: 0.05 });
       // 1. The pressed map against the profile on the CPU: t is the distance over the print's half size.
       const smooth = (a, b, x) => {
           const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
@@ -154,7 +179,10 @@ await runSuite(
             h = Math.min(Math.max(((x - ax) * bx + (z - az) * bz) / (bx * bx + bz * bz), 0), 1),
             tt = Math.hypot(x - ax - bx * h, z - az - bz * h) / 0.1;
           const press = Math.max(depth * (1 - smooth(0.55, 1, tf)), 0.05 * (1 - smooth(0.55, 1, tt))),
-            rim = Math.max(depth * 0.25 * (1 - smooth(0, 0.45, Math.abs(tf - 1.2))), 0.05 * 0.25 * (1 - smooth(0, 0.45, Math.abs(tt - 1.2))));
+            rim = Math.max(
+              depth * 0.25 * (1 - smooth(0, 0.45, Math.abs(tf - 1.2))),
+              0.05 * 0.25 * (1 - smooth(0, 0.45, Math.abs(tt - 1.2))),
+            );
           return rim * (1 - smooth(0, 0.02, press)) - press;
         };
       let worst = 0,
@@ -169,7 +197,8 @@ await runSuite(
           worst = Math.max(worst, Math.abs(printed.relief[k] - pressedAt(x, z)));
           slopeWorst = Math.max(slopeWorst, Math.abs(printed.relief[k + 1] - gx) / Math.max(1, Math.abs(gx)));
         }
-      for (let j = 300; j < 400; j++) for (let i = 300; i < 400; i++) far = Math.max(far, Math.abs(printed.relief[(j * side + i) * 4]));
+      for (let j = 300; j < 400; j++)
+        for (let i = 300; i < 400; i++) far = Math.max(far, Math.abs(printed.relief[(j * side + i) * 4]));
       out.profile = {
         worst: +worst.toFixed(6),
         slopeWorst: +slopeWorst.toFixed(4),
@@ -183,30 +212,50 @@ await runSuite(
       // 3. The truth: the read-back relief as real geometry, the same patch at 4 mm cells.
       const heights = new Float32Array(n * n);
       for (let j = 0; j < n; j++)
-        for (let i = 0; i < n; i++) heights[j * n + i] = reliefAt(printed.relief, patch.origin[0] + i * cell, patch.origin[1] + j * cell);
+        for (let i = 0; i < n; i++)
+          heights[j * n + i] = reliefAt(printed.relief, patch.origin[0] + i * cell, patch.origin[1] + j * cell);
       const truth = await frame({ heights }),
         flatTruth = await frame({ heights: new Float32Array(n * n) }),
         ours = await frame({ deform: { darken: 0, fade: 0 }, prints: stamp }),
         mask = new Uint8Array(size * size);
       for (let p = 0; p < size * size; p++)
-        mask[p] = +(Math.max(...[0, 1, 2].map((c) => Math.abs(truth.pixels[p * 4 + c] - flatTruth.pixels[p * 4 + c]))) > 4);
+        mask[p] = +(
+          Math.max(...[0, 1, 2].map((c) => Math.abs(truth.pixels[p * 4 + c] - flatTruth.pixels[p * 4 + c]))) > 4
+        );
       out.truth = { deformed: diff(ours.pixels, truth.pixels, mask), flat: diff(plain.pixels, truth.pixels, mask) };
       // 4. Darkening; fading by frame time; following.
       const dark = await frame({ deform: { darken: 0.5, fade: 0 }, prints: stamp });
-      out.darker = +(diff(dark.pixels, plain.pixels, mask).mean - diff(ours.pixels, plain.pixels, mask).mean).toFixed(3);
+      out.darker = +(diff(dark.pixels, plain.pixels, mask).mean - diff(ours.pixels, plain.pixels, mask).mean).toFixed(
+        3,
+      );
       const centre = (r) => +r.relief[(5 * side + 0) * 4].toFixed(5);
       out.fade = [];
       for (const seconds of [0.5, 1, 2])
-        out.fade.push(centre(await frame({ deform: { fade: 3, depth: 0.15 }, prints: stamp, frames: 1, then: async (_, engine) => {
-          for (let t = 0; t < seconds - 1e-9; t += 0.25) engine.render({ delta: 0.25 });
-        } })));
+        out.fade.push(
+          centre(
+            await frame({
+              deform: { fade: 3, depth: 0.15 },
+              prints: stamp,
+              frames: 1,
+              then: async (_, engine) => {
+                for (let t = 0; t < seconds - 1e-9; t += 0.25) engine.render({ delta: 0.25 });
+              },
+            }),
+          ),
+        );
       const moved = async (offset) =>
-        centre(await frame({ deform: { fade: 0 }, prints: stamp, then: async (_, engine) => {
-          const at = [...engine.camera.position];
-          engine.camera.position = [at[0] + offset, at[1], at[2]];
-          engine.render({ delta: 0 });
-          engine.camera.position = at;
-        } }));
+        centre(
+          await frame({
+            deform: { fade: 0 },
+            prints: stamp,
+            then: async (_, engine) => {
+              const at = [...engine.camera.position];
+              engine.camera.position = [at[0] + offset, at[1], at[2]];
+              engine.render({ delta: 0 });
+              engine.camera.position = at;
+            },
+          }),
+        );
       out.follow = { near: await moved(2), away: await moved(12) };
       // 5. Painted weights: all of layer 0, whose softness is 0.
       const hard = await frame({ deform: { layers: [0] }, prints: stamp, weights: [255, 0, 0, 0] }),
@@ -221,7 +270,10 @@ await runSuite(
     assert.deepEqual(result.errors, []);
     // f16 holds 0.1 to 1 part in 2,048 (5e-5); the profile's own maths is the same formula in f32.
     assert.ok(r.profile.worst < 2e-4, `the pressed map follows the profile: ${JSON.stringify(r.profile)}`);
-    assert.ok(r.profile.slopeWorst < 0.01, `its slopes are the profile's central differences: ${JSON.stringify(r.profile)}`);
+    assert.ok(
+      r.profile.slopeWorst < 0.01,
+      `its slopes are the profile's central differences: ${JSON.stringify(r.profile)}`,
+    );
     assert.ok(Math.abs(r.profile.centre + 0.1) < 1e-4, 'a footprint is its depth deep at its centre');
     assert.equal(r.profile.far, 0, 'nothing pressed far from the prints');
     assert.ok(r.idle <= 1, `no print draws the plain picture: ${r.idle}`);
@@ -233,7 +285,9 @@ await runSuite(
     assert.ok(r.darker > 1, `darken darkens the prints: ${r.darker}`);
     // depth 0.15 refilled over 3 s: 0.05 a second, from 0.1 deep.
     const expected = [0.075, 0.05, 0];
-    r.fade.forEach((d, i) => assert.ok(Math.abs(d + expected[i]) < 2e-4, `fading after ${[0.5, 1, 2][i]} s: ${r.fade}`));
+    r.fade.forEach((d, i) =>
+      assert.ok(Math.abs(d + expected[i]) < 2e-4, `fading after ${[0.5, 1, 2][i]} s: ${r.fade}`),
+    );
     assert.ok(Math.abs(r.follow.near + 0.1) < 1e-4, `a 2 m move keeps the print: ${JSON.stringify(r.follow)}`);
     assert.equal(r.follow.away, 0, `a 12 m move (past the 10.24 m window) clears it: ${JSON.stringify(r.follow)}`);
     assert.ok(r.hard <= 1, `a layer of softness 0 takes no print: ${r.hard}`);

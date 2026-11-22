@@ -85,7 +85,13 @@ test('NaN and the GDAL no-data value are filled from the nearest valid texel', (
 });
 
 test('a no-data value equal to a float32 value is matched in float32', () => {
-  const g = gridHeightField({ width: 2, height: 2, heights: [Math.fround(-999999.9), 1, 2, 3], size: [1, 1], noData: -999999.9 });
+  const g = gridHeightField({
+    width: 2,
+    height: 2,
+    heights: [Math.fround(-999999.9), 1, 2, 3],
+    size: [1, 1],
+    noData: -999999.9,
+  });
   assert.equal(g.filled, 1);
   assert.ok(g.min >= 1);
 });
@@ -101,7 +107,10 @@ test('fill takes a number, the minimum or the mean of the valid heights', () => 
 });
 
 test('a grid with no valid sample needs a numeric fill', () => {
-  assert.throws(() => gridHeightField({ width: 2, height: 2, heights: [NaN, NaN, NaN, NaN], size: [1, 1] }), RangeError);
+  assert.throws(
+    () => gridHeightField({ width: 2, height: 2, heights: [NaN, NaN, NaN, NaN], size: [1, 1] }),
+    RangeError,
+  );
   assert.throws(
     () => gridHeightField({ width: 2, height: 2, heights: [1, 1, 1, 1], size: [1, 1], noData: 1, fill: 'mean' }),
     RangeError,

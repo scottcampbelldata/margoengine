@@ -160,7 +160,10 @@ const UNITS = ['cracks', 'wetDarkening', 'wetGloss'] as const;
 function checkLook(look: GroundLook): void {
   for (const k of COLORS) {
     const v = look[k];
-    if (v !== undefined && !(Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && x >= 0 && x <= 1)))
+    if (
+      v !== undefined &&
+      !(Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && x >= 0 && x <= 1))
+    )
       throw new RangeError(`Invalid ground change ${k}; give three numbers from 0 to 1 (linear RGB).`);
   }
   for (const k of UNITS) {
@@ -170,9 +173,16 @@ function checkLook(look: GroundLook): void {
   }
   if (look.glow !== undefined && !(typeof look.glow === 'number' && look.glow >= 0 && look.glow <= 100))
     throw new RangeError('Invalid ground change glow; give a number from 0 to 100.');
-  if (look.crackSize !== undefined && !(typeof look.crackSize === 'number' && look.crackSize > 0 && look.crackSize <= 100))
+  if (
+    look.crackSize !== undefined &&
+    !(typeof look.crackSize === 'number' && look.crackSize > 0 && look.crackSize <= 100)
+  )
     throw new RangeError('Invalid ground change crackSize; give a number above 0 up to 100.');
-  if (look.rain !== undefined && look.rain !== null && !(typeof look.rain === 'number' && look.rain >= 0 && look.rain <= 1))
+  if (
+    look.rain !== undefined &&
+    look.rain !== null &&
+    !(typeof look.rain === 'number' && look.rain >= 0 && look.rain <= 1)
+  )
     throw new RangeError('Invalid ground change rain; give a number from 0 to 1, or null to follow the weather.');
 }
 
@@ -289,7 +299,8 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
         'Invalid ground change grid; give size [w, d] above 0 (up to 1e6), an integer resolution 1 to 4,096 (or one along X and one along Z) and a finite origin.',
       );
     const t = options.time ?? 0;
-    if (!(typeof t === 'number' && t >= 0 && t <= 1e9)) throw new RangeError('Invalid ground change time; give 0 to 1e9 seconds.');
+    if (!(typeof t === 'number' && t >= 0 && t <= 1e9))
+      throw new RangeError('Invalid ground change time; give 0 to 1e9 seconds.');
     if (options.clock !== undefined && typeof options.clock !== 'function')
       throw new TypeError('Invalid ground change clock; pass a function returning film seconds.');
     if (options.shadows !== undefined && typeof options.shadows?.invalidate !== 'function')
@@ -457,7 +468,12 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
     const grow = (r: GroundRect | undefined) => {
       if (!r) return;
       rect = rect
-        ? { x0: Math.min(rect.x0, r.x0), z0: Math.min(rect.z0, r.z0), x1: Math.max(rect.x1, r.x1), z1: Math.max(rect.z1, r.z1) }
+        ? {
+            x0: Math.min(rect.x0, r.x0),
+            z0: Math.min(rect.z0, r.z0),
+            x1: Math.max(rect.x1, r.x1),
+            z1: Math.max(rect.z1, r.z1),
+          }
         : r;
     };
     for (const r of this.#forced) grow(r);
@@ -471,7 +487,12 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
     this.#compute(rect, t);
     const p = this.#pending;
     this.#pending = p
-      ? { x0: Math.min(p.x0, rect.x0), z0: Math.min(p.z0, rect.z0), x1: Math.max(p.x1, rect.x1), z1: Math.max(p.z1, rect.z1) }
+      ? {
+          x0: Math.min(p.x0, rect.x0),
+          z0: Math.min(p.z0, rect.z0),
+          x1: Math.max(p.x1, rect.x1),
+          z1: Math.max(p.z1, rect.z1),
+        }
       : rect;
     for (const listener of this.#listeners) listener(rect);
     return rect;
@@ -483,7 +504,12 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
       x0w = this.#world(r.x0, r.z0),
       x1w = this.#world(r.x1, r.z1),
       near = this.#events.filter(
-        (e) => e.start < t && e.bounds[0] <= x1w[0] && e.bounds[2] >= x0w[0] && e.bounds[1] <= x1w[1] && e.bounds[3] >= x0w[1],
+        (e) =>
+          e.start < t &&
+          e.bounds[0] <= x1w[0] &&
+          e.bounds[2] >= x0w[0] &&
+          e.bounds[1] <= x1w[1] &&
+          e.bounds[3] >= x0w[1],
       );
     for (let j = r.z0; j <= r.z1; j++)
       for (let i = r.x0; i <= r.x1; i++) {
@@ -537,7 +563,8 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
    * there (bilinear between grid vertices) plus every event's change, and the covers. For placing people and props.
    */
   sample(x: number, z: number, t = this.#time): GroundSample {
-    if (!Number.isFinite(x) || !Number.isFinite(z) || !(t >= 0)) throw new RangeError('Invalid ground sample; give finite x, z and t of 0 or more.');
+    if (!Number.isFinite(x) || !Number.isFinite(z) || !(t >= 0))
+      throw new RangeError('Invalid ground sample; give finite x, z and t of 0 or more.');
     const nx = this.sides[0] - 1,
       nz = this.sides[1] - 1,
       fx = Math.min(Math.max(((x - this.origin[0]) / this.size[0]) * nx, 0), nx),
@@ -547,10 +574,12 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
       tx = fx - i,
       tz = fz - j,
       at = (a: number, b: number) => this.#base[Math.min(b, nz) * this.side + Math.min(a, nx)],
-      base = (at(i, j) * (1 - tx) + at(i + 1, j) * tx) * (1 - tz) + (at(i, j + 1) * (1 - tx) + at(i + 1, j + 1) * tx) * tz,
+      base =
+        (at(i, j) * (1 - tx) + at(i + 1, j) * tx) * (1 - tz) + (at(i, j + 1) * (1 - tx) + at(i + 1, j + 1) * tx) * tz,
       out = new Float64Array(9);
     for (const e of this.#events)
-      if (x >= e.bounds[0] && x <= e.bounds[2] && z >= e.bounds[1] && z <= e.bounds[3]) sampleEvent(e, x, z, t, base, out);
+      if (x >= e.bounds[0] && x <= e.bounds[2] && z >= e.bounds[1] && z <= e.bounds[3])
+        sampleEvent(e, x, z, t, base, out);
     const result = { height: base + out[0], change: out[0] } as GroundSample;
     COVER_CHANNELS.forEach((c, k) => (result[c] = Math.min(Math.max(out[k + 1], 0), 1)));
     return result;
@@ -564,9 +593,14 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
     requireWebGPU(engine, 'GroundChange');
     if (this.#terrain) return this.#setupTerrain(engine);
     if (this.sides[0] !== this.sides[1])
-      throw new TypeError('GroundChange on a mesh needs a square grid (one resolution), as heightfieldGeometry builds.');
+      throw new TypeError(
+        'GroundChange on a mesh needs a square grid (one resolution), as heightfieldGeometry builds.',
+      );
     const mesh = this.#mesh ? meshRuntime(this.#mesh) : undefined;
-    if (!mesh) throw new TypeError('GroundChange needs a mesh; use GroundChange.attach(engine, mesh, options) or new GroundChange(options, mesh)');
+    if (!mesh)
+      throw new TypeError(
+        'GroundChange needs a mesh; use GroundChange.attach(engine, mesh, options) or new GroundChange(options, mesh)',
+      );
     mesh.check();
     if (this.disposed || (this.#engine && this.#engine !== engine) || mesh.engine !== engine)
       throw new MargoError(
@@ -587,8 +621,18 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
           fz = ((v[k * 6 + 2] - this.origin[1]) / this.size[1]) * (n - 1),
           i = Math.round(fx),
           j = Math.round(fz);
-        if (Math.abs(fx - i) > tol || Math.abs(fz - j) > tol || i < 0 || j < 0 || i >= n || j >= n || map[j * n + i] >= 0)
-          throw new TypeError('GroundChange: the mesh is not a heightfield on this grid; build it with heightfieldGeometry on the same size, origin and resolution.');
+        if (
+          Math.abs(fx - i) > tol ||
+          Math.abs(fz - j) > tol ||
+          i < 0 ||
+          j < 0 ||
+          i >= n ||
+          j >= n ||
+          map[j * n + i] >= 0
+        )
+          throw new TypeError(
+            'GroundChange: the mesh is not a heightfield on this grid; build it with heightfieldGeometry on the same size, origin and resolution.',
+          );
         map[j * n + i] = k;
       }
       this.#map = map;
@@ -612,7 +656,10 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         });
     if (n > device.limits.maxTextureDimension2D)
-      throw new MargoError('unsupported', 'The ground change grid is larger than this device allows; use a smaller resolution');
+      throw new MargoError(
+        'unsupported',
+        'The ground change grid is larger than this device allows; use a smaller resolution',
+      );
     this.#coverTexture = texture();
     this.#heatTexture = texture();
     this.#lookBuffer = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -655,7 +702,8 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
         if (this.#source !== c.shader) {
           this.#source = c.shader;
           this.#binding = 44;
-          while ([0, 1, 2].some((d) => c.bindings.some((entry) => entry.binding === this.#binding + d))) this.#binding++;
+          while ([0, 1, 2].some((d) => c.bindings.some((entry) => entry.binding === this.#binding + d)))
+            this.#binding++;
           this.#entries = [
             { binding: this.#binding, resource: this.#coverTexture!.createView() },
             { binding: this.#binding + 1, resource: this.#heatTexture!.createView() },
@@ -690,15 +738,24 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
       dx = this.size[0] / (n - 1),
       dz = this.size[1] / (n - 1),
       // Normals depend on the neighbours: one vertex more on every side.
-      e = { x0: Math.max(r.x0 - 1, 0), z0: Math.max(r.z0 - 1, 0), x1: Math.min(r.x1 + 1, n - 1), z1: Math.min(r.z1 + 1, n - 1) };
+      e = {
+        x0: Math.max(r.x0 - 1, 0),
+        z0: Math.max(r.z0 - 1, 0),
+        x1: Math.min(r.x1 + 1, n - 1),
+        z1: Math.min(r.z1 + 1, n - 1),
+      };
     for (let j = e.z0; j <= e.z1; j++) {
       let lo = Infinity,
         hi = -Infinity;
       for (let i = e.x0; i <= e.x1; i++) {
         const g = j * n + i,
           k = map[g],
-          gx = (d[j * n + Math.min(i + 1, n - 1)] - d[j * n + Math.max(i - 1, 0)]) / (dx * (Math.min(i + 1, n - 1) - Math.max(i - 1, 0))),
-          gz = (d[Math.min(j + 1, n - 1) * n + i] - d[Math.max(j - 1, 0) * n + i]) / (dz * (Math.min(j + 1, n - 1) - Math.max(j - 1, 0)));
+          gx =
+            (d[j * n + Math.min(i + 1, n - 1)] - d[j * n + Math.max(i - 1, 0)]) /
+            (dx * (Math.min(i + 1, n - 1) - Math.max(i - 1, 0))),
+          gz =
+            (d[Math.min(j + 1, n - 1) * n + i] - d[Math.max(j - 1, 0) * n + i]) /
+            (dz * (Math.min(j + 1, n - 1) - Math.max(j - 1, 0)));
         v[k * 6 + 1] = base[g] + d[g];
         if (gx === 0 && gz === 0) {
           v[k * 6 + 3] = nb[g * 3];
@@ -723,8 +780,14 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
     const width = r.x1 - r.x0 + 1,
       height = r.z1 - r.z0 + 1,
       layout = { offset: (r.z0 * n + r.x0) * 4, bytesPerRow: n * 4 };
-    device.queue.writeTexture({ texture: this.#coverTexture!, origin: [r.x0, r.z0] }, this.#cover, layout, [width, height]);
-    device.queue.writeTexture({ texture: this.#heatTexture!, origin: [r.x0, r.z0] }, this.#heat, layout, [width, height]);
+    device.queue.writeTexture({ texture: this.#coverTexture!, origin: [r.x0, r.z0] }, this.#cover, layout, [
+      width,
+      height,
+    ]);
+    device.queue.writeTexture({ texture: this.#heatTexture!, origin: [r.x0, r.z0] }, this.#heat, layout, [
+      width,
+      height,
+    ]);
     this.options.shadows?.invalidate();
   }
 
@@ -775,7 +838,10 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
         );
     }
     if (nx > device.limits.maxTextureDimension2D || nz > device.limits.maxTextureDimension2D)
-      throw new MargoError('unsupported', 'The ground change grid is larger than this device allows; use a smaller heightmap');
+      throw new MargoError(
+        'unsupported',
+        'The ground change grid is larger than this device allows; use a smaller heightmap',
+      );
     this.#engine = engine;
     this.#terrainTexture = device.createTexture({
       size: [nx, nz, 3],
@@ -791,7 +857,12 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
     this.#writeLook(device);
     const bytes = new Uint8Array(this.#delta.buffer, this.#delta.byteOffset, this.#delta.byteLength);
     [this.#cover, this.#heat, bytes].forEach((data, layer) =>
-      device.queue.writeTexture({ texture: this.#terrainTexture!, origin: [0, 0, layer] }, data, { bytesPerRow: nx * 4 }, [nx, nz]),
+      device.queue.writeTexture(
+        { texture: this.#terrainTexture!, origin: [0, 0, layer] },
+        data,
+        { bytesPerRow: nx * 4 },
+        [nx, nz],
+      ),
     );
     this.#removeLighting ??= terrain.addLighting(this);
     this.#offDispose ??= terrain.onDispose(() => this.dispose());
@@ -855,11 +926,17 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
         const k = (r.z0 + j) * nx + r.x0 + i;
         rows[j * width + i] = d[k] === 0 ? raw[k] : raw[k] + d[k] / scale;
       }
-    device.queue.writeTexture({ texture: heightmap, origin: [r.x0, r.z0] }, rows, { bytesPerRow: width * 4 }, [width, height]);
+    device.queue.writeTexture({ texture: heightmap, origin: [r.x0, r.z0] }, rows, { bytesPerRow: width * 4 }, [
+      width,
+      height,
+    ]);
     const layout = { offset: (r.z0 * nx + r.x0) * 4, bytesPerRow: nx * 4 },
       bytes = new Uint8Array(d.buffer, d.byteOffset, d.byteLength);
     [this.#cover, this.#heat, bytes].forEach((data, layer) =>
-      device.queue.writeTexture({ texture: this.#terrainTexture!, origin: [r.x0, r.z0, layer] }, data, layout, [width, height]),
+      device.queue.writeTexture({ texture: this.#terrainTexture!, origin: [r.x0, r.z0, layer] }, data, layout, [
+        width,
+        height,
+      ]),
     );
     terrain.invalidate();
     this.options.shadows?.invalidate();
@@ -945,7 +1022,10 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
         out[at + 2] = cover[k + 2];
         out[at + 3] = state[k + 1];
       }
-    device.queue.writeTexture({ texture: this.#plantCovers, origin: [r.x0, r.z0] }, out, { bytesPerRow: width * 4 }, [width, height]);
+    device.queue.writeTexture({ texture: this.#plantCovers, origin: [r.x0, r.z0] }, out, { bytesPerRow: width * 4 }, [
+      width,
+      height,
+    ]);
   }
   /** Writes a rectangle of the scatter maps: heights (base plus change) and the share of plants kept. */
   #uploadScatter(device: GPUDevice, r: GroundRect): void {
@@ -971,8 +1051,16 @@ export class GroundChange implements EnginePlugin, TerrainLighting {
         // Mud, ash, char and lava (the surface bytes) and fresh soil (the state's third byte) each clear the plants.
         kept[at] = 255 - Math.max(cover[k * 4], cover[k * 4 + 1], cover[k * 4 + 2], cover[k * 4 + 3], state[k * 4 + 2]);
       }
-    device.queue.writeTexture({ texture: this.#scatterHeight, origin: [r.x0, r.z0] }, rows, { bytesPerRow: width * 4 }, [width, height]);
-    device.queue.writeTexture({ texture: this.#scatterDensity, origin: [r.x0, r.z0] }, kept, { bytesPerRow: width }, [width, height]);
+    device.queue.writeTexture(
+      { texture: this.#scatterHeight, origin: [r.x0, r.z0] },
+      rows,
+      { bytesPerRow: width * 4 },
+      [width, height],
+    );
+    device.queue.writeTexture({ texture: this.#scatterDensity, origin: [r.x0, r.z0] }, kept, { bytesPerRow: width }, [
+      width,
+      height,
+    ]);
   }
 
   /** The terrain lighting effect's engine (`TerrainLighting`). */
@@ -1051,7 +1139,10 @@ fn groundTilt${s}(i:Output)->Output {
     let code = source
       .replace(terrainColorHead, `fn terrainColorUnchanged${s}(position:vec3f,normal:vec3f)->vec3f {`)
       .replace(terrainFragmentHead, `fn groundChangeInner${s}(i:Output)->vec4f {`)
-      .replace('let a=i.material.x*i.material.x;', `let groundRough${s}=i.material.x*(1.0-groundGloss${s});let a=groundRough${s}*groundRough${s};`)
+      .replace(
+        'let a=i.material.x*i.material.x;',
+        `let groundRough${s}=i.material.x*(1.0-groundGloss${s});let a=groundRough${s}*groundRough${s};`,
+      )
       .replace(/let linear=([^;]+);/, `let linear=$1+groundGlow${s};`);
     code =
       (code.includes('fn terrainNoise(') ? '' : noiseCode) +
@@ -1069,14 +1160,26 @@ fn groundTilt${s}(i:Output)->Output {
       f = this.#lookData,
       rain = l.rain ?? 0;
     const want = [
-      ...l.soil, rain,
-      ...l.mud, l.wetDarkening,
-      ...l.ash, l.wetGloss,
-      ...l.char, l.glow,
-      ...l.ashen, l.cracks,
-      ...l.lava, l.crackSize,
-      this.origin[0], this.origin[1], this.size[0], this.size[1],
-      this.sides[0] - 1, this.sides[1] - 1, 0, 0,
+      ...l.soil,
+      rain,
+      ...l.mud,
+      l.wetDarkening,
+      ...l.ash,
+      l.wetGloss,
+      ...l.char,
+      l.glow,
+      ...l.ashen,
+      l.cracks,
+      ...l.lava,
+      l.crackSize,
+      this.origin[0],
+      this.origin[1],
+      this.size[0],
+      this.size[1],
+      this.sides[0] - 1,
+      this.sides[1] - 1,
+      0,
+      0,
     ];
     let same = !this.#lookDirty;
     for (let k = 0; k < 32; k++)

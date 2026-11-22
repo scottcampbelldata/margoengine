@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { craterField, ridgeNoise, domainWarp, combine, planetPreset, planetPresetRadius } from '../dist/planet-recipes.js';
+import {
+  craterField,
+  ridgeNoise,
+  domainWarp,
+  combine,
+  planetPreset,
+  planetPresetRadius,
+} from '../dist/planet-recipes.js';
 import { cubeSphere } from '../dist/planet.js';
 
 const R = 1737400;
@@ -31,7 +38,11 @@ function away(c, arc) {
   ty /= l;
   tz /= l;
   const a = arc / R;
-  return [c.x * Math.cos(a) + tx * Math.sin(a), c.y * Math.cos(a) + ty * Math.sin(a), c.z * Math.cos(a) + tz * Math.sin(a)];
+  return [
+    c.x * Math.cos(a) + tx * Math.sin(a),
+    c.y * Math.cos(a) + ty * Math.sin(a),
+    c.z * Math.cos(a) + tz * Math.sin(a),
+  ];
 }
 
 test('an isolated crater has the Pike depth and rim ratios and the McGetchin ejecta', () => {
@@ -53,8 +64,8 @@ test('an isolated crater has the Pike depth and rim ratios and the McGetchin eje
 
 test('a flat floor stays flat and a deep crater is capped at the depth limit', () => {
   const { field, crater } = isolated({ floor: 0.4 });
-  const a = field(...away(crater, 0.1 * crater.diameter / 2), 0),
-    b = field(...away(crater, 0.35 * crater.diameter / 2), 0),
+  const a = field(...away(crater, (0.1 * crater.diameter) / 2), 0),
+    b = field(...away(crater, (0.35 * crater.diameter) / 2), 0),
     c = field(crater.x, crater.y, crater.z, 0);
   assert.ok(Math.abs(a - c) < 1e-6 && Math.abs(b - c) < 1e-6, 'floor is flat');
   const big = craterField({ radius: R, dMin: 200000, dMax: 300000, count: 300, seed: 5, maxDepth: 3400 });
@@ -132,7 +143,7 @@ test('craterField is finite everywhere and has no seams at the cube face edges',
   let min = 0,
     max = 0;
   for (let i = 0; i < 100000; i++) {
-    const [x, y, z] = cubeSphere(i % 6, ((i * 0.6180339) % 2) - 1, ((i * 0.3819660) % 2) - 1);
+    const [x, y, z] = cubeSphere(i % 6, ((i * 0.6180339) % 2) - 1, ((i * 0.381966) % 2) - 1);
     const h = field(x, y, z, 0);
     assert.ok(Number.isFinite(h));
     min = Math.min(min, h);
@@ -141,7 +152,7 @@ test('craterField is finite everywhere and has no seams at the cube face edges',
   assert.ok(min < 0 && max > 0);
   // Heights are continuous: 1 mm apart on the same crater gives almost the same height.
   for (let i = 0; i < 2000; i++) {
-    const [x, y, z] = cubeSphere(i % 6, ((i * 0.6180339) % 2) - 1, ((i * 0.3819660) % 2) - 1),
+    const [x, y, z] = cubeSphere(i % 6, ((i * 0.6180339) % 2) - 1, ((i * 0.381966) % 2) - 1),
       [u, v, w] = along(0.001, 1000),
       h0 = field(x, y, z, 0),
       h1 = field(x + 1e-6 * u, y + 1e-6 * v, z + 1e-6 * w, 0);
@@ -167,7 +178,10 @@ test('craterField rejects invalid options and a density no cell can hold', () =>
     { ejecta: 1 },
   ])
     assert.throws(() => craterField(bad), RangeError, JSON.stringify(bad));
-  assert.throws(() => craterField({ radius: 1000, dMin: 1, dMax: 100, density: 1e15 }), /raise dMin or lower the density/);
+  assert.throws(
+    () => craterField({ radius: 1000, dMin: 1, dMax: 100, density: 1e15 }),
+    /raise dMin or lower the density/,
+  );
   assert.equal(craterField({ radius: 1000, dMin: 1, dMax: 100, density: 0 })(1, 0, 0, 0), 0);
 });
 
@@ -187,7 +201,15 @@ test('ridgeNoise stays in 0..relief, is deterministic and drops octaves below th
   assert.ok(min >= 0 && max <= 500 && max > 100, `${min}..${max}`);
   assert.ok(finer > 10000, 'coarse detail changes the sum');
   assert.equal(ridgeNoise({ relief: 0 })(1, 0, 0, 0), 0);
-  for (const bad of [{ radius: -1 }, { relief: -1 }, { octaves: 0 }, { octaves: 25 }, { gain: -1 }, { frequency: 0 }, { seed: 0.5 }])
+  for (const bad of [
+    { radius: -1 },
+    { relief: -1 },
+    { octaves: 0 },
+    { octaves: 25 },
+    { gain: -1 },
+    { frequency: 0 },
+    { seed: 0.5 },
+  ])
     assert.throws(() => ridgeNoise(bad), RangeError);
 });
 
@@ -234,7 +256,7 @@ test('presets give finite, plausible heights for every body and reject bad input
     let lo = Infinity,
       hi = -Infinity;
     for (let i = 0; i < 100000; i++) {
-      const [x, y, z] = cubeSphere(i % 6, ((i * 0.6180339) % 2) - 1, ((i * 0.3819660) % 2) - 1),
+      const [x, y, z] = cubeSphere(i % 6, ((i * 0.6180339) % 2) - 1, ((i * 0.381966) % 2) - 1),
         h = height(x, y, z, 0);
       assert.ok(Number.isFinite(h), `${name} ${h}`);
       lo = Math.min(lo, h);

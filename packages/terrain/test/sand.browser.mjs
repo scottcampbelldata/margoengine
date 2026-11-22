@@ -39,7 +39,11 @@ await runSuite(
     assert.equal(exact.max, 0, `the defaults written leave the frame exact: ${JSON.stringify(exact)}`);
     const [swept, counts] = await page.evaluate((a) => window.check.show(...a), ['swept', null, 'near', 'sweep']);
     assert.deepEqual(swept, [], 'swept');
-    assert.deepEqual(counts.after, counts.before, `60 frames of every live row made GPU objects: ${JSON.stringify(counts)}`);
+    assert.deepEqual(
+      counts.after,
+      counts.before,
+      `60 frames of every live row made GPU objects: ${JSON.stringify(counts)}`,
+    );
     const values = await page.evaluate(() => window.check.sweepValues());
     assert.deepEqual(await page.evaluate((a) => window.check.show(...a), ['once', null, 'near', values]), [], 'once');
     const once = await page.evaluate(() => window.check.diff('swept', 'once'));

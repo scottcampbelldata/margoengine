@@ -113,12 +113,7 @@ await runSuite(
           stripe.set(i % 4 < 2 ? [40, 40, 40, 255] : [230, 230, 230, 255], i * 4);
         }
         gpu.queue.writeTexture({ texture }, red, { bytesPerRow: 16, rowsPerImage: 4 }, [4, 4, 1]);
-        gpu.queue.writeTexture(
-          { texture, origin: [0, 0, 1] },
-          stripe,
-          { bytesPerRow: 16, rowsPerImage: 4 },
-          [4, 4, 1],
-        );
+        gpu.queue.writeTexture({ texture, origin: [0, 0, 1] }, stripe, { bytesPerRow: 16, rowsPerImage: 4 }, [4, 4, 1]);
         return texture;
       };
       // A spot on the mountain's lower slopes, 40 m up, looking 300 m ahead and down.
@@ -331,11 +326,17 @@ await runSuite(
     console.log('terrain rvt:', JSON.stringify(r));
     assert.equal(r.firstBake, 7 * 1024 * 1024, 'the first frame bakes every level whole');
     assert.equal(r.stillBake, 0, 'a still frame bakes nothing');
-    assert.ok(r.quality.mean < 6 && r.quality.p99 < 48, `cached ground close to the full shader: ${JSON.stringify(r.quality)}`);
+    assert.ok(
+      r.quality.mean < 6 && r.quality.p99 < 48,
+      `cached ground close to the full shader: ${JSON.stringify(r.quality)}`,
+    );
     assert.equal(r.moved.worst, 0, `moved there draws what made there draws: ${JSON.stringify(r.moved)}`);
     assert.ok(r.movedBakes[2] < 1024 * 1024, `a short move bakes strips: ${r.movedBakes}`);
     assert.equal(r.decal.before, 0);
-    assert.ok(r.decal.red > 30 && r.decal.stray === 0, `the decal shows red, and nothing changes away from it: ${JSON.stringify(r.decal)}`);
+    assert.ok(
+      r.decal.red > 30 && r.decal.stray === 0,
+      `the decal shows red, and nothing changes away from it: ${JSON.stringify(r.decal)}`,
+    );
     assert.equal(r.removed, 0, 'removing the decal restores the ground exactly');
     assert.ok(r.road > 100, `the road draws: ${r.road}`);
     const [cr, cg, cb, ca, , , , fa] = r.reader;

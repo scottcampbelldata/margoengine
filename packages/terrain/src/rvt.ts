@@ -446,7 +446,11 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     });
     this.#layout = device.createBindGroupLayout({
       entries: [
-        { binding: 0, visibility: 2, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: this.#floating ? 40 : 32 } },
+        {
+          binding: 0,
+          visibility: 2,
+          buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: this.#floating ? 40 : 32 },
+        },
         { binding: 1, visibility: 2, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: 2, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: 2, texture: { viewDimension: '2d-array' } },

@@ -34,7 +34,13 @@ export {
   type TerrainLook,
   type TerrainLookUpdate,
 } from './colors.js';
-export { heightfield, heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
+export {
+  heightfield,
+  heightfieldGeometry,
+  TerrainHeightmap,
+  type HeightField,
+  type HeightfieldOptions,
+} from './heightfield.js';
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
