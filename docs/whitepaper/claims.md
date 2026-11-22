@@ -5160,3 +5160,7 @@ Proof capture (2026-11-21): the water-ssr current reference advances to c82e6722
 Proof capture (2026-11-21, KB-WATER-SURGEVOL1): the water-ssr --current proof advances to 294127ec66, whose surf WGSL takes every tanh argument through min(x, 10.0) (native WebGPU on an Intel xe-2lpg returned NaN for tanh past f32 overflow, and the Ruessink phase passed it in calm deep water, draining the open sea). The terrain story's shader module text differs in those three tanh calls only; the dispatches, pipelines, bind groups, uniform writes, submits and draws are the reference's. Golden captured again with examples/package-benchmarks/proofs/capture.mjs --only=water-ssr.
 
 Proof capture (2026-11-21, KB-WATER-REFRACTDEPTH1): water-ssr advances to f616fc9327. Above-water refraction checks the bent ray against the captured depth and uses the same hit for color and distance. The Water uniform grows from 560 to 576 B with one viewport row. The current proof records the new shader and buffer writes. The historical SSR capture claim keeps its original reference. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
+The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
+the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
+regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.
