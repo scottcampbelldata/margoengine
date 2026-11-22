@@ -32,7 +32,9 @@ for (const indexed of [false, true]) {
 // eviction in front stalled every later transaction, and staleTouch never finished in Playwright WebKit.
 for (const indexed of [false, true])
   for (const mode of ['evict', 'replace'])
-    test(`staleTouch ${mode} finishes when the database refuses Blobs as WebKit does (indexed=${indexed})`, { timeout: 30_000 }, async () => {
+    test(`staleTouch ${mode} finishes when the database refuses Blobs as WebKit does (indexed=${indexed})`, {
+      timeout: 30_000,
+    }, async () => {
       globalThis.indexedDB = fakeIndexedDB({ refuseBlobs: 'webkit' });
       const result = await staleTouch(mode, indexed);
       assert.deepEqual(result.after, result.before);

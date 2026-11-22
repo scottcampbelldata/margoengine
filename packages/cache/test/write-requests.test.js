@@ -11,7 +11,12 @@ async function perMiss(indexed) {
   const factory = fakeIndexedDB();
   globalThis.indexedDB = factory;
   const files = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`/t${i}`, { body: bytes(10, i) }])),
-    cache = new AssetCache({ name: 'requests', maxBytes: 40, fetch: server(files), ...(indexed && { eviction: evictionIndex() }) });
+    cache = new AssetCache({
+      name: 'requests',
+      maxBytes: 40,
+      fetch: server(files),
+      ...(indexed && { eviction: evictionIndex() }),
+    });
   await read(await cache.fetch(`${base}t0`));
   await cache.flush();
   const counts = [];
@@ -44,7 +49,12 @@ async function burst(indexed, together) {
   const factory = fakeIndexedDB();
   globalThis.indexedDB = factory;
   const files = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`/b${i}`, { body: bytes(10, i) }])),
-    cache = new AssetCache({ name: 'burst', maxBytes: 200, fetch: server(files), ...(indexed && { eviction: evictionIndex() }) });
+    cache = new AssetCache({
+      name: 'burst',
+      maxBytes: 200,
+      fetch: server(files),
+      ...(indexed && { eviction: evictionIndex() }),
+    });
   await cache.usage();
   let transactions = 0;
   const db = factory.databases.get('burst');
@@ -55,7 +65,7 @@ async function burst(indexed, together) {
   await cache.flush();
   transactions = factory.counts.requests - before;
   const usage = await cache.usage(),
-    kept = [...db.stores.get('meta')?.map.keys() ?? []].filter((k) => !String(k).startsWith('\0')).sort();
+    kept = [...(db.stores.get('meta')?.map.keys() ?? [])].filter((k) => !String(k).startsWith('\0')).sort();
   return { requests: transactions, stored: cache.stats.stored, evicted: cache.stats.evicted, usage, kept };
 }
 

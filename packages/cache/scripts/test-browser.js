@@ -60,7 +60,8 @@ const server = await createServer({
   cacheDir: resolve(results, '.vite'),
   server: { port: 0, host: '127.0.0.1', hmr: false, watch: null, fs: { allow: [root] } },
   optimizeDeps: { noDiscovery: true, include: [] },
-  plugins: [noFileWatcher(),
+  plugins: [
+    noFileWatcher(),
     {
       name: 'cache-files',
       configureServer(vite) {
