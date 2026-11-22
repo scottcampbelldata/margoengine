@@ -120,8 +120,7 @@ export class NodePass implements EnginePlugin {
   ) {
     if (!(node instanceof Node) || (node.type !== 'vec3f' && node.type !== 'vec4f'))
       throw new TypeError('NodePass needs a vec3f or vec4f node');
-    if (kind !== 'hdr' && kind !== 'ldr')
-      throw new TypeError("NodePass kind must be 'hdr' or 'ldr'");
+    if (kind !== 'hdr' && kind !== 'ldr') throw new TypeError("NodePass kind must be 'hdr' or 'ldr'");
     this.name = name;
     this.kind = kind;
     const s = this.program.stage(post, [node]);
@@ -148,8 +147,7 @@ export class NodePass implements EnginePlugin {
   setup(engine: Engine): void {
     if (!this.host || this.disposed)
       throw new MargoError('state', 'NodePass runs inside a PostStack: PostStack.attach(engine, [pass])');
-    if (!engine.gpu)
-      throw new MargoError('unsupported', 'NodePass requires WebGPU; use a WebGPU engine');
+    if (!engine.gpu) throw new MargoError('unsupported', 'NodePass requires WebGPU; use a WebGPU engine');
     this.engine = engine;
     ShaderClock.hold(engine, this);
   }
@@ -157,7 +155,12 @@ export class NodePass implements EnginePlugin {
   private render(c: Context, view: GPUTextureView, output: StageOutput): void {
     const device = c.device,
       encode = this.kind === 'hdr' && !output.hdr;
-    if (!this.pipeline || this.format !== output.format || this.samples !== output.multisample.count || this.encoded !== encode) {
+    if (
+      !this.pipeline ||
+      this.format !== output.format ||
+      this.samples !== output.multisample.count ||
+      this.encoded !== encode
+    ) {
       this.format = output.format;
       this.samples = output.multisample.count;
       this.encoded = encode;

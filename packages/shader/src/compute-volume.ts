@@ -85,7 +85,9 @@ export class ComputeVolume<F extends StorageFormat = StorageFormat> implements B
     if (dimension !== '3d' && dimension !== '2d-array') throw new TypeError("Use dimension '3d' or '2d-array'");
     if (!Object.hasOwn(bytes, format)) throw new TypeError('Use a supported storage texture format');
     if (data && data.byteLength !== width * height * depth * bytes[format])
-      throw new RangeError(`Use volume data containing ${width * height * depth * bytes[format]} bytes in x, y, z order`);
+      throw new RangeError(
+        `Use volume data containing ${width * height * depth * bytes[format]} bytes in x, y, z order`,
+      );
     if (filter !== 'linear' && filter !== 'nearest') throw new TypeError("Use filter 'linear' or 'nearest'");
     if (!['clamp-to-edge', 'repeat', 'mirror-repeat'].includes(wrap))
       throw new TypeError('Use a supported texture wrap mode');

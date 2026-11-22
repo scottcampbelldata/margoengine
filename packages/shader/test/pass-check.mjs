@@ -51,7 +51,10 @@ try {
   near(lit.at(0.5, 0.75), direct.at(0.5, 0.75), 'the lit colour matches the picture');
   console.log('ok litColor');
 
-  for (const [name, reference] of [['sunColor', 'sunDirect'], ['toneColor', 'toneDirect']]) {
+  for (const [name, reference] of [
+    ['sunColor', 'sunDirect'],
+    ['toneColor', 'toneDirect'],
+  ]) {
     const want = (await grab(reference)).at(0.5, 0.5);
     assert.ok(want[0] > 40, `${reference} is lit: ${want}`);
     near((await grab(name)).at(0.5, 0.5), want, `${name} is encoded and tone mapped once`);
@@ -59,7 +62,11 @@ try {
   }
 
   near((await grab('emissive')).at(0.5, 0.5), [encode(0.5), 0, 0], "the material's final emissive");
-  near((await grab('uniformOutput')).at(0.5, 0.5), [0, encode(0.5), 0], 'a live uniform, in an output named with a WGSL word');
+  near(
+    (await grab('uniformOutput')).at(0.5, 0.5),
+    [0, encode(0.5), 0],
+    'a live uniform, in an output named with a WGSL word',
+  );
   console.log('ok emissive, uniform');
 
   const moved = await grab('moved');
@@ -75,8 +82,17 @@ try {
   const bare = await grab('frameBare'),
     behind = await grab('frameBehind');
   assert.ok(bare.at(0.5, 0.5)[0] > 40, `the core mesh is lit: ${bare.at(0.5, 0.5)}`);
-  for (const [y, x] of [[0.5, 0.5], [0.1, 0.1], [0.5, 0.2]])
-    near(behind.at(y, x), bare.at(y, x), 'a pane reading the frame shows a core mesh and the clear colour as they are', 1);
+  for (const [y, x] of [
+    [0.5, 0.5],
+    [0.1, 0.1],
+    [0.5, 0.2],
+  ])
+    near(
+      behind.at(y, x),
+      bare.at(y, x),
+      'a pane reading the frame shows a core mesh and the clear colour as they are',
+      1,
+    );
   assert.ok(bare.at(0.1, 0.1)[2] > 60, `the clear colour shows: ${bare.at(0.1, 0.1)}`);
   console.log('ok frame behind', bare.at(0.5, 0.5), bare.at(0.1, 0.1));
 
@@ -92,7 +108,11 @@ try {
   console.log('ok frame resized');
 
   // SSR draws through an HDR stack, whose display curve takes pure red to 241, 33, 33.
-  near((await grab('sharedHook')).at(0.5, 0.5), [241, 33, 33], 'a mesh in a ScenePass and in SSR keeps its pass output');
+  near(
+    (await grab('sharedHook')).at(0.5, 0.5),
+    [241, 33, 33],
+    'a mesh in a ScenePass and in SSR keeps its pass output',
+  );
   console.log('ok shared hook');
 
   const alone = await grab('alone');

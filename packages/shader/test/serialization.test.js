@@ -18,7 +18,8 @@ test('compiled storage-buffer vertex programs retain all declarations, geometry 
 test('a raw material keeps its depth compare, depth bias and alpha to coverage through a save and restore', async () => {
   const { RawShaderMaterial } = await import('../dist/raw.js');
   const material = new RawShaderMaterial({
-    vertexShader: '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f { return vec4f(0.0, 0.0, 0.5, 1.0); }\n@fragment fn fragment()->@location(0) vec4f { return vec4f(1.0); }',
+    vertexShader:
+      '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f { return vec4f(0.0, 0.0, 0.5, 1.0); }\n@fragment fn fragment()->@location(0) vec4f { return vec4f(1.0); }',
     depthCompare: 'equal',
     depthBias: 3,
     depthBiasSlopeScale: 1.5,

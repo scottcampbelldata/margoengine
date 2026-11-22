@@ -36,7 +36,14 @@ const compare = (actual, expected) => {
     if (d > max) (max = d), (at = i);
     sum += d;
   });
-  return { max, mean: sum / actual.length, pixel: at < 0 ? '' : ` at x ${Math.floor(at / 3) % 32}, y ${Math.floor(at / 96)} channel ${at % 3} (${actual[at]} vs ${expected[at]})` };
+  return {
+    max,
+    mean: sum / actual.length,
+    pixel:
+      at < 0
+        ? ''
+        : ` at x ${Math.floor(at / 3) % 32}, y ${Math.floor(at / 96)} channel ${at % 3} (${actual[at]} vs ${expected[at]})`,
+  };
 };
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
@@ -56,7 +63,10 @@ try {
       assert.equal(got.length, want.length, 'pixel counts');
       assert.ok(want.some((v) => v > 0) && got.some((v) => v > 0), `${f.name} draws`);
       rows.push(`${f.name} (${which === 1 ? 'first' : 'changed'}): max ${d.max}, mean ${d.mean.toFixed(4)}${d.pixel}`);
-      assert.ok(d.max <= 1, `${f.name} (${which === 1 ? 'first' : 'changed'}) differs from the browser's own WebGL by ${d.max} levels${d.pixel}`);
+      assert.ok(
+        d.max <= 1,
+        `${f.name} (${which === 1 ? 'first' : 'changed'}) differs from the browser's own WebGL by ${d.max} levels${d.pixel}`,
+      );
     }
   }
   // KB-GLSLP1: two side by side views; each point is 8 pixels of its own view, and viewport_size is the view's size.
@@ -70,17 +80,26 @@ try {
         for (let y = 0; y < 32; y++) for (let x = x0; x < x0 + 16; x++) if (got[(y * 32 + x) * 3 + 1] > 0) n++;
         return n;
       });
-    rows.push(`sized points in two views: max ${d.max}, mean ${d.mean.toFixed(4)}${d.pixel}, lit pixels ${lit.join(' and ')}`);
+    rows.push(
+      `sized points in two views: max ${d.max}, mean ${d.mean.toFixed(4)}${d.pixel}, lit pixels ${lit.join(' and ')}`,
+    );
     assert.deepEqual(lit, [64, 64], 'an 8 pixel point in each 16 x 32 view covers 64 pixels');
     assert.ok(d.max <= 1, `sized points in two views differ from the browser's own WebGL by ${d.max} levels${d.pixel}`);
   }
   // Depth against a core mesh, both ways round: the nearer surface shows at the centre (red: the GLSL quad).
-  for (const [z, front] of [[0.5, true], [-0.5, false]]) {
+  for (const [z, front] of [
+    [0.5, true],
+    [-0.5, false],
+  ]) {
     assert.deepEqual(await page.evaluate((v) => window.check.depthOrder(v), z), [], 'depth order');
     const p = await rgb(),
       c = (16 * 32 + 16) * 3,
       red = p[c] > 200 && p[c + 1] < 40 && p[c + 2] < 40;
-    assert.equal(red, front, `GLSL quad at z ${z} ${front ? 'in front of' : 'behind'} the core box: centre pixel ${p.slice(c, c + 3)}`);
+    assert.equal(
+      red,
+      front,
+      `GLSL quad at z ${z} ${front ? 'in front of' : 'behind'} the core box: centre pixel ${p.slice(c, c + 3)}`,
+    );
     rows.push(`depth order, GLSL quad ${front ? 'in front' : 'behind'}: centre ${p.slice(c, c + 3)}`);
   }
   assert.deepEqual(await page.evaluate(() => window.check.close()), []);

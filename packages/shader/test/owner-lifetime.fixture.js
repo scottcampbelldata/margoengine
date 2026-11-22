@@ -16,7 +16,8 @@ uniform sampler2D tDiffuse;
 uniform float amount;
 varying vec2 vUv;
 void main() { gl_FragColor = vec4(texture2D(tDiffuse, vUv).rgb * amount, 1.0); }`;
-const toySource = 'void mainImage(out vec4 fragColor, in vec2 fragCoord) { fragColor = vec4(fragCoord / iResolution.xy, texture(iChannel0, fragCoord / iResolution.xy).r, 1.0); }';
+const toySource =
+  'void mainImage(out vec4 fragColor, in vec2 fragCoord) { fragColor = vec4(fragCoord / iResolution.xy, texture(iChannel0, fragCoord / iResolution.xy).r, 1.0); }';
 const quad = { positions: [-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], indices: [0, 1, 2, 0, 2, 3] };
 
 export async function fixtures(load = (entry) => import(entry)) {
@@ -27,7 +28,11 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { PostStack } = await load('../../post/dist/stack.js');
   const { NodePass, inputColor } = await load('../dist/index.js');
   const glslMesh = (plugin) => {
-    const material = new ShaderMaterial({ vertexShader, fragmentShader, uniforms: { tint: { value: [1, 0.5, 0.25] } } });
+    const material = new ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: { tint: { value: [1, 0.5, 0.25] } },
+    });
     plugin.add(shaderMesh(quad, material));
     return material;
   };

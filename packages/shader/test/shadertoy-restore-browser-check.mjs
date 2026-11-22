@@ -8,7 +8,10 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
-const context = await openBrowser({ startPath: '/packages/shader/test/shadertoy-restore-browser-check.html', port: 5267 }),
+const context = await openBrowser({
+    startPath: '/packages/shader/test/shadertoy-restore-browser-check.html',
+    port: 5267,
+  }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -21,7 +24,10 @@ const centre = async () => {
   return [...png.data.slice(o, o + 3)];
 };
 const is = (actual, expected, label) =>
-  assert.ok(actual.every((v, i) => Math.abs(v - expected[i]) <= 2), `${label}: [${actual}] vs [${expected}]`);
+  assert.ok(
+    actual.every((v, i) => Math.abs(v - expected[i]) <= 2),
+    `${label}: [${actual}] vs [${expected}]`,
+  );
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -32,7 +38,10 @@ try {
   is(await centre(), [0, 255, 0], 'the lost plain channel reads black; the function channel is back');
   const reported = await page.evaluate(() => window.check.reported());
   assert.equal(reported.length, 1, `one report: ${JSON.stringify(reported)}`);
-  assert.match(reported[0], /^state Shadertoy iChannel0 lost with the device; pass a function or call toy\.setChannel\(0, texture\).*#borrowed-lost/);
+  assert.match(
+    reported[0],
+    /^state Shadertoy iChannel0 lost with the device; pass a function or call toy\.setChannel\(0, texture\).*#borrowed-lost/,
+  );
   await step('fresh');
   is(await centre(), [255, 255, 0], 'setChannel brings red back');
   await step('function');

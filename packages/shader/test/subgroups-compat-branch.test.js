@@ -12,5 +12,8 @@ test('subgroups-check asserts the WebGL2 layer fallback under MARGO_COMPAT=1', (
   assert.match(branch, /assert\.ok\(!fast\.supported && !fast\.half/, 'compat: the requested features are absent');
   assert.match(branch, /const a = verify\(fast, inputs\)/, 'compat: every lane is still verified');
   assert.match(branch, /assert\.equal\(a\.lanes, 1/, 'compat: one-lane subgroups');
-  assert.ok(text.indexOf('const plain = await run([])') > text.indexOf('if (compat) {'), 'the featureless run follows on both backends');
+  assert.ok(
+    text.indexOf('const plain = await run([])') > text.indexOf('if (compat) {'),
+    'the featureless run follows on both backends',
+  );
 });

@@ -28,7 +28,7 @@ test('Kerr radii match Bardeen, Press and Teukolsky (1972)', () => {
   near(kerrIsco(0), 6, 1e-12, 'ISCO a=0');
   near(kerrPhotonOrbit(0), 3, 1e-12, 'photon orbit a=0');
   near(kerrHorizon(0.998), 1.0632, 1e-4, 'horizon a=0.998');
-  near(kerrIsco(0.998), 1.2370, 1e-3, 'ISCO a=0.998');
+  near(kerrIsco(0.998), 1.237, 1e-3, 'ISCO a=0.998');
 });
 
 test('Page-Thorne flux: zero at the ISCO, peak at 9.55 M for a = 0, Newtonian far out', () => {
@@ -43,7 +43,12 @@ test('Page-Thorne flux: zero at the ISCO, peak at 9.55 M for a = 0, Newtonian fa
   near(at, 9.55, 0.02, 'peak radius');
   // F -> 3 / (8 pi r^3) (1 - sqrt(r_in / r)) far out.
   const r = 1e6;
-  near((novikovThorneFlux(r, 0.5) * 8 * Math.PI * r ** 3) / 3, 1 - Math.sqrt(kerrIsco(0.5) / r), 2e-3, 'Newtonian limit');
+  near(
+    (novikovThorneFlux(r, 0.5) * 8 * Math.PI * r ** 3) / 3,
+    1 - Math.sqrt(kerrIsco(0.5) / r),
+    2e-3,
+    'Newtonian limit',
+  );
 });
 
 test('disk redshift and jet Doppler factor', () => {
@@ -78,7 +83,11 @@ test('the shadow edges: 3 sqrt(3) M without spin, 2 M prograde and 7 M retrograd
 });
 
 test('rays stay null: |H| under 1e-5 on escaping rays', () => {
-  for (const [x, a] of [[-3.6, 0.998], [3.6, 0.998], [-2.7, 0]]) {
+  for (const [x, a] of [
+    [-3.6, 0.998],
+    [3.6, 0.998],
+    [-2.7, 0],
+  ]) {
     const g = fate(x, a);
     assert.equal(g.fate, 'escape');
     assert.ok(g.drift < 1e-5, `drift ${g.drift} at x ${x}, a ${a}`);
@@ -114,10 +123,16 @@ test('the shader filters by footprint and draws stars as points', () => {
   assert.match(blackHoleShader, /smoothstep\(0\.25, 0\.5, f\)/);
   assert.match(blackHoleShader, /fr\.inv \* vec2f/);
   // The escape radius in the WGSL (in M) is twice ESCAPE_RADIUS (in r_s), written out in the literal.
-  assert.ok(blackHoleShader.includes(`if (r > ${(ESCAPE_RADIUS * 2).toFixed(1)} && k1.d.x > 0.0)`), 'escape radius out of step');
+  assert.ok(
+    blackHoleShader.includes(`if (r > ${(ESCAPE_RADIUS * 2).toFixed(1)} && k1.d.x > 0.0)`),
+    'escape radius out of step',
+  );
   assert.match(blackHoleShader, /pow\(lapse \* D, 2\.7\)/);
   // The axis band in the WGSL matches POLE_BAND (axial rays turn within a third of it), written out in the literal.
-  assert.ok(blackHoleShader.includes(`select(0.0, ${POLE_BAND}, tMin <= ${(POLE_BAND / 3).toFixed(8)})`), 'axis band out of step');
+  assert.ok(
+    blackHoleShader.includes(`select(0.0, ${POLE_BAND}, tMin <= ${(POLE_BAND / 3).toFixed(8)})`),
+    'axis band out of step',
+  );
   // The disk-plane crossing is half open, as crossesEquator.
   assert.ok(blackHoleShader.includes('if ((y.y < 1.5707963) != (yn.y < 1.5707963))'), 'disk crossing not half open');
   assert.doesNotMatch(blackHoleShader, /atan2\(-cm/);
@@ -139,7 +154,11 @@ test('no ray-dependent branch is the only user of a derivative (regression: the 
     return tail.slice(m.index + m[0].length, end - 1);
   });
   assert.deepEqual(branches, ['dot(e1, e1) < 1e-8'], `branches between the derivatives and the output: ${branches}`);
-  assert.doesNotMatch(tail, /\b(while|loop|break|return)\b/, 'a ray-dependent exit between the derivatives and the output');
+  assert.doesNotMatch(
+    tail,
+    /\b(while|loop|break|return)\b/,
+    'a ray-dependent exit between the derivatives and the output',
+  );
 });
 
 test('the shipped shader dist carries no shader comment text (KB-WGSL1: the build strips black-hole and noise)', () => {
@@ -166,7 +185,12 @@ test('rays a hair either side of the spin axis leave together (regression: the d
     return g.direction;
   });
   for (const d of dirs) {
-    const angle = Math.acos(Math.min(1, d.reduce((s, v, i) => s + v * dirs[0][i], 0)));
+    const angle = Math.acos(
+      Math.min(
+        1,
+        d.reduce((s, v, i) => s + v * dirs[0][i], 0),
+      ),
+    );
     assert.ok(angle < 0.004, `direction off by ${angle} rad: ${d} vs ${dirs[0]}`);
   }
   // Looking down at 70 degrees latitude: rays over the pole to the far disk meet it where their neighbours do.
@@ -188,7 +212,8 @@ test('the jet light is redshifted by the lapse, so its base fades at the horizon
   // Schwarzschild: alpha = sqrt(1 - 2M / r).
   for (const r of [2.5, 3, 6, 50]) near(kerrLapse(r, 1, 0), Math.sqrt(1 - 2 / r), 1e-12, `lapse a=0 at r ${r}`);
   // Kerr: 0 on the horizon at any angle, rising to 1 far out.
-  for (const th of [0.05, 1, Math.PI / 2]) near(kerrLapse(kerrHorizon(0.9), th, 0.9), 0, 1e-6, `lapse on the horizon at ${th}`);
+  for (const th of [0.05, 1, Math.PI / 2])
+    near(kerrLapse(kerrHorizon(0.9), th, 0.9), 0, 1e-6, `lapse on the horizon at ${th}`);
   near(kerrLapse(1e6, 0.3, 0.9), 1, 1e-5, 'lapse far out');
   // Over the pole, 0.5 M above the horizon, the jet's light keeps under 40% of its frequency: alpha^2.7 under 0.1.
   assert.ok(kerrLapse(kerrHorizon(0.9) + 0.5, 0, 0.9) ** 2.7 < 0.1, 'jet base not dimmed');

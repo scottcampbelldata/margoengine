@@ -13,9 +13,7 @@ export interface GLSLSourceInfo {
  * and `#version 300 es` (GLSL ES 3.00 3.3); the version found is written to `info`.
  */
 export function preprocessGLSL(source: string, info: GLSLSourceInfo = { version: 100 }): string {
-  info.version = /^\s*#\s*version\s+300\s+es\s*$/m.test(source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ''))
-    ? 300
-    : 100;
+  info.version = /^\s*#\s*version\s+300\s+es\s*$/m.test(source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')) ? 300 : 100;
   const macros = new Map<string, Macro>([
     ['GL_ES', { body: '1' }],
     ['__VERSION__', { body: String(info.version) }],

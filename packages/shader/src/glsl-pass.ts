@@ -32,7 +32,15 @@ export interface ShaderPassShader {
 export interface ShaderPassOptions
   extends Pick<
     ShaderMaterialOptions,
-    'glslVersion' | 'flipY' | 'strict' | 'builtins' | 'attributes' | 'includes' | 'outputColorSpace' | 'blending' | 'unfilterable'
+    | 'glslVersion'
+    | 'flipY'
+    | 'strict'
+    | 'builtins'
+    | 'attributes'
+    | 'includes'
+    | 'outputColorSpace'
+    | 'blending'
+    | 'unfilterable'
   > {
   /**
    * `'ldr'` (default) runs after tonemapping on display colour; `'hdr'` runs on linear light before it and, when last,
@@ -92,7 +100,10 @@ export class ShaderPass implements EnginePlugin {
   private device?: GPUDevice;
   private rect = '';
   private camera?: GPUBuffer;
-  private readonly context: { format: GPUTextureFormat; descriptor: { multisample: GPUMultisampleState } } = { format: 'rgba8unorm', descriptor: { multisample: { count: 1 } } };
+  private readonly context: { format: GPUTextureFormat; descriptor: { multisample: GPUMultisampleState } } = {
+    format: 'rgba8unorm',
+    descriptor: { multisample: { count: 1 } },
+  };
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
   private readonly pass: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   constructor(shader: ShaderPassShader, options: ShaderPassOptions = {}) {
@@ -119,7 +130,10 @@ export class ShaderPass implements EnginePlugin {
       name,
     });
     if (this.input !== null && !this.material.program.textures.some((t) => t.name === this.input))
-      throw new MargoError('failed', `ShaderPass input ${this.input} is not a sampler of the program; declare it or pass input: null`);
+      throw new MargoError(
+        'failed',
+        `ShaderPass input ${this.input} is not a sampler of the program; declare it or pass input: null`,
+      );
     this.mesh = shaderMesh(triangle, this.material, { frustumCulled: false });
   }
   /**
@@ -129,7 +143,11 @@ export class ShaderPass implements EnginePlugin {
    * @throws MargoError `'unsupported'` on a WebGL engine; the stack's errors (a repeated name, an HDR pass on the LDR
    * tier); the signal's reason when aborted before the pass attaches.
    */
-  static async attach(engine: EngineKernel, shader: ShaderPassShader, options: ShaderPassAttachOptions = {}): Promise<ShaderPass> {
+  static async attach(
+    engine: EngineKernel,
+    shader: ShaderPassShader,
+    options: ShaderPassAttachOptions = {},
+  ): Promise<ShaderPass> {
     const { signal, ...rest } = options;
     signal?.throwIfAborted();
     const pass = new ShaderPass(shader, rest);
@@ -142,12 +160,16 @@ export class ShaderPass implements EnginePlugin {
   }
   private joinStack(host: StackHost): StackStage {
     if (this.host || this.disposed)
-      throw new MargoError(this.disposed ? 'disposed' : 'attached', `${this.name} is already attached; create a new ShaderPass for another PostStack`);
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'attached',
+        `${this.name} is already attached; create a new ShaderPass for another PostStack`,
+      );
     this.host = host;
     return { kind: this.kind, render: (c, input, output) => this.render(c, input, output) };
   }
   setup(engine: Engine): void {
-    if (!this.host || this.disposed) throw new MargoError('state', 'ShaderPass runs inside a PostStack: PostStack.attach(engine, [pass])');
+    if (!this.host || this.disposed)
+      throw new MargoError('state', 'ShaderPass runs inside a PostStack: PostStack.attach(engine, [pass])');
     if (!engine.gpu) throw new MargoError('unsupported', 'ShaderPass requires WebGPU; use a WebGPU engine');
     this.engine = engine;
   }
@@ -167,7 +189,11 @@ export class ShaderPass implements EnginePlugin {
     if (this.device !== device) this.release();
     this.device = device;
     if (this.input !== null) m.uniforms[this.input]!.value = input;
-    const camera = (this.camera ??= device.createBuffer({ label: this.name + ':camera', size: 240, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
+    const camera = (this.camera ??= device.createBuffer({
+        label: this.name + ':camera',
+        size: 240,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })),
       format = output.format,
       rect = viewRect(c),
       block = this.raw.cameraBlock(c.camera, screen, c.width, c.height, c.delta, this.encoding(format), rect);

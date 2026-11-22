@@ -27,7 +27,17 @@ const near = (actual, expected, label, tolerance = 2) =>
     actual.every((v, i) => Math.abs(v - expected[i]) <= tolerance),
     `${label}: ${actual} != ${expected}`,
   );
-const same = async (a, b, points = [[0.5, 0.5], [0.5, 0.55], [0.42, 0.6], [0.35, 0.35], [0.6, 0.45]]) => {
+const same = async (
+  a,
+  b,
+  points = [
+    [0.5, 0.5],
+    [0.5, 0.55],
+    [0.42, 0.6],
+    [0.35, 0.35],
+    [0.6, 0.45],
+  ],
+) => {
   const left = await grab(a),
     right = await grab(b);
   for (const [y, x] of points) near(left(y, x), right(y, x), `${a} and ${b} at ${y}, ${x}`);

@@ -57,11 +57,18 @@ try {
       worstVelocity = Math.max(worstVelocity, off);
       assert.ok(off <= 1, `velocity at x ${i % W}, y ${Math.floor(i / W)} channel ${c}: WGSL ${a[c]}, GLSL ${b[c]}`);
     }
-    assert.equal(Math.sign(wgsl.d[i]) < 0, Math.sign(glsl.d[i]) < 0, `history at x ${i % W}, y ${Math.floor(i / W)} in both or neither`);
+    assert.equal(
+      Math.sign(wgsl.d[i]) < 0,
+      Math.sign(glsl.d[i]) < 0,
+      `history at x ${i % W}, y ${Math.floor(i / W)} in both or neither`,
+    );
     if (wgsl.d[i] >= 0) {
       history++;
       worstDepth = Math.max(worstDepth, Math.abs(wgsl.d[i] - glsl.d[i]));
-      assert.ok(Math.abs(wgsl.d[i] - glsl.d[i]) <= 1e-6, `previous depth at x ${i % W}, y ${Math.floor(i / W)}: WGSL ${wgsl.d[i]}, GLSL ${glsl.d[i]}`);
+      assert.ok(
+        Math.abs(wgsl.d[i] - glsl.d[i]) <= 1e-6,
+        `previous depth at x ${i % W}, y ${Math.floor(i / W)}: WGSL ${wgsl.d[i]}, GLSL ${glsl.d[i]}`,
+      );
       if (Math.hypot(...wgsl.v[i]) > 1e-3) moving++;
       if (Math.hypot(wgsl.v[i][0] - plain.v[i][0], wgsl.v[i][1] - plain.v[i][1]) > 1e-3) unlike++;
     }
