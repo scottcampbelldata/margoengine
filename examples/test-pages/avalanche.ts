@@ -23,22 +23,38 @@ const W = 181,
   origin: [number, number] = [-360, 0];
 // A 38 degree face falling toward +Z into a flat valley at z = 560, a gully down its middle and ridges at its sides.
 const mountain = (x: number, z: number) =>
-  Math.tan((38 * Math.PI) / 180) * Math.max(0, 560 - z) + 0.4 * Math.abs(x) * Math.min(1, Math.max(0, (560 - z) / 200)) + 6 * Math.sin(x / 37) * Math.cos(z / 53);
+  Math.tan((38 * Math.PI) / 180) * Math.max(0, 560 - z) +
+  0.4 * Math.abs(x) * Math.min(1, Math.max(0, (560 - z) / 200)) +
+  6 * Math.sin(x / 37) * Math.cos(z / 53);
 const ground = new Float32Array(W * D);
-for (let j = 0; j < D; j++) for (let i = 0; i < W; i++) ground[j * W + i] = mountain(origin[0] + i * cell, origin[1] + j * cell);
+for (let j = 0; j < D; j++)
+  for (let i = 0; i < W; i++) ground[j * W + i] = mountain(origin[0] + i * cell, origin[1] + j * cell);
 
 async function start() {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   canvas.width = canvas.clientWidth * devicePixelRatio;
   canvas.height = canvas.clientHeight * devicePixelRatio;
-  const engine = await Engine.create(canvas, { camera: { position: [380, 260, 900], target: [0, 150, 300], near: 1, far: 5000 } });
+  const engine = await Engine.create(canvas, {
+    camera: { position: [380, 260, 900], target: [0, 150, 300], near: 1, far: 5000 },
+  });
   engine.lighting.direction.set([0.4, 0.8, 0.45, 3]);
   engine
     .createMesh()
     .setGeometry(heightfield(mountain, { size: [(W - 1) * cell, (D - 1) * cell], origin, resolution: W - 1 }))
     .setMaterial(new PbrMaterial({ color: [0.32, 0.29, 0.25], roughness: 0.9 }));
   const weather = new WeatherMachine('snow', { seed: 5 });
-  const slide = new Avalanche({ width: W, depth: D, cellSize: cell, origin, ground, cover: 1.2, release: { at: [0, 60], size: [40, 25] }, releaseDepth: 1.2, releaseTime: 2, weather });
+  const slide = new Avalanche({
+    width: W,
+    depth: D,
+    cellSize: cell,
+    origin,
+    ground,
+    cover: 1.2,
+    release: { at: [0, 60], size: [40, 25] },
+    releaseDepth: 1.2,
+    releaseTime: 2,
+    weather,
+  });
   Snow.attach(engine, { field: slide });
   const clouds = Clouds.attach(engine);
   let playing = false;
@@ -53,12 +69,18 @@ async function start() {
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const b = slide.budget(),
       off = b.flowing + b.deposited + b.suspended - b.released - b.entrained;
-    if (Math.abs(off) > 1e-6 * Math.max(1, b.released + b.entrained)) console.warn(`BUG: the avalanche budget is off by ${off} kg`);
+    if (Math.abs(off) > 1e-6 * Math.max(1, b.released + b.entrained))
+      console.warn(`BUG: the avalanche budget is off by ${off} kg`);
     const f = slide.fieldData();
-    for (const [x, z] of [[0, 100], [0, 400], [-120, 300]] as const) {
+    for (const [x, z] of [
+      [0, 100],
+      [0, 400],
+      [-120, 300],
+    ] as const) {
       const k = Math.round(z / cell) * W + Math.round((x - origin[0]) / cell),
         at = snowFieldAt(slide, x, z)!;
-      if (Math.abs(at[1] - f[2 * k + 1]!) > 1e-4) console.warn(`BUG: Snow reads ${at[1]} m at ${x}, ${z}; the avalanche has ${f[2 * k + 1]}`);
+      if (Math.abs(at[1] - f[2 * k + 1]!) > 1e-4)
+        console.warn(`BUG: Snow reads ${at[1]} m at ${x}, ${z}; the avalanche has ${f[2 * k + 1]}`);
     }
     const speed = Math.max(...slide.flowSpeed()),
       cloud = slide.powderCloud(),
@@ -81,7 +103,8 @@ async function start() {
     const stepped = Float32Array.from(slide.fieldData());
     slide.seek(0);
     slide.seek(8);
-    if (!stepped.every((v, k) => v === slide.fieldData()[k])) console.warn('BUG: stepping to 8 s drew other snow than a seek to it');
+    if (!stepped.every((v, k) => v === slide.fieldData()[k]))
+      console.warn('BUG: stepping to 8 s drew other snow than a seek to it');
     await check(8);
   };
   button('btnPowder').onclick = async () => {
@@ -98,7 +121,8 @@ async function start() {
   };
   button('btnWeather').onclick = async () => {
     applyAvalancheSettings(slide, { releaseTime: 2, releaseDepth: 1.2, wind: null, windDirection: null });
-    if (slide.options.wind !== undefined) console.warn('BUG: a null wind row did not hand the wind back to the weather');
+    if (slide.options.wind !== undefined)
+      console.warn('BUG: a null wind row did not hand the wind back to the weather');
     await check(slide.time);
   };
   await check(10);

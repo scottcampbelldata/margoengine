@@ -38,7 +38,8 @@ async function start() {
   });
   engine.start();
 
-  const frames = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  const frames = () =>
+    new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   // The weather at the camera against the storm's own, and the region the camera is in.
   const check = async (label: string) => {
     await frames();
@@ -50,7 +51,9 @@ async function start() {
       console.warn(`BUG: the weather at the camera is not the storm's (${JSON.stringify({ here, want })})`);
     if (clouds.time > 0 && Math.abs(clouds.time - map.time) > 0.5)
       console.warn(`BUG: the clouds' clock ${clouds.time} s and the map's ${map.time} s differ`);
-    say(`${label}: ${region}, wind ${here.wind.toFixed(1)} m/s (true ${storm.windAt(x, z, map.time).speed.toFixed(1)}), rain ${storm.rainAt(x, z, map.time).toFixed(1)} mm/h, gust ${here.gust.toFixed(2)}.`);
+    say(
+      `${label}: ${region}, wind ${here.wind.toFixed(1)} m/s (true ${storm.windAt(x, z, map.time).speed.toFixed(1)}), rain ${storm.rainAt(x, z, map.time).toFixed(1)} mm/h, gust ${here.gust.toFixed(2)}.`,
+    );
     return region;
   };
   const place = (x: number, y: number, z: number, tx: number, ty: number, tz: number) => {
@@ -90,11 +93,16 @@ async function start() {
       map.update(1); // render() runs no frame hook, so the map takes the same second by hand
     }
     if (Math.abs(map.time - before - 60) > 1 || Math.abs(clouds.time - drawn - 60) > 1)
-      console.warn(`BUG: a minute of frames moved the map ${map.time - before} s and the clouds ${clouds.time - drawn} s`);
+      console.warn(
+        `BUG: a minute of frames moved the map ${map.time - before} s and the clouds ${clouds.time - drawn} s`,
+      );
     await check('A minute later');
   };
   button('btnRows').onclick = async () => {
-    applySkySettings({ sky, clouds }, { 'volumetric.type': 'hurricane', 'hurricane.bands': 5, 'hurricane.hemisphere': 'south' });
+    applySkySettings(
+      { sky, clouds },
+      { 'volumetric.type': 'hurricane', 'hurricane.bands': 5, 'hurricane.hemisphere': 'south' },
+    );
     const options = storm.options;
     if (options.bands !== 5 || options.latitude !== -20) console.warn('BUG: the rows did not reach the storm');
     await check('Rows applied');

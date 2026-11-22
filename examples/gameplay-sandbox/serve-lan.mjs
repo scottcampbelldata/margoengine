@@ -12,7 +12,8 @@ const option = (name, fallback) => {
   const text = process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
   if (text === undefined) return fallback;
   const value = Number(text);
-  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(`--${name} must be a port from 1 to 65535, got "${text}".`);
+  if (!Number.isInteger(value) || value < 1 || value > 65535)
+    throw new Error(`--${name} must be a port from 1 to 65535, got "${text}".`);
   return value;
 };
 const port = option('port', 5200),

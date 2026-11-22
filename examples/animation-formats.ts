@@ -103,7 +103,8 @@ try {
     warnings: [...dae.warnings, ...manDAE.warnings, ...animation.warnings, ...coloursAnimation.warnings],
   };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent = 'Collada skins (ours and Cesium Man) and KHR_animation_pointer glTFs (AnimatedColorsCube and ours).';
+  status.textContent =
+    'Collada skins (ours and Cesium Man) and KHR_animation_pointer glTFs (AnimatedColorsCube and ours).';
   canvas.dataset.ready = 'true';
 } catch (error) {
   if (!life.signal.aborted) status.textContent = String(error);

@@ -8,11 +8,18 @@ for (const [dir, base, name, key, field, units] of [
 ]) {
   const root = `test-results/${dir}/${base}`;
   const data = parseShapefile(await readFile(root + '.shp'), { dbf: await readFile(root + '.dbf'), prj: 'OGC:CRS84' });
-  const geometry = { type: 'FeatureCollection', features: data.features.map((f) => ({
-    ...f, properties: { key: f.properties[key], name: f.properties.NAME ?? f.properties.ADMIN },
-  })) };
+  const geometry = {
+    type: 'FeatureCollection',
+    features: data.features.map((f) => ({
+      ...f,
+      properties: { key: f.properties[key], name: f.properties.NAME ?? f.properties.ADMIN },
+    })),
+  };
   const values = data.features.map((f) => ({ key: f.properties[key], value: f.properties[field] }));
   await writeFile(`examples/assets/sciviz/geo-vector/${name}.geojson`, JSON.stringify(geometry) + '\n');
-  await writeFile(`examples/assets/sciviz/geo-vector/${name}-values.json`, JSON.stringify({ units, rows: values }) + '\n');
+  await writeFile(
+    `examples/assets/sciviz/geo-vector/${name}-values.json`,
+    JSON.stringify({ units, rows: values }) + '\n',
+  );
   console.log(name, geometry.features.length, values.slice(0, 2));
 }

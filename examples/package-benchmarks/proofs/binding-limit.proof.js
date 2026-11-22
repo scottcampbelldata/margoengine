@@ -15,12 +15,9 @@ import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 const { ref, pin } = refs('e017d50', 'f8a36ca');
 const all = await Promise.all(
-  [
-    ['gltf', 'src/pbr.ts'],
-    ['shadows'],
-    ['clustered'],
-    ['environment'],
-  ].map(([name, entry]) => versions(name, ref, entry, pin)),
+  [['gltf', 'src/pbr.ts'], ['shadows'], ['clustered'], ['environment']].map(([name, entry]) =>
+    versions(name, ref, entry, pin),
+  ),
 );
 const [baseline, candidate] = ['baseline', 'candidate'].map((k) => all.map((v) => v[k]));
 const materials = [

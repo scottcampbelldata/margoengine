@@ -51,12 +51,16 @@ try {
     bc1 = parseDDS(await bytes('checker-bc1.dds'));
   const textures: [string, Texture][] = [
     ['TGA', new Texture(tga)],
-    ['TIFF', new Texture(tiff.format === 'rgba8unorm' ? { data: tiff.data, width: tiff.width, height: tiff.height } : tiff)],
+    [
+      'TIFF',
+      new Texture(tiff.format === 'rgba8unorm' ? { data: tiff.data, width: tiff.width, height: tiff.height } : tiff),
+    ],
     ['KTX', new Texture(uploadTexture(device, ktx))],
     ['DDS', new Texture(uploadTexture(device, dds))],
   ];
   // BC1 needs the device feature; without it the decoder's own error names the fix, and the quad stays empty.
-  if (device.features.has('texture-compression-bc')) textures.push(['DDS BC1', new Texture(uploadTexture(device, bc1))]);
+  if (device.features.has('texture-compression-bc'))
+    textures.push(['DDS BC1', new Texture(uploadTexture(device, bc1))]);
   const quad = {
     positions: [-0.5, -0.5, 0, 0.5, -0.5, 0, -0.5, 0.5, 0, 0.5, 0.5, 0],
     normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
