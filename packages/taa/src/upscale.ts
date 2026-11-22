@@ -41,7 +41,11 @@ type View = NonNullable<Context['view']>;
  * `background` or a camera layer mask as one full-canvas view; that is still one full-canvas view, so its rectangles
  * shrink with the render size. Several views, a partial rectangle or a view into a target throw.
  */
-function renderSizeView(view: View | undefined, canvas: readonly [number, number], size: readonly [number, number]): View | undefined {
+function renderSizeView(
+  view: View | undefined,
+  canvas: readonly [number, number],
+  size: readonly [number, number],
+): View | undefined {
   if (!view) return undefined;
   const full = (r: readonly number[] | undefined) =>
     !r || (r[0] === 0 && r[1] === 0 && r[2] === canvas[0] && r[3] === canvas[1]);
