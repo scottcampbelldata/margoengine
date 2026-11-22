@@ -46,7 +46,7 @@ const near = (got, want, rel, label) =>
   assert.ok(Math.abs(got - want) <= rel * Math.abs(want), `${label}: ${got} against ${want} (within ${rel * 100}%)`);
 const luma = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
-test('blackbody colour: the chromaticity of Planck\'s law is the published locus within 0.012, and the colour is the sRGB of it', () => {
+test("blackbody colour: the chromaticity of Planck's law is the published locus within 0.012, and the colour is the sRGB of it", () => {
   // CIE 1931 2 degree Planckian locus (Kelly 1963 / Wyszecki and Stiles 1982 tables): kelvin, x, y.
   for (const [k, x, y] of [
     [1000, 0.6528, 0.3444],
@@ -57,10 +57,16 @@ test('blackbody colour: the chromaticity of Planck\'s law is the published locus
     [6500, 0.3135, 0.3237],
   ]) {
     const [gx, gy] = blackbodyChromaticity(k);
-    assert.ok(Math.abs(gx - x) <= 0.012 && Math.abs(gy - y) <= 0.012, `${k} K: (${gx.toFixed(4)}, ${gy.toFixed(4)}) against (${x}, ${y})`);
+    assert.ok(
+      Math.abs(gx - x) <= 0.012 && Math.abs(gy - y) <= 0.012,
+      `${k} K: (${gx.toFixed(4)}, ${gy.toFixed(4)}) against (${x}, ${y})`,
+    );
   }
   const white = blackbodyColor(6500);
-  assert.ok(white.every((v) => v > 0.93 && v <= 1), `6,500 K is white: ${white}`);
+  assert.ok(
+    white.every((v) => v > 0.93 && v <= 1),
+    `6,500 K is white: ${white}`,
+  );
   let last = Infinity;
   for (let k = 900; k <= 3000; k += 100) {
     const [r, g, b] = blackbodyColor(k);
@@ -95,12 +101,17 @@ test('flameRamp: a clear core-to-edge ramp (hot, bright, yellow-orange to cool, 
     physical = flameRamp({ exposure: 1, core: 1900, edge: 1000 });
   for (const s of flat) near(Math.max(...s.color), FLAME_PEAK, 1e-12, 'exposure 0');
   for (const s of physical)
-    near(Math.max(...s.color), blackbodyLuminanceRatio(1000 + 900 * (1 - s.at) ** 1.2, 1900), 1e-9, `stop ${s.at} at exposure 1 is Planck's luminance ratio`);
+    near(
+      Math.max(...s.color),
+      blackbodyLuminanceRatio(1000 + 900 * (1 - s.at) ** 1.2, 1900),
+      1e-9,
+      `stop ${s.at} at exposure 1 is Planck's luminance ratio`,
+    );
   assert.throws(() => flameRamp({ edge: 3000, core: 1000 }), RangeError);
   assert.throws(() => flameRamp({ peak: 0 }), RangeError);
 });
 
-test('Byram\'s flame length 0.0775 I^0.46 at stated intensities, and its inverse', () => {
+test("Byram's flame length 0.0775 I^0.46 at stated intensities, and its inverse", () => {
   // Hand-evaluated from Byram 1959: kW/m, metres.
   for (const [I, L] of [
     [100, 0.645],
@@ -117,13 +128,16 @@ test('Byram\'s flame length 0.0775 I^0.46 at stated intensities, and its inverse
   assert.throws(() => byramIntensity(Number.POSITIVE_INFINITY), RangeError);
 });
 
-test('Heskestad\'s flame height 0.235 Q^(2/5) - 1.02 D at stated heat releases, never below 0', () => {
+test("Heskestad's flame height 0.235 Q^(2/5) - 1.02 D at stated heat releases, never below 0", () => {
   for (const [Q, D, L] of [
     [1e6, 1, 2.704],
     [5e6, 2, 5.05],
     [30e6, 4.3, 10.132],
   ])
-    assert.ok(Math.abs(heskestadFlameLength(Q, D) - L) <= 0.0005, `${Q} W over ${D} m: ${heskestadFlameLength(Q, D)} against ${L}`);
+    assert.ok(
+      Math.abs(heskestadFlameLength(Q, D) - L) <= 0.0005,
+      `${Q} W over ${D} m: ${heskestadFlameLength(Q, D)} against ${L}`,
+    );
   assert.equal(heskestadFlameLength(1e4, 10), 0, 'a source wider than its flame');
   assert.throws(() => heskestadFlameLength(-1, 1), RangeError);
   assert.throws(() => heskestadFlameLength(1, -1), RangeError);
@@ -148,7 +162,12 @@ test('Flame: a length, an intensity (Byram) or a heat (Heskestad) sizes it, its 
   h.frame();
   assert.equal(byLength.flameLength, 6);
   near(byIntensity.flameLength, byramFlameLength(10000), 1e-12, "intensity gives Byram's length");
-  near(byHeat.flameLength, heskestadFlameLength(5e6, Math.sqrt((4 * 2 * 2) / Math.PI)), 1e-12, "heat gives Heskestad's length");
+  near(
+    byHeat.flameLength,
+    heskestadFlameLength(5e6, Math.sqrt((4 * 2 * 2) / Math.PI)),
+    1e-12,
+    "heat gives Heskestad's length",
+  );
   near(byLength.puffing, puffingFrequency(puffingDiameter([10, 4])), 1e-12, 'the puffing of its footprint');
   assert.ok(byLength.time > 0, 'the clock runs on frame deltas');
   assert.deepEqual(byLength.lights, [], 'no lights without lights');
@@ -203,7 +222,12 @@ test('Flame crowns and dither: a crown fire takes a tree spacing, the box reache
   const extra = 48 + 16 * 4; // the extra vec4 after the temperature table
   assert.equal(crown.values[extra + 1], 8, 'the spacing reaches the shader');
   assert.equal(surface.values[extra + 1], 0, 'a surface fire has none');
-  near(crown.values[42], -0.46 * 20, 1e-5, 'the box starts 0.46 flame lengths down, where the lowest torching tree starts');
+  near(
+    crown.values[42],
+    -0.46 * 20,
+    1e-5,
+    'the box starts 0.46 flame lengths down, where the lowest torching tree starts',
+  );
   near(surface.values[42], -0.16 * 20, 1e-5);
   const shift = crown.values[extra];
   h.frame();
@@ -229,18 +253,36 @@ test('Flame lights: points over the footprint at a third of the height, as brigh
   }
   const lit = flame.lights.filter((l) => l.intensity > 0);
   assert.equal(lit.length, 3, 'a 12 m stretch of 4 m flames takes three points');
-  near(flame.steadyIntensities.reduce((a, b) => a + b, 0), total, 1e-9, 'intensity is the peak radiance times half the silhouette');
+  near(
+    flame.steadyIntensities.reduce((a, b) => a + b, 0),
+    total,
+    1e-9,
+    'intensity is the peak radiance times half the silhouette',
+  );
   for (const l of lit) {
     near(l.position[1], 0.35 * L, 1e-12, 'a third of the way up');
-    assert.ok(Math.abs(l.position[2] + 4) < 1e-9 && Math.abs(l.position[0] - 10) <= 0.4 * 12 + 1e-9, 'over the footprint');
+    assert.ok(
+      Math.abs(l.position[2] + 4) < 1e-9 && Math.abs(l.position[0] - 10) <= 0.4 * 12 + 1e-9,
+      'over the footprint',
+    );
   }
   const mean = sums.reduce((a, b) => a + b, 0) / sums.length;
   assert.ok(Math.abs(mean / total - 1) < 0.1, `the flicker swings about the mean: ${mean} against ${total}`);
   assert.ok(Math.max(...one) / Math.min(...one) > 1.5, `each point visibly: ${Math.max(...one) / Math.min(...one)}`);
   applyFlameSettings(flame, { 'flames.peak': 2, 'flames.radiance': 0.5, 'flames.flicker': 0 });
   e.render({ delta: 1 / 30 });
-  near(flame.steadyIntensities.reduce((a, b) => a + b, 0), total, 1e-9, 'peak 2 at radiance 0.5 is the same light');
-  near(flame.lights.reduce((s, l) => s + l.intensity, 0), total, 1e-9, 'flicker 0 holds the light steady');
+  near(
+    flame.steadyIntensities.reduce((a, b) => a + b, 0),
+    total,
+    1e-9,
+    'peak 2 at radiance 0.5 is the same light',
+  );
+  near(
+    flame.lights.reduce((s, l) => s + l.intensity, 0),
+    total,
+    1e-9,
+    'flicker 0 holds the light steady',
+  );
   const warm = [...flame.lights[0].color];
   applyFlameSettings(flame, { 'flames.core': 1400 });
   e.render({ delta: 1 / 30 });
@@ -254,20 +296,35 @@ test('Fire with a flameLength: its flames are a Flame volume of that length that
   LocalShadows.attach(e, { lights: clustered });
   const groups = LightGroups.attach(e, clustered),
     small = Fire.attach(e, { position: [0, 0, 0], lights: groups }),
-    big = Fire.attach(e, { position: [0, 0, 0], flameLength: 10, width: 12, breadth: 6, axis: [0, 0, 1], lights: groups });
+    big = Fire.attach(e, {
+      position: [0, 0, 0],
+      flameLength: 10,
+      width: 12,
+      breadth: 6,
+      axis: [0, 0, 1],
+      lights: groups,
+    });
   big.flame.onPreUpdate(1 / 30);
   assert.equal(big.particles.flames, undefined, 'no billboards');
   assert.equal(big.flame.flameLength, 10);
   assert.deepEqual(big.flame.options.footprint, [12, 6]);
   near(big.flame.options.yaw, -Math.PI / 2, 1e-12, 'the footprint runs along the axis');
   assert.equal(big.lights.length, 0, "the light is the flame's");
-  assert.ok(big.flame.lights.some((l) => l.intensity > 0), 'and it is on');
+  assert.ok(
+    big.flame.lights.some((l) => l.intensity > 0),
+    'and it is on',
+  );
   assert.ok(big.particles.embers.options.size > small.particles.embers.options.size, 'larger embers');
   assert.ok(big.particles.embers.options.rate < small.particles.embers.options.rate * 40, 'but not that many more');
   const before = big.flame.steadyIntensities.reduce((a, b) => a + b, 0);
   applyFlameSettings(big, FLAME_LOOKS.animatedFeature);
   big.flame.onPreUpdate(1 / 30);
-  near(big.flame.steadyIntensities.reduce((a, b) => a + b, 0), before * FLAME_LOOKS.animatedFeature['flames.radiance'], 1e-9, 'the flame rows reach the volume');
+  near(
+    big.flame.steadyIntensities.reduce((a, b) => a + b, 0),
+    before * FLAME_LOOKS.animatedFeature['flames.radiance'],
+    1e-9,
+    'the flame rows reach the volume',
+  );
   // A large fire stands a column on the flame tips with the heat of its flame length (KB-FLAME-LOOK2); a large Fire
   // was refused as a Smoke source before (KB-SMOKE-BIGFIRE1).
   assert.equal(small.smoke, undefined, 'a hearth has no smoke column');
@@ -275,7 +332,12 @@ test('Fire with a flameLength: its flames are a Flame volume of that length that
   const smoky = Fire.attach(e, { position: [0, 0, 0], flameLength: 10, width: 12, breadth: 6 });
   assert.deepEqual(smoky.smoke.options.position, [0, 10, 0], 'the column stands on the flame tips');
   const D = Math.sqrt((4 * 12 * 6) / Math.PI);
-  near(smoky.smoke.options.heat, 0.7 * 1000 * ((10 + 1.02 * D) / 0.235) ** 2.5, 1e-9, "Heskestad's heat, 70% convected");
+  near(
+    smoky.smoke.options.heat,
+    0.7 * 1000 * ((10 + 1.02 * D) / 0.235) ** 2.5,
+    1e-9,
+    "Heskestad's heat, 70% convected",
+  );
   near(smoky.smoke.options.radius, D / 2, 1e-12, 'as wide as the flames');
   assert.equal(smoky.smoke.options.fire, smoky, 'the column follows the fire and its wind');
   const plain = Fire.attach(e, { position: [0, 0, 0], flameLength: 4, smoke: false }),
@@ -308,16 +370,31 @@ test('FireFront.flames: a stretch of the front is as long as Byram flame of its 
   const lengths = {};
   for (const fuel of ['FM1', 'FM4', 'FM13']) {
     const front = runFront({ fuel }),
-      head = fireBehaviour(FUEL_MODELS[fuel], { moisture: 0.05, moisture10: 0.06, moisture100: 0.07, liveMoisture: 0.9, wind: MIDFLAME });
+      head = fireBehaviour(FUEL_MODELS[fuel], {
+        moisture: 0.05,
+        moisture10: 0.06,
+        moisture100: 0.07,
+        liveMoisture: 0.9,
+        wind: MIDFLAME,
+      });
     front.advanceTime(120);
     const flames = front.flames();
-    assert.ok(flames.length >= 1 && flames.every((f) => f.kind === 'front' && f.structure === -1), `${fuel}: stretches of front`);
+    assert.ok(
+      flames.length >= 1 && flames.every((f) => f.kind === 'front' && f.structure === -1),
+      `${fuel}: stretches of front`,
+    );
     for (const f of flames) {
       near(f.intensity, head.firelineIntensity, 1e-9, `${fuel}: the cells burn at the head fire's intensity (kW/m)`);
       near(f.flameLength, 0.0775 * f.intensity ** 0.46, 1e-12, `${fuel}: Byram's law`);
       near(f.flameLength, head.flameLength, 1e-9, `${fuel}: the same as fireBehaviour's flame length`);
       // Along the stretch's line (KB-FIRE-FLATBOX1): at most the segment's diagonal plus a cell, at least a cell across.
-      assert.ok(f.footprint[0] >= 4 && f.footprint[1] >= 4 && f.footprint[0] <= 64 * Math.SQRT2 + 4 && f.footprint[1] <= f.footprint[0], `a line of cells within its segment: ${f.footprint}`);
+      assert.ok(
+        f.footprint[0] >= 4 &&
+          f.footprint[1] >= 4 &&
+          f.footprint[0] <= 64 * Math.SQRT2 + 4 &&
+          f.footprint[1] <= f.footprint[0],
+        `a line of cells within its segment: ${f.footprint}`,
+      );
     }
     for (let i = 1; i < flames.length; i++) assert.ok(flames[i - 1].heat >= flames[i].heat, 'hottest first');
     lengths[fuel] = flames[0].flameLength;
@@ -326,7 +403,7 @@ test('FireFront.flames: a stretch of the front is as long as Byram flame of its 
   assert.ok(lengths.FM4 > 6 && lengths.FM4 < 10, `chaparral flames are about 8 m: ${lengths.FM4}`);
 });
 
-test('FireFront.flames: a burning house gives Heskestad\'s flame of its heat over its vent, and its smoke heat is megawatts, not 18 kW a cell', () => {
+test("FireFront.flames: a burning house gives Heskestad's flame of its heat over its vent, and its smoke heat is megawatts, not 18 kW a cell", () => {
   const front = runFront({
       structures: [{ at: [-120, 0], radius: 6 }],
       structureExposure: 5,
@@ -343,14 +420,24 @@ test('FireFront.flames: a burning house gives Heskestad\'s flame of its heat ove
   const cells = h.cells,
     q = h.heat / 0.7 / 1000,
     d = Math.sqrt((4 * 0.1 * cells * 16) / Math.PI);
-  near(h.flameLength, Math.max(0.235 * q ** 0.4 - 1.02 * d, 0), 1e-12, 'Heskestad\'s law over the vent');
+  near(h.flameLength, Math.max(0.235 * q ** 0.4 - 1.02 * d, 0), 1e-12, "Heskestad's law over the vent");
   assert.ok(h.heat / cells >= 1e6, `a building cell releases megawatts: ${h.heat / cells} W`);
   assert.ok(h.flameLength > 3, `a house fire has flames over 3 m: ${h.flameLength}`);
-  assert.ok(front.segments().some((s) => s.heat >= 1e6), 'the smoke heat of a house is megawatts');
+  assert.ok(
+    front.segments().some((s) => s.heat >= 1e6),
+    'the smoke heat of a house is megawatts',
+  );
   // A second ignition-free house elsewhere is unburnt and has no flame; the vent share changes the length.
-  const tight = runFront({ structures: [{ at: [-120, 0], radius: 6 }], ignitions: [{ at: [-120, 0], radius: 3 }], structureVent: 0.5 });
+  const tight = runFront({
+    structures: [{ at: [-120, 0], radius: 6 }],
+    ignitions: [{ at: [-120, 0], radius: 3 }],
+    structureVent: 0.5,
+  });
   tight.advanceTime(20);
-  assert.ok(tight.flames().find((f) => f.kind === 'structure').flameLength < h.flameLength, 'a wider vent spreads the heat: shorter flames');
+  assert.ok(
+    tight.flames().find((f) => f.kind === 'structure').flameLength < h.flameLength,
+    'a wider vent spreads the heat: shorter flames',
+  );
   assert.throws(() => runFront({ structureVent: 0 }), RangeError);
 });
 
@@ -367,7 +454,10 @@ test('FireFront with an engine: a fixed pool of flame volumes sits on the hottes
       columns: 0,
       flames: 3,
       buildingFlames: 2,
-      structures: [{ at: [-100, 0], radius: 6 }, { at: [0, 20], radius: 6 }],
+      structures: [
+        { at: [-100, 0], radius: 6 },
+        { at: [0, 20], radius: 6 },
+      ],
       structureExposure: 5,
       ignitions: [{ at: [-200, 0], radius: 10 }],
     });
@@ -393,19 +483,34 @@ test('FireFront with an engine: a fixed pool of flame volumes sits on the hottes
       top = flames.filter((f) => f.kind === kind).slice(0, pool.length),
       lengths = pool.map((f) => f.options.length).sort((a, b) => b - a);
     assert.ok(top.length > 0, `${kind} flames exist`);
-    assert.deepEqual(top.map((f) => f.flameLength).sort((a, b) => b - a), lengths.slice(0, top.length), `${kind} volumes are as long as their stretch's flame`);
+    assert.deepEqual(
+      top.map((f) => f.flameLength).sort((a, b) => b - a),
+      lengths.slice(0, top.length),
+      `${kind} volumes are as long as their stretch's flame`,
+    );
     for (const f of top) {
-      const flame = pool.find((p) => Math.abs(p.options.position[0] - f.x) < 1e-9 && Math.abs(p.options.position[2] - f.z) < 1e-9);
+      const flame = pool.find(
+        (p) => Math.abs(p.options.position[0] - f.x) < 1e-9 && Math.abs(p.options.position[2] - f.z) < 1e-9,
+      );
       assert.ok(flame, `a volume stands on the ${kind} at ${f.x}, ${f.z}`);
       assert.equal(flame.options.length, f.flameLength);
       assert.deepEqual([...flame.options.wind], [MIDFLAME, 0], 'the midflame wind leans the flames');
     }
   }
   // A volume keeps its stretch as the others come and go: its key stays while it is in the top.
-  const keys = [...front.flames().filter((f) => f.kind === 'front').slice(0, 3)].map((f) => f.key);
+  const keys = [
+    ...front
+      .flames()
+      .filter((f) => f.kind === 'front')
+      .slice(0, 3),
+  ].map((f) => f.key);
   front.advanceTime(1);
   h.frame();
-  const keysAfter = front.flames().filter((f) => f.kind === 'front').slice(0, 3).map((f) => f.key);
+  const keysAfter = front
+    .flames()
+    .filter((f) => f.kind === 'front')
+    .slice(0, 3)
+    .map((f) => f.key);
   assert.ok(keys.filter((k) => keysAfter.includes(k)).length >= 2, 'the same stretches keep their volumes');
   front.dispose();
   assert.equal(front.flameVolumes.length, 0, 'disposed with the front');
@@ -416,7 +521,7 @@ test('FireFront with an engine: a fixed pool of flame volumes sits on the hottes
 // A FireFront as a flame-look target (timber-valley, scenes plan push 13): a scene's look family and a shot's flame rows
 // go through applyFlameSettings, which had no way into a front's flame volumes (it threw reading `particles` of the
 // front). setFlameLook writes the rows onto every volume, and onto the volumes made after it is called.
-test('applyFlameSettings writes a FireFront\'s flame volumes, the ones made later too', async () => {
+test("applyFlameSettings writes a FireFront's flame volumes, the ones made later too", async () => {
   const h = optionalGPU(),
     front = FireFront.attach(h.engine, {
       size: [300, 300],
@@ -443,9 +548,20 @@ test('applyFlameSettings writes a FireFront\'s flame volumes, the ones made late
 
 test('Flame slope and glow: the base follows the ground plane, the glow sources, haze and box reach the shader, and the depth pass follows the colour (KB-FLAME-FRONTEMBERS1)', () => {
   const h = optionalGPU(),
-    flame = Flame.attach(h.engine, { position: [0, 0, 0], length: 10, footprint: [40, 6], yaw: Math.PI / 2, slope: [0.3, -0.1] }),
+    flame = Flame.attach(h.engine, {
+      position: [0, 0, 0],
+      length: 10,
+      footprint: [40, 6],
+      yaw: Math.PI / 2,
+      slope: [0.3, -0.1],
+    }),
     off = Flame.attach(h.engine, { position: [0, 0, 0], length: 10, footprint: [40, 6], glow: 0 }),
-    lit = Flame.attach(h.engine, { position: [0, 0, 0], length: 10, footprint: [8, 6], lights: Clustered.attach(h.engine) });
+    lit = Flame.attach(h.engine, {
+      position: [0, 0, 0],
+      length: 10,
+      footprint: [8, 6],
+      lights: Clustered.attach(h.engine),
+    });
   h.frame();
   const extra = 48 + 16 * 4,
     v = flame.values;
@@ -456,7 +572,10 @@ test('Flame slope and glow: the base follows the ground plane, the glow sources,
   assert.equal(v[extra + 7], Math.fround(0.0005), 'a light haze by default');
   assert.equal(v[extra + 3], 4, 'four glow sources along a 40 m line of 10 m flames');
   near(v[extra + 2], 30, 1e-6, 'the glow reaches three flame lengths');
-  assert.ok(v[extra + 12] >= 30 * 1.3 && v[extra + 13] >= 3.5 + 30 * 1.3, 'the glow box holds the glow radius through the slope');
+  assert.ok(
+    v[extra + 12] >= 30 * 1.3 && v[extra + 13] >= 3.5 + 30 * 1.3,
+    'the glow box holds the glow radius through the slope',
+  );
   assert.ok(v[extra + 8] > 0 && v[extra + 8] > v[extra + 10], 'warm glow sources');
   assert.equal(off.values[extra + 3], 0, 'glow 0: no sources');
   assert.equal(lit.values[extra + 6], 0, 'with lights, the point lights light the ground');
@@ -467,8 +586,18 @@ test('Flame slope and glow: the base follows the ground plane, the glow sources,
   applyFlameSettings(flame, { 'flames.haze': 4 });
   h.frame();
   assert.equal(flame.values[extra + 7], Math.fround(0.002), 'the flames.haze row scales the haze');
-  for (const bad of [{ slope: [11, 0] }, { slope: [0, Number.NaN] }, { glow: -1 }, { haze: 2 }, { groundAlbedo: 1.5 }, { glowRadius: 0.1 }])
-    assert.throws(() => Flame.attach(h.engine, { position: [0, 0, 0], length: 4, ...bad }), /slope|glow|haze|groundAlbedo|glowRadius/);
+  for (const bad of [
+    { slope: [11, 0] },
+    { slope: [0, Number.NaN] },
+    { glow: -1 },
+    { haze: 2 },
+    { groundAlbedo: 1.5 },
+    { glowRadius: 0.1 },
+  ])
+    assert.throws(
+      () => Flame.attach(h.engine, { position: [0, 0, 0], length: 4, ...bad }),
+      /slope|glow|haze|groundAlbedo|glowRadius/,
+    );
   const passes = [];
   flame.registerPasses({ add: (p) => passes.push(p) });
   assert.deepEqual(
@@ -518,7 +647,10 @@ test('FireFront embers and slope: one ember effect per front flame volume, over 
   front.flameVolumes.forEach((flame, i) => {
     const e = front.flameEmbers[i].options,
       L = flame.options.length;
-    assert.deepEqual(flame.options.slope, front.flames().find((f) => f.x === flame.options.position[0])?.slope ?? flame.options.slope);
+    assert.deepEqual(
+      flame.options.slope,
+      front.flames().find((f) => f.x === flame.options.position[0])?.slope ?? flame.options.slope,
+    );
     if (!(L > 0)) return assert.equal(e.rate, 0, 'no embers where the volume is out');
     burning++;
     near(e.position[0], flame.options.position[0], 1e-9, 'over the flames');

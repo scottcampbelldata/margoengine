@@ -24,7 +24,15 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
-import { VFX, type FogLike, type VFXLightSource, type VFXLit, type VFXOptions, type VFXTexture, type VFXWind } from '@margoengine/vfx/base';
+import {
+  VFX,
+  type FogLike,
+  type VFXLightSource,
+  type VFXLit,
+  type VFXOptions,
+  type VFXTexture,
+  type VFXWind,
+} from '@margoengine/vfx/base';
 import { curves } from '@margoengine/vfx/curves';
 import { soft } from '@margoengine/vfx/soft';
 import { lit } from '@margoengine/vfx/lit';
@@ -92,7 +100,8 @@ export function smokeAlphaCurve(lifetime: number): number[] {
  * @param airTemperature Air temperature, kelvin. Default 288.15.
  */
 export function buoyancyFlux(heat: number, airTemperature = 288.15): number {
-  if (!(heat >= 0 && Number.isFinite(heat))) throw new RangeError('Smoke heat must be a finite number of watts, 0 or more');
+  if (!(heat >= 0 && Number.isFinite(heat)))
+    throw new RangeError('Smoke heat must be a finite number of watts, 0 or more');
   if (!(airTemperature > 0 && Number.isFinite(airTemperature)))
     throw new RangeError('Smoke airTemperature must be a finite temperature above 0 K');
   return (GRAVITY * heat) / (Math.PI * AIR_DENSITY * AIR_HEAT * airTemperature);
@@ -103,7 +112,8 @@ export function buoyancyFlux(heat: number, airTemperature = 288.15): number {
  * (Briggs 1969). Neutral air is 0; an isothermal layer (dtheta/dz about 0.0098 K/m) gives about 3.3e-4.
  */
 export function airStability(lapse: number, airTemperature = 288.15): number {
-  if (!Number.isFinite(lapse) || lapse < 0) throw new RangeError('Smoke lapse must be a finite rise of 0 or more kelvin a metre');
+  if (!Number.isFinite(lapse) || lapse < 0)
+    throw new RangeError('Smoke lapse must be a finite rise of 0 or more kelvin a metre');
   return (GRAVITY / airTemperature) * lapse;
 }
 
@@ -169,7 +179,10 @@ export function plumeRise(
   if (stability > 0) {
     const ceiling =
       wind > 1e-6
-        ? Math.min(STABLE_WIND_RISE * Math.cbrt(flux / (wind * stability)), STABLE_CALM_RISE * flux ** 0.25 * stability ** -0.375)
+        ? Math.min(
+            STABLE_WIND_RISE * Math.cbrt(flux / (wind * stability)),
+            STABLE_CALM_RISE * flux ** 0.25 * stability ** -0.375,
+          )
         : STABLE_CALM_RISE * flux ** 0.25 * stability ** -0.375;
     if (p.rise >= ceiling) {
       // Levelled off: the column spreads at the height it reached and stops rising.
@@ -253,7 +266,12 @@ export interface SmokeOptions {
 const windSpeed = (wind: unknown, at: Vec3, time: number): number => {
   if (!wind) return 0;
   if (typeof wind === 'object' && 'sample' in (wind as object)) {
-    const v = (wind as { sample(x: number, y: number, z: number, t: number): readonly number[] }).sample(at[0], at[1], at[2], time);
+    const v = (wind as { sample(x: number, y: number, z: number, t: number): readonly number[] }).sample(
+      at[0],
+      at[1],
+      at[2],
+      time,
+    );
     return Math.hypot(v[0], v[2]);
   }
   const v = wind as readonly number[];
@@ -261,7 +279,9 @@ const windSpeed = (wind: unknown, at: Vec3, time: number): number => {
 };
 const unit = (v: number, label: string, min: number, max: number, open = false): number => {
   if (!(Number.isFinite(v) && (open ? v > min : v >= min) && v <= max))
-    throw new RangeError(`Smoke ${label} is ${v}; pass a finite number ${open ? 'above' : 'from'} ${min} ${open ? 'and at most' : 'to'} ${max}`);
+    throw new RangeError(
+      `Smoke ${label} is ${v}; pass a finite number ${open ? 'above' : 'from'} ${min} ${open ? 'and at most' : 'to'} ${max}`,
+    );
   return v;
 };
 
@@ -303,7 +323,8 @@ export class Smoke implements EnginePlugin {
   private readonly glowAt: [number, number, number] = [0, 0, 0];
   private constructor(engine: EngineKernel, options: SmokeOptions) {
     const fire = options.fire;
-    if (fire && !fire.particles?.flames && !fire.flame?.options) throw new TypeError('Invalid Smoke fire; pass a Fire from @margoengine/vfx/fire');
+    if (fire && !fire.particles?.flames && !fire.flame?.options)
+      throw new TypeError('Invalid Smoke fire; pass a Fire from @margoengine/vfx/fire');
     this.options = options;
     this.lifetime = unit(options.lifetime ?? 60, 'lifetime', 0, 3600, true);
     if (options.prewarm !== undefined && typeof options.prewarm !== 'boolean')
@@ -338,9 +359,16 @@ export class Smoke implements EnginePlugin {
       overLife: { speed: this.speed, size: this.size },
       lit: this.lit,
       ...(options.depth ? { softness: 1, depth: options.depth } : {}),
-      ...((options.prewarm ?? true) ? { schedule: { prewarm: this.lifetime, step: Math.max(0.1, this.lifetime / 600) } } : {}),
+      ...((options.prewarm ?? true)
+        ? { schedule: { prewarm: this.lifetime, step: Math.max(0.1, this.lifetime / 600) } }
+        : {}),
       nodes: {
-        graph: [{ op: 'attribute', value: 'velocity' }, { op: 'const', value: this.still }, { op: 'mul', inputs: [0, 1] }, { op: 'force', inputs: [2] }],
+        graph: [
+          { op: 'attribute', value: 'velocity' },
+          { op: 'const', value: this.still },
+          { op: 'mul', inputs: [0, 1] },
+          { op: 'force', inputs: [2] },
+        ],
       },
     };
     this.ownWind = options.wind;
@@ -412,7 +440,8 @@ export class Smoke implements EnginePlugin {
       wind = this.wind(),
       stability = o.stability ?? 0,
       key = this.key;
-    if (key[0] === flux && key[1] === wind && key[2] === radius && key[3] === stability && key[4] === this.lifetime) return;
+    if (key[0] === flux && key[1] === wind && key[2] === radius && key[3] === stability && key[4] === this.lifetime)
+      return;
     key[0] = flux;
     key[1] = wind;
     key[2] = radius;
@@ -432,7 +461,13 @@ export class Smoke implements EnginePlugin {
   /** The column now: rise, speed and radius at a puff age of `seconds` for the wind it follows this frame. */
   column(seconds: number): PlumePoint {
     const o = this.options;
-    return plumeRise(seconds, buoyancyFlux(this.heat(), o.airTemperature), this.wind(), this.radius(), o.stability ?? 0);
+    return plumeRise(
+      seconds,
+      buoyancyFlux(this.heat(), o.airTemperature),
+      this.wind(),
+      this.radius(),
+      o.stability ?? 0,
+    );
   }
   setup(engine: Engine): void {
     this.engine = engine;
@@ -503,7 +538,8 @@ export class Smoke implements EnginePlugin {
   }
   /** A smoke column at `options.position` or over `options.fire`; see {@link SmokeOptions}. */
   static attach(engine: EngineKernel, options: SmokeOptions): Smoke {
-    if (!options || typeof options !== 'object') throw new TypeError('Invalid Smoke options; pass {position: [x, y, z]} or {fire}');
+    if (!options || typeof options !== 'object')
+      throw new TypeError('Invalid Smoke options; pass {position: [x, y, z]} or {fire}');
     const smoke = new Smoke(engine, options);
     engineRuntime(engine).use(smoke);
     return smoke;

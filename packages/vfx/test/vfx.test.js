@@ -36,7 +36,11 @@ test('reset puts the clock, the seed and the waiting births back, and clears the
   assert.equal(effect.reset(), effect);
   h.engine.use(effect);
   h.frame();
-  const first = { budget: new Uint32Array(uniform())[53], seed: new Uint32Array(uniform())[54], time: new Float32Array(uniform())[31] };
+  const first = {
+    budget: new Uint32Array(uniform())[53],
+    seed: new Uint32Array(uniform())[54],
+    time: new Float32Array(uniform())[31],
+  };
   assert.equal(first.budget, 17);
   effect.options.rate = 120;
   h.frame();
@@ -49,12 +53,19 @@ test('reset puts the clock, the seed and the waiting births back, and clears the
   new Uint32Array(visible.data).set([3, 9, 0, 0, 0]);
   effect.options.rate = 0;
   effect.reset();
-  assert.ok(new Uint8Array(particles.data).every((byte) => byte === 0), 'every slot dead');
+  assert.ok(
+    new Uint8Array(particles.data).every((byte) => byte === 0),
+    'every slot dead',
+  );
   assert.ok(new Uint8Array(alive.data).every((byte) => byte === 0));
   for (const counts of [indirect, visible]) assert.deepEqual([...new Uint32Array(counts.data)], [3, 0, 0, 0, 0]);
   h.frame();
   assert.deepEqual(
-    { budget: new Uint32Array(uniform())[53], seed: new Uint32Array(uniform())[54], time: new Float32Array(uniform())[31] },
+    {
+      budget: new Uint32Array(uniform())[53],
+      seed: new Uint32Array(uniform())[54],
+      time: new Float32Array(uniform())[31],
+    },
     first,
     'the first frame again',
   );
@@ -185,7 +196,10 @@ test('a texture atlas draws one frame per particle, random at spawn or stepped o
     lifetime = shader({ columns: 4, rows: 2, frames: 'lifetime' });
   assert.ok(plain.includes('textureSample(sprite,spriteSampler,i.uv*vec2f(0.5,-0.5)+0.5)') && !plain.includes('cell'));
   // The disc's triangle cuts the sprite's top corners (its edges pass y = 0.27 at x = +-1): a sprite needs the square.
-  assert.ok(plain.includes('array<vec2f,3>(vec2f(-3,-1),vec2f(3,-1),vec2f(0,2))'), 'the triangle holds the whole sprite');
+  assert.ok(
+    plain.includes('array<vec2f,3>(vec2f(-3,-1),vec2f(3,-1),vec2f(0,2))'),
+    'the triangle holds the whole sprite',
+  );
   for (const code of [random, lifetime]) {
     assert.ok(code.includes('@location(1) color:vec4f,@location(2) @interpolate(flat) cell:vec2f}'));
     assert.ok(code.includes('o.cell=vec2f(f32(atlasFrame%4u),f32(atlasFrame/4u));'), 'frames run left to right');
@@ -238,14 +252,19 @@ test('capacity reaches what the device holds: 2,097,152 slots on a default devic
   h.engine.stats = { drawCalls: 0 };
   assert.throws(
     () => h.engine.use(new VFX({ capacity: 2_097_153 })),
-    (e) => e instanceof RangeError && /capacity 2097153 exceeds the device limits .*at most 2097152 here/.test(e.message),
+    (e) =>
+      e instanceof RangeError && /capacity 2097153 exceeds the device limits .*at most 2097152 here/.test(e.message),
   );
 });
 
 // KB-FIRE-RECEIVER1 (Scott, 2026-11-16 03:39, "Yes to both"): a particle's intensity is limited by the HDR target it
 // draws into, a half float, not by 16. A fire whose flames are as bright as the light they give (about 59) threw.
 test('intensity accepts any finite value from 0 to the half-float maximum, and nothing outside it', () => {
-  for (const intensity of [0, 1, 16, 16.5, 58.52, 65_504]) assert.equal(new VFX({ capacity: 4, intensity }).options.intensity, intensity);
+  for (const intensity of [0, 1, 16, 16.5, 58.52, 65_504])
+    assert.equal(new VFX({ capacity: 4, intensity }).options.intensity, intensity);
   for (const intensity of [-1e-9, 65_504.001, Infinity, NaN])
-    assert.throws(() => new VFX({ capacity: 4, intensity }), (e) => e instanceof RangeError && /between 0 and 65,504/.test(e.message));
+    assert.throws(
+      () => new VFX({ capacity: 4, intensity }),
+      (e) => e instanceof RangeError && /between 0 and 65,504/.test(e.message),
+    );
 });

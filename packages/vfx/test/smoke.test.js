@@ -119,14 +119,20 @@ const climb = (smoke, frames, dt) => {
   return heights;
 };
 
-test('Smoke writes the plume as its puffs\' speed and size curves, within 7% of the law and 4% at the top', () => {
+test("Smoke writes the plume as its puffs' speed and size curves, within 7% of the law and 4% at the top", () => {
   for (const U of [0, 2, 5, 15]) {
     const h = optionalGPU(),
-      smoke = Smoke.attach(h.engine, { position: [0, 0, 0], heat: 5e6, prewarm: false, ...(U ? { wind: [U, 0] } : {}) });
+      smoke = Smoke.attach(h.engine, {
+        position: [0, 0, 0],
+        heat: 5e6,
+        prewarm: false,
+        ...(U ? { wind: [U, 0] } : {}),
+      });
     h.frame();
     const heights = climb(smoke, 3600, 1 / 60);
     let worst = 0;
-    for (let i = 59; i < heights.length; i++) worst = Math.max(worst, Math.abs(heights[i] / smoke.column((i + 1) / 60).rise - 1));
+    for (let i = 59; i < heights.length; i++)
+      worst = Math.max(worst, Math.abs(heights[i] / smoke.column((i + 1) / 60).rise - 1));
     assert.ok(worst <= 0.07, `${U} m/s: worst ${worst}`);
     near(heights.at(-1), smoke.column(60).rise, 0.04, `${U} m/s top`);
     // The size curve is the column's radius over the source radius.
@@ -156,11 +162,14 @@ test('Smoke rewrites its curves in place when the wind or heat changes, and make
   assert.equal(smoke.effect.options.overLife.speed, speed, 'the same array');
   assert.equal(smoke.effect.options.overLife.size, size, 'the same array');
   assert.notDeepEqual([...speed], before, 'the wind bent the column');
-  assert.deepEqual(smoke.effect.options.color.map((c) => +c.toFixed(6)), [0.495, 0.2, 0.2, 0.595]);
+  assert.deepEqual(
+    smoke.effect.options.color.map((c) => +c.toFixed(6)),
+    [0.495, 0.2, 0.2, 0.595],
+  );
   smoke.dispose();
 });
 
-test('Smoke follows the wind rule of Fire: its own wind stays, without one it takes the fire\'s, and calm is upright', () => {
+test("Smoke follows the wind rule of Fire: its own wind stays, without one it takes the fire's, and calm is upright", () => {
   const h = optionalGPU();
   const own = Smoke.attach(h.engine, { position: [0, 0, 0], wind: [4, 0], prewarm: false });
   h.frame();
@@ -176,7 +185,7 @@ test('Smoke follows the wind rule of Fire: its own wind stays, without one it ta
   h.frame();
   assert.deepEqual(fed.effect.options.position, [1, 0.5, 2], 'stands on the flames');
   assert.deepEqual(fed.effect.options.wind, [3, 4]);
-  near(fed.column(10).rise, plumeRise(10, buoyancyFlux(20000), 5, 0.3).rise, 1e-12, 'a hearth fire in the fire\'s wind');
+  near(fed.column(10).rise, plumeRise(10, buoyancyFlux(20000), 5, 0.3).rise, 1e-12, "a hearth fire in the fire's wind");
   flames.options.wind = [0, 1];
   h.frame();
   assert.deepEqual(fed.effect.options.wind, [0, 1], 'follows the fire');
@@ -193,7 +202,11 @@ test('Smoke in calm air drags its puffs toward rest as a wind would toward itsel
   const calm = Smoke.attach(h.engine, { position: [0, 0, 0], prewarm: false });
   h.frame();
   const graph = calm.effect.options.nodes.graph;
-  assert.deepEqual(evaluateNodes(graph, sample), [-12, 0, 8], 'horizontal drag 4/s toward rest; the rise is left alone');
+  assert.deepEqual(
+    evaluateNodes(graph, sample),
+    [-12, 0, 8],
+    'horizontal drag 4/s toward rest; the rise is left alone',
+  );
   calm.setWind([0, 0]);
   h.frame();
   assert.deepEqual(evaluateNodes(graph, sample), [-12, 0, 8], '[0, 0] is calm air too');
@@ -205,7 +218,11 @@ test('Smoke in calm air drags its puffs toward rest as a wind would toward itsel
   assert.deepEqual(evaluateNodes(graph, sample), [-12, 0, 8], 'a field that is calm at the column');
   const flames = { options: { position: [1, 0.5, 2], wind: [3, 4] } },
     fed = Smoke.attach(h.engine, { fire: { particles: { flames } }, prewarm: false });
-  assert.deepEqual(evaluateNodes(fed.effect.options.nodes.graph, sample).map(Math.abs), [0, 0, 0], "in the fire's wind from attach");
+  assert.deepEqual(
+    evaluateNodes(fed.effect.options.nodes.graph, sample).map(Math.abs),
+    [0, 0, 0],
+    "in the fire's wind from attach",
+  );
   calm.dispose();
   fed.dispose();
 });
@@ -287,7 +304,15 @@ test('a fire front stands its columns on the flames: source as wide as the burni
   const { FireFront } = await import('../dist/fire-front.js'),
     h = optionalGPU(),
     front = FireFront.attach(h.engine, {
-      size: [600, 300], cell: 8, fuel: 'FM10', moisture: 0.05, wind: [12, 0], spotting: 0, columns: 2, flames: 0, buildingFlames: 0,
+      size: [600, 300],
+      cell: 8,
+      fuel: 'FM10',
+      moisture: 0.05,
+      wind: [12, 0],
+      spotting: 0,
+      columns: 2,
+      flames: 0,
+      buildingFlames: 0,
       ignitions: [{ at: [-250, 0], radius: 40 }],
     });
   await front.ready;
@@ -298,13 +323,25 @@ test('a fire front stands its columns on the flames: source as wide as the burni
   assert.deepEqual([...col.effect.options.lifetime], [300, 300]);
   assert.equal(col.options.stability, 1.5e-4);
   near(col.options.position[1], seg.y + seg.flameLength, 1e-9, 'the column leaves the flame tops');
-  near(col.options.radius, Math.min(60, Math.sqrt((seg.cells * 64) / Math.PI)), 1e-9, 'source radius of the burning ground');
+  near(
+    col.options.radius,
+    Math.min(60, Math.sqrt((seg.cells * 64) / Math.PI)),
+    1e-9,
+    'source radius of the burning ground',
+  );
   assert.ok(col.options.radius > 2, `radius ${col.options.radius}`);
   // In the pall's stable air the column levels off at Briggs' final rise, a few hundred metres up.
   const top = col.column(300);
   assert.ok(top.level && top.rise > 150 && top.rise < 2000, `levels at ${top.rise} m`);
   front.dispose();
-  const own = FireFront.attach(h.engine, { size: [200, 200], columns: 1, flames: 0, buildingFlames: 0, smoke: { radius: 5, lifetime: 40 }, ignitions: [{ at: [0, 0], radius: 20 }] });
+  const own = FireFront.attach(h.engine, {
+    size: [200, 200],
+    columns: 1,
+    flames: 0,
+    buildingFlames: 0,
+    smoke: { radius: 5, lifetime: 40 },
+    ignitions: [{ at: [0, 0], radius: 20 }],
+  });
   await own.ready;
   own.advanceTime(5);
   assert.equal(own.smokeColumns[0].options.radius, 5, 'a radius the scene gave stays');
@@ -312,11 +349,22 @@ test('a fire front stands its columns on the flames: source as wide as the burni
   own.dispose();
 });
 
-test('KB-VFX-FRONTSMOKE-LOOK1: a smoke look reaches a fire front\'s columns, made before or after, and keeps their per-column heat and radius', async () => {
-  const [{ FireFront }, { applySmokeSettings, SMOKE_LOOKS }] = await Promise.all([import('../dist/fire-front.js'), import('../dist/settings.js')]),
+test("KB-VFX-FRONTSMOKE-LOOK1: a smoke look reaches a fire front's columns, made before or after, and keeps their per-column heat and radius", async () => {
+  const [{ FireFront }, { applySmokeSettings, SMOKE_LOOKS }] = await Promise.all([
+      import('../dist/fire-front.js'),
+      import('../dist/settings.js'),
+    ]),
     h = optionalGPU(),
     opts = {
-      size: [600, 300], cell: 8, fuel: 'FM10', moisture: 0.05, wind: [12, 0], spotting: 0, columns: 2, flames: 0, buildingFlames: 0,
+      size: [600, 300],
+      cell: 8,
+      fuel: 'FM10',
+      moisture: 0.05,
+      wind: [12, 0],
+      spotting: 0,
+      columns: 2,
+      flames: 0,
+      buildingFlames: 0,
       ignitions: [{ at: [-250, 0], radius: 40 }],
     },
     front = FireFront.attach(h.engine, opts);
@@ -340,7 +388,10 @@ test('KB-VFX-FRONTSMOKE-LOOK1: a smoke look reaches a fire front\'s columns, mad
   assert.equal(col.options.opacity, SMOKE_LOOKS.houseFire.opacity);
   near(col.options.radius, radius, 1e-9, 'a look radius does not reset the column');
   near(col.options.heat, seg.heat, 1e-9, 'a look heat does not reset the column');
-  assert.ok(!('color' in front.options) && !('heat' in front.options) && !('opacity' in front.options), 'the front options stay clean');
+  assert.ok(
+    !('color' in front.options) && !('heat' in front.options) && !('opacity' in front.options),
+    'the front options stay clean',
+  );
   // natural gives back what the front built the column with.
   applySmokeSettings(front, SMOKE_LOOKS.natural);
   assert.deepEqual(col.options.color, [0.24, 0.22, 0.2]);

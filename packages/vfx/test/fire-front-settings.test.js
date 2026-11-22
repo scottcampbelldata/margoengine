@@ -17,13 +17,16 @@ import { WeatherMachine } from '../../weather/dist/index.js';
 test('the rows: all live, wind follows the weather at null, ranges and errors are enforced', () => {
   assert.equal(FIRE_LIVE_SETTINGS.length, FIRE_SETTINGS.length);
   for (const row of FIRE_SETTINGS) assert.ok(row.about.length > 15 && row.max > row.min, row.name);
-  assert.deepEqual(FIRE_SETTINGS.filter((r) => r.weather).map((r) => [r.name, r.weather]), [
-    ['moisture', 'humidity'],
-    ['moisture10', 'humidity'],
-    ['moisture100', 'humidity'],
-    ['wind.x', 'wind'],
-    ['wind.z', 'wind'],
-  ]);
+  assert.deepEqual(
+    FIRE_SETTINGS.filter((r) => r.weather).map((r) => [r.name, r.weather]),
+    [
+      ['moisture', 'humidity'],
+      ['moisture10', 'humidity'],
+      ['moisture100', 'humidity'],
+      ['wind.x', 'wind'],
+      ['wind.z', 'wind'],
+    ],
+  );
   assert.throws(() => applyFireSettings({ options: {} }, { nope: 1 }), TypeError);
   assert.throws(() => applyFireSettings({ options: {} }, { moisture: 2 }), RangeError);
   assert.throws(() => applyFireSettings({ options: {} }, { spotting: -1 }), RangeError);
@@ -54,7 +57,13 @@ test('every row at both ends of its range builds a front and reads back; the def
 
 test('the looks are only row values and a drier, windier look burns faster', () => {
   const run = (look) => {
-    const front = FireFront.create({ size: [400, 400], cell: 4, fuel: 'FM4', ignitions: [{ at: [0, 0], radius: 6 }], spotting: 0 });
+    const front = FireFront.create({
+      size: [400, 400],
+      cell: 4,
+      fuel: 'FM4',
+      ignitions: [{ at: [0, 0], radius: 6 }],
+      spotting: 0,
+    });
     applyFireSettings(front, { ...look, spotting: 0 });
     front.advanceTime(400);
     return front.arrivalTime(-60, 60);
@@ -71,7 +80,10 @@ test('the weather drive writes the wind of a front found by name; a value on the
     drive = new WeatherDrive({ weather });
   drive.setup(engine);
   drive.update(0.1);
-  assert.ok(Array.isArray(front.options.wind) && Math.hypot(...front.options.wind) > 5, 'the weather wind blows the front');
+  assert.ok(
+    Array.isArray(front.options.wind) && Math.hypot(...front.options.wind) > 5,
+    'the weather wind blows the front',
+  );
   applyFireSettings(front, { 'wind.x': 3, 'wind.z': -4 });
   drive.update(0.1);
   assert.deepEqual(front.options.wind, [3, -4], 'a value overrides the weather');
@@ -101,7 +113,10 @@ test('the weather drive dries and wets the dead fuel of a front; a value on a mo
   applyFireSettings(front, {});
   weather.set({ wind: 6, gust: 0, humidity: 0.95, temperature: 12, cloud: 1, rain: 0.6 });
   for (let i = 0; i < 60; i++) drive.update(60); // an hour of rain
-  assert.ok(front.options.moisture > 0.2 && front.options.moisture < 0.35, `an hour of rain wets the fine fuel: ${front.options.moisture}`);
+  assert.ok(
+    front.options.moisture > 0.2 && front.options.moisture < 0.35,
+    `an hour of rain wets the fine fuel: ${front.options.moisture}`,
+  );
   assert.ok(front.options.moisture100 < 0.05, 'the 100-hour fuel barely moves in an hour');
   const off = FireFront.create({ size: [64, 64] }),
     still = new WeatherDrive({ weather, fires: off, fuelMoistureFromWeather: false });

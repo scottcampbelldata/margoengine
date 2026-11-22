@@ -41,7 +41,10 @@ const kernels = /* wgsl */ `
 const edits: Record<'generation' | 'ticket' | 'birth' | 'death' | 'collision' | 'list', [string, string]> = {
   // The slot's generation (rotation.w: 1 for a child), read once before the slot stores anything and kept in step with
   // the birth's store below, so no event test reads `particles` back after storing to it.
-  generation: ['let at=i*2;let cold=f.control.x*2+at;', 'let at=i*2;let cold=f.control.x*2+at;var generation=particles[cold+1].w;'],
+  generation: [
+    'let at=i*2;let cold=f.control.x*2+at;',
+    'let at=i*2;let cold=f.control.x*2+at;var generation=particles[cold+1].w;',
+  ],
   // A birth whose ticket is past the emitter's budget takes event (ticket - budget) / count of last frame's list, if any.
   ticket: [
     'if(ticket>=f.control.y){particles[at].w=0;return 0u;}',

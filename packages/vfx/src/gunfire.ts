@@ -118,7 +118,9 @@ export interface PowderProducts {
 
 const check = (v: number, label: string, min: number, max: number, open = false): number => {
   if (!(typeof v === 'number' && Number.isFinite(v) && (open ? v > min : v >= min) && v <= max))
-    throw new RangeError(`Gunfire ${label} is ${v}; pass a finite number ${open ? 'above' : 'from'} ${min} ${open ? 'and at most' : 'to'} ${max}`);
+    throw new RangeError(
+      `Gunfire ${label} is ${v}; pass a finite number ${open ? 'above' : 'from'} ${min} ${open ? 'and at most' : 'to'} ${max}`,
+    );
   return v;
 };
 
@@ -165,7 +167,11 @@ export function muzzleFlash(charge: number, duration = FLASH_DURATION): MuzzleFl
     // Water vapour: 22.4 L a mole at 0 C, 18 g a mole.
     volume = ((p.gasVolume + (p.water * 22.414) / 18.015) * BLACK_POWDER.flameTemperature) / 273.15;
   check(duration, 'flash duration', 0, 10, true);
-  return { radius: Math.cbrt((3 * volume) / (4 * Math.PI)), duration, color: blackbodyColor(BLACK_POWDER.flameTemperature) };
+  return {
+    radius: Math.cbrt((3 * volume) / (4 * Math.PI)),
+    duration,
+    color: blackbodyColor(BLACK_POWDER.flameTemperature),
+  };
 }
 
 /**
@@ -175,7 +181,8 @@ export function muzzleFlash(charge: number, duration = FLASH_DURATION): MuzzleFl
  * peak), as a film camera records it.
  */
 export function flashExposure(age: number, shutter: number, duration = FLASH_DURATION): number {
-  if (!(Number.isFinite(age) && Number.isFinite(shutter) && shutter >= 0 && duration > 0)) throw new RangeError('Gunfire flashExposure needs finite numbers, shutter 0 or more, duration above 0');
+  if (!(Number.isFinite(age) && Number.isFinite(shutter) && shutter >= 0 && duration > 0))
+    throw new RangeError('Gunfire flashExposure needs finite numbers, shutter 0 or more, duration above 0');
   if (age < 0) return 0;
   if (shutter < 1e-9) return Math.exp(-age / duration);
   const open = Math.max(0, age - shutter);
@@ -273,7 +280,14 @@ export class PowderPuff {
       out[4] = uh;
       out[5] = uy;
     };
-    const y = new Float64Array([r0 / alpha, this.momentum * Math.cos(elevation), this.momentum * Math.sin(elevation), this.buoyancy, 0, 0]);
+    const y = new Float64Array([
+      r0 / alpha,
+      this.momentum * Math.cos(elevation),
+      this.momentum * Math.sin(elevation),
+      this.buoyancy,
+      0,
+      0,
+    ]);
     const k1 = new Float64Array(6),
       k2 = new Float64Array(6),
       kk3 = new Float64Array(6),
@@ -342,7 +356,8 @@ export class PowderPuff {
  * m/s. 0 in calm air (the bank then thins by its own growth only).
  */
 export function smokeDispersion(seconds: number, wind: number, height = 10, constant = 0.5): number {
-  if (!(seconds >= 0 && wind >= 0 && height > 0 && constant >= 0)) throw new RangeError('Gunfire smokeDispersion needs seconds, wind and constant 0 or more and a height above 0');
+  if (!(seconds >= 0 && wind >= 0 && height > 0 && constant >= 0))
+    throw new RangeError('Gunfire smokeDispersion needs seconds, wind and constant 0 or more and a height above 0');
   const ustar = Math.sqrt(1.2e-3) * wind,
     eps = ustar ** 3 / (0.4 * height);
   return Math.sqrt(constant * eps * seconds ** 3);
@@ -484,7 +499,8 @@ const RICOCHET_TANGENT = 0.8,
 /** Volume of one splinter, m^3: a hand-sized piece 15 by 2 by 2 cm (Margo's). */
 const SPLINTER_VOLUME = 0.15 * 0.02 * 0.02;
 
-const matrixOf = (s: Carrier | ArrayLike<number>): ArrayLike<number> => (typeof (s as Carrier).matrix === 'function' ? (s as Carrier).matrix() : (s as ArrayLike<number>));
+const matrixOf = (s: Carrier | ArrayLike<number>): ArrayLike<number> =>
+  typeof (s as Carrier).matrix === 'function' ? (s as Carrier).matrix() : (s as ArrayLike<number>);
 /** World to the frame of a rigid (rotation, translation, uniform or axis scale) matrix. */
 const inverseRigid = (m: ArrayLike<number>, p: Vec3): V3 => {
   const d = [p[0] - m[12]!, p[1] - m[13]!, p[2] - m[14]!],
@@ -507,7 +523,8 @@ interface Hull {
   wood: { density: number; strength: number };
 }
 const hullOf = (t: ShotTarget): Hull => {
-  if (!t || typeof t !== 'object' || !t.ship) throw new TypeError('Gunfire target needs {ship}: a Floater or a world matrix');
+  if (!t || typeof t !== 'object' || !t.ship)
+    throw new TypeError('Gunfire target needs {ship}: a Floater or a world matrix');
   const m = matrixOf(t.ship);
   if (!m || m.length < 16) throw new TypeError('Gunfire target ship must have matrix() or be 16 numbers');
   return {
@@ -520,7 +537,8 @@ const hullOf = (t: ShotTarget): Hull => {
     wood: woodOf(t.wood),
   };
 };
-const insideHull = (h: Hull, l: Vec3): boolean => l[1] >= h.keel && l[1] <= h.top && (l[0] / h.a) ** 2 + (l[2] / h.b) ** 2 <= 1;
+const insideHull = (h: Hull, l: Vec3): boolean =>
+  l[1] >= h.keel && l[1] <= h.top && (l[0] / h.a) ** 2 + (l[2] / h.b) ** 2 <= 1;
 /** The outward world normal of the hull at a local point on it: the deck (up) when it is at the top, else the side. */
 const hullNormal = (h: Hull, l: Vec3): V3 => {
   const side = (l[0] / h.a) ** 2 + (l[2] / h.b) ** 2,
@@ -555,7 +573,13 @@ export interface ShotPathOptions {
  * side the same way. It ends at the water (`water`, or the plane `seaLevel`), lodged, or after `maxTime` seconds.
  * The ships are where their `matrix()` puts them at the shot.
  */
-export function shotPath(from: Vec3, direction: Vec3, speed: number, shot: RoundShot = {}, options: ShotPathOptions = {}): ShotPath {
+export function shotPath(
+  from: Vec3,
+  direction: Vec3,
+  speed: number,
+  shot: RoundShot = {},
+  options: ShotPathOptions = {},
+): ShotPath {
   finiteVector(from, 3, 'Gunfire shot position');
   finiteVector(direction, 3, 'Gunfire shot direction');
   check(speed, 'shot speed', 0, 3000);
@@ -574,7 +598,14 @@ export function shotPath(from: Vec3, direction: Vec3, speed: number, shot: Round
     inside = hulls.map((h) => insideHull(h, inverseRigid(h.m, from))),
     hits: HullHit[] = [],
     height = (x: number, z: number): number => options.water?.sample(x, z)?.height ?? sea;
-  const s = [from[0], from[1], from[2], (direction[0] / len) * speed, (direction[1] / len) * speed, (direction[2] / len) * speed];
+  const s = [
+    from[0],
+    from[1],
+    from[2],
+    (direction[0] / len) * speed,
+    (direction[1] / len) * speed,
+    (direction[2] / len) * speed,
+  ];
   const deriv = (y: number[], t: number): number[] => {
     const [wx, wz] = windAt(wind, [y[0]!, y[1]!, y[2]!], fireTime + t),
       rx = y[3]! - wx,
@@ -605,14 +636,30 @@ export function shotPath(from: Vec3, direction: Vec3, speed: number, shot: Round
       vn = Math.abs(v[0] * n[0] + v[1] * n[1] + v[2] * n[2]),
       depth = woodPenetration(Math.min(3000, vn), radius, mass, hull.wood),
       time = fireTime + t + hi * dt,
-      hit: HullHit = { target: h, kind: 'lodged', time, position: p, local, normal: n, velocity: v, after: [0, 0, 0], depth, hole: radius * 1.1, splinters: 0 };
+      hit: HullHit = {
+        target: h,
+        kind: 'lodged',
+        time,
+        position: p,
+        local,
+        normal: n,
+        velocity: v,
+        after: [0, 0, 0],
+        depth,
+        hole: radius * 1.1,
+        splinters: 0,
+      };
     hits.push(hit);
     if (!leaving && depth < radius) {
       // A glance: the ball keeps most of its run along the side and rebounds off it.
       const tangent: V3 = [v[0] + vn * n[0], v[1] + vn * n[1], v[2] + vn * n[2]];
       hit.kind = 'ricochet';
       hit.hole = 0;
-      hit.after = [RICOCHET_TANGENT * tangent[0] + RICOCHET_REBOUND * vn * n[0], RICOCHET_TANGENT * tangent[1] + RICOCHET_REBOUND * vn * n[1], RICOCHET_TANGENT * tangent[2] + RICOCHET_REBOUND * vn * n[2]];
+      hit.after = [
+        RICOCHET_TANGENT * tangent[0] + RICOCHET_REBOUND * vn * n[0],
+        RICOCHET_TANGENT * tangent[1] + RICOCHET_REBOUND * vn * n[1],
+        RICOCHET_TANGENT * tangent[2] + RICOCHET_REBOUND * vn * n[2],
+      ];
       hit.splinters = Math.round((area * depth) / SPLINTER_VOLUME);
       for (let i = 0; i < 3; i++) {
         s[i] = p[i]! + n[i]! * radius * 0.01;
@@ -670,7 +717,13 @@ export function shotPath(from: Vec3, direction: Vec3, speed: number, shot: Round
         at = s.map((v, i) => v + (next[i]! - v) * f);
       return {
         hits,
-        impact: { time: fireTime + t + f * dt, position: [at[0]!, height(at[0]!, at[2]!), at[2]!], velocity: [at[3]!, at[4]!, at[5]!], radius, density },
+        impact: {
+          time: fireTime + t + f * dt,
+          position: [at[0]!, height(at[0]!, at[2]!), at[2]!],
+          velocity: [at[3]!, at[4]!, at[5]!],
+          radius,
+          density,
+        },
       };
     }
     for (let i = 0; i < 6; i++) s[i] = next[i]!;
@@ -684,7 +737,13 @@ export function shotPath(from: Vec3, direction: Vec3, speed: number, shot: Round
  * {@link sphereDrag} on its velocity relative to the wind until it meets the water: {@link shotPath}'s impact.
  * Returns the impact, or undefined for a shot still in the air or stopped in a ship.
  */
-export function shotFlight(from: Vec3, direction: Vec3, speed: number, shot: RoundShot = {}, options: ShotPathOptions = {}): ShotImpact | undefined {
+export function shotFlight(
+  from: Vec3,
+  direction: Vec3,
+  speed: number,
+  shot: RoundShot = {},
+  options: ShotPathOptions = {},
+): ShotImpact | undefined {
   return shotPath(from, direction, speed, shot, options).impact;
 }
 
@@ -741,7 +800,13 @@ export function powderGrains(charge: number, grain = 0.003, speed = 490): Powder
     }
     speeds.push(v0 > 0 ? Math.max(0, v / v0) : 0);
   }
-  return { count: (charge * UNBURNT_FRACTION) / m1, burnTime, stopping: ((4 / 3) * d * GRAIN_DENSITY) / (AIR_DENSITY * 0.47), reach: x, speeds };
+  return {
+    count: (charge * UNBURNT_FRACTION) / m1,
+    burnTime,
+    stopping: ((4 / 3) * d * GRAIN_DENSITY) / (AIR_DENSITY * 0.47),
+    reach: x,
+    speeds,
+  };
 }
 
 /**
@@ -927,15 +992,18 @@ export class Battery implements EnginePlugin {
     this.queue = [...(options.shots ?? [])];
     for (const s of this.queue) this.checkShot(s);
     this.queue.sort((a, b) => a.time - b.time || a.gun - b.gun);
-    if (options.ship && typeof options.ship.matrix !== 'function') throw new TypeError('Battery ship needs matrix(), such as a Floater');
+    if (options.ship && typeof options.ship.matrix !== 'function')
+      throw new TypeError('Battery ship needs matrix(), such as a Floater');
     this.checkLive();
     const banks = check(options.banks ?? 48, 'banks', 1, 512),
       puffs = check(options.puffs ?? 24, 'puffs', 4, 128);
-    if (!Number.isInteger(banks) || !Number.isInteger(puffs)) throw new RangeError('Battery banks and puffs must be whole numbers');
+    if (!Number.isInteger(banks) || !Number.isInteger(puffs))
+      throw new RangeError('Battery banks and puffs must be whole numbers');
     const lights = options.lights,
       groups = lights && 'names' in lights && 'clustered' in lights ? lights : undefined,
       clustered = groups ? groups.clustered : lights && 'maxLights' in lights ? lights : undefined;
-    if (lights && !clustered) throw new TypeError('Invalid Battery lights; pass a Clustered from @margoengine/clustered or its LightGroups');
+    if (lights && !clustered)
+      throw new TypeError('Invalid Battery lights; pass a Clustered from @margoengine/clustered or its LightGroups');
     if (groups) {
       let name = 'gunfire';
       for (let n = 2; groups.names.includes(name); n++) name = `gunfire ${n}`;
@@ -951,10 +1019,25 @@ export class Battery implements EnginePlugin {
         w = Math.cbrt(random()),
         th = 2 * Math.PI * u,
         ph = Math.acos(2 * v - 1);
-      return { point: [w * Math.sin(ph) * Math.cos(th), w * Math.sin(ph) * Math.sin(th) * 0.8, w * Math.cos(ph)], volume: 0.75 + 0.25 * (1 - w) + 0 * i };
+      return {
+        point: [w * Math.sin(ph) * Math.cos(th), w * Math.sin(ph) * Math.sin(th) * 0.8, w * Math.cos(ph)],
+        volume: 0.75 + 0.25 * (1 - w) + 0 * i,
+      };
     };
     for (let b = 0; b < banks; b++)
-      this.banks.push({ cloud: this.clouds.add({ seed: 1 + b * 7, segments: puffs, bounds: [1.6, 1.6, 1.6], volume: 1.2, distribute: placed, opacity: 0, speed: 0.15 }), shot: null, puff: null });
+      this.banks.push({
+        cloud: this.clouds.add({
+          seed: 1 + b * 7,
+          segments: puffs,
+          bounds: [1.6, 1.6, 1.6],
+          volume: 1.2,
+          distribute: placed,
+          opacity: 0,
+          speed: 0.15,
+        }),
+        shot: null,
+        puff: null,
+      });
     for (const [i, g] of options.guns.entries()) {
       const flash = muzzleFlash(g.charge ?? 4.5),
         fade = options.flashDuration ?? FLASH_DURATION;
@@ -1002,7 +1085,8 @@ export class Battery implements EnginePlugin {
           { curves, overLife, stretch },
         ),
       );
-      if (this.target) this.lights.push({ position: [0, -1e6, 0], range: 1, intensity: 0, color: flash.color, radius: flash.radius });
+      if (this.target)
+        this.lights.push({ position: [0, -1e6, 0], range: 1, intensity: 0, color: flash.color, radius: flash.radius });
       void i;
     }
     // Splinters: oak heartwood, falling under gravity and tumbling.
@@ -1027,12 +1111,14 @@ export class Battery implements EnginePlugin {
     if (!g || typeof g !== 'object') throw new TypeError('Battery gun needs {position, direction}');
     finiteVector(g.position, 3, 'Battery gun position');
     finiteVector(g.direction, 3, 'Battery gun direction');
-    if (!(Math.hypot(g.direction[0], g.direction[1], g.direction[2]) > 0)) throw new RangeError('Battery gun direction must not be zero');
+    if (!(Math.hypot(g.direction[0], g.direction[1], g.direction[2]) > 0))
+      throw new RangeError('Battery gun direction must not be zero');
     check(g.charge ?? 4.5, 'charge', 0, 10000, true);
     check(g.muzzleVelocity ?? 490, 'muzzleVelocity', 0, 3000, true);
   }
   private checkShot(s: GunShot): void {
-    if (!s || !Number.isInteger(s.gun) || s.gun < 0 || s.gun >= this.options.guns.length) throw new RangeError('Battery shot gun must be a gun index');
+    if (!s || !Number.isInteger(s.gun) || s.gun < 0 || s.gun >= this.options.guns.length)
+      throw new RangeError('Battery shot gun must be a gun index');
     check(s.time, 'shot time', 0, 1e7);
   }
   private checkLive(): void {
@@ -1053,7 +1139,8 @@ export class Battery implements EnginePlugin {
     check(o.sparkSize ?? 0.3, 'sparkSize', 0.01, 2);
     check(o.grain ?? 0.003, 'grain', 5e-4, 0.02);
     check(o.splinters ?? 1, 'splinters', 0, 10);
-    if (o.targets !== undefined && !Array.isArray(o.targets)) throw new TypeError('Battery targets must be a list of {ship, length, beam}');
+    if (o.targets !== undefined && !Array.isArray(o.targets))
+      throw new TypeError('Battery targets must be a list of {ship, length, beam}');
     if (o.smokeColor) {
       finiteVector(o.smokeColor, 3, 'Battery smokeColor');
       for (const c of o.smokeColor) check(c, 'smokeColor channel', 0, 1);
@@ -1080,7 +1167,15 @@ export class Battery implements EnginePlugin {
       g = o.guns[gun]!,
       dir = this.worldDirection(g),
       elevation = Math.asin(Math.max(-1, Math.min(1, dir[1]))),
-      key = [g.charge ?? 4.5, g.muzzleVelocity ?? 490, elevation.toFixed(4), o.stability ?? 1e-4, o.heatFraction ?? 0.4, o.entrainment ?? 0.25, o.smokeLife ?? 600].join('|');
+      key = [
+        g.charge ?? 4.5,
+        g.muzzleVelocity ?? 490,
+        elevation.toFixed(4),
+        o.stability ?? 1e-4,
+        o.heatFraction ?? 0.4,
+        o.entrainment ?? 0.25,
+        o.smokeLife ?? 600,
+      ].join('|');
     let puff = this.puffs.get(key);
     if (!puff) {
       puff = new PowderPuff({
@@ -1098,7 +1193,9 @@ export class Battery implements EnginePlugin {
     return puff;
   }
   private worldDirection(g: Gun): V3 {
-    const d = this.options.ship ? transformDir(this.options.ship.matrix(), g.direction) : [g.direction[0], g.direction[1], g.direction[2]],
+    const d = this.options.ship
+        ? transformDir(this.options.ship.matrix(), g.direction)
+        : [g.direction[0], g.direction[1], g.direction[2]],
       l = Math.hypot(d[0]!, d[1]!, d[2]!);
     return [d[0]! / l, d[1]! / l, d[2]! / l];
   }
@@ -1145,7 +1242,14 @@ export class Battery implements EnginePlugin {
         direction = this.worldDirection(g),
         // The drift at the shot's own time (it fired up to a frame ago): the wind's motion over that part of the frame.
         back = this.clock - s.time,
-        shot: FiredShot = { gun: s.gun, time: s.time, muzzle, direction, drift: [this.drift[0] - w[0] * back, this.drift[1] - w[1] * back], hits: [] };
+        shot: FiredShot = {
+          gun: s.gun,
+          time: s.time,
+          muzzle,
+          direction,
+          drift: [this.drift[0] - w[0] * back, this.drift[1] - w[1] * back],
+          hits: [],
+        };
       // The flight through the wind the banks drift in, at the ships' poses now.
       const air = o.wind ?? this.flashes[0]?.options.wind,
         path = shotPath(muzzle, direction, g.muzzleVelocity ?? 490, g.shot ?? {}, {
@@ -1172,7 +1276,11 @@ export class Battery implements EnginePlugin {
         fo = flash.options,
         f = muzzleFlash(g.charge ?? 4.5, o.flashDuration ?? FLASH_DURATION),
         size = f.radius * (o.flashSize ?? 1);
-      fo.position = [muzzle[0] + direction[0] * size * 0.8, muzzle[1] + direction[1] * size * 0.8, muzzle[2] + direction[2] * size * 0.8];
+      fo.position = [
+        muzzle[0] + direction[0] * size * 0.8,
+        muzzle[1] + direction[1] * size * 0.8,
+        muzzle[2] + direction[2] * size * 0.8,
+      ];
       // Billboards 1.6 radii across over the ball, thrown on along the barrel: together they fill the fireball.
       fo.emissionExtent = [size * 0.45, size * 0.45, size * 0.45];
       fo.velocity = [direction[0] * size * 4, direction[1] * size * 4, direction[2] * size * 4];
@@ -1184,7 +1292,11 @@ export class Battery implements EnginePlugin {
         grains = powderGrains(g.charge ?? 4.5, o.grain ?? 0.003, v0),
         sp = this.sparks[s.gun]!,
         so = sp.options;
-      so.position = [muzzle[0] + direction[0] * size * 0.5, muzzle[1] + direction[1] * size * 0.5, muzzle[2] + direction[2] * size * 0.5];
+      so.position = [
+        muzzle[0] + direction[0] * size * 0.5,
+        muzzle[1] + direction[1] * size * 0.5,
+        muzzle[2] + direction[2] * size * 0.5,
+      ];
       so.velocity = [direction[0] * v0, direction[1] * v0, direction[2] * v0];
       so.spread = 0.1 * v0;
       so.emissionExtent = [size * 0.3, size * 0.3, size * 0.3];
@@ -1194,7 +1306,8 @@ export class Battery implements EnginePlugin {
       if (n > 0) sp.burst(n);
     }
     // Strikes on ships fall due on the clock: splinters and a hole in the target's mask.
-    while (this.hitCursor < this.pendingHits.length && this.pendingHits[this.hitCursor]!.time <= this.clock) this.strike(this.pendingHits[this.hitCursor++]!);
+    while (this.hitCursor < this.pendingHits.length && this.pendingHits[this.hitCursor]!.time <= this.clock)
+      this.strike(this.pendingHits[this.hitCursor++]!);
     this.place();
   }
   /** Every strike on the `targets` so far, in time order (the ones whose time has come). */
@@ -1318,11 +1431,13 @@ export class Battery implements EnginePlugin {
     }
     this.clouds.options.density = live > 0 ? densitySum / live : 1;
     const co = o.clouds ?? {};
-    for (const key of Object.keys(co) as (keyof typeof co)[]) (this.clouds.options as Record<string, unknown>)[key] = co[key];
+    for (const key of Object.keys(co) as (keyof typeof co)[])
+      (this.clouds.options as Record<string, unknown>)[key] = co[key];
   }
   /** A battery of guns; see {@link BatteryOptions}. */
   static attach(engine: EngineKernel, options: BatteryOptions): Battery {
-    if (!options || typeof options !== 'object') throw new TypeError('Invalid Battery options; pass {guns: [{position, direction}]}');
+    if (!options || typeof options !== 'object')
+      throw new TypeError('Invalid Battery options; pass {guns: [{position, direction}]}');
     return new Battery(engine, options);
   }
   /** Removes the flashes, banks and lights. */
@@ -1441,13 +1556,30 @@ export interface HullMask {
 }
 const maskImage = (mask: HullMask): { data: Uint8Array | Uint8ClampedArray; width: number; height: number } => {
   const s = mask?.source as { data?: unknown; width?: number; height?: number } | undefined;
-  if (!s || !(s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray) || !Number.isInteger(s.width) || !Number.isInteger(s.height) || s.data.length !== s.width! * s.height! * 4 || typeof mask.update !== 'function')
-    throw new TypeError('Gunfire hull mask needs a Texture of raw RGBA8 data: new Texture(hullMaskImage(), {colorSpace: "linear"})');
+  if (
+    !s ||
+    !(s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray) ||
+    !Number.isInteger(s.width) ||
+    !Number.isInteger(s.height) ||
+    s.data.length !== s.width! * s.height! * 4 ||
+    typeof mask.update !== 'function'
+  )
+    throw new TypeError(
+      'Gunfire hull mask needs a Texture of raw RGBA8 data: new Texture(hullMaskImage(), {colorSpace: "linear"})',
+    );
   return s as { data: Uint8Array; width: number; height: number };
 };
 /** A blank hull mask image, `width` by `height` texels (RGBA8, alpha 255), for a `Texture`. Default 256 by 64. */
 export function hullMaskImage(width = 256, height = 64): { data: Uint8Array; width: number; height: number } {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 4 || height < 2 || width > 4096 || height > 4096 || width % 2)
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width < 4 ||
+    height < 2 ||
+    width > 4096 ||
+    height > 4096 ||
+    width % 2
+  )
     throw new RangeError('hullMaskImage needs an even whole width 4..4096 and a whole height 2..4096');
   const data = new Uint8Array(width * height * 4);
   for (let i = 3; i < data.length; i += 4) data[i] = 255;
@@ -1459,7 +1591,10 @@ export function hullMaskImage(width = 256, height = 64): { data: Uint8Array; wid
  * and 0.5 more on the port side, v = (y + draft) / (deck + draft). Give it to the mesh as its second UV set and the
  * mask to a `layered()` layer with `texCoord: 1`.
  */
-export function hullMaskUVs(positions: ArrayLike<number>, hull: { length?: number; deck?: number; draft?: number } = {}): Float32Array {
+export function hullMaskUVs(
+  positions: ArrayLike<number>,
+  hull: { length?: number; deck?: number; draft?: number } = {},
+): Float32Array {
   if (!positions || positions.length % 3) throw new TypeError('hullMaskUVs needs x, y, z for each vertex');
   const L = check(hull.length ?? 50, 'hull length', 1, 500),
     deck = check(hull.deck ?? 6, 'hull deck', 0, 50),
@@ -1475,7 +1610,13 @@ export function hullMaskUVs(positions: ArrayLike<number>, hull: { length?: numbe
   }
   return out;
 }
-const maskTexel = (img: { width: number; height: number }, local: Vec3, L: number, deck: number, draft: number): [number, number] => {
+const maskTexel = (
+  img: { width: number; height: number },
+  local: Vec3,
+  L: number,
+  deck: number,
+  draft: number,
+): [number, number] => {
   const half = img.width / 2,
     along = Math.min(1, Math.max(0, local[2] / L + 0.5));
   return [along * half + (local[0] >= 0 ? half : 0), ((local[1] + draft) / (deck + draft || 1)) * img.height];
@@ -1592,11 +1733,14 @@ export class HullFire implements EnginePlugin {
     this.checkLive();
     const nf = check(options.flames ?? 10, 'flames', 0, 64),
       nc = check(options.columns ?? 2, 'columns', 0, 16);
-    if (!Number.isInteger(nf) || !Number.isInteger(nc)) throw new RangeError('HullFire flames and columns must be whole numbers');
+    if (!Number.isInteger(nf) || !Number.isInteger(nc))
+      throw new RangeError('HullFire flames and columns must be whole numbers');
     engineRuntime(engine).use(this);
     const at = this.toWorld([0, -1e6, 0]),
       lights = options.lights,
-      smokeLights = (lights && 'clustered' in lights ? lights.clustered : lights) as unknown as import('@margoengine/vfx/base').VFXLightSource | undefined;
+      smokeLights = (lights && 'clustered' in lights ? lights.clustered : lights) as unknown as
+        | import('@margoengine/vfx/base').VFXLightSource
+        | undefined;
     for (let i = 0; i < nc; i++)
       this.smokeColumns.push(
         Smoke.attach(engine, {
@@ -1613,12 +1757,20 @@ export class HullFire implements EnginePlugin {
         }),
       );
     for (let i = 0; i < nf; i++)
-      this.flameVolumes.push(Flame.attach(engine, { position: at, length: 0, footprint: [1, 1], ...(options.lights ? { lights: options.lights } : {}) }));
+      this.flameVolumes.push(
+        Flame.attach(engine, {
+          position: at,
+          length: 0,
+          footprint: [1, 1],
+          ...(options.lights ? { lights: options.lights } : {}),
+        }),
+      );
     this.place();
   }
   private checkLive(): void {
     const o = this.options;
-    if (!o || typeof o !== 'object' || !o.ship) throw new TypeError('HullFire needs {ship}: a Floater or a world matrix');
+    if (!o || typeof o !== 'object' || !o.ship)
+      throw new TypeError('HullFire needs {ship}: a Floater or a world matrix');
     if (typeof (o.ship as Carrier).matrix !== 'function' && (o.ship as ArrayLike<number>).length !== 16)
       throw new TypeError('HullFire ship must have matrix() (a Floater) or be 16 numbers');
     const h = o.hull ?? {};
@@ -1770,7 +1922,10 @@ export class HullFire implements EnginePlugin {
       out: RiggingPiece[] = [];
     (o.masts ?? []).forEach((m, i) => {
       const start = this.mastFallTime(i),
-        angle = this.clock > start ? mastTopple(m.height, this.clock - start, Math.min(50, Math.max(0, m.position[1]))).angle : 0,
+        angle =
+          this.clock > start
+            ? mastTopple(m.height, this.clock - start, Math.min(50, Math.max(0, m.position[1]))).angle
+            : 0,
         f = m.falls ?? [1, 0, 0],
         fl = Math.hypot(f[0], f[2]) || 1,
         dx = f[0] / fl,
@@ -1782,7 +1937,24 @@ export class HullFire implements EnginePlugin {
         fall: V3 = [c * dx, -s, c * dz],
         across: V3 = [-dz, 0, dx];
       const place = (axisX: V3, axisY: V3, axisZ: V3, origin: V3): Float32Array => {
-        const local = [axisX[0], axisX[1], axisX[2], 0, axisY[0], axisY[1], axisY[2], 0, axisZ[0], axisZ[1], axisZ[2], 0, origin[0], origin[1], origin[2], 1],
+        const local = [
+            axisX[0],
+            axisX[1],
+            axisX[2],
+            0,
+            axisY[0],
+            axisY[1],
+            axisY[2],
+            0,
+            axisZ[0],
+            axisZ[1],
+            axisZ[2],
+            0,
+            origin[0],
+            origin[1],
+            origin[2],
+            1,
+          ],
           w = new Float32Array(16);
         for (let col = 0; col < 4; col++)
           for (let row = 0; row < 4; row++) {
@@ -1797,7 +1969,13 @@ export class HullFire implements EnginePlugin {
       for (const y of m.yards ?? []) {
         const centre: V3 = [foot[0] + up[0] * y.at, foot[1] + up[1] * y.at, foot[2] + up[2] * y.at];
         // A yard crosses the mast athwart its fall: its +X along `across`.
-        out.push({ kind: 'yard', mast: i, matrix: place(across, up, [-fall[0], -fall[1], -fall[2]], centre), length: y.length, angle });
+        out.push({
+          kind: 'yard',
+          mast: i,
+          matrix: place(across, up, [-fall[0], -fall[1], -fall[2]], centre),
+          length: y.length,
+          angle,
+        });
       }
     });
     return out;
@@ -1833,8 +2011,18 @@ export class HullFire implements EnginePlugin {
         length = ventFlameHeight(rate, w, ph),
         side = port.normal ?? [Math.sign(port.position[0]) || 1, 0, 0];
       // The flame leaves the opening's top a little out from the hull side and climbs the side.
-      const base: Vec3 = [port.position[0] + side[0] * 0.4, port.position[1] + ph / 2, port.position[2] + side[2] * 0.4];
-      out.push({ kind: 'port', position: this.toWorld(base), length: length + ph, footprint: [w, 0.6 * w], heat: rate * HULL_FUEL_HEAT });
+      const base: Vec3 = [
+        port.position[0] + side[0] * 0.4,
+        port.position[1] + ph / 2,
+        port.position[2] + side[2] * 0.4,
+      ];
+      out.push({
+        kind: 'port',
+        position: this.toWorld(base),
+        length: length + ph,
+        footprint: [w, 0.6 * w],
+        heat: rate * HULL_FUEL_HEAT,
+      });
     }
     return out;
   }
@@ -1868,7 +2056,13 @@ export class HullFire implements EnginePlugin {
     // The pool goes to the hottest flames; the rest of the deck's heat goes to the volumes beside it (their footprint widens).
     for (let i = 0; i < pool.length; i++) {
       const f = all[i],
-        fo = pool[i]!.options as { position: Vec3; length?: number; footprint?: readonly [number, number]; wind?: VFXWind; yaw?: number };
+        fo = pool[i]!.options as {
+          position: Vec3;
+          length?: number;
+          footprint?: readonly [number, number];
+          wind?: VFXWind;
+          yaw?: number;
+        };
       if (!f) {
         fo.length = 0;
         continue;

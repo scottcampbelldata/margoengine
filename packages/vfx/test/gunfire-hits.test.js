@@ -18,7 +18,13 @@ import {
   woodExitSpeed,
   woodPenetration,
 } from '../dist/gunfire.js';
-import { GUNFIRE_SETTINGS, HULL_FIRE_SETTINGS, applyGunfireSettings, applyHullFireSettings, hullFireSettingValues } from '../dist/settings.js';
+import {
+  GUNFIRE_SETTINGS,
+  HULL_FIRE_SETTINGS,
+  applyGunfireSettings,
+  applyHullFireSettings,
+  hullFireSettingValues,
+} from '../dist/settings.js';
 import { optionalGPU as harness } from '../../../tests/support/optional-gpu.js';
 
 const optionalGPU = () => {
@@ -45,10 +51,19 @@ test('the wind moves the shot: drag on the velocity relative to the air, the lag
   near(i.position[2], lag, 0.03 * lag, 'crosswind deflection W (T - X / u0)');
   // A head wind shortens the range; a wind field is read along the path.
   assert.ok(shotPath([0, 3, 0], [1, 0.03, 0], 490, {}, { wind: [-W, 0] }).impact.position[0] < calm.impact.position[0]);
-  near(shotPath([0, 3, 0], [1, 0.03, 0], 490, {}, { wind: { sample: () => [0, 0, W] } }).impact.position[2], i.position[2], 1e-9, 'field');
+  near(
+    shotPath([0, 3, 0], [1, 0.03, 0], 490, {}, { wind: { sample: () => [0, 0, W] } }).impact.position[2],
+    i.position[2],
+    1e-9,
+    'field',
+  );
   // The battery flies its shots in its wind (its own, or the weather's on its flashes).
   const { engine } = optionalGPU();
-  const b = Battery.attach(engine, { guns: [{ position: [0, 3, 0], direction: [1, 0.03, 0] }], shots: [{ gun: 0, time: 0 }], wind: [0, W] });
+  const b = Battery.attach(engine, {
+    guns: [{ position: [0, 3, 0], direction: [1, 0.03, 0] }],
+    shots: [{ gun: 0, time: 0 }],
+    wind: [0, W],
+  });
   b.advanceTime(1 / 30);
   near(b.impacts()[0].position[2], i.position[2], 1e-9, 'Battery shot in the wind');
   b.dispose();
@@ -70,7 +85,13 @@ test('burning powder grains: Piobert burn-out and the drag that stops them', () 
   assert.ok(g.reach > 5 && g.reach < 40, `sparks reach tens of metres: ${g.reach}`);
   // The battery throws them with the flash.
   const { engine } = optionalGPU();
-  const b = Battery.attach(engine, { guns: [gun], shots: [{ gun: 0, time: 0 }, { gun: 0, time: 1 }] });
+  const b = Battery.attach(engine, {
+    guns: [gun],
+    shots: [
+      { gun: 0, time: 0 },
+      { gun: 0, time: 1 },
+    ],
+  });
   const bursts = [];
   b.sparks[0].burst = (n) => bursts.push(n);
   b.advanceTime(1 / 30);
@@ -99,7 +120,12 @@ test('Poncelet penetration into oak and the three outcomes of a strike', () => {
   }
   near(woodPenetration(400, r, 14.5), x, 2e-3 * x, 'stopping depth');
   const q = OAK.strength / (0.5 * OAK.density);
-  near(woodExitSpeed(400, r, 14.5, 0.3) ** 2, (q + 400 ** 2) * Math.exp((-OAK.density * A * 0.3) / 14.5) - q, 1e-6, 'exit speed');
+  near(
+    woodExitSpeed(400, r, 14.5, 0.3) ** 2,
+    (q + 400 ** 2) * Math.exp((-OAK.density * A * 0.3) / 14.5) - q,
+    1e-6,
+    'exit speed',
+  );
   assert.equal(woodExitSpeed(400, r, 14.5, woodPenetration(400, r, 14.5) + 0.01), 0);
   // A ship broadside on at 60 m: holed through both sides, the ball going on to the sea.
   const ship = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 60, 0, 0, 1];
@@ -112,7 +138,12 @@ test('Poncelet penetration into oak and the three outcomes of a strike', () => {
   near(h0.position[0], 60 - 6.5, 0.02, 'strikes the near side');
   near(h1.position[0], 60 + 6.5, 0.6, 'leaves the far side');
   const vn = Math.abs(h0.velocity.reduce((s, x, i) => s + x * h0.normal[i], 0));
-  near(Math.hypot(...h0.after) / Math.hypot(...h0.velocity), woodExitSpeed(vn, r, 14.5, 0.5) / vn, 1e-9, 'Poncelet exit speed of the part into the side');
+  near(
+    Math.hypot(...h0.after) / Math.hypot(...h0.velocity),
+    woodExitSpeed(vn, r, 14.5, 0.5) / vn,
+    1e-9,
+    'Poncelet exit speed of the part into the side',
+  );
   assert.ok(through.impact && through.impact.position[0] > 67, 'and goes on to the water');
   assert.ok(h0.splinters > 50, `splinters ${h0.splinters}`);
   // A side thicker than its reach stops it: lodged, no impact.
@@ -163,7 +194,13 @@ test('the hull chars at the Eurocode rate where the fire has burnt, and the mask
   const { engine } = optionalGPU();
   const image = hullMaskImage(48, 12);
   let updates = 0;
-  const fire = HullFire.attach(engine, { ship: identity(), spread: 0.5, burnTime: 7200, ports: [{ position: [6.5, 3, 0] }], mask: { source: image, update: () => updates++ } });
+  const fire = HullFire.attach(engine, {
+    ship: identity(),
+    spread: 0.5,
+    burnTime: 7200,
+    ports: [{ position: [6.5, 3, 0] }],
+    mask: { source: image, update: () => updates++ },
+  });
   while (fire.time < 2160 - 1e-6) fire.advanceTime(1 / 2);
   // 2,160 s after ignition: 360 s of growth (half counts) then full burn: 1,980 s, so 16.5 mm at 0.5 mm/min.
   near(fire.exposure(0), 180 + 1800, 1e-6, 'exposure');
@@ -186,7 +223,13 @@ test('the hull chars at the Eurocode rate where the fire has burnt, and the mask
   // A seek: the same clock in other steps paints the same mask.
   const paint = (dt) => {
     const img = hullMaskImage(48, 12),
-      f = HullFire.attach(optionalGPU().engine, { ship: identity(), spread: 0.5, burnTime: 120, ports: [{ position: [6.5, 3, 0] }], mask: { source: img, update() {} } });
+      f = HullFire.attach(optionalGPU().engine, {
+        ship: identity(),
+        spread: 0.5,
+        burnTime: 120,
+        ports: [{ position: [6.5, 3, 0] }],
+        mask: { source: img, update() {} },
+      });
     for (let i = 0; i < Math.round(90 / dt); i++) f.advanceTime(dt);
     f.dispose();
     return [...img.data];
@@ -205,7 +248,12 @@ test('a mast topples on its foot as a falling chimney (Varieschi and Kamiya 2003
   for (const t of [1, 3, 4]) {
     const m = mastTopple(L, t, 6);
     if (m.down) continue;
-    near(m.rate, Math.sqrt((3 * 9.81 * (Math.cos(th0) - Math.cos(m.angle))) / L), 1e-6 * Math.max(1, m.rate), `energy at ${t} s`);
+    near(
+      m.rate,
+      Math.sqrt((3 * 9.81 * (Math.cos(th0) - Math.cos(m.angle))) / L),
+      1e-6 * Math.max(1, m.rate),
+      `energy at ${t} s`,
+    );
   }
   // Time to horizontal: the integral of dtheta / omega from 0.02 to pi/2 (Simpson in u, theta = th0 + u^2).
   const omega = (th) => Math.sqrt((3 * 9.81 * (Math.cos(th0) - Math.cos(th))) / L);
@@ -225,7 +273,12 @@ test('a mast topples on its foot as a falling chimney (Varieschi and Kamiya 2003
   // On a burning hull: it stands until the fire has reached it and burnt its stays, then falls to port with its yards.
   const { engine } = optionalGPU();
   const pose = identity();
-  const fire = HullFire.attach(engine, { ship: { matrix: () => pose }, spread: 0.5, mastFall: 5, masts: [{ position: [0, 6, 10], height: L, yards: [{ at: 30, length: 20 }] }] });
+  const fire = HullFire.attach(engine, {
+    ship: { matrix: () => pose },
+    spread: 0.5,
+    mastFall: 5,
+    masts: [{ position: [0, 6, 10], height: L, yards: [{ at: 30, length: 20 }] }],
+  });
   near(fire.mastFallTime(0), 25, 1e-9, 'reach 20 s plus 5 s');
   while (fire.time < 24.9) fire.advanceTime(1 / 10);
   let [mast, yard] = fire.rigging();
@@ -245,7 +298,8 @@ test('a mast topples on its foot as a falling chimney (Varieschi and Kamiya 2003
 test('the new rows are live and write the battery and the hull', () => {
   const rows = [...GUNFIRE_SETTINGS, ...HULL_FIRE_SETTINGS],
     names = new Set(rows.map((r) => r.name));
-  for (const n of ['sparks', 'sparkRadiance', 'grain', 'splinters', 'charRate', 'mastFall']) assert.ok(names.has(n) && rows.find((r) => r.name === n).live, n);
+  for (const n of ['sparks', 'sparkRadiance', 'grain', 'splinters', 'charRate', 'mastFall'])
+    assert.ok(names.has(n) && rows.find((r) => r.name === n).live, n);
   const { engine } = optionalGPU();
   const b = Battery.attach(engine, { guns: [gun] });
   applyGunfireSettings(b, { sparks: 2, grain: 0.005 });

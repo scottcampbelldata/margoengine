@@ -277,7 +277,14 @@ export function defaultPuffTexture(size = 128): CloudPixels {
 function pixelsOf(texture: CloudTexture): CloudPixels {
   if ('data' in texture && texture.data) {
     const { width, height, data } = texture as CloudPixels;
-    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096)
+    if (
+      !Number.isInteger(width) ||
+      !Number.isInteger(height) ||
+      width < 1 ||
+      height < 1 ||
+      width > 4096 ||
+      height > 4096
+    )
       fail(`Clouds texture is ${width} x ${height}; pass whole sizes from 1 to 4096`);
     if (data.length !== width * height * 4)
       fail(`Clouds texture data has ${data.length} bytes for ${width} x ${height}; pass width * height * 4 RGBA bytes`);
@@ -287,7 +294,10 @@ function pixelsOf(texture: CloudTexture): CloudPixels {
     width = (source as HTMLImageElement).naturalWidth || source.width,
     height = (source as HTMLImageElement).naturalHeight || source.height;
   if (typeof OffscreenCanvas !== 'function')
-    throw new MargoError('unsupported', 'Clouds texture image sources need OffscreenCanvas; pass {width, height, data}');
+    throw new MargoError(
+      'unsupported',
+      'Clouds texture image sources need OffscreenCanvas; pass {width, height, data}',
+    );
   const canvas = new OffscreenCanvas(width, height),
     context = canvas.getContext('2d')!;
   context.drawImage(source as CanvasImageSource, 0, 0);
@@ -299,8 +309,7 @@ const toLinear = new Float32Array(256).map((_, i) => {
   const c = i / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 });
-const toByte = (c: number) =>
-  Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055));
+const toByte = (c: number) => Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055));
 /** The mip chain of `pixels`, each level a 2 x 2 box filter of the one above (colour in linear light). */
 function mipChain(pixels: CloudPixels): CloudPixels[] {
   const levels = [pixels];
@@ -503,8 +512,7 @@ export class Clouds implements EnginePlugin {
         opacity = number(c.opacity, 1, 'Cloud opacity', 0, 1),
         rgb = parseColor(c.color ?? [1, 1, 1]) as number[],
         // A puff's size follows the cloud's mean axis scale.
-        scale =
-          (Math.hypot(m[0], m[1], m[2]) + Math.hypot(m[4], m[5], m[6]) + Math.hypot(m[8], m[9], m[10])) / 3,
+        scale = (Math.hypot(m[0], m[1], m[2]) + Math.hypot(m[4], m[5], m[6]) + Math.hypot(m[8], m[9], m[10])) / 3,
         layout = cloud.layout,
         first = out.length;
       for (let i = 0; i < layout.length; i += 6) {
@@ -670,14 +678,20 @@ export class Clouds implements EnginePlugin {
     u[31] = o.ambient ?? 0.55;
     parseColor(o.lightColor ?? [1, 1, 1], u, 32);
     u[35] = (o.shading ?? 'scatter') === 'scatter' ? 1 : 0;
-    this.uniform ??= device.createBuffer({ size: UNIFORM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform ??= device.createBuffer({
+      size: UNIFORM_FLOATS * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     device.queue.writeBuffer(this.uniform, 0, u as Float32Array<ArrayBuffer>);
     const fog = this.fogSource,
       encode = !c.format.includes('float') && !c.format.endsWith('-srgb');
     if (fog) {
       // Fog mixes in linear light here; the shader encodes the result for an 8-bit target.
       writeFog(fog, c.camera.position, this.fogData);
-      this.fogBuffer ??= device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.fogBuffer ??= device.createBuffer({
+        size: FOG_BYTES,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
       device.queue.writeBuffer(this.fogBuffer, 0, this.fogData as Float32Array<ArrayBuffer>);
     }
     const softness = o.softness ?? 0;

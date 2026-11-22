@@ -16,7 +16,10 @@ const { SimulationRoute, routeShaders } = await import(`../dist/${compatChunk}`)
 // The bindings of group 0 that the entry point `main` of `code` reaches, as the layer's auto layout holds them.
 const reached = (code) => {
   const entry = checkWGSL(code).entryPoints.find((e) => e.name === 'main');
-  return entry.globals.filter((g) => g.kind === 'var' && g.group === 0).map((g) => g.binding).sort((a, b) => a - b);
+  return entry.globals
+    .filter((g) => g.kind === 'var' && g.group === 0)
+    .map((g) => g.binding)
+    .sort((a, b) => a - b);
 };
 
 for (const [name, options] of [
@@ -43,7 +46,9 @@ for (const [name, options] of [
       state = effect.gpuState,
       uniform = h.resources.find((r) => r.usage & 64),
       // Every binding the simulation declares, as base.ts hands the route its feature entries.
-      declared = [...simulation.matchAll(/@group\(0\) @binding\((\d+)\)/g)].map((m) => +m[1]).filter((b) => b > 5 && b !== 9 && b !== 10),
+      declared = [...simulation.matchAll(/@group\(0\) @binding\((\d+)\)/g)]
+        .map((m) => +m[1])
+        .filter((b) => b > 5 && b !== 9 && b !== 10),
       more = declared.map((binding) => ({ binding, resource: { buffer: uniform } })),
       events = routeShaders(simulation).events ? { events: uniform } : {};
     // Each auto layout names its pipeline, so every bind group is checked against its own entry point.
@@ -61,8 +66,12 @@ for (const [name, options] of [
     for (const g of bound) {
       const code = g.layout.pipeline.compute.module.code,
         entries = g.entries.map((e) => e.binding).sort((a, b) => a - b);
-      assert.deepEqual(entries, reached(code), `binds what its entry point uses:
-${code.slice(-300)}`);
+      assert.deepEqual(
+        entries,
+        reached(code),
+        `binds what its entry point uses:
+${code.slice(-300)}`,
+      );
     }
     owned.forEach((r) => r.destroy());
     effect.dispose();

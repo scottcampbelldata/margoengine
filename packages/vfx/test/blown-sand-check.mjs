@@ -20,7 +20,13 @@ const shot = async (args) => {
 const differing = (a, b) => {
   let n = 0;
   for (let i = 0; i < a.data.length; i += 4)
-    if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]) > 3) n++;
+    if (
+      Math.abs(a.data[i] - b.data[i]) +
+        Math.abs(a.data[i + 1] - b.data[i + 1]) +
+        Math.abs(a.data[i + 2] - b.data[i + 2]) >
+      3
+    )
+      n++;
   return n;
 };
 try {
