@@ -16,7 +16,7 @@ the owner files them.
 | KB1042f | `KB1042f` | ANGLE, NVIDIA | standalone page does not trigger it (0 of 300 frames); full Margo grid still does (KB5822a) |
 | KB2224c | `KB2224c` | Playwright, WebKit | draft only, no repro |
 | KB2426 | `KB2426` | NVIDIA | evidence only, no trigger |
-| KB2481 | `KB2481` | Intel, NVIDIA | NVIDIA half yes; Intel half needs an Arc |
+| KB2481 | `KB2481` | Intel, NVIDIA | NVIDIA half yes; Intel half yes, Arc 140V with msaa-additive-repeat.html (2026-11-21) |
 | KB3497 | `KB3497` | NVIDIA (via KB3508) | link to KB3508 not proven |
 | KB3508 | `KB3508` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (WebGPU and WebGL2 on ANGLE D3D11); exact on an Intel Arc 140V, ANGLE D3D11 (2026-11-21) |
 | KB5185b | `KB5185b` | ANGLE, NVIDIA | draft only, no standalone repro |
