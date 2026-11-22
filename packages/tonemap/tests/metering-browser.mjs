@@ -143,7 +143,10 @@ await postBrowser(
     console.log(JSON.stringify(r));
     const m = r.modes;
     assert.ok(r.worst < 0.002, `every mode matches the CPU oracle: ${r.worst} stops`);
-    assert.ok(Object.values(m).every(([, , set]) => set === 1), 'each run stored an exposure');
+    assert.ok(
+      Object.values(m).every(([, , set]) => set === 1),
+      'each run stored an exposure',
+    );
     assert.ok(Math.abs(r.spot - Math.log2(0.18 / 0.5)) < 1e-4, `the spot on the mid box meters it: ${r.spot}`);
     assert.equal(r.kept, r.spot, 'an empty mask keeps the exposure');
     const values = Object.values(m).map(([gpu]) => gpu);

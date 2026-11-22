@@ -23,7 +23,13 @@ const W = 320,
     const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
     return t * t * (3 - 2 * t);
   };
-const VIG = { vignette: 1, vignetteRadius: 0.2, vignetteSoftness: 0.5, vignetteCenter: [0.25, 0.5], vignetteRoundness: 1 };
+const VIG = {
+  vignette: 1,
+  vignetteRadius: 0.2,
+  vignetteSoftness: 0.5,
+  vignetteCenter: [0.25, 0.5],
+  vignetteRoundness: 1,
+};
 function vignetted(x, y, colour, opaque, grey) {
   const s = [(W * Math.SQRT2) / Math.hypot(W, H), (H * Math.SQRT2) / Math.hypot(W, H)],
     d = [((x + 0.5) / W - 0.25) * 2 * s[0], ((y + 0.5) / H - 0.5) * 2 * s[1]],
@@ -125,7 +131,8 @@ for (const compat of [false, true])
         }
         const across = at(image, cx + 50, cy),
           down = at(image, cx, cy + 50);
-        for (let k = 0; k < 3; k++) assert.ok(Math.abs(across[k] - down[k]) <= 1, `${backend} ${name}: round (${across} against ${down})`);
+        for (let k = 0; k < 3; k++)
+          assert.ok(Math.abs(across[k] - down[k]) <= 1, `${backend} ${name}: round (${across} against ${down})`);
       }
       assert.deepEqual(at(images.opaque, W - 1, H - 1), [255, 0, 0], `${backend}: the far corner is the colour`);
     },

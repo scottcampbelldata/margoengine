@@ -41,26 +41,80 @@ test('every row is well formed: a unique name in its group, a default in range, 
     if (row.kind === 'number') {
       assert.ok(row.default >= row.min && row.default <= row.max, `${row.name} default in range`);
       assert.ok(row.min < row.max && row.step > 0, `${row.name} has a range and a step`);
-    } else if (row.kind === 'color') assert.ok(row.default.every((x) => x >= row.min && x <= row.max), `${row.name} default in range`);
+    } else if (row.kind === 'color')
+      assert.ok(
+        row.default.every((x) => x >= row.min && x <= row.max),
+        `${row.name} default in range`,
+      );
     else assert.ok(row.choices.includes(row.default), `${row.name} default is a choice`);
   }
   // Every option of Tonemap (but source, inputColorSpace and extensions), Grade (but curves), HueGrade (but hueHue) and LocalExposure.
   for (const name of [
-    'tonemap.curve', 'tonemap.exposure', 'tonemap.contrast', 'tonemap.whitePoint', 'tonemap.toe', 'tonemap.shoulder', 'tonemap.temperature', 'tonemap.tint', 'tonemap.grain',
-    'tonemap.dither', 'tonemap.chromaticAberration', 'vignette.amount', 'vignette.radius', 'vignette.softness',
-    'vignette.color', 'vignette.centerX', 'vignette.roundness', 'vignette.blend', 'autoExposure.enabled',
-    'autoExposure.min', 'autoExposure.max', 'autoExposure.speed', 'autoExposure.compensation', 'autoExposure.method',
-    'autoExposure.percentileLow', 'autoExposure.metering', 'autoExposure.spotRadius', 'grade.shadows', 'grade.midtones',
-    'grade.highlights', 'grade.saturationRed', 'grade.saturationMagenta', 'grade.lift', 'grade.gamma', 'grade.gain',
-    'grade.saturation', 'hue.shift', 'local.strength', 'local.maxStops', 'local.radius', 'local.edges',
+    'tonemap.curve',
+    'tonemap.exposure',
+    'tonemap.contrast',
+    'tonemap.whitePoint',
+    'tonemap.toe',
+    'tonemap.shoulder',
+    'tonemap.temperature',
+    'tonemap.tint',
+    'tonemap.grain',
+    'tonemap.dither',
+    'tonemap.chromaticAberration',
+    'vignette.amount',
+    'vignette.radius',
+    'vignette.softness',
+    'vignette.color',
+    'vignette.centerX',
+    'vignette.roundness',
+    'vignette.blend',
+    'autoExposure.enabled',
+    'autoExposure.min',
+    'autoExposure.max',
+    'autoExposure.speed',
+    'autoExposure.compensation',
+    'autoExposure.method',
+    'autoExposure.percentileLow',
+    'autoExposure.metering',
+    'autoExposure.spotRadius',
+    'grade.shadows',
+    'grade.midtones',
+    'grade.highlights',
+    'grade.saturationRed',
+    'grade.saturationMagenta',
+    'grade.lift',
+    'grade.gamma',
+    'grade.gain',
+    'grade.saturation',
+    'hue.shift',
+    'local.strength',
+    'local.maxStops',
+    'local.radius',
+    'local.edges',
   ])
-    assert.ok(TONEMAP_SETTINGS.some((row) => row.name === name), `${name} is a row`);
+    assert.ok(
+      TONEMAP_SETTINGS.some((row) => row.name === name),
+      `${name} is a row`,
+    );
   assert.deepEqual(
     TONEMAP_SETTINGS.filter((row) => !row.live).map((row) => row.name),
     [
-      'tonemap.curve', 'tonemap.whitePoint', 'tonemap.toe', 'tonemap.shoulder', 'tonemap.temperature', 'tonemap.tint', 'tonemap.grain', 'tonemap.dither',
-      'tonemap.chromaticAberration', 'vignette.amount', 'autoExposure.enabled', 'grade.lift', 'grade.gamma', 'grade.gain',
-      'grade.saturation', 'local.radius',
+      'tonemap.curve',
+      'tonemap.whitePoint',
+      'tonemap.toe',
+      'tonemap.shoulder',
+      'tonemap.temperature',
+      'tonemap.tint',
+      'tonemap.grain',
+      'tonemap.dither',
+      'tonemap.chromaticAberration',
+      'vignette.amount',
+      'autoExposure.enabled',
+      'grade.lift',
+      'grade.gamma',
+      'grade.gain',
+      'grade.saturation',
+      'local.radius',
     ],
   );
   assert.equal(TONEMAP_LIVE_SETTINGS.length, TONEMAP_SETTINGS.length - 16);
@@ -125,21 +179,43 @@ test('rows write the option they name; autoExposure builds, keeps its mask and i
 test('a value outside its row throws RangeError, an unknown name TypeError, a missing target TypeError', () => {
   const t = rig();
   for (const row of TONEMAP_SETTINGS.filter((r) => r.kind === 'number')) {
-    assert.throws(() => applyTonemapSettings(t, { [row.name]: row.max + row.step }), RangeError, `${row.name} above its max`);
-    assert.throws(() => applyTonemapSettings(t, { [row.name]: row.min - row.step }), RangeError, `${row.name} below its min`);
+    assert.throws(
+      () => applyTonemapSettings(t, { [row.name]: row.max + row.step }),
+      RangeError,
+      `${row.name} above its max`,
+    );
+    assert.throws(
+      () => applyTonemapSettings(t, { [row.name]: row.min - row.step }),
+      RangeError,
+      `${row.name} below its min`,
+    );
     assert.throws(() => applyTonemapSettings(t, { [row.name]: NaN }), RangeError, `${row.name} NaN`);
   }
   for (const row of TONEMAP_SETTINGS.filter((r) => r.kind === 'choice'))
     assert.throws(() => applyTonemapSettings(t, { [row.name]: 'sideways' }), RangeError, `${row.name} choice`);
   assert.throws(() => applyTonemapSettings(t, { 'grade.gain': [5, 1, 1] }), RangeError);
   assert.throws(() => applyTonemapSettings(t, { 'tonemap.nope': 1 }), TypeError);
-  assert.throws(() => applyTonemapSettings(t, { 'autoExposure.min': 2, 'autoExposure.max': 1 }), RangeError, 'min above max');
-  assert.throws(() => applyTonemapSettings(t, { 'autoExposure.percentileLow': 0.9 }), RangeError, 'low at or above high');
+  assert.throws(
+    () => applyTonemapSettings(t, { 'autoExposure.min': 2, 'autoExposure.max': 1 }),
+    RangeError,
+    'min above max',
+  );
+  assert.throws(
+    () => applyTonemapSettings(t, { 'autoExposure.percentileLow': 0.9 }),
+    RangeError,
+    'low at or above high',
+  );
   assert.throws(() => applyTonemapSettings({}, { 'tonemap.exposure': 1 }), /needs targets.tonemap/);
-  assert.throws(() => applyTonemapSettings({ tonemap: t.tonemap }, { 'grade.lift': [0.1, 0, 0] }), /needs targets.grade/);
+  assert.throws(
+    () => applyTonemapSettings({ tonemap: t.tonemap }, { 'grade.lift': [0.1, 0, 0] }),
+    /needs targets.grade/,
+  );
   assert.throws(() => applyTonemapSettings({ grade: t.grade }, { 'hue.shift': 5 }), /needs targets.hueGrade/);
   assert.throws(() => applyTonemapSettings({ tonemap: t.tonemap }, { 'local.edges': 2 }), /needs targets.local/);
-  assert.doesNotThrow(() => applyTonemapSettings({ tonemap: t.tonemap }, { 'local.edges': 1.3 }), 'a default needs no target');
+  assert.doesNotThrow(
+    () => applyTonemapSettings({ tonemap: t.tonemap }, { 'local.edges': 1.3 }),
+    'a default needs no target',
+  );
 });
 
 test('a refused call writes nothing', () => {

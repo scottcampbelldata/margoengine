@@ -261,7 +261,11 @@ export function effectsShader(code: string, auto: boolean): string {
     );
   // Dither the encoded value, the last step before the target quantises it.
   const encode = 'return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),';
-  out = swap(out, encode, 'return vec4f(fxDither(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),pos),');
+  out = swap(
+    out,
+    encode,
+    'return vec4f(fxDither(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),pos),',
+  );
   if (!out.includes('fxFinish(color'))
     throw new MargoError(
       'failed',

@@ -22,7 +22,8 @@ export interface CustomCurveOptions {
 const SAMPLES = 128,
   LOW = -12,
   RANGE = 20,
-  FN = /^\s*(?:\/\/[^\n]*\n\s*)*fn\s+([A-Za-z_]\w*)\s*\(\s*\w+\s*:\s*(?:vec3f|vec3<f32>)\s*\)\s*->\s*(?:vec3f|vec3<f32>)/;
+  FN =
+    /^\s*(?:\/\/[^\n]*\n\s*)*fn\s+([A-Za-z_]\w*)\s*\(\s*\w+\s*:\s*(?:vec3f|vec3<f32>)\s*\)\s*->\s*(?:vec3f|vec3<f32>)/;
 
 const code = (binding: number, call: string) => `
 struct CustomCurve {params:array<vec4f,4>,table:array<vec4f,${SAMPLES / 4 + 1}>}
@@ -58,8 +59,13 @@ export class CustomCurve implements TonemapExtension {
       extra = '';
     if (wgsl !== undefined) {
       const name = FN.exec(wgsl)![1];
-      if (new RegExp(`fn\\s+${name}\\s*\\(`).test(shader) || /^(custom(Sample|Curve|CurveData)|curveParams)$/.test(name))
-        throw new RangeError(`CustomCurve: the name ${name} is already used by the Tonemap shader; rename the function.`);
+      if (
+        new RegExp(`fn\\s+${name}\\s*\\(`).test(shader) ||
+        /^(custom(Sample|Curve|CurveData)|curveParams)$/.test(name)
+      )
+        throw new RangeError(
+          `CustomCurve: the name ${name} is already used by the Tonemap shader; rename the function.`,
+        );
       // The phony read keeps customCurveData in the pipeline's automatic layout when the curve ignores curveParams:
       // the Tonemap always binds it, and a layout without it fails the bind group (KB-OWN-TONE3).
       call = `_=customCurveData.params;return ${name}(x);`;

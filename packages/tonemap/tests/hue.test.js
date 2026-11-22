@@ -71,7 +71,8 @@ test('Grade and HueGrade together build valid WGSL and apply in order', () => {
     const h = gpuHarness(),
       effect = Tonemap.attach(h.engine, { extensions });
     h.frame();
-    const code = h.pipelines.filter((p) => p.fragment?.module.code.includes('fn sampleLUT')).at(-1).fragment.module.code;
+    const code = h.pipelines.filter((p) => p.fragment?.module.code.includes('fn sampleLUT')).at(-1).fragment
+      .module.code;
     // The WebGL2 layer's WGSL checker rejects a name declared twice at module scope, as a device does.
     const glsl = translateWGSL({ vertex: { source: code }, fragment: { source: code } });
     assert.deepEqual(

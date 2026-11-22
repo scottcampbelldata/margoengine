@@ -58,7 +58,11 @@ await postBrowser(
         return t;
       };
       let made = 0;
-      const tonemap = Tonemap.attach(engine, { curve: 'linear', source, autoExposure: { metering: 'mask', mask: mask(engine.gpu) } });
+      const tonemap = Tonemap.attach(engine, {
+        curve: 'linear',
+        source,
+        autoExposure: { metering: 'mask', mask: mask(engine.gpu) },
+      });
       const exposure = async () => {
         const device = engine.gpu,
           read = device.createBuffer({ size: 8, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });

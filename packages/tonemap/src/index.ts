@@ -521,7 +521,11 @@ export class Tonemap implements EnginePlugin {
       shaped = (o.whitePoint ?? 0) > 0 || (o.toe ?? 1) !== 1 || (o.shoulder ?? 1) !== 1,
       flags = exts.length
         ? -1
-        : (excess ? 1 : 0) | (variableLUT ? 2 : 0) | (fxOn ? (auto ? 12 : 4) : 0) | (classic ? 16 : 0) | (shaped ? 32 : 0),
+        : (excess ? 1 : 0) |
+          (variableLUT ? 2 : 0) |
+          (fxOn ? (auto ? 12 : 4) : 0) |
+          (classic ? 16 : 0) |
+          (shaped ? 32 : 0),
       // The key string is built only when what it names may have changed (a frame with extensions always builds it):
       // a steady frame builds no string.
       key =
