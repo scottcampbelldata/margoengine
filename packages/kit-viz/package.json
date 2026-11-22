@@ -1055,6 +1055,10 @@
       "types": "./dist/lines/tiles.d.ts",
       "import": "./dist/lines/tiles.js"
     },
+    "./lines/flow": {
+      "types": "./dist/lines/flow.d.ts",
+      "import": "./dist/lines/flow.js"
+    },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
       "import": "./dist/loaders/ply.js"

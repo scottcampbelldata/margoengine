@@ -14,6 +14,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Stroke } = await load('../dist/stroke.js');
   const { LineTexture, TexturedLine } = await load('../dist/texture.js');
   const { Trail } = await load('../dist/trail.js');
+  const { FlowPath } = await load('../dist/flow.js');
   const { LinePicking } = await load('../dist/pick.js');
   const fill = (lines) => {
     const line = lines.add(new Line({ positions: strip(0), width: 3 }));
@@ -26,6 +27,7 @@ export async function fixtures(load = (entry) => import(entry)) {
       .moveTo(0, 0, 0)
       .moveTo(0.2, 0.1, 0)
       .moveTo(0.4, 0, 0);
+    new FlowPath(lines, { positions: strip(0.45) }).seek(1.25);
     lines.add(new EdgesHelper(quad, { stride: 3 }));
     lines.add(new GridHelper({ size: 1, divisions: 2 }));
     lines.add(new AxesHelper({ size: 0.5 }));

@@ -1,5 +1,11 @@
 # Clean room
 
+### Animated flow paths in Lines (2026-11-22)
+
+Bruno Jobard and Wilfrid Lefer, [Unsteady Flow Visualization by Animating Evenly-Spaced Streamlines](https://doi.org/10.1111/1467-8659.00395), 2000, show how a cyclic pattern moving along a streamline conveys direction. Greg Turk and David Banks, [Image-Guided Streamline Placement](https://doi.org/10.1145/237170.237285), 1996, describe using line density and visual contrast to make trajectories readable. Jobard and Lefer, [Creating Evenly-Spaced Streamlines of Arbitrary Density](https://web.cs.ucdavis.edu/~ma/SIGGRAPH02/course23/notes/papers/Jobard.pdf), 1997, discuss regular spacing by distance.
+
+Margo takes an authored 3D polyline, scrolls its existing world-distance dash pattern from absolute time, and places a quieter line under it to keep the route readable. Endpoint opacity is based on local arc length with intermediate samples inside the fades. The implementation uses Margo's existing depth, draw and disposal paths and introduces no field solver.
+
 ### Ship wakes at harbor speed (2026-11-21)
 
 Francis Noblesse, Gérard Delhommeau, Michel Guilbaud, Dane Hendrix and Chi Yang, [Simple analytical relations for ship bow waves](https://doi.org/10.1017/S0022112008000220), 2008, supply the existing speed law and crest location. Ravindra Pethiyagoda, Timothy J. Moroney, Christopher J. Lustri and Scott W. McCue, [Kelvin wake pattern at small Froude numbers](https://doi.org/10.1017/jfm.2021.193), 2021, describe why slow flow need not show a strong diverging wave. Donald C. Wyatt, Thomas C. Fu, Genevieve L. Taylor, Eric J. Terrill, Tao Xing, Shanti Bhushan, Thomas T. O'Shea and Douglas G. Dommermuth, [A Comparison of Full-Scale Experimental Measurements and Computational Predictions of the Transom-Stern Wave of the R/V Athena I](https://arxiv.org/abs/1410.1810), 2008, distinguish the near stern elevation and the spatially uneven bubble signature. Their example is at 5.4 m/s.

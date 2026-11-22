@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17393929,
+  "total": 17399825,
   "history": [
     {
       "date": "2026-10-24",
@@ -11331,6 +11331,12 @@
       "commit": "3ebc6f28fb",
       "reason": "Ground and classify distant trees from the drawn terrain. Terrain gzip 16671 to 17402, stream 13366 to 14072, Biomes cover 3089 to 3539 and far 3849 to 4331. A split would still need the same prepared rings and buffers for rasterizing height. Core and stage stay at 24797 bytes.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-22",
+      "commit": "1a585ae1cc",
+      "reason": "Optional lines/flow adds 5640 B min+gzip for seekable dashes, an optional guide and arc-length endpoint fades. One entry shares the two layers and their disposal. Details are in the Lines README and docs/limits.md.",
+      "grew": 1
     }
   ],
   "items": {
@@ -11890,6 +11896,7 @@
     "@margoengine/lines/batch": 6616,
     "@margoengine/lines/debug": 10845,
     "@margoengine/lines/edges": 5972,
+    "@margoengine/lines/flow": 5896,
     "@margoengine/lines/hidden": 5219,
     "@margoengine/lines/pick": 6268,
     "@margoengine/lines/stroke": 5680,

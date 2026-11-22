@@ -165,6 +165,57 @@ lines.add(new Line({positions: [0, -2, 0, 0, 2, 0], width: 6, color: '#40ff40', 
 
 A depth-writing line takes two draws, so its edge stays smooth: the part at least half covered writes depth, then the rest of the edge ramp blends over it without writing. All writers draw before lines that do not write, so those sort against them. With `antialias: false` it is one draw. Dash gaps and parts cut by clipping planes write nothing. Depth is written at the line's centre, also for a translucent line, which then hides what is drawn behind it after it, as a depth-writing translucent mesh does.
 
+## Animated flow paths
+
+Use `@margoengine/lines/flow` for color-coded air, liquid or signal paths in a 3D cutaway. Each path draws moving pulses over a faint guide and tapers their opacity at both ends. Opaque scene geometry occludes the lines. The application supplies the route, speed and time.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Lines } from '@margoengine/lines';
+import { FlowPath } from '@margoengine/lines/flow';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+const air = new FlowPath(lines, {
+  positions: [-1, 0.3, 0, 0, 0.4, 0, 1, 0.3, 0],
+  color: '#16aeff',
+  speed: 0.5,
+});
+const fuel = new FlowPath(lines, {
+  positions: [-0.2, -0.5, 0, 0.12, -0.3, 0, 0.4, 0.34, 0],
+  color: '#ffca29',
+  speed: 0.22,
+  dashSize: 0.08,
+  gapSize: 0.12,
+});
+
+function renderAt(seconds: number) {
+  air.seek(seconds);
+  fuel.seek(seconds);
+  engine.render();
+}
+
+renderAt(1.5);
+// Call renderAt with the playhead's time for each frame, in any order.
+air.dispose();
+fuel.dispose();
+engine.dispose();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `positions` | Required | Ordered x, y, z coordinates with at least two distinct points. |
+| `color` | `'#57c6ff'` | Shared color for the pulse and guide. |
+| `width`, `worldUnits` | `5`, `false` | Pulse width in CSS pixels, or world units when enabled. |
+| `speed`, `phase` | `0.5`, `0` | World units per second and initial advance in world units. Negative speed reverses flow and zero holds it. |
+| `dashSize`, `gapSize` | `0.14`, `0.2` | Lengths in world units. Dashes have rounded ends. |
+| `opacity`, `guideOpacity` | `1`, `0.28` | Layer opacity at full gain. A zero-opacity guide allocates no line. |
+| `guideWidth` | `0.38` | Guide width as a fraction of the pulse width. |
+| `startFade`, `endFade` | `0.12`, `0.14` | Fractions of local route length. Each can be zero, and their sum can be at most one. |
+| `mesh`, `matrix` | None, identity | Follow a mesh's world transform or position an unmounted path with a matrix. |
+
+`seek(seconds, gain = 1)` uses absolute time and a gain from 0 to 1. It does not rebuild path geometry. Gain zero hides both layers. Each visible path draws one dashed line and, if configured, its guide. `dispose()` or `using` unregisters both. The same API works on WebGPU and the WebGL2 compatibility layer.
+
 ## Trails
 
 `Trail` from `margoengine/lines/trail` is a line that follows something and fades behind it: missiles, swords, cursors. It advances with the `Lines` plugin's frames, so there is nothing to call each frame. The fade clock (`trail.time`) moves in the frame update (`lines.advanceTime(delta)`), once a frame however many views draw, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the clock a continuous run reads; the points are the target's history, which a warm-up of `lifetime` seconds refills.

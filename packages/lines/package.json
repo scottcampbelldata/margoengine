@@ -70,6 +70,10 @@
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"
+    },
+    "./flow": {
+      "types": "./dist/flow.d.ts",
+      "import": "./dist/flow.js"
     }
   },
   "files": [

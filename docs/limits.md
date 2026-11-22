@@ -8,6 +8,8 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Animated flow paths (2026-11-22) use an authored polyline of 2 to 3,999,992 finite float32 points with positive local length. Endpoint fades use fractions of local arc length, adding at most eight points to fit the Lines renderer's 4,000,000-point limit. A visible path has one dash layer and an optional guide. The browser tests read back forward travel, exact seek replay, zero gain and occlusion on WebGPU and the WebGL2 layer. The optional `@margoengine/lines/flow` entry adds 5,640 B min+gzip. See [Lines](../packages/lines/README.md#animated-flow-paths) and [the clean-room record](clean-room.md#animated-flow-paths-in-lines-2026-11-22).
+
 - Zero scale (KB-GLTFA B1, 2026-11-19): a mesh, a glTF node (TRS or a matrix with zero columns) and an animation key
   may scale an axis to 0, as glTF 2.0 section 3.5.3 allows. The mesh is flattened: its normals turn by the cofactor
   matrix, a determinant of 0 counts as not mirrored, and a normal the flattened matrix maps to exactly zero (or that
