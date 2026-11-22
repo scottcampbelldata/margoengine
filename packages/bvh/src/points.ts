@@ -217,7 +217,11 @@ export class PointRaycaster extends Raycaster {
           (clip[7] > 0 ? clip[7] * bounds[b + 4] : clip[7] * bounds[b + 1]) +
           (clip[11] > 0 ? clip[11] * bounds[b + 5] : clip[11] * bounds[b + 2]);
       if (!(deepest > 1e-6)) continue;
-      const most = Math.max(sizeUnits === 'world' ? largest / 2 : 0, drawn(largest, deepest), this.reach(view, deepest)),
+      const most = Math.max(
+          sizeUnits === 'world' ? largest / 2 : 0,
+          drawn(largest, deepest),
+          this.reach(view, deepest),
+        ),
         pad = most * stretch * (1 + 1e-5);
       if (!crosses(bounds, b, local, direction, this.near - most, this.far + most, pad)) continue;
       for (let slot = blocks.starts[block], end = slot + blocks.counts[block]; slot < end; slot++) {
@@ -234,7 +238,13 @@ export class PointRaycaster extends Raycaster {
         if (!(w > 1e-6)) continue;
         if (offset > Math.max(drawn(size * (sizes ? sizes[index] : 1), w), this.reach(view, w))) continue;
         if (clipped(material, p)) continue;
-        found.push(hit(cloud, index, along, p.slice() as MutableVec3, offset, d, [positions[at], positions[at + 1], positions[at + 2]]));
+        found.push(
+          hit(cloud, index, along, p.slice() as MutableVec3, offset, d, [
+            positions[at],
+            positions[at + 1],
+            positions[at + 2],
+          ]),
+        );
       }
     }
     out.push(...found);
@@ -282,7 +292,10 @@ export class PointRaycaster extends Raycaster {
       const result = hit(batch, index, t, point, 0, d, [data[s], data[s + 1], data[s + 2]]),
         cu = Math.min(Math.max(u, 0), 1),
         cv = Math.min(Math.max(v, 0), 1);
-      result.uv = [data[s + 8] + (data[s + 10] - data[s + 8]) * cu, data[s + 9] + (data[s + 11] - data[s + 9]) * (1 - cv)];
+      result.uv = [
+        data[s + 8] + (data[s + 10] - data[s + 8]) * cu,
+        data[s + 9] + (data[s + 11] - data[s + 9]) * (1 - cv),
+      ];
       out.push(result);
     }
   }

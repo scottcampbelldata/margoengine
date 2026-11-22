@@ -56,7 +56,10 @@ export async function sdfChecks(report) {
     points.set(uvw, i * 4);
     expected.push(sdf.distance(world));
   }
-  const input = device.createBuffer({ size: points.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }),
+  const input = device.createBuffer({
+      size: points.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    }),
     output = device.createBuffer({ size: count * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
     read = device.createBuffer({ size: count * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
     pipeline = await device.createComputePipelineAsync({

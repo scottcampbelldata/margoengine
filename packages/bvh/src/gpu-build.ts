@@ -342,7 +342,8 @@ export class GPUDynamicBVH {
   /** Compiles the passes and makes the buffers. Throws a RangeError for a mesh over the device's limits. */
   static async create(target: GPUTarget, options: GPUDynamicBVHOptions): Promise<GPUDynamicBVH> {
     const { vertices, indices, stride = 3, offset = 0, mode = 'build', bvh } = options;
-    if (!vertices || typeof vertices.size !== 'number') throw new TypeError('Missing vertices; pass a GPUBuffer of positions.');
+    if (!vertices || typeof vertices.size !== 'number')
+      throw new TypeError('Missing vertices; pass a GPUBuffer of positions.');
     if (!(indices instanceof Uint32Array) || !indices.length || indices.length % 3)
       throw new RangeError('Invalid indices; pass a Uint32Array of whole triangles.');
     if (!Number.isInteger(stride) || stride < 3 || !Number.isInteger(offset) || offset < 0)
@@ -358,7 +359,7 @@ export class GPUDynamicBVH {
       stride,
       offset,
       triangles: indices.length / 3,
-      nodes: mode === 'refit' ? bvh!.nodeCount : Math.max(indices.length / 3 * 2 - 1, 1),
+      nodes: mode === 'refit' ? bvh!.nodeCount : Math.max((indices.length / 3) * 2 - 1, 1),
       bvh: mode === 'refit' ? bvh! : null,
     });
     const self = new GPUDynamicBVH(tree, mode);
@@ -428,10 +429,17 @@ export class GPUDynamicBVH {
 
   /** Adds the passes that bring the tree up to the vertices' current contents, once they are written in this encoder. */
   encode(encoder: GPUCommandEncoder): void {
-    if (this.#disposed) throw new MargoError('disposed', 'GPUDynamicBVH is disposed; create a new one to follow a mesh.');
+    if (this.#disposed)
+      throw new MargoError('disposed', 'GPUDynamicBVH is disposed; create a new one to follow a mesh.');
     const { primitive } = this;
-    if (primitive && (primitive.deformed !== this.#followed?.buffer || (primitive.deformedOffset ?? 0) !== this.#followed?.offset))
-      throw new MargoError('state', 'The primitive moved to another deformed buffer or offset; make a new GPUDynamicBVH.');
+    if (
+      primitive &&
+      (primitive.deformed !== this.#followed?.buffer || (primitive.deformedOffset ?? 0) !== this.#followed?.offset)
+    )
+      throw new MargoError(
+        'state',
+        'The primitive moved to another deformed buffer or offset; make a new GPUDynamicBVH.',
+      );
     const pass = encoder.beginComputePass({ label: 'bvh follow' });
     for (const { pipeline, groups, slot, x, y } of this.#steps) {
       pass.setPipeline(pipeline);
@@ -545,7 +553,9 @@ export class GPUDynamicBVH {
     const keysBytes = padded * 8 + nodes * 4,
       limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
     if (keysBytes > limit || indices.byteLength > limit)
-      throw new RangeError(`${triangles} triangles need ${keysBytes} bytes, over this device's ${limit}; split the mesh.`);
+      throw new RangeError(
+        `${triangles} triangles need ${keysBytes} bytes, over this device's ${limit}; split the mesh.`,
+      );
     const source = this.#buffer('bvh follow source', indices, indices.byteLength, GPUBufferUsage.STORAGE),
       keys = this.#buffer('bvh follow keys', null, keysBytes, GPUBufferUsage.STORAGE),
       scene = this.#buffer('bvh follow scene', null, 32, GPUBufferUsage.STORAGE),
@@ -558,10 +568,12 @@ export class GPUDynamicBVH {
     const groups = device.createBindGroup({
         label: 'bvh build',
         layout: bounds.getBindGroupLayout(0),
-        entries: [tree.nodes, tree.index, vertices, tree.params, source, tree.faces, keys, scene].map((buffer, binding) => ({
-          binding,
-          resource: { buffer },
-        })),
+        entries: [tree.nodes, tree.index, vertices, tree.params, source, tree.faces, keys, scene].map(
+          (buffer, binding) => ({
+            binding,
+            resource: { buffer },
+          }),
+        ),
       }),
       ranges: [number, number, number, number][] = [],
       step = (pipeline: GPUComputePipeline, threads: number, first: number, count: number, a: number): void => {

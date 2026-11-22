@@ -63,7 +63,12 @@ test('sampling filters between pixels, wraps and clamps', () => {
 
 test('each axis wraps by itself, and mirror flips every second tile', () => {
   // Top row solid, bottom row clear: the rows show what v reads.
-  const rows = (extra) => ({ width: 2, height: 2, data: new Uint8Array(16).map((_, i) => (i < 8 && i % 4 === 3 ? 255 : 0)), ...extra });
+  const rows = (extra) => ({
+    width: 2,
+    height: 2,
+    data: new Uint8Array(16).map((_, i) => (i < 8 && i % 4 === 3 ? 255 : 0)),
+    ...extra,
+  });
   assert.equal(sampleAlpha(halves({ wrap: 'mirror' }), 1.25, 0.25), 0, 'the next tile runs backwards');
   assert.equal(sampleAlpha(halves({ wrap: 'mirror' }), 1.75, 0.25), 1);
   assert.equal(sampleAlpha(halves({ wrap: 'mirror' }), -0.25, 0.25), 1, 'and so does the one before');
@@ -75,7 +80,11 @@ test('each axis wraps by itself, and mirror flips every second tile', () => {
 test('a transform maps the uv before sampling, and the factor scales the alpha', () => {
   assert.equal(sampleAlpha(halves({ transform: [1, 0, 0.5, 0, 1, 0] }), 0.25, 0.25), 0, 'offset by half');
   assert.equal(sampleAlpha(halves({ transform: [0.25, 0, 0, 0, 1, 0] }), 1, 0.25), 1, 'a quarter scale stays left');
-  assert.equal(sampleAlpha(halves({ transform: [0, 1, 0, 1, 0, 0] }), 0.75, 0.25), 1, 'u and v swapped read the left column');
+  assert.equal(
+    sampleAlpha(halves({ transform: [0, 1, 0, 1, 0, 0] }), 0.75, 0.25),
+    1,
+    'u and v swapped read the left column',
+  );
   assert.equal(sampleAlpha(halves({ factor: 0.25 }), 0.25, 0.25), 0.25);
 });
 
@@ -92,7 +101,12 @@ test('modelAlphaMasks reads a MASK material: pixels, cutoff, factor, wrap per ax
   const mask = material({
       base: [1, 1, 1, 0.5],
       settings: [1, 0.25, 0],
-      maps: [{ index: 0, extensions: { KHR_texture_transform: { offset: [0.5, 0.25], rotation: Math.PI / 2, scale: [2, 3] } } }],
+      maps: [
+        {
+          index: 0,
+          extensions: { KHR_texture_transform: { offset: [0.5, 0.25], rotation: Math.PI / 2, scale: [2, 3] } },
+        },
+      ],
     }),
     model = loaded([mask], { textures: [{ source: 0, sampler: 0 }], samplers: [{ wrapS: 33071, wrapT: 33648 }] }),
     source = await modelAlphaMasks(model, { pixels: raw }),
@@ -144,7 +158,10 @@ test('what cannot be read picks solid and is listed with why', async () => {
       loaded([second, moved, packed], { textures: [{ source: 0 }, { source: 1 }] }, [halves(), { ktx2: {} }]),
       { pixels: raw },
     );
-  assert.deepEqual(source.skipped.map(({ material }) => material), [second, moved, packed]);
+  assert.deepEqual(
+    source.skipped.map(({ material }) => material),
+    [second, moved, packed],
+  );
   assert.match(source.skipped[0].reason, /TEXCOORD_1/);
   assert.match(source.skipped[2].reason, /compressed/);
   assert.equal(source({ primitiveIndex: 0 }), null);

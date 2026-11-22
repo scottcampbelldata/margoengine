@@ -114,7 +114,11 @@ function solidAngle(x: number, y: number, z: number): number {
     lb = Math.hypot(bx, by, bz),
     lc = Math.hypot(cx, cy, cz),
     volume = ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx),
-    base = la * lb * lc + (ax * bx + ay * by + az * bz) * lc + (ax * cx + ay * cy + az * cz) * lb + (bx * cx + by * cy + bz * cz) * la;
+    base =
+      la * lb * lc +
+      (ax * bx + ay * by + az * bz) * lc +
+      (ax * cx + ay * cy + az * cz) * lb +
+      (bx * cx + by * cy + bz * cz) * la;
   return 2 * Math.atan2(volume, base);
 }
 

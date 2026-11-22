@@ -89,7 +89,10 @@ test('the gradient points away from the surface and project lands on it', () => 
     assert.ok(dot > 0.99, `gradient ${n} at ${p}: ${dot}`);
     assert.ok(Math.abs(Math.hypot(...sdf.project(p)) - 1) < 0.02);
   }
-  assert.deepEqual(new MeshSDF(new Float32Array(8), [2, 2, 2], [0, 0, 0], [1, 1, 1]).gradient([0.5, 0.5, 0.5]), [0, 0, 0]);
+  assert.deepEqual(
+    new MeshSDF(new Float32Array(8), [2, 2, 2], [0, 0, 0], [1, 1, 1]).gradient([0.5, 0.5, 0.5]),
+    [0, 0, 0],
+  );
 });
 
 test('resolution keeps cells cubic on a long box, or takes three numbers', () => {
