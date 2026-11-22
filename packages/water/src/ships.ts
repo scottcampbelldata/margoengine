@@ -158,7 +158,11 @@ function ridge(s: number, outside: number, crest: number, width: number): number
   const sigma = s / crest;
   // Rising along the stem's parabola to the crest, then Margo's falling shape into a shallow trough.
   const along =
-    sigma < 0 ? 0 : sigma <= 1 ? sigma * (2 - sigma) : Math.exp(-(sigma - 1) * (sigma - 1)) * Math.cos(1.2 * (sigma - 1));
+    sigma < 0
+      ? 0
+      : sigma <= 1
+        ? sigma * (2 - sigma)
+        : Math.exp(-(sigma - 1) * (sigma - 1)) * Math.cos(1.2 * (sigma - 1));
   return along * Math.exp(-Math.max(outside, 0) / width);
 }
 /** Signed distance from the waterline of a hull (positive outside), s behind the stem and y to the side. */
@@ -276,6 +280,8 @@ export interface ShipWakeSample {
 interface TrailPoint {
   x: number;
   z: number;
+  sternX: number;
+  sternZ: number;
   t: number;
   u: number;
 }
@@ -308,7 +314,8 @@ export class WakeShip {
   }
   /** Places the ship (no path): the trail keeps what it passed through. */
   setPose(pose: ShipPose): this {
-    if (!pose || typeof pose !== 'object') throw typeError('Ship pose must be { position, heading, speed }', 'geometry');
+    if (!pose || typeof pose !== 'object')
+      throw typeError('Ship pose must be { position, heading, speed }', 'geometry');
     this.state = {
       position: vec3(pose.position, 'position'),
       heading: finite(pose.heading, -1e6, 1e6, 'heading'),
@@ -320,7 +327,13 @@ export class WakeShip {
   }
   /** Takes the pose of a {@link Floater} (position, heading, pitch, roll) at a speed. */
   follow(floater: Floater, speed: number): this {
-    return this.setPose({ position: floater.position, heading: floater.heading, speed, pitch: floater.pitch, roll: floater.roll });
+    return this.setPose({
+      position: floater.position,
+      heading: floater.heading,
+      speed,
+      pitch: floater.pitch,
+      roll: floater.roll,
+    });
   }
   /** Forgets the recorded trail (a cut or a seek without a path). */
   clearTrail(): this {
@@ -345,24 +358,43 @@ export class WakeShip {
         u = Math.hypot(vx, vz),
         here = at(time);
       const heading = u > 1e-6 ? (Math.atan2(vx, vz) * 180) / Math.PI : this.state.heading;
-      this.state = { ...this.state, position: [here[0], this.state.position[1], here[1]], heading, speed: Math.min(100, u) };
+      this.state = {
+        ...this.state,
+        position: [here[0], this.state.position[1], here[1]],
+        heading,
+        speed: Math.min(100, u),
+      };
       // Equal time steps back over the span at the present speed; a stopped ship has no trail.
       const out: TrailPoint[] = [];
       const step = u > 0.05 ? span / u / (TRAIL_POINTS - 1) : 0;
+      // Retain the direction through stationary samples so the hull does not rotate at the berth.
+      let direction = heading;
       for (let i = 0; i < TRAIL_POINTS && (i === 0 || step > 0); i++) {
         const t = time - i * step,
           p = i === 0 ? here : at(t),
           q = at(t - h),
           r = at(t + h);
         const speed = Math.hypot(r[0] - q[0], r[1] - q[1]) / (2 * h);
-        const f = this.forward(i === 0 ? heading : (Math.atan2(r[0] - q[0], r[1] - q[1]) * 180) / Math.PI);
-        out.push({ x: p[0] + (f[0] * l) / 2, z: p[1] + (f[1] * l) / 2, t, u: Math.min(100, speed) });
+        if (speed > 1e-6) direction = (Math.atan2(r[0] - q[0], r[1] - q[1]) * 180) / Math.PI;
+        const f = this.forward(direction);
+        const dx = (f[0] * l) / 2;
+        const dz = (f[1] * l) / 2;
+        out.push({ x: p[0] + dx, z: p[1] + dz, sternX: p[0] - dx, sternZ: p[1] - dz, t, u: Math.min(100, speed) });
       }
       return out;
     }
     const f = this.forward(this.state.heading),
       p = this.state.position;
-    const bow: TrailPoint = { x: p[0] + (f[0] * l) / 2, z: p[2] + (f[1] * l) / 2, t: time, u: this.state.speed };
+    const dx = (f[0] * l) / 2;
+    const dz = (f[1] * l) / 2;
+    const bow: TrailPoint = {
+      x: p[0] + dx,
+      z: p[2] + dz,
+      sternX: p[0] - dx,
+      sternZ: p[2] - dz,
+      t: time,
+      u: this.state.speed,
+    };
     const last = this.recorded[0];
     if (last && time < last.t) this.recorded = [];
     const spacing = span / (TRAIL_POINTS - 1);
@@ -391,12 +423,15 @@ export class WakeShip {
   }
 }
 function checkLamps(lamps: readonly ShipLamp[], what: string): readonly ShipLamp[] {
-  if (!Array.isArray(lamps) || lamps.length > MAX_LAMPS) throw rangeError(`Invalid ${what}; pass up to ${MAX_LAMPS}`, 'geometry');
+  if (!Array.isArray(lamps) || lamps.length > MAX_LAMPS)
+    throw rangeError(`Invalid ${what}; pass up to ${MAX_LAMPS}`, 'geometry');
   return Object.freeze(
     lamps.map((l) =>
       Object.freeze({
         position: vec3(l?.position, 'lamp position'),
-        color: vec3(l.color ?? [1, 0.78, 0.5], 'lamp color').map((c) => finite(c, 0, 1, 'lamp color')) as unknown as Vec3,
+        color: vec3(l.color ?? [1, 0.78, 0.5], 'lamp color').map((c) =>
+          finite(c, 0, 1, 'lamp color'),
+        ) as unknown as Vec3,
         intensity: finite(l.intensity ?? 50, 0, 1e6, 'lamp intensity'),
       }),
     ),
@@ -441,30 +476,39 @@ fn shipHullDistance(s:f32,y:f32,l:f32,b:f32,tanE:f32)->f32 {
  if(s>l){return length(vec2f(s-l,max(ay-half,0.0)));}
  let reach=min(1.0,s*tanE/b);return ay-half*reach*(2.0-reach);
 }
-// The nearest point of ship i's trail: (s behind the bow, signed side, speed there, age there).
-fn shipLocal(i:u32,p:vec2f)->vec4f {
+// Project onto the bow track for Kelvin waves, or the stern track for newly churned water.
+fn shipStation(index:u32,stern:bool)->vec3f {
+ return select(shipTrail[index*2u].xyz,shipTrail[index*2u+1u].yzw,stern);
+}
+fn shipLocal(i:u32,p:vec2f,stern:bool)->vec4f {
  let ship=shipData.ships[i];let first=u32(ship.d.x);let count=u32(ship.d.y);let f=ship.a.zw;
- let bow=shipTrail[first*2u].xy;let rel=p-bow;
- if(count<2u){return vec4f(-dot(rel,f),f.y*rel.x-f.x*rel.y,ship.b.x,0.0);}
- var best=1e30;var out=vec4f(1e30,0.0,0.0,0.0);
+ let rel=p-shipStation(first,stern).xy;
+ let current=vec4f(-dot(rel,f),f.y*rel.x-f.x*rel.y,ship.b.x,0.0);
+ let noTrack=vec4f(1e30,0.0,0.0,0.0);
+ if(count<2u){return select(current,noTrack,stern);}
+ var best=1e30;var out=noTrack;
  for(var j=0u;j+1u<count;j++){
-  let a=shipTrail[(first+j)*2u];let b=shipTrail[(first+j+1u)*2u];
-  let d=b.xy-a.xy;let w=p-a.xy;let len2=max(dot(d,d),1e-9);let t=clamp(dot(w,d)/len2,0.0,1.0);
+  let a=shipStation(first+j,stern);let b=shipStation(first+j+1u,stern);
+  let d=b.xy-a.xy;let w=p-a.xy;let len2=dot(d,d);
+  if(stern&&len2<1e-9){continue;}
+  let along=dot(w,d)/max(len2,1e-9);let t=clamp(along,0.0,1.0);
   let e=w-d*t;let dist2=dot(e,e);
   if(dist2<best){
    best=dist2;let side=select(-1.0,1.0,d.x*w.y-d.y*w.x<0.0);
    let ua=shipTrail[(first+j)*2u+1u].x;let ub=shipTrail[(first+j+1u)*2u+1u].x;
-   out=vec4f(mix(a.z,b.z,t),side*sqrt(dist2),mix(ua,ub,t),mix(a.w,b.w,t));
-   if(j==0u&&t<=0.0){out=vec4f(-dot(rel,f),f.y*rel.x-f.x*rel.y,ship.b.x,0.0);}
+   let aa=shipTrail[(first+j)*2u].w;let ab=shipTrail[(first+j+1u)*2u].w;
+   out=vec4f(mix(a.z,b.z,t),side*sqrt(dist2),mix(ua,ub,t),mix(aa,ab,t));
+   if(j==0u&&along<=0.0){out=current;}
+   if(stern&&along>1.0&&j+2u==count){out=noTrack;}
   }
  }
  return out;
 }
 // (height, foam) the ships add at p.
-fn shipWake(p:vec2f)->vec2f {
+fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
  var height=0.0;var foam=0.0;
  for(var i=0u;i<u32(shipData.head.x);i++){
-  let ship=shipData.ships[i];let local=shipLocal(i,p);
+  let ship=shipData.ships[i];let local=shipLocal(i,p,false);
   let l=ship.b.y;let b=ship.b.z;let d=ship.b.w;let span=ship.d.z;
   if(local.x>span){continue;}
   let s=local.x;let y=local.y;let u=local.z;let age=local.w;
@@ -475,11 +519,19 @@ fn shipWake(p:vec2f)->vec2f {
   let width=max(ship.c.y,b*0.25);let crestRidge=shipRidge(s,hull,ship.c.y,width);
   let bow=ship.c.x*ship.c.w*shipData.look.w*crestRidge;
   height+=(waves+bow)*mask;
+  if(!sampleFoam){continue;}
   let speed=ship.b.x;let fr=speed/sqrt(9.81*l);
   let band=shipData.foam.x*(0.5+min(fr,1.0));
   var wl=0.0;if(band>0.0&&s<=l+band){wl=(1.0-shipSmooth(0.0,band,hull))*shipSmooth(-0.1*b,0.0,hull)*shipSmooth(0.3,2.0,speed);}
-  let x=s-l;var turbulent=0.0;
-  if(x>0.0){let half=b*0.5*(1.0+0.6*sqrt(x/l));turbulent=shipData.foam.z*exp(-age/shipData.foam.y)*(1.0-shipSmooth(0.5*half,half,abs(y)))*shipSmooth(0.5,3.0,u)*(1.0-shipSmooth(0.8*span,span,s));}
+  var turbulent=0.0;
+  if(shipData.foam.z>0.0){
+   let stern=shipLocal(i,p,true);
+   if(stern.x>=0.0&&stern.x<span){
+    let half=b*0.5*(1.0+0.6*sqrt(stern.x/l));
+    turbulent=shipData.foam.z*exp(-stern.w/shipData.foam.y)*(1.0-shipSmooth(0.5*half,half,abs(stern.y)))
+      *shipSmooth(0.5,3.0,stern.z)*(1.0-shipSmooth(0.8*span,span,stern.x));
+   }
+  }
   var breaking=0.0;if(speed>0.05){breaking=shipSmooth(0.3,0.48,9.81*ship.c.x/(speed*speed))*shipSmooth(0.5,2.0,speed)*max(crestRidge,0.0)*min(shipData.look.w,1.0);}
   foam=max(foam,max(max(wl,turbulent),breaking));
  }
@@ -617,9 +669,17 @@ export class ShipWakes implements EnginePlugin {
       v.set([bw.height, bw.crest, Math.tan((h.entrance * Math.PI) / 180), ship.wake], o + 8);
       v.set([i * TRAIL_POINTS, trail.length, span, 0], o + 12);
       let s = 0;
+      let sternDistance = 0;
       trail.forEach((p, j) => {
-        if (j) s += Math.hypot(p.x - trail[j - 1].x, p.z - trail[j - 1].z);
-        this.trails.set([p.x, p.z, s, Math.max(0, this.seconds - p.t), p.u, 0, 0, 0], (i * TRAIL_POINTS + j) * 8);
+        if (j) {
+          const previous = trail[j - 1];
+          s += Math.hypot(p.x - previous.x, p.z - previous.z);
+          sternDistance += Math.hypot(p.sternX - previous.sternX, p.sternZ - previous.sternZ);
+        }
+        this.trails.set(
+          [p.x, p.z, s, Math.max(0, this.seconds - p.t), p.u, p.sternX, p.sternZ, sternDistance],
+          (i * TRAIL_POINTS + j) * 8,
+        );
       });
       // Lamps ride the ship: port, up and forward rotated by the heading, pitch and roll.
       const cp = Math.cos(pose.pitch),
@@ -634,14 +694,19 @@ export class ShipWakes implements EnginePlugin {
         const z2 = rz * cp - y1 * sp,
           y2 = y1 * cp + rz * sp;
         lamps.push({
-          p: [pose.position[0] + x1 * f[1] + z2 * f[0], pose.position[1] + y2, pose.position[2] - x1 * f[0] + z2 * f[1]],
+          p: [
+            pose.position[0] + x1 * f[1] + z2 * f[0],
+            pose.position[1] + y2,
+            pose.position[2] - x1 * f[0] + z2 * f[1],
+          ],
           c: lamp.color!,
           i: lamp.intensity!,
         });
       }
     });
     for (const l of this.lamps) lamps.push({ p: l.position, c: l.color!, i: l.intensity! });
-    if (lamps.length > MAX_LAMPS) throw rangeError(`ShipWakes draws up to ${MAX_LAMPS} lamps, ships' and fixed ones together`, 'geometry');
+    if (lamps.length > MAX_LAMPS)
+      throw rangeError(`ShipWakes draws up to ${MAX_LAMPS} lamps, ships' and fixed ones together`, 'geometry');
     v.set([this.ships.length, lamps.length, look.lampRoughness ?? -1, 0], 0);
     v.set([look.wakeHeight, look.sternWaves, look.wakeLife, look.bowWave], 4);
     v.set([look.waterlineFoam, look.foamLife, look.turbulentWake, look.lampIntensity], 8);
@@ -659,54 +724,66 @@ export class ShipWakes implements EnginePlugin {
     }
     return out;
   }
+  private trailAt(x: number, z: number, ship: number, stern: boolean): [number, number, number, number] {
+    const t = this.trails;
+    const o = 12 + ship * SHIP_FLOATS;
+    const first = this.values[o + 12];
+    const count = this.values[o + 13];
+    const offset = stern ? 5 : 0;
+    const dx = x - t[first * 8 + offset];
+    const dz = z - t[first * 8 + offset + 1];
+    const fx = this.values[o + 2];
+    const fz = this.values[o + 3];
+    const current: [number, number, number, number] = [-dx * fx - dz * fz, fz * dx - fx * dz, this.values[o + 4], 0];
+    const noTrack: [number, number, number, number] = [Infinity, 0, 0, 0];
+    if (count < 2) return stern ? noTrack : current;
+    let best = Infinity;
+    let local = noTrack;
+    for (let j = 0; j + 1 < count; j++) {
+      const a = (first + j) * 8;
+      const b = a + 8;
+      const vx = t[b + offset] - t[a + offset];
+      const vz = t[b + offset + 1] - t[a + offset + 1];
+      const wx = x - t[a + offset];
+      const wz = z - t[a + offset + 1];
+      const length2 = vx * vx + vz * vz;
+      if (stern && length2 < 1e-9) continue;
+      const along = (wx * vx + wz * vz) / Math.max(length2, 1e-9);
+      const u = Math.min(1, Math.max(0, along));
+      const ex = wx - vx * u;
+      const ez = wz - vz * u;
+      const distance2 = ex * ex + ez * ez;
+      if (distance2 >= best) continue;
+      best = distance2;
+      if (j === 0 && along <= 0) local = current;
+      else if (stern && along > 1 && j + 2 === count) local = noTrack;
+      else {
+        const side = vx * wz - vz * wx < 0 ? 1 : -1;
+        local = [
+          t[a + offset + 2] + (t[b + offset + 2] - t[a + offset + 2]) * u,
+          side * Math.sqrt(distance2),
+          t[a + 4] + (t[b + 4] - t[a + 4]) * u,
+          t[a + 3] + (t[b + 3] - t[a + 3]) * u,
+        ];
+      }
+    }
+    return local;
+  }
   /** What the ships add to the sea at world XZ, the same numbers the GPU draws (in doubles). */
   sample(x: number, z: number): ShipWakeSample {
     finite(x, -1e7, 1e7, 'x');
     finite(z, -1e7, 1e7, 'z');
     this.build();
-    const v = this.values,
-      t = this.trails;
-    let height = 0,
-      foam = 0;
+    const v = this.values;
+    let height = 0;
+    let foam = 0;
     for (let i = 0; i < v[0]; i++) {
-      const o = 12 + i * SHIP_FLOATS,
-        f = [v[o + 2], v[o + 3]],
-        first = v[o + 12],
-        count = v[o + 13],
-        span = v[o + 14];
-      const l = v[o + 5],
-        b = v[o + 6],
-        d = v[o + 7];
-      const bow = [t[first * 8], t[first * 8 + 1]],
-        rel = [x - bow[0], z - bow[1]];
-      let local = [-(rel[0] * f[0] + rel[1] * f[1]), f[1] * rel[0] - f[0] * rel[1], v[o + 4], 0];
-      if (count >= 2) {
-        let best = Infinity;
-        for (let j = 0; j + 1 < count; j++) {
-          const a = (first + j) * 8,
-            c = (first + j + 1) * 8;
-          const dx = t[c] - t[a],
-            dz = t[c + 1] - t[a + 1],
-            wx = x - t[a],
-            wz = z - t[a + 1];
-          const tt = Math.min(1, Math.max(0, (wx * dx + wz * dz) / Math.max(dx * dx + dz * dz, 1e-9)));
-          const ex = wx - dx * tt,
-            ez = wz - dz * tt,
-            dist2 = ex * ex + ez * ez;
-          if (dist2 < best) {
-            best = dist2;
-            const side = dx * wz - dz * wx < 0 ? 1 : -1;
-            local = [
-              t[a + 2] + (t[c + 2] - t[a + 2]) * tt,
-              side * Math.sqrt(dist2),
-              t[a + 4] + (t[c + 4] - t[a + 4]) * tt,
-              t[a + 3] + (t[c + 3] - t[a + 3]) * tt,
-            ];
-            if (j === 0 && tt <= 0) local = [-(rel[0] * f[0] + rel[1] * f[1]), f[1] * rel[0] - f[0] * rel[1], v[o + 4], 0];
-          }
-        }
-      }
-      const [s, y, u, age] = local;
+      const o = 12 + i * SHIP_FLOATS;
+      const span = v[o + 14];
+      const l = v[o + 5];
+      const b = v[o + 6];
+      const d = v[o + 7];
+      const [s, y, u, age] = this.trailAt(x, z, i, false);
       if (s > span) continue;
       const fade = (1 - smoothstep(0.8 * span, span, s)) * Math.exp(-age / v[6]);
       const hull = hullDistance(s, y, l, b, v[o + 10]),
@@ -722,16 +799,25 @@ export class ShipWakes implements EnginePlugin {
         band > 0 && s <= l + band
           ? (1 - smoothstep(0, band, hull)) * smoothstep(-0.1 * b, 0, hull) * smoothstep(0.3, 2, speed)
           : 0;
-      const xs = s - l;
       let turbulent = 0;
-      if (xs > 0) {
-        const half = b * 0.5 * (1 + 0.6 * Math.sqrt(xs / l));
-        turbulent =
-          v[10] * Math.exp(-age / v[9]) * (1 - smoothstep(0.5 * half, half, Math.abs(y))) * smoothstep(0.5, 3, u) * (1 - smoothstep(0.8 * span, span, s));
+      if (v[10] > 0) {
+        const [distance, side, sourceSpeed, sternAge] = this.trailAt(x, z, i, true);
+        if (distance >= 0 && distance < span) {
+          const half = b * 0.5 * (1 + 0.6 * Math.sqrt(distance / l));
+          turbulent =
+            v[10] *
+            Math.exp(-sternAge / v[9]) *
+            (1 - smoothstep(0.5 * half, half, Math.abs(side))) *
+            smoothstep(0.5, 3, sourceSpeed) *
+            (1 - smoothstep(0.8 * span, span, distance));
+        }
       }
       const breaking =
         speed > 0.05
-          ? smoothstep(0.3, 0.48, (G * v[o + 8]) / (speed * speed)) * smoothstep(0.5, 2, speed) * Math.max(crestRidge, 0) * Math.min(v[7], 1)
+          ? smoothstep(0.3, 0.48, (G * v[o + 8]) / (speed * speed)) *
+            smoothstep(0.5, 2, speed) *
+            Math.max(crestRidge, 0) *
+            Math.min(v[7], 1)
           : 0;
       foam = Math.max(foam, wl, turbulent, breaking);
     }
@@ -740,14 +826,22 @@ export class ShipWakes implements EnginePlugin {
   setup(engine: Engine): void {
     this.live();
     if (this.engine) throw fault('attached', 'ShipWakes already attached; create another ShipWakes', 'state');
-    if (!engine.gpu) throw fault('unsupported', 'ShipWakes need WebGPU or the full WebGL2 compatibility layer', 'webgpu');
-    if (!engine.hasPlugin(this.surface.name)) throw fault('state', 'Attach the Water surface to this engine before ShipWakes');
+    if (!engine.gpu)
+      throw fault('unsupported', 'ShipWakes need WebGPU or the full WebGL2 compatibility layer', 'webgpu');
+    if (!engine.hasPlugin(this.surface.name))
+      throw fault('state', 'Attach the Water surface to this engine before ShipWakes');
     if (surfaceEffects.get(this.surface)?.some((e) => e.key === 'ships'))
       throw fault('attached', 'This Water already has ship wakes; add ships to the attached ShipWakes', 'state');
     this.engine = engine;
     const device = engine.gpu;
-    this.uniform = device.createBuffer({ size: UNIFORM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.trailBuffer = device.createBuffer({ size: TRAIL_FLOATS * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({
+      size: UNIFORM_FLOATS * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.trailBuffer = device.createBuffer({
+      size: TRAIL_FLOATS * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
     this.resources = [{ buffer: this.uniform }, { buffer: this.trailBuffer }];
     this.remove = addSurfaceEffect(this.surface, {
       key: 'ships',
@@ -759,7 +853,8 @@ export class ShipWakes implements EnginePlugin {
     this.removeDispose = this.surface.onDispose(() => this.dispose());
   }
   private prepare(c: Context): readonly GPUBindingResource[] {
-    if (c.device !== this.engine?.gpu) throw fault('state', 'ShipWakes and Water must use the same engine; attach both to one engine');
+    if (c.device !== this.engine?.gpu)
+      throw fault('state', 'ShipWakes and Water must use the same engine; attach both to one engine');
     this.build();
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
     c.device.queue.writeBuffer(this.trailBuffer!, 0, this.trails);
@@ -800,7 +895,8 @@ function shipShader(code: string, binding: number): string {
   const foamLine = 'var foam=max(fresh,surfFoam);';
   const colorLine = 'var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;';
   for (const needle of [surfaceReturn, foamLine, colorLine])
-    if (!code.includes(needle)) throw fault('state', 'ShipWakes found no place in the Water shader for the wake; update @margoengine/water');
+    if (!code.includes(needle))
+      throw fault('state', 'ShipWakes found no place in the Water shader for the wake; update @margoengine/water');
   const head = `
 @group(0) @binding(${binding}) var<uniform> shipData:ShipData;
 @group(0) @binding(${binding + 1}) var<storage,read> shipTrail:array<vec4f>;
@@ -811,13 +907,13 @@ ${WAKE_WGSL}`;
       .replace(
         surfaceReturn,
         // The wake's height and its slope by central differences one tenth of the shortest Kelvin wave apart.
-        `{let sw=shipWake(xz);p.y+=sw.x;
+        `{let sw=shipWake(xz,false);p.y+=sw.x;
  if(u32(shipData.head.x)>0u){let e=0.25;
-  tangent.y+=(shipWake(xz+vec2f(e,0)).x-shipWake(xz-vec2f(e,0)).x)/(2.0*e);
-  binormal.y+=(shipWake(xz+vec2f(0,e)).x-shipWake(xz-vec2f(0,e)).x)/(2.0*e);}}
+  tangent.y+=(shipWake(xz+vec2f(e,0),false).x-shipWake(xz-vec2f(e,0),false).x)/(2.0*e);
+  binormal.y+=(shipWake(xz+vec2f(0,e),false).x-shipWake(xz-vec2f(0,e),false).x)/(2.0*e);}}
  ${surfaceReturn}`,
       )
-      .replace(foamLine, `${foamLine}foam=max(foam,shipWake(i.world.xz).y*pattern);`)
+      .replace(foamLine, `${foamLine}foam=max(foam,shipWake(i.world.xz,true).y*pattern);`)
       .replace(colorLine, `${colorLine}color+=shipLamps(i.world,n,v,rough);`)
   );
 }
@@ -897,7 +993,15 @@ export class Floater {
     if (!options || typeof options !== 'object') throw typeError('Floater needs options { hull }', 'geometry');
     this.hull = Object.freeze(checkHull(options.hull));
     const pts = options.points ?? [7, 3];
-    if (!Array.isArray(pts) || !Number.isInteger(pts[0]) || !Number.isInteger(pts[1]) || pts[0] < 2 || pts[0] > 32 || pts[1] < 1 || pts[1] > 16)
+    if (
+      !Array.isArray(pts) ||
+      !Number.isInteger(pts[0]) ||
+      !Number.isInteger(pts[1]) ||
+      pts[0] < 2 ||
+      pts[0] > 32 ||
+      pts[1] < 1 ||
+      pts[1] > 16
+    )
       throw rangeError('Floater points must be [2..32, 1..16] whole numbers', 'geometry');
     this.points = [pts[0], pts[1]];
     this.drift = finite(options.drift ?? 0, 0, 1, 'drift');
@@ -934,8 +1038,11 @@ export class Floater {
     return { clearance: this.lastBow - this.bowWater, relativeVelocity: this.bowRate - this.bowWaterRate };
   }
   /** Fits the water plane under the hull now: its height at the centre, slope along (bow up) and across (starboard down). */
-  fit(source: WaterHeightSource): { height: number; pitch: number; roll: number; velocity: [number, number]; hits: number } | undefined {
-    if (!source || typeof source.sample !== 'function') throw typeError('Floater needs a water source with sample(x, z)', 'geometry');
+  fit(
+    source: WaterHeightSource,
+  ): { height: number; pitch: number; roll: number; velocity: [number, number]; hits: number } | undefined {
+    if (!source || typeof source.sample !== 'function')
+      throw typeError('Floater needs a water source with sample(x, z)', 'geometry');
     const [nx, ny] = this.points,
       h = this.hull,
       a = (this.heading * Math.PI) / 180,
@@ -984,7 +1091,9 @@ export class Floater {
     ];
     const rhs = [sh, sxh, syh];
     const det3 = (q: number[][]) =>
-      q[0][0] * (q[1][1] * q[2][2] - q[1][2] * q[2][1]) - q[0][1] * (q[1][0] * q[2][2] - q[1][2] * q[2][0]) + q[0][2] * (q[1][0] * q[2][1] - q[1][1] * q[2][0]);
+      q[0][0] * (q[1][1] * q[2][2] - q[1][2] * q[2][1]) -
+      q[0][1] * (q[1][0] * q[2][2] - q[1][2] * q[2][0]) +
+      q[0][2] * (q[1][0] * q[2][1] - q[1][1] * q[2][0]);
     const d = det3(m);
     const solve = (k: number) => det3(m.map((row, r) => row.map((x, c) => (c === k ? rhs[r] : x)))) / d;
     let c0 = sh / n,
@@ -1100,7 +1209,11 @@ export class Floater {
     const f = [Math.sin(a) * Math.cos(p), Math.sin(p), Math.cos(a) * Math.cos(p)];
     // The port axis before roll is (cos a, 0, -sin a); roll turns it and up about forward.
     const right0 = [Math.cos(a), 0, -Math.sin(a)];
-    const up0 = [f[1] * right0[2] - f[2] * right0[1], f[2] * right0[0] - f[0] * right0[2], f[0] * right0[1] - f[1] * right0[0]];
+    const up0 = [
+      f[1] * right0[2] - f[2] * right0[1],
+      f[2] * right0[0] - f[0] * right0[2],
+      f[0] * right0[1] - f[1] * right0[0],
+    ];
     const cr = Math.cos(r),
       sr = Math.sin(r);
     const right = right0.map((x, i) => x * cr + up0[i] * sr),
@@ -1131,7 +1244,15 @@ export interface FloodSurfaceReading {
  */
 export function floodSurface(reading: FloodSurfaceReading, extent: FloodExtent): WaterHeightSource {
   const { width, height, depth, bed, velocity } = reading ?? ({} as FloodSurfaceReading);
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 2 || height < 2 || depth?.length !== width * height || bed?.length !== width * height || velocity?.length !== width * height * 2)
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width < 2 ||
+    height < 2 ||
+    depth?.length !== width * height ||
+    bed?.length !== width * height ||
+    velocity?.length !== width * height * 2
+  )
     throw typeError('floodSurface needs a FloodReading (width, height, depth, bed, velocity)', 'geometry');
   const [ox, oz] = extent.origin,
     [sx, sz] = extent.size;
@@ -1208,7 +1329,11 @@ export class ShipSplash {
   last: SplashState = { rate: 0, slam: false, burst: 0, relativeVelocity: 0 };
   constructor(options: ShipSplashOptions) {
     if (!(options?.floater instanceof Floater)) throw typeError('ShipSplash needs a Floater', 'geometry');
-    if (!options.particles || typeof options.particles.burst !== 'function' || typeof options.particles.options !== 'object')
+    if (
+      !options.particles ||
+      typeof options.particles.burst !== 'function' ||
+      typeof options.particles.options !== 'object'
+    )
       throw typeError('ShipSplash needs particles with options and burst(count), such as a VFX', 'geometry');
     this.floater = options.floater;
     this.particles = options.particles;

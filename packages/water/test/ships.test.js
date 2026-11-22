@@ -79,7 +79,10 @@ test('the drawn wake narrows as Rabaud and Moisy measured above Fr 0.49 (the hul
   for (const fr of [0.8, 1, 1.5, 2]) {
     const { at } = brightestAngle(fr);
     const expected = deg(wakeAngle(fr));
-    assert.ok(Math.abs(at - expected) < Math.max(0.8, expected * 0.08), `Fr ${fr}: brightest at ${at}, eq. 3 gives ${expected}`);
+    assert.ok(
+      Math.abs(at - expected) < Math.max(0.8, expected * 0.08),
+      `Fr ${fr}: brightest at ${at}, eq. 3 gives ${expected}`,
+    );
   }
   // Mach-like: doubling the speed halves the angle (within 15%).
   const one = brightestAngle(1).at,
@@ -105,7 +108,11 @@ test('the bow wave is Noblesse et al. (2008), never above the stagnation head U^
   assert.deepEqual(bowWave(0, hull), { height: 0, crest: 0 });
   const speed = 6,
     { height, crest } = bowWave(speed, hull);
-  const wakes = new ShipWakes({ surface: fakeWater(), look: { wakeHeight: 0 }, ships: [{ hull, pose: { position: [0, 0, 0], heading: 0, speed } }] });
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeHeight: 0 },
+    ships: [{ hull, pose: { position: [0, 0, 0], heading: 0, speed } }],
+  });
   // Beside the hull side at the crest: the bow is at z = 30 heading +Z, the side at x = half beam * reach.
   const reach = Math.min(1, (crest * Math.tan((20 * Math.PI) / 180)) / 10);
   const side = 5 * reach * (2 - reach);
@@ -145,8 +152,16 @@ test('the wake fades with age, follows a turning ship, and draws foam on the wat
   // Waterline band.
   assert.ok(free.sample(3.2, 300).foam > 0.3);
   // Older waves are lower.
-  const young = new ShipWakes({ surface: fakeWater(), look: { wakeLife: 1e3 }, ships: [{ hull, path: (t) => [0, 5 * t] }] });
-  const old = new ShipWakes({ surface: fakeWater(), look: { wakeLife: 10 }, ships: [{ hull, path: (t) => [0, 5 * t] }] });
+  const young = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeLife: 1e3 },
+    ships: [{ hull, path: (t) => [0, 5 * t] }],
+  });
+  const old = new ShipWakes({
+    surface: fakeWater(),
+    look: { wakeLife: 10 },
+    ships: [{ hull, path: (t) => [0, 5 * t] }],
+  });
   young.setTime(100);
   old.setTime(100);
   let y = 0,
@@ -158,11 +173,49 @@ test('the wake fades with age, follows a turning ship, and draws foam on the wat
   assert.ok(o < y * 0.2, `old ${o} young ${y}`);
 });
 
+test('stern foam has age zero where it is created and fades at the same rate for long and short hulls', () => {
+  const wakeAt = (length) => {
+    const wakes = new ShipWakes({
+      surface: fakeWater(),
+      look: { waterlineFoam: 0, bowWave: 0, turbulentWake: 0.8, foamLife: 4 },
+      ships: [{ hull: { length, beam: 8, draft: 4 }, path: (t) => [0, Math.max(0, t) * 3] }],
+    });
+    wakes.setTime(12);
+    const stern = 36 - length / 2;
+    assert.equal(wakes.sample(0, stern + 0.2).foam, 0);
+    assert.equal(wakes.sample(0, stern - 37).foam, 0, 'no foam behind the start of the journey');
+    return [wakes.sample(0, stern - 0.3).foam, wakes.sample(0, stern - 12).foam];
+  };
+  const expected = [0.8 * Math.exp(-0.1 / 4), 0.8 * Math.exp(-1)];
+  for (const length of [18, 72]) {
+    for (const [i, foam] of wakeAt(length).entries()) assert.ok(Math.abs(foam - expected[i]) < 1e-6);
+  }
+});
+
+test('stationary path history cannot rotate the stern away from the starting berth', () => {
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    trail: 2,
+    ships: [{ hull: { length: 72, beam: 8, draft: 4 }, path: (t) => [Math.max(0, t) * 3, 0] }],
+  });
+  const last = wakes.ships[0].trail(12, 144).at(-1);
+  assert.equal(last.sternX, -36);
+  assert.ok(Math.abs(last.sternZ) < 1e-10);
+  wakes.setTime(12);
+  assert.equal(wakes.sample(-18, -18).foam, 0);
+});
+
 test('lamps ride the ship: rolled and pitched with it', () => {
   const wakes = new ShipWakes({
     surface: fakeWater(),
     lamps: [{ position: [5, 10, 5] }],
-    ships: [{ hull: { length: 30, beam: 6, draft: 2 }, lamps: [{ position: [0, 10, 0] }, { position: [0, 0, 10] }], pose: { position: [1, 0, 2], heading: 90, speed: 0, roll: Math.PI / 2 } }],
+    ships: [
+      {
+        hull: { length: 30, beam: 6, draft: 2 },
+        lamps: [{ position: [0, 10, 0] }, { position: [0, 0, 10] }],
+        pose: { position: [1, 0, 2], heading: 90, speed: 0, roll: Math.PI / 2 },
+      },
+    ],
   });
   const [mast, bow, fixed] = wakes.lampPositions();
   // Rolled 90 degrees starboard down, the masthead lies over to starboard; heading 90 (+X) puts starboard at +Z.
@@ -197,7 +250,10 @@ test('the Floater fits the water plane by least squares: a long wave pitches it 
   const short = new Floater({ hull, points: [32, 1], heave: instant, pitch: instant, roll: instant });
   short.update(sea(1, 40), 0);
   assert.ok(Math.abs(Math.tan(short.pitch) - expected) < 1e-9, `${Math.tan(short.pitch)} against ${expected}`);
-  assert.ok(Math.abs(Math.tan(short.pitch)) < 0.45 * k, 'a one-length wave should pitch the hull less than half its slope');
+  assert.ok(
+    Math.abs(Math.tan(short.pitch)) < 0.45 * k,
+    'a one-length wave should pitch the hull less than half its slope',
+  );
   // Across: a beam sea rolls it starboard-down when port (+X at heading 0) is higher.
   const beam = new Floater({ hull, heave: instant, pitch: instant, roll: instant });
   beam.update({ sample: (x) => ({ height: 0.1 * x }) }, 0);
@@ -211,7 +267,10 @@ test('the Floater fits the water plane by least squares: a long wave pitches it 
   const m = Array.from(new Floater({ hull, heading: 90 }).update(sea(0, 1), 0).matrix());
   assert.ok(Math.abs(m[8] - 1) < 1e-9 && Math.abs(m[10]) < 1e-9);
   // The quaternion turns +Z (forward) onto the matrix's forward column, pitched and rolled.
-  const tilted = new Floater({ hull, heading: 30, heave: instant, pitch: instant, roll: instant }).update({ sample: (x, z) => ({ height: 0.1 * x + 0.05 * z }) }, 0);
+  const tilted = new Floater({ hull, heading: 30, heave: instant, pitch: instant, roll: instant }).update(
+    { sample: (x, z) => ({ height: 0.1 * x + 0.05 * z }) },
+    0,
+  );
   const [qx, qy, qz, qw] = tilted.quaternion(),
     mm = tilted.matrix(new Array(16));
   assert.ok(Math.abs(Math.hypot(qx, qy, qz, qw) - 1) < 1e-12);
@@ -265,7 +324,10 @@ test('film time: a seek replays advanceTime on the wake clock and the Floater, l
   assert.deepEqual(idle.position, [0, 0, 0], 'no water given yet: advanceTime does nothing');
   for (let i = 0; i < 60; i++) stepped.update(current, 1 / 30);
   for (let i = 0; i < 60; i++) replayed.advanceTime(1 / 30);
-  assert.ok(Math.abs(replayed.position[0] - 3) < 1e-9 && Math.abs(replayed.position[2] + 1) < 1e-9, `${replayed.position}`);
+  assert.ok(
+    Math.abs(replayed.position[0] - 3) < 1e-9 && Math.abs(replayed.position[2] + 1) < 1e-9,
+    `${replayed.position}`,
+  );
   assert.deepEqual(replayed.position, stepped.position);
   assert.equal(replayed.pitch, stepped.pitch);
   assert.equal(replayed.roll, stepped.roll);
@@ -294,7 +356,15 @@ test('floodSurface: bed plus depth between cell centres, dry and off-map undefin
   assert.equal(source.sample(5, 5), undefined);
   assert.equal(source.sample(-10, 5), undefined);
   // Riding the sloped surface: pitch atan(0.05) heading +X, drifting with the flow.
-  const f = new Floater({ hull: { length: 20, beam: 4, draft: 1 }, heading: 90, position: [50, 0, 25], drift: 1, heave: { period: 0 }, pitch: { period: 0 }, roll: { period: 0 } });
+  const f = new Floater({
+    hull: { length: 20, beam: 4, draft: 1 },
+    heading: 90,
+    position: [50, 0, 25],
+    drift: 1,
+    heave: { period: 0 },
+    pitch: { period: 0 },
+    roll: { period: 0 },
+  });
   f.update(source, 0.5);
   assert.ok(Math.abs(f.pitch - Math.atan(0.05)) < 1e-6, String(f.pitch));
   assert.equal(f.position[0], 51);
@@ -312,7 +382,13 @@ test("ShipSplash: a slam bursts when the bow re-enters faster than Ochi's 0.093 
   const run = (rise) => {
     const slow = { period: 120, damping: 4 };
     const f = new Floater({ hull, heave: slow, pitch: slow, roll: slow });
-    const particles = { options: {}, bursts: [], burst(n) { this.bursts.push(n); } };
+    const particles = {
+      options: {},
+      bursts: [],
+      burst(n) {
+        this.bursts.push(n);
+      },
+    };
     const splash = new ShipSplash({ floater: f, particles });
     let water = { height: 0, velocity: [0, 0, 0] };
     const source = { sample: () => water };
@@ -365,8 +441,14 @@ test('ship settings: rows on the shared shape, lampRoughness follows the weather
 });
 
 test('ships reject bad input with coded errors', () => {
-  assert.throws(() => new ShipWakes({ surface: fakeWater(), ships: [{ hull: { length: 0, beam: 1, draft: 1 } }] }), RangeError);
-  assert.throws(() => new ShipWakes({ surface: fakeWater(), ships: Array(9).fill({ hull: { length: 10, beam: 2, draft: 1 } }) }), RangeError);
+  assert.throws(
+    () => new ShipWakes({ surface: fakeWater(), ships: [{ hull: { length: 0, beam: 1, draft: 1 } }] }),
+    RangeError,
+  );
+  assert.throws(
+    () => new ShipWakes({ surface: fakeWater(), ships: Array(9).fill({ hull: { length: 10, beam: 2, draft: 1 } }) }),
+    RangeError,
+  );
   assert.throws(() => new ShipWakes({}), /surface/);
   assert.throws(() => new Floater({ hull: { length: 10, beam: 2, draft: 1 }, points: [1, 1] }), RangeError);
   assert.throws(() => new ShipSplash({ floater: {}, particles: {} }), TypeError);

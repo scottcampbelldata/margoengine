@@ -1,3 +1,9 @@
+### Section 5 evidence: ship wake foam history (2026-11-21)
+
+Water's ships entry reads each turbulent foam sample from the stern's nearest historical segment. Kelvin waves still use the bow track. The two positions and arc lengths share the existing eight-float station layout. Vertex shading continues to evaluate only wave height and slope. The fragment shader uses the stern's time and speed, and rejects samples before the track begins or ahead of the stern. Zero-speed samples on a path retain the nearest newer moving heading so a stationary ship does not leave a false turn at the dock.
+
+The CPU regression compares two hull lengths at the same speed. The WebGPU and WebGL2 tests read four GPU foam samples with a 72 m ship at 3 m/s. Their values were 0.553 near the stern, 0.192 farther astern, and zero ahead and outside the trail on both backends. See the [clean-room research](../clean-room.md#stern-foam-history-in-water-2026-11-21).
+
 ### Section 5 evidence: above-water refraction depth (2026-11-21)
 Water uses the existing opaque color and reversed depth snapshots. It solves
 the intersection of a Snell-bent ray with a sampled texel's depth plane in

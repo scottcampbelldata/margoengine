@@ -65,7 +65,11 @@ try {
       };
 
       // 1. The open sea: flat, so its height is the wake alone.
-      const sea = Water.attach(engine, { size: [64, 64], segments: 256, waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }] });
+      const sea = Water.attach(engine, {
+        size: [64, 64],
+        segments: 256,
+        waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
+      });
       const wakes = ShipWakes.attach(engine, { surface: sea, ships: [{ hull, path }] });
       wakes.setTime(10);
       const open = await compare(sea, wakes, 0);
@@ -75,10 +79,90 @@ try {
       wakes.dispose();
       sea.dispose();
 
+      // At 3 m/s a 72 m hull takes 24 s to pass a point. Fresh foam must still start at the transom.
+      engine.camera.position = [0, 47, -15];
+      engine.camera.target = [0, 0, -9];
+      const calm = Water.attach(engine, {
+        size: [100, 100],
+        segments: 48,
+        waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
+      });
+      const sternWake = ShipWakes.attach(engine, {
+        surface: calm,
+        ships: [{ hull: { length: 72, beam: 8, draft: 4 }, path: (t) => [0, Math.max(0, t) * 3] }],
+        look: { wakeHeight: 0, waterlineFoam: 0, bowWave: 0, turbulentWake: 0.8, foamLife: 4 },
+      });
+      sternWake.setTime(12);
+      const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+      await waitForPipelines(async () => {
+        engine.render({ delta: 0 });
+        await d.queue.onSubmittedWorkDone();
+      });
+      const matrix = engine.camera.matrix;
+      const project = ([x, z]) => {
+        const w = matrix[3] * x + matrix[11] * z + matrix[15];
+        return [
+          Math.floor((0.5 + (0.5 * (matrix[0] * x + matrix[8] * z + matrix[12])) / w) * engine.canvas.width),
+          Math.floor((0.5 - (0.5 * (matrix[1] * x + matrix[9] * z + matrix[13])) / w) * engine.canvas.height),
+        ];
+      };
+      const texels = [
+        [0, -0.9],
+        [0, -15],
+        [0, 1.4],
+        [9, -0.9],
+      ].map(project);
+      const reader = d.createComputePipeline({
+        layout: 'auto',
+        compute: {
+          module: d.createShaderModule({
+            code: `
+            @group(0) @binding(0) var mask: texture_2d<f32>;
+            @group(0) @binding(1) var<storage, read_write> out: array<f32, 4>;
+            @compute @workgroup_size(4) fn readFoam(@builtin(local_invocation_index) k: u32) {
+              let p = array<vec2i, 4>(${texels.map(([x, y]) => 'vec2i(' + x + ',' + y + ')').join(',')});
+              out[k] = textureLoad(mask, p[k], 0).r;
+            }`,
+          }),
+          entryPoint: 'readFoam',
+        },
+      });
+      const readback = d.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      const foamData = d.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE });
+      const group = d.createBindGroup({
+        layout: reader.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: calm.view.foam[calm.view.current].createView() },
+          { binding: 1, resource: { buffer: foamData } },
+        ],
+      });
+      const encoder = d.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+      pass.setPipeline(reader);
+      pass.setBindGroup(0, group);
+      pass.dispatchWorkgroups(1);
+      pass.end();
+      encoder.copyBufferToBuffer(foamData, 0, readback, 0, 16);
+      d.queue.submit([encoder.finish()]);
+      await readback.mapAsync(GPUMapMode.READ);
+      const sternFoam = Array.from(new Float32Array(readback.getMappedRange()));
+      readback.unmap();
+      foamData.destroy();
+      readback.destroy();
+      sternWake.dispose();
+      calm.dispose();
+
       // 2. A Flood's water, 2 m deep over a flat bed: the drawn surface is the flood plus the wake.
       const width = 64,
-        terrain = d.createTexture({ size: [width, width], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
-      d.queue.writeTexture({ texture: terrain }, new Float32Array(width * width), { bytesPerRow: width * 4 }, [width, width]);
+        terrain = d.createTexture({
+          size: [width, width],
+          format: 'r32float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+      d.queue.writeTexture({ texture: terrain }, new Float32Array(width * width), { bytesPerRow: width * 4 }, [
+        width,
+        width,
+      ]);
       const water = Water.attach(engine, {
         height: -100,
         size: [64, 64],
@@ -97,9 +181,20 @@ try {
       // A small boat rides the drawn wake as it rides the CPU law. Its 7 x 3 sample points (0.15 L along, 0.4 B across)
       // fall on the grid's vertices, where the drawn surface is the law itself rather than a linear blend of it.
       const instant = { period: 0 };
-      const boat = () => new Floater({ hull: { length: 5, beam: 1.25, draft: 0.4 }, position: [6, 0, 6], heading: 0, heave: instant, pitch: instant, roll: instant });
+      const boat = () =>
+        new Floater({
+          hull: { length: 5, beam: 1.25, draft: 0.4 },
+          position: [6, 0, 6],
+          heading: 0,
+          heave: instant,
+          pitch: instant,
+          roll: instant,
+        });
       const gpuBoat = boat().update(onFlood.query, 0),
-        cpuBoat = boat().update({ sample: (x, z) => ({ height: still.heightAt(x, z) + floodWakes.sample(x, z).height }) }, 0);
+        cpuBoat = boat().update(
+          { sample: (x, z) => ({ height: still.heightAt(x, z) + floodWakes.sample(x, z).height }) },
+          0,
+        );
       const ride = {
         heave: Math.abs(gpuBoat.position[1] - cpuBoat.position[1]),
         pitch: Math.abs(gpuBoat.pitch - cpuBoat.pitch),
@@ -116,10 +211,14 @@ try {
       engine.camera.target = [0, 1, -40];
       engine.lighting.direction.set([0.3, 0.5, 0.2, 0.3]);
       engine.lighting.radiance.set([0.2, 0.25, 0.4, 0.02]);
-      const night = Water.attach(engine, { size: [400, 400], segments: 64, waves: [{ direction: [1, 0], amplitude: 0.02, wavelength: 3 }] });
+      const night = Water.attach(engine, {
+        size: [400, 400],
+        segments: 64,
+        waves: [{ direction: [1, 0], amplitude: 0.02, wavelength: 3 }],
+      });
       const lamps = ShipWakes.attach(engine, { surface: night, lamps: [{ position: [0, 10, -80], intensity: 3000 }] });
       window.shipsTest = { engine, lamps, night };
-      return { open, early, onFlood, ride };
+      return { open, early, onFlood, ride, sternFoam };
     },
     { WIDTH, HEIGHT },
   );
@@ -159,13 +258,24 @@ try {
     assert.ok(r.worst < 1e-3 + r.peak * 1e-3, `${name}: drawn wake ${r.worst} m from the CPU law (peak ${r.peak} m)`);
   }
   assert.ok(result.ride.moved > 1e-3, 'the boat did not move on the wake');
-  assert.ok(result.ride.heave < 1e-4 && result.ride.pitch < 1e-4 && result.ride.roll < 1e-4, JSON.stringify(result.ride));
+  assert.ok(
+    result.ride.heave < 1e-4 && result.ride.pitch < 1e-4 && result.ride.roll < 1e-4,
+    JSON.stringify(result.ride),
+  );
+
+  const [fresh, aged, forward, offAxis] = result.sternFoam;
+  assert.ok(fresh > 0.35, 'fresh foam must start at the stern: ' + result.sternFoam);
+  assert.ok(aged > 0.07 && aged < fresh * 0.6, 'stern foam must fade with its own age: ' + result.sternFoam);
+  assert.equal(forward, 0, 'no turbulent foam ahead of the stern');
+  assert.equal(offAxis, 0, 'no turbulent foam outside the wake');
+  console.log('stern foam fresh, aged, forward, off-axis:', result.sternFoam);
 
   // The glint: luminance added by the lamp, per pixel.
   const luminance = async (bytes) => {
     const png = await decodePNG(bytes);
     const out = new Float64Array(png.width * png.height);
-    for (let k = 0; k < out.length; k++) out[k] = 0.2126 * png.data[k * 4] + 0.7152 * png.data[k * 4 + 1] + 0.0722 * png.data[k * 4 + 2];
+    for (let k = 0; k < out.length; k++)
+      out[k] = 0.2126 * png.data[k * 4] + 0.7152 * png.data[k * 4 + 1] + 0.0722 * png.data[k * 4 + 2];
     return { out, width: png.width, height: png.height };
   };
   const dark = await luminance(result.dark),
@@ -187,12 +297,18 @@ try {
     g2 = glint(wide);
   console.log(JSON.stringify({ sharp: g1, wide: g2, width: dark.width }));
   assert.ok(g1.best > 40, `the lamp adds no glint (${g1.best})`);
-  assert.ok(Math.abs(g1.bestX - (dark.width - 1) / 2) <= 2, `the glint is off the mirror line at column ${g1.bestX} of ${dark.width}`);
+  assert.ok(
+    Math.abs(g1.bestX - (dark.width - 1) / 2) <= 2,
+    `the glint is off the mirror line at column ${g1.bestX} of ${dark.width}`,
+  );
   assert.ok(g2.lit > g1.lit * 1.5, `a rougher sea should spread the glint (${g1.lit} -> ${g2.lit} pixels)`);
   assert.equal(result.validation, null);
   assert.deepEqual(errors, []);
   const report = { hardware, open, early, flood, ride: result.ride, glint: { sharp: g1, wide: g2 } };
-  await writeFile(`test-results/water-ships-${hardware?.compat ? 'compat' : 'webgpu'}.json`, JSON.stringify(report, null, 2));
+  await writeFile(
+    `test-results/water-ships-${hardware?.compat ? 'compat' : 'webgpu'}.json`,
+    JSON.stringify(report, null, 2),
+  );
   console.log(`water ships browser check passed (${hardware.webgpu?.vendor ?? 'compat'})`);
 } finally {
   await page.evaluate(() => window.shipsTest?.engine.dispose());

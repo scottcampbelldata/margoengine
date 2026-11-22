@@ -820,6 +820,8 @@ interface TerrainHeights {
 interface TrailPoint {
     x: number;
     z: number;
+    sternX: number;
+    sternZ: number;
     t: number;
     u: number;
 }

@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: turbulent foam was already old at the stern (water/ships)
+
+- **Repro:** move a 72 m hull at 3 m/s with a 9.5-second foam life. Sample within one metre aft of the transom after the ship has moved one hull length.
+- **Cause:** the foam used the time at which the bow passed each point. The newest churning water was treated as roughly 24 seconds old. Stationary samples in a path also fell back to a due-north heading and could put a false turn in the wake near the berth.
+- **Fix:** sample the position and time of the stern as it passed. Keep the bow trajectory for the Kelvin and bow wave systems. Carry the last moving heading through stationary history samples.
+- **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check fresh and aging foam and reject points outside the trail. The CPU test also checks that an eastbound ship leaves no diagonal wake at its starting berth.
+
 ### Fixed 2026-11-21: the upstream-reports README check rejected a hyphenated report id (KB-UPSTREAM-IDS1, tests)
 
 - **Repro (before):** after bfa6c541b added docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1, `node --test tests/upstream-reports.test.js`

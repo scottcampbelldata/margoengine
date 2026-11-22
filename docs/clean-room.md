@@ -1,5 +1,11 @@
 # Clean room
 
+### Stern foam history in Water (2026-11-21)
+
+Yingfei Liu and Ruru Deng, [Ship Wakes in Optical Images](https://doi.org/10.1175/JTECH-D-18-0021.1), 2018, distinguish the bright turbulent region behind a vessel from the Kelvin wave pattern. Vincent G. Johnston and David T. Walker, [Experimentally Observed Features of the Turbulent Near-Wake of a Model Ship](https://deepblue.lib.umich.edu/bitstream/handle/2027.42/116057/39015075172091.pdf?isAllowed=y&sequence=1), 1991, observed a rapidly spreading surface layer and irregular free-surface disturbances aft. Antonio Posa, Riccardo Broglia and Elias Balaras, [The wake flow downstream of a propeller-rudder system](https://doi.org/10.1016/j.ijheatfluidflow.2020.108765), 2021, characterize turbulence and shear downstream of the propeller and rudder.
+
+The observations support a turbulent surface trail that starts at the stern. A single bow trajectory with a time offset equal to hull length divided by current speed approximates straight, steady motion. Sampling the actual stern trajectory also follows the time and position of a turn or acceleration. Margo records both end positions at each station. It uses a laterally spreading envelope and exponential decay as artistic approximations. CPU and WGSL are authored here from these observations. No other engine's implementation was used.
+
 ### Spruce crown top and leader (procedural, KB-CABIN-LEADER1, 2026-11-16)
 
 The crown top in `generateTreeMesh` (`packages/procedural/src/foliage.ts`: the youngest whorl, the upright leader blades
