@@ -72,7 +72,10 @@ test('a cylinder: side normals are exactly radial (smooth across the curved face
     } else {
       side++;
       assert.ok(Math.abs(Math.hypot(x, y) - r) < 1e-9, 'side vertices lie on the cylinder');
-      assert.ok(Math.abs(n[0] - x / r) < 1e-6 && Math.abs(n[1] - y / r) < 1e-6 && n[2] === 0, `radial normal at ${x},${y}`);
+      assert.ok(
+        Math.abs(n[0] - x / r) < 1e-6 && Math.abs(n[1] - y / r) < 1e-6 && n[2] === 0,
+        `radial normal at ${x},${y}`,
+      );
     }
   }
   assert.ok(side > 8, 'the side is sampled round');
@@ -98,7 +101,10 @@ test('smoothing false: one flat normal per triangle, the cross product of its ed
       l = Math.hypot(...n);
     for (let j = 0; j < 3; j++) {
       const got = normalOf(part, part.indices[t + j]);
-      assert.ok(got.every((g, i) => Math.abs(g - n[i] / l) < 1e-5), `triangle ${t / 3} normal`);
+      assert.ok(
+        got.every((g, i) => Math.abs(g - n[i] / l) < 1e-5),
+        `triangle ${t / 3} normal`,
+      );
     }
   }
 });
@@ -151,8 +157,14 @@ test('an assembly: the body is meshed once and each placement reuses it with its
     ['0,0,0', '0,0.01,0', '0.01,0,0'],
   );
   const s = Math.SQRT1_2,
-    near = (a, b, label) => assert.ok(a.every((v, i) => Math.abs(v - b[i]) < 1e-12), `${label}: ${a} != ${b}`);
-  const placed = new Map(result.parts.map((p) => [p.transform.position.map((v) => Math.round(v * 1e9) / 1e9).join(), p]));
+    near = (a, b, label) =>
+      assert.ok(
+        a.every((v, i) => Math.abs(v - b[i]) < 1e-12),
+        `${label}: ${a} != ${b}`,
+      );
+  const placed = new Map(
+    result.parts.map((p) => [p.transform.position.map((v) => Math.round(v * 1e9) / 1e9).join(), p]),
+  );
   assert.deepEqual([...placed.keys()].sort(), ['0,0.05,0', '0.1,0,0']);
   near(placed.get('0.1,0,0').transform.rotation, [0, 0, s, s], '90 degrees about z');
   near(placed.get('0,0.05,0').transform.rotation, [0, 0, 0, 1], 'unturned');
