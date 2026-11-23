@@ -364,6 +364,14 @@ export class CCDSolver {
   captureRest(): void {
     this.rest.set(this.rotations);
   }
+  /** Projects the stored local rotations into their calibrated joint limits without moving an effector. */
+  projectRotations(): void {
+    for (let i = 0; i < this.joints; i++) {
+      normalize(this.rotations, i * 4);
+      normalize(this.rest, i * 4);
+      this.constrain(i);
+    }
+  }
   /**
    * Sets the parent frame from a column-major world matrix with a positive uniform scale (a parent bone's matrix).
    * Throws RangeError for a sheared, mirrored or non-uniformly scaled matrix.
@@ -433,11 +441,7 @@ export class CCDSolver {
     s[MAX_ANGLE] = maxAngle;
     normalize(this.parentRotation, 0);
     // Start inside the limits.
-    for (let i = 0; i < this.joints; i++) {
-      normalize(this.rotations, i * 4);
-      normalize(this.rest, i * 4);
-      this.constrain(i);
-    }
+    this.projectRotations();
     this.forward(0);
     const oriented = rotation !== null && rotation !== undefined,
       bend = pole !== null && pole !== undefined,

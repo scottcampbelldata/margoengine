@@ -1,5 +1,26 @@
 # @margoengine/procedural
 
+## Coral colonies (`margoengine/procedural/coral`)
+
+`coralGeometry` returns closed, seeded Y-up geometry with a flat attachment at Y = 0, projected UVs and outward
+normals. Use the branching, table or brain forms across the reef. The diameter parameter scales in metres, and
+`resolution` controls the number of samples along the longest axis (default 100, range 48–128). Cache colonies by
+form, seed and resolution when placing them in a scene. Choose fewer samples for distant colonies and a higher
+resolution for close-ups where the surface grooves matter.
+
+```ts
+import { coralGeometry } from 'margoengine/procedural/coral';
+const colony = coralGeometry({ form: 'branching', seed: 8, diameter: 0.65, resolution: 76 });
+console.log(colony.indices.length / 3);
+```
+
+The branched forms use tapered, smoothly joined growing tips and small-scale surface relief. The massive form
+cuts an irregular field of grooves into a basal dome. These are procedural approximations of growth forms.
+References for crown, plate and groove morphology are [Kaandorp et al., Morphogenesis of the Branching Reef
+Coral Madracis mirabilis (2005)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1634949/), [Kaandorp et al.,
+Macroscopic Modelling of Environmental Influence on Growth and Form of Sponges and Corals Using the Accretive
+Growth Model (2013)](https://doi.org/10.1155/2013/159170) and the [Smithsonian 3D coral collection](https://3d.si.edu/corals/).
+
 Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
 
 Import `margoengine/procedural` from the `margoengine` package, or `@margoengine/procedural` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).

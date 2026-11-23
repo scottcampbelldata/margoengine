@@ -8,6 +8,17 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Swimming and dense rigs (2026-11-23). The CPU rig builder accepts 1–65,536 joints. The swimming entry accepts
+  at least four spine segments, 0.001–1,000 m head-to-tail length, and at most 65,536 joints including the fins.
+  Nonuniform stations must differ by at least one hundred-millionth of the length. It samples deterministic
+  kinematic poses, leaving path integration and water forces to the caller. Existing rendering and skin buffer
+  limits still apply. The contact solver takes 2–256 ordered joints, with positive uniform ancestor scales.
+  Distances and angles are measured after blending. Standalone joint limits can cover up to 65,536 joints in
+  the pose. See [rigging](../packages/rigging/README.md).
+- Coral colonies (2026-11-23). The optional CPU generator builds a connected surface at 48–128 samples along
+  its longest axis. Colonies scale by a 0.01–30 m diameter. Finer structure beyond the sampled detail requires
+  a normal map or a close-up asset. See [procedural coral](../packages/procedural/README.md#coral-colonies-margoengineproceduralcoral).
+
 - Animated flow paths (2026-11-22) use an authored polyline of 2 to 3,999,992 finite float32 points with positive local length. Endpoint fades use fractions of local arc length, adding at most eight points to fit the Lines renderer's 4,000,000-point limit. A visible path has one dash layer and an optional guide. The browser tests read back forward travel, exact seek replay, zero gain and occlusion on WebGPU and the WebGL2 layer. The optional `@margoengine/lines/flow` entry adds 5,640 B min+gzip. See [Lines](../packages/lines/README.md#animated-flow-paths) and [the clean-room record](clean-room.md#animated-flow-paths-in-lines-2026-11-22).
 
 - Zero scale (KB-GLTFA B1, 2026-11-19): a mesh, a glTF node (TRS or a matrix with zero columns) and an animation key

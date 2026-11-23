@@ -27,11 +27,11 @@ export interface RigPose {
   readonly rest: ArrayLike<number>;
 }
 
-/** Most joints the package accepts. */
-const MAX_JOINTS = 1024;
+/** glTF `JOINTS_0` may contain unsigned-short indices, including 65,535. */
+const MAX_JOINTS = 65_536;
 
 /**
- * Checks a joint array (1-1024 joints, unique nonempty names, finite positions, parents that reach a root without a
+ * Checks a joint array (1-65,536 joints, unique nonempty names, finite positions, parents that reach a root without a
  * cycle) and returns its parent-before-child order.
  * @throws TypeError for a malformed joint, RangeError for a bad parent or position.
  */

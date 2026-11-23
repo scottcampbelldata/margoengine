@@ -156,6 +156,38 @@ console.log(solved.status, solved.elbow, solved.target);
 
 Root motion and look-at / aim constraints live with the Animator: `addRootMotion`, `addLookAt` and `addAimConstraint` in [`@margoengine/animator`](../animator/README.md).
 
+## Hand and foot contacts (`margoengine/rigging/contact`)
+
+`solveContactIK` puts the point on the hand, shoe or hoof that actually touches the surface at a chosen position and orientation. The chain runs through the wrist, ankle or hoof. `anchor` is the palm, sole or other landmark in the final joint's own coordinates. Read `locked` before applying a grip pose or firing a contact sound. The solve measures the actual landmark after posing and returns its position, angular error and remaining gap. Approaching with `weight` below 1 blends the landmark and wrist toward the contact. A pole selects the bend side. Calibrate each limited joint's neutral rotation and axes from the rig. A hinge gives an elbow, knee or hock one bounded axis. A cone limits wrist or ball-joint swing and signed twist independently. Per-axis limits suit a joint with separate rotation controls.
+
+```ts
+import { solveContactIK } from 'margoengine/rigging/contact';
+
+const parents = [-1, 0, 1];
+const local = new Float64Array([
+  0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+  0.3, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+  0.26, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+]);
+const contact = solveContactIK({ parents, local }, {
+  joints: [0, 1, 2],
+  point: [0.42, 0.16, 0.18],
+  rotation: [0, 0, 0, 1],
+  anchor: [0.06, 0, 0],
+  pole: [0.15, 0.08, 0.27],
+  limits: [
+    { joint: 1, neutral: [0, 0, 0, 1], limit: { type: 'hinge', axis: [0, 0, 1], min: 0, max: 2.35 } },
+    { joint: 2, neutral: [0, 0, 0, 1], limit: { type: 'cone', axis: [1, 0, 0], angle: 0.85, twist: [-0.35, 0.35] } },
+  ],
+  tolerance: 0.002,
+});
+console.log(contact.locked, contact.distance);
+```
+
+Pose and contact points use skeleton space and the same units. Ancestor scales must be uniform and positive. The end joint can have different positive scales along its axes. Default tolerances are 0.0001 scene units and 0.02 radians. Each solve uses up to 64 CCD sweeps by default. The chain can contain 2–256 joints inside a larger rig. `checkRig` accepts up to 65,536 joints, the number of joint indices representable by glTF unsigned shorts. A weight of 0 measures the input pose exactly. A gap or orientation outside either tolerance leaves `locked` false. Start from the sampled animation pose each frame so corrections cannot accumulate.
+
+The contact landmark follows [*Footskate Cleanup for Motion Capture Editing*, Kovar, Gleicher and Schreiner (2002)](https://research.cs.wisc.edu/graphics/Papers/Gleicher/Mocap/cleanup.pdf). The chain solve uses the Animator's constrained CCD solver. [*Parametrization and Range of Motion of the Ball-and-Socket Joint*, Baerlocher and Boulic (2000)](https://infoscience.epfl.ch/bitstreams/949101d1-ec81-4e38-91d8-c414ee95c8fc/download) describes swing and twist boundaries. Position error is at the surface landmark because the joint origin and the surface point differ, as in the hand and foot annotations of [*CIMI4D*, Yan et al. (2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Yan_CIMI4D_A_Large_Multimodal_Climbing_Motion_Dataset_Under_Human-Scene_Interactions_CVPR_2023_paper.pdf).
+
 ## Joint hulls (`margoengine/rigging/hulls`)
 
 `jointHulls(model, options)` finds the convex hull of the vertices each joint carries, from a skinned mesh in its bind pose. A hull is a short list of corners, so a clearance or collision test can use the real shape of a torso, head or forearm instead of a sphere or capsule. Run it once at load. It uses `@margoengine/geometry`'s quickhull, and only this entry imports it.
@@ -682,6 +714,56 @@ import { gripFinger } from 'margoengine/rigging/hands';
 const index = gripFinger([0.045, 0.026, 0.019], 0.035); // phalanx lengths in metres, a 35 mm bar
 console.log(index.flex.map(Math.round), index.tipGap < 0.0005); // joint angles in degrees; the tip meets the bar
 ```
+
+## Joint-space limits (`margoengine/rigging/joint-limits`)
+
+Calibrate a hinge or swing-and-twist cone in the joint's local frame. `PoseJointLimits` projects packed local TRS
+samples in place and preserves translations and scales. Use it after clip blending, or install the same projection as a
+final Animator solver with `addPoseJointLimits(animator, limits)`. `redistributeJointTwist` can move excessive axial
+rotation from a joint to its parent while preserving that joint's attachment and world orientation.
+
+```ts
+import { PoseJointLimits } from 'margoengine/rigging/joint-limits';
+const elbowPose = new Float64Array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1]);
+const limit = new PoseJointLimits(1, [
+  { joint: 0, neutral: [0, 0, 0, 1], limit: { type: 'hinge', axis: [0, 0, 1], min: 0, max: 2.35 } },
+]);
+limit.apply(elbowPose);
+console.log(elbowPose[6]);
+```
+
+Author these axes for the skeleton's bind pose. For human limbs, the limits are per-rig constraints on permitted
+motion rather than an estimate of anatomy from a bone name. See [Akhter and Black, Pose-Conditioned Joint Angle
+Limits for 3D Human Pose Reconstruction (2015)](https://openaccess.thecvf.com/content_cvpr_2015/html/Akhter_Pose-Conditioned_Joint_Angle_2015_CVPR_paper.html)
+and [Crisco et al., The Mechanical Axes of the Wrist Are Oriented Obliquely to the Anatomical Axes (2011)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3016043/).
+
+## Swimming (`margoengine/rigging/swim`)
+
+`createSwimRig` creates a head-to-tail chain in metres, with +Y up and +Z forward. A shark or reef fish sweeps laterally.
+A dolphin or humpback flexes in the vertical plane and feathers its flukes. The ray profile supplies fin hinges by
+default. Custom fin hinges may include a distal joint to introduce a delayed second bend. Use arbitrary
+increasing station fractions to match measured landmark spacing, or choose a uniform segment count. Feed the local
+TRS frames to your skin or bake quaternion keys into an animation. Update the caller's world path independently.
+
+```ts
+import { createSwimRig, sampleSwimPose, swimCadence } from 'margoengine/rigging/swim';
+const rig = createSwimRig('reef-shark', { length: 1.4, segments: 28 });
+const phase = 0.25 * swimCadence(rig, 0.9);
+const pose = sampleSwimPose(rig, { phase, effort: 0.8, turn: 0.1 });
+console.log(rig.names.length, pose.length);
+```
+
+With variable speed, accumulate phase across steps or sample a continuous phase curve. Fade effort to zero while
+coasting. `swimCadence` estimates cruising frequency from speed and the profile's peak-to-peak tail or fin excursion.
+The profiles are kinematic. They illustrate tail and fin mechanics and leave thrust, buoyancy, ecological behaviour
+and model-specific skin weights to the caller. The travelling wave and constant-length spine draw on [Lighthill,
+Large-Amplitude Elongated-Body Theory of Fish Locomotion (1971)](https://doi.org/10.1098/rspb.1971.0085),
+[Wilga and Lauder, Function of the Heterocercal Tail in Sharks (2002)](https://bpb-us-e1.wpmucdn.com/sites.harvard.edu/dist/6/58/files/2022/03/WilgaLauder2002.pdf),
+[Fish, Power Output and Propulsive Efficiency of Swimming Bottlenose Dolphins (1993)](https://doi.org/10.1242/jeb.185.1.179),
+[Gazzola, Argentina and Mahadevan, Scaling Macroscopic Aquatic Locomotion (2014)](https://doi.org/10.1038/nphys3078),
+[Smits, Undulatory and Oscillatory Swimming (2019)](https://doi.org/10.1017/jfm.2019.284),
+[Segre et al., A Hydrodynamically Active Flipper-Stroke in Humpback Whales (2017)](https://pubmed.ncbi.nlm.nih.gov/28697357/),
+and [Blevins and Lauder, Rajiform Locomotion in the Freshwater Stingray Potamotrygon orbignyi (2012)](https://bpb-us-e1.wpmucdn.com/sites.harvard.edu/dist/6/58/files/2022/03/Blevins.Lauder.2012.pdf).
 
 ## Test character
 

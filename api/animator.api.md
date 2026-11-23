@@ -224,6 +224,7 @@ export class CCDSolver {
     constructor(offsets: readonly Vec3[], tip?: Vec3);
     setLimit(index: number, limit: CCDJointLimit | null): void;
     captureRest(): void;
+    projectRotations(): void;
     setParentMatrix(m: ArrayLike<number>): void;
     update(): void;
     solve(target: Vec3, rotation?: ArrayLike<number> | null, pole?: Vec3 | null): CCDResult;

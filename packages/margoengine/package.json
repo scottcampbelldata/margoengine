@@ -107,6 +107,10 @@
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
     },
+    "./animator/ccd": {
+      "types": "./dist/animator/ccd.d.ts",
+      "import": "./dist/animator/ccd.js"
+    },
     "./animator/graph": {
       "types": "./dist/animator/graph.d.ts",
       "import": "./dist/animator/graph.js"
@@ -3299,6 +3303,10 @@
       "types": "./dist/procedural/marching-cubes.d.ts",
       "import": "./dist/procedural/marching-cubes.js"
     },
+    "./procedural/coral": {
+      "types": "./dist/procedural/coral.d.ts",
+      "import": "./dist/procedural/coral.js"
+    },
     "./procedural/conifer-species": {
       "types": "./dist/procedural/conifer-species.d.ts",
       "import": "./dist/procedural/conifer-species.js"
@@ -3562,6 +3570,18 @@
     "./rigging/ik": {
       "types": "./dist/rigging/ik.d.ts",
       "import": "./dist/rigging/ik.js"
+    },
+    "./rigging/contact": {
+      "types": "./dist/rigging/contact.d.ts",
+      "import": "./dist/rigging/contact.js"
+    },
+    "./rigging/joint-limits": {
+      "types": "./dist/rigging/joint-limits.d.ts",
+      "import": "./dist/rigging/joint-limits.js"
+    },
+    "./rigging/swim": {
+      "types": "./dist/rigging/swim.d.ts",
+      "import": "./dist/rigging/swim.js"
     },
     "./rigging/retarget": {
       "types": "./dist/rigging/retarget.d.ts",

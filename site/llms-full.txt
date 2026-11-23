@@ -1307,7 +1307,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,950 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,960 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -3132,6 +3132,17 @@ package or tool that takes you past it. The reference tables are [Scale](#scale)
 column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
+
+- Swimming and dense rigs (2026-11-23). The CPU rig builder accepts 1–65,536 joints. The swimming entry accepts
+  at least four spine segments, 0.001–1,000 m head-to-tail length, and at most 65,536 joints including the fins.
+  Nonuniform stations must differ by at least one hundred-millionth of the length. It samples deterministic
+  kinematic poses, leaving path integration and water forces to the caller. Existing rendering and skin buffer
+  limits still apply. The contact solver takes 2–256 ordered joints, with positive uniform ancestor scales.
+  Distances and angles are measured after blending. Standalone joint limits can cover up to 65,536 joints in
+  the pose. See [rigging](../packages/rigging/README.md).
+- Coral colonies (2026-11-23). The optional CPU generator builds a connected surface at 48–128 samples along
+  its longest axis. Colonies scale by a 0.01–30 m diameter. Finer structure beyond the sampled detail requires
+  a normal map or a close-up asset. See [procedural coral](../packages/procedural/README.md#coral-colonies-margoengineproceduralcoral).
 
 - Animated flow paths (2026-11-22) use an authored polyline of 2 to 3,999,992 finite float32 points with positive local length. Endpoint fades use fractions of local arc length, adding at most eight points to fit the Lines renderer's 4,000,000-point limit. A visible path has one dash layer and an optional guide. The browser tests read back forward travel, exact seek replay, zero gain and occlusion on WebGPU and the WebGL2 layer. The optional `@margoengine/lines/flow` entry adds 5,640 B min+gzip. See [Lines](../packages/lines/README.md#animated-flow-paths) and [the clean-room record](clean-room.md#animated-flow-paths-in-lines-2026-11-22).
 
@@ -30960,6 +30971,27 @@ secondary scene, attach the stack with `scene.use()`:
 
 # @margoengine/procedural
 
+## Coral colonies (`margoengine/procedural/coral`)
+
+`coralGeometry` returns closed, seeded Y-up geometry with a flat attachment at Y = 0, projected UVs and outward
+normals. Use the branching, table or brain forms across the reef. The diameter parameter scales in metres, and
+`resolution` controls the number of samples along the longest axis (default 100, range 48–128). Cache colonies by
+form, seed and resolution when placing them in a scene. Choose fewer samples for distant colonies and a higher
+resolution for close-ups where the surface grooves matter.
+
+```ts
+import { coralGeometry } from 'margoengine/procedural/coral';
+const colony = coralGeometry({ form: 'branching', seed: 8, diameter: 0.65, resolution: 76 });
+console.log(colony.indices.length / 3);
+```
+
+The branched forms use tapered, smoothly joined growing tips and small-scale surface relief. The massive form
+cuts an irregular field of grooves into a basal dome. These are procedural approximations of growth forms.
+References for crown, plate and groove morphology are [Kaandorp et al., Morphogenesis of the Branching Reef
+Coral Madracis mirabilis (2005)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1634949/), [Kaandorp et al.,
+Macroscopic Modelling of Environmental Influence on Growth and Form of Sponges and Corals Using the Accretive
+Growth Model (2013)](https://doi.org/10.1155/2013/159170) and the [Smithsonian 3D coral collection](https://3d.si.edu/corals/).
+
 Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
 
 Import `margoengine/procedural` from the `margoengine` package, or `@margoengine/procedural` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
@@ -30996,26 +31028,6 @@ for (const data of Object.values(cabin.parts)) {
 }
 engine.dispose();
 ```
-
-`generateLogWall({ courses, diameter = 0.3, bottom = diameter / 2, openings = [], segments = 14, sill = true })` builds a log
-wall as one geometry: round logs along local X, stacked one diameter apart from `bottom` (the centre of the first
-course), Z the wall's thickness. `courses` lists each course's `[start, end]`, bottom first; an empty course (`[0, 0]`)
-ends a gable early. `openings` are `[x0, x1, y0, y1]` rectangles cut out exactly (a door's sill is `-Infinity`):
-a log wholly inside one is cut away, and a log the opening's top or bottom edge crosses keeps the part outside it,
-notched flat along the edge, so a door 2.15 m high in 0.3 m courses opens to 2.15 m, not to the 2.4 m top of the log
-it cuts into. Openings must not overlap. Chinking runs along every course line where both logs exist: a faceted log's flat sits
-`r (1 - cos(pi / segments))` inside its circle, so bare stacked logs leave a slit straight through the wall (0.75 cm
-for 0.3 m logs of 14 segments), which showed the sky as one-pixel lines. The chinking, the strip log builders pack
-between courses (B. D. Bomberger, "The Preservation and Repair of Historic Log Buildings", NPS Preservation Brief 26,
-1991), lies inside the logs' inscribed circles, so it fills the slit and is hidden everywhere else. Pieces shorter
-than a tenth of the diameter are dropped. A wall standing on the ground (its bottom course less than a diameter up) is
-closed down to y = 0 by default: notched corners set two of a cabin's four walls half a log higher, and builders
-start those walls on a sill log hewn flat underneath, the half-log starter course (B. A. Mackie, "Building with Logs",
-1971; sill logs on the foundation in Bomberger 1991), so `generateLogWall` puts one under the bottom course, cut at
-y = 0 and chinked to the course above, and chinks a bottom course that rests on y = 0 to the ground under its facets.
-Without it the room's light showed on the snow under Cabin Hearth's side walls. `sill: false` leaves the gap for a
-foundation built up to the bottom course (stone piers or a raised foundation); a wall a diameter or more up, such as a
-gable set on another wall, never gets a sill.
 
 [README continues: https://margoengine.com/llms/packages/procedural.md]
 
@@ -31244,11 +31256,15 @@ Import `margoengine/animator` from the `margoengine` package, or `@margoengine/a
 
 Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade the state they leave, which keeps playing until its weight reaches 0, into the destination; a transition taken during a crossfade fades from the blended pose it cut in on, held still. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
 
+Import `margoengine/animator/ccd` for the standalone CPU solver. `projectRotations()` applies just the
+calibrated limits to the current local rotations. Call `update()` afterward if you need the resulting world frames.
+
 ```ts
 import {EngineKernel} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator, addCCDChain, type CCDChain} from 'margoengine/animator';
+import {CCDSolver} from 'margoengine/animator/ccd';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const animation = Animation.attach(model);
@@ -31262,6 +31278,12 @@ const animator = Animator.attach(animation, {
 });
 animator.parameters.speed = 2;
 engine.start();
+
+// This standalone chain can also run in a worker without the engine.
+const chain = new CCDSolver([[0, 0, 0], [0, 0.4, 0]]);
+chain.setLimit(1, { type: 'hinge', axis: [1, 0, 0], min: 0, max: 1.9 });
+chain.projectRotations();
+chain.update();
 ```
 
 For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:'Idle'},...]}` with unique coordinates. Parameters default to zero. 1D samples must be strictly increasing. Clips loop independently in seconds (`Animation.options.loop` false holds the last frame). `playing = false` pauses state time and crossfades; `Animation.options.speed` scales them, as for Animation playback. `transition(state,duration)` switches states explicitly; predicates are evaluated in declaration order, at most once per frame. Add a layer with `addLayer({clip:'Aim',weight:0.5,mask:[upperBodyNodeIndex,...]})`. Masks use glTF node indices. The returned function removes the layer; mutable weights are validated each frame. `referenceTime` defaults to zero.
@@ -31275,8 +31297,6 @@ with code `unsupported` and a help link. The callback receives a world-space ori
 The examples use [Quaternius' bundled CC0 mannequin](../../examples/assets/quaternius/UAL1_Standard_RM.glb). Serve that file at `/UAL1_Standard_RM.glb`; its authored clip and bone names are used below. The root-motion example instead serves [KayKit's CC0 mannequin](../../examples/assets/kaykit/adventurers/animations/Rig_Medium/Rig_Medium_MovementBasic.glb) at `/Rig_Medium_MovementBasic.glb`.
 
 ## CCD chains (any length)
-
-`addCCDChain(animator, chain)` adds a Cyclic Coordinate Descent IK chain (Wang and Chen 1991) for arms, spines, tails, tentacles or fingers, solved every frame after the pose, additive layers and foot IK. Each sweep goes from the last joint to the first; every joint turns, on its own, so the end effector moves toward the target, then its limit is applied. `joints` lists glTF node indices from the first joint to the last, each the child of the one before. The Animator keeps the chain object and reads `target`, `rotation`, `pole`, `weight` and the solve settings every frame, so move the target by writing into it:
 
 [README continues: https://margoengine.com/llms/packages/animator.md]
 

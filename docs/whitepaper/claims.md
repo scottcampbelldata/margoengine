@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Swimming, contact and coral generation (2026-11-23). Stroke-plane, fixed-length, fin phase and seek tests
+  cover the swimming profiles and a dense chain with 1,207 segments. Contact tests measure position and orientation
+  after solving, including targets beyond reach. The coral test checks closed connected meshes, seabed attachment
+  and deterministic scaling on all three forms. Build with `npm run build:packages`, then run
+  `node --test packages/rigging/tests/swim.test.js packages/rigging/tests/contact.test.js packages/rigging/tests/joint-limits.test.js packages/procedural/test/coral.test.js`.
+  See [limits](../limits.md) for the API ranges and the package READMEs for the published sources.
+
 - Batch 170 vfx: a steady frame of 100,000 live particles sends 224 bytes to the GPU in one write; three.quarks 0.17.1
   marks 4,800,000 bytes of instance attributes for upload. Work evidence only, no speed claim.
   [Scope, rival count and reproduction](batch-170-vfx.md).

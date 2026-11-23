@@ -122,6 +122,10 @@
       "types": "./dist/marching-cubes.d.ts",
       "import": "./dist/marching-cubes.js"
     },
+    "./coral": {
+      "types": "./dist/coral.d.ts",
+      "import": "./dist/coral.js"
+    },
     "./conifer-species": {
       "types": "./dist/conifer-species.d.ts",
       "import": "./dist/conifer-species.js"

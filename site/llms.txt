@@ -241,14 +241,14 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 10 entry points
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 33 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 14 entry points
-- [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 29 entry points
+- [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 30 entry points
 - [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 10 entry points
 - [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 9 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 16 entry points
-- [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 12 entry points
+- [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 13 entry points
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 6 entry points
 - [@margoengine/robot-planning API](https://margoengine.com/llms/api/robot-planning.md): 5 entry points
-- [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 18 entry points
+- [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 21 entry points
 - [@margoengine/humans API](https://margoengine.com/llms/api/humans.md): 4 entry points
 - [@margoengine/horses API](https://margoengine.com/llms/api/horses.md): 7 entry points
 - [@margoengine/armies API](https://margoengine.com/llms/api/armies.md): 5 entry points

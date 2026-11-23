@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17402468,
+  "total": 17419931,
   "history": [
     {
       "date": "2026-10-24",
@@ -11355,6 +11355,12 @@
       "commit": "abe38d562e",
       "reason": "Rigging retarget palm orientation: 3,470 to 3,757 B gzip, ceiling 3,583 to 4,013 B. Matching two anatomical axes fixes palm roll during synchronous rest alignment. A split would add an import or a second call for the same operation.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-23",
+      "commit": "8305614bdd",
+      "reason": "New optional entries add CCD 6012 B, procedural coral 4554 B, contact IK 1997 B, pose joint limits 1514 B and swimming 2106 B min+gzip. Each loads independently and keeps core plus stage at 24797 B.",
+      "grew": 5
     }
   ],
   "items": {
@@ -11376,6 +11382,7 @@
     "@margoengine/animation/vat": 8800,
     "@margoengine/animator": 20643,
     "@margoengine/animator/blend-trees": 1841,
+    "@margoengine/animator/ccd": 6268,
     "@margoengine/animator/fbik": 5984,
     "@margoengine/animator/graph": 10914,
     "@margoengine/animator/inertialize": 2150,
@@ -12183,6 +12190,7 @@
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,
+    "@margoengine/procedural/coral": 4810,
     "@margoengine/procedural/dungeon": 1479,
     "@margoengine/procedural/expression": 4718,
     "@margoengine/procedural/fir-sprays": 1724,
@@ -12265,15 +12273,18 @@
     "@margoengine/react/xr-pointer": 1516,
     "@margoengine/rigging": 8361,
     "@margoengine/rigging/autorig": 11019,
+    "@margoengine/rigging/contact": 2253,
     "@margoengine/rigging/correctives": 2242,
     "@margoengine/rigging/face": 2363,
     "@margoengine/rigging/hands": 5966,
     "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 4108,
+    "@margoengine/rigging/joint-limits": 1770,
     "@margoengine/rigging/mtoon": 11432,
     "@margoengine/rigging/pose-tracking": 5458,
     "@margoengine/rigging/retarget": 4013,
     "@margoengine/rigging/springs": 5069,
+    "@margoengine/rigging/swim": 2362,
     "@margoengine/rigging/transfer": 4108,
     "@margoengine/rigging/voxel-weights": 5854,
     "@margoengine/rigging/vrm": 11160,
