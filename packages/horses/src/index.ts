@@ -14,9 +14,14 @@ import type { hair as hairFeature, HairOptions } from '@margoengine/materials/ha
 import { captureScene } from '../../shared/scene-scope.js';
 import type { HorseBody } from './anatomy.js';
 import { GAIT_PATTERNS, froude, stride, type Gait, type Stride } from './gaits.js';
+import { horseClipPlan, strideReachScale } from './clip-plan.js';
 import {
   horseDocument,
+  horseJointTranslation,
   horsePose,
+  horseSkeleton,
+  horseTailFlick,
+  poseHooves,
   poseSaddle,
   type HorseClip,
   type HorseModelOptions,
@@ -29,8 +34,20 @@ export interface HorseReceiver {
   add(source: never, ...rest: never[]): unknown;
 }
 
+/** An artist's skinned horse posed by the package's runtime gait controller. The caller owns the model. */
+export interface HorseSkin {
+  /** Loaded skinned glTF in the same engine and in metres, facing +Z. */
+  readonly model: PBRModel;
+  /** Native or fitted skeleton in the rig's model space. */
+  readonly skeleton: HorseSkeleton;
+  /** Apply the solved model-space pose to the skin's joints. Root placement and yaw are applied by the controller. */
+  applyPose(pose: HorsePose): void;
+}
+
 /** Options of {@link addHorse}. Every one is optional; the defaults give a bay riding horse standing at the origin. */
 export interface HorseOptions extends HorseModelOptions {
+  /** Use an existing skinned horse and preserve its materials. Default builds a procedural horse. */
+  readonly skin?: HorseSkin;
   /** Starting position on the ground, `[x, z]`. Default `[0, 0]`. */
   position?: readonly [number, number];
   /** Starting heading in radians about +Y, 0 facing +Z. Default 0. */
@@ -89,6 +106,8 @@ export interface Horse {
   readonly pose: HorsePose;
   /** Position, heading and the saddle now. */
   frame(): HorseFrame;
+  /** Flicks the tail from the current film time. Strength defaults to 1 and side to left. */
+  flickTail(strength?: number, side?: 'left' | 'right'): void;
   /** Moves film time forward by `delta` seconds (fixed 1/240 s steps inside). */
   advanceTime(delta: number): this;
   /** Jumps to film time `time`, replaying every speed, heading and gait set since 0: the same as playing up to it. */
@@ -100,7 +119,9 @@ export interface Horse {
 }
 
 const STEP = 1 / 240;
-type Command = { at: number; key: 'speed' | 'heading' | 'gait'; value: number | string };
+type MotionKey = 'speed' | 'heading' | 'gait';
+type TailAction = { strength: number; side: -1 | 1 };
+type Command = { at: number; key: MotionKey; value: number | string } | { at: number; key: 'tail'; value: TailAction };
 
 const receiver = (value: unknown, what: string): HorseReceiver | undefined => {
   if (value === undefined || value === false) return undefined;
@@ -127,9 +148,19 @@ function nlerp(a: readonly number[], b: readonly number[], t: number): [number, 
 }
 /** Pose blend: `t` of `b` over `a`. */
 export function blendPoses(a: HorsePose, b: HorsePose, t: number): HorsePose {
+  const blend = (from: readonly number[] | undefined, to: readonly number[] | undefined): [number, number, number] =>
+    [0, 1, 2].map((k) => (from?.[k] ?? 0) * (1 - t) + (to?.[k] ?? 0) * t) as [number, number, number];
   return {
     rotations: a.rotations.map((q, i) => nlerp(q, b.rotations[i]!, t)),
-    bodyOffset: [0, 1, 2].map((k) => a.bodyOffset[k]! * (1 - t) + b.bodyOffset[k]! * t) as [number, number, number],
+    bodyOffset: blend(a.bodyOffset, b.bodyOffset),
+    ...(a.scapulaOffsets || b.scapulaOffsets
+      ? {
+          scapulaOffsets: [
+            blend(a.scapulaOffsets?.[0], b.scapulaOffsets?.[0]),
+            blend(a.scapulaOffsets?.[1], b.scapulaOffsets?.[1]),
+          ] as const,
+        }
+      : {}),
   };
 }
 
@@ -179,12 +210,16 @@ export class HorseMotion {
       }
     return g;
   }
+  /** Speed after one acceleration-limited step toward the target, in metres per second. */
+  speedAfter(dt: number, target: number): number {
+    const dv = target - this.speed;
+    const limit = (this.options.acceleration ?? 3) * dt;
+    return this.speed + Math.max(-limit, Math.min(limit, dv));
+  }
   step(dt: number, target: { speed: number; heading: number; gait: Gait | 'auto' }): void {
-    const acc = this.options.acceleration ?? 3,
-      turn = this.options.turnRate ?? 1.2,
-      fadeTime = this.options.fade ?? 0.3,
-      dv = target.speed - this.speed;
-    this.speed += Math.max(-acc * dt, Math.min(acc * dt, dv));
+    const turn = this.options.turnRate ?? 1.2,
+      fadeTime = this.options.fade ?? 0.3;
+    this.speed = this.speedAfter(dt, target.speed);
     let dh = target.heading - this.heading;
     dh = Math.atan2(Math.sin(dh), Math.cos(dh));
     // A standing horse turns on the spot more slowly than a moving one.
@@ -222,8 +257,11 @@ export class HorseMotion {
  * @throws TypeError or RangeError for bad options.
  */
 export async function addHorse(engine: Engine, options: HorseOptions = {}): Promise<Horse> {
-  const doc = horseDocument(options),
-    { body, skeleton, clips } = doc,
+  const skin = options.skin,
+    doc = skin ? undefined : horseDocument(options),
+    skeleton = skin?.skeleton ?? doc!.skeleton,
+    body = skeleton.body,
+    clips = doc?.clips ?? horseClipPlan(body, options.speeds, strideReachScale(skeleton, horseSkeleton(body))).clips,
     acceleration = options.acceleration ?? 3,
     turnRate = options.turnRate ?? 1.2,
     fade = options.fade ?? 0.3;
@@ -238,6 +276,8 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     occlusion = receiver(options.occlusion, 'occlusion'),
     // The scene this call was made for, kept across the lazy imports: the model and everything it brings belong to it.
     scope = captureScene(engine);
+  if (skin && (skin.model.root.engine !== engine || typeof skin.applyPose !== 'function'))
+    throw new TypeError('Pass an authored horse skin from this engine and a function that applies its pose');
   // The loader, skinning and hair shading load on the first horse, so importing this entry costs only the horse maths.
   const [{ parseGLTFAsync }, { Animation }, { dualQuaternionSkinning }, { install }, { hair }] = await Promise.all([
     import('@margoengine/gltf/pbr'),
@@ -246,7 +286,8 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     import('@margoengine/materials'),
     import('@margoengine/materials/hair'),
   ]);
-  const model = (await scope.run(() => parseGLTFAsync(engine as never, doc.doc, doc.buffers))) as PBRModel,
+  const model =
+      skin?.model ?? ((await scope.run(() => parseGLTFAsync(engine as never, doc!.doc, doc!.buffers))) as PBRModel),
     shadows =
       options.shadows === undefined
         ? ((engine as unknown as EngineKernel).sceneOf(model as never)?.plugins.get('shadows') as
@@ -254,9 +295,9 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
             | undefined)
         : explicitShadows,
     features: Record<string, ReturnType<typeof hairFeature>[]> = {};
-  if (options.coatHair !== false)
+  if (!skin && options.coatHair !== false)
     features.Coat = [hair({ direction: 'u', strands: 400, specular: 0.45, ...(options.coatHair || {}) })];
-  if (options.maneHair !== false) {
+  if (!skin && options.maneHair !== false) {
     features.Mane = [hair({ strands: 1024, ...(options.maneHair || {}) })];
     features.Tail = [hair({ strands: 1024, ...(options.maneHair || {}) })];
   }
@@ -267,13 +308,18 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     kernel = engine as unknown as EngineKernel,
     into = kernel.sceneOf(model as never) ?? model.root.scene;
   kernel.use(animation, into);
+  animation.playing = false;
   cleanups.push(() => animation.dispose());
   // Shadows and occlusion both take the model and may give back their own remover.
   for (const off of [shadows?.add(model as never), occlusion?.add(model as never)])
     if (typeof off === 'function') cleanups.push(off as () => void);
 
   const strides = new Map<Gait, Stride>();
-  for (const c of clips) if (c.name !== 'stand') strides.set(c.name, stride(body, c.speed, c.name));
+  const phaseOffsets = new Map<Gait, number>();
+  for (const c of clips) {
+    if (c.name === 'stand') continue;
+    strides.set(c.name, { ...stride(body, c.speed, c.name), length: c.strideLength, duration: c.duration });
+  }
   const motionOptions = { position: options.position, heading: options.heading, acceleration, turnRate, fade };
   let motion = new HorseMotion(body, motionOptions),
     // Film time asked for, and whole fixed steps simulated: the motion lives on the grid ticks x STEP and is shown
@@ -283,8 +329,11 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     next = 0,
     prev = { x: motion.x, z: motion.z, heading: motion.heading, distance: motion.distance },
     target = { speed: 0, heading: options.heading ?? 0, gait: 'auto' as Gait | 'auto' },
-    pose: HorsePose = horsePose(skeleton, null, 0, 0);
+    pose: HorsePose = horsePose(skeleton, null, 0, 0),
+    interruptedFrom: HorsePose | undefined,
+    outgoingDistance = 0;
   const commands: Command[] = [],
+    tailActions: { at: number; value: TailAction }[] = [],
     listeners = new Set<{ step: (dt: number, horse: Horse) => void; reset?: () => void }>();
   const shown = () => {
     const a = Math.min(1, Math.max(0, (time - ticks * STEP) / STEP)),
@@ -296,30 +345,77 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       distance: motion.distance + (motion.distance - prev.distance) * a,
     };
   };
-  const gaitPose = (g: Gait | 'stand', distance: number): HorsePose => {
-    if (g === 'stand') return horsePose(skeleton, null, 0, time);
+  const movingPose = (st: Stride, phase: number, at: number): HorsePose => {
+    // The stride of a requested gait represents its cruising speed. Ease in its excursion at very low
+    // speed so a newly requested canter or gallop cannot throw limbs into an extended pose from a stand.
+    const lowSpeedWeight = Math.min(1, motion.speed / (st.speed * 0.85));
+    return horsePose(skeleton, st, phase - Math.floor(phase), at, lowSpeedWeight ** 2 * (3 - 2 * lowSpeedWeight));
+  };
+  const gaitPose = (g: Gait | 'stand', distance: number, at: number): HorsePose => {
+    if (g === 'stand') return horsePose(skeleton, null, 0, at);
     const st = strides.get(g)!;
-    return horsePose(skeleton, st, motion.phaseAt(g, st.length, distance));
+    const phase = motion.phaseAt(g, st.length, distance) + (phaseOffsets.get(g) ?? 0);
+    return movingPose(st, phase, at);
+  };
+  const retiringRate = (g: Gait | 'stand', speed: number): number =>
+    g === 'stand' || speed === 0 ? 1 : Math.min(1, strides.get(g)!.speed / speed);
+  const locomotionPose = (distance: number, at: number) => {
+    const now = gaitPose(motion.gait, distance, at);
+    if (motion.fade >= 1) return now;
+    const t = motion.fade;
+    const weight = t ** 3 * (10 + t * (-15 + 6 * t));
+    const carried =
+      outgoingDistance + (distance - motion.distance) * (1 - t) * retiringRate(motion.previous, motion.speed);
+    return blendPoses(interruptedFrom ?? gaitPose(motion.previous, carried, at), now, weight);
   };
   const computePose = (distance: number) => {
-    const now = gaitPose(motion.gait, distance);
-    pose = motion.fade < 1 ? blendPoses(gaitPose(motion.previous, distance), now, motion.fade) : now;
+    pose = locomotionPose(distance, time);
+    for (const action of tailActions)
+      pose = horseTailFlick(skeleton, pose, time - action.at, action.value.strength, action.value.side);
   };
+  const alignGait = (gait: Gait, from: HorsePose, after: HorsePose, at: number, lead: number) => {
+    const st = strides.get(gait)!;
+    const hooves = poseHooves(skeleton, from),
+      anticipated = poseHooves(skeleton, after);
+    let phase = 0,
+      best = Infinity;
+    const judge = (candidate: number) => {
+      const placed = poseHooves(skeleton, movingPose(st, candidate, at));
+      const next = poseHooves(skeleton, movingPose(st, candidate + (motion.speed * lead) / st.length, at + lead));
+      const cost = placed.reduce((sum, p, i) => {
+        const [x, y, z] = hooves[i]!;
+        // Preserve the support sequence: keeping a loaded foot down takes precedence over matching swing height.
+        const support = Math.abs(y) < 0.025 ? 4 : 1;
+        const nextHoof = next[i]!;
+        const mismatch = nextHoof.reduce(
+          (v, axis, k) => v + (axis - p[k]! - (anticipated[i]![k]! - hooves[i]![k]!)) ** 2,
+          0,
+        );
+        return sum + (p[0] - x) ** 2 + support * (p[1] - y) ** 2 + (p[2] - z) ** 2 + 2 * mismatch;
+      }, 0);
+      if (cost < best) {
+        best = cost;
+        phase = candidate;
+      }
+    };
+    for (let i = 0; i < 24; i++) judge(i / 24);
+    const nearest = phase;
+    for (const delta of [-1 / 72, 1 / 72]) judge((nearest + delta + 1) % 1);
+    phaseOffsets.set(gait, phase - motion.phaseAt(gait, st.length, motion.distance));
+  };
+  const movingJoints = ['body', 'scapulaL', 'scapulaR'].map((name) => skeleton.index(name));
   const apply = () => {
     const v = shown();
     computePose(v.distance);
     const nodes = model.nodes as unknown as {
-        setQuaternion(q: readonly number[]): unknown;
-        setPosition(p: readonly number[]): unknown;
-      }[],
-      bodyIndex = skeleton.index('body'),
-      rest = skeleton.joints[bodyIndex]!.rest;
-    pose.rotations.forEach((q, i) => i > 0 && nodes[i]?.setQuaternion(q));
-    nodes[bodyIndex]?.setPosition([
-      rest[0] + pose.bodyOffset[0],
-      rest[1] + pose.bodyOffset[1],
-      rest[2] + pose.bodyOffset[2],
-    ]);
+      setQuaternion(q: readonly number[]): unknown;
+      setPosition(p: readonly number[]): unknown;
+    }[];
+    if (skin) skin.applyPose(pose);
+    else {
+      pose.rotations.forEach((q, i) => i > 0 && nodes[i]?.setQuaternion(q));
+      for (const joint of movingJoints) nodes[joint]?.setPosition(horseJointTranslation(skeleton, pose, joint));
+    }
     model.root.setPosition([v.x, ground(v.x, v.z), v.z]);
     model.root.setQuaternion([0, Math.sin(v.heading / 2), 0, Math.cos(v.heading / 2)]);
   };
@@ -333,10 +429,31 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       const start = ticks * STEP;
       while (next < commands.length && commands[next]!.at <= start + 1e-9) {
         const c = commands[next++]!;
-        (target as Record<string, unknown>)[c.key] = c.value;
+        if (c.key === 'tail') tailActions.push(c);
+        else (target as Record<string, unknown>)[c.key] = c.value;
       }
+      while (tailActions.length && start - tailActions[0]!.at >= 1) tailActions.shift();
       prev = { x: motion.x, z: motion.z, heading: motion.heading, distance: motion.distance };
+      const priorGait = motion.gait;
+      const incoming = motion.pick(motion.speedAfter(STEP, target.speed), target.gait);
+      const previousFade = motion.fade;
+      const interrupted = previousFade < 1;
+      const lead = Math.min(0.12, fade * 0.4);
+      const changing = incoming !== priorGait;
+      const previousPose = changing ? locomotionPose(motion.distance, start) : undefined;
+      const after = changing
+        ? locomotionPose(motion.distance + motion.speed * retiringRate(priorGait, motion.speed) * lead, start + lead)
+        : undefined;
       motion.step(STEP, target);
+      const retiringDistance = (motion.distance - prev.distance) * retiringRate(motion.previous, motion.speed);
+      if (previousPose) {
+        outgoingDistance = prev.distance + retiringDistance * (1 - motion.fade / 2);
+        interruptedFrom = interrupted ? previousPose : undefined;
+        if (motion.gait !== 'stand') alignGait(motion.gait, previousPose, after!, start, lead);
+      } else if (interrupted) {
+        // Finish the old stride within its cadence while the new gait takes the load.
+        outgoingDistance += retiringDistance * (1 - (previousFade + motion.fade) / 2);
+      }
       ticks++;
       if (listeners.size) {
         const keep = time;
@@ -348,16 +465,19 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     }
     apply();
   };
-  const record = (key: Command['key'], value: number | string) => {
+  const record = (command: Command) => {
     // A later set at the same time replaces the earlier one; sets after now are cut (a re-shot from here). The set
     // takes effect at the next fixed step, as it does in a replay.
     for (let i = commands.length - 1; i >= 0; i--)
-      if (commands[i]!.at > time + 1e-9 || (commands[i]!.at >= time - 1e-9 && commands[i]!.key === key && i >= next))
+      if (
+        commands[i]!.at > time + 1e-9 ||
+        (commands[i]!.at >= time - 1e-9 && commands[i]!.key === command.key && i >= next)
+      )
         commands.splice(i, 1);
     next = Math.min(next, commands.length);
-    commands.push({ at: time, key, value });
+    commands.push(command);
   };
-  const asked = (key: Command['key']) => {
+  const asked = (key: MotionKey) => {
     for (let i = commands.length - 1; i >= 0; i--) if (commands[i]!.key === key) return commands[i]!.value;
     return key === 'speed' ? 0 : key === 'heading' ? (options.heading ?? 0) : 'auto';
   };
@@ -367,7 +487,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     disposed = true;
     listeners.clear();
     for (const step of cleanups.reverse()) step();
-    (model as unknown as { dispose?(): void }).dispose?.();
+    if (!skin) (model as unknown as { dispose?(): void }).dispose?.();
   };
   const horse: Horse = {
     model,
@@ -384,13 +504,13 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     },
     set speed(v: number) {
       if (!(finite(v, 'speed') >= 0) || v > 25) throw new RangeError('Horse speed must be 0 to 25 m/s');
-      record('speed', v);
+      record({ at: time, key: 'speed', value: v });
     },
     get heading() {
       return asked('heading') as number;
     },
     set heading(v: number) {
-      record('heading', finite(v, 'heading'));
+      record({ at: time, key: 'heading', value: finite(v, 'heading') });
     },
     get gait() {
       return asked('gait') as Gait | 'auto';
@@ -398,7 +518,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     set gait(v: Gait | 'auto') {
       if (v !== 'auto' && !strides.has(v as Gait))
         throw new RangeError("Horse gait must be 'auto', 'walk', 'trot', 'canter' or 'gallop'");
-      record('gait', v);
+      record({ at: time, key: 'gait', value: v });
     },
     get currentSpeed() {
       return motion.speed;
@@ -411,6 +531,11 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     },
     get pose() {
       return pose;
+    },
+    flickTail(strength = 1, side = 'left') {
+      if (!(strength >= 0 && strength <= 1) || (side !== 'left' && side !== 'right'))
+        throw new RangeError('Horse tail flick needs strength 0 to 1 and side left or right');
+      record({ at: time, key: 'tail', value: { strength, side: side === 'left' ? 1 : -1 } });
     },
     frame() {
       const s = poseSaddle(skeleton, pose),
@@ -439,9 +564,13 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     seek(at: number) {
       if (!(at >= 0 && at < Infinity)) throw new RangeError('seek needs a finite film time in seconds, 0 or more');
       motion = new HorseMotion(body, motionOptions);
+      phaseOffsets.clear();
       time = 0;
       ticks = 0;
       next = 0;
+      tailActions.length = 0;
+      interruptedFrom = undefined;
+      outgoingDistance = 0;
       prev = { x: motion.x, z: motion.z, heading: motion.heading, distance: motion.distance };
       target = { speed: 0, heading: options.heading ?? 0, gait: 'auto' };
       for (const l of listeners) l.reset?.();
@@ -457,7 +586,12 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     dispose,
     [Symbol.dispose]: dispose,
   };
-  apply();
+  try {
+    apply();
+  } catch (error) {
+    dispose();
+    throw error;
+  }
   return horse;
 }
 

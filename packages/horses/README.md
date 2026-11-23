@@ -2,7 +2,7 @@
 
 Horses built in code from published equine measurements. `addHorse(engine)` builds a riding horse, a cavalry remount or
 a heavy draft horse to its breed group's proportions, with a coat, white markings, a mane and tail of hair cards shaded
-as strand hair, a 32-joint rig and walk, trot, canter and gallop taken from equine biomechanics. Its gait follows its
+as strand hair, a 37-joint rig and walk, trot, canter and gallop taken from equine biomechanics. Its gait follows its
 speed, a stance hoof stays where it struck, and film time seeks exactly. A rider seat gives a person the saddle, stirrups
 and reins and a hip that rides the horse's back; `addHorseCrowd` draws hundreds in one call.
 
@@ -14,6 +14,24 @@ const horse = await addHorse(engine, {type: 'cavalry', coat: 'bay', markings: {b
 horse.speed = 4; // eases into a trot at 3 m/s^2
 horse.advanceTime(1 / 30); // or horse.seek(12.5) for a film frame
 console.log(horse.currentGait, horse.body.mass.toFixed(0)); // 'walk' as it sets off, 'trot' near 4 m/s; about 459 kg
+```
+
+An existing skinned horse can use the same controller through `skin`. Provide its loaded model in the same engine,
+its fitted skeleton in metres facing +Z, and a function that applies the solved pose to its joint map. The controller
+sets root position and yaw, attaches its skinning pass, and keeps the authored materials. The tightest of the four
+fitted limbs determines whether the stride must shorten to keep the same speed at a quicker cadence. Fit the skeleton
+in metres in a naturally bent stance so the package can measure extension in both directions. The caller owns the model.
+
+```ts
+import type { Engine } from 'margoengine';
+import { addHorse, type HorseSkin } from 'margoengine/horses';
+
+export async function startImportedHorse(engine: Engine, skin: HorseSkin) {
+  const horse = await addHorse(engine, { skin });
+  horse.speed = 3;
+  horse.advanceTime(1);
+  return horse;
+}
 ```
 
 ## Anatomy (`./anatomy`)
@@ -61,7 +79,7 @@ console.log(gaitFor(body, 7), s.length.toFixed(2), s.duty.toFixed(2), hoovesDown
 
 `horseDocument(options)` returns the horse as a glTF 2.0 document and its buffers, for `parseGLTFAsync(engine, doc,
 buffers)`; `horseGLB(options)` returns a `.glb` file. Five materials (`Coat` with vertex colours for points and markings,
-`Hoof`, `Mane`, `Tail`, `Eye`), a skin of 32 joints (the fore limb swings from the scapula, the hind from the pelvis),
+`Hoof`, `Mane`, `Tail`, `Eye`), a skin of 37 joints (the fore limb swings from the scapula, the hind from the pelvis),
 a `saddle` node on the trunk, and the clips `stand`, `walk`, `trot`, `canter` and `gallop`, each one stride long at its
 speed (`speeds` sets them). A pair of planar inverse-kinematic solves places each elbow or stifle and then the
 lower-leg hinge. The fore carpus stays nearly straight through loaded stance and flexes in early swing. The hind
@@ -71,6 +89,20 @@ phases described in [The forelimb in walking horses, Hodson, Clayton and Lanovaz
 [The hindlimb in walking horses, Hodson, Clayton and Lanovaz (2001)](https://doi.org/10.2746/042516401776767485), and
 [Forelimb kinematics and net joint moments during the swing phase of the trot, Lanovaz, Clayton, Colborne and Schamhardt (1999)](https://doi.org/10.1111/j.2042-3306.1999.tb05225.x).
 The gait curves are approximations of these patterns. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
+
+Swing matches the planted hoof's local fore-aft velocity at lift-off and touchdown. During a gait change, the
+controller matches hoof positions and short-term travel to select the incoming phase. The outgoing cadence eases out
+as the new gait takes over. Timing comes from the support sequences in [*Symmetrical Gaits of Horses*, Milton Hildebrand
+(1965)](https://pubmed.ncbi.nlm.nih.gov/5844074/). The contact and transition treatment draws on [*Footskate Cleanup for
+Motion Capture Editing*, Lucas Kovar, John Schreiner and Michael Gleicher (2002)](https://graphics.cs.wisc.edu/Papers/2002/KSG02/)
+and [*Automated Semi-Procedural Animation for Character Locomotion*, Rune Skovbo Johansen (2009)](https://runevision.com/thesis/rune_skovbo_johansen_thesis.pdf).
+
+The scapula glides against the thorax through loading and swing. Both scapula translation channels are exported,
+and the runtime solves the forelimbs from the changing attachment. The dock drives five weighted hair joints so
+that a tail motion can travel toward the tip. On a live horse, `horse.flickTail(0.8, 'left')` plays a recorded
+tail action that survives `seek`. The reference range for scapula glide is [Lawson and Marlin, Preliminary Report
+Into the Function of the Shoulder Using a Novel Imaging Approach (2010)](https://doi.org/10.1111/j.2042-3306.2010.00289.x).
+The motion model also draws on [Matherne et al., Mammals Repel Mosquitoes with Their Tails (2018)](https://doi.org/10.1242/jeb.178905).
 
 | Option | Default |
 | --- | --- |

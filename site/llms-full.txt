@@ -496,7 +496,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/robot-planning`](packages/robot-planning/README.md) | Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch. |
 | [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh. |
 | [`@margoengine/humans`](packages/humans/README.md) | People in one call: addPerson dresses a loaded character with skin, eyes and strand hair by material name, an Animator with clip cross-fades, dual quaternion skinning, shadows and natural hand poses; a period cast kit of measured bodies and code-built garments with measured cloth optics, fitted and skinned to any loaded rig in one call. |
-| [`@margoengine/horses`](packages/horses/README.md) | Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 32-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw. |
+| [`@margoengine/horses`](packages/horses/README.md) | Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 37-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw. |
 | [`@margoengine/armies`](packages/armies/README.md) | Armies of hundreds: soldiers and riders drawn at every distance (instanced skinning near, a vertex animation of a simplified mesh far, culled and budgeted), following navmesh formations, keeping step, riding horses on the saddle the horse crowd draws; any person source plugs in. |
 | [`@margoengine/tween`](packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](packages/cinematic/README.md) | Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake. |
@@ -3132,6 +3132,14 @@ package or tool that takes you past it. The reference tables are [Scale](#scale)
 column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
+
+- Horse gait transitions (2026-11-23). The runtime matches incoming four-hoof positions and supporting movement,
+  then retires the previous cadence over the configured fade (0.3 s by default). The built-in horse has 37 joints,
+  including five flexible tail hair joints. Authored skins provide their own joint mapping and remain caller-owned.
+  The gait solver uses planar leg anatomy and can shorten the stride to fit a tighter limb while preserving speed.
+  Arbitrary terrain still needs a separate contact calibration. The optional min+gzip entries are 13,856 B
+  for `horses`, 11,539 B for `horses/crowd`, and 10,673 B for `horses/model`.
+  [Horse setup and evidence](../packages/horses/README.md).
 
 - Human palm contacts (2026-11-23). The palm must be within the default 0.003 model units and 5 degrees to close.
   One contact solves a contiguous arm and one mapped hand. The grip approximates a cylinder with a diameter
@@ -31593,7 +31601,7 @@ const variants = castVariants({'miner-1910': 3, 'logger-1910': 1});
 
 Horses built in code from published equine measurements. `addHorse(engine)` builds a riding horse, a cavalry remount or
 a heavy draft horse to its breed group's proportions, with a coat, white markings, a mane and tail of hair cards shaded
-as strand hair, a 32-joint rig and walk, trot, canter and gallop taken from equine biomechanics. Its gait follows its
+as strand hair, a 37-joint rig and walk, trot, canter and gallop taken from equine biomechanics. Its gait follows its
 speed, a stance hoof stays where it struck, and film time seeks exactly. A rider seat gives a person the saddle, stirrups
 and reins and a hip that rides the horse's back; `addHorseCrowd` draws hundreds in one call.
 
@@ -31605,6 +31613,24 @@ const horse = await addHorse(engine, {type: 'cavalry', coat: 'bay', markings: {b
 horse.speed = 4; // eases into a trot at 3 m/s^2
 horse.advanceTime(1 / 30); // or horse.seek(12.5) for a film frame
 console.log(horse.currentGait, horse.body.mass.toFixed(0)); // 'walk' as it sets off, 'trot' near 4 m/s; about 459 kg
+```
+
+An existing skinned horse can use the same controller through `skin`. Provide its loaded model in the same engine,
+its fitted skeleton in metres facing +Z, and a function that applies the solved pose to its joint map. The controller
+sets root position and yaw, attaches its skinning pass, and keeps the authored materials. The tightest of the four
+fitted limbs determines whether the stride must shorten to keep the same speed at a quicker cadence. Fit the skeleton
+in metres in a naturally bent stance so the package can measure extension in both directions. The caller owns the model.
+
+```ts
+import type { Engine } from 'margoengine';
+import { addHorse, type HorseSkin } from 'margoengine/horses';
+
+export async function startImportedHorse(engine: Engine, skin: HorseSkin) {
+  const horse = await addHorse(engine, { skin });
+  horse.speed = 3;
+  horse.advanceTime(1);
+  return horse;
+}
 ```
 
 ## Anatomy (`./anatomy`)
@@ -31649,19 +31675,6 @@ console.log(gaitFor(body, 7), s.length.toFixed(2), s.duty.toFixed(2), hoovesDown
 ```
 
 ## The model (`./model`)
-
-`horseDocument(options)` returns the horse as a glTF 2.0 document and its buffers, for `parseGLTFAsync(engine, doc,
-buffers)`; `horseGLB(options)` returns a `.glb` file. Five materials (`Coat` with vertex colours for points and markings,
-`Hoof`, `Mane`, `Tail`, `Eye`), a skin of 32 joints (the fore limb swings from the scapula, the hind from the pelvis),
-a `saddle` node on the trunk, and the clips `stand`, `walk`, `trot`, `canter` and `gallop`, each one stride long at its
-speed (`speeds` sets them). A pair of planar inverse-kinematic solves places each elbow or stifle and then the
-lower-leg hinge. The fore carpus stays nearly straight through loaded stance and flexes in early swing. The hind
-hock folds on the opposite side of the limb and extends toward landing. Through late stance and lift-off the hoof
-rolls about the toe and transitions continuously to the swing arc. The kinematics follow the swing and support
-phases described in [The forelimb in walking horses, Hodson, Clayton and Lanovaz (2000)](https://pubmed.ncbi.nlm.nih.gov/10952376/),
-[The hindlimb in walking horses, Hodson, Clayton and Lanovaz (2001)](https://doi.org/10.2746/042516401776767485), and
-[Forelimb kinematics and net joint moments during the swing phase of the trot, Lanovaz, Clayton, Colborne and Schamhardt (1999)](https://doi.org/10.1111/j.2042-3306.1999.tb05225.x).
-The gait curves are approximations of these patterns. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
 
 [README continues: https://margoengine.com/llms/packages/horses.md]
 

@@ -9,12 +9,18 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Horse motion and authored skins (2026-11-23). The WebGPU and compatible WebGL2 horse fixture samples a deliberate
+  start, gait interruption, halt and restart at 120 Hz, checks saddle travel and tail motion, and replays the same
+  poses after seeks. It also checks that a loaded skin follows the live controller and remains caller-owned. CPU
+  fixtures check steady stance and hinge directions across riding, cavalry and draft horses. Run `npm test --workspace
+  @margoengine/horses` and `node packages/horses/test/horses-check.mjs` after building. [Sources and API](../../packages/horses/README.md).
+
 - Explicit elbow plane and thumb articulation (2026-11-23). `packages/rigging/tests/contact.test.js` checks 101
   neighbouring poses against the geometric elbow position, despite alternating incoming upper-arm keys, and verifies
   that collision rejection leaves the input intact. `packages/rigging/tests/hands.test.js` measures closing motion
   at both thumb joints on a mirrored hand with a forward thumb web. A separate fixture checks bar clearance across
   seven closure samples.
-  [Method and bounds](../packages/rigging/README.md#hand-and-foot-contacts-margoengineriggingcontact).
+  [Method and bounds](../../packages/rigging/README.md#hand-and-foot-contacts-margoengineriggingcontact).
 
 - Character limb and wrist contacts (2026-11-23). CPU tests check a two-sided palm at an exact 90-degree bend,
   a planted hand that clears the chest through an alternate elbow direction, and a moving animal chest that
@@ -22,7 +28,7 @@ first: each names its scope, its evidence file and how to reproduce it.
   surface and the fixture checks each digit's clearance at seven closure samples. Evidence is in
   `packages/rigging/tests/{contact,hands,limb-collision}.test.js`. Build the packages,
   then run `node --test packages/rigging/tests/contact.test.js packages/rigging/tests/hands.test.js packages/rigging/tests/limb-collision.test.js`.
-  [Assumptions and research](../packages/rigging/README.md#character-self-collision-during-contact).
+  [Assumptions and research](../../packages/rigging/README.md#character-self-collision-during-contact).
 
 - Human palm contacts and forearm roll (2026-11-23). Tests require both mirrored hands to close only on
   registration, and reject a coincident palm facing backward. The Animator test starts with keyed clenching

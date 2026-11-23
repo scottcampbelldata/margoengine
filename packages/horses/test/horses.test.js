@@ -26,8 +26,10 @@ import {
   coatAtlasUV,
   horseDocument,
   horseGLB,
+  horseJointTranslation,
   horsePose,
   horseSkeleton,
+  horseTailFlick,
   poseHooves,
   poseJoints,
   poseSaddle,
@@ -239,7 +241,7 @@ test('model: each limb travels continuously through lift-off and follows its ana
 test('model: the rig, the standing pose and the document', () => {
   const b = horseBody(),
     sk = horseSkeleton(b);
-  assert.equal(sk.joints.length, 32);
+  assert.equal(sk.joints.length, 37);
   assert.equal(sk.joints[0].parent, -1);
   sk.joints.forEach((j, i) => assert.ok(j.parent < i));
   const stand = horsePose(sk, null, 0, 0),
@@ -253,7 +255,7 @@ test('model: the rig, the standing pose and the document', () => {
     horsePose(sk, stride(b, 4), 0.3),
     'a pose is a pure function of the phase',
   );
-  assert.equal(poseJoints(sk, stand).length, 32);
+  assert.equal(poseJoints(sk, stand).length, sk.joints.length);
   const full = horseDocument(),
     { doc } = full;
   assert.deepEqual(
@@ -264,7 +266,7 @@ test('model: the rig, the standing pose and the document', () => {
     doc.animations.map((a) => a.name),
     ['stand', 'walk', 'trot', 'canter', 'gallop'],
   );
-  assert.equal(doc.skins[0].joints.length, 32);
+  assert.equal(doc.skins[0].joints.length, sk.joints.length);
   assert.ok(doc.nodes.some((n) => n.name === 'saddle'));
   // Model height: the poll stands above the withers, the muzzle reaches past the chest, nothing below the ground.
   const pos = doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
@@ -277,7 +279,7 @@ test('model: the rig, the standing pose and the document', () => {
       jv = full.buffers[doc.bufferViews[doc.accessors[prim.attributes.JOINTS_0].bufferView].buffer],
       j = new Uint16Array(jv.buffer, jv.byteOffset, jv.byteLength / 2);
     for (let i = 0; i < w.length; i += 4) assert.ok(Math.abs(w[i] + w[i + 1] + w[i + 2] + w[i + 3] - 1) < 1e-5);
-    assert.ok(j.every((x) => x < 32));
+    assert.ok(j.every((x) => x < sk.joints.length));
   }
   // Detail levels fall away for a far crowd; clips last one stride at their speed.
   assert.ok(
@@ -291,6 +293,57 @@ test('model: the rig, the standing pose and the document', () => {
   assert.throws(() => horseDocument({ coat: 'purple' }), TypeError);
   assert.throws(() => horseDocument({ markings: { socks: [1, 0, 0] } }), RangeError);
   assert.throws(() => horseDocument({ speeds: { trot: 0 } }), RangeError);
+});
+
+test('scapulae slide on the thorax and the exported trot carries both translation tracks', () => {
+  const document = horseDocument(),
+    sk = document.skeleton,
+    b = sk.body,
+    cycle = stride(b, preferredSpeed(b, 'trot'), 'trot'),
+    left = sk.index('scapulaL'),
+    right = sk.index('scapulaR');
+  const poses = Array.from({ length: 129 }, (_, i) => horsePose(sk, cycle, i / 128));
+  for (const side of [0, 1]) {
+    const z = poses.map((p) => p.scapulaOffsets[side][2]),
+      y = poses.map((p) => p.scapulaOffsets[side][1]);
+    assert.ok(Math.abs(Math.max(...z) - Math.min(...z) - 0.049 * b.withers) < 0.0001);
+    assert.ok(Math.max(...y) > 0.024 && Math.min(...y) === 0);
+    assert.deepEqual(poses[0].scapulaOffsets[side], poses.at(-1).scapulaOffsets[side]);
+  }
+  const trot = document.doc.animations.find((clip) => clip.name === 'trot');
+  for (const index of [left, right]) {
+    const track = trot.channels.find((ch) => ch.target.node === index && ch.target.path === 'translation');
+    const accessor = document.doc.accessors[trot.samplers[track.sampler].output];
+    const view = document.doc.bufferViews[accessor.bufferView];
+    const bytes = document.buffers[view.buffer];
+    const values = new Float32Array(
+      bytes.buffer,
+      bytes.byteOffset + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0),
+      accessor.count * 3,
+    );
+    for (let k = 0; k < accessor.count; k++) {
+      const start = k * 3;
+      const expected = horseJointTranslation(sk, horsePose(sk, cycle, k / (accessor.count - 1)), index);
+      assert.deepEqual([...values.subarray(start, start + 3)], expected.map(Math.fround));
+    }
+  }
+});
+
+test('a tail flick begins at the dock and travels through the hair without disturbing the feet', () => {
+  const skeleton = horseSkeleton(horseBody());
+  const pose = horsePose(skeleton, null, 0, 0.3);
+  const dock = skeleton.index('tail1'),
+    tip = skeleton.index('tailHair5');
+  const early = horseTailFlick(skeleton, pose, 0.08);
+  assert.notDeepEqual(early.rotations[dock], pose.rotations[dock]);
+  assert.deepEqual(early.rotations[tip], pose.rotations[tip]);
+  const end = horseTailFlick(skeleton, pose, 0.33),
+    across = horseTailFlick(skeleton, pose, 0.33, 1, -1);
+  assert.notDeepEqual(end.rotations[tip], pose.rotations[tip]);
+  const delta = Math.abs(poseJoints(skeleton, end)[tip][0] - poseJoints(skeleton, across)[tip][0]);
+  assert.ok(delta > 0.25, `a visible swat has ${delta} m of side-to-side tail movement`);
+  assert.deepEqual(poseHooves(skeleton, end), poseHooves(skeleton, pose));
+  assert.equal(horseTailFlick(skeleton, pose, 1.1), pose);
 });
 
 test('model: coats, markings and the crowd atlas', () => {

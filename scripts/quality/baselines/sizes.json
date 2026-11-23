@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17431486,
+  "total": 17435430,
   "history": [
     {
       "date": "2026-10-24",
@@ -11379,6 +11379,12 @@
       "commit": "aed58d8fc5",
       "reason": "Rigging contact grows from 11451 to 12637 B min+gzip to keep a prescribed elbow plane and coordinate the thumb hinges across a calibrated bar. A split would separate the registration constraints from the same hand pose.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-23",
+      "commit": "8a314c3a3a",
+      "reason": "Horse motion matches support through gait changes and calibrates authored stride reach, with shared animated shoulders and tail in the root, model and crowd entries",
+      "grew": 3
     }
   ],
   "items": {
@@ -11848,11 +11854,11 @@
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,
     "@margoengine/headless/video": 12819,
-    "@margoengine/horses": 12239,
+    "@margoengine/horses": 14287,
     "@margoengine/horses/anatomy": 1097,
-    "@margoengine/horses/crowd": 11151,
+    "@margoengine/horses/crowd": 11886,
     "@margoengine/horses/gaits": 1467,
-    "@margoengine/horses/model": 9833,
+    "@margoengine/horses/model": 10994,
     "@margoengine/horses/seat": 1758,
     "@margoengine/horses/settings": 2384,
     "@margoengine/html": 7487,

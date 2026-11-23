@@ -83,6 +83,7 @@ interface Horse {
     readonly distance: number;
     readonly pose: HorsePose;
     frame(): HorseFrame;
+    flickTail(strength?: number, side?: 'left' | 'right'): void;
     advanceTime(delta: number): this;
     seek(time: number): this;
     onStep(step: (dt: number, horse: Horse) => void, reset?: () => void): () => void;
@@ -119,6 +120,7 @@ interface HorseJoint {
 interface HorsePose {
     readonly rotations: readonly (readonly [number, number, number, number])[];
     readonly bodyOffset: readonly [number, number, number];
+    readonly scapulaOffsets?: readonly [Readonly<V3>, Readonly<V3>];
 }
 
 interface HorseProportions {
@@ -152,4 +154,6 @@ interface HorseSkeleton {
 }
 
 type HorseType = 'draft' | 'cavalry' | 'riding';
+
+type V3 = [number, number, number];
 ```
