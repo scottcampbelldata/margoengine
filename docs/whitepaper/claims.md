@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Equine walking fetlock (2026-11-23). The horse CPU fixture checks a visible fore fetlock tuck near 81% of the
+  walk stride on both sides of the native and fitted skeleton. It checks full sagittal excursion alongside the existing
+  carpus and coffin timing and stance checks.
+  [Motion references](../../packages/horses/README.md#the-model-model).
+
 - Equine tail swish (2026-11-23). `packages/horses/test/horses.test.js` samples a walking pose at 120 Hz
   across an isolated flick. It checks the requested side, the delay between dock and hair, the smaller return,
   and exact hoof agreement. The browser fixtures exercise motion and deterministic seek on WebGPU and WebGL2.

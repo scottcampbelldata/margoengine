@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17437697,
+  "total": 17438208,
   "history": [
     {
       "date": "2026-10-24",
@@ -11391,6 +11391,12 @@
       "commit": "74281e2851",
       "reason": "Terrain hoof plants and research-based foreleg flexion share the horse leg solve across live, baked and crowd poses",
       "grew": 2
+    },
+    {
+      "date": "2026-11-23",
+      "commit": "4a259433c8",
+      "reason": "Walking fetlock articulation: horses/crowd grows from 11,735 to 12,035 B min+gzip. The crowd bake uses the live solver to keep the same ankle motion, avoiding duplication or a load before baking.",
+      "grew": 1
     }
   ],
   "items": {
@@ -11862,7 +11868,7 @@
     "@margoengine/headless/video": 12819,
     "@margoengine/horses": 15786,
     "@margoengine/horses/anatomy": 1097,
-    "@margoengine/horses/crowd": 11886,
+    "@margoengine/horses/crowd": 12397,
     "@margoengine/horses/gaits": 1467,
     "@margoengine/horses/model": 11762,
     "@margoengine/horses/seat": 1758,

@@ -645,11 +645,12 @@ test('forelimb flexion peaks in anatomical order and the loaded carpus stays ext
           const phase = i / 320,
             pose = horsePose(rig, cycle, phase + cycle.strike[hoof]),
             joints = poseJoints(rig, pose),
-            [, shoulder, elbow, carpus, fetlock] = leg.map((j) => joints[j]);
+            [, shoulder, elbow, carpus, fetlock, coronet] = leg.map((j) => joints[j]);
           return {
             phase,
             elbow: Math.abs(difference(angle(shoulder, elbow), angle(elbow, carpus))),
             carpus: difference(angle(elbow, carpus), angle(carpus, fetlock)),
+            fetlock: difference(angle(carpus, fetlock), angle(fetlock, coronet)),
             coffin: -2 * Math.atan2(pose.rotations[leg[5]][0], pose.rotations[leg[5]][3]),
           };
         });
@@ -671,6 +672,17 @@ test('forelimb flexion peaks in anatomical order and the loaded carpus stays ext
         if (gait === 'walk') {
           assert.ok(Math.abs(fold.phase - 0.76) < 0.027, 'walking carpus peaks near 76% of a stride');
           assert.ok(Math.abs(distal.phase - 0.84) < 0.02, 'walking coffin peaks near 84% of a stride');
+          const tuck = peak('fetlock');
+          const angles = samples.map((row) => row.fetlock);
+          const excursion = Math.max(...angles) - Math.min(...angles);
+          assert.ok(
+            Math.abs(tuck.phase - 0.81) < 0.04 && tuck.fetlock > 0.12,
+            'the fetlock folds relative to the cannon in mid-swing',
+          );
+          assert.ok(
+            excursion > 0.9 && excursion < 1.38,
+            'walking fetlock spans the measured flexion and extension range',
+          );
         }
       }
 });

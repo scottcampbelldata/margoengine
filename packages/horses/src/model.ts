@@ -271,6 +271,15 @@ function forePeak(stride: Stride, walk: number, faster: number): number {
   return stride.gait === 'walk' ? clamp((walk - stride.duty) / (1 - stride.duty), 0.23, 0.78) : faster;
 }
 
+// Integral of a velocity that eases from zero, cruises, then eases back to zero.
+function walkingKneeTravel(t: number): number {
+  const edge = 0.19;
+  const u = Math.min(t, 1 - t);
+  const x = u / edge;
+  const distance = (u < edge ? edge * (x ** 3 - 0.5 * x ** 4) : u - 0.5 * edge) / (1 - edge);
+  return t <= 0.5 ? distance : 1 - distance;
+}
+
 /** Integrate the hoof velocity through swing, matching the backward stance velocity at both contacts. */
 function swingTravel(stride: Stride, t: number): number {
   const edge = 0.065,
@@ -320,6 +329,7 @@ function reachLeg(
   guideZ: number,
   lowerReach: number,
   fore: boolean,
+  lowerBend = fore ? -1 : 1,
 ): [number, number, number, number] {
   const shoulder = len2(rest[0]!, rest[1]!),
     upper = len2(rest[1]!, rest[2]!),
@@ -341,7 +351,7 @@ function reachLeg(
     [s1, s2] = twoBone(top, [0, ey, ez], shoulder, upper, bend),
     jy = top[1] + shoulder * Math.cos(s1) + upper * Math.cos(s2),
     jz = top[2] + shoulder * Math.sin(s1) + upper * Math.sin(s2),
-    [a1, a2] = twoBone([0, jy, jz], fetlock, aboveHinge, belowHinge, bend);
+    [a1, a2] = twoBone([0, jy, jz], fetlock, aboveHinge, belowHinge, lowerBend);
   return [
     s1 - restAng(rest[0]!, rest[1]!),
     s2 - restAng(rest[1]!, rest[2]!),
@@ -399,6 +409,7 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
   };
   skeleton.legs.forEach((leg, i) => {
     const fore = i === 1 || i === 3,
+      walkFore = fore && s?.gait === 'walk',
       j = leg.map((k) => J[k]!.rest),
       g0 = skeleton.ground[i]!;
     let target: V3,
@@ -406,7 +417,8 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
       sink = 0,
       breakover = 0,
       coffinFlex = 0,
-      elbowFlex = 0;
+      elbowFlex = 0,
+      fetlockTuck = 0;
     // Pastern and hoof vectors at rest: fetlock to coronet, coronet to ground point.
     const n = leg.length,
       pastern = [0, j[n - 1]![1] - j[n - 2]![1], j[n - 1]![2] - j[n - 2]![2]],
@@ -422,9 +434,13 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
         sweep = s.length * s.duty * amplitude;
       if (h.stance) {
         target = [g0[0], 0, g0[2] + sweep / 2 - sweep * h.t];
-        const loadPeak = fore && s.gait === 'walk' ? clamp(0.34 / s.duty, 0.42, 0.64) : 0.5;
-        const load = fore ? swingFlex(h.t, loadPeak) : Math.sin(Math.PI * h.t);
-        sink = (s.gait === 'walk' ? 0.12 : s.gait === 'trot' ? 0.25 : 0.32) * load;
+        // The fetlock yields during loading and releases before the heel lifts. The walking peak is 34% of the stride.
+        const load = walkFore
+          ? swingFlex(Math.min(1, h.t / BREAKOVER), 0.34 / (s.duty * BREAKOVER))
+          : fore
+            ? swingFlex(h.t, 0.5)
+            : Math.sin(Math.PI * h.t);
+        sink = (walkFore ? 0.26 : s.gait === 'walk' ? 0.12 : s.gait === 'trot' ? 0.25 : 0.32) * load;
         // Breakover: over the last fifth of the stance the heel lifts and the hoof rolls over its toe.
         if (h.t > BREAKOVER) breakover = rollAtLift * smooth((h.t - BREAKOVER) / (1 - BREAKOVER));
         // Under load the carpus is a near-straight strut. The hind tarsus keeps its rest bend.
@@ -439,11 +455,14 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
           const peakAngle = ((s.gait === 'walk' ? 55 : s.gait === 'trot' ? 76 : 82) * Math.PI) / 180;
           const peak = forePeak(s, 0.76, 0.4);
           const start = rollAtLift * 0.19;
-          hinge =
-            h.t < peak
-              ? restHinge + start + (peakAngle - restHinge - start) * smooth(h.t / peak)
-              : restHinge + (peakAngle - restHinge) * (1 - smooth((h.t - peak) / (1 - peak)));
-          flex = (s.gait === 'walk' ? 0.56 : 0.72) * swingFlex(h.t, forePeak(s, 0.81, 0.5));
+          const rising = h.t < peak;
+          const progress = rising ? h.t / peak : (1 - h.t) / (1 - peak);
+          const kneeTravel = walkFore ? walkingKneeTravel(progress) : smooth(progress);
+          const minimum = restHinge + (rising ? start : 0);
+          hinge = minimum + (peakAngle - minimum) * kneeTravel;
+          const digit = swingFlex(h.t, forePeak(s, 0.81, 0.5));
+          flex = (walkFore ? 0.56 : 0.72) * digit;
+          if (walkFore) fetlockTuck = digit * amplitude;
           const later = swingFlex(h.t, forePeak(s, 0.84, 0.51));
           coffinFlex = 0.095 * later;
           elbowFlex = 0.07 * H * later;
@@ -463,20 +482,17 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
     }
     const G = toBody(target);
     // Pastern flattens (sink) under load and folds back (flex) in the swing; the hoof stays flat on the ground.
-    const pAng = -pitch - sink + flex + breakover,
-      hAng = -pitch + breakover + (fore ? flex - coffinFlex : 0.9 * flex),
-      // In breakover the toe, a little ahead of the ground point, stays put while the hoof turns about it.
-      toe = [0, 0, TOE * H],
+    let pAng = -pitch - sink + flex + breakover,
+      hAng = -pitch + breakover + (fore ? flex - coffinFlex : 0.9 * flex);
+    // In breakover the toe, a little ahead of the ground point, stays put while the hoof turns about it.
+    const toe = [0, 0, TOE * H],
       rotation = qx(hAng),
       ph = qrot(rotation, hoofVec),
       rolledToe = qrot(rotation, toe),
       toeWeight = breakover / rollAtLift,
       pp = qrot(qx(pAng), pastern),
-      fetlock: V3 = [
-        G[0],
-        G[1] - ph[1] - toeWeight * rolledToe[1] - pp[1] + lift,
-        G[2] - ph[2] - toeWeight * (rolledToe[2] - toe[2]!) - pp[2],
-      ];
+      pad: V3 = [G[0], G[1] - toeWeight * rolledToe[1] + lift, G[2] - toeWeight * (rolledToe[2] - toe[2]!)],
+      fetlock = minus(minus(pad, ph), pp);
     // Limb protraction: the angle of the whole limb from its top joint to the hoof, against rest.
     const restTop = j[0]!,
       slide = fore ? scapulaOffsets[i === 1 ? 0 : 1] : undefined,
@@ -490,8 +506,39 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
       rz = j[2]![2] - restTop[2],
       guideY = top[1] + ry * c - rz * sn + 0.18 * elbowFlex,
       guideZ = top[2] + ry * sn + rz * c - elbowFlex,
-      desired = Math.sqrt(la * la + lb * lb + 2 * la * lb * Math.cos(hinge)),
-      deltas: number[] = reachLeg(j, top, fetlock, guideY, guideZ, desired, fore);
+      desired = Math.sqrt(la * la + lb * lb + 2 * la * lb * Math.cos(hinge));
+    let deltas: number[] = reachLeg(j, top, fetlock, guideY, guideZ, desired, fore);
+    if (fetlockTuck > 0) {
+      // The fetlock flexes relative to the cannon. Holding an absolute pastern angle lets the folding
+      // carpus cancel the visible tuck. Solve the cannon, pastern and hoof as one link at the desired
+      // local angles, then recover those angles without moving the authored landing point.
+      const restCannon = restAng(j[3]!, j[4]!),
+        restFetlock = signedAngle(restAng(j[4]!, j[5]!) - restCannon),
+        original = signedAngle(pAng - deltas[3]!),
+        tuck = clamp(restFetlock + 0.8, 0.15, 0.52) - restFetlock,
+        flexed = original + (tuck - original) * fetlockTuck,
+        coffin = hAng - pAng,
+        compound = plus(
+          [0, j[4]![1] - j[3]![1], j[4]![2] - j[3]![2]],
+          plus(qrot(qx(flexed), pastern), qrot(qx(flexed + coffin), hoofVec)),
+        ),
+        lowerLength = Math.hypot(compound[1], compound[2]),
+        combinedHinge = hinge + signedAngle(ang(compound[1], compound[2]) - restCannon),
+        reach = Math.sqrt(la * la + lowerLength * lowerLength + 2 * la * lowerLength * Math.cos(combinedHinge)),
+        elbow = plus(top, plus(qrot(qx(deltas[0]!), minus(j[1]!, j[0]!)), qrot(qx(deltas[1]!), minus(j[2]!, j[1]!))));
+      deltas = reachLeg(
+        [...j.slice(0, 4), plus(j[3]!, compound)],
+        top,
+        pad,
+        elbow[1],
+        elbow[2],
+        reach,
+        true,
+        combinedHinge < 0 ? 1 : -1,
+      );
+      pAng = deltas[3]! + flexed;
+      hAng = pAng + coffin;
+    }
     // Absolute pastern and hoof angles against their rest, in the body frame; locals are differences down the chain.
     deltas.push(pAng, hAng);
     deltas.forEach((d, k) => (rotations[leg[k]!] = qx(d - (k ? deltas[k - 1]! : 0))));

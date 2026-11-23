@@ -151,6 +151,15 @@ as the new gait takes over. Timing comes from the support sequences in [*Symmetr
 Motion Capture Editing*, Lucas Kovar, John Schreiner and Michael Gleicher (2002)](https://graphics.cs.wisc.edu/Papers/2002/KSG02/)
 and [*Automated Semi-Procedural Animation for Character Locomotion*, Rune Skovbo Johansen (2009)](https://runevision.com/thesis/rune_skovbo_johansen_thesis.pdf).
 
+In a walk the fore fetlock yields as weight transfers and tucks relative to the cannon during swing.
+The pose solver combines the cannon, pastern, and hoof at their local angles to maintain the planned sole path,
+including the established departure from and return to the plant. It preserves segment lengths and leaves
+the carpus and coffin flexion timed separately. References are [Hodson, Clayton and Lanovaz, *The Forelimb
+in Walking Horses: 1. Kinematics and Ground Reaction Forces* (2000)](https://doi.org/10.2746/042516400777032237),
+[Clayton, Hodson and Lanovaz, *The Forelimb in Walking Horses: 2. Net Joint Moments and Joint Powers*
+(2000)](https://doi.org/10.2746/042516400777032174), and [Clayton, Sha, Stick and Elvin, *3D Kinematics of the
+Equine Metacarpophalangeal Joint at Walk and Trot* (2007)](https://pubmed.ncbi.nlm.nih.gov/17546207/).
+
 The scapula glides against the thorax through loading and swing. Both scapula translation channels are exported,
 and the runtime solves the forelimbs from the changing attachment. The reference range for scapula glide is
 [Lawson and Marlin, Preliminary Report Into the Function of the Shoulder Using a Novel Imaging Approach (2010)](https://doi.org/10.1111/j.2042-3306.2010.00289.x).

@@ -8,6 +8,12 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Horse fore fetlock (2026-11-23). The walking pose yields into stance and folds the fetlock locally in swing.
+  A compound lower link holds the forehoof path and maintains segment lengths. The walking knee flexion uses
+  eased angular velocity. This is a sagittal joint model with terrain slope handled by the live
+  hoof solver. The optional entries measure 15,641 B for `horses`, 11,716 B for `horses/model` and 12,035 B for
+  `horses/crowd`. [Joint measurements and implementation](../packages/horses/README.md#the-model-model).
+
 - Horse tail motion (2026-11-23). The stride drives a passive sway. A live tail action of strength from 0 to 1
   plays a sweep and rebound for less than 0.94 s across three dock and five hair joints. Baked gait loops include
   the passive sway. Live swishes are timed events. The approximation uses joint rotations for the tail.
