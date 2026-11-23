@@ -152,11 +152,28 @@ Motion Capture Editing*, Lucas Kovar, John Schreiner and Michael Gleicher (2002)
 and [*Automated Semi-Procedural Animation for Character Locomotion*, Rune Skovbo Johansen (2009)](https://runevision.com/thesis/rune_skovbo_johansen_thesis.pdf).
 
 The scapula glides against the thorax through loading and swing. Both scapula translation channels are exported,
-and the runtime solves the forelimbs from the changing attachment. The dock drives five weighted hair joints so
-that a tail motion can travel toward the tip. On a live horse, `horse.flickTail(0.8, 'left')` plays a recorded
-tail action that survives `seek`. The reference range for scapula glide is [Lawson and Marlin, Preliminary Report
-Into the Function of the Shoulder Using a Novel Imaging Approach (2010)](https://doi.org/10.1111/j.2042-3306.2010.00289.x).
-The motion model also draws on [Matherne et al., Mammals Repel Mosquitoes with Their Tails (2018)](https://doi.org/10.1242/jeb.178905).
+and the runtime solves the forelimbs from the changing attachment. The reference range for scapula glide is
+[Lawson and Marlin, Preliminary Report Into the Function of the Shoulder Using a Novel Imaging Approach (2010)](https://doi.org/10.1111/j.2042-3306.2010.00289.x).
+
+Three dock joints lead a stride-driven sway and five weighted hair joints follow with a phase lag.
+Call `horse.flickTail(strength, side)` for a stronger swish at any gait. It lifts from the dock, sweeps toward
+the chosen flank, and settles with a smaller return. The event is recorded on the timeline and survives `seek`.
+Authored skins get the follow-through when their `applyPose` maps all eight tail joints. The measured separation
+of the dock and trailing hair follows [Matherne, Cockerill, Zhou, Bellamkonda and Hu,
+*Mammals Repel Mosquitoes with Their Tails* (2018)](https://doi.org/10.1242/jeb.178905). The flexible chain is a
+kinematic approximation of bending and drag, informed by [Bertails, Audoly, Cani, Querleux, Leroy and
+Lévêque, *Super-Helices for Predicting the Dynamics of Natural Hair* (2006)](https://doi.org/10.1145/1179352.1142012).
+
+```ts
+function swishOnTheWalk(horse: import('margoengine/horses').Horse) {
+  horse.gait = 'walk';
+  horse.speed = 1.5;
+  horse.advanceTime(2);
+  horse.flickTail(0.8, 'left');
+  horse.advanceTime(0.32);
+  return horse.pose;
+}
+```
 
 | Option | Default |
 | --- | --- |

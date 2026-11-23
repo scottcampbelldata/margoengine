@@ -8,6 +8,12 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Horse tail motion (2026-11-23). The stride drives a passive sway. A live tail action of strength from 0 to 1
+  plays a sweep and rebound for less than 0.94 s across three dock and five hair joints. Baked gait loops include
+  the passive sway. Live swishes are timed events. The approximation uses joint rotations for the tail.
+  This change measures 15,343 B for `horses`, 11,440 B for `horses/model` and 11,735 B for `horses/crowd`.
+  [Motion setup and sources](../packages/horses/README.md#the-model-model).
+
 - Horse terrain contact (2026-11-23). The live horse can plant four reachable world points on a continuous
   height field, with slope-specific hoof angles and a 0.18 s horizontal release. Fitted chains keep their lengths
   and bend sides, and lateral splay is capped at 0.35 radians. The height field uses one elevation per XZ

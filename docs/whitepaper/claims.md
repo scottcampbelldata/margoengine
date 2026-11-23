@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Equine tail swish (2026-11-23). `packages/horses/test/horses.test.js` samples a walking pose at 120 Hz
+  across an isolated flick. It checks the requested side, the delay between dock and hair, the smaller return,
+  and exact hoof agreement. The browser fixtures exercise motion and deterministic seek on WebGPU and WebGL2.
+  [Movement references and use](../../packages/horses/README.md#the-model-model).
+
 - Equine foreleg motion (2026-11-23). `packages/horses/test/horses.test.js` samples both sides of both
   native and fitted rigs over full walk and trot strides. It bounds loaded carpal flexion, compares the swing
   range and walks through the order of carpal, elbow and coffin flexion. The fitted fixture begins from a visibly

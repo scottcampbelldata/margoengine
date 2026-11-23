@@ -499,20 +499,15 @@ export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase = 0, 
   // Neck and head nod; the head keeps its carriage against the trunk's pitch.
   rotations[skeleton.index('neck1')] = qx(0.6 * trunk.nod - 0.5 * pitch);
   rotations[skeleton.index('head')] = qx(0.4 * trunk.nod - 0.3 * pitch);
-  // Tail: carried higher and streaming with speed, swinging a little with each stride.
-  const carry = s ? Math.min(0.9, 0.05 * s.speed) * amplitude : 0,
-    idleSwing = 0.05 * Math.sin((2 * Math.PI * time) / 4),
-    swing = s ? idleSwing * (1 - amplitude) + 0.12 * amplitude * Math.sin(2 * Math.PI * phase) : idleSwing;
-  rotations[skeleton.index('tail1')] = qmul(qx(carry), qz(swing));
-  rotations[skeleton.index('tail2')] = qmul(qx(carry * 0.6), qz(swing * 0.8));
-  rotations[skeleton.index('tail3')] = qmul(qx(carry * 0.4), qz(swing * 0.6));
-  for (let i = 3; i < TAIL.length; i++) {
-    const along = (i - 2) / (TAIL.length - 3),
-      idleWave = 0.016 * Math.sin(2 * Math.PI * (time / 4 - 0.15 * along)),
-      wave = s
-        ? idleWave * (1 - amplitude) + 0.036 * amplitude * Math.sin(2 * Math.PI * (phase - 0.17 * along))
-        : idleWave;
-    rotations[skeleton.index(TAIL[i]!)] = qmul(qx(carry * 0.11 * (1 - 0.55 * along)), qz(wave));
+  // The dock follows the stride and the hanging hair follows the dock with phase lag.
+  const carry = s ? Math.min(0.9, 0.05 * s.speed) * amplitude : 0;
+  for (let i = 0; i < TAIL.length; i++) {
+    const along = i / (TAIL.length - 1),
+      idle = 0.024 * (1 - 0.65 * along) * Math.sin((2 * Math.PI * (time - 0.1 * along)) / 4),
+      sway = 0.044 * (1 - 0.82 * along) * Math.sin(2 * Math.PI * (phase - 0.19 * along)),
+      bend = s ? idle * (1 - amplitude) + sway * amplitude : idle,
+      lift = carry * (i < 3 ? 1 / (1 + 0.8 * i) : 0.1 * (1 - 0.55 * along));
+    rotations[skeleton.index(TAIL[i]!)] = qmul(qx(lift), qz(bend));
   }
   return { rotations, bodyOffset: [0, trunk.rise, 0], scapulaOffsets };
 }
@@ -600,13 +595,21 @@ export function horseTailFlick(
     throw new RangeError('Horse tail flick needs finite time, strength 0 to 1 and side -1 or 1');
   if (seconds <= 0 || seconds >= 0.94 || strength === 0) return pose;
   const rotations = pose.rotations.slice();
+  // Matherne et al. (2018) describe an actuated dock and trailing, flexible hair that takes a 3D path.
+  // Use two compact pulses for the outward swing and the smaller inertial rebound. Offsetting the pulses down
+  // the chain is a seekable approximation of the out-of-phase response of those two sections.
   for (let i = 0; i < TAIL.length; i++) {
-    const u = (seconds - 0.026 * i) / 0.75;
-    if (u <= 0 || u >= 1) continue;
-    const envelope = Math.sin(Math.PI * u) ** 2 * strength,
-      lateral = side * envelope * Math.sin(2 * Math.PI * u + 0.85) * (i === 0 ? 0.48 : 0.17),
+    const along = i / (TAIL.length - 1),
+      delay = 0.161 * along,
+      t = (seconds - delay) / 0.77;
+    if (t <= 0 || t >= 1) continue;
+    const outward = t < 0.69 ? swingFlex(t / 0.69, 0.42 + 0.1 * along) : 0,
+      rebound = t > 0.69 ? swingFlex((t - 0.69) / 0.31, 0.45) : 0,
+      amount = i === 0 ? 0.34 : i < 3 ? 0.11 : 0.095,
+      lateral = side * strength * amount * (outward - (i < 3 ? 0.16 : 0.24) * rebound),
+      lift = strength * outward * (i < 3 ? 0.15 / (i + 1) : -0.027),
       joint = skeleton.index(TAIL[i]!);
-    rotations[joint] = qmul(rotations[joint] as Q, qmul(qx(envelope * (i < 3 ? 0.075 : 0.034)), qz(lateral)));
+    rotations[joint] = qmul(rotations[joint] as Q, qmul(qx(lift), qz(lateral)));
   }
   return { ...pose, rotations };
 }

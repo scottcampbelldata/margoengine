@@ -346,6 +346,35 @@ test('a tail flick begins at the dock and travels through the hair without distu
   assert.equal(horseTailFlick(skeleton, pose, 1.1), pose);
 });
 
+test('a walking tail flick leads to the requested side and relaxes through a smaller return', () => {
+  const body = horseBody();
+  const skeleton = horseSkeleton(body);
+  const walk = stride(body, preferredSpeed(body, 'walk'), 'walk');
+  const dock = skeleton.index('tail1');
+  const tip = skeleton.index('tailHair5');
+  const moving = horsePose(skeleton, walk, 0.371, 2);
+  const rest = poseJoints(skeleton, moving)[tip];
+  const flick = (seconds, side = 1) => horseTailFlick(skeleton, moving, seconds, 0.85, side);
+  const changes = Array.from({ length: 114 }, (_, frame) => {
+    const pose = flick(frame / 120);
+    const point = poseJoints(skeleton, pose)[tip];
+    return { x: point[0] - rest[0], dockZ: pose.rotations[dock][2] - moving.rotations[dock][2] };
+  });
+  const swing = changes.map((sample) => sample.x);
+  const peak = Math.max(...swing);
+  const returnSwing = -Math.min(...swing);
+  const dockPeak = Math.max(...changes.map((sample) => sample.dockZ));
+  const dockAt = changes.findIndex((sample) => sample.dockZ === dockPeak);
+  assert.ok(peak > 0.36, `outward movement is ${peak} m`);
+  assert.ok(returnSwing > 0.03 && returnSwing < 0.32 * peak, `return movement is ${returnSwing} m`);
+  assert.ok(swing.indexOf(peak) - dockAt >= 4, 'the hair peaks at least 33 ms after the dock');
+  assert.ok(poseJoints(skeleton, flick(0.33, -1))[tip][0] < rest[0] - 0.32, 'right flick mirrors the outward sweep');
+  assert.deepEqual(poseHooves(skeleton, flick(0.37)), poseHooves(skeleton, moving));
+  assert.equal(flick(0), moving);
+  assert.equal(flick(0.94), moving);
+  assert.equal(horseTailFlick(skeleton, moving, 0.3, 0), moving);
+});
+
 test('model: coats, markings and the crowd atlas', () => {
   const { doc, buffers } = horseDocument({ coat: 'bay', markings: { socks: [0.4, 0, 0, 0], blaze: true }, detail: 0 }),
     prim = doc.meshes[0].primitives[0],
