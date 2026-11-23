@@ -98,6 +98,8 @@ try {
   for (const r of results) {
     assert.ok(Math.abs(r.got - r.want) < 0.03, `${r.style} at light ${r.light}: ${r.got} inked, ${r.want} expected`);
   }
+  const shadowed = await page.evaluate(() => window.check.runWithShadows());
+  assert.deepEqual(shadowed.errors, [], 'hatching and shadows draw in the same frame');
   assert.deepEqual(pageErrors, []);
   console.log('toon hatch-check: ok');
 } finally {

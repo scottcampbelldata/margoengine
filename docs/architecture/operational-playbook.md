@@ -1,3 +1,10 @@
+### Section 5 evidence: ink hatching over shadowed meshes (2026-11-22)
+
+`@margoengine/toon/hatch` now wraps the light expression after the shadow and clustered-lighting passes. Applying
+ink earlier removed the shader anchor used by Shadows and caused the frame to fail. The CPU fixture exercises the
+pass order and verifies that ink wraps the shadow term. The browser fixture draws a board with both packages
+attached. The core shader and exported APIs stay unchanged.
+
 ### Section 5 evidence: ship wakes at harbor speed (2026-11-21)
 
 At 1.5 m/s the 68 m test hull's analytic crest is about 0.23 m aft of the stem. The CPU and WGSL profiles broaden the

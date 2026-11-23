@@ -54,6 +54,11 @@ Options (every one but `renderOrder` live as a property): `mesh` (required); `ge
 
 ## Hatching and halftone
 
+Hatching composes with `Shadows` and `Clustered`. The ink is applied after both have contributed to the lit paper
+colour. This follows the separation of tone and ink coverage described by [Winkenbach and Salesin,
+*Computer-Generated Pen-and-Ink Illustration* (1994)](https://grail.cs.washington.edu/projects/cg-illus/) and
+[Praun, Hoppe, Webb and Finkelstein, *Real-Time Hatching* (2001)](https://gfx.cs.princeton.edu/pubs/Praun_2001_RH/).
+
 `@margoengine/toon/hatch` draws pen hatching or print dots in place of flat bands on core meshes: the surface takes its full lit colour (the paper) and the diffuse light level decides how much of each pixel is ink, in a pattern fixed to the screen.
 
 ```ts

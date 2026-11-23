@@ -45,8 +45,8 @@ export class Hatching extends HatchStyle implements EnginePlugin {
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: 'toon:hatch',
-      // After ToonShading's band patch (-25), whose diffuse line this replaces.
-      order: -24,
+      // Apply ink after ToonShading (-25), Shadows (-5) and Clustered (-3) finish composing the lighting.
+      order: -2,
       execute: (c) => {
         if (c.backend !== 'webgpu' || !this.buffer) return;
         let shader = this.shaders.get(c.shader);

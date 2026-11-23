@@ -55,3 +55,21 @@ test('after ToonShading the hatching replaces its bands, keeping its rim', () =>
   assert.match(shader, /let direct=i\.color;/);
   assert.match(shader, /vec3f\(rim\)/);
 });
+
+test('hatching wraps the composed lighting after a shadow pass replaces the direct-light term', () => {
+  const h = harness();
+  Hatching.attach(h.engine);
+  h.engine.frameGraph.add({
+    name: 'shadow-lighting-anchor',
+    order: -5,
+    execute(context) {
+      assert.match(context.shader, /let linear=direct\*/);
+      context.shader = context.shader.replace(
+        'let linear=direct*',
+        'let linear=shadowLit(direct,i.position,i.normal)*',
+      );
+    },
+  });
+  h.frame();
+  assert.match(h.drawn.shader, /let linear=mix\(shadowLit\(direct,i.position,i.normal\)\*/);
+});
