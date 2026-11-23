@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { axisAngleToQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
+import { solveTwoBoneIK } from '@margoengine/animator';
 import { LimbCollisionRig, solveContactIK } from '../dist/contact.js';
 import { checkRig } from '../dist/index.js';
 
@@ -127,6 +128,42 @@ test('if the whole arm cannot clear the obstacle, palm contact reports blocked w
   assert.equal(rejected.clearance, -0.01);
   assert.deepEqual(arm.local, before);
   assert.throws(() => solveContactIK(arm, { ...contact, clearance: () => NaN }), /signed distance/);
+  assert.deepEqual(arm.local, before);
+});
+
+test('hinged contact follows one continuous elbow plane through a planted wrist, independent of incoming elbow keys', () => {
+  const pole = [0.12, 0.36, 0.35],
+    joints = [1, 2, 3],
+    limits = [{ joint: 2, neutral: [0, 0, 0, 1], limit: { type: 'hinge', axis: [0, 0, 1], min: 0, max: 2.75 } }];
+  const samples = Array.from({ length: 101 }, (_, i) => [0.48 + i * 0.001, 0.21, 0.12 + 0.023 * Math.sin(i / 30)]);
+  const positions = [];
+  for (const [i, point] of samples.entries()) {
+    const arm = pose();
+    // This unrelated shoulder animation flips 126 degrees each frame. The explicit bend plane stays fixed.
+    arm.local.set(axisAngleToQuaternion([1, 0, 0], i % 2 ? -1.1 : 1.1), 13);
+    const result = solveContactIK(arm, {
+      ...contact,
+      point,
+      joints,
+      pole,
+      limits,
+      anchor: [0, 0, 0],
+      reach: 'hinged',
+      clearance: (packed) => {
+        positions.push(Array.from(packed.slice(3, 6)));
+        return 0.02;
+      },
+    });
+    const expected = solveTwoBoneIK([0, 0, 0], [0.4, 0, 0], [0.78, 0, 0], point, pole).knee;
+    assert.ok(result.locked && result.distance < 1e-7, JSON.stringify(result));
+    assert.ok(Math.hypot(...positions[i].map((v, k) => v - expected[k])) < 1e-7);
+    if (i) assert.ok(Math.hypot(...positions[i].map((v, k) => v - positions[i - 1][k])) < 0.002);
+  }
+  const arm = pose(),
+    before = arm.local.slice();
+  const blocked = solveContactIK(arm, { ...contact, joints, limits, pole, reach: 'hinged', clearance: () => -0.04 });
+  assert.equal(blocked.blocked, true);
+  assert.equal(blocked.locked, false);
   assert.deepEqual(arm.local, before);
 });
 

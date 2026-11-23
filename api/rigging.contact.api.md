@@ -29,6 +29,7 @@ export interface ContactIKOptions {
     readonly tolerance?: number;
     readonly angleTolerance?: number;
     readonly clearance?: (positions: ArrayLike<number>, rotations: ArrayLike<number>) => number;
+    readonly reach?: 'hinged';
 }
 
 export interface ContactIKResult {
@@ -119,6 +120,7 @@ export interface PalmContactTarget {
     readonly weight?: number;
     readonly elbowPole?: Vec3;
     readonly clearance?: ContactIKOptions['clearance'];
+    readonly reach?: ContactIKOptions['reach'];
 }
 
 export interface PalmElbowCalibration {

@@ -57,7 +57,7 @@ function seeded(seed) {
   let x = seed;
   return () => ((x = (x * 1103515245 + 12345) >>> 0) / 2 ** 32) * 2 - 1;
 }
-function makeRig(naming, seed = 7) {
+function makeRig(naming, seed = 7, profiles) {
   const rnd = seeded(seed),
     names = [],
     parents = [],
@@ -84,11 +84,16 @@ function makeRig(naming, seed = 7) {
       const along = [dir[0] * x, dir[2], dir[1]],
         l = Math.hypot(...along),
         u = along.map((v) => v / l);
-      let p = [0.72 * x + a * x, 1.45 + d, c],
+      const profile = profiles?.[finger];
+      let p = profile
+          ? [0.72 * x + profile[0][0] * x, 1.45 - profile[0][1], -profile[0][2]]
+          : [0.72 * x + a * x, 1.45 + d, c],
         parent = hand;
       for (let k = 0; k < 3; k++) {
         parent = add(n(side, `${finger}${k + 1}`), parent, p);
-        p = p.map((v, i) => v + u[i] * lengths[k]);
+        const offset = profile?.[k + 1];
+        const vector = offset ? [offset[0] * x, -offset[1], -offset[2]] : u.map((v) => v * lengths[k]);
+        p = p.map((v, i) => v + vector[i]);
       }
       fingertips[`${side}-${finger}`] = p;
     }
@@ -324,6 +329,61 @@ test('a registered power grip brings each thumb around the actual bar surface', 
           assert.ok(clearance >= -0.0001, `${side} ${name} segment ${i} at ${close} closure: ${clearance} m`);
         }
       }
+    }
+  }
+});
+
+test('a forward thumb base moves the contact above its web and both thumb hinges articulate', () => {
+  const digitProfile = {
+    thumb: [
+      [0.0391, 0.0042, -0.0255],
+      [0.012, 0.0214, -0.0206],
+      [0.0265, 0.0187, -0.02],
+    ],
+    index: [
+      [0.1083, 0.0046, -0.0272],
+      [0.0258, 0.0073, -0.0039],
+      [0.0213, 0.0113, -0.0022],
+    ],
+    middle: [
+      [0.1074, 0, 0],
+      [0.0331, 0.0114, 0.0047],
+      [0.0261, 0.0123, 0.002],
+    ],
+    ring: [
+      [0.1013, -0.0004, 0.0204],
+      [0.0284, 0.0088, 0.0094],
+      [0.023, 0.0108, 0.0057],
+    ],
+    little: [
+      [0.0914, 0.0046, 0.0397],
+      [0.0188, 0.0084, 0.0089],
+      [0.0127, 0.0087, 0.0054],
+    ],
+  };
+  const rig = makeRig('mixamo', 78, digitProfile),
+    measurements = measureHands(rig, 'mixamo'),
+    bones = humanoidBones(rig.names, 'mixamo');
+  for (const side of ['left', 'right']) {
+    const hand = measurements[side],
+      wrist = hand.world(hand.hand);
+    const joints = ['UpperArm', 'LowerArm', 'Hand'].map((name) => bones.get(side + name));
+    const grip = new PalmContactRig(rig, { side, joints, preset: 'mixamo' });
+    const normal = hand.palm.map((v) => -v),
+      forward = [SIDE[side], 0, 0];
+    const offset = rot(grip.anchor, wrist.rotation);
+    const point = wrist.position.map((v, i) => v + offset[i]);
+    const target = { point, normal, towardsFingers: forward, diameter: 0.029 };
+    const open = rig.rest.slice(),
+      closed = rig.rest.slice();
+    grip.solve(open, { ...target, close: 0 });
+    const result = grip.solve(closed, target);
+    assert.ok(result.locked && result.gripWeight > 0.99);
+    assert.ok(offset[0] * SIDE[side] > 0.07 && offset[0] * SIDE[side] < 0.076);
+    for (const joint of hand.fingers.thumb.bones.slice(1)) {
+      const at = joint * 10 + 3;
+      const flex = turnFromRest(closed.subarray(at, at + 4), open.subarray(at, at + 4));
+      assert.ok(flex >= 10, `${side} thumb joint ${joint} flexes ${flex} degrees during closure`);
     }
   }
 });

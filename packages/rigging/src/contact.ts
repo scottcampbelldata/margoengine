@@ -25,6 +25,7 @@ import type { IKPose } from './ik.js';
 import type { HumanoidBone, SkeletonPreset } from './retarget.js';
 import { parentOrder, worldFrames } from './rig.js';
 import { fitBarGrip } from './bar-grip.js';
+import { poseHingedContact } from './hinged-contact.js';
 
 export { LimbCollisionRig } from './limb-collision.js';
 export type {
@@ -73,6 +74,8 @@ export interface ContactIKOptions {
   readonly angleTolerance?: number;
   /** Signed clearance of the posed chain. Packed skeleton-space XYZ points and XYZW rotations are valid during the call. */
   readonly clearance?: (positions: ArrayLike<number>, rotations: ArrayLike<number>) => number;
+  /** Follow the explicit pole with a single analytical bend. Requires a penultimate hinge and at least three joints. */
+  readonly reach?: 'hinged';
 }
 
 /** What the posed landmark achieved. Use `locked` to start a grasp or foot plant. */
@@ -219,7 +222,18 @@ export function solveContactIK(pose: IKPose, options: ContactIKOptions): Contact
   // position and orientation describe the same rigid frame, then measure the landmark with its solved rotation.
   const target = sub(blendedPoint, rotateByQuaternion(offset, goal));
   let gap: number | undefined;
-  if (clearance) {
+  if (options.reach === 'hinged') {
+    const hinge = limits.find(({ joint }) => joint === joints[joints.length - 2])?.limit;
+    if (joints.length < 3 || !pole || hinge?.type !== 'hinge')
+      throw new RangeError(
+        'Hinged contact requires three joints or more, an explicit pole and a penultimate hinge limit',
+      );
+    poseHingedContact(solver, target, goal, pole, hinge);
+    if (clearance) {
+      gap = signedGap(clearance, solver.positions.subarray(0, solver.joints * 3), solver.worldRotations);
+      if (gap < 0) return { ...animatedContact(), locked: false, blocked: true, clearance: animatedClearance() };
+    }
+  } else if (clearance) {
     const bend = joints[joints.length - 2] * 3,
       preferredPole = pole ?? [before.position[bend], before.position[bend + 1], before.position[bend + 2]];
     gap = settleClearContact(solver, target, goal, preferredPole, clearance);
@@ -383,6 +397,8 @@ export interface PalmContactTarget {
   readonly elbowPole?: Vec3;
   /** Whole-arm clearance check for this sample. See the packed positions in {@link ContactIKOptions.clearance}. */
   readonly clearance?: ContactIKOptions['clearance'];
+  /** Keep the elbow in the supplied pole's bend plane. Requires elbow calibration and an explicit elbow pole. */
+  readonly reach?: ContactIKOptions['reach'];
 }
 
 /** Measured palm registration and the applied finger closure for one sample. */
@@ -497,7 +513,19 @@ export class PalmContactRig {
       const offset = basis + axis * 3;
       return Math.hypot(frame[offset], frame[offset + 1], frame[offset + 2]);
     });
-    const local = add(scale(forward, 0.56), pad).map((n, axis) => n / wristScale[axis]) as [number, number, number];
+    const palmLength = length(forward),
+      palmAlong = normalize(forward),
+      thumb = hand.fingers.thumb,
+      thumbBase = thumb
+        ? dot(rotateByQuaternion(sub(hand.world(thumb.bones[0]).position, wrist.position), inv), palmAlong)
+        : 0,
+      // Leave room for the thumb web and proximal joint before placing a bar across the palm.
+      padAlong = Math.min(palmLength * 0.88, Math.max(palmLength * 0.56, thumbBase + 0.9 * (thumb?.lengths[1] ?? 0)));
+    const local = add(scale(palmAlong, padAlong), pad).map((n, axis) => n / wristScale[axis]) as [
+      number,
+      number,
+      number,
+    ];
     this.anchor = anchor ? [...anchor] : local;
     finiteVector(this.anchor, 'Palm anchor');
     this.gripForward = normalize(forward);
@@ -566,6 +594,7 @@ export class PalmContactRig {
         rotation: orientation,
         weight,
         pole: elbowPole,
+        reach: target.reach,
         limits: this.limits,
         clearance: checked,
         // Solve tighter than the acceptance region so a reachable wrist can enter its full-grip centre.

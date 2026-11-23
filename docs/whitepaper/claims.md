@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Explicit elbow plane and thumb articulation (2026-11-23). `packages/rigging/tests/contact.test.js` checks 101
+  neighbouring poses against the geometric elbow position, despite alternating incoming upper-arm keys, and verifies
+  that collision rejection leaves the input intact. `packages/rigging/tests/hands.test.js` measures closing motion
+  at both thumb joints on a mirrored hand with a forward thumb web. A separate fixture checks bar clearance across
+  seven closure samples.
+  [Method and bounds](../packages/rigging/README.md#hand-and-foot-contacts-margoengineriggingcontact).
+
 - Character limb and wrist contacts (2026-11-23). CPU tests check a two-sided palm at an exact 90-degree bend,
   a planted hand that clears the chest through an alternate elbow direction, and a moving animal chest that
   crosses a foreleg between two clear endpoint poses. Both mirrored thumb pads move closer to the actual rung

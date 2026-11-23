@@ -3148,6 +3148,11 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   It reports a blocked path on budget exhaustion. Curved joint motion needs subframes, and moving direction
   limits are checked at each pose. [Setup and examples](../packages/rigging/README.md#character-self-collision-during-contact).
 
+- Explicit hinged reach (2026-11-23). `rigging/contact` can solve the last two links using a single authored bend
+  plane. It requires an off-axis pole and a perpendicular hinge at the penultimate joint. A blocked path reports a
+  failed contact. Angular and spatial margins still apply. The default palm pad clears the thumb web and is bounded
+  between 56% and 88% of the wrist-to-middle-knuckle span. Exact mesh clearance requires the deformed asset.
+
 - Swimming and dense rigs (2026-11-23). The CPU rig builder accepts 1–65,536 joints. The swimming entry accepts
   at least four spine segments, 0.001–1,000 m head-to-tail length, and at most 65,536 joints including the fins.
   Nonuniform stations must differ by at least one hundred-millionth of the length. It samples deterministic

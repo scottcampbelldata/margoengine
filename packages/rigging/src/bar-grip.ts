@@ -1,8 +1,10 @@
 import { CCDSolver } from '@margoengine/animator/ccd';
 import type { Vec3 } from '@margoengine/math';
 import {
+  axisAngleToQuaternion,
   conjugateQuaternion,
   interpolateQuaternions,
+  multiplyQuaternions,
   normalizeQuaternion,
   rotateByQuaternion,
 } from '@margoengine/math/quat';
@@ -74,8 +76,10 @@ export function fitBarGrip(
         ? { type: 'cone', axis: normalize(segments[1]), angle: 1.12, twist: [-0.58, 0.58] }
         : { type: 'hinge', axis: finger.curl[0], min: -0.08, max: 1.56 },
     );
-    solver.setLimit(1, { type: 'hinge', axis: finger.curl[1], min: -0.15, max: thumb ? 1.16 : 1.97 });
-    solver.setLimit(2, { type: 'hinge', axis: finger.curl[2], min: -0.15, max: 1.37 });
+    const proximal = { type: 'hinge', axis: finger.curl[1], min: -0.15, max: thumb ? 1.16 : 1.97 } as const,
+      distalLimit = { type: 'hinge', axis: finger.curl[2], min: -0.15, max: 1.37 } as const;
+    solver.setLimit(1, proximal);
+    solver.setLimit(2, distalLimit);
     solver.tolerance = Math.max(0.00005, pad * 0.018);
     solver.iterations = 28;
 
@@ -100,10 +104,10 @@ export function fitBarGrip(
       along = thumb ? indexOffset * 0.7 + baseOffset * 0.3 : baseOffset,
       axial = scale(across, along - dot(center, across)),
       baseTarget = add(center, axial);
-    const aim = (theta: number, extra: number, initial: Float64Array) => {
+    const aim = (theta: number, extra: number, initial: Float64Array, slide = 0) => {
       const radial = add(scale(tangent, Math.sin(theta) * (thumb ? -1 : 1)), scale(normal, -Math.cos(theta)));
       solver.rotations.set(initial);
-      solver.solve(add(baseTarget, scale(radial, radius + pad + extra)));
+      solver.solve(add(add(baseTarget, scale(across, slide)), scale(radial, radius + pad + extra)));
       return solver.rotations.slice();
     };
     const score = (approach: Float64Array, angles: Float64Array) => {
@@ -118,9 +122,19 @@ export function fitBarGrip(
         deepest = Math.max(deepest, penetration());
       }
       const end = projected(9);
-      return Math.abs(Math.hypot(...end) - radius - pad) + 16 * deepest + Math.max(0, thumb ? end[0] : -end[0]);
+      let uncurl = 0;
+      if (thumb)
+        for (const k of [1, 2]) {
+          const i = k * 4,
+            delta = multiplyQuaternions(conjugateQuaternion(approach.subarray(i, i + 4)), angles.subarray(i, i + 4)),
+            flex = 2 * Math.atan2(dot(delta.slice(0, 3), finger.curl[k]), delta[3]);
+          uncurl += pad * 16 * Math.max(0, 0.16 - Math.atan2(Math.sin(flex), Math.cos(flex)));
+        }
+      return (
+        Math.abs(Math.hypot(...end) - radius - pad) + 16 * deepest + uncurl + Math.max(0, thumb ? end[0] : -end[0])
+      );
     };
-    let best = seed,
+    let best = seed.slice(),
       bestOpen = resting,
       bestCost = score(resting, seed);
     for (const theta of thumb ? [0.4, 0.68, 0.95, 1.22, 1.48] : [0.74, 1.06, 1.42, 1.78, 2.14, 2.52, 2.88]) {
@@ -145,6 +159,36 @@ export function fitBarGrip(
           }
         }
     }
+    // An unconstrained fingertip solve can pivot only at the thumb base. Try coupled phalanx flexion with opposition.
+    if (thumb)
+      for (const theta of [0.4, 0.68, 0.95, 1.22, 1.48, 1.78, 2.1, 2.44]) {
+        for (const flex of [0.17, 0.32, 0.51, 0.73]) {
+          for (const slide of [0, -0.02, 0.02, -0.038, 0.038]) {
+            for (const [slot, limit, angle] of [
+              [1, proximal, flex],
+              [2, distalLimit, flex * 0.75],
+            ] as const) {
+              const i = slot * 4;
+              seed.set(
+                multiplyQuaternions(solver.rest.subarray(i, i + 4), axisAngleToQuaternion(limit.axis, angle)),
+                i,
+              );
+              solver.setLimit(slot, { ...limit, min: angle, max: angle + 0.14 });
+            }
+            const candidate = aim(theta, 0, seed, slide);
+            solver.setLimit(1, proximal);
+            solver.setLimit(2, distalLimit);
+            for (const approach of [resting, bestOpen, aim(theta, 0.013, candidate, slide)]) {
+              const cost = score(approach, candidate);
+              if (cost + 1e-6 < bestCost) {
+                bestCost = cost;
+                best = candidate;
+                bestOpen = approach;
+              }
+            }
+          }
+        }
+      }
     for (const [k, bone] of finger.bones.entries()) {
       rotations.set(bone, Array.from(best.subarray(k * 4, k * 4 + 4)));
       open.set(bone, Array.from(bestOpen.subarray(k * 4, k * 4 + 4)));

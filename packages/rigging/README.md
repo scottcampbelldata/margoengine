@@ -171,10 +171,11 @@ const local = new Float64Array([
 ]);
 const contact = solveContactIK({ parents, local }, {
   joints: [0, 1, 2],
-  point: [0.42, 0.16, 0.18],
-  rotation: [0, 0, 0, 1],
+  point: [0.46, 0.16 * Math.sqrt(3), 0],
+  rotation: [0, 0, 0.5, Math.sqrt(3) / 2],
   anchor: [0.06, 0, 0],
-  pole: [0.15, 0.08, 0.27],
+  pole: [0.3, 0, 0],
+  reach: 'hinged',
   limits: [
     { joint: 1, neutral: [0, 0, 0, 1], limit: { type: 'hinge', axis: [0, 0, 1], min: 0, max: 2.35 } },
     { joint: 2, neutral: [0, 0, 0, 1], limit: { type: 'cone', axis: [1, 0, 0], angle: 0.85, twist: [-0.35, 0.35] } },
@@ -185,6 +186,13 @@ console.log(contact.locked, contact.distance);
 ```
 
 Pose and contact points use skeleton space and the same units. Ancestor scales must be uniform and positive. The end joint can have different positive scales along its axes. Default tolerances are 0.0001 scene units and 0.02 radians. Each solve uses up to 64 CCD sweeps by default. The chain can contain 2–256 joints inside a larger rig. `checkRig` accepts up to 65,536 joints, the number of joint indices representable by glTF unsigned shorts. A weight of 0 measures the input pose exactly. A gap or orientation outside either tolerance leaves `locked` false. Start from the sampled animation pose each frame so corrections cannot accumulate.
+
+Use `reach: 'hinged'` with an explicit pole to keep the elbow or knee on one authored bend plane across samples.
+The final three joints form the two links and the penultimate joint needs a hinge whose axis is perpendicular to
+both links in its neutral pose. An optional hinge twist axis follows the lower link. Earlier joints carry the reach
+and retain their sampled pose within their limits. Animate the pole smoothly off the reach axis. Unreachable goals
+clamp to the calibrated reach, and a collision rejects the sample without choosing a different bend plane.
+`PalmContactRig` accepts the same option on a target with calibrated elbow and `elbowPole`.
 
 The contact landmark follows [*Footskate Cleanup for Motion Capture Editing*, Kovar, Gleicher and Schreiner (2002)](https://research.cs.wisc.edu/graphics/Papers/Gleicher/Mocap/cleanup.pdf). The chain solve uses the Animator's constrained CCD solver. [*Parametrization and Range of Motion of the Ball-and-Socket Joint*, Baerlocher and Boulic (2000)](https://infoscience.epfl.ch/bitstreams/949101d1-ec81-4e38-91d8-c414ee95c8fc/download) describes swing and twist boundaries. Position error is at the surface landmark because the joint origin and the surface point differ, as in the hand and foot annotations of [*CIMI4D*, Yan et al. (2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Yan_CIMI4D_A_Large_Multimodal_Climbing_Motion_Dataset_Under_Human-Scene_Interactions_CVPR_2023_paper.pdf).
 
@@ -228,8 +236,9 @@ Default registration tolerances are 3 mm on metre-scale rigs and 5 degrees. With
 bends about its measured flexion axis, defaults to −0.035 to 2.55 radians relative to bind and rolls ±1.25 radians
 about its length. Use `roll: false` for a separately authored twist joint. The measured wrist defaults to 1.15
 radians of swing and ±0.22 radians of axial twist. Use `limits` to set per-character bounds and `anchor` for a
-measured palm-pad point in wrist-local coordinates. The default anchor is 56% of the wrist-to-middle-knuckle
-distance with an 8.5% outward pad offset. Cylindrical poses use the measured digit lengths and a diameter
+measured palm-pad point in wrist-local coordinates. The default anchor starts at 56% of the wrist-to-middle-knuckle
+distance. A forward thumb base can move it up to 88% to keep the bar away from the thumb web. The outward pad offset
+is 8.5% of palm length. Cylindrical poses use the measured digit lengths and a diameter
 above 0 and below 1 m. The solver measures palm registration, and per-digit skin collision requires its own
 geometry and verification.
 
@@ -240,7 +249,9 @@ of flexion, 1.0 of extension, and 0.46 of sideways deviation. Calibrate these th
 and action. A compatible custom constraint can take over this check with `wrist: false`. The cylindrical fit
 uses the same diameter as the palm target. It chooses a pose for each digit from its measured lengths, fits the
 thumb on the opposing side, and checks for proxy intersections from the open approach through six stages of
-closure. A hand with very short
+closure. The anchor's clearance from the thumb base leaves room to oppose and curl the thumb together.
+A second search tests coupled thumb flexion along the same bar when a base turn alone leaves the joints rigid.
+A hand with very short
 digits or an oversized bar can still have a gap. Check the final deformed skin against the production geometry.
 
 The independent forearm and wrist controls follow the distinct axes described in
@@ -293,6 +304,9 @@ proof of clearance before committing a move.
 The alternate elbow search draws on [*Real-Time Inverse Kinematics Techniques for Anthropomorphic Limbs*, Tolani,
 Goswami and Badler (2000)](https://www.ambarish.com/paper/Tolani_Goswami_Badler_IK.pdf) and [*Analytical Inverse
 Kinematics with Body Posture Control*, Kallmann (2008)](https://mkallmann.github.io/papers/08-cavw-bodyik.pdf).
+The explicit-pole mode uses the analytical elbow circle described by Tolani, Goswami and Badler. Keeping the bend
+plane on a continuous authored curve follows the use of smooth pose corrections in [*A Hierarchical Approach to
+Interactive Motion Editing for Human-like Figures*, Jehee Lee and Sung Yong Shin (1999)](https://doi.org/10.1145/311535.311539).
 Capsule gaps use the segment-distance construction in [*On Fast Computation of Distance Between Line Segments*,
 Lumelsky (1985)](https://doi.org/10.1016/0020-0190(85)90032-8). The continuous check adapts conservative advancement
 to straight proxy paths, following [*Fast Continuous Collision Detection for Articulated Models*, Redon, Lin and
