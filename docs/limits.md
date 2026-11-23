@@ -47,9 +47,11 @@ notes one change's size or behaviour and its evidence. Every number has a row in
 - Character limb collision (2026-11-23). The optional rigging contact entry checks caller-configured capsules
   against body volumes and bounds upper limb directions relative to the animated skeleton. An intersecting arm
   triggers a bounded search of eleven alternate bend directions. The sweep checks straight proxy endpoint paths
-  between two samples, with a default contact margin of 0.0001 model units and a 128-check budget (range 1–4,096).
-  It reports a blocked path on budget exhaustion. Curved joint motion needs subframes, and moving direction
-  limits are checked at each pose. [Setup and examples](../packages/rigging/README.md#character-self-collision-during-contact).
+  and direction limits carried by the shortest arc of the body axis. The default contact margin is 0.0001 model
+  units and the work budget is 128 checks (range 1–4,096). Curved joint paths and opposed body axes need an
+  intermediate sample. Budget exhaustion and unresolved opposed axes report a blocked path. Direction limits
+  require direction data in both snapshots. The contact entry measures 13,167 B gzip.
+  [Setup and examples](../packages/rigging/README.md#character-self-collision-during-contact).
 
 - Explicit hinged reach (2026-11-23). `rigging/contact` can solve the last two links using a single authored bend
   plane. It requires an off-axis pole and a perpendicular hinge at the penultimate joint. A blocked path reports a

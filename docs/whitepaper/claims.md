@@ -9,6 +9,14 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Swept anatomical direction limits (2026-11-23). The rigging contact sweep detects an upper limb leaving its
+  allowed range between two valid samples. The fixture checks analytical first-crossing times for a moving limb
+  and a rotating chest, a clear turn, two legacy samples, and an unresolved half turn. Build the packages, then
+  run `node --test packages/rigging/tests/limb-collision.test.js`. The optional contact entry grows from 12,637 to
+  13,167 B minified and gzipped. The rigging root stays at 8,106 B. Use `npm run quality -- --gate=sizes` to check
+  the entry budgets.
+  [Interpolation and sources](../../packages/rigging/README.md#character-self-collision-during-contact).
+
 - Equine walking fetlock (2026-11-23). The horse CPU fixture checks a visible fore fetlock tuck near 81% of the
   walk stride on both sides of the native and fitted skeleton. It checks full sagittal excursion alongside the existing
   carpus and coffin timing and stance checks.

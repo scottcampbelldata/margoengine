@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-23: a shoulder could exceed its range between two accepted poses (rigging/contact)
+
+- **Repro:** keep a sleeve above a torso capsule. Aim the upper arm diagonally backward to opposite sides in two poses. Both poses pass the shoulder direction limit, but the interpolated arm points directly backward in between.
+- **Cause:** the swept check captured capsule endpoints only. The shoulder limit was available solely to the single-pose check.
+- **Fix:** snapshot the joint vector and body axis, interpolate the axis on its short arc, and conservatively advance against the directional margin as well as the capsule distance.
+- **Regression:** `packages/rigging/tests/limb-collision.test.js` covers static and turning references, the first violation time, opposed axes, a legal turn, and legacy snapshots.
+
 ### Fixed 2026-11-21: water displacement and stern foam faded too early at harbor speeds (water/ships)
 
 - **Repro:** advance a 68 m hull at 1.5 m/s. Sample just ahead of the stem and 0.75 m or so outboard at the shoulder. The bow footprint misses the stem samples and the narrow side rise ends before the shoulder sample. The stern trail is hard to distinguish as it ages.

@@ -296,10 +296,26 @@ tries alternate elbow directions when the preferred pose is blocked, and leaves 
 finds no clear solution. Check `blocked` and choose a reachable hold or a safe fallback pose. The result's `clearance`
 combines proxy separation and the margin to the configured joint directions and wrist range.
 
-Use `snapshot` for the accepted limb at two consecutive poses and `sweep` to test the intervening proxy motion,
-including movement of the torso. It assumes straight paths for the capsule endpoints. Sample curved limb motion at
-subframes and run the direction checks at each pose. An exhausted sweep returns `clear: false` so a caller can require
-proof of clearance before committing a move.
+Use `snapshot` for the accepted limb at two consecutive poses and `sweep` to test the intervening proxy motion
+and direction limits. Capsule endpoints and the vectors between the configured limb joints are linearly
+interpolated. Each reference axis follows a short spherical arc as the torso turns. Include intermediate poses for curved joint motion or opposite reference
+axes. A sweep that cannot certify clearance returns `clear: false` and `exhausted: true`. Legacy snapshots without
+the direction channel still check capsule motion. Use the same snapshot format at both ends.
+
+```ts
+import { LimbCollisionRig } from 'margoengine/rigging/contact';
+
+export function checkShoulderTravel(before: number[], after: number[]) {
+  const guard = new LimbCollisionRig(
+    [-1],
+    [{ start: { joint: 0 }, radius: 0.16 }],
+    [{ start: 0, end: 1, radius: 0.04 }],
+    [{ start: 0, end: 1, reference: 0, forward: [0, 0, 1] }],
+  );
+  guard.setBodyPose([0, 0, 0, 0, 0, 0, 1, 1, 1, 1]);
+  return guard.sweep(guard.snapshot(before), guard.snapshot(after));
+}
+```
 
 The alternate elbow search draws on [*Real-Time Inverse Kinematics Techniques for Anthropomorphic Limbs*, Tolani,
 Goswami and Badler (2000)](https://www.ambarish.com/paper/Tolani_Goswami_Badler_IK.pdf) and [*Analytical Inverse
@@ -311,6 +327,13 @@ Capsule gaps use the segment-distance construction in [*On Fast Computation of D
 Lumelsky (1985)](https://doi.org/10.1016/0020-0190(85)90032-8). The continuous check adapts conservative advancement
 to straight proxy paths, following [*Fast Continuous Collision Detection for Articulated Models*, Redon, Lin and
 Manocha (2004)](https://diglib.eg.org/items/13aac165-e652-4c78-a0a6-0b42305f0753).
+The direction limit uses a body-relative axis, as in [*Parametrization and Range of Motion of the Ball-and-Socket
+Joint*, Paolo Baerlocher and Ronan Boulic (2000)](https://infoscience.epfl.ch/bitstreams/949101d1-ec81-4e38-91d8-c414ee95c8fc/download).
+The sweep uses the angular speed of that axis and the linear speed of the limb vector
+to bound gap changes. See [*Animating Rotation with Quaternion Curves*, Ken Shoemake (1985)](https://doi.org/10.1145/325334.325242)
+for spherical interpolation and [*Continuous Collision Detection for Articulated Models Using Taylor Models
+and Temporal Culling*, Zhang, Redon, Lee and Kim (2007)](https://doi.org/10.1145/1239451.1239466) for
+angular motion bounds in conservative advancement.
 
 ## Joint hulls (`margoengine/rigging/hulls`)
 

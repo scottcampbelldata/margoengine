@@ -1,5 +1,5 @@
 import type { Vec3 } from '@margoengine/math';
-import { cross, dot, length, normalize, scale, sub } from '@margoengine/math/vec3';
+import { add, cross, dot, length, normalize, scale, sub } from '@margoengine/math/vec3';
 import { parentOrder, worldFrames } from './rig.js';
 
 /** An anatomical landmark carried by a bone. */
@@ -52,6 +52,8 @@ export interface LimbCollisionSample {
   readonly body: Float64Array;
   /** Capsule endpoints of the candidate limb in skeleton space, six numbers per link. */
   readonly limb: Float64Array;
+  /** Direction vector and body axis per limit, six numbers each. Older samples may omit this channel. */
+  readonly directions?: Float64Array;
 }
 
 /** Precision and work limits for a check between two collision samples. */
@@ -62,15 +64,15 @@ export interface LimbSweepOptions {
   readonly maxSteps?: number;
 }
 
-/** Result of advancing a set of moving body and limb capsules toward contact. */
+/** Result of advancing the moving proxies and joint directions toward contact. */
 export interface LimbSweepResult {
   /** True when all motion along the supplied proxy paths was clear. */
   readonly clear: boolean;
   /** Time fraction at the first conservative hit, the work limit, or 1 when clear. */
   readonly time: number;
-  /** Smallest signed distance measured so far. */
+  /** Smallest signed capsule separation or direction margin measured so far, in skeleton units. */
   readonly clearance: number;
-  /** True when the work limit was reached before certification. */
+  /** True when certification needs more steps or a sample resolving an opposed pair of axes. */
   readonly exhausted: boolean;
 }
 
@@ -79,6 +81,42 @@ const three = (a: ArrayLike<number>, i: number): Vec3 => [a[i], a[i + 1], a[i + 
 
 function vector(v: ArrayLike<number>): boolean {
   return v?.length === 3 && Number.isFinite(v[0]) && Number.isFinite(v[1]) && Number.isFinite(v[2]);
+}
+
+function directionGap(delta: Vec3, forward: Vec3, allowance: number): number {
+  const gap = dot(delta, forward) + length(delta) * allowance;
+  if (!Number.isFinite(gap)) throw new RangeError('Give the direction limit finite vectors at scene scale');
+  return gap;
+}
+
+function directionMotion(from: Float64Array, to: Float64Array, offset: number, allowance: number) {
+  const start = three(from, offset),
+    end = three(to, offset),
+    initialAxis = three(from, offset + 3),
+    finalAxis = three(to, offset + 3);
+  if (Math.abs(length(initialAxis) - 1) > 1e-9 || Math.abs(length(finalAxis) - 1) > 1e-9)
+    throw new RangeError('Direction samples need unit body axes');
+  const axis = normalize(initialAxis),
+    nextAxis = normalize(finalAxis),
+    normal = cross(axis, nextAxis),
+    sine = length(normal),
+    cosine = dot(axis, nextAxis),
+    arc = Math.atan2(sine, cosine),
+    tangent = cross(normalize(normal), axis),
+    delta = sub(end, start);
+  // For g = a·d + allowance|d|, the arc's angular speed bounds |a'|, and d' is constant.
+  const speed = (1 + allowance) * length(delta) + arc * Math.max(length(start), length(end));
+  if (!Number.isFinite(speed)) throw new RangeError('Give the direction sweep finite motion at scene scale');
+  return { start, delta, axis, tangent, arc, allowance, speed, opposed: sine <= 1e-12 && cosine < 0 };
+}
+
+function sampledDirectionGap(motion: ReturnType<typeof directionMotion>, time: number): number {
+  const angle = motion.arc * time;
+  return directionGap(
+    add(motion.start, scale(motion.delta, time)),
+    add(scale(motion.axis, Math.cos(angle)), scale(motion.tangent, Math.sin(angle))),
+    motion.allowance,
+  );
 }
 
 function endpointDistance(a: Vec3, unit: Vec3, size: number): number {
@@ -239,7 +277,7 @@ export class LimbCollisionRig {
     let gap = this.measure(this.body, this.candidate);
     this.limits.forEach(({ start, end, maxBackwards }, i) => {
       const delta = sub(three(positions, end * 3), three(positions, start * 3));
-      gap = Math.min(gap, dot(delta, this.axes[i]) + length(delta) * Math.sin(maxBackwards));
+      gap = Math.min(gap, directionGap(delta, this.axes[i], Math.sin(maxBackwards)));
     });
     return gap;
   };
@@ -247,12 +285,21 @@ export class LimbCollisionRig {
   /** Captures the current obstacle shape and a candidate limb for between-frame checks. */
   snapshot(positions: ArrayLike<number>): LimbCollisionSample {
     this.packLimb(positions, this.candidate);
-    return { body: this.body.slice(), limb: this.candidate.slice() };
+    const sample = { body: this.body.slice(), limb: this.candidate.slice() };
+    if (!this.limits.length) return sample;
+    const directions = new Float64Array(this.limits.length * 6);
+    this.limits.forEach(({ start, end }, i) => {
+      const delta = sub(three(positions, end * 3), three(positions, start * 3));
+      if (!vector(delta)) throw new RangeError('Give the direction sample finite joint displacements at scene scale');
+      directions.set(delta, i * 6);
+      directions.set(this.axes[i], i * 6 + 3);
+    });
+    return { ...sample, directions };
   }
 
   /**
-   * Tests linearly moving proxy endpoints, including motion of the body. It cannot jump over a thin contact.
-   * Pass subframes when using curved joint trajectories. Direction limits are checked by {@link clearance} per pose.
+   * Tests linearly moving capsule endpoints and joint vectors. Body axes follow their shortest spherical arcs.
+   * Include an intermediate pose for opposite axes or curved limb paths. Two legacy samples check capsules alone.
    */
   sweep(
     from: LimbCollisionSample,
@@ -271,6 +318,20 @@ export class LimbCollisionRig {
         !sample.limb.every(Number.isFinite)
       )
         throw new RangeError('Sweep samples must come from the same proxy layout and contain finite positions');
+    const startDirections = from.directions,
+      endDirections = to.directions;
+    if (Boolean(startDirections) !== Boolean(endDirections))
+      throw new RangeError('Pass direction data in both sweep snapshots, or two legacy snapshots');
+    for (const data of [startDirections, endDirections])
+      if (data && (data.length !== this.limits.length * 6 || !data.every(Number.isFinite)))
+        throw new RangeError('Sweep direction samples must match the rig layout and contain finite vectors');
+    const directions =
+      startDirections && endDirections
+        ? this.limits.map(({ maxBackwards }, i) =>
+            directionMotion(startDirections, endDirections, i * 6, Math.sin(maxBackwards)),
+          )
+        : [];
+    const opposed = directions.some((motion) => motion.opposed);
     const body = from.body.slice(),
       limb = from.limb.slice(),
       bodyMotion = to.body.map((value, i) => value - from.body[i]),
@@ -282,14 +343,23 @@ export class LimbCollisionRig {
       return fastest;
     };
     const speed = maxMotion(bodyMotion) + maxMotion(limbMotion);
+    if (!Number.isFinite(speed)) throw new RangeError('Give the collision sweep finite motion at scene scale');
     let time = 0,
       smallest = Infinity;
     for (let step = 0; step < maxSteps; step++) {
-      const gap = this.measure(body, limb);
+      const capsuleGap = this.measure(body, limb);
+      let gap = capsuleGap;
+      let advance = speed > 0 ? (capsuleGap - tolerance * 0.5) / speed : Infinity;
+      for (const motion of directions) {
+        const margin = sampledDirectionGap(motion, time);
+        gap = Math.min(gap, margin);
+        if (motion.speed > 0) advance = Math.min(advance, (margin - tolerance * 0.5) / motion.speed);
+      }
       smallest = Math.min(smallest, gap);
       if (gap <= tolerance) return { clear: false, time, clearance: smallest, exhausted: false };
-      if (time === 1 || speed === 0) return { clear: true, time: 1, clearance: smallest, exhausted: false };
-      const next = Math.min(1, time + (gap - tolerance * 0.5) / speed);
+      if (opposed) break;
+      if (time === 1 || advance === Infinity) return { clear: true, time: 1, clearance: smallest, exhausted: false };
+      const next = Math.min(1, time + advance);
       if (next <= time) break;
       time = next;
       for (let i = 0; i < body.length; i++) body[i] = from.body[i] + bodyMotion[i] * time;

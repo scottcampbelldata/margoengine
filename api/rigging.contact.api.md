@@ -65,6 +65,7 @@ export class LimbCollisionRig {
 export interface LimbCollisionSample {
     readonly body: Float64Array;
     readonly limb: Float64Array;
+    readonly directions?: Float64Array;
 }
 
 export interface LimbDirectionLimit {
