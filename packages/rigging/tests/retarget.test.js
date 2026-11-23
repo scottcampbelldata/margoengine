@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { HUMANOID_BONES, detectSkeleton, humanoidBones, prepareRetarget } from '../dist/retarget.js';
 import { createKeyframeClip, sampleKeyframes } from '../../animation/dist/index.js';
 import { Retarget } from '../../animation/dist/skeleton-utils.js';
+import { rotateByQuaternion } from '@margoengine/math/quat';
 
 /**
  * A humanoid rig under one naming, standing in a T-pose (arms along x) or an A-pose (arms 40 degrees down), y up,
@@ -174,6 +175,52 @@ test('rest-pose alignment drives an A-pose target into the source T-pose', () =>
     a = direction(raw);
   assert.ok(Math.abs(t[1]) < 1e-9 && t[0] > 0.999999, `aligned: the arm is level (${t})`);
   assert.ok(a[1] < -0.6, `unaligned: the arm stays 40 degrees down (${a})`);
+});
+
+test('retargeting corrects palm roll on both hands without changing their aim', () => {
+  for (const [side, x] of [
+    ['left', 1],
+    ['right', -1],
+  ]) {
+    const names = ['hips', `${side}Hand`, `${side}MiddleProximal`, `${side}IndexProximal`, `${side}LittleProximal`],
+      source = {
+        names,
+        parents: [-1, 0, 1, 1, 1],
+        rest: Float64Array.from(
+          [
+            [0, 1, 0],
+            [0.5 * x, 0, 0],
+            [0.08 * x, 0, 0],
+            [0.08 * x, 0, 0.03],
+            [0.07 * x, 0, -0.03],
+          ].flatMap((at) => [...at, 0, 0, 0, 1, 1, 1, 1]),
+        ),
+      },
+      target = { ...source, rest: source.rest.slice() };
+    target.rest.set([2, 1.5, 0.8], 7); // The wrist lives below a stretched parent.
+    target.rest.set([x * Math.SQRT1_2, 0, 0, Math.SQRT1_2], 13);
+
+    const check = (rig, options, expected) => {
+      const prepared = prepareRetarget(rig, target, { from: 'humanoid', to: 'humanoid', ...options }),
+        pose = new Retarget(rig, prepared.target, prepared).pose(rig.rest),
+        wrist = pose.subarray(13, 17),
+        aim = rotateByQuaternion([x, 0, 0], wrist),
+        across = rotateByQuaternion([0, 0, 1], wrist);
+      assert.ok(Math.hypot(aim[0] - x, aim[1], aim[2]) < 1e-9, `${side} hand still aims outwards`);
+      assert.ok(Math.hypot(...across.map((v, i) => v - expected[i])) < 1e-9, `${side} palm points ${across}`);
+    };
+    check(source, {}, [0, 0, 1]);
+    check(source, { alignRest: false }, [0, -x, 0]);
+    const withoutLittle = {
+      names: names.slice(0, 4),
+      parents: source.parents.slice(0, 4),
+      rest: source.rest.slice(0, 40),
+    };
+    check(withoutLittle, {}, [0, -x, 0]);
+    const collinear = { ...source, rest: source.rest.slice() };
+    collinear.rest[32] = collinear.rest[42] = 0;
+    check(collinear, {}, [0, -x, 0]);
+  }
 });
 
 test('Roblox R15 takes Mixamo clips: trunk and limbs map, missing bones are listed', () => {

@@ -2,7 +2,13 @@
 // humanoid) mapped onto one humanoid vocabulary, so a clip made for one plays on another with
 // `@margoengine/animation`'s Retarget; plus rest-pose alignment, which turns the target's reference pose to match the
 // source's (an A-pose character driven by T-pose clips) bone by bone.
-import { multiplyQuaternions, normalizeQuaternion } from '@margoengine/math/quat';
+import {
+  axisAngleToQuaternion,
+  multiplyQuaternions,
+  normalizeQuaternion,
+  rotateByQuaternion,
+} from '@margoengine/math/quat';
+import { cross, dot, length, normalize, scale, sub } from '@margoengine/math/vec3';
 import { rotationBetween } from './ik.js';
 import { parentOrder, worldFrames } from './rig.js';
 
@@ -442,9 +448,38 @@ function unapply(linear: Float64Array, b: number, v: readonly number[]): number[
   return [det(v, y, z) / whole, det(x, v, z) / whole, det(x, y, v) / whole];
 }
 
+/** The direction across the palm, from the little finger's base to the index finger's base. */
+function palmAcross(
+  side: (typeof SIDES)[number],
+  bones: Map<HumanoidBone, number>,
+  positions: readonly number[][],
+): [number, number, number] | null {
+  const index = bones.get(`${side}IndexProximal`),
+    little = bones.get(`${side}LittleProximal`);
+  return index === undefined || little === undefined ? null : sub(positions[index], positions[little]);
+}
+
+/** Roll around the already aligned wrist-to-middle-finger axis, in the target parent's frame. */
+function alignPalm(
+  aim: readonly number[],
+  swing: [number, number, number, number],
+  from: readonly number[],
+  to: readonly number[],
+): [number, number, number, number] {
+  const axis = normalize(aim),
+    across = rotateByQuaternion(normalize(from), swing),
+    desired = normalize(to),
+    have = sub(across, scale(axis, dot(across, axis))),
+    want = sub(desired, scale(axis, dot(desired, axis)));
+  // A coincident or collinear pair of finger bases cannot tell us which way the palm faces.
+  if (length(have) < 1e-9 || length(want) < 1e-9) return swing;
+  const roll = Math.atan2(dot(axis, cross(have, want)), dot(have, want));
+  return multiplyQuaternions(axisAngleToQuaternion(axis, roll), swing);
+}
+
 /**
  * The target rig with its rest rotations turned, parents first, so every mapped bone points at its mapped child the
- * way the source's bone does at rest.
+ * way the source's bone does at rest, with the palms also facing the same way when the finger bases are mapped.
  */
 function alignRestPose(
   source: RetargetRigData,
@@ -474,13 +509,19 @@ function alignRestPose(
       from = p < 0 ? have : unapply(world.linear, p, have),
       to = p < 0 ? want : unapply(world.linear, p, want);
     if (!from || !to) continue; // a flat parent scale: nothing below it can be aimed
+    let turn = rotationBetween(from, to);
+    if (bone === 'leftHand' || bone === 'rightHand') {
+      const side = bone === 'leftHand' ? 'left' : 'right',
+        targetPalm = palmAcross(side, targetBones, world.position),
+        sourcePalm = palmAcross(side, sourceBones, sourceWorld.position);
+      if (targetPalm && sourcePalm) {
+        const across = p < 0 ? targetPalm : unapply(world.linear, p, targetPalm),
+          desired = p < 0 ? sourcePalm : unapply(world.linear, p, sourcePalm);
+        if (across && desired) turn = alignPalm(rotateByQuaternion(from, turn), turn, across, desired);
+      }
+    }
     const l = t * 10 + 3;
-    rest.set(
-      normalizeQuaternion(
-        multiplyQuaternions(rotationBetween(from, to), [rest[l], rest[l + 1], rest[l + 2], rest[l + 3]]),
-      ),
-      l,
-    );
+    rest.set(normalizeQuaternion(multiplyQuaternions(turn, [rest[l], rest[l + 1], rest[l + 2], rest[l + 3]])), l);
   }
   return { names: target.names, parents: target.parents, rest };
 }

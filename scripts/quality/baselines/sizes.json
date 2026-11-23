@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17402038,
+  "total": 17402468,
   "history": [
     {
       "date": "2026-10-24",
@@ -11349,6 +11349,12 @@
       "commit": "dee3abca82",
       "reason": "Fieldstone fracture profiles: 17,562 to 18,164 B gzip. Filtered mineral grain in the existing rock surface pass: 4,408 to 4,800 B. A split would require a separate async entry for synchronous scatter geometry or another shader variant and material setup for mineral shading.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-23",
+      "commit": "abe38d562e",
+      "reason": "Rigging retarget palm orientation: 3,470 to 3,757 B gzip, ceiling 3,583 to 4,013 B. Matching two anatomical axes fixes palm roll during synchronous rest alignment. A split would add an import or a second call for the same operation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12266,7 +12272,7 @@
     "@margoengine/rigging/ik": 4108,
     "@margoengine/rigging/mtoon": 11432,
     "@margoengine/rigging/pose-tracking": 5458,
-    "@margoengine/rigging/retarget": 3583,
+    "@margoengine/rigging/retarget": 4013,
     "@margoengine/rigging/springs": 5069,
     "@margoengine/rigging/transfer": 4108,
     "@margoengine/rigging/voxel-weights": 5854,
