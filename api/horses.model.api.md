@@ -34,6 +34,12 @@ export interface HorseDocument {
     readonly vertices: number;
 }
 
+export interface HorseHoofTarget {
+    readonly point: Readonly<V3>;
+    readonly pitch: number;
+    readonly roll: number;
+}
+
 export interface HorseJoint {
     readonly name: string;
     readonly parent: number;
@@ -77,6 +83,8 @@ export function coatAtlas(): {
 };
 
 export function coatAtlasUV(coat: HorseCoat, row: 'body' | 'points' | 'mane' | 'hoof'): [number, number];
+
+export function fitHorseHooves(skeleton: HorseSkeleton, pose: HorsePose, targets: readonly HorseHoofTarget[], pitch?: number, roll?: number): HorsePose;
 
 export function horseDocument(options?: HorseModelOptions): HorseDocument;
 

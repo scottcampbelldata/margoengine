@@ -34,6 +34,32 @@ export async function startImportedHorse(engine: Engine, skin: HorseSkin) {
 }
 ```
 
+Pass `ground(x, z)` for an uneven path. The controller holds each stance hoof at its world-space landing point
+through turns, then releases the horizontal correction over 0.18 seconds. It conforms the hoof to the local grade and
+retains toe breakover and swing clearance. The back and saddle lean with the wider ground slope. Supply a stable,
+continuous height field in metres for deterministic seeks. Jumps, large risers, and overhangs require separate route
+planning. Limb reach and splay constraints still apply.
+
+```ts
+import type { Engine } from 'margoengine';
+import { addHorse } from 'margoengine/horses';
+
+export async function walkOnAGrade(engine: Engine) {
+  const horse = await addHorse(engine, { ground: (x, z) => 0.08 * z - 0.06 * x + 0.04 * Math.sin(2 * z) });
+  horse.gait = 'walk';
+  horse.speed = 1.4;
+  horse.seek(2.4);
+  return horse;
+}
+```
+
+The terrain pass follows the world-space plant and continuous correction approach of [Kovar, Schreiner and Gleicher,
+Footskate Cleanup for Motion Capture Editing (2002)](https://research.cs.wisc.edu/graphics/Papers/Gleicher/Mocap/cleanup.pdf).
+Its separate support frames and trunk sampling draw on [Coros, Karpathy, Jones, Reveret and van de Panne,
+Locomotion Skills for Simulated Quadrupeds (2011)](https://www.cs.ubc.ca/~van/papers/2011-TOG-quadruped/index.html)
+and [Miller, Holden, Al-Ashqar, Dubach, Mitchell and Komura, Carpet Unrolling for Character Control on Uneven Terrain
+(2015)](https://www.pure.ed.ac.uk/ws/portalfiles/portal/21937045/MIG_2015_paper_22.pdf).
+
 ## Anatomy (`./anatomy`)
 
 | Group | Withers | Build | Weight |
@@ -89,6 +115,34 @@ phases described in [The forelimb in walking horses, Hodson, Clayton and Lanovaz
 [The hindlimb in walking horses, Hodson, Clayton and Lanovaz (2001)](https://doi.org/10.2746/042516401776767485), and
 [Forelimb kinematics and net joint moments during the swing phase of the trot, Lanovaz, Clayton, Colborne and Schamhardt (1999)](https://doi.org/10.1111/j.2042-3306.1999.tb05225.x).
 The gait curves are approximations of these patterns. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
+
+The two forelegs straighten the carpus under weight, including if a skinned model's bind pose already bends it.
+For a typical walk, the engine targets about 55 degrees of carpal fold, peaking near 76% of the full stride.
+The fetlock drive follows at about 81%, and the elbow and coffin joint drive follow near 84%. The trot has a
+larger carpal swing around 76 degrees and decelerates into landing. The angles and order follow [Hodson, Clayton
+and Lanovaz, The Forelimb in Walking Horses: Kinematics and Ground Reaction Forces (2000)](https://doi.org/10.2746/042516400777032237),
+[Clayton, Sha, Stick and Mullineaux, Three-Dimensional Carpal Kinematics of Trotting Horses
+(2004)](https://doi.org/10.2746/0425164044848037), and the walking range summarized in [Jose L. Mendez-Angulo,
+Effect of Water Level on Kinematics of Healthy Horses (2012), Table 1](https://conservancy.umn.edu/bitstreams/3a03b69d-656f-4f98-be2c-9706192aa746/download).
+
+`fitHorseHooves` runs the leg solve directly for authored contact targets in model space. Pitch and roll are in
+radians about +X and +Z, with zero as the default trunk slope. Each target applies its terrain angles to the base
+hoof motion. The leg lengths and original bending sides are preserved. Turning the whole chain laterally is capped
+at 0.35 radians. The live terrain controller uses this same method.
+
+```ts
+import { horseBody } from 'margoengine/horses/anatomy';
+import { fitHorseHooves, horsePose, horseSkeleton, type HorseHoofTarget } from 'margoengine/horses/model';
+
+const rig = horseSkeleton(horseBody());
+const targets: HorseHoofTarget[] = rig.ground.map(([x, , z]) => ({
+  point: [x, 0.1 * z, z],
+  pitch: -Math.atan(0.1),
+  roll: 0,
+}));
+const standingOnTheGrade = fitHorseHooves(rig, horsePose(rig, null), targets, -Math.atan(0.1));
+console.log(standingOnTheGrade.rotations.length); // 37
+```
 
 Swing matches the planted hoof's local fore-aft velocity at lift-off and touchdown. During a gait change, the
 controller matches hoof positions and short-term travel to select the incoming phase. The outgoing cadence eases out

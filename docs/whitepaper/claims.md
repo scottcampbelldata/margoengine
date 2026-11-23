@@ -9,6 +9,18 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Equine foreleg motion (2026-11-23). `packages/horses/test/horses.test.js` samples both sides of both
+  native and fitted rigs over full walk and trot strides. It bounds loaded carpal flexion, compares the swing
+  range and walks through the order of carpal, elbow and coffin flexion. The fitted fixture begins from a visibly
+  bent carpus. [Published angles and gait timing](../../packages/horses/README.md#the-model-model).
+
+- Horse terrain contact (2026-11-23). The horse GPU fixture walks and turns on a continuous rolling, cross-sloped
+  surface, tests four standing hoof contacts, checks stationary world anchors and clearance while moving, verifies
+  seek replay, and bounds the motion through a halt and restart. The CPU fixture verifies the targeted leg lengths
+  for all three builds. Build the packages and run `node packages/horses/test/horses-check.mjs` with WebGPU or
+  `MARGO_COMPAT=1` for WebGL2, and `node --test packages/horses/test/grounding.test.js`.
+  [Method and sources](../../packages/horses/README.md).
+
 - Horse motion and authored skins (2026-11-23). The WebGPU and compatible WebGL2 horse fixture samples a deliberate
   start, gait interruption, halt and restart at 120 Hz, checks saddle travel and tail motion, and replays the same
   poses after seeks. It also checks that a loaded skin follows the live controller and remains caller-owned. CPU

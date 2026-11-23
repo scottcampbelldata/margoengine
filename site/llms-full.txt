@@ -3133,12 +3133,20 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Horse terrain contact (2026-11-23). The live horse can plant four reachable world points on a continuous
+  height field, with slope-specific hoof angles and a 0.18 s horizontal release. Fitted chains keep their lengths
+  and bend sides, and lateral splay is capped at 0.35 radians. The height field uses one elevation per XZ
+  and assumes a reachable route. Baked clips and crowd gaits follow their authored plane.
+  With the foreleg update, the optional entries are 15,326 B for `horses`, 11,419 B for `horses/model`,
+  and 11,765 B for `horses/crowd`.
+  [Terrain setup and evidence](../packages/horses/README.md).
+
 - Horse gait transitions (2026-11-23). The runtime matches incoming four-hoof positions and supporting movement,
   then retires the previous cadence over the configured fade (0.3 s by default). The built-in horse has 37 joints,
   including five flexible tail hair joints. Authored skins provide their own joint mapping and remain caller-owned.
   The gait solver uses planar leg anatomy and can shorten the stride to fit a tighter limb while preserving speed.
-  Arbitrary terrain still needs a separate contact calibration. The optional min+gzip entries are 13,856 B
-  for `horses`, 11,539 B for `horses/crowd`, and 10,673 B for `horses/model`.
+  This gait-transition pass measured 13,856 B for `horses`, 11,539 B for `horses/crowd`, and 10,673 B for `horses/model`
+  before the live terrain contact change.
   [Horse setup and evidence](../packages/horses/README.md).
 
 - Human palm contacts (2026-11-23). The palm must be within the default 0.003 model units and 5 degrees to close.
@@ -31633,6 +31641,32 @@ export async function startImportedHorse(engine: Engine, skin: HorseSkin) {
 }
 ```
 
+Pass `ground(x, z)` for an uneven path. The controller holds each stance hoof at its world-space landing point
+through turns, then releases the horizontal correction over 0.18 seconds. It conforms the hoof to the local grade and
+retains toe breakover and swing clearance. The back and saddle lean with the wider ground slope. Supply a stable,
+continuous height field in metres for deterministic seeks. Jumps, large risers, and overhangs require separate route
+planning. Limb reach and splay constraints still apply.
+
+```ts
+import type { Engine } from 'margoengine';
+import { addHorse } from 'margoengine/horses';
+
+export async function walkOnAGrade(engine: Engine) {
+  const horse = await addHorse(engine, { ground: (x, z) => 0.08 * z - 0.06 * x + 0.04 * Math.sin(2 * z) });
+  horse.gait = 'walk';
+  horse.speed = 1.4;
+  horse.seek(2.4);
+  return horse;
+}
+```
+
+The terrain pass follows the world-space plant and continuous correction approach of [Kovar, Schreiner and Gleicher,
+Footskate Cleanup for Motion Capture Editing (2002)](https://research.cs.wisc.edu/graphics/Papers/Gleicher/Mocap/cleanup.pdf).
+Its separate support frames and trunk sampling draw on [Coros, Karpathy, Jones, Reveret and van de Panne,
+Locomotion Skills for Simulated Quadrupeds (2011)](https://www.cs.ubc.ca/~van/papers/2011-TOG-quadruped/index.html)
+and [Miller, Holden, Al-Ashqar, Dubach, Mitchell and Komura, Carpet Unrolling for Character Control on Uneven Terrain
+(2015)](https://www.pure.ed.ac.uk/ws/portalfiles/portal/21937045/MIG_2015_paper_22.pdf).
+
 ## Anatomy (`./anatomy`)
 
 | Group | Withers | Build | Weight |
@@ -31653,28 +31687,6 @@ console.log(shire.withers.toFixed(3), shire.mass.toFixed(0)); // 1.778, about 90
 ```
 
 ## Gaits (`./gaits`)
-
-| Gait | Froude u^2/gh | Footfall (left lead) | Duty factor | Trunk |
-| --- | --- | --- | --- | --- |
-| walk | below 0.4 | LH, LF, RH, RF, a quarter stride apart | 0.75 to 0.6 | two rises a stride, 2.5 % of withers |
-| trot | 0.4 to 2.4 | diagonal pairs, half a stride apart | 0.48 to 0.36 | two rises, 5 % (about 8 cm) |
-| canter | 2.4 to 6.5 | RH; LH and RF; LF; suspension | 0.46 to 0.36 | one rise and a rock |
-| gallop | above 6.5 | RH, LH, RF, LF; suspension | 0.32 to 0.22 | one rise and a rock |
-
-Stride length is 2.3 h (u^2/gh)^0.3 with h the hip joint height (Alexander and Jayes 1983): a riding horse covers
-1.6 m a stride at 1.6 m/s, 2.8 m at 4 m/s, 3.9 m at 7 m/s and 6.4 m at 16 m/s. Gait changes by Froude number, so a pony
-trots sooner than a Shire. Footfall timing is Hildebrand (1965, 1977), trot and canter stance Clayton (1993, 1994), trunk
-motion Buchner et al. (1996).
-
-```ts
-import {horseBody} from 'margoengine/horses/anatomy';
-import {gaitFor, stride, hoovesDown} from 'margoengine/horses/gaits';
-const body = horseBody();
-const s = stride(body, 7); // a canter
-console.log(gaitFor(body, 7), s.length.toFixed(2), s.duty.toFixed(2), hoovesDown(s, 0.95)); // canter 3.92 0.41 0
-```
-
-## The model (`./model`)
 
 [README continues: https://margoengine.com/llms/packages/horses.md]
 

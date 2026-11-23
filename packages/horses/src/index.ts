@@ -13,8 +13,9 @@ import type { MaterialInstallation } from '@margoengine/materials';
 import type { hair as hairFeature, HairOptions } from '@margoengine/materials/hair';
 import { captureScene } from '../../shared/scene-scope.js';
 import type { HorseBody } from './anatomy.js';
-import { GAIT_PATTERNS, froude, stride, type Gait, type Stride } from './gaits.js';
+import { GAIT_PATTERNS, froude, hoofPhase, stride, type Gait, type Stride } from './gaits.js';
 import { horseClipPlan, strideReachScale } from './clip-plan.js';
+import { horseGrounding } from './grounding.js';
 import {
   horseDocument,
   horseJointTranslation,
@@ -52,7 +53,7 @@ export interface HorseOptions extends HorseModelOptions {
   position?: readonly [number, number];
   /** Starting heading in radians about +Y, 0 facing +Z. Default 0. */
   heading?: number;
-  /** Ground height under a point; the horse stands on it. Default flat ground at 0. */
+  /** Ground height in metres. Fits and plants individual hooves on the supplied surface. Default flat ground at 0. */
   ground?: (x: number, z: number) => number;
   /** Most the speed changes per second, m/s^2. Default 3 (a riding horse reaches a gallop in about 4 s). */
   acceleration?: number;
@@ -272,6 +273,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
   if (!(fade >= 0 && fade < Infinity)) throw new RangeError('addHorse fade must be 0 or more seconds');
   const ground = options.ground ?? (() => 0);
   if (typeof ground !== 'function') throw new TypeError('addHorse ground must be a function (x, z) => height');
+  const grounding = options.ground ? horseGrounding(skeleton, ground) : undefined;
   const explicitShadows = receiver(options.shadows, 'shadows'),
     occlusion = receiver(options.occlusion, 'occlusion'),
     // The scene this call was made for, kept across the lazy imports: the model and everything it brings belong to it.
@@ -359,19 +361,31 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
   };
   const retiringRate = (g: Gait | 'stand', speed: number): number =>
     g === 'stand' || speed === 0 ? 1 : Math.min(1, strides.get(g)!.speed / speed);
+  const carriedDistance = (distance: number) =>
+    outgoingDistance + (distance - motion.distance) * (1 - motion.fade) * retiringRate(motion.previous, motion.speed);
+  const supportAt = (distance: number) => {
+    const retiring = motion.fade < 0.5 && !interruptedFrom;
+    const gait = retiring ? motion.previous : motion.gait;
+    const stride = gait === 'stand' ? undefined : strides.get(gait);
+    const phase =
+      gait === 'stand' || !stride
+        ? 0
+        : motion.phaseAt(gait, stride.length, retiring ? carriedDistance(distance) : distance) +
+          (phaseOffsets.get(gait) ?? 0);
+    return [0, 1, 2, 3].map((hoof) => Boolean(stride && hoofPhase(stride, hoof, phase).stance));
+  };
   const locomotionPose = (distance: number, at: number) => {
     const now = gaitPose(motion.gait, distance, at);
     if (motion.fade >= 1) return now;
     const t = motion.fade;
     const weight = t ** 3 * (10 + t * (-15 + 6 * t));
-    const carried =
-      outgoingDistance + (distance - motion.distance) * (1 - t) * retiringRate(motion.previous, motion.speed);
-    return blendPoses(interruptedFrom ?? gaitPose(motion.previous, carried, at), now, weight);
+    return blendPoses(interruptedFrom ?? gaitPose(motion.previous, carriedDistance(distance), at), now, weight);
   };
-  const computePose = (distance: number) => {
-    pose = locomotionPose(distance, time);
+  const computePose = (frame: ReturnType<typeof shown>, height: number) => {
+    pose = locomotionPose(frame.distance, time);
     for (const action of tailActions)
       pose = horseTailFlick(skeleton, pose, time - action.at, action.value.strength, action.value.side);
+    if (grounding) pose = grounding.fit(frame, height, time, pose);
   };
   const alignGait = (gait: Gait, from: HorsePose, after: HorsePose, at: number, lead: number) => {
     const st = strides.get(gait)!;
@@ -405,8 +419,9 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
   };
   const movingJoints = ['body', 'scapulaL', 'scapulaR'].map((name) => skeleton.index(name));
   const apply = () => {
-    const v = shown();
-    computePose(v.distance);
+    const v = shown(),
+      y = ground(v.x, v.z);
+    computePose(v, y);
     const nodes = model.nodes as unknown as {
       setQuaternion(q: readonly number[]): unknown;
       setPosition(p: readonly number[]): unknown;
@@ -416,7 +431,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       pose.rotations.forEach((q, i) => i > 0 && nodes[i]?.setQuaternion(q));
       for (const joint of movingJoints) nodes[joint]?.setPosition(horseJointTranslation(skeleton, pose, joint));
     }
-    model.root.setPosition([v.x, ground(v.x, v.z), v.z]);
+    model.root.setPosition([v.x, y, v.z]);
     model.root.setQuaternion([0, Math.sin(v.heading / 2), 0, Math.cos(v.heading / 2)]);
   };
   const stepTo = (end: number) => {
@@ -455,10 +470,14 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
         outgoingDistance += retiringDistance * (1 - (previousFade + motion.fade) / 2);
       }
       ticks++;
+      if (grounding)
+        grounding.advance(motion, ticks * STEP, supportAt(motion.distance), () =>
+          locomotionPose(motion.distance, ticks * STEP),
+        );
       if (listeners.size) {
         const keep = time;
         time = ticks * STEP;
-        computePose(motion.distance);
+        computePose(motion, ground(motion.x, motion.z));
         for (const l of listeners) l.step(STEP, horse);
         time = keep;
       }
@@ -539,7 +558,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     },
     frame() {
       const s = poseSaddle(skeleton, pose),
-        v = listeners.size && time !== ticks * STEP ? shown() : shown(),
+        v = shown(),
         h = v.heading,
         c = Math.cos(h),
         sn = Math.sin(h),
@@ -569,6 +588,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       ticks = 0;
       next = 0;
       tailActions.length = 0;
+      grounding?.reset();
       interruptedFrom = undefined;
       outgoingDistance = 0;
       prev = { x: motion.x, z: motion.z, heading: motion.heading, distance: motion.distance };

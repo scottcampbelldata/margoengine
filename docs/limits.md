@@ -8,12 +8,20 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Horse terrain contact (2026-11-23). The live horse can plant four reachable world points on a continuous
+  height field, with slope-specific hoof angles and a 0.18 s horizontal release. Fitted chains keep their lengths
+  and bend sides, and lateral splay is capped at 0.35 radians. The height field uses one elevation per XZ
+  and assumes a reachable route. Baked clips and crowd gaits follow their authored plane.
+  With the foreleg update, the optional entries are 15,326 B for `horses`, 11,419 B for `horses/model`,
+  and 11,765 B for `horses/crowd`.
+  [Terrain setup and evidence](../packages/horses/README.md).
+
 - Horse gait transitions (2026-11-23). The runtime matches incoming four-hoof positions and supporting movement,
   then retires the previous cadence over the configured fade (0.3 s by default). The built-in horse has 37 joints,
   including five flexible tail hair joints. Authored skins provide their own joint mapping and remain caller-owned.
   The gait solver uses planar leg anatomy and can shorten the stride to fit a tighter limb while preserving speed.
-  Arbitrary terrain still needs a separate contact calibration. The optional min+gzip entries are 13,856 B
-  for `horses`, 11,539 B for `horses/crowd`, and 10,673 B for `horses/model`.
+  This gait-transition pass measured 13,856 B for `horses`, 11,539 B for `horses/crowd`, and 10,673 B for `horses/model`
+  before the live terrain contact change.
   [Horse setup and evidence](../packages/horses/README.md).
 
 - Human palm contacts (2026-11-23). The palm must be within the default 0.003 model units and 5 degrees to close.

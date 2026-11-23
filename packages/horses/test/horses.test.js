@@ -590,3 +590,58 @@ test('crowd: the coat atlas goes with the draw however the draw is let go, once'
   herd.crowd.dispose();
   assert.equal(released, 1, 'and not again by the herd or a repeated disposal');
 });
+
+test('forelimb flexion peaks in anatomical order and the loaded carpus stays extended on an authored rig', () => {
+  const native = horseSkeleton(horseBody());
+  // This forward carpus is intentionally bent in bind, as an authored, weighted model often is.
+  const fitted = {
+    ...native,
+    joints: native.joints.map((joint) =>
+      joint.name.startsWith('foreCannon')
+        ? { ...joint, rest: [joint.rest[0], joint.rest[1], joint.rest[2] + 0.052] }
+        : joint,
+    ),
+  };
+  const angle = (a, b) => Math.atan2(b[2] - a[2], b[1] - a[1]);
+  const difference = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  for (const rig of [native, fitted])
+    for (const hoof of [1, 3])
+      for (const [gait, speed, maxDegrees] of [
+        ['walk', 1.52, 55],
+        ['trot', 3.2, 76],
+      ]) {
+        const cycle = stride(rig.body, speed, gait),
+          leg = rig.legs[hoof];
+        const samples = Array.from({ length: 320 }, (_, i) => {
+          const phase = i / 320,
+            pose = horsePose(rig, cycle, phase + cycle.strike[hoof]),
+            joints = poseJoints(rig, pose),
+            [, shoulder, elbow, carpus, fetlock] = leg.map((j) => joints[j]);
+          return {
+            phase,
+            elbow: Math.abs(difference(angle(shoulder, elbow), angle(elbow, carpus))),
+            carpus: difference(angle(elbow, carpus), angle(carpus, fetlock)),
+            coffin: -2 * Math.atan2(pose.rotations[leg[5]][0], pose.rotations[leg[5]][3]),
+          };
+        });
+        const beforeLift = samples.filter((row) => row.phase > 0.08 && row.phase < cycle.duty * 0.76);
+        assert.ok(
+          beforeLift.every((row) => row.carpus > -1e-7 && row.carpus < 0.15),
+          'loaded foreleg stays nearly straight',
+        );
+        const swing = samples.filter((row) => row.phase > cycle.duty);
+        const peak = (key) => swing.reduce((a, b) => (a[key] > b[key] ? a : b));
+        const fold = peak('carpus'),
+          distal = peak('coffin'),
+          upper = peak('elbow');
+        assert.ok(Math.abs((fold.carpus * 180) / Math.PI - maxDegrees) < 7, 'swing carpus fold is gait-specific');
+        assert.ok(
+          upper.phase > fold.phase && distal.phase > fold.phase,
+          'the carpus folds before the elbow and coffin release',
+        );
+        if (gait === 'walk') {
+          assert.ok(Math.abs(fold.phase - 0.76) < 0.027, 'walking carpus peaks near 76% of a stride');
+          assert.ok(Math.abs(distal.phase - 0.84) < 0.02, 'walking coffin peaks near 84% of a stride');
+        }
+      }
+});

@@ -82,6 +82,18 @@ try {
   );
   assert.ok(authored.lowest > -0.01, `the fitted hooves remain above the ground during a start: ${authored.lowest}`);
   assert.ok(authored.callerOwns, 'the caller keeps its authored model after the controller is disposed');
+  const terrain = await page.evaluate(() => window.check.terrain());
+  keep('terrain.png', terrain.bytes);
+  assert.deepEqual(terrain.errors, []);
+  assert.ok(terrain.standGap < 0.002, 'standing hoof clearance: ' + terrain.standGap);
+  assert.ok(terrain.min > -0.012, 'deepest hoof penetration: ' + terrain.min);
+  assert.ok(terrain.stable > 900, 'fixed plants across the turning stride: ' + terrain.stable);
+  assert.ok(
+    terrain.worstStep < 0.065,
+    'ground contact releases smoothly across a stop and restart: ' + terrain.worstStep,
+  );
+  assert.equal(terrain.replay, terrain.played, 'ground contacts replay exactly through a seek');
+  console.log('terrain walking contacts', terrain.stable, 'fixed, minimum clearance', terrain.min.toFixed(4), 'm');
   const herd = await page.evaluate(() => window.check.herd());
   keep('herd.png', herd.bytes);
   assert.deepEqual(herd.errors, []);

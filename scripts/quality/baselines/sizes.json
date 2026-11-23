@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17435430,
+  "total": 17437697,
   "history": [
     {
       "date": "2026-10-24",
@@ -11385,6 +11385,12 @@
       "commit": "8a314c3a3a",
       "reason": "Horse motion matches support through gait changes and calibrates authored stride reach, with shared animated shoulders and tail in the root, model and crowd entries",
       "grew": 3
+    },
+    {
+      "date": "2026-11-23",
+      "commit": "74281e2851",
+      "reason": "Terrain hoof plants and research-based foreleg flexion share the horse leg solve across live, baked and crowd poses",
+      "grew": 2
     }
   ],
   "items": {
@@ -11854,11 +11860,11 @@
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,
     "@margoengine/headless/video": 12819,
-    "@margoengine/horses": 14287,
+    "@margoengine/horses": 15786,
     "@margoengine/horses/anatomy": 1097,
     "@margoengine/horses/crowd": 11886,
     "@margoengine/horses/gaits": 1467,
-    "@margoengine/horses/model": 10994,
+    "@margoengine/horses/model": 11762,
     "@margoengine/horses/seat": 1758,
     "@margoengine/horses/settings": 2384,
     "@margoengine/html": 7487,
