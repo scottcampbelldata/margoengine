@@ -9,6 +9,14 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Human palm contacts and forearm roll (2026-11-23). Tests require both mirrored hands to close only on
+  registration, and reject a coincident palm facing backward. The Animator test starts with keyed clenching
+  and checks the relaxed hand during an unreachable approach after the transform store grows, closure on
+  registration and restoration after removal. The standalone CCD test checks isolated roll on a flexed arm,
+  fixed bone offsets and signed limits.
+  Build with `npm run build:packages`, then run
+  `node --test packages/rigging/tests/hands.test.js packages/animator/test/ccd-entry.test.js`.
+
 - Swimming, contact and coral generation (2026-11-23). Stroke-plane, fixed-length, fin phase and seek tests
   cover the swimming profiles and a dense chain with 1,207 segments. Contact tests measure position and orientation
   after solving, including targets beyond reach. The coral test checks closed connected meshes, seabed attachment

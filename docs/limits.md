@@ -8,6 +8,12 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Human palm contacts (2026-11-23). The palm must be within the default 0.003 model units and 5 degrees to close.
+  One contact solves a contiguous arm and one mapped hand. The grip approximates a cylinder with a diameter
+  above 0 and below 1 m. Per-digit skin collision remains an independent constraint. The optional forearm
+  limit takes perpendicular nonzero flex and roll axes with signed ranges within ±π. See
+  [palm calibration](../packages/rigging/README.md#human-palm-and-cylindrical-grips).
+
 - Swimming and dense rigs (2026-11-23). The CPU rig builder accepts 1–65,536 joints. The swimming entry accepts
   at least four spine segments, 0.001–1,000 m head-to-tail length, and at most 65,536 joints including the fins.
   Nonuniform stations must differ by at least one hundred-millionth of the length. It samples deterministic

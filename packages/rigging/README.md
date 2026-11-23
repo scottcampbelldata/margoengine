@@ -188,6 +188,58 @@ Pose and contact points use skeleton space and the same units. Ancestor scales m
 
 The contact landmark follows [*Footskate Cleanup for Motion Capture Editing*, Kovar, Gleicher and Schreiner (2002)](https://research.cs.wisc.edu/graphics/Papers/Gleicher/Mocap/cleanup.pdf). The chain solve uses the Animator's constrained CCD solver. [*Parametrization and Range of Motion of the Ball-and-Socket Joint*, Baerlocher and Boulic (2000)](https://infoscience.epfl.ch/bitstreams/949101d1-ec81-4e38-91d8-c414ee95c8fc/download) describes swing and twist boundaries. Position error is at the surface landmark because the joint origin and the surface point differ, as in the hand and foot annotations of [*CIMI4D*, Yan et al. (2023)](https://openaccess.thecvf.com/content/CVPR2023/papers/Yan_CIMI4D_A_Large_Multimodal_Climbing_Motion_Dataset_Under_Human-Scene_Interactions_CVPR_2023_paper.pdf).
 
+### Human palm and cylindrical grips
+
+`PalmContactRig` measures the palm and digits from the rig's bind pose, aligns a palm pad to a contact point and its
+surface normal, and closes the fingers in proportion to the actual contact. Arm reach and finger closure are separate
+inputs. While a reach is active, the contact layer owns the digits, including any earlier keyed grip. Closure eases to
+zero when the palm is farther away or more misaligned than its tolerance. A reversed palm cannot engage the grip.
+`addPalmContact` evaluates this same solve after the Animator's pose and earlier solvers.
+
+```ts
+import type { Animator } from 'margoengine/animator';
+import { addPalmContact, type PalmContactTarget } from 'margoengine/rigging/contact';
+
+export function attachRailGrip(animator: Animator, upperArm: number, elbow: number, wrist: number) {
+  let target: PalmContactTarget | undefined;
+  const dispose = addPalmContact(animator, {
+    side: 'right',
+    preset: 'mixamo',
+    joints: [upperArm, elbow, wrist],
+    elbow: { joint: elbow, flexDirection: [0, 0, 1] },
+  }, () => target);
+  return {
+    reach(point: PalmContactTarget['point']) {
+      target = { point, normal: [0, 0, 1], towardsFingers: [0, 1, 0], diameter: 0.035 };
+    },
+    release() { target = undefined; },
+    dispose,
+  };
+}
+```
+
+Use node indices from the avatar and directions in its skeleton space. Supply a custom humanoid `bones` map for
+an unfamiliar naming scheme. For offline posing, construct `new PalmContactRig(rig, calibration)` and call
+`solve(sampledLocal, target)` once per sample. Both routes report the achieved position, distance, angle, contact
+state and `gripWeight`. Resolve moving holds into model space at the sample time. Supply `close` to animate
+release and `weight` to blend the reach. Return `undefined` to give control to the underlying animation.
+
+Default registration tolerances are 3 mm on metre-scale rigs and 5 degrees. With elbow calibration, the forearm
+bends about its measured flexion axis, defaults to −0.035 to 2.55 radians relative to bind and rolls ±1.25 radians
+about its length. Use `roll: false` for a separately authored twist joint. The measured wrist defaults to 1.15
+radians of swing and ±0.22 radians of axial twist. Use `limits` to set per-character bounds and `anchor` for a
+measured palm-pad point in wrist-local coordinates. The default anchor is 56% of the wrist-to-middle-knuckle
+distance with an 8.5% outward pad offset. Cylindrical poses use the measured digit lengths and a diameter
+above 0 and below 1 m. The solver measures palm registration, and per-digit skin collision requires its own
+geometry and verification.
+
+The grip model draws on [*The Computer Animation of Human Hand Grasping*, Rijpkema and Girard (1991)](https://doi.org/10.1145/127719.127748)
+and [*Handrix*, ElKoura and Singh (2003)](https://doi.org/10.2312/SCA03/110-119).
+The independent forearm and wrist controls follow the distinct axes described in
+[*From Skin to Skeleton*, Keller et al. (2023)](https://doi.org/10.1145/3618381) and
+[*In Vivo Analysis of the Mechanical Axes of the Wrist During Dynamic Motion*, Crisco et al. (2011)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3016043/).
+These are rig-space defaults that can be calibrated to the actor's proportions, bind orientation and authored controls.
+
 ## Joint hulls (`margoengine/rigging/hulls`)
 
 `jointHulls(model, options)` finds the convex hull of the vertices each joint carries, from a skinned mesh in its bind pose. A hull is a short list of corners, so a clearance or collision test can use the real shape of a torso, head or forearm instead of a sphere or capsule. Run it once at load. It uses `@margoengine/geometry`'s quickhull, and only this entry imports it.

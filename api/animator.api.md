@@ -193,6 +193,12 @@ export interface CCDHingeLimit {
     axis: Vec3;
     min?: number;
     max?: number;
+    twist?: CCDHingeTwist;
+}
+
+export interface CCDHingeTwist {
+    axis: Vec3;
+    range: readonly [number, number];
 }
 
 export type CCDJointLimit = CCDEulerLimit | CCDHingeLimit | CCDConeLimit;

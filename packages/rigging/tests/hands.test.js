@@ -6,6 +6,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { Animator } from '../../animator/dist/index.js';
+import { PalmContactRig, addPalmContact } from '../dist/contact.js';
 import {
   FINGERS,
   addHands,
@@ -124,6 +125,85 @@ function forward(rig, rotations = new Map()) {
   });
   return out;
 }
+
+test('both hands align their measured palm to the surface and fail open off the geometry', () => {
+  const rig = makeRig('mixamo', 78);
+  const bones = humanoidBones(rig.names, 'mixamo');
+  const measured = measureHands(rig, 'mixamo');
+  const world = forward(rig);
+  for (const side of ['left', 'right']) {
+    const joints = ['UpperArm', 'LowerArm', 'Hand'].map((suffix) => bones.get(side + suffix));
+    const hand = measured[side],
+      wrist = world[joints[2]],
+      middle = world[hand.fingers.middle.bones[0]],
+      contact = new PalmContactRig(rig, {
+        side,
+        joints,
+        preset: 'mixamo',
+        elbow: { joint: joints[1], flexDirection: [0, 0, 1] },
+      });
+    const target = {
+      point: rot(contact.anchor, wrist.q).map((n, i) => n + wrist.p[i]),
+      normal: hand.palm.map((n) => -n),
+      towardsFingers: middle.p.map((n, i) => n - wrist.p[i]),
+      diameter: 0.032,
+    };
+    const local = rig.rest.slice();
+    const planted = contact.solve(local, target);
+    assert.equal(planted.locked, true);
+    assert.ok(planted.gripWeight > 0.999);
+    assert.equal(planted.point.length, 3);
+    const makeMiss = () => {
+      const frame = rig.rest.slice();
+      const missed = contact.solve(frame, {
+        ...target,
+        point: target.point.map((n, i) => n + (i === 0 ? SIDE[side] * 2 : 0)),
+      });
+      assert.equal(missed.locked, false);
+      assert.equal(missed.gripWeight, 0);
+      return frame;
+    };
+    const miss = makeMiss();
+    assert.notDeepEqual(local, miss, 'closure needs a registered palm');
+    assert.deepEqual(miss, makeMiss(), 'random access produces identical results');
+    assert.deepEqual(local.slice(0, 30), rig.rest.slice(0, 30), 'the procedure leaves the body keys intact');
+    const zero = rig.rest.slice();
+    contact.solve(zero, { ...target, weight: 0 });
+    assert.deepEqual(zero, rig.rest);
+    assert.throws(() => contact.solve(zero, { ...target, towardsFingers: target.normal }), /direction across/);
+    assert.deepEqual(zero, rig.rest);
+  }
+});
+
+test('a coincident but upside-down palm cannot trigger finger closure', () => {
+  const rig = makeRig('vrm'),
+    bones = humanoidBones(rig.names, 'humanoid'),
+    hand = measureHands(rig, 'humanoid').right,
+    joints = ['UpperArm', 'LowerArm', 'Hand'].map((suffix) => bones.get('right' + suffix)),
+    wrist = hand.world(hand.hand),
+    contact = new PalmContactRig(rig, {
+      side: 'right',
+      joints,
+      preset: 'humanoid',
+      anchor: [0, 0, 0],
+      limits: joints.map((joint) => ({
+        joint,
+        neutral: [...rig.rest.subarray(joint * 10 + 3, joint * 10 + 7)],
+        limit: { type: 'hinge', axis: [1, 0, 0], min: 0, max: 0 },
+      })),
+    });
+  const local = rig.rest.slice();
+  const result = contact.solve(local, {
+    point: wrist.position,
+    normal: hand.palm,
+    towardsFingers: hand.world(hand.fingers.middle.bones[0]).position.map((n, i) => n - wrist.position[i]),
+    diameter: 0.036,
+  });
+  assert.equal(result.gripWeight, 0);
+  assert.equal(result.locked, false);
+  assert.ok(result.distance < 1e-6);
+  assert.ok(result.angle > Math.PI - 1e-6);
+});
 /** The fingertip of a digit at rest or posed: its distal bone's end, 3/4 of the middle phalanx past the distal joint. */
 function tip(rig, frames, finger) {
   const [, middle, distal] = finger.bones,
@@ -323,8 +403,48 @@ async function animator(t, clips, initial) {
   };
   const meanTurn = () =>
     fingerBones.reduce((s, i) => s + turnFromRest(rotationOf(i), a.restRotation(i)), 0) / fingerBones.length;
-  return { a, rig, fingerBones, rotationOf, meanTurn };
+  return { a, rig, store, fingerBones, rotationOf, meanTurn };
 }
+
+test('Animator palm contact reopens pre-keyed fingers off the hold, then releases the layer cleanly', async (t) => {
+  const run = await animator(t, [{ name: 'clench', turn: 50 }], 'clench');
+  const hand = measureHands(run.rig, 'mixamo').right;
+  const bones = humanoidBones(run.rig.names, 'mixamo');
+  const joints = ['rightUpperArm', 'rightLowerArm', 'rightHand'].map((name) => bones.get(name));
+  const wrist = hand.world(hand.hand);
+  const target = {
+    point: wrist.position,
+    normal: hand.palm.map((v) => -v),
+    towardsFingers: hand.world(hand.fingers.middle.bones[0]).position.map((v, i) => v - wrist.position[i]),
+    diameter: 0.035,
+  };
+  const side = 'right';
+  const calibration = { side, joints, preset: 'mixamo', anchor: [0, 0, 0] };
+  const relaxedRotations = handRotations(hand, poseTable(relaxed(), hand));
+  let input = { ...target, point: [4, 1.45, 0], weight: 0.3 };
+  let result;
+  const remove = addPalmContact(
+    run.a,
+    calibration,
+    () => input,
+    (value) => {
+      result = value;
+    },
+  );
+  run.store.grow(512);
+  run.a.onPreUpdate(1 / 30);
+  assert.equal(result.gripWeight, 0);
+  for (const [joint, q] of relaxedRotations) {
+    assert.ok(Math.abs(q.reduce((sum, v, i) => sum + v * run.rotationOf(joint)[i], 0)) > 1 - 1e-6);
+  }
+  input = target;
+  run.a.onPreUpdate(1 / 30);
+  assert.equal(result.locked, true);
+  assert.ok(result.gripWeight > 0.999);
+  remove();
+  run.a.onPreUpdate(1 / 30);
+  assert.ok(Math.abs(run.meanTurn() - 50) < 0.5);
+});
 
 test('a clip with flat fingers comes out at 20 degrees mean or more; a clip that keys its fingers is left as keyed', async (t) => {
   const run = await animator(
