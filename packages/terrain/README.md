@@ -1402,9 +1402,13 @@ engine.start();
   and Gamito and Musgrave 2001.
 - Sea rocks. A lumpy (`lobes` 0.22 of the radius), tapering (`taper` 0.25, a skerry 0.5) column with a wave-cut notch
   `notchDepth` (0.6 m, at most 0.45 of the radius) deep in a band `notchHeight` (1.2 m) high, centred a tenth of it over
-  the still water, so the rock above overhangs it; strata ledges, `joints` (7) around it and a rounded top. Boulders are
-  the cell of `facets` (9) fracture planes inside a sphere, edges rounded by `rounding` (rock piles after Peytavie et al.
-  2009), `embed` (0.3) of the radius buried.
+  the still water, so the rock above overhangs it; strata ledges, `joints` (7) around it and a rounded top. Boulders
+  use `facets` (9) bed, joint and corner cuts through a seeded block. The bed face sits under the ground at the
+  default `embed` (0.3). The upper face has a seeded pitch and each side has its own cut, with `rounding` (0.18)
+  controlling edge wear. These cuts draw on [A. Peytavie, E. Galin, J. Grosjean and S. Mérillou,
+  *Procedural Generation of Rock Piles using Aperiodic Tiling* (2009)](https://perso.liris.cnrs.fr/eric.galin/Articles/2009-aperiodic.pdf)
+  and [A. Paris, A. Peytavie, E. Guérin, J.-M. Dischler and E. Galin, *Modeling Rocky Scenery using Implicit Blocks*
+  (2020)](https://perso.liris.cnrs.fr/aparis/public_html/projects/paris2020_Blocks.html).
 - Meshes. Each piece is a signed distance field polygonized by Marching Cubes (Lorensen and Cline 1987, `marchingCubes`
   of `@margoengine/procedural`) at `cell` spacing (cliffs 0.5 m, sea rocks radius / 12, boulders radius / 10) in blocks
   of up to 127 cells whose shared vertices are welded and whose normals all come from the field's central differences,
@@ -1418,10 +1422,17 @@ engine.start();
   rock type's two bed tones banded by its `strata` with thin bedding lines; broad tone variation; broken joint cracks;
   moss on faces that look up; a wet, algae-dark band up to `tideHeight` over the rock's `seaLevel`; and rain that
   darkens and smooths it (Lekner and Dorf 1988, Jensen et al. 1999). Rock types: `sandstone` (default), `limestone`,
-  `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override). The
+  `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override).
+  At close range, granite has light quartz and dark mica grains, basalt has subtle dark pits, and shale has thin
+  laminations between beds. Grain color and relief fade when the screen footprint can no longer resolve them.
+  These materials use visual characteristics from the [British Columbia Geological Survey, *Rock Identification
+  Key* (1987)](https://cmscontent.nrs.gov.bc.ca/geoscience/publicationcatalogue/InformationCircular/BCGS_IC1987-05_METC1980.pdf)
+  and [Utah Geological Survey, *Igneous, Sedimentary, & Metamorphic Rocks*](https://geology.utah.gov/map-pub/survey-notes/glad-you-asked/igneous-sedimentary-metamorphic-rocks/).
+  Set `tideHeight: 0` for inland scenes to disable shoreline darkening, including below the assigned sea level. The
   look (`RockLook`, defaults in `ROCK_LOOK_DEFAULTS`) is live through `setLook`; `look.rain` null follows a
   `WeatherDrive`, which finds the surface by its name. One group-0 binding (from 40, past any taken); an added mesh's
-  pixels cost about twenty value-noise reads, other meshes one storage read. WebGPU, and WebGPU on the WebGL2 layer.
+  pixels cost about twenty value-noise reads plus three triplanar grain samples in close shots, other meshes one
+  storage read. WebGPU, and WebGPU on the WebGL2 layer.
   Its patch runs after `TerrainBlend`'s, so the blend's fade into the ground is laid over the rock.
 - Sliders: `@margoengine/terrain/rock-settings` holds every control on the shared row shape: the live look rows
   (`detail.*`, `moss.*`, `tide.*`, `wet.*`; `wet.rain` null follows the weather's `rainRate`) for

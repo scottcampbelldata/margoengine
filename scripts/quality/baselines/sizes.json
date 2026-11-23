@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17400858,
+  "total": 17402038,
   "history": [
     {
       "date": "2026-10-24",
@@ -11343,6 +11343,12 @@
       "commit": "f6cd74c55f",
       "reason": "Continuous, anatomically aligned horse gait: root 11,667 to 11,882 B gzip and crowd 10,602 to 10,826 B gzip. Both entries use the solver to pose every horse. A lazy chunk adds a request and still loads for every horse or herd.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-23",
+      "commit": "dee3abca82",
+      "reason": "Fieldstone fracture profiles: 17,562 to 18,164 B gzip. Filtered mineral grain in the existing rock surface pass: 4,408 to 4,800 B. A split would require a separate async entry for synchronous scatter geometry or another shader variant and material setup for mineral shading.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12162,7 +12168,7 @@
     "@margoengine/post/sss": 8242,
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,
-    "@margoengine/procedural": 17856,
+    "@margoengine/procedural": 18709,
     "@margoengine/procedural/building-plans": 17803,
     "@margoengine/procedural/building-rules": 13427,
     "@margoengine/procedural/building-settings": 5164,
@@ -12570,7 +12576,7 @@
     "@margoengine/terrain/planet-recipes": 3472,
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/rock-settings": 2718,
-    "@margoengine/terrain/rock-surface": 4729,
+    "@margoengine/terrain/rock-surface": 5056,
     "@margoengine/terrain/rocks": 6844,
     "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,

@@ -280,6 +280,30 @@ test('a boulder is a closed, faceted block partly buried in the ground', () => {
   assert.equal(all.length, 5);
 });
 
+test('fallen boulders keep a broad bearing face and seeded fracture profiles', () => {
+  const site = { kind: 'boulder', position: [3, 2, -1], radius: 2, cliff: 0 };
+  const fields = [1, 17, 27, 1234].map((seed) => boulderField(site, { seed, roughness: 0, rounding: 0 }));
+  for (const { sd } of fields) {
+    for (const [x, z] of [
+      [0, 0],
+      [-0.4, 0.3],
+      [0.4, -0.3],
+    ]) {
+      assert.ok(Math.abs(sd(x, -1.68, z)) < 1e-7, 'the same bedding plane lies under the whole footprint');
+      assert.ok(sd(x, -1.58, z) < 0 && sd(x, -1.78, z) > 0);
+    }
+  }
+  const profiles = fields.map(({ sd }) =>
+    [
+      [0.45, 1.25, 0],
+      [-0.45, 1.25, 0],
+    ]
+      .map((p) => sd(...p))
+      .join('/'),
+  );
+  assert.equal(new Set(profiles).size, fields.length);
+});
+
 test('bad input throws RangeError with the README section', () => {
   assert.throws(() => findRockSites({ heights: [0], resolution: [1, 1], size: [1, 1] }), RangeError);
   assert.throws(() => findRockSites(ground, { cliffSlope: 10 }), /Cliffs, overhangs and sea rocks/);

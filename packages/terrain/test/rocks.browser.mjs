@@ -145,6 +145,13 @@ await runSuite(
         shaded = await picture({ surface: {} }),
         rained = await picture({ surface: { rain: 1 } }),
         tidal = await picture({ surface: {}, style: { seaLevel: 4 } }),
+        drySettings = { tideHeight: 0, moss: 0 },
+        dryShore = await picture({ surface: drySettings, style: { seaLevel: 4 } }),
+        dryInland = await picture({ surface: drySettings, style: { seaLevel: -40 } }),
+        sameBase = { color: [0.25, 0.22, 0.2], color2: [0.35, 0.32, 0.29], strata: 0, porosity: 0.3 },
+        closeSettings = { ...drySettings, scale: 2.5 },
+        sandy = await picture({ surface: closeSettings, style: { ...sameBase, type: 'sandstone' } }),
+        granite = await picture({ surface: closeSettings, style: { ...sameBase, type: 'granite' } }),
         blended = await picture({ surface: {}, blend: true }),
         bare = await picture({ empty: true }),
         farPlain = [await picture({ far: true }), await picture({ far: true, shift: 0.2 })],
@@ -165,6 +172,8 @@ await runSuite(
           below: mean(tidal, ...below) / mean(shaded, ...below),
           above: mean(tidal, ...above) / mean(shaded, ...above),
         },
+        dryTideChange: change(dryShore, dryInland),
+        mineralDetail: { sand: detail(sandy), granite: detail(granite), change: change(sandy, granite) },
         foot: (() => {
           // The pixels the blend changes, and their colour distance from the bare ground the rock hides there.
           let count = 0,
@@ -200,6 +209,11 @@ await runSuite(
     assert.ok(r.rain.wet < 0.8 * r.rain.dry, `rain darkens the rock: ${JSON.stringify(r.rain)}`);
     assert.ok(r.tide.below < 0.75, `the tide band is darker: ${JSON.stringify(r.tide)}`);
     assert.ok(Math.abs(r.tide.above - 1) < 0.02, `the rock above the tide is unchanged: ${JSON.stringify(r.tide)}`);
+    assert.ok(r.dryTideChange < 0.01, 'a zero tide height leaves rock dry at every elevation');
+    assert.ok(
+      r.mineralDetail.change > 0.4,
+      `matching base colors retain distinct mineral detail: ${JSON.stringify(r.mineralDetail)}`,
+    );
     assert.ok(r.foot.count > 200, `the blend changes the cliff's foot: ${JSON.stringify(r.foot)}`);
     assert.ok(
       r.foot.blended < r.foot.rock * 0.6,

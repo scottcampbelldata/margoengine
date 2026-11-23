@@ -116,8 +116,24 @@ Register `parts` with your shadow module. `poseHumanoid(rig, position, heading,
 phase, speed)` writes a walk pose into the existing transforms in place.
 The sandbox supplies phase/speed from the shared controls module.
 
-`generateRockMesh()` produces deformed fieldstones with smooth, averaged normals
-across split vertices while preserving UV seams and tangent frames.
+`generateRockMesh(seed = 1, form?)` builds a 180-triangle fieldstone centered at the origin, +Y up. It uses broad
+fracture faces, clipped corners and fine weathering. Choose `block`, `slab`, `wedge`, `shard` or `pebble`, or omit
+the form to let the unsigned 32-bit seed select it. The default seed selects a block. The same seed and form give
+the same positions, averaged normals, UV seams and tangent frames. Rotate and instance a few seeded meshes for
+scatter. For close-up stone shading use `@margoengine/terrain/rock-surface` with the rock type of the site.
+
+```ts
+import { generateRockMesh } from 'margoengine/procedural';
+const fieldstones = [generateRockMesh(17, 'slab'), generateRockMesh(32, 'wedge'), generateRockMesh(53, 'block')];
+```
+
+The overall form, edge rounding and surface texture are separate shape properties in the [Geological Survey of India
+*Rock Texture Atlas*](https://gsi.gov.in/RockTextureAtlas/TexturesInSedimentaryRocks/).
+The plane cuts and edge wear are a compact approximation informed by [A. Peytavie, E. Galin, J. Grosjean and S. Mérillou,
+*Procedural Generation of Rock Piles using Aperiodic Tiling* (2009)](https://perso.liris.cnrs.fr/eric.galin/Articles/2009-aperiodic.pdf)
+and [A. Paris, A. Peytavie, E. Guérin, J.-M. Dischler and E. Galin, *Modeling Rocky Scenery using Implicit Blocks*
+(2020)](https://perso.liris.cnrs.fr/aparis/public_html/projects/paris2020_Blocks.html).
+
 `generateFernMesh()` produces seven curved, tapered ribbon fronds; use a
 double-sided material. Both return `GeometryData` and are deterministic.
 For the biome presets there are more plants: `generatePalmMesh()`, `generateBirchMesh()`, `generateAcaciaMesh()` and

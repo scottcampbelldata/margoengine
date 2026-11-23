@@ -85,9 +85,17 @@ export const ROCK_TYPES: Readonly<Record<RockType, Required<Omit<RockStyle, 'typ
   sandstone: { color: [0.36, 0.25, 0.15], color2: [0.45, 0.33, 0.21], strata: 1.2, porosity: 0.9 },
   limestone: { color: [0.42, 0.4, 0.35], color2: [0.5, 0.48, 0.42], strata: 0.8, porosity: 0.6 },
   chalk: { color: [0.66, 0.65, 0.6], color2: [0.58, 0.57, 0.53], strata: 1.5, porosity: 1 },
-  granite: { color: [0.3, 0.28, 0.27], color2: [0.36, 0.33, 0.31], strata: 0, porosity: 0.25 },
+  granite: { color: [0.25, 0.219, 0.192], color2: [0.36, 0.316, 0.266], strata: 0, porosity: 0.25 },
   basalt: { color: [0.07, 0.07, 0.075], color2: [0.1, 0.095, 0.09], strata: 0, porosity: 0.3 },
   shale: { color: [0.16, 0.15, 0.14], color2: [0.22, 0.2, 0.18], strata: 0.25, porosity: 0.5 },
+};
+const ROCK_FABRIC: Readonly<Record<RockType, number>> = {
+  sandstone: 0,
+  limestone: 0,
+  chalk: 0,
+  granite: 1,
+  basalt: 2,
+  shale: 3,
 };
 /** The look `RockSurface` starts from. */
 export const ROCK_LOOK_DEFAULTS: Readonly<Required<RockLook>> = {
@@ -143,7 +151,7 @@ function styleRow(style: RockStyle | undefined): Float32Array {
   if (style !== undefined && (style === null || typeof style !== 'object'))
     throw new RangeError('Rock style must be an object');
   const type = style?.type ?? 'sandstone';
-  if (!(type in ROCK_TYPES))
+  if (!Object.hasOwn(ROCK_TYPES, type))
     throw new RangeError(`Unknown rock type ${String(type)}; use one of ${Object.keys(ROCK_TYPES).join(', ')}`);
   const base = ROCK_TYPES[type],
     color = style?.color ?? base.color,
@@ -168,8 +176,17 @@ function styleRow(style: RockStyle | undefined): Float32Array {
     throw new RangeError(
       'Invalid rock style; colours are linear RGB 0 to 1, strata 0 to 100 m, porosity 0 to 1, seaLevel finite, seed a uint32',
     );
-  // Row: color, on; color2, strata; sea level, porosity, seed (as a pattern offset), 0.
-  return new Float32Array([...color, 1, ...color2, strata, sea, porosity, (seed % 65521) * 0.6180339, 0]);
+  // Row: color, on; color2, strata; sea level, porosity, pattern offset, mineral fabric.
+  return new Float32Array([
+    ...color,
+    1,
+    ...color2,
+    strata,
+    sea,
+    porosity,
+    (seed % 65521) * 0.6180339,
+    ROCK_FABRIC[type],
+  ]);
 }
 let serial = 0;
 const GLOBAL = 5,
@@ -315,17 +332,46 @@ fn rockShade(p:vec3f,n0:vec3f,id:f32,footprint:f32)->RockShade {
  col=mix(col,m1.rgb,g0.w*smoothstep(0.3,0.8,tone)*0.6);
  col*=1.0+g0.w*(broad-0.5)*1.2+0.6*detail;
  col*=1.0-0.55*crack;
+ // Rock types share weathering, but have different grains at the scale of a broken face.
+ // Fade grain contrast and relief together when the footprint can no longer resolve it.
+ var fabric=0.0;
+ let gf=select(21.0,13.0,m2.w==1.0)/g0.y;
+ let keepGrain=clamp(2.0-4.0*footprint*gf,0.0,1.0);
+ if(keepGrain>0.0){
+  let grain=rockPlanar(p,w,gf,m2.z+53.79);
+  if(m2.w==1.0){
+   let quartz=smoothstep(0.53,0.77,grain.value);
+   let mica=1.0-smoothstep(0.22,0.43,grain.value);
+   fabric=(0.44*quartz-0.57*mica)*keepGrain;
+   grad+=grain.gradient*(0.11/gf)*keepGrain;
+  }else if(m2.w==2.0){
+   let pit=1.0-smoothstep(0.20,0.36,grain.value);
+   fabric=-0.29*pit*keepGrain;
+   grad+=grain.gradient*(0.35/gf)*pit*keepGrain;
+  }else if(m2.w==3.0&&m1.w>0.0){
+   let lf=5.0/m1.w;
+   let bed=p.y*lf+(grain.value-0.5)*0.26+m2.z;
+   let seam=1.0-smoothstep(0.015,0.22,abs(fract(bed)-0.5));
+   fabric=-0.32*seam*g1.x*clamp(2.0-6.0*footprint*lf,0.0,1.0)*keepGrain;
+  }else{
+   fabric=0.22*(grain.value-0.5)*keepGrain;
+  }
+ }
+ col*=1.0+fabric;
  let gt=grad-n0*dot(n0,grad);
  let n=normalize(n0-g0.x*gt);
- var rough=g2.w*(1.0+0.1*detail)+0.1*crack;
+ var rough=g2.w*(1.0+0.1*detail)-0.15*fabric+0.1*crack;
  let above=p.y-m2.x;
  // Moss: up-facing rock clear of the tide, in patches of the broad noise.
  let moss=g1.y*smoothstep(0.5,0.85,n.y)*smoothstep(0.35,0.6,broad+0.2*detail)*smoothstep(g1.z,g1.z+0.6,above);
  col=mix(col,g2.rgb*(0.85+0.3*broad),moss);rough=mix(rough,0.95,moss);
  let tideTop=g1.z*(1.0+0.25*(broad-0.5));
- let tide=1.0-smoothstep(tideTop*0.8,tideTop+0.05,above);
- let algae=g1.w*(1.0-smoothstep(0.0,tideTop*0.55,above))*smoothstep(0.3,0.55,broad+0.3*detail);
- col=mix(col,g3.rgb,algae*tide);
+ var tide=0.0;
+ if(tideTop>0.0){
+  tide=1.0-smoothstep(tideTop*0.8,tideTop+0.05,above);
+  let algae=g1.w*(1.0-smoothstep(0.0,tideTop*0.55,above))*smoothstep(0.3,0.55,broad+0.3*detail);
+  col=mix(col,g3.rgb,algae*tide);
+ }
  let wet=max(tide,g4.y*m2.y);
  col*=mix(1.0,g3.w,wet);rough=mix(rough,rough*(1.0-g4.x),wet);
  var r:RockShade;r.color=col;r.rough=clamp(rough,0.05,1.0);r.normal=n;return r;

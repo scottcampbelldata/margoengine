@@ -182,7 +182,7 @@ export interface BoulderOptions {
   cell?: number;
   /** Fracture planes that cut the block, integer 4 to 32. Default 9. */
   facets?: number;
-  /** How rounded its edges are, 0 (sharp) to 1, as a share of the radius. Default 0.25. */
+  /** How rounded its edges are, 0 (sharp) to 1. Default 0.18. */
   rounding?: number;
   /** Rough bumps as a share of the radius, 0 to 0.5. Default 0.06. */
   roughness?: number;
@@ -968,15 +968,15 @@ function boulderOptions(options: BoulderOptions | undefined, site: BoulderSite) 
   return {
     cell: num(o.cell ?? Math.max(0.04, site.radius / 10), 0.02, 10, 'cell'),
     facets: int(o.facets ?? 9, 4, 32, 'facets'),
-    rounding: num(o.rounding ?? 0.25, 0, 1, 'rounding'),
+    rounding: num(o.rounding ?? 0.18, 0, 1, 'rounding'),
     roughness: num(o.roughness ?? 0.06, 0, 0.5, 'roughness'),
     embed: num(o.embed ?? 0.3, 0, 0.9, 'embed'),
     seed: seedOf(o.seed),
   };
 }
 /**
- * The signed distance field of a boulder about its centre (the site's position raised by (1 - embed) of its radius):
- * the cell cut by `facets` fracture planes, their edges rounded, inside a sphere a little larger than its radius.
+ * The signed distance field of a boulder about its centre. The seed varies the proportions, joint orientation and
+ * fracture planes. The bed face and principal joints keep broad faces between the rounded edges.
  */
 export function boulderField(site: BoulderSite, options?: BoulderOptions): RockField {
   if (!site || site.kind !== 'boulder') bad('boulder site: pass one of findRockSites(...).boulders');
@@ -984,23 +984,37 @@ export function boulderField(site: BoulderSite, options?: BoulderOptions): RockF
     r = num(site.radius, 0, 1e4, 'boulder radius', true),
     planes: number[] = [],
     key = Math.round(site.position[0] * 7) ^ Math.round(site.position[2] * 13) ^ o.seed;
-  for (let k = 0; k < o.facets; k++) {
-    // Spread over the sphere (golden-angle spiral), jittered per boulder; flattened a little (blocks lie on a face).
-    const y = 1 - (2 * (k + 0.5)) / o.facets + (0.25 * hash(k, 1, key, 3)) / o.facets,
-      a = k * 2.399963 + hash(k, 2, key, 3),
-      s = Math.sqrt(Math.max(0, 1 - y * y)),
-      d = r * (0.72 + 0.18 * rand(k, 3, key, 3));
-    planes.push(Math.cos(a) * s, y, Math.sin(a) * s, y < -0.7 ? d * 0.85 : d);
+  const angle = 2 * Math.PI * rand(0, 1, key, 3),
+    c = Math.cos(angle),
+    s = Math.sin(angle),
+    xSpan = 0.92 + 0.25 * rand(1, 1, key, 3),
+    zSpan = 0.63 + 0.35 * rand(2, 1, key, 3),
+    pitch = 0.12 + 0.73 * rand(3, 1, key, 3),
+    roof = 0.71 + 0.23 * rand(4, 1, key, 3);
+  // Keep a bearing face below ground and a pitched fracture above it, then cut the sides and corners in local axes.
+  planes.push(0, -1, 0, 0.84 * r, pitch, 1, 0.12 * hash(3, 2, key, 3), roof * r);
+  for (let k = 2; k < o.facets; k++) {
+    const side = k < 6,
+      a = (k - 2) * (side ? Math.PI / 2 : 2.399963) + 0.24 * hash(k, 2, key, 3),
+      y = side ? 0.32 * hash(k, 4, key, 3) : 0.39 + 0.5 * hash(k, 4, key, 3),
+      distance = r * (0.73 + 0.25 * rand(k, 3, key, 3));
+    planes.push(Math.cos(a) / xSpan, y, Math.sin(a) / zSpan, distance);
   }
   const k = o.rounding * r * 0.25,
     sd = (u: number, y: number, v: number) => {
-      let d = Math.hypot(u, y * 1.15, v) - r * 1.05;
+      const x = u * c + v * s,
+        z = v * c - u * s;
+      // The envelope closes sparsely cut rocks; on most faces the fractures lie well inside the envelope.
+      let d = Math.hypot(x / xSpan, y * 0.89, z / zSpan) - r * 1.105;
       for (let p = 0; p < planes.length; p += 4)
-        d = smax(d, u * planes[p] + y * planes[p + 1] + v * planes[p + 2] - planes[p + 3], k);
-      return d + o.roughness * r * fbm(u / (0.45 * r), y / (0.45 * r), v / (0.45 * r), o.seed + key, 3) * 2;
+        d = smax(d, x * planes[p] + y * planes[p + 1] + z * planes[p + 2] - planes[p + 3], k);
+      return d + o.roughness * r * fbm(x / (0.45 * r), y / (0.34 * r), z / (0.45 * r), o.seed + key, 3) * 2;
     };
-  const e = r * (1.1 + 2 * o.roughness) + 2 * o.cell;
-  return { sd, lo: [-e, -e, -e], hi: [e, e, e], cell: o.cell, frame: [1, 0, 0, 1, 0] };
+  const e = r * (1.105 + 1.75 * o.roughness),
+    ex = e * Math.hypot(c * xSpan, s * zSpan) + 2 * o.cell,
+    ez = e * Math.hypot(s * xSpan, c * zSpan) + 2 * o.cell,
+    down = Math.min(e / 0.89, r * (0.84 + 1.75 * o.roughness)) + 2 * o.cell;
+  return { sd, lo: [-ex, -down, -ez], hi: [ex, e / 0.89 + 2 * o.cell, ez], cell: o.cell, frame: [1, 0, 0, 1, 0] };
 }
 /**
  * Builds a boulder as a closed mesh about its centre, which lies `embed` of its radius above the ground point of its site

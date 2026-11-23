@@ -142,6 +142,18 @@ is 0 past 1.8 m, so its spray is unchanged).
 
 ### Section 5 evidence: cliffs, overhangs and sea rocks over the heightfield (terrain/rocks, 2026-11-18)
 
+Fieldstone scatter uses seeded fracture profiles at 180 triangles per mesh. In `/rocks`, fallen boulders use a
+common bearing plane, a seeded pitched face and unequal side cuts within an anisotropic envelope. `/rock-surface`
+adds mineral grain to albedo, roughness and the surface gradient. The grain contribution tapers with the same
+world-space pixel footprint used for the existing relief. The CPU regressions cover distinct proportions, the
+fieldstone seam normals, and a boulder's planar underside. The existing rock GPU fixture also renders equal base
+colours with different mineral types, and confirms that disabling the tide band removes all sea-level-dependent
+darkening with moss disabled. Both checks pass on WebGPU and the WebGL2 compatibility layer on the development
+workstation. Grain shading cost and evidence on other hardware tiers are still unmeasured. Optional entry sizes
+(minified gzip) changed from 17,562 to 18,164 B for procedural, from 6,588 to 6,733 B for `/rocks`, and from 4,408
+to 4,800 B for `/rock-surface`. The procedural and rock-surface ceilings cover this growth. A separate geometry
+entry would delay the synchronous scatter path and a second shader variant would duplicate material setup.
+
 The clipmap terrain stays a heightfield; rock it cannot hold (overhangs, stacks, notches) comes as closed meshes from
 `@margoengine/terrain/rocks`: signed distance fields polygonized once on the CPU by procedural's `marchingCubes` in
 blocks of at most 127 cells, vertices welded across blocks and normals from the field's central differences, so a
