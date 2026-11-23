@@ -204,6 +204,51 @@ test('a coincident but upside-down palm cannot trigger finger closure', () => {
   assert.ok(result.distance < 1e-6);
   assert.ok(result.angle > Math.PI - 1e-6);
 });
+
+test('a palm cannot register when its wrist is locked at a right angle to the forearm', () => {
+  const rig = makeRig('mixamo', 78);
+  const bones = humanoidBones(rig.names, 'mixamo');
+  const bySide = measureHands(rig, 'mixamo');
+  const world = forward(rig);
+  for (const side of ['left', 'right']) {
+    const hand = bySide[side];
+    const joints = ['UpperArm', 'LowerArm', 'Hand'].map((part) => bones.get(side + part));
+    const wrist = world[hand.hand],
+      middle = world[hand.fingers.middle.bones[0]];
+    const turn = [0, Math.SQRT1_2, 0, Math.SQRT1_2];
+    const turned = qmul(turn, wrist.q);
+    const inner = qmul(conj(world[joints[1]].q), turned);
+    const local = rig.rest.slice();
+    local.set(inner, joints[2] * 10 + 3);
+    const calibration = {
+      side,
+      joints,
+      preset: 'mixamo',
+      anchor: [0, 0, 0],
+      limits: joints.map((joint) => ({
+        joint,
+        neutral: [...local.subarray(joint * 10 + 3, joint * 10 + 7)],
+        limit: { type: 'hinge', axis: [1, 0, 0], min: 0, max: 0 },
+      })),
+    };
+    const point = {
+      point: wrist.p,
+      normal: rot(hand.palm, turn).map((x) => -x),
+      towardsFingers: rot(
+        middle.p.map((x, i) => x - wrist.p[i]),
+        turn,
+      ),
+      diameter: 0.035,
+    };
+    const rejected = new PalmContactRig(rig, calibration).solve(local.slice(), point);
+    assert.ok(rejected.blocked, JSON.stringify(rejected));
+    assert.ok(rejected.distance < 1e-8 && rejected.angle < 1e-6);
+    assert.equal(rejected.locked, false);
+    assert.equal(rejected.gripWeight, 0);
+    const unconstrained = new PalmContactRig(rig, { ...calibration, wrist: false }).solve(local.slice(), point);
+    assert.ok(unconstrained.locked && unconstrained.gripWeight > 0.999);
+  }
+});
 /** The fingertip of a digit at rest or posed: its distal bone's end, 3/4 of the middle phalanx past the distal joint. */
 function tip(rig, frames, finger) {
   const [, middle, distal] = finger.bones,
@@ -215,6 +260,73 @@ function tip(rig, frames, finger) {
     l = Math.hypot(...local);
   return frames[distal].p.map((v, k) => v + (rot(local, frames[distal].q)[k] / l) * length);
 }
+
+test('a registered power grip brings each thumb around the actual bar surface', () => {
+  const rig = makeRig('mixamo', 78);
+  const bones = humanoidBones(rig.names, 'mixamo');
+  const world = forward(rig);
+  const direction = (v) => {
+    const n = Math.hypot(...v);
+    return v.map((x) => x / n);
+  };
+  const subtract = (a, b) => a.map((x, i) => x - b[i]);
+  const dot = (a, b) => a.reduce((sum, x, i) => sum + x * b[i], 0);
+  const cross = ([x, y, z], [a, b, c]) => [y * c - z * b, z * a - x * c, x * b - y * a];
+  for (const side of ['left', 'right']) {
+    const hand = measureHands(rig, 'mixamo')[side];
+    const joints = ['UpperArm', 'LowerArm', 'Hand'].map((name) => bones.get(side + name));
+    const wrist = world[hand.hand];
+    const contact = new PalmContactRig(rig, { side, joints, preset: 'mixamo' });
+    const diameter = 0.035;
+    const point = rot(contact.anchor, wrist.q).map((x, i) => x + wrist.p[i]);
+    const bar = point.map((x, i) => x + (hand.palm[i] * diameter) / 2);
+    const fingers = direction(subtract(world[hand.fingers.middle.bones[0]].p, wrist.p));
+    const axis = direction(cross(fingers, hand.palm));
+    const pad = hand.fingers.thumb.lengths[1] * 0.23;
+    const clearance = (frames) => {
+      const delta = subtract(tip(rig, frames, hand.fingers.thumb), bar);
+      const along = dot(delta, axis);
+      return Math.hypot(...delta.map((v, i) => v - along * axis[i])) - diameter / 2 - pad;
+    };
+    const prior = clearance(forward(rig, handRotations(hand, poseTable(grip(diameter), hand))));
+    const target = {
+      point,
+      normal: hand.palm.map((x) => -x),
+      towardsFingers: fingers,
+      diameter,
+    };
+    const pose = rig.rest.slice();
+    const landed = contact.solve(pose, target);
+    const solved = new Map(rig.names.map((_, i) => [i, Array.from(pose.subarray(i * 10 + 3, i * 10 + 7))]));
+    const gap = clearance(forward(rig, solved));
+    assert.ok(landed.gripWeight > 0.999);
+    assert.ok(
+      Math.abs(gap) < 0.004 && Math.abs(gap) < Math.abs(prior) / 2,
+      `${side}: thumb clearance after fitting ${gap} m, previous ${prior} m`,
+    );
+    const radial = (point) => {
+      const delta = subtract(point, bar),
+        along = dot(delta, axis);
+      return delta.map((x, i) => x - along * axis[i]);
+    };
+    for (const close of [0, 0.16, 0.32, 0.49, 0.66, 0.83, 1]) {
+      const local = rig.rest.slice();
+      contact.solve(local, { ...target, close });
+      const rotations = new Map(rig.names.map((_, i) => [i, Array.from(local.subarray(i * 10 + 3, i * 10 + 7))]));
+      const frames = forward(rig, rotations);
+      for (const [name, finger] of Object.entries(hand.fingers)) {
+        const radius = diameter / 2 + finger.lengths[1] * (name === 'thumb' ? 0.23 : 0.28);
+        const points = [...finger.bones.map((bone) => frames[bone].p), tip(rig, frames, finger)].map(radial);
+        for (let i = 0; i < 3; i++) {
+          const delta = subtract(points[i + 1], points[i]);
+          const t = Math.max(0, Math.min(1, -dot(points[i], delta) / (dot(delta, delta) || 1)));
+          const clearance = Math.hypot(...points[i].map((x, k) => x + delta[k] * t)) - radius;
+          assert.ok(clearance >= -0.0001, `${side} ${name} segment ${i} at ${close} closure: ${clearance} m`);
+        }
+      }
+    }
+  }
+});
 
 test('the relaxed pose curls every finger inside the rest posture ranges, more toward the little finger, tip 2/3 of middle', () => {
   const rig = makeRig('mixamo'),

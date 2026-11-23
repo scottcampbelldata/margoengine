@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { axisAngleToQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
-import { solveContactIK } from '../dist/contact.js';
+import { LimbCollisionRig, solveContactIK } from '../dist/contact.js';
 import { checkRig } from '../dist/index.js';
 
 const pose = () => ({
@@ -76,6 +76,57 @@ test('bad transforms and disconnected joints are rejected before editing the pos
   assert.throws(() => solveContactIK(arm, contact), /uniform positive ancestor scales/);
   assert.throws(() => solveContactIK(arm, { ...contact, joints: [0, 2, 3] }), /parent-child chain/);
   assert.throws(() => solveContactIK(arm, { ...contact, rotation: [0, 0, 0, 0] }), /nonzero quaternion/);
+  assert.deepEqual(arm.local, before);
+});
+
+test('contact can swivel an already planted arm around a torso, keeping the wrist on the hold', () => {
+  const arm = pose();
+  for (const [joint, turn] of [
+    [1, Math.PI / 4],
+    [2, -Math.PI / 2],
+    [3, Math.PI / 4],
+  ])
+    arm.local.set(axisAngleToQuaternion([0, 0, 1], turn), joint * 10 + 3);
+  const wrist = [0.78 * Math.SQRT1_2, 0.02 * Math.SQRT1_2, 0];
+  const guard = new LimbCollisionRig(
+    arm.parents,
+    [{ start: { joint: 0, offset: [0.28, 0.17, 0] }, end: { joint: 0, offset: [0.28, 0.4, 0] }, radius: 0.105 }],
+    [
+      { start: 1, end: 2, radius: 0.045 },
+      { start: 2, end: 3, radius: 0.04 },
+    ],
+  );
+  guard.setBodyPose(arm.local);
+  const target = {
+    joints: [0, 1, 2, 3],
+    point: wrist,
+    anchor: [0, 0, 0],
+    rotation: [0, 0, 0, 1],
+    pole: [0.3, 0.3, 0],
+    tolerance: 1e-6,
+    limits: [{ joint: 0, neutral: [0, 0, 0, 1], limit: { type: 'hinge', axis: [0, 0, 1], min: 0, max: 0 } }],
+    clearance: guard.clearance,
+  };
+  const before = arm.local.slice();
+  const initial = solveContactIK(arm, { ...target, weight: 0 });
+  assert.ok(initial.blocked && initial.clearance < -0.12);
+  assert.deepEqual(arm.local, before);
+  const solved = solveContactIK(arm, target);
+  assert.ok(solved.locked && solved.blocked === false && solved.clearance >= 0, JSON.stringify(solved));
+  assert.notDeepEqual(arm.local, before);
+  assert.deepEqual(arm.local.slice(0, 10), before.slice(0, 10), 'the clavicle stays locked');
+  assert.ok(solved.distance < 1e-6 && solved.angle < 1e-6);
+});
+
+test('if the whole arm cannot clear the obstacle, palm contact reports blocked without committing angles', () => {
+  const arm = pose();
+  const before = arm.local.slice();
+  const rejected = solveContactIK(arm, { ...contact, clearance: () => -0.01 });
+  assert.equal(rejected.locked, false);
+  assert.equal(rejected.blocked, true);
+  assert.equal(rejected.clearance, -0.01);
+  assert.deepEqual(arm.local, before);
+  assert.throws(() => solveContactIK(arm, { ...contact, clearance: () => NaN }), /signed distance/);
   assert.deepEqual(arm.local, before);
 });
 

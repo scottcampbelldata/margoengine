@@ -3135,9 +3135,18 @@ notes one change's size or behaviour and its evidence. Every number has a row in
 
 - Human palm contacts (2026-11-23). The palm must be within the default 0.003 model units and 5 degrees to close.
   One contact solves a contiguous arm and one mapped hand. The grip approximates a cylinder with a diameter
-  above 0 and below 1 m. Per-digit skin collision remains an independent constraint. The optional forearm
+  above 0 and below 1 m, evaluating the approach and six closing poses of each measured digit proxy. Exact skin clearance needs
+  the deformed mesh. The anatomical wrist defaults to 1.12 rad flexion, 1.0 rad extension and 0.46 rad sideways
+  deviation. The optional forearm
   limit takes perpendicular nonzero flex and roll axes with signed ranges within ±π. See
   [palm calibration](../packages/rigging/README.md#human-palm-and-cylindrical-grips).
+
+- Character limb collision (2026-11-23). The optional rigging contact entry checks caller-configured capsules
+  against body volumes and bounds upper limb directions relative to the animated skeleton. An intersecting arm
+  triggers a bounded search of eleven alternate bend directions. The sweep checks straight proxy endpoint paths
+  between two samples, with a default contact margin of 0.0001 model units and a 128-check budget (range 1–4,096).
+  It reports a blocked path on budget exhaustion. Curved joint motion needs subframes, and moving direction
+  limits are checked at each pose. [Setup and examples](../packages/rigging/README.md#character-self-collision-during-contact).
 
 - Swimming and dense rigs (2026-11-23). The CPU rig builder accepts 1–65,536 joints. The swimming entry accepts
   at least four spine segments, 0.001–1,000 m head-to-tail length, and at most 65,536 joints including the fins.

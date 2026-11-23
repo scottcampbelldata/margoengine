@@ -235,10 +235,68 @@ geometry and verification.
 
 The grip model draws on [*The Computer Animation of Human Hand Grasping*, Rijpkema and Girard (1991)](https://doi.org/10.1145/127719.127748)
 and [*Handrix*, ElKoura and Singh (2003)](https://doi.org/10.2312/SCA03/110-119).
+The wrist also checks the angle between the forearm and the measured palm frame, with defaults of 1.12 radians
+of flexion, 1.0 of extension, and 0.46 of sideways deviation. Calibrate these through `wrist` for the character
+and action. A compatible custom constraint can take over this check with `wrist: false`. The cylindrical fit
+uses the same diameter as the palm target. It chooses a pose for each digit from its measured lengths, fits the
+thumb on the opposing side, and checks for proxy intersections from the open approach through six stages of
+closure. A hand with very short
+digits or an oversized bar can still have a gap. Check the final deformed skin against the production geometry.
+
 The independent forearm and wrist controls follow the distinct axes described in
 [*From Skin to Skeleton*, Keller et al. (2023)](https://doi.org/10.1145/3618381) and
 [*In Vivo Analysis of the Mechanical Axes of the Wrist During Dynamic Motion*, Crisco et al. (2011)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3016043/).
+The functional ranges measured by [Ryu, Cooney, Askew, An and Chao (1991)](https://pubmed.ncbi.nlm.nih.gov/1861019/)
+guide the additional pose check. The opposing thumb follows the grip observations in
+[*The GRASP Taxonomy of Human Grasp Types*, Feix et al. (2016)](https://www.eng.yale.edu/grablab/pubs/Feix_THMS2016.pdf)
+and [*In Vivo Kinematics of the Thumb Carpometacarpal Joint During Three Isometric Functional Tasks*, Halilaj et al. (2014)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3940759/).
 These are rig-space defaults that can be calibrated to the actor's proportions, bind orientation and authored controls.
+
+### Character self-collision during contact
+
+`LimbCollisionRig` attaches capsules and spheres to a human or animal skeleton. Configure a chain of limb links,
+the body volumes it can hit, and optional joint directions relative to bones such as the chest or pelvis. Capsule
+radii are in skeleton units. Measure them with clothing or fur included, then trim shared segments at the shoulder
+or hip to allow the intended attachment. The same API works for a quadruped foreleg, a wing, or a tail when given
+the corresponding landmarks and joint slots.
+
+```ts
+import { LimbCollisionRig, type PalmContactTarget } from 'margoengine/rigging/contact';
+
+export function guardReach(parents: readonly number[], lowerSpine: number, chest: number) {
+  const guard = new LimbCollisionRig(parents, [
+    { start: { joint: lowerSpine }, end: { joint: chest }, radius: 0.12 },
+  ], [
+    { start: 0, end: 1, radius: 0.04, range: [0.35, 1] },
+    { start: 1, end: 2, radius: 0.035 },
+  ], [
+    { start: 0, end: 1, reference: chest, forward: [0, 0, 1] },
+  ]);
+  return (local: Float64Array, target: PalmContactTarget): PalmContactTarget => {
+    guard.setBodyPose(local);
+    return { ...target, clearance: guard.clearance };
+  };
+}
+```
+
+Pass the resulting target to `PalmContactRig.solve` with the same three chain slots ordered shoulder, elbow and
+wrist. `solveContactIK` also accepts the clearance callback. Negative values reject the candidate. The solver
+tries alternate elbow directions when the preferred pose is blocked, and leaves the input arm pose in place if it
+finds no clear solution. Check `blocked` and choose a reachable hold or a safe fallback pose. The result's `clearance`
+combines proxy separation and the margin to the configured joint directions and wrist range.
+
+Use `snapshot` for the accepted limb at two consecutive poses and `sweep` to test the intervening proxy motion,
+including movement of the torso. It assumes straight paths for the capsule endpoints. Sample curved limb motion at
+subframes and run the direction checks at each pose. An exhausted sweep returns `clear: false` so a caller can require
+proof of clearance before committing a move.
+
+The alternate elbow search draws on [*Real-Time Inverse Kinematics Techniques for Anthropomorphic Limbs*, Tolani,
+Goswami and Badler (2000)](https://www.ambarish.com/paper/Tolani_Goswami_Badler_IK.pdf) and [*Analytical Inverse
+Kinematics with Body Posture Control*, Kallmann (2008)](https://mkallmann.github.io/papers/08-cavw-bodyik.pdf).
+Capsule gaps use the segment-distance construction in [*On Fast Computation of Distance Between Line Segments*,
+Lumelsky (1985)](https://doi.org/10.1016/0020-0190(85)90032-8). The continuous check adapts conservative advancement
+to straight proxy paths, following [*Fast Continuous Collision Detection for Articulated Models*, Redon, Lin and
+Manocha (2004)](https://diglib.eg.org/items/13aac165-e652-4c78-a0a6-0b42305f0753).
 
 ## Joint hulls (`margoengine/rigging/hulls`)
 

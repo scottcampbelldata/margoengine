@@ -2,6 +2,7 @@ import type { Animator } from '@margoengine/animator';
 import { type CCDJointLimit, CCDSolver } from '@margoengine/animator/ccd';
 import type { Vec3 } from '@margoengine/math';
 import {
+  axisAngleToQuaternion,
   conjugateQuaternion,
   interpolateQuaternions,
   multiplyQuaternions,
@@ -23,6 +24,18 @@ import {
 import type { IKPose } from './ik.js';
 import type { HumanoidBone, SkeletonPreset } from './retarget.js';
 import { parentOrder, worldFrames } from './rig.js';
+import { fitBarGrip } from './bar-grip.js';
+
+export { LimbCollisionRig } from './limb-collision.js';
+export type {
+  BodyCollisionVolume,
+  CollisionLandmark,
+  LimbCollisionLink,
+  LimbCollisionSample,
+  LimbDirectionLimit,
+  LimbSweepOptions,
+  LimbSweepResult,
+} from './limb-collision.js';
 
 type Quaternion = readonly [number, number, number, number];
 
@@ -58,6 +71,8 @@ export interface ContactIKOptions {
   readonly tolerance?: number;
   /** Maximum angular error to accept for contact, in radians. Default 0.02. */
   readonly angleTolerance?: number;
+  /** Signed clearance of the posed chain. Packed skeleton-space XYZ points and XYZW rotations are valid during the call. */
+  readonly clearance?: (positions: ArrayLike<number>, rotations: ArrayLike<number>) => number;
 }
 
 /** What the posed landmark achieved. Use `locked` to start a grasp or foot plant. */
@@ -70,6 +85,10 @@ export interface ContactIKResult {
   readonly angle: number;
   /** The measured point on the final pose, in skeleton space. */
   readonly point: Vec3;
+  /** True when clearance prevented the solve from writing the arm. Present when a clearance callback is supplied. */
+  readonly blocked?: boolean;
+  /** Signed gap of the returned pose, in skeleton units. Present when a clearance callback is supplied. */
+  readonly clearance?: number;
 }
 
 function unitRotation(q: Quaternion, label: string): [number, number, number, number] {
@@ -87,7 +106,7 @@ function unitRotation(q: Quaternion, label: string): [number, number, number, nu
  */
 export function solveContactIK(pose: IKPose, options: ContactIKOptions): ContactIKResult {
   const { parents, local } = pose;
-  const { joints, point, anchor, rotation, pole, limits = [] } = options;
+  const { joints, point, anchor, rotation, pole, limits = [], clearance } = options;
   const { weight = 1, iterations = 64, tolerance = 1e-4, angleTolerance = 0.02 } = options;
   if (!Array.isArray(parents) || !(local instanceof Float64Array) || local.length !== parents.length * 10)
     throw new TypeError('Contact IK needs a pose with parents and 10 local values per joint');
@@ -152,7 +171,19 @@ export function solveContactIK(pose: IKPose, options: ContactIKOptions): Contact
     before = worldFrames(parents, local, order),
     animatedRotation = before.rotation.subarray(end * 4, end * 4 + 4),
     animatedPoint = add(before.position.subarray(end * 3, end * 3 + 3), rotateByQuaternion(offset, animatedRotation));
-  if (weight === 0) return measure(animatedPoint, animatedRotation, point, requested, tolerance, angleTolerance);
+  const animatedContact = () => measure(animatedPoint, animatedRotation, point, requested, tolerance, angleTolerance);
+  const animatedClearance = () =>
+    signedGap(
+      clearance!,
+      joints.flatMap((joint) => Array.from(before.position.subarray(joint * 3, joint * 3 + 3))),
+      joints.flatMap((joint) => Array.from(before.rotation.subarray(joint * 4, joint * 4 + 4))),
+    );
+  if (weight === 0) {
+    const result = animatedContact();
+    if (!clearance) return result;
+    const gap = animatedClearance();
+    return { ...result, locked: result.locked && gap >= 0, blocked: gap < 0, clearance: gap };
+  }
 
   const solver = new CCDSolver(
     joints.map((joint): Vec3 => {
@@ -186,15 +217,89 @@ export function solveContactIK(pose: IKPose, options: ContactIKOptions): Contact
   const blendedPoint = add(animatedPoint, scale(sub(point, animatedPoint), weight));
   // With a nonzero CCD tip, the final joint can trade swing for position. Aim the joint origin so the surface
   // position and orientation describe the same rigid frame, then measure the landmark with its solved rotation.
-  solver.solve(sub(blendedPoint, rotateByQuaternion(offset, goal)), goal, pole);
-  joints.forEach((joint, slot) => local.set(solver.rotations.subarray(slot * 4, slot * 4 + 4), joint * 10 + 3));
+  const target = sub(blendedPoint, rotateByQuaternion(offset, goal));
+  let gap: number | undefined;
+  if (clearance) {
+    const bend = joints[joints.length - 2] * 3,
+      preferredPole = pole ?? [before.position[bend], before.position[bend + 1], before.position[bend + 2]];
+    gap = settleClearContact(solver, target, goal, preferredPole, clearance);
+    if (gap === undefined)
+      return { ...animatedContact(), locked: false, blocked: true, clearance: animatedClearance() };
+  } else solver.solve(target, goal, pole);
   const endSlot = joints.length - 1,
     actualRotation = solver.worldRotations.subarray(endSlot * 4, endSlot * 4 + 4),
     actualPoint = add(
       solver.positions.subarray(endSlot * 3, endSlot * 3 + 3),
       rotateByQuaternion(offset, actualRotation),
     );
-  return measure(actualPoint, actualRotation, point, requested, tolerance, angleTolerance);
+  joints.forEach((joint, slot) => local.set(solver.rotations.subarray(slot * 4, slot * 4 + 4), joint * 10 + 3));
+  const result = measure(actualPoint, actualRotation, point, requested, tolerance, angleTolerance);
+  return gap === undefined ? result : { ...result, blocked: false, clearance: gap };
+}
+
+function signedGap(
+  clearance: NonNullable<ContactIKOptions['clearance']>,
+  positions: ArrayLike<number>,
+  rotations: ArrayLike<number>,
+): number {
+  const gap = clearance(positions, rotations);
+  if (!Number.isFinite(gap) && gap !== Infinity)
+    throw new RangeError(
+      'Contact clearance must return a signed distance, or positive infinity when no obstacle applies',
+    );
+  return gap;
+}
+
+function settleClearContact(
+  solver: CCDSolver,
+  target: Vec3,
+  goal: Quaternion,
+  pole: Vec3,
+  clearance: NonNullable<ContactIKOptions['clearance']>,
+): number | undefined {
+  const positions = solver.positions.subarray(0, solver.joints * 3);
+  const initial = solver.solve(target, goal, pole);
+  const preferred = signedGap(clearance, positions, solver.worldRotations);
+  if (preferred >= 0 && initial.reached) return preferred;
+
+  const pivot = Math.max(0, solver.joints - 3),
+    root = positions.slice(pivot * 3, pivot * 3 + 3),
+    axis = normalize(sub(target, root));
+  if (length(axis) < 0.9) return preferred >= 0 ? preferred : undefined;
+  const seed = solver.rotations.slice(),
+    last = (solver.joints - 1) * 4,
+    start = pivot * 4,
+    shoulder = seed.subarray(start, start + 4),
+    parent = pivot === 0 ? solver.parentRotation : solver.worldRotations.slice(start - 4, start),
+    inverseParent = conjugateQuaternion(parent),
+    wristParent = solver.worldRotations.slice(last - 4, last),
+    wristRotation = solver.worldRotations.slice(last, last + 4);
+  let bend = sub(pole, root);
+  if (length(cross(axis, bend)) < 1e-6) bend = cross(axis, Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]);
+  const error = (distance: number, angle: number) => distance / solver.tolerance + angle / solver.angleTolerance;
+  let best =
+    preferred >= 0 ? { distance: error(initial.distance, initial.angle), gap: preferred, pose: seed } : undefined;
+  for (const turn of [0.32, -0.32, 0.65, -0.65, 1.05, -1.05, 1.6, -1.6, 2.25, -2.25, Math.PI]) {
+    const swing = axisAngleToQuaternion(axis, turn);
+    solver.rotations.set(seed);
+    // Seed a different bend even when the preferred pose already landed exactly and CCD would take zero sweeps.
+    const localSwing = multiplyQuaternions(inverseParent, multiplyQuaternions(swing, parent));
+    solver.rotations.set(multiplyQuaternions(localSwing, shoulder), start);
+    solver.rotations.set(
+      multiplyQuaternions(conjugateQuaternion(multiplyQuaternions(swing, wristParent)), wristRotation),
+      last,
+    );
+    const result = solver.solve(target, goal, add(root, rotateByQuaternion(bend, swing)));
+    const gap = signedGap(clearance, positions, solver.worldRotations);
+    if (gap < 0) continue;
+    if (result.reached) return gap;
+    const distance = error(result.distance, result.angle);
+    if (!best || distance < best.distance) best = { distance, gap, pose: solver.rotations.slice() };
+  }
+  if (!best) return undefined;
+  solver.rotations.set(best.pose);
+  solver.update();
+  return best.gap;
 }
 
 function measure(
@@ -226,12 +331,24 @@ export interface PalmContactCalibration {
   readonly limits?: readonly ContactJointLimit[];
   /** Optional elbow hinge and forearm roll calibrated relative to the imported rest pose. */
   readonly elbow?: PalmElbowCalibration;
+  /** Forearm-to-hand angle bounds. Defaults to calibrated flexion, extension and side deviation. */
+  readonly wrist?: PalmWristRanges | false;
   /** Exact skin contact point in wrist-local coordinates. Default uses the measured palm centre and pad depth. */
   readonly anchor?: Vec3;
   /** Maximum palm gap in skeleton units for grip engagement. Default 0.003. */
   readonly tolerance?: number;
   /** Maximum palm angle error in radians for grip engagement. Default 0.0873 (five degrees). */
   readonly angleTolerance?: number;
+}
+
+/** Functional wrist angles measured between the forearm and the palm, independent of imported bone axes. */
+export interface PalmWristRanges {
+  /** Palm-side bend from neutral, radians. Default 1.12 (64 degrees). */
+  readonly flexion?: number;
+  /** Back-of-hand bend from neutral, radians. Default 1.0 (57 degrees). */
+  readonly extension?: number;
+  /** Absolute sideways bend, radians. Default 0.46 (26 degrees). */
+  readonly deviation?: number;
 }
 
 /** Calibrates the positive side of an elbow joint's flexion in skeleton space at rest. */
@@ -264,6 +381,8 @@ export interface PalmContactTarget {
   readonly weight?: number;
   /** A point toward which the elbow bends, in skeleton space. */
   readonly elbowPole?: Vec3;
+  /** Whole-arm clearance check for this sample. See the packed positions in {@link ContactIKOptions.clearance}. */
+  readonly clearance?: ContactIKOptions['clearance'];
 }
 
 /** Measured palm registration and the applied finger closure for one sample. */
@@ -331,7 +450,11 @@ export class PalmContactRig {
   private readonly tolerance: number;
   private readonly angleTolerance: number;
   private readonly open: Map<number, number[]>;
-  private closed?: { diameter: number; rotations: Map<number, number[]> };
+  private readonly gripForward: Vec3;
+  private readonly gripNormal: Vec3;
+  private readonly gripAnchor: Vec3;
+  private readonly wrist: Required<PalmWristRanges> | null;
+  private gripPose?: { diameter: number; approach: Map<number, number[]>; closed: Map<number, number[]> };
   /** Calibrated surface point in the wrist's local coordinates. */
   readonly anchor: Vec3;
   /** Arm and finger joints which this solve can rotate. */
@@ -370,12 +493,20 @@ export class PalmContactRig {
     this.inversePalm = conjugateQuaternion(palmFrame(forward, normal));
     const frame = worldFrames(rig.parents, rig.rest, order).linear,
       basis = hand.hand * 9;
-    const local = add(scale(forward, 0.56), pad).map((n, axis) => {
+    const wristScale = [0, 1, 2].map((axis) => {
       const offset = basis + axis * 3;
-      return n / Math.hypot(frame[offset], frame[offset + 1], frame[offset + 2]);
-    }) as [number, number, number];
+      return Math.hypot(frame[offset], frame[offset + 1], frame[offset + 2]);
+    });
+    const local = add(scale(forward, 0.56), pad).map((n, axis) => n / wristScale[axis]) as [number, number, number];
     this.anchor = anchor ? [...anchor] : local;
     finiteVector(this.anchor, 'Palm anchor');
+    this.gripForward = normalize(forward);
+    this.gripNormal = normalize(normal);
+    this.gripAnchor = this.anchor.map((value, axis) => value * wristScale[axis]) as [number, number, number];
+    const { flexion = 1.12, extension = 1.0, deviation = 0.46 } = calibration.wrist || {};
+    if (![flexion, extension, deviation].every((angle) => angle >= 0 && angle <= Math.PI / 2))
+      throw new RangeError('Palm wrist ranges need angles from zero to π/2 radians');
+    this.wrist = calibration.wrist === false ? null : { flexion, extension, deviation };
     this.hand = hand;
     this.arm = [...joints];
     const calibrated = [...limits];
@@ -406,17 +537,26 @@ export class PalmContactRig {
 
   /** Rotates the arm and fingers for one surface sample, leaving all other local transforms intact. */
   solve(local: Float64Array, target: PalmContactTarget): PalmContactResult {
-    const { point, normal, towardsFingers, diameter, close = 1, weight = 1, elbowPole } = target;
+    const { point, normal, towardsFingers, diameter, close = 1, weight = 1, elbowPole, clearance } = target;
     finiteVector(normal, 'Surface normal');
     finiteVector(towardsFingers, 'Direction toward fingers');
     if (elbowPole) finiteVector(elbowPole, 'Elbow pole');
     if (!(close >= 0 && close <= 1 && weight >= 0 && weight <= 1))
       throw new RangeError('Hand closure and reach weight must be from zero to one');
-    if (this.closed?.diameter !== diameter)
-      this.closed = { diameter, rotations: handRotations(this.hand, poseTable(grip(diameter), this.hand)) };
+    if (this.gripPose?.diameter !== diameter) {
+      const closed = handRotations(this.hand, poseTable(grip(diameter), this.hand)),
+        approach = new Map(this.open);
+      fitBarGrip(this.rig, this.hand, this.gripForward, this.gripNormal, this.gripAnchor, diameter, approach, closed);
+      this.gripPose = { diameter, approach, closed };
+    }
     const orientation = normalizeQuaternion(
       multiplyQuaternions(palmFrame(towardsFingers, scale(normal, -1)), this.inversePalm),
     );
+    const range = this.wrist;
+    const checked: ContactIKOptions['clearance'] = range
+      ? (positions, rotations) =>
+          Math.min(this.wristGap(positions, rotations, range), clearance?.(positions, rotations) ?? Infinity)
+      : clearance;
     const result = solveContactIK(
       { parents: this.rig.parents, local },
       {
@@ -427,21 +567,50 @@ export class PalmContactRig {
         weight,
         pole: elbowPole,
         limits: this.limits,
+        clearance: checked,
         // Solve tighter than the acceptance region so a reachable wrist can enter its full-grip centre.
         tolerance: this.tolerance * 0.05,
         angleTolerance: this.angleTolerance * 0.05,
       },
     );
-    const error = Math.max(result.distance / this.tolerance, result.angle / this.angleTolerance),
+    const error = result.blocked
+        ? Infinity
+        : Math.max(result.distance / this.tolerance, result.angle / this.angleTolerance),
       confidence = Math.max(0, 1 - error),
       gripWeight = weight === 0 ? 0 : close * confidence * confidence * (3 - 2 * confidence);
     if (weight > 0) {
-      for (const [bone, open] of this.open) {
-        const goal = interpolateQuaternions(open, this.closed.rotations.get(bone) ?? open, gripWeight, 0.9995);
+      for (const [bone, open] of this.gripPose.approach) {
+        const goal = interpolateQuaternions(open, this.gripPose.closed.get(bone) ?? open, gripWeight, 0.9995);
         local.set(goal, bone * 10 + 3);
       }
     }
     return { ...result, locked: error <= 1, gripWeight };
+  }
+
+  private wristGap(
+    positions: ArrayLike<number>,
+    rotations: ArrayLike<number>,
+    range: Required<PalmWristRanges>,
+  ): number {
+    const end = this.arm.length - 1,
+      p = end * 3,
+      r = end * 4;
+    const forearm = sub(
+      [positions[p], positions[p + 1], positions[p + 2]],
+      [positions[p - 3], positions[p - 2], positions[p - 1]],
+    );
+    const size = length(forearm);
+    if (size < 1e-6) return Infinity;
+    const inv = [-rotations[r], -rotations[r + 1], -rotations[r + 2], rotations[r + 3]];
+    const axis = rotateByQuaternion(forearm, inv),
+      across = normalize(cross(this.gripForward, this.gripNormal)),
+      forward = cross(this.gripNormal, across);
+    const x = dot(axis, forward),
+      y = dot(axis, this.gripNormal),
+      z = dot(axis, across),
+      flex = -Math.atan2(y, x),
+      deviation = Math.atan2(Math.abs(z), Math.hypot(x, y));
+    return size * Math.min(range.flexion - flex, range.extension + flex, range.deviation - deviation);
   }
 }
 

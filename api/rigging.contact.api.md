@@ -6,6 +6,17 @@
 import { Animator, CCDJointLimit } from "@margoengine/animator";
 import { Vec3 } from "@margoengine/core";
 
+export interface BodyCollisionVolume {
+    readonly start: CollisionLandmark;
+    readonly end?: CollisionLandmark;
+    readonly radius: number;
+}
+
+export interface CollisionLandmark {
+    readonly joint: number;
+    readonly offset?: Vec3;
+}
+
 export interface ContactIKOptions {
     readonly joints: readonly number[];
     readonly point: Vec3;
@@ -17,6 +28,7 @@ export interface ContactIKOptions {
     readonly iterations?: number;
     readonly tolerance?: number;
     readonly angleTolerance?: number;
+    readonly clearance?: (positions: ArrayLike<number>, rotations: ArrayLike<number>) => number;
 }
 
 export interface ContactIKResult {
@@ -24,12 +36,54 @@ export interface ContactIKResult {
     readonly distance: number;
     readonly angle: number;
     readonly point: Vec3;
+    readonly blocked?: boolean;
+    readonly clearance?: number;
 }
 
 export interface ContactJointLimit {
     readonly joint: number;
     readonly neutral: Quaternion;
     readonly limit: CCDJointLimit;
+}
+
+export interface LimbCollisionLink {
+    readonly start: number;
+    readonly end: number;
+    readonly radius: number;
+    readonly range?: readonly [number, number];
+}
+
+export class LimbCollisionRig {
+    constructor(parents: readonly number[], volumes: readonly BodyCollisionVolume[], links: readonly LimbCollisionLink[], limits?: readonly LimbDirectionLimit[]);
+    setBodyPose(local: ArrayLike<number>): void;
+    readonly clearance: (positions: ArrayLike<number>) => number;
+    snapshot(positions: ArrayLike<number>): LimbCollisionSample;
+    sweep(from: LimbCollisionSample, to: LimbCollisionSample, { tolerance, maxSteps }?: LimbSweepOptions): LimbSweepResult;
+}
+
+export interface LimbCollisionSample {
+    readonly body: Float64Array;
+    readonly limb: Float64Array;
+}
+
+export interface LimbDirectionLimit {
+    readonly start: number;
+    readonly end: number;
+    readonly reference: number;
+    readonly forward: Vec3;
+    readonly maxBackwards?: number;
+}
+
+export interface LimbSweepOptions {
+    readonly tolerance?: number;
+    readonly maxSteps?: number;
+}
+
+export interface LimbSweepResult {
+    readonly clear: boolean;
+    readonly time: number;
+    readonly clearance: number;
+    readonly exhausted: boolean;
 }
 
 export interface PalmContactCalibration {
@@ -39,6 +93,7 @@ export interface PalmContactCalibration {
     readonly bones?: ReadonlyMap<HumanoidBone, number>;
     readonly limits?: readonly ContactJointLimit[];
     readonly elbow?: PalmElbowCalibration;
+    readonly wrist?: PalmWristRanges | false;
     readonly anchor?: Vec3;
     readonly tolerance?: number;
     readonly angleTolerance?: number;
@@ -63,6 +118,7 @@ export interface PalmContactTarget {
     readonly close?: number;
     readonly weight?: number;
     readonly elbowPole?: Vec3;
+    readonly clearance?: ContactIKOptions['clearance'];
 }
 
 export interface PalmElbowCalibration {
@@ -71,6 +127,12 @@ export interface PalmElbowCalibration {
     readonly min?: number;
     readonly max?: number;
     readonly roll?: readonly [number, number] | false;
+}
+
+export interface PalmWristRanges {
+    readonly flexion?: number;
+    readonly extension?: number;
+    readonly deviation?: number;
 }
 
 export function addPalmContact(animator: Animator, calibration: PalmContactCalibration, target: () => PalmContactTarget | undefined, onSolve?: (result: PalmContactResult) => void): () => void;
