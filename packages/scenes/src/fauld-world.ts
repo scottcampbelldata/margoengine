@@ -34,6 +34,7 @@ import { loadGLTF, type Model } from '@margoengine/gltf';
 import { textured } from '@margoengine/gltf/textured';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
+import { DOF } from '@margoengine/dof';
 import { libraryMesh, type LibraryMeshPart } from './library-mesh.js';
 import { libraryParts } from './library-parts.js';
 
@@ -99,6 +100,10 @@ export interface FauldWorldSettings {
   readonly library?: string;
   /** Whether the buildings, vehicles and cattle of `FAULD_SLOTS` are drawn. Default true. */
   readonly buildings?: boolean;
+  /** The lens: an f-number (`stop`) and a focus distance in metres, drawn by `DOF` of @margoengine/dof on a Super 35
+   * sensor (24.89 mm across), so the focal length follows the camera's field of view. Default f/8 focused at 1,000 m
+   * (a landscape lens: the blur at f/8 on a 24 mm lens is under a pixel from about 12 m out). */
+  readonly lens?: { readonly stop?: number; readonly focusDistance?: number };
   readonly seed?: number;
   readonly signal?: AbortSignal;
 }
@@ -113,6 +118,8 @@ export interface FauldWorld extends Disposable {
   readonly clouds: VolumetricClouds;
   readonly weather: WeatherMachine;
   readonly shadows: Shadows;
+  /** The lens's depth of field (`settings.lens`). */
+  readonly dof: DOF;
   readonly meshes: readonly Mesh[];
   /** The slot models drawn, by slot name (cattle are one model per animal). */
   readonly buildings: Readonly<Record<string, readonly Model[]>>;
@@ -404,6 +411,13 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       });
     disposers.push(() => preset.dispose());
     preset.post.addEffect(new GTAO({ radius: 2, slices: 3, steps: 8 }), 0);
+    // A real lens, never a pinhole: the film's f-stop and focus on the film pipeline's Super 35 filmback.
+    const stop = settings.lens?.stop ?? 8,
+      focusDistance = settings.lens?.focusDistance ?? 1000;
+    if (!(stop > 0) || !(focusDistance > 0))
+      throw new RangeError(`Fauld lens needs a stop and focus distance over 0 (got f/${stop} at ${focusDistance} m)`);
+    const dof = new DOF({ aperture: stop, focalDistance: focusDistance, filmGauge: 24.89, sensorFit: 'horizontal' });
+    preset.post.addEffect(dof, 1);
     const shadows = Shadows.attach(engine, {
       resolution: 4096,
       distance: 1200,
@@ -520,6 +534,7 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       clouds,
       weather,
       shadows,
+      dof,
       meshes,
       buildings,
       height,

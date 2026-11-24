@@ -293,8 +293,13 @@ console.log(typeof show, FAULD_PLACES.hanbury, Object.keys(FAULD_SLOTS).length);
 | `radius` | 2,500 | how far round the camera the view grows plants (hedges, trees, woods), 200 to 3,000 m |
 | `dem`, `library` | under `/asset-library/` | the height grid and the model library |
 | `buildings` | `true` | draws the `FAULD_SLOTS` models of the era (church, inn, cottages, kiln works, guard hut, tender, van, cattle) |
+| `lens` | `{stop: 8, focusDistance: 1000}` | the lens's f-number and focus distance (metres), drawn by `DOF` of `@margoengine/dof` on a Super 35 sensor (24.89 mm across), so its focal length follows the camera's field of view; the handle's `dof` is that effect |
 
-Shot files for the film's crater and countryside rows: `node tools/shot/fauld-shots.mjs` (from the recut shot list);
+Shot files for the film's crater and countryside rows: `node tools/shot/fauld-shots.mjs` (from the recut shot list).
+Each lens is on the film's 24.89 x 14 mm filmback inside a named band (wide 18 to 24 mm, natural 35 to 50, portrait 85
+to 135; a 28 or 200 mm row takes the nearest band edge), the aim drifts across the subject by 7 percent of the frame
+width, and the page query carries the lens (`stop` f/8 or f/11, `focusDistance` at the harmonic mean of the subject's
+near and far faces, so the thin-lens depth of field covers it);
 stills through the shot tool, which adds the page's ground under each camera (`shot.page.ground`):
 `node tools/shot/cli.mjs tools/shot/shots/fauld-fr008.json --stills --out <folder>`, or by hand
 `node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder>`.

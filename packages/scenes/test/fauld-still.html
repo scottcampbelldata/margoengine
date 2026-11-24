@@ -4,7 +4,7 @@
 <script type="module">
 // @margoengine/scenes/fauld-countryside and /fauld-crater as a still page, in two modes.
 // - The shot tool (tools/shot, `shot.page`: engine `fauldStill.engine`, ground `fauldStill.height`): the query names the
-//   place, era, sky and focus; the canvas fills the window and the engine runs its own frame loop, which the tool's
+//   place, era, sky, focus and lens (`stop`, `focusDistance` metres: the dof package); the canvas fills the window and the engine runs its own frame loop, which the tool's
 //   driver steps. Camera heights in the Fauld shot files are above the ground: the tool adds `fauldStill.height`.
 // - By hand (`shot=frNNN`, fauld-still.mjs): reads tools/shot/shots/fauld-frNNN.json, sets the camera at `t` seconds
 //   (default the shot's mid probe) with the ground added, renders `frames` frames and reports GPU errors.
@@ -30,7 +30,7 @@ engine.stop();
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const focus=(query.get('focus')??'0,0').split(',').map(Number);
 const since=performance.now();
-const scene=await (query.get('place')==='crater'?crater:countryside)(engine,{era:query.get('era')??undefined,sky:query.get('sky')??undefined,focus,radius:Number(query.get('radius')??1200)});
+const scene=await (query.get('place')==='crater'?crater:countryside)(engine,{era:query.get('era')??undefined,sky:query.get('sky')??undefined,focus,radius:Number(query.get('radius')??1200),lens:{stop:Number(query.get('stop')??8),focusDistance:Number(query.get('focusDistance')??1000)}});
 const built=performance.now()-since;
 globalThis.fauldStill={engine,scene,height:(x,z)=>scene.height(x,z),errors};
 if(!byHand)engine.start();
