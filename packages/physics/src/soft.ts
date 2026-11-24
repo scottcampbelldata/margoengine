@@ -2401,6 +2401,12 @@ export class SoftBodies implements PhysicsAttachment {
     }
   }
 
+  /** @internal Sets a body's volume target to `factor` times its rest volume and puts its triangles in the volume search. */
+  setVolumeFactorOf(body: SoftBody, factor: number): void {
+    this.syncVolume(factor);
+    this.setVolume(body, factor);
+  }
+
   /** @internal The volume a closed triangle surface encloses, in cubic metres (positive when it faces outward). */
   private meshVolume(positions: readonly number[], triangles: readonly number[]): number {
     let v = 0;

@@ -197,6 +197,57 @@ function carryShape(
   });
 }
 
+/**
+ * The volume constraint of a closed surface goes to a piece of cells (its boundary is closed by construction): the same factor of the
+ * volume the piece has at rest, the sum of its cells' rest volumes.
+ */
+function carryVolume(
+  soft: SoftBodies,
+  body: SoftBody,
+  c: Record<string, Float32Array>,
+  piece: SoftBody,
+  desc: SoftBodyDesc,
+  rest: number,
+): void {
+  if (!body.volumeOn || !(body.surfaceRest > 0) || desc.triangles.length === 0) return;
+  const factor = c.vb_target![body.handle]! / body.surfaceRest;
+  piece.surfaceRest = rest;
+  piece.volumeOn = true;
+  soft.setVolumeFactorOf(piece, factor);
+}
+
+/**
+ * The skin goes to the pieces: each takes the vertices bound to its cells, with the cell numbers it has now, and the triangles whose
+ * three corners it holds.
+ */
+function carrySkin(body: SoftBody, piece: SoftBody, desc: SoftBodyDesc, oldCells: number[]): void {
+  const skin = body.skin;
+  if (!skin) return;
+  const cellOf = new Map(oldCells.map((old, k) => [old, k])),
+    vertex = new Map<number, number>(),
+    keep: number[] = [];
+  for (let i = 0; i < skin.cell.length; i++)
+    if (cellOf.has(skin.cell[i]!)) {
+      vertex.set(i, keep.length);
+      keep.push(i);
+    }
+  if (keep.length === 0) return;
+  const indices: number[] = [];
+  for (let t = 0; t < skin.indices.length; t += 3) {
+    const corner = [skin.indices[t]!, skin.indices[t + 1]!, skin.indices[t + 2]!];
+    if (corner.every((v) => vertex.has(v))) indices.push(...corner.map((v) => vertex.get(v)!));
+  }
+  piece.skin = {
+    vertices: Float32Array.from(
+      keep.flatMap((i) => [skin.vertices[i * 3]!, skin.vertices[i * 3 + 1]!, skin.vertices[i * 3 + 2]!]),
+    ),
+    indices: Uint32Array.from(indices),
+    cell: Uint32Array.from(keep.map((i) => cellOf.get(skin.cell[i]!)!)),
+    weight: Float32Array.from(keep.flatMap((i) => [0, 1, 2, 3].map((k) => skin.weight[i * 4 + k]!))),
+  };
+  piece.skinCells = Uint32Array.from(desc.cells);
+}
+
 /** What a piece copies from the body it was split from. */
 function carry(
   desc: SoftBodyDesc,
@@ -381,6 +432,20 @@ function splitCells(
       where.set(p - body.firstParticle, list);
     });
     carryShape(soft, body, c, piece, origin);
+    carryVolume(
+      soft,
+      body,
+      c,
+      piece,
+      desc,
+      mine.reduce((sum, t) => sum + f.vol0![t]!, 0),
+    );
+    carrySkin(
+      body,
+      piece,
+      desc,
+      mine.map((t) => t - first),
+    );
     pieces.push(piece);
     if (body.surface && desc.triangles.length > 0)
       soft.createSurfaceCollider(piece, { friction: body.surface.colliders[0]!.friction() });

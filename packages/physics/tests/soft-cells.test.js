@@ -987,3 +987,42 @@ test('shape matching goes with the pieces: a torn bent rope with shape matching 
     assert.ok(worst < 0.02, `a piece is straight again: ${worst}`);
   }
 });
+
+test('the volume constraint and the skin go with the pieces of a body that is cut', async () => {
+  const { soft } = await create([0, 0, 0], 8, 2);
+  soft.splitOnTear = 'cells';
+  const vertices = [],
+    indices = [];
+  // The mesh of a box 0.4 across, twelve triangles, to ride in the cells.
+  for (const x of [0, 0.4]) for (const y of [0, 0.4]) for (const z of [0, 0.4]) vertices.push(x, y, z);
+  for (const [a, b, c, d] of [
+    [0, 1, 3, 2],
+    [4, 6, 7, 5],
+    [0, 4, 5, 1],
+    [2, 3, 7, 6],
+    [0, 2, 6, 4],
+    [1, 5, 7, 3],
+  ])
+    indices.push(a, b, c, a, c, d);
+  const cube = soft.create(SoftBodyDesc.volumetric(vertices, indices, 0.1, true).setVolumeFactor(1));
+  const rest = cube.restVolume();
+  const event = soft.cut(cube, [
+    [0.2, -1, -1],
+    [0.2, 3, -1],
+    [0.2, -1, 3],
+  ]);
+  assert.equal(event.pieces.length, 2);
+  for (const piece of event.pieces) {
+    assert.ok(piece.volumeOn, 'each piece holds a volume');
+    near(piece.surfaceVolume(), piece.restVolume(), 1e-3, 'the volume its surface holds is the volume of its cells');
+    assert.ok(piece.meshVertices().length > 0, 'and carries the part of the skin bound to its cells');
+  }
+  near(
+    event.pieces.reduce((sum, piece) => sum + piece.restVolume(), 0),
+    rest,
+    1e-6,
+    'no volume is lost',
+  );
+  const skinned = event.pieces.reduce((sum, piece) => sum + piece.meshVertices().length / 3, 0);
+  assert.equal(skinned, vertices.length / 3, 'every skin vertex went to a piece');
+});

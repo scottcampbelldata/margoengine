@@ -48,6 +48,7 @@ export class SoftBodies implements PhysicsAttachment {
     create(desc: SoftBodyDesc): SoftBody;
     setContactHook(hook: ((contact: SoftContact) => void) | null): void;
     setSleep(body: SoftBody, asleep: boolean): void;
+    setVolumeFactorOf(body: SoftBody, factor: number): void;
     surfaceVolume(body: SoftBody): number;
     setVolume(body: SoftBody, factor: number | null): void;
     attach(soft: SoftBody, index: number, body: PhysicsBody): void;
