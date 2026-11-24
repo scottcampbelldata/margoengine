@@ -22,6 +22,8 @@ interface KernelExports extends WebAssembly.Exports {
   world_iterations(): number;
   world_steps(): number;
   world_step(dt: number): number;
+  world_detect(): number;
+  world_quarantined(): number;
   world_lost(): number;
   world_layout(): number;
   world_pairs(): number;
@@ -796,6 +798,35 @@ export interface KernelSolverOptions {
   staticContactHertz?: number;
   /** The damping ratio of {@link KernelSolverOptions.staticContactHertz}. */
   staticContactDamping?: number;
+  /**
+   * Solve friction in the pushing passes as well as the relaxing ones (default true), Rapier's `friction_in_bias_pass` (whose own
+   * default is false: friction only in the unbiased pass, cheaper and kinder to tall stacks). With no relaxing pass
+   * (`internalStabilizationIterations` 0) friction is solved in the pushing one whatever this says.
+   */
+  frictionInBiasPass?: boolean;
+  /**
+   * How many relaxing passes a substep makes, Rapier's `num_internal_stabilization_iterations`; `null` (the default) is as many as
+   * pushing passes. A count set here is every island's, whatever extra passes it asked for.
+   */
+  internalStabilizationIterations?: number | null;
+  /** The friction model, Rapier's `friction_model`: `'coulomb'` (default) a cone at each point, `'simplified'` one constraint for a manifold and a twist about its normal. */
+  frictionModel?: 'coulomb' | 'simplified';
+  /**
+   * The least time, in seconds, a continuous-collision advance is worth (default 0, every advance is taken), Rapier's `min_ccd_dt`
+   * (whose default is 1/60/100): a sweep whose next advance is shorter stops at the time it has reached, which is before any touch.
+   */
+  minCcdDt?: number;
+  /** How close, in metres, the sweep brings a piece to what it meets before it stops (default 0.001). */
+  ccdTolerance?: number;
+  /** The most advances the sweep takes for a pair of pieces (default 64); the time reached after them is before any touch. */
+  ccdMaxAdvances?: number;
+  /**
+   * Take a body whose position or speed leaves the numbers (past 1e15, or not a number) out of the world and carry on, in place of
+   * stopping the world (default false), Rapier's quarantine: the body is disabled at rest where the step began, flagged in
+   * {@link KernelWorld.quarantinedBodies} and told by the `quarantine` event of `Physics`. The numbers that reached other bodies
+   * through a contact in that step follow them out.
+   */
+  quarantine?: boolean;
 }
 
 /**
@@ -979,6 +1010,13 @@ export class KernelWorld {
       maxLinearSpeed: read(9),
       staticContactHertz: read(10),
       staticContactDamping: read(11),
+      frictionInBiasPass: read(12) !== 0,
+      internalStabilizationIterations: read(13) < 0 ? null : read(13),
+      frictionModel: read(14) === 0 ? 'coulomb' : 'simplified',
+      minCcdDt: read(15),
+      ccdTolerance: read(16),
+      ccdMaxAdvances: read(17),
+      quarantine: read(18) !== 0,
     };
   }
   /**
@@ -992,7 +1030,24 @@ export class KernelWorld {
    * @throws RangeError when a value is not finite, or outside its range.
    */
   setSolver(options: KernelSolverOptions): this {
-    const names: readonly (readonly [keyof KernelSolverOptions, number, number])[] = [
+    const names: readonly (readonly [
+      (
+        | 'contactHertz'
+        | 'contactDamping'
+        | 'contactMaxPush'
+        | 'allowedPenetration'
+        | 'jointShare'
+        | 'jointLooseShare'
+        | 'jointMaxPush'
+        | 'warmStart'
+        | 'warmStartJoints'
+        | 'maxLinearSpeed'
+        | 'staticContactHertz'
+        | 'staticContactDamping'
+      ),
+      number,
+      number,
+    ])[] = [
       ['contactHertz', 0, Infinity],
       ['contactDamping', 0, Infinity],
       ['contactMaxPush', 0, Infinity],
@@ -1014,9 +1069,50 @@ export class KernelWorld {
           `Solver ${name} must be a finite number from ${low} to ${high === Infinity ? 'any size' : high}; got ${value}.`,
         );
     });
+    const {
+      frictionInBiasPass,
+      internalStabilizationIterations,
+      frictionModel,
+      minCcdDt,
+      ccdTolerance,
+      ccdMaxAdvances,
+    } = options;
+    if (frictionModel !== undefined && frictionModel !== 'coulomb' && frictionModel !== 'simplified')
+      throw new RangeError(`Solver frictionModel must be 'coulomb' or 'simplified'; got ${String(frictionModel)}.`);
+    if (
+      internalStabilizationIterations !== undefined &&
+      internalStabilizationIterations !== null &&
+      !(
+        Number.isInteger(internalStabilizationIterations) &&
+        internalStabilizationIterations >= 0 &&
+        internalStabilizationIterations <= 65535
+      )
+    )
+      throw new RangeError(
+        `Solver internalStabilizationIterations must be null or a whole number from 0 to 65535; got ${internalStabilizationIterations}.`,
+      );
+    for (const [name, value, low] of [
+      ['minCcdDt', minCcdDt, 0],
+      ['ccdTolerance', ccdTolerance, 1e-7],
+    ] as const)
+      if (value !== undefined && !(Number.isFinite(value) && value >= low))
+        throw new RangeError(`Solver ${name} must be a finite number of ${low} or more; got ${value}.`);
+    if (
+      ccdMaxAdvances !== undefined &&
+      !(Number.isInteger(ccdMaxAdvances) && ccdMaxAdvances >= 0 && ccdMaxAdvances <= 4096)
+    )
+      throw new RangeError(`Solver ccdMaxAdvances must be a whole number from 0 to 4096; got ${ccdMaxAdvances}.`);
     names.forEach(([name], index) => {
-      if (options[name] !== undefined) this.api.world_set_solver(index, options[name]);
+      if (options[name] !== undefined) this.api.world_set_solver(index, options[name] as number);
     });
+    if (frictionInBiasPass !== undefined) this.api.world_set_solver(12, frictionInBiasPass ? 1 : 0);
+    if (internalStabilizationIterations !== undefined)
+      this.api.world_set_solver(13, internalStabilizationIterations ?? -1);
+    if (frictionModel !== undefined) this.api.world_set_solver(14, frictionModel === 'simplified' ? 1 : 0);
+    if (minCcdDt !== undefined) this.api.world_set_solver(15, minCcdDt);
+    if (ccdTolerance !== undefined) this.api.world_set_solver(16, ccdTolerance);
+    if (ccdMaxAdvances !== undefined) this.api.world_set_solver(17, ccdMaxAdvances);
+    if (options.quarantine !== undefined) this.api.world_set_solver(18, options.quarantine ? 1 : 0);
     return this;
   }
   /**
@@ -1142,7 +1238,7 @@ export class KernelWorld {
    * How long the phases of the last step took, in milliseconds, as Rapier's `timingStep` and its siblings do: `step` is the
    * whole of it, then `begin` (impulses land, kinematic targets are read), `broad` phase, `narrow` phase, `islands`,
    * `solver` (contact and joint rows and every substep), `ccd` and `events`. The phases add up to `step`, bar the clock's
-   * own calls. All zero before the first step. A reading is not part of the world: a snapshot and the hash leave it out.
+   * own calls; `assembly`, `resolution`, `update` and `writeback` split `solver` and `ccdBroad`, `ccdToi` and `ccdSolver` split `ccd`. All zero before the first step. A reading is not part of the world: a snapshot and the hash leave it out.
    */
   get timing(): {
     step: number;
@@ -1153,6 +1249,15 @@ export class KernelWorld {
     solver: number;
     ccd: number;
     events: number;
+    /** The solver's finer timers, Rapier's velocity assembly, resolution, update and writeback; sums over the substeps. */
+    assembly: number;
+    resolution: number;
+    update: number;
+    writeback: number;
+    /** The sweep's, Rapier's CCD broad phase, time-of-impact computation and solver; sums over the bodies. */
+    ccdBroad: number;
+    ccdToi: number;
+    ccdSolver: number;
   } {
     const read = (phase: number): number => this.api.world_timing(phase);
     return {
@@ -1164,6 +1269,13 @@ export class KernelWorld {
       solver: read(5),
       ccd: read(6),
       events: read(7),
+      assembly: read(8),
+      resolution: read(9),
+      update: read(10),
+      writeback: read(11),
+      ccdBroad: read(12),
+      ccdToi: read(13),
+      ccdSolver: read(14),
     };
   }
   /**
@@ -2703,6 +2815,41 @@ export class KernelWorld {
         `Body row ${lost} went past 1e15 in position or speed, where a step has no numbers left to work with. A true path can do this: a bead free on a spinning rail flies out exponentially. This world has stopped; limit the joint that drives the body, then restore a snapshot or build the world again.`,
       );
     return this;
+  }
+  /**
+   * Finds the contacts and events of the world as it stands without a step of dynamics, Rapier's collision pipeline: the broad and
+   * narrow phases run, pairs that began or ended touching give their events, and nothing moves or falls asleep. The contact
+   * queries then answer for the poses as they are.
+   * @throws MargoError (`state`) from inside a contact filter.
+   */
+  detect(): this {
+    if (this.stepping) throw new MargoError('state', 'A contact filter ran a step; a filter may only read the world.');
+    for (const row of this.wakeAtStep) this.api.body_wake_touching(row);
+    this.wakeAtStep.length = 0;
+    this.stepping = true;
+    let failed: number;
+    try {
+      failed = this.api.world_detect();
+    } finally {
+      this.stepping = false;
+    }
+    if (this.api.world_layout() !== this.layout) this.bind();
+    if (failed)
+      throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
+    return this;
+  }
+  /** How many bodies the world has taken out of it for leaving the numbers so far (see the `quarantine` solver option). */
+  get quarantinedCount(): number {
+    return this.api.world_quarantined() >>> 0;
+  }
+  /** The rows of the bodies taken out of the world for leaving the numbers, which stay out. */
+  quarantinedBodies(): number[] {
+    const flags = this.columns.flags as Uint32Array,
+      rows: number[] = [];
+    if (this.quarantinedCount === 0) return rows;
+    for (let row = 0; row < flags.length; row++)
+      if ((flags[row]! & (1 | (1 << 17))) === (1 | (1 << 17))) rows.push(row);
+    return rows;
   }
   /** Bytes of the world, and of a {@link KernelWorld.snapshot}. */
   get bytes(): number {

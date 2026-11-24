@@ -113,6 +113,17 @@ pub extern "C" fn world_step(dt: f32) -> u32 {
     world().step(dt);
     world().header().failed
 }
+/// Finds the contacts and events of the world as it stands, with no dynamics: no body moves.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_detect() -> u32 {
+    world().detect();
+    world().header().failed
+}
+/// How many bodies have been quarantined so far (see `world_set_solver` index 18).
+#[unsafe(no_mangle)]
+pub extern "C" fn world_quarantined() -> u32 {
+    world().header().quarantined
+}
 /// The row of the body that left the range a step can work in, or -1.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_lost() -> i32 {
@@ -222,7 +233,9 @@ pub extern "C" fn world_sleep_time() -> f32 {
     world().header().sleep_time
 }
 /// Solver settings, by index: 0 contact hertz, 1 contact damping ratio, 2 contact maximum push speed, 3 contact allowed
-/// penetration, 4 joint share, 5 loose joint share, 6 joint maximum push speed, 7 contact warm start share, 8 joint warm start share, 9 world linear speed cap, 10 and 11 static contact hertz and damping ratio.
+/// penetration, 4 joint share, 5 loose joint share, 6 joint maximum push speed, 7 contact warm start share, 8 joint warm start share, 9 world linear speed cap, 10 and 11 static contact hertz and damping ratio,
+/// 12 friction in the pushing passes (1) or only the relaxing ones (0), 13 relaxing passes a substep (negative: as many as pushing ones), 14 friction model (0 Coulomb cones, 1 simplified),
+/// 15 the least time a continuous-collision advance is worth, 16 how close a sweep brings a piece before it stops, 17 the most advances a pair of pieces takes, 18 quarantine (1) in place of stopping when a body leaves the range.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_set_solver(index: u32, value: f32) -> u32 {
     let header = world().header_mut();
@@ -239,6 +252,14 @@ pub extern "C" fn world_set_solver(index: u32, value: f32) -> u32 {
         9 => header.max_linear_speed = value,
         10 => header.static_hertz = value,
         11 => header.static_damping = value,
+        12 => header.friction_in_bias = (value != 0.0) as u32,
+        // A negative number is the default: as many relaxing passes as pushing ones.
+        13 => header.stabilization = if value < 0.0 { crate::world::NONE } else { value as u32 },
+        14 => header.friction_model = (value != 0.0) as u32,
+        15 => header.ccd_min_dt = value,
+        16 => header.ccd_touch = value,
+        17 => header.ccd_advances = value as u32,
+        18 => header.quarantine = (value != 0.0) as u32,
         _ => return 0,
     }
     1
@@ -259,6 +280,13 @@ pub extern "C" fn world_solver(index: u32) -> f32 {
         9 => header.max_linear_speed,
         10 => header.static_hertz,
         11 => header.static_damping,
+        12 => header.friction_in_bias as f32,
+        13 => if header.stabilization == crate::world::NONE { -1.0 } else { header.stabilization as f32 },
+        14 => header.friction_model as f32,
+        15 => header.ccd_min_dt,
+        16 => header.ccd_touch,
+        17 => header.ccd_advances as f32,
+        18 => header.quarantine as f32,
         _ => f32::NAN,
     }
 }

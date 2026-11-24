@@ -368,6 +368,14 @@ export interface PhysicsEventMap {
   afterstep: number;
   /** After a step in which a joint with break limits broke: once for that joint, with its bodies. */
   jointbreak: JointBreakEvent;
+  /** After a step in which a body left the numbers and was taken out of the world (the `quarantine` solver option): once for it. */
+  quarantine: QuarantineEvent;
+}
+
+/** A body taken out of the world for leaving the numbers: at rest, disabled, where its last good step ended. */
+export interface QuarantineEvent {
+  type: 'quarantine';
+  body: PhysicsBody;
 }
 
 /** A joint that broke under its load. */
@@ -877,7 +885,19 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.stepCount++;
     this.dispatch(dt);
     this.reportBreaks();
+    this.reportQuarantine();
     this.emit('afterstep', dt);
+  }
+  /**
+   * Finds what touches what in the world as it stands, with no dynamics: the broad and narrow phases run and `contactstart`,
+   * `contactend`, `intersectionstart` and `intersectionend` fire for what began or ended, as in Rapier's `CollisionPipeline`. No body
+   * moves, speeds stay, nothing falls asleep and `stepCount` does not change; `contactPair`, `touching` and `contactPoints` then
+   * answer for the poses as they stand. Kinematic targets and impulses wait for the next step.
+   */
+  detectCollisions(): void {
+    this.live();
+    this.kernel.detect();
+    this.dispatch(0);
   }
   private readonly followMesh = (body: PhysicsBody): void => {
     if (body.type !== 'kinematicPosition') return;
@@ -895,6 +915,24 @@ export class Physics implements EnginePlugin, BodyOwner {
     body.setNextPosition([m[12]!, m[13]!, m[14]!]);
     body.setNextRotation(q as unknown as Quat);
   };
+  private reported = 0;
+  private reportQuarantine(): void {
+    const kernel = this.kernel;
+    if (kernel.quarantinedCount === this.reported) return;
+    this.reported = kernel.quarantinedCount;
+    for (const row of kernel.quarantinedBodies()) {
+      const body = this.byBodyRow.get(row);
+      if (body && !this.quarantinedBodies.has(body)) {
+        this.quarantinedBodies.add(body);
+        this.emit('quarantine', { type: 'quarantine', body });
+      }
+    }
+  }
+  private readonly quarantinedBodies = new Set<PhysicsBody>();
+  /** The bodies taken out of the world for leaving the numbers (the `quarantine` solver option), in the order it happened. */
+  get quarantined(): readonly PhysicsBody[] {
+    return [...this.quarantinedBodies];
+  }
   private reportBreaks(): void {
     let found: PhysicsJoint[] | null = null;
     for (const joint of this.joints)

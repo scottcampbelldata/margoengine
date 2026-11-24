@@ -1,7 +1,7 @@
 // Reading meshes for physics, for both entries: where a mesh sits in its hierarchy, and the geometry to fit a collider to.
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh } from '@margoengine/core';
-import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
+import { meshRuntime, type Mesh as CoreMesh } from '@margoengine/core/extension';
 import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import { eulerToQuat, type Vec3 } from './math.js';
 import { geometryPositions, type ColliderGeometry } from './shapes.js';

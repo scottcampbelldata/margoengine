@@ -159,12 +159,13 @@ test('the phases of a step are timed, add up to the step, and stay out of the ha
   };
   const a = build(),
     b = build();
-  assert.deepEqual(Object.values(a.timing), new Array(8).fill(0), 'nothing has run yet');
+  assert.deepEqual(Object.values(a.timing), new Array(15).fill(0), 'nothing has run yet');
   steps(a, 30);
   steps(b, 30);
   const timing = a.timing,
-    phases = ['begin', 'broad', 'narrow', 'islands', 'solver', 'ccd', 'events'];
-  assert.deepEqual(Object.keys(timing), ['step', ...phases]);
+    phases = ['begin', 'broad', 'narrow', 'islands', 'solver', 'ccd', 'events'],
+    finer = ['assembly', 'resolution', 'update', 'writeback', 'ccdBroad', 'ccdToi', 'ccdSolver'];
+  assert.deepEqual(Object.keys(timing), ['step', ...phases, ...finer]);
   for (const value of Object.values(timing)) assert.ok(Number.isFinite(value) && value >= 0);
   assert.ok(timing.step > 0, 'a step with a pile takes time');
   near(
@@ -174,6 +175,17 @@ test('the phases of a step are timed, add up to the step, and stay out of the ha
     'the phases tile the step',
   );
   assert.ok(timing.solver > timing.broad && timing.solver > timing.events, 'a pile is mostly solver');
+  // The solver's own timers split the solver phase (what they leave out is the multibody and coupling bookkeeping between them).
+  const inside = timing.assembly + timing.resolution + timing.update + timing.writeback;
+  assert.ok(
+    inside <= timing.solver * 1.001 + 1e-6 && inside >= timing.solver * 0.5,
+    `the solver's parts: ${inside} of ${timing.solver}`,
+  );
+  assert.ok(timing.resolution > timing.assembly && timing.resolution > timing.writeback, 'a pile is mostly resolution');
+  assert.ok(
+    timing.ccdBroad + timing.ccdToi + timing.ccdSolver <= timing.ccd * 1.001 + 1e-6,
+    'the sweep splits the ccd phase',
+  );
   assert.equal(a.kernel.hash, b.kernel.hash, 'the same world hashes the same whatever the clock said');
   a.dispose();
   b.dispose();

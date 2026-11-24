@@ -15,7 +15,7 @@
 // angle-times-reach terms, and time can advance by the gap over that bound without passing a touch. The gap is a lower
 // bound, the largest of the support-plane gaps along the GJK closest points' axis and the axis kept from the last step
 // (the same bound `cast::sharpen` uses), never GJK's own distance, which can sit above a touch. The advance stops within
-// TOUCH of the surface, or after STEPS, at a time that is still before any touch: CCD can lose time, never tunnel.
+// `ccd_touch` of the surface (1 mm), or after `ccd_advances` (64), at a time that is still before any touch: CCD can lose time, never tunnel.
 use crate::cast::{Solid, bounds, core};
 use crate::gjk::{Convex, Distance, epa, gjk};
 use crate::hull::BoxData;
@@ -25,9 +25,10 @@ use crate::revolve::Revolved;
 use crate::sat::Pose;
 use crate::world::{NONE, World};
 
-/// How close the sweep brings a piece before it stops, and its most advances a pair.
-const TOUCH: f32 = 1e-3;
-const STEPS: usize = 64;
+/// How close the sweep brings a piece before it stops, by default, and its most advances a pair (`ccd_touch` and `ccd_advances`
+/// of the header start at these).
+pub const TOUCH: f32 = 1e-3;
+pub const STEPS: u32 = 64;
 
 /// A body's motion over the step: the centre of mass from `c0` to `c1`, the turn `turn` (a rotation vector) from `q0`.
 #[derive(Clone, Copy)]
@@ -126,6 +127,7 @@ impl World {
     /// After the step's substeps: puts each awake CCD body that moved further than it is thick back to its first touch,
     /// and marks which ones were checked (CCD_ACTIVE, Rapier's `is_ccd_active`).
     pub fn ccd_pass(&mut self) {
+        let mut inner = crate::integrate::now();
         for slot in 0..self.header().awake as usize {
             let at = self.uu(AWAKE, slot) as usize;
             let flags = self.flags(at);
@@ -155,9 +157,12 @@ impl World {
             // step began with, and a knock from another body in the step can carry it past them.
             let grow = v3(reach, reach, reach);
             let path = (motion.c0.min(motion.c1).sub(grow), motion.c0.max(motion.c1).add(grow));
+            crate::integrate::tick(self, 12, &mut inner);
             let (first, hit) = self.first_touch(at, &motion, path, 0.0, false);
+            crate::integrate::tick(self, 13, &mut inner);
             if first >= 1.0 {
                 self.sensor_crossings(at, &motion, 1.0, path);
+                crate::integrate::tick(self, 14, &mut inner);
                 continue;
             }
             let mut pose = motion.at(first);
@@ -179,7 +184,9 @@ impl World {
             self.set_q(ROTATION_X, at, pose.q);
             self.set_v(CENTER_X, at, pose.apply(motion.local));
             self.sensor_crossings(at, &motion, first, path);
+            crate::integrate::tick(self, 14, &mut inner);
         }
+        crate::integrate::tick(self, 12, &mut inner);
     }
 
     /// A fast body can cross a sensor between two steps and be in it at neither end. For each sensor the body's solid
@@ -312,12 +319,14 @@ impl World {
         let floor = -0.5 * self.thickness(c);
         let mut s = 0.0f32;
         let mut kept = v3(0.0, 0.0, 0.0);
-        for _ in 0..STEPS {
+        let (touch, advances, floor_dt) = (self.header().ccd_touch, self.header().ccd_advances, self.header().ccd_min_dt);
+        let dt = self.header().step_dt;
+        for _ in 0..advances {
             let now = (self.piece_pose(c, mine.at(s)), theirs.at(s));
             let Some((gap, n)) = self.gap(c, other, now, start, (kept, far, shift, floor)) else {
                 return until;
             };
-            if gap <= TOUCH {
+            if gap <= touch {
                 return s;
             }
             kept = n;
@@ -328,7 +337,13 @@ impl World {
             }
             // Aimed half the touch short, so the advance ends within TOUCH and not on the surface, where rounding can read
             // the two as overlapping.
-            s += (gap - 0.5 * TOUCH) / closing;
+            let advance = (gap - 0.5 * touch) / closing;
+            // An advance shorter than the least time worth a substep (Rapier's `min_ccd_dt`) is not taken: the time reached so far
+            // is still before any touch.
+            if advance * dt < floor_dt {
+                return s;
+            }
+            s += advance;
             if s >= until {
                 return until;
             }
@@ -354,6 +369,7 @@ impl World {
     /// piece out of it, and holds the body at the start while it goes on in.
     fn gap(&self, c: usize, other: usize, now: (Pose, Pose), start: (Pose, Pose), (kept, far, shift, floor): (V3, f32, V3, f32)) -> Option<(f32, V3)> {
         let mut best: Option<(f32, V3)> = None;
+        let touch = self.header().ccd_touch;
         // One part, `target` against the piece now and `target0` at the start, each in a frame turned by `frame` from the
         // world's.
         let mut offer = |piece: &Solid, target: &Solid, frame: Q, piece0: &Solid, target0: &Solid, frame0: Q| {
@@ -361,7 +377,7 @@ impl World {
             let at_start = gjk(piece0, target0, v3(0.0, 0.0, 0.0), f32::INFINITY);
             let between = at_start.v;
             let length = at_start.distance;
-            let apart = !at_start.overlap && length > TOUCH && bound(piece0, target0, between.scale(1.0 / length)) > TOUCH;
+            let apart = !at_start.overlap && length > touch && bound(piece0, target0, between.scale(1.0 / length)) > touch;
             let held = if apart {
                 None
             } else {
@@ -375,7 +391,7 @@ impl World {
             let (gap, axis) = match held {
                 Some(axis0) => {
                     let world = frame0.rotate(axis0);
-                    if bound(piece0, target0, axis0) - floor <= TOUCH {
+                    if bound(piece0, target0, axis0) - floor <= touch {
                         if shift.dot(world) >= 0.0 {
                             return;
                         }

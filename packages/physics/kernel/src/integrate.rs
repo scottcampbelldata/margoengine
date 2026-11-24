@@ -16,18 +16,30 @@ unsafe extern "C" {
 }
 #[cfg(target_arch = "wasm32")]
 #[inline(always)]
-fn now() -> f64 {
+pub(crate) fn now() -> f64 {
     unsafe { clock() }
 }
 #[cfg(not(target_arch = "wasm32"))]
 #[inline(always)]
-fn now() -> f64 {
+pub(crate) fn now() -> f64 {
     0.0
 }
 /// What `World::timing` holds: the whole step, then the phases in order. Begin is the start of the step (impulses land,
 /// kinematic targets are read); Solver is the contact and joint rows and every substep; Events lists what pairs began or
 /// ended touching.
-pub const PHASES: [&str; 8] = ["step", "begin", "broad", "narrow", "islands", "solver", "ccd", "events"];
+pub const PHASES: [&str; 15] = [
+    "step", "begin", "broad", "narrow", "islands", "solver", "ccd", "events", "assembly", "resolution", "update", "writeback", "ccdBroad",
+    "ccdToi", "ccdSolver",
+];
+
+/// Adds the time since `since` to a slot of the timings and starts the next stretch there: the finer timers of the solver and
+/// the sweep, which are sums over the substeps and the bodies.
+#[inline(always)]
+pub(crate) fn tick(world: &mut World, slot: usize, since: &mut f64) {
+    let at = now();
+    world.timing[slot] += (at - *since) as f32;
+    *since = at;
+}
 
 /// A position or speed past this leaves a step nothing to work with: their squares and the rows built from them reach the
 /// end of f32 within the step. A true path can get here, as a bead on a spinning rail flies out exponentially, so a step
@@ -150,6 +162,7 @@ impl World {
         }
         let substeps = self.header().substeps;
         let h = dt / substeps as f32;
+        self.header_mut().step_dt = dt;
         let mut stamp = now();
         let begun = stamp;
         // Closes a phase: the time since the last stamp, in milliseconds, goes in its slot.
@@ -158,6 +171,9 @@ impl World {
             world.timing[phase] = (at - stamp) as f32;
             stamp = at;
         };
+        for sub in 8..self.timing.len() {
+            self.timing[sub] = 0.0;
+        }
         self.begin_step(dt);
         lap(self, 1);
         self.broad_update(dt);
@@ -166,14 +182,17 @@ impl World {
         lap(self, 3);
         self.update_islands(dt);
         lap(self, 4);
+        let mut inner = now();
         self.prepare_contacts();
         self.prepare_joints();
+        tick(self, 8, &mut inner);
         // A soft constraint stiffer than a quarter of the substep rate shakes a pile the passes cannot settle (measured).
         let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
         let stiffness = soft(hertz, damping, h);
         for substep in 0..substeps {
             self.integrate_velocities(h);
+            tick(self, 10, &mut inner);
             self.refresh_joints();
             self.warm_start();
             self.warm_start_joints();
@@ -188,34 +207,45 @@ impl World {
             }
             // Any u32 is a valid count, as on Rapier: the sum saturates instead of wrapping to a few passes.
             let all = passes.saturating_add(most);
+            // How many relaxing passes follow: as many as pushing ones unless the world sets a count (Rapier's
+            // `num_internal_stabilization_iterations`).
+            let relaxes = match self.header().stabilization {
+                NONE => all.max(1),
+                set => set,
+            };
             for pass in 1..=all {
                 let least = most.saturating_add(1).saturating_sub(pass);
                 self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
                 self.solve_couplings(h, pass == all);
-                self.solve_contacts(h, stiffness, true, substep as usize, least, false);
+                // With no relaxing pass the last pushing one is the last word, and friction is always solved in it.
+                self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
             }
             self.clamp_speeds();
+            tick(self, 9, &mut inner);
             self.integrate_poses(h, substep + 1 == substeps);
             self.track_couplings(h);
             self.fk_multibodies(h);
             self.tally_drift(h);
             self.refresh_joints();
+            tick(self, 10, &mut inner);
             // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
             // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra
             // passes relaxes iterations + e times, at least once, so it still runs as a world of iterations + e would: it takes
             // the last of them, and `least` is the fewest extra passes that ask for a pass `need` from the end.
-            let relaxes = all.max(1);
             for pass in 1..=relaxes {
                 let need = relaxes - (pass - 1);
-                let least = if need <= 1 { 0 } else { need.saturating_sub(passes) };
+                // A count the world sets is every island's, with no gate by its extra passes.
+                let least = if need <= 1 || self.header().stabilization != NONE { 0 } else { need.saturating_sub(passes) };
                 self.solve_joints(h, stiffness, Pass::Relax, least, u32::MAX);
                 self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
             }
             self.solve_impacts();
             self.project_multibodies();
             self.clamp_speeds();
+            tick(self, 9, &mut inner);
         }
         self.break_joints(h);
+        tick(self, 11, &mut inner);
         lap(self, 5);
         if self.header().ccd_substeps > 0 {
             self.ccd_pass();
@@ -229,18 +259,63 @@ impl World {
         self.check_range();
     }
 
-    /// Notes the first awake body past RANGE, or not a number at all.
-    pub fn check_range(&mut self) {
+    /// Finds what touches what without moving anything: the broad and narrow phases and the events they give, as Rapier's collision
+    /// pipeline (and a physics step of no time) does. No velocity changes, no pose changes, nothing falls asleep; a pair that begins
+    /// or ends touching gives its event as in a step. The impulses and targets waiting for the next step stay waiting.
+    pub fn detect(&mut self) {
+        if self.header().lost != NONE {
+            return;
+        }
+        self.header_mut().step_dt = 0.0;
         for slot in 0..self.header().awake as usize {
             let at = self.uu(AWAKE, slot) as usize;
-            for v in [self.v(POSITION_X, at), self.v(LINEAR_X, at), self.v(ANGULAR_X, at)] {
-                for x in [v.x, v.y, v.z] {
-                    if !(x < RANGE && x > -RANGE) {
-                        self.header_mut().lost = at as u32;
-                        return;
+            let (position, rotation) = (self.v(POSITION_X, at), self.q(ROTATION_X, at));
+            self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
+        }
+        self.broad_update(0.0);
+        self.narrow_phase(0.0);
+        self.gather_events();
+    }
+
+    /// Notes the first awake body past RANGE, or not a number at all. With quarantine on, each such body is taken out of the world
+    /// instead (QUARANTINED and DISABLED, at rest, at the pose the step began from when that is in range, else the origin) and the
+    /// world steps on; a step's numbers that reached other bodies through a contact leave them out of range too, and they follow.
+    pub fn check_range(&mut self) {
+        let quarantine = self.header().quarantine != 0;
+        loop {
+            let mut bad = NONE as usize;
+            'scan: for slot in 0..self.header().awake as usize {
+                let at = self.uu(AWAKE, slot) as usize;
+                if self.flags(at) & DISABLED != 0 {
+                    continue;
+                }
+                for v in [self.v(POSITION_X, at), self.v(LINEAR_X, at), self.v(ANGULAR_X, at)] {
+                    for x in [v.x, v.y, v.z] {
+                        if !(x < RANGE && x > -RANGE) {
+                            bad = at;
+                            break 'scan;
+                        }
                     }
                 }
             }
+            if bad == NONE as usize {
+                return;
+            }
+            if !quarantine {
+                self.header_mut().lost = bad as u32;
+                return;
+            }
+            let before = self.v(PREVIOUS_X, bad);
+            let finite = [before.x, before.y, before.z].iter().all(|x| *x < RANGE && *x > -RANGE);
+            let rest = if finite { before } else { v3(0.0, 0.0, 0.0) };
+            let still = self.q(PREVIOUS_ROTATION_X, bad);
+            let turn = if still.x.is_finite() && still.y.is_finite() && still.z.is_finite() && still.w.is_finite() { still } else { Q::IDENTITY };
+            self.set_v(LINEAR_X, bad, v3(0.0, 0.0, 0.0));
+            self.set_v(ANGULAR_X, bad, v3(0.0, 0.0, 0.0));
+            self.set_pose(bad as u32, rest, turn, false);
+            self.set_body_enabled(bad as u32, false);
+            self.set_u(FLAGS, bad, self.flags(bad) | QUARANTINED);
+            self.header_mut().quarantined += 1;
         }
     }
 

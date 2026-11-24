@@ -335,6 +335,18 @@ impl World {
                 body_a.push(impulse.scale(-1.0), self.v(CONTACT_ARM_A_X, at));
                 body_b.push(impulse, self.v(CONTACT_ARM_B_X, at));
             }
+            // The simplified model's twist about the normal.
+            let twist = if self.header().friction_model == 1 { self.s(PAIR_TWIST, row) } else { 0.0 };
+            if twist == 0.0 && self.s(PAIR_TWIST, row) != 0.0 {
+                self.set_s(PAIR_TWIST, row, 0.0);
+            }
+            if twist != 0.0 {
+                let twist = if share != 1.0 { twist * share } else { twist };
+                self.set_s(PAIR_TWIST, row, twist);
+                let turn = normal.scale(twist);
+                body_a.angular = body_a.angular.sub(body_a.inertia.mul(turn));
+                body_b.angular = body_b.angular.add(body_b.inertia.mul(turn));
+            }
             self.settle(a, &body_a);
             self.settle(b, &body_b);
         }
@@ -403,7 +415,11 @@ impl World {
                 step
             };
             let given = if biased {
-                self.friction_rows(row, step, true, turn, &mut body_a, &mut body_b);
+                // Friction in the pushing pass is a switch (Rapier's `friction_in_bias_pass`), but with no relaxing pass to
+                // solve it, the pushing one must.
+                if self.header().friction_in_bias != 0 || self.header().stabilization == 0 {
+                    self.friction_rows(row, step, true, turn, &mut body_a, &mut body_b);
+                }
                 self.normal_rows(row, a, b, h, step, true, turn, &mut impacts, &mut body_a, &mut body_b)
             } else {
                 let given = self.normal_rows(row, a, b, h, step, false, turn, &mut impacts, &mut body_a, &mut body_b);
@@ -455,6 +471,9 @@ impl World {
 
     /// A pair's friction, one sweep over the points, each in a circular cone of mu times its normal impulse so far.
     fn friction_rows(&mut self, row: usize, step: Soft, biased: bool, turn: usize, body_a: &mut Moving, body_b: &mut Moving) {
+        if self.header().friction_model == 1 && self.uu(PAIR_CONTACTS, row) > 1 {
+            return self.simplified_friction(row, step, biased, body_a, body_b);
+        }
         let normal = self.v(PAIR_NORMAL_X, row);
         let tangent = self.v(PAIR_TANGENT_X, row);
         let other = normal.cross(tangent);
@@ -493,6 +512,82 @@ impl World {
             body_a.push(applied.scale(-1.0), arm_a);
             body_b.push(applied, arm_b);
             self.set_v(CONTACT_TANGENT_X, at, next);
+        }
+    }
+
+    /// The simplified friction model (Rapier's `FrictionModel::Simplified`): one friction constraint for the whole manifold, at the mean
+    /// of its points, in a circular cone of mu times the load the points hold together, and a twist about the normal, limited by mu
+    /// times each point's load times its distance from that mean (the limit surface of a patch, Goyal, Ruina and Papadopoulos 1991).
+    /// The manifold's impulse is held as an equal share on each point, so the warm start puts back the same force and the same
+    /// moment about the mean. A single point has no patch to twist on and takes the point rows.
+    fn simplified_friction(&mut self, row: usize, step: Soft, biased: bool, body_a: &mut Moving, body_b: &mut Moving) {
+        let normal = self.v(PAIR_NORMAL_X, row);
+        let tangent = self.v(PAIR_TANGENT_X, row);
+        let other = normal.cross(tangent);
+        let friction = self.s(PAIR_FRICTION, row);
+        let surface = self.v(PAIR_SURFACE_X, row);
+        let count = self.uu(PAIR_CONTACTS, row) as usize;
+        let share = 1.0 / count as f32;
+        let (mut arm_a, mut arm_b) = (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0));
+        let (mut held, mut drift, mut pressed) = (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), 0.0f32);
+        for k in 0..count {
+            let at = row * MANIFOLD + k;
+            arm_a = arm_a.add(self.v(CONTACT_ARM_A_X, at));
+            arm_b = arm_b.add(self.v(CONTACT_ARM_B_X, at));
+            held = held.add(self.v(CONTACT_TANGENT_X, at));
+            drift = drift.add(self.v(CONTACT_DRIFT_X, at));
+            pressed += self.s(CONTACT_NORMAL_IMPULSE, at);
+        }
+        let (arm_a, arm_b, drift) = (arm_a.scale(share), arm_b.scale(share), drift.scale(share));
+        let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(surface);
+        let slide = relative.sub(normal.scale(relative.dot(normal)));
+        let (mass_scale, impulse_scale, target) = if biased {
+            (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
+        } else {
+            (1.0, 0.0, slide)
+        };
+        let mass_along = 1.0 / (body_a.give(tangent, arm_a) + body_b.give(tangent, arm_b));
+        let mass_across = 1.0 / (body_a.give(other, arm_a) + body_b.give(other, arm_b));
+        let along = -mass_along * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
+        let across = -mass_across * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
+        let mut next = held.add(tangent.scale(along)).add(other.scale(across));
+        let most = friction * pressed;
+        let squared = next.dot(next);
+        if squared > most * most {
+            let cut = most / sqrt(squared);
+            next = next.scale(cut);
+            if !biased {
+                for k in 0..count {
+                    let at = row * MANIFOLD + k;
+                    self.set_v(CONTACT_DRIFT_X, at, self.v(CONTACT_DRIFT_X, at).scale(cut));
+                }
+            }
+        }
+        let applied = next.sub(held);
+        body_a.push(applied.scale(-1.0), arm_a);
+        body_b.push(applied, arm_b);
+        for k in 0..count {
+            self.set_v(CONTACT_TANGENT_X, row * MANIFOLD + k, next.scale(share));
+        }
+        // The twist: the relative turn about the normal, brought to rest within what the points' loads and their spread can hold.
+        let mut reach = 0.0f32;
+        for k in 0..count {
+            let at = row * MANIFOLD + k;
+            let spread = self.v(CONTACT_ARM_A_X, at).sub(arm_a);
+            let flat = spread.sub(normal.scale(spread.dot(normal)));
+            reach += self.s(CONTACT_NORMAL_IMPULSE, at) * sqrt(flat.dot(flat));
+        }
+        let turn = body_b.angular.sub(body_a.angular).dot(normal);
+        let (ia, ib) = (body_a.inertia.mul(normal).dot(normal), body_b.inertia.mul(normal).dot(normal));
+        if ia + ib > 0.0 {
+            let held_twist = self.s(PAIR_TWIST, row);
+            let wanted = held_twist - (mass_scale * turn / (ia + ib) + impulse_scale * held_twist);
+            let limit = friction * reach;
+            let next_twist = if wanted > limit { limit } else if wanted < -limit { -limit } else { wanted };
+            let delta = next_twist - held_twist;
+            body_a.angular = body_a.angular.sub(body_a.inertia.mul(normal.scale(delta)));
+            body_b.angular = body_b.angular.add(body_b.inertia.mul(normal.scale(delta)));
+            self.set_s(PAIR_TWIST, row, next_twist);
         }
     }
 

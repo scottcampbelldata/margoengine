@@ -302,6 +302,8 @@ columns! {
     PAIR_SURFACE_X f32 Pair,
     PAIR_SURFACE_Y f32 Pair,
     PAIR_SURFACE_Z f32 Pair,
+    // The impulse of the simplified friction model's twist about the pair's normal, carried from substep to substep.
+    PAIR_TWIST f32 Pair,
     SOLVE_PAIRS u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
@@ -793,6 +795,8 @@ pub const CCD_ACTIVE: u32 = 1 << 14;
 pub const ASKED_TO_SLEEP: u32 = 1 << 15;
 /// The gyroscopic term is off for this body (Rapier's default; here the term is on unless this bit is set).
 pub const NO_GYROSCOPIC: u32 = 1 << 16;
+/// Taken out of the world by the step because its numbers left the range (see `check_range`); stays set, with DISABLED.
+pub const QUARANTINED: u32 = 1 << 17;
 
 // Bits of the COLLIDER_FLAGS column.
 /// Sees overlaps and pushes nothing.

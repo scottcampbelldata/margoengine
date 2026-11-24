@@ -2097,7 +2097,9 @@ export class SoftBodies implements PhysicsAttachment {
         colors.push(...color, ...color);
       };
     if (!(stressRange > 0) || !Number.isFinite(stressRange))
-      throw new RangeError(`The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`);
+      throw new RangeError(
+        `The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`,
+      );
     const c = this.columns();
     for (const body of this.bodies) {
       const at = (row: number): [number, number, number] => [c.x![row]!, c.y![row]!, c.z![row]!];
@@ -2112,7 +2114,10 @@ export class SoftBodies implements PhysicsAttachment {
             const rest = c.rest![row]!,
               strain = rest > 0 ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) / rest - 1 : 0,
               k = Math.min(1, Math.abs(strain) / stressRange);
-            color = strain >= 0 ? [0.4 + 0.6 * k, 0.8 * (1 - k), 0.5 * (1 - k), 1] : [0.4 * (1 - k), 0.8 * (1 - k), 0.5 + 0.5 * k, 1];
+            color =
+              strain >= 0
+                ? [0.4 + 0.6 * k, 0.8 * (1 - k), 0.5 * (1 - k), 1]
+                : [0.4 * (1 - k), 0.8 * (1 - k), 0.5 + 0.5 * k, 1];
           }
           line(a, b, color);
         }

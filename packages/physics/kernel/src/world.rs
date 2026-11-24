@@ -108,6 +108,25 @@ pub struct Header {
     pub coupling_rows: u32,
     /// Words of PATH_WORD handed out so far, ranges abandoned by a growing path included until the next compaction.
     pub path_used: u32,
+    /// Whether friction is solved in the pushing passes too (1, the default) or only in the relaxing ones (0), Rapier's
+    /// `friction_in_bias_pass`.
+    pub friction_in_bias: u32,
+    /// How many relaxing passes a substep makes, or NONE for as many as the pushing passes (Rapier's
+    /// `num_internal_stabilization_iterations`).
+    pub stabilization: u32,
+    /// The friction model: 0 a Coulomb cone at each point, 1 one constraint for the manifold and a twist about its normal.
+    pub friction_model: u32,
+    /// The least time, in seconds, a continuous-collision advance is worth (Rapier's `min_ccd_dt`), how close a sweep brings a
+    /// piece before it stops, in metres, and the most advances a pair of pieces takes.
+    pub ccd_min_dt: f32,
+    pub ccd_touch: f32,
+    pub ccd_advances: u32,
+    /// The length of the step being taken, for the parts of it that count in seconds.
+    pub step_dt: f32,
+    /// Not zero: a body whose numbers leave the range is taken out of the world (QUARANTINED) and the world steps on, in place of
+    /// stopping (Rapier's quarantine). How many bodies have been taken out so far.
+    pub quarantine: u32,
+    pub quarantined: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -122,7 +141,7 @@ pub struct World {
     pub modifier: Option<fn(&mut World, usize)>,
     /// Milliseconds the phases of the last step took (see `integrate::PHASES`). Not in the arena: a clock reading is not
     /// part of the world's state, so it never reaches a snapshot or the hash.
-    pub timing: [f32; 8],
+    pub timing: [f32; 15],
     /// The upper halves of the next wide queries' groups (`query::QUERY_WIDE`), set by `query_groups_hi`. Not in the arena: a
     /// query leaves no state in the world.
     pub query_groups_hi: u32,
@@ -154,7 +173,7 @@ impl World {
             filter: None,
             #[cfg(not(target_arch = "wasm32"))]
             modifier: None,
-            timing: [0.0; 8],
+            timing: [0.0; 15],
             query_groups_hi: 0,
             query_motion: [0.0; 9],
             part_id: core::cell::Cell::new(u32::MAX),
@@ -220,6 +239,15 @@ impl World {
                 static_damping: 0.0,
                 coupling_rows: 0,
                 path_used: 0,
+                friction_in_bias: 1,
+                stabilization: NONE,
+                friction_model: 0,
+                ccd_min_dt: 0.0,
+                ccd_touch: 1e-3,
+                ccd_advances: 64,
+                step_dt: 0.0,
+                quarantine: 0,
+                quarantined: 0,
             });
         }
         Some(world)
