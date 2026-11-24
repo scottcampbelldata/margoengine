@@ -6,6 +6,92 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-21: a closed WebSocket or data-channel connection kept its listeners on the socket and channels (KB-NETCODE-LISTENERS1, netcode)
+
+- **Repro:** `openWebSocket` a socket (or `dataChannelConnection` two channels), close the connection, count the listeners on the socket or
+  channels: 2 (message and close) on a socket, 4 on the channel pair, still attached. The netcode owner/lifetime fixture (`listenWebSocket` entry, real
+  loopback socket; `dataChannelConnection` entry) failed "no leaked event listeners" in every case.
+- **Cause:** the connections added anonymous arrow listeners in their constructors and never removed them, so a closed connection stayed reachable
+  from its socket or channels until they were collected (and a channel that dispatches `close` synchronously re-entered `close()`).
+- **Fix:** the listeners are fields and `finish()` removes them (`packages/netcode/src/websocket.ts`, `webrtc.ts`); `DataChannelConnection.close()`
+  takes them off before it closes the channels.
+- **Regression:** packages/netcode/tests/connection-listeners.test.js (four cases) and the netcode owner/lifetime fixture.
+
+### Fixed 2026-11-21: connectVoxelNet left its listeners on a socket that had closed (KB-VOXELNET-WSLISTENERS1, voxel-net)
+- **Repro:** `const client = connectVoxelNet(url, world); client.close();` and wait for `onClose`: the closed WebSocket still held its `open`, `message` and `close` listeners, and each of them kept the client, the world and the resume loop reachable from the socket. The new owner fixture `packages/voxel-net/tests/owner-lifetime.fixture.js` (`connectVoxelNet`, `VoxelShardClient`) failed with "no leaked event listeners (3: open on WebSocket, message on WebSocket, close on WebSocket)" in every case.
+- **Cause:** `open()` in `packages/voxel-net/src/client.ts` added three anonymous listeners to each socket and never removed them, neither when the socket closed nor when a resume replaced it.
+- **Fix:** the three listeners are named, and the `close` listener (the last event a socket delivers) removes all three before it tells the client, so a client's `onClose` finds the socket released; a replaced socket's own close does the same.
+- **Regression:** `packages/voxel-net/tests/on-close.test.js` "connectVoxelNet takes its listeners off a socket once it closed, before onClose" (fails on the old code with 3 listeners left); `npm run check:owners -- --packages=voxel-net` on the CPU model, WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: a Figure in a scene of its own put its lines, points, label and depth plugins in the engine's scene (KB-SCIVIZ-SCENE1, sciviz)
+- **Repro:** make a scene with `engine.createScene()`, add `Figure.attach(engine)` to it from a plugin's `setup`, add a line or scatter layer and wait for `figure.ready()`: `engine.sceneOf(figure.renderer)` was the new scene, but the lines plugin, the points plugin, the axes' label renderer (and, for a volume, the depth capture) were in the engine's own scene, so disposing the scene left them behind. The new owner fixture `packages/sciviz/tests/owner-lifetime.fixture.js` failed "async factory retains its originating scene" and "releases its registration".
+- **Cause:** those plugins are made after a dynamic `import()` has settled, when the engine's active scene is the default one again, and `Lines.attach(engine)` joins the active scene. `SciRenderer.dispose` also removed itself from the active scene instead of the scene it joined, so a figure disposed from outside its scene stayed registered there.
+- **Fix:** `packages/sciviz/src/scene-owner.ts` `inSceneOf(engine, owner, make)` runs the attach with the owner's scene active; the figure, its axes, point clouds, geo-vector labels and the progressive controller use it, the depth capture is one per scene, and the renderer leaves the scene `engine.sceneOf(this)` names.
+- **Regression:** `packages/sciviz/tests/scene-owner.test.js` (the scene a made plugin joins, the capture per scene); `npm run check:owners -- --packages=sciviz` on the CPU model, WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: disposing a Figure left its lines and points plugins, and an engine that removed its renderer left the figure running (KB-SCIVIZ-PLUGINS1, sciviz)
+- **Repro:** `const figure = Figure.attach(engine); await figure.line(...); figure.dispose();`: the lines plugin stayed registered on the engine (and the points plugin after a scatter, the depth capture after the last volume). A 2D figure whose renderer the engine or scene removed (`engine.removePlugin(figure.renderer.name)`, `scene.dispose()`) kept `engine.views` and the camera's `project` hook, because only `Figure.dispose` undid them.
+- **Cause:** `Figure.dispose` freed its layers, axes and panels but never the plugins it had added, and nothing tied the figure to its renderer's removal.
+- **Fix:** the figure keeps the lines and points plugins it makes and removes them when it is disposed (one that finishes loading afterwards goes at once); an idle depth capture leaves its scene (`VolumeDepthCapture.release`); the figure registers a hidden drawable on its renderer, whose disposal disposes the figure.
+- **Regression:** `packages/sciviz/tests/scene-owner.test.js` (`release` of an idle capture); the owner fixture's `Figure.2d` and 3D entries in every disposal mode.
+
+### Fixed 2026-11-21: a Figure disposed while its axes were loading ended in an unhandled "Engine disposed" rejection (KB-SCIVIZ-AXESDISPOSE1, sciviz)
+- **Repro:** add a graph layer (its bounds queue an axes update), then dispose the engine before the axes' dynamic imports finish: the queued update rejected with `MargoError disposed` from `Lines.attach`, which nothing awaited, and Node ended the process.
+- **Cause:** `Axes.update` awaited the plugin loads and rethrew whatever they threw, also after the axes had been disposed.
+- **Fix:** an update whose axes were disposed while the plugins loaded draws nothing and does not reject.
+- **Regression:** the owner fixture's `graphLayer` entry (the `cycles` case failed the run); `packages/sciviz/tests/axes-dispose.test.js` still passes.
+
+### Fixed 2026-11-21: RemoteTarget, PackageEditor and ShaderEditor disposal left them registered in their scene (KB-INSPECTOR-REMOTE-OWNER1, inspector)
+
+- **Repro:** `RemoteTarget.attach(engine, { transport })` in a scene, `target.dispose()`: `engine.sceneOf(target)` still returned the scene and
+  `scene.plugins` still held `inspector:remote`; `PackageEditor.dispose()` (`inspector:packages`) and `ShaderEditor.dispose()` (`inspector:shaders`) did the same. The inspector owner/lifetime fixture failed "<entry> releases its registration" for all three.
+- **Cause:** each `dispose()` stopped its timer, transport or panel, but never removed itself from the scene (FrameDebugger, the
+  animation and GL panels, the camera tools, the scene editor and the gizmo do).
+- **Fix:** `dispose()` removes the plugin from the scene that holds it (`engine.sceneOf(this)?.removePlugin(this.name)`), after setting its own
+  disposed flag, so a second call and the engine's own disposal stay harmless (`packages/inspector/src/remote.ts`, `packages.ts`, `shaders.ts`).
+- **Regression:** packages/inspector/test/dispose-scene.test.js (all three, in a scene other than the active one, twice, with a same-name
+  plugin in a third scene), packages/inspector/test/remote.test.js "disposing a target takes it off the scene...", and the inspector
+  owner/lifetime fixture.
+
+### Fixed 2026-11-21: disposing a GeometryGenerator left its plugin and frame pass in the scene (KB-GEOMETRY-GENDISPOSE1, geometry)
+- **Repro:** `const generator = GeometryGenerator.attach(engine); generator.dispose();` then `engine.sceneOf(generator)` still returned the scene and its compute pass stayed registered; the new owner fixture `packages/geometry/tests/owner-lifetime.fixture.js` failed with "releases its registration" in every direct-disposal case.
+- **Cause:** `dispose()` freed the items' buffers and cleared the engine and device but never called `removePlugin`, unlike every other plugin's `dispose` (Scatter, SculptView). It also kept the read-back copy pipeline of the old device.
+- **Fix:** `dispose()` clears its fields, then removes the plugin from its scene (the repeated dispose that `removePlugin` triggers finds nothing to do) and drops the copy pipeline.
+- **Regression:** `packages/geometry/tests/gpu.test.js` "disposing the generator takes its plugin out of the scene, once"; `npm run check:owners -- --packages=geometry` on WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: disposing a machinery plugin left it registered in its scene (KB-MACHINERY-DISPOSE1, machinery)
+- **Repro:** `const view = ExplodedView.attach(engine, parts); view.dispose();` then `engine.sceneOf(view)` still returned the scene; the same for Kinematics, SurfacePhysics, TelemetryChannel, FeatureEdges, SectionPlanes and EngineeringAnnotations. The new owner fixture `packages/machinery/test/owner-lifetime.fixture.js` failed with "releases its registration" for each. Dimensions removed its plugins from the active scene, not the one it was attached to.
+- **Cause:** `dispose()` cleared the plugin's own fields but never called `removePlugin`, unlike Scatter and SculptView; Dimensions called `engine.removePlugin(name)`, which uses the active scene.
+- **Fix:** each `dispose()` clears its fields, then removes the plugin from its own scene (the repeated dispose that `removePlugin` triggers finds nothing to do). FeatureEdges and SectionPlanes keep their device-restore path on a private release that does not unregister.
+- **Regression:** `packages/machinery/test/scene.test.js` "disposing Kinematics, ExplodedView, SurfacePhysics or TelemetryChannel takes the plugin out of its scene"; `npm run check:owners -- --packages=machinery` on WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: FeatureEdges and the SectionPlanes caps ignored the view's viewport and scissor (KB-MACHINERY-VIEWPORT1, machinery)
+- **Repro:** render a view with a viewport smaller than the canvas with FeatureEdges (or SectionPlanes with caps) attached; the owner fixture `packages/machinery/test/owner-lifetime.fixture.js` failed in the browser leaf with "draw restores the current viewport".
+- **Cause:** their render passes never set the pass viewport and scissor, so edges and cap fills were drawn over the whole target instead of the view's rectangle.
+- **Fix:** both passes set `context.view`'s viewport and scissor the way core's own draw does.
+- **Regression:** `npm run check:owners -- --packages=machinery` on WebGPU and the WebGL2 layer (the harness checks every draw's viewport and scissor).
+
+### Fixed 2026-11-21: disposing ToonShading or Stars left them registered, and the starfield ignored the view (KB-CREATIVE-DISPOSE1, creative)
+
+- **Repro:** `ToonShading.attach(engine).dispose()` or `Stars.attach(engine).dispose()`, then `engine.sceneOf(plugin)` still returned the scene and the frame pass kept running on freed buffers (ToonShading's pass then threw on `this.entry!`). With two views, the starfield also drew over the whole target (the harness: "draw restores the current viewport").
+- **Cause:** both `dispose()` freed their buffers and never called `removePlugin`, which `onDeviceRestored` shared with them; Stars' pass never called `applyView`.
+- **Fix:** a private `release()` for the device resources (used by `onDeviceRestored`), and `dispose()` removes the plugin from the scene it was attached to, then releases. Stars and Planet set the view's viewport and scissor.
+- **Regression:** `packages/creative/tests/dispose-scene.test.js` "ToonShading.dispose takes it out of its own scene, once" and the Stars twin; `npm run check:owners -- --packages=creative`.
+
+### Fixed 2026-11-21: GrassField and Planet refused an offscreen target of the other 8-bit canvas format (KB-CREATIVE-TARGETFMT1, creative)
+
+- **Repro:** on a device whose preferred canvas format is `bgra8unorm` (Windows), draw a GrassField or Planet into an `rgba8unorm` texture: "Unsupported grass target format". The owner harness' target is `rgba8unorm`.
+- **Cause:** the variant check allowed only `navigator.gpu.getPreferredCanvasFormat()` and the HDR formats, though the pipeline and shader are the same for both 8-bit formats WebGPU defines for a canvas.
+- **Fix:** `rgba8unorm` and `bgra8unorm` are both accepted (other formats and sample counts are still refused).
+- **Regression:** `tests/modern-grass.test.js` "GrassField builds only its initial variant" (draws both formats); `npm run check:owners -- --packages=creative` on WebGPU and the WebGL2 layer.
+
+### Fixed 2026-11-21: horse crowds and army crowds drew into the active scene and leaked their coat atlas on scene disposal (KB-HORSES-CROWDOWN1, horses, armies)
+
+- **Repro:** `addHorseCrowd`, `addHorse`, `PersonCrowd.attach` and `addArmy`, called from inside a scene (a plugin setup of a non-default scene), put their model and crowd draws into whichever scene was active after the lazy imports finished; the new owner fixtures failed "exercises a real registration". Disposing the owner scene or engine of a horse crowd, with `herd.dispose()` never called, left the coat atlas texture alive ("no leaked GPU buffers, textures or query sets").
+- **Cause:** the calls did not keep the scene they were made for across their awaits (`captureScene` in gltf and blender does); the atlas was owned by the herd handle only, not by the draw plugin the scene disposes.
+- **Fix:** each call captures its scene before the first await and runs the registration in it; the herd's crowd draw is a subclass whose `dispose()` also releases the atlas, once.
+- **Regression:** `packages/horses/test/horses.test.js` "crowd: the coat atlas goes with the draw however the draw is let go, once"; `npm run check:owners -- --packages=horses,armies`.
+
 ### Fixed 2026-11-24: a body a joint or a contact was still pulling home fell asleep short of it (KB-PHYS-SLEEP-PUSH1, physics kernel)
 
 - **Repro:** a fixed body and a 10 kg ball at y = -2 with a spherical joint whose anchors lie 1.5 m apart (`anchorA: [0, 0.5, 0]`, `anchorB: [0, 1, 0]`, canSleep default); `physics.step()` 200 times. The ball closes the error at the joint's push speed (3 m/s, 0.05 m a step) and stopped at y = -0.55, asleep, 0.05 m from the joint's home at -0.5. With `canSleep: false` it reached -0.5.

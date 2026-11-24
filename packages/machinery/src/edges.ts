@@ -358,6 +358,12 @@ export class FeatureEdges implements EnginePlugin {
     this.colorAttachment.view = context.color;
     this.descriptor.depthStencilAttachment!.view = context.depth;
     const pass = context.encoder.beginRenderPass(this.descriptor);
+    // The view being drawn: its viewport and scissor, as core's own draw of the same call uses them.
+    const view = context.view;
+    if (view) {
+      pass.setViewport(...view.viewport, 0, 1);
+      pass.setScissorRect(...(view.scissor ?? view.viewport));
+    }
     pass.setPipeline(this.pipeline(context, !!section));
     for (const [shape, group] of drawn)
       for (let t = 0; t < TIERS; t++) {
@@ -449,10 +455,16 @@ export class FeatureEdges implements EnginePlugin {
     return pipeline;
   }
   onDeviceRestored(engine: Engine): void {
-    this.dispose();
+    this.releaseAll();
     this.setup(engine);
   }
   dispose(): void {
+    const engine = this.engine;
+    this.releaseAll();
+    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
+    engine?.sceneOf(this)?.removePlugin(this.name);
+  }
+  private releaseAll(): void {
     for (const shape of this.shapes.values()) this.release(shape);
     this.shapes.clear();
     this.uniform?.destroy();

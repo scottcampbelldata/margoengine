@@ -175,11 +175,14 @@ export class TelemetryChannel implements EnginePlugin {
     this.sample();
   }
   dispose(): void {
+    const engine = this.engine;
     this.socket?.removeEventListener('message', this.message);
     this.socket = undefined;
     if (this.engine && this.kinematics.attachedTo(this.engine)) this.kinematics.setExternalControl(null);
     this.engine = undefined;
     this.reset();
+    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

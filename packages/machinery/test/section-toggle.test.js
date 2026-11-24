@@ -6,7 +6,8 @@ import { SectionPlanes } from '../dist/index.js';
 
 // A minimal stand-in for the base shader a host hands to the pass. SectionPlanes patches the text only: it needs an
 // `@fragment` entry and the `let facing=` statement to insert its clip loop before.
-const wgsl = 'struct Out { @location(0) position:vec3f }\n@fragment fn fragment(i:Out)->@location(0) vec4f {\nlet facing=true;return vec4f(1);\n}';
+const wgsl =
+  'struct Out { @location(0) position:vec3f }\n@fragment fn fragment(i:Out)->@location(0) vec4f {\nlet facing=true;return vec4f(1);\n}';
 
 function rig(options) {
   const gpu = mockGPU(),
@@ -23,7 +24,7 @@ function rig(options) {
     run = passes(section),
     view = context(gpu, { shader: wgsl, depthFormat: 'depth32float-stencil8' });
   Object.assign(section, options);
-  section.setup({ gpu: gpu.device });
+  section.setup({ gpu: gpu.device, sceneOf: () => undefined });
   const frame = (i) => {
     const log = gpu.record(() => {
         view.begin(i);

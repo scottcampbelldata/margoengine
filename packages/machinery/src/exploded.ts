@@ -17,6 +17,7 @@ export class ExplodedView implements EnginePlugin {
   amount = 0;
   private origins: number[][] = [];
   private applied = NaN;
+  private engine?: Engine;
   /** Same as `engine.use(new ExplodedView(...))`; returns the ExplodedView. */
   static attach(engine: EngineKernel, parts: readonly ExplodedPart[]): ExplodedView {
     const value = new ExplodedView(parts);
@@ -25,6 +26,7 @@ export class ExplodedView implements EnginePlugin {
   }
   constructor(readonly parts: readonly ExplodedPart[]) {}
   setup(engine: Engine): void {
+    this.engine = engine;
     this.origins = this.parts.map(({ node, offset }) => {
       node.check();
       if (
@@ -61,8 +63,12 @@ export class ExplodedView implements EnginePlugin {
     this.applied = this.amount;
   }
   dispose(): void {
+    const engine = this.engine;
+    this.engine = undefined;
     this.origins = [];
     this.applied = NaN;
+    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '@margoengine/core/extension';
-import { SurfacePhysics, Kinematics, TelemetryChannel } from '../dist/index.js';
+import { SurfacePhysics, Kinematics, TelemetryChannel, ExplodedView } from '../dist/index.js';
 
 // KB-OWN-ASYNC3: SurfacePhysics.attach and TelemetryChannel.attach add their plugin after an await, when the default scene
 // is active again.
@@ -33,7 +33,10 @@ const withEngine = async (run) => {
 const belt = (e) => {
   const roller = e.createMesh(),
     part = e.createMesh();
-  return [[{ node: part, carrier: 0, lane: 0, axis: [1, 0, 0], halfLength: 0.2 }], [{ node: roller, velocity: [1, 0, 0] }]];
+  return [
+    [{ node: part, carrier: 0, lane: 0, axis: [1, 0, 0], halfLength: 0.2 }],
+    [{ node: roller, velocity: [1, 0, 0] }],
+  ];
 };
 
 test('SurfacePhysics.attach started in a second scene joins that scene', () =>
@@ -82,5 +85,37 @@ test('a rejected TelemetryChannel.attach in a second scene leaves nothing behind
     });
     await assert.rejects(started, /finite delay/);
     assert.deepEqual(owned(e.scene), []);
-    assert.deepEqual(owned(scene).filter((n) => !/kinematics/i.test(n)), []);
+    assert.deepEqual(
+      owned(scene).filter((n) => !/kinematics/i.test(n)),
+      [],
+    );
+  }));
+
+// KB-MACHINERY-DISPOSE1: dispose() of a plugin took its fields back but left the plugin registered in its scene.
+test('disposing Kinematics, ExplodedView, SurfacePhysics or TelemetryChannel takes the plugin out of its scene', () =>
+  withEngine(async (e) => {
+    const scene = e.createScene('b');
+    let made;
+    scene.use({
+      name: 'attacher',
+      setup: () => {
+        const [parts, carriers] = belt(e);
+        const kinematics = Kinematics.attach(e, [{ node: e.createMesh(), axis: 'z', min: -1, max: 1 }]);
+        made = Promise.all([
+          Promise.resolve(kinematics),
+          Promise.resolve(ExplodedView.attach(e, [{ node: e.createMesh(), offset: [1, 0, 0] }])),
+          SurfacePhysics.attach(e, parts, carriers),
+          TelemetryChannel.attach(e, kinematics),
+        ]);
+      },
+    });
+    const plugins = await made;
+    assert.equal(owned(scene).length, 4);
+    for (const plugin of plugins) {
+      assert.ok(e.sceneOf(plugin) === scene);
+      plugin.dispose();
+      assert.equal(e.sceneOf(plugin), undefined, plugin.name + ' is still in its scene');
+      plugin.dispose();
+    }
+    assert.deepEqual(owned(scene), []);
   }));

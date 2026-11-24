@@ -23,8 +23,8 @@ test('immutable complete presets, independent palettes and invalid style tokens'
   assert.deepEqual(PRINT_PALETTES.color, ['#332288', '#117733', '#882255', '#AA4499', '#775500', '#000000']);
   assert.equal(themeLayerOptions(a, 7).color, PRINT_PALETTES.color[1]);
   assert.equal(themeLayerOptions(a).colormap, 'cividis');
-  assert.equal('color' in themeLayerOptions(a,0,'scalar'), false);
-  assert.throws(()=>themeLayerOptions(a,0,'unknown'));
+  assert.equal('color' in themeLayerOptions(a, 0, 'scalar'), false);
+  assert.throws(() => themeLayerOptions(a, 0, 'unknown'));
   assert.equal(themeVariables(a)['--margo-line-width'], String(4 / 3));
   for (const value of [
     { fontSize: 0 },
@@ -92,7 +92,7 @@ function fixture() {
         return () => frames.delete(fn);
       },
     },
-    renderer = { ready: async () => {}, dispose() {} };
+    renderer = { ready: async () => {}, add() {}, remove() {}, dispose() {} };
   const fig = new Figure(engine, { axes: false }, renderer);
   return {
     dom,

@@ -4,6 +4,8 @@
 import type { Line, Lines } from '@margoengine/lines';
 import type { Label, LabelRenderer } from '@margoengine/labels';
 import type { EngineKernel } from '@margoengine/core';
+import type { EnginePlugin } from '@margoengine/core/extension';
+import { inSceneOf } from './scene-owner.js';
 import { axisScale, type Scale } from './scales.js';
 import { toScene, type Bounds } from './layer.js';
 import { tickSegment, themeFont } from './theme-style.js';
@@ -69,6 +71,8 @@ export class Axes {
     readonly theme: Theme,
     readonly options: AxesOptions,
     readonly lines: () => Promise<Lines>,
+    /** The figure's renderer, whose scene the labels plugin joins. */
+    readonly owner?: EnginePlugin,
   ) {}
 
   /**
@@ -82,15 +86,22 @@ export class Axes {
     scales: readonly [Scale, Scale, Scale] = [axisScale(), axisScale(), axisScale()],
   ): Promise<void> {
     this.#loading ??= (async () => {
-      const [lines, { LabelRenderer }, { Line }] = await Promise.all([
+      const loaded = await Promise.all([
         this.lines(),
         import('@margoengine/labels'),
         import('@margoengine/lines'),
-      ]);
-      if (this.#disposed) return;
+      ]).catch((error) => {
+        // The figure was disposed (the engine with it) while the plugins loaded: there is nothing to draw, and no error.
+        if (this.#disposed) return undefined;
+        throw error;
+      });
+      if (this.#disposed || !loaded) return;
+      const [lines, { LabelRenderer }, { Line }] = loaded;
       this.#lines = lines;
       this.#Line = Line;
-      this.#labels = LabelRenderer.attach(this.engine);
+      this.#labels = this.owner
+        ? inSceneOf(this.engine, this.owner, () => LabelRenderer.attach(this.engine))
+        : LabelRenderer.attach(this.engine);
     })();
     await this.#loading;
     // No await from here on: a dispose() can only land before this check, never between it and the drawing.

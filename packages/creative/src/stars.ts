@@ -5,6 +5,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import shader from './shaders/stars.wgsl?raw';
 import { overlayPass } from '../../shared/pass.js';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number };
@@ -23,6 +24,7 @@ export class Stars implements EnginePlugin {
   }
   enabled = true;
   readonly name = 'creative:stars';
+  private engine?: Engine;
   private buffer?: GPUBuffer;
   private layout?: GPUBindGroupLayout;
   private bindings?: GPUBindGroup;
@@ -43,6 +45,7 @@ export class Stars implements EnginePlugin {
         'unsupported',
         'The Earth starfield requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
+    this.engine = engine;
     this.depthFormat = device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float';
     this.buffer = device.createBuffer({
       size: this.data.byteLength,
@@ -58,7 +61,7 @@ export class Stars implements EnginePlugin {
       });
       this.module = device.createShaderModule({ code: shader });
     } catch (error) {
-      this.dispose();
+      this.release();
       throw error;
     }
   }
@@ -91,18 +94,27 @@ export class Stars implements EnginePlugin {
     const pass = context.encoder.beginRenderPass(this.descriptor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.bindings!);
+    // Inside the view's rectangle only: a plain full-canvas frame has no view and keeps the whole target.
+    applyView(pass, context);
     pass.draw(3);
     pass.end();
   };
 
-  onDeviceRestored(engine: Engine): void {
-    this.dispose();
-    this.setup(engine);
-  }
-  dispose(): void {
+  private release(): void {
     this.buffer?.destroy();
     this.buffer = this.layout = this.bindings = this.module = undefined;
     this.pipelines.clear();
+  }
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.setup(engine);
+  }
+  dispose(): void {
+    // The scene the starfield was attached to, not whichever scene is active now.
+    const scene = this.engine?.sceneOf(this);
+    this.engine = undefined;
+    scene?.removePlugin(this.name);
+    this.release();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

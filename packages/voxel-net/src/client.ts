@@ -922,18 +922,26 @@ export function connectVoxelNet(
     socket = ws;
     silent = 0;
     ws.binaryType = 'arraybuffer';
-    ws.addEventListener('open', () => {
+    const opened = (): void => {
       for (const data of queue.splice(0)) ws.send(data as Uint8Array<ArrayBuffer>);
-    });
-    ws.addEventListener('message', (event) => {
+    };
+    const received = (event: MessageEvent): void => {
       if (ws !== socket) return;
       silent = 0;
       client.receive(new Uint8Array(event.data as ArrayBuffer));
       loop.heard();
-    });
-    ws.addEventListener('close', ({ code, reason }) => {
+    };
+    // A socket that has closed delivers nothing more, so its listeners go with it, before the client is told (the
+    // client's own `onClose` can then rely on the socket being released; KB-VOXELNET-WSLISTENERS1).
+    const closed = ({ code, reason }: CloseEvent): void => {
+      ws.removeEventListener('open', opened);
+      ws.removeEventListener('message', received);
+      ws.removeEventListener('close', closed);
       if (ws === socket) lost(code, reason);
-    });
+    };
+    ws.addEventListener('open', opened);
+    ws.addEventListener('message', received);
+    ws.addEventListener('close', closed);
     return {
       send: (data) => (ws.readyState === 1 ? ws.send(data as Uint8Array<ArrayBuffer>) : queue.push(data)),
       close,

@@ -13,6 +13,7 @@ import type {
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Figure } from './figure.js';
+import { inSceneOf } from './scene-owner.js';
 import { resolveColormap, rangeOption, type Bounds, type ColormapSource } from './layer.js';
 import { nearestPoint, selectPoints, type SelectRegion } from './pick.js';
 import { selectionOperation, type RowKey, type SelectionOperation, type SelectionStore } from './link.js';
@@ -165,10 +166,12 @@ export class PointCloudLayer extends EventTarget {
       wrapped,
       { ...options, pointBudget: budget, material: options.material ?? { size: 3, shape: 'round' } },
     );
-    this.points = Plugin.attach(figure.engine, { name: `figure-pointcloud-${++serial}`, pointBudget: budget });
+    this.points = inSceneOf(figure.engine, figure.renderer, () =>
+      Plugin.attach(figure.engine, { name: `figure-pointcloud-${++serial}`, pointBudget: budget }),
+    );
     // Point sizes are CSS pixels, on screen and in export alike (SciRenderer.cssScale).
     this.points.pixelScale = (context) => figure.renderer.cssScale(context.width);
-    figure.engine.use(this.octree);
+    inSceneOf(figure.engine, figure.renderer, () => figure.engine.use(this.octree));
     this.octree.onError((node, error) => {
       this.#error = error;
       this.dispatchEvent(new CustomEvent('loaderror', { detail: { node, error } }));

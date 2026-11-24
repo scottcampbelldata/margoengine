@@ -470,6 +470,7 @@ export class Kinematics implements EnginePlugin {
     if (this.options.targets?.length || this.options.distances?.length) this.solve();
   }
   dispose(): void {
+    const engine = this.engine;
     if (this.engine && !this.engine.disposed)
       for (const joint of this.joints)
         if (this.engine.meshes.get(joint.node.id) === joint.node)
@@ -483,6 +484,8 @@ export class Kinematics implements EnginePlugin {
     this.values = [];
     this.order = [];
     this.driven.clear();
+    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

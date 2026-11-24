@@ -786,12 +786,16 @@ export class GeometryGenerator implements EnginePlugin {
     state.frames?.destroy();
   }
 
-  /** Stops every item and detaches from the engine. */
+  /** Stops every item and detaches from the engine, taking this plugin and its frame pass out of the scene. */
   dispose(): void {
+    const engine = this.#engine;
     for (const item of [...this.#items.keys()]) this.remove(item);
     this.#pipelines.clear();
+    this.#copy = undefined;
     this.#device = undefined;
     this.#engine = undefined;
+    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
 
   [Symbol.dispose](): void {

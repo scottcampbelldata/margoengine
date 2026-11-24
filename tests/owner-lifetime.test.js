@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   exerciseLifetime,
@@ -314,7 +314,12 @@ test('check:owners prints the pending list and runs only registered fixtures', {
     // One real package that still has no fixture and no exclusion, if any is left.
     const waiting = readdirSync(new URL('../packages', import.meta.url))
       .sort()
-      .filter((name) => !OWNER_FIXTURES[name] && !OWNER_EXCLUSIONS[name])
+      .filter(
+        (name) =>
+          existsSync(new URL(`../packages/${name}/package.json`, import.meta.url)) &&
+          !OWNER_FIXTURES[name] &&
+          !OWNER_EXCLUSIONS[name],
+      )
       .slice(0, 1);
     const result = await runOwners({ packages: [...waiting, 'cinematic'], adapter, report() {} });
     assert.deepEqual(result.pending, waiting);
