@@ -67,6 +67,12 @@ export interface BiomeViewOptions {
   /** Draws the stored objects (trees, shrubs, rocks) and the detail (grass, ferns) of the world's biomes through
    * scatter. Default true. */
   readonly objects?: boolean;
+  /**
+   * Shrubs, hedge shrubs, rocks and props (every species off the canopy layer) are drawn within this distance of the
+   * camera, at most `radius` (`BiomeObjects` `nearRadius`). Raise it for hedged country seen from a hill or the air.
+   * Default 300 m.
+   */
+  readonly nearRadius?: number;
   /** Detail is drawn within this distance of the camera. Default 120 m. */
   readonly detailRadius?: number;
   /** Seconds ahead along the camera's velocity that tiles are fetched early. Default 3. */
@@ -942,7 +948,8 @@ export class BiomeView implements Disposable {
       throw rangeError('BiomeView maxSteps must be 1 or more', 'biomes');
     if (typeof this.#clock !== 'function')
       throw typeError('BiomeView clock must be a function returning milliseconds', 'biomes');
-    this.#near = Math.min(this.#radius, 300);
+    this.#near = Math.min(this.#radius, options.nearRadius ?? 300);
+    if (!(this.#near > 0)) throw rangeError('BiomeView nearRadius must be above 0', 'biomes');
     if (!(this.#lookahead >= 0) || !(this.#budget > 0))
       throw rangeError('BiomeView lookahead must be 0 or more seconds and budget above 0 ms', 'biomes');
     const [x0, z0, x1, z1] = world.bounds;
@@ -1272,6 +1279,7 @@ export class BiomeView implements Disposable {
             // Height texels sit on the world's grid corners: the rectangle their centres cover is half a texel wider.
             bounds,
             radius: options.radius ?? 1000,
+            nearRadius: view.#near,
             detailRadius: options.detailRadius ?? 120,
             detailResolution: detail,
             detailBudget: options.detailBudget,

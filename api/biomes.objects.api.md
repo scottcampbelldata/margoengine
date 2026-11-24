@@ -43,6 +43,7 @@ export interface BiomeObjectsOptions {
     readonly heightmap: () => GPUTexture | undefined;
     readonly bounds: readonly [number, number, number, number];
     readonly radius?: number;
+    readonly nearRadius?: number;
     readonly detailRadius?: number;
     readonly detailResolution?: number;
     readonly detailBudget?: number;

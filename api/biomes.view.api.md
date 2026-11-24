@@ -90,6 +90,7 @@ export interface BiomeViewOptions {
     };
     readonly signal?: AbortSignal;
     readonly objects?: boolean;
+    readonly nearRadius?: number;
     readonly detailRadius?: number;
     readonly lookahead?: number;
     readonly budget?: number;

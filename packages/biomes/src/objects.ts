@@ -22,6 +22,13 @@ export interface BiomeObjectsOptions {
   readonly bounds: readonly [number, number, number, number];
   /** Stored objects are drawn within this distance of the camera. Default 1,000 m. */
   readonly radius?: number;
+  /**
+   * Species off the canopy layer (shrubs, hedge shrubs, rocks, props) are drawn within this distance, at most `radius`.
+   * A hedged countryside seen from a hill or a drone needs its hedge shrubs out to the view's reach: at 300 m a 2 m hedge
+   * is about 26 pixels high through a 50 mm lens on a 1,920 pixel Super 35 frame (24.89 mm wide), and 5 pixels at 1,500 m.
+   * Default 300 m.
+   */
+  readonly nearRadius?: number;
   /** Detail (grass, ferns) is drawn within this distance. Default 120 m. */
   readonly detailRadius?: number;
   /** Metres per detail density texel. Default 2. */
@@ -91,7 +98,9 @@ export interface BiomeMeshPart {
  * @throws TypeError for a malformed registry or part; RangeError for a colour outside 0..1, vertex data whose lengths
  *   are not whole vertices and triangles, or an index past the last vertex.
  */
-export function checkBiomeMeshes(meshes: unknown): asserts meshes is Readonly<Record<string, readonly BiomeMeshPart[]>> {
+export function checkBiomeMeshes(
+  meshes: unknown,
+): asserts meshes is Readonly<Record<string, readonly BiomeMeshPart[]>> {
   if (typeof meshes !== 'object' || meshes === null || Array.isArray(meshes))
     throw typeError('BiomeObjects meshes must be an object of mesh parts by key', 'biomes');
   for (const [key, parts] of Object.entries(meshes as Record<string, unknown>)) {
@@ -103,7 +112,9 @@ export function checkBiomeMeshes(meshes: unknown): asserts meshes is Readonly<Re
       const c = part.color as unknown as ArrayLike<unknown>;
       if (!c || c.length !== 3 || !Array.from(c).every((v) => typeof v === 'number' && v >= 0 && v <= 1))
         throw rangeError(`BiomeObjects meshes.${key}: color must be three linear RGB values 0 to 1`, 'biomes');
-      const rings = Array.isArray(part.geometry) ? (part.geometry as readonly BiomeMeshData[]) : [part.geometry as BiomeMeshData];
+      const rings = Array.isArray(part.geometry)
+        ? (part.geometry as readonly BiomeMeshData[])
+        : [part.geometry as BiomeMeshData];
       if (rings.length !== 1 && rings.length !== 3)
         throw typeError(`BiomeObjects meshes.${key}: geometry is one mesh or three (near, middle, far)`, 'biomes');
       if (
@@ -112,14 +123,31 @@ export function checkBiomeMeshes(meshes: unknown): asserts meshes is Readonly<Re
       )
         throw typeError(`BiomeObjects meshes.${key}: textures need uvs and maps (ScatterTextures)`, 'biomes');
       for (const d of rings) {
-        if (!d || typeof d.positions?.length !== 'number' || typeof d.normals?.length !== 'number' || typeof d.indices?.length !== 'number')
+        if (
+          !d ||
+          typeof d.positions?.length !== 'number' ||
+          typeof d.normals?.length !== 'number' ||
+          typeof d.indices?.length !== 'number'
+        )
           throw typeError(`BiomeObjects meshes.${key}: geometry needs positions, normals and indices`, 'biomes');
         const n = d.positions.length / 3;
-        if (!Number.isInteger(n) || n === 0 || d.normals.length !== d.positions.length || d.indices.length % 3 || !d.indices.length)
-          throw rangeError(`BiomeObjects meshes.${key}: positions and normals must be equal whole vertices and indices whole triangles`, 'biomes');
+        if (
+          !Number.isInteger(n) ||
+          n === 0 ||
+          d.normals.length !== d.positions.length ||
+          d.indices.length % 3 ||
+          !d.indices.length
+        )
+          throw rangeError(
+            `BiomeObjects meshes.${key}: positions and normals must be equal whole vertices and indices whole triangles`,
+            'biomes',
+          );
         for (let i = 0; i < d.indices.length; i++)
           if (!(d.indices[i] >= 0 && d.indices[i] < n && Number.isInteger(d.indices[i])))
-            throw rangeError(`BiomeObjects meshes.${key}: index ${d.indices[i]} is past the last vertex ${n - 1}`, 'biomes');
+            throw rangeError(
+              `BiomeObjects meshes.${key}: index ${d.indices[i]} is past the last vertex ${n - 1}`,
+              'biomes',
+            );
       }
     }
   }
@@ -242,7 +270,14 @@ function partsOf(
     return [
       { geometry: all(levels.trunk), color: bark, kind: 'bark' },
       ...(levels.textures
-        ? [{ geometry: all(levels.canopy), color: [1, 1, 1] as const, kind: 'foliage' as const, textures: levels.textures }]
+        ? [
+            {
+              geometry: all(levels.canopy),
+              color: [1, 1, 1] as const,
+              kind: 'foliage' as const,
+              textures: levels.textures,
+            },
+          ]
         : []),
     ];
   }
@@ -310,7 +345,9 @@ type Detail = { id: string; scatter: Scatter; texture?: GPUTexture; device?: GPU
 export class BiomeObjects implements Disposable {
   readonly #engine: EngineKernel;
   readonly #placement: BiomePlacement;
-  readonly #options: Required<Omit<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states'>> &
+  readonly #options: Required<
+    Omit<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states'>
+  > &
     Pick<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states'>;
   /** Foliage materials that follow the seasons, with their base colours, and the seasons listener's remover. */
   readonly #seasonal: { material: PbrMaterial; base: readonly [number, number, number] }[] = [];
@@ -328,7 +365,14 @@ export class BiomeObjects implements Disposable {
   private constructor(engine: EngineKernel, placement: BiomePlacement, options: BiomeObjectsOptions, modules: Modules) {
     this.#engine = engine;
     this.#placement = placement;
-    this.#options = { radius: 1000, detailRadius: 120, detailResolution: 2, detailBudget: DETAIL_BUDGET, ...options };
+    this.#options = {
+      radius: 1000,
+      nearRadius: 300,
+      detailRadius: 120,
+      detailResolution: 2,
+      detailBudget: DETAIL_BUDGET,
+      ...options,
+    };
     this.#modules = modules;
   }
 
@@ -349,14 +393,17 @@ export class BiomeObjects implements Disposable {
         'BiomeObjects needs a heightmap function and the bounds [minX, minZ, maxX, maxZ] it covers',
         'biomes',
       );
-    for (const key of ['radius', 'detailRadius', 'detailResolution', 'detailBudget'] as const)
+    for (const key of ['radius', 'nearRadius', 'detailRadius', 'detailResolution', 'detailBudget'] as const)
       if (options[key] !== undefined && !(options[key]! > 0))
         throw rangeError(`BiomeObjects ${key} must be above 0`, 'biomes');
     if (!(b[2] > b[0] && b[3] > b[1]))
       throw rangeError('BiomeObjects bounds must be [minX, minZ, maxX, maxZ] with max above min', 'biomes');
     if (options.meshes !== undefined) checkBiomeMeshes(options.meshes);
     if (options.states !== undefined && typeof options.states !== 'function')
-      throw typeError('BiomeObjects states must be a function (key, kind) returning a PlantStates.plant() response or undefined', 'biomes');
+      throw typeError(
+        'BiomeObjects states must be a function (key, kind) returning a PlantStates.plant() response or undefined',
+        'biomes',
+      );
     if (options.seasons !== undefined && typeof options.seasons?.colorAt !== 'function')
       throw typeError('BiomeObjects seasons must be a BiomeSeasons from @margoengine/biomes/seasons', 'biomes');
     if (options.seasons !== undefined && options.seasons.world !== placement.world)
@@ -384,7 +431,13 @@ export class BiomeObjects implements Disposable {
       conifers = keys.some((k) => !Object.hasOwn(own, k) && parseConiferKey(k))
         ? await import('@margoengine/procedural/conifers')
         : undefined;
-    const objects = new BiomeObjects(engine, placement, options, { tiles, scatter, procedural, core, ...(conifers ? { conifers } : {}) });
+    const objects = new BiomeObjects(engine, placement, options, {
+      tiles,
+      scatter,
+      procedural,
+      core,
+      ...(conifers ? { conifers } : {}),
+    });
     held.run(() => objects.#build());
     if (objects.#seasonal.length) {
       // Each `seasons.set` and each change of the placement's world (climate, heights, biomes) re-tints the foliage.
@@ -406,9 +459,9 @@ export class BiomeObjects implements Disposable {
       // Stand-ins come in over the last tile of the stored trees.
       objects.#far = await held.run(() =>
         FarForest.attach(
-        engine,
-        { scatter, core },
-        { ...far, heightmap: options.heightmap, bounds: b, inner: Math.max(0, r - side), fade: side },
+          engine,
+          { scatter, core },
+          { ...far, heightmap: options.heightmap, bounds: b, inner: Math.max(0, r - side), fade: side },
         ),
       );
     }
@@ -450,19 +503,25 @@ export class BiomeObjects implements Disposable {
   #make = (d: Data): Geometry => new this.#modules.core.Geometry(d.positions, d.normals, d.indices);
 
   #build(): void {
-    const { radius, detailRadius, detailResolution, bounds, heightmap } = this.#options,
+    const { radius, nearRadius, detailRadius, detailResolution, bounds, heightmap } = this.#options,
       side = this.#placement.tileSize,
-      // Canopy trees are drawn within the full radius, smaller plants, rocks and props within 300 m.
+      // Canopy trees are drawn within the full radius, smaller plants, rocks and props within `nearRadius`.
       seasons = this.#options.seasons,
       tiles = (key: string, near: boolean, seasonal = false) => {
-        const r = near ? Math.min(radius, 300) : radius,
+        const r = near ? Math.min(radius, nearRadius) : radius,
           // Room for every tile within the draw distance plus a tile: a view keeps a tile's objects until it is a whole
           // tile beyond (sized for the distance alone, a view with tiles queued ran out of slots in a frame).
           slots = (Math.ceil((2 * (r + side)) / side) + 2) ** 2, // float division: view only
           // Memory follows the held records, so a tile may hold up to scatter's per-tile limit (no stand is dropped).
           slotSize = Math.min(65536, Math.floor(16777216 / slots)), // float division: view only
           list: ScatterTiles[] = [];
-        for (const part of partsOf(key, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules.conifers))
+        for (const part of partsOf(
+          key,
+          this.#modules.procedural,
+          this.#make,
+          this.#options.meshes,
+          this.#modules.conifers,
+        ))
           list.push(
             this.#modules.tiles.ScatterTiles.attach(this.#engine, part.geometry, {
               bounds,
@@ -567,7 +626,10 @@ export class BiomeObjects implements Disposable {
     if (entry.texture && entry.device === device) return entry.texture;
     entry.texture?.destroy();
     const texture = device.createTexture({ size: [width, depth], format: 'r8unorm', usage: 4 | 2 }); // TEXTURE_BINDING | COPY_DST
-    device.queue.writeTexture({ texture }, entry.data as Uint8Array<ArrayBuffer>, { bytesPerRow: width }, [width, depth]);
+    device.queue.writeTexture({ texture }, entry.data as Uint8Array<ArrayBuffer>, { bytesPerRow: width }, [
+      width,
+      depth,
+    ]);
     entry.device = device;
     return (entry.texture = texture);
   }

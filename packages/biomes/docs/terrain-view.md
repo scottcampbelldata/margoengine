@@ -182,6 +182,7 @@ Before the ordered cull (2026-11-05) the same world took 5.9 MB (`packages/biome
 | `BiomeView.attach` option | Default | Meaning |
 | --- | --- | --- |
 | `objects` | true | draw stored objects and detail |
+| `nearRadius` | 300 | metres around the camera with shrubs, hedge shrubs, rocks and props (every species off the canopy layer), at most `radius`; raise it for hedged country seen from a hill or the air |
 | `detailRadius` | 120 | metres around the camera with grass and ferns |
 | `shadows` | none | a `Shadows` (`@margoengine/shadows`): the view adds its terrain and every stored-object mesh to it and removes them on dispose |
 
@@ -205,7 +206,7 @@ engine.start();
 ```
 
 Each tree, palm, birch, acacia and shrub part draws `@margoengine/procedural`'s `detail` 2, 1 and 0 meshes in its
-three LOD rings (150, 400 and 1,000 m for canopy trees, 45, 120 and 300 m for the rest; a broadleaf canopy goes from
+three LOD rings (150, 400 and 1,000 m for canopy trees, 15, 40 and 100 percent of `nearRadius` for the rest, 45, 120 and 300 m by default; a broadleaf canopy goes from
 6,240 to 3,180 to 400 triangles), switched hard: a dithered fade between them cost 1.2 to 5.6 ms a frame with shadows.
 Rocks, cacti and snags have one mesh. Every part takes scatter's `variation` from a hash of its position, so no two
 trees share a colour: leaves `{ hue: 0.06, value: 0.15 }` with `clusters: 0.6` (canopies shade as clumps about 0.6 m

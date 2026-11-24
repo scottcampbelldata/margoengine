@@ -34,7 +34,8 @@ hedges draw with the rest of the plants, LOD rings and far impostors included, a
 `FARMLAND_PAINT` gives the hedgerow and lane layers their own narrow blend (`FARMLAND_EDGES`: 1 m and 2 m), so a 2 m
 hedge keeps its full weight on its line and none 8 m off it instead of a thin smear across the world's 24 m blend; the
 hedge's ground is leaf litter and bare soil, the dark line it draws from the air. Shrubs (hawthorn, blackthorn, hazel,
-holly) draw within the view's 300 m small-plant radius; beyond it the hedge reads by its trees and that dark strip.
+holly) draw within the view's small-plant radius (`nearRadius`, 300 m by default); beyond it the hedge reads by its trees and that
+dark strip, so a view of the country from a hill or the air raises `nearRadius` to its reach.
 `farm.trees` still lists hedge tree spots for a scene that places its own field trees.
 
 ## How it is laid out

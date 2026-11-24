@@ -2206,6 +2206,7 @@ export const entries = [
       'BiomeView clock must be a function returning milliseconds',
       'BiomeView prefetch takes a [minX, minZ, maxX, maxZ] rectangle in metres',
       'BiomeView radius must be above 0',
+      'BiomeView nearRadius must be above 0',
       'BiomeView shadows must be a Shadows from @margoengine/shadows',
       'BiomeView sky must be a Sky from @margoengine/sky (it reads reflectionTexture and lights)',
       'BiomeView textureResolution must be a positive multiple of the world resolution',
