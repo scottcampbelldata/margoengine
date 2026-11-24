@@ -395,3 +395,39 @@ test('particles meet a triangle mesh and rest on its tilted face', async () => {
     assert.ok(distance < 0.04 + 0.05, `particle ${i} lies on it (${distance})`);
   }
 });
+
+test('cloth falling on cloth stays above it with self contacts, and falls through without', async () => {
+  const run = async (selfContacts, upperOrigin) => {
+    const { physics, soft } = await create();
+    const make = (origin, n, pinned) => {
+      const desc = SoftBodyDesc.cloth(origin, [0.1, 0, 0], [0, 0, 0.1], n, n)
+        .setParticleMass(0.05)
+        .setLinearDamping(2)
+        .setParticleRadius(0.025)
+        .setSelfContacts(selfContacts);
+      return soft.create(pinned ? desc.setPinnedParticles(Array.from({ length: n * n }, (_, i) => i)) : desc);
+    };
+    make([-0.55, 0.5, -0.55], 12, true);
+    const upper = make(upperOrigin, 8, false);
+    steps(physics, 240);
+    let lowest = Infinity;
+    for (let i = 0; i < 64; i++) lowest = Math.min(lowest, upper.particlePosition(i)[1]);
+    return lowest;
+  };
+  const held = await run(true, [-0.3, 1, -0.3]),
+    through = await run(false, [-0.3, 1, -0.3]);
+  assert.ok(held > 0.5 + 0.02, `with self contacts the upper sheet rests on the lower: lowest ${held}`);
+  // Sheets whose vertices lie exactly over one another are the hard case for a contact search.
+  const aligned = await run(true, [-0.35, 1, -0.35]);
+  assert.ok(aligned > 0.5 + 0.02, `aligned sheets hold too: lowest ${aligned}`);
+  assert.ok(through < 0.4, `without them it falls through: lowest ${through}`);
+});
+
+test('self contacts need triangles', async () => {
+  const { soft } = await create();
+  assert.throws(() => soft.create(new SoftBodyDesc([0, 0, 0]).setSelfContacts(true)), RangeError);
+  assert.throws(
+    () => SoftBodyDesc.cloth([0, 0, 0], [1, 0, 0], [0, 0, 1], 2, 2).setSelfContacts(true, { friction: -1 }),
+    RangeError,
+  );
+});

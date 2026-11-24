@@ -19,6 +19,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_apply(h: number): void;
   soft_post(h: number): void;
   soft_finish(): void;
+  soft_cloth_reserve(triangles: number, contacts: number): number;
+  soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
   soft_torn(): number;
   soft_hash(): number;
   soft_fem_reserve(tets: number, clusters: number, members: number): void;
@@ -234,6 +236,8 @@ export class SoftBodyDesc {
   /** @internal */ damping = 0;
   /** @internal */ shift: Vec3 = [0, 0, 0];
   /** @internal */ shapeMatching = false;
+  /** @internal */ selfContacts = false;
+  /** @internal */ selfFriction = 0;
   /** @internal */ triangles: number[] = [];
   /** @internal Four particle indices per tetrahedron. */ cells: number[] = [];
   /** @internal */ cellMaterial = new CellMaterial();
@@ -382,6 +386,19 @@ export class SoftBodyDesc {
         }
     desc.shapeMatching = true;
     return desc;
+  }
+
+  /**
+   * Makes the body's triangles collide with each other and with those of other bodies that have it on (Rapier's
+   * `setSelfContacts`, default off): cloth falling on itself stays outside itself, a particle radius apart, found before it
+   * passes through by a continuous point-triangle and edge-edge search. `friction` is Coulomb's coefficient between touching
+   * cloth (default 0.3). The body needs triangles (`cloth`, `clothTube`, `trimesh`). It costs a search every piece of a step.
+   */
+  setSelfContacts(on: boolean, { friction = 0.3 }: { friction?: number } = {}): this {
+    if (!(friction >= 0 && Number.isFinite(friction))) throw new RangeError('Friction is 0 or more.');
+    this.selfContacts = on;
+    this.selfFriction = friction;
+    return this;
   }
 
   /** Turns shape matching on or off (on for `trimesh`, off otherwise). It pulls the particles toward their rest shape. */
@@ -698,6 +715,8 @@ export class SoftBody {
   /** @internal The fixed body that holds this body's surface collider, once it has one. */
   surface: PhysicsBody | null = null;
   /** @internal Whether shape matching holds this body. */ matched = false;
+  /** @internal Whether its triangles are in the cloth contact search, and how rough the cloth is. */ selfContacts = false;
+  /** @internal */ selfFriction = 0;
 
   /** False once the body was removed. */
   get valid(): boolean {
@@ -1174,6 +1193,8 @@ export class SoftBodies implements PhysicsAttachment {
   create(desc: SoftBodyDesc): SoftBody {
     if (this.disposed) throw new MargoError('state', 'SoftBodies was disposed.');
     const particles = desc.particleCount;
+    if (desc.selfContacts && desc.triangles.length === 0)
+      throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
     if (particles === 0) throw new RangeError('A soft body has at least one particle.');
     const structural = desc.edgePairs.length / 2,
       edges = structural + desc.bendPairs.length / 2,
@@ -1274,6 +1295,8 @@ export class SoftBodies implements PhysicsAttachment {
     );
     body.triangleList = Uint32Array.from(desc.triangles);
     body.matched = desc.shapeMatching;
+    body.selfContacts = desc.selfContacts;
+    body.selfFriction = desc.selfFriction;
     if (cells) {
       const [mu, lambda] = desc.cellMaterial.lame(),
         model = desc.cellMaterial.model === 'corotated' ? 1 : 0;
@@ -1304,7 +1327,28 @@ export class SoftBodies implements PhysicsAttachment {
     this.bodies.push(body);
     this.writeMaterial(body);
     this.writeCellMaterial(body);
+    this.syncCloth();
     return body;
+  }
+
+  /** Lays the triangles of the bodies that collide with themselves into the kernel's cloth search. */
+  private syncCloth(): void {
+    const on = this.bodies.filter((b) => b.selfContacts);
+    let triangles = 0,
+      thickness = Infinity,
+      friction = 0;
+    const radius = this.columns().radius;
+    for (const b of on) {
+      triangles += b.triangleList.length / 3;
+      friction = Math.max(friction, b.selfFriction);
+      for (let i = 0; i < b.particles; i++) thickness = Math.min(thickness, radius[b.firstParticle + i]!);
+    }
+    const at = this.exports.soft_cloth_reserve(triangles, Math.max(triangles * 8 + 64, 16384)),
+      buffer = new Uint32Array(this.exports.memory.buffer, at, triangles * 3);
+    let k = 0;
+    for (const b of on) for (const v of b.triangleList) buffer[k++] = b.firstParticle + v;
+    this.exports.soft_cloth_enable(triangles, on.length ? thickness : 0, friction);
+    this.view = null;
   }
 
   /** @internal Writes a body's cell material into its cell rows; the rest shapes stay. */
@@ -1507,6 +1551,7 @@ export class SoftBodies implements PhysicsAttachment {
     body.surface?.remove();
     body.surface = null;
     this.bodies.splice(at, 1);
+    this.syncCloth();
   }
 
   /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */

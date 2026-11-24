@@ -80,6 +80,8 @@ export class SoftBody {
     triangleList: Uint32Array<ArrayBuffer>;
     surface: PhysicsBody | null;
     matched: boolean;
+    selfContacts: boolean;
+    selfFriction: number;
     get valid(): boolean;
     private get c();
     numParticles(): number;
@@ -132,6 +134,8 @@ export class SoftBodyDesc {
     damping: number;
     shift: Vec3;
     shapeMatching: boolean;
+    selfContacts: boolean;
+    selfFriction: number;
     triangles: number[];
     cells: number[];
     cellMaterial: CellMaterial;
@@ -148,6 +152,9 @@ export class SoftBodyDesc {
     static trimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, { bending }?: {
         bending?: boolean;
     }): SoftBodyDesc;
+    setSelfContacts(on: boolean, { friction }?: {
+        friction?: number;
+    }): this;
     setShapeMatching(on: boolean): this;
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;

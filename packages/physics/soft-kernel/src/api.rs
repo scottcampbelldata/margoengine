@@ -94,6 +94,20 @@ pub extern "C" fn soft_finish() {
     world().finish();
 }
 
+/// Makes room for cloth triangles and contacts and says where the triangles go (three particle indices each). Views over the
+/// memory are stale after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_cloth_reserve(triangles: u32, contacts: u32) -> u32 {
+    crate::collide::reserve(triangles as usize, contacts as usize);
+    crate::collide::buffer() as usize as u32
+}
+
+/// Puts the first `triangles` of the buffer into the cloth contact search, with a thickness and a friction coefficient.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_cloth_enable(triangles: u32, thickness: f32, friction: f32) {
+    crate::collide::enable(triangles as usize, thickness, friction);
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_torn() -> u32 {
     world().torn

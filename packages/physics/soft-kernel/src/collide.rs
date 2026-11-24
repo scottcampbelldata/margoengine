@@ -73,6 +73,20 @@ pub fn configure(triangles: &[u32], thickness: f32) {
     s.friction = 0.0;
 }
 
+/// Where the triangles go: the host writes three particle indices a triangle here after `reserve`, then calls `enable`.
+pub fn buffer() -> *mut u32 {
+    state().triangles.as_mut_ptr()
+}
+
+/// Puts the first `count` triangles of the buffer, a thickness and a friction coefficient into force (0 thickness or no
+/// triangles turns the search off).
+pub fn enable(count: usize, thickness: f32, friction: f32) {
+    let s = state();
+    s.count = count;
+    s.thickness = thickness;
+    s.friction = friction;
+}
+
 /// Sets Coulomb's friction coefficient between cloth surfaces that touch: the tangential motion two touching points make
 /// against each other in a substep is cut by up to this much of the push that separated them (Bridson, Fedkiw, Anderson 2002,
 /// section 5; Mueller et al. 2007, section 4.4).
