@@ -19,7 +19,7 @@ export interface AutoExposure {
         y?: number;
         radius?: number;
     };
-    mask?: GPUTexture;
+    mask?: GPUTexture | (() => GPUTexture | undefined);
 }
 
 export interface CubeLUT {
@@ -40,6 +40,7 @@ export class Tonemap implements EnginePlugin {
     setup(engine: Engine): void;
     setLUT(lut: CubeLUT | string | null): void;
     registerPasses(graph: FrameGraph): void;
+    setAutoExposureMask(mask: NonNullable<AutoExposure['mask']>): this;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

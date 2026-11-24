@@ -76,7 +76,7 @@ All are off by default and compiled in only when asked for: without them the sha
   side; all 4,096 samples land in it) or `'mask'` (each sample weighted by the red channel of `mask`, a texture of any
   size stretched over the view). `method: 'histogram'` sorts the weighted samples into 64 bins of log2 luminance (-12 to
   12) and averages only those between `percentiles` (default `[0.1, 0.9]`), so a small light or a dark corner does not
-  swing the exposure; `'mean'` (default) is the weighted log-average. A mask of zero weight keeps the last exposure.
+  swing the exposure; `'mean'` (default) is the weighted log-average. A mask of zero weight keeps the last exposure. `mask` may also be a function giving the texture for the current device; a plain mask belongs to the device it was made on, so after a device restore it is dropped (the exposure holds), reported once through `engine.onError`, and `tonemap.setAutoExposureMask(texture)` brings a new one in (docs/conventions.md, "Borrowed GPU objects").
   Every mode shares one compute pipeline; checked on a real GPU against a CPU oracle of the meter within 0.002 stops in
   all eight combinations (`packages/tonemap/tests/metering-browser.mjs`, Apple silicon Mac, Metal).
 

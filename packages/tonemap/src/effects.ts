@@ -35,8 +35,13 @@ export interface AutoExposure {
   metering?: 'average' | 'center' | 'spot' | 'mask';
   /** The spot of `'spot'` metering: centre `x`, `y` as fractions of the view (default 0.5) and `radius` as a fraction of its shorter side (default 0.05). */
   spot?: { x?: number; y?: number; radius?: number };
-  /** Weight texture of `'mask'` metering (any size, filterable float or unorm; red channel 0 to 1). */
-  mask?: GPUTexture;
+  /**
+   * Weight texture of `'mask'` metering (any size, filterable float or unorm; red channel 0 to 1), or a function
+   * giving it for the current device. A plain texture belongs to the device it was made on: after a device restore the
+   * meter weighs nothing (the exposure holds), the loss is reported once through `engine.onError`, and
+   * `Tonemap.setAutoExposureMask` brings a new one in.
+   */
+  mask?: GPUTexture | (() => GPUTexture | undefined);
 }
 
 const METHODS = ['mean', 'histogram'],
@@ -54,7 +59,9 @@ export function validMetering(a: AutoExposure): boolean {
       (Array.isArray(p) && p.length === 2 && inside(p[0], 0, 1) && inside(p[1], 0, 1) && p[0] < p[1])) &&
     (s === undefined ||
       (typeof s === 'object' && inside(s.x, 0, 1) && inside(s.y, 0, 1) && inside(s.radius, 1e-3, 1))) &&
-    (a.metering !== 'mask' || typeof (a.mask as { createView?: unknown } | undefined)?.createView === 'function')
+    (a.metering !== 'mask' ||
+      typeof a.mask === 'function' ||
+      typeof (a.mask as { createView?: unknown } | undefined)?.createView === 'function')
   );
 }
 
@@ -254,7 +261,11 @@ export function effectsShader(code: string, auto: boolean): string {
     );
   // Dither the encoded value, the last step before the target quantises it.
   const encode = 'return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),';
-  out = swap(out, encode, 'return vec4f(fxDither(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),pos),');
+  out = swap(
+    out,
+    encode,
+    'return vec4f(fxDither(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),pos),',
+  );
   if (!out.includes('fxFinish(color'))
     throw new MargoError(
       'failed',

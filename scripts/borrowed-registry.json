@@ -1110,12 +1110,12 @@
       "source": "packages/tilemap/src/renderer.ts"
     },
     "tonemap:AutoExposure.mask": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/tonemap/src/index.ts"
     },
     "tonemap:TonemapPassContext.source": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "exempt",
+      "reason": "a per-frame argument: TonemapExtension.encode(context) receives the frame's HDR texture from Tonemap each frame (rule 6)"
     },
     "toon:ModelPrimitiveLike.buffers": {
       "status": "exempt",

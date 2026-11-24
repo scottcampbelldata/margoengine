@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
+import { TextureOption, type TextureSource2D } from '../../shared/texture-option.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -230,6 +231,8 @@ export class Tonemap implements EnginePlugin {
   private balanceTint = NaN;
   private readonly meterValues = new Float32Array(16);
   private meterMask?: GPUTexture;
+  /** The auto exposure `mask`, held by the borrowed-object rule (docs/conventions.md); made on first use. */
+  private maskOption?: TextureOption;
   private blankMask?: GPUTexture;
 
   constructor(readonly options: TonemapOptions = {}) {
@@ -513,7 +516,11 @@ export class Tonemap implements EnginePlugin {
       shaped = (o.whitePoint ?? 0) > 0 || (o.toe ?? 1) !== 1 || (o.shoulder ?? 1) !== 1,
       flags = exts.length
         ? -1
-        : (excess ? 1 : 0) | (variableLUT ? 2 : 0) | (fxOn ? (auto ? 12 : 4) : 0) | (classic ? 16 : 0) | (shaped ? 32 : 0),
+        : (excess ? 1 : 0) |
+          (variableLUT ? 2 : 0) |
+          (fxOn ? (auto ? 12 : 4) : 0) |
+          (classic ? 16 : 0) |
+          (shaped ? 32 : 0),
       // The key string is built only when what it names may have changed (a frame with extensions always builds it):
       // a steady frame builds no string.
       key =
@@ -704,7 +711,14 @@ export class Tonemap implements EnginePlugin {
         usage: GPUTextureUsage.TEXTURE_BINDING,
       });
     }
-    const mask = a.metering === 'mask' ? a.mask! : this.blankMask!;
+    let mask = this.blankMask!;
+    if (a.metering === 'mask' && a.mask !== undefined) {
+      // The options object is read every frame: a `mask` assigned straight onto it is taken like the setter.
+      if (!this.maskOption) this.holdMask(a.mask, c.device);
+      else if (this.maskOption.value !== a.mask) this.maskOption.set(a.mask as TextureSource2D, c.device);
+      // A mask lost with its device weighs nothing: the exposure holds until a new one arrives.
+      mask = this.maskOption?.get(c.device, this.engine) ?? mask;
+    }
     if (!this.meterGroup || this.meterMask !== mask) {
       this.meterMask = mask;
       this.meterGroup = c.device.createBindGroup({
@@ -766,6 +780,24 @@ export class Tonemap implements EnginePlugin {
     this.meterPipeline = this.meterGroup = undefined;
     this.original = undefined;
     this.shaders.clear();
+  }
+  private holdMask(mask: AutoExposure['mask'], device: GPUDevice | null | undefined): void {
+    this.maskOption = new TextureOption(mask as TextureSource2D, 'Tonemap autoExposure mask', 'setAutoExposureMask');
+    this.maskOption.fix(device);
+  }
+  /**
+   * Sets the metering mask from the next frame (`autoExposure.mask`), a texture of the engine's current device or a
+   * function giving one. Call it from `onDeviceRestored` with a texture of the new device after a restore.
+   */
+  setAutoExposureMask(mask: NonNullable<AutoExposure['mask']>): this {
+    if (typeof mask !== 'function' && typeof mask?.createView !== 'function')
+      throw new TypeError('autoExposure mask must be a GPUTexture or a function giving one');
+    const options = this.options,
+      auto = typeof options.autoExposure === 'object' ? options.autoExposure : (options.autoExposure = {});
+    auto.mask = mask;
+    if (this.maskOption) this.maskOption.set(mask as TextureSource2D, this.engine?.gpu);
+    else this.holdMask(mask, this.engine?.gpu);
+    return this;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
