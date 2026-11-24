@@ -49,7 +49,7 @@ export type BrushFalloff = 'smooth' | 'linear' | 'constant';
  * along a road or path: `strength` under its width, fading across its edge with `falloff`.
  */
 export interface BiomeEdit {
-  readonly kind: 'paint' | 'fill' | 'path';
+  readonly kind: 'paint' | 'fill' | 'path' | 'polygon';
   /** `paint/<biome>` or `mask/<name>`. */
   readonly layer: string;
   /** Dab centre [x, z] and radius (paint). */
@@ -64,6 +64,12 @@ export interface BiomeEdit {
   readonly mask?: string;
   /** The road or path (path). */
   readonly path?: PathOptions;
+  /**
+   * A closed outline `[x, z]` in metres, 3 to 65,536 points (polygon): `strength` on every cell whose corner is inside
+   * it (even-odd), nothing outside; the falloff is not used. `farmlandEdits` of `@margoengine/biomes/farmland` paints
+   * fields with it.
+   */
+  readonly points?: readonly (readonly [number, number])[];
 }
 
 /** Brush settings of {@link BiomeEditor.paint}. */
@@ -184,6 +190,22 @@ export class BiomeEditor implements Disposable {
       mode: 'set',
       falloff: 'constant',
       mask: options.mask,
+    });
+  }
+
+  /**
+   * Sets a layer to `value` (default 1) inside a closed outline `[x, z]` in metres (a field, a yard, a burn scar).
+   * @example
+   * editor.polygon('plough', [[0, 0], [200, 10], [190, 180], [-10, 170]]);
+   */
+  polygon(layer: string, points: readonly (readonly [number, number])[], value = 1): void {
+    this.apply({
+      kind: 'polygon',
+      layer: layer.includes('/') ? layer : `paint/${layer}`,
+      points,
+      strength: value,
+      mode: 'set',
+      falloff: 'constant',
     });
   }
 
@@ -336,8 +358,8 @@ function check(edit: BiomeEdit, world: BiomeWorld): BiomeEdit {
   if (!edit || typeof edit !== 'object')
     throw typeError('A biome edit is an object such as editor.edits holds', 'biomes');
   const e = { ...edit } as { -readonly [K in keyof BiomeEdit]: BiomeEdit[K] };
-  if (e.kind !== 'paint' && e.kind !== 'fill' && e.kind !== 'path')
-    throw rangeError("A biome edit kind is 'paint', 'fill' or 'path'", 'biomes');
+  if (e.kind !== 'paint' && e.kind !== 'fill' && e.kind !== 'path' && e.kind !== 'polygon')
+    throw rangeError("A biome edit kind is 'paint', 'fill', 'path' or 'polygon'", 'biomes');
   if (typeof e.layer !== 'string' || !/^(paint\/[a-z0-9][a-z0-9-]*|mask\/[\w-]+)$/.test(e.layer))
     throw rangeError('A biome edit layer is a biome id, paint/<biome> or mask/<name>', 'biomes');
   if (e.layer.startsWith('paint/') && !world.biomes.some((b) => `paint/${b.id}` === e.layer))
@@ -364,6 +386,17 @@ function check(edit: BiomeEdit, world: BiomeWorld): BiomeEdit {
         'biomes',
       );
     e.path = splinesHook.check(e.path!);
+  } else if (e.kind === 'polygon') {
+    if (
+      !Array.isArray(e.points) ||
+      e.points.length < 3 ||
+      e.points.length > 65536 ||
+      !e.points.every(
+        (p) => Array.isArray(p) && p.length === 2 && p.every((v) => Number.isFinite(v) && Math.abs(v) < 1.1e6),
+      )
+    )
+      throw rangeError('A polygon edit needs 3 to 65,536 finite [x, z] points within 1,100 km', 'biomes');
+    e.points = Object.freeze(e.points.map((p) => Object.freeze([p[0], p[1]] as const)));
   } else if (!Array.isArray(e.rect) || e.rect.length !== 4 || !e.rect.every(Number.isFinite))
     throw rangeError('A fill rectangle is [minX, minZ, maxX, maxZ] in metres', 'biomes');
   if (e.mask !== undefined && !/^mask\/[\w-]+$/.test(e.mask)) throw rangeError('A fill mask is mask/<name>', 'biomes');
@@ -398,6 +431,23 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
     g0z = divFloor(z0 - oz, cell);
     g1x = divFloor(x1 - ox, cell) + 1;
     g1z = divFloor(z1 - oz, cell) + 1;
+  } else if (e.kind === 'polygon') {
+    let x0 = Infinity,
+      z0 = Infinity,
+      x1 = -Infinity,
+      z1 = -Infinity;
+    for (const [x, z] of e.points!) {
+      const mx = Math.round(x * 1000) - ox,
+        mz = Math.round(z * 1000) - oz;
+      x0 = Math.min(x0, mx);
+      z0 = Math.min(z0, mz);
+      x1 = Math.max(x1, mx);
+      z1 = Math.max(z1, mz);
+    }
+    g0x = divFloor(x0 + cell - 1, cell);
+    g0z = divFloor(z0 + cell - 1, cell);
+    g1x = divFloor(x1, cell);
+    g1z = divFloor(z1, cell);
   } else {
     const [x0, z0, x1, z1] = e.rect!;
     g0x = divFloor(Math.round(x0 * 1000) - ox + cell - 1, cell);
@@ -412,6 +462,11 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
   if (g0x > g1x || g0z > g1z) return [];
   const target = Math.round(e.strength * 255),
     multiply = world.paint.some((p) => `paint/${p.biome}` === e.layer && p.mode === 'multiply'),
+    // A polygon's outline in integer mm from the world's corner, as the cells are addressed.
+    ring =
+      e.kind === 'polygon'
+        ? e.points!.map(([x, z]) => [Math.round(x * 1000) - ox, Math.round(z * 1000) - oz] as const)
+        : undefined,
     neutral = multiply ? 255 : 0,
     writes: LayerWrite[] = [];
   let minX = Infinity,
@@ -453,6 +508,8 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
           } else if (along) {
             amount = along[k];
             if (!amount) continue;
+          } else if (ring) {
+            if (!insideRing(ring, gx * cell, gz * cell)) continue;
           } else if (e.mask) amount = mask ? divFloor(mask[k] * ONE, 255) : 0;
           const v = data[k],
             push = Math.floor((target * amount) / ONE),
@@ -488,4 +545,24 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
           bz + (maxZ + 1) * world.resolution,
         ];
   return writes.map((w) => ({ ...w, changed: rect }));
+}
+
+/**
+ * Even-odd test of the point (px, pz) against a ring, integers in mm: the crossing compares two products of
+ * differences, never a division (exact below 2^53, so in worlds up to about 90 km; past that they round, the same on
+ * every engine), so every machine agrees on the cells along an edge.
+ */
+function insideRing(ring: readonly (readonly [number, number])[], px: number, pz: number): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, az] = ring[j],
+      [bx, bz] = ring[i];
+    if (az > pz !== bz > pz) {
+      // px < ax + (bx - ax) (pz - az) / (bz - az), multiplied through by (bz - az) with its sign.
+      const lhs = (px - ax) * (bz - az),
+        rhs = (bx - ax) * (pz - az);
+      if (bz > az ? lhs < rhs : lhs > rhs) inside = !inside;
+    }
+  }
+  return inside;
 }

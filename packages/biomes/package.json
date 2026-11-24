@@ -134,6 +134,10 @@
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"
     },
+    "./farmland": {
+      "types": "./dist/farmland.d.ts",
+      "import": "./dist/farmland.js"
+    },
     "./settlements": {
       "types": "./dist/settlements.d.ts",
       "import": "./dist/settlements.js"

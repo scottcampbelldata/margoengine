@@ -64,7 +64,7 @@ interface BiomeDefinition {
 }
 
 interface BiomeEdit {
-    readonly kind: 'paint' | 'fill' | 'path';
+    readonly kind: 'paint' | 'fill' | 'path' | 'polygon';
     readonly layer: string;
     readonly center?: readonly [number, number];
     readonly radius?: number;
@@ -74,6 +74,7 @@ interface BiomeEdit {
     readonly falloff: BrushFalloff;
     readonly mask?: string;
     readonly path?: PathOptions;
+    readonly points?: readonly (readonly [number, number])[];
 }
 
 class BiomeEditor implements Disposable {
@@ -86,6 +87,7 @@ class BiomeEditor implements Disposable {
     paint(layer: string, options: BrushOptions): void;
     erase(layer: string, options: Omit<BrushOptions, 'mode' | 'strength'>): void;
     fill(layer: string, options?: FillOptions): void;
+    polygon(layer: string, points: readonly (readonly [number, number])[], value?: number): void;
     stroke(work?: () => void): {
         end(): void;
         [Symbol.dispose](): void;
