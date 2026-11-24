@@ -1919,6 +1919,10 @@ The own 2D kernel (`packages/physics2d/kernel`) filters pairs by collision group
 
 `World::remove_shape`, `remove_body` and `remove_joint` take things out between steps. A removed shape leaves the broad phase and its contacts at once; a pair that was touching reports a stop on the next step, and the bodies it touched wake. A removed body takes its shapes and joints. Body and shape slots are reused by the next one created (a joint's id is never reused, and other joints keep theirs), so a world that adds and removes bullets every step stays the size of its busiest moment. A refused creation leaves no slot behind. Tests: `packages/physics2d/kernel/tests/lifecycle.rs`.
 
+## Own 2D body controls (2026-11-24)
+
+The kernel's `World` sets velocities (`set_velocity`), applies impulses at the centre or at a world point (`apply_impulse`, `apply_torque_impulse`), keeps a force and torque acting every step until `reset_forces` (`add_force`), sets damping, gravity scale, sleep permission, continuous collision and dominance (`set_body_params`), locks or frees turning (`set_fixed_rotation`) and drives a kinematic body to a position (`set_next_kinematic`: the step gives it the speed that reaches the target in exactly one step, so what it pushes feels the motion, then places it on the target). In a contact between bodies of different dominance the higher one acts with infinite mass, as in Rapier's user guide. Accepted limit: the sustained-contact certificates (`solver/path_support.rs`) read gravity and the bodies' own masses alone, so a world with any applied force, torque or non-zero dominance solves without them. Tests: `packages/physics2d/kernel/tests/bodies.rs`.
+
 ## Own 2D sustained contact support
 
 The recovery cap applies to the combined elastic residual, `max(beta*s+C*lambda,-P)`, rather than penetration

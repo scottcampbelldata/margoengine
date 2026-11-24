@@ -735,6 +735,13 @@ pub(super) fn plan<'a>(
     if !(world.settings.contact_max_push > 0.0 && world.settings.contact_max_push.is_finite()) {
         return None;
     }
+    // The certificates read gravity and the bodies' own masses alone: a force, a torque or a dominance group is outside them.
+    if ids.iter().any(|&id| {
+        let b = &world.bodies[id as usize];
+        b.dominance != 0 || b.force != crate::math::V2::ZERO || b.torque != 0.0
+    }) {
+        return None;
+    }
     dynamic.clear();
     dynamic.extend(ids
         .iter()

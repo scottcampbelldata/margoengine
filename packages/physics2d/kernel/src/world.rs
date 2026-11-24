@@ -49,6 +49,10 @@ pub struct BodyDef {
     pub can_sleep: bool,
     /// No turning: infinite inertia.
     pub fixed_rotation: bool,
+    /// Continuous collision detection against everything it can tunnel through (ccd.rs).
+    pub ccd: bool,
+    /// In a contact with a body of lower dominance, a body acts as if it had infinite mass.
+    pub dominance: i8,
 }
 
 impl Default for BodyDef {
@@ -64,6 +68,8 @@ impl Default for BodyDef {
             gravity_scale: 1.0,
             can_sleep: true,
             fixed_rotation: false,
+            ccd: false,
+            dominance: 0,
         }
     }
 }
@@ -93,6 +99,13 @@ pub struct Body {
     pub gravity_scale: f32,
     pub can_sleep: bool,
     pub fixed_rotation: bool,
+    pub ccd: bool,
+    pub dominance: i8,
+    /// A force and a torque that act every step until reset.
+    pub force: V2,
+    pub torque: f32,
+    /// Where a position-driven kinematic body is to be at the end of the next step.
+    pub next_target: Option<(V2, Rot)>,
     pub awake: bool,
     pub sleep_time: f32,
     pub shapes: Vec<u32>,
@@ -556,6 +569,11 @@ impl World {
             gravity_scale: def.gravity_scale,
             can_sleep: def.can_sleep,
             fixed_rotation: def.fixed_rotation,
+            ccd: def.ccd,
+            dominance: def.dominance,
+            force: V2::ZERO,
+            torque: 0.0,
+            next_target: None,
             awake: moving,
             sleep_time: 0.0,
             shapes: Vec::new(),
@@ -886,6 +904,95 @@ impl World {
         self.wake(body)
     }
 
+    fn live_body(&mut self, body: u32) -> Result<&mut Body, PhysicsError> {
+        let b = self.bodies.get_mut(body as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if b.dead { Err(PhysicsError::InvalidHandle) } else { Ok(b) }
+    }
+
+    /// Sets the velocities of a kinematic or dynamic body (a static body keeps none) and wakes it.
+    pub fn set_velocity(&mut self, body: u32, linear: V2, angular: f32) -> Result<(), PhysicsError> {
+        if ![linear.x, linear.y, angular].into_iter().all(f32::is_finite) { return Err(PhysicsError::NotFinite); }
+        let b = self.live_body(body)?;
+        if b.kind != Kind::Static {
+            b.linear_velocity = linear;
+            b.angular_velocity = angular;
+        }
+        self.wake(body)
+    }
+
+    /// Adds `impulse` (kg m/s) at the centre of mass, or at world `point` when given, and wakes the body.
+    pub fn apply_impulse(&mut self, body: u32, impulse: V2, point: Option<V2>) -> Result<(), PhysicsError> {
+        if !finite_vector(impulse) || point.is_some_and(|p| !finite_vector(p)) { return Err(PhysicsError::NotFinite); }
+        let b = self.live_body(body)?;
+        if b.kind == Kind::Dynamic {
+            b.linear_velocity = b.linear_velocity.add(impulse.scale(b.inv_mass));
+            if let Some(p) = point {
+                let center = v2(b.exact_center[0] as f32, b.exact_center[1] as f32);
+                b.angular_velocity += b.inv_inertia * p.sub(center).cross(impulse);
+            }
+        }
+        self.wake(body)
+    }
+
+    pub fn apply_torque_impulse(&mut self, body: u32, impulse: f32) -> Result<(), PhysicsError> {
+        if !impulse.is_finite() { return Err(PhysicsError::NotFinite); }
+        let b = self.live_body(body)?;
+        if b.kind == Kind::Dynamic {
+            b.angular_velocity += b.inv_inertia * impulse;
+        }
+        self.wake(body)
+    }
+
+    /// Adds to the force and torque that act on the body every step until `reset_forces`.
+    pub fn add_force(&mut self, body: u32, force: V2, torque: f32) -> Result<(), PhysicsError> {
+        if !finite_vector(force) || !torque.is_finite() { return Err(PhysicsError::NotFinite); }
+        let b = self.live_body(body)?;
+        b.force = b.force.add(force);
+        b.torque += torque;
+        self.wake(body)
+    }
+
+    pub fn reset_forces(&mut self, body: u32) -> Result<(), PhysicsError> {
+        let b = self.live_body(body)?;
+        b.force = V2::ZERO;
+        b.torque = 0.0;
+        Ok(())
+    }
+
+    /// Damping, gravity scale, sleep permission and continuous collision of a body.
+    pub fn set_body_params(&mut self, body: u32, linear_damping: f32, angular_damping: f32, gravity_scale: f32, can_sleep: bool, ccd: bool, dominance: i8) -> Result<(), PhysicsError> {
+        if ![linear_damping, angular_damping, gravity_scale].into_iter().all(f32::is_finite) { return Err(PhysicsError::NotFinite); }
+        if linear_damping < 0.0 || angular_damping < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        let b = self.live_body(body)?;
+        (b.linear_damping, b.angular_damping, b.gravity_scale, b.can_sleep, b.ccd, b.dominance) = (linear_damping, angular_damping, gravity_scale, can_sleep, ccd, dominance);
+        self.wake(body)
+    }
+
+    /// Locks or frees the body's turning (its inertia is worked out again).
+    pub fn set_fixed_rotation(&mut self, body: u32, fixed: bool) -> Result<(), PhysicsError> {
+        let before = self.live_body(body)?.clone();
+        self.bodies[body as usize].fixed_rotation = fixed;
+        if let Err(error) = self.update_mass(body) {
+            self.bodies[body as usize] = before;
+            return Err(error);
+        }
+        if fixed {
+            self.bodies[body as usize].angular_velocity = 0.0;
+        }
+        self.wake(body)
+    }
+
+    /// Where a position-driven kinematic body is to be when the next step ends; the step moves it there at the speed that
+    /// takes exactly one step, so what it pushes feels the motion.
+    pub fn set_next_kinematic(&mut self, body: u32, position: V2, rotation: Rot) -> Result<(), PhysicsError> {
+        if ![position.x, position.y, rotation.c, rotation.s].into_iter().all(f32::is_finite) { return Err(PhysicsError::NotFinite); }
+        let rotation = Rot::from_pair(rotation.c, rotation.s);
+        let b = self.live_body(body)?;
+        if b.kind != Kind::Kinematic { return Err(PhysicsError::InvalidParameter); }
+        b.next_target = Some((position, rotation));
+        self.wake(body)
+    }
+
     /// Wakes `body` and resets its sleep timer.
     pub fn wake(&mut self, body: u32) -> Result<(), PhysicsError> {
         let b = self.bodies.get_mut(body as usize).ok_or(PhysicsError::InvalidHandle)?;
@@ -962,10 +1069,31 @@ impl World {
         self.events.append(&mut self.pending_events);
         self.force_events.clear();
         self.steps = self.steps.checked_add(1).ok_or(PhysicsError::ArithmeticOverflow)?;
+        for body in self.bodies.iter_mut() {
+            if let Some((target, q)) = body.next_target {
+                let origin = body.exact_origin();
+                let turn = q.mul(Rot { c: body.xf.q.c, s: -body.xf.q.s });
+                body.linear_velocity = v2(((target.x as f64 - origin[0]) / dt as f64) as f32, ((target.y as f64 - origin[1]) / dt as f64) as f32);
+                body.angular_velocity = crate::math::atan2(turn.s, turn.c) / dt;
+                body.awake = true;
+                body.sleep_time = 0.0;
+            }
+        }
         self.broad_phase()?;
         self.narrow_phase()?;
         self.wake_and_join();
         solver::solve_validated(self, dt)?;
+        for body in self.bodies.iter_mut() {
+            // The body ends the step exactly where it was told to be, with the velocity that took it there.
+            if let Some((target, q)) = body.next_target.take() {
+                let offset = q.apply(body.local_center);
+                body.xf.q = q;
+                body.exact_center = [target.x as f64 + offset.x as f64, target.y as f64 + offset.y as f64];
+                body.round_pose();
+                body.linear_velocity = V2::ZERO;
+                body.angular_velocity = 0.0;
+            }
+        }
         self.validate_solver_outputs()?;
         self.force_events(dt);
         self.sleep(dt);

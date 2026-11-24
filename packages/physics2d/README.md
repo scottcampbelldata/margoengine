@@ -75,7 +75,8 @@ The package is moving off Rapier onto Margo's own 2D kernel (`kernel/`, Rust to 
 | Queries | ray cast (with normal, solid or not), point, shape intersection, shape cast, query filters (groups, kinds, excluded shape and body) | yes | all of them, exact per shape, broad phase culled | partial: facade on Rapier |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | all | static, kinematic (velocity), dynamic | partial |
 | Bodies | damping, gravity scale, locked rotation | yes | damping, gravity scale, fixed rotation | partial |
-| Bodies | locked translation axes, dominance, additional mass, soft CCD, per-collider mass props, forces/impulses at a point | no | none | missing |
+| Bodies | dominance, forces, torques, impulses at a point, position-driven kinematic bodies | forces, impulses | all of them | partial: facade on Rapier |
+| Bodies | locked translation axes, additional mass, soft CCD, per-collider mass props | no | none | missing |
 | Bodies | sleeping, wake-up, can-sleep | yes | islands and sleep | partial |
 | Joints | fixed, revolute, prismatic, rope, spring, with limits and motors | all | all five, limits, motors | partial: no Wasm binding |
 | Joints | generic (locked axes), joint enable-contacts, reduced-coordinate multibody joints | no | none | missing |

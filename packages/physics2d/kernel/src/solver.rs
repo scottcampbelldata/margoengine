@@ -330,12 +330,13 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
         let m = &contact.manifold;
         let n = m.normal;
         let t = n.right();
-        let (ima, iia) = if ba.is_dynamic() {
+        // A body of higher dominance acts as if it were immovable in a contact with one of lower.
+        let (ima, iia) = if ba.is_dynamic() && ba.dominance <= bb.dominance {
             (ba.inv_mass, ba.inv_inertia)
         } else {
             (0.0, 0.0)
         };
-        let (imb, iib) = if bb.is_dynamic() {
+        let (imb, iib) = if bb.is_dynamic() && bb.dominance <= ba.dominance {
             (bb.inv_mass, bb.inv_inertia)
         } else {
             (0.0, 0.0)
@@ -507,8 +508,9 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
             if source.kind != Kind::Dynamic {
                 continue;
             }
-            let v = body.v.add(g.scale(h * source.gravity_scale));
+            let v = body.v.add(g.scale(h * source.gravity_scale)).add(source.force.scale(h * source.inv_mass));
             body.v = v.scale(1.0 / (1.0 + h * source.linear_damping));
+            body.w += h * source.inv_inertia * source.torque;
             body.w *= 1.0 / (1.0 + h * source.angular_damping);
         }
         wide::warm_start(&mut bodies, &blocks.blocks);
