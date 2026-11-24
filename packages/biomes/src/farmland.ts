@@ -134,7 +134,10 @@ export interface Farmland {
   readonly trees: readonly HedgeTree[];
   readonly lanes: readonly Lane[];
   readonly gates: readonly Gate[];
-  /** Lanes and hedges as placement exclusions, so no stored tree or shrub stands in them. */
+  /**
+   * Lanes as placement exclusions, so no stored tree or shrub stands in them. Hedges are not excluded: they are painted
+   * strips of the hedgerow biome whose hawthorn, blackthorn and hedge trees must stand in them.
+   */
   readonly exclusions: readonly Exclusion[];
 }
 
@@ -716,10 +719,10 @@ export function layoutFarmland(world: FarmlandWorld, options: FarmlandOptions = 
       s += Math.max(8, -spacing * Math.log(1 - 0.98 * unit(hash4(seed, 13, k, n))));
     }
   });
-  const exclusions: Exclusion[] = [
-    ...lanes.map((l) => ({ kind: 'line' as const, points: l.points, width: l.width, verge: 1 })),
-    ...hedges.map((h) => ({ kind: 'line' as const, points: h.points, width: h.width, verge: 0.5 })),
-  ];
+  // Lanes only. Until the Fauld recut round 3 the hedges were exclusions too, left from when a scene drew its own hedges:
+  // once hedges became painted hedgerow strips, that kept every hawthorn and blackthorn off its own hedge, so a hedge
+  // drew as a row of bare trees at its edge with nothing between them.
+  const exclusions: Exclusion[] = lanes.map((l) => ({ kind: 'line' as const, points: l.points, width: l.width, verge: 1 }));
   return { fields, hedges, trees, lanes, gates, exclusions };
 }
 

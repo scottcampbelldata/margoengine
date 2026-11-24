@@ -347,3 +347,14 @@ test('a hedge keeps its width: hedgerow paint blends over its own metre, not the
       RangeError,
     );
 });
+
+// Fauld recut round 3: the hedges were placement exclusions as well as painted hedgerow strips, so no hawthorn or
+// blackthorn ever stood in a hedge and each drew as bare trees in a row. Exclusions are the lanes alone.
+test('no exclusion covers a hedge: its shrubs may stand on it; lanes stay excluded', () => {
+  assert.equal(farm.exclusions.length, farm.lanes.length);
+  for (const e of farm.exclusions) assert.ok(farm.lanes.some((l) => l.points === e.points), 'each exclusion is a lane');
+  for (const h of farm.hedges.slice(0, 40)) {
+    const mid = h.points[Math.floor(h.points.length / 2)];
+    for (const e of farm.exclusions) assert.ok(segDist(mid, e.points) > e.width / 2 + (e.verge ?? 0) || h.points.length < 2);
+  }
+});
