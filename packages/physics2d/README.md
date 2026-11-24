@@ -55,6 +55,36 @@ Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier 2D is bun
 
 Build and unit tests: npm test --workspace @margoengine/physics2d
 
+## Parity with Rapier 2D
+
+The package is moving off Rapier onto Margo's own 2D kernel (`kernel/`, Rust to Wasm). Capabilities below are listed from Rapier's public user guide (rapier.rs/docs), never from its source. "Facade" is what `Physics2D` exposes today; "Kernel" is what `kernel/` holds. Status: **full** (done and tested), **partial**, **missing**. A row turns full only when the kernel does it, the facade exposes it and a test covers it. Docs: [limits](../../docs/limits.md), [known bugs](../../docs/known-bugs.md).
+
+| Area | Rapier 2D capability | Facade | Kernel | Status |
+| --- | --- | --- | --- | --- |
+| Shapes | ball, cuboid, capsule, segment | all four | circle, capsule, segment, rect | partial: facade on Rapier |
+| Shapes | convex polygon (hull), convex decomposition of concave input | yes | convex hull to 8 vertices; no decomposition | partial |
+| Shapes | triangle, round (border-radius) cuboid/convex | no | rounded cores (radius) | partial |
+| Shapes | polyline, trimesh | polyline | chains (one-sided ghosts, smooth) | partial |
+| Shapes | heightfield, voxels, halfspace, compound, shared shapes | no | none | missing |
+| Collision | broad phase, narrow phase, manifolds | yes | box tree broad phase, SAT/clip manifolds, smooth chains | partial |
+| Collision | continuous collision detection (per body) | `ccd` | none | missing |
+| Collision | sensors | yes | none | missing |
+| Collision | collision groups, solver groups, active collision types | collision groups | none | missing |
+| Collision | collision events, contact-force events | start/end | none | missing |
+| Collision | physics hooks (filter and modify contact pairs, one-way platforms) | no | none | missing |
+| Queries | ray cast (with normal), point, shape intersection, shape cast, query filters, query pipeline | yes | none | missing |
+| Bodies | dynamic, fixed, kinematic position, kinematic velocity | all | static, kinematic (velocity), dynamic | partial |
+| Bodies | damping, gravity scale, locked rotation | yes | damping, gravity scale, fixed rotation | partial |
+| Bodies | locked translation axes, dominance, additional mass, soft CCD, per-collider mass props, forces/impulses at a point | no | none | missing |
+| Bodies | sleeping, wake-up, can-sleep | yes | islands and sleep | partial |
+| Joints | fixed, revolute, prismatic, rope, spring, with limits and motors | all | all five, limits, motors | partial: no Wasm binding |
+| Joints | generic (locked axes), joint enable-contacts, reduced-coordinate multibody joints | no | none | missing |
+| Character | kinematic character controller: slide, autostep, snap to ground, slope limits, push dynamic bodies, up vector | yes | none | missing |
+| World | integration parameters, fixed timestep, determinism | step, determinism of the Rapier build | deterministic step, bit-identical native and Wasm | partial |
+| World | snapshots (serialise and restore the world) | no | none | missing |
+| World | debug-render data (lines for shapes, joints, contacts, AABBs) | no | none | missing |
+| Tools | tile map and sprite-outline colliders | yes | built on the facade | partial: moves with the facade |
+
 ## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)
 
 `outlineColliders(image, options)` turns the alpha of an image into colliders that follow what is drawn, holes and hollows included, so a ball can rest in a cup. `image` is RGBA8 straight alpha, row by row from the top: `ImageData` fits.
