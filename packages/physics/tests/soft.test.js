@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Physics } from '../dist/index.js';
-import { SoftBodies, SoftBodyDesc, SoftBodyMaterial } from '../dist/soft.js';
+import { SoftBodies, SoftBodyDesc, SoftBodyMaterial, SoftMeshBinding } from '../dist/soft.js';
 
 const warn = console.warn;
 console.warn = () => {};
@@ -829,4 +829,56 @@ test('the builders take Rapier signatures: anisotropic cloth springs, a tube by 
     }
   const ball = soft.create(SoftBodyDesc.sphere([0, 0, 0], 1, 1));
   assert.equal(ball.numParticles(), 42);
+});
+
+test('a deformable collider bound to a soft body follows it: direct, direct by position and skinned', async () => {
+  const { physics, soft } = await create();
+  const top = (collider) => collider.aabb().max[1];
+  const bottom = (collider) => collider.aabb().min[1];
+  // A free 4 x 4 cloth falling; a thin mesh made of its four corner particles, bound directly.
+  const cloth = soft.create(SoftBodyDesc.cloth([0, 5, 0], [0.1, 0, 0], [0, 0, 0.1], 4, 4).setParticleMass(0.05));
+  const corners = [0, 3, 12, 15];
+  const quad = { vertices: [0, 5, 0, 0.3, 5, 0, 0, 5, 0.3, 0.3, 5, 0.3], indices: [0, 1, 2, 1, 3, 2] };
+  const direct = soft.createDeformableCollider(cloth, quad, SoftMeshBinding.direct(corners));
+  const byPosition = soft.createDeformableCollider(
+    cloth,
+    { vertices: quad.vertices.map((v, k) => (k % 3 === 1 ? v + 0.002 : v)), indices: quad.indices },
+    SoftMeshBinding.directByPosition(0.01),
+  );
+  steps(physics, 30);
+  const fell = 5 - cloth.particlePosition(0)[1];
+  assert.ok(fell > 0.3, `the cloth fell: ${fell}`);
+  near(top(direct), cloth.particlePosition(0)[1], 0.06, 'a directly bound mesh follows its particles down');
+  near(top(byPosition), cloth.particlePosition(0)[1], 0.06, 'and so does one bound by position');
+  assert.throws(
+    () =>
+      soft.createDeformableCollider(
+        cloth,
+        { vertices: [9, 9, 9, 9, 9, 10, 9, 10, 9], indices: [0, 1, 2] },
+        SoftMeshBinding.directByPosition(0.01),
+      ),
+    RangeError,
+  );
+  assert.throws(() => soft.createDeformableCollider(cloth, quad, SoftMeshBinding.direct([0, 1])), RangeError);
+  assert.throws(
+    () => soft.createDeformableCollider(cloth, quad, SoftMeshBinding.skinned()),
+    RangeError,
+    'a cloth has no cells',
+  );
+
+  // A block of cells hanging from its top face; a triangle skinned to three particles and one at a cell's centre.
+  const block = soft.create(SoftBodyDesc.box([2, 1, 0], [0.4, 0.2, 0.2], [2, 1, 1]));
+  const rest = block.particlePositions();
+  const skinned = soft.createDeformableCollider(
+    block,
+    { vertices: [...rest.slice(0, 3), ...rest.slice(3, 6), ...rest.slice(6, 9)], indices: [0, 1, 2] },
+    SoftMeshBinding.skinned(),
+  );
+  steps(physics, 60);
+  const now = block.particlePositions();
+  const ys = [now[1], now[4], now[7]];
+  near(skinned.aabb().min[1], Math.min(...ys), 0.05, 'a skinned vertex at a particle rides it');
+  near(skinned.aabb().max[1], Math.max(...ys), 0.05, 'to the other extreme too');
+  soft.remove(cloth);
+  assert.equal(direct.valid, false, 'a deformable collider goes with its body');
 });

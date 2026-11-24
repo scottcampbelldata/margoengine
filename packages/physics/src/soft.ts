@@ -207,6 +207,40 @@ export class SoftBodyMaterial {
   }
 }
 
+/**
+ * How the vertices of a deformable collider follow a soft body (Rapier's `SoftMeshBinding`): `direct(particles)` (vertex `i`
+ * is particle `particles[i]`), `directByPosition(eps)` (each vertex is its nearest particle within `eps` metres) and
+ * `skinned()` (each vertex is embedded in the tetrahedral cell that holds it, and moves with the cell's corners).
+ */
+export class SoftMeshBinding {
+  /** @internal */
+  private constructor(
+    readonly mode: 'direct' | 'directByPosition' | 'skinned',
+    readonly particles: readonly number[],
+    readonly eps: number,
+  ) {}
+  static direct(particles: ArrayLike<number>): SoftMeshBinding {
+    return new SoftMeshBinding('direct', Array.from(particles), 0);
+  }
+  static directByPosition(eps: number): SoftMeshBinding {
+    if (!(eps > 0 && Number.isFinite(eps))) throw new RangeError('eps is a positive number of metres.');
+    return new SoftMeshBinding('directByPosition', [], eps);
+  }
+  static skinned(): SoftMeshBinding {
+    return new SoftMeshBinding('skinned', [], 0);
+  }
+}
+
+/** A deformable collider bound to a soft body: where each vertex gets its place. @internal */
+interface BoundMesh {
+  soft: SoftBody;
+  host: PhysicsBody;
+  /** Per vertex, the particles it follows (one for a direct binding, four for a skinned one) and their weights. */
+  particles: Uint32Array;
+  weights: Float32Array;
+  per: number;
+}
+
 /** The elastic model of a body's cells. */
 /**
  * How a body's cells are solved: `'constraints'` (default) as XPBD constraints, whose stiffness grows with the substeps and passes
@@ -1832,6 +1866,7 @@ export class SoftBodies implements PhysicsAttachment {
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0];
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
+  private bound: BoundMesh[] = [];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
   private particleCount = 0;
   private edgeCount = 0;
@@ -2797,6 +2832,8 @@ export class SoftBodies implements PhysicsAttachment {
       info.proxy = null;
     }
     this.attachments = this.attachments.filter((a) => a.soft !== body);
+    for (const mesh of this.bound.filter((m) => m.soft === body)) mesh.host.remove();
+    this.bound = this.bound.filter((m) => m.soft !== body);
     body.surface?.remove();
     body.surface = null;
     this.bodies.splice(at, 1);
@@ -2855,6 +2892,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.report(c);
     }
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, c);
+    for (const mesh of this.bound) this.moveBound(mesh, c);
   }
 
   /**
@@ -2908,6 +2946,8 @@ export class SoftBodies implements PhysicsAttachment {
         for (let slot = 0; slot < 4; slot++) {
           const at = k * 4 + slot;
           if (hit.collider[at] === 0xffffffff) continue;
+          // The body's own deformable meshes are not obstacles to it.
+          if (this.bound.some((m) => m.soft === soft && m.host.row === hit.body[at])) continue;
           found.push({
             row: free[k]!,
             slot,
@@ -3042,6 +3082,128 @@ export class SoftBodies implements PhysicsAttachment {
     });
     body.surface = host;
     return host.colliders[0]!;
+  }
+
+  /**
+   * A deformable triangle-mesh collider of its own (any mesh, `vertices` flat x, y, z and `indices` three a triangle) whose
+   * vertices follow a soft body by `binding`, so every rigid shape meets the mesh as it moves, with each vertex's speed
+   * counted (Rapier's `createDeformableCollider`). Its vertices are moved to their particles at once. It goes with the body.
+   * @throws RangeError for a binding that does not fit: a particle that is not the body's, a vertex with no particle within
+   * `eps`, or a skinned binding on a body with no cells.
+   */
+  createDeformableCollider(
+    soft: SoftBody,
+    mesh: { vertices: ArrayLike<number>; indices: ArrayLike<number> },
+    binding: SoftMeshBinding,
+    settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {},
+  ): PhysicsCollider {
+    if (soft.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
+    const count = mesh.vertices.length / 3;
+    if (!Number.isInteger(count) || count < 3) throw new RangeError('A mesh has vertices, three numbers each.');
+    const c = this.columns(),
+      near: number[] = [],
+      bound: BoundMesh = {
+        soft,
+        host: null as unknown as PhysicsBody,
+        particles: new Uint32Array(0),
+        weights: new Float32Array(0),
+        per: 1,
+      };
+    if (binding.mode === 'direct') {
+      if (binding.particles.length !== count)
+        throw new RangeError(`A direct binding names one particle for each of the ${count} vertices.`);
+      for (const k of binding.particles)
+        if (!Number.isInteger(k) || k < 0 || k >= soft.particles)
+          throw new RangeError(`Particle ${k} is not in this body (0 to ${soft.particles - 1}).`);
+      bound.particles = Uint32Array.from(binding.particles, (k) => soft.firstParticle + k);
+      bound.weights = new Float32Array(count).fill(1);
+    } else if (binding.mode === 'directByPosition') {
+      for (let v = 0; v < count; v++) {
+        let best = -1,
+          bestD = binding.eps;
+        for (let i = 0; i < soft.particles; i++) {
+          const row = soft.firstParticle + i,
+            d = Math.hypot(
+              c.x[row]! - mesh.vertices[v * 3]!,
+              c.y[row]! - mesh.vertices[v * 3 + 1]!,
+              c.z[row]! - mesh.vertices[v * 3 + 2]!,
+            );
+          if (d <= bestD) {
+            bestD = d;
+            best = row;
+          }
+        }
+        if (best < 0) throw new RangeError(`Vertex ${v} has no particle within ${binding.eps} m.`);
+        near.push(best);
+      }
+      bound.particles = Uint32Array.from(near);
+      bound.weights = new Float32Array(count).fill(1);
+    } else {
+      if (soft.cellRange.count === 0)
+        throw new RangeError('A skinned binding needs a body of cells: build it with box or solid.');
+      const f = this.cellColumns(),
+        { first, count: cells } = soft.cellRange;
+      bound.per = 4;
+      bound.particles = new Uint32Array(count * 4);
+      bound.weights = new Float32Array(count * 4);
+      for (let v = 0; v < count; v++) {
+        const p: Vec3 = [mesh.vertices[v * 3]!, mesh.vertices[v * 3 + 1]!, mesh.vertices[v * 3 + 2]!];
+        let bestCell = -1,
+          bestWorst = -Infinity,
+          bestWeights = [0, 0, 0, 0];
+        for (let t = 0; t < cells; t++) {
+          const idx = [0, 1, 2, 3].map((k) => f[`p${k}`]![first + t]!),
+            a = idx.map((i) => [c.x[i]!, c.y[i]!, c.z[i]!] as Vec3),
+            weights = barycentric(a as [Vec3, Vec3, Vec3, Vec3], p);
+          // The cell that holds the point has all its weights non-negative; failing that, the one it is nearest to.
+          const worst = Math.min(...weights);
+          if (worst > bestWorst) {
+            bestWorst = worst;
+            bestCell = t;
+            bestWeights = weights;
+          }
+        }
+        for (let k = 0; k < 4; k++) {
+          bound.particles[v * 4 + k] = f[`p${k}`]![first + bestCell]!;
+          bound.weights[v * 4 + k] = bestWeights[k]!;
+        }
+      }
+    }
+    const positions = this.boundPositions(bound, c, count).positions;
+    bound.host = this.physics.addBody(null, {
+      type: 'fixed',
+      colliders: { shape: 'trimesh', vertices: positions, indices: mesh.indices, deformable: true, ...settings },
+    });
+    this.bound.push(bound);
+    return bound.host.colliders[0]!;
+  }
+
+  private boundPositions(
+    mesh: BoundMesh,
+    c: Columns,
+    count: number,
+  ): { positions: Float32Array; velocities: Float32Array } {
+    const positions = new Float32Array(count * 3),
+      velocities = new Float32Array(count * 3);
+    for (let v = 0; v < count; v++)
+      for (let k = 0; k < mesh.per; k++) {
+        const row = mesh.particles[v * mesh.per + k]!,
+          w = mesh.weights[v * mesh.per + k]!;
+        positions[v * 3] += w * c.x[row]!;
+        positions[v * 3 + 1] += w * c.y[row]!;
+        positions[v * 3 + 2] += w * c.z[row]!;
+        velocities[v * 3] += w * c.vx[row]!;
+        velocities[v * 3 + 1] += w * c.vy[row]!;
+        velocities[v * 3 + 2] += w * c.vz[row]!;
+      }
+    return { positions, velocities };
+  }
+
+  private moveBound(mesh: BoundMesh, c: Columns): void {
+    if (mesh.soft.removed || !mesh.host.valid) return;
+    const count = mesh.particles.length / mesh.per,
+      { positions, velocities } = this.boundPositions(mesh, c, count);
+    mesh.host.colliders[0]!.setVertices(positions, { velocities });
   }
 
   private moveSurface(body: SoftBody, c: Columns): void {
@@ -3204,6 +3366,8 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed) return;
     this.disposed = true;
     this.physics.detach(this);
+    for (const mesh of this.bound) mesh.host.remove();
+    this.bound = [];
     for (const body of this.bodies) {
       body.removed = true;
       body.surface?.remove();
@@ -3276,4 +3440,21 @@ function rotate(q: readonly number[], v: readonly number[]): Vec3 {
     ty = 2 * (z * v[0]! - x * v[2]!),
     tz = 2 * (x * v[1]! - y * v[0]!);
   return [v[0]! + w * tx + (y * tz - z * ty), v[1]! + w * ty + (z * tx - x * tz), v[2]! + w * tz + (x * ty - y * tx)];
+}
+
+/** The barycentric weights of `p` in the tetrahedron `a` (they sum to 1; all are non-negative inside it). */
+function barycentric(a: [Vec3, Vec3, Vec3, Vec3], p: Vec3): number[] {
+  const m = [0, 1, 2].map((r) => [a[1][r]! - a[0][r]!, a[2][r]! - a[0][r]!, a[3][r]! - a[0][r]!]),
+    b = [p[0] - a[0][0], p[1] - a[0][1], p[2] - a[0][2]],
+    det = (x: number[][]): number =>
+      x[0]![0]! * (x[1]![1]! * x[2]![2]! - x[1]![2]! * x[2]![1]!) -
+      x[0]![1]! * (x[1]![0]! * x[2]![2]! - x[1]![2]! * x[2]![0]!) +
+      x[0]![2]! * (x[1]![0]! * x[2]![1]! - x[1]![1]! * x[2]![0]!),
+    d = det(m);
+  if (Math.abs(d) < 1e-20) return [1, 0, 0, 0];
+  const solve = (column: number): number => det(m.map((row, r) => row.map((v, c) => (c === column ? b[r]! : v)))) / d,
+    w1 = solve(0),
+    w2 = solve(1),
+    w3 = solve(2);
+  return [1 - w1 - w2 - w3, w1, w2, w3];
 }
