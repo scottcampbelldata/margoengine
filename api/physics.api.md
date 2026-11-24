@@ -731,9 +731,12 @@ export class PhysicsBody {
     get angularVelocity(): [number, number, number];
     setAngularVelocity(velocity: Vec3, wakeUp?: boolean): this;
     addForce(force: Vec3, point?: Vec3, wakeUp?: boolean): this;
+    addForceAtPoint(force: Vec3, point: Vec3, wakeUp?: boolean): this;
     applyImpulse(impulse: Vec3, point?: Vec3, wakeUp?: boolean): this;
+    applyImpulseAtPoint(impulse: Vec3, point: Vec3, wakeUp?: boolean): this;
     addTorque(torque: Vec3, wakeUp?: boolean): this;
     applyTorqueImpulse(torque: Vec3, wakeUp?: boolean): this;
+    resetTorques(wakeUp?: boolean): this;
     resetForces(wakeUp?: boolean): this;
     get appliedForce(): [number, number, number];
     get appliedTorque(): [number, number, number];
@@ -772,6 +775,10 @@ export class PhysicsBody {
     set sleepTime(seconds: number);
     lockRotations(locked?: boolean): this;
     lockTranslations(locked?: boolean): this;
+    get enabledTranslations(): [boolean, boolean, boolean];
+    set enabledTranslations(enabled: readonly [boolean, boolean, boolean]);
+    get enabledRotations(): [boolean, boolean, boolean];
+    set enabledRotations(enabled: readonly [boolean, boolean, boolean]);
     addCollider(options: ColliderOptions): PhysicsCollider;
     removeCollider(collider: PhysicsCollider): void;
     remove(): void;

@@ -164,7 +164,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | Export | Purpose |
 | --- | --- |
 | `Physics` | The world and engine plugin: `update`, `step`, `sync`, `addBody`, `addJoint`, `createCharacterController`, `raycast`, `raycastAll`, `shapeCast`, `projectPoint`, `intersectPoint`, `intersectShape`, `touching`, `contactPoints`, `on`, `debugRender`, `dispose`; `kernel` is the solver's world, with its columns, `hash`, `snapshot` and `restore` |
-| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `applyImpulse` (optionally at a point), `addTorque`, `applyTorqueImpulse`, `resetForces`, `appliedForce`, `appliedTorque`, `setAdditionalMass`, `setMassProperties`, `mass`, `centerOfMass`, `principalInertia`, `inertiaFrame`, `additionalSolverIterations`, sleep and wake, `gravityScale`, `ccd`, locks, `addCollider`, `removeCollider`, `remove`, `colliders` |
+| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `addForceAtPoint`, `applyImpulse`, `applyImpulseAtPoint` (both forms take a point too), `addTorque`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, `appliedForce`, `appliedTorque`, `setAdditionalMass`, `setMassProperties`, `mass`, `centerOfMass`, `principalInertia`, `inertiaFrame`, `additionalSolverIterations`, sleep and wake, `gravityScale`, `ccd`, locks (`lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations`), `addCollider`, `removeCollider`, `remove`, `colliders` |
 | `PhysicsCollider` | What `body.colliders`, events and query hits hand you, one object per collider: `shape`, `body`, `handle`, `valid`, `boundingRadius`, read and set `friction`, `restitution`, `density`, `sensor`, `enabled`, `collisionGroups`, `solverGroups`; `translation`, `rotation`, `translationWrtParent`, `rotationWrtParent`, `halfExtents`, `radius`, `halfHeight`, `vertices`, `indices`, `containsPoint`; for `voxels`, `setVoxel`, `combineVoxelStates`, `propagateVoxelChange`. It throws a `state` error once removed. |
 | `PhysicsJoint` | `setLimits`, `setMotor`, `setRotationMotor` (spherical joints: a spring toward a rotation), `setAxisLimits` and `setAxisMotor` (generic joints: one axis), `clearMotor`, `anchorA`, `anchorB`, `contactsEnabled`, `remove` |
 | `CharacterController` | `move(desired)` per fixed step, `grounded`, `collisions`, `dispose` |
@@ -214,6 +214,22 @@ physics.addJoint(wall, door, { type: 'revolute', frameA: upright, frameB: uprigh
 physics.step();
 console.log(physics.contactPoints(door)); // where the solver pushes on it: [x, y, z] per point
 console.log(door.appliedForce, door.appliedTorque); // what addForce and addTorque left on it, until resetForces
+```
+
+A force at a point pushes the body and turns it by the arm from its centre of mass; `resetTorques` clears the turning and keeps the push, `resetForces` clears both. `enabledTranslations` and `enabledRotations` are `[x, y, z]` booleans, a `false` holding that world axis still, and can be read and set after the body is made.
+
+```ts
+import { Physics } from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0] });
+const ball = physics.addBody(null, { colliders: { shape: 'sphere', radius: 1, mass: 2 } });
+ball.applyImpulseAtPoint([4, 0, 0], [0, 1, 0]); // travels at 2 m/s and spins at -5 rad/s about z
+ball.enabledTranslations = [true, false, true]; // it can no longer rise or fall
+ball.addForceAtPoint([0, 0, 2], [1, 0, 0]);
+physics.step();
+ball.resetTorques(); // the force keeps pushing, nothing turns it any more
+console.log(ball.linearVelocity, ball.angularVelocity, ball.enabledTranslations);
 ```
 
 A `'generic'` joint picks its six degrees of freedom, named `linX`, `linY`, `linZ`, `angX`, `angY` and `angZ` along and about the axes of its frame on body A: `locked` lists axes that do not move, `limits` gives an axis a `[min, max]`, `motors` gives one a motor, and any other axis is free. `frameA` and `frameB` turn the joint's frame on each body (default identity). Positions are measured from frame A to frame B. `joint.setAxisLimits(dof, min, max)` and `joint.setAxisMotor(dof, motor)` change them later.
@@ -963,10 +979,10 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | --- | --- | --- |
 | Body types: dynamic, fixed, kinematic position-based, kinematic velocity-based | `addBody`, `setType`, `setNextPosition` | full |
 | Pose, linear and angular velocity, teleport with or without waking | `setPosition`, `setRotation`, `setLinearVelocity`, `setAngularVelocity` | full |
-| Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addTorque`, `applyImpulse`, `applyTorqueImpulse`, `resetForces` | full |
+| Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addForceAtPoint`, `addTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques` | full |
 | Linear and angular damping, gravity scale | body options | full |
 | Dominance groups | `dominance` | full |
-| Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` | full |
+| Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` (options, and readable and settable on a body) | full |
 | Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full |
 | Additional solver iterations per body | `additionalSolverIterations` | full |
 | Maximum linear and angular velocity per body | `maxLinearSpeed`, `maxAngularSpeed` | full |

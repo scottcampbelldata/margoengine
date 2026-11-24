@@ -56,6 +56,13 @@ export interface BodyOptions {
   userData?: unknown;
 }
 
+/** The lock bits of a per-axis freedom tuple: a set bit is an axis held still. */
+function lockBits(enabled: readonly [boolean, boolean, boolean], name: string): number {
+  if (!Array.isArray(enabled) || enabled.length !== 3 || enabled.some((axis) => typeof axis !== 'boolean'))
+    throw new TypeError(`${name} must be three booleans [x, y, z]; pass [true, true, true] to free every axis.`);
+  return (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
+}
+
 /** Internal hooks the body needs from its world. */
 export interface BodyOwner {
   readonly kernel: KernelWorld;
@@ -284,6 +291,10 @@ export class PhysicsBody {
     forceZ[row] += force[2];
     return point ? this.addTorque(this.moment(point, force), wakeUp) : this;
   }
+  /** Adds a force at a world `point`: it pushes the body and turns it by the arm from the centre of mass. Persists until `resetForces`. */
+  addForceAtPoint(force: Vec3, point: Vec3, wakeUp = true): this {
+    return this.addForce(force, point, wakeUp);
+  }
   /** Applies an instantaneous impulse, optionally at a world point. It lands once, at the start of the next step. */
   applyImpulse(impulse: Vec3, point?: Vec3, wakeUp = true): this {
     checkVec(impulse, 'Impulse');
@@ -296,6 +307,11 @@ export class PhysicsBody {
     impulseZ[row] += impulse[2];
     return point ? this.applyTorqueImpulse(this.moment(point, impulse), wakeUp) : this;
   }
+  /** Applies an instantaneous impulse at a world `point`: it pushes the body and turns it by the arm from the centre of mass. */
+  applyImpulseAtPoint(impulse: Vec3, point: Vec3, wakeUp = true): this {
+    return this.applyImpulse(impulse, point, wakeUp);
+  }
+  /** Adds a torque in newton metres (persists across steps until `resetForces` or `resetTorques`). */
   addTorque(torque: Vec3, wakeUp = true): this {
     checkVec(torque, 'Torque');
     if (wakeUp) this.world().wake(this.row);
@@ -316,6 +332,15 @@ export class PhysicsBody {
     angularImpulseZ[row] += torque[2];
     return this;
   }
+  /** Clears the torque left by `addTorque` and by forces at a point, and keeps the force. `resetForces` clears both. */
+  resetTorques(wakeUp = true): this {
+    if (wakeUp) this.world().wake(this.row);
+    const { torqueX, torqueY, torqueZ } = this.columns,
+      { row } = this;
+    torqueX[row] = torqueY[row] = torqueZ[row] = 0;
+    return this;
+  }
+  /** Clears the force and the torque left on the body. */
   resetForces(wakeUp = true): this {
     if (wakeUp) this.world().wake(this.row);
     const { forceX, forceY, forceZ, torqueX, torqueY, torqueZ } = this.columns,
@@ -512,6 +537,28 @@ export class PhysicsBody {
   lockTranslations(locked = true): this {
     this.world().setLocks(this.row, { linear: locked ? 7 : 0 });
     return this;
+  }
+
+  /**
+   * Which world axes the body may travel along, for example `[true, false, true]` to keep it on a floor. The tuple is
+   * the `enabledTranslations` option of `addBody`; `lockTranslations` is every axis at once.
+   */
+  get enabledTranslations(): [boolean, boolean, boolean] {
+    return this.axes(3);
+  }
+  set enabledTranslations(enabled: readonly [boolean, boolean, boolean]) {
+    this.world().setLocks(this.row, { linear: lockBits(enabled, 'enabledTranslations') });
+  }
+  /** Which world axes the body may turn about, for example `[false, true, false]` to only spin around Y. */
+  get enabledRotations(): [boolean, boolean, boolean] {
+    return this.axes(6);
+  }
+  set enabledRotations(enabled: readonly [boolean, boolean, boolean]) {
+    this.world().setLocks(this.row, { angular: lockBits(enabled, 'enabledRotations') });
+  }
+  private axes(shift: number): [boolean, boolean, boolean] {
+    const locked = (this.columns.flags[this.row] >>> shift) & 7;
+    return [(locked & 1) === 0, (locked & 2) === 0, (locked & 4) === 0];
   }
 
   /** Adds a collider and works out the body's mass again. */

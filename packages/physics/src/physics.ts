@@ -358,6 +358,7 @@ export interface ColliderDistance {
   pointB: [number, number, number];
 }
 
+/** The closest point of a collider to a query point: where it is, whether the query point lies inside it, and how far. */
 export interface PointProjection {
   body: PhysicsBody;
   mesh: Mesh | null;
