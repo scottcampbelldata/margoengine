@@ -818,7 +818,11 @@ and `dispose()` gives the Water its level back.
 - `tsunami({height = 3, period = 300, leading = 'trough', at = now, shape = 'n-wave'})` (at most 8): the N-wave of
   Tadepalli and Synolakis (1994), `height` is both the crest and the trough, the sea draws back first by default and the
   crest follows; `shape: 'solitary'` is one crest H sech^2 of time (Synolakis 1987). `tsunamiElevation(t, wave)` is the
-  same shape as a plain function.
+  same shape as a plain function. A trough deeper than 5/9 of the still depth at the side cannot come in: drawn down to
+  4/9 of its depth, the water leaving through the side is critical (u = -sqrt(g h) for a simple wave, the Ritter 1892
+  dam-break section) and no wave from outside reaches the map past it, so the edge stops at 5/9 of its depth (a 42 m
+  trough over 60 m of sea stands at -33.3 m, within 1%, packages/water/test/flood-sea.browser.mjs case 10). Put the sea
+  side where the still depth is at least 1.8 times the trough (FG-01).
 - `surge` (m, default null) is the storm surge at the sea sides; null means the wind's set-up, `stress x shelf length /
   (rho g shelf depth)` on `shelf` (default 50 km x 20 m): 0.2 m at 18 m/s and 1.2 m at 40 m/s. A change eases in over
   `surgeRise` seconds (default 600).

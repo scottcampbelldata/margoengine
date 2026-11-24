@@ -8,7 +8,8 @@
 //    within 5% (Synolakis 1987; the NOAA benchmark of Synolakis et al. 2008);
 //  - a steady wind tilts a closed basin by rho_air Cd U^2 L / (rho g h) within 5% (30 m/s, Resio and Westerink 2008);
 //  - rain of 100 mm/h for 60 s on a flat closed basin is 1.667 mm within 1%;
-//  - a surge of the sea level fills the basin to it through the sea side.
+//  - a surge of the sea level fills the basin to it through the sea side;
+//  - a trough deeper than 5/9 of the still depth stops there at the side, where the outflow is critical (FG-01).
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
@@ -42,9 +43,18 @@ try {
     // A strip of n x rows cells (default 4) of dx metres: the bed ground(x, z), the Water at sea level 0 (or its fill), a Flood on it.
     const strip = (n, dx, ground, options = {}, fill, rows = 4) => {
       const size = [n * dx, rows * dx],
-        terrain = d.createTexture({ size: [n, rows], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+        terrain = d.createTexture({
+          size: [n, rows],
+          format: 'r32float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
       textures.push(terrain);
-      d.queue.writeTexture({ texture: terrain }, Float32Array.from({ length: n * rows }, (_, k) => ground(((k % n) + 0.5) * dx, (Math.floor(k / n) + 0.5) * dx)), { bytesPerRow: n * 4 }, [n, rows]);
+      d.queue.writeTexture(
+        { texture: terrain },
+        Float32Array.from({ length: n * rows }, (_, k) => ground(((k % n) + 0.5) * dx, (Math.floor(k / n) + 0.5) * dx)),
+        { bytesPerRow: n * 4 },
+        [n, rows],
+      );
       const water = Water.attach(engine, {
         height: options.seaLevel ?? 0,
         size: [200, 200],
@@ -80,7 +90,9 @@ try {
 
     // 1. A lake at rest behind a sea side stays at rest: 10 m deep over a step, 2,400 ticks.
     {
-      const m = strip(100, 2, (x) => (x < 100 ? -10 : -4), { flood: { boundary: { west: 'sea', east: 'sea' }, maxDepth: 12, maxSpeed: 3 } });
+      const m = strip(100, 2, (x) => (x < 100 ? -10 : -4), {
+        flood: { boundary: { west: 'sea', east: 'sea' }, maxDepth: 12, maxSpeed: 3 },
+      });
       await m.run(20);
       const r = await m.flood.read();
       let level = 0;
@@ -90,7 +102,13 @@ try {
     }
     // 2. A hump of 0.3 m leaves through both sea sides: 400 m of 10 m of water, 120 s.
     {
-      const m = strip(200, 2, () => -10, { flood: { boundary: { west: 'sea', east: 'sea' }, maxDepth: 11, maxSpeed: 3 } }, (x) => 0.3 * Math.exp(-((x - 200) ** 2) / (2 * 15 ** 2)));
+      const m = strip(
+        200,
+        2,
+        () => -10,
+        { flood: { boundary: { west: 'sea', east: 'sea' }, maxDepth: 11, maxSpeed: 3 } },
+        (x) => 0.3 * Math.exp(-((x - 200) ** 2) / (2 * 15 ** 2)),
+      );
       const start = await m.flood.read();
       await m.run(120, 1);
       const r = await m.flood.read();
@@ -117,7 +135,9 @@ try {
     // 4. Drawback: a trough-first N-wave of 1 m and 10 minutes on a 1 : 20 beach (bed -10 m at the sea, level at x = 200 m): the shoreline
     // retreats before the crest and the crest floods past where it started.
     {
-      const m = strip(300, 1, (x) => -10 + x / 20, { flood: { boundary: { west: 'sea' }, maxDepth: 14, maxSpeed: 10 } });
+      const m = strip(300, 1, (x) => -10 + x / 20, {
+        flood: { boundary: { west: 'sea' }, maxDepth: 14, maxSpeed: 10 },
+      });
       m.flood.tsunami({ height: 1, period: 600, at: 0 });
       const wet = [];
       await m.run(800, 1, async (t) => {
@@ -133,7 +153,9 @@ try {
         gamma = Math.sqrt((3 * H) / 4),
         c = Math.sqrt(9.81 * (1 + H)),
         period = 13.5 / (gamma * c),
-        m = strip(512, 30 / 512, (x) => (x < 5 ? -1 : -1 + (x - 5) / 19.85), { flood: { boundary: { west: 'sea' }, maxDepth: 1.3, maxSpeed: 1, roughness: 0 } });
+        m = strip(512, 30 / 512, (x) => (x < 5 ? -1 : -1 + (x - 5) / 19.85), {
+          flood: { boundary: { west: 'sea' }, maxDepth: 1.3, maxSpeed: 1, roughness: 0 },
+        });
       m.flood.tsunami({ height: H, period, at: 0, shape: 'solitary' });
       let runup = -1;
       await m.run(45, 0.1, async (t) => {
@@ -167,7 +189,9 @@ try {
     // 8. A surge: the sea side's level rises 0.5 m in 20 s over a closed basin 200 m long of 5 m of water; after 200 s the
     // basin stands at it, whatever sloshed in between.
     {
-      const m = strip(100, 2, () => -5, { flood: { boundary: { west: 'sea' }, maxDepth: 6, maxSpeed: 2, surge: 0.5, surgeRise: 20 } });
+      const m = strip(100, 2, () => -5, {
+        flood: { boundary: { west: 'sea' }, maxDepth: 6, maxSpeed: 2, surge: 0.5, surgeRise: 20 },
+      });
       await m.run(200, 1);
       const r = await m.flood.read();
       let low = 9,
@@ -185,7 +209,14 @@ try {
       ['shore', 64, 32, (x, z) => (z < 32 ? -10 : 1.7 - (128 - x) / 40), { height: 7, period: 120, at: 0 }],
       ['land', 60, 4, (x) => 1.7 - (120 - x) / 50, { height: 6, period: 120, at: 0, leading: 'crest' }],
     ]) {
-      const m = strip(n, 2, ground, { flood: { boundary: { east: 'sea' }, maxDepth: 30, maxSpeed: 20, roughness: 0.03 } }, undefined, rows);
+      const m = strip(
+        n,
+        2,
+        ground,
+        { flood: { boundary: { east: 'sea' }, maxDepth: 30, maxSpeed: 20, roughness: 0.03 } },
+        undefined,
+        rows,
+      );
       m.flood.tsunami(wave);
       let fastest = 0,
         capped = 0,
@@ -199,6 +230,25 @@ try {
       (out.edge ??= {})[name] = { fastest, capped, edge };
       m.dispose();
     }
+    // 10. A 42 m trough-first N-wave of 260 s (the Doggerland film's, FG-01) through a sea side over 110, 60 and 40 m of
+    // still water, 128 x 4 cells of 8 m, Manning 0.045: the lowest level of the edge cell. Over 110 m the whole trough
+    // comes in; over 60 and 40 m the water leaving is critical at 4/9 of the depth (u + c = 0 for the simple wave
+    // u = 2 (c - c0), Ritter 1892's section), so the edge stops at 5/9 of it.
+    for (const D of [110, 60, 40]) {
+      const m = strip(128, 8, () => -D, {
+        flood: { boundary: { west: 'sea', east: 'open' }, maxDepth: 160, maxSpeed: 60, roughness: 0.045 },
+      });
+      m.flood.tsunami({ height: 42, period: 260, at: 2 });
+      let low = 0,
+        capped = 0;
+      await m.run(140, 1, async () => {
+        const r = await m.flood.read();
+        low = Math.min(low, surface(r, m.n));
+        capped = Math.max(capped, r.capped);
+      });
+      (out.deep ??= {})[D] = { low, capped };
+      m.dispose();
+    }
     for (const t of textures) t.destroy();
     out.validation = String(await d.popErrorScope().then((e) => e?.message ?? ''));
     return out;
@@ -207,9 +257,15 @@ try {
   assert.deepEqual(errors, [], 'no page errors');
   assert.equal(result.validation, '', 'no validation errors');
   // 1. rest
-  assert.ok(result.calm.speed < 1e-4 && result.calm.level < 1e-5, `a sea side holds a lake at rest: ${JSON.stringify(result.calm)}`);
+  assert.ok(
+    result.calm.speed < 1e-4 && result.calm.level < 1e-5,
+    `a sea side holds a lake at rest: ${JSON.stringify(result.calm)}`,
+  );
   // 2. no reflection
-  assert.ok(result.leaving.left < 0.05 * result.leaving.first, `waves leave: ${result.leaving.left} left of ${result.leaving.first}`);
+  assert.ok(
+    result.leaving.left < 0.05 * result.leaving.first,
+    `waves leave: ${result.leaving.left} left of ${result.leaving.first}`,
+  );
   // 3. arrival
   {
     const { probe, x, c, wave } = result.arrival,
@@ -223,16 +279,22 @@ try {
       eLo = 0,
       eHi = 0;
     for (const [t, e] of probe) {
-      if (e < lo) ((lo = e), (tLo = t));
-      if (e > hi) ((hi = e), (tHi = t));
+      if (e < lo) (lo = e), (tLo = t);
+      if (e > hi) (hi = e), (tHi = t);
     }
     for (let t = wave.at; t <= wave.at + wave.period; t += 0.01) {
       const e = tsunamiElevationOf(shape, t);
-      if (e < eLo) ((eLo = e), (tLoExp = t + x / c));
-      if (e > eHi) ((eHi = e), (tHiExp = t + x / c));
+      if (e < eLo) (eLo = e), (tLoExp = t + x / c);
+      if (e > eHi) (eHi = e), (tHiExp = t + x / c);
     }
-    assert.ok(Math.abs(lo + wave.height) < 0.08 * wave.height && Math.abs(hi - wave.height) < 0.08 * wave.height, `N-wave height at 101 m: trough ${lo}, crest ${hi}`);
-    assert.ok(Math.abs(tLo - tLoExp) < 1.5 && Math.abs(tHi - tHiExp) < 1.5, `arrival times ${tLo} (${tLoExp}) and ${tHi} (${tHiExp})`);
+    assert.ok(
+      Math.abs(lo + wave.height) < 0.08 * wave.height && Math.abs(hi - wave.height) < 0.08 * wave.height,
+      `N-wave height at 101 m: trough ${lo}, crest ${hi}`,
+    );
+    assert.ok(
+      Math.abs(tLo - tLoExp) < 1.5 && Math.abs(tHi - tHiExp) < 1.5,
+      `arrival times ${tLo} (${tLoExp}) and ${tHi} (${tHiExp})`,
+    );
     assert.ok(tLo < tHi, 'the trough arrives first');
   }
   // 4. drawback
@@ -246,27 +308,36 @@ try {
       max = start,
       tMax = 0;
     for (const [t, a] of wet) {
-      if (a < min) ((min = a), (tMin = t));
-      if (a > max) ((max = a), (tMax = t));
+      if (a < min) (min = a), (tMin = t);
+      if (a > max) (max = a), (tMax = t);
     }
-    assert.ok(min < start - 10, `the sea draws back (the 1 m trough is 20 m of this beach): wet length ${start} to ${min} m`);
+    assert.ok(
+      min < start - 10,
+      `the sea draws back (the 1 m trough is 20 m of this beach): wet length ${start} to ${min} m`,
+    );
     assert.ok(tMin < tMax, `the bed is bare (t = ${tMin}) before the crest has flooded it (t = ${tMax})`);
     assert.ok(max > start + 10, `and the crest floods past the first shore: ${max} against ${start} m`);
   }
   // 5. run-up
   {
     const expected = solitaryRunup(0.0185, 19.85);
-    assert.ok(Math.abs(result.runup.runup / expected - 1) < 0.05, `run-up ${result.runup.runup} against ${expected} (R/d, d = 1 m): Synolakis 1987`);
+    assert.ok(
+      Math.abs(result.runup.runup / expected - 1) < 0.05,
+      `run-up ${result.runup.runup} against ${expected} (R/d, d = 1 m): Synolakis 1987`,
+    );
   }
   // 6. wind
   {
-    const expected = ((windStress(30) / (1000 * 9.81 * 2)) * 400);
+    const expected = (windStress(30) / (1000 * 9.81 * 2)) * 400;
     assert.ok(Math.abs(result.wind.mean / expected - 1) < 0.05, `wind tilt ${result.wind.mean} against ${expected} m`);
   }
   // 7. rain
   assert.ok(Math.abs(result.rain.depth / 1.6667e-3 - 1) < 0.01, `rain ${result.rain.depth} against 1.667 mm`);
   // 8. surge
-  assert.ok(result.surge.low > 0.46 && result.surge.high < 0.54, `the basin stands at the surge: ${result.surge.low} .. ${result.surge.high}`);
+  assert.ok(
+    result.surge.low > 0.46 && result.surge.high < 0.54,
+    `the basin stands at the surge: ${result.surge.low} .. ${result.surge.high}`,
+  );
   assert.ok(Math.abs(result.surge.level - 0.5) < 1e-6, 'and so does the Water level');
   // 9. The sea comes over a land edge with no cell capped and slower than the flood's 20 m/s limit (a dam-break front
   // of the 5.3 m crest over the edge runs at 2 sqrt(g h) = 14.4 m/s, Ritter 1892, a little more down the slope), and floods it.
@@ -275,6 +346,19 @@ try {
     assert.equal(e.capped, 0, `${name}: no cell capped (${JSON.stringify(e)})`);
     assert.ok(e.fastest < 20, `${name}: the fastest water ${e.fastest} m/s`);
     assert.ok(e.edge > 1, `${name}: the crest floods the land edge cell (${e.edge} m)`);
+  }
+  // 10. The trough at a sea side: all of it over 110 m, 5/9 of the depth over 60 and 40 m (FG-01).
+  for (const [D, expected, within] of [
+    [110, -42, 0.01],
+    [60, (-5 / 9) * 60, 0.02],
+    [40, (-5 / 9) * 40, 0.03],
+  ]) {
+    const e = result.deep[D];
+    assert.equal(e.capped, 0, `${D} m: no cell capped`);
+    assert.ok(
+      Math.abs(e.low / expected - 1) < within,
+      `${D} m of sea: the edge falls to ${e.low} m against ${expected}`,
+    );
   }
   console.log('flood sea: ok');
 } finally {
