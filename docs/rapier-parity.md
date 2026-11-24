@@ -541,7 +541,7 @@ Counted from the rows on 2026-11-24 by `node scripts/check-rapier-parity.mjs`, o
 
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED | MISSING | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 254 | 189 | 38 | 0 | 0 | 21 | 6 |
+| 1, Rapier parity | 254 | 192 | 37 | 0 | 0 | 19 | 6 |
 | 2, beyond Rapier | 83 | 11 | 29 | 0 | 0 | 43 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The 2D rows have a finer page-by-page audit in [rapier-parity-2d.md](rapier-parity-2d.md), and the 3D collision and query rows a table of their own in [physics-collision-parity.md](physics-collision-parity.md).
