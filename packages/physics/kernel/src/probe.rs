@@ -59,18 +59,38 @@ impl World {
         }
         let step = to.sub(from);
         let length = sqrt(step.dot(step));
+        // A ball that starts touching the collider, or inside its radius, has no sweep to make: the surface it touches is the one
+        // nearest where it is now, on the side it started on, and the move says whether it goes into it. (A thin solid has two
+        // faces; the end of the move may be nearer the far one, but the move came from the near one.)
+        if let Some(start) = self.project_collider(c, from, false) {
+            let offset = from.sub(start.point);
+            let distance = sqrt(offset.dot(offset));
+            let gap = if start.inside { -distance - radius } else { distance - radius };
+            if gap <= 1e-5 * (1.0 + radius) {
+                let away = if length > 1e-9 { step.scale(-1.0 / length) } else { v3(0.0, 1.0, 0.0) };
+                let normal = if distance > 1e-9 {
+                    offset.scale(if start.inside { -1.0 } else { 1.0 } / distance)
+                } else {
+                    away
+                };
+                let depth = radius - to.sub(start.point).dot(normal);
+                // Going into it, or still within reach at the end.
+                if step.dot(normal) < 0.0 || depth > -margin.max(0.0) {
+                    return Some(ParticleContact { collider: c as u32, t: 0.0, normal, point: start.point, depth, started: true });
+                }
+                return None;
+            }
+        }
         let identity = Pose { p: from, q: Q::IDENTITY };
         let ball = Shape { kind: SHAPE_BALL, size: v3(radius, 0.0, 0.0), hull: 0, border: 0.0 };
         if length > 1e-9 && self.query_valid(ball, identity) {
             let direction = step.scale(1.0 / length);
             let options = CastOptions { max: length, target: 0.0, stop: true, geometry: false };
             if let Some(hit) = self.cast_collider(c, ball, identity, direction, &options) {
-                if hit.started {
-                    // Touching at the start: the end of the move says whether it still is, and where the surface is.
-                    return self.probe_overlap(c, to, radius, margin).map(|p| ParticleContact { t: 0.0, started: true, ..p });
+                if !hit.started {
+                    let depth = radius - to.sub(hit.on_target).dot(hit.normal);
+                    return Some(ParticleContact { collider: c as u32, t: (hit.t / length).min(1.0), normal: hit.normal, point: hit.on_target, depth, started: false });
                 }
-                let depth = radius - to.sub(hit.on_target).dot(hit.normal);
-                return Some(ParticleContact { collider: c as u32, t: (hit.t / length).min(1.0), normal: hit.normal, point: hit.on_target, depth, started: false });
             }
         }
         self.probe_overlap(c, to, radius, margin)

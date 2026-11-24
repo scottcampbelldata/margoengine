@@ -122,7 +122,7 @@ test('a particle that starts in contact says so, and one inside a solid is pushe
   const { physics, kernel } = world({ shape: 'box', halfExtents: [1, 1, 1] });
   const started = probe(kernel, [0.2, 1 + 0.5 * R, 0], [0.2, 1 + 0.9 * R, 0]);
   assert.ok(started?.started, 'it started touching');
-  const inside = probe(kernel, [0.1, 0, 0.2], [0.1, 0.5, 0.2]);
+  const inside = probe(kernel, [0.1, 0.7, 0.2], [0.1, 0.5, 0.2]);
   assert.ok(inside, 'inside a solid');
   assert.deepEqual(
     inside.normal.map((v) => Math.round(v) + 0),
@@ -298,5 +298,59 @@ test('a deformable mesh gives the velocity of its surface, by the triangle the c
   assert.notEqual(c.collider[0], 0xffffffff);
   assert.notEqual(c.triangle[0], 0xffffffff);
   near(c.velocity[1], 3.6, 1e-2, 'the sheet rises at 3.6 m/s');
+  physics.dispose();
+});
+
+// KB-PHYS-PROBE-THIN1: a start that touches, or lies inside the radius, has a defined answer, and a thin solid is met on the side
+// the move came from, whatever the speed and wherever it starts.
+test('a particle that starts exactly touching a thin wall, or inside its radius, meets the near face, whatever its speed', () => {
+  const { physics, kernel } = world({ shape: 'box', halfExtents: [0.01, 2, 2] }, { position: [3, 0, 0] });
+  // The soft body session's two cases.
+  const touching = probe(kernel, [2.97, 1, 0], [3.065, 1, 0], 0.02, { flags: 8 });
+  assert.ok(touching, 'exactly touching, moving in: a contact');
+  assert.deepEqual(
+    touching.normal.map((v) => Math.round(v) + 0),
+    [-1, 0, 0],
+  );
+  near(touching.point[0], 2.99, 1e-5, 'the near face');
+  assert.equal(touching.t, 0);
+  const inside = probe(kernel, [2.9701, 1, 0], [3, 1, 0], 0.02);
+  assert.ok(inside?.started);
+  near(inside.point[0], 2.99, 1e-5, 'the near face, not the far one');
+  assert.deepEqual(
+    inside.normal.map((v) => Math.round(v) + 0),
+    [-1, 0, 0],
+  );
+  near(inside.depth, 0.02 + 0.01, 1e-4, 'pushed back by the way in plus the radius');
+  // A sweep over speeds and start offsets, from both sides: the face is always the one the move came from, and every fast
+  // particle that would end past the wall is stopped.
+  for (const side of [-1, 1]) {
+    for (const speed of [0.01, 0.5, 5, 60, 600]) {
+      for (const gap of [0.02 - 1e-6, 0.02, 0.02 + 1e-6, 0.021, 0.05, 0.3]) {
+        const from = [3 - side * (0.01 + gap), 1, 0];
+        const to = [from[0] + (side * speed) / 60, 1, 0];
+        const contact = probe(kernel, from, to, 0.02);
+        const reaches = Math.abs(to[0] - 3) < 0.01 + 0.02 || (to[0] - 3) * side > 0;
+        const label = `side ${side}, speed ${speed}, gap ${gap}`;
+        if (!reaches) {
+          assert.equal(contact, null, label);
+          continue;
+        }
+        assert.ok(contact, label);
+        // The wall's face on the side the particle is on: its x is 3 - side * 0.01, and the normal points back at the particle.
+        near(contact.point[0], 3 - side * 0.01, 1e-4, `${label}: the near face`);
+        assert.equal(Math.round(contact.normal[0]) + 0, -side, `${label}: the normal`);
+      }
+    }
+  }
+  physics.dispose();
+});
+
+test('softContacts with several slots gives a thin wall the same side, from both sides', () => {
+  const { physics, kernel } = world({ shape: 'box', halfExtents: [0.01, 2, 2] }, { position: [3, 0, 0] });
+  const c = kernel.softContacts({ from: [2.9701, 1, 0, 3.0299, 1, 0], to: [3, 1, 0, 3, 1, 0], radius: 0.02 }, 3);
+  assert.equal(c.normal[0], -1);
+  assert.equal(c.normal[3 * 3], 1, 'the second particle came from the far side');
+  near(c.point[3 * 3], 3.01, 1e-5, 'and meets the far face');
   physics.dispose();
 });
