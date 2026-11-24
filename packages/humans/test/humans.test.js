@@ -60,6 +60,25 @@ test('addPerson checks its options before it changes anything', async (t) => {
   assert.equal(engine.plugins.size, 0, 'nothing was attached');
 });
 
+test("Character Creator's hair materials (<name>_Transparency) get the hair look", () => {
+  // The material names of a CC5 GLB export (Fauld civ_gypsum_b): every hair mesh's material ends in _Transparency.
+  const cc = ['Boots', 'Brows_Hair_Transparency', 'Brows_Base_Transparency', 'Brows_Color_Transparency', 'Std_Skin_Head',
+    'Std_Eyelash', 'TR_jumper', 'Hair_Transparency', 'Hair_Clap_Transparency', 'Hairband_Opaque', 'Std_Hair_Transparency_Mask'];
+  assert.deepEqual(personMaterials(cc), {
+    Std_Skin_Head: 'skin',
+    Brows_Hair_Transparency: 'hair',
+    Brows_Base_Transparency: 'hair',
+    Brows_Color_Transparency: 'hair',
+    Hair_Transparency: 'hair',
+    Hair_Clap_Transparency: 'hair',
+  });
+  assert.deepEqual(personMaterials(cc, { hair: false }), { Std_Skin_Head: 'skin' });
+  // A hair list of your own covers its CC materials the same way, and leaves the defaults' names alone.
+  assert.deepEqual(personMaterials(['Beard_Transparency', 'Hair_Transparency', 'Wig_Transparency'], { materials: { hair: ['Wig'] } }), {
+    Wig_Transparency: 'hair',
+  });
+});
+
 test('Character Creator names get their looks, and a skinned CC eyeball is fitted and follows its joint', async (t) => {
   const cc = ['Std_Skin_Head', 'Std_Skin_Body', 'Std_Eye_R', 'Std_Cornea_R', 'Std_Tearline_R', 'Std_Eye_Occlusion_R', 'Boxers'];
   assert.deepEqual(personMaterials(cc), {

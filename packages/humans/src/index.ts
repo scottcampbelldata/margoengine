@@ -34,7 +34,12 @@ export interface PersonMaterialNames {
   skin?: readonly string[];
   /** Default `['EyeL', 'EyeR', 'Eye', 'Eyes', 'Std_Eye_L', 'Std_Eye_R']`. */
   eyes?: readonly string[];
-  /** Default `['Hair', 'Brows', 'Eyebrows', 'Lashes', 'Eyelashes', 'Moustache', 'Beard']`. */
+  /**
+   * Default `['Hair', 'Brows', 'Eyebrows', 'Lashes', 'Eyelashes', 'Moustache', 'Beard']`. Each name also covers
+   * Character Creator's hair materials made from it, `<name>_Transparency` and `<name>_<part>_Transparency`
+   * (`Hair_Transparency`, `Hair_Clap_Transparency`, `Brows_Base_Transparency` ...), as CC names every hair mesh's
+   * material after the mesh with `_Transparency` on the end.
+   */
   hair?: readonly string[];
   /**
    * Clear shells over an eyeball that the eye look already draws (its cornea and tear film), hidden while the person
@@ -170,9 +175,17 @@ export function personMaterials(
     if (!Array.isArray(list) || list.some((n) => typeof n !== 'string'))
       throw new TypeError(`addPerson materials.${look} must be an array of material names`);
     for (const name of list) if (present.has(name) && !Object.hasOwn(out, name)) out[name] = look;
+    if (look === 'hair')
+      for (const name of names)
+        if (!Object.hasOwn(out, name) && list.some((n) => ccHairOf(name, n))) out[name] = look;
   }
   return out;
 }
+
+// Character Creator names a hair mesh's material after the mesh, with `_Transparency` on the end: `Hair_Transparency`,
+// `Hair_Clap_Transparency`, `Brows_Base_Transparency`. Such a name belongs to the listed hair name it starts with.
+const ccHairOf = (name: string, listed: string) =>
+  name.endsWith('_Transparency') && (name === `${listed}_Transparency` || name.startsWith(`${listed}_`));
 
 // Character Creator's eye maps (Std_Eye_* and Std_Cornea_* of CC4 and CC5) hold the iris within 0.123 of the map's
 // middle and the pupil within 0.042 (measured across a row of Wilbur's 1024-pixel maps), on a UV sphere whose middle is

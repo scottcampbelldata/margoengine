@@ -182,7 +182,7 @@ garment over 5 mm into the body. What it does not do yet: push cloth aside at ru
 | Skin (`@margoengine/materials/skin`) | on materials named `Skin`, `Body`, `Face`, and Character Creator's `Std_Skin_Head`, `Std_Skin_Body`, `Std_Skin_Arm`, `Std_Skin_Leg` | `skin: SkinOptions` or `false`; names in `materials.skin` |
 | Eyes (`@margoengine/materials/eye`), each fitted by `personEye` (centre from its vertices; a skinned eyeball follows its joint; a Character Creator eye also takes its axis, iris size and iris map) | on `EyeL`, `EyeR`, `Eye`, `Eyes`, `Std_Eye_L`, `Std_Eye_R` | `eyes: EyeOptions` or `false` (what you pass wins over the fit); names in `materials.eyes` |
 | Eye shells hidden, as the eye draws its own cornea and tear film | `Std_Cornea_L`, `Std_Cornea_R`, `Std_Tearline_L`, `Std_Tearline_R` | names in `materials.shells`; none when `eyes` is `false`; a tear line drawn by `@margoengine/fbx/character-creator` stays |
-| Strand hair (`@margoengine/materials/hair`), 1024 strands across a UV unit, running along the UVs (a direction of three numbers in `hair` follows the joint that carries most of the hair's weight) | on `Hair`, `Brows`, `Eyebrows`, `Lashes`, `Eyelashes`, `Moustache`, `Beard` | `hair: HairOptions` or `false`; names in `materials.hair` |
+| Strand hair (`@margoengine/materials/hair`), 1024 strands across a UV unit, running along the UVs (a direction of three numbers in `hair` follows the joint that carries most of the hair's weight) | on `Hair`, `Brows`, `Eyebrows`, `Lashes`, `Eyelashes`, `Moustache`, `Beard`, and Character Creator's hair materials made from them (`Hair_Transparency`, `Hair_Clap_Transparency`, `Brows_Base_Transparency` ...) | `hair: HairOptions` or `false`; names in `materials.hair` |
 | Hair cards (`hairCards()` from `@margoengine/materials/hair`): a BLEND lash card seen edge on darkens the lid line as a fringe of lashes does | on `Std_Eyelash`, `Lashes`, `Eyelashes` | `cards: HairCardOptions` or `false`; names in `materials.cards` |
 | Animator (`@margoengine/animator`), one state per clip, named as the clip | starts on the first clip | `clip: 'name'` |
 | Cross-fade length for `play` | 0.3 s | `fade` |
@@ -201,7 +201,8 @@ console.log(personMaterials(['Skin', 'EyeL', 'Hair', 'Suit'])); // {Skin: 'skin'
 ```
 
 A Character Creator 4 or 5 export (FBX, Blender preset, loaded with `loadFBX` and the `pbrMaterials` entry) needs
-nothing named: `addPerson(engine, model)` puts skin on `Std_Skin_*`, the eye on `Std_Eye_*` and hides the cornea and
+nothing named: `addPerson(engine, model)` puts skin on `Std_Skin_*`, the eye on `Std_Eye_*`, strand hair on its
+`Hair_*_Transparency` and `Brows_*_Transparency` hair materials and hides the cornea and
 tear line shells. Loaded with `characterCreator(json)` from `@margoengine/fbx/character-creator` as well, the tear line
 is the reader's clear glossy strip along the lower lid and stays drawn.
 
