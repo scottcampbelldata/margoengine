@@ -919,6 +919,10 @@ type CompoundPart = ({
     shape: 'voxels';
     cells: Int32Array;
     size?: Vec3;
+}
+ | {
+    shape: 'halfSpace';
+    normal?: Vec3;
 }) & {
     offset?: Vec3;
     rotation?: Quat;
@@ -945,7 +949,7 @@ interface KernelCastOptions {
 }
 
 interface KernelCompoundPart {
-    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
     size: readonly number[];
     position?: readonly [number, number, number];
     rotation?: readonly [number, number, number, number];

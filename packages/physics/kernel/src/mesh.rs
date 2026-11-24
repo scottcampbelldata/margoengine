@@ -25,6 +25,7 @@ use crate::layout::*;
 use crate::math::*;
 use crate::narrow::{Manifold, Point, Round, collide_polys, collide_round_poly, face_contact, ID_END};
 use crate::cast::{Solid, core};
+use crate::compound::MESH_CHILD;
 use crate::sat::Pose;
 use crate::smooth::{clip_along, collide_solids};
 use crate::world::{NONE, World};
@@ -684,7 +685,9 @@ impl World {
     #[allow(clippy::too_many_arguments)]
     fn touch_triangle(&mut self, row: usize, sides: (usize, bool, usize, u32), triangle: u32, pose: Pose, limit: f32, ratio: f32, bodies: (usize, usize), manifold: &mut Manifold) -> bool {
         let (other, other_is_a, mesh, sub) = sides;
-        self.touch_part(row, (triangle, sub), ratio, bodies, manifold, |w, m| w.collide_triangle(other, other_is_a, mesh, triangle, pose, limit, m))
+        // A triangle of a compound's mesh child against a compound's child names that child too.
+        let third = if sub != NONE && sub & MESH_CHILD != 0 { other as u32 } else { NONE };
+        self.touch_part3(row, (triangle, sub, third), ratio, bodies, manifold, |w, m| w.collide_triangle(other, other_is_a, mesh, triangle, pose, limit, m))
     }
 
     /// One part of pair `row`, named by `key` (its PAIR_PART and PAIR_SUB): `collide` fills the manifold, which starts
@@ -692,6 +695,13 @@ impl World {
     /// False when memory cannot hold a new part.
     pub(crate) fn touch_part(
         &mut self, row: usize, key: (u32, u32), ratio: f32, bodies: (usize, usize), manifold: &mut Manifold, collide: impl FnOnce(&Self, &mut Manifold),
+    ) -> bool {
+        self.touch_part3(row, (key.0, key.1, NONE), ratio, bodies, manifold, collide)
+    }
+
+    /// `touch_part` with a part named by three words (PAIR_PART, PAIR_SUB, PAIR_THIRD).
+    pub(crate) fn touch_part3(
+        &mut self, row: usize, key: (u32, u32, u32), ratio: f32, bodies: (usize, usize), manifold: &mut Manifold, collide: impl FnOnce(&Self, &mut Manifold),
     ) -> bool {
         // Only the call to `collide` is generic; the bookkeeping either side is one copy for every caller.
         let part = self.open_part(row, key, manifold);
@@ -701,7 +711,7 @@ impl World {
 
     /// The part of pair `row` named by `key`, or NONE, with the points it held loaded into `manifold`.
     #[inline(never)]
-    fn open_part(&self, row: usize, key: (u32, u32), manifold: &mut Manifold) -> u32 {
+    fn open_part(&self, row: usize, key: (u32, u32, u32), manifold: &mut Manifold) -> u32 {
         let part = self.find_part(row, key);
         manifold.held_count = 0;
         manifold.feature = 0;
@@ -717,7 +727,7 @@ impl World {
 
     /// Stores a manifold with points in `part` (made now when NONE). False when memory cannot hold a new part.
     #[inline(never)]
-    fn close_part(&mut self, row: usize, key: (u32, u32), part: u32, ratio: f32, bodies: (usize, usize), manifold: &Manifold) -> bool {
+    fn close_part(&mut self, row: usize, key: (u32, u32, u32), part: u32, ratio: f32, bodies: (usize, usize), manifold: &Manifold) -> bool {
         if manifold.count == 0 {
             return true;
         }
@@ -804,16 +814,16 @@ impl World {
     }
 
     /// The part of `row` named `key` (PAIR_PART, PAIR_SUB), or NONE.
-    fn find_part(&self, row: usize, key: (u32, u32)) -> u32 {
+    fn find_part(&self, row: usize, key: (u32, u32, u32)) -> u32 {
         let mut part = self.uu(PAIR_CHILD, row);
-        while part != NONE && (self.uu(PAIR_PART, part as usize) != key.0 || self.uu(PAIR_SUB, part as usize) != key.1) {
+        while part != NONE && (self.uu(PAIR_PART, part as usize) != key.0 || self.uu(PAIR_SUB, part as usize) != key.1 || self.uu(PAIR_THIRD, part as usize) != key.2) {
             part = self.uu(PAIR_CHILD, part as usize);
         }
         part
     }
 
     /// A new part of `row` named `key`, on the active list when its pair is; NONE when memory cannot.
-    fn add_part(&mut self, row: usize, key: (u32, u32)) -> u32 {
+    fn add_part(&mut self, row: usize, key: (u32, u32, u32)) -> u32 {
         let Some(part) = self.take_pair_row() else { return NONE };
         let at = part as usize;
         self.set_u(PAIR_A, at, self.uu(PAIR_A, row));
@@ -827,6 +837,7 @@ impl World {
         }
         self.set_u(PAIR_PART, at, key.0);
         self.set_u(PAIR_SUB, at, key.1);
+        self.set_u(PAIR_THIRD, at, key.2);
         self.set_u(PAIR_CHILD, at, self.uu(PAIR_CHILD, row));
         self.set_u(PAIR_CHILD, row, part);
         if self.uu(PAIR_SLOT, row) != NONE {

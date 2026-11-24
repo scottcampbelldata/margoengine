@@ -163,6 +163,10 @@ export type CompoundPart = ({
     shape: 'voxels';
     cells: Int32Array;
     size?: Vec3;
+}
+ | {
+    shape: 'halfSpace';
+    normal?: Vec3;
 }) & {
     offset?: Vec3;
     rotation?: Quat;

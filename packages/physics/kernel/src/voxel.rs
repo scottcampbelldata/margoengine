@@ -504,7 +504,8 @@ impl World {
                 true
             });
             for &index in &cells[..count] {
-                if !self.touch_part(row, (index, sub), ratio, bodies, &mut manifold, |w, m| w.collide_cell(other, other_is_a, mesh, index, pose, limit, m)) {
+                let third = if sub != crate::world::NONE && sub & crate::compound::MESH_CHILD != 0 { other as u32 } else { crate::world::NONE };
+                if !self.touch_part3(row, (index, sub, third), ratio, bodies, &mut manifold, |w, m| w.collide_cell(other, other_is_a, mesh, index, pose, limit, m)) {
                     return false;
                 }
             }

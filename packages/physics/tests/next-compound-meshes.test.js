@@ -59,28 +59,43 @@ test('rays, projections and overlaps meet the mesh parts of a compound where the
   for (const w of pair) w.physics.dispose();
 });
 
-test('a compound of meshes meets no mesh, and two compounds with meshes do not crash', () => {
+test('a compound with a mesh part carries a compound that rests on it, and a mesh meets no mesh', () => {
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', colliders: { shape: 'compound', parts: [{ ...ground }] } });
-  physics.addBody(null, { type: 'fixed', position: [0, 1, 0], colliders: { ...ground } });
+  physics.addBody(null, { type: 'fixed', colliders: { shape: 'compound', parts: [{ ...ground }, { shape: 'box', halfExtents: [0.1, 1, 5], offset: [5.1, 1, 0] }] } });
   const crate = physics.addBody(null, {
-    position: [0, 3, 0],
-    colliders: { shape: 'compound', parts: [{ shape: 'box', halfExtents: [0.3, 0.3, 0.3] }, { shape: 'sphere', radius: 0.2, offset: [0.6, 0, 0] }] },
+    position: [0, 2, 0],
+    colliders: { shape: 'compound', parts: [{ shape: 'box', halfExtents: [0.3, 0.3, 0.3] }, { shape: 'sphere', radius: 0.2, offset: [0.6, -0.1, 0] }] },
   });
-  const other = physics.addBody(null, {
-    type: 'fixed',
-    position: [0, -1, 0],
-    colliders: { shape: 'compound', parts: [{ ...ground }, { shape: 'box', halfExtents: [1, 0.1, 1], offset: [0, 4, 0] }] },
-  });
-  for (let i = 0; i < 240; i++) physics.step();
-  assert.ok(Number.isFinite(crate.position[1]), `${crate.position[1]}`);
-  assert.ok(other.colliders.length === 1);
+  // A plain mesh through the same place: the mesh of the compound meets the compound's parts, and not this mesh.
+  physics.addBody(null, { type: 'fixed', position: [0, -3, 0], colliders: { ...ground } });
+  for (let i = 0; i < 300; i++) physics.step();
+  // The box part's base on the mesh (0.3) and the ball's lowest point (-0.1 - 0.2 = -0.3 below the body origin) both meet it: the
+  // body rests with the lower of the two on the floor.
+  assert.ok(Math.abs(crate.position[1] - 0.3) < 0.02, `rests on the mesh part ${crate.position[1]}`);
+  const other = new Physics(null);
+  other.addBody(null, { type: 'fixed', colliders: { shape: 'compound', parts: [{ ...ground }] } });
+  const passing = other.addBody(null, { type: 'fixed', position: [0, 0.2, 0], colliders: { shape: 'compound', parts: [{ ...ground }] } });
+  other.step();
+  assert.equal(other.contactPoints(passing).length, 0, 'two meshes meet nothing');
+  physics.dispose();
+  other.dispose();
+});
+
+test('a half space is a part of a compound: an endless floor beside a box', () => {
+  const physics = new Physics(null);
+  physics.addBody(null, { type: 'fixed', colliders: { shape: 'compound', parts: [{ shape: 'halfSpace' }, { shape: 'box', halfExtents: [1, 1, 1], offset: [10, 1, 0] }] } });
+  const ball = physics.addBody(null, { position: [0, 3, 0], colliders: { shape: 'sphere', radius: 0.4 } });
+  const onBox = physics.addBody(null, { position: [10, 4, 0], colliders: { shape: 'sphere', radius: 0.4 } });
+  for (let i = 0; i < 300; i++) physics.step();
+  assert.ok(Math.abs(ball.position[1] - 0.4) < 0.01, `on the plane ${ball.position[1]}`);
+  assert.ok(Math.abs(onBox.position[1] - 2.4) < 0.01, `on the box ${onBox.position[1]}`);
+  assert.equal(physics.raycast([100, 5, 7], [0, -1, 0]).distance, 5);
   physics.dispose();
 });
 
-test('a half space cannot be a part, and Rapier says so for a mesh part instead of aborting', () => {
+test('a custom shape cannot be a part, and Rapier says so for a mesh part instead of aborting', () => {
   const physics = new Physics(null);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'compound', parts: [{ shape: 'halfSpace' }] } }), /cannot be a part/);
+  assert.throws(() => physics.addBody(null, { colliders: { shape: 'compound', parts: [{ shape: 'custom', desc: {} }] } }), /cannot be a part/);
   physics.dispose();
   const rapier = new RapierPhysics(null);
   assert.throws(() => rapier.addBody(null, { colliders: { shape: 'compound', parts: [{ ...ground }] } }), /own solver/);

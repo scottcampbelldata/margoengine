@@ -459,6 +459,8 @@ columns! {
     PAIR_PART u32 Pair,
     PAIR_CHILD u32 Pair,
     PAIR_SUB u32 Pair,
+    // A third word of a part's name: the other side's compound child, for a mesh child of a compound against a compound.
+    PAIR_THIRD u32 Pair,
     // A triangle mesh: where its rows start and how many it has, MESH_ bits, the box around it and the radius about the
     // box's centre that holds it. MESH_COLUMNS is 0 for a mesh of triangle rows and a height field's columns of cells
     // otherwise: a height field has vertex rows only, and its triangles follow from its cells (mesh.rs, `end_grid`).

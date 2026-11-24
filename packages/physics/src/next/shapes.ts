@@ -28,7 +28,7 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   halfSpace: 'halfspace',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
-const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull', 'trimesh', 'heightfield', 'voxels'];
+const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull', 'trimesh', 'heightfield', 'voxels', 'halfSpace'];
 
 type Quat4 = readonly [number, number, number, number];
 export const multiply = (a: Quat4, b: Quat4): [number, number, number, number] => [
@@ -146,11 +146,15 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
   return parts.map((part) => {
     if (!CONVEX_PARTS.includes(part?.shape))
       throw new TypeError(
-        `Compound part shape ${String(part?.shape)} cannot be a part; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield or voxels parts.`,
+        `Compound part shape ${String(part?.shape)} cannot be a part; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, voxels or halfSpace parts.`,
       );
     const offset = part.offset ?? [0, 0, 0];
     checkVec(offset, 'Compound part offset');
     const placed = { position: [offset[0], offset[1], offset[2]] as [number, number, number], rotation: part.rotation };
+    if (part.shape === 'halfSpace') {
+      const whole = kernelCollider(part, { geometry: null, scale: [1, 1, 1] }, hulls);
+      return { shape: 'halfspace', size: whole.size, ...placed };
+    }
     if (part.shape === 'trimesh' || part.shape === 'heightfield' || part.shape === 'voxels') {
       // A mesh part is built as a collider of its own would be, and then placed in the compound.
       const whole = kernelCollider(part, { geometry: null, scale: [1, 1, 1] }, hulls);

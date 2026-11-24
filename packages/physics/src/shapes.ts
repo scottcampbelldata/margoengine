@@ -123,6 +123,8 @@ export type CompoundPart = (
   | { shape: 'trimesh'; vertices: ArrayLike<number>; indices: ArrayLike<number>; fixInternalEdges?: boolean }
   | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3; fixInternalEdges?: boolean }
   | { shape: 'voxels'; cells: Int32Array; size?: Vec3 }
+  /** The half space behind a plane through the part's offset (default normal up): an endless floor or wall in a compound. */
+  | { shape: 'halfSpace'; normal?: Vec3 }
 ) & {
   /** Part position in the collider's frame (default origin). */
   offset?: Vec3;
@@ -437,7 +439,7 @@ export function createColliderDesc(
         positions: Vector[] = [],
         rotations: Rotation[] = [];
       for (const part of parts as readonly CompoundPart[]) {
-        if (part?.shape === 'trimesh' || part?.shape === 'heightfield' || part?.shape === 'voxels')
+        if (part?.shape === 'trimesh' || part?.shape === 'heightfield' || part?.shape === 'voxels' || part?.shape === 'halfSpace')
           throw new MargoError(
             'unsupported',
             `A ${part.shape} part in a compound needs the own solver: import {Physics} from '@margoengine/physics/next'. Rapier's JavaScript fails on a compound with a mesh in it.`,

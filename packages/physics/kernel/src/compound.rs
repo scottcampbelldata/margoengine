@@ -8,7 +8,7 @@ use crate::world::{NONE, World};
 
 /// A triangle part of a compound's mesh child is named by this bit and the child's row in PAIR_SUB, so it differs from a
 /// part named by a convex child's row (under 2^22) and from a triangle of a mesh collider (no child).
-const MESH_CHILD: u32 = 1 << 31;
+pub(crate) const MESH_CHILD: u32 = 1 << 31;
 
 impl World {
     /// True when a collider row is a mesh, height field or voxel grid.
@@ -61,9 +61,10 @@ impl World {
                 let (x, y) = (ca as usize, cb as usize);
                 let (mesh_x, mesh_y) = (self.is_mesh(x), self.is_mesh(y));
                 if mesh_x || mesh_y {
-                    // A mesh child meets a convex collider that is no compound's child: a part names the triangle and the
-                    // mesh child. Two meshes, or a mesh child against a compound's children, meet nothing.
-                    if mesh_x != mesh_y && !(compound_a && compound_b) && self.boxes_overlap(x, y) {
+                    // A mesh child meets a convex collider or child: a part names the triangle, the mesh child and, against a
+                    // compound, that compound's child. Two meshes, or a mesh and a half space, meet nothing.
+                    let flat = |c: usize| self.uu(COLLIDER_SHAPE, c) == SHAPE_HALFSPACE;
+                    if mesh_x != mesh_y && !flat(x) && !flat(y) && self.boxes_overlap(x, y) {
                         let (mesh, other, other_is_a) = if mesh_x { (x, y, false) } else { (y, x, true) };
                         let limit = self.contact_limit_of(x, y, dt);
                         if !self.mesh_walk(row, mesh, (other, other_is_a, mesh as u32 | MESH_CHILD), limit, ratio, bodies) {
@@ -112,7 +113,8 @@ impl World {
                 let (x, y) = (ca as usize, cb as usize);
                 let (mesh_x, mesh_y) = (self.is_mesh(x), self.is_mesh(y));
                 if mesh_x || mesh_y {
-                    if mesh_x != mesh_y && !(compound_a && compound_b) && self.boxes_overlap(x, y) {
+                    let flat = |c: usize| self.uu(COLLIDER_SHAPE, c) == SHAPE_HALFSPACE;
+                    if mesh_x != mesh_y && !flat(x) && !flat(y) && self.boxes_overlap(x, y) {
                         let (mesh, other, other_is_a) = if mesh_x { (x, y, false) } else { (y, x, true) };
                         if self.mesh_overlaps_with(mesh, other, other_is_a) {
                             return true;

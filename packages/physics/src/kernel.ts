@@ -200,7 +200,7 @@ export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hu
 
 /** One convex child of {@link KernelWorld.addCompound}: a shape and size as {@link KernelWorld.addCollider} takes them. */
 export interface KernelCompoundPart {
-  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
   size: readonly number[];
   /** Place in the compound's frame (default its origin). */
   position?: readonly [number, number, number];
@@ -875,9 +875,9 @@ export class KernelWorld {
     const codes: number[] = [];
     for (const part of parts) {
       const shape: string = part?.shape,
-        spec = Object.hasOwn(shapes, shape) && shape !== 'halfspace' ? shapes[shape as KernelShape] : undefined;
+        spec = Object.hasOwn(shapes, shape) ? shapes[shape as KernelShape] : undefined;
       if (!spec)
-        throw new RangeError(`A compound part is a ball, box, capsule, cylinder, cone, hull or mesh row (got ${String(part?.shape)}); pass one of those.`);
+        throw new RangeError(`A compound part is a ball, box, capsule, cylinder, cone, hull, half space or mesh row (got ${String(part?.shape)}); pass one of those.`);
       this.checkSize(part.shape, part.size);
       this.checkPose(part.position ?? [0, 0, 0], part.rotation ?? [0, 0, 0, 1]);
       codes.push(spec[0]);
