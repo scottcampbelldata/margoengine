@@ -20,9 +20,12 @@ function cellOf(x: number, size: number): number {
 }
 
 function cellSize(size: number | Vec3 | undefined): Vec3 {
-  const s: Vec3 = size === undefined ? [1, 1, 1] : typeof size === 'number' ? [size, size, size] : [size[0], size[1], size[2]];
+  const s: Vec3 =
+    size === undefined ? [1, 1, 1] : typeof size === 'number' ? [size, size, size] : [size[0], size[1], size[2]];
   if (!(s[0] > 0 && s[1] > 0 && s[2] > 0) || !s.every((v) => Number.isFinite(v)))
-    throw new RangeError(`A voxel size is positive and finite on every axis (got ${s.join(', ')}); pass a number or [x, y, z] in metres.`);
+    throw new RangeError(
+      `A voxel size is positive and finite on every axis (got ${s.join(', ')}); pass a number or [x, y, z] in metres.`,
+    );
   return s;
 }
 
@@ -35,11 +38,17 @@ function cellSize(size: number | Vec3 | undefined): Vec3 {
  */
 export function voxelsFromPoints(points: ArrayLike<number>, size?: number | Vec3): { cells: Int32Array; size: Vec3 } {
   const s = cellSize(size);
-  if (points.length % 3 !== 0) throw new RangeError(`voxelsFromPoints takes packed x, y, z; ${points.length} numbers are not whole points.`);
+  if (points.length % 3 !== 0)
+    throw new RangeError(`voxelsFromPoints takes packed x, y, z; ${points.length} numbers are not whole points.`);
   const seen = new Map<string, [number, number, number]>();
   for (let i = 0; i < points.length; i += 3) {
-    if (!Number.isFinite(points[i]! + points[i + 1]! + points[i + 2]!)) throw new RangeError(`Point ${i / 3} is not finite; pass finite coordinates.`);
-    const c: [number, number, number] = [cellOf(points[i]!, s[0]), cellOf(points[i + 1]!, s[1]), cellOf(points[i + 2]!, s[2])];
+    if (!Number.isFinite(points[i]! + points[i + 1]! + points[i + 2]!))
+      throw new RangeError(`Point ${i / 3} is not finite; pass finite coordinates.`);
+    const c: [number, number, number] = [
+      cellOf(points[i]!, s[0]),
+      cellOf(points[i + 1]!, s[1]),
+      cellOf(points[i + 2]!, s[2]),
+    ];
     seen.set(`${c[0]},${c[1]},${c[2]}`, c);
   }
   const cells = [...seen.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
@@ -63,14 +72,19 @@ function triangleMeetsBox(t: readonly [Vec3, Vec3, Vec3], c: Vec3, h: Vec3): boo
     if (lo > h[k]! || hi < -h[k]!) return false;
   }
   // The triangle's plane.
-  const n: Vec3 = [e[0]![1]! * e[1]![2]! - e[0]![2]! * e[1]![1]!, e[0]![2]! * e[1]![0]! - e[0]![0]! * e[1]![2]!, e[0]![0]! * e[1]![1]! - e[0]![1]! * e[1]![0]!];
+  const n: Vec3 = [
+    e[0]![1]! * e[1]![2]! - e[0]![2]! * e[1]![1]!,
+    e[0]![2]! * e[1]![0]! - e[0]![0]! * e[1]![2]!,
+    e[0]![0]! * e[1]![1]! - e[0]![1]! * e[1]![0]!,
+  ];
   const reach = h[0] * Math.abs(n[0]) + h[1] * Math.abs(n[1]) + h[2] * Math.abs(n[2]);
   const d = n[0] * v[0][0] + n[1] * v[0][1] + n[2] * v[0][2];
   if (Math.abs(d) > reach) return false;
   // The nine cross products of an edge and a box axis.
   for (const edge of e)
     for (let k = 0; k < 3; k++) {
-      const axis: Vec3 = k === 0 ? [0, -edge[2]!, edge[1]!] : k === 1 ? [edge[2]!, 0, -edge[0]!] : [-edge[1]!, edge[0]!, 0];
+      const axis: Vec3 =
+        k === 0 ? [0, -edge[2]!, edge[1]!] : k === 1 ? [edge[2]!, 0, -edge[0]!] : [-edge[1]!, edge[0]!, 0];
       if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) continue;
       const p = v.map((q) => axis[0] * q[0] + axis[1] * q[1] + axis[2] * q[2]);
       const r = h[0] * Math.abs(axis[0]) + h[1] * Math.abs(axis[1]) + h[2] * Math.abs(axis[2]);
@@ -98,7 +112,8 @@ export function voxelizedMesh(
 ): { cells: Int32Array; size: Vec3 } {
   const s = cellSize(size);
   const count = vertices.length / 3;
-  if (!Number.isInteger(count) || indices.length % 3 !== 0) throw new RangeError('voxelizedMesh takes packed x, y, z vertices and three indices a triangle.');
+  if (!Number.isInteger(count) || indices.length % 3 !== 0)
+    throw new RangeError('voxelizedMesh takes packed x, y, z vertices and three indices a triangle.');
   const surface = new Map<number, [number, number, number]>();
   let low: [number, number, number] = [Infinity, Infinity, Infinity],
     high: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -106,13 +121,22 @@ export function voxelizedMesh(
   for (let t = 0; t < indices.length; t += 3) {
     const p = [0, 1, 2].map((k) => {
       const i = indices[t + k]!;
-      if (!(i >= 0 && i < count)) throw new RangeError(`Index ${i} is outside the ${count} vertices; keep every index below it.`);
+      if (!(i >= 0 && i < count))
+        throw new RangeError(`Index ${i} is outside the ${count} vertices; keep every index below it.`);
       return [vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!] as Vec3;
     }) as [Vec3, Vec3, Vec3];
     tris.push(p);
     for (const q of p) {
-      low = [Math.min(low[0], cellOf(q[0], s[0])), Math.min(low[1], cellOf(q[1], s[1])), Math.min(low[2], cellOf(q[2], s[2]))];
-      high = [Math.max(high[0], cellOf(q[0], s[0])), Math.max(high[1], cellOf(q[1], s[1])), Math.max(high[2], cellOf(q[2], s[2]))];
+      low = [
+        Math.min(low[0], cellOf(q[0], s[0])),
+        Math.min(low[1], cellOf(q[1], s[1])),
+        Math.min(low[2], cellOf(q[2], s[2])),
+      ];
+      high = [
+        Math.max(high[0], cellOf(q[0], s[0])),
+        Math.max(high[1], cellOf(q[1], s[1])),
+        Math.max(high[2], cellOf(q[2], s[2])),
+      ];
     }
   }
   if (!tris.length) return { cells: new Int32Array(0), size: s };
@@ -141,7 +165,14 @@ export function voxelizedMesh(
         z = at % dims[2],
         y = Math.trunc(at / dims[2]) % dims[1],
         x = Math.trunc(at / (dims[2] * dims[1]));
-      for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] as const) {
+      for (const [dx, dy, dz] of [
+        [1, 0, 0],
+        [-1, 0, 0],
+        [0, 1, 0],
+        [0, -1, 0],
+        [0, 0, 1],
+        [0, 0, -1],
+      ] as const) {
         const nx = x + dx,
           ny = y + dy,
           nz = z + dz;
@@ -217,7 +248,12 @@ export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology {
   const triangles = indices.length / 3;
   if (!Number.isInteger(triangles)) throw new RangeError('meshHalfEdges takes three indices a triangle.');
   const n = indices.length,
-    out: HalfEdgeTopology = { vertex: new Uint32Array(n), twin: new Uint32Array(n).fill(0xffffffff), next: new Uint32Array(n), face: new Uint32Array(n) };
+    out: HalfEdgeTopology = {
+      vertex: new Uint32Array(n),
+      twin: new Uint32Array(n).fill(0xffffffff),
+      next: new Uint32Array(n),
+      face: new Uint32Array(n),
+    };
   const edges = new Map<string, number[]>();
   for (let t = 0; t < triangles; t++)
     for (let k = 0; k < 3; k++) {
@@ -264,7 +300,9 @@ export function convertMesh(
   if (out.shape === 'trimesh' && options.trimesh) return { ...out, ...options.trimesh };
   if (out.shape === 'convexHull' && options.borderRadius !== undefined) {
     if (!(options.borderRadius >= 0) || !Number.isFinite(options.borderRadius))
-      throw new RangeError(`borderRadius is 0 or more metres and finite (got ${options.borderRadius}); pass 0 for a sharp hull.`);
+      throw new RangeError(
+        `borderRadius is 0 or more metres and finite (got ${options.borderRadius}); pass 0 for a sharp hull.`,
+      );
     return { ...out, borderRadius: options.borderRadius };
   }
   return out;
@@ -284,12 +322,15 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
     throw new RangeError('convertMesh takes packed x, y, z vertices and at least one triangle of three indices.');
   const used = new Set<number>();
   for (let i = 0; i < indices.length; i++) {
-    if (!(indices[i]! >= 0 && indices[i]! < count)) throw new RangeError(`Index ${indices[i]} is outside the ${count} vertices.`);
+    if (!(indices[i]! >= 0 && indices[i]! < count))
+      throw new RangeError(`Index ${indices[i]} is outside the ${count} vertices.`);
     used.add(indices[i]!);
   }
-  if (to === 'trimesh') return { shape: 'trimesh', vertices: Float32Array.from(vertices), indices: Uint32Array.from(indices) };
+  if (to === 'trimesh')
+    return { shape: 'trimesh', vertices: Float32Array.from(vertices), indices: Uint32Array.from(indices) };
   const points: number[] = [];
-  for (const i of [...used].sort((a, b) => a - b)) points.push(vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!);
+  for (const i of [...used].sort((a, b) => a - b))
+    points.push(vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!);
   if (to === 'convexHull') return { shape: 'convexHull', points };
   const n = points.length / 3;
   if (to === 'aabb') {
@@ -300,9 +341,17 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
         lo[k] = Math.min(lo[k]!, points[3 * i + k]!);
         hi[k] = Math.max(hi[k]!, points[3 * i + k]!);
       }
-    return { shape: 'box', halfExtents: [(hi[0]! - lo[0]!) / 2, (hi[1]! - lo[1]!) / 2, (hi[2]! - lo[2]!) / 2], offset: [(hi[0]! + lo[0]!) / 2, (hi[1]! + lo[1]!) / 2, (hi[2]! + lo[2]!) / 2] };
+    return {
+      shape: 'box',
+      halfExtents: [(hi[0]! - lo[0]!) / 2, (hi[1]! - lo[1]!) / 2, (hi[2]! - lo[2]!) / 2],
+      offset: [(hi[0]! + lo[0]!) / 2, (hi[1]! + lo[1]!) / 2, (hi[2]! + lo[2]!) / 2],
+    };
   }
-  if (to !== 'obb') throw new MargoError('unsupported', `convertMesh turns a mesh into trimesh, convexHull, aabb or obb, not ${String(to)}.`);
+  if (to !== 'obb')
+    throw new MargoError(
+      'unsupported',
+      `convertMesh turns a mesh into trimesh, convexHull, aabb or obb, not ${String(to)}.`,
+    );
   // The principal axes: the eigenvectors of the covariance of the vertices, by Jacobi's method.
   const mean = [0, 0, 0];
   for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) mean[k]! += points[3 * i + k]! / n;
@@ -312,7 +361,9 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
     [0, 0, 0],
   ];
   for (let i = 0; i < n; i++)
-    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) cov[a]![b]! += ((points[3 * i + a]! - mean[a]!) * (points[3 * i + b]! - mean[b]!)) / n;
+    for (let a = 0; a < 3; a++)
+      for (let b = 0; b < 3; b++)
+        cov[a]![b]! += ((points[3 * i + a]! - mean[a]!) * (points[3 * i + b]! - mean[b]!)) / n;
   const axes = [
     [1, 0, 0],
     [0, 1, 0],
@@ -358,7 +409,8 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
     hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < n; i++)
     for (let a = 0; a < 3; a++) {
-      const d = frame[a]![0]! * points[3 * i]! + frame[a]![1]! * points[3 * i + 1]! + frame[a]![2]! * points[3 * i + 2]!;
+      const d =
+        frame[a]![0]! * points[3 * i]! + frame[a]![1]! * points[3 * i + 1]! + frame[a]![2]! * points[3 * i + 2]!;
       lo[a] = Math.min(lo[a]!, d);
       hi[a] = Math.max(hi[a]!, d);
     }
@@ -385,5 +437,10 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
     const z = Math.sqrt(1 + m[2]![2]! - m[0]![0]! - m[1]![1]!) / 2;
     q = [(m[0]![2]! + m[2]![0]!) / (4 * z), (m[1]![2]! + m[2]![1]!) / (4 * z), z, (m[1]![0]! - m[0]![1]!) / (4 * z)];
   }
-  return { shape: 'box', halfExtents: [(hi[0]! - lo[0]!) / 2, (hi[1]! - lo[1]!) / 2, (hi[2]! - lo[2]!) / 2], offset: centre, rotation: q };
+  return {
+    shape: 'box',
+    halfExtents: [(hi[0]! - lo[0]!) / 2, (hi[1]! - lo[1]!) / 2, (hi[2]! - lo[2]!) / 2],
+    offset: centre,
+    rotation: q,
+  };
 }

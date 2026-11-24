@@ -171,6 +171,8 @@ test('combine rules: the pair takes the higher rule, max over multiply over min 
     ['min', 0.2, 0.4],
     ['multiply', 0.12, 0.32],
     ['max', 0.6, 0.8],
+    ['clampedSum', 0.8, 1],
+    ['geometricMean', Math.sqrt(0.12), Math.sqrt(0.32)],
   ]) {
     const [f, r] = pair(
       { ...values, frictionCombine: rule, restitutionCombine: rule },
@@ -184,6 +186,17 @@ test('combine rules: the pair takes the higher rule, max over multiply over min 
   near(r, 0.32);
   const [plain] = pair({}, {});
   near(plain, 0.5);
+  // The strongest rule decides, as in Rapier: geometricMean over clampedSum over max over multiply over min over average.
+  const order = ['average', 'min', 'multiply', 'max', 'clampedSum', 'geometricMean'],
+    wanted = { average: 0.4, min: 0.2, multiply: 0.12, max: 0.6, clampedSum: 0.8, geometricMean: Math.sqrt(0.12) };
+  for (let a = 0; a < order.length; a++)
+    for (let b = 0; b < order.length; b++) {
+      const [f] = pair({ ...values, frictionCombine: order[a] }, { ...others, frictionCombine: order[b] });
+      near(f, wanted[order[Math.max(a, b)]]);
+    }
+  // A zero on either side gives zero under the geometric mean, and the clamped sum stops at 1.
+  near(pair({ friction: 0, frictionCombine: 'geometricMean' }, { friction: 0.9 })[0], 0);
+  near(pair({ friction: 0.7, frictionCombine: 'clampedSum' }, { friction: 0.9 })[0], 1);
 });
 
 test('counts and values the solver cannot use are refused by name', async () => {

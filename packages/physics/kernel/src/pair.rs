@@ -34,6 +34,20 @@ impl World {
         (low, high)
     }
 
+    /// The box of a collider's shape as if its body stood at `position` turned by `rotation`, with no margin: the body is put
+    /// there for the read and put back, so nothing else sees it. The caller makes the pose of a collider from its own
+    /// (body pose = collider pose less the collider's place in the body).
+    pub fn collider_box_at(&mut self, c: usize, position: V3, rotation: Q) -> (V3, V3) {
+        let body = self.uu(COLLIDER_BODY, c) as usize;
+        let (was_p, was_q) = (self.v(POSITION_X, body), self.q(ROTATION_X, body));
+        self.set_v(POSITION_X, body, position);
+        self.set_q(ROTATION_X, body, rotation);
+        let out = self.collider_box(c);
+        self.set_v(POSITION_X, body, was_p);
+        self.set_q(ROTATION_X, body, was_q);
+        out
+    }
+
     /// Whether two colliders overlap now, whatever their pair says.
     pub fn pair_intersects(&self, a: usize, b: usize) -> bool {
         let (shape_a, shape_b) = (self.meshy_shape(a), self.meshy_shape(b));

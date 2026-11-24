@@ -14,7 +14,7 @@
 // cell with a hit holds the nearest one. A height field's columns need not be evenly spaced, so each boundary is read
 // from its vertex instead of stepping by a fixed width.
 use crate::bvh::STACK;
-use crate::events::groups_meet;
+use crate::events::{groups_meet, wide_meet};
 use crate::hull::Poly;
 use crate::layout::*;
 use crate::math::*;
@@ -40,6 +40,11 @@ pub const ONLY_KINEMATIC: u32 = 64;
 pub const ONLY_FIXED: u32 = 128;
 /// No group test at all, as a Rapier query filter with no groups: every collider passes it, whatever its own groups.
 pub const NO_GROUPS: u32 = 256;
+/// The query's groups are 32 bits wide: the packed word holds the lower 16 of its memberships and filter, and
+/// `World::query_groups_hi` the upper 16 (as COLLIDER_GROUPS_HI does).
+pub const WIDE_GROUPS: u32 = 512;
+/// With WIDE_GROUPS: the query tests by `Or` against a collider that also asks for it (Rapier's `InteractionTestMode::Or`).
+pub const GROUPS_OR: u32 = 1024;
 
 /// A ray's hit: how far along it, and the surface normal there (zero for a start inside a solid shape).
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -478,7 +483,20 @@ impl World {
         let excluded = (fixed && f & EXCLUDE_FIXED != 0) || (kinematic && f & EXCLUDE_KINEMATIC != 0) || (dynamic && f & EXCLUDE_DYNAMIC != 0);
         let only = f & (ONLY_DYNAMIC | ONLY_KINEMATIC | ONLY_FIXED);
         let allowed = only == 0 || (dynamic && f & ONLY_DYNAMIC != 0) || (kinematic && f & ONLY_KINEMATIC != 0) || (fixed && f & ONLY_FIXED != 0);
-        !excluded && allowed && (f & NO_GROUPS != 0 || groups_meet(filter.groups, self.uu(COLLIDER_GROUPS, c)))
+        !excluded && allowed && (f & NO_GROUPS != 0 || self.query_meets(filter, c))
+    }
+
+    /// Whether a query's groups meet collider `c`'s collision groups: the packed words as always, or 32 bits wide with a test mode.
+    #[inline]
+    fn query_meets(&self, filter: &Filter, c: usize) -> bool {
+        if filter.flags & WIDE_GROUPS == 0 {
+            return groups_meet(filter.groups, self.uu(COLLIDER_GROUPS, c));
+        }
+        wide_meet(
+            crate::events::wide_groups(filter.groups, self.query_groups_hi, true),
+            crate::events::wide_groups(self.uu(COLLIDER_GROUPS, c), self.uu(COLLIDER_GROUPS_HI, c), self.uu(COLLIDER_FLAGS, c) & COLLIDER_GROUPS_WIDE != 0),
+            filter.flags & GROUPS_OR != 0 && self.uu(COLLIDER_FLAGS, c) & COLLIDER_GROUPS_OR != 0,
+        )
     }
 
     /// Calls `visit` with each collider a query with `filter` sees, body by body in row order, until it returns false.

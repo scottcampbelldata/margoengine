@@ -444,7 +444,7 @@ fn a_pair_mixes_its_surfaces_by_the_higher_rule() {
         let (_, second) = ball(&mut w, v3(0.0, 0.5, 0.0), true);
         for (c, (value, rule)) in [(first, a), (second, b)] {
             w.set_s(COLLIDER_FRICTION, c as usize, value);
-            w.set_u(COLLIDER_COMBINE, c as usize, rule);
+            w.set_u(COLLIDER_COMBINE, c as usize, combine_bits(rule, COMBINE_AVERAGE));
         }
         w.step(DT);
         w.s(PAIR_FRICTION, 0)
@@ -453,6 +453,13 @@ fn a_pair_mixes_its_surfaces_by_the_higher_rule() {
     assert_eq!(mix((0.2, COMBINE_MIN), (0.6, COMBINE_AVERAGE)), 0.2);
     assert_eq!(mix((0.5, COMBINE_MIN), (0.5, COMBINE_MULTIPLY)), 0.25);
     assert_eq!(mix((0.2, COMBINE_MULTIPLY), (0.6, COMBINE_MAX)), 0.6);
+    // The two newer rules sit above the others, and read as Rapier's docs write them.
+    assert!((mix((0.3, COMBINE_CLAMPED_SUM), (0.4, COMBINE_MAX)) - 0.7).abs() < 1e-6, "clamped sum wins over max: 0.3 + 0.4");
+    assert_eq!(mix((0.8, COMBINE_CLAMPED_SUM), (0.7, COMBINE_AVERAGE)), 1.0, "and the sum stops at 1");
+    assert!((mix((0.2, COMBINE_GEOMETRIC_MEAN), (0.8, COMBINE_CLAMPED_SUM)) - 0.4).abs() < 1e-6, "the geometric mean wins over clamped sum: sqrt(0.16)");
+    assert_eq!(mix((0.0, COMBINE_GEOMETRIC_MEAN), (0.9, COMBINE_AVERAGE)), 0.0, "a zero on either side gives zero");
+    assert_eq!(combine_bits(COMBINE_MAX, COMBINE_MULTIPLY), 3 | (2 << 2));
+    assert_eq!((friction_rule(combine_bits(COMBINE_GEOMETRIC_MEAN, COMBINE_CLAMPED_SUM)), restitution_rule(combine_bits(COMBINE_GEOMETRIC_MEAN, COMBINE_CLAMPED_SUM))), (COMBINE_GEOMETRIC_MEAN, COMBINE_CLAMPED_SUM));
 }
 
 #[test]

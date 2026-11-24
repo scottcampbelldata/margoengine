@@ -1,7 +1,6 @@
 // The narrow phase: for each pair the broad phase found near, one manifold, a set of points that share a normal. One-shot,
 // as Gregorius 2015 sets out: find the touching features, then clip one face against the side planes of the other, so a
 // box resting on a box has all its points from the first frame, with no artificial torque while they gather.
-use crate::events::groups_meet;
 use crate::gjk::{Posed, Segment, epa, gjk};
 use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
@@ -650,7 +649,7 @@ impl World {
                 continue;
             }
             // A pair nothing solves needs to know only that it overlaps.
-            if sensor || verdict == crate::events::PAIR_EVENTS_ONLY || !groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b)) {
+            if sensor || verdict == crate::events::PAIR_EVENTS_ONLY || !self.colliders_meet(a, b, true) {
                 manifold.held_count = 0;
                 manifold.feature = 0;
                 let overlaps = if compound {

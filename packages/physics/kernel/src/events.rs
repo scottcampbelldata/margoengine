@@ -24,7 +24,43 @@ pub fn groups_meet(a: u32, b: u32) -> bool {
     (a >> 16) & b != 0 && (b >> 16) & a != 0
 }
 
+/// The 32-bit memberships and filter of a packed word, and its upper halves when `wide` (see COLLIDER_GROUPS_HI). A packed
+/// word that is not wide holds Rapier's JavaScript 16 + 16 bits, and all ones in it means every one of the 32 groups.
+#[inline(always)]
+pub fn wide_groups(packed: u32, hi: u32, wide: bool) -> (u32, u32) {
+    if wide {
+        ((packed >> 16) | (hi & 0xffff_0000), (packed & 0xffff) | ((hi & 0xffff) << 16))
+    } else if packed == u32::MAX {
+        (u32::MAX, u32::MAX)
+    } else {
+        (packed >> 16, packed & 0xffff)
+    }
+}
+
+/// Rapier's `InteractionGroups::test`: `Or` only when both sides ask for it, in place of `And`.
+#[inline(always)]
+pub fn wide_meet(a: (u32, u32), b: (u32, u32), both_or: bool) -> bool {
+    let (one, other) = (a.0 & b.1 != 0, b.0 & a.1 != 0);
+    if both_or { one || other } else { one && other }
+}
+
 impl World {
+    /// Whether two colliders' collision groups (`solver` false) or solver groups meet, with 32-bit groups and Rapier's test mode.
+    #[inline]
+    pub fn colliders_meet(&self, a: usize, b: usize, solver: bool) -> bool {
+        let (packed, hi, or, wide) = if solver {
+            (COLLIDER_SOLVER_GROUPS, COLLIDER_SOLVER_GROUPS_HI, COLLIDER_SOLVER_OR, COLLIDER_SOLVER_WIDE)
+        } else {
+            (COLLIDER_GROUPS, COLLIDER_GROUPS_HI, COLLIDER_GROUPS_OR, COLLIDER_GROUPS_WIDE)
+        };
+        let (flags_a, flags_b) = (self.uu(COLLIDER_FLAGS, a), self.uu(COLLIDER_FLAGS, b));
+        wide_meet(
+            wide_groups(self.uu(packed, a), self.uu(hi, a), flags_a & wide != 0),
+            wide_groups(self.uu(packed, b), self.uu(hi, b), flags_b & wide != 0),
+            flags_a & flags_b & or != 0,
+        )
+    }
+
     /// The kind of body pair, as the bit `COLLIDER_TYPES` names it.
     #[inline]
     fn pair_type(&self, body_a: usize, body_b: usize) -> u32 {
@@ -69,7 +105,7 @@ impl World {
     pub fn touch_verdict(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> u32 {
         let base = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_OFF == 0
             && (self.flags(body_a) | self.flags(body_b)) & DISABLED == 0
-            && groups_meet(self.uu(COLLIDER_GROUPS, a), self.uu(COLLIDER_GROUPS, b))
+            && self.colliders_meet(a, b, false)
             && !self.joined(body_a, body_b)
             && !self.apart_in_tree(body_a, body_b);
         if !base {
@@ -126,7 +162,7 @@ impl World {
     /// Lists an event: two words, the first collider with what happened in its top bits, then the second. The list holds two
     /// events a pair row, which is all a step can make while whoever reads it clears it after each step: one end for a row
     /// that leaves and one event for the pair that takes its place.
-    fn push_event(&mut self, row: usize, started: bool) {
+    fn push_event(&mut self, row: usize, started: bool, removed: bool) {
         let at = 2 * self.header().events as usize;
         if at + 2 > 4 * self.header().capacity[3] as usize {
             return;
@@ -134,7 +170,7 @@ impl World {
         let (a, b) = (self.uu(PAIR_A, row), self.uu(PAIR_B, row));
         let sensor = (self.uu(COLLIDER_FLAGS, a as usize) | self.uu(COLLIDER_FLAGS, b as usize)) & COLLIDER_SENSOR != 0;
         self.set_u(EVENTS, at, a | if started { EVENT_STARTED } else { 0 } | if sensor { EVENT_SENSOR } else { 0 });
-        self.set_u(EVENTS, at + 1, b);
+        self.set_u(EVENTS, at + 1, b | if removed { EVENT_REMOVED } else { 0 });
         self.header_mut().events += 1;
     }
 
@@ -159,29 +195,35 @@ impl World {
             }
             if now != (flags & PAIR_TOUCHING != 0) {
                 self.set_u(PAIR_FLAGS, row, flags ^ PAIR_TOUCHING);
-                self.push_event(row, now);
+                self.push_event(row, now, false);
             }
         }
     }
 
-    /// A pair leaves the broad phase: it ends if it touched. A pair of a removed collider says nothing, as JS has let go of it.
+    /// A pair leaves the broad phase: it ends if it touched. A pair of a removed collider ended already, when it was removed.
     pub fn pair_ended(&mut self, row: usize) {
         if self.uu(PAIR_FLAGS, row) & PAIR_TOUCHING != 0 {
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             if (self.uu(COLLIDER_STATE, a) | self.uu(COLLIDER_STATE, b)) & REMOVED == 0 {
-                self.push_event(row, false);
+                self.push_event(row, false, false);
             }
         }
     }
 
     /// Everything a collider touches ends now, and wakes: what rested on it has to find out.
     pub(crate) fn end_touches(&mut self, collider: u32) {
+        self.end_touches_as(collider, false);
+    }
+
+    /// Ends what a collider touches, and says so with a stopped event: `removed` marks the stop as the collider's leaving
+    /// the world, as Rapier's `CollisionEventFlags::REMOVED` does.
+    pub(crate) fn end_touches_as(&mut self, collider: u32, removed: bool) {
         let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
         while pair != NONE {
             let row = pair as usize;
             let flags = self.uu(PAIR_FLAGS, row);
             if flags & PAIR_TOUCHING != 0 {
-                self.push_event(row, false);
+                self.push_event(row, false, removed);
             }
             self.set_u(PAIR_FLAGS, row, flags & !(PAIR_TOUCHING | PAIR_OVERLAP));
             let (a, b) = self.pair_bodies(pair);
@@ -196,6 +238,22 @@ impl World {
         let (a, b) = self.pair_bodies(pair);
         self.wake(a as u32);
         self.wake(b as u32);
+    }
+
+    /// A collider is leaving: each pair that touched says so with a stop marked as a removal, and wakes its bodies, as
+    /// Rapier wakes the bodies of a contact pair it removes. The pair's contacts stay for the step that drops it.
+    pub(crate) fn remove_touches(&mut self, collider: u32) {
+        let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
+        while pair != NONE {
+            let row = pair as usize;
+            let flags = self.uu(PAIR_FLAGS, row);
+            if flags & PAIR_TOUCHING != 0 {
+                self.push_event(row, false, true);
+                self.set_u(PAIR_FLAGS, row, flags & !PAIR_TOUCHING);
+                self.wake_pair(pair);
+            }
+            pair = self.next_pair(pair, collider);
+        }
     }
 
     /// Wakes the bodies of every pair a collider touches in: what rests on a collider that goes falls, as Rapier wakes

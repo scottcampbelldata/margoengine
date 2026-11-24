@@ -227,6 +227,12 @@ columns! {
     COLLIDER_FLAGS u32 Collider,
     COLLIDER_GROUPS u32 Collider,
     COLLIDER_SOLVER_GROUPS u32 Collider,
+    // The upper 16 bits of the 32-bit memberships (bits 16 to 31 of this word) and of the 32-bit filter (bits 0 to 15), for
+    // collision groups and for solver groups, read only when COLLIDER_GROUPS_WIDE (or COLLIDER_SOLVER_WIDE) is set: the packed
+    // words above then hold the lower 16 of each. Without it the packed word is Rapier's JavaScript packing, with all ones
+    // meaning every one of the 32 groups (`InteractionGroups::all()`), the default.
+    COLLIDER_GROUPS_HI u32 Collider,
+    COLLIDER_SOLVER_GROUPS_HI u32 Collider,
     // Broad phase. State bits, the next in the pending chain, the first of its pairs.
     COLLIDER_STATE u32 Collider,
     COLLIDER_PENDING u32 Collider,
@@ -700,11 +706,33 @@ pub const EDGE_CONVEX: u32 = 1;
 pub const EDGE_CONCAVE: u32 = 2;
 pub const EDGE_FLAT: u32 = 3;
 
-// How two colliders mix a surface property: a pair takes the larger number of its two.
+// How two colliders mix a surface property: a pair takes the larger number of its two rules. COLLIDER_COMBINE holds the friction
+// rule in bits 0, 1 and 4 and the restitution rule in bits 2, 3 and 5 (the third bit of each came later, so the first two sit
+// where they always did); `friction_rule` and `restitution_rule` read them whole.
 pub const COMBINE_AVERAGE: u32 = 0;
 pub const COMBINE_MIN: u32 = 1;
 pub const COMBINE_MULTIPLY: u32 = 2;
 pub const COMBINE_MAX: u32 = 3;
+pub const COMBINE_CLAMPED_SUM: u32 = 4;
+pub const COMBINE_GEOMETRIC_MEAN: u32 = 5;
+
+/// The friction rule of a COLLIDER_COMBINE word.
+#[inline(always)]
+pub const fn friction_rule(bits: u32) -> u32 {
+    (bits & 3) | ((bits >> 2) & 4)
+}
+
+/// The restitution rule of a COLLIDER_COMBINE word.
+#[inline(always)]
+pub const fn restitution_rule(bits: u32) -> u32 {
+    ((bits >> 2) & 3) | ((bits >> 3) & 4)
+}
+
+/// A COLLIDER_COMBINE word for a friction rule and a restitution rule.
+#[inline(always)]
+pub const fn combine_bits(friction: u32, restitution: u32) -> u32 {
+    (friction & 3) | ((restitution & 3) << 2) | ((friction & 4) << 2) | ((restitution & 4) << 3)
+}
 
 // Bits of the FLAGS column.
 pub const ALIVE: u32 = 1;
@@ -759,6 +787,14 @@ pub const COLLIDER_NO_CONTACT_FILTER: u32 = 1 << 9;
 pub const COLLIDER_NO_INTERSECTION_FILTER: u32 = 1 << 10;
 /// Bit 11 of COLLIDER_FLAGS: the collider's mass properties are the COLLIDER_OWN_ columns, not its shape's at its density.
 pub const COLLIDER_OWN_SOLID: u32 = 1 << 11;
+/// Bits 12 and 13 of COLLIDER_FLAGS: the collider's collision groups, or its solver groups, test by `Or` in place of `And`
+/// (Rapier's `InteractionTestMode`); a pair uses `Or` only when both of its colliders ask for it.
+pub const COLLIDER_GROUPS_OR: u32 = 1 << 12;
+pub const COLLIDER_SOLVER_OR: u32 = 1 << 13;
+/// Bits 14 and 15 of COLLIDER_FLAGS: the collider's collision groups, or its solver groups, are 32 bits wide: the upper
+/// halves are in COLLIDER_GROUPS_HI (or COLLIDER_SOLVER_GROUPS_HI).
+pub const COLLIDER_GROUPS_WIDE: u32 = 1 << 14;
+pub const COLLIDER_SOLVER_WIDE: u32 = 1 << 15;
 pub const TYPES_DEFAULT: u32 = 7;
 
 // Bits of the PAIR_FLAGS column.
@@ -776,6 +812,9 @@ pub const PAIR_IS_PART: u32 = 16;
 pub const EVENT_STARTED: u32 = 1 << 31;
 pub const EVENT_SENSOR: u32 = 1 << 30;
 pub const EVENT_COLLIDER: u32 = (1 << 30) - 1;
+/// The top bit of an event's second word: the stop is because a collider (or its body) was removed, Rapier's
+/// `CollisionEventFlags::REMOVED`. The collider row is the word below it.
+pub const EVENT_REMOVED: u32 = 1 << 31;
 
 // Bits of the COLLIDER_STATE column.
 /// Its ends are in the sorted lists.

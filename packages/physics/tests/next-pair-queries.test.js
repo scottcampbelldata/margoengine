@@ -147,3 +147,47 @@ test('a removed collider is refused by name', () => {
   assert.throws(() => physics.intersectionPair(box, ball), /removed/);
   physics.dispose();
 });
+
+test('a swept box holds the collider at both poses, and a collision box is the box grown by the prediction', () => {
+  const physics = new Physics(null);
+  const body = physics.addBody(null, {
+    type: 'fixed',
+    position: [1, 2, 3],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.25, 1], offset: [0.5, 0, 0] },
+  });
+  physics.step();
+  const [collider] = body.colliders,
+    here = collider.aabb();
+  // The collider stands at (1.5, 2, 3). Moved to (4.5, 2, 3) with no turn the swept box spans both places.
+  const swept = collider.sweptAabb([4.5, 2, 3]);
+  assert.deepEqual(swept.min, here.min, 'the low corner is where it is');
+  assert.ok(
+    Math.abs(swept.max[0] - (4.5 + 0.5)) < 1e-6 && swept.max[1] === here.max[1],
+    `the high corner is where it goes (${swept.max})`,
+  );
+  // A quarter turn about z in place: the half extents (0.5, 0.25) trade places, so the box grows along y and shrinks along x.
+  const quarter = [0, 0, Math.SQRT1_2, Math.SQRT1_2],
+    turned = collider.sweptAabb([1.5, 2, 3], quarter);
+  assert.ok(
+    Math.abs(turned.max[1] - (2 + 0.5)) < 1e-5 && Math.abs(turned.min[1] - (2 - 0.5)) < 1e-5,
+    `grown along y (${turned.min}, ${turned.max})`,
+  );
+  assert.deepEqual(turned.min[0], Math.min(here.min[0], 1.5 - 0.25), 'and the two boxes merge along x');
+  // Nothing moved: the world still holds the collider where it was.
+  assert.deepEqual(collider.aabb(), here);
+  // The collision box adds the world's prediction distance to the box, which holds the skin already.
+  const base = collider.collisionAabb(0);
+  assert.deepEqual(base, here, 'no prediction and no skin: the tight box');
+  const grown = collider.collisionAabb();
+  assert.ok(Math.abs(grown.min[0] - (here.min[0] - physics.kernel.predictionDistance)) < 1e-6);
+  collider.setContactSkin(0.1);
+  assert.ok(Math.abs(collider.aabb().max[2] - (here.max[2] + 0.1)) < 1e-6, 'the skin thickens the shape');
+  assert.ok(
+    Math.abs(collider.collisionAabb(0.05).max[2] - (here.max[2] + 0.15)) < 1e-6,
+    'and the prediction grows the box again',
+  );
+  assert.throws(() => collider.collisionAabb(-1), /0 or more/);
+  assert.throws(() => collider.sweptAabb([0, 0, Number.NaN]), RangeError);
+  assert.throws(() => collider.sweptAabb([0, 0, 0], [0, 0, 0, 2]), /unit quaternion/);
+  physics.dispose();
+});

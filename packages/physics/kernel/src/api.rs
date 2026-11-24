@@ -466,6 +466,13 @@ const QUERY_HITS: usize = 256;
 static mut QUERY: [u32; 8 * QUERY_HITS] = [0; 8 * QUERY_HITS];
 
 /// Where the last query's hits are, for JS to read.
+/// Sets the upper halves of the groups of the next queries that carry the WIDE_GROUPS flag: memberships' bits 16 to 31 in
+/// bits 16 to 31, the filter's in bits 0 to 15.
+#[unsafe(no_mangle)]
+pub extern "C" fn query_groups_hi(hi: u32) {
+    world().query_groups_hi = hi;
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn query_buffer() -> u32 {
     core::ptr::addr_of!(QUERY) as u32
@@ -793,6 +800,19 @@ pub extern "C" fn collider_cast_collider(moving: u32, target: u32, dx: f32, dy: 
 fn collider_alive(c: u32) -> bool {
     let w = world();
     c < w.header().collider_rows && w.uu(COLLIDER_STATE, c as usize) & REMOVED == 0 && w.uu(COLLIDER_STATE, c as usize) & (IN_BROAD | PENDING) != 0
+}
+
+/// The tight box of a collider whose body stood at (x, y, z) turned by the unit quaternion (qx, qy, qz, qw), into the query
+/// buffer as `collider_aabb` writes it. 0 when the collider is gone.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn collider_aabb_at(collider: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> u32 {
+    if !collider_alive(collider) {
+        return 0;
+    }
+    let (low, high) = world().collider_box_at(collider as usize, crate::math::v3(x, y, z), crate::math::Q { x: qx, y: qy, z: qz, w: qw });
+    write_words(0, &[low.x.to_bits(), low.y.to_bits(), low.z.to_bits(), high.x.to_bits(), high.y.to_bits(), high.z.to_bits()]);
+    1
 }
 
 /// The tight box of a collider into the query buffer, six words: low x y z, high x y z. 0 when the collider is gone.

@@ -135,6 +135,7 @@ interface KernelExports extends WebAssembly.Exports {
   collider_aim(collider: number, motion: number): number;
   mesh_end_grid(rows: number, columns: number, flags: number): number;
   mesh_set_cell(collider: number, row: number, column: number, status: number): number;
+  query_groups_hi(hi: number): void;
   mesh_cell(collider: number, row: number, column: number): number;
   mesh_next(rows: number): number;
   voxels_begin(cells: number): number;
@@ -170,6 +171,16 @@ interface KernelExports extends WebAssembly.Exports {
     qw: number,
   ): number;
   collider_aabb(collider: number): number;
+  collider_aabb_at(
+    collider: number,
+    x: number,
+    y: number,
+    z: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+  ): number;
   query_aabb(
     lx: number,
     ly: number,
@@ -319,6 +330,12 @@ export const COLLIDER_MODIFY = 1 << 8;
 /** Bits 9 and 10 of a collider's flags: the pair filter is not asked about solid pairs, or pairs with a sensor, for it. */
 export const COLLIDER_NO_CONTACT_FILTER = 1 << 9;
 export const COLLIDER_NO_INTERSECTION_FILTER = 1 << 10;
+/** Bits 12 and 13 of a collider's flags: its collision groups, or its solver groups, test by `or` (layout.rs COLLIDER_GROUPS_OR). */
+export const COLLIDER_GROUPS_OR = 1 << 12;
+export const COLLIDER_SOLVER_OR = 1 << 13;
+/** Bits 14 and 15 of a collider's flags: its collision groups, or its solver groups, are 32 bits wide (layout.rs COLLIDER_GROUPS_WIDE). */
+export const COLLIDER_GROUPS_WIDE = 1 << 14;
+export const COLLIDER_SOLVER_WIDE = 1 << 15;
 export const COLLIDER_TYPES = 63 << COLLIDER_TYPES_SHIFT;
 /** Bit of the `flags` column: the body is out of the world. */
 export const BODY_DISABLED = 1 << 11;
@@ -330,6 +347,8 @@ export const BODY_NO_GYROSCOPIC = 1 << 16;
 /** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
 export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;
+/** The top bit of an event's second word: the stop is because a collider or its body was removed (layout.rs EVENT_REMOVED). */
+export const EVENT_REMOVED = 0x80000000;
 /** Bit of the `pairFlags` column: a part of a mesh pair, one triangle's manifold. */
 export const PAIR_IS_PART = 16;
 /** Bit of a pair's flags: the pair touched at the end of the last step it was looked at (layout.rs PAIR_TOUCHING). */
@@ -590,7 +609,11 @@ export const QUERY_EXCLUDE_FIXED = 1,
   QUERY_ONLY_KINEMATIC = 64,
   QUERY_ONLY_FIXED = 128,
   /** No group test at all: a query without groups sees every collider, whatever its groups. */
-  QUERY_NO_GROUPS = 256;
+  QUERY_NO_GROUPS = 256,
+  /** The query's groups are 32 bits wide: the upper halves come from `setQueryGroupsHi`. */
+  QUERY_WIDE_GROUPS = 512,
+  /** With QUERY_WIDE_GROUPS: test by `or` against a collider that asks for it too. */
+  QUERY_GROUPS_OR = 1024;
 /** Hits the kernel's query buffer holds at once; `raycastAll` pages through more. */
 const QUERY_HITS = 256;
 /** A query shape of {@link KernelWorld.shapeCast} and {@link KernelWorld.intersectShape}: a convex kernel shape and its
@@ -648,9 +671,23 @@ const CAST_REFUSED =
     'A shape query needs a finite position, a nonzero rotation, a finite nonzero direction, a target distance of 0 or more and a ball, box, capsule, cylinder, cone or hull row; pass those.',
   POINT_REFUSED = 'A point query needs a finite point; pass three finite numbers.';
 
-/** How two colliders mix a value. When their rules differ the pair takes the higher: max, multiply, min, average. */
-export type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
-const combines: readonly KernelCombine[] = ['average', 'min', 'multiply', 'max'];
+/**
+ * How two colliders mix a value, as Rapier's `CoefficientCombineRule`. When their rules differ the pair takes the higher:
+ * geometricMean (the square root of the product, 0 if either is 0), clampedSum (the sum, at most 1), max, multiply, min, average.
+ */
+export type KernelCombine = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
+/** The rules in the order of their codes, the order of their precedence too. */
+export const combines: readonly KernelCombine[] = ['average', 'min', 'multiply', 'max', 'clampedSum', 'geometricMean'];
+
+/**
+ * The COLLIDER_COMBINE word of a friction rule and a restitution rule: each rule's low two bits sit in bits 0 and 1 (friction)
+ * and 2 and 3 (restitution), the third bit of each in bits 4 and 5.
+ */
+export const combineBits = (friction: number, restitution: number): number =>
+  (friction & 3) | ((restitution & 3) << 2) | ((friction & 4) << 2) | ((restitution & 4) << 3);
+/** The friction rule (`restitution` false) or restitution rule of a COLLIDER_COMBINE word. */
+export const combineRule = (bits: number, restitution: boolean): number =>
+  restitution ? ((bits >> 2) & 3) | ((bits >> 3) & 4) : (bits & 3) | ((bits >> 2) & 4);
 
 /** Options of {@link KernelWorld.addCollider}. */
 export interface KernelColliderOptions {
@@ -1334,7 +1371,7 @@ export class KernelWorld {
     const { colliderFriction, colliderRestitution, colliderCombine } = this.columns;
     colliderFriction[row] = friction;
     colliderRestitution[row] = restitution;
-    colliderCombine[row] = frictionRule | (restitutionRule << 2);
+    colliderCombine[row] = combineBits(frictionRule, restitutionRule);
     return row;
   }
   /**
@@ -1426,7 +1463,11 @@ export class KernelWorld {
         links[k][t0 + t] = other < 0 ? 0xffffffff : other;
       }
     }
-    const row = api.mesh_end(count, triangles, (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0) | (deformable ? 8 : 0) | (solid ? 32 : 0));
+    const row = api.mesh_end(
+      count,
+      triangles,
+      (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0) | (deformable ? 8 : 0) | (solid ? 32 : 0),
+    );
     if (row < 0) throw new RangeError(`This trimesh was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
     return row;
@@ -1587,6 +1628,10 @@ export class KernelWorld {
       );
     this.meshRows = row + 1;
     return row;
+  }
+  /** Sets the upper halves of the groups of the next queries that carry QUERY_WIDE_GROUPS. */
+  setQueryGroupsHi(hi: number): void {
+    this.api.query_groups_hi(hi >>> 0);
   }
   /**
    * Sets the status of cell (row, column) of a heightfield collider in place (see {@link KernelHeightfieldOptions.cellStatus}),
@@ -1850,6 +1895,34 @@ export class KernelWorld {
   /**
    * The tight box of a collider's shape at its body's pose, with no margin: `[low, high]`, or null for a collider that is gone.
    */
+  /**
+   * The tight box of a collider as if its body stood at `position` turned by the unit quaternion `rotation`, nothing in the
+   * world moved. Null when the collider is gone.
+   */
+  colliderAabbAt(
+    collider: number,
+    position: readonly number[],
+    rotation: readonly number[],
+  ): [[number, number, number], [number, number, number]] | null {
+    if (
+      !this.api.collider_aabb_at(
+        collider,
+        position[0]!,
+        position[1]!,
+        position[2]!,
+        rotation[0]!,
+        rotation[1]!,
+        rotation[2]!,
+        rotation[3]!,
+      )
+    )
+      return null;
+    const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 6);
+    return [
+      [f[0]!, f[1]!, f[2]!],
+      [f[3]!, f[4]!, f[5]!],
+    ];
+  }
   colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null {
     if (!this.api.collider_aabb(collider)) return null;
     const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 6);

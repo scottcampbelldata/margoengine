@@ -74,7 +74,7 @@ test("a capsule from two end points is the segment grown by a radius, as Rapier'
   );
 });
 
-test("a tetrahedron is the convex hull of its four points, with the volume |det| / 6, and rests as Rapier's hull of them does", () => {
+test("a tetrahedron is the convex hull of its four points, with the volume abs(det) / 6, and rests as Rapier's hull of them does", () => {
   const points = [
     [0, 0, 0],
     [1, 0, 0],

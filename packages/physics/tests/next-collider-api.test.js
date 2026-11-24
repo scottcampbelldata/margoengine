@@ -69,7 +69,13 @@ test('combine rules, border radius and the world pose of a collider read and set
   collider.setFrictionCombineRule('max').setRestitutionCombineRule('min');
   assert.equal(collider.frictionCombineRule(), 'max');
   assert.equal(collider.restitutionCombineRule(), 'min');
+  collider.setFrictionCombineRule('geometricMean').setRestitutionCombineRule('clampedSum');
+  assert.equal(collider.frictionCombineRule(), 'geometricMean');
+  assert.equal(collider.restitutionCombineRule(), 'clampedSum');
+  collider.setFrictionCombineRule('min');
+  assert.equal(collider.restitutionCombineRule(), 'clampedSum', 'setting one rule leaves the other');
   assert.throws(() => collider.setFrictionCombineRule('nonsense'), /combine rule/);
+  collider.setFrictionCombineRule('max').setRestitutionCombineRule('min');
   // A quarter turn about y takes the body's x to its -z: the offset (2, 0, 0) lands at (1, 2, 3 - 2).
   const p = collider.translation();
   near(p.x, 1);

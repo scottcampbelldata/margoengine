@@ -10,8 +10,12 @@ import {
   COLLIDER_TYPES_SHIFT,
   QUERY_NO_GROUPS,
   type KernelWorld,
+  combineBits,
+  combineRule,
+  combines,
 } from './kernel.js';
-import type { CollisionPairKind, CombineRule, ColliderOptions, ShapeOptions } from './shapes.js';
+import type { CollisionPairKind, CombineRule, ColliderOptions, InteractionGroups, ShapeOptions } from './shapes.js';
+import { readGroups, writeGroups } from './groups.js';
 import { meshConnectedComponents, meshHalfEdges, type HalfEdgeTopology } from './mesh-tools.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
@@ -27,7 +31,7 @@ function cell(value: number): number {
   return value;
 }
 
-const COMBINES: readonly CombineRule[] = ['average', 'min', 'multiply', 'max'];
+const COMBINES: readonly CombineRule[] = combines;
 const PAIR_KINDS: readonly CollisionPairKind[] = [
   'dynamicDynamic',
   'dynamicKinematic',
@@ -48,6 +52,28 @@ export function pairKindBits(kinds: readonly CollisionPairKind[]): number {
     wanted |= 1 << at;
   }
   return ((wanted ^ 7) << COLLIDER_TYPES_SHIFT) & COLLIDER_TYPES;
+}
+
+/** Product of two quaternions [x, y, z, w]: `b` first, then `a`. */
+function multiplyQuat(a: Quat, b: Quat): [number, number, number, number] {
+  return [
+    a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+    a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+    a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+    a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+  ];
+}
+
+/** A vector turned by a unit quaternion. */
+function rotateByQuat(q: Quat, v: Vec3): [number, number, number] {
+  const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
+    ty = 2 * (q[2] * v[0] - q[0] * v[2]),
+    tz = 2 * (q[0] * v[1] - q[1] * v[0]);
+  return [
+    v[0] + q[3] * tx + (q[1] * tz - q[2] * ty),
+    v[1] + q[3] * ty + (q[2] * tx - q[0] * tz),
+    v[2] + q[3] * tz + (q[0] * ty - q[1] * tx),
+  ];
 }
 
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
@@ -112,6 +138,61 @@ export class PhysicsCollider {
     return { min: box[0], max: box[1] };
   }
   /**
+   * The box that holds the collider's shape now and at the world pose `nextPosition` and `nextRotation` (default: the pose it
+   * has), as Rapier's `compute_swept_aabb`: the two tight boxes merged. A shape's box between the two poses can be larger than
+   * this when it turns on the way; the box of a straight move is exact.
+   * @throws RangeError for a position or rotation that is not finite, or a rotation that is not a unit quaternion.
+   * @throws MargoError (`state`) for a collider not in the world yet.
+   */
+  sweptAabb(nextPosition: Vec3, nextRotation?: Quat): { min: [number, number, number]; max: [number, number, number] } {
+    checkVec(nextPosition, 'Next position');
+    const c = this.columns(),
+      h = this.handle,
+      now = this.aabb(),
+      body = this.body.row,
+      localQ: Quat = [
+        c.colliderRotationX[h]!,
+        c.colliderRotationY[h]!,
+        c.colliderRotationZ[h]!,
+        c.colliderRotationW[h]!,
+      ],
+      localP: Vec3 = [c.colliderX[h]!, c.colliderY[h]!, c.colliderZ[h]!],
+      current: Quat = [c.rotationX[body]!, c.rotationY[body]!, c.rotationZ[body]!, c.rotationW[body]!],
+      worldQ = nextRotation ?? multiplyQuat(current, localQ);
+    if (worldQ.length !== 4 || !worldQ.every(Number.isFinite) || Math.abs(Math.hypot(...worldQ) - 1) > 1e-3)
+      throw new RangeError('The next rotation is a unit quaternion [x, y, z, w]; pass one.');
+    // The body's pose that puts the collider at the given pose: its turn is the collider's less the collider's own, and its
+    // place the collider's less the collider's offset turned by it.
+    const bodyQ = multiplyQuat(worldQ, [-localQ[0], -localQ[1], -localQ[2], localQ[3]]),
+      offset = rotateByQuat(bodyQ, localP),
+      next = this.kernel.colliderAabbAt(
+        h,
+        [nextPosition[0] - offset[0], nextPosition[1] - offset[1], nextPosition[2] - offset[2]],
+        bodyQ,
+      );
+    if (!next) throw new MargoError('state', 'Collider is not in the world yet; step the world once after adding it.');
+    return {
+      min: [Math.min(now.min[0], next[0][0]), Math.min(now.min[1], next[0][1]), Math.min(now.min[2], next[0][2])],
+      max: [Math.max(now.max[0], next[1][0]), Math.max(now.max[1], next[1][1]), Math.max(now.max[2], next[1][2])],
+    };
+  }
+  /**
+   * The box the collider is held in for contacts, as Rapier's `compute_collision_aabb`: its box (which already holds the contact
+   * skin, as the shape is that much thicker) grown on every side by `prediction` (default the world's prediction distance).
+   * @throws RangeError for a prediction that is negative or not finite.
+   * @throws MargoError (`state`) for a collider not in the world yet.
+   */
+  collisionAabb(prediction?: number): { min: [number, number, number]; max: [number, number, number] } {
+    const margin = prediction ?? this.kernel.predictionDistance;
+    if (!(margin >= 0) || !Number.isFinite(margin))
+      throw new RangeError(`A prediction is 0 or more metres and finite (got ${prediction}); pass a few centimetres.`);
+    const { min, max } = this.aabb();
+    return {
+      min: [min[0] - margin, min[1] - margin, min[2] - margin],
+      max: [max[0] + margin, max[1] + margin, max[2] + margin],
+    };
+  }
+  /**
    * Gives the collider another shape, with its offset and rotation in the body's frame as `options` say (zero and none when
    * it leaves them out). Friction, groups, events and the other settings stay. What it touched ends, and the body's mass is
    * worked out again from its density (`mass` or `density` in `options` replaces it). A compound cannot be made or changed
@@ -140,7 +221,9 @@ export class PhysicsCollider {
   setHalfExtents(halfExtents: Vec3): this {
     checkVec(halfExtents, 'Half extents');
     if (this.shape !== 'box' || !(halfExtents[0] > 0 && halfExtents[1] > 0 && halfExtents[2] > 0))
-      throw new RangeError(`setHalfExtents takes three positive numbers and a box collider (this is a ${this.shape}); pass [x, y, z].`);
+      throw new RangeError(
+        `setHalfExtents takes three positive numbers and a box collider (this is a ${this.shape}); pass [x, y, z].`,
+      );
     return this.setShape({ shape: 'box', halfExtents, borderRadius: this.borderRadius(), ...this.placement() });
   }
   private placement(): { offset: Vec3; rotation: [number, number, number, number] } {
@@ -150,7 +233,9 @@ export class PhysicsCollider {
   }
   private resize(what: 'radius' | 'halfHeight', value: number): this {
     if (!(value > 0) || !Number.isFinite(value))
-      throw new RangeError(`A ${what === 'radius' ? 'radius' : 'half height'} is positive and finite (got ${value}); pass a size in metres.`);
+      throw new RangeError(
+        `A ${what === 'radius' ? 'radius' : 'half height'} is positive and finite (got ${value}); pass a size in metres.`,
+      );
     const place = this.placement();
     switch (this.shape) {
       case 'sphere':
@@ -173,7 +258,9 @@ export class PhysicsCollider {
           ...place,
         });
     }
-    throw new RangeError(`A ${this.shape} collider has no ${what === 'radius' ? 'radius' : 'half height'} to set; use setShape.`);
+    throw new RangeError(
+      `A ${this.shape} collider has no ${what === 'radius' ? 'radius' : 'half height'} to set; use setShape.`,
+    );
   }
   /** Moves the collider in its body's frame, and works the body's mass out again. */
   setTranslationWrtParent(position: Vec3): this {
@@ -374,7 +461,9 @@ export class PhysicsCollider {
         `This mesh has ${count} vertices and setVertices got ${positions.length / 3}; pass one x, y, z per vertex.`,
       );
     if (velocities && velocities.length !== positions.length)
-      throw new RangeError(`setVertices got ${velocities.length / 3} velocities for ${count} vertices; pass one x, y, z each.`);
+      throw new RangeError(
+        `setVertices got ${velocities.length / 3} velocities for ${count} vertices; pass one x, y, z each.`,
+      );
     const dt = this.kernel.stepSeconds,
       target = [columns.meshVertexX, columns.meshVertexY, columns.meshVertexZ],
       speed = (axis: number, i: number): number => (velocities ? velocities[3 * i + axis]! : 0);
@@ -384,7 +473,8 @@ export class PhysicsCollider {
       for (let axis = 0; axis < 3; axis++) {
         const p = positions[3 * i + axis]!,
           v = speed(axis, i);
-        if (!Number.isFinite(p) || !Number.isFinite(v)) throw new RangeError(`Vertex ${i} is not finite; pass finite numbers.`);
+        if (!Number.isFinite(p) || !Number.isFinite(v))
+          throw new RangeError(`Vertex ${i} is not finite; pass finite numbers.`);
         const move = p - target[axis]![first + i]!;
         d += move * move;
       }
@@ -401,7 +491,9 @@ export class PhysicsCollider {
       for (let axis = 0; axis < 3; axis++) {
         const p = positions[3 * i + axis]!;
         target[axis]![first + count + i] = p;
-        target[axis]![first + 2 * count + i] = velocities ? velocities[3 * i + axis]! : (p - target[axis]![first + i]!) / dt;
+        target[axis]![first + 2 * count + i] = velocities
+          ? velocities[3 * i + axis]!
+          : (p - target[axis]![first + i]!) / dt;
       }
     this.kernel.aimCollider(this.handle, reach);
   }
@@ -411,7 +503,10 @@ export class PhysicsCollider {
    */
   connectedComponents(): { component: Uint32Array; count: number } {
     if (!this.data?.reads?.components)
-      throw new MargoError('state', 'This collider was not made with connectedComponents: true on a trimesh; add the option to read its components.');
+      throw new MargoError(
+        'state',
+        'This collider was not made with connectedComponents: true on a trimesh; add the option to read its components.',
+      );
     return meshConnectedComponents(this.data.indices!);
   }
   /**
@@ -420,7 +515,10 @@ export class PhysicsCollider {
    */
   halfEdgeTopology(): HalfEdgeTopology {
     if (!this.data?.reads?.halfEdges)
-      throw new MargoError('state', 'This collider was not made with halfEdgeTopology: true on a trimesh; add the option to read its half edges.');
+      throw new MargoError(
+        'state',
+        'This collider was not made with halfEdgeTopology: true on a trimesh; add the option to read its half edges.',
+      );
     return meshHalfEdges(this.data.indices!);
   }
   /** Triangle indices of a trimesh. */
@@ -547,27 +645,33 @@ export class PhysicsCollider {
   }
   /** The friction combine rule: how this collider's friction mixes with another's (default 'average'; the higher rule of the two decides). */
   frictionCombineRule(): CombineRule {
-    return COMBINES[this.columns().colliderCombine[this.handle] & 3]!;
+    return COMBINES[combineRule(this.columns().colliderCombine[this.handle], false)]!;
   }
   /** Sets the friction combine rule, from the next step on. @throws RangeError for a name that is not a rule. */
   setFrictionCombineRule(rule: CombineRule): this {
     const c = this.columns(),
       at = COMBINES.indexOf(rule);
-    if (at < 0) throw new RangeError(`Unknown combine rule ${String(rule)}; use average, min, multiply or max.`);
-    c.colliderCombine[this.handle] = (c.colliderCombine[this.handle] & ~3) | at;
+    if (at < 0)
+      throw new RangeError(
+        `Unknown combine rule ${String(rule)}; use average, min, multiply, max, clampedSum or geometricMean.`,
+      );
+    c.colliderCombine[this.handle] = combineBits(at, combineRule(c.colliderCombine[this.handle], true));
     this.wake();
     return this;
   }
   /** The restitution combine rule (default 'average'). */
   restitutionCombineRule(): CombineRule {
-    return COMBINES[(this.columns().colliderCombine[this.handle] >> 2) & 3]!;
+    return COMBINES[combineRule(this.columns().colliderCombine[this.handle], true)]!;
   }
   /** Sets the restitution combine rule, from the next step on. @throws RangeError for a name that is not a rule. */
   setRestitutionCombineRule(rule: CombineRule): this {
     const c = this.columns(),
       at = COMBINES.indexOf(rule);
-    if (at < 0) throw new RangeError(`Unknown combine rule ${String(rule)}; use average, min, multiply or max.`);
-    c.colliderCombine[this.handle] = (c.colliderCombine[this.handle] & ~12) | (at << 2);
+    if (at < 0)
+      throw new RangeError(
+        `Unknown combine rule ${String(rule)}; use average, min, multiply, max, clampedSum or geometricMean.`,
+      );
+    c.colliderCombine[this.handle] = combineBits(combineRule(c.colliderCombine[this.handle], false), at);
     this.wake();
     return this;
   }
@@ -612,7 +716,8 @@ export class PhysicsCollider {
   cellStatuses(): Uint8Array {
     const { rows, columns } = this.grid(),
       out = new Uint8Array(rows * columns);
-    for (let c = 0; c < columns; c++) for (let r = 0; r < rows; r++) out[r + rows * c] = this.kernel.cellStatus(this.handle, r, c);
+    for (let c = 0; c < columns; c++)
+      for (let r = 0; r < rows; r++) out[r + rows * c] = this.kernel.cellStatus(this.handle, r, c);
     return out;
   }
   /**
@@ -628,8 +733,17 @@ export class PhysicsCollider {
   }
   private cell(row: number, column: number): void {
     const { rows, columns } = this.grid();
-    if (!Number.isInteger(row) || !Number.isInteger(column) || row < 0 || column < 0 || row >= rows || column >= columns)
-      throw new RangeError(`Cell (${row}, ${column}) is off this ${rows} by ${columns} height field; pass a row below ${rows} and a column below ${columns}.`);
+    if (
+      !Number.isInteger(row) ||
+      !Number.isInteger(column) ||
+      row < 0 ||
+      column < 0 ||
+      row >= rows ||
+      column >= columns
+    )
+      throw new RangeError(
+        `Cell (${row}, ${column}) is off this ${rows} by ${columns} height field; pass a row below ${rows} and a column below ${columns}.`,
+      );
   }
   private grid(): { rows: number; columns: number } {
     if (this.shape !== 'heightfield') throw new RangeError(`A ${this.shape} is no height field; use a heightfield.`);
@@ -672,21 +786,38 @@ export class PhysicsCollider {
   private wake(): void {
     if (this.body.type === 'dynamic') this.kernel.wake(this.body.row);
   }
+  /** The packed collision groups: the lower 16 bits of each side, as Rapier's JavaScript build reads them. */
   collisionGroups(): number {
     return this.columns().colliderGroups[this.handle];
   }
-  /** Packed interaction groups, see `collisionGroups` from this package. */
-  setCollisionGroups(groups: number): this {
-    this.columns().colliderGroups[this.handle] = groups;
+  /** The collision groups 32 bits wide, with their test mode, as Rapier's Rust `InteractionGroups`. */
+  interactionGroups(): InteractionGroups {
+    this.columns();
+    return readGroups(this.kernel, this.handle, false);
+  }
+  /**
+   * Sets the collision groups: a packed number (see `collisionGroups` from this package) or 32 bits wide with a test mode
+   * (see `interactionGroups`).
+   */
+  setCollisionGroups(groups: number | InteractionGroups): this {
+    this.columns();
+    writeGroups(this.kernel, this.handle, groups, false);
     this.reach();
     return this;
   }
+  /** The packed solver groups. */
   solverGroups(): number {
     return this.columns().colliderSolverGroups[this.handle];
   }
-  /** Packed solver groups: pairs whose groups do not meet are detected and fire events, and are not solved. */
-  setSolverGroups(groups: number): this {
-    this.columns().colliderSolverGroups[this.handle] = groups;
+  /** The solver groups 32 bits wide, with their test mode. */
+  solverInteractionGroups(): InteractionGroups {
+    this.columns();
+    return readGroups(this.kernel, this.handle, true);
+  }
+  /** Sets the solver groups, packed or wide: pairs whose groups do not meet are detected and fire events, and are not solved. */
+  setSolverGroups(groups: number | InteractionGroups): this {
+    this.columns();
+    writeGroups(this.kernel, this.handle, groups, true);
     this.reach();
     return this;
   }

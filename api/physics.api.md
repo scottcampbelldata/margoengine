@@ -118,8 +118,8 @@ export interface ColliderSettings {
     mass?: number;
     massless?: boolean;
     sensor?: boolean;
-    collisionGroups?: number;
-    solverGroups?: number;
+    collisionGroups?: number | InteractionGroups;
+    solverGroups?: number | InteractionGroups;
     contactSkin?: number;
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
@@ -152,13 +152,14 @@ export interface CollisionEvent {
     colliderA: PhysicsCollider;
     colliderB: PhysicsCollider;
     sensor: boolean;
+    removed?: boolean;
 }
 
 export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
 
 export type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
 
-export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
+export type CombineRule = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
 export type CompoundPart = ({
     shape: 'box';
@@ -349,6 +350,12 @@ export interface IkTarget {
     rotation?: Quat;
 }
 
+export interface InteractionGroups {
+    readonly memberships: number;
+    readonly filter: number;
+    readonly testMode?: 'and' | 'or';
+}
+
 export interface JointBreakEvent {
     type: 'jointbreak';
     joint: PhysicsJoint;
@@ -427,7 +434,7 @@ export interface KernelColliderOptions {
 
 export type KernelColumn = Float32Array | Uint32Array;
 
-export type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
+export type KernelCombine = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
 export interface KernelContact {
     colliderA: number;
@@ -592,6 +599,7 @@ export class KernelWorld {
     aimCollider(collider: number, motion: number): void;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
+    setQueryGroupsHi(hi: number): void;
     setCellStatus(collider: number, row: number, column: number, status: number): void;
     cellStatus(collider: number, row: number, column: number): number;
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
@@ -605,6 +613,7 @@ export class KernelWorld {
     projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[];
     intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
+    colliderAabbAt(collider: number, position: readonly number[], rotation: readonly number[]): [[number, number, number], [number, number, number]] | null;
     colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null;
     setColliderShape(collider: number, shape: KernelShape, size: readonly number[]): void;
     setColliderBorder(collider: number, border: number): void;
@@ -994,6 +1003,14 @@ export class PhysicsCollider {
         min: [number, number, number];
         max: [number, number, number];
     };
+    sweptAabb(nextPosition: Vec3, nextRotation?: Quat): {
+        min: [number, number, number];
+        max: [number, number, number];
+    };
+    collisionAabb(prediction?: number): {
+        min: [number, number, number];
+        max: [number, number, number];
+    };
     setShape(options: ColliderOptions): this;
     setRadius(radius: number): this;
     setHalfHeight(halfHeight: number): this;
@@ -1098,9 +1115,11 @@ export class PhysicsCollider {
     restitution(): number;
     setRestitution(restitution: number): this;
     collisionGroups(): number;
-    setCollisionGroups(groups: number): this;
+    interactionGroups(): InteractionGroups;
+    setCollisionGroups(groups: number | InteractionGroups): this;
     solverGroups(): number;
-    setSolverGroups(groups: number): this;
+    solverInteractionGroups(): InteractionGroups;
+    setSolverGroups(groups: number | InteractionGroups): this;
     setVoxel(x: number, y: number, z: number, filled: boolean): this;
     combineVoxelStates(other: PhysicsCollider, sx?: number, sy?: number, sz?: number): this;
     propagateVoxelChange(other: PhysicsCollider, x: number, y: number, z: number, sx?: number, sy?: number, sz?: number): this;
@@ -1231,7 +1250,7 @@ export interface PointProjection {
 export type Quat = readonly [number, number, number, number];
 
 export interface QueryFilter {
-    groups?: number;
+    groups?: number | InteractionGroups;
     exclude?: PhysicsBody;
     excludeCollider?: PhysicsCollider;
     excludeSensors?: boolean;
@@ -1491,6 +1510,8 @@ function buildHull(input: ArrayLike<number>): HullFaces;
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
 
 export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float32Array;
+
+export function interactionGroups(memberships?: number | readonly number[], filter?: number | readonly number[], testMode?: 'and' | 'or'): InteractionGroups;
 
 export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;
 

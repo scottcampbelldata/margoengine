@@ -239,7 +239,7 @@ impl World {
     /// Whether two colliders push each other: neither is a sensor and their solver groups meet.
     fn solid_pair(&self, a: usize, b: usize) -> bool {
         (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR == 0
-            && crate::events::groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b))
+            && self.colliders_meet(a, b, true)
     }
     /// How far a turn about its body's centre of mass can move a collider's surface: its reach less a ball's or capsule's
     /// radius, or a cylinder's or cone's border, since a round shape's support along any axis is its core's plus the

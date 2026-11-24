@@ -212,7 +212,7 @@ fn contact_events_begin_on_touching_and_end_on_leaving() {
 }
 
 #[test]
-fn a_teleport_out_of_a_contact_ends_it_and_a_removed_body_says_nothing() {
+fn a_teleport_out_of_a_contact_ends_it_and_a_removed_body_says_it_was_removed() {
     let mut w = world(4);
     floor(&mut w);
     let body = block(&mut w, [0.5, 0.5, 0.5], v3(0.0, 0.5, 0.0), 1.0);
@@ -226,9 +226,32 @@ fn a_teleport_out_of_a_contact_ends_it_and_a_removed_body_says_nothing() {
     let log = events(&mut w);
     assert_eq!(log.len(), 1, "{log:?}");
     assert!(!log[0].2);
-    w.remove_body(other);
+    // The block that stayed on the floor touched it; removing it ends that contact at once, marked as a removal.
+    w.set_pose(body, v3(0.0, 0.5, 0.0), Q::IDENTITY, true);
+    for _ in 0..3 {
+        w.step(DT);
+    }
+    assert_eq!(events(&mut w).len(), 1, "the block is back on the floor");
+    w.remove_body(body);
+    let removed: Vec<(u32, u32, bool)> = (0..w.header().events as usize)
+        .map(|i| (w.uu(EVENTS, 2 * i) & EVENT_COLLIDER, w.uu(EVENTS, 2 * i + 1), w.uu(EVENTS, 2 * i) & EVENT_STARTED != 0))
+        .collect();
+    assert_eq!(removed.len(), 1, "{removed:?}");
+    assert!(!removed[0].2, "a stop");
+    assert!(removed[0].1 & EVENT_REMOVED != 0, "marked as a removal");
+    w.header_mut().events = 0;
     w.step(DT);
-    assert_eq!(events(&mut w).len(), 0);
+    let again = events(&mut w);
+    assert_eq!(again.len(), 0, "and it is not said again: {again:?}");
+    // The other block rests on the floor too: it says it was removed as well. A body that touches nothing says nothing.
+    w.remove_body(other);
+    assert_eq!(w.header().events, 1);
+    w.header_mut().events = 0;
+    let lone = block(&mut w, [0.5, 0.5, 0.5], v3(30.0, 40.0, 0.0), 1.0);
+    w.step(DT);
+    events(&mut w);
+    w.remove_body(lone);
+    assert_eq!(w.header().events, 0);
 }
 
 #[test]

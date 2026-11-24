@@ -1,6 +1,8 @@
 // Debug lines of the own solver, Rapier's debug-render pipeline: colliders, joints, contact points and boxes as line
 // segments to draw with `@margoengine/lines`. It reads the kernel's columns and is not on the step path, so it may use `Math`.
 import type { KernelWorld } from './kernel.js';
+import { readGroups } from './groups.js';
+import type { InteractionGroups } from './shapes.js';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsJoint } from './joints.js';
 import type { PhysicsCollider } from './collider.js';
@@ -57,6 +59,15 @@ const COS = [
 /** Packed groups meet when each one's memberships (high 16 bits) are in the other's filter (low 16). */
 function groupsMeet(a: number, b: number): boolean {
   return ((a >>> 16) & b) !== 0 && ((b >>> 16) & a) !== 0;
+}
+
+/** Whether a query's groups meet a collider's collision groups, as the kernel tests them (`query_meets`). */
+function queryMeets(groups: number | InteractionGroups, world: KernelWorld, row: number): boolean {
+  if (typeof groups === 'number') return groupsMeet(groups >>> 0, world.columns.colliderGroups![row]!);
+  const own = readGroups(world, row, false),
+    one = (groups.memberships & own.filter) !== 0,
+    other = (own.memberships & groups.filter) !== 0;
+  return groups.testMode === 'or' && own.testMode === 'or' ? one || other : one && other;
 }
 
 function rotate(q: Q, v: V): V {
@@ -150,7 +161,7 @@ export function debugLines(
           (kinematic && filter.onlyKinematic) ||
           (type === 'fixed' && filter.onlyFixed)
         )) ||
-      (filter.groups !== undefined && !groupsMeet(filter.groups >>> 0, c.colliderGroups[collider.handle]!)) ||
+      (filter.groups !== undefined && !queryMeets(filter.groups, world, collider.handle)) ||
       (filter.predicate && !filter.predicate(body, collider))
     );
   };

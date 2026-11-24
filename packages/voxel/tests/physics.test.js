@@ -4,7 +4,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
-import { fileURLToPath } from 'node:url';
 import { Physics, PhysicsBody, PhysicsCollider } from '@margoengine/physics';
 import {
   BlockTypes,
@@ -874,8 +873,8 @@ rtest('contacts with blocks raise Physics collision events naming voxels.body an
   steps(physics, 2);
   assert.deepEqual(
     events.splice(0),
-    ['contactend box 0,0,0 mesh', 'contactstart box 0,0,0 voxels'],
-    'and back: a dropped mesh piece ends its contacts too',
+    ['contactend ball 1,0,0 mesh', 'contactend box 0,0,0 mesh', 'contactstart box 0,0,0 voxels'],
+    'and back: the removed ball ends its contact (Rapier fires an end event when a body goes), and a dropped mesh piece ends its contacts too',
   );
   world.setBlock(8, 0, 8, 0);
   world.setBlock(9, 0, 8, 0);

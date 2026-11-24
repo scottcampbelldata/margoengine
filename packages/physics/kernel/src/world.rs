@@ -111,6 +111,9 @@ pub struct World {
     /// Milliseconds the phases of the last step took (see `integrate::PHASES`). Not in the arena: a clock reading is not
     /// part of the world's state, so it never reaches a snapshot or the hash.
     pub timing: [f32; 8],
+    /// The upper halves of the next wide queries' groups (`query::QUERY_WIDE`), set by `query_groups_hi`. Not in the arena: a
+    /// query leaves no state in the world.
+    pub query_groups_hi: u32,
 }
 
 impl World {
@@ -132,6 +135,7 @@ impl World {
             #[cfg(not(target_arch = "wasm32"))]
             modifier: None,
             timing: [0.0; 8],
+            query_groups_hi: 0,
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);
@@ -338,8 +342,9 @@ impl World {
     /// costs one pass over the lists.
     fn retire_collider(&mut self, collider: u32) {
         let at = collider as usize;
-        // What it held up or pushed wakes now, while its pairs still name its body.
-        self.wake_touching_pairs(collider);
+        // What it touched ends with a stop marked as a removal, and what it held up or pushed wakes, while its pairs still name
+        // its body. Its pairs keep their contacts until the next step drops them with the collider.
+        self.remove_touches(collider);
         // A compound's children go with it: rows off the broad phase, so the next step only frees them.
         if unsafe { *self.u(COLLIDER_SHAPE).add(at) } == SHAPE_COMPOUND {
             let mut child = unsafe { *self.u(COLLIDER_HULL).add(at) };
@@ -430,6 +435,8 @@ impl World {
             *self.u(COLLIDER_COMBINE).add(at) = 0;
             *self.u(COLLIDER_GROUPS).add(at) = u32::MAX;
             *self.u(COLLIDER_SOLVER_GROUPS).add(at) = u32::MAX;
+            *self.u(COLLIDER_GROUPS_HI).add(at) = 0;
+            *self.u(COLLIDER_SOLVER_GROUPS_HI).add(at) = 0;
             *self.u(COLLIDER_PAIRS).add(at) = NONE;
             // At the end of the body's chain, so colliders add up in the order they were given.
             *self.u(COLLIDER_NEXT).add(at) = NONE;

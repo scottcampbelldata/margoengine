@@ -2803,6 +2803,7 @@
     "exports": [
       "CharacterController",
       "ContactModification",
+      "HeightfieldCell",
       "KernelWorld",
       "Multibody",
       "Physics",
@@ -2818,6 +2819,7 @@
       "convexHull",
       "eulerToQuat",
       "geometryPositions",
+      "interactionGroups",
       "loadKernel",
       "meshConnectedComponents",
       "meshHalfEdges",

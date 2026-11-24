@@ -206,7 +206,7 @@ impl World {
         self.set_s(SOLVE_INERTIA_ZZ, at, inertia.zz);
     }
 
-    /// Mixes one property of two colliders: a pair takes the higher rule of its two, Max over Multiply over Min over Average.
+    /// Mixes one property of two colliders: a pair takes the higher rule of its two: GeometricMean over ClampedSum over Max over Multiply over Min over Average.
     fn combine(a: f32, b: f32, rule: u32) -> f32 {
         match rule {
             COMBINE_MAX => {
@@ -214,6 +214,20 @@ impl World {
                     a
                 } else {
                     b
+                }
+            }
+            COMBINE_GEOMETRIC_MEAN => {
+                let product = a * b;
+                if product > 0.0 { sqrt(product) } else { 0.0 }
+            }
+            COMBINE_CLAMPED_SUM => {
+                let sum = a + b;
+                if sum > 1.0 {
+                    1.0
+                } else if sum > 0.0 {
+                    sum
+                } else {
+                    0.0
                 }
             }
             COMBINE_MULTIPLY => a * b,
@@ -251,8 +265,8 @@ impl World {
             let (first, second) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             let (rules_a, rules_b) = (self.uu(COLLIDER_COMBINE, first), self.uu(COLLIDER_COMBINE, second));
             let higher = |x: u32, y: u32| if x > y { x } else { y };
-            let friction = Self::combine(self.s(COLLIDER_FRICTION, first), self.s(COLLIDER_FRICTION, second), higher(rules_a & 3, rules_b & 3));
-            let bounce = Self::combine(self.s(COLLIDER_RESTITUTION, first), self.s(COLLIDER_RESTITUTION, second), higher(rules_a >> 2 & 3, rules_b >> 2 & 3));
+            let friction = Self::combine(self.s(COLLIDER_FRICTION, first), self.s(COLLIDER_FRICTION, second), higher(friction_rule(rules_a), friction_rule(rules_b)));
+            let bounce = Self::combine(self.s(COLLIDER_RESTITUTION, first), self.s(COLLIDER_RESTITUTION, second), higher(restitution_rule(rules_a), restitution_rule(rules_b)));
             self.set_s(PAIR_FRICTION, row, friction);
             self.set_s(PAIR_RESTITUTION, row, bounce);
             self.set_v(PAIR_SURFACE_X, row, self.moving_surface(row, first, second));

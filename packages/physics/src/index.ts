@@ -41,7 +41,8 @@ export type {
   CharacterMoveFilter,
   CharacterMoveResult,
 } from './character.js';
-export { collisionGroups, geometryPositions, HeightfieldCell } from './shapes.js';
+export { collisionGroups, geometryPositions, HeightfieldCell, interactionGroups } from './shapes.js';
+export type { InteractionGroups } from './shapes.js';
 export type {
   CollisionPairKind,
   ShapeOptions,

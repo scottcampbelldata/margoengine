@@ -450,8 +450,8 @@ interface ColliderSettings {
     mass?: number;
     massless?: boolean;
     sensor?: boolean;
-    collisionGroups?: number;
-    solverGroups?: number;
+    collisionGroups?: number | InteractionGroups;
+    solverGroups?: number | InteractionGroups;
     contactSkin?: number;
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
@@ -484,6 +484,7 @@ interface CollisionEvent {
     colliderA: PhysicsCollider;
     colliderB: PhysicsCollider;
     sensor: boolean;
+    removed?: boolean;
 }
 
 type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
@@ -492,7 +493,7 @@ type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' 
 
 type Columns = Record<string, Float32Array>;
 
-type CombineRule = 'average' | 'min' | 'multiply' | 'max';
+type CombineRule = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
 type CompoundPart = ({
     shape: 'box';
@@ -667,6 +668,12 @@ interface IkTarget {
     rotation?: Quat;
 }
 
+interface InteractionGroups {
+    readonly memberships: number;
+    readonly filter: number;
+    readonly testMode?: 'and' | 'or';
+}
+
 interface JointBase {
     anchorA?: Vec3;
     anchorB?: Vec3;
@@ -773,7 +780,7 @@ interface KernelColliderOptions {
 
 type KernelColumn = Float32Array | Uint32Array;
 
-type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
+type KernelCombine = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
 interface KernelCompoundPart {
     shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
@@ -977,6 +984,7 @@ class KernelWorld {
     aimCollider(collider: number, motion: number): void;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
+    setQueryGroupsHi(hi: number): void;
     setCellStatus(collider: number, row: number, column: number, status: number): void;
     cellStatus(collider: number, row: number, column: number): number;
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
@@ -990,6 +998,7 @@ class KernelWorld {
     projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[];
     intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
+    colliderAabbAt(collider: number, position: readonly number[], rotation: readonly number[]): [[number, number, number], [number, number, number]] | null;
     colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null;
     setColliderShape(collider: number, shape: KernelShape, size: readonly number[]): void;
     setColliderBorder(collider: number, border: number): void;
@@ -1383,6 +1392,14 @@ class PhysicsCollider {
         min: [number, number, number];
         max: [number, number, number];
     };
+    sweptAabb(nextPosition: Vec3, nextRotation?: Quat): {
+        min: [number, number, number];
+        max: [number, number, number];
+    };
+    collisionAabb(prediction?: number): {
+        min: [number, number, number];
+        max: [number, number, number];
+    };
     setShape(options: ColliderOptions): this;
     setRadius(radius: number): this;
     setHalfHeight(halfHeight: number): this;
@@ -1487,9 +1504,11 @@ class PhysicsCollider {
     restitution(): number;
     setRestitution(restitution: number): this;
     collisionGroups(): number;
-    setCollisionGroups(groups: number): this;
+    interactionGroups(): InteractionGroups;
+    setCollisionGroups(groups: number | InteractionGroups): this;
     solverGroups(): number;
-    setSolverGroups(groups: number): this;
+    solverInteractionGroups(): InteractionGroups;
+    setSolverGroups(groups: number | InteractionGroups): this;
     setVoxel(x: number, y: number, z: number, filled: boolean): this;
     combineVoxelStates(other: PhysicsCollider, sx?: number, sy?: number, sz?: number): this;
     propagateVoxelChange(other: PhysicsCollider, x: number, y: number, z: number, sx?: number, sy?: number, sz?: number): this;
@@ -1601,7 +1620,7 @@ interface PointProjection {
 type Quat = readonly [number, number, number, number];
 
 interface QueryFilter {
-    groups?: number;
+    groups?: number | InteractionGroups;
     exclude?: PhysicsBody;
     excludeCollider?: PhysicsCollider;
     excludeSensors?: boolean;

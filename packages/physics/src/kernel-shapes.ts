@@ -323,7 +323,9 @@ export function kernelCollider(
     parts: KernelCompoundPart[] | undefined,
     voxels: number | undefined,
     segment: { middle: Vec3; rotation: Quat4 } | undefined,
-    data: { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } } | undefined,
+    data:
+      | { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } }
+      | undefined,
     border = 0;
   const surface =
     options.shape === 'segment' ||
@@ -418,13 +420,17 @@ export function kernelCollider(
           b = 3 * meshIndices[t + 1]!,
           c = 3 * meshIndices[t + 2]!;
         enclosed +=
-          (meshVertices[a]! * (meshVertices[b + 1]! * meshVertices[c + 2]! - meshVertices[b + 2]! * meshVertices[c + 1]!) +
+          (meshVertices[a]! *
+            (meshVertices[b + 1]! * meshVertices[c + 2]! - meshVertices[b + 2]! * meshVertices[c + 1]!) +
             meshVertices[a + 1]! * (meshVertices[b + 2]! * meshVertices[c]! - meshVertices[b]! * meshVertices[c + 2]!) +
-            meshVertices[a + 2]! * (meshVertices[b]! * meshVertices[c + 1]! - meshVertices[b + 1]! * meshVertices[c]!)) /
+            meshVertices[a + 2]! *
+              (meshVertices[b]! * meshVertices[c + 1]! - meshVertices[b + 1]! * meshVertices[c]!)) /
           6;
       }
       if (!(enclosed > 0))
-        throw new RangeError('A trimesh with a mass or a density must be wound outwards (counter-clockwise seen from outside); this one encloses no volume, so flip its triangles.');
+        throw new RangeError(
+          'A trimesh with a mass or a density must be wound outwards (counter-clockwise seen from outside); this one encloses no volume, so flip its triangles.',
+        );
       voxels = enclosed;
     }
     size = [
@@ -674,12 +680,24 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
   if (options.shape === 'capsule') {
     if ('a' in options) {
       const frame = segmentFrame(options.a, options.b, 'Capsule');
-      return { shape: 'capsule', size: [options.radius, frame.half], placed: { offset: frame.middle, turn: frame.rotation } };
+      return {
+        shape: 'capsule',
+        size: [options.radius, frame.half],
+        placed: { offset: frame.middle, turn: frame.rotation },
+      };
     }
     if (options.axis === 'x')
-      return { shape: 'capsule', size: [options.radius, options.halfHeight], placed: { offset: [0, 0, 0], turn: [0, 0, -HALF_ROOT, HALF_ROOT] } };
+      return {
+        shape: 'capsule',
+        size: [options.radius, options.halfHeight],
+        placed: { offset: [0, 0, 0], turn: [0, 0, -HALF_ROOT, HALF_ROOT] },
+      };
     if (options.axis === 'z')
-      return { shape: 'capsule', size: [options.radius, options.halfHeight], placed: { offset: [0, 0, 0], turn: [HALF_ROOT, 0, 0, HALF_ROOT] } };
+      return {
+        shape: 'capsule',
+        size: [options.radius, options.halfHeight],
+        placed: { offset: [0, 0, 0], turn: [HALF_ROOT, 0, 0, HALF_ROOT] },
+      };
     return { shape: 'capsule', size: [options.radius, options.halfHeight] };
   }
   if (options.shape === 'cylinder' || options.shape === 'cone')

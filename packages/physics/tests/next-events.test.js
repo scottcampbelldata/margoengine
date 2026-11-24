@@ -289,3 +289,81 @@ test('a collider made enabled: false joins switched off', () => {
   assert.ok(body.position[1] < -1);
   physics.dispose();
 });
+
+test('removing a body or a collider that touched ends the contact with an end event marked as removed', () => {
+  const physics = new Physics(null),
+    log = listen(physics);
+  ground(physics);
+  const crate = physics.addBody(null, {
+      position: [0, 0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    }),
+    sensor = physics.addBody(null, {
+      type: 'fixed',
+      position: [6, 0.5, 0],
+      colliders: { shape: 'box', halfExtents: [1, 1, 1], sensor: true },
+    }),
+    ball = physics.addBody(null, { position: [6, 0.5, 0], colliders: { shape: 'sphere', radius: 0.2 } });
+  run(physics, 1);
+  assert.deepEqual(
+    log.map((event) => event.type).sort(),
+    ['contactstart', 'contactstart', 'intersectionstart'],
+    'the crate and the ball landed, and the ball is in the sensor',
+  );
+  log.length = 0;
+  physics.removeBody(crate);
+  assert.equal(log.length, 0, 'nothing is delivered until the next step, as in Rapier');
+  physics.removeBody(sensor);
+  physics.step();
+  const ends = log.filter((event) => event.type.endsWith('end'));
+  assert.deepEqual(ends.map((event) => event.type).sort(), ['contactend', 'intersectionend']);
+  assert.ok(
+    ends.every((event) => event.removed === true),
+    'each is marked as a removal',
+  );
+  assert.ok(
+    ends.every((event) => event.colliderA && event.colliderB && event.bodyA && event.bodyB),
+    'and still names both colliders',
+  );
+  log.length = 0;
+  run(physics, 1);
+  assert.equal(log.filter((event) => event.type.endsWith('end')).length, 0, 'and says nothing again');
+  // Removing a collider alone does the same, and a pair that was apart says nothing.
+  const lone = physics.addBody(null, {
+    position: [10, 0.5, 0],
+    colliders: [
+      { shape: 'sphere', radius: 0.5 },
+      { shape: 'sphere', radius: 0.2, offset: [0, 5, 0] },
+    ],
+  });
+  run(physics, 1);
+  log.length = 0;
+  lone.removeCollider(lone.colliders[1]);
+  physics.step();
+  assert.equal(log.length, 0, 'a collider that touched nothing ends nothing');
+  lone.removeCollider(lone.colliders[0]);
+  physics.step();
+  assert.equal(
+    log.filter((event) => event.type === 'contactend' && event.removed).length,
+    1,
+    'but the one on the ground does',
+  );
+  assert.ok(ball.valid !== false);
+  physics.dispose();
+});
+
+test('a normal end event is not marked as removed', () => {
+  const physics = new Physics(null),
+    log = listen(physics);
+  ground(physics);
+  const crate = physics.addBody(null, {
+    position: [0, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
+  run(physics, 1);
+  crate.setPosition([0, 20, 0]);
+  physics.step();
+  const end = log.find((event) => event.type === 'contactend');
+  assert.ok(end && end.removed === undefined);
+  physics.dispose();
+});

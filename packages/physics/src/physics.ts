@@ -8,6 +8,7 @@ import {
   COLLIDER_MODIFY,
   COLLIDER_SENSOR,
   EVENT_COLLIDER,
+  EVENT_REMOVED,
   EVENT_SENSOR,
   KernelWorld,
   loadKernel,
@@ -20,6 +21,8 @@ import {
   QUERY_EXCLUDE_SOLIDS,
   QUERY_ONLY_DYNAMIC,
   QUERY_NO_GROUPS,
+  QUERY_WIDE_GROUPS,
+  QUERY_GROUPS_OR,
   QUERY_ONLY_FIXED,
   QUERY_ONLY_KINEMATIC,
   type KernelRayHit,
@@ -30,14 +33,18 @@ import {
   type KernelSolverOptions,
   type KernelParticleViews,
   type KernelSoftContacts,
+  combineRule,
 } from './kernel.js';
+import { mixCoefficients } from './combine.js';
+import { writeGroups } from './groups.js';
+import { groupWords } from './shapes.js';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import { matrixRotation, worldMatrix } from './transform.js';
 import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
 import { colliderGeometry } from './mesh-fit.js';
-import type { ColliderOptions, ColliderSettings, ShapeOptions } from './shapes.js';
+import type { ColliderOptions, ColliderSettings, InteractionGroups, ShapeOptions } from './shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider, featureAt, type Feature, type FeatureType } from './collider.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
@@ -216,6 +223,11 @@ export interface CollisionEvent {
   colliderB: PhysicsCollider;
   /** True when either collider is a sensor (intersection events). */
   sensor: boolean;
+  /**
+   * True on an end event that came because a collider, or its body, was removed (Rapier's `CollisionEventFlags::REMOVED`).
+   * It is delivered at the end of the next step.
+   */
+  removed?: boolean;
 }
 
 /** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
@@ -278,8 +290,11 @@ export interface JointBreakEvent {
 
 /** Which colliders a scene query sees: the root entry's names, plus Rapier's flags the root does not name. */
 export interface QueryFilter {
-  /** Packed interaction groups of the query, see `collisionGroups`; a collider is seen when the groups meet both ways. */
-  groups?: number;
+  /**
+   * Interaction groups of the query: packed (see `collisionGroups`), or 32 bits wide with a test mode (see `interactionGroups`); a
+   * collider is seen when the groups meet, both ways for `and` and either way for `or` against a collider that asks for it too.
+   */
+  groups?: number | InteractionGroups;
   /** Leave out every collider of this body. */
   exclude?: PhysicsBody;
   /** Leave out this one collider. */
@@ -472,9 +487,14 @@ export class Physics implements EnginePlugin, BodyOwner {
     addTrimesh: (vertices, indices, fixInternalEdges, oriented, deformable, solid) =>
       this.kernel.addTrimesh(vertices, indices, { fixInternalEdges, oriented, deformable, solid }),
     addHeightfield: (rows, columns, heights, scale, fixInternalEdges, cellStatus) =>
-      this.kernel.addHeightfield(rows, columns, heights, [scale[0], scale[1], scale[2]], { fixInternalEdges, cellStatus }),
+      this.kernel.addHeightfield(rows, columns, heights, [scale[0], scale[1], scale[2]], {
+        fixInternalEdges,
+        cellStatus,
+      }),
     addVoxels: (cells, size) => this.kernel.addVoxels(cells, [size[0], size[1], size[2]]),
   };
+  /** Colliders removed since the last step's events: a stop marked `removed` still names them. */
+  private readonly retired = new Map<number, PhysicsCollider>();
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
   // Gathered into a reused array; a step run from inside a listener gathers into its own.
@@ -784,8 +804,9 @@ export class Physics implements EnginePlugin, BodyOwner {
       count = kernel.eventCount;
     for (let i = 0; i < count; i++) {
       const first = words[2 * i],
-        colliderA = this.byRow.get(first & EVENT_COLLIDER),
-        colliderB = this.byRow.get(words[2 * i + 1]);
+        colliderA = this.byRow.get(first & EVENT_COLLIDER) ?? this.retired.get(first & EVENT_COLLIDER),
+        colliderB =
+          this.byRow.get(words[2 * i + 1] & EVENT_COLLIDER) ?? this.retired.get(words[2 * i + 1] & EVENT_COLLIDER);
       if (!colliderA || !colliderB || !(colliderA.emits || colliderB.emits)) continue;
       const sensor = (first & EVENT_SENSOR) !== 0,
         started = first >>> 31 !== 0,
@@ -800,8 +821,10 @@ export class Physics implements EnginePlugin, BodyOwner {
         colliderA,
         colliderB,
         sensor,
+        ...(words[2 * i + 1] & EVENT_REMOVED ? { removed: true } : {}),
       });
     }
+    this.retired.clear();
     kernel.clearEvents();
   }
   private gatherForces(events: (CollisionEvent | ContactForceEvent)[], dt: number): void {
@@ -1009,8 +1032,8 @@ export class Physics implements EnginePlugin, BodyOwner {
         ? this.kernel.addCompound(body.row, parts, placed)
         : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
       collider = new PhysicsCollider(this.kernel, row, body, name);
-    if (options.collisionGroups !== undefined) this.kernel.columns.colliderGroups[row] = options.collisionGroups;
-    if (options.solverGroups !== undefined) this.kernel.columns.colliderSolverGroups[row] = options.solverGroups;
+    if (options.collisionGroups !== undefined) writeGroups(this.kernel, row, options.collisionGroups, false);
+    if (options.solverGroups !== undefined) writeGroups(this.kernel, row, options.solverGroups, true);
     if (options.sensor || options.enabled === false)
       this.kernel.setColliderState(
         row,
@@ -1081,6 +1104,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
     body.colliders.splice(index, 1);
     this.byRow.delete(collider.handle);
+    this.retired.set(collider.handle, collider);
     this.kernel.removeCollider(collider.handle);
     collider.markRemoved();
   }
@@ -1093,7 +1117,10 @@ export class Physics implements EnginePlugin, BodyOwner {
       if (multibody.root === body || multibody.links.some((link) => link.body === body))
         this.removeMultibody(multibody);
     for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
-    for (const collider of body.colliders) this.byRow.delete(collider.handle);
+    for (const collider of body.colliders) {
+      this.byRow.delete(collider.handle);
+      this.retired.set(collider.handle, collider);
+    }
     this.bodies.delete(body);
     this.byBodyRow.delete(body.row);
     this.followers.delete(body);
@@ -1331,7 +1358,14 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (filter.onlyKinematic) flags |= QUERY_ONLY_KINEMATIC;
     if (filter.onlyFixed) flags |= QUERY_ONLY_FIXED;
     if (filter.groups === undefined) flags |= QUERY_NO_GROUPS;
-    const groups = filter.groups === undefined ? 0xffffffff : filter.groups >>> 0;
+    let groups = 0xffffffff;
+    if (typeof filter.groups === 'number') groups = filter.groups >>> 0;
+    else if (filter.groups) {
+      const words = groupWords(filter.groups);
+      groups = words.packed;
+      flags |= QUERY_WIDE_GROUPS | (words.or ? QUERY_GROUPS_OR : 0);
+      this.kernel.setQueryGroupsHi(words.hi);
+    }
     const collider = filter.excludeCollider ? filter.excludeCollider.handle : NONE;
     const body = filter.exclude ? filter.exclude.row : NONE;
     return [flags, groups, collider, body];
@@ -1634,12 +1668,11 @@ export class Physics implements EnginePlugin, BodyOwner {
   private mixed(a: number, b: number, restitution: boolean): number {
     const c = this.kernel.columns,
       values = restitution ? c.colliderRestitution : c.colliderFriction,
-      shift = restitution ? 2 : 0,
-      ruleA = (c.colliderCombine[a] >> shift) & 3,
-      ruleB = (c.colliderCombine[b] >> shift) & 3,
+      ruleA = combineRule(c.colliderCombine[a], restitution),
+      ruleB = combineRule(c.colliderCombine[b], restitution),
       rule = ruleA > ruleB ? ruleA : ruleB,
       [x, y] = [values[a], values[b]];
-    return rule === 1 ? (x < y ? x : y) : rule === 2 ? x * y : rule === 3 ? (x > y ? x : y) : (x + y) / 2;
+    return mixCoefficients(x, y, rule);
   }
   /**
    * Whether two colliders overlap now, whether or not their bodies touch in the world. Sensors count.

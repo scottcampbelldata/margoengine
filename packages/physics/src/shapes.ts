@@ -175,7 +175,7 @@ const _ZERO = { x: 0, y: 0, z: 0 },
 const _CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'];
 
 /** How two colliders combine their friction or restitution values. */
-export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
+export type CombineRule = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
 /**
  * A kind of body pair a collider can take part in, Rapier's `ActiveCollisionTypes`. A pair of colliders is made when both
@@ -212,10 +212,10 @@ export interface ColliderSettings {
   massless?: boolean;
   /** Sensors detect overlaps (intersection events) and produce no contact forces. */
   sensor?: boolean;
-  /** Packed 32-bit interaction groups, see `collisionGroups`. */
-  collisionGroups?: number;
-  /** Packed 32-bit solver groups: which pairs generate contact forces (contacts still detected). */
-  solverGroups?: number;
+  /** Interaction groups: packed 16 + 16 bits (see `collisionGroups`) or 32 bits wide with a test mode (see `interactionGroups`). */
+  collisionGroups?: number | InteractionGroups;
+  /** Solver groups, packed or wide: which pairs generate contact forces (contacts still detected). */
+  solverGroups?: number | InteractionGroups;
   /**
    * A skin around the shape in metres (default 0), Rapier's contact skin: contacts are made and solved as if the shape were
    * this much thicker, so a body rests a skin above what it lies on, and starts touching a skin away. Two colliders'
@@ -285,6 +285,69 @@ export function collisionGroups(
     return bits;
   };
   return ((mask(memberships) << 16) | mask(filter)) >>> 0;
+}
+
+/**
+ * Interaction groups 32 bits wide with a test mode, as the Rust `InteractionGroups` of Rapier: `memberships` and `filter` are
+ * masks of up to 32 groups. Two colliders meet when each one's memberships share a bit with the other's filter (`'and'`, the
+ * default), or when either's do (`'or'`, used only when both colliders ask for it; a mixed pair tests by `'and'`).
+ */
+export interface InteractionGroups {
+  readonly memberships: number;
+  readonly filter: number;
+  readonly testMode?: 'and' | 'or';
+}
+
+/**
+ * Makes interaction groups from masks or lists of group indices 0..31. {@link collisionGroups} packs 16 groups a side into one
+ * number, as Rapier's JavaScript build does; this keeps 32 and the test mode.
+ * @throws RangeError for a mask that is not an integer from 0 to 4,294,967,295, an index outside 0..31 or a test mode that is not `and` or `or`.
+ */
+export function interactionGroups(
+  memberships: number | readonly number[] = 0xffffffff,
+  filter: number | readonly number[] = 0xffffffff,
+  testMode: 'and' | 'or' = 'and',
+): InteractionGroups {
+  const mask = (value: number | readonly number[]): number => {
+    if (typeof value === 'number') {
+      if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
+        throw new RangeError(
+          'A group mask must be an integer from 0 to 4294967295; pass a 32-bit mask or an array of group indices.',
+        );
+      return value;
+    }
+    let bits = 0;
+    for (const group of value) {
+      if (!Number.isInteger(group) || group < 0 || group > 31)
+        throw new RangeError('Group indices must be integers from 0 to 31; use one of the 32 groups.');
+      bits = (bits | (1 << group)) >>> 0;
+    }
+    return bits;
+  };
+  if (testMode !== 'and' && testMode !== 'or')
+    throw new RangeError(`Unknown test mode ${String(testMode)}; use 'and' or 'or'.`);
+  return Object.freeze({ memberships: mask(memberships), filter: mask(filter), testMode });
+}
+
+/**
+ * The words a collider's columns hold for groups: the packed lower 16 bits of each side, the upper halves, and whether the
+ * test is `or`. A packed number (`collisionGroups`) has no upper halves: 0, so a 16-bit group never meets a 32-bit one by
+ * a bit it does not have.
+ */
+export function groupWords(groups: number | InteractionGroups): {
+  packed: number;
+  hi: number;
+  or: boolean;
+  wide: boolean;
+} {
+  if (typeof groups === 'number') return { packed: groups >>> 0, hi: 0, or: false, wide: false };
+  const { memberships, filter } = interactionGroups(groups.memberships, groups.filter, groups.testMode);
+  return {
+    packed: (((memberships & 0xffff) << 16) | (filter & 0xffff)) >>> 0,
+    hi: ((memberships & 0xffff0000) | (filter >>> 16)) >>> 0,
+    or: groups.testMode === 'or',
+    wide: true,
+  };
 }
 
 const _positive = (value: unknown, label: string): number => {

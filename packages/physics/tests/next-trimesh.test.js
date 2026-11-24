@@ -190,7 +190,9 @@ test('a restored world takes only the hull and mesh rows it holds', () => {
 const cube = (lo, hi) => {
   const v = [];
   for (let i = 0; i < 8; i++) v.push(i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]);
-  const f = [0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5];
+  const f = [
+    0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5,
+  ];
   return { vertices: v, indices: f };
 };
 
@@ -209,16 +211,28 @@ test('a closed trimesh has the mass, centre and inertia of the box it encloses, 
   assert.ok(Math.abs(mesh.colliders[0].volume() - volume) < 1e-4, `volume ${mesh.colliders[0].volume()}`);
   assert.ok(Math.abs(mesh.mass - 500 * volume) < 0.5, `mass ${mesh.mass}`);
   // The centre of mass is the middle of the box, in the body's frame; the inertia is the box's.
-  for (let k = 0; k < 3; k++) assert.ok(Math.abs(mesh.centerOfMass[k] - (lo[k] + hi[k]) / 2) < 1e-4, `centre ${mesh.centerOfMass}`);
-  for (let k = 0; k < 3; k++) assert.ok(Math.abs(mesh.principalInertia[k] / reference.principalInertia[k] - 1) < 2e-3, `inertia ${mesh.principalInertia} against ${reference.principalInertia}`);
+  for (let k = 0; k < 3; k++)
+    assert.ok(Math.abs(mesh.centerOfMass[k] - (lo[k] + hi[k]) / 2) < 1e-4, `centre ${mesh.centerOfMass}`);
+  for (let k = 0; k < 3; k++)
+    assert.ok(
+      Math.abs(mesh.principalInertia[k] / reference.principalInertia[k] - 1) < 2e-3,
+      `inertia ${mesh.principalInertia} against ${reference.principalInertia}`,
+    );
   // A mass given sets the density from the volume.
   const heavy = physics.addBody(null, { colliders: { shape: 'trimesh', vertices, indices, mass: 80 } });
   assert.ok(Math.abs(heavy.mass - 80) < 0.05, `mass ${heavy.mass}`);
   // And it falls and rests as a solid body does.
   physics.dispose();
   const world = new Physics(null);
-  world.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
-  const fall = world.addBody(null, { position: [0, 2, 0], colliders: { shape: 'trimesh', ...cube([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]), density: 100 } });
+  world.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+  });
+  const fall = world.addBody(null, {
+    position: [0, 2, 0],
+    colliders: { shape: 'trimesh', ...cube([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]), density: 100 },
+  });
   for (let i = 0; i < 240; i++) world.step();
   assert.ok(Math.abs(fall.position[1] - 0.5) < 0.02, `rests on its bottom face: ${fall.position[1]}`);
   world.dispose();
@@ -227,9 +241,15 @@ test('a closed trimesh has the mass, centre and inertia of the box it encloses, 
 test('a trimesh with a mass or density must be closed and wound outwards, and says how to fix it', () => {
   const physics = new Physics(null);
   const { vertices, indices } = cube([0, 0, 0], [1, 1, 1]);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'trimesh', vertices, indices: indices.slice(3), density: 1 } }), /closed surface/);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'trimesh', vertices, indices: indices.slice(3), density: 1 } }),
+    /closed surface/,
+  );
   const inside = indices.slice();
   for (let t = 0; t < inside.length; t += 3) [inside[t + 1], inside[t + 2]] = [inside[t + 2], inside[t + 1]];
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'trimesh', vertices, indices: inside, density: 1 } }), /wound outwards/);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'trimesh', vertices, indices: inside, density: 1 } }),
+    /wound outwards/,
+  );
   physics.dispose();
 });

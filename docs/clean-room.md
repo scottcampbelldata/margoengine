@@ -11137,3 +11137,5 @@ Written clean room from the sources below and Rapier's published API pages (docs
 - M. Mantyla, "An Introduction to Solid Modeling", Computer Science Press, 1988 (the half-edge data structure).
 - Z. Wei, M. Liu, Z. Ling and H. Su, "Approximate Convex Decomposition for 3D Meshes with Collision-Aware Concavity and Tree Search", ACM TOG 41(4), 2022 (the decomposition the rounded parts come from).
 - Jacobi's eigenvalue method for symmetric matrices: G. Golub and C. Van Loan, "Matrix Computations", 4th ed., 2013, section 8.5.
+- Rapier's published docs for `CoefficientCombineRule` (docs.rs rapier3d 0.36: Average, Min, Multiply, Max, ClampedSum, GeometricMean and the order of precedence) and `InteractionGroups` and `InteractionTestMode` (the `and` and `or` tests, `or` only when both sides ask), read as published pages; no source.
+

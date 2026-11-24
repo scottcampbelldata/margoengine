@@ -58,7 +58,9 @@ test('a removed triangle is a hole: the ray falls through it, the other triangle
     cellStatus,
   });
   // Cells r + 2 c: (0,0) plain, (1,0) left removed, (0,1) right removed, (1,1) removed.
-  const { physics } = world(flat([0, HeightfieldCell.leftRemoved, HeightfieldCell.rightRemoved, HeightfieldCell.removed]));
+  const { physics } = world(
+    flat([0, HeightfieldCell.leftRemoved, HeightfieldCell.rightRemoved, HeightfieldCell.removed]),
+  );
   const hit = (x, z) => down(physics, x, z);
   // Cell (r, c) covers x in [-1 + c, c] and z in [-1 + r, r]; the left triangle holds its lower-x edge.
   assert.ok(hit(-0.9, -0.5), 'a plain cell is there');
@@ -91,11 +93,13 @@ test('statuses read back as Rapier reads them, are set in place, and bad ones ar
   assert.throws(() => collider.setCellStatus(0, 0, 8), /status 8/);
   assert.throws(() => collider.setCellStatus(0, 0, 1.5), /status 1.5/);
   assert.throws(
-    () => world({ shape: 'heightfield', rows: 1, columns: 1, heights: [0, 0, 0, 0], scale: [1, 1, 1], cellStatus: [0, 0] }),
+    () =>
+      world({ shape: 'heightfield', rows: 1, columns: 1, heights: [0, 0, 0, 0], scale: [1, 1, 1], cellStatus: [0, 0] }),
     /takes 1 cell statuses/,
   );
   assert.throws(
-    () => world({ shape: 'heightfield', rows: 1, columns: 1, heights: [0, 0, 0, 0], scale: [1, 1, 1], cellStatus: [9] }),
+    () =>
+      world({ shape: 'heightfield', rows: 1, columns: 1, heights: [0, 0, 0, 0], scale: [1, 1, 1], cellStatus: [9] }),
     /Cell status 0 is 9/,
   );
   const ball = new Physics(null).addBody(null, { colliders: { shape: 'sphere', radius: 1 } }).colliders[0];
@@ -119,7 +123,10 @@ test('a ball drops through a hole made in place, and rests on the cells that sta
   // The cell under the ball: x in [0, 1] is column 2, z in [0, 1] is row 2.
   field.colliders[0].setCellStatus(2, 2, HeightfieldCell.removed);
   for (let i = 0; i < 90; i++) physics.step();
-  assert.ok(Math.abs(ball.position[1] - (-3 + 0.2)) < 0.01, `it fell through the hole and rests on the floor (${ball.position[1]})`);
+  assert.ok(
+    Math.abs(ball.position[1] - (-3 + 0.2)) < 0.01,
+    `it fell through the hole and rests on the floor (${ball.position[1]})`,
+  );
   assert.ok(floor);
 });
 
@@ -139,7 +146,10 @@ test('a snapshot keeps the statuses, and a field with them replays bit for bit',
       },
     });
     const balls = [0, 1, 2, 3].map((k) =>
-      physics.addBody(null, { position: [-2 + k, 2 + 0.2 * k, 0.3 * k - 0.5], colliders: { shape: 'sphere', radius: 0.25 } }),
+      physics.addBody(null, {
+        position: [-2 + k, 2 + 0.2 * k, 0.3 * k - 0.5],
+        colliders: { shape: 'sphere', radius: 0.25 },
+      }),
     );
     return { physics, field, balls };
   };
