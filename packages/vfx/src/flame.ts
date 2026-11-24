@@ -68,12 +68,20 @@ import { valueNoiseWgsl } from '../../shared/noise-wgsl.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { soft, softDepthWgsl } from './soft.js';
 import type { VFXWind } from '@margoengine/vfx/base';
-import { blackbodyColor, blackbodyXYZ, FLAME_PEAK, rampIn, type FlameRampOptions } from './flame-ramp.js';
+import {
+  blackbodyColor,
+  blackbodyLuminousEfficacy,
+  blackbodyXYZ,
+  FLAME_PEAK,
+  rampIn,
+  type FlameRampOptions,
+} from './flame-ramp.js';
 
 export {
   blackbodyChromaticity,
   blackbodyColor,
   blackbodyLuminanceRatio,
+  blackbodyLuminousEfficacy,
   flameRamp,
   FLAME_PEAK,
   type FlameRampOptions,
@@ -99,12 +107,14 @@ export const HEARTH_FLAME_LENGTH = 0.25;
  * @example byramFlameLength(10000); // 5.4 m
  */
 export function byramFlameLength(intensity: number): number {
-  if (!(Number.isFinite(intensity) && intensity >= 0)) throw new RangeError('Fireline intensity must be a finite kW/m of 0 or more');
+  if (!(Number.isFinite(intensity) && intensity >= 0))
+    throw new RangeError('Fireline intensity must be a finite kW/m of 0 or more');
   return 0.0775 * intensity ** 0.46;
 }
 /** The fireline intensity, kW/m, whose Byram flame length is `length` metres (the inverse of {@link byramFlameLength}). */
 export function byramIntensity(length: number): number {
-  if (!(Number.isFinite(length) && length >= 0)) throw new RangeError('Flame length must be a finite number of metres, 0 or more');
+  if (!(Number.isFinite(length) && length >= 0))
+    throw new RangeError('Flame length must be a finite number of metres, 0 or more');
   return (length / 0.0775) ** (1 / 0.46);
 }
 /**
@@ -114,8 +124,10 @@ export function byramIntensity(length: number): number {
  * @example heskestadFlameLength(20e6, 4); // 8.3 m: a house fire through a roof breach 4 m across
  */
 export function heskestadFlameLength(heat: number, diameter: number): number {
-  if (!(Number.isFinite(heat) && heat >= 0)) throw new RangeError('Heat release must be a finite number of watts, 0 or more');
-  if (!(Number.isFinite(diameter) && diameter >= 0)) throw new RangeError('Fire diameter must be a finite number of metres, 0 or more');
+  if (!(Number.isFinite(heat) && heat >= 0))
+    throw new RangeError('Heat release must be a finite number of watts, 0 or more');
+  if (!(Number.isFinite(diameter) && diameter >= 0))
+    throw new RangeError('Fire diameter must be a finite number of metres, 0 or more');
   return Math.max(0.235 * (heat / 1000) ** 0.4 - 1.02 * diameter, 0);
 }
 
@@ -131,7 +143,8 @@ export const PUFFING_CONSTANT = 1.5;
  * @example puffingFrequency(4); // 0.75 Hz
  */
 export function puffingFrequency(diameter: number): number {
-  if (!(Number.isFinite(diameter) && diameter > 0)) throw new RangeError('Fire diameter must be a finite number of metres above 0');
+  if (!(Number.isFinite(diameter) && diameter > 0))
+    throw new RangeError('Fire diameter must be a finite number of metres above 0');
   return PUFFING_CONSTANT / Math.sqrt(diameter);
 }
 /**
@@ -184,6 +197,38 @@ const TABLE = 16;
  * rectangle, at about its peak radiance).
  */
 export const FLAME_LIGHT_FILL = 0.5;
+/**
+ * The share of a fire's heat release that leaves as radiation (the radiative fraction chi_r): about 0.3 for wood,
+ * cellulosic packing and most sooty fuels in free burn (Tewarson, "Generation of Heat and Gaseous, Liquid, and Solid
+ * Products in Fires", SFPE Handbook of Fire Protection Engineering, 5th ed., 2016; Koseki, "Combustion properties of
+ * large liquid pool fires", Fire Technology 25(3), 241-255, 1989; McCaffrey, "Purely Buoyant Diffusion Flames: Some
+ * Experimental Results", NBSIR 79-1910, 1979).
+ */
+export const FLAME_RADIANT_FRACTION = 0.3;
+
+/**
+ * The luminous flux of a fire, lumens: the radiated share of its heat release (`radiantFraction` of `heat` watts) times
+ * the luminous efficacy of blackbody radiation at the temperature it radiates at (`kelvin`, Planck's law through the
+ * photopic curve). A candle (about 80 W, chi_r about 0.2, 1,850 K soot) gives about 12 lm, the one candela it was
+ * named for; a 1 MW wood fire at 1,760 K about 150,000 lm.
+ * @throws RangeError for a heat or fraction out of range, or a temperature outside 500 to 40,000 K.
+ * @example flameLuminousFlux(1e6, 1760); // about 150,000 lm
+ */
+export function flameLuminousFlux(heat: number, kelvin: number, radiantFraction = FLAME_RADIANT_FRACTION): number {
+  if (!(Number.isFinite(heat) && heat >= 0))
+    throw new RangeError('Heat release must be a finite number of watts, 0 or more');
+  if (!(Number.isFinite(radiantFraction) && radiantFraction >= 0 && radiantFraction <= 1))
+    throw new RangeError('Radiant fraction must be a number from 0 to 1');
+  return radiantFraction * heat * blackbodyLuminousEfficacy(kelvin);
+}
+/** The heat release, watts, of a flame `length` metres tall over a source `diameter` across (Heskestad 1983 turned round). */
+export function heskestadHeat(length: number, diameter: number): number {
+  if (!(Number.isFinite(length) && length >= 0))
+    throw new RangeError('Flame length must be a finite number of metres, 0 or more');
+  if (!(Number.isFinite(diameter) && diameter >= 0))
+    throw new RangeError('Fire diameter must be a finite number of metres, 0 or more');
+  return 1000 * ((length + 1.02 * diameter) / 0.235) ** 2.5;
+}
 
 // The shader's hash and value noise, and their twin here, so the light of a stretch puffs with the tongues above it.
 const hash = (n: number): number => {
@@ -558,7 +603,14 @@ export class Flame implements EnginePlugin {
   private readonly key: number[] = [];
   private readonly values = new Float32Array(UNIFORM_FLOATS);
   private readonly view = new Float32Array(16);
-  private readonly heat = { position: [0, 0, 0] as [number, number, number], length: 0, footprint: [0, 0] as [number, number], yaw: 0, lean: [0, 0] as [number, number], time: 0 };
+  private readonly heat = {
+    position: [0, 0, 0] as [number, number, number],
+    length: 0,
+    footprint: [0, 0] as [number, number],
+    yaw: 0,
+    lean: [0, 0] as [number, number],
+    time: 0,
+  };
   private readonly fogData = new Float32Array(FOG_BYTES / 4);
   private readonly target?: Clustered | LightGroup;
   private readonly group?: LightGroup;
@@ -581,10 +633,12 @@ export class Flame implements EnginePlugin {
     const lights = options.lights,
       groups = lights && 'names' in lights && 'clustered' in lights ? lights : undefined,
       clustered = groups ? groups.clustered : lights && 'maxLights' in lights ? lights : undefined;
-    if (lights && !clustered) throw new TypeError('Invalid Flame lights; pass a Clustered from @margoengine/clustered or its LightGroups');
+    if (lights && !clustered)
+      throw new TypeError('Invalid Flame lights; pass a Clustered from @margoengine/clustered or its LightGroups');
     const list: PointLight[] = [];
     if (clustered) {
-      for (let i = 0; i < 4; i++) list.push({ position: [0, -1e6, 0], range: 1, intensity: 0, color: [1, 0.5, 0.2], radius: 0 });
+      for (let i = 0; i < 4; i++)
+        list.push({ position: [0, -1e6, 0], range: 1, intensity: 0, color: [1, 0.5, 0.2], radius: 0 });
       if (groups) {
         let name = 'flame';
         for (let n = 2; groups.names.includes(name); n++) name = `flame ${n}`;
@@ -604,7 +658,8 @@ export class Flame implements EnginePlugin {
   }
   private check(): void {
     const o = this.options;
-    if (!o || typeof o !== 'object') throw new TypeError('Flame options must be an object with a position and a length, intensity or heat');
+    if (!o || typeof o !== 'object')
+      throw new TypeError('Flame options must be an object with a position and a length, intensity or heat');
     finiteVector(o.position, 3, 'Flame position');
     if (o.length === undefined && o.intensity === undefined && o.heat === undefined)
       throw new TypeError('Flame needs a length (m), an intensity (kW/m) or a heat (W)');
@@ -633,7 +688,8 @@ export class Flame implements EnginePlugin {
   private lookOf() {
     const o = this.options,
       look = this.look,
-      lv = (name: string, fallback: number): number => (look && typeof look[name] === 'number' ? (look[name] as number) : fallback),
+      lv = (name: string, fallback: number): number =>
+        look && typeof look[name] === 'number' ? (look[name] as number) : fallback,
       edgeColor = (look?.['flames.edgeColor'] as readonly number[] | undefined) ?? [0.55, 0.12, 0.04];
     return {
       core: lv('flames.core', o.core ?? 2200),
@@ -654,7 +710,16 @@ export class Flame implements EnginePlugin {
   private write(force = false): void {
     const o = this.options,
       l = this.lookOf(),
-      key = [l.core, l.edge, o.cooling ?? 1.2, o.exposure ?? 0.3, l.ramp, l.edgeColor[0]!, l.edgeColor[1]!, l.edgeColor[2]!];
+      key = [
+        l.core,
+        l.edge,
+        o.cooling ?? 1.2,
+        o.exposure ?? 0.3,
+        l.ramp,
+        l.edgeColor[0]!,
+        l.edgeColor[1]!,
+        l.edgeColor[2]!,
+      ];
     if (!force && key.every((v, i) => v === this.key[i])) return;
     for (let i = 0; i < key.length; i++) this.key[i] = key[i]!;
     const core = rampIn(l.core, 'core', 800, 3000),
@@ -669,7 +734,8 @@ export class Flame implements EnginePlugin {
         kelvin = edge + (core - edge) * x ** cooling,
         scale = Math.min(1, (blackbodyXYZ(kelvin)[1] / top) ** exposure),
         c = blackbodyColor(kelvin);
-      for (let ch = 0; ch < 3; ch++) u[48 + k * 4 + ch] = c[ch]! * scale + (l.edgeColor[ch]! - c[ch]! * scale) * l.ramp * (1 - x);
+      for (let ch = 0; ch < 3; ch++)
+        u[48 + k * 4 + ch] = c[ch]! * scale + (l.edgeColor[ch]! - c[ch]! * scale) * l.ramp * (1 - x);
       u[48 + k * 4 + 3] = 1;
     }
   }
@@ -828,7 +894,13 @@ export class Flame implements EnginePlugin {
    * The ground plane and the glow: the slope in the footprint's axes, the glow sources' intensity (the light's total, as
    * {@link FLAME_LIGHT_FILL}, over as many sources as its points), the haze and the glow box around the flame box.
    */
-  private glow(L: number, fp: readonly [number, number], l: ReturnType<Flame['lookOf']>, rise: number, u: Float32Array): void {
+  private glow(
+    L: number,
+    fp: readonly [number, number],
+    l: ReturnType<Flame['lookOf']>,
+    rise: number,
+    u: Float32Array,
+  ): void {
     const o = this.options,
       c = Math.cos(o.yaw ?? 0),
       s = Math.sin(o.yaw ?? 0),
@@ -839,7 +911,9 @@ export class Flame implements EnginePlugin {
       sz = gx * s + gz * c,
       n = Math.min(GLOW_SOURCES, Math.max(1, Math.round(Math.max(fp[0], fp[1]) / L))),
       on = this.current > 0 && l.glow > 0,
-      total = on ? FLAME_LIGHT_FILL * l.peak * l.radiance * l.glow * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L) * (o.lightPower ?? 1) : 0,
+      total = on
+        ? FLAME_LIGHT_FILL * l.peak * l.radiance * l.glow * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L) * (o.lightPower ?? 1)
+        : 0,
       colour = blackbodyColor(Math.max(1000, Math.min(l.core * 0.8, 3000))),
       R = (o.glowRadius ?? GLOW_RADIUS) * L,
       lean = Math.max(Math.abs(u[26]!), Math.abs(u[27]!)),
@@ -861,7 +935,14 @@ export class Flame implements EnginePlugin {
     void rise;
   }
   /** Places the light's points over the footprint and sets each one's flicker from the puffing of the tongues above it. */
-  private light(L: number, fp: readonly [number, number], f: number, diameter: number, flicker: number, seed: number): void {
+  private light(
+    L: number,
+    fp: readonly [number, number],
+    f: number,
+    diameter: number,
+    flicker: number,
+    seed: number,
+  ): void {
     if (!this.target || this.target.isDisposed) return;
     const o = this.options,
       lights = this.lights as PointLight[],
@@ -870,7 +951,9 @@ export class Flame implements EnginePlugin {
       n = Math.min(4, Math.max(1, Math.round(span / Math.max(L, 1e-3)))),
       on = this.current > 0,
       look = this.lookOf(),
-      total = on ? FLAME_LIGHT_FILL * look.peak * look.radiance * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L) * (o.lightPower ?? 1) : 0,
+      total = on
+        ? FLAME_LIGHT_FILL * look.peak * look.radiance * L * (0.5 * (fp[0] + fp[1]) + 0.24 * L) * (o.lightPower ?? 1)
+        : 0,
       c = Math.cos(o.yaw ?? 0),
       s = Math.sin(o.yaw ?? 0),
       colour = blackbodyColor(Math.max(1000, Math.min(look.core * 0.8, 3000)));
@@ -879,9 +962,14 @@ export class Flame implements EnginePlugin {
         along = n > 1 ? (i / (n - 1) - 0.5) * span * 0.8 : 0,
         lx = longX ? along : 0,
         lz = longX ? 0 : along,
-        phase = 6.2831853 * (f * this.clock - (0.35 * L) / (FLAME_FROUDE * Math.sqrt(G * L) / f) + vnoise1(along / diameter + seed)),
+        phase =
+          6.2831853 *
+          (f * this.clock - (0.35 * L) / ((FLAME_FROUDE * Math.sqrt(G * L)) / f) + vnoise1(along / diameter + seed)),
         // The visible area, and with it the light, swells and shrinks with the puff above the point.
-        wave = Math.max(0.15, 1 + flicker * (0.3 * Math.sin(phase) + 0.25 * (vnoise1(this.clock * f * 2.7 + i * 5.1 + seed) - 0.5))),
+        wave = Math.max(
+          0.15,
+          1 + flicker * (0.3 * Math.sin(phase) + 0.25 * (vnoise1(this.clock * f * 2.7 + i * 5.1 + seed) - 0.5)),
+        ),
         p = light.position as unknown as number[];
       p[0] = o.position[0] + c * lx + s * lz;
       p[1] = o.position[1] + 0.35 * L;
@@ -907,7 +995,10 @@ export class Flame implements EnginePlugin {
         u[16 + i] = c.camera.position[i]!;
         u[44 + i] = -v[i * 4 + 2]!;
       }
-      this.uniform ??= device.createBuffer({ size: UNIFORM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.uniform ??= device.createBuffer({
+        size: UNIFORM_FLOATS * 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
       device.queue.writeBuffer(this.uniform, 0, u as Float32Array<ArrayBuffer>);
     }
     if (!this.uniform) return;
@@ -915,7 +1006,10 @@ export class Flame implements EnginePlugin {
       encode = !c.format.includes('float') && !c.format.endsWith('-srgb');
     if (fog && !depthPass) {
       writeFog(fog, c.camera.position, this.fogData);
-      this.fogBuffer ??= device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.fogBuffer ??= device.createBuffer({
+        size: FOG_BYTES,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
       device.queue.writeBuffer(this.fogBuffer, 0, this.fogData as Float32Array<ArrayBuffer>);
     }
     let samples = 0;
@@ -943,7 +1037,12 @@ export class Flame implements EnginePlugin {
           color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
           alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
         },
-        make = (vertex: string, fragment: string, target: GPUColorTargetState, depthStencil: Omit<GPUDepthStencilState, 'format'>) =>
+        make = (
+          vertex: string,
+          fragment: string,
+          target: GPUColorTargetState,
+          depthStencil: Omit<GPUDepthStencilState, 'format'>,
+        ) =>
           device.createRenderPipeline({
             layout: 'auto',
             vertex: { module, entryPoint: vertex },
@@ -954,10 +1053,25 @@ export class Flame implements EnginePlugin {
           });
       set = [
         // The glow tests the depth where its ray enters the box (frag_depth), so it is hidden behind what stands in front.
-        make('glowVertex', 'glowFragment', { format: c.format, blend }, { depthWriteEnabled: false, depthCompare: 'greater-equal' }),
-        make('vertex', 'fragment', { format: c.format, blend }, { depthWriteEnabled: false, depthCompare: depth ? 'always' : 'greater-equal' }),
+        make(
+          'glowVertex',
+          'glowFragment',
+          { format: c.format, blend },
+          { depthWriteEnabled: false, depthCompare: 'greater-equal' },
+        ),
+        make(
+          'vertex',
+          'fragment',
+          { format: c.format, blend },
+          { depthWriteEnabled: false, depthCompare: depth ? 'always' : 'greater-equal' },
+        ),
         // The depth pass writes no colour; its own (frag_depth) depth is tested against the scene and the nearer kept.
-        make('vertex', 'depthFragment', { format: c.format, writeMask: 0 }, { depthWriteEnabled: true, depthCompare: 'greater-equal' }),
+        make(
+          'vertex',
+          'depthFragment',
+          { format: c.format, writeMask: 0 },
+          { depthWriteEnabled: true, depthCompare: 'greater-equal' },
+        ),
       ];
       shared.set(key, set);
     }
@@ -988,7 +1102,10 @@ export class Flame implements EnginePlugin {
       delete this.depthAttachment.depthStoreOp;
     }
     this.depthAttachment.stencilReadOnly = depthFormat.includes('stencil') ? true : undefined;
-    const pass = c.encoder.beginRenderPass({ colorAttachments: [this.attachment], depthStencilAttachment: this.depthAttachment });
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [this.attachment],
+      depthStencilAttachment: this.depthAttachment,
+    });
     applyView(pass, c);
     for (const pipeline of pipelines) {
       pass.setPipeline(pipeline);
@@ -1051,7 +1168,11 @@ export class Flame implements EnginePlugin {
 }
 
 /** The embers of a hearth kit scaled to a fire of flame length `length` over `footprint` (for `Fire.attach({flameLength})`). */
-export function scaleHearthEmbers<T extends Record<string, unknown>>(embers: T, length: number, footprint: readonly [number, number]): T {
+export function scaleHearthEmbers<T extends Record<string, unknown>>(
+  embers: T,
+  length: number,
+  footprint: readonly [number, number],
+): T {
   const root = Math.sqrt(Math.max(length / HEARTH_FLAME_LENGTH, 1)),
     e = structuredClone(embers) as Record<string, unknown> & {
       size: number;
@@ -1072,5 +1193,9 @@ export function scaleHearthEmbers<T extends Record<string, unknown>>(embers: T, 
   e.gravity = e.gravity.map((v) => v * root) as [number, number, number];
   e.turbulence *= root;
   e.frequency /= root;
-  return { ...e, emissionExtent: [footprint[0] / 2, 0.02 * length, footprint[1] / 2], schedule: { prewarm: e.lifetime[1] } } as unknown as T;
+  return {
+    ...e,
+    emissionExtent: [footprint[0] / 2, 0.02 * length, footprint[1] / 2],
+    schedule: { prewarm: e.lifetime[1] },
+  } as unknown as T;
 }

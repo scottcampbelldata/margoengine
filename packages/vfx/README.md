@@ -946,6 +946,11 @@ pixel turns white whatever the rows ask. Give it a `length` in metres, an `inten
 `heskestadFlameLength`). With `lights` (a `LightGroups` or a `Clustered`) it lights the meshes added to that
 `Clustered`, and smoke lit by it, with up to four point lights over its footprint a third of the way up, as bright as
 its silhouette at its peak radiance (`FLAME_LIGHT_FILL`), each flickering with the puffing of the tongues above it.
+To meter a fire as a real emitter, `flameLuminousFlux(heat, kelvin, radiantFraction = FLAME_RADIANT_FRACTION)` gives
+its lumens: the radiated share of its heat release (chi_r about 0.3 for sooty fuels, Tewarson 2016, Koseki 1989) times the
+luminous efficacy of blackbody radiation at its soot temperature (`blackbodyLuminousEfficacy`, Planck's law through the
+photopic curve, about 0.5 lm/W at 1,760 K and 16.5 at CIE illuminant A). `heskestadHeat(length, diameter)` turns
+Heskestad's height round to give the heat of a flame of a given length.
 The luminous surface is thin, as the reaction zone of a diffusion flame is (Turns 2012, ch. 9): density rises over a
 short step of the field, fine streaks a quarter and an eighth of a tongue across, drawn up with the flow, tear the
 edge into wisps, and coverage follows 1 - T^2, so tongues keep crisp edges. The march steps at most 0.03 flame lengths
@@ -975,7 +980,7 @@ in a `PostStack` bends the light through it, and `() => front.flameVolumes` does
 import {Engine} from 'margoengine/core';
 import {Clustered} from 'margoengine/clustered';
 import {LightGroups} from 'margoengine/clustered/groups';
-import {Flame, byramFlameLength} from 'margoengine/vfx/flame';
+import {Flame, byramFlameLength, flameLuminousFlux} from 'margoengine/vfx/flame';
 import {FLAME_LOOKS, applyFlameSettings} from 'margoengine/vfx/settings';
 
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
@@ -989,6 +994,7 @@ const line = Flame.attach(engine, {position: [0, 0, 60], length: 6, footprint: [
 applyFlameSettings(house, {...FLAME_LOOKS.animatedFeature, 'flames.core': 2400, 'flames.tongues': 0.8});
 house.options.footprint = [8, 6]; // it spreads; the same uniform, rewritten in place
 console.log(byramFlameLength(10000).toFixed(1), house.puffing.toFixed(2)); // 5.4 0.54
+console.log(Math.round(flameLuminousFlux(1e6, 1760))); // about 150,000 lm from a 1 MW wood fire
 ```
 
 - The flame rows of `FLAME_SETTINGS` (`applyFlameSettings`, all live): `flames.core` and `flames.edge` (kelvin),

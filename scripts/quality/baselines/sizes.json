@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17364107,
+  "total": 17364587,
   "history": [
     {
       "date": "2026-10-24",
@@ -11289,6 +11289,12 @@
       "commit": "779499ac4d",
       "reason": "Fauld places draw through a real lens: DOF of @margoengine/dof in the preset post stack (film ruling: a pinhole camera is not a lens), plus the FAULD_CLOUD_DECK constant",
       "grew": 4
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "f3865d702d",
+      "reason": "vfx/flame 11877 to 11997 B: blackbodyLuminousEfficacy, flameLuminousFlux and heskestadHeat, the luminous flux a fire emits; a split entry would cost a second import for one function",
+      "grew": 1
     }
   ],
   "items": {
@@ -12628,7 +12634,7 @@
     "@margoengine/vfx/fields": 2079,
     "@margoengine/vfx/fire": 2208,
     "@margoengine/vfx/fire-front": 9841,
-    "@margoengine/vfx/flame": 11877,
+    "@margoengine/vfx/flame": 12357,
     "@margoengine/vfx/flipbook": 1167,
     "@margoengine/vfx/gunfire": 12137,
     "@margoengine/vfx/json": 2860,

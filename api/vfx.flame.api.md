@@ -15,6 +15,8 @@ export const FLAME_LIGHT_FILL = 0.5;
 
 export const FLAME_PEAK = 1;
 
+export const FLAME_RADIANT_FRACTION = 0.3;
+
 export class Flame implements EnginePlugin {
     readonly name: string;
     readonly options: FlameOptions;
@@ -93,13 +95,19 @@ export function blackbodyColor(kelvin: number): [number, number, number];
 
 export function blackbodyLuminanceRatio(kelvin: number, reference: number): number;
 
+export function blackbodyLuminousEfficacy(kelvin: number): number;
+
 export function byramFlameLength(intensity: number): number;
 
 export function byramIntensity(length: number): number;
 
+export function flameLuminousFlux(heat: number, kelvin: number, radiantFraction?: number): number;
+
 export function flameRamp(options?: FlameRampOptions): FlameStop[];
 
 export function heskestadFlameLength(heat: number, diameter: number): number;
+
+export function heskestadHeat(length: number, diameter: number): number;
 
 export function puffingDiameter(footprint: readonly [number, number]): number;
 

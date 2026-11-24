@@ -62,6 +62,23 @@ export function blackbodyLuminanceRatio(kelvin: number, reference: number): numb
   return blackbodyXYZ(kelvinIn(kelvin))[1] / blackbodyXYZ(kelvinIn(reference))[1];
 }
 /**
+ * The luminous efficacy of a blackbody's radiation at `kelvin`, lumens per radiant watt: 683 lm/W times Planck's
+ * spectral radiance weighted by the photopic curve (the Wyman fit of y-bar, 360 to 830 nm), over the total radiance
+ * sigma T^4 / pi (Stefan-Boltzmann). About 0.5 lm/W at 1,760 K (a flame's radiating soot), 16 at 2,856 K (CIE
+ * illuminant A), 55 at 4,000 K and 95 at 7,000 K, the published blackbody efficacies.
+ * @throws RangeError for a temperature outside 500 to 40,000 K.
+ * @example blackbodyLuminousEfficacy(4000); // about 54.8
+ */
+export function blackbodyLuminousEfficacy(kelvin: number): number {
+  const t = kelvinIn(kelvin);
+  let y = 0;
+  for (let l = 360; l <= 830; l++) {
+    const m = l * 1e-9;
+    y += (1.191042972e-16 / (m ** 5 * Math.expm1(C2 / (m * t)))) * matching(l)[1] * 1e-9;
+  }
+  return (683 * y) / ((5.670374419e-8 * t ** 4) / Math.PI);
+}
+/**
  * The linear sRGB colour of a blackbody at `kelvin`, scaled so its largest channel is 1 and negative channels (colours
  * outside the sRGB gamut, the blues of a cool flame) cut to 0.
  * @throws RangeError for a temperature outside 500 to 40,000 K.
@@ -128,4 +145,3 @@ export function flameRamp(options: FlameRampOptions = {}): FlameStop[] {
     return { at, color: blackbodyColor(kelvin).map((v) => v * scale) as [number, number, number] };
   });
 }
-
