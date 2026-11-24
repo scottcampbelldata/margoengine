@@ -149,6 +149,9 @@ columns! {
     // Sleep: seconds under the threshold, and the energy the window began with.
     SLEEP_TIME f32 Body,
     SLEEP_ENERGY f32 Body,
+    // This body's own sleep threshold, in J/kg, and window, in seconds; zero takes the world's.
+    SLEEP_LIMIT f32 Body,
+    SLEEP_AFTER f32 Body,
     // A body's place in the awake list, NONE when it is not there.
     AWAKE_SLOT u32 Body,
     // Islands of this step: the forest, and a body's island.

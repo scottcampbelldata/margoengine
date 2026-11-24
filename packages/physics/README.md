@@ -838,6 +838,8 @@ console.log(body.position[1].toFixed(2)); // '2.00'
 physics.dispose();
 ```
 
+Each body can also take its own sleep limits: `body.sleepThreshold` (kinetic energy per unit of mass in J/kg, default the world's 0.0002) and `body.sleepTime` (seconds, default the world's 0.5), each cleared back to the world's with `Infinity`. An island sleeps when every body of it is still by its own limits.
+
 ### Breaking joints
 
 A joint takes `breakForce` (newtons) and `breakTorque` (newton metres), or `joint.setBreakLimits(force, torque)`; the default is never. The load is what the joint's linear rows (force) or angular rows (torque) give in a substep over the substep's length, read at the last substep of a step, so a joint that holds a weight at rest reads that weight. A joint past a limit breaks: it solves nothing from then on, its two bodies may collide and both wake, and the world raises one `jointbreak` event with the joint and its bodies. `joint.broken` reads it, `joint.breakLimits` the limits, and `joint.repair()` puts it back at work. A limit must be above 0 or `Infinity`.
@@ -890,7 +892,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full |
 | Additional solver iterations per body | `additionalSolverIterations` | full |
 | Maximum linear and angular velocity per body | `maxLinearSpeed`, `maxAngularSpeed` | full |
-| Sleep thresholds, can sleep, put to sleep, wake up | world thresholds, `canSleep`, `sleep`, `wakeUp` | partial: thresholds are the world's, not per body |
+| Sleep thresholds, can sleep, put to sleep, wake up | `sleepThreshold`, `sleepTime`, `canSleep`, `sleep`, `wakeUp` | full |
 | Enabled flag | `enabled` | full |
 | Continuous collision detection | `ccd` | full |
 | Islands | island forest, an island sleeps together | full |
@@ -903,7 +905,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full |
 | Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full |
 | Multibody (reduced-coordinate) joints and inverse kinematics | none | missing |
-| Cross-platform determinism | bit-equal replay in Node, native code, Chromium and Firefox; `world.hash` | partial: no named mode |
+| Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |
 | PID controller | `PidController` | full |
 | Debug-render data: colliders, joints, contacts, boxes | `debugRender` | full |

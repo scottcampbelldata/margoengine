@@ -217,7 +217,9 @@ impl World {
     /// Runs a body's sleep timer over `dt`, and says whether the body is ready.
     fn tick(&mut self, at: usize, dt: f32) -> bool {
         let energy = self.energy(at);
-        let (threshold, window) = (self.header().sleep_energy, self.header().sleep_time);
+        let (limit, after) = (self.s(SLEEP_LIMIT, at), self.s(SLEEP_AFTER, at));
+        let threshold = if limit > 0.0 { limit } else { self.header().sleep_energy };
+        let window = if after > 0.0 { after } else { self.header().sleep_time };
         let pushed = {
             let (force, torque) = (self.v(FORCE_X, at), self.v(TORQUE_X, at));
             force.dot(force) + torque.dot(torque) > 0.0

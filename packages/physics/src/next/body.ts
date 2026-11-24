@@ -388,6 +388,28 @@ export class PhysicsBody {
   set maxAngularSpeed(speed: number) {
     this.columns.maxAngular[this.row] = capIn(speed, 'maxAngularSpeed', 'rad/s');
   }
+  /**
+   * Kinetic energy per unit of mass under which this body counts as still, in J/kg (default the world's, 0.0002, a slide of
+   * 0.02 m/s). A higher value lets a body sleep while it still creeps; an island sleeps when every body of it is still.
+   * `Infinity` clears it back to the world's.
+   */
+  get sleepThreshold(): number {
+    const own = this.columns.sleepLimit[this.row];
+    return own > 0 ? own : this.world().sleepEnergy;
+  }
+  set sleepThreshold(energy: number) {
+    if (!(energy > 0)) throw new RangeError('sleepThreshold must be above 0 J/kg; use canSleep: false to keep a body awake.');
+    this.columns.sleepLimit[this.row] = energy === Infinity ? 0 : energy;
+  }
+  /** Seconds this body must stay still before it sleeps (default the world's, 0.5). `Infinity` clears it back to the world's. */
+  get sleepTime(): number {
+    const own = this.columns.sleepAfter[this.row];
+    return own > 0 ? own : this.world().sleepTime;
+  }
+  set sleepTime(seconds: number) {
+    if (!(seconds > 0)) throw new RangeError('sleepTime must be above 0 seconds; use canSleep: false to keep a body awake.');
+    this.columns.sleepAfter[this.row] = seconds === Infinity ? 0 : seconds;
+  }
   /** Stops all turning, on every world axis, or frees it again. */
   lockRotations(locked = true): this {
     this.world().setLocks(this.row, { angular: locked ? 7 : 0 });
