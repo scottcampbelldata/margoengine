@@ -1041,3 +1041,29 @@ test('a contact hook edits or drops the contacts of colliders that ask for it', 
   );
   soft.setContactHook(null);
 });
+
+test('a body made with no configuration rests on rigid geometry, with no surface collider needed', async () => {
+  const { physics, soft } = await create();
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
+  const cloth = soft.create(SoftBodyDesc.cloth([-0.4, 2, -0.4], [0.1, 0, 0], [0, 0, 0.1], 9, 9));
+  const ball = soft.create(SoftBodyDesc.sphere([2, 3, 0], 0.3, { detail: 1 }));
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [2, 0, 0],
+    colliders: { shape: 'cylinder', halfHeight: 0.2, radius: 4 },
+  });
+  steps(physics, 300);
+  assert.equal(cloth.surface, null, 'there is no surface collider unless asked');
+  let lowest = Infinity;
+  const p = cloth.particlePositions();
+  for (let k = 1; k < p.length; k += 3) lowest = Math.min(lowest, p[k]);
+  assert.ok(lowest > 0.95, `the cloth rests on the box and does not fall through it: ${lowest}`);
+  const q = ball.particlePositions();
+  let low = Infinity;
+  for (let k = 1; k < q.length; k += 3) low = Math.min(low, q[k]);
+  assert.ok(low > 0.15, `the ball rests on the cylinder: ${low}`);
+});
