@@ -126,7 +126,7 @@ test("a measure gives the camera's clip planes and the ground under every kept f
   assert.deepEqual(m.errors, []);
   assert.equal(m.subjectGround, null, 'the shot names no subject');
   assert.equal(m.version, 2);
-  assert.equal(m.scene.version, 1, 'the measure carries the scene record');
+  assert.equal(m.scene.version, 2, 'the measure carries the scene record');
   assert.deepEqual(
     m.loaded,
     ['/asset-library/fauld/a b.glb', '/tools/shot/test/scene.html'],

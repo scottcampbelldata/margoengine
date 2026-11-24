@@ -33,6 +33,7 @@ function stage() {
   const model = {
     name: 'gltf/pbr:3',
     disposed: false,
+    asset: { baseURL: 'http://127.0.0.1:5173/asset-library/fauld/oak%20door/door.gltf' },
     lods: [{ levels: [node, lodNode] }],
     textures: [
       { width: 1024, height: 1024, format: 'rgba8unorm-srgb', label: 'door_basecolor.png' },
@@ -56,7 +57,43 @@ function stage() {
   const scatter = { name: 'scatter:1', options: { heightmap: () => null, follow: true, lod: [10, 20, 30] } };
   const textured = {
     name: 'gltf-textured',
-    textures: new Map([[{}, new Map([[0, { width: 512, height: 300, format: 'rgba8unorm-srgb', label: 'bark' }]])]]),
+    textures: new Map([
+      [{}, new Map([[0, { width: 512, height: 300, format: 'rgba8unorm-srgb', label: 'bark', usage: 0x06 }]])],
+    ]),
+  };
+  // A post pass's render target (RENDER_ATTACHMENT 0x10) beside a terrain whose textures sit in a plain object.
+  const gtao = {
+    name: 'gtao',
+    options: { radius: 2 },
+    textures: [{ width: 2880, height: 1620, format: 'rgba16float', label: '', usage: 0x14 }],
+  };
+  const terrain = {
+    name: 'terrain:0',
+    options: {
+      origin: [-100, -100],
+      size: [200, 200],
+      textures: () => null,
+      layers: [
+        { height: [-100, 40], slope: [0, 0.4], scale: 0.25, macro: 0.3 },
+        { height: [-100, 400], slope: [0.4, 1], scale: 0.5 },
+      ],
+    },
+    textures: {
+      heightmap: { width: 1024, height: 1024, format: 'r32float', label: 'dem', usage: 0x06 },
+      weights: [
+        { width: 512, height: 512, format: 'rgba8unorm', label: 'w0', usage: 0x06 },
+        { width: 512, height: 512, format: 'rgba8unorm', label: 'w1', usage: 0x06 },
+      ],
+    },
+  };
+  // Clustered keeps the lights last given to setLights in `list`.
+  const clustered = {
+    name: 'clustered',
+    list: [
+      { position: [1, 3, 2], range: 12, intensity: 80, color: [1, 0.6, 0.3], radius: 0.05 },
+      { position: [5, 3, 2], range: 8, direction: [0, -1, 0], outerAngle: 0.6, castShadow: true },
+      { position: [9, 3, 2], range: 8, shadow: true },
+    ],
   };
   const engine = {
     scene: {
@@ -65,7 +102,7 @@ function stage() {
         [2, node],
         [3, lodNode],
       ]),
-      plugins: new Map([stack, scatter, textured].map((p) => [p.name, p])),
+      plugins: new Map([stack, scatter, textured, gtao, terrain, clustered].map((p) => [p.name, p])),
       stats: { drawCalls: 7, visible: 3 },
       lighting: {
         direction: new Float32Array([0, 1, 0, 3]),
@@ -75,19 +112,28 @@ function stage() {
     },
   };
   const ground = (x) => x * 0.1;
+  return read(engine, ground, registry);
+}
+
+// Runs the reader as the page does: the shot driver, the mesh-source registry and the page's origin.
+function read(engine, ground, registry) {
   globalThis.__margoShot = { get: (name) => ({ engine, ground })[name] };
   globalThis[sources] = registry;
+  const before = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { origin: 'http://127.0.0.1:5173' }, configurable: true });
   try {
     return readSceneRecord({ engine: 'engine', ground: 'ground', step: 0.5 });
   } finally {
     delete globalThis.__margoShot;
     delete globalThis[sources];
+    delete globalThis.location;
+    if (before) Object.defineProperty(globalThis, 'location', before);
   }
 }
 
 test('the scene record reads the sun and ambient light with their colour temperatures', () => {
   const r = stage();
-  assert.equal(r.version, 1);
+  assert.equal(r.version, 2);
   const [sun, ambient] = r.lights;
   assert.equal(sun.kind, 'sun');
   assert.equal(sun.intensity, 3);
@@ -115,7 +161,7 @@ test('every plugin is recorded with its options, post effects inside a stack and
   assert.equal(scatter.options.heightmap, 'function', 'a function option is named, never read as an empty list');
   assert.deepEqual(scatter.options.lod, [10, 20, 30]);
   assert.deepEqual(r.plugins.find((p) => p.name === 'gltf-textured').textures, [
-    { width: 512, height: 300, format: 'rgba8unorm-srgb', label: 'bark' },
+    { width: 512, height: 300, format: 'rgba8unorm-srgb', label: 'bark', usage: 6, attachment: false, key: null },
   ]);
 });
 
@@ -149,8 +195,24 @@ test('every mesh gives its triangles, LOD levels, tangents, materials, world bou
   assert.equal(m.ior, 1.45);
   assert.deepEqual(m.extensions, ['KHR_materials_ior']);
   assert.deepEqual(m.maps, [
-    { slot: 'baseColor', index: 0, width: 1024, height: 1024, format: 'rgba8unorm-srgb', label: 'door_basecolor.png' },
-    { slot: 'normal', index: 1, width: 1000, height: 1000, format: 'rgba8unorm', label: 'door_normal_dx.png' },
+    {
+      slot: 'baseColor',
+      index: 0,
+      scale: [1, 1],
+      width: 1024,
+      height: 1024,
+      format: 'rgba8unorm-srgb',
+      label: 'door_basecolor.png',
+    },
+    {
+      slot: 'normal',
+      index: 1,
+      scale: [1, 1],
+      width: 1000,
+      height: 1000,
+      format: 'rgba8unorm',
+      label: 'door_normal_dx.png',
+    },
   ]);
   const core = r.materials[crate.materials[0]];
   assert.equal(core.kind, 'core');
@@ -168,4 +230,139 @@ test('a page engine that is not an engine fails the measure, naming the page key
   } finally {
     delete globalThis.__margoShot;
   }
+});
+
+test("a render target is marked as an attachment and an asset texture is not, a plain object's textures keep their key", () => {
+  const r = stage();
+  const [target] = r.plugins.find((p) => p.name === 'gtao').textures;
+  assert.equal(target.attachment, true, 'usage 0x14 holds RENDER_ATTACHMENT (0x10): a post pass target');
+  assert.equal(target.usage, 0x14);
+  const terrain = r.plugins.find((p) => p.name === 'terrain:0');
+  assert.deepEqual(
+    terrain.textures.map((t) => [t.key, t.label, t.attachment]),
+    [
+      ['heightmap', 'dem', false],
+      ['weights', 'w0', false],
+      ['weights', 'w1', false],
+    ],
+  );
+  assert.deepEqual(terrain.options.layers, [
+    { height: [-100, 40], slope: [0, 0.4], scale: 0.25, macro: 0.3 },
+    { height: [-100, 400], slope: [0.4, 1], scale: 0.5 },
+  ]);
+  assert.equal(terrain.options.textures, 'function');
+});
+
+test('a texture whose usage the GPU object does not give is unknown, never an asset or a target', () => {
+  const r = stage();
+  const tex = r.plugins.find((p) => p.name === 'gltf-textured').textures[0];
+  assert.equal(tex.attachment, false);
+  const engine = {
+    scene: {
+      meshes: new Map(),
+      plugins: new Map([['x', { name: 'x', textures: [{ width: 4, height: 4, format: 'rgba8unorm' }] }]]),
+      lighting: {
+        direction: new Float32Array([0, 1, 0, 1]),
+        radiance: new Float32Array([1, 1, 1, 0]),
+        ambient: new Float32Array([1, 1, 1]),
+      },
+    },
+  };
+  const [t] = read(engine, null, new WeakMap()).plugins[0].textures;
+  assert.equal(t.usage, null);
+  assert.equal(t.attachment, null);
+});
+
+test('the local lights a plugin lists are recorded in candela with their falloff, size and cone', () => {
+  const r = stage();
+  const local = r.lights.filter((l) => l.plugin === 'clustered');
+  assert.equal(local.length, 3);
+  assert.equal(local[0].kind, 'point');
+  assert.deepEqual(local[0].position, [1, 3, 2]);
+  assert.equal(local[0].intensity, 80);
+  assert.equal(local[0].units, 'candela');
+  assert.equal(local[0].decay, 2, 'inverse square, the package default');
+  assert.ok(Math.abs(local[0].radius - 0.05) < 1e-9);
+  assert.ok(
+    local[0].temperature > 3000 && local[0].temperature < 4500,
+    `linear (1, 0.6, 0.3) is about 3680 K, ${local[0].temperature} K`,
+  );
+  assert.equal(local[1].kind, 'spot');
+  assert.deepEqual(local[1].direction, [0, -1, 0]);
+  assert.ok(Math.abs(local[1].outerAngle - 0.6) < 1e-9);
+  assert.equal(local[1].castShadow, true);
+  assert.equal(local[1].intensity, 1, 'the package default intensity');
+  assert.equal(local[0].castShadow, false);
+  assert.equal(local[2].castShadow, true, "Clustered's integrated shadow map also shadows the light");
+});
+
+test("a model's mesh names the file it was loaded from, its texture repeat, vertex colours and open edges", () => {
+  const r = stage();
+  const door = r.meshes.find((m) => m.name === 'door');
+  assert.equal(door.file, '/asset-library/fauld/oak door/door.gltf', 'the decoded URL path on the page origin');
+  assert.equal(r.meshes.find((m) => m.name === 'crate').file, null, 'a core mesh has no file');
+  // A quad of two triangles whose diagonal vertices are split (a UV seam): welded, it has 4 open edges, and its
+  // texture coordinates run 0 to 3 by 0 to 2, so its map repeats 3 by 2 times.
+  const quad = (seam) => {
+    const corners = [
+      [0, 0, 0, 0, 0],
+      [1, 0, 0, 3, 0],
+      [1, 0, 1, 3, 2],
+      [0, 0, 1, 0, 2],
+    ];
+    const order = seam ? [0, 1, 2, 0, 2, 3] : [0, 1, 2, 3, 2, 0];
+    const vertices = new Float32Array(20 * 6);
+    order.forEach((c, i) => {
+      vertices.set(corners[c].slice(0, 3), i * 20);
+      vertices.set(corners[c].slice(3), i * 20 + 12);
+    });
+    return vertices;
+  };
+  const node = { name: 'cutaway wall', visible: true, geometry: null, matrix: matrix(0, 0, 0) },
+    model = { name: 'gltf/pbr:9', disposed: false, lods: [], textures: [] },
+    material = { name: 'plaster', maps: [{ index: 0, extensions: { KHR_texture_transform: { scale: [4, 4] } } }] };
+  const engine = {
+    scene: {
+      meshes: new Map([[1, node]]),
+      plugins: new Map(),
+      lighting: {
+        direction: new Float32Array([0, 1, 0, 1]),
+        radiance: new Float32Array([1, 1, 1, 0]),
+        ambient: new Float32Array([1, 1, 1]),
+      },
+    },
+  };
+  const registry = new WeakMap([
+    [
+      node,
+      {
+        model,
+        bounds: new Float32Array([0, 0, 0, 1, 0, 1]),
+        primitives: [
+          {
+            vertices: quad(true),
+            indices: new Uint32Array([0, 1, 2, 3, 4, 5]),
+            material,
+            definition: { attributes: { POSITION: 0, TEXCOORD_0: 1, COLOR_0: 2 } },
+          },
+        ],
+      },
+    ],
+  ]);
+  const [wall] = read(engine, null, registry).meshes;
+  assert.equal(wall.openEdges, 4, "the seam welds shut; the quad's rim is open");
+  assert.deepEqual(wall.uvSpan, [3, 2]);
+  assert.equal(wall.vertexColours, true);
+  const [map] = read(engine, null, registry).materials[0].maps;
+  assert.deepEqual(map.scale, [4, 4], "the map's KHR_texture_transform repeat");
+  assert.equal(wall.file, null, 'a model with no asset URL (parsed from memory) names no file');
+  const closed = read(
+    {
+      ...engine,
+      scene: { ...engine.scene, meshes: new Map([[1, { ...node }]]) },
+    },
+    null,
+    new WeakMap(),
+  );
+  assert.deepEqual(closed.meshes, [], 'a node with no geometry and no model is a group node, not a mesh');
 });

@@ -6,6 +6,14 @@
 // clear coat, sheen or transmission, the tangents of its primitives and the size and format of each map) and the
 // frame's draw count. A value the graph does not hold is null, so a judge reads it as unknown.
 //
+// Version 2 adds: the GPU usage of every texture a plugin keeps, with `attachment` true for a render target
+// (GPUTextureUsage.RENDER_ATTACHMENT, WebGPU section 6.1.2), so a judge of texture assets can tell a post pass's
+// target from an asset; textures kept in a plain object (a terrain's heightmap, layers and weights) with their `key`;
+// options one level deeper (a terrain's layer rules); the local lights of a plugin that lists them (`list`, as
+// Clustered keeps them: candela, glTF KHR_lights_punctual units); each mesh's model file (`file`, the URL its glTF was
+// loaded from), its texture coordinate span and vertex colours, its open edges (edges of one triangle, positions
+// welded), and each map's KHR_texture_transform repeat.
+//
 // readSceneRecord is one self-contained function: Playwright serialises it into the page (page.evaluate), where
 // globalThis.__margoShot is the shot driver. It allocates per call and is run once per measure.
 
@@ -33,8 +41,11 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
       n = (x - 0.332) / (0.1858 - y);
     return 449 * n ** 3 + 3525 * n ** 2 + 6823.3 * n + 5520.33;
   };
-  // A plugin's settings: its options (or settings) object's plain values, one level deep.
-  const plain = (o) => {
+  const isPlain = (v) =>
+    !!v && typeof v === 'object' && !ArrayBuffer.isView(v) && Object.getPrototypeOf(v) === Object.prototype;
+  // A plugin's settings: its options (or settings) object's plain values, two levels deep: numbers, strings, booleans,
+  // short number lists, plain objects and lists of up to 64 plain objects (a terrain's layer rules).
+  const plain = (o, depth = 0) => {
     if (!o || typeof o !== 'object') return null;
     const out = {};
     for (const k of Object.keys(o)) {
@@ -44,30 +55,34 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
       else if (typeof v === 'string' || typeof v === 'boolean') out[k] = v;
       else if (v && typeof v.length === 'number' && v.length <= 16 && Array.from(v).every((x) => typeof x === 'number'))
         out[k] = list(v);
-      else if (v && typeof v === 'object' && !ArrayBuffer.isView(v) && Object.getPrototypeOf(v) === Object.prototype) {
-        const inner = {};
-        for (const j of Object.keys(v))
-          if (['number', 'string', 'boolean'].includes(typeof v[j]))
-            inner[j] = typeof v[j] === 'number' ? finite(v[j]) : v[j];
-        out[k] = inner;
-      }
+      else if (depth < 2 && Array.isArray(v) && v.length && v.length <= 64 && v.every(isPlain))
+        out[k] = v.map((x) => plain(x, depth + 1));
+      else if (isPlain(v)) out[k] = depth < 2 ? plain(v, depth + 1) : {};
     }
     return out;
   };
-  // The GPU textures a plugin keeps in its `textures` field (an array or a map, nested maps too): size and format.
-  const texturesOf = (t, out = [], depth = 0) => {
+  // GPUTextureUsage.RENDER_ATTACHMENT (WebGPU, section 6.1.2): the texture is a render target, not an asset.
+  const RENDER_ATTACHMENT = 0x10;
+  // The GPU textures a plugin keeps in its `textures` field (an array, a map or a plain object, nested ones too): size,
+  // format, usage, and the key of the plain object field that holds it.
+  const texturesOf = (t, out = [], depth = 0, key = null) => {
     if (!t || typeof t !== 'object' || depth > 3) return out;
     if (typeof t.width === 'number' && typeof t.format === 'string') {
+      const usage = finite(t.usage);
       out.push({
         width: t.width,
         height: t.height,
         format: t.format,
         label: typeof t.label === 'string' ? t.label : null,
+        usage,
+        attachment: usage === null ? null : (usage & RENDER_ATTACHMENT) !== 0,
+        key,
       });
       return out;
     }
-    const items = t instanceof Map ? [...t.values()] : Array.isArray(t) ? t : [];
-    for (const item of items) texturesOf(item, out, depth + 1);
+    if (t instanceof Map) for (const item of t.values()) texturesOf(item, out, depth + 1, key);
+    else if (Array.isArray(t)) for (const item of t) texturesOf(item, out, depth + 1, key);
+    else if (isPlain(t)) for (const k of Object.keys(t)) texturesOf(t[k], out, depth + 1, k);
     return out;
   };
   const plugin = (p) => ({
@@ -100,6 +115,40 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
       temperature: kelvin(ambientColour.map((c, i) => c * sunColour[i])),
     },
   ];
+  // Local lights: every plugin that lists its point and spot lights (`list`, as Clustered keeps the lights last given
+  // to setLights). Intensity is luminous intensity in candela (clustered/units, glTF KHR_lights_punctual); decay 2 is
+  // inverse square, the package default.
+  for (const p of engine.scene.plugins.values()) {
+    let given = null;
+    try {
+      given = p.list;
+    } catch {
+      given = null;
+    }
+    if (!Array.isArray(given)) continue;
+    given.forEach((l, i) => {
+      if (!l || typeof l !== 'object' || !l.position) return;
+      const colour = list(l.color ?? [1, 1, 1]),
+        spot = !!l.direction;
+      lights.push({
+        kind: spot ? 'spot' : 'point',
+        label: `${String(p.name)} ${i}`,
+        plugin: String(p.name),
+        position: list(l.position),
+        direction: spot ? list(l.direction) : null,
+        outerAngle: spot ? finite(l.outerAngle ?? l.angle ?? null) : null,
+        range: finite(l.range),
+        intensity: finite(l.intensity ?? 1),
+        units: 'candela',
+        decay: finite(l.decay ?? 2),
+        radius: finite(l.radius ?? 0),
+        // shadowed by LocalShadows (`castShadow`) or by Clustered's integrated maps (`shadow`)
+        castShadow: !!(l.castShadow || l.shadow),
+        colour,
+        temperature: kelvin(colour),
+      });
+    });
+  }
 
   // Materials by identity: core PbrMaterial (data: rgb, alpha, roughness, metalness, double-sided) or a glTF material.
   const materials = [],
@@ -126,9 +175,12 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
     (m.maps ?? []).slice(0, 5).forEach((info, i) => {
       if (!info) return;
       const t = textures[info.index];
+      const scale = info.extensions?.KHR_texture_transform?.scale;
       maps.push({
         slot: slots[i],
         index: finite(info.index),
+        // KHR_texture_transform's repeat of this map over its texture coordinates (1, 1 without the extension).
+        scale: Array.isArray(scale) ? list(scale) : [1, 1],
         width: finite(t?.width),
         height: finite(t?.height),
         format: typeof t?.format === 'string' ? t.format : null,
@@ -191,6 +243,50 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
     }
     return out.every(Number.isFinite) ? out : null;
   };
+  // Open edges: edges of exactly one triangle, with vertices welded by position (a UV or normal seam splits vertices
+  // but not the surface). `parts` is [[vertices, stride, indices]]; null over OPEN_EDGE_TRIANGLES (not measured).
+  const OPEN_EDGE_TRIANGLES = 2_000_000;
+  const openEdges = (parts) => {
+    if (parts.reduce((n, [, , idx]) => n + idx.length / 3, 0) > OPEN_EDGE_TRIANGLES) return null;
+    const weld = new Map(),
+      edges = new Map();
+    let base = 0;
+    const id = (v, stride, i) => {
+      const k = `${v[i * stride]},${v[i * stride + 1]},${v[i * stride + 2]}`;
+      if (!weld.has(k)) weld.set(k, base++);
+      return weld.get(k);
+    };
+    for (const [v, stride, idx] of parts)
+      for (let t = 0; t + 2 < idx.length; t += 3) {
+        const a = id(v, stride, idx[t]),
+          b = id(v, stride, idx[t + 1]),
+          c = id(v, stride, idx[t + 2]);
+        for (const [x, y] of [
+          [a, b],
+          [b, c],
+          [c, a],
+        ]) {
+          if (x === y) continue;
+          const k = x < y ? x * 4294967296 + y : y * 4294967296 + x;
+          edges.set(k, (edges.get(k) ?? 0) + 1);
+        }
+      }
+    let open = 0;
+    for (const n of edges.values()) if (n === 1) open++;
+    return open;
+  };
+  // The URL path a model was loaded from (its asset's base URL), decoded, when it is on the page's own origin.
+  const fileOf = (model) => {
+    const href = model?.asset?.baseURL;
+    if (typeof href !== 'string') return null;
+    try {
+      const url = new URL(href),
+        here = globalThis.location?.origin;
+      return url.origin === here ? decodeURIComponent(url.pathname) : url.href;
+    } catch {
+      return href;
+    }
+  };
   // The levels of every LOD a model holds (MSFT_lod), so a mesh knows how many levels it draws from.
   const levelsOf = new Map();
   const meshes = [];
@@ -208,24 +304,40 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
       vertices = 0,
       bounds = null,
       tangents = null,
-      mats = [];
+      mats = [],
+      uvSpan = null,
+      vertexColours = null,
+      open = null;
     if (mesh.geometry) {
       triangles = mesh.geometry.indices.length / 3;
       vertices = mesh.geometry.vertices.length / 6;
       bounds = vertices ? geometryBounds(mesh.geometry) : null;
       mats = [materialOf(mesh.material)];
+      open = openEdges([[mesh.geometry.vertices, 6, mesh.geometry.indices]]);
     } else if (model) {
       const primitives = source.primitives ?? [];
+      // Texture coordinate 0 (floats 12 and 13 of a packed vertex): its span is how often a map repeats over the mesh.
+      const uv = [Infinity, Infinity, -Infinity, -Infinity];
       for (const p of primitives) {
         const count = p.instances?.count ?? 1;
         triangles += (p.indices.length / 3) * count;
         vertices += p.vertices.length / 20;
+        if (p.definition?.attributes?.TEXCOORD_0 !== undefined)
+          for (let i = 12; i < p.vertices.length; i += 20) {
+            uv[0] = Math.min(uv[0], p.vertices[i]);
+            uv[1] = Math.min(uv[1], p.vertices[i + 1]);
+            uv[2] = Math.max(uv[2], p.vertices[i]);
+            uv[3] = Math.max(uv[3], p.vertices[i + 1]);
+          }
       }
+      uvSpan = uv[2] >= uv[0] ? [uv[2] - uv[0], uv[3] - uv[1]] : null;
+      vertexColours = primitives.some((p) => p.definition?.attributes?.COLOR_0 !== undefined);
       bounds = Array.from(source.bounds ?? []);
       // A primitive's tangents: its own TANGENT attribute (glTF 2.0 3.7.2.1), or none needed without a normal map.
       tangents = primitives.every((p) => p.definition?.attributes?.TANGENT !== undefined || !p.material?.normalTexture);
       mats = [...new Set(primitives.map((p) => materialOf(p.material, model)))];
-    } else continue;
+      open = openEdges(primitives.map((p) => [p.vertices, 20, p.indices]));
+    } else continue; // a group node: no geometry of its own (a glTF node without a mesh, a model's root)
     const box = world(bounds, mesh.matrix);
     let under = null;
     if (box && typeof ground === 'function') {
@@ -246,19 +358,23 @@ export function readSceneRecord({ engine: engineName, ground: groundName, step }
       visible: !!mesh.visible,
       kind: mesh.geometry ? 'core' : 'model',
       model: model ? String(model.name) : null,
+      file: fileOf(model),
       triangles,
       vertices,
       instances: model ? Math.max(1, ...(source.primitives ?? []).map((p) => p.instances?.count ?? 1)) : 1,
       lods: levelsOf.get(mesh) ?? 1,
       tangents,
       materials: mats,
+      uvSpan,
+      vertexColours,
+      openEdges: open,
       bounds: box,
       ground: under,
     });
   }
   const stats = engine.scene.stats ?? engine.stats ?? {};
   return {
-    version: 1,
+    version: 2,
     drawCalls: finite(stats.drawCalls),
     visible: finite(stats.visible),
     lights,

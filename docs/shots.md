@@ -210,32 +210,46 @@ the page's error. It writes no picture.
 The measure (`version` 2) also carries `loaded`, every file the page loaded from its own origin (URL paths, as a
 stills render records them), and `scene`, the scene record a film pipeline's scene audit judges
 (`tools/shot/scene-record.mjs`). The record is read from the page engine's own scene graph after the warm-up, never
-from a report the page writes, so every page gets it with no page code:
+from a report the page writes, so every page gets it with no page code (the record's own `version` is 2):
 
 - `lights`: the scene's sun (`direction`, `intensity`, linear `colour`) and ambient (`intensity` and the colour of
   the ambient term, the sun colour times `scene.lighting.ambient`), each with its correlated colour `temperature` in
-  Kelvin by McCamy's cubic (null for a neutral grey or black colour).
+  Kelvin by McCamy's cubic (null for a neutral grey or black colour). Then the local lights of every plugin that
+  lists them in `list` (`Clustered` keeps the lights last given to `setLights` there): `kind` (`point` or `spot`),
+  `plugin`, `position`, `direction` and `outerAngle` of a spot, `range`, `intensity` in candela (`units`, the
+  `@margoengine/clustered/units` convention of glTF `KHR_lights_punctual`), `decay` (2 is inverse square),
+  `radius` (the source size), `castShadow` (true with `castShadow` or an integrated `shadow`), `colour` and
+  `temperature`.
 - `plugins`: every plugin attached to the scene, in attach order: `name`, `enabled` when the plugin has one, the
-  plain values of its `options` (or `settings`) object one level deep (a function option reads `'function'`), the
-  size and format of the GPU textures it keeps in a `textures` field, and the `effects` of a post stack, each recorded
-  the same way. Post strengths (bloom, tonemap exposure, vignette, grain and fringing, lens flare), the depth of field
-  lens (`dof`: `aperture`, `focalDistance`, `focalLength`), fog, sky and terrain extents are read from here.
-- `meshes`: every mesh of the scene with geometry or a glTF model behind it: `name`, `visible`, `kind` (`core` or
-  `model`), `triangles` (instances counted), `vertices`, `lods` (the levels of its `MSFT_lod`, 1 without),
+  plain values of its `options` (or `settings`) object two levels deep, lists of plain objects such as a terrain's
+  `layers` included (a function option reads `'function'`), the GPU textures it keeps in a `textures` field (an
+  array, a map or a plain object such as a terrain's heightmap and weights) with their size, format, `usage`,
+  `attachment` (true when the usage holds `GPUTextureUsage.RENDER_ATTACHMENT`, 0x10: a pass's render target, not a
+  texture asset; null when the GPU object gives no usage) and `key` (the plain object field that holds it), and the
+  `effects` of a post stack, each recorded the same way. Post strengths (bloom, tonemap exposure, vignette, grain
+  and fringing, lens flare), the depth of field lens (`dof`: `aperture`, `focalDistance`, `focalLength`), fog, sky and terrain extents are read from here.
+- `meshes`: every mesh of the scene with geometry or a glTF model behind it (a group node with neither is not a
+  mesh): `name`, `visible`, `kind` (`core` or `model`), `file` (the URL path its glTF was loaded from on the page's
+  origin, decoded; null for a core mesh or a model parsed from memory), `uvSpan` (how many times texture
+  coordinate 0 repeats over the mesh, per axis; null without one), `vertexColours` (a primitive has `COLOR_0`),
+  `openEdges` (edges of exactly one triangle with vertices welded by position, so a UV seam is not open; null over
+  2,000,000 triangles), `triangles` (instances counted), `vertices`, `lods` (the levels of its `MSFT_lod`, 1 without),
   `tangents` (true when every primitive that draws a normal map has a `TANGENT` attribute; null for core meshes),
   `materials` (indices into `materials`), `bounds` (world box, metres) and `ground`, the page ground under the box's
   base at its centre and at four points `GROUND_STEP` (0.5 m) out toward its corners (null without
   `shot.page.ground`).
 - `materials`: core and glTF materials by identity: base `colour`, `roughness`, `metalness`, `doubleSided`,
   `alphaMode`, `ior` and `specular` (`KHR_materials_ior` and `KHR_materials_specular`, glTF defaults 1.5 and 1), the
-  glTF `extensions` it uses and its `maps` (slot, texture size, GPU format and label). The values are the ones the
+  glTF `extensions` it uses and its `maps` (slot, `scale` from `KHR_texture_transform`, texture size, GPU format and
+  label). The values are the ones the
   model draws with, so a change made in code after loading is what is measured.
 - `drawCalls` and `visible`: the scene's counts of its last drawn frame.
 
 Sources: C. S. McCamy, "Correlated color temperature as an explicit function of chromaticity coordinates", Color
 Research and Application 17(2), 1992, https://doi.org/10.1002/col.5080170211; The Khronos Group, glTF 2.0
 specification (metallic-roughness material, alpha modes, TANGENT and MSFT_lod), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html;
-KHR_materials_ior and KHR_materials_specular, https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos.
+KHR_materials_ior and KHR_materials_specular, https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos;
+W3C, WebGPU, GPUTextureUsage (section 6.1.2), https://www.w3.org/TR/webgpu/#typedefdef-gputextureusageflags.
 
 ## Masks (AOVs)
 
