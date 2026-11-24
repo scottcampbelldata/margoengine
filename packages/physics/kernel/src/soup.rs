@@ -64,6 +64,11 @@ impl World {
         found
     }
 
+    /// `cast_solid`, for the crate.
+    pub(crate) fn cast_solid_pub(&self, c: usize, query: &Solid, r: V3, o: &CastOptions) -> Option<Cast> {
+        self.cast_solid(c, query, r, o)
+    }
+
     /// The first touch of a convex solid, in the world, moving along unit `r` with collider `c`.
     fn cast_solid(&self, c: usize, query: &Solid, r: V3, o: &CastOptions) -> Option<Cast> {
         let kind = self.uu(COLLIDER_SHAPE, c);

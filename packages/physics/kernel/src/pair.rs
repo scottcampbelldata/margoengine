@@ -2,7 +2,7 @@
 // distance, how far apart are they and where are the nearest points; and the tight box of one. These do not touch the
 // world's pairs, so they work for any two colliders, touching or not, as Rapier's `contactPair`, `intersectionPair` and
 // `distance` do.
-use crate::cast::{Solid, bounds, touch};
+use crate::cast::{Cast, CastOptions, Shape, Solid, bounds, nearer, touch};
 use crate::gjk::gjk;
 use crate::hull::BoxData;
 use crate::layout::*;
@@ -193,5 +193,80 @@ impl World {
     fn meshy_shape(&self, c: usize) -> u32 {
         let shape = self.uu(COLLIDER_SHAPE, c);
         if shape == SHAPE_TRIMESH && self.is_round_triangle(c) { SHAPE_HULL } else { shape }
+    }
+}
+
+impl World {
+    /// Calls `visit` with each convex piece of collider `c` in the world: a convex collider's solid, each child of a compound,
+    /// each triangle or cell of a mesh, until it returns false. A half space has none.
+    fn each_piece_of(&self, c: usize, visit: &mut dyn FnMut(Solid) -> bool) -> bool {
+        let kind = self.uu(COLLIDER_SHAPE, c);
+        if kind == SHAPE_COMPOUND {
+            let mut child = self.uu(COLLIDER_HULL, c);
+            while child != NONE {
+                if !self.each_piece_of(child as usize, visit) {
+                    return false;
+                }
+                child = self.uu(COLLIDER_NEXT, child as usize);
+            }
+            return true;
+        }
+        if kind == SHAPE_HALFSPACE {
+            return true;
+        }
+        if kind == SHAPE_TRIMESH && !self.is_round_triangle(c) {
+            let frame = self.collider_pose(c);
+            let everything = v3(1.0e9, 1.0e9, 1.0e9);
+            let mut going = true;
+            self.each_part(self.uu(COLLIDER_HULL, c) as usize, (everything.scale(-1.0), everything), &|_, _| true, &mut |part| {
+                going = visit(crate::soup::placed(&part, frame));
+                going
+            });
+            return going;
+        }
+        let mut data = BoxData::new();
+        match self.solid(self.shape_of(c), self.collider_pose(c), &mut data) {
+            Some(solid) => visit(solid),
+            None => true,
+        }
+    }
+
+    /// The first touch of collider `a`, moving along unit `r`, with collider `b`: the nearest of a's pieces'.
+    pub fn cast_collider_collider(&self, a: usize, b: usize, r: V3, o: &CastOptions) -> Option<Cast> {
+        let mut best: Option<Cast> = None;
+        self.each_piece_of(a, &mut |piece| {
+            let limit = CastOptions { max: best.map_or(o.max, |h| h.t), ..*o };
+            best = nearer(best, self.cast_solid_pub(b, &piece, r, &limit));
+            true
+        });
+        best
+    }
+
+    /// Calls `visit` with each manifold of collider `c` and a query shape at `pose` within `prediction` of touching, normals
+    /// from the collider to the shape: one a convex collider, a child of a compound, a triangle or cell of a mesh.
+    pub fn shape_contacts(&self, c: usize, shape: Shape, pose: crate::sat::Pose, prediction: f32, visit: &mut dyn FnMut(&Manifold)) {
+        let mut data = BoxData::new();
+        let Some(query) = self.solid(shape, pose, &mut data) else { return };
+        let mut manifold = Manifold::new();
+        let kind = self.uu(COLLIDER_SHAPE, c);
+        if kind == SHAPE_HALFSPACE {
+            let (point, n) = self.plane_of(c);
+            let low = crate::gjk::Convex::support(&query, n.scale(-1.0));
+            let height = n.dot(low.sub(point));
+            if height <= prediction {
+                manifold.normal = n;
+                manifold.count = 1;
+                manifold.points[0] = crate::narrow::Point { on_a: low.sub(n.scale(height)), on_b: low, separation: height, id: 0 };
+                visit(&manifold);
+            }
+            return;
+        }
+        self.each_piece_of(c, &mut |piece| {
+            collide_solids(&piece, &query, prediction, &mut manifold);
+            if manifold.count > 0 {
+                visit(&manifold);
+            }
+            true
+        });
     }
 }

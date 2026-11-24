@@ -14632,5 +14632,23 @@
     "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
     "date": "2026-11-24",
     "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ContactManifold.points",
+    "change": "signature",
+    "was": "70ba9666",
+    "reason": "Contact points of `contactPair` and `contactShape` gain `normalImpulse` and `tangentImpulse` (the solver's last substep, 0 for a contact the world does not hold), as Rapier's narrow phase reads them. The fields are added; existing readers keep working. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.volume",
+    "change": "signature",
+    "was": "2fe83b5b",
+    "reason": "`PhysicsCollider.volume` was an internal property holding a function the world set; it is now the method `volume()` the kernel answers, as Rapier's `collider.volume()`. Callers of `volume()` keep working. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
   }
 ]

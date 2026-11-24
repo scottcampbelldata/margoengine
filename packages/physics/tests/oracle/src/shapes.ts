@@ -670,7 +670,15 @@ export function configureCollider(
   if (options.frictionCombine) desc.setFrictionCombineRule(combine(R, options.frictionCombine));
   if (options.restitutionCombine) desc.setRestitutionCombineRule(combine(R, options.restitutionCombine));
   if (options.massless) desc.setMassProperties(0, ZERO, ZERO, IDENTITY);
-  else if (options.mass !== undefined) desc.setMass(options.mass);
+  else if (
+    (options as { massProperties?: { mass: number; centerOfMass: Vec3; principalInertia: Vec3; inertiaFrame?: Quat } })
+      .massProperties
+  ) {
+    const own = (
+      options as { massProperties: { mass: number; centerOfMass: Vec3; principalInertia: Vec3; inertiaFrame?: Quat } }
+    ).massProperties;
+    desc.setMassProperties(own.mass, vec(own.centerOfMass), vec(own.principalInertia), quat(own.inertiaFrame));
+  } else if (options.mass !== undefined) desc.setMass(options.mass);
   else if (options.density !== undefined) desc.setDensity(options.density);
   if (options.modifyContacts)
     throw new MargoError(

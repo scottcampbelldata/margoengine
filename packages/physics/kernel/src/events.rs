@@ -48,6 +48,14 @@ impl World {
     }
 
     /// True when a pair may touch: neither side is off, the groups meet, no joint keeps them apart, and the filter agrees.
+    /// Whether the world's pair filter is asked about a pair: one of its two colliders has not turned the question off.
+    #[inline]
+    fn asks_filter(&self, a: usize, b: usize) -> bool {
+        let (fa, fb) = (self.uu(COLLIDER_FLAGS, a), self.uu(COLLIDER_FLAGS, b));
+        let off = if (fa | fb) & COLLIDER_SENSOR != 0 { COLLIDER_NO_INTERSECTION_FILTER } else { COLLIDER_NO_CONTACT_FILTER };
+        fa & off == 0 || fb & off == 0
+    }
+
     /// The filter comes last, as it leaves Wasm.
     #[inline]
     pub fn may_touch(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> bool {
@@ -55,7 +63,7 @@ impl World {
             && (self.flags(body_a) | self.flags(body_b)) & DISABLED == 0
             && groups_meet(self.uu(COLLIDER_GROUPS, a), self.uu(COLLIDER_GROUPS, b))
             && !self.joined(body_a, body_b)
-            && (self.header().filtering == 0 || self.filter_says(a as u32, b as u32))
+            && (self.header().filtering == 0 || !self.asks_filter(a, b) || self.filter_says(a as u32, b as u32))
     }
 
     /// Shows a pair to the contact modifier, which may change its friction, bounce and normal in the pair's columns, or clear

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17477739,
+  "total": 17494307,
   "history": [
     {
       "date": "2026-10-24",
@@ -11343,6 +11343,12 @@
       "commit": "786ffce7e",
       "reason": "@margoengine/physics lazy kernel blueprint 186,638 B to 186,944 B gzip: the kernel's tree-solved multibody joints, merged with the switch; the entry total is the one recorded with the switch (Rapier's download of 1,176,707 B and 42,407 B gzip is gone).",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "b6ef18ed7",
+      "reason": "Rapier 3D collision parity (2026-11-24): the kernel gains the collider and narrow-phase API (mass properties, hooks per collider, pair listings, shape contacts, collider casts, feature ids, contact detail), 233,951 to 239,676 B and its base 47,444 to 49,607 B; the code is in the same entry as the solver it serves, and a split would make every world load a second Wasm module and a second chunk of the same step path.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12098,8 +12104,8 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 233951,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 47444,
+    "@margoengine/physics": 246867,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 51096,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 192553,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics2d": 18716,

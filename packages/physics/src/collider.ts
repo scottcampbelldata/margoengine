@@ -1,7 +1,16 @@
 // A collider of the own solver. Reads only, so it may use `Math`: nothing here can change a step.
 import { MargoError } from '@margoengine/math/errors';
-import { COLLIDER_OFF, COLLIDER_SENSOR, COLLIDER_TYPES, COLLIDER_TYPES_SHIFT, type KernelWorld } from './kernel.js';
-import type { CollisionPairKind, ColliderOptions, ShapeOptions } from './shapes.js';
+import {
+  COLLIDER_MODIFY,
+  COLLIDER_NO_CONTACT_FILTER,
+  COLLIDER_NO_INTERSECTION_FILTER,
+  COLLIDER_OFF,
+  COLLIDER_SENSOR,
+  COLLIDER_TYPES,
+  COLLIDER_TYPES_SHIFT,
+  type KernelWorld,
+} from './kernel.js';
+import type { CollisionPairKind, CombineRule, ColliderOptions, ShapeOptions } from './shapes.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
 
@@ -16,6 +25,7 @@ function cell(value: number): number {
   return value;
 }
 
+const COMBINES: readonly CombineRule[] = ['average', 'min', 'multiply', 'max'];
 const PAIR_KINDS: readonly CollisionPairKind[] = [
   'dynamicDynamic',
   'dynamicKinematic',
@@ -49,8 +59,6 @@ export class PhysicsCollider {
   forceThreshold = 0;
   /** @internal The points (and indices) of a convex hull or triangle mesh. */
   data?: { vertices: Float32Array; indices?: Uint32Array };
-  /** @internal The collider's volume, for {@link PhysicsCollider.mass}. */
-  volume: () => number = () => 0;
   /** @internal */
   constructor(
     private readonly kernel: KernelWorld,
@@ -166,6 +174,36 @@ export class PhysicsCollider {
     this.wake();
     return this;
   }
+  /**
+   * Which hooks involve this collider, as Rapier's `activeHooks`: `filterContactPairs` and `filterIntersectionPairs` (the
+   * world's `contactFilter` is asked about solid pairs, and about pairs with a sensor, when either collider has the
+   * flag; both on by default) and `modifyContacts` (off by default).
+   */
+  activeHooks(): { filterContactPairs: boolean; filterIntersectionPairs: boolean; modifyContacts: boolean } {
+    const flags = this.columns().colliderFlags[this.handle];
+    return {
+      filterContactPairs: (flags & COLLIDER_NO_CONTACT_FILTER) === 0,
+      filterIntersectionPairs: (flags & COLLIDER_NO_INTERSECTION_FILTER) === 0,
+      modifyContacts: (flags & COLLIDER_MODIFY) !== 0,
+    };
+  }
+  /** Chooses the hooks that involve this collider; what it touched ends and starts again as it is now. */
+  setActiveHooks(hooks: {
+    filterContactPairs?: boolean;
+    filterIntersectionPairs?: boolean;
+    modifyContacts?: boolean;
+  }): this {
+    const was = this.activeHooks(),
+      next = { ...was, ...hooks };
+    let flags =
+      this.columns().colliderFlags[this.handle] &
+      ~(COLLIDER_NO_CONTACT_FILTER | COLLIDER_NO_INTERSECTION_FILTER | COLLIDER_MODIFY);
+    if (!next.filterContactPairs) flags |= COLLIDER_NO_CONTACT_FILTER;
+    if (!next.filterIntersectionPairs) flags |= COLLIDER_NO_INTERSECTION_FILTER;
+    if (next.modifyContacts) flags |= COLLIDER_MODIFY;
+    this.kernel.setColliderState(this.handle, flags);
+    return this;
+  }
   /** The kinds of body pair this collider takes part in. */
   activeCollisionTypes(): CollisionPairKind[] {
     const wanted = ((this.columns().colliderFlags[this.handle] & COLLIDER_TYPES) >>> COLLIDER_TYPES_SHIFT) ^ 7;
@@ -211,10 +249,6 @@ export class PhysicsCollider {
   private setBit(bit: number, on: boolean): void {
     const flags = this.columns().colliderFlags[this.handle];
     this.kernel.setColliderState(this.handle, on ? flags | bit : flags & ~bit);
-  }
-  /** Mass in kilograms: its density times its volume (0 for a mesh, a plane or a massless collider). */
-  mass(): number {
-    return this.density() * this.volume();
   }
   /** Centre in world space. */
   translation(): { x: number; y: number; z: number } {
@@ -289,10 +323,143 @@ export class PhysicsCollider {
   halfHeight(): number {
     return this.columns().colliderB[this.handle];
   }
-  /** Border radius of a cylinder or cone, 0 for a sharp one (Rapier's `roundRadius`). */
+  /** Border radius of a box, hull, triangle, cylinder or cone, 0 for a sharp one (Rapier's `roundRadius`). */
   borderRadius(): number {
-    return this.shape === 'cylinder' || this.shape === 'cone' ? this.columns().colliderC[this.handle] : 0;
+    const c = this.columns();
+    return this.shape === 'cylinder' || this.shape === 'cone'
+      ? c.colliderC[this.handle]
+      : c.colliderBorder[this.handle];
   }
+  /**
+   * Sets the border radius of a box, convex hull, triangle, cylinder or cone (Rapier's `setRoundRadius`); what it touched
+   * ends and the body's mass is worked out again.
+   * @throws RangeError for a border that is negative or not finite, or a shape that cannot have one.
+   */
+  setBorderRadius(border: number): this {
+    if (!(border >= 0) || !Number.isFinite(border))
+      throw new RangeError(`A border radius is 0 or more and finite (got ${border}); pass 0 for a sharp edge.`);
+    const c = this.columns(),
+      h = this.handle;
+    if (this.shape === 'cylinder' || this.shape === 'cone')
+      this.kernel.setColliderShape(h, this.shape, [c.colliderA[h], c.colliderB[h], border]);
+    else if (this.shape === 'box' || this.shape === 'convexHull' || this.shape === 'triangle') {
+      const before = c.colliderBorder[h];
+      this.kernel.setColliderBorder(h, border);
+      // A round triangle meets what it touches through a skin of its border.
+      if (this.shape === 'triangle') this.setContactSkin(c.colliderSkin[h] - before + border);
+    } else
+      throw new RangeError(`A ${this.shape} has no border radius; use a box, convexHull, triangle, cylinder or cone.`);
+    return this;
+  }
+  /**
+   * Gives the collider mass properties of its own in place of its shape's at its density (Rapier's `setMassProperties`): a
+   * mass in kilograms, the centre of mass in the collider's frame, the principal moments of inertia about it and the turn of
+   * their axes (default none). The body's mass, centre and inertia are worked out again.
+   * @throws RangeError for numbers that cannot be a body's.
+   */
+  setMassProperties(mass: number, centerOfMass: Vec3, principalInertia: Vec3, inertiaFrame: Quat = [0, 0, 0, 1]): this {
+    checkVec(centerOfMass, 'Centre of mass');
+    checkVec(principalInertia, 'Principal inertia');
+    if (!(mass >= 0) || !Number.isFinite(mass))
+      throw new RangeError(`A collider's mass properties need a mass of 0 or more kilograms and finite (got ${mass}).`);
+    this.columns();
+    this.kernel.setColliderMassProperties(this.handle, mass, centerOfMass, principalInertia, inertiaFrame);
+    return this;
+  }
+  /** Takes the collider's own mass properties off: the shape's at its density count again. */
+  clearMassProperties(): this {
+    this.columns();
+    this.kernel.setColliderMassProperties(this.handle, null, [0, 0, 0], [0, 0, 0], [0, 0, 0, 1]);
+    return this;
+  }
+  /** The volume of the shape in cubic metres, 0 for a surface. */
+  volume(): number {
+    this.columns();
+    return this.kernel.colliderVolume(this.handle);
+  }
+  /** The mass the collider adds to its body, from its density: volume times density, in kilograms. */
+  mass(): number {
+    this.columns();
+    return this.kernel.colliderMass(this.handle);
+  }
+  /**
+   * Sets the mass by setting the density to mass over volume, so it stays in step with a change of shape; the body's mass,
+   * centre and inertia are worked out again.
+   * @throws RangeError for a mass that is negative or not finite, or a shape with no volume.
+   */
+  setMass(mass: number): this {
+    if (!(mass >= 0) || !Number.isFinite(mass))
+      throw new RangeError(`A collider mass is 0 or more kilograms and finite (got ${mass}).`);
+    const volume = this.volume();
+    if (!(volume > 0))
+      throw new RangeError(
+        'A collider with no volume has no mass to set; give the body its mass with setMassProperties.',
+      );
+    return this.setDensity(mass / volume);
+  }
+  /** The friction combine rule: how this collider's friction mixes with another's (default 'average'; the higher rule of the two decides). */
+  frictionCombineRule(): CombineRule {
+    return COMBINES[this.columns().colliderCombine[this.handle] & 3]!;
+  }
+  /** Sets the friction combine rule, from the next step on. @throws RangeError for a name that is not a rule. */
+  setFrictionCombineRule(rule: CombineRule): this {
+    const c = this.columns(),
+      at = COMBINES.indexOf(rule);
+    if (at < 0) throw new RangeError(`Unknown combine rule ${String(rule)}; use average, min, multiply or max.`);
+    c.colliderCombine[this.handle] = (c.colliderCombine[this.handle] & ~3) | at;
+    this.wake();
+    return this;
+  }
+  /** The restitution combine rule (default 'average'). */
+  restitutionCombineRule(): CombineRule {
+    return COMBINES[(this.columns().colliderCombine[this.handle] >> 2) & 3]!;
+  }
+  /** Sets the restitution combine rule, from the next step on. @throws RangeError for a name that is not a rule. */
+  setRestitutionCombineRule(rule: CombineRule): this {
+    const c = this.columns(),
+      at = COMBINES.indexOf(rule);
+    if (at < 0) throw new RangeError(`Unknown combine rule ${String(rule)}; use average, min, multiply or max.`);
+    c.colliderCombine[this.handle] = (c.colliderCombine[this.handle] & ~12) | (at << 2);
+    this.wake();
+    return this;
+  }
+  /** A height field's cells along z. @throws RangeError for another shape. */
+  heightfieldNRows(): number {
+    return this.grid().rows;
+  }
+  /** A height field's cells along x. @throws RangeError for another shape. */
+  heightfieldNCols(): number {
+    return this.grid().columns;
+  }
+  /**
+   * A height field's heights, column major as it was made (row r, column c at `r + (rows + 1) * c`), as scaled in its frame:
+   * with `heightfieldScale()` of [width, 1, depth].
+   * @throws RangeError for another shape.
+   */
+  heightfieldHeights(): Float32Array {
+    const { rows, columns } = this.grid(),
+      c = this.columns(),
+      first = c.meshFirstVertex[c.colliderHull[this.handle]],
+      out = new Float32Array((rows + 1) * (columns + 1));
+    for (let i = 0; i < out.length; i++) out[i] = c.meshVertexY[first + i];
+    return out;
+  }
+  /** A height field's scale as `[width, 1, depth]`: its heights are read already scaled. @throws RangeError for another shape. */
+  heightfieldScale(): [number, number, number] {
+    const { rows, columns } = this.grid(),
+      c = this.columns(),
+      first = c.meshFirstVertex[c.colliderHull[this.handle]],
+      last = first + (rows + 1) * (columns + 1) - 1;
+    return [c.meshVertexX[last] - c.meshVertexX[first], 1, c.meshVertexZ[last] - c.meshVertexZ[first]];
+  }
+  private grid(): { rows: number; columns: number } {
+    if (this.shape !== 'heightfield') throw new RangeError(`A ${this.shape} is no height field; use a heightfield.`);
+    const c = this.columns(),
+      row = c.colliderHull[this.handle],
+      columns = c.meshColumns[row];
+    return { rows: c.meshVertices[row] / (columns + 1) - 1, columns };
+  }
+
   friction(): number {
     return this.columns().colliderFriction[this.handle];
   }
@@ -383,4 +550,177 @@ function rotateBy(q: readonly number[], x: number, y: number, z: number): [numbe
     ty = 2 * (qz * x - qx * z),
     tz = 2 * (qx * y - qy * x);
   return [x + qw * tx + (qy * tz - qz * ty), y + qw * ty + (qz * tx - qx * tz), z + qw * tz + (qx * ty - qy * tx)];
+}
+
+// Features: which vertex, edge or face of a collider a point lies on, for the hits of rays and the points of projections.
+// Read from the collider's rows after the query, so a query costs nothing more when nobody asks.
+
+/** What kind of feature a point is on: a corner, an edge between two faces, a face, or none this solver names. */
+export type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
+
+/** A feature of a collider's shape. `id` is `undefined` for 'unknown'. */
+export interface Feature {
+  type: FeatureType;
+  id: number | undefined;
+}
+
+const UNKNOWN: Feature = { type: 'unknown', id: undefined };
+/** Most triangles a mesh may have for a hit to be searched among them. */
+const SEARCHED_TRIANGLES = 4096;
+
+/** `world`, a point in the world, in a collider's own frame. */
+function local(collider: PhysicsCollider, world: Vec3): Vec3 {
+  const t = collider.translation(),
+    q = collider.rotation(),
+    // The conjugate turns a vector back: v + 2 w (u x v) + 2 u x (u x v) with u = -q.xyz.
+    v: Vec3 = [world[0] - t.x, world[1] - t.y, world[2] - t.z],
+    u: Vec3 = [-q.x, -q.y, -q.z],
+    c: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+    d: Vec3 = [u[1] * c[2] - u[2] * c[1], u[2] * c[0] - u[0] * c[2], u[0] * c[1] - u[1] * c[0]];
+  return [v[0] + 2 * q.w * c[0] + 2 * d[0], v[1] + 2 * q.w * c[1] + 2 * d[1], v[2] + 2 * q.w * c[2] + 2 * d[2]];
+}
+
+/**
+ * The feature of `collider` that the world point `point` lies on, within a tolerance of 1e-4 of the shape's size.
+ *
+ * - A box: faces are numbered `2 axis + (point on the low side ? 1 : 0)` over x, y, z; an edge `4 axis + two bits` (the
+ *   signs of the other two axes, in axis order) for the axis it runs along; a vertex by three bits, x low to z high.
+ * - A convex hull: a face is its row among the hull's faces, a vertex its row, an edge the lower of its two half-edge rows.
+ * - A triangle mesh: a face is a triangle's number, as it was given; an edge `3 triangle + side`, a vertex the vertex's number.
+ *   Searched among meshes of at most 4096 triangles.
+ * - A height field: a face is `2 cell + half` (cell `row + rows column`, half 0 for the lower-row triangle).
+ * - Every other shape: unknown.
+ */
+export function featureAt(kernel: KernelWorld, collider: PhysicsCollider, point: Vec3): Feature {
+  if (!collider.valid) return UNKNOWN;
+  const c = kernel.columns,
+    h = collider.handle,
+    p = local(collider, point);
+  if (collider.shape === 'box' && c.colliderBorder[h] === 0) {
+    const half = [c.colliderA[h], c.colliderB[h], c.colliderC[h]],
+      eps = 1e-4 * (1 + Math.max(half[0], half[1], half[2])),
+      on: number[] = [];
+    for (let axis = 0; axis < 3; axis++) if (Math.abs(p[axis]) >= half[axis] - eps) on.push(axis);
+    if (on.length === 3) return { type: 'vertex', id: (p[0] > 0 ? 1 : 0) | (p[1] > 0 ? 2 : 0) | (p[2] > 0 ? 4 : 0) };
+    if (on.length === 2) {
+      const free = 3 - on[0] - on[1],
+        low = (axis: number): number => (p[axis] > 0 ? 1 : 0);
+      return { type: 'edge', id: 4 * free + low(on[0]) + 2 * low(on[1]) };
+    }
+    if (on.length === 1) return { type: 'face', id: 2 * on[0] + (p[on[0]] < 0 ? 1 : 0) };
+    return UNKNOWN;
+  }
+  if (collider.shape === 'convexHull' && c.colliderBorder[h] === 0) {
+    const row = c.colliderHull[h],
+      vertexRow = c.hullFirstVertex[row],
+      faceRow = c.hullFirstFace[row],
+      eps = 1e-4 * (1 + c.hullRadius[row]);
+    for (let v = 0; v < c.hullVertices[row]; v++) {
+      const dx = c.vertexX[vertexRow + v] - p[0],
+        dy = c.vertexY[vertexRow + v] - p[1],
+        dz = c.vertexZ[vertexRow + v] - p[2];
+      if (dx * dx + dy * dy + dz * dz <= eps * eps) return { type: 'vertex', id: v };
+    }
+    const faces: number[] = [];
+    for (let f = 0; f < c.hullFaces[row]; f++) {
+      const distance =
+        c.faceNormalX[faceRow + f] * p[0] +
+        c.faceNormalY[faceRow + f] * p[1] +
+        c.faceNormalZ[faceRow + f] * p[2] -
+        c.faceOffset[faceRow + f];
+      if (Math.abs(distance) <= eps) faces.push(f);
+    }
+    if (faces.length === 1) return { type: 'face', id: faces[0] };
+    if (faces.length >= 2) {
+      const edgeRow = c.hullFirstEdge[row];
+      for (let e = 0; e < c.hullEdges[row]; e++) {
+        const twin = c.edgeTwin[edgeRow + e];
+        if (e < twin && faces.includes(c.edgeFace[edgeRow + e]) && faces.includes(c.edgeFace[edgeRow + twin]))
+          return { type: 'edge', id: e };
+      }
+      return { type: 'face', id: faces[0] };
+    }
+    return UNKNOWN;
+  }
+  if (collider.shape === 'trimesh') {
+    const row = c.colliderHull[h],
+      first = c.meshFirstTriangle[row],
+      count = c.meshTriangles[row],
+      vertices = c.meshFirstVertex[row];
+    if (count > SEARCHED_TRIANGLES) return UNKNOWN;
+    return nearestTriangle(c, p, first, count, vertices, (t) => [
+      c.triangleA[first + t],
+      c.triangleB[first + t],
+      c.triangleC[first + t],
+    ]);
+  }
+  if (collider.shape === 'heightfield') {
+    const row = c.colliderHull[h],
+      columns = c.meshColumns[row],
+      rows = c.meshVertices[row] / (columns + 1) - 1,
+      v0 = c.meshFirstVertex[row],
+      stride = rows + 1,
+      x0 = c.meshVertexX[v0],
+      z0 = c.meshVertexZ[v0],
+      dx = (c.meshVertexX[v0 + stride * columns] - x0) / columns,
+      dz = (c.meshVertexZ[v0 + rows] - z0) / rows,
+      column = Math.min(columns - 1, Math.max(0, Math.floor((p[0] - x0) / dx))),
+      r = Math.min(rows - 1, Math.max(0, Math.floor((p[2] - z0) / dz))),
+      // The cell's diagonal runs from row r + 1, column c to row r, column c + 1: a point under it is in the first triangle.
+      fx = (p[0] - (x0 + column * dx)) / dx,
+      fz = (p[2] - (z0 + r * dz)) / dz;
+    return { type: 'face', id: 2 * (r + rows * column) + (fx + fz <= 1 ? 0 : 1) };
+  }
+  return UNKNOWN;
+}
+
+/** The triangle of a mesh nearest a point of its frame, as a face, an edge or a vertex when the point is on one. */
+function nearestTriangle(
+  c: KernelWorld['columns'],
+  p: Vec3,
+  _first: number,
+  count: number,
+  vertices: number,
+  corners: (t: number) => [number, number, number],
+): Feature {
+  const eps = 1e-4;
+  let best = { distance: Infinity, t: -1, side: -1, corner: -1 };
+  for (let t = 0; t < count; t++) {
+    const index = corners(t),
+      point = index.map(
+        (i) => [c.meshVertexX[vertices + i], c.meshVertexY[vertices + i], c.meshVertexZ[vertices + i]] as Vec3,
+      );
+    const [a, b, d] = point,
+      ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+      ad: Vec3 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]],
+      n: Vec3 = [ab[1] * ad[2] - ab[2] * ad[1], ab[2] * ad[0] - ab[0] * ad[2], ab[0] * ad[1] - ab[1] * ad[0]],
+      length = Math.hypot(n[0], n[1], n[2]);
+    if (!(length > 0)) continue;
+    const away = ((p[0] - a[0]) * n[0] + (p[1] - a[1]) * n[1] + (p[2] - a[2]) * n[2]) / length;
+    if (Math.abs(away) > eps) continue;
+    // Barycentric coordinates of the point's foot in the triangle.
+    const ap: Vec3 = [p[0] - a[0], p[1] - a[1], p[2] - a[2]],
+      d00 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2],
+      d01 = ab[0] * ad[0] + ab[1] * ad[1] + ab[2] * ad[2],
+      d11 = ad[0] * ad[0] + ad[1] * ad[1] + ad[2] * ad[2],
+      d20 = ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2],
+      d21 = ap[0] * ad[0] + ap[1] * ad[1] + ap[2] * ad[2],
+      denominator = d00 * d11 - d01 * d01,
+      v = (d11 * d20 - d01 * d21) / denominator,
+      w = (d00 * d21 - d01 * d20) / denominator,
+      u = 1 - v - w,
+      slack = 1e-4;
+    if (u < -slack || v < -slack || w < -slack) continue;
+    const low = [u, v, w].map((x) => x < slack),
+      zeros = low.filter(Boolean).length,
+      score = Math.abs(away);
+    if (score >= best.distance) continue;
+    best = { distance: score, t, side: -1, corner: -1 };
+    if (zeros === 2) best.corner = [u, v, w].findIndex((x) => !(x < slack));
+    else if (zeros === 1) best.side = low.indexOf(true);
+  }
+  if (best.t < 0) return UNKNOWN;
+  if (best.corner >= 0) return { type: 'vertex', id: corners(best.t)[best.corner] };
+  if (best.side >= 0) return { type: 'edge', id: 3 * best.t + best.side };
+  return { type: 'face', id: best.t };
 }

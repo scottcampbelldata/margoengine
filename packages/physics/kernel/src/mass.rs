@@ -207,7 +207,33 @@ impl World {
     /// Calls `add` with each solid collider `c` adds, its centre and the frame of its moments in the body's frame: one for
     /// a convex collider, one a child for a compound, one a filled cell for a voxel grid, none for a mesh.
     fn each_solid(&self, c: usize, mut add: impl FnMut(Solid, V3, Q)) {
-        let density = self.s(COLLIDER_DENSITY, c);
+        if self.uu(COLLIDER_FLAGS, c) & COLLIDER_OWN_SOLID != 0 {
+            // Mass properties given for the collider stand in for its shape's, centre and axes in its own frame.
+            let (place, turn) = (self.v(COLLIDER_X, c), self.q(COLLIDER_ROTATION_X, c));
+            let solid = Solid { mass: self.s(COLLIDER_OWN_MASS, c), moments: self.v(COLLIDER_OWN_INERTIA_X, c) };
+            add(solid, place.add(turn.rotate(self.v(COLLIDER_OWN_CENTER_X, c))), turn.mul(self.q(COLLIDER_OWN_FRAME_X, c)));
+            return;
+        }
+        self.each_solid_at(c, self.s(COLLIDER_DENSITY, c), add);
+    }
+
+    /// The volume of a collider in cubic metres: what its solids come to at a density of 1. A mesh has none; a voxel grid
+    /// has its filled cells'.
+    pub fn collider_volume(&self, c: usize) -> f32 {
+        let mut volume = 0.0;
+        self.each_solid_at(c, 1.0, |solid, _, _| volume += solid.mass);
+        volume
+    }
+
+    /// The mass a collider adds to its body in kilograms.
+    pub fn collider_mass(&self, c: usize) -> f32 {
+        let mut mass = 0.0;
+        self.each_solid(c, |solid, _, _| mass += solid.mass);
+        mass
+    }
+
+    /// `each_solid` at a density given.
+    fn each_solid_at(&self, c: usize, density: f32, mut add: impl FnMut(Solid, V3, Q)) {
         if self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH {
             if density > 0.0 && self.is_voxels(self.uu(COLLIDER_HULL, c) as usize) {
                 let (place, turn) = (self.v(COLLIDER_X, c), self.q(COLLIDER_ROTATION_X, c));

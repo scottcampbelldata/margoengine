@@ -187,6 +187,33 @@ interface KernelExports extends WebAssembly.Exports {
   pair_intersects(a: number, b: number): number;
   pair_contacts(a: number, b: number, prediction: number): number;
   pair_distance(a: number, b: number): number;
+  collider_shape_contacts(collider: number, ...words: number[]): number;
+  collider_cast_collider(
+    moving: number,
+    target: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    max: number,
+    target_distance: number,
+    options: number,
+  ): number;
+  collider_set_mass_properties(
+    collider: number,
+    mass: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    ix: number,
+    iy: number,
+    iz: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+  ): number;
+  collider_volume(collider: number): number;
+  collider_mass(collider: number): number;
   query_ray(
     ox: number,
     oy: number,
@@ -274,6 +301,9 @@ export const COLLIDER_OFF = 2;
 export const COLLIDER_TYPES_SHIFT = 2;
 /** Bit 8 of a collider's flags: its pairs are shown to the contact modifier (layout.rs COLLIDER_MODIFY). */
 export const COLLIDER_MODIFY = 1 << 8;
+/** Bits 9 and 10 of a collider's flags: the pair filter is not asked about solid pairs, or pairs with a sensor, for it. */
+export const COLLIDER_NO_CONTACT_FILTER = 1 << 9;
+export const COLLIDER_NO_INTERSECTION_FILTER = 1 << 10;
 export const COLLIDER_TYPES = 63 << COLLIDER_TYPES_SHIFT;
 /** Bit of the `flags` column: the body is out of the world. */
 export const BODY_DISABLED = 1 << 11;
@@ -285,6 +315,8 @@ export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;
 /** Bit of the `pairFlags` column: a part of a mesh pair, one triangle's manifold. */
 export const PAIR_IS_PART = 16;
+/** Bit of a pair's flags: the pair touched at the end of the last step it was looked at (layout.rs PAIR_TOUCHING). */
+export const PAIR_TOUCHING = 1;
 
 /** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
@@ -1768,6 +1800,9 @@ export class KernelWorld {
   pairContacts(a: number, b: number, prediction: number): KernelManifold[] {
     const total = this.api.pair_contacts(a, b, prediction);
     if (total < 0) throw new RangeError(PAIR_REFUSED);
+    return this.readManifolds(total);
+  }
+  private readManifolds(total: number): KernelManifold[] {
     const kept = total < 56 ? total : 56,
       words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), 36 * kept),
       f = new Float32Array(words.buffer, words.byteOffset, 36 * kept),
@@ -1787,6 +1822,87 @@ export class KernelWorld {
       manifolds.push({ normal: [f[at]!, f[at + 1]!, f[at + 2]!], points });
     }
     return manifolds;
+  }
+  /**
+   * The manifolds of a collider and a query shape within `prediction` of touching, normals from the collider to the shape.
+   * @throws RangeError for a collider that is gone, a shape or pose the kernel refuses, or a prediction below 0.
+   */
+  colliderShapeContacts(
+    collider: number,
+    shape: KernelQueryShape,
+    position: readonly number[],
+    rotation: readonly number[],
+    prediction: number,
+  ): KernelManifold[] {
+    const total = this.api.collider_shape_contacts(collider, ...this.shapeWords(shape, position, rotation), prediction);
+    if (total < 0) throw new RangeError(`${PAIR_REFUSED} ${CAST_REFUSED}`);
+    return this.readManifolds(total);
+  }
+  /** The first touch of collider `moving`, as it is, moving along `direction` with collider `target`, or null. @throws RangeError for a collider that is gone. */
+  colliderCastCollider(
+    moving: number,
+    target: number,
+    direction: readonly number[],
+    cast: KernelCastOptions,
+  ): KernelShapeCastHit | null {
+    const found = this.api.collider_cast_collider(
+      moving,
+      target,
+      direction[0]!,
+      direction[1]!,
+      direction[2]!,
+      cast.max,
+      cast.target,
+      castBits(cast),
+    );
+    if (found < 0)
+      throw new RangeError(
+        `${PAIR_REFUSED} A cast also needs a finite nonzero direction and a target distance of 0 or more.`,
+      );
+    return found ? this.readCast(0) : null;
+  }
+  /**
+   * Gives a collider mass properties of its own in place of its shape's at its density, or takes them off (`mass` null); the
+   * body's mass, centre and inertia are worked out again.
+   * @throws RangeError for a collider that is gone, or a mass, centre, moments or frame that cannot be a body's.
+   */
+  setColliderMassProperties(
+    collider: number,
+    mass: number | null,
+    center: readonly number[],
+    inertia: readonly number[],
+    frame: readonly number[],
+  ): void {
+    const ok = this.api.collider_set_mass_properties(
+      collider,
+      mass === null ? -1 : mass,
+      center[0]!,
+      center[1]!,
+      center[2]!,
+      inertia[0]!,
+      inertia[1]!,
+      inertia[2]!,
+      frame[0]!,
+      frame[1]!,
+      frame[2]!,
+      frame[3]!,
+    );
+    if (!ok)
+      throw new RangeError(
+        `Row ${collider} holds no collider, or its mass properties are not a body's: a finite mass of 0 or more, a finite centre, moments of 0 or more and a unit quaternion.`,
+      );
+  }
+  /** A collider's volume in cubic metres (0 for a mesh). @throws RangeError for a collider that is gone. */
+  colliderVolume(collider: number): number {
+    const volume = this.api.collider_volume(collider);
+    if (volume < 0) throw new RangeError(PAIR_REFUSED);
+    return volume;
+  }
+  /** The mass a collider adds to its body, in kilograms. @throws RangeError for a collider that is gone. */
+  colliderMass(collider: number): number {
+    const mass = this.api.collider_mass(collider);
+    if (mass < 0) throw new RangeError(PAIR_REFUSED);
+    return mass;
   }
   /** The distance between two colliders and the nearest point on each; null when none can be read. @throws RangeError for a collider row that is gone. */
   pairDistance(a: number, b: number): KernelDistance | null {

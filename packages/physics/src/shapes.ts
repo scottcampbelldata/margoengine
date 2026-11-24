@@ -199,6 +199,18 @@ export interface ColliderSettings {
    */
   modifyContacts?: boolean;
   /**
+   * Which hooks involve this collider, as Rapier's `activeHooks`: `filterContactPairs` and `filterIntersectionPairs` (the
+   * pair filters of the world are asked about a pair when either collider has the flag; both on by default) and
+   * `modifyContacts` (off by default).
+   */
+  activeHooks?: { filterContactPairs?: boolean; filterIntersectionPairs?: boolean; modifyContacts?: boolean };
+  /**
+   * Mass properties of the collider's own in place of its shape's at its density, Rapier's `setMassProperties`: the mass in
+   * kilograms, the centre of mass in the collider's frame, the principal moments of inertia and the turn of their axes
+   * (default none). Wins over `mass` and `density`; `massless` wins over it.
+   */
+  massProperties?: { mass: number; centerOfMass: Vec3; principalInertia: Vec3; inertiaFrame?: Quat };
+  /**
    * Whether this collider asks for contact-force events on the own solver (default true; a pair speaks when either side
    * asks). See `contactForceThreshold`.
    */

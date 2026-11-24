@@ -620,6 +620,23 @@ A collider can be edited after it is made: `collider.setTranslationWrtParent([x,
 
 `new Physics(engine, {predictionDistance})` and `physics.predictionDistance` (metres, default 0.04) are the prediction distance: how far apart two shapes may be and still have contacts made. A contact inside it is speculative: it keeps the shapes from sinking in and pushes nothing until they close. A larger value finds contacts earlier and keeps more pairs; setting it fits every box again at the next step. `contactSkin` on a collider (metres, default 0) is Rapier's contact skin: contacts are made and solved as if the shape were that much thicker, so a body rests a skin above what it lies on (two colliders' skins add up) and starts touching a skin away; `collider.setContactSkin(skin)` and `contactSkin()` change and read it. `softCcdPrediction` on a body (metres, default 0) is Rapier's soft CCD: its contacts reach that much further than the step's own motion, which the own solver always includes (a fast body meets a thin wall without it), so a value adds margin; `body.softCcdPrediction` reads and sets it.
 
+A collider answers what Rapier's collider API does. `volume()`, `mass()` and `setMass(kg)` (which sets the density from the volume); `massProperties: {mass, centerOfMass, principalInertia, inertiaFrame}` as an option, or `setMassProperties(...)` and `clearMassProperties()`, give it a mass, centre and inertia of its own in place of its shape's, and the body's are worked out from them. `frictionCombineRule()` and `restitutionCombineRule()` with their setters, `borderRadius()` and `setBorderRadius()` (a box, hull, triangle, cylinder or cone), `translation()` and `rotation()` in the world, and `vertices()`, `indices()` and `heightfieldHeights()`, `heightfieldNRows()`, `heightfieldNCols()` and `heightfieldScale()` (heights as scaled, the scale `[width, 1, depth]`) read it back. `activeHooks` (`filterContactPairs`, `filterIntersectionPairs`, `modifyContacts`) as an option or `setActiveHooks(...)` says which hooks involve it: a pair is shown to `contactFilter` (or, with a sensor in it, to `intersectionFilter`) when either collider has the flag, and both flags are on by default. On the world: `contactPairsWith(collider)` and `intersectionPairsWith(collider)` list what it touches as of the last step, `contactShape(collider, shape, position, rotation, prediction)` gives the manifolds with a shape, `castColliderOnto(moving, target, direction)` and `castCollider(moving, direction)` cast a collider as it is, and `getColliders()` visits every collider. `contactPair` also gives the pair's friction and restitution and each point's `normalImpulse` and `tangentImpulse` (the solver's last substep, 0 for a contact the world does not hold), and a `contactforce` event the `totalForce` vector, `maxForceMagnitude` and `maxForceDirection` of the pair's contacts (the last substep's pushes scaled to the step's impulse). Ray hits and point projections carry `featureType` ('vertex', 'edge', 'face' or 'unknown') and `featureId`, worked out when read: a box's faces are `2 axis + (low side ? 1 : 0)`, its edges `4 axis + two bits`, its vertices three bits; a hull's faces, vertices and edges are its rows; a mesh's faces are triangle numbers; a height field's `2 cell + half`; other shapes are unknown.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+const crate = physics.addBody(null, {colliders: {shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: 800}}).colliders[0];
+const wall = physics.addBody(null, {type: 'fixed', position: [3, 0, 0], colliders: {shape: 'box', halfExtents: [0.5, 2, 2]}}).colliders[0];
+physics.step();
+console.log(crate.volume(), crate.mass());                         // 1 800
+const hit = physics.raycast([-5, 0.2, 0.3], [1, 0, 0]);
+console.log(hit.featureType, hit.featureId);                       // 'face' 1: the crate's -x face
+console.log(physics.castColliderOnto(crate, wall, [1, 0, 0]).distance.toFixed(2)); // '2.00'
+physics.dispose();
+```
+
 `activeCollisionTypes` on a collider names the kinds of body pair it takes part in: any of `dynamicDynamic`, `dynamicKinematic`, `dynamicFixed` (the default three), `kinematicKinematic`, `kinematicFixed` and `fixedFixed`. A pair of colliders is made when both name its kind, so two kinematic bodies raise `contactstart` and `contactend` only when both colliders add `kinematicKinematic`, and a floor that leaves out `dynamicFixed` lets a body fall through. A sensor sees every kind. `collider.setActiveCollisionTypes(kinds)` and `activeCollisionTypes()` change and read it. `contactForceEvents` (default true, where Rapier's default is off) and `contactForceThreshold` (newtons, default 0) on a collider choose its contact-force events; a pair speaks when either side asks and its force passes the larger threshold, and `collider.setActiveEvents({collision, contactForce})` and `setContactForceEventThreshold(n)` change them.
 
 `physics.on('contactforce', listener)` says how hard two colliders pressed on each other: after each step with a listener, once a pair, with `bodyA`, `bodyB`, `meshA`, `meshB`, `colliderA`, `colliderB`, `impulse` (the normal impulse of the whole step, N s) and `force` (that over the step's length, N). A box at rest on a floor reads its weight, and the impulses of a landing add up to what stops it. A pair of sleepers is not solved, so it says nothing. Only the own solver has this event.
@@ -925,7 +942,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Islands | island forest, an island sleeps together | full |
 | Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full |
 | Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full |
-| Integration parameters: prediction distance | a constant of the broad phase, 0.04 m | partial: not settable |
+| Integration parameters: prediction distance | `predictionDistance` (`tests/next-prediction.test.js`) | full |
 | Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full |
 | Joint limits, per axis | `setLimits`, `setAxisLimits` | full |
 | Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |

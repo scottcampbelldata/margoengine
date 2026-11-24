@@ -12,6 +12,7 @@ import {
   KernelWorld,
   loadKernel,
   PAIR_IS_PART,
+  PAIR_TOUCHING,
   QUERY_EXCLUDE_DYNAMIC,
   QUERY_EXCLUDE_FIXED,
   QUERY_EXCLUDE_KINEMATIC,
@@ -21,6 +22,7 @@ import {
   QUERY_ONLY_FIXED,
   QUERY_ONLY_KINEMATIC,
   type KernelRayHit,
+  type KernelManifold,
   type KernelShapeCastHit,
   type KernelLoadOptions,
   type KernelShape,
@@ -34,7 +36,7 @@ import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
 import { colliderGeometry } from './mesh-fit.js';
 import type { ColliderOptions, ColliderSettings, ShapeOptions } from './shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
-import { PhysicsCollider } from './collider.js';
+import { PhysicsCollider, featureAt, type Feature, type FeatureType } from './collider.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
 import { type Multibody, buildMultibody, clearMultibody, type MultibodyLinkOptions } from './multibody.js';
 import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
@@ -77,6 +79,12 @@ export interface PhysicsOptions {
   name?: string;
   /** Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet. */
   contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+  /**
+   * Decides each candidate pair with a sensor in it, as Rapier's `filterIntersectionPair`: false lets them pass and keeps their
+   * intersection events quiet. Left out, `contactFilter` decides those pairs too. A collider can leave a hook out with
+   * `activeHooks`.
+   */
+  intersectionFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
   /**
    * Called for each touching pair that has a collider with `modifyContacts` set, after its friction and bounce are set and
    * before it is solved, each step: change its friction, restitution and normal, or clear its contacts (a one-way platform,
@@ -197,6 +205,18 @@ export interface CollisionEvent {
 }
 
 /** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
+/** A pair's force over a step as the solver gave it: the sum of its contacts' impulses and the strongest one. */
+interface ForceSum {
+  impulse: number;
+  x: number;
+  y: number;
+  z: number;
+  max: number;
+  mx: number;
+  my: number;
+  mz: number;
+}
+
 export interface ContactForceEvent {
   type: 'contactforce';
   bodyA: PhysicsBody;
@@ -209,6 +229,12 @@ export interface ContactForceEvent {
   impulse: number;
   /** `impulse` over the step's length, in newtons. A box at rest on a floor reads its weight. */
   force: number;
+  /** The sum of the pair's contact forces, normal and friction, in newtons, world space (Rapier's `totalForce`). */
+  totalForce: [number, number, number];
+  /** The strongest single contact's force in newtons (Rapier's `maxForceMagnitude`). */
+  maxForceMagnitude: number;
+  /** The direction of that contact's force, a unit vector (Rapier's `maxForceDirection`). */
+  maxForceDirection: [number, number, number];
 }
 
 /** Events a Physics world emits, keyed by event name. `touching` and `contactPoints` read contacts after a step. */
@@ -277,6 +303,10 @@ export interface RaycastHit {
   point: [number, number, number];
   /** Outward surface normal, world space; zero for a hit at distance 0 inside a solid shape. */
   normal: [number, number, number];
+  /** The kind of feature of the collider the hit is on (a ray's hit; not set on a shape cast's). */
+  readonly featureType?: FeatureType;
+  /** That feature's number, in Margo's numbering (see `PhysicsCollider.featureAt` rules in the README); `undefined` when 'unknown'. */
+  readonly featureId?: number | undefined;
 }
 
 /** Options of `Physics.shapeCast`: the query filter plus Rapier's `ShapeCastOptions`. */
@@ -298,9 +328,21 @@ export interface ShapeCastHit extends RaycastHit {
 /** The point of a collider nearest a query point, whether the query point is inside it, and how far it is. */
 /** What {@link Physics.contactPair} returns for one part of a pair: the normal from the first collider to the second. */
 export interface ContactManifold {
+  /** The pair's friction and restitution: what the solver mixed for it, or the colliders' by their combine rules. */
+  friction?: number;
+  restitution?: number;
   normal: [number, number, number];
   /** Up to four points: where each collider's surface is, how far apart they are (negative when they overlap) and an id that stays with the feature. */
-  points: { pointA: [number, number, number]; pointB: [number, number, number]; separation: number; id: number }[];
+  points: {
+    pointA: [number, number, number];
+    pointB: [number, number, number];
+    separation: number;
+    id: number;
+    /** The normal impulse the solver last gave this point (its last substep), 0 for a contact the world does not hold. */
+    normalImpulse: number;
+    /** The friction impulse the solver last gave it, along the pair's surface. */
+    tangentImpulse: [number, number, number];
+  }[];
 }
 
 /** What {@link Physics.colliderDistance} returns. */
@@ -318,6 +360,10 @@ export interface PointProjection {
   point: [number, number, number];
   inside: boolean;
   distance: number;
+  /** The kind of feature of the collider the point lies on. */
+  readonly featureType: FeatureType;
+  /** That feature's number, in Margo's numbering; `undefined` when 'unknown'. */
+  readonly featureId: number | undefined;
 }
 
 // gltf/pbr models (shared/model.js): skinned and morphed primitives are read in their bind pose; an instanced
@@ -451,8 +497,15 @@ export class Physics implements EnginePlugin, BodyOwner {
     checkVec(gravity, 'Gravity');
     this.world = new KernelWorld();
     this.world.setGravity(...gravity);
-    const filter = options.contactFilter;
-    if (filter) this.world.contactFilter = (a, b) => filter(this.byRow.get(a)!.body, this.byRow.get(b)!.body);
+    const filter = options.contactFilter,
+      sensorFilter = options.intersectionFilter;
+    if (filter || sensorFilter)
+      this.world.contactFilter = (a, b) => {
+        const first = this.byRow.get(a)!,
+          second = this.byRow.get(b)!,
+          decide = (first.isSensor() || second.isSensor() ? sensorFilter : undefined) ?? filter;
+        return decide ? decide(first.body, second.body) : true;
+      };
     if (options.predictionDistance !== undefined) this.world.setPredictionDistance(options.predictionDistance);
     const modifier = options.contactModifier;
     if (modifier) {
@@ -676,27 +729,31 @@ export class Physics implements EnginePlugin, BodyOwner {
   private gatherForces(events: (CollisionEvent | ContactForceEvent)[], dt: number): void {
     if (!this.listeners.get('contactforce')?.size) return;
     const kernel = this.kernel,
-      { solvePairs, pairForce, pairA, pairB, pairFlags } = kernel.columns,
+      c = kernel.columns,
+      { solvePairs, pairA, pairB, pairFlags } = kernel.columns,
       count = kernel.solvingPairs;
     // A mesh pair is solved as one part a triangle: its event sums them, as one pair of colliders felt one push.
-    let meshed: Map<number, number> | null = null;
+    let meshed: Map<number, ForceSum> | null = null;
     for (let i = 0; i < count; i++) {
       const row = solvePairs[i];
       if (!(pairFlags[row] & PAIR_IS_PART)) continue;
       meshed ??= new Map();
-      const key = pairA[row] * 0x400000 + pairB[row];
-      meshed.set(key, (meshed.get(key) ?? 0) + pairForce[row]);
+      const key = pairA[row] * 0x400000 + pairB[row],
+        sum = meshed.get(key) ?? { impulse: 0, x: 0, y: 0, z: 0, max: 0, mx: 0, my: 0, mz: 0 };
+      this.addForce(sum, row, c);
+      meshed.set(key, sum);
     }
     for (let i = 0; i < count; i++) {
       const row = solvePairs[i],
         key = pairA[row] * 0x400000 + pairB[row];
-      let impulse = pairForce[row];
+      let sum: ForceSum;
       if (meshed && pairFlags[row] & PAIR_IS_PART) {
-        impulse = meshed.get(key) ?? 0;
+        sum = meshed.get(key) ?? { impulse: 0, x: 0, y: 0, z: 0, max: 0, mx: 0, my: 0, mz: 0 };
         // The first part of the pair speaks; the rest are in its sum.
         meshed.delete(key);
-      }
-      const colliderA = this.byRow.get(pairA[row]),
+      } else this.addForce((sum = { impulse: 0, x: 0, y: 0, z: 0, max: 0, mx: 0, my: 0, mz: 0 }), row, c);
+      const impulse = sum.impulse,
+        colliderA = this.byRow.get(pairA[row]),
         colliderB = this.byRow.get(pairB[row]);
       if (!(impulse > 0) || !colliderA || !colliderB) continue;
       if (!(colliderA.forceEvents || colliderB.forceEvents)) continue;
@@ -704,7 +761,8 @@ export class Physics implements EnginePlugin, BodyOwner {
         colliderA.forceThreshold > colliderB.forceThreshold ? colliderA.forceThreshold : colliderB.forceThreshold;
       if (impulse / dt <= threshold) continue;
       const bodyA = colliderA.body,
-        bodyB = colliderB.body;
+        bodyB = colliderB.body,
+        peak = root(sum.mx * sum.mx + sum.my * sum.my + sum.mz * sum.mz);
       events.push({
         type: 'contactforce',
         bodyA,
@@ -715,7 +773,39 @@ export class Physics implements EnginePlugin, BodyOwner {
         colliderB,
         impulse,
         force: impulse / dt,
+        totalForce: [sum.x / dt, sum.y / dt, sum.z / dt],
+        maxForceMagnitude: sum.max / dt,
+        maxForceDirection: peak > 0 ? [sum.mx / peak, sum.my / peak, sum.mz / peak] : [0, 0, 0],
       });
+    }
+  }
+  /**
+   * Adds a solved pair row to a force sum: its normal impulse over the step, its contacts' pushes (along the normal and
+   * along the surface, as the last substep gave them) scaled so their normal parts add up to that impulse, and the
+   * strongest of them.
+   */
+  private addForce(sum: ForceSum, row: number, c: KernelWorld['columns']): void {
+    const first = row * 4,
+      points = c.pairContacts[row],
+      nx = c.pairNormalX[row],
+      ny = c.pairNormalY[row],
+      nz = c.pairNormalZ[row];
+    let pressed = 0;
+    for (let k = 0; k < points; k++) pressed += c.contactNormalImpulse[first + k];
+    const impulse = c.pairForce[row],
+      scale = pressed > 0 ? impulse / pressed : 0;
+    sum.impulse += impulse;
+    for (let k = 0; k < points; k++) {
+      const at = first + k,
+        pn = c.contactNormalImpulse[at],
+        x = (nx * pn + c.contactTangentX[at]) * scale,
+        y = (ny * pn + c.contactTangentY[at]) * scale,
+        z = (nz * pn + c.contactTangentZ[at]) * scale,
+        size = root(x * x + y * y + z * z);
+      sum.x += x;
+      sum.y += y;
+      sum.z += z;
+      if (size > sum.max) [sum.max, sum.mx, sum.my, sum.mz] = [size, x, y, z];
     }
   }
 
@@ -834,7 +924,7 @@ export class Physics implements EnginePlugin, BodyOwner {
               scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
             };
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
-    const { name, shape, size, parts, data, volume, options: placed } = kernelCollider(options, fit, this.hulls),
+    const { name, shape, size, parts, data, options: placed } = kernelCollider(options, fit, this.hulls),
       row = parts
         ? this.kernel.addCompound(body.row, parts, placed)
         : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
@@ -847,7 +937,6 @@ export class Physics implements EnginePlugin, BodyOwner {
         (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0),
       );
     collider.data = data;
-    collider.volume = volume;
     collider.reshape = (next) => this.reshapeCollider(body, collider, next);
     collider.emits = options.events ?? true;
     collider.forceEvents = options.contactForceEvents ?? true;
@@ -858,6 +947,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.contactForceThreshold !== undefined)
       collider.setContactForceEventThreshold(options.contactForceThreshold);
     if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
+    if (options.activeHooks) collider.setActiveHooks(options.activeHooks);
+    if (options.massProperties && !options.massless) {
+      const own = options.massProperties;
+      collider.setMassProperties(own.mass, own.centerOfMass, own.principalInertia, own.inertiaFrame);
+    }
     if (options.modifyContacts) {
       if (!this.hasModifier)
         throw new MargoError('state', 'modifyContacts needs a contactModifier: pass one in the Physics options.');
@@ -1143,17 +1237,27 @@ export class Physics implements EnginePlugin, BodyOwner {
     return [flags, groups, collider, body];
   }
   private rayHit(hit: KernelRayHit): RaycastHit | null {
-    const collider = this.byRow.get(hit.collider);
-    return collider
-      ? {
-          body: collider.body,
-          mesh: collider.body.mesh,
-          collider,
-          distance: hit.distance,
-          point: hit.point,
-          normal: hit.normal,
-        }
-      : null;
+    const collider = this.byRow.get(hit.collider),
+      found = collider
+        ? {
+            body: collider.body,
+            mesh: collider.body.mesh,
+            collider,
+            distance: hit.distance,
+            point: hit.point,
+            normal: hit.normal,
+          }
+        : null;
+    return found && collider ? this.withFeatures(found, collider, hit.point) : null;
+  }
+  /** Gives a hit `featureType` and `featureId`, worked out when first read. */
+  private withFeatures<T extends object>(hit: T, collider: PhysicsCollider, point: [number, number, number]): T {
+    let found: Feature | null = null;
+    const feature = (): Feature => (found ??= featureAt(this.kernel, collider, point));
+    return Object.defineProperties(hit, {
+      featureType: { get: () => feature().type, enumerable: true },
+      featureId: { get: () => feature().id, enumerable: true },
+    });
   }
   private passes(hit: RaycastHit, predicate: QueryFilter['predicate']): boolean {
     return !predicate || predicate(hit.body, hit.collider);
@@ -1298,14 +1402,18 @@ export class Physics implements EnginePlugin, BodyOwner {
       const collider = raw && this.byRow.get(raw.collider);
       if (!raw || !collider || (options.predicate && !options.predicate(collider.body, collider))) continue;
       const distance = raw.inside ? 0 : raw.distance,
-        hit = {
-          body: collider.body,
-          mesh: collider.body.mesh,
+        hit = this.withFeatures(
+          {
+            body: collider.body,
+            mesh: collider.body.mesh,
+            collider,
+            point: raw.point,
+            inside: raw.inside,
+            distance,
+          },
           collider,
-          point: raw.point,
-          inside: raw.inside,
-          distance,
-        };
+          raw.point,
+        ) as PointProjection;
       if (!best || distance < best.distance || (distance === best.distance && hit.inside && !best.inside)) best = hit;
     }
     return best;
@@ -1375,10 +1483,63 @@ export class Physics implements EnginePlugin, BodyOwner {
    */
   contactPair(a: PhysicsCollider, b: PhysicsCollider, prediction = 0): ContactManifold[] {
     this.live();
-    return this.kernel.pairContacts(this.rowOf(a), this.rowOf(b), prediction).map(({ normal, points }) => ({
-      normal,
-      points: points.map((p) => ({ pointA: p.onA, pointB: p.onB, separation: p.separation, id: p.id })),
+    const first = this.rowOf(a),
+      second = this.rowOf(b),
+      stored = this.storedContacts(first, second),
+      friction = stored?.friction ?? this.mixed(first, second, false),
+      restitution = stored?.restitution ?? this.mixed(first, second, true);
+    return this.kernel.pairContacts(first, second, prediction).map((m) => ({
+      ...this.manifold(m, stored?.points),
+      friction,
+      restitution,
     }));
+  }
+  /** A manifold of the kernel in this entry's names, with the impulses a stored pair holds for its points. */
+  private manifold(
+    m: KernelManifold,
+    held?: Map<number, { normalImpulse: number; tangentImpulse: [number, number, number] }>,
+  ): ContactManifold {
+    return {
+      normal: m.normal,
+      points: m.points.map((p) => ({
+        pointA: p.onA,
+        pointB: p.onB,
+        separation: p.separation,
+        id: p.id,
+        normalImpulse: held?.get(p.id)?.normalImpulse ?? 0,
+        tangentImpulse: held?.get(p.id)?.tangentImpulse ?? [0, 0, 0],
+      })),
+    };
+  }
+  /** What the solver holds for the pair of two colliders in the world: its mixed friction and restitution and each contact's impulses. */
+  private storedContacts(a: number, b: number) {
+    const kernel = this.kernel,
+      c = kernel.columns;
+    for (let row = kernel.firstPair(a); row !== NONE; row = kernel.nextPair(row, a)) {
+      if (!((c.pairA[row] === a && c.pairB[row] === b) || (c.pairA[row] === b && c.pairB[row] === a))) continue;
+      const points = new Map<number, { normalImpulse: number; tangentImpulse: [number, number, number] }>();
+      for (let part = row; part !== NONE; part = c.pairChild[part])
+        for (let k = 0; k < c.pairContacts[part]; k++) {
+          const at = part * 4 + k;
+          points.set(c.contactId[at], {
+            normalImpulse: c.contactNormalImpulse[at],
+            tangentImpulse: [c.contactTangentX[at], c.contactTangentY[at], c.contactTangentZ[at]],
+          });
+        }
+      return { friction: c.pairFriction[row], restitution: c.pairRestitution[row], points };
+    }
+    return null;
+  }
+  /** The friction or restitution two colliders make by their combine rules (the higher rule of the two decides). */
+  private mixed(a: number, b: number, restitution: boolean): number {
+    const c = this.kernel.columns,
+      values = restitution ? c.colliderRestitution : c.colliderFriction,
+      shift = restitution ? 2 : 0,
+      ruleA = (c.colliderCombine[a] >> shift) & 3,
+      ruleB = (c.colliderCombine[b] >> shift) & 3,
+      rule = ruleA > ruleB ? ruleA : ruleB,
+      [x, y] = [values[a], values[b]];
+    return rule === 1 ? (x < y ? x : y) : rule === 2 ? x * y : rule === 3 ? (x > y ? x : y) : (x + y) / 2;
   }
   /**
    * Whether two colliders overlap now, whether or not their bodies touch in the world. Sensors count.
@@ -1481,6 +1642,95 @@ export class Physics implements EnginePlugin, BodyOwner {
     checkRotation(rotation);
     this.live();
     return this.kernel.colliderOverlaps(this.rowOf(collider), queryShape(shape, this.hulls), position, rotation);
+  }
+  /** Every collider in the world, in the order their rows were made, as Rapier's `forEachCollider` visits them. */
+  getColliders(): PhysicsCollider[] {
+    return [...this.byRow.entries()].sort((a, b) => a[0] - b[0]).map(([, collider]) => collider);
+  }
+  /**
+   * The colliders `collider` touches as of the last step, with solid contact (neither side a sensor): Rapier's
+   * `contactPairsWith`.
+   * @throws RangeError for a collider that was removed.
+   */
+  contactPairsWith(collider: PhysicsCollider): PhysicsCollider[] {
+    return this.touchingWith(collider, false);
+  }
+  /**
+   * The colliders `collider` overlaps as of the last step where one of the two is a sensor: Rapier's `intersectionPairsWith`.
+   * @throws RangeError for a collider that was removed.
+   */
+  intersectionPairsWith(collider: PhysicsCollider): PhysicsCollider[] {
+    return this.touchingWith(collider, true);
+  }
+  private touchingWith(collider: PhysicsCollider, sensors: boolean): PhysicsCollider[] {
+    this.live();
+    const self = this.rowOf(collider),
+      kernel = this.kernel,
+      c = kernel.columns,
+      found: PhysicsCollider[] = [];
+    for (let row = kernel.firstPair(self); row !== NONE; row = kernel.nextPair(row, self)) {
+      if (!(c.pairFlags[row] & PAIR_TOUCHING)) continue;
+      const other = this.byRow.get(c.pairA[row] === self ? c.pairB[row] : c.pairA[row]);
+      if (other && (collider.isSensor() || other.isSensor()) === sensors) found.push(other);
+    }
+    return found.sort((a, b) => a.handle - b.handle);
+  }
+  /**
+   * The contact manifolds of a collider and a convex query shape at a pose within `prediction` metres of touching (default
+   * 0), normals from the collider to the shape: Rapier's `contactShape`.
+   * @throws RangeError for a collider that was removed, a pose that is not finite or a prediction below 0; MargoError `unsupported` for a query shape the solver does not hold.
+   */
+  contactShape(
+    collider: PhysicsCollider,
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat = [0, 0, 0, 1],
+    prediction = 0,
+  ): ContactManifold[] {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    this.live();
+    return this.kernel
+      .colliderShapeContacts(this.rowOf(collider), queryShape(shape, this.hulls), position, rotation, prediction)
+      .map((m) => this.manifold(m));
+  }
+  /**
+   * Casts a collider, with its own shape and pose, along `direction` against one other collider: Rapier's `castCollider`.
+   * `distance` is along the direction's unit. Returns the touch of the two, or null.
+   * @throws RangeError for a collider that was removed or a direction that is not finite and nonzero.
+   */
+  castColliderOnto(
+    moving: PhysicsCollider,
+    target: PhysicsCollider,
+    direction: Vec3,
+    options: PhysicsShapeCastOptions = {},
+  ): ShapeCastHit | null {
+    checkVec(direction, 'Cast direction');
+    this.live();
+    const raw = this.kernel.colliderCastCollider(this.rowOf(moving), this.rowOf(target), direction, {
+      max: options.maxDistance ?? Infinity,
+      target: options.targetDistance ?? 0,
+      stop: options.stopAtPenetration ?? true,
+      geometry: options.computeImpactGeometryOnPenetration ?? true,
+    });
+    return raw ? this.castHit(raw) : null;
+  }
+  /**
+   * Casts a collider along `direction` against the rest of the world (the colliders of other bodies the filter lets
+   * through) and returns the nearest touch, or null.
+   */
+  castCollider(moving: PhysicsCollider, direction: Vec3, options: PhysicsShapeCastOptions = {}): ShapeCastHit | null {
+    let best: ShapeCastHit | null = null;
+    for (const target of this.getColliders()) {
+      if (target.body === moving.body || (options.exclude !== undefined && options.exclude === target.body)) continue;
+      if (options.predicate && !options.predicate(target.body, target)) continue;
+      const hit = this.castColliderOnto(moving, target, direction, {
+        ...options,
+        maxDistance: best ? best.distance : options.maxDistance,
+      });
+      if (hit && (!best || hit.distance < best.distance)) best = hit;
+    }
+    return best;
   }
   /** A collider's row, for the kernel; refuses what is not this world's. */
   private rowOf(collider: PhysicsCollider): number {

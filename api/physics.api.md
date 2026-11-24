@@ -113,6 +113,17 @@ export interface ColliderSettings {
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
     modifyContacts?: boolean;
+    activeHooks?: {
+        filterContactPairs?: boolean;
+        filterIntersectionPairs?: boolean;
+        modifyContacts?: boolean;
+    };
+    massProperties?: {
+        mass: number;
+        centerOfMass: Vec3;
+        principalInertia: Vec3;
+        inertiaFrame?: Quat;
+    };
     contactForceEvents?: boolean;
     contactForceThreshold?: number;
     enabled?: boolean;
@@ -216,15 +227,22 @@ export interface ContactForceEvent {
     colliderB: PhysicsCollider;
     impulse: number;
     force: number;
+    totalForce: [number, number, number];
+    maxForceMagnitude: number;
+    maxForceDirection: [number, number, number];
 }
 
 export interface ContactManifold {
+    friction?: number;
+    restitution?: number;
     normal: [number, number, number];
     points: {
         pointA: [number, number, number];
         pointB: [number, number, number];
         separation: number;
         id: number;
+        normalImpulse: number;
+        tangentImpulse: [number, number, number];
     }[];
 }
 
@@ -488,6 +506,11 @@ export class KernelWorld {
     colliderOverlaps(collider: number, shape: KernelQueryShape, position: readonly number[], rotation: readonly number[]): boolean;
     pairIntersects(a: number, b: number): boolean;
     pairContacts(a: number, b: number, prediction: number): KernelManifold[];
+    colliderShapeContacts(collider: number, shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], prediction: number): KernelManifold[];
+    colliderCastCollider(moving: number, target: number, direction: readonly number[], cast: KernelCastOptions): KernelShapeCastHit | null;
+    setColliderMassProperties(collider: number, mass: number | null, center: readonly number[], inertia: readonly number[], frame: readonly number[]): void;
+    colliderVolume(collider: number): number;
+    colliderMass(collider: number): number;
     pairDistance(a: number, b: number): KernelDistance | null;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
@@ -663,6 +686,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     colliderContainsPoint(collider: PhysicsCollider, point: Vec3): boolean;
     castShapeAtCollider(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
     colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat): boolean;
+    getColliders(): PhysicsCollider[];
+    contactPairsWith(collider: PhysicsCollider): PhysicsCollider[];
+    intersectionPairsWith(collider: PhysicsCollider): PhysicsCollider[];
+    contactShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat, prediction?: number): ContactManifold[];
+    castColliderOnto(moving: PhysicsCollider, target: PhysicsCollider, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
+    castCollider(moving: PhysicsCollider, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
     debugRender(options?: DebugRenderOptions): DebugLines;
@@ -756,7 +785,6 @@ export class PhysicsCollider {
         vertices: Float32Array;
         indices?: Uint32Array;
     };
-    volume: () => number;
     constructor(kernel: KernelWorld,
     handle: number,
     body: PhysicsBody,
@@ -778,6 +806,16 @@ export class PhysicsCollider {
     setEnabled(enabled: boolean): this;
     contactSkin(): number;
     setContactSkin(skin: number): this;
+    activeHooks(): {
+        filterContactPairs: boolean;
+        filterIntersectionPairs: boolean;
+        modifyContacts: boolean;
+    };
+    setActiveHooks(hooks: {
+        filterContactPairs?: boolean;
+        filterIntersectionPairs?: boolean;
+        modifyContacts?: boolean;
+    }): this;
     activeCollisionTypes(): CollisionPairKind[];
     setActiveCollisionTypes(kinds: readonly CollisionPairKind[]): this;
     activeEvents(): {
@@ -790,7 +828,6 @@ export class PhysicsCollider {
     }): this;
     contactForceEventThreshold(): number;
     setContactForceEventThreshold(threshold: number): this;
-    mass(): number;
     translation(): {
         x: number;
         y: number;
@@ -830,6 +867,20 @@ export class PhysicsCollider {
     radius(): number;
     halfHeight(): number;
     borderRadius(): number;
+    setBorderRadius(border: number): this;
+    setMassProperties(mass: number, centerOfMass: Vec3, principalInertia: Vec3, inertiaFrame?: Quat): this;
+    clearMassProperties(): this;
+    volume(): number;
+    mass(): number;
+    setMass(mass: number): this;
+    frictionCombineRule(): CombineRule;
+    setFrictionCombineRule(rule: CombineRule): this;
+    restitutionCombineRule(): CombineRule;
+    setRestitutionCombineRule(rule: CombineRule): this;
+    heightfieldNRows(): number;
+    heightfieldNCols(): number;
+    heightfieldHeights(): Float32Array;
+    heightfieldScale(): [number, number, number];
     friction(): number;
     setFriction(friction: number): this;
     restitution(): number;
@@ -900,6 +951,7 @@ export interface PhysicsOptions {
     solverIterations?: number;
     name?: string;
     contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+    intersectionFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
     contactModifier?: (contact: ContactModification) => void;
     predictionDistance?: number;
 }
@@ -942,6 +994,8 @@ export interface PointProjection {
     point: [number, number, number];
     inside: boolean;
     distance: number;
+    readonly featureType: FeatureType;
+    readonly featureId: number | undefined;
 }
 
 export type Quat = readonly [number, number, number, number];
@@ -968,6 +1022,8 @@ export interface RaycastHit {
     distance: number;
     point: [number, number, number];
     normal: [number, number, number];
+    readonly featureType?: FeatureType;
+    readonly featureId?: number | undefined;
 }
 
 export class Rope implements PhysicsAttachment {
@@ -1189,6 +1245,8 @@ interface BodyOwner {
     removeBody(body: PhysicsBody): void;
     moved(body: PhysicsBody): void;
 }
+
+type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
 
 interface JointBase {
     anchorA?: Vec3;

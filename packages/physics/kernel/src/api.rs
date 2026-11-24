@@ -658,6 +658,75 @@ pub extern "C" fn query_shape_all(
     count as i32
 }
 
+/// Gives a live collider mass properties of its own, in place of its shape's at its density: a mass in kilograms (below 0
+/// takes them off), the centre of mass in the collider's frame, the principal moments of inertia and the unit quaternion
+/// that turns their axes. False for a collider that is gone, or numbers that cannot be a body.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_set_mass_properties(collider: u32, mass: f32, cx: f32, cy: f32, cz: f32, ix: f32, iy: f32, iz: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> u32 {
+    world().set_collider_mass_properties(collider, mass, [cx, cy, cz], [ix, iy, iz], [qx, qy, qz, qw]) as u32
+}
+/// A collider's volume in cubic metres (a mesh has none): -1 when the collider is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_volume(collider: u32) -> f32 {
+    if !collider_alive(collider) { -1.0 } else { world().collider_volume(collider as usize) }
+}
+/// The mass a collider adds to its body in kilograms: -1 when the collider is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_mass(collider: u32) -> f32 {
+    if !collider_alive(collider) { -1.0 } else { world().collider_mass(collider as usize) }
+}
+
+/// Manifold `k` of a contacts answer into the query buffer, 36 words (kept up to 56 of them).
+fn write_manifold(k: usize, m: &crate::narrow::Manifold) {
+    if k >= 56 {
+        return;
+    }
+    let mut words = [0u32; 36];
+    words[..4].copy_from_slice(&[m.normal.x.to_bits(), m.normal.y.to_bits(), m.normal.z.to_bits(), m.count as u32]);
+    for (i, p) in m.points.iter().enumerate().take(m.count) {
+        let at = 4 + 8 * i;
+        words[at..at + 8].copy_from_slice(&[p.on_a.x.to_bits(), p.on_a.y.to_bits(), p.on_a.z.to_bits(), p.on_b.x.to_bits(), p.on_b.y.to_bits(), p.on_b.z.to_bits(), p.separation.to_bits(), p.id]);
+    }
+    write_words(36 * k, &words);
+}
+
+/// Manifolds of a collider and a query shape within `prediction` of touching (the layout of `pair_contacts`), normals from
+/// the collider to the shape; -1 when the collider is gone, the shape is refused or `prediction` is not 0 or more.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_shape_contacts(collider: u32, kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, prediction: f32) -> i32 {
+    let Some((shape, pose)) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw) else { return -1 };
+    if !collider_alive(collider) || !(prediction >= 0.0 && prediction < f32::INFINITY) || world().solid(shape, pose, &mut BoxData::new()).is_none() {
+        return -1;
+    }
+    let mut count = 0usize;
+    world().shape_contacts(collider as usize, shape, pose, prediction, &mut |m| {
+        write_manifold(count, m);
+        count += 1;
+    });
+    count as i32
+}
+
+/// A collider cast as it is (its shape, its pose) along a direction against another collider: 1 with the hit in the buffer
+/// (see `query_shape_cast`), 0 for none, -1 for a direction that is not finite and nonzero or a collider that is gone.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_cast_collider(moving: u32, target: u32, dx: f32, dy: f32, dz: f32, max: f32, target_distance: f32, options: u32) -> i32 {
+    let Some((_, dir, _)) = ray_args(0.0, 0.0, 0.0, dx, dy, dz, 0, u32::MAX, crate::world::NONE, crate::world::NONE) else { return -1 };
+    if !collider_alive(moving) || !collider_alive(target) || max.is_nan() || !(target_distance >= 0.0 && target_distance < f32::INFINITY) {
+        return -1;
+    }
+    let o = CastOptions { max, target: target_distance, stop: options & 1 != 0, geometry: options & 2 != 0 };
+    match world().cast_collider_collider(moving as usize, target as usize, dir, &o) {
+        Some(hit) => {
+            write_cast(0, target, hit);
+            1
+        }
+        None => 0,
+    }
+}
+
 /// Whether a collider row is alive and in the world.
 fn collider_alive(c: u32) -> bool {
     let w = world();
@@ -718,15 +787,7 @@ pub extern "C" fn pair_contacts(a: u32, b: u32, prediction: f32) -> i32 {
     }
     let mut count = 0usize;
     world().pair_contacts(a as usize, b as usize, prediction, &mut |m| {
-        if count < 56 {
-            let mut words = [0u32; 36];
-            words[..4].copy_from_slice(&[m.normal.x.to_bits(), m.normal.y.to_bits(), m.normal.z.to_bits(), m.count as u32]);
-            for (k, p) in m.points.iter().enumerate().take(m.count) {
-                let at = 4 + 8 * k;
-                words[at..at + 8].copy_from_slice(&[p.on_a.x.to_bits(), p.on_a.y.to_bits(), p.on_a.z.to_bits(), p.on_b.x.to_bits(), p.on_b.y.to_bits(), p.on_b.z.to_bits(), p.separation.to_bits(), p.id]);
-            }
-            write_words(36 * count, &words);
-        }
+        write_manifold(count, m);
         count += 1;
     });
     count as i32

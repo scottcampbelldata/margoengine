@@ -197,6 +197,19 @@ columns! {
     COLLIDER_ROTATION_Z f32 Collider,
     COLLIDER_ROTATION_W f32 Collider,
     COLLIDER_DENSITY f32 Collider,
+    // A collider's own mass properties (Rapier's collider `setMassProperties`), used in place of its shape's and density when
+    // COLLIDER_OWN_SOLID is set: the mass, the centre in the collider's frame, the principal moments and the turn of their axes.
+    COLLIDER_OWN_MASS f32 Collider,
+    COLLIDER_OWN_CENTER_X f32 Collider,
+    COLLIDER_OWN_CENTER_Y f32 Collider,
+    COLLIDER_OWN_CENTER_Z f32 Collider,
+    COLLIDER_OWN_INERTIA_X f32 Collider,
+    COLLIDER_OWN_INERTIA_Y f32 Collider,
+    COLLIDER_OWN_INERTIA_Z f32 Collider,
+    COLLIDER_OWN_FRAME_X f32 Collider,
+    COLLIDER_OWN_FRAME_Y f32 Collider,
+    COLLIDER_OWN_FRAME_Z f32 Collider,
+    COLLIDER_OWN_FRAME_W f32 Collider,
     // A collider's skin: contacts are made and solved as if every shape were this much thicker (Rapier's contact skin).
     COLLIDER_SKIN f32 Collider,
     // A box's or hull's border radius (Rapier's round cuboid and round convex); 0 for none. A cylinder's and cone's is C.
@@ -698,6 +711,13 @@ pub const COLLIDER_TYPES: u32 = 63 << COLLIDER_TYPES_SHIFT;
 /// after its friction and bounce are set and before it is solved. The modifier may change the pair's friction, bounce
 /// and normal, or clear its contacts.
 pub const COLLIDER_MODIFY: u32 = 1 << 8;
+/// Bits 9 and 10 of COLLIDER_FLAGS: the world's pair filter is not asked about a solid pair, or about a pair with a sensor,
+/// unless one of the two colliders leaves the bit clear (Rapier's `FILTER_CONTACT_PAIRS` and `FILTER_INTERSECTION_PAIRS`,
+/// reversed so that clear, the default, asks).
+pub const COLLIDER_NO_CONTACT_FILTER: u32 = 1 << 9;
+pub const COLLIDER_NO_INTERSECTION_FILTER: u32 = 1 << 10;
+/// Bit 11 of COLLIDER_FLAGS: the collider's mass properties are the COLLIDER_OWN_ columns, not its shape's at its density.
+pub const COLLIDER_OWN_SOLID: u32 = 1 << 11;
 pub const TYPES_DEFAULT: u32 = 7;
 
 // Bits of the PAIR_FLAGS column.

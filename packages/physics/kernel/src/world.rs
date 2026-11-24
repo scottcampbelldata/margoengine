@@ -522,6 +522,39 @@ impl World {
         true
     }
 
+    /// Gives a live collider mass properties of its own, or takes them off with `mass` below 0 (see `api::collider_set_mass_properties`).
+    pub fn set_collider_mass_properties(&mut self, collider: u32, mass: f32, center: [f32; 3], inertia: [f32; 3], frame: [f32; 4]) -> bool {
+        let at = collider as usize;
+        if collider >= self.header().collider_rows
+            || self.uu(COLLIDER_STATE, at) & REMOVED != 0
+            || self.uu(COLLIDER_STATE, at) & (IN_BROAD | PENDING) == 0
+        {
+            return false;
+        }
+        let flags = self.uu(COLLIDER_FLAGS, at);
+        if mass < 0.0 {
+            self.set_u(COLLIDER_FLAGS, at, flags & !COLLIDER_OWN_SOLID);
+        } else {
+            let length = frame.iter().map(|v| v * v).sum::<f32>();
+            let finite = center.iter().chain(inertia.iter()).chain(frame.iter()).chain([mass].iter()).all(|v| v.is_finite());
+            if !finite || mass >= f32::INFINITY || inertia.iter().any(|v| *v < 0.0) || !(0.99..=1.01).contains(&length) {
+                return false;
+            }
+            self.set_s(COLLIDER_OWN_MASS, at, mass);
+            for k in 0..3 {
+                self.set_s(COLLIDER_OWN_CENTER_X + k, at, center[k]);
+                self.set_s(COLLIDER_OWN_INERTIA_X + k, at, inertia[k]);
+            }
+            for k in 0..4 {
+                self.set_s(COLLIDER_OWN_FRAME_X + k, at, frame[k]);
+            }
+            self.set_u(COLLIDER_FLAGS, at, flags | COLLIDER_OWN_SOLID);
+        }
+        self.update_mass(self.uu(COLLIDER_BODY, at));
+        self.wake(self.uu(COLLIDER_BODY, at));
+        true
+    }
+
     /// Sets the prediction distance (see `api::world_set_prediction`).
     pub fn set_prediction(&mut self, distance: f32) -> bool {
         if !(distance >= 0.0 && distance < 1.0e6) {
