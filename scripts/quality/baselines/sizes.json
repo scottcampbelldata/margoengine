@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17362871,
+  "total": 17363497,
   "history": [
     {
       "date": "2026-10-24",
@@ -11277,6 +11277,12 @@
       "commit": "7d8a8737e2",
       "reason": "vfx/debris ballistic debris entry; water/flood mud mode; terrain crater rim noise, benches, blocks and pits; weather BlastCloud; vfx clouds relief",
       "grew": 5
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "ec85cab3c6",
+      "reason": "fauld-tunnels: the mains lamps hang in a well-glass fitting whose opal globe is the emitter (loaded, instanced, its glass emissive), the hand lamp lens and deep bowl radii and the metered EVs (KB-FAULD-GLOBE1), the 3,000 K blast flash and drift flash, a fire for every fire lamp and paint tones; 12,860 B to 13,096 B gzip. A second entry would load on every state anyway, as every tunnel state draws lamps",
+      "grew": 1
     }
   ],
   "items": {
@@ -12249,7 +12255,7 @@
     "@margoengine/scenes/dune-coast": 6475,
     "@margoengine/scenes/fauld-countryside": 7910,
     "@margoengine/scenes/fauld-crater": 7910,
-    "@margoengine/scenes/fauld-tunnels": 12860,
+    "@margoengine/scenes/fauld-tunnels": 13489,
     "@margoengine/scenes/library": 4468,
     "@margoengine/scenes/look-family": 809,
     "@margoengine/scenes/shot-settings": 1718,
@@ -12929,10 +12935,7 @@
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/dof": 1,
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/environment": 1,
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/environment/volumetric": 1,
-    "leak @margoengine/scenes/fauld-tunnels -> @margoengine/geometry": 1,
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/gltf/pbr": 1,
-    "leak @margoengine/scenes/fauld-tunnels -> @margoengine/gltf/pbr-model": 1,
-    "leak @margoengine/scenes/fauld-tunnels -> @margoengine/materials": 1,
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/post/gtao": 1,
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/sky/scenes": 1,
     "leak @margoengine/scenes/fauld-tunnels -> @margoengine/tonemap": 1,

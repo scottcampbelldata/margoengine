@@ -32,8 +32,6 @@ import { DOF } from '@margoengine/dof';
 import { Tonemap } from '@margoengine/tonemap';
 import { Fire } from '@margoengine/vfx/fire';
 import { Smoke } from '@margoengine/vfx/smoke';
-import { sphereGeometry } from '@margoengine/geometry';
-import { UnlitMaterial, createMesh } from '@margoengine/materials';
 import { DAY_PRESETS } from '@margoengine/sky/day-presets';
 import { PresetScene, SCENE_PRESETS } from '@margoengine/sky/scenes';
 import { FAULD_TUNNELS_PLAN as PLAN } from './fauld-tunnels-plan.js';
@@ -103,21 +101,52 @@ export interface FauldTunnelsScene extends Disposable {
  * Lamp catalogue (lighting plan): Osram-GEC coiled coil, 2700 K. Lumens per lamp.
  */
 export const FAULD_LAMPS = { w40: 400, w60: 690, w100: 1250, handlamp: 40 } as const;
+/**
+ * The mains fitting, `tn_wellglass` (channel-films tunnels_kit_blender.py `well_glass`, a 1940s well-glass bulkhead):
+ * a 60 or 100 W GLS lamp inside a 140 mm opal well glass. The glowing part a camera sees is the globe, not the 30 mm
+ * filament bulb (an opal or frosted globe diffuses the filament over its whole surface), so the globe is the lamp's
+ * emitter: the light's `radius` is the globe's, measured on the model (its TN_Paper glass spans x and z -0.07 to
+ * 0.07 about the pivot), and its radiance is the lamp's candela over the globe's projected area, the lumens
+ * unchanged (KB-FAULD-GLOBE1). A 30 mm bulb at 2700 K reads about 26,000 to 28,500 in the pre-exposed frame, inside
+ * half-float range but without the headroom bloom and the white balance need; the globe, 0.07 m, about 4,700 to 6,700.
+ */
+export const WELL_GLASS_RADIUS = 0.07;
+/**
+ * The cradle's work lamp hangs in a 12.5 in deep bowl (concentrating) reflector (tunnels_kit_blender.py DEEP_DISH, rim
+ * radius 0.16 m): seen from under the beam the whole mouth of the bowl is bright with the lamp's image, so the
+ * mouth is the emitter (it was 0.02, a hand lamp's).
+ */
+export const DEEP_BOWL_RADIUS = 0.16;
+/** Lamps at or over this plan height (m) hang in a well-glass fitting; lower ones are lanterns and work lamps. */
+export const HUNG_Z = 2.0;
+/** The model of the mains fitting, its pivot at the globe's centre (the light's place), the conduit up to the arch. */
+export const WELL_GLASS_ASSET = 'fauld-1944/tunnels/tn_wellglass';
+/**
+ * A rescuer's hand lamp emits through its lens: 104 mm across on the period battery hand lamp of the kit
+ * (tunnels_kit_blender.py `handlamp`, the lens TN_Water spans -0.052 to 0.052), so its light's radius is the lens's
+ * (it was 0.02, a 40 mm source that put the lens 6.8 times over its real radiance; KB-FAULD-GLOBE1).
+ */
+export const HANDLAMP_LENS_RADIUS = 0.052;
 /** Light output ratio of a caged bulkhead fitting (lower hemisphere): judgement, lighting plan. */
 export const BULKHEAD_OUTPUT = 0.65;
 /**
- * EV100 per state: a white card at the state's key mark reads 1.0 (lighting plan, step 2). Mains about 3, hand lamps
- * 1, fire 5 to 6; daylight overcast November about 12, the portal lamp at night 1.
+ * EV100 per state: a white card at the state's key mark reads 1.0 (lighting plan, step 2; channel-films
+ * tunnels_light.key_cards). Working: the card 2.5 m along vault S from its second lamp, 1.2 m up. After, flooded and
+ * sealed: a card 2 m along the first rescuer's hand lamp's beam, facing it, as the plan's key_after; they were set to 1
+ * by hand when the hand lamps were lifted to chest height, which left that card reading 7.4 (2.9 stops over) and put
+ * every lamp's glass over the half-float headroom (KB-FAULD-GLOBE1). The night yard: 1.75 m along the yard lamp's beam
+ * (it read 1.33 at 1.5). Fire is metered on its flames and the blast clips on purpose; daylight overcast November
+ * about 12.
  */
 export const FAULD_STATE_EV: Readonly<Record<FauldTunnelState, number>> = {
   working: 2,
   blast: 9,
   fire: 4,
-  after: 1,
-  flooded: 1,
-  sealed: 1,
+  after: 3.9,
+  flooded: 3.9,
+  sealed: 3.9,
   yard_day: 12,
-  yard_night: 1.5,
+  yard_night: 1.9,
   yard_fire: 11.5,
   yard_sealed: 12,
 };
@@ -130,6 +159,14 @@ export const TUNGSTEN_2700: Vec3 = [1.98, 0.786, 0.188];
 const TUNGSTEN = TUNGSTEN_2700;
 /** The detonation flash of the blast state, candela (see the blast lamps in `attach`). */
 export const BLAST_FLASH_CD = 1.9e6;
+/**
+ * The colour of the detonation flash: a 3,000 K blackbody in linear sRGB, scaled to luminance 1 (blackbodyColor of
+ * @margoengine/math). Post-detonation fireballs of high explosive radiate at about 3,000 to 3,500 K (Lewis and
+ * Rumchik, "Measurement of apparent temperature in post-detonation fireballs using atomic emission spectroscopy",
+ * J. Appl. Phys. 105, 2009), so the flash reads hot white-orange through the store's 3,200 K balance. It was
+ * [1, 0.93, 0.82], about 5,000 K, which that balance turned steel blue (KB-FAULD-BLASTBLUE1).
+ */
+export const BLAST_FLASH_COLOR: Vec3 = [1.767, 0.845, 0.273];
 /** The mains rig by bulb run (lighting plan: main drift and work bay 100 W, aisles 60 W, old roadway 40 W). */
 const LAMP_OF_RUN = (name: string): number =>
   /^bulbs_(main|workN)$/.test(name)
@@ -267,6 +304,118 @@ export function dressState(state: FauldTunnelState) {
   return { pieces, lamps, fx: st.fx };
 }
 
+/** A primitive of the well-glass fitting, as `@margoengine/gltf/pbr` loads it. */
+type GlobePrimitive = {
+  instances?: PBRInstances;
+  material: { name?: string; base: number[]; emission: number[] };
+};
+
+/** A lamp of a state, ready for `Clustered`: pre-exposed (see {@link stateLights}). */
+export type FauldLamp = PointLight | SpotLight;
+
+/**
+ * The lights of a state, pre-exposed: every intensity is its photometric candela times the state's exposure
+ * (`exposureFromEV100` of {@link FAULD_STATE_EV}), so the frame holds display values and the tonemap adds no exposure.
+ * Absolute luminance does not fit the half-float colour target: a 100 W bulb's glass is about 50,000 cd/m2 and its
+ * red channel at 2700 K about 100,000, past half-float's 65,504, which clipped red alone and turned the bulbs and their
+ * glow white-green under the 3200 K white balance (KB-FAULD-BULBHUE1; Lagarde and de Rousiers, "Moving Frostbite to
+ * Physically Based Rendering", SIGGRAPH 2014, section 5.1: pre-exposed lighting for half-float targets). The vfx
+ * flames are in display units already (their radiance is shown through an exposure, `@margoengine/vfx/flame`), so
+ * they now light at their own scale beside the lamps instead of 1.3 to 4.3 stops under them (KB-FAULD-FIREDARK1).
+ * Hand lamps, lanterns and sparks are 2700 K filaments (the plan carried Unreal's [1, 0.82, 0.6], about 3,800 K,
+ * which a 3,200 K balance turns blue); a lamp marked `fire` is a burning heap, a {@link Fire} of `scale` at its
+ * place, unless one of the state's fires is within 1.5 m (KB-FAULD-FIRELAMPS1).
+ */
+export function stateLights(state: FauldTunnelState): {
+  lamps: FauldLamp[];
+  glass: Vec3[];
+  fires: { at: readonly number[]; scale: number }[];
+  exposure: number;
+} {
+  const { lamps, fx } = dressState(state),
+    exposure = exposureFromEV100(FAULD_STATE_EV[state]),
+    out: FauldLamp[] = [],
+    glass: Vec3[] = [],
+    fires: { at: readonly number[]; scale: number }[] = [];
+  for (const { run, at, extra } of lamps) {
+    if (extra?.fire) {
+      if (!fx.some(([, kind, x, y]) => kind === 'fire' && Math.hypot(x - at[0], y - at[1]) <= 1.5))
+        fires.push({ at: [at[0], at[1], 0], scale: 0.6 });
+      continue;
+    }
+    const p = toWorld(at[0], at[1], at[2]);
+    if (extra?.aim) {
+      const a = toWorld(extra.aim[0], extra.aim[1], extra.aim[2]),
+        d = [a[0] - p[0], a[1] - p[1], a[2] - p[2]],
+        l = Math.hypot(d[0], d[1], d[2]) || 1,
+        cone = ((extra.cone ?? 34) / 2) * D;
+      out.push({
+        position: p,
+        direction: [d[0] / l, d[1] / l, d[2] / l],
+        outerAngle: cone,
+        innerAngle: cone * 0.55,
+        range: 25,
+        color: TUNGSTEN,
+        intensity: lumensToCandela(FAULD_LAMPS.handlamp, { outerAngle: cone, innerAngle: cone * 0.55 }) * exposure,
+        // the night yard's lamp is a well glass under its blackout hood, the cradle's lamp shines from its deep bowl's
+        // mouth; every other aimed lamp is a hand lamp
+        radius:
+          run === 'yard_lamp' ? WELL_GLASS_RADIUS : run === 'bulbs_cradle' ? DEEP_BOWL_RADIUS : HANDLAMP_LENS_RADIUS,
+        castShadow: true,
+      });
+      continue;
+    }
+    const lm = LAMP_OF_RUN(run) * BULKHEAD_OUTPUT;
+    out.push({
+      position: p,
+      direction: [0, -1, 0],
+      outerAngle: Math.PI / 2,
+      innerAngle: Math.PI * 0.32,
+      range: 22,
+      color: TUNGSTEN,
+      intensity: lumensToCandela(lm, { outerAngle: Math.PI / 2, innerAngle: Math.PI * 0.32 }) * exposure,
+      radius: WELL_GLASS_RADIUS,
+      castShadow: true,
+    });
+    // a hung lamp is a well-glass fitting (the arch or the roadway roof over it); lower lamps are carried or stood
+    if (at[2] >= HUNG_Z) glass.push(p);
+  }
+  // The blast: the first instant of the detonation, a white fireball at each fire of the state that floods the drift
+  // to the blast state's metered exposure (EV100 9: a pale wall 30 m away reads mid grey at about 700 lux, so
+  // 700 x 30^2, about 630,000 cd; BLAST_FLASH_CD holds three times that so the near bays clip, as the flash did). The
+  // fireball fills its bay and runs out along the main drift (the drift was swept by the blast): a second flash where
+  // the bay meets the drift lights the drift past the bay's walls (KB-FAULD-BLASTDARK1).
+  if (state === 'blast')
+    for (const [, kind, x, y] of fx)
+      if (kind === 'fire')
+        for (const at of [toWorld(x, y, 3.1), toWorld(x, 0, 2.2)])
+          out.push({
+            position: at,
+            color: BLAST_FLASH_COLOR,
+            intensity: BLAST_FLASH_CD * exposure,
+            range: 220,
+            radius: 0.6,
+            castShadow: true,
+          });
+  return { lamps: out, glass, fires, exposure };
+}
+
+/**
+ * The paint of one casing stack at plan place (x, z): a tone 0.86 to 1.08 and a warm or cool shift up to 3%, from a hash
+ * of the place, so neighbours differ and the same stack keeps its paint in every state and frame. Batches of casings
+ * came from several filling stations and years, faded and dusty to different degrees (the depot photographs).
+ */
+export function paintTone(x: number, z: number): [number, number, number] {
+  let h = Math.imul(Math.round(x * 10) | 0, 0x9e3779b1) ^ Math.imul(Math.round(z * 10) | 0, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h ^= h >>> 12;
+  const a = (h & 0xffff) / 0xffff,
+    b = ((h >>> 16) & 0xffff) / 0xffff,
+    tone = 0.86 + 0.22 * a,
+    warm = (b - 0.5) * 0.06;
+  return [tone * (1 + warm), tone, tone * (1 - warm)];
+}
+
 const lensFov = (focal: number) => (2 * Math.atan(20.25 / (2 * focal))) / D; // 36 x 20.25 mm (16:9 full frame)
 
 /**
@@ -290,7 +439,9 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     yard = s.state.startsWith('yard'),
     ev = FAULD_STATE_EV[s.state],
     root = s.library.endsWith('/') ? s.library : s.library + '/',
-    { pieces, lamps, fx } = dressState(s.state);
+    { pieces, fx } = dressState(s.state),
+    // Lamps, pre-exposed (see stateLights): every light has a fitting on real geometry (lighting plan, step 1).
+    { lamps: lampLights, glass, fires: fireSpots, exposure } = stateLights(s.state);
   const lights = Clustered.attach(engine, { maxLights: 256 }),
     groups = LightGroups.attach(engine, lights),
     shadows = LocalShadows.attach(engine, { lights, maxLights: film ? 16 : 8, resolution: film ? 1024 : 512 });
@@ -313,7 +464,7 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     bounce = HemisphereLight.attach(engine, {
       sky: [0.02, 0.016, 0.011],
       ground: [0.012, 0.01, 0.008],
-      intensity: 0.4,
+      intensity: 0.4 * exposure,
     } as never);
   }
   // Models: one load each, every repeat drawn by GPU instancing.
@@ -325,6 +476,9 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
         model = await loadGLTF(engine, `${root}${asset}/${id}_2k.gltf`, { signal: settings.signal });
       const inst = new PBRInstances(mats.length);
       mats.forEach((m, i) => inst.setMatrixAt(i, m));
+      // Painted casings were never one tone: each stack, bomb and trolley load gets its own paint, from its place.
+      if (/tn_(stack|bomb|trolley_bomb|tail)/.test(id))
+        mats.forEach((m, i) => inst.setColorAt(i, paintTone(m[12], m[14])));
       for (const p of (model as unknown as { primitives: { instances?: PBRInstances }[] }).primitives)
         p.instances = inst;
       instances += mats.length;
@@ -333,59 +487,6 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
       models.push(model as never);
     }),
   );
-  // Lamps: each a caged bulkhead fitting (the kit's lamp bracket) with its bulb lighting the lower hemisphere, or a
-  // hand lamp's cone toward its aim. Every light has a fitting on real geometry (lighting plan, step 1).
-  const glass: Vec3[] = [];
-  const lampLights: (PointLight | SpotLight)[] = [];
-  for (const { run, at, extra } of lamps) {
-    if (extra?.fire) continue; // the fires light themselves (vfx Fire)
-    const p = toWorld(at[0], at[1], at[2]);
-    if (extra?.aim) {
-      const a = toWorld(extra.aim[0], extra.aim[1], extra.aim[2]),
-        d = [a[0] - p[0], a[1] - p[1], a[2] - p[2]],
-        l = Math.hypot(d[0], d[1], d[2]) || 1,
-        cone = ((extra.cone ?? 34) / 2) * D;
-      lampLights.push({
-        position: p,
-        direction: [d[0] / l, d[1] / l, d[2] / l],
-        outerAngle: cone,
-        innerAngle: cone * 0.55,
-        range: 25,
-        color: (extra.rgb as Vec3 | undefined) ?? [1, 0.82, 0.6],
-        intensity: lumensToCandela(FAULD_LAMPS.handlamp, { outerAngle: cone, innerAngle: cone * 0.55 }),
-        radius: 0.02,
-        castShadow: true,
-      });
-      continue;
-    }
-    const lm = LAMP_OF_RUN(run) * BULKHEAD_OUTPUT;
-    lampLights.push({
-      position: p,
-      direction: [0, -1, 0],
-      outerAngle: Math.PI / 2,
-      innerAngle: Math.PI * 0.32,
-      range: 22,
-      color: TUNGSTEN,
-      intensity: lumensToCandela(lm, { outerAngle: Math.PI / 2, innerAngle: Math.PI * 0.32 }),
-      radius: 0.03,
-      castShadow: true,
-    });
-    glass.push(p);
-  }
-  // The blast: the first instant of the detonation, a white fireball at each fire of the state that floods the drift
-  // to the blast state's metered exposure (EV100 9: a pale wall 30 m away reads mid grey at about 700 lux, so
-  // 700 x 30^2, about 630,000 cd; BLAST_FLASH_CD holds three times that so the near bays clip, as the flash did).
-  if (s.state === 'blast')
-    for (const [, kind, x, y] of fx)
-      if (kind === 'fire')
-        lampLights.push({
-          position: toWorld(x, y, 3.1),
-          color: [1, 0.93, 0.82],
-          intensity: BLAST_FLASH_CD,
-          range: 220,
-          radius: 0.6,
-          castShadow: true,
-        });
   const viewer = () => engine.camera.position as unknown as Vec3;
   const bulbs = groups.group('bulbs');
   const budget = () =>
@@ -402,24 +503,35 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   // as the white gypsum and limewash did (the lamps light only their lower hemisphere).
   const lightBounce = LightBounce.attach(engine, { lights, intensity: 1 } as never);
   disposers.push(() => lightBounce.dispose?.());
-  // The glowing bulbs: a 30 mm sphere at the light's own radiance (flameEmission: intensity over the projected area).
+  // The mains fittings: a well glass at each hung lamp, its opal globe the lamp's emitter (KB-FAULD-GLOBE1): the
+  // globe's radiance is the light's pre-exposed candela over the globe's projected area (flameEmission), the lumens
+  // unchanged. The fitting takes the lamps' light but casts no shadow map: each lamp sits inside its own globe.
   if (glass.length) {
-    const bulb = lampLights.find((l) => (l as SpotLight).outerAngle === Math.PI / 2)!;
-    const mat = new UnlitMaterial({
-      color: [0, 0, 0],
-      ...flameEmission({ color: TUNGSTEN, intensity: bulb.intensity!, radius: 0.03 }),
-    });
-    for (const p of glass) {
-      const m = createMesh(engine, sphereGeometry(0.03, 12, 8), mat);
-      m.root.setPosition([p[0], p[1] - 0.04, p[2]]);
-      models.push(m as never);
+    const bulb = lampLights.find((l) => (l as SpotLight).outerAngle === Math.PI / 2)!, // pre-exposed
+      glow = flameEmission({ color: TUNGSTEN, intensity: bulb.intensity!, radius: WELL_GLASS_RADIUS }),
+      id = WELL_GLASS_ASSET.slice(WELL_GLASS_ASSET.lastIndexOf('/') + 1),
+      fitting = await loadGLTF(engine, `${root}${WELL_GLASS_ASSET}/${id}_2k.gltf`, { signal: settings.signal }),
+      inst = new PBRInstances(glass.length);
+    glass.forEach((p, i) => inst.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, p[0], p[1], p[2], 1]));
+    for (const p of (fitting as unknown as { primitives: GlobePrimitive[] }).primitives) {
+      p.instances = inst;
+      if (p.material.name === 'TN_Paper') {
+        p.material.base = [0, 0, 0, 1];
+        p.material.emission = glow.emissive.map((c) => c * glow.emissiveIntensity);
+      }
     }
+    instances += glass.length;
+    lights.add(fitting as never);
+    models.push(fitting as never);
   }
   const stack = sky ? sky.post : PostStack.attach(engine, []);
   // Fire and smoke of the state.
   const fires: Fire[] = [],
     smokes: Smoke[] = [];
-  for (const [, kind, x, y, z, scale] of fx) {
+  for (const [, kind, x, y, z, scale] of [
+    ...fx,
+    ...fireSpots.map((f) => ['', 'fire', f.at[0], f.at[1], f.at[2], f.scale] as const),
+  ]) {
     const p = toWorld(x, y, z);
     // A burning store: flames about 1.6 m long a unit of scale (a crate and its packing, about 1 MW by Heskestad's
     // length), held under the 3.6 m arch, with their own light and smoke on the lamps' groups.
@@ -469,7 +581,8 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     // set the exposure, in candela, as underground.
     tonemap = sky.tonemap;
     bloom = sky.bloom;
-    if (night) Object.assign(tonemap.options, { exposure: Math.log2(exposureFromEV100(ev)), temperature: 3200 });
+    // The night's lamps are pre-exposed like the store's (stateLights), so the preset's tonemap keeps exposure 0.
+    if (night) Object.assign(tonemap.options, { exposure: 0, temperature: 3200 });
     stack.addEffect(occlusion as never, 0);
     stack.addEffect(dof as never, 1);
     stack.addEffect(smaa as never);
@@ -478,7 +591,8 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     bloom = new Bloom({ threshold: 1.5, strength: 0.025, radius: 0.5 });
     tonemap = new Tonemap({
       curve: 'agx',
-      exposure: Math.log2(exposureFromEV100(ev)),
+      // The lights are pre-exposed (stateLights), so the frame holds display values and the tonemap adds nothing.
+      exposure: 0,
       contrast: 1.05,
       temperature: 3200,
     } as never);

@@ -16,9 +16,18 @@ const library = arg('library', process.env.MARGO_ASSET_LIBRARY ?? '../../Assets/
   h = Number(arg('h', 1080)),
   shots =
     arg('shots')?.split(',') ??
-    (await readdir('tools/shot/shots'))
-      .filter((f) => /^fauld-fr\d+\.json$/.test(f))
-      .map((f) => f.slice(6, -5))
+    // the tunnel rows only: the countryside and crater rows share the fauld-frNNN names
+    (
+      await Promise.all(
+        (
+          await readdir('tools/shot/shots')
+        )
+          .filter((f) => /^fauld-fr\d+\.json$/.test(f))
+          .map(async (f) => [f, JSON.parse(await readFile(join('tools/shot/shots', f), 'utf8')).shot.scene]),
+      )
+    )
+      .filter(([, scene]) => scene === 'fauld-tunnels')
+      .map(([f]) => f.slice(6, -5))
       .sort(),
   port = 5341,
   context = await openBrowser({ startPath: '/examples/fauld/index.html', port }),
