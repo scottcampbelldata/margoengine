@@ -32,6 +32,7 @@ export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 export class SoftBodies implements PhysicsAttachment {
     cellTornByHand: boolean;
     cellDamping: number;
+    splitOnTear: 'cells' | 'all' | 'never';
     substeps: number;
     iterations: number;
     private constructor();
@@ -46,11 +47,17 @@ export class SoftBodies implements PhysicsAttachment {
     setVolume(body: SoftBody, factor: number | null): void;
     attach(soft: SoftBody, index: number, body: PhysicsBody): void;
     release(soft: SoftBody, index: number, body?: PhysicsBody): boolean;
+    relinkCells(body: SoftBody): void;
     writeCellMaterial(body: SoftBody): void;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
     createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
+    tear(body: SoftBody, { cells, edges }?: {
+        cells?: readonly number[];
+        edges?: readonly number[];
+    }): SoftTearEvent;
+    cut(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent;
     afterSync(): void;
     bodyRemoved(_body: PhysicsBody): void;
     dispose(): void;
@@ -226,15 +233,27 @@ export class SoftBodyMaterial {
     clone(): SoftBodyMaterial;
 }
 
+export interface SoftDestination {
+    body: SoftBody;
+    particle: number;
+}
+
 export interface SoftSoftness {
     naturalFrequency: number;
     dampingRatio: number;
+}
+
+export interface SoftSplit {
+    pieces: SoftBody[];
+    destinations(particle: number): SoftDestination[];
 }
 
 export interface SoftTearEvent {
     body: SoftBody;
     edges: number[];
     cells: number[];
+    pieces: SoftBody[];
+    destination(particle: number): SoftDestination[];
 }
 
 // Not exported from this entry, but used by the exports above:

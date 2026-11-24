@@ -8,6 +8,9 @@ import type { PhysicsCollider } from './collider.js';
 import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
+import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
+
+export type { SoftDestination, SoftSplit } from './soft-split.js';
 
 interface SoftExports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -936,6 +939,10 @@ export interface SoftTearEvent {
   edges: number[];
   /** Cell indices, as `body.cells()` numbers them: the tetrahedra that tore, empty when only edges did. */
   cells: number[];
+  /** The bodies the tear split `body` into (then removed), empty when it stayed whole. */
+  pieces: SoftBody[];
+  /** Where a particle of `body` (numbered as it was) went: a place in each piece it is part of; none when the body stayed whole. */
+  destination(particle: number): SoftDestination[];
 }
 
 /** A soft body in a world: read and move its particles, apply forces, pin it, tear it. */
@@ -1387,6 +1394,11 @@ export class SoftBodies implements PhysicsAttachment {
    * body, so a block that was struck stops ringing. 0 never settles, and a very large value makes the body feel like putty.
    */
   cellDamping = 10;
+  /**
+   * Whether a tear that parts a body makes pieces of it: `'cells'` (default) for bodies of cells, `'all'` for every body made of
+   * edges alone too (a rope in two ropes), `'never'`. A body with triangles (cloth, a trimesh) or a surface collider is never split.
+   */
+  splitOnTear: 'cells' | 'all' | 'never' = 'cells';
   /** @internal Fixed step pieces and passes: change them between steps. */
   substeps: number;
   iterations: number;
@@ -1754,6 +1766,11 @@ export class SoftBodies implements PhysicsAttachment {
     this.view = null;
   }
 
+  /** @internal Finds again the cells across each face of a body's cells, after their corners were rewritten. */
+  relinkCells(body: SoftBody): void {
+    this.linkCells(body.cellRange, body.handle);
+  }
+
   /** @internal Writes a body's cell material into its cell rows; the rest shapes stay. */
   writeCellMaterial(body: SoftBody): void {
     const { first, count } = body.cellRange;
@@ -1786,6 +1803,7 @@ export class SoftBodies implements PhysicsAttachment {
     for (let t = range.first; t < range.first + range.count; t++) {
       const corner = [f.p0![t]!, f.p1![t]!, f.p2![t]!, f.p3![t]!];
       (f.cbody as unknown as Uint32Array)[t] = handle;
+      (f.flags as unknown as Uint32Array)[t] = (f.flags as unknown as Uint32Array)[t]! & ~INTERIOR_CELL;
       for (let k = 0; k < 4; k++) {
         (f[`nb${k}`] as unknown as Uint32Array)[t] = none;
         const key = corner
@@ -2293,7 +2311,8 @@ export class SoftBodies implements PhysicsAttachment {
   }
 
   private report(c: Columns): void {
-    for (const body of this.bodies) {
+    for (const body of [...this.bodies]) {
+      c = this.columns();
       const fresh: number[] = [],
         freshCells: number[] = [];
       for (let e = 0; e < body.structural; e++)
@@ -2309,9 +2328,119 @@ export class SoftBodies implements PhysicsAttachment {
             freshCells.push(t);
           }
       }
-      if (fresh.length || freshCells.length)
-        for (const listener of [...this.listeners]) listener({ body, edges: fresh, cells: freshCells });
+      if (fresh.length || freshCells.length) this.announce(body, fresh, freshCells, this.splitAfterTear(body));
     }
+  }
+
+  private splitAfterTear(body: SoftBody, cut?: ReadonlySet<number>): SoftSplit | null {
+    if (this.splitOnTear === 'never' || (body.cellRange.count === 0 && this.splitOnTear !== 'all')) return null;
+    return splitBody(this, body, (positions) => new SoftBodyDesc(positions), cut);
+  }
+
+  private announce(body: SoftBody, edges: number[], cells: number[], split: SoftSplit | null): SoftTearEvent {
+    const event: SoftTearEvent = {
+      body,
+      edges,
+      cells,
+      pieces: split?.pieces ?? [],
+      destination: (particle) => split?.destinations(particle) ?? [],
+    };
+    for (const listener of [...this.listeners]) listener(event);
+    return event;
+  }
+
+  /**
+   * Tears the given cells and edges of a body at once (numbered as `body.cells()` and `body.edges()` do), splits the body where it
+   * is parted, and tells the tear listeners. Returns the event: its `pieces` and `destination` say what became of the body.
+   */
+  tear(
+    body: SoftBody,
+    { cells = [], edges = [] }: { cells?: readonly number[]; edges?: readonly number[] } = {},
+  ): SoftTearEvent {
+    if (body.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
+    const freshCells: number[] = [],
+      freshEdges: number[] = [];
+    for (const cell of cells)
+      if (!body.isCellTorn(cell)) {
+        body.tearCell(cell);
+        body.cellsTornSeen.add(cell);
+        freshCells.push(cell);
+      }
+    for (const edge of edges)
+      if (!body.isEdgeTorn(edge)) {
+        body.tearEdge(edge);
+        body.tornSeen.add(edge);
+        freshEdges.push(edge);
+      }
+    this.cellTornByHand = false;
+    return this.announce(body, freshEdges, freshCells, this.splitAfterTear(body));
+  }
+
+  /**
+   * Cuts a body along a blade, a triangle of three points: every face of its cells that the blade meets is parted, the particles
+   * along it are duplicated and the body becomes the pieces the cut leaves. No material is removed. Returns the event.
+   */
+  cut(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent {
+    if (body.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
+    for (const point of blade) checkVec(point, 'Blade point');
+    const f = this.cellColumns(),
+      c = this.columns(),
+      { first, count } = body.cellRange,
+      at = (row: number): Vec3 => [c.x[row]!, c.y[row]!, c.z[row]!],
+      cutFaces = new Set<number>();
+    // A cell is on the side of the blade's plane its centre is on; a face the blade meets is parted when the cells either side of it
+    // are on opposite sides, so no cell is cut in two and no material is removed.
+    const [p0, p1, p2] = blade,
+      u: Vec3 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]],
+      v: Vec3 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]],
+      normal: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+      side = (t: number): number => {
+        let d = 0;
+        for (let k = 0; k < 4; k++) {
+          const q = at(f[`p${k}`]![t]!);
+          d += (normal[0] * (q[0] - p0[0]) + normal[1] * (q[1] - p0[1]) + normal[2] * (q[2] - p0[2])) / 4;
+        }
+        return d;
+      };
+    for (let t = first; t < first + count; t++) {
+      if ((f.flags![t]! & TORN_CELL) !== 0) continue;
+      const corner = [0, 1, 2, 3].map((k) => at(f[`p${k}`]![t]!));
+      for (let k = 0; k < 4; k++) {
+        const other = f[`nb${k}`]![t]!;
+        if (other === NO_NEIGHBOUR || (f.flags![other]! & TORN_CELL) !== 0) continue;
+        if (side(t) > 0 === side(other) > 0) continue;
+        // The face's centre, carried onto the blade's plane, lies inside the blade.
+        const mid = [0, 1, 2, 3]
+            .filter((j) => j !== k)
+            .reduce(
+              (sum, j) => [sum[0]! + corner[j]![0] / 3, sum[1]! + corner[j]![1] / 3, sum[2]! + corner[j]![2] / 3],
+              [0, 0, 0],
+            ),
+          w: Vec3 = [mid[0]! - p0[0], mid[1]! - p0[1], mid[2]! - p0[2]],
+          area = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2],
+          cross = (a: Vec3, b: Vec3): number =>
+            (a[1] * b[2] - a[2] * b[1]) * normal[0] +
+            (a[2] * b[0] - a[0] * b[2]) * normal[1] +
+            (a[0] * b[1] - a[1] * b[0]) * normal[2],
+          beta = cross(w, v) / area,
+          gamma = cross(u, w) / area;
+        if (area > 0 && beta >= 0 && gamma >= 0 && beta + gamma <= 1) cutFaces.add(t * 4 + k);
+      }
+    }
+    // An edge the blade passes through tears (cells' own edges lie on faces the cut already parts).
+    const torn: number[] = [];
+    if (count === 0)
+      for (let e = 0; e < body.structural; e++) {
+        if (body.isEdgeTorn(e)) continue;
+        const p = at(c.ea[body.firstEdge + e]!),
+          q = at(c.eb[body.firstEdge + e]!);
+        if (crossesBlade([p, q, q], blade)) {
+          body.tearEdge(e);
+          body.tornSeen.add(e);
+          torn.push(e);
+        }
+      }
+    return this.announce(body, torn, [], this.splitAfterTear(body, cutFaces));
   }
 
   /** @internal Nothing to do after the sync: the particles are read on demand. */

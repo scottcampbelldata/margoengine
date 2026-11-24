@@ -11100,6 +11100,8 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 - G. Irving, J. Teran and R. Fedkiw, "Invertible Finite Elements for Robust Simulation of Large Deformation", SCA 2004 (the split of the deformation gradient into an elastic and a plastic part).
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), SIGGRAPH 2005.
 - M. Macklin, M. Müller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", Motion in Games, 2016; M. Macklin et al., "Small Steps in Physics Simulation", SCA 2019.
+- N. Molino, Z. Bao and R. Fedkiw, "A Virtual Node Algorithm for Changing Mesh Topology During Simulation", ACM TOG 23(3), SIGGRAPH 2004 (duplicating the particles along a tear, one for each side).
+- T. Moller and B. Trumbore, "Fast, Minimum Storage Ray-Triangle Intersection", J. Graphics Tools 2(1), 1997 (a segment against a triangle, for the blade).
 - H. Kuhn, "Some combinatorial lemmas in topology", IBM J. Res. Dev. 4(5), 1960 (the cube cut into six tetrahedra that match across faces).
 - Check: the Euler-Bernoulli deflection of a uniformly loaded cantilever, rho g A L^4 / (8 E I), from any text on the mechanics of materials.
 

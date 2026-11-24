@@ -13,6 +13,8 @@ console.warn = warn;
 const create = async (gravity = [0, -9.81, 0], substeps = 20, iterations = 20) => {
   const physics = new Physics(null, { gravity });
   const soft = await SoftBodies.attach(physics, { substeps, iterations });
+  // The tests that read a torn body keep it in one piece; those of splitting turn it on.
+  soft.splitOnTear = 'never';
   return { physics, soft };
 };
 const steps = (physics, count) => {
@@ -529,4 +531,93 @@ test('an edge pulled with more than its tear force tears and one pulled with les
   };
   assert.equal(await hang(1000), 0, 'a rope of 10 kg on a 1,000 N edge holds');
   assert.ok((await hang(40)) > 0, 'a rope of 10 kg on a 40 N edge tears (98 N hangs from the top)');
+});
+
+test('a body torn clean through becomes two bodies, each with its share of the mass and its own fall', async () => {
+  const { physics, soft } = await create([0, -9.81, 0], 8, 4);
+  soft.splitOnTear = 'cells';
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.6, 0.1, 0.1], [6, 1, 1], rubber({ youngsModulus: 2e5 }));
+  desc.setPinnedParticles(plane(desc, 0, 0));
+  const body = soft.create(desc),
+    mass = body.mass(),
+    events = [];
+  soft.onTear((event) => events.push(event));
+  // The cells whose centre is past x = 0.3 and before 0.3 + a cell: the layer of cells across the middle.
+  const cells = body.cells(),
+    p = body.particlePositions(),
+    layer = [];
+  for (let t = 0; t < body.numCells(); t++) {
+    const x = [0, 1, 2, 3].reduce((sum, k) => sum + p[cells[t * 4 + k] * 3], 0) / 4;
+    if (x > 0.25 && x < 0.35) layer.push(t);
+  }
+  const event = soft.tear(body, { cells: layer });
+  assert.equal(event.pieces.length, 2, 'two pieces');
+  assert.equal(body.valid, false, 'the old body is gone');
+  assert.deepEqual(events, [event], 'the listener was told once');
+  assert.equal(soft.list().length, 2);
+  const [near, far] =
+    event.pieces[0].isParticlePinned(0) || event.pieces[0].particlePosition(0)[0] < 0.1
+      ? event.pieces
+      : [event.pieces[1], event.pieces[0]];
+  assert.ok(
+    near.mass() + far.mass() <= mass + 1e-4 && near.mass() + far.mass() > 0.9 * mass,
+    `the mass is shared: ${near.mass() + far.mass()} of ${mass}`,
+  );
+  // Every particle that a cell still holds went to a piece.
+  let gone = 0;
+  for (let i = 0; i < body.numParticles(); i++) if (event.destination(i).length === 0) gone++;
+  assert.ok(gone < body.numParticles() / 2, `most particles went to a piece, ${gone} did not`);
+  const before = far.centerOfMass()[1];
+  steps(physics, 120);
+  assert.ok(far.centerOfMass()[1] < before - 0.5, 'the far piece falls');
+  assert.ok(near.centerOfMass()[1] > -0.05, 'the held piece stays up');
+});
+
+test('a tear that cracks a body without parting it duplicates the particles along the crack and keeps one body', async () => {
+  const { soft } = await create([0, 0, 0], 8, 4);
+  soft.splitOnTear = 'cells';
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.4, 0.4, 0.4], [4, 4, 4], rubber({ youngsModulus: 2e5 }));
+  const body = soft.create(desc),
+    particles = body.numParticles(),
+    volume = body.restVolume();
+  // A blade across half of the block, from its middle out to a side: a crack with the other half still joining the sides.
+  const event = soft.cut(body, [
+    [0.2 + 1e-3, -1, -1],
+    [0.2 + 1e-3, 2, -1],
+    [0.2 + 1e-3, 0.5, 0.2],
+  ]);
+  assert.equal(event.pieces.length, 1, 'one body, rebuilt with the crack');
+  const [piece] = event.pieces;
+  assert.ok(
+    piece.numParticles() > particles,
+    `particles were duplicated: ${piece.numParticles()} against ${particles}`,
+  );
+  near(piece.restVolume(), volume, 1e-6, 'no material was removed');
+});
+
+test('a blade through a block makes two pieces whose volumes add to the block', async () => {
+  const { soft } = await create([0, 0, 0], 8, 4);
+  soft.splitOnTear = 'cells';
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.4, 0.4, 0.4], [4, 4, 4], rubber({ youngsModulus: 2e5 }));
+  const body = soft.create(desc),
+    volume = body.restVolume();
+  const event = soft.cut(body, [
+    [0.2 + 1e-3, -1, -1],
+    [0.2 + 1e-3, 3, -1],
+    [0.2 + 1e-3, -1, 3],
+  ]);
+  assert.equal(event.pieces.length, 2);
+  near(event.pieces[0].restVolume() + event.pieces[1].restVolume(), volume, 1e-6, 'the pieces add up to the block');
+  near(event.pieces[0].restVolume(), volume / 2, 1e-6, 'a cut across the middle halves it');
+  assert.ok(event.pieces[0].mass() + event.pieces[1].mass() > 0);
+});
+
+test('a rope torn through becomes two ropes when asked to split edges too', async () => {
+  const { soft } = await create([0, 0, 0], 8, 4);
+  soft.splitOnTear = 'all';
+  const rope = soft.create(SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 11, { bending: false }));
+  const event = soft.tear(rope, { edges: [4] });
+  assert.equal(event.pieces.length, 2);
+  assert.deepEqual(event.pieces.map((piece) => piece.numParticles()).sort(), [5, 6]);
+  assert.equal(event.destination(4)[0].body, event.pieces[0]);
 });
