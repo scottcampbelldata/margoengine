@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17807740,
+  "total": 17816531,
   "history": [
     {
       "date": "2026-10-24",
@@ -11613,6 +11613,12 @@
       "commit": "96e0fe617",
       "reason": "physics: path constraint (couplings.rs kind 5) and the couplings' island edges and growing table: lazy kernel blueprint 206,519 to 209,689 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "86f8e0033c",
+      "reason": "KB-RESTORE-BORROWED1 environment and materials rows after rebase: environment +405 B, materials +713 B",
+      "grew": 7
     }
   ],
   "items": {
@@ -11928,7 +11934,7 @@
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/environment": 32706,
+    "@margoengine/environment": 34105,
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 6181,
@@ -12237,22 +12243,22 @@
     "@margoengine/machinery/spatial": 16699,
     "@margoengine/machinery/surface": 14297,
     "@margoengine/machinery/telemetry": 13829,
-    "@margoengine/materials": 67960,
+    "@margoengine/materials": 70734,
     "@margoengine/materials/alpha-hash": 1615,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 39949,
+    "@margoengine/materials/batched": 41223,
     "@margoengine/materials/eye": 4661,
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 4112,
     "@margoengine/materials/layered": 3230,
-    "@margoengine/materials/mips": 11875,
+    "@margoengine/materials/mips": 12838,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/presets": 532,
     "@margoengine/materials/serialization": 45773,
-    "@margoengine/materials/settings": 20493,
-    "@margoengine/materials/skin": 15686,
-    "@margoengine/materials/soot": 11377,
+    "@margoengine/materials/settings": 21363,
+    "@margoengine/materials/skin": 16364,
+    "@margoengine/materials/soot": 12210,
     "@margoengine/materials/stochastic": 2802,
     "@margoengine/materials/transmission": 8673,
     "@margoengine/materials/transmission-layers": 5464,
