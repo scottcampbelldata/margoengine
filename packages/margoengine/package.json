@@ -2975,6 +2975,10 @@
       "types": "./dist/physics/decomposition.d.ts",
       "import": "./dist/physics/decomposition.js"
     },
+    "./physics/soft": {
+      "types": "./dist/physics/soft.d.ts",
+      "import": "./dist/physics/soft.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

@@ -28,6 +28,7 @@ await build({
       entry: {
         index: resolve(root, 'src/index.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
+        soft: resolve(root, 'src/soft.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17508377,
+  "total": 17536971,
   "history": [
     {
       "date": "2026-10-24",
@@ -11379,6 +11379,12 @@
       "commit": "178a5bd30",
       "reason": "Deformable trimesh colliders in the physics base (aim, land, surface velocity: 51,095 to 51,678 B); ragdoll balance grew with the ankle limit fix (5,695 to 5,811 B) on main",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "dc13aa99d",
+      "reason": "new optional entry @margoengine/physics/soft: soft bodies on XPBD distance constraints with two-way contact; 6,698 B entry code plus a 6,777 B lazy Wasm kernel chunk loaded only by SoftBodies.attach. Rapier's soft-bodies page is the bar; the root entry pays nothing.",
+      "grew": 3
     }
   ],
   "items": {
@@ -12135,9 +12141,12 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 246854,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53229,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/soft": 14660,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 6954,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 7033,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

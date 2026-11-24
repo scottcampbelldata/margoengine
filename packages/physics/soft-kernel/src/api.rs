@@ -11,7 +11,8 @@ static mut WORLD: World = World {
     qy: Col::new(), qz: Col::new(), qw: Col::new(), sx: Col::new(), sy: Col::new(), sz: Col::new(), friction: Col::new(),
     lvx: Col::new(), lvy: Col::new(), lvz: Col::new(), avx: Col::new(), avy: Col::new(), avz: Col::new(), mx: Col::new(),
     my: Col::new(), mz: Col::new(), jx: Col::new(), jy: Col::new(), jz: Col::new(), kx: Col::new(), ky: Col::new(),
-    kz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0,
+    kz: Col::new(), wm: Col::new(), iixx: Col::new(), iixy: Col::new(), iixz: Col::new(), iiyy: Col::new(),
+    iiyz: Col::new(), iizz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0,
 };
 
 #[allow(static_mut_refs)]
@@ -36,7 +37,7 @@ columns! {
     x, y, z, px, py, pz, vx, vy, vz, w, radius, tx, ty, tz, pflags, pbody,
     ea, eb, rest, omega, zeta, lambda, tear, eflags, gravity_scale, linear_damping,
     c_kind, cx, cy, cz, qx, qy, qz, qw, sx, sy, sz, friction, lvx, lvy, lvz, avx, avy, avz, mx, my, mz,
-    jx, jy, jz, kx, ky, kz,
+    jx, jy, jz, kx, ky, kz, wm, iixx, iixy, iixz, iiyy, iiyz, iizz,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.

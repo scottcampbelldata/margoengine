@@ -9236,3 +9236,7 @@ exceeded the group limit on the WebGL2 path while passing cases in order. The
 suite split keeps each existing browser case and both underwater capture modes,
 with unchanged assertions and per-suite deadlines. The manifest coverage
 regression is in `packages/water/test/browser-root.test.js`.
+
+## Soft bodies (section 5 evidence, 2026-11-24)
+
+`@margoengine/physics/soft` runs on its own Rust crate, `packages/physics/soft-kernel`, compiled to Wasm with SIMD, built by `packages/physics/scripts/build-soft-kernel.mjs` into the committed blueprint `src/soft-wasm.ts` (a chunk of its own, loaded by `SoftBodies.attach`). The step path uses only addition, subtraction, multiplication, division, square root, comparisons and integer operations, so two runs end in the same state (`tests/soft.test.js`, and the crate's `a_step_is_bit_for_bit_the_same`). Evidence: a rope pinned at both ends matches the catenary in sag and per-particle height within 3% and 0.06 m, a soft edge oscillates at its natural frequency within 4% for masses 0.1 to 25 (`soft-kernel/tests/rope.rs`), a swinging rope never gains energy, a particle resting on a half space loads its body with its weight (`soft-kernel/tests/contact.rs`), a cloth pinned along an edge hangs its full length, and a box on a cloth sinks it more as it gets heavier. Missing: speed (build phase), cells and the finite-element solver, plasticity, cuts and the other rows of the parity document.

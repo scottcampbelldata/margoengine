@@ -27,7 +27,15 @@ export function softColumns() {
 function build() {
   execFileSync(
     'cargo',
-    ['build', '--locked', '--manifest-path', resolve(kernel, 'Cargo.toml'), '--target', 'wasm32-unknown-unknown', '--release'],
+    [
+      'build',
+      '--locked',
+      '--manifest-path',
+      resolve(kernel, 'Cargo.toml'),
+      '--target',
+      'wasm32-unknown-unknown',
+      '--release',
+    ],
     { stdio: 'inherit', env: blueprintRustEnv(kernel, RUSTFLAGS) },
   );
   const wasmPath = resolve(kernel, 'target/wasm32-unknown-unknown/release/margoengine_soft_kernel.wasm');
@@ -56,8 +64,12 @@ function build() {
   for (const leak of ['Users', 'Development', '.cargo', 'rustc'])
     assert.ok(!text.includes(leak), `The blueprint holds a build path (${leak})`);
   // The committed string stays when it still inflates to this kernel, so a rebuild gives the same bytes on every machine.
-  const compressed = committedBlueprint(resolve(root, 'src/soft-wasm.ts'), 'wasmBase64', wasm, inflateRawSync, (bytes) =>
-    deflateRawSync(bytes, { level: 9 }),
+  const compressed = committedBlueprint(
+    resolve(root, 'src/soft-wasm.ts'),
+    'wasmBase64',
+    wasm,
+    inflateRawSync,
+    (bytes) => deflateRawSync(bytes, { level: 9 }),
   );
   assert.deepEqual(inflateRawSync(compressed), wasm, 'Kernel compression must be lossless');
   writeFileSync(

@@ -5205,3 +5205,7 @@ compatibility layer (RTX A6000, Edge 158, Direct3D on the compatibility path).
 The probe covers the sky-only sample, the transition and the interior. It does not
 measure performance or recover reflected objects outside the capture.
 See the [clean-room record](../clean-room.md#water-planar-capture-edges-2026-11-24).
+
+### Soft bodies on a small Wasm kernel (2026-11-24)
+
+Claim: ropes and cloth in `@margoengine/physics/soft` follow closed forms and replay bit for bit, and a rigid body that a soft body presses on takes the impulse, shared by inverse mass. Proof: `packages/physics/tests/soft.test.js` (catenary sag and per-particle height, cloth hanging length and edge lengths, box on cloth, tearing events, replay hash, removal) and the Rust tests in `packages/physics/soft-kernel/tests`. Not claimed: speed, volumetric or finite-element bodies, and contact with meshes. Sources in the [clean-room record](../clean-room.md#soft-bodies-particles-distance-constraints-and-contacts-physicssoft-2026-11-24).

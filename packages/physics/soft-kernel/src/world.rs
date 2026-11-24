@@ -77,6 +77,14 @@ pub struct World {
     pub kx: Col<f32>,
     pub ky: Col<f32>,
     pub kz: Col<f32>,
+    /// The body's inverse mass (0 for one that does not move) and the six distinct entries of its world inverse inertia.
+    pub wm: Col<f32>,
+    pub iixx: Col<f32>,
+    pub iixy: Col<f32>,
+    pub iixz: Col<f32>,
+    pub iiyy: Col<f32>,
+    pub iiyz: Col<f32>,
+    pub iizz: Col<f32>,
     pub particles: usize,
     pub edges: usize,
     pub bodies: usize,
@@ -117,7 +125,8 @@ impl World {
             &mut self.cx, &mut self.cy, &mut self.cz, &mut self.qx, &mut self.qy, &mut self.qz, &mut self.qw, &mut self.sx,
             &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
             &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
-            &mut self.kx, &mut self.ky, &mut self.kz,
+            &mut self.kx, &mut self.ky, &mut self.kz, &mut self.wm, &mut self.iixx, &mut self.iixy, &mut self.iixz,
+            &mut self.iiyy, &mut self.iiyz, &mut self.iizz,
         ] {
             grow(v, colliders);
         }
@@ -186,6 +195,17 @@ impl World {
         }
         for i in 0..self.particles {
             self.contact(i, h);
+        }
+        // A body that the particles pushed on has a new velocity; it carries its collider along for the rest of the step.
+        for c in 0..self.colliders {
+            if self.wm[c] > 0.0 {
+                self.cx[c] += self.lvx[c] * h;
+                self.cy[c] += self.lvy[c] * h;
+                self.cz[c] += self.lvz[c] * h;
+                self.mx[c] += self.lvx[c] * h;
+                self.my[c] += self.lvy[c] * h;
+                self.mz[c] += self.lvz[c] * h;
+            }
         }
         let inv = 1.0 / h;
         for i in 0..self.particles {
@@ -259,9 +279,20 @@ impl World {
                 continue;
             }
             let push = -gap;
-            self.x[i] += nx * push;
-            self.y[i] += ny * push;
-            self.z[i] += nz * push;
+            // The contact point, from the body's centre of mass, and how easily the body gives way there along the normal:
+            // the particle takes the share of the correction its inverse mass leaves it (Macklin et al. 2014, section 4).
+            let (qx, qy, qz) = (
+                self.x[i] - self.mx[c] - nx * self.radius[i],
+                self.y[i] - self.my[c] - ny * self.radius[i],
+                self.z[i] - self.mz[c] - nz * self.radius[i],
+            );
+            let (ax, ay, az) = (qy * nz - qz * ny, qz * nx - qx * nz, qx * ny - qy * nx);
+            let (ix, iy, iz) = self.inverse_inertia(c, ax, ay, az);
+            let wb = self.wm[c] + ax * ix + ay * iy + az * iz;
+            let share = self.w[i] / (self.w[i] + wb);
+            self.x[i] += nx * push * share;
+            self.y[i] += ny * push * share;
+            self.z[i] += nz * push * share;
             // Friction as a bounded displacement across the surface (Macklin et al. 2014, "Unified Particle Physics").
             let (rx, ry, rz) = (self.x[i] - self.mx[c], self.y[i] - self.my[c], self.z[i] - self.mz[c]);
             let sx = self.lvx[c] + self.avy[c] * rz - self.avz[c] * ry;
@@ -282,21 +313,39 @@ impl World {
                 fx = -ux * k;
                 fy = -uy * k;
                 fz = -uz * k;
-                self.x[i] += fx;
-                self.y[i] += fy;
-                self.z[i] += fz;
+                self.x[i] += fx * share;
+                self.y[i] += fy * share;
+                self.z[i] += fz * share;
             }
-            // The body takes the opposite impulse, at the particle's surface point.
-            let s = m / h;
+            // The body takes the opposite impulse, at the particle's surface point, and moves on with it.
+            let s = share * m / h;
             let (jx, jy, jz) = (-(nx * push + fx) * s, -(ny * push + fy) * s, -(nz * push + fz) * s);
             self.jx[c] += jx;
             self.jy[c] += jy;
             self.jz[c] += jz;
-            let (px, py, pz) = (rx - nx * self.radius[i], ry - ny * self.radius[i], rz - nz * self.radius[i]);
-            self.kx[c] += py * jz - pz * jy;
-            self.ky[c] += pz * jx - px * jz;
-            self.kz[c] += px * jy - py * jx;
+            let (kx, ky, kz) = (qy * jz - qz * jy, qz * jx - qx * jz, qx * jy - qy * jx);
+            self.kx[c] += kx;
+            self.ky[c] += ky;
+            self.kz[c] += kz;
+            if self.wm[c] > 0.0 {
+                self.lvx[c] += jx * self.wm[c];
+                self.lvy[c] += jy * self.wm[c];
+                self.lvz[c] += jz * self.wm[c];
+                let (wx, wy, wz) = self.inverse_inertia(c, kx, ky, kz);
+                self.avx[c] += wx;
+                self.avy[c] += wy;
+                self.avz[c] += wz;
+            }
         }
+    }
+
+    /// A body's world inverse inertia applied to a vector.
+    fn inverse_inertia(&self, c: usize, x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+        (
+            self.iixx[c] * x + self.iixy[c] * y + self.iixz[c] * z,
+            self.iixy[c] * x + self.iiyy[c] * y + self.iiyz[c] * z,
+            self.iixz[c] * x + self.iiyz[c] * y + self.iizz[c] * z,
+        )
     }
 
     /// Signed distance from a point to a collider's surface, and the outward normal there.

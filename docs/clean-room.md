@@ -11057,3 +11057,13 @@ that principle to the UV of a planar reflection: use the larger of the filter fo
 wave shift as a transition width on each axis and apply the cubic
 [WGSL smoothstep](https://www.w3.org/TR/WGSL/#smoothstep-builtin). This calculation was written from the
 descriptions without consulting implementation code.
+
+## Soft bodies: particles, distance constraints and contacts (`@margoengine/physics/soft`, 2026-11-24)
+
+Written clean room from the papers below and Rapier's published Soft-bodies user guide page (the guide only; no Rapier or other engine source was read). The solver is compliant distance constraints in the mass-independent softness form, many small steps of few iterations, position-level contacts with bounded Coulomb friction, and a contact correction shared with a rigid body by inverse mass and inertia.
+
+- M. Macklin, M. Müller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", Motion in Games, 2016. https://matthias-research.github.io/pages/publications/XPBD.pdf
+- M. Macklin, K. Storey, M. Lu, P. Terdiman, N. Chentanez, S. Jeschke and M. Müller, "Small Steps in Physics Simulation", SCA 2019. https://mmacklin.com/smallsteps.pdf
+- M. Macklin, M. Müller, N. Chentanez and T.-Y. Kim, "Unified Particle Physics for Real-Time Applications", ACM TOG 33(4), 2014 (friction as a bounded displacement, and the share of a contact correction between particle and body).
+- M. Müller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007.
+- Catenary check: the closed form of a hanging chain, length = 2a sinh(span / 2a), height = a cosh(x / a) (any mechanics text).

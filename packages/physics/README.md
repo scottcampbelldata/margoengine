@@ -119,6 +119,47 @@ console.log(car.speed, car.wheel(0).inContact, polyline.length);
 - **Convex decomposition.** `convexDecomposition({vertices, indices})` from `margoengine/physics/decomposition` splits a closed concave triangle mesh into convex pieces after CoACD (Wei et al., ACM TOG 2022), and its result is a collider (`body.addCollider(result)`): a dynamic cup stays hollow where a `convexHull` fills it in. `addModel(model, {shape: 'convexDecomposition'})` does it per primitive. It is build-time work, so decompose once and keep the parts; the world never loads it.
 - **Vehicles.** `new Vehicle(physics, chassis, {wheels})` puts a ray-cast vehicle (a spring and damper per wheel, drive and brake force, tyre grip inside a friction circle) on a dynamic chassis. Each wheel casts its suspension along `direction` (default down) from its `position` every fixed step. `engineForce` (driven wheels), `steering` (radians around the chassis up axis, positive turns a +Z-facing car toward +X) and `brake` act on the wheels marked `drive` (default true), `steer` (default false) and `brake` (default true); `setInput({throttle, steer, brake})` maps normalized input onto `maxEngineForce` (default the chassis mass in newtons per driven wheel, so four driven wheels accelerate at 0.4 g), `maxSteeringAngle` (0.5 rad) and `maxBrakeForce` (3 x the mass, newtons per braking wheel). Throttle wakes a sleeping chassis. `speed` is the forward speed in m/s, `wheel(i)` the contact, suspension and spin state, and `wheelLocalPose(i)` the hub pose that wheel `mesh`es (children of the chassis mesh) receive after every sync. Suspension and tyre settings default to a soft road car (stiffness 5.88, compression 0.83, relaxation 0.88, friction slip 10.5). Each wheel's `rollInfluence` (0 to 1, default 0.1) is how much of its height above the ground the sideways grip turns the chassis by: at 0.1 a car with grippy tyres takes a bend without tipping over, at 1 the grip pushes at the tyre and a light car rolls. `wheel(i)` also gives the `ground` collider the wheel stands on, the `hardPoint` where its suspension is mounted in the world, and the `forwardImpulse` and `sideImpulse` it pushed the chassis with in the last step. `vehicle.dispose()` (or removing the chassis) detaches it. Ropes and vehicles step and dispose with their world, and the `Physics` class never imports them, so a bundle that does not use them leaves them out.
 
+## Soft bodies
+
+Ropes, cloth and particle meshes live in their own entry, `margoengine/physics/soft`, so a game that never imports it pays nothing: the root entry does not load it, and its kernel (a small Rust program compiled to Wasm) is a chunk of its own. Particles are held by compliant distance constraints (XPBD, Macklin, Müller and Chentanez 2016) solved in many small steps (Macklin et al. 2019); they collide with the spheres, boxes and capsules of the rigid world, and the bodies they press on take the impulse back, shared by the body's inverse mass and inertia, so a light crate on cloth sinks it and a heavy one sinks it more.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {SoftBodies, SoftBodyDesc, SoftBodyMaterial} from 'margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics); // loads the soft kernel once per app
+
+// A rope of 20 particles pinned at one end, a 12 x 12 cloth pinned at its four corners.
+const rope = soft.create(SoftBodyDesc.rope([0, 4, 0], [2, 4, 0], 20).setPinnedParticles([0]));
+const cloth = soft.create(
+  SoftBodyDesc.cloth([-0.55, 1, -0.55], [0.1, 0, 0], [0, 0, 0.1], 12, 12)
+    .setPinnedParticles([0, 11, 132, 143])
+    .setParticleMass(0.02)
+    .setLinearDamping(3),
+);
+physics.addBody(null, {position: [0, 1.4, 0], colliders: {shape: 'box', halfExtents: [0.1, 0.1, 0.1], density: 400}});
+
+soft.onTear(({body, edges}) => console.log('torn', body.handle, edges));
+for (let i = 0; i < 300; i++) physics.step();
+const positions = cloth.particlePositions(); // flat x, y, z, a copy
+console.log(positions.length / 3, rope.particlePosition(19));
+
+// Tear a rope that stretches past 20%, pull a particle along with a kinematic target, then let go.
+const fragile = soft.create(SoftBodyDesc.rope([3, 4, 0], [3, 2, 0], 6).setEdgeTearResistance(0.2));
+fragile.setParticleKinematicTarget(0, [3, 4.02, 0]);
+fragile.setParticlePinned(0, false);
+```
+
+- **Builders.** `SoftBodyDesc.rope(start, end, particles, {bending})`, `cloth(origin, du, dv, nu, nv)` (particle (i, j) is at `origin + i*du + j*dv`, index `i * nv + j`; structural, shear and bend edges) and `clothTube`, or `new SoftBodyDesc(positions)` with `setEdges` and `setBendEdges` for any other particle mesh. `append` merges two descriptions and `addEdges` sews them, with the rest length the distance at insertion.
+- **Settings.** `setPinnedParticles`, `setParticleMass`, `setMass`, `setMasses`, `setParticleRadius` (default half the shortest edge), `setSoftness(hertz, dampingRatio)`, `setMaterial(SoftBodyMaterial)`, `setEdgeTearResistance(strain)`, `setGravityScale`, `setLinearDamping`, `setTranslation`. A natural frequency of 0 makes an edge rigid, the default for stretch edges; bend edges default to 10 Hz.
+- **Particles.** `particlePosition(i)`, `particlePositions()`, `particleVelocity(i)`, `particleVelocities()`, `setParticlePosition` (a teleport), `setParticleVelocity`, `setParticlePinned`, `setParticleKinematicTarget` (a pinned particle that travels to the target over the next step, so contacts and friction see it move), `edges()`, `bendEdges()`, `isEdgeTorn`, `tearEdge`.
+- **Forces.** `addForce`, `addParticleForce`, `resetForces`, `applyImpulse` (shared by mass), `applyParticleImpulse` and `applyImpulseAtPoint(impulse, point, radius)` (linear falloff to zero at `radius`). Pinned particles ignore them.
+- **World.** `soft.create`, `soft.remove`, `soft.list()`, `soft.onTear(listener)`, `soft.hash()` (equal across two runs that did the same), `soft.substeps` (default 8) and `soft.iterations` (default 2), `soft.dispose()`.
+
+Not in this entry yet: volumetric cells and the FEM solver, shape matching, plastic flow, cuts, clusters and the root soft frame, attaching a particle to a rigid body, self-contacts, deformable colliders, skinned meshes, and collision with cylinders, cones, hulls, triangle meshes and heightfields (see `docs/physics-collision-parity.md` for each row).
+
 ## How it works
 
 Static meshes loaded by `@margoengine/gltf/pbr` or `@margoengine/fbx` support fitted colliders without attaching core geometry. `physics.addBody(model.root)` gathers the static core/PBR triangles beneath a geometry-free root into one fitted box, preserving the loaded hierarchy. Each descendant's world transform contributes its translation, rotation and scale; the collider uses the body's rotation/translation frame, retaining root scale exactly once because a body has no scale. A node with its own geometry fits only that node, with its scale applied once. Hidden descendants still contribute collision geometry.

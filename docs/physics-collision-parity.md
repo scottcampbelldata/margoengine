@@ -135,18 +135,18 @@ type declarations. What the check found and closed: `FIX_INTERNAL_EDGES_TWO_SIDE
 
 ## Soft bodies (Rapier's Soft-bodies guide page)
 
-None of this page is built: ropes are rigid link chains (`Rope`), not soft bodies. Each row below is in progress as its own piece of work; the deformable-collider row needs this kernel's mesh refit and contacts against vertices that move each step.
+The first slice is built in `@margoengine/physics/soft`: particles held by compliant distance constraints (XPBD), ropes and cloth, pinning, kinematic targets, forces, edge tearing, and two-way contact with spheres, boxes and capsules. The rest is in progress as separate pieces of work; the deformable-collider row needs this kernel's mesh refit and contacts against vertices that move each step. Rows marked partial name what is still missing.
 
 | Capability | Status | Notes | Tests |
 | --- | --- | --- | --- |
-| Builders: rope, cloth (and anisotropic, tube), grid, cuboid, polygon, disk, sphere, trimesh, polyline, volumetric | missing, in progress | `SoftBodyDesc` constructors | |
-| Lattice elements: edges, bend edges, dihedrals, cells, surface, wire, skin; merging builders | missing, in progress | `setEdges`, `setCells`, `append` and the rest | |
-| Builder settings: pinned particles, softness, masses, particle radius, surface collider, self contacts, damping, gravity scale, dominance, sleep | missing, in progress | `setPinnedParticles`, `setSoftness`, `setParticleMass` and the rest | |
-| Materials and plasticity: shape matching, bend, edge and volume softness, Young modulus, Poisson ratio, damping, plastic yield, creep and flow | missing, in progress | `SoftBodyMaterial` | |
-| Tearing and cutting: edge and cell tears, tear events, splitting into pieces | missing, in progress | `tearEdge`, `tearCell`, `tearSoftBody`, `cutSoftBody` | |
+| Builders: rope, cloth (and anisotropic, tube), grid, cuboid, polygon, disk, sphere, trimesh, polyline, volumetric | partial | `SoftBodyDesc.rope`, `cloth`, `clothTube` and `new SoftBodyDesc(positions)` are built; anisotropic cloth, grid, cuboid, polygon, disk, sphere, trimesh, polyline and volumetric are missing (they need cells or shape matching) | `tests/soft.test.js` |
+| Lattice elements: edges, bend edges, dihedrals, cells, surface, wire, skin; merging builders | partial | `setEdges`, `setBendEdges`, `addEdges` and `append` are built; dihedrals, cells, surface, wire and skin are missing | `tests/soft.test.js` |
+| Builder settings: pinned particles, softness, masses, particle radius, surface collider, self contacts, damping, gravity scale, dominance, sleep | partial | pinned particles, softness, masses, particle radius, edge tear resistance, damping, gravity scale and translation are built; surface collider, self contacts, dominance and sleep are missing | `tests/soft.test.js` |
+| Materials and plasticity: shape matching, bend, edge and volume softness, Young modulus, Poisson ratio, damping, plastic yield, creep and flow | partial | `SoftBodyMaterial` has edge and bend softness and `tearStrain`; the cell and plastic fields are missing | `tests/soft.test.js` |
+| Tearing and cutting: edge and cell tears, tear events, splitting into pieces | partial | edge tears by strain or `tearEdge`, and `onTear` events are built; the torn edge stays in the body (particles are not duplicated, pieces do not become new bodies); cell tears and cuts are missing | `tests/soft.test.js` |
 | Solvers and cell models: constraints solver, finite elements, volume, corotational and neo-Hookean cells; recovery settings | missing, in progress | `SoftBodySolver`, `SoftBodyCellModel` | |
 | Clusters and root frames: frame bodies, stiffness scales, pinning, kinematic targets, spring joints | missing, in progress | `addSoftBodyCluster` and the cluster setters | |
-| Particle API: positions, velocities, pin, kinematic target, attach and detach, forces and impulses (radial too) | missing, in progress | `particlePosition`, `applyParticleImpulse` and the rest | |
+| Particle API: positions, velocities, pin, kinematic target, attach and detach, forces and impulses (radial too) | partial | everything but `attachParticle` and `detachParticle`; `applyImpulse` is the whole body's impulse shared by mass, which has not been compared with Rapier's | `tests/soft.test.js` |
 | Deformable trimesh collider: vertices that move each step, the tree refit with no rebuild, queries and contacts against the moved surface | full | `deformable: true`, `collider.setVertices(positions, {velocities, now})`: aimed like a kinematic body, per-vertex surface velocity for friction, bounce and swept contacts, landed with one refit at the step's end | `tests/next-deformable.test.js`, `kernel/tests/refit.rs` |
 | Skinning and mesh bindings: skinned and direct bindings of a deformable collider to a soft body's mesh | missing, in progress | `SoftMeshBinding`, `createDeformableCollider`; the soft-body work drives `setVertices` | |
 

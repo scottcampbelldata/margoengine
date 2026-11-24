@@ -39,6 +39,10 @@
     "./decomposition": {
       "types": "./dist/decomposition.d.ts",
       "import": "./dist/decomposition.js"
+    },
+    "./soft": {
+      "types": "./dist/soft.d.ts",
+      "import": "./dist/soft.js"
     }
   },
   "files": [

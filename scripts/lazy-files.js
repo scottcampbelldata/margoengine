@@ -811,6 +811,17 @@ export const LAZY_SPLITS = [
     when: '`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own',
   },
   {
+    package: 'physics',
+    entry: './soft',
+    specifier: '@margoengine/physics/soft',
+    dist: 'packages/physics/dist/soft.js',
+    chunk: /^soft-wasm-/,
+    lazyLabel: 'soft body kernel (deflated Wasm blueprint and its column table)',
+    source: 'packages/physics/src/soft-wasm.ts',
+    baseLabel: 'everything the entry loads before <code>SoftBodies.attach()</code>',
+    when: '`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own',
+  },
+  {
     package: 'physics2d',
     entry: '.',
     specifier: '@margoengine/physics2d',

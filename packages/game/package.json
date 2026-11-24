@@ -2031,6 +2031,10 @@
       "types": "./dist/physics/decomposition.d.ts",
       "import": "./dist/physics/decomposition.js"
     },
+    "./physics/soft": {
+      "types": "./dist/physics/soft.d.ts",
+      "import": "./dist/physics/soft.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"
