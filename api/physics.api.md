@@ -498,6 +498,7 @@ export class KernelWorld {
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: KernelTrimeshOptions): number;
     refitCollider(collider: number, motion: number): number;
+    aimCollider(collider: number, motion: number): void;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
@@ -543,6 +544,7 @@ export class KernelWorld {
         angular?: number;
     }): this;
     touch(body: number): this;
+    stepSeconds: number;
     step(dt: number): this;
     get bytes(): number;
     get hash(): number;
@@ -870,7 +872,10 @@ export class PhysicsCollider {
         w: number;
     };
     vertices(): Float32Array;
-    setVertices(positions: ArrayLike<number>): void;
+    setVertices(positions: ArrayLike<number>, options?: {
+        velocities?: ArrayLike<number>;
+        now?: boolean;
+    }): void;
     indices(): Uint32Array | undefined;
     containsPoint(point: {
         x: number;

@@ -615,7 +615,7 @@ ball.enabled = false;
 physics.dispose();
 ```
 
-A `trimesh` with `deformable: true` (Rapier's `TriMeshFlags.DEFORMABLE`) keeps its vertices movable: `collider.setVertices(positions)` takes one packed x, y, z a vertex, in the collider's frame, and follows them with a refit of the mesh's tree (every node touched once, no rebuild), so rays, queries and contacts see the moved surface from the next call and what rests on it wakes. Call it between steps, as often as every step. Contacts and the broad phase reach as far as the farthest vertex moved, so a surface rising towards a body meets it; the surface has no velocity of its own, so one that moves through a body by more than its radius in one step passes it (limits). A mesh that is not `deformable` throws a `state` error from `setVertices`.
+A `trimesh` with `deformable: true` (Rapier's `TriMeshFlags.DEFORMABLE`) keeps its vertices movable: `collider.setVertices(positions)` takes one packed x, y, z a vertex, in the collider's frame, and moves the surface as a kinematic body goes to its target. The next step makes its contacts against the surface where it is, with each vertex moving at its velocity (its displacement over the step, or the `velocities` you pass), so friction carries a crate lying on a sliding sheet, bounce and the push count the surface's speed, and a surface that moves through a body faster than its radius a step still catches it (contacts and the broad phase reach as far as the farthest vertex goes, and the contact solver closes the gap as the surface comes on). The end of that step lands the mesh on the positions with one refit of its tree (every node touched once, no rebuild), and what rests on it wakes. The speed lasts that one step: a surface not set again is still. Call it between steps, as often as every step. `vertices()`, rays and queries see the new positions once the step has run; `setVertices(positions, {now: true})` moves the mesh at once with no velocity (a teleport, for building a mesh up between steps). A mesh that is not `deformable` throws a `state` error from `setVertices`. A surface moves in a straight line over the step, with the mean of a triangle's three vertex velocities as its speed.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -630,6 +630,7 @@ for (let step = 0; step < 120; step++) {
   floor.colliders[0].setVertices(vertices.map((v, i) => (i % 3 === 1 ? lift : v)));
   physics.step();
 }
+for (let step = 0; step < 60; step++) physics.step();
 console.log(ball.position[1] > 0.4);
 ```
 

@@ -219,6 +219,7 @@ impl World {
         }
         lap(self, 6);
         self.gather_events();
+        self.land_meshes();
         lap(self, 7);
         self.timing[0] = (stamp - begun) as f32;
         self.header_mut().steps += 1;

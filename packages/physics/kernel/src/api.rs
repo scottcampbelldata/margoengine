@@ -388,6 +388,24 @@ pub extern "C" fn collider_refit(collider: u32, motion: f32) -> i32 {
     }
     touched
 }
+/// Aims a deformable collider's mesh at the targets and velocities written into the second and third blocks of its vertex
+/// rows: this step's contacts see the surface where it is, each vertex moving at its velocity, and the step's end lands the
+/// mesh on its targets, as a kinematic body goes to its target. `motion` is how far the farthest vertex goes. 0, or a
+/// negative MESH_ code.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_aim(collider: u32, motion: f32) -> i32 {
+    let w = world();
+    let at = collider as usize;
+    if collider >= w.header().collider_rows || w.uu(COLLIDER_STATE, at) & REMOVED != 0 || w.uu(COLLIDER_SHAPE, at) != SHAPE_TRIMESH {
+        return -1;
+    }
+    let done = w.aim_mesh(w.uu(COLLIDER_HULL, at) as usize, collider, motion);
+    if done >= 0 {
+        w.mark_pending(collider);
+        w.touch_collider(collider);
+    }
+    done
+}
 /// Finishes a height field written after `mesh_begin(vertices, 0)` as `(rows + 1) (columns + 1)` vertices, column
 /// major: its row, or a negative MESH_ code. `flags` holds MESH_ bits.
 #[unsafe(no_mangle)]

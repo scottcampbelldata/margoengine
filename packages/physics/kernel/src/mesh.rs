@@ -330,7 +330,73 @@ impl World {
         self.set_v(MESH_HALF_X, mesh, high.sub(low).scale(0.5));
         self.set_s(MESH_RADIUS, mesh, sqrt(radius));
         self.set_s(MESH_MOTION, mesh, motion);
+        self.set_u(MESH_STAMP, mesh, self.header().steps);
         nodes as i32
+    }
+
+    /// How far a deformable mesh's surface moves in the step now being made, as aimed before it: 0 for any mesh after.
+    #[inline(always)]
+    pub(crate) fn mesh_reach(&self, mesh: usize) -> f32 {
+        if self.uu(MESH_STAMP, mesh) == self.header().steps { self.s(MESH_MOTION, mesh) } else { 0.0 }
+    }
+
+    /// Aims a deformable mesh at the targets written into the second block of its vertex rows, with the velocities written
+    /// into the third: the step now begun makes contacts against the surface where it is, with each vertex moving at its
+    /// velocity, and lands the mesh on its targets at its end, as a kinematic body goes to its target. `motion` is how far the
+    /// farthest vertex goes. 0, or a MESH_ code (-1 not a deformable mesh, -3 a number that is not finite).
+    pub fn aim_mesh(&mut self, mesh: usize, owner: u32, motion: f32) -> i32 {
+        if mesh >= self.header().mesh_rows[0] as usize || self.uu(MESH_FLAGS, mesh) & (MESH_DEFORMABLE | MESH_VOXELS) != MESH_DEFORMABLE || !(motion >= 0.0 && motion.is_finite()) {
+            return MESH_EMPTY;
+        }
+        let (v0, n) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_VERTICES, mesh) as usize);
+        for i in v0 + n..v0 + 3 * n {
+            let p = self.v(MESH_VERTEX_X, i);
+            if !(p.x.is_finite() && p.y.is_finite() && p.z.is_finite()) {
+                return MESH_NOT_FINITE;
+            }
+        }
+        self.set_u(MESH_FLAGS, mesh, self.uu(MESH_FLAGS, mesh) | MESH_AIMED);
+        self.set_u(MESH_STAMP, mesh, self.header().steps);
+        self.set_u(MESH_OWNER, mesh, owner);
+        self.set_s(MESH_MOTION, mesh, motion);
+        0
+    }
+
+    /// The velocity of a deformable mesh's surface over triangle `t` in the world: the mean of its three vertices' velocities,
+    /// turned by the collider's pose; zero when the mesh was not aimed for this step.
+    pub(crate) fn mesh_surface_velocity(&self, collider: usize, t: usize) -> V3 {
+        let mesh = self.uu(COLLIDER_HULL, collider) as usize;
+        let zero = v3(0.0, 0.0, 0.0);
+        if self.uu(MESH_FLAGS, mesh) & MESH_AIMED == 0 || self.uu(MESH_STAMP, mesh) != self.header().steps || t >= self.uu(MESH_TRIANGLES, mesh) as usize {
+            return zero;
+        }
+        let (v0, n, t0) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_VERTICES, mesh) as usize, self.uu(MESH_FIRST_TRIANGLE, mesh) as usize);
+        let sum = [TRIANGLE_A, TRIANGLE_B, TRIANGLE_C].iter().fold(zero, |sum, &column| sum.add(self.v(MESH_VERTEX_X, v0 + 2 * n + self.uu(column, t0 + t) as usize)));
+        self.collider_pose(collider).q.rotate(sum.scale(1.0 / 3.0))
+    }
+
+    /// The end of a step: every mesh aimed in it lands on its targets, its tree refit once, and its collider is looked at
+    /// again by the broad phase, waking what rests on it.
+    pub fn land_meshes(&mut self) {
+        for mesh in 0..self.header().mesh_rows[0] as usize {
+            if self.uu(MESH_FLAGS, mesh) & MESH_AIMED == 0 || self.uu(MESH_STAMP, mesh) != self.header().steps {
+                continue;
+            }
+            let (v0, n) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_VERTICES, mesh) as usize);
+            for i in 0..n {
+                let p = self.v(MESH_VERTEX_X, v0 + n + i);
+                self.set_v(MESH_VERTEX_X, v0 + i, p);
+            }
+            self.set_u(MESH_FLAGS, mesh, self.uu(MESH_FLAGS, mesh) & !MESH_AIMED);
+            let motion = self.s(MESH_MOTION, mesh);
+            if self.refit_mesh(mesh, motion) >= 0 {
+                let owner = self.uu(MESH_OWNER, mesh);
+                if owner != NONE && owner < self.header().collider_rows && self.uu(COLLIDER_STATE, owner as usize) & REMOVED == 0 {
+                    self.mark_pending(owner);
+                    self.touch_collider(owner);
+                }
+            }
+        }
     }
 
     /// Grows the mesh classes to at least these rows; false when memory cannot.
@@ -427,7 +493,19 @@ impl World {
             }
             self.set_u(TRIANGLE_EDGES, t, classes);
         }
-        self.finish_mesh([row, first_vertex, vertices, first_triangle, triangles, first_node, used, flags, 0], low, high)
+        let made = self.finish_mesh([row, first_vertex, vertices, first_triangle, triangles, first_node, used, flags, 0], low, high);
+        // A deformable mesh keeps two more blocks of vertex rows behind its positions: the targets, then the velocities.
+        if flags & MESH_DEFORMABLE != 0 && made >= 0 {
+            let n = vertices as usize;
+            for i in 0..n {
+                let p = self.v(MESH_VERTEX_X, v0 + i);
+                self.set_v(MESH_VERTEX_X, v0 + n + i, p);
+                self.set_v(MESH_VERTEX_X, v0 + 2 * n + i, v3(0.0, 0.0, 0.0));
+            }
+            self.header_mut().mesh_rows[1] += 2 * vertices;
+            self.set_u(MESH_OWNER, made as usize, NONE);
+        }
+        made
     }
 
     /// Writes a mesh's row and hands out its rows: `rows` holds its row, first vertex, vertices, first triangle,
@@ -653,7 +731,7 @@ impl World {
         let (mesh_collider, other, other_is_a) = self.mesh_sides(a, b);
         let bodies = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
         // A mesh that moved in its last refit is met that much further off.
-        let limit = limit + self.s(MESH_MOTION, self.uu(COLLIDER_HULL, mesh_collider) as usize);
+        let limit = limit + self.mesh_reach(self.uu(COLLIDER_HULL, mesh_collider) as usize);
         if self.uu(COLLIDER_SHAPE, other) == SHAPE_TRIMESH {
             // Two voxel grids meet cell by cell; a grid and a mesh, or two meshes, do not meet, as on Rapier.
             let voxels = |c: usize| self.is_voxels(self.uu(COLLIDER_HULL, c) as usize);
@@ -689,7 +767,7 @@ impl World {
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
         // The mesh's own skin reaches triangles that far from the other collider's box.
-        let skin = self.s(COLLIDER_SKIN, mesh_collider) + self.s(MESH_MOTION, mesh);
+        let skin = self.s(COLLIDER_SKIN, mesh_collider) + self.mesh_reach(mesh);
         let (low, high) = (low.sub(v3(skin, skin, skin)), high.add(v3(skin, skin, skin)));
         let mut manifold = Manifold::new();
         if let Some((rows, columns)) = self.grid_size(mesh) {

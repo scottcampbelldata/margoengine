@@ -255,7 +255,7 @@ impl World {
             let bounce = Self::combine(self.s(COLLIDER_RESTITUTION, first), self.s(COLLIDER_RESTITUTION, second), higher(rules_a >> 2 & 3, rules_b >> 2 & 3));
             self.set_s(PAIR_FRICTION, row, friction);
             self.set_s(PAIR_RESTITUTION, row, bounce);
-            self.set_v(PAIR_SURFACE_X, row, v3(0.0, 0.0, 0.0));
+            self.set_v(PAIR_SURFACE_X, row, self.moving_surface(row, first, second));
             if (self.uu(COLLIDER_FLAGS, first) | self.uu(COLLIDER_FLAGS, second)) & COLLIDER_MODIFY != 0 {
                 self.modify_contacts(row);
             }
@@ -416,6 +416,22 @@ impl World {
         load * self.s(INVERSE_MASS, a).max(self.s(INVERSE_MASS, b)) < limit
     }
 
+    /// The velocity the surface of a deformable mesh gives a part of pair `row` in this step, as the pair's surface velocity: the
+    /// mesh's own if it is the pair's first collider, its negative if the second (see `friction_rows`).
+    fn moving_surface(&self, row: usize, first: usize, second: usize) -> V3 {
+        let zero = v3(0.0, 0.0, 0.0);
+        if self.uu(PAIR_FLAGS, row) & PAIR_IS_PART == 0 || self.uu(PAIR_SUB, row) != crate::world::NONE {
+            return zero;
+        }
+        let triangle = self.uu(PAIR_PART, row) as usize;
+        for (collider, sign) in [(first, 1.0f32), (second, -1.0f32)] {
+            if self.uu(COLLIDER_SHAPE, collider) == SHAPE_TRIMESH && self.uu(MESH_FLAGS, self.uu(COLLIDER_HULL, collider) as usize) & MESH_AIMED != 0 {
+                return self.mesh_surface_velocity(collider, triangle).scale(sign);
+            }
+        }
+        zero
+    }
+
     /// A pair's friction, one sweep over the points, each in a circular cone of mu times its normal impulse so far.
     fn friction_rows(&mut self, row: usize, step: Soft, biased: bool, turn: usize, body_a: &mut Moving, body_b: &mut Moving) {
         let normal = self.v(PAIR_NORMAL_X, row);
@@ -482,6 +498,7 @@ impl World {
         let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
         let normal = self.v(PAIR_NORMAL_X, row);
         let bounce = self.s(PAIR_RESTITUTION, row);
+        let surface_normal = self.v(PAIR_SURFACE_X, row).dot(normal);
         let count = self.uu(PAIR_CONTACTS, row) as usize;
         let zero = v3(0.0, 0.0, 0.0);
         let (round_a, round_b) = (self.round_core(self.uu(PAIR_A, row) as usize), self.round_core(self.uu(PAIR_B, row) as usize));
@@ -504,9 +521,10 @@ impl World {
                 Some(core) => center_b.add(rotation_b.rotate(core.nearest(anchor_b))).sub(normal.scale(core.radius)),
                 None => center_b.add(rotation_b.rotate(anchor_b)),
             };
-            let gap = on_b.sub(on_a).dot(normal);
+            // A moving surface has come on by what it made since the step began: the gap closes by that, and the speed counts it.
+            let gap = on_b.sub(on_a).dot(normal) - surface_normal * h * (turn as f32);
             (hold[k], was[k]) = (pressed, pressed);
-            speed[k] = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
+            speed[k] = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal) - surface_normal;
             approach[k] = speed[k];
             open[k] = gap;
             (bias[k], scale[k], leak[k]) = if gap > 0.0 {

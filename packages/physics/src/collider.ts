@@ -276,47 +276,82 @@ export class PhysicsCollider {
   vertices(): Float32Array {
     if (!this.data)
       throw new MargoError('state', `A ${this.shape} collider holds no vertices; ask a trimesh or convexHull.`);
+    const columns = this.columns(),
+      mesh = columns.colliderHull[this.handle]!;
+    // A deformable mesh's vertices are the kernel's, as the last step landed them.
+    if (this.shape === 'trimesh' && columns.meshFlags[mesh]! & 8) {
+      const count = columns.meshVertices[mesh]!,
+        first = columns.meshFirstVertex[mesh]!,
+        out = new Float32Array(3 * count);
+      for (let i = 0; i < count; i++) {
+        out[3 * i] = columns.meshVertexX[first + i]!;
+        out[3 * i + 1] = columns.meshVertexY[first + i]!;
+        out[3 * i + 2] = columns.meshVertexZ[first + i]!;
+      }
+      return out;
+    }
     return this.data.vertices;
   }
   /**
-   * Moves the vertices of a `deformable` trimesh to these packed xyz positions (in the collider's frame, as many as it has):
-   * the mesh's tree is refit in one pass with no rebuild, so rays, queries and contacts see the moved surface from the next
-   * call, and what rests on it wakes. Contacts reach as far as the farthest vertex moved until the next call. Call it
-   * between steps, as often as every step.
-   * @throws RangeError for a count that is not the mesh's, or a position that is not finite.
+   * Moves the vertices of a `deformable` trimesh to these packed xyz positions (in the collider's frame, as many as it has),
+   * as a kinematic body goes to its target: the next step makes its contacts against the surface where it is, each vertex
+   * moving at its velocity, so friction carries what lies on it, bounce and the push count its speed, and a surface that
+   * moves through a body faster than its radius a step still catches it; the end of that step lands the mesh on these
+   * positions with one refit of its tree (every node once, no rebuild), and what rests on it wakes. Call it between steps,
+   * as often as every step; queries and `vertices()` see the new positions once the step has run.
+   *
+   * `velocities` (packed xyz, in the collider's frame, metres a second) are each vertex's velocity over that step; left
+   * out, each is the vertex's displacement over the step. `now: true` instead moves the mesh at once, with no velocity (a
+   * teleport: a refit, then queries see it): for building a mesh up between steps.
+   * @throws RangeError for a count that is not the mesh's, or a position or velocity that is not finite.
    * @throws MargoError code `state` for a collider that is not a trimesh made with `deformable: true`.
    */
-  setVertices(positions: ArrayLike<number>): void {
+  setVertices(positions: ArrayLike<number>, options: { velocities?: ArrayLike<number>; now?: boolean } = {}): void {
     const columns = this.columns(),
-      data = this.data;
-    const mesh = columns.colliderHull[this.handle]!;
-    if (this.shape !== 'trimesh' || !data || (columns.meshFlags[mesh]! & 8) === 0)
+      mesh = columns.colliderHull[this.handle]!;
+    if (this.shape !== 'trimesh' || !this.data || (columns.meshFlags[mesh]! & 8) === 0)
       throw new MargoError(
         'state',
         `A ${this.shape} collider cannot move its vertices; make a trimesh with deformable: true.`,
       );
-    if (positions.length !== data.vertices.length)
+    const count = columns.meshVertices[mesh]!,
+      first = columns.meshFirstVertex[mesh]!,
+      { velocities, now = false } = options;
+    if (positions.length !== 3 * count)
       throw new RangeError(
-        `This mesh has ${data.vertices.length / 3} vertices and setVertices got ${positions.length / 3}; pass one x, y, z per vertex.`,
+        `This mesh has ${count} vertices and setVertices got ${positions.length / 3}; pass one x, y, z per vertex.`,
       );
+    if (velocities && velocities.length !== positions.length)
+      throw new RangeError(`setVertices got ${velocities.length / 3} velocities for ${count} vertices; pass one x, y, z each.`);
+    const dt = this.kernel.stepSeconds,
+      target = [columns.meshVertexX, columns.meshVertexY, columns.meshVertexZ],
+      speed = (axis: number, i: number): number => (velocities ? velocities[3 * i + axis]! : 0);
     let farthest = 0;
-    for (let i = 0; i < positions.length; i += 3) {
-      const dx = positions[i]! - data.vertices[i]!,
-        dy = positions[i + 1]! - data.vertices[i + 1]!,
-        dz = positions[i + 2]! - data.vertices[i + 2]!,
-        d = dx * dx + dy * dy + dz * dz;
-      if (!Number.isFinite(d) || !Number.isFinite(positions[i]! + positions[i + 1]! + positions[i + 2]!))
-        throw new RangeError(`Vertex ${i / 3} is not finite; pass finite numbers.`);
+    for (let i = 0; i < count; i++) {
+      let d = 0;
+      for (let axis = 0; axis < 3; axis++) {
+        const p = positions[3 * i + axis]!,
+          v = speed(axis, i);
+        if (!Number.isFinite(p) || !Number.isFinite(v)) throw new RangeError(`Vertex ${i} is not finite; pass finite numbers.`);
+        const move = p - target[axis]![first + i]!;
+        d += move * move;
+      }
       if (d > farthest) farthest = d;
     }
-    const first = columns.meshFirstVertex[mesh]!;
-    for (let i = 0; i < positions.length / 3; i++) {
-      columns.meshVertexX[first + i] = positions[3 * i]!;
-      columns.meshVertexY[first + i] = positions[3 * i + 1]!;
-      columns.meshVertexZ[first + i] = positions[3 * i + 2]!;
+    const reach = Math.sqrt(farthest);
+    if (now) {
+      for (let i = 0; i < count; i++)
+        for (let axis = 0; axis < 3; axis++) target[axis]![first + i] = positions[3 * i + axis]!;
+      this.kernel.refitCollider(this.handle, reach);
+      return;
     }
-    data.vertices.set(positions as ArrayLike<number>);
-    this.kernel.refitCollider(this.handle, Math.sqrt(farthest));
+    for (let i = 0; i < count; i++)
+      for (let axis = 0; axis < 3; axis++) {
+        const p = positions[3 * i + axis]!;
+        target[axis]![first + count + i] = p;
+        target[axis]![first + 2 * count + i] = velocities ? velocities[3 * i + axis]! : (p - target[axis]![first + i]!) / dt;
+      }
+    this.kernel.aimCollider(this.handle, reach);
   }
   /** Triangle indices of a trimesh. */
   indices(): Uint32Array | undefined {

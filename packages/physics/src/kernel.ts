@@ -132,6 +132,7 @@ interface KernelExports extends WebAssembly.Exports {
   mesh_begin(vertices: number, triangles: number): number;
   mesh_end(vertices: number, triangles: number, flags: number): number;
   collider_refit(collider: number, motion: number): number;
+  collider_aim(collider: number, motion: number): number;
   mesh_end_grid(rows: number, columns: number, flags: number): number;
   mesh_next(rows: number): number;
   voxels_begin(cells: number): number;
@@ -1318,7 +1319,7 @@ export class KernelWorld {
     }
     // The edges' neighbours serve only the internal edge rule, so a mesh without it skips finding them.
     const across = fixInternalEdges ? trianglesAcross(vertices, indices) : null;
-    if (!api.mesh_begin(count, triangles))
+    if (!api.mesh_begin(deformable ? 3 * count : count, triangles))
       throw new RangeError(
         `Memory cannot hold a trimesh of ${triangles} triangles; free another world, or simplify the mesh.`,
       );
@@ -1359,6 +1360,20 @@ export class KernelWorld {
         `Collider ${collider} cannot be refit (code ${touched}); it must be a trimesh made with deformable: true, with finite vertices.`,
       );
     return touched;
+  }
+  /**
+   * Aims a deformable trimesh collider's mesh at the targets written into the second block of its vertex rows and the
+   * velocities in the third (each `vertexCount` rows after the one before): the next step's contacts see the surface where it
+   * is, each vertex moving at its velocity (friction, bounce and sweeping count it), and the end of that step lands the mesh
+   * on its targets with one refit. `motion` is how far the farthest vertex goes.
+   * @throws RangeError for a collider that is not a deformable trimesh or a number that is not finite.
+   */
+  aimCollider(collider: number, motion: number): void {
+    const code = this.api.collider_aim(collider, motion);
+    if (code < 0)
+      throw new RangeError(
+        `Collider ${collider} cannot be aimed (code ${code}); it must be a trimesh made with deformable: true, with finite vertices.`,
+      );
   }
   /**
    * Adds a height field that colliders can share, for {@link KernelWorld.addCollider} with shape `trimesh`, laid out as
@@ -2190,6 +2205,8 @@ export class KernelWorld {
     this.api.body_touch(body);
     return this;
   }
+  /** Seconds of the last step, or one 60th before the first. */
+  stepSeconds = 1 / 60;
   /**
    * Advances the world by `dt` seconds, in {@link KernelWorld.substeps} equal pieces. Finding new pairs can grow the world,
    * so read views from `columns` after this call.
@@ -2201,6 +2218,7 @@ export class KernelWorld {
     if (!(dt > 0) || !Number.isFinite(dt))
       throw new RangeError(`A step must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
     if (this.stepping) throw new MargoError('state', 'A contact filter ran a step; a filter may only read the world.');
+    this.stepSeconds = dt;
     for (const row of this.wakeAtStep) this.api.body_wake_touching(row);
     this.wakeAtStep.length = 0;
     this.stepping = true;

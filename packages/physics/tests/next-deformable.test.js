@@ -154,3 +154,106 @@ test('a surface rising 0.05 m a step (3 m/s) meets a ball hovering 0.6 m above i
     );
   }
 });
+
+const shifted = (dx, dy = 0) => {
+  const out = flat.slice();
+  for (let v = 0; v < out.length / 3; v++) {
+    out[3 * v] += dx;
+    out[3 * v + 1] += dy;
+  }
+  return out;
+};
+
+test('a box on a deformable sheet that slides under it is carried along by friction', () => {
+  const physics = new Physics(null, { gravity: [0, -10, 0] });
+  const sheet = physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true, friction: 1 },
+  });
+  const crate = physics.addBody(null, {
+    position: [0, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25], friction: 1 },
+  });
+  for (let i = 0; i < 60; i++) physics.step();
+  const start = crate.position[0];
+  // The sheet slides 1 m/s along x for 1.5 s (far less than its width), a mover that never lets go.
+  let x = 0;
+  for (let step = 0; step < 90; step++) {
+    x += 1 / 60;
+    sheet.colliders[0].setVertices(shifted(x));
+    physics.step();
+  }
+  const carried = crate.position[0] - start;
+  assert.ok(carried > 1.0 && carried < 1.7, `the crate moved ${carried} m while the sheet slid 1.5 m`);
+  assert.ok(
+    crate.linearVelocity[0] > 0.7 && crate.linearVelocity[0] < 1.3,
+    `the crate's speed is ${crate.linearVelocity[0]}`,
+  );
+  // Left alone, the sheet's speed ends with its last step: the crate is no longer pulled.
+  for (let step = 0; step < 120; step++) physics.step();
+  assert.ok(
+    Math.abs(crate.linearVelocity[0]) < 0.2,
+    `the crate went on at ${crate.linearVelocity[0]} with the sheet still`,
+  );
+});
+
+test('explicit velocities say how fast each vertex goes, whatever its displacement', () => {
+  const physics = new Physics(null, { gravity: [0, -10, 0] });
+  const sheet = physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true, friction: 1 },
+  });
+  const crate = physics.addBody(null, {
+    position: [0, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25], friction: 1 },
+  });
+  for (let i = 0; i < 60; i++) physics.step();
+  const velocities = flat.map((_, i) => (i % 3 === 2 ? 2 : 0));
+  // The vertices stay where they are and the surface says it moves at 2 m/s along z.
+  for (let step = 0; step < 60; step++) {
+    sheet.colliders[0].setVertices(flat, { velocities });
+    physics.step();
+  }
+  assert.ok(crate.linearVelocity[2] > 1.0, `the crate's speed along z is ${crate.linearVelocity[2]}`);
+});
+
+test('a surface that rises 5 m in one step does not pass through a ball: it carries it', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const sheet = physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true },
+  });
+  const ball = physics.addBody(null, { position: [0.05, 2, 0.05], colliders: { shape: 'sphere', radius: 0.3 } });
+  physics.step();
+  sheet.colliders[0].setVertices(shifted(0, 5));
+  physics.step();
+  assert.ok(ball.position[1] > 5, `the ball is at ${ball.position[1]}, under the surface at 5`);
+  assert.ok(ball.position[1] < 6, `the ball was thrown to ${ball.position[1]}`);
+});
+
+test('a surface that stops moving stops pulling: the speed lasts one step', () => {
+  const physics = new Physics(null, { gravity: [0, -10, 0] });
+  const sheet = physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true, friction: 1 },
+  });
+  const crate = physics.addBody(null, {
+    position: [0, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25], friction: 1 },
+  });
+  for (let i = 0; i < 60; i++) physics.step();
+  sheet.colliders[0].setVertices(shifted(0.2));
+  physics.step();
+  for (let i = 0; i < 90; i++) physics.step();
+  assert.ok(Math.abs(crate.linearVelocity[0]) < 0.05, `the crate still moves at ${crate.linearVelocity[0]}`);
+});
+
+test('the same 5 m rise as a teleport (now: true) has no velocity or sweep, so it passes the ball: the swept path is the one that catches it', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const sheet = physics.addBody(null, { type: 'fixed', colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true } });
+  const ball = physics.addBody(null, { position: [0.05, 2, 0.05], colliders: { shape: 'sphere', radius: 0.3 } });
+  physics.step();
+  sheet.colliders[0].setVertices(shifted(0, 5), { now: true });
+  physics.step();
+  assert.ok(ball.position[1] < 3, `the ball is at ${ball.position[1]}`);
+});

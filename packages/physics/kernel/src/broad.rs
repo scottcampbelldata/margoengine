@@ -90,7 +90,7 @@ impl World {
                 let y = turn.rotate(v3(0.0, half.y, 0.0)).abs();
                 let z = turn.rotate(v3(0.0, 0.0, half.z)).abs();
                 center = center.add(turn.rotate(self.v(MESH_BOX_X, mesh)));
-                moved = self.s(MESH_MOTION, mesh);
+                moved = self.mesh_reach(mesh);
                 (x.add(y).add(z), self.s(MESH_RADIUS, mesh))
             }
             SHAPE_CYLINDER | SHAPE_CONE => {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17499650,
+  "total": 17505871,
   "history": [
     {
       "date": "2026-10-24",
@@ -11367,6 +11367,12 @@
       "commit": "69153cf68d",
       "reason": "FG-05/FG-06 far field: Water.setFarField (+60 B) and Flood farField/farFieldAt (+96 B); a split would need a second Water shader variant",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "b0ccfafe9",
+      "reason": "Deformable trimesh colliders: aim, land and refit a mesh, a surface velocity in the contact rows (kernel blueprint 192,553 to 192,984 B deflated with its column table)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12124,7 +12130,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 246854,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 51095,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 192553,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
