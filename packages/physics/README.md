@@ -1175,6 +1175,10 @@ console.log(Math.abs(Math.hypot(...arm[0].position) - 1) < 1e-3); // true
 physics.dispose();
 ```
 
+### More world settings
+
+`physics.setSolver` also takes `warmStartJoints` (the share of each joint impulse carried from one step to the next, 1 by default), `maxLinearSpeed` (one linear speed cap for every dynamic body, 0 for none, a lower cap on a body still wins) and `staticContactHertz` with `staticContactDamping` (a stiffness of their own for contacts with a fixed or kinematic body; 0 leaves them with `contactHertz`). `physics.wakeUpAll()` wakes every sleeper.
+
 ### Reading a body
 
 A body reads and sets `linearDamping`, `angularDamping`, `dominance` and `gyroscopicForces` (on by default here; Rapier's default is off), and reads `inverseMass`, `inversePrincipalInertia`, `worldCenterOfMass`, `velocityAtPoint(point)`, `kineticEnergy`, `gravitationalPotentialEnergy(gravity?, dt?)`, `nextPosition` and `nextRotation` (the pose a kinematic position body is to reach), `effectiveInverseMass`, `effectiveAngularInertia`, `effectiveWorldInverseInertia` (locked axes take their freedom out) and `isMoving`. `predictPositionUsingVelocity(dt)` and `predictPositionUsingVelocityAndForces(dt)` give the pose after `dt` seconds without moving the body, and `copyFrom(other)` takes another body's settings.
@@ -1218,6 +1222,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Limits on two or three turning axes of one generic joint | `limits` on `angX`, `angY`, `angZ` | full | `next-joint-limits.test.js` |
 | Coupled axes of a generic joint, softness of a joint's locks, joint damping and friction | `coupled`, `setSoftness`, `setDamping`, `setFriction` | full (a hinge's own turning locks stay rigid under softness) | `next-joint-coupled.test.js`, `next-joint-softness.test.js`, `next-multibody-kinematics.test.js` |
 | Multibody forward kinematics of one link, Jacobian, branch, displacements, kinematic links, IK masks | `forwardKinematics`, `bodyJacobian`, `kinematicBranch`, `applyDisplacements`, `constrain` | full | `next-multibody-kinematics.test.js` |
+| World settings: joint warm start share, world speed cap, static contact stiffness, wake all | `setSolver`, `wakeUpAll` | full | `next-world-settings.test.js` |
 | Body reads: damping, dominance, gyroscopic switch, velocity at a point, predicted poses, energies, effective masses, copy | see Reading a body | full | `next-body-reads.test.js` |
 | Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full | `replay.test.js`, `kernel-step.test.js` |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full | `kernel-solver.test.js`, `next-joints.test.js`, `next-parameters.test.js` |

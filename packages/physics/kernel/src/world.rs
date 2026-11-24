@@ -96,6 +96,14 @@ pub struct Header {
     /// How many continuous-collision passes a step may make: 0 leaves every body's CCD off for the world, any other number
     /// lets the one pass a step takes run (it resolves a body's whole sweep, so more passes would find nothing more).
     pub ccd_substeps: u32,
+    /// The share of each joint impulse carried from one step to the next (1 keeps all).
+    pub joint_warm_start: f32,
+    /// One cap on every dynamic body's linear speed, 0 for none.
+    pub max_linear_speed: f32,
+    /// A contact stiffness of its own for contacts with a body that does not move: frequency and damping ratio, a zero frequency
+    /// meaning the same as every other contact.
+    pub static_hertz: f32,
+    pub static_damping: f32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -190,6 +198,10 @@ impl World {
                 warm_start: 1.0,
                 mb_calls: 0,
                 ccd_substeps: 1,
+                joint_warm_start: 1.0,
+                max_linear_speed: 0.0,
+                static_hertz: 0.0,
+                static_damping: 0.0,
             });
         }
         Some(world)

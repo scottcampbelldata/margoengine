@@ -661,7 +661,7 @@ impl World {
 
     /// Once a step: lists the joints with a body awake, in paths, and gives their impulses the length of this substep.
     pub fn prepare_joints(&mut self) {
-        let ratio = self.header().substep_ratio;
+        let ratio = self.header().substep_ratio * self.header().joint_warm_start;
         let stamp = self.header().steps + 1;
         let rows = self.header().joint_rows as usize;
         let live = |w: &World, row: usize| {

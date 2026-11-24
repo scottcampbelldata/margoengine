@@ -327,7 +327,11 @@ impl World {
                 continue;
             }
             for (velocity, cap) in [(LINEAR_X, MAX_LINEAR), (ANGULAR_X, MAX_ANGULAR)] {
-                let cap = self.s(cap, at);
+                let mut cap = self.s(cap, at);
+                let world = self.header().max_linear_speed;
+                if velocity == LINEAR_X && world > 0.0 && (cap <= 0.0 || world < cap) {
+                    cap = world;
+                }
                 if cap > 0.0 {
                     let v = self.v(velocity, at);
                     let speed = sqrt(v.dot(v));

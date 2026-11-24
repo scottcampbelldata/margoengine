@@ -939,6 +939,10 @@ interface KernelSolverOptions {
     jointLooseShare?: number;
     jointMaxPush?: number;
     warmStart?: number;
+    warmStartJoints?: number;
+    maxLinearSpeed?: number;
+    staticContactHertz?: number;
+    staticContactDamping?: number;
 }
 
 interface KernelTrimeshOptions {
@@ -1219,6 +1223,7 @@ class Physics implements EnginePlugin, BodyOwner {
     removeMultibody(multibody: Multibody): void;
     get substepLength(): number;
     holdsMultibody(joint: PhysicsJoint): boolean;
+    wakeUpAll(): this;
     getJoints(): PhysicsJoint[];
     get jointCount(): number;
     removeJoint(joint: PhysicsJoint): void;

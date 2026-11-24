@@ -1312,6 +1312,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const multibody of this.multibodies) if (multibody.links.some((link) => link.joint === joint)) return true;
     return false;
   }
+  /** Wakes every body of the world that sleeps, Rapier's `wake_up_all`. */
+  wakeUpAll(): this {
+    for (const body of this.bodies) this.kernel.wake(body.row);
+    return this;
+  }
   /** Every joint in the world, in the order they were added. */
   getJoints(): PhysicsJoint[] {
     return [...this.joints];

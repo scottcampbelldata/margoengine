@@ -762,6 +762,14 @@ export interface KernelSolverOptions {
   jointLooseShare?: number;
   jointMaxPush?: number;
   warmStart?: number;
+  /** The share of each joint impulse carried from a step to the next, from 0 to 1 (default 1). */
+  warmStartJoints?: number;
+  /** One cap on every dynamic body's linear speed, in m/s; 0 is none (default). A lower cap of a body still wins. */
+  maxLinearSpeed?: number;
+  /** A contact stiffness of its own for contacts with a fixed or kinematic body, in hertz; 0 is the same as `contactHertz` (default). */
+  staticContactHertz?: number;
+  /** The damping ratio of {@link KernelSolverOptions.staticContactHertz}. */
+  staticContactDamping?: number;
 }
 
 /**
@@ -941,6 +949,10 @@ export class KernelWorld {
       jointLooseShare: read(5),
       jointMaxPush: read(6),
       warmStart: read(7),
+      warmStartJoints: read(8),
+      maxLinearSpeed: read(9),
+      staticContactHertz: read(10),
+      staticContactDamping: read(11),
     };
   }
   /**
@@ -963,6 +975,10 @@ export class KernelWorld {
       ['jointLooseShare', 0, 1],
       ['jointMaxPush', 0, Infinity],
       ['warmStart', 0, 1],
+      ['warmStartJoints', 0, 1],
+      ['maxLinearSpeed', 0, Infinity],
+      ['staticContactHertz', 0, Infinity],
+      ['staticContactDamping', 0, Infinity],
     ];
     names.forEach(([name, low, high]) => {
       const value = options[name];

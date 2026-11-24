@@ -395,6 +395,13 @@ impl World {
                 Some((eighth, limit)) if self.is_chain(row, a, b, passes, limit) => eighth,
                 _ => step,
             };
+            // A contact with a body that does not move may have a stiffness of its own, held under a quarter of the substep rate.
+            let step = if self.header().static_hertz > 0.0 && (self.flags(a) & KIND != DYNAMIC || self.flags(b) & KIND != DYNAMIC) {
+                let hertz = self.header().static_hertz;
+                soft(if hertz * h > 0.25 { 0.25 / h } else { hertz }, self.header().static_damping, h)
+            } else {
+                step
+            };
             let given = if biased {
                 self.friction_rows(row, step, true, turn, &mut body_a, &mut body_b);
                 self.normal_rows(row, a, b, h, step, true, turn, &mut impacts, &mut body_a, &mut body_b)
