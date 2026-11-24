@@ -21,6 +21,22 @@ interface SoftExports extends WebAssembly.Exports {
   soft_finish(): void;
   soft_torn(): number;
   soft_hash(): number;
+  soft_fem_reserve(tets: number, clusters: number, members: number): void;
+  soft_fem_column(id: number): number;
+  soft_tet_set(
+    t: number,
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    mu: number,
+    lambda: number,
+    model: number,
+  ): number;
+  soft_cluster_set(c: number, start: number, count: number, omega: number): void;
+  soft_fem_damping(damping: number): void;
+  soft_fem_torn(): number;
+  soft_fem_trim(tets: number, clusters: number, members: number): void;
 }
 
 const PINNED = 1;
@@ -38,13 +54,17 @@ const INTEGER_COLUMNS = new Set([
   'b_count',
   'kc',
 ]);
+const TORN_CELL = 1;
+const INTEGER_CELL_COLUMNS = new Set(['p0', 'p1', 'p2', 'p3', 'model', 'flags', 'cstart', 'ccount', 'member']);
 
 let columnNames: readonly string[] = [];
+let cellColumnNames: readonly string[] = [];
 // The blueprint (the deflated kernel) is a chunk of its own: an app that imports this entry but never attaches soft bodies
 // does not download it.
 const compiled = new LoadOnce<WebAssembly.Module>(async () => {
   const blueprint = await import('./soft-wasm.js');
   columnNames = blueprint.softColumns;
+  cellColumnNames = blueprint.femColumns;
   const bytes = Uint8Array.from(atob(blueprint.wasmBase64), (c) => c.charCodeAt(0));
   return WebAssembly.compile(
     await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(),
@@ -93,6 +113,91 @@ export class SoftBodyMaterial {
   }
 }
 
+/** The elastic model of a body's cells. */
+export type CellModel = 'neo-hookean' | 'corotated';
+
+/**
+ * What the tetrahedral cells of a soft body are made of. The defaults are a soft rubber that is elastic all the way and never
+ * tears; set `yieldStrain` for a body that keeps a set (clay, putty, bent metal) and `tearStrain` for one that breaks.
+ */
+export class CellMaterial {
+  /** Stiffness in pascals (default 100 kPa, soft rubber). */
+  youngsModulus = 1e5;
+  /** How much a stretched body thins: 0 to below 0.5 (default 0.3); near 0.5 it keeps its volume. */
+  poissonRatio = 0.3;
+  /**
+   * `'neo-hookean'` (default) is the stable Neo-Hookean of Smith, de Goes and Kim (2018) held by the constraints of Macklin and
+   * Mueller (2021): an inverted cell comes back and nothing locks near zero volume. `'corotated'` is the co-rotated linear
+   * elasticity of Mueller and Gross (2004): stiffer for a given modulus at small strain.
+   */
+  model: CellModel = 'neo-hookean';
+  /** Kilograms per cubic metre, for the mass the cells give their particles when no mass was set (default 1000). */
+  density = 1000;
+  /**
+   * Plastic flow: the shape change (the Frobenius norm of the stretch's deviatoric strain) a cell holds before it starts to flow
+   * and keep a set, as the multiplicative plasticity of Bargteil et al. (2007). 0 (default) is elastic all the way.
+   */
+  yieldStrain = 0;
+  /** How fast flow follows, per second (default 0: at once, so the cell never holds more than its yield strain). */
+  creep = 0;
+  /**
+   * The stretch (the Frobenius norm of the stretch's strain, about 1.7 times the stretch fraction along one axis) past which a cell
+   * is removed at the end of the step (0, the default, never). A torn cell stays torn.
+   */
+  tearStrain = 0;
+  /** @internal */
+  clone(): CellMaterial {
+    return Object.assign(new CellMaterial(), this);
+  }
+  /** @internal The Lame parameters. */
+  lame(): [number, number] {
+    const e = this.youngsModulus,
+      nu = this.poissonRatio;
+    return [e / (2 * (1 + nu)), (e * nu) / ((1 + nu) * (1 - 2 * nu))];
+  }
+}
+
+function checkCellMaterial(m: CellMaterial): void {
+  if (!(m.youngsModulus > 0 && Number.isFinite(m.youngsModulus)))
+    throw new RangeError("Young's modulus is a positive number of pascals.");
+  if (!(m.poissonRatio >= 0 && m.poissonRatio < 0.5))
+    throw new RangeError("Poisson's ratio is 0 or more and below 0.5.");
+  if (m.model !== 'neo-hookean' && m.model !== 'corotated')
+    throw new RangeError("Cell model is 'neo-hookean' or 'corotated'.");
+  if (!(m.density > 0 && Number.isFinite(m.density))) throw new RangeError('Density is a positive number of kg/m3.');
+  for (const [value, label] of [
+    [m.yieldStrain, 'yieldStrain'],
+    [m.creep, 'creep'],
+    [m.tearStrain, 'tearStrain'],
+  ] as const)
+    if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} is 0 or more.`);
+}
+
+/** Where a body's cells, clusters and cluster members sit in the kernel's rows. */
+interface CellRange {
+  first: number;
+  count: number;
+  clusterFirst: number;
+  clusterCount: number;
+  memberFirst: number;
+  memberCount: number;
+}
+const NO_CELLS: CellRange = { first: 0, count: 0, clusterFirst: 0, clusterCount: 0, memberFirst: 0, memberCount: 0 };
+
+/** Six times the signed volume of the tetrahedron `a b c d` in a flat list of positions. */
+function tetDeterminant(p: ArrayLike<number>, a: number, b: number, c: number, d: number): number {
+  const ux = p[b * 3]! - p[a * 3]!,
+    uy = p[b * 3 + 1]! - p[a * 3 + 1]!,
+    uz = p[b * 3 + 2]! - p[a * 3 + 2]!,
+    vx = p[c * 3]! - p[a * 3]!,
+    vy = p[c * 3 + 1]! - p[a * 3 + 1]!,
+    vz = p[c * 3 + 2]! - p[a * 3 + 2]!,
+    wx = p[d * 3]! - p[a * 3]!,
+    wy = p[d * 3 + 1]! - p[a * 3 + 1]!,
+    wz = p[d * 3 + 2]! - p[a * 3 + 2]!;
+  return ux * (vy * wz - vz * wy) - uy * (vx * wz - vz * wx) + uz * (vx * wy - vy * wx);
+}
+
 function checkSoftness(softness: SoftSoftness, label: string): void {
   if (!(softness.naturalFrequency >= 0 && Number.isFinite(softness.naturalFrequency)))
     throw new RangeError(`${label}: natural frequency is 0 (rigid) or a positive number of hertz.`);
@@ -130,6 +235,11 @@ export class SoftBodyDesc {
   /** @internal */ shift: Vec3 = [0, 0, 0];
   /** @internal */ shapeMatching = false;
   /** @internal */ triangles: number[] = [];
+  /** @internal Four particle indices per tetrahedron. */ cells: number[] = [];
+  /** @internal */ cellMaterial = new CellMaterial();
+  /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
+  /** @internal */ clusterHertz = 0;
+  /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
 
   /** Raw particles from flat x, y, z numbers or a list of points; add the elements with `setEdges`. */
   constructor(positions: ArrayLike<number> | readonly Vec3[]) {
@@ -280,6 +390,147 @@ export class SoftBodyDesc {
     return this;
   }
 
+  /**
+   * A solid block of tetrahedral cells: `counts` cubes along x, y and z of side `cell` metres from `origin`, each cut into six
+   * tetrahedra around a diagonal (Kuhn's triangulation, which matches across the faces of neighbouring cubes). Particle
+   * (i, j, k) has index `(i * (ny + 1) + j) * (nz + 1) + k`. Pass `inside` to keep only the cubes whose centre it accepts, which
+   * carves a ball, a ring or any other solid out of the grid; particles no kept cube uses are dropped and the rest renumbered in
+   * the same order.
+   */
+  static solid(
+    origin: Vec3,
+    cell: number,
+    counts: readonly [number, number, number],
+    inside?: (x: number, y: number, z: number) => boolean,
+    material: CellMaterial = new CellMaterial(),
+  ): SoftBodyDesc {
+    checkVec(origin, 'Block origin');
+    if (!(cell > 0 && Number.isFinite(cell))) throw new RangeError('Cell size is a positive number of metres.');
+    const [nx, ny, nz] = counts.map((n) => count(n, 'Cell counts', 1)) as [number, number, number],
+      py = ny + 1,
+      pz = nz + 1,
+      id = (i: number, j: number, k: number): number => (i * py + j) * pz + k,
+      used = new Int32Array((nx + 1) * py * pz).fill(-1),
+      kept: [number, number, number][] = [];
+    for (let i = 0; i < nx; i++)
+      for (let j = 0; j < ny; j++)
+        for (let k = 0; k < nz; k++)
+          if (
+            !inside ||
+            inside(origin[0] + (i + 0.5) * cell, origin[1] + (j + 0.5) * cell, origin[2] + (k + 0.5) * cell)
+          )
+            kept.push([i, j, k]);
+    if (kept.length === 0) throw new RangeError('The solid has no cells: `inside` accepted no cube of the grid.');
+    for (const [i, j, k] of kept)
+      for (let a = 0; a < 2; a++)
+        for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) used[id(i + a, j + b, k + c)] = 0;
+    const points: number[] = [];
+    for (let i = 0; i <= nx; i++)
+      for (let j = 0; j < py; j++)
+        for (let k = 0; k < pz; k++)
+          if (used[id(i, j, k)] === 0) {
+            used[id(i, j, k)] = points.length / 3;
+            points.push(origin[0] + i * cell, origin[1] + j * cell, origin[2] + k * cell);
+          }
+    const tets: number[] = [];
+    // The six paths from a cube's first corner to its last along its edges.
+    const paths = [
+      [0, 4, 6, 7],
+      [0, 4, 5, 7],
+      [0, 2, 6, 7],
+      [0, 2, 3, 7],
+      [0, 1, 5, 7],
+      [0, 1, 3, 7],
+    ];
+    for (const [i, j, k] of kept) {
+      const corner = (n: number): number => used[id(i + ((n >> 2) & 1), j + ((n >> 1) & 1), k + (n & 1))]!;
+      for (const path of paths) tets.push(corner(path[0]!), corner(path[1]!), corner(path[2]!), corner(path[3]!));
+    }
+    const desc = new SoftBodyDesc(points).setCells(tets, material);
+    desc.radius = cell * 0.25;
+    return desc;
+  }
+
+  /** A solid box of tetrahedral cells, `size` metres from `origin`, cut into `counts` cubes along each axis (see {@link SoftBodyDesc.solid}). */
+  static box(
+    origin: Vec3,
+    size: Vec3,
+    counts: readonly [number, number, number],
+    material: CellMaterial = new CellMaterial(),
+  ): SoftBodyDesc {
+    checkVec(size, 'Block size');
+    const cell = size[0] / counts[0];
+    if (
+      !(cell > 0) ||
+      Math.abs(size[1] / counts[1] - cell) > cell * 1e-6 ||
+      Math.abs(size[2] / counts[2] - cell) > cell * 1e-6
+    )
+      throw new RangeError('A box has cubic cells: size divided by counts is the same along every axis.');
+    return SoftBodyDesc.solid(origin, cell, counts, undefined, material);
+  }
+
+  /**
+   * Gives the body tetrahedral cells: four particle indices per cell, the shape the particles stand in now as the cell's rest
+   * shape. A cell listed left-handed has its last two corners swapped. The cells carry the body's elasticity (and its plastic
+   * flow and tearing, see {@link CellMaterial}), and when no mass was set they give each particle its share of their density.
+   */
+  setCells(tets: ArrayLike<number>, material?: CellMaterial): this {
+    if (tets.length % 4 !== 0) throw new RangeError('Cells are four particle indices each.');
+    const next: number[] = [];
+    for (let t = 0; t < tets.length / 4; t++) {
+      const four = [0, 1, 2, 3].map((k) => tets[t * 4 + k]!);
+      for (const index of four)
+        if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
+          throw new RangeError(`Cell ${t} uses ${index}, which is not a particle (0 to ${this.particleCount - 1}).`);
+      if (new Set(four).size !== 4) throw new RangeError(`Cell ${t} repeats a particle.`);
+      if (!(Math.abs(tetDeterminant(this.positions, four[0]!, four[1]!, four[2]!, four[3]!)) > 1e-18))
+        throw new RangeError(`Cell ${t} is flat: its four particles lie in one plane.`);
+      next.push(...four);
+    }
+    this.cells = next;
+    if (material) this.setCellMaterial(material);
+    return this;
+  }
+  /** Replaces the cells' material (copied). */
+  setCellMaterial(material: CellMaterial): this {
+    checkCellMaterial(material);
+    this.cellMaterial = material.clone();
+    return this;
+  }
+  /**
+   * Groups of particles held to their rest shape by shape matching (Mueller et al. 2005): each group is pulled toward its rest
+   * shape turned and moved to where the group stands, as an implicit spring of `hertz` natural frequency, so it is stable at any
+   * stiffness. A cluster keeps a body's overall shape whatever the cells do; the groups may overlap.
+   */
+  setClusters(groups: readonly ArrayLike<number>[], hertz: number): this {
+    if (!(hertz > 0 && Number.isFinite(hertz)))
+      throw new RangeError('Cluster stiffness is a positive number of hertz.');
+    this.clusterGroups = groups.map((group, g) => {
+      if (group.length < 4) throw new RangeError(`Cluster ${g} has at least four particles.`);
+      return Array.from(group, (index) => {
+        if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
+          throw new RangeError(`Cluster ${g} uses ${index}, which is not a particle (0 to ${this.particleCount - 1}).`);
+        return index;
+      });
+    });
+    this.clusterHertz = hertz;
+    return this;
+  }
+  /** @internal The masses the body is created with: the cells' density where none was given. */
+  resolvedMasses(): number[] {
+    if (this.massGiven || this.cells.length === 0) return this.masses;
+    const out = new Array<number>(this.particleCount).fill(0),
+      density = this.cellMaterial.density;
+    for (let t = 0; t < this.cells.length; t += 4) {
+      const volume =
+        Math.abs(
+          tetDeterminant(this.positions, this.cells[t]!, this.cells[t + 1]!, this.cells[t + 2]!, this.cells[t + 3]!),
+        ) / 6;
+      for (let k = 0; k < 4; k++) out[this.cells[t + k]!]! += (density * volume) / 4;
+    }
+    return out.map((m, i) => (m > 0 ? m : this.masses[i]!));
+  }
+
   /** Replaces the structural edges, as pairs of particle indices. */
   setEdges(pairs: ArrayLike<number>): this {
     this.edgePairs = this.checkPairs(pairs, 'Edge');
@@ -318,6 +569,11 @@ export class SoftBodyDesc {
     for (const p of other.edgePairs) this.edgePairs.push(p + base);
     for (const p of other.bendPairs) this.bendPairs.push(p + base);
     for (const p of other.pinned) this.pinned.add(p + base);
+    if (other.cells.length && !this.cells.length) this.cellMaterial = other.cellMaterial.clone();
+    for (const p of other.cells) this.cells.push(p + base);
+    for (const group of other.clusterGroups) this.clusterGroups.push(group.map((p) => p + base));
+    if (other.clusterGroups.length && !this.clusterHertz) this.clusterHertz = other.clusterHertz;
+    this.massGiven ||= other.massGiven;
     return this;
   }
   /** Particles that never move (infinite mass) unless a kinematic target moves them. */
@@ -336,6 +592,7 @@ export class SoftBodyDesc {
   setParticleMass(mass: number): this {
     if (!(mass > 0 && Number.isFinite(mass))) throw new RangeError('Particle mass is a positive number of kilograms.');
     this.masses.fill(mass);
+    this.massGiven = true;
     return this;
   }
   /** Total mass, shared evenly. */
@@ -350,6 +607,7 @@ export class SoftBodyDesc {
     const next = Array.from(masses);
     if (next.some((m) => !(m > 0 && Number.isFinite(m)))) throw new RangeError('Every particle mass is positive.');
     this.masses = next;
+    this.massGiven = true;
     return this;
   }
   /** Contact thickness of every particle in metres (default: half the shortest structural edge, or 0.01 with none). */
@@ -411,6 +669,8 @@ export interface SoftTearEvent {
   body: SoftBody;
   /** Edge indices, as `body.edges()` numbers them. */
   edges: number[];
+  /** Cell indices, as `body.cells()` numbers them: the tetrahedra that tore, empty when only edges did. */
+  cells: number[];
 }
 
 /** A soft body in a world: read and move its particles, apply forces, pin it, tear it. */
@@ -426,8 +686,11 @@ export class SoftBody {
     /** @internal */ public structural: number,
     /** @internal */ public masses: Float32Array,
     /** @internal */ public material: SoftBodyMaterial,
+    /** @internal */ public cellRange: CellRange = NO_CELLS,
+    /** @internal */ public cellMaterial: CellMaterial = new CellMaterial(),
   ) {}
   /** @internal */ removed = false;
+  /** @internal */ cellsTornSeen = new Set<number>();
   /** @internal */ force: Vec3 = [0, 0, 0];
   /** @internal */ pointForces = new Map<number, Vec3>();
   /** @internal */ tornSeen = new Set<number>();
@@ -581,6 +844,93 @@ export class SoftBody {
     eflags[this.firstEdge + edge] = eflags[this.firstEdge + edge]! | TORN;
     return this;
   }
+  /** Number of tetrahedral cells (0 for a rope or cloth). */
+  numCells(): number {
+    return this.cellRange.count;
+  }
+  /** The cells as flat groups of four particle indices (a left-handed cell has its last two corners swapped). */
+  cells(): Uint32Array {
+    this.check();
+    const f = this.owner.cellColumns(),
+      { first, count } = this.cellRange,
+      out = new Uint32Array(count * 4);
+    for (let t = 0; t < count; t++)
+      for (let k = 0; k < 4; k++) out[t * 4 + k] = f[`p${k}`]![first + t]! - this.firstParticle;
+    return out;
+  }
+  private checkCell(cell: number): void {
+    this.check();
+    if (!Number.isInteger(cell) || cell < 0 || cell >= this.cellRange.count)
+      throw new RangeError(`Cell ${cell} is not in this body (0 to ${this.cellRange.count - 1}).`);
+  }
+  /** True once a cell has torn away. */
+  isCellTorn(cell: number): boolean {
+    this.checkCell(cell);
+    return (this.owner.cellColumns().flags![this.cellRange.first + cell]! & TORN_CELL) !== 0;
+  }
+  /** Indices of the cells that have torn. */
+  tornCells(): number[] {
+    this.check();
+    const { flags } = this.owner.cellColumns(),
+      out: number[] = [];
+    for (let t = 0; t < this.cellRange.count; t++)
+      if ((flags![this.cellRange.first + t]! & TORN_CELL) !== 0) out.push(t);
+    return out;
+  }
+  /** Tears one cell away now. */
+  tearCell(cell: number): this {
+    this.checkCell(cell);
+    const { flags } = this.owner.cellColumns(),
+      row = this.cellRange.first + cell;
+    if ((flags![row]! & TORN_CELL) === 0) {
+      flags![row] = flags![row]! | TORN_CELL;
+      this.owner.cellTornByHand = true;
+    }
+    return this;
+  }
+  /** Volume of the cells that have not torn, in cubic metres, as the particles stand now. */
+  volume(): number {
+    this.check();
+    const f = this.owner.cellColumns(),
+      { x, y, z } = this.c,
+      position = new Float64Array(this.particles * 3);
+    for (let i = 0; i < this.particles; i++) {
+      position[i * 3] = x[this.firstParticle + i]!;
+      position[i * 3 + 1] = y[this.firstParticle + i]!;
+      position[i * 3 + 2] = z[this.firstParticle + i]!;
+    }
+    let total = 0;
+    for (let t = 0; t < this.cellRange.count; t++) {
+      const row = this.cellRange.first + t;
+      if ((f.flags![row]! & TORN_CELL) !== 0) continue;
+      const at = (k: number): number => f[`p${k}`]![row]! - this.firstParticle;
+      total += tetDeterminant(position, at(0), at(1), at(2), at(3)) / 6;
+    }
+    return total;
+  }
+  /** Volume of the cells that have not torn, as they were made, in cubic metres. */
+  restVolume(): number {
+    this.check();
+    const f = this.owner.cellColumns();
+    let total = 0;
+    for (let t = 0; t < this.cellRange.count; t++) {
+      const row = this.cellRange.first + t;
+      if ((f.flags![row]! & TORN_CELL) === 0) total += f.vol0![row]!;
+    }
+    return total;
+  }
+  /** Replaces the cells' material, taking effect at once; a cell keeps the shape it has flowed into. */
+  setCellMaterial(material: CellMaterial): this {
+    this.check();
+    checkCellMaterial(material);
+    this.cellMaterial = material.clone();
+    this.owner.writeCellMaterial(this);
+    return this;
+  }
+  /** A copy of the cells' material; change it and pass it to {@link SoftBody.setCellMaterial}. */
+  getCellMaterial(): CellMaterial {
+    return this.cellMaterial.clone();
+  }
   /** Replaces the material, taking effect on every edge. */
   setMaterial(material: SoftBodyMaterial): this {
     this.check();
@@ -706,7 +1056,21 @@ export class SoftBodies implements PhysicsAttachment {
   private capacity = [0, 0, 0, 0];
   private particleCount = 0;
   private edgeCount = 0;
+  private cellView: Columns | null = null;
+  private cellViewBuffer: ArrayBuffer | null = null;
+  private cellCapacity = [0, 0, 0];
+  private cellTotal = 0;
+  private clusterTotal = 0;
+  private memberTotal = 0;
+  private cellsTornSeen = 0;
+  /** @internal A cell was torn by a call, so the next step reports it. */
+  cellTornByHand = false;
   private disposed = false;
+  /**
+   * How much of the speed along a cell's constraints the cells take out each second (default 10): the damping of the elastic
+   * body, so a block that was struck stops ringing. 0 never settles, and a very large value makes the body feel like putty.
+   */
+  cellDamping = 10;
   /** @internal Fixed step pieces and passes: change them between steps. */
   substeps: number;
   iterations: number;
@@ -760,8 +1124,43 @@ export class SoftBodies implements PhysicsAttachment {
     return (this.view = view);
   }
 
+  /** @internal The cell and cluster columns as typed arrays over the kernel's memory; read them fresh, as growth replaces them. */
+  cellColumns(): Columns {
+    if (this.disposed) throw new MargoError('state', 'SoftBodies was disposed.');
+    const buffer = this.exports.memory.buffer;
+    if (this.cellView && this.cellViewBuffer === buffer) return this.cellView;
+    const [tets, clusters, members] = this.cellCapacity,
+      view: Columns = {};
+    cellColumnNames.forEach((name, id) => {
+      const rows = /^(cstart|ccount|comega)$/.test(name)
+          ? clusters!
+          : /^(member|rest\d)$/.test(name)
+            ? members!
+            : tets!,
+        at = this.exports.soft_fem_column(id);
+      view[name] = (
+        INTEGER_CELL_COLUMNS.has(name) ? new Uint32Array(buffer, at, rows) : new Float32Array(buffer, at, rows)
+      ) as Float32Array;
+    });
+    this.cellViewBuffer = buffer;
+    return (this.cellView = view);
+  }
+
+  private reserveCells(tets: number, clusters: number, members: number): void {
+    this.exports.soft_fem_reserve(tets, clusters, members);
+    this.cellCapacity = [
+      Math.max(this.cellCapacity[0]!, tets),
+      Math.max(this.cellCapacity[1]!, clusters),
+      Math.max(this.cellCapacity[2]!, members),
+    ];
+    this.view = null;
+    this.cellView = null;
+  }
+
   private reserve(particles: number, edges: number, bodies: number, colliders: number): void {
     this.exports.soft_reserve(particles, edges, bodies, colliders);
+    this.view = null;
+    this.cellView = null;
     this.capacity = [
       Math.max(this.capacity[0]!, particles),
       Math.max(this.capacity[1]!, edges),
@@ -786,7 +1185,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.edgeCount += edges;
     const c = this.columns(),
       pos = desc.positions,
-      masses = Float32Array.from(desc.masses);
+      masses = Float32Array.from(desc.resolvedMasses());
     // The radius a body gets: half its shortest structural edge, so neighbours do not push one another.
     let shortest = Infinity;
     const length = (a: number, b: number): number =>
@@ -844,6 +1243,22 @@ export class SoftBodies implements PhysicsAttachment {
     writeEdges(desc.bendPairs, structural);
     c.gravity_scale[handle] = desc.gravity;
     c.linear_damping[handle] = desc.damping;
+    const cells = desc.cells.length / 4,
+      memberCount = desc.clusterGroups.reduce((sum, group) => sum + group.length, 0),
+      range: CellRange = {
+        first: this.cellTotal,
+        count: cells,
+        clusterFirst: this.clusterTotal,
+        clusterCount: desc.clusterGroups.length,
+        memberFirst: this.memberTotal,
+        memberCount,
+      };
+    if (cells || memberCount) {
+      this.reserveCells(this.cellTotal + cells, this.clusterTotal + range.clusterCount, this.memberTotal + memberCount);
+      this.cellTotal += cells;
+      this.clusterTotal += range.clusterCount;
+      this.memberTotal += memberCount;
+    }
     const body = new SoftBody(
       this,
       handle,
@@ -854,12 +1269,59 @@ export class SoftBodies implements PhysicsAttachment {
       structural,
       masses,
       desc.material.clone(),
+      range,
+      desc.cellMaterial.clone(),
     );
     body.triangleList = Uint32Array.from(desc.triangles);
     body.matched = desc.shapeMatching;
+    if (cells) {
+      const [mu, lambda] = desc.cellMaterial.lame(),
+        model = desc.cellMaterial.model === 'corotated' ? 1 : 0;
+      for (let t = 0; t < cells; t++) {
+        const [a, b, d, e] = [0, 1, 2, 3].map((k) => firstParticle + desc.cells[t * 4 + k]!) as [
+          number,
+          number,
+          number,
+          number,
+        ];
+        // The cells were checked when they were set, so none is flat.
+        this.exports.soft_tet_set(range.first + t, a, b, d, e, mu, lambda, model);
+      }
+    }
+    if (memberCount) {
+      const members = this.cellColumns().member!;
+      let at = range.memberFirst;
+      desc.clusterGroups.forEach((group, k) => {
+        for (const particle of group) members[at++] = firstParticle + particle;
+        this.exports.soft_cluster_set(
+          range.clusterFirst + k,
+          at - group.length,
+          group.length,
+          desc.clusterHertz * 2 * Math.PI,
+        );
+      });
+    }
     this.bodies.push(body);
     this.writeMaterial(body);
+    this.writeCellMaterial(body);
     return body;
+  }
+
+  /** @internal Writes a body's cell material into its cell rows; the rest shapes stay. */
+  writeCellMaterial(body: SoftBody): void {
+    const { first, count } = body.cellRange;
+    if (count === 0) return;
+    const f = this.cellColumns(),
+      m = body.cellMaterial,
+      [mu, lambda] = m.lame();
+    for (let t = first; t < first + count; t++) {
+      f.mu![t] = mu;
+      f.lambda![t] = lambda;
+      (f.model as unknown as Uint32Array)[t] = m.model === 'corotated' ? 1 : 0;
+      f.yield_strain![t] = m.yieldStrain;
+      f.creep![t] = m.creep;
+      f.tear![t] = m.tearStrain;
+    }
   }
 
   /** @internal Writes a body's material into its edge rows. */
@@ -922,6 +1384,41 @@ export class SoftBodies implements PhysicsAttachment {
         gravity: c.gravity_scale[b.handle]!,
         damping: c.linear_damping[b.handle]!,
       }));
+    // The cells, clusters and cluster members of the others, with particle and member numbers made relative to their body.
+    const tetNames = [
+        'p0',
+        'p1',
+        'p2',
+        'p3',
+        ...Array.from({ length: 9 }, (_, k) => `b${k}`),
+        'vol0',
+        'mu',
+        'lambda',
+        'model',
+        'yield_strain',
+        'creep',
+        'tear',
+        'flags',
+      ],
+      memberNames = ['member', 'rest0', 'rest1', 'rest2'],
+      cellSaved = keep.map((b) => {
+        const r = b.cellRange;
+        if (r.count === 0 && r.memberCount === 0) return null;
+        const f = this.cellColumns();
+        return {
+          tets: tetNames.map((name) => {
+            const part = f[name]!.slice(r.first, r.first + r.count);
+            return /^p\d$/.test(name) ? part.map((v) => v - b.firstParticle) : part;
+          }),
+          cstart: f.cstart!.slice(r.clusterFirst, r.clusterFirst + r.clusterCount).map((v) => v - r.memberFirst),
+          ccount: f.ccount!.slice(r.clusterFirst, r.clusterFirst + r.clusterCount),
+          comega: f.comega!.slice(r.clusterFirst, r.clusterFirst + r.clusterCount),
+          members: memberNames.map((name) => {
+            const part = f[name]!.slice(r.memberFirst, r.memberFirst + r.memberCount);
+            return name === 'member' ? part.map((v) => v - b.firstParticle) : part;
+          }),
+        };
+      });
     let particles = 0,
       edges = 0;
     for (const b of keep) {
@@ -930,6 +1427,7 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.exports.soft_reserve(particles, edges, keep.length, 0);
     this.view = null;
+    this.cellView = null;
     const d = this.columns();
     let pi = 0,
       ei = 0;
@@ -955,6 +1453,54 @@ export class SoftBodies implements PhysicsAttachment {
       pi += b.particles;
       ei += b.edgeTotal;
     });
+    // Cells, clusters and members follow in the same order, with their particles and members renumbered.
+    let tets = 0,
+      clusters = 0,
+      members = 0;
+    for (const b of keep) {
+      tets += b.cellRange.count;
+      clusters += b.cellRange.clusterCount;
+      members += b.cellRange.memberCount;
+    }
+    this.exports.soft_fem_reserve(tets, clusters, members);
+    this.exports.soft_fem_trim(tets, clusters, members);
+    this.cellCapacity = [tets, clusters, members];
+    this.view = null;
+    this.cellView = null;
+    this.cellTotal = this.clusterTotal = this.memberTotal = 0;
+    keep.forEach((b, k) => {
+      const saved = cellSaved[k],
+        r = b.cellRange,
+        next: CellRange = {
+          first: this.cellTotal,
+          count: r.count,
+          clusterFirst: this.clusterTotal,
+          clusterCount: r.clusterCount,
+          memberFirst: this.memberTotal,
+          memberCount: r.memberCount,
+        };
+      if (saved) {
+        const f = this.cellColumns();
+        tetNames.forEach((name, n) => {
+          const part = saved.tets[n]!;
+          f[name]!.set(/^p\d$/.test(name) ? part.map((v) => v + b.firstParticle) : part, next.first);
+        });
+        f.cstart!.set(
+          saved.cstart.map((v) => v + next.memberFirst),
+          next.clusterFirst,
+        );
+        f.ccount!.set(saved.ccount, next.clusterFirst);
+        f.comega!.set(saved.comega, next.clusterFirst);
+        memberNames.forEach((name, n) => {
+          const part = saved.members[n]!;
+          f[name]!.set(name === 'member' ? part.map((v) => v + b.firstParticle) : part, next.memberFirst);
+        });
+      }
+      b.cellRange = next;
+      this.cellTotal += r.count;
+      this.clusterTotal += r.clusterCount;
+      this.memberTotal += r.memberCount;
+    });
     this.particleCount = particles;
     this.edgeCount = edges;
     body.removed = true;
@@ -973,6 +1519,7 @@ export class SoftBodies implements PhysicsAttachment {
       bodies: PhysicsBody[] = [];
     this.reserve(this.particleCount, this.edgeCount, this.bodies.length, 0);
     this.view = null;
+    this.exports.soft_fem_damping(this.cellDamping);
     this.exports.soft_begin(dt);
     for (let piece = 0; piece < this.substeps; piece++) {
       this.exports.soft_pre(h, this.iterations, g[0], g[1], g[2]);
@@ -989,7 +1536,12 @@ export class SoftBodies implements PhysicsAttachment {
       if (j[0] !== 0 || j[1] !== 0 || j[2] !== 0) body.applyImpulse(j, [c.mx[row]!, c.my[row]!, c.mz[row]!]);
       if (k[0] !== 0 || k[1] !== 0 || k[2] !== 0) body.applyTorqueImpulse(k);
     });
-    if (this.exports.soft_torn() > 0) this.report(c);
+    const cellsTorn = this.exports.soft_fem_torn();
+    if (this.exports.soft_torn() > 0 || cellsTorn !== this.cellsTornSeen || this.cellTornByHand) {
+      this.cellsTornSeen = cellsTorn;
+      this.cellTornByHand = false;
+      this.report(c);
+    }
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, c);
   }
 
@@ -1143,13 +1695,23 @@ export class SoftBodies implements PhysicsAttachment {
 
   private report(c: Columns): void {
     for (const body of this.bodies) {
-      const fresh: number[] = [];
+      const fresh: number[] = [],
+        freshCells: number[] = [];
       for (let e = 0; e < body.structural; e++)
         if ((c.eflags[body.firstEdge + e]! & TORN) !== 0 && !body.tornSeen.has(e)) {
           body.tornSeen.add(e);
           fresh.push(e);
         }
-      if (fresh.length) for (const listener of [...this.listeners]) listener({ body, edges: fresh });
+      if (body.cellRange.count) {
+        const { flags } = this.cellColumns();
+        for (let t = 0; t < body.cellRange.count; t++)
+          if ((flags![body.cellRange.first + t]! & TORN_CELL) !== 0 && !body.cellsTornSeen.has(t)) {
+            body.cellsTornSeen.add(t);
+            freshCells.push(t);
+          }
+      }
+      if (fresh.length || freshCells.length)
+        for (const listener of [...this.listeners]) listener({ body, edges: fresh, cells: freshCells });
     }
   }
 

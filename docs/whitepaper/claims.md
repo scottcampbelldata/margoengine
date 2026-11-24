@@ -9,6 +9,18 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Own physics soft solids (2026-11-24): `@margoengine/physics/soft` bodies made of tetrahedral cells (stable Neo-Hookean or
+  co-rotated elasticity, plastic flow, tearing, shape-matching clusters). A uniformly loaded cantilever 1 m long with a
+  0.25 m square section and E = 3 MPa sags at its free end to 55, 88 and about 99 percent of the Euler-Bernoulli
+  deflection rho g A L^4 / (8 E I) on meshes of 8 by 2, 12 by 3 and 16 by 4 cells (linear tetrahedra lock when coarse and
+  converge as the mesh is refined); a near-incompressible rubber (Poisson's ratio 0.49) keeps its volume within 3 percent
+  under a 30 percent stretch and a foam (0.05) grows by more than 15 percent; a plastic cantilever keeps over a third of
+  its sag after the load goes where an elastic one returns to within 5 percent; a bar torn past its strain threshold is
+  two pieces and one stretched less holds; a twisted block with a shape-matching cluster returns to its shape within
+  0.1 mm; the same scene twice gives the same hash. No other engine was compared and no speed claim is made. Reproduce:
+  `node --test packages/physics/tests/soft-cells.test.js` and `cargo test --release --test fem` in
+  `packages/physics/soft-kernel`.
+
 - Own physics ragdoll balance (2026-11-24): on the kernel's cone joint, whose ankle limits hold under the weight, a powered
   Knight recovers a 1.5 m/s push of its upper body in each of four directions in all 120 cases of a solver sweep
   (iterations 2 to 6, substeps 4, 8 and 16, warm start on and off), ending upright with a foot stepped that way. Rapier's

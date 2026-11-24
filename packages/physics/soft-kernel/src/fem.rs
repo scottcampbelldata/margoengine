@@ -235,24 +235,12 @@ impl World {
         true
     }
 
-    /// Makes cluster `c` of `count` particles whose ids are already in the member column from `start`, as {@link set_cluster} does.
+    /// Makes cluster `c` of `count` particles whose ids are already in the member column from `start`, with the shape they stand in
+    /// now as its rest shape, held by an implicit spring of natural frequency `omega`. Clusters are set in order from the first.
     pub fn set_cluster_in_place(&mut self, c: usize, start: usize, count: usize, omega: f32) {
-        let ids: alloc::vec::Vec<u32> = (0..count).map(|k| self.fem.member[start + k]).collect();
-        let before = start;
-        self.set_cluster_at(c, before, &ids, omega);
-    }
-
-    /// Makes cluster `c` of these particles with the shape they stand in now as its rest shape, held by an implicit spring of natural
-    /// frequency `omega`. Members are stored back to back, so clusters must be set in order from the first.
-    pub fn set_cluster(&mut self, c: usize, particles: &[u32], omega: f32) {
-        let start = if c == 0 { 0 } else { (self.fem.cstart[c - 1] + self.fem.ccount[c - 1]) as usize };
-        self.set_cluster_at(c, start, particles, omega);
-    }
-
-    fn set_cluster_at(&mut self, c: usize, start: usize, particles: &[u32], omega: f32) {
         let (mut mass, mut cx, mut cy, mut cz) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-        for &p in particles {
-            let p = p as usize;
+        for k in 0..count {
+            let p = self.fem.member[start + k] as usize;
             let m = if self.w[p] > 0.0 { 1.0 / self.w[p] } else { 1e6 };
             mass += m;
             cx += m * self.x[p];
@@ -260,22 +248,28 @@ impl World {
             cz += m * self.z[p];
         }
         let (cx, cy, cz) = (cx / mass, cy / mass, cz / mass);
+        for k in 0..count {
+            let p = self.fem.member[start + k] as usize;
+            self.fem.rest[0][start + k] = self.x[p] - cx;
+            self.fem.rest[1][start + k] = self.y[p] - cy;
+            self.fem.rest[2][start + k] = self.z[p] - cz;
+        }
         let f = &mut self.fem;
         f.cstart[c] = start as u32;
-        f.ccount[c] = particles.len() as u32;
+        f.ccount[c] = count as u32;
         f.comega[c] = omega;
-        for (k, &p) in particles.iter().enumerate() {
-            f.member[start + k] = p;
-        }
-        for (k, &p) in particles.iter().enumerate() {
-            let p = p as usize;
-            f.rest[0][start + k] = self.x[p] - cx;
-            f.rest[1][start + k] = self.y[p] - cy;
-            f.rest[2][start + k] = self.z[p] - cz;
-        }
-        let f = &mut self.fem;
         f.clusters = f.clusters.max(c + 1);
-        f.members = f.members.max(start + particles.len());
+        f.members = f.members.max(start + count);
+    }
+
+    /// Makes cluster `c` of these particles (see {@link set_cluster_in_place}); members are stored back to back, so clusters are
+    /// set in order from the first.
+    pub fn set_cluster(&mut self, c: usize, particles: &[u32], omega: f32) {
+        let start = if c == 0 { 0 } else { (self.fem.cstart[c - 1] + self.fem.ccount[c - 1]) as usize };
+        for (k, &p) in particles.iter().enumerate() {
+            self.fem.member[start + k] = p;
+        }
+        self.set_cluster_in_place(c, start, particles.len(), omega);
     }
 
     pub(crate) fn fem_begin(&mut self) {

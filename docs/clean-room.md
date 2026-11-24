@@ -11087,3 +11087,18 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.
 - M. Müller, J. Bender, N. Chentanez and M. Macklin, "A Robust Method to Extract the Rotational Part of Deformations", MIG 2016. The rotation step uses the quaternion Cayley form (a rotation about w by 2 atan(|w| / 2)) in place of the paper's exact exponential, so the step path calls no trigonometric function. The constraint is the XPBD form of the same paper family as the edges (Macklin et al. 2016).
+
+## Soft bodies: tetrahedral cells, plasticity, tearing and clusters (`@margoengine/physics/soft`, 2026-11-24)
+
+Written clean room from the papers below and Rapier's published Soft-bodies user guide page (the guide only; no Rapier or other engine source was read, nor any companion code of a paper). The elasticity is constraints on the deformation gradient solved by XPBD in small steps, plastic flow is a multiplicative split folded into each cell's rest shape, tearing removes a cell, and clusters are shape matching held as an implicit spring. The polar decomposition is a fixed number of scaled Newton steps, so a step is bit for bit the same everywhere.
+
+- M. Macklin and M. Müller, "A Constraint-based Formulation of Stable Neo-Hookean Elasticity", Motion, Interaction and Games, 2021. https://mmacklin.com/neohookean.pdf
+- B. Smith, F. De Goes and T. Kim, "Stable Neo-Hookean Flesh Simulation", ACM TOG 37(2), 2018. https://dl.acm.org/doi/10.1145/3180491
+- M. Müller and M. Gross, "Interactive Virtual Materials", Graphics Interface 2004 (co-rotated elasticity).
+- N. J. Higham, "Computing the polar decomposition, with applications", SIAM J. Sci. Stat. Comput. 7(4), 1986 (the scaled Newton iteration).
+- A. W. Bargteil, C. Wojtan, J. K. Hodgins and G. Turk, "A Finite Element Method for Animating Large Viscoplastic Flow", ACM TOG 26(3), SIGGRAPH 2007.
+- G. Irving, J. Teran and R. Fedkiw, "Invertible Finite Elements for Robust Simulation of Large Deformation", SCA 2004 (the split of the deformation gradient into an elastic and a plastic part).
+- M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), SIGGRAPH 2005.
+- M. Macklin, M. Müller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", Motion in Games, 2016; M. Macklin et al., "Small Steps in Physics Simulation", SCA 2019.
+- H. Kuhn, "Some combinatorial lemmas in topology", IBM J. Res. Dev. 4(5), 1960 (the cube cut into six tetrahedra that match across faces).
+- Check: the Euler-Bernoulli deflection of a uniformly loaded cantilever, rho g A L^4 / (8 E I), from any text on the mechanics of materials.

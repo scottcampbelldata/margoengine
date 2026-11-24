@@ -159,7 +159,43 @@ fragile.setParticlePinned(0, false);
 - **Surface collider.** `soft.createSurfaceCollider(body, {friction})` gives a body made from triangles (`trimesh`, `cloth`, `clothTube`) a deformable triangle-mesh collider that follows its particles each step with each vertex's speed, so every rigid shape, convex hulls and meshes included, rests on cloth and is dragged by its friction; particles meet every shape directly through the kernel's swept particle probe. It is removed with the body.
 - **World.** `soft.create`, `soft.remove`, `soft.list()`, `soft.onTear(listener)`, `soft.hash()` (equal across two runs that did the same), `soft.substeps` (default 8) and `soft.iterations` (default 2), `soft.dispose()`.
 
-Not in this entry yet: volumetric cells and the FEM solver, plastic flow, cuts, clusters and the root soft frame, attaching a particle to a rigid body, self-contacts, skinned meshes (see `docs/physics-collision-parity.md` for each row).
+### Solid bodies: tetrahedral cells, plasticity, tearing and clusters
+
+A body made of tetrahedral cells behaves as an elastic solid. Each cell holds the shape its four particles stood in when the body was made, and two constraints on its deformation gradient carry the elasticity: the stable Neo-Hookean energy of Smith, de Goes and Kim (2018) in the constraint form of Macklin and Müller (2021), where an inverted cell comes back and nothing locks near zero volume, or, as an option, the co-rotated linear elasticity of Müller and Gross (2004). Both are solved by XPBD in the same small steps as the edges, so the cells' stiffness is real: a cantilever of Young's modulus E sags by the Euler-Bernoulli deflection rho g A L^4 / (8 E I) as its mesh is refined (a coarse mesh of linear tetrahedra locks and reads stiff: 8 by 2 cells give 55 percent of it, 12 by 3 give 88, 16 by 4 give 99), and a near-incompressible rubber (Poisson's ratio 0.49) keeps its volume within 3 percent under a 30 percent stretch where a foam (0.05) grows with it.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {CellMaterial, SoftBodies, SoftBodyDesc} from 'margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics, {substeps: 20, iterations: 8}); // a stiff body wants more small steps
+
+// A beam of rubber that bends for good past 2 percent strain and tears past 80, held at one end.
+const material = new CellMaterial();
+material.youngsModulus = 3e6; // pascals; the default is 1e5, a soft rubber
+material.poissonRatio = 0.3; // below 0.5; near it the body keeps its volume
+material.yieldStrain = 0.02; // plastic flow: 0, the default, is elastic all the way
+material.tearStrain = 0.8; // 0, the default, never tears
+const beam = SoftBodyDesc.box([0, 1, 0], [1, 0.25, 0.25], [8, 2, 2], material);
+const held = [];
+for (let i = 0; i < beam.particleCount; i++) if (beam.positions[i * 3] === 0) held.push(i);
+const body = soft.create(beam.setPinnedParticles(held).setLinearDamping(4));
+soft.cellDamping = 20; // how fast the cells take out the speed along their constraints, per second (default 10)
+
+soft.onTear(({body: torn, cells}) => console.log('torn', torn.handle, cells));
+for (let i = 0; i < 360; i++) physics.step();
+console.log(body.volume() / body.restVolume(), body.tornCells().length);
+```
+
+- **Builders.** `SoftBodyDesc.box(origin, size, counts, material)` cuts a block into cubes of equal side, each into six tetrahedra around a diagonal (Kuhn's triangulation, which matches across faces); particle (i, j, k) has index `(i * (ny + 1) + j) * (nz + 1) + k`. `SoftBodyDesc.solid(origin, cell, counts, inside, material)` keeps only the cubes whose centre `inside(x, y, z)` accepts, which carves a ball, a ring or a statue out of the grid and drops the particles no kept cube uses. `new SoftBodyDesc(positions).setCells(tets, material)` takes any tetrahedral mesh, four particle indices a cell (a left-handed cell has its last two corners swapped; a flat one throws a `RangeError`). `append` merges bodies with their cells and clusters.
+- **Material** (`CellMaterial`, a copy is taken). `youngsModulus` (pascals, default 1e5), `poissonRatio` (0 to under 0.5, default 0.3), `model` (`'neo-hookean'` by default, or `'corotated'`), `density` (kg/m3, default 1000: when no mass is set the cells give each particle its share, and `setMass`, `setParticleMass` and `setMasses` take over), `yieldStrain` and `creep` (plastic flow) and `tearStrain`. `desc.setCellMaterial`, `body.setCellMaterial` and `body.getCellMaterial` change it, at once, on a body that exists; a cell keeps the shape it has flowed into.
+- **Plasticity.** The elastic deformation gradient splits from a plastic one (Bargteil, Wojtan, Hodgins and Turk 2007; Irving, Teran and Fedkiw 2004), the plastic part folded into the cell's rest shape. When the deviatoric part of a cell's stretch, in Frobenius norm, passes `yieldStrain`, the excess goes into the rest shape (all at once for a `creep` of 0, else `creep` per second), so the body keeps a set when the load goes and keeps its volume while it flows. A plastic cantilever loaded and released keeps more than a third of its sag; an elastic one returns.
+- **Tearing.** A cell whose stretch strain (the Frobenius norm of the stretch minus identity) passes `tearStrain` is removed at the end of the step and stays torn; the cells around it hold what is left. `onTear` listeners get `{body, edges, cells}`, `body.tornCells()`, `isCellTorn(cell)`, `tearCell(cell)`, `cells()` (four particle indices a cell), `numCells()`, `volume()` (cells not torn, as they stand) and `restVolume()` read and change it. A bar torn clean through is two pieces, joined by no cell.
+- **Clusters.** `desc.setClusters(groups, hertz)` holds each group of particles to its rest shape by shape matching (Müller, Heidelberger, Teschner and Gross 2005), turned and moved to where the group stands, as an implicit spring of `hertz`, so it is stable at any stiffness; groups may overlap and the cells may be soft. A block twisted by 0.6 rad and let go with a cluster returns to its shape within 0.1 mm; without one the twist stays in.
+- **World.** `soft.cellDamping` (per second, default 10) damps every cell's constraints so a struck body stops ringing; `soft.substeps` and `soft.iterations` set the small steps as for edges: a stiff body wants more (the cantilever test uses 20 and 20, the example above 20 and 8).
+
+Not in this entry yet: cuts that split a body into pieces, the root soft frame, attaching a particle to a rigid body, self-contacts, skinned meshes (see `docs/physics-collision-parity.md` for each row).
 
 ## How it works
 

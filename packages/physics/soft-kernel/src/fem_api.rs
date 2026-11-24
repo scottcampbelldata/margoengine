@@ -58,6 +58,15 @@ pub extern "C" fn soft_fem_torn() -> u32 {
     world().fem.torn
 }
 
+/// Sets how many tetrahedra, clusters and cluster members are in use, after a body is removed and the rows after it moved up.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_trim(tets: u32, clusters: u32, members: u32) {
+    let f = &mut world().fem;
+    f.count = tets as usize;
+    f.clusters = clusters as usize;
+    f.members = members as usize;
+}
+
 /// The number of tetrahedra in use.
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_count() -> u32 {
