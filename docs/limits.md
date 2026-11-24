@@ -8484,3 +8484,10 @@ bake finishes. Each bake takes up to 32 sky azimuths plus the directional sun an
 by the configured radius and the heightmap edge. The lit draw adds one bilinear lookup. The bake captures a
 single sun direction and a static heightmap. Changing either needs `rebake()`. A heightfield cannot represent
 overhangs, and distant features between samples may be missed.
+## Open-ocean horizon depth (2026-11-23)
+
+Water with `horizon: true` keeps the scene far plane for its displaced grid. Its flat extension reaches 10,000 km
+in each world-horizontal axis from the snapped grid center and covers only rays beyond the original far plane.
+Depth there is reversed-Z zero, the same as the sky. It supports the existing Water colour and reflection passes.
+It adds four vertices and six indices to the same draw and uses no new buffer, texture, pass or package option.
+The horizon remains a flat ocean approximation. See [GPU evidence](architecture/operational-playbook.md#section-5-evidence-open-ocean-horizon-depth-2026-11-23).

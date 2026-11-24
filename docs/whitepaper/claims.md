@@ -2020,6 +2020,15 @@ offset and a vertex buffer whose outer rows grow geometrically to 10 km and whos
 `horizon: false` the rendered pixels are unchanged (`packages/water/test/horizon.browser.mjs` compares the near field of
 both grids on a real GPU).
 
+**Water horizon depth (2026-11-23):** A far ocean skirt reaches the horizon without changing the depth of the
+displaced Water grid. The dry plateau regression in `packages/water/test/horizon.browser.mjs` compares a point
+on the plateau with and without horizon water. The previous surface turned that point from `[183, 84, 58, 255]`
+to `[14, 69, 84, 255]` on the test GPU. The fixed surface preserves the original pixel and the near-grid comparison.
+The current `water-ssr` GPU call proof advances for the horizon story. That story's surface and capture shaders
+now clip the original grid and the existing uploads contain 48 extra vertex bytes and 24 extra index bytes for the
+far quad. Each horizon draw submits six more indices. Both bounded stories keep their previous call traces.
+See the [rasterization and test record](../architecture/operational-playbook.md#section-5-evidence-open-ocean-horizon-depth-2026-11-23).
+
 **quality-presets, advanced to `33c403984` on 2026-10-30 (VFX repeatable particle order):** the VFX update kernel took
 respawn tickets and draw-list places with `atomicAdd`, so which dead slots were born and the order of blended particles
 changed from run to run. It now runs four small workgroup prefix-sum passes around the simulation, so births take the

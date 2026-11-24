@@ -607,6 +607,29 @@ ${displayShader}
 const captureHead = '@fragment fn fragment(i:Output)->Result{',
   captureTail =
     /var color=mix\(body,skyColor\(reflect\(-v,n\),rough\),reflection\)\+glint\*shade;[\s\S]*return Result\(vec4f\(color,1\),vec4f\(foam,0,0,1\)\);/;
+// Leave the bounded Water shader intact. The ocean drops the vertex depth clamp on its real grid and adds a flat
+// quad distinguished by negative sample width. Its depth is the sky's and it fills only beyond the original far clip.
+function horizonDepthShader(code: string): string {
+  const vertex =
+    'let v=surface(xz,sampleWidth);var clip=frame.camera*vec4f(v.position,1);if(HORIZON){clip.z=max(clip.z,0.000001*clip.w);}return Output(clip,v.normal,v.position,v.crest,xz);';
+  const discard = 'if(dry){discard;}';
+  if (!code.includes(vertex) || !code.includes(discard))
+    throw margoError(
+      'unsupported',
+      'Water horizon depth needs the unclipped surface and dry-fragment anchors; update its shader edit',
+    );
+  return code
+    .replace(
+      vertex,
+      `if(sampleWidth<0.0){
+        let p=vec3f(xz.x,frame.settings.y,xz.y);let clip=frame.camera*vec4f(p,1);
+        return Output(vec4f(clip.xy,0.0,clip.w),vec3f(0,1,0),p,0.0,xz);
+       }
+       let v=surface(xz,sampleWidth);
+       return Output(frame.camera*vec4f(v.position,1),v.normal,v.position,v.crest,xz);`,
+    )
+    .replace(discard, `if(i.clip.z==0.0&&(frame.camera*vec4f(i.world,1)).z>0.0){discard;}\n ${discard}`);
+}
 function captureShader(code: string, declarations: string): string {
   const out = code
     .replace(captureHead, '@fragment fn fragment(i:Output)->MargoSSR{')
@@ -920,8 +943,10 @@ export class Water implements EnginePlugin {
       this.maxWaveHeight = Math.max(this.maxWaveHeight, w.amplitude);
     }
     this.followWind();
-    this.positions = new Float32Array((segments + 1) ** 2 * 3);
-    this.triangles = new Uint32Array(segments ** 2 * 6);
+    const vertices = (segments + 1) ** 2,
+      indices = segments ** 2 * 6;
+    this.positions = new Float32Array((vertices + (this.horizon ? 4 : 0)) * 3);
+    this.triangles = new Uint32Array(indices + (this.horizon ? 6 : 0));
     // Horizon rows: the central 75% of each axis keeps its regular cells and follows the camera (drawSurface); each
     // outer row but the last is `ratio` times wider than the one inside it, reaching 10 km past the grid's edge, so
     // waves fade over many rows instead of one. The last row lies HORIZON_REACH out, where a camera 10 km up sees the
@@ -968,6 +993,13 @@ export class Water implements EnginePlugin {
           this.triangles.set([a, b, a + 1, a + 1, b, b + 1], (z * segments + x) * 6);
         }
       }
+    if (this.horizon) {
+      // Keep the real far clip for the displaced mesh. Clamping its shared vertices advances the depth of triangles
+      // that cross the far plane and can draw over distant land. A separate flat quad at depth zero fills the sky there.
+      const reach = HORIZON_REACH;
+      this.positions.set([-reach, -reach, -1, reach, -reach, -1, -reach, reach, -1, reach, reach, -1], vertices * 3);
+      this.triangles.set([vertices, vertices + 2, vertices + 1, vertices + 1, vertices + 2, vertices + 3], indices);
+    }
     this.count = this.triangles.length;
     queryStates.set(this, () =>
       this.disposed || !this.engine?.gpu || !this.uniform || !this.drawnView?.groups.length
@@ -1505,6 +1537,7 @@ export class Water implements EnginePlugin {
           .replace('const HORIZON=false;', `const HORIZON=${this.horizon};`)
           .replace('const STILL=false;', `const STILL=${!!this.options.still};`) +
         (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed);
+      if (this.horizon) code = horizonDepthShader(code);
       let binding = 9;
       for (const effect of effects) {
         code = effect.shader(code, binding);

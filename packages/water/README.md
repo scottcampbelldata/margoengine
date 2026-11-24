@@ -18,7 +18,9 @@ its original spacing and follows the camera in whole cells, so the swell
 surrounds the camera wherever it goes and the waves stay put in the world. Each
 outer row is a fixed ratio wider than the one inside it, out to 10 km past the
 grid's edge, and the last row lies 10,000 km out, so the sea meets the true
-horizon even from a camera kilometres up; both draw beyond the scene's far clip.
+horizon even from a camera kilometres up. Below the far clip the displaced mesh
+writes its ordinary scene depth. Beyond the far clip a flat quad fills the ocean
+at sky depth, where it cannot cover opaque terrain inside the camera's range.
 Wave displacement and normals fade
 together over those rows as the cells grow too large to resolve the wavelength.
 The default grid remains bounded and centred on the origin for ponds and finite

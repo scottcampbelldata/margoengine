@@ -1,3 +1,16 @@
+### Section 5 evidence: open-ocean horizon depth (2026-11-23)
+
+Water keeps its original homogeneous depth on the displaced grid. A separate flat quad fills the remaining ocean
+beyond the camera's far plane at reversed-Z zero. The previous vertex clamp changed the depth plane of triangles
+straddling the far clip and hid dry land in regional aerial shots. The existing Water pass draws both parts with
+the same bindings, depth test and surface shader. Core and the public API stay unchanged.
+
+The GPU regression in `packages/water/test/horizon.browser.mjs` puts a 1 km high plateau about 155 km ahead of a
+26 km high camera. Its central RGBA pixel matches the dry reference exactly. The same fixture compares the near
+field of bounded and camera-following grids and measures coverage at the horizon. It makes no speed claim.
+
+The implementation follows James F. Blinn and Martin E. Newell, [Clipping Using Homogeneous Coordinates](https://authors.library.caltech.edu/records/c543j-0mg40) (1978), the W3C GPU for the Web Working Group's [WebGPU primitive clipping](https://www.w3.org/TR/webgpu/#primitive-clipping), and the separation of resolved waves and distant surface appearance in Eric Bruneton, Fabrice Neyret and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless Transitions from Geometry to BRDF](https://diglib.eg.org/items/fb727c69-2be2-4edd-833e-f7a9baea9b63) (2010).
+
 ### Section 5 evidence: ink hatching over shadowed meshes (2026-11-22)
 
 `@margoengine/toon/hatch` now wraps the light expression after the shadow and clustered-lighting passes. Applying
