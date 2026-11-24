@@ -18,6 +18,7 @@ extern crate alloc;
 pub mod api;
 mod col;
 pub mod attach;
+mod rigid;
 pub mod collide;
 mod volume;
 pub mod fem;

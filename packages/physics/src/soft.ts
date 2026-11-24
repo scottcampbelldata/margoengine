@@ -1376,6 +1376,7 @@ export class SoftBodies implements PhysicsAttachment {
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0];
+  private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
   private particleCount = 0;
   private edgeCount = 0;
@@ -2074,6 +2075,15 @@ export class SoftBodies implements PhysicsAttachment {
 
   /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */
   beforeStep(dt: number): void {
+    // What the bodies were pushed with last step comes off: the soft bodies push by a force over the step, not an impulse
+    // at its start, so a body they hold up neither rises nor sinks (an impulse that cancels a step's weight at its start lets
+    // gravity pull the body back through the step, and it creeps up half a g dt squared each time).
+    for (const [body, [force, torque]] of this.pushes) {
+      if (!body.valid) continue;
+      body.addForce([-force[0], -force[1], -force[2]], undefined, false);
+      body.addTorque([-torque[0], -torque[1], -torque[2]], false);
+    }
+    this.pushes.clear();
     if (this.particleCount === 0) return;
     this.applyForces(this.columns(), dt);
     const h = dt / this.substeps,
@@ -2097,8 +2107,12 @@ export class SoftBodies implements PhysicsAttachment {
       if (body.type !== 'dynamic') return;
       const j: Vec3 = [c.jx[row]!, c.jy[row]!, c.jz[row]!],
         k: Vec3 = [c.kx[row]!, c.ky[row]!, c.kz[row]!];
-      if (j[0] !== 0 || j[1] !== 0 || j[2] !== 0) body.applyImpulse(j, [c.mx[row]!, c.my[row]!, c.mz[row]!]);
-      if (k[0] !== 0 || k[1] !== 0 || k[2] !== 0) body.applyTorqueImpulse(k);
+      if (j[0] === 0 && j[1] === 0 && j[2] === 0 && k[0] === 0 && k[1] === 0 && k[2] === 0) return;
+      const force: Vec3 = [j[0] / dt, j[1] / dt, j[2] / dt],
+        torque: Vec3 = [k[0] / dt, k[1] / dt, k[2] / dt];
+      body.addForce(force);
+      body.addTorque(torque);
+      this.pushes.set(body, [force, torque]);
     });
     const cellsTorn = this.exports.soft_fem_torn();
     if (this.exports.soft_torn() > 0 || cellsTorn !== this.cellsTornSeen || this.cellTornByHand) {
@@ -2238,6 +2252,7 @@ export class SoftBodies implements PhysicsAttachment {
     c.avy[row] = av[1];
     c.avz[row] = av[2];
     c.wm[row] = inverse[0]!;
+    c.gs[row] = body.gravityScale;
     c.iixx[row] = inverse[1]!;
     c.iixy[row] = inverse[2]!;
     c.iixz[row] = inverse[3]!;

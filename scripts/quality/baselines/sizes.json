@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17685096,
+  "total": 17698532,
   "history": [
     {
       "date": "2026-10-24",
@@ -11493,6 +11493,12 @@
       "commit": "d492f3924",
       "reason": "physics/soft: splitting torn bodies into pieces, tear and cut: entry budget 50,747 to 51,596 B gzip, base 14,278 to 16,385 (soft-split.ts: virtual-node particle duplication, piece rebuilding, blade tests); the work is TypeScript because pieces are new bodies with rows in the world's columns",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "8befd3e01",
+      "reason": "soft entry gains the exact solve of rigid edges and body links (conjugate gradient with Newton steps): lazy kernel 35,674 to 41,105 B gzip, the loader slightly.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12253,9 +12259,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 53144,
+    "@margoengine/physics/soft": 59915,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 16877,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 35674,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 42339,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

@@ -587,3 +587,41 @@ test('a body whose triangles face inward cannot hold a volume', async () => {
   ).setVolumeFactor(1);
   assert.throws(() => soft.create(flipped), RangeError);
 });
+
+test('the stretch of a rope under a heavy load does not depend on the iterations, the substeps or the mass ratio', async () => {
+  const hang = async (iterations, substeps, particleMass) => {
+    const physics = new Physics(null, {});
+    const soft = await SoftBodies.attach(physics, { iterations, substeps });
+    const crate = physics.addBody(null, {
+      position: [0, 2, 0],
+      colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], density: 250 },
+    });
+    const rope = soft.create(
+      SoftBodyDesc.rope([0, 6, 0], [0, 2.2, 0], 20, { bending: false })
+        .setPinnedParticles([0])
+        .setParticleMass(particleMass)
+        .setLinearDamping(1)
+        .setParticleRadius(0.01),
+    );
+    rope.attachParticle(19, crate);
+    steps(physics, 300);
+    const end = rope.particlePosition(19);
+    return { length: Math.hypot(end[0], 6 - end[1], end[2]), crate: crate.position[1] };
+  };
+  // The crate is 16 kg: a particle of 0.01 kg makes the load 1,600 times the rope's own weight per particle.
+  const runs = [];
+  for (const [iterations, substeps, particleMass] of [
+    [1, 4, 0.01],
+    [2, 8, 0.01],
+    [8, 8, 0.01],
+    [2, 16, 0.01],
+    [2, 8, 0.5],
+    [4, 4, 0.1],
+  ])
+    runs.push(await hang(iterations, substeps, particleMass));
+  for (const run of runs) {
+    near(run.length, runs[1].length, 0.004, 'the rope end is as far from the pin in every setting');
+    near(run.crate, runs[1].crate, 0.004, 'and the crate as high');
+  }
+  near(runs[1].length, 3.8, 0.04, 'and it is a rope length away: the rope does not stretch');
+});

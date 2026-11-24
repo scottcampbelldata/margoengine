@@ -11108,3 +11108,11 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 ### Volume preservation (`@margoengine/physics/soft`, 2026-11-24)
 
 One scalar constraint on the volume a closed triangle surface encloses, V = sum of x_a . (x_b x x_c) / 6 over its triangles, whose gradient at a vertex is the sum of the cross products of the other two vertices of each triangle around it over 6, held to a target by the XPBD correction (Macklin, Mueller and Chentanez 2016). The balloon constraint is that of M. Mueller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007, section 4.4, with the divergence-theorem volume of a closed mesh (any computational geometry text).
+
+### Exact solve of rigid edges and body links (`@margoengine/physics/soft`, 2026-11-24)
+
+- M. R. Hestenes and E. Stiefel, "Methods of Conjugate Gradients for Solving Linear Systems", J. Research of the National Bureau of Standards 49(6), 1952.
+- J. R. Shewchuk, "An Introduction to the Conjugate Gradient Method Without the Agonizing Pain", 1994 (the preconditioned form).
+- D. Baraff and A. Witkin, "Large Steps in Cloth Simulation", SIGGRAPH 1998 (a conjugate gradient solve of the constraints of a cloth).
+- D. Baraff, "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996 (the direct solve of a tree of constraints, which the conjugate gradient solve matches in the answer; Margo's own tree solve of the 2D kernel, `packages/physics2d/kernel/src/joint/tree.rs`, follows it).
+- M. Macklin, M. Mueller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", 2016 (the sweep that sheets keep, and the rigid-edge limit this replaces for ropes).

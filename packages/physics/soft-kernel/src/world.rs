@@ -151,6 +151,10 @@ pub struct World {
     pub vgx: Col<f32>,
     pub vgy: Col<f32>,
     pub vgz: Col<f32>,
+    /// The exact solve of the rigid edges and attachments (src/rigid.rs).
+    pub rg: crate::rigid::Rigid,
+    /// Per body row: how much gravity pulls the body, so it falls through the step with the particles that hang from it.
+    pub gs: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -211,7 +215,7 @@ impl World {
             &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
             &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
             &mut self.kx, &mut self.ky, &mut self.kz, &mut self.wm, &mut self.iixx, &mut self.iixy, &mut self.iixz,
-            &mut self.iiyy, &mut self.iiyz, &mut self.iizz,
+            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs,
         ] {
             grow(v, colliders);
         }
@@ -273,6 +277,14 @@ impl World {
 
     /// The first half of a piece of a step: move every particle under gravity, then solve the constraints.
     pub fn substep_pre(&mut self, h: f32, iterations: u32, gravity: [f32; 3]) {
+        // A body that can move falls as the host's step will let it, so what hangs from it is held against its weight.
+        for c in 0..self.colliders {
+            if self.wm[c] > 0.0 {
+                self.lvx[c] += h * gravity[0] * self.gs[c];
+                self.lvy[c] += h * gravity[1] * self.gs[c];
+                self.lvz[c] += h * gravity[2] * self.gs[c];
+            }
+        }
         for i in 0..self.particles {
             self.px[i] = self.x[i];
             self.py[i] = self.y[i];
@@ -297,6 +309,7 @@ impl World {
         self.shape_begin();
         self.fem_begin();
         self.volume_begin();
+        self.rigid_begin(h);
         for _ in 0..iterations {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
@@ -305,6 +318,7 @@ impl World {
             self.solve_fem(h);
             self.solve_volume(h);
         }
+        self.solve_rigid(h);
         self.collide(h);
     }
 
@@ -346,6 +360,10 @@ impl World {
         let (wa, wb) = (self.w[a], self.w[b]);
         let w = wa + wb;
         if w == 0.0 {
+            return;
+        }
+        // A rigid edge (no natural frequency) is held by the exact solve (src/rigid.rs), together with the body links.
+        if self.omega[e] == 0.0 && self.held_exactly(e) {
             return;
         }
         let dx = self.x[a] - self.x[b];
@@ -431,7 +449,6 @@ impl World {
                 }
             }
         }
-        self.pull_attachments(h);
     }
 
     /// Pushes particle `i` out of the surface of body row `c` by `push` along the unit normal `n`, with friction, and gives
