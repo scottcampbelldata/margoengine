@@ -135,6 +135,7 @@ export class SoftBody {
     oriented: boolean | undefined;
     selfContacts: boolean;
     selfFriction: number;
+    selfThickness: number;
     get valid(): boolean;
     private get c();
     numParticles(): number;

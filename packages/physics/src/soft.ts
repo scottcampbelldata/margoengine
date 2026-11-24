@@ -912,13 +912,16 @@ export class SoftBodyDesc {
     return this;
   }
 
-  /** Gives the body a surface collider of its own when it is created (see {@link SoftBodies.createSurfaceCollider}); the default is none. */
+  /**
+   * Gives the body a surface collider of its own when it is created (see {@link SoftBodies.createSurfaceCollider}) with these
+   * settings; a body with triangles or a skin has one by default.
+   */
   setSurfaceCollider(settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {}): this {
     this.surfaceSettings = { ...settings };
     return this;
   }
 
-  /** The body has no surface collider of its own (the default). */
+  /** The body has no surface collider of its own (a body with triangles or a skin has one by default). */
   setNoSurfaceCollider(): this {
     this.surfaceSettings = null;
     return this;
@@ -970,7 +973,10 @@ export class SoftBodyDesc {
             inside(origin[0] + (i + 0.5) * cell, origin[1] + (j + 0.5) * cell, origin[2] + (k + 0.5) * cell)
           )
             kept.push([i, j, k]);
-    if (kept.length === 0) throw new RangeError('The solid has no cells: `inside` accepted no cube of the grid; widen the grid or accept more cubes.');
+    if (kept.length === 0)
+      throw new RangeError(
+        'The solid has no cells: `inside` accepted no cube of the grid; widen the grid or accept more cubes.',
+      );
     for (const [i, j, k] of kept)
       for (let a = 0; a < 2; a++)
         for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) used[id(i + a, j + b, k + c)] = 0;
@@ -1267,7 +1273,7 @@ export class SoftBodyDesc {
     this.massGiven = true;
     return this;
   }
-  /** Contact thickness of every particle in metres (default: half the shortest structural edge, or 0.01 with none). */
+  /** Contact thickness of every particle in metres (default: for a body of triangles the circumradius of its widest triangle, so no triangle has a gap between its three spheres wide enough for a small thing to pass; else half the shortest structural edge, or 0.01 with none). */
   setParticleRadius(radius: number): this {
     if (!(radius >= 0 && Number.isFinite(radius))) throw new RangeError('Particle radius must be 0 or more metres.');
     this.radius = radius;
@@ -1379,6 +1385,8 @@ export class SoftBody {
   /** @internal */ oriented: boolean | undefined = undefined;
   /** @internal Whether its triangles are in the cloth contact search, and how rough the cloth is. */ selfContacts = false;
   /** @internal */ selfFriction = 0;
+  /** @internal How far its triangles are held from each other: its radius, and at most half its shortest edge. */
+  selfThickness = 0;
 
   /** False once the body was removed. */
   get valid(): boolean {
@@ -2200,7 +2208,20 @@ export class SoftBodies implements PhysicsAttachment {
       Math.hypot(pos[a * 3]! - pos[b * 3]!, pos[a * 3 + 1]! - pos[b * 3 + 1]!, pos[a * 3 + 2]! - pos[b * 3 + 2]!);
     for (let e = 0; e < structural; e++)
       shortest = Math.min(shortest, length(desc.edgePairs[e * 2]!, desc.edgePairs[e * 2 + 1]!));
-    const radius = desc.radius ?? (Number.isFinite(shortest) ? shortest * 0.5 : 0.01);
+    // A body of triangles gets particles that cover them: no triangle has a gap, at its middle, wide enough for a small thing to pass
+    // between three spheres (the circumradius of the widest triangle); a rope or a raw mesh gets half its shortest edge.
+    let covering = 0;
+    for (let t = 0; t + 2 < desc.triangles.length; t += 3) {
+      const [a, b, d] = [desc.triangles[t]!, desc.triangles[t + 1]!, desc.triangles[t + 2]!],
+        ab = length(a, b),
+        bd = length(b, d),
+        da = length(d, a),
+        s2 = (ab + bd + da) / 2,
+        area = Math.sqrt(Math.max(0, s2 * (s2 - ab) * (s2 - bd) * (s2 - da)));
+      if (area > 1e-12) covering = Math.max(covering, (ab * bd * da) / (4 * area));
+    }
+    const half = Number.isFinite(shortest) ? shortest * 0.5 : 0.01;
+    const radius = desc.radius ?? (covering > 0 ? covering : half);
     for (let i = 0; i < particles; i++) {
       const row = firstParticle + i;
       c.x[row] = c.px[row] = pos[i * 3]! + desc.shift[0];
@@ -2302,6 +2323,7 @@ export class SoftBodies implements PhysicsAttachment {
       body.volumeOn = true;
     }
     body.selfFriction = desc.selfFriction;
+    body.selfThickness = Math.min(radius, half);
     body.dominance = desc.dominance;
     body.canSleepFlag = desc.canSleep;
     body.additionalIterations = desc.additionalIterations;
@@ -2350,6 +2372,8 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeCellMaterial(body);
     this.syncCloth();
     this.syncVolume(desc.volumeFactor);
+    // A body with triangles or a skin has a surface collider unless it was told not to (Rapier's default): the particles are
+    // spheres, and a thing that fits between them is caught by the mesh.
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
     return body;
   }
@@ -2482,11 +2506,10 @@ export class SoftBodies implements PhysicsAttachment {
     let triangles = 0,
       thickness = Infinity,
       friction = 0;
-    const radius = this.columns().radius;
     for (const b of on) {
       triangles += b.triangleList.length / 3;
       friction = Math.max(friction, b.selfFriction);
-      for (let i = 0; i < b.particles; i++) thickness = Math.min(thickness, radius[b.firstParticle + i]!);
+      thickness = Math.min(thickness, b.selfThickness);
     }
     const at = this.exports.soft_cloth_reserve(triangles, Math.max(triangles * 8 + 64, 16384)),
       buffer = new Uint32Array(this.exports.memory.buffer, at, triangles * 3);
@@ -3081,7 +3104,8 @@ export class SoftBodies implements PhysicsAttachment {
     for (const b of this.bodies) extra = Math.max(extra, b.additionalIterations);
     for (let piece = 0; piece < this.substeps; piece++) {
       this.exports.soft_pre(h, this.iterations + extra, g[0], g[1], g[2]);
-      this.exports.soft_apply(h, h * (piece + 1));
+      // A body touched by many particles settles over a few passes, each meeting the body where the last left it.
+      for (let pass = 0; pass < 4; pass++) this.exports.soft_apply(h, h * (piece + 1));
       this.exports.soft_post(h);
     }
     this.exports.soft_finish();
@@ -3290,6 +3314,15 @@ export class SoftBodies implements PhysicsAttachment {
     c.mx[row] = body.position[0] + r[0];
     c.my[row] = body.position[1] + r[1];
     c.mz[row] = body.position[2] + r[2];
+    c.m0x[row] = c.mx[row]!;
+    c.m0y[row] = c.my[row]!;
+    c.m0z[row] = c.mz[row]!;
+    c.a0x[row] = av[0];
+    c.a0y[row] = av[1];
+    c.a0z[row] = av[2];
+    c.l0x[row] = lv[0];
+    c.l0y[row] = lv[1];
+    c.l0z[row] = lv[2];
     c.lvx[row] = lv[0];
     c.lvy[row] = lv[1];
     c.lvz[row] = lv[2];
@@ -3720,11 +3753,11 @@ function rowsOf(
   if (name === 'vtri') return volumeTriangles * 3;
   if (/^vb_/.test(name)) return bodies;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
-  if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf)$/.test(name)) return particles * 4;
+  if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (
-    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|ii(xx|xy|xz|yy|yz|zz))$/.test(
+    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|dm[xyz]|th[xyz]|ii(xx|xy|xz|yy|yz|zz))$/.test(
       name,
     )
   )
