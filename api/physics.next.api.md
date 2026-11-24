@@ -749,8 +749,12 @@ interface KernelProjection {
 }
 
 interface KernelQueryShape {
-    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
+    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
     size: readonly number[];
+    placed?: {
+        offset: readonly [number, number, number];
+        turn: readonly [number, number, number, number];
+    };
 }
 
 interface KernelShapeCastHit {

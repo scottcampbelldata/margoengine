@@ -383,24 +383,37 @@ export function kernelCollider(
  * volume.
  */
 export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryShape {
-  if ((options.shape === 'box' || options.shape === 'convexHull') && roundness(options.borderRadius, 'Query shape') > 0)
-    throw new MargoError(
-      'unsupported',
-      'A box or convexHull query shape with a borderRadius is not in the own solver yet; cast a cylinder, cone, sphere or capsule, or leave the border out.',
-    );
+  const border = options.shape === 'box' || options.shape === 'convexHull' ? roundness(options.borderRadius, 'Query shape') : 0;
   if (options.shape === 'sphere' && options.radius !== undefined) return { shape: 'ball', size: [options.radius] };
   if (options.shape === 'box' && options.halfExtents) {
     checkVec(options.halfExtents, 'Box halfExtents');
+    if (border > 0) {
+      // A round box is a hull of its corners with a border, as the kernel holds the query's rounded polyhedra.
+      const [x, y, z] = options.halfExtents,
+        points = Float32Array.from([-x, -y, -z, x, -y, -z, x, y, -z, -x, y, -z, -x, -y, z, x, -y, z, x, y, z, -x, y, z]),
+        { vertices, faces } = buildHull(points);
+      return { shape: 'hull', size: [hulls.addHull(vertices, faces), border] };
+    }
     return { shape: 'box', size: [...options.halfExtents] };
+  }
+  if (options.shape === 'segment') {
+    const frame = segmentFrame(options.a, options.b, 'Segment');
+    return { shape: 'capsule', size: [0, frame.half], placed: { offset: frame.middle, turn: frame.rotation } };
+  }
+  if (options.shape === 'triangle') {
+    checkVec(options.a, 'Triangle a');
+    checkVec(options.b, 'Triangle b');
+    checkVec(options.c, 'Triangle c');
+    return { shape: 'trimesh', size: [hulls.addTrimesh(Float32Array.of(...options.a, ...options.b, ...options.c), Uint32Array.of(0, 1, 2), false)] };
   }
   if (options.shape === 'capsule') return { shape: 'capsule', size: [options.radius, options.halfHeight] };
   if (options.shape === 'cylinder' || options.shape === 'cone') return { shape: options.shape, size: revolvedSize(options) };
   if (options.shape === 'convexHull' && options.points) {
     const { vertices, faces } = buildHull(options.points);
-    return { shape: 'hull', size: [hulls.addHull(vertices, faces)] };
+    return { shape: 'hull', size: border > 0 ? [hulls.addHull(vertices, faces), border] : [hulls.addHull(vertices, faces)] };
   }
   throw new MargoError(
     'unsupported',
-    `A ${String(options?.shape)} query shape is not in the own solver yet; cast or overlap a sphere, box, capsule, cylinder, cone or convexHull with its size or points given, or use @margoengine/physics.`,
+    `A ${String(options?.shape)} query shape is not in the own solver yet; cast or overlap a sphere, box, capsule, cylinder, cone, segment, triangle or convexHull with its size or points given, or use @margoengine/physics.`,
   );
 }

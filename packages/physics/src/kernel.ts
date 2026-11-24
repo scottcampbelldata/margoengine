@@ -344,8 +344,11 @@ const QUERY_HITS = 256;
 /** A query shape of {@link KernelWorld.shapeCast} and {@link KernelWorld.intersectShape}: a convex kernel shape and its
  * `addCollider` size (a hull names its `addHull` row). */
 export interface KernelQueryShape {
-  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
+  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+  /** A hull's or a one-triangle mesh's is `[row]`, and a hull's `[row, border]` when it has a border. */
   size: readonly number[];
+  /** Where the shape sits in the query's frame, before its position and rotation (default the origin, no turn). */
+  placed?: { offset: readonly [number, number, number]; turn: readonly [number, number, number, number] };
 }
 /** How far a cast goes, how far short of touching it stops, and what a start in contact means (Rapier's `ShapeCastOptions`). */
 export interface KernelCastOptions {
@@ -374,7 +377,7 @@ export interface KernelProjection {
   point: [number, number, number];
   distance: number;
 }
-const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3, cylinder: 6, cone: 7 } as const;
+const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3, trimesh: 4, cylinder: 6, cone: 7 } as const;
 const castBits = (cast: KernelCastOptions): number => (cast.stop ? 1 : 0) | (cast.geometry ? 2 : 0);
 const CAST_REFUSED =
     'A shape query needs a finite position, a nonzero rotation, a finite nonzero direction, a target distance of 0 or more and a ball, box, capsule, cylinder, cone or hull row; pass those.',
@@ -1185,8 +1188,27 @@ export class KernelWorld {
     return rows;
   }
   private shapeWords(shape: KernelQueryShape, p: readonly number[], q: readonly number[]): [number, number, number, number, number, number, number, number, number, number, number, number] {
-    const s = shape.size;
-    return [QUERY_KINDS[shape.shape], shape.shape === 'hull' ? 0 : s[0]!, s[1] ?? 0, s[2] ?? 0, shape.shape === 'hull' ? s[0]! : 0, p[0]!, p[1]!, p[2]!, q[0]!, q[1]!, q[2]!, q[3]!];
+    const s = shape.size,
+      row = shape.shape === 'hull' || shape.shape === 'trimesh';
+    let [px, py, pz, qx, qy, qz, qw] = [p[0]!, p[1]!, p[2]!, q[0]!, q[1]!, q[2]!, q[3]!];
+    if (shape.placed) {
+      // The shape's own frame inside the query's: its offset turned by the query's rotation, and its turn after it.
+      const [ox, oy, oz] = shape.placed.offset,
+        [tx, ty, tz, tw] = shape.placed.turn,
+        cx = 2 * (qy * oz - qz * oy),
+        cy = 2 * (qz * ox - qx * oz),
+        cz = 2 * (qx * oy - qy * ox);
+      px += ox + qw * cx + qy * cz - qz * cy;
+      py += oy + qw * cy + qz * cx - qx * cz;
+      pz += oz + qw * cz + qx * cy - qy * cx;
+      [qx, qy, qz, qw] = [
+        qw * tx + qx * tw + qy * tz - qz * ty,
+        qw * ty - qx * tz + qy * tw + qz * tx,
+        qw * tz + qx * ty - qy * tx + qz * tw,
+        qw * tw - qx * tx - qy * ty - qz * tz,
+      ];
+    }
+    return [QUERY_KINDS[shape.shape], row ? (shape.shape === 'hull' ? (s[1] ?? 0) : 0) : s[0]!, row ? 0 : (s[1] ?? 0), row ? 0 : (s[2] ?? 0), row ? s[0]! : 0, px, py, pz, qx, qy, qz, qw];
   }
   private readCast(i: number): KernelShapeCastHit {
     const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 64 * i, 16),

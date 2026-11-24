@@ -83,10 +83,10 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Capability | Status | Notes |
 | --- | --- | --- |
 | Ray cast, all hits, solid flag, max time of impact | full | |
-| Shape cast, all hits, target distance, stop at penetration | partial | query shape is ball, box, capsule or hull only; Rapier casts any shape, with a cast rotation and a rotating motion off |
+| Shape cast, all hits, target distance, stop at penetration | partial | every convex query shape (ball, box, capsule, cylinder, cone, segment, triangle, hull, round box and hull), tested against Rapier's casts; a non-convex query shape (mesh, height field, compound, half space) is open |
 | Point projection, all hits | full | a trimesh holds no point |
 | Point containment (`intersectPoint`) | full | |
-| Shape intersection (`intersectShape`) | partial | query shape limit as shape cast |
+| Shape intersection (`intersectShape`) | partial | the same convex query shapes; non-convex ones open |
 | AABB intersection (colliders whose box meets a box) | missing | |
 | Collider-to-collider distance and closest points | missing | |
 | Collider-to-collider contact (`contactPair`) and intersection tests | partial | |

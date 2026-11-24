@@ -59,9 +59,8 @@ test('a round box rests a border above where a sharp one does, as on Rapier', ()
   for (const w of worlds) w.physics.dispose();
 });
 
-test('a border is refused when negative, and on a compound part or query shape the own solver does not hold', () => {
+test('a border is refused when negative', () => {
   const physics = new Physics(null);
   assert.throws(() => physics.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], borderRadius: -1 } }), /borderRadius/);
-  assert.throws(() => physics.shapeCast({ shape: 'box', halfExtents: [1, 1, 1], borderRadius: 0.1 }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), /not in the own solver/);
   physics.dispose();
 });

@@ -545,6 +545,11 @@ impl World {
                 Solid::RoundPoly { poly: self.hull_poly(shape.hull as usize), pose, border: shape.border }
             }
             SHAPE_HULL if shape.hull < self.header().hull_rows[0] => Solid::Poly { poly: self.hull_poly(shape.hull as usize), pose },
+            // A mesh of one triangle is a triangle: a query shape that is a surface, solid on both sides.
+            SHAPE_TRIMESH if shape.hull < self.header().mesh_rows[0] && self.is_one_triangle(shape.hull as usize) => {
+                let corners = self.mesh_triangle(shape.hull as usize, 0);
+                Solid::Triangle([pose.apply(corners[0]), pose.apply(corners[1]), pose.apply(corners[2])])
+            }
             SHAPE_CYLINDER | SHAPE_CONE => {
                 Solid::Revolved { shape: Revolved { cone: shape.kind == SHAPE_CONE, r: shape.size.x, h: shape.size.y }, border: shape.size.z, pose }
             }

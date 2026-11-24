@@ -430,6 +430,11 @@ impl World {
         Some((self.uu(MESH_VERTICES, mesh) / (columns + 1) - 1, columns))
     }
 
+    /// Whether a mesh row is one triangle: no height field, no voxel grid.
+    pub(crate) fn is_one_triangle(&self, mesh: usize) -> bool {
+        self.uu(MESH_TRIANGLES, mesh) == 1 && self.grid_size(mesh).is_none() && !self.is_voxels(mesh)
+    }
+
     /// The corners of triangle `t` of a mesh, counted from its first; for a height field, half `t % 2` of cell `t / 2`.
     #[inline(always)]
     pub fn mesh_triangle(&self, mesh: usize, t: u32) -> [V3; 3] {
