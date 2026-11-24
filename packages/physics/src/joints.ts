@@ -29,6 +29,13 @@ export interface MotorOptions {
   damping?: number;
   /** 'acceleration' (default, mass independent) or 'force'. */
   model?: 'acceleration' | 'force';
+  /**
+   * The motor as a spring of this natural frequency in hertz, in the acceleration model (per kilogram, so a light body and a heavy one
+   * follow it alike): `stiffness` becomes (2 pi f) squared and `damping` 2 `dampingRatio` (2 pi f). Replaces `stiffness` and `damping`.
+   */
+  frequency?: number;
+  /** The damping ratio of a `frequency` motor: 1 is critical, below 1 it overshoots (default 1). */
+  dampingRatio?: number;
   /** The most force (prismatic) or torque (revolute, spherical) the motor applies, in N or N m. Default no cap. */
   maxForce?: number;
 }
@@ -53,8 +60,8 @@ interface JointBase {
   userData?: unknown;
   /** False makes the joint with nothing solved, until `joint.enabled = true` (default true). */
   enabled?: boolean;
-  /** Lets the joint's locks give way as a spring of `hertz` and damping ratio `damping` (default 1); see `setSoftness`. */
-  softness?: { hertz: number; damping?: number };
+  /** Lets the joint's locks give way as springs of their own; see `setSoftness`. `angular` gives the turning locks theirs. */
+  softness?: { hertz: number; damping?: number; angular?: { hertz?: number; damping?: number } };
 }
 /** One degree of freedom of a generic joint: along or about an axis of its frame on body A. */
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
@@ -161,8 +168,8 @@ export interface ConeJointOptions {
   userData?: unknown;
   /** False makes the joint with nothing solved, until `joint.enabled = true` (default true). */
   enabled?: boolean;
-  /** Lets the joint's locks give way as a spring of `hertz` and damping ratio `damping` (default 1); see `setSoftness`. */
-  softness?: { hertz: number; damping?: number };
+  /** Lets the joint's locks give way as springs of their own; see `setSoftness`. `angular` gives the turning locks theirs. */
+  softness?: { hertz: number; damping?: number; angular?: { hertz?: number; damping?: number } };
 }
 
 /** What `physics.addJoint` takes on the own solver: the root's joints and the cone. */
@@ -190,6 +197,29 @@ const locks: Readonly<Partial<Record<JointType | 'cone', number>>> = {
   rope: JOINT_DISTANCE | (JOINT_LIMIT << SLIDE),
   spring: JOINT_DISTANCE | (JOINT_MOTOR_ON << SLIDE) | (JOINT_MOTOR_FORCE << SLIDE),
 };
+
+/** A motor given as a frequency and damping ratio, as the stiffness and damping of the acceleration model it means. */
+function springForm(motor: MotorOptions): MotorOptions {
+  const { frequency, dampingRatio } = motor;
+  if (frequency === undefined) {
+    if (dampingRatio !== undefined)
+      throw new RangeError('A damping ratio goes with a frequency; pass `frequency` in hertz too.');
+    return motor;
+  }
+  if (!(frequency >= 0) || !Number.isFinite(frequency))
+    throw new RangeError(
+      "Motor frequency must be a finite number of at least 0 hertz; pass the spring's natural frequency.",
+    );
+  const zeta = dampingRatio ?? 1;
+  if (!(zeta >= 0) || !Number.isFinite(zeta))
+    throw new RangeError('Motor dampingRatio must be a finite number of at least 0; 1 is critical damping.');
+  if (motor.model === 'force')
+    throw new RangeError(
+      "A frequency and damping ratio are per kilogram; use model 'acceleration' (the default), or give stiffness and damping.",
+    );
+  const omega = 6.283185307179586 * frequency;
+  return { ...motor, stiffness: omega * omega, damping: 2 * zeta * omega, model: 'acceleration' };
+}
 
 function checkLimits(min: number, max: number): void {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
@@ -386,7 +416,7 @@ export class PhysicsJoint {
     const columns = this.owner.kernel.columns,
       { row } = this,
       flags = columns.jointFlags[row];
-    if (flags & (JOINT_CONE | JOINT_DRIVE) || columns.jointCouple[row] !== 0 || this.softAxes !== 0)
+    if (flags & (JOINT_CONE | JOINT_DRIVE) || columns.jointCouple[row] !== 0 || columns.jointSoft[row] !== 0)
       throw new TypeError(
         'A cone, a rotation motor, coupled axes or a soft joint does not mirror axis by axis; make it again with the bodies swapped.',
       );
@@ -494,8 +524,9 @@ export class PhysicsJoint {
   setMotor(motor: MotorOptions): this {
     return this.drive(this.type === 'rope' ? SLIDE : this.unit(), motor);
   }
-  private drive(axis: number, motor: MotorOptions): this {
-    const { row } = this,
+  private drive(axis: number, options: MotorOptions): this {
+    const motor = springForm(options),
+      { row } = this,
       columns = this.owner.kernel.columns,
       cap = motor.maxForce ?? Infinity,
       position = motor.targetPosition;
@@ -666,59 +697,69 @@ export class PhysicsJoint {
     const { jointLimitHertz, jointLimitZeta } = this.owner.kernel.columns;
     return [jointLimitHertz[this.row], jointLimitZeta[this.row]];
   }
-  private softAxes = 0;
-  private softHertz = 0;
-  private softDamping = 1;
   /**
-   * Lets the joint's locks give way as a spring of its own, `hertz` and a damping ratio `damping` (default 1), in the
-   * acceleration model: the spring is per kilogram, so a light body and a heavy one sag alike under a steady load, by its
-   * acceleration over (2 pi hertz) squared. `0` makes the joint rigid again. The sliding locks go soft always, and the turning
-   * locks when the joint locks all three or none: a hinge's or a slider's other turning locks stay rigid. A soft joint takes
-   * no break limit (its load is a motor's, not a lock's), and `flip` refuses it.
-   * @throws RangeError unless `hertz` is 0 or above and finite, and `damping` above 0.
+   * Lets the joint's locks give way as springs of their own: the sliding locks at `hertz` and a damping ratio `damping` (default 1),
+   * the turning locks at the same unless `angular` gives theirs. The spring is in the acceleration model, per kilogram, so a light body and
+   * a heavy one sag alike under a steady load, by its acceleration over (2 pi hertz) squared. A frequency of `0` makes that group
+   * rigid again, so `setSoftness(0, 1, {hertz: 2})` is a pin that turns like a spring. A hinge's or a slider's turning locks go soft
+   * too, and its free axis stays free. A soft lock takes no break limit (its load is a motor's, not a lock's), and `flip` refuses a soft joint.
+   * @throws RangeError unless each frequency is 0 or above and finite, and each damping ratio above 0.
    */
-  setSoftness(hertz: number, damping = 1): this {
+  setSoftness(hertz: number, damping = 1, angular?: { hertz?: number; damping?: number }): this {
     this.live();
-    if (!(hertz >= 0) || !Number.isFinite(hertz) || !(damping > 0) || !Number.isFinite(damping))
-      throw new RangeError(
-        'Joint softness needs a frequency of 0 or more hertz (0 is rigid) and a damping ratio above 0.',
-      );
+    const turnHertz = angular?.hertz ?? hertz,
+      turnDamping = angular?.damping ?? damping;
+    for (const [f, z] of [
+      [hertz, damping],
+      [turnHertz, turnDamping],
+    ] as const)
+      if (!(f >= 0) || !Number.isFinite(f) || !(z > 0) || !Number.isFinite(z))
+        throw new RangeError(
+          'Joint softness needs a frequency of 0 or more hertz (0 is rigid) and a damping ratio above 0.',
+        );
     const { row } = this,
-      columns = this.owner.kernel.columns;
-    if (hertz === 0 && this.softAxes === 0) return this;
-    if (this.softAxes === 0) {
-      const flags = columns.jointFlags[row],
-        turns = [3, 4, 5].filter((axis) => flags & (JOINT_LOCK << axis)).length;
-      for (let axis = 0; axis < 6; axis++)
-        if (flags & (JOINT_LOCK << axis) && (axis < 3 || turns === 3)) this.softAxes |= 1 << axis;
-    }
-    const omega = 6.283185307179586 * hertz;
+      columns = this.owner.kernel.columns,
+      locked = (columns.jointFlags[row] | columns.jointSoft[row]) & 63;
+    if (hertz === 0 && turnHertz === 0 && columns.jointSoft[row] === 0) return this;
+    let soft = 0;
     for (let axis = 0; axis < 6; axis++) {
-      if (!(this.softAxes & (1 << axis))) continue;
-      if (hertz === 0) {
+      if (!(locked & (1 << axis))) continue;
+      const f = axis < 3 ? hertz : turnHertz,
+        z = axis < 3 ? damping : turnDamping;
+      if (f === 0) {
         columns.jointFlags[row] =
           (columns.jointFlags[row] & ~((JOINT_MOTOR_ON | JOINT_MOTOR_FORCE) << axis)) | (JOINT_LOCK << axis);
         columns[`jointStiffness${axis}`][row] = columns[`jointDamping${axis}`][row] = 0;
         columns[`jointCap${axis}`][row] = 0;
         columns[`jointMotor${axis}`][row] = 0;
       } else {
+        const omega = 6.283185307179586 * f;
+        soft |= 1 << axis;
         columns[`jointTarget${axis}`][row] = columns[`jointSpeed${axis}`][row] = 0;
         columns[`jointStiffness${axis}`][row] = omega * omega;
-        columns[`jointDamping${axis}`][row] = 2 * damping * omega;
+        columns[`jointDamping${axis}`][row] = 2 * z * omega;
         columns[`jointCap${axis}`][row] = Infinity;
         columns.jointFlags[row] =
           (columns.jointFlags[row] & ~((JOINT_LOCK | JOINT_MOTOR_FORCE) << axis)) | (JOINT_MOTOR_ON << axis);
       }
     }
-    if (hertz === 0) this.softAxes = 0;
-    this.softHertz = hertz;
-    this.softDamping = hertz === 0 ? 1 : damping;
+    columns.jointSoft[row] = soft;
+    columns.jointSoftLinearHertz[row] = hertz;
+    columns.jointSoftLinearZeta[row] = hertz === 0 ? 1 : damping;
+    columns.jointSoftAngularHertz[row] = turnHertz;
+    columns.jointSoftAngularZeta[row] = turnHertz === 0 ? 1 : turnDamping;
     this.wake();
     return this;
   }
-  /** The softness as `[hertz, damping]`; `[0, 1]` for a rigid joint. */
+  /** The softness of the sliding locks as `[hertz, damping]`; `[0, 1]` when they are rigid. */
   get softness(): [number, number] {
-    return [this.softHertz, this.softDamping];
+    const { jointSoftLinearHertz: h, jointSoftLinearZeta: z } = this.owner.kernel.columns;
+    return [h[this.row], h[this.row] === 0 ? 1 : z[this.row]];
+  }
+  /** The softness of the turning locks as `[hertz, damping]`; `[0, 1]` when they are rigid. */
+  get angularSoftness(): [number, number] {
+    const { jointSoftAngularHertz: h, jointSoftAngularZeta: z } = this.owner.kernel.columns;
+    return [h[this.row], h[this.row] === 0 ? 1 : z[this.row]];
   }
   /**
    * The load that breaks the joint: newtons on its linear rows and newton metres on its angular rows, each `Infinity` for
@@ -868,7 +909,7 @@ export function createJoint(
     joint.setBreakLimits(options.breakForce ?? Infinity, options.breakTorque ?? Infinity);
   joint.userData = options.userData;
   if (options.softness) {
-    joint.setSoftness(options.softness.hertz, options.softness.damping);
+    joint.setSoftness(options.softness.hertz, options.softness.damping, options.softness.angular);
   }
   if (options.enabled === false) columns.jointFlags[row] |= JOINT_DISABLED;
   if (type === 'rope') {

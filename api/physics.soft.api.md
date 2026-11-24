@@ -621,6 +621,10 @@ interface ConeJointOptions {
     softness?: {
         hertz: number;
         damping?: number;
+        angular?: {
+            hertz?: number;
+            damping?: number;
+        };
     };
 }
 
@@ -756,6 +760,10 @@ interface JointBase {
     softness?: {
         hertz: number;
         damping?: number;
+        angular?: {
+            hertz?: number;
+            damping?: number;
+        };
     };
 }
 
@@ -1150,6 +1158,8 @@ interface MotorOptions {
     stiffness?: number;
     damping?: number;
     model?: 'acceleration' | 'force';
+    frequency?: number;
+    dampingRatio?: number;
     maxForce?: number;
 }
 
@@ -1643,8 +1653,12 @@ class PhysicsJoint {
     get contactsEnabled(): boolean;
     setLimitSoftness(hertz: number, damping?: number): this;
     get limitSoftness(): [number, number];
-    setSoftness(hertz: number, damping?: number): this;
+    setSoftness(hertz: number, damping?: number, angular?: {
+        hertz?: number;
+        damping?: number;
+    }): this;
     get softness(): [number, number];
+    get angularSoftness(): [number, number];
     setBreakLimits(force: number, torque?: number): this;
     get breakLimits(): [number, number];
     get broken(): boolean;

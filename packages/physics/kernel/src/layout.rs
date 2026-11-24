@@ -485,6 +485,14 @@ columns! {
     // The sliding axes of frame A (bits 0 to 2) whose distances one limit measures together: the first of them carries the
     // row, along the line from A's frame to the anchor on B inside their plane. Zero couples nothing.
     JOINT_COUPLE u32 Joint,
+    // The axes (bit k for axis k) whose locks give way as springs of their own: their flags hold the motor, not the lock, and the
+    // measures still count them as locked, so a hinge's angle is read as one. The sliding axes' frequency and damping ratio, then the
+    // turning axes'; read by the facade to put the locks back.
+    JOINT_SOFT u32 Joint,
+    JOINT_SOFT_LINEAR_HERTZ f32 Joint,
+    JOINT_SOFT_LINEAR_ZETA f32 Joint,
+    JOINT_SOFT_ANGULAR_HERTZ f32 Joint,
+    JOINT_SOFT_ANGULAR_ZETA f32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
     SOLVE_JOINTS u32 JointList,
     // The joint whose scratch keeps the sums of this one's island, for the warm start; NONE with no body to move.

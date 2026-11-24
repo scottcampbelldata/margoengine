@@ -72,3 +72,93 @@ test('softness reads back, 0 makes the joint rigid again, and it checks its inpu
   assert.throws(() => joint.setSoftness(Number.NaN), RangeError);
   physics.dispose();
 });
+
+test('a soft hinge gives way about its turning locks too, and still turns freely about its axis', async () => {
+  await Physics.load();
+  const omega = 2 * Math.PI * 2;
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const wall = physics.addBody(null, { type: 'fixed' });
+  // Inertia of a solid sphere of 1 kg and radius 0.5: 0.1 kg m^2.
+  const body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5, mass: 1 } });
+  const joint = physics.addJoint(wall, body, {
+    type: 'revolute',
+    axis: [0, 0, 1],
+    softness: { hertz: 2, damping: 0.7 },
+  });
+  [2, 0.7].forEach((v, i) => near(joint.softness[i], v, 1e-6, 'softness read back'));
+  body.addTorque([1, 0, 0]);
+  for (let i = 0; i < 240; i++) physics.step();
+  near(
+    2 * Math.asin(body.rotation[0]),
+    1 / (0.1 * omega * omega),
+    0.006,
+    'tilted by torque over inertia over omega squared',
+  );
+  physics.dispose();
+  // The free axis is still free: a torque about z spins the body up at torque over inertia.
+  const spin = new Physics(null, { gravity: [0, 0, 0] });
+  const post = spin.addBody(null, { type: 'fixed' });
+  const wheel = spin.addBody(null, { colliders: { shape: 'sphere', radius: 0.5, mass: 1 } });
+  spin.addJoint(post, wheel, { type: 'revolute', axis: [0, 0, 1], softness: { hertz: 2 } });
+  wheel.addTorque([0, 0, 1]);
+  for (let i = 0; i < 60; i++) spin.step();
+  near(wheel.angularVelocity[2], 10, 0.2, 'a spin of 10 rad/s after a second');
+  spin.dispose();
+});
+
+test('a weld takes its sliding and turning softness apart: a stiff pin that turns like a spring', async () => {
+  await Physics.load();
+  const omega = 2 * Math.PI * 2;
+  const physics = new Physics(null);
+  const wall = physics.addBody(null, { type: 'fixed' });
+  const body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5, mass: 1 } });
+  const joint = physics.addJoint(wall, body, { type: 'fixed' });
+  joint.setSoftness(0, 1, { hertz: 2, damping: 0.7 });
+  assert.deepEqual(joint.softness, [0, 1]);
+  [2, 0.7].forEach((v, i) => near(joint.angularSoftness[i], v, 1e-6, 'angular softness read back'));
+  body.addTorque([0, 0, 1]);
+  body.addForce([5, 0, 0]);
+  for (let i = 0; i < 240; i++) physics.step();
+  near(body.position[0], 0, 0.002, 'the sliding locks stay rigid under a push');
+  near(2 * Math.asin(body.rotation[2]), 1 / (0.1 * omega * omega), 0.006, 'the turning locks are the spring');
+  physics.dispose();
+});
+
+test('a motor takes a frequency and damping ratio, mass independent: the peak of a step response', async () => {
+  await Physics.load();
+  function peak(mass) {
+    const physics = new Physics(null, { gravity: [0, 0, 0] });
+    const wall = physics.addBody(null, { type: 'fixed' });
+    const body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5, mass } });
+    physics.addJoint(wall, body, {
+      type: 'revolute',
+      axis: [0, 0, 1],
+      motor: { targetPosition: 0.5, frequency: 2, dampingRatio: 0.1 },
+    });
+    let high = 0,
+      when = 0;
+    for (let i = 1; i <= 60; i++) {
+      physics.step();
+      const angle = 2 * Math.asin(body.rotation[2]);
+      if (angle > high) [high, when] = [angle, i / 60];
+    }
+    physics.dispose();
+    return { high, when };
+  }
+  const omega = 2 * Math.PI * 2,
+    zeta = 0.1,
+    overshoot = Math.exp((-Math.PI * zeta) / Math.sqrt(1 - zeta * zeta));
+  for (const mass of [1, 8]) {
+    const { high, when } = peak(mass);
+    near(when, Math.PI / (omega * Math.sqrt(1 - zeta * zeta)), 0.02, `peak time at ${mass} kg`);
+    near(high, 0.5 * (1 + overshoot), 0.03, `peak height at ${mass} kg`);
+  }
+  const physics = new Physics(null);
+  const a = physics.addBody(null, { type: 'fixed' });
+  const b = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5 } });
+  const hinge = physics.addJoint(a, b, { type: 'revolute', axis: [0, 0, 1] });
+  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: 2, model: 'force' }), RangeError);
+  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: -1 }), RangeError);
+  assert.throws(() => hinge.setMotor({ targetPosition: 0, frequency: 2, dampingRatio: -1 }), RangeError);
+  physics.dispose();
+});

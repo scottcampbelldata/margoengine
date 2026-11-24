@@ -75,3 +75,41 @@ test('self contacts off: two bodies of one tree that overlap pass through each o
   assert.ok(Math.abs(overlapping(false) + 0.3) < 1e-3, 'off: nothing pushes it');
   assert.ok(Math.abs(overlapping(true) + 0.3) > 0.05, 'on: the root pushes it away');
 });
+
+test('a loop closed by an ordinary joint between a tree link and a fixed body holds its closure while the four-bar moves', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  // Ground joints at (0, 0) and (1, -1.6); three unit links: ends at A, B and C = the second ground joint.
+  const A = [0.6, -0.8, 0],
+    B = [1.6, -0.8, 0],
+    C = [1, -1.6, 0];
+  const root = physics.addBody(null, { type: 'fixed' });
+  const post = physics.addBody(null, { type: 'fixed', position: C });
+  const body = (at) => physics.addBody(null, { position: at, colliders: { shape: 'sphere', radius: 0.05, mass: 1 } });
+  const [a, b, c] = [body(A), body(B), body(C)];
+  const sub = (p, q) => [p[0] - q[0], p[1] - q[1], 0];
+  const hinge = (parent, child) => ({
+    type: 'revolute',
+    axis: [0, 0, 1],
+    anchorA: [0, 0, 0],
+    anchorB: sub(parent, child),
+  });
+  const multibody = physics.addMultibody(root, [
+    { body: a, joint: { type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0], anchorB: sub([0, 0, 0], A) } },
+    { body: b, parent: a, joint: hinge(A, B) },
+    { body: c, parent: b, joint: hinge(B, C) },
+  ]);
+  assert.equal(multibody.links.length, 3);
+  // The chain is held at its joints by the tree; the loop is closed at c's origin by an ordinary joint to the post.
+  physics.addJoint(post, c, { type: 'revolute', axis: [0, 0, 1] });
+  a.setAngularVelocity([0, 0, 0.3]);
+  let worst = 0;
+  for (let i = 0; i < 180; i++) {
+    physics.step();
+    const [x, y] = c.position;
+    worst = Math.max(worst, Math.hypot(x - C[0], y - C[1]));
+  }
+  assert.ok(worst < 2e-3, `the loop stays closed to 2 mm: ${worst}`);
+  assert.ok(Number.isFinite(a.position[0]) && Math.abs(a.position[0]) < 3, 'and nothing blows up');
+  physics.dispose();
+});

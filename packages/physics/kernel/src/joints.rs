@@ -793,7 +793,7 @@ impl World {
         if q.w < 0.0 {
             q = Q { x: -q.x, y: -q.y, z: -q.z, w: -q.w };
         }
-        let locked = flags / (JOINT_LOCK << 3) & 7;
+        let locked = (flags / (JOINT_LOCK << 3) | self.uu(JOINT_SOFT, row) >> 3) & 7;
         let free = 3 - (locked & 1) - (locked >> 1 & 1) - (locked >> 2 & 1);
         if free == 0 {
             at[3] = 2.0 * q.x;
