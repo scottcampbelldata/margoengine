@@ -18,6 +18,8 @@ pub const MAX_COUPLINGS: usize = 64;
 pub const GEAR: u32 = 1;
 pub const RACK_AND_PINION: u32 = 2;
 pub const PULLEY: u32 = 3;
+/// Two anchors that keep a distance within a range: `ratio` is the least, `total` the greatest (0 for no greatest).
+pub const DISTANCE: u32 = 4;
 
 /// One coupling: bodies `a` and `b`, directions in their own frames, and the row's memory. A free slot has kind 0.
 #[repr(C)]
@@ -89,7 +91,7 @@ struct Row {
 impl World {
     /// Adds a coupling between two live bodies; its slot, or None when they are one body, one is gone, or the table is full.
     pub fn add_coupling(&mut self, kind: u32, a: u32, b: u32) -> Option<usize> {
-        if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=PULLEY).contains(&kind) {
+        if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=DISTANCE).contains(&kind) {
             return None;
         }
         let slot = (0..MAX_COUPLINGS).find(|&k| self.header().couplings[k].kind == 0)?;
@@ -175,6 +177,25 @@ impl World {
                 row.db = qb.rotate(vec(c.axis_b));
                 (row, 0.0)
             }
+            DISTANCE => {
+                let pa = self.v(POSITION_X, a).add(qa.rotate(vec(c.anchor_a)));
+                let pb = self.v(POSITION_X, b).add(qb.rotate(vec(c.anchor_b)));
+                let d = pb.sub(pa);
+                let length = sqrt(d.dot(d));
+                row.la = if length > 1e-9 { d.scale(1.0 / length) } else { v3(1.0, 0.0, 0.0) };
+                row.ra = pa.sub(self.v(CENTER_X, a));
+                row.rb = pb.sub(self.v(CENTER_X, b));
+                // The distance from the nearest end of the range (positive past the greatest, negative short of the least), and the length.
+                let past = if c.total > 0.0 && length > c.total {
+                    length - c.total
+                } else if length < c.ratio {
+                    length - c.ratio
+                } else {
+                    0.0
+                };
+                row.lb = v3(length, 0.0, 0.0);
+                (row, past)
+            }
             _ => {
                 let pa = self.v(POSITION_X, a).add(qa.rotate(vec(c.anchor_a)));
                 let pb = self.v(POSITION_X, b).add(qb.rotate(vec(c.anchor_b)));
@@ -197,6 +218,10 @@ impl World {
                 row.ta.dot(a.angular) + row.db.dot(b.linear),
                 row.ta.dot(a.inertia.mul(row.ta)) + row.db.mul(row.db).dot(b.mass),
             ),
+            DISTANCE => {
+                let speed = row.la.dot(b.at(row.rb).sub(a.at(row.ra)));
+                (speed, a.give(row.la, row.ra) + b.give(row.la, row.rb))
+            }
             _ => {
                 let speed = row.la.dot(a.at(row.ra)) + c.ratio * row.lb.dot(b.at(row.rb));
                 (speed, a.give(row.la, row.ra) + c.ratio * c.ratio * b.give(row.lb, row.rb))
@@ -214,6 +239,10 @@ impl World {
             RACK_AND_PINION => {
                 a.angular = a.angular.add(a.inertia.mul(row.ta).scale(p));
                 b.linear = b.linear.add(b.mass.mul(row.db).scale(p));
+            }
+            DISTANCE => {
+                a.push(row.la.scale(-p), row.ra);
+                b.push(row.la.scale(p), row.rb);
             }
             _ => {
                 a.push(row.la.scale(p), row.ra);
@@ -250,7 +279,7 @@ impl World {
             if !(inverse > 0.0) {
                 continue;
             }
-            let error = if c.kind == PULLEY { rope } else { c.error };
+            let error = if c.kind == PULLEY || c.kind == DISTANCE { rope } else { c.error };
             // A soft row gives by its stiffness, a rigid one closes a share of its error in the biased pass.
             let (beta, gamma) = if c.hertz > 0.0 {
                 let mass = 1.0 / inverse;
@@ -268,6 +297,14 @@ impl World {
                 let kept = if wanted > 0.0 || error + speed * h < -1e-5 { 0.0 } else { wanted };
                 change = kept - c.impulse;
             }
+            // A distance joint pushes or pulls only where its range ends: apart at the least, together at the greatest.
+            if c.kind == DISTANCE {
+                let length = row.lb.x;
+                let (high, low) = (c.total > 0.0 && length + speed * h > c.total, length + speed * h < c.ratio);
+                let wanted = c.impulse + change;
+                let kept = if high { wanted.min(0.0) } else if low { wanted.max(0.0) } else { 0.0 };
+                change = kept - c.impulse;
+            }
             if change == 0.0 {
                 continue;
             }
@@ -282,7 +319,7 @@ impl World {
     pub fn track_couplings(&mut self, h: f32) {
         for k in 0..MAX_COUPLINGS {
             let c = self.header().couplings[k];
-            if !self.coupling_live(&c) || c.kind == PULLEY {
+            if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE {
                 continue;
             }
             let (row, _) = self.coupling_row(&c);

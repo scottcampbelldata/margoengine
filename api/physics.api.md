@@ -322,6 +322,17 @@ export interface DebugStyle {
     axisLength?: number;
 }
 
+export class DistanceJoint extends Mechanism {
+    constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: DistanceOptions);
+}
+
+export interface DistanceOptions extends MechanismOptions {
+    anchorA?: Vec3;
+    anchorB?: Vec3;
+    min?: number;
+    max?: number;
+}
+
 export class DragJoint implements PhysicsAttachment {
     readonly body: PhysicsBody;
     constructor(physics: Physics, body: PhysicsBody, point: Vec3, options?: DragOptions);
@@ -700,7 +711,7 @@ export class KernelWorld {
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
-    addCoupling(kind: 1 | 2 | 3, a: number, b: number): number;
+    addCoupling(kind: 1 | 2 | 3 | 4, a: number, b: number): number;
     setCoupling(slot: number, field: number, value: readonly [number, number, number]): void;
     removeCoupling(slot: number): boolean;
     couplingState(slot: number): {
@@ -1767,7 +1778,7 @@ abstract class Mechanism implements PhysicsAttachment {
     protected readonly a: PhysicsBody;
     protected readonly b: PhysicsBody;
     protected readonly slot: number;
-    protected constructor(physics: Physics, kind: 1 | 2 | 3, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
+    protected constructor(physics: Physics, kind: 1 | 2 | 3 | 4, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
     state(): {
         error: number;
         impulse: number;

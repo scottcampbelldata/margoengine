@@ -293,7 +293,7 @@ pub extern "C" fn body_set_own(body: u32, mass: f32, x: f32, y: f32, z: f32, ix:
     }
 }
 /// A new joint between two bodies, or -1 when one is gone, they are one body, or memory is out. JS then writes its columns.
-/// Adds a coupling (1 gear, 2 rack and pinion, 3 pulley) between two bodies; its slot, or -1.
+/// Adds a coupling (1 gear, 2 rack and pinion, 3 pulley, 4 distance range) between two bodies; its slot, or -1.
 #[unsafe(no_mangle)]
 pub extern "C" fn coupling_add(kind: u32, a: u32, b: u32) -> i32 {
     world().add_coupling(kind, a, b).map_or(-1, |slot| slot as i32)

@@ -107,3 +107,35 @@ fn a_pulley_rope_goes_slack_and_a_replay_gives_the_same_bits() {
     let second = atwood(3.0, 1.0, 45);
     assert_eq!((first.0.to_bits(), first.1.to_bits(), first.2.to_bits()), (second.0.to_bits(), second.1.to_bits(), second.2.to_bits()));
 }
+
+fn hang(start: V3, speed: V3, least: f32, most: f32, hertz: f32, steps: u32) -> (f32, V3) {
+    let mut w = World::new(8, 8).unwrap();
+    let post = w.add_body(FIXED).unwrap();
+    w.set_pose(post, v3(0.0, 0.0, 0.0), Q::IDENTITY, false);
+    let body = point(&mut w, start, 2.0, 0.1);
+    w.set_v(LINEAR_X, body as usize, speed);
+    let range = w.add_coupling(DISTANCE, post, body).unwrap();
+    w.set_coupling(range, 6, [least, 0.0, 0.0]);
+    w.set_coupling(range, 7, [most, 0.0, 0.0]);
+    w.set_coupling(range, 8, [hertz, 1.0, 0.2]);
+    run(&mut w, steps);
+    let p = w.v(POSITION_X, body as usize);
+    (sqrt(p.dot(p)), p)
+}
+
+#[test]
+fn a_distance_range_stops_a_body_at_its_greatest_and_its_least() {
+    // Falling from half a metre below the post on a rope of 1 m: it comes to rest a metre below, and goes no further.
+    let (length, p) = hang(v3(0.0, -0.5, 0.0), v3(0.0, 0.0, 0.0), 0.0, 1.0, 0.0, 180);
+    assert!((length - 1.0).abs() < 0.01, "hangs a metre down: {length}");
+    assert!(p.y < -0.98);
+    // Slack inside the range: a body between 0.5 and 2 m falls freely there (a quarter of a second drops it 0.31 m).
+    let (length, _) = hang(v3(0.0, -1.0, 0.0), v3(0.0, 0.0, 0.0), 0.5, 2.0, 0.0, 15);
+    assert!((length - (1.0 + 0.5 * 9.81 * 0.0625)).abs() < 0.03, "free inside the range: {length}");
+    // Thrown at the post it stops at the least distance, as a strut would.
+    let (length, _) = hang(v3(0.0, 2.0, 0.0), v3(0.0, -6.0, 0.0), 1.0, 0.0, 0.0, 60);
+    assert!(length > 0.97, "it cannot come nearer than the least: {length}");
+    // A soft limit gives a little, but holds.
+    let (length, _) = hang(v3(0.0, -0.5, 0.0), v3(0.0, 0.0, 0.0), 0.0, 1.0, 8.0, 240);
+    assert!(length > 1.0 && length < 1.25, "a soft range stretches a little and holds: {length}");
+}

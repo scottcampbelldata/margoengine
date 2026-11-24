@@ -29,6 +29,7 @@ export interface MechanismOptions {
 const GEAR = 1;
 const RACK_AND_PINION = 2;
 const PULLEY = 3;
+const DISTANCE = 4;
 
 abstract class Mechanism implements PhysicsAttachment {
   protected readonly slot: number;
@@ -36,7 +37,7 @@ abstract class Mechanism implements PhysicsAttachment {
 
   protected constructor(
     protected readonly physics: Physics,
-    kind: 1 | 2 | 3,
+    kind: 1 | 2 | 3 | 4,
     protected readonly a: PhysicsBody,
     protected readonly b: PhysicsBody,
     options: MechanismOptions,
@@ -196,5 +197,42 @@ export class PulleyJoint extends Mechanism {
       0,
       0,
     ]);
+  }
+}
+
+/** Options of {@link DistanceJoint}. */
+export interface DistanceOptions extends MechanismOptions {
+  /** Where the first body is held, in its frame (default its centre). */
+  anchorA?: Vec3;
+  /** Where the second body is held, in its frame (default its centre). */
+  anchorB?: Vec3;
+  /** The least distance in metres (default 0: they may touch). */
+  min?: number;
+  /** The greatest distance in metres (default no greatest). */
+  max?: number;
+}
+
+/**
+ * A distance joint with a range: the two anchors stay between `min` and `max` apart and are free in between (a rope is a joint
+ * with only a `max`, a strut one with only a `min`). Rigid by default; give `frequency` and `damping` for a spring-like end, one
+ * that gives a little and pulls back. For a spring about a rest length use a `spring` joint.
+ */
+export class DistanceJoint extends Mechanism {
+  constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options: DistanceOptions = {}) {
+    const anchorA: V = options.anchorA ? ([...options.anchorA] as V) : [0, 0, 0],
+      anchorB: V = options.anchorB ? ([...options.anchorB] as V) : [0, 0, 0],
+      { min = 0, max = 0 } = options;
+    checkVec(anchorA, 'Anchor A');
+    checkVec(anchorB, 'Anchor B');
+    if (!(min >= 0 && Number.isFinite(min)))
+      throw new RangeError('Distance min is 0 or more metres; pass options.min of 0 or above.');
+    if (!(max >= 0 && Number.isFinite(max)) || (max > 0 && max < min))
+      throw new RangeError('Distance max is 0 (none) or at least min, in metres; pass options.max above options.min.');
+    super(physics, DISTANCE, bodyA, bodyB, options);
+    const k = physics.kernel;
+    k.setCoupling(this.slot, 2, anchorA);
+    k.setCoupling(this.slot, 3, anchorB);
+    k.setCoupling(this.slot, 6, [min, 0, 0]);
+    k.setCoupling(this.slot, 7, [max, 0, 0]);
   }
 }

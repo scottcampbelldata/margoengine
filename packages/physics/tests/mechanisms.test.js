@@ -1,7 +1,7 @@
 // Gear, rack and pinion and pulley joints against their closed forms.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { GearJoint, PulleyJoint, Physics, RackAndPinionJoint } from '../dist/index.js';
+import { DistanceJoint, GearJoint, PulleyJoint, Physics, RackAndPinionJoint } from '../dist/index.js';
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
@@ -107,4 +107,26 @@ test('a pulley rope goes slack when nothing pulls it and the mechanisms are chec
   assert.throws(() => new RackAndPinionJoint(physics, a, b, { radius: -1 }), RangeError);
   assert.throws(() => new PulleyJoint(physics, a, b, { groundA: [0, 0], groundB: [0, 0, 0] }), RangeError);
   assert.throws(() => new GearJoint(physics, a, b, { frequency: -1 }), RangeError);
+});
+
+test('a distance joint with a range holds a body between its least and greatest distance, rigid or soft', async () => {
+  const hang = (options, steps, start = [0, -0.5, 0], velocity = [0, 0, 0]) => {
+    const physics = new Physics(null);
+    const post = physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: [] });
+    const body = physics.addBody(null, { position: start, colliders: { shape: 'sphere', radius: 0.1, mass: 2 } });
+    body.setLinearVelocity(velocity);
+    new DistanceJoint(physics, post, body, options);
+    for (let i = 0; i < steps; i++) physics.step();
+    return Math.hypot(...body.position);
+  };
+  near(hang({ max: 1 }, 180), 1, 0.01, 'a rope: it hangs at the greatest distance');
+  near(hang({ min: 0.5, max: 2 }, 15, [0, -1, 0]), 1 + 0.5 * 9.81 * 0.0625, 0.03, 'free inside the range');
+  assert.ok(hang({ min: 1 }, 60, [0, 2, 0], [0, -6, 0]) > 0.97, 'a strut: it cannot come nearer than the least');
+  const soft = hang({ max: 1, frequency: 8, damping: 1 }, 240);
+  assert.ok(soft > 1 && soft < 1.25, `a soft end gives a little and holds: ${soft}`);
+  const physics = new Physics(null);
+  const a = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
+  const b = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
+  assert.throws(() => new DistanceJoint(physics, a, b, { min: -1 }), RangeError);
+  assert.throws(() => new DistanceJoint(physics, a, b, { min: 2, max: 1 }), RangeError);
 });
