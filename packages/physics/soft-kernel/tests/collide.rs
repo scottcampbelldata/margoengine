@@ -210,3 +210,53 @@ fn a_sheet_dropped_over_a_sphere_does_not_cut_through_itself() {
     let (per, tri, positions) = settle_over_sphere(0.0);
     assert!(close_pairs(per, &tri, &positions, 0.003) > 0, "without the search the cloth does touch itself");
 }
+
+/// A sheet of 6 by 6 squares on a pinned sheet of 8 by 8, both tilted by `angle` about z, the upper 1.2 cm over the lower and
+/// 10 cm up the slope. Returns how far, along the slope, the upper sheet's centre has gone after `seconds` (down is negative).
+fn slide_on_a_slope(angle: f32, friction: f32, seconds: f32) -> f32 {
+    let (n, m) = (8usize, 6usize);
+    let (per, per_m) = ((n + 1) * (n + 1), (m + 1) * (m + 1));
+    let edges = (4 * n * n + 2 * n) + (4 * m * m + 2 * m);
+    let mut w = World::new();
+    w.reserve(per + per_m, edges, 1, 0);
+    w.particles = per + per_m;
+    w.bodies = 1;
+    w.gravity_scale[0] = 1.0;
+    let (_low, mut tri, e) = sheet(&mut w, 0, 0, n, 0.1, 0.0, (0.0, 0.0), true);
+    let (high, upper, e) = sheet(&mut w, per, e, m, 0.1, 0.012, (0.1, 0.0), false);
+    w.edges = e;
+    tri.extend(upper);
+    // Tilt everything about the z axis through the origin, so the slope rises towards +x.
+    let (s, c) = angle.sin_cos();
+    for k in 0..per + per_m {
+        let (x, y) = (w.x[k], w.y[k]);
+        w.x[k] = x * c - y * s;
+        w.y[k] = x * s + y * c;
+    }
+    collide::configure(&tri, 0.01);
+    collide::set_friction(friction);
+    let centre = |w: &World| {
+        let n = high.n as f32;
+        (0..high.n).fold((0.0, 0.0), |(x, y), k| (x + w.x[high.first + k] / n, y + w.y[high.first + k] / n))
+    };
+    let start = centre(&w);
+    run(&mut w, seconds, 1.0 / 60.0, 8, 6);
+    let end = centre(&w);
+    (end.0 - start.0) * c + (end.1 - start.1) * s
+}
+
+#[test]
+fn a_cloth_on_a_tilted_cloth_holds_below_the_friction_angle_and_slides_above_it() {
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    // Coulomb: a body on a slope holds when tan(angle) is under the coefficient: 0.5 holds up to 26.6 degrees.
+    let below = slide_on_a_slope(15f32.to_radians(), 0.5, 1.0);
+    assert!(below.abs() < 0.01, "at 15 degrees with friction 0.5 it stays: moved {below}");
+    let above = slide_on_a_slope(35f32.to_radians(), 0.5, 0.5);
+    assert!(above < -0.1, "at 35 degrees it slides: moved {above}");
+    // The friction is what holds it: with none, the gentle slope lets it go.
+    let free = slide_on_a_slope(15f32.to_radians(), 0.0, 0.5);
+    assert!(free < -0.1, "at 15 degrees without friction it slides: moved {free}");
+    // And a rougher cloth holds the steeper slope: tan(35 degrees) = 0.70 against a coefficient of 0.9.
+    let rough = slide_on_a_slope(35f32.to_radians(), 0.9, 1.0);
+    assert!(rough.abs() < 0.02, "at 35 degrees with friction 0.9 it stays: moved {rough}");
+}

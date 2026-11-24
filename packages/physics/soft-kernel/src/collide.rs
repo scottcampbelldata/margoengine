@@ -11,6 +11,7 @@
 // one world to a Wasm instance, as the rest of this crate has.
 use crate::World;
 use crate::col::Col;
+use crate::math::sqrt;
 use margoengine_physics_kernel_common::cloth::{ClothContact, EDGE_EDGE, Found, POINT_TRIANGLE, Scratch, find_contacts};
 
 pub use margoengine_physics_kernel_common::cloth::ClothContact as Contact;
@@ -19,6 +20,7 @@ struct State {
     triangles: Col<u32>,
     count: usize,
     thickness: f32,
+    friction: f32,
     boxes: Col<f32>,
     order: Col<u32>,
     parent: Col<u32>,
@@ -35,6 +37,7 @@ static mut STATE: State = State {
     triangles: Col::new(),
     count: 0,
     thickness: 0.0,
+    friction: 0.0,
     boxes: Col::new(),
     order: Col::new(),
     parent: Col::new(),
@@ -60,13 +63,21 @@ pub fn reserve(triangles: usize, contacts: usize) {
 }
 
 /// Sets the triangles (three particle indices each) and the thickness, in metres, from which cloth is kept apart: 0 or no
-/// triangles turns the search off.
+/// triangles turns the search off. Friction is Coulomb's coefficient between cloth surfaces, 0 for none (see `set_friction`).
 pub fn configure(triangles: &[u32], thickness: f32) {
     reserve(triangles.len() / 3, state().capacity.max(16384));
     let s = state();
     s.triangles[..triangles.len()].copy_from_slice(triangles);
     s.count = triangles.len() / 3;
     s.thickness = thickness;
+    s.friction = 0.0;
+}
+
+/// Sets Coulomb's friction coefficient between cloth surfaces that touch: the tangential motion two touching points make
+/// against each other in a substep is cut by up to this much of the push that separated them (Bridson, Fedkiw, Anderson 2002,
+/// section 5; Mueller et al. 2007, section 4.4).
+pub fn set_friction(friction: f32) {
+    state().friction = friction;
 }
 
 /// The contacts the last substep found, sorted and grouped (see `ClothContact`).
@@ -110,7 +121,7 @@ impl World {
         let mut pushed = 0;
         for k in 0..s.found.count {
             let c = s.out[k];
-            if self.push_apart(&c, s.thickness) {
+            if self.push_apart(&c, s.thickness, s.friction) {
                 pushed += 1;
             }
         }
@@ -119,7 +130,7 @@ impl World {
 
     /// Moves the particles of one contact along its normal until its two primitives are `thickness` apart again. False when
     /// they already are, or when none of the particles can move.
-    fn push_apart(&mut self, c: &ClothContact, thickness: f32) -> bool {
+    fn push_apart(&mut self, c: &ClothContact, thickness: f32, friction: f32) -> bool {
         // The coefficient of each particle in the move of the touching points, and which way each goes: the first primitive along
         // the normal, the second against it.
         let (ids, coefficients): ([usize; 4], [f32; 4]) = if c.kind == POINT_TRIANGLE {
@@ -155,6 +166,33 @@ impl World {
             self.y[i] += move_by * n[1];
             self.z[i] += move_by * n[2];
         }
+        if friction > 0.0 {
+            // What the touching points moved against each other in this substep, along the surface: the first primitive's point
+            // less the second's. Coulomb's cone: up to `friction` of the push that separated them is taken back, all of it when
+            // that is less (static friction), so a cloth on a slope holds when tan(slope) is under the coefficient.
+            let mut slide = [0.0f32; 3];
+            for k in 0..4 {
+                let i = ids[k];
+                slide[0] += coefficients[k] * (self.x[i] - self.px[i]);
+                slide[1] += coefficients[k] * (self.y[i] - self.py[i]);
+                slide[2] += coefficients[k] * (self.z[i] - self.pz[i]);
+            }
+            let along = slide[0] * n[0] + slide[1] * n[1] + slide[2] * n[2];
+            let tangent = [slide[0] - along * n[0], slide[1] - along * n[1], slide[2] - along * n[2]];
+            let length = sqrt(tangent[0] * tangent[0] + tangent[1] * tangent[1] + tangent[2] * tangent[2]);
+            if length > 1e-12 {
+                let take = if length < friction * violation { length } else { friction * violation };
+                let lambda = take / weight;
+                let scale = lambda / length;
+                for k in 0..4 {
+                    let i = ids[k];
+                    let move_by = self.w[i] * coefficients[k] * scale;
+                    self.x[i] -= move_by * tangent[0];
+                    self.y[i] -= move_by * tangent[1];
+                    self.z[i] -= move_by * tangent[2];
+                }
+            }
+        }
         true
     }
 }
@@ -173,12 +211,14 @@ mod exports {
     pub extern "C" fn soft_collide_triangles() -> u32 {
         state().triangles.as_mut_ptr() as usize as u32
     }
-    /// Turns the search on for `triangles` triangles already written, with a thickness in metres; 0 turns it off.
+    /// Turns the search on for `triangles` triangles already written, with a thickness in metres (0 turns it off) and Coulomb's
+    /// friction coefficient between the cloth surfaces (0 for none).
     #[unsafe(no_mangle)]
-    pub extern "C" fn soft_collide_set(triangles: u32, thickness: f32) {
+    pub extern "C" fn soft_collide_set(triangles: u32, thickness: f32, friction: f32) {
         let s = state();
         s.count = triangles as usize;
         s.thickness = thickness;
+        s.friction = friction;
     }
     /// Where the last substep's contacts are, `soft_collide_stride` words each.
     #[unsafe(no_mangle)]
