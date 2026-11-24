@@ -306,7 +306,11 @@ export interface World {
     colliderA: Collider,
     colliderB: Collider,
     callback: (
-      manifold: { numContacts(): number; numSolverContacts(): number; solverContactPoint(index: number): Vector | null },
+      manifold: {
+        numContacts(): number;
+        numSolverContacts(): number;
+        solverContactPoint(index: number): Vector | null;
+      },
       flipped: boolean,
     ) => void,
   ): void;
@@ -381,7 +385,11 @@ export interface RapierModule {
   /** Rapier 0.20 and later. */
   JointAxis?: Record<'AngX' | 'AngY' | 'AngZ', number>;
   /** Rapier 0.20 and later. */
-  SphericalImpulseJoint?: new (rawSet: never, bodySet: never, handle: number) => SphericalImpulseJoint;
+  SphericalImpulseJoint?: new (
+    rawSet: never,
+    bodySet: never,
+    handle: number,
+  ) => SphericalImpulseJoint;
   CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
   ActiveCollisionTypes: {
     ALL: number;

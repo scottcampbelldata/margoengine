@@ -32,7 +32,7 @@ import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
 import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
-import { type NextJointOptions, PhysicsJoint, createJoint } from './joint.js';
+import { type NextJointOptions, type PhysicsJoint, createJoint } from './joint.js';
 import { kernelCollider, multiply, queryParts, queryShape, shapeServed, turn, type HullRows } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
@@ -91,7 +91,8 @@ export class ContactModification {
     return this.kernel.columns.pairFriction[this.row];
   }
   set friction(value: number) {
-    if (!(value >= 0) || !Number.isFinite(value)) throw new RangeError(`Friction must be finite and not negative (got ${value}).`);
+    if (!(value >= 0) || !Number.isFinite(value))
+      throw new RangeError(`Friction must be finite and not negative (got ${value}).`);
     this.kernel.columns.pairFriction[this.row] = value;
   }
   /** Restitution of the pair; set it to override. */
@@ -130,7 +131,11 @@ export class ContactModification {
     const length = Math.hypot(value[0], value[1], value[2]);
     if (!(length > 1e-6)) throw new RangeError('A contact normal needs a direction; pass a vector of some length.');
     const c = this.kernel.columns;
-    [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]] = [value[0] / length, value[1] / length, value[2] / length];
+    [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]] = [
+      value[0] / length,
+      value[1] / length,
+      value[2] / length,
+    ];
   }
   /** Drops every contact of the pair for this step: the bodies pass through each other and push nothing. */
   clear(): void {
@@ -306,7 +311,10 @@ function callListener(this: never, listener: (event: never) => void): void {
 }
 const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
 const later = (what: string, when: string): MargoError =>
-  new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
+  new MargoError(
+    'unsupported',
+    `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`,
+  );
 const ascending = (x: number, y: number): number => x - y;
 const bits = (enabled: readonly [boolean, boolean, boolean]): number =>
   (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
@@ -351,7 +359,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       return row;
     },
     hullVolume: (row) => this.kernel.columns.hullVolume[row],
-    addTrimesh: (vertices, indices, fixInternalEdges, oriented) => this.kernel.addTrimesh(vertices, indices, { fixInternalEdges, oriented }),
+    addTrimesh: (vertices, indices, fixInternalEdges, oriented) =>
+      this.kernel.addTrimesh(vertices, indices, { fixInternalEdges, oriented }),
     addHeightfield: (rows, columns, heights, scale, fixInternalEdges) =>
       this.kernel.addHeightfield(rows, columns, heights, [scale[0], scale[1], scale[2]], { fixInternalEdges }),
     addVoxels: (cells, size) => this.kernel.addVoxels(cells, [size[0], size[1], size[2]]),
@@ -388,7 +397,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.interpolate = options.interpolate ?? true;
     this.timeScale = options.timeScale ?? 1;
     this.paused = options.paused ?? false;
-    if (!(this.fixedTimestep > 0 && this.fixedTimestep <= 1)) throw new RangeError('fixedTimestep must be in (0, 1] seconds');
+    if (!(this.fixedTimestep > 0 && this.fixedTimestep <= 1))
+      throw new RangeError('fixedTimestep must be in (0, 1] seconds');
     if (!Number.isInteger(this.maxSubsteps) || this.maxSubsteps < 1)
       throw new RangeError('maxSubsteps must be a positive integer');
     const gravity = options.gravity ?? [0, -9.81, 0];
@@ -507,7 +517,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Advances the accumulator by `delta` seconds, runs whole fixed steps, then writes interpolated poses to meshes. Returns the number of steps. */
   update(delta: number): number {
     if (this.disposed) return 0;
-    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('delta must be a finite, non-negative number of seconds');
+    if (!Number.isFinite(delta) || delta < 0)
+      throw new RangeError('delta must be a finite, non-negative number of seconds');
     let steps = 0;
     if (!this.paused) {
       const dt = this.fixedTimestep;
@@ -545,9 +556,12 @@ export class Physics implements EnginePlugin, BodyOwner {
         joint.reported = true;
         (found ??= []).push(joint);
       }
-    if (found) for (const joint of found) this.emit('jointbreak', { type: 'jointbreak', joint, bodyA: joint.bodyA, bodyB: joint.bodyB });
+    if (found)
+      for (const joint of found)
+        this.emit('jointbreak', { type: 'jointbreak', joint, bodyA: joint.bodyA, bodyB: joint.bodyB });
   }
-  private readonly attachmentStep = (attachment: PhysicsAttachment): void => attachment.beforeStep?.(this.fixedTimestep);
+  private readonly attachmentStep = (attachment: PhysicsAttachment): void =>
+    attachment.beforeStep?.(this.fixedTimestep);
   /** Reads what the step found into events, then calls listeners: one may change the world, so nothing is read after one runs. */
   private dispatch(dt: number): void {
     const outer = this.dispatching,
@@ -635,7 +649,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Writes body poses to their meshes, interpolated by `alpha` between the last two steps. Allocates nothing. */
   sync(alpha = this.lastAlpha): void {
     if (this.disposed) return;
-    if (!Number.isFinite(alpha)) throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
+    if (!Number.isFinite(alpha))
+      throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
     this.meshes.write(!this.interpolate || alpha > 1 ? 1 : alpha < 0 ? 0 : alpha);
     this.attachments.forEach(attachmentSync);
   }
@@ -733,15 +748,23 @@ export class Physics implements EnginePlugin, BodyOwner {
       fit =
         mesh && fitted
           ? colliderGeometry(mesh, body.fitScale)
-          : { geometry: null, scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const) };
+          : {
+              geometry: null,
+              scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
+            };
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
     const { name, shape, size, parts, options: placed } = kernelCollider(options, fit, this.hulls),
-      row = parts ? this.kernel.addCompound(body.row, parts, placed) : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
+      row = parts
+        ? this.kernel.addCompound(body.row, parts, placed)
+        : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
       collider = new PhysicsCollider(this.kernel, row, body, name);
     if (options.collisionGroups !== undefined) this.kernel.columns.colliderGroups[row] = options.collisionGroups;
     if (options.solverGroups !== undefined) this.kernel.columns.colliderSolverGroups[row] = options.solverGroups;
     if (options.sensor || options.enabled === false)
-      this.kernel.setColliderState(row, (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0));
+      this.kernel.setColliderState(
+        row,
+        (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0),
+      );
     collider.reshape = (next) => this.reshapeCollider(body, collider, next);
     collider.emits = options.events ?? true;
     collider.forceEvents = options.contactForceEvents ?? true;
@@ -749,10 +772,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     // A round triangle meets what it touches a border away: its contacts are made with that skin, its queries with the border.
     const skin = (options.contactSkin ?? 0) + (options.shape === 'triangle' ? (placed.border ?? 0) : 0);
     if (skin > 0) collider.setContactSkin(skin);
-    if (options.contactForceThreshold !== undefined) collider.setContactForceEventThreshold(options.contactForceThreshold);
+    if (options.contactForceThreshold !== undefined)
+      collider.setContactForceEventThreshold(options.contactForceThreshold);
     if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
     if (options.modifyContacts) {
-      if (!this.hasModifier) throw new MargoError('state', 'modifyContacts needs a contactModifier: pass one in the Physics options.');
+      if (!this.hasModifier)
+        throw new MargoError('state', 'modifyContacts needs a contactModifier: pass one in the Physics options.');
       this.kernel.setColliderState(row, this.kernel.columns.colliderFlags[row] | COLLIDER_MODIFY);
     }
     body.colliders.push(collider);
@@ -769,10 +794,17 @@ export class Physics implements EnginePlugin, BodyOwner {
       fit =
         mesh && fitted
           ? colliderGeometry(mesh, body.fitScale)
-          : { geometry: null, scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const) };
+          : {
+              geometry: null,
+              scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
+            };
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
     const { name, shape, size, parts, options: placed } = kernelCollider(options, fit, this.hulls);
-    if (parts) throw new MargoError('unsupported', 'A collider cannot become a compound; remove it and add a compound collider to the body.');
+    if (parts)
+      throw new MargoError(
+        'unsupported',
+        'A collider cannot become a compound; remove it and add a compound collider to the body.',
+      );
     const row = collider.handle;
     this.kernel.setColliderShape(row, shape as KernelShape, size);
     this.kernel.setColliderPose(row, placed.position ?? [0, 0, 0], placed.rotation ?? [0, 0, 0, 1]);
@@ -787,7 +819,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @internal use `body.removeCollider`. */
   removeCollider(body: PhysicsBody, collider: PhysicsCollider): void {
     const index = body.colliders.indexOf(collider);
-    if (index < 0) throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
+    if (index < 0)
+      throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
     body.colliders.splice(index, 1);
     this.byRow.delete(collider.handle);
     this.kernel.removeCollider(collider.handle);
@@ -849,7 +882,10 @@ export class Physics implements EnginePlugin, BodyOwner {
    */
   addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint {
     if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
-      throw new MargoError('state', 'Both bodies must belong to this physics world; add them with physics.addBody first.');
+      throw new MargoError(
+        'state',
+        'Both bodies must belong to this physics world; add them with physics.addBody first.',
+      );
     if (bodyA === bodyB)
       throw new MargoError('state', 'A joint needs two different bodies; pass bodyA and bodyB that are not the same.');
     const joint = createJoint(this, bodyA, bodyB, options);
@@ -888,7 +924,16 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   private rayHit(hit: KernelRayHit): RaycastHit | null {
     const collider = this.byRow.get(hit.collider);
-    return collider ? { body: collider.body, mesh: collider.body.mesh, collider, distance: hit.distance, point: hit.point, normal: hit.normal } : null;
+    return collider
+      ? {
+          body: collider.body,
+          mesh: collider.body.mesh,
+          collider,
+          distance: hit.distance,
+          point: hit.point,
+          normal: hit.normal,
+        }
+      : null;
   }
   private passes(hit: RaycastHit, predicate: QueryFilter['predicate']): boolean {
     return !predicate || predicate(hit.body, hit.collider);
@@ -919,18 +964,27 @@ export class Physics implements EnginePlugin, BodyOwner {
    * Every hit along a ray, nearest first: one a collider. Return false from `options.stop` to end the list there.
    * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
    */
-  raycastAll(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions & { stop?: (hit: RaycastHit) => boolean } = {}): RaycastHit[] {
+  raycastAll(
+    origin: Vec3,
+    direction: Vec3,
+    options: PhysicsRaycastOptions & { stop?: (hit: RaycastHit) => boolean } = {},
+  ): RaycastHit[] {
     checkVec(origin, 'Ray origin');
     checkVec(direction, 'Ray direction');
     if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
     const hits: RaycastHit[] = [];
-    for (const raw of this.kernel.raycastAll(origin, direction, options.maxDistance ?? Infinity, options.solid ?? true, ...this.filterWords(options))) {
+    for (const raw of this.kernel.raycastAll(
+      origin,
+      direction,
+      options.maxDistance ?? Infinity,
+      options.solid ?? true,
+      ...this.filterWords(options),
+    )) {
       const hit = this.rayHit(raw);
       if (hit && this.passes(hit, options.predicate)) hits.push(hit);
     }
     hits.sort(byDistance);
-    if (options.stop)
-      for (let i = 0; i < hits.length; i++) if (!options.stop(hits[i]!)) return hits.slice(0, i + 1);
+    if (options.stop) for (let i = 0; i < hits.length; i++) if (!options.stop(hits[i]!)) return hits.slice(0, i + 1);
     return hits;
   }
   private castHit(hit: KernelShapeCastHit): ShapeCastHit | null {
@@ -958,7 +1012,13 @@ export class Physics implements EnginePlugin, BodyOwner {
    * @throws RangeError for a position, rotation or direction that is not finite, or a zero direction; MargoError
    * `unsupported` for another query shape.
    */
-  shapeCast(shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options: PhysicsShapeCastOptions = {}): ShapeCastHit | null {
+  shapeCast(
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat,
+    direction: Vec3,
+    options: PhysicsShapeCastOptions = {},
+  ): ShapeCastHit | null {
     checkVec(position, 'Shape position');
     checkRotation(rotation);
     checkVec(direction, 'Cast direction');
@@ -969,7 +1029,13 @@ export class Physics implements EnginePlugin, BodyOwner {
       let best: ShapeCastHit | null = null;
       for (const part of parts) {
         const moved = turn(rotation, part.offset),
-          hit = this.shapeCast(part.shape, [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]], multiply(rotation, part.rotation), direction, options);
+          hit = this.shapeCast(
+            part.shape,
+            [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]],
+            multiply(rotation, part.rotation),
+            direction,
+            options,
+          );
         if (hit && (!best || hit.distance < best.distance)) best = hit;
       }
       return best;
@@ -1004,13 +1070,22 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.live();
     const solid = options.solid ?? true,
       words = this.filterWords(options);
-    const raws = options.predicate ? this.kernel.projectPointAll(point, solid, ...words) : [this.kernel.projectPoint(point, solid, ...words)];
+    const raws = options.predicate
+      ? this.kernel.projectPointAll(point, solid, ...words)
+      : [this.kernel.projectPoint(point, solid, ...words)];
     let best: PointProjection | null = null;
     for (const raw of raws) {
       const collider = raw && this.byRow.get(raw.collider);
       if (!raw || !collider || (options.predicate && !options.predicate(collider.body, collider))) continue;
       const distance = raw.inside ? 0 : raw.distance,
-        hit = { body: collider.body, mesh: collider.body.mesh, collider, point: raw.point, inside: raw.inside, distance };
+        hit = {
+          body: collider.body,
+          mesh: collider.body.mesh,
+          collider,
+          point: raw.point,
+          inside: raw.inside,
+          distance,
+        };
       if (!best || distance < best.distance || (distance === best.distance && hit.inside && !best.inside)) best = hit;
     }
     return best;
@@ -1029,7 +1104,12 @@ export class Physics implements EnginePlugin, BodyOwner {
    * they were added.
    * @throws RangeError for a position or rotation that is not finite; MargoError `unsupported` for another query shape.
    */
-  intersectShape(shape: ShapeOptions, position: Vec3, rotation: Quat = [0, 0, 0, 1], options: QueryFilter = {}): PhysicsBody[] {
+  intersectShape(
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat = [0, 0, 0, 1],
+    options: QueryFilter = {},
+  ): PhysicsBody[] {
     checkVec(position, 'Shape position');
     checkRotation(rotation);
     this.live();
@@ -1038,13 +1118,22 @@ export class Physics implements EnginePlugin, BodyOwner {
       const found = new Set<PhysicsBody>();
       for (const part of parts) {
         const moved = turn(rotation, part.offset);
-        for (const body of this.intersectShape(part.shape, [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]], multiply(rotation, part.rotation), options)) found.add(body);
+        for (const body of this.intersectShape(
+          part.shape,
+          [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]],
+          multiply(rotation, part.rotation),
+          options,
+        ))
+          found.add(body);
       }
       // In the order the bodies were added, as every query lists them.
       return [...this.bodies].filter((body) => found.has(body));
     }
     const query = queryShape(shape, this.hulls);
-    return this.bodiesOf(this.kernel.intersectShape(query, position, rotation, ...this.filterWords(options)), options.predicate);
+    return this.bodiesOf(
+      this.kernel.intersectShape(query, position, rotation, ...this.filterWords(options)),
+      options.predicate,
+    );
   }
   /**
    * The bodies whose colliders' boxes meet the box from `min` to `max`, in the order they were added. A collider's box is
@@ -1093,11 +1182,22 @@ export class Physics implements EnginePlugin, BodyOwner {
    * `solid` to true.
    * @throws RangeError for an origin or direction that is not three finite numbers, a zero direction or a removed collider.
    */
-  raycastCollider(collider: PhysicsCollider, origin: Vec3, direction: Vec3, options: { maxDistance?: number; solid?: boolean } = {}): RaycastHit | null {
+  raycastCollider(
+    collider: PhysicsCollider,
+    origin: Vec3,
+    direction: Vec3,
+    options: { maxDistance?: number; solid?: boolean } = {},
+  ): RaycastHit | null {
     checkVec(origin, 'Ray origin');
     checkVec(direction, 'Ray direction');
     this.live();
-    const raw = this.kernel.colliderRay(this.rowOf(collider), origin, direction, options.maxDistance ?? Infinity, options.solid ?? true);
+    const raw = this.kernel.colliderRay(
+      this.rowOf(collider),
+      origin,
+      direction,
+      options.maxDistance ?? Infinity,
+      options.solid ?? true,
+    );
     return raw ? this.rayHit(raw) : null;
   }
   /**
@@ -1105,7 +1205,11 @@ export class Physics implements EnginePlugin, BodyOwner {
    * the point itself. Null when nothing can be projected (a mesh holds no inside).
    * @throws RangeError for a point that is not three finite numbers or a removed collider.
    */
-  projectPointOnCollider(collider: PhysicsCollider, point: Vec3, options: { solid?: boolean } = {}): { point: [number, number, number]; inside: boolean; distance: number } | null {
+  projectPointOnCollider(
+    collider: PhysicsCollider,
+    point: Vec3,
+    options: { solid?: boolean } = {},
+  ): { point: [number, number, number]; inside: boolean; distance: number } | null {
     checkVec(point, 'Point');
     this.live();
     const raw = this.kernel.colliderProject(this.rowOf(collider), point, options.solid ?? true);
@@ -1122,7 +1226,14 @@ export class Physics implements EnginePlugin, BodyOwner {
    * A shape cast against one collider, as Rapier's `collider.castShape`, with the options of `shapeCast`.
    * @throws RangeError for a pose or direction that is not finite, a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
    */
-  castShapeAtCollider(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options: PhysicsShapeCastOptions = {}): ShapeCastHit | null {
+  castShapeAtCollider(
+    collider: PhysicsCollider,
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat,
+    direction: Vec3,
+    options: PhysicsShapeCastOptions = {},
+  ): ShapeCastHit | null {
     checkVec(position, 'Shape position');
     checkRotation(rotation);
     checkVec(direction, 'Cast direction');
@@ -1140,7 +1251,12 @@ export class Physics implements EnginePlugin, BodyOwner {
    * Whether a convex shape overlaps one collider, as Rapier's `collider.intersectsShape`.
    * @throws RangeError for a pose that is not finite or a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
    */
-  colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat = [0, 0, 0, 1]): boolean {
+  colliderIntersectsShape(
+    collider: PhysicsCollider,
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat = [0, 0, 0, 1],
+  ): boolean {
     checkVec(position, 'Shape position');
     checkRotation(rotation);
     this.live();
@@ -1149,7 +1265,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** A collider's row, for the kernel; refuses what is not this world's. */
   private rowOf(collider: PhysicsCollider): number {
     if (!collider.valid || this.byRow.get(collider.handle) !== collider)
-      throw new RangeError('That collider was removed or belongs to another world; pass a collider from body.colliders.');
+      throw new RangeError(
+        'That collider was removed or belongs to another world; pass a collider from body.colliders.',
+      );
     return collider.handle;
   }
   private bodiesOf(rows: readonly number[], predicate: QueryFilter['predicate']): PhysicsBody[] {
@@ -1202,7 +1320,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       for (let at = row * 4; at < row * 4 + c.pairContacts[row]; at++)
-        if (c.contactSeparation[at] <= 0 || c.contactNormalImpulse[at] > 0) points.push([c.contactX[at], c.contactY[at], c.contactZ[at]]);
+        if (c.contactSeparation[at] <= 0 || c.contactNormalImpulse[at] > 0)
+          points.push([c.contactX[at], c.contactY[at], c.contactZ[at]]);
     }
     rows.length = 0;
     return points;

@@ -121,7 +121,14 @@ export type CompoundPart = (
   | { shape: 'convexHull'; points: ArrayLike<number>; borderRadius?: number }
   /** A mesh, height field or voxel grid as a part: a surface (a voxel grid weighs nothing here), for a fixed body's scenery. */
   | { shape: 'trimesh'; vertices: ArrayLike<number>; indices: ArrayLike<number>; fixInternalEdges?: boolean }
-  | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3; fixInternalEdges?: boolean }
+  | {
+      shape: 'heightfield';
+      rows: number;
+      columns: number;
+      heights: ArrayLike<number>;
+      scale: Vec3;
+      fixInternalEdges?: boolean;
+    }
   | { shape: 'voxels'; cells: Int32Array; size?: Vec3 }
   /** The half space behind a plane through the part's offset (default normal up): an endless floor or wall in a compound. */
   | { shape: 'halfSpace'; normal?: Vec3 }
@@ -280,7 +287,8 @@ export function usedVertices(vertices: ArrayLike<number>, indices: ArrayLike<num
     used.add(index);
   }
   const points: number[] = [];
-  for (const index of [...used].sort((a, b) => a - b)) points.push(vertices[3 * index]!, vertices[3 * index + 1]!, vertices[3 * index + 2]!);
+  for (const index of [...used].sort((a, b) => a - b))
+    points.push(vertices[3 * index]!, vertices[3 * index + 1]!, vertices[3 * index + 2]!);
   return Float32Array.from(points);
 }
 
@@ -319,8 +327,17 @@ export function createColliderDesc(
       checkVec(half, 'Box halfExtents');
       const border = roundness(options.borderRadius, 'Box');
       desc = border
-        ? R.ColliderDesc.roundCuboid(positive(half[0], 'Box half extent'), positive(half[1], 'Box half extent'), positive(half[2], 'Box half extent'), border)
-        : R.ColliderDesc.cuboid(positive(half[0], 'Box half extent'), positive(half[1], 'Box half extent'), positive(half[2], 'Box half extent'));
+        ? R.ColliderDesc.roundCuboid(
+            positive(half[0], 'Box half extent'),
+            positive(half[1], 'Box half extent'),
+            positive(half[2], 'Box half extent'),
+            border,
+          )
+        : R.ColliderDesc.cuboid(
+            positive(half[0], 'Box half extent'),
+            positive(half[1], 'Box half extent'),
+            positive(half[2], 'Box half extent'),
+          );
       break;
     }
     case 'sphere': {
@@ -353,8 +370,14 @@ export function createColliderDesc(
         border = options.borderRadius ?? 0;
       if (!(border >= 0) || !Number.isFinite(border))
         throw new RangeError(`${name} borderRadius must be 0 or more and finite (got ${border}).`);
-      if (options.shape === 'cone') desc = border > 0 ? R.ColliderDesc.roundCone(halfHeight, radius, border) : R.ColliderDesc.cone(halfHeight, radius);
-      else desc = border > 0 ? R.ColliderDesc.roundCylinder(halfHeight, radius, border) : R.ColliderDesc.cylinder(halfHeight, radius);
+      if (options.shape === 'cone')
+        desc =
+          border > 0 ? R.ColliderDesc.roundCone(halfHeight, radius, border) : R.ColliderDesc.cone(halfHeight, radius);
+      else
+        desc =
+          border > 0
+            ? R.ColliderDesc.roundCylinder(halfHeight, radius, border)
+            : R.ColliderDesc.cylinder(halfHeight, radius);
       break;
     }
     case 'convexHull': {
@@ -362,9 +385,9 @@ export function createColliderDesc(
         ? Float32Array.from(options.points)
         : options.vertices && options.indices
           ? usedVertices(options.vertices, options.indices)
-        : options.geometry
-          ? geometryPositions(options.geometry, fit?.scale)
-          : fitted();
+          : options.geometry
+            ? geometryPositions(options.geometry, fit?.scale)
+            : fitted();
       if (points.length < 12 || points.length % 3) throw new RangeError('A convex hull needs at least 4 points');
       finite(points, 'Convex hull points');
       const round = roundness(options.borderRadius, 'Convex hull');
@@ -439,7 +462,12 @@ export function createColliderDesc(
         positions: Vector[] = [],
         rotations: Rotation[] = [];
       for (const part of parts as readonly CompoundPart[]) {
-        if (part?.shape === 'trimesh' || part?.shape === 'heightfield' || part?.shape === 'voxels' || part?.shape === 'halfSpace')
+        if (
+          part?.shape === 'trimesh' ||
+          part?.shape === 'heightfield' ||
+          part?.shape === 'voxels' ||
+          part?.shape === 'halfSpace'
+        )
           throw new MargoError(
             'unsupported',
             `A ${part.shape} part in a compound needs the own solver: import {Physics} from '@margoengine/physics/next'. Rapier's JavaScript fails on a compound with a mesh in it.`,
@@ -492,7 +520,9 @@ export function createColliderDesc(
     case 'voxels': {
       const { cells, size = [1, 1, 1] } = options;
       if (!(cells instanceof Int32Array) || cells.length % 3)
-        throw new TypeError('A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.');
+        throw new TypeError(
+          'A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.',
+        );
       checkVec(size, 'Voxel size');
       if (!shapeSupported(R, 'voxels'))
         throw new MargoError(
@@ -526,10 +556,12 @@ export function createColliderDesc(
     case 'polyline': {
       const points = Float32Array.from(options.vertices);
       finite(points, 'Polyline vertices');
-      if (points.length < 6 || points.length % 3) throw new RangeError('A polyline needs at least two vertices, three numbers each.');
+      if (points.length < 6 || points.length % 3)
+        throw new RangeError('A polyline needs at least two vertices, three numbers each.');
       let indices: Uint32Array | undefined;
       if (options.indices) {
-        if (!options.indices.length || options.indices.length % 2) throw new RangeError('A polyline needs whole segments; pass two indices per segment.');
+        if (!options.indices.length || options.indices.length % 2)
+          throw new RangeError('A polyline needs whole segments; pass two indices per segment.');
         for (const index of Array.from(options.indices))
           if (!Number.isInteger(index) || index < 0 || index >= points.length / 3)
             throw new RangeError('Polyline index is out of range; keep every index below the vertex count.');
@@ -672,7 +704,10 @@ export function configureCollider(
   }
   if (options.contactSkin !== undefined) {
     if (typeof desc.setContactSkin !== 'function')
-      throw new MargoError('unsupported', 'contactSkin needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.');
+      throw new MargoError(
+        'unsupported',
+        'contactSkin needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.',
+      );
     desc.setContactSkin(options.contactSkin);
   }
   if (options.collisionGroups !== undefined) desc.setCollisionGroups(options.collisionGroups);

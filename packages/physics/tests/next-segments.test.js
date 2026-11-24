@@ -19,7 +19,10 @@ test('a segment, a triangle and a polyline refuse a mass and a density', () => {
     { shape: 'polyline', vertices: [0, 0, 0, 1, 0, 0], mass: 1 },
   ])
     assert.throws(() => physics.addBody(null, { type: 'fixed', colliders }), /no volume/);
-  assert.throws(() => physics.addBody(null, { type: 'fixed', colliders: { shape: 'segment', a: [1, 1, 1], b: [1, 1, 1] } }), /two different points/);
+  assert.throws(
+    () => physics.addBody(null, { type: 'fixed', colliders: { shape: 'segment', a: [1, 1, 1], b: [1, 1, 1] } }),
+    /two different points/,
+  );
   physics.dispose();
 });
 
@@ -29,7 +32,13 @@ test('a ball dropped on a turned segment rests on it, as on Rapier', () => {
     physics.addBody(null, {
       type: 'fixed',
       position: [0.5, 0, 0.25],
-      colliders: { shape: 'segment', a: [-1, 0, 0], b: [1, 0, 0], rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2], offset: [0, 0.1, 0] },
+      colliders: {
+        shape: 'segment',
+        a: [-1, 0, 0],
+        b: [1, 0, 0],
+        rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+        offset: [0, 0.1, 0],
+      },
     });
     const ball = physics.addBody(null, { position: [0.5, 1, 0.25], colliders: { shape: 'sphere', radius: 0.2 } });
     return { ball };
@@ -37,14 +46,20 @@ test('a ball dropped on a turned segment rests on it, as on Rapier', () => {
   for (let i = 0; i < 240; i++) for (const r of rests) r.physics.step();
   const [own, rapier] = rests;
   // Both sit on the line at the radius above it.
-  assert.ok(Math.abs(own.ball.position[1] - rapier.ball.position[1]) < 0.02, `${own.ball.position} vs ${rapier.ball.position}`);
+  assert.ok(
+    Math.abs(own.ball.position[1] - rapier.ball.position[1]) < 0.02,
+    `${own.ball.position} vs ${rapier.ball.position}`,
+  );
   assert.ok(Math.abs(own.ball.position[1] - 0.3) < 0.01, `rests ${own.ball.position[1]}`);
   for (const r of rests) r.physics.dispose();
 });
 
 test('a ball dropped on a triangle rests on it, and a ray hits it from both sides, as on Rapier', () => {
   const rests = both((physics) => {
-    physics.addBody(null, { type: 'fixed', colliders: { shape: 'triangle', a: [-2, 0, -2], b: [-2, 0, 2], c: [3, 0, 0] } });
+    physics.addBody(null, {
+      type: 'fixed',
+      colliders: { shape: 'triangle', a: [-2, 0, -2], b: [-2, 0, 2], c: [3, 0, 0] },
+    });
     const ball = physics.addBody(null, { position: [0, 1, 0], colliders: { shape: 'sphere', radius: 0.25 } });
     return { ball };
   });
@@ -66,7 +81,11 @@ test('a ball rolls along a polyline of two segments and stops in its corner, as 
       type: 'fixed',
       colliders: { shape: 'polyline', vertices: [-2, 2, 0, 0, 0, 0, 2, 2, 0] },
     });
-    const ball = physics.addBody(null, { position: [-1, 3, 0], colliders: { shape: 'sphere', radius: 0.2 }, linearDamping: 0.5 });
+    const ball = physics.addBody(null, {
+      position: [-1, 3, 0],
+      colliders: { shape: 'sphere', radius: 0.2 },
+      linearDamping: 0.5,
+    });
     return { ball };
   });
   for (let i = 0; i < 600; i++) for (const r of rests) r.physics.step();

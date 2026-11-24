@@ -13,7 +13,12 @@ const box = (extra = {}) => ({ shape: 'box', halfExtents: [0.5, 0.5, 0.5], ...ex
 test('two kinematic bodies start and end a contact only when both colliders name kinematicKinematic', () => {
   const run = (a, b) => {
     const physics = new Physics(null, { gravity: [0, 0, 0] });
-    const mover = physics.addBody(null, { type: 'kinematicVelocity', position: [-3, 0, 0], linearVelocity: [3, 0, 0], colliders: box(a) });
+    const mover = physics.addBody(null, {
+      type: 'kinematicVelocity',
+      position: [-3, 0, 0],
+      linearVelocity: [3, 0, 0],
+      colliders: box(a),
+    });
     physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 0], colliders: box(b) });
     const seen = [];
     physics.on('contactstart', () => seen.push('start'));
@@ -30,7 +35,11 @@ test('two kinematic bodies start and end a contact only when both colliders name
 
 test('leaving out dynamicFixed lets a box fall through a floor, and adding it back stops the fall', () => {
   const physics = new Physics(null);
-  const floor = physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: box({ halfExtents: [5, 0.5, 5], activeCollisionTypes: ['dynamicDynamic'] }) });
+  const floor = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: box({ halfExtents: [5, 0.5, 5], activeCollisionTypes: ['dynamicDynamic'] }),
+  });
   const body = physics.addBody(null, { position: [0, 3, 0], colliders: box() });
   for (let i = 0; i < 120; i++) physics.step();
   assert.ok(body.position[1] < -1, `fell through ${body.position[1]}`);
@@ -62,7 +71,11 @@ test('an unknown pair kind is refused with the kinds to use', () => {
 test('a contact-force event needs the force to pass the larger threshold, and a collider can opt out', () => {
   const run = (floorOptions, boxOptions) => {
     const physics = new Physics(null);
-    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: box({ halfExtents: [5, 0.5, 5], ...floorOptions }) });
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: box({ halfExtents: [5, 0.5, 5], ...floorOptions }),
+    });
     physics.addBody(null, { position: [0, 3, 0], colliders: box({ mass: 3, ...boxOptions }) });
     let hardest = 0,
       count = 0;

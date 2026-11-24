@@ -11,10 +11,19 @@ console.warn = warn;
 
 test('a one-way platform lets a ball rise through it from below and holds it from above', () => {
   const physics = new Physics(null, {
-    contactModifier: (contact) => contact.oneWay(contact.first.body.type === 'fixed' ? contact.first : contact.second, [0, 1, 0]),
+    contactModifier: (contact) =>
+      contact.oneWay(contact.first.body.type === 'fixed' ? contact.first : contact.second, [0, 1, 0]),
   });
-  physics.addBody(null, { type: 'fixed', position: [0, 3, 0], colliders: { shape: 'box', halfExtents: [3, 0.1, 3], modifyContacts: true } });
-  const ball = physics.addBody(null, { position: [0, 1, 0], linearVelocity: [0, 12, 0], colliders: { shape: 'sphere', radius: 0.3 } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 3, 0],
+    colliders: { shape: 'box', halfExtents: [3, 0.1, 3], modifyContacts: true },
+  });
+  const ball = physics.addBody(null, {
+    position: [0, 1, 0],
+    linearVelocity: [0, 12, 0],
+    colliders: { shape: 'sphere', radius: 0.3 },
+  });
   let peak = 0;
   for (let i = 0; i < 90; i++) {
     physics.step();
@@ -60,10 +69,16 @@ test('a collider that did not ask is not shown, and the modifier can set frictio
 
 test('modifyContacts needs a modifier, and Rapier has none', () => {
   const physics = new Physics(null);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], modifyContacts: true } }), /contactModifier/);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], modifyContacts: true } }),
+    /contactModifier/,
+  );
   physics.dispose();
   const rapier = new RapierPhysics(null);
-  assert.throws(() => rapier.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], modifyContacts: true } }), /own solver/);
+  assert.throws(
+    () => rapier.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], modifyContacts: true } }),
+    /own solver/,
+  );
   rapier.dispose();
 });
 
@@ -76,8 +91,15 @@ test('a surface velocity carries a box along a belt, and stops when the modifier
         contact.surfaceVelocity = beltFirst ? [speed, 0, 0] : [-speed, 0, 0];
       },
     });
-    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [40, 0.5, 5], friction: 1, modifyContacts: true } });
-    const crate = physics.addBody(null, { position: [0, 0.5, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], friction: 1 } });
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [40, 0.5, 5], friction: 1, modifyContacts: true },
+    });
+    const crate = physics.addBody(null, {
+      position: [0, 0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], friction: 1 },
+    });
     for (let i = 0; i < 120; i++) physics.step();
     const result = { x: crate.position[0], speed: crate.linearVelocity?.[0] ?? crate.getLinearVelocity?.()[0] };
     physics.dispose();

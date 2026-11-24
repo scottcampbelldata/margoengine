@@ -12,9 +12,19 @@ console.warn = warn;
 const near = (a, b, tol = 1e-4, label = '') => assert.ok(Math.abs(a - b) <= tol, `${label} ${a} vs ${b}`);
 const scene = () => {
   const physics = new Physics(null, { gravity: [0, 0, 0] });
-  const ball = physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: { shape: 'sphere', radius: 1 } }).colliders[0];
-  const box = physics.addBody(null, { type: 'fixed', position: [3, 0, 0], colliders: { shape: 'box', halfExtents: [0.5, 1, 1] } }).colliders[0];
-  const far = physics.addBody(null, { type: 'fixed', position: [0, 10, 0], rotation: [0, 0, 0.2, 0.98], colliders: { shape: 'capsule', halfHeight: 1, radius: 0.5 } }).colliders[0];
+  const ball = physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: { shape: 'sphere', radius: 1 } })
+    .colliders[0];
+  const box = physics.addBody(null, {
+    type: 'fixed',
+    position: [3, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 1, 1] },
+  }).colliders[0];
+  const far = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 10, 0],
+    rotation: [0, 0, 0.2, 0.98],
+    colliders: { shape: 'capsule', halfHeight: 1, radius: 0.5 },
+  }).colliders[0];
   physics.step();
   return { physics, ball, box, far };
 };
@@ -32,9 +42,17 @@ test('the distance between a ball and a box is the gap, with the nearest points 
 test('overlapping colliders are 0 apart and intersect, and a gap does not', () => {
   const { physics, ball, box } = scene();
   assert.equal(physics.intersectionPair(ball, box), false);
-  physics.addBody(null, { type: 'fixed', position: [0.5, 0, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0.5, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
   physics.step();
-  const overlapping = physics.addBody(null, { type: 'fixed', position: [1.2, 0, 0], colliders: { shape: 'sphere', radius: 0.5 } }).colliders[0];
+  const overlapping = physics.addBody(null, {
+    type: 'fixed',
+    position: [1.2, 0, 0],
+    colliders: { shape: 'sphere', radius: 0.5 },
+  }).colliders[0];
   physics.step();
   assert.equal(physics.intersectionPair(ball, overlapping), true);
   assert.equal(physics.colliderDistance(ball, overlapping).distance, 0);
@@ -61,13 +79,27 @@ test('a contact pair against a mesh gives a manifold for each triangle near, a c
     type: 'fixed',
     colliders: { shape: 'trimesh', vertices: [-2, 0, -2, -2, 0, 2, 2, 0, -2, 2, 0, 2], indices: [0, 1, 2, 2, 1, 3] },
   }).colliders[0];
-  const ball = physics.addBody(null, { type: 'fixed', position: [0.1, 0.45, 0.1], colliders: { shape: 'sphere', radius: 0.5 } }).colliders[0];
+  const ball = physics.addBody(null, {
+    type: 'fixed',
+    position: [0.1, 0.45, 0.1],
+    colliders: { shape: 'sphere', radius: 0.5 },
+  }).colliders[0];
   const pair = physics.addBody(null, {
     type: 'fixed',
     position: [0, 3, 0],
-    colliders: { shape: 'compound', parts: [{ shape: 'sphere', radius: 0.5, offset: [-1, 0, 0] }, { shape: 'sphere', radius: 0.5, offset: [1, 0, 0] }] },
+    colliders: {
+      shape: 'compound',
+      parts: [
+        { shape: 'sphere', radius: 0.5, offset: [-1, 0, 0] },
+        { shape: 'sphere', radius: 0.5, offset: [1, 0, 0] },
+      ],
+    },
   }).colliders[0];
-  const target = physics.addBody(null, { type: 'fixed', position: [0, 3, 0], colliders: { shape: 'box', halfExtents: [3, 0.5, 0.5] } }).colliders[0];
+  const target = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 3, 0],
+    colliders: { shape: 'box', halfExtents: [3, 0.5, 0.5] },
+  }).colliders[0];
   physics.step();
   const onFloor = physics.contactPair(floor, ball, 0.1);
   assert.ok(onFloor.length >= 1);
@@ -84,9 +116,21 @@ test('a contact pair against a mesh gives a manifold for each triangle near, a c
 test('a collider reports its tight box, and the box query finds colliders by it', () => {
   const { physics, ball, box, far } = scene();
   const b = ball.aabb();
-  assert.deepEqual([b.min, b.max], [[-1, -1, -1], [1, 1, 1]]);
+  assert.deepEqual(
+    [b.min, b.max],
+    [
+      [-1, -1, -1],
+      [1, 1, 1],
+    ],
+  );
   const x = box.aabb();
-  assert.deepEqual([x.min, x.max], [[2.5, -1, -1], [3.5, 1, 1]]);
+  assert.deepEqual(
+    [x.min, x.max],
+    [
+      [2.5, -1, -1],
+      [3.5, 1, 1],
+    ],
+  );
   const c = far.aabb();
   assert.ok(c.max[1] > 10.5 && c.min[1] < 9.5);
   assert.equal(physics.intersectAabb([0.9, -5, -5], [2.6, 5, 5]).length, 2, 'the ball and the box');

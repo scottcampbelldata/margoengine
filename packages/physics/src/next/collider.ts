@@ -1,7 +1,7 @@
 // A collider of the own solver. Reads only, so it may use `Math`: nothing here can change a step.
 import { MargoError } from '@margoengine/math/errors';
 import { COLLIDER_OFF, COLLIDER_SENSOR, COLLIDER_TYPES, COLLIDER_TYPES_SHIFT, type KernelWorld } from '../kernel.js';
-import { DEFAULT_PAIR_KINDS, type CollisionPairKind } from '../shapes.js';
+import type { CollisionPairKind } from '../shapes.js';
 import type { ColliderShape } from '../collider.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { ColliderOptions } from '../shapes.js';
@@ -10,7 +10,9 @@ import type { PhysicsBody } from './body.js';
 /** A cell coordinate, checked: a whole number in 32 bits. */
 function cell(value: number): number {
   if (!Number.isInteger(value) || value < -(2 ** 31) || value >= 2 ** 31)
-    throw new RangeError(`A voxel cell coordinate is a whole number in 32 bits (got ${value}); pass cell numbers, not metres.`);
+    throw new RangeError(
+      `A voxel cell coordinate is a whole number in 32 bits (got ${value}); pass cell numbers, not metres.`,
+    );
   return value;
 }
 
@@ -79,7 +81,8 @@ export class PhysicsCollider {
       a = this.handle;
     if (this.shape === 'box') return Math.hypot(colliderA[a], colliderB[a], colliderC[a]);
     if (this.shape === 'capsule') return colliderA[a] + colliderB[a];
-    if (this.shape === 'cylinder' || this.shape === 'cone') return Math.hypot(colliderA[a], colliderB[a]) + colliderC[a];
+    if (this.shape === 'cylinder' || this.shape === 'cone')
+      return Math.hypot(colliderA[a], colliderB[a]) + colliderC[a];
     return this.shape === 'sphere' ? colliderA[a] : null;
   }
   /**
@@ -110,7 +113,12 @@ export class PhysicsCollider {
     checkVec(position, 'Collider position');
     const c = this.columns(),
       h = this.handle;
-    this.kernel.setColliderPose(h, position, [c.colliderRotationX[h], c.colliderRotationY[h], c.colliderRotationZ[h], c.colliderRotationW[h]]);
+    this.kernel.setColliderPose(h, position, [
+      c.colliderRotationX[h],
+      c.colliderRotationY[h],
+      c.colliderRotationZ[h],
+      c.colliderRotationW[h],
+    ]);
     return this;
   }
   /** Turns the collider in its body's frame by a unit quaternion [x, y, z, w], and works the body's mass out again. */
@@ -146,7 +154,8 @@ export class PhysicsCollider {
    * @throws RangeError for a skin that is negative or not finite.
    */
   setContactSkin(skin: number): this {
-    if (!(skin >= 0) || !Number.isFinite(skin)) throw new RangeError(`A contact skin is 0 or more metres and finite (got ${skin}).`);
+    if (!(skin >= 0) || !Number.isFinite(skin))
+      throw new RangeError(`A contact skin is 0 or more metres and finite (got ${skin}).`);
     this.columns().colliderSkin[this.handle] = skin;
     this.wake();
     return this;
@@ -258,7 +267,9 @@ export class PhysicsCollider {
    */
   setRestitution(restitution: number): this {
     if (!(restitution >= 0 && restitution <= 1))
-      throw new RangeError(`Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`);
+      throw new RangeError(
+        `Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`,
+      );
     this.columns().colliderRestitution[this.handle] = restitution;
     this.wake();
     return this;

@@ -13,11 +13,9 @@ import { checkVec, eulerToQuat, quat, tuple, vec, type Quat, type Vec3 } from '.
 import {
   configureCollider,
   createColliderDesc,
-  geometryPositions,
   shapeName,
   shapeSupported,
   type ColliderOptions,
-  type ColliderGeometry,
   type ColliderSettings,
   type RapierModule,
   type ShapeOptions,
@@ -261,9 +259,12 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @throws MargoError (`state`) before {@link Physics.load} has finished. */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
     const R = options.rapier ?? solver.value;
-    if (!R) throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
+    if (!R)
+      throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
     if (typeof R.World !== 'function' || !R.ColliderDesc)
-      throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics.load().');
+      throw new TypeError(
+        'The rapier option needs the initialized module; leave it out and call await Physics.load().',
+      );
     this.rapier = R;
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
@@ -686,7 +687,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.ccd) desc.setCcdEnabled(true);
     if (options.softCcdPrediction !== undefined) {
       if (typeof desc.setSoftCcdPrediction !== 'function')
-        throw new MargoError('unsupported', 'softCcdPrediction needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.');
+        throw new MargoError(
+          'unsupported',
+          'softCcdPrediction needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.',
+        );
       desc.setSoftCcdPrediction(options.softCcdPrediction);
     }
     if (options.canSleep !== undefined) desc.setCanSleep(options.canSleep);

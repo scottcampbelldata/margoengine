@@ -12,8 +12,16 @@ console.warn = warn;
 const near = (a, b, tol = 1e-4, label = '') => assert.ok(Math.abs(a - b) <= tol, `${label} ${a} vs ${b}`);
 const world = () => {
   const physics = new Physics(null, { gravity: [0, 0, 0] });
-  const front = physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: { shape: 'sphere', radius: 1 } });
-  const back = physics.addBody(null, { type: 'fixed', position: [5, 0, 0], colliders: { shape: 'box', halfExtents: [0.5, 1, 1] } });
+  const front = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0, 0],
+    colliders: { shape: 'sphere', radius: 1 },
+  });
+  const back = physics.addBody(null, {
+    type: 'fixed',
+    position: [5, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 1, 1] },
+  });
   physics.step();
   return { physics, front: front.colliders[0], back: back.colliders[0], backBody: back };
 };
@@ -48,9 +56,18 @@ test('a shape cast and an overlap test against one collider', () => {
   const hit = physics.castShapeAtCollider(back, { shape: 'sphere', radius: 0.5 }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]);
   near(hit.distance, 4);
   assert.equal(hit.collider, back);
-  assert.equal(physics.castShapeAtCollider(back, { shape: 'sphere', radius: 0.5 }, [0, 5, 0], [0, 0, 0, 1], [1, 0, 0]), null);
-  assert.equal(physics.colliderIntersectsShape(front, { shape: 'box', halfExtents: [0.5, 0.5, 0.5] }, [1.2, 0, 0]), true);
-  assert.equal(physics.colliderIntersectsShape(front, { shape: 'box', halfExtents: [0.5, 0.5, 0.5] }, [3, 0, 0]), false);
+  assert.equal(
+    physics.castShapeAtCollider(back, { shape: 'sphere', radius: 0.5 }, [0, 5, 0], [0, 0, 0, 1], [1, 0, 0]),
+    null,
+  );
+  assert.equal(
+    physics.colliderIntersectsShape(front, { shape: 'box', halfExtents: [0.5, 0.5, 0.5] }, [1.2, 0, 0]),
+    true,
+  );
+  assert.equal(
+    physics.colliderIntersectsShape(front, { shape: 'box', halfExtents: [0.5, 0.5, 0.5] }, [3, 0, 0]),
+    false,
+  );
   physics.dispose();
 });
 

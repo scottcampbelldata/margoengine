@@ -16,17 +16,29 @@ export interface MeshCleanOptions {
 
 /** True when any step is asked for. */
 export function wantsClean(options: MeshCleanOptions): boolean {
-  return !!(options.mergeDuplicateVertices || options.deleteDegenerateTriangles || options.deleteDuplicateTriangles || options.deleteBadTopologyTriangles);
+  return !!(
+    options.mergeDuplicateVertices ||
+    options.deleteDegenerateTriangles ||
+    options.deleteDuplicateTriangles ||
+    options.deleteBadTopologyTriangles
+  );
 }
 
 /**
  * The mesh after the steps asked for. Vertices no triangle uses stay unless merging joins them.
  * @throws RangeError for an index outside the vertices.
  */
-export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, options: MeshCleanOptions): { vertices: Float32Array; indices: Uint32Array } {
+export function cleanTrimesh(
+  vertices: Float32Array,
+  indices: Uint32Array,
+  options: MeshCleanOptions,
+): { vertices: Float32Array; indices: Uint32Array } {
   const count = vertices.length / 3;
   for (let i = 0; i < indices.length; i++)
-    if (indices[i]! >= count) throw new RangeError(`Trimesh index ${indices[i]} is out of range; keep every index below the ${count} vertices.`);
+    if (indices[i]! >= count)
+      throw new RangeError(
+        `Trimesh index ${indices[i]} is out of range; keep every index below the ${count} vertices.`,
+      );
   let points = vertices,
     triangles = Array.from(indices);
   if (options.mergeDuplicateVertices) {
@@ -50,7 +62,11 @@ export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, optio
     points = Float32Array.from(kept);
     triangles = triangles.map((index) => remap[index]!);
   }
-  const corner = (index: number): [number, number, number] => [points[3 * index]!, points[3 * index + 1]!, points[3 * index + 2]!];
+  const corner = (index: number): [number, number, number] => [
+    points[3 * index]!,
+    points[3 * index + 1]!,
+    points[3 * index + 2]!,
+  ];
   if (options.deleteDegenerateTriangles) {
     const kept: number[] = [];
     for (let t = 0; t < triangles.length; t += 3) {
