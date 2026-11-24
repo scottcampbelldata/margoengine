@@ -172,7 +172,7 @@ test('packages with no fixture are pending, never passed; held packages are expl
     { selected: ['cinematic'], pending: ['later'] });
   assert.throws(() => selectOwnerPackages(['unknown']), /OWNER_UNKNOWN_PACKAGE: unknown/);
   assert.deepEqual(selectOwnerPackages(['physics', 'physics2d', 'ragdoll', 'core', 'math', 'splines', 'cinematic']),
-    { selected: ['cinematic'], pending: [] });
+    { selected: ['physics', 'cinematic'], pending: [] });
   assert.match(pendingLine(['audio', 'stage']), /pending, no fixture yet, NOT checked \(2\): audio, stage/);
   assert.equal(pendingLine([]), '');
 });

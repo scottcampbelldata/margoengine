@@ -10,7 +10,6 @@ export const OWNER_FIXTURES = Object.fromEntries(readdirSync(`${root}packages`).
     .filter((file) => existsSync(root + file)).slice(0, 1).map((file) => [name, file])));
 export const OWNER_EXCLUSIONS = {
   core: 'Core is the engine every fixture runs on; its scene routing, plugins and frame graph are exercised by all of them.',
-  physics: 'Physics is on hold (Scott, 2026-11-10).',
   physics2d: 'Physics is on hold (Scott, 2026-11-10).',
   ragdoll: 'Physics is on hold (Scott, 2026-11-10).',
   math: 'Vectors, matrices, colours and shapes on numbers and typed arrays; the one runtime import of core (the mesh world matrix) only reads state and holds none. tests/owner-exclusions.test.js reads the source and fails if it gains a listener, timer, worker, storage handle, GPU resource or engine registration.',
