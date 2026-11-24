@@ -752,8 +752,9 @@ export function farmlandEdits(
         l = Math.hypot(bx - ax, bz - az),
         steps = Math.max(1, Math.ceil(l / 2));
       for (let k = 1; k <= steps; k++) {
-        const p: Pt = [ax + ((bx - ax) * k) / steps, az + ((bz - az) * k) / steps],
-          d = along + (l * k) / steps;
+        // Points along the hedge line in metres (steps is at least 1), not a placement decision.
+        const p: Pt = [ax + ((bx - ax) * k) / steps, az + ((bz - az) * k) / steps], // float division
+          d = along + (l * k) / steps; // float division
         if (open(d)) {
           if (run.length > 1) out.push(run);
           run = [];

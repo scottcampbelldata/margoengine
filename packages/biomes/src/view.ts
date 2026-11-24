@@ -16,7 +16,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { captureScene } from '../../shared/scene-scope.js';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
-import { clampInt, divFloor, hash3, ONE, wendland } from '@margoengine/biomes/toolkit';
+import { clampInt, divFloor, hash3, imod, ONE, wendland } from '@margoengine/biomes/toolkit';
 import { horizonHeights } from './horizon.js';
 export { horizonHeights, HORIZON_SKIRT, type HorizonHeights, type HorizonSource } from './horizon.js';
 import type { PlantStates, PlantStateSource } from '@margoengine/scatter/states';
@@ -679,7 +679,9 @@ function resample(data: ArrayLike<number>, from: number, size: number): Uint8Arr
         }
     return out;
   }
-  const f = from / size; // float division: view only
+  const f = from / size, // float division: view only
+    // The image repeats, so a texel index wraps into 0 to from - 1 (negative indices included).
+    wrap = (i: number) => imod(imod(i, from) + from, from);
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
       const sx = (x + 0.5) * f - 0.5,
@@ -688,8 +690,7 @@ function resample(data: ArrayLike<number>, from: number, size: number): Uint8Arr
         y0 = Math.floor(sy),
         u = sx - x0,
         v = sy - y0,
-        at = (a: number, b: number, c: number) =>
-          data[((((b % from) + from) % from) * from + (((a % from) + from) % from)) * 4 + c];
+        at = (a: number, b: number, c: number) => data[(wrap(b) * from + wrap(a)) * 4 + c];
       for (let c = 0; c < 4; c++)
         out[(y * size + x) * 4 + c] = Math.round(
           (at(x0, y0, c) * (1 - u) + at(x0 + 1, y0, c) * u) * (1 - v) +
