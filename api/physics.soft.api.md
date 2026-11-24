@@ -1106,6 +1106,13 @@ class KernelWorld {
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
+    addCoupling(kind: 1 | 2 | 3, a: number, b: number): number;
+    setCoupling(slot: number, field: number, value: readonly [number, number, number]): void;
+    removeCoupling(slot: number): boolean;
+    couplingState(slot: number): {
+        error: number;
+        impulse: number;
+    };
     setJointAxis(joint: number, axis: readonly [number, number, number]): void;
     setJointFrames(joint: number, a: Quat, b: Quat): void;
     updateMass(body: number): this;

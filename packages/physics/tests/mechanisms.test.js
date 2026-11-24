@@ -70,16 +70,10 @@ test('a rigid pulley lifts the lighter body as the heavier falls, at the acceler
     for (let i = 0; i < 30; i++) physics.step();
     const a = ((heavyMass - lightMass) / (heavyMass + lightMass)) * 9.81,
       t = 0.5;
-    // The impulse lands once at the start of the step while gravity integrates across its substeps, so the fall is out by about
-    // g dt^2 (2.7 mm at 60 Hz) however slow: one percent of it where the machine moves quickly.
+    // A row of the kernel's solve, in every substep: the fall is a closed form to one percent whatever the masses.
     const fall = 0.5 * a * t * t;
-    near(
-      -heavy.position[1],
-      fall,
-      Math.max(0.01 * fall, (0.8 * 9.81) / 3600),
-      `the heavy body falls ½ a t² (${heavyMass}:${lightMass})`,
-    );
-    near(-heavy.linearVelocity[1], a * t, 0.02 * a * t + (0.2 * 9.81) / 60, `at a t (${heavyMass}:${lightMass})`);
+    near(-heavy.position[1], fall, 0.01 * fall, `the heavy body falls ½ a t² (${heavyMass}:${lightMass})`);
+    near(-heavy.linearVelocity[1], a * t, 0.02 * a * t + 0.005, `at a t (${heavyMass}:${lightMass})`);
     near(light.position[1], -heavy.position[1], 0.005, 'and the light one rises as far');
   }
 });

@@ -112,6 +112,11 @@ interface KernelExports extends WebAssembly.Exports {
     qw: number,
   ): number;
   collider_remove(collider: number): number;
+  coupling_add(kind: number, a: number, b: number): number;
+  coupling_set(slot: number, field: number, x: number, y: number, z: number): void;
+  coupling_remove(slot: number): number;
+  coupling_error(slot: number): number;
+  coupling_impulse(slot: number): number;
   joint_add(a: number, b: number, flags: number): number;
   joint_remove(joint: number): number;
   joint_set_axis(joint: number, x: number, y: number, z: number): void;
@@ -2452,6 +2457,25 @@ export class KernelWorld {
    */
   removeJoint(joint: number): boolean {
     return Number.isInteger(joint) && joint >= 0 && this.api.joint_remove(joint) === 1;
+  }
+  /**
+   * Adds a coupling between two bodies: `kind` 1 is a gear, 2 a rack and pinion, 3 a pulley (see `couplings.rs`). Returns its slot
+   * (at most 64 a world), or -1 when the bodies are one, one is gone or the table is full.
+   */
+  addCoupling(kind: 1 | 2 | 3, a: number, b: number): number {
+    return this.api.coupling_add(kind, a, b);
+  }
+  /** Writes a coupling's field: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B, 6 ratio, 7 total, 8 softness (hertz, damping, correction). */
+  setCoupling(slot: number, field: number, value: readonly [number, number, number]): void {
+    this.api.coupling_set(slot, field, value[0], value[1], value[2]);
+  }
+  /** Removes a coupling. */
+  removeCoupling(slot: number): boolean {
+    return Number.isInteger(slot) && slot >= 0 && this.api.coupling_remove(slot) === 1;
+  }
+  /** The error a coupling has built up (a gear's and a rack's; a pulley reads its rope), and the impulse it last gave. */
+  couplingState(slot: number): { error: number; impulse: number } {
+    return { error: this.api.coupling_error(slot), impulse: this.api.coupling_impulse(slot) };
   }
   /** Turns a joint's frames on both bodies so that frame X runs along `axis`, a direction in each body's own frame. */
   setJointAxis(joint: number, axis: readonly [number, number, number]): void {

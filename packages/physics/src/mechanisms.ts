@@ -1,25 +1,14 @@
-// Mechanical constraints between two bodies' motions: a gear, a rack and pinion and a pulley. Each is one velocity constraint on a
-// combination of two joints' speeds, solved every step as the soft constraint of Catto, "Soft Constraints", GDC 2011 (rigid by
-// default: the position error of the combination is fed back by a share of the step), with the effective mass of the combination
-// from the masses and inertias of the two bodies. They are written over a world, as `DragJoint` is, and act next to the
-// ordinary joints that guide the bodies (a hinge for each gear, a slider for a rack); their impulses are the rope, tooth and
-// belt forces. Baraff, "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996, is the form of a constraint between two
-// bodies' coordinates as one row of the system.
-import { multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
-import type { PhysicsBody } from './body.js';
+// Mechanical constraints between two bodies' motions: a gear, a rack and pinion and a pulley. Each is a row of the kernel's solve
+// (kernel/src/couplings.rs), solved in every substep next to the joints and contacts with sequential impulses and a warm start, so
+// it holds exactly through a step, shares the work with the bodies' other constraints and wakes and sleeps with them. A row is rigid
+// by default or soft, as the constraint of Catto, "Soft Constraints", GDC 2011 (a frequency and a damping ratio). Baraff,
+// "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996, is the form of a constraint between two bodies' coordinates as
+// one row of the system. They act next to the joints that guide the bodies (a hinge for each gear, a slider for a rack).
 import { checkVec, type Vec3 } from './math.js';
+import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 
 type V = [number, number, number];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const sub = (a: Vec3, b: Vec3): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a: Vec3, b: Vec3): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const scale = (a: Vec3, s: number): V => [a[0] * s, a[1] * s, a[2] * s];
-const cross = (a: Vec3, b: Vec3): V => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
 const unit = (a: Vec3, label: string): V => {
   checkVec(a, label);
   const n = Math.hypot(a[0], a[1], a[2]);
@@ -27,46 +16,27 @@ const unit = (a: Vec3, label: string): V => {
   return [a[0] / n, a[1] / n, a[2] / n];
 };
 
-/** The inverse inertia of a body applied to a world vector. */
-function inverseInertia(body: PhysicsBody, v: Vec3): V {
-  if (body.type !== 'dynamic') return [0, 0, 0];
-  const frame = multiplyQuaternions(body.rotation, body.inertiaFrame),
-    moments = body.principalInertia;
-  let out: V = [0, 0, 0];
-  for (let k = 0; k < 3; k++) {
-    if (!(moments[k]! > 0)) continue;
-    const axis = rotateByQuaternion(k === 0 ? [1, 0, 0] : k === 1 ? [0, 1, 0] : [0, 0, 1], frame) as V;
-    out = add(out, scale(axis, dot(axis, v) / moments[k]!));
-  }
-  return out;
-}
-const inverseMass = (body: PhysicsBody): number => (body.type === 'dynamic' && body.mass > 0 ? 1 / body.mass : 0);
-const local = (body: PhysicsBody, v: Vec3): V => rotateByQuaternion(v, body.rotation) as V;
-
 /** Options of a mechanism's constraint. */
 export interface MechanismOptions {
   /** The constraint's stiffness as a natural frequency in hertz (default 0: rigid, its error corrected by `correction`). */
   frequency?: number;
   /** Damping ratio of a soft constraint (default 1). */
   damping?: number;
-  /** The share of the position error a rigid constraint removes each step (default 0.2). */
+  /** The share of the position error a rigid constraint removes each substep's biased pass (default 0.2). */
   correction?: number;
 }
 
+const GEAR = 1;
+const RACK_AND_PINION = 2;
+const PULLEY = 3;
+
 abstract class Mechanism implements PhysicsAttachment {
-  protected error = 0;
-  /** Whether `measure` reads the position error itself instead of leaving it to follow from the speed. */
-  protected absolute = false;
+  protected readonly slot: number;
   private released = false;
-  private readonly frequency: number;
-  private readonly softRatio: number;
-  private readonly share: number;
-  protected last = 1 / 60;
-  /** The step being solved. */
-  protected step = 1 / 60;
 
   protected constructor(
     protected readonly physics: Physics,
+    kind: 1 | 2 | 3,
     protected readonly a: PhysicsBody,
     protected readonly b: PhysicsBody,
     options: MechanismOptions,
@@ -78,59 +48,19 @@ abstract class Mechanism implements PhysicsAttachment {
       throw new RangeError('Damping ratio is 0 or more; pass options.damping of 0 or above.');
     if (!(correction >= 0 && correction <= 1))
       throw new RangeError('Correction is a share from 0 to 1; pass options.correction between them.');
-    this.frequency = frequency;
-    this.softRatio = damping;
-    this.share = correction;
+    const slot = physics.kernel.addCoupling(kind, a.row, b.row);
+    if (slot < 0)
+      throw new RangeError(
+        'A mechanism joins two different live bodies, and a world holds 64; pass two bodies, or remove one first.',
+      );
+    this.slot = slot;
+    physics.kernel.setCoupling(slot, 8, [frequency, damping, correction]);
     physics.attach(this);
   }
 
-  /**
-   * The velocity a body will have at the end of this step if the constraint did nothing: its own plus what gravity and the forces
-   * on it add over the step. Solving the constraint on that, not on the velocity at the start, keeps the combination exact through
-   * the step (a body falling on a rope is held by the rope's whole pull, not the pull of the speed it had before).
-   */
-  protected linear(body: PhysicsBody): V {
-    const v = body.linearVelocity;
-    if (body.type !== 'dynamic' || !(body.mass > 0)) return v;
-    const g = this.physics.gravity,
-      f = body.appliedForce,
-      s = body.gravityScale;
-    return [
-      v[0] + this.step * (g[0] * s + f[0] / body.mass),
-      v[1] + this.step * (g[1] * s + f[1] / body.mass),
-      v[2] + this.step * (g[2] * s + f[2] / body.mass),
-    ];
-  }
-  protected angular(body: PhysicsBody): V {
-    const w = body.angularVelocity;
-    if (body.type !== 'dynamic') return w;
-    return add(w, scale(inverseInertia(body, body.appliedTorque), this.step));
-  }
-
-  /** The speed of the constrained combination now, its inverse mass, and where to apply a unit of impulse. */
-  protected abstract measure(): { speed: number; inverse: number };
-  protected abstract apply(impulse: number): void;
-
-  /** @internal */
-  beforeStep(dt: number): void {
-    if (this.released || !this.a.valid || !this.b.valid) return;
-    this.step = dt;
-    const { speed, inverse } = this.measure();
-    // The position error of the combination follows from its speed one step behind.
-    if (!this.absolute) this.error += speed * this.last;
-    this.last = dt;
-    if (!(inverse > 0)) return;
-    let beta = this.share / dt,
-      gamma = 0;
-    if (this.frequency > 0) {
-      const mass = 1 / inverse,
-        omega = 2 * Math.PI * this.frequency,
-        d = 2 * mass * this.softRatio * omega,
-        k = mass * omega * omega;
-      gamma = 1 / (dt * (d + dt * k));
-      beta = k / (d + dt * k);
-    }
-    this.apply(-(speed + beta * this.error) / (inverse + gamma));
+  /** The error the mechanism has built up (the gear's angle sum, the rack's offset, the rope's stretch) and the impulse it last gave. */
+  state(): { error: number; impulse: number } {
+    return this.physics.kernel.couplingState(this.slot);
   }
 
   /** @internal */
@@ -142,11 +72,13 @@ abstract class Mechanism implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
+    this.physics.kernel.removeCoupling(this.slot);
     this.physics.detach(this);
   }
 
   /** @internal */
   dispose(): void {
+    if (!this.released) this.physics.kernel.removeCoupling(this.slot);
     this.released = true;
   }
 }
@@ -167,31 +99,16 @@ export interface GearOptions extends MechanismOptions {
  * them.
  */
 export class GearJoint extends Mechanism {
-  private readonly axisA: V;
-  private readonly axisB: V;
-  private readonly ratio: number;
   constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options: GearOptions = {}) {
-    super(physics, bodyA, bodyB, options);
-    this.axisA = unit(options.axisA ?? [0, 0, 1], 'Axis A');
-    this.axisB = unit(options.axisB ?? [0, 0, 1], 'Axis B');
-    this.ratio = options.ratio ?? 1;
-    if (!Number.isFinite(this.ratio) || this.ratio === 0)
+    const axisA = unit(options.axisA ?? [0, 0, 1], 'Axis A'),
+      axisB = unit(options.axisB ?? [0, 0, 1], 'Axis B'),
+      ratio = options.ratio ?? 1;
+    if (!Number.isFinite(ratio) || ratio === 0)
       throw new RangeError('A gear ratio is a nonzero number; pass options.ratio other than 0.');
-  }
-  private worldAxes(): [V, V] {
-    return [local(this.a, this.axisA), local(this.b, this.axisB)];
-  }
-  protected override measure(): { speed: number; inverse: number } {
-    const [wa, wb] = this.worldAxes();
-    return {
-      speed: dot(this.angular(this.a), wa) + this.ratio * dot(this.angular(this.b), wb),
-      inverse: dot(wa, inverseInertia(this.a, wa)) + this.ratio * this.ratio * dot(wb, inverseInertia(this.b, wb)),
-    };
-  }
-  protected override apply(impulse: number): void {
-    const [wa, wb] = this.worldAxes();
-    this.a.applyTorqueImpulse(scale(wa, impulse));
-    this.b.applyTorqueImpulse(scale(wb, impulse * this.ratio));
+    super(physics, GEAR, bodyA, bodyB, options);
+    physics.kernel.setCoupling(this.slot, 0, axisA);
+    physics.kernel.setCoupling(this.slot, 1, axisB);
+    physics.kernel.setCoupling(this.slot, 6, [ratio, 0, 0]);
   }
 }
 
@@ -211,30 +128,16 @@ export interface RackAndPinionOptions extends MechanismOptions {
  * their own joints, then join them.
  */
 export class RackAndPinionJoint extends Mechanism {
-  private readonly pinion: V;
-  private readonly rack: V;
-  private readonly radius: number;
   constructor(physics: Physics, pinion: PhysicsBody, rack: PhysicsBody, options: RackAndPinionOptions = {}) {
-    super(physics, pinion, rack, options);
-    this.pinion = unit(options.pinionAxis ?? [0, 0, 1], 'Pinion axis');
-    this.rack = unit(options.rackAxis ?? [1, 0, 0], 'Rack axis');
-    this.radius = options.radius ?? 1;
-    if (!(this.radius > 0 && Number.isFinite(this.radius)))
+    const pinionAxis = unit(options.pinionAxis ?? [0, 0, 1], 'Pinion axis'),
+      rackAxis = unit(options.rackAxis ?? [1, 0, 0], 'Rack axis'),
+      radius = options.radius ?? 1;
+    if (!(radius > 0 && Number.isFinite(radius)))
       throw new RangeError('Pinion radius is a positive number of metres; pass options.radius above 0.');
-  }
-  protected override measure(): { speed: number; inverse: number } {
-    const wp = local(this.a, this.pinion),
-      wr = local(this.b, this.rack);
-    return {
-      speed: this.radius * dot(this.angular(this.a), wp) + dot(this.linear(this.b), wr),
-      inverse: this.radius * this.radius * dot(wp, inverseInertia(this.a, wp)) + inverseMass(this.b),
-    };
-  }
-  protected override apply(impulse: number): void {
-    const wp = local(this.a, this.pinion),
-      wr = local(this.b, this.rack);
-    this.a.applyTorqueImpulse(scale(wp, impulse * this.radius));
-    this.b.applyImpulse(scale(wr, impulse));
+    super(physics, RACK_AND_PINION, pinion, rack, options);
+    physics.kernel.setCoupling(this.slot, 0, pinionAxis);
+    physics.kernel.setCoupling(this.slot, 1, rackAxis);
+    physics.kernel.setCoupling(this.slot, 6, [radius, 0, 0]);
   }
 }
 
@@ -258,68 +161,40 @@ export interface PulleyOptions extends MechanismOptions {
  * only pulls, never pushes.
  */
 export class PulleyJoint extends Mechanism {
-  private readonly groundA: V;
-  private readonly groundB: V;
-  private readonly anchorA: V;
-  private readonly anchorB: V;
-  private readonly ratio: number;
-  private readonly total: number;
-  private measured = 0;
   constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options: PulleyOptions) {
-    super(physics, bodyA, bodyB, options);
     checkVec(options.groundA, 'Ground A');
     checkVec(options.groundB, 'Ground B');
-    this.groundA = [...options.groundA];
-    this.groundB = [...options.groundB];
-    this.anchorA = options.anchorA ? ([...options.anchorA] as V) : [0, 0, 0];
-    this.anchorB = options.anchorB ? ([...options.anchorB] as V) : [0, 0, 0];
-    this.ratio = options.ratio ?? 1;
-    if (!(this.ratio > 0 && Number.isFinite(this.ratio)))
+    const anchorA: V = options.anchorA ? ([...options.anchorA] as V) : [0, 0, 0],
+      anchorB: V = options.anchorB ? ([...options.anchorB] as V) : [0, 0, 0],
+      ratio = options.ratio ?? 1;
+    checkVec(anchorA, 'Anchor A');
+    checkVec(anchorB, 'Anchor B');
+    if (!(ratio > 0 && Number.isFinite(ratio)))
       throw new RangeError('A pulley ratio is a positive number; pass options.ratio above 0.');
-    this.total = this.lengthA() + this.ratio * this.lengthB();
-    this.absolute = true;
-  }
-  private point(body: PhysicsBody, anchor: V): V {
-    return add(body.position, local(body, anchor));
-  }
-  private lengthA(): number {
-    const d = sub(this.point(this.a, this.anchorA), this.groundA);
-    return Math.hypot(d[0], d[1], d[2]);
-  }
-  private lengthB(): number {
-    const d = sub(this.point(this.b, this.anchorB), this.groundB);
-    return Math.hypot(d[0], d[1], d[2]);
-  }
-  private ropes(): { ua: V; ub: V; ra: V; rb: V } {
-    const pa = this.point(this.a, this.anchorA),
-      pb = this.point(this.b, this.anchorB),
-      da = sub(pa, this.groundA),
-      db = sub(pb, this.groundB),
-      la = Math.hypot(da[0], da[1], da[2]) || 1,
-      lb = Math.hypot(db[0], db[1], db[2]) || 1;
-    return { ua: scale(da, 1 / la), ub: scale(db, 1 / lb), ra: sub(pa, this.a.position), rb: sub(pb, this.b.position) };
-  }
-  protected override measure(): { speed: number; inverse: number } {
-    const { ua, ub, ra, rb } = this.ropes(),
-      va = add(this.linear(this.a), cross(this.angular(this.a), ra)),
-      vb = add(this.linear(this.b), cross(this.angular(this.b), rb)),
-      speed = dot(ua, va) + this.ratio * dot(ub, vb);
-    this.error = this.lengthA() + this.ratio * this.lengthB() - this.total;
-    this.measured = speed;
-    const k = (u: V, r: V, body: PhysicsBody): number => {
-      const n = cross(r, u);
-      return inverseMass(body) + dot(n, inverseInertia(body, n));
+    super(physics, PULLEY, bodyA, bodyB, options);
+    const k = physics.kernel;
+    k.setCoupling(this.slot, 2, anchorA);
+    k.setCoupling(this.slot, 3, anchorB);
+    k.setCoupling(this.slot, 4, options.groundA as V);
+    k.setCoupling(this.slot, 5, options.groundB as V);
+    k.setCoupling(this.slot, 6, [ratio, 0, 0]);
+    // The rope as long as it is now.
+    const length = (body: PhysicsBody, anchor: V, ground: Vec3): number => {
+      const [px, py, pz] = body.position,
+        q = body.rotation,
+        [x, y, z] = anchor,
+        t = [2 * (q[1] * z - q[2] * y), 2 * (q[2] * x - q[0] * z), 2 * (q[0] * y - q[1] * x)],
+        turned = [
+          x + q[3] * t[0]! + (q[1] * t[2]! - q[2] * t[1]!),
+          y + q[3] * t[1]! + (q[2] * t[0]! - q[0] * t[2]!),
+          z + q[3] * t[2]! + (q[0] * t[1]! - q[1] * t[0]!),
+        ];
+      return Math.hypot(px + turned[0]! - ground[0], py + turned[1]! - ground[1], pz + turned[2]! - ground[2]);
     };
-    return { speed, inverse: k(ua, ra, this.a) + this.ratio * this.ratio * k(ub, rb, this.b) };
-  }
-  protected override apply(impulse: number): void {
-    // A rope pulls and does not push: only an impulse that shortens the whole (negative along the ropes' growth) is kept.
-    // Slack through this step: the rope would still be short of taut at the end of it.
-    if (impulse > 0 || this.error + this.measured * this.step < -1e-5) return;
-    const { ua, ub, ra, rb } = this.ropes(),
-      pa = scale(ua, impulse),
-      pb = scale(ub, impulse * this.ratio);
-    this.a.applyImpulse(pa, add(this.a.position, ra));
-    this.b.applyImpulse(pb, add(this.b.position, rb));
+    k.setCoupling(this.slot, 7, [
+      length(bodyA, anchorA, options.groundA) + ratio * length(bodyB, anchorB, options.groundB),
+      0,
+      0,
+    ]);
   }
 }

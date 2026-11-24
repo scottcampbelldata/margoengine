@@ -350,11 +350,6 @@ export interface ExplosionOptions {
 
 export class GearJoint extends Mechanism {
     constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: GearOptions);
-    protected measure(): {
-        speed: number;
-        inverse: number;
-    };
-    protected apply(impulse: number): void;
 }
 
 export interface GearOptions extends MechanismOptions {
@@ -705,6 +700,13 @@ export class KernelWorld {
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
+    addCoupling(kind: 1 | 2 | 3, a: number, b: number): number;
+    setCoupling(slot: number, field: number, value: readonly [number, number, number]): void;
+    removeCoupling(slot: number): boolean;
+    couplingState(slot: number): {
+        error: number;
+        impulse: number;
+    };
     setJointAxis(joint: number, axis: readonly [number, number, number]): void;
     setJointFrames(joint: number, a: Quat, b: Quat): void;
     updateMass(body: number): this;
@@ -1338,11 +1340,6 @@ export interface PointProjection {
 
 export class PulleyJoint extends Mechanism {
     constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options: PulleyOptions);
-    protected measure(): {
-        speed: number;
-        inverse: number;
-    };
-    protected apply(impulse: number): void;
 }
 
 export interface PulleyOptions extends MechanismOptions {
@@ -1372,11 +1369,6 @@ export interface QueryFilter {
 
 export class RackAndPinionJoint extends Mechanism {
     constructor(physics: Physics, pinion: PhysicsBody, rack: PhysicsBody, options?: RackAndPinionOptions);
-    protected measure(): {
-        speed: number;
-        inverse: number;
-    };
-    protected apply(impulse: number): void;
 }
 
 export interface RackAndPinionOptions extends MechanismOptions {
@@ -1774,19 +1766,12 @@ abstract class Mechanism implements PhysicsAttachment {
     protected readonly physics: Physics;
     protected readonly a: PhysicsBody;
     protected readonly b: PhysicsBody;
-    protected error: number;
-    protected absolute: boolean;
-    protected last: number;
-    protected step: number;
-    protected constructor(physics: Physics, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
-    protected linear(body: PhysicsBody): V;
-    protected angular(body: PhysicsBody): V;
-    protected abstract measure(): {
-        speed: number;
-        inverse: number;
+    protected readonly slot: number;
+    protected constructor(physics: Physics, kind: 1 | 2 | 3, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
+    state(): {
+        error: number;
+        impulse: number;
     };
-    protected abstract apply(impulse: number): void;
-    beforeStep(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
@@ -1811,6 +1796,4 @@ interface PhysicsAttachment {
     bodyRemoved?(body: PhysicsBody): void;
     dispose(): void;
 }
-
-type V = [number, number, number];
 ```
