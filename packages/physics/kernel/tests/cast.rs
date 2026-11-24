@@ -283,6 +283,7 @@ fn height_field(w: &mut World) -> (i32, Vec<[V3; 3]>) {
         }
     }
     assert!(w.begin_mesh(vertices.len() as u32, 0));
+    assert!(w.begin_voxels(rows * columns));
     let v0 = w.header().mesh_rows[1] as usize;
     for (i, &p) in vertices.iter().enumerate() {
         w.set_v(MESH_VERTEX_X, v0 + i, p);

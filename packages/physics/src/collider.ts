@@ -12,6 +12,7 @@ import {
   type KernelWorld,
 } from './kernel.js';
 import type { CollisionPairKind, CombineRule, ColliderOptions, ShapeOptions } from './shapes.js';
+import { meshConnectedComponents, meshHalfEdges, type HalfEdgeTopology } from './mesh-tools.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
 
@@ -61,7 +62,7 @@ export class PhysicsCollider {
   /** @internal */
   forceThreshold = 0;
   /** @internal The points (and indices) of a convex hull or triangle mesh. */
-  data?: { vertices: Float32Array; indices?: Uint32Array };
+  data?: { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } };
   /** @internal */
   constructor(
     private readonly kernel: KernelWorld,
@@ -122,6 +123,57 @@ export class PhysicsCollider {
     if (!this.reshape) throw new MargoError('state', 'This collider cannot change shape; remove it and add another.');
     this.reshape(options);
     return this;
+  }
+  /**
+   * Sets the radius of a sphere, capsule, cylinder or cone, keeping the rest of its shape and its place in the body (Rapier's
+   * `setRadius`); the body's mass is worked out again.
+   * @throws RangeError for a radius that is not positive and finite, or a shape that has none.
+   */
+  setRadius(radius: number): this {
+    return this.resize('radius', radius);
+  }
+  /** Sets the half height of a capsule, cylinder or cone, as {@link PhysicsCollider.setRadius} (Rapier's `setHalfHeight`). */
+  setHalfHeight(halfHeight: number): this {
+    return this.resize('halfHeight', halfHeight);
+  }
+  /** Sets the half extents of a box, keeping its border radius and its place in the body (Rapier's `setHalfExtents`). */
+  setHalfExtents(halfExtents: Vec3): this {
+    checkVec(halfExtents, 'Half extents');
+    if (this.shape !== 'box' || !(halfExtents[0] > 0 && halfExtents[1] > 0 && halfExtents[2] > 0))
+      throw new RangeError(`setHalfExtents takes three positive numbers and a box collider (this is a ${this.shape}); pass [x, y, z].`);
+    return this.setShape({ shape: 'box', halfExtents, borderRadius: this.borderRadius(), ...this.placement() });
+  }
+  private placement(): { offset: Vec3; rotation: [number, number, number, number] } {
+    const t = this.translationWrtParent(),
+      q = this.rotationWrtParent();
+    return { offset: [t.x, t.y, t.z], rotation: [q.x, q.y, q.z, q.w] };
+  }
+  private resize(what: 'radius' | 'halfHeight', value: number): this {
+    if (!(value > 0) || !Number.isFinite(value))
+      throw new RangeError(`A ${what === 'radius' ? 'radius' : 'half height'} is positive and finite (got ${value}); pass a size in metres.`);
+    const place = this.placement();
+    switch (this.shape) {
+      case 'sphere':
+        if (what === 'radius') return this.setShape({ shape: 'sphere', radius: value, ...place });
+        break;
+      case 'capsule':
+        return this.setShape({
+          shape: 'capsule',
+          halfHeight: what === 'halfHeight' ? value : this.halfHeight(),
+          radius: what === 'radius' ? value : this.radius(),
+          ...place,
+        });
+      case 'cylinder':
+      case 'cone':
+        return this.setShape({
+          shape: this.shape,
+          halfHeight: what === 'halfHeight' ? value : this.halfHeight(),
+          radius: what === 'radius' ? value : this.radius(),
+          borderRadius: this.borderRadius(),
+          ...place,
+        });
+    }
+    throw new RangeError(`A ${this.shape} collider has no ${what === 'radius' ? 'radius' : 'half height'} to set; use setShape.`);
   }
   /** Moves the collider in its body's frame, and works the body's mass out again. */
   setTranslationWrtParent(position: Vec3): this {
@@ -353,6 +405,24 @@ export class PhysicsCollider {
       }
     this.kernel.aimCollider(this.handle, reach);
   }
+  /**
+   * The connected components of a trimesh made with `connectedComponents: true` (Rapier's `CONNECTED_COMPONENTS`): one number a
+   * triangle, and how many components. @throws MargoError (`state`) for a mesh made without the flag.
+   */
+  connectedComponents(): { component: Uint32Array; count: number } {
+    if (!this.data?.reads?.components)
+      throw new MargoError('state', 'This collider was not made with connectedComponents: true on a trimesh; add the option to read its components.');
+    return meshConnectedComponents(this.data.indices!);
+  }
+  /**
+   * The half-edge topology of a trimesh made with `halfEdgeTopology: true` (Rapier's `HALF_EDGE_TOPOLOGY`): the vertex, twin,
+   * next half edge and face of each of its three half edges a triangle. @throws MargoError (`state`) for a mesh made without it.
+   */
+  halfEdgeTopology(): HalfEdgeTopology {
+    if (!this.data?.reads?.halfEdges)
+      throw new MargoError('state', 'This collider was not made with halfEdgeTopology: true on a trimesh; add the option to read its half edges.');
+    return meshHalfEdges(this.data.indices!);
+  }
   /** Triangle indices of a trimesh. */
   indices(): Uint32Array | undefined {
     return this.data?.indices;
@@ -529,6 +599,37 @@ export class PhysicsCollider {
       first = c.meshFirstVertex[c.colliderHull[this.handle]],
       last = first + (rows + 1) * (columns + 1) - 1;
     return [c.meshVertexX[last] - c.meshVertexX[first], 1, c.meshVertexZ[last] - c.meshVertexZ[first]];
+  }
+  /**
+   * A height field's cell status, a sum of {@link HeightfieldCell} bits: 0 for a plain cell, as Rapier's `cell_status`.
+   * @throws RangeError for another shape, or a cell off the field.
+   */
+  cellStatus(row: number, column: number): number {
+    this.cell(row, column);
+    return this.kernel.cellStatus(this.handle, row, column);
+  }
+  /** Every cell's status, row r of column c at `r + rows * c`, as Rapier's `cells_statuses`. @throws RangeError for another shape. */
+  cellStatuses(): Uint8Array {
+    const { rows, columns } = this.grid(),
+      out = new Uint8Array(rows * columns);
+    for (let c = 0; c < columns; c++) for (let r = 0; r < rows; r++) out[r + rows * c] = this.kernel.cellStatus(this.handle, r, c);
+    return out;
+  }
+  /**
+   * Sets a height field's cell status in place, as Rapier's `set_cell_status`: add {@link HeightfieldCell} bits, `zigzag` to
+   * split the cell along its other diagonal, `leftRemoved` and `rightRemoved` to make a hole. Contacts on a removed triangle
+   * end and what rests on it wakes.
+   * @throws RangeError for another shape, a cell off the field or a status that is not 0 to 7.
+   */
+  setCellStatus(row: number, column: number, status: number): this {
+    this.cell(row, column);
+    this.kernel.setCellStatus(this.handle, row, column, status);
+    return this;
+  }
+  private cell(row: number, column: number): void {
+    const { rows, columns } = this.grid();
+    if (!Number.isInteger(row) || !Number.isInteger(column) || row < 0 || column < 0 || row >= rows || column >= columns)
+      throw new RangeError(`Cell (${row}, ${column}) is off this ${rows} by ${columns} height field; pass a row below ${rows} and a column below ${columns}.`);
   }
   private grid(): { rows: number; columns: number } {
     if (this.shape !== 'heightfield') throw new RangeError(`A ${this.shape} is no height field; use a heightfield.`);

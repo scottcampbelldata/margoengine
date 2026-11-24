@@ -516,6 +516,19 @@ columns! {
     MESH_HALF_Y f32 Mesh,
     MESH_HALF_Z f32 Mesh,
     MESH_RADIUS f32 Mesh,
+    // A closed, outward-wound mesh made solid (MESH_SOLID): its volume, centre of mass, principal moments about it at a density of 1,
+    // and the turn of their axes.
+    MESH_VOLUME f32 Mesh,
+    MESH_COM_X f32 Mesh,
+    MESH_COM_Y f32 Mesh,
+    MESH_COM_Z f32 Mesh,
+    MESH_MOMENT_X f32 Mesh,
+    MESH_MOMENT_Y f32 Mesh,
+    MESH_MOMENT_Z f32 Mesh,
+    MESH_FRAME_X f32 Mesh,
+    MESH_FRAME_Y f32 Mesh,
+    MESH_FRAME_Z f32 Mesh,
+    MESH_FRAME_W f32 Mesh,
     // How far the surface moved in its last refit (deformable meshes): the search and the contact limit reach that much further.
     MESH_MOTION f32 Mesh,
     // The step a deformable mesh's motion was last aimed in (its motion and surface velocity count only in that step) and the
@@ -678,6 +691,9 @@ pub const MESH_DEFORMABLE: u32 = 8;
 /// MESH_FLAGS: a deformable mesh holds targets for its vertices (the second block of its vertex rows) that the end of the
 /// step moves it to; its third block holds the velocity of each vertex in the meantime.
 pub const MESH_AIMED: u32 = 16;
+/// MESH_FLAGS: a closed mesh wound outwards has a volume: `end_mesh` works out its mass properties (Rapier's trimesh mass from the
+/// volume it encloses), and a collider on it has mass by its density.
+pub const MESH_SOLID: u32 = 32;
 /// TRIANGLE_EDGES, two bits an edge: open (no triangle across), convex, concave, or flat.
 pub const EDGE_OPEN: u32 = 0;
 pub const EDGE_CONVEX: u32 = 1;

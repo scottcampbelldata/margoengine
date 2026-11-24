@@ -536,6 +536,7 @@ type CompoundPart = ({
     heights: ArrayLike<number>;
     scale: Vec3;
     fixInternalEdges?: boolean;
+    cellStatus?: ArrayLike<number>;
 } | {
     shape: 'voxels';
     cells: Int32Array;
@@ -633,6 +634,13 @@ interface DebugRenderOptions {
 }
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
+
+interface HalfEdgeTopology {
+    vertex: Uint32Array;
+    twin: Uint32Array;
+    next: Uint32Array;
+    face: Uint32Array;
+}
 
 interface IkOptions {
     point?: Vec3;
@@ -797,6 +805,7 @@ interface KernelDistance {
 
 interface KernelHeightfieldOptions {
     fixInternalEdges?: boolean;
+    cellStatus?: ArrayLike<number>;
 }
 
 interface KernelLoadOptions {
@@ -902,6 +911,7 @@ interface KernelSolverOptions {
 interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;
     oriented?: boolean;
+    solid?: boolean;
     deformable?: boolean;
 }
 
@@ -967,6 +977,8 @@ class KernelWorld {
     aimCollider(collider: number, motion: number): void;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
+    setCellStatus(collider: number, row: number, column: number, status: number): void;
+    cellStatus(collider: number, row: number, column: number): number;
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
     combineVoxels(a: number, b: number, shift: readonly [number, number, number]): void;
     propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void;
@@ -1354,6 +1366,10 @@ class PhysicsCollider {
     data?: {
         vertices: Float32Array;
         indices?: Uint32Array;
+        reads?: {
+            components: boolean;
+            halfEdges: boolean;
+        };
     };
     constructor(kernel: KernelWorld,
     handle: number,
@@ -1368,6 +1384,9 @@ class PhysicsCollider {
         max: [number, number, number];
     };
     setShape(options: ColliderOptions): this;
+    setRadius(radius: number): this;
+    setHalfHeight(halfHeight: number): this;
+    setHalfExtents(halfExtents: Vec3): this;
     setTranslationWrtParent(position: Vec3): this;
     setRotationWrtParent(rotation: Quat): this;
     isSensor(): boolean;
@@ -1414,6 +1433,11 @@ class PhysicsCollider {
         velocities?: ArrayLike<number>;
         now?: boolean;
     }): void;
+    connectedComponents(): {
+        component: Uint32Array;
+        count: number;
+    };
+    halfEdgeTopology(): HalfEdgeTopology;
     indices(): Uint32Array | undefined;
     containsPoint(point: {
         x: number;
@@ -1455,6 +1479,9 @@ class PhysicsCollider {
     heightfieldNCols(): number;
     heightfieldHeights(): Float32Array;
     heightfieldScale(): [number, number, number];
+    cellStatus(row: number, column: number): number;
+    cellStatuses(): Uint8Array;
+    setCellStatus(row: number, column: number, status: number): this;
     friction(): number;
     setFriction(friction: number): this;
     restitution(): number;
@@ -1615,10 +1642,26 @@ type ShapeOptions = {
 } | {
     shape: 'sphere';
     radius?: number;
-} | {
+}
+ | {
     shape: 'capsule';
     halfHeight: number;
     radius: number;
+    axis?: 'x' | 'y' | 'z';
+}
+ | {
+    shape: 'capsule';
+    a: Vec3;
+    b: Vec3;
+    radius: number;
+}
+ | {
+    shape: 'tetrahedron';
+    a: Vec3;
+    b: Vec3;
+    c: Vec3;
+    d: Vec3;
+    borderRadius?: number;
 }
  | {
     shape: 'cylinder';
@@ -1649,6 +1692,8 @@ type ShapeOptions = {
     deleteDuplicateTriangles?: boolean;
     deleteBadTopologyTriangles?: boolean;
     oriented?: boolean;
+    connectedComponents?: boolean;
+    halfEdgeTopology?: boolean;
     deformable?: boolean;
 } | {
     shape: 'heightfield';
@@ -1657,6 +1702,7 @@ type ShapeOptions = {
     heights: ArrayLike<number>;
     scale: Vec3;
     fixInternalEdges?: boolean;
+    cellStatus?: ArrayLike<number>;
 }
  | {
     shape: 'compound';

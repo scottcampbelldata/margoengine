@@ -2814,11 +2814,16 @@
       "Vehicle",
       "cleanTrimesh",
       "collisionGroups",
+      "convertMesh",
       "convexHull",
       "eulerToQuat",
       "geometryPositions",
       "loadKernel",
-      "trianglesAcross"
+      "meshConnectedComponents",
+      "meshHalfEdges",
+      "trianglesAcross",
+      "voxelizedMesh",
+      "voxelsFromPoints"
     ],
     "category": "Simulation and games"
   },

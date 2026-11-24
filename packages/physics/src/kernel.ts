@@ -134,6 +134,8 @@ interface KernelExports extends WebAssembly.Exports {
   collider_refit(collider: number, motion: number): number;
   collider_aim(collider: number, motion: number): number;
   mesh_end_grid(rows: number, columns: number, flags: number): number;
+  mesh_set_cell(collider: number, row: number, column: number, status: number): number;
+  mesh_cell(collider: number, row: number, column: number): number;
   mesh_next(rows: number): number;
   voxels_begin(cells: number): number;
   voxels_end(
@@ -377,6 +379,7 @@ const meshErrors: Readonly<Record<number, string>> = {
   [-3]: 'A vertex is not finite; check what fed it',
   [-4]: 'The triangle found across an edge does not exist',
   [-5]: 'The heights do not make a grid the kernel can hold; pass a scale whose cells are wider than rounding, and fewer cells',
+  [-6]: 'A trimesh with a mass or a density must be a closed surface wound outwards, enclosing a volume; flip its triangles, close it, or give its body mass with setMassProperties',
 };
 
 /** Options of {@link KernelWorld.addTrimesh}. */
@@ -392,6 +395,8 @@ export interface KernelTrimeshOptions {
    * how many triangles a ray from the point crosses. Default false.
    */
   oriented?: boolean;
+  /** The mesh is a closed surface wound outwards and has the mass of its volume at a density (Rapier's trimesh mass). Default false. */
+  solid?: boolean;
   /** The vertices may move later: {@link KernelWorld.refitCollider} follows them with no rebuild (Rapier's `DEFORMABLE`). Default false. */
   deformable?: boolean;
 }
@@ -403,6 +408,12 @@ export interface KernelHeightfieldOptions {
    * `HeightFieldFlags.FIX_INTERNAL_EDGES`). Default false, as in Rapier.
    */
   fixInternalEdges?: boolean;
+  /**
+   * The status of each cell, one byte a cell, row r of column c at `r + rows * c`: bit 0 (1) splits the cell the other way
+   * (Rapier's `HeightFieldCellStatus.ZIGZAG_SUBDIVISION`), bit 1 (2) removes its left triangle (the one on its lower x) and
+   * bit 2 (4) its right one (`LEFT_TRIANGLE_REMOVED`, `RIGHT_TRIANGLE_REMOVED`; both is `CELL_REMOVED`). Default none.
+   */
+  cellStatus?: ArrayLike<number>;
 }
 
 /**
@@ -1379,7 +1390,7 @@ export class KernelWorld {
    */
   addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options: KernelTrimeshOptions = {}): number {
     const { api } = this,
-      { fixInternalEdges = false, oriented = false, deformable = false } = options,
+      { fixInternalEdges = false, oriented = false, deformable = false, solid = false } = options,
       count = vertices.length / 3,
       triangles = indices.length / 3;
     if (!Number.isInteger(count) || !Number.isInteger(triangles))
@@ -1415,7 +1426,7 @@ export class KernelWorld {
         links[k][t0 + t] = other < 0 ? 0xffffffff : other;
       }
     }
-    const row = api.mesh_end(count, triangles, (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0) | (deformable ? 8 : 0));
+    const row = api.mesh_end(count, triangles, (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0) | (deformable ? 8 : 0) | (solid ? 32 : 0));
     if (row < 0) throw new RangeError(`This trimesh was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
     return row;
@@ -1466,7 +1477,7 @@ export class KernelWorld {
     options: KernelHeightfieldOptions = {},
   ): number {
     const { api } = this,
-      { fixInternalEdges = false } = options;
+      { fixInternalEdges = false, cellStatus } = options;
     if (
       !Number.isInteger(rows) ||
       !Number.isInteger(columns) ||
@@ -1489,7 +1500,18 @@ export class KernelWorld {
     for (let i = 0; i < count; i++)
       if (!Number.isFinite(heights[i]))
         throw new RangeError(`Heightfield height ${i} is ${heights[i]}; pass finite heights.`);
-    if (!api.mesh_begin(count, 0))
+    if (cellStatus !== undefined) {
+      if (cellStatus.length !== rows * columns)
+        throw new RangeError(
+          `A heightfield of ${rows} by ${columns} cells takes ${rows * columns} cell statuses (got ${cellStatus.length}); pass one a cell, row r of column c at r + rows * c.`,
+        );
+      for (let i = 0; i < cellStatus.length; i++)
+        if (!Number.isInteger(cellStatus[i]) || cellStatus[i] < 0 || cellStatus[i] > 7)
+          throw new RangeError(
+            `Cell status ${i} is ${cellStatus[i]}; use 0 to 7: 1 splits the cell the other way, 2 removes its left triangle, 4 its right one.`,
+          );
+    }
+    if (!api.mesh_begin(count, 0) || !api.voxels_begin(rows * columns))
       throw new RangeError(
         `Memory cannot hold a heightfield of ${count} points; free another world, or use fewer cells.`,
       );
@@ -1506,6 +1528,10 @@ export class KernelWorld {
         c.meshVertexZ[v0 + i] = -depth / 2 + (depth * row) / rows;
       }
     }
+    const words = this.columns.voxelWord,
+      first = api.mesh_next(3);
+    if (cellStatus)
+      for (let i = 0; i < cellStatus.length; i++) words[first + (i >>> 2)] |= cellStatus[i] << (8 * (i & 3));
     const row = api.mesh_end_grid(rows, columns, fixInternalEdges ? 1 : 0);
     if (row < 0) throw new RangeError(`This heightfield was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
@@ -1561,6 +1587,21 @@ export class KernelWorld {
       );
     this.meshRows = row + 1;
     return row;
+  }
+  /**
+   * Sets the status of cell (row, column) of a heightfield collider in place (see {@link KernelHeightfieldOptions.cellStatus}),
+   * and wakes what touches it.
+   * @throws RangeError for a collider that is no heightfield, a cell off it or a status above 7.
+   */
+  setCellStatus(collider: number, row: number, column: number, status: number): void {
+    if (!Number.isInteger(status) || !this.api.mesh_set_cell(collider, row >>> 0, column >>> 0, status))
+      throw new RangeError(
+        `Cell (${row}, ${column}) with status ${status} cannot be set: the collider must be a heightfield, the cell on it and the status 0 to 7 (1 splits the cell the other way, 2 removes its left triangle, 4 its right one).`,
+      );
+  }
+  /** The status of cell (row, column) of a heightfield collider; 0 for a cell off it. */
+  cellStatus(collider: number, row: number, column: number): number {
+    return this.api.mesh_cell(collider, row >>> 0, column >>> 0);
   }
   /**
    * Fills or empties cell (x, y, z) of a voxel collider in place, growing the grid for a cell outside it. The body's mass

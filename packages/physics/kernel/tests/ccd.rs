@@ -52,6 +52,7 @@ fn wall(w: &mut World, kind: u32) {
         _ => {
             // A flat height field of 4 by 4 cells over 12 m, its up axis turned from y to -x.
             assert!(w.begin_mesh(25, 0));
+            assert!(w.begin_voxels(16));
             let v0 = w.header().mesh_rows[1] as usize;
             for c in 0..5 {
                 for r in 0..5 {

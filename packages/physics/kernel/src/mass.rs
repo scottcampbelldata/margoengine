@@ -235,6 +235,11 @@ impl World {
     /// `each_solid` at a density given.
     fn each_solid_at(&self, c: usize, density: f32, mut add: impl FnMut(Solid, V3, Q)) {
         if self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH {
+            let mesh = self.uu(COLLIDER_HULL, c) as usize;
+            if self.uu(MESH_FLAGS, mesh) & MESH_SOLID != 0 {
+                add(self.collider_solid(c, density), self.solid_center(c), self.solid_frame(c));
+                return;
+            }
             if density > 0.0 && self.is_voxels(self.uu(COLLIDER_HULL, c) as usize) {
                 let (place, turn) = (self.v(COLLIDER_X, c), self.q(COLLIDER_ROTATION_X, c));
                 self.voxel_solids(c, |center, half| add(solid_box(half, density), place.add(turn.rotate(center)), turn));
@@ -271,6 +276,11 @@ impl World {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
                 Solid { mass: self.s(HULL_VOLUME, hull) * density, moments: self.v(HULL_MOMENT_X, hull).scale(density) }
             }
+            // A mesh made solid has the volume it encloses.
+            SHAPE_TRIMESH if self.uu(MESH_FLAGS, self.uu(COLLIDER_HULL, c) as usize) & MESH_SOLID != 0 => {
+                let mesh = self.uu(COLLIDER_HULL, c) as usize;
+                Solid { mass: self.s(MESH_VOLUME, mesh) * density, moments: self.v(MESH_MOMENT_X, mesh).scale(density) }
+            }
             // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none; `each_solid` adds a voxel
             // grid's cells.
             SHAPE_TRIMESH | SHAPE_COMPOUND | SHAPE_HALFSPACE => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
@@ -298,6 +308,10 @@ impl World {
             let center = self.v(HULL_CENTER_X, self.uu(COLLIDER_HULL, c) as usize);
             return place.add(self.q(COLLIDER_ROTATION_X, c).rotate(center));
         }
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH && self.uu(MESH_FLAGS, self.uu(COLLIDER_HULL, c) as usize) & MESH_SOLID != 0 {
+            let center = self.v(MESH_COM_X, self.uu(COLLIDER_HULL, c) as usize);
+            return place.add(self.q(COLLIDER_ROTATION_X, c).rotate(center));
+        }
         place
     }
 
@@ -306,6 +320,9 @@ impl World {
         let turn = self.q(COLLIDER_ROTATION_X, c);
         if self.uu(COLLIDER_SHAPE, c) == SHAPE_HULL {
             return turn.mul(self.q(HULL_FRAME_X, self.uu(COLLIDER_HULL, c) as usize));
+        }
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH && self.uu(MESH_FLAGS, self.uu(COLLIDER_HULL, c) as usize) & MESH_SOLID != 0 {
+            return turn.mul(self.q(MESH_FRAME_X, self.uu(COLLIDER_HULL, c) as usize));
         }
         turn
     }

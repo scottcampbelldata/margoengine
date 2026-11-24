@@ -11125,3 +11125,15 @@ One scalar constraint on the volume a closed triangle surface encloses, V = sum 
 ### Anisotropic cloth (`@margoengine/physics/soft`, 2026-11-24)
 
 A woven sheet's threads have springs of their own, each an XPBD distance constraint (Macklin et al. 2016) with its own natural frequency and damping ratio: the warp along the builder's `du`, the weft along `dv`, the diagonals of each cell as shear, and bend edges two along; the stretch and the shear are separate terms of an orthotropic sheet as in D. Baraff and A. Witkin, "Large Steps in Cloth Simulation", SIGGRAPH 1998, and B. Thomaszewski, S. Wacker and W. Strasser, "A consistent bending model for cloth simulation with corotational subdivision finite elements", SCA 2006 (for the bend); H. Wang, J. F. O'Brien and R. Ramamoorthi, "Data-driven elastic models for cloth: modeling and measurement", ACM TOG 30(4), 2011, for the anisotropic stretch measured on real cloth.
+
+## Physics shape forms, mesh tools and height field cell status (`@margoengine/physics`, 2026-11-24)
+
+Written clean room from the sources below and Rapier's published API pages (docs.rs `parry3d` 0.31 for `HeightFieldCellStatus`, `HeightField`, `TriMeshFlags`, `MeshConverter`, `Tetrahedron`, `Capsule` and the Rapier JavaScript reference); no Rapier, parry or other engine source was read.
+
+- B. Mirtich, "Fast and Accurate Computation of Polyhedral Mass Properties", J. Graphics Tools 1(2), 1996. https://www.cs.berkeley.edu/~jfc/mirtich/massProps.html
+- D. Eberly, "Polyhedral Mass Properties (Revised)", Geometric Tools, 2002. https://www.geometrictools.com/Documentation/PolyhedralMassProperties.pdf
+- T. Akenine-Moeller, "Fast 3D Triangle-Box Overlap Testing", J. Graphics Tools 6(1), 2001. https://fileadmin.cs.lth.se/cs/personal/tomas_akenine-moller/code/tribox_tam.pdf
+- S. Gottschalk, M. Lin and D. Manocha, "OBBTree: A Hierarchical Structure for Rapid Interference Detection", SIGGRAPH 1996.
+- M. Mantyla, "An Introduction to Solid Modeling", Computer Science Press, 1988 (the half-edge data structure).
+- Z. Wei, M. Liu, Z. Ling and H. Su, "Approximate Convex Decomposition for 3D Meshes with Collision-Aware Concavity and Tree Search", ACM TOG 41(4), 2022 (the decomposition the rounded parts come from).
+- Jacobi's eigenvalue method for symmetric matrices: G. Golub and C. Van Loan, "Matrix Computations", 4th ed., 2013, section 8.5.

@@ -202,6 +202,7 @@ export type CompoundPart = ({
     heights: ArrayLike<number>;
     scale: Vec3;
     fixInternalEdges?: boolean;
+    cellStatus?: ArrayLike<number>;
 } | {
     shape: 'voxels';
     cells: Int32Array;
@@ -297,6 +298,20 @@ export interface DebugRenderOptions {
     boxes?: boolean;
     filter?: QueryFilter;
 }
+
+export interface HalfEdgeTopology {
+    vertex: Uint32Array;
+    twin: Uint32Array;
+    next: Uint32Array;
+    face: Uint32Array;
+}
+
+export const HeightfieldCell: {
+    readonly zigzag: 1;
+    readonly leftRemoved: 2;
+    readonly rightRemoved: 4;
+    readonly removed: 6;
+};
 
 export interface Hit {
     body: PhysicsBody;
@@ -511,6 +526,7 @@ export interface KernelSolverOptions {
 export interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;
     oriented?: boolean;
+    solid?: boolean;
     deformable?: boolean;
 }
 
@@ -576,6 +592,8 @@ export class KernelWorld {
     aimCollider(collider: number, motion: number): void;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
+    setCellStatus(collider: number, row: number, column: number, status: number): void;
+    cellStatus(collider: number, row: number, column: number): number;
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
     combineVoxels(a: number, b: number, shift: readonly [number, number, number]): void;
     propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void;
@@ -638,6 +656,8 @@ export interface MeshCleanOptions {
     deleteDuplicateTriangles?: boolean;
     deleteBadTopologyTriangles?: boolean;
 }
+
+export type MeshConversion = 'trimesh' | 'convexHull' | 'aabb' | 'obb';
 
 export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
     shape?: 'trimesh' | 'convexHull' | 'convexDecomposition';
@@ -957,6 +977,10 @@ export class PhysicsCollider {
     data?: {
         vertices: Float32Array;
         indices?: Uint32Array;
+        reads?: {
+            components: boolean;
+            halfEdges: boolean;
+        };
     };
     constructor(kernel: KernelWorld,
     handle: number,
@@ -971,6 +995,9 @@ export class PhysicsCollider {
         max: [number, number, number];
     };
     setShape(options: ColliderOptions): this;
+    setRadius(radius: number): this;
+    setHalfHeight(halfHeight: number): this;
+    setHalfExtents(halfExtents: Vec3): this;
     setTranslationWrtParent(position: Vec3): this;
     setRotationWrtParent(rotation: Quat): this;
     isSensor(): boolean;
@@ -1017,6 +1044,11 @@ export class PhysicsCollider {
         velocities?: ArrayLike<number>;
         now?: boolean;
     }): void;
+    connectedComponents(): {
+        component: Uint32Array;
+        count: number;
+    };
+    halfEdgeTopology(): HalfEdgeTopology;
     indices(): Uint32Array | undefined;
     containsPoint(point: {
         x: number;
@@ -1058,6 +1090,9 @@ export class PhysicsCollider {
     heightfieldNCols(): number;
     heightfieldHeights(): Float32Array;
     heightfieldScale(): [number, number, number];
+    cellStatus(row: number, column: number): number;
+    cellStatuses(): Uint8Array;
+    setCellStatus(row: number, column: number, status: number): this;
     friction(): number;
     setFriction(friction: number): this;
     restitution(): number;
@@ -1262,10 +1297,26 @@ export type ShapeOptions = {
 } | {
     shape: 'sphere';
     radius?: number;
-} | {
+}
+ | {
     shape: 'capsule';
     halfHeight: number;
     radius: number;
+    axis?: 'x' | 'y' | 'z';
+}
+ | {
+    shape: 'capsule';
+    a: Vec3;
+    b: Vec3;
+    radius: number;
+}
+ | {
+    shape: 'tetrahedron';
+    a: Vec3;
+    b: Vec3;
+    c: Vec3;
+    d: Vec3;
+    borderRadius?: number;
 }
  | {
     shape: 'cylinder';
@@ -1296,6 +1347,8 @@ export type ShapeOptions = {
     deleteDuplicateTriangles?: boolean;
     deleteBadTopologyTriangles?: boolean;
     oriented?: boolean;
+    connectedComponents?: boolean;
+    halfEdgeTopology?: boolean;
     deformable?: boolean;
 } | {
     shape: 'heightfield';
@@ -1304,6 +1357,7 @@ export type ShapeOptions = {
     heights: ArrayLike<number>;
     scale: Vec3;
     fixInternalEdges?: boolean;
+    cellStatus?: ArrayLike<number>;
 }
  | {
     shape: 'compound';
@@ -1386,6 +1440,8 @@ export interface VehicleOptions {
     forward?: Vec3;
 }
 
+export type VoxelFill = 'surface' | 'filled';
+
 export interface WheelOptions {
     position: Vec3;
     radius: number;
@@ -1427,6 +1483,8 @@ export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, optio
 
 export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
 
+export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, to: MeshConversion, options?: MeshConversionOptions): ColliderOptions;
+
 export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
@@ -1436,7 +1494,24 @@ export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float
 
 export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;
 
+export function meshConnectedComponents(indices: ArrayLike<number>): {
+    component: Uint32Array;
+    count: number;
+};
+
+export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology;
+
 export function trianglesAcross(vertices: ArrayLike<number>, indices: ArrayLike<number>): Int32Array;
+
+export function voxelizedMesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, size?: number | Vec3, fill?: VoxelFill): {
+    cells: Int32Array;
+    size: Vec3;
+};
+
+export function voxelsFromPoints(points: ArrayLike<number>, size?: number | Vec3): {
+    cells: Int32Array;
+    size: Vec3;
+};
 
 // Not exported from this entry, but used by the exports above:
 
@@ -1488,6 +1563,7 @@ interface KernelCompoundPart {
 
 interface KernelHeightfieldOptions {
     fixInternalEdges?: boolean;
+    cellStatus?: ArrayLike<number>;
 }
 
 interface KernelProjection {
@@ -1514,6 +1590,13 @@ interface KernelShapeCastHit {
     queryPoint: [number, number, number];
     queryNormal: [number, number, number];
     started: boolean;
+}
+
+interface MeshConversionOptions {
+    borderRadius?: number;
+    trimesh?: Omit<Extract<ColliderOptions, {
+        shape: 'trimesh';
+    }>, 'shape' | 'vertices' | 'indices'>;
 }
 
 interface MultibodyOwner {

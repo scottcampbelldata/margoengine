@@ -37,13 +37,18 @@ export interface ConvexDecompositionOptions {
   seed?: number;
   /** Milliseconds before it stops with a `timeout` MargoError (default 60,000): it never returns a part-done result. */
   timeLimit?: number;
+  /**
+   * Rounds every part with a border outside its hull (default 0), as Rapier's `round_convex_decomposition`: each part is the hull
+   * grown by this much in metres, so the parts overlap a little and the edges of the union are round.
+   */
+  borderRadius?: number;
 }
 
 /** A decomposition: pass it as a collider, `body.addCollider(decomposition)`, on `@margoengine/physics/next` or the root entry. */
 export interface ConvexDecomposition {
   shape: 'convexDecomposition';
   /** Each part as the points of its convex hull, in the mesh's own units and frame. */
-  parts: { shape: 'convexHull'; points: Float32Array }[];
+  parts: { shape: 'convexHull'; points: Float32Array; borderRadius?: number }[];
   /** Each part's concavity, in the units of the `concavity` option (a share of the mesh's largest side). */
   concavity: number[];
 }
@@ -162,6 +167,9 @@ export function convexDecomposition(mesh: ColliderGeometry, options: ConvexDecom
   const threshold = options.concavity ?? 0.05;
   if (!(threshold > 0) || !Number.isFinite(threshold))
     throw new RangeError(`concavity must be a positive share of the mesh size, such as 0.05 (got ${options.concavity}).`);
+  const border = options.borderRadius ?? 0;
+  if (!(border >= 0) || !Number.isFinite(border))
+    throw new RangeError(`borderRadius is 0 or more metres and finite (got ${border}); pass 0 for sharp parts.`);
   const maxParts = count(options.maxConvexHulls, 64, 'maxConvexHulls', 1),
     timeLimit = options.timeLimit ?? 60000;
   if (!(timeLimit > 0)) throw new RangeError(`timeLimit must be a positive number of milliseconds (got ${options.timeLimit}).`);
@@ -208,7 +216,7 @@ export function convexDecomposition(mesh: ColliderGeometry, options: ConvexDecom
       const hull = solid.hull()!,
         points = new Float32Array(hull.points.length);
       for (let i = 0; i < points.length; i++) points[i] = hull.points[i] * size + center[i % 3];
-      return { shape: 'convexHull' as const, points };
+      return border > 0 ? { shape: 'convexHull' as const, points, borderRadius: border } : { shape: 'convexHull' as const, points };
     }),
     concavity: parts.map((part) => part.concavity),
   };

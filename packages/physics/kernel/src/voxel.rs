@@ -76,6 +76,11 @@ impl World {
         (word >> (8 * (index & 3))) & 0xff
     }
 
+    /// For the height field's status bytes, which live in the same words.
+    pub(crate) fn set_cell_byte_pub(&mut self, mesh: usize, index: u32, byte: u32) {
+        self.set_cell_byte(mesh, index, byte);
+    }
+
     #[inline(always)]
     fn set_cell_byte(&mut self, mesh: usize, index: u32, byte: u32) {
         let at = self.uu(VOXEL_FIRST, mesh) as usize + (index >> 2) as usize;

@@ -41,7 +41,7 @@ export type {
   CharacterMoveFilter,
   CharacterMoveResult,
 } from './character.js';
-export { collisionGroups, geometryPositions } from './shapes.js';
+export { collisionGroups, geometryPositions, HeightfieldCell } from './shapes.js';
 export type {
   CollisionPairKind,
   ShapeOptions,
@@ -66,6 +66,8 @@ export { PidController } from './pid.js';
 export type { PidOptions } from './pid.js';
 export type { DebugLines, DebugRenderOptions } from './debug.js';
 export { cleanTrimesh } from './mesh-clean.js';
+export { convertMesh, meshConnectedComponents, meshHalfEdges, voxelizedMesh, voxelsFromPoints } from './mesh-tools.js';
+export type { HalfEdgeTopology, MeshConversion, VoxelFill } from './mesh-tools.js';
 export type { MeshCleanOptions } from './mesh-clean.js';
 export type { HullFaces } from './hull.js';
 export type {

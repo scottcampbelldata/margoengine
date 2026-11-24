@@ -440,6 +440,17 @@ pub extern "C" fn voxels_end(x: i32, y: i32, z: i32, dx: u32, dy: u32, dz: u32, 
 pub extern "C" fn voxels_set(collider: u32, x: i32, y: i32, z: i32, filled: u32) -> i32 {
     world().set_voxel(collider, [x, y, z], filled != 0)
 }
+/// Sets the status of height field cell (row, column) of a collider: bit 0 splits it the other way, bits 1 and 2 remove its
+/// left or right triangle. 1, or 0 when the collider is no height field, the cell is off it or the status is above 7.
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_set_cell(collider: u32, row: u32, column: u32, status: u32) -> u32 {
+    world().set_cell_status(collider, row, column, status)
+}
+/// The status of a height field's cell (row, column), 0 off the field.
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_cell(collider: u32, row: u32, column: u32) -> u32 {
+    world().cell_status(collider, row, column)
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn voxels_combine(a: u32, b: u32, sx: i32, sy: i32, sz: i32) -> i32 {
     world().combine_voxels(a, b, [sx, sy, sz])

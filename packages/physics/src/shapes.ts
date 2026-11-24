@@ -6,6 +6,21 @@ export type ColliderGeometry =
   | Geometry
   | { readonly vertices: ArrayLike<number>; readonly indices?: ArrayLike<number>; readonly stride?: number };
 
+/**
+ * The bits of a height field cell's status (Rapier's `HeightFieldCellStatus`): add them together. The left triangle of a
+ * cell is the one on its lower x, the right one the one on its higher x, whichever way the cell is split.
+ */
+export const HeightfieldCell = {
+  /** Split the cell along the diagonal from its lower row and column to its higher ones (the default runs the other way). */
+  zigzag: 1,
+  /** Remove the triangle on the cell's lower x. */
+  leftRemoved: 2,
+  /** Remove the triangle on the cell's higher x. */
+  rightRemoved: 4,
+  /** Remove both triangles. */
+  removed: 6,
+} as const;
+
 /** Collider shape description: a primitive, mesh or heightfield with its size. */
 export type ShapeOptions =
   | {
@@ -15,7 +30,12 @@ export type ShapeOptions =
       borderRadius?: number;
     }
   | { shape: 'sphere'; radius?: number }
-  | { shape: 'capsule'; halfHeight: number; radius: number }
+  /** A capsule along local Y by default, or along X or Z with `axis` (Rapier's `capsule_x`, `capsule_z`). */
+  | { shape: 'capsule'; halfHeight: number; radius: number; axis?: 'x' | 'y' | 'z' }
+  /** A capsule from two end points and a radius (Rapier's `capsule_from_endpoints`): the segment `a` to `b` grown by `radius`. */
+  | { shape: 'capsule'; a: Vec3; b: Vec3; radius: number }
+  /** A tetrahedron of four points, a convex hull of them (Rapier's `Tetrahedron`); `borderRadius` rounds it. */
+  | { shape: 'tetrahedron'; a: Vec3; b: Vec3; c: Vec3; d: Vec3; borderRadius?: number }
   /**
    * Along local Y, centred. `borderRadius` (default 0) rounds every edge with a border outside `radius` and `halfHeight`,
    * Rapier's `roundCylinder`.
@@ -57,6 +77,10 @@ export type ShapeOptions =
        * unchanged. Only the own solver holds it.
        */
       oriented?: boolean;
+      /** Lets `collider.connectedComponents()` read the mesh's connected components (default false), Rapier's `CONNECTED_COMPONENTS`. */
+      connectedComponents?: boolean;
+      /** Lets `collider.halfEdgeTopology()` read the mesh's half edges (default false), Rapier's `HALF_EDGE_TOPOLOGY`. */
+      halfEdgeTopology?: boolean;
       /**
        * The vertices may move after the mesh is made (default false), Rapier's `TriMeshFlags.DEFORMABLE`: `collider.setVertices`
        * moves them, and the tree follows by a refit with no rebuild. A deformable mesh is not shared between colliders.
@@ -71,6 +95,13 @@ export type ShapeOptions =
       scale: Vec3;
       /** Smooth the normals at the grid's inner edges so bodies slide and roll over them without catching (default false). */
       fixInternalEdges?: boolean;
+      /**
+       * The status of each cell, one number a cell, row r of column c at `r + rows * c` (default every cell plain): add
+       * {@link HeightfieldCell}`.zigzag` (1) to split the cell along its other diagonal, `leftRemoved` (2) to take away the
+       * triangle on its lower x and `rightRemoved` (4) the one on its higher x, as Rapier's `HeightFieldCellStatus` does
+       * (Rapier's JavaScript build has no way to set them). A removed triangle is a hole: nothing touches it, no ray hits it.
+       */
+      cellStatus?: ArrayLike<number>;
     }
   /**
    * Several convex parts welded into one collider (one handle, one set of events), each with its own offset and
@@ -127,6 +158,7 @@ export type CompoundPart = (
       heights: ArrayLike<number>;
       scale: Vec3;
       fixInternalEdges?: boolean;
+      cellStatus?: ArrayLike<number>;
     }
   | { shape: 'voxels'; cells: Int32Array; size?: Vec3 }
   /** The half space behind a plane through the part's offset (default normal up): an endless floor or wall in a compound. */

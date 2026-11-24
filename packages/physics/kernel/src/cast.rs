@@ -663,8 +663,10 @@ impl World {
                 for r in r0..=r1 {
                     if self.cell_reaches(mesh, rows, r, c, low.y, high.y) {
                         let cell = 2 * (r + rows * c);
-                        if !visit(Solid::Triangle(self.mesh_triangle(mesh, cell))) || !visit(Solid::Triangle(self.mesh_triangle(mesh, cell + 1))) {
-                            return;
+                        for triangle in [cell, cell + 1] {
+                            if self.triangle_alive(mesh, triangle) && !visit(Solid::Triangle(self.mesh_triangle(mesh, triangle))) {
+                                return;
+                            }
                         }
                     }
                 }

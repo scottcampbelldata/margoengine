@@ -635,6 +635,9 @@ impl World {
             let cell = 2 * (r + rows * c);
             let mut best: Option<RayHit> = None;
             for triangle in [cell, cell + 1] {
+                if !self.triangle_alive(mesh, triangle) {
+                    continue;
+                }
                 let limit = best.map_or(max, |hit| hit.t);
                 if let Some(hit) = ray_triangle(o, d, self.mesh_triangle(mesh, triangle), limit)
                     && best.is_none_or(|b| hit.t < b.t)

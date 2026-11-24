@@ -4,10 +4,12 @@
 use margoengine_physics_kernel::layout::*;
 use margoengine_physics_kernel::math::*;
 use margoengine_physics_kernel::mesh::*;
+use margoengine_physics_kernel::query::*;
 use margoengine_physics_kernel::world::{NONE, World};
 use std::collections::HashMap;
 
 const DT: f32 = 1.0 / 60.0;
+const ALL: Filter = Filter { flags: 0, groups: u32::MAX, collider: NONE, body: NONE };
 
 /// The triangle across each edge, by corner positions, as JS finds it: an edge shared by more than two is open.
 fn across(vertices: &[V3], triangles: &[[u32; 3]]) -> Vec<[u32; 3]> {
@@ -340,6 +342,7 @@ fn height_points(rows: u32, columns: u32, size: f32, height: &impl Fn(u32, u32) 
 
 fn add_grid(w: &mut World, rows: u32, columns: u32, vertices: &[V3], flags: u32) -> i32 {
     assert!(w.begin_mesh(vertices.len() as u32, 0));
+    assert!(w.begin_voxels(rows * columns));
     let v0 = w.header().mesh_rows[1] as usize;
     for (i, &p) in vertices.iter().enumerate() {
         w.set_v(MESH_VERTEX_X, v0 + i, p);
@@ -443,6 +446,162 @@ fn a_height_field_meets_shapes_as_the_same_triangles_do() {
         }
     }
     assert!(touched > 40, "most drops touch some triangles ({touched} parts)");
+}
+
+/// The cells' triangles as rows, each cell split as its status says and a removed triangle left out; the ids the grid gave
+/// them, by row.
+fn status_triangles(rows: u32, columns: u32, status: &impl Fn(u32, u32) -> u32) -> (Vec<[u32; 3]>, Vec<u32>) {
+    let at = |r: u32, c: u32| r + (rows + 1) * c;
+    let (mut triangles, mut ids) = (Vec::new(), Vec::new());
+    for c in 0..columns {
+        for r in 0..rows {
+            let (s, cell) = (status(r, c), 2 * (r + rows * c));
+            let (left, right) = if s & GRID_ZIGZAG != 0 {
+                ([at(r, c), at(r + 1, c), at(r + 1, c + 1)], [at(r, c), at(r + 1, c + 1), at(r, c + 1)])
+            } else {
+                ([at(r, c), at(r + 1, c), at(r, c + 1)], [at(r + 1, c), at(r + 1, c + 1), at(r, c + 1)])
+            };
+            if s & GRID_LEFT_REMOVED == 0 {
+                triangles.push(left);
+                ids.push(cell);
+            }
+            if s & GRID_RIGHT_REMOVED == 0 {
+                triangles.push(right);
+                ids.push(cell + 1);
+            }
+        }
+    }
+    (triangles, ids)
+}
+
+fn some_status(r: u32, c: u32) -> u32 {
+    let mut h = (r * 73_856_093) ^ (c * 19_349_663) ^ 0x9e37_79b9;
+    h ^= h >> 13;
+    h = h.wrapping_mul(0x5bd1_e995);
+    h ^= h >> 15;
+    match h % 8 {
+        0 | 1 => GRID_ZIGZAG,
+        2 => GRID_LEFT_REMOVED,
+        3 => GRID_RIGHT_REMOVED,
+        4 => GRID_LEFT_REMOVED | GRID_RIGHT_REMOVED,
+        5 => GRID_ZIGZAG | GRID_LEFT_REMOVED,
+        6 => GRID_ZIGZAG | GRID_RIGHT_REMOVED,
+        _ => 0,
+    }
+}
+
+#[test]
+fn cell_status_splits_the_other_way_and_removes_triangles_as_the_same_rows_do() {
+    let (rows, columns) = (8, 10);
+    let vertices = height_points(rows, columns, 0.5, &bumpy);
+    let (triangles, ids) = status_triangles(rows, columns, &some_status);
+    let links = across(&vertices, &triangles);
+    let mut grid = World::new(4, 4).unwrap();
+    let field = add_grid(&mut grid, rows, columns, &vertices, MESH_FIX_EDGES);
+    assert!(field >= 0);
+    let mesh = field as usize;
+    for r in 0..rows {
+        for c in 0..columns {
+            assert!(grid.set_grid_cell_status(mesh, r, c, some_status(r, c)));
+            assert_eq!(grid.grid_cell_status(mesh, r, c), some_status(r, c));
+        }
+    }
+    assert!(!grid.set_grid_cell_status(mesh, rows, 0, 1), "a cell off the field");
+    assert!(!grid.set_grid_cell_status(mesh, 0, 0, 8), "a status past the three bits");
+    let row_of: HashMap<u32, usize> = ids.iter().enumerate().map(|(row, &id)| (id, row)).collect();
+    for (row, tri) in triangles.iter().enumerate() {
+        let id = ids[row];
+        assert!(grid.triangle_alive(mesh, id));
+        let corners = grid.mesh_triangle(mesh, id);
+        assert_eq!(corners, [vertices[tri[0] as usize], vertices[tri[1] as usize], vertices[tri[2] as usize]], "triangle {id}");
+        let n = corners[1].sub(corners[0]).cross(corners[2].sub(corners[0]));
+        assert!(n.y > 0.0, "triangle {id} faces up");
+        for k in 0..3 {
+            let across = grid.mesh_across(mesh, id, k);
+            let expected = if links[row][k] == NONE { NONE } else { ids[links[row][k] as usize] };
+            assert_eq!(across, expected, "triangle {id} edge {k}: the one across by corner positions, none where it is removed");
+            assert!(across == NONE || row_of.contains_key(&across));
+        }
+    }
+    let removed = (0..2 * rows * columns).filter(|&t| !grid.triangle_alive(mesh, t)).count();
+    assert_eq!(removed as u32 + triangles.len() as u32, 2 * rows * columns);
+    assert!(removed > 10 && triangles.len() > 40);
+}
+
+#[test]
+fn a_field_with_cell_status_meets_shapes_and_rays_as_the_same_triangle_rows_do() {
+    let (rows, columns) = (8, 10);
+    let vertices = height_points(rows, columns, 0.5, &bumpy);
+    let (triangles, _) = status_triangles(rows, columns, &some_status);
+    let mut seed = 11u32;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed % 10_000) as f32 / 10_000.0
+    };
+    let shapes = [(SHAPE_BOX, [0.4, 0.3, 0.35]), (SHAPE_BALL, [0.3, 0.0, 0.0]), (SHAPE_CAPSULE, [0.2, 0.3, 0.0])];
+    let (mut touched, mut rays) = (0, 0);
+    for flags in [0, MESH_FIX_EDGES] {
+        for n in 0..30 {
+            let (shape, size) = shapes[n % 3];
+            let at = v3(next() * 6.0 - 3.0, 0.2 + next() * 0.3, next() * 5.0 - 2.5);
+            let turn = Q::from_rotation_vector(v3(0.6, 0.0, 0.8).scale(next() * 3.0));
+            let contacts = |w: &World| {
+                let mut out: Vec<(u32, Vec<u32>)> = (0..w.header().pair_rows as usize)
+                    .filter(|&r| w.uu(PAIR_A, r) != NONE && w.uu(PAIR_FLAGS, r) & PAIR_IS_PART != 0)
+                    .map(|r| {
+                        let count = w.uu(PAIR_CONTACTS, r);
+                        (count, (0..count as usize).map(|k| w.s(CONTACT_SEPARATION, r * MANIFOLD + k).to_bits()).collect())
+                    })
+                    .collect();
+                out.sort();
+                out
+            };
+            let mut grid = World::new(4, 4).unwrap();
+            let field = add_grid(&mut grid, rows, columns, &vertices, flags);
+            for r in 0..rows {
+                for c in 0..columns {
+                    assert!(grid.set_grid_cell_status(field as usize, r, c, some_status(r, c)));
+                }
+            }
+            ground(&mut grid, field);
+            let (body, _) = dynamic(&mut grid, shape, size, at);
+            grid.set_pose(body, at, turn, false);
+            detect(&mut grid);
+            let mut tree = World::new(4, 4).unwrap();
+            let mesh = add_mesh(&mut tree, &vertices, &triangles, flags);
+            ground(&mut tree, mesh);
+            let (body, _) = dynamic(&mut tree, shape, size, at);
+            tree.set_pose(body, at, turn, false);
+            detect(&mut tree);
+            let found = contacts(&grid);
+            touched += found.len();
+            assert_eq!(found, contacts(&tree), "shape {shape} at {at:?}, flags {flags}");
+        }
+    }
+    assert!(touched > 40, "most drops touch some triangles ({touched} parts)");
+    // Rays straight down hit the surface where a triangle is, and pass through the hole where one is not.
+    let mut grid = World::new(4, 4).unwrap();
+    let field = add_grid(&mut grid, rows, columns, &vertices, 0);
+    for r in 0..rows {
+        for c in 0..columns {
+            grid.set_grid_cell_status(field as usize, r, c, some_status(r, c));
+        }
+    }
+    ground(&mut grid, field);
+    let mut tree = World::new(4, 4).unwrap();
+    let mesh = add_mesh(&mut tree, &vertices, &triangles, 0);
+    ground(&mut tree, mesh);
+    detect(&mut grid);
+    detect(&mut tree);
+    for _ in 0..200 {
+        let o = v3(next() * 5.0 - 2.5, 3.0, next() * 4.0 - 2.0);
+        let hit = |w: &World| w.cast_ray(o, v3(0.0, -1.0, 0.0), 10.0, true, &ALL).map(|(_, h)| h.t.to_bits());
+        assert_eq!(hit(&grid), hit(&tree), "a ray down at {o:?}");
+        rays += hit(&grid).is_some() as u32;
+    }
+    assert!(rays > 60 && rays < 190, "some rays hit and some fall through the holes ({rays})");
 }
 
 #[test]

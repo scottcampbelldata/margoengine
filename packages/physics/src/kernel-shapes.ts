@@ -14,8 +14,11 @@ import {
 } from './shapes.js';
 import { buildHull } from './hull.js';
 import { cleanTrimesh, wantsClean } from './mesh-clean.js';
+import { meshHalfEdges } from './mesh-tools.js';
 
 export const PI = 3.141592653589793;
+/** The square root of a half: the quarter turn about an axis has this for its sine and cosine. */
+const HALF_ROOT = 0.7071067811865476;
 
 /** The shapes the own solver holds so far, by the name their options use. */
 const served: Readonly<Record<string, KernelShape | 'compound'>> = {
@@ -35,6 +38,8 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   triangle: 'trimesh',
   polyline: 'compound',
   halfSpace: 'halfspace',
+  // A tetrahedron is the convex hull of its four points.
+  tetrahedron: 'hull',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
 const CONVEX_PARTS = [
@@ -93,6 +98,21 @@ function segmentFrame(a: Vec3, b: Vec3, label: string): { middle: Vec3; rotation
   return { middle: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], rotation: q, half: length / 2 };
 }
 
+/** A tetrahedron as the convex hull of its four points. */
+function tetrahedronHull<T extends { shape: 'tetrahedron'; a: Vec3; b: Vec3; c: Vec3; d: Vec3; borderRadius?: number }>(
+  options: T,
+): Omit<T, 'shape' | 'a' | 'b' | 'c' | 'd'> & { shape: 'convexHull'; points: number[] } {
+  for (const [name, point] of [
+    ['a', options.a],
+    ['b', options.b],
+    ['c', options.c],
+    ['d', options.d],
+  ] as const)
+    checkVec(point, `Tetrahedron ${name}`);
+  const { a, b, c, d, ...rest } = options;
+  return { ...rest, shape: 'convexHull', points: [...a, ...b, ...c, ...d] };
+}
+
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
   name: ShapeOptions['shape'];
@@ -101,7 +121,7 @@ export interface KernelCollider {
   /** A compound's children, for KernelWorld.addCompound. */
   parts?: KernelCompoundPart[];
   /** The points (and triangle indices) a convex hull or triangle mesh was built from. */
-  data?: { vertices: Float32Array; indices?: Uint32Array };
+  data?: { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } };
   /** The collider's volume, for its mass. */
   volume: () => number;
   options: KernelColliderOptions;
@@ -254,6 +274,7 @@ export interface HullRows {
     fixInternalEdges: boolean,
     oriented?: boolean,
     deformable?: boolean,
+    solid?: boolean,
   ): number;
   addHeightfield(
     rows: number,
@@ -261,6 +282,7 @@ export interface HullRows {
     heights: ArrayLike<number>,
     scale: Vec3,
     fixInternalEdges: boolean,
+    cellStatus?: ArrayLike<number>,
   ): number;
   addVoxels(cells: Int32Array, size: Vec3): number;
 }
@@ -284,6 +306,7 @@ export function kernelCollider(
   fit: { geometry: ColliderGeometry | null; scale: Vec3 },
   hulls: HullRows,
 ): KernelCollider {
+  if (options.shape === 'tetrahedron') options = tetrahedronHull(options);
   const shape = shapeServed(options.shape) ? served[options.shape] : undefined;
   if (!shape)
     throw new MargoError(
@@ -300,7 +323,7 @@ export function kernelCollider(
     parts: KernelCompoundPart[] | undefined,
     voxels: number | undefined,
     segment: { middle: Vec3; rotation: Quat4 } | undefined,
-    data: { vertices: Float32Array; indices?: Uint32Array } | undefined,
+    data: { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } } | undefined,
     border = 0;
   const surface =
     options.shape === 'segment' ||
@@ -328,8 +351,18 @@ export function kernelCollider(
       for (let a = 0; a < 3; a++) center[a] = (min[a] + max[a]) / 2;
       size = fittedSphere(points, center);
     } else size = [options.radius];
-  } else if (options.shape === 'capsule') size = [options.radius, options.halfHeight];
-  else if (options.shape === 'cylinder' || options.shape === 'cone') size = revolvedSize(options);
+  } else if (options.shape === 'capsule') {
+    if ('a' in options) {
+      const frame = segmentFrame(options.a, options.b, 'Capsule');
+      segment = frame;
+      size = [options.radius, frame.half];
+    } else {
+      size = [options.radius, options.halfHeight];
+      // Along X or Z: the capsule is turned there in the collider's frame.
+      if (options.axis === 'x') segment = { middle: [0, 0, 0], rotation: [0, 0, -HALF_ROOT, HALF_ROOT] };
+      else if (options.axis === 'z') segment = { middle: [0, 0, 0], rotation: [HALF_ROOT, 0, 0, HALF_ROOT] };
+    }
+  } else if (options.shape === 'cylinder' || options.shape === 'cone') size = revolvedSize(options);
   else if (options.shape === 'convexHull') {
     const points =
         options.points ??
@@ -362,10 +395,7 @@ export function kernelCollider(
         throw new RangeError(
           `Trimesh index ${indexSource[i]} is out of range; keep every index a whole number below the vertex count.`,
         );
-    if (options.mass !== undefined || options.density !== undefined)
-      throw new RangeError(
-        'A trimesh has no volume, so no mass or density; give the body its mass with setMassProperties, or use convexHull or convexDecomposition.',
-      );
+    const massive = options.mass !== undefined || options.density !== undefined;
     let meshVertices: Float32Array = vertices,
       meshIndices: Uint32Array = Uint32Array.from(indexSource);
     if (wantsClean(options))
@@ -374,6 +404,29 @@ export function kernelCollider(
       throw new RangeError(
         'Every triangle of the trimesh was dropped by its clean-up flags; keep some, or leave the flags out.',
       );
+    if (massive) {
+      // A mesh has the mass of the volume it encloses when it is closed (every edge shared by two triangles that run opposite ways)
+      // and wound outwards (its signed volume is positive): Rapier's trimesh mass.
+      const twins = meshHalfEdges(meshIndices);
+      if (twins.twin.some((t) => t === 0xffffffff))
+        throw new RangeError(
+          'A trimesh with a mass or a density must be a closed surface, every edge shared by two triangles that run opposite ways; close it, or give its body mass with setMassProperties, or use convexHull or convexDecomposition.',
+        );
+      let enclosed = 0;
+      for (let t = 0; t < meshIndices.length; t += 3) {
+        const a = 3 * meshIndices[t]!,
+          b = 3 * meshIndices[t + 1]!,
+          c = 3 * meshIndices[t + 2]!;
+        enclosed +=
+          (meshVertices[a]! * (meshVertices[b + 1]! * meshVertices[c + 2]! - meshVertices[b + 2]! * meshVertices[c + 1]!) +
+            meshVertices[a + 1]! * (meshVertices[b + 2]! * meshVertices[c]! - meshVertices[b]! * meshVertices[c + 2]!) +
+            meshVertices[a + 2]! * (meshVertices[b]! * meshVertices[c + 1]! - meshVertices[b + 1]! * meshVertices[c]!)) /
+          6;
+      }
+      if (!(enclosed > 0))
+        throw new RangeError('A trimesh with a mass or a density must be wound outwards (counter-clockwise seen from outside); this one encloses no volume, so flip its triangles.');
+      voxels = enclosed;
+    }
     size = [
       hulls.addTrimesh(
         Float32Array.from(meshVertices),
@@ -381,9 +434,14 @@ export function kernelCollider(
         options.fixInternalEdges ?? false,
         options.oriented ?? false,
         options.deformable ?? false,
+        massive,
       ),
     ];
-    data = { vertices: Float32Array.from(meshVertices), indices: Uint32Array.from(meshIndices) };
+    data = {
+      vertices: Float32Array.from(meshVertices),
+      indices: Uint32Array.from(meshIndices),
+      reads: { components: options.connectedComponents ?? false, halfEdges: options.halfEdgeTopology ?? false },
+    };
   } else if (options.shape === 'heightfield') {
     if (options.mass !== undefined || options.density !== undefined)
       throw new RangeError(
@@ -397,6 +455,7 @@ export function kernelCollider(
         options.heights,
         options.scale,
         options.fixInternalEdges ?? false,
+        options.cellStatus,
       ),
     ];
   } else if (options.shape === 'segment') {
@@ -540,6 +599,7 @@ export function queryParts(options: ShapeOptions): { shape: ShapeOptions; offset
  * volume.
  */
 export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryShape {
+  if (options.shape === 'tetrahedron') options = tetrahedronHull(options);
   const border =
     options.shape === 'box' || options.shape === 'convexHull' ? roundness(options.borderRadius, 'Query shape') : 0;
   if (options.shape === 'sphere' && options.radius !== undefined) return { shape: 'ball', size: [options.radius] };
@@ -611,7 +671,17 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
       row = hulls.addTrimesh(Float32Array.of(...options.a, ...options.b, ...options.c), Uint32Array.of(0, 1, 2), false);
     return { shape: 'trimesh', size: round > 0 ? [row, round] : [row] };
   }
-  if (options.shape === 'capsule') return { shape: 'capsule', size: [options.radius, options.halfHeight] };
+  if (options.shape === 'capsule') {
+    if ('a' in options) {
+      const frame = segmentFrame(options.a, options.b, 'Capsule');
+      return { shape: 'capsule', size: [options.radius, frame.half], placed: { offset: frame.middle, turn: frame.rotation } };
+    }
+    if (options.axis === 'x')
+      return { shape: 'capsule', size: [options.radius, options.halfHeight], placed: { offset: [0, 0, 0], turn: [0, 0, -HALF_ROOT, HALF_ROOT] } };
+    if (options.axis === 'z')
+      return { shape: 'capsule', size: [options.radius, options.halfHeight], placed: { offset: [0, 0, 0], turn: [HALF_ROOT, 0, 0, HALF_ROOT] } };
+    return { shape: 'capsule', size: [options.radius, options.halfHeight] };
+  }
   if (options.shape === 'cylinder' || options.shape === 'cone')
     return { shape: options.shape, size: revolvedSize(options) };
   if (options.shape === 'convexHull' && options.points) {

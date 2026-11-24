@@ -10,6 +10,7 @@ export interface ConvexDecomposition {
     parts: {
         shape: 'convexHull';
         points: Float32Array;
+        borderRadius?: number;
     }[];
     concavity: number[];
 }
@@ -23,6 +24,7 @@ export interface ConvexDecompositionOptions {
     merge?: boolean;
     seed?: number;
     timeLimit?: number;
+    borderRadius?: number;
 }
 
 export function convexDecomposition(mesh: ColliderGeometry, options?: ConvexDecompositionOptions): ConvexDecomposition;

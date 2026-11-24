@@ -401,9 +401,30 @@ function scaleCollider(source: ColliderOptions, scale: Triple): ColliderOptions 
     case 'sphere':
       return { ...source, radius: source.radius === undefined ? undefined : source.radius * Math.max(...abs) };
     case 'capsule':
+      // A capsule from two end points scales its points; along X or Z it lengthens along that axis.
+      if ('a' in source)
+        return {
+          ...source,
+          a: source.a.map((value, axis) => value * scale[axis]!) as unknown as Triple,
+          b: source.b.map((value, axis) => value * scale[axis]!) as unknown as Triple,
+          radius: source.radius * radial,
+        };
+      return {
+        ...source,
+        halfHeight: source.halfHeight * abs[source.axis === 'x' ? 0 : source.axis === 'z' ? 2 : 1]!,
+        radius: source.radius * radial,
+      };
     case 'cylinder':
     case 'cone':
       return { ...source, halfHeight: source.halfHeight * abs[1], radius: source.radius * radial };
+    case 'tetrahedron':
+      return {
+        ...source,
+        a: source.a.map((value, axis) => value * scale[axis]!) as unknown as Triple,
+        b: source.b.map((value, axis) => value * scale[axis]!) as unknown as Triple,
+        c: source.c.map((value, axis) => value * scale[axis]!) as unknown as Triple,
+        d: source.d.map((value, axis) => value * scale[axis]!) as unknown as Triple,
+      };
     case 'convexHull':
       return source.points ? { ...source, points: scalePoints(source.points, scale) } : source;
     case 'trimesh':

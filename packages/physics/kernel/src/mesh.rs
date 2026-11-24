@@ -37,6 +37,16 @@ pub const MESH_NOT_FINITE: i32 = -3;
 pub const MESH_BAD_ACROSS: i32 = -4;
 /// A height field whose size or vertices do not make the grid `end_grid` reads.
 pub const MESH_BAD_GRID: i32 = -5;
+/// A mesh made solid that does not enclose a volume: wound inwards, or flat.
+pub const MESH_NOT_SOLID: i32 = -6;
+
+/// A height field cell's status byte, `HeightFieldCellStatus` of Rapier's Rust crate: bit 0 splits the cell along the other
+/// diagonal (a Z pattern), bits 1 and 2 remove its left or its right triangle. The left triangle of a cell holds the edge
+/// at its lower x, the right one the edge at its higher x, whichever way the cell is split; triangle ids stay 2 a cell, the
+/// left one first, so a removed triangle leaves a gap in the ids and nothing else moves.
+pub const GRID_ZIGZAG: u32 = 1;
+pub const GRID_LEFT_REMOVED: u32 = 2;
+pub const GRID_RIGHT_REMOVED: u32 = 4;
 
 /// An edge folds less than this, as the sine of the fold, and it is flat: about 0.06 degrees.
 const FOLD: f32 = 1e-3;
@@ -494,6 +504,9 @@ impl World {
             self.set_u(TRIANGLE_EDGES, t, classes);
         }
         let made = self.finish_mesh([row, first_vertex, vertices, first_triangle, triangles, first_node, used, flags, 0], low, high);
+        if made >= 0 && flags & MESH_SOLID != 0 && !self.solidify_mesh(made as usize) {
+            return MESH_NOT_SOLID;
+        }
         // A deformable mesh keeps two more blocks of vertex rows behind its positions: the targets, then the velocities.
         if flags & MESH_DEFORMABLE != 0 && made >= 0 {
             let n = vertices as usize;
@@ -506,6 +519,48 @@ impl World {
             self.set_u(MESH_OWNER, made as usize, NONE);
         }
         made
+    }
+
+    /// Works out the volume, centre of mass and principal inertia of a closed mesh wound outwards, per unit of density, from the
+    /// tetrahedra its triangles make with a point inside its box (the sums of `hull_mass`: with the apex at the origin, a
+    /// tetrahedron of volume V and vertices a, b, c has `integral x_i = V/4 sum p_i` and `integral x_i x_j = V/20 (sum p_i p_j +
+    /// sum p_i sum p_j)`). False when the volume is not positive.
+    fn solidify_mesh(&mut self, mesh: usize) -> bool {
+        let (v0, t0, triangles) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_FIRST_TRIANGLE, mesh) as usize, self.uu(MESH_TRIANGLES, mesh) as usize);
+        let apex = self.v(MESH_BOX_X, mesh);
+        let mut volume = 0.0f32;
+        let mut first_moment = v3(0.0, 0.0, 0.0);
+        let mut second = crate::mass::Sym { xx: 0.0, yy: 0.0, zz: 0.0, xy: 0.0, xz: 0.0, yz: 0.0 };
+        let (mut xx, mut yy, mut zz) = (0.0f32, 0.0f32, 0.0f32);
+        for t in t0..t0 + triangles {
+            let [pa, pb, pc] = self.triangle_corners(v0, t);
+            let (a, b, c) = (pa.sub(apex), pb.sub(apex), pc.sub(apex));
+            let v = a.dot(b.cross(c)) / 6.0;
+            volume += v;
+            let s = a.add(b).add(c);
+            first_moment = first_moment.add(s.scale(v * 0.25));
+            let w = v / 20.0;
+            xx += w * (a.x * a.x + b.x * b.x + c.x * c.x + s.x * s.x);
+            yy += w * (a.y * a.y + b.y * b.y + c.y * c.y + s.y * s.y);
+            zz += w * (a.z * a.z + b.z * b.z + c.z * c.z + s.z * s.z);
+            second.xy -= w * (a.x * a.y + b.x * b.y + c.x * c.y + s.x * s.y);
+            second.xz -= w * (a.x * a.z + b.x * b.z + c.x * c.z + s.x * s.z);
+            second.yz -= w * (a.y * a.z + b.y * b.z + c.y * c.z + s.y * s.z);
+        }
+        if !(volume > 0.0) {
+            return false;
+        }
+        second.xx = yy + zz;
+        second.yy = xx + zz;
+        second.zz = xx + yy;
+        let offset = first_moment.scale(1.0 / volume);
+        crate::mass::add_offset(&mut second, -volume, offset);
+        let (moments, frame) = crate::mass::principal(second);
+        self.set_s(MESH_VOLUME, mesh, volume);
+        self.set_v(MESH_COM_X, mesh, apex.add(offset));
+        self.set_v(MESH_MOMENT_X, mesh, moments);
+        self.set_q(MESH_FRAME_X, mesh, frame);
+        true
     }
 
     /// Writes a mesh's row and hands out its rows: `rows` holds its row, first vertex, vertices, first triangle,
@@ -545,8 +600,10 @@ impl World {
         }
         let (cells, count) = (rows as u64 * columns as u64, (rows as u64 + 1) * (columns as u64 + 1));
         let have = mesh_capacity(&self.header().capacity);
-        // Triangle ids are 2 a cell and must stay below NONE; the vertices must fit the rows `begin_mesh` made.
-        if 2 * cells >= NONE as u64 || row >= have[0] || first_vertex as u64 + count > have[1] as u64 {
+        let first_word = self.header().mesh_rows[4];
+        // Triangle ids are 2 a cell and must stay below NONE; the vertices and the status bytes of the cells (one a cell,
+        // `begin_voxels` made room and zeroed them) must fit the rows made for them.
+        if 2 * cells >= NONE as u64 || row >= have[0] || first_vertex as u64 + count > have[1] as u64 || first_word as u64 + cells.div_ceil(4) > have[4] as u64 {
             return MESH_BAD_GRID;
         }
         let (v0, stride, vertices) = (first_vertex as usize, rows as usize + 1, count as u32);
@@ -567,7 +624,62 @@ impl World {
                 high = high.max(p);
             }
         }
-        self.finish_mesh([row, first_vertex, vertices, first_triangle, 0, first_node, 0, flags, columns], low, high)
+        let made = self.finish_mesh([row, first_vertex, vertices, first_triangle, 0, first_node, 0, flags, columns], low, high);
+        if made >= 0 {
+            self.set_u(VOXEL_FIRST, row as usize, first_word);
+            self.header_mut().mesh_rows[4] = first_word + (cells.div_ceil(4)) as u32;
+        }
+        made
+    }
+
+    /// The status byte of cell `(r, c)` of a height field, or 0 for a cell off it.
+    pub fn grid_cell_status(&self, mesh: usize, r: u32, c: u32) -> u32 {
+        match self.grid_size(mesh) {
+            Some((rows, columns)) if r < rows && c < columns => self.cell_byte(mesh, r + rows * c),
+            _ => 0,
+        }
+    }
+
+    /// Sets the status byte of cell `(r, c)` of a height field. False for a cell off it, a status above 7, or a mesh that
+    /// is no height field. What touches the field must be woken by the caller.
+    pub fn set_grid_cell_status(&mut self, mesh: usize, r: u32, c: u32, status: u32) -> bool {
+        match self.grid_size(mesh) {
+            Some((rows, columns)) if r < rows && c < columns && status < 8 => {
+                self.set_cell_byte_pub(mesh, r + rows * c, status);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Sets the status of cell `(r, c)` of height field collider `collider` in place, and wakes what touches it. 1, or 0 when
+    /// the collider is no height field, the cell is off it or the status is above 7.
+    pub fn set_cell_status(&mut self, collider: u32, r: u32, c: u32, status: u32) -> u32 {
+        let k = collider as usize;
+        if collider >= self.header().collider_rows || self.uu(COLLIDER_SHAPE, k) != SHAPE_TRIMESH {
+            return 0;
+        }
+        let mesh = self.uu(COLLIDER_HULL, k) as usize;
+        if !self.set_grid_cell_status(mesh, r, c, status) {
+            return 0;
+        }
+        self.wake_touching_pairs(collider);
+        1
+    }
+
+    /// The status of cell `(r, c)` of height field collider `collider`: 0 for a cell off it or a collider that is none.
+    pub fn cell_status(&self, collider: u32, r: u32, c: u32) -> u32 {
+        let k = collider as usize;
+        if collider >= self.header().collider_rows || self.uu(COLLIDER_SHAPE, k) != SHAPE_TRIMESH {
+            return 0;
+        }
+        self.grid_cell_status(self.uu(COLLIDER_HULL, k) as usize, r, c)
+    }
+
+    /// Whether triangle `t` of a mesh is there: a height field's triangle is gone when its cell's status removes it.
+    #[inline(always)]
+    pub fn triangle_alive(&self, mesh: usize, t: u32) -> bool {
+        self.grid_size(mesh).is_none() || self.cell_byte(mesh, t / 2) & (GRID_LEFT_REMOVED << (t % 2)) == 0
     }
 
     /// A height field's rows and columns of cells, or None for a mesh of triangle rows.
@@ -600,7 +712,13 @@ impl World {
         let cell = t / 2;
         let (r, c, stride) = ((cell % rows) as usize, (cell / rows) as usize, rows as usize + 1);
         let at = |r: usize, c: usize| self.v(MESH_VERTEX_X, v0 + r + stride * c);
-        if t % 2 == 0 { [at(r, c), at(r + 1, c), at(r, c + 1)] } else { [at(r + 1, c), at(r + 1, c + 1), at(r, c + 1)] }
+        if self.cell_byte(mesh, cell) & GRID_ZIGZAG != 0 {
+            if t % 2 == 0 { [at(r, c), at(r + 1, c), at(r + 1, c + 1)] } else { [at(r, c), at(r + 1, c + 1), at(r, c + 1)] }
+        } else if t % 2 == 0 {
+            [at(r, c), at(r + 1, c), at(r, c + 1)]
+        } else {
+            [at(r + 1, c), at(r + 1, c + 1), at(r, c + 1)]
+        }
     }
 
     /// The triangle across edge `k` (corner k to k + 1) of triangle `t` of a mesh, or NONE for an open edge.
@@ -612,17 +730,38 @@ impl World {
         let cell = t / 2;
         let (r, c) = (cell % rows, cell / rows);
         let id = |r: u32, c: u32, half: u32| 2 * (r + rows * c) + half;
-        // The first half's edges run up its column line, along the diagonal and back along its row line; the second
-        // half's along the far row line, back along the far column line and along the diagonal.
-        match (t % 2, k) {
-            (0, 0) if c > 0 => id(r, c - 1, 1),
-            (0, 1) => t + 1,
-            (0, 2) if r > 0 => id(r - 1, c, 1),
-            (1, 0) if r + 1 < rows => id(r + 1, c, 0),
-            (1, 1) if c + 1 < columns => id(r, c + 1, 0),
-            (1, 2) => t - 1,
-            _ => NONE,
-        }
+        // The half of cell (r, c) that holds the edge on the far or the near row line: the left one when the diagonal runs
+        // from the cell's low row to its high column across the far line, as the default split does, and the other one
+        // when the cell is split the other way. The left triangle always holds the low column line and the right one the
+        // high column line.
+        let zig = |r: u32, c: u32| self.cell_byte(mesh, r + rows * c) & GRID_ZIGZAG != 0;
+        let zigzag = zig(r, c);
+        let across = if zigzag {
+            // Left: the low column line, the far row line, the diagonal. Right: the diagonal, the high column line, the low row line.
+            match (t % 2, k) {
+                (0, 0) if c > 0 => id(r, c - 1, 1),
+                (0, 1) if r + 1 < rows => id(r + 1, c, if zig(r + 1, c) { 1 } else { 0 }),
+                (0, 2) => t + 1,
+                (1, 0) => t - 1,
+                (1, 1) if c + 1 < columns => id(r, c + 1, 0),
+                (1, 2) if r > 0 => id(r - 1, c, if zig(r - 1, c) { 0 } else { 1 }),
+                _ => NONE,
+            }
+        } else {
+            // The first half's edges run up its column line, along the diagonal and back along its row line; the second
+            // half's along the far row line, back along the far column line and along the diagonal.
+            match (t % 2, k) {
+                (0, 0) if c > 0 => id(r, c - 1, 1),
+                (0, 1) => t + 1,
+                (0, 2) if r > 0 => id(r - 1, c, if zig(r - 1, c) { 0 } else { 1 }),
+                (1, 0) if r + 1 < rows => id(r + 1, c, if zig(r + 1, c) { 1 } else { 0 }),
+                (1, 1) if c + 1 < columns => id(r, c + 1, 0),
+                (1, 2) => t - 1,
+                _ => NONE,
+            }
+        };
+        // A removed triangle is no neighbour: that edge is open.
+        if across == NONE || !self.triangle_alive(mesh, across) { NONE } else { across }
     }
 
     /// The cells of height field `mesh` under the box from `low` to `high` in its frame along x and z: the first and last
@@ -654,6 +793,9 @@ impl World {
     #[allow(clippy::too_many_arguments)]
     fn collide_triangle(&self, other: usize, other_is_a: bool, mesh: usize, t: u32, pose: Pose, limit: f32, out: &mut Manifold) {
         out.count = 0;
+        if !self.triangle_alive(mesh, t) {
+            return;
+        }
         let corners = self.mesh_triangle(mesh, t);
         let Some(front) = triangle_normal(corners[0], corners[1], corners[2]) else { return };
         let data = TriData::new(corners[0], corners[1], corners[2], front);

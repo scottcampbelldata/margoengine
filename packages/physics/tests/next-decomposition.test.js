@@ -191,3 +191,22 @@ test('the decomposition is a collider on the root entry too, and /next asks for 
       /@margoengine\/physics\/decomposition/.test(error.message),
   );
 });
+
+test('borderRadius rounds every part like Rapier round_convex_decomposition, and is refused when negative', () => {
+  const sharp = convexDecomposition(tube()),
+    round = convexDecomposition(tube(), { borderRadius: 0.05 });
+  assert.equal(round.parts.length, sharp.parts.length);
+  for (const part of sharp.parts) assert.equal('borderRadius' in part, false, 'a sharp part has no border');
+  for (const part of round.parts) assert.equal(part.borderRadius, 0.05);
+  const rest = (parts) => {
+    const physics = new Physics(null);
+    physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: parts });
+    const marble = physics.addBody(null, { position: [0.5, 6, 0.5], colliders: { shape: 'sphere', radius: 0.2 } });
+    for (let i = 0; i < 300; i++) physics.step();
+    return marble.position[1];
+  };
+  const top = rest(round) - rest(sharp);
+  assert.ok(Math.abs(top - 0.05) < 0.01, `a rounded decomposition rests the marble 0.05 m higher (${top})`);
+  assert.throws(() => convexDecomposition(tube(), { borderRadius: -1 }), RangeError);
+  assert.throws(() => convexDecomposition(tube(), { borderRadius: Number.NaN }), RangeError);
+});
