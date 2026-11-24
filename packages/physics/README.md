@@ -775,6 +775,40 @@ console.log(box.parts.length, marble.position[1].toFixed(2)); // 8 0.33: inside 
 physics.dispose();
 ```
 
+## Parity with Rapier 3D
+
+Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table is the work list until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
+
+### Dynamics and joints
+
+| Capability (Rapier 3D) | Kernel and `next` entry | Status |
+| --- | --- | --- |
+| Body types: dynamic, fixed, kinematic position-based, kinematic velocity-based | `addBody`, `setType`, `setNextPosition` | full |
+| Pose, linear and angular velocity, teleport with or without waking | `setPosition`, `setRotation`, `setLinearVelocity`, `setAngularVelocity` | full |
+| Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addTorque`, `applyImpulse`, `applyTorqueImpulse`, `resetForces` | full |
+| Linear and angular damping, gravity scale | body options | full |
+| Dominance groups | `dominance` | full |
+| Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` | full |
+| Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full |
+| Additional solver iterations per body | `additionalSolverIterations` | full |
+| Maximum linear and angular velocity per body | none | missing |
+| Sleep thresholds, can sleep, put to sleep, wake up | world thresholds, `canSleep`, `sleep`, `wakeUp` | partial: thresholds are the world's, not per body |
+| Enabled flag | `enabled` | full |
+| Continuous collision detection | `ccd` | full |
+| Islands | island forest, an island sleeps together | full |
+| Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full |
+| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, prediction distance, warm starting | held in the world header, no setter | partial |
+| Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full |
+| Joint limits, per axis | `setLimits`, `setAxisLimits` | full |
+| Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |
+| Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full |
+| Joint break on a force or torque threshold | none | missing |
+| Multibody (reduced-coordinate) joints and inverse kinematics | none | missing |
+| Cross-platform determinism | bit-equal replay in Node, native code, Chromium and Firefox; `world.hash` | partial: no named mode |
+| Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |
+| PID controller | none | missing |
+| Debug-render data: colliders, joints, contacts, boxes | none | missing |
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.
