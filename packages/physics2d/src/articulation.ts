@@ -78,13 +78,13 @@ export class Articulation2D {
     this.links = links.map((link, i) => {
       const parent = link.parent ?? -1;
       if (!Number.isInteger(parent) || parent < -1 || parent >= i)
-        throw new RangeError(`link ${i}: parent must be -1 (the root) or the index of an earlier link, got ${parent}.`);
+        throw new RangeError(`link ${i}: parent must be -1 (the root) or the index of an earlier link, got ${parent}; list parents before children.`);
       const j = link.joint;
       if (j.type !== 'revolute' && j.type !== 'prismatic')
-        throw new TypeError(`link ${i}: an articulation joint is revolute or prismatic, got "${(j as { type: string }).type}".`);
+        throw new TypeError(`link ${i}: an articulation joint is revolute or prismatic, got "${(j as { type: string }).type}"; use one of those types.`);
       const raw: Vec2D = j.axis ?? [1, 0];
       const length = Math.hypot(raw[0], raw[1]);
-      if (!(length > 0) || !Number.isFinite(length)) throw new RangeError(`link ${i}: the joint axis must be a finite vector that is not zero.`);
+      if (!(length > 0) || !Number.isFinite(length)) throw new RangeError(`link ${i}: the joint axis must be a finite vector that is not zero; try [1, 0].`);
       // The kernel's prismatic joint measures along the unit axis, so the joint space does too.
       const axis: Vec2D = [raw[0] / length, raw[1] / length];
       return { link, parent, anchorParent: j.anchorParent ?? [0, 0], anchorChild: j.anchorChild ?? [0, 0], axis };
@@ -161,7 +161,7 @@ export class Articulation2D {
   /** Where every link is when the joints are at `q`, from the root's pose now. */
   forwardKinematics(q: readonly number[] = this.positions()): LinkPose2D[] {
     this.check();
-    if (q.length !== this.dof) throw new RangeError(`q has ${q.length} values for ${this.dof} joints.`);
+    if (q.length !== this.dof) throw new RangeError(`q has ${q.length} values for ${this.dof} joints; pass one value per joint.`);
     const poses: LinkPose2D[] = [];
     const rootPose: LinkPose2D = { position: [...this.root.position], rotation: this.root.rotation };
     this.links.forEach(({ link, parent, anchorParent, anchorChild, axis }, i) => {
@@ -189,7 +189,7 @@ export class Articulation2D {
     return [pose.position[0] + r[0], pose.position[1] + r[1]];
   }
   private checkLink(link: number): void {
-    if (!Number.isInteger(link) || link < 0 || link >= this.dof) throw new RangeError(`link must be 0 to ${this.dof - 1}, got ${link}.`);
+    if (!Number.isInteger(link) || link < 0 || link >= this.dof) throw new RangeError(`link must be 0 to ${this.dof - 1}, got ${link}; pass an index of this articulation.`);
   }
 
   /** The 2 by dof Jacobian of the point `local` of link `link`: how it moves, in world units per unit of each joint, at `q`. */
@@ -271,7 +271,7 @@ export class Articulation2D {
   /** Sets the position motor of every joint toward `q`, with the stiffness and damping given (defaults 200 and 20), so the arm moves there under the physics. */
   driveTo(q: readonly number[], { stiffness = 200, damping = 20, maxForce }: { stiffness?: number; damping?: number; maxForce?: number } = {}): this {
     this.check();
-    if (q.length !== this.dof) throw new RangeError(`q has ${q.length} values for ${this.dof} joints.`);
+    if (q.length !== this.dof) throw new RangeError(`q has ${q.length} values for ${this.dof} joints; pass one value per joint.`);
     this.joints.forEach((joint, i) => joint.setMotor({ targetPosition: q[i], stiffness, damping, ...(maxForce !== undefined ? { maxForce } : {}) }));
     return this;
   }
