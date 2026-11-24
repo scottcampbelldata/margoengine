@@ -5,12 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { AssetOptions, GLTFImage } from './asset.js';
 import type { GLTFLoadOptions as CompressionOptions } from './compression.js';
 import { withDecoders } from './decoder-default.js';
-import {
-  loadGLTF as loadModel,
-  parseGLTFAsync as parseModel,
-  type GLTFLoadOptions,
-  type PBRModel,
-} from './model.js';
+import { loadGLTF as loadModel, parseGLTFAsync as parseModel, type GLTFLoadOptions, type PBRModel } from './model.js';
 
 export * from './model.js';
 
@@ -21,7 +16,7 @@ export function loadGLTF(instance: EngineKernel, url: string | URL, options: GLT
 
 /**
  * Async in-memory JSON/GLB parsing, including Draco, meshopt and KTX2. With no third argument (or an options object),
- * decodes embedded images and resolves external URIs against the page. The positional buffers/images overload uses
+ * decodes embedded images and resolves external URIs against the `baseURL` option (a file in memory has no location: without it an external URI is refused). The positional buffers/images overload uses
  * supplied ordinary bitmaps; an undefined buffers argument keeps that overload when images or later options are passed.
  */
 export function parseGLTFAsync(

@@ -101,16 +101,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   affected packages that have tests. A full reason (core, stage, check code and the rest) still runs every package.
   Regression: `tests/check-merge-affected.test.js` ("test:changed picks the changed packages ...").
 
-### Open: parseGLTFAsync of a file in memory fetches its external URIs from the page's directory (KB-GLTFA B7, gltf/pbr)
+### Fixed 2026-11-24: parseGLTFAsync of a file in memory fetched its external URIs from the page's directory (KB-GLTFA B7, gltf/pbr)
 
-- **Repro:** `parseGLTFAsync(engine, docWithImageUri)` from `@margoengine/gltf/pbr` on a page at
-  `https://app.test/editor/` with `images: [{ uri: 'secret/tex.png' }]` requests `https://app.test/editor/secret/tex.png`
-  and fails with `glTF download request failed: HTTP 404`, which does not say that the file has no location.
-- **Cause:** `loadAsset` (`packages/gltf/src/asset.ts`) resolves URIs against `globalThis.location` when no URL is
-  given. This is documented on `parseGLTFAsync` ("resolves external URIs against the page") and matches what loaders
-  people switch from do with an empty path, so it stays; the light loader refuses instead ("needs the file location;
-  use loadGLTF"). Open as an API question: a refusal naming `loadGLTF` and the `buffers` option would change documented
-  behaviour.
+- **Repro (before):** `parseGLTFAsync(engine, docWithImageUri)` from `@margoengine/gltf/pbr` on a page at
+  `https://app.test/editor/` with `images: [{ uri: 'secret/tex.png' }]` requested `https://app.test/editor/secret/tex.png`
+  and failed with `glTF download request failed: HTTP 404`, which did not say that the file has no location.
+- **Cause:** `loadAsset` (`packages/gltf/src/asset.ts`) resolved URIs against `globalThis.location` when no URL was given.
+- **Fix:** `AssetOptions.baseURL` names what a file in memory resolves against; without it an external buffer or image
+  URI (not `data:`) is refused with a coded `state` error that names `baseURL` and `loadGLTF`, and nothing is fetched.
+  `loadGLTF` and the other loaders that fetch the file know its location and ignore the option. This changes the
+  documented "resolves against the page" behaviour on purpose (manager ruling 2026-11-24).
+- **Regression:** packages/gltf/test/in-memory-base.test.js; test/download-budget.test.js now passes `baseURL`.
 
 ### Fixed 2026-11-19: loadAuto held a large file twice while gltf/pbr loaded it (KB-GLTFA B14, gltf)
 

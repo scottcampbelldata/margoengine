@@ -1026,6 +1026,13 @@ export interface AssetOptions {
    */
   allowedURLs?: readonly string[];
   /**
+   * The URL external buffer and image URIs are resolved against when the file is parsed from memory
+   * (`parseGLTFAsync`), for example `https://cdn.example.com/models/car.gltf`. A file in memory has no location of its
+   * own, so without this option a URI that is not a `data:` URI is refused with a coded error (KB-GLTFA B7); `loadGLTF`
+   * and the other loaders that fetch the file know its location and ignore this option.
+   */
+  baseURL?: string | URL;
+  /**
    * Most bytes the file, its buffers and embedded or external images may total (default 512 MiB, `assetLimit`). Decoded accessors,
    * packed geometry and decoded images may each use 4x this. Exceeding it throws a RangeError naming this option.
    */
@@ -1051,7 +1058,7 @@ export async function triangleOrder(): Promise<NonNullable<GLTFAsset['reorder']>
   const { optimizeOverdraw, optimizeVertexCache } = await import('@margoengine/geometry/optimize');
   return (indices, positions, count) => optimizeOverdraw(optimizeVertexCache(indices, count), positions);
 }
-/** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else the page. */
+/** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else `baseURL` (none: refused). */
 export async function loadAsset(
   url: string | URL | undefined,
   options: AssetOptions | AbortSignal = {},
@@ -1077,7 +1084,12 @@ export async function loadAsset(
   const limit = downloadLimit(maxDownloadBytes),
     partVertices = partLimit(maxPartVertices);
   signal?.throwIfAborted();
-  let base = url === undefined ? undefined : new URL(url, globalThis.location?.href),
+  let base =
+      url !== undefined
+        ? new URL(url, globalThis.location?.href)
+        : config.baseURL !== undefined
+          ? new URL(config.baseURL, globalThis.location?.href)
+          : undefined,
     total = downloadedBytes;
   const fetchBytes = async (target: URL, root = false) => {
     if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
@@ -1093,7 +1105,14 @@ export async function loadAsset(
     total += bytes.length;
     return bytes;
   };
-  const resolve = (uri: string) => assetURL(uri, base ?? globalThis.location?.href, allowedURLs, 'glTF resource');
+  const resolve = (uri: string) => {
+    if (base === undefined && url === undefined)
+      throw margoError(
+        'state',
+        `glTF URI ${uri} needs the file location, which a file in memory does not have; pass the baseURL option to parseGLTFAsync or load the file with loadGLTF`,
+      );
+    return assetURL(uri, base ?? globalThis.location?.href, allowedURLs, 'glTF resource');
+  };
   const { doc, binary, sourceBytes } = container(input ?? (await fetchBytes(base!, true)), limit),
     buffers: Uint8Array[] = [],
     images: GLTFImage[] = [];

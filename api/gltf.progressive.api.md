@@ -81,6 +81,7 @@ interface AssetOptions {
     buffers?: Array<ArrayBuffer | ArrayBufferView>;
     fetch?: typeof fetch;
     allowedURLs?: readonly string[];
+    baseURL?: string | URL;
     maxDownloadBytes?: number;
     maxNodes?: number;
     optimize?: boolean;

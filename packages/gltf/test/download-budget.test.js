@@ -54,6 +54,7 @@ async function scene(run) {
   };
   const options = (maxDownloadBytes) => ({
     maxDownloadBytes,
+    baseURL: rootURL,
     allowedURLs: ['https://fixture.invalid/'],
     fetch: async (target) => {
       const url = String(target);

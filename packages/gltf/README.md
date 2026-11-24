@@ -469,7 +469,7 @@ engine.dispose();
 
 For in-memory JSON or GLB bytes, use `await parseGLTFAsync(engine, input)` or pass an options object as the third
 argument, for example `{buffers, signal, draco, ktx2}`. Both forms decode embedded PNG/JPEG and KTX2 images;
-external buffers and images resolve against the page. Passing `undefined` as the third argument alone behaves like
+external buffers and images resolve against the `baseURL` option (`{baseURL: 'https://cdn.example.com/models/car.gltf'}`); a file in memory has no location, so without it an external URI is refused with a coded error and nothing is fetched. Passing `undefined` as the third argument alone behaves like
 omitting it. Decoded bitmaps close with the model, or before rejection on decode, size-limit, cancellation or attachment
 failure.
 

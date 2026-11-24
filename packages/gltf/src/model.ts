@@ -5968,7 +5968,7 @@ export async function loadGLTF(
 }
 /**
  * Async in-memory JSON/GLB parsing, including Draco, meshopt and KTX2. With no third argument (or an options object),
- * decodes embedded images and resolves external URIs against the page. The positional buffers/images overload uses
+ * decodes embedded images and resolves external URIs against the `baseURL` option (a file in memory has no location: without it an external URI is refused). The positional buffers/images overload uses
  * supplied ordinary bitmaps; an undefined buffers argument keeps that overload when images or later options are passed.
  */
 export async function parseGLTFAsync(
