@@ -50,9 +50,11 @@ export function splitBody(
   make: (positions: number[]) => SoftBodyDesc,
   cut?: ReadonlySet<number>,
 ): SoftSplit | null {
-  if (body.removed || body.triangleList.length > 0 || body.surface) return null;
+  if (body.removed) return null;
   const { count } = body.cellRange;
-  return count > 0 ? splitCells(soft, body, make, cut) : splitEdges(soft, body, make);
+  // A body of cells with triangles has surfaces the cell split does not carry; one of edges (cloth, a trimesh) takes them along.
+  if (count > 0) return body.triangleList.length > 0 || body.surface ? null : splitCells(soft, body, make, cut);
+  return splitEdges(soft, body, make);
 }
 
 /** A body of edges only: its pieces are the connected parts of the edges that are left. */
@@ -64,9 +66,19 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
   for (let e = 0; e < body.edgeTotal; e++) {
     if ((c.eflags[body.firstEdge + e]! & TORN) !== 0) continue;
     alive.push(e);
-    join(parent, c.ea[body.firstEdge + e]! - body.firstParticle, c.eb[body.firstEdge + e]! - body.firstParticle);
+    // Only a structural or shear edge joins particles into a piece: a bend edge reaches across a tear and holds nothing together.
+    if (e < body.structural)
+      join(parent, c.ea[body.firstEdge + e]! - body.firstParticle, c.eb[body.firstEdge + e]! - body.firstParticle);
   }
-  const roots = new Set<number>();
+  const roots = new Set<number>(),
+    // The sides of torn edges, as pairs of particles, for the triangles that stand on them.
+    tornSide = new Set<number>();
+  for (let e = 0; e < body.structural; e++)
+    if ((c.eflags[body.firstEdge + e]! & TORN) !== 0) {
+      const a = c.ea[body.firstEdge + e]! - body.firstParticle,
+        b = c.eb[body.firstEdge + e]! - body.firstParticle;
+      tornSide.add(Math.min(a, b) * n + Math.max(a, b));
+    }
   for (let i = 0; i < n; i++) roots.add(find(parent, i));
   if (roots.size <= 1) return null;
   const f = snapshot(soft.cellColumns()),
@@ -95,9 +107,27 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
     for (const e of alive) {
       const a = c.ea[body.firstEdge + e]! - body.firstParticle,
         b = c.eb[body.firstEdge + e]! - body.firstParticle;
-      if (!local.has(a)) continue;
+      if (!local.has(a) || !local.has(b)) continue;
       (e < body.structural ? desc.edgePairs : desc.bendPairs).push(local.get(a)!, local.get(b)!);
+      if (e < body.structural) desc.edgeKinds.push(body.edgeKinds[e] ?? 0);
       edgeRows.push(e);
+    }
+    // The triangles of the piece: those whose corners are all in it and none of whose sides has torn (a crack that does not part
+    // the body leaves its triangles out, as a hole in the surface).
+    const triangles = body.triangleList;
+    for (let t = 0; t < triangles.length; t += 3) {
+      const corner = [triangles[t]!, triangles[t + 1]!, triangles[t + 2]!];
+      if (!corner.every((p) => local.has(p))) continue;
+      let whole = true;
+      for (let k = 0; k < 3 && whole; k++) {
+        const key = Math.min(corner[k]!, corner[(k + 1) % 3]!) * n + Math.max(corner[k]!, corner[(k + 1) % 3]!);
+        if (tornSide.has(key)) whole = false;
+      }
+      if (whole) desc.triangles.push(...corner.map((p) => local.get(p)!));
+    }
+    if (desc.triangles.length > 0) {
+      desc.selfContacts = body.selfContacts;
+      desc.selfFriction = body.selfFriction;
     }
     const piece = soft.create(desc),
       after = soft.columns(),
@@ -117,6 +147,11 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
       where.set(p, { body: piece, particle: k });
     });
     pieces.push(piece);
+    // A surface collider for each piece, like the body's, and the body's own is taken away with it.
+    if (body.surface && desc.triangles.length > 0) {
+      const old = body.surface.colliders[0]!;
+      soft.createSurfaceCollider(piece, { friction: old.friction() });
+    }
   }
   soft.remove(body);
   return { pieces, destinations: (p) => (where.has(p) ? [where.get(p)!] : []) };
@@ -157,14 +192,16 @@ function splitCells(
     across = (t: number, k: number): number => at(`nb${k}`)[t]!,
     isAlive = (t: number): boolean => (flags[t]! & TORN) === 0;
   const cells: number[] = [];
-  for (let t = first; t < first + count; t++) if (isAlive(t)) cells.push(t);
+  // A cell that tore is not dropped: it parts from every cell it was joined to and, with the torn cells it touches, goes on as a
+  // piece of its own, so the volume and mass of the body are kept.
+  for (let t = first; t < first + count; t++) cells.push(t);
   // A cell corner is a slot; corners that are the same particle and share a face the crack leaves whole are one virtual node.
   const slots = new Int32Array(count * 4).map((_, i) => i),
     part = Int32Array.from({ length: count }, (_, i) => i);
   for (const t of cells) {
     for (let k = 0; k < 4; k++) {
       const n = across(t, k);
-      if (n === NONE || !isAlive(n)) continue;
+      if (n === NONE || isAlive(t) !== isAlive(n)) continue;
       const opposite = [0, 1, 2, 3].find((j) => across(n, j) === t);
       if (cut?.has(t * 4 + k) || (opposite !== undefined && cut?.has(n * 4 + opposite))) continue;
       join(part, t - first, n - first);

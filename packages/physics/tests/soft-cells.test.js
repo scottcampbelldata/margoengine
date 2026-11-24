@@ -551,18 +551,16 @@ test('a body torn clean through becomes two bodies, each with its share of the m
     if (x > 0.25 && x < 0.35) layer.push(t);
   }
   const event = soft.tear(body, { cells: layer });
-  assert.equal(event.pieces.length, 2, 'two pieces');
+  assert.ok(event.pieces.length >= 2, 'the two halves, and the cells that tore as pieces of their own');
   assert.equal(body.valid, false, 'the old body is gone');
   assert.deepEqual(events, [event], 'the listener was told once');
-  assert.equal(soft.list().length, 2);
+  assert.equal(soft.list().length, event.pieces.length);
+  const total = event.pieces.reduce((sum, piece) => sum + piece.mass(), 0);
   const [near, far] =
     event.pieces[0].isParticlePinned(0) || event.pieces[0].particlePosition(0)[0] < 0.1
       ? event.pieces
       : [event.pieces[1], event.pieces[0]];
-  assert.ok(
-    near.mass() + far.mass() <= mass + 1e-4 && near.mass() + far.mass() > 0.9 * mass,
-    `the mass is shared: ${near.mass() + far.mass()} of ${mass}`,
-  );
+  assert.ok(total <= mass + 1e-4 && total > 0.99 * mass, `the mass is kept: ${total} of ${mass}`);
   // Every particle that a cell still holds went to a piece.
   let gone = 0;
   for (let i = 0; i < body.numParticles(); i++) if (event.destination(i).length === 0) gone++;
@@ -872,4 +870,42 @@ test('the fem solver is switched by body, checked and carried to pieces', async 
   ]);
   assert.equal(event.pieces.length, 2);
   assert.ok(event.pieces.every((piece) => piece.solver === 'fem'));
+});
+
+test('a cloth torn in two becomes two cloths that each keep their triangles and surface collider and fall on a box', async () => {
+  const { physics, soft } = await create([0, -9.81, 0], 8, 2);
+  soft.splitOnTear = 'all';
+  physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: { shape: 'box', halfExtents: [2, 0.1, 2] } });
+  const n = 10,
+    d = 0.1,
+    cloth = soft.create(
+      SoftBodyDesc.cloth([-0.45, 1, -0.45], [d, 0, 0], [0, 0, d], n, n).setSelfContacts(true).setLinearDamping(1),
+    );
+  const surface = soft.createSurfaceCollider(cloth);
+  assert.ok(surface);
+  const pairs = cloth.edges(),
+    across = [];
+  for (let e = 0; e < pairs.length / 2; e++) {
+    const a = Math.floor(pairs[e * 2] / n),
+      b = Math.floor(pairs[e * 2 + 1] / n);
+    if (Math.min(a, b) <= 4 && Math.max(a, b) >= 5) across.push(e);
+  }
+  const triangles = cloth.triangles().length / 3,
+    event = soft.tear(cloth, { edges: across });
+  assert.equal(event.pieces.length, 2, 'two cloths');
+  for (const piece of event.pieces) {
+    assert.ok(piece.surface, 'each has a surface collider of its own');
+    assert.ok(piece.triangles().length > 0, 'and its triangles');
+    assert.ok(piece.valid);
+  }
+  assert.ok(
+    event.pieces.reduce((sum, piece) => sum + piece.triangles().length / 3, 0) >= triangles - 2 * n,
+    'only the triangles that stood on the tear are gone',
+  );
+  assert.equal(cloth.valid, false);
+  steps(physics, 360);
+  for (const piece of event.pieces) {
+    const lowest = Math.min(...piece.particlePositions().filter((_, k) => k % 3 === 1));
+    assert.ok(lowest > 0.1 - 0.02, `the piece lies on the box: ${lowest}`);
+  }
 });
