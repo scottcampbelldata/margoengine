@@ -712,10 +712,15 @@ test('page.ground: heights above the ground, set on it under the camera and unde
   assert.equal(cameraFrames(parseShot(shot({ fps: 2, seconds: 1 }, { tracks }))).heights, 'world');
 });
 
-test('every Fauld shot file is a valid shot on the Fauld still page with its ground', () => {
+test('every Fauld countryside and crater shot file is a valid shot on the Fauld still page with its ground', () => {
   const dir = join(root, 'tools/shot/shots'),
-    files = readdirSync(dir).filter((name) => /^fauld-fr\d+\.json$/.test(name));
-  assert.ok(files.length >= 81, `${files.length} Fauld shot files`);
+    // The tunnel rows (scene fauld-tunnels) share the fr numbering and draw on their own page.
+    files = readdirSync(dir).filter(
+      (name) =>
+        /^fauld-fr\d+\.json$/.test(name) &&
+        JSON.parse(readFileSync(join(dir, name), 'utf8')).shot.scene !== 'fauld-tunnels',
+    );
+  assert.equal(files.length, 81, `${files.length} Fauld countryside and crater shot files`);
   for (const name of files) {
     const file = parseShot(JSON.parse(readFileSync(join(dir, name), 'utf8')));
     assert.equal(file.shot.page.path, 'packages/scenes/test/fauld-still.html', name);
