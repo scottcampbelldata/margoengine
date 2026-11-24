@@ -72,7 +72,7 @@ The package is moving off Rapier onto Margo's own 2D kernel (`kernel/`, Rust to 
 | Collision | collision groups, solver groups, active collision types | collision groups | all three | partial: facade on Rapier |
 | Collision | collision events, contact-force events | start/end | both (force from the biased pass of each substep) | partial: facade on Rapier |
 | Collision | physics hooks (filter and modify contact pairs, one-way platforms) | no | none | missing |
-| Queries | ray cast (with normal), point, shape intersection, shape cast, query filters, query pipeline | yes | none | missing |
+| Queries | ray cast (with normal, solid or not), point, shape intersection, shape cast, query filters (groups, kinds, excluded shape and body) | yes | all of them, exact per shape, broad phase culled | partial: facade on Rapier |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | all | static, kinematic (velocity), dynamic | partial |
 | Bodies | damping, gravity scale, locked rotation | yes | damping, gravity scale, fixed rotation | partial |
 | Bodies | locked translation axes, dominance, additional mass, soft CCD, per-collider mass props, forces/impulses at a point | no | none | missing |

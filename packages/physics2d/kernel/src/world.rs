@@ -360,7 +360,7 @@ pub enum BroadPhase {
     Sweep,
 }
 
-enum Broad {
+pub(crate) enum Broad {
     Tree(Tree<2>),
     Sweep(SweepPrune<2>),
 }
@@ -376,6 +376,12 @@ impl Broad {
         match self {
             Broad::Tree(t) => t.pairs(out, keep),
             Broad::Sweep(s) => s.pairs(out, keep),
+        }
+    }
+    pub(crate) fn query(&mut self, bounds: &Bounds<2>, out: &mut Vec<u32>) {
+        match self {
+            Broad::Tree(t) => t.query(bounds, out),
+            Broad::Sweep(s) => s.query(bounds, out),
         }
     }
     fn compared(&self) -> u64 {
@@ -443,7 +449,7 @@ pub struct World {
     pub force_events: Vec<ForceEvent>,
     pub counts: Counts,
     pub steps: u64,
-    broad: Broad,
+    pub(crate) broad: Broad,
     pairs: Vec<(u32, u32)>,
     /// Body pairs a joint keeps from colliding, sorted, rebuilt each step.
     apart: Vec<(u32, u32)>,
@@ -691,6 +697,36 @@ impl World {
         Ok(self.joints.len() as u32 - 1)
     }
 
+
+    /// Puts `body`'s origin at `position` turned by `rotation` now, waking it; velocities stay. Its shapes' boxes follow, so
+    /// a query right after sees it.
+    pub fn set_transform(&mut self, body: u32, position: V2, rotation: Rot) -> Result<(), PhysicsError> {
+        if ![position.x, position.y, rotation.c, rotation.s].into_iter().all(f32::is_finite) { return Err(PhysicsError::NotFinite); }
+        let rotation = Rot::from_pair(rotation.c, rotation.s);
+        if rotation.c == 0.0 && rotation.s == 0.0 { return Err(PhysicsError::InvalidParameter); }
+        let before = self.bodies.get(body as usize).ok_or(PhysicsError::InvalidHandle)?.clone();
+        {
+            let b = &mut self.bodies[body as usize];
+            let offset = rotation.apply(b.local_center);
+            b.xf = Xf { p: position, q: rotation };
+            b.exact_center = [position.x as f64 + offset.x as f64, position.y as f64 + offset.y as f64];
+            b.round_pose();
+        }
+        let mut staged = Vec::new();
+        for &s in &self.bodies[body as usize].shapes {
+            match bounds_of(&self.shapes[s as usize].core, self.bodies[body as usize].xf) {
+                Ok(bounds) => staged.push((s, bounds)),
+                Err(error) => {
+                    self.bodies[body as usize] = before;
+                    return Err(error);
+                }
+            }
+        }
+        for (s, bounds) in staged {
+            self.broad.place(s, &bounds, BOX_MARGIN);
+        }
+        self.wake(body)
+    }
 
     /// Wakes `body` and resets its sleep timer.
     pub fn wake(&mut self, body: u32) -> Result<(), PhysicsError> {
