@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsCollider } from './collider.js';
-import type { PhysicsBody } from './body.js';
+import type { PhysicsBody, BodyOptions } from './body.js';
 import type { Physics, QueryFilter, ShapeCastHit } from './physics.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { ShapeOptions } from './shapes.js';
@@ -37,6 +37,39 @@ export interface CharacterControllerOptions {
   applyImpulsesToDynamicBodies?: boolean;
   /** Mass used when pushing dynamic bodies (default 1). */
   characterMass?: number;
+  /**
+   * The most force the character puts into a body it pushes, in newtons (default no limit): a push is an impulse over one step, and
+   * it is capped at `maxPushStrength * dt`, so a strong character still cannot shift what it cannot lift (Jolt's `mMaxStrength`).
+   */
+  maxPushStrength?: number;
+  /**
+   * Bodies heavier than this many times `characterMass` are not pushed at all and act as walls (default no limit): a person does
+   * not shove a lorry. Lighter ones are pushed with the reduced mass of the pair, as before.
+   */
+  maxPushMassRatio?: number;
+  /**
+   * Carry the character along with the body it stands on (default true): a moving platform, a lift or a turning deck adds its
+   * velocity at the foot to every move, the turn of a platform about `up` turns the character with it, and what stops the
+   * platform's motion (a wall) stops the character too. The controller's `platform` is the body it stands on.
+   */
+  inheritPlatformVelocity?: boolean;
+  /**
+   * An inner body for other bodies to hit (Jolt's inner rigid body): a second `kinematicPosition` body made with these colliders
+   * that follows the character's body, in whatever groups and shape the colliders give. The character's own cast never meets it, so
+   * its shape can be larger (a hit box with arms) or smaller than the shape the character walks with. Removed with the controller.
+   */
+  innerBody?: { colliders: NonNullable<BodyOptions['colliders']> };
+}
+
+/** The two methods of `Physics` the inner body needs: the controller is made by `Physics.createCharacterController`, which is one. */
+type BodyHost = Pick<Physics, 'addBody' | 'removeBody'>;
+
+/** What a contact listener is told about one obstacle, as the move meets it. */
+export interface CharacterContact extends CharacterCollision {
+  /** The body that was met. */
+  body: PhysicsBody;
+  /** Set false in the listener to leave this body alone (no push) though it still blocks the character; default true for a dynamic body. */
+  canPush: boolean;
 }
 
 /** One obstacle a move met. */
@@ -99,6 +132,48 @@ function multiply(a: readonly number[], b: readonly number[]): [number, number, 
   ];
 }
 
+/** Where a body's collider is in the world: its position and rotation, for casting the collider's shape from where it stands. */
+export function colliderPose(
+  body: PhysicsBody,
+  collider: PhysicsCollider,
+): { position: [number, number, number]; rotation: [number, number, number, number] } {
+  const at = body.position,
+    local = collider.translationWrtParent(),
+    turn = collider.rotationWrtParent(),
+    offset = rotate(body.rotation, [local.x, local.y, local.z]);
+  return {
+    position: [at[0] + offset[0], at[1] + offset[1], at[2] + offset[2]],
+    rotation: multiply(body.rotation, [turn.x, turn.y, turn.z, turn.w]),
+  };
+}
+
+/** The cast shape of a sphere, box, capsule, cylinder or cone collider (what a character is swept as). */
+export function colliderShape(collider: PhysicsCollider): ShapeOptions {
+  switch (collider.shape) {
+    case 'sphere':
+      return { shape: 'sphere', radius: collider.radius() };
+    case 'box': {
+      const h = collider.halfExtents()!;
+      return { shape: 'box', halfExtents: [h.x, h.y, h.z], borderRadius: collider.borderRadius() };
+    }
+    case 'capsule':
+      return { shape: 'capsule', halfHeight: collider.halfHeight(), radius: collider.radius() };
+    case 'cylinder':
+    case 'cone':
+      return {
+        shape: collider.shape,
+        halfHeight: collider.halfHeight(),
+        radius: collider.radius(),
+        borderRadius: collider.borderRadius(),
+      };
+    default:
+      throw new MargoError(
+        'unsupported',
+        `A character collider can be a sphere, box, capsule, cylinder or cone; this one is a ${collider.shape}. Give the body a primitive collider as its first.`,
+      );
+  }
+}
+
 /**
  * A kinematic character controller on a kinematic position-based body, written over the world's shape casts: it slides
  * along obstacles, climbs slopes up to a limit, slides down steeper ones, climbs steps, snaps to the ground and can push
@@ -123,6 +198,12 @@ export class CharacterController {
   private readonly slide: boolean;
   private readonly pushes: boolean;
   private readonly mass: number;
+  private readonly maxStrength: number;
+  private readonly maxRatio: number;
+  private readonly inherits: boolean;
+  private readonly inner: PhysicsBody | null;
+  private readonly listeners = new Set<(contact: CharacterContact) => void>();
+  private ground: PhysicsBody | null = null;
   private readonly hits: CharacterCollision[] = [];
 
   /** @internal */
@@ -169,6 +250,40 @@ export class CharacterController {
     this.slide = options.slide ?? true;
     this.pushes = options.applyImpulsesToDynamicBodies ?? false;
     this.mass = options.characterMass ?? 1;
+    this.maxStrength = options.maxPushStrength ?? Infinity;
+    this.maxRatio = options.maxPushMassRatio ?? Infinity;
+    for (const [name, value] of [
+      ['characterMass', this.mass],
+      ['maxPushStrength', this.maxStrength],
+      ['maxPushMassRatio', this.maxRatio],
+    ] as const)
+      if (!(value > 0)) throw new RangeError(`${name} must be more than zero (omit it for no limit)`);
+    this.inherits = options.inheritPlatformVelocity ?? true;
+    this.inner = options.innerBody
+      ? (owner as unknown as BodyHost).addBody(null, {
+          type: 'kinematicPosition',
+          position: body.position,
+          rotation: body.rotation,
+          colliders: options.innerBody.colliders,
+        })
+      : null;
+  }
+
+  /** The body the character stood on at the start of the last move, or null in the air (what `inheritPlatformVelocity` carries it with). */
+  get platform(): PhysicsBody | null {
+    return this.ground;
+  }
+  /** The inner body other bodies hit, when the controller was made with `innerBody`. */
+  get innerBody(): PhysicsBody | null {
+    return this.inner;
+  }
+  /**
+   * Calls `listener` for every obstacle a move meets, as it meets it, with the body, the contact and a `canPush` flag the listener
+   * may clear (Jolt's contact listener). Returns a function that removes the listener.
+   */
+  onContact(listener: (contact: CharacterContact) => void): () => void {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
   }
 
   /** Whether the last move ended on ground it can stand on. */
@@ -200,32 +315,6 @@ export class CharacterController {
     return this.hits[i];
   }
 
-  private shapeOf(collider: PhysicsCollider): ShapeOptions {
-    switch (collider.shape) {
-      case 'sphere':
-        return { shape: 'sphere', radius: collider.radius() };
-      case 'box': {
-        const h = collider.halfExtents()!;
-        return { shape: 'box', halfExtents: [h.x, h.y, h.z], borderRadius: collider.borderRadius() };
-      }
-      case 'capsule':
-        return { shape: 'capsule', halfHeight: collider.halfHeight(), radius: collider.radius() };
-      case 'cylinder':
-      case 'cone':
-        return {
-          shape: collider.shape,
-          halfHeight: collider.halfHeight(),
-          radius: collider.radius(),
-          borderRadius: collider.borderRadius(),
-        };
-      default:
-        throw new MargoError(
-          'unsupported',
-          `A character collider can be a sphere, box, capsule, cylinder or cone; this one is a ${collider.shape}. Give the body a primitive collider as its first.`,
-        );
-    }
-  }
-
   /**
    * Computes how far the character can move toward `desired` (a translation for this step, gravity included)
    * and schedules it as the body's next kinematic position.
@@ -243,7 +332,7 @@ export class CharacterController {
     checkVec(desired, 'Desired movement');
     const body = this.body,
       collider = body.colliders[0]!,
-      shape = this.shapeOf(collider),
+      shape = colliderShape(collider),
       bodyPosition = body.position,
       bodyRotation = body.rotation,
       local = collider.translationWrtParent(),
@@ -279,8 +368,9 @@ export class CharacterController {
     if (flags & 4) exclude.excludeDynamic = true;
     if (flags & 8) exclude.excludeSensors = true;
     if (flags & 16) exclude.excludeSolids = true;
-    const predicate = filter?.predicate;
-    if (predicate) exclude.predicate = (_body, hit) => predicate(hit);
+    const predicate = filter?.predicate,
+      inner = this.inner;
+    if (predicate || inner) exclude.predicate = (hitBody, hit) => hitBody !== inner && (!predicate || predicate(hit));
     const cast = (
       position: Vec3,
       direction: Vec3,
@@ -297,16 +387,32 @@ export class CharacterController {
         stopAtPenetration: false,
         targetDistance: target,
       });
+    let groundHit: ShapeCastHit | null = null;
     const probeGround = (position: Vec3): boolean => {
       const hit = cast(position, down, offset * 2 + 1e-3);
-      return !!hit && dot(hit.normal, up) >= cosClimb - 1e-4 && hit.distance <= offset + 1e-3;
+      const ok = !!hit && dot(hit.normal, up) >= cosClimb - 1e-4 && hit.distance <= offset + 1e-3;
+      groundHit = ok ? hit : null;
+      return ok;
     };
 
     this.hits.length = 0;
     const groundedBefore = probeGround(start);
-    let position: V = [...start],
-      remaining: V = [desired[0], desired[1], desired[2]];
     const dt = this.owner.fixedTimestep;
+    // What the ground under the character does this step: a moving body carries it by its velocity at the foot, and a turn about
+    // `up` turns it too.
+    const standingOn = groundHit as ShapeCastHit | null;
+    this.ground = standingOn ? standingOn.body : null;
+    let carried: V = [0, 0, 0],
+      carriedTurn = 0;
+    if (this.inherits && standingOn && standingOn.body.type !== 'fixed') {
+      const v = standingOn.body.velocityAtPoint(standingOn.point),
+        w = standingOn.body.angularVelocity;
+      carried = scale(v, dt);
+      carriedTurn = dot(w, up) * dt;
+    }
+    const wish: V = [desired[0] + carried[0], desired[1] + carried[1], desired[2] + carried[2]];
+    let position: V = [...start],
+      remaining: V = [...wish];
     for (let iteration = 0; iteration < 8; iteration++) {
       const span = length(remaining);
       if (span < EPS) break;
@@ -336,12 +442,22 @@ export class CharacterController {
         translationApplied: scale(direction, travelled),
         translationRemaining: [...remaining],
       });
-      if (this.pushes && hit.body.type === 'dynamic') {
-        const into = -dot(remaining, normal) / dt;
-        if (into > 0) {
-          const mb = hit.body.mass,
-            reduced = mb > 0 ? (this.mass * mb) / (this.mass + mb) : this.mass;
-          hit.body.applyImpulse(scale(normal, -reduced * into * dt), hit.point);
+      const contact: CharacterContact = {
+        ...this.hits[this.hits.length - 1]!,
+        body: hit.body,
+        canPush: hit.body.type === 'dynamic',
+      };
+      for (const listener of this.listeners) listener(contact);
+      if (this.pushes && contact.canPush && hit.body.type === 'dynamic') {
+        // The character closes on the body at the speed it wants into it (the whole step's wish, not what is left after the gap
+        // is crossed), less the body's own speed away from it, so a light crate soon goes at the walking pace and a heavy one
+        // takes the reduced mass of the pair.
+        const mb = hit.body.mass,
+          closing = -dot(wish, normal) / dt + dot(hit.body.velocityAtPoint(hit.point), normal);
+        if (closing > 0 && mb <= this.maxRatio * this.mass) {
+          const reduced = mb > 0 ? (this.mass * mb) / (this.mass + mb) : this.mass,
+            impulse = Math.min(reduced * closing, this.maxStrength * dt);
+          hit.body.applyImpulse(scale(normal, -impulse), hit.point);
         }
       }
       // A step: an obstacle the character cannot walk up, with room above it and ground beyond.
@@ -413,7 +529,19 @@ export class CharacterController {
       }
     }
     const movement: V = [position[0] - start[0], position[1] - start[1], position[2] - start[2]];
-    body.setNextPosition([bodyPosition[0] + movement[0], bodyPosition[1] + movement[1], bodyPosition[2] + movement[2]]);
+    const next: V = [bodyPosition[0] + movement[0], bodyPosition[1] + movement[1], bodyPosition[2] + movement[2]];
+    body.setNextPosition(next);
+    let nextRotation: readonly number[] = bodyRotation;
+    if (carriedTurn !== 0) {
+      const half = carriedTurn / 2,
+        s = Math.sin(half);
+      nextRotation = multiply([up[0] * s, up[1] * s, up[2] * s, Math.cos(half)], bodyRotation);
+      body.setNextRotation(nextRotation as [number, number, number, number]);
+    }
+    if (inner) {
+      inner.setNextPosition(next);
+      inner.setNextRotation(nextRotation as [number, number, number, number]);
+    }
     this.lastGrounded = grounded;
     this.sliding = slidingDown;
     this.lastMovement = movement;
@@ -423,6 +551,8 @@ export class CharacterController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.listeners.clear();
+    if (this.inner?.valid) (this.owner as unknown as BodyHost).removeBody(this.inner);
     this.owner.removeController(this);
   }
   declare [Symbol.dispose]: () => void;

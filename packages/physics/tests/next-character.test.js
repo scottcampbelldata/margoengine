@@ -222,3 +222,200 @@ test('a slope at or above minSlopeSlideAngle slides the character down it, a gen
     assert.ok(Math.abs(holds) < 0.05, `${name}: moved ${holds} m on a slope under the slide angle`);
   }
 });
+
+test('a character walking into a light crate takes it up to the walking pace, not a fraction of it', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] }),
+    crate = physics.addBody(null, {
+      position: [1, 0, 0],
+      colliders: { shape: 'box', halfExtents: [0.3, 0.3, 0.3], density: 1 },
+    }),
+    body = physics.addBody(null, { type: 'kinematicPosition', colliders: { shape: 'sphere', radius: 0.3 } }),
+    controller = physics.createCharacterController(body, {
+      applyImpulsesToDynamicBodies: true,
+      characterMass: 80,
+      snapToGround: false,
+      autostep: false,
+    }),
+    pace = 3;
+  for (let i = 0; i < 90; i++) {
+    physics.step();
+    controller.move([pace / 60, 0, 0]);
+  }
+  near(crate.linearVelocity[0], pace, 0.3, 'the crate goes at the walking pace');
+  physics.dispose();
+});
+
+test('maxPushStrength caps the push, and maxPushMassRatio leaves a heavy body as a wall', () => {
+  const run = (options, density) => {
+    const physics = new Physics(null, { gravity: [0, 0, 0] }),
+      crate = physics.addBody(null, {
+        position: [1, 0, 0],
+        colliders: { shape: 'box', halfExtents: [0.3, 0.3, 0.3], density },
+      }),
+      body = physics.addBody(null, { type: 'kinematicPosition', colliders: { shape: 'sphere', radius: 0.3 } }),
+      controller = physics.createCharacterController(body, {
+        applyImpulsesToDynamicBodies: true,
+        characterMass: 80,
+        snapToGround: false,
+        autostep: false,
+        ...options,
+      });
+    for (let i = 0; i < 60; i++) {
+      physics.step();
+      controller.move([3 / 60, 0, 0]);
+    }
+    const speed = crate.linearVelocity[0];
+    physics.dispose();
+    return speed;
+  };
+  // A crate of 21.6 kg (density 100): 20 N for a second moves it about 0.9 m/s, so the cap is what limits it.
+  const free = run({}, 100),
+    capped = run({ maxPushStrength: 20 }, 100),
+    refused = run({ maxPushMassRatio: 0.1 }, 100);
+  assert.ok(free > 2.5, `uncapped crate speed ${free}`);
+  near(capped, 0.9, 0.2, 'a 20 N limit gives it 20 N times a second over its mass');
+  assert.equal(refused, 0, 'a body 2.7 times the allowed ratio is not pushed');
+  assert.throws(() => {
+    const world = new Physics(null);
+    world.createCharacterController(
+      world.addBody(null, { type: 'kinematicPosition', colliders: { shape: 'sphere', radius: 1 } }),
+      { maxPushStrength: 0 },
+    );
+  }, /maxPushStrength must be more than zero/);
+});
+
+test('a character stands on a moving platform and rides it, unless asked not to', () => {
+  const run = (options, spin = 0) => {
+    const physics = new Physics(null, { gravity: [0, 0, 0] }),
+      platform = physics.addBody(null, {
+        type: 'kinematicPosition',
+        position: [0, -0.5, 0],
+        colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+      }),
+      body = physics.addBody(null, {
+        type: 'kinematicPosition',
+        position: [0, halfHeight + radius + 0.005, 0],
+        colliders: { shape: 'capsule', halfHeight, radius },
+      }),
+      controller = physics.createCharacterController(body, { snapToGround: 0.2, autostep: false, ...options });
+    let angle = 0;
+    for (let i = 0; i < 120; i++) {
+      angle += spin / 60;
+      platform.setNextPosition([i * (1 / 60) * 1 + 1 / 60, -0.5, 0]);
+      platform.setNextRotation(eulerToQuat(0, angle, 0));
+      physics.step();
+      controller.move([0, -0.01, 0]);
+    }
+    const result = {
+      x: body.position[0],
+      z: body.position[2],
+      rotation: body.rotation,
+      platform: controller.platform === platform,
+    };
+    physics.dispose();
+    return result;
+  };
+  const carried = run({}),
+    left = run({ inheritPlatformVelocity: false });
+  near(carried.x, 2, 0.1, 'carried two metres in two seconds at 1 m/s');
+  assert.ok(carried.platform, 'the controller says what it stands on');
+  near(left.x, 0, 1e-6, 'left behind when it does not inherit');
+  const turned = run({}, 0.5);
+  assert.ok(
+    Math.abs(turned.rotation[1]) > 0.2,
+    `the character turned with a platform turning about up: ${turned.rotation}`,
+  );
+});
+
+test('a platform that runs into a wall stops the character against it too', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] }),
+    platform = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+    });
+  physics.addBody(null, { type: 'fixed', position: [3, 1, 0], colliders: { shape: 'box', halfExtents: [0.1, 1, 5] } });
+  const body = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, halfHeight + radius + 0.005, 0],
+      colliders: { shape: 'capsule', halfHeight, radius },
+    }),
+    controller = physics.createCharacterController(body, { snapToGround: 0.2, autostep: false });
+  for (let i = 0; i < 300; i++) {
+    platform.setNextPosition([(i + 1) / 60, -0.5, 0]);
+    physics.step();
+    controller.move([0, -0.01, 0]);
+  }
+  assert.ok(body.position[0] < 2.9 - radius + 1e-3, `the wall stopped it at ${body.position[0]}`);
+  physics.dispose();
+});
+
+test('a contact listener sees each obstacle and can refuse the push', () => {
+  const run = (refuse) => {
+    const physics = new Physics(null, { gravity: [0, 0, 0] }),
+      crate = physics.addBody(null, {
+        position: [1, 0, 0],
+        colliders: { shape: 'box', halfExtents: [0.3, 0.3, 0.3], density: 1 },
+      }),
+      body = physics.addBody(null, { type: 'kinematicPosition', colliders: { shape: 'sphere', radius: 0.3 } }),
+      controller = physics.createCharacterController(body, {
+        applyImpulsesToDynamicBodies: true,
+        characterMass: 80,
+        snapToGround: false,
+        autostep: false,
+      }),
+      seen = [],
+      stop = controller.onContact((contact) => {
+        seen.push(contact);
+        if (refuse) contact.canPush = false;
+      });
+    for (let i = 0; i < 60; i++) {
+      physics.step();
+      controller.move([3 / 60, 0, 0]);
+    }
+    const speed = crate.linearVelocity[0];
+    stop();
+    controller.move([0.01, 0, 0]);
+    const after = seen.length;
+    physics.dispose();
+    return { speed, seen, after, crate };
+  };
+  const refused = run(true),
+    allowed = run(false);
+  assert.ok(allowed.speed > 2, `pushed when the listener leaves it: ${allowed.speed}`);
+  assert.equal(refused.speed, 0, 'not pushed when the listener refuses');
+  assert.ok(refused.seen.length > 0 && refused.seen[0].body === refused.crate, 'the listener got the crate');
+  near(Math.abs(refused.seen[0].normal[0]), 1, 0.01, 'and the contact normal');
+  assert.equal(refused.after, refused.seen.length, 'a removed listener hears nothing more');
+});
+
+test('an inner body follows the character for other bodies to hit, is never an obstacle to it, and goes with it', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] }),
+    body = physics.addBody(null, { type: 'kinematicPosition', colliders: { shape: 'sphere', radius: 0.3 } }),
+    controller = physics.createCharacterController(body, {
+      snapToGround: false,
+      autostep: false,
+      innerBody: { colliders: { shape: 'sphere', radius: 1 } },
+    }),
+    inner = controller.innerBody;
+  assert.ok(inner && inner !== body && inner.type === 'kinematicPosition');
+  // A ball rolling in from x = 4 meets the inner sphere of radius 1, not the character's 0.3.
+  const ball = physics.addBody(null, {
+    position: [4, 0, 0],
+    linearVelocity: [-2, 0, 0],
+    colliders: { shape: 'sphere', radius: 0.2, restitution: 0 },
+  });
+  for (let i = 0; i < 120; i++) {
+    physics.step();
+    const move = controller.move([0.5 / 60, 0, 0]);
+    assert.equal(move.collisions, 0, 'the inner body is no obstacle to its own character');
+  }
+  near(inner.position[0], body.position[0], 1e-6, 'it follows the character');
+  assert.ok(
+    ball.position[0] - body.position[0] > 1.15,
+    `the ball is held off by the inner body: ${ball.position[0] - body.position[0]}`,
+  );
+  controller.dispose();
+  assert.ok(!inner.valid, 'disposing the controller removes the inner body');
+  physics.dispose();
+});

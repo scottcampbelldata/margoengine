@@ -48,6 +48,7 @@ import type { ColliderOptions, ColliderSettings, InteractionGroups, ShapeOptions
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider, featureAt, type Feature, type FeatureType } from './collider.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
+import { DynamicCharacter, type DynamicCharacterOptions } from './dynamic-character.js';
 import { type Multibody, buildMultibody, clearMultibody, type MultibodyLinkOptions } from './multibody.js';
 import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
 import { type NextJointOptions, type PhysicsJoint, createJoint } from './joints.js';
@@ -467,6 +468,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private lastAlpha = 1;
   private disposed = false;
   private readonly controllers = new Set<CharacterController>();
+  private readonly dynamicCharacters = new Set<DynamicCharacter>();
   private readonly followers = new Set<PhysicsBody>();
   private readonly parentScratch = new Float64Array(16);
   private readonly parentRotation = [0, 0, 0, 1];
@@ -1359,6 +1361,25 @@ export class Physics implements EnginePlugin, BodyOwner {
   removeController(controller: CharacterController): void {
     this.controllers.delete(controller);
   }
+  /**
+   * A controller for a dynamic body that keeps it upright with a stable proportional-derivative torque and walks it at a target velocity
+   * over the ground, jumps and rides platforms: a character the solver pushes and knocks about, in place of the kinematic one. Call
+   * `update()` once per fixed step, for example from `beforestep`.
+   * @throws MargoError (`state`) unless the body belongs to this world.
+   * @throws TypeError unless the body is `dynamic` with a collider.
+   */
+  createDynamicCharacter(body: PhysicsBody, options: DynamicCharacterOptions = {}): DynamicCharacter {
+    this.live();
+    if (!this.bodies.has(body))
+      throw new MargoError('state', 'The body must belong to this physics world; add it with physics.addBody first.');
+    const character = new DynamicCharacter(this, body, options);
+    this.dynamicCharacters.add(character);
+    return character;
+  }
+  /** @internal use `character.dispose`. */
+  removeDynamicCharacter(character: DynamicCharacter): void {
+    this.dynamicCharacters.delete(character);
+  }
   /** The kernel's filter words for a query filter: flags, groups, collider row and body row to leave out. */
   private filterWords(filter: QueryFilter): [number, number, number, number] {
     let flags = 0;
@@ -2045,6 +2066,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       }
     }
     for (const controller of [...this.controllers]) controller.dispose();
+    for (const character of [...this.dynamicCharacters]) character.dispose();
     for (const attachment of [...this.attachments]) attachment.dispose();
     for (const joint of [...this.joints]) this.removeJoint(joint);
     for (const body of [...this.bodies]) this.removeBody(body);

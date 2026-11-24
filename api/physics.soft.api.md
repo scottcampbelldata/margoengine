@@ -416,11 +416,19 @@ interface CharacterCollision {
     translationRemaining: [number, number, number];
 }
 
+interface CharacterContact extends CharacterCollision {
+    body: PhysicsBody;
+    canPush: boolean;
+}
+
 class CharacterController {
     readonly body: PhysicsBody;
     constructor(owner: Pick<Physics, 'shapeCast' | 'fixedTimestep'> & {
         removeController(controller: CharacterController): void;
     }, body: PhysicsBody, options?: CharacterControllerOptions);
+    get platform(): PhysicsBody | null;
+    get innerBody(): PhysicsBody | null;
+    onContact(listener: (contact: CharacterContact) => void): () => void;
     get grounded(): boolean;
     get collisions(): readonly CharacterCollision[];
     get isSlidingDownSlope(): boolean;
@@ -448,6 +456,12 @@ interface CharacterControllerOptions {
     slide?: boolean;
     applyImpulsesToDynamicBodies?: boolean;
     characterMass?: number;
+    maxPushStrength?: number;
+    maxPushMassRatio?: number;
+    inheritPlatformVelocity?: boolean;
+    innerBody?: {
+        colliders: NonNullable<BodyOptions['colliders']>;
+    };
 }
 
 type CharacterLength = number | {
@@ -708,6 +722,35 @@ interface DebugStyle {
     box?: DebugColor;
     normalLength?: number;
     axisLength?: number;
+}
+
+class DynamicCharacter {
+    readonly body: PhysicsBody;
+    constructor(owner: Pick<Physics, 'shapeCast' | 'fixedTimestep' | 'gravity'> & {
+        removeDynamicCharacter(character: DynamicCharacter): void;
+    }, body: PhysicsBody, options?: DynamicCharacterOptions);
+    get grounded(): boolean;
+    get platform(): PhysicsBody | null;
+    get groundNormal(): [number, number, number];
+    setTargetVelocity(velocity: Vec3): this;
+    setFacing(direction: Vec3 | null): this;
+    jump(speed: number): boolean;
+    update(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+interface DynamicCharacterOptions {
+    up?: Vec3;
+    bodyUp?: Vec3;
+    uprightFrequency?: number;
+    uprightDamping?: number;
+    maxUprightTorque?: number;
+    maxSlopeClimbAngle?: number;
+    groundProbe?: number;
+    groundAcceleration?: number;
+    airAcceleration?: number;
+    facingFrequency?: number;
 }
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
@@ -1292,6 +1335,8 @@ class Physics implements EnginePlugin, BodyOwner {
     removeJoint(joint: PhysicsJoint): void;
     createCharacterController(body: PhysicsBody, options?: CharacterControllerOptions): CharacterController;
     removeController(controller: CharacterController): void;
+    createDynamicCharacter(body: PhysicsBody, options?: DynamicCharacterOptions): DynamicCharacter;
+    removeDynamicCharacter(character: DynamicCharacter): void;
     raycast(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions): RaycastHit | null;
     raycastAll(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions & {
         stop?: (hit: RaycastHit) => boolean;

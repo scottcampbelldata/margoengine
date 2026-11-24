@@ -35,10 +35,13 @@ export type {
   RotationMotorOptions,
 } from './joints.js';
 export { CharacterController } from './character.js';
+export { DynamicCharacter } from './dynamic-character.js';
+export type { DynamicCharacterOptions } from './dynamic-character.js';
 export type {
   CharacterControllerOptions,
   CharacterLength,
   CharacterCollision,
+  CharacterContact,
   CharacterMoveFilter,
   CharacterMoveResult,
 } from './character.js';
