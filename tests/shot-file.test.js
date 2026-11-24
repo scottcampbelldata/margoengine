@@ -788,7 +788,10 @@ test('every Fauld countryside and crater shot has a lens in a named band, a real
       const d = Math.hypot(...sub(k.position, target)),
         near = (H * focus) / (H + focus),
         far = focus >= H ? Infinity : (H * focus) / (H - focus);
-      assert.ok(near <= Math.max(d - size / 2, 0.5) * 1.05 && far >= (d + size / 2) * 0.95, `${name}: sharp ${near.toFixed(0)} to ${far.toFixed(0)} m, subject ${(d - size / 2).toFixed(0)} to ${(d + size / 2).toFixed(0)} m`);
+      assert.ok(
+        near <= Math.max(d - size / 2, 0.5) * 1.05 && far >= (d + size / 2) * 0.95,
+        `${name}: sharp ${near.toFixed(0)} to ${far.toFixed(0)} m, subject ${(d - size / 2).toFixed(0)} to ${(d + size / 2).toFixed(0)} m`,
+      );
     }
   }
   assert.equal(n, 81);

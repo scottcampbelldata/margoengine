@@ -122,7 +122,7 @@ const dofLimits = (focalMm, stop, focusM) => {
 const lensFor = (focalMm, distance, size) => {
   const near = Math.max(distance - size / 2, 0.5),
     far = distance + size / 2,
-    focusDistance = Math.round((2 * near * far) / (near + far) * 10) / 10;
+    focusDistance = Math.round(((2 * near * far) / (near + far)) * 10) / 10;
   for (const stop of [8, 11]) {
     const [n, f] = dofLimits(focalMm, stop, focusDistance);
     if (n <= near && f >= far) return { stop, focusDistance };
