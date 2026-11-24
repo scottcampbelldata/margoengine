@@ -231,6 +231,12 @@ export interface KernelTrimeshOptions {
    * triangles without catching (Rapier's `TriMeshFlags.FIX_INTERNAL_EDGES`). Default false, as in Rapier.
    */
   fixInternalEdges?: boolean;
+  /**
+   * The mesh is a closed surface, so a point inside it is known (Rapier's `TriMeshFlags.ORIENTED`): `projectPoint` and
+   * `intersectPoint` find it inside, and a solid ray from inside hits at distance 0. A mesh that is not closed answers by
+   * how many triangles a ray from the point crosses. Default false.
+   */
+  oriented?: boolean;
 }
 
 /** Options of {@link KernelWorld.addHeightfield}. */
@@ -965,7 +971,7 @@ export class KernelWorld {
    */
   addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options: KernelTrimeshOptions = {}): number {
     const { api } = this,
-      { fixInternalEdges = false } = options,
+      { fixInternalEdges = false, oriented = false } = options,
       count = vertices.length / 3,
       triangles = indices.length / 3;
     if (!Number.isInteger(count) || !Number.isInteger(triangles))
@@ -997,7 +1003,7 @@ export class KernelWorld {
         links[k][t0 + t] = other < 0 ? 0xffffffff : other;
       }
     }
-    const row = api.mesh_end(count, triangles, fixInternalEdges ? 1 : 0);
+    const row = api.mesh_end(count, triangles, (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0));
     if (row < 0) throw new RangeError(`This trimesh was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
     return row;

@@ -791,7 +791,11 @@ impl World {
             }
             true
         });
-        best.get().map(|(_, point)| Projection { point, inside: false })
+        let inside = self.uu(MESH_FLAGS, mesh) & MESH_ORIENTED != 0 && self.mesh_contains(mesh, p);
+        if inside && solid {
+            return Some(Projection { point: p, inside });
+        }
+        best.get().map(|(_, point)| Projection { point, inside })
     }
 
     /// The point of any collider `filter` lets through nearest to `p`: the collider and its projection. A point inside

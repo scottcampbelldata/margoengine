@@ -64,3 +64,18 @@ test('a border is refused when negative', () => {
   assert.throws(() => physics.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], borderRadius: -1 } }), /borderRadius/);
   physics.dispose();
 });
+
+test('a convex hull from a mesh is the hull of the vertices its triangles use, as on Rapier', () => {
+  // A cube with a stray vertex no triangle uses, far away: it must not stretch the hull.
+  const vertices = [...cube, 50, 50, 50],
+    indices = [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5];
+  const worlds = both((physics) => {
+    physics.addBody(null, { type: 'fixed', colliders: { shape: 'convexHull', vertices: vertices.slice(), indices } });
+    physics.step();
+    return {};
+  });
+  const [own, rapier] = worlds.map((w) => w.physics.raycast([-9, 0.2, 0.1], [1, 0, 0]));
+  assert.ok(Math.abs(own.distance - 8) < 1e-4 && Math.abs(rapier.distance - 8) < 1e-4, `${own.distance} ${rapier.distance}`);
+  assert.throws(() => new Physics(null).addBody(null, { colliders: { shape: 'convexHull', vertices, indices: [0, 1, 99] } }), /out of range/);
+  for (const w of worlds) w.physics.dispose();
+});

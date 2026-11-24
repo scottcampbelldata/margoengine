@@ -606,6 +606,9 @@ pub const MESH_FIX_EDGES: u32 = 1;
 /// MESH_FLAGS: a voxel grid, no vertices or triangles: its cells are in VOXEL_WORD rows from VOXEL_FIRST. It meets what a
 /// mesh meets, and other grids too.
 pub const MESH_VOXELS: u32 = 2;
+/// MESH_FLAGS: a closed surface with its outside known, so a point is inside it when a ray from the point leaves through an
+/// odd number of triangles: point queries and rays from inside (Rapier's `TriMeshFlags.ORIENTED`).
+pub const MESH_ORIENTED: u32 = 4;
 /// TRIANGLE_EDGES, two bits an edge: open (no triangle across), convex, concave, or flat.
 pub const EDGE_OPEN: u32 = 0;
 pub const EDGE_CONVEX: u32 = 1;

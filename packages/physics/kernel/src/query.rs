@@ -539,6 +539,8 @@ impl World {
                     self.ray_voxels(mesh, o, d, max, solid)
                 } else if self.uu(MESH_COLUMNS, mesh) != 0 {
                     self.ray_grid(mesh, o, d, max)
+                } else if solid && self.uu(MESH_FLAGS, mesh) & MESH_ORIENTED != 0 && self.mesh_contains(mesh, o) {
+                    Some(RayHit { t: 0.0, normal: ZERO })
                 } else {
                     self.ray_mesh(mesh, o, d, max)
                 }
@@ -546,6 +548,22 @@ impl World {
             _ => None,
         }?;
         Some(RayHit { t: hit.t, normal: pose.q.rotate(hit.normal) })
+    }
+
+    /// Whether a point in an oriented mesh's frame is inside its closed surface: a ray from it, along a direction no seam of a
+    /// model lies along, crosses the surface an odd number of times.
+    pub(crate) fn mesh_contains(&self, mesh: usize, p: V3) -> bool {
+        let d = v3(0.577_350_3, 0.577_350_3 * 0.97, 0.577_350_3 * 1.03);
+        let d = d.scale(1.0 / sqrt(d.dot(d)));
+        let (mut at, mut crossings) = (p, 0u32);
+        for _ in 0..4096 {
+            let Some(hit) = self.ray_mesh(mesh, at, d, f32::INFINITY) else { break };
+            crossings += 1;
+            // Step past the triangle it met, by the least a float can tell apart.
+            let step = hit.t + 1e-4 * (1.0 + hit.t);
+            at = at.add(d.scale(step));
+        }
+        crossings % 2 == 1
     }
 
     /// A ray in a triangle mesh's frame against its triangles, through its tree.

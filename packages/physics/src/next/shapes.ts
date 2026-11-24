@@ -2,8 +2,9 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from '../kernel.js';
 import { checkVec, type Vec3 } from '../math.js';
-import { bounds, geometryPositions, roundness, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
+import { bounds, geometryPositions, roundness, usedVertices, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
 import { buildHull } from './hull.js';
+import { cleanTrimesh, wantsClean } from './mesh-clean.js';
 
 const PI = 3.141592653589793;
 
@@ -194,7 +195,7 @@ function fittedSphere(points: Float32Array, center: number[]): number[] {
 export interface HullRows {
   addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
   hullVolume(row: number): number;
-  addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean): number;
+  addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean, oriented?: boolean): number;
   addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: Vec3, fixInternalEdges: boolean): number;
   addVoxels(cells: Int32Array, size: Vec3): number;
 }
@@ -259,7 +260,7 @@ export function kernelCollider(
   } else if (options.shape === 'capsule') size = [options.radius, options.halfHeight];
   else if (options.shape === 'cylinder' || options.shape === 'cone') size = revolvedSize(options);
   else if (options.shape === 'convexHull') {
-    const points = options.points ?? (options.geometry ? geometryPositions(options.geometry, fit.scale) : fitted()),
+    const points = options.points ?? (options.vertices && options.indices ? usedVertices(options.vertices, options.indices) : options.geometry ? geometryPositions(options.geometry, fit.scale) : fitted()),
       { vertices, faces } = buildHull(points);
     size = [hulls.addHull(vertices, faces)];
     border = roundness(options.borderRadius, 'Convex hull');
@@ -276,7 +277,11 @@ export function kernelCollider(
       throw new RangeError(
         'A trimesh has no volume, so no mass or density; give the body its mass with setMassProperties, or use convexHull or convexDecomposition.',
       );
-    size = [hulls.addTrimesh(vertices, Uint32Array.from(indexSource), options.fixInternalEdges ?? false)];
+    let meshVertices: Float32Array = vertices,
+      meshIndices: Uint32Array = Uint32Array.from(indexSource);
+    if (wantsClean(options)) ({ vertices: meshVertices, indices: meshIndices } = cleanTrimesh(vertices, meshIndices, options));
+    if (!meshIndices.length) throw new RangeError('Every triangle of the trimesh was dropped by its clean-up flags; keep some, or leave the flags out.');
+    size = [hulls.addTrimesh(Float32Array.from(meshVertices), Uint32Array.from(meshIndices), options.fixInternalEdges ?? false, options.oriented ?? false)];
   } else if (options.shape === 'heightfield') {
     if (options.mass !== undefined || options.density !== undefined)
       throw new RangeError(

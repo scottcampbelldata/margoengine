@@ -215,6 +215,7 @@ export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hu
 
 export interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;
+    oriented?: boolean;
 }
 
 export class KernelWorld {
@@ -302,6 +303,13 @@ export class KernelWorld {
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;
     reserve(bodies: number, colliders?: number): this;
+}
+
+export interface MeshCleanOptions {
+    mergeDuplicateVertices?: boolean;
+    deleteDegenerateTriangles?: boolean;
+    deleteDuplicateTriangles?: boolean;
+    deleteBadTopologyTriangles?: boolean;
 }
 
 export interface MotorOptions {
@@ -642,6 +650,8 @@ export type ShapeOptions = {
     shape: 'convexHull';
     geometry?: ColliderGeometry;
     points?: ArrayLike<number>;
+    vertices?: ArrayLike<number>;
+    indices?: ArrayLike<number>;
     borderRadius?: number;
 } | {
     shape: 'trimesh';
@@ -649,6 +659,11 @@ export type ShapeOptions = {
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
     fixInternalEdges?: boolean;
+    mergeDuplicateVertices?: boolean;
+    deleteDegenerateTriangles?: boolean;
+    deleteDuplicateTriangles?: boolean;
+    deleteBadTopologyTriangles?: boolean;
+    oriented?: boolean;
 } | {
     shape: 'heightfield';
     rows: number;
@@ -696,6 +711,11 @@ export type ShapeOptions = {
  | {
     shape: 'custom';
     desc: ColliderDesc;
+};
+
+export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, options: MeshCleanOptions): {
+    vertices: Float32Array;
+    indices: Uint32Array;
 };
 
 export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;

@@ -317,7 +317,14 @@ export interface RapierModule {
   HalfSpace: new (normal: Vector) => Shape;
   ImpulseJoint?: { prototype: Partial<ImpulseJoint> };
   ShapeType: Record<string, number | string>;
-  TriMeshFlags?: { FIX_INTERNAL_EDGES?: number };
+  TriMeshFlags?: {
+    FIX_INTERNAL_EDGES?: number;
+    MERGE_DUPLICATE_VERTICES?: number;
+    DELETE_DEGENERATE_TRIANGLES?: number;
+    DELETE_DUPLICATE_TRIANGLES?: number;
+    DELETE_BAD_TOPOLOGY_TRIANGLES?: number;
+    ORIENTED?: number;
+  };
   HeightFieldFlags?: { FIX_INTERNAL_EDGES?: number };
   Collider?: { prototype: Partial<Collider> };
   ColliderDesc: {

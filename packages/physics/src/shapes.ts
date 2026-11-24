@@ -30,6 +30,12 @@ export type ShapeOptions =
       shape: 'convexHull';
       geometry?: ColliderGeometry;
       points?: ArrayLike<number>;
+      /**
+       * A mesh of the hull as `vertices` (flat x, y, z) and `indices` (three a triangle), Rapier's `convexMesh`: the hull of
+       * the vertices the triangles use, so a mesh that is not convex is wrapped.
+       */
+      vertices?: ArrayLike<number>;
+      indices?: ArrayLike<number>;
       /** Rounds every edge and corner with a border outside the hull (default 0), Rapier's `roundConvexHull`. */
       borderRadius?: number;
     }
@@ -40,6 +46,20 @@ export type ShapeOptions =
       indices?: ArrayLike<number>;
       /** Smooth the normals at shared edges so bodies slide and roll over the seams without catching (default false). */
       fixInternalEdges?: boolean;
+      /** Joins vertices at one position before the mesh is built (default false), Rapier's `MERGE_DUPLICATE_VERTICES`. */
+      mergeDuplicateVertices?: boolean;
+      /** Drops triangles with a repeated vertex or no area (default false), Rapier's `DELETE_DEGENERATE_TRIANGLES`. */
+      deleteDegenerateTriangles?: boolean;
+      /** Drops a triangle another one repeats (default false), Rapier's `DELETE_DUPLICATE_TRIANGLES`. */
+      deleteDuplicateTriangles?: boolean;
+      /** Drops triangles that make an edge belong to more than two (default false), Rapier's `DELETE_BAD_TOPOLOGY_TRIANGLES`. */
+      deleteBadTopologyTriangles?: boolean;
+      /**
+       * The mesh is a closed surface with its outside known (default false), Rapier's `ORIENTED`: a point inside it is found
+       * inside by `projectPoint` and `intersectPoint`, and a solid ray from inside hits at distance 0. Contacts are
+       * unchanged. Only the own solver holds it.
+       */
+      oriented?: boolean;
     }
   | {
       shape: 'heightfield';
@@ -237,6 +257,21 @@ export function bounds(positions: Float32Array): { min: [number, number, number]
   return { min, max };
 }
 
+/** The points of a convex hull collider that has a mesh: the vertices its triangles use. */
+export function usedVertices(vertices: ArrayLike<number>, indices: ArrayLike<number>): Float32Array {
+  const count = vertices.length / 3,
+    used = new Set<number>();
+  for (let i = 0; i < indices.length; i++) {
+    const index = indices[i]!;
+    if (!Number.isInteger(index) || index < 0 || index >= count)
+      throw new RangeError('Convex hull index is out of range; keep every index below the vertex count.');
+    used.add(index);
+  }
+  const points: number[] = [];
+  for (const index of [...used].sort((a, b) => a - b)) points.push(vertices[3 * index]!, vertices[3 * index + 1]!, vertices[3 * index + 2]!);
+  return Float32Array.from(points);
+}
+
 /** A border radius: 0 for none, else above zero and finite. */
 export function roundness(border: number | undefined, label: string): number {
   if (border === undefined) return 0;
@@ -313,6 +348,8 @@ export function createColliderDesc(
     case 'convexHull': {
       const points = options.points
         ? Float32Array.from(options.points)
+        : options.vertices && options.indices
+          ? usedVertices(options.vertices, options.indices)
         : options.geometry
           ? geometryPositions(options.geometry, fit?.scale)
           : fitted();
@@ -335,13 +372,25 @@ export function createColliderDesc(
           : fitted();
       const indexSource = options.indices ?? source?.indices;
       if (!indexSource) throw new TypeError('A trimesh needs indices');
-      const indices = triangleIndices(indexSource, vertices, 'Trimesh'),
-        flags = options.fixInternalEdges ? R.TriMeshFlags?.FIX_INTERNAL_EDGES : undefined;
-      if (options.fixInternalEdges && flags === undefined)
-        throw new MargoError(
-          'unsupported',
-          'fixInternalEdges needs Rapier 0.17.1 or later; upgrade @dimforge/rapier3d-compat or leave it out.',
-        );
+      const indices = triangleIndices(indexSource, vertices, 'Trimesh');
+      let flags: number | undefined;
+      for (const [option, name] of [
+        ['fixInternalEdges', 'FIX_INTERNAL_EDGES'],
+        ['mergeDuplicateVertices', 'MERGE_DUPLICATE_VERTICES'],
+        ['deleteDegenerateTriangles', 'DELETE_DEGENERATE_TRIANGLES'],
+        ['deleteDuplicateTriangles', 'DELETE_DUPLICATE_TRIANGLES'],
+        ['deleteBadTopologyTriangles', 'DELETE_BAD_TOPOLOGY_TRIANGLES'],
+        ['oriented', 'ORIENTED'],
+      ] as const) {
+        if (!options[option]) continue;
+        const bit = R.TriMeshFlags?.[name];
+        if (bit === undefined)
+          throw new MargoError(
+            'unsupported',
+            `${option} needs a Rapier that has TriMeshFlags.${name} (0.17.1 or later; ORIENTED and the clean-up flags need 0.18); upgrade @dimforge/rapier3d-compat or leave it out.`,
+          );
+        flags = (flags ?? 0) | bit;
+      }
       desc = R.ColliderDesc.trimesh(vertices, indices, flags);
       break;
     }

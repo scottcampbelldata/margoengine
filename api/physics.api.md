@@ -488,6 +488,11 @@ export interface RapierModule {
     ShapeType: Record<string, number | string>;
     TriMeshFlags?: {
         FIX_INTERNAL_EDGES?: number;
+        MERGE_DUPLICATE_VERTICES?: number;
+        DELETE_DEGENERATE_TRIANGLES?: number;
+        DELETE_DUPLICATE_TRIANGLES?: number;
+        DELETE_BAD_TOPOLOGY_TRIANGLES?: number;
+        ORIENTED?: number;
     };
     HeightFieldFlags?: {
         FIX_INTERNAL_EDGES?: number;
@@ -625,6 +630,8 @@ export type ShapeOptions = {
     shape: 'convexHull';
     geometry?: ColliderGeometry;
     points?: ArrayLike<number>;
+    vertices?: ArrayLike<number>;
+    indices?: ArrayLike<number>;
     borderRadius?: number;
 } | {
     shape: 'trimesh';
@@ -632,6 +639,11 @@ export type ShapeOptions = {
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
     fixInternalEdges?: boolean;
+    mergeDuplicateVertices?: boolean;
+    deleteDegenerateTriangles?: boolean;
+    deleteDuplicateTriangles?: boolean;
+    deleteBadTopologyTriangles?: boolean;
+    oriented?: boolean;
 } | {
     shape: 'heightfield';
     rows: number;

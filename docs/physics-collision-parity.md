@@ -20,8 +20,8 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Capsule | full | |
 | Cylinder, cone | full | with border radius (round cylinder, round cone) |
 | Convex hull, convex mesh (Quickhull from points) | full | |
-| Convex hull from indexed mesh (convex mesh with faces) | partial | `addHull` takes faces; no `next` option for indexed input |
-| Triangle mesh (trimesh) | partial | `fixInternalEdges` only; the other creation flags below are missing |
+| Convex hull from indexed mesh (convex mesh with faces) | full | `convexHull` with `vertices` and `indices` |
+| Triangle mesh (trimesh) | full | every creation flag below |
 | Height field | full | Rapier's layout and split |
 | Compound | full | convex parts |
 | Compound with non-convex parts (trimesh, height field, voxels, half space as part) | missing | Rapier's compound takes any shape |
@@ -40,11 +40,11 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Flag | Status |
 | --- | --- |
 | FIX_INTERNAL_EDGES | full |
-| MERGE_DUPLICATE_VERTICES | missing |
-| DELETE_BAD_TOPOLOGY_TRIANGLES | missing |
-| DELETE_DEGENERATE_TRIANGLES | missing |
-| DELETE_DUPLICATE_TRIANGLES | missing |
-| ORIENTED (inside/outside known, solid point queries) | missing |
+| MERGE_DUPLICATE_VERTICES | full |
+| DELETE_BAD_TOPOLOGY_TRIANGLES | full |
+| DELETE_DEGENERATE_TRIANGLES | full |
+| DELETE_DUPLICATE_TRIANGLES | full |
+| ORIENTED (inside/outside known, solid point queries) | full |
 
 ## Broad phase, narrow phase, contacts
 

@@ -6,6 +6,8 @@ export { PhysicsCollider } from './next/collider.js';
 export { PhysicsJoint } from './next/joint.js';
 export { collisionGroups } from './shapes.js';
 export { buildHull as convexHull } from './next/hull.js';
+export { cleanTrimesh } from './next/mesh-clean.js';
+export type { MeshCleanOptions } from './next/mesh-clean.js';
 export type { HullFaces } from './next/hull.js';
 export type { ConeJointOptions, NextJointOptions } from './next/joint.js';
 export type {
