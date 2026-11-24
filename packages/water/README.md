@@ -1038,6 +1038,10 @@ console.log(panel.roughness, coast.surgeAt());
     where the stern has passed. Fresh foam spreads and decays downstream with `foamLife`, even on long hulls at low speed.
     The surface shader concentrates faint foam into sparse patches as it disperses. `ShipWakes.sample` reports the
     underlying foam density before this shading step.
+  - `ShipOptions.wakeTint` is optional linear RGB in the range 0 to 1, with `null` as the default. It colours water
+    and foam along this ship's turbulent stern trail. The tint spreads and fades with the turbulence. Change
+    `WakeShip.wakeTint` to recolour the current trail, including on a paused frame. Where tinted trails overlap,
+    the strongest local contribution supplies the colour. The tint leaves the height and foam-density queries intact.
   - Ships' and shore lamps leave glints on a night sea.
   - A ship with a `path` (time to [x, z]) draws the same wake after a seek as after playing to that time. A ship placed
     with `setPose` leaves the trail it has passed through. Either way a turning ship's wake bends with its track.
@@ -1064,6 +1068,7 @@ const wakes = ShipWakes.attach(engine, {
   lamps: [{position: [60, 8, 100], color: [1, 0.9, 0.7], intensity: 400}], // a harbour light
 });
 applyShipSettings(wakes, SHIP_LOOKS.calmNight);
+wakes.ships[0].wakeTint = [0.56, 0.15, 0.065]; // illustrative suspended sediment, linear RGB
 // A small boat rides the ship's wake and the sea; the bow spray goes to any emitter with options and burst().
 const boat = new Floater({hull: {length: 6, beam: 2, draft: 0.5}, position: [20, 0, 0], heading: 45});
 const spray = {options: {}, burst: (count: number) => count};
@@ -1079,7 +1084,8 @@ console.log(boat.matrix(), wakes.sample(10, -60), (wakeAngle(hullFroude(6, 40)) 
 On a Flood, ride `floodSurface(await flood.read(), {origin, size})` (the Water's terrain extent), or `WaveQuery.capture`
 of its Water, which already holds the flood. The GPU check (`test/ships.browser.mjs`, WebGPU and MARGO_COMPAT=1) holds
 the drawn wake to `wakes.sample` within 4e-6 m on the open sea and on a flood, and a Floater's ride to the CPU law within
-1e-7. It also checks that a lamp's glint stands on the mirror line and spreads on a rougher sea. `test/ships.test.js`
+1e-7. It also checks the stern tint in a fixed frame, the untouched water outside the trail, and the lamp glint
+at the mirror line and across a rougher sea. `test/ships.test.js`
 measures the bounds: the brightest ray of the drawn wake at 19.47 degrees below Fr 0.49 and at Rabaud and Moisy's angle
 at Fr 0.8 to 2, the bow wave law, the Floater's least-squares pitch and its damped overshoot exp(-zeta pi / sqrt(1 -
 zeta^2)), and the slam threshold. `examples/test-pages/ships.html` runs all of it in one scene.

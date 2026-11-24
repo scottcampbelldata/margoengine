@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Stern tint (2026-11-23). Live per-ship colour follows the existing turbulent trail, including on a paused clock.
+  The GPU fixture checks recolouring, clearing, unchanged foam density, and unaffected pixels away from the trail.
+  Build the packages, then run `node packages/water/test/ships.browser.mjs` on WebGPU and with `MARGO_COMPAT=1`
+  for WebGL2. The colour is an authored appearance parameter.
+  [Method and sources](../clean-room.md#colour-in-the-stern-wake-2026-11-23).
+
 - Kelvin wake crest phase (2026-11-23). The CPU sample at the cusp of a 128 m hull matches the coalesced phase on either
   side. The [water GPU fixture](../../packages/water/test/ships.browser.mjs) compares those wave laws over open and
   flooded surfaces. Build the packages, then run `node --test packages/water/test/ships.test.js` and

@@ -276,6 +276,8 @@ export interface ShipOptions {
   lamps?: readonly ShipLamp[];
   /** Height multiplier of this ship's wake and bow wave, 0..5. Default 1. */
   wake?: number;
+  /** Linear RGB of discoloured water in this ship's turbulent stern trail, 0..1 per channel. Default null. */
+  wakeTint?: Vec3 | null;
 }
 /** Settings of {@link ShipWakes}. */
 export interface ShipWakesOptions {
@@ -312,6 +314,7 @@ export class WakeShip {
   lamps: readonly ShipLamp[];
   /** Wake height multiplier, 0..5; read every frame. */
   wake: number;
+  private tint: Vec3 | null = null;
   private state: Required<ShipPose>;
   /** Recorded trail, newest first (bow positions). */
   private recorded: TrailPoint[] = [];
@@ -324,12 +327,28 @@ export class WakeShip {
     this.path = options.path;
     this.lamps = checkLamps(options.lamps ?? [], 'ship lamps');
     this.wake = finite(options.wake ?? 1, 0, 5, 'wake');
+    this.wakeTint = options.wakeTint ?? null;
     this.state = { position: [0, 0, 0], heading: 0, speed: 0, pitch: 0, roll: 0 };
     if (options.pose) this.setPose(options.pose);
   }
   /** The ship's pose as last set or read from its path. */
   get pose(): Readonly<Required<ShipPose>> {
     return this.state;
+  }
+  /** Linear RGB of the turbulent water, or null for the default clear trail. Read each frame, including paused frames. */
+  get wakeTint(): Vec3 | null {
+    return this.tint;
+  }
+  set wakeTint(value: Vec3 | null) {
+    if (value === null) this.tint = null;
+    else {
+      const [r, g, b] = vec3(value, 'wake tint');
+      this.tint = Object.freeze([
+        finite(r, 0, 1, 'wake tint red'),
+        finite(g, 0, 1, 'wake tint green'),
+        finite(b, 0, 1, 'wake tint blue'),
+      ]);
+    }
   }
   /** Places the ship (no path): the trail keeps what it passed through. */
   setPose(pose: ShipPose): this {
@@ -458,15 +477,16 @@ function checkLamps(lamps: readonly ShipLamp[], what: string): readonly ShipLamp
 }
 
 // Uniform: head (ships, lamps, roughness, 0), look (wake height, stern waves, wake life, bow wave), foam (waterline foam,
-// foam life, turbulent wake, lamp intensity), then 8 ships of 4 vec4 and 16 lamps of 2 vec4.
-const SHIP_FLOATS = 16,
+// foam life, turbulent wake, lamp intensity), then 8 ships of 5 vec4 and 16 lamps of 2 vec4.
+const SHIP_FLOATS = 20,
   UNIFORM_FLOATS = 12 + MAX_SHIPS * SHIP_FLOATS + MAX_LAMPS * 8;
 const TRAIL_FLOATS = MAX_SHIPS * TRAIL_POINTS * 8;
 
 /** WGSL of the wake law; the same numbers as the TypeScript above, which the GPU check compares. */
 const WAKE_WGSL = /* wgsl */ `
-struct ShipRecord {a:vec4f,b:vec4f,c:vec4f,d:vec4f}
+struct ShipRecord {a:vec4f,b:vec4f,c:vec4f,d:vec4f,tint:vec4f}
 struct ShipData {head:vec4f,look:vec4f,foam:vec4f,ships:array<ShipRecord,${MAX_SHIPS}>,lamps:array<vec4f,${MAX_LAMPS * 2}>}
+struct ShipSurface {height:f32,foam:f32,tint:vec4f}
 fn shipSmooth(a:f32,b:f32,x:f32)->f32 {return smoothstep(a,b,x);}
 fn shipHullWeight(k:f32,k0:f32,kl:f32,d:f32)->f32 {return shipSmooth(0.85*kl,kl,k)*exp(-(k-k0)*d*0.5);}
 fn shipWaveTerm(t:f32,kg:f32,k0:f32,kl:f32,d:f32,x:f32,tau:f32)->f32 {
@@ -536,9 +556,9 @@ fn shipLocal(i:u32,p:vec2f,stern:bool)->vec4f {
  }
  return out;
 }
-// (height, foam) the ships add at p.
-fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
- var height=0.0;var foam=0.0;
+// The strongest tinted turbulent trail supplies the colour. The foam mask and height keep their existing values.
+fn shipWake(p:vec2f,sampleFoam:bool)->ShipSurface {
+ var height=0.0;var foam=0.0;var tint=vec4f(0);
  for(var i=0u;i<u32(shipData.head.x);i++){
   let ship=shipData.ships[i];let local=shipLocal(i,p,false);
   let l=ship.b.y;let b=ship.b.z;let d=ship.b.w;let span=ship.d.z;
@@ -567,10 +587,12 @@ fn shipWake(p:vec2f,sampleFoam:bool)->vec2f {
       *shipSmooth(0.5,2.2,stern.z)*(1.0-shipSmooth(0.8*span,span,stern.x));
    }
   }
+  let tintStrength=turbulent*ship.tint.w;
+  if(tintStrength>tint.w){tint=vec4f(ship.tint.rgb,tintStrength);}
   var breaking=0.0;if(speed>0.05){breaking=shipSmooth(0.3,0.48,9.81*ship.c.x/(speed*speed))*shipSmooth(0.5,2.0,speed)*max(crestRidge,0.0)*mask*min(shipData.look.w,1.0);}
   foam=max(foam,max(max(wl,turbulent),breaking));
  }
- return vec2f(height,clamp(foam,0.0,1.0));
+ return ShipSurface(height,clamp(foam,0.0,1.0),vec4f(tint.rgb,clamp(tint.w,0.0,1.0)));
 }
 // Lamp glints: GGX reflection of each point lamp off the sea's normal n, seen along v, at roughness rough.
 fn shipLamps(world:vec3f,n:vec3f,v:vec3f,waterRough:f32)->vec3f {
@@ -898,6 +920,13 @@ export class ShipWakes implements EnginePlugin {
     if (c.device !== this.engine?.gpu)
       throw fault('state', 'ShipWakes and Water must use the same engine; attach both to one engine');
     this.build();
+    // Tint is live even when the trail clock is paused.
+    for (let i = 0; i < this.ships.length; i++) {
+      const offset = 12 + i * SHIP_FLOATS + 16;
+      const tint = this.ships[i].wakeTint;
+      if (tint) this.values.set(tint, offset);
+      this.values[offset + 3] = tint ? 1 : 0;
+    }
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
     c.device.queue.writeBuffer(this.trailBuffer!, 0, this.trails);
     return this.resources;
@@ -936,7 +965,9 @@ function shipShader(code: string, binding: number): string {
   const surfaceReturn = 'return Surface(p,normalize(cross(binormal,tangent)),crest);';
   const foamLine = 'var foam=max(fresh,surfFoam);';
   const colorLine = 'var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;';
-  for (const needle of [surfaceReturn, foamLine, colorLine])
+  const bodyStart = 'let body=bottom*transmission+';
+  const foamAlbedo = 'vec3f(0.72,0.77,0.74)';
+  for (const needle of [surfaceReturn, foamLine, bodyStart, colorLine, foamAlbedo])
     if (!code.includes(needle))
       throw fault('state', 'ShipWakes found no place in the Water shader for the wake; update @margoengine/water');
   const head = `
@@ -949,16 +980,17 @@ ${WAKE_WGSL}`;
       .replace(
         surfaceReturn,
         // The wake's height and its slope by central differences one tenth of the shortest Kelvin wave apart.
-        `{let sw=shipWake(xz,false);p.y+=sw.x;
+        `{let sw=shipWake(xz,false);p.y+=sw.height;
  if(u32(shipData.head.x)>0u){let e=0.25;
-  tangent.y+=(shipWake(xz+vec2f(e,0),false).x-shipWake(xz-vec2f(e,0),false).x)/(2.0*e);
-  binormal.y+=(shipWake(xz+vec2f(0,e),false).x-shipWake(xz-vec2f(0,e),false).x)/(2.0*e);}}
+  tangent.y+=(shipWake(xz+vec2f(e,0),false).height-shipWake(xz-vec2f(e,0),false).height)/(2.0*e);
+  binormal.y+=(shipWake(xz+vec2f(0,e),false).height-shipWake(xz-vec2f(0,e),false).height)/(2.0*e);}}
  ${surfaceReturn}`,
       )
       .replace(
         foamLine,
         `${foamLine}
- let wash=shipWake(i.world.xz,true).y;
+ let shipSurface=shipWake(i.world.xz,true);
+ let wash=shipSurface.foam;
  if(wash>0.001){
   let patternValue=noise(i.world.xz*0.38+vec2f(frame.settings.x*0.035,-frame.settings.x*0.021)).x;
   let root=sqrt(wash);
@@ -968,7 +1000,13 @@ ${WAKE_WGSL}`;
   foam=max(foam,clamp(pattern*(wash*mix(0.40,1.45,flecks)+islands*flecks),0.0,1.0));
  }`,
       )
-      .replace(colorLine, `${colorLine}color+=shipLamps(i.world,n,v,rough);`)
+      .replace(bodyStart, 'var body=bottom*transmission+')
+      .replace(
+        colorLine,
+        `body=mix(body,shipSurface.tint.rgb*bodyLight,shipSurface.tint.w);
+ ${colorLine}color+=shipLamps(i.world,n,v,rough);`,
+      )
+      .replace(foamAlbedo, `mix(${foamAlbedo},shipSurface.tint.rgb,0.75*shipSurface.tint.w)`)
   );
 }
 

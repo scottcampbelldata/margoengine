@@ -293,6 +293,28 @@ test('the wake fades with age, follows a turning ship, and draws foam on the wat
   assert.ok(o < y * 0.2, `old ${o} young ${y}`);
 });
 
+test('a wake tint is a copied per-vessel colour and leaves height and foam density intact', () => {
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    ships: [{ hull: { length: 20, beam: 6, draft: 2 }, path: (time) => [0, time * 3] }],
+  });
+  const ship = wakes.ships[0];
+  wakes.setTime(12);
+  const point = wakes.sample(0, 24);
+  assert.equal(ship.wakeTint, null);
+  const source = [0.64, 0.08, 0.03];
+  ship.wakeTint = source;
+  source[0] = 0;
+  assert.deepEqual(ship.wakeTint, [0.64, 0.08, 0.03]);
+  assert.throws(() => {
+    ship.wakeTint = [1.01, 0, 0];
+  }, /wake tint red/);
+  assert.deepEqual(ship.wakeTint, [0.64, 0.08, 0.03]);
+  assert.deepEqual(wakes.sample(0, 24), point);
+  ship.wakeTint = null;
+  assert.equal(ship.wakeTint, null);
+});
+
 test('stern foam has age zero where it is created and fades at the same rate for long and short hulls', () => {
   const wakeAt = (length) => {
     const wakes = new ShipWakes({

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17442318,
+  "total": 17442877,
   "history": [
     {
       "date": "2026-10-24",
@@ -11409,6 +11409,12 @@
       "commit": "459e33f9ba",
       "reason": "Add the optional terrain relief lighting entry for horizon-based ridge shadows and sky visibility. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "wake-tint",
+      "reason": "water/ships 10,619 to 10,931 B min+gzip. Ship tint reuses the existing two bindings and turbulent stern sample. A split would repeat trail sampling or add a second rendering pass.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12880,7 +12886,7 @@
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,
     "@margoengine/water/settings": 6675,
-    "@margoengine/water/ships": 10700,
+    "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5779,
     "@margoengine/water/underwater": 9360,
     "@margoengine/weather": 8467,

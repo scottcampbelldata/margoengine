@@ -1,3 +1,13 @@
+### Section 5 evidence: discoloured water behind a ship (2026-11-23)
+
+`ShipWakes` has a per-ship linear RGB tint for the turbulent stern trail. It shades the part of the water body
+and foam that the stern has passed over, with the existing turbulence envelope. The uniform holds one extra vector
+per vessel. The same fragment and buffer layout run on WebGPU and WebGL2. Core stays unchanged.
+
+The browser witness changes and clears the tint with the wake time held still. It checks the RGB near the stern,
+the pixels ahead and outside of the trail, and the unchanged foam-density values. The CPU fixture checks input
+validation and the unchanged height and foam query. See the [clean-room record](../clean-room.md#colour-in-the-stern-wake-2026-11-23).
+
 ### Section 5 evidence: Kelvin wake crest phase (2026-11-23)
 
 `ShipWakes` now uses the correct sign for the lateral part of the phase when distance along the trail is measured aft.

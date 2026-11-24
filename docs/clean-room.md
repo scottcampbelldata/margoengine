@@ -1,5 +1,14 @@
 # Clean room
 
+### Colour in the stern wake (2026-11-23)
+
+Amanda T. Nylund, Lars Arneborg, Anders Tengberg, Ulf Mallast and Ida-Maja Hassellöv, [In situ observations of turbulent ship wakes and their spatiotemporal extent](https://doi.org/10.5194/os-17-1285-2021), 2021, characterize the trail of mixed water and its relation to the bubble wake. Yingfei Liu and Ruru Deng, [Ship Wakes in Optical Images](https://doi.org/10.1175/JTECH-D-18-0021.1), 2018, identify the surface trail separately from the divergent waves. Morgan F. Gelinas, Henry Bokuniewicz, John G. Rapaglia and Kamazima M. M. Lwiza, [Sediment Resuspension by Ship Wakes in the Venice Lagoon](https://digitalcommons.sacredheart.edu/bio_fac/28/), 2013, measure suspended material associated with ship passages in shallow water.
+
+Margo applies an authored linear reflectance to the near-surface water and foam. The existing stern trail supplies
+the amount, width and age envelope. The strongest coloured parcel supplies the reflectance where two trails
+overlap. This is a surface appearance model. It does not compute sediment mass, wavelength-dependent transport or
+the location or mechanism that released the material.
+
 ### Kelvin wake crest phase (2026-11-23)
 
 Fritz Ursell, [On Kelvin's ship-wave pattern](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/volume/840945DCC46FC5078D12D1BB82B7E65D?pageNum=2), 1960, derives the two stationary points and their coalescence. Marc Rabaud and Frédéric Moisy, [Ship Wakes: Kelvin or Mach Angle?](https://doi.org/10.1103/PhysRevLett.110.214503), 2013, give the deep-water dispersion and the angle constraints. Ravindra Pethiyagoda, Timothy J. Moroney, Christopher J. Lustri and Scott W. McCue, [Kelvin wake pattern at small Froude numbers](https://doi.org/10.1017/jfm.2021.193), 2021, distinguish the transverse and diverging branches. Michael V. Berry and Christopher J. Howls, [NIST DLMF §36.13](https://dlmf.nist.gov/36.13), 2010, give an independent caustic formulation.

@@ -193,6 +193,16 @@ try {
         return values;
       };
       const sternFoam = await readFoam();
+      const neutralWake = canvas.toDataURL();
+      sternWake.ships[0].wakeTint = [0.8, 0.075, 0.025];
+      engine.render({ delta: 0 });
+      await d.queue.onSubmittedWorkDone();
+      const tintedWake = canvas.toDataURL();
+      const tintedFoam = await readFoam();
+      sternWake.ships[0].wakeTint = null;
+      engine.render({ delta: 0 });
+      await d.queue.onSubmittedWorkDone();
+      const clearedWake = canvas.toDataURL();
       sternWake.delete(sternWake.ships[0]);
       sternWake.add({ hull: { length: 72, beam: 8, draft: 4 }, path: (time) => [0, Math.max(0, time) * 1.5] });
       sternWake.setLook({ foamLife: 9.5 });
@@ -270,7 +280,23 @@ try {
       });
       const lamps = ShipWakes.attach(engine, { surface: night, lamps: [{ position: [0, 10, -80], intensity: 3000 }] });
       window.shipsTest = { engine, lamps, night };
-      return { open, early, onFlood, ride, sternFoam, bowCrest, sideWash, slowBow, slowSide, slowFoam };
+      return {
+        open,
+        early,
+        onFlood,
+        ride,
+        sternFoam,
+        bowCrest,
+        sideWash,
+        slowBow,
+        slowSide,
+        slowFoam,
+        tintedFoam,
+        neutralWake,
+        tintedWake,
+        clearedWake,
+        texels,
+      };
     },
     { WIDTH, HEIGHT },
   );
@@ -333,6 +359,21 @@ try {
   assert.equal(forward, 0, 'no turbulent foam ahead of the stern');
   assert.equal(offAxis, 0, 'no turbulent foam outside the wake');
   console.log('stern foam fresh, aged, forward, off-axis:', result.sternFoam);
+  const decodeWake = (data) => decodePNG(Buffer.from(data.split(',')[1], 'base64'));
+  const [neutral, tinted, cleared] = await Promise.all([
+    decodeWake(result.neutralWake),
+    decodeWake(result.tintedWake),
+    decodeWake(result.clearedWake),
+  ]);
+  const rgbAt = (png, [x, y]) => Array.from(png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 3));
+  const neutralStern = rgbAt(neutral, result.texels[0]);
+  const tintedStern = rgbAt(tinted, result.texels[0]);
+  const redBalance = ([r, g, b]) => r - (g + b) / 2;
+  assert.ok(redBalance(tintedStern) - redBalance(neutralStern) > 15, JSON.stringify({ neutralStern, tintedStern }));
+  for (const location of result.texels.slice(2)) assert.deepEqual(rgbAt(tinted, location), rgbAt(neutral, location));
+  assert.deepEqual(rgbAt(cleared, result.texels[0]), neutralStern);
+  assert.deepEqual(result.tintedFoam, result.sternFoam);
+  console.log('stern tint changes only its trail colour:', { neutralStern, tintedStern });
   const [slowFresh, slowAged, slowForward, slowOffAxis] = result.slowFoam;
   assert.ok(slowFresh > 0.26 && slowAged > 0.03 && slowAged < slowFresh, 'missing or unfaded harbor foam');
   assert.ok(slowForward < 0.025 && slowOffAxis < 0.025, 'harbor foam leaves the stern trail');

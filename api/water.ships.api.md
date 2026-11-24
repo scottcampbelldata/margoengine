@@ -97,6 +97,7 @@ export interface ShipOptions {
     pose?: ShipPose;
     lamps?: readonly ShipLamp[];
     wake?: number;
+    wakeTint?: Vec3 | null;
 }
 
 export interface ShipPose {
@@ -204,6 +205,8 @@ export class WakeShip {
     wake: number;
     constructor(options: ShipOptions);
     get pose(): Readonly<Required<ShipPose>>;
+    get wakeTint(): Vec3 | null;
+    set wakeTint(value: Vec3 | null);
     setPose(pose: ShipPose): this;
     follow(floater: Floater, speed: number): this;
     clearTrail(): this;
