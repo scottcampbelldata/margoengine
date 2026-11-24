@@ -359,7 +359,7 @@ if (balance.state === 'fallen') motors.fade(0, 0.5);
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `feet` | none | The two foot bones. Each needs a knee hinge above it, as `humanoidProfile` builds. |
-| `stepTime` | `0.28` | Seconds a step takes. |
+| `stepTime` | `0.28` | Seconds a step takes at most; a harder push shortens it (below). |
 | `stepHeight` | `0.15` | How high a foot lifts, as a share of the leg's length. |
 | `stepTrigger` | `0.2` | How far the capture point may leave the feet before a step, as a share of the leg's length. |
 | `stance` | `0.97` | Hip height held, as a share of the height when added. |
@@ -368,6 +368,8 @@ if (balance.state === 'fallen') motors.fade(0, 0.5);
 | `maxUpright` | `40` | Largest turn that gives, in rad/s². A harder blow knocks the character over. |
 | `fallTilt` | `0.8` | Radians of lean past which it has fallen and balancing stops. |
 | `gravity` | `9.81` | World gravity along up, in m/s². |
+
+A step lands where the capture point will be when the foot comes down, and a hard push makes the capture point run away from the stance foot as e^(omega t), so a step that took its full `stepTime` would land short and the stance foot would be dragged off the ground. Each step takes no longer than the capture point needs to reach the edge of the leg's reach, ln(reach / d) / omega for a capture point d from the stance foot, and no less than 0.4 / omega (0.094 s for a figure 0.26 m tall at the hips): step timing adaptation (Khadiv, Herzog, Moosavian and Righetti, IEEE T-RO 2020) on the capture point of Pratt et al. (2006) and Englsberger et al. (2011). A planted foot's target stays on the ground, so a stance foot a push lifts is pressed back down, and a foot that is off the ground anyway steps next. Both feet are held level, the swing foot heading where the hips head as SIMBICON keeps it (Yin, Loken and van de Panne 2007), and every target stays inside the ankle's cone. The ankle's limits hold under the weight, which they did not on Rapier: `docs/limits.md`, Ragdoll balance. Knight recovers a 1.5 m/s push of its upper body in each of four directions at every solver setting from 2 to 6 iterations, 4, 8 and 16 substeps and warm start on and off, which `node packages/ragdoll/scripts/balance-ab.mjs --sweep` checks.
 
 Every torque is a pair inside the body, so a hard enough blow knocks it over. Set `carry` to lend an outside force, capped at 1.5 times the share asked for; `balance.carried` reads the share of the body's weight it gave at the last step, and is 0 without it. While it balances it adds inertia to the feet and shins, brings the character's island, not the world, to at least 8 solver passes, and stands a foot fitted with a hull on a flat sole of four corners; `dispose` takes all three away. A stance knee takes its torque from the balance, with a spring of its own beside it, so `motors.setStrength` reaches only the swinging leg's knee. Its torques are forces, so more solver passes only steady it, and a force of your own on a bone stays yours. `steps` counts steps, `capture` is the capture point, `tilt` the lean, and `state` is `standing`, `stepping` or `fallen`. Add it with the character standing still, before `activate`. After a fall, get up with `margoengine/ragdoll/getup` and call `reset()`. `motors.setTarget(bone, rotation)` is what it drives the legs with, and is open to any controller: a rotation relative to the parent bone, or `null` for the animation's pose.
 

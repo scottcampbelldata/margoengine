@@ -65,7 +65,8 @@ interface Leg {
   /** The bend a straight hinge already has in the rig: the angle at the knee between thigh and shin, at hinge angle 0. */
   restBend: number;
   plant: Vec3;
-  swing: { from: Vec3; to: Vec3; t: number } | null;
+  /** A step under way: from and to where, how far through it (0 to 1), and how long it takes, in seconds. */
+  swing: { from: Vec3; to: Vec3; t: number; time: number } | null;
 }
 
 const add = (a: ArrayLike<number>, b: ArrayLike<number>): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -118,6 +119,13 @@ const CLEARLY_BETTER = 0.25;
 const SOLE_HEIGHT = 0.1;
 /** The share of what friction holds that the pull over the feet may use. */
 const GRIP = 0.8;
+/** A planted ankle higher than this share of `stepHeight` above the ground is off it: see {@link RagdollBalance.lifted}. */
+const LIFTED = 0.25;
+/**
+ * The shortest step, in units of 1 / omega, the inverted pendulum's time constant: 0.094 s for Knight, 0.26 m tall at the hips.
+ * At 0.5 a hard push backward still outran 4 of 30 solver settings of the acceptance sweep; at 0.4 none.
+ */
+const SHORTEST_STEP = 0.4;
 const ease = (t: number): number => t * t * (3 - 2 * t);
 const within = (value: number | undefined, fallback: number, low: number, high: number, name: string): number => {
   const v = value ?? fallback;
@@ -349,11 +357,14 @@ export class RagdollBalance {
       this.fall();
       return;
     }
-    // A planted foot is where it is, not where it was sent.
+    // A planted foot is where it is across the ground, not where it was sent, and on the ground: its ankle at the height a
+    // planted ankle stands. Read from the foot alone, a stance foot that a push lifted (its ankle at the end of its range, the
+    // body moving away over it) set its own target in the air, the leg held it there and the body had no support; on the
+    // ground the leg presses it back down.
     for (const leg of this.legs)
       if (!leg.swing) {
-        const at = leg.foot.body.position;
-        leg.plant = [at[0], at[1], at[2]];
+        const at: Vec3 = [leg.foot.body.position[0], leg.foot.body.position[1], leg.foot.body.position[2]];
+        leg.plant = add(at, times(this.up, this.floor - dot(at, this.up)));
       }
     this.capture = this.capturePoint();
     const [a, b] = this.legs,
@@ -703,14 +714,44 @@ export class RagdollBalance {
       toB = this.landing(b),
       inA = this.outside(toA, b.plant),
       inB = this.outside(toB, a.plant),
-      // The step that leaves the capture point between the feet; between two as good, the foot left farther behind.
+      // A foot off the ground holds nothing up: it steps next, wherever the other would land. Then the step that leaves the
+      // capture point between the feet; between two as good, the foot left farther behind.
+      offA = this.lifted(a),
+      offB = this.lifted(b),
       first =
-        Math.abs(inA - inB) > this.trigger * CLEARLY_BETTER
-          ? inA < inB
-          : size(minus(toA, a.plant)) >= size(minus(toB, b.plant)),
+        offA !== offB
+          ? offA
+          : Math.abs(inA - inB) > this.trigger * CLEARLY_BETTER
+            ? inA < inB
+            : size(minus(toA, a.plant)) >= size(minus(toB, b.plant)),
       leg = first ? a : b;
-    leg.swing = { from: leg.plant, to: first ? toA : toB, t: 0 };
+    leg.swing = { from: leg.plant, to: first ? toA : toB, t: 0, time: this.stepDuration(first ? b : a) };
     this.steps++;
+  }
+
+  /**
+   * How long this step may take. The capture point runs away from the stance foot as e^(omega t) (J. Pratt et al., "Capture
+   * Point: A Step toward Humanoid Push Recovery", Humanoids 2006; J. Englsberger et al., "Bipedal walking control based on
+   * Capture Point dynamics", IROS 2011), so a step that takes `stepTime` lands where the capture point has gone, and after a
+   * hard push that is past where the leg reaches: the stance foot is then dragged off the ground and the body has nothing
+   * under it. The step takes no longer than the capture point needs to run from d, its distance from the stance foot now, to the
+   * edge of the step's reach, ln(reach / d) / omega, as step timing adaptation chooses it (M. Khadiv, A. Herzog, S. A. A. Moosavian,
+   * L. Righetti, "Walking Control Based on Step Timing Adaptation", IEEE T-RO 2020), and no less than half a natural period.
+   */
+  private stepDuration(stance: Leg): number {
+    const flat = minus(this.capture, stance.plant),
+      d = size(minus(flat, times(this.up, dot(flat, this.up)))),
+      height = this.height * this.stance,
+      leg = stance.thigh + stance.shin,
+      reach = Math.sqrt(Math.max(0, leg * leg * 0.9 - height * height)) + size(this.stanceLine) / 2,
+      shortest = SHORTEST_STEP / this.natural;
+    if (!(d > 1e-6)) return this.stepTime;
+    return Math.max(shortest, Math.min(this.stepTime, Math.log(Math.max(1, reach / d)) / this.natural));
+  }
+
+  /** True when a planted foot's ankle stands well above the ground: a push lifted it, and it carries nothing. */
+  private lifted(leg: Leg): boolean {
+    return dot(leg.foot.body.position, this.up) - this.floor > this.lift * LIFTED;
   }
 
   /** Where a step of `leg` lands: beside the capture point by half the rest stance, on the foot's own side. */
@@ -736,7 +777,7 @@ export class RagdollBalance {
     let target = leg.plant;
     if (leg.swing) {
       const swing = leg.swing;
-      swing.t += dt / this.stepTime;
+      swing.t += dt / swing.time;
       const t = Math.min(1, swing.t),
         e = ease(t);
       target = add(

@@ -129,7 +129,14 @@ async function run(solver, direction, { trace = false, limits, settings = {}, wi
       upper = ragdoll.bones.filter((part) => !/leg|foot|toes/.test(part.node.name));
     ragdoll.activate();
     rig.frames(120);
-    const before = keeper.steps;
+    const before = keeper.steps,
+      was = [...hips.position],
+      feet = [n('foot.l'), n('foot.r')].map((foot) => ragdoll.part(foot).body),
+      feetWere = feet.map((body) => [...body.position]),
+      along = (a, b) =>
+        ((a[0] - b[0]) * direction[0] + (a[2] - b[2]) * direction[1]) / Math.hypot(direction[0], direction[1]);
+    let went = 0,
+      moved = 0;
     for (const { body } of upper) {
       const v = body.linearVelocity;
       body.setLinearVelocity([v[0] + direction[0] * push, v[1], v[2] + direction[1] * push]);
@@ -151,6 +158,8 @@ async function run(solver, direction, { trace = false, limits, settings = {}, wi
     if (trace) record();
     for (let f = 0; f < 240; f++) {
       rig.frames(1);
+      went = Math.max(went, along(hips.position, was));
+      feet.forEach((body, i) => (moved = Math.max(moved, along(body.position, feetWere[i]))));
       if (trace && f < 60) record();
     }
     const result = {
@@ -158,11 +167,20 @@ async function run(solver, direction, { trace = false, limits, settings = {}, wi
       steps: keeper.steps - before,
       hips: hips.position[1] / height,
       tilt: keeper.tilt,
+      went,
+      moved,
     };
     rig.frames(120);
     result.speed = Math.hypot(...hips.linearVelocity);
+    // What tests/balance.test.js asks of a push.
     result.ok =
-      result.state !== 'fallen' && result.steps > 0 && result.hips > 0.8 && result.tilt < 0.3 && result.speed < 0.5;
+      result.state !== 'fallen' &&
+      result.steps > 0 &&
+      result.hips > 0.8 &&
+      result.tilt < 0.3 &&
+      went > 0.02 &&
+      moved > 0.02 &&
+      result.speed < 0.5;
     return { result, frames };
   } finally {
     restore();
@@ -176,6 +194,7 @@ const line = ({ state, steps, hips, tilt, speed, ok }) =>
 if (args.sweep) {
   // The acceptance sweep: the kernel at every setting, all four pushes.
   let failed = 0;
+  const fails = [];
   for (const iterations of [2, 3, 4, 5, 6])
     for (const substeps of [4, 8, 16])
       for (const warm of [1, 0]) {
@@ -186,12 +205,16 @@ if (args.sweep) {
             limits: args.limits,
             wide: args.wide,
           });
-          if (!result.ok) failed++;
+          if (!result.ok) {
+            failed++;
+            fails.push(`${key} i${iterations} s${substeps} w${warm}: ${line(result)}`);
+          }
           row.push(`${key} ${result.ok ? 'ok' : 'FAIL'}`);
         }
         console.log(`iterations ${iterations} substeps ${substeps} warm ${warm}: ${row.join('  ')}`);
       }
-  console.log(`${failed} failed`);
+  console.log(`${failed} failed at ${push} m/s`);
+  for (const fail of fails) console.log(`  ${fail}`);
   process.exitCode = failed ? 1 : 0;
 } else {
   const settings = {
