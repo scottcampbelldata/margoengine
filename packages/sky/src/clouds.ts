@@ -129,6 +129,7 @@ const f7 = (v: number): string => v.toFixed(7);
 // for Bruneton 20 x the luminance of the transmittance straight up from the eye over 4 pi x 0.55, by the same 64-step
 // column as the CPU's zenithTransmittance (atmosphere.ts) through the sky's own extinction (the look's air included).
 // The fog under a cover (fog.ts) reads the same overcastLight.
+/** WGSL of the overcast deck's light (overcastLight, clearSkyLevel, deckUnits), which the sky and its fog compile. */
 export const overcastLightWgsl = /* wgsl */ `
 fn deckUnits()->f32 {
  if(frame.settings.x<0.5){return 1.0;}

@@ -6,15 +6,21 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
-export const DECK_ABOVE: number;
+export const CLEAR_SKY_RULE: readonly (readonly [number, number, number, number])[];
+
+export const DECK_ABOVE = 2.2;
 
 export const DECK_DEPTH = 20;
 
 export const DECK_VARIATION = 0.12;
 
+export function clearSkyLevel(radiance: (direction: [number, number, number]) => readonly number[], sun: readonly number[]): [number, number, number];
+
 export const clouds: NonNullable<SkyFeatures['clouds']>;
 
-export function overcastDeck(sunlight: readonly number[], sunUp: number, up: number, depth?: number, units?: number): [number, number, number];
+export function overcastDeck(sunlight: readonly number[], sunUp: number, up: number, depth?: number, units?: number, clear?: readonly number[]): [number, number, number];
+
+export const overcastLightWgsl: string;
 
 // Not exported from this entry, but used by the exports above:
 

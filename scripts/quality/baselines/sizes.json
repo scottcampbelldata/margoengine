@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17354552,
+  "total": 17356178,
   "history": [
     {
       "date": "2026-10-24",
@@ -11265,6 +11265,12 @@
       "commit": "7106ba73d3",
       "reason": "catalogue entries for fauld-countryside and fauld-crater, so their shot files name a scene",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "3d350786d2",
+      "reason": "KB-SKY-OVERCAST2: the overcast deck and the fog under cloud integrate the clear sky (clearSkyLevel, 15 daySky directions, and the Bruneton zenith column) so a low sun no longer turns them orange; sky/clouds 2011 to 2350 B and sky/fog 3077 to 3333 B gzip (fog carries the same overcastLight WGSL when the sky draws no clouds). biomes 16819 to 16833 B: PaintLayer.ecotone, a per-layer paint blend so hedges and lanes keep their width. A split would only move the same WGSL into another lazily loaded chunk of the same entry.",
+      "grew": 3
     }
   ],
   "items": {
@@ -11331,7 +11337,7 @@
     "@margoengine/behavior/subtrees": 5463,
     "@margoengine/behavior/text": 4007,
     "@margoengine/behavior/triggers": 1862,
-    "@margoengine/biomes": 16819,
+    "@margoengine/biomes": 17338,
     "@margoengine/biomes dist/workers/biomes-erosion.js": 2834,
     "@margoengine/biomes dist/workers/biomes-graph.js": 3224,
     "@margoengine/biomes dist/workers/biomes-multinoise.js": 2369,
@@ -12371,13 +12377,13 @@
     "@margoengine/sky/cloud-shadows": 8245,
     "@margoengine/sky/cloud-shadows base (without hurricane storm field)": 4410,
     "@margoengine/sky/cloud-shadows lazy hurricane storm field": 4617,
-    "@margoengine/sky/clouds": 2011,
+    "@margoengine/sky/clouds": 2606,
     "@margoengine/sky/compat-clouds": 28071,
     "@margoengine/sky/compat-clouds base (without hurricane storm field)": 23902,
     "@margoengine/sky/compat-clouds lazy hurricane storm field": 4617,
     "@margoengine/sky/day-presets": 1757,
     "@margoengine/sky/ephemeris": 2235,
-    "@margoengine/sky/fog": 3077,
+    "@margoengine/sky/fog": 3589,
     "@margoengine/sky/hillaire": 10843,
     "@margoengine/sky/hurricane": 2851,
     "@margoengine/sky/lighting": 4834,

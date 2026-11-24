@@ -722,7 +722,12 @@ export function layoutFarmland(world: FarmlandWorld, options: FarmlandOptions = 
   // Lanes only. Until the Fauld recut round 3 the hedges were exclusions too, left from when a scene drew its own hedges:
   // once hedges became painted hedgerow strips, that kept every hawthorn and blackthorn off its own hedge, so a hedge
   // drew as a row of bare trees at its edge with nothing between them.
-  const exclusions: Exclusion[] = lanes.map((l) => ({ kind: 'line' as const, points: l.points, width: l.width, verge: 1 }));
+  const exclusions: Exclusion[] = lanes.map((l) => ({
+    kind: 'line' as const,
+    points: l.points,
+    width: l.width,
+    verge: 1,
+  }));
   return { fields, hedges, trees, lanes, gates, exclusions };
 }
 

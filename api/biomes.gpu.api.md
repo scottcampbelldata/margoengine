@@ -153,6 +153,7 @@ class BiomeWorld implements Disposable {
     get biomes(): readonly BiomeDefinition[];
     get rivers(): readonly Int32Array[];
     get region(): Region;
+    get paintEcotone(): number;
     get paint(): readonly PaintLayer[];
     overview(): {
         readonly width: number;
@@ -229,6 +230,7 @@ interface ClassifyInput {
     layer(name: string): ArrayLike<number>;
     user(name: string, margin?: number): ArrayLike<number> | undefined;
     readonly ecotone?: number;
+    readonly feathers?: readonly number[];
     readonly gx: number;
     readonly gz: number;
     readonly seed: number;
@@ -548,6 +550,7 @@ interface PaintLayer {
     readonly biome: string;
     readonly mode?: PaintMode;
     readonly mask?: string;
+    readonly ecotone?: number;
 }
 
 type PaintMode = 'replace' | 'add' | 'multiply' | 'max';

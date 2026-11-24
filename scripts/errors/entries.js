@@ -2018,6 +2018,7 @@ export const entries = [
       'Classification origins and endpoints must fit i32; use a smaller rectangle or origin',
       'Supply an integer seed and a positive safe integer cell size in mm',
       'Supply a nonnegative integer ecotone half width in cells',
+      'Supply nonnegative integer paint feather half widths in cells',
       'Supply a built classifier with input modes and 1 to 255 biomes',
       'Supply matching flattened envelope arrays from classifier()',
       'Envelope starts must cover the dimensions in biome order; rebuild the classifier',

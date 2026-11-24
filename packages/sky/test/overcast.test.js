@@ -2,7 +2,15 @@
 // The GPU draws the same deck (features-check.mjs overcast, both backends); here its CPU twin against the sources.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clouds, overcastDeck, clearSkyLevel, CLEAR_SKY_RULE, DECK_ABOVE, DECK_DEPTH, DECK_VARIATION } from '../dist/clouds.js';
+import {
+  clouds,
+  overcastDeck,
+  clearSkyLevel,
+  CLEAR_SKY_RULE,
+  DECK_ABOVE,
+  DECK_DEPTH,
+  DECK_VARIATION,
+} from '../dist/clouds.js';
 import { sunlight } from '../dist/index.js';
 import { preethamRGB } from './preetham-reference.js';
 import { cloudTransmission } from '../dist/volumetric-clouds.js';
@@ -40,7 +48,10 @@ test('the deck lights level ground with the two-stream share of the light above 
 test('the clear-sky rule integrates the sky on level ground: within 6 percent of a dense integral, 2 to 80 degree suns', () => {
   const weights = CLEAR_SKY_RULE.reduce((a, r) => a + r[3], 0);
   assert.ok(Math.abs(weights - 1) < 1e-12, `weights ${weights}`);
-  assert.deepEqual(clearSkyLevel(() => [1, 1, 1], [0, 1, 0]).map((v) => +v.toFixed(12)), [1, 1, 1]);
+  assert.deepEqual(
+    clearSkyLevel(() => [1, 1, 1], [0, 1, 0]).map((v) => +v.toFixed(12)),
+    [1, 1, 1],
+  );
   for (const t of [2, 6])
     for (const deg of [2, 5, 10, 20, 45, 80]) {
       const r = (deg * Math.PI) / 180,
@@ -57,7 +68,8 @@ test('the clear-sky rule integrates the sky on level ground: within 6 percent of
         }
       }
       const q = clearSkyLevel((d) => preethamRGB(d, s, t), s);
-      for (let c = 0; c < 3; c++) assert.ok(Math.abs(q[c] / e[c] - 1) < 0.06, `turbidity ${t}, ${deg} degrees, ${c}: ${q[c] / e[c]}`);
+      for (let c = 0; c < 3; c++)
+        assert.ok(Math.abs(q[c] / e[c] - 1) < 0.06, `turbidity ${t}, ${deg} degrees, ${c}: ${q[c] / e[c]}`);
     }
 });
 test('under a low November sun the overcast deck is daylight grey, not the sun orange (KB-SKY-OVERCAST2)', () => {
@@ -72,7 +84,10 @@ test('under a low November sun the overcast deck is daylight grey, not the sun o
     // sky is near white: blue over red 0.75 to 1.3 at turbidity 3 (0.78 to 0.89 measured), toward overcast daylight's
     // chromaticity near D65 (linear sRGB white is 1, 1, 1).
     assert.ok(sunOnly[2] / sunOnly[0] < 0.6, `${deg} degrees: the sun alone ${sunOnly[2] / sunOnly[0]}`);
-    assert.ok(deck[2] / deck[0] > 0.75 && deck[2] / deck[0] < 1.3, `${deg} degrees: the deck's blue over red ${deck[2] / deck[0]}`);
+    assert.ok(
+      deck[2] / deck[0] > 0.75 && deck[2] / deck[0] < 1.3,
+      `${deg} degrees: the deck's blue over red ${deck[2] / deck[0]}`,
+    );
     // And brighter than the sun's share alone: the clear sky's light is most of what a low sun gives level ground.
     assert.ok(deck[1] > sunOnly[1] * 1.5, `${deg} degrees: ${deck[1]} vs ${sunOnly[1]}`);
   }
@@ -111,7 +126,8 @@ test('the deck follows the CIE overcast sky: the horizon a third of the zenith, 
   assert.ok(DECK_VARIATION > 0 && DECK_VARIATION <= 0.15, 'gentle variation');
 });
 test('clouds.depth is checked and has a slider row', () => {
-  for (const depth of [0.5, 201, NaN]) assert.throws(() => clouds.validate({ coverage: 1, depth }), RangeError, String(depth));
+  for (const depth of [0.5, 201, NaN])
+    assert.throws(() => clouds.validate({ coverage: 1, depth }), RangeError, String(depth));
   clouds.validate({ coverage: 1, depth: 1 });
   clouds.validate({ coverage: 1, depth: 200 });
   const row = SKY_SETTINGS.find((s) => s.name === 'clouds.depth');
@@ -128,7 +144,11 @@ test('the engine sun fades out with the deck: none under a full overcast, untouc
   const light = (coverage) => {
     const h = optionalGPU();
     h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
-    const sky = new Sky({ sunDirection: [0, Math.SQRT1_2, -Math.SQRT1_2], clouds: { coverage }, lighting: { intensity: 5 } });
+    const sky = new Sky({
+      sunDirection: [0, Math.SQRT1_2, -Math.SQRT1_2],
+      clouds: { coverage },
+      lighting: { intensity: 5 },
+    });
     try {
       h.engine.use(sky);
       sky.onPreUpdate(0);
@@ -186,5 +206,8 @@ test('the look tints the deck with its cloud colour', () => {
   } finally {
     sky.dispose();
   }
-  assert.ok(codes.some((c) => c.includes('*T)*frame.lookCloud.rgb;')), 'the deck is tinted');
+  assert.ok(
+    codes.some((c) => c.includes('*T)*frame.lookCloud.rgb;')),
+    'the deck is tinted',
+  );
 });
