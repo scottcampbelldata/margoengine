@@ -1276,6 +1276,23 @@ export class Physics implements EnginePlugin, BodyOwner {
     clearMultibody(this.kernel, multibody);
     multibody.markRemoved();
   }
+  /** @internal The length of one substep, over which a joint's impulses are taken. */
+  get substepLength(): number {
+    return this.fixedTimestep / this.kernel.substeps;
+  }
+  /** @internal */
+  holdsMultibody(joint: PhysicsJoint): boolean {
+    for (const multibody of this.multibodies) if (multibody.links.some((link) => link.joint === joint)) return true;
+    return false;
+  }
+  /** Every joint in the world, in the order they were added. */
+  getJoints(): PhysicsJoint[] {
+    return [...this.joints];
+  }
+  /** How many joints the world holds. */
+  get jointCount(): number {
+    return this.joints.size;
+  }
   /** @internal use `joint.remove`. */
   removeJoint(joint: PhysicsJoint): void {
     if (!this.joints.delete(joint)) return;

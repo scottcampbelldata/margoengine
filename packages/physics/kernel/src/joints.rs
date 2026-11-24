@@ -771,6 +771,23 @@ impl World {
             at[0] = size;
         }
 
+        // Coupled sliding axes share one measure: how far the anchor on B is from frame A's origin inside their plane. The first of
+        // them carries its row, along that line; its derivative also has A's turn, which `reach` carries as for any axis.
+        let couple = self.uu(JOINT_COUPLE, row) & 7;
+        if couple != 0 {
+            let first = if couple & 1 != 0 { 0 } else if couple & 2 != 0 { 1 } else { 2 };
+            let mut inside = v3(0.0, 0.0, 0.0);
+            for k in 0..3 {
+                if couple >> k & 1 != 0 {
+                    inside = inside.add(axes[k].scale(axes[k].dot(gap)));
+                }
+            }
+            let size = sqrt(inside.dot(inside));
+            let line = if size > COINCIDENT { inside.scale(1.0 / size) } else { axes[first] };
+            rows[first] = Row { d: line, ta: reach.cross(line), tb: arm_b.cross(line) };
+            at[first] = size;
+        }
+
         // Rotation of frame B in frame A, the short way round.
         let mut q = frame_a.conjugate().mul(frame_b);
         if q.w < 0.0 {

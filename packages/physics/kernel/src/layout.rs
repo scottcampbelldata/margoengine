@@ -162,6 +162,8 @@ columns! {
     MB_STAMP u32 Body,
     // The link before this one in the tree, which the pass from the last link to the first walks.
     MB_PREV u32 Body,
+    // On a root: nonzero when no two bodies of its tree touch (the tree's self contacts are off).
+    MB_NO_SELF u32 Body,
     // A body's place in the awake list, NONE when it is not there.
     AWAKE_SLOT u32 Body,
     // Islands of this step: the forest, and a body's island.
@@ -474,6 +476,9 @@ columns! {
     JOINT_BREAK_TORQUE f32 Joint,
     // The step a joint was last listed in, plus one.
     JOINT_SEEN u32 Joint,
+    // The sliding axes of frame A (bits 0 to 2) whose distances one limit measures together: the first of them carries the
+    // row, along the line from A's frame to the anchor on B inside their plane. Zero couples nothing.
+    JOINT_COUPLE u32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
     SOLVE_JOINTS u32 JointList,
     // The joint whose scratch keeps the sums of this one's island, for the warm start; NONE with no body to move.
@@ -713,6 +718,8 @@ pub const CCD: u32 = 1 << 13;
 pub const CCD_ACTIVE: u32 = 1 << 14;
 /// Asked to sleep (`sleep`): ready at once, whatever the pose was pushed through, until it sleeps or wakes.
 pub const ASKED_TO_SLEEP: u32 = 1 << 15;
+/// The gyroscopic term is off for this body (Rapier's default; here the term is on unless this bit is set).
+pub const NO_GYROSCOPIC: u32 = 1 << 16;
 
 // Bits of the COLLIDER_FLAGS column.
 /// Sees overlaps and pushes nothing.
@@ -787,5 +794,8 @@ pub const JOINT_BROKEN: u32 = 1 << 29;
 /// The three turning motors drive frame B toward JOINT_DRIVE_ in frame A, whatever the joint's own turning rows measure: a
 /// cone's rows are its twist and swing, so its rotation motor cannot ride on them.
 pub const JOINT_DRIVE: u32 = 1 << 30;
-/// Either reason a joint solves nothing.
-pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN;
+/// The caller switched the joint off (`joint.enabled = false`): it solves nothing until switched on, and its bodies keep the
+/// contact rule the joint gave them.
+pub const JOINT_DISABLED: u32 = 1 << 31;
+/// Any reason a joint solves nothing.
+pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;

@@ -70,7 +70,8 @@ impl World {
         let base = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_OFF == 0
             && (self.flags(body_a) | self.flags(body_b)) & DISABLED == 0
             && groups_meet(self.uu(COLLIDER_GROUPS, a), self.uu(COLLIDER_GROUPS, b))
-            && !self.joined(body_a, body_b);
+            && !self.joined(body_a, body_b)
+            && !self.apart_in_tree(body_a, body_b);
         if !base {
             return PAIR_SKIP;
         }
@@ -78,6 +79,16 @@ impl World {
             return PAIR_SOLVE;
         }
         self.filter_says(a as u32, b as u32)
+    }
+
+    /// True when both bodies are in one multibody whose self contacts are off.
+    #[inline]
+    fn apart_in_tree(&self, a: usize, b: usize) -> bool {
+        if self.uu(MB_ROLE, a) == 0 || self.uu(MB_ROLE, b) == 0 {
+            return false;
+        }
+        let root = self.uu(MB_ROOT, a);
+        root == self.uu(MB_ROOT, b) && self.uu(MB_NO_SELF, root as usize) != 0
     }
 
     /// Whether a pair may touch at all, solved or not.

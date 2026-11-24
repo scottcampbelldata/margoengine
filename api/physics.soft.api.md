@@ -561,6 +561,12 @@ interface ConeJointOptions {
     contactsEnabled?: boolean;
     breakForce?: number;
     breakTorque?: number;
+    userData?: unknown;
+    enabled?: boolean;
+    softness?: {
+        hertz: number;
+        damping?: number;
+    };
 }
 
 interface ContactForceEvent {
@@ -635,6 +641,10 @@ interface IkOptions {
     positionTolerance?: number;
     rotationTolerance?: number;
     maxStep?: number;
+    constrain?: {
+        position?: readonly [boolean, boolean, boolean];
+        rotation?: readonly [boolean, boolean, boolean];
+    };
 }
 
 interface IkResult {
@@ -655,6 +665,12 @@ interface JointBase {
     contactsEnabled?: boolean;
     breakForce?: number;
     breakTorque?: number;
+    userData?: unknown;
+    enabled?: boolean;
+    softness?: {
+        hertz: number;
+        damping?: number;
+    };
 }
 
 interface JointBreakEvent {
@@ -676,12 +692,24 @@ type JointOptions = (JointBase & {
  | (JointBase & {
     type: 'rope';
     length: number;
+    motor?: MotorOptions;
 })
  | (JointBase & {
     type: 'spring';
     restLength: number;
     stiffness: number;
     damping?: number;
+    model?: 'force' | 'acceleration';
+})
+ | (JointBase & {
+    type: 'pinSlot';
+    axis?: Vec3;
+    frameA?: Quat;
+    frameB?: Quat;
+    slideLimits?: readonly [number, number];
+    turnLimits?: readonly [number, number];
+    slideMotor?: MotorOptions;
+    turnMotor?: MotorOptions;
 }) | (JointBase & {
     type: 'revolute' | 'prismatic';
     limits?: readonly [number, number];
@@ -703,11 +731,14 @@ type JointOptions = (JointBase & {
     locked?: readonly JointDof[];
     limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
     motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
+    coupled?: readonly JointDof[];
 });
 
 interface JointOwner {
     readonly kernel: KernelWorld;
+    readonly substepLength: number;
     removeJoint(joint: PhysicsJoint): void;
+    holdsMultibody(joint: PhysicsJoint): boolean;
 }
 
 type JointType = JointOptions['type'];
@@ -1031,9 +1062,23 @@ class Multibody {
     readonly links: readonly MultibodyLink[];
     constructor(owner: MultibodyOwner, root: PhysicsBody, links: readonly MultibodyLink[]);
     get valid(): boolean;
+    get numLinks(): number;
+    attachedBodies(): PhysicsBody[];
+    linkIndex(body: PhysicsBody): number;
+    bodyAt(index: number): PhysicsBody | undefined;
+    jointBetween(a: PhysicsBody, b: PhysicsBody): PhysicsJoint | undefined;
+    get selfContacts(): boolean;
+    set selfContacts(value: boolean);
     get dof(): number;
     coordinates(): number[];
     setCoordinates(values: readonly number[]): this;
+    applyDisplacements(deltas: readonly number[]): this;
+    forwardKinematics(body: PhysicsBody, coordinates?: readonly number[]): {
+        position: [number, number, number];
+        rotation: [number, number, number, number];
+    };
+    bodyJacobian(body: PhysicsBody, point?: Vec3, coordinates?: readonly number[]): number[][];
+    kinematicBranch(body: PhysicsBody): PhysicsBody[];
     velocities(): number[];
     inverseKinematics(link: PhysicsBody, target: IkTarget, options?: IkOptions): IkResult;
     remove(): void;
@@ -1117,6 +1162,10 @@ class Physics implements EnginePlugin, BodyOwner {
     addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint;
     addMultibody(root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody;
     removeMultibody(multibody: Multibody): void;
+    get substepLength(): number;
+    holdsMultibody(joint: PhysicsJoint): boolean;
+    getJoints(): PhysicsJoint[];
+    get jointCount(): number;
     removeJoint(joint: PhysicsJoint): void;
     createCharacterController(body: PhysicsBody, options?: CharacterControllerOptions): CharacterController;
     removeController(controller: CharacterController): void;
@@ -1227,6 +1276,35 @@ class PhysicsBody {
         inertia?: Vec3;
         inertiaFrame?: Quat;
     }): this;
+    get linearDamping(): number;
+    set linearDamping(value: number);
+    get angularDamping(): number;
+    set angularDamping(value: number);
+    get dominance(): number;
+    set dominance(value: number);
+    get gyroscopicForces(): boolean;
+    set gyroscopicForces(enabled: boolean);
+    get inverseMass(): number;
+    get inversePrincipalInertia(): [number, number, number];
+    get worldCenterOfMass(): [number, number, number];
+    velocityAtPoint(point: Vec3): [number, number, number];
+    get effectiveInverseMass(): [number, number, number];
+    get effectiveWorldInverseInertia(): number[];
+    get effectiveAngularInertia(): number[];
+    get isMoving(): boolean;
+    get kineticEnergy(): number;
+    gravitationalPotentialEnergy(gravity?: Vec3, dt?: number): number;
+    get nextPosition(): [number, number, number];
+    get nextRotation(): [number, number, number, number];
+    predictPositionUsingVelocity(dt: number): {
+        position: [number, number, number];
+        rotation: [number, number, number, number];
+    };
+    predictPositionUsingVelocityAndForces(dt: number): {
+        position: [number, number, number];
+        rotation: [number, number, number, number];
+    };
+    copyFrom(other: PhysicsBody): this;
     get gravityScale(): number;
     set gravityScale(value: number);
     get additionalSolverIterations(): number;
@@ -1398,12 +1476,23 @@ class PhysicsJoint {
     readonly type: JointType | 'cone';
     readonly bodyA: PhysicsBody;
     readonly bodyB: PhysicsBody;
+    userData: unknown;
     constructor(owner: JointOwner,
     row: number, type: JointType | 'cone', bodyA: PhysicsBody, bodyB: PhysicsBody);
     get valid(): boolean;
     markRemoved(): void;
     get anchorA(): [number, number, number];
     get anchorB(): [number, number, number];
+    setAnchorA(anchor: Vec3): this;
+    setAnchorB(anchor: Vec3): this;
+    get frameA(): [number, number, number, number];
+    get frameB(): [number, number, number, number];
+    setFrames(frameA: Quat, frameB: Quat): this;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    get force(): [number, number, number];
+    get torque(): [number, number, number];
+    flip(): this;
     setLimits(min: number, max: number): this;
     get limits(): [number, number] | null;
     setCone(swing: number | readonly [number, number], twist?: readonly [number, number]): this;
@@ -1413,6 +1502,8 @@ class PhysicsJoint {
     } | null;
     setMotor(motor: MotorOptions): this;
     setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
+    setDamping(coefficient: number): this;
+    setFriction(maxForce: number): this;
     setAxisLimits(dof: JointDof, min: number, max: number): this;
     setAxisMotor(dof: JointDof, motor: MotorOptions): this;
     clearMotor(): this;
@@ -1420,6 +1511,8 @@ class PhysicsJoint {
     get contactsEnabled(): boolean;
     setLimitSoftness(hertz: number, damping?: number): this;
     get limitSoftness(): [number, number];
+    setSoftness(hertz: number, damping?: number): this;
+    get softness(): [number, number];
     setBreakLimits(force: number, torque?: number): this;
     get breakLimits(): [number, number];
     get broken(): boolean;

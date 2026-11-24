@@ -5,10 +5,14 @@ import { MargoError } from '@margoengine/math/errors';
 import type { JointOptions } from './joints.js';
 import type { KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
+import type { Vec3 } from './math.js';
 import type { PhysicsJoint } from './joints.js';
 import {
+  applyDisplacements,
+  bodyJacobian,
   coordinates,
   inverseKinematics,
+  linkPose,
   jointVelocities,
   setCoordinates,
   type IkOptions,
@@ -59,6 +63,42 @@ export class Multibody {
   get valid(): boolean {
     return !this.removed;
   }
+  /** How many links the tree has, its root included (Rapier's `num_links`). */
+  get numLinks(): number {
+    return this.links.length + 1;
+  }
+  /** Every body of the tree, the root first and the links in the order they were given (Rapier's `attached_bodies`). */
+  attachedBodies(): PhysicsBody[] {
+    return [this.root, ...this.links.map((link) => link.body)];
+  }
+  /** A body's place in the tree: 0 for the root, 1 and up for the links in order, -1 for a body that is not in it. */
+  linkIndex(body: PhysicsBody): number {
+    if (body === this.root) return 0;
+    const at = this.links.findIndex((link) => link.body === body);
+    return at < 0 ? -1 : at + 1;
+  }
+  /** The body at a place of {@link Multibody.linkIndex}, or `undefined` past the end. */
+  bodyAt(index: number): PhysicsBody | undefined {
+    return index === 0 ? this.root : this.links[index - 1]?.body;
+  }
+  /** The joint that holds two bodies of the tree together, in either order, or `undefined` when none does. */
+  jointBetween(a: PhysicsBody, b: PhysicsBody): PhysicsJoint | undefined {
+    return this.links.find((link) => (link.body === a && link.parent === b) || (link.body === b && link.parent === a))
+      ?.joint;
+  }
+  /**
+   * Whether bodies of the tree may touch one another, Rapier's `set_self_contacts_enabled` (default true). Off, no two bodies of
+   * the tree touch, joined or not; on, a joint's own `contactsEnabled` still decides for the pair it holds.
+   */
+  get selfContacts(): boolean {
+    this.check();
+    return this.owner.kernel.columns.mbNoSelf[this.root.row] === 0;
+  }
+  set selfContacts(value: boolean) {
+    this.check();
+    this.owner.kernel.columns.mbNoSelf[this.root.row] = value ? 0 : 1;
+    this.owner.kernel.wake(this.root.row);
+  }
   /** Joint speeds the tree has beyond its root's own: the number of values `coordinates()` returns. */
   get dof(): number {
     return coordinates(this.owner.kernel, this).length;
@@ -77,6 +117,44 @@ export class Multibody {
     this.check();
     setCoordinates(this.owner.kernel, this, values);
     return this;
+  }
+  /** Adds `deltas` to the coordinates, in the order of {@link Multibody.coordinates}, and poses the links; a turn of two or three axes composes. */
+  applyDisplacements(deltas: readonly number[]): this {
+    this.check();
+    applyDisplacements(this.owner.kernel, this, deltas);
+    return this;
+  }
+  /**
+   * Where a body of the tree is for the given coordinates (or where its joints are now), as `{position, rotation}` in the
+   * world's frame, without moving any body: Rapier's `forward_kinematics_single_link`.
+   * @throws RangeError for a body that is not in the tree, or coordinates of the wrong number.
+   */
+  forwardKinematics(
+    body: PhysicsBody,
+    coordinates?: readonly number[],
+  ): { position: [number, number, number]; rotation: [number, number, number, number] } {
+    this.check();
+    return linkPose(this.owner.kernel, this, body, coordinates);
+  }
+  /**
+   * The Jacobian of a point of a body (default its origin): six rows, the point's velocity along X, Y, Z then the body's spin about
+   * X, Y, Z, each with a column for every coordinate in the order of {@link Multibody.coordinates}; only the joints between the
+   * root and the body are nonzero. Rapier's `body_jacobian`.
+   * @throws RangeError for a body that is not in the tree, or coordinates of the wrong number.
+   */
+  bodyJacobian(body: PhysicsBody, point: Vec3 = [0, 0, 0], coordinates?: readonly number[]): number[][] {
+    this.check();
+    return bodyJacobian(this.owner.kernel, this, body, point, coordinates);
+  }
+  /** The bodies from the root to `body`, both included: the joints a coordinate of it depends on (Rapier's `kinematic_branch`). */
+  kinematicBranch(body: PhysicsBody): PhysicsBody[] {
+    this.check();
+    const branch: PhysicsBody[] = [];
+    for (let at: PhysicsBody | undefined = body; at; at = this.links.find((link) => link.body === at)?.parent) {
+      branch.unshift(at);
+      if (at === this.root) return branch;
+    }
+    throw new RangeError('This body is not in the multibody; pass its root or one of its links.');
   }
   /** The speed of each coordinate, in the order of {@link Multibody.coordinates}, in m/s or rad/s. */
   velocities(): number[] {
@@ -183,5 +261,6 @@ export function clearMultibody(kernel: KernelWorld, multibody: Multibody): void 
     columns.mbNext[body.row] = NONE;
     columns.mbJoint[body.row] = NONE;
     columns.mbParent[body.row] = NONE;
+    columns.mbNoSelf[body.row] = 0;
   }
 }

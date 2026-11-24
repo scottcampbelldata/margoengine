@@ -4,7 +4,12 @@
 // bound of Buss and Kim 2005, "Selectively Damped Least Squares for Inverse Kinematics" (section 4: a bound on how far one step
 // may turn any joint).
 import { MargoError } from '@margoengine/math/errors';
-import { conjugateQuaternion, multiplyQuaternions, normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
+import {
+  conjugateQuaternion,
+  multiplyQuaternions,
+  normalizeQuaternion,
+  rotateByQuaternion,
+} from '@margoengine/math/quat';
 import { JOINT_LIMIT, JOINT_LOCK, type KernelWorld } from './kernel.js';
 import type { Quat, Vec3 } from './math.js';
 import type { Multibody } from './multibody.js';
@@ -31,6 +36,14 @@ export interface IkOptions {
   rotationTolerance?: number;
   /** The most any joint moves in one iteration, in metres or radians (default 0.3). */
   maxStep?: number;
+  /**
+   * Which world axes of the target count, as Rapier's constrained axes: `position` for X, Y and Z of the point, `rotation` for the
+   * turn about X, Y and Z (all true by default). An axis left out is free: it neither pulls the joints nor counts in the error.
+   */
+  constrain?: {
+    position?: readonly [boolean, boolean, boolean];
+    rotation?: readonly [boolean, boolean, boolean];
+  };
 }
 
 /** Where `inverseKinematics` ended. */
@@ -287,6 +300,88 @@ function solve(a: number[][], b: number[]): number[] {
   return x;
 }
 
+/** The pose of one body of the tree for the given coordinates, or where the joints are now. */
+export function linkPose(
+  kernel: KernelWorld,
+  multibody: Multibody,
+  body: { row: number },
+  values?: readonly number[],
+): { position: V; rotation: Q } {
+  const { links } = describe(kernel, multibody),
+    rows = [multibody.root.row, ...links.map((link) => link.body)],
+    at = rows.indexOf(body.row);
+  if (at < 0) throw new RangeError('This body is not in the multibody; pass its root or one of its links.');
+  const states = values ? checkedStates(kernel, links, values) : links.map((link) => measure(kernel, link)),
+    pose = forward(kernel, links, states, multibody.root.row)[at]!;
+  return { position: pose.p, rotation: pose.q };
+}
+
+function checkedStates(kernel: KernelWorld, links: Link[], values: readonly number[]): State[] {
+  const need = links.reduce((n, l) => n + l.linear.length + l.angular.length, 0);
+  if (values.length !== need || !values.every(Number.isFinite))
+    throw new RangeError(`This multibody has ${need} coordinates, all finite numbers; got ${values.length}.`);
+  return statesFrom(links, values, kernel);
+}
+
+/**
+ * The Jacobian of a point of a body: six rows (the point's velocity, then the body's spin, in the world's axes) and a column
+ * for each coordinate in the order of `coordinates()`, nonzero only for the joints between the root and the body.
+ */
+export function bodyJacobian(
+  kernel: KernelWorld,
+  multibody: Multibody,
+  body: { row: number },
+  point: Vec3,
+  values?: readonly number[],
+): number[][] {
+  const { links } = describe(kernel, multibody),
+    rows = [multibody.root.row, ...links.map((link) => link.body)],
+    end = rows.indexOf(body.row);
+  if (end < 0) throw new RangeError('This body is not in the multibody; pass its root or one of its links.');
+  const states = values ? checkedStates(kernel, links, values) : links.map((link) => measure(kernel, link)),
+    poses = forward(kernel, links, states, multibody.root.row),
+    tip = poses[end]!,
+    reach = add(tip.p, qrot(tip.q, point)),
+    onPath = new Set<number>();
+  for (let at = end; at > 0; at = links[at - 1]!.parent) onPath.add(at);
+  const columns: number[][] = [];
+  links.forEach((link, i) => {
+    const parent = poses[link.parent]!,
+      frame = qmul(parent.q, link.frameA),
+      anchor = add(parent.p, qrot(parent.q, link.anchorA)),
+      live = onPath.has(i + 1);
+    for (const k of link.linear) columns.push(live ? [...qrot(frame, unit[k]!), 0, 0, 0] : [0, 0, 0, 0, 0, 0]);
+    for (const k of link.angular) {
+      const axis = qrot(frame, unit[k]!);
+      columns.push(live ? [...cross(axis, sub(reach, anchor)), ...axis] : [0, 0, 0, 0, 0, 0]);
+    }
+  });
+  return [0, 1, 2, 3, 4, 5].map((r) => columns.map((column) => column[r]!));
+}
+
+/** Adds displacements to the coordinates: along the free sliding axes, about a hinge, and composed in frame A for a joint of two or three. */
+export function applyDisplacements(kernel: KernelWorld, multibody: Multibody, deltas: readonly number[]): void {
+  const { links } = describe(kernel, multibody),
+    need = links.reduce((n, l) => n + l.linear.length + l.angular.length, 0);
+  if (deltas.length !== need || !deltas.every(Number.isFinite))
+    throw new RangeError(`This multibody has ${need} coordinates, all finite numbers; got ${deltas.length}.`);
+  let at = 0;
+  const states = links.map((link) => {
+    const base = measure(kernel, link),
+      offsets = base.offsets.map((offset) => offset + deltas[at++]!);
+    let rel = base.rel,
+      angle = base.angle;
+    if (link.angular.length === 1) angle += deltas[at++]!;
+    else if (link.angular.length > 1) {
+      const v: V = [0, 0, 0];
+      for (const k of link.angular) v[k] = deltas[at++]!;
+      rel = qnorm(qmul(fromVector(v), base.rel));
+    }
+    return { offsets, rel, angle };
+  });
+  place(kernel, multibody, links, states);
+}
+
 export function inverseKinematics(
   kernel: KernelWorld,
   multibody: Multibody,
@@ -310,6 +405,13 @@ export function inverseKinematics(
   } = options;
   if (!(damping > 0) || !(iterations >= 1) || !(maxStep > 0))
     throw new RangeError('IK damping, iterations and maxStep must be above 0.');
+  const wantPosition = options.constrain?.position ?? [true, true, true],
+    wantRotation = options.constrain?.rotation ?? [true, true, true],
+    pick = (v: readonly number[], want: readonly boolean[]): number[] => v.filter((_, i) => want[i]),
+    counted =
+      (target.position ? pick([0, 0, 0], wantPosition).length : 0) +
+      (target.rotation ? pick([0, 0, 0], wantRotation).length : 0);
+  if (counted === 0) throw new RangeError('The constrained axes leave nothing to reach; leave at least one axis true.');
   const path: number[] = [];
   for (let at = end; at > 0; at = links[at - 1]!.parent) path.unshift(at);
   const states = links.map((l) => measure(kernel, l)),
@@ -322,12 +424,12 @@ export function inverseKinematics(
     let position = 0,
       rotation = 0;
     if (target.position) {
-      const d = sub(target.position, reach);
+      const d = pick(sub(target.position, reach), wantPosition);
       e.push(...d);
       position = Math.hypot(...d);
     }
     if (goalRotation) {
-      const d = toVector(qmul(goalRotation, qconj(tip.q)));
+      const d = pick(toVector(qmul(goalRotation, qconj(tip.q))), wantRotation);
       e.push(...d);
       rotation = Math.hypot(...d);
     }
@@ -350,16 +452,16 @@ export function inverseKinematics(
       l.linear.forEach((k, n) => {
         const axis = qrot(frame, unit[k]!),
           col: number[] = [];
-        if (target.position) col.push(...axis);
-        if (goalRotation) col.push(0, 0, 0);
+        if (target.position) col.push(...pick(axis, wantPosition));
+        if (goalRotation) col.push(...pick([0, 0, 0], wantRotation));
         columns.push(col);
         owners.push({ link: i - 1, kind: 'offset', axis: k, slot: n });
       });
       l.angular.forEach((k) => {
         const axis = qrot(frame, unit[k]!),
           col: number[] = [];
-        if (target.position) col.push(...cross(axis, sub(reach, anchor)));
-        if (goalRotation) col.push(...axis);
+        if (target.position) col.push(...pick(cross(axis, sub(reach, anchor)), wantPosition));
+        if (goalRotation) col.push(...pick(axis, wantRotation));
         columns.push(col);
         owners.push({ link: i - 1, kind: l.angular.length === 1 ? 'angle' : 'turn', axis: k, slot: 0 });
       });

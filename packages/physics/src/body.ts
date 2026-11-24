@@ -2,8 +2,8 @@
 // these from `beforestep`: no `Math`, only + - * / on values the kernel then rounds, and the same in every browser.
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh } from '@margoengine/core';
-import { BODY_CCD, BODY_DISABLED, type KernelWorld } from './kernel.js';
-import { checkVec, type Quat, type Vec3 } from './math.js';
+import { BODY_CCD, BODY_DISABLED, BODY_NO_GYROSCOPIC, type KernelWorld } from './kernel.js';
+import { checkVec, matrixOf, multiplyQuat, quatFromTurn, rotateVec, type Quat, type Vec3 } from './math.js';
 import type { ColliderOptions } from './shapes.js';
 import type { PhysicsCollider } from './collider.js';
 
@@ -438,6 +438,220 @@ export class PhysicsBody {
     for (const collider of this.colliders) colliderDensity[collider.handle] = 0;
     kernel.setOwnSolid(this.row, total, center, moments, frame);
     kernel.wake(this.row);
+    return this;
+  }
+  /** Linear damping in 1/s: the share of linear speed the body loses, implicitly each substep (default 0). */
+  get linearDamping(): number {
+    return this.columns.linearDamping[this.row];
+  }
+  set linearDamping(value: number) {
+    if (!(value >= 0) || !Number.isFinite(value))
+      throw new RangeError('Damping must be a finite number of at least 0; pass 1/s.');
+    this.world().wake(this.row);
+    this.columns.linearDamping[this.row] = value;
+  }
+  /** Angular damping in 1/s (default 0). */
+  get angularDamping(): number {
+    return this.columns.angularDamping[this.row];
+  }
+  set angularDamping(value: number) {
+    if (!(value >= 0) || !Number.isFinite(value))
+      throw new RangeError('Damping must be a finite number of at least 0; pass 1/s.');
+    this.world().wake(this.row);
+    this.columns.angularDamping[this.row] = value;
+  }
+  /** Dominance group: in a contact the body of the higher group is a wall to the lower (default 0); Rapier's range is -127 to 127. */
+  get dominance(): number {
+    return this.columns.dominance[this.row];
+  }
+  set dominance(value: number) {
+    if (!Number.isFinite(value)) throw new RangeError('Dominance must be a finite number; 0 is the default group.');
+    this.world().wake(this.row);
+    this.columns.dominance[this.row] = value;
+  }
+  /**
+   * Whether the gyroscopic term acts on the body (default true here; Rapier's `gyroscopicForcesEnabled` defaults to false). With
+   * it a body spinning about an unstable axis tumbles as a real one does; without it the spin keeps to the axis.
+   */
+  get gyroscopicForces(): boolean {
+    this.world();
+    return (this.columns.flags[this.row] & BODY_NO_GYROSCOPIC) === 0;
+  }
+  set gyroscopicForces(enabled: boolean) {
+    const flags = this.columns.flags;
+    this.world().wake(this.row);
+    flags[this.row] = enabled ? flags[this.row] & ~BODY_NO_GYROSCOPIC : flags[this.row] | BODY_NO_GYROSCOPIC;
+  }
+  /** The mass's inverse in 1/kg: 0 for a fixed body or one of infinite mass. */
+  get inverseMass(): number {
+    return this.columns.inverseMass[this.row];
+  }
+  /** The inverse of {@link PhysicsBody.principalInertia}, about the same axes (0 for an axis that cannot turn). */
+  get inversePrincipalInertia(): [number, number, number] {
+    const { inverseInertiaX, inverseInertiaY, inverseInertiaZ } = this.columns,
+      { row } = this;
+    return [inverseInertiaX[row], inverseInertiaY[row], inverseInertiaZ[row]];
+  }
+  /** The centre of mass in the world's frame, as of the body's pose now. */
+  get worldCenterOfMass(): [number, number, number] {
+    const turned = rotateVec(this.rotation, this.centerOfMass),
+      [x, y, z] = this.position;
+    return [x + turned[0], y + turned[1], z + turned[2]];
+  }
+  /** The velocity of a world point carried with the body: the linear velocity plus the spin crossed with the arm from the centre of mass. */
+  velocityAtPoint(point: Vec3): [number, number, number] {
+    checkVec(point, 'Point');
+    const c = this.worldCenterOfMass,
+      [wx, wy, wz] = this.angularVelocity,
+      [vx, vy, vz] = this.linearVelocity,
+      ax = point[0] - c[0],
+      ay = point[1] - c[1],
+      az = point[2] - c[2];
+    return [vx + wy * az - wz * ay, vy + wz * ax - wx * az, vz + wx * ay - wy * ax];
+  }
+  /** The world-space matrix of the principal axes, row major, with each axis's value taken from `diagonal`. */
+  private worldMatrix(diagonal: readonly number[], lockedTurns: readonly boolean[]): number[] {
+    const r = matrixOf(multiplyQuat(this.rotation, this.inertiaFrame)),
+      out = new Array<number>(9).fill(0);
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++) {
+        let sum = 0;
+        for (let k = 0; k < 3; k++) sum += r[3 * i + k]! * diagonal[k]! * r[3 * j + k]!;
+        out[3 * i + j] = lockedTurns[i] || lockedTurns[j] ? 0 : sum;
+      }
+    return out;
+  }
+  /** The inverse mass along each world axis, 0 for an axis the body may not translate along ({@link PhysicsBody.enabledTranslations}). */
+  get effectiveInverseMass(): [number, number, number] {
+    const inverse = this.inverseMass,
+      [x, y, z] = this.enabledTranslations;
+    return [x ? inverse : 0, y ? inverse : 0, z ? inverse : 0];
+  }
+  /** The inverse inertia in the world's axes, a 3 by 3 matrix row major, with a row and column of 0 for each axis the body may not turn about. */
+  get effectiveWorldInverseInertia(): number[] {
+    return this.worldMatrix(
+      this.inversePrincipalInertia,
+      this.enabledRotations.map((on) => !on),
+    );
+  }
+  /**
+   * The inertia in the world's axes, a 3 by 3 matrix row major, with `Infinity` on the diagonal for each axis the body may not turn about
+   * and 0 off it.
+   */
+  get effectiveAngularInertia(): number[] {
+    const locked = this.enabledRotations.map((on) => !on),
+      out = this.worldMatrix(this.principalInertia, locked);
+    locked.forEach((lock, k) => {
+      if (lock) out[4 * k] = Infinity;
+    });
+    return out;
+  }
+  /** True when the body has any linear or angular speed. */
+  get isMoving(): boolean {
+    const [vx, vy, vz] = this.linearVelocity,
+      [wx, wy, wz] = this.angularVelocity;
+    return vx * vx + vy * vy + vz * vz + wx * wx + wy * wy + wz * wz > 0;
+  }
+  /** Half the mass times the speed squared plus half the spin times the inertia times the spin, in joules. */
+  get kineticEnergy(): number {
+    const [vx, vy, vz] = this.linearVelocity,
+      w = this.angularVelocity,
+      mass = this.mass,
+      inertia = this.worldMatrix(this.principalInertia, [false, false, false]);
+    let turning = 0;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) turning += w[i]! * inertia[3 * i + j]! * w[j]!;
+    return 0.5 * mass * (vx * vx + vy * vy + vz * vz) + 0.5 * turning;
+  }
+  /**
+   * Minus the mass times `gravity` dotted with the centre of mass, `dt` seconds on at the body's velocity (Rapier's
+   * `gravitational_potential_energy`). `gravity` is the world's by default.
+   */
+  gravitationalPotentialEnergy(gravity: Vec3 = this.world().gravity, dt = 0): number {
+    checkVec(gravity, 'Gravity');
+    const c = this.worldCenterOfMass,
+      [vx, vy, vz] = this.linearVelocity;
+    return -this.mass * (gravity[0] * (c[0] + vx * dt) + gravity[1] * (c[1] + vy * dt) + gravity[2] * (c[2] + vz * dt));
+  }
+  /** The pose a kinematic position-based body is to reach at the end of the next step ({@link PhysicsBody.setNextPosition}). */
+  get nextPosition(): [number, number, number] {
+    const { targetX, targetY, targetZ } = this.columns,
+      { row } = this;
+    return [targetX[row], targetY[row], targetZ[row]];
+  }
+  get nextRotation(): [number, number, number, number] {
+    const { targetRotationX, targetRotationY, targetRotationZ, targetRotationW } = this.columns,
+      { row } = this;
+    return [targetRotationX[row], targetRotationY[row], targetRotationZ[row], targetRotationW[row]];
+  }
+  /** Where the body would be after `dt` seconds at its velocity, without forces or gravity: `{position, rotation}`. */
+  predictPositionUsingVelocity(dt: number): {
+    position: [number, number, number];
+    rotation: [number, number, number, number];
+  } {
+    return this.predict(dt, false);
+  }
+  /**
+   * The same, with the forces and torques applied now acting over `dt` first, as a semi-implicit step does. Gravity is the world's to
+   * add and is not included.
+   */
+  predictPositionUsingVelocityAndForces(dt: number): {
+    position: [number, number, number];
+    rotation: [number, number, number, number];
+  } {
+    return this.predict(dt, true);
+  }
+  private predict(
+    dt: number,
+    withForces: boolean,
+  ): { position: [number, number, number]; rotation: [number, number, number, number] } {
+    if (!Number.isFinite(dt)) throw new RangeError('The time to predict over must be a finite number of seconds.');
+    this.world();
+    const type = this.type;
+    if (type === 'fixed') return { position: this.position, rotation: this.rotation };
+    if (type === 'kinematicPosition') return { position: this.nextPosition, rotation: this.nextRotation };
+    let v = this.linearVelocity,
+      w = this.angularVelocity;
+    if (withForces && type === 'dynamic') {
+      const mass = this.effectiveInverseMass,
+        f = this.appliedForce,
+        t = this.appliedTorque,
+        inverse = this.effectiveWorldInverseInertia;
+      v = [v[0] + f[0] * mass[0] * dt, v[1] + f[1] * mass[1] * dt, v[2] + f[2] * mass[2] * dt];
+      w = [
+        w[0] + (inverse[0]! * t[0] + inverse[1]! * t[1] + inverse[2]! * t[2]) * dt,
+        w[1] + (inverse[3]! * t[0] + inverse[4]! * t[1] + inverse[5]! * t[2]) * dt,
+        w[2] + (inverse[6]! * t[0] + inverse[7]! * t[1] + inverse[8]! * t[2]) * dt,
+      ];
+    }
+    const [x, y, z] = this.position,
+      turn = quatFromTurn([w[0] * dt, w[1] * dt, w[2] * dt]);
+    return { position: [x + v[0] * dt, y + v[1] * dt, z + v[2] * dt], rotation: multiplyQuat(turn, this.rotation) };
+  }
+  /**
+   * Takes another body's settings onto this one: kind, damping, gravity scale, dominance, CCD, speed caps, sleep limits, locked axes, extra
+   * solver passes, the gyroscopic switch and user data. Its pose, velocity, colliders and joints stay as they are.
+   * @throws RangeError for a body that is not valid, or the body itself.
+   */
+  copyFrom(other: PhysicsBody): this {
+    this.world();
+    if (other === this || !other.valid)
+      throw new RangeError('copyFrom needs another body that is still in the world; pass a different body.');
+    this.setType(other.type);
+    this.linearDamping = other.linearDamping;
+    this.angularDamping = other.angularDamping;
+    this.gravityScale = other.gravityScale;
+    this.dominance = other.dominance;
+    this.ccd = other.ccd;
+    this.softCcdPrediction = other.softCcdPrediction;
+    this.maxLinearSpeed = other.maxLinearSpeed;
+    this.maxAngularSpeed = other.maxAngularSpeed;
+    this.columns.sleepLimit[this.row] = other.columns.sleepLimit[other.row];
+    this.columns.sleepAfter[this.row] = other.columns.sleepAfter[other.row];
+    this.additionalSolverIterations = other.additionalSolverIterations;
+    this.enabledTranslations = other.enabledTranslations;
+    this.enabledRotations = other.enabledRotations;
+    this.gyroscopicForces = other.gyroscopicForces;
+    this.userData = other.userData;
     return this;
   }
   get gravityScale(): number {

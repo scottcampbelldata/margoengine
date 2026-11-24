@@ -1044,6 +1044,35 @@ console.log(rope.broken, weight.position[1] < -2); // true true
 physics.dispose();
 ```
 
+### More of the joint API
+
+A joint reads and sets what it was made with. `userData` (an option, then a property) carries anything you want to find again; `enabled = false` takes a joint out of the solve and `true` puts it back, with its limits and motors as they were; `joint.force` and `joint.torque` are the force and couple, in newtons and newton metres in the world's axes, that the joint applied to `bodyB` in the last step, so a joint that holds a 10 kg weight reads 98.1 N up. `setAnchorA`, `setAnchorB` and `setFrames(frameA, frameB)` move a joint's anchors and turn its frames after creation, and `flip()` swaps its two bodies with their anchors and frames and mirrors the limits, motor targets and angle, so the joint holds the same pose from the other body; it flips a hinge, a slider, a ball, a fixed joint, a rope, a spring and a generic joint with one free turning axis, and refuses what does not mirror axis by axis (a cone, a rotation motor, a joint of a multibody, limits on two turning axes) with a `TypeError` that says so. `physics.getJoints()` and `physics.jointCount` list the world's joints.
+
+Three more kinds. A `spring` takes `model: 'acceleration'`, which makes its stiffness and damping per kilogram, so a light body and a heavy one swing at the same frequency (the default `'force'` is newtons per metre, and a heavy body swings slowly on it). A `rope` takes a `motor`, a winch: its `targetVelocity` is the speed the anchors' distance changes at, so a negative one reels them in, up to the motor's `maxForce`. A `pinSlot` joint slides along one axis and turns about it, and holds the rest; `slideLimits`, `turnLimits`, `slideMotor` and `turnMotor` bound and drive the two.
+
+A generic joint takes `coupled` axes, Rapier's `coupled_axes`: `coupled: ['linY', 'linZ']` with `limits: {linY: [0, 0.5]}` keeps the anchor within 0.5 m of the joint's X axis (a rod in a round hole), and `coupled: ['angY', 'angZ']` with `limits: {angY: [0, 0.5]}` limits the swing across X to 0.5 rad as one angle. `joint.setSoftness(hertz, damping)` (or the `softness` option) lets a joint's locks give way as a spring of its own, per kilogram so a light body and a heavy one sag alike by g over (2 pi hertz) squared, and `0` makes it rigid again. `joint.setDamping(c)` and `joint.setFriction(f)` put a drag (c times the speed) or dry friction (at most f) on a hinge or slider.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+const wall = physics.addBody(null, {type: 'fixed'});
+const load = physics.addBody(null, {position: [0, -2, 0], colliders: {shape: 'sphere', radius: 0.25, mass: 10}});
+const winch = physics.addJoint(wall, load, {
+  type: 'rope',
+  length: 2,
+  userData: 'hoist',
+  motor: {targetVelocity: -1, damping: 200, maxForce: 2000},
+});
+for (let i = 0; i < 60; i++) physics.step();
+console.log(load.position[1] > -1.2, winch.userData); // true 'hoist' (reeled in 1 m)
+winch.enabled = false; // the load falls free
+for (let i = 0; i < 30; i++) physics.step();
+console.log(winch.enabled, winch.force); // false [0, 0, 0]
+physics.dispose();
+```
+
 ### Debug lines
 
 `physics.debugRender(options)` returns debug-render data: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the outlines of every collider (all shapes, a compound by its parts, a mesh by its edges, a voxel grid by its box), a line across each joint with a line from each anchor to its body (dark red once broken), and each contact point of the last step with a short line along its normal. `boxes: true` adds the world box of each collider; `colliders`, `joints` and `contacts` switch their lines off; `filter` takes a query filter (kind and sensor flags, `exclude`, `groups`, `predicate`) and draws only the colliders it sees, their contacts, and the joints between bodies that are shown. Colours: green awake dynamic bodies, grey fixed, blue kinematic, dim green sleeping, yellow sensors, red joints, magenta contacts, translucent cyan boxes. Draw them with `@margoengine/lines`.
@@ -1065,6 +1094,8 @@ physics.dispose();
 
 `physics.addMultibody(root, links)` holds a tree of bodies to reduced coordinates, (multibody joints). Each link names its `body`, the body it hangs from (`parent`, default the link before it) and a `joint` of locks: `fixed`, `revolute`, `prismatic`, `spherical` or `generic`. The joints are made for you and are ordinary joints too, with their limits, motors and break limits. The tree adds what plain joints cannot give: every substep the speeds of the links are projected onto the joint space (the least change of kinetic energy that keeps every joint closed, the normal equations of Featherstone's joint-space inertia matrix, 2008, solved over the tree with articulated-body inertias in time proportional to its links), and a link that has moved more than 1 mm or 1 mrad from where its parent and joint place it is put back, with the correction fed back as a speed (SHAKE with RATTLE). A branch is as exact as a chain: a tree with 1000 kg ends that plain joints throw 42 m apart holds within 1 mm, and a hinge limit holds to 1e-7 rad where plain joints overshoot by a fifth. Contacts on a link share their impulse through the joints as an articulated body would. A tree has no size of its own (it uses the scratch rows of its joints, which grow with the world), a body is in one tree, and a removed joint or body dissolves its tree (`multibody.remove()` frees it on purpose).
 
+A multibody reads where one link would be with `forwardKinematics(body, coordinates?)`, a point's Jacobian with `bodyJacobian(body, point?)`, the joints to a body with `kinematicBranch(body)`, and moves its coordinates by `applyDisplacements(deltas)`; a `kinematicPosition` body in `links` is a kinematic link that `setCoordinates` drives, and `inverseKinematics` takes `constrain: {position, rotation}` masks for the world axes that count. It reads its tree with `numLinks`, `attachedBodies()`, `linkIndex(body)`, `bodyAt(index)` and `jointBetween(a, b)`, and `multibody.selfContacts = false` makes no two bodies of the tree touch (the default, true, leaves each joint's own `contactsEnabled` to decide for the pair it holds).
+
 `multibody.coordinates()` lists the joint coordinates link by link (an offset in metres for each free linear axis, an angle in radians for a hinge counted past a whole turn, the rotation vector for a ball), `setCoordinates(values)` poses the tree from the root's pose, and `velocities()` reads each coordinate's speed. `multibody.inverseKinematics(link, {position, rotation}, options)` is Rapier's multibody inverse kinematics: damped least squares of the Jacobian over the joints between the root and the link (Buss 2004), with hinge and slider limits kept and a step bound (Buss and Kim 2005). It returns `{converged, iterations, positionError, rotationError}`. Rapier poses a multibody from its joint coordinates and ignores a body's speed or pose at the time the joint is made; here the bodies' poses are read as given, so `setCoordinates` or `inverseKinematics` is how you place a tree.
 
 ```ts
@@ -1085,6 +1116,10 @@ for (let i = 0; i < 60; i++) physics.step();                // swings from there
 console.log(Math.abs(Math.hypot(...arm[0].position) - 1) < 1e-3); // true
 physics.dispose();
 ```
+
+### Reading a body
+
+A body reads and sets `linearDamping`, `angularDamping`, `dominance` and `gyroscopicForces` (on by default here; Rapier's default is off), and reads `inverseMass`, `inversePrincipalInertia`, `worldCenterOfMass`, `velocityAtPoint(point)`, `kineticEnergy`, `gravitationalPotentialEnergy(gravity?, dt?)`, `nextPosition` and `nextRotation` (the pose a kinematic position body is to reach), `effectiveInverseMass`, `effectiveAngularInertia`, `effectiveWorldInverseInertia` (locked axes take their freedom out) and `isMoving`. `predictPositionUsingVelocity(dt)` and `predictPositionUsingVelocityAndForces(dt)` give the pose after `dt` seconds without moving the body, and `copyFrom(other)` takes another body's settings.
 
 ## Parity with Rapier 3D
 
@@ -1117,8 +1152,15 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Joint limits, per axis | `setLimits`, `setAxisLimits` | full | `next-joints.test.js` |
 | Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full | `next-joints.test.js`, `next-motor-models.test.js`, `next-cone-motor.test.js`, `next-cone-motor-oracle.test.js` |
 | Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full | `next-joints.test.js`, `frames.test.js` |
+| Joint anchors and frames set after creation, flip, user data, enabled switch, force and torque readback, joint list | `setAnchorA`, `setAnchorB`, `setFrames`, `flip`, `userData`, `enabled`, `force`, `torque`, `getJoints` | full | `next-joint-api.test.js` |
+| Spring model (acceleration or force), rope motor (a winch), pin-slot joint | `spring` `model`, `rope` `motor`, `type: 'pinSlot'` | full | `next-joint-kinds.test.js` |
 | Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full | `next-joint-break.test.js` |
 | Multibody (reduced-coordinate) joints and inverse kinematics | `addMultibody`, `coordinates`, `setCoordinates`, `inverseKinematics` | full | `next-multibody.test.js`, `next-multibody-oracle.test.js` |
+| Multibody links and lookups, self contacts on and off | `root`, `links`, `numLinks`, `attachedBodies`, `linkIndex`, `bodyAt`, `jointBetween`, `selfContacts` | full | `next-multibody-api.test.js` |
+| Limits on two or three turning axes of one generic joint | `limits` on `angX`, `angY`, `angZ` | full | `next-joint-limits.test.js` |
+| Coupled axes of a generic joint, softness of a joint's locks, joint damping and friction | `coupled`, `setSoftness`, `setDamping`, `setFriction` | full (a hinge's own turning locks stay rigid under softness) | `next-joint-coupled.test.js`, `next-joint-softness.test.js`, `next-multibody-kinematics.test.js` |
+| Multibody forward kinematics of one link, Jacobian, branch, displacements, kinematic links, IK masks | `forwardKinematics`, `bodyJacobian`, `kinematicBranch`, `applyDisplacements`, `constrain` | full | `next-multibody-kinematics.test.js` |
+| Body reads: damping, dominance, gyroscopic switch, velocity at a point, predicted poses, energies, effective masses, copy | see Reading a body | full | `next-body-reads.test.js` |
 | Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full | `replay.test.js`, `kernel-step.test.js` |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full | `kernel-solver.test.js`, `next-joints.test.js`, `next-parameters.test.js` |
 | PID controller | `PidController` | full | `next-pid.test.js` |

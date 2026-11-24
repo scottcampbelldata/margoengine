@@ -301,7 +301,7 @@ impl World {
             let turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, self.v(TORQUE_X, at));
             let mut angular = self.v(ANGULAR_X, at).add(turn.scale(h));
             let inertia = self.v(INERTIA_X, at);
-            if flags & LOCK_ANGULAR == 0 && (inertia.x != inertia.y || inertia.y != inertia.z) {
+            if flags & (LOCK_ANGULAR | NO_GYROSCOPIC) == 0 && (inertia.x != inertia.y || inertia.y != inertia.z) {
                 angular = frame.rotate(gyroscopic(inertia, frame.unrotate(angular), h));
             }
             // Implicit Euler of v' = -c v: the factor stays in (0, 1] for any c and h.

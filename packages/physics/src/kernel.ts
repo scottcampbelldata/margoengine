@@ -305,6 +305,8 @@ export const JOINT_DISTANCE = 1 << 27;
 export const JOINT_BROKEN = 1 << 29;
 /** The turning motors drive frame B toward the `jointDrive` rotation in frame A (a cone's rotation motor). */
 export const JOINT_DRIVE = 1 << 30;
+/** The caller switched the joint off: it solves nothing until switched on. */
+export const JOINT_DISABLED = 1 << 31;
 /** Bits of the `colliderFlags` column. */
 export const COLLIDER_SENSOR = 1;
 export const COLLIDER_OFF = 2;
@@ -321,6 +323,8 @@ export const BODY_DISABLED = 1 << 11;
 /** Bits of the `flags` column: continuous collision on, and whether the last step's CCD pass checked the body. */
 export const BODY_CCD = 1 << 13,
   BODY_CCD_ACTIVE = 1 << 14;
+/** Bit of the `flags` column: the body's gyroscopic term is off. */
+export const BODY_NO_GYROSCOPIC = 1 << 16;
 /** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
 export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;
@@ -2157,7 +2161,11 @@ export class KernelWorld {
       throw new RangeError(
         `softContacts takes packed x, y, z for each particle in both arrays, the same number (got ${from.length} and ${to.length}); pass 3 numbers a particle.`,
       );
-    for (const [name, value] of [['radii', radius], ['margins', margin], ['groups words', groups]] as const)
+    for (const [name, value] of [
+      ['radii', radius],
+      ['margins', margin],
+      ['groups words', groups],
+    ] as const)
       if (value !== undefined && typeof value !== 'number' && value.length !== count)
         throw new RangeError(`softContacts got ${value.length} ${name} for ${count} particles; pass one or one each.`);
     if (this.api.world_layout() !== this.layout) this.bind();
@@ -2179,7 +2187,8 @@ export class KernelWorld {
         triangle: new Uint32Array(slots),
       };
     const { flags = 0, groups: shared, excludeBody = 0xffffffff, dt = 0 } = options;
-    if (!(dt >= 0) || !Number.isFinite(dt)) throw new RangeError(`softContacts takes a step length of zero or more seconds (got ${dt}).`);
+    if (!(dt >= 0) || !Number.isFinite(dt))
+      throw new RangeError(`softContacts takes a step length of zero or more seconds (got ${dt}).`);
     const all = shared === undefined ? 0xffffffff : shared >>> 0;
     for (let start = 0; start < count; start += capacity) {
       const n = capacity < count - start ? capacity : count - start,
@@ -2198,7 +2207,8 @@ export class KernelWorld {
         input[at + 9] = dt;
         input[at + 10] = input[at + 11] = 0;
         for (let j = 0; j < 8; j++)
-          if (!Number.isFinite(input[at + j]!)) throw new RangeError('softContacts needs finite positions, radii and margins.');
+          if (!Number.isFinite(input[at + j]!))
+            throw new RangeError('softContacts needs finite positions, radii and margins.');
       }
       this.api.soft_probe(n, k, flags, excludeBody);
       const answer = new Uint32Array(this.api.memory.buffer, this.api.probe_output(), 16 * k * n),
