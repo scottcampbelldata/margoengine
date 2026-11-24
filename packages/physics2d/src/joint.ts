@@ -72,7 +72,15 @@ export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number
   io.u.fill(0, 0, 32);
   const a = o.anchorA ?? [0, 0],
     b = o.anchorB ?? [0, 0];
-  io.f.set([finite(a[0], 'anchorA x') * k, finite(a[1], 'anchorA y') * k, finite(b[0], 'anchorB x') * k, finite(b[1], 'anchorB y') * k], 1);
+  io.f.set(
+    [
+      finite(a[0], 'anchorA x') * k,
+      finite(a[1], 'anchorA y') * k,
+      finite(b[0], 'anchorB x') * k,
+      finite(b[1], 'anchorB y') * k,
+    ],
+    1,
+  );
   const limits = (o as { limits?: readonly [number, number] }).limits;
   const unit = o.type === 'prismatic' ? k : 1;
   if (limits) {
@@ -173,7 +181,15 @@ export class Joint2D {
   setLimits(min: number, max: number): this {
     void this.limited;
     const u = this.unit;
-    this.kernel.ok(this.kernel.exports.joint_set_limits(this.world, this.handle, 1, finite(min, 'limit') * u, finite(max, 'limit') * u));
+    this.kernel.ok(
+      this.kernel.exports.joint_set_limits(
+        this.world,
+        this.handle,
+        1,
+        finite(min, 'limit') * u,
+        finite(max, 'limit') * u,
+      ),
+    );
     return this;
   }
   /** Removes the limits. */
