@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17777093,
+  "total": 17777122,
   "history": [
     {
       "date": "2026-10-24",
@@ -11587,7 +11587,7 @@
     {
       "date": "2026-11-24",
       "commit": "FG-10",
-      "reason": "FG-10 new optional entry environment/density-volume, 3,934 B gzip: sparse 8^3-brick density grid (VDB leaf layout) with splats, VDB import and the froxel medium WGSL; water/flood-bake 3,729 to 4,334 B for floodMist, the spray-mist puff model beside the emitters it reads (a separate entry would repeat the option checks and the sites type)",
+      "reason": "FG-10 new optional entry environment/density-volume, 3,963 B gzip: sparse 8^3-brick density grid (VDB leaf layout) with splats, VDB import and the froxel medium WGSL; water/flood-bake 3,729 to 4,334 B for floodMist, the spray-mist puff model beside the emitters it reads (a separate entry would repeat the option checks and the sites type)",
       "grew": 2
     }
   ],
@@ -11908,7 +11908,7 @@
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 6181,
-    "@margoengine/environment/density-volume": 3934,
+    "@margoengine/environment/density-volume": 3963,
     "@margoengine/environment/exr-codecs": 1729,
     "@margoengine/environment/exr-tiled": 8898,
     "@margoengine/environment/exr-write": 2084,
