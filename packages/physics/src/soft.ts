@@ -49,6 +49,10 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_step_begin(): void;
 }
 
+/** The kinds of structural edge a woven sheet has; 0 is any other, with the material's edge softness. */
+const THREAD_WARP = 1;
+const THREAD_WEFT = 2;
+const THREAD_SHEAR = 3;
 const PINNED = 1;
 const TARGETED = 2;
 const TORN = 1;
@@ -120,6 +124,15 @@ export interface SoftSoftness {
 export class SoftBodyMaterial {
   /** Structural and shear edges (default rigid: they do not stretch). */
   edgeSoftness: SoftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
+  /**
+   * The threads of a woven sheet (`cloth`, `clothTube`, `clothAnisotropic`) each have a spring of their own: along the warp (the
+   * builder's `du`), along the weft (`dv`) and across the diagonals of each cell, the shear; left out (null, the default),
+   * each is {@link SoftBodyMaterial.edgeSoftness}, which is also every other edge's. A natural frequency of 0 holds a thread
+   * rigid; a lower one lets it stretch, by about the square of the frequency's ratio between two threads under one load.
+   */
+  warpSoftness: SoftSoftness | null = null;
+  weftSoftness: SoftSoftness | null = null;
+  shearSoftness: SoftSoftness | null = null;
   /** Bend edges, which join a particle to the one two along (default 10 Hz, critically damped). */
   bendSoftness: SoftSoftness = { naturalFrequency: 10, dampingRatio: 1 };
   /**
@@ -168,6 +181,9 @@ export class SoftBodyMaterial {
     const copy = new SoftBodyMaterial();
     copy.edgeSoftness = { ...this.edgeSoftness };
     copy.bendSoftness = { ...this.bendSoftness };
+    copy.warpSoftness = this.warpSoftness && { ...this.warpSoftness };
+    copy.weftSoftness = this.weftSoftness && { ...this.weftSoftness };
+    copy.shearSoftness = this.shearSoftness && { ...this.shearSoftness };
     copy.tearStrain = this.tearStrain;
     copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
     copy.volumeSoftness = { ...this.volumeSoftness };
@@ -327,6 +343,9 @@ function checkSoftness(softness: SoftSoftness, label: string): void {
 function checkMaterial(material: SoftBodyMaterial): void {
   checkSoftness(material.edgeSoftness, 'Edge softness');
   checkSoftness(material.bendSoftness, 'Bend softness');
+  if (material.warpSoftness) checkSoftness(material.warpSoftness, 'Warp softness');
+  if (material.weftSoftness) checkSoftness(material.weftSoftness, 'Weft softness');
+  if (material.shearSoftness) checkSoftness(material.shearSoftness, 'Shear softness');
   checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
   checkSoftness(material.volumeSoftness, 'Volume softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
@@ -357,6 +376,8 @@ const count = (value: number, label: string, least: number): number => {
 export class SoftBodyDesc {
   /** @internal */ positions: number[];
   /** @internal */ edgePairs: number[] = [];
+  /** @internal Which thread each structural edge is (0 for any other), by index as `edgePairs`. */ edgeKinds: number[] =
+    [];
   /** @internal */ bendPairs: number[] = [];
   /** @internal */ masses: number[];
   /** @internal */ pinned = new Set<number>();
@@ -469,7 +490,26 @@ export class SoftBodyDesc {
         desc.edgePairs.push(at(nu - 1, j), at(nu - 1, j + 1));
         if (j + 2 < nv) desc.bendPairs.push(at(nu - 1, j), at(nu - 1, j + 2));
       }
+    // Which thread each edge is: along the weft (one `u` row), along the warp (one `v` column) or across a cell.
+    for (let e = 0; e < desc.edgePairs.length; e += 2) {
+      const a = desc.edgePairs[e]!,
+        b = desc.edgePairs[e + 1]!;
+      desc.edgeKinds.push(
+        Math.floor(a / nv) === Math.floor(b / nv) ? THREAD_WEFT : a % nv === b % nv ? THREAD_WARP : THREAD_SHEAR,
+      );
+    }
     return desc;
+  }
+
+  /**
+   * A woven sheet whose threads have springs of their own: like {@link SoftBodyDesc.cloth}, with the warp along `du` and the
+   * weft along `dv`, and the material's `warpSoftness`, `weftSoftness` and `shearSoftness` (and `bendSoftness`) setting how
+   * each resists (after Thomaszewski, Wacker and Strasser, 2008, "A consistent bending model for cloth simulation", for the
+   * bend, and the separate stretch and shear of Baraff and Witkin, 1998, and Wang, O'Brien and Ramamoorthi, 2011, "Data-driven
+   * elastic models for cloth": an orthotropic sheet's stretch along each thread and its shear are separate).
+   */
+  static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc {
+    return SoftBodyDesc.cloth(origin, du, dv, nu, nv);
   }
 
   /**
@@ -802,6 +842,7 @@ export class SoftBodyDesc {
   /** Replaces the structural edges, as pairs of particle indices. */
   setEdges(pairs: ArrayLike<number>): this {
     this.edgePairs = this.checkPairs(pairs, 'Edge');
+    this.edgeKinds = [];
     return this;
   }
   /** Replaces the bend edges, as pairs of particle indices. */
@@ -834,6 +875,9 @@ export class SoftBodyDesc {
     for (const t of other.triangles) this.triangles.push(t + base);
     this.shapeMatching = this.shapeMatching || other.shapeMatching;
     this.masses.push(...other.masses);
+    // The kinds stay in step with the edges: pad what has none with 0 (any other edge).
+    while (this.edgeKinds.length < this.edgePairs.length / 2) this.edgeKinds.push(0);
+    for (let e = 0; e < other.edgePairs.length / 2; e++) this.edgeKinds.push(other.edgeKinds[e] ?? 0);
     for (const p of other.edgePairs) this.edgePairs.push(p + base);
     for (const p of other.bendPairs) this.bendPairs.push(p + base);
     for (const p of other.pinned) this.pinned.add(p + base);
@@ -970,6 +1014,8 @@ export class SoftBody {
   /** @internal The fixed body that holds this body's surface collider, once it has one. */
   surface: PhysicsBody | null = null;
   /** @internal Whether shape matching holds this body. */ matched = false;
+  /** @internal Which thread each structural edge is (see SoftBodyDesc.edgeKinds); empty for a body that is not a woven sheet. */
+  edgeKinds = new Uint8Array(0);
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
   /** @internal */ surfaceRest = 0;
   /** @internal The packed groups the particles meet colliders by; undefined meets every collider. */ collisionGroups:
@@ -1115,6 +1161,18 @@ export class SoftBody {
       throw new RangeError('This body has no closed triangle surface to hold a volume.');
     this.owner.setVolume(this, factor);
     return this;
+  }
+  /** @internal The spring of a woven sheet's thread, or null for an edge that is none of them. */
+  threadSoftness(edge: number): SoftSoftness | null {
+    const kind = this.edgeKinds[edge];
+    const m = this.material;
+    return kind === THREAD_WARP
+      ? m.warpSoftness
+      : kind === THREAD_WEFT
+        ? m.weftSoftness
+        : kind === THREAD_SHEAR
+          ? m.shearSoftness
+          : null;
   }
   /** The triangles of a body built from a mesh (`SoftBodyDesc.trimesh`), as particle indices, three per triangle. */
   triangles(): Uint32Array {
@@ -1635,6 +1693,7 @@ export class SoftBodies implements PhysicsAttachment {
       desc.cellMaterial.clone(),
     );
     body.triangleList = Uint32Array.from(desc.triangles);
+    body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     body.matched = desc.shapeMatching;
     body.collisionGroups = desc.groups;
     body.selfContacts = desc.selfContacts;
@@ -1835,7 +1894,7 @@ export class SoftBodies implements PhysicsAttachment {
     for (let e = 0; e < body.edgeTotal; e++) {
       const row = body.firstEdge + e,
         bend = e >= body.structural,
-        softness = bend ? bendSoftness : edgeSoftness;
+        softness = bend ? bendSoftness : (body.threadSoftness(e) ?? edgeSoftness);
       c.omega[row] = softness.naturalFrequency * 2 * Math.PI;
       c.zeta[row] = softness.dampingRatio;
       // The cells' module tears and flows the edges (it smooths the load, shields the interior and keeps the pieces), so the

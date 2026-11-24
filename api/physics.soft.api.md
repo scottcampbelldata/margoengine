@@ -100,6 +100,7 @@ export class SoftBody {
     triangleList: Uint32Array<ArrayBuffer>;
     surface: PhysicsBody | null;
     matched: boolean;
+    edgeKinds: Uint8Array<ArrayBuffer>;
     volumeOn: boolean;
     surfaceRest: number;
     collisionGroups: number | undefined;
@@ -121,6 +122,7 @@ export class SoftBody {
     setParticleKinematicTarget(index: number, position: Vec3): this;
     surfaceVolume(): number;
     setVolumeFactor(factor: number | null): this;
+    threadSoftness(edge: number): SoftSoftness | null;
     triangles(): Uint32Array;
     edges(): Uint32Array;
     bendEdges(): Uint32Array;
@@ -153,6 +155,7 @@ export class SoftBody {
 export class SoftBodyDesc {
     positions: number[];
     edgePairs: number[];
+    edgeKinds: number[];
     bendPairs: number[];
     masses: number[];
     pinned: Set<number>;
@@ -179,6 +182,7 @@ export class SoftBodyDesc {
     }): SoftBodyDesc;
     static cloth(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
     static clothTube(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
+    static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
     static trimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, { bending }?: {
         bending?: boolean;
     }): SoftBodyDesc;
@@ -217,6 +221,9 @@ export class SoftBodyDesc {
 
 export class SoftBodyMaterial {
     edgeSoftness: SoftSoftness;
+    warpSoftness: SoftSoftness | null;
+    weftSoftness: SoftSoftness | null;
+    shearSoftness: SoftSoftness | null;
     bendSoftness: SoftSoftness;
     tearStrain: number;
     shapeMatchingSoftness: SoftSoftness;

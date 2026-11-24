@@ -625,3 +625,72 @@ test('the stretch of a rope under a heavy load does not depend on the iterations
   }
   near(runs[1].length, 3.8, 0.04, 'and it is a rope length away: the rope does not stretch');
 });
+
+test('an anisotropic cloth stretches along the warp and the weft in the ratio of their stiffnesses', async () => {
+  // A strip two particles wide hung from its top row, along `u` (the warp) or along `v` (the weft), under its own weight.
+  const hang = async (along, warpHz, weftHz) => {
+    const { physics, soft } = await create();
+    const n = 12,
+      d = 0.1;
+    const material = new SoftBodyMaterial();
+    material.warpSoftness = { naturalFrequency: warpHz, dampingRatio: 1 };
+    material.weftSoftness = { naturalFrequency: weftHz, dampingRatio: 1 };
+    // The diagonals and the bending are far softer than the threads, so what stretches is the thread tested.
+    material.shearSoftness = { naturalFrequency: 1, dampingRatio: 1 };
+    material.bendSoftness = { naturalFrequency: 0.5, dampingRatio: 1 };
+    // `along === 'warp'`: the strip's long side is `u`; else it is `v`.
+    const desc =
+      along === 'warp'
+        ? SoftBodyDesc.clothAnisotropic([0, 3, 0], [0, -d, 0], [0, 0, d], n, 2)
+        : SoftBodyDesc.clothAnisotropic([0, 3, 0], [0, 0, d], [0, -d, 0], 2, n);
+    const body = soft.create(
+      desc.setMaterial(material).setParticleMass(0.5).setLinearDamping(2).setParticleRadius(0.005).setPinnedParticles(
+        along === 'warp' ? [0, 1] : [0, n],
+      ),
+    );
+    steps(physics, 600);
+    const p = body.particlePositions();
+    return 3 - p[(along === 'warp' ? (n - 1) * 2 : n - 1) * 3 + 1] - (n - 1) * d;
+  };
+  // Warp 20 Hz and weft 10 Hz: the weft is a quarter as stiff, so it extends four times as far.
+  const warp = await hang('warp', 20, 10),
+    weft = await hang('weft', 20, 10);
+  assert.ok(warp > 0.002 && weft > 0.002, `both threads stretch under the weight: ${warp}, ${weft}`);
+  near(weft / warp, 4, 0.8, 'the weft stretches four times as far as the warp');
+  // Isotropic settings are the plain cloth.
+  const plain = await hang('warp', 15, 15),
+    same = await hang('weft', 15, 15);
+  near(same / plain, 1, 0.1, 'equal threads stretch alike');
+});
+
+test('a sheared cloth stays within its shear stiffness', async () => {
+  const shear = async (hz) => {
+    const { physics, soft } = await create({ gravity: [0, 0, 0] });
+    const n = 6,
+      d = 0.1;
+    const material = new SoftBodyMaterial();
+    material.warpSoftness = { naturalFrequency: 0, dampingRatio: 1 };
+    material.weftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
+    material.shearSoftness = { naturalFrequency: hz, dampingRatio: 1 };
+    material.bendSoftness = { naturalFrequency: 0.5, dampingRatio: 1 };
+    const body = soft.create(
+      SoftBodyDesc.clothAnisotropic([0, 0, 0], [d, 0, 0], [0, d, 0], n, n)
+        .setMaterial(material)
+        .setParticleMass(0.5)
+        .setLinearDamping(3)
+        .setParticleRadius(0.005)
+        .setPinnedParticles(Array.from({ length: n }, (_, j) => j)),
+    );
+    // Push the free edge along the weft, sideways across the pinned one: a shear (the sheet's rigid threads cannot stretch).
+    for (let step = 0; step < 300; step++) {
+      for (let j = 0; j < n; j++) body.addParticleForce((n - 1) * n + j, [0, 0.05, 0]);
+      physics.step();
+    }
+    const p = body.particlePositions();
+    return p[((n - 1) * n + 2) * 3 + 1] - p[2 * 3 + 1];
+  };
+  const stiff = await shear(12),
+    soft = await shear(6);
+  assert.ok(stiff > 0.001, `it shears: ${stiff}`);
+  near(soft / stiff, 4, 1.2, 'half the shear frequency shears four times as far');
+});
