@@ -158,6 +158,21 @@ export interface ShapeCastHit extends RaycastHit {
   queryNormal: [number, number, number];
 }
 /** The point of a collider nearest a query point, whether the query point is inside it, and how far it is. */
+/** What {@link Physics.contactPair} returns for one part of a pair: the normal from the first collider to the second. */
+export interface ContactManifold {
+  normal: [number, number, number];
+  /** Up to four points: where each collider's surface is, how far apart they are (negative when they overlap) and an id that stays with the feature. */
+  points: { pointA: [number, number, number]; pointB: [number, number, number]; separation: number; id: number }[];
+}
+
+/** What {@link Physics.colliderDistance} returns. */
+export interface ColliderDistance {
+  /** 0 when the colliders overlap. */
+  distance: number;
+  pointA: [number, number, number];
+  pointB: [number, number, number];
+}
+
 export interface PointProjection {
   body: PhysicsBody;
   mesh: Mesh | null;
@@ -830,6 +845,54 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.live();
     const query = queryShape(shape, this.hulls);
     return this.bodiesOf(this.kernel.intersectShape(query, position, rotation, ...this.filterWords(options)), options.predicate);
+  }
+  /**
+   * The bodies whose colliders' boxes meet the box from `min` to `max`, in the order they were added. A collider's box is
+   * tight to its shape at its pose of the last step (see {@link PhysicsCollider.aabb}).
+   * @throws RangeError for a box that is not finite or has a `min` over its `max`.
+   */
+  intersectAabb(min: Vec3, max: Vec3, options: QueryFilter = {}): PhysicsBody[] {
+    checkVec(min, 'Box min');
+    checkVec(max, 'Box max');
+    this.live();
+    return this.bodiesOf(this.kernel.intersectAabb(min, max, ...this.filterWords(options)), options.predicate);
+  }
+  /**
+   * The contact manifolds of two colliders within `prediction` metres of touching (default 0), whether or not their bodies
+   * touch in the world: one for two convex colliders, one a pair of children for a compound, one a triangle or cell for a
+   * mesh. Normals run from `a` to `b`. A mesh's triangles give their own normals, without the seam smoothing of
+   * `fixInternalEdges`.
+   * @throws RangeError for a collider that was removed or a prediction below 0.
+   */
+  contactPair(a: PhysicsCollider, b: PhysicsCollider, prediction = 0): ContactManifold[] {
+    this.live();
+    return this.kernel.pairContacts(this.rowOf(a), this.rowOf(b), prediction).map(({ normal, points }) => ({
+      normal,
+      points: points.map((p) => ({ pointA: p.onA, pointB: p.onB, separation: p.separation, id: p.id })),
+    }));
+  }
+  /**
+   * Whether two colliders overlap now, whether or not their bodies touch in the world. Sensors count.
+   * @throws RangeError for a collider that was removed.
+   */
+  intersectionPair(a: PhysicsCollider, b: PhysicsCollider): boolean {
+    this.live();
+    return this.kernel.pairIntersects(this.rowOf(a), this.rowOf(b));
+  }
+  /**
+   * How far apart two colliders are, with the nearest point on each; 0 when they overlap. Null when none can be read (a
+   * half space against a mesh).
+   * @throws RangeError for a collider that was removed.
+   */
+  colliderDistance(a: PhysicsCollider, b: PhysicsCollider): ColliderDistance | null {
+    this.live();
+    return this.kernel.pairDistance(this.rowOf(a), this.rowOf(b));
+  }
+  /** A collider's row, for the kernel; refuses what is not this world's. */
+  private rowOf(collider: PhysicsCollider): number {
+    if (!collider.valid || this.byRow.get(collider.handle) !== collider)
+      throw new RangeError('That collider was removed or belongs to another world; pass a collider from body.colliders.');
+    return collider.handle;
   }
   private bodiesOf(rows: readonly number[], predicate: QueryFilter['predicate']): PhysicsBody[] {
     const found = new Set<PhysicsBody>();

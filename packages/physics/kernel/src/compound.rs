@@ -16,7 +16,7 @@ impl World {
     /// The rows one side of a compound pair brings: a compound's first child, or the collider itself; and whether the
     /// side is a compound.
     #[inline(always)]
-    fn side(&self, c: usize) -> (u32, bool) {
+    pub(crate) fn side(&self, c: usize) -> (u32, bool) {
         if self.uu(COLLIDER_SHAPE, c) == SHAPE_COMPOUND { (self.uu(COLLIDER_HULL, c), true) } else { (c as u32, false) }
     }
 

@@ -78,6 +78,16 @@ export class PhysicsCollider {
     if (this.shape === 'cylinder' || this.shape === 'cone') return Math.hypot(colliderA[a], colliderB[a]) + colliderC[a];
     return this.shape === 'sphere' ? colliderA[a] : null;
   }
+  /**
+   * The box of the collider's shape at its body's pose as of the last step, tight and with no margin: `{min, max}`. A
+   * half space is as large as the world.
+   */
+  aabb(): { min: [number, number, number]; max: [number, number, number] } {
+    this.columns();
+    const box = this.kernel.colliderAabb(this.handle);
+    if (!box) throw new MargoError('state', 'Collider is not in the world yet; step the world once after adding it.');
+    return { min: box[0], max: box[1] };
+  }
   isSensor(): boolean {
     return (this.columns().colliderFlags[this.handle] & COLLIDER_SENSOR) !== 0;
   }

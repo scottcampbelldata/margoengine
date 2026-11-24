@@ -597,3 +597,93 @@ pub extern "C" fn query_shape_all(
     });
     count as i32
 }
+
+/// Whether a collider row is alive and in the world.
+fn collider_alive(c: u32) -> bool {
+    let w = world();
+    c < w.header().collider_rows && w.uu(COLLIDER_STATE, c as usize) & REMOVED == 0 && w.uu(COLLIDER_STATE, c as usize) & (IN_BROAD | PENDING) != 0
+}
+
+/// The tight box of a collider into the query buffer, six words: low x y z, high x y z. 0 when the collider is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_aabb(collider: u32) -> u32 {
+    if !collider_alive(collider) {
+        return 0;
+    }
+    let (low, high) = world().collider_box(collider as usize);
+    write_words(0, &[low.x.to_bits(), low.y.to_bits(), low.z.to_bits(), high.x.to_bits(), high.y.to_bits(), high.z.to_bits()]);
+    1
+}
+
+/// Every collider whose tight box meets the box from `(lx, ly, lz)` to `(hx, hy, hz)`, in row order, one word each (paged
+/// by 2048); -1 for a box that is not finite or is inside out.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_aabb(lx: f32, ly: f32, lz: f32, hx: f32, hy: f32, hz: f32, flags: u32, groups: u32, collider: u32, body: u32, skip: u32) -> i32 {
+    let ok = [lx, ly, lz, hx, hy, hz].iter().all(|v| v.is_finite()) && lx <= hx && ly <= hy && lz <= hz;
+    if !ok {
+        return -1;
+    }
+    let w = world();
+    let mut count = 0usize;
+    w.each_queried(&Filter { flags, groups, collider, body }, &mut |c| {
+        let (low, high) = w.collider_box(c);
+        if low.x <= hx && lx <= high.x && low.y <= hy && ly <= high.y && low.z <= hz && lz <= high.z {
+            if count >= skip as usize && count - (skip as usize) < 8 * QUERY_HITS {
+                write_words(count - skip as usize, &[c as u32]);
+            }
+            count += 1;
+        }
+        true
+    });
+    count as i32
+}
+
+/// 1 when two colliders overlap now, 0 when not, -1 when either is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn pair_intersects(a: u32, b: u32) -> i32 {
+    if !collider_alive(a) || !collider_alive(b) {
+        return -1;
+    }
+    world().pair_intersects(a as usize, b as usize) as i32
+}
+
+/// Manifolds of two colliders within `prediction` of touching, into the query buffer, 36 words each: the normal from a to
+/// b (3), the point count (1), then four points of on a (3), on b (3), separation, id. The count of all manifolds comes
+/// back, 56 at most are kept; -1 when either collider is gone or `prediction` is not 0 or more.
+#[unsafe(no_mangle)]
+pub extern "C" fn pair_contacts(a: u32, b: u32, prediction: f32) -> i32 {
+    if !collider_alive(a) || !collider_alive(b) || !(prediction >= 0.0 && prediction < f32::INFINITY) {
+        return -1;
+    }
+    let mut count = 0usize;
+    world().pair_contacts(a as usize, b as usize, prediction, &mut |m| {
+        if count < 56 {
+            let mut words = [0u32; 36];
+            words[..4].copy_from_slice(&[m.normal.x.to_bits(), m.normal.y.to_bits(), m.normal.z.to_bits(), m.count as u32]);
+            for (k, p) in m.points.iter().enumerate().take(m.count) {
+                let at = 4 + 8 * k;
+                words[at..at + 8].copy_from_slice(&[p.on_a.x.to_bits(), p.on_a.y.to_bits(), p.on_a.z.to_bits(), p.on_b.x.to_bits(), p.on_b.y.to_bits(), p.on_b.z.to_bits(), p.separation.to_bits(), p.id]);
+            }
+            write_words(36 * count, &words);
+        }
+        count += 1;
+    });
+    count as i32
+}
+
+/// The distance between two colliders and the nearest point on each into the query buffer, seven words: distance, on a (3),
+/// on b (3). 1; 0 when no distance can be read (a half space against a mesh); -1 when either collider is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn pair_distance(a: u32, b: u32) -> i32 {
+    if !collider_alive(a) || !collider_alive(b) {
+        return -1;
+    }
+    match world().pair_distance(a as usize, b as usize) {
+        Some((d, on_a, on_b)) => {
+            write_words(0, &[d.to_bits(), on_a.x.to_bits(), on_a.y.to_bits(), on_a.z.to_bits(), on_b.x.to_bits(), on_b.y.to_bits(), on_b.z.to_bits()]);
+            1
+        }
+        None => 0,
+    }
+}

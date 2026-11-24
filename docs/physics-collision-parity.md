@@ -54,7 +54,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Narrow phase for every pair of held shapes, manifolds up to 4 points | full | |
 | Narrow phase for the missing shapes (segment, triangle, polyline, half space) against every shape | missing | |
 | Contact skin / prediction distance as a collider option | missing | the step uses a fixed prediction |
-| Contact manifold read (`contacts()`, `contactPoints`, `touching`) | partial | no per-pair `contactPair(a, b)` with normal and depth per point for any two colliders (touching pairs only) |
+| Contact manifold read (`contacts()`, `contactPoints`, `touching`, `contactPair`) | full | `contactPair` works for any two colliders |
 | Friction, restitution, combine rules | full | all four rules |
 | Collision groups, solver groups | full | |
 | Active collision types (which of dynamic, kinematic, fixed pairs collide) | full | all six kinds, both colliders must want it; `kernel/tests/collision_types.rs`, `next-collision-types.test.js` |
@@ -87,9 +87,9 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Point projection, all hits | full | a trimesh holds no point |
 | Point containment (`intersectPoint`) | full | |
 | Shape intersection (`intersectShape`) | partial | the same convex query shapes; non-convex ones open |
-| AABB intersection (colliders whose box meets a box) | missing | |
-| Collider-to-collider distance and closest points | missing | |
-| Collider-to-collider contact (`contactPair`) and intersection tests | partial | |
+| AABB intersection (colliders whose box meets a box) | full | `intersectAabb`, `collider.aabb()` |
+| Collider-to-collider distance and closest points | full | `colliderDistance`; convex, compound, mesh, half space |
+| Collider-to-collider contact (`contactPair`) and intersection tests | full | `contactPair`, `intersectionPair`, any two colliders; a mesh gives each triangle's own normal |
 | Filter flags, groups, predicate, exclude collider and body | full | |
 | Ray cast on a ray against a single collider, shape cast of one collider | missing | |
 | Query pipeline updated on demand (`updateQueryPipeline`) | partial | queries read the last step's poses |

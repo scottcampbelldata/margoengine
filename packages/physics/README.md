@@ -359,6 +359,23 @@ console.log(physics.intersectShape({shape: 'box', halfExtents: [1, 1, 1]}, [3.6,
 physics.dispose();
 ```
 
+Two colliders can be asked about directly, whether or not their bodies touch: `physics.contactPair(a, b, prediction = 0)` gives the contact manifolds within `prediction` metres (normal from `a` to `b`, and up to four points with the nearest point on each collider and their separation), `physics.intersectionPair(a, b)` whether they overlap, and `physics.colliderDistance(a, b)` how far apart they are with the nearest point on each, 0 when they overlap. A compound gives a manifold for each pair of children, a mesh or height field one for each triangle near the other collider (with the triangle's own normal: `fixInternalEdges` smooths only the world's contacts). `collider.aabb()` is a collider's tight box at its last step's pose, and `physics.intersectAabb(min, max)` the bodies whose colliders' boxes meet a box.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+const ball = physics.addBody(null, {type: 'fixed', colliders: {shape: 'sphere', radius: 1}}).colliders[0];
+const box = physics.addBody(null, {type: 'fixed', position: [3, 0, 0], colliders: {shape: 'box', halfExtents: [0.5, 1, 1]}}).colliders[0];
+physics.step();
+const {distance, pointA, pointB} = physics.colliderDistance(ball, box)!;
+console.log(distance.toFixed(2), pointA[0].toFixed(1), pointB[0].toFixed(1)); // '1.50' '1.0' '2.5'
+console.log(physics.contactPair(ball, box).length, physics.contactPair(ball, box, 2)[0].points[0].separation.toFixed(2)); // 0 '1.50'
+console.log(physics.intersectionPair(ball, box), box.aabb().min); // false [2.5, -1, -1]
+physics.dispose();
+```
+
 `ccd: true` on `addBody`, or `body.ccd = true`, turns on continuous collision for a body (default off), as Rapier's `enableCcd`: after each step a dynamic body that moved further than its thinnest piece is thick is swept from where the step began to where it ended and put back to its first touch, its velocity kept, so a fast thin body cannot pass a wall, a mesh or a height field. A slow body moves exactly as it would without it. `body.ccdActive` is true when the last step's sweep checked the body.
 
 ```ts

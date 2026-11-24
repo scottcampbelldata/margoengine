@@ -23,6 +23,7 @@ pub mod mass;
 pub mod math;
 pub mod memory;
 pub mod mesh;
+pub mod pair;
 pub mod narrow;
 pub mod query;
 pub mod revolve;

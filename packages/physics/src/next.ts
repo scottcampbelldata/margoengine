@@ -11,7 +11,9 @@ export type { ConeJointOptions, NextJointOptions } from './next/joint.js';
 export type {
   CollisionEvent,
   CollisionEventType,
+  ColliderDistance,
   ContactForceEvent,
+  ContactManifold,
   PhysicsEventMap,
   PhysicsOptions,
   PhysicsRaycastOptions,
@@ -20,11 +22,13 @@ export type {
 } from './next/physics.js';
 export type { BodyOptions, BodyType } from './body.js';
 export type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from './joints.js';
-export type { ColliderOptions, ShapeOptions } from './shapes.js';
+export type { ColliderOptions, CollisionPairKind, ShapeOptions } from './shapes.js';
 export type {
   KernelBodyKind,
   KernelColliderOptions,
   KernelColumn,
+  KernelDistance,
+  KernelManifold,
   KernelCombine,
   KernelContact,
   KernelContactPoint,

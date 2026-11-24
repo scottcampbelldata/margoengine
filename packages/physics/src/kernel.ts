@@ -131,6 +131,11 @@ interface KernelExports extends WebAssembly.Exports {
   voxels_combine(a: number, b: number, sx: number, sy: number, sz: number): number;
   voxels_propagate(a: number, b: number, x: number, y: number, z: number, sx: number, sy: number, sz: number): number;
   query_buffer(): number;
+  collider_aabb(collider: number): number;
+  query_aabb(lx: number, ly: number, lz: number, hx: number, hy: number, hz: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
+  pair_intersects(a: number, b: number): number;
+  pair_contacts(a: number, b: number, prediction: number): number;
+  pair_distance(a: number, b: number): number;
   query_ray(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number): number;
   query_ray_all(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
   query_shape_cast(...words: number[]): number;
@@ -377,8 +382,20 @@ export interface KernelProjection {
   point: [number, number, number];
   distance: number;
 }
+/** One manifold of two colliders: the normal from the first to the second and up to four points. */
+export interface KernelManifold {
+  normal: [number, number, number];
+  points: { onA: [number, number, number]; onB: [number, number, number]; separation: number; id: number }[];
+}
+/** The distance between two colliders (0 when they overlap) and the nearest point on each. */
+export interface KernelDistance {
+  distance: number;
+  pointA: [number, number, number];
+  pointB: [number, number, number];
+}
 const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3, trimesh: 4, cylinder: 6, cone: 7 } as const;
 const castBits = (cast: KernelCastOptions): number => (cast.stop ? 1 : 0) | (cast.geometry ? 2 : 0);
+const PAIR_REFUSED = 'A pair query needs two colliders that are in the world, and a prediction of 0 or more; pass rows addCollider returned.';
 const CAST_REFUSED =
     'A shape query needs a finite position, a nonzero rotation, a finite nonzero direction, a target distance of 0 or more and a ball, box, capsule, cylinder, cone or hull row; pass those.',
   POINT_REFUSED = 'A point query needs a finite point; pass three finite numbers.';
@@ -1174,6 +1191,58 @@ export class KernelWorld {
   intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {
     const words = this.shapeWords(shape, position, rotation);
     return this.rows((skip) => this.api.query_shape_all(...words, flags, groups, collider, body, skip), CAST_REFUSED);
+  }
+  /**
+   * The tight box of a collider's shape at its body's pose, with no margin: `[low, high]`, or null for a collider that is gone.
+   */
+  colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null {
+    if (!this.api.collider_aabb(collider)) return null;
+    const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 6);
+    return [[f[0]!, f[1]!, f[2]!], [f[3]!, f[4]!, f[5]!]];
+  }
+  /** The collider rows whose tight box meets the box `low` to `high`, in row order. @throws RangeError for a box that is not finite or is inside out. */
+  intersectAabb(low: readonly number[], high: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {
+    return this.rows(
+      (skip) => this.api.query_aabb(low[0]!, low[1]!, low[2]!, high[0]!, high[1]!, high[2]!, flags, groups, collider, body, skip),
+      'A box query needs finite corners with low at or under high on every axis; pass [x, y, z] corners.',
+    );
+  }
+  /** Whether two colliders overlap now. @throws RangeError for a collider row that is gone. */
+  pairIntersects(a: number, b: number): boolean {
+    const found = this.api.pair_intersects(a, b);
+    if (found < 0) throw new RangeError(PAIR_REFUSED);
+    return found === 1;
+  }
+  /**
+   * The manifolds of two colliders within `prediction` of touching, normals from `a` to `b`: one for convex colliders, one a
+   * pair of children for a compound, one a triangle or cell for a mesh (up to 56).
+   * @throws RangeError for a collider row that is gone or a prediction that is negative or not finite.
+   */
+  pairContacts(a: number, b: number, prediction: number): KernelManifold[] {
+    const total = this.api.pair_contacts(a, b, prediction);
+    if (total < 0) throw new RangeError(PAIR_REFUSED);
+    const kept = total < 56 ? total : 56,
+      words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), 36 * kept),
+      f = new Float32Array(words.buffer, words.byteOffset, 36 * kept),
+      manifolds: KernelManifold[] = [];
+    for (let m = 0; m < kept; m++) {
+      const at = 36 * m,
+        points: KernelManifold['points'] = [];
+      for (let k = 0; k < words[at + 3]!; k++) {
+        const p = at + 4 + 8 * k;
+        points.push({ onA: [f[p]!, f[p + 1]!, f[p + 2]!], onB: [f[p + 3]!, f[p + 4]!, f[p + 5]!], separation: f[p + 6]!, id: words[p + 7]! });
+      }
+      manifolds.push({ normal: [f[at]!, f[at + 1]!, f[at + 2]!], points });
+    }
+    return manifolds;
+  }
+  /** The distance between two colliders and the nearest point on each; null when none can be read. @throws RangeError for a collider row that is gone. */
+  pairDistance(a: number, b: number): KernelDistance | null {
+    const found = this.api.pair_distance(a, b);
+    if (found < 0) throw new RangeError(PAIR_REFUSED);
+    if (!found) return null;
+    const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 7);
+    return { distance: f[0]!, pointA: [f[1]!, f[2]!, f[3]!], pointB: [f[4]!, f[5]!, f[6]!] };
   }
   private rows(call: (skip: number) => number, refused: string): number[] {
     const rows: number[] = [];

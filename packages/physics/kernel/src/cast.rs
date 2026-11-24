@@ -212,7 +212,7 @@ pub(crate) fn core(s: &Solid) -> (Solid, f32) {
 /// The closest points of two solids and the unit normal from B to A, or for an overlap the way out. The radii come off
 /// first, so two round shapes apart at their cores meet in closed form (the core points pushed out by the radii) and only
 /// cores that overlap need the expanding polytope.
-fn touch(a: &Solid, b: &Solid) -> (V3, V3, V3) {
+pub(crate) fn touch(a: &Solid, b: &Solid) -> (V3, V3, V3) {
     let ((core_a, ra), (core_b, rb)) = (core(a), core(b));
     let d = gjk(&core_a, &core_b, ZERO, f32::INFINITY);
     if !d.overlap && d.distance > 0.0 {

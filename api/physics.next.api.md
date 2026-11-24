@@ -30,6 +30,12 @@ export interface BodyOptions {
 
 export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
 
+export interface ColliderDistance {
+    distance: number;
+    pointA: [number, number, number];
+    pointB: [number, number, number];
+}
+
 export type ColliderOptions = ShapeOptions & ColliderSettings;
 
 export interface CollisionEvent {
@@ -44,6 +50,8 @@ export interface CollisionEvent {
 }
 
 export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+
+export type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
 
 export interface ConeJointOptions {
     type: 'cone';
@@ -67,6 +75,16 @@ export interface ContactForceEvent {
     colliderB: PhysicsCollider;
     impulse: number;
     force: number;
+}
+
+export interface ContactManifold {
+    normal: [number, number, number];
+    points: {
+        pointA: [number, number, number];
+        pointB: [number, number, number];
+        separation: number;
+        id: number;
+    }[];
 }
 
 export interface HullFaces {
@@ -148,8 +166,24 @@ export interface KernelContactPoint {
     normalImpulse: number;
 }
 
+export interface KernelDistance {
+    distance: number;
+    pointA: [number, number, number];
+    pointB: [number, number, number];
+}
+
 export interface KernelLoadOptions {
     signal?: AbortSignal;
+}
+
+export interface KernelManifold {
+    normal: [number, number, number];
+    points: {
+        onA: [number, number, number];
+        onB: [number, number, number];
+        separation: number;
+        id: number;
+    }[];
 }
 
 export interface KernelRayHit {
@@ -219,6 +253,11 @@ export class KernelWorld {
     projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[];
     intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
+    colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null;
+    intersectAabb(low: readonly number[], high: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
+    pairIntersects(a: number, b: number): boolean;
+    pairContacts(a: number, b: number, prediction: number): KernelManifold[];
+    pairDistance(a: number, b: number): KernelDistance | null;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
@@ -311,6 +350,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     }): PointProjection | null;
     intersectPoint(point: Vec3, options?: QueryFilter): PhysicsBody[];
     intersectShape(shape: ShapeOptions, position: Vec3, rotation?: Quat, options?: QueryFilter): PhysicsBody[];
+    intersectAabb(min: Vec3, max: Vec3, options?: QueryFilter): PhysicsBody[];
+    contactPair(a: PhysicsCollider, b: PhysicsCollider, prediction?: number): ContactManifold[];
+    intersectionPair(a: PhysicsCollider, b: PhysicsCollider): boolean;
+    colliderDistance(a: PhysicsCollider, b: PhysicsCollider): ColliderDistance | null;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
     debugRender(): never;
@@ -395,6 +438,10 @@ export class PhysicsCollider {
     get valid(): boolean;
     markRemoved(): void;
     get boundingRadius(): number | null;
+    aabb(): {
+        min: [number, number, number];
+        max: [number, number, number];
+    };
     isSensor(): boolean;
     setSensor(sensor: boolean): this;
     isEnabled(): boolean;
@@ -679,8 +726,6 @@ interface ColliderSettings {
 }
 
 type ColliderShape = ShapeOptions['shape'];
-
-type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
 
 type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
