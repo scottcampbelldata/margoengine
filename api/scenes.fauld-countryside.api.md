@@ -7,6 +7,7 @@ import { BiomeWorld } from "@margoengine/biomes";
 import { Farmland } from "@margoengine/biomes/farmland";
 import { BiomeView } from "@margoengine/biomes/view";
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
+import { DOF } from "@margoengine/dof";
 import { Model } from "@margoengine/gltf";
 import { Shadows } from "@margoengine/shadows";
 import { PresetScene } from "@margoengine/sky/scenes";
@@ -16,6 +17,11 @@ import { WeatherMachine } from "@margoengine/weather";
 export const FAULD_CENTRE: Readonly<{
     easting: 418225;
     northing: 327725;
+}>;
+
+export const FAULD_CLOUD_DECK: Readonly<{
+    bottom: 1000;
+    top: 1600;
 }>;
 
 export const FAULD_PLACES: Readonly<{
@@ -108,6 +114,7 @@ interface FauldWorld extends Disposable {
     readonly clouds: VolumetricClouds;
     readonly weather: WeatherMachine;
     readonly shadows: Shadows;
+    readonly dof: DOF;
     readonly meshes: readonly Mesh[];
     readonly buildings: Readonly<Record<string, readonly Model[]>>;
     height(x: number, z: number): number;
@@ -126,6 +133,10 @@ interface FauldWorldSettings {
     readonly dem?: string;
     readonly library?: string;
     readonly buildings?: boolean;
+    readonly lens?: {
+        readonly stop?: number;
+        readonly focusDistance?: number;
+    };
     readonly seed?: number;
     readonly signal?: AbortSignal;
 }

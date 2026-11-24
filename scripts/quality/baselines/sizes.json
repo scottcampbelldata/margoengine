@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17363497,
+  "total": 17364107,
   "history": [
     {
       "date": "2026-10-24",
@@ -11283,6 +11283,12 @@
       "commit": "ec85cab3c6",
       "reason": "fauld-tunnels: the mains lamps hang in a well-glass fitting whose opal globe is the emitter (loaded, instanced, its glass emissive), the hand lamp lens and deep bowl radii and the metered EVs (KB-FAULD-GLOBE1), the 3,000 K blast flash and drift flash, a fire for every fire lamp and paint tones; 12,860 B to 13,096 B gzip. A second entry would load on every state anyway, as every tunnel state draws lamps",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "779499ac4d",
+      "reason": "Fauld places draw through a real lens: DOF of @margoengine/dof in the preset post stack (film ruling: a pinhole camera is not a lens), plus the FAULD_CLOUD_DECK constant",
+      "grew": 4
     }
   ],
   "items": {
@@ -12253,8 +12259,8 @@
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 4356,
     "@margoengine/scenes/dune-coast": 6475,
-    "@margoengine/scenes/fauld-countryside": 7910,
-    "@margoengine/scenes/fauld-crater": 7910,
+    "@margoengine/scenes/fauld-countryside": 8214,
+    "@margoengine/scenes/fauld-crater": 8214,
     "@margoengine/scenes/fauld-tunnels": 13489,
     "@margoengine/scenes/library": 4468,
     "@margoengine/scenes/look-family": 809,
@@ -12917,6 +12923,7 @@
     "leak @margoengine/scenes/dune-coast -> @margoengine/water": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes/view": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/dof": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/post/gtao": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/shadows": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/sky/scenes": 1,
@@ -12924,6 +12931,7 @@
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/tonemap": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/biomes": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/biomes/view": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/dof": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/post/gtao": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/shadows": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/sky/scenes": 1,
