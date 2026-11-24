@@ -8,6 +8,7 @@ import {
   COLLIDER_SENSOR,
   COLLIDER_TYPES,
   COLLIDER_TYPES_SHIFT,
+  QUERY_NO_GROUPS,
   type KernelWorld,
 } from './kernel.js';
 import type { CollisionPairKind, CombineRule, ColliderOptions, ShapeOptions } from './shapes.js';
@@ -283,7 +284,7 @@ export class PhysicsCollider {
   containsPoint(point: { x: number; y: number; z: number }): boolean {
     this.columns();
     return this.kernel
-      .intersectPoint([point.x, point.y, point.z], 0, 0xffffffff, 0xffffffff, 0xffffffff)
+      .intersectPoint([point.x, point.y, point.z], QUERY_NO_GROUPS, 0xffffffff, 0xffffffff, 0xffffffff)
       .includes(this.handle);
   }
   density(): number {

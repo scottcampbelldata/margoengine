@@ -413,3 +413,14 @@ fn a_far_or_grazing_ray_meets_a_ball_and_a_capsule_to_float_precision() {
         }
     }
 }
+
+#[test]
+fn a_query_with_no_group_test_sees_a_collider_whose_filter_is_zero() {
+    let mut w = world();
+    let body = fixed(&mut w, v3(5.0, 0.0, 0.0), Q::IDENTITY);
+    let c = w.add_collider(body, SHAPE_BALL, [0.5, 0.0, 0.0], [0.0; 3], ID, 1.0).unwrap();
+    w.set_u(COLLIDER_GROUPS, c as usize, 0);
+    let ray = |flags: u32| w.cast_ray(v3(0.0, 0.0, 0.0), v3(1.0, 0.0, 0.0), 20.0, true, &Filter { flags, ..ALL }).map(|(hit, _)| hit);
+    assert_eq!(ray(NO_GROUPS), Some(c), "no group test sees it");
+    assert_eq!(ray(0), None, "a group test with every group does not meet a filter of 0");
+}

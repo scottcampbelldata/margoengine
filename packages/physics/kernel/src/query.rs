@@ -38,6 +38,8 @@ pub const EXCLUDE_SOLIDS: u32 = 16;
 pub const ONLY_DYNAMIC: u32 = 32;
 pub const ONLY_KINEMATIC: u32 = 64;
 pub const ONLY_FIXED: u32 = 128;
+/// No group test at all, as a Rapier query filter with no groups: every collider passes it, whatever its own groups.
+pub const NO_GROUPS: u32 = 256;
 
 /// A ray's hit: how far along it, and the surface normal there (zero for a start inside a solid shape).
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -476,7 +478,7 @@ impl World {
         let excluded = (fixed && f & EXCLUDE_FIXED != 0) || (kinematic && f & EXCLUDE_KINEMATIC != 0) || (dynamic && f & EXCLUDE_DYNAMIC != 0);
         let only = f & (ONLY_DYNAMIC | ONLY_KINEMATIC | ONLY_FIXED);
         let allowed = only == 0 || (dynamic && f & ONLY_DYNAMIC != 0) || (kinematic && f & ONLY_KINEMATIC != 0) || (fixed && f & ONLY_FIXED != 0);
-        !excluded && allowed && groups_meet(filter.groups, self.uu(COLLIDER_GROUPS, c))
+        !excluded && allowed && (f & NO_GROUPS != 0 || groups_meet(filter.groups, self.uu(COLLIDER_GROUPS, c)))
     }
 
     /// Calls `visit` with each collider a query with `filter` sees, body by body in row order, until it returns false.

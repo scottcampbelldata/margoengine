@@ -495,7 +495,9 @@ export const QUERY_EXCLUDE_FIXED = 1,
   QUERY_EXCLUDE_SOLIDS = 16,
   QUERY_ONLY_DYNAMIC = 32,
   QUERY_ONLY_KINEMATIC = 64,
-  QUERY_ONLY_FIXED = 128;
+  QUERY_ONLY_FIXED = 128,
+  /** No group test at all: a query without groups sees every collider, whatever its groups. */
+  QUERY_NO_GROUPS = 256;
 /** Hits the kernel's query buffer holds at once; `raycastAll` pages through more. */
 const QUERY_HITS = 256;
 /** A query shape of {@link KernelWorld.shapeCast} and {@link KernelWorld.intersectShape}: a convex kernel shape and its

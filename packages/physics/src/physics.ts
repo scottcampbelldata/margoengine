@@ -19,6 +19,7 @@ import {
   QUERY_EXCLUDE_SENSORS,
   QUERY_EXCLUDE_SOLIDS,
   QUERY_ONLY_DYNAMIC,
+  QUERY_NO_GROUPS,
   QUERY_ONLY_FIXED,
   QUERY_ONLY_KINEMATIC,
   type KernelRayHit,
@@ -1231,6 +1232,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (filter.onlyDynamic) flags |= QUERY_ONLY_DYNAMIC;
     if (filter.onlyKinematic) flags |= QUERY_ONLY_KINEMATIC;
     if (filter.onlyFixed) flags |= QUERY_ONLY_FIXED;
+    if (filter.groups === undefined) flags |= QUERY_NO_GROUPS;
     const groups = filter.groups === undefined ? 0xffffffff : filter.groups >>> 0;
     const collider = filter.excludeCollider ? filter.excludeCollider.handle : NONE;
     const body = filter.exclude ? filter.exclude.row : NONE;

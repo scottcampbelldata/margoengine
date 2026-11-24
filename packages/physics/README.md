@@ -238,7 +238,7 @@ physics.addJoint(wall, door, {
 
 Character controller options (a sphere, box, capsule, cylinder or cone collider on a `kinematicPosition` body): `offset` (0.01), `up`, `maxSlopeClimbAngle` (45 degrees), `minSlopeSlideAngle` (30 degrees), `autostep` (`{maxHeight: 0.3, minWidth: 0.2}` or `false`), `snapToGround` (0.2 or `false`), `slide`, `applyImpulsesToDynamicBodies`, `characterMass`.
 
-Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSensors`, `excludeFixed`, `excludeKinematic`, `excludeDynamic` and `predicate(body, collider)`. Ray and shape-cast distances are along the normalized direction. Queries see the world as of the last step.
+Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSensors`, `excludeFixed`, `excludeKinematic`, `excludeDynamic` and `predicate(body, collider)`. Ray and shape-cast distances are along the normalized direction. A query with no `groups` applies no group test at all, as Rapier's query filter does, so it sees every collider, even one whose own filter is 0; naming `groups` applies them both ways. Queries see the world as of the last step.
 
 ## The solver
 
