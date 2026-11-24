@@ -7,7 +7,8 @@
 //    the seconds since each cell was last wet: never below the depth now, and a cell the run-up wet and left has dried
 //    for no longer than the run;
 //  - a bore run up a frictionless beach never climbs above U0^2 / 2g of its shoreline speed at the toe (Shen and Meyer
-//    1963, J. Fluid Mech. 16(1) 113-125, https://doi.org/10.1017/S0022112063000628).
+//    1963, J. Fluid Mech. 16(1) 113-125, https://doi.org/10.1017/S0022112063000628);
+//  - a uniform supercritical chute has no breaker or foam once its front has run out (FG-07: fast flow alone is not white).
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
@@ -41,9 +42,18 @@ try {
     // A strip of n x 4 cells of dx metres: the bed ground(x), the Water far below (or its fill), a Flood on it.
     const strip = (n, dx, ground, options = {}, fill) => {
       const size = [n * dx, 4 * dx],
-        terrain = d.createTexture({ size: [n, 4], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+        terrain = d.createTexture({
+          size: [n, 4],
+          format: 'r32float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
       textures.push(terrain);
-      d.queue.writeTexture({ texture: terrain }, Float32Array.from({ length: n * 4 }, (_, k) => ground(((k % n) + 0.5) * dx)), { bytesPerRow: n * 4 }, [n, 4]);
+      d.queue.writeTexture(
+        { texture: terrain },
+        Float32Array.from({ length: n * 4 }, (_, k) => ground(((k % n) + 0.5) * dx)),
+        { bytesPerRow: n * 4 },
+        [n, 4],
+      );
       const water = Water.attach(engine, {
         height: -50,
         size: [200, 200],
@@ -85,7 +95,13 @@ try {
     const out = {};
     // 1. A lake at rest: 2 m over a step and an island, 10 s.
     {
-      const m = strip(100, 1, (x) => (x < 40 ? -2 : x > 60 && x < 70 ? 1 : -1), { maxDepth: 3, maxSpeed: 2 }, () => 0);
+      const m = strip(
+        100,
+        1,
+        (x) => (x < 40 ? -2 : x > 60 && x < 70 ? 1 : -1),
+        { maxDepth: 3, maxSpeed: 2 },
+        () => 0,
+      );
       await m.run(10);
       const r = await m.flood.read(),
         v = await m.texture(m.flood.velocityTexture);
@@ -99,7 +115,13 @@ try {
     // 2. A dam break: 1 m of water behind x = 20 m over a dry flat bed 100 m long, closed, rough; the front at 4 s, then
     // the box left to calm for 60 s.
     {
-      const m = strip(200, 0.5, () => 0, { maxDepth: 1.2, maxSpeed: 5, roughness: 0.05 }, (x) => (x < 20 ? 1 : undefined));
+      const m = strip(
+        200,
+        0.5,
+        () => 0,
+        { maxDepth: 1.2, maxSpeed: 5, roughness: 0.05 },
+        (x) => (x < 20 ? 1 : undefined),
+      );
       await m.run(4, 0.25);
       const r = await m.flood.read();
       let front = 0;
@@ -117,17 +139,36 @@ try {
       const v = await m.texture(m.flood.velocityTexture);
       let match = 0;
       for (let i = 0; i < 200; i++)
-        match = Math.max(match, Math.abs(v[i * 4] - r.velocity[(i + 200) * 2]), Math.abs(v[i * 4 + 3] - r.depth[i + 200]));
+        match = Math.max(
+          match,
+          Math.abs(v[i * 4] - r.velocity[(i + 200) * 2]),
+          Math.abs(v[i * 4 + 3] - r.depth[i + 200]),
+        );
       await m.run(60, 1);
       const late = await m.flood.read();
-      out.dam = { front: front * 0.5, froude, white, foam, area: r.foamArea, match, late: Math.max(...late.foam), lateSpeed: late.maxSpeed };
+      out.dam = {
+        front: front * 0.5,
+        froude,
+        white,
+        foam,
+        area: r.foamArea,
+        match,
+        late: Math.max(...late.foam),
+        lateSpeed: late.maxSpeed,
+      };
       m.dispose();
     }
     // 3. A bore up a frictionless beach: 0.5 m behind x = 2 m, flat to x = 5 m, then a 1 : 10 slope, on 0.05 m cells.
     {
       const dx = 0.05,
         n = 400,
-        m = strip(n, dx, (x) => (x < 5 ? 0 : (x - 5) / 10), { maxDepth: 0.6, maxSpeed: 5, roughness: 0 }, (x) => (x < 2 ? 0.5 : undefined));
+        m = strip(
+          n,
+          dx,
+          (x) => (x < 5 ? 0 : (x - 5) / 10),
+          { maxDepth: 0.6, maxSpeed: 5, roughness: 0 },
+          (x) => (x < 2 ? 0.5 : undefined),
+        );
       // The dam break's tip runs the flat 3 m to the toe at Ritter's front speed U0 = 2 sqrt(g h0) (Ritter 1892, SWASHES
       // 4.1.2), the shoreline speed of Shen and Meyer; the fastest water seen at the toe is logged beside it.
       let toe = 0,
@@ -136,7 +177,8 @@ try {
         const r = await m.flood.read();
         let shore = 0;
         for (let i = 0; i < n; i++) if (r.depth[i + n] > 1e-3) shore = i;
-        for (let i = 90; i < 110; i++) if (r.depth[i + n] > 1e-4) toe = Math.max(toe, Math.abs(r.velocity[(i + n) * 2]));
+        for (let i = 90; i < 110; i++)
+          if (r.depth[i + n] > 1e-4) toe = Math.max(toe, Math.abs(r.velocity[(i + n) * 2]));
         const x = (shore + 0.5) * dx;
         top = Math.max(top, x > 5 ? (x - 5) / 10 : 0);
       });
@@ -153,6 +195,34 @@ try {
       out.bore = { toe, top, below, dried, longest, time: m.flood.time };
       m.dispose();
     }
+    // 4. A steady chute (FG-07): 400 m of bed falling 1 in 50, 16 m^3/s in at the head over 8 m, open at the foot, rough
+    // (n 0.02): uniform supercritical flow at about 4 m/s and Froude 2 once the front has run out. Fast water that is not
+    // compressed or steepened makes no white water, so neither the breaker nor the foam is left on for the whole run.
+    {
+      const m = strip(200, 2, (x) => 8 - 0.02 * x, {
+        maxDepth: 1.5,
+        maxSpeed: 8,
+        roughness: 0.02,
+        sources: [{ position: [3, 4], discharge: 16, radius: 4 }],
+        boundary: { east: 'open' },
+      });
+      await m.run(240, 1);
+      const r = await m.flood.read();
+      let breaker = 0,
+        foam = 0,
+        froude = Infinity,
+        wet = 0;
+      for (let i = 25; i < 190; i++) {
+        const h = r.depth[i + 200],
+          u = Math.abs(r.velocity[(i + 200) * 2]);
+        if (h > 0.05) wet++;
+        froude = Math.min(froude, u / Math.sqrt(9.81 * Math.max(h, 1e-6)));
+        breaker = Math.max(breaker, r.breaker[i + 200]);
+        foam = Math.max(foam, r.foam[i + 200]);
+      }
+      out.chute = { breaker, foam, froude, wet, maxSpeed: r.maxSpeed };
+      m.dispose();
+    }
     for (const t of textures) t.destroy();
     out.validation = String(await d.popErrorScope().then((e) => e?.message ?? ''));
     return out;
@@ -160,14 +230,29 @@ try {
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, [], 'no page errors');
   assert.equal(result.validation, '', 'no validation errors');
-  assert.ok(result.rest.foam === 0 && result.rest.breaker === 0, `no white water on a lake at rest: ${JSON.stringify(result.rest)}`);
+  assert.ok(
+    result.rest.foam === 0 && result.rest.breaker === 0,
+    `no white water on a lake at rest: ${JSON.stringify(result.rest)}`,
+  );
   // The solver's own lake-at-rest bound (under 1e-5 m/s; float32 rounding of the well-balanced fluxes, SWASHES 3.1.2).
   assert.ok(result.rest.current < 1e-5, `no current on a lake at rest: ${result.rest.current}`);
   const dam = result.dam;
   assert.ok(dam.froude > 1, `the dam break front is supercritical: ${dam.froude}`);
-  assert.ok(dam.white > 0.5 && dam.foam > 0.5 && dam.area > 0, `the front breaks white and leaves foam: ${JSON.stringify(dam)}`);
+  assert.ok(
+    dam.white > 0.5 && dam.foam > 0.5 && dam.area > 0,
+    `the front breaks white and leaves foam: ${JSON.stringify(dam)}`,
+  );
   assert.ok(dam.match < 1e-6, `velocityTexture is the reading's current and depth: ${dam.match}`);
-  assert.ok(dam.late < 0.05 && dam.late < dam.foam, `the foam decays once the water calms: ${dam.late} (speed ${dam.lateSpeed})`);
+  assert.ok(
+    dam.late < 0.05 && dam.late < dam.foam,
+    `the foam decays once the water calms: ${dam.late} (speed ${dam.lateSpeed})`,
+  );
+  const chute = result.chute;
+  assert.ok(chute.wet === 165 && chute.froude > 1.2, `the chute runs full and supercritical: ${JSON.stringify(chute)}`);
+  assert.ok(
+    chute.breaker < 0.05 && chute.foam < 0.05,
+    `uniform fast flow leaves no breaker or foam behind its front (FG-07): ${JSON.stringify(chute)}`,
+  );
   const bore = result.bore,
     bound = boreRunup(2 * Math.sqrt(9.81 * 0.5));
   assert.ok(bore.toe > 1, `the bore reaches the toe moving: ${bore.toe} m/s`);

@@ -916,10 +916,15 @@ wave keeps its crest exactly until it breaks, Stoker 1957).
 
 ### White water, the current and wet ground
 
-The flood makes its own foam and spray. Each step finds the water breaking in every cell: supercritical flow (Froude above
-1, a bore or a jump front), fast flow whatever its depth, and a steep surface the water runs at, each through a clamped
-ramp (Ihmsen et al. 2012, https://doi.org/10.1007/s00371-012-0697-9; fronts after Chentanez and Muller 2010,
-https://doi.org/10.2312/SCA/SCA10/197-206). That is the state's breaker channel, which Water's spray takes off from at any
+The flood makes its own foam and spray. Each step finds the water breaking in every cell, after Ihmsen et al. 2012's
+potentials (https://doi.org/10.1007/s00371-012-0697-9), each through a clamped ramp: water pushed together (neighbours
+closing on each other at 0.25 to 1 m/s across a cell: a hydraulic jump, a jet into slower water), a steep surface the
+water runs at (fronts after Chentanez and Muller 2010, https://doi.org/10.2312/SCA/SCA10/197-206) and a surge running
+into water 20 to 60 percent shallower than itself (the aerated roller of a surge or bore front, Chanson 2009,
+https://doi.org/10.1016/j.euromechflu.2008.06.004), all scaled by the flow's speed (0.5 to 2 m/s), which alone makes no
+white water. Fast flow that is neither compressed nor steepened, such as the long current behind a tsunami bore or a
+uniform chute, stays clear, so the foam marks the breaking front and what it sheds (until 2026-11-24 every cell above
+Froude 0.7 or 3 m/s was breaking, so foam sat at 1 for kilometres behind a bore, FG-07). That is the state's breaker channel, which Water's spray takes off from at any
 depth, and the foam is never less than it. Foam is carried with the water on each face's mass flux, taken upwind, and
 fades with an e-folding time of 3 s (oceanic whitecap foam: 1.4 to 4.8 s on the area-weighted mean, Callaghan, Deane,
 Stokes and Ward 2012, https://doi.org/10.1029/2012JC008147); inflow, rain and the sea bring clean water. `read()` adds
@@ -967,7 +972,8 @@ console.log(reading.foamArea, Math.max(...reading.breaker), flood.wetTexture?.wi
 
 Measured (`test/flood-foam.browser.mjs`, WebGPU and the WebGL2 layer): a lake at rest over a step and an island has
 foam and breaker exactly 0 and a current under 1e-5 m/s; a dam break of 1 m runs at Froude 1.6 at its front, breaks
-white (1) and leaves 25 m^2 of foam on a strip 2 m wide, which falls under 0.03 once the water calms; `velocityTexture`
+white (0.97) and leaves 18 m^2 of foam on a strip 2 m wide, which falls under 0.002 once the water calms; a uniform
+chute 400 m long at Froude 1.9 and 4.3 m/s has breaker 0 and foam under 0.01 once its front has run out; `velocityTexture`
 matches the reading within 2.4e-7; a dam-break bore of 0.5 m (Ritter's front speed U0 = 2 sqrt(g h0), 4.43 m/s) runs up a
 frictionless 1 : 10 beach to 0.89 m, under Shen and Meyer's U0^2 / 2g = 1.02 m (1963,
 https://doi.org/10.1017/S0022112063000628), and the wetting record is never below the depth and dries only the cells the

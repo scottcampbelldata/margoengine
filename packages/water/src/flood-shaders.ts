@@ -247,20 +247,41 @@ fn rates(p:vec2i,axis:u32,size:vec2i)->vec4f{
 }
 // Ihmsen et al. 2012's clamped ramp: 0 below lo, 1 above hi.
 fn ramp(i:f32,lo:f32,hi:f32)->f32{return (min(i,hi)-min(i,lo))/(hi-lo);}
-// White water where the flow breaks: supercritical flow (Froude above 1, a bore or a jump front), fast flow whatever its
-// depth (Ihmsen 2012's kinetic-energy potential), and a steep surface the water runs at (a front, Chentanez and Muller
-// 2010), over wet ground. 0 in still water.
-fn breaking(p:vec2i,size:vec2i)->f32{
- let s=textureLoad(evalState,p,0);let m=textureLoad(evalMomentum,p,0);
- if(s.x<=flood.dry){return 0.0;}
- let u=vec2f(velocity(s.x,m.y),velocity(s.x,m.w));let speed=length(u);
- let froude=speed/sqrt(G*max(s.x,1e-6));
- let east=textureLoad(evalState,min(p+vec2i(1,0),size-1),0);let west=textureLoad(evalState,max(p-vec2i(1,0),vec2i(0)),0);
- let north=textureLoad(evalState,min(p+vec2i(0,1),size-1),0);let south=textureLoad(evalState,max(p-vec2i(0,1),vec2i(0)),0);
- let slope=vec2f((east.x+east.y)-(west.x+west.y),(north.x+north.y)-(south.x+south.y))/(2.0*flood.cell);
- let front=ramp(max(0.0,-dot(slope,u)/max(speed,1e-6)),0.05,0.3)*ramp(speed,0.5,2.0);
- return max(max(ramp(froude,0.7,1.5),0.6*ramp(speed,3.0,8.0)),front)*ramp(s.x,0.01,0.08);
+// White water where the flow breaks, after Ihmsen et al. 2012's potentials: water is aerated where it is pushed together
+// (their trapped-air potential, the velocity of neighbours running into each other: a bore, a hydraulic jump, a jet
+// hitting slower water), where the surface stands up against the flow (their wave-crest potential; fronts after
+// Chentanez and Muller 2010) or where a surge runs into shallower water, each scaled by the kinetic-energy potential, which alone makes no white water. Fast flow
+// that is not compressed or steepened (the long run of current behind a bore, a uniform chute) stays clear, so the
+// channel marks the breaking front, not every fast cell (FG-07). 0 in still water.
+fn cellVelocity(p:vec2i)->vec2f{
+ let s=textureLoad(evalState,p,0);if(s.x<=flood.dry){return vec2f(0);}
+ let m=textureLoad(evalMomentum,p,0);return vec2f(velocity(s.x,m.y),velocity(s.x,m.w));
 }
+fn breaking(p:vec2i,size:vec2i)->f32{
+ let s=textureLoad(evalState,p,0);
+ if(s.x<=flood.dry){return 0.0;}
+ let u=cellVelocity(p);let speed=length(u);
+ let pe=min(p+vec2i(1,0),size-1);let pw=max(p-vec2i(1,0),vec2i(0));let pn=min(p+vec2i(0,1),size-1);let ps=max(p-vec2i(0,1),vec2i(0));
+ let east=textureLoad(evalState,pe,0);let west=textureLoad(evalState,pw,0);
+ let north=textureLoad(evalState,pn,0);let south=textureLoad(evalState,ps,0);
+ let slope=vec2f((east.x+east.y)-(west.x+west.y),(north.x+north.y)-(south.x+south.y))/(2.0*flood.cell);
+ let front=ramp(max(0.0,-dot(slope,u)/max(speed,1e-6)),0.05,0.3);
+ // Neighbours closing on each other across one cell (m/s): the compressive half of the velocity differences.
+ let ue=cellVelocity(pe);let uw=cellVelocity(pw);let un=cellVelocity(pn);let us=cellVelocity(ps);
+ let closing=0.5*(max(uw.x-ue.x,0.0)+max(us.y-un.y,0.0));
+ let trapped=ramp(closing,FOAM_CLOSING_LO,FOAM_CLOSING_HI);
+ // A surge front: water running into water a good part shallower than itself (the tip of a surge over dry ground, the
+ // face of a bore over standing water), each axis's drop weighted by the share of the current along it. The aerated
+ // roller of a surge or bore front (Chanson 2009) is white; the even depth behind it is not.
+ let downX=select(west.x,east.x,u.x>0.0);let downZ=select(south.x,north.x,u.y>0.0);
+ let surge=ramp((abs(u.x)*max(s.x-downX,0.0)+abs(u.y)*max(s.x-downZ,0.0))/(max(abs(u.x)+abs(u.y),1e-6)*s.x),0.2,0.6);
+ return ramp(speed,0.5,2.0)*max(max(front,trapped),surge)*ramp(s.x,0.01,0.08);
+}
+// The closing speed (m/s across one cell) where the trapped-air potential starts and saturates: a hydraulic jump closes
+// at metres a second over a cell or two at any cell size, while the slow deceleration of a long current closes at
+// centimetres a second a cell.
+const FOAM_CLOSING_LO=0.25;
+const FOAM_CLOSING_HI=1.0;
 // Inflow depth rate (m/s): each source's discharge spread over the cells whose centres lie within its radius of its
 // position (per axis), and always the cell under it, as water/rivers spreads its sources.
 fn inflow(p:vec2i,size:vec2i)->f32{
