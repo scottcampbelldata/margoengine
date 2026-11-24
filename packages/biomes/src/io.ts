@@ -3,6 +3,7 @@
 // An entry of its own: the root entry does not import it. The PNG writer is ours (stored or CompressionStream deflate,
 // CRC-32 and Adler-32 written out below); nothing here reads a file format library or sends bytes anywhere.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { crc32 } from '../../shared/crc32.js';
 import { divFloor } from './fixed.js';
 import { LAYERS } from './layers.js';
 import type { RasterLayer } from './layers.js';
@@ -50,20 +51,8 @@ export interface WeightExport {
 
 const textEncoder = new TextEncoder();
 
-let crcTable: Uint32Array | undefined;
-function crc32(parts: readonly Uint8Array[]): number {
-  if (!crcTable) {
-    crcTable = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      crcTable[n] = c >>> 0;
-    }
-  }
-  let c = 0xffffffff;
-  for (const part of parts) for (let i = 0; i < part.length; i++) c = crcTable[(c ^ part[i]) & 255] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
+/** CRC-32 of several byte runs in turn (shared/crc32.js). */
+const crcOf = (parts: readonly Uint8Array[]): number => parts.reduce((c, part) => crc32(part, c), 0);
 
 function adler32(data: Uint8Array): number {
   let a = 1,
@@ -148,7 +137,7 @@ export async function encodePng(
     view.setUint32(at, data.length);
     out.set(tag, at + 4);
     out.set(data, at + 8);
-    view.setUint32(at + 8 + data.length, crc32([tag, data]));
+    view.setUint32(at + 8 + data.length, crcOf([tag, data]));
     at += 12 + data.length;
   }
   return out;

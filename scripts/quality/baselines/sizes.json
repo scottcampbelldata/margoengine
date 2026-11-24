@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17494307,
+  "total": 17497465,
   "history": [
     {
       "date": "2026-10-24",
@@ -11349,6 +11349,12 @@
       "commit": "b6ef18ed7",
       "reason": "Rapier 3D collision parity (2026-11-24): the kernel gains the collider and narrow-phase API (mass properties, hooks per collider, pair listings, shape contacts, collider casts, feature ids, contact detail), 233,951 to 239,676 B and its base 47,444 to 49,607 B; the code is in the same entry as the solver it serves, and a split would make every world load a second Wasm module and a second chunk of the same step path.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "e6665a26e6",
+      "reason": "FG-03: new optional entry water/flood-bake (bakeFlood async iterator; flood fields as EXR images, flipbook atlases and 16-bit PNGs, EXR writer loaded lazily from environment/exr-write); biomes/io takes CRC-32 from shared/crc32.js (quality duplicates)",
+      "grew": 2
     }
   ],
   "items": {
@@ -11436,7 +11442,7 @@
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
     "@margoengine/biomes/hydrology": 5138,
-    "@margoengine/biomes/io": 4137,
+    "@margoengine/biomes/io": 4543,
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/multinoise": 3748,
     "@margoengine/biomes/objects": 5494,
@@ -12104,8 +12110,8 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 246867,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 51096,
+    "@margoengine/physics": 246854,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 51095,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 192553,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics2d": 18716,
@@ -12802,6 +12808,7 @@
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
     "@margoengine/water/flood": 12177,
+    "@margoengine/water/flood-bake": 2766,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 18041,

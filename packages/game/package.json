@@ -3559,6 +3559,10 @@
       "types": "./dist/water/flood.d.ts",
       "import": "./dist/water/flood.js"
     },
+    "./water/flood-bake": {
+      "types": "./dist/water/flood-bake.d.ts",
+      "import": "./dist/water/flood-bake.js"
+    },
     "./water/sea-state": {
       "types": "./dist/water/sea-state.d.ts",
       "import": "./dist/water/sea-state.js"

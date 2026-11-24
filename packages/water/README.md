@@ -1029,6 +1029,47 @@ for (let i = 0; i < 60; i++) {
 console.log(panel.roughness, coast.surgeAt());
 ```
 
+### Baking a flood to files: `@margoengine/water/flood-bake`
+
+For a renderer or compositor outside the engine, `bakeFlood(flood, {from, to, fps = 24, signal})` is an async iterator
+that moves the flood's own clock (`advanceTime`, then `settle`) and yields `{index, time, reading}` at each frame time
+from `from` (default now) to `to` inclusive; no render loop is needed and each frame equals a live run read at the same
+time bit for bit (`test/flood-bake.browser.mjs`, WebGPU and the WebGL2 layer). The readings turn into files with no
+resampling, one pixel a cell:
+
+- `floodImage(reading, {fields, type = 'FLOAT', northUp = true})`: named float channels, from `FLOOD_BAKE_FIELDS`
+  (`depth`, `surface`, `velocity`, `foam`, `breaker`) by default; also `bed`, `speed` and `wet` (1 above 1 mm).
+  `velocity` is two channels, `velocity.x` and `velocity.z`; `surface` is depth + bed (world y). With `northUp` the
+  image's top row is the map's largest z. `type: 'HALF'` halves the file.
+- `encodeFloodEXR(reading, options)`: that image as an uncompressed scanline OpenEXR (through
+  `@margoengine/environment/exr-write`, loaded on first use), which Blender, Houdini, Nuke and Unreal read by channel name.
+- `floodAtlas(frames, {columns, ...})`: frames tiled row-major from the top left into one flipbook image (columns default
+  about square, at most 16,384 pixels a side), with `columns`, `rows`, `frameWidth`, `frameHeight` and each tile's `time`.
+- `encodeFloodPNG(image, {channel, range})`: one channel of an image or atlas as a 16-bit greyscale PNG, `range` (default
+  the channel's own least and greatest value) mapped to 0..65,535, so p reads back as lo + (hi - lo) p / 65535.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Water} from 'margoengine/water';
+import {Flood} from 'margoengine/water/flood';
+import {bakeFlood, encodeFloodEXR, encodeFloodPNG, floodAtlas} from 'margoengine/water/flood-bake';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const bed = engine.gpu!.createTexture({size: [64, 4], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+engine.gpu!.queue.writeTexture({texture: bed}, new Float32Array(256).fill(-1), {bytesPerRow: 256}, [64, 4]);
+const lake = Water.attach(engine, {height: -1, size: [200, 200], fill: (x) => (x < 16 ? 1 : 0), terrain: {heightmap: () => bed, origin: [0, 0], size: [64, 4]}});
+const flood = Flood.attach(engine, {surface: lake, maxDepth: 3, maxSpeed: 8});
+engine.render({delta: 0}); // the flood starts with the Water's first frame
+const frames = [];
+const files: Uint8Array[] = [];
+for await (const frame of bakeFlood(flood, {to: 2, fps: 12})) {
+  frames.push(frame);
+  files.push(await encodeFloodEXR(frame.reading)); // one EXR a frame: depth, surface, velocity.x/z, foam, breaker
+}
+const sheet = floodAtlas(frames, {fields: ['depth']}); // 25 frames, 5 x 5 tiles of 64 x 4
+const png = await encodeFloodPNG(sheet, {range: [0, 1]});
+console.log(files.length, sheet.columns, sheet.rows, png.byteLength);
+```
+
 ## Ships riding the sea
 
 `@margoengine/water/ships` puts ships on any Water: the open sea, or the Water a `Flood` runs on.
