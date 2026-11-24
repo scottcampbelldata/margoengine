@@ -61,8 +61,8 @@ export interface AnimatedUSDZOptions extends USDZOptions {
 /** What {@link exportAnimatedUSDZ} left out of the file. */
 export interface AnimatedUSDZSkip {
   /**
-   * `'morph-weights'`: a channel of morph target weights for a mesh that is not skinned (UsdSkel's blend shapes need a
-   * skeleton, so a morphed mesh with no skin is written at its rest weights). `'not-exported'`: a channel of a
+   * `'morph-weights'`: a channel of morph target weights on a node that draws no triangle mesh with morph targets (points
+   * and lines have no blend shapes in UsdSkel). `'not-exported'`: a channel of a
    * node the scene did not collect. `'primitive'`, `'texture'`, `'colors'` and `'channel'`, for GLB input: a primitive that
    * is not triangles, a texture not PNG or JPEG, vertex colours under a base colour texture, a channel with no node, such as
    * one of KHR_animation_pointer.
@@ -214,9 +214,58 @@ const drawn = (node: Node): { geometry: Geo; material?: Mat }[] => [
 const skinned = (node: Node, geometry: Geo): boolean =>
   !!node.skin && !!geometry.joints && !!geometry.weights && !geometry.topology;
 
-/** True for a node whose skin moves a primitive that carries morph targets: the ones UsdSkel's blend shapes can drive. */
+/** True for a triangle primitive that carries morph targets but no skin: it gets a skeleton of one still joint. */
+const morphOnly = (node: Node, geometry: Geo): boolean =>
+  !geometry.topology && !!geometry.morphs?.length && !skinned(node, geometry);
+
+/**
+ * True for a node that draws a triangle primitive with morph targets: the ones UsdSkel's blend shapes can drive. A skinned
+ * one has its skin's skeleton; one with no skin is given a skeleton of one joint that never moves.
+ */
 const morphed = (node: Node): boolean =>
-  drawn(node).some(({ geometry }) => skinned(node, geometry) && !!geometry.morphs?.length);
+  drawn(node).some(({ geometry }) => !geometry.topology && !!geometry.morphs?.length);
+
+/** A 4x4 identity as USD writes a matrix. */
+const IDENTITY_MATRIX = '((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))';
+/** The reflection {@link reflected} applies, as a matrix. */
+const MIRROR_X = new Float64Array([-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
+/**
+ * A SkelRoot that drives the blend shapes of a node's unskinned meshes. UsdSkel applies blend shapes only to a mesh bound to
+ * a skeleton, so the meshes bind rigidly (one constant influence of weight 1) to a single joint whose bind, rest and animated
+ * transforms are all the identity: skinning leaves the points where they rest, in the node's own space, and the node's Xform
+ * above still moves them. A mirrored mesh, written reflected, is turned back by its `geomBindTransform`, which UsdSkel applies
+ * after the blend shapes (OpenUSD UsdSkel, "Schemas In-Depth": BlendShape, SkelBindingAPI, geomBindTransform).
+ */
+function morphRoot(
+  path: string,
+  name: string,
+  meshes: readonly string[],
+  tokens: readonly string[],
+  frames: readonly string[],
+): string[] {
+  return [
+    `def SkelRoot "${name}" {`,
+    '    def Skeleton "Skeleton" (',
+    '        prepend apiSchemas = ["SkelBindingAPI"]',
+    '    ) {',
+    '        uniform token[] joints = ["Root"]',
+    `        uniform matrix4d[] bindTransforms = [${IDENTITY_MATRIX}]`,
+    `        uniform matrix4d[] restTransforms = [${IDENTITY_MATRIX}]`,
+    `        rel skel:animationSource = <${path}/Motion>`,
+    '    }',
+    '    def SkelAnimation "Motion" {',
+    '        uniform token[] joints = ["Root"]',
+    '        float3[] translations = [(0, 0, 0)]',
+    '        quatf[] rotations = [(1, 0, 0, 0)]',
+    '        half3[] scales = [(1, 1, 1)]',
+    `        uniform token[] blendShapes = [${tokens.map((token) => JSON.stringify(token)).join(', ')}]`,
+    ...attribute('float[]', 'blendShapeWeights', frames).map((line) => `    ${line}`),
+    '    }',
+    ...meshes,
+    '}',
+  ];
+}
 
 /**
  * The weights of a node's morph targets at each frame: its `weights` channel sampled as glTF 2.0 section 3.11 says (STEP,
@@ -708,7 +757,15 @@ export async function exportAnimatedUSDZ(
   };
   const placed = new Map<
     Node,
-    { geometry: Geo; material: Mat; shape: Shape; flipped: boolean; counts?: number[]; listed?: boolean }[]
+    {
+      geometry: Geo;
+      material: Mat;
+      shape: Shape;
+      flipped: boolean;
+      counts?: number[];
+      listed?: boolean;
+      morphs?: boolean;
+    }[]
   >();
   for (const node of order) {
     const list = drawn(node)
@@ -730,6 +787,14 @@ export async function exportAnimatedUSDZ(
             listed: true,
           };
         }
+        if (morphOnly(node, geometry)) {
+          // Its BlendShape prims are children of the mesh prim, so the mesh is its own, never a shared class.
+          const flipped = determinant3(poses.world(node)) < 0,
+            shape = flipped ? reflected(geometry) : shapeOf(geometry.positions, geometry.normals, geometry.indices);
+          shape.users = 1;
+          materials.note(shape, material);
+          return { geometry, material, shape, flipped, morphs: true };
+        }
         const { shape, flipped } = shapeFor(node, geometry);
         shape.users++;
         materials.note(shape, material);
@@ -738,14 +803,74 @@ export async function exportAnimatedUSDZ(
     if (list.length) placed.set(node, list);
   }
 
-  const tree = (node: Node, out: string[]): void => {
+  const tree = (node: Node, out: string[], parent: string): void => {
     if (!needed.has(node)) return;
-    const own = tracks.get(node);
+    const own = tracks.get(node),
+      path = `${parent}/Node_${ids.get(node)}`;
     signal?.throwIfAborted();
     out.push(`def Xform "Node_${ids.get(node)}" {`);
     if (node.name) out.push(`    string displayName = ${JSON.stringify(node.name)}`);
     out.push(...xformOps(node, own, frames, poses));
-    for (const { geometry, material, shape, flipped, counts, listed } of placed.get(node) ?? []) {
+    const list = placed.get(node) ?? [],
+      morphing = list.filter(({ morphs }) => morphs);
+    if (morphing.length) {
+      const name = `Morph_${ids.get(node)}`,
+        root = `${path}/${name}`,
+        lines: string[] = [],
+        tokens: string[] = [];
+      for (const { geometry, material, shape, flipped } of morphing) {
+        const i = meshes++,
+          bound = materials.bind(i, geometry, material),
+          morphs = geometry.morphs!;
+        meshPrim(lines, tail, i, node.name, geometry, shape, bound, {
+          transform: [],
+          schemas: '"MaterialBindingAPI", "SkelBindingAPI"',
+          extra: [
+            '    int[] primvars:skel:jointIndices = [0] (',
+            '        elementSize = 1',
+            '        interpolation = "constant"',
+            '    )',
+            '    float[] primvars:skel:jointWeights = [1] (',
+            '        elementSize = 1',
+            '        interpolation = "constant"',
+            '    )',
+            ...(flipped ? [`    matrix4d primvars:skel:geomBindTransform = ${matrix(MIRROR_X)}`] : []),
+            `    rel skel:skeleton = <${root}/Skeleton>`,
+          ],
+        });
+        const names = morphs.map((_, k) => `Blend_${i}_${k}`),
+          closing = lines.pop();
+        lines.push(
+          // The reflected points take reflected offsets; geomBindTransform turns both back after the shapes apply.
+          ...morphs.flatMap((morph, k) => blendShape(names[k], morph, flipped ? MIRROR_X : undefined)),
+          `    uniform token[] skel:blendShapes = [${names.map((n) => JSON.stringify(n)).join(', ')}]`,
+          `    rel skel:blendShapeTargets = [${names.map((n) => `<${root}/Mesh_${i}/${n}>`).join(', ')}]`,
+          closing!,
+        );
+        tokens.push(...names);
+      }
+      const weights = morphing.map(({ geometry }) =>
+        weightsOf(node, geometry.morphs!.length, weightTracks.get(node), fps),
+      );
+      out.push(
+        ...morphRoot(
+          root,
+          name,
+          lines,
+          tokens,
+          Array.from(
+            { length: frames },
+            (_, frame) =>
+              `[${weights
+                .flatMap((at) => at(frame))
+                .map(num)
+                .join(', ')}]`,
+          ),
+        ),
+      );
+    }
+    for (const { geometry, material, shape, flipped, counts, listed, morphs } of list) {
+      if (morphs) continue;
       const i = meshes++,
         bound = materials.bind(i, geometry, material);
       if (listed) {
@@ -758,11 +883,11 @@ export async function exportAnimatedUSDZ(
           : [],
       });
     }
-    for (const child of node.children) tree(child, out);
+    for (const child of node.children) tree(child, out, path);
     out.push('}');
   };
   const body: string[] = [];
-  for (const root of roots) tree(root, body);
+  for (const root of roots) tree(root, body, '/Margo');
 
   // One SkelRoot for each skin, holding the meshes it moves.
   const skins = new Map<SkinData, Node[]>();

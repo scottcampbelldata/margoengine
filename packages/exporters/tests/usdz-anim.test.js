@@ -10,6 +10,7 @@ import { exportAnimatedUSDZ } from '@margoengine/exporters/usdz-anim';
 import { sceneOfGLB } from '../dist/glb-scene.js';
 import { parseUSDFiles } from '@margoengine/usdz/compose';
 import { skeletons } from '@margoengine/usdz/skel';
+import { animation } from '@margoengine/usdz/anim';
 import { nodeOf, pose, vertices } from '../../usdz/tests/pose.js';
 
 const quad = {
@@ -602,12 +603,8 @@ test('every node between two joints adds its part, nearest last', async () => {
   [-3, 0, 0].forEach((value, r) => near(t[r], value, 1e-6, `lower axis ${r}`));
 });
 
-test('morph weight channels are named, not lost in silence', async () => {
-  const node = {
-      name: 'face',
-      geometry: { ...quad, morphs: [{ positions: new Float32Array(12) }] },
-      morphWeights: [0],
-    },
+test('morph weight channels of a node with no morph targets are named, not lost in silence', async () => {
+  const node = { name: 'face', geometry: quad },
     { skipped } = await exportAnimatedUSDZ({
       nodes: [node],
       animations: [
@@ -886,8 +883,16 @@ test('morph targets of a skinned mesh become BlendShape prims driven by the clip
   assert.equal(result.skipped.length, 0);
 });
 
-test('weights of a mesh with no skin stay skipped by name', async () => {
-  const node = { name: 'plain', geometry: { ...quad, morphs: [{ positions: new Float32Array(12) }] } },
+// A morphed mesh with no skin binds rigidly to a skeleton of one still joint, since UsdSkel only applies blend shapes to a
+// mesh bound to a skeleton (OpenUSD UsdSkel, "Schemas In-Depth": BlendShape, SkelBindingAPI).
+test('morph targets of a mesh with no skin become BlendShape prims on a one-joint skeleton', async () => {
+  const node = {
+      name: 'plain',
+      geometry: {
+        ...quad,
+        morphs: [{ name: 'lift', positions: new Float32Array([0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0]) }],
+      },
+    },
     result = await exportAnimatedUSDZ({
       nodes: [node],
       animations: [
@@ -898,8 +903,70 @@ test('weights of a mesh with no skin stay skipped by name', async () => {
           ],
         },
       ],
-    });
-  assert.deepEqual(result.skipped, [{ kind: 'morph-weights', target: 'plain' }]);
+    }),
+    text = await usda(result);
+  assert.deepEqual(result.skipped, []);
+  assert.match(text, /def SkelRoot "Morph_0"/);
+  assert.match(text, /uniform token\[\] joints = \["Root"\]/);
+  assert.match(text, /rel skel:skeleton = <\/Margo\/Node_0\/Morph_0\/Skeleton>/);
+  assert.match(text, /rel skel:blendShapeTargets = \[<\/Margo\/Node_0\/Morph_0\/Mesh_0\/Blend_0_0>\]/);
+  assert.match(text, /int\[\] primvars:skel:jointIndices = \[0\]/);
+  assert.match(text, /uniform int\[\] pointIndices = \[1\]/);
+  const weights = samples(text, 'float[] blendShapeWeights');
+  assert.deepEqual(weights[0], [0]);
+  assert.deepEqual(weights.at(-1), [1]);
+  // The node's own motion stays on its Xform, above the SkelRoot.
+  assert.ok(samples(text, 'double3 xformOp:translate'));
+});
+
+test('the import side moves an unskinned morphed corner by weight times its offset, under the node motion', async () => {
+  const node = {
+      name: 'plain',
+      geometry: { ...quad, morphs: [{ positions: new Float32Array([0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0]) }] },
+    },
+    { usdz } = await exportAnimatedUSDZ({
+      nodes: [node],
+      animations: [
+        {
+          channels: [
+            { node, path: 'weights', times: [0, 1], values: [0, 1] },
+            { node, path: 'translation', times: [0, 1], values: [0, 0, 0, 2, 0, 0] },
+          ],
+        },
+      ],
+    }),
+    text = await readZipEntry(usdz, readZipDirectory(usdz)[0]),
+    asset = await parseUSDFiles('scene.usda', (id) => (id === 'scene.usda' ? text : undefined), {
+      extensions: [skeletons(), animation()],
+    }),
+    id = nodeOf(asset, '/Margo/Node_0/Morph_0/Mesh_0');
+  assert.deepEqual(asset.issues, []);
+  for (const [seconds, x, z] of [
+    [0, 1, 0],
+    [0.5, 2, 0.25],
+    [1, 3, 0.5],
+  ]) {
+    const corner = vertices(asset, id, pose(asset, seconds))[1];
+    near(corner[0], x, 1e-6, `corner x at ${seconds} s`);
+    near(corner[2], z, 1e-6, `corner z at ${seconds} s`);
+  }
+});
+
+test('a mirrored unskinned morphed mesh is written reflected and turned back by its geomBindTransform', async () => {
+  const node = {
+      name: 'mirror',
+      scale: [-1, 1, 1],
+      geometry: { ...quad, morphs: [{ positions: new Float32Array([0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0]) }] },
+    },
+    text = await usda(
+      await exportAnimatedUSDZ({
+        nodes: [node],
+        animations: [{ channels: [{ node, path: 'weights', times: [0, 1], values: [0, 1] }] }],
+      }),
+    );
+  assert.match(text, /matrix4d primvars:skel:geomBindTransform = \(\(-1, 0, 0, 0\)/);
+  // The offset +x is written -x, as the reflected points are.
+  assert.match(text, /uniform vector3f\[\] offsets = \[\(-0\.25, 0, 0\)\]/);
 });
 
 test('the import side reads the blend shapes back: a corner moves by weight times its offset', async () => {
