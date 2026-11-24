@@ -161,6 +161,7 @@ impl World {
             }
             self.clamp_speeds();
             self.integrate_poses(h, substep + 1 == substeps);
+            self.fk_multibodies(h);
             self.tally_drift(h);
             self.refresh_joints();
             // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
@@ -175,6 +176,7 @@ impl World {
                 self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
             }
             self.solve_impacts();
+            self.project_multibodies();
             self.clamp_speeds();
         }
         self.break_joints(h);

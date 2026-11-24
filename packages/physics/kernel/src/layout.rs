@@ -152,6 +152,14 @@ columns! {
     // This body's own sleep threshold, in J/kg, and window, in seconds; zero takes the world's.
     SLEEP_LIMIT f32 Body,
     SLEEP_AFTER f32 Body,
+    // A body of a multibody: 0 none, 1 its root, 2 a link; the root's row; the next link, parents first; the joint to its parent and
+    // the parent's row; and the call that last visited the tree.
+    MB_ROLE u32 Body,
+    MB_ROOT u32 Body,
+    MB_NEXT u32 Body,
+    MB_JOINT u32 Body,
+    MB_PARENT u32 Body,
+    MB_STAMP u32 Body,
     // A body's place in the awake list, NONE when it is not there.
     AWAKE_SLOT u32 Body,
     // Islands of this step: the forest, and a body's island.

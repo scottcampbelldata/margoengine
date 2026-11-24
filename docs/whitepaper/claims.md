@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Own physics dynamics (2026-11-24): the rigid body, solver, joint, multibody, PID, determinism, snapshot and debug-render
+  capabilities of Rapier 3D's public user guide are listed row by row in the dynamics table of
+  `packages/physics/README.md` (Parity with Rapier 3D), each marked full only where a test proves it. Checked against
+  closed forms (a pendulum to 4 decimals at 1 s, energy of single and double pendulums) and against Rapier 0.21 as a black
+  box (cone rotation motor within 0.03 rad of its spherical joint; multibody pendulums within 5 cm over a second). Capability
+  evidence only, no speed claim; reproduce with `node --test packages/physics/tests/next-*.test.js`.
+
 - Own physics collision kernel (2026-11-24): the shapes, queries, events, filters and hooks of Rapier 3D's public user
   guide are listed row by row in [the parity table](../physics-collision-parity.md), each row marked full only where a
   test proves it. The new shapes and queries are checked against Rapier 0.21 as a black box (rest heights, ray and cast

@@ -877,6 +877,31 @@ console.log(vertices.length / 6 > 12, colors.length / 4 === vertices.length / 3)
 physics.dispose();
 ```
 
+### Multibody joints
+
+`physics.addMultibody(root, links)` holds a tree of bodies to reduced coordinates, as Rapier's multibody joints do. Each link names its `body`, the body it hangs from (`parent`, default the link before it) and a `joint` of locks: `fixed`, `revolute`, `prismatic`, `spherical` or `generic`. The joints are made for you and are ordinary joints too, with their limits, motors and break limits. The tree adds what plain joints cannot give: every substep the speeds of the links are projected onto the joint space (the least change of kinetic energy that keeps every joint closed, the normal equations of Featherstone's joint-space inertia matrix, 2008, solved by Cholesky), and a link that has moved more than 1 mm or 1 mrad from where its parent and joint place it is put back, with the correction fed back as a speed (SHAKE with RATTLE). A branch is as exact as a chain: a tree with 1000 kg ends that plain joints throw 42 m apart holds within 1 mm, and a hinge limit holds to 1e-7 rad where plain joints overshoot by a fifth. Contacts on a link share their impulse through the joints as an articulated body would. A tree holds at most 39 links beside its root and 64 free joint speeds, a body is in one tree, and a removed joint or body dissolves its tree (`multibody.remove()` frees it on purpose).
+
+`multibody.coordinates()` lists the joint coordinates link by link (an offset in metres for each free linear axis, an angle in radians for a hinge counted past a whole turn, the rotation vector for a ball), `setCoordinates(values)` poses the tree from the root's pose, and `velocities()` reads each coordinate's speed. `multibody.inverseKinematics(link, {position, rotation}, options)` is Rapier's multibody inverse kinematics: damped least squares of the Jacobian over the joints between the root and the link (Buss 2004), with hinge and slider limits kept and a step bound (Buss and Kim 2005). It returns `{converged, iterations, positionError, rotationError}`. Rapier poses a multibody from its joint coordinates and ignores a body's speed or pose at the time the joint is made; here the bodies' poses are read as given, so `setCoordinates` or `inverseKinematics` is how you place a tree.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+const shoulder = physics.addBody(null, {type: 'fixed'});
+const arm = [1, 2, 3].map((i) =>
+  physics.addBody(null, {position: [0, -i, 0], colliders: {shape: 'sphere', radius: 0.05, mass: 1}}));
+const tree = physics.addMultibody(shoulder, arm.map((body) => ({
+  body,
+  joint: {type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0], anchorB: [0, 1, 0]},
+})));
+const found = tree.inverseKinematics(arm[2], {position: [1.2, -1.4, 0]});
+console.log(found.converged, found.positionError < 1e-3); // true true
+for (let i = 0; i < 60; i++) physics.step();                // swings from there under gravity, its joints closed
+console.log(Math.abs(Math.hypot(...arm[0].position) - 1) < 1e-3); // true
+physics.dispose();
+```
+
 ## Parity with Rapier 3D
 
 Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table shows what is left until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
@@ -906,7 +931,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |
 | Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full |
 | Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full |
-| Multibody (reduced-coordinate) joints and inverse kinematics | none | missing |
+| Multibody (reduced-coordinate) joints and inverse kinematics | `addMultibody`, `coordinates`, `setCoordinates`, `inverseKinematics` | full |
 | Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |
 | PID controller | `PidController` | full |

@@ -31,6 +31,7 @@ import { colliderGeometry } from '../mesh-fit.js';
 import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
+import { Multibody, buildMultibody, clearMultibody, type MultibodyLinkOptions } from './multibody.js';
 import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
 import { type NextJointOptions, type PhysicsJoint, createJoint } from './joint.js';
 import {
@@ -357,6 +358,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Pair rows of one `contactPoints` call, kept between calls. */
   private readonly rowScratch: number[] = [];
   private readonly joints = new Set<PhysicsJoint>();
+  private readonly multibodies = new Set<Multibody>();
   private readonly byMesh = new Map<Mesh, PhysicsBody>();
   private readonly byRow = new Map<number, PhysicsCollider>();
   // A hull's rows stay for the world's life, so colliders built from the same points share one.
@@ -846,6 +848,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   removeBody(body: PhysicsBody): void {
     if (!this.bodies.has(body)) return;
     for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
+    for (const multibody of this.multibodies) if (multibody.root === body || multibody.links.some((link) => link.body === body)) this.removeMultibody(multibody);
     for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const collider of body.colliders) this.byRow.delete(collider.handle);
     this.bodies.delete(body);
@@ -907,9 +910,31 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.joints.add(joint);
     return joint;
   }
+  /**
+   * Holds a tree of bodies to reduced coordinates, Rapier's multibody joints: the `root` and `links`, each link a body, the body
+   * it hangs from (default the link before it) and a joint of locks (`fixed`, `revolute`, `prismatic`, `spherical` or
+   * `generic`) between them. The joints are made here and are ordinary joints too, with their limits and motors; the tree
+   * holds them exactly, so they cannot drift open and a branch is as stiff as a chain.
+   * @throws MargoError (`state`) for a body in another multibody, a parent not in the tree yet, or a loop.
+   * @throws RangeError for a tree past 39 links or 64 joint speeds.
+   */
+  addMultibody(root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody {
+    for (const body of [root, ...links.map((link) => link.body), ...links.flatMap((link) => (link.parent ? [link.parent] : []))])
+      if (!this.bodies.has(body)) throw new MargoError('state', 'Every body of a multibody must belong to this physics world; add it with physics.addBody first.');
+    const multibody = buildMultibody(this, root, links);
+    this.multibodies.add(multibody);
+    return multibody;
+  }
+  /** @internal use `multibody.remove`. */
+  removeMultibody(multibody: Multibody): void {
+    if (!this.multibodies.delete(multibody)) return;
+    clearMultibody(this.kernel, multibody);
+    multibody.markRemoved();
+  }
   /** @internal use `joint.remove`. */
   removeJoint(joint: PhysicsJoint): void {
     if (!this.joints.delete(joint)) return;
+    for (const multibody of this.multibodies) if (multibody.links.some((link) => link.joint === joint)) this.removeMultibody(multibody);
     this.kernel.removeJoint(joint.row);
     joint.markRemoved();
   }

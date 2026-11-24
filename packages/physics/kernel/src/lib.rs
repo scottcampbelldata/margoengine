@@ -22,6 +22,7 @@ pub mod layout;
 pub mod mass;
 pub mod math;
 pub mod memory;
+pub mod multibody;
 pub mod mesh;
 pub mod pair;
 pub mod narrow;
