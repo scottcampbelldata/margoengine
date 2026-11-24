@@ -165,10 +165,32 @@ test('E57 images2D: pinhole, spherical and cylindrical pictures come back with b
         height: 480,
         scan: 0,
         pose,
-        parameters: { focalLength: 0.0035, pixelWidth: 5e-6, pixelHeight: 5e-6, principalPointX: 320, principalPointY: 240 },
+        parameters: {
+          focalLength: 0.0035,
+          pixelWidth: 5e-6,
+          pixelHeight: 5e-6,
+          principalPointX: 320,
+          principalPointY: 240,
+        },
       },
-      { name: 'pano', data: png, format: 'png', projection: 'spherical', width: 4096, height: 2048, mask, parameters: { pixelWidth: 0.001 } },
-      { data: jpeg, format: 'jpeg', projection: 'cylindrical', width: 100, height: 50, parameters: { radius: 2, principalPointY: 25 } },
+      {
+        name: 'pano',
+        data: png,
+        format: 'png',
+        projection: 'spherical',
+        width: 4096,
+        height: 2048,
+        mask,
+        parameters: { pixelWidth: 0.001 },
+      },
+      {
+        data: jpeg,
+        format: 'jpeg',
+        projection: 'cylindrical',
+        width: 100,
+        height: 50,
+        parameters: { radius: 2, principalPointY: 25 },
+      },
     ],
   });
   const e57 = parseE57(file);
@@ -210,6 +232,10 @@ function corruptBlob(file) {
     xml = new TextDecoder().decode(bytes.subarray(readE57Header(bytes).xmlOffset)),
     offset = Number(/pngImage type="Blob" fileOffset="(\d+)"/.exec(xml)[1]);
   bytes[offset] = 9; // the section id
-  new DataView(bytes.buffer).setUint32(Math.floor(offset / 1024) * 1024 + 1020, crc32c(bytes.subarray(Math.floor(offset / 1024) * 1024, Math.floor(offset / 1024) * 1024 + 1020)), false);
+  new DataView(bytes.buffer).setUint32(
+    Math.floor(offset / 1024) * 1024 + 1020,
+    crc32c(bytes.subarray(Math.floor(offset / 1024) * 1024, Math.floor(offset / 1024) * 1024 + 1020)),
+    false,
+  );
   return bytes;
 }
