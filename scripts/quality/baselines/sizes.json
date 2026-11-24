@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17568325,
+  "total": 17595878,
   "history": [
     {
       "date": "2026-10-24",
@@ -11427,6 +11427,12 @@
       "commit": "022bcb703",
       "reason": "soft entry now meets every collider shape through the kernel swept particle probe instead of its own primitive tests: entry 18,392 to 18,814 B gzip, lazy kernel chunk 9,839 to 10,202 B (staged step exports and the shared contact resolve). Needed for parity with Rapier contacts against every shape.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "906a2f0f7",
+      "reason": "Soft body collision: Physics.softContacts and the probe buffers in the physics kernel (physics 246,854 to 249,605 B), cloth contacts in the soft kernel (collide.rs and kernel-common cloth.rs; the lazy soft kernel 10,509 to 18,618 B with its column table, the soft entry 19,379 to 27,207 B)",
+      "grew": 3
     }
   ],
   "items": {
@@ -12182,13 +12188,13 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 246854,
+    "@margoengine/physics": 257094,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 19379,
+    "@margoengine/physics/soft": 28024,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 7926,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 10509,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 19177,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
