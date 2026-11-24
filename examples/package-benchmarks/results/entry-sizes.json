@@ -1,10 +1,10 @@
 {
-  "commit": "4aec617e0",
+  "commit": "8fb3b07b38",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 60994,
-    "gzip": 24811,
+    "raw": 60984,
+    "gzip": 24797,
     "limit": 25000
   },
   "packages": {
@@ -922,12 +922,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53125,
-        "gzip": 22163
+        "raw": 53121,
+        "gzip": 22179
       },
       "./extension": {
-        "raw": 53303,
-        "gzip": 22260
+        "raw": 53302,
+        "gzip": 22248
       }
     },
     "@margoengine/creative": {
@@ -936,8 +936,8 @@
         "gzip": 3089
       },
       ".": {
-        "raw": 64760,
-        "gzip": 19601
+        "raw": 65398,
+        "gzip": 19649
       },
       "./particles": {
         "raw": 1138,
@@ -956,20 +956,20 @@
         "gzip": 7183
       },
       "./grass": {
-        "raw": 18432,
-        "gzip": 6482
+        "raw": 18722,
+        "gzip": 6500
       },
       "./grass-settings": {
         "raw": 4081,
         "gzip": 1814
       },
       "./planet": {
-        "raw": 21273,
-        "gzip": 7263
+        "raw": 21501,
+        "gzip": 7278
       },
       "./stars": {
-        "raw": 5925,
-        "gzip": 2562
+        "raw": 6045,
+        "gzip": 2575
       },
       "./planet-atmosphere": {
         "raw": 7081,
@@ -1304,8 +1304,8 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 98959,
-        "gzip": 32165
+        "raw": 101610,
+        "gzip": 32651
       },
       "./probes": {
         "raw": 52917,
@@ -13312,8 +13312,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 369703,
-        "gzip": 217697
+        "raw": 396248,
+        "gzip": 232979
       },
       "./decomposition": {
         "raw": 26455,
@@ -13322,8 +13322,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 53504,
-        "gzip": 18170
+        "raw": 53658,
+        "gzip": 18212
       },
       "./outline": {
         "raw": 4782,
@@ -15017,7 +15017,7 @@
       },
       "./lights": {
         "raw": 3700,
-        "gzip": 1701
+        "gzip": 1698
       },
       "./scene": {
         "raw": 7696,
@@ -15025,7 +15025,7 @@
       },
       "./viewer-extras": {
         "raw": 25920,
-        "gzip": 9804
+        "gzip": 9814
       }
     },
     "@margoengine/stats": {
@@ -16526,9 +16526,9 @@
       "brotli": 6477
     },
     "packages/environment/dist/index.js": {
-      "raw": 98959,
-      "gzip": 32165,
-      "brotli": 28256
+      "raw": 101610,
+      "gzip": 32651,
+      "brotli": 28655
     },
     "packages/shadows/dist/index.js": {
       "raw": 65026,
@@ -16556,9 +16556,9 @@
       "brotli": 12604
     },
     "packages/physics/dist/index.js": {
-      "raw": 369703,
-      "gzip": 217697,
-      "brotli": 209956
+      "raw": 396248,
+      "gzip": 232979,
+      "brotli": 224900
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16786,9 +16786,9 @@
       "brotli": 5202
     },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 382158,
-      "gzip": 138566,
-      "brotli": 110616
+      "raw": 407438,
+      "gzip": 147599,
+      "brotli": 117595
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -16938,21 +16938,21 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 131730,
-        "gzip": 42856
+        "raw": 142064,
+        "gzip": 46160
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 237972,
-        "gzip": 174772,
+        "raw": 254183,
+        "gzip": 186944,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 49465,
-        "gzip": 16602
+        "raw": 49619,
+        "gzip": 16645
       },
       "lazy": {
         "name": "2D physics kernel loader JavaScript",
