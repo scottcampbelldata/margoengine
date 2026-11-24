@@ -11694,14 +11694,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   when loadAuto returns it forgets everything. The same load now holds 104,867,300 B (one copy). Regression:
   `packages/gltf/test/auto.test.js` ("downloaded once and held once"; the declared-length move keeps the redirect URL).
 
-### Open: loadAuto on an engine with no GPU device reports gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
+### Fixed 2026-11-24: loadAuto on an engine with no GPU device reported gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
 
-- **Repro (by reading):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour
-  map: `gltf/textured` refuses with `unsupported` (it names `install()` from `@margoengine/webgl2-compat`), `loadAuto`
-  moves to gltf/pbr, which fails with `PBRModel requires WebGPU`, and the first reason is dropped.
-- **Cause:** `loadAuto` moves on any `unsupported` refusal without checking that gltf/pbr can run on the engine. The
-  current test "a texture on WebGL does too" (`packages/gltf/test/auto.test.js`) asserts the move, so changing it is
-  a decision on what loadAuto should do on an engine without a GPU device.
+- **Repro (before):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour map:
+  `gltf/textured` refused with `unsupported` (naming `install()` from `@margoengine/webgl2-compat`), `loadAuto` moved to
+  gltf/pbr, which failed with `PBRModel requires WebGPU`, and the first reason was dropped.
+- **Cause:** the move to gltf/pbr rethrew its error as it was.
+- **Fix:** when gltf/pbr also refuses with `unsupported`, `loadAuto` throws an `unsupported` MargoError whose message is
+  the light loader's reason followed by `gltf/pbr cannot load it here either: <gltf/pbr's message>`. The move itself is
+  unchanged, so engines with a device still reach gltf/pbr (the existing "a texture on WebGL does too" test holds).
+- **Regression:** packages/gltf/test/auto.test.js ("with no GPU device for gltf/pbr either ...").
 
 ### Fixed 2026-11-19: a node with a zero scale on any axis stopped the whole glTF load, in both loaders (KB-GLTFA B1, core + gltf)
 

@@ -212,11 +212,19 @@ async function choose(
           !doc || uses(doc, 'EXT_mesh_gpu_instancing')
             ? { instancing: (await import('@margoengine/gltf/pbr-instancing')).instancing }
             : undefined;
-      return {
-        loader: 'gltf/pbr',
-        model: await scope.run(() => pro.loadGLTF(engine, target, decoders ? { ...options, decoders } : options)),
-        reason,
-      };
+      try {
+        return {
+          loader: 'gltf/pbr',
+          model: await scope.run(() => pro.loadGLTF(engine, target, decoders ? { ...options, decoders } : options)),
+          reason,
+        };
+      } catch (error) {
+        // gltf/pbr cannot run here either (no WebGPU device): say why the light loader let go of the file first, since
+        // its reason names the fix (KB-GLTFA B17).
+        if (error instanceof MargoError && error.code === 'unsupported' && !error.message.includes(reason))
+          throw new MargoError('unsupported', `${reason}; gltf/pbr cannot load it here either: ${error.message}`);
+        throw error;
+      }
     };
   let data: Uint8Array;
   try {

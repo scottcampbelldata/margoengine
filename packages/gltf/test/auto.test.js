@@ -8,6 +8,7 @@ import { loadAuto } from '../dist/auto.js';
 import { sceneData } from '../dist/scene-data.js';
 import { encodeAttributes } from '../../decoders/tests/support/meshopt-encode.js';
 import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.js';
+import { MargoError } from '@margoengine/math/errors';
 
 // Stands in for gltf/pbr, which needs a GPU; the real one runs in scripts/test-gltf-browser.mjs.
 registerHooks({
@@ -319,6 +320,34 @@ test('a material the light entries refuse moves on; a texture on WebGL does too'
     assert.match(result.reason, /WebGPU/);
     assert.equal(calls, 2);
     assert.equal(engine.meshes.size, 0);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('with no GPU device for gltf/pbr either, the error carries the light loader reason first (KB-GLTFA B17)', async (t) => {
+  globalThis.loadPro = async () => {
+    throw new MargoError('unsupported', 'PBRModel requires WebGPU; use a browser that supports it');
+  };
+  t.after(() => delete globalThis.loadPro);
+  withBitmaps(t);
+  const { engine } = await headlessEngine();
+  try {
+    const png = new Uint8Array([137, 80, 78, 71]),
+      mapped = documentOf([positions, normals, new Float32Array(6), png], {
+        accessors: [...accessors, { bufferView: 2, componentType: 5126, count: 3, type: 'VEC2' }],
+        images: [{ bufferView: 3, mimeType: 'image/png' }],
+        textures: [{ source: 0 }],
+        materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+        meshes: [{ primitives: [{ attributes: { ...primitive.attributes, TEXCOORD_0: 2 }, material: 0 }] }],
+        nodes: [{ mesh: 0 }],
+      });
+    await assert.rejects(loadAuto(engine, url, server(fileOf(mapped))), (error) => {
+      assert.equal(error.code, 'unsupported');
+      assert.match(error.message, /^(?!PBRModel requires WebGPU)/, 'the light loader reason leads');
+      assert.match(error.message, /gltf\/pbr cannot load it here either: PBRModel requires WebGPU/);
+      return true;
+    });
   } finally {
     engine.dispose();
   }
