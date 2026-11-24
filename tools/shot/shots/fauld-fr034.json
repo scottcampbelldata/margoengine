@@ -68,12 +68,16 @@
       ],
       "size": 3.33
     },
+    "scene": "fauld-tunnels",
+    "about": "fr034 working | Push along bay A1 to a brick blast wall with its steel door (framing of fd038) | 28 mm, dolly 0.6 m/s",
     "probes": {
-      "still": 3.3333333333333335
+      "mid": 3.3333333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr034",
         "state": "working",
         "focal": 28.0,

@@ -68,12 +68,16 @@
       ],
       "size": 0.1
     },
+    "scene": "fauld-tunnels",
+    "about": "fr122 blast | The spark held, then the frame whites out | 100 mm, push in",
     "probes": {
-      "still": 3.0416666666666665
+      "mid": 3.0416666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr122",
         "state": "blast",
         "focal": 100.0,

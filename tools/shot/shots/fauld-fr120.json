@@ -11,9 +11,9 @@
         {
           "time": 0,
           "position": [
-            178.5,
-            1.7,
-            -3.5
+            178.0,
+            1.56,
+            -5.3
           ],
           "target": [
             179.3,
@@ -25,9 +25,9 @@
         {
           "time": 6.083333333333333,
           "position": [
-            178.8,
-            1.65,
-            -3.7
+            178.3,
+            1.51,
+            -5.2
           ],
           "target": [
             179.3,
@@ -68,12 +68,16 @@
       ],
       "size": 0.33
     },
+    "scene": "fauld-tunnels",
+    "about": "fr120 working | The probable cause: a kneeling armourer at a fuze pocket with a brass chisel, seen from behind | 50 mm over the shoulder, slow push",
     "probes": {
-      "still": 3.0416666666666665
+      "mid": 3.0416666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr120",
         "state": "working",
         "focal": 50.0,

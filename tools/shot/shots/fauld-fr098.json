@@ -68,12 +68,16 @@
       ],
       "size": 8.97
     },
+    "scene": "fauld-tunnels",
+    "about": "fr098 after | The main tunnel clearing of smoke, rows of bombs still in place | 35 mm, dolly 0.6 m/s",
     "probes": {
-      "still": 2.9166666666666665
+      "mid": 2.9166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr098",
         "state": "after",
         "focal": 35.0,

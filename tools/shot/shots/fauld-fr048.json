@@ -11,12 +11,12 @@
         {
           "time": 0,
           "position": [
-            177.1,
-            1.18,
-            -5.65
+            178.1,
+            1.13,
+            -6.2
           ],
           "target": [
-            177.1,
+            178.3,
             0.93,
             -7.05
           ],
@@ -25,12 +25,12 @@
         {
           "time": 6.208333333333333,
           "position": [
-            178.3,
-            1.18,
-            -5.65
+            178.7,
+            1.13,
+            -6.2
           ],
           "target": [
-            178.3,
+            178.7,
             0.93,
             -7.05
           ],
@@ -62,18 +62,22 @@
     "warmup": 12,
     "subject": {
       "target": [
-        177.7,
+        178.5,
         0.93,
         -7.05
       ],
-      "size": 0.17
+      "size": 0.1
     },
+    "scene": "fauld-tunnels",
+    "about": "fr048 working | The tool rack: wooden mallet, copper drift, a brass chisel (sm_fc_chisel_brass) | 85 mm, slide 0.3 m/s",
     "probes": {
-      "still": 3.0833333333333335
+      "mid": 3.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr048",
         "state": "working",
         "focal": 85.0,

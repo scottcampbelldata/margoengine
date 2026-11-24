@@ -68,12 +68,16 @@
       ],
       "size": 6.27
     },
+    "scene": "fauld-tunnels",
+    "about": "fr090 yard_fire | A tunnel portal with smoke rolling out, rescuers' lamps inside (framing of fd091) | 35 mm, push in 0.8 m/s",
     "probes": {
-      "still": 3.1666666666666665
+      "mid": 3.1666666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr090",
         "state": "yard_fire",
         "focal": 35.0,

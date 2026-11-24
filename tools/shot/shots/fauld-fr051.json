@@ -68,12 +68,16 @@
       ],
       "size": 0.76
     },
+    "scene": "fauld-tunnels",
+    "about": "fr051 working | The work bay: lamp, bomb, stillness (framing of fd054) | 50 mm, very slow push 0.3 m/s",
     "probes": {
-      "still": 2.5416666666666665
+      "mid": 2.5416666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr051",
         "state": "working",
         "focal": 50.0,

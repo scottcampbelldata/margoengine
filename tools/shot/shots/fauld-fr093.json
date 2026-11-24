@@ -68,12 +68,16 @@
       ],
       "size": 0.87
     },
+    "scene": "fauld-tunnels",
+    "about": "fr093 fire | A bulkhead door bent off its hinges, smoke pouring through | 35 mm, push in 0.4 m/s",
     "probes": {
-      "still": 2.7916666666666665
+      "mid": 2.7916666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr093",
         "state": "fire",
         "focal": 35.0,

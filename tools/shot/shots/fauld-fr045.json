@@ -11,9 +11,9 @@
         {
           "time": 0,
           "position": [
-            168.0,
+            171.6,
             1.15,
-            -3.0
+            -5.3
           ],
           "target": [
             180.0,
@@ -25,9 +25,9 @@
         {
           "time": 4.208333333333333,
           "position": [
-            168.0,
+            171.6,
             1.15,
-            -3.7
+            -5.9
           ],
           "target": [
             180.0,
@@ -66,14 +66,18 @@
         0.8,
         -4.6
       ],
-      "size": 1.44
+      "size": 1.01
     },
+    "scene": "fauld-tunnels",
+    "about": "fr045 working | Two RAF armourers bent over a bomb at the far end, silhouetted | 85 mm through a gap in the stacks, slide",
     "probes": {
-      "still": 2.0833333333333335
+      "mid": 2.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr045",
         "state": "working",
         "focal": 85.0,

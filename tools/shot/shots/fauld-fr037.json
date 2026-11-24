@@ -11,28 +11,28 @@
         {
           "time": 0,
           "position": [
-            56.4,
-            2.45,
-            0.7
+            55.2,
+            2.1,
+            1.6
           ],
           "target": [
-            58.0,
-            2.92,
-            -0.35
+            60.5,
+            2.3,
+            -1.6
           ],
           "fov": 13.586
         },
         {
           "time": 4.791666666666667,
           "position": [
-            56.4,
-            2.45,
-            0.7
+            55.2,
+            2.1,
+            1.6
           ],
           "target": [
-            58.0,
-            2.92,
-            -0.35
+            60.5,
+            2.3,
+            -1.6
           ],
           "fov": 13.586,
           "ease": "smoothstep"
@@ -62,18 +62,22 @@
     "warmup": 12,
     "subject": {
       "target": [
-        58.0,
-        2.92,
-        -0.35
+        60.5,
+        2.3,
+        -1.6
       ],
-      "size": 0.23
+      "size": 0.74
     },
+    "scene": "fauld-tunnels",
+    "about": "fr037 working | A lamp bracket close, bulb glow and dust motes, bombs soft behind | 85 mm f/2, focus pull to the stacks",
     "probes": {
-      "still": 2.4166666666666665
+      "mid": 2.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr037",
         "state": "working",
         "focal": 85.0,

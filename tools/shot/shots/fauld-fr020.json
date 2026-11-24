@@ -11,28 +11,28 @@
         {
           "time": 0,
           "position": [
-            74.0,
+            72.6,
             1.7,
             5.6
           ],
           "target": [
-            66.4,
-            1.6,
-            5.6
+            44.0,
+            1.5,
+            5.4
           ],
           "fov": 39.761
         },
         {
           "time": 4.791666666666667,
           "position": [
-            71.1,
+            69.8,
             1.7,
             5.6
           ],
           "target": [
-            66.4,
-            1.6,
-            5.6
+            44.0,
+            1.5,
+            5.4
           ],
           "fov": 39.761,
           "ease": "smoothstep"
@@ -62,18 +62,22 @@
     "warmup": 12,
     "subject": {
       "target": [
-        66.4,
-        1.6,
-        5.6
+        44.0,
+        1.5,
+        5.4
       ],
-      "size": 2.22
+      "size": 9.84
     },
+    "scene": "fauld-tunnels",
+    "about": "fr020 working | Inside: brick blast walls dividing the bays, lamps along the arch (framing of fd024) | 28 mm, dolly 0.6 m/s",
     "probes": {
-      "still": 2.4166666666666665
+      "mid": 2.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr020",
         "state": "working",
         "focal": 28.0,

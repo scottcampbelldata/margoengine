@@ -68,12 +68,16 @@
       ],
       "size": 5.09
     },
+    "scene": "fauld-tunnels",
+    "about": "fr094 fire | Smoke curling along the arch over the bomb stacks, orange glow | 24 mm, tilt down 8 deg",
     "probes": {
-      "still": 2.75
+      "mid": 2.75
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr094",
         "state": "fire",
         "focal": 24.0,

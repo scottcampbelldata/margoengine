@@ -68,12 +68,16 @@
       ],
       "size": 9.42
     },
+    "scene": "fauld-tunnels",
+    "about": "fr019 yard_day | The store portal in the hillside, rails running into the dark (framing of fd011) | 35 mm, 1.6 m, push in 1 m/s",
     "probes": {
-      "still": 2.4166666666666665
+      "mid": 2.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr019",
         "state": "yard_day",
         "focal": 35.0,

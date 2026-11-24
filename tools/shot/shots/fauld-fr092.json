@@ -68,12 +68,16 @@
       ],
       "size": 0.67
     },
+    "scene": "fauld-tunnels",
+    "about": "fr092 fire | Two rescuers in breathing sets climbing the rubble, lit by their lamps | 50 mm, slide 0.4 m/s",
     "probes": {
-      "still": 2.7916666666666665
+      "mid": 2.7916666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr092",
         "state": "fire",
         "focal": 50.0,

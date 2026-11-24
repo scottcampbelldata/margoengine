@@ -68,12 +68,16 @@
       ],
       "size": 0.31
     },
+    "scene": "fauld-tunnels",
+    "about": "fr025 working | Close along a row of casings: stencils, red bands, dust on the paint (framing of fd028) | 50 mm, slide 0.4 m/s",
     "probes": {
-      "still": 2.75
+      "mid": 2.75
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr025",
         "state": "working",
         "focal": 50.0,

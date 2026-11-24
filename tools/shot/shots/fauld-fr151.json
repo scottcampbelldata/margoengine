@@ -68,12 +68,16 @@
       ],
       "size": 1.11
     },
+    "scene": "fauld-tunnels",
+    "about": "fr151 sealed | A torch beam over fallen rock and a twisted rail in the dark (framing of fd144) | 35 mm, slide 0.4 m/s",
     "probes": {
-      "still": 3.1666666666666665
+      "mid": 3.1666666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr151",
         "state": "sealed",
         "focal": 35.0,

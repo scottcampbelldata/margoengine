@@ -68,12 +68,16 @@
       ],
       "size": 3.5
     },
+    "scene": "fauld-tunnels",
+    "about": "fr021 working | A side bay: bombs on timber baulks, a blast wall closing the end (framing of fd025) | 24 mm low, push in",
     "probes": {
-      "still": 2.4166666666666665
+      "mid": 2.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr021",
         "state": "working",
         "focal": 24.0,

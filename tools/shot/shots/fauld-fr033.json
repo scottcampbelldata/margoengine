@@ -68,12 +68,16 @@
       ],
       "size": 2.88
     },
+    "scene": "fauld-tunnels",
+    "about": "fr033 working | A great vaulted chamber in deep shadow, casings curving away like ribs (framing of fd036) | 24 mm, crane down 0.5 m/s",
     "probes": {
-      "still": 3.4166666666666665
+      "mid": 3.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr033",
         "state": "working",
         "focal": 24.0,

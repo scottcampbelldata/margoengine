@@ -68,12 +68,16 @@
       ],
       "size": 38.19
     },
+    "scene": "fauld-tunnels",
+    "about": "fr124 working | A long tunnel with only a few lamps lit, bays unattended (framing of fd119) | 35 mm, dolly 0.5 m/s",
     "probes": {
-      "still": 3.0833333333333335
+      "mid": 3.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr124",
         "state": "working",
         "focal": 35.0,

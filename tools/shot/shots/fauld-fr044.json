@@ -68,12 +68,16 @@
       ],
       "size": 1.08
     },
+    "scene": "fauld-tunnels",
+    "about": "fr044 working | A work bay deep underground, a bomb on its cradle under a lamp (framing of fd047) | 35 mm, push in 0.5 m/s",
     "probes": {
-      "still": 2.0833333333333335
+      "mid": 2.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr044",
         "state": "working",
         "focal": 35.0,

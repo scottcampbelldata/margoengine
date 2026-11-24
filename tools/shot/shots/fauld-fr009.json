@@ -68,12 +68,16 @@
       ],
       "size": 3.99
     },
+    "scene": "fauld-tunnels",
+    "about": "fr009 working | Low on the rails of the main drift, the line running away between racks of bombs (framing of fd013) | 28 mm, 0.4 m high, dolly forward 0.8 m/s",
     "probes": {
-      "still": 2.75
+      "mid": 2.75
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr009",
         "state": "working",
         "focal": 28.0,

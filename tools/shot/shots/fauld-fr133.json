@@ -68,12 +68,16 @@
       ],
       "size": 7.21
     },
+    "scene": "fauld-tunnels",
+    "about": "fr133 yard_sealed | A tunnel portal bricked up, ivy over concrete, a rusted gate (framing of fd128) | 35 mm, push in 0.6 m/s",
     "probes": {
-      "still": 3.25
+      "mid": 3.25
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr133",
         "state": "yard_sealed",
         "focal": 35.0,

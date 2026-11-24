@@ -68,12 +68,16 @@
       ],
       "size": 1.15
     },
+    "scene": "fauld-tunnels",
+    "about": "fr047 working | A rail wagon of returned bombs in a side tunnel, a tag on each | 35 mm, track 0.8 m/s",
     "probes": {
-      "still": 3.2916666666666665
+      "mid": 3.2916666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr047",
         "state": "working",
         "focal": 35.0,

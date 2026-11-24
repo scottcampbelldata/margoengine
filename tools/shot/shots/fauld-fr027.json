@@ -68,12 +68,16 @@
       ],
       "size": 3.77
     },
+    "scene": "fauld-tunnels",
+    "about": "fr027 working | A crossroads of tunnels, bombs in every direction (framing of fd030) | 18 mm, slow turn 10 deg",
     "probes": {
-      "still": 2.7916666666666665
+      "mid": 2.7916666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr027",
         "state": "working",
         "focal": 18.0,

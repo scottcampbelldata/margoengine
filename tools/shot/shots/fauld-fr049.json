@@ -68,12 +68,16 @@
       ],
       "size": 0.1
     },
+    "scene": "fauld-tunnels",
+    "about": "fr049 working | Insert: a gloved hand reaching to the fuze pocket, lamp flaring behind | 100 mm f/2, push in",
     "probes": {
-      "still": 3.0833333333333335
+      "mid": 3.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr049",
         "state": "working",
         "focal": 100.0,

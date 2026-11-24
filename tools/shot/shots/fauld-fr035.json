@@ -68,12 +68,16 @@
       ],
       "size": 3.8
     },
+    "scene": "fauld-tunnels",
+    "about": "fr035 working | Bay A2 under the bulbs, stacks to the arch, work going on day and night (framing of fd039) | 24 mm, dolly 0.7 m/s",
     "probes": {
-      "still": 2.3333333333333335
+      "mid": 2.3333333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr035",
         "state": "working",
         "focal": 24.0,

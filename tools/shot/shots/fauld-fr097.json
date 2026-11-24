@@ -68,12 +68,16 @@
       ],
       "size": 1.23
     },
+    "scene": "fauld-tunnels",
+    "about": "fr097 fire | A brick blast wall standing whole, dust settling (framing of fd097) | 28 mm, push in 0.5 m/s",
     "probes": {
-      "still": 2.9166666666666665
+      "mid": 2.9166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr097",
         "state": "fire",
         "focal": 28.0,

@@ -68,12 +68,16 @@
       ],
       "size": 1.24
     },
+    "scene": "fauld-tunnels",
+    "about": "fr099 after | Past the intact racks under one working bulb | 50 mm, slide 0.4 m/s",
     "probes": {
-      "still": 2.9166666666666665
+      "mid": 2.9166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr099",
         "state": "after",
         "focal": 50.0,

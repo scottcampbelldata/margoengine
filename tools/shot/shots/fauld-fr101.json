@@ -68,12 +68,16 @@
       ],
       "size": 5.75
     },
+    "scene": "fauld-tunnels",
+    "about": "fr101 flooded | The flooded mine roadway, black water to the pillars, a lamp reflecting | 28 mm, dolly 0.4 m/s",
     "probes": {
-      "still": 2.7083333333333335
+      "mid": 2.7083333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr101",
         "state": "flooded",
         "focal": 28.0,

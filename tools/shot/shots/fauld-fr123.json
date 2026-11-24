@@ -68,12 +68,16 @@
       ],
       "size": 0.75
     },
+    "scene": "fauld-tunnels",
+    "about": "fr123 working | Back to the empty bench, the brass chisel missing from its slot | 35 mm, slide 0.4 m/s",
     "probes": {
-      "still": 3.0833333333333335
+      "mid": 3.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr123",
         "state": "working",
         "focal": 35.0,

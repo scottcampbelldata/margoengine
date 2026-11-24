@@ -68,12 +68,16 @@
       ],
       "size": 1.55
     },
+    "scene": "fauld-tunnels",
+    "about": "fr003 working | Deep in the store: the arched bay, racks of 1000 lb bombs both sides, dust trickling from the corrugated roof in the bulb light (framing of fd004) | 24 mm low, push in 0.6 m/s",
     "probes": {
-      "still": 2.1666666666666665
+      "mid": 2.1666666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr003",
         "state": "working",
         "focal": 24.0,

@@ -11,28 +11,28 @@
         {
           "time": 0,
           "position": [
-            185.0,
+            176.5,
             0.9,
-            -8.4
+            -11.2
           ],
           "target": [
-            185.0,
-            1.4,
-            -12.8
+            186.5,
+            1.2,
+            -11.6
           ],
           "fov": 39.761
         },
         {
           "time": 5.5,
           "position": [
-            185.0,
-            2.5,
-            -8.4
+            176.5,
+            2.3,
+            -11.2
           ],
           "target": [
-            185.0,
-            2.2,
-            -12.8
+            186.5,
+            1.9,
+            -11.6
           ],
           "fov": 39.761,
           "ease": "smoothstep"
@@ -62,18 +62,22 @@
     "warmup": 12,
     "subject": {
       "target": [
-        185.0,
-        1.8,
-        -12.8
+        186.5,
+        1.55,
+        -11.6
       ],
-      "size": 1.59
+      "size": 3.62
     },
+    "scene": "fauld-tunnels",
+    "about": "fr026 working | SAA boxes stacked to the roof in a side bay | 28 mm, crane up 0.5 m/s",
     "probes": {
-      "still": 2.75
+      "mid": 2.75
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr026",
         "state": "working",
         "focal": 28.0,

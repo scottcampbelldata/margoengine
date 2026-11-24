@@ -68,12 +68,16 @@
       ],
       "size": 5.67
     },
+    "scene": "fauld-tunnels",
+    "about": "fr014 working | A long old mine roadway, timber sets and pillars of rock receding into the dark (framing of fd023) | 24 mm, 1.5 m, dolly 0.7 m/s",
     "probes": {
-      "still": 3.25
+      "mid": 3.25
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr014",
         "state": "working",
         "focal": 24.0,

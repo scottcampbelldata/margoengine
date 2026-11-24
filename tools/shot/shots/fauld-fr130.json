@@ -68,12 +68,16 @@
       ],
       "size": 2.37
     },
+    "scene": "fauld-tunnels",
+    "about": "fr130 working | From above the work bay: bench, tool roll and cradle under a hanging lamp (framing of fd123) | 24 mm high, tilt down 8 deg",
     "probes": {
-      "still": 2.5416666666666665
+      "mid": 2.5416666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr130",
         "state": "working",
         "focal": 24.0,

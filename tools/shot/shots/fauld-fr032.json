@@ -68,12 +68,16 @@
       ],
       "size": 0.95
     },
+    "scene": "fauld-tunnels",
+    "about": "fr032 working | A work bay: bench, a single bomb on a cradle, tools laid out (framing of fd035) | 35 mm, push in 0.5 m/s",
     "probes": {
-      "still": 3.4583333333333335
+      "mid": 3.4583333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr032",
         "state": "working",
         "focal": 35.0,

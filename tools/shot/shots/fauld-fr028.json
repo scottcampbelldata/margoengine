@@ -68,12 +68,16 @@
       ],
       "size": 3.25
     },
+    "scene": "fauld-tunnels",
+    "about": "fr028 working | Far down a tunnel: small backlit RAF armourers push a bomb trolley along the rails | 85 mm, slow push",
     "probes": {
-      "still": 2.4166666666666665
+      "mid": 2.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr028",
         "state": "working",
         "focal": 85.0,

@@ -68,12 +68,16 @@
       ],
       "size": 4.09
     },
+    "scene": "fauld-tunnels",
+    "about": "fr150 sealed | A bricked up passage underground, roof collapsed, a rusted casing half buried (framing of fd143) | 28 mm, push in 0.4 m/s",
     "probes": {
-      "still": 3.0833333333333335
+      "mid": 3.0833333333333335
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr150",
         "state": "sealed",
         "focal": 28.0,

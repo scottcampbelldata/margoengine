@@ -68,12 +68,16 @@
       ],
       "size": 3.49
     },
+    "scene": "fauld-tunnels",
+    "about": "fr126 working | Far off down a tunnel, small silhouettes hurrying a trolley of bombs between bays | 85 mm, slow push",
     "probes": {
-      "still": 3.5
+      "mid": 3.5
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr126",
         "state": "working",
         "focal": 85.0,

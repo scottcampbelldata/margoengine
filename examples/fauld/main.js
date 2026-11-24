@@ -1,6 +1,6 @@
 // The Fauld bomb store page (@margoengine/scenes/fauld-tunnels): one shot of the Fauld film, by row of the recut shot
 // list. Query: shot (a row id, frNNN: the camera track of tools/shot/shots/fauld-frNNN.json), t (seconds into the
-// shot; default its still probe), state (the store's lighting state), focal and stop (the lens), w and h (pixels, default the window),
+// shot; default its mid probe), state (the store's lighting state), focal and stop (the lens), w and h (pixels, default the window),
 // library (URL root of the asset library, default /asset-library/). window.fauld drives it for tools/shot and stills.
 import { Engine } from '/packages/core/dist/index.js';
 import { attach } from '/packages/scenes/dist/fauld-tunnels.js';
@@ -54,13 +54,13 @@ try {
     if (time > now) scene.advanceTime(time - now);
     now = Math.max(now, time);
   };
-  // Opened on its own (a still at ?t=, default the still probe), the page puts the camera where the track is then.
+  // Opened on its own (a still at ?t=, default the mid probe), the page puts the camera where the track is then.
   const shotDriven = Boolean(globalThis.__margoShot);
   if (!shotDriven) {
-    const c = camera(Number(q.get('t') ?? file.shot.probes.still ?? 0));
+    const c = camera(Number(q.get('t') ?? file.shot.probes.mid ?? 0));
     scene.frame(c.position, c.target, focal, stop);
-    scene.advanceTime(Number(q.get('t') ?? file.shot.probes.still ?? 0));
-    now = Number(q.get('t') ?? file.shot.probes.still ?? 0);
+    scene.advanceTime(Number(q.get('t') ?? file.shot.probes.mid ?? 0));
+    now = Number(q.get('t') ?? file.shot.probes.mid ?? 0);
   }
   window.fauld = {
     engine,

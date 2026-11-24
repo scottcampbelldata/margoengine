@@ -68,12 +68,16 @@
       ],
       "size": 0.1
     },
+    "scene": "fauld-tunnels",
+    "about": "fr121 working | Insert: a brass chisel against the fuze pocket, slow motion, one spark | 100 mm macro, locked slow push",
     "probes": {
-      "still": 3.0416666666666665
+      "mid": 3.0416666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr121",
         "state": "working",
         "focal": 100.0,

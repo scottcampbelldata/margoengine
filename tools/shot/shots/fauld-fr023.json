@@ -68,12 +68,16 @@
       ],
       "size": 1.78
     },
+    "scene": "fauld-tunnels",
+    "about": "fr023 working | A long bay of stacked bombs, the far end lost in darkness (framing of fd027) | 35 mm, dolly 0.6 m/s",
     "probes": {
-      "still": 2.6666666666666665
+      "mid": 2.6666666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr023",
         "state": "working",
         "focal": 35.0,

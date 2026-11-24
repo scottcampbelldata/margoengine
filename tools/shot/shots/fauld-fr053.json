@@ -68,12 +68,16 @@
       ],
       "size": 9.83
     },
+    "scene": "fauld-tunnels",
+    "about": "fr053 blast | White flash from deep inside the tunnel, the lamps blow out (framing of fd055) | 24 mm, locked push 0.5 m/s",
     "probes": {
-      "still": 2.5
+      "mid": 2.5
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr053",
         "state": "blast",
         "focal": 24.0,

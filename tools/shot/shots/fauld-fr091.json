@@ -68,12 +68,16 @@
       ],
       "size": 5.61
     },
+    "scene": "fauld-tunnels",
+    "about": "fr091 fire | Inside a broken tunnel: collapsed roof, twisted rails, smoke, a lamp beam | 24 mm, dolly 0.4 m/s",
     "probes": {
-      "still": 2.7916666666666665
+      "mid": 2.7916666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr091",
         "state": "fire",
         "focal": 24.0,

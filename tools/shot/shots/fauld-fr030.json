@@ -68,12 +68,16 @@
       ],
       "size": 0.75
     },
+    "scene": "fauld-tunnels",
+    "about": "fr030 working | A trolley of bombs on the narrow gauge, the camera tracking past between the stacks (framing of fd033) | 35 mm, track 1 m/s",
     "probes": {
-      "still": 2.4166666666666665
+      "mid": 2.4166666666666665
     },
     "page": {
       "path": "examples/fauld/index.html",
       "query": {
+        "place": "tunnels",
+        "era": "1944",
         "shot": "fr030",
         "state": "working",
         "focal": 35.0,
