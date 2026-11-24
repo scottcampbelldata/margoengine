@@ -32,6 +32,12 @@ export interface WheelOptions {
   frictionSlip?: number;
   /** Tyre grip sideways (default 1). */
   sideFrictionStiffness?: number;
+  /**
+   * How much of its height above the ground the sideways grip of this wheel turns the chassis by, from 0 (none: it
+   * cannot tip the car over) to 1 (the grip pushes at the tyre and tips it as in life); default 0.1. A tyre that grips
+   * as hard as a `frictionSlip` of 2 or more tips a light car over in a bend unless this is low.
+   */
+  rollInfluence?: number;
   /** This wheel turns with `vehicle.steering` (default false). */
   steer?: boolean;
   /** This wheel receives `vehicle.engineForce` (default true). */
@@ -87,6 +93,14 @@ export interface WheelState {
   contactPoint: [number, number, number] | null;
   /** World contact normal, or null in the air. */
   contactNormal: [number, number, number] | null;
+  /** The collider the wheel stands on, or null in the air. */
+  ground: PhysicsCollider | null;
+  /** Where the suspension is mounted, in world space (the top of its travel). */
+  hardPoint: [number, number, number];
+  /** What the tyre pushed the chassis with along its rolling direction in the last step (drive and brake), in newton seconds. */
+  forwardImpulse: number;
+  /** What the tyre pushed the chassis with sideways in the last step (grip), in newton seconds. */
+  sideImpulse: number;
 }
 
 interface WheelSetup {
@@ -106,6 +120,7 @@ interface WheelSetup {
   maxForce: number;
   slip: number;
   side: number;
+  roll: number;
   // State after the last step.
   contact: boolean;
   length: number;
@@ -114,6 +129,10 @@ interface WheelSetup {
   steering: number;
   point: [number, number, number];
   normal: [number, number, number];
+  ground: PhysicsCollider | null;
+  hard: [number, number, number];
+  forwardImpulse: number;
+  sideImpulse: number;
 }
 
 type V = [number, number, number];
@@ -152,6 +171,11 @@ const unit = (value: Vec3, label: string): V => {
 const positive = (value: unknown, label: string): number => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
     throw new RangeError(`${label} must be a positive finite number`);
+  return value;
+};
+const fraction = (value: unknown, label: string): number => {
+  if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+    throw new RangeError(`${label} must be a number from 0 to 1; use 0.1 for a car that does not tip over.`);
   return value;
 };
 const clamp = (value: number | undefined, min: number, max: number, label: string): number => {
@@ -233,6 +257,7 @@ export class Vehicle implements PhysicsAttachment {
         maxForce: wheel.maxSuspensionForce ?? 6000,
         slip: wheel.frictionSlip ?? 10.5,
         side: wheel.sideFrictionStiffness ?? 1,
+        roll: wheel.rollInfluence === undefined ? 0.1 : fraction(wheel.rollInfluence, 'Wheel rollInfluence'),
         contact: false,
         length: rest,
         force: 0,
@@ -240,6 +265,10 @@ export class Vehicle implements PhysicsAttachment {
         steering: 0,
         point: [0, 0, 0],
         normal: [0, 1, 0],
+        ground: null,
+        hard: [0, 0, 0],
+        forwardImpulse: 0,
+        sideImpulse: 0,
       });
     }
     const mass = chassis.mass;
@@ -298,6 +327,10 @@ export class Vehicle implements PhysicsAttachment {
       steering: w.steering,
       contactPoint: w.contact ? [...w.point] : null,
       contactNormal: w.contact ? [...w.normal] : null,
+      ground: w.contact ? w.ground : null,
+      hardPoint: [...w.hard],
+      forwardImpulse: w.forwardImpulse,
+      sideImpulse: w.sideImpulse,
     };
   }
 
@@ -372,6 +405,7 @@ export class Vehicle implements PhysicsAttachment {
     const own = this.physics;
     const predicate =
       this.predicate && ((_body: PhysicsBody, collider: PhysicsCollider): boolean => this.predicate!(collider));
+    // The springs first, every one seeing the same chassis.
     for (const wheel of this.wheels) {
       const origin = rotate(rotation, wheel.connection).map((c, i) => c + position[i]!) as V,
         down = rotate(rotation, wheel.direction),
@@ -384,13 +418,17 @@ export class Vehicle implements PhysicsAttachment {
           predicate,
         });
       wheel.steering = wheel.steer ? this.steering : 0;
+      wheel.hard = origin;
+      wheel.forwardImpulse = wheel.sideImpulse = 0;
       if (!hit) {
+        wheel.ground = null;
         wheel.contact = false;
         wheel.length = wheel.rest;
         wheel.force = 0;
         continue;
       }
       wheel.contact = true;
+      wheel.ground = hit.collider;
       wheel.point = hit.point;
       wheel.normal = hit.normal;
       const minimum = Math.max(0, wheel.rest - wheel.travel),
@@ -410,7 +448,18 @@ export class Vehicle implements PhysicsAttachment {
       force -= (relative < 0 ? wheel.compression : wheel.relaxation) * relative;
       force = Math.min(wheel.maxForce, Math.max(0, force * mass));
       wheel.force = force;
-      const grip = wheel.slip * force * dt;
+      chassis.applyImpulse([normal[0] * force * dt, normal[1] * force * dt, normal[2] * force * dt], hit.point, false);
+    }
+    // Then drive, brake and grip. Every wheel sees the same chassis, so a wheel that cancelled all of a slide or a roll by
+    // itself would have it cancelled once for each wheel on the ground: the chassis would rock from side to side at every
+    // step, its grip clipped, and a car at rest would not drive at full force. The wheels share it instead.
+    const grounded = this.wheels.filter((wheel) => wheel.contact).length;
+    for (const wheel of this.wheels) {
+      if (!wheel.contact) continue;
+      const normal = wheel.normal,
+        r: V = [wheel.point[0] - centreWorld[0], wheel.point[1] - centreWorld[1], wheel.point[2] - centreWorld[2]],
+        pv = pointVelocity(r),
+        grip = wheel.slip * wheel.force * dt;
       // The wheel's rolling direction: the surface normal crossed with the steered axle, on the ground plane.
       const axle = wheel.steer
           ? rotate(
@@ -426,24 +475,22 @@ export class Vehicle implements PhysicsAttachment {
         axleWorld = rotate(rotation, axle);
       let forward = cross(normal, axleWorld);
       const flat = Math.hypot(forward[0], forward[1], forward[2]);
-      if (flat < 1e-6) {
-        chassis.applyImpulse(
-          [normal[0] * force * dt, normal[1] * force * dt, normal[2] * force * dt],
-          hit.point,
-          false,
-        );
-        continue;
-      }
+      if (flat < 1e-6) continue;
       forward = [forward[0] / flat, forward[1] / flat, forward[2] / flat];
       const side = cross(forward, normal);
       let drive = wheel.drive ? this.engineForce * dt : 0;
       const rolling = dot(forward, pv);
       if (wheel.brake && this.brake > 0) {
-        const stop = -rolling / inverseMass(r, forward),
+        const stop = -rolling / inverseMass(r, forward) / grounded,
           limit = this.brake * dt;
         drive += Math.max(-limit, Math.min(limit, stop));
       }
-      const slide = (-dot(side, pv) / inverseMass(r, side)) * wheel.side;
+      // The grip's push on the chassis is felt at a point drawn up toward the centre of mass by the roll influence, so a
+      // grippy tyre turns the car about its length less than it would at the ground.
+      const up = rotate(rotation, [-wheel.direction[0], -wheel.direction[1], -wheel.direction[2]]),
+        height = dot(r, up) * (1 - wheel.roll),
+        lifted: V = [r[0] - up[0] * height, r[1] - up[1] * height, r[2] - up[2] * height],
+        slide = ((-dot(side, pv) / inverseMass(lifted, side)) * wheel.side) / grounded;
       // The friction circle: drive and grip together stay inside what the load can hold.
       let along = drive,
         across = slide;
@@ -452,12 +499,14 @@ export class Vehicle implements PhysicsAttachment {
         along *= grip / total;
         across *= grip / total;
       }
-      const impulse: V = [
-        normal[0] * force * dt + forward[0] * along + side[0] * across,
-        normal[1] * force * dt + forward[1] * along + side[1] * across,
-        normal[2] * force * dt + forward[2] * along + side[2] * across,
-      ];
-      chassis.applyImpulse(impulse, hit.point, false);
+      wheel.forwardImpulse = along;
+      wheel.sideImpulse = across;
+      chassis.applyImpulse([forward[0] * along, forward[1] * along, forward[2] * along], wheel.point, false);
+      chassis.applyImpulse(
+        [side[0] * across, side[1] * across, side[2] * across],
+        [centreWorld[0] + lifted[0], centreWorld[1] + lifted[1], centreWorld[2] + lifted[2]],
+        false,
+      );
       wheel.rotation += (rolling / wheel.radius) * dt;
     }
   }

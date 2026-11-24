@@ -1216,6 +1216,7 @@ export interface WheelOptions {
     maxSuspensionForce?: number;
     frictionSlip?: number;
     sideFrictionStiffness?: number;
+    rollInfluence?: number;
     steer?: boolean;
     drive?: boolean;
     brake?: boolean;
@@ -1230,6 +1231,10 @@ export interface WheelState {
     steering: number;
     contactPoint: [number, number, number] | null;
     contactNormal: [number, number, number] | null;
+    ground: PhysicsCollider | null;
+    hardPoint: [number, number, number];
+    forwardImpulse: number;
+    sideImpulse: number;
 }
 
 export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, options: MeshCleanOptions): {
