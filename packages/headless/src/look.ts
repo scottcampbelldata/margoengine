@@ -59,6 +59,7 @@ export type LookCheckName =
   | 'penumbra'
   | 'stairs'
   | 'colourEdges'
+  | 'chromaSmear'
   | 'shimmerMoving'
   | 'motionBlur'
   | 'silhouette'
@@ -117,6 +118,7 @@ export const LOOK_CHECKS: Readonly<Record<LookCheckName, { bound: [number, numbe
     penumbra: { bound: [0, 0.7], unit: 'code', about: 'noise standard deviation inside the shadow penumbra mask' },
     stairs: { bound: [0, 1], unit: '%', about: 'strong luma edges that are one pixel stair steps' },
     colourEdges: { bound: [0, 10], unit: '%', about: 'strong colour edges one pixel wide, which 4:2:0 smears' },
+    chromaSmear: { bound: [0, 2], unit: '%', about: 'pixels whose colour moves visibly (CIE76 over 6) when the frame is cut to 4:2:0 chroma' },
     shimmerMoving: { bound: [0, 0.5], unit: '%', about: 'pixels off by over 6 codes after the camera motion is undone' },
     motionBlur: { bound: [0, 5], unit: '%', about: 'fast edges narrower than half their travel in a frame' },
     silhouette: { bound: [80, 100], unit: '%', about: 'subject outline with at least 15 L* against what is behind' },
@@ -1296,6 +1298,7 @@ export function checkProbe(
   );
   run('stairs', null, () => stairs(frame, { bound: b('stairs') }));
   run('colourEdges', null, () => colourEdges(frame, { bound: b('colourEdges') }));
+  run('chromaSmear', null, () => chromaSmear(frame, { bound: b('chromaSmear') }));
   run('shimmerMoving', probe.moving ? null : 'the next frame and its motion', () =>
     shimmerMoving(frame, probe.moving!, { bound: b('shimmerMoving') }),
   );
@@ -1699,6 +1702,7 @@ export const LOOK_FAMILY_BOUNDS: Readonly<Record<string, Readonly<Record<string,
     crush: [0, 0.1] as [number, number],
     reference: [0, 0.04] as [number, number],
     colourEdges: [0, 10] as [number, number],
+    chromaSmear: [0, 2] as [number, number],
     motionBlur: [0, 5] as [number, number],
   }),
 });
@@ -1841,6 +1845,90 @@ export function colourEdges(frame: LookImage, { mask, strong = 24, bound }: Edge
     edges = a.edges + b.edges,
     hard = a.hard + b.hard;
   return result('colourEdges', percent(hard, edges), bound, { edges, hard });
+}
+
+/** Options of {@link chromaSmear}. */
+export interface ChromaSmearOptions extends RegionOptions {
+  /** A pixel whose CIE76 colour difference after the 4:2:0 round trip is over this is smeared. Default 6, clearly visible side by side. */
+  threshold?: number;
+}
+
+/**
+ * T7: percent of the pixels whose colour moves visibly when the frame is cut to 4:2:0 chroma, as a platform's H.264
+ * encode does before any quantisation. The frame goes to BT.709 Y'CbCr (full range), Cb and Cr are averaged over
+ * each 2 x 2 block (the frame's edge blocks use the pixels they have) and read back with the bilinear sampling a
+ * player uses (the block centres, linear between them), and each pixel's CIE76 difference is counted over
+ * `threshold`. It needs no encoder, so it runs on any frame, and finds the colour detail an encode will lose: where
+ * {@link colourEdges} counts the edges that are one pixel wide, this counts what that loss does.
+ */
+export function chromaSmear(frame: LookImage, { mask, threshold = 6, bound }: ChromaSmearOptions = {}): LookResult {
+  const { width, height, data } = frame,
+    n = width * height,
+    inside = maskBits(frame, mask, 'chromaSmear'),
+    Y = new Float32Array(n),
+    cb = new Float32Array(n),
+    cr = new Float32Array(n);
+  for (let i = 0, j = 0; i < n; i++, j += 4) {
+    const r = data[j],
+      g = data[j + 1],
+      b = data[j + 2],
+      y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    Y[i] = y;
+    cb[i] = (b - y) / 1.8556;
+    cr[i] = (r - y) / 1.5748;
+  }
+  const bw = (width + 1) >> 1,
+    bh = (height + 1) >> 1,
+    blockCb = new Float32Array(bw * bh),
+    blockCr = new Float32Array(bw * bh);
+  for (let by = 0; by < bh; by++)
+    for (let bx = 0; bx < bw; bx++) {
+      let sb = 0,
+        sr = 0,
+        count = 0;
+      for (let y = by * 2; y < Math.min(height, by * 2 + 2); y++)
+        for (let x = bx * 2; x < Math.min(width, bx * 2 + 2); x++) {
+          sb += cb[y * width + x];
+          sr += cr[y * width + x];
+          count++;
+        }
+      blockCb[by * bw + bx] = sb / count;
+      blockCr[by * bw + bx] = sr / count;
+    }
+  // Block k's chroma sits at pixel 2k + 0.5; a pixel at x reads blocks around (x - 0.5) / 2.
+  const sample = (plane: Float32Array, x: number, y: number) => {
+    const fx = Math.min(Math.max((x - 0.5) / 2, 0), bw - 1),
+      fy = Math.min(Math.max((y - 0.5) / 2, 0), bh - 1),
+      x0 = Math.floor(fx),
+      y0 = Math.floor(fy),
+      x1 = Math.min(x0 + 1, bw - 1),
+      y1 = Math.min(y0 + 1, bh - 1),
+      tx = fx - x0,
+      ty = fy - y0;
+    return (
+      (plane[y0 * bw + x0] * (1 - tx) + plane[y0 * bw + x1] * tx) * (1 - ty) +
+      (plane[y1 * bw + x0] * (1 - tx) + plane[y1 * bw + x1] * tx) * ty
+    );
+  };
+  const clamp = (v: number) => Math.min(255, Math.max(0, v));
+  let counted = 0,
+    smeared = 0;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (!inside[i]) continue;
+      const u = sample(blockCb, x, y),
+        v = sample(blockCr, x, y),
+        r = clamp(Y[i] + 1.5748 * v),
+        b = clamp(Y[i] + 1.8556 * u),
+        g = clamp((Y[i] - 0.2126 * r - 0.0722 * b) / 0.7152),
+        j = i * 4,
+        [L0, a0, b0] = lab(data[j], data[j + 1], data[j + 2]),
+        [L1, a1, b1] = lab(r, g, b);
+      counted++;
+      if (Math.hypot(L0 - L1, a0 - a1, b0 - b1) > threshold) smeared++;
+    }
+  return result('chromaSmear', percent(smeared, counted), bound, { pixels: counted, smeared });
 }
 
 /** Options of {@link penumbra}. */

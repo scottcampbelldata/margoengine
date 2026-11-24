@@ -14,6 +14,7 @@ import {
   bounce,
   checkProbe,
   checkShot,
+  chromaSmear,
   colourEdges,
   depthFromDistance,
   detailKeptFloor,
@@ -451,4 +452,20 @@ test('checkShot reads lookFamily from the manifest header and a probe moving pai
   const short = { ...files, 'probes/a.motion.f32': new Uint8Array(8) };
   await assert.rejects(checkShot({ manifest: { probes }, read: async (p) => short[p] }), RangeError);
   await assert.rejects(checkShot({ manifest: { header: { lookFamily: 'cinematic' }, probes }, read }), RangeError);
+});
+
+test('T7 chroma smear: one pixel colour stripes move visibly at 4:2:0, flat and smooth colour do not', () => {
+  const red = [200, 40, 30],
+    green = [40, 170, 60],
+    stripes = chromaSmear(image(64, 64, (x) => ((x & 1) === 0 ? red : green))),
+    wide = chromaSmear(image(64, 64, (x) => (((x >> 3) & 1) === 0 ? red : green))),
+    flat = chromaSmear(image(64, 64, red)),
+    ramp = chromaSmear(image(64, 64, (x) => mix(red, green, x / 63)));
+  assert.ok(stripes.value > 80 && !stripes.pass, `stripes ${stripes.value}`);
+  assert.ok(wide.value > 10 && wide.value < 25, `eight pixel stripes ${wide.value}: only the pixels beside each hard edge move`);
+  assert.equal(flat.value, 0);
+  assert.equal(ramp.value, 0, 'a smooth ramp survives');
+  assert.equal(stripes.detail.pixels, 64 * 64);
+  const half = chromaSmear(image(64, 64, (x) => ((x & 1) === 0 ? red : green)), { mask: mask(64, 64, (x) => x < 32) });
+  assert.equal(half.detail.pixels, 64 * 32);
 });

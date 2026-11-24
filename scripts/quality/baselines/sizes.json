@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17549060,
+  "total": 17549411,
   "history": [
     {
       "date": "2026-10-24",
@@ -11858,7 +11858,7 @@
     "@margoengine/headless/ffmpeg-files": 4632,
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 15605,
+    "@margoengine/headless/look": 15956,
     "@margoengine/headless/null": 2977,
     "@margoengine/headless/stage": 3396,
     "@margoengine/headless/tiles": 2466,

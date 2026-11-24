@@ -48,6 +48,10 @@ export interface CheckedProbe {
     })[];
 }
 
+export interface ChromaSmearOptions extends RegionOptions {
+    threshold?: number;
+}
+
 export interface CrushOptions {
     dark?: LookMask;
     level?: number;
@@ -129,7 +133,7 @@ export interface LightsOptions {
 
 export type LookBound = number | readonly [number, number];
 
-export type LookCheckName = 'skyClip' | 'grain' | 'speckle' | 'banding' | 'flat' | 'blocks' | 'horizonSeam' | 'waterSeam' | 'lights' | 'foamEdges' | 'crush' | 'flicker' | 'shimmer' | 'nan' | 'backends' | 'reference' | 'penumbra' | 'stairs' | 'colourEdges' | 'shimmerMoving' | 'motionBlur' | 'silhouette' | 'silhouetteShape' | 'bounce' | 'shadowTint' | 'nightLuma' | 'nightPeak';
+export type LookCheckName = 'skyClip' | 'grain' | 'speckle' | 'banding' | 'flat' | 'blocks' | 'horizonSeam' | 'waterSeam' | 'lights' | 'foamEdges' | 'crush' | 'flicker' | 'shimmer' | 'nan' | 'backends' | 'reference' | 'penumbra' | 'stairs' | 'colourEdges' | 'chromaSmear' | 'shimmerMoving' | 'motionBlur' | 'silhouette' | 'silhouetteShape' | 'bounce' | 'shadowTint' | 'nightLuma' | 'nightPeak';
 
 export type LookImage = HeadlessPixels;
 
@@ -255,6 +259,8 @@ export function checkProbe(probe: LookProbe, bounds?: Readonly<Record<string, Lo
 })[];
 
 export function checkShot({ manifest, read, signal, pitch, pixelsPerDegree, ...report }: CheckShotOptions): Promise<LookReport>;
+
+export function chromaSmear(frame: LookImage, { mask, threshold, bound }?: ChromaSmearOptions): LookResult;
 
 export function colourEdges(frame: LookImage, { mask, strong, bound }?: EdgeOptions): LookResult;
 

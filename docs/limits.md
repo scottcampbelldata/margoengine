@@ -8300,7 +8300,7 @@ filtered, and the motion is the camera's alone, so rain, sea and cloud leave a r
 `shadowTint` run on real shots (`tools/shot/test/look-masks-check.mjs`). Limits of those masks: the visibility is the
 sun's alone (local lights' shadows do not count), a coloured shadow counts by its luminance, ground is a normal within
 45 degrees of up facing the sun with a cosine of at least 0.2, and only gltf/pbr models and materials meshes can be the
-subject (core meshes draw in one pass). The decoded-master colour edges are not written yet. `stairs` and `colourEdges` read the frame alone. Their first test judged a step against the climb along its own row and
+subject (core meshes draw in one pass). `chromaSmear` (2026-11-24) measures the 4:2:0 loss on any frame without an encoder: BT.709 full range Y'CbCr, 2 x 2 chroma averages, bilinear read back; real players and encoders differ in filters and quantisation, so it bounds the loss from subsampling alone. Colour edges against a real decoded master are still unwritten. `stairs` and `colourEdges` read the frame alone. Their first test judged a step against the climb along its own row and
 read 15 percent on a 16 sample per pixel frame (an antialiased edge near a pixel axis has one partial pixel per row); they
 now look for a value between the plateaus (KB-LOOK-STAIRS-REAL1). Storm-light at 720 x 1280, whole frame: msaa 1 5.70 (30.6 by the old test)
 percent, msaa 4 at supersample 1, 1.5 and 2 0.10, 0.00 and 0.01 percent, the 16 sample reference 0.00 percent, against
