@@ -258,10 +258,13 @@ docs/fuel.md, vfx fire-front).
 The hills round Hanbury and Fauld on the real ground (Ordnance Survey OS Terrain 50, tiles SK12, SK13, SK22 and SK23,
 resampled to 5 m; Open Government Licence v3.0, "Contains OS data (c) Crown copyright and database right"), the farm
 quilt of `@margoengine/biomes/farmland` (hedged fields, hedge oaks, ashes and hollies, lanes that end at a junction, the
-edge or a gate), woods, a November sky, clouds and weather. `fauld-crater` stamps the 1944 crater (`era: '1944'`) or the
-wooded hollow today (`era: 'today'`) into the ground from its model. Trees, hedges and the crater are library models
-(served from `library`, default `/asset-library/`); buildings and cattle have slots (`FAULD_SLOTS`) and draw nothing until
-their models exist. Origin: the crater's centre, OS grid E 418225, N 327725; x east, z south.
+edge or a gate), hedgerows and woods grown by the biome view from library trees with Poly Haven bark maps, fields,
+lanes, mud and woodland floor from Poly Haven ground scans (CC0) at their own repeats, and an overcast late-November
+sky, clouds and weather calibrated to photographs of the area. `fauld-crater` stamps the 1944 crater (`era: '1944'`, bare
+marl and gypsum) or the wooded hollow today (`era: 'today'`) into the terrain from its model's heights. Models, scans and
+the height grid are served from `library` (default `/asset-library/`, which holds `margo-library/fauld/` and `dem/`);
+buildings and cattle have slots (`FAULD_SLOTS`) and draw nothing until their models exist. Origin: the crater's centre,
+OS grid E 418225, N 327725; x east, z south.
 
 ```ts
 import { Engine } from 'margoengine';
@@ -284,11 +287,14 @@ console.log(typeof show, FAULD_PLACES.hanbury, Object.keys(FAULD_SLOTS).length);
 | `era` | `before` (countryside), `1944` (crater) | `before`, `1944` or `today` |
 | `sky` | `lowSun` | `dawn`, `lowSun`, `overcast`, `grey`, `dusk`, `night`, `snow`, `rain` or `mist` |
 | `hour` | by `sky` | local solar time on 27 November |
-| `focus`, `radius` | `[0, 0]`, 1,200 | hedges and hedge trees are drawn within `radius` metres of `focus` |
+| `focus` | `[0, 0]` | the shot's subject (the shot files keep it) |
+| `radius` | 2,500 | how far round the camera the view grows plants (hedges, trees, woods), 200 to 3,000 m |
 | `dem`, `library` | under `/asset-library/` | the height grid and the model library |
 
 Shot files for the film's crater and countryside rows: `node tools/shot/fauld-shots.mjs` (from the recut shot list);
-stills: `node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder>`.
+stills through the shot tool, which adds the page's ground under each camera (`shot.page.ground`):
+`node tools/shot/cli.mjs tools/shot/shots/fauld-fr008.json --stills --out <folder>`, or by hand
+`node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder>`.
 
 ## Look families: one call, every package
 

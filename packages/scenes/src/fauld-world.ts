@@ -3,16 +3,16 @@
 // from Ordnance Survey OS Terrain 50 (tiles SK12, SK13, SK22, SK23; Open Government Licence v3.0, "Contains OS data
 // (c) Crown copyright and database right"), resampled to 5 m, with the 1944 or today crater stamped in from its own
 // model; the English lowland farm quilt of @margoengine/biomes/farmland over it (hedged fields, hedge trees, lanes ending
-// at junctions, the edge or gates); hedges and hedge trees drawn from library models (Blender, Sapling Tree Gen) as
-// instances round the shot's focus; woods of the same models through the biome mesh registry; a winter sky, clouds and
-// weather; slots for the buildings and cattle that come later (Tripo), drawn as nothing until they exist.
+// at junctions, the edge or gates); hedgerows, hedge trees and woods grown by the biome view from library models
+// (Blender, Sapling Tree Gen) with Poly Haven bark maps (CC0); fields, lanes, mud and woodland floor from Poly Haven
+// ground scans (CC0) at their own repeats; an overcast late-November sky, clouds and weather calibrated to photographs
+// of the area; slots for the buildings and cattle that come later (Tripo), drawn as nothing until they exist.
 // Layout: x east, z south, y up, metres; the origin is the crater's centre, OS grid SK 18225 27725 (E 418225,
 // N 327725). Places from the Fauld reference bible (channel-films Docs/fauld-reference-bible.md): Hanbury's church on its
 // hill about 1.2 km west, the crater where Upper Castle Hayes Farm stood, Ford's works and its reservoir down the slope
 // to the north, the Dove valley beyond.
-import { PbrMaterial, type EngineKernel, type Mesh, type Vec3 } from '@margoengine/core';
-import { toGeometry } from '@margoengine/geometry';
-import { BiomeWorld } from '@margoengine/biomes';
+import type { EngineKernel, Mesh, Vec3 } from '@margoengine/core';
+import { BiomeWorld, defineBiome } from '@margoengine/biomes';
 import { BiomeEditor } from '@margoengine/biomes/editor';
 import '@margoengine/biomes/splines';
 import {
@@ -23,9 +23,7 @@ import {
   lowlandFarmWorld,
   type Farmland,
 } from '@margoengine/biomes/farmland';
-import { BiomeView, type BiomeViewOptions } from '@margoengine/biomes/view';
-import { ScatterInstances, type ScatterBatch } from '@margoengine/scatter';
-import { pbrVertexStream } from '@margoengine/geometry';
+import { BiomeView, type BiomeViewOptions, type GroundImage, type MaterialLook } from '@margoengine/biomes/view';
 import { DAY_PRESETS } from '@margoengine/sky/day-presets';
 import { PresetScene, SCENE_PRESETS } from '@margoengine/sky/scenes';
 import { degrees, sunPath } from '@margoengine/sky/sun';
@@ -35,6 +33,7 @@ import { WeatherDrive } from '@margoengine/weather/drive';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
 import { libraryMesh, type LibraryMeshPart } from './library-mesh.js';
+import { libraryParts } from './library-parts.js';
 
 /** World size, metres. */
 export const FAULD_SIZE = 6400;
@@ -78,9 +77,9 @@ export interface FauldWorldSettings {
   readonly sky?: FauldSky;
   /** Local solar time, hours. Default by `sky`. */
   readonly hour?: number;
-  /** Where hedges and hedge trees are drawn round, `[x, z]` metres. Default the crater. */
+  /** The shot's subject, `[x, z]` metres (kept for the shot files; the view draws round the camera). Default the crater. */
   readonly focus?: readonly [number, number];
-  /** Radius of hedges and hedge trees round the focus, metres, 200 to 3,000. Default 1,200. */
+  /** How far round the camera the view grows plants (hedges, trees, woods), metres, 200 to 3,000. Default 2,500. */
   readonly radius?: number;
   /** URL of the height grid (`fauld_sk12_sk23.f32` with its `.json` beside it). Default under `library`. */
   readonly dem?: string;
@@ -109,35 +108,67 @@ export interface FauldWorld extends Disposable {
   dispose(): void;
 }
 
+// Late November at Fauld (52.84 N), calibrated to photographs of the area (channel-films References/fauld/places):
+// mostly overcast, cool grey-green, low contrast, visibility about 8 to 15 km, morning mist in the Dove valley. Fog is
+// the weather's thickness (0.0002 x 100^fog per metre): 0.12 is about 11 km, 0.25 about 6 km, 0.4 about 3 km.
 const SKY: Readonly<
   Record<
     FauldSky,
-    { hour: number; weather: Partial<WeatherState>; preset: 'dawn' | 'goldenHour' | 'noon' | 'overcast' }
+    { hour: number; weather: Partial<WeatherState>; preset: 'dawn' | 'goldenHour' | 'noon' | 'overcast'; clouds: 'stratus' | 'cumulus' }
   >
 > = {
-  dawn: { hour: 8.3, weather: { cloud: 0.35, fog: 0.06, humidity: 0.9, temperature: -2, wind: 1.5 }, preset: 'dawn' },
-  lowSun: { hour: 11.5, weather: { cloud: 0.3, humidity: 0.7, temperature: 3, wind: 3 }, preset: 'goldenHour' },
-  overcast: { hour: 11.2, weather: { ...WEATHER_PRESETS.overcast, fog: 0.04, temperature: 4 }, preset: 'overcast' },
-  grey: { hour: 12.5, weather: { ...WEATHER_PRESETS.overcast, fog: 0.1, temperature: 4 }, preset: 'overcast' },
+  dawn: { hour: 8.7, weather: { cloud: 0.85, fog: 0.25, humidity: 0.92, temperature: -1, wind: 1.5 }, preset: 'overcast', clouds: 'stratus' },
+  lowSun: { hour: 11.5, weather: { cloud: 0.6, fog: 0.12, humidity: 0.75, temperature: 4, wind: 3 }, preset: 'noon', clouds: 'cumulus' },
+  overcast: { hour: 11.2, weather: { ...WEATHER_PRESETS.overcast, cloud: 0.9, fog: 0.14, temperature: 5 }, preset: 'overcast', clouds: 'stratus' },
+  grey: { hour: 12.5, weather: { ...WEATHER_PRESETS.overcast, cloud: 0.95, fog: 0.22, temperature: 4 }, preset: 'overcast', clouds: 'stratus' },
   dusk: {
     hour: 15.9,
-    weather: { cloud: 0.5, fog: 0.06, humidity: 0.85, temperature: 1, wind: 2 },
+    weather: { cloud: 0.7, fog: 0.18, humidity: 0.85, temperature: 1, wind: 2 },
     preset: 'goldenHour',
+    clouds: 'stratus',
   },
-  night: { hour: 19, weather: { cloud: 0.8, fog: 0.1, humidity: 0.9, temperature: 0, wind: 1 }, preset: 'overcast' },
-  snow: { hour: 12, weather: { ...WEATHER_PRESETS.snow }, preset: 'overcast' },
-  rain: { hour: 12, weather: { ...WEATHER_PRESETS.rain, wind: 5 }, preset: 'overcast' },
-  mist: { hour: 8.4, weather: { ...WEATHER_PRESETS.fog, fog: 0.3 }, preset: 'dawn' },
+  night: { hour: 19, weather: { cloud: 0.8, fog: 0.2, humidity: 0.9, temperature: 0, wind: 1 }, preset: 'overcast', clouds: 'stratus' },
+  snow: { hour: 12, weather: { ...WEATHER_PRESETS.snow }, preset: 'overcast', clouds: 'stratus' },
+  rain: { hour: 12, weather: { ...WEATHER_PRESETS.rain, wind: 5 }, preset: 'overcast', clouds: 'stratus' },
+  mist: { hour: 8.6, weather: { ...WEATHER_PRESETS.fog, fog: 0.4 }, preset: 'overcast', clouds: 'stratus' },
 };
 
 /** Hedge shrubs and hedge trees by library file. */
-const MODELS = {
-  hedge: ['hawthorn_a', 'hawthorn_b', 'blackthorn_a'],
-  oak: 'oak',
-  ash: 'ash',
-  birch: 'birch',
-  holly: 'holly',
-} as const;
+const MODELS: Readonly<Record<string, string>> = {
+  oak: 'trees/oak',
+  ash: 'trees/ash',
+  birch: 'trees/birch',
+  holly: 'trees/holly',
+  hazel: 'hedges/hawthorn_b',
+  hawthorn: 'hedges/hawthorn_a',
+  blackthorn: 'hedges/blackthorn_a',
+};
+
+/** Ground scans (Poly Haven, CC0) under `margo-library/fauld/ground/`, the repeat in metres and the winter colour. */
+const GROUND: Readonly<Record<string, { file: string; repeat: number; color: readonly [number, number, number] }>> = {
+  'winter-pasture': { file: 'grass_ground', repeat: 3, color: [0.3, 0.38, 0.19] },
+  'rough-meadow': { file: 'sparse_grass', repeat: 3, color: [0.36, 0.36, 0.22] },
+  plough: { file: 'brown_mud_dry', repeat: 2.5, color: [0.36, 0.25, 0.18] },
+  stubble: { file: 'withered_grass', repeat: 2.5, color: [0.55, 0.48, 0.33] },
+  'lane-gravel': { file: 'gravel_road', repeat: 3, color: [0.42, 0.37, 0.31] },
+  mud: { file: 'mud_forest', repeat: 2.5, color: [0.27, 0.21, 0.15] },
+  'leaf-litter': { file: 'leaves_forest_ground', repeat: 2.5, color: [0.34, 0.26, 0.18] },
+  moss: { file: 'forest_leaves_02', repeat: 2.5, color: [0.27, 0.29, 0.16] },
+  'crater-marl': { file: 'brown_mud_dry', repeat: 3, color: [0.55, 0.5, 0.44] },
+};
+
+/** A ground scan decoded to 1,024 texels a side (the view's layer size). */
+async function groundImage(url: string, signal?: AbortSignal): Promise<GroundImage> {
+  const blob = await (await fetch(url, signal ? { signal } : {})).blob(),
+    size = 1024,
+    bitmap = await createImageBitmap(blob, { resizeWidth: size, resizeHeight: size, resizeQuality: 'high' }),
+    canvas = new OffscreenCanvas(size, size),
+    context = canvas.getContext('2d');
+  if (!context) throw new Error('fauld: no 2D canvas to decode the ground scans');
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return { width: size, height: size, data: context.getImageData(0, 0, size, size).data };
+}
 
 const join = (root: string, path: string) => (root.endsWith('/') ? root : root + '/') + path;
 
@@ -198,6 +229,13 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+/** The 1944 crater's bare marl and gypsum (painted over the bowl and its lip; no plants). */
+const CRATER_SPOIL = defineBiome({
+  id: 'crater-spoil',
+  climate: { height: [100000, null] },
+  ground: [{ material: 'crater-marl' }, { material: 'mud', moisture: [0.85, null] }],
+});
+
 /** Builds the shared Fauld ground, farmland, sky and weather into `engine`. */
 export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorldSettings = {}): Promise<FauldWorld> {
   const era = settings.era ?? 'before',
@@ -205,24 +243,25 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     sky = SKY[skyName],
     seed = settings.seed ?? 1944,
     library = settings.library ?? '/asset-library/',
-    radius = settings.radius ?? 1200,
-    focus = settings.focus ?? [0, 0],
+    radius = settings.radius ?? 2500,
     signal = settings.signal,
     disposers: (() => void)[] = [],
     meshes: Mesh[] = [];
   if (!SKY[skyName]) throw new RangeError(`fauld: unknown sky ${skyName}; pass one of ${Object.keys(SKY).join(', ')}.`);
   if (!['before', '1944', 'today'].includes(era)) throw new RangeError(`fauld: unknown era ${era}; pass 'before', '1944' or 'today'.`);
+  if (!(radius >= 200 && radius <= 3000)) throw new RangeError(`fauld: radius ${radius} is outside 200 to 3,000 metres.`);
   try {
     const demAt = await loadDem(settings.dem ?? join(library, 'dem/os-terrain-50/fauld_sk12_sk23.f32'), signal),
-      fetchPart = (file: string, maxTriangles = 250000) =>
-        libraryMesh(join(library, file), { kind: 'bark', maxTriangles, ...(signal ? { signal } : {}) }),
+      // The crater model gives only its heights (the terrain draws the crater, textured like the ground round it).
       crater =
         era === 'before'
           ? undefined
-          : await fetchPart(
-              `margo-library/fauld/crater/crater_inner_${era === '1944' ? '1944' : 'today'}.gltf`,
-              600000,
-            ),
+          : await libraryMesh(join(library, `margo-library/fauld/crater/crater_inner_${era === '1944' ? '1944' : 'today'}.gltf`), {
+              kind: 'stone',
+              color: [0.5, 0.5, 0.5],
+              maxTriangles: 600000,
+              ...(signal ? { signal } : {}),
+            }),
       bowl = crater ? craterHeights(crater) : undefined;
     // The rim height the crater model's edge meets: the ground's mean round a 250 m circle.
     let rim = 0;
@@ -241,9 +280,8 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
         if (bowl) {
           const c = bowl.at(x, z),
             w = 1 - smooth(150, 200, Math.hypot(x, z));
-          // Inside, the ground sits 1.5 m under the model (the model draws the crater's detail); at the edge it meets
-          // the real ground.
-          if (c !== undefined) h = h * (1 - w) + (c + lift - 1.5) * w;
+          // The crater's own heights inside, easing into the real ground from 150 to 200 m out (no mesh edge, no band).
+          if (c !== undefined) h = h * (1 - w) + (c + lift) * w;
         }
         samples[j * n + i] = h;
       }
@@ -253,8 +291,8 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       size: [FAULD_SIZE, FAULD_SIZE],
       climate: lowlandFarmWorld.climate,
       height: { samples, width: n, depth: n, unit: 'm' },
-      biomes: lowlandFarmWorld.biomes,
-      paint: FARMLAND_PAINT,
+      biomes: [...lowlandFarmWorld.biomes, CRATER_SPOIL],
+      paint: [...FARMLAND_PAINT, { biome: CRATER_SPOIL.id }],
       ...(signal ? { signal } : {}),
     });
     disposers.push(() => world.dispose());
@@ -294,11 +332,13 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       ...(era === 'today' ? [ring(FAULD_PLACES.crater, 200)] : []),
     ]))
       editor.apply(edit);
+    // The fresh crater: bare marl and gypsum thrown out over its bowl and lip (about 230 m across in the RAF survey).
+    if (era === '1944') editor.polygon(CRATER_SPOIL.id, ring(FAULD_PLACES.crater, 175, 48));
     const sun = sunPath({ latitude: degrees(52.84), dayOfYear: 332, hour: settings.hour ?? sky.hour }),
       preset = PresetScene.attach(engine, {
         ...SCENE_PRESETS[sky.preset],
         day: {
-          ...(sky.preset === 'overcast' ? DAY_PRESETS.noon : DAY_PRESETS.goldenHour),
+          ...DAY_PRESETS[sky.preset === 'dawn' ? 'overcast' : sky.preset],
           azimuth: sun.azimuth.degrees,
           elevation: Math.max(skyName === 'night' ? -12 : 1, sun.elevation.degrees),
         },
@@ -317,45 +357,44 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       casterMargin: 300,
     });
     disposers.push(() => shadows.dispose());
-    // Woods: the farm-wood biome's species drawn from the library models (never the procedural stand-ins).
-    const parts: Record<string, LibraryMeshPart> = {};
-    for (const [key, file] of [
-      ['oak', MODELS.oak],
-      ['ash', MODELS.ash],
-      ['birch', MODELS.birch],
-      ['holly', MODELS.holly],
-      ['hazel', MODELS.hedge[0]],
-    ] as const)
-      parts[key] = await fetchPart(`margo-library/fauld/${key === 'hazel' ? 'hedges' : 'trees'}/${file}.gltf`);
-    const tint: Record<string, readonly [number, number, number]> = {
-      oak: [0.11, 0.09, 0.075],
-      ash: [0.2, 0.19, 0.17],
-      birch: [0.6, 0.58, 0.55],
-      holly: [0.03, 0.07, 0.03],
-      hazel: [0.13, 0.1, 0.08],
-    };
-    const registry = Object.fromEntries(
-      Object.entries(parts).map(([k, p]) => [
-        `library:${k}`,
-        [{ geometry: p.geometry, color: tint[k], kind: k === 'holly' ? 'foliage' : 'bark' }],
-      ]),
-    ) as Record<string, NonNullable<BiomeViewOptions['meshes']>[string]>;
+    // Woods, hedgerows and hedge trees: the biomes' species from the library models with their bark maps.
+    const registry: Record<string, NonNullable<BiomeViewOptions['meshes']>[string]> = {};
+    for (const [key, file] of Object.entries(MODELS))
+      registry[`library:${key}`] = await libraryParts(join(library, `margo-library/fauld/${file}.gltf`), {
+        maxTriangles: 250000,
+        kind: 'bark',
+        ...(signal ? { signal } : {}),
+      });
+    // Bracken dead and brown by late November (the fern's own colour only, never its green summer fronds).
     registry['library:fern'] = [
       {
-        geometry: (await fetchPart('big-burn-1910/plants/fern_02/fern_02_2k.gltf', 60000)).geometry,
-        color: [0.16, 0.13, 0.07],
+        geometry: (await libraryMesh(join(library, 'big-burn-1910/plants/fern_02/fern_02_2k.gltf'), {
+          kind: 'foliage',
+          color: [0.2, 0.12, 0.06],
+          maxTriangles: 60000,
+          ...(signal ? { signal } : {}),
+        })).geometry,
+        color: [0.2, 0.12, 0.06],
         kind: 'foliage',
       },
     ];
+    const materials: Record<string, MaterialLook> = { ...FARMLAND_MATERIALS };
+    for (const [key, g] of Object.entries(GROUND))
+      materials[key] = {
+        ...(FARMLAND_MATERIALS[key] ?? { detail: 0.4, bump: 0.4, macro: 0.35 }),
+        color: g.color,
+        image: await groundImage(join(library, `margo-library/fauld/ground/${g.file}_diff_2k.jpg`), signal),
+        repeat: g.repeat,
+      };
     const view = await BiomeView.attach(engine, world, {
       sky: preset.sky,
       shadows,
-      materials: FARMLAND_MATERIALS,
+      materials,
       exclusions: [
         ...farm.exclusions,
         ...(era === '1944' ? [{ kind: 'polygon' as const, points: ring(FAULD_PLACES.crater, 205) }] : []),
       ],
-      radius: 2000,
+      radius,
       meshes: registry,
       ...(signal ? { signal } : {}),
     });
@@ -363,102 +402,12 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     const height = (x: number, z: number) => {
       const g = world.heightAt(x, z),
         c = bowl && Math.hypot(x, z) < 150 ? bowl.at(x, z) : undefined;
+      // Inside the crater the model's finer heights (a camera or prop never sits under a slump the terrain smooths).
       return c === undefined ? g : Math.max(g, c + lift);
     };
-    // The crater model, lifted onto the ground and blended into it at its square edge.
-    if (crater && bowl) {
-      const p = crater.geometry.positions.slice();
-      for (let i = 0; i < p.length; i += 3) {
-        const w = smooth(150, 200, Math.hypot(p[i], p[i + 2]));
-        p[i + 1] = (p[i + 1] + lift) * (1 - w) + (height(p[i], p[i + 2]) + 0.05) * w;
-      }
-      const src = crater.geometry.indices,
-        keepTri: number[] = [];
-      for (let t = 0; t < src.length; t += 3)
-        if ([src[t], src[t + 1], src[t + 2]].every((v) => Math.hypot(p[v * 3], p[v * 3 + 2]) < 205))
-          keepTri.push(src[t], src[t + 1], src[t + 2]);
-      const indices = new Uint32Array(keepTri),
-        uvs = new Float32Array((p.length / 3) * 2),
-        mesh = engine
-          .createMesh()
-          .setGeometry(toGeometry({ positions: p, normals: crater.geometry.normals, uvs, indices }))
-          .setMaterial(
-            new PbrMaterial({ color: era === '1944' ? [0.36, 0.33, 0.29] : [0.2, 0.18, 0.12], roughness: 0.95 }),
-          );
-      mesh.name = 'fauld-crater';
-      meshes.push(mesh);
-      shadows.add(mesh, { static: true });
-    }
-    // Hedges and hedge trees round the focus, as instances of the library models.
-    const near = (p: readonly [number, number]) => Math.hypot(p[0] - focus[0], p[1] - focus[1]) < radius,
-      shrubs = await Promise.all(MODELS.hedge.map((m) => fetchPart(`margo-library/fauld/hedges/${m}.gltf`))),
-      stream = (part: LibraryMeshPart) => {
-        const count = part.geometry.positions.length / 3,
-          tangents = new Float32Array(count * 4);
-        for (let i = 0; i < count; i++) tangents[i * 4] = tangents[i * 4 + 3] = 1;
-        return pbrVertexStream({
-          positions: part.geometry.positions,
-          normals: part.geometry.normals,
-          uvs: new Float32Array(count * 2),
-          tangents,
-          indices: part.geometry.indices,
-        } as never);
-      },
-      matrix = (x: number, z: number, turn: number, s: number, sy = s): number[] => {
-        const c = Math.cos(turn),
-          sn = Math.sin(turn);
-        return [c * s, 0, -sn * s, 0, 0, sy, 0, 0, sn * s, 0, c * s, 0, x, height(x, z) - 0.15, z, 1];
-      },
-      shrubAt: number[][][] = shrubs.map(() => []),
-      treeAt: Record<string, number[][]> = { oak: [], ash: [], holly: [] };
-    let k = 0;
-    for (const h of farm.hedges)
-      for (let i = 1; i < h.points.length; i++) {
-        const [ax, az] = h.points[i - 1],
-          [bx, bz] = h.points[i],
-          l = Math.hypot(bx - ax, bz - az);
-        if (!near([ax, az]) && !near([bx, bz])) continue;
-        for (let s = 0; s < l; s += 2.6) {
-          const x = ax + ((bx - ax) * s) / l,
-            z = az + ((bz - az) * s) / l;
-          k++;
-          shrubAt[k % shrubs.length].push(
-            matrix(x, z, (k * 2.399) % (2 * Math.PI), 0.9 + ((k * 37) % 11) / 30, h.height / 2.6),
-          );
-        }
-      }
-    for (const t of farm.trees)
-      if (near(t.at))
-        treeAt[t.species].push(
-          matrix(t.at[0], t.at[1], t.turn, t.height / (t.species === 'oak' ? 17 : t.species === 'ash' ? 15 : 6.5)),
-        );
-    const bark = (c: readonly [number, number, number]) =>
-        new PbrMaterial({ color: [c[0], c[1], c[2]], roughness: 0.92 }),
-      batches = (): ScatterBatch[] =>
-        [
-          ...shrubs.map((p, i) => ({
-            name: `fauld-hedge-${i}`,
-            vertices: stream(p),
-            indices: p.geometry.indices,
-            transforms: new Float32Array(shrubAt[i].flat()),
-            material: bark(i === 2 ? [0.06, 0.05, 0.05] : [0.13, 0.1, 0.08]),
-            wind: [1, 0, 0.15] as [number, number, number],
-          })),
-          ...(['oak', 'ash', 'holly'] as const).map((sp) => ({
-            name: `fauld-hedge-${sp}`,
-            vertices: stream(parts[sp]),
-            indices: parts[sp].geometry.indices,
-            transforms: new Float32Array(treeAt[sp].flat()),
-            material: bark(tint[sp]),
-            wind: [1, 0, 0.08] as [number, number, number],
-          })),
-        ].filter((b) => b.transforms.length > 0) as ScatterBatch[];
-    const instances = ScatterInstances.attach(engine, batches);
-    shadows.add(instances as never, { static: true });
-    disposers.push(() => instances.dispose());
     const clouds = VolumetricClouds.attach(engine, {
       sky: preset.sky as never,
-      type: sky.preset === 'overcast' ? 'stratus' : 'cumulus',
+      type: sky.clouds,
       coverage: Math.min(0.95, (sky.weather.cloud ?? 0.4) + 0.05),
     });
     disposers.push(() => clouds.dispose());
