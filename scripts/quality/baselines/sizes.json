@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17616461,
+  "total": 17617276,
   "history": [
     {
       "date": "2026-10-24",
@@ -11439,6 +11439,12 @@
       "commit": "3fc755de9",
       "reason": "physics/soft gains tetrahedral cells, plasticity, tearing and clusters: entry 28,024 to 37,206 B gzip budget (base 7,926 to 10,554, kernel blueprint 19,177 to 25,743, which holds the stable Neo-Hookean and co-rotated solvers, the polar decomposition, plastic flow and clusters); a second entry would load the same kernel for any body with cells",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "d993a9973a",
+      "reason": "exporters/threemf 19,392 to 19,618 B gzip: writes the base colour texture (texture2d, texture2dgroup, relationships, content types)",
+      "grew": 1
     }
   ],
   "items": {
@@ -11808,7 +11814,7 @@
     "@margoengine/exporters/sparse": 24609,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 10316,
-    "@margoengine/exporters/threemf": 19392,
+    "@margoengine/exporters/threemf": 20207,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,

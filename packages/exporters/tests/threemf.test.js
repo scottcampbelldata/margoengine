@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parse3MF, readZipDirectory, readZipEntry } from '@margoengine/loaders';
+import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
 import { exportGLB } from '@margoengine/exporters';
 import { export3MF } from '@margoengine/exporters/threemf';
 
@@ -278,4 +279,74 @@ test('what it cannot write is refused', async () => {
   const stop = new AbortController();
   stop.abort(new Error('stopped'));
   await assert.rejects(export3MF({ nodes: [{ geometry: box }] }, { signal: stop.signal }), /stopped/);
+});
+
+// A 1 x 1 PNG; the writer stores the bytes without decoding them.
+const png = Uint8Array.from(
+  atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+  (c) => c.charCodeAt(0),
+);
+
+test('a base colour texture becomes texture2d and texture2dgroup, read back corner by corner', async () => {
+  const uvs = new Float32Array((box.positions.length / 3) * 2).map((_, i) => ((i * 37) % 100) / 100),
+    textured = { ...box, uvs },
+    file = await export3MF({
+      nodes: [{ geometry: textured, material: { baseColorTexture: { image: png, mimeType: 'image/png' } } }],
+    }),
+    names = readZipDirectory(file).map((e) => e.name),
+    text = await model(file);
+  assert.ok(names.includes('3D/Textures/texture1.png') && names.includes('3D/_rels/3dmodel.model.rels'), names.join());
+  assert.match(
+    text,
+    /<m:texture2d id="\d+" path="\/3D\/Textures\/texture1\.png" contenttype="image\/png" tilestyleu="wrap"/,
+  );
+  assert.match(text, /<m:texture2dgroup id="\d+" texid="\d+">/);
+  const read = await parse3MFMaterials(file);
+  assert.equal(read.textures.length, 1);
+  assert.deepEqual([...read.textures[0].data], [...png]);
+  assert.equal(
+    read.groups.some((g) => g.texture === 0),
+    true,
+  );
+  // Every corner of every triangle kept its coordinate (the reader returns the corners in file order).
+  const index = box.indices;
+  let matched = 0;
+  const wanted = new Set();
+  for (const i of index) wanted.add(`${uvs[i * 2].toFixed(4)} ${uvs[i * 2 + 1].toFixed(4)}`);
+  for (let c = 0; c < read.uvs.length; c += 2)
+    if (wanted.has(`${read.uvs[c].toFixed(4)} ${read.uvs[c + 1].toFixed(4)}`)) matched++;
+  assert.equal(matched, read.uvs.length / 2, 'every coordinate read back is one that was written');
+});
+
+test('texture transform, wrap and a shared image are written once, and the texture wins over vertex colours', async () => {
+  const uvs = new Float32Array((box.positions.length / 3) * 2).fill(0.25),
+    colored = { ...box, uvs, colors: new Float32Array(box.positions.length).fill(1), colorSize: 3 },
+    texture = { image: png, mimeType: 'image/png', wrapS: 'clamp', wrapT: 'mirror', magFilter: 'nearest' },
+    file = await export3MF({
+      nodes: [
+        {
+          geometry: colored,
+          material: { baseColorTexture: texture, baseColorTextureTransform: { offset: [0.5, 0], scale: [2, 2] } },
+        },
+        { translation: [3, 0, 0], geometry: colored, material: { baseColorTexture: texture } },
+      ],
+    }),
+    text = await model(file);
+  assert.equal(count(text, /<m:texture2d /g), 1, 'one image for both materials');
+  assert.match(text, /tilestyleu="clamp" tilestylev="mirror" filter="nearest"/);
+  assert.equal(count(text, /<m:colorgroup/g), 0);
+  // u = 0.5 + 0.25 * 2, v = 1 - (0 + 0.25 * 2) for the transformed node.
+  assert.match(text, /<m:tex2coord u="1" v="0.5"\/>/);
+  assert.match(text, /<m:tex2coord u="0.25" v="0.75"\/>/);
+});
+
+test('a material without the UV set it needs keeps its colours and writes no texture', async () => {
+  const file = await export3MF({
+      nodes: [
+        { geometry: box, material: { color: [1, 0, 0, 1], baseColorTexture: { image: png, mimeType: 'image/png' } } },
+      ],
+    }),
+    names = readZipDirectory(file).map((e) => e.name);
+  assert.ok(!names.some((n) => n.startsWith('3D/Textures')));
+  assert.match(await model(file), /displaycolor="#FF0000"/);
 });

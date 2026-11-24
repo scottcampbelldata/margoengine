@@ -14,6 +14,7 @@ import {
   type ExportSource,
   type Geo,
   type Mat,
+  type TextureData,
   type SceneOptions,
 } from './scene.js';
 
@@ -69,9 +70,11 @@ const colorOf = (r: number, g: number, b: number, a: number): string => {
 interface Shape {
   vertices: number[];
   triangles: number[];
-  /** For each corner of each triangle, the index of its colour in `palette`. */
+  /** For each corner of each triangle, the index of its colour (or, with `texture`, its texture coordinate) in `palette`. */
   corners?: number[];
   palette?: string[];
+  /** The image the palette's `u v` coordinates sample. */
+  texture?: TextureData;
 }
 
 /** The positions moved by `transform`, a column-major 4 x 4 matrix. */
@@ -93,6 +96,7 @@ function shapeOf(
   colors: ((vertex: number) => string) | undefined,
   scale: number,
   mirrored: boolean,
+  texture?: TextureData,
 ): Shape {
   const known = new Map<string, number>(),
     vertices: number[] = [],
@@ -128,7 +132,9 @@ function shapeOf(
     triangles.push(a, mirrored ? c : b, mirrored ? b : c);
     if (colors) for (const k of mirrored ? [0, 2, 1] : [0, 1, 2]) corners.push(paletteIndex(colors(indices[i + k])));
   }
-  return colors ? { vertices, triangles, corners, palette: [...palette.keys()] } : { vertices, triangles };
+  return colors
+    ? { vertices, triangles, corners, palette: [...palette.keys()], ...(texture ? { texture } : {}) }
+    : { vertices, triangles };
 }
 
 /** Reads a corner's colour: the vertex colour times the material's. */
@@ -139,6 +145,25 @@ function vertexColors(geometry: Geo, material: Mat): ((vertex: number) => string
     const at = vertex * colorSize,
       [r, g, b, a] = material.color;
     return colorOf(colors[at] * r, colors[at + 1] * g, colors[at + 2] * b, (colorSize === 4 ? colors[at + 3] : 1) * a);
+  };
+}
+
+/**
+ * A corner's texture coordinate as the materials extension writes it: the glTF texture transform (offset times rotation
+ * times scale) applied, then v turned to point up, as 3MF's origin is the image's lower left corner.
+ */
+function textureCoordinates(geometry: Geo, material: Mat): ((vertex: number) => string) | undefined {
+  const texture = material.baseColorTexture;
+  if (!texture) return undefined;
+  const uvs = [geometry.uvs, geometry.uvs1, geometry.uvs2, geometry.uvs3][texture.texCoord ?? 0];
+  if (!uvs) return undefined;
+  const { offset = [0, 0], scale = [1, 1], rotation = 0 } = material.baseColorTextureTransform ?? {},
+    cos = Math.cos(rotation),
+    sin = Math.sin(rotation);
+  return (vertex) => {
+    const u = uvs[vertex * 2] * scale[0],
+      v = uvs[vertex * 2 + 1] * scale[1];
+    return `${num(offset[0] + cos * u + sin * v)} ${num(1 - (offset[1] - sin * u + cos * v))}`;
   };
 }
 
@@ -165,7 +190,7 @@ function itemTransform(placed: readonly number[], scale: number): string {
  * object holding every part in place, so a slicer prints what the scene shows; with `assembly: false` each node is a build
  * item instead, one object for each geometry, and a mirroring node draws a reflected object those nodes share. Either way no
  * transform carries a reflection, so a slicer sees nothing inside out. Colours come from the material's
- * base colour and from vertex colours; textures are not written. Vertices are welded by position, but a slicer still needs
+ * base colour and from vertex colours; the base colour texture is written as a materials-extension texture (`texture2d` and `texture2dgroup`, with its texture transform and wrap) where the geometry has the UV set it uses, and wins over vertex colours on that mesh; other maps are not written. Vertices are welded by position, but a slicer still needs
  * a closed mesh to print: an open one is written as it is.
  *
  * @example
@@ -198,6 +223,9 @@ export async function export3MF(
     materials = new Map<string, number>(),
     objects: string[] = [],
     groups: string[] = [],
+    textures = new Map<TextureData, number>(),
+    textureXml: string[] = [],
+    files: { name: string; data: Uint8Array }[] = [],
     build: string[] = [],
     merged: { vertices: string[]; faces: string[]; pindex: number; name?: string } = {
       vertices: [],
@@ -221,12 +249,38 @@ export async function export3MF(
     if (index === undefined) materials.set(color, (index = materials.size));
     return index;
   };
+  /** The id of a `texture2d` resource for an image, written once however many materials share it. */
+  const textureId = (texture: TextureData): number => {
+    let at = textures.get(texture);
+    if (at === undefined) {
+      at = id++;
+      textures.set(texture, at);
+      const extension = texture.mimeType === 'image/png' ? 'png' : 'jpg',
+        path = `3D/Textures/texture${textures.size}.${extension}`,
+        tile = { repeat: 'wrap', mirror: 'mirror', clamp: 'clamp' } as const;
+      files.push({ name: path, data: texture.image });
+      textureXml.push(
+        `<m:texture2d id="${at}" path="/${path}" contenttype="${texture.mimeType}" tilestyleu="${tile[texture.wrapS ?? 'repeat']}" tilestylev="${tile[texture.wrapT ?? 'repeat']}" filter="${texture.magFilter === 'nearest' ? 'nearest' : 'auto'}"/>`,
+      );
+    }
+    return at;
+  };
   /** Adds a shape's vertices and triangles to lists that may hold others; `pindex` is its colour where the object's differs. */
   const append = (shape: Shape, vertices: string[], faces: string[], pindex?: number): void => {
-    const { triangles, corners, palette } = shape,
+    const { triangles, corners, palette, texture } = shape,
       first = vertices.length;
     let group = 0;
-    if (palette) {
+    if (palette && texture) {
+      group = id++;
+      groups.push(
+        `<m:texture2dgroup id="${group}" texid="${textureId(texture)}">${palette
+          .map((uv) => {
+            const [u, v] = uv.split(' ');
+            return `<m:tex2coord u="${u}" v="${v}"/>`;
+          })
+          .join('')}</m:texture2dgroup>`,
+      );
+    } else if (palette) {
       group = id++;
       groups.push(
         `<m:colorgroup id="${group}">${palette.map((color) => `<m:color color="${color}"/>`).join('')}</m:colorgroup>`,
@@ -260,7 +314,9 @@ export async function export3MF(
       mirrored = determinant < 0,
       world = mirrored ? item.world.map((v, i) => (i < 3 ? -v : v)) : item.world,
       pindex = materialIndex(material),
-      key = `${geometries(geometry)} ${pindex} ${mirrored}`;
+      coordinates = textureCoordinates(geometry, material),
+      texture = coordinates ? material.baseColorTexture : undefined,
+      key = `${geometries(geometry)} ${pindex} ${mirrored} ${texture ? `${textureId(texture)} ${JSON.stringify(material.baseColorTextureTransform ?? null)}` : ''}`;
     if (!Number.isFinite(determinant)) throw new RangeError('3MF needs a finite transform');
     // glTF and the other writers keep a zero scale; a 3MF item is a solid to print, and a flattened one has no volume.
     if (!determinant)
@@ -268,7 +324,7 @@ export async function export3MF(
         'unsupported',
         '3MF holds solids to print, and a node scaled to 0 on an axis has no volume; give it a nonzero scale or leave it out',
       );
-    const colors = vertexColors(geometry, material);
+    const colors = coordinates ?? vertexColors(geometry, material);
     if (together) {
       const shape = shapeOf(
         moved(geometry.positions, upright(item.world, zUp)),
@@ -276,6 +332,7 @@ export async function export3MF(
         colors,
         scale,
         mirrored,
+        texture,
       );
       if (!shape.triangles.length) return;
       if (merged.pindex < 0) Object.assign(merged, { pindex, name: title === undefined ? name : String(title) });
@@ -287,7 +344,7 @@ export async function export3MF(
       const positions = mirrored
           ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
           : geometry.positions,
-        shape = shapeOf(positions, geometry.indices, colors, scale, mirrored);
+        shape = shapeOf(positions, geometry.indices, colors, scale, mirrored, texture);
       if (!shape.triangles.length) return;
       const vertices: string[] = [],
         faces: string[] = [];
@@ -306,7 +363,7 @@ export async function export3MF(
       `<model unit="${unit}" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"` +
       ' xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">' +
       (title === undefined ? '' : `<metadata name="Title">${escaped(String(title))}</metadata>`) +
-      `<resources><basematerials id="1">${base}</basematerials>${groups.join('')}${objects.join('')}</resources>` +
+      `<resources><basematerials id="1">${base}</basematerials>${textureXml.join('')}${groups.join('')}${objects.join('')}</resources>` +
       `<build>${build.join('')}</build></model>\n`,
     encoder = new TextEncoder();
   return encodeZIP(
@@ -316,7 +373,10 @@ export async function export3MF(
         data: encoder.encode(
           '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-            '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>\n',
+            '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>' +
+            (files.some((f) => f.name.endsWith('.png')) ? '<Default Extension="png" ContentType="image/png"/>' : '') +
+            (files.some((f) => f.name.endsWith('.jpg')) ? '<Default Extension="jpg" ContentType="image/jpeg"/>' : '') +
+            '</Types>\n',
         ),
       },
       {
@@ -328,6 +388,24 @@ export async function export3MF(
         ),
       },
       { name: '3D/3dmodel.model', data: encoder.encode(model) },
+      ...(files.length
+        ? [
+            {
+              name: '3D/_rels/3dmodel.model.rels',
+              data: encoder.encode(
+                '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+                  files
+                    .map(
+                      (f, i) =>
+                        `<Relationship Target="/${f.name}" Id="tex${i}" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dtexture"/>`,
+                    )
+                    .join('') +
+                  '</Relationships>\n',
+              ),
+            },
+            ...files,
+          ]
+        : []),
     ],
     { signal },
   );
