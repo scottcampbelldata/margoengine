@@ -218,7 +218,7 @@ fn active_bit(a: Kind, b: Kind) -> u8 {
 /// Whether two shapes on bodies of these kinds may meet: groups, active types, and a body that moves unless one is a
 /// sensor.
 #[inline]
-fn pair_allowed(sa: &Shape, ka: Kind, sb: &Shape, kb: Kind) -> bool {
+pub(crate) fn pair_allowed(sa: &Shape, ka: Kind, sb: &Shape, kb: Kind) -> bool {
     let bit = active_bit(ka, kb);
     (sa.active_types & bit) != 0
         && (sb.active_types & bit) != 0
@@ -1082,7 +1082,9 @@ impl World {
         self.broad_phase()?;
         self.narrow_phase()?;
         self.wake_and_join();
+        let ccd = self.ccd_starts();
         solver::solve_validated(self, dt)?;
+        self.solve_ccd(&ccd)?;
         for body in self.bodies.iter_mut() {
             // The body ends the step exactly where it was told to be, with the velocity that took it there.
             if let Some((target, q)) = body.next_target.take() {

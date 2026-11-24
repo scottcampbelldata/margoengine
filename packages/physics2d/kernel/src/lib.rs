@@ -10,6 +10,7 @@ extern crate alloc;
 #[cfg(test)]
 extern crate self as margoengine_physics2d_kernel;
 
+pub(crate) mod ccd;
 pub mod error;
 pub mod joint;
 pub mod manifold;
