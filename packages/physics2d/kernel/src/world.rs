@@ -96,6 +96,8 @@ pub struct Body {
     pub awake: bool,
     pub sleep_time: f32,
     pub shapes: Vec<u32>,
+    /// A removed body keeps its slot, as a static body with no shapes, until a new body takes it.
+    pub dead: bool,
 }
 
 impl Body {
@@ -229,6 +231,8 @@ pub struct Shape {
     pub events: u8,
     pub active_types: u8,
     pub force_threshold: f32,
+    /// A removed shape keeps its slot until a new shape takes it.
+    pub dead: bool,
 }
 
 /// Whether a pair began or stopped touching.
@@ -378,6 +382,12 @@ impl Broad {
             Broad::Sweep(s) => s.pairs(out, keep),
         }
     }
+    fn remove(&mut self, key: u32) {
+        match self {
+            Broad::Tree(t) => t.remove(key),
+            Broad::Sweep(s) => s.remove(key),
+        }
+    }
     pub(crate) fn query(&mut self, bounds: &Bounds<2>, out: &mut Vec<u32>) {
         match self {
             Broad::Tree(t) => t.query(bounds, out),
@@ -447,6 +457,13 @@ pub struct World {
     /// What began or stopped touching in the last step, and what pushed past a force threshold.
     pub events: Vec<Event>,
     pub force_events: Vec<ForceEvent>,
+    /// Stop events of pairs that lost a shape between steps; the next step reports them first.
+    pending_events: Vec<Event>,
+    free_bodies: Vec<u32>,
+    free_shapes: Vec<u32>,
+    /// Each joint's stable id, by index, and the index of each id (`NONE` once removed).
+    joint_ids: Vec<u32>,
+    joint_slot: Vec<u32>,
     pub counts: Counts,
     pub steps: u64,
     pub(crate) broad: Broad,
@@ -499,6 +516,11 @@ impl World {
             joints: Vec::new(),
             events: Vec::new(),
             force_events: Vec::new(),
+            pending_events: Vec::new(),
+            free_bodies: Vec::new(),
+            free_shapes: Vec::new(),
+            joint_ids: Vec::new(),
+            joint_slot: Vec::new(),
             counts: Counts::default(),
             steps: 0,
             broad: if settings.broad_phase == BroadPhase::Sweep { Broad::Sweep(SweepPrune::new()) } else { Broad::Tree(Tree::new()) },
@@ -516,7 +538,7 @@ impl World {
         let rotation = Rot::from_pair(def.rotation.c, def.rotation.s);
         if !rotation.c.is_finite() || !rotation.s.is_finite() || rotation.c == 0.0 && rotation.s == 0.0 { return Err(PhysicsError::ArithmeticOverflow); }
         let moving = def.kind != Kind::Static;
-        self.bodies.push(Body {
+        let fresh = Body {
             kind: def.kind,
             xf: Xf { p: def.position, q: rotation },
             center: def.position,
@@ -537,10 +559,23 @@ impl World {
             awake: moving,
             sleep_time: 0.0,
             shapes: Vec::new(),
-        });
-        let id = self.bodies.len() as u32 - 1;
+            dead: false,
+        };
+        let id = match self.free_bodies.pop() {
+            Some(id) => {
+                self.bodies[id as usize] = fresh;
+                id
+            }
+            None => {
+                self.bodies.push(fresh);
+                self.bodies.len() as u32 - 1
+            }
+        };
         if let Err(error) = self.update_mass(id) {
-            self.bodies.pop();
+            self.bodies[id as usize].dead = true;
+            self.bodies[id as usize].kind = Kind::Static;
+            self.free_bodies.push(id);
+            self.trim_dead_tail();
             return Err(error);
         }
         Ok(id)
@@ -557,15 +592,27 @@ impl World {
     /// only after its last segment succeeds, while keeping the existing per-segment mass arithmetic.
     fn append_shape(&mut self, body: u32, core: Core, def: &ShapeDef) -> Result<(u32, Bounds<2>), PhysicsError> {
         let target = self.bodies.get(body as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if target.dead { return Err(PhysicsError::InvalidHandle); }
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL { return Err(PhysicsError::InvalidParameter); }
-        let id = self.shapes.len() as u32;
-        self.shapes.push(Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold });
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, dead: false };
+        let reused = self.free_shapes.pop();
+        let id = match reused {
+            Some(id) => {
+                self.shapes[id as usize] = shape;
+                id
+            }
+            None => {
+                self.shapes.push(shape);
+                self.shapes.len() as u32 - 1
+            }
+        };
         self.bodies[body as usize].shapes.push(id);
         if let Err(error) = self.update_mass(body) {
             self.bodies[body as usize].shapes.pop();
-            self.shapes.pop();
+            self.retire_shape(id);
+            self.trim_dead_tail();
             return Err(error);
         }
         Ok((id, bounds))
@@ -593,14 +640,22 @@ impl World {
             return Err(PhysicsError::Degenerate);
         }
         let segments = if closed { n } else { n - 1 };
-        let previous_shapes = self.shapes.len();
         let staged = (|| -> Result<Vec<(u32, Bounds<2>)>, PhysicsError> {
             let mut staged = Vec::with_capacity(segments);
             for i in 0..segments {
                 let (a, b) = (kept[i], kept[(i + 1) % n]);
                 let before = if i > 0 { Some(kept[i - 1]) } else if closed { Some(kept[n - 1]) } else { None };
                 let after = if i + 2 < n || closed { Some(kept[(i + 2) % n]) } else { None };
-                let (id, bounds) = self.append_shape(body, Core::segment(a, b)?, def)?;
+                let (id, bounds) = match Core::segment(a, b).map_err(PhysicsError::from).and_then(|core| self.append_shape(body, core, def)) {
+                    Ok(made) => made,
+                    Err(error) => {
+                        for &(id, _) in &staged {
+                            self.retire_shape(id);
+                        }
+                        self.trim_dead_tail();
+                        return Err(error);
+                    }
+                };
                 let shape = &mut self.shapes[id as usize];
                 shape.ghosts = [before, after];
                 shape.chain = true;
@@ -618,7 +673,7 @@ impl World {
                 Ok(ids)
             }
             Err(error) => {
-                self.shapes.truncate(previous_shapes);
+                self.trim_dead_tail();
                 self.bodies[body as usize] = previous_body;
                 Err(error)
             }
@@ -692,9 +747,112 @@ impl World {
         validate_body_state(&self.bodies[def.a as usize])?;
         validate_body_state(&self.bodies[def.b as usize])?;
         self.joints.push(Joint::new(*def));
+        let id = self.joint_slot.len() as u32;
+        self.joint_ids.push(id);
+        self.joint_slot.push(self.joints.len() as u32 - 1);
         self.wake(def.a)?;
         self.wake(def.b)?;
-        Ok(self.joints.len() as u32 - 1)
+        Ok(id)
+    }
+
+    /// The index in `joints` of the joint `id` (what `create_joint` returned), or `None` once removed.
+    pub fn joint_index(&self, id: u32) -> Option<usize> {
+        self.joint_slot.get(id as usize).copied().filter(|&slot| slot != u32::MAX).map(|slot| slot as usize)
+    }
+
+    /// Takes a joint out and wakes the two bodies it joined. Other joints keep their ids.
+    pub fn remove_joint(&mut self, id: u32) -> Result<(), PhysicsError> {
+        let index = self.joint_index(id).ok_or(PhysicsError::InvalidHandle)?;
+        let def = self.joints[index].def;
+        self.joints.swap_remove(index);
+        self.joint_ids.swap_remove(index);
+        self.joint_slot[id as usize] = u32::MAX;
+        if let Some(&moved) = self.joint_ids.get(index) {
+            self.joint_slot[moved as usize] = index as u32;
+        }
+        for body in [def.a, def.b] {
+            self.wake(body)?;
+        }
+        Ok(())
+    }
+
+    /// Takes a shape out of its body and the broad phase, ends its contacts (reporting a stop where a pair was touching)
+    /// and wakes what it touched; the body's mass is worked out again.
+    pub fn remove_shape(&mut self, id: u32) -> Result<(), PhysicsError> {
+        let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if shape.dead { return Err(PhysicsError::InvalidHandle); }
+        let body = shape.body;
+        self.bodies[body as usize].shapes.retain(|&s| s != id);
+        self.retire_shape(id);
+        self.update_mass(body)
+    }
+
+    /// Takes a body out with its shapes and its joints. Its slot is reused by the next body.
+    pub fn remove_body(&mut self, id: u32) -> Result<(), PhysicsError> {
+        let body = self.bodies.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if body.dead { return Err(PhysicsError::InvalidHandle); }
+        let joined: Vec<u32> = (0..self.joint_ids.len()).filter(|&i| self.joints[i].def.a == id || self.joints[i].def.b == id).map(|i| self.joint_ids[i]).collect();
+        for joint in joined {
+            self.remove_joint(joint)?;
+        }
+        for shape in core::mem::take(&mut self.bodies[id as usize].shapes) {
+            self.retire_shape(shape);
+        }
+        let body = &mut self.bodies[id as usize];
+        body.kind = Kind::Static;
+        body.awake = false;
+        body.dead = true;
+        body.linear_velocity = V2::ZERO;
+        body.angular_velocity = 0.0;
+        (body.mass, body.inv_mass, body.inertia, body.inv_inertia, body.extent) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        body.local_center = V2::ZERO;
+        body.exact_center = body.exact_origin();
+        body.round_pose();
+        self.free_bodies.push(id);
+        Ok(())
+    }
+
+    /// Drops the dead slots at the ends of the shape and body lists, so a refused creation leaves nothing behind.
+    fn trim_dead_tail(&mut self) {
+        while self.shapes.last().is_some_and(|s| s.dead) {
+            let id = self.shapes.len() as u32 - 1;
+            self.shapes.pop();
+            self.free_shapes.retain(|&f| f != id);
+        }
+        while self.bodies.last().is_some_and(|b| b.dead) {
+            let id = self.bodies.len() as u32 - 1;
+            self.bodies.pop();
+            self.free_bodies.retain(|&f| f != id);
+        }
+    }
+
+    /// Marks a shape dead and ends everything that refers to it. The caller has taken it out of its body's list.
+    fn retire_shape(&mut self, id: u32) {
+        self.broad.remove(id);
+        let old = core::mem::take(&mut self.contacts);
+        let mut woken = Vec::new();
+        for contact in old {
+            if contact.a != id && contact.b != id {
+                self.contacts.push(contact);
+                continue;
+            }
+            if contact.overlap {
+                let (sa, sb) = (&self.shapes[contact.a as usize], &self.shapes[contact.b as usize]);
+                if (sa.events | sb.events) & EVENT_COLLISION != 0 {
+                    self.pending_events.push(Event { kind: EventKind::Stopped, a: contact.a, b: contact.b, sensor: sa.sensor || sb.sensor });
+                }
+            }
+            woken.push(self.shapes[if contact.a == id { contact.b } else { contact.a } as usize].body);
+        }
+        for body in woken {
+            let b = &mut self.bodies[body as usize];
+            if b.kind != Kind::Static && !b.dead {
+                b.awake = true;
+                b.sleep_time = 0.0;
+            }
+        }
+        self.shapes[id as usize].dead = true;
+        self.free_shapes.push(id);
     }
 
 
@@ -752,7 +910,9 @@ impl World {
         if [dt, settings.gravity.x, settings.gravity.y, settings.contact_hertz, settings.contact_damping, settings.contact_max_push, settings.restitution_threshold, settings.sleep_threshold, settings.sleep_time, settings.joint_hertz, settings.joint_damping, settings.joint_max_push].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if settings.contact_max_push < 0.0 || settings.joint_max_push < 0.0 { return Err(PhysicsError::InvalidParameter); }
         self.shape_marks.resize(self.shapes.len(), false);
-        self.shape_marks.fill(false);
+        for (mark, shape) in self.shape_marks.iter_mut().zip(&self.shapes) {
+            *mark = shape.dead;
+        }
         for (id, body) in self.bodies.iter().enumerate() {
             validate_collision_pose(body.xf)?;
             validate_body_state(body)?;
@@ -799,6 +959,7 @@ impl World {
         }
         self.counts = Counts::default();
         self.events.clear();
+        self.events.append(&mut self.pending_events);
         self.force_events.clear();
         self.steps = self.steps.checked_add(1).ok_or(PhysicsError::ArithmeticOverflow)?;
         self.broad_phase()?;
@@ -817,7 +978,7 @@ impl World {
     fn broad_phase(&mut self) -> Result<(), PhysicsError> {
         for s in 0..self.shapes.len() {
             let body = &self.bodies[self.shapes[s].body as usize];
-            if body.kind != Kind::Static && body.awake {
+            if !self.shapes[s].dead && body.kind != Kind::Static && body.awake {
                 let tight = bounds_from_validated(&self.shapes[s].core, body.xf)?;
                 self.broad.place(s as u32, &tight, BOX_MARGIN);
             }

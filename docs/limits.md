@@ -1915,6 +1915,10 @@ The own 2D kernel (`packages/physics2d/kernel`) filters pairs by collision group
 
 `packages/physics2d/kernel/src/query.rs` answers rays (`ray_cast`, `ray_cast_all`, with `solid` choosing a hit at 0 or the exit for a ray that starts inside), points, shapes placed in the world (`shape_overlap`) and shapes slid along a unit direction (`shape_cast`, `shape_cast_all`; a shape already overlapping is met at 0). Every query culls with the broad phase's fat boxes and then tests the exact shape at its body's pose; `World::set_transform` refits a moved body's boxes at once, so a query right after a teleport sees it. Filters: collision groups, kind flags (sensors, fixed, kinematic, dynamic), an excluded shape and an excluded body. Direction vectors must be unit length within 1e-3 and finite (`PHYSICS2D_INVALID_PARAMETER`, `PHYSICS2D_NOT_FINITE`). A shape cast is conservative advancement on the convex distance function and stops within 0.1 linear slop of touching, in at most 64 iterations per candidate shape; a candidate that has not converged by then is not reported. Tests: `packages/physics2d/kernel/tests/queries.rs`, including 400 random rays checked against marching.
 
+## Own 2D removal (2026-11-24)
+
+`World::remove_shape`, `remove_body` and `remove_joint` take things out between steps. A removed shape leaves the broad phase and its contacts at once; a pair that was touching reports a stop on the next step, and the bodies it touched wake. A removed body takes its shapes and joints. Body and shape slots are reused by the next one created (a joint's id is never reused, and other joints keep theirs), so a world that adds and removes bullets every step stays the size of its busiest moment. A refused creation leaves no slot behind. Tests: `packages/physics2d/kernel/tests/lifecycle.rs`.
+
 ## Own 2D sustained contact support
 
 The recovery cap applies to the combined elastic residual, `max(beta*s+C*lambda,-P)`, rather than penetration
