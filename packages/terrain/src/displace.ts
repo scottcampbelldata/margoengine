@@ -49,7 +49,9 @@ const BINDING = 108,
   // that has not left the relief by then counts the rest as lit.
   SHADOW_STEPS = 160,
   // Half the angle, in radians, over which the sun's light fades at the relief's horizon (about 1.1 degrees).
-  SOFT = 0.02;
+  SOFT = 0.02,
+  // Most shadow rays a pixel traces along each screen axis when it spans several texels (4: up to 16 rays).
+  AREA = 4;
 const entry = '@fragment fn fragment(i:Output)->@location(0) vec4f {return terrainPbrShade(i);}',
   gradients = 'let dx=dpdx(position);let dy=dpdy(position);',
   direct = 'let direct=(';
@@ -116,6 +118,24 @@ fn terrainDisplaceSun(p:vec3f,normal:vec3f,depth:f32)->f32 {
     tau=exit;
   }
   return smoothstep(-${SOFT},${SOFT},lowest);
+}
+// A pixel that spans several texels of the finest active layer takes the mean of n by n shadow rays spread over its
+// footprint (the screen derivatives of the ground), so far relief shows the share of its area in sunlight instead of
+// whichever texel its centre lands on. It filters the results of the visibility test, not the heights, as percentage-
+// closer filtering does for depth maps (Reeves, Salesin and Cook 1987, "Rendering Antialiased Shadows with Depth Maps",
+// SIGGRAPH); shading is not linear in the heights, so prefiltering them first would bias it (Bruneton and Neyret 2012,
+// "A Survey of Non-linear Pre-filtering Methods for Efficient and Accurate Surface Shading", IEEE TVCG 18(2)).
+fn terrainDisplaceSunArea(p:vec3f,normal:vec3f,depth:f32)->f32 {
+  var reference=0.0;
+  for(var layer=0u;layer<u32(frame.heights.z);layer++){if(terrainDisplaceW[layer]>0.0){reference=max(reference,layerRules[layer].params.x);}}
+  let ax=terrainDisplaceDx.xz;let ay=terrainDisplaceDy.xz;
+  let n=clamp(round(max(length(ax),length(ay))*reference*f32(textureDimensions(terrainDisplaceMax).x)),1.0,${AREA}.0);
+  if(n<=1.0){return terrainDisplaceSun(p,normal,depth);}
+  var sum=0.0;
+  for(var y=0.0;y<n;y+=1.0){for(var x=0.0;x<n;x+=1.0){
+    let o=ax*((x+0.5)/n-0.5)+ay*((y+0.5)/n-0.5);sum+=terrainDisplaceSun(p+vec3f(o.x,0.0,o.y),normal,depth);
+  }}
+  return sum/(n*n);
 }`;
 /**
  * The relief functions: `terrainDisplaceWeights` takes the layer weights at the fragment (painted, or the height and
@@ -170,7 +190,7 @@ fn terrainDisplace(position:vec3f,normal:vec3f)->vec3f {
     d0=d1;f0=f1;
   }
   var hit=d1;if(f1>=0.0&&f1>f0){hit=d0+(d1-d0)*(-f0)/(f1-f0);}
-  let p=position+ray*hit;terrainDisplaced=true;${shadows ? 'terrainDisplaceShadow=terrainDisplaceSun(p,normal,depth);' : ''}
+  let p=position+ray*hit;terrainDisplaced=true;${shadows ? 'terrainDisplaceShadow=terrainDisplaceSunArea(p,normal,depth);' : ''}
   return p;
 }`;
 /** Builds one level of the maximum mipmap: level 0 from the surface maps' height (alpha), the rest from the level below. */

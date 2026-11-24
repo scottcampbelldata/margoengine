@@ -808,7 +808,9 @@ height maps (the `surface` maps' alpha that `TerrainMaterials` binds): each pixe
 down through the relief (parallax occlusion mapping), and the terrain shades the point the ray hits, so pebbles hide
 the ground behind them and cracks look deep. With `shadows` (the default) the relief also shadows itself from the sun:
 a ray from the hit toward the sun runs through a maximum mipmap of the height maps, passing over every square of the
-map whose highest point stays under it, so no thin ridge is stepped over. No geometry moves: the ground's outline
+map whose highest point stays under it, so no thin ridge is stepped over. A pixel that spans several texels of the
+finest layer traces up to 4 by 4 such rays over its footprint and takes their mean, so far relief shows the share of
+its area in sunlight rather than aliasing on whichever texel its centre lands. No geometry moves: the ground's outline
 against the sky stays the clipmap's.
 
 ```ts
@@ -857,7 +859,9 @@ on a 4 mm clipmap), the flat one 24.5; depth 0 and a reach short of the view dre
 weights drew the same rock. Seen from straight above under a 14 degree sun, with white, flat materials and no ambient
 light, the share of the ground in shadow was 2.71% against 2.76% from a CPU trace of the same relief at 10 cm deep, and
 30.7% against 30.85% at 30 cm; the shadowed pixels overlapped the CPU's by 0.57 and 0.56 (union), the rest being
-texels finer than a pixel. Cost not timed.
+texels finer than a pixel. There a pixel spans about 6.7 texels; against the share of each pixel's area a CPU trace
+finds lit (4 by 4 traces a pixel), the mean per-pixel error is 0.109 at 30 cm and 0.0125 at 10 cm (one ray from the
+pixel's centre: 0.176 and 0.024). Cost not timed.
 
 - Relief: the layers' heights blended by the terrain's weights with the materials' `heightBlend`, from the top
   projection only, on ground no steeper than about 57 degrees (fading out from about 32); cliffs stay flat. The view

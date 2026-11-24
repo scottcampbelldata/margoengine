@@ -9,7 +9,9 @@
 // 3. self-shadowing under a low sun darkens 30 cm of relief seen at a slant; seen from straight above with white, flat materials and no
 //    ambient light (so a pixel's light is the sun's share there), the share of the rock in shadow matches a CPU
 //    trace of the same relief (bilinear between texels, as the sampler reads it, marched a quarter texel at a time
-//    toward the sun) at 10 cm and 30 cm deep under a 14 degree sun;
+//    toward the sun) at 10 cm and 30 cm deep under a 14 degree sun; there a pixel spans about 6.7 texels, and each
+//    pixel's sun share is close to the share of its area the CPU finds lit (4 x 4 traces a pixel): one shadow ray from
+//    the pixel's centre aliased (mean error 0.176 at 30 cm, 0.024 at 10 cm, before the footprint rays);
 // 4. painted weights compile and draw.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -215,9 +217,10 @@ await runSuite(
           right[0] * forward[1] - right[1] * forward[0],
         ],
         half = Math.tan(((top.fov / 2) * Math.PI) / 180),
-        ground = (px, py) => {
-          const x = ((px + 0.5) / size) * 2 - 1,
-            y = 1 - ((py + 0.5) / size) * 2,
+        // fx, fy: where in the pixel (0 to 1), its centre by default.
+        ground = (px, py, fx = 0.5, fy = 0.5) => {
+          const x = ((px + fx) / size) * 2 - 1,
+            y = 1 - ((py + fy) / size) * 2,
             d = [0, 1, 2].map((a) => forward[a] + right[a] * x * half + upward[a] * y * half),
             t = -eye[1] / d[1];
           return [eye[0] + d[0] * t, eye[2] + d[2] * t];
@@ -240,7 +243,10 @@ await runSuite(
           cpu = 0,
           both = 0,
           either = 0,
-          all = 0;
+          all = 0,
+          // Far relief: a pixel here spans about 6.7 texels, so its sun share is the share of its area in sunlight. The
+          // CPU takes that from 4 x 4 traces over the pixel; the GPU's per-pixel error against it shows aliasing.
+          area = 0;
         for (let py = 0; py < size; py++)
           for (let px = 0; px < size; px++) {
             const i = (py * size + px) * 4,
@@ -248,6 +254,10 @@ await runSuite(
             if (l < 0.01) continue;
             const a = light(shadowed, i) < 0.5 * l,
               b = shadowedTruth(ground(px, py), d);
+            let dark = 0;
+            for (let sy = 0; sy < 4; sy++)
+              for (let sx = 0; sx < 4; sx++) dark += shadowedTruth(ground(px, py, (sx + 0.5) / 4, (sy + 0.5) / 4), d);
+            area += Math.abs(Math.min(light(shadowed, i) / l, 1) - (1 - dark / 16));
             all++;
             gpu += a;
             cpu += b;
@@ -258,6 +268,7 @@ await runSuite(
           gpu: +(gpu / all).toFixed(4),
           cpu: +(cpu / all).toFixed(4),
           overlap: +(both / Math.max(either, 1)).toFixed(3),
+          areaError: +(area / Math.max(all, 1)).toFixed(4),
           pixels: all,
         };
       }
@@ -279,6 +290,11 @@ await runSuite(
         `at ${d} m the shadowed share matches the CPU trace: ${JSON.stringify(s)}`,
       );
       assert.ok(s.overlap > 0.4, `at ${d} m the shadows fall where the CPU trace puts them: ${JSON.stringify(s)}`);
+      // Far relief does not alias: one ray from the pixel's centre measured 0.176 (30 cm) and 0.024 (10 cm).
+      assert.ok(
+        s.areaError < (Number(d) === 0.3 ? 0.14 : 0.018),
+        `at ${d} m each pixel's sun share follows its lit area: ${JSON.stringify(s)}`,
+      );
     }
     assert.ok(r.painted <= 2, `painted weights draw the same rock: ${r.painted}`);
     await writeFile('test-results/terrain-displace.json', JSON.stringify({ hardware, result }, null, 1));

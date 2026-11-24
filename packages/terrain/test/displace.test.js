@@ -82,7 +82,9 @@ test('displacement patches the materials shader: the hit point shades, gradients
   const lit = rig(false),
     code = lit.displacement.shader(lit.materials.shader(lit.lit, 1), 1);
   assert.match(code, /@group\(1\) @binding\(109\) var terrainDisplaceMax:texture_2d_array<f32>;/);
-  assert.match(code, /terrainDisplaceShadow=terrainDisplaceSun\(p,normal,depth\);/);
+  // The sun's share is the mean of the shadow rays over the pixel's footprint (one ray when it spans a texel or less).
+  assert.match(code, /terrainDisplaceShadow=terrainDisplaceSunArea\(p,normal,depth\);/);
+  assert.match(code, /sum\+=terrainDisplaceSun\(p\+vec3f\(o\.x,0\.0,o\.y\),normal,depth\)/);
 });
 
 test('displacement needs layer materials first and owns its uniform and maximum mipmap', () => {
@@ -136,7 +138,9 @@ test('with a floating origin every relief read takes the world phase, the self-s
     code = r.displacement.shader(r.materials.shader(r.lit, 1), 1);
   assert.ok(r.lit.includes('wrap:vec4f'), 'the rig has a floating origin');
   const added = code.slice(0, code.indexOf('fn terrainDisplace(position'));
-  const reads = [...added.matchAll(/textureSample(?:Level|Grad)\(terrainPbrSurfaces,terrainSampler,([^,]+),/g)].map((m) => m[1]);
+  const reads = [...added.matchAll(/textureSample(?:Level|Grad)\(terrainPbrSurfaces,terrainSampler,([^,]+),/g)].map(
+    (m) => m[1],
+  );
   // terrainDisplaceRelief (the shadow's single-texel test and its start height) and terrainDisplaceHeight (the view ray).
   assert.equal(reads.length, 2);
   for (const uv of reads) assert.match(uv, /^\(xz\+layerRules\[layer\]\.wrap\.xz\)\*/, uv);
