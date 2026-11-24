@@ -118,6 +118,61 @@ export interface PhysicsOptions {
   lengthUnit?: number;
 }
 
+/** One contact point of a pair shown to the modifier: where it presses on each body, and how far apart the surfaces are. */
+export class ContactPointModification {
+  /** @internal */
+  constructor(
+    private readonly kernel: KernelWorld,
+    private readonly at: number,
+  ) {}
+  /** Where the point is on the first body, from its centre of mass and in the body's frame. */
+  get anchorA(): [number, number, number] {
+    const c = this.kernel.columns;
+    return [c.contactAnchorAX[this.at]!, c.contactAnchorAY[this.at]!, c.contactAnchorAZ[this.at]!];
+  }
+  set anchorA(value: Vec3) {
+    checkVec(value, 'Contact anchor');
+    const c = this.kernel.columns;
+    [c.contactAnchorAX[this.at], c.contactAnchorAY[this.at], c.contactAnchorAZ[this.at]] = value;
+  }
+  /** Where the point is on the second body, from its centre of mass and in the body's frame. */
+  get anchorB(): [number, number, number] {
+    const c = this.kernel.columns;
+    return [c.contactAnchorBX[this.at]!, c.contactAnchorBY[this.at]!, c.contactAnchorBZ[this.at]!];
+  }
+  set anchorB(value: Vec3) {
+    checkVec(value, 'Contact anchor');
+    const c = this.kernel.columns;
+    [c.contactAnchorBX[this.at], c.contactAnchorBY[this.at], c.contactAnchorBZ[this.at]] = value;
+  }
+  /**
+   * How far apart the surfaces are along the normal at this point: negative when they overlap. The solver reads where the
+   * point is on each body, not a stored distance, so setting this moves the point on the second body along the normal by the
+   * difference: a smaller distance presses harder, a larger one lets go.
+   */
+  get distance(): number {
+    return this.kernel.columns.contactSeparation[this.at]!;
+  }
+  set distance(value: number) {
+    if (!Number.isFinite(value))
+      throw new RangeError(`A contact distance is a finite number of metres (got ${value}).`);
+    const c = this.kernel.columns,
+      row = Math.floor(this.at / 4),
+      body = c.colliderBody[c.pairB[row]!]!,
+      shift = value - c.contactSeparation[this.at]!,
+      n = [c.pairNormalX[row]! * shift, c.pairNormalY[row]! * shift, c.pairNormalZ[row]! * shift] as const,
+      // The shift into the second body's frame: the inverse of its turn.
+      local = turn(
+        [-c.rotationX[body]!, -c.rotationY[body]!, -c.rotationZ[body]!, c.rotationW[body]!],
+        [n[0], n[1], n[2]],
+      );
+    c.contactAnchorBX[this.at]! += local[0];
+    c.contactAnchorBY[this.at]! += local[1];
+    c.contactAnchorBZ[this.at]! += local[2];
+    c.contactSeparation[this.at] = value;
+  }
+}
+
 /** A touching pair shown to `PhysicsOptions.contactModifier`, valid only inside the call. */
 export class ContactModification {
   /** @internal */
@@ -191,6 +246,30 @@ export class ContactModification {
   /** Drops every contact of the pair for this step: the bodies pass through each other and push nothing. */
   clear(): void {
     this.kernel.columns.pairContacts[this.row] = 0;
+  }
+  /**
+   * A word the modifier keeps with the pair, as Rapier's persistent manifold `user_data`: 0 when the pair is made, and it stays
+   * for as long as the pair does (a contact that is cleared or leaves does not reset it). A whole number from 0 to 4,294,967,295.
+   */
+  get userData(): number {
+    return this.kernel.columns.pairUser[this.row]!;
+  }
+  set userData(value: number) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
+      throw new RangeError(`A pair's user data is a whole number from 0 to 4294967295 (got ${value}); pass one.`);
+    this.kernel.columns.pairUser[this.row] = value;
+  }
+  /**
+   * Contact point `k` of the pair, for edits of its anchors and distance (Rapier's solver contact `point` and `dist`). The
+   * object is a view of the kernel's row, valid inside the call.
+   * @throws RangeError for a point the pair does not have.
+   */
+  point(k: number): ContactPointModification {
+    if (!Number.isInteger(k) || k < 0 || k >= this.contactCount)
+      throw new RangeError(
+        `This pair has ${this.contactCount} contact points; pass k from 0 to ${this.contactCount - 1}.`,
+      );
+    return new ContactPointModification(this.kernel, this.row * 4 + k);
   }
   /**
    * Makes the collider `platform` a one-way platform: contacts whose normal, taken from the platform to the other collider,

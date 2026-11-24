@@ -690,7 +690,20 @@ class ContactModification {
     get normal(): [number, number, number];
     set normal(value: Vec3);
     clear(): void;
+    get userData(): number;
+    set userData(value: number);
+    point(k: number): ContactPointModification;
     oneWay(platform: PhysicsCollider, direction: Vec3, angle?: number): void;
+}
+
+class ContactPointModification {
+    constructor(kernel: KernelWorld, at: number);
+    get anchorA(): [number, number, number];
+    set anchorA(value: Vec3);
+    get anchorB(): [number, number, number];
+    set anchorB(value: Vec3);
+    get distance(): number;
+    set distance(value: number);
 }
 
 type DebugColor = readonly [number, number, number, number];

@@ -164,3 +164,89 @@ test('the modifier can clear a pair, and set its normal', () => {
   );
   pushed.physics.dispose();
 });
+
+test('the modifier keeps a word with the pair, which lasts as long as the pair does', () => {
+  const seen = [];
+  const physics = new Physics(null, {
+    contactModifier: (contact) => {
+      seen.push(contact.userData);
+      contact.userData = contact.userData + 1;
+    },
+  });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10], modifyContacts: true },
+  });
+  const ball = physics.addBody(null, {
+    position: [0, 0.5, 0],
+    canSleep: false,
+    colliders: { shape: 'sphere', radius: 0.5 },
+  });
+  for (let i = 0; i < 6; i++) physics.step();
+  assert.deepEqual(
+    seen.slice(0, 5),
+    [0, 1, 2, 3, 4],
+    'a new pair starts at 0 and the word counts the steps it was shown',
+  );
+  ball.setPosition([0, 30, 0]);
+  for (let i = 0; i < 3; i++) physics.step();
+  ball.setPosition([0, 0.5, 0]);
+  seen.length = 0;
+  for (let i = 0; i < 3; i++) physics.step();
+  assert.equal(seen[0], 0, 'a pair that ended and began again starts over');
+  physics.dispose();
+});
+
+test("the modifier can move a contact point's distance and anchors, and the solver follows", () => {
+  const rest = (edit) => {
+    const physics = new Physics(null, { contactModifier: edit });
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [10, 0.5, 10], modifyContacts: true },
+    });
+    const crate = physics.addBody(null, {
+      position: [0, 0.5, 0],
+      canSleep: false,
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    });
+    let spin = 0;
+    for (let i = 0; i < 120; i++) {
+      physics.step();
+      spin = Math.max(spin, Math.hypot(...crate.angularVelocity));
+    }
+    const out = { y: crate.position[1], spin };
+    physics.dispose();
+    return out;
+  };
+  const plain = rest(() => {}),
+    sunk = rest((contact) => {
+      for (let k = 0; k < contact.contactCount; k++) contact.point(k).distance += 0.1;
+    }),
+    shifted = rest((contact) => {
+      for (let k = 0; k < contact.contactCount; k++) {
+        const point = contact.point(k);
+        const [, y, z] = point.anchorB;
+        // Every point moved off the crate's side: the floor can only press where the crate is not, so it tips the crate over.
+        point.anchorB = [0.6, y, z];
+      }
+    });
+  assert.ok(Math.abs(plain.y - 0.5) < 0.01, `rests on its floor (${plain.y})`);
+  assert.ok(plain.y - sunk.y > 0.05, `a contact that reads 0.1 m further apart lets the crate sink (${sunk.y})`);
+  assert.ok(
+    shifted.spin > plain.spin + 0.5,
+    `anchors moved off its side press where it is not and turn it (${shifted.spin} against ${plain.spin})`,
+  );
+  const physics = new Physics(null, {
+    contactModifier: (contact) => {
+      assert.throws(() => contact.point(9), /contact points/);
+      assert.throws(() => (contact.userData = -1), /whole number/);
+      assert.throws(() => (contact.point(0).distance = Number.NaN), /finite/);
+    },
+  });
+  physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [5, 0.5, 5], modifyContacts: true } });
+  physics.addBody(null, { position: [0, 0.99, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  for (let i = 0; i < 3; i++) physics.step();
+  physics.dispose();
+});

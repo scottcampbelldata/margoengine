@@ -1,4 +1,4 @@
-export { ContactModification, Physics } from './physics.js';
+export { ContactModification, ContactPointModification, Physics } from './physics.js';
 export type {
   PhysicsOptions,
   PhysicsSnapshot,

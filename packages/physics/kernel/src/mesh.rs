@@ -1129,6 +1129,7 @@ impl World {
             self.set_u(column, at, NONE);
         }
         self.set_u(PAIR_PART, at, key.0);
+        self.set_u(PAIR_USER, at, 0);
         self.set_u(PAIR_SUB, at, key.1);
         self.set_u(PAIR_THIRD, at, key.2);
         self.set_u(PAIR_CHILD, at, self.uu(PAIR_CHILD, row));

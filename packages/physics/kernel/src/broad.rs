@@ -536,6 +536,7 @@ impl World {
         let Some(row) = self.take_pair_row() else { return };
         let at = row as usize;
         self.set_u(PAIR_PART, at, NONE);
+        self.set_u(PAIR_USER, at, 0);
         self.set_u(PAIR_CHILD, at, NONE);
         self.set_u(PAIR_SUB, at, NONE);
         let (first_a, first_b) = (self.uu(COLLIDER_PAIRS, a as usize), self.uu(COLLIDER_PAIRS, b as usize));
