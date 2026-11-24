@@ -263,7 +263,9 @@ lanes, mud and woodland floor from Poly Haven ground scans (CC0) at their own re
 sky, clouds and weather calibrated to photographs of the area. `fauld-crater` stamps the 1944 crater (`era: '1944'`, bare
 marl and gypsum) or the wooded hollow today (`era: 'today'`) into the terrain from its model's heights. Models, scans and
 the height grid are served from `library` (default `/asset-library/`, which holds `margo-library/fauld/` and `dem/`);
-buildings and cattle have slots (`FAULD_SLOTS`) and draw nothing until their models exist. Origin: the crater's centre,
+the buildings, the fire tender, the WVS van and a grazing herd stand in their slots (`FAULD_SLOTS`, each with its eras),
+from Tripo models decimated to real size in `margo-library/fauld/buildings/`, drawn by `@margoengine/gltf/textured`
+with their base colour maps and stood on the ground; shots keep them 150 m or more away. Origin: the crater's centre,
 OS grid E 418225, N 327725; x east, z south.
 
 ```ts
@@ -279,7 +281,7 @@ async function show(canvas: HTMLCanvasElement) {
   engine.start();
   return scene;
 }
-console.log(typeof show, FAULD_PLACES.hanbury, Object.keys(FAULD_SLOTS).length); // function [-1225, -175] 7
+console.log(typeof show, FAULD_PLACES.hanbury, Object.keys(FAULD_SLOTS).length); // function [-1225, -175] 9
 ```
 
 | Setting | Default | What it does |
@@ -290,6 +292,7 @@ console.log(typeof show, FAULD_PLACES.hanbury, Object.keys(FAULD_SLOTS).length);
 | `focus` | `[0, 0]` | the shot's subject (the shot files keep it) |
 | `radius` | 2,500 | how far round the camera the view grows plants (hedges, trees, woods), 200 to 3,000 m |
 | `dem`, `library` | under `/asset-library/` | the height grid and the model library |
+| `buildings` | `true` | draws the `FAULD_SLOTS` models of the era (church, inn, cottages, kiln works, guard hut, tender, van, cattle) |
 
 Shot files for the film's crater and countryside rows: `node tools/shot/fauld-shots.mjs` (from the recut shot list);
 stills through the shot tool, which adds the page's ground under each camera (`shot.page.ground`):

@@ -7,6 +7,7 @@ import { BiomeWorld } from "@margoengine/biomes";
 import { Farmland } from "@margoengine/biomes/farmland";
 import { BiomeView } from "@margoengine/biomes/view";
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
+import { Model } from "@margoengine/gltf";
 import { Shadows } from "@margoengine/shadows";
 import { PresetScene } from "@margoengine/sky/scenes";
 import { VolumetricClouds } from "@margoengine/sky/volumetric-clouds";
@@ -35,30 +36,56 @@ export const FAULD_SLOTS: Readonly<{
     church: {
         at: readonly [-1190, -190];
         turn: number;
+        model: string;
+        eras: string[];
     };
     inn: {
         at: readonly [-1120, -120];
         turn: number;
+        model: string;
+        eras: string[];
     };
     cottages: {
         at: readonly [-1260, -90];
         turn: number;
+        model: string;
+        eras: string[];
     };
     farmhouse: {
         at: readonly [0, 10];
         turn: number;
+        model: undefined;
+        eras: string[];
     };
     kilnWorks: {
         at: readonly [120, -780];
         turn: number;
+        model: string;
+        eras: string[];
     };
     guardHut: {
         at: readonly [150, 120];
         turn: number;
+        model: string;
+        eras: string[];
+    };
+    nfsTender: {
+        at: readonly [205, 150];
+        turn: number;
+        model: string;
+        eras: string[];
+    };
+    wvsVan: {
+        at: readonly [222, 162];
+        turn: number;
+        model: string;
+        eras: string[];
     };
     cattle: {
         at: readonly [-160, 220];
         turn: number;
+        model: string;
+        eras: string[];
     };
 }>;
 
@@ -82,6 +109,7 @@ interface FauldWorld extends Disposable {
     readonly weather: WeatherMachine;
     readonly shadows: Shadows;
     readonly meshes: readonly Mesh[];
+    readonly buildings: Readonly<Record<string, readonly Model[]>>;
     height(x: number, z: number): number;
     look(position: Vec3, target: Vec3, fov?: number): void;
     advanceTime(seconds: number): void;
@@ -97,6 +125,7 @@ interface FauldWorldSettings {
     readonly radius?: number;
     readonly dem?: string;
     readonly library?: string;
+    readonly buildings?: boolean;
     readonly seed?: number;
     readonly signal?: AbortSignal;
 }

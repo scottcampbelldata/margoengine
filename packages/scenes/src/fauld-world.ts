@@ -30,6 +30,8 @@ import { degrees, sunPath } from '@margoengine/sky/sun';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
 import { WeatherMachine, WEATHER_PRESETS, type WeatherState } from '@margoengine/weather';
 import { WeatherDrive } from '@margoengine/weather/drive';
+import { loadGLTF, type Model } from '@margoengine/gltf';
+import { textured } from '@margoengine/gltf/textured';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
 import { libraryMesh, type LibraryMeshPart } from './library-mesh.js';
@@ -55,16 +57,26 @@ export const FAULD_PLACES = Object.freeze({
   tutbury: [3100, -1300] as const,
 });
 
-/** Tripo models that come later: where each stands; nothing is drawn until a model is given. */
+/**
+ * The buildings, vehicles and cattle (Tripo models by Scott, 2026-11-24, decimated in Blender to real size): where each
+ * stands, its turn about the vertical in fractions of a full turn, the library model under
+ * `margo-library/fauld/buildings/` and the eras it stands in. Shots keep buildings at 150 m or more and under a quarter
+ * of the frame height (channel-films fauld-recut-plan section 4). The farmhouse slot has no model yet (drawn as nothing).
+ */
 export const FAULD_SLOTS = Object.freeze({
-  church: { at: FAULD_PLACES.church, turn: 0 },
-  inn: { at: FAULD_PLACES.inn, turn: 0.3 },
-  cottages: { at: [-1260, -90] as const, turn: 0.1 },
-  farmhouse: { at: FAULD_PLACES.farm, turn: 0.2 },
-  kilnWorks: { at: FAULD_PLACES.works, turn: -0.4 },
-  guardHut: { at: [150, 120] as const, turn: 0 },
-  cattle: { at: [-160, 220] as const, turn: 0 },
-});
+  church: { at: FAULD_PLACES.church, turn: 0, model: 'church_st_werburgh', eras: ['before', '1944', 'today'] },
+  inn: { at: FAULD_PLACES.inn, turn: 0.3, model: 'cock_inn', eras: ['before', '1944', 'today'] },
+  cottages: { at: [-1260, -90] as const, turn: 0.1, model: 'cottage_row', eras: ['before', '1944', 'today'] },
+  farmhouse: { at: FAULD_PLACES.farm, turn: 0.2, model: undefined, eras: ['before'] },
+  kilnWorks: { at: FAULD_PLACES.works, turn: -0.4, model: 'kiln_works', eras: ['before', '1944'] },
+  guardHut: { at: [150, 120] as const, turn: 0, model: 'guard_hut', eras: ['before', '1944'] },
+  nfsTender: { at: [205, 150] as const, turn: 0.15, model: 'nfs_tender', eras: ['1944'] },
+  wvsVan: { at: [222, 162] as const, turn: 0.4, model: 'wvs_van', eras: ['1944'] },
+  cattle: { at: [-160, 220] as const, turn: 0, model: 'cattle', eras: ['before', 'today'] },
+} satisfies Record<
+  string,
+  { at: readonly [number, number]; turn: number; model: string | undefined; eras: readonly string[] }
+>);
 
 /** The era of the ground: the farm before the explosion, the fresh 1944 crater, or the wooded crater today. */
 export type FauldEra = 'before' | '1944' | 'today';
@@ -85,6 +97,8 @@ export interface FauldWorldSettings {
   readonly dem?: string;
   /** URL of the asset library root. Default `/asset-library/`. */
   readonly library?: string;
+  /** Whether the buildings, vehicles and cattle of `FAULD_SLOTS` are drawn. Default true. */
+  readonly buildings?: boolean;
   readonly seed?: number;
   readonly signal?: AbortSignal;
 }
@@ -100,6 +114,8 @@ export interface FauldWorld extends Disposable {
   readonly weather: WeatherMachine;
   readonly shadows: Shadows;
   readonly meshes: readonly Mesh[];
+  /** The slot models drawn, by slot name (cattle are one model per animal). */
+  readonly buildings: Readonly<Record<string, readonly Model[]>>;
   height(x: number, z: number): number;
   /** Puts the camera at a position looking at a target (field of view in degrees). */
   look(position: Vec3, target: Vec3, fov?: number): void;
@@ -195,7 +211,9 @@ async function groundImage(url: string, signal?: AbortSignal): Promise<GroundIma
     canvas = new OffscreenCanvas(size, size),
     context = canvas.getContext('2d');
   if (!context)
-    throw new TypeError('fauld: no 2D canvas to decode the ground scans; run the scene in a browser with OffscreenCanvas 2D.');
+    throw new TypeError(
+      'fauld: no 2D canvas to decode the ground scans; run the scene in a browser with OffscreenCanvas 2D.',
+    );
   context.drawImage(bitmap, 0, 0);
   bitmap.close();
   return { width: size, height: size, data: context.getImageData(0, 0, size, size).data };
@@ -458,6 +476,41 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     disposers.push(() => weather.dispose());
     const drive = WeatherDrive.attach(engine, { weather, listener: engine.camera, clouds });
     disposers.push(() => drive.dispose?.());
+    // The slot models: core meshes with their base colour maps, stood on the ground at their slot, turned about the
+    // vertical. The cattle are a small herd grazing one field, both breeds, each turned its own way.
+    const buildings: Record<string, Model[]> = {};
+    if (settings.buildings ?? true)
+      for (const [name, slot] of Object.entries(FAULD_SLOTS)) {
+        if (!slot.model || !(slot.eras as readonly string[]).includes(era)) continue;
+        const herd =
+          slot.model === 'cattle'
+            ? Array.from({ length: 14 }, (_, i) => {
+                const a = i * 2.399963, // golden angle: the herd spread over the field without a grid
+                  r = 9 * Math.sqrt(i + 0.5);
+                return {
+                  file: i % 3 === 2 ? 'cow_friesian' : 'cow_shorthorn',
+                  at: [slot.at[0] + r * Math.cos(a), slot.at[1] + r * Math.sin(a)] as const,
+                  turn: (i * 0.618034) % 1,
+                };
+              })
+            : [{ file: slot.model, at: slot.at, turn: slot.turn }];
+        buildings[name] = [];
+        for (const one of herd) {
+          const model = await loadGLTF(
+            engine,
+            join(library, `margo-library/fauld/buildings/${one.file}/${one.file}.gltf`),
+            {
+              extensions: [textured],
+              ...(signal ? { signal } : {}),
+            },
+          );
+          disposers.push(() => model.dispose());
+          // Stood on the lowest ground under its footprint's centre, so no corner floats on a slope.
+          model.root.setPosition([one.at[0], height(one.at[0], one.at[1]) - 0.15, one.at[1]]);
+          model.root.setRotation([0, one.turn * 2 * Math.PI, 0]);
+          buildings[name].push(model);
+        }
+      }
     const handle: FauldWorld = {
       era,
       world,
@@ -468,6 +521,7 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       weather,
       shadows,
       meshes,
+      buildings,
       height,
       look(position, target, fov = 45) {
         engine.camera.position = [...position] as Vec3;

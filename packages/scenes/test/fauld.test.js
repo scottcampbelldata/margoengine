@@ -34,6 +34,25 @@ test('every place and slot is inside the world; the crater is the origin', () =>
   assert.ok(Object.isFrozen(countryside.FAULD_SLOTS) && Object.isFrozen(countryside.FAULD_PLACES));
 });
 
+test('the slot models are the Tripo set, each standing only in its eras (no cattle on the 1944 crater day)', () => {
+  const tripo = new Set([
+    'church_st_werburgh',
+    'cock_inn',
+    'cottage_row',
+    'kiln_works',
+    'guard_hut',
+    'nfs_tender',
+    'wvs_van',
+    'cattle',
+  ]);
+  for (const [name, slot] of Object.entries(countryside.FAULD_SLOTS)) {
+    if (slot.model !== undefined) assert.ok(tripo.has(slot.model), `${name} model ${slot.model}`);
+    assert.ok(slot.eras.length > 0 && slot.eras.every((e) => ['before', '1944', 'today'].includes(e)), name);
+  }
+  assert.ok(!countryside.FAULD_SLOTS.cattle.eras.includes('1944'));
+  assert.deepEqual([...countryside.FAULD_SLOTS.nfsTender.eras], ['1944']);
+});
+
 // The tunnel rows share the fr numbering; they are read by the next test.
 const tunnelRow = (s) => s.shot.scene === 'fauld-tunnels';
 const FAULD_TUNNEL_STATES = scenes.find((scene) => scene.name === 'fauld-tunnels').settings.state.options;
