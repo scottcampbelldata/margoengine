@@ -109,6 +109,9 @@ columns! {
     DOMINANCE f32 Body,
     LINEAR_DAMPING f32 Body,
     ANGULAR_DAMPING f32 Body,
+    // The fastest the body's centre and the fastest it turns, in m/s and rad/s; zero is no cap.
+    MAX_LINEAR f32 Body,
+    MAX_ANGULAR f32 Body,
     // The pose a kinematicPosition body reaches at the end of the next step.
     TARGET_X f32 Body,
     TARGET_Y f32 Body,

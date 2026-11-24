@@ -2829,6 +2829,7 @@
       "Collider2D",
       "Joint2D",
       "Physics2D",
+      "PidController2D",
       "interactionGroups",
       "tileMapColliders"
     ],

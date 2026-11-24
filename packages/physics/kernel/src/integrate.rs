@@ -159,6 +159,7 @@ impl World {
                 self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
                 self.solve_contacts(h, stiffness, true, substep as usize, least, false);
             }
+            self.clamp_speeds();
             self.integrate_poses(h, substep + 1 == substeps);
             self.tally_drift(h);
             self.refresh_joints();
@@ -174,6 +175,7 @@ impl World {
                 self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
             }
             self.solve_impacts();
+            self.clamp_speeds();
         }
         self.ccd_pass();
         self.gather_events();
@@ -263,6 +265,27 @@ impl World {
             }
             self.set_v(LINEAR_X, at, linear);
             self.set_v(ANGULAR_X, at, angular);
+        }
+    }
+
+    /// Cuts the speed of each awake dynamic body to its cap, keeping the direction; a cap of zero is none. The cut is a
+    /// scale by cap over speed, so only the length changes.
+    pub fn clamp_speeds(&mut self) {
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
+            if self.flags(at) & KIND != DYNAMIC {
+                continue;
+            }
+            for (velocity, cap) in [(LINEAR_X, MAX_LINEAR), (ANGULAR_X, MAX_ANGULAR)] {
+                let cap = self.s(cap, at);
+                if cap > 0.0 {
+                    let v = self.v(velocity, at);
+                    let speed = sqrt(v.dot(v));
+                    if speed > cap {
+                        self.set_v(velocity, at, v.scale(cap / speed));
+                    }
+                }
+            }
         }
     }
 

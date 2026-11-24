@@ -175,6 +175,39 @@ pub extern "C" fn world_sleep_energy() -> f32 {
 pub extern "C" fn world_sleep_time() -> f32 {
     world().header().sleep_time
 }
+/// Solver settings, by index: 0 contact hertz, 1 contact damping ratio, 2 contact maximum push speed, 3 contact allowed
+/// penetration, 4 joint share, 5 loose joint share, 6 joint maximum push speed, 7 contact warm start share.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_solver(index: u32, value: f32) -> u32 {
+    let header = world().header_mut();
+    match index {
+        0 => header.contact_hertz = value,
+        1 => header.contact_damping = value,
+        2 => header.contact_max_push = value,
+        3 => header.contact_slop = value,
+        4 => header.joint_share = value,
+        5 => header.joint_loose_share = value,
+        6 => header.joint_max_push = value,
+        7 => header.warm_start = value,
+        _ => return 0,
+    }
+    1
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_solver(index: u32) -> f32 {
+    let header = world().header();
+    match index {
+        0 => header.contact_hertz,
+        1 => header.contact_damping,
+        2 => header.contact_max_push,
+        3 => header.contact_slop,
+        4 => header.joint_share,
+        5 => header.joint_loose_share,
+        6 => header.joint_max_push,
+        7 => header.warm_start,
+        _ => f32::NAN,
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn body_wake(body: u32) {
     if world().body_alive(body) {

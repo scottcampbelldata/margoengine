@@ -54,6 +54,10 @@ export interface BodyOptions {
    */
   follow?: boolean;
   dominance?: number;
+  /** The fastest the body's centre may travel, in m/s (default no cap). Own solver only: Rapier has no cap and ignores it. */
+  maxLinearSpeed?: number;
+  /** The fastest the body may turn, in rad/s (default no cap). Own solver only. */
+  maxAngularSpeed?: number;
   userData?: unknown;
 }
 

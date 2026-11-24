@@ -11502,6 +11502,10 @@ clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.
 Near a capture edge, the filter and distortion determine the width of the transition.
 Reflected objects beyond the captured extent are unavailable to the planar adapter.
 
+## Physics solver settings and speed caps (own solver)
+
+`setSolver` (contact stiffness and damping, maximum push speed, allowed penetration, joint shares and push speed, warm start share) checks every value: finite, at least 0, and shares at most 1; a refused call changes nothing. The contact stiffness is still held under an eighth to a quarter of the substep rate whatever is asked, because a stiffer soft constraint shakes a pile the passes cannot settle. A warm start share under 1 forgets part of each contact's carried impulse at every substep, so a cold start (0) rests a box but costs more passes for a stack; joint warm starts keep their own energy test and ignore the share. `maxLinearSpeed` and `maxAngularSpeed` cut a dynamic body's velocity to its cap twice a substep, before the poses move and after the relaxing passes, keeping its direction; a collision can still move a body faster than its cap by a position correction of up to `contactMaxPush`. Kinematic bodies are never cut. The prediction distance (the 0.04 m margin of the broad phase) is not yet settable.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

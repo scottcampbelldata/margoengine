@@ -304,6 +304,7 @@ impl World {
 
     /// Each substep: the impulses the points carry, before anything is solved.
     pub fn warm_start(&mut self) {
+        let share = self.header().warm_start;
         for i in 0..self.header().solving as usize {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
@@ -311,6 +312,11 @@ impl World {
             let normal = self.v(PAIR_NORMAL_X, row);
             for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
                 let at = row * MANIFOLD + k;
+                // A share under one forgets part of what the point carried, stored and applied alike, so the solve's sums agree.
+                if share != 1.0 {
+                    self.set_s(CONTACT_NORMAL_IMPULSE, at, self.s(CONTACT_NORMAL_IMPULSE, at) * share);
+                    self.set_v(CONTACT_TANGENT_X, at, self.v(CONTACT_TANGENT_X, at).scale(share));
+                }
                 let impulse = normal.scale(self.s(CONTACT_NORMAL_IMPULSE, at)).add(self.v(CONTACT_TANGENT_X, at));
                 body_a.push(impulse.scale(-1.0), self.v(CONTACT_ARM_A_X, at));
                 body_b.push(impulse, self.v(CONTACT_ARM_B_X, at));

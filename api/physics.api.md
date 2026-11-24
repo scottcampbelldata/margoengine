@@ -27,6 +27,8 @@ export interface BodyOptions {
     additionalMass?: number;
     follow?: boolean;
     dominance?: number;
+    maxLinearSpeed?: number;
+    maxAngularSpeed?: number;
     userData?: unknown;
 }
 

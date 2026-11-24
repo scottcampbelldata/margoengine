@@ -26,6 +26,8 @@ export interface BodyOptions {
     additionalMass?: number;
     follow?: boolean;
     dominance?: number;
+    maxLinearSpeed?: number;
+    maxAngularSpeed?: number;
     userData?: unknown;
 }
 
@@ -216,6 +218,17 @@ export interface KernelRayHit {
 
 export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
 
+export interface KernelSolverOptions {
+    contactHertz?: number;
+    contactDamping?: number;
+    contactMaxPush?: number;
+    allowedPenetration?: number;
+    jointShare?: number;
+    jointLooseShare?: number;
+    jointMaxPush?: number;
+    warmStart?: number;
+}
+
 export interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;
     oriented?: boolean;
@@ -238,6 +251,8 @@ export class KernelWorld {
     setColliderState(collider: number, state: number): void;
     touchCollider(collider: number): void;
     setBodyEnabled(body: number, enabled: boolean): void;
+    get solver(): Required<KernelSolverOptions>;
+    setSolver(options: KernelSolverOptions): this;
     get solvingPairs(): number;
     get awakeCount(): number;
     get islandCount(): number;
@@ -348,6 +363,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     get pendingTime(): number;
     get substeps(): number;
     set substeps(substeps: number);
+    get solver(): Required<KernelSolverOptions>;
+    setSolver(options: KernelSolverOptions): this;
     get iterations(): number;
     set iterations(iterations: number);
     get solverIterations(): number;
@@ -470,6 +487,10 @@ export class PhysicsBody {
     get ccdActive(): boolean;
     get enabled(): boolean;
     set enabled(value: boolean);
+    get maxLinearSpeed(): number;
+    set maxLinearSpeed(speed: number);
+    get maxAngularSpeed(): number;
+    set maxAngularSpeed(speed: number);
     lockRotations(locked?: boolean): this;
     lockTranslations(locked?: boolean): this;
     addCollider(options: ColliderOptions): PhysicsCollider;

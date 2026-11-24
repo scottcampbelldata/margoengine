@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17382333,
+  "total": 17330086,
   "history": [
     {
       "date": "2026-10-24",
@@ -11313,6 +11313,12 @@
       "commit": "5e7e8d9d6e",
       "reason": "fbx/export: propertyClips camera and light curves, 8525 -> 8905 B min+gzip; a split entry would duplicate the curve writer",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "46f0e4e92",
+      "reason": "physics/next 202008 to 202529 B and physics base 20430 to 20772 B gzip: solver settings, warm start share and speed caps; the two physics2d entries were new on public main and are recorded as measured",
+      "grew": 4
     }
   ],
   "items": {
@@ -11539,13 +11545,13 @@
     "@margoengine/core": 22467,
     "@margoengine/core/extension": 22756,
     "@margoengine/creative": 20099,
-    "@margoengine/creative/grass": 6756,
+    "@margoengine/creative/grass": 6738,
     "@margoengine/creative/grass-settings": 2070,
     "@margoengine/creative/grass-terrain": 1907,
     "@margoengine/creative/paint": 3329,
     "@margoengine/creative/paint-aniso": 4002,
     "@margoengine/creative/particles": 759,
-    "@margoengine/creative/planet": 7534,
+    "@margoengine/creative/planet": 7519,
     "@margoengine/creative/planet-atmosphere": 3377,
     "@margoengine/creative/post": 7339,
     "@margoengine/creative/stars": 2818,
@@ -12069,13 +12075,13 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 61380,
-    "@margoengine/physics base (without Rapier solver JavaScript)": 20430,
+    "@margoengine/physics base (without Rapier solver JavaScript)": 21396,
     "@margoengine/physics lazy Rapier solver JavaScript": 41104,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/next": 202008,
-    "@margoengine/physics2d": 45639,
-    "@margoengine/physics2d base (without Rapier 2D solver JavaScript)": 8679,
-    "@margoengine/physics2d lazy Rapier 2D solver JavaScript": 37086,
+    "@margoengine/physics/next": 208605,
+    "@margoengine/physics2d": 15575,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 14052,
+    "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/crt": 4237,

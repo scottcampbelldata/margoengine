@@ -84,6 +84,8 @@ pub struct Header {
     pub mesh_rows: [u32; 5],
     /// Parts that lost their points in this narrow phase, which then frees them.
     pub stale_parts: u32,
+    /// The share of each carried contact impulse kept at the start of a substep.
+    pub warm_start: f32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -165,6 +167,7 @@ impl World {
                 extra_passes: 0,
                 mesh_rows: [0; 5],
                 stale_parts: 0,
+                warm_start: 1.0,
             });
         }
         Some(world)

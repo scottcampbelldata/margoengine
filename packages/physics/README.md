@@ -800,6 +800,25 @@ console.log(box.parts.length, marble.position[1].toFixed(2)); // 8 0.33: inside 
 physics.dispose();
 ```
 
+### Solver settings and speed caps
+
+`physics.setSolver(options)` tunes the solver from the next step on, and `physics.solver` reads it. Contacts are soft constraints (Catto 2011): `contactHertz` is their stiffness as a frequency (default 120, and never above an eighth to a quarter of the substep rate), `contactDamping` their damping ratio (default 10), `contactMaxPush` the fastest a depth is pushed out in m/s (default 3) and `allowedPenetration` the depth left alone in metres (default 0.0002). Joints close `jointShare` of an error a substep where the solve is exact (default 1) and `jointLooseShare` where they meet in a branch or ring (default 0.2), at most `jointMaxPush` units a second (default 3). `warmStart` (0 to 1, default 1) is the share of each carried contact impulse kept at the start of a substep. The settings are part of a snapshot, a value out of range throws a `RangeError`, and a call changes nothing when it throws.
+
+A body takes `maxLinearSpeed` (m/s) and `maxAngularSpeed` (rad/s), as options or properties; the step cuts a faster dynamic body to its cap and keeps its direction. The default is `Infinity`, no cap, and kinematic bodies are never cut.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+physics.setSolver({contactHertz: 60, allowedPenetration: 0.001});
+const body = physics.addBody(null, {colliders: {shape: 'sphere', radius: 0.5}, maxLinearSpeed: 5});
+body.setLinearVelocity([30, 40, 0]);
+physics.step();
+console.log(Math.hypot(...body.linearVelocity).toFixed(2)); // '5.00'
+physics.dispose();
+```
+
 ## Parity with Rapier 3D
 
 Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table shows what is left until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
@@ -816,13 +835,14 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` | full |
 | Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full |
 | Additional solver iterations per body | `additionalSolverIterations` | full |
-| Maximum linear and angular velocity per body | none | missing |
+| Maximum linear and angular velocity per body | `maxLinearSpeed`, `maxAngularSpeed` | full |
 | Sleep thresholds, can sleep, put to sleep, wake up | world thresholds, `canSleep`, `sleep`, `wakeUp` | partial: thresholds are the world's, not per body |
 | Enabled flag | `enabled` | full |
 | Continuous collision detection | `ccd` | full |
 | Islands | island forest, an island sleeps together | full |
 | Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full |
-| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, prediction distance, warm starting | held in the world header, no setter | partial |
+| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full |
+| Integration parameters: prediction distance | a constant of the broad phase, 0.04 m | partial: not settable |
 | Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full |
 | Joint limits, per axis | `setLimits`, `setAxisLimits` | full |
 | Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |

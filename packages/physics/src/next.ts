@@ -37,5 +37,6 @@ export type {
   KernelLoadOptions,
   KernelRayHit,
   KernelShape,
+  KernelSolverOptions,
   KernelTrimeshOptions,
 } from './kernel.js';

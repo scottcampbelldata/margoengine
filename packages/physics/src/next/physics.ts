@@ -24,6 +24,7 @@ import {
   type KernelShapeCastHit,
   type KernelLoadOptions,
   type KernelShape,
+  type KernelSolverOptions,
 } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { colliderGeometry } from '../mesh-fit.js';
@@ -449,6 +450,16 @@ export class Physics implements EnginePlugin, BodyOwner {
   set substeps(substeps: number) {
     this.kernel.substeps = substeps;
   }
+  /** The solver settings (contact stiffness, allowed penetration, joint shares); see {@link KernelWorld.setSolver}. */
+  get solver(): Required<KernelSolverOptions> {
+    return this.kernel.solver;
+  }
+  /** Tunes the solver from the next step on; leave out what stays. Wakes every dynamic body, so a sleeper meets the new settings. */
+  setSolver(options: KernelSolverOptions): this {
+    this.kernel.setSolver(options);
+    for (const body of this.bodies) if (body.type === 'dynamic') this.kernel.wake(body.row);
+    return this;
+  }
   /** Solver passes in each substep (default 2). */
   get iterations(): number {
     return this.kernel.iterations;
@@ -638,6 +649,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.angularVelocity) body.setAngularVelocity(options.angularVelocity);
     if (options.linearDamping !== undefined) columns.linearDamping[row] = options.linearDamping;
     if (options.angularDamping !== undefined) columns.angularDamping[row] = options.angularDamping;
+    if (options.maxLinearSpeed !== undefined) body.maxLinearSpeed = options.maxLinearSpeed;
+    if (options.maxAngularSpeed !== undefined) body.maxAngularSpeed = options.maxAngularSpeed;
     if (options.gravityScale !== undefined) columns.gravityScale[row] = options.gravityScale;
     if (options.dominance !== undefined) columns.dominance[row] = options.dominance;
     if (options.canSleep !== undefined) kernel.setCanSleep(row, options.canSleep);

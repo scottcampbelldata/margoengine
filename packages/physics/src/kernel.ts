@@ -39,6 +39,8 @@ interface KernelExports extends WebAssembly.Exports {
   world_set_sleep(energy: number, time: number): void;
   world_sleep_energy(): number;
   world_sleep_time(): number;
+  world_set_solver(index: number, value: number): number;
+  world_solver(index: number): number;
   body_wake(body: number): void;
   body_wake_touching(body: number): void;
   body_sleep(body: number): void;
@@ -479,6 +481,18 @@ export async function loadKernel({ signal }: KernelLoadOptions = {}): Promise<vo
 /** A column view: float columns are `Float32Array`, integer columns `Uint32Array`. One row per body or collider. */
 export type KernelColumn = Float32Array | Uint32Array;
 
+/** The solver settings of {@link KernelWorld.setSolver}. */
+export interface KernelSolverOptions {
+  contactHertz?: number;
+  contactDamping?: number;
+  contactMaxPush?: number;
+  allowedPenetration?: number;
+  jointShare?: number;
+  jointLooseShare?: number;
+  jointMaxPush?: number;
+  warmStart?: number;
+}
+
 /**
  * One simulated world in its own Wasm instance. Column views alias the kernel's memory: reading a pose is a typed-array
  * read, with no call and no copy. Growth, which a step can cause, replaces every view, so read them from `columns` each
@@ -634,6 +648,52 @@ export class KernelWorld {
   /** Takes a body out of the world or puts it back: out, it keeps its pose and speed, touches nothing and its joints rest. */
   setBodyEnabled(body: number, enabled: boolean): void {
     this.api.body_set_enabled(body, enabled ? 1 : 0);
+  }
+  /** The solver settings, with the defaults and units {@link KernelWorld.setSolver} documents. */
+  get solver(): Required<KernelSolverOptions> {
+    const read = (index: number): number => this.api.world_solver(index);
+    return {
+      contactHertz: read(0),
+      contactDamping: read(1),
+      contactMaxPush: read(2),
+      allowedPenetration: read(3),
+      jointShare: read(4),
+      jointLooseShare: read(5),
+      jointMaxPush: read(6),
+      warmStart: read(7),
+    };
+  }
+  /**
+   * Tunes the solver; leave out what stays. Contacts are soft constraints (Catto 2011): `contactHertz` is their stiffness as
+   * a frequency (default 120, held under an eighth of the substep rate) and `contactDamping` their damping ratio (default
+   * 10); `contactMaxPush` is the fastest a depth is pushed out, in m/s (default 3), and `allowedPenetration` the depth left
+   * alone, in metres (default 0.0002). Joints close `jointShare` of an error a substep where the solve is exact (default 1,
+   * from 0 to 1) and `jointLooseShare` where they meet in a branch or a ring (default 0.2), at most `jointMaxPush` units a
+   * second (default 3). `warmStart` is the share of each carried contact impulse kept at the start of a substep, from 0 (a cold
+   * start) to 1 (all, the default). A value takes effect at the next step and is part of a {@link KernelWorld.snapshot}.
+   * @throws RangeError when a value is not finite, or outside its range.
+   */
+  setSolver(options: KernelSolverOptions): this {
+    const names: readonly (readonly [keyof KernelSolverOptions, number, number])[] = [
+      ['contactHertz', 0, Infinity],
+      ['contactDamping', 0, Infinity],
+      ['contactMaxPush', 0, Infinity],
+      ['allowedPenetration', 0, Infinity],
+      ['jointShare', 0, 1],
+      ['jointLooseShare', 0, 1],
+      ['jointMaxPush', 0, Infinity],
+      ['warmStart', 0, 1],
+    ];
+    names.forEach(([name, low, high]) => {
+      const value = options[name];
+      if (value === undefined) return;
+      if (!(value >= low && value <= high) || Number.isNaN(value) || value === Infinity)
+        throw new RangeError(`Solver ${name} must be a finite number from ${low} to ${high === Infinity ? 'any size' : high}; got ${value}.`);
+    });
+    names.forEach(([name], index) => {
+      if (options[name] !== undefined) this.api.world_set_solver(index, options[name]);
+    });
+    return this;
   }
   /** Pairs the last step solved: the first this many rows of the `solvePairs` column. */
   get solvingPairs(): number {

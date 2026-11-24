@@ -18,6 +18,13 @@ export interface BodyOwner {
   moved(body: PhysicsBody): void;
 }
 
+/** A cap column holds 0 for no cap. */
+const capOf = (stored: number): number => (stored > 0 ? stored : Infinity);
+function capIn(speed: number, name: string, unit: string): number {
+  if (!(speed > 0)) throw new RangeError(`${name} must be above 0, or Infinity for no cap; pass ${unit}. To stop a body, lock its axes.`);
+  return speed === Infinity ? 0 : speed;
+}
+
 /** @throws RangeError unless `rotation` is four finite numbers that are not all zero. */
 export function checkRotation(rotation: Quat): void {
   const [x, y, z, w] = rotation,
@@ -366,6 +373,20 @@ export class PhysicsBody {
   }
   set enabled(value: boolean) {
     this.world().setBodyEnabled(this.row, value);
+  }
+  /** The fastest the body's centre may travel, in m/s (default Infinity, no cap). The step cuts a faster body to it, keeping its direction. */
+  get maxLinearSpeed(): number {
+    return capOf(this.columns.maxLinear[this.row]);
+  }
+  set maxLinearSpeed(speed: number) {
+    this.columns.maxLinear[this.row] = capIn(speed, 'maxLinearSpeed', 'm/s');
+  }
+  /** The fastest the body may turn, in rad/s (default Infinity, no cap). */
+  get maxAngularSpeed(): number {
+    return capOf(this.columns.maxAngular[this.row]);
+  }
+  set maxAngularSpeed(speed: number) {
+    this.columns.maxAngular[this.row] = capIn(speed, 'maxAngularSpeed', 'rad/s');
   }
   /** Stops all turning, on every world axis, or frees it again. */
   lockRotations(locked = true): this {
