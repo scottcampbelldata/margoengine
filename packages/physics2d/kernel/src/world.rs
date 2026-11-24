@@ -164,6 +164,9 @@ pub struct ShapeDef {
     pub active_types: u8,
     /// A contact force event fires above this total force.
     pub force_threshold: f32,
+    /// For a chain: only the side its segments' right-hand normals point to is solid (a one-way platform or a one-sided
+    /// terrain); a body on the other side passes.
+    pub one_sided: bool,
 }
 
 /// `ShapeDef::events` bits.
@@ -191,6 +194,7 @@ impl Default for ShapeDef {
             events: 0,
             active_types: ACTIVE_DEFAULT,
             force_threshold: 0.0,
+            one_sided: false,
         }
     }
 }
@@ -244,6 +248,7 @@ pub struct Shape {
     pub events: u8,
     pub active_types: u8,
     pub force_threshold: f32,
+    pub one_sided: bool,
     /// A removed shape keeps its slot until a new shape takes it.
     pub dead: bool,
 }
@@ -614,7 +619,7 @@ impl World {
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, dead: false };
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {
@@ -1194,9 +1199,17 @@ impl World {
             // A chain segment takes its ghosts (smooth.rs); with the chain second, the pair is solved the other way round
             // and the normal turned back, so it still runs from `a` to `b`.
             let manifold = if sa.chain {
-                collide_smooth_trusted(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE)?
+                let mut m = collide_smooth_trusted(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE)?;
+                // A one-sided chain is solid on the side its segments' right-hand normals point to.
+                if sa.one_sided && m.count > 0 && xa.q.apply(sa.core.normals[0]).dot(m.normal) < 0.0 {
+                    m = Manifold::default();
+                }
+                m
             } else if sb.chain {
                 let mut m = collide_smooth_trusted(&sb.core, sb.ghosts, xb, &sa.core, xa, SPECULATIVE)?;
+                if sb.one_sided && m.count > 0 && xb.q.apply(sb.core.normals[0]).dot(m.normal) < 0.0 {
+                    m = Manifold::default();
+                }
                 m.normal = m.normal.neg();
                 m
             } else {

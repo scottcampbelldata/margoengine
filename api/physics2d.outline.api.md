@@ -49,10 +49,16 @@ interface ColliderSettings2D {
     contactForceThreshold?: number;
 }
 
+type CompoundPart2D = ShapeOptions2D & {
+    offset?: Vec2D;
+    rotation?: number;
+};
+
 type ShapeOptions2D = {
     shape: 'box';
     width: number;
     height: number;
+    borderRadius?: number;
 } | {
     shape: 'circle';
     radius: number;
@@ -63,13 +69,42 @@ type ShapeOptions2D = {
 } | {
     shape: 'polygon';
     points: readonly Vec2D[];
+    borderRadius?: number;
 } | {
     shape: 'polyline';
     points: readonly Vec2D[];
+    oneSided?: boolean;
 } | {
     shape: 'segment';
     from: Vec2D;
     to: Vec2D;
+} | {
+    shape: 'triangle';
+    a: Vec2D;
+    b: Vec2D;
+    c: Vec2D;
+    borderRadius?: number;
+} | {
+    shape: 'compound';
+    shapes: readonly CompoundPart2D[];
+} | {
+    shape: 'trimesh';
+    vertices: readonly Vec2D[];
+    indices: ArrayLike<number>;
+} | {
+    shape: 'heightfield';
+    heights: ArrayLike<number>;
+    width: number;
+} | {
+    shape: 'halfspace';
+    normal?: Vec2D;
+} | {
+    shape: 'voxels';
+    cellWidth: number;
+    cellHeight: number;
+    columns: number;
+    rows: number;
+    solid: ArrayLike<number | boolean>;
 };
 
 interface SpriteLike {

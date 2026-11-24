@@ -125,3 +125,32 @@ fn a_chain_refuses_too_few_points() {
     assert!(world.create_chain(body, &[v2(0.0, 0.0), v2(0.0, 0.0)], false, &ShapeDef::default()).is_err());
     assert!(world.create_chain(body, &[v2(0.0, 0.0), v2(1.0, 0.0)], true, &ShapeDef::default()).is_err());
 }
+
+/// A one-sided chain is a one-way platform: a ball thrown up from below passes through it and lands on its top; the
+/// same chain two-sided stops the ball from below.
+#[test]
+fn a_one_sided_chain_is_a_platform_that_can_be_jumped_through_from_below() {
+    use margoengine_physics2d_kernel::world::Settings;
+    let run = |one_sided: bool| {
+        let mut world = World::new(Settings { gravity: v2(0.0, -9.81), ..Default::default() });
+        let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+        // Right to left in a y-up world: the right-hand normal points up (+y). (In a y-down world such as the sprite
+        // space, left to right puts the solid side up on screen.)
+        world.create_chain(body, &[v2(5.0, 2.0), v2(0.0, 2.0), v2(-5.0, 2.0)], false, &ShapeDef { one_sided, friction: 0.0, ..Default::default() }).unwrap();
+        let ball = world.create_body(&BodyDef { position: v2(0.0, 0.0), linear_velocity: v2(0.0, 9.0), can_sleep: false, ..Default::default() }).unwrap();
+        world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: 0.0, friction: 0.0, ..Default::default() }).unwrap();
+        let mut top = f32::MIN;
+        for _ in 0..240 {
+            world.step(DT).unwrap();
+            top = top.max(world.bodies[ball as usize].xf.p.y);
+        }
+        (top, world.bodies[ball as usize].xf.p.y)
+    };
+    // Free flight at 9 m/s rises 4.1 m: through the platform at 2 m, then back down onto its top (2.25).
+    let (top, rest) = run(true);
+    assert!(top > 3.5, "passed up through the platform: peak {top}");
+    assert!((rest - 2.25).abs() < 0.05, "lands on top: {rest}");
+    let (top, rest) = run(false);
+    assert!(top < 1.9, "two-sided: stopped from below, peak {top}");
+    assert!(rest < 1.9, "and it falls back, {rest}");
+}

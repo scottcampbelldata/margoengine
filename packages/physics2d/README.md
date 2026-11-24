@@ -64,8 +64,9 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Shapes | ball, cuboid, capsule, segment | `box`, `circle`, `capsule`, `segment` colliders | full |
 | Shapes | convex polygon, convex decomposition of concave or large input | `polygon` (convex hull to 8 corners; concave or larger split by ear clipping and Hertel-Mehlhorn) | full |
 | Shapes | polyline | `polyline` (chains with ghost vertices: bodies slide over the joins) | full |
-| Shapes | triangle, round (border radius) cuboid and convex, trimesh | kernel cores carry a radius; the facade has no option for them yet | partial |
-| Shapes | heightfield, voxels, halfspace, compound, shared shapes | none | missing |
+| Shapes | triangle, round (border radius) cuboid, triangle and convex polygon, trimesh | `triangle`, `borderRadius` on `box`, `polygon` and `triangle`, `trimesh` (triangles by index) | full |
+| Shapes | heightfield, halfspace, compound, voxels, shared shapes | `heightfield` (a smooth chain), `halfspace` (a polygon 200,000 units across), `compound` (parts with their own placement), `voxels` (merged outlines, no thickness); shape options are plain values, so one can be reused on any number of colliders | full, with the accepted differences in limits |
+| Shapes | oriented (one-sided) polyline | `polyline` with `oneSided: true` | full |
 | Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
 | Collision | continuous collision detection | `ccd` against fixed and kinematic bodies; dynamic bodies are not swept against each other | partial |
 | Collision | sensors | `sensor: true` (senses fixed and kinematic bodies too) | full |

@@ -285,6 +285,7 @@ fn shape_def() -> ShapeDef {
         active_types: ((flags >> 8) & 0xff) as u8,
         sensor: flags & (1 << 16) != 0,
         force_threshold: f(6),
+        one_sided: flags & (1 << 17) != 0,
     }
 }
 

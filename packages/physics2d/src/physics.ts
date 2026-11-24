@@ -6,7 +6,7 @@ import type { Kernel, KernelWasmSource } from './kernel.js';
 import { Body2D, Collider2D, type BodyOptions2D, type BodyOwner2D, type BodyType2D, type SpriteLike } from './body.js';
 import { CharacterController2D, type CharacterOptions2D } from './character.js';
 import { Joint2D, writeJoint, type JointOptions2D } from './joint.js';
-import { describeShape, type ColliderOptions2D, type Described, type ShapeOptions2D, type Vec2D } from './shapes.js';
+import { describeShape, describeShapes, type ColliderOptions2D, type Described, type ShapeOptions2D, type Vec2D } from './shapes.js';
 import { tileMapColliders, type TileMapBodyOptions, type TileMapSource } from './tilemap.js';
 
 /** Options of {@link Physics2D.load}. */
@@ -440,11 +440,17 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   /** @internal */
   addCollider(body: Body2D, options: ColliderOptions2D): Collider2D {
     this.live();
-    const d = describeShape(options, this.scale);
-    const ids = this.createShapes(body, d);
-    const settings = Uint32Array.from(d.settings);
+    const parts = describeShapes(options, this.scale);
+    const ids: number[] = [];
+    try {
+      for (const d of parts) ids.push(...this.createShapes(body, d));
+    } catch (error) {
+      for (const id of ids) this.kernel.exports.shape_remove(this.handle, id);
+      throw error;
+    }
+    const settings = Uint32Array.from(parts[0].settings);
     const collider = new Collider2D(this, body, ids, settings, options.offset ?? [0, 0], options.rotation ?? 0);
-    collider.described = d;
+    collider.described = parts[0];
     for (const id of ids) this.byShape.set(id, collider);
     body.colliders.push(collider);
     return collider;

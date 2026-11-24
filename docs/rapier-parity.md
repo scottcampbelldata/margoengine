@@ -333,9 +333,9 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 | --- | --- | --- | --- | --- | --- | --- |
 | T-01 | 2D bodies, types, forces, damping, sleep, locks | yes, on the own kernel (2026-11-24) | the kernel: static, kinematic (velocity or position driven) and dynamic bodies, gravity scale, damping, forces, torques, impulses at a point, fixed rotation, dominance, islands that sleep and wake as one (`physics2d/kernel/tests/world.rs`, `bodies.rs`); locked translation axes and additional mass not yet | PARTIAL: locked axes and additional mass MISSING | Wasm | Wasm |
 | T-02 | `ball`, `cuboid`, `capsule`, `segment`, `convex_polygon`, `polyline` | yes, on the own kernel | the kernel and the Wasm facade: circle, box, capsule, segment, convex polygon, concave polygons split by ear clipping and Hertel-Mehlhorn (`kernel/tests/decompose.rs`), polylines with ghost vertices (`physics2d/tests/physics2d.test.js`) | DONE | Wasm | Wasm |
-| T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | no | every kernel polygon takes a radius, with exact mass (`physics2d/kernel/tests/shapes.rs`); no world yet | BUILDING 127 (was 143.1) | Wasm | Wasm |
-| T-04 | 2D `heightfield`, `halfspace`, `compound`, `voxels`, `convex_decomposition` | no | none | MISSING, 143.2 | Wasm | Wasm |
-| T-05 | `oriented_polyline` (one-sided) | no | none | MISSING, 143.1 | Wasm | Wasm |
+| T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | `triangle`, `borderRadius` | kernel cores with a radius, exact mass, facade options (`physics2d/tests/shapes-more.test.js`) | DONE | Wasm | Wasm |
+| T-04 | 2D `heightfield`, `halfspace`, `compound`, `voxels`, `convex_decomposition` | `heightfield`, `halfspace`, `compound`, `voxels`, `trimesh`, concave polygons | chains, a polygon 200,000 units across for the half space, pieces of one collider, merged outlines for voxels (`physics2d/tests/shapes-more.test.js`); accepted differences in limits.md | DONE | Wasm | Wasm |
+| T-05 | `oriented_polyline` (one-sided) | `polyline` with `oneSided` | one-sided chains in the narrow phase (`physics2d/kernel/tests/chain.rs`, `shapes-more.test.js`) | DONE | Wasm | Wasm |
 | T-06 | 2D fixed, revolute, prismatic, rope and spring joints with limits and motors | yes, on the own kernel | the kernel's joints through the facade (`physics2d/tests/physics2d.test.js`, `kernel-features.test.js`, `kernel/tests/joints.rs`: a 50-link chain under a 1000:1 end mass stretches 0.55 percent where Rapier 2D's stretches to 22 times its length; the 30 by 30 joint grid within 3.96 mm, Rapier 2D 9.88; LIM-534) | DONE | Wasm | Wasm |
 | T-07 | 2D pin-slot and generic joints | no | none | MISSING, 143.3 | Wasm | Wasm |
 | T-08 | 2D multibody joints | no | none | MISSING, 143.3 | Wasm | Wasm |
@@ -541,7 +541,7 @@ Counted from the rows on 2026-11-08 by `node scripts/check-rapier-parity.mjs`, o
 
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 252 | 90 | 21 | 1 | 9 | 127 | 4 |
+| 1, Rapier parity | 252 | 93 | 21 | 0 | 9 | 125 | 4 |
 | 2, beyond Rapier | 83 | 0 | 0 | 0 | 4 (extended later) | 79 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans; 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.

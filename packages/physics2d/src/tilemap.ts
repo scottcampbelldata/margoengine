@@ -74,7 +74,8 @@ const FLIP_H = 0x80000000,
 type Pt = [number, number];
 
 /** Outlines of the filled cells as closed point loops in cell units: shared edges vanish, straight runs merge. */
-function cellOutlines(solid: Uint8Array, width: number, height: number): Pt[][] {
+/** @internal Closed outlines (in cells) of the solid cells of a grid, row by row from the top. */
+export function cellOutlines(solid: Uint8Array, width: number, height: number): Pt[][] {
   const at = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height && solid[y * width + x] === 1;
   const edges = new Map<number, number[]>(), // start vertex -> end vertices
     stride = width + 1;

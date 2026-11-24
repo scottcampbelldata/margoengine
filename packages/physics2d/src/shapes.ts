@@ -1,3 +1,5 @@
+import { cellOutlines } from './tilemap.js';
+
 /** A 2D point or vector [x, y]. */
 export type Vec2D = readonly [number, number];
 
@@ -8,6 +10,8 @@ export type ShapeOptions2D =
       shape: 'box';
       width: number;
       height: number;
+      /** Rounds the corners: the box grows by this radius on every side, as Rapier's round cuboid does (default 0). */
+      borderRadius?: number;
     }
   | { shape: 'circle'; radius: number }
   | {
@@ -20,13 +24,72 @@ export type ShapeOptions2D =
       /** A filled polygon, convex or concave (concave ones are split into convex pieces). */
       shape: 'polygon';
       points: readonly Vec2D[];
+      /** Grows the polygon by this radius, with round corners (default 0). */
+      borderRadius?: number;
     }
   | {
       /** Edges with no area: terrain outlines. Close the loop by repeating the first point. */
       shape: 'polyline';
       points: readonly Vec2D[];
+      /**
+       * Only one side is solid: the one an edge's right-hand normal points to when you walk the points in order (left to
+       * right is up on screen). A body on the other side passes through: a one-way platform (default false).
+       */
+      oneSided?: boolean;
     }
-  | { shape: 'segment'; from: Vec2D; to: Vec2D };
+  | { shape: 'segment'; from: Vec2D; to: Vec2D }
+  | {
+      /** Three points; the same as a polygon of three. */
+      shape: 'triangle';
+      a: Vec2D;
+      b: Vec2D;
+      c: Vec2D;
+      borderRadius?: number;
+    }
+  | {
+      /** Several shapes, each with its own `offset` and `rotation`, as one collider that shares its settings. */
+      shape: 'compound';
+      shapes: readonly CompoundPart2D[];
+    }
+  | {
+      /** Triangles from `indices` (three to a triangle) into `vertices`: a mesh as one collider. */
+      shape: 'trimesh';
+      vertices: readonly Vec2D[];
+      indices: ArrayLike<number>;
+    }
+  | {
+      /**
+       * Terrain from evenly spaced heights: `heights[i]` is the y of the surface at x = -width / 2 + i width / (n - 1),
+       * a chain with smooth joins. The solid side is up on screen.
+       */
+      shape: 'heightfield';
+      heights: ArrayLike<number>;
+      width: number;
+    }
+  | {
+      /**
+       * Everything behind a plane through the collider's position, `normal` pointing out of the solid (default [0, -1],
+       * up on screen). The plane is a polygon 200,000 world units across and deep: a body never reaches its edge.
+       */
+      shape: 'halfspace';
+      normal?: Vec2D;
+    }
+  | {
+      /**
+       * A grid of solid cells, `columns` by `rows`, row by row from the top; `solid[i]` non-zero is a filled cell.
+       * Neighbouring cells merge into outlines, so bodies slide across their seams. The grid's top left is the offset.
+       * Outlines have no thickness, so a very fast body needs `ccd: true`.
+       */
+      shape: 'voxels';
+      cellWidth: number;
+      cellHeight: number;
+      columns: number;
+      rows: number;
+      solid: ArrayLike<number | boolean>;
+    };
+
+/** A part of a compound shape: any shape with its own placement. */
+export type CompoundPart2D = ShapeOptions2D & { offset?: Vec2D; rotation?: number };
 
 /** Material, sensor and filtering settings of a collider. */
 export interface ColliderSettings2D {
@@ -96,6 +159,12 @@ const finite = (value: number, what: string, positive = false): number => {
   return value;
 };
 
+const radiusOf = (value: number | undefined): number => {
+  if (value === undefined) return 0;
+  if (!Number.isFinite(value) || value < 0) throw new RangeError(`borderRadius must be a finite number of 0 or more, got ${value}.`);
+  return value;
+};
+
 const KIND = { circle: 0, capsule: 1, segment: 2, rect: 3, polygon: 4, chain: 5, decomposed: 6 } as const;
 
 /** A collider ready for the kernel: its shape kind, the eight settings words and the geometry words, in metres. */
@@ -147,15 +216,17 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
   let kind: number,
     geometry: Buffer32,
     area = 0,
+    oneSided = false,
     convex = true;
   switch (options.shape) {
     case 'box': {
       const hx = (finite(options.width, 'box width', true) * scale) / 2,
-        hy = (finite(options.height, 'box height', true) * scale) / 2;
+        hy = (finite(options.height, 'box height', true) * scale) / 2,
+        r = radiusOf(options.borderRadius) * scale;
       kind = KIND.rect;
       geometry = new Buffer32(7);
-      geometry.f.set([hx, hy, ox * scale, oy * scale, c, s, 0]);
-      area = 4 * hx * hy;
+      geometry.f.set([hx, hy, ox * scale, oy * scale, c, s, r]);
+      area = 4 * hx * hy + 2 * r * (2 * hx + 2 * hy) + Math.PI * r * r;
       break;
     }
     case 'circle': {
@@ -191,6 +262,7 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
       const closed = n >= 4 && flat[0] === flat[2 * n - 2] && flat[1] === flat[2 * n - 1];
       const used = closed ? n - 1 : n;
       kind = KIND.chain;
+      oneSided = options.oneSided === true;
       geometry = new Buffer32(2 + 2 * used);
       geometry.u[0] = closed ? 1 : 0;
       geometry.u[1] = used;
@@ -202,20 +274,23 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
       const n = flat.length / 2;
       const placed = new Float32Array(2 * n);
       for (let i = 0; i < n; i++) placed.set(place(flat[2 * i], flat[2 * i + 1]), 2 * i);
-      area = polygonArea(placed);
+      const r = radiusOf(options.borderRadius) * scale;
+      let perimeter = 0;
+      for (let i = 0; i < n; i++) perimeter += Math.hypot(placed[2 * i] - placed[2 * ((i + 1) % n)], placed[2 * i + 1] - placed[2 * ((i + 1) % n) + 1]);
+      area = polygonArea(placed) + perimeter * r + Math.PI * r * r;
       if (!(polygonArea(flat) > 1e-9))
         throw new RangeError('polygon points are degenerate (no area); give at least three points not on a line.');
       convex = n <= 8 && isConvex(options.points);
       kind = convex ? KIND.polygon : KIND.decomposed;
       geometry = new Buffer32(2 + 2 * n);
-      geometry.f[0] = 0;
+      geometry.f[0] = r;
       geometry.u[1] = n;
       geometry.f.set(placed, 2);
       break;
     }
     default:
       throw new TypeError(
-        `Unknown collider shape "${(options as { shape?: string }).shape}"; use box, circle, capsule, polygon, polyline or segment.`,
+        `Unknown collider shape "${(options as { shape?: string }).shape}"; use box, circle, capsule, segment, triangle, polygon, polyline, compound, trimesh, heightfield, halfspace or voxels.`,
       );
   }
   const settings = new Buffer32(8);
@@ -230,7 +305,7 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
   settings.u[4] = options.solverGroups ?? 0xffffffff;
   // A sensor also senses fixed and kinematic bodies, so a walking character can enter a trigger.
   const active = options.activeCollisionTypes ?? (sensor ? 63 : 7);
-  settings.u[5] = events | ((active & 0xff) << 8) | (sensor ? 1 << 16 : 0);
+  settings.u[5] = events | ((active & 0xff) << 8) | (sensor ? 1 << 16 : 0) | (oneSided ? 1 << 17 : 0);
   settings.f[6] = options.contactForceThreshold ?? 0;
   return { kind, settings: settings.u, geometry: geometry.u, area, convex };
 }
@@ -261,4 +336,101 @@ function isConvex(points: readonly Vec2D[]): boolean {
     }
   }
   return true;
+}
+
+const HALFSPACE_EXTENT = 100_000;
+
+/**
+ * Describes a collider for the kernel as one or more shapes: a compound, a mesh, a height field, a half space or a grid
+ * of cells becomes several, every other shape one. All of them share the collider's settings.
+ */
+export function describeShapes(options: ColliderOptions2D, scale: number): Described[] {
+  const parts = describePieces(options, scale);
+  if (options.mass !== undefined && parts.length > 1) {
+    // One mass over every piece: each takes the density that makes the pieces weigh `mass` together.
+    const total = parts.reduce((sum, d) => sum + d.area, 0);
+    for (const d of parts) new Float32Array(d.settings.buffer)[0] = total > 0 ? options.mass / total : 0;
+  }
+  return parts;
+}
+
+function describePieces(options: ColliderOptions2D, scale: number): Described[] {
+  const [ox, oy] = options.offset ?? [0, 0];
+  const turn = options.rotation ?? 0;
+  const rest = (shape: ShapeOptions2D, offset: Vec2D = [ox, oy], rotation: number = turn): ColliderOptions2D =>
+    ({ ...options, ...shape, offset, rotation }) as ColliderOptions2D;
+  switch (options.shape) {
+    case 'triangle':
+      return [describeShape(rest({ shape: 'polygon', points: [options.a, options.b, options.c], borderRadius: options.borderRadius }), scale)];
+    case 'compound': {
+      if (!Array.isArray(options.shapes) || options.shapes.length === 0)
+        throw new TypeError('A compound shape needs a non-empty shapes list; pass at least one part.');
+      const c = Math.cos(turn),
+        s = Math.sin(turn);
+      const out: Described[] = [];
+      for (const part of options.shapes) {
+        const [px, py] = part.offset ?? [0, 0];
+        // The part's own placement, then the collider's.
+        out.push(...describePieces(rest(part, [ox + c * px - s * py, oy + s * px + c * py], turn + (part.rotation ?? 0)), scale));
+      }
+      return out;
+    }
+    case 'trimesh': {
+      const { vertices, indices } = options;
+      if (!Array.isArray(vertices) || !indices || indices.length === 0 || indices.length % 3 !== 0)
+        throw new TypeError('A trimesh needs vertices and an index list with three indices to a triangle.');
+      const out: Described[] = [];
+      for (let i = 0; i < indices.length; i += 3) {
+        const tri = [indices[i], indices[i + 1], indices[i + 2]].map((k) => {
+          if (!Number.isInteger(k) || k < 0 || k >= vertices.length)
+            throw new RangeError(`trimesh index ${k} is outside its ${vertices.length} vertices; fix the indices.`);
+          return vertices[k];
+        });
+        const area = Math.abs((tri[1][0] - tri[0][0]) * (tri[2][1] - tri[0][1]) - (tri[2][0] - tri[0][0]) * (tri[1][1] - tri[0][1]));
+        if (area > 1e-9) out.push(describeShape(rest({ shape: 'polygon', points: tri }), scale));
+      }
+      if (!out.length) throw new RangeError('trimesh has no triangle with an area; give it triangles that are not flat.');
+      return out;
+    }
+    case 'heightfield': {
+      const { heights, width } = options;
+      const n = heights?.length ?? 0;
+      if (n < 2) throw new TypeError('A heightfield needs at least two heights.');
+      finite(width, 'heightfield width', true);
+      const points: Vec2D[] = [];
+      for (let i = 0; i < n; i++) points.push([-width / 2 + (i * width) / (n - 1), finite(heights[i], 'heightfield height')]);
+      return [describeShape(rest({ shape: 'polyline', points, oneSided: false }), scale)];
+    }
+    case 'halfspace': {
+      const [nx, ny] = options.normal ?? [0, -1];
+      const length = Math.hypot(nx, ny);
+      if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('halfspace normal must be a finite vector that is not zero.');
+      const n: Vec2D = [nx / length, ny / length],
+        t: Vec2D = [-n[1], n[0]],
+        H = HALFSPACE_EXTENT;
+      const corner = (a: number, b: number): Vec2D => [t[0] * a + n[0] * b, t[1] * a + n[1] * b];
+      const points = [corner(H, 0), corner(-H, 0), corner(-H, -2 * H), corner(H, -2 * H)];
+      return [describeShape(rest({ shape: 'polygon', points }), scale)];
+    }
+    case 'voxels': {
+      const { cellWidth, cellHeight, columns, rows, solid } = options;
+      finite(cellWidth, 'voxels cellWidth', true);
+      finite(cellHeight, 'voxels cellHeight', true);
+      if (!Number.isInteger(columns) || !Number.isInteger(rows) || columns < 1 || rows < 1)
+        throw new RangeError(`voxels columns and rows must be positive integers, got ${columns} x ${rows}.`);
+      if (!solid || solid.length !== columns * rows)
+        throw new RangeError(`voxels has ${solid?.length} values for ${columns} x ${rows} cells; give columns * rows values.`);
+      const grid = new Uint8Array(columns * rows);
+      for (let i = 0; i < grid.length; i++) grid[i] = solid[i] ? 1 : 0;
+      const loops = cellOutlines(grid, columns, rows);
+      if (!loops.length) throw new RangeError('voxels has no solid cell; fill at least one.');
+      return loops.map((loop) => {
+        const points = loop.map((p): Vec2D => [p[0] * cellWidth, p[1] * cellHeight]);
+        points.push(points[0]);
+        return describeShape(rest({ shape: 'polyline', points }), scale);
+      });
+    }
+    default:
+      return [describeShape(options, scale)];
+  }
 }
