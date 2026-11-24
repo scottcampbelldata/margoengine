@@ -29,6 +29,7 @@ await build({
         index: resolve(root, 'src/index.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
+        meshfiles: resolve(root, 'src/meshfiles.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

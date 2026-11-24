@@ -1265,6 +1265,23 @@ console.log(Math.abs(Math.hypot(...arm[0].position) - 1) < 1e-3); // true
 physics.dispose();
 ```
 
+### Mesh files as colliders
+
+`@margoengine/physics/meshfiles` reads binary and ASCII STL files and Wavefront OBJ files (faces of any size are fanned, indices may be negative) with no other package: `parseSTL(file)` and `parseOBJ(file)` give a welded `{vertices, indices}`, and `meshFileCollider(file, {format, shape})` gives collider options, a `trimesh` by default (for fixed bodies) or the `convexHull` of the points (for dynamic ones). `Physics.kernelBuild` is the hash of the kernel source the loaded solver was made from, to record beside a replay.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {meshFileCollider} from 'margoengine/physics/meshfiles';
+
+await Physics.load();
+const physics = new Physics(null);
+const obj = 'v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nv 0 0 1\nv 1 0 1\nv 1 1 1\nv 0 1 1\n' +
+  'f 1 4 3 2\nf 5 6 7 8\nf 1 2 6 5\nf 3 4 8 7\nf 2 3 7 6\nf 4 1 5 8\n';
+const crate = physics.addBody(null, {position: [0, 2, 0], colliders: {...meshFileCollider(obj, {shape: 'convexHull'}), density: 100}});
+console.log(crate.mass > 0, Physics.kernelBuild.length); // true 64
+physics.dispose();
+```
+
 ### More world settings
 
 `physics.setSolver` also takes `warmStartJoints` (the share of each joint impulse carried from one step to the next, 1 by default), `maxLinearSpeed` (one linear speed cap for every dynamic body, 0 for none, a lower cap on a body still wins) and `staticContactHertz` with `staticContactDamping` (a stiffness of their own for contacts with a fixed or kinematic body; 0 leaves them with `contactHertz`). `physics.wakeUpAll()` wakes every sleeper.

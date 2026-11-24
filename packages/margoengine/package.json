@@ -2987,6 +2987,10 @@
       "types": "./dist/physics/soft.d.ts",
       "import": "./dist/physics/soft.js"
     },
+    "./physics/meshfiles": {
+      "types": "./dist/physics/meshfiles.d.ts",
+      "import": "./dist/physics/meshfiles.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

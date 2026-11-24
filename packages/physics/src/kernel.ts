@@ -743,8 +743,12 @@ const bodyKinds: Readonly<Record<KernelBodyKind, number>> = {
 // The blueprint (the deflated kernel and its column table) is a chunk of its own: an app that imports the entry but never
 // calls `Physics.load()` does not download it.
 let kernelColumns: readonly (readonly [string, 'f' | 'u', number])[] = [];
+let loadedBuild = '';
+/** The hash of the kernel source the loaded Wasm was made from, or '' before {@link loadKernel} has finished. */
+export const kernelBuild = (): string => loadedBuild;
 const compiled = new LoadOnce<WebAssembly.Module>(async () => {
   const blueprint = await import('./wasm.js');
+  loadedBuild = blueprint.kernelSource;
   kernelColumns = blueprint.kernelColumns;
   const bytes = Uint8Array.from(atob(blueprint.wasmBase64), (c) => c.charCodeAt(0));
   return WebAssembly.compile(

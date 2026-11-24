@@ -11,6 +11,7 @@ import {
   EVENT_REMOVED,
   EVENT_SENSOR,
   KernelWorld,
+  kernelBuild,
   loadKernel,
   PAIR_IS_PART,
   PAIR_TOUCHING,
@@ -511,6 +512,16 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly eventBuffer: (CollisionEvent | ContactForceEvent)[] = [];
   private dispatching = false;
 
+  /**
+   * The build of the solver this package carries: the hash of the kernel's source its Wasm was made from, 64 hex digits, the same in
+   * every browser and equal exactly when the kernel is. Record it with a replay to know which solver made it.
+   * @throws MargoError (`state`) before `Physics.load()` has finished.
+   */
+  static get kernelBuild(): string {
+    const build = kernelBuild();
+    if (!build) throw new MargoError('state', 'The solver is not loaded yet; await Physics.load() first.');
+    return build;
+  }
   /**
    * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.
    * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.

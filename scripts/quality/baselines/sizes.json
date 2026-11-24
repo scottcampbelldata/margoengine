@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17818839,
+  "total": 17820088,
   "history": [
     {
       "date": "2026-10-24",
@@ -11625,6 +11625,12 @@
       "commit": "b484c2e81",
       "reason": "DynamicCharacter entry (stable PD upright, velocity controller) and the kinematic controller's platform, inner body, contact listener and push limits: physics base 70,938 to 71,112 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "1a9ed2b1e",
+      "reason": "new optional entry @margoengine/physics/meshfiles (STL and OBJ readers, 993 B gzip)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12386,6 +12392,7 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 73246,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 215980,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/meshfiles": 1249,
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25114,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,

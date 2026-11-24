@@ -43,6 +43,10 @@
     "./soft": {
       "types": "./dist/soft.d.ts",
       "import": "./dist/soft.js"
+    },
+    "./meshfiles": {
+      "types": "./dist/meshfiles.d.ts",
+      "import": "./dist/meshfiles.js"
     }
   },
   "files": [

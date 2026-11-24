@@ -1283,6 +1283,7 @@ class Physics implements EnginePlugin, BodyOwner {
     timeScale: number;
     paused: boolean;
     stepCount: number;
+    static get kernelBuild(): string;
     static load(options?: KernelLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: PhysicsOptions): Physics;
     constructor(engine: EngineKernel | null, options?: PhysicsOptions);
