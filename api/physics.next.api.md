@@ -830,6 +830,23 @@ type CompoundPart = ({
     shape: 'convexHull';
     points: ArrayLike<number>;
     borderRadius?: number;
+}
+ | {
+    shape: 'trimesh';
+    vertices: ArrayLike<number>;
+    indices: ArrayLike<number>;
+    fixInternalEdges?: boolean;
+} | {
+    shape: 'heightfield';
+    rows: number;
+    columns: number;
+    heights: ArrayLike<number>;
+    scale: Vec3;
+    fixInternalEdges?: boolean;
+} | {
+    shape: 'voxels';
+    cells: Int32Array;
+    size?: Vec3;
 }) & {
     offset?: Vec3;
     rotation?: Quat;
@@ -854,7 +871,7 @@ interface KernelCastOptions {
 }
 
 interface KernelCompoundPart {
-    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
+    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
     size: readonly number[];
     position?: readonly [number, number, number];
     rotation?: readonly [number, number, number, number];

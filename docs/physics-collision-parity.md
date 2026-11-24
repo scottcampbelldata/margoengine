@@ -24,7 +24,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Triangle mesh (trimesh) | full | every creation flag below |
 | Height field | full | Rapier's layout and split |
 | Compound | full | convex parts |
-| Compound with non-convex parts (trimesh, height field, voxels, half space as part) | missing | Rapier's compound takes any shape |
+| Compound with non-convex parts (trimesh, height field, voxels, half space as part) | partial | mesh, height field and voxel parts work against convex colliders (`next-compound-meshes.test.js`); a mesh part against another compound's parts, and a half space part, are open |
 | Voxels | full | edit, combine, propagate |
 | Segment | full | a capsule with no radius; `next-segments.test.js` against Rapier |
 | Triangle | full | a one-triangle mesh, both sides; ray and rest tested against Rapier |

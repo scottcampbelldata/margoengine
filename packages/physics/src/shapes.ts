@@ -119,6 +119,10 @@ export type CompoundPart = (
   | { shape: 'cylinder'; halfHeight: number; radius: number; borderRadius?: number }
   | { shape: 'cone'; halfHeight: number; radius: number; borderRadius?: number }
   | { shape: 'convexHull'; points: ArrayLike<number>; borderRadius?: number }
+  /** A mesh, height field or voxel grid as a part: a surface (a voxel grid weighs nothing here), for a fixed body's scenery. */
+  | { shape: 'trimesh'; vertices: ArrayLike<number>; indices: ArrayLike<number>; fixInternalEdges?: boolean }
+  | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3; fixInternalEdges?: boolean }
+  | { shape: 'voxels'; cells: Int32Array; size?: Vec3 }
 ) & {
   /** Part position in the collider's frame (default origin). */
   offset?: Vec3;
@@ -433,9 +437,14 @@ export function createColliderDesc(
         positions: Vector[] = [],
         rotations: Rotation[] = [];
       for (const part of parts as readonly CompoundPart[]) {
+        if (part?.shape === 'trimesh' || part?.shape === 'heightfield' || part?.shape === 'voxels')
+          throw new MargoError(
+            'unsupported',
+            `A ${part.shape} part in a compound needs the own solver: import {Physics} from '@margoengine/physics/next'. Rapier's JavaScript fails on a compound with a mesh in it.`,
+          );
         if (!CONVEX_PARTS.includes(part?.shape))
           throw new TypeError(
-            `Compound part shape ${String(part?.shape)} is not convex; use box, sphere, capsule, cylinder, cone or convexHull parts.`,
+            `Compound part shape ${String(part?.shape)} cannot be a part; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield or voxels parts.`,
           );
         if (part.shape === 'box' && !part.halfExtents)
           throw new TypeError('A compound box part needs halfExtents; parts are never fitted to the mesh.');

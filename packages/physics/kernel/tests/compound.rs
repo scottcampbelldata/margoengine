@@ -77,8 +77,8 @@ fn a_child_sits_in_the_body_frame_through_the_compound_pose() {
     assert!(p.x.abs() < 1e-6 && (p.y - 2.0).abs() < 1e-6 && p.z.abs() < 1e-6, "child at {p:?}");
     let q = w.q(COLLIDER_ROTATION_X, child);
     assert!((q.z - 0.707_106_8).abs() < 1e-6 && (q.w - 0.707_106_8).abs() < 1e-6, "child turned {q:?}");
-    // Not a convex child, or not a compound: refused.
-    assert!(w.add_compound_part(c, SHAPE_TRIMESH, [0.0; 3], [0.0; 3], ID).is_none());
+    // Not a child shape, or not a compound: refused.
+    assert!(w.add_compound_part(c, SHAPE_HALFSPACE, [0.0, 1.0, 0.0], [0.0; 3], ID).is_none());
     assert!(w.add_compound_part(c, SHAPE_COMPOUND, [0.0; 3], [0.0; 3], ID).is_none());
     assert!(w.add_compound_part(child as u32, SHAPE_BALL, [1.0, 0.0, 0.0], [0.0; 3], ID).is_none());
 }

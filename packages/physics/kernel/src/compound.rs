@@ -6,7 +6,17 @@ use crate::layout::*;
 use crate::narrow::Manifold;
 use crate::world::{NONE, World};
 
+/// A triangle part of a compound's mesh child is named by this bit and the child's row in PAIR_SUB, so it differs from a
+/// part named by a convex child's row (under 2^22) and from a triangle of a mesh collider (no child).
+const MESH_CHILD: u32 = 1 << 31;
+
 impl World {
+    /// True when a collider row is a mesh, height field or voxel grid.
+    #[inline(always)]
+    fn is_mesh(&self, c: usize) -> bool {
+        self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH
+    }
+
     /// True when either side of a pair is a compound.
     #[inline(always)]
     pub fn has_compound(&self, a: usize, b: usize) -> bool {
@@ -31,7 +41,8 @@ impl World {
             let mut child = self.uu(COLLIDER_HULL, compound);
             while child != NONE {
                 let at = child as usize;
-                if self.boxes_overlap(at, mesh_collider) {
+                // A mesh meets no mesh, whether it is a collider or a child.
+                if !self.is_mesh(at) && self.boxes_overlap(at, mesh_collider) {
                     let limit = self.contact_limit_of(at, mesh_collider, dt);
                     if !self.mesh_walk(row, mesh_collider, (at, compound_is_a, child), limit, ratio, bodies) {
                         return;
@@ -48,7 +59,18 @@ impl World {
             let mut cb = first_b;
             while cb != NONE {
                 let (x, y) = (ca as usize, cb as usize);
-                if self.boxes_overlap(x, y) {
+                let (mesh_x, mesh_y) = (self.is_mesh(x), self.is_mesh(y));
+                if mesh_x || mesh_y {
+                    // A mesh child meets a convex collider that is no compound's child: a part names the triangle and the
+                    // mesh child. Two meshes, or a mesh child against a compound's children, meet nothing.
+                    if mesh_x != mesh_y && !(compound_a && compound_b) && self.boxes_overlap(x, y) {
+                        let (mesh, other, other_is_a) = if mesh_x { (x, y, false) } else { (y, x, true) };
+                        let limit = self.contact_limit_of(x, y, dt);
+                        if !self.mesh_walk(row, mesh, (other, other_is_a, mesh as u32 | MESH_CHILD), limit, ratio, bodies) {
+                            return;
+                        }
+                    }
+                } else if self.boxes_overlap(x, y) {
                     // A part names B's child, or A's when B is no compound; PAIR_SUB names A's child of two compounds.
                     let key = match (compound_a, compound_b) {
                         (true, true) => (cb, ca),
@@ -88,7 +110,15 @@ impl World {
             let mut cb = first_b;
             while cb != NONE {
                 let (x, y) = (ca as usize, cb as usize);
-                if self.boxes_overlap(x, y) {
+                let (mesh_x, mesh_y) = (self.is_mesh(x), self.is_mesh(y));
+                if mesh_x || mesh_y {
+                    if mesh_x != mesh_y && !(compound_a && compound_b) && self.boxes_overlap(x, y) {
+                        let (mesh, other, other_is_a) = if mesh_x { (x, y, false) } else { (y, x, true) };
+                        if self.mesh_overlaps_with(mesh, other, other_is_a) {
+                            return true;
+                        }
+                    }
+                } else if self.boxes_overlap(x, y) {
                     manifold.held_count = 0;
                     manifold.feature = 0;
                     self.collide(x, y, 0.0, &mut manifold);

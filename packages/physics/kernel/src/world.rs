@@ -546,7 +546,7 @@ impl World {
     /// in the compound's frame, then recomputes the body's mass. None when the rows are used up, `compound` is not a live
     /// compound, or the shape is not convex.
     pub fn add_compound_part(&mut self, compound: u32, shape: u32, size: [f32; 3], position: [f32; 3], rotation: [f32; 4]) -> Option<u32> {
-        if compound >= self.header().collider_rows || !matches!(shape, SHAPE_BALL | SHAPE_BOX | SHAPE_CAPSULE | SHAPE_HULL | SHAPE_CYLINDER | SHAPE_CONE) {
+        if compound >= self.header().collider_rows || !matches!(shape, SHAPE_BALL | SHAPE_BOX | SHAPE_CAPSULE | SHAPE_HULL | SHAPE_CYLINDER | SHAPE_CONE | SHAPE_TRIMESH) {
             return None;
         }
         let parent = compound as usize;
@@ -568,7 +568,7 @@ impl World {
             for k in 0..3 {
                 *self.f(COLLIDER_A + k).add(at) = size[k];
             }
-            if shape == SHAPE_HULL {
+            if shape == SHAPE_HULL || shape == SHAPE_TRIMESH {
                 *self.u(COLLIDER_HULL).add(at) = size[0] as u32;
                 *self.f(COLLIDER_A).add(at) = 0.0;
             }
