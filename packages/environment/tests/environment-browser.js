@@ -104,13 +104,15 @@ async function readLut(device, lut) {
   };
 }
 
+// Height-correlated Smith-GGX G2 (Heitz 2014, JCGT 3(2), eq. 99), the masking core's direct light and the LUT use.
+const smithG2 = (nl, nv, a2) =>
+  (2 * nl * nv) / (nl * Math.sqrt(a2 + (1 - a2) * nv * nv) + nv * Math.sqrt(a2 + (1 - a2) * nl * nl));
 // Brute-force reference for the split-sum BRDF: uniform grid over the hemisphere of L with core's GGX D and
-// separable Smith G, independent of the GPU's importance sampling.
+// height-correlated Smith G2, independent of the GPU's importance sampling.
 function brdfReference(nv, roughness, steps = 700) {
   const alpha = roughness * roughness,
     a2 = alpha * alpha,
     v = [Math.sqrt(1 - nv * nv), 0, nv];
-  const g1 = (x) => (2 * x) / (x + Math.sqrt(a2 + (1 - a2) * x * x));
   let scale = 0,
     bias = 0;
   const dTheta = Math.PI / 2 / steps,
@@ -129,7 +131,7 @@ function brdfReference(nv, roughness, steps = 700) {
         vh = Math.max(0, h[0] * v[0] + h[2] * v[2]);
       const q = nh * nh * (a2 - 1) + 1,
         d = a2 / (Math.PI * q * q);
-      const f = ((d * g1(nv) * g1(nl)) / (4 * nv * nl)) * nl * st * dTheta * dPhi,
+      const f = ((d * smithG2(nl, nv, a2)) / (4 * nv * nl)) * nl * st * dTheta * dPhi,
         fc = (1 - vh) ** 5;
       scale += (1 - fc) * f;
       bias += fc * f;
@@ -153,7 +155,6 @@ function brdfHammersley(size, samples) {
     const roughness = (y + 0.5) / size,
       alpha = roughness * roughness,
       a2 = alpha * alpha,
-      g1 = (x) => (2 * x) / (x + Math.sqrt(a2 + (1 - a2) * x * x)),
       half = points.map(([u, w]) => {
         const theta = Math.atan(alpha * Math.sqrt(w / (1 - w))),
           phi = 2 * Math.PI * u;
@@ -168,7 +169,7 @@ function brdfHammersley(size, samples) {
         const vh = Math.min(1, Math.max(0, v[0] * h[0] + v[2] * h[2])),
           lz = 2 * vh * h[2] - v[2];
         if (lz > 0 && vh > 0) {
-          const visibility = (g1(nv) * g1(lz) * vh) / (h[2] * nv),
+          const visibility = (smithG2(lz, nv, a2) * vh) / (h[2] * nv),
             fc = (1 - vh) ** 5;
           scale += (1 - fc) * visibility;
           bias += fc * visibility;
@@ -185,13 +186,6 @@ const halfUlp16 = (x) => 0.5 * 2 ** (Math.max(-14, Math.floor(Math.log2(Math.max
 // f32 evaluation of 512 samples beyond the f16 rounding: 2.44e-4 measured on the RTX A6000 (WebGPU and WebGL2
 // compat) with the stable inverse CDF; the sqrt(1 - cos^2) form was 8.28e-4 over at the smoothest grazing cell.
 const LUT_F32_ALLOWANCE = 3e-4;
-// Karis, "Physically Based Shading on Mobile" (2014) analytic fit of the UE4 environment BRDF.
-function karisApproximation(nv, roughness) {
-  const r = [roughness * -1 + 1, roughness * -0.0275 + 0.0425, roughness * -0.572 + 1.04, roughness * 0.022 - 0.04];
-  const a004 = Math.min(r[0] * r[0], 2 ** (-9.28 * nv)) * r[0] + r[1];
-  return [-1.04 * a004 + r[2], 1.04 * a004 + r[3]];
-}
-
 // The display curve of packages/shared/display.js (Khronos PBR Neutral, then exact sRGB), as 8-bit values.
 const tonemap = (rgb) => {
   const x = Math.min(...rgb),
@@ -466,13 +460,15 @@ window.runEnvironmentTests = async () => {
     );
   }
 
-  // 4. BRDF LUT against brute-force quadrature, the smooth-surface analytic limit and Karis's published fit.
+  // 4. BRDF LUT against an f64 quadrature of the height-correlated integral and the smooth-surface analytic limit.
+  // KB6016b: Karis 2014's mobile fit models the separable-G table, so it is no oracle for this one; the dielectric
+  // F0 = 0.04 response it covered is checked against the f64 G2 quadrature instead, bound 0.012 (was 0.04).
   {
     const lut = await readLut(device, codedEnvironment.brdfLut),
       size = lut.width,
       points = [];
     let quadratureError = 0,
-      karisError = 0,
+      dielectricError = 0,
       smoothError = 0;
     for (const [x, y] of [
       [4, 10],
@@ -487,12 +483,10 @@ window.runEnvironmentTests = async () => {
       const nv = (x + 0.5) / size,
         roughness = (y + 0.5) / size,
         got = lut.at(0, x, y).slice(0, 2);
-      const expected = brdfReference(nv, roughness),
-        karis = karisApproximation(nv, roughness);
+      const expected = brdfReference(nv, roughness);
       points.push({ nv, roughness, got, expected });
       quadratureError = Math.max(quadratureError, Math.abs(got[0] - expected[0]), Math.abs(got[1] - expected[1]));
-      // The mobile fit targets dielectrics, so compare the F0 = 0.04 response it was fitted for.
-      karisError = Math.max(karisError, Math.abs(0.04 * got[0] + got[1] - 0.04 * karis[0] - karis[1]));
+      dielectricError = Math.max(dielectricError, Math.abs(0.04 * got[0] + got[1] - 0.04 * expected[0] - expected[1]));
     }
     for (let x = 0; x < size; x += 4) {
       const nv = (x + 0.5) / size,
@@ -502,9 +496,9 @@ window.runEnvironmentTests = async () => {
     }
     assert(quadratureError < 0.012, `BRDF LUT vs quadrature ${quadratureError}: ${JSON.stringify(points)}`);
     assert(smoothError < 0.01, `BRDF LUT smooth limit error ${smoothError}`);
-    assert(karisError < 0.04, `BRDF LUT vs Karis fit at F0 = 0.04: ${karisError}`);
-    report.brdf = { quadratureError, smoothLimitError: smoothError, karisFitError: karisError };
-    report.checks.push('BRDF LUT matches quadrature, the smooth analytic limit and the Karis mobile fit');
+    assert(dielectricError < 0.012, `BRDF LUT vs G2 quadrature at F0 = 0.04: ${dielectricError}`);
+    report.brdf = { quadratureError, smoothLimitError: smoothError, dielectricError };
+    report.checks.push('BRDF LUT matches the f64 G2 quadrature (also at F0 = 0.04) and the smooth analytic limit');
   }
 
   // 4b. The shared LUT: two environments hold one buffer, it outlives the first, and it equals a LUT filled on its own.
@@ -520,12 +514,20 @@ window.runEnvironmentTests = async () => {
       second = await Environment.create(device, flat, lutOptions);
     assert(first.brdfLut === second.brdfLut, 'two environments of one device hold one BRDF LUT');
     first.dispose();
-    assert(JSON.stringify(await bits(second.brdfLut)) === JSON.stringify(alone), 'the LUT changed when its first holder went');
+    assert(
+      JSON.stringify(await bits(second.brdfLut)) === JSON.stringify(alone),
+      'the LUT changed when its first holder went',
+    );
     second.dispose();
     const third = await Environment.create(device, flat, lutOptions);
-    assert(JSON.stringify(await bits(third.brdfLut)) === JSON.stringify(alone), 'a fresh fill differs from the shared LUT');
+    assert(
+      JSON.stringify(await bits(third.brdfLut)) === JSON.stringify(alone),
+      'a fresh fill differs from the shared LUT',
+    );
     third.dispose();
-    report.checks.push('Environments of one device share one BRDF LUT, which outlives its first holder and equals a fresh fill');
+    report.checks.push(
+      'Environments of one device share one BRDF LUT, which outlives its first holder and equals a fresh fill',
+    );
   }
 
   // 4c. Every cell of the default 128 x 128 LUT (512 samples) against an f64 CPU integration of the same Hammersley
@@ -533,12 +535,16 @@ window.runEnvironmentTests = async () => {
   {
     const size = 128,
       samples = 512,
-      environment = await Environment.create(device, equirect(64, 32, () => [1, 1, 1]), {
-        size: 16,
-        samples: 64,
-        brdfSize: size,
-        brdfSamples: samples,
-      }),
+      environment = await Environment.create(
+        device,
+        equirect(64, 32, () => [1, 1, 1]),
+        {
+          size: 16,
+          samples: 64,
+          brdfSize: size,
+          brdfSamples: samples,
+        },
+      ),
       lut = await readLut(device, environment.brdfLut),
       expected = brdfHammersley(size, samples);
     environment.dispose();
@@ -558,8 +564,15 @@ window.runEnvironmentTests = async () => {
       }
     }
     assert(worst.excess <= 0, `BRDF LUT vs f64 Hammersley integration: ${JSON.stringify(worst)}`);
-    report.brdfHammersley = { worstOverF16: worst.excess + LUT_F32_ALLOWANCE, worstError: worst.error, worstCell: [worst.x, worst.y, worst.c], smoothRowsError: smoothRows };
-    report.checks.push('every BRDF LUT cell matches an f64 integration of the same Hammersley samples within f16 storage rounding');
+    report.brdfHammersley = {
+      worstOverF16: worst.excess + LUT_F32_ALLOWANCE,
+      worstError: worst.error,
+      worstCell: [worst.x, worst.y, worst.c],
+      smoothRowsError: smoothRows,
+    };
+    report.checks.push(
+      'every BRDF LUT cell matches an f64 integration of the same Hammersley samples within f16 storage rounding',
+    );
   }
 
   // 5. Background pass rendered directly: directions, rotation, exposure, blur, HDR and 8-bit outputs, depth.

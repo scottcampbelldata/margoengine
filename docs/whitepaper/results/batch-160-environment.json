@@ -249,5 +249,100 @@
         }
       }
     }
+  },
+  "acceptedKB6016b": {
+    "issue": "KB6016b",
+    "domain": "Accepted difference, recorded 2026-11-24: Margo's split-sum DFG table integrates the height-correlated Smith G2 (Heitz 2014, the glTF 2.0 appendix B visibility, as core's direct light) while Mitsuba 3.9.1 principled evaluates the separable G1(wi) G1(wo) (measured: G = 0.683054 = G1 G1 where G2 gives 0.704176). The rows above stay the published record measured with the separable table; these are the same frozen references against the G2 picture, exact first measurements that the script now gates on. Direct absolute 2,294,442 -> 2,326,991 (+1.4 %). Like for like, against the exact G2 split-sum model (batch-160-environment-decomposition.json, split-model-unoccluded-1024) the error falls 467,718 -> 447,308 and the flat signed sum -17,492 -> -870.",
+    "hardware": {
+      "native": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "158.0.4370.33",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "compat": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "158.0.4370.33",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      }
+    },
+    "native": {
+      "direct": {
+        "pixels": 262144,
+        "absolute": 2326991,
+        "square": 78217549,
+        "max": 170,
+        "mae": 2.9589220682779946,
+        "rmse": 9.972901120773725,
+        "foreground": 47481,
+        "foregroundAbsolute": 2326991,
+        "foregroundMae": 16.33629592187752,
+        "changed": 46735
+      },
+      "full": {
+        "pixels": 262144,
+        "absolute": 1510119,
+        "square": 32969063,
+        "max": 118,
+        "mae": 1.9202156066894531,
+        "rmse": 6.474745670071228,
+        "foreground": 47500,
+        "foregroundAbsolute": 1510119,
+        "foregroundMae": 10.597326315789473,
+        "changed": 46701
+      }
+    },
+    "compat": {
+      "direct": {
+        "pixels": 262144,
+        "absolute": 2326940,
+        "square": 78215460,
+        "max": 170,
+        "mae": 2.958857218424479,
+        "rmse": 9.972767943949522,
+        "foreground": 47481,
+        "foregroundAbsolute": 2326940,
+        "foregroundMae": 16.3359378839255,
+        "changed": 46737
+      },
+      "full": {
+        "pixels": 262144,
+        "absolute": 1510078,
+        "square": 32967762,
+        "max": 118,
+        "mae": 1.9201634724934895,
+        "rmse": 6.474617918075058,
+        "foreground": 47500,
+        "foregroundAbsolute": 1510078,
+        "foregroundMae": 10.597038596491227,
+        "changed": 46699
+      }
+    }
   }
 }

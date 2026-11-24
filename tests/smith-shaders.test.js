@@ -52,13 +52,10 @@ test("materials' anisotropic lobe is the height-correlated G2 and meets the isot
 });
 
 // The separable form G1(v) G1(l), each G1 written 2 x / (x + sqrt(...)) or 2 x / (x + width), anywhere in package
-// source. One known exception remains, tracked as its own row.
+// source. None is left: environment's split-sum DFG table (Karis 2013), the last one, integrates G2 since KB6016b.
 const separable = /2(?:\.0)?\s*\*\s*(\w+)\s*\/\s*(?:max\()?\(?\s*\1\s*\+\s*(?:sqrt\(|length\(|\w+\))/;
-const exceptions = {
-  // KB6016b: environment's split-sum DFG table (Karis 2013) still integrates the separable G; changing it moves every
-  // image-based-lighting picture and the batch 160 reference budgets, so it is its own row.
-  'packages/environment/src/shaders.ts': 1,
-};
+/** @type {Record<string, number>} */
+const exceptions = {};
 
 function* sources(dir) {
   for (const name of readdirSync(new URL(dir, root))) {
@@ -68,7 +65,7 @@ function* sources(dir) {
   }
 }
 
-test('no package source writes the separable Smith product outside the listed exception', () => {
+test('no package source writes the separable Smith product', () => {
   const hits = {};
   const dirs = readdirSync(new URL('packages', root))
     .map((name) => `packages/${name}/src`)
@@ -99,7 +96,11 @@ test('the shared GGX D is a2 / pi where the half vector faces away, and the text
       ggxDOf: shaderExpression(terms.ggxDOf('s.n', 'q'), ['s', 'q', 'nh', 'a2']),
     },
     n = [0, 0, 1];
-  assert.equal(terms.ggxD, terms.ggxDOf('n', 'h'), 'ggxD is ggxDOf over n and h, written as a literal so bundles drop it unused');
+  assert.equal(
+    terms.ggxD,
+    terms.ggxDOf('n', 'h'),
+    'ggxD is ggxDOf over n and h, written as a literal so bundles drop it unused',
+  );
   for (const [name, d] of Object.entries(forms)) {
     const call = (h, nh, a2) => (name === 'ggxDOf' ? d({ n }, h, nh, a2) : d(n, h, nh, a2));
     for (const c of [-0.999, -0.9, -0.5, -0.1, -1e-6, 0.3, 0.9, 0.999])
@@ -133,7 +134,10 @@ test('every G2 text keeps the exact value on smooth surfaces at grazing angles, 
       for (const nv of [1e-4, 0.001, 0.01, 0.5])
         for (const a2 of [1e-10, 1e-8, 1e-6, 1e-4]) {
           const want = correlatedG2(nl, nv, a2);
-          assert.ok(Math.abs(g(nl, nv, a2) / want - 1) < 1e-9, `${name} at nl ${nl}, nv ${nv}, a2 ${a2}: ${g(nl, nv, a2)} vs ${want}`);
+          assert.ok(
+            Math.abs(g(nl, nv, a2) / want - 1) < 1e-9,
+            `${name} at nl ${nl}, nv ${nv}, a2 ${a2}: ${g(nl, nv, a2)} vs ${want}`,
+          );
         }
     assert.equal(g(0, 0.5, 0), 0, `${name} at nl = a2 = 0`);
   }

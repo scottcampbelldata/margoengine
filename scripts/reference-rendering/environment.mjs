@@ -48,8 +48,12 @@ if (process.argv.includes('--capture-reference')) {
       copyFileSync(join(candidate, 'mitsuba-' + mode + suffix), join(out, 'mitsuba-' + mode + suffix));
 }
 const decomposition = existsSync(decompositionPath) ? JSON.parse(readFileSync(decompositionPath)) : undefined;
-assert.ok(!measureDecomposition || !decomposition, '--measure-decomposition cannot replace an established decomposition');
-if (decompose && !measureDecomposition) assert.ok(decomposition, 'Record the decomposition with --measure-decomposition');
+assert.ok(
+  !measureDecomposition || !decomposition,
+  '--measure-decomposition cannot replace an established decomposition',
+);
+if (decompose && !measureDecomposition)
+  assert.ok(decomposition, 'Record the decomposition with --measure-decomposition');
 if (process.argv.includes('--capture-decomposition')) {
   // CUDA Mitsuba; validated against the frozen hashes before any file is replaced.
   const candidate = join(out, `decomposition-${Date.now()}-${process.pid}`);
@@ -90,13 +94,23 @@ try {
   for (const mode of ['direct', 'full']) {
     const reference = readPathReference(out, 'mitsuba-' + mode, settings.width, settings.height, baseline?.rows[mode]);
     const metrics = pictureError(actual, reference.image);
-    if (baseline) assertBudget(metrics, compat ? baseline.compat.rows[mode].metrics : baseline.rows[mode].metrics);
+    // KB6016b accepted difference: the rows stay the published record (separable-G table against Mitsuba principled,
+    // whose G is separable); the G2 picture is gated on the exact measurements recorded beside them.
+    const accepted = baseline?.acceptedKB6016b;
+    if (accepted) assertBudget(metrics, (compat ? accepted.compat : accepted.native)[mode]);
+    else if (baseline) assertBudget(metrics, compat ? baseline.compat.rows[mode].metrics : baseline.rows[mode].metrics);
     const { image, ...metadata } = reference;
     rows[mode] = { ...metadata, metrics };
   }
   let split;
   if (decompose) {
-    const frozen = readPathReference(out, 'mitsuba-direct', settings.width, settings.height, baseline?.rows.direct).image;
+    const frozen = readPathReference(
+      out,
+      'mitsuba-direct',
+      settings.width,
+      settings.height,
+      baseline?.rows.direct,
+    ).image;
     split = { frozen: { ...rows.direct.metrics, ...edgeSplit(actual, frozen, frozen) } };
     for (const name of decompositionNames) {
       const reference = readPathReference(

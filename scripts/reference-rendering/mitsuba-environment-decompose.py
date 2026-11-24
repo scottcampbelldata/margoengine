@@ -25,9 +25,13 @@ folder = Path(sys.argv[1])
 ALPHA_MIN = 1e-3  # GGX alpha floor for roughness 0 (a mirror to float precision); Mitsuba's principled clamps too.
 
 
-def ggx_d(alpha, nh):
+def ggx_d(alpha, m):
+    """GGX D for a unit half vector m in the local frame (z is the normal), with the denominator written
+    |n x m|^2 + a2 (n.m)^2 (equal to (n.m)^2 (a2 - 1) + 1 for unit vectors): in float32 the expanded form cancels
+    near the normal, so at the alpha floor 1e-3 the albedo integral came out 0.896 instead of 1 (KB6016b), as
+    core's KB6016c. Walter et al. 2007, eq. 33."""
     a2 = alpha * alpha
-    t = nh * nh * (a2 - 1) + 1
+    t = m.x * m.x + m.y * m.y + a2 * m.z * m.z
     return a2 / (dr.pi * t * t)
 
 
@@ -41,7 +45,7 @@ def gltf_eval(color, metallic, alpha, wi, wo):
     diffuse = (1 - fresnel) * dr.lerp(color, mi.Color3f(0), metallic) / dr.pi
     a2 = alpha * alpha
     vis = 0.5 / (nl * dr.sqrt(nv * nv * (1 - a2) + a2) + nv * dr.sqrt(nl * nl * (1 - a2) + a2))
-    specular = fresnel * vis * ggx_d(alpha, h.z)
+    specular = fresnel * vis * ggx_d(alpha, h)
     return dr.select(nl > 0, (diffuse + specular) * nl, 0)
 
 
@@ -81,7 +85,7 @@ class Unoccluded(mi.SamplingIntegrator):
             ok = valid & (wo.z > 0) & (wi.z > 0) & (pdf > 0)
             a2 = alpha * alpha
             vis = 0.5 / (wo.z * dr.sqrt(wi.z * wi.z * (1 - a2) + a2) + wi.z * dr.sqrt(wo.z * wo.z * (1 - a2) + a2))
-            g = ggx_d(alpha, m.z) * vis * wo.z / pdf
+            g = ggx_d(alpha, m) * vis * wo.z / pdf
             fc = dr.power(1 - dr.clip(dr.dot(wi, m), 0, 1), 5)
             return mi.Spectrum(dr.select(ok, mi.Color3f(g * (1 - fc), g * fc, 0), 0)), valid, []
         wo = dr.select(choose < 0.5, mi.warp.square_to_cosine_hemisphere(u), mi.reflect(wi, m))

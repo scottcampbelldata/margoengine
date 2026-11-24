@@ -13458,14 +13458,30 @@ tests/smith-shaders.test.js (fails on the separable text in every user, on `ggxN
 and on any separable product left in package source). The materials tests also pinned gltf/pbr's base shader hash from
 before KB5875a; they take its current hash (the root tests already did).
 
-### Open: environment's split-sum table integrates the separable Smith G (KB6016b, 2026-11-11)
+### Fixed 2026-11-24: environment's split-sum table integrated the separable Smith G (KB6016b, 2026-11-11)
 
 Repro: `packages/environment/src/shaders.ts` `smithG1(nv, a2) * smithG1(l.z, a2)` in the DFG table (Karis 2013,
-split sum), the one separable product tests/smith-shaders.test.js still lists. Direct light everywhere uses the
-height-correlated G2 since KB5875a and KB6016, so image-based specular uses a different masking from direct specular.
-Cause: the table was left out of KB6016 because it moves every image-based-lighting picture, including the batch 160
-environment budget (already 1 over, KB3574), which needs a re-record ruling. Fix to build: integrate G2 in the table
-(Heitz 2014 eq. 99), recapture the environment proofs and re-record the IBL budget under a ruling.
+split sum), the one separable product tests/smith-shaders.test.js still listed. Direct light everywhere uses the
+height-correlated G2 since KB5875a and KB6016, so image-based specular used a different masking from direct specular.
+Fix: the table integrates the shared `smithGCorrelatedFloat` (Heitz 2014, JCGT 3(2), eq. 99). The browser test compares
+it with an f64 quadrature of the G2 integral, also at F0 0.04 (bound 0.012, measured 0.00072; Karis 2014's mobile fit
+models the separable table, so it is no oracle here). Manager ruling 2026-11-24: Mitsuba principled's G is separable
+(measured G = 0.683054 = G1 G1), so the batch 160 direct row is the wrong oracle; it stays as the published record
+(2,294,442) and the G2 picture (2,326,991, +1.4 %) is an accepted difference in docs/limits.md (batch 160 job 7), gated
+on its own exact measurements. The gate is the decomposition's exact G2 split-sum model, 484,953 -> 447,308 with every
+budget tighter. Found on the way: the decomposition script's float32 GGX D cancelled at its alpha floor (albedo 0.896
+instead of 1 on roughness-0 spheres); it writes |n x m|^2 + a2 (n.m)^2 now and the references were re-captured.
+Regression: tests/smith-shaders.test.js (no separable product left), tests/reference-environment.test.js (the script's
+D text, the accepted budgets, the split-model row no looser than the KB3563 record).
+
+### Open: the CUDA decomposition references are not bit-reproducible, so `--capture-decomposition` refuses a rerun
+
+Repro: `node scripts/reference-rendering/environment.mjs --capture-decomposition` with the committed script: the
+display pictures match the frozen ones (0 or 1 levels in all 262,144 pixels) but the raw float32 files differ, so the
+linear SHA-256 check refuses every capture (found 2026-11-24 while re-capturing for KB6016b; it was true before).
+Cause: the references render on Mitsuba's cuda_ad_rgb variant, whose parallel accumulation order is not fixed; the
+frozen record pins raw hashes as for the deterministic scalar_rgb references. Fix to build: pin the CUDA references by
+their display hash and a raw tolerance, or render them on scalar_rgb.
 
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 

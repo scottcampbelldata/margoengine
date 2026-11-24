@@ -74,6 +74,39 @@ test('IBL has exact first-measured direct/full budgets on each actual backend', 
   assert.equal(b.sceneSha256, b.compat.sceneSha256);
 });
 
+// KB6016b accepted difference (docs/limits.md): the rows above stay the published record of the separable-G table;
+// the height-correlated G2 picture is gated on its own exact first measurements against the same frozen references.
+test('IBL G2 table: exact accepted-difference budgets beside the unmoved published record (KB6016b)', () => {
+  const b = JSON.parse(readFileSync(new URL('../docs/whitepaper/results/batch-160-environment.json', import.meta.url)));
+  const accepted = b.acceptedKB6016b;
+  assert.equal(accepted.issue, 'KB6016b');
+  assert.equal(accepted.hardware.compat.webgpu.vendor, 'margo-webgl2');
+  for (const [side, abs, square] of [
+    ['native', [2326991, 1510119], [78217549, 32969063]],
+    ['compat', [2326940, 1510078], [78215460, 32967762]],
+  ])
+    for (const [i, mode] of ['direct', 'full'].entries()) {
+      const m = accepted[side][mode];
+      assert.equal(m.absolute, abs[i]);
+      assert.equal(m.square, square[i]);
+      assert.equal(m.mae, abs[i] / (512 * 512 * 3));
+    }
+  // Published record unmoved: +1.4 % on the direct row, all of it the separable G of Mitsuba principled.
+  assert.equal(b.rows.direct.metrics.absolute, 2294442);
+  assert.equal(Math.round((1000 * accepted.native.direct.absolute) / b.rows.direct.metrics.absolute) / 10, 101.4);
+});
+
+// KB6016b: the decomposition script's GGX D cancelled in float32 near the normal (albedo 0.896 at alpha 1e-3).
+test('the decomposition references write the GGX D denominator without float32 cancellation (KB6016b)', () => {
+  const script = readFileSync(
+    new URL('../scripts/reference-rendering/mitsuba-environment-decompose.py', import.meta.url),
+    'utf8',
+  );
+  assert.match(script, /t = m\.x \* m\.x \+ m\.y \* m\.y \+ a2 \* m\.z \* m\.z/);
+  assert.doesNotMatch(script, /t = \w+ \* \w+ \* \(a2 - 1\)/);
+  assert.doesNotMatch(script, /ggx_d\(alpha, \w+\.z\)/);
+});
+
 // KB3563 accepted difference: the frozen direct residual split by difference (docs/limits.md, batch 160 job 7).
 test('IBL furnace residual decomposes into noise, visibility, BSDF model, multiple scattering and edges (KB3563)', () => {
   const b = JSON.parse(readFileSync(new URL('../docs/whitepaper/results/batch-160-environment.json', import.meta.url)));
@@ -82,9 +115,14 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
   );
   assert.equal(d.sceneSha256, b.sceneSha256);
   assert.equal(d.frozenDirect.linearSha256, b.rows.direct.linearSha256);
-  assert.equal(d.frozenDirect.native.absolute, b.rows.direct.metrics.absolute);
+  assert.equal(d.frozenDirect.native.absolute, b.acceptedKB6016b.native.direct.absolute);
   assert.equal(d.compat.hardware.webgpu.vendor, 'margo-webgl2');
-  const names = ['principled-direct-1024', 'principled-unoccluded-1024', 'gltf-unoccluded-1024', 'split-model-unoccluded-1024'];
+  const names = [
+    'principled-direct-1024',
+    'principled-unoccluded-1024',
+    'gltf-unoccluded-1024',
+    'split-model-unoccluded-1024',
+  ];
   assert.deepEqual(Object.keys(d.references), names);
   for (const [i, name] of names.entries()) {
     const meta = d.references[name].meta;
@@ -94,8 +132,8 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
     assert.equal(meta.visibility, i === 0);
   }
   for (const [side, absolute] of [
-    ['native', [2253028, 1269809, 1017910, 484953]],
-    ['compat', [2252974, 1269851, 1017870, 484989]],
+    ['native', [2285851, 1276741, 1045571, 447308]],
+    ['compat', [2285792, 1276742, 1045530, 447309]],
   ])
     names.forEach((name, i) => {
       assert.equal(d[side][name].absolute, absolute[i]);
@@ -105,11 +143,21 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
     rows = d.native,
     share = (x) => Math.round((1000 * x) / base) / 10;
   assert.equal(share(base - rows['principled-direct-1024'].absolute), 1.8); // 128-spp reference noise
-  assert.equal(share(rows['principled-direct-1024'].absolute - rows['principled-unoccluded-1024'].absolute), 42.9); // visibility
-  assert.equal(share(rows['principled-unoccluded-1024'].absolute - rows['gltf-unoccluded-1024'].absolute), 11); // BSDF model
-  assert.equal(share(rows['gltf-unoccluded-1024'].absolute - rows['split-model-unoccluded-1024'].absolute), 23.2); // multiple scattering
-  // What is left against the model's own exact integrals: silhouettes, and 1.7 % of numerics with no bias.
-  assert.equal(share(rows['split-model-unoccluded-1024'].edge), 19.4);
-  assert.equal(share(rows['split-model-unoccluded-1024'].flat), 1.7);
+  assert.equal(share(rows['principled-direct-1024'].absolute - rows['principled-unoccluded-1024'].absolute), 43.4); // visibility
+  assert.equal(share(rows['principled-unoccluded-1024'].absolute - rows['gltf-unoccluded-1024'].absolute), 9.9); // BSDF model
+  assert.equal(share(rows['gltf-unoccluded-1024'].absolute - rows['split-model-unoccluded-1024'].absolute), 25.7); // multiple scattering
+  // What is left against the model's own exact integrals: silhouettes, and 0.8 % of numerics with no bias.
+  assert.equal(share(rows['split-model-unoccluded-1024'].edge), 18.5);
+  assert.equal(share(rows['split-model-unoccluded-1024'].flat), 0.8);
   assert.ok(Math.abs(rows['split-model-unoccluded-1024'].flatSigned) < rows['split-model-unoccluded-1024'].flat / 5);
+  // KB6016b gates on this row: no budget looser than the KB3563 record of the separable table (2026-11-11).
+  for (const [side, before] of [
+    ['native', { absolute: 484953, square: 12933485, max: 106, edge: 445796, flat: 39157 }],
+    ['compat', { absolute: 484989, square: 12933615, max: 106, edge: 445806, flat: 39183 }],
+  ]) {
+    const row = d[side]['split-model-unoccluded-1024'];
+    for (const [key, value] of Object.entries(before))
+      assert.ok(row[key] <= value, `${side} ${key} ${row[key]} > ${value}`);
+    assert.ok(row.foreground >= 47776);
+  }
 });

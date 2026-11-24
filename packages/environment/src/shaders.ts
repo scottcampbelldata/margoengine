@@ -4,7 +4,7 @@
 // Equirect convention: u = 0.5 + atan2(d.x, -d.z) / 2PI (image center faces -Z, +X is right of center),
 // v = acos(d.y) / PI (row 0 is straight up, +Y). Standard latitude-longitude mapping; the orientation is Margo's choice.
 import { displayShader } from '../../shared/display.js';
-import { ggxDenominator } from '../../shared/light-terms.js';
+import { ggxDenominator, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { common } from './shader-common.js';
 
 export { common } from './shader-common.js';
@@ -155,17 +155,20 @@ fn areaElement(x: f32, y: f32) -> f32 { return atan(x * y / sqrt(x * x + y * y +
 `;
 
 // Split-sum environment BRDF: x = NdotV, y = perceptual roughness (texel centers), output (scale, bias)
-// so that specular = prefiltered * (F0 * scale + bias). Uses the same GGX D and separable Smith-GGX G as core.
-// Karis 2013 eq. 8-9 (split-sum scale and bias); Walter et al. 2007 eq. 33-35 (GGX D, Smith G1, sampling);
+// so that specular = prefiltered * (F0 * scale + bias). Uses the same GGX D and height-correlated Smith-GGX G2 as
+// core's direct light (KB6016b): Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs",
+// JCGT 3(2), eq. 99 (https://jcgt.org/published/0003/02/03/), the shared `smithGCorrelatedFloat`.
+// Karis 2013 eq. 8-9 (split-sum scale and bias); Walter et al. 2007 eq. 33-35 (GGX D, sampling);
 // Schlick 1994 Fresnel weight (1 - v.h)^5.
 // Written as size x size f16 pairs into a storage buffer (not a texture): IBL then binds one sampled texture.
 // params: samples, size.
-export const brdfLut =
+// A pure-annotated call: a template that interpolates an imported string is not provably side-effect free, so without
+// it every entry importing this module (environment/ground: +245 B gzip) kept the whole table shader.
+export const brdfLut = /* @__PURE__ */ (() =>
   common +
   /* wgsl */ `
 @group(0) @binding(0) var<storage, read_write> destination: array<u32>;
 @group(0) @binding(1) var<uniform> params: vec4u;
-fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) * x * x)); }
 @compute @workgroup_size(8, 8, 1) fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = params.y;
   if (id.x >= size || id.y >= size) { return; }
@@ -182,7 +185,8 @@ fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) 
     let vh = clamp(dot(v, h), 0.0, 1.0);
     let l = 2.0 * vh * h - v;
     if (l.z > 0.0 && vh > 0.0) {
-      let g = smithG1(nv, a2) * smithG1(l.z, a2);
+      let nl = l.z;
+      let g = ${smithGCorrelatedFloat};
       let visibility = g * vh / (h.z * nv);
       let fc = pow(1.0 - vh, 5.0);
       scale += (1.0 - fc) * visibility;
@@ -191,7 +195,7 @@ fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) 
   }
   destination[id.y * size + id.x] = pack2x16float(vec2f(scale, bias) / f32(samples));
 }
-`;
+`)();
 
 // The full-screen triangle of both backgrounds, passing its NDC position to the fragment.
 const screen = /* wgsl */ `override outputHdr: bool = false;
