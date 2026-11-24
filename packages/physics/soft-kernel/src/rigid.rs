@@ -411,6 +411,8 @@ impl World {
                 }
                 let (a, b) = (self.ea[e] as usize, self.eb[e] as usize);
                 let s = self.rg.u[e];
+                // The multiplier gathers over the substep as a sweep's does, so the load on the edge can be read from it.
+                self.lambda[e] += s as f32;
                 self.x[a] += (self.w[a] as f64 * self.rg.nx[e] * s) as f32;
                 self.y[a] += (self.w[a] as f64 * self.rg.ny[e] * s) as f32;
                 self.z[a] += (self.w[a] as f64 * self.rg.nz[e] * s) as f32;
