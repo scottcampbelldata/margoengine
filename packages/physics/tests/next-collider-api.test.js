@@ -176,6 +176,7 @@ test('a contact force event carries the total and the strongest contact force', 
   // At rest a 10 kg box presses with its weight, 98.1 N, straight along the normal, shared by four corners.
   near(Math.abs(last.totalForce[1]), 98.1, 2, 'total force');
   near(Math.hypot(...last.totalForce), 98.1, 2, 'total magnitude');
+  near(last.totalForceMagnitude, Math.hypot(...last.totalForce), 1e-3, 'totalForceMagnitude is its length');
   assert.ok(last.maxForceMagnitude > 98.1 / 4 - 3 && last.maxForceMagnitude < 98.1, `${last.maxForceMagnitude}`);
   near(Math.abs(last.maxForceDirection[1]), 1, 0.05);
   physics.dispose();

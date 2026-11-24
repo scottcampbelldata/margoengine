@@ -243,6 +243,8 @@ export interface ContactForceEvent {
   force: number;
   /** The sum of the pair's contact forces, normal and friction, in newtons, world space (Rapier's `totalForce`). */
   totalForce: [number, number, number];
+  /** The length of `totalForce`, in newtons (Rapier's `totalForceMagnitude`). */
+  totalForceMagnitude: number;
   /** The strongest single contact's force in newtons (Rapier's `maxForceMagnitude`). */
   maxForceMagnitude: number;
   /** The direction of that contact's force, a unit vector (Rapier's `maxForceDirection`). */
@@ -848,6 +850,7 @@ export class Physics implements EnginePlugin, BodyOwner {
         impulse,
         force: impulse / dt,
         totalForce: [sum.x / dt, sum.y / dt, sum.z / dt],
+        totalForceMagnitude: root(sum.x * sum.x + sum.y * sum.y + sum.z * sum.z) / dt,
         maxForceMagnitude: sum.max / dt,
         maxForceDirection: peak > 0 ? [sum.mx / peak, sum.my / peak, sum.mz / peak] : [0, 0, 0],
       });

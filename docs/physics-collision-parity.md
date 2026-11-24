@@ -11,6 +11,19 @@ switch kept.
 Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `packages/physics/tests` (JS) and
 `packages/physics/kernel/tests` (Rust).
 
+## Checked against the published API reference
+
+Every row in this file was checked on 2026-11-24 against Rapier's published pages (the user guide pages and the JavaScript
+API reference at rapier.rs/javascript3d: the `Collider`, `World`, `ColliderDesc`, `RayColliderHit`,
+`RayColliderIntersection`, `ShapeCastHit`, `PointColliderProjection`, `TempContactForceEvent`, `TempContactManifold`,
+`EventQueue` and `DebugRenderPipeline` classes and the `FeatureType`, `ActiveHooks`, `ActiveEvents`,
+`ActiveCollisionTypes`, `TriMeshFlags`, `CoefficientCombineRule` and `QueryFilterFlags` enums), not against the package's
+type declarations. What the check found and closed: `FIX_INTERNAL_EDGES_TWO_SIDED` (held from both sides, a test added),
+`totalForceMagnitude` (added). Rapier's collider-level queries (`castRay`, `castRayAndGetNormal`, `intersectsRay`,
+`projectPoint`, `intersectsShape`, `contactShape`, `contactCollider`, `castShape`, `castCollider`) are Margo's
+`Physics.raycastCollider`, `projectPointOnCollider`, `colliderIntersectsShape`, `contactShape`, `contactPair`,
+`castShapeAtCollider` and `castCollider`: the same queries under Physics-scoped names.
+
 ## Shapes
 
 | Capability | Status | Notes | Tests |
@@ -113,6 +126,8 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Feature type and id on ray hits and point projections | full | `featureType`, `featureId`: Margo's numbering, boxes, hulls, meshes and height fields; other shapes are unknown | `tests/next-collider-api.test.js` |
 | Contact detail: friction, restitution, per-point normal and tangent impulses | full | `contactPair` | `tests/next-collider-api.test.js` |
 | Contact force event totals: total force, maximum force and its direction | full | `totalForce`, `maxForceMagnitude`, `maxForceDirection`; the solver's last substep scaled to the step | `tests/next-collider-api.test.js` |
+| Triangle mesh fix of internal edges from both sides (`FIX_INTERNAL_EDGES` and `FIX_INTERNAL_EDGES_TWO_SIDED`) | full | `fixInternalEdges` holds from the front and from the back of the surface | `tests/next-trimesh.test.js` |
+| Contact force event totals: the length of the total force | full | `totalForceMagnitude` next to `totalForce` | `tests/next-collider-api.test.js` |
 | Iterate every collider | full | `getColliders()` | `tests/next-collider-api.test.js` |
 | Pair filter answers: skip the pair, solve it, or find its contacts and fire its events with no forces (a hook answering with no solver flags) | full | `contactFilter` returns `false`, `true` or `'noForces'`; Rapier's hook agrees on the same scene | `tests/next-pair-no-forces.test.js` |
 | Query filter with no groups applies no group test | full | `groups` left out means every collider is seen, even one whose filter is 0 | `tests/next-query-no-groups.test.js`, `kernel/tests/query.rs` |

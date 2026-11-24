@@ -70,6 +70,36 @@ test('fixInternalEdges reaches the kernel: a box slides over the seams without c
   assert.ok(rough > 0.1, `the seams catch without it (spin ${rough}), which is what the option is for`);
 });
 
+test("fixInternalEdges holds from the back of the surface too, as Rapier's FIX_INTERNAL_EDGES_TWO_SIDED does", () => {
+  // The same slide as above, along the underside of the mesh: gravity up, the box pressed to the back faces.
+  const run = (fixInternalEdges) => {
+    const physics = new Physics(null, { gravity: [0, 10, 0] }),
+      { vertices, indices } = grid(20, 1);
+    physics.addBody(null, {
+      type: 'fixed',
+      colliders: { shape: 'trimesh', vertices, indices, fixInternalEdges, friction: 0 },
+    });
+    const box = physics.addBody(null, {
+      position: [-7, -0.25, 0.3],
+      canSleep: false,
+      colliders: { shape: 'box', halfExtents: [0.4, 0.25, 0.3], friction: 0 },
+    });
+    for (let i = 0; i < 30; i++) physics.step();
+    box.setLinearVelocity([4, 0, 0]);
+    let spin = 0;
+    for (let i = 0; i < 120; i++) {
+      physics.step();
+      const [x, y, z] = box.angularVelocity;
+      spin = Math.max(spin, Math.hypot(x, y, z));
+    }
+    physics.dispose();
+    return spin;
+  };
+  const [smooth, rough] = [run(true), run(false)];
+  assert.ok(smooth < 1e-2, `spin with the fix ${smooth}`);
+  assert.ok(rough > 0.1, `the seams catch from below without it (spin ${rough})`);
+});
+
 test('a mesh pair is one pair to JS: one contactforce event, one entry in pairs()', () => {
   const physics = new Physics(null),
     { vertices, indices } = grid(4, 1),

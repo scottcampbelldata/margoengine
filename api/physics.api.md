@@ -229,6 +229,7 @@ export interface ContactForceEvent {
     impulse: number;
     force: number;
     totalForce: [number, number, number];
+    totalForceMagnitude: number;
     maxForceMagnitude: number;
     maxForceDirection: [number, number, number];
 }

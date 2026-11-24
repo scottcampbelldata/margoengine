@@ -17,6 +17,17 @@ first: each names its scope, its evidence file and how to reproduce it.
   `node packages/ragdoll/scripts/balance-ab.mjs --sweep` and `node --test packages/ragdoll/tests/balance.test.js`
   (docs/limits.md, Ragdoll ankles on the kernel hold their limits).
 
+- Own physics shape casts on large floors (2026-11-24): a capsule lying across x, 5 mm above a flat box floor and cast 5 m
+  along x over it never touches, so a correct cast answers no hit. Over 25 start points on floors 40 m, 200 m and 800 m
+  across, Rapier 0.21 (the JavaScript build, as the test oracle, same scene and same query) reports a hit in 2, 5 and 5 of
+  the 25, at distances of 1.6 to 4.4 m with a normal tilted by up to 0.3 degrees; Margo's kernel reports 0, 0 and 1 (the
+  800 m floor, a documented limit of 32-bit numbers at that size, [docs/limits.md](../limits.md)). At gaps of 20 mm and
+  50 mm both give no false hit on every floor. Measured on one machine, one scene shape and one query kind (a capsule on a
+  box floor); it is not a claim about Rapier in general, and no speed claim is made (both answered in about 1 ms; an
+  earlier run on an 800 m floor in another scene was slow in Rapier and is not claimed, as it is not reproduced here).
+  Reproduce with `node packages/physics/scripts/compare-rapier-floors.mjs --limit=60 --floors=20,100,400` (floor
+  half-widths in metres; each engine in its own process under a hard limit; needs `npm run build --workspace
+  @margoengine/physics` and the test oracle, `node packages/physics/scripts/build-oracle.js`).
 - Own physics dynamics (2026-11-24): the rigid body, solver, joint, multibody, PID, determinism, snapshot and debug-render
   capabilities of Rapier 3D's public user guide are listed row by row in the dynamics table of
   `packages/physics/README.md` (Parity with Rapier 3D), each marked full only where a test proves it. Checked against
