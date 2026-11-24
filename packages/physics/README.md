@@ -242,6 +242,8 @@ Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSenso
 
 ## Own solver preview
 
+What the own collision kernel holds against Rapier 3D, row by row, is in [docs/physics-collision-parity.md](../../docs/physics-collision-parity.md).
+
 `@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world, its memory, bodies with colliders that move under forces, contacts, joints, and islands that sleep.
 
 ```ts
