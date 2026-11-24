@@ -21,6 +21,8 @@ export interface LightmapMesh {
 export interface LightmapOccluder {
   positions: Float32Array;
   indices?: Uint32Array | Uint16Array;
+  /** Linear RGB diffuse reflectance, each 0 to 1, for `bounces`. Default the mesh's `albedo`. */
+  albedo?: readonly number[];
 }
 
 /** Options of {@link bakeMeshLightmap}. Every budget is checked before any texture is allocated or ray traced. */
@@ -43,8 +45,18 @@ export interface MeshLightmapOptions {
   bias?: number;
   /** Unsigned 32-bit seed of the ray directions; the same seed gives the same lightmap. Default 0. */
   seed?: number;
-  /** More geometry that blocks light and AO but is not baked. Default none. */
+  /** More geometry that blocks light and AO but is not baked; with `bounces` it reflects light too. Default none. */
   occluders?: readonly LightmapOccluder[];
+  /**
+   * Diffuse bounces per path, 0 to 8; above 0 needs `radiometry: 'physical'`. Each of `bounceRays` cosine-weighted
+   * paths per texel adds, at every hit, the hit's reflectance (product along the path) times the direct light there
+   * (next-event estimation: shadowed lights plus ambient), the same estimator as `./gpu`'s `bounces`. Default 0.
+   */
+  bounces?: number;
+  /** Paths per texel for `bounces`, 1 to 1,024. Default 16. */
+  bounceRays?: number;
+  /** Linear RGB diffuse reflectance of the mesh, each 0 to 1, for `bounces`. Default [0.8, 0.8, 0.8]. */
+  albedo?: readonly number[];
   /** Most covered texels, 1 to 4,194,304. Default 1,048,576. */
   maxSamples?: number;
   /** Most rays, 1 to 67,108,864. Default 16,777,216. */
@@ -75,7 +87,7 @@ export interface MeshLightmap {
   radiometry?: 'physical';
   /** Texels baked (covered by a triangle). */
   samples: number;
-  /** Rays reserved (an upper bound of those traced). */
+  /** Rays reserved (an upper bound of those traced), bounce paths and their shadow rays included. */
   rays: number;
   /** Texels whose centre lies strictly inside two or more triangles: overlapping UV charts, which share light. */
   overlaps: number;
@@ -87,7 +99,8 @@ export interface MeshLightmap {
  * Bakes a triangle mesh's lighting into a lightmap at its own second UV set (`uv1`, glTF TEXCOORD_1), so any mesh with
  * lightmap UVs bakes, not only quads. Each texel a triangle touches samples the surface (its centre's point, or the
  * triangle's nearest point for texels on a chart border), gets shadowed direct light and cosine-weighted AO traced
- * through @margoengine/bvh against the mesh and `occluders`, and charts are then dilated by `dilate` texels. Inputs are
+ * through @margoengine/bvh against the mesh and `occluders` (with `bounces`, path-traced diffuse indirect light from the
+ * mesh and the occluders too), and charts are then dilated by `dilate` texels. Inputs are
  * copied before the first await; the bake yields every 256 texels for `signal` and `onProgress`.
  */
 export function bakeMeshLightmap(mesh: LightmapMesh, options: MeshLightmapOptions = {}): Promise<MeshLightmap> {

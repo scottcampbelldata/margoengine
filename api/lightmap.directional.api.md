@@ -26,6 +26,7 @@ export interface LightmapMesh {
 export interface LightmapOccluder {
     positions: Float32Array;
     indices?: Uint32Array | Uint16Array;
+    albedo?: readonly number[];
 }
 
 export interface MeshLightmap {
@@ -54,6 +55,9 @@ export interface MeshLightmapOptions {
     bias?: number;
     seed?: number;
     occluders?: readonly LightmapOccluder[];
+    bounces?: number;
+    bounceRays?: number;
+    albedo?: readonly number[];
     maxSamples?: number;
     maxRays?: number;
     maxBytes?: number;

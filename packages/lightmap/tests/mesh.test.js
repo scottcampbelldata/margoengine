@@ -219,3 +219,137 @@ test('inputs are checked first and copied before the first await; budgets and ab
   assert.deepEqual((await changed).lightmap, reference.lightmap);
   assert.deepEqual(progress.at(-1), [64, 64]);
 });
+
+// Batch 54 gap: triangle meshes had no bounce light (only quad charts in ./global). Path-traced bounces with next-event
+// estimation, as ./gpu's.
+test('bounces in a closed furnace: every texel gets ambient times the geometric series of the reflectance', async () => {
+  const { mesh } = cube(),
+    inward = new Uint16Array(mesh.indices.length);
+  // The same box seen from inside: each triangle wound the other way, so its normal points in.
+  for (let t = 0; t < mesh.indices.length; t += 3)
+    inward.set([mesh.indices[t], mesh.indices[t + 2], mesh.indices[t + 1]], t);
+  const albedo = [0.5, 0.25, 0],
+    bounces = 3,
+    baked = await bakeMeshLightmap(
+      { ...mesh, indices: inward },
+      {
+        width: 48,
+        height: 32,
+        radiometry: 'physical',
+        lights: [{ type: 'ambient', intensity: 1 }],
+        bounces,
+        bounceRays: 4,
+        albedo,
+      },
+    );
+  // Every path stays inside and every hit sees the ambient light: E = sum over k of rho^k, k = 0 to bounces.
+  const expected = albedo.map((rho) => (1 - rho ** (bounces + 1)) / (1 - rho));
+  let worst = 0;
+  for (let at = 0; at < 48 * 32; at++) {
+    if (baked.triangle[at] < 0) continue;
+    for (let a = 0; a < 3; a++) worst = Math.max(worst, Math.abs(baked.irradiance[at * 3 + a] - expected[a]));
+  }
+  assert.ok(worst < 1e-5, `furnace error ${worst}`);
+  assert.equal(baked.rays, baked.samples * (32 + 0 + 4 * bounces));
+});
+
+test('bounce light comes from what the paths hit: a black wall adds nothing, a white one lights the floor beside it', async () => {
+  const wall = { positions: new Float32Array([2, 0, 0, 2, 0, -4, 2, 3, -4, 2, 3, 0]), indices: floorIndices },
+    base = {
+      width: 16,
+      radiometry: 'physical',
+      lights: [{ type: 'directional', direction: [-0.5, 1, 0.2], intensity: 2 }],
+      seed: 7,
+    },
+    flat = await bakeMeshLightmap(
+      { positions: floor, uv1: floorUV, indices: floorIndices },
+      { ...base, occluders: [wall] },
+    ),
+    black = await bakeMeshLightmap(
+      { positions: floor, uv1: floorUV, indices: floorIndices },
+      { ...base, occluders: [{ ...wall, albedo: [0, 0, 0] }], bounces: 2, bounceRays: 8 },
+    ),
+    white = await bakeMeshLightmap(
+      { positions: floor, uv1: floorUV, indices: floorIndices },
+      { ...base, occluders: [{ ...wall, albedo: [1, 1, 1] }], albedo: [0, 0, 0], bounces: 2, bounceRays: 64 },
+    );
+  // The floor is flat, so its paths hit only the wall: a black wall reflects nothing and the bake is the direct one.
+  assert.deepEqual(black.irradiance, flat.irradiance);
+  // The wall at x = 2 faces -x (the light's side is lit): beside it (x near 2) the floor gains more than far from it.
+  const gain = (x) => {
+    let sum = 0;
+    for (let y = 0; y < 16; y++) sum += white.irradiance[(y * 16 + x) * 3] - flat.irradiance[(y * 16 + x) * 3];
+    return sum / 16;
+  };
+  assert.ok(gain(0) > 0, `the floor gains bounce light: ${gain(0)}`);
+  assert.ok(gain(7) > gain(0) * 1.5, `more beside the wall: ${gain(7)} vs ${gain(0)}`);
+  // Past the wall (x > 2) its back is unlit (the light comes from -x) and the black floor reflects nothing further.
+  assert.ok(Math.abs(gain(12)) < 1e-6, `behind the wall: ${gain(12)}`);
+});
+
+test('bounce options are checked: physical radiometry, ranges and reflectances', async () => {
+  const mesh = { positions: floor, uv1: floorUV, indices: floorIndices };
+  await assert.rejects(bakeMeshLightmap(mesh, { bounces: 1 }), /radiometry 'physical'/);
+  await assert.rejects(bakeMeshLightmap(mesh, { radiometry: 'physical', bounces: 9 }), RangeError);
+  await assert.rejects(bakeMeshLightmap(mesh, { radiometry: 'physical', bounces: 1, bounceRays: 0 }), RangeError);
+  await assert.rejects(bakeMeshLightmap(mesh, { radiometry: 'physical', bounces: 1, bounceRays: 1025 }), RangeError);
+  await assert.rejects(bakeMeshLightmap(mesh, { radiometry: 'physical', albedo: [1, 2, 0] }), /albedo/);
+  await assert.rejects(
+    bakeMeshLightmap(mesh, {
+      radiometry: 'physical',
+      occluders: [{ positions: blocker, indices: floorIndices, albedo: [0.5] }],
+    }),
+    /occluder 0 albedo/,
+  );
+  await assert.rejects(
+    bakeMeshLightmap(mesh, { radiometry: 'physical', bounces: 8, bounceRays: 1024, width: 512, maxRays: 1e6 }),
+    /over maxRays/,
+  );
+});
+
+test('one bounce off a lit wall matches the exact form factor on every floor texel', async () => {
+  // A wall (albedo 0.5) at z = -4 lit head-on lights the floor, which gets no direct light. Each floor texel receives
+  // albedo * E_wall * F, F the exact point-to-polygon form factor (Lambert's contour formula); the same scene and
+  // reference as ./gpu's bounce check in tests/gpu.browser.mjs.
+  const wall = { positions: new Float32Array([0, 0, -4, 4, 0, -4, 4, 4, -4, 0, 4, -4]), indices: floorIndices },
+    baked = await bakeMeshLightmap(
+      { positions: floor, uv1: floorUV, indices: floorIndices },
+      {
+        width: 8,
+        radiometry: 'physical',
+        bounces: 1,
+        bounceRays: 1024,
+        lights: [{ type: 'directional', direction: [0, 0, 1], intensity: 2 }],
+        occluders: [{ ...wall, albedo: [0.5, 0.5, 0.5] }],
+        dilate: 0,
+      },
+    ),
+    sub = (a, b) => a.map((v, i) => v - b[i]),
+    crossed = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    norm = (a) => Math.hypot(...a),
+    corners = [
+      [0, 0, -4],
+      [4, 0, -4],
+      [4, 4, -4],
+      [0, 4, -4],
+    ];
+  let worst = 0,
+    mean = 0;
+  for (let y = 0; y < 8; y++)
+    for (let x = 0; x < 8; x++) {
+      const p = [(x + 0.5) / 2, 0, -(y + 0.5) / 2];
+      let f = 0;
+      for (let k = 0; k < 4; k++) {
+        const a = sub(corners[k], p),
+          b = sub(corners[(k + 1) % 4], p),
+          c = crossed(a, b),
+          angle = Math.acos(Math.max(-1, Math.min(1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (norm(a) * norm(b)))));
+        f += (angle * c[1]) / norm(c);
+      }
+      const d = baked.irradiance[(y * 8 + x) * 3] - 0.5 * 2 * Math.abs(f / (2 * Math.PI));
+      worst = Math.max(worst, Math.abs(d));
+      mean += d / 64;
+    }
+  // 1,024 paths per texel: a standard error of at most 0.5 / 32 per texel; the mean over 64 texels is unbiased.
+  assert.ok(worst < 0.06 && Math.abs(mean) < 0.01, JSON.stringify({ worst, mean }));
+});

@@ -80,6 +80,32 @@ baked.irradiance; // Float32 RGB per texel, HDR
 - **Lighting.** The same lights, shadows, AO and `radiometry` as `bakeLightmap`, traced through `@margoengine/bvh`
   against the mesh and `occluders`. Normals are interpolated from `normals` when given, else each triangle's own.
   Point and spot shadows skip the receiving triangle; other rays start `bias` (default 0.001) off the surface.
+- **Bounces.** With `radiometry: 'physical'`, `bounces` (0 to 8) adds path-traced diffuse indirect light:
+  `bounceRays` (1 to 1,024, default 16) cosine-weighted paths per texel, each hit adding its reflectance (the
+  product along the path) times its direct light by next-event estimation, the estimator `./gpu` uses. The mesh
+  reflects with `albedo` (default 0.8 grey) and each occluder with its own `albedo` (default the mesh's). A closed
+  box under ambient light gives the exact geometric series, and one bounce off a lit wall matches the exact form
+  factor on every texel.
+
+```ts
+import { bakeMeshLightmap } from 'margoengine/lightmap/mesh';
+
+const quad = new Uint32Array([0, 1, 2, 0, 2, 3]);
+const withBounce = await bakeMeshLightmap(
+  { positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]), uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), indices: quad },
+  {
+    width: 32,
+    radiometry: 'physical',
+    lights: [{ type: 'directional', direction: [0, 0, 1], intensity: 2 }],
+    bounces: 2,
+    bounceRays: 64,
+    albedo: [0.7, 0.7, 0.7],
+    // A lit wall behind the floor: it blocks light and reflects it onto the floor.
+    occluders: [{ positions: new Float32Array([0, 0, -4, 4, 0, -4, 4, 4, -4, 0, 4, -4]), indices: quad, albedo: [0.9, 0.4, 0.3] }],
+  },
+);
+console.log(withBounce.irradiance[0], withBounce.rays);
+```
 - **Dilation.** `dilate` passes (default 2) give each empty texel next to a chart the mean of its filled neighbours,
   so bilinear filtering at chart borders reads light, not black. Leave at least that many texels between charts.
 - **Checks.** UVs must be 0 to 1; `overlaps` counts texels inside two triangles (overlapping charts) and `degenerate`

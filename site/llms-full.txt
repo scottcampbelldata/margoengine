@@ -7446,8 +7446,9 @@ removal and speed-phase timing debt remain open.
 ## Triangle-mesh lightmaps (batch 54)
 
 `bakeMeshLightmap` (`@margoengine/lightmap/mesh`) bakes on the CPU, one mesh per call, at most 2,048 x 2,048 texels,
-4,194,304 covered texels and 67,108,864 rays. Light is direct (with shadows) and AO; bounces, area and emissive lights
-are in `./global` for quads only. Overlapping UV charts are counted (`overlaps`), not separated: the later triangle's
+4,194,304 covered texels and 67,108,864 rays. Light is direct (with shadows) and AO, plus path-traced diffuse bounces
+with physical radiometry (see "Path-traced lightmap bounces"); area and emissive lights are in `./global` for quads
+only. Overlapping UV charts are counted (`overlaps`), not separated: the later triangle's
 light is kept where both centres fall. Dilation averages neighbours across a gutter narrower than twice `dilate`, so
 two charts closer than that blend in the gutter (never inside a chart). Overlaps under 1e-3 texels count as touching.
 
@@ -7501,8 +7502,19 @@ carries 8-bit quantisation; the mesh path reads the float `irradiance`.
 `bakeGlobalLightmap({ bounceMode: 'path' })` traces at most 8 diffuse bounces, `bounceRays` (1 to 32) paths per texel,
 on the CPU, within `maxRays`. Each path vertex reads the direct light of the texel it hits, at that texel's centre, so
 light varying inside one texel is averaged (texel-sized bias); there is no Russian roulette (paths stop at `bounces`),
-no glossy or metallic bounce (metals reflect nothing) and no light through glass on bounce paths. Quad charts are the
-only input: triangle meshes (`./mesh`) have no bounces yet.
+no glossy or metallic bounce (metals reflect nothing) and no light through glass on bounce paths.
+
+Triangle meshes (`bakeMeshLightmap` and `bakeDirectionalLightmap`, 2026-11-24) take `bounces` (0 to 8, physical
+radiometry only) and `bounceRays` (1 to 1,024 paths per texel, default 16), on the CPU, within `maxRays` (each path
+counts one ray per bounce plus one shadow ray per light at each hit). Each hit gets its direct light by next-event
+estimation at the hit itself (no texel-sized bias), with the geometric normal turned toward the ray, as `./gpu` does;
+reflectance is one RGB per mesh and per occluder (no textures), diffuse only, and there is no Russian roulette.
+Ambient light adds its unoccluded irradiance at every hit (as in `./gpu`). Bounce light is not directional: a
+directional bake's direction and directional colour hold direct light only. Proof: a closed box under ambient light
+equals the geometric series within 1e-5 on every texel; one bounce off a lit wall matches the exact form factor
+(worst texel 0.047, mean 0.0035, 1,024 paths; `packages/lightmap/tests/mesh.test.js`). The bounce code took
+`lightmap/mesh` from 3,128 B to 4,089 B and `lightmap/directional` from 4,215 B to 5,140 B min+gzip (ceilings 3,272 to
+4,345 B and 4,471 to 5,396 B): both entries share the bake, and a separate entry would copy its setup.
 
 ### Batch 133 resource and historical acceptance inventory
 

@@ -35,6 +35,7 @@ export interface LightmapMesh {
 export interface LightmapOccluder {
     positions: Float32Array;
     indices?: Uint32Array | Uint16Array;
+    albedo?: readonly number[];
 }
 
 export interface MeshLightmap {
