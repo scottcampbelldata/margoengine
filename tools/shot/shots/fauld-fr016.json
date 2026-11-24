@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -279.957,
+            600,
+            -332.748
+          ],
+          "target": [
+            120,
+            0,
+            -780
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 4.8,
+          "position": [
+            -279.957,
+            528,
+            -332.748
+          ],
+          "target": [
+            120,
+            0,
+            -780
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr016",
+    "kind": "long",
+    "seconds": 4.8,
+    "scene": "fauld-countryside",
+    "about": "fr016 01 Gentle country: Ford's plaster works from 600 m: kiln chimney smoke, sheds white with dust, the tramway | drone 600 m, slow descent | day; winter sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=120%2C-780&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.4
+    },
+    "subject": {
+      "target": [
+        120,
+        0,
+        -780
+      ],
+      "size": 200
+    }
+  }
+}

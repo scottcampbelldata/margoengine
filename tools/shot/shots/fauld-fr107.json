@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -454.168,
+            1.7,
+            479.855
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 26.99
+        },
+        {
+          "time": 4.4,
+          "position": [
+            -454.015,
+            1.7,
+            477.66
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 26.99,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr107",
+    "kind": "long",
+    "seconds": 4.4,
+    "scene": "fauld-countryside",
+    "about": "fr107 10 Seventy lives: An empty water trough and gate under dust at the field corner | 50 mm, push in 0.5 m/s | dusk; dust",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=dusk&focus=-450%2C420&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.2
+    },
+    "subject": {
+      "target": [
+        -450,
+        2,
+        420
+      ],
+      "size": 400
+    }
+  }
+}

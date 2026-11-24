@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -8.59,
+            1.7,
+            149.754
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 5.4,
+          "position": [
+            -4.277,
+            1.7,
+            150.001
+          ],
+          "target": [
+            4.313,
+            2,
+            0.247
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr111",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-crater",
+    "about": "fr111 10 Seventy lives: Mist drifting over the 1944 crater from the north rim (framing of fd109) | 35 mm, track 0.8 m/s | night; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=mist&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

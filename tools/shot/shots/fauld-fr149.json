@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.9,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            91.289,
+            1.7,
+            119.022
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 5.9,
+          "position": [
+            88.417,
+            1.7,
+            115.277
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr149",
+    "kind": "long",
+    "seconds": 5.9,
+    "scene": "fauld-crater",
+    "about": "fr149 13 The crater today: Down the wooded slope toward the hollow, the pond glinting through (framing of fd142) | 35 mm, dolly 0.8 m/s | day; dappled",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.95
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

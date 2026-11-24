@@ -399,6 +399,10 @@
       "types": "./dist/biomes/splines.d.ts",
       "import": "./dist/biomes/splines.js"
     },
+    "./biomes/farmland": {
+      "types": "./dist/biomes/farmland.d.ts",
+      "import": "./dist/biomes/farmland.js"
+    },
     "./biomes/settlements": {
       "types": "./dist/biomes/settlements.d.ts",
       "import": "./dist/biomes/settlements.js"
@@ -3802,6 +3806,14 @@
     "./scenes/dune-coast": {
       "types": "./dist/scenes/dune-coast.d.ts",
       "import": "./dist/scenes/dune-coast.js"
+    },
+    "./scenes/fauld-countryside": {
+      "types": "./dist/scenes/fauld-countryside.d.ts",
+      "import": "./dist/scenes/fauld-countryside.js"
+    },
+    "./scenes/fauld-crater": {
+      "types": "./dist/scenes/fauld-crater.d.ts",
+      "import": "./dist/scenes/fauld-crater.js"
     },
     "./scenes/timber-valley": {
       "types": "./dist/scenes/timber-valley.d.ts",

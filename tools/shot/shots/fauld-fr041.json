@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            124.448,
+            1.7,
+            -660.082
+          ],
+          "target": [
+            120,
+            2,
+            -780
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 5.4,
+          "position": [
+            124.448,
+            1.7,
+            -660.082
+          ],
+          "target": [
+            130.491,
+            2,
+            -780.389
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr041",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-countryside",
+    "about": "fr041 04 Monday morning: A farm hand leads cattle across the yard, small at 120 m | 85 mm, pan with him | day; low sun (fallback until people: cattle grazing the frosty field below the farm)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=120%2C-780&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        120,
+        2,
+        -780
+      ],
+      "size": 200
+    }
+  }
+}

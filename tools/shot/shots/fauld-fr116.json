@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1255.253,
+            400,
+            223.854
+          ],
+          "target": [
+            -1225,
+            0,
+            -175
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 4.4,
+          "position": [
+            -1255.253,
+            352,
+            223.854
+          ],
+          "target": [
+            -1225,
+            0,
+            -175
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr116",
+    "kind": "long",
+    "seconds": 4.4,
+    "scene": "fauld-countryside",
+    "about": "fr116 11 The inquiry: Hanbury in the snow from 400 m, smoke from chimneys, a tarpaulin on the inn roof | drone 400 m, slow descent | winter; snow",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=snow&focus=-1225%2C-175&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.2
+    },
+    "subject": {
+      "target": [
+        -1225,
+        0,
+        -175
+      ],
+      "size": 400
+    }
+  }
+}

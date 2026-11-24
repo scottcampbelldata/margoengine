@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            258.303,
+            1.7,
+            368.483
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 6.7,
+          "position": [
+            258.303,
+            1.7,
+            368.483
+          ],
+          "target": [
+            32.238,
+            2,
+            -22.599
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr136",
+    "kind": "long",
+    "seconds": 6.7,
+    "scene": "fauld-crater",
+    "about": "fr136 12 After the war: The ridge from Hanbury today: fields, hedges, the wooded hollow (framing of fd130) | 135 mm, slow pan 5 deg | day; winter sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.35
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

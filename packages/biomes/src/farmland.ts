@@ -730,14 +730,16 @@ export function fieldAt(farm: Farmland, x: number, z: number): Field | undefined
 
 /**
  * Biome edits that paint each field's use and each lane as the biomes of {@link lowlandFarmWorld} (or yours):
- * `polygon` fills for the fields and `path` edits for the lanes. Apply them with `BiomeEditor` (load
+ * `polygon` fills for the fields and for `woods` (outlines painted as `farm-wood`), and `path` edits for the lanes. Apply them with `BiomeEditor` (load
  * `@margoengine/biomes/splines` first for the lanes). Fields of use `none` are left alone.
  */
 export function farmlandEdits(
   farm: Farmland,
-  biomes: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane', string>>> = {},
+  biomes: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane' | 'wood', string>>> = {},
+  woods: readonly (readonly Pt[])[] = [],
 ): BiomeEdit[] {
-  const id = (k: Exclude<FieldUse, 'none'> | 'lane') => biomes[k] ?? (k === 'lane' ? 'farm-lane' : k);
+  const id = (k: Exclude<FieldUse, 'none'> | 'lane' | 'wood') =>
+    biomes[k] ?? (k === 'lane' ? 'farm-lane' : k === 'wood' ? 'farm-wood' : k);
   return [
     ...farm.fields
       .filter((f) => f.use !== 'none')
@@ -751,6 +753,16 @@ export function farmlandEdits(
           falloff: 'constant',
         }),
       ),
+    ...woods.map(
+      (points): BiomeEdit => ({
+        kind: 'polygon',
+        layer: `paint/${id('wood')}`,
+        points,
+        strength: 1,
+        mode: 'set',
+        falloff: 'constant',
+      }),
+    ),
     ...farm.lanes.map(
       (l): BiomeEdit => ({
         kind: 'path',
@@ -788,8 +800,9 @@ const farmBiome = (id: string, material: string, details: BiomeDefinition['detai
 
 /**
  * The English lowland farm world: a cool, wet temperate climate (52.8 N, about 730 mm of rain), rolling clay hills, and
- * its biomes: `farm-wood` (oak, ash, birch, holly and hazel over ferns; the base biome where nothing is painted),
- * `pasture`, `plough`, `stubble`, `meadow` and `farm-lane` (painted by {@link farmlandEdits}). Paint each with
+ * its biomes: `pasture` (the base biome where nothing is painted), `farm-wood` (oak, ash, birch, holly and hazel over
+ * ferns, mesh keys `library:<species>` and `library:fern` for the view's `meshes` registry; painted),
+ * `plough`, `stubble`, `meadow` and `farm-lane` (painted by {@link farmlandEdits}). Paint each with
  * `paint: FARMLAND_PAINT` in `BiomeWorld.create`.
  */
 export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDefinition[] } = Object.freeze({
@@ -798,26 +811,32 @@ export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDe
   biomes: Object.freeze([
     Object.freeze({
       id: 'farm-wood',
-      climate: {},
+      // Painted only (woods, the wooded crater today): the base biome is pasture.
+      climate: { height: NEVER },
       ground: [{ material: 'leaf-litter' }, { material: 'moss', moisture: [0.7, null] }],
       plants: [
-        { id: 'oak', mesh: 'procedural:broadleaf', density: 120, radius: 5, shade: 0.4 },
-        { id: 'ash', mesh: 'procedural:broadleaf', density: 90, radius: 4.5, shade: 0.5 },
-        { id: 'birch', mesh: 'procedural:broadleaf', density: 50, radius: 3, shade: 0.3 },
-        { id: 'holly', mesh: 'procedural:shrub', density: 200, radius: 1.5, shade: 0.8 },
-        { id: 'hazel', mesh: 'procedural:shrub', density: 300, radius: 1.4, shade: 0.6 },
+        { id: 'oak', mesh: 'library:oak', density: 120, radius: 5, shade: 0.4 },
+        { id: 'ash', mesh: 'library:ash', density: 90, radius: 4.5, shade: 0.5 },
+        { id: 'birch', mesh: 'library:birch', density: 50, radius: 3, shade: 0.3 },
+        { id: 'holly', mesh: 'library:holly', density: 200, radius: 1.5, shade: 0.8 },
+        { id: 'hazel', mesh: 'library:hazel', density: 300, radius: 1.4, shade: 0.6 },
       ],
-      details: [{ id: 'fern', mesh: 'procedural:fern', density: 6, light: [0, 0.6] }],
+      details: [{ id: 'fern', mesh: 'library:fern', density: 6, light: [0, 0.6] }],
     } as BiomeDefinition),
-    farmBiome('pasture', 'winter-pasture', [{ id: 'grass', mesh: 'procedural:grass', density: 40 }]),
+    // The base biome: pasture wherever nothing else is painted (kept ground such as a village or a yard included).
+    Object.freeze({
+      id: 'pasture',
+      climate: {},
+      ground: [{ material: 'winter-pasture' }, { material: 'mud', moisture: [0.85, null] }],
+    } as BiomeDefinition),
     farmBiome('plough', 'plough'),
-    farmBiome('stubble', 'stubble', [{ id: 'stubble', mesh: 'procedural:grass', density: 20 }]),
-    farmBiome('meadow', 'rough-meadow', [{ id: 'grass', mesh: 'procedural:grass', density: 60 }]),
+    farmBiome('stubble', 'stubble'),
+    farmBiome('meadow', 'rough-meadow'),
     farmBiome('farm-lane', 'lane-gravel'),
   ]),
 });
 
 /** The paint layers of the farm biomes, for `BiomeWorld.create({ paint })`. */
 export const FARMLAND_PAINT = Object.freeze(
-  ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane'].map((biome) => Object.freeze({ biome })),
+  ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane', 'farm-wood'].map((biome) => Object.freeze({ biome })),
 );

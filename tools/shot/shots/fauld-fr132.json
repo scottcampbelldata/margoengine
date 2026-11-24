@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.5,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            332.6,
+            400,
+            450.53
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6.5,
+          "position": [
+            292.069,
+            400,
+            477.803
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr132",
+    "kind": "long",
+    "seconds": 6.5,
+    "scene": "fauld-crater",
+    "about": "fr132 12 After the war: Time passing over the crater: snow, then grass, then young trees on the floor | drone 400 m, very slow orbit | time-lapse; seasons",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.25
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

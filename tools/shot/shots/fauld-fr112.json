@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -6.137,
+            80,
+            119.843
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 5.3,
+          "position": [
+            -6.137,
+            83.18,
+            119.843
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr112",
+    "kind": "long",
+    "seconds": 5.3,
+    "scene": "fauld-crater",
+    "about": "fr112 10 Seventy lives: A slow rise over the dark bowl, mist pooling | drone 80 to 250 m, rise | night; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=mist&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.65
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

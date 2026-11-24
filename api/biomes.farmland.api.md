@@ -88,7 +88,7 @@ export interface Lane {
 
 export type LaneEnd = 'junction' | 'edge' | 'gate';
 
-export function farmlandEdits(farm: Farmland, biomes?: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane', string>>>): BiomeEdit[];
+export function farmlandEdits(farm: Farmland, biomes?: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane' | 'wood', string>>>, woods?: readonly (readonly Pt[])[]): BiomeEdit[];
 
 export function fieldAt(farm: Farmland, x: number, z: number): Field | undefined;
 

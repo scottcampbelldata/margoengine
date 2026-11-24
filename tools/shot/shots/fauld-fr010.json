@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -785.506,
+            500,
+            -2095.734
+          ],
+          "target": [
+            -300,
+            0,
+            -2600
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6.7,
+          "position": [
+            -850.961,
+            500,
+            -2168.211
+          ],
+          "target": [
+            -300,
+            0,
+            -2600
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr010",
+    "kind": "long",
+    "seconds": 6.7,
+    "scene": "fauld-countryside",
+    "about": "fr010 01 Gentle country: High over the Dove valley in winter sun: meadows, hedgerows with hedge trees, the river bend | drone 500 m, slow orbit 8 deg | day; winter sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=-300%2C-2600&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.35
+    },
+    "subject": {
+      "target": [
+        -300,
+        0,
+        -2600
+      ],
+      "size": 300
+    }
+  }
+}

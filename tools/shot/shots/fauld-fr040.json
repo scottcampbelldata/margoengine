@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            7.733,
+            1.7,
+            259.88
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 5.3,
+          "position": [
+            7.634,
+            1.7,
+            256.702
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr040",
+    "kind": "long",
+    "seconds": 5.3,
+    "scene": "fauld-countryside",
+    "about": "fr040 04 Monday morning: Upper Castle Hayes Farm from 250 m: house, barns, rick, smoke from the chimney | 135 mm, slow push | day; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.65
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

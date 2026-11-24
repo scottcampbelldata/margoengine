@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.1,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -39.538,
+            1.7,
+            448.26
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 5.1,
+          "position": [
+            -39.27,
+            1.7,
+            445.211
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr114",
+    "kind": "long",
+    "seconds": 5.1,
+    "scene": "fauld-crater",
+    "about": "fr114 11 The inquiry: A sentry small at the fence in the snow, back to camera | 135 mm, slow push | winter; snow (fallback until people: the fence and a warning board in the snow)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=snow&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.55
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

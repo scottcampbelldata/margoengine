@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -343.235,
+            1.7,
+            539.169
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 5.3,
+          "position": [
+            -345.357,
+            1.7,
+            536.8
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr066",
+    "kind": "long",
+    "seconds": 5.3,
+    "scene": "fauld-countryside",
+    "about": "fr066 07 A mile around: Grey dust falling like snow over a hedge, settling on the branches | 85 mm, slow push | grey; dustfall",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-450%2C420&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.65
+    },
+    "subject": {
+      "target": [
+        -450,
+        2,
+        420
+      ],
+      "size": 400
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            9.158,
+            150,
+            219.8
+          ],
+          "target": [
+            0,
+            0,
+            10
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6.7,
+          "position": [
+            7.989,
+            150,
+            193.026
+          ],
+          "target": [
+            0,
+            0,
+            10
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr038",
+    "kind": "long",
+    "seconds": 6.7,
+    "scene": "fauld-countryside",
+    "about": "fr038 04 Monday morning: Dawn over the fields above Fauld, mist in the hollows, the farm small on the ridge | drone 150 m, dolly 4 m/s | dawn; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=mist&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.35
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

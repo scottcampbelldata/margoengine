@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.9,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            15.336,
+            1.7,
+            19.743
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 5.9,
+          "position": [
+            15.336,
+            1,
+            19.743
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr148",
+    "kind": "long",
+    "seconds": 5.9,
+    "scene": "fauld-crater",
+    "about": "fr148 13 The crater today: Inside the crater today: mature trees on the steep slopes, ferns (framing of fd140) | 24 mm, crane down 1 m/s | day; dappled",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.95
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1.585,
+            1.7,
+            24.95
+          ],
+          "target": [
+            0,
+            25,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 5.4,
+          "position": [
+            -1.585,
+            1,
+            24.95
+          ],
+          "target": [
+            0,
+            25,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr110",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-crater",
+    "about": "fr110 10 Seventy lives: The crater floor at night, mist settling, nothing moving (framing of fd107) | 24 mm, crane down 1 m/s | night; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=mist&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        0,
+        25,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

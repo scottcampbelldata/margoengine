@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            70.071,
+            60,
+            97.417
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6.3,
+          "position": [
+            98.099,
+            400,
+            136.384
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr158",
+    "kind": "long",
+    "seconds": 6.3,
+    "scene": "fauld-crater",
+    "about": "fr158 13 The crater today: Final: slow pull back and rise from the wooded crater over the fields, room for the end screen | drone 60 to 400 m, pull back | dawn; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=mist&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.15
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

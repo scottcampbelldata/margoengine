@@ -45,6 +45,14 @@
       "types": "./dist/dune-coast.d.ts",
       "import": "./dist/dune-coast.js"
     },
+    "./fauld-countryside": {
+      "types": "./dist/fauld-countryside.d.ts",
+      "import": "./dist/fauld-countryside.js"
+    },
+    "./fauld-crater": {
+      "types": "./dist/fauld-crater.d.ts",
+      "import": "./dist/fauld-crater.js"
+    },
     "./timber-valley": {
       "types": "./dist/timber-valley.d.ts",
       "import": "./dist/timber-valley.js"

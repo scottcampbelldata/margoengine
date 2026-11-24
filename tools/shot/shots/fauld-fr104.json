@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.9,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1240.325,
+            300,
+            124.608
+          ],
+          "target": [
+            -1225,
+            0,
+            -175
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 4.9,
+          "position": [
+            -1239.574,
+            300,
+            109.927
+          ],
+          "target": [
+            -1225,
+            0,
+            -175
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr104",
+    "kind": "long",
+    "seconds": 4.9,
+    "scene": "fauld-countryside",
+    "about": "fr104 09 The rescue: Hanbury in frost from 300 m, smoke from patched chimneys | drone 300 m, dolly 3 m/s | winter; frost",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=lowSun&focus=-1225%2C-175&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.45
+    },
+    "subject": {
+      "target": [
+        -1225,
+        0,
+        -175
+      ],
+      "size": 400
+    }
+  }
+}

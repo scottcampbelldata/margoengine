@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            84.58,
+            0.6,
+            123.88
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 5.4,
+          "position": [
+            86.81,
+            0.6,
+            122.357
+          ],
+          "target": [
+            2.23,
+            2,
+            -1.522
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr142",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-crater",
+    "about": "fr142 12 After the war: Fallen leaves on the path between the two memorials, the wood beyond | 35 mm, 0.6 m up, track 0.5 m/s | day; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

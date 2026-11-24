@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -991.571,
+            1.7,
+            33.316
+          ],
+          "target": [
+            -1120,
+            2,
+            -120
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 6.7,
+          "position": [
+            -986.435,
+            1.7,
+            29.014
+          ],
+          "target": [
+            -1114.864,
+            2,
+            -124.302
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr138",
+    "kind": "long",
+    "seconds": 6.7,
+    "scene": "fauld-countryside",
+    "about": "fr138 12 After the war: The Cock Inn and a quiet lane today from 200 m, low winter sun | 85 mm, slide 1 m/s | day; winter sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=today&sky=lowSun&focus=-1120%2C-120&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.35
+    },
+    "subject": {
+      "target": [
+        -1120,
+        2,
+        -120
+      ],
+      "size": 20
+    }
+  }
+}

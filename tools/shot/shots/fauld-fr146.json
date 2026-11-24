@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            262.786,
+            1.7,
+            365.299
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 6.87
+        },
+        {
+          "time": 5,
+          "position": [
+            262.786,
+            1.7,
+            365.299
+          ],
+          "target": [
+            31.96,
+            2,
+            -22.991
+          ],
+          "fov": 6.87,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr146",
+    "kind": "long",
+    "seconds": 5,
+    "scene": "fauld-crater",
+    "about": "fr146 13 The crater today: A walker in modern clothes small at the wood's edge, far away | 200 mm, slow pan | frost; low sun (fallback until people: the empty path disappearing into the wood)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.5
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

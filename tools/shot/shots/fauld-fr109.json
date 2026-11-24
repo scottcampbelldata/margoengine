@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1222.678,
+            1.7,
+            208.663
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 6.8,
+          "position": [
+            -1222.345,
+            1.7,
+            204.597
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr109",
+    "kind": "long",
+    "seconds": 6.8,
+    "scene": "fauld-countryside",
+    "about": "fr109 10 Seventy lives: Hanbury church at dusk from 400 m, one light in a window | 135 mm, slow push | dusk; lamp",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=dusk&focus=-1190%2C-190&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.4
+    },
+    "subject": {
+      "target": [
+        -1190,
+        2,
+        -190
+      ],
+      "size": 30
+    }
+  }
+}

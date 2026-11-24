@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            2.249,
+            1,
+            69.958
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 26.99
+        },
+        {
+          "time": 6.7,
+          "position": [
+            6.266,
+            1,
+            69.807
+          ],
+          "target": [
+            4.017,
+            2,
+            9.849
+          ],
+          "fov": 26.99,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr039",
+    "kind": "long",
+    "seconds": 6.7,
+    "scene": "fauld-countryside",
+    "about": "fr039 04 Monday morning: Frost-white field edge and hedge, the sun rising behind the ridge | 50 mm, 1 m up, slide 0.6 m/s | dawn; frost",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=dawn&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.35
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

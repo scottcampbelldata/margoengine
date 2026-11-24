@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.6,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            381.337,
+            400,
+            410.1
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 4.6,
+          "position": [
+            381.337,
+            352,
+            410.1
+          ],
+          "target": [
+            0,
+            -78.703,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr005",
+    "kind": "long",
+    "seconds": 4.6,
+    "scene": "fauld-crater",
+    "about": "fr005 00 Cold open: From the air where the farm stood: a raw grey bowl, steam and smoke drifting (framing of fd075) | drone 400 m, descend and tilt 8 deg | overcast; smoke",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.3
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

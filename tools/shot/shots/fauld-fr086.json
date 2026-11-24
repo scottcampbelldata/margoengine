@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.2,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -662.555,
+            700,
+            722.095
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6.2,
+          "position": [
+            -722.968,
+            700,
+            661.602
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr086",
+    "kind": "long",
+    "seconds": 6.2,
+    "scene": "fauld-crater",
+    "about": "fr086 08 The crater and the mud: High aerial: crater, mud flood and broken works together, smoke over all (framing of fd088) | drone 700 m, slow orbit | overcast; smoke",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.1
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

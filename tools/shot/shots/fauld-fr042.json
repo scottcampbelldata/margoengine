@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            211.12,
+            1.7,
+            -370.01
+          ],
+          "target": [
+            210,
+            2,
+            -430
+          ],
+          "fov": 26.99
+        },
+        {
+          "time": 5.8,
+          "position": [
+            211.011,
+            1.7,
+            -375.809
+          ],
+          "target": [
+            210,
+            2,
+            -430
+          ],
+          "fov": 26.99,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr042",
+    "kind": "long",
+    "seconds": 5.8,
+    "scene": "fauld-countryside",
+    "about": "fr042 04 Monday morning: The works from the reservoir bank, kiln smoke drifting over the valley | 50 mm, dolly 1 m/s | day; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=210%2C-430&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.9
+    },
+    "subject": {
+      "target": [
+        210,
+        2,
+        -430
+      ],
+      "size": 300
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.1,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            83.812,
+            1.7,
+            124.401
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 5.1,
+          "position": [
+            82.102,
+            1.7,
+            121.863
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr153",
+    "kind": "long",
+    "seconds": 5.1,
+    "scene": "fauld-crater",
+    "about": "fr153 13 The crater today: The rim at dawn, mist in the hollow, sun through the trees (framing of fd146) | 35 mm, slow push | dawn; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=mist&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.55
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

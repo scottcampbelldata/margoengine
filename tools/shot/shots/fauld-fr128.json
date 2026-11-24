@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.1,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1234.651,
+            1.7,
+            106.659
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 5.1,
+          "position": [
+            -1234.195,
+            1.7,
+            103.633
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr128",
+    "kind": "long",
+    "seconds": 5.1,
+    "scene": "fauld-countryside",
+    "about": "fr128 11 The inquiry: Hanbury churchyard in winter rain from 300 m, the church dark, puddles on the path | 135 mm, slow push | rain; overcast",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=rain&focus=-1190%2C-190&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.55
+    },
+    "subject": {
+      "target": [
+        -1190,
+        2,
+        -190
+      ],
+      "size": 30
+    }
+  }
+}

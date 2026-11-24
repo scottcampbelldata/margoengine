@@ -154,6 +154,8 @@ export const RUNNER_SMOKE = [
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'packages/scenes/test/fauld-still.mjs':
+    'stills of the Fauld film shots; it reads the OS Terrain 50 grid and the crater and tree models from the asset library outside git (MARGO_ASSETS), so it runs by hand per shot (--shots=fr008,...), not as a gate',
   'packages/webgl2-compat/scripts/browser-matrix.mjs':
     'the browser matrix of docs/limits.md (Safari, the iOS Simulator, Firefox, Android Chrome), not a gate: run with --browser (npm run matrix)',
   'scripts/reference-rendering/mip-blend-control.mjs':

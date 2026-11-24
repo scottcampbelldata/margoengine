@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.2,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            102.138,
+            1.6,
+            109.854
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 46.4
+        },
+        {
+          "time": 6.2,
+          "position": [
+            106.678,
+            1.6,
+            105.632
+          ],
+          "target": [
+            4.541,
+            2,
+            -4.222
+          ],
+          "fov": 46.4,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr075",
+    "kind": "long",
+    "seconds": 6.2,
+    "scene": "fauld-crater",
+    "about": "fr075 08 The crater and the mud: Along the rim: torn turf, a broken hedge hanging over the edge, white gypsum in the wall (framing of fd076) | 28 mm, 1.6 m, track 1 m/s | overcast; smoke",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.1
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

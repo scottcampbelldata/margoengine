@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            91.827,
+            1.7,
+            131.026
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 6.3,
+          "position": [
+            91.827,
+            1.7,
+            131.026
+          ],
+          "target": [
+            11.463,
+            2,
+            -8.034
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr156",
+    "kind": "long",
+    "seconds": 6.3,
+    "scene": "fauld-crater",
+    "about": "fr156 13 The crater today: The rim at sunrise from the far side, the mist lifting off the hollow | 85 mm, slow pan 5 deg | dawn; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=mist&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.15
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

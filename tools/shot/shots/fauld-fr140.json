@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.9,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            86.094,
+            0.5,
+            122.832
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 4.9,
+          "position": [
+            63.457,
+            0.5,
+            135.916
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr140",
+    "kind": "long",
+    "seconds": 4.9,
+    "scene": "fauld-crater",
+    "about": "fr140 12 After the war: The stone from low beside the weathered paving, the wood behind (framing of fd135) | 24 mm, 0.5 m up, arc 10 deg | day; soft",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.45
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

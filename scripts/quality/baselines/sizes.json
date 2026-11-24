@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17316709,
+  "total": 17334989,
   "history": [
     {
       "date": "2026-10-24",
@@ -11241,6 +11241,12 @@
       "commit": "7659adcc09",
       "reason": "@margoengine/cutscene/film-titles (new, 2220 B): captions, chapter cards and a closing card on film time (Fauld recut gap 7); it draws with @margoengine/ui Label and Panel, so it loads the ui root (and its text) statically, which an app already holds for the Ui it passes in; its own entry, so the cutscene root does not grow",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "2b4fa79a67",
+      "reason": "Fauld places (biomes/farmland, the editor polygon fill, scenes/fauld-countryside and fauld-crater): new entries; scene entries import their feature packages like dune-coast",
+      "grew": 22
     }
   ],
   "items": {
@@ -11319,10 +11325,11 @@
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 6282,
     "@margoengine/biomes/ecosystem": 3466,
-    "@margoengine/biomes/editor": 4010,
+    "@margoengine/biomes/editor": 4433,
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/erosion-wasm": 2649,
     "@margoengine/biomes/far": 4020,
+    "@margoengine/biomes/farmland": 5577,
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
@@ -12210,6 +12217,8 @@
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 2965,
     "@margoengine/scenes/dune-coast": 6475,
+    "@margoengine/scenes/fauld-countryside": 6131,
+    "@margoengine/scenes/fauld-crater": 6131,
     "@margoengine/scenes/library": 4468,
     "@margoengine/scenes/look-family": 809,
     "@margoengine/scenes/shot-settings": 1718,
@@ -12868,6 +12877,24 @@
     "leak @margoengine/scenes/dune-coast -> @margoengine/terrain": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/tonemap": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/water": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes/view": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/geometry": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/post/gtao": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/scatter": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/shadows": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/sky/scenes": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/sky/volumetric-clouds": 1,
+    "leak @margoengine/scenes/fauld-countryside -> @margoengine/tonemap": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/biomes": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/biomes/view": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/geometry": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/post/gtao": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/scatter": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/shadows": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/sky/scenes": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/sky/volumetric-clouds": 1,
+    "leak @margoengine/scenes/fauld-crater -> @margoengine/tonemap": 1,
     "leak @margoengine/scenes/timber-valley -> @margoengine/biomes": 1,
     "leak @margoengine/scenes/timber-valley -> @margoengine/biomes/view": 1,
     "leak @margoengine/scenes/timber-valley -> @margoengine/post/gtao": 1,

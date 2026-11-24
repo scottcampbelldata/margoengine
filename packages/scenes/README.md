@@ -212,6 +212,43 @@ burning of part of Wallace); Koch, "History of the 1910 forest fires in Idaho an
 1942. The valley, forest, fuel and fire come from their packages' own sources (biomes docs/relief-and-hydrology.md and
 docs/fuel.md, vfx fire-front).
 
+## Fauld, Staffordshire: `@margoengine/scenes/fauld-countryside` and `@margoengine/scenes/fauld-crater`
+
+The hills round Hanbury and Fauld on the real ground (Ordnance Survey OS Terrain 50, tiles SK12, SK13, SK22 and SK23,
+resampled to 5 m; Open Government Licence v3.0, "Contains OS data (c) Crown copyright and database right"), the farm
+quilt of `@margoengine/biomes/farmland` (hedged fields, hedge oaks, ashes and hollies, lanes that end at a junction, the
+edge or a gate), woods, a November sky, clouds and weather. `fauld-crater` stamps the 1944 crater (`era: '1944'`) or the
+wooded hollow today (`era: 'today'`) into the ground from its model. Trees, hedges and the crater are library models
+(served from `library`, default `/asset-library/`); buildings and cattle have slots (`FAULD_SLOTS`) and draw nothing until
+their models exist. Origin: the crater's centre, OS grid E 418225, N 327725; x east, z south.
+
+```ts
+import { Engine } from 'margoengine';
+import { attach, FAULD_PLACES, FAULD_SLOTS } from 'margoengine/scenes/fauld-countryside';
+
+// Needs the asset library served at /asset-library/ (the OS Terrain 50 grid and the crater and tree models).
+async function show(canvas: HTMLCanvasElement) {
+  const engine = await Engine.create(canvas, { camera: { far: 40000 } });
+  const scene = await attach(engine, { sky: 'dawn', focus: [...FAULD_PLACES.hanbury] });
+  const [x, z] = FAULD_PLACES.hanbury;
+  scene.look([x + 900, scene.height(x + 900, z + 1200) + 120, z + 1200], [x, scene.height(x, z) + 20, z], 30);
+  engine.start();
+  return scene;
+}
+console.log(typeof show, FAULD_PLACES.hanbury, Object.keys(FAULD_SLOTS).length); // function [-1225, -175] 7
+```
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `era` | `before` (countryside), `1944` (crater) | `before`, `1944` or `today` |
+| `sky` | `lowSun` | `dawn`, `lowSun`, `overcast`, `grey`, `dusk`, `night`, `snow`, `rain` or `mist` |
+| `hour` | by `sky` | local solar time on 27 November |
+| `focus`, `radius` | `[0, 0]`, 1,200 | hedges and hedge trees are drawn within `radius` metres of `focus` |
+| `dem`, `library` | under `/asset-library/` | the height grid and the model library |
+
+Shot files for the film's crater and countryside rows: `node tools/shot/fauld-shots.mjs` (from the recut shot list);
+stills: `node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder>`.
+
 ## Look families: one call, every package
 
 `applyLookFamily(name, targets)` (`@margoengine/scenes/look-family`) applies a look family by name through each package's own

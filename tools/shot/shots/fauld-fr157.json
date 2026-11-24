@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            86.84,
+            1.7,
+            122.306
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 26.99
+        },
+        {
+          "time": 6.3,
+          "position": [
+            89.408,
+            1.7,
+            120.483
+          ],
+          "target": [
+            2.568,
+            2,
+            -1.824
+          ],
+          "fov": 26.99,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr157",
+    "kind": "long",
+    "seconds": 6.3,
+    "scene": "fauld-crater",
+    "about": "fr157 13 The crater today: Birch trunks and ferns in the low sun, slow slide | 50 mm, slide 0.5 m/s | dawn; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=dawn&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.15
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

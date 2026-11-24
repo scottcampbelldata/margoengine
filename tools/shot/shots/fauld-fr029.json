@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            122.062,
+            1.7,
+            -620.013
+          ],
+          "target": [
+            120,
+            2,
+            -780
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 4.8,
+          "position": [
+            122.062,
+            1.7,
+            -620.013
+          ],
+          "target": [
+            136.815,
+            2,
+            -780.217
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr029",
+    "kind": "long",
+    "seconds": 4.8,
+    "scene": "fauld-countryside",
+    "about": "fr029 03 A thousand workers: The works yard at shift change from the hill: civ_gypsum_b and others in caps cross to the mill, small | 85 mm, pan 6 deg | day; overcast (fallback until people: the empty yard, a coat on a peg by the door)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=overcast&focus=120%2C-780&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.4
+    },
+    "subject": {
+      "target": [
+        120,
+        2,
+        -780
+      ],
+      "size": 200
+    }
+  }
+}

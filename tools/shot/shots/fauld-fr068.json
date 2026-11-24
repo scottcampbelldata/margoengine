@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1055.907,
+            250,
+            9.14
+          ],
+          "target": [
+            -1225,
+            0,
+            -175
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6,
+          "position": [
+            -1068.081,
+            250,
+            -4.118
+          ],
+          "target": [
+            -1225,
+            0,
+            -175
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr068",
+    "kind": "long",
+    "seconds": 6,
+    "scene": "fauld-countryside",
+    "about": "fr068 07 A mile around: Over the village roofs at 250 m: slipped tiles, broken chimney pots, the valley behind | drone 250 m, dolly 3 m/s | grey; dust",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-1225%2C-175&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3
+    },
+    "subject": {
+      "target": [
+        -1225,
+        0,
+        -175
+      ],
+      "size": 400
+    }
+  }
+}

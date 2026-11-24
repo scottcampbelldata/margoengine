@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            193.221,
+            3,
+            -411.467
+          ],
+          "target": [
+            210,
+            2,
+            -430
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 4.8,
+          "position": [
+            196.443,
+            3,
+            -415.025
+          ],
+          "target": [
+            210,
+            2,
+            -430
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr017",
+    "kind": "long",
+    "seconds": 4.8,
+    "scene": "fauld-countryside",
+    "about": "fr017 01 Gentle country: The reservoir above the works from the slope: still water, reeds, works roofs below | 35 mm, 3 m up, dolly along the bank 1 m/s | day; winter sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=210%2C-430&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.4
+    },
+    "subject": {
+      "target": [
+        210,
+        2,
+        -430
+      ],
+      "size": 300
+    }
+  }
+}

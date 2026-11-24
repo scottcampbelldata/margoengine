@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.9,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -457.193,
+            1.7,
+            579.838
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 4.9,
+          "position": [
+            -457.061,
+            1.7,
+            576.901
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr103",
+    "kind": "long",
+    "seconds": 4.9,
+    "scene": "fauld-countryside",
+    "about": "fr103 09 The rescue: Women in headscarves at a WVS van in the damaged street, 60 m | 85 mm, slow push | winter; overcast (fallback until people: a tea urn and blankets on a trestle by the van)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=overcast&focus=-450%2C420&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.45
+    },
+    "subject": {
+      "target": [
+        -450,
+        2,
+        420
+      ],
+      "size": 400
+    }
+  }
+}

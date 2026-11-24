@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.2,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            16.91,
+            1.7,
+            18.413
+          ],
+          "target": [
+            0,
+            25,
+            0
+          ],
+          "fov": 67.38
+        },
+        {
+          "time": 6.2,
+          "position": [
+            16.91,
+            1.7,
+            18.413
+          ],
+          "target": [
+            0,
+            30.314,
+            0
+          ],
+          "fov": 67.38,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr076",
+    "kind": "long",
+    "seconds": 6.2,
+    "scene": "fauld-crater",
+    "about": "fr076 08 The crater and the mud: From the crater floor up the hundred foot walls to the grey sky | 18 mm, tilt up 12 deg | overcast; steam",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.1
+    },
+    "subject": {
+      "target": [
+        0,
+        25,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

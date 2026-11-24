@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.5,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -273.891,
+            400,
+            301.52
+          ],
+          "target": [
+            0,
+            0,
+            10
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 5.5,
+          "position": [
+            -258.827,
+            400,
+            285.486
+          ],
+          "target": [
+            0,
+            0,
+            10
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr008",
+    "kind": "long",
+    "seconds": 5.5,
+    "scene": "fauld-countryside",
+    "about": "fr008 00 Cold open: Hard cut, calm: the ridge at dawn from 400 m, frost on the field quilt, the farm small on the ridge with chimney smoke | drone 400 m, dolly 4 m/s | dawn; frost",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=dawn&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.75
+    },
+    "subject": {
+      "target": [
+        0,
+        0,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

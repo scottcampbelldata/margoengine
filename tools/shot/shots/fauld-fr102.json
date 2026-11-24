@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            112.235,
+            200,
+            -580.151
+          ],
+          "target": [
+            120,
+            0,
+            -780
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 5.4,
+          "position": [
+            94.847,
+            200,
+            -581.588
+          ],
+          "target": [
+            120,
+            0,
+            -780
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr102",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-countryside",
+    "about": "fr102 09 The rescue: Winter weeks later: frost on the mud, the works still buried, a hut and a crane at the edge | drone 200 m, slow orbit | winter; frost",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=lowSun&focus=120%2C-780&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        120,
+        0,
+        -780
+      ],
+      "size": 200
+    }
+  }
+}

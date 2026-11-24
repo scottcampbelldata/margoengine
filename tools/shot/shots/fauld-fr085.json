@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.2,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -178.08,
+            1.7,
+            -442.882
+          ],
+          "target": [
+            120,
+            2,
+            -780
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 6.2,
+          "position": [
+            -175.757,
+            1.7,
+            -440.829
+          ],
+          "target": [
+            122.322,
+            2,
+            -777.947
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr085",
+    "kind": "long",
+    "seconds": 6.2,
+    "scene": "fauld-countryside",
+    "about": "fr085 08 The crater and the mud: Water trickling off the mud field in thin channels | 135 mm low, slide 0.5 m/s | overcast; mud",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=120%2C-780&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.1
+    },
+    "subject": {
+      "target": [
+        120,
+        2,
+        -780
+      ],
+      "size": 200
+    }
+  }
+}

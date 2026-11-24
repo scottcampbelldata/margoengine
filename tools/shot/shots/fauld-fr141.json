@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            85.339,
+            1.7,
+            123.358
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 26.99
+        },
+        {
+          "time": 5.4,
+          "position": [
+            83.496,
+            1.7,
+            120.694
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 26.99,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr141",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-crater",
+    "about": "fr141 12 After the war: The second memorial in a clearing, light through bare trees (framing of fd136) | 50 mm, dolly 0.6 m/s | day; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

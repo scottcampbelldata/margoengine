@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -108.894,
+            1.7,
+            117.227
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 16.07
+        },
+        {
+          "time": 6.3,
+          "position": [
+            -106.321,
+            1.7,
+            114.458
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 16.07,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr089",
+    "kind": "long",
+    "seconds": 6.3,
+    "scene": "fauld-crater",
+    "about": "fr089 09 The rescue: Firemen in helmets running across the dusty field toward the rim | 85 mm, slow push | grey; smoke (fallback until people: the dusty field with a hose line running to the rim)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.15
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

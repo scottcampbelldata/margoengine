@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            16.568,
+            1.7,
+            18.722
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 46.4
+        },
+        {
+          "time": 5.3,
+          "position": [
+            13.065,
+            1.7,
+            21.315
+          ],
+          "target": [
+            0,
+            2,
+            0
+          ],
+          "fov": 46.4,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr065",
+    "kind": "long",
+    "seconds": 5.3,
+    "scene": "fauld-crater",
+    "about": "fr065 07 A mile around: A ton block of white gypsum in a ploughed field, dust smoking off it | 28 mm low, arc 10 deg | overcast; dust",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.65
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        0
+      ],
+      "size": 230
+    }
+  }
+}

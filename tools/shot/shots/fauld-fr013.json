@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.5,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -532.698,
+            60,
+            506.955
+          ],
+          "target": [
+            -450,
+            0,
+            420
+          ],
+          "fov": 53.13
+        },
+        {
+          "time": 6.5,
+          "position": [
+            -510.3,
+            60,
+            483.404
+          ],
+          "target": [
+            -450,
+            0,
+            420
+          ],
+          "fov": 53.13,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr013",
+    "kind": "long",
+    "seconds": 6.5,
+    "scene": "fauld-countryside",
+    "about": "fr013 01 Gentle country: Low sun aerial: fresh furrows on a red-brown ploughed field, rooks lifting | drone 60 m, dolly 5 m/s | day; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=-450%2C420&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.25
+    },
+    "subject": {
+      "target": [
+        -450,
+        0,
+        420
+      ],
+      "size": 400
+    }
+  }
+}

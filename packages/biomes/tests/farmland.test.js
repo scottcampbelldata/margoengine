@@ -220,6 +220,16 @@ test('the polygon edit paints exactly the cells whose corner is inside, and farm
       edits = farmlandEdits(small);
     assert.equal(edits.filter((e) => e.kind === 'polygon').length, small.fields.length);
     assert.ok(edits.some((e) => e.kind === 'path' && e.layer === 'paint/farm-lane'));
+    const wood = farmlandEdits(small, {}, [tri]);
+    assert.ok(
+      wood.some((e) => e.kind === 'polygon' && e.layer === 'paint/farm-wood'),
+      'a wood outline paints farm-wood',
+    );
+    // Woods are painted only: the base biome is pasture, so no tree grows along the field lines where paint blends.
+    assert.equal(lowlandFarmWorld.biomes.find((b) => Object.keys(b.climate).length === 0)?.id, 'pasture');
+    for (const b of lowlandFarmWorld.biomes)
+      for (const r of [...(b.plants ?? []), ...(b.details ?? [])])
+        assert.ok(r.mesh.startsWith('library:'), `${b.id} ${r.id} draws a library model, not a procedural one`);
     for (const e of edits) editor.apply(e);
     assert.ok(FARMLAND_MATERIALS.plough.color.every((v) => v >= 0 && v <= 1));
   } finally {

@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1191.43,
+            1.7,
+            -165.041
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 5,
+          "position": [
+            -1191.43,
+            6.7,
+            -165.041
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr105",
+    "kind": "long",
+    "seconds": 5,
+    "scene": "fauld-countryside",
+    "about": "fr105 09 The rescue: The village from beneath the churchyard yew at dusk | 35 mm, crane up 1 m/s | dusk; frost",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=dusk&focus=-1190%2C-190&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.5
+    },
+    "subject": {
+      "target": [
+        -1190,
+        2,
+        -190
+      ],
+      "size": 30
+    }
+  }
+}

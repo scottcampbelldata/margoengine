@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -451.738,
+            1.7,
+            444.94
+          ],
+          "target": [
+            -450,
+            2,
+            420
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 4.3,
+          "position": [
+            -451.738,
+            1.7,
+            444.94
+          ],
+          "target": [
+            -450,
+            5.514,
+            420
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr117",
+    "kind": "long",
+    "seconds": 4.3,
+    "scene": "fauld-countryside",
+    "about": "fr117 11 The inquiry: Night sky over the fields, low cloud lit faintly from below | 35 mm, tilt up 8 deg | night; cloud",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=night&focus=-450%2C420&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.15
+    },
+    "subject": {
+      "target": [
+        -450,
+        2,
+        420
+      ],
+      "size": 400
+    }
+  }
+}

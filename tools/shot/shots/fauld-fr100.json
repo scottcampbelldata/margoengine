@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            108.048,
+            1.7,
+            -330.159
+          ],
+          "target": [
+            120,
+            2,
+            -780
+          ],
+          "fov": 10.16
+        },
+        {
+          "time": 5.4,
+          "position": [
+            108.134,
+            1.7,
+            -333.398
+          ],
+          "target": [
+            120,
+            2,
+            -780
+          ],
+          "fov": 10.16,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr100",
+    "kind": "long",
+    "seconds": 5.4,
+    "scene": "fauld-countryside",
+    "about": "fr100 09 The rescue: Rescuers small on the mud field probing with poles, seen from the slope | 135 mm, slow push | grey; mud (fallback until people: poles standing in the mud where the search went)",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=120%2C-780&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7
+    },
+    "subject": {
+      "target": [
+        120,
+        2,
+        -780
+      ],
+      "size": 200
+    }
+  }
+}

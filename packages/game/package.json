@@ -371,6 +371,10 @@
       "types": "./dist/biomes/splines.d.ts",
       "import": "./dist/biomes/splines.js"
     },
+    "./biomes/farmland": {
+      "types": "./dist/biomes/farmland.d.ts",
+      "import": "./dist/biomes/farmland.js"
+    },
     "./biomes/settlements": {
       "types": "./dist/biomes/settlements.d.ts",
       "import": "./dist/biomes/settlements.js"

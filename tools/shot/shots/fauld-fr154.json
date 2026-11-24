@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.1,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            14.096,
+            1.7,
+            30.647
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 5.1,
+          "position": [
+            14.096,
+            1.7,
+            30.647
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr154",
+    "kind": "long",
+    "seconds": 5.1,
+    "scene": "fauld-countryside",
+    "about": "fr154 13 The crater today: The same frame dissolving to 1944: the farm on the ridge in the same morning light | matched to the previous camera | dawn; mist",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=mist&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.55
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.3,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            294.075,
+            1.7,
+            350.617
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 6.87
+        },
+        {
+          "time": 5.3,
+          "position": [
+            291.997,
+            1.7,
+            348.21
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 6.87,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr073",
+    "kind": "long",
+    "seconds": 5.3,
+    "scene": "fauld-countryside",
+    "about": "fr073 07 A mile around: Far off across farmland: the column small on the skyline above a row of poplars | 200 mm, slow push | grey; distance haze",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.65
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

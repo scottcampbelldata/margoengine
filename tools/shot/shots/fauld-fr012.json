@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -17.117,
+            2,
+            28.221
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 37.85
+        },
+        {
+          "time": 6.7,
+          "position": [
+            -17.117,
+            25,
+            28.221
+          ],
+          "target": [
+            0,
+            2,
+            10
+          ],
+          "fov": 37.85,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr012",
+    "kind": "long",
+    "seconds": 6.7,
+    "scene": "fauld-countryside",
+    "about": "fr012 01 Gentle country: Crane up over a hedgerow lane (the lane runs across frame) to the fields rolling to the ridge | 35 mm, 2 m up to 25 m, crane 2 m/s | frost; low sun",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=0%2C10&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.35
+    },
+    "subject": {
+      "target": [
+        0,
+        2,
+        10
+      ],
+      "size": 60
+    }
+  }
+}

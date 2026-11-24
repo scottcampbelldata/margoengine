@@ -1,0 +1,75 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.7,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -891.767,
+            1.7,
+            146.982
+          ],
+          "target": [
+            -1190,
+            2,
+            -190
+          ],
+          "fov": 6.87
+        },
+        {
+          "time": 5.7,
+          "position": [
+            -891.767,
+            1.7,
+            146.982
+          ],
+          "target": [
+            -1166.436,
+            2,
+            -210.855
+          ],
+          "fov": 6.87,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr071",
+    "kind": "long",
+    "seconds": 5.7,
+    "scene": "fauld-countryside",
+    "about": "fr071 07 A mile around: Far across the fields: a distant steeple on the skyline under grey cloud, dust drifting | 200 mm, pan 4 deg | grey; overcast",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-1190%2C-190&yref=ground",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.85
+    },
+    "subject": {
+      "target": [
+        -1190,
+        2,
+        -190
+      ],
+      "size": 30
+    }
+  }
+}
