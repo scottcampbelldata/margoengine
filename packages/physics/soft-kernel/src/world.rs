@@ -159,6 +159,8 @@ pub struct World {
     pub gs: Col<f32>,
     /// Per body row: 1 when the soft body dominates the body (the particle is immovable to it), else 0.
     pub dom: Col<f32>,
+    /// Per body: 1 while it sleeps, its particles still and left out of the prediction.
+    pub bsleep: Col<u32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -185,6 +187,7 @@ impl World {
             grow(v, bodies);
         }
         grow(&mut self.b_on, bodies);
+        grow(&mut self.bsleep, bodies);
         grow(&mut self.b_first, bodies);
         grow(&mut self.b_count, bodies);
         for v in [
@@ -293,7 +296,12 @@ impl World {
             self.px[i] = self.x[i];
             self.py[i] = self.y[i];
             self.pz[i] = self.z[i];
-            if self.w[i] > 0.0 {
+            if self.bsleep[self.pbody[i] as usize] != 0 {
+                // A sleeping body stays where it is.
+                self.vx[i] = 0.0;
+                self.vy[i] = 0.0;
+                self.vz[i] = 0.0;
+            } else if self.w[i] > 0.0 {
                 let scale = self.gravity_scale[self.pbody[i] as usize];
                 self.vx[i] += h * gravity[0] * scale;
                 self.vy[i] += h * gravity[1] * scale;
@@ -330,6 +338,14 @@ impl World {
     /// The second half of a piece of a step, after the contacts: the bodies the particles pushed on move on, and the
     /// particles take the velocity they ended with.
     pub fn substep_post(&mut self, h: f32) {
+        // A sleeping body does not move: whatever the constraints did to its particles this piece is undone.
+        for i in 0..self.particles {
+            if self.bsleep[self.pbody[i] as usize] != 0 {
+                self.x[i] = self.px[i];
+                self.y[i] = self.py[i];
+                self.z[i] = self.pz[i];
+            }
+        }
         self.fem_end(h);
         // A body that the particles pushed on has a new velocity; it carries its collider along for the rest of the step.
         for c in 0..self.colliders {

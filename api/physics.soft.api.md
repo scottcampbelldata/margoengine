@@ -46,6 +46,7 @@ export class SoftBodies implements PhysicsAttachment {
     columns(): Columns;
     cellColumns(): Columns;
     create(desc: SoftBodyDesc): SoftBody;
+    setSleep(body: SoftBody, asleep: boolean): void;
     surfaceVolume(body: SoftBody): number;
     setVolume(body: SoftBody, factor: number | null): void;
     attach(soft: SoftBody, index: number, body: PhysicsBody): void;
@@ -123,6 +124,9 @@ export class SoftBody {
     edgeKinds: Uint8Array<ArrayBuffer>;
     volumeOn: boolean;
     surfaceRest: number;
+    canSleepFlag: boolean;
+    asleep: boolean;
+    quiet: number;
     collisionGroups: number | undefined;
     dominance: number;
     additionalIterations: number;
@@ -146,6 +150,12 @@ export class SoftBody {
     surfaceVolume(): number;
     setVolumeFactor(factor: number | null): this;
     threadSoftness(edge: number): SoftSoftness | null;
+    get canSleep(): boolean;
+    set canSleep(value: boolean);
+    get sleeping(): boolean;
+    sleep(): this;
+    wakeUp(): this;
+    wake(): this;
     triangles(): Uint32Array;
     edges(): Uint32Array;
     bendEdges(): Uint32Array;
@@ -210,6 +220,7 @@ export class SoftBodyDesc {
     selfContacts: boolean;
     selfFriction: number;
     dominance: number;
+    canSleep: boolean;
     additionalIterations: number;
     surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null;
     oriented: boolean | undefined;
@@ -244,6 +255,7 @@ export class SoftBodyDesc {
     setVolumeFactor(factor: number | null): this;
     setTensionOnly(edges?: boolean | readonly number[]): this;
     setDominanceGroup(group: number): this;
+    setCanSleep(on: boolean): this;
     setAdditionalSolverIterations(passes: number): this;
     setSurfaceCollider(settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): this;
     setNoSurfaceCollider(): this;

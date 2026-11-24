@@ -75,6 +75,7 @@ const INTEGER_COLUMNS = new Set([
   'kc',
   'at_p',
   'at_row',
+  'bsleep',
   'vtri',
   'vb_on',
   'vb_first',
@@ -467,6 +468,8 @@ export class SoftBodyDesc {
   /** @internal */ selfFriction = 0;
   /** @internal Dominance group: a body of a higher one is not pushed by this one, and one of a lower one is pushed whole. */
   dominance = 0;
+  /** @internal */
+  canSleep = true;
   /** @internal Extra constraint passes for this body's step. */
   additionalIterations = 0;
   /** @internal The collider of the body's own surface, made when it is created (null: none, the default). */
@@ -868,6 +871,12 @@ export class SoftBodyDesc {
     if (!Number.isInteger(group) || group < -128 || group > 127)
       throw new RangeError('A dominance group is a whole number from -128 to 127.');
     this.dominance = group;
+    return this;
+  }
+
+  /** Whether the body may fall asleep (default true; see {@link SoftBody.canSleep}). */
+  setCanSleep(on: boolean): this {
+    this.canSleep = on;
     return this;
   }
 
@@ -1322,6 +1331,9 @@ export class SoftBody {
   edgeKinds = new Uint8Array(0);
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
   /** @internal */ surfaceRest = 0;
+  /** @internal */ canSleepFlag = true;
+  /** @internal */ asleep = false;
+  /** @internal Seconds the body has been still. */ quiet = 0;
   /** @internal The packed groups the particles meet colliders by; undefined meets every collider. */ collisionGroups:
     | number
     | undefined = undefined;
@@ -1387,6 +1399,7 @@ export class SoftBody {
   /** Teleports a particle: contacts do not see the move. Use {@link SoftBody.setParticleKinematicTarget} to drive one. */
   setParticlePosition(index: number, position: Vec3): this {
     this.check(index);
+    this.wake();
     checkVec(position, 'Position');
     const { x, y, z, px, py, pz } = this.c,
       row = this.firstParticle + index;
@@ -1397,6 +1410,7 @@ export class SoftBody {
   }
   setParticleVelocity(index: number, velocity: Vec3): this {
     this.check(index);
+    this.wake();
     checkVec(velocity, 'Velocity');
     const { vx, vy, vz } = this.c,
       row = this.firstParticle + index;
@@ -1408,6 +1422,7 @@ export class SoftBody {
   /** Pins a particle (it holds still, a rigid anchor for the others) or releases it with its mass back and its velocity kept. */
   setParticlePinned(index: number, pinned: boolean): this {
     this.check(index);
+    this.wake();
     const { w, pflags } = this.c,
       row = this.firstParticle + index;
     if (pinned) {
@@ -1426,6 +1441,7 @@ export class SoftBody {
    */
   attachParticle(index: number, body: PhysicsBody): this {
     this.check(index);
+    this.wake();
     this.owner.attach(this, index, body);
     return this;
   }
@@ -1444,6 +1460,7 @@ export class SoftBody {
    */
   setParticleKinematicTarget(index: number, position: Vec3): this {
     this.check(index);
+    this.wake();
     checkVec(position, 'Target');
     this.setParticlePinned(index, true);
     const { tx, ty, tz, pflags } = this.c,
@@ -1480,6 +1497,38 @@ export class SoftBody {
         : kind === THREAD_SHEAR
           ? m.shearSoftness
           : null;
+  }
+  /**
+   * Whether the body may fall asleep (default true): after two seconds with every particle slower than 2 mm/s it stops being
+   * stepped until something touches it (a force, an impulse, a moved or pinned particle, a collider moving past it). Bodies with
+   * cells, clusters or particles attached to rigid bodies stay awake.
+   */
+  get canSleep(): boolean {
+    return this.canSleepFlag;
+  }
+  set canSleep(value: boolean) {
+    this.canSleepFlag = value;
+    if (!value) this.wake();
+  }
+  /** Whether the body is asleep now. */
+  get sleeping(): boolean {
+    return this.asleep;
+  }
+  /** Puts the body to sleep now, its particles still. */
+  sleep(): this {
+    this.check();
+    this.owner.setSleep(this, true);
+    return this;
+  }
+  /** Wakes the body. */
+  wakeUp(): this {
+    return this.wake();
+  }
+  /** @internal */
+  wake(): this {
+    if (this.asleep && !this.removed) this.owner.setSleep(this, false);
+    this.quiet = 0;
+    return this;
   }
   /** The triangles of a body built from a mesh (`SoftBodyDesc.trimesh`), as particle indices, three per triangle. */
   triangles(): Uint32Array {
@@ -1824,6 +1873,7 @@ export class SoftBody {
   /** A force in newtons on the whole body, shared by mass, until {@link SoftBody.resetForces}. Pinned particles ignore it. */
   addForce(force: Vec3): this {
     this.check();
+    this.wake();
     checkVec(force, 'Force');
     this.force = [this.force[0] + force[0], this.force[1] + force[1], this.force[2] + force[2]];
     return this;
@@ -1831,6 +1881,7 @@ export class SoftBody {
   /** A force on one particle until {@link SoftBody.resetForces}. */
   addParticleForce(index: number, force: Vec3): this {
     this.check(index);
+    this.wake();
     checkVec(force, 'Force');
     const had = this.pointForces.get(index) ?? [0, 0, 0];
     this.pointForces.set(index, [had[0] + force[0], had[1] + force[1], had[2] + force[2]]);
@@ -1896,6 +1947,7 @@ export class SoftBody {
     return this;
   }
   private kick(index: number, dx: number, dy: number, dz: number): void {
+    this.wake();
     const { vx, vy, vz, w } = this.c,
       row = this.firstParticle + index;
     if (w[row] === 0) return;
@@ -2210,6 +2262,7 @@ export class SoftBodies implements PhysicsAttachment {
     }
     body.selfFriction = desc.selfFriction;
     body.dominance = desc.dominance;
+    body.canSleepFlag = desc.canSleep;
     body.additionalIterations = desc.additionalIterations;
     body.oriented = desc.oriented;
     if (cells) {
@@ -2258,6 +2311,43 @@ export class SoftBodies implements PhysicsAttachment {
     this.syncVolume(desc.volumeFactor);
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
     return body;
+  }
+
+  /** @internal Puts a body to sleep or wakes it: its particles are left out of the prediction while it sleeps. */
+  setSleep(body: SoftBody, asleep: boolean): void {
+    this.columns().bsleep[body.handle] = asleep ? 1 : 0;
+    body.asleep = asleep;
+    body.quiet = 0;
+    if (asleep) {
+      const { vx, vy, vz } = this.columns();
+      for (let i = 0; i < body.particles; i++)
+        vx[body.firstParticle + i] = vy[body.firstParticle + i] = vz[body.firstParticle + i] = 0;
+    }
+  }
+
+  /** Counts how long each body has been still, and puts the ones that may sleep to sleep. */
+  private updateSleep(dt: number, c: Columns): void {
+    for (const body of this.bodies) {
+      if (body.asleep || !body.canSleepFlag) continue;
+      if (
+        body.cellRange.count > 0 ||
+        body.clusterInfo.length > 0 ||
+        body.force.some((f) => f !== 0) ||
+        body.pointForces.size > 0 ||
+        this.attachments.some((a) => a.soft === body)
+      ) {
+        body.quiet = 0;
+        continue;
+      }
+      let fastest = 0;
+      for (let i = 0; i < body.particles; i++) {
+        const row = body.firstParticle + i;
+        if (c.w[row] === 0) continue;
+        fastest = Math.max(fastest, Math.hypot(c.vx[row]!, c.vy[row]!, c.vz[row]!));
+      }
+      body.quiet = fastest < 0.002 ? body.quiet + dt : 0;
+      if (body.quiet >= 2) this.setSleep(body, true);
+    }
   }
 
   /** @internal The volume a closed triangle surface encloses, in cubic metres (positive when it faces outward). */
@@ -2967,6 +3057,7 @@ export class SoftBodies implements PhysicsAttachment {
     }
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, c);
     for (const mesh of this.bound) this.moveBound(mesh, c);
+    this.updateSleep(dt, c);
   }
 
   /**
@@ -3023,6 +3114,11 @@ export class SoftBodies implements PhysicsAttachment {
           if (hit.collider[at] === 0xffffffff) continue;
           // The body's own deformable meshes are not obstacles to it.
           if (this.bound.some((m) => m.soft === soft && m.host.row === hit.body[at])) continue;
+          if (
+            soft.asleep &&
+            Math.hypot(hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!) > 0.05
+          )
+            soft.wake();
           found.push({
             row: free[k]!,
             slot,
@@ -3528,7 +3624,7 @@ function rowsOf(
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
-  if (/^(gravity_scale|linear_damping|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
+  if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (
     /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|ii(xx|xy|xz|yy|yz|zz))$/.test(
       name,

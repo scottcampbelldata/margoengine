@@ -966,3 +966,45 @@ test('extra solver iterations stiffen a sheet, a surface collider can be made wi
   void oriented;
   void shell;
 });
+
+test('a still body falls asleep, stays where it is, and wakes when it is touched or a collider moves past it', async () => {
+  const { physics, soft } = await create();
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5], friction: 1 },
+  });
+  const ball = soft.create(
+    SoftBodyDesc.sphere([0, 0.5, 0], 0.3, { detail: 1 }).setSoftness(30, 1).setParticleMass(0.02).setLinearDamping(2),
+  );
+  const never = soft.create(SoftBodyDesc.rope([3, 0.05, 0], [4, 0.05, 0], 5).setCanSleep(false).setLinearDamping(3));
+  assert.equal(ball.canSleep, true);
+  const settle = (limit) => {
+    for (let i = 0; i < limit && !ball.sleeping; i++) physics.step();
+  };
+  settle(1200);
+  assert.equal(ball.sleeping, true, 'a body at rest sleeps once it has been still for two seconds');
+  assert.equal(never.sleeping, false, 'a body that may not sleep stays awake');
+  const rested = [...ball.particlePositions()];
+  steps(physics, 60);
+  assert.deepEqual([...ball.particlePositions()], rested, 'a sleeping body does not move');
+  // An impulse wakes it.
+  ball.applyImpulse([0, 0.5, 0]);
+  assert.equal(ball.sleeping, false);
+  steps(physics, 20);
+  assert.notDeepEqual([...ball.particlePositions()], rested, 'and it moves');
+  // Let it settle again, then a rigid body that rolls over it wakes it.
+  settle(1200);
+  assert.equal(ball.sleeping, true);
+  const crate = physics.addBody(null, {
+    position: [0.9, 0.35, 0],
+    colliders: { shape: 'sphere', radius: 0.3, density: 500 },
+  });
+  crate.setLinearVelocity([-3, 0, 0]);
+  steps(physics, 30);
+  assert.equal(ball.sleeping, false, 'a moving collider wakes the body it touches');
+  ball.sleep();
+  assert.equal(ball.sleeping, true);
+  ball.canSleep = false;
+  assert.equal(ball.sleeping, false, 'a body that may not sleep is awake');
+});
