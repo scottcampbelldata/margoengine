@@ -149,6 +149,14 @@ export interface SkyFogOptions {
   falloff?: 'exp' | 'exp2';
   /** Extra density per metre below y = 0, as a fraction (default 0). */
   height?: number;
+  /**
+   * Height falloff of the haze, metres (exponential height fog): the density is `density` at `base` and falls by e every
+   * `scaleHeight` metres above it, integrated along each ray, so a drone looking down sees through the thin air above the
+   * haze layer instead of the ground-level haze over its whole path. 0 (default) keeps the density the same at every height.
+   */
+  scaleHeight?: number;
+  /** World height, metres, where the haze has its `density` (with `scaleHeight`). Default 0. */
+  base?: number;
   /** Fixed linear fog colour instead of the sky's radiance in the view direction. */
   color?: Vec3;
 }

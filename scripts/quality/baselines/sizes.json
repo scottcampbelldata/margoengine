@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20897055,
+  "total": 20897849,
   "history": [
     {
       "date": "2026-10-24",
@@ -14565,6 +14565,12 @@
       "commit": "2ec8bf0ff",
       "reason": "@margoengine/physics base 98,776 to 104,696 B gzip budget (measured 101,646 + 3%, Mac build): main already measured 101,602 B, over its budget, from changes since the last recorded figure that did not raise it; this change adds 44 B, the world's clock (stepCount and the accumulator) in Physics.takeSnapshot and restoreSnapshot, so a wind or tide that reads the time replays after a restore. The clock lives with the rigid world's snapshot; a split would put two calls where one restores the world.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "fog-height-falloff",
+      "reason": "@margoengine/sky 25291 to 25506 B gzip (ceiling 25478 to 26272): the sky fog's exponential height falloff (scaleHeight, base) in the fog shader, its option checks and the exported CPU twin fogOpticalDepth, so a drone looks down through thin air over a haze layer. WGSL comments are stripped; a lazy split would cost more than the 215 B. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15841,7 +15847,7 @@
     "@margoengine/shadows/viewer": 2540,
     "@margoengine/shadows/virtual": 18421,
     "@margoengine/shadows/vsm": 2046,
-    "@margoengine/sky": 25478,
+    "@margoengine/sky": 26272,
     "@margoengine/sky/aerial": 7124,
     "@margoengine/sky/astro": 10457,
     "@margoengine/sky/aurora": 5489,

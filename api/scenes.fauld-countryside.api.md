@@ -24,6 +24,8 @@ export const FAULD_CLOUD_DECK: Readonly<{
     top: 1600;
 }>;
 
+export const FAULD_HAZE_SCALE_HEIGHT = 500;
+
 export const FAULD_PLACES: Readonly<{
     crater: readonly [0, 0];
     farm: readonly [0, 10];

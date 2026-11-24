@@ -27,6 +27,8 @@
 // Recorded again with KB-SKY-HOLES-KH1 (2026-11-26): the broken cloud sheet's optical depth goes as its depth to the 5/3
 // (Brenguier et al. 2000) and its own depth shades its sunlight, so every configuration of the full Sky changed text; no
 // buffer write changed, and only skies with cloud cover between 0 and 1 draw differently (sheet-check.html).
+// Recorded again with the fog's exponential height falloff (2026-11-27, scaleHeight and base): the fog WGSL gained the
+// closed-form term (run only with a scaleHeight) and its uniform one vec4; the same commands in every trace.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

@@ -127,6 +127,8 @@ export interface SkyFogOptions {
     start?: number;
     falloff?: 'exp' | 'exp2';
     height?: number;
+    scaleHeight?: number;
+    base?: number;
     color?: Vec3;
 }
 
@@ -228,6 +230,14 @@ export interface SkyOptions {
 export function cloudHaze(clear: readonly number[], sunlight: readonly number[], sunUp: number, up: number, coverage: number, T: number, above?: readonly number[], units?: number): [number, number, number];
 
 export function cloudTransmittance(cover: number): number;
+
+export function fogOpticalDepth(fog: {
+    density?: number;
+    start?: number;
+    height?: number;
+    scaleHeight?: number;
+    base?: number;
+}, distance: number, eyeY: number, pointY: number): number;
 
 export function moonAirmass(up: number): number;
 

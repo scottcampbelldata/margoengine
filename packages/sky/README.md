@@ -264,7 +264,7 @@ the scene, whose rays stop at the horizon; wind is the cloud sheet's own `clouds
 ### Sliders for every control: settings
 
 `@margoengine/sky/settings` lists every sky control as one table for panels and tools, and names eleven looks made
-only of its values. `SKY_SETTINGS` has 133 rows across the clock, the sun, the air, clouds, the volumetric layer, the hurricane, lightning, fog, tints, the gradient,
+only of its values. `SKY_SETTINGS` has 135 rows across the clock, the sun, the air, clouds, the volumetric layer, the hurricane, lightning, fog, tints, the gradient,
 the sun disc, the glow, exposure and grading; each row gives `name`, `group`, `kind` (`number`, `color`, `choice` or
 `gradient`), `default`, `min`, `max`, `step`, `unit`, `about` and `live`. `applySkySettings({sky, tonemap, grade, clouds, weather}, values)`
 writes a set of values (a name left out takes its default) onto the sky, onto a `Tonemap` and its `Grade` when
@@ -1060,9 +1060,24 @@ Fog is enabled only while `fog` is set.
 Three optional fog fields change the look: `falloff: 'exp'` uses `1 - exp(-optical)` instead of the squared
 default; `height` adds density below y = 0 (optical depth × (1 + height × metres below 0), e.g. 0.065 for a
 sea haze); `color` replaces the sky radiance with a fixed linear colour. The `night-fog` trace configuration
-(`test/configs.js`) uses `{start: 0, falloff: 'exp', height: 0.065, color: horizon}`. This is homogeneous distance haze, without height fog,
-volumetric light shafts or particle-depth fog; large scenes need a suitable
-camera far plane.
+(`test/configs.js`) uses `{start: 0, falloff: 'exp', height: 0.065, color: horizon}`.
+
+`scaleHeight` (metres, default 0) makes the haze an exponential height fog: the density is `density` at the world
+height `base` (default 0) and falls by e every `scaleHeight` metres above it, integrated along each ray in closed form
+(optical depth times `exp(-(eyeY - base) / H) (1 - exp(-k)) / k`, `k = (pointY - eyeY) / H`; Wenzel, "Real-time
+Atmospheric Effects in Games Revisited", GDC 2007; Quilez, "Better Fog", 2010). A camera high over a landscape then looks
+down through thin air onto clear fields while level views keep their haze. `fogOpticalDepth(fog, distance, eyeY, pointY)`
+returns the shader's optical depth on the CPU:
+
+```ts
+import {fogOpticalDepth} from 'margoengine/sky';
+const haze = {density: 0.0005, start: 0, scaleHeight: 500, base: 80};
+const down = fogOpticalDepth(haze, 800, 600, 80);   // a drone 520 m over the base looking at the ground: about 0.25
+const level = fogOpticalDepth(haze, 800, 80, 80);   // a level view at the base: 0.4
+console.log(down < level);
+```
+
+There are no volumetric light shafts or particle-depth fog here; large scenes need a suitable camera far plane.
 
 The clock and sun update before rendering, so shadows and scene lighting can use
 the same frame's direction. Set `lighting: {intensity: 6, minimum: 0.15}` to copy

@@ -10,6 +10,7 @@ import { attachFauldWorld, type FauldWorld, type FauldWorldSettings } from './fa
 export {
   FAULD_CENTRE,
   FAULD_CLOUD_DECK,
+  FAULD_HAZE_SCALE_HEIGHT,
   FAULD_PLACES,
   FAULD_SIZE,
   FAULD_SLOTS,

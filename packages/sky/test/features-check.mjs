@@ -747,6 +747,9 @@ checks.look = async (page, samples) => {
   const glow = r.nightGlow.mid;
   assert.ok(glow[0] > 1.5 * glow[1] && glow[1] > 1.5 * glow[2], `the pall glows its own colour: ${show('nightGlow')}`);
   assert.ok(Math.abs(lum(r.nightGlow.high) / lum(r.nightGlow.horizon) - 1) < 0.02, 'the glow is even over the dome');
+  // The height falloff: the GPU's share of the fog is the CPU twin's, far under the same-density-everywhere share.
+  const hf = r.heightFog;
+  assert.ok(Math.abs(hf.share - hf.want) < 0.01 && hf.share < 0.3 * hf.even, `the height fog: ${JSON.stringify(hf)}`);
   assert.ok(lum(r.nightCloud.all) > 0, 'the night clouds draw');
   assert.ok(lum(r.nightCloudPall.all) < 1e-4 * lum(r.nightCloud.all), `clouds above the pall go out: ${show('nightCloudPall')}`);
   const b = r.bruneton;

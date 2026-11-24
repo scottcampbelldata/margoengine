@@ -845,6 +845,8 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
   n('fog.density', 'fog', 0.01, 0, 1, 0.0005, '1/m', 'Fog density, while the sky has fog (it needs a depth texture).'),
   n('fog.start', 'fog', 40, 0, 10000, 1, 'm', 'Distance from the camera where fog starts.'),
   n('fog.height', 'fog', 0, 0, 1, 0.001, '', 'Extra fog below y = 0, as a fraction: height fog.'),
+  n('fog.scaleHeight', 'fog', 0, 0, 10000, 10, 'm', 'Height over which the haze thins by e above fog.base, integrated along each ray (0: the same at every height).'),
+  n('fog.base', 'fog', 0, -1000, 10000, 1, 'm', 'World height where the haze has fog.density (with fog.scaleHeight).'),
   choice('fog.falloff', 'fog', ['exp2', 'exp'], "How fog thickens with distance: 'exp2' softer near the camera."),
   {
     ...c('fog.color', 'fog', [1, 1, 1], 0, 4, "Fixed fog colour; null takes the sky's colour in the view direction."),

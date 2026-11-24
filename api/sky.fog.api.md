@@ -10,6 +10,14 @@ export function cloudHaze(clear: readonly number[], sunlight: readonly number[],
 
 export const fog: NonNullable<SkyFeatures['fog']>;
 
+export function fogOpticalDepth(fog: {
+    density?: number;
+    start?: number;
+    height?: number;
+    scaleHeight?: number;
+    base?: number;
+}, distance: number, eyeY: number, pointY: number): number;
+
 // Not exported from this entry, but used by the exports above:
 
 type Lights = {
@@ -173,6 +181,8 @@ interface SkyFogOptions {
     start?: number;
     falloff?: 'exp' | 'exp2';
     height?: number;
+    scaleHeight?: number;
+    base?: number;
     color?: Vec3;
 }
 

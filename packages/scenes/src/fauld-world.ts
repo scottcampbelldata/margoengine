@@ -186,6 +186,8 @@ const SKY: Readonly<
   mist: { hour: 8.6, weather: { ...WEATHER_PRESETS.fog, fog: 0.4 }, preset: 'overcast', clouds: 'stratus' },
 };
 
+/** How fast the winter haze thins with height over the Fauld ground, metres per e-fold (the sky fog's `scaleHeight`). */
+export const FAULD_HAZE_SCALE_HEIGHT = 500;
 /**
  * The overcast deck of a grey November day, metres above the ground: a stratocumulus sheet, the common winter overcast
  * over the English Midlands, with its base at 1,000 m and tops at 1,600 m (WMO International Cloud Atlas 2017,
@@ -486,6 +488,16 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       // Inside the crater the model's finer heights (a camera or prop never sits under a slump the terrain smooths).
       return c === undefined ? g : Math.max(g, c + lift);
     };
+    // The winter haze lies in the boundary layer, not at every height: the sky fog thins by e every 500 m above the
+    // ground round the subject (a stable November boundary layer is 100 to 500 m deep; Stull, "An Introduction to
+    // Boundary Layer Meteorology", 1988, ch. 12), so the drone shots look down through thin air onto the fields instead
+    // of through ground-level haze over their whole path (they read as grey fields of fog with a uniform density).
+    const fogOptions = (preset.sky.options as { fog?: { scaleHeight?: number; base?: number } }).fog;
+    if (fogOptions) {
+      fogOptions.scaleHeight = FAULD_HAZE_SCALE_HEIGHT;
+      const [fx, fz] = settings.focus ?? FAULD_PLACES.crater;
+      fogOptions.base = height(fx, fz);
+    }
     const clouds = VolumetricClouds.attach(engine, {
       sky: preset.sky as never,
       type: sky.clouds,

@@ -10,11 +10,13 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 // share (cloudHaze), not the clear sky behind the cloud: a low sun under an overcast no longer tints it gold.
 const fragment = `
 @group(0) @binding(3) var sceneDepth:texture_depth_2d;
-@group(0) @binding(4) var<uniform> fog:array<vec4f,2>;
+@group(0) @binding(4) var<uniform> fog:array<vec4f,3>;
 @fragment fn fogFragment(i:Vertex)->@location(0) vec4f {
  let d=textureLoad(sceneDepth,vec2i(i.position.xy),0);if(d<=0.0){discard;}
  let p=frame.inverse*vec4f(i.uv*vec2f(2,-2)+vec2f(-1,1),d,1);let world=p.xyz/p.w;let offset=world-frame.eye.xyz;
- let distance=length(offset);let optical=max(0.0,distance-fog[0].y)*fog[0].x*(1.0+max(-world.y,0.0)*fog[0].w);if(optical<=0.0){discard;}
+ let distance=length(offset);var optical=max(0.0,distance-fog[0].y)*fog[0].x*(1.0+max(-world.y,0.0)*fog[0].w);
+ if(fog[2].x>0.0){let a=(frame.eye.y-fog[2].y)*fog[2].x;let k=(world.y-frame.eye.y)*fog[2].x;optical=optical*exp(-a)*select((1.0-exp(-k))/k,1.0-0.5*k,abs(k)<1e-3);}
+ if(optical<=0.0){discard;}
  let opacity=1.0-exp(-select(optical*optical,optical,fog[0].z>0.5));
  // shortcut: homogeneous distance haze, use volumetric scattering for local weather and light shafts.
  // A zero footprint takes the sky's gradient without the stylized night's stars and moon.
@@ -54,6 +56,31 @@ export function cloudHaze(
   ) as [number, number, number];
 }
 
+/**
+ * The fog's optical depth along a ray of `distance` metres from an eye at height `eyeY` to a point at `pointY`, as the fog
+ * shader computes it (exp falloff, before the squaring of exp2): `density` times the distance past `start`, times the
+ * below-zero boost, times the exponential height fog's mean along the ray when `scaleHeight` is over 0:
+ * exp(-(eyeY - base) / H) (1 - exp(-k)) / k with k = (pointY - eyeY) / H (the closed-form integral of an exponential
+ * density along a straight ray; Wenzel, "Real-time Atmospheric Effects in Games Revisited", GDC 2007; Quilez, "Better
+ * Fog", 2010). Fauld recut (2026-11-24): with a density the same at every height, drone shots at 300 to 600 m looked
+ * through ground-level winter haze over their whole path and read as grey fields of fog.
+ * @example fogOpticalDepth({ density: 0.0005, start: 0, scaleHeight: 400, base: 80 }, 800, 600, 80); // under 0.4, the haze is thin above the layer
+ */
+export function fogOpticalDepth(
+  fog: { density?: number; start?: number; height?: number; scaleHeight?: number; base?: number },
+  distance: number,
+  eyeY: number,
+  pointY: number,
+): number {
+  let optical = Math.max(0, distance - (fog.start ?? 40)) * (fog.density ?? 0.01) * (1 + Math.max(-pointY, 0) * (fog.height ?? 0));
+  if (fog.scaleHeight) {
+    const a = (eyeY - (fog.base ?? 0)) / fog.scaleHeight,
+      k = (pointY - eyeY) / fog.scaleHeight;
+    optical *= Math.exp(-a) * (Math.abs(k) < 1e-3 ? 1 - 0.5 * k : (1 - Math.exp(-k)) / k);
+  }
+  return optical;
+}
+
 /** Distance and height fog over the scene depth (`fog` option), in the sky's colour or a fixed one. */
 export const fog: NonNullable<SkyFeatures['fog']> = {
   validate(fog) {
@@ -69,16 +96,19 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
       (fog.density ?? 0.01) < 0 ||
       (fog.density ?? 0.01) > 1 ||
       !Number.isFinite(Math.fround(fog.start ?? 40)) ||
-      (fog.start ?? 40) < 0
+      (fog.start ?? 40) < 0 ||
+      !(Math.fround(fog.scaleHeight ?? 0) >= 0) ||
+      !Number.isFinite(Math.fround(fog.scaleHeight ?? 0)) ||
+      !Number.isFinite(Math.fround(fog.base ?? 0))
     )
       throw new RangeError(
-        'Invalid sky fog; give an optional depth function, falloff "exp" or "exp2", height and start of 0 or more, and density from 0 to 1.',
+        'Invalid sky fog; give an optional depth function, falloff "exp" or "exp2", height, start and scaleHeight of 0 or more, a finite base, and density from 0 to 1.',
       );
   },
   create(code) {
     // The deck's light (clouds.ts overcastLight): the sky's own when it draws the clouds, else compiled in here.
     const shader = code + (code.includes('fn overcastLight(') ? '' : overcastLightWgsl) + fragment,
-      values = new Float32Array(8),
+      values = new Float32Array(12),
       attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' },
       descriptor: GPURenderPassDescriptor = { colorAttachments: [attachment] };
     let uniform: GPUBuffer | undefined,
@@ -107,7 +137,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         const live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined,
           depthSamples = live ? 4 : depth.sampleCount,
           next = c.format + ':' + samples + ':' + depthSamples;
-        uniform ??= c.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        uniform ??= c.device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         if (key !== next) {
           // Per sample over multisampled depth: one draw reading sample_index, or at the compatibility level, which has
           // no sample_index, one masked draw per sample.
@@ -162,6 +192,8 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         values[3] = fog.height ?? 0;
         values.set(fog.color ?? [0, 0, 0], 4);
         values[7] = +!!fog.color;
+        values[8] = fog.scaleHeight ? 1 / fog.scaleHeight : 0;
+        values[9] = fog.base ?? 0;
         c.device.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
         attachment.view = c.color;
         const pass = c.encoder.beginRenderPass(descriptor);

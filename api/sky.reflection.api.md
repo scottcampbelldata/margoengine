@@ -171,6 +171,8 @@ interface SkyFogOptions {
     start?: number;
     falloff?: 'exp' | 'exp2';
     height?: number;
+    scaleHeight?: number;
+    base?: number;
     color?: Vec3;
 }
 

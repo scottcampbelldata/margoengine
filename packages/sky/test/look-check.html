@@ -6,7 +6,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {sceneSamples} from '/packages/core/dist/quality.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
-import {Sky} from '/packages/sky/dist/index.js';
+import {Sky,fogOpticalDepth} from '/packages/sky/dist/index.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,-1],fov:80,near:0.5,far:100000}}),device=engine.gpu,errors=[];
 engine.stop();
@@ -108,6 +108,17 @@ window.check={samples:sceneSamples,
   aim(60);
   await nshot('nightCloud',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={};});
   await nshot('nightCloudPall',o=>{n(o);o.clouds={coverage:0.6};o.atmosphere={layerTransmittance:[1e-6,1e-6,1e-6]};});
+  // The fog's exponential height falloff on the GPU against its CPU twin: a depth of the test's own 2 km along a view 30
+  // degrees up, so the point is about 1 km above the eye. The fog's share of the pixel is (with - without) / (colour - without).
+  aim(30);
+  const flat=device.createTexture({size:[128,96],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),clear=device.createCommandEncoder();
+  clear.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:flat.createView(),depthClearValue:0.5*(100000-2000)/(2000*(100000-0.5)),depthLoadOp:'clear',depthStoreOp:'store'}}).end();
+  device.queue.submit([clear.finish()]);
+  const middle=async(fog)=>{n(night.options);delete night.options.fog;if(fog)night.options.fog=fog;const r=await bands();return r.pixels[(48*128+64)*4];};
+  const bare=await middle(),hazy={depth:()=>flat,density:0.001,start:0,falloff:'exp',color:[1,1,1],scaleHeight:100,base:0},share=(await middle(hazy)-bare)/(1-bare);
+  const y=engine.camera.position[1];
+  out.heightFog={share,want:1-Math.exp(-fogOpticalDepth(hazy,2000,y,y+1000)),even:1-Math.exp(-2)};
+  delete night.options.fog;flat.destroy();
   night.dispose();
   const error=await device.popErrorScope();
   const result={error:error?.message??null,errors:errors.splice(0)};

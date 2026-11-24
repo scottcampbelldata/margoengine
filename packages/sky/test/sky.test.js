@@ -459,11 +459,13 @@ test('exponential height fog with a fixed colour packs its uniform every frame',
   h.engine.use(sky);
   h.frame();
   const values = () =>
-    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 32).data), (v) => +v.toFixed(4));
-  assert.deepEqual(values(), [0.01, 0, 1, 0.065, 0.1, 0.2, 0.3, 1]);
+    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 48).data), (v) => +v.toFixed(4));
+  assert.deepEqual(values(), [0.01, 0, 1, 0.065, 0.1, 0.2, 0.3, 1, 0, 0, 0, 0]);
   color[0] = 0.5;
   sky.options.fog.density = 0.02;
+  Object.assign(sky.options.fog, { scaleHeight: 500, base: 80 });
   h.frame();
+  assert.deepEqual(values().slice(8), [0.002, 80, 0, 0], 'the height falloff: 1 / scaleHeight and the base');
   assert.deepEqual(values().slice(0, 5), [0.02, 0, 1, 0.065, 0.5]);
   delete sky.options.fog.color;
   delete sky.options.fog.falloff;
