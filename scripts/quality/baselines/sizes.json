@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17537743,
+  "total": 17548605,
   "history": [
     {
       "date": "2026-10-24",
@@ -11391,6 +11391,12 @@
       "commit": "a2346873d4",
       "reason": "weather/eruption 9,802 to 10,574 B: BlastCloud lobed cap, blackbody fire glow, debris jets and soot colours; one entry, the features need the code",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "2d90faf92d",
+      "reason": "Lane D batch (2026-11-24): scenes/fauld-blast is a new scene entry that imports its feature packages statically like the other scene entries (14 leak items, as fauld-crater and fauld-tunnels); the scenes root grows by its catalogue row; react/textures and react/clouds carry the fourth audit pass's binding fixes",
+      "grew": 18
     }
   ],
   "items": {
@@ -12256,7 +12262,7 @@
     "@margoengine/react/animation": 3015,
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/caustics": 3429,
-    "@margoengine/react/clouds": 3497,
+    "@margoengine/react/clouds": 3792,
     "@margoengine/react/controls": 10113,
     "@margoengine/react/controls-extra": 6012,
     "@margoengine/react/devtools": 1008,
@@ -12290,7 +12296,7 @@
     "@margoengine/react/taa": 1153,
     "@margoengine/react/test": 4887,
     "@margoengine/react/text": 4383,
-    "@margoengine/react/textures": 4940,
+    "@margoengine/react/textures": 5203,
     "@margoengine/react/tonemap": 1156,
     "@margoengine/react/ui": 2992,
     "@margoengine/react/viewcube": 1288,
@@ -12361,8 +12367,9 @@
     "@margoengine/scene/graph": 2254,
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
-    "@margoengine/scenes": 4356,
+    "@margoengine/scenes": 4642,
     "@margoengine/scenes/dune-coast": 6475,
+    "@margoengine/scenes/fauld-blast": 10004,
     "@margoengine/scenes/fauld-countryside": 8214,
     "@margoengine/scenes/fauld-crater": 8214,
     "@margoengine/scenes/fauld-tunnels": 13489,
@@ -13027,6 +13034,20 @@
     "leak @margoengine/scenes/dune-coast -> @margoengine/terrain": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/tonemap": 1,
     "leak @margoengine/scenes/dune-coast -> @margoengine/water": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/biomes": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/biomes/view": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/dof": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/gltf/pbr": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/post/gtao": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/shadows": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/sky/scenes": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/sky/volumetric-clouds": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/tonemap": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/vfx/base": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/vfx/flame": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/water": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/water/flood": 1,
+    "leak @margoengine/scenes/fauld-blast -> @margoengine/weather/eruption": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes/view": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/dof": 1,
