@@ -2,7 +2,7 @@
 // The mechanics themselves are proved in kernel/tests/solver.rs; here each option has to reach the kernel and mean it.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, Physics, loadKernel } from '../dist/next.js';
+import { KernelWorld, Physics, loadKernel } from '../dist/index.js';
 
 await Physics.load();
 const G = 9.81;
@@ -237,8 +237,16 @@ test('more colliders than the world had room for keep their friction', async () 
 
 test('contactforce says how hard a pair pressed: a box at rest reads its weight', () => {
   const physics = new Physics(null),
-    floor = physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } }),
-    box = physics.addBody(null, { position: [0, 0.5, 0], canSleep: false, colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 3 } }),
+    floor = physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+    }),
+    box = physics.addBody(null, {
+      position: [0, 0.5, 0],
+      canSleep: false,
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 3 },
+    }),
     seen = [];
   const stop = physics.on('contactforce', (event) => seen.push(event));
   for (let i = 0; i < 30; i++) physics.step();
@@ -257,8 +265,15 @@ test('contactforce says how hard a pair pressed: a box at rest reads its weight'
 
 test('contactforce listeners may step and remove: each gathers into its own list', () => {
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
-  const box = physics.addBody(null, { position: [0, 0.5, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+  });
+  const box = physics.addBody(null, {
+    position: [0, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
   let calls = 0;
   physics.on('contactforce', () => {
     calls++;
@@ -296,9 +311,17 @@ test('touching and contactPoints walk only the asking body pairs and agree with 
     indices = [];
   for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) vertices.push(i - 2, 0, j - 2);
   for (let j = 0; j < 4; j++)
-    for (let i = 0; i < 4; i++) indices.push(j * 5 + i, (j + 1) * 5 + i, j * 5 + i + 1, j * 5 + i + 1, (j + 1) * 5 + i, (j + 1) * 5 + i + 1);
-  const meshFloor = physics.addBody(null, { type: 'fixed', position: [0, 0, 12], colliders: { shape: 'trimesh', vertices, indices } }),
-    onMesh = physics.addBody(null, { position: [0.3, 0.5, 12.2], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: 1 } }),
+    for (let i = 0; i < 4; i++)
+      indices.push(j * 5 + i, (j + 1) * 5 + i, j * 5 + i + 1, j * 5 + i + 1, (j + 1) * 5 + i, (j + 1) * 5 + i + 1);
+  const meshFloor = physics.addBody(null, {
+      type: 'fixed',
+      position: [0, 0, 12],
+      colliders: { shape: 'trimesh', vertices, indices },
+    }),
+    onMesh = physics.addBody(null, {
+      position: [0.3, 0.5, 12.2],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: 1 },
+    }),
     dumbbell = physics.addBody(null, {
       position: [0, 0.5, -8],
       colliders: {
@@ -315,8 +338,15 @@ test('touching and contactPoints walk only the asking body pairs and agree with 
     of = (collider) => physics.bodyOfCollider(collider),
     contacts = physics.kernel.contacts(),
     touches = (a, b) =>
-      contacts.some((c) => ((of(c.colliderA) === a && of(c.colliderB) === b) || (of(c.colliderA) === b && of(c.colliderB) === a)) && c.points.some(pressing)),
-    points = (body) => contacts.flatMap((c) => (of(c.colliderA) === body || of(c.colliderB) === body ? c.points.filter(pressing).map((p) => p.position) : []));
+      contacts.some(
+        (c) =>
+          ((of(c.colliderA) === a && of(c.colliderB) === b) || (of(c.colliderA) === b && of(c.colliderB) === a)) &&
+          c.points.some(pressing),
+      ),
+    points = (body) =>
+      contacts.flatMap((c) =>
+        of(c.colliderA) === body || of(c.colliderB) === body ? c.points.filter(pressing).map((p) => p.position) : [],
+      );
   const expected = bodies.map((a) => [bodies.map((b) => touches(a, b)), points(a)]);
   assert.ok(expected.flat(2).filter((x) => x === true).length > 100, 'the pile touches');
   assert.ok(points(pair).length >= 5, 'both colliders of one body rest on the floor: four corners and the ball');

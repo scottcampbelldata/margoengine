@@ -1,8 +1,8 @@
 // The contact modifier (Rapier's MODIFY_SOLVER_CONTACTS hook): a one-way platform, a friction override, and the guards.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
-import { Physics as RapierPhysics } from '../dist/index.js';
+import { Physics } from '../dist/index.js';
+import { RapierPhysics } from './oracle.js';
 
 const warn = console.warn;
 console.warn = () => {};

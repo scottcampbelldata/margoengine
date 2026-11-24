@@ -6,6 +6,30 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-24: ragdoll on the kernel's cone joint fails its powered and balance tests (KB-PHYS-SWITCH-CONE1, physics, ragdoll)
+
+- **Repro:** in `packages/ragdoll/src/ragdoll.ts` build the default `cone` joint as `{type: 'cone', frameA, frameB, swing, twist}` (the patch is `join()` with frame X on the bone axis) and run `node --test packages/ragdoll/tests/*.test.js`: 32 of 89 fail (a head "turned 0.71 rad" under its motors, "hips drifted 1.6 m"), where the spherical joint with the ragdoll's own limit projection fails 5.
+- **Cause:** the kernel's cone joint holds swing and twist correctly (the limit tests pass on it) and now takes `setRotationMotor`, but the powered ragdoll's springs, written against Rapier's spherical-joint motor, reach a different pose inside the cone: not yet traced to the motor formulation, the cone's frame or the solver passes. The projection the ragdoll keeps on the spherical joint turns unstable on the kernel (the child's spin grows from 0.7 to over 100 rad/s once a limit pushes back) and fails the two limit tests.
+- **State:** the ragdoll stays on the spherical joint with its projection (5 failing tests: the two limit tests, the Fox and Knight hull silhouettes, and the balance sink) until the powered difference is found.
+
+### Open 2026-11-24: ragdoll balance and push recovery were tuned on Rapier's joints (KB-PHYS-SWITCH-BAL1, ragdoll)
+
+- **Repro:** `node --test packages/ragdoll/tests/balance.test.js`: "without it the character folds up" reads `motors alone sink (0.4004 of 0.4057)` (the kernel's motors hold the standing pose instead of folding), and "pushed to its left it steps that way, catches itself and stands" ends moving at 0.77 m/s.
+- **Cause:** the balance controller's gains, `LEG_INERTIA` and solver passes were measured against Rapier's softer joints and iteration scheme. The kernel's joints and 8 substeps of 2 passes answer differently. `SOLVER_PASSES` is 16 now (8 substeps of the world plus the island's extra substeps).
+- **State:** to retune after the cone rotation motor above lands.
+
+### Open 2026-11-24: a query with no `groups` misses colliders whose filter is 0 (KB-PHYS-SWITCH-GROUPS1, physics collision)
+
+- **Repro:** `physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh', vertices, indices, collisionGroups: (0x4000 << 16) >>> 0}})` then `physics.raycast(origin, direction)`: null. `packages/ragdoll/tests/hulls.test.js` ("Fox in centimetres") reads 0 against 0 because its probe mesh is such a collider.
+- **Cause:** `Physics.filterWords` sends `0xffffffff` for a query without `groups` and the kernel's `groups_meet` tests it against the collider's groups; a query without groups must see every collider, as Rapier's does.
+- **State:** needs a "no group test" flag in the kernel's query filter (collision work in `packages/physics/kernel/src/query.rs`).
+
+### Open 2026-11-24: `shapeCast` reports a hit at distance 0 for a shape moving along a surface within the contact margin (KB-PHYS-SWITCH-CAST1, physics collision)
+
+- **Repro:** a capsule 2 cm above a floor, cast sideways with `stopAtPenetration` true (the default): a hit at distance 0. With `stopAtPenetration: false` it is null. Gaps up to about 0.06 m answer the same.
+- **Cause:** the cast treats the contact prediction margin as penetration. A shape that does not overlap should not stop at the start.
+- **State:** the character controller works around it with `stopAtPenetration: false`.
+
 ### Open 2026-11-24: a long thin body that hits a wall hard and spinning swings through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
 
 - **Repro:** a 2 m by 0.1 m box with `ccd: true`, moving at 150 m/s and turning at 8 rad/s toward a 0.1 m thick wall,

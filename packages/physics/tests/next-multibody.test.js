@@ -2,10 +2,11 @@
 // branches, inverse kinematics, contacts and replays.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const G = 9.81;
-const near = (actual, expected, tolerance, label) => assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
+const near = (actual, expected, tolerance, label) =>
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
 const bob = (radius = 0.05, mass = 1) => ({ shape: 'sphere', radius, mass });
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
@@ -19,7 +20,14 @@ function chain(physics, count, { length = 1, radius = 0.05, mass = 1, limits, mo
     bodies.push(body);
     links.push({
       body,
-      joint: { type: 'revolute', axis: [0, 0, 1], anchorA: i === 0 ? [0, 0, 0] : [0, 0, 0], anchorB: [0, length, 0], limits, motor },
+      joint: {
+        type: 'revolute',
+        axis: [0, 0, 1],
+        anchorA: i === 0 ? [0, 0, 0] : [0, 0, 0],
+        anchorB: [0, length, 0],
+        limits,
+        motor,
+      },
     });
   }
   // A joint's anchor on the parent is the bob's own origin for links after the first.
@@ -35,7 +43,10 @@ function energy(physics, bodies) {
       v = body.linearVelocity,
       w = body.angularVelocity,
       inertia = body.principalInertia;
-    total += 0.5 * m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) + 0.5 * inertia[0] * (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]) + m * G * body.position[1];
+    total +=
+      0.5 * m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) +
+      0.5 * inertia[0] * (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]) +
+      m * G * body.position[1];
   }
   return total;
 }
@@ -48,12 +59,12 @@ test('a single pendulum swings at its analytic period and keeps its energy', asy
   const inertia = body.mass * 1 + body.principalInertia[0];
   const period = 2 * Math.PI * Math.sqrt(inertia / (body.mass * G * 1));
   multibody.setCoordinates([0.05]);
-  let crossings = [];
+  const crossings = [];
   let last = multibody.coordinates()[0];
   for (let i = 0; i < 60 * 10; i++) {
     physics.step();
     const angle = multibody.coordinates()[0];
-    if (last > 0 && angle <= 0) crossings.push(i / 60 + (last / (last - angle)) / 60);
+    if (last > 0 && angle <= 0) crossings.push(i / 60 + last / (last - angle) / 60);
     last = angle;
   }
   assert.ok(crossings.length >= 4, `${crossings.length} swings`);
@@ -173,7 +184,11 @@ test('inverse kinematics reaches a target and stops toward one out of reach', as
 test('a chain dropped on a floor stays closed and comes to rest', async () => {
   await Physics.load();
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', position: [0, -3.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -3.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+  });
   const root = physics.addBody(null, { type: 'dynamic', position: [0, 0, 0], colliders: bob(0.1, 1) });
   const links = [];
   const bodies = [root];
@@ -186,10 +201,14 @@ test('a chain dropped on a floor stays closed and comes to rest', async () => {
   let worst = 0;
   for (let i = 0; i < 60 * 6; i++) {
     physics.step();
-    for (let k = 1; k < bodies.length; k++) worst = Math.max(worst, Math.abs(dist(bodies[k - 1].position, bodies[k].position) - 0.5));
+    for (let k = 1; k < bodies.length; k++)
+      worst = Math.max(worst, Math.abs(dist(bodies[k - 1].position, bodies[k].position) - 0.5));
   }
   assert.ok(worst < 1e-3, `a joint opened by ${worst}`);
-  assert.ok(bodies.every((body) => body.position[1] > -3.1 && body.position[1] < -2.7), 'the chain lies on the floor');
+  assert.ok(
+    bodies.every((body) => body.position[1] > -3.1 && body.position[1] < -2.7),
+    'the chain lies on the floor',
+  );
   assert.ok(mb.valid);
   physics.dispose();
 });
@@ -202,12 +221,17 @@ test('removing a multibody or a body of one frees the others, and bad trees thro
   multibody.remove();
   assert.equal(multibody.valid, false);
   assert.throws(() => multibody.coordinates(), { code: 'state' });
-  const again = physics.addMultibody(pivot, [{ body: bodies[0], joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [0, 1, 0] } }]);
+  const again = physics.addMultibody(pivot, [
+    { body: bodies[0], joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [0, 1, 0] } },
+  ]);
   assert.equal(again.coordinates().length, 1);
   physics.removeBody(bodies[0]);
   assert.equal(again.valid, false);
   const loose = physics.addBody(null, { colliders: bob() });
-  assert.throws(() => physics.addMultibody(pivot, [{ body: loose, parent: bodies[1], joint: { type: 'fixed' } }]), /already in the tree|belong/);
+  assert.throws(
+    () => physics.addMultibody(pivot, [{ body: loose, parent: bodies[1], joint: { type: 'fixed' } }]),
+    /already in the tree|belong/,
+  );
   assert.throws(() => physics.addMultibody(pivot, []), RangeError);
   assert.throws(() => physics.addMultibody(pivot, [{ body: loose, joint: { type: 'rope', length: 1 } }]), TypeError);
   physics.dispose();

@@ -1,8 +1,8 @@
 // Debug lines of the own solver, Rapier's debug-render pipeline: colliders, joints, contact points and boxes as line
 // segments to draw with `@margoengine/lines`. It reads the kernel's columns and is not on the step path, so it may use `Math`.
-import type { KernelWorld } from '../kernel.js';
+import type { KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
-import type { PhysicsJoint } from './joint.js';
+import type { PhysicsJoint } from './joints.js';
 
 /** What {@link Physics.debugRender} draws. */
 export interface DebugRenderOptions {
@@ -35,15 +35,25 @@ const DYNAMIC: Color = [0.35, 0.85, 0.45, 1],
   BROKEN: Color = [0.5, 0.15, 0.15, 1],
   CONTACT: Color = [1, 0.3, 0.9, 1],
   BOX: Color = [0.3, 0.9, 0.95, 0.6];
-const COS = [1, 0.9659258, 0.8660254, 0.7071068, 0.5, 0.258819, 0, -0.258819, -0.5, -0.7071068, -0.8660254, -0.9659258, -1, -0.9659258, -0.8660254, -0.7071068, -0.5, -0.258819, 0, 0.258819, 0.5, 0.7071068, 0.8660254, 0.9659258],
-  SIN = [0, 0.258819, 0.5, 0.7071068, 0.8660254, 0.9659258, 1, 0.9659258, 0.8660254, 0.7071068, 0.5, 0.258819, 0, -0.258819, -0.5, -0.7071068, -0.8660254, -0.9659258, -1, -0.9659258, -0.8660254, -0.7071068, -0.5, -0.258819],
+const COS = [
+    1, 0.9659258, 0.8660254, 0.7071068, 0.5, 0.258819, 0, -0.258819, -0.5, -0.7071068, -0.8660254, -0.9659258, -1,
+    -0.9659258, -0.8660254, -0.7071068, -0.5, -0.258819, 0, 0.258819, 0.5, 0.7071068, 0.8660254, 0.9659258,
+  ],
+  SIN = [
+    0, 0.258819, 0.5, 0.7071068, 0.8660254, 0.9659258, 1, 0.9659258, 0.8660254, 0.7071068, 0.5, 0.258819, 0, -0.258819,
+    -0.5, -0.7071068, -0.8660254, -0.9659258, -1, -0.9659258, -0.8660254, -0.7071068, -0.5, -0.258819,
+  ],
   NONE = 0xffffffff;
 
 function rotate(q: Q, v: V): V {
   const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
     ty = 2 * (q[2] * v[0] - q[0] * v[2]),
     tz = 2 * (q[0] * v[1] - q[1] * v[0]);
-  return [v[0] + q[3] * tx + q[1] * tz - q[2] * ty, v[1] + q[3] * ty + q[2] * tx - q[0] * tz, v[2] + q[3] * tz + q[0] * ty - q[1] * tx];
+  return [
+    v[0] + q[3] * tx + q[1] * tz - q[2] * ty,
+    v[1] + q[3] * ty + q[2] * tx - q[0] * tz,
+    v[2] + q[3] * tz + q[0] * ty - q[1] * tx,
+  ];
 }
 function multiply(a: Q, b: Q): Q {
   return [
@@ -69,7 +79,15 @@ class Lines {
 /** A collider's local points taken into the world. */
 type Place = (p: V) => V;
 
-function ring(out: Lines, place: Place, color: Color, axis: 0 | 1 | 2, radius: number, along: number, radiusB = radius): void {
+function ring(
+  out: Lines,
+  place: Place,
+  color: Color,
+  axis: 0 | 1 | 2,
+  radius: number,
+  along: number,
+  radiusB = radius,
+): void {
   for (let i = 0; i < COS.length; i++) {
     const j = (i + 1) % COS.length,
       at = (k: number): V => {
@@ -86,13 +104,23 @@ function ring(out: Lines, place: Place, color: Color, axis: 0 | 1 | 2, radius: n
  * colours: green awake dynamic bodies, grey fixed, blue kinematic, dim sleeping, yellow sensors, red joints (dark when broken),
  * magenta contacts, and a translucent cyan box.
  */
-export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, joints: Iterable<PhysicsJoint>, options: DebugRenderOptions = {}): DebugLines {
+export function debugLines(
+  world: KernelWorld,
+  bodies: Iterable<PhysicsBody>,
+  joints: Iterable<PhysicsJoint>,
+  options: DebugRenderOptions = {},
+): DebugLines {
   const { colliders = true, joints: drawJoints = true, contacts = true, boxes = false } = options,
     out = new Lines(),
     c = world.columns;
   const shape = (row: number, body: V, turn: Q, color: Color, local: boolean): void => {
     const lp: V = [c.colliderX[row]!, c.colliderY[row]!, c.colliderZ[row]!],
-      lq: Q = [c.colliderRotationX[row]!, c.colliderRotationY[row]!, c.colliderRotationZ[row]!, c.colliderRotationW[row]!],
+      lq: Q = [
+        c.colliderRotationX[row]!,
+        c.colliderRotationY[row]!,
+        c.colliderRotationZ[row]!,
+        c.colliderRotationW[row]!,
+      ],
       q = multiply(turn, local ? lq : [0, 0, 0, 1]),
       p = local ? rotate(turn, lp) : [0, 0, 0],
       place: Place = (v) => {
@@ -108,14 +136,28 @@ export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, jo
         break;
       case 1: {
         const corner = (i: number): V => [i & 1 ? a : -a, i & 2 ? b : -b, i & 4 ? d : -d];
-        for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(place(corner(i)), place(corner(i | bit)), color);
+        for (let i = 0; i < 8; i++)
+          for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(place(corner(i)), place(corner(i | bit)), color);
         break;
       }
       case 2:
         ring(out, place, color, 1, a, b);
         ring(out, place, color, 1, a, -b);
-        for (const [x, z] of [[a, 0], [-a, 0], [0, a], [0, -a]] as const) out.segment(place([x, b, z]), place([x, -b, z]), color);
-        for (const s of [1, -1]) for (const [x, z] of [[a, 0], [0, a], [-a, 0], [0, -a]] as const) out.segment(place([x, b * s, z]), place([0, (b + a) * s, 0]), color);
+        for (const [x, z] of [
+          [a, 0],
+          [-a, 0],
+          [0, a],
+          [0, -a],
+        ] as const)
+          out.segment(place([x, b, z]), place([x, -b, z]), color);
+        for (const s of [1, -1])
+          for (const [x, z] of [
+            [a, 0],
+            [0, a],
+            [-a, 0],
+            [0, -a],
+          ] as const)
+            out.segment(place([x, b * s, z]), place([0, (b + a) * s, 0]), color);
         break;
       case 3: {
         const hull = c.colliderHull[row]!,
@@ -125,7 +167,11 @@ export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, jo
           if (twin === NONE || twin < e) continue;
           const from = c.edgeOrigin[e0 + e]!,
             to = c.edgeOrigin[e0 + c.edgeNext[e0 + e]!]!;
-          out.segment(place([c.vertexX[v0 + from]!, c.vertexY[v0 + from]!, c.vertexZ[v0 + from]!]), place([c.vertexX[v0 + to]!, c.vertexY[v0 + to]!, c.vertexZ[v0 + to]!]), color);
+          out.segment(
+            place([c.vertexX[v0 + from]!, c.vertexY[v0 + from]!, c.vertexZ[v0 + from]!]),
+            place([c.vertexX[v0 + to]!, c.vertexY[v0 + to]!, c.vertexZ[v0 + to]!]),
+            color,
+          );
         }
         break;
       }
@@ -151,11 +197,23 @@ export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, jo
       case 6:
         ring(out, place, color, 1, a, b);
         ring(out, place, color, 1, a, -b);
-        for (const [x, z] of [[a, 0], [-a, 0], [0, a], [0, -a]] as const) out.segment(place([x, b, z]), place([x, -b, z]), color);
+        for (const [x, z] of [
+          [a, 0],
+          [-a, 0],
+          [0, a],
+          [0, -a],
+        ] as const)
+          out.segment(place([x, b, z]), place([x, -b, z]), color);
         break;
       case 7:
         ring(out, place, color, 1, a, -b);
-        for (const [x, z] of [[a, 0], [-a, 0], [0, a], [0, -a]] as const) out.segment(place([x, -b, z]), place([0, b, 0]), color);
+        for (const [x, z] of [
+          [a, 0],
+          [-a, 0],
+          [0, a],
+          [0, -a],
+        ] as const)
+          out.segment(place([x, -b, z]), place([0, b, 0]), color);
         break;
       case 8:
         // A half space: its plane as a grid of 2 m cells, 10 m each way.
@@ -176,8 +234,13 @@ export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, jo
         const mesh = c.colliderHull[row]!,
           [hx, hy, hz] = [c.meshHalfX[mesh]!, c.meshHalfY[mesh]!, c.meshHalfZ[mesh]!],
           centre: V = [c.meshBoxX[mesh]!, c.meshBoxY[mesh]!, c.meshBoxZ[mesh]!],
-          corner = (i: number): V => [centre[0] + (i & 1 ? hx : -hx), centre[1] + (i & 2 ? hy : -hy), centre[2] + (i & 4 ? hz : -hz)];
-        for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(place(corner(i)), place(corner(i | bit)), color);
+          corner = (i: number): V => [
+            centre[0] + (i & 1 ? hx : -hx),
+            centre[1] + (i & 2 ? hy : -hy),
+            centre[2] + (i & 4 ? hz : -hz),
+          ];
+        for (let i = 0; i < 8; i++)
+          for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(place(corner(i)), place(corner(i | bit)), color);
       }
     }
   };
@@ -194,13 +257,21 @@ export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, jo
   if (colliders || boxes)
     for (const body of list) {
       const { p, q } = bodyPose(body),
-        color = body.sleeping && body.type === 'dynamic' ? SLEEPING : body.type === 'dynamic' ? DYNAMIC : body.type === 'fixed' ? FIXED : KINEMATIC;
+        color =
+          body.sleeping && body.type === 'dynamic'
+            ? SLEEPING
+            : body.type === 'dynamic'
+              ? DYNAMIC
+              : body.type === 'fixed'
+                ? FIXED
+                : KINEMATIC;
       for (const collider of body.colliders) {
         const row = collider.handle;
         if (colliders) {
           const tint = c.colliderFlags[row]! & 1 ? SENSOR : color;
           if (c.colliderShape[row] === 5) {
-            for (let child = c.colliderHull[row]!; child !== NONE; child = c.colliderNext[child]!) shape(child, p, q, tint, true);
+            for (let child = c.colliderHull[row]!; child !== NONE; child = c.colliderNext[child]!)
+              shape(child, p, q, tint, true);
           } else shape(row, p, q, tint, true);
         }
         if (boxes) {
@@ -208,7 +279,8 @@ export function debugLines(world: KernelWorld, bodies: Iterable<PhysicsBody>, jo
           if (box) {
             const [lo, hi] = box,
               corner = (i: number): V => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]];
-            for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(corner(i), corner(i | bit), BOX);
+            for (let i = 0; i < 8; i++)
+              for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(corner(i), corner(i | bit), BOX);
           }
         }
       }

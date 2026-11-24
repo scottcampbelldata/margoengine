@@ -1,7 +1,7 @@
 // Islands and sleeping through Wasm.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 function still(x = 0, rows = 8) {
   const world = new KernelWorld(rows);

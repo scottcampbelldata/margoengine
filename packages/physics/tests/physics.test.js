@@ -1,32 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Geometry, box } from '@margoengine/core';
 import { Engine, TransformStore } from '@margoengine/core/extension';
-import { Physics, CharacterController, collisionGroups, eulerToQuat, geometryPositions } from '../dist/index.js';
+import { Physics, collisionGroups, eulerToQuat, geometryPositions } from '../dist/index.js';
 import { setMeshSource, clearMeshSource } from '../../shared/mesh-source.js';
 
-// Consumers keep Rapier optional; the monorepo installs it as a test dependency.
-const rapierDir = process.env.MARGOENGINE_RAPIER
-  ? resolve(process.env.MARGOENGINE_RAPIER)
-  : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/', import.meta.url));
-const rapierEntry = rapierDir && resolve(rapierDir, 'dist/rapier.mjs');
-let RAPIER = null;
-if (rapierEntry && existsSync(rapierEntry)) {
-  RAPIER = (await import(pathToFileURL(rapierEntry).href)).default;
-  // Silence the wasm-bindgen deprecation notice about init() arguments.
-  const warn = console.warn;
-  console.warn = () => {};
-  await RAPIER.init();
-  console.warn = warn;
-}
-const skip = RAPIER
-  ? false
-  : 'Rapier not found: set MARGOENGINE_RAPIER to an installed @dimforge/rapier3d-compat package folder to run the physics tests';
-if (skip) console.log(skip);
-const rtest = (name, fn) => test(name, { skip }, fn);
+const warn = console.warn;
+console.warn = () => {};
+await Physics.load();
+console.warn = warn;
+const rtest = test;
 
 /** Minimal stand-in for a core Mesh: the public transform API plus the runtime fields `meshRuntime` exposes. */
 let nextId = 0;
@@ -85,7 +68,7 @@ function fakeMesh({ position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1
     },
   };
 }
-const create = (options = {}) => new Physics(null, { rapier: RAPIER, ...options });
+const create = (options = {}) => new Physics(null, options);
 const ground = (physics, options = {}) =>
   physics.addBody(null, {
     type: 'fixed',
@@ -99,87 +82,22 @@ const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} not within ${tolerance} of ${expected}`);
 const angleAbout = (q, axis) => 2 * Math.atan2(q[0] * axis[0] + q[1] * axis[1] + q[2] * axis[2], q[3]);
 
-test('a world needs the solver loaded, and importing touches no browser global', () => {
+test('importing touches no browser global', () => {
   for (const name of ['window', 'document', 'GPUBufferUsage', 'GPUTextureUsage'])
     assert.equal(globalThis[name], undefined, `${name} touched`);
-  assert.throws(() => new Physics(null), { name: 'MargoError', code: 'state', message: /await Physics\.load\(\)/ });
-  assert.throws(() => Physics.attach(null, {}), { name: 'MargoError', code: 'state' });
-  assert.throws(() => new Physics(null, { rapier: {} }), { name: 'TypeError', message: /initialized module/ });
 });
 
-test('rejected plugin attachment releases the new world and event queue', () => {
-  const freed = [],
-    failure = new TypeError('Invalid/attached plugin');
-  const rapier = {
-    ColliderDesc: {},
-    World: class {
-      free() {
-        freed.push('world');
-      }
-    },
-    EventQueue: class {
-      free() {
-        freed.push('queue');
-      }
-    },
-  };
+test('a rejected plugin attachment rethrows its error and leaves no world behind', () => {
+  const failure = new TypeError('Invalid/attached plugin');
   assert.throws(
     () =>
-      new Physics(
-        {
-          use() {
-            throw failure;
-          },
+      new Physics({
+        use() {
+          throw failure;
         },
-        { rapier },
-      ),
+      }),
     (error) => error === failure,
   );
-  assert.deepEqual(freed, ['queue', 'world']);
-});
-
-test('failed event queue creation releases its already allocated native world', () => {
-  const freed = [],
-    failure = new Error('EventQueue allocation failed');
-  const rapier = {
-    ColliderDesc: {},
-    World: class {
-      free() {
-        freed.push('world');
-      }
-    },
-    EventQueue: class {
-      constructor() {
-        throw failure;
-      }
-    },
-  };
-  assert.throws(
-    () => new Physics(null, { rapier }),
-    (error) => error === failure,
-  );
-  assert.deepEqual(freed, ['world']);
-});
-
-test('invalid character setup releases the native controller before rethrowing', () => {
-  const raw = {},
-    removed = [],
-    body = { type: 'kinematicPosition', colliders: [{}] };
-  const owner = {
-    world: {
-      createCharacterController() {
-        return raw;
-      },
-      removeCharacterController(value) {
-        removed.push(value);
-      },
-    },
-    removeController() {
-      throw new Error('Unregistered controller');
-    },
-  };
-  assert.throws(() => new CharacterController(owner, body, { up: [NaN, 1, 0] }), /Up must be three finite numbers/);
-  assert.deepEqual(removed, [raw]);
 });
 
 test('collisionGroups packs memberships and filters', () => {
@@ -239,7 +157,6 @@ rtest(
     try {
       assert.throws(() => physics.addBody(mesh), { code: 'state', message: /Mesh has no geometry/ });
       assert.equal(physics.bodyCount, 0);
-      assert.equal(physics.world.bodies.len(), 0, 'The failed default collider must release its native body');
       assert.equal(physics.bodyOf(mesh), undefined);
       const explicit = physics.addBody(mesh, { colliders: [] }),
         unbound = physics.addBody(null);
@@ -338,14 +255,20 @@ rtest('accumulator, max substeps and interpolation alpha', () => {
   assert.equal(mesh.position.y, 10, 'no step yet');
   assert.equal(physics.update(dt), 1);
   near(physics.alpha, 0.25, 1e-9, 'alpha carries the remainder');
-  const pose = body.pose,
-    expected = pose[1] + (pose[8] - pose[1]) * physics.alpha;
-  assert.ok(pose[8] < pose[1], 'body fell');
+  const { previousY, positionY } = physics.kernel.columns,
+    pose = { previous: previousY[body.row], current: positionY[body.row] },
+    expected = pose.previous + (pose.current - pose.previous) * physics.alpha;
+  assert.ok(pose.current < pose.previous, 'body fell');
   near(mesh.position.y, expected, 1e-5, 'mesh is interpolated between the last two steps');
   assert.ok(mesh.position.y > body.position[1], 'rendered pose lags the physics pose');
   assert.equal(physics.update(dt * 0.5), 0);
   near(physics.alpha, 0.75, 1e-9, 'alpha after another half step');
-  near(mesh.position.y, pose[1] + (pose[8] - pose[1]) * 0.75, 1e-5, 'interpolated again with no new step');
+  near(
+    mesh.position.y,
+    pose.previous + (pose.current - pose.previous) * 0.75,
+    1e-5,
+    'interpolated again with no new step',
+  );
   // A one second hitch runs at most maxSubsteps steps and drops the backlog.
   const before = physics.stepCount;
   assert.equal(physics.update(1), 4);
@@ -580,7 +503,12 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
   );
   const heights = new Float32Array(5 * 5).fill(0.5);
   near(rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20] }), 0.5, 0.02, 'heightfield');
-  near(rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20], fixInternalEdges: true }), 0.5, 0.02, 'heightfield, internal edges fixed');
+  near(
+    rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20], fixInternalEdges: true }),
+    0.5,
+    0.02,
+    'heightfield, internal edges fixed',
+  );
   // Geometry-derived colliders take the mesh scale.
   const physics = create();
   const body = physics.addBody(
@@ -600,31 +528,6 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
     /\(rows \+ 1\)/,
   );
   assert.equal(physics.bodyCount, 1, 'a failed addBody leaves nothing behind');
-  physics.dispose();
-});
-
-rtest('custom colliders take a Rapier ColliderDesc and raise the same events', () => {
-  const physics = create(),
-    plane = RAPIER.ColliderDesc.trimesh(
-      new Float32Array([-10, 0.5, -10, 10, 0.5, -10, 10, 0.5, 10, -10, 0.5, 10]),
-      new Uint32Array([0, 2, 1, 0, 3, 2]),
-      RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
-    ).setTranslation(0, 1, 0),
-    floor = physics.addBody(null, { type: 'fixed', colliders: { shape: 'custom', desc: plane, friction: 0.25 } }),
-    log = [];
-  physics.on('contactstart', (event) => log.push(event));
-  const ball = physics.addBody(null, { position: [0.3, 4, -0.2], colliders: { shape: 'sphere', radius: 0.5 } });
-  run(physics, 3);
-  near(ball.position[1], 2, 0.02, 'rests on the desc at its own translation (y 0.5 + 1)');
-  assert.equal(floor.colliders[0].friction(), 0.25, 'the other options apply on top');
-  assert.equal(log.length, 1);
-  assert.ok(log[0].bodyA === floor || log[0].bodyB === floor, 'its contact events name the body');
-  const moved = physics.addBody(null, {
-    type: 'fixed',
-    colliders: { shape: 'custom', desc: RAPIER.ColliderDesc.ball(1).setTranslation(0, 9, 0), offset: [0, 5, 0] },
-  });
-  near(moved.colliders[0].translation().y, 5, 1e-6, 'an offset replaces its translation');
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'custom', desc: {} } }), TypeError);
   physics.dispose();
 });
 
@@ -727,7 +630,8 @@ rtest('forces, impulses, torques, velocities, gravity scale, sleeping and CCD', 
     colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
   });
   box1.sleep();
-  assert.ok(box1.sleeping);
+  sleepy.step();
+  assert.ok(box1.sleeping, 'a sleep call takes effect at the next step');
   box1.applyImpulse([0, 5, 0]);
   assert.ok(!box1.sleeping, 'impulse wakes the body');
   sleepy.dispose();
@@ -848,24 +752,6 @@ rtest('only root-level meshes may carry bodies; disposed meshes drop their bodie
 
 rtest('dispose frees every body, collider, joint, controller and the world', () => {
   const physics = create();
-  const freed = [];
-  const world = physics.world,
-    queue = physics['queue'];
-  const spy = (object, label) => {
-    const free = object.free.bind(object);
-    object.free = () => {
-      freed.push(label);
-      free();
-    };
-  };
-  spy(world, 'world');
-  spy(queue, 'queue');
-  const removedControllers = [];
-  const removeController = world.removeCharacterController.bind(world);
-  world.removeCharacterController = (controller) => {
-    removedControllers.push(controller);
-    removeController(controller);
-  };
   ground(physics);
   const a = physics.addBody(fakeMesh({ geometry: box() }));
   const b = physics.addBody(null, {
@@ -883,18 +769,16 @@ rtest('dispose frees every body, collider, joint, controller and the world', () 
   });
   const controller = physics.createCharacterController(character);
   physics.update(1 / 60);
-  assert.equal(world.bodies.len(), 4);
-  assert.equal(world.colliders.len(), 5);
-  assert.equal(world.impulseJoints.len?.() ?? 1, 1);
-  // Removing a collider and a body frees them in Rapier immediately.
+  assert.equal(physics.bodyCount, 4);
+  assert.equal(physics.colliderCount, 5);
   b.removeCollider(b.colliders[1]);
-  assert.equal(world.colliders.len(), 4);
+  assert.equal(physics.colliderCount, 4);
   physics.dispose();
-  assert.deepEqual(freed, ['queue', 'world']);
-  assert.deepEqual(removedControllers, [controller.raw]);
   assert.ok(!a.valid && !b.valid && !character.valid && !joint.valid, 'handles are invalidated');
+  assert.throws(() => controller.move([0, 0, 0]), { code: 'disposed' });
   assert.equal(physics.bodyCount, 0);
-  assert.throws(() => physics.world, { code: 'disposed', message: /disposed/ });
+  assert.equal(physics.colliderCount, 0);
+  assert.throws(() => physics.kernel, { code: 'disposed', message: /disposed/ });
   assert.throws(() => a.position, { code: 'state', message: /removed/ });
   assert.equal(physics.update(1), 0);
   physics.dispose(); // idempotent
@@ -922,7 +806,7 @@ rtest('engine plugin lifecycle: use, onPreUpdate, removePlugin disposes', () => 
       for (const plugin of plugins.values()) plugin.onPreUpdate?.(delta);
     },
   };
-  const physics = new Physics(engine, { rapier: RAPIER });
+  const physics = new Physics(engine);
   assert.ok(engine.hasPlugin('physics'));
   const mesh = fakeMesh({ position: [0, 2, 0] });
   physics.addBody(mesh, { colliders: { shape: 'sphere', radius: 0.5 } });
@@ -930,7 +814,7 @@ rtest('engine plugin lifecycle: use, onPreUpdate, removePlugin disposes', () => 
   assert.ok(mesh.position.y < 2, 'engine frames step the world');
   physics.dispose();
   assert.ok(!engine.hasPlugin('physics') && physics.isDisposed, 'dispose detaches from the engine');
-  const second = new Physics(engine, { rapier: RAPIER });
+  const second = new Physics(engine);
   engine.removePlugin('physics');
   assert.ok(second.isDisposed, 'removePlugin disposes');
 });
@@ -942,10 +826,17 @@ rtest('dispose removes the world from its own scene, not the active one', async 
     other = engine.createScene('b');
   try {
     let physics;
-    other.use({ name: 'loader', setup: () => (physics = new Physics(engine, { rapier: RAPIER })) });
+    other.use({ name: 'loader', setup: () => (physics = new Physics(engine)) });
     other.removePlugin('loader');
     assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
-    const bystander = { name: 'physics', disposed: 0, setup() {}, dispose() { this.disposed++; } };
+    const bystander = {
+      name: 'physics',
+      disposed: 0,
+      setup() {},
+      dispose() {
+        this.disposed++;
+      },
+    };
     engine.use(bystander);
     physics.dispose();
     assert.ok(physics.isDisposed);
@@ -991,7 +882,7 @@ rtest('sensors also fire for kinematic bodies such as characters', () => {
   physics.dispose();
 });
 
-rtest('core transform synchronization passes the same preallocated buffers to core setters every frame', async () => {
+rtest('core transform synchronization writes the body pose to the mesh every frame', async () => {
   const store = await TransformStore.create(8),
     engine = new Engine(
       { width: 1, height: 1 },
@@ -1000,29 +891,14 @@ rtest('core transform synchronization passes the same preallocated buffers to co
       undefined,
       null,
     );
-  const physics = new Physics(engine, { rapier: RAPIER }),
+  const physics = new Physics(engine),
     mesh = engine.createMesh().setGeometry(box()).setPosition([0, 5, 0]);
   const body = physics.addBody(mesh);
-  body.raw.setAngvel({ x: 0.2, y: 0.4, z: 0.1 }, true);
-  const setPosition = mesh.setPosition,
-    setQuaternion = mesh.setQuaternion,
-    inputs = new Set(),
-    rotations = new Set();
-  mesh.setPosition = function (value) {
-    inputs.add(value);
-    return setPosition.call(this, value);
-  };
-  // Core's setQuaternion allocates nothing (tests/core-set-quaternion.test.js), so physics hands it its own buffer.
-  mesh.setQuaternion = function (value) {
-    rotations.add(value);
-    return setQuaternion.call(this, value);
-  };
+  body.setAngularVelocity([0.2, 0.4, 0.1]);
   for (let i = 0; i < 120; i++) physics.update(1 / 60);
-  assert.equal(inputs.size, 1);
-  assert.equal(rotations.size, 1);
   assert.ok(mesh.position.y < 5);
   const id = mesh.id,
-    q = body.pose.subarray(10, 14);
+    q = body.rotation;
   for (let i = 0; i < 4; i++)
     near(store.transforms[['qx', 'qy', 'qz', 'qw'][i]][id], q[i], 0.01, 'synchronized quaternion');
   physics.dispose();
@@ -1060,7 +936,7 @@ rtest(
   'a geometry-free root fits descendant PBR triangles in its rigid frame with every hierarchy scale applied once',
   async () => {
     const engine = await hierarchyEngine(),
-      physics = new Physics(engine, { rapier: RAPIER });
+      physics = new Physics(engine);
     const root = engine
       .createMesh()
       .setPosition([7, -3, 9])
@@ -1095,7 +971,7 @@ rtest(
   'root fitting unions core and PBR descendants, including hidden geometry, without unrelated engine meshes',
   async () => {
     const engine = await hierarchyEngine(),
-      physics = new Physics(engine, { rapier: RAPIER }),
+      physics = new Physics(engine),
       root = engine.createMesh();
     const child = engine.createMesh(root).setPosition([-3, 0, 0]);
     registerPBR(child, { geometry: box(2, 2, 2) });
@@ -1127,7 +1003,7 @@ rtest(
   'direct node geometry retains its scale fitting and does not pull unrelated descendants into its collider',
   async () => {
     const engine = await hierarchyEngine(),
-      physics = new Physics(engine, { rapier: RAPIER });
+      physics = new Physics(engine);
     const core = engine
       .createMesh()
       .setGeometry(box(2, 4, 6))
@@ -1151,7 +1027,7 @@ rtest(
     for (const flag of ['skinned', 'morphed'])
       for (const nested of [false, true]) {
         const engine = await hierarchyEngine(),
-          physics = new Physics(engine, { rapier: RAPIER }),
+          physics = new Physics(engine),
           root = engine.createMesh();
         const node = nested ? engine.createMesh(root) : root;
         registerPBR(node, { [flag]: true });
@@ -1161,7 +1037,7 @@ rtest(
             message: /Skinned mesh needs an explicit collider/,
           });
           assert.equal(physics.bodyCount, 0);
-          assert.equal(physics.world.bodies.len(), 0);
+          assert.equal(physics.bodyCount, 0);
           assert.equal(physics.bodyOf(root), undefined);
           const body = physics.addBody(root, {
             colliders: { shape: 'capsule', halfHeight: 0.7, radius: 0.3, offset: [1, 2, 3] },
@@ -1183,7 +1059,7 @@ rtest(
   async () => {
     const engine = await hierarchyEngine(),
       foreign = await hierarchyEngine(),
-      physics = new Physics(engine, { rapier: RAPIER }),
+      physics = new Physics(engine),
       root = engine.createMesh();
     const child = engine.createMesh(root),
       source = registerPBR(child);
@@ -1198,16 +1074,16 @@ rtest(
         /positions must be finite/,
       );
       assert.equal(physics.bodyCount, 0);
-      assert.equal(physics.world.bodies.len(), 0);
-      assert.equal(physics.world.colliders.len(), 0);
+      assert.equal(physics.bodyCount, 0);
+      assert.equal(physics.colliderCount, 0);
       assert.equal(physics.bodyOf(root), undefined);
-      assert.equal(physics['byHandle'].size, 0);
+      assert.equal(physics['byRow'].size, 0);
       clearMeshSource(child);
       child.dispose();
       engine.createMesh().setGeometry(box());
       assert.throws(() => physics.addBody(root), { code: 'state', message: /Mesh has no geometry/ });
       assert.equal(physics.bodyCount, 0);
-      assert.equal(physics.world.bodies.len(), 0);
+      assert.equal(physics.bodyCount, 0);
       root.dispose();
       assert.throws(() => physics.addBody(root), {
         message: 'Mesh disposed; see https://margoengine.com/errors#disposed',
@@ -1220,82 +1096,6 @@ rtest(
     }
   },
 );
-
-test('published physics declarations keep Rapier optional and accept its installed namespace', async (t) => {
-  const { cp, mkdtemp, mkdir, rm, stat, writeFile } = await import('node:fs/promises');
-  const { tmpdir } = await import('node:os');
-  const { execFileSync } = await import('node:child_process');
-  const { createRequire } = await import('node:module');
-  const directory = await mkdtemp(resolve(tmpdir(), 'margoengine-physics-types-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const repository = fileURLToPath(new URL('../../../', import.meta.url));
-  const declarationsOnly = async (path) => (await stat(path)).isDirectory() || path.endsWith('.d.ts');
-  for (const name of ['physics', 'core', 'math']) {
-    const source = resolve(repository, 'packages', name),
-      target = resolve(directory, 'node_modules/@margoengine', name);
-    await mkdir(target, { recursive: true });
-    await cp(resolve(source, 'package.json'), resolve(target, 'package.json'));
-    await cp(resolve(source, 'dist'), resolve(target, 'dist'), { recursive: true, filter: declarationsOnly });
-  }
-  await writeFile(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
-  await writeFile(
-    resolve(directory, 'tsconfig.json'),
-    JSON.stringify({
-      compilerOptions: {
-        target: 'ES2022',
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        strict: true,
-        skipLibCheck: false,
-        noEmit: true,
-      },
-      files: ['consumer.ts'],
-    }),
-  );
-  const consumer = `
-    import type { Physics, PhysicsBody, RapierModule } from '@margoengine/physics';
-    declare const physics: Physics;
-    declare const body: PhysicsBody;
-    declare const rapier: RapierModule;
-    physics.world.step();
-    body.raw.translation().x;
-    body.raw.applyImpulse({x: 0, y: 1, z: 0}, true);
-    body.colliders[0].isSensor();
-    body.colliders[0].halfExtents()?.y;
-    new rapier.World({x: 0, y: -9.81, z: 0});
-  `;
-  await writeFile(resolve(directory, 'consumer.ts'), consumer);
-  assert.throws(
-    () => createRequire(resolve(directory, 'consumer.js')).resolve('@dimforge/rapier3d-compat'),
-    { code: 'MODULE_NOT_FOUND' },
-    'The isolated consumer must not resolve a monorepo or ancestor copy of Rapier',
-  );
-  const compile = () =>
-    execFileSync(
-      process.execPath,
-      [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(directory, 'tsconfig.json')],
-      { encoding: 'utf8', stdio: 'pipe' },
-    );
-  assert.doesNotThrow(compile, 'Importing published physics declarations must not require the optional Rapier peer');
-  if (!rapierEntry || !existsSync(rapierEntry)) return;
-  const peer = resolve(directory, 'node_modules/@dimforge/rapier3d-compat');
-  await mkdir(peer, { recursive: true });
-  await cp(resolve(rapierDir, 'package.json'), resolve(peer, 'package.json'));
-  await cp(resolve(rapierDir, 'dist'), resolve(peer, 'dist'), { recursive: true, filter: declarationsOnly });
-  await writeFile(
-    resolve(directory, 'consumer.ts'),
-    consumer +
-      `
-    import * as RAPIER from '@dimforge/rapier3d-compat';
-    const installed: RapierModule = RAPIER;
-    const world: Physics['world'] = new RAPIER.World({x: 0, y: -9.81, z: 0});
-    const collider: ReturnType<Physics['world']['createCollider']> = world.createCollider(RAPIER.ColliderDesc.ball(1));
-    void installed;
-    void collider;
-  `,
-  );
-  assert.doesNotThrow(compile, 'Installed Rapier declarations must satisfy the structural protocol');
-});
 
 rtest('misuse throws coded errors that name the fix', () => {
   const physics = create();
@@ -1447,15 +1247,15 @@ rtest('maxForce caps a motor at the torque it names, on a ball joint and on a hi
 });
 
 rtest('a body reads the mass of its colliders at once, before any step', () => {
-  // Regression: Rapier folds colliders in at the next step, so a swapped collider read as both for a frame.
+  // Regression: a mass is folded in at the next step on some solvers, so a swapped collider read as both for a frame.
   const physics = create({ gravity: [0, 0, 0] }),
     body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 2 } });
-  assert.equal(body.mass, 2);
+  near(body.mass, 2, 1e-5, 'one collider');
   const old = body.colliders[0];
   body.addCollider({ shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 3 });
-  assert.equal(body.mass, 5);
+  near(body.mass, 5, 1e-5, 'two colliders');
   body.removeCollider(old);
-  assert.equal(body.mass, 3);
+  near(body.mass, 3, 1e-5, 'the swapped collider alone');
   physics.dispose();
 });
 
@@ -1465,6 +1265,7 @@ rtest('additional mass and inertia add to what the colliders give, and 0 takes t
     spun = (torque) => {
       body.setAngularVelocity([0, 0, 0]);
       body.applyTorqueImpulse(torque);
+      physics.step();
       return body.angularVelocity[1];
     };
   physics.step();

@@ -1,9 +1,15 @@
 // Per-body sleep thresholds: a body's own limit and window replace the world's for that body only.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
-const drift = (physics, extra = {}) => physics.addBody(null, { linearVelocity: [0.1, 0, 0], linearDamping: 0, colliders: { shape: 'sphere', radius: 0.5 }, ...extra });
+const drift = (physics, extra = {}) =>
+  physics.addBody(null, {
+    linearVelocity: [0.1, 0, 0],
+    linearDamping: 0,
+    colliders: { shape: 'sphere', radius: 0.5 },
+    ...extra,
+  });
 
 test('a higher threshold lets a creeping body sleep, and the default does not', async () => {
   await Physics.load();

@@ -16,7 +16,7 @@ The browser's [script-src documentation](https://developer.mozilla.org/en-US/doc
 | --- | --- |
 | `@margoengine/core` | Engine creation compiles the embedded transform kernel from `packages/kernel`. Importing the module alone does not compile it. |
 | `@margoengine/stage` | Creating a stage creates the core engine and therefore needs the same permission. The facade adds no separate Wasm compiler. |
-| `@margoengine/physics` | `Physics.load()` initializes Rapier 3D. |
+| `@margoengine/physics` | `Physics.load()` compiles the physics kernel (Margo's own, a blueprint inside the package's JavaScript). |
 | `@margoengine/physics/next` | `loadKernel()` or its `Physics.load()` initializes Margo's Rust physics kernel. |
 | `@margoengine/physics2d` | `Physics2D.load()` initializes Rapier 2D. Its separate Rust kernel currently has a test harness, not a shipping loader. |
 | `@margoengine/decoders` (`DracoDecoder`), `/draco-points` | First geometry decode in a classic worker, with separate glTF and point-cloud builds. |

@@ -1,6 +1,5 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import RAPIER from '@dimforge/rapier3d-compat';
 import validator from 'gltf-validator';
 import { Physics } from '@margoengine/physics';
 import { exportGLTF } from '@margoengine/exporters';
@@ -24,7 +23,7 @@ try {
   throw error;
 }
 after(() => assets.close());
-await RAPIER.init();
+await Physics.load();
 
 async function withLoaded(fixture, action) {
   const loaded = await assets.load(fixture);
@@ -47,7 +46,7 @@ function close(actual, expected, label) {
 for (const fixture of loadedPBRFixtures) {
   test(`${fixture.producer}: default PhysicsBody fits static ${fixture.asset} geometry or requires an explicit deformed collider`, async () => {
     await withLoaded(fixture, ({ engine, mesh, primitive }) => {
-      const physics = new Physics(engine, { rapier: RAPIER });
+      const physics = new Physics(engine);
       try {
         // Physics requires a root-level mesh. It is still the actual loaded mesh with its original primitive.
         mesh.setParent(null);
@@ -83,16 +82,12 @@ for (const fixture of loadedPBRFixtures) {
 
   test(`${fixture.producer}: an explicit capsule attaches to the real ${fixture.asset} mesh`, async () => {
     await withLoaded(fixture, ({ engine, mesh }) => {
-      const physics = new Physics(engine, { rapier: RAPIER });
+      const physics = new Physics(engine);
       try {
         mesh.setParent(null);
         const body = physics.addBody(mesh, { colliders: { shape: 'capsule', halfHeight: 0.4, radius: 0.15 } });
         assert.equal(body.colliders.length, 1);
-        assert.equal(
-          body.colliders[0].body,
-          body,
-          'explicit collider belongs to the loaded mesh body',
-        );
+        assert.equal(body.colliders[0].body, body, 'explicit collider belongs to the loaded mesh body');
         close([body.colliders[0].halfHeight(), body.colliders[0].radius()], [0.4, 0.15], 'explicit capsule dimensions');
         assert.equal(mesh.geometry, null, 'explicit collision does not attach a second core Geometry');
       } finally {
@@ -103,7 +98,7 @@ for (const fixture of loadedPBRFixtures) {
 
   test(`${fixture.producer}: PhysicsBody rejects the real ${fixture.asset} mesh after model disposal`, async () => {
     await withLoaded(fixture, ({ engine, model, mesh }) => {
-      const physics = new Physics(engine, { rapier: RAPIER });
+      const physics = new Physics(engine);
       try {
         mesh.setParent(null);
         assert.equal(meshTriangles(mesh)?.kind, 'pbr');
@@ -183,7 +178,7 @@ for (const fixture of loadedPBRFixtures) {
 
 test('default PhysicsBody rejects a mesh with neither core geometry nor a PBR primitive', async () => {
   const engine = await loadedPBREngine(),
-    physics = new Physics(engine, { rapier: RAPIER });
+    physics = new Physics(engine);
   try {
     const mesh = engine.createMesh();
     assert.throws(() => physics.addBody(mesh), /geometry|primitive/i);

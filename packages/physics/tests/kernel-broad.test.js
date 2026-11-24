@@ -1,7 +1,7 @@
 // The broad phase through Wasm: pairs read from JS, and views that survive growth inside a step.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 /** A free ball at a place, with a velocity along x. */
 function ball(world, x, speed = 0) {

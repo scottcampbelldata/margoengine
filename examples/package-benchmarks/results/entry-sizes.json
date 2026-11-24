@@ -1,5 +1,5 @@
 {
-  "commit": "db2f798dd",
+  "commit": "4aec617e0",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1588,8 +1588,8 @@
         "gzip": 24991
       },
       "./export": {
-        "raw": 21529,
-        "gzip": 8385
+        "raw": 23155,
+        "gzip": 8905
       },
       "./scene-extras": {
         "raw": 5368,
@@ -3674,10 +3674,6 @@
       "./physics": {
         "raw": 34,
         "gzip": 54
-      },
-      "./physics/next": {
-        "raw": 39,
-        "gzip": 59
       },
       "./physics/decomposition": {
         "raw": 48,
@@ -13316,22 +13312,18 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 291384,
-        "gzip": 60318
-      },
-      "./next": {
-        "raw": 324807,
-        "gzip": 199911
+        "raw": 369703,
+        "gzip": 217697
       },
       "./decomposition": {
-        "raw": 26425,
-        "gzip": 10805
+        "raw": 26455,
+        "gzip": 10833
       }
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 34715,
-        "gzip": 12481
+        "raw": 53504,
+        "gzip": 18170
       },
       "./outline": {
         "raw": 4782,
@@ -13714,8 +13706,8 @@
         "gzip": 2163
       },
       "./balance": {
-        "raw": 14220,
-        "gzip": 5439
+        "raw": 14221,
+        "gzip": 5440
       }
     },
     "@margoengine/react": {
@@ -16564,9 +16556,9 @@
       "brotli": 12604
     },
     "packages/physics/dist/index.js": {
-      "raw": 291384,
-      "gzip": 60318,
-      "brotli": 49454
+      "raw": 369703,
+      "gzip": 217697,
+      "brotli": 209956
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16793,15 +16785,10 @@
       "gzip": 5858,
       "brotli": 5202
     },
-    "packages/physics/dist/rapier3d.wasm": {
-      "raw": 3082103,
-      "gzip": 1176707,
-      "brotli": 852125
-    },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 311260,
-      "gzip": 116279,
-      "brotli": 93510
+      "raw": 382158,
+      "gzip": 138566,
+      "brotli": 110616
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -16951,26 +16938,26 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 63398,
-        "gzip": 20661
+        "raw": 131730,
+        "gzip": 42856
       },
       "lazy": {
-        "name": "Rapier solver JavaScript",
-        "raw": 227985,
-        "gzip": 39993,
-        "loadedBy": "`await Physics.load()`, once per app (import() in physics.ts); its Wasm, rapier3d.wasm, is a file of its own"
+        "name": "physics kernel (deflated Wasm blueprint and its column table)",
+        "raw": 237972,
+        "gzip": 174772,
+        "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 30996,
-        "gzip": 11068
+        "raw": 49465,
+        "gzip": 16602
       },
       "lazy": {
         "name": "2D physics kernel loader JavaScript",
-        "raw": 3718,
-        "gzip": 1746,
+        "raw": 4038,
+        "gzip": 1855,
         "loadedBy": "`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, physics2d.wasm, is a file of its own"
       }
     }

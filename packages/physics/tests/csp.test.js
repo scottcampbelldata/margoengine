@@ -7,5 +7,5 @@ for (const kind of ['WebAssembly.CompileError', 'EvalError'])
   });
 for (const kind of ['WebAssembly.CompileError', 'EvalError'])
   test('physics/next reports blocked Wasm compilation: ' + kind, () => {
-    blockedLoad(new URL('../dist/next.js', import.meta.url), 'await api.loadKernel();', kind);
+    blockedLoad(new URL('../dist/index.js', import.meta.url), 'await api.loadKernel();', kind);
   });

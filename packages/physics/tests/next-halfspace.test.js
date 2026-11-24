@@ -1,8 +1,8 @@
 // A half space on the own solver against Rapier's (the root entry as a black box). Closed forms: kernel/tests/halfspace.rs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics as RapierPhysics } from '../dist/index.js';
-import { Physics } from '../dist/next.js';
+import { RapierPhysics } from './oracle.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

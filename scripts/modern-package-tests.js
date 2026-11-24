@@ -132,8 +132,6 @@ const dependencies = {
   '@playwright/test': JSON.parse(await readFile('package.json', 'utf8')).devDependencies['@playwright/test'],
   jsdom: '26.1.0',
   vite: JSON.parse(await readFile('package.json', 'utf8')).devDependencies.vite,
-  '@dimforge/rapier3d-compat': JSON.parse(await readFile('node_modules/@dimforge/rapier3d-compat/package.json', 'utf8'))
-    .version,
 };
 // One build for all packages (every package's prepack is that same build, so packing with scripts ran it once per
 // package). A stale file planted in two dist folders must not survive the build into a tarball. When check:merge's

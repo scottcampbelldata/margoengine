@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { openBrowser } from './browser.js';
 import { ensurePBRBoxAssets } from './support/pbr-box-assets.js';
 
-/** Published entry points, the actual Khronos Box, native WebGPU, and real Rapier. */
+/** Published entry points, the actual Khronos Box, native WebGPU, and the real solver. */
 export async function pbrBoxBrowserChecks(page) {
   return page.evaluate(async () => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
@@ -16,8 +16,7 @@ export async function pbrBoxBrowserChecks(page) {
     const { BoxHelper } = await import('/packages/lines/dist/index.js');
     const { worldBounds } = await import('/packages/stage/dist/model.js');
     const { meshTriangles } = await import('/packages/shared/mesh-source.js');
-    const { default: RAPIER } = await import('/node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs');
-    await RAPIER.init();
+    await Physics.load();
     const check = (value, message) => {
       if (!value) throw new Error(message);
     };
@@ -266,7 +265,7 @@ export async function pbrBoxBrowserChecks(page) {
         vertexRecord = resources.find((record) => record.resource === borrowed.vertex),
         indexRecord = resources.find((record) => record.resource === borrowed.index);
       check(vertexRecord && indexRecord, 'native PBR vertex/index uploads were not observed');
-      physics = new Physics(instance, { rapier: RAPIER, gravity: [0, 0, 0], paused: true });
+      physics = new Physics(instance, { gravity: [0, 0, 0], paused: true });
       const beforeFit = resources.length,
         body = physics.addBody(model.root),
         collider = body.colliders[0];
@@ -344,7 +343,7 @@ export async function pbrBoxBrowserChecks(page) {
         vertexRecord.destroyed && indexRecord.destroyed && meshTriangles(mesh) === null && instance.meshes.size === 0,
         'model disposal retained registry/GPU ownership',
       );
-      const disposedPhysics = (physics = new Physics(instance, { rapier: RAPIER }));
+      const disposedPhysics = (physics = new Physics(instance));
       rejects(() => disposedPhysics.addBody(mesh), /^Mesh disposed; see /, 'disposed mesh handle');
       check(disposedPhysics.bodyCount === 0, 'disposed handle retained a physics body');
       disposedPhysics.dispose();

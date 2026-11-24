@@ -2,7 +2,6 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { loadGLTF, parseGLTF, PBRModel } from '@margoengine/gltf/pbr';
 import { parseGLTF as parseBasicGLTF } from '@margoengine/gltf';
 import { Physics } from '@margoengine/physics';
@@ -18,7 +17,7 @@ import { loadedPBREngine, primitivePositions, positionBounds } from './support/l
 // FBX fixture is deliberately not read or preflighted before these assertions.
 assert.match(import.meta.resolve('@margoengine/gltf/pbr'), /\/gltf\/dist\/pbr\.js$/);
 const box = await readFile(new URL('../packages/exporters/tests/fixtures/Box.glb', import.meta.url));
-await RAPIER.init();
+await Physics.load();
 const server = createServer((_request, response) => {
   response.writeHead(200, { 'content-type': 'model/gltf-binary' });
   response.end(box);
@@ -65,7 +64,7 @@ function transformed(positions, matrix) {
   return result;
 }
 function bodyFramePositions(world, body) {
-  // Rapier poses contain translation and unit rotation, never mesh scale.
+  // Body poses contain translation and unit rotation, never mesh scale.
   // Rotate each actual world vertex by the inverse rigid quaternion rather than
   // reusing the physics package's fitting code or its hierarchy traversal.
   const position = body.raw.translation(),
@@ -152,7 +151,7 @@ test('built gltf/pbr Box preserves all three null-Geometry nodes and registers o
 
 test('Box addBody(model.root) fits the attached grandchild through the authored (x,z,-y) parent matrix', async () => {
   await withBox(({ engine, model, primitive, mesh }) => {
-    const physics = new Physics(engine, { rapier: RAPIER });
+    const physics = new Physics(engine);
     try {
       const parents = [model.root, ...model.nodes].map((node) => engine.store.parents[node.id]);
       const matrices = [model.root, ...model.nodes].map((node) => [...node.matrix]);
@@ -185,7 +184,7 @@ test('Box addBody(model.root) fits the attached grandchild through the authored 
   });
 });
 
-test('transformed real Box descendants retain rotated offsets and nonuniform root scale exactly once in the Rapier frame', async () => {
+test('transformed real Box descendants retain rotated offsets and nonuniform root scale exactly once in the body frame', async () => {
   const doc = embeddedBoxDocument(),
     angle = 0.43,
     c = Math.cos(angle),
@@ -196,7 +195,7 @@ test('transformed real Box descendants retain rotated offsets and nonuniform roo
   await withBox(({ engine, model, mesh, primitive }) => {
     model.root.setPosition([9, -8, 7]).setRotation([0.2, -0.4, 0.7]).setScale([2, 3, 4]);
     engine.store.tick(false);
-    const physics = new Physics(engine, { rapier: RAPIER });
+    const physics = new Physics(engine);
     try {
       const world = transformed(primitivePositions(primitive), mesh.matrix),
         matrix = [...mesh.matrix];
@@ -220,7 +219,7 @@ test('transformed real Box descendants retain rotated offsets and nonuniform roo
 
 test('Box primitive fits both an attached child world pose and an explicitly detached mesh', async () => {
   await withBox(({ engine, model, mesh, primitive }) => {
-    const physics = new Physics(engine, { rapier: RAPIER });
+    const physics = new Physics(engine);
     try {
       const original = [...mesh.matrix],
         parent = engine.store.parents[mesh.id];
@@ -331,7 +330,7 @@ test('BoxHelper emits finite bounds for the primitive and no synthetic descendan
 
 test('Box default fitting rolls back empty roots and disposed model handles without leaving a body', async () => {
   await withBox(({ engine, model }) => {
-    const physics = new Physics(engine, { rapier: RAPIER });
+    const physics = new Physics(engine);
     try {
       assert.throws(() => physics.addBody(engine.createMesh()), { code: 'state', message: /Mesh has no geometry/ });
       assert.equal(physics.bodyCount, 0);
@@ -358,7 +357,7 @@ test('a genuine Box morph source needs an explicit collider even when discovered
   doc.meshes[0].weights = [0];
   await withBox(({ engine, model, mesh }) => {
     assert.equal(meshTriangles(mesh).source.morphed, true);
-    const physics = new Physics(engine, { rapier: RAPIER });
+    const physics = new Physics(engine);
     try {
       assert.throws(() => physics.addBody(model.root), {
         code: 'state',

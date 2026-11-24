@@ -1,25 +1,9 @@
-// Physics in Node: @margoengine/physics (Rapier) stepping a pile of falling boxes into core meshes.
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+// Physics in Node: @margoengine/physics (the own kernel) stepping a pile of falling boxes into core meshes.
 import { headlessEngine, ms, nodeCase, timed } from '../lib/node.mjs';
-import { root } from '../lib/env.mjs';
-
-async function rapier() {
-  const entry = resolve(
-    process.env.MARGOENGINE_RAPIER ?? resolve(root, 'node_modules/@dimforge/rapier3d-compat'),
-    'dist/rapier.mjs',
-  );
-  const RAPIER = (await import(pathToFileURL(entry).href)).default,
-    warn = console.warn;
-  console.warn = () => {}; // wasm-bindgen's notice about init() arguments
-  await RAPIER.init();
-  console.warn = warn;
-  return RAPIER;
-}
 
 export default {
   name: 'physics',
-  title: 'Rigid bodies (Rapier) in Node',
+  title: 'Rigid bodies in Node',
   uses: 'cpu',
   async cases() {
     const state = {};
@@ -31,13 +15,13 @@ export default {
         () => ({ stepMs: timed(() => state[n].physics.step(), { reps: 120, warm: 0 }) }),
         {
           async setup() {
-            const [{ Physics }, { box }, RAPIER] = await Promise.all([
+            const [{ Physics }, { box }] = await Promise.all([
               import('../../packages/physics/dist/index.js'),
               import('../../packages/core/dist/extension.js'),
-              rapier(),
             ]);
+            await (await import('../../packages/physics/dist/index.js')).Physics.load();
             const e = await headlessEngine(n + 4),
-              physics = new Physics(e, { rapier: RAPIER }),
+              physics = new Physics(e),
               side = Math.ceil(Math.cbrt(n));
             physics.addBody(
               e

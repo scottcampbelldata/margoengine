@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { Physics as Own } from '../dist/next.js';
-import { Physics as Rapier } from '../dist/index.js';
+import { Physics as Own } from '../dist/index.js';
+import { Physics as Rapier } from './oracle/dist/index.js';
 
 const dir = process.env.MARGOENGINE_RAPIER
   ? resolve(process.env.MARGOENGINE_RAPIER)
@@ -26,11 +26,13 @@ const between = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] 
 function build(Physics, options, joint) {
   const physics = new Physics(null, { gravity: [0, 0, 0], ...options });
   const anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    rod = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass: 2 } });
+    rod = physics.addBody(null, {
+      colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass: 2 },
+    });
   return { physics, rod, joint: physics.addJoint(anchor, rod, joint) };
 }
 
-test('a cone motor inside its cone turns as Rapier\'s spherical motor does', { skip }, async () => {
+test("a cone motor inside its cone turns as Rapier's spherical motor does", { skip }, async () => {
   await Own.load();
   const target = about([0, 0, 1], 0.4),
     inertia = 2 / 3,

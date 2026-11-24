@@ -7,7 +7,19 @@ import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const source = new URL('../src/', import.meta.url);
-const offPath = new Set(['next/sync.ts', 'next/collider.ts', 'next/debug.ts', 'next/kinematics.ts']);
+// Files of a step: the kernel, the world, its bodies, joints, shape tables and the PID controller. The mesh sync, the collider
+// reads, the debug lines and the helpers written over a world (character controller, vehicle, rope) are off the step path.
+const stepFiles = [
+  'kernel.ts',
+  'physics.ts',
+  'body.ts',
+  'joints.ts',
+  'kernel-shapes.ts',
+  'hull.ts',
+  'pid.ts',
+  'mesh-clean.ts',
+  'multibody.ts',
+];
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 
 /** `text` with comments and the insides of strings blanked, newlines kept. The checked files hold no regular expressions. */
@@ -74,10 +86,8 @@ function findings(text, name = 'source.ts') {
 }
 
 test('the TypeScript on the step path uses no Math, clock or power operator', () => {
-  const files = ['kernel.ts', ...readdirSync(new URL('next/', source)).map((name) => `next/${name}`)].filter(
-    (name) => !offPath.has(name),
-  );
-  assert.ok(files.includes('next/physics.ts') && files.includes('next/body.ts') && files.includes('next/shapes.ts'));
+  const files = stepFiles;
+  assert.ok(readdirSync(new URL('.', source)).includes('physics.ts'));
   const found = files.flatMap((name) => findings(readFileSync(new URL(name, source), 'utf8'), name));
   assert.deepEqual(found, []);
 });

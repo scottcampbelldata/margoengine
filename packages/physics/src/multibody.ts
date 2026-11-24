@@ -2,11 +2,19 @@
 // This file builds and removes the tree and writes its columns; reading and setting its coordinates and the inverse
 // kinematics are in next/kinematics.ts.
 import { MargoError } from '@margoengine/math/errors';
-import type { JointOptions } from '../joints.js';
-import type { KernelWorld } from '../kernel.js';
+import type { JointOptions } from './joints.js';
+import type { KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
-import type { PhysicsJoint } from './joint.js';
-import { coordinates, inverseKinematics, jointVelocities, setCoordinates, type IkOptions, type IkResult, type IkTarget } from './kinematics.js';
+import type { PhysicsJoint } from './joints.js';
+import {
+  coordinates,
+  inverseKinematics,
+  jointVelocities,
+  setCoordinates,
+  type IkOptions,
+  type IkResult,
+  type IkTarget,
+} from './kinematics.js';
 
 /** One link added to a multibody: its body, the body it hangs from, and the joint between them. */
 export interface MultibodyLinkOptions {
@@ -94,7 +102,8 @@ export class Multibody {
     this.removed = true;
   }
   private check(): void {
-    if (this.removed) throw new MargoError('state', 'Multibody was removed; build a new one with physics.addMultibody.');
+    if (this.removed)
+      throw new MargoError('state', 'Multibody was removed; build a new one with physics.addMultibody.');
   }
 }
 
@@ -103,18 +112,30 @@ export class Multibody {
  * @throws RangeError or MargoError for a body already in a tree, a parent that is not in this one, or a joint that is not made of
  * locks.
  */
-export function buildMultibody(owner: MultibodyOwner, root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody {
+export function buildMultibody(
+  owner: MultibodyOwner,
+  root: PhysicsBody,
+  links: readonly MultibodyLinkOptions[],
+): Multibody {
   const { kernel } = owner,
     columns = kernel.columns;
-  if (links.length < 1) throw new RangeError('A multibody needs at least one link besides its root; pass the bodies that hang from it.');
+  if (links.length < 1)
+    throw new RangeError('A multibody needs at least one link besides its root; pass the bodies that hang from it.');
   const inTree = new Set<PhysicsBody>([root]);
-  if (columns.mbRole[root.row] !== 0) throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
+  if (columns.mbRole[root.row] !== 0)
+    throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
   for (const link of links) {
     const parent = link.parent ?? [...inTree].pop()!;
-    if (!inTree.has(parent)) throw new MargoError('state', 'A link hangs from a body already in the tree; list parents before their children.');
+    if (!inTree.has(parent))
+      throw new MargoError(
+        'state',
+        'A link hangs from a body already in the tree; list parents before their children.',
+      );
     if (inTree.has(link.body)) throw new MargoError('state', 'A body is in a multibody once; the tree has no loops.');
-    if (columns.mbRole[link.body.row] !== 0) throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
-    if (!TYPES.includes(link.joint.type)) throw new TypeError(`A multibody joint is ${TYPES.join(', ')}; got ${String(link.joint.type)}.`);
+    if (columns.mbRole[link.body.row] !== 0)
+      throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
+    if (!TYPES.includes(link.joint.type))
+      throw new TypeError(`A multibody joint is ${TYPES.join(', ')}; got ${String(link.joint.type)}.`);
     inTree.add(link.body);
   }
   const built: MultibodyLink[] = [],

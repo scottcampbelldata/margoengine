@@ -2,8 +2,8 @@
 // ORIENTED point queries (checked against the closed form of a cube).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
-import { cleanTrimesh } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
+import { cleanTrimesh } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

@@ -1,7 +1,7 @@
 // Debug lines of the own solver: the right number of segments for each shape, at the right places, with matching colours.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const segments = (lines) => lines.vertices.length / 6;
 
@@ -49,7 +49,10 @@ test('every shape draws, and each option adds only its own lines', async () => {
     body.remove();
   }
   assert.equal(counts[0], 72);
-  assert.ok(counts.every((n) => n > 0), `${counts}`);
+  assert.ok(
+    counts.every((n) => n > 0),
+    `${counts}`,
+  );
   assert.equal(counts[5], 5, 'two triangles share one edge');
   assert.equal(counts[4], 8, 'a pyramid has 8 edges');
   const floor = physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
@@ -62,12 +65,21 @@ test('every shape draws, and each option adds only its own lines', async () => {
 test('joints draw three lines, a broken one darker, and contacts draw a point and a normal', async () => {
   await Physics.load();
   const physics = new Physics(null);
-  const floor = physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+  const floor = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+  });
   const ball = physics.addBody(null, { position: [0, 0.5, 0], colliders: { shape: 'sphere', radius: 0.5 } });
   physics.step();
   const contacts = physics.debugRender({ colliders: false });
   assert.ok(segments(contacts) >= 1);
-  const joint = physics.addJoint(floor, ball, { type: 'spherical', anchorA: [0, 0.5, 0], anchorB: [0, 0, 0], breakForce: 1 });
+  const joint = physics.addJoint(floor, ball, {
+    type: 'spherical',
+    anchorA: [0, 0.5, 0],
+    anchorB: [0, 0, 0],
+    breakForce: 1,
+  });
   assert.equal(segments(physics.debugRender({ colliders: false, contacts: false })), 3);
   const fresh = [...physics.debugRender({ colliders: false, contacts: false }).colors.slice(0, 3)];
   for (let i = 0; i < 30; i++) physics.step();

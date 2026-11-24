@@ -10,7 +10,6 @@ import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compa
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
-// Physics.load() in the page fetches dist/rapier3d.wasm through the dev server, the way an app's bundler serves it.
 await mkdir(results, { recursive: true });
 const server = await createServer({
   plugins: [noFileWatcher()],

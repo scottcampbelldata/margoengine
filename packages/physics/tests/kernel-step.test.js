@@ -1,7 +1,7 @@
 // The step through Wasm: what cargo test proves natively must hold in the shipped build, column views included.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 /** A dynamic body of unit mass and unit moments. */
 function ball(world) {

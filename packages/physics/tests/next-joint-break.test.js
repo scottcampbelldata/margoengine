@@ -1,12 +1,15 @@
 // Joints that break: a load past the limit ends the joint, once, with an event; below it the joint holds.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 function hang(options) {
   const physics = new Physics(null);
   const anchor = physics.addBody(null, { type: 'fixed' });
-  const weight = physics.addBody(null, { position: [0, -2, 0], colliders: { shape: 'sphere', radius: 0.25, mass: 10 } });
+  const weight = physics.addBody(null, {
+    position: [0, -2, 0],
+    colliders: { shape: 'sphere', radius: 0.25, mass: 10 },
+  });
   const joint = physics.addJoint(anchor, weight, { type: 'spherical', anchorB: [0, 2, 0], ...options });
   return { physics, anchor, weight, joint };
 }

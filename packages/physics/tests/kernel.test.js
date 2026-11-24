@@ -1,7 +1,7 @@
 // KernelWorld: the views alias the kernel's memory, rows survive growth, and the load behaves like Physics.load.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 test('a world before the load says what to do', async () => {
   // This file's first test: nothing in this process has loaded the kernel yet.

@@ -1,13 +1,12 @@
 {
   "name": "@margoengine/physics",
   "version": "1.0.0",
-  "description": "Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.",
+  "description": "Rigid-body physics for Margo Engine on its own Rust kernel: fixed-step engine plugin with interpolation, colliders, joints, queries, events, a character controller, vehicles and ropes.",
   "keywords": [
     "margoengine",
     "webgpu",
     "3d",
-    "physics",
-    "rapier"
+    "physics"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -26,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
+    "test": "npm run build && node scripts/build-oracle.js && node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-replay.js --browsers=default",
     "test:replay": "npm run build && node scripts/test-replay.js",
     "prepack": "npm run build"
@@ -36,10 +35,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./next": {
-      "types": "./dist/next.d.ts",
-      "import": "./dist/next.js"
     },
     "./decomposition": {
       "types": "./dist/decomposition.d.ts",
@@ -51,16 +46,9 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@dimforge/rapier3d-compat": ">=0.14.0 <1",
     "@margoengine/core": "^1.0.0"
   },
-  "peerDependenciesMeta": {
-    "@dimforge/rapier3d-compat": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@dimforge/rapier3d": "0.21.0",
     "@margoengine/math": "^1.0.0"
   }
 }

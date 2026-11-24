@@ -3,8 +3,8 @@
 // uncoupled one), a grid's mass, and what a grid meets. The contact mechanics are proved in kernel/tests/voxel.rs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics as RapierPhysics } from '../dist/index.js';
-import { Physics } from '../dist/next.js';
+import { RapierPhysics } from './oracle.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};
@@ -33,7 +33,10 @@ test('a box rests on the top of the cells where Rapier rests it, and size scales
   ]) {
     const [own, rapier] = both((physics) => {
       physics.addBody(null, { type: 'fixed', colliders: { shape: 'voxels', cells: slab(8), size, massless: true } });
-      const crate = physics.addBody(null, { position: at, colliders: { shape: 'box', halfExtents: [half, half, half] } });
+      const crate = physics.addBody(null, {
+        position: at,
+        colliders: { shape: 'box', halfExtents: [half, half, half] },
+      });
       step(physics, 240);
       return crate.position[1];
     });
@@ -49,7 +52,11 @@ test('setVoxel opens a hole under a body in place, and a cell outside the grid g
         colliders: { shape: 'voxels', cells: cells([0, 0, 0], [1, 0, 0], [2, 0, 0]), massless: true },
       }),
       [grid] = ground.colliders,
-      crate = physics.addBody(null, { position: [1.5, 2, 0.5], canSleep: false, colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] } });
+      crate = physics.addBody(null, {
+        position: [1.5, 2, 0.5],
+        canSleep: false,
+        colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] },
+      });
     step(physics, 180);
     const rest = crate.position[1];
     assert.equal(grid.setVoxel(1, 0, 0, false), grid);
@@ -57,7 +64,10 @@ test('setVoxel opens a hole under a body in place, and a cell outside the grid g
     const fell = crate.position[1];
     assert.equal(ground.colliders[0], grid, 'the same collider');
     grid.setVoxel(5, 0, 0, true);
-    const other = physics.addBody(null, { position: [5.5, 2, 0.5], colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] } });
+    const other = physics.addBody(null, {
+      position: [5.5, 2, 0.5],
+      colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] },
+    });
     step(physics, 180);
     return { rest, fell, grown: other.position[1] };
   });
@@ -71,8 +81,11 @@ test('a box crosses two coupled grids at its height as on Rapier, and catches at
   for (const coupled of [true, false]) {
     const [own, rapier] = both((physics) => {
       const fixed = (x) =>
-          physics.addBody(null, { type: 'fixed', position: [x, 0, 0], colliders: { shape: 'voxels', cells: slab(4), massless: true } })
-            .colliders[0],
+          physics.addBody(null, {
+            type: 'fixed',
+            position: [x, 0, 0],
+            colliders: { shape: 'voxels', cells: slab(4), massless: true },
+          }).colliders[0],
         a = fixed(0),
         b = fixed(4);
       if (coupled) {
@@ -98,7 +111,10 @@ test('a box crosses two coupled grids at its height as on Rapier, and catches at
       return { x: crate.position[0], speed: crate.linearVelocity[0], low, high };
     });
     if (coupled) {
-      for (const [name, run] of [['own', own], ['Rapier', rapier]]) {
+      for (const [name, run] of [
+        ['own', own],
+        ['Rapier', rapier],
+      ]) {
         assert.ok(run.x > 4.5, `${name} crossed the seam to x = ${run.x}`);
         assert.ok(run.low > 1.28 && run.high < 1.32, `${name} height ${run.low} to ${run.high}`);
       }
@@ -112,7 +128,12 @@ test('a box crosses two coupled grids at its height as on Rapier, and catches at
 test('a dynamic grid weighs what Rapier says, its centre and moments where Rapier puts them, and follows an edit', () => {
   const options = {
       position: [0, 3, 0],
-      colliders: { shape: 'voxels', cells: cells([0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 2], [0, 0, 2]), size: [0.5, 0.4, 0.3], density: 3 },
+      colliders: {
+        shape: 'voxels',
+        cells: cells([0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 2], [0, 0, 2]),
+        size: [0.5, 0.4, 0.3],
+        density: 3,
+      },
     },
     own = new Physics(null),
     rapier = new RapierPhysics(null),
@@ -138,12 +159,19 @@ test('a grid meets boxes, balls, capsules, hulls, compounds and grids, and falls
   const grounds = {
     voxels: { shape: 'voxels', cells: slab(4, -1) },
     compound: { shape: 'compound', parts: [{ shape: 'box', halfExtents: [5, 0.5, 5], offset: [0, -0.5, 0] }] },
-    trimesh: { shape: 'trimesh', vertices: [-10, 0, -10, 10, 0, -10, 10, 0, 10, -10, 0, 10], indices: [0, 2, 1, 0, 3, 2] },
+    trimesh: {
+      shape: 'trimesh',
+      vertices: [-10, 0, -10, 10, 0, -10, 10, 0, 10, -10, 0, 10],
+      indices: [0, 2, 1, 0, 3, 2],
+    },
   };
   for (const [name, ground] of Object.entries(grounds)) {
     const [own, rapier] = both((physics) => {
       physics.addBody(null, { type: 'fixed', colliders: { ...ground, massless: true } });
-      const body = physics.addBody(null, { position: [1, 2, 1], colliders: { shape: 'voxels', cells: cells([0, 0, 0]) } });
+      const body = physics.addBody(null, {
+        position: [1, 2, 1],
+        colliders: { shape: 'voxels', cells: cells([0, 0, 0]) },
+      });
       step(physics, 180);
       return body.position[1];
     });
@@ -171,7 +199,11 @@ test('voxels options are checked as on the root entry', () => {
     add = (colliders) => physics.addBody(null, { type: 'fixed', colliders });
   assert.equal(physics.supportsShape('voxels'), true);
   assert.equal(add({ shape: 'voxels', cells: cells([0, 0, 0]) }).colliders[0].boundingRadius, null);
-  assert.equal(add({ shape: 'voxels', cells: new Int32Array(0) }).colliders.length, 1, 'an empty grid, as Rapier takes one');
+  assert.equal(
+    add({ shape: 'voxels', cells: new Int32Array(0) }).colliders.length,
+    1,
+    'an empty grid, as Rapier takes one',
+  );
   assert.throws(() => add({ shape: 'voxels', cells: [0, 0, 0] }), TypeError);
   assert.throws(() => add({ shape: 'voxels', cells: Int32Array.of(0, 0) }), TypeError);
   assert.throws(() => add({ shape: 'voxels', cells: slab(1), size: [1, 0, 1] }), RangeError);

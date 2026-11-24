@@ -1,7 +1,7 @@
 // The prediction distance: contacts are made inside it and not beyond, and it can be set per world.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

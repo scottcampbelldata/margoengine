@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { MargoError } from '@margoengine/math/errors';
-import { Physics as RapierPhysics } from '../dist/index.js';
+import { RapierPhysics } from './oracle.js';
 import { convexDecomposition, decompositionConcavity } from '../dist/decomposition.js';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 await Promise.all([Physics.load(), RapierPhysics.load()]);
 
@@ -82,17 +82,21 @@ function cells(filled) {
 function tube() {
   const filled = [];
   for (let i = 0; i < 4; i++)
-    for (let k = 0; k < 4; k++) if (i === 0 || i === 3 || k === 0 || k === 3) for (let j = 0; j < 4; j++) filled.push([i, j, k]);
+    for (let k = 0; k < 4; k++)
+      if (i === 0 || i === 3 || k === 0 || k === 3) for (let j = 0; j < 4; j++) filled.push([i, j, k]);
   return cells(filled);
 }
 
 /** libigl's decimated knight (packages/loaders/tests/fixtures, in THIRD-PARTY-NOTICES.md): 502 vertices, 1,000 triangles, closed. */
 function knight() {
-  const words = readFileSync(new URL('../../loaders/tests/fixtures/decimated-knight.off', import.meta.url), 'utf8').split(/\s+/).filter(Boolean);
+  const words = readFileSync(new URL('../../loaders/tests/fixtures/decimated-knight.off', import.meta.url), 'utf8')
+    .split(/\s+/)
+    .filter(Boolean);
   const [vertexCount, faceCount] = [+words[1], +words[2]],
     vertices = words.slice(4, 4 + vertexCount * 3).map(Number),
     indices = [];
-  for (let f = 0, i = 4 + vertexCount * 3; f < faceCount; f++, i += 4) indices.push(+words[i + 1], +words[i + 2], +words[i + 3]);
+  for (let f = 0, i = 4 + vertexCount * 3; f < faceCount; f++, i += 4)
+    indices.push(+words[i + 1], +words[i + 2], +words[i + 3]);
   return { vertices, indices };
 }
 
@@ -106,7 +110,10 @@ test('a square tube splits into its four walls, as the paper shows a tree search
   const score = decompositionConcavity(mesh, result.parts);
   assert.ok(score < 0.05, `the paper's score is under the threshold (${score})`);
   const filled = decompositionConcavity(mesh, [{ points: mesh.vertices }]);
-  assert.ok(Math.abs(filled - 0.25) < 0.01, `one hull fills the tube: its score is the hollow's half width, a quarter of the side (${filled})`);
+  assert.ok(
+    Math.abs(filled - 0.25) < 0.01,
+    `one hull fills the tube: its score is the hollow's half width, a quarter of the side (${filled})`,
+  );
 });
 
 test('the same mesh, options and seed give the same parts bit for bit, and an inside-out mesh the same as an outward one', () => {
@@ -116,7 +123,8 @@ test('the same mesh, options and seed give the same parts bit for bit, and an in
     again = convexDecomposition(mesh, options);
   assert.deepEqual(again, first);
   const outward = { vertices: mesh.vertices, indices: [] };
-  for (let i = 0; i < mesh.indices.length; i += 3) outward.indices.push(mesh.indices[i], mesh.indices[i + 2], mesh.indices[i + 1]);
+  for (let i = 0; i < mesh.indices.length; i += 3)
+    outward.indices.push(mesh.indices[i], mesh.indices[i + 2], mesh.indices[i + 1]);
   assert.deepEqual(convexDecomposition(outward, options), first);
 });
 
@@ -149,7 +157,11 @@ test('a marble falls inside a decomposed cup on the own solver, and rests on the
   const parts = convexDecomposition(cup());
   const drop = (colliders) => {
     const physics = new Physics(null);
-    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+    });
     const body = physics.addBody(null, { position: [0, 0, 0], colliders }),
       marble = physics.addBody(null, { position: [0, 2, 0], colliders: { shape: 'sphere', radius: 0.2 } });
     for (let i = 0; i < 300; i++) physics.step();
@@ -173,6 +185,9 @@ test('the decomposition is a collider on the root entry too, and /next asks for 
     mesh = tube();
   assert.throws(
     () => own.addBody(null, { colliders: { shape: 'convexDecomposition', ...mesh } }),
-    (error) => error instanceof MargoError && error.code === 'unsupported' && /@margoengine\/physics\/decomposition/.test(error.message),
+    (error) =>
+      error instanceof MargoError &&
+      error.code === 'unsupported' &&
+      /@margoengine\/physics\/decomposition/.test(error.message),
   );
 });

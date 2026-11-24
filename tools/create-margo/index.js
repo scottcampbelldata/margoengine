@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 /** Each template and what it starts; `shared` adds the Vite files (tsconfig, public/, .gitignore) every Vite app uses. */
 const TEMPLATES = {
   web: { about: 'a lit scene with orbit controls and quality tiers (default)', shared: true },
-  game: { about: 'a small physics game with the @margoengine/game kit and Rapier', shared: true },
+  game: { about: 'a small physics game with the @margoengine/game kit and Margo physics', shared: true },
   viz: { about: 'a point-cloud visualization with grid and labels (@margoengine/kit-viz)', shared: true },
   react: { about: 'React + Vite with @margoengine/kit-react', shared: true },
   next: { about: 'Next.js (app router) with @margoengine/kit-react', shared: false },

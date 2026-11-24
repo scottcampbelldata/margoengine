@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
-import type { PhysicsBody, BodyOptions } from './body.js';
+import type { BodyOptions } from './body.js';
+import type { PhysicsBody } from './body.js';
 import type { PhysicsJoint } from './joints.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import type { ColliderSettings } from './shapes.js';
@@ -170,9 +171,11 @@ export class Rope implements PhysicsAttachment {
       throw new RangeError('Rope points buffer is too short; pass a Float32Array of (segments + 1) * 3 numbers.');
     const half = this.segmentLength / 2;
     for (let i = 0; i < this.segments.length; i++) {
-      const raw = this.segments[i].raw,
-        t = raw.translation(),
-        q = raw.rotation();
+      const body = this.segments[i],
+        p = body.position,
+        r = body.rotation,
+        t = { x: p[0], y: p[1], z: p[2] },
+        q = { x: r[0], y: r[1], z: r[2], w: r[3] };
       // Segment +Y axis in world space: the second column of its rotation matrix.
       const ux = 2 * (q.x * q.y - q.w * q.z),
         uy = 1 - 2 * (q.x * q.x + q.z * q.z),

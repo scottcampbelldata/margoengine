@@ -6,7 +6,7 @@ import test from 'node:test';
 import { box } from '@margoengine/core';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import * as root from '../dist/index.js';
-import * as next from '../dist/next.js';
+import * as next from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};
@@ -27,7 +27,10 @@ const makeEngine = async () =>
     null,
   );
 const near = (actual, expected, bound, message) =>
-  assert.ok(Math.abs(actual - expected) <= bound, `${message ?? 'value'}: ${actual} is not within ${bound} of ${expected}`);
+  assert.ok(
+    Math.abs(actual - expected) <= bound,
+    `${message ?? 'value'}: ${actual} is not within ${bound} of ${expected}`,
+  );
 const steps = (physics, count) => {
   for (let i = 0; i < count; i++) physics.step();
 };

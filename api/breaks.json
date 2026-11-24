@@ -14056,5 +14056,581 @@
     "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
     "date": "2026-11-24",
     "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "CharacterController.raw",
+    "change": "removed",
+    "was": "523e553a",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "CharacterController.constructor",
+    "change": "signature",
+    "was": "31dd27df",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "CharacterController.move",
+    "change": "signature",
+    "was": "54d847ba",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.rapier",
+    "change": "removed",
+    "was": "42da3455",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.load",
+    "change": "signature",
+    "was": "7b576d67",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.world",
+    "change": "removed",
+    "was": "aac8f08b",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.colliderOf",
+    "change": "removed",
+    "was": "3f211b0f",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.addJoint",
+    "change": "signature",
+    "was": "54e1019c",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.raycastAll",
+    "change": "signature",
+    "was": "8767893d",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.shapeCast",
+    "change": "signature",
+    "was": "c66428b8",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Physics.debugRender",
+    "change": "signature",
+    "was": "61f0a628",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.raw",
+    "change": "removed",
+    "was": "a6fb8d4f",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.pose",
+    "change": "signature",
+    "was": "29d0d42f",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.slept",
+    "change": "removed",
+    "was": "58452d4d",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.constructor",
+    "change": "signature",
+    "was": "93cf9c1f",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.snapshot",
+    "change": "removed",
+    "was": "467af3e9",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.raw",
+    "change": "removed",
+    "was": "31346874",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.shape",
+    "change": "signature",
+    "was": "b1b1d002",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.constructor",
+    "change": "signature",
+    "was": "56c954c6",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.handle",
+    "change": "signature",
+    "was": "88814fb8",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.translation",
+    "change": "signature",
+    "was": "98682a2a",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.rotation",
+    "change": "signature",
+    "was": "3bb7b0ba",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.translationWrtParent",
+    "change": "signature",
+    "was": "fcb5cb24",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.rotationWrtParent",
+    "change": "signature",
+    "was": "6ae47f34",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.halfExtents",
+    "change": "signature",
+    "was": "b6198380",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsCollider.containsPoint",
+    "change": "signature",
+    "was": "b1c5f792",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsJoint.raw",
+    "change": "removed",
+    "was": "d8c43162",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsJoint.type",
+    "change": "signature",
+    "was": "219eefcb",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsJoint.constructor",
+    "change": "signature",
+    "was": "f2016bc7",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsLoadOptions",
+    "change": "removed",
+    "was": "9166034a",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsOptions.rapier",
+    "change": "removed",
+    "was": "2aad305e",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PointProjection",
+    "change": "signature",
+    "was": "8bfff219",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RapierModule",
+    "change": "removed",
+    "was": "38abe618",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RapierWasmSource",
+    "change": "removed",
+    "was": "3307033b",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RaycastHit",
+    "change": "signature",
+    "was": "844c98ec",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ShapeCastHit",
+    "change": "signature",
+    "was": "1a724b16",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ShapeOptions",
+    "change": "signature",
+    "was": "46eda95b",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Vehicle.raw",
+    "change": "removed",
+    "was": "d70c605f",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "BodyOwner.rapier",
+    "change": "removed",
+    "was": "42da3455",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "BodyOwner.world",
+    "change": "removed",
+    "was": "951e8ea2",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Collider",
+    "change": "removed",
+    "was": "ccc28280",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ColliderDesc",
+    "change": "removed",
+    "was": "a26d8119",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ColliderShapeCastHit",
+    "change": "removed",
+    "was": "1b456ffa",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "DynamicRayCastVehicleController",
+    "change": "removed",
+    "was": "f4e57e6b",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "EventQueue",
+    "change": "removed",
+    "was": "75748dab",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ImpulseJoint",
+    "change": "removed",
+    "was": "c3f32447",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "JointData",
+    "change": "removed",
+    "was": "4571350d",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "KinematicCharacterController",
+    "change": "removed",
+    "was": "59294404",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsHooks",
+    "change": "removed",
+    "was": "a9197768",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PointColliderProjection",
+    "change": "removed",
+    "was": "c5d8a0fb",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "QueryArgs",
+    "change": "removed",
+    "was": "e05d71d3",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Ray",
+    "change": "removed",
+    "was": "e426c72d",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RayColliderIntersection",
+    "change": "removed",
+    "was": "39988031",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RigidBody",
+    "change": "removed",
+    "was": "67f2cf26",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RigidBodyDesc",
+    "change": "removed",
+    "was": "99a57b0c",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Rotation",
+    "change": "removed",
+    "was": "37d5d17f",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Shape",
+    "change": "removed",
+    "was": "c33759b4",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "SphericalImpulseJoint",
+    "change": "removed",
+    "was": "2b56f44b",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "Vector",
+    "change": "removed",
+    "was": "ce899e40",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "World",
+    "change": "removed",
+    "was": "c663c52e",
+    "reason": "Rapier is gone from @margoengine/physics: the solver is Margo's own kernel, so the objects and options that exposed Rapier's classes (raw, world, rapier, RapierModule and the types that mirrored them) are removed.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "KernelCompoundPart.shape",
+    "change": "signature",
+    "was": "114fc9e7",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "KernelQueryShape.shape",
+    "change": "signature",
+    "was": "876dcab0",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "CompoundPart",
+    "change": "signature",
+    "was": "c7d7893f",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "KernelCompoundPart.shape",
+    "change": "signature",
+    "was": "876dcab0",
+    "reason": "The own kernel replaces Rapier as the solver: this signature follows the kernel's types (plain tuples for points, vectors and rotations, the kernel's query hits) where it followed Rapier's.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
   }
 ]

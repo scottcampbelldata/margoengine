@@ -28,17 +28,14 @@ for (const file of guides)
           code: match[1],
           line: doc.slice(0, match.index).split('\n').length + 1,
         }));
-    assert.ok(
-      snippets.length >= 1,
-      `expected the guide's snippets, found ${snippets.length}`,
-    );
+    assert.ok(snippets.length >= 1, `expected the guide's snippets, found ${snippets.length}`);
     for (const { code, line } of snippets)
       for (const [, from] of code.matchAll(/from '([^']+)'/g))
         assert.match(
           from,
           task?.react
             ? /^(margoengine\/react(\/gltf)?|react|react-dom\/client)$/
-            : /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
+            : /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?)$/,
           `snippet at line ${line} imports ${from}`,
         );
     // Inside the repository so package resolution finds node_modules; test-results is git-ignored.

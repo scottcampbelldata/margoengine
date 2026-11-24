@@ -1,7 +1,7 @@
 // What a collider's options mean to the kernel. On the step path, as a game can add colliders in its step: no `Math`.
 import { MargoError } from '@margoengine/math/errors';
-import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from '../kernel.js';
-import { checkVec, type Quat, type Vec3 } from '../math.js';
+import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from './kernel.js';
+import { checkVec, type Quat, type Vec3 } from './math.js';
 import {
   bounds,
   geometryPositions,
@@ -11,7 +11,7 @@ import {
   type ColliderOptions,
   type CompoundPart,
   type ShapeOptions,
-} from '../shapes.js';
+} from './shapes.js';
 import { buildHull } from './hull.js';
 import { cleanTrimesh, wantsClean } from './mesh-clean.js';
 
@@ -100,6 +100,10 @@ export interface KernelCollider {
   size: number[];
   /** A compound's children, for KernelWorld.addCompound. */
   parts?: KernelCompoundPart[];
+  /** The points (and triangle indices) a convex hull or triangle mesh was built from. */
+  data?: { vertices: Float32Array; indices?: Uint32Array };
+  /** The collider's volume, for its mass. */
+  volume: () => number;
   options: KernelColliderOptions;
 }
 
@@ -278,7 +282,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition, voxels, segment, triangle, polyline or halfSpace, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition, voxels, segment, triangle, polyline or halfSpace.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry)
@@ -290,6 +294,7 @@ export function kernelCollider(
     parts: KernelCompoundPart[] | undefined,
     voxels: number | undefined,
     segment: { middle: Vec3; rotation: Quat4 } | undefined,
+    data: { vertices: Float32Array; indices?: Uint32Array } | undefined,
     border = 0;
   const surface =
     options.shape === 'segment' ||
@@ -329,6 +334,7 @@ export function kernelCollider(
             : fitted()),
       { vertices, faces } = buildHull(points);
     size = [hulls.addHull(vertices, faces)];
+    data = { vertices: Float32Array.from(points) };
     border = roundness(options.borderRadius, 'Convex hull');
   } else if (options.shape === 'trimesh') {
     const source = options.geometry ?? (options.vertices ? null : fit.geometry),
@@ -345,6 +351,11 @@ export function kernelCollider(
       );
     for (let i = 0; i < vertices.length; i++)
       if (!Number.isFinite(vertices[i])) throw new RangeError('Trimesh vertices must be finite Float32 values.');
+    for (let i = 0; i < indexSource.length; i++)
+      if (!Number.isInteger(indexSource[i]) || indexSource[i] < 0 || indexSource[i] >= vertices.length / 3)
+        throw new RangeError(
+          `Trimesh index ${indexSource[i]} is out of range; keep every index a whole number below the vertex count.`,
+        );
     if (options.mass !== undefined || options.density !== undefined)
       throw new RangeError(
         'A trimesh has no volume, so no mass or density; give the body its mass with setMassProperties, or use convexHull or convexDecomposition.',
@@ -365,6 +376,7 @@ export function kernelCollider(
         options.oriented ?? false,
       ),
     ];
+    data = { vertices: Float32Array.from(meshVertices), indices: Uint32Array.from(meshIndices) };
   } else if (options.shape === 'heightfield') {
     if (options.mass !== undefined || options.density !== undefined)
       throw new RangeError(
@@ -429,7 +441,7 @@ export function kernelCollider(
     if (!options.parts)
       throw new MargoError(
         'unsupported',
-        "The own solver takes a decomposed mesh, not the mesh: import { convexDecomposition } from '@margoengine/physics/decomposition' and pass its result, body.addCollider(convexDecomposition({ vertices, indices })).",
+        "A convexDecomposition collider takes the decomposed mesh, not the mesh: import { convexDecomposition } from '@margoengine/physics/decomposition' and pass its result, body.addCollider(convexDecomposition({ vertices, indices })).",
       );
     parts = compoundParts(options.parts, hulls);
     size = [];
@@ -449,7 +461,7 @@ export function kernelCollider(
     size = [hulls.addVoxels(cells, cell)];
   } else
     throw new TypeError(
-      `Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels.`,
+      `Unknown shape ${(options as { shape: string }).shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels.`,
     );
   let offset = options.offset ?? [0, 0, 0],
     rotation = options.rotation;
@@ -475,6 +487,8 @@ export function kernelCollider(
     shape,
     size,
     parts,
+    data,
+    volume: whole,
     options: {
       position: [offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]],
       rotation,

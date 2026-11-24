@@ -1,7 +1,7 @@
 // Bodies and colliders through Wasm: free lists, mass from shapes, and growth.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 test('mass, centre and moments come from the colliders', async () => {
   await loadKernel();
@@ -67,7 +67,10 @@ test('addCollider grows the world by itself', async () => {
     body = world.addBody('dynamic'),
     rows = [];
   for (let i = 0; i < 40; i++) rows.push(world.addCollider(body, 'ball', [0.1], { position: [i, 0, 0] }));
-  assert.deepEqual(rows, Array.from({ length: 40 }, (_, i) => i));
+  assert.deepEqual(
+    rows,
+    Array.from({ length: 40 }, (_, i) => i),
+  );
   assert.ok(world.colliderCapacity >= 40);
   assert.equal(world.capacity, 1);
   assert.ok(Math.abs(world.columns.localCenterX[body] - 19.5) <= 19.5 * 2 ** -20);

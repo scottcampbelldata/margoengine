@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { KernelWorld, Physics } from '../dist/next.js';
+import { KernelWorld, Physics } from '../dist/index.js';
 import { kernelSourceHash } from '../scripts/build-kernel.mjs';
 import { REPLAY_EVERY, REPLAY_STEPS, kernelScene, physicsScene } from './replay-scene.js';
 
@@ -48,7 +48,8 @@ test('a world that moved one bit gives a different hash: the proof can fail', ()
   // The hash must differ on every step the two worlds differ, and only then. Reading it 50 steps later is no test: body 0
   // drifts alone under damping, and since 2026-11-08 the bit it was moved by rounds away by step 80, both worlds bit-equal.
   const steps = 200,
-    bytes = (world) => Object.values(world.columns).map((view) => Buffer.from(view.buffer, view.byteOffset, view.byteLength)),
+    bytes = (world) =>
+      Object.values(world.columns).map((view) => Buffer.from(view.buffer, view.byteOffset, view.byteLength)),
     seen = [],
     clean = kernelScene(KernelWorld, steps, (world, step) => {
       if (step >= 50) seen[step] = { hash: world.hash, state: bytes(world).map((b) => Buffer.from(b)) };
@@ -60,7 +61,11 @@ test('a world that moved one bit gives a different hash: the proof can fail', ()
     const now = bytes(world),
       same = now.every((b, i) => b.equals(seen[step].state[i]));
     if (!same) differed++;
-    assert.equal(world.hash === seen[step].hash, same, `step ${step}: hash ${same ? 'differs on' : 'equals on'} different state`);
+    assert.equal(
+      world.hash === seen[step].hash,
+      same,
+      `step ${step}: hash ${same ? 'differs on' : 'equals on'} different state`,
+    );
   });
   assert.equal(clean[0], golden.kernel[0]);
   assert.ok(differed > 0, 'the move changed nothing');

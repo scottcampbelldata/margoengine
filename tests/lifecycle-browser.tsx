@@ -1,9 +1,8 @@
-// Page for scripts/lifecycle-browser-tests.mjs: a stage (with Rapier physics) or a React Canvas whose frame loop the
+// Page for scripts/lifecycle-browser-tests.mjs: a stage (with physics) or a React Canvas whose frame loop the
 // test drives through lifecycleClock (tests/lifecycle-browser.html): background the tab, resize at fractional pixel
 // ratios, lose the GPU device, or run with no WebGPU at all.
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { Canvas, useFrame, useMargo, type MargoContextValue } from '@margoengine/react';
 import { Box } from '@margoengine/react/geometry';
 import { box } from '@margoengine/core';
@@ -60,7 +59,7 @@ function Probe({ mode }: { mode: 'always' | 'demand' }) {
 
 const lifecycle = {
   errors,
-  /** Creates a stage in #app, with a falling Rapier body when `physics`; resolves the rejection when it fails. */
+  /** Creates a stage in #app, with a falling physics body when `physics`; resolves the rejection when it fails. */
   async stage({ physics = false } = {}) {
     try {
       stage = await createStage(host, { onError: (error) => errors.push(`onError: ${String(error)}`) });
@@ -69,8 +68,8 @@ const lifecycle = {
     }
     stage.box({ color: '#c08040' });
     if (physics) {
-      await RAPIER.init();
-      const world = new Physics(stage.engine, { rapier: RAPIER });
+      await Physics.load();
+      const world = new Physics(stage.engine);
       body = world.addBody(stage.box({ position: [0, 5, 0] }), {});
       world.on('afterstep', () => steps++);
     }
@@ -185,7 +184,9 @@ const lifecycle = {
       device = e.gpu!,
       gpuErrors: string[] = [],
       request = GPUAdapter.prototype.requestDevice;
-    device.addEventListener('uncapturederror', (event) => gpuErrors.push((event as GPUUncapturedErrorEvent).error.message));
+    device.addEventListener('uncapturederror', (event) =>
+      gpuErrors.push((event as GPUUncapturedErrorEvent).error.message),
+    );
     GPUAdapter.prototype.requestDevice = async function (...args) {
       const small = await request.apply(this, args);
       Object.defineProperty(small, 'limits', { value: { maxBufferSize: 4 } });

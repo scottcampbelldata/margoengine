@@ -16,6 +16,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   box (cone rotation motor within 0.03 rad of its spherical joint; multibody pendulums within 5 cm over a second). Capability
   evidence only, no speed claim; reproduce with `node --test packages/physics/tests/next-*.test.js`.
 
+- Own physics solver replaces Rapier in 3D (2026-11-24): `@margoengine/physics`, `@margoengine/ragdoll`, `@margoengine/react`,
+  `@margoengine/game` and `margoengine` import no Rapier, ship no Rapier Wasm and install no peer for it; the kernel is a
+  lazy chunk of the physics entry (168,164 B gzip, base 39,722 B) where Rapier was a 1,176,707 B gzip Wasm and a 42,407 B
+  chunk. Open parity gaps are in `docs/known-bugs.md` (KB-PHYS-SWITCH-*); reproduce with `npm test --workspace
+  @margoengine/physics`, `@margoengine/ragdoll`, `@margoengine/react` and `@margoengine/game`.
 - Own physics collision kernel (2026-11-24): the shapes, queries, events, filters and hooks of Rapier 3D's public user
   guide are listed row by row in [the parity table](../physics-collision-parity.md), each row marked full only where a
   test proves it. The new shapes and queries are checked against Rapier 0.21 as a black box (rest heights, ray and cast

@@ -2,7 +2,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { LoadOnce } from '../../shared/load-once.js';
 import type { Quat, Vec3 } from './math.js';
-import { kernelColumns, wasmBase64 } from './wasm.js';
 
 interface KernelExports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -560,8 +559,13 @@ const bodyKinds: Readonly<Record<KernelBodyKind, number>> = {
   kinematicVelocity: 6,
 };
 
+// The blueprint (the deflated kernel and its column table) is a chunk of its own: an app that imports the entry but never
+// calls `Physics.load()` does not download it.
+let kernelColumns: readonly (readonly [string, 'f' | 'u', number])[] = [];
 const compiled = new LoadOnce<WebAssembly.Module>(async () => {
-  const bytes = Uint8Array.from(atob(wasmBase64), (c) => c.charCodeAt(0));
+  const blueprint = await import('./wasm.js');
+  kernelColumns = blueprint.kernelColumns;
+  const bytes = Uint8Array.from(atob(blueprint.wasmBase64), (c) => c.charCodeAt(0));
   return WebAssembly.compile(
     await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(),
   );

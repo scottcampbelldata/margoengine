@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 // Let Vite prepare the test's optional dependencies before any scene mounts.
 // Discovering these after a lazy component loads would reload the running page.
 import 'react-dom';
-import '@dimforge/rapier3d-compat';
 import { Engine, engineRuntime, type Mesh as RuntimeMesh } from '@margoengine/core/extension';
 import {
   Canvas,
@@ -571,7 +570,7 @@ async function removeFeatures() {
     mode === 'physics' &&
     (!world.isDisposed || [body, fbxAutoBody, fbxExplicitBody, ballBody].some((value) => value?.valid))
   )
-    throw new Error('RigidBody collider removal leaked a live Rapier body/world');
+    throw new Error('RigidBody collider removal leaked a live physics body or world');
   await draw();
   return snapshot();
 }

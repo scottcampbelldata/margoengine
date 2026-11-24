@@ -1,14 +1,18 @@
 // Speed caps of the own solver: a body never moves faster than its cap, keeps its direction, and replays bit for bit.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const speed = (v) => Math.hypot(v[0], v[1], v[2]);
 
 test('a linear cap cuts speed and keeps direction', async () => {
   await Physics.load();
   const physics = new Physics(null, { gravity: [0, 0, 0] });
-  const body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5 }, maxLinearSpeed: 5, linearVelocity: [30, 40, 0] });
+  const body = physics.addBody(null, {
+    colliders: { shape: 'sphere', radius: 0.5 },
+    maxLinearSpeed: 5,
+    linearVelocity: [30, 40, 0],
+  });
   assert.equal(body.maxLinearSpeed, 5);
   physics.step();
   const v = body.linearVelocity;
@@ -20,7 +24,11 @@ test('a linear cap cuts speed and keeps direction', async () => {
 test('a body under force stops gaining speed at its cap, and an angular cap holds a torque', async () => {
   await Physics.load();
   const physics = new Physics(null, { gravity: [0, 0, 0] });
-  const body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5 }, maxLinearSpeed: 3, maxAngularSpeed: 2 });
+  const body = physics.addBody(null, {
+    colliders: { shape: 'sphere', radius: 0.5 },
+    maxLinearSpeed: 3,
+    maxAngularSpeed: 2,
+  });
   for (let i = 0; i < 120; i++) {
     body.addForce([100, 0, 0]);
     body.addTorque([0, 50, 0]);
@@ -44,7 +52,12 @@ test('no cap by default, Infinity clears one, bad values throw, a cap never touc
   assert.throws(() => (body.maxLinearSpeed = 0), RangeError);
   assert.throws(() => (body.maxAngularSpeed = NaN), RangeError);
   assert.throws(() => (body.maxAngularSpeed = -1), RangeError);
-  const kin = physics.addBody(null, { type: 'kinematicVelocity', colliders: [], linearVelocity: [50, 0, 0], maxLinearSpeed: 1 });
+  const kin = physics.addBody(null, {
+    type: 'kinematicVelocity',
+    colliders: [],
+    linearVelocity: [50, 0, 0],
+    maxLinearSpeed: 1,
+  });
   physics.step();
   assert.ok(Math.abs(kin.linearVelocity[0] - 50) < 1e-3);
   physics.dispose();
@@ -54,8 +67,19 @@ test('capped worlds replay bit for bit', async () => {
   await Physics.load();
   const run = () => {
     const physics = new Physics(null);
-    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
-    physics.addBody(null, { position: [0, 20, 0], maxLinearSpeed: 4, maxAngularSpeed: 1, linearVelocity: [3, 0, 2], angularVelocity: [5, 5, 5], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+    });
+    physics.addBody(null, {
+      position: [0, 20, 0],
+      maxLinearSpeed: 4,
+      maxAngularSpeed: 1,
+      linearVelocity: [3, 0, 2],
+      angularVelocity: [5, 5, 5],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    });
     for (let i = 0; i < 240; i++) physics.step();
     const hash = physics.kernel.hash;
     physics.dispose();

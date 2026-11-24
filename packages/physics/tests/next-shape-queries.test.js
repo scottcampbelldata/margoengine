@@ -3,8 +3,8 @@
 // kernel/tests/cast.rs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics as RapierPhysics } from '../dist/index.js';
-import { Physics } from '../dist/next.js';
+import { RapierPhysics } from './oracle.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};
@@ -30,10 +30,20 @@ const sceneShapes = [
   { shape: 'box', halfExtents: [0.5, 0.3, 0.8] },
   { shape: 'capsule', radius: 0.3, halfHeight: 0.6 },
   { shape: 'convexHull', points: hullPoints },
-  { shape: 'trimesh', vertices: Float32Array.from([-1, 0, -1, 1, 0, -1, 0, 0.5, 1, 0, -0.5, 0]), indices: Uint32Array.from([0, 1, 2, 0, 3, 1]) },
+  {
+    shape: 'trimesh',
+    vertices: Float32Array.from([-1, 0, -1, 1, 0, -1, 0, 0.5, 1, 0, -0.5, 0]),
+    indices: Uint32Array.from([0, 1, 2, 0, 3, 1]),
+  },
   { shape: 'heightfield', rows: 4, columns: 4, heights, scale: [3, 1, 3] },
   { shape: 'voxels', cells: Int32Array.from([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1]), size: [0.4, 0.4, 0.4] },
-  { shape: 'compound', parts: [{ shape: 'box', halfExtents: [0.3, 0.3, 0.3] }, { shape: 'sphere', radius: 0.4, offset: [0.8, 0, 0] }] },
+  {
+    shape: 'compound',
+    parts: [
+      { shape: 'box', halfExtents: [0.3, 0.3, 0.3] },
+      { shape: 'sphere', radius: 0.4, offset: [0.8, 0, 0] },
+    ],
+  },
 ];
 /** The shapes placed and turned at random, each on its own body. */
 const scene = (physics) => {
@@ -43,7 +53,14 @@ const scene = (physics) => {
   for (let i = 0; i < 32; i++) {
     // Fixed and kinematic bodies only, so shapes placed overlapping are not pushed apart differently by the two solvers.
     const colliders = { ...sceneShapes[i % sceneShapes.length], sensor: i % 9 === 4 };
-    bodies.push(physics.addBody(null, { type: i % 2 ? 'kinematicPosition' : 'fixed', position: at(), rotation: unitQuat(next), colliders }));
+    bodies.push(
+      physics.addBody(null, {
+        type: i % 2 ? 'kinematicPosition' : 'fixed',
+        position: at(),
+        rotation: unitQuat(next),
+        colliders,
+      }),
+    );
   }
   physics instanceof Physics ? physics.step() : physics.update(1 / 60);
   return bodies;
@@ -77,7 +94,8 @@ const octahedron = (v) => {
   }
   return v.map((x) => Math.sign(x) * Math.max(Math.abs(x) - theta, 0));
 };
-const near = (a, b, tolerance, what) => assert.ok(Math.hypot(...a.map((v, k) => v - b[k])) <= tolerance, `${what}: ${a} against ${b}`);
+const near = (a, b, tolerance, what) =>
+  assert.ok(Math.hypot(...a.map((v, k) => v - b[k])) <= tolerance, `${what}: ${a} against ${b}`);
 const setup = () => {
   const own = new Physics(null),
     rapier = new RapierPhysics(null);
@@ -139,7 +157,8 @@ const hullDistance = (points) => {
     origin = [0, 0, 0];
   let best = Math.min(...points.map((p) => Math.hypot(...p))),
     inside = true;
-  for (let i = 0; i < points.length; i++) for (let j = i + 1; j < points.length; j++) best = Math.min(best, pointSegment(origin, points[i], points[j]));
+  for (let i = 0; i < points.length; i++)
+    for (let j = i + 1; j < points.length; j++) best = Math.min(best, pointSegment(origin, points[i], points[j]));
   const solid = faces(points, tolerance, (i, j, k, side) => {
     best = Math.min(best, pointTriangle(origin, [points[i], points[j], points[k]]));
     if (side(origin) > tolerance) inside = false;
@@ -147,7 +166,8 @@ const hullDistance = (points) => {
   if (!solid)
     for (let i = 0; i < points.length; i++)
       for (let j = i + 1; j < points.length; j++)
-        for (let k = j + 1; k < points.length; k++) best = Math.min(best, pointTriangle(origin, [points[i], points[j], points[k]]));
+        for (let k = j + 1; k < points.length; k++)
+          best = Math.min(best, pointTriangle(origin, [points[i], points[j], points[k]]));
   return solid && inside ? 0 : best;
 };
 /**
@@ -171,7 +191,9 @@ const hullEntry = (points, unit) => {
 const f32 = Math.fround;
 /** The eight corners of a box of half extents `half` about `at`. */
 const boxCorners = (half, at = [0, 0, 0]) =>
-  [-1, 1].flatMap((i) => [-1, 1].flatMap((j) => [-1, 1].map((k) => add(at, [i * f32(half[0]), j * f32(half[1]), k * f32(half[2])]))));
+  [-1, 1].flatMap((i) =>
+    [-1, 1].flatMap((j) => [-1, 1].map((k) => add(at, [i * f32(half[0]), j * f32(half[1]), k * f32(half[2])]))),
+  );
 /** A shape as convex pieces in its frame, each the hull of its points grown by its radius, in the solvers' f32 sizes. */
 const pieces = (shape) => {
   if (shape.shape === 'sphere') return [{ points: [[0, 0, 0]], radius: f32(shape.radius) }];
@@ -188,26 +210,54 @@ const pieces = (shape) => {
     ];
   }
   if (shape.shape === 'box') return [{ points: boxCorners(shape.halfExtents), radius: 0 }];
-  if (shape.shape === 'convexHull') return [{ points: Array.from({ length: shape.points.length / 3 }, (_, i) => [...shape.points.slice(3 * i, 3 * i + 3)]), radius: 0 }];
+  if (shape.shape === 'convexHull')
+    return [
+      {
+        points: Array.from({ length: shape.points.length / 3 }, (_, i) => [...shape.points.slice(3 * i, 3 * i + 3)]),
+        radius: 0,
+      },
+    ];
   if (shape.shape === 'trimesh') {
     const at = (i) => [...shape.vertices.slice(3 * i, 3 * i + 3)];
-    return Array.from({ length: shape.indices.length / 3 }, (_, t) => ({ points: [0, 1, 2].map((k) => at(shape.indices[3 * t + k])), radius: 0 }));
+    return Array.from({ length: shape.indices.length / 3 }, (_, t) => ({
+      points: [0, 1, 2].map((k) => at(shape.indices[3 * t + k])),
+      radius: 0,
+    }));
   }
   if (shape.shape === 'heightfield') {
     const { rows, columns, scale: size } = shape,
-      at = (r, c) => [f32(-size[0] / 2 + (size[0] * c) / columns), f32(shape.heights[r + (rows + 1) * c] * size[1]), f32(-size[2] / 2 + (size[2] * r) / rows)],
+      at = (r, c) => [
+        f32(-size[0] / 2 + (size[0] * c) / columns),
+        f32(shape.heights[r + (rows + 1) * c] * size[1]),
+        f32(-size[2] / 2 + (size[2] * r) / rows),
+      ],
       triangles = [];
     // Each cell is split along the diagonal from row r + 1, column c to row r, column c + 1, as Rapier's height field is.
     for (let c = 0; c < columns; c++)
-      for (let r = 0; r < rows; r++) triangles.push({ points: [at(r, c), at(r + 1, c), at(r, c + 1)], radius: 0 }, { points: [at(r + 1, c), at(r + 1, c + 1), at(r, c + 1)], radius: 0 });
+      for (let r = 0; r < rows; r++)
+        triangles.push(
+          { points: [at(r, c), at(r + 1, c), at(r, c + 1)], radius: 0 },
+          { points: [at(r + 1, c), at(r + 1, c + 1), at(r, c + 1)], radius: 0 },
+        );
     return triangles;
   }
   if (shape.shape === 'voxels') {
     const half = shape.size.map((v) => f32(v) / 2);
-    return Array.from({ length: shape.cells.length / 3 }, (_, i) => ({ points: boxCorners(half, half.map((h, k) => (2 * shape.cells[3 * i + k] + 1) * h)), radius: 0 }));
+    return Array.from({ length: shape.cells.length / 3 }, (_, i) => ({
+      points: boxCorners(
+        half,
+        half.map((h, k) => (2 * shape.cells[3 * i + k] + 1) * h),
+      ),
+      radius: 0,
+    }));
   }
   if (shape.shape === 'compound')
-    return shape.parts.flatMap((part) => pieces(part).map(({ points, radius }) => ({ points: points.map((p) => add(p, part.offset ?? [0, 0, 0])), radius })));
+    return shape.parts.flatMap((part) =>
+      pieces(part).map(({ points, radius }) => ({
+        points: points.map((p) => add(p, part.offset ?? [0, 0, 0])),
+        radius,
+      })),
+    );
   throw new Error(`No reference for the ${shape.shape} shape.`);
 };
 /**
@@ -243,7 +293,8 @@ const reference = (body, index, shape, from, rotation, unit, options) => {
 const gaps = (body, index, shape, from, rotation, unit, t, p) => {
   const inBody = turn(body.rotation, sub(p, body.position), true),
     inQuery = turn(rotation, sub(p, add(from, scale(unit, t))), true),
-    distance = (list, x) => Math.min(...list.map((piece) => hullDistance(piece.points.map((v) => sub(v, x))) - piece.radius));
+    distance = (list, x) =>
+      Math.min(...list.map((piece) => hullDistance(piece.points.map((v) => sub(v, x))) - piece.radius));
   return [distance(pieces(sceneShapes[index % sceneShapes.length]), inBody), distance(pieces(shape), inQuery)];
 };
 /**
@@ -280,20 +331,44 @@ test('a shape cast stops on the same collider as Rapier, at the same distance an
       // Nor is Rapier's earlier stop a touch there.
       const other = rapierBodies.indexOf(theirs.body);
       if (theirs.distance < mine.distance - 1e-4)
-        assert.ok(confirmed(rapierBodies, other, shape, from, rotation, unit, theirs.distance, options) > 5e-5, `cast ${i}: Rapier's touch on body ${other} at ${theirs.distance} is real`);
+        assert.ok(
+          confirmed(rapierBodies, other, shape, from, rotation, unit, theirs.distance, options) > 5e-5,
+          `cast ${i}: Rapier's touch on body ${other} at ${theirs.distance} is real`,
+        );
       settled++;
     }
     if (mine.distance > 0) {
       // The own point is on the collider, the target distance from the query at the touch. Where Rapier's is more than
       // 2 mm from it, either the touch is a patch and both points are on it, or Rapier's is off the query.
       const [body, query] = gaps(rapierBodies[index], index, shape, from, rotation, unit, mine.distance, mine.point);
-      assert.ok(Math.abs(body) < 1e-5 && Math.abs(query - options.targetDistance) < 1e-5, `cast ${i} point ${mine.point}: ${body} from the collider, ${query} from the query`);
+      assert.ok(
+        Math.abs(body) < 1e-5 && Math.abs(query - options.targetDistance) < 1e-5,
+        `cast ${i} point ${mine.point}: ${body} from the collider, ${query} from the query`,
+      );
       if (index === rapierBodies.indexOf(theirs.body) && Math.hypot(...sub(mine.point, theirs.point)) > 2e-3) {
-        const [rapierBody, rapierQuery] = gaps(rapierBodies[index], index, shape, from, rotation, unit, mine.distance, theirs.point);
+        const [rapierBody, rapierQuery] = gaps(
+          rapierBodies[index],
+          index,
+          shape,
+          from,
+          rotation,
+          unit,
+          mine.distance,
+          theirs.point,
+        );
         if (Math.abs(rapierBody) > 1e-4 || Math.abs(rapierQuery - options.targetDistance) > 1e-4) strayPoints++;
       }
-      assert.ok(Math.abs(Math.hypot(...mine.normal) - 1) < 1e-5 && mine.normal.reduce((sum, v, k) => sum + v * unit[k], 0) <= 1e-5, `cast ${i} normal ${mine.normal}`);
-      near(mine.queryNormal, mine.normal.map((v) => -v), 1e-6, `cast ${i} query normal`);
+      assert.ok(
+        Math.abs(Math.hypot(...mine.normal) - 1) < 1e-5 &&
+          mine.normal.reduce((sum, v, k) => sum + v * unit[k], 0) <= 1e-5,
+        `cast ${i} normal ${mine.normal}`,
+      );
+      near(
+        mine.queryNormal,
+        mine.normal.map((v) => -v),
+        1e-6,
+        `cast ${i} query normal`,
+      );
     }
     hits++;
   }
@@ -311,7 +386,10 @@ test('a point projects onto the same collider and point as in Rapier, solid or h
       mine = own.projectPoint(point, options),
       theirs = rapier.projectPoint(point, options);
     assert.ok(mine && theirs, `point ${i}`);
-    assert.ok(Math.abs(mine.distance - theirs.distance) < 1e-4, `point ${i}: ${mine.distance} against ${theirs.distance}`);
+    assert.ok(
+      Math.abs(mine.distance - theirs.distance) < 1e-4,
+      `point ${i}: ${mine.distance} against ${theirs.distance}`,
+    );
     const index = ownBodies.indexOf(mine.body);
     if (index === rapierBodies.indexOf(theirs.body)) {
       assert.equal(mine.inside, theirs.inside, `point ${i} inside`);
@@ -319,7 +397,11 @@ test('a point projects onto the same collider and point as in Rapier, solid or h
       // point strays by up to 1e-3; the hull's is held to its f64 projection instead.
       if (index % 8 === 3 && !mine.inside) {
         const body = mine.body,
-          local = turn(body.rotation, point.map((v, k) => v - body.position[k]), true),
+          local = turn(
+            body.rotation,
+            point.map((v, k) => v - body.position[k]),
+            true,
+          ),
           exact = turn(body.rotation, octahedron(local)).map((v, k) => v + body.position[k]);
         near(mine.point, exact, 1e-5, `point ${i} on the hull`);
         near(theirs.point, exact, 2e-3, `point ${i} Rapier on the hull`);
@@ -356,22 +438,37 @@ test('point and shape overlaps find the same bodies as Rapier', () => {
       if (exact) fields++;
     }
     for (const index of extra) {
-      assert.ok(index % sceneShapes.length === 5 && shape.shape !== 'sphere', `shape ${i} at ${point}: an own overlap with body ${index} that Rapier does not find`);
+      assert.ok(
+        index % sceneShapes.length === 5 && shape.shape !== 'sphere',
+        `shape ${i} at ${point}: an own overlap with body ${index} that Rapier does not find`,
+      );
       missed++;
     }
-    assert.deepEqual(shapes.filter((index) => !extra.includes(index)), rapierShapes, `shape ${i} at ${point}`);
+    assert.deepEqual(
+      shapes.filter((index) => !extra.includes(index)),
+      rapierShapes,
+      `shape ${i} at ${point}`,
+    );
     found += mine.length + shapes.length;
   }
   assert.ok(found > 60, `too few overlaps to mean anything: ${found}`);
   // Rapier's count for this seed, pinned so the record stays exact: it misses every one of the height-field overlaps
   // with a box, capsule or hull. A change means Rapier changed; update the parity rows and this count with it.
-  assert.deepEqual({ fields, missed }, { fields: 30, missed: 17 }, 'height-field overlaps found by the exact reference, and missed by Rapier');
+  assert.deepEqual(
+    { fields, missed },
+    { fields: 30, missed: 17 },
+    'height-field overlaps found by the exact reference, and missed by Rapier',
+  );
 });
 
 test('stopAtPenetration and the filter act as Rapier documents them', () => {
   const own = new Physics(null),
     ball = own.addBody(null, { type: 'fixed', colliders: { shape: 'sphere', radius: 1 } }),
-    far = own.addBody(null, { type: 'fixed', position: [5, 0, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+    far = own.addBody(null, {
+      type: 'fixed',
+      position: [5, 0, 0],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    });
   own.step();
   const probe = { shape: 'sphere', radius: 0.5 },
     out = own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0]);
@@ -382,14 +479,21 @@ test('stopAtPenetration and the filter act as Rapier documents them', () => {
   const on = own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], { stopAtPenetration: false });
   assert.equal(on.body, far);
   assert.ok(Math.abs(on.distance - 3.2) < 1e-4, `${on.distance}`);
-  const bare = own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], { computeImpactGeometryOnPenetration: false });
+  const bare = own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], {
+    computeImpactGeometryOnPenetration: false,
+  });
   assert.deepEqual(bare.normal, [0, 0, 0]);
   assert.equal(own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], { exclude: ball }).body, far);
-  assert.equal(own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], { predicate: (body) => body !== ball }).body, far);
+  assert.equal(
+    own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], { predicate: (body) => body !== ball }).body,
+    far,
+  );
   assert.equal(own.shapeCast(probe, [0.8, 0, 0], [0, 0, 0, 1], [1, 0, 0], { maxDistance: 3 }).body, ball);
   assert.deepEqual(own.intersectPoint([0.2, 0, 0]), [ball]);
   assert.deepEqual(own.intersectPoint([0.2, 0, 0], { excludeFixed: true }), []);
   assert.equal(own.projectPoint([2, 0, 0], { predicate: (body) => body === far }).body, far);
-  assert.throws(() => own.shapeCast({ shape: 'custom', desc: {} }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), { code: 'unsupported' });
+  assert.throws(() => own.shapeCast({ shape: 'custom', desc: {} }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), {
+    code: 'unsupported',
+  });
   assert.throws(() => own.shapeCast(probe, [0, 0, 0], [0, 0, 0, 1], [0, 0, 0]), RangeError);
 });

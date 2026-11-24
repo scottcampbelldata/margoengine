@@ -3,7 +3,7 @@
 // Collision-Aware Concavity and Tree Search", ACM TOG 41(4) 42, 2022 (arXiv 2205.02961), sections 4 and 5.
 //
 // Only + - * / and own roots, so a decomposition repeats bit for bit in every engine for the same seed.
-import { buildHull, root } from '../next/hull.js';
+import { buildHull, root } from '../hull.js';
 
 const PI = 3.141592653589793;
 
@@ -289,7 +289,13 @@ export function cut(solid: Solid, plane: Plane, planeId: number): [Solid, Solid]
 }
 
 /** Chains a side's cut segments into loops and triangulates them in the plane, outer loops with their holes. */
-function capLoops(side: Side, edges: Map<number, [number, number]>, index: number, outward: readonly number[], tag: number): void {
+function capLoops(
+  side: Side,
+  edges: Map<number, [number, number]>,
+  index: number,
+  outward: readonly number[],
+  tag: number,
+): void {
   const [ox, oy, oz] = outward,
     // A basis (u, w) of the plane with u x w along the outward normal, so a cap's outer loop runs counter-clockwise.
     ax = ox < 0 ? -ox : ox,
@@ -360,7 +366,16 @@ const cross = (ax: number, ay: number, bx: number, by: number, cx: number, cy: n
   (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 
 /** Whether segments ab and cd cross at a point inside both. */
-function crosses(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): boolean {
+function crosses(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number,
+): boolean {
   const d1 = cross(ax, ay, bx, by, cx, cy),
     d2 = cross(ax, ay, bx, by, dx, dy),
     d3 = cross(cx, cy, dx, dy, ax, ay),
@@ -394,7 +409,8 @@ function bridge(outer: Loop, holes: Loop[]): Loop {
   const order = holes
     .map((hole) => {
       let best = 0;
-      for (let i = 1; i < hole.x.length; i++) if (hole.x[i] > hole.x[best] || (hole.x[i] === hole.x[best] && hole.y[i] < hole.y[best])) best = i;
+      for (let i = 1; i < hole.x.length; i++)
+        if (hole.x[i] > hole.x[best] || (hole.x[i] === hole.x[best] && hole.y[i] < hole.y[best])) best = i;
       return { hole, best };
     })
     .sort((a, b) => b.hole.x[b.best] - a.hole.x[a.best]);
@@ -428,7 +444,8 @@ function bridge(outer: Loop, holes: Loop[]): Loop {
         left = cross(cx, cy, qx, qy, mx, my) > 0,
         right = cross(px, py, cx, cy, mx, my) > 0;
       if (convex ? !(left && right) : !(left || right)) continue;
-      if (blocked(cx, cy, mx, my, polygon) || [hole, ...pending].some((other) => blocked(cx, cy, mx, my, other))) continue;
+      if (blocked(cx, cy, mx, my, polygon) || [hole, ...pending].some((other) => blocked(cx, cy, mx, my, other)))
+        continue;
       join = c;
       break;
     }
@@ -449,7 +466,8 @@ function bridge(outer: Loop, holes: Loop[]): Loop {
 /** Whether segment ab crosses an edge of a loop away from a and b. */
 function blocked(ax: number, ay: number, bx: number, by: number, loop: Loop): boolean {
   const { x, y } = loop;
-  for (let i = 0, j = x.length - 1; i < x.length; j = i++) if (crosses(ax, ay, bx, by, x[j], y[j], x[i], y[i])) return true;
+  for (let i = 0, j = x.length - 1; i < x.length; j = i++)
+    if (crosses(ax, ay, bx, by, x[j], y[j], x[i], y[i])) return true;
   return false;
 }
 
@@ -498,8 +516,13 @@ function earClip(polygon: Loop, out: number[]): void {
     if (ear)
       for (let j = next[c]; j !== a; j = next[j]) {
         // A vertex at a corner's own position (a bridge end) never blocks it.
-        if ((x[j] === x[a] && y[j] === y[a]) || (x[j] === x[i] && y[j] === y[i]) || (x[j] === x[c] && y[j] === y[c])) continue;
-        if (cross(x[a], y[a], x[i], y[i], x[j], y[j]) >= 0 && cross(x[i], y[i], x[c], y[c], x[j], y[j]) >= 0 && cross(x[c], y[c], x[a], y[a], x[j], y[j]) >= 0) {
+        if ((x[j] === x[a] && y[j] === y[a]) || (x[j] === x[i] && y[j] === y[i]) || (x[j] === x[c] && y[j] === y[c]))
+          continue;
+        if (
+          cross(x[a], y[a], x[i], y[i], x[j], y[j]) >= 0 &&
+          cross(x[i], y[i], x[c], y[c], x[j], y[j]) >= 0 &&
+          cross(x[c], y[c], x[a], y[a], x[j], y[j]) >= 0
+        ) {
           ear = false;
           break;
         }
@@ -592,7 +615,13 @@ function triangleDistance(p: Float64Array, a: number, b: number, c: number, x: n
 }
 
 /** Points sampled evenly on triangles, about `density` per unit area (3,000 in the paper's appendix C). */
-function sample(p: Float64Array, t: Uint32Array, density: number, random: Random, emit: (x: number, y: number, z: number) => void): void {
+function sample(
+  p: Float64Array,
+  t: Uint32Array,
+  density: number,
+  random: Random,
+  emit: (x: number, y: number, z: number) => void,
+): void {
   for (let i = 0; i < t.length; i += 3) {
     const a = t[i] * 3,
       b = t[i + 1] * 3,
@@ -652,7 +681,8 @@ class Grid {
       const c0 = lo.map((v, a) => this.cell(v, a)),
         c1 = hi.map((v, a) => this.cell(v, a));
       for (let i = c0[0]; i <= c1[0]; i++)
-        for (let j = c0[1]; j <= c1[1]; j++) for (let k = c0[2]; k <= c1[2]; k++) this.cells[(i * this.res + j) * this.res + k].push(f);
+        for (let j = c0[1]; j <= c1[1]; j++)
+          for (let k = c0[2]; k <= c1[2]; k++) this.cells[(i * this.res + j) * this.res + k].push(f);
     }
   }
   cell(v: number, a: number): number {
@@ -675,11 +705,27 @@ class Grid {
         for (let j = cj - ring; j <= cj + ring; j++)
           for (let k = ck - ring; k <= ck + ring; k++) {
             if (i < 0 || j < 0 || k < 0 || i >= this.res || j >= this.res || k >= this.res) continue;
-            if (i !== ci - ring && i !== ci + ring && j !== cj - ring && j !== cj + ring && k !== ck - ring && k !== ck + ring) continue;
+            if (
+              i !== ci - ring &&
+              i !== ci + ring &&
+              j !== cj - ring &&
+              j !== cj + ring &&
+              k !== ck - ring &&
+              k !== ck + ring
+            )
+              continue;
             for (const f of this.cells[(i * this.res + j) * this.res + k]) {
               if (this.stamp[f] === q) continue;
               this.stamp[f] = q;
-              const d = triangleDistance(this.p, this.t[f * 3] * 3, this.t[f * 3 + 1] * 3, this.t[f * 3 + 2] * 3, x, y, z);
+              const d = triangleDistance(
+                this.p,
+                this.t[f * 3] * 3,
+                this.t[f * 3 + 1] * 3,
+                this.t[f * 3 + 2] * 3,
+                x,
+                y,
+                z,
+              );
               if (d < best) {
                 best = d;
                 if (best < enough) return best;

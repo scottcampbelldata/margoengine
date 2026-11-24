@@ -19,7 +19,16 @@ const runtimes = ['./jsx-runtime', './jsx-dev-runtime'];
 const expected = {
   './test': ['TestRenderer', 'act', 'createTestRenderer'],
   './offscreen': ['OffscreenCanvas'],
-  './effects-extra': ['Decal', 'Edges', 'ScreenQuad', 'Sparkles', 'Stars', 'Trail', 'Wireframe', 'screenQuadVertexShader'],
+  './effects-extra': [
+    'Decal',
+    'Edges',
+    'ScreenQuad',
+    'Sparkles',
+    'Stars',
+    'Trail',
+    'Wireframe',
+    'screenQuadVertexShader',
+  ],
   './portals': ['Hud', 'RenderTexture', 'useDepthBuffer', 'useFBO'],
   './controls-extra': [
     'KeyboardControls',
@@ -487,8 +496,6 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
       '/sky/',
       '/text/',
       '/fbx/',
-      'rapier3d',
-      'rapier-solver',
     ])
       assert.equal(
         modules.some((id) => id.includes(fragment)),
@@ -505,15 +512,7 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
       ),
       'only the root, core, the stage and their dependencies are emitted',
     );
-    for (const name of [
-      'fbx',
-      'selection',
-      'shadows',
-      'cameras',
-      'gltf',
-      'creative',
-      'environment',
-    ])
+    for (const name of ['fbx', 'selection', 'shadows', 'cameras', 'gltf', 'creative', 'environment'])
       assert.equal(
         emitted.some((id) => id.includes(`/packages/${name}/`)),
         false,
@@ -537,18 +536,7 @@ test('an unused binding of the one-install entry emits nothing: preload is not a
   export const Cube=()=>h(Canvas,null,h(Mesh,null,h(BoxGeometry),h(PbrMaterial)));`,
     );
     const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
-    for (const name of [
-      'gltf',
-      'fbx',
-      'environment',
-      'html',
-      'text',
-      'sky',
-      'geometry',
-      'post',
-      'shadows',
-      'decoders',
-    ])
+    for (const name of ['gltf', 'fbx', 'environment', 'html', 'text', 'sky', 'geometry', 'post', 'shadows', 'decoders'])
       assert.equal(
         emitted.some((id) => id.includes(`/packages/${name}/`)),
         false,
@@ -614,7 +602,11 @@ test('an Environment without children loads none of the capture binding, CubeCam
           .map((chunk) => chunk.code)
           .join('\n'),
         code = outputs.map((chunk) => chunk.code).join('\n');
-      for (const marker of ['function CubeCamera(', 'function EnvironmentCapture(', ...(children ? [] : ['function Lightformer('])])
+      for (const marker of [
+        'function CubeCamera(',
+        'function EnvironmentCapture(',
+        ...(children ? [] : ['function Lightformer(']),
+      ])
         assert.equal(initial.includes(marker), false, `${name}: ${marker} stays off the initial chunk graph`);
       assert.ok(code.includes('function EnvironmentCapture('), `${name}: the capture binding is a lazy chunk`);
       assert.equal(code.includes('function Lightformer('), children, `${name}: Lightformer is emitted only when used`);
@@ -675,8 +667,6 @@ test('Vite optional entry includes requested bindings while keeping their native
       '/packages/xr/',
       '/packages/text/',
       '/packages/gltf/',
-      'rapier3d',
-      'rapier-solver',
     ])
       assert.equal(
         modules.some((id) => id.includes(fragment)),
@@ -690,7 +680,6 @@ test('Vite optional entry includes requested bindings while keeping their native
       '/packages/xr/',
       '/packages/text/',
       '/packages/gltf/',
-      'rapier-solver',
     ])
       assert.ok(
         all.some((id) => id.includes(fragment)),

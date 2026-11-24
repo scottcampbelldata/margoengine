@@ -1,7 +1,7 @@
 // A collider edited after it was made: its pose in the body's frame, and its whole shape.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { KernelWorld, Physics, convexHull, loadKernel } from '../dist/next.js';
+import { KernelWorld, Physics, convexHull, loadKernel } from '../dist/index.js';
 
 await Physics.load();
 
@@ -48,7 +48,9 @@ function clouds() {
   sets.grid = grid;
   // The grid turned and rounded, so its faces hold points a rounding off their planes.
   const [c, s] = [Math.cos(0.3), Math.sin(0.3)];
-  sets['turned grid'] = f32(grid.flatMap((_, i) => (i % 3 ? [] : [c * grid[i] - s * grid[i + 1], s * grid[i] + c * grid[i + 1], grid[i + 2]])));
+  sets['turned grid'] = f32(
+    grid.flatMap((_, i) => (i % 3 ? [] : [c * grid[i] - s * grid[i + 1], s * grid[i] + c * grid[i + 1], grid[i + 2]])),
+  );
   sets['far grid'] = f32(grid.map((value) => value + 1000));
   sets['tiny grid'] = f32(grid.map((value) => value * 1e-3));
   for (const sides of [3, 7, 64, 255, 256]) {
@@ -133,7 +135,9 @@ test('every hull holds its points, reaches its farthest ones, and the kernel tak
     assert.ok(gap <= 3e-5, `${name}: the hull falls ${gap} of the size short of its points`);
     assert.ok(kernel.addHull(hull.vertices, hull.faces) >= 0, `${name}: the kernel refused it`);
   }
-  console.log(`hulls: worst point outside ${worstOutside.toExponential(2)}, worst support gap ${worstGap.toExponential(2)} of the size`);
+  console.log(
+    `hulls: worst point outside ${worstOutside.toExponential(2)}, worst support gap ${worstGap.toExponential(2)} of the size`,
+  );
 });
 
 /** The points of `given` in an order drawn from `r`. */
@@ -210,7 +214,11 @@ test('points that span no volume are refused with the fix', () => {
 /** A floor and one hull body dropped onto it. */
 function drop(points, options = {}) {
   const physics = new Physics(null),
-    floor = physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } }),
+    floor = physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+    }),
     body = physics.addBody(null, { position: [0, 3, 0], colliders: { shape: 'convexHull', points, ...options } });
   return { physics, floor, body };
 }
@@ -250,7 +258,10 @@ test('mass sets the density from the hull volume, and the same points share one 
   assert.ok(Math.abs(a.mass - 3) < 1e-5, `mass ${a.mass}`);
   // Volume 1/6 at the default density of 1.
   assert.ok(Math.abs(b.mass - 1 / 6) < 1e-6, `mass ${b.mass}`);
-  assert.equal(physics.kernel.columns.colliderHull[a.colliders[0].handle], physics.kernel.columns.colliderHull[b.colliders[0].handle]);
+  assert.equal(
+    physics.kernel.columns.colliderHull[a.colliders[0].handle],
+    physics.kernel.columns.colliderHull[b.colliders[0].handle],
+  );
   physics.dispose();
 });
 
@@ -267,7 +278,7 @@ test('a hull without points is the hull of the given geometry, scaled with the m
 // replaced, 5e-15 times the product of the three L1 lengths, called a point 2e-15 above a face spanned by 4 by 4 in
 // plane not above it, though its volume of 3.2e-14 is exact (every other product is zero); the paper bounds it by 2.5e-29.
 test('a point a hair above a face counts as above it, and rounding noise never does', async () => {
-  const { beyond } = await import('../src/next/hull.ts');
+  const { beyond } = await import('../src/hull.ts');
   assert.equal(beyond(4, 0, 0, 0, 4, 0, 3, 3, 2e-15), true, 'an exact volume of 3.2e-14 is above the bound');
   assert.equal(beyond(0, 4, 0, 4, 0, 0, 3, 3, 2e-15), false, 'the same corners the other way round are below');
   assert.equal(beyond(4, 0, 0, 0, 4, 0, 3, 3, 0), false, 'a point in the plane is not above');

@@ -640,14 +640,6 @@ export const LAZY_FILES = [
   },
   // Third-party Wasm runtimes.
   {
-    package: '@margoengine/physics',
-    file: 'packages/physics/dist/rapier3d.wasm',
-    label: 'rapier3d.wasm',
-    kind: 'Rapier Wasm (@dimforge/rapier3d, bundled)',
-    measure: 'file',
-    when: '`await Physics.load()`, once per app, compiled while it downloads; its JavaScript is the lazy rapier-solver chunk of the entry',
-  },
-  {
     package: '@margoengine/physics2d',
     file: 'packages/physics2d/dist/physics2d.wasm',
     label: 'physics2d.wasm',
@@ -804,7 +796,7 @@ export const LAZY_SPLITS = [
     chunk: /^tornado-shader-/,
     lazyLabel: 'tornado shader',
     source: 'packages/sky/src/tornado-shader.ts',
-    baseLabel: 'everything a page reading a Tornado\'s wind and rain loads',
+    baseLabel: "everything a page reading a Tornado's wind and rain loads",
     when: 'the first frame of a TornadoCloud (import() in tornado.ts)',
   },
   {
@@ -812,11 +804,11 @@ export const LAZY_SPLITS = [
     entry: '.',
     specifier: '@margoengine/physics',
     dist: 'packages/physics/dist/index.js',
-    chunk: /^rapier-solver-/,
-    lazyLabel: 'Rapier solver JavaScript',
-    source: 'packages/physics/src/rapier-solver.ts',
+    chunk: /^wasm-/,
+    lazyLabel: 'physics kernel (deflated Wasm blueprint and its column table)',
+    source: 'packages/physics/src/wasm.ts',
     baseLabel: 'everything the entry loads before <code>Physics.load()</code>',
-    when: '`await Physics.load()`, once per app (import() in physics.ts); its Wasm, rapier3d.wasm, is a file of its own',
+    when: '`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own',
   },
   {
     package: 'physics2d',

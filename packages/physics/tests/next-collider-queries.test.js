@@ -2,7 +2,7 @@
 // answers are the world query's, limited to that collider, and a query sees a pose written by hand at once.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

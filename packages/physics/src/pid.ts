@@ -1,6 +1,6 @@
 // A PID controller for bodies of the own solver: it turns where a body is, and how fast it moves, into the impulse that
 // drives it toward a target pose. Only + - * / on the values it holds, so a controller replays bit for bit.
-import { checkVec, type Quat, type Vec3 } from '../math.js';
+import { checkVec, type Quat, type Vec3 } from './math.js';
 import { checkRotation, type PhysicsBody } from './body.js';
 
 /** Gains and axes of a {@link PidController}. */
@@ -17,11 +17,13 @@ export interface PidOptions {
 
 function gain(value: number | undefined, name: string, fallback: number): number {
   const v = value ?? fallback;
-  if (!(v >= 0) || v === Infinity) throw new RangeError(`PID ${name} must be a finite number of at least 0; got ${value}.`);
+  if (!(v >= 0) || v === Infinity)
+    throw new RangeError(`PID ${name} must be a finite number of at least 0; got ${value}.`);
   return v;
 }
 function checkStep(dt: number): void {
-  if (!(dt > 0) || dt === Infinity) throw new RangeError(`PID dt must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
+  if (!(dt > 0) || dt === Infinity)
+    throw new RangeError(`PID dt must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
 }
 
 /**
@@ -71,7 +73,12 @@ export class PidController {
    * The acceleration that drives `body` to the `target` position, with `targetVelocity` the speed it should have there
    * (default at rest), in m/s². Moves the integral on by one step.
    */
-  linearCorrection(dt: number, body: PhysicsBody, target: Vec3, targetVelocity: Vec3 = [0, 0, 0]): [number, number, number] {
+  linearCorrection(
+    dt: number,
+    body: PhysicsBody,
+    target: Vec3,
+    targetVelocity: Vec3 = [0, 0, 0],
+  ): [number, number, number] {
     checkStep(dt);
     checkVec(target, 'PID target position');
     checkVec(targetVelocity, 'PID target velocity');
@@ -98,7 +105,12 @@ export class PidController {
    * target, taken the short way: the turn's angle in radians to within 0.1 percent below 0.1 radian, and 2 sin(angle / 2)
    * beyond, so a large error asks a little less than its angle, never more.
    */
-  angularCorrection(dt: number, body: PhysicsBody, target: Quat, targetAngularVelocity: Vec3 = [0, 0, 0]): [number, number, number] {
+  angularCorrection(
+    dt: number,
+    body: PhysicsBody,
+    target: Quat,
+    targetAngularVelocity: Vec3 = [0, 0, 0],
+  ): [number, number, number] {
     checkStep(dt);
     checkRotation(target);
     checkVec(targetAngularVelocity, 'PID target angular velocity');

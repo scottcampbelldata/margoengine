@@ -2,7 +2,7 @@
 // swing and twist limits keep acting.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const about = (axis, angle) => {
   const s = Math.sin(angle / 2);
@@ -11,8 +11,18 @@ const about = (axis, angle) => {
 const rod = (options = {}) => {
   const physics = new Physics(null, { gravity: [0, 0, 0] });
   const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    body = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
-    joint = physics.addJoint(top, body, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4], ...options });
+    body = physics.addBody(null, {
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 },
+    }),
+    joint = physics.addJoint(top, body, {
+      type: 'cone',
+      anchorB: [0, 0.5, 0],
+      axis: [0, -1, 0],
+      swing: 0.5,
+      twist: [-0.4, 0.4],
+      ...options,
+    });
   return { physics, body, joint };
 };
 // The angle between the rod's own axis and straight down, from its rotation.
@@ -51,7 +61,10 @@ test('the limits win when the target lies outside the cone, and the twist stops 
   const over = rod();
   over.joint.setRotationMotor(about([1, 0, 0], 1.2), gains);
   run(over.physics, 300);
-  assert.ok(Math.abs(Math.abs(twistOf(over.body.rotation)) - 0.4) < 0.01, `twist ${twistOf(over.body.rotation)} stops at 0.4`);
+  assert.ok(
+    Math.abs(Math.abs(twistOf(over.body.rotation)) - 0.4) < 0.01,
+    `twist ${twistOf(over.body.rotation)} stops at 0.4`,
+  );
   for (const w of [swung, twisted, over]) w.physics.dispose();
 });
 
@@ -63,7 +76,10 @@ test('maxForce caps the drive, a target velocity leads a moving target, and clea
   capped.joint.setRotationMotor(about([0, 0, 1], 0.4), { ...gains, maxForce: 0.01 });
   run(free.physics, 8);
   run(capped.physics, 8);
-  assert.ok(swingOf(capped.body.rotation) < 0.2 * swingOf(free.body.rotation), `${swingOf(capped.body.rotation)} against ${swingOf(free.body.rotation)}`);
+  assert.ok(
+    swingOf(capped.body.rotation) < 0.2 * swingOf(free.body.rotation),
+    `${swingOf(capped.body.rotation)} against ${swingOf(free.body.rotation)}`,
+  );
   free.joint.clearMotor();
   run(free.physics, 60);
   const settled = swingOf(free.body.rotation);

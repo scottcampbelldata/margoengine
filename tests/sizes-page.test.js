@@ -153,7 +153,6 @@ test('sizes page lists every file loaded later, with its measured bytes and the 
   for (const name of [
     'draco_decoder.wasm',
     'basis_transcoder.wasm',
-    'rapier3d.wasm',
     'web-ifc.wasm',
     'gltf.js',
     'decoder.worker.js',

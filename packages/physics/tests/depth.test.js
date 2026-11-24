@@ -1,29 +1,16 @@
-// Ropes, spring and rope joints, compound and convex-decomposition colliders, and ray-cast vehicles, against real Rapier.
+// Ropes, spring and rope joints, compound and convex-decomposition colliders, and ray-cast vehicles, against the real solver.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Physics, Rope, Vehicle } from '../dist/index.js';
+import { convexDecomposition } from '../dist/decomposition.js';
 
-const rapierDir = process.env.MARGOENGINE_RAPIER
-  ? resolve(process.env.MARGOENGINE_RAPIER)
-  : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/', import.meta.url));
-const rapierEntry = resolve(rapierDir, 'dist/rapier.mjs');
-let RAPIER = null;
-if (existsSync(rapierEntry)) {
-  RAPIER = (await import(pathToFileURL(rapierEntry).href)).default;
-  const warn = console.warn;
-  console.warn = () => {};
-  await RAPIER.init();
-  console.warn = warn;
-}
-const skip = RAPIER
-  ? false
-  : 'Rapier not found: set MARGOENGINE_RAPIER to an installed @dimforge/rapier3d-compat package';
-const rtest = (name, fn) => test(name, { skip }, fn);
+const warn = console.warn;
+console.warn = () => {};
+await Physics.load();
+console.warn = warn;
+const rtest = test;
 
-const create = (options = {}) => new Physics(null, { rapier: RAPIER, ...options });
+const create = (options = {}) => new Physics(null, options);
 const floor = (physics) =>
   physics.addBody(null, {
     type: 'fixed',
@@ -245,7 +232,7 @@ rtest('convex decomposition keeps a dynamic cup hollow where a convex hull fills
     const { vertices, indices } = cup();
     const body = physics.addBody(null, {
       position: [0, 0, 0],
-      colliders: shape === 'convexHull' ? { shape, points: vertices } : { shape, vertices, indices },
+      colliders: shape === 'convexHull' ? { shape, points: vertices } : convexDecomposition({ vertices, indices }),
     });
     const marble = physics.addBody(null, { position: [0, 2, 0], colliders: { shape: 'sphere', radius: 0.2 } });
     steps(physics, 300);
@@ -262,13 +249,10 @@ rtest('convex decomposition keeps a dynamic cup hollow where a convex hull fills
 
   const physics = create();
   const body = physics.addBody(null, { colliders: [] });
+  // The mesh itself is not taken: decomposing is build-time work in its own entry, so a world never loads it.
   assert.throws(
-    () => body.addCollider({ shape: 'convexDecomposition', vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0] }),
-    /indices/,
-  );
-  assert.throws(
-    () => body.addCollider({ shape: 'convexDecomposition', vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 3] }),
-    /out of range/,
+    () => body.addCollider({ shape: 'convexDecomposition', vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
+    { code: 'unsupported', message: /@margoengine\/physics\/decomposition/ },
   );
   physics.dispose();
 });

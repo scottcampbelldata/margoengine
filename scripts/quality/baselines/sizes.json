@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17356211,
+  "total": 17477739,
   "history": [
     {
       "date": "2026-10-24",
@@ -11331,6 +11331,18 @@
       "commit": "f5bab77b4",
       "reason": "physics/next 217917 to 221883 B gzip: multibody joints with inverse kinematics (about 3 KB of TypeScript: coordinates, forward and inverse kinematics) and 1 KB of Wasm for the joint-space projection; a split into a lazy entry would cost a second import for every ragdoll, which needs them. physics2d entries recorded as measured on public main.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "495173ef2",
+      "reason": "@margoengine/physics now ships its own Rust kernel inside the entry: 61,380 B gzip (the TypeScript wrapper without the solver; Rapier's Wasm and chunk were a separate download of 1,176,707 B and 42,407 B gzip) to 227,136 B, of which 46,062 B is the entry and 181,201 B the lazy kernel blueprint (the deflated Wasm and its column table) that Physics.load() imports. The kernel is the solver, so the bytes are the engine's own; the blueprint is already a lazy chunk, so a further split would only add a request.",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "786ffce7e",
+      "reason": "@margoengine/physics lazy kernel blueprint 186,638 B to 186,944 B gzip: the kernel's tree-solved multibody joints, merged with the switch; the entry total is the one recorded with the switch (Rapier's download of 1,176,707 B and 42,407 B gzip is gone).",
+      "grew": 1
     }
   ],
   "items": {
@@ -12086,11 +12098,10 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 61380,
-    "@margoengine/physics base (without Rapier solver JavaScript)": 21396,
-    "@margoengine/physics lazy Rapier solver JavaScript": 41104,
+    "@margoengine/physics": 233951,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 47444,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 192553,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/next": 228540,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

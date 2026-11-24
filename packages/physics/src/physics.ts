@@ -1,34 +1,60 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+// The own solver behind the names `Physics` has today. On the step path: no `Math`, tests/step-path.test.js holds that.
 import { MargoError } from '@margoengine/math/errors';
-import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from './rapier-types.js';
-import { PhysicsCollider } from './collider.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
-import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
-import { SharedLoad } from '../../shared/shared-load.js';
-import type { RapierWasmSource } from './rapier-solver.js';
-import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
-import { CharacterController, type CharacterControllerOptions } from './character.js';
-import { PhysicsJoint, createJointData, type JointDof, type JointOptions } from './joints.js';
-import { checkVec, eulerToQuat, quat, tuple, vec, type Quat, type Vec3 } from './math.js';
+import type { BodyOptions, BodyType } from './body.js';
 import {
-  configureCollider,
-  createColliderDesc,
-  shapeName,
-  shapeSupported,
-  type ColliderOptions,
-  type ColliderSettings,
-  type RapierModule,
-  type ShapeOptions,
-} from './shapes.js';
-import { colliderGeometry, depthOf, parentOf } from './mesh-fit.js';
-import { matrixRotation, matrixScale, worldMatrix, type TransformStoreLike } from './transform.js';
-import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
+  COLLIDER_OFF,
+  COLLIDER_MODIFY,
+  COLLIDER_SENSOR,
+  EVENT_COLLIDER,
+  EVENT_SENSOR,
+  KernelWorld,
+  loadKernel,
+  PAIR_IS_PART,
+  QUERY_EXCLUDE_DYNAMIC,
+  QUERY_EXCLUDE_FIXED,
+  QUERY_EXCLUDE_KINEMATIC,
+  QUERY_EXCLUDE_SENSORS,
+  QUERY_EXCLUDE_SOLIDS,
+  QUERY_ONLY_DYNAMIC,
+  QUERY_ONLY_FIXED,
+  QUERY_ONLY_KINEMATIC,
+  type KernelRayHit,
+  type KernelShapeCastHit,
+  type KernelLoadOptions,
+  type KernelShape,
+  type KernelSolverOptions,
+} from './kernel.js';
+import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
+import { multiplyMatrices } from '@margoengine/math/mat4';
+import { checkVec, type Quat, type Vec3 } from './math.js';
+import { matrixRotation, worldMatrix } from './transform.js';
 import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
+import { colliderGeometry } from './mesh-fit.js';
+import type { ColliderOptions, ColliderSettings, ShapeOptions } from './shapes.js';
+import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
+import { PhysicsCollider } from './collider.js';
+import { CharacterController, type CharacterControllerOptions } from './character.js';
+import { type Multibody, buildMultibody, clearMultibody, type MultibodyLinkOptions } from './multibody.js';
+import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
+import { type NextJointOptions, type PhysicsJoint, createJoint } from './joints.js';
+import {
+  PI,
+  cosine,
+  kernelCollider,
+  multiply,
+  queryParts,
+  queryShape,
+  root,
+  shapeServed,
+  turn,
+  type HullRows,
+} from './kernel-shapes.js';
+import { MeshSync, meshPose } from './sync.js';
 
 /** Options for creating a Physics world; every field has a default. */
 export interface PhysicsOptions {
-  /** A Rapier module you initialized yourself. Default: the one `Physics.load()` loaded. */
-  rapier?: RapierModule;
   /** Default [0, -9.81, 0]. */
   gravity?: Vec3;
   /** Seconds per physics step (default 1/60). */
@@ -41,30 +67,119 @@ export interface PhysicsOptions {
   timeScale?: number;
   /** Start paused (default false). */
   paused?: boolean;
-  /** Solver iterations per step (Rapier default 4). */
+  /** Equal pieces each step is split into; forces reach every piece and impulses land once (default 8). */
+  substeps?: number;
+  /** Solver passes in each substep (default 2). */
+  iterations?: number;
+  /** The old name of `substeps`, kept for one release. */
   solverIterations?: number;
-  /** Return false to make a pair of bodies pass through each other (and suppress sensor events). Runs for every candidate pair, so keep it cheap. */
-  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
   /** Plugin name (default 'physics'). */
   name?: string;
+  /** Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet. */
+  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+  /**
+   * Called for each touching pair that has a collider with `modifyContacts` set, after its friction and bounce are set and
+   * before it is solved, each step: change its friction, restitution and normal, or clear its contacts (a one-way platform,
+   * a slippery patch). The object is reused, so keep what you need, not the object.
+   */
+  contactModifier?: (contact: ContactModification) => void;
+  /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04), Rapier's `predictionDistance`. */
+  predictionDistance?: number;
 }
 
-/** Options of {@link Physics.load}. */
-export interface PhysicsLoadOptions {
+/** A touching pair shown to `PhysicsOptions.contactModifier`, valid only inside the call. */
+export class ContactModification {
+  /** @internal */
+  row = 0;
+  /** @internal */
+  colliderA!: PhysicsCollider;
+  /** @internal */
+  colliderB!: PhysicsCollider;
+  /** @internal */
+  constructor(private readonly kernel: KernelWorld) {}
+  /** The pair's first collider; normals run from it to {@link ContactModification.colliderB}. */
+  get first(): PhysicsCollider {
+    return this.colliderA;
+  }
+  /** The pair's second collider. */
+  get second(): PhysicsCollider {
+    return this.colliderB;
+  }
+  /** Coulomb friction of the pair, from the colliders' own and their combine rules; set it to override. */
+  get friction(): number {
+    return this.kernel.columns.pairFriction[this.row];
+  }
+  set friction(value: number) {
+    if (!(value >= 0) || !Number.isFinite(value))
+      throw new RangeError(`Friction must be finite and not negative (got ${value}).`);
+    this.kernel.columns.pairFriction[this.row] = value;
+  }
+  /** Restitution of the pair; set it to override. */
+  get restitution(): number {
+    return this.kernel.columns.pairRestitution[this.row];
+  }
+  set restitution(value: number) {
+    if (!(value >= 0 && value <= 1)) throw new RangeError(`Restitution must be from 0 to 1 (got ${value}).`);
+    this.kernel.columns.pairRestitution[this.row] = value;
+  }
   /**
-   * Stops this call's wait. When no other call is waiting on the same load, it also cancels the download, and the next
-   * call starts again.
+   * The velocity the second collider's surface moves relative to the first's, in world space (default zero): a conveyor
+   * belt. Friction brings the bodies' sliding to it, so a box on a belt is carried at the belt's speed. Only its part along
+   * the contact's surface counts, and it lasts for this step: set it each time the modifier is called.
    */
-  signal?: AbortSignal;
+  get surfaceVelocity(): [number, number, number] {
+    const c = this.kernel.columns;
+    return [c.pairSurfaceX[this.row], c.pairSurfaceY[this.row], c.pairSurfaceZ[this.row]];
+  }
+  set surfaceVelocity(value: Vec3) {
+    checkVec(value, 'Surface velocity');
+    const c = this.kernel.columns;
+    [c.pairSurfaceX[this.row], c.pairSurfaceY[this.row], c.pairSurfaceZ[this.row]] = value;
+  }
+  /** How many contact points the pair has. */
+  get contactCount(): number {
+    return this.kernel.columns.pairContacts[this.row];
+  }
+  /** The unit contact normal in world space, from the first collider to the second. */
+  get normal(): [number, number, number] {
+    const c = this.kernel.columns;
+    return [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]];
+  }
+  set normal(value: Vec3) {
+    checkVec(value, 'Contact normal');
+    const squared = value[0] * value[0] + value[1] * value[1] + value[2] * value[2],
+      length = root(squared);
+    if (!(squared > 1e-12)) throw new RangeError('A contact normal needs a direction; pass a vector of some length.');
+    const c = this.kernel.columns;
+    [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]] = [
+      value[0] / length,
+      value[1] / length,
+      value[2] / length,
+    ];
+  }
+  /** Drops every contact of the pair for this step: the bodies pass through each other and push nothing. */
+  clear(): void {
+    this.kernel.columns.pairContacts[this.row] = 0;
+  }
   /**
-   * Where Rapier's Wasm comes from: a URL (a CDN or your own server), a fetched `Response`, its bytes or a compiled
-   * `WebAssembly.Module`. Default: `dist/rapier3d.wasm` beside this package, which bundlers emit as its own file. It must
-   * be the Rapier build this package bundles (`@dimforge/rapier3d` 0.21.0). Calls made while a load runs share that load.
+   * Makes the collider `platform` a one-way platform: contacts whose normal, taken from the platform to the other collider,
+   * lies within `angle` radians (default a quarter turn: the half space above it) of `direction` stay, and the rest are
+   * dropped. A body rising through the underside meets nothing, and standing on top it rests.
+   * @throws RangeError when `platform` is neither collider of the pair.
    */
-  wasm?: RapierWasmSource;
+  oneWay(platform: PhysicsCollider, direction: Vec3, angle = PI / 2): void {
+    checkVec(direction, 'Platform direction');
+    if (platform !== this.colliderA && platform !== this.colliderB)
+      throw new RangeError('That collider is not in this pair; pass colliderA or colliderB of the contact.');
+    const [nx, ny, nz] = this.normal,
+      sign = platform === this.colliderA ? 1 : -1,
+      squared = direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2],
+      length = root(squared);
+    if (!(squared > 0)) throw new RangeError('A platform direction needs some length.');
+    const along = (sign * (nx * direction[0] + ny * direction[1] + nz * direction[2])) / length;
+    if (along < cosine(angle)) this.clear();
+  }
 }
-
-export type { RapierWasmSource };
 
 /** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
 export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
@@ -80,60 +195,126 @@ export interface CollisionEvent {
   /** True when either collider is a sensor (intersection events). */
   sensor: boolean;
 }
-/** Events a Physics world emits, keyed by event name. */
+
+/** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
+export interface ContactForceEvent {
+  type: 'contactforce';
+  bodyA: PhysicsBody;
+  bodyB: PhysicsBody;
+  meshA: Mesh | null;
+  meshB: Mesh | null;
+  colliderA: PhysicsCollider;
+  colliderB: PhysicsCollider;
+  /** The normal impulse of the whole step, in newton seconds. */
+  impulse: number;
+  /** `impulse` over the step's length, in newtons. A box at rest on a floor reads its weight. */
+  force: number;
+}
+
+/** Events a Physics world emits, keyed by event name. `touching` and `contactPoints` read contacts after a step. */
 export interface PhysicsEventMap {
   contactstart: CollisionEvent;
   contactend: CollisionEvent;
   intersectionstart: CollisionEvent;
   intersectionend: CollisionEvent;
-  /** Before each fixed step, with the step length. Drive character controllers and kinematic bodies here. */
+  /** After each step that has a listener, once for each pair of colliders that pressed on each other. */
+  contactforce: ContactForceEvent;
+  /** Before each fixed step, with the step length. Drive kinematic bodies here. */
   beforestep: number;
   afterstep: number;
+  /** After a step in which a joint with break limits broke: once for that joint, with its bodies. */
+  jointbreak: JointBreakEvent;
 }
 
-/** Limits which colliders a scene query can hit. */
+/** A joint that broke under its load. */
+export interface JointBreakEvent {
+  type: 'jointbreak';
+  joint: PhysicsJoint;
+  bodyA: PhysicsBody;
+  bodyB: PhysicsBody;
+}
+
+/** Which colliders a scene query sees: the root entry's names, plus Rapier's flags the root does not name. */
 export interface QueryFilter {
-  /** Packed interaction groups of the query, see `collisionGroups`. */
+  /** Packed interaction groups of the query, see `collisionGroups`; a collider is seen when the groups meet both ways. */
   groups?: number;
-  /** Ignore this body. */
+  /** Leave out every collider of this body. */
   exclude?: PhysicsBody;
+  /** Leave out this one collider. */
+  excludeCollider?: PhysicsCollider;
   excludeSensors?: boolean;
+  /** Leave out colliders that are not sensors. */
+  excludeSolids?: boolean;
   excludeFixed?: boolean;
   excludeKinematic?: boolean;
   excludeDynamic?: boolean;
-  /** Return false to skip a body. */
+  /** See only colliders of dynamic bodies; with other `only` flags, any of the kinds named. */
+  onlyDynamic?: boolean;
+  onlyKinematic?: boolean;
+  onlyFixed?: boolean;
+  /** Return false to skip a collider. */
   predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
 }
 /** Options of `Physics.raycast` and `raycastAll`: the query filter plus a distance limit and solid starts. */
 export interface PhysicsRaycastOptions extends QueryFilter {
   /** Default unbounded. */
   maxDistance?: number;
-  /** Solid shapes report a hit at distance 0 when the ray starts inside (default true). */
+  /** A ray that starts inside a shape hits it at distance 0 (default true); false: where it leaves, the normal facing the ray. */
   solid?: boolean;
 }
-/** A query hit: the body and collider, and how far along the ray or cast it was. */
+/** A query hit: the body and collider, and its mesh. */
 export interface Hit {
   body: PhysicsBody;
   mesh: Mesh | null;
   collider: PhysicsCollider;
 }
-/** A ray hit with its point and surface normal. */
-export interface RaycastHit extends Hit {
+/** A ray hit: the body, its mesh and the collider, how far along the ray, the point and the surface normal. */
+export interface RaycastHit {
+  body: PhysicsBody;
+  mesh: Mesh | null;
+  collider: PhysicsCollider;
   distance: number;
   point: [number, number, number];
+  /** Outward surface normal, world space; zero for a hit at distance 0 inside a solid shape. */
   normal: [number, number, number];
 }
-/** A shape-cast hit with its witness point, normal and time of impact. */
-export interface ShapeCastHit extends Hit {
-  /** Distance travelled along the normalized direction before impact. */
+
+/** Options of `Physics.shapeCast`: the query filter plus Rapier's `ShapeCastOptions`. */
+export interface PhysicsShapeCastOptions extends QueryFilter {
+  /** Default unbounded. */
+  maxDistance?: number;
+  /** Stop this far short of touching (default 0). */
+  targetDistance?: number;
+  /** A cast that starts in contact hits at distance 0 even when it moves out (default true); false lets such a cast go on. */
+  stopAtPenetration?: boolean;
+  /** A hit at the start gets its normal and points (default true); false leaves them zero. */
+  computeImpactGeometryOnPenetration?: boolean;
+}
+/** A shape cast's first touch: the ray hit's fields on the collider hit, plus the point and normal on the cast shape. */
+export interface ShapeCastHit extends RaycastHit {
+  queryPoint: [number, number, number];
+  queryNormal: [number, number, number];
+}
+/** The point of a collider nearest a query point, whether the query point is inside it, and how far it is. */
+/** What {@link Physics.contactPair} returns for one part of a pair: the normal from the first collider to the second. */
+export interface ContactManifold {
+  normal: [number, number, number];
+  /** Up to four points: where each collider's surface is, how far apart they are (negative when they overlap) and an id that stays with the feature. */
+  points: { pointA: [number, number, number]; pointB: [number, number, number]; separation: number; id: number }[];
+}
+
+/** What {@link Physics.colliderDistance} returns. */
+export interface ColliderDistance {
+  /** 0 when the colliders overlap. */
   distance: number;
-  /** Contact point on the hit collider, world space. */
-  point: [number, number, number];
-  /** Outward normal of the hit collider at the contact, world space. */
-  normal: [number, number, number];
+  pointA: [number, number, number];
+  pointB: [number, number, number];
 }
-/** The closest point on a collider to a query point, and whether the point is inside it. */
-export interface PointProjection extends Hit {
+
+export interface PointProjection {
+  body: PhysicsBody;
+  mesh: Mesh | null;
+  collider: PhysicsCollider;
   point: [number, number, number];
   inside: boolean;
   distance: number;
@@ -146,7 +327,7 @@ export type { ModelLike, ModelPrimitiveLike };
 export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
   /**
    * Collider per primitive (and per instance of an instanced primitive). Default 'trimesh' for fixed and kinematic
-   * bodies, 'convexHull' for dynamic ones (a Rapier trimesh has no volume, so it gives a dynamic body no mass).
+   * bodies, 'convexHull' for dynamic ones (a trimesh has no volume, so it gives a dynamic body no mass).
    * 'convexDecomposition' splits each concave primitive into convex pieces, for dynamic bodies that must keep holes.
    */
   shape?: 'trimesh' | 'convexHull' | 'convexDecomposition';
@@ -158,7 +339,7 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
   collider?: Omit<ColliderSettings, 'offset' | 'rotation'>;
 }
 
-/** @internal A helper that steps, syncs and is disposed with a world: `Vehicle`, `Rope`. */
+/** @internal A helper that steps, syncs and is disposed with a world. */
 export interface PhysicsAttachment {
   beforeStep?(dt: number): void;
   afterSync?(): void;
@@ -166,26 +347,26 @@ export interface PhysicsAttachment {
   dispose(): void;
 }
 
+/** No row: the end of a pair list, and a filter word that leaves nothing out. */
+const NONE = 0xffffffff;
+const byDistance = (a: RaycastHit, b: RaycastHit): number => a.distance - b.distance;
 const noop = (): void => {};
 // Set.forEach with the event as thisArg calls listeners without allocating a closure or a snapshot array.
 function callListener(this: never, listener: (event: never) => void): void {
   listener(this);
 }
-const identityRotation: Quat = [0, 0, 0, 1];
-
-// The solver `Physics.load` loaded, shared by every world of the app. Calls during a load share it; the download is
-// cancelled when every call waiting on it has been aborted.
-const solver = new SharedLoad<RapierModule, RapierWasmSource | undefined>((wasm, signal) =>
-  import('./rapier-solver.js').then((chunk) => chunk.startRapier(wasm ?? chunk.defaultWasm(), signal)),
-);
+const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
+const ascending = (x: number, y: number): number => x - y;
+const bits = (enabled: readonly [boolean, boolean, boolean]): number =>
+  (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
 
 /**
- * Rigid-body physics on Rapier as a Margo Engine engine plugin. Steps a fixed timestep with an accumulator and
- * writes interpolated poses through reused buffers and core's extension transform storage.
+ * Rigid-body physics on Margo's own solver as a Margo Engine plugin. The same names as `Physics` from the root entry, with
+ * a fixed timestep, an accumulator and interpolation. Bodies fall, turn, collide, sleep and hold joints; a call that needs
+ * queries throws `unsupported`. A preview, removed when it becomes the root.
  */
 export class Physics implements EnginePlugin, BodyOwner {
   readonly name: string;
-  readonly rapier: RapierModule;
   fixedTimestep: number;
   maxSubsteps: number;
   interpolate: boolean;
@@ -193,79 +374,69 @@ export class Physics implements EnginePlugin, BodyOwner {
   paused: boolean;
   /** Fixed steps taken since creation. */
   stepCount = 0;
-  private worldRef: World | null;
-  private queue: EventQueue | null;
-  private hooks?: PhysicsHooks | null;
+  private world: KernelWorld | null;
+  private hasModifier = false;
   private engine: EngineKernel | null = null;
   private accumulator = 0;
   private lastAlpha = 1;
   private disposed = false;
-  private readonly bodies = new Set<PhysicsBody>();
-  private readonly followers = new Set<PhysicsBody>();
-  // Bodies on child meshes, gathered during a sync and written parents first. Reused, so a sync allocates nothing.
-  private readonly nested: PhysicsBody[] = [];
-  private readonly byMesh = new Map<Mesh, PhysicsBody>();
-  private readonly byHandle = new Map<number, PhysicsCollider>();
-  private readonly joints = new Set<PhysicsJoint>();
   private readonly controllers = new Set<CharacterController>();
+  private readonly followers = new Set<PhysicsBody>();
+  private readonly parentScratch = new Float64Array(16);
+  private readonly parentRotation = [0, 0, 0, 1];
+  private readonly meshes: MeshSync;
+  private readonly bodies = new Set<PhysicsBody>();
+  /** Pair rows of one `contactPoints` call, kept between calls. */
+  private readonly rowScratch: number[] = [];
+  private readonly joints = new Set<PhysicsJoint>();
+  private readonly multibodies = new Set<Multibody>();
+  private readonly byMesh = new Map<Mesh, PhysicsBody>();
+  private readonly byRow = new Map<number, PhysicsCollider>();
+  // A hull's rows stay for the world's life, so colliders built from the same points share one.
+  private readonly hullRows = new Map<string, number>();
+  private readonly hulls: HullRows = {
+    addHull: (vertices, faces) => {
+      const key = JSON.stringify([vertices, faces]);
+      let row = this.hullRows.get(key);
+      if (row === undefined) {
+        row = this.kernel.addHull(vertices, faces);
+        this.hullRows.set(key, row);
+      }
+      return row;
+    },
+    hullVolume: (row) => this.kernel.columns.hullVolume[row],
+    addTrimesh: (vertices, indices, fixInternalEdges, oriented) =>
+      this.kernel.addTrimesh(vertices, indices, { fixInternalEdges, oriented }),
+    addHeightfield: (rows, columns, heights, scale, fixInternalEdges) =>
+      this.kernel.addHeightfield(rows, columns, heights, [scale[0], scale[1], scale[2]], { fixInternalEdges }),
+    addVoxels: (cells, size) => this.kernel.addVoxels(cells, [size[0], size[1], size[2]]),
+  };
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
-  private readonly scratch = [0, 0, 0, 0];
-  private readonly positionScratch: [number, number, number] = [0, 0, 0];
-  private readonly parentScratch = new Float64Array(16);
-  private readonly inverseScratch = new Float64Array(16);
-  private readonly parentRotation = [0, 0, 0, 1];
-  private syncAlpha = 1;
-  // Collision events are gathered into a reused array; a step run from inside a listener gathers into its own.
-  private readonly eventBuffer: CollisionEvent[] = [];
-  private collecting: CollisionEvent[] = this.eventBuffer;
+  // Gathered into a reused array; a step run from inside a listener gathers into its own.
+  private readonly eventBuffer: (CollisionEvent | ContactForceEvent)[] = [];
   private dispatching = false;
-  private readonly collect = (h1: number, h2: number, started: boolean): void => {
-    const colliderA = this.byHandle.get(h1),
-      colliderB = this.byHandle.get(h2);
-    if (!colliderA || !colliderB) return;
-    const bodyA = colliderA.body,
-      bodyB = colliderB.body,
-      sensor = colliderA.isSensor() || colliderB.isSensor();
-    this.collecting.push({
-      type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
-      bodyA,
-      bodyB,
-      meshA: bodyA.mesh,
-      meshB: bodyB.mesh,
-      colliderA,
-      colliderB,
-      sensor,
-    });
-  };
 
   /**
    * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.
    * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.
-   * Rapier's Wasm is a file of its own (`dist/rapier3d.wasm`), fetched and compiled while it downloads; `wasm` points
-   * at another copy.
    * @example await Physics.load();
    * const physics = new Physics(engine);
    * @throws AbortError (the signal's reason) when `signal` aborts first.
-   * @throws MargoError (`failed`) when the Wasm cannot be fetched or is not Rapier's.
    */
-  static async load({ signal, wasm }: PhysicsLoadOptions = {}): Promise<void> {
-    await solver.load(wasm, signal);
+  static async load(options: KernelLoadOptions = {}): Promise<void> {
+    await loadKernel(options);
   }
   /** Creates the Physics on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options: PhysicsOptions = {}): Physics {
     return new Physics(engine, options);
   }
-  /** @throws MargoError (`state`) before {@link Physics.load} has finished. */
+  /**
+   * @throws MargoError (`state`) before {@link Physics.load} has finished.
+   * @throws MargoError (`unsupported`) for an option the own solver does not hold yet.
+   */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
-    const R = options.rapier ?? solver.value;
-    if (!R)
-      throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
-    if (typeof R.World !== 'function' || !R.ColliderDesc)
-      throw new TypeError(
-        'The rapier option needs the initialized module; leave it out and call await Physics.load().',
-      );
-    this.rapier = R;
+    if ('rapier' in options) throw new TypeError('The own solver takes no rapier option; leave it out.');
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
     this.maxSubsteps = options.maxSubsteps ?? 4;
@@ -278,27 +449,31 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new RangeError('maxSubsteps must be a positive integer');
     const gravity = options.gravity ?? [0, -9.81, 0];
     checkVec(gravity, 'Gravity');
-    this.worldRef = new R.World(vec(gravity));
-    this.worldRef.timestep = this.fixedTimestep;
-    if (options.solverIterations !== undefined) this.worldRef.numSolverIterations = options.solverIterations;
-    try {
-      this.queue = new R.EventQueue(true);
-    } catch (error) {
-      this.worldRef!.free();
-      throw error;
-    }
+    this.world = new KernelWorld();
+    this.world.setGravity(...gravity);
     const filter = options.contactFilter;
-    if (filter) {
-      const allow = (h1: number, h2: number): boolean => {
-        const a = this.byHandle.get(h1)?.body,
-          b = this.byHandle.get(h2)?.body;
-        return !a || !b || filter(a, b) !== false;
-      };
-      this.hooks = {
-        filterContactPair: (h1: number, h2: number) => (allow(h1, h2) ? R.SolverFlags.COMPUTE_IMPULSE : null),
-        filterIntersectionPair: allow,
-      };
+    if (filter) this.world.contactFilter = (a, b) => filter(this.byRow.get(a)!.body, this.byRow.get(b)!.body);
+    if (options.predictionDistance !== undefined) this.world.setPredictionDistance(options.predictionDistance);
+    const modifier = options.contactModifier;
+    if (modifier) {
+      const world = this.world,
+        view = new ContactModification(world);
+      this.hasModifier = true;
+      world.setContactModifier((row) => {
+        const c = world.columns,
+          a = this.byRow.get(c.pairA[row]),
+          b = this.byRow.get(c.pairB[row]);
+        if (!a || !b) return;
+        view.row = row;
+        view.colliderA = a;
+        view.colliderB = b;
+        modifier(view);
+      });
     }
+    const substeps = options.substeps ?? options.solverIterations;
+    if (substeps !== undefined) this.world.substeps = substeps;
+    if (options.iterations !== undefined) this.world.iterations = options.iterations;
+    this.meshes = new MeshSync(this.world, (body) => this.removeBody(body));
     if (engine)
       try {
         engine.use(this);
@@ -308,25 +483,32 @@ export class Physics implements EnginePlugin, BodyOwner {
       }
   }
 
-  /** The Rapier `World`. Use it for anything this wrapper does not cover. */
-  get world(): World {
+  /** The kernel's world: its columns, `hash`, `snapshot` and `restore`. A preview; it may change while the solver is built. */
+  get kernel(): KernelWorld {
     if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
-    return this.worldRef!;
+    return this.world!;
   }
   get isDisposed(): boolean {
     return this.disposed;
   }
+  /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04). */
+  get predictionDistance(): number {
+    return this.kernel.predictionDistance;
+  }
+  set predictionDistance(distance: number) {
+    this.kernel.setPredictionDistance(distance);
+  }
   get gravity(): [number, number, number] {
-    return tuple(this.world.gravity);
+    return this.kernel.gravity;
   }
   set gravity(value: Vec3) {
     checkVec(value, 'Gravity');
-    const world = this.world,
-      old = world.gravity;
-    world.gravity = vec(value);
-    // Rapier leaves sleeping bodies asleep when gravity changes, so they would float in the old field: wake them.
-    if (old.x !== value[0] || old.y !== value[1] || old.z !== value[2])
-      for (const body of this.bodies) if (body.type === 'dynamic' && body.raw.isSleeping()) body.raw.wakeUp();
+    const kernel = this.kernel,
+      old = kernel.gravity;
+    kernel.setGravity(value[0], value[1], value[2]);
+    // A sleeper would float in the old field: wake it.
+    if (old[0] !== value[0] || old[1] !== value[1] || old[2] !== value[2])
+      for (const body of this.bodies) if (body.type === 'dynamic') kernel.wake(body.row);
   }
   /** Interpolation factor used by the last `update`: leftover accumulator time over the step length, 0..1. */
   get alpha(): number {
@@ -336,18 +518,40 @@ export class Physics implements EnginePlugin, BodyOwner {
   get pendingTime(): number {
     return this.accumulator;
   }
-  /** Solver passes per step for every island; a body can ask for more with `additionalSolverIterations`. */
+  /** Equal pieces each step is split into (default 8). */
+  get substeps(): number {
+    return this.kernel.substeps;
+  }
+  set substeps(substeps: number) {
+    this.kernel.substeps = substeps;
+  }
+  /** The solver settings (contact stiffness, allowed penetration, joint shares); see {@link KernelWorld.setSolver}. */
+  get solver(): Required<KernelSolverOptions> {
+    return this.kernel.solver;
+  }
+  /** Tunes the solver from the next step on; leave out what stays. Wakes every dynamic body, so a sleeper meets the new settings. */
+  setSolver(options: KernelSolverOptions): this {
+    this.kernel.setSolver(options);
+    for (const body of this.bodies) if (body.type === 'dynamic') this.kernel.wake(body.row);
+    return this;
+  }
+  /** Solver passes in each substep (default 2). */
+  get iterations(): number {
+    return this.kernel.iterations;
+  }
+  set iterations(iterations: number) {
+    this.kernel.iterations = iterations;
+  }
+  /** The old name of {@link Physics.substeps}, kept for one release. */
   get solverIterations(): number {
-    return this.world.numSolverIterations;
+    return this.substeps;
   }
   set solverIterations(passes: number) {
-    if (!Number.isInteger(passes) || passes < 1)
-      throw new RangeError('Solver iterations must be a whole number of at least 1; pass the passes a step takes.');
-    this.world.numSolverIterations = passes;
+    this.substeps = passes;
   }
   /** How many colliders the world holds. */
   get colliderCount(): number {
-    return this.byHandle.size;
+    return this.byRow.size;
   }
   get bodyCount(): number {
     return this.bodies.size;
@@ -386,37 +590,20 @@ export class Physics implements EnginePlugin, BodyOwner {
     return steps;
   }
 
-  /**
-   * Runs exactly one fixed step and dispatches its events. Does not touch meshes; call `sync()` to write them.
-   * Apart from Rapier's own `World.step` and the event objects of steps that have collisions, it allocates nothing.
-   */
+  /** Runs exactly one fixed step. Does not touch meshes; call `sync()` to write them. */
   step(): void {
-    const world = this.world,
+    const kernel = this.kernel,
       dt = this.fixedTimestep;
     this.emit('beforestep', dt);
     if (this.disposed) return;
-    world.timestep = dt;
     this.followers.forEach(this.followMesh);
     this.attachments.forEach(this.attachmentStep);
-    world.step(this.queue!, this.hooks!);
+    kernel.step(dt);
     this.stepCount++;
-    this.bodies.forEach(this.snapshotBody);
-    const outer = this.dispatching,
-      events = (this.collecting = outer ? [] : this.eventBuffer);
-    this.queue!.drainCollisionEvents(this.collect);
-    this.dispatching = true;
-    try {
-      for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i]);
-    } finally {
-      this.dispatching = outer;
-      events.length = 0;
-    }
+    this.dispatch(dt);
+    this.reportBreaks();
     this.emit('afterstep', dt);
   }
-  private readonly attachmentStep = (attachment: PhysicsAttachment): void =>
-    attachment.beforeStep?.(this.fixedTimestep);
-  private readonly followPosition = { x: 0, y: 0, z: 0 };
-  private readonly followRotation = { x: 0, y: 0, z: 0, w: 1 };
   private readonly followMesh = (body: PhysicsBody): void => {
     if (body.type !== 'kinematicPosition') return;
     const mesh = body.mesh as CoreMesh;
@@ -428,185 +615,117 @@ export class Physics implements EnginePlugin, BodyOwner {
     }
     const runtime = meshRuntime(mesh),
       m = worldMatrix(runtime.engine.store, runtime.id, this.parentScratch),
-      q = this.parentRotation,
-      p = this.followPosition,
-      r = this.followRotation;
+      q = this.parentRotation;
     matrixRotation(m, q);
-    p.x = m[12];
-    p.y = m[13];
-    p.z = m[14];
-    r.x = q[0];
-    r.y = q[1];
-    r.z = q[2];
-    r.w = q[3];
-    body.raw.setNextKinematicTranslation(p);
-    body.raw.setNextKinematicRotation(r);
+    body.setNextPosition([m[12]!, m[13]!, m[14]!]);
+    body.setNextRotation(q as unknown as Quat);
   };
-  private readonly snapshotBody = (body: PhysicsBody): void => {
-    if (body.type === 'fixed') return;
-    const p = body.pose;
-    // A dynamic body asleep since the previous step has not moved, so skip Rapier's pose getters (in Rapier 0.21 each
-    // allocates a typed-array view). The step that puts a body to sleep can still move it, so that one is read.
-    const sleeping = body.type === 'dynamic' && body.raw.isSleeping();
-    if (sleeping && body.slept) p.copyWithin(0, 7, 14);
-    else body.snapshot();
-    body.slept = sleeping;
-    for (let i = 0; i < 7; i++)
-      if (p[i] !== p[i + 7]) {
-        body.restWritten = false;
-        break;
+  private reportBreaks(): void {
+    let found: PhysicsJoint[] | null = null;
+    for (const joint of this.joints)
+      if (joint.watched && !joint.reported && joint.broken) {
+        joint.reported = true;
+        (found ??= []).push(joint);
       }
-  };
+    if (found)
+      for (const joint of found)
+        this.emit('jointbreak', { type: 'jointbreak', joint, bodyA: joint.bodyA, bodyB: joint.bodyB });
+  }
+  private readonly attachmentStep = (attachment: PhysicsAttachment): void =>
+    attachment.beforeStep?.(this.fixedTimestep);
+  /** Reads what the step found into events, then calls listeners: one may change the world, so nothing is read after one runs. */
+  private dispatch(dt: number): void {
+    const outer = this.dispatching,
+      events = outer ? [] : this.eventBuffer;
+    this.gatherEvents(events);
+    this.gatherForces(events, dt);
+    this.dispatching = true;
+    try {
+      for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i] as never);
+    } finally {
+      this.dispatching = outer;
+      events.length = 0;
+    }
+  }
+  private gatherEvents(events: (CollisionEvent | ContactForceEvent)[]): void {
+    const kernel = this.kernel,
+      words = kernel.columns.events,
+      count = kernel.eventCount;
+    for (let i = 0; i < count; i++) {
+      const first = words[2 * i],
+        colliderA = this.byRow.get(first & EVENT_COLLIDER),
+        colliderB = this.byRow.get(words[2 * i + 1]);
+      if (!colliderA || !colliderB || !(colliderA.emits || colliderB.emits)) continue;
+      const sensor = (first & EVENT_SENSOR) !== 0,
+        started = first >>> 31 !== 0,
+        bodyA = colliderA.body,
+        bodyB = colliderB.body;
+      events.push({
+        type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
+        bodyA,
+        bodyB,
+        meshA: bodyA.mesh,
+        meshB: bodyB.mesh,
+        colliderA,
+        colliderB,
+        sensor,
+      });
+    }
+    kernel.clearEvents();
+  }
+  private gatherForces(events: (CollisionEvent | ContactForceEvent)[], dt: number): void {
+    if (!this.listeners.get('contactforce')?.size) return;
+    const kernel = this.kernel,
+      { solvePairs, pairForce, pairA, pairB, pairFlags } = kernel.columns,
+      count = kernel.solvingPairs;
+    // A mesh pair is solved as one part a triangle: its event sums them, as one pair of colliders felt one push.
+    let meshed: Map<number, number> | null = null;
+    for (let i = 0; i < count; i++) {
+      const row = solvePairs[i];
+      if (!(pairFlags[row] & PAIR_IS_PART)) continue;
+      meshed ??= new Map();
+      const key = pairA[row] * 0x400000 + pairB[row];
+      meshed.set(key, (meshed.get(key) ?? 0) + pairForce[row]);
+    }
+    for (let i = 0; i < count; i++) {
+      const row = solvePairs[i],
+        key = pairA[row] * 0x400000 + pairB[row];
+      let impulse = pairForce[row];
+      if (meshed && pairFlags[row] & PAIR_IS_PART) {
+        impulse = meshed.get(key) ?? 0;
+        // The first part of the pair speaks; the rest are in its sum.
+        meshed.delete(key);
+      }
+      const colliderA = this.byRow.get(pairA[row]),
+        colliderB = this.byRow.get(pairB[row]);
+      if (!(impulse > 0) || !colliderA || !colliderB) continue;
+      if (!(colliderA.forceEvents || colliderB.forceEvents)) continue;
+      const threshold =
+        colliderA.forceThreshold > colliderB.forceThreshold ? colliderA.forceThreshold : colliderB.forceThreshold;
+      if (impulse / dt <= threshold) continue;
+      const bodyA = colliderA.body,
+        bodyB = colliderB.body;
+      events.push({
+        type: 'contactforce',
+        bodyA,
+        bodyB,
+        meshA: bodyA.mesh,
+        meshB: bodyB.mesh,
+        colliderA,
+        colliderB,
+        impulse,
+        force: impulse / dt,
+      });
+    }
+  }
 
   /** Writes body poses to their meshes, interpolated by `alpha` between the last two steps. Allocates nothing. */
   sync(alpha = this.lastAlpha): void {
     if (this.disposed) return;
     if (!Number.isFinite(alpha))
       throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
-    this.syncAlpha = this.interpolate ? Math.min(1, Math.max(0, alpha)) : 1;
-    const nested = this.nested;
-    nested.length = 0;
-    this.bodies.forEach(this.syncBody);
-    // A child's local pose is measured from its parent's, so each parent is written first: insertion sort by depth.
-    for (let i = 1; i < nested.length; i++) {
-      const body = nested[i];
-      let j = i - 1;
-      for (; j >= 0 && nested[j].depth > body.depth; j--) nested[j + 1] = nested[j];
-      nested[j + 1] = body;
-    }
-    for (let i = 0; i < nested.length; i++) this.writeBody(nested[i]);
-    nested.length = 0;
+    this.meshes.write(!this.interpolate || alpha > 1 ? 1 : alpha < 0 ? 0 : alpha);
     this.attachments.forEach(attachmentSync);
-  }
-  // A stable callback avoids creating a Set iterator during every synchronization.
-  private readonly syncBody = (body: PhysicsBody): void => {
-    const mesh = body.mesh;
-    // The mesh drives a follower, so nothing goes back to it.
-    if (!mesh || (body.follow && body.type === 'kinematicPosition')) return;
-    const depth = depthOf(mesh);
-    // A resting body on a child mesh is still rewritten: its parent may have moved, and the body keeps its world pose.
-    if ((body.type === 'fixed' && !body.dirty) || (body.restWritten && depth === 0)) return;
-    if (depth) {
-      body.depth = depth;
-      this.nested.push(body);
-    } else this.writeBody(body);
-  };
-  private writeBody(body: PhysicsBody): void {
-    const out = this.scratch,
-      lerp = this.syncAlpha,
-      mesh = body.mesh!;
-    try {
-      mesh.check();
-    } catch {
-      this.removeBody(body);
-      return;
-    }
-    const p = body.pose;
-    const position = this.positionScratch;
-    position[0] = p[0] + (p[7] - p[0]) * lerp;
-    position[1] = p[1] + (p[8] - p[1]) * lerp;
-    position[2] = p[2] + (p[9] - p[2]) * lerp;
-    // Shortest-arc slerp of the two step rotations, inline: V8 boxes a fractional number passed to a call it does not
-    // inline (a heap allocation), and Math.hypot allocates an array for its arguments.
-    const ax = p[3],
-      ay = p[4],
-      az = p[5],
-      aw = p[6];
-    let bx = p[10],
-      by = p[11],
-      bz = p[12],
-      bw = p[13],
-      cos = ax * bx + ay * by + az * bz + aw * bw,
-      k0 = 1 - lerp,
-      k1 = lerp;
-    if (cos < 0) {
-      cos = -cos;
-      bx = -bx;
-      by = -by;
-      bz = -bz;
-      bw = -bw;
-    }
-    if (cos <= 0.9995) {
-      const angle = Math.acos(cos),
-        sin = Math.sin(angle);
-      k0 = Math.sin((1 - lerp) * angle) / sin;
-      k1 = Math.sin(lerp * angle) / sin;
-    }
-    out[0] = ax * k0 + bx * k1;
-    out[1] = ay * k0 + by * k1;
-    out[2] = az * k0 + bz * k1;
-    out[3] = aw * k0 + bw * k1;
-    const length = Math.sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2] + out[3] * out[3]) || 1;
-    for (let i = 0; i < 4; i++) out[i] /= length;
-    if (mesh instanceof CoreMesh) {
-      const runtime = meshRuntime(mesh),
-        store = runtime.engine.store,
-        parent = store.parents[runtime.id];
-      // A child mesh gets its pose relative to the parent's current world transform (no frame of lag).
-      if (parent !== -1) this.toLocal(store, parent, position, out);
-      const x = out[0],
-        y = out[1],
-        z = out[2],
-        w = out[3];
-      if (
-        !Number.isFinite(Math.fround(position[0])) ||
-        !Number.isFinite(Math.fround(position[1])) ||
-        !Number.isFinite(Math.fround(position[2]))
-      )
-        throw new RangeError('Physics body position must be finite; check the body for NaN or Infinity.');
-      if (
-        !Number.isFinite(Math.fround(x)) ||
-        !Number.isFinite(Math.fround(y)) ||
-        !Number.isFinite(Math.fround(z)) ||
-        !Number.isFinite(Math.fround(w))
-      )
-        throw new RangeError('Physics body rotation must be finite; check the body for NaN or Infinity.');
-      // Core's setters allocate nothing, so preallocated `position` and `out` go straight in.
-      mesh.setPosition(position).setQuaternion(out);
-    } else {
-      if (parentOf(mesh) !== -1)
-        throw new MargoError(
-          'state',
-          'Non-core physics bodies need root-level meshes; use a core Mesh for child meshes.',
-        );
-      mesh.setPosition(position).setQuaternion(out);
-    }
-    body.dirty = false;
-    body.restWritten =
-      p[0] === p[7] &&
-      p[1] === p[8] &&
-      p[2] === p[9] &&
-      p[3] === p[10] &&
-      p[4] === p[11] &&
-      p[5] === p[12] &&
-      p[6] === p[13];
-  }
-  /** World pose (in place) to the pose relative to `parent`: inverse parent matrix on the position, inverse parent rotation on the quaternion. */
-  private toLocal(store: TransformStoreLike, parent: number, position: number[], rotation: number[]): void {
-    const m = worldMatrix(store, parent, this.parentScratch),
-      inverse = invertMatrix(m, this.inverseScratch);
-    if (!inverse)
-      throw new RangeError('Physics body parent has a singular world transform; give the parent a non-zero scale.');
-    const x = position[0],
-      y = position[1],
-      z = position[2];
-    for (let r = 0; r < 3; r++)
-      position[r] = inverse[r] * x + inverse[4 + r] * y + inverse[8 + r] * z + inverse[12 + r];
-    const q = this.parentRotation;
-    matrixRotation(m, q);
-    // conjugate(q) * rotation
-    const ax = -q[0],
-      ay = -q[1],
-      az = -q[2],
-      aw = q[3],
-      bx = rotation[0],
-      by = rotation[1],
-      bz = rotation[2],
-      bw = rotation[3];
-    rotation[0] = aw * bx + ax * bw + ay * bz - az * by;
-    rotation[1] = aw * by - ax * bz + ay * bw + az * bx;
-    rotation[2] = aw * bz + ax * by - ay * bx + az * bw;
-    rotation[3] = aw * bw - ax * bx - ay * by - az * bz;
   }
 
   /**
@@ -614,104 +733,55 @@ export class Physics implements EnginePlugin, BodyOwner {
    * pose, and each frame the interpolated world pose is written to the mesh's position and rotation (relative to its
    * parent for a child mesh, using the parent's current world transform, so there is no frame of lag). Scale is never
    * written.
+   * @throws MargoError (`unsupported`) for an option the own solver does not hold yet.
    */
   addBody(mesh: Mesh | null, options: BodyOptions = {}): PhysicsBody {
-    const world = this.world,
-      R = this.rapier,
+    const kernel = this.kernel,
       type: BodyType = options.type ?? 'dynamic';
-    let worldPose: Float64Array | null = null;
-    if (mesh) {
-      mesh.check();
-      if (mesh instanceof CoreMesh && this.engine && meshRuntime(mesh).engine !== this.engine)
-        throw new TypeError(
-          'Physics mesh belongs to another engine; add meshes from the engine this Physics is attached to.',
-        );
-      if (this.byMesh.has(mesh))
-        throw new MargoError(
-          'state',
-          'This mesh already has a physics body; remove it first or use the existing body.',
-        );
-      if (parentOf(mesh) !== -1) {
-        if (!(mesh instanceof CoreMesh))
-          throw new MargoError(
-            'state',
-            'Non-core physics bodies need root-level meshes; use a core Mesh for child meshes.',
-          );
-        const runtime = meshRuntime(mesh);
-        worldPose = worldMatrix(runtime.engine.store, runtime.id, new Float64Array(16));
-      }
-    }
-    const factory = (
-      {
-        dynamic: 'dynamic',
-        fixed: 'fixed',
-        kinematicPosition: 'kinematicPositionBased',
-        kinematicVelocity: 'kinematicVelocityBased',
-      } as const
-    )[type];
-    if (!factory)
+    if (!['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
       throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+    if (mesh && this.byMesh.has(mesh))
+      throw new MargoError('state', 'This mesh already has a physics body; remove it first or use the existing body.');
     if (options.follow) {
       if (type !== 'kinematicPosition')
         throw new TypeError("A body with follow must be a 'kinematicPosition' body; the mesh is what moves it.");
       if (!(mesh instanceof CoreMesh)) throw new TypeError('A body with follow needs a core Mesh to follow.');
     }
-    const desc = R.RigidBodyDesc[factory]();
-    const position =
-      options.position ??
-      (worldPose
-        ? ([worldPose[12], worldPose[13], worldPose[14]] as const)
-        : mesh
-          ? ([mesh.position.x, mesh.position.y, mesh.position.z] as const)
-          : ([0, 0, 0] as const));
+    const start = mesh ? meshPose(mesh, this.engine) : null,
+      position = options.position ?? start?.position ?? [0, 0, 0],
+      rotation: Quat = options.rotation ?? start?.rotation ?? [0, 0, 0, 1];
     checkVec(position, 'Position');
-    let rotation: Quat =
-      options.rotation ?? (mesh ? eulerToQuat(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z) : identityRotation);
-    if (!options.rotation && worldPose) {
-      const q: [number, number, number, number] = [0, 0, 0, 1];
-      matrixRotation(worldPose, q);
-      rotation = q;
-    }
-    desc.setTranslation(position[0], position[1], position[2]).setRotation(quat(rotation));
-    if (options.linearVelocity) {
-      checkVec(options.linearVelocity, 'linearVelocity');
-      desc.setLinvel(...options.linearVelocity);
-    }
-    if (options.angularVelocity) {
-      checkVec(options.angularVelocity, 'angularVelocity');
-      desc.setAngvel(vec(options.angularVelocity));
-    }
-    if (options.linearDamping !== undefined) desc.setLinearDamping(options.linearDamping);
-    if (options.angularDamping !== undefined) desc.setAngularDamping(options.angularDamping);
-    if (options.gravityScale !== undefined) desc.setGravityScale(options.gravityScale);
-    if (options.ccd) desc.setCcdEnabled(true);
-    if (options.softCcdPrediction !== undefined) {
-      if (typeof desc.setSoftCcdPrediction !== 'function')
-        throw new MargoError(
-          'unsupported',
-          'softCcdPrediction needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.',
-        );
-      desc.setSoftCcdPrediction(options.softCcdPrediction);
-    }
-    if (options.canSleep !== undefined) desc.setCanSleep(options.canSleep);
-    if (options.sleeping) desc.setSleeping(true);
-    if (options.dominance !== undefined) desc.setDominanceGroup(options.dominance);
-    if (options.additionalMass !== undefined) desc.setAdditionalMass(options.additionalMass);
-    if (options.lockRotations) desc.lockRotations();
-    if (options.lockTranslations) desc.lockTranslations();
-    if (options.enabledRotations) desc.enabledRotations(...options.enabledRotations);
-    if (options.enabledTranslations) desc.enabledTranslations(...options.enabledTranslations);
-    const raw = world.createRigidBody(desc);
-    const body = new PhysicsBody(this, raw, mesh, type);
+    checkRotation(rotation);
+    if (options.linearVelocity) checkVec(options.linearVelocity, 'linearVelocity');
+    if (options.angularVelocity) checkVec(options.angularVelocity, 'angularVelocity');
+    const row = kernel.addBody(type),
+      body = new PhysicsBody(this, row, mesh, type),
+      columns = kernel.columns;
+    kernel.setPose(row, position, rotation);
+    if (options.linearVelocity) body.setLinearVelocity(options.linearVelocity);
+    if (options.angularVelocity) body.setAngularVelocity(options.angularVelocity);
+    if (options.linearDamping !== undefined) columns.linearDamping[row] = options.linearDamping;
+    if (options.angularDamping !== undefined) columns.angularDamping[row] = options.angularDamping;
+    if (options.maxLinearSpeed !== undefined) body.maxLinearSpeed = options.maxLinearSpeed;
+    if (options.maxAngularSpeed !== undefined) body.maxAngularSpeed = options.maxAngularSpeed;
+    if (options.gravityScale !== undefined) columns.gravityScale[row] = options.gravityScale;
+    if (options.dominance !== undefined) columns.dominance[row] = options.dominance;
+    if (options.canSleep !== undefined) kernel.setCanSleep(row, options.canSleep);
+    if (options.ccd) kernel.setCcd(row, true);
+    if (options.softCcdPrediction !== undefined) body.softCcdPrediction = options.softCcdPrediction;
+    if (options.additionalMass !== undefined) columns.additionalMass[row] = options.additionalMass;
+    const angular = options.lockRotations ? 7 : options.enabledRotations ? bits(options.enabledRotations) : 0,
+      linear = options.lockTranslations ? 7 : options.enabledTranslations ? bits(options.enabledTranslations) : 0;
+    kernel.setLocks(row, { linear, angular });
     body.userData = options.userData;
-    if (options.follow) {
-      body.follow = true;
-      this.followers.add(body);
-    }
-    if (worldPose) body.fitScale = matrixScale(worldPose, [1, 1, 1]) as [number, number, number];
+    body.fitScale = start?.fitScale;
     // A pose taken from the mesh is already on the mesh; writing it back would only round a child's transform.
     if (mesh && !options.position && !options.rotation) body.dirty = false;
     this.bodies.add(body);
+    if (options.follow) {
+      body.follow = true;
+      this.followers.add(body);
+    } else this.meshes.add(body);
     if (mesh) this.byMesh.set(mesh, body);
     const colliders =
       options.colliders === undefined
@@ -727,7 +797,165 @@ export class Physics implements EnginePlugin, BodyOwner {
       this.removeBody(body);
       throw error;
     }
+    kernel.updateMass(row);
+    if (options.sleeping) kernel.sleep(row);
     return body;
+  }
+
+  /** The body of a mesh, if it has one. */
+  bodyOf(mesh: Mesh): PhysicsBody | undefined {
+    return this.byMesh.get(mesh);
+  }
+  /** The body a collider or its handle belongs to. */
+  bodyOfCollider(collider: PhysicsCollider | number): PhysicsBody | undefined {
+    return this.byRow.get(typeof collider === 'number' ? collider : collider.handle)?.body;
+  }
+  /** True when the own solver holds this shape. */
+  supportsShape(shape: ShapeOptions['shape']): boolean {
+    return shapeServed(shape);
+  }
+  getBodies(): PhysicsBody[] {
+    return [...this.bodies];
+  }
+
+  /** @internal use `body.addCollider`. */
+  addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider {
+    const { mesh } = body,
+      fitted =
+        (options.shape === 'box' && !options.halfExtents) ||
+        (options.shape === 'sphere' && options.radius === undefined) ||
+        (options.shape === 'convexHull' && !options.points && !options.geometry) ||
+        (options.shape === 'trimesh' && !options.vertices && !options.geometry),
+      fit =
+        mesh && fitted
+          ? colliderGeometry(mesh, body.fitScale)
+          : {
+              geometry: null,
+              scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
+            };
+    if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
+    const { name, shape, size, parts, data, volume, options: placed } = kernelCollider(options, fit, this.hulls),
+      row = parts
+        ? this.kernel.addCompound(body.row, parts, placed)
+        : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
+      collider = new PhysicsCollider(this.kernel, row, body, name);
+    if (options.collisionGroups !== undefined) this.kernel.columns.colliderGroups[row] = options.collisionGroups;
+    if (options.solverGroups !== undefined) this.kernel.columns.colliderSolverGroups[row] = options.solverGroups;
+    if (options.sensor || options.enabled === false)
+      this.kernel.setColliderState(
+        row,
+        (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0),
+      );
+    collider.data = data;
+    collider.volume = volume;
+    collider.reshape = (next) => this.reshapeCollider(body, collider, next);
+    collider.emits = options.events ?? true;
+    collider.forceEvents = options.contactForceEvents ?? true;
+    collider.forceThreshold = options.contactForceThreshold ?? 0;
+    // A round triangle meets what it touches a border away: its contacts are made with that skin, its queries with the border.
+    const skin = (options.contactSkin ?? 0) + (options.shape === 'triangle' ? (placed.border ?? 0) : 0);
+    if (skin > 0) collider.setContactSkin(skin);
+    if (options.contactForceThreshold !== undefined)
+      collider.setContactForceEventThreshold(options.contactForceThreshold);
+    if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
+    if (options.modifyContacts) {
+      if (!this.hasModifier)
+        throw new MargoError('state', 'modifyContacts needs a contactModifier: pass one in the Physics options.');
+      this.kernel.setColliderState(row, this.kernel.columns.colliderFlags[row] | COLLIDER_MODIFY);
+    }
+    body.colliders.push(collider);
+    this.byRow.set(row, collider);
+    return collider;
+  }
+  /** @internal use `collider.setShape`. */
+  private reshapeCollider(body: PhysicsBody, collider: PhysicsCollider, options: ColliderOptions): void {
+    const { mesh } = body,
+      fitted =
+        (options.shape === 'box' && !options.halfExtents) ||
+        (options.shape === 'sphere' && options.radius === undefined) ||
+        (options.shape === 'convexHull' && !options.points && !options.vertices && !options.geometry),
+      fit =
+        mesh && fitted
+          ? colliderGeometry(mesh, body.fitScale)
+          : {
+              geometry: null,
+              scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
+            };
+    if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
+    const { name, shape, size, parts, options: placed } = kernelCollider(options, fit, this.hulls);
+    if (parts)
+      throw new MargoError(
+        'unsupported',
+        'A collider cannot become a compound; remove it and add a compound collider to the body.',
+      );
+    const row = collider.handle;
+    this.kernel.setColliderShape(row, shape as KernelShape, size);
+    this.kernel.setColliderPose(row, placed.position ?? [0, 0, 0], placed.rotation ?? [0, 0, 0, 1]);
+    if (placed.border) this.kernel.setColliderBorder(row, placed.border);
+    if (options.shape === 'triangle') collider.setContactSkin((options.contactSkin ?? 0) + (placed.border ?? 0));
+    if (options.mass !== undefined || options.density !== undefined || options.massless) {
+      this.kernel.columns.colliderDensity[row] = placed.density ?? 0;
+      this.kernel.updateMass(body.row);
+    }
+    collider.shape = name;
+  }
+  /** @internal use `body.removeCollider`. */
+  removeCollider(body: PhysicsBody, collider: PhysicsCollider): void {
+    const index = body.colliders.indexOf(collider);
+    if (index < 0)
+      throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
+    body.colliders.splice(index, 1);
+    this.byRow.delete(collider.handle);
+    this.kernel.removeCollider(collider.handle);
+    collider.markRemoved();
+  }
+
+  /** Removes a body with its colliders and joints. */
+  removeBody(body: PhysicsBody): void {
+    if (!this.bodies.has(body)) return;
+    for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
+    for (const multibody of this.multibodies)
+      if (multibody.root === body || multibody.links.some((link) => link.body === body))
+        this.removeMultibody(multibody);
+    for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
+    for (const collider of body.colliders) this.byRow.delete(collider.handle);
+    this.bodies.delete(body);
+    this.followers.delete(body);
+    this.meshes.remove(body);
+    if (body.mesh) this.byMesh.delete(body.mesh);
+    this.kernel.removeBody(body.row);
+    body.markRemoved();
+  }
+  /** @internal use `body.setTranslation` and the like: the mesh follows at the next sync. */
+  moved(body: PhysicsBody): void {
+    this.meshes.mark(body);
+  }
+  owns(body: PhysicsBody): boolean {
+    return this.bodies.has(body);
+  }
+  /** @internal Registers a helper that steps and syncs with the world. */
+  attach(attachment: PhysicsAttachment): void {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    this.attachments.add(attachment);
+  }
+  /** @internal Unregisters a helper; returns false when it was not attached. */
+  detach(attachment: PhysicsAttachment): boolean {
+    return this.attachments.delete(attachment);
+  }
+
+  /** Subscribes to step and contact events. Returns an unsubscribe function. */
+  on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
+    if (this.disposed) return noop;
+    let set = this.listeners.get(type);
+    if (!set) this.listeners.set(type, (set = new Set()));
+    set.add(listener);
+    return () => {
+      set!.delete(listener);
+    };
+  }
+  private emit<K extends keyof PhysicsEventMap>(type: K, event: PhysicsEventMap[K]): void {
+    // Listeners removed during dispatch are skipped; listeners added during dispatch also run for this event.
+    this.listeners.get(type)?.forEach(callListener, event);
   }
 
   /**
@@ -817,7 +1045,7 @@ export class Physics implements EnginePlugin, BodyOwner {
           this.addBody(anchor, { ...bodyOptions, type, position: [px, py, pz], rotation: [qx, qy, qz, qw], colliders }),
         );
         // The pose came from the mesh: nothing to write back until the body moves.
-        created[created.length - 1].dirty = false;
+        created[created.length - 1]!.dirty = false;
       }
     } catch (error) {
       for (const body of created) this.removeBody(body);
@@ -826,82 +1054,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     return created;
   }
 
-  /** The body driving `mesh`, if any. */
-  bodyOf(mesh: Mesh): PhysicsBody | undefined {
-    return this.byMesh.get(mesh);
-  }
-  /** The body owning a collider or collider handle. */
-  bodyOfCollider(collider: PhysicsCollider | number): PhysicsBody | undefined {
-    return this.byHandle.get(typeof collider === 'number' ? collider : collider?.handle)?.body;
-  }
-  /** @internal The collider behind the solver's own object, for predicates the solver calls. */
-  colliderOf(raw: Collider): PhysicsCollider | undefined {
-    return this.byHandle.get(raw.handle);
-  }
-  /** Whether this world's solver can make `shape`. Every shape but `voxels` always can. */
-  supportsShape(shape: ShapeOptions['shape']): boolean {
-    return shapeSupported(this.rapier, shape);
-  }
-  getBodies(): PhysicsBody[] {
-    return [...this.bodies];
-  }
-
-  /** @internal use `body.addCollider`. */
-  addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider {
-    const R = this.rapier,
-      mesh = body.mesh;
-    const needsGeometry =
-      (options.shape === 'box' && !options.halfExtents) ||
-      (options.shape === 'sphere' && options.radius === undefined) ||
-      (options.shape === 'convexHull' && !options.points && !options.geometry) ||
-      (options.shape === 'trimesh' && !options.vertices && !options.geometry) ||
-      (options.shape === 'convexDecomposition' && !options.vertices && !options.geometry);
-    const fit =
-      mesh && needsGeometry
-        ? colliderGeometry(mesh, body.fitScale)
-        : {
-            geometry: null,
-            scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
-          };
-    if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
-    const { desc, center } = createColliderDesc(R, options, fit);
-    configureCollider(R, desc, options, center, !!this.hooks);
-    const raw = this.world.createCollider(desc, body.raw),
-      collider = new PhysicsCollider(raw, body, shapeName(R, options.shape, raw.shapeType()));
-    body.colliders.push(collider);
-    this.byHandle.set(raw.handle, collider);
-    // Rapier folds a collider's mass in at the next step; a game reads `mass` before that.
-    body.raw.recomputeMassPropertiesFromColliders();
-    return collider;
-  }
-  /** @internal use `body.removeCollider`. */
-  removeCollider(body: PhysicsBody, collider: PhysicsCollider): void {
-    const index = body.colliders.indexOf(collider);
-    if (index < 0)
-      throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
-    body.colliders.splice(index, 1);
-    this.byHandle.delete(collider.handle);
-    this.world.removeCollider(collider.raw, true);
-    collider.markRemoved();
-    body.raw.recomputeMassPropertiesFromColliders();
-  }
-
-  /** Removes a body with its colliders, joints and character controllers. */
-  removeBody(body: PhysicsBody): void {
-    if (!this.bodies.has(body)) return;
-    for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
-    for (const controller of this.controllers) if (controller.body === body) controller.dispose();
-    for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
-    for (const collider of body.colliders) this.byHandle.delete(collider.handle);
-    this.bodies.delete(body);
-    this.followers.delete(body);
-    if (body.mesh) this.byMesh.delete(body.mesh);
-    this.world.removeRigidBody(body.raw);
-    body.markRemoved();
-  }
-
-  /** Connects two bodies with a fixed, spherical, revolute, prismatic, rope, spring or generic joint. Anchors are in each body's local frame. */
-  addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
+  /**
+   * Connects two bodies with a fixed, spherical, revolute or prismatic joint. Anchors are in each body's local frame.
+   * @throws MargoError (`state`) unless both bodies belong to this world and are two bodies.
+   * @throws MargoError (`unsupported`) for a kind the own solver does not hold yet.
+   */
+  addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint {
     if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
       throw new MargoError(
         'state',
@@ -909,244 +1067,263 @@ export class Physics implements EnginePlugin, BodyOwner {
       );
     if (bodyA === bodyB)
       throw new MargoError('state', 'A joint needs two different bodies; pass bodyA and bodyB that are not the same.');
-    const raw = this.world.createImpulseJoint(createJointData(this.rapier, options), bodyA.raw, bodyB.raw, true);
-    const joint = new PhysicsJoint(this, raw, options.type, bodyA, bodyB);
+    const joint = createJoint(this, bodyA, bodyB, options);
     this.joints.add(joint);
-    if (options.contactsEnabled !== undefined) raw.setContactsEnabled(options.contactsEnabled);
-    if (options.type === 'revolute' || options.type === 'prismatic') {
-      // The descriptor takes one axis, not two frames: as for a generic joint, the frames go on the made joint.
-      if (options.frameA) {
-        const { anchorA = [0, 0, 0], anchorB = [0, 0, 0], frameA, frameB } = options;
-        raw.setLocalFrame1(vec(anchorA), quat(frameA));
-        raw.setLocalFrame2(vec(anchorB), quat(frameB));
-      }
-      if (options.limits) joint.setLimits(options.limits[0], options.limits[1]);
-      if (options.motor) joint.setMotor(options.motor);
-    }
-    if (options.type === 'generic') {
-      // Rapier's descriptor takes one axis, not two frames: the frames go on the made joint.
-      const { anchorA = [0, 0, 0], anchorB = [0, 0, 0], frameA, frameB } = options;
-      if (frameA) raw.setLocalFrame1(vec(anchorA), quat(frameA));
-      if (frameB) raw.setLocalFrame2(vec(anchorB), quat(frameB));
-      for (const [dof, range] of Object.entries(options.limits ?? {}))
-        joint.setAxisLimits(dof as JointDof, range[0], range[1]);
-      for (const [dof, motor] of Object.entries(options.motors ?? {})) joint.setAxisMotor(dof as JointDof, motor);
-    }
     return joint;
+  }
+  /**
+   * Holds a tree of bodies to reduced coordinates, Rapier's multibody joints: the `root` and `links`, each link a body, the body
+   * it hangs from (default the link before it) and a joint of locks (`fixed`, `revolute`, `prismatic`, `spherical` or
+   * `generic`) between them. The joints are made here and are ordinary joints too, with their limits and motors; the tree
+   * holds them exactly, so they cannot drift open and a branch is as stiff as a chain.
+   * @throws MargoError (`state`) for a body in another multibody, a parent not in the tree yet, or a loop.
+   * @throws RangeError for a tree with no link.
+   */
+  addMultibody(root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody {
+    for (const body of [
+      root,
+      ...links.map((link) => link.body),
+      ...links.flatMap((link) => (link.parent ? [link.parent] : [])),
+    ])
+      if (!this.bodies.has(body))
+        throw new MargoError(
+          'state',
+          'Every body of a multibody must belong to this physics world; add it with physics.addBody first.',
+        );
+    const multibody = buildMultibody(this, root, links);
+    this.multibodies.add(multibody);
+    return multibody;
+  }
+  /** @internal use `multibody.remove`. */
+  removeMultibody(multibody: Multibody): void {
+    if (!this.multibodies.delete(multibody)) return;
+    clearMultibody(this.kernel, multibody);
+    multibody.markRemoved();
   }
   /** @internal use `joint.remove`. */
   removeJoint(joint: PhysicsJoint): void {
     if (!this.joints.delete(joint)) return;
-    if (joint.raw.isValid()) this.world.removeImpulseJoint(joint.raw, true);
+    for (const multibody of this.multibodies)
+      if (multibody.links.some((link) => link.joint === joint)) this.removeMultibody(multibody);
+    this.kernel.removeJoint(joint.row);
     joint.markRemoved();
   }
-
-  /** Wraps Rapier's KinematicCharacterController around a kinematicPosition body. */
-  createCharacterController(body: PhysicsBody, options?: CharacterControllerOptions): CharacterController {
+  /**
+   * A kinematic character controller for a `kinematicPosition` body whose first collider is a sphere, box, capsule,
+   * cylinder or cone. Call `move` once per fixed step, for example from `beforestep`.
+   * @throws MargoError (`state`) unless the body belongs to this world.
+   * @throws TypeError unless the body is `kinematicPosition` with a collider.
+   */
+  createCharacterController(body: PhysicsBody, options: CharacterControllerOptions = {}): CharacterController {
+    this.live();
     if (!this.bodies.has(body))
-      throw new MargoError('state', 'Body must belong to this physics world; add it with physics.addBody first.');
+      throw new MargoError('state', 'The body must belong to this physics world; add it with physics.addBody first.');
     const controller = new CharacterController(this, body, options);
     this.controllers.add(controller);
     return controller;
   }
   /** @internal use `controller.dispose`. */
   removeController(controller: CharacterController): void {
-    if (!this.controllers.delete(controller)) return;
-    if (!this.disposed) this.worldRef!.removeCharacterController(controller.raw);
+    this.controllers.delete(controller);
   }
-
-  /** True when `body` belongs to this world. */
-  owns(body: PhysicsBody): boolean {
-    return this.bodies.has(body);
+  /** The kernel's filter words for a query filter: flags, groups, collider row and body row to leave out. */
+  private filterWords(filter: QueryFilter): [number, number, number, number] {
+    let flags = 0;
+    if (filter.excludeFixed) flags |= QUERY_EXCLUDE_FIXED;
+    if (filter.excludeKinematic) flags |= QUERY_EXCLUDE_KINEMATIC;
+    if (filter.excludeDynamic) flags |= QUERY_EXCLUDE_DYNAMIC;
+    if (filter.excludeSensors) flags |= QUERY_EXCLUDE_SENSORS;
+    if (filter.excludeSolids) flags |= QUERY_EXCLUDE_SOLIDS;
+    if (filter.onlyDynamic) flags |= QUERY_ONLY_DYNAMIC;
+    if (filter.onlyKinematic) flags |= QUERY_ONLY_KINEMATIC;
+    if (filter.onlyFixed) flags |= QUERY_ONLY_FIXED;
+    const groups = filter.groups === undefined ? 0xffffffff : filter.groups >>> 0;
+    const collider = filter.excludeCollider ? filter.excludeCollider.handle : NONE;
+    const body = filter.exclude ? filter.exclude.row : NONE;
+    return [flags, groups, collider, body];
+  }
+  private rayHit(hit: KernelRayHit): RaycastHit | null {
+    const collider = this.byRow.get(hit.collider);
+    return collider
+      ? {
+          body: collider.body,
+          mesh: collider.body.mesh,
+          collider,
+          distance: hit.distance,
+          point: hit.point,
+          normal: hit.normal,
+        }
+      : null;
+  }
+  private passes(hit: RaycastHit, predicate: QueryFilter['predicate']): boolean {
+    return !predicate || predicate(hit.body, hit.collider);
   }
   /**
-   * @internal Registers a helper that steps and syncs with the world (vehicles, ropes): `beforeStep` runs before each
-   * Rapier step, `afterSync` after the meshes are written, `bodyRemoved` when a body goes and `dispose` with the world.
+   * The first hit along a ray, or null. Queries see the poses of the last step, as Rapier's do.
+   * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
    */
-  attach(attachment: PhysicsAttachment): void {
-    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
-    this.attachments.add(attachment);
-  }
-  /** @internal Unregisters a helper; returns false when it was not attached. */
-  detach(attachment: PhysicsAttachment): boolean {
-    return this.attachments.delete(attachment);
-  }
-
-  /** Subscribes to collision or step events. Returns an unsubscribe function. */
-  on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
-    if (this.disposed) return noop;
-    let set = this.listeners.get(type);
-    if (!set) this.listeners.set(type, (set = new Set()));
-    set.add(listener);
-    return () => {
-      set!.delete(listener);
-    };
-  }
-  private emit<K extends keyof PhysicsEventMap>(type: K, event: PhysicsEventMap[K]): void {
-    // Listeners removed during dispatch are skipped; listeners added during dispatch also run for this event.
-    this.listeners.get(type)?.forEach(callListener, event);
-  }
-
-  // Scene queries. All positions and directions are world space.
-  private filterArgs(
-    filter: QueryFilter = {},
-  ): [
-    number | undefined,
-    number | undefined,
-    undefined,
-    RigidBody | undefined,
-    ((collider: Collider) => boolean) | undefined,
-  ] {
-    const F = this.rapier.QueryFilterFlags;
-    let flags = 0;
-    if (filter.excludeSensors) flags |= F.EXCLUDE_SENSORS;
-    if (filter.excludeFixed) flags |= F.EXCLUDE_FIXED;
-    if (filter.excludeKinematic) flags |= F.EXCLUDE_KINEMATIC;
-    if (filter.excludeDynamic) flags |= F.EXCLUDE_DYNAMIC;
-    const predicate = filter.predicate;
-    return [
-      flags || undefined,
-      filter.groups,
-      undefined,
-      filter.exclude?.raw,
-      (raw) => {
-        const collider = this.byHandle.get(raw.handle);
-        return !!collider && (!predicate || predicate(collider.body, collider));
-      },
-    ];
-  }
-  private hit(raw: Collider): Hit | null {
-    const collider = this.byHandle.get(raw.handle);
-    return collider ? { body: collider.body, mesh: collider.body.mesh, collider } : null;
-  }
-  private ray(origin: Vec3, direction: Vec3): { ray: Ray; dir: [number, number, number] } {
+  raycast(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit | null {
     checkVec(origin, 'Ray origin');
     checkVec(direction, 'Ray direction');
-    const length = Math.hypot(...direction);
-    if (!length) throw new RangeError('Ray direction must be nonzero');
-    const dir: [number, number, number] = [direction[0] / length, direction[1] / length, direction[2] / length];
-    return { ray: new this.rapier.Ray(vec(origin), vec(dir)), dir };
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    const max = options.maxDistance ?? Infinity,
+      solid = options.solid ?? true,
+      words = this.filterWords(options);
+    if (options.predicate) {
+      let best: RaycastHit | null = null;
+      for (const raw of this.kernel.raycastAll(origin, direction, max, solid, ...words)) {
+        const hit = this.rayHit(raw);
+        if (hit && this.passes(hit, options.predicate) && (!best || hit.distance < best.distance)) best = hit;
+      }
+      return best;
+    }
+    const raw = this.kernel.raycast(origin, direction, max, solid, ...words);
+    return raw ? this.rayHit(raw) : null;
   }
-
-  /** First hit along a ray, or null. */
-  raycast(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit | null {
-    const { ray, dir } = this.ray(origin, direction);
-    const result = this.world.castRayAndGetNormal(
-      ray,
-      options.maxDistance ?? 1e30,
+  /**
+   * Every hit along a ray, nearest first: one a collider. Return false from `options.stop` to end the list there.
+   * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
+   */
+  raycastAll(
+    origin: Vec3,
+    direction: Vec3,
+    options: PhysicsRaycastOptions & { stop?: (hit: RaycastHit) => boolean } = {},
+  ): RaycastHit[] {
+    checkVec(origin, 'Ray origin');
+    checkVec(direction, 'Ray direction');
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    const hits: RaycastHit[] = [];
+    for (const raw of this.kernel.raycastAll(
+      origin,
+      direction,
+      options.maxDistance ?? Infinity,
       options.solid ?? true,
-      ...this.filterArgs(options),
-    );
-    if (!result) return null;
-    const base = this.hit(result.collider);
-    if (!base) return null;
-    const t = result.timeOfImpact;
-    return {
-      ...base,
-      distance: t,
-      point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t],
-      normal: tuple(result.normal),
-    };
+      ...this.filterWords(options),
+    )) {
+      const hit = this.rayHit(raw);
+      if (hit && this.passes(hit, options.predicate)) hits.push(hit);
+    }
+    hits.sort(byDistance);
+    if (options.stop) for (let i = 0; i < hits.length; i++) if (!options.stop(hits[i]!)) return hits.slice(0, i + 1);
+    return hits;
   }
-
-  /** Every hit along a ray, nearest first. */
-  raycastAll(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit[] {
-    const { ray, dir } = this.ray(origin, direction),
-      hits: RaycastHit[] = [];
-    const [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
-    this.world.intersectionsWithRay(
-      ray,
-      options.maxDistance ?? 1e30,
-      options.solid ?? true,
-      (result) => {
-        const base = this.hit(result.collider),
-          t = result.timeOfImpact;
-        if (base)
-          hits.push({
-            ...base,
-            distance: t,
-            point: [origin[0] + dir[0] * t, origin[1] + dir[1] * t, origin[2] + dir[2] * t],
-            normal: tuple(result.normal),
-          });
-        return true;
-      },
-      flags,
-      groups,
-      undefined,
-      excludeBody,
-      predicate,
-    );
-    return hits.sort((a, b) => a.distance - b.distance);
+  private castHit(hit: KernelShapeCastHit): ShapeCastHit | null {
+    const collider = this.byRow.get(hit.collider);
+    return collider
+      ? {
+          body: collider.body,
+          mesh: collider.body.mesh,
+          collider,
+          distance: hit.distance,
+          point: hit.point,
+          normal: hit.normal,
+          queryPoint: hit.queryPoint,
+          queryNormal: hit.queryNormal,
+        }
+      : null;
   }
-
-  /** Sweeps a shape from `position` along `direction` and returns the first hit, or null. */
+  private live(): void {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+  }
+  /**
+   * Sweeps a convex shape (sphere, box, capsule, cylinder, cone or convexHull, with its size given) from `position` and
+   * `rotation` along `direction` and returns the first collider it touches, or null. `distance` is along the direction's
+   * unit. Queries see the poses of the last step, as Rapier's do.
+   * @throws RangeError for a position, rotation or direction that is not finite, or a zero direction; MargoError
+   * `unsupported` for another query shape.
+   */
   shapeCast(
     shape: ShapeOptions,
     position: Vec3,
     rotation: Quat,
     direction: Vec3,
-    options: QueryFilter & { maxDistance?: number; targetDistance?: number; stopAtPenetration?: boolean } = {},
+    options: PhysicsShapeCastOptions = {},
   ): ShapeCastHit | null {
     checkVec(position, 'Shape position');
-    const { dir } = this.ray(position, direction);
-    const query = createColliderDesc(this.rapier, shape).desc.shape;
-    const result = this.world.castShape(
-      vec(position),
-      quat(rotation),
-      vec(dir),
-      query,
-      options.targetDistance ?? 0,
-      options.maxDistance ?? 1e30,
-      options.stopAtPenetration ?? true,
-      ...this.filterArgs(options),
-    );
-    if (!result) return null;
-    const base = this.hit(result.collider);
-    return base
-      ? { ...base, distance: result.time_of_impact, point: tuple(result.witness1), normal: tuple(result.normal1) }
-      : null;
+    checkRotation(rotation);
+    checkVec(direction, 'Cast direction');
+    this.live();
+    const parts = queryParts(shape);
+    if (parts) {
+      // A compound is cast piece by piece: the first touch is the nearest of its pieces'.
+      let best: ShapeCastHit | null = null;
+      for (const part of parts) {
+        const moved = turn(rotation, part.offset),
+          hit = this.shapeCast(
+            part.shape,
+            [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]],
+            multiply(rotation, part.rotation),
+            direction,
+            options,
+          );
+        if (hit && (!best || hit.distance < best.distance)) best = hit;
+      }
+      return best;
+    }
+    const query = queryShape(shape, this.hulls),
+      cast = {
+        max: options.maxDistance ?? Infinity,
+        target: options.targetDistance ?? 0,
+        stop: options.stopAtPenetration ?? true,
+        geometry: options.computeImpactGeometryOnPenetration ?? true,
+      },
+      words = this.filterWords(options);
+    if (options.predicate) {
+      let best: ShapeCastHit | null = null;
+      for (const raw of this.kernel.shapeCastAll(query, position, rotation, direction, cast, ...words)) {
+        const hit = this.castHit(raw);
+        if (hit && options.predicate(hit.body, hit.collider) && (!best || hit.distance < best.distance)) best = hit;
+      }
+      return best;
+    }
+    const raw = this.kernel.shapeCast(query, position, rotation, direction, cast, ...words);
+    return raw ? this.castHit(raw) : null;
   }
-
-  /** Closest point on any collider to `point`, or null. */
+  /**
+   * The point on any collider nearest `point`, or null when no collider is seen. Inside a shape with `solid` true (the
+   * default) the point itself; with `solid` false the nearest point of its surface. Inside, `inside` is true and
+   * `distance` 0 either way, as on the root entry.
+   * @throws RangeError for a point that is not three finite numbers.
+   */
   projectPoint(point: Vec3, options: QueryFilter & { solid?: boolean } = {}): PointProjection | null {
     checkVec(point, 'Point');
-    const result = this.world.projectPoint(vec(point), options.solid ?? true, ...this.filterArgs(options));
-    if (!result) return null;
-    const base = this.hit(result.collider);
-    if (!base) return null;
-    const projected = tuple(result.point);
-    return {
-      ...base,
-      point: projected,
-      inside: result.isInside,
-      distance: result.isInside
-        ? 0
-        : Math.hypot(projected[0] - point[0], projected[1] - point[1], projected[2] - point[2]),
-    };
+    this.live();
+    const solid = options.solid ?? true,
+      words = this.filterWords(options);
+    const raws = options.predicate
+      ? this.kernel.projectPointAll(point, solid, ...words)
+      : [this.kernel.projectPoint(point, solid, ...words)];
+    let best: PointProjection | null = null;
+    for (const raw of raws) {
+      const collider = raw && this.byRow.get(raw.collider);
+      if (!raw || !collider || (options.predicate && !options.predicate(collider.body, collider))) continue;
+      const distance = raw.inside ? 0 : raw.distance,
+        hit = {
+          body: collider.body,
+          mesh: collider.body.mesh,
+          collider,
+          point: raw.point,
+          inside: raw.inside,
+          distance,
+        };
+      if (!best || distance < best.distance || (distance === best.distance && hit.inside && !best.inside)) best = hit;
+    }
+    return best;
   }
-
-  /** Bodies whose colliders contain `point`. */
+  /**
+   * The bodies whose colliders hold `point`, in the order they were added. A trimesh or height field holds no point.
+   * @throws RangeError for a point that is not three finite numbers.
+   */
   intersectPoint(point: Vec3, options: QueryFilter = {}): PhysicsBody[] {
     checkVec(point, 'Point');
-    const found = new Set<PhysicsBody>(),
-      [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
-    this.world.intersectionsWithPoint(
-      vec(point),
-      (collider) => {
-        const body = this.byHandle.get(collider.handle)?.body;
-        if (body) found.add(body);
-        return true;
-      },
-      flags,
-      groups,
-      undefined,
-      excludeBody,
-      predicate,
-    );
-    return [...found];
+    this.live();
+    return this.bodiesOf(this.kernel.intersectPoint(point, ...this.filterWords(options)), options.predicate);
   }
-
-  /** Bodies whose colliders overlap a shape placed at `position` and `rotation`. */
+  /**
+   * The bodies whose colliders overlap a convex shape (as `shapeCast` takes) at `position` and `rotation`, in the order
+   * they were added.
+   * @throws RangeError for a position or rotation that is not finite; MargoError `unsupported` for another query shape.
+   */
   intersectShape(
     shape: ShapeOptions,
     position: Vec3,
@@ -1154,74 +1331,232 @@ export class Physics implements EnginePlugin, BodyOwner {
     options: QueryFilter = {},
   ): PhysicsBody[] {
     checkVec(position, 'Shape position');
-    const query = createColliderDesc(this.rapier, shape).desc.shape,
-      found = new Set<PhysicsBody>(),
-      [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
-    this.world.intersectionsWithShape(
-      vec(position),
-      quat(rotation),
-      query,
-      (collider) => {
-        const body = this.byHandle.get(collider.handle)?.body;
-        if (body) found.add(body);
-        return true;
-      },
-      flags,
-      groups,
-      undefined,
-      excludeBody,
-      predicate,
+    checkRotation(rotation);
+    this.live();
+    const parts = queryParts(shape);
+    if (parts) {
+      const found = new Set<PhysicsBody>();
+      for (const part of parts) {
+        const moved = turn(rotation, part.offset);
+        for (const body of this.intersectShape(
+          part.shape,
+          [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]],
+          multiply(rotation, part.rotation),
+          options,
+        ))
+          found.add(body);
+      }
+      // In the order the bodies were added, as every query lists them.
+      return [...this.bodies].filter((body) => found.has(body));
+    }
+    const query = queryShape(shape, this.hulls);
+    return this.bodiesOf(
+      this.kernel.intersectShape(query, position, rotation, ...this.filterWords(options)),
+      options.predicate,
     );
+  }
+  /**
+   * The bodies whose colliders' boxes meet the box from `min` to `max`, in the order they were added. A collider's box is
+   * tight to its shape at its pose of the last step (see {@link PhysicsCollider.aabb}).
+   * @throws RangeError for a box that is not finite or has a `min` over its `max`.
+   */
+  intersectAabb(min: Vec3, max: Vec3, options: QueryFilter = {}): PhysicsBody[] {
+    checkVec(min, 'Box min');
+    checkVec(max, 'Box max');
+    this.live();
+    return this.bodiesOf(this.kernel.intersectAabb(min, max, ...this.filterWords(options)), options.predicate);
+  }
+  /**
+   * The contact manifolds of two colliders within `prediction` metres of touching (default 0), whether or not their bodies
+   * touch in the world: one for two convex colliders, one a pair of children for a compound, one a triangle or cell for a
+   * mesh. Normals run from `a` to `b`. A mesh's triangles give their own normals, without the seam smoothing of
+   * `fixInternalEdges`.
+   * @throws RangeError for a collider that was removed or a prediction below 0.
+   */
+  contactPair(a: PhysicsCollider, b: PhysicsCollider, prediction = 0): ContactManifold[] {
+    this.live();
+    return this.kernel.pairContacts(this.rowOf(a), this.rowOf(b), prediction).map(({ normal, points }) => ({
+      normal,
+      points: points.map((p) => ({ pointA: p.onA, pointB: p.onB, separation: p.separation, id: p.id })),
+    }));
+  }
+  /**
+   * Whether two colliders overlap now, whether or not their bodies touch in the world. Sensors count.
+   * @throws RangeError for a collider that was removed.
+   */
+  intersectionPair(a: PhysicsCollider, b: PhysicsCollider): boolean {
+    this.live();
+    return this.kernel.pairIntersects(this.rowOf(a), this.rowOf(b));
+  }
+  /**
+   * How far apart two colliders are, with the nearest point on each; 0 when they overlap. Null when none can be read (a
+   * half space against a mesh).
+   * @throws RangeError for a collider that was removed.
+   */
+  colliderDistance(a: PhysicsCollider, b: PhysicsCollider): ColliderDistance | null {
+    this.live();
+    return this.kernel.pairDistance(this.rowOf(a), this.rowOf(b));
+  }
+  /**
+   * A ray against one collider, as Rapier's `collider.castRay`: the hit or null. `maxDistance` defaults to unbounded and
+   * `solid` to true.
+   * @throws RangeError for an origin or direction that is not three finite numbers, a zero direction or a removed collider.
+   */
+  raycastCollider(
+    collider: PhysicsCollider,
+    origin: Vec3,
+    direction: Vec3,
+    options: { maxDistance?: number; solid?: boolean } = {},
+  ): RaycastHit | null {
+    checkVec(origin, 'Ray origin');
+    checkVec(direction, 'Ray direction');
+    this.live();
+    const raw = this.kernel.colliderRay(
+      this.rowOf(collider),
+      origin,
+      direction,
+      options.maxDistance ?? Infinity,
+      options.solid ?? true,
+    );
+    return raw ? this.rayHit(raw) : null;
+  }
+  /**
+   * The point of one collider nearest `point`, as Rapier's `collider.projectPoint`: inside, with `solid` true (the default)
+   * the point itself. Null when nothing can be projected (a mesh holds no inside).
+   * @throws RangeError for a point that is not three finite numbers or a removed collider.
+   */
+  projectPointOnCollider(
+    collider: PhysicsCollider,
+    point: Vec3,
+    options: { solid?: boolean } = {},
+  ): { point: [number, number, number]; inside: boolean; distance: number } | null {
+    checkVec(point, 'Point');
+    this.live();
+    const raw = this.kernel.colliderProject(this.rowOf(collider), point, options.solid ?? true);
+    return raw ? { point: raw.point, inside: raw.inside, distance: raw.inside ? 0 : raw.distance } : null;
+  }
+  /**
+   * Whether `point` is inside one collider, as Rapier's `collider.containsPoint`; a mesh or height field holds no point.
+   * @throws RangeError for a point that is not three finite numbers or a removed collider.
+   */
+  colliderContainsPoint(collider: PhysicsCollider, point: Vec3): boolean {
+    return this.projectPointOnCollider(collider, point, { solid: true })?.inside ?? false;
+  }
+  /**
+   * A shape cast against one collider, as Rapier's `collider.castShape`, with the options of `shapeCast`.
+   * @throws RangeError for a pose or direction that is not finite, a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
+   */
+  castShapeAtCollider(
+    collider: PhysicsCollider,
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat,
+    direction: Vec3,
+    options: PhysicsShapeCastOptions = {},
+  ): ShapeCastHit | null {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    checkVec(direction, 'Cast direction');
+    this.live();
+    const query = queryShape(shape, this.hulls),
+      raw = this.kernel.colliderShapeCast(this.rowOf(collider), query, position, rotation, direction, {
+        max: options.maxDistance ?? Infinity,
+        target: options.targetDistance ?? 0,
+        stop: options.stopAtPenetration ?? true,
+        geometry: options.computeImpactGeometryOnPenetration ?? true,
+      });
+    return raw ? this.castHit(raw) : null;
+  }
+  /**
+   * Whether a convex shape overlaps one collider, as Rapier's `collider.intersectsShape`.
+   * @throws RangeError for a pose that is not finite or a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
+   */
+  colliderIntersectsShape(
+    collider: PhysicsCollider,
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat = [0, 0, 0, 1],
+  ): boolean {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    this.live();
+    return this.kernel.colliderOverlaps(this.rowOf(collider), queryShape(shape, this.hulls), position, rotation);
+  }
+  /** A collider's row, for the kernel; refuses what is not this world's. */
+  private rowOf(collider: PhysicsCollider): number {
+    if (!collider.valid || this.byRow.get(collider.handle) !== collider)
+      throw new RangeError(
+        'That collider was removed or belongs to another world; pass a collider from body.colliders.',
+      );
+    return collider.handle;
+  }
+  private bodiesOf(rows: readonly number[], predicate: QueryFilter['predicate']): PhysicsBody[] {
+    const found = new Set<PhysicsBody>();
+    for (const row of rows) {
+      const collider = this.byRow.get(row);
+      if (collider && (!predicate || predicate(collider.body, collider))) found.add(collider.body);
+    }
     return [...found];
   }
-
-  /** Whether two bodies' colliders currently touch (contact) or overlap (sensor), as of the last step. */
+  /**
+   * Whether two bodies' colliders touch as of the last step. A point still ahead of a moving body does not count. It walks
+   * only the pairs of `a`'s colliders and allocates nothing.
+   */
   touching(a: PhysicsBody, b: PhysicsBody): boolean {
-    const world = this.world;
-    for (const ca of a.colliders)
-      for (const cb of b.colliders) {
-        if (ca.isSensor() || cb.isSensor()) {
-          if (world.intersectionPair(ca.raw, cb.raw)) return true;
-          continue;
-        }
-        let touching = false;
-        world.contactPair(ca.raw, cb.raw, (manifold) => {
-          if (manifold.numContacts() > 0) touching = true;
-        });
-        if (touching) return true;
+    const { kernel } = this,
+      c = kernel.columns,
+      { colliders } = a;
+    for (let i = 0; i < colliders.length; i++) {
+      const self = colliders[i].handle;
+      for (let row = kernel.firstPair(self); row !== NONE; row = kernel.nextPair(row, self)) {
+        if (this.bodyOfCollider(c.pairA[row] === self ? c.pairB[row] : c.pairA[row]) !== b) continue;
+        // A mesh or compound pair keeps its points on its parts, one row each down the pairChild chain.
+        for (let part = row; part !== NONE; part = c.pairChild[part])
+          for (let at = part * 4; at < part * 4 + c.pairContacts[part]; at++)
+            if (c.contactSeparation[at] <= 0 || c.contactNormalImpulse[at] > 0) return true;
       }
+    }
     return false;
   }
 
   /**
-   * Where the solver pushes on this body as of the last step: one world position [x, y, z] per solver contact point, so
-   * a box flat on a floor has its four corners. Sensors have none, and a point two colliders share comes once for each.
+   * Where the solver pushes on this body as of the last step: one world position [x, y, z] per contact point, so a box
+   * flat on a floor has its four corners. A point two colliders share comes once for each. It walks only the pairs of the
+   * body's colliders and their mesh parts, in the order of their rows, and allocates only what it returns.
    */
   contactPoints(body: PhysicsBody): [number, number, number][] {
-    const world = this.world,
-      points: [number, number, number][] = [];
-    for (const { raw } of body.colliders)
-      world.contactPairsWith(raw, (other) =>
-        world.contactPair(raw, other, (manifold) => {
-          for (let i = 0; i < manifold.numSolverContacts(); i++) {
-            const point = manifold.solverContactPoint(i);
-            if (point) points.push(tuple(point));
-          }
-        }),
-      );
+    const points: [number, number, number][] = [],
+      { kernel } = this,
+      c = kernel.columns,
+      { colliders } = body,
+      rows = this.rowScratch;
+    rows.length = 0;
+    for (let i = 0; i < colliders.length; i++) {
+      const self = colliders[i].handle;
+      for (let row = kernel.firstPair(self); row !== NONE; row = kernel.nextPair(row, self))
+        for (let part = row; part !== NONE; part = c.pairChild[part]) if (c.pairContacts[part] !== 0) rows.push(part);
+    }
+    rows.sort(ascending);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      for (let at = row * 4; at < row * 4 + c.pairContacts[row]; at++)
+        if (c.contactSeparation[at] <= 0 || c.contactNormalImpulse[at] > 0)
+          points.push([c.contactX[at], c.contactY[at], c.contactZ[at]]);
+    }
+    rows.length = 0;
     return points;
   }
 
   /**
-   * Rapier's debug line buffers: `vertices` (xyz pairs, one segment per pair) and `colors` (rgba per vertex).
-   * Draw them with `@margoengine/lines`: `new Line({mode: 'segments', positions: vertices, colors})`.
+   * Rapier's debug lines: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the collider
+   * outlines, joints and last-step contact points of the world, and with `boxes` the box around each collider. Draw them with
+   * `@margoengine/lines`: `new Line({mode: 'segments', positions: vertices, colors})`. Reads the poses of the last step.
    */
-  debugRender(): { vertices: Float32Array; colors: Float32Array } {
-    const buffers = this.world.debugRender();
-    return { vertices: buffers.vertices, colors: buffers.colors };
+  debugRender(options: DebugRenderOptions = {}): DebugLines {
+    return debugLines(this.kernel, this.bodies, this.joints, options);
   }
 
-  /** Frees every controller, joint, collider, body and the world. Detaches from the engine if attached. */
+  /** Frees every body and the world. Detaches from the engine if attached. */
   dispose(): void {
     if (this.disposed) return;
     const engine = this.engine,
@@ -1241,16 +1576,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const joint of [...this.joints]) this.removeJoint(joint);
     for (const body of [...this.bodies]) this.removeBody(body);
     this.listeners.clear();
-    this.queue!.free();
-    this.worldRef!.free();
     this.disposed = true;
     this.engine = null;
-    this.queue = this.worldRef = this.hooks = null;
+    this.world = null;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
   }
 }
-
-const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();

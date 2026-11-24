@@ -1,7 +1,7 @@
 // Active collision types and contact-force thresholds on the own solver. The kernel's side is in kernel/tests/collision_types.rs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

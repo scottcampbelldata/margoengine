@@ -17,11 +17,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 
-const PHYSICS = 'docs/known-bugs.md, "plugin scene owner (physics)": physics is on hold';
 const SCIVIZ = 'docs/known-bugs.md, "plugin scene owner (sciviz)": sciviz is held out of list 5';
 /** Every open site the check lets through, each by file, exact call text and the known-bugs entry. */
 export const OPEN = [
-  { file: 'packages/physics/src/next/physics.ts', call: 'engine.removePlugin(this.name)', bug: PHYSICS },
   { file: 'packages/sciviz/src/progressive.ts', call: 'this.#engine?.removePlugin(this.name)', bug: SCIVIZ },
   { file: 'packages/sciviz/src/render.ts', call: 'engine?.removePlugin(this.name)', bug: SCIVIZ },
 ];
@@ -31,7 +29,8 @@ const ON_PURPOSE = /\/\/\s*scene-owner: active scene on purpose, \S/;
 function receiverName(node) {
   if (node?.type === 'ChainExpression') return receiverName(node.expression);
   if (node?.type === 'ParenthesizedExpression') return receiverName(node.expression);
-  if (['TSNonNullExpression', 'TSAsExpression', 'TSSatisfiesExpression'].includes(node?.type)) return receiverName(node.expression);
+  if (['TSNonNullExpression', 'TSAsExpression', 'TSSatisfiesExpression'].includes(node?.type))
+    return receiverName(node.expression);
   if (node?.type === 'Identifier') return node.name;
   if (node?.type === 'MemberExpression' || node?.type === 'StaticMemberExpression') return node.property?.name;
   if (node?.type === 'PrivateFieldExpression') return node.field?.name;

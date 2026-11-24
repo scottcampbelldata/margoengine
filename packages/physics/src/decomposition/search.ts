@@ -1,7 +1,7 @@
 // The cutting-plane search of Wei, Liu, Ling and Su 2022 (arXiv 2205.02961), section 6: Monte Carlo tree search over
 // axis-aligned candidate planes (Algorithm 2), scored by Rv over a fixed number of cuts (Eq. 9), then the first plane
 // refined by ternary search (section 6.5).
-import { root } from '../next/hull.js';
+import { root } from '../hull.js';
 import { cut, logarithm, type Plane, type Random, type Solid } from './mesh.js';
 
 /** The plane id trial cuts tag their caps with; only a kept cut takes a real one. */
@@ -24,7 +24,8 @@ export interface SearchSettings {
 /** A cut into two parts that both have a hull, or null. */
 function split(part: Solid, plane: Plane): [Solid, Solid] | null {
   const parts = cut(part, plane, TRIAL);
-  if (!parts || parts[0].volume <= SLIVER || parts[1].volume <= SLIVER || !parts[0].hull() || !parts[1].hull()) return null;
+  if (!parts || parts[0].volume <= SLIVER || parts[1].volume <= SLIVER || !parts[0].hull() || !parts[1].hull())
+    return null;
   return parts;
 }
 
@@ -78,7 +79,8 @@ function quality(maxima: readonly number[], depth: number): number {
 function candidates(part: Solid, m: number): Plane[] {
   const out: Plane[] = [];
   for (let axis = 0; axis < 3; axis++)
-    for (let j = 1; j <= m; j++) out.push(axisPlane(axis, part.min[axis] + (j / (m + 1)) * (part.max[axis] - part.min[axis])));
+    for (let j = 1; j <= m; j++)
+      out.push(axisPlane(axis, part.min[axis] + (j / (m + 1)) * (part.max[axis] - part.min[axis])));
   return out;
 }
 

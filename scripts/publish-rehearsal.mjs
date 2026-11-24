@@ -319,7 +319,7 @@ function secretsOfThisMachine() {
 }
 
 /** Entries that need an optional library installed first, and the libraries the check adds for them. */
-const OPTIONAL_LIBRARIES = ['react', 'react-dom', 'web-ifc', '@dimforge/rapier3d-compat'];
+const OPTIONAL_LIBRARIES = ['react', 'react-dom', 'web-ifc'];
 
 /** What the app itself installs to type-check and build. Node's types: margoengine/voxel-net has a server entry. */
 const TOOLS = ['typescript', 'vite', '@types/node', '@types/react', '@types/react-dom'];

@@ -2,7 +2,7 @@
 // the tight box of one, against analytic answers and Rapier (the root entry as a black box).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 
 const warn = console.warn;
 console.warn = () => {};

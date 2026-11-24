@@ -1,30 +1,26 @@
 // What only the own entry does: calls it does not serve yet, snapshots, poses read straight from the columns.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, Physics, loadKernel } from '../dist/next.js';
+import { KernelWorld, Physics, loadKernel } from '../dist/index.js';
 
 await Physics.load();
 const DT = 1 / 60;
 
-test('a call that is not served yet says so, and what to use', () => {
-  const physics = new Physics(null),
-    body = physics.addBody(null);
-  const unsupported = { code: 'unsupported', message: /not in the own solver yet|does not have yet/ };
-  for (const call of [
-    () => physics.addModel(),
-    () => physics.createCharacterController(),
-    () => physics.removeController(),
-    () => physics.addBody(null, { colliders: { shape: 'custom', desc: {} } }),
-  ])
-    assert.throws(call, unsupported);
-  assert.equal(physics.bodyCount, 1, 'a refused body leaves nothing behind');
-  body.ccd = true;
-  assert.equal(body.ccd, true);
+test('a shape that is not a collider is refused with the list of the ones that are', () => {
+  const physics = new Physics(null);
+  assert.throws(() => physics.addBody(null, { colliders: { shape: 'custom', desc: {} } }), {
+    code: 'unsupported',
+    message: /not in the own solver yet; use box, sphere/,
+  });
+  assert.equal(physics.bodyCount, 0, 'a refused body leaves nothing behind');
   assert.equal(physics.supportsShape('custom'), false);
   assert.equal(physics.supportsShape('halfSpace'), true);
   assert.equal(physics.supportsShape('cylinder'), true);
   assert.equal(physics.supportsShape('capsule'), true);
-  assert.throws(() => new Physics(null, { rapier: {} }), TypeError);
+  const body = physics.addBody(null);
+  body.ccd = true;
+  assert.equal(body.ccd, true);
+  assert.equal(physics.debugRender().vertices.length, 0, 'no colliders, no lines');
   physics.dispose();
 });
 

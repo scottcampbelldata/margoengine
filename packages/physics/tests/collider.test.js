@@ -14,7 +14,10 @@ const run = (physics, steps) => {
   for (let i = 0; i < steps; i++) physics.step();
 };
 const floor = (physics) =>
-  physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.5, 20], offset: [0, -0.5, 0] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'box', halfExtents: [20, 0.5, 20], offset: [0, -0.5, 0] },
+  });
 const cells = (...list) => Int32Array.from(list.flat());
 // A square of cells at height y, from 0 to size in x and z.
 const slab = (size, y = 0) => {
@@ -90,7 +93,12 @@ test('boundingRadius holds each simple shape and is null where it would have to 
 
 test('a removed collider says so, whether alone or with its body', () => {
   const physics = world(),
-    body = physics.addBody(null, { colliders: [{ shape: 'sphere', radius: 1 }, { shape: 'sphere', radius: 2 }] }),
+    body = physics.addBody(null, {
+      colliders: [
+        { shape: 'sphere', radius: 1 },
+        { shape: 'sphere', radius: 2 },
+      ],
+    }),
     [first, second] = body.colliders;
   body.removeCollider(first);
   assert.equal(first.valid, false);
@@ -120,8 +128,14 @@ test('a box rests on a voxels shape at the height of the top of the cells', () =
 
 test('the size of a voxels shape scales its cells', () => {
   const physics = world();
-  physics.addBody(null, { type: 'fixed', colliders: { shape: 'voxels', cells: slab(8), size: [0.5, 2, 0.5], massless: true } });
-  const crate = physics.addBody(null, { position: [2, 4, 2], colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'voxels', cells: slab(8), size: [0.5, 2, 0.5], massless: true },
+  });
+  const crate = physics.addBody(null, {
+    position: [2, 4, 2],
+    colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] },
+  });
   run(physics, 240);
   assert.ok(Math.abs(crate.position[1] - 2.25) < 0.02, `rests at ${crate.position[1]}`);
   physics.dispose();
@@ -186,24 +200,15 @@ test('voxels options are checked before the solver sees them', () => {
   physics.dispose();
 });
 
-test('a solver without voxels refuses them with a coded error', () => {
-  const physics = world(),
-    { voxels } = physics.rapier.ColliderDesc;
-  physics.rapier.ColliderDesc.voxels = undefined;
-  try {
-    assert.equal(physics.supportsShape('voxels'), false);
-    assert.equal(physics.supportsShape('box'), true);
-    assert.throws(() => physics.addBody(null, { colliders: { shape: 'voxels', cells: slab(1) } }), { code: 'unsupported' });
-  } finally {
-    physics.rapier.ColliderDesc.voxels = voxels;
-  }
-  physics.dispose();
-});
-
 test('massless adds nothing to a body, whatever mass or density it names', () => {
   const physics = world(),
     add = (extra) =>
-      physics.addBody(null, { colliders: [{ shape: 'box', halfExtents: [1, 1, 1], density: 1 }, { shape: 'sphere', radius: 1, ...extra }] });
+      physics.addBody(null, {
+        colliders: [
+          { shape: 'box', halfExtents: [1, 1, 1], density: 1 },
+          { shape: 'sphere', radius: 1, ...extra },
+        ],
+      });
   const plain = add({ density: 1000 }),
     light = add({ massless: true }),
     both = add({ massless: true, mass: 5 });
@@ -228,7 +233,10 @@ test('halfSpace holds a body on the solid side of any normal', () => {
   const pushed = wall.addBody(null, { colliders: { shape: 'sphere', radius: 0.5 } });
   run(wall, 240);
   assert.ok(Math.abs(pushed.position[0] + 0.5) < 0.02, `rests at ${pushed.position[0]}`);
-  assert.throws(() => wall.addBody(null, { type: 'fixed', colliders: { shape: 'halfSpace', normal: [0, 0, 0] } }), RangeError);
+  assert.throws(
+    () => wall.addBody(null, { type: 'fixed', colliders: { shape: 'halfSpace', normal: [0, 0, 0] } }),
+    RangeError,
+  );
   wall.dispose();
 });
 
@@ -264,15 +272,6 @@ test('fixInternalEdges takes a ball over the shared edges of flat triangles', ()
   // No friction anywhere and a flat floor: nothing may take speed along x, and a seam does when the edges are left as they are.
   assert.ok(Math.abs(slide(true) - 4) < 1e-3, `kept its speed: ${slide(true)}`);
   assert.ok(slide(false) < 3.9, `the seams of the plain mesh catch it: ${slide(false)}`);
-});
-
-test('custom keeps working and is named after what it holds', () => {
-  const physics = world(),
-    { ColliderDesc } = physics.rapier,
-    named = physics.addBody(null, { colliders: { shape: 'custom', desc: ColliderDesc.ball(1) } });
-  assert.equal(named.colliders[0].shape, 'sphere');
-  assert.equal(named.colliders[0].radius(), 1);
-  physics.dispose();
 });
 
 test('a character predicate gets the wrapper, and can refuse a collider by it', () => {
@@ -349,10 +348,7 @@ test('mass, centre and inertia read back and setMassProperties replaces them', (
   tuned.setMassProperties({ mass: 2, centerOfMass: [1, 0, 0], inertia: [1, 2, 3] });
   assert.equal(tuned.mass, 2);
   near(tuned.centerOfMass[0], 1);
-  assert.deepEqual(
-    tuned.principalInertia.map((value) => Math.round(value * 1e4) / 1e4).sort(),
-    [1, 2, 3],
-  );
+  assert.deepEqual(tuned.principalInertia.map((value) => Math.round(value * 1e4) / 1e4).sort(), [1, 2, 3]);
   assert.equal(tuned.inertiaFrame.length, 4);
   // The colliders no longer count.
   assert.equal(tuned.colliders[0].density(), 0);

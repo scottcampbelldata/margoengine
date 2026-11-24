@@ -1,7 +1,7 @@
 // Hulls and manifolds through Wasm: what the native tests prove, here at the JavaScript boundary.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 const PYRAMID = [
   [

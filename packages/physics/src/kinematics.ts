@@ -4,8 +4,8 @@
 // bound of Buss and Kim 2005, "Selectively Damped Least Squares for Inverse Kinematics" (section 4: a bound on how far one step
 // may turn any joint).
 import { MargoError } from '@margoengine/math/errors';
-import { JOINT_LIMIT, JOINT_LOCK, type KernelWorld } from '../kernel.js';
-import type { Quat, Vec3 } from '../math.js';
+import { JOINT_LIMIT, JOINT_LOCK, type KernelWorld } from './kernel.js';
+import type { Quat, Vec3 } from './math.js';
 import type { Multibody } from './multibody.js';
 
 /** What `inverseKinematics` is to reach: a position of the chosen point, a rotation of the link, or both. */
@@ -61,7 +61,11 @@ function qrot(q: Q, v: Vec3): V {
   const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
     ty = 2 * (q[2] * v[0] - q[0] * v[2]),
     tz = 2 * (q[0] * v[1] - q[1] * v[0]);
-  return [v[0] + q[3] * tx + q[1] * tz - q[2] * ty, v[1] + q[3] * ty + q[2] * tx - q[0] * tz, v[2] + q[3] * tz + q[0] * ty - q[1] * tx];
+  return [
+    v[0] + q[3] * tx + q[1] * tz - q[2] * ty,
+    v[1] + q[3] * ty + q[2] * tx - q[0] * tz,
+    v[2] + q[3] * tz + q[0] * ty - q[1] * tx,
+  ];
 }
 function fromVector(r: Vec3): Q {
   const angle = Math.hypot(r[0], r[1], r[2]);
@@ -78,9 +82,17 @@ function toVector(q: Q): V {
 }
 const sub = (a: Vec3, b: Vec3): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: Vec3, b: Vec3): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const cross = (a: Vec3, b: Vec3): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const cross = (a: Vec3, b: Vec3): V => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const unit: readonly Vec3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+const unit: readonly Vec3[] = [
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+];
 
 /** A joint of the tree as the kernel holds it. */
 interface Link {
@@ -120,7 +132,12 @@ function describe(kernel: KernelWorld, multibody: Multibody): { links: Link[] } 
       linear: axes(0),
       angular: axes(3),
       limits: [0, 1, 2, 3, 4, 5].map((k) =>
-        flags & (JOINT_LIMIT << k) ? ([(c as never as Record<string, Float32Array>)[`jointMin${k}`]![row]!, (c as never as Record<string, Float32Array>)[`jointMax${k}`]![row]!] as [number, number]) : null,
+        flags & (JOINT_LIMIT << k)
+          ? ([
+              (c as never as Record<string, Float32Array>)[`jointMin${k}`]![row]!,
+              (c as never as Record<string, Float32Array>)[`jointMax${k}`]![row]!,
+            ] as [number, number])
+          : null,
       ),
     });
   });
@@ -181,7 +198,9 @@ function forward(kernel: KernelWorld, links: Link[], states: State[], rootRow: n
       turned = qnorm(qmul(qmul(frame, turnOf(link, states[i]!)), qconj(link.frameB))),
       anchorA = add(parent.p, qrot(parent.q, link.anchorA));
     let target: V = anchorA;
-    link.linear.forEach((k, n) => (target = add(target, qrot(frame, unit[k]!).map((x) => x * states[i]!.offsets[n]!) as V)));
+    link.linear.forEach(
+      (k, n) => (target = add(target, qrot(frame, unit[k]!).map((x) => x * states[i]!.offsets[n]!) as V)),
+    );
     poses.push({ p: sub(target, qrot(turned, link.anchorB)), q: turned });
   });
   return poses;
@@ -239,7 +258,10 @@ export function jointVelocities(kernel: KernelWorld, multibody: Multibody): numb
   const { links } = describe(kernel, multibody),
     c = kernel.columns,
     out: number[] = [],
-    speed = (row: number): { v: V; w: V } => ({ v: [c.linearX[row]!, c.linearY[row]!, c.linearZ[row]!], w: [c.angularX[row]!, c.angularY[row]!, c.angularZ[row]!] });
+    speed = (row: number): { v: V; w: V } => ({
+      v: [c.linearX[row]!, c.linearY[row]!, c.linearZ[row]!],
+      w: [c.angularX[row]!, c.angularY[row]!, c.angularZ[row]!],
+    });
   for (const link of links) {
     const parent = poseOf(kernel, link.parentBody),
       body = poseOf(kernel, link.body),
@@ -281,14 +303,29 @@ function solve(a: number[][], b: number[]): number[] {
   return x;
 }
 
-export function inverseKinematics(kernel: KernelWorld, multibody: Multibody, link: { row: number }, target: IkTarget, options: IkOptions): IkResult {
+export function inverseKinematics(
+  kernel: KernelWorld,
+  multibody: Multibody,
+  link: { row: number },
+  target: IkTarget,
+  options: IkOptions,
+): IkResult {
   const { links } = describe(kernel, multibody),
     rows = [multibody.root.row, ...links.map((l) => l.body)],
     end = rows.indexOf(link.row);
   if (end < 1) throw new RangeError('Inverse kinematics needs a link of this multibody other than its root.');
-  if (!target.position && !target.rotation) throw new RangeError('An inverse kinematics target needs a position, a rotation, or both.');
-  const { point = [0, 0, 0], damping = 0.05, iterations = 100, positionTolerance = 1e-4, rotationTolerance = 1e-3, maxStep = 0.3 } = options;
-  if (!(damping > 0) || !(iterations >= 1) || !(maxStep > 0)) throw new RangeError('IK damping, iterations and maxStep must be above 0.');
+  if (!target.position && !target.rotation)
+    throw new RangeError('An inverse kinematics target needs a position, a rotation, or both.');
+  const {
+    point = [0, 0, 0],
+    damping = 0.05,
+    iterations = 100,
+    positionTolerance = 1e-4,
+    rotationTolerance = 1e-3,
+    maxStep = 0.3,
+  } = options;
+  if (!(damping > 0) || !(iterations >= 1) || !(maxStep > 0))
+    throw new RangeError('IK damping, iterations and maxStep must be above 0.');
   const path: number[] = [];
   for (let at = end; at > 0; at = links[at - 1]!.parent) path.unshift(at);
   const states = links.map((l) => measure(kernel, l)),
@@ -314,7 +351,8 @@ export function inverseKinematics(kernel: KernelWorld, multibody: Multibody, lin
   };
   let now = errors(),
     step = 0;
-  const done = (): boolean => (!target.position || now.position < positionTolerance) && (!goalRotation || now.rotation < rotationTolerance);
+  const done = (): boolean =>
+    (!target.position || now.position < positionTolerance) && (!goalRotation || now.rotation < rotationTolerance);
   for (; step < iterations && !done(); step++) {
     const tip = now.poses[end]!,
       reach = add(tip.p, qrot(tip.q, point)),
@@ -343,7 +381,12 @@ export function inverseKinematics(kernel: KernelWorld, multibody: Multibody, lin
       });
     }
     const rowsN = now.e.length,
-      jjt = Array.from({ length: rowsN }, (_, r) => Array.from({ length: rowsN }, (_, s) => columns.reduce((sum, col) => sum + col[r]! * col[s]!, 0) + (r === s ? damping * damping : 0))),
+      jjt = Array.from({ length: rowsN }, (_, r) =>
+        Array.from(
+          { length: rowsN },
+          (_, s) => columns.reduce((sum, col) => sum + col[r]! * col[s]!, 0) + (r === s ? damping * damping : 0),
+        ),
+      ),
       y = solve(jjt, now.e),
       delta = columns.map((col) => col.reduce((sum, v, r) => sum + v * y[r]!, 0)),
       biggest = Math.max(...delta.map(Math.abs)),
@@ -368,6 +411,7 @@ export function inverseKinematics(kernel: KernelWorld, multibody: Multibody, lin
     now = errors();
   }
   place(kernel, multibody, links, states);
-  if (!Number.isFinite(now.position) || !Number.isFinite(now.rotation)) throw new MargoError('failed', 'Inverse kinematics went out of range; give it a target the tree can approach.');
+  if (!Number.isFinite(now.position) || !Number.isFinite(now.rotation))
+    throw new MargoError('failed', 'Inverse kinematics went out of range; give it a target the tree can approach.');
   return { converged: done(), iterations: step, positionError: now.position, rotationError: now.rotation };
 }

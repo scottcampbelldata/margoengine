@@ -1,7 +1,7 @@
 // Solver settings through Wasm: the setters check, hold across a snapshot, and change what the solver does.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, loadKernel } from '../dist/next.js';
+import { KernelWorld, loadKernel } from '../dist/index.js';
 
 function resting(options) {
   const world = new KernelWorld(8);

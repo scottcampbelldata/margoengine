@@ -2,9 +2,10 @@
 // honours axes, checks its input, and replays bit for bit.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PidController, Physics } from '../dist/next.js';
+import { PidController, Physics } from '../dist/index.js';
 
-const ball = (physics, extra = {}) => physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.25, density: 1000 }, ...extra });
+const ball = (physics, extra = {}) =>
+  physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.25, density: 1000 }, ...extra });
 
 test('a damped controller brings a body to its target and stops it there, whatever its mass', async () => {
   await Physics.load();
@@ -59,7 +60,10 @@ test('the angular controller turns a body to the target the short way, with iner
   await Physics.load();
   const s = Math.sin(0.6),
     c = Math.cos(0.6);
-  for (const colliders of [{ shape: 'sphere', radius: 0.5, density: 100 }, { shape: 'box', halfExtents: [1, 0.2, 0.5], density: 800 }]) {
+  for (const colliders of [
+    { shape: 'sphere', radius: 0.5, density: 100 },
+    { shape: 'box', halfExtents: [1, 0.2, 0.5], density: 800 },
+  ]) {
     const physics = new Physics(null, { gravity: [0, 0, 0] });
     const body = physics.addBody(null, { colliders });
     const pid = new PidController({ kp: 80, kd: 16 });

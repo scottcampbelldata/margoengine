@@ -1,4 +1,3 @@
-import RAPIER from '@dimforge/rapier3d-compat';
 import { Physics } from '../../packages/physics/dist/index.js';
 
 let initialized;
@@ -7,16 +6,16 @@ export async function createWorkload(count = 80) {
   if (!Number.isInteger(count) || count < 80 || count > 528)
     throw new RangeError('Physics workload count must be 80..528');
   const started = performance.now();
-  // Rapier is optional and initialized once; a rejected initialization can be retried.
+  // The solver is compiled once; a rejected load can be retried.
   try {
-    await (initialized ??= RAPIER.init());
+    await (initialized ??= Physics.load());
   } catch (error) {
     initialized = undefined;
     throw error;
   }
   const initializedAt = performance.now(),
     initializationElapsedMilliseconds = initializedAt - started;
-  let physics = new Physics(null, { rapier: RAPIER, fixedTimestep: 1 / 60, maxSubsteps: 4, interpolate: false });
+  let physics = new Physics(null, { fixedTimestep: 1 / 60, maxSubsteps: 4, interpolate: false });
   const points = new Float32Array(count * 4),
     bodyCount = count - queryMarkers,
     columns = Math.ceil(Math.sqrt(bodyCount)),
@@ -115,7 +114,7 @@ export async function createWorkload(count = 80) {
     },
     bounds: { min: [-extent, -0.3, -extent], max: [extent, 3.2, extent] },
     description:
-      'Real Rapier fixed steps simulate rotation-locked 0.22-meter cubes on a ground collider. Staggered impulses keep contacts active; amber means a recent contact, purple a sleeping body or a downward ray hit, and red a missed query. Sixteen markers show actual ray-hit positions.',
+      'Real solver fixed steps simulate rotation-locked 0.22-meter cubes on a ground collider. Staggered impulses keep contacts active; amber means a recent contact, purple a sleeping body or a downward ray hit, and red a missed query. Sixteen markers show actual ray-hit positions.',
     step(delta) {
       if (disposed) return;
       if (!Number.isFinite(delta) || delta < 0 || delta > 0.1) throw new RangeError('Invalid physics frame delta');
