@@ -59,7 +59,7 @@
   "tonemap": ["./export-cube"],
   "toon": ["./screen-outline","./hatch-models"],
   "transitions": ["./presets"],
-  "usdz": ["./instancer","./shapes","./curves","./preview-surface","./clips"],
+  "usdz": ["./preview-surface","./clips"],
   "vfx": ["./json"],
   "video": ["./dome","./demux","./playback"],
   "viewcube": ["./up","./fit","./compass"],
