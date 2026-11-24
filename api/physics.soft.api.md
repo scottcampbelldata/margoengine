@@ -40,6 +40,16 @@ export class SoftBodies implements PhysicsAttachment {
     iterations: number;
     private constructor();
     static attach(physics: Physics, options?: SoftBodiesOptions): Promise<SoftBodies>;
+    debugRender(options?: {
+        edges?: boolean;
+        stress?: boolean;
+        stressRange?: number;
+        particles?: boolean;
+        contacts?: boolean;
+    }): {
+        vertices: Float32Array;
+        colors: Float32Array;
+    };
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
     hash(): number;
@@ -160,6 +170,7 @@ export class SoftBody {
     wakeUp(): this;
     wake(): this;
     triangles(): Uint32Array;
+    structuralEdges(): number;
     edges(): Uint32Array;
     bendEdges(): Uint32Array;
     setTensionOnly(on?: boolean): this;
@@ -719,6 +730,8 @@ interface DebugRenderOptions {
     contacts?: boolean;
     boxes?: boolean;
     filter?: QueryFilter;
+    solverContacts?: boolean;
+    pseudoNormals?: boolean;
     axes?: boolean;
     style?: DebugStyle;
 }
@@ -732,6 +745,8 @@ interface DebugStyle {
     joint?: DebugColor;
     brokenJoint?: DebugColor;
     contact?: DebugColor;
+    solverContact?: DebugColor;
+    pseudoNormal?: DebugColor;
     box?: DebugColor;
     normalLength?: number;
     axisLength?: number;

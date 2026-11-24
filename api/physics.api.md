@@ -331,6 +331,8 @@ export interface DebugRenderOptions {
     contacts?: boolean;
     boxes?: boolean;
     filter?: QueryFilter;
+    solverContacts?: boolean;
+    pseudoNormals?: boolean;
     axes?: boolean;
     style?: DebugStyle;
 }
@@ -344,6 +346,8 @@ export interface DebugStyle {
     joint?: DebugColor;
     brokenJoint?: DebugColor;
     contact?: DebugColor;
+    solverContact?: DebugColor;
+    pseudoNormal?: DebugColor;
     box?: DebugColor;
     normalLength?: number;
     axisLength?: number;

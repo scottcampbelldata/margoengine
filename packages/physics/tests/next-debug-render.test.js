@@ -116,3 +116,51 @@ test('a style recolours each kind and sizes the contact normal, and axes draw th
   assert.ok(axes.colors[0] === 1 && axes.colors[8 + 1] === 1, 'red x then green y');
   physics.dispose();
 });
+
+test('solver contacts draw a gap line and a normal tick a point, and pseudo normals one tick a face and a shared edge', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+  });
+  physics.addBody(null, {
+    position: [0, 0.5, 0],
+    canSleep: false,
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+  });
+  for (let i = 0; i < 30; i++) physics.step();
+  const solver = physics.debugRender({ colliders: false, contacts: false, solverContacts: true });
+  assert.equal(segments(solver), 4 * 2, 'four points, each a gap line and a normal tick');
+  const [r, g, b] = solver.colors.slice(0, 3);
+  assert.ok(r === 1 && g > 0.5 && b < 0.2, 'in the solver contact colour');
+  // The gap line is tiny for a resting box, and the tick is 0.1 m long.
+  const tick = [0, 1, 2].map((k) => solver.vertices[18 + 3 + k] - solver.vertices[18 + k]);
+  assert.ok(Math.abs(Math.hypot(...tick) - 0.1) < 1e-4, `the second segment of a point is the normal tick (${tick})`);
+  physics.dispose();
+  const world = new Physics(null);
+  world.addBody(null, {
+    type: 'fixed',
+    colliders: {
+      shape: 'trimesh',
+      vertices: [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1],
+      indices: [0, 1, 2, 2, 1, 3],
+      fixInternalEdges: true,
+    },
+  });
+  const normals = world.debugRender({ colliders: false, contacts: false, pseudoNormals: true });
+  assert.equal(segments(normals), 3, 'a tick at each of the two triangles and one at the edge they share');
+  const plain = new Physics(null);
+  plain.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: [0, 0, 0, 0, 0, 1, 1, 0, 0], indices: [0, 1, 2] },
+  });
+  assert.equal(
+    segments(plain.debugRender({ colliders: false, contacts: false, pseudoNormals: true })),
+    0,
+    'a mesh without fixInternalEdges has none',
+  );
+  world.dispose();
+  plain.dispose();
+});

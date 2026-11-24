@@ -1580,6 +1580,10 @@ export class SoftBody {
     this.check();
     return this.triangleList.slice();
   }
+  /** @internal The number of structural edges. */
+  structuralEdges(): number {
+    return this.structural;
+  }
   /** Structural edges as flat pairs of particle indices (shear edges included; bend edges are in {@link SoftBody.bendEdges}). */
   edges(): Uint32Array {
     this.check();
@@ -2075,6 +2079,60 @@ export class SoftBodies implements PhysicsAttachment {
     return new SoftBodies(physics, instance.exports as SoftExports, options);
   }
 
+  /**
+   * Debug lines of every soft body (Rapier's soft-body debug modes): `edges` draws each structural edge that has not torn, and
+   * with `stress` colours it by its strain, green at rest, towards red as it stretches and towards blue as it is squeezed (full
+   * colour at `stressRange`, default 0.2 of its rest length); `particles` draws a small cross at each particle; `contacts` draws
+   * a tick along the normal of each particle's contact with a collider. Same layout as `physics.debugRender`: `vertices`
+   * (two points a segment) and `colors` (r, g, b, a a vertex).
+   */
+  debugRender(
+    options: { edges?: boolean; stress?: boolean; stressRange?: number; particles?: boolean; contacts?: boolean } = {},
+  ): { vertices: Float32Array; colors: Float32Array } {
+    const { edges = true, stress = false, stressRange = 0.2, particles = false, contacts = false } = options,
+      positions: number[] = [],
+      colors: number[] = [],
+      line = (a: readonly number[], b: readonly number[], color: readonly number[]): void => {
+        positions.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!);
+        colors.push(...color, ...color);
+      };
+    if (!(stressRange > 0) || !Number.isFinite(stressRange))
+      throw new RangeError(`The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`);
+    const c = this.columns();
+    for (const body of this.bodies) {
+      const at = (row: number): [number, number, number] => [c.x![row]!, c.y![row]!, c.z![row]!];
+      if (edges)
+        for (let e = 0; e < body.structuralEdges(); e++) {
+          const row = body.firstEdge + e;
+          if (c.eflags![row]! & TORN) continue;
+          const a = at(c.ea![row]!),
+            b = at(c.eb![row]!);
+          let color: readonly number[] = [0.4, 0.8, 0.5, 1];
+          if (stress) {
+            const rest = c.rest![row]!,
+              strain = rest > 0 ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) / rest - 1 : 0,
+              k = Math.min(1, Math.abs(strain) / stressRange);
+            color = strain >= 0 ? [0.4 + 0.6 * k, 0.8 * (1 - k), 0.5 * (1 - k), 1] : [0.4 * (1 - k), 0.8 * (1 - k), 0.5 + 0.5 * k, 1];
+          }
+          line(a, b, color);
+        }
+      for (let i = 0; i < body.numParticles(); i++) {
+        const row = body.firstParticle + i,
+          p = at(row);
+        if (particles) {
+          const r = Math.max(c.radius![row]!, 0.02);
+          line([p[0] - r, p[1], p[2]], [p[0] + r, p[1], p[2]], [0.9, 0.9, 0.9, 1]);
+          line([p[0], p[1] - r, p[2]], [p[0], p[1] + r, p[2]], [0.9, 0.9, 0.9, 1]);
+          line([p[0], p[1], p[2] - r], [p[0], p[1], p[2] + r], [0.9, 0.9, 0.9, 1]);
+        }
+        if (contacts && c.kc![row]! > 0) {
+          const k: [number, number, number] = [c.kpx![row]!, c.kpy![row]!, c.kpz![row]!];
+          line(k, [k[0] + c.knx![row]! * 0.1, k[1] + c.kny![row]! * 0.1, k[2] + c.knz![row]! * 0.1], [1, 0.3, 0.9, 1]);
+        }
+      }
+    }
+    return { vertices: new Float32Array(positions), colors: new Float32Array(colors) };
+  }
   /** Every live soft body, oldest first. */
   list(): readonly SoftBody[] {
     return this.bodies;

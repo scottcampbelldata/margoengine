@@ -25,6 +25,18 @@ export interface DebugRenderOptions {
    * colliders are.
    */
   filter?: QueryFilter;
+  /**
+   * The points the solver pressed this step, one line each from where it put the point on the first body to where it put it on
+   * the second (a line of the gap, long for a speculative contact), with a short line along the contact normal (default false;
+   * Rapier's `SOLVER_CONTACTS`). Unlike `contacts` it shows what the solver held, after the modifier.
+   */
+  solverContacts?: boolean;
+  /**
+   * For each triangle mesh built with `fixInternalEdges`, the normal of each triangle at its middle and, at the middle of each
+   * edge a triangle shares with another, the normal the ghost-collision rule clamps to there: the mean of the two faces' normals
+   * (default false; Rapier's `PSEUDO_NORMALS`).
+   */
+  pseudoNormals?: boolean;
   /** The three axes of each body at its origin, red x, green y and blue z, `axisLength` metres long (default false; Rapier's `RIGID_BODY_AXES`). */
   axes?: boolean;
   /** Colours and sizes, each left out one keeping its default (Rapier's `DebugRenderStyle`). */
@@ -37,7 +49,7 @@ export type DebugColor = readonly [number, number, number, number];
 /**
  * The colours and sizes of {@link DebugRenderOptions.style}. Defaults: dynamic [0.35, 0.85, 0.45, 1], fixed [0.6, 0.6, 0.65, 1],
  * kinematic [0.35, 0.6, 1, 1], sleeping [0.3, 0.45, 0.35, 1], sensor [1, 0.9, 0.2, 1], joint [1, 0.3, 0.25, 1], brokenJoint
- * [0.5, 0.15, 0.15, 1], contact [1, 0.3, 0.9, 1], box [0.3, 0.9, 0.95, 0.6]; `normalLength` 0.1 m, `axisLength` 0.5 m.
+ * [0.5, 0.15, 0.15, 1], contact [1, 0.3, 0.9, 1], solverContact [1, 0.6, 0.1, 1], pseudoNormal [0.6, 1, 0.3, 1], box [0.3, 0.9, 0.95, 0.6]; `normalLength` 0.1 m, `axisLength` 0.5 m.
  */
 export interface DebugStyle {
   dynamic?: DebugColor;
@@ -48,6 +60,8 @@ export interface DebugStyle {
   joint?: DebugColor;
   brokenJoint?: DebugColor;
   contact?: DebugColor;
+  solverContact?: DebugColor;
+  pseudoNormal?: DebugColor;
   box?: DebugColor;
   /** The line along each contact normal, in metres. */
   normalLength?: number;
@@ -73,6 +87,8 @@ const DYNAMIC: Color = [0.35, 0.85, 0.45, 1],
   JOINT: Color = [1, 0.3, 0.25, 1],
   BROKEN: Color = [0.5, 0.15, 0.15, 1],
   CONTACT: Color = [1, 0.3, 0.9, 1],
+  SOLVER: Color = [1, 0.6, 0.1, 1],
+  PSEUDO: Color = [0.6, 1, 0.3, 1],
   BOX: Color = [0.3, 0.9, 0.95, 0.6];
 const COS = [
     1, 0.9659258, 0.8660254, 0.7071068, 0.5, 0.258819, 0, -0.258819, -0.5, -0.7071068, -0.8660254, -0.9659258, -1,
@@ -163,7 +179,16 @@ export function debugLines(
   joints: Iterable<PhysicsJoint>,
   options: DebugRenderOptions = {},
 ): DebugLines {
-  const { colliders = true, joints: drawJoints = true, contacts = true, boxes = false, axes = false, filter } = options,
+  const {
+      colliders = true,
+      joints: drawJoints = true,
+      contacts = true,
+      boxes = false,
+      axes = false,
+      solverContacts = false,
+      pseudoNormals = false,
+      filter,
+    } = options,
     style = options.style ?? {},
     paint = (name: keyof DebugStyle, fallback: Color): Color => (style[name] as Color | undefined) ?? fallback,
     out = new Lines(),
@@ -421,5 +446,97 @@ export function debugLines(
         out.segment([x, y, z], [x + n[0] * length, y + n[1] * length, z + n[2] * length], paint('contact', CONTACT));
       }
     }
+  if (solverContacts) solverLines(world, seen, out, style.normalLength ?? 0.1, paint('solverContact', SOLVER));
+  if (pseudoNormals)
+    for (const body of list)
+      for (const collider of body.colliders) {
+        if (!seen.has(collider.handle) || c.colliderShape[collider.handle] !== 4) continue;
+        pseudoNormalLines(
+          world,
+          collider.handle,
+          bodyPose(body),
+          out,
+          style.normalLength ?? 0.1,
+          paint('pseudoNormal', PSEUDO),
+        );
+      }
   return out.finish();
+}
+
+/** The solver's contact points of the last step: a line across each gap and a tick along the normal. */
+function solverLines(world: KernelWorld, seen: ReadonlySet<number>, out: Lines, length: number, color: Color): void {
+  const c = world.columns;
+  for (let i = 0; i < world.solvingPairs; i++) {
+    const row = c.solvePairs[i]!,
+      a = c.pairA[row]!,
+      b = c.pairB[row]!;
+    if (!seen.has(a) || !seen.has(b)) continue;
+    const bodyA = c.colliderBody[a]!,
+      bodyB = c.colliderBody[b]!,
+      qa: Q = [c.rotationX[bodyA]!, c.rotationY[bodyA]!, c.rotationZ[bodyA]!, c.rotationW[bodyA]!],
+      qb: Q = [c.rotationX[bodyB]!, c.rotationY[bodyB]!, c.rotationZ[bodyB]!, c.rotationW[bodyB]!],
+      n: V = [c.pairNormalX[row]!, c.pairNormalY[row]!, c.pairNormalZ[row]!];
+    for (let k = 0; k < c.pairContacts[row]!; k++) {
+      const at = row * 4 + k,
+        ra = rotate(qa, [c.contactAnchorAX[at]!, c.contactAnchorAY[at]!, c.contactAnchorAZ[at]!]),
+        rb = rotate(qb, [c.contactAnchorBX[at]!, c.contactAnchorBY[at]!, c.contactAnchorBZ[at]!]),
+        pa: V = [c.centerX[bodyA]! + ra[0], c.centerY[bodyA]! + ra[1], c.centerZ[bodyA]! + ra[2]],
+        pb: V = [c.centerX[bodyB]! + rb[0], c.centerY[bodyB]! + rb[1], c.centerZ[bodyB]! + rb[2]];
+      out.segment(pa, pb, color);
+      out.segment(pb, [pb[0] + n[0] * length, pb[1] + n[1] * length, pb[2] + n[2] * length], color);
+    }
+  }
+}
+
+/** The normals of a `fixInternalEdges` triangle mesh: one at each triangle's middle, one at each shared edge's middle. */
+function pseudoNormalLines(
+  world: KernelWorld,
+  row: number,
+  pose: { p: V; q: Q },
+  out: Lines,
+  length: number,
+  color: Color,
+): void {
+  const c = world.columns,
+    mesh = c.colliderHull[row]!;
+  if (!(c.meshFlags[mesh]! & 1) || c.meshColumns[mesh]! !== 0 || c.meshTriangles[mesh]! === 0) return;
+  const v0 = c.meshFirstVertex[mesh]!,
+    t0 = c.meshFirstTriangle[mesh]!,
+    local = (i: number): V => [c.meshVertexX[v0 + i]!, c.meshVertexY[v0 + i]!, c.meshVertexZ[v0 + i]!],
+    place = (v: V): V => {
+      const r = rotate(pose.q, v);
+      return [pose.p[0] + r[0], pose.p[1] + r[1], pose.p[2] + r[2]];
+    },
+    face = (t: number): { n: V; mid: V; corners: V[] } => {
+      const [a, b, d] = [local(c.triangleA[t0 + t]!), local(c.triangleB[t0 + t]!), local(c.triangleC[t0 + t]!)],
+        u: V = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+        w: V = [d[0] - a[0], d[1] - a[1], d[2] - a[2]],
+        x: V = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
+        l = Math.hypot(x[0], x[1], x[2]) || 1;
+      return {
+        n: [x[0] / l, x[1] / l, x[2] / l],
+        mid: [(a[0] + b[0] + d[0]) / 3, (a[1] + b[1] + d[1]) / 3, (a[2] + b[2] + d[2]) / 3],
+        corners: [a, b, d],
+      };
+    },
+    tick = (from: V, n: V): void => {
+      const start = place(from),
+        r = rotate(pose.q, n);
+      out.segment(start, [start[0] + r[0] * length, start[1] + r[1] * length, start[2] + r[2] * length], color);
+    };
+  for (let t = 0; t < c.meshTriangles[mesh]!; t++) {
+    const f = face(t);
+    tick(f.mid, f.n);
+    for (let k = 0; k < 3; k++) {
+      const other = [c.triangleAcross0, c.triangleAcross1, c.triangleAcross2][k]![t0 + t]!;
+      // Each shared edge once, from the lower triangle.
+      if (other === 0xffffffff || other < t) continue;
+      const g = face(other),
+        p = f.corners[k]!,
+        q = f.corners[(k + 1) % 3]!,
+        sum: V = [f.n[0] + g.n[0], f.n[1] + g.n[1], f.n[2] + g.n[2]],
+        l = Math.hypot(sum[0], sum[1], sum[2]) || 1;
+      tick([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2], [sum[0] / l, sum[1] / l, sum[2] / l]);
+    }
+  }
 }
