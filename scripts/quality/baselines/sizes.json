@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17787955,
+  "total": 17798279,
   "history": [
     {
       "date": "2026-10-24",
@@ -11601,6 +11601,12 @@
       "commit": "FG-11",
       "reason": "FG-11 animation/geometry-cache 4,929 to 5,305 B gzip for encodeMeshSequence and streamMeshSequence: a per-frame mesh bake (a meshed fluid) grouped into chunks by topology, beside the encoder and reader they reuse (a separate entry would repeat the chunk writer)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "25d0f223a",
+      "reason": "soft contacts correct the touched body inside the soft step and solve contact speeds: lazy kernel up a few KB.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12362,9 +12368,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 70938,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 206519,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 74503,
+    "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25114,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 50845,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
