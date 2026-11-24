@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { refs, versions, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-// The current horizon story now includes a separate far quad. Bounded Water keeps the previous call trace.
-const { ref, pin } = refs('6c20076d', '49f3e971', '64265c9db1');
+// The current stories include the wind-wave filtering and sky reflection shader changes.
+const { ref, pin } = refs('6c20076d', '49f3e971', '1de24300d9');
 await coreAt(pin); // water imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('water', ref, undefined, pin);
 

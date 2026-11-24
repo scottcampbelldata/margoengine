@@ -5263,6 +5263,8 @@ Proof capture (2026-11-21, KB-WATER-SURGEVOL1): the water-ssr --current proof ad
 
 Proof capture (2026-11-21, KB-WATER-REFRACTDEPTH1): water-ssr advances to f616fc9327. Above-water refraction checks the bent ray against the captured depth and uses the same hit for color and distance. The Water uniform grows from 560 to 576 B with one viewport row. The current proof records the new shader and buffer writes. The historical SSR capture claim keeps its original reference. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-24): the water-ssr current reference advances to 1de24300d9 for directional ripple filtering, crossing wind wavelets and two-axis sky reflection sampling. The bounded, coastal and horizon stories record 545, 27,675 and 593 calls respectively, the same counts as before. Four shader module sources change per story. A comparison of the old and new recordings found identical descriptors apart from those sources and identical bindings, uploads, dispatches and draws. The pinned historical claim and exact comparator stay in place. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.
