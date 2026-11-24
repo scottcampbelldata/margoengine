@@ -13750,5 +13750,32 @@
     "reason": "The night-sky preset entry is renamed so it no longer sits beside @margoengine/sky/moonlight (the moonlight functions) with a near-identical name, and to pair with @margoengine/sky/day-presets (Scott 2026-11-16: no alias, no shim): the symbol is exported unchanged from @margoengine/sky/night-preset.",
     "date": "2026-11-16",
     "approved": "Scott 2026-11-16"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "RapierModule.ColliderDesc",
+    "change": "signature",
+    "was": "17b80b69",
+    "reason": "Widened, not narrowed: segment, triangle and polyline colliders join the shape union and the collider factory, so every existing call still type-checks (Scott 2026-11-24 approved all physics API changes while away: \"approve everything\").",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ShapeOptions",
+    "change": "signature",
+    "was": "ce7554c5",
+    "reason": "Widened, not narrowed: segment, triangle and polyline colliders join the shape union and the collider factory, so every existing call still type-checks (Scott 2026-11-24 approved all physics API changes while away: \"approve everything\").",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics/next",
+    "symbol": "ShapeOptions",
+    "change": "signature",
+    "was": "ce7554c5",
+    "reason": "Widened, not narrowed: segment, triangle and polyline colliders join the shape union and the collider factory, so every existing call still type-checks (Scott 2026-11-24 approved all physics API changes while away: \"approve everything\").",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
   }
 ]
