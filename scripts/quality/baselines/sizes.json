@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17798279,
+  "total": 17807740,
   "history": [
     {
       "date": "2026-10-24",
@@ -11607,6 +11607,12 @@
       "commit": "25d0f223a",
       "reason": "soft contacts correct the touched body inside the soft step and solve contact speeds: lazy kernel up a few KB.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "96e0fe617",
+      "reason": "physics: path constraint (couplings.rs kind 5) and the couplings' island edges and growing table: lazy kernel blueprint 206,519 to 209,689 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -12366,7 +12372,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 282538,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 70938,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 206519,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 215980,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25114,
