@@ -909,3 +909,41 @@ test('a cloth torn in two becomes two cloths that each keep their triangles and 
     assert.ok(lowest > 0.1 - 0.02, `the piece lies on the box: ${lowest}`);
   }
 });
+
+test('a soft cube with a surface collider cut in two becomes two bodies, each with its own surface triangles and collider, resting on a box', async () => {
+  const { physics, soft } = await create([0, -9.81, 0], 8, 2);
+  soft.splitOnTear = 'cells';
+  physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: { shape: 'box', halfExtents: [2, 0.1, 2] } });
+  const cube = soft.create(
+    SoftBodyDesc.box([-0.2, 0.6, -0.2], [0.4, 0.4, 0.4], [4, 4, 4], rubber({ youngsModulus: 2e5 })),
+  );
+  assert.ok(cube.triangles().length > 0, 'a box of cells has the triangles of its surface');
+  // Every outside face of a cube of 4 by 4 by 4 cubes: six sides of 16 squares of two triangles.
+  assert.equal(cube.triangles().length / 3, 6 * 16 * 2);
+  soft.createSurfaceCollider(cube);
+  const whole = cube.restVolume(),
+    event = soft.cut(cube, [
+      [0.0, -1, -1],
+      [0.0, 3, -1],
+      [0.0, -1, 3],
+    ]);
+  assert.equal(event.pieces.length, 2, 'two bodies');
+  for (const piece of event.pieces) {
+    assert.ok(piece.surface, 'each has a surface collider of its own');
+    assert.ok(
+      piece.triangles().length / 3 > 6 * 8 * 2 * 0.5,
+      'and the triangles of its own surface, the cut face among them',
+    );
+  }
+  near(
+    event.pieces.reduce((sum, piece) => sum + piece.restVolume(), 0),
+    whole,
+    1e-6,
+    'no volume is lost',
+  );
+  steps(physics, 360);
+  for (const piece of event.pieces) {
+    const lowest = Math.min(...piece.particlePositions().filter((_, k) => k % 3 === 1));
+    assert.ok(lowest > 0.1 - 0.02, `the piece rests on the box: ${lowest}`);
+  }
+});

@@ -8,7 +8,7 @@ import type { PhysicsCollider } from './collider.js';
 import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
-import { boundsOf, bindSkin, reaches, type Skin } from './soft-volume.js';
+import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 
 export type { SoftDestination, SoftSplit } from './soft-split.js';
@@ -974,7 +974,7 @@ export class SoftBodyDesc {
       const corner = (n: number): number => used[id(i + ((n >> 2) & 1), j + ((n >> 1) & 1), k + (n & 1))]!;
       for (const path of paths) tets.push(corner(path[0]!), corner(path[1]!), corner(path[2]!), corner(path[3]!));
     }
-    const desc = new SoftBodyDesc(points).setCells(tets, material);
+    const desc = new SoftBodyDesc(points).setCells(tets, material).setSurface();
     desc.radius = cell * 0.25;
     return desc;
   }
@@ -1099,6 +1099,14 @@ export class SoftBodyDesc {
             this.edgePairs.push(i, j);
           }
         }
+    return this;
+  }
+  /**
+   * Gives the body the triangles of the surface of its cells (every face a single cell has, facing outward): what a surface collider
+   * is made of, and how a body of cells that tears gets surfaces on its cracks. `box`, `solid`, `volumetric` and `cuboid` call it.
+   */
+  setSurface(): this {
+    this.triangles = boundaryTriangles(this.cells, this.positions);
     return this;
   }
   /** Picks how the body's cells are solved, Rapier's `setSolver` (see {@link SoftSolver}). */

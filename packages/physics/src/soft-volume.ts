@@ -211,3 +211,28 @@ export function boundsOf(vertices: ArrayLike<number>): { min: Vec3; max: Vec3 } 
     }
   return { min: min as unknown as Vec3, max: max as unknown as Vec3 };
 }
+
+/**
+ * The surface of a set of tetrahedra: every face that only one of them has, as a triangle (three particle indices) facing away from
+ * its tetrahedron's fourth corner, so the triangles of a solid face outward.
+ */
+export function boundaryTriangles(cells: ArrayLike<number>, positions: ArrayLike<number>): number[] {
+  const faces = new Map<string, { corner: [number, number, number]; opposite: number; count: number }>();
+  for (let t = 0; t < cells.length; t += 4)
+    for (let k = 0; k < 4; k++) {
+      const corner = [0, 1, 2, 3].filter((j) => j !== k).map((j) => cells[t + j]!) as [number, number, number],
+        key = [...corner].sort((a, b) => a - b).join(','),
+        had = faces.get(key);
+      if (had) had.count++;
+      else faces.set(key, { corner, opposite: cells[t + k]!, count: 1 });
+    }
+  const out: number[] = [];
+  for (const { corner, opposite, count } of faces.values()) {
+    if (count !== 1) continue;
+    const at = (i: number): V => [positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!],
+      [a, b, c] = [at(corner[0]), at(corner[1]), at(corner[2])],
+      outward = dot(cross(sub(b, a), sub(c, a)), sub(at(opposite), a)) < 0;
+    out.push(corner[0], outward ? corner[1] : corner[2], outward ? corner[2] : corner[1]);
+  }
+  return out;
+}

@@ -3,6 +3,7 @@
 // During Simulation", SIGGRAPH 2004), and each piece of cells that is no longer joined to another becomes a soft body of its own,
 // with the rest shapes, plastic flow and rest lengths its cells and edges had.
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
+import { boundaryTriangles } from './soft-volume.js';
 
 const TORN = 1;
 const PINNED = 1;
@@ -53,7 +54,7 @@ export function splitBody(
   if (body.removed) return null;
   const { count } = body.cellRange;
   // A body of cells with triangles has surfaces the cell split does not carry; one of edges (cloth, a trimesh) takes them along.
-  if (count > 0) return body.triangleList.length > 0 || body.surface ? null : splitCells(soft, body, make, cut);
+  if (count > 0) return splitCells(soft, body, make, cut);
   return splitEdges(soft, body, make);
 }
 
@@ -267,6 +268,15 @@ function splitCells(
     carry(desc, body, c, rows, nodeIndex, masses);
     desc.massGiven = true;
     desc.cells = mine.flatMap((t) => [0, 1, 2, 3].map((j) => nodeIndex.get(find(slots, (t - first) * 4 + j))!));
+    // The piece's surface: its own boundary faces, the faces along the crack among them.
+    if (body.triangleList.length > 0 || body.surface) {
+      desc.triangles = boundaryTriangles(
+        desc.cells,
+        origin.flatMap((p) => [c.x[p]!, c.y[p]!, c.z[p]!]),
+      );
+      desc.selfContacts = body.selfContacts && desc.triangles.length > 0;
+      desc.selfFriction = body.selfFriction;
+    }
     // Edges: each edge of the body goes to the node pair the cells that hold both of its ends use.
     const byParticle = new Map<number, number[]>();
     for (const t of mine)
@@ -331,6 +341,8 @@ function splitCells(
       where.set(p - body.firstParticle, list);
     });
     pieces.push(piece);
+    if (body.surface && desc.triangles.length > 0)
+      soft.createSurfaceCollider(piece, { friction: body.surface.colliders[0]!.friction() });
   }
   soft.remove(body);
   return { pieces, destinations: (p) => where.get(p) ?? [] };

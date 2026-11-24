@@ -268,6 +268,7 @@ export class SoftBodyDesc {
     setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
     addCellEdges(): this;
+    setSurface(): this;
     setSolver(solver: SoftSolver): this;
     setCellMaterial(material: CellMaterial): this;
     setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
