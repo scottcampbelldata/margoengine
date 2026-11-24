@@ -1,6 +1,6 @@
 {
  "night-fog": {
-  "digest": "6d4cb9cba1e86b6d",
+  "digest": "c7a21717c41a4841",
   "created": 62,
   "commands": 58
  },
@@ -10,7 +10,7 @@
   "commands": 34
  },
  "afterlight": {
-  "digest": "682002e46f985d08",
+  "digest": "764ccf537ebc9e18",
   "created": 88,
   "commands": 381
  },
@@ -25,7 +25,7 @@
   "commands": 70
  },
  "preetham-clouds-fog": {
-  "digest": "ba0e30486b2bd9a5",
+  "digest": "7d07f989c73bdf58",
   "created": 62,
   "commands": 58
  }

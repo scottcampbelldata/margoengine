@@ -18,6 +18,8 @@
 // Recorded again with KB-GLTFA B1 (2026-11-19): core's vertex stage keeps a finite normal at a zero determinant
 // (select on the determinant's sign and a +Y fallback), so every shader that composes core's vertex stage changed text;
 // no buffer write changed and no configuration with a nonzero scale draws differently.
+// Recorded again with the fog's cloud haze (2026-11-24, Fauld recut): the fog WGSL mixes in the light under a cloud cover
+// (cloudHaze), so fog and fogColour changed text; no buffer write changed, and without clouds they draw as before.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
