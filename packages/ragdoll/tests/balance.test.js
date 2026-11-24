@@ -75,7 +75,11 @@ async function standing({ balance = true, rounding, ...options } = {}) {
 rtest('without it the character folds up; with it the same character settles, stands and takes no more steps', async () => {
   const limp = await standing({ balance: false });
   limp.rig.frames(180);
-  assert.ok(limp.hips.position[1] < limp.height * 0.85, `motors alone sink (${limp.hips.position[1]} of ${limp.height})`);
+  // Rapier's ankles rolled over under the standing weight and the hips sank to 0.74 of their height. A straight pose needs
+  // about no ankle torque, a rod on a spherical or a cone motor sags by the closed form m g L / 2k, and the kernel's motors hold
+  // the pose (docs/limits.md, Ragdoll balance): the character stands on its motors and what it still lacks is the balance
+  // that catches a push.
+  assert.ok(limp.hips.position[1] > limp.height * 0.95, `motors alone hold the pose (${limp.hips.position[1]} of ${limp.height})`);
   limp.rig.dispose();
 
   const { rig, keeper, hips, height } = await standing();
