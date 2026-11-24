@@ -57,9 +57,14 @@ export interface Wave {
   /** Phase offset in radians. Default 0. */
   phase?: number;
 }
+/** The most cells a Water terrain may have per side: every WebGPU device can make a 2D texture this wide. */
+const WATER_TERRAIN_MAX = 8192;
 /** Terrain coupling: a borrowed heightmap the shallow-water flow, foam and spray run on. */
 export interface WaterTerrain {
-  /** World-space Y heights in a sampleable `r32float` 2D texture, 2-512 cells per side; read every frame. */
+  /**
+   * World-space Y heights in a sampleable `r32float` 2D texture, 2 cells per side up to the device's
+   * `maxTextureDimension2D` (8,192 on every WebGPU device), within its storage-buffer binding limit; read every frame.
+   */
   heightmap: () => GPUTexture | undefined;
   /** World XZ of the heightmap's first texel corner. */
   origin: readonly [number, number];
@@ -745,12 +750,12 @@ export class Water implements EnginePlugin {
             !Number.isInteger(terrain.heights.height) ||
             terrain.heights.width < 2 ||
             terrain.heights.height < 2 ||
-            terrain.heights.width > 512 ||
-            terrain.heights.height > 512 ||
+            terrain.heights.width > WATER_TERRAIN_MAX ||
+            terrain.heights.height > WATER_TERRAIN_MAX ||
             terrain.heights.data?.length !== terrain.heights.width * terrain.heights.height))
       )
         throw new RangeError(
-          'Invalid water terrain; pass a heightmap function, a finite origin [x, z], a size [x, z] from 0 to 100000 and heights of width x height values (2 to 512 a side)',
+          'Invalid water terrain; pass a heightmap function, a finite origin [x, z], a size [x, z] from 0 to 100000 and heights of width x height values (2 to 8192 a side)',
         );
       this.values.set(terrain.origin, 96);
       this.values.set(terrain.size, 98);
@@ -973,8 +978,16 @@ export class Water implements EnginePlugin {
    * frame; RangeError for a colour outside 0-1 or a depth outside 0-100.
    */
   setShallow(color: readonly [number, number, number], depth: number): this {
-    if (color.length !== 3 || color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) || !Number.isFinite(depth) || depth < 0 || depth > 100)
-      throw new RangeError('Invalid water shallow band; use a colour of three numbers from 0 to 1 and a depth from 0 to 100');
+    if (
+      color.length !== 3 ||
+      color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) ||
+      !Number.isFinite(depth) ||
+      depth < 0 ||
+      depth > 100
+    )
+      throw new RangeError(
+        'Invalid water shallow band; use a colour of three numbers from 0 to 1 and a depth from 0 to 100',
+      );
     this.values.set(color, 136);
     this.values[139] = depth;
     return this;
@@ -1001,7 +1014,8 @@ export class Water implements EnginePlugin {
     const terrain = this.options.terrain;
     if (!terrain?.heights) return [];
     const waves = [];
-    for (let i = 0; i < this.values[23]!; i++) waves.push({ amplitude: this.values[34 + i * 8]!, wavenumber: this.values[35 + i * 8]! });
+    for (let i = 0; i < this.values[23]!; i++)
+      waves.push({ amplitude: this.values[34 + i * 8]!, wavenumber: this.values[35 + i * 8]! });
     const depth = breakerDepth(waves),
       level = this.values[21]! - depth,
       held = this.breakers;
@@ -1455,17 +1469,24 @@ export class Water implements EnginePlugin {
         terrain.depthOrArrayLayers > 1 ||
         terrain.width < 2 ||
         terrain.height < 2 ||
-        terrain.width > 512 ||
-        terrain.height > 512 ||
         terrain.format !== 'r32float' ||
         !(terrain.usage & GPUTextureUsage.TEXTURE_BINDING)
       )
         throw new MargoError(
           'state',
-          'Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side; return one from options.terrain.heightmap',
+          'Water terrain needs a sampleable 2D r32float heightmap of at least 2 cells per side; return one from options.terrain.heightmap',
         );
       const river = riverKernels.get(this),
         solver = waterSolvers.get(this);
+      // The flow keeps one connectivity word a cell in a storage binding, and the open-sea surf nine (surf.ts).
+      const cells = terrain.width * terrain.height,
+        bytes = (solver || river || this.options.still ? cells + 1 : coastSurf.words(cells)) * 4,
+        room = Math.min(c.device.limits.maxStorageBufferBindingSize, c.device.limits.maxBufferSize);
+      if (bytes > room)
+        throw new MargoError(
+          'state',
+          `Water terrain of ${terrain.width} x ${terrain.height} cells needs ${bytes} B in one storage binding, over this device's ${room} B; use larger cells`,
+        );
       if (
         this.coastal?.terrain !== terrain ||
         this.coastalSource?.[0] !== river ||

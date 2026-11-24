@@ -10,7 +10,8 @@
 //    1963, J. Fluid Mech. 16(1) 113-125, https://doi.org/10.1017/S0022112063000628);
 //  - a uniform supercritical chute has no breaker or foam once its front has run out (FG-07: fast flow alone is not white);
 //  - a plane of 8 m cells drains as the same plane at 2 m cells does in the JavaScript reference: the cell size leaves no
-//    film of water behind (FG-09).
+//    film of water behind (FG-09);
+//  - a terrain of 1,024 cells a side, over the old 512-cell cap, floods and keeps its volume (FG-02).
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
@@ -242,6 +243,25 @@ try {
       out.drain = [50, 100, 200, 400, 800].map((x) => ({ x, h: r.depth[Math.floor(x / 8) + 500] }));
       m.dispose();
     }
+    // 6. A terrain wider than the old 512-cell cap (FG-02): 1,024 x 4 cells of 1 m, 2 m of water behind x = 200 m on a
+    // flat closed bed; after 60 s the front has run past cell 512 and the volume is what it was.
+    {
+      const m = strip(
+        1024,
+        1,
+        () => 0,
+        { maxDepth: 2.5, maxSpeed: 9, roughness: 0 },
+        (x) => (x < 200 ? 2 : undefined),
+      );
+      await m.run(0, 1);
+      const before = (await m.flood.read()).volume;
+      await m.run(60, 0.5);
+      const r = await m.flood.read();
+      let front = 0;
+      for (let i = 0; i < 1024; i++) if (r.depth[i + 1024] > 0.01) front = i;
+      out.wide = { width: r.width, front, drift: Math.abs(r.volume - before) / before };
+      m.dispose();
+    }
     for (const t of textures) t.destroy();
     out.validation = String(await d.popErrorScope().then((e) => e?.message ?? ''));
     return out;
@@ -284,6 +304,11 @@ try {
       `drying at 8 m cells: ${h.toFixed(3)} m at ${x} m against ${want.toFixed(3)} m at 2 m cells (FG-09)`,
     );
   }
+  assert.ok(
+    result.wide.width === 1024 && result.wide.front > 600,
+    `a 1,024-cell flood runs past cell 512: ${JSON.stringify(result.wide)}`,
+  );
+  assert.ok(result.wide.drift < 1e-5, `and keeps its volume: ${result.wide.drift}`);
   const chute = result.chute;
   assert.ok(chute.wet === 165 && chute.froude > 1.2, `the chute runs full and supercritical: ${JSON.stringify(chute)}`);
   assert.ok(

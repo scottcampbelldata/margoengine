@@ -109,7 +109,9 @@ with RangeError. At 0 both draw exactly as before.
 
 For beaches and inland dips, supply `terrain: {heightmap: () => texture,
 origin: [-80,-80], size: [160,160]}`. The borrowed heightmap must contain world-space
-Y heights in a sampleable `r32float` texture, 2..512 cells per side. Each cell holds
+Y heights in a sampleable `r32float` texture, from 2 cells per side up to the device's
+`maxTextureDimension2D` (8,192 on every WebGPU device; 512 until 2026-11-24, FG-02), within its storage binding limit
+(one 4-byte word a cell for a flood or river, nine for the open-sea surf, else a coded error naming the bytes). Each cell holds
 water depth and exchanges conservative flux with its neighbors; higher ground
 blocks flow and outlet sills retain puddles as the sea recedes. A GPU connectivity
 pass identifies below-sea-level cells connected to the map boundary. Those open-sea
