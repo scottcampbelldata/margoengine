@@ -56,10 +56,42 @@ test('rays, casts, projections and overlaps meet a tilted half space where Rapie
   for (const w of worlds) w.physics.dispose();
 });
 
-test('a half space refuses a zero normal and a mass, and is no query shape', () => {
+test('a half space refuses a zero normal and a mass', () => {
   const physics = new Physics(null);
   assert.throws(() => physics.addBody(null, { type: 'fixed', colliders: { shape: 'halfSpace', normal: [0, 0, 0] } }), /nonzero normal/);
   assert.throws(() => physics.addBody(null, { type: 'fixed', colliders: { shape: 'halfSpace', mass: 1 } }), /no volume/);
-  assert.throws(() => physics.shapeCast({ shape: 'halfSpace' }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), /not in the own solver/);
   physics.dispose();
+});
+
+test('a half space as the query shape casts and overlaps as on Rapier', () => {
+  const worlds = both((physics) => {
+    physics.addBody(null, { type: 'fixed', position: [6, 0, 0], colliders: { shape: 'box', halfExtents: [0.5, 2, 2] } });
+    physics.addBody(null, { type: 'fixed', position: [0, 6, 0], colliders: { shape: 'sphere', radius: 1 } });
+    physics.addBody(null, { type: 'fixed', position: [0, 0, 7], colliders: { shape: 'capsule', halfHeight: 1, radius: 0.5 } });
+    physics.step();
+    return {};
+  });
+  let hits = 0;
+  for (const [normal, position, rotation, direction] of [
+    [[1, 0, 0], [3, 0, 0], [0, 0, 0, 1], [1, 0, 0]],
+    [[1, 0, 0], [3, 0, 0], [0, 0, 0, 1], [-1, 0, 0]],
+    [[0.6, 0.8, 0], [0, 0, 0], [0, 0, 0, 1], [0, 1, 0]],
+    [[0, 1, 0], [0, 2, 0], [0, 0, 0.2, 0.98], [0, 1, 0.1]],
+    [[0, 0, 1], [0, 0, 2], [0, 0, 0, 1], [0, 0, 1]],
+    [[-1, 0, 0], [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]],
+  ]) {
+    const shape = { shape: 'halfSpace', normal },
+      [own, rapier] = worlds.map((w) => w.physics.shapeCast(shape, position, rotation, direction, { maxDistance: 100 }));
+    assert.equal(!!own, !!rapier, `${normal} at ${position} along ${direction}`);
+    if (own) {
+      hits++;
+      assert.ok(Math.abs(own.distance - rapier.distance) < 5e-3, `${normal}: ${own.distance} vs ${rapier.distance}`);
+    }
+  }
+  assert.ok(hits >= 4, `${hits} casts hit`);
+  for (const [normal, position] of [[[1, 0, 0], [5.8, 0, 0]], [[1, 0, 0], [3, 0, 0]], [[0, -1, 0], [0, 5.5, 0]], [[0, 1, 0], [0, 4.5, 0]], [[0, 0, 1], [0, 0, 9]]]) {
+    const [own, rapier] = worlds.map((w) => w.physics.intersectShape({ shape: 'halfSpace', normal }, position).length);
+    assert.equal(own, rapier, `overlap ${normal} at ${position}`);
+  }
+  for (const w of worlds) w.physics.dispose();
 });

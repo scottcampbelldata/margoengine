@@ -387,6 +387,9 @@ export function kernelCollider(
   };
 }
 
+/** The mesh rows built for query shapes, by world and by the options that described them. */
+const soupRows = new WeakMap<object, WeakMap<object, number>>();
+
 /**
  * The convex pieces of a query shape that is a compound, each a shape with its place in the compound's frame, or null for a
  * shape that is not a compound (or a decomposed mesh).
@@ -420,6 +423,25 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
       return { shape: 'hull', size: [hulls.addHull(vertices, faces), border] };
     }
     return { shape: 'box', size: [...options.halfExtents] };
+  }
+  if (options.shape === 'trimesh' || options.shape === 'heightfield' || options.shape === 'voxels') {
+    // A surface or a grid as the query shape: its triangles or cells are cast one by one. The mesh is built once for these options.
+    let rows = soupRows.get(hulls);
+    if (!rows) soupRows.set(hulls, (rows = new WeakMap()));
+    let row = rows.get(options);
+    if (row === undefined) {
+      row = kernelCollider(options, { geometry: null, scale: [1, 1, 1] }, hulls).size[0]!;
+      rows.set(options, row);
+    }
+    return { shape: 'trimesh', size: [row] };
+  }
+  if (options.shape === 'halfSpace') {
+    const normal = options.normal ?? [0, 1, 0];
+    checkVec(normal, 'Half space normal');
+    const squared = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2],
+      length = root(squared);
+    if (!(squared > 0)) throw new RangeError('A half space needs a nonzero normal; pass the direction out of the solid.');
+    return { shape: 'halfspace', size: [normal[0] / length, normal[1] / length, normal[2] / length] };
   }
   if (options.shape === 'segment') {
     const frame = segmentFrame(options.a, options.b, 'Segment');

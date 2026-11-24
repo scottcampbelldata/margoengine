@@ -911,7 +911,7 @@ interface KernelProjection {
 }
 
 interface KernelQueryShape {
-    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
     size: readonly number[];
     placed?: {
         offset: readonly [number, number, number];

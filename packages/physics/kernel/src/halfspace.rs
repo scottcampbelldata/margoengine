@@ -126,6 +126,86 @@ impl World {
         n.dot(query.support(n.scale(-1.0)).sub(point)) <= 0.0
     }
 
+    /// The point of collider `c` lowest along `n` (least `n . x`): the collider's support in `-n`. None for another half space,
+    /// or a collider nothing can be read from.
+    fn lowest_along(&self, c: usize, n: V3) -> Option<V3> {
+        let kind = self.uu(COLLIDER_SHAPE, c);
+        let (down, mut best): (V3, Option<V3>) = (n.scale(-1.0), None);
+        let mut offer = |p: V3| {
+            if best.is_none_or(|b| n.dot(p) < n.dot(b)) {
+                best = Some(p);
+            }
+        };
+        if kind == SHAPE_COMPOUND {
+            let mut child = self.uu(COLLIDER_HULL, c);
+            while child != crate::world::NONE {
+                if let Some(p) = self.lowest_along(child as usize, n) {
+                    offer(p);
+                }
+                child = self.uu(COLLIDER_NEXT, child as usize);
+            }
+            return best;
+        }
+        if kind == SHAPE_HALFSPACE {
+            return None;
+        }
+        if kind == SHAPE_TRIMESH && !self.is_round_triangle(c) {
+            let frame = self.collider_pose(c);
+            let everything = v3(1.0e9, 1.0e9, 1.0e9);
+            self.each_part(self.uu(COLLIDER_HULL, c) as usize, (everything.scale(-1.0), everything), &|_, _| true, &mut |part| {
+                offer(frame.apply(crate::gjk::Convex::support(&part, frame.q.unrotate(down))));
+                true
+            });
+            return best;
+        }
+        let mut data = BoxData::new();
+        let solid = self.solid(self.shape_of(c), self.collider_pose(c), &mut data)?;
+        Some(crate::gjk::Convex::support(&solid, down))
+    }
+
+    /// Whether a half space query shape (a point on its plane and the normal out of it) overlaps collider `c`.
+    pub(crate) fn plane_query_overlaps(&self, c: usize, point: V3, n: V3) -> bool {
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_HALFSPACE {
+            // Two half spaces meet unless they face away from each other with a gap between.
+            let (other, m) = self.plane_of(c);
+            let opposite = m.dot(n) < -0.999_999;
+            return !opposite || n.dot(other.sub(point)) <= 0.0;
+        }
+        self.lowest_along(c, n).is_some_and(|low| n.dot(low.sub(point)) <= 0.0)
+    }
+
+    /// The first touch of a half space query shape moving along unit `r` with collider `c`: the plane meets the collider's
+    /// lowest point along its normal.
+    pub(crate) fn plane_query_cast(&self, c: usize, point: V3, n: V3, r: V3, o: &CastOptions) -> Option<Cast> {
+        let low = self.lowest_along(c, n)?;
+        // How far in front of the plane the collider starts, less the distance the cast stops short.
+        let height = n.dot(low.sub(point)) - o.target;
+        let on_plane = |at: V3| at.sub(n.scale(n.dot(at.sub(point))));
+        if height <= 0.0 {
+            if !o.stop && n.dot(r) <= 0.0 {
+                return None;
+            }
+            let geometry = o.geometry;
+            return Some(Cast {
+                t: 0.0,
+                normal: if geometry { n.scale(-1.0) } else { ZERO },
+                on_query: if geometry { on_plane(low) } else { ZERO },
+                on_target: if geometry { low } else { ZERO },
+                started: true,
+            });
+        }
+        let closing = n.dot(r);
+        if closing <= 0.0 {
+            return None;
+        }
+        let t = height / closing;
+        if t > o.max {
+            return None;
+        }
+        // The plane has moved by r t when it meets the point.
+        Some(Cast { t, normal: n.scale(-1.0), on_query: low.sub(n.scale(o.target)), on_target: low, started: false })
+    }
+
     /// A half space's box in the broad phase: a slab when its plane faces along an axis, else the whole world.
     pub(crate) fn halfspace_reach(&self, c: usize) -> (V3, V3) {
         const BIG: f32 = 1.0e6;

@@ -546,7 +546,7 @@ fn floor(f: f32) -> i64 {
     if (i as f32) > f { i - 1 } else { i }
 }
 
-fn nearer(best: Option<Cast>, hit: Option<Cast>) -> Option<Cast> {
+pub(crate) fn nearer(best: Option<Cast>, hit: Option<Cast>) -> Option<Cast> {
     match (best, hit) {
         (Some(b), Some(h)) if h.t < b.t => Some(h),
         (None, h) => h,
@@ -588,6 +588,12 @@ impl World {
 
     /// The first touch of a query shape at `pose` moving along unit `r` (world space) with collider `c`.
     pub fn cast_collider(&self, c: usize, shape: Shape, pose: Pose, r: V3, o: &CastOptions) -> Option<Cast> {
+        if self.is_soup(shape) {
+            return self.cast_soup(c, shape.hull as usize, pose, r, o);
+        }
+        if shape.kind == SHAPE_HALFSPACE {
+            return self.plane_query_cast(c, pose.p, pose.q.rotate(shape.size), r, o);
+        }
         let kind = self.uu(COLLIDER_SHAPE, c);
         if kind == SHAPE_COMPOUND {
             let mut best: Option<Cast> = None;
@@ -617,7 +623,7 @@ impl World {
     }
 
     /// A cast in a mesh's, height field's or voxel grid's frame against the triangles or cells it can reach.
-    fn cast_triangles(&self, mesh: usize, query: &Solid, r: V3, o: &CastOptions) -> Option<Cast> {
+    pub(crate) fn cast_triangles(&self, mesh: usize, query: &Solid, r: V3, o: &CastOptions) -> Option<Cast> {
         let (low, high) = bounds(query);
         let grow = v3(o.target, o.target, o.target);
         let (center, half) = (low.add(high).scale(0.5), high.sub(low).scale(0.5).add(grow));
@@ -846,6 +852,12 @@ impl World {
 
     /// True when a query shape at `pose` overlaps collider `c`.
     pub fn overlaps(&self, c: usize, shape: Shape, pose: Pose) -> bool {
+        if self.is_soup(shape) {
+            return self.overlaps_soup(c, shape.hull as usize, pose);
+        }
+        if shape.kind == SHAPE_HALFSPACE {
+            return self.plane_query_overlaps(c, pose.p, pose.q.rotate(shape.size));
+        }
         let kind = self.uu(COLLIDER_SHAPE, c);
         if kind == SHAPE_COMPOUND {
             let mut child = self.uu(COLLIDER_HULL, c);

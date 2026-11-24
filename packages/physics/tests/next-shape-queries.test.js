@@ -390,6 +390,6 @@ test('stopAtPenetration and the filter act as Rapier documents them', () => {
   assert.deepEqual(own.intersectPoint([0.2, 0, 0]), [ball]);
   assert.deepEqual(own.intersectPoint([0.2, 0, 0], { excludeFixed: true }), []);
   assert.equal(own.projectPoint([2, 0, 0], { predicate: (body) => body === far }).body, far);
-  assert.throws(() => own.shapeCast({ shape: 'trimesh', vertices: new Float32Array(9), indices: Uint32Array.from([0, 1, 2]) }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), { code: 'unsupported' });
+  assert.throws(() => own.shapeCast({ shape: 'custom', desc: {} }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), { code: 'unsupported' });
   assert.throws(() => own.shapeCast(probe, [0, 0, 0], [0, 0, 0, 1], [0, 0, 0]), RangeError);
 });

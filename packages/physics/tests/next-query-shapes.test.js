@@ -75,3 +75,28 @@ test('a compound as the query shape casts and overlaps piece by piece, as on Rap
   }
   assert.throws(() => worlds[0].shapeCast({ shape: 'compound', parts: [] }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), /at least one part/);
 });
+
+test('a mesh, a height field and a voxel grid as the query shape cast and overlap as on Rapier', () => {
+  const mesh = { shape: 'trimesh', vertices: [0, -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1], indices: [0, 1, 2, 0, 2, 3] };
+  const field = { shape: 'heightfield', rows: 2, columns: 2, heights: [0, 0.2, 0, 0.1, 0.3, 0.1, 0, 0.2, 0], scale: [2, 1, 2] };
+  let hits = 0;
+  const grid = { shape: 'voxels', cells: Int32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]), size: [0.5, 0.5, 0.5] };
+  for (const [name, shape, position, rotation, direction] of [
+    ['mesh', mesh, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]],
+    ['turned mesh', mesh, [0, 0, 0], [0, 0.2, 0, 0.98], [1, 0.1, 0]],
+    ['height field', field, [6, 4, 0], [0, 0, 0, 1], [0, -1, 0]],
+    ['voxel grid', grid, [3, 0, 0], [0, 0, 0, 1], [1, 0, 0]],
+  ]) {
+    const [own, rapier] = worlds.map((w) => w.shapeCast(shape, position, rotation, direction, { maxDistance: 50 }));
+    assert.equal(!!own, !!rapier, name);
+    if (own) {
+      hits++;
+      assert.ok(Math.abs(own.distance - rapier.distance) < 6e-3, `${name}: ${own.distance} vs ${rapier.distance}`);
+    }
+  }
+  assert.ok(hits >= 3, `${hits} of the four casts hit something`);
+  for (const [shape, position] of [[mesh, [5.2, 0, 0]], [mesh, [0, 0, 0]], [grid, [5.3, 0.2, 0]], [grid, [0, 3, 0]], [field, [0, 8, 0]]]) {
+    const [own, rapier] = worlds.map((w) => w.intersectShape(shape, position).length);
+    assert.equal(own, rapier, `overlap of ${shape.shape} at ${position}`);
+  }
+});

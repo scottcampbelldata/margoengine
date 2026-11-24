@@ -525,8 +525,9 @@ fn cast_args(
 ) -> Option<(Shape, Pose, V3, CastOptions, Filter)> {
     let (shape, pose) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw)?;
     let (_, dir, filter) = ray_args(x, y, z, dx, dy, dz, flags, groups, collider, body)?;
-    let mut data = BoxData::new();
-    world().solid(shape, pose, &mut data)?;
+    if !world().query_valid(shape, pose) {
+        return None;
+    }
     if max.is_nan() || !(target >= 0.0 && target < f32::INFINITY) {
         return None;
     }
@@ -631,7 +632,7 @@ pub extern "C" fn query_shape_all(
 ) -> i32 {
     let Some((shape, pose)) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw) else { return -1 };
     let w = world();
-    if w.solid(shape, pose, &mut BoxData::new()).is_none() {
+    if !w.query_valid(shape, pose) {
         return -1;
     }
     let mut count = 0usize;
@@ -796,7 +797,7 @@ pub extern "C" fn collider_shape_cast(
 #[unsafe(no_mangle)]
 pub extern "C" fn collider_overlaps(collider: u32, kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> i32 {
     let Some((shape, pose)) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw) else { return -1 };
-    if !collider_alive(collider) || world().solid(shape, pose, &mut BoxData::new()).is_none() {
+    if !collider_alive(collider) || !world().query_valid(shape, pose) {
         return -1;
     }
     world().overlaps(collider as usize, shape, pose) as i32

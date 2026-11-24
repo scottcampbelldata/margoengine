@@ -30,6 +30,7 @@ pub mod revolve;
 pub mod sat;
 pub mod smooth;
 pub mod solver;
+pub mod soup;
 pub mod voxel;
 pub mod world;
 

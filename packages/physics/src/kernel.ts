@@ -368,7 +368,7 @@ const QUERY_HITS = 256;
 /** A query shape of {@link KernelWorld.shapeCast} and {@link KernelWorld.intersectShape}: a convex kernel shape and its
  * `addCollider` size (a hull names its `addHull` row). */
 export interface KernelQueryShape {
-  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
   /** A hull's or a one-triangle mesh's is `[row]`, and a hull's `[row, border]` when it has a border. */
   size: readonly number[];
   /** Where the shape sits in the query's frame, before its position and rotation (default the origin, no turn). */
@@ -412,7 +412,7 @@ export interface KernelDistance {
   pointA: [number, number, number];
   pointB: [number, number, number];
 }
-const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3, trimesh: 4, cylinder: 6, cone: 7 } as const;
+const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3, trimesh: 4, cylinder: 6, cone: 7, halfspace: 8 } as const;
 const castBits = (cast: KernelCastOptions): number => (cast.stop ? 1 : 0) | (cast.geometry ? 2 : 0);
 const PAIR_REFUSED = 'A pair query needs two colliders that are in the world, and a prediction of 0 or more; pass rows addCollider returned.';
 const CAST_REFUSED =
