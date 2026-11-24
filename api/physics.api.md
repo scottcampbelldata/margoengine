@@ -1605,6 +1605,18 @@ export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, optio
 
 export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
 
+export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, to: 'aabb' | 'obb', options?: MeshConversionOptions): Extract<ColliderOptions, {
+    shape: 'box';
+}> & {
+    halfExtents: Vec3;
+    offset: Vec3;
+};
+export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, to: 'convexHull', options?: MeshConversionOptions): Extract<ColliderOptions, {
+    shape: 'convexHull';
+}>;
+export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, to: 'trimesh', options?: MeshConversionOptions): Extract<ColliderOptions, {
+    shape: 'trimesh';
+}>;
 export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, to: MeshConversion, options?: MeshConversionOptions): ColliderOptions;
 
 export { buildHull as convexHull };

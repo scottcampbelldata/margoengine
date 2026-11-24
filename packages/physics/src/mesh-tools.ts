@@ -113,7 +113,9 @@ export function voxelizedMesh(
   const s = cellSize(size);
   const count = vertices.length / 3;
   if (!Number.isInteger(count) || indices.length % 3 !== 0)
-    throw new RangeError('voxelizedMesh takes packed x, y, z vertices and three indices a triangle.');
+    throw new RangeError(
+      'voxelizedMesh takes packed x, y, z vertices and three indices a triangle; pass whole vertices and whole triangles.',
+    );
   const surface = new Map<number, [number, number, number]>();
   let low: [number, number, number] = [Infinity, Infinity, Infinity],
     high: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -203,7 +205,8 @@ export function voxelizedMesh(
  */
 export function meshConnectedComponents(indices: ArrayLike<number>): { component: Uint32Array; count: number } {
   const triangles = indices.length / 3;
-  if (!Number.isInteger(triangles)) throw new RangeError('meshConnectedComponents takes three indices a triangle.');
+  if (!Number.isInteger(triangles))
+    throw new RangeError('meshConnectedComponents takes three indices a triangle; pass whole triangles.');
   const parent = new Map<number, number>();
   const find = (v: number): number => {
     let root = v;
@@ -244,9 +247,15 @@ export interface HalfEdgeTopology {
   next: Uint32Array;
   face: Uint32Array;
 }
+
+/**
+ * The half-edge topology of a triangle mesh, from its indices (three a triangle).
+ * @throws RangeError for indices that are not whole triangles.
+ */
 export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology {
   const triangles = indices.length / 3;
-  if (!Number.isInteger(triangles)) throw new RangeError('meshHalfEdges takes three indices a triangle.');
+  if (!Number.isInteger(triangles))
+    throw new RangeError('meshHalfEdges takes three indices a triangle; pass whole triangles.');
   const n = indices.length,
     out: HalfEdgeTopology = {
       vertex: new Uint32Array(n),
@@ -293,6 +302,30 @@ export type MeshConversion = 'trimesh' | 'convexHull' | 'aabb' | 'obb';
 export function convertMesh(
   vertices: ArrayLike<number>,
   indices: ArrayLike<number>,
+  to: 'aabb' | 'obb',
+  options?: MeshConversionOptions,
+): Extract<ColliderOptions, { shape: 'box' }> & { halfExtents: Vec3; offset: Vec3 };
+export function convertMesh(
+  vertices: ArrayLike<number>,
+  indices: ArrayLike<number>,
+  to: 'convexHull',
+  options?: MeshConversionOptions,
+): Extract<ColliderOptions, { shape: 'convexHull' }>;
+export function convertMesh(
+  vertices: ArrayLike<number>,
+  indices: ArrayLike<number>,
+  to: 'trimesh',
+  options?: MeshConversionOptions,
+): Extract<ColliderOptions, { shape: 'trimesh' }>;
+export function convertMesh(
+  vertices: ArrayLike<number>,
+  indices: ArrayLike<number>,
+  to: MeshConversion,
+  options?: MeshConversionOptions,
+): ColliderOptions;
+export function convertMesh(
+  vertices: ArrayLike<number>,
+  indices: ArrayLike<number>,
   to: MeshConversion,
   options: MeshConversionOptions = {},
 ): ColliderOptions {
@@ -323,7 +356,7 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
   const used = new Set<number>();
   for (let i = 0; i < indices.length; i++) {
     if (!(indices[i]! >= 0 && indices[i]! < count))
-      throw new RangeError(`Index ${indices[i]} is outside the ${count} vertices.`);
+      throw new RangeError(`Index ${indices[i]} is outside the ${count} vertices; pass indices below ${count}.`);
     used.add(indices[i]!);
   }
   if (to === 'trimesh')
@@ -350,7 +383,7 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
   if (to !== 'obb')
     throw new MargoError(
       'unsupported',
-      `convertMesh turns a mesh into trimesh, convexHull, aabb or obb, not ${String(to)}.`,
+      `convertMesh turns a mesh into trimesh, convexHull, aabb or obb, not ${String(to)}; pass one of those.`,
     );
   // The principal axes: the eigenvectors of the covariance of the vertices, by Jacobi's method.
   const mean = [0, 0, 0];

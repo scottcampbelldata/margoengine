@@ -2126,7 +2126,10 @@ export class KernelWorld {
     prediction: number,
   ): KernelManifold[] {
     const total = this.api.collider_shape_contacts(collider, ...this.shapeWords(shape, position, rotation), prediction);
-    if (total < 0) throw new RangeError(`${PAIR_REFUSED} ${CAST_REFUSED}`);
+    if (total < 0)
+      throw new RangeError(
+        `${PAIR_REFUSED} ${CAST_REFUSED} Pass a live collider row and a query shape the kernel holds.`,
+      );
     return this.readManifolds(total);
   }
   /** The first touch of collider `moving`, as it is, moving along `direction` with collider `target`, or null. @throws RangeError for a collider that is gone. */
@@ -2180,7 +2183,7 @@ export class KernelWorld {
     );
     if (!ok)
       throw new RangeError(
-        `Row ${collider} holds no collider, or its mass properties are not a body's: a finite mass of 0 or more, a finite centre, moments of 0 or more and a unit quaternion.`,
+        `Row ${collider} holds no collider, or its mass properties are not a body's: a finite mass of 0 or more, a finite centre, moments of 0 or more and a unit quaternion; pass a live collider row and those numbers.`,
       );
   }
   /** A collider's volume in cubic metres (0 for a mesh). @throws RangeError for a collider that is gone. */
@@ -2318,7 +2321,9 @@ export class KernelWorld {
       };
     const { flags = 0, groups: shared, excludeBody = 0xffffffff, dt = 0 } = options;
     if (!(dt >= 0) || !Number.isFinite(dt))
-      throw new RangeError(`softContacts takes a step length of zero or more seconds (got ${dt}).`);
+      throw new RangeError(
+        `softContacts takes a step length of zero or more seconds (got ${dt}); pass the step's dt, or leave it out.`,
+      );
     const all = shared === undefined ? 0xffffffff : shared >>> 0;
     for (let start = 0; start < count; start += capacity) {
       const n = capacity < count - start ? capacity : count - start,

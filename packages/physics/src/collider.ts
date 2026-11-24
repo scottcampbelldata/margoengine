@@ -635,7 +635,7 @@ export class PhysicsCollider {
    */
   setMass(mass: number): this {
     if (!(mass >= 0) || !Number.isFinite(mass))
-      throw new RangeError(`A collider mass is 0 or more kilograms and finite (got ${mass}).`);
+      throw new RangeError(`A collider mass is 0 or more kilograms and finite (got ${mass}); pass a number such as 1.`);
     const volume = this.volume();
     if (!(volume > 0))
       throw new RangeError(

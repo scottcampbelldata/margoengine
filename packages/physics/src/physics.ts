@@ -238,7 +238,6 @@ export interface CollisionEvent {
   removed?: boolean;
 }
 
-/** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
 /** A pair's force over a step as the solver gave it: the sum of its contacts' impulses and the strongest one. */
 interface ForceSum {
   impulse: number;
@@ -251,6 +250,7 @@ interface ForceSum {
   mz: number;
 }
 
+/** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
 export interface ContactForceEvent {
   type: 'contactforce';
   bodyA: PhysicsBody;
