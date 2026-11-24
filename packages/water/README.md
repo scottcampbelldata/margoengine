@@ -1100,6 +1100,36 @@ const png = await encodeFloodPNG(sheet, {range: [0, 1]});
 console.log(files.length, sheet.columns, sheet.rows, png.byteLength);
 ```
 
+#### Spray and debris emitters (FG-08)
+
+`floodEmitters(reading, {place})` turns a frame into emitter sites a particle system, Blender or Houdini can spawn from:
+`spray` where the water breaks and `debris` where the current lifts the bed, each `count` sites with a world `position`,
+a launch `velocity` (m/s) and a `rate` (particles a second), highest rate first, deterministic. Spray uses the solver's
+breaker channel (Ihmsen et al. 2012's potentials): `sprayRate` (default 20) particles a second per square metre of fully
+breaking water above `sprayThreshold` (0.2), leaving with the current and an upward `sprayLift` (0.5) x breaker x
+sqrt(g h). Debris starts where the Manning bed shear passes the Shields threshold of pieces of `debrisSize` (0.05 m) and
+`debrisDensity` (2.65), at the bedload rate of Meyer-Peter and Mueller (1948), q = 8 (theta - 0.047)^1.5 sqrt((s - 1) g
+d^3), counted in pieces of d^3 across the cell (`debrisRate` scales it, `roughness` is Manning n, default 0.03).
+`floodBirths(sites, seconds, {cell, seed, frame})` draws one frame's births: rate x seconds on average per site, spread
+over the cell, the same call giving the same births. `test/flood-emit.test.js` checks the rates against the formulas.
+
+```ts
+import {floodBirths, floodEmitters} from 'margoengine/water/flood-bake';
+import type {FloodReading} from 'margoengine/water/flood';
+
+// A frame as flood.read() gives it: here two 4 m cells, a bore breaking over 3 m of water and a 5 m/s sheet over sand.
+const frame = {
+  time: 0, steps: 0, ticks: 0, volume: 0, wetArea: 32, maxDepth: 3, maxSpeed: 5, courant: 0, capped: 0, foamArea: 0,
+  width: 2, height: 1,
+  depth: Float32Array.from([3, 0.4]), bed: Float32Array.from([-3, 0]),
+  velocity: Float32Array.from([2, 0, 5, 0]), foam: new Float32Array(2), breaker: Float32Array.from([0.9, 0]),
+} satisfies FloodReading;
+const place = {origin: [0, 0] as const, size: [8, 4] as const};
+const {spray, debris} = floodEmitters(frame, {place, sprayRate: 40, debrisSize: 0.01});
+const births = floodBirths(spray, 1 / 24, {cell: [place.size[0] / frame.width, place.size[1] / frame.height], frame: 12});
+console.log(spray.count, debris.count, births.count);
+```
+
 ## Ships riding the sea
 
 `@margoengine/water/ships` puts ships on any Water: the open sea, or the Water a `Flood` runs on.

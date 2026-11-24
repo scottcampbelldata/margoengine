@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17557829,
+  "total": 17558792,
   "history": [
     {
       "date": "2026-10-24",
@@ -11397,6 +11397,12 @@
       "commit": "2d90faf92d",
       "reason": "Lane D batch (2026-11-24): scenes/fauld-blast is a new scene entry that imports its feature packages statically like the other scene entries (14 leak items, as fauld-crater and fauld-tunnels); the scenes root grows by its catalogue row; react/textures and react/clouds carry the fourth audit pass's binding fixes",
       "grew": 18
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "20322dcbd6",
+      "reason": "FG-08 spray and debris emitters (floodEmitters, floodBirths) in water/flood-bake, 2,766 to 3,729 B; renderer outputs of a flood frame belong with the bake, and a new entry would repeat its reading checks",
+      "grew": 1
     }
   ],
   "items": {
@@ -12854,7 +12860,7 @@
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
     "@margoengine/water/flood": 12642,
-    "@margoengine/water/flood-bake": 2766,
+    "@margoengine/water/flood-bake": 3729,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 18041,

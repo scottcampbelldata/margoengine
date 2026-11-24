@@ -34,6 +34,39 @@ export interface FloodBakeOptions {
     signal?: AbortSignal;
 }
 
+export interface FloodBirthOptions {
+    cell: readonly [number, number];
+    seed?: number;
+    frame?: number;
+    max?: number;
+}
+
+export interface FloodBirths {
+    count: number;
+    position: Float32Array;
+    velocity: Float32Array;
+}
+
+export interface FloodEmitterOptions {
+    place: {
+        origin: readonly [number, number];
+        size: readonly [number, number];
+    };
+    sprayThreshold?: number;
+    sprayRate?: number;
+    sprayLift?: number;
+    debrisSize?: number;
+    debrisDensity?: number;
+    debrisRate?: number;
+    roughness?: number;
+    maxSites?: number;
+}
+
+export interface FloodEmitters {
+    spray: FloodSites;
+    debris: FloodSites;
+}
+
 export type FloodField = 'depth' | 'bed' | 'surface' | 'velocity' | 'speed' | 'foam' | 'breaker' | 'wet';
 
 export interface FloodImage {
@@ -57,6 +90,14 @@ export interface FloodPNGOptions {
     range?: readonly [number, number];
 }
 
+export interface FloodSites {
+    count: number;
+    position: Float32Array;
+    velocity: Float32Array;
+    rate: Float32Array;
+    cell: Uint32Array;
+}
+
 export function bakeFlood(flood: Flood, options: FloodBakeOptions): AsyncGenerator<FloodBakeFrame>;
 
 export function encodeFloodEXR(reading: FloodReading, options?: FloodImageOptions & {
@@ -66,6 +107,10 @@ export function encodeFloodEXR(reading: FloodReading, options?: FloodImageOption
 export function encodeFloodPNG(image: FloodImage, options?: FloodPNGOptions): Promise<Uint8Array>;
 
 export function floodAtlas(frames: readonly (FloodBakeFrame | FloodReading)[], options?: FloodAtlasOptions): FloodAtlas;
+
+export function floodBirths(sites: FloodSites, seconds: number, options: FloodBirthOptions): FloodBirths;
+
+export function floodEmitters(reading: FloodReading, options: FloodEmitterOptions): FloodEmitters;
 
 export function floodImage(reading: FloodReading, options?: FloodImageOptions): FloodImage;
 
