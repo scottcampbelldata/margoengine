@@ -20,9 +20,55 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   compound: 'compound',
   convexDecomposition: 'compound',
   voxels: 'trimesh',
+  // A segment is a capsule with no radius, a triangle a one-triangle mesh and a polyline a compound of segments.
+  segment: 'capsule',
+  triangle: 'trimesh',
+  polyline: 'compound',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
 const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'];
+
+type Quat4 = readonly [number, number, number, number];
+const multiply = (a: Quat4, b: Quat4): [number, number, number, number] => [
+  a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+  a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+  a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+];
+/** `v` turned by the unit quaternion `q`. */
+function turn(q: Quat4, v: Vec3): Vec3 {
+  const t = [2 * (q[1] * v[2] - q[2] * v[1]), 2 * (q[2] * v[0] - q[0] * v[2]), 2 * (q[0] * v[1] - q[1] * v[0])];
+  return [
+    v[0] + q[3] * t[0] + q[1] * t[2] - q[2] * t[1],
+    v[1] + q[3] * t[1] + q[2] * t[0] - q[0] * t[2],
+    v[2] + q[3] * t[2] + q[0] * t[1] - q[1] * t[0],
+  ];
+}
+
+/**
+ * A segment as the capsule with no radius that holds it: its middle, the turn that stands local Y along it, and half its length.
+ * @throws RangeError for a segment of no length.
+ */
+function segmentFrame(a: Vec3, b: Vec3, label: string): { middle: Vec3; rotation: Quat4; half: number } {
+  checkVec(a, `${label} a`);
+  checkVec(b, `${label} b`);
+  const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+    squared = d[0] * d[0] + d[1] * d[1] + d[2] * d[2],
+    length = root(squared);
+  if (!(squared > 0)) throw new RangeError(`A ${label.toLowerCase()} needs two different points; a and b are the same.`);
+  const y = d[1] / length;
+  // The shortest turn from +Y to the direction: the axis Y x d with the angle's half in w, and a half turn about X for -Y.
+  let q: [number, number, number, number];
+  if (y < -0.999999) q = [1, 0, 0, 0];
+  else {
+    const w = 1 + y,
+      x = d[2] / length,
+      z = -d[0] / length,
+      norm = root(x * x + z * z + w * w);
+    q = [x / norm, 0, z / norm, w / norm];
+  }
+  return { middle: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], rotation: q, half: length / 2 };
+}
 
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
@@ -184,7 +230,13 @@ export function kernelCollider(
     center = [0, 0, 0];
   let size: number[],
     parts: KernelCompoundPart[] | undefined,
-    voxels: number | undefined;
+    voxels: number | undefined,
+    segment: { middle: Vec3; rotation: Quat4 } | undefined;
+  const surface = options.shape === 'segment' || options.shape === 'triangle' || options.shape === 'polyline';
+  if (surface && (options.mass !== undefined || options.density !== undefined))
+    throw new RangeError(
+      `A ${options.shape} has no volume, so no mass or density; give the body its mass with setMassProperties, or use a convexHull or box.`,
+    );
   if (options.shape === 'box') {
     let half = options.halfExtents;
     if (!half) {
@@ -228,6 +280,32 @@ export function kernelCollider(
       );
     checkVec(options.scale, 'Heightfield scale');
     size = [hulls.addHeightfield(options.rows, options.columns, options.heights, options.scale, options.fixInternalEdges ?? false)];
+  } else if (options.shape === 'segment') {
+    const frame = segmentFrame(options.a, options.b, 'Segment');
+    size = [0, frame.half];
+    segment = frame;
+  } else if (options.shape === 'triangle') {
+    checkVec(options.a, 'Triangle a');
+    checkVec(options.b, 'Triangle b');
+    checkVec(options.c, 'Triangle c');
+    size = [hulls.addTrimesh(Float32Array.of(...options.a, ...options.b, ...options.c), Uint32Array.of(0, 1, 2), false)];
+  } else if (options.shape === 'polyline') {
+    const points = Float32Array.from(options.vertices);
+    if (points.length < 6 || points.length % 3) throw new RangeError('A polyline needs at least two vertices, three numbers each.');
+    const count = points.length / 3,
+      pairs = options.indices ? Array.from(options.indices) : Array.from({ length: (count - 1) * 2 }, (_, i) => (i >> 1) + (i & 1));
+    if (!pairs.length || pairs.length % 2) throw new RangeError('A polyline needs whole segments; pass two indices per segment.');
+    parts = [];
+    for (let i = 0; i < pairs.length; i += 2) {
+      for (const index of [pairs[i], pairs[i + 1]])
+        if (!Number.isInteger(index) || index < 0 || index >= count)
+          throw new RangeError('Polyline index is out of range; keep every index below the vertex count.');
+      const a = Array.from(points.subarray(3 * pairs[i], 3 * pairs[i] + 3)) as unknown as Vec3,
+        b = Array.from(points.subarray(3 * pairs[i + 1], 3 * pairs[i + 1] + 3)) as unknown as Vec3,
+        frame = segmentFrame(a, b, 'Polyline segment');
+      parts.push({ shape: 'capsule', size: [0, frame.half], position: frame.middle, rotation: frame.rotation });
+    }
+    size = [];
   } else if (options.shape === 'compound') {
     parts = compoundParts(options.parts, hulls);
     size = [];
@@ -251,13 +329,20 @@ export function kernelCollider(
     size = [hulls.addVoxels(cells, cell)];
   } else
     throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels.`);
-  const offset = options.offset ?? [0, 0, 0];
+  let offset = options.offset ?? [0, 0, 0],
+    rotation = options.rotation;
   checkVec(offset, 'Collider offset');
+  if (segment) {
+    // The capsule stands in the collider's frame, which is itself turned in the body's.
+    const turned = rotation ? turn(rotation as Quat4, segment.middle) : segment.middle;
+    offset = [offset[0] + turned[0], offset[1] + turned[1], offset[2] + turned[2]];
+    rotation = rotation ? multiply(rotation as Quat4, segment.rotation) : [...segment.rotation];
+  }
   const whole = (): number =>
       parts
         ? parts.reduce((sum, part) => sum + volume(part.shape, part.size, hulls.hullVolume), 0)
         : (voxels ?? volume(shape as KernelShape, size, hulls.hullVolume)),
-    density = options.massless || (shape === 'trimesh' && voxels === undefined)
+    density = options.massless || surface || (shape === 'trimesh' && voxels === undefined)
       ? 0
       : options.mass !== undefined
         ? options.mass / whole()
@@ -269,7 +354,7 @@ export function kernelCollider(
     parts,
     options: {
       position: [offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]],
-      rotation: options.rotation,
+      rotation,
       density,
       friction: options.friction,
       restitution: options.restitution,

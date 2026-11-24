@@ -800,6 +800,10 @@ export class KernelWorld {
     } else if (shape === 'cylinder' || shape === 'cone') {
       if (!Array.isArray(size) || size.length !== 3 || !size.every(Number.isFinite) || !(size[0] > 0 && size[1] > 0 && size[2] >= 0))
         throw new RangeError(`A ${shape} needs [radius, halfHeight, borderRadius], the first two above zero and the border 0 or more (got ${String(size)}).`);
+    } else if (shape === 'capsule') {
+      // A radius of 0 is a segment: no volume, and it touches, is cast and is hit as the line it is.
+      if (!Array.isArray(size) || size.length !== 2 || !size.every(Number.isFinite) || !(size[0] >= 0 && size[1] > 0))
+        throw new RangeError(`A capsule needs [radius, halfLength], the radius 0 or more and the half length above zero (got ${String(size)}).`);
     } else if (!Array.isArray(size) || size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
       throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${String(size)}).`);
   }

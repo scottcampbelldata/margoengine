@@ -63,6 +63,15 @@ export type ShapeOptions =
    * {@link PhysicsCollider.setVoxel}; {@link PhysicsCollider.combineVoxelStates} couples two grids along a shared border.
    */
   | { shape: 'voxels'; cells: Int32Array; size?: Vec3 }
+  /** A line segment from `a` to `b` in the collider's frame. It has no volume, so no mass; it collides, is raycast and is cast against. */
+  | { shape: 'segment'; a: Vec3; b: Vec3 }
+  /** A single triangle `a`, `b`, `c` in the collider's frame, solid on both sides, with no volume and so no mass. */
+  | { shape: 'triangle'; a: Vec3; b: Vec3; c: Vec3 }
+  /**
+   * A chain or set of segments in the collider's frame: `vertices` (flat x, y, z) joined by `indices` (two a segment), or in
+   * order when `indices` is left out. No volume, so no mass.
+   */
+  | { shape: 'polyline'; vertices: ArrayLike<number>; indices?: ArrayLike<number> }
   /** Everything on one side of a plane through the collider's origin; `normal` points out of the solid (default up). */
   | { shape: 'halfSpace'; normal?: Vec3 }
   /**
@@ -378,6 +387,34 @@ export function createColliderDesc(
       );
       break;
     }
+    case 'segment': {
+      checkVec(options.a, 'Segment a');
+      checkVec(options.b, 'Segment b');
+      desc = R.ColliderDesc.segment(vec(options.a), vec(options.b));
+      break;
+    }
+    case 'triangle': {
+      checkVec(options.a, 'Triangle a');
+      checkVec(options.b, 'Triangle b');
+      checkVec(options.c, 'Triangle c');
+      desc = R.ColliderDesc.triangle(vec(options.a), vec(options.b), vec(options.c));
+      break;
+    }
+    case 'polyline': {
+      const points = Float32Array.from(options.vertices);
+      finite(points, 'Polyline vertices');
+      if (points.length < 6 || points.length % 3) throw new RangeError('A polyline needs at least two vertices, three numbers each.');
+      let indices: Uint32Array | undefined;
+      if (options.indices) {
+        if (!options.indices.length || options.indices.length % 2) throw new RangeError('A polyline needs whole segments; pass two indices per segment.');
+        for (const index of Array.from(options.indices))
+          if (!Number.isInteger(index) || index < 0 || index >= points.length / 3)
+            throw new RangeError('Polyline index is out of range; keep every index below the vertex count.');
+        indices = Uint32Array.from(options.indices);
+      }
+      desc = R.ColliderDesc.polyline(points, indices);
+      break;
+    }
     case 'halfSpace': {
       const normal = options.normal ?? [0, 1, 0];
       checkVec(normal, 'Half space normal');
@@ -397,7 +434,7 @@ export function createColliderDesc(
       break;
     default:
       throw new TypeError(
-        `Unknown collider shape ${(options as { shape: string }).shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition, voxels, halfSpace or custom.`,
+        `Unknown collider shape ${(options as { shape: string }).shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition, voxels, segment, triangle, polyline, halfSpace or custom.`,
       );
   }
   return { desc, center };
@@ -426,6 +463,9 @@ const SHAPE_OF_TYPE: Readonly<Record<string, ShapeOptions['shape']>> = {
   Compound: 'compound',
   Voxels: 'voxels',
   HalfSpace: 'halfSpace',
+  Segment: 'segment',
+  Triangle: 'triangle',
+  Polyline: 'polyline',
 };
 /** What a made collider is called: its option, or for `custom` what its solver type maps to. */
 export function shapeName(R: RapierModule, shape: ShapeOptions['shape'], type: number): ShapeOptions['shape'] {

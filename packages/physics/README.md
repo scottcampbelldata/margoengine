@@ -502,6 +502,20 @@ console.log(rock.position[1].toFixed(2), convexHull(points).faces.length); // 0.
 physics.dispose();
 ```
 
+A `segment` (`a`, `b`), a `triangle` (`a`, `b`, `c`) and a `polyline` (`vertices`, optional `indices`) are surfaces in the collider's frame with no volume, so no mass or density: they belong on fixed bodies or with `setMassProperties`. A triangle collides on both sides.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', colliders: {shape: 'polyline', vertices: [-2, 2, 0, 0, 0, 0, 2, 2, 0]}}); // a V
+const ball = physics.addBody(null, {position: [-1, 3, 0], colliders: {shape: 'sphere', radius: 0.2}, linearDamping: 0.5});
+for (let i = 0; i < 600; i++) physics.step();
+console.log(ball.position[0].toFixed(1), ball.position[1].toFixed(2)); // '0.0' '0.28': in the corner
+physics.dispose();
+```
+
 A `cylinder` and a `cone` stand along their local Y, `halfHeight` each way, a cone's apex at the top. `borderRadius` rounds every edge with a border outside `radius` and `halfHeight`, Rapier's `roundCylinder` and `roundCone`, and `collider.borderRadius()` reads it back. A round shape weighs its border too, where Rapier weighs only its core, so give `mass` to match a Rapier scene's weights. A cap or base on a floor holds a full manifold, so the shape stands; rays, `shapeCast` and point queries meet the exact surface.
 
 ```ts

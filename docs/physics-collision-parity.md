@@ -26,9 +26,9 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Compound | full | convex parts |
 | Compound with non-convex parts (trimesh, height field, voxels, half space as part) | missing | Rapier's compound takes any shape |
 | Voxels | full | edit, combine, propagate |
-| Segment | missing | |
-| Triangle | missing | |
-| Polyline | missing | |
+| Segment | full | a capsule with no radius; `next-segments.test.js` against Rapier |
+| Triangle | full | a one-triangle mesh, both sides; ray and rest tested against Rapier |
+| Polyline | full | a compound of segments; as a query shape see shape cast |
 | Half space | missing | root entry has it |
 | Round cuboid, round convex hull, round triangle | missing | border radius exists for cylinder and cone only |
 | Collider shape change after creation | missing | |

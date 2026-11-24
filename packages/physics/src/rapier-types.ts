@@ -334,6 +334,9 @@ export interface RapierModule {
     trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
     voxels?(cells: Int32Array, size: Vector): ColliderDesc;
     heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector, flags?: number): ColliderDesc;
+    segment(a: Vector, b: Vector): ColliderDesc;
+    triangle(a: Vector, b: Vector, c: Vector): ColliderDesc;
+    polyline(vertices: Float32Array, indices?: Uint32Array | null): ColliderDesc;
     /** Rapier 0.19 and later. */
     compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
     /** Rapier 0.19 and later (V-HACD). */
