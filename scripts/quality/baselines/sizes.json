@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17771974,
+  "total": 17772554,
   "history": [
     {
       "date": "2026-10-24",
@@ -11577,6 +11577,12 @@
       "commit": "97e4dd0934",
       "reason": "terrain/displace 4342 -> 4454 gzip: displaced relief read its sun shadow maps under the clipmap surface and showed 95% falsely shadowed; the lookup now moves to where the point's sun ray leaves that surface (finish step). No split: it is part of the same shader patch.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "d0cc35ea50",
+      "reason": "KB-RESTORE-BORROWED1: the tonemap auto exposure mask goes through the shared TextureOption, with setAutoExposureMask",
+      "grew": 1
     }
   ],
   "items": {
@@ -12851,7 +12857,7 @@
     "@margoengine/tiles/splats": 2654,
     "@margoengine/tiles/style": 10360,
     "@margoengine/tiles/terrain": 5974,
-    "@margoengine/tonemap": 14544,
+    "@margoengine/tonemap": 15124,
     "@margoengine/tonemap/3dl": 2510,
     "@margoengine/tonemap/custom": 1459,
     "@margoengine/tonemap/export-cube": 1407,
