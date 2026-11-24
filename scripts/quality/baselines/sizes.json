@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17505871,
+  "total": 17508377,
   "history": [
     {
       "date": "2026-10-24",
@@ -11373,6 +11373,12 @@
       "commit": "b0ccfafe9",
       "reason": "Deformable trimesh colliders: aim, land and refit a mesh, a surface velocity in the contact rows (kernel blueprint 192,553 to 192,984 B deflated with its column table)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "178a5bd30",
+      "reason": "Deformable trimesh colliders in the physics base (aim, land, surface velocity: 51,095 to 51,678 B); ragdoll balance grew with the ankle limit fix (5,695 to 5,811 B) on main",
+      "grew": 2
     }
   ],
   "items": {
@@ -12129,7 +12135,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 246854,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 51095,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53229,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics2d": 18716,
@@ -12225,7 +12231,7 @@
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 7630,
-    "@margoengine/ragdoll/balance": 5695,
+    "@margoengine/ragdoll/balance": 6067,
     "@margoengine/ragdoll/getup": 1994,
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
