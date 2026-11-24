@@ -11,7 +11,7 @@ use crate::world::World;
 static mut WORLD: Option<World> = None;
 
 #[inline(always)]
-fn world() -> &'static mut World {
+pub(crate) fn world() -> &'static mut World {
     // SAFETY: an instance runs on one thread, and KernelWorld calls world_new before anything else.
     unsafe { (*core::ptr::addr_of_mut!(WORLD)).as_mut().unwrap_unchecked() }
 }

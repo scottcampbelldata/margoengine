@@ -414,6 +414,22 @@ export interface KernelManifold {
     }[];
 }
 
+export interface KernelParticleContact {
+    collider: number;
+    body: number;
+    t: number;
+    normal: [number, number, number];
+    depth: number;
+    point: [number, number, number];
+    started: boolean;
+}
+
+export interface KernelProbeOptions {
+    flags?: number;
+    groups?: number;
+    excludeBody?: number;
+}
+
 export interface KernelRayHit {
     collider: number;
     distance: number;
@@ -530,6 +546,8 @@ export class KernelWorld {
     colliderVolume(collider: number): number;
     colliderMass(collider: number): number;
     pairDistance(a: number, b: number): KernelDistance | null;
+    probeParticles(from: ArrayLike<number>, to: ArrayLike<number>, radius: number | ArrayLike<number>, options?: KernelProbeOptions): (KernelParticleContact | null)[];
+    get probeCapacity(): number;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;

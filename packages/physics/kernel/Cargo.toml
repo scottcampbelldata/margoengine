@@ -8,6 +8,10 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[dev-dependencies]
+# The cloth contacts the soft body kernel calls (kernel-common/src/cloth.rs) are tested here; the shipped kernel has no dependency.
+margoengine-physics-kernel-common = { path = "../kernel-common" }
+
 [features]
 # Work counts for examples/profile.rs, native only; never in the Wasm build.
 counts = []

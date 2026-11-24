@@ -78,6 +78,8 @@ export type {
   KernelContactPoint,
   KernelLoadOptions,
   KernelRayHit,
+  KernelParticleContact,
+  KernelProbeOptions,
   KernelShape,
   KernelSolverOptions,
   KernelTrimeshOptions,

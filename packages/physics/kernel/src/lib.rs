@@ -25,6 +25,7 @@ pub mod memory;
 pub mod multibody;
 pub mod mesh;
 pub mod pair;
+pub mod probe;
 pub mod narrow;
 pub mod query;
 pub mod revolve;

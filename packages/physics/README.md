@@ -676,6 +676,20 @@ for (let step = 0; step < 60; step++) physics.step();
 console.log(ball.position[1] > 0.4);
 ```
 
+`physics.kernel.probeParticles(from, to, radius, options)` answers a soft solver's question for a batch of particles at once: where does a particle of radius `radius`, moving from its position in `from` to its position in `to` (packed x, y, z), first meet the colliders? It sweeps a ball, so a fast particle never passes through a thin shape, and for one that ends within its radius of a surface, or inside a solid, gives the nearest point on the surface. Each answer is `null` or `{collider, body, t, normal, depth, point, started}`: `t` is the fraction of the move at which it touches, `normal` points out of the collider, `depth` is how far the end of the move is inside the radius (push out along `normal` by that much when it is positive), `point` is on the surface. It works for every collider shape, honours `groups` and the query flags and can leave a body out (`excludeBody`); one contact a particle, so ask again once a particle has been moved to find the next in a corner. Cloth meeting itself is in the soft kernel (`cloth::find_contacts` in `kernel-common`), not in JavaScript.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [5, 0.5, 5]}});
+physics.step();
+// One particle of radius 0.1 falls 20 m in one step: it is stopped at the floor, not carried through it.
+const [contact] = physics.kernel.probeParticles([0, 10, 0], [0, -10, 0], 0.1);
+console.log(contact?.t, contact?.normal, contact?.depth);
+```
+
 A `contactFilter` may also answer `'noForces'`: the pair's contacts are found and its `contactstart` and `contactend` events fire, but nothing pushes (Rapier's `filterContactPair` answering with no solver flags). `false` still lets the pair pass through with no events, and `true` solves it.
 
 ```ts

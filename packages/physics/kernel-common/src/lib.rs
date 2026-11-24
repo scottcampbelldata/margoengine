@@ -5,6 +5,7 @@
 extern crate alloc;
 
 pub mod broad;
+pub mod cloth;
 pub mod colour;
 pub mod heap;
 pub mod lanes;
