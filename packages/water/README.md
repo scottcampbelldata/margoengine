@@ -746,6 +746,42 @@ layer. Over open water a wave keeps its height: a 0.1 m crest 18 m wide keeps it
   const r = mudRheology({ sediment: 'aspen-natural-soil', concentration: 0.45 });
   console.log(Math.round(r.yieldStress)); // 69 Pa: a mud that stands in heaps
   ```
+- `sediment` (null, FG-13): suspended soil, `{erosion, criticalShear, settling, soil, tint}`, read when the flow
+  starts. Each 1/120 s tick the load c (kg/m^3) is carried with the current (a semi-Lagrangian step, Stam 1999), the bed
+  gives up E = M (tau / tau_c - 1) where the Manning bed shear tau = rho g n^2 U^2 / h^(1/3) passes `criticalShear`
+  (Partheniades 1965; `erosion` M 5e-5 kg m^-2 s^-1, `criticalShear` 0.2 Pa), and it settles at `settling` x c / h
+  (Krone 1962; 0.001 m/s, medium silt), so steady flow tends to E / w_s; a cell that dries drops its load, and c stays
+  under 100 kg/m^3 (`FLOOD_SEDIMENT_MAX`; heavier loads are `mud`). `soil(x, z)` gives the ground's erodibility 0..1
+  (0 paving, default 1), read once per cell. The load is the fourth channel of `wetTexture`, `read()` returns it per
+  cell as `sediment` with the total `sedimentMass` in kg, and `flood-bake` writes it as the 'sediment' field. With
+  `tint` (default true) the Water surface turns brown-grey with it: the non-algal particle absorption of Babin et al.
+  (2003) and a brown back-scatter, the same terms as `BreakingWaveMaterial`'s `look.sediment`, with beige foam.
+
+  ```ts
+  import {Engine} from 'margoengine/core';
+  import {Water} from 'margoengine/water';
+  import {Flood} from 'margoengine/water/flood';
+  const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+  // A dam break down a 100 x 20 m valley of soil, with a paved town east of x = 60 m.
+  const width = 100, height = 20, ground = new Float32Array(width * height).fill(0);
+  const terrain = engine.gpu!.createTexture({size: [width, height], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+  engine.gpu!.queue.writeTexture({texture: terrain}, ground, {bytesPerRow: width * 4}, [width, height]);
+  const water = Water.attach(engine, {
+    height: -50,
+    terrain: {heightmap: () => terrain, origin: [0, 0], size: [width, height]},
+    fill: (x) => (x < 20 ? 2 : undefined),
+  });
+  const flood = Flood.attach(engine, {
+    surface: water,
+    maxDepth: 3,
+    maxSpeed: 8,
+    sediment: {criticalShear: 0.3, soil: (x) => (x > 60 ? 0 : 1)},
+  });
+  for (let i = 0; i < 240; i++) engine.render({delta: 1 / 60});
+  await flood.settle();
+  const {sediment = new Float32Array(), sedimentMass = 0} = await flood.read(); // read() always sets both
+  console.log(Math.max(...sediment), Math.round(sedimentMass)); // kg/m^3 at the muddiest cell, kg in the water
+  ```
 - `roughness`: Manning n, default 0.03 (earth channel), read every frame. `boundary`: per map side 'wall' (default),
   'open' (zero gradient) or 'sea' (an open boundary held at the sea level, see below).
 - `maxDepth` (20 m) and `maxSpeed` (15 m/s) set the fixed step, `1 / (120 m)` s with `m` the least whole number that

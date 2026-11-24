@@ -485,6 +485,7 @@ interface FloodOptions {
     obstacles?: (x: number, z: number) => number | undefined;
     roughness?: number;
     mud?: FloodMud | null;
+    sediment?: FloodSediment | null;
     inflow?: number;
     rain?: number | null;
     surge?: number | null;
@@ -527,6 +528,16 @@ interface FloodReading {
     foam: Float32Array;
     breaker: Float32Array;
     foamArea: number;
+    sediment?: Float32Array;
+    sedimentMass?: number;
+}
+
+interface FloodSediment {
+    erosion?: number;
+    criticalShear?: number;
+    settling?: number;
+    soil?: (x: number, z: number) => number | undefined;
+    tint?: boolean;
 }
 
 interface FloodSource {

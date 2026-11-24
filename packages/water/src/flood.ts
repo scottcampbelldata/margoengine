@@ -36,7 +36,11 @@ import {
   floodInitialize,
   floodRecord,
   floodStage,
+  type FloodSedimentText,
 } from './flood-shaders.js';
+import { addSurfaceEffect } from './surface-effects.js';
+export { FLOOD_SEDIMENT_MAX } from './flood-shaders.js';
+import { siltShader } from './flood-silt.js';
 import { compute, group } from '../../shared/gpu.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
@@ -159,6 +163,13 @@ export interface FloodOptions {
    * Mud stops where its yield stress holds its slope, in heaps and lobes. Read every frame. Default null (water).
    */
   mud?: FloodMud | null;
+  /**
+   * Suspended sediment (FG-13): flood water picks up soil where its bed shear passes the soil's critical shear, carries it
+   * with the current and lets it settle, and the Water surface turns brown-grey with the load (the absorption and
+   * back-scatter of `BreakingWaveMaterial`'s `sediment`). Read when the flow starts. Default null: clear water, the
+   * record's fourth channel stays 0 and the solver runs the text it ran before.
+   */
+  sediment?: FloodSediment | null;
   /** Live multiplier of every inflow's discharge, 0..100: 0 turns the sources off, 2 doubles them. Default 1; read every frame. */
   inflow?: number;
   /** Rain on the whole map, mm/h, 0..2,000. Default null: follows `setRainRate` (the weather's), 0 until it is called. */
@@ -193,6 +204,43 @@ export interface FloodOptions {
   /** The fastest flow expected (m/s), 0..200; sets the time step with `maxDepth`. Default 15. */
   maxSpeed?: number;
 }
+/** Suspended sediment of a flood ({@link FloodOptions.sediment}); every field has a default. */
+export interface FloodSediment {
+  /**
+   * Erosion rate M of the soil, kg m^-2 s^-1, 0..0.1: what a square metre of bed gives up each second at twice its
+   * critical shear. Default 5e-5 (the middle of the cohesive-soil range of Winterwerp and van Kesteren 2004).
+   */
+  erosion?: number;
+  /** Bed shear stress the soil holds, Pa, 0.01..100. Default 0.2 (soft silt and clay loam). */
+  criticalShear?: number;
+  /** Settling velocity of the load, m/s, 0..0.1. Default 0.001 (medium silt, Stokes' law at about 35 micrometres). */
+  settling?: number;
+  /**
+   * How erodible the ground is at world (x, z), 0..1: 0 for paving, rock and buildings, 1 for loose soil; read once per
+   * cell centre when the flow starts. Default 1 everywhere.
+   */
+  soil?: (x: number, z: number) => number | undefined;
+  /** Tint the Water surface by the load. Default true. */
+  tint?: boolean;
+}
+const SEDIMENT_DEFAULTS = { erosion: 5e-5, criticalShear: 0.2, settling: 0.001 };
+function sedimentText(sediment: FloodSediment): FloodSedimentText {
+  if (typeof sediment !== 'object')
+    throw typeError(
+      'Flood sediment must be an object { erosion, criticalShear, settling, soil, tint } or null',
+      'geometry',
+    );
+  if (sediment.soil != null && typeof sediment.soil !== 'function')
+    throw typeError('Flood sediment.soil must be a function (x, z) => erodibility 0..1', 'geometry');
+  if (sediment.tint != null && typeof sediment.tint !== 'boolean')
+    throw typeError('Flood sediment.tint must be true or false', 'geometry');
+  return {
+    erosion: finite(sediment.erosion, SEDIMENT_DEFAULTS.erosion, 'sediment.erosion', 0, 0.1),
+    criticalShear: finite(sediment.criticalShear, SEDIMENT_DEFAULTS.criticalShear, 'sediment.criticalShear', 0.01, 100),
+    settling: finite(sediment.settling, SEDIMENT_DEFAULTS.settling, 'sediment.settling', 0, 0.1),
+  };
+}
+
 /** What {@link Flood.read} measures, summed in doubles over the map. */
 export interface FloodReading {
   /** Seconds simulated (whole ticks). */
@@ -228,6 +276,13 @@ export interface FloodReading {
   breaker: Float32Array;
   /** Area with foam above 0.05, m^2. */
   foamArea: number;
+  /**
+   * Suspended sediment per cell, kg/m^3 (FG-13); all 0 without `sediment`. `read()` always sets it; optional so readings
+   * made by hand (for `flood-bake`) need not.
+   */
+  sediment?: Float32Array;
+  /** Suspended sediment in the water, kg: concentration x depth x cell area, summed; `read()` always sets it. */
+  sedimentMass?: number;
 }
 
 let nextId = 0;
@@ -474,6 +529,7 @@ export class Flood implements EnginePlugin {
     this.options = { ...options };
     finite(options.roughness, 0.03, 'roughness', 0, 0.2);
     if (options.mud != null) mudRheology(options.mud);
+    if (options.sediment != null) sedimentText(options.sediment);
     finite(options.maxDepth, 20, 'maxDepth', 0.01, 1000);
     finite(options.maxSpeed, 15, 'maxSpeed', 0, 200);
     finite(options.rain, 0, 'rain', 0, 2000);
@@ -518,6 +574,29 @@ export class Flood implements EnginePlugin {
       );
     this.engine = engine;
     waterSolvers.set(surface, this.factory);
+    if (this.options.sediment != null && this.options.sediment.tint !== false) this.tint(engine.gpu);
+  }
+  private removeTint?: () => void;
+  private readonly tintOwned: { destroy(): void }[] = [];
+  /** The surface effect that browns the Water with the sediment the last tick recorded (flood-silt.ts). */
+  private tint(device: GPUDevice): void {
+    const place = this.options.surface.options.terrain!,
+      uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+      fallback = device.createTexture({ size: [1, 1], format: 'rgba32float', usage: GPUTextureUsage.TEXTURE_BINDING });
+    this.tintOwned.push(uniform, fallback);
+    device.queue.writeBuffer(uniform, 0, new Float32Array([...place.origin, ...place.size]));
+    const resources: GPUBindingResource[] = [{ buffer: uniform }, fallback.createView()];
+    this.removeTint = addSurfaceEffect(this.options.surface, {
+      key: 'flood-sediment',
+      vertex: false,
+      count: 2,
+      shader: siltShader,
+      prepare: () => {
+        const view = this.solver && !this.solver.disposed ? this.solver.shownView : undefined;
+        if (view && resources[1] !== view) resources[1] = view;
+        return resources;
+      },
+    });
   }
   /** Seconds on the flood's clock: the sum of frame deltas and `advanceTime` calls. */
   get time(): number {
@@ -940,6 +1019,10 @@ export class Flood implements EnginePlugin {
     this.disposed = true;
     const surface = this.options.surface as unknown as { setSeaLevel?: (y: number) => unknown };
     if (waterSolvers.get(this.options.surface) === this.factory) waterSolvers.delete(this.options.surface);
+    this.removeTint?.();
+    this.removeTint = undefined;
+    for (const object of this.tintOwned) object.destroy();
+    this.tintOwned.length = 0;
     if (!this.surfaceGone && typeof surface.setSeaLevel === 'function' && this.written !== this.base)
       surface.setSeaLevel(this.base);
     if (!this.surfaceGone && this.farDrawn)
@@ -978,6 +1061,10 @@ class FloodSolver implements WaterSolver {
   private readonly stage: GPUComputePipeline;
   private readonly first: GPUComputePipeline;
   private readonly recorder: GPUComputePipeline;
+  /** With sediment: the soil's erodibility per cell, and the record of the last tick copied where Water's surface reads it. */
+  private readonly soil?: GPUTexture;
+  private readonly shown?: GPUTexture;
+  readonly shownView?: GPUTextureView;
   private readonly recordGroups = new Map<number, GPUBindGroup>();
   private readonly firstGroup: GPUBindGroup;
   private readonly groups = new Map<number, GPUBindGroup>();
@@ -1103,7 +1190,23 @@ class FloodSolver implements WaterSolver {
         view(this.fluxes[0]),
       ]);
       this.stage = compute(device, floodStage);
-      this.recorder = compute(device, floodRecord(1 / RATE, DRY));
+      const sediment = o.sediment != null ? sedimentText(o.sediment) : undefined;
+      this.recorder = compute(device, floodRecord(1 / RATE, DRY, sediment));
+      if (sediment) {
+        const soil = new Float32Array(width * height).fill(1),
+          read = o.sediment!.soil;
+        if (read)
+          for (let j = 0; j < height; j++)
+            for (let i = 0; i < width; i++) {
+              const v = read(place.origin[0] + (i + 0.5) * dx, place.origin[1] + (j + 0.5) * dz);
+              if (v !== undefined && v !== null && (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1))
+                throw rangeError('Flood sediment.soil must return a number in 0..1, or undefined', 'geometry');
+              soil[j * width + i] = v ?? 1;
+            }
+        this.soil = upload(soil);
+        this.shown = texture('rgba32float', GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST);
+        this.shownView = this.shown.createView();
+      }
       this.resources = [view(terrain), view(obstacles), ...this.states.map(view), ...this.fluxes.map(view)];
     } catch (error) {
       this.dispose();
@@ -1132,7 +1235,8 @@ class FloodSolver implements WaterSolver {
   }
   /** The bind group that records the tick ending with state `c`: it reads the record of parity `k` and writes the other. */
   private recordGroup(c: number, k: number): GPUBindGroup {
-    const key = c * 2 + k;
+    // With sediment the group also binds the tick's uniform slice (its roughness), so it is kept per ring pair.
+    const key = c * 2 + k + (this.soil ? 4 * this.pair : 0);
     let g = this.recordGroups.get(key);
     if (!g) {
       const view = (t: GPUTexture) => t.createView();
@@ -1142,6 +1246,12 @@ class FloodSolver implements WaterSolver {
         view(this.records[k]),
         view(this.velocities[1 - k]),
         view(this.records[1 - k]),
+        ...(this.soil
+          ? [
+              { buffer: this.ring, offset: this.pair * 2 * FLOOD_UNIFORM_STRIDE, size: FLOOD_UNIFORM_BYTES },
+              view(this.soil),
+            ]
+          : []),
       ]);
       this.recordGroups.set(key, g);
     }
@@ -1196,6 +1306,11 @@ class FloodSolver implements WaterSolver {
     }
     pass.end();
     this.ticks += count;
+    if (this.shown && count > 0)
+      encoder.copyTextureToTexture({ texture: this.records[this.ticks % 2] }, { texture: this.shown }, [
+        this.width,
+        this.height,
+      ]);
     return count;
   }
   step(encoder: GPUCommandEncoder): void {
@@ -1213,7 +1328,11 @@ class FloodSolver implements WaterSolver {
     const { device, width, height } = this,
       row = Math.ceil((width * 16) / 256) * 256,
       size = row * height,
-      buffer = device.createBuffer({ size: size * 2, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+      silty = !!this.soil && this.ticks > 0,
+      buffer = device.createBuffer({
+        size: size * (silty ? 3 : 2),
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      }),
       encoder = device.createCommandEncoder(),
       steps = this.steps;
     try {
@@ -1225,6 +1344,12 @@ class FloodSolver implements WaterSolver {
         width,
         height,
       ]);
+      if (silty)
+        encoder.copyTextureToBuffer(
+          { texture: this.records[this.ticks % 2] },
+          { buffer, offset: size * 2, bytesPerRow: row },
+          [width, height],
+        );
       device.queue.submit([encoder.finish()]);
       await buffer.mapAsync(GPUMapMode.READ);
       const data = new Float32Array(buffer.getMappedRange().slice(0)),
@@ -1234,10 +1359,12 @@ class FloodSolver implements WaterSolver {
         velocity = new Float32Array(cells * 2),
         foam = new Float32Array(cells),
         breaker = new Float32Array(cells),
+        sediment = new Float32Array(cells),
         [dx, dz] = this.cell,
         maxDepth = o.maxDepth ?? 20,
         maxSpeed = o.maxSpeed ?? 15;
       let volume = 0,
+        load = 0,
         foamy = 0,
         wet = 0,
         deepest = 0,
@@ -1254,6 +1381,11 @@ class FloodSolver implements WaterSolver {
           bed[k] = data[s + 1];
           foam[k] = data[s + 2];
           breaker[k] = data[s + 3];
+          if (silty) {
+            const c = data[(size * 2 + j * row) / 4 + i * 4 + 3];
+            sediment[k] = c;
+            load += c * h;
+          }
           if (data[s + 2] > 0.05) foamy++;
           volume += h;
           if (h > deepest) deepest = h;
@@ -1293,6 +1425,8 @@ class FloodSolver implements WaterSolver {
         foam,
         breaker,
         foamArea: foamy * dx * dz,
+        sediment,
+        sedimentMass: load * dx * dz,
       };
     } finally {
       buffer.destroy();

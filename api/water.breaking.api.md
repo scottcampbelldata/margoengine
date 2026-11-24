@@ -95,5 +95,7 @@ interface FloodReading {
     foam: Float32Array;
     breaker: Float32Array;
     foamArea: number;
+    sediment?: Float32Array;
+    sedimentMass?: number;
 }
 ```

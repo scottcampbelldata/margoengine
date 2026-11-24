@@ -18,6 +18,7 @@ const reading = (t = 0, width = 3, height = 2) => {
     velocity: Float32Array.from({ length: cells * 2 }, (_, k) => (k % 2 ? -0.5 * k : 0.125 * k + t)),
     foam: f((k) => k / 10),
     breaker: f((k) => k / 20),
+    sediment: f((k) => k * 1.5),
   };
 };
 
@@ -149,6 +150,20 @@ test('floodImage: one pixel a cell, the named fields, north up by default', () =
   assert.throws(() => floodImage(r, { fields: ['height'] }), RangeError);
   assert.throws(() => floodImage(r, { type: 'UINT' }), RangeError);
   assert.throws(() => floodImage({ width: 2, height: 2, depth: new Float32Array(3) }), TypeError);
+});
+
+test('floodImage: the sediment field is the load of the reading (FG-13), and 0 for a reading without one', () => {
+  const r = reading(),
+    image = floodImage(r, { fields: ['sediment'], northUp: false });
+  assert.deepEqual(
+    image.channels.map((c) => c.name),
+    ['sediment'],
+  );
+  assert.deepEqual([...image.channels[0].data], [...r.sediment]);
+  const { sediment, ...old } = r;
+  assert.ok(sediment.length === 6);
+  assert.deepEqual([...floodImage(old, { fields: ['sediment'] }).channels[0].data], [0, 0, 0, 0, 0, 0]);
+  assert.ok(!FLOOD_BAKE_FIELDS.includes('sediment'), 'the default fields are unchanged');
 });
 
 test('encodeFloodEXR: the cells exactly, as FLOAT channels a reader finds by name', async () => {

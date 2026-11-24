@@ -7,6 +7,8 @@ import { Engine, EngineKernel, EnginePlugin } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export const FLOOD_SEDIMENT_MAX = 100;
+
 export class Flood implements EnginePlugin {
     readonly name: string;
     readonly options: FloodOptions;
@@ -66,6 +68,7 @@ export interface FloodOptions {
     obstacles?: (x: number, z: number) => number | undefined;
     roughness?: number;
     mud?: FloodMud | null;
+    sediment?: FloodSediment | null;
     inflow?: number;
     rain?: number | null;
     surge?: number | null;
@@ -108,6 +111,16 @@ export interface FloodReading {
     foam: Float32Array;
     breaker: Float32Array;
     foamArea: number;
+    sediment?: Float32Array;
+    sedimentMass?: number;
+}
+
+export interface FloodSediment {
+    erosion?: number;
+    criticalShear?: number;
+    settling?: number;
+    soil?: (x: number, z: number) => number | undefined;
+    tint?: boolean;
 }
 
 export interface FloodSource {

@@ -10,9 +10,9 @@ import type { Flood, FloodReading } from './flood.js';
 
 /**
  * A field of a flood frame. 'surface' is depth + bed (the water's height, world y; the bed where dry); 'velocity' is two
- * channels, `velocity.x` and `velocity.z`; 'speed' is their length; 'wet' is 1 where deeper than 1 mm, else 0.
+ * channels, `velocity.x` and `velocity.z`; 'speed' is their length; 'wet' is 1 where deeper than 1 mm, else 0; 'sediment' is the suspended load in kg/m^3 (0 without the flood's `sediment`).
  */
-export type FloodField = 'depth' | 'bed' | 'surface' | 'velocity' | 'speed' | 'foam' | 'breaker' | 'wet';
+export type FloodField = 'depth' | 'bed' | 'surface' | 'velocity' | 'speed' | 'foam' | 'breaker' | 'wet' | 'sediment';
 /** The fields a bake writes when none are given. */
 export const FLOOD_BAKE_FIELDS: readonly FloodField[] = Object.freeze([
   'depth',
@@ -21,7 +21,7 @@ export const FLOOD_BAKE_FIELDS: readonly FloodField[] = Object.freeze([
   'foam',
   'breaker',
 ]);
-const FIELDS = new Set<string>(['depth', 'bed', 'surface', 'velocity', 'speed', 'foam', 'breaker', 'wet']);
+const FIELDS = new Set<string>(['depth', 'bed', 'surface', 'velocity', 'speed', 'foam', 'breaker', 'wet', 'sediment']);
 const WET = 1e-3;
 const G = 9.81;
 // The critical Shields number of loose grains (Meyer-Peter and Mueller 1948).
@@ -103,6 +103,9 @@ function planes(r: FloodReading, field: FloodField): { name: string; data: Float
       return [{ name: 'breaker', data: r.breaker }];
     case 'wet':
       return [{ name: 'wet', data: plane((k) => (r.depth[k] > WET ? 1 : 0)) }];
+    case 'sediment':
+      // A reading made before FG-13 (or by hand) may have no load: it bakes as clear water.
+      return [{ name: 'sediment', data: r.sediment ?? new Float32Array(r.width * r.height) }];
   }
 }
 function checkFields(fields: readonly FloodField[] | undefined): readonly FloodField[] {

@@ -55,6 +55,24 @@ texture equal to the reading within 2.4e-7, and a bore run-up of 0.89 m under Sh
 one more dispatch a tick and 32 B a cell; Water's spray now spawns from the breaker at any depth (the coast flow's breaker
 is 0 past 1.8 m, so its spray is unchanged).
 
+### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
+
+GPU maths change in `packages/water/src/flood-shaders.ts` (`floodRecord`), both backends from one WGSL source, only when
+`FloodOptions.sediment` is set: without it the record pass's text is the one before and its fourth channel stays 0. With
+it, the wetting record's fourth channel carries the load c (kg/m^3): each tick a semi-Lagrangian carry with the cell's
+current (bilinear in the record before the tick, Stam 1999), Partheniades (1965) entrainment M (tau / tau_c - 1) under the
+Manning bed shear rho g n^2 U^2 / h^(1/3), scaled by a per-cell erodibility texture, and Krone (1962) settling taken
+implicitly, c' = (c + dt E / h) / (1 + dt w_s / h); a drying cell drops its load and c stays under 100 kg/m^3. The pass
+binds the tick's own uniform slice (its roughness), so its bind groups are kept per ring pair. After the ticks of a frame
+the latest record is copied to one texture the Water surface reads through a surface effect (`flood-silt.ts`): Babin et
+al. (2003) non-algal absorption and a brown back-scatter, the terms of `BreakingWaveMaterial`'s `sediment`. Depth and
+momentum are unchanged. Evidence: `test/flood-sediment.browser.mjs` (RTX A6000, WebGPU and `MARGO_COMPAT=1`): no load
+without `sediment`, on a lake at rest or on paving (soil 0); one tick of a dam break against a JavaScript mirror of the
+scheme within 4.4e-7 relative over 244 wet cells; the load settles from 16.5 kg to 1.5 kg in 20 s once the bed shear is
+0; 30 and 60 fps reach the same load bit for bit with the roughness changed mid-run. Cost: one copy of an rgba32float map
+a frame, one more texture read a pixel on the surface; the record pass reads 4 more texels a wet cell. Missing: the bed
+does not change height (no morphodynamics), and the carry is not mass-conservative (bilinear semi-Lagrangian).
+
 ### Section 5 evidence: cliffs, overhangs and sea rocks over the heightfield (terrain/rocks, 2026-11-18)
 
 The clipmap terrain stays a heightfield; rock it cannot hold (overhangs, stacks, notches) comes as closed meshes from

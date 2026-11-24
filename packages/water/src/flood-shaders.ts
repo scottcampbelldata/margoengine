@@ -336,27 +336,74 @@ const FOAM_LIFE=3.0;
  textureStore(outState,p,vec4f(depth,bedAt(p),foam,breaker));textureStore(outMomentum,p,vec4f(0,mu,0,mv));
 }`;
 
+/** Suspended sediment settings baked into the record pass's text ({@link floodRecord}); SI units. */
+export interface FloodSedimentText {
+  /** Erosion rate M, kg m^-2 s^-1. */
+  erosion: number;
+  /** Critical bed shear stress for erosion, Pa. */
+  criticalShear: number;
+  /** Settling velocity, m/s. */
+  settling: number;
+}
+/** The most suspended sediment the flood carries, kg/m^3; heavier loads are mud flows (`FloodOptions.mud`). */
+export const FLOOD_SEDIMENT_MAX = 100;
+const wgslFloat = (v: number): string => (Number.isInteger(v) ? v + '.0' : String(v));
+
 /**
  * After each tick: the current in m/s for `Flood.velocityTexture` (u, v, speed, depth) and the wetting record for
- * `Flood.wetTexture` (deepest depth so far in m, seconds since the cell was last wet, 1 once it has been wet, 0). A cell
- * is wet above 1 cm. Bindings: 0 and 1 the state and momentum, 2 the record before the tick, 3 and 4 the targets; a
- * gather that writes only its own texel of two rgba32float targets, as the stage does, so the WebGL2 layer runs it on its
- * Fragment tier. The tick is 1 / 120 s and the dry depth `dry` m, both written into the text.
+ * `Flood.wetTexture` (deepest depth so far in m, seconds since the cell was last wet, 1 once it has been wet, suspended
+ * sediment in kg/m^3). A cell is wet above 1 cm. Bindings: 0 and 1 the state and momentum, 2 the record before the
+ * tick, 3 and 4 the targets; a gather that writes only its own texel of two rgba32float targets, as the stage does, so
+ * the WebGL2 layer runs it on its Fragment tier. The tick is 1 / 120 s and the dry depth `dry` m, both written into the
+ * text.
+ *
+ * With `sediment` (FG-13) the fourth channel carries suspended sediment c and two more bindings come in: 5 the tick's
+ * `Flood` uniform (its cell size and Manning roughness) and 6 the soil's erodibility per cell (r32float, 0..1). Each tick
+ * c is carried with the current by a semi-Lagrangian step (J. Stam, "Stable fluids", SIGGRAPH 1999,
+ * https://doi.org/10.1145/311535.311548; bilinear in the record before the tick), the bed gives up E = M (tau / tau_c - 1)
+ * where the bed shear tau = rho g n^2 U^2 / h^(1/3) passes tau_c (the erosion law of E. Partheniades, "Erosion and
+ * deposition of cohesive soils", J. Hydraul. Div. ASCE 91(1), 1965, https://doi.org/10.1061/JYCEAJ.0001165; the Manning
+ * shear of V. T. Chow, "Open-Channel Hydraulics", 1959), and the load settles at w_s c (R. B. Krone, "Flume studies of the
+ * transport of sediment in estuarial shoaling processes", University of California, Berkeley, 1962), implicitly:
+ * c' = (c + dt E / h) / (1 + dt w_s / h), so it can never go negative and tends to E / w_s in steady flow. A cell that
+ * dries drops its load (c = 0), and c stays under {@link FLOOD_SEDIMENT_MAX}. Without `sediment` the text is the one
+ * before FG-13 and the channel is 0.
  */
-export function floodRecord(tick: number, dry: number): string {
+export function floodRecord(tick: number, dry: number, sediment?: FloodSedimentText): string {
+  const carry = sediment
+    ? `
+struct Head {dt:f32,stage:f32,cell:vec2f,boundary:vec4f,roughness:f32}
+@group(0) @binding(5) var<uniform> head:Head;
+@group(0) @binding(6) var soil:texture_2d<f32>;
+fn load(i:vec2i,size:vec2i)->f32{return textureLoad(before,clamp(i,vec2i(0),size-1),0).w;}
+fn carried(q:vec2f,size:vec2i)->f32{
+ let a=q-0.5;let f=floor(a);let t=a-f;let i=vec2i(f);
+ return mix(mix(load(i,size),load(i+vec2i(1,0),size),t.x),mix(load(i+vec2i(0,1),size),load(i+vec2i(1,1),size),t.x),t.y);
+}`
+    : '';
+  const silt = sediment
+    ? `var c=0.0;
+ if(wet){
+  c=carried(vec2f(p)+0.5-u*${tick}/head.cell,size);
+  let tau=1000.0*9.81*head.roughness*head.roughness*dot(u,u)/pow(s.x,1.0/3.0);
+  let e=${wgslFloat(sediment.erosion)}*textureLoad(soil,p,0).r*max(tau/${wgslFloat(sediment.criticalShear)}-1.0,0.0);
+  c=min((c+${tick}*e/s.x)/(1.0+${tick}*${wgslFloat(sediment.settling)}/s.x),${wgslFloat(FLOOD_SEDIMENT_MAX)});
+ }
+ `
+    : '';
   return `
 @group(0) @binding(0) var state:texture_2d<f32>;
 @group(0) @binding(1) var momentum:texture_2d<f32>;
 @group(0) @binding(2) var before:texture_2d<f32>;
 @group(0) @binding(3) var outVelocity:texture_storage_2d<rgba32float,write>;
-@group(0) @binding(4) var outWet:texture_storage_2d<rgba32float,write>;
+@group(0) @binding(4) var outWet:texture_storage_2d<rgba32float,write>;${carry}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
  let size=vec2i(textureDimensions(state));let p=vec2i(id.xy);if(any(p>=size)){return;}
  let s=textureLoad(state,p,0);let m=textureLoad(momentum,p,0);let w=textureLoad(before,p,0);
  var u=vec2f(0);
  if(s.x>${dry}){let h4=s.x*s.x*s.x*s.x;let d4=${dry * dry * dry * dry};u=1.41421356*s.x*vec2f(m.y,m.w)/sqrt(h4+max(h4,d4));}
  let wet=s.x>0.01;
- textureStore(outVelocity,p,vec4f(u,length(u),s.x));
- textureStore(outWet,p,vec4f(max(w.x,s.x),select(select(0.0,w.y+${tick},w.z>0.5),0.0,wet),select(w.z,1.0,wet),0.0));
+ ${silt}textureStore(outVelocity,p,vec4f(u,length(u),s.x));
+ textureStore(outWet,p,vec4f(max(w.x,s.x),select(select(0.0,w.y+${tick},w.z>0.5),0.0,wet),select(w.z,1.0,wet),${sediment ? 'c' : '0.0'}));
 }`;
 }

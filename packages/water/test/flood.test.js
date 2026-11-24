@@ -10,7 +10,11 @@ import { readdirSync } from 'node:fs';
 const chunk = readdirSync(new URL('../dist/', import.meta.url)).find((f) => /^query-state-.*\.js$/.test(f));
 const maps = Object.values(await import(`../dist/${chunk}`)).filter((v) => v instanceof WeakMap);
 
-const water = () => ({ name: 'water-0', setWaveHeight() {}, options: { terrain: { heightmap: () => undefined, origin: [0, 0], size: [10, 10] } } });
+const water = () => ({
+  name: 'water-0',
+  setWaveHeight() {},
+  options: { terrain: { heightmap: () => undefined, origin: [0, 0], size: [10, 10] } },
+});
 const engine = (surface, gpu = {}) => ({
   gpu,
   hasPlugin: (name) => name === surface.name,
@@ -36,9 +40,27 @@ test('Flood refuses what it cannot run', () => {
   assert.throws(() => new Flood({ surface, shelf: { depth: 0 } }), RangeError);
   assert.throws(() => new Flood({ surface, shelf: { length: 0 } }), RangeError);
   assert.throws(() => new Flood({ surface, obstacles: 3 }), TypeError);
+  // FG-13 sediment.
+  assert.doesNotThrow(() => new Flood({ surface, sediment: {} }));
+  assert.doesNotThrow(() => new Flood({ surface, sediment: null }));
+  assert.doesNotThrow(
+    () =>
+      new Flood({ surface, sediment: { erosion: 0.1, criticalShear: 100, settling: 0, soil: () => 1, tint: false } }),
+  );
+  assert.throws(() => new Flood({ surface, sediment: 3 }), TypeError);
+  assert.throws(() => new Flood({ surface, sediment: { erosion: -1 } }), RangeError);
+  assert.throws(() => new Flood({ surface, sediment: { erosion: 0.2 } }), RangeError);
+  assert.throws(() => new Flood({ surface, sediment: { criticalShear: 0 } }), RangeError);
+  assert.throws(() => new Flood({ surface, sediment: { settling: NaN } }), RangeError);
+  assert.throws(() => new Flood({ surface, sediment: { soil: 1 } }), TypeError);
+  assert.throws(() => new Flood({ surface, sediment: { tint: 'yes' } }), TypeError);
   assert.throws(() => new Flood({ surface, sources: Array(17).fill({ position: [0, 0], discharge: 1 }) }), RangeError);
   assert.throws(() => new Flood({ surface, sources: [{ position: [0, NaN], discharge: 1 }] }), TypeError);
-  assert.throws(() => new Flood({ surface, walls: [{ from: [0, 0], to: [1, 1] }] }), RangeError, 'a wall needs its top');
+  assert.throws(
+    () => new Flood({ surface, walls: [{ from: [0, 0], to: [1, 1] }] }),
+    RangeError,
+    'a wall needs its top',
+  );
   const flood = new Flood({ surface, walls: Array.from({ length: 16 }, () => ({ from: [0, 0], to: [1, 0], top: 1 })) });
   assert.throws(() => flood.wall({ from: [0, 0], to: [1, 0], top: 1 }), RangeError, 'at most 16 walls');
   assert.throws(() => flood.breach(16), RangeError);
@@ -89,7 +111,11 @@ test('the clock owes whole ticks of 1 / 120 s, at most 240 a frame', () => {
 
 test('24, 30 and 60 fps give the same inputs at every tick', () => {
   const run = (fps, seconds) => {
-    const flood = new Flood({ surface: water(), boundary: { west: 'sea' }, walls: [{ from: [0, 0], to: [0, 9], top: 5 }] }),
+    const flood = new Flood({
+        surface: water(),
+        boundary: { west: 'sea' },
+        walls: [{ from: [0, 0], to: [0, 9], top: 5 }],
+      }),
       frames = Math.round(seconds * fps),
       rows = [];
     for (let i = 0; i < frames; i++) {
@@ -147,14 +173,17 @@ test('a tsunami is an N-wave: the trough first, the crest after, nothing outside
     tHi = 0;
   for (let t = 100; t <= 400; t += 0.1) {
     const e = tsunamiElevation(t, w);
-    if (e < lo) ((lo = e), (tLo = t));
-    if (e > hi) ((hi = e), (tHi = t));
+    if (e < lo) (lo = e), (tLo = t);
+    if (e > hi) (hi = e), (tHi = t);
   }
   assert.ok(Math.abs(lo + 3) < 0.01 && Math.abs(hi - 3) < 0.01, `trough ${lo} and crest ${hi} are the height`);
   assert.ok(tLo < tHi, 'the sea draws back before the crest arrives');
   assert.ok(Math.abs(tLo + tHi - 500) < 0.5, 'symmetric about the middle of the window');
   const flip = { ...w, leading: 'crest' };
-  assert.ok(Math.abs(tsunamiElevation(tHi, flip) - tsunamiElevation(tLo, w)) < 1e-9, 'crest first is the same wave run backwards');
+  assert.ok(
+    Math.abs(tsunamiElevation(tHi, flip) - tsunamiElevation(tLo, w)) < 1e-9,
+    'crest first is the same wave run backwards',
+  );
   assert.ok(tsunamiElevation(tLo, flip) > 2.9, 'the crest comes first');
 });
 
@@ -180,7 +209,10 @@ test('a tsunami needs a sea side and its limits are checked', () => {
 
 test('wind stress and the surge law, with the numbers of the plan', () => {
   assert.ok(Math.abs(windStress(18) - 0.776) < 0.005);
-  assert.ok(Math.abs(windStress(40) / (1.225 * 1600) - windStress(26) / (1.225 * 676)) < 1e-12, 'the drag coefficient stops growing at 26 m/s');
+  assert.ok(
+    Math.abs(windStress(40) / (1.225 * 1600) - windStress(26) / (1.225 * 676)) < 1e-12,
+    'the drag coefficient stops growing at 26 m/s',
+  );
   const flood = new Flood({ surface: water(), boundary: { east: 'sea' }, surgeRise: 0 });
   flood.setWind({ speed: 18 });
   flood.advanceTime(1);
@@ -271,7 +303,13 @@ test('attach registers the solver on the Water and dispose takes it away, once',
 
 // Disaster water push 5: `inflow` is a live multiplier of every source's discharge, a function of the tick like the rest.
 test('inflow scales every source from the next tick and is checked', () => {
-  const flood = new Flood({ surface: water(), sources: [{ position: [3, 4], discharge: 5, radius: 2 }, { position: [6, 6], discharge: 2 }] });
+  const flood = new Flood({
+    surface: water(),
+    sources: [
+      { position: [3, 4], discharge: 5, radius: 2 },
+      { position: [6, 6], discharge: 2 },
+    ],
+  });
   const data = new Float32Array(316);
   flood.writeUniform(data, 0);
   assert.equal(data[26], 5, 'default 1 keeps the discharge as given');
