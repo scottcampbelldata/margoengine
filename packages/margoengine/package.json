@@ -3819,6 +3819,10 @@
       "types": "./dist/scenes/timber-valley.d.ts",
       "import": "./dist/scenes/timber-valley.js"
     },
+    "./scenes/fauld-tunnels": {
+      "types": "./dist/scenes/fauld-tunnels.d.ts",
+      "import": "./dist/scenes/fauld-tunnels.js"
+    },
     "./scenes/library": {
       "types": "./dist/scenes/library.d.ts",
       "import": "./dist/scenes/library.js"

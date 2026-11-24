@@ -60,6 +60,14 @@
     "grade": null,
     "endCard": null,
     "warmup": 12,
+    "subject": {
+      "target": [
+        124.5,
+        1.0,
+        5.6
+      ],
+      "size": 2.88
+    },
     "probes": {
       "still": 3.4166666666666665
     },

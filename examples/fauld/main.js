@@ -1,6 +1,6 @@
 // The Fauld bomb store page (@margoengine/scenes/fauld-tunnels): one shot of the Fauld film, by row of the recut shot
 // list. Query: shot (a row id, frNNN: the camera track of tools/shot/shots/fauld-frNNN.json), t (seconds into the
-// shot; default its still probe), state (the store's lighting state), focal and stop (the lens), w and h (pixels),
+// shot; default its still probe), state (the store's lighting state), focal and stop (the lens), w and h (pixels, default the window),
 // library (URL root of the asset library, default /asset-library/). window.fauld drives it for tools/shot and stills.
 import { Engine } from '/packages/core/dist/index.js';
 import { attach } from '/packages/scenes/dist/fauld-tunnels.js';
@@ -9,8 +9,8 @@ const q = new URLSearchParams(location.search),
   viewport = document.querySelector('#viewport'),
   status = document.querySelector('#status'),
   canvas = viewport.querySelector('canvas'),
-  w = Number(q.get('w') ?? 1920),
-  h = Number(q.get('h') ?? 1080),
+  w = Number(q.get('w') ?? innerWidth),
+  h = Number(q.get('h') ?? innerHeight),
   errors = [];
 canvas.width = w;
 canvas.height = h;
@@ -33,7 +33,6 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 1.6, 0], target: [10, 1.6, 0], fov: 40, near: 0.03, far: 600 },
   });
-  engine.stop();
   engine.gpu.addEventListener('uncapturederror', (e) => fail(e.error.message));
   const scene = await attach(engine, { state, library: q.get('library') ?? '/asset-library/' });
   // The camera of the shot at time t: the track's keys, linear between keys, smoothstep where the key says so.
@@ -47,14 +46,22 @@ try {
       lerp = (p, r) => p.map((v, j) => v + (r[j] - v) * e);
     return { position: lerp(a.position, b.position), target: lerp(a.target, b.target) };
   };
+  // tools/shot moves the engine camera along the shot's track before each frame and then calls apply with the shot
+  // clock: the lens, focus and lamp shadow budget follow the camera, and the scene's own time (fire, smoke) the clock.
   let now = 0;
-  const apply = ({ time }) => {
-    const c = camera(time);
-    scene.frame(c.position, c.target, focal, stop);
+  const apply = (state, { time } = state) => {
+    scene.frame([...engine.camera.position], [...engine.camera.target], focal, stop);
     if (time > now) scene.advanceTime(time - now);
-    now = time;
+    now = Math.max(now, time);
   };
-  apply({ time: Number(q.get('t') ?? file.shot.probes.still ?? 0) });
+  // Opened on its own (a still at ?t=, default the still probe), the page puts the camera where the track is then.
+  const shotDriven = Boolean(globalThis.__margoShot);
+  if (!shotDriven) {
+    const c = camera(Number(q.get('t') ?? file.shot.probes.still ?? 0));
+    scene.frame(c.position, c.target, focal, stop);
+    scene.advanceTime(Number(q.get('t') ?? file.shot.probes.still ?? 0));
+    now = Number(q.get('t') ?? file.shot.probes.still ?? 0);
+  }
   window.fauld = {
     engine,
     scene,
@@ -62,6 +69,7 @@ try {
     errors,
     // Renders `frames` frames (shadow maps, fog and occlusion history settle), then resolves.
     async still(frames = 24) {
+      engine.stop();
       for (let i = 0; i < frames; i++) {
         engine.render({ delta: 1 / 24 });
         if (i % 6 === 5) await engine.gpu.queue.onSubmittedWorkDone();
@@ -71,6 +79,8 @@ try {
     },
   };
   status.hidden = true;
+  // The page's own loop: tools/shot's driver holds its frames and draws each on the shot clock.
+  engine.start();
   viewport.dataset.ready = 'true';
 } catch (e) {
   fail(e);

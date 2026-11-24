@@ -285,7 +285,7 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   } as const;
   if (!FAULD_TUNNEL_STATES.includes(s.state))
     throw new RangeError(`Unknown Fauld tunnels state ${s.state}; use one of ${FAULD_TUNNEL_STATES.join(', ')}`);
-  if (!(s.time >= 0 && s.time <= 600)) throw new RangeError('Fauld tunnels time is 0 to 600 seconds');
+  if (!(s.time >= 0 && s.time <= 600)) throw new RangeError('Invalid Fauld tunnels time; pass 0 to 600 seconds');
   const film = s.quality === 'film',
     yard = s.state.startsWith('yard'),
     ev = FAULD_STATE_EV[s.state],

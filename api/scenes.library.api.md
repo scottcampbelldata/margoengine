@@ -33,6 +33,7 @@ export interface LibraryGeometry {
 export interface LibraryMeshOptions {
     readonly kind?: 'bark' | 'foliage' | 'stone';
     readonly color?: readonly [number, number, number];
+    readonly decode?: (bytes: ArrayBuffer, mimeType: string) => Promise<ScatterImage>;
     readonly maxTriangles?: number;
     readonly scale?: number;
     readonly signal?: AbortSignal;
@@ -54,6 +55,8 @@ export interface LibraryMeshPart {
     };
     readonly color: readonly [number, number, number];
     readonly kind: 'bark' | 'foliage' | 'stone';
+    readonly textures?: ScatterTextures;
+    readonly name?: string;
 }
 
 export interface LibraryPartsOptions extends Omit<LibraryMeshOptions, 'color' | 'kind'> {
