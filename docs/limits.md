@@ -8475,3 +8475,12 @@ The Biomes worker measures 40,935 B gzip and 108,708 B raw, up from the last rec
 The extra bytes keep regional curvature and tile curvature in the same integer units and let the canopy task load
 the existing graph part on first use. Keeping those calls in another part would still require the same sampler and
 worker dispatch. The graph evaluator stays in its existing optional worker file.
+
+## Terrain relief lighting (2026-11-23)
+
+The optional relief-lighting entry adds 8 bytes per height sample for a filterable RGBA16F bake, about 8 MiB
+for a 1,024×1,024 map. The heightmap is borrowed. One 48-byte uniform buffer is released after the submitted
+bake finishes. Each bake takes up to 32 sky azimuths plus the directional sun and 256 samples per ray, bounded
+by the configured radius and the heightmap edge. The lit draw adds one bilinear lookup. The bake captures a
+single sun direction and a static heightmap. Changing either needs `rebake()`. A heightfield cannot represent
+overhangs, and distant features between samples may be missed.

@@ -9479,3 +9479,15 @@ pairs for distinct resources. The real-adapter `packages/machinery/test/section-
 both providers and verifies that the closed solid is capped and the open sheet stays open. The binding rules are in the
 [W3C WGSL resource interface](https://www.w3.org/TR/WGSL/#resource-interface) and
 [W3C WebGPU pipeline layout](https://www.w3.org/TR/webgpu/#pipeline-layout).
+
+### Section 5 evidence for heightfield relief lighting (terrain/relief-lighting, 2026-11-23)
+
+An optional compute pass records the directional horizon and projected sky visibility separately so landforms
+retain both broad cast shadows and diffuse shading. The fields are indexed by world XZ, independent of the
+camera and of the surface color. The terrain clipmap evaluates both through one bilinear lookup in its lit pass.
+The package also exposes the same bake and lookup for a caller's terrain mesh. Core and stage are outside this path.
+
+The GPU regression uses an untextured ridge to verify east and west sunlight, open-sky versus valley irradiance,
+zenith visibility, map edges and rebaking. The clipmap render in the same test verifies that the baked terms
+change untextured pixels and that disposing the effect removes the render attachment.
+[GPU regression](../../packages/terrain/test/relief-lighting.browser.mjs)

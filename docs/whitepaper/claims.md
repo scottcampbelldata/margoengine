@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Heightfield relief lighting (2026-11-23). A terrain ridge casts sun shadows across its valley, and the
+  valley receives less diffuse skylight than open ground. The GPU regression evaluates both fields, switches
+  light direction, checks the zenith and the map edge, and verifies the untextured clipmap render. Build the
+  packages and run `node packages/terrain/test/relief-lighting.browser.mjs` on WebGPU or with `MARGO_COMPAT=1`
+  on the WebGL2 layer. The optional entry is 3,308 bytes minified and gzipped.
+  [Method and sources](../../packages/terrain/README.md#terrain-relief-lighting).
+
 - Swept anatomical direction limits (2026-11-23). The rigging contact sweep detects an upper limb leaving its
   allowed range between two valid samples. The fixture checks analytical first-crossing times for a moving limb
   and a rotating chest, a clear turn, two legacy samples, and an unresolved half turn. Build the packages, then

@@ -1709,3 +1709,65 @@ Checked in `test/planet-recipes.test.js` (an isolated crater's depth and rim ove
 ejecta against McGetchin within 2%, a flat floor within 1e-6, diameters against the power law with a
 Kolmogorov-Smirnov statistic under 0.02, determinism, pruning by detail, bounded reads, validation) and on both GPU backends by
 `test/planet-recipes.browser.mjs` (every preset drawn on `PlanetTerrain`, deterministic, no validation error).
+
+## Terrain relief lighting
+
+Use `@margoengine/terrain/relief-lighting` to shade terrain from its measured or generated heightfield. A ridge can
+block the sun on the floor of a valley, even if the ridge is outside the camera view. The visible sky supplies the
+remaining diffuse light. The bake keeps sunlight visibility and projected sky visibility separate so layer albedo,
+roughness and explicit light sources retain their roles.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Terrain } from '@margoengine/terrain';
+import { TerrainReliefLighting } from '@margoengine/terrain/relief-lighting';
+
+const canvas = document.body.appendChild(document.createElement('canvas'));
+const engine = await Engine.create(canvas, {
+  backend: 'webgpu',
+  camera: { position: [31, 43, 65], target: [31, 0, 25] },
+});
+engine.lighting.direction.set([1, 0.28, 0, 3]);
+const terrain = Terrain.attach(engine, {
+  size: [64, 64],
+  heightScale: 1,
+  layers: Array.from({ length: 4 }, () => ({ height: [-1, 100], slope: [0, 1], scale: 1 })),
+  textures(device) {
+    const heightmap = device.createTexture({ size: [65, 65], format: 'r32float', usage: 6 });
+    const samples = new Float32Array(65 * 65);
+    for (let z = 0; z < 65; z++) samples[z * 65 + 32] = 18;
+    device.queue.writeTexture({ texture: heightmap }, samples, { bytesPerRow: 260 }, [65, 65]);
+    const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm', usage: 6 });
+    device.queue.writeTexture(
+      { texture: layers }, new Uint8Array(16).fill(140), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4],
+    );
+    return { heightmap, layers };
+  },
+});
+const relief = TerrainReliefLighting.attach(engine, terrain);
+engine.start();
+// After a height or sun change, call relief.rebake(). Call engine.dispose() when leaving the view.
+```
+
+- Attach to a live clipmap terrain. On device restore the effect bakes from the heightmap on the restored device.
+  Disposing the effect releases its texture and detaches it from its actual scene.
+- `direction` defaults to the engine light at the time of the bake. `radius` defaults to one quarter of the
+  shorter extent. The defaults are 12 sky azimuths, 48 samples per ray and a 0.75-degree half-width for the sun.
+  Use 4–32 azimuths, 8–256 samples and a positive half-width of up to 10 degrees.
+- Height samples must be finite and corner aligned. The effect uses the terrain height scale by default. It
+  works with a single sampled 2D `r32float`, `rgba16float` or `rgba8unorm` height texture at least 2×2.
+- For Blender meshes and custom terrain draws, `bakeTerrainReliefLighting(device, heightmap, size, options)`
+  returns an owned filterable `rgba16float` texture. Its R channel is sun visibility and its G channel is
+  projected sky visibility. Call `texture.destroy()` when finished. `terrainReliefLightingWGSL` provides
+  `terrainReliefLight(map, sampler, uv)`, with UV coordinates 0 and 1 at the first and last height samples.
+- Work is bounded by `width × height × (rays + 1) × steps` horizon samples per bake. Draws fetch one texel
+  bilinearly. Radii and sample spacing limit the result. Distant narrow ridges can fall between samples.
+  Overhangs and occluders absent from the heightfield require regular shadow casters.
+
+Terrain horizons follow Nicolas Max, *Horizon Mapping: Shadows for Bump-Mapped Surfaces* (1988), and
+A. James Stewart, *Fast Horizon Computation at All Points of a Terrain with Visibility and Shading Applications*
+(1998). The azimuth-sampled sky view follows Klemen Zakšek, Krištof Oštir and Žiga Kokalj, *Sky-View Factor as
+a Relief Visualization Technique* (2011).
+[Max](https://cir.nii.ac.jp/crid/1573387451457112064)
+[Stewart](https://research.cs.queensu.ca/home/jstewart/papers/tvcg97.html)
+[Zakšek, Oštir and Kokalj](https://doi.org/10.3390/RS3020398)

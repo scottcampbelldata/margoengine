@@ -67,6 +67,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Terrain, TerrainColors, TerrainHeightmap } = await load('../dist/index.js');
   const { TerrainMaterials } = await load('../dist/layers-pbr.js');
   const { TerrainDisplacement } = await load('../dist/displace.js');
+  const { TerrainReliefLighting } = await load('../dist/relief-lighting.js');
   const { TerrainDeformation } = await load('../dist/deform.js');
   const { TerrainVirtualTexture } = await load('../dist/rvt.js');
   const { GroundChange } = await load('../dist/ground-change.js');
@@ -206,6 +207,9 @@ export async function fixtures(load = (entry) => import(entry)) {
     });
   for (const factory of [false, true]) {
     const suffix = factory ? '.attach' : '';
+    on('TerrainReliefLighting' + suffix, (engine, terrain) =>
+      factory ? TerrainReliefLighting.attach(engine, terrain) : new TerrainReliefLighting(terrain),
+    );
     on('TerrainMaterials' + suffix, (engine, terrain) => {
       const textures = (device) => ({
         normals: array(device, [128, 128, 255, 255]),

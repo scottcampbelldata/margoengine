@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17438754,
+  "total": 17442318,
   "history": [
     {
       "date": "2026-10-24",
@@ -11403,6 +11403,12 @@
       "commit": "a665f0f575",
       "reason": "Rigging contact direction sweeps: 12,637 to 13,167 B gzip, with root unchanged at 8,106 B. Body-relative limits now share the capsule sweep to catch impossible poses between frames. A separate entry would add another import and duplicate the time advancement needed to find the earliest hit across both checks.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "459e33f9ba",
+      "reason": "Add the optional terrain relief lighting entry for horizon-based ridge shadows and sky visibility. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12634,6 +12640,7 @@
     "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/planet-recipes": 3472,
     "@margoengine/terrain/query": 3420,
+    "@margoengine/terrain/relief-lighting": 3564,
     "@margoengine/terrain/rock-settings": 2718,
     "@margoengine/terrain/rock-surface": 5056,
     "@margoengine/terrain/rocks": 6844,

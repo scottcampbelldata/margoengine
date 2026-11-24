@@ -3135,6 +3135,10 @@
       "types": "./dist/terrain/ground-change-settings.d.ts",
       "import": "./dist/terrain/ground-change-settings.js"
     },
+    "./terrain/relief-lighting": {
+      "types": "./dist/terrain/relief-lighting.d.ts",
+      "import": "./dist/terrain/relief-lighting.js"
+    },
     "./terrain/wet-ground": {
       "types": "./dist/terrain/wet-ground.d.ts",
       "import": "./dist/terrain/wet-ground.js"
