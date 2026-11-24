@@ -169,6 +169,7 @@ interface SkinningMode {
     readonly name: string;
     shader(extra: boolean): string;
     encode(palette: Float32Array): void;
+    share?(extras: unknown): ArrayLike<number> | undefined;
 }
 
 interface Track {

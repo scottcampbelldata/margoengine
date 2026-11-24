@@ -187,7 +187,7 @@ console.log(model.extras().filter((node) => node.extras.fbxSkinning).length);
 | `Additive` clusters | Weights that sum under 1 take a new joint that does not move, under a `<skin> group` root with the skeleton, so the vertex keeps its unweighted share at rest. A stand-in: no real file with this mode was found. |
 | In-between shapes | One morph target for each shape. The channel walks in straight lines from stop to stop, with the base shape as a stop at 0, and goes on along its end segments past the last stops; `inbetweenWeight(stops, percent, value)` is that sum. Curves on the channel bake to one weight curve for each target. |
 
-A viewer that knows nothing of `extras.fbxSkinning` draws these skins linearly, which is what glTF means, so a dual quaternion skin shows the candy wrapper there. `dualQuaternionSkinning` in `@margoengine/animation/dqs` is whole skin, not per vertex: a `Blend` skin with a mixed share has no runtime in the engine yet, and `skinDualQuaternion` with the share is how the test reaches it.
+A viewer that knows nothing of `extras.fbxSkinning` draws these skins linearly, which is what glTF means, so a dual quaternion skin shows the candy wrapper there. `dualQuaternionSkinning` in `@margoengine/animation/dqs` is whole skin, not per vertex: a `Blend` skin with a mixed share draws with `Animation.attach(model, {skinning: blendSkinning})` from `@margoengine/animation/dqs`, which reads `extras.fbxSkinning.blendWeights` per vertex (sketched in the animation README).
 
 Proof: all four frames Maya wrote of a real in-between rig match to 0.001 cm, and on a real `Blend` rig the share and the dual quaternion sum meet Maya's frames to 0.05 cm where linear alone misses by more than twice as much (`test/deformers.test.js`).
 

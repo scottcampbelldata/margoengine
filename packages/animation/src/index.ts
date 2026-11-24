@@ -819,6 +819,19 @@ export class Animation implements EnginePlugin {
             }
         }
       }
+      const shares = joints.length
+        ? this.options.skinning?.share?.((doc.nodes[p.nodeIndex] as { extras?: unknown } | undefined)?.extras)
+        : undefined;
+      if (shares) {
+        if (shares.length !== sourceCount)
+          throw new RangeError('Invalid skin share count; the node needs one share per vertex of its primitive');
+        const owned = vertexValues(shares, 1, vertexMap);
+        for (let i = 0; i < count; i++) {
+          if (!(owned[i] >= 0 && owned[i] <= 1))
+            throw new RangeError('Invalid skin share; each vertex needs a finite share between 0 and 1');
+          jointIds[i * stride] = (jointIds[i * stride] & 0xffff) | (Math.round(owned[i] * 65535) << 16);
+        }
+      }
       record.joints = joints;
       record.inverseBind = inverseBind;
       if (!joints.length) {

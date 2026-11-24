@@ -276,6 +276,7 @@ export interface SkinningMode {
     readonly name: string;
     shader(extra: boolean): string;
     encode(palette: Float32Array): void;
+    share?(extras: unknown): ArrayLike<number> | undefined;
 }
 
 export function applyKeyframeClip(clip: KeyframeClip, time: number): void;

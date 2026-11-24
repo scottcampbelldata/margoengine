@@ -20,7 +20,7 @@ try {
       { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
       { Animation } = await import('/packages/animation/dist/index.js'),
       { cloneModel } = await import('/packages/animation/dist/skeleton-utils.js'),
-      { dualQuaternionSkinning, skinDualQuaternion } = await import('/packages/animation/dist/dqs.js');
+      { blendSkinning, dualQuaternionSkinning, skinDualQuaternion } = await import('/packages/animation/dist/dqs.js');
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:64px;height:64px';
     document.body.append(canvas);
@@ -65,7 +65,11 @@ try {
         // Weights over joints by distance to each joint's x: a wide, smooth falloff.
         const reach = eight ? 2.6 : 1,
           raw = Array.from({ length: JOINTS }, (_, j) => Math.max(0, 1 - Math.abs(x - j) / reach)),
-          used = raw.map((w, j) => [w, j]).filter(([w]) => w > 0).sort((a, b) => b[0] - a[0]).slice(0, 8);
+          used = raw
+            .map((w, j) => [w, j])
+            .filter(([w]) => w > 0)
+            .sort((a, b) => b[0] - a[0])
+            .slice(0, 8);
         for (let s = 0; s < SIDES; s++) {
           const a = (s / SIDES) * Math.PI * 2;
           positions.push(x, Math.cos(a), Math.sin(a));
@@ -139,7 +143,14 @@ try {
       return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(h)];
     };
 
-    const report = { checks: 0, worstPosition: 0, worstNormal: 0, dqRadius: Infinity, linearRadius: Infinity, failure: null };
+    const report = {
+      checks: 0,
+      worstPosition: 0,
+      worstNormal: 0,
+      dqRadius: Infinity,
+      linearRadius: Infinity,
+      failure: null,
+    };
     for (const eight of [false, true]) {
       const { doc, buffers } = tube(eight),
         dqModel = parseGLTF(engine, doc, buffers);
@@ -221,6 +232,50 @@ try {
       linearModel.dispose();
       dqModel.dispose();
     }
+    // A Blend skin: each vertex mixes linear and dual quaternion skinning by the share on the node's extras.
+    report.blendChecks = 0;
+    report.worstBlend = 0;
+    for (const eight of [false, true]) {
+      const { doc, buffers } = tube(eight),
+        shares = Array.from({ length: RINGS * SIDES }, (_, i) => Math.floor(i / SIDES) / (RINGS - 1));
+      doc.nodes[0].extras = { fbxSkinning: { type: 'Blend', blendWeights: shares } };
+      const blendModel = parseGLTF(engine, doc, buffers);
+      if (engine.plugins.get(blendModel.name) !== blendModel) engine.use(blendModel);
+      const blend = Animation.attach(blendModel, { skinning: blendSkinning });
+      blend.playing = false;
+      blendModel.primitives[0].weights[0] = 0;
+      blendModel.nodes[3].setQuaternion(q([1, 0, 0], 170));
+      blendModel.nodes[2].setQuaternion(q([0, 0, 1], 50));
+      engine.render({ culling: false });
+      const p = blendModel.primitives[0],
+        actual = await read(p),
+        palette = blend.resources[0].palette,
+        raw = doc.meshes[0].primitives[0].attributes,
+        sets = [[raw.JOINTS_0, raw.WEIGHTS_0]];
+      if (eight) sets.push([raw.JOINTS_1, raw.WEIGHTS_1]);
+      const data = sets.map(([j, w]) => [blendModel.asset.accessor(j, 'VEC4'), blendModel.asset.accessor(w, 'VEC4')]);
+      for (let i = 0; i < p.vertices.length / 20; i++) {
+        const joints = [],
+          weights = [];
+        let total = 0;
+        for (const [, w] of data) for (let c = 0; c < 4; c++) total += w[i * 4 + c];
+        for (const [j, w] of data)
+          for (let c = 0; c < 4; c++) {
+            joints.push(j[i * 4 + c]);
+            weights.push(w[i * 4 + c] / total);
+          }
+        const v = p.vertices.subarray(i * 20, i * 20 + 8),
+          expected = skinDualQuaternion(palette, joints, weights, [v[0], v[1], v[2]], [v[4], v[5], v[6]], shares[i]);
+        for (let c = 0; c < 3; c++) {
+          const dp = Math.abs(actual[i * 20 + c] - expected.position[c]),
+            dn = Math.abs(actual[i * 20 + 4 + c] - expected.normal[c]);
+          report.worstBlend = Math.max(report.worstBlend, dp, dn);
+          report.blendChecks += 2;
+        }
+      }
+      blend.dispose();
+      blendModel.dispose();
+    }
     const error = await device.popErrorScope();
     return { ...report, validation: error?.message ?? null };
   });
@@ -231,6 +286,8 @@ try {
   assert.ok(result.checks >= 2 * 5 * 33 * 12 * 6, 'every vertex of every pose checked');
   assert.ok(result.worstPosition <= 2e-5, `GPU positions differ from the CPU twin by ${result.worstPosition}`);
   assert.ok(result.worstNormal <= 2e-5, `GPU normals differ from the CPU twin by ${result.worstNormal}`);
+  assert.ok(result.blendChecks >= 2 * 3 * 33 * 12 * 2, 'every vertex of both blend tubes checked');
+  assert.ok(result.worstBlend <= 2e-5, `GPU blend differs from the CPU twin by ${result.worstBlend}`);
   assert.ok(result.dqRadius > 0.97, `the twisted tube's narrowest ring is ${result.dqRadius}`);
   assert.ok(result.linearRadius < 0.6, `the linear tube should pinch, narrowest ring ${result.linearRadius}`);
 } finally {

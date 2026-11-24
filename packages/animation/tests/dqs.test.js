@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { Animation } from '../dist/index.js';
-import { dualQuaternionSkinning, encodeDualQuaternions, skinDualQuaternion } from '../dist/dqs.js';
+import { blendSkinning, dualQuaternionSkinning, encodeDualQuaternions, skinDualQuaternion } from '../dist/dqs.js';
 import { skinnedStrip } from '../test/fixture.js';
 import { engine, model, near } from './support/models.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -16,9 +16,15 @@ function bone(translation, axis, degrees, stretch = [1, 0, 0, 0, 1, 0, 0, 0, 1])
     t = 1 - c,
     [x, y, z] = axis,
     r = [
-      t * x * x + c, t * x * y - s * z, t * x * z + s * y,
-      t * x * y + s * z, t * y * y + c, t * y * z - s * x,
-      t * x * z - s * y, t * y * z + s * x, t * z * z + c,
+      t * x * x + c,
+      t * x * y - s * z,
+      t * x * z + s * y,
+      t * x * y + s * z,
+      t * y * y + c,
+      t * y * z - s * x,
+      t * x * z - s * y,
+      t * y * z + s * x,
+      t * z * z + c,
     ],
     out = new Float32Array(16);
   for (let i = 0; i < 3; i++)
@@ -54,7 +60,12 @@ test('one bone: the encoded slot moves points exactly as its matrix, whatever th
   bones.forEach((m, b) => {
     const slot = encodeDualQuaternions(m.slice());
     assert.ok(Math.abs(Math.hypot(...slot.subarray(0, 4)) - 1) < 1e-6, `bone ${b} has a unit rotation`);
-    for (const point of [[0, 0, 0], [1, 0, 0], [0.3, -2, 5], [-4, 1, 1]])
+    for (const point of [
+      [0, 0, 0],
+      [1, 0, 0],
+      [0.3, -2, 5],
+      [-4, 1, 1],
+    ])
       near(skinDualQuaternion(slot, [0], [1], point).position, apply(m, point), 2e-5, `bone ${b} at ${point}`);
   });
 });
@@ -195,7 +206,12 @@ test('the skinning option reaches the shader and the bones, and models of both m
     device.queue.writeBuffer = writeBuffer;
   });
   const context = { backend: 'webgpu', device, encoder: device.createCommandEncoder() };
-  context.encoder.beginComputePass ??= () => ({ setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, end() {} });
+  context.encoder.beginComputePass ??= () => ({
+    setPipeline() {},
+    setBindGroup() {},
+    dispatchWorkgroups() {},
+    end() {},
+  });
   dq['upload'](context);
   const palette = dq['resources'][0].palette;
   // Joint 1 turned 45 degrees about +Z: the slot's rotation, not a matrix.
@@ -217,4 +233,78 @@ test('an invalid skinning option names the entry to import', async () => {
   const strip = model(await engine(), skinnedStrip());
   for (const skinning of ['dual', {}, null])
     assert.throws(() => new Animation(strip, { skinning }), /dualQuaternionSkinning from @margoengine\/animation\/dqs/);
+});
+
+test('a vertex blends linear and dual quaternion skinning by its share, as an FBX Blend skin does', () => {
+  const twisted = bone([0, 0, 0], [1, 0, 0], 170),
+    palette = new Float32Array(32);
+  palette.set(bone([0, 0, 0], [1, 0, 0], 0), 0);
+  palette.set(twisted, 16);
+  const slots = encodeDualQuaternions(palette.slice()),
+    point = [0.3, 1, 0],
+    linear = [0, 1].map((j) => apply(j ? twisted : bone([0, 0, 0], [1, 0, 0], 0), point)),
+    mean = linear[0].map((v, i) => 0.5 * v + 0.5 * linear[1][i]),
+    dq = skinDualQuaternion(slots, [0, 1], [0.5, 0.5], point),
+    at = (share) => skinDualQuaternion(slots, [0, 1], [0.5, 0.5], point, [0, 1, 0], share);
+  near(at(0).position, mean, 1e-5, 'share 0 is the linear blend of the matrices');
+  near(at(1).position, dq.position, 1e-6, 'share 1 is the dual quaternion skin');
+  near(
+    at(0.25).position,
+    mean.map((v, i) => 0.75 * v + 0.25 * dq.position[i]),
+    1e-5,
+    'a quarter share',
+  );
+  assert.ok(Math.abs(Math.hypot(...at(0.5).normal) - 1) < 1e-6, 'the normal stays unit length');
+  // A scaled, shifted bone: share 0 still reproduces the matrix.
+  const moved = bone([1, 2, 3], [0, 0, 1], 40, [2, 0, 0, 0, 1, 0, 0, 0, 0.5]),
+    one = encodeDualQuaternions(Float32Array.from(moved));
+  near(skinDualQuaternion(one, [0], [1], [1, -1, 2], [0, 1, 0], 0).position, apply(moved, [1, -1, 2]), 1e-5);
+});
+
+test('blendSkinning is a shader of its own that masks the share out of the first joint', () => {
+  for (const extra of [false, true]) {
+    const code = blendSkinning.shader(extra);
+    assert.match(code, /fn boneMatrix/);
+    assert.match(code, /joints\.x&65535u/);
+    assert.match(code, /joints\.x>>16u/);
+    assert.equal(code.includes('jointsExtra'), extra);
+  }
+  assert.notEqual(blendSkinning.shader(false), dualQuaternionSkinning.shader(false));
+  assert.deepEqual(blendSkinning.share({ fbxSkinning: { blendWeights: [0, 1] } }), [0, 1]);
+  assert.equal(blendSkinning.share({ fbxSkinning: { type: 'DualQuaternion' } }), undefined);
+  assert.equal(blendSkinning.share(undefined), undefined);
+});
+
+test('Animation packs each vertex share into the upper half of its first joint, and refuses a wrong count', async (t) => {
+  const { e, gpu } = await gpuEngine(t),
+    device = gpu.engine.gpu,
+    writes = [],
+    writeBuffer = device.queue.writeBuffer;
+  device.queue.writeBuffer = function (buffer, offset, data, ...rest) {
+    if (data instanceof Uint32Array) writes.push(data.slice());
+    return writeBuffer.call(this, buffer, offset, data, ...rest);
+  };
+  t.after(() => {
+    device.queue.writeBuffer = writeBuffer;
+  });
+  const shared = model(e, skinnedStrip());
+  e.use(shared);
+  const primitive = shared.primitives.find((p) => p.vertices.length),
+    count = primitive.vertices.length / 20,
+    node = shared.asset.doc.nodes[primitive.nodeIndex],
+    blendWeights = Array.from({ length: count }, (_, i) => i / (count - 1));
+  node.extras = { fbxSkinning: { type: 'Blend', blendWeights } };
+  Animation.attach(shared, { skinning: blendSkinning });
+  const packed = writes.flatMap((w) => [...w]).filter((w) => w >>> 16);
+  assert.ok(packed.length >= count - 1, 'shares reached the influence buffer');
+  assert.ok(
+    packed.some((w) => w >>> 16 === 65535),
+    'the last vertex is all dual quaternion',
+  );
+  const wrong = model(e, skinnedStrip());
+  e.use(wrong);
+  wrong.asset.doc.nodes[wrong.primitives.find((p) => p.vertices.length).nodeIndex].extras = {
+    fbxSkinning: { blendWeights: [0.5] },
+  };
+  assert.throws(() => Animation.attach(wrong, { skinning: blendSkinning }), /one share per vertex/);
 });

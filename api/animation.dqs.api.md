@@ -8,11 +8,13 @@ export interface SkinnedVertex {
     normal: [number, number, number];
 }
 
+export const blendSkinning: SkinningMode;
+
 export const dualQuaternionSkinning: SkinningMode;
 
 export function encodeDualQuaternions(palette: Float32Array, out?: Float32Array): Float32Array;
 
-export function skinDualQuaternion(slots: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal?: ArrayLike<number>): SkinnedVertex;
+export function skinDualQuaternion(slots: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal?: ArrayLike<number>, share?: number): SkinnedVertex;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -20,5 +22,6 @@ interface SkinningMode {
     readonly name: string;
     shader(extra: boolean): string;
     encode(palette: Float32Array): void;
+    share?(extras: unknown): ArrayLike<number> | undefined;
 }
 ```

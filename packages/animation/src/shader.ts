@@ -69,6 +69,11 @@ export interface SkinningMode {
   shader(extra: boolean): string;
   /** Rewrites a bone palette in place, 16 floats per bone, into what the shader reads. Runs after the palette is checked. */
   encode(palette: Float32Array): void;
+  /**
+   * A share in [0, 1] for each vertex of a node's file primitive, read from the node's glTF `extras`. `Animation`
+   * packs it into the upper 16 bits of each vertex's first joint index, so only a mode that masks the index reads it.
+   */
+  share?(extras: unknown): ArrayLike<number> | undefined;
 }
 
 /** Text a skinning mode puts into the batched shader: module-scope `functions`, and the `blend` that moves `v`. */

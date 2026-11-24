@@ -576,6 +576,24 @@ models of both kinds in one scene all work; each kind is its own dispatch.
 
 `encodeDualQuaternions(palette, out?)` turns 16-float bone matrices into 16-float slots (rotation, dual part, stretch),
 and `skinDualQuaternion(slots, joints, weights, position, normal?)` is the shader's CPU twin, for tests and CPU picking.
+`blendSkinning` is the same dual quaternion skin with a share per vertex: each vertex mixes the linear skin of its bones
+with the dual quaternion skin by a number in [0, 1], which is what an FBX `Blend` skin means. The shares come from the
+node's glTF `extras.fbxSkinning.blendWeights` (one per vertex of its primitive, written by `@margoengine/fbx/deformers`);
+a node without them is all dual quaternion, and a list of the wrong length or a share outside [0, 1] throws. Position,
+normal and tangent blend between the two skins. `skinDualQuaternion(slots, joints, weights, position, normal, share)` takes
+the share as its sixth argument, and matches the GPU to 7e-6 on a twisted tube (`npm run test:gpu:dqs`).
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {blendSkinning} from 'margoengine/animation/dqs';
+const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb'); // an FBX Blend skin: loadFBX with the deformers extension
+const animation = Animation.attach(model, {skinning: blendSkinning});
+animation.play('Walking');
+```
+
 Only `Animation` has the option: `Skin` on raw data, `bakeVAT` and the bone-texture crowd stay linear.
 
 ## Bone-texture crowds (`@margoengine/animation/instanced-skin`)

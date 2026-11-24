@@ -201,8 +201,8 @@ export function encodeDualQuaternions(palette: Float32Array, out: Float32Array =
   return out;
 }
 
-const blendLines = (extra: boolean) => {
-  const influences = ['x', 'y', 'z', 'w'].map((c) => [`joints.${c}`, `jointWeights.${c}`]);
+const blendLines = (extra: boolean, masked = false) => {
+  const influences = ['x', 'y', 'z', 'w'].map((c) => [masked ? `ids.${c}` : `joints.${c}`, `jointWeights.${c}`]);
   if (extra) for (const c of ['x', 'y', 'z', 'w']) influences.push([`jointsExtra.${c}`, `weightsExtra.${c}`]);
   return /* wgsl */ `var pivot=${influences[0][0]};var heaviest=${influences[0][1]};
     ${influences
@@ -247,6 +247,59 @@ export const dualQuaternionSkinning: SkinningMode = {
   },
 };
 
+/** The first bone matrix a slot encodes, rebuilt: rotation times stretch, then the rigid shift. */
+const boneFunction = /* wgsl */ `fn boneMatrix(b:mat4x4f)->mat4x4f {
+  let st=mat3x3f(b[2].x,b[2].w,b[3].x,b[2].w,b[2].y,b[3].y,b[3].x,b[3].y,b[2].z);
+  let shift=2*(b[0].w*b[1].xyz-b[1].w*b[0].xyz+cross(b[0].xyz,b[1].xyz));
+  return mat4x4f(vec4f(rotated(b[0],st[0]),0),vec4f(rotated(b[0],st[1]),0),vec4f(rotated(b[0],st[2]),0),vec4f(shift,1));
+}`;
+
+/** Linear skin of the slots a bone encodes, then the mix with the dual quaternion result `v` by `share`. */
+const mixLines = (extra: boolean) => {
+  const terms = ['x', 'y', 'z', 'w'].map((c) => `boneMatrix(boneMatrices[s.bones+ids.${c}])*jointWeights.${c}`);
+  if (extra)
+    for (const c of ['x', 'y', 'z', 'w'])
+      terms.push(`boneMatrix(boneMatrices[s.bones+jointsExtra.${c}])*weightsExtra.${c}`);
+  return /* wgsl */ `
+    {let lin=${terms.join('+')};
+    let lp=lin*vec4f(p0.xyz,1);
+    let nm=mat3x3f(cross(lin[1].xyz,lin[2].xyz),cross(lin[2].xyz,lin[0].xyz),cross(lin[0].xyz,lin[1].xyz));
+    let hd=select(-1.0,1.0,dot(lin[0].xyz,cross(lin[1].xyz,lin[2].xyz))>=0.0);let bn=nm*n0.xyz*hd;
+    let ln=select(vec3f(0,1,0),normalize(bn),dot(bn,bn)>0.0);let dn=v.normal.xyz;let dnu=select(dn,normalize(dn),dot(dn,dn)>0.0);
+    let lt=(lin*vec4f(t0.xyz,0)).xyz;
+    v.position=vec4f(mix(lp.xyz,v.position.xyz,share),1);
+    v.normal=vec4f(mix(ln,dnu,share),0);
+    v.tangent=vec4f(mix(lt,v.tangent.xyz,share),select(t0.w*hd,v.tangent.w,share>=0.5));}`;
+};
+
+/**
+ * The `skinning` option for a skin that blends linear and dual quaternion skinning per vertex, as an FBX `Blend` skin
+ * does (Autodesk's FbxSkin::eBlend: each control point has its own share of dual quaternion). The share of each vertex
+ * comes from the node's `extras.fbxSkinning.blendWeights`, which `@margoengine/fbx/deformers` writes, one number in
+ * [0, 1] per vertex of the node's primitive (0 is linear, 1 is all dual quaternion). A node without it is all dual
+ * quaternion. Position, normal and tangent blend between the two skins with that share.
+ *
+ * @example
+ * ```ts
+ * const animation = Animation.attach(model, { skinning: blendSkinning });
+ * ```
+ */
+export const blendSkinning: SkinningMode = {
+  name: 'dual-quaternion-blend',
+  shader: (extra) =>
+    batchedDeformationShader(extra, {
+      functions: `fn rotated(q:vec4f,x:vec3f)->vec3f {return x+2*cross(q.xyz,cross(q.xyz,x)+q.w*x);}\n${boneFunction}`,
+      blend: `let ids=vec4u(joints.x&65535u,joints.y,joints.z,joints.w);let share=f32(joints.x>>16u)/65535.0;
+    let p0=v.position;let n0=v.normal;let t0=v.tangent;
+    ${blendLines(extra, true)}${mixLines(extra)}`,
+    }),
+  encode: dualQuaternionSkinning.encode,
+  share: (extras) => {
+    const blend = (extras as { fbxSkinning?: { blendWeights?: unknown } } | undefined)?.fbxSkinning?.blendWeights;
+    return Array.isArray(blend) || ArrayBuffer.isView(blend) ? (blend as ArrayLike<number>) : undefined;
+  },
+};
+
 /** Where one vertex goes, the CPU twin of the shader. */
 export interface SkinnedVertex {
   position: [number, number, number];
@@ -263,6 +316,8 @@ const rotate = (q: ArrayLike<number>, x: number, y: number, z: number): [number,
 /**
  * One vertex under encoded bones (`encodeDualQuaternions`), the same steps as the GPU in double precision, for checks
  * and CPU picking. `joints` and `weights` are parallel, with weights summing to 1; the normal comes back unit length.
+ * `share` is the vertex's share of dual quaternion (default 1, all of it), the rest being the linear skin of the same
+ * bones, as `blendSkinning` draws it.
  */
 export function skinDualQuaternion(
   slots: Float32Array,
@@ -270,6 +325,7 @@ export function skinDualQuaternion(
   weights: ArrayLike<number>,
   position: ArrayLike<number>,
   normal: ArrayLike<number> = [0, 0, 1],
+  share = 1,
 ): SkinnedVertex {
   if (joints.length !== weights.length || !joints.length)
     throw new RangeError('Invalid influences; pass as many joints as weights, at least one');
@@ -326,8 +382,66 @@ export function skinDualQuaternion(
       hand * (c02 * normal[0] + c12 * normal[1] + c22 * normal[2]),
     ),
     length = Math.hypot(n[0], n[1], n[2]) || 1;
-  return {
+  const dq: SkinnedVertex = {
     position: [moved[0] + shift[0], moved[1] + shift[1], moved[2] + shift[2]],
     normal: [n[0] / length, n[1] / length, n[2] / length],
+  };
+  return share >= 1 ? dq : mixLinear(slots, joints, weights, position, normal, share, dq);
+}
+
+/** The linear skin of the bones a slot palette encodes, mixed with `dq` by `share` (the CPU twin of `mixLines`). */
+function mixLinear(
+  slots: Float32Array,
+  joints: ArrayLike<number>,
+  weights: ArrayLike<number>,
+  position: ArrayLike<number>,
+  normal: ArrayLike<number>,
+  share: number,
+  dq: SkinnedVertex,
+): SkinnedVertex {
+  // lin = sum of weight * (rotation * stretch | shift), columns first.
+  const cols = [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    shift = [0, 0, 0];
+  for (let i = 0; i < joints.length; i++) {
+    const o = joints[i] * FLOATS,
+      w = weights[i],
+      q = [slots[o], slots[o + 1], slots[o + 2], slots[o + 3]],
+      e = [slots[o + 4], slots[o + 5], slots[o + 6], slots[o + 7]],
+      st = [
+        [slots[o + 8], slots[o + 11], slots[o + 12]],
+        [slots[o + 11], slots[o + 9], slots[o + 13]],
+        [slots[o + 12], slots[o + 13], slots[o + 10]],
+      ];
+    for (let c = 0; c < 3; c++) {
+      const r = rotate(q, st[c][0], st[c][1], st[c][2]);
+      for (let k = 0; k < 3; k++) cols[c * 3 + k] += r[k] * w;
+    }
+    shift[0] += w * 2 * (q[3] * e[0] - e[3] * q[0] + q[1] * e[2] - q[2] * e[1]);
+    shift[1] += w * 2 * (q[3] * e[1] - e[3] * q[1] + q[2] * e[0] - q[0] * e[2]);
+    shift[2] += w * 2 * (q[3] * e[2] - e[3] * q[2] + q[0] * e[1] - q[1] * e[0]);
+  }
+  const [a, b, c] = [cols.slice(0, 3), cols.slice(3, 6), cols.slice(6, 9)],
+    cross = (u: number[], v: number[]) => [
+      u[1] * v[2] - u[2] * v[1],
+      u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0],
+    ],
+    cofactors = [cross(b, c), cross(c, a), cross(a, b)],
+    hand = Math.sign(a[0] * cofactors[0][0] + a[1] * cofactors[0][1] + a[2] * cofactors[0][2]) || 1,
+    at = (m: number[][], v: ArrayLike<number>) => [
+      m[0][0] * v[0] + m[1][0] * v[1] + m[2][0] * v[2],
+      m[0][1] * v[0] + m[1][1] * v[1] + m[2][1] * v[2],
+      m[0][2] * v[0] + m[1][2] * v[1] + m[2][2] * v[2],
+    ],
+    p = at([a, b, c], position).map((v, i) => v + shift[i]),
+    bent = at(cofactors, normal).map((v) => v * hand),
+    size = Math.hypot(bent[0], bent[1], bent[2]),
+    ln = size > 0 ? bent.map((v) => v / size) : [0, 1, 0],
+    mix = (l: number, d: number) => l + (d - l) * share,
+    n = [mix(ln[0], dq.normal[0]), mix(ln[1], dq.normal[1]), mix(ln[2], dq.normal[2])],
+    nl = Math.hypot(n[0], n[1], n[2]) || 1;
+  return {
+    position: [mix(p[0], dq.position[0]), mix(p[1], dq.position[1]), mix(p[2], dq.position[2])],
+    normal: [n[0] / nl, n[1] / nl, n[2] / nl],
   };
 }
