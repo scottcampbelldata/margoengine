@@ -13,7 +13,7 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-const VERSION: u32 = 4;
+const VERSION: u32 = 5;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -296,6 +296,7 @@ impl World {
             w.bool(c.solved);
             w.bool(c.overlap);
             w.bool(c.primed);
+            w.f32(c.tangent_speed);
             for o in [c.friction, c.restitution] {
                 w.bool(o.is_some());
                 w.f32(o.unwrap_or(0.0));
@@ -446,6 +447,7 @@ impl World {
             }
             let [n0, n1, t0, t1, total_impulse] = [r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?];
             let (solved, overlap, primed) = (r.bool()?, r.bool()?, r.bool()?);
+            let tangent_speed = r.f32()?;
             let mut over = [None; 2];
             for slot in over.iter_mut() {
                 let some = r.bool()?;
@@ -455,7 +457,7 @@ impl World {
             if count > 2 || a as usize >= world.shapes.len() || b as usize >= world.shapes.len() {
                 return Err(PhysicsError::InvalidParameter);
             }
-            world.contacts.push(Contact { a, b, manifold: Manifold { normal, points, count }, normal_impulse: [n0, n1], tangent_impulse: [t0, t1], solved, overlap, primed, total_impulse, friction: over[0], restitution: over[1] });
+            world.contacts.push(Contact { a, b, manifold: Manifold { normal, points, count }, normal_impulse: [n0, n1], tangent_impulse: [t0, t1], solved, overlap, primed, total_impulse, friction: over[0], restitution: over[1], tangent_speed });
         }
         for which in 0..2 {
             let n = r.count(4)?;

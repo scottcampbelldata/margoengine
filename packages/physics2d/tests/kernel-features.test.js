@@ -372,3 +372,20 @@ test('soft CCD holds a fast body at a thick wall without a sweep', () => {
   assert.ok(through(200) < 310, `held at the wall: ${through(200)}`);
   assert.throws(() => world().addBody(null, { softCcd: -1 }), RangeError);
 });
+
+test('hooks: a conveyor carries a box at the set speed', () => {
+  const physics = world();
+  const belt = physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: { shape: 'box', width: 800, height: 10, friction: 1, hooks: { modifyContact: true } } });
+  const crate = physics.addBody(null, { position: [0, 90], canSleep: false, colliders: { shape: 'box', width: 16, height: 16, friction: 1 } });
+  physics.hooks = {
+    modifyContact: (change) => {
+      // Carry whatever rests on the belt to the right: along the contact's tangent, whichever collider is A.
+      const sign = change.colliderA === belt.colliders[0] ? 1 : -1;
+      change.tangentVelocity = (change.tangent[0] >= 0 ? 1 : -1) * sign * 96;
+    },
+  };
+  run(physics, 180);
+  assert.ok(Math.abs(crate.linearVelocity[0] - 96) < 3, `carried at ${crate.linearVelocity[0]}`);
+  assert.ok(crate.position[0] > 200, `to ${crate.position[0]}`);
+  physics.dispose();
+});

@@ -464,6 +464,12 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     let lanes = settings.contact_lanes || cfg!(target_arch = "wasm32");
     let want_force = world.shapes.iter().any(|s| s.events & crate::world::EVENT_CONTACT_FORCE != 0);
     let mut totals: Vec<f32> = Vec::new();
+    // The tangent speed a hook gave each contact, by constraint; empty (and never read) unless some contact has one.
+    let surfaces: Vec<f32> = if world.contacts.iter().any(|c| c.solved && c.tangent_speed != 0.0) {
+        constraints.iter().map(|c| world.contacts[c.contact as usize].tangent_speed).collect()
+    } else {
+        Vec::new()
+    };
     let single = if lanes { starts[COLOURS] as usize } else { 0 };
     let mut blocks = core::mem::take(&mut scratch.blocks);
     blocks.blocks.clear();
@@ -472,6 +478,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
         for k in 0..COLOURS {
             blocks.push(
                 &constraints,
+                &surfaces,
                 &order[starts[k] as usize..starts[k + 1] as usize],
             );
         }
@@ -551,6 +558,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 let (b, s) = solve_contact(
                     &mut bodies,
                     &mut constraints[i as usize],
+                    surface_of(&surfaces, i),
                     true,
                     inv_h,
                     max_push,
@@ -649,6 +657,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 let (b, s) = solve_contact(
                     &mut bodies,
                     &mut constraints[i as usize],
+                    surface_of(&surfaces, i),
                     false,
                     inv_h,
                     max_push,
@@ -824,10 +833,17 @@ fn row(spring: &Soft, s: f32, biased: bool, inv_h: f32, _max_push: f32) -> (f32,
     }
 }
 
+/// The surface speed of constraint `i`: its entry in `surfaces`, or 0 when there is none.
+#[inline]
+fn surface_of(surfaces: &[f32], i: u32) -> f32 {
+    surfaces.get(i as usize).copied().unwrap_or(0.0)
+}
+
 /// One pass over one contact: friction and normal, in the pass's order. Returns (block solves, sequential fallbacks).
 fn solve_contact(
     bodies: &mut [SolverBody],
     c: &mut Constraint,
+    surface: f32,
     biased: bool,
     inv_h: f32,
     max_push: f32,
@@ -839,23 +855,25 @@ fn solve_contact(
         gaps[k] = gap(bodies, c, &c.points[k]);
     }
     if biased {
-        friction(c, &mut ma, &mut mb);
+        friction(c, &mut ma, &mut mb, surface);
     }
     let spring = &springs[c.eighth as usize];
     let counts = normal(c, &mut ma, &mut mb, gaps, biased, inv_h, max_push, spring)?;
     if !biased {
-        friction(c, &mut ma, &mut mb);
+        friction(c, &mut ma, &mut mb, surface);
     }
     store(bodies, c, ma, mb);
     Ok(counts)
 }
 
-fn friction(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion) {
+/// Friction rows. `surface` is the relative tangent speed of body B against body A the contact drives toward (0 for the
+/// ordinary contact, a conveyor's speed when a hook set one).
+fn friction(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, surface: f32) {
     let t = c.normal.right();
     let mu = c.friction;
     for k in 0..c.count as usize {
         let p = c.points[k];
-        let vt = t.dot(speed_at(*mb, p.anchor_b).sub(speed_at(*ma, p.anchor_a)));
+        let vt = t.dot(speed_at(*mb, p.anchor_b).sub(speed_at(*ma, p.anchor_a))) - surface;
         let limit = mu * p.normal_impulse;
         let total = crate::math::clamp(p.tangent_impulse - p.tangent_mass * vt, -limit, limit);
         let applied = total - p.tangent_impulse;

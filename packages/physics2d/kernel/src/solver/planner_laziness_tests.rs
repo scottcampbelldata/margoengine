@@ -45,7 +45,7 @@ fn graph(n:usize,edges:&[(usize,usize)])->(World,Vec<u32>,Vec<Constraint>,Vec<Bo
     let mut cs=Vec::new();let mut bs=Vec::new();
     for &(a,b) in edges {
         let ci=w.contacts.len();
-        w.contacts.push(Contact{a:a as u32,b:b as u32,manifold:Default::default(),normal_impulse:[0.0;2],tangent_impulse:[0.0;2],solved:true,overlap:false,primed:true,total_impulse:0.0,friction:None,restitution:None});
+        w.contacts.push(Contact{a:a as u32,b:b as u32,manifold:Default::default(),normal_impulse:[0.0;2],tangent_impulse:[0.0;2],solved:true,overlap:false,primed:true,total_impulse:0.0,friction:None,restitution:None,tangent_speed:0.0});
         cs.push(Constraint{contact:ci as u32,a:a as u32,b:b as u32,inv_mass_a:w.bodies[a].inv_mass,inv_i_a:w.bodies[a].inv_inertia,inv_mass_b:w.bodies[b].inv_mass,inv_i_b:w.bodies[b].inv_inertia,normal:v2(0.0,1.0),friction:0.5,k:[2.5,-0.5,2.5],points:[super::super::Point::default();2],count:2,block:true,eighth:false,pushed:0});
         bs.push(Bounce{restitution:0.0,approach:[0.0;2]});
     }

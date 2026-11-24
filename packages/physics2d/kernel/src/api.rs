@@ -633,6 +633,9 @@ impl Hook for PageHook {
         if answer & 8 != 0 {
             change.one_way = Some(point(2));
         }
+        if answer & 16 != 0 {
+            change.tangent_speed = f(4);
+        }
     }
 }
 

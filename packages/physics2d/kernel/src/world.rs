@@ -287,6 +287,8 @@ pub struct ContactMod {
     pub friction: Option<f32>,
     pub restitution: Option<f32>,
     pub one_way: Option<V2>,
+    /// The relative tangent speed of body B against body A to drive toward, along the right-hand side of `normal`.
+    pub tangent_speed: f32,
 }
 
 /// Code the world asks about pairs whose shapes have `ShapeDef::hooks` set, in the same order every step.
@@ -348,6 +350,9 @@ pub struct Contact {
     /// Friction and restitution a hook set for this step, replacing the shapes' own.
     pub friction: Option<f32>,
     pub restitution: Option<f32>,
+    /// The relative tangent speed of body B against body A (along the normal's right-hand side) the contact drives toward,
+    /// set by a hook: a conveyor. 0 for an ordinary contact.
+    pub tangent_speed: f32,
 }
 
 /// A contact starts when its closest point is nearer than this, and stops when it is farther than `TOUCH_OFF`.
@@ -1286,7 +1291,7 @@ impl World {
             if i < old.len() && (old[i].a, old[i].b) == (a, b) {
                 next.push(old[i]);
             } else {
-                next.push(Contact { a, b, manifold: Manifold::default(), normal_impulse: [0.0; 2], tangent_impulse: [0.0; 2], solved: true, overlap: false, primed: false, total_impulse: 0.0, friction: None, restitution: None });
+                next.push(Contact { a, b, manifold: Manifold::default(), normal_impulse: [0.0; 2], tangent_impulse: [0.0; 2], solved: true, overlap: false, primed: false, total_impulse: 0.0, friction: None, restitution: None, tangent_speed: 0.0 });
             }
         }
         // A pair that left the list stops touching, if it was.
@@ -1378,10 +1383,11 @@ impl World {
             }
             contact.friction = None;
             contact.restitution = None;
+            contact.tangent_speed = 0.0;
             if contact.manifold.count == 0 {
                 continue;
             }
-            let mut change = ContactMod { a: contact.a, b: contact.b, normal: contact.manifold.normal, points: contact.manifold.count, solver_active: true, friction: None, restitution: None, one_way: None };
+            let mut change = ContactMod { a: contact.a, b: contact.b, normal: contact.manifold.normal, points: contact.manifold.count, solver_active: true, friction: None, restitution: None, one_way: None, tangent_speed: 0.0 };
             hook.contact(&mut change);
             let open = change.one_way.is_none_or(|way| contact.manifold.normal.dot(way) > 0.0);
             if !change.solver_active || !open {
@@ -1389,6 +1395,7 @@ impl World {
             }
             contact.friction = change.friction.filter(|f| f.is_finite() && *f >= 0.0);
             contact.restitution = change.restitution.filter(|r| r.is_finite() && *r >= 0.0);
+            contact.tangent_speed = if change.tangent_speed.is_finite() { change.tangent_speed } else { 0.0 };
         }
         self.hook = Some(hook);
     }

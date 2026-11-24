@@ -122,6 +122,13 @@ export interface ContactChange2D {
   restitution?: number;
   /** A direction the contact lets bodies through from: it pushes only while the normal has a positive part along it. */
   oneWay?: Vec2D;
+  /** The unit direction `tangentVelocity` is along: the normal turned a quarter turn, [normal.y, -normal.x]. */
+  readonly tangent: [number, number];
+  /**
+   * A conveyor: friction drives collider B's surface to this speed (world units per second) relative to collider A along
+   * `tangent`, so a body resting on a belt is carried at the belt's speed. Default 0.
+   */
+  tangentVelocity?: number;
 }
 /** Code the world asks about pairs of colliders that have `hooks` set; it must be fast and must not change the world. */
 export interface Physics2DHooks {
@@ -604,10 +611,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
             const ca = this.byShape.get(a),
               cb = this.byShape.get(b);
             if (!ca || !cb || !this.hookSet?.modifyContact) return 0;
-            const change: ContactChange2D = { colliderA: ca, colliderB: cb, normal: [nx, ny], points, solverActive: true };
+            const change: ContactChange2D = { colliderA: ca, colliderB: cb, normal: [nx, ny], tangent: [ny, -nx], points, solverActive: true };
             this.hookSet.modifyContact(change);
             let bits = change.solverActive ? 0 : 1;
-            const io = this.kernel.current(4);
+            const io = this.kernel.current(5);
+            if (change.tangentVelocity) {
+              io.f[4] = change.tangentVelocity * this.scale;
+              bits |= 16;
+            }
             if (change.friction !== undefined) {
               io.f[0] = change.friction;
               bits |= 2;

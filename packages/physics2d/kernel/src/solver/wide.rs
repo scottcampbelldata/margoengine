@@ -58,6 +58,8 @@ pub(super) struct Block {
     nx: F4,
     ny: F4,
     friction: F4,
+    /// The relative tangent speed of body B against body A each contact drives toward (0 unless a hook set one).
+    tangent: F4,
     k11: F4,
     k12: F4,
     k22: F4,
@@ -118,7 +120,7 @@ impl Blocks {
         count
     }
     /// Puts `constraints[order[i]]` (one colour's, in visiting order) into blocks of four.
-    pub(super) fn push(&mut self, constraints: &[Constraint], order: &[u32]) {
+    pub(super) fn push(&mut self, constraints: &[Constraint], surfaces: &[f32], order: &[u32]) {
         for group in order.chunks(4) {
             // Field by field across the lanes; empty lanes keep zeros and the last contact's bodies.
             let mut f = [[0.0f32; 4]; 12 + 18];
@@ -133,7 +135,7 @@ impl Blocks {
                 mut pushed0,
                 mut pushed1,
             ) = (0, 0, 0, 0, 0, 0, 0);
-            for (k, c) in group.iter().map(|&i| &constraints[i as usize]).enumerate() {
+            for (k, (c, surface)) in group.iter().map(|&i| (&constraints[i as usize], surfaces.get(i as usize).copied().unwrap_or(0.0))).enumerate() {
                 a[k] = c.a;
                 b[k] = c.b;
                 two |= ((c.count == 2) as u32) << k;
@@ -154,7 +156,7 @@ impl Blocks {
                     c.k[0],
                     c.k[1],
                     c.k[2],
-                    0.0,
+                    surface,
                     0.0,
                 ];
                 for (i, &x) in head.iter().enumerate() {
@@ -211,6 +213,7 @@ impl Blocks {
                 nx: v(4),
                 ny: v(5),
                 friction: v(6),
+                tangent: v(10),
                 k11: v(7),
                 k12: v(8),
                 k22: v(9),
@@ -537,7 +540,7 @@ fn friction_point(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, i: usize) {
     let p = c.points[i];
     let (bx, by) = speed_at(mb, p.rbx, p.rby);
     let (ax, ay) = speed_at(ma, p.rax, p.ray);
-    let vt = tx * (bx - ax) + ty * (by - ay);
+    let vt = tx * (bx - ax) + ty * (by - ay) - c.tangent;
     let limit = c.friction * p.normal_impulse;
     let low = -limit;
     // clamp(x, -limit, limit): x below the low end becomes it, then x above the high end becomes it.

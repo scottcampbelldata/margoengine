@@ -46,7 +46,7 @@ fn constraint(scale: f32, count: u8, coupled: bool, old: [f32; 2]) -> Constraint
 fn block(cs: &[Constraint]) -> Block {
     let mut blocks = Blocks::default();
     let order: Vec<_> = (0..cs.len() as u32).collect();
-    blocks.push(cs, &order);
+    blocks.push(cs, &[], &order);
     blocks.blocks[0]
 }
 

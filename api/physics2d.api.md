@@ -199,6 +199,8 @@ export interface ContactChange2D {
     friction?: number;
     restitution?: number;
     oneWay?: Vec2D;
+    readonly tangent: [number, number];
+    tangentVelocity?: number;
 }
 
 export interface ContactForceEvent2D {

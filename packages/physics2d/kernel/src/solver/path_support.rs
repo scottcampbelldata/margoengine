@@ -554,7 +554,7 @@ fn component_local(
     for &(ci, _, _) in path {
         let c = &mut staged_constraints[ci];
         let (mut a, mut b) = super::motions(&staged_bodies, c);
-        super::friction(c, &mut a, &mut b);
+        super::friction(c, &mut a, &mut b, 0.0);
         super::store(&mut staged_bodies, c, a, b);
     }
     for r in &rows {
@@ -736,7 +736,11 @@ pub(super) fn plan<'a>(
     if !(world.settings.contact_max_push > 0.0 && world.settings.contact_max_push.is_finite()) {
         return None;
     }
-    // The certificates read gravity and the bodies' own masses alone: a force, a torque or a dominance group is outside them.
+    // The certificates read gravity and the bodies' own masses alone: a force, a torque, a dominance group or a conveyor
+    // speed is outside them.
+    if world.contacts.iter().any(|c| c.solved && c.tangent_speed != 0.0) {
+        return None;
+    }
     if ids.iter().any(|&id| {
         let b = &world.bodies[id as usize];
         b.dominance != 0 || b.force != crate::math::V2::ZERO || b.torque != 0.0
