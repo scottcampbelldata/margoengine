@@ -367,3 +367,26 @@ test('a normal end event is not marked as removed', () => {
   assert.ok(end && end.removed === undefined);
   physics.dispose();
 });
+
+test('a fast body with ccd on says it crossed a sensor it passed in one step, and one without it does not', () => {
+  const crossing = (ccd) => {
+    const physics = new Physics(null, { gravity: [0, 0, 0] }),
+      log = listen(physics);
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [5, 0, 0],
+      colliders: { shape: 'box', halfExtents: [0.01, 3, 3], sensor: true },
+    });
+    physics.addBody(null, {
+      position: [3, 0, 0],
+      linearVelocity: [300, 0, 0],
+      ccd,
+      colliders: { shape: 'sphere', radius: 0.1 },
+    });
+    physics.step();
+    physics.dispose();
+    return log.map((event) => event.type);
+  };
+  assert.deepEqual(crossing(true), ['intersectionstart', 'intersectionend']);
+  assert.deepEqual(crossing(false), []);
+});

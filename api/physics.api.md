@@ -287,6 +287,8 @@ export class ContactModification {
     oneWay(platform: PhysicsCollider, direction: Vec3, angle?: number): void;
 }
 
+export type DebugColor = readonly [number, number, number, number];
+
 export interface DebugLines {
     vertices: Float32Array;
     colors: Float32Array;
@@ -298,6 +300,22 @@ export interface DebugRenderOptions {
     contacts?: boolean;
     boxes?: boolean;
     filter?: QueryFilter;
+    axes?: boolean;
+    style?: DebugStyle;
+}
+
+export interface DebugStyle {
+    dynamic?: DebugColor;
+    fixed?: DebugColor;
+    kinematic?: DebugColor;
+    sleeping?: DebugColor;
+    sensor?: DebugColor;
+    joint?: DebugColor;
+    brokenJoint?: DebugColor;
+    contact?: DebugColor;
+    box?: DebugColor;
+    normalLength?: number;
+    axisLength?: number;
 }
 
 export class DragJoint implements PhysicsAttachment {
@@ -903,6 +921,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     castCollider(moving: PhysicsCollider, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
+    takeSnapshot(): PhysicsSnapshot;
+    restoreSnapshot(snapshot: PhysicsSnapshot): this;
     debugRender(options?: DebugRenderOptions): DebugLines;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -1259,6 +1279,13 @@ export interface PhysicsShapeCastOptions extends QueryFilter {
     targetDistance?: number;
     stopAtPenetration?: boolean;
     computeImpactGeometryOnPenetration?: boolean;
+}
+
+export interface PhysicsSnapshot {
+    readonly bytes: Uint8Array;
+    readonly bodies: readonly (readonly [number, number])[];
+    readonly colliders: readonly (readonly [number, number])[];
+    readonly joints: readonly number[];
 }
 
 export class PidController {

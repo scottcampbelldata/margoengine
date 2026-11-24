@@ -25,6 +25,34 @@ export interface DebugRenderOptions {
    * colliders are.
    */
   filter?: QueryFilter;
+  /** The three axes of each body at its origin, red x, green y and blue z, `axisLength` metres long (default false; Rapier's `RIGID_BODY_AXES`). */
+  axes?: boolean;
+  /** Colours and sizes, each left out one keeping its default (Rapier's `DebugRenderStyle`). */
+  style?: DebugStyle;
+}
+
+/** A line colour: red, green, blue and alpha, each from 0 to 1. */
+export type DebugColor = readonly [number, number, number, number];
+
+/**
+ * The colours and sizes of {@link DebugRenderOptions.style}. Defaults: dynamic [0.35, 0.85, 0.45, 1], fixed [0.6, 0.6, 0.65, 1],
+ * kinematic [0.35, 0.6, 1, 1], sleeping [0.3, 0.45, 0.35, 1], sensor [1, 0.9, 0.2, 1], joint [1, 0.3, 0.25, 1], brokenJoint
+ * [0.5, 0.15, 0.15, 1], contact [1, 0.3, 0.9, 1], box [0.3, 0.9, 0.95, 0.6]; `normalLength` 0.1 m, `axisLength` 0.5 m.
+ */
+export interface DebugStyle {
+  dynamic?: DebugColor;
+  fixed?: DebugColor;
+  kinematic?: DebugColor;
+  sleeping?: DebugColor;
+  sensor?: DebugColor;
+  joint?: DebugColor;
+  brokenJoint?: DebugColor;
+  contact?: DebugColor;
+  box?: DebugColor;
+  /** The line along each contact normal, in metres. */
+  normalLength?: number;
+  /** The length of each body axis, in metres. */
+  axisLength?: number;
 }
 
 /** Line segments: `vertices` hold x, y, z, two vertices a segment, and `colors` hold r, g, b, a for each vertex. */
@@ -135,7 +163,9 @@ export function debugLines(
   joints: Iterable<PhysicsJoint>,
   options: DebugRenderOptions = {},
 ): DebugLines {
-  const { colliders = true, joints: drawJoints = true, contacts = true, boxes = false, filter } = options,
+  const { colliders = true, joints: drawJoints = true, contacts = true, boxes = false, axes = false, filter } = options,
+    style = options.style ?? {},
+    paint = (name: keyof DebugStyle, fallback: Color): Color => (style[name] as Color | undefined) ?? fallback,
     out = new Lines(),
     c = world.columns,
     list = [...bodies],
@@ -319,17 +349,17 @@ export function debugLines(
       const { p, q } = bodyPose(body),
         color =
           body.sleeping && body.type === 'dynamic'
-            ? SLEEPING
+            ? paint('sleeping', SLEEPING)
             : body.type === 'dynamic'
-              ? DYNAMIC
+              ? paint('dynamic', DYNAMIC)
               : body.type === 'fixed'
-                ? FIXED
-                : KINEMATIC;
+                ? paint('fixed', FIXED)
+                : paint('kinematic', KINEMATIC);
       for (const collider of body.colliders) {
         const row = collider.handle;
         if (!seen.has(row)) continue;
         if (colliders) {
-          const tint = c.colliderFlags[row]! & 1 ? SENSOR : color;
+          const tint = c.colliderFlags[row]! & 1 ? paint('sensor', SENSOR) : color;
           if (c.colliderShape[row] === 5) {
             for (let child = c.colliderHull[row]!; child !== NONE; child = c.colliderNext[child]!)
               shape(child, p, q, tint, true);
@@ -341,17 +371,42 @@ export function debugLines(
             const [lo, hi] = box,
               corner = (i: number): V => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]];
             for (let i = 0; i < 8; i++)
-              for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(corner(i), corner(i | bit), BOX);
+              for (const bit of [1, 2, 4]) if (!(i & bit)) out.segment(corner(i), corner(i | bit), paint('box', BOX));
           }
         }
       }
+    }
+  if (axes)
+    for (const body of list) {
+      if (![...body.colliders].some((collider) => seen.has(collider.handle)) && body.colliders.length) continue;
+      const { p, q } = bodyPose(body),
+        length = style.axisLength ?? 0.5;
+      (
+        [
+          [
+            [length, 0, 0],
+            [1, 0.2, 0.2, 1],
+          ],
+          [
+            [0, length, 0],
+            [0.2, 1, 0.2, 1],
+          ],
+          [
+            [0, 0, length],
+            [0.3, 0.4, 1, 1],
+          ],
+        ] as const
+      ).forEach(([end, color]) => {
+        const r = rotate(q, [end[0], end[1], end[2]]);
+        out.segment(p, [p[0] + r[0], p[1] + r[1], p[2] + r[2]], color);
+      });
     }
   if (drawJoints)
     for (const joint of joints) {
       if (!shown.has(joint.bodyA) || !shown.has(joint.bodyB)) continue;
       const a = worldAnchor(joint.bodyA, joint.anchorA),
         b = worldAnchor(joint.bodyB, joint.anchorB),
-        color = joint.broken ? BROKEN : JOINT;
+        color = joint.broken ? paint('brokenJoint', BROKEN) : paint('joint', JOINT);
       out.segment(a, b, color);
       out.segment(a, bodyPose(joint.bodyA).p, color);
       out.segment(b, bodyPose(joint.bodyB).p, color);
@@ -361,8 +416,9 @@ export function debugLines(
       if (!seen.has(manifold.colliderA) || !seen.has(manifold.colliderB)) continue;
       for (const point of manifold.points) {
         const [x, y, z] = point.position,
-          n = manifold.normal;
-        out.segment([x, y, z], [x + n[0] * 0.1, y + n[1] * 0.1, z + n[2] * 0.1], CONTACT);
+          n = manifold.normal,
+          length = style.normalLength ?? 0.1;
+        out.segment([x, y, z], [x + n[0] * length, y + n[1] * length, z + n[2] * length], paint('contact', CONTACT));
       }
     }
   return out.finish();

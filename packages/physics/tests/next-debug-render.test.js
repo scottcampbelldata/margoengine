@@ -87,3 +87,32 @@ test('joints draw three lines, a broken one darker, and contacts draw a point an
   if (joint.broken) assert.notDeepEqual(after, fresh);
   physics.dispose();
 });
+
+test('a style recolours each kind and sizes the contact normal, and axes draw three coloured lines a body', async () => {
+  await Physics.load();
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  physics.addBody(null, { position: [1, 2, 3], colliders: { shape: 'box', halfExtents: [0.5, 1, 1.5] } });
+  const plain = physics.debugRender({ contacts: false }),
+    styled = physics.debugRender({ contacts: false, style: { dynamic: [0.1, 0.2, 0.3, 0.4] } });
+  assert.deepEqual(
+    [...styled.colors.slice(0, 4)].map((v) => Math.round(v * 10)),
+    [1, 2, 3, 4],
+  );
+  assert.notDeepEqual([...plain.colors.slice(0, 4)], [...styled.colors.slice(0, 4)]);
+  assert.equal(segments(styled), segments(plain), 'a style changes colours, not lines');
+  const axes = physics.debugRender({ colliders: false, contacts: false, axes: true, style: { axisLength: 2 } });
+  assert.equal(segments(axes), 3, 'one line a axis');
+  const lengths = [0, 1, 2].map((k) =>
+    Math.hypot(
+      axes.vertices[6 * k + 3] - axes.vertices[6 * k],
+      axes.vertices[6 * k + 4] - axes.vertices[6 * k + 1],
+      axes.vertices[6 * k + 5] - axes.vertices[6 * k + 2],
+    ),
+  );
+  assert.ok(
+    lengths.every((length) => Math.abs(length - 2) < 1e-5),
+    `each axis is 2 m (${lengths})`,
+  );
+  assert.ok(axes.colors[0] === 1 && axes.colors[8 + 1] === 1, 'red x then green y');
+  physics.dispose();
+});

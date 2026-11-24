@@ -110,3 +110,57 @@ test('a surface velocity carries a box along a belt, and stops when the modifier
   assert.ok(Math.abs(belt(0).x) < 0.05, 'a belt at rest holds it');
   assert.ok(belt(-3).x < -4, 'the other way');
 });
+
+/** A ball dropped on a floor of the given material; the modifier sees the pair when `modify` is set. */
+function dropped(modifier, floorOptions = {}, ballOptions = {}) {
+  const physics = new Physics(null, { contactModifier: modifier });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10], modifyContacts: true, ...floorOptions },
+  });
+  const ball = physics.addBody(null, {
+    position: [0, 1.5, 0],
+    canSleep: false,
+    colliders: { shape: 'sphere', radius: 0.5, ...ballOptions },
+  });
+  return { physics, ball };
+}
+
+test('the modifier can set restitution: a ball that would stay down bounces back', () => {
+  const rebound = (restitution) => {
+    const { physics, ball } = dropped(
+      restitution === undefined ? () => {} : (contact) => (contact.restitution = restitution),
+    );
+    let up = 0;
+    for (let i = 0; i < 90; i++) {
+      physics.step();
+      up = Math.max(up, ball.linearVelocity[1]);
+    }
+    physics.dispose();
+    return up;
+  };
+  const dead = rebound(undefined),
+    live = rebound(0.8);
+  assert.ok(dead < 0.1, `no restitution, no bounce (${dead})`);
+  // It fell 1 m (4.4 m/s): 80% of it comes back.
+  assert.ok(Math.abs(live - 0.8 * Math.sqrt(2 * 9.81)) < 0.4, `restitution 0.8 gives back about 3.5 m/s (${live})`);
+});
+
+test('the modifier can clear a pair, and set its normal', () => {
+  const cleared = dropped((contact) => contact.clear());
+  for (let i = 0; i < 90; i++) cleared.physics.step();
+  assert.ok(cleared.ball.position[1] < -2, `a cleared pair holds nothing (${cleared.ball.position[1]})`);
+  cleared.physics.dispose();
+  // A tilted normal pushes the ball along its horizontal share, as a slope would.
+  const tilt = [0.6, 0.8, 0];
+  const pushed = dropped(
+    (contact) => (contact.normal = contact.first.body.type === 'fixed' ? tilt : [-tilt[0], -tilt[1], -tilt[2]]),
+  );
+  for (let i = 0; i < 60; i++) pushed.physics.step();
+  assert.ok(
+    Math.abs(pushed.ball.linearVelocity[0]) > 0.3,
+    `the ball is pushed sideways (${pushed.ball.linearVelocity[0]})`,
+  );
+  pushed.physics.dispose();
+});

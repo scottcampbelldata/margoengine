@@ -1,6 +1,7 @@
 export { ContactModification, Physics } from './physics.js';
 export type {
   PhysicsOptions,
+  PhysicsSnapshot,
   PhysicsEventMap,
   CollisionEvent,
   CollisionEventType,
@@ -69,7 +70,7 @@ export type { MultibodyLink, MultibodyLinkOptions } from './multibody.js';
 export type { IkOptions, IkResult, IkTarget } from './kinematics.js';
 export { PidController } from './pid.js';
 export type { PidOptions } from './pid.js';
-export type { DebugLines, DebugRenderOptions } from './debug.js';
+export type { DebugColor, DebugLines, DebugRenderOptions, DebugStyle } from './debug.js';
 export { cleanTrimesh } from './mesh-clean.js';
 export { convertMesh, meshConnectedComponents, meshHalfEdges, voxelizedMesh, voxelsFromPoints } from './mesh-tools.js';
 export type { HalfEdgeTopology, MeshConversion, VoxelFill } from './mesh-tools.js';

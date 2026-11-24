@@ -749,7 +749,7 @@ console.log(can.position[1].toFixed(2), cone.position[1].toFixed(2)); // 0.55 0.
 physics.dispose();
 ```
 
-After each step a pair that began or stopped touching fires `contactstart` or `contactend`, or `intersectionstart` or `intersectionend` when either collider is a sensor, with both bodies, meshes and colliders. A sensor sees overlaps and pushes nothing, and it sees kinematic and fixed bodies too. Two fixed bodies never meet, sensor or not. A collider stays quiet with `events: false` when the other side has it too. A pair of sleepers says nothing. A collider or body removed while it touches ends the contact at once, and the end event, `removed: true` (Rapier's `CollisionEventFlags::REMOVED`), is delivered at the end of the next step, still naming both colliders. `collisionGroups` keeps a pair apart; `solverGroups` lets it be seen and fire events without being solved. Both take a packed `collisionGroups(memberships, filter)` number (16 + 16 bits, as Rapier's JavaScript build packs them) or `interactionGroups(memberships, filter, testMode)`, 32 bits wide as Rapier's Rust `InteractionGroups` is: masks or lists of group indices 0 to 31, tested by `'and'` (each side's memberships share a bit with the other's filter, the default) or `'or'` (either way; used only when both colliders ask for it, and a mixed pair tests by `and`). A collider left at its default is in every group. `collider.interactionGroups()` and `solverInteractionGroups()` read them back, and scene queries take either form as `groups`. `contactFilter(a, b)` runs inside the step for each candidate pair of bodies: it may read the world and must not change it, so a step run from it throws, and false lets the pair pass and keeps its sensor events quiet. A body of higher `dominance` is a wall to a dynamic body of lower dominance, in contacts only, and floors still hold it. `body.enabled = false` takes a body out of the world: it keeps its pose and speed, nothing wakes it, its touches end and what rested on it falls, and its joints rest until it comes back, awake. `collider.setEnabled(false)` does the same for one collider, which keeps its mass.
+After each step a pair that began or stopped touching fires `contactstart` or `contactend`, or `intersectionstart` or `intersectionend` when either collider is a sensor, with both bodies, meshes and colliders. A sensor sees overlaps and pushes nothing, and it sees kinematic and fixed bodies too. Two fixed bodies never meet, sensor or not. A collider stays quiet with `events: false` when the other side has it too. A pair of sleepers says nothing. A fast body with `ccd: true` that passes through a sensor inside one step fires `intersectionstart` and `intersectionend` for it, though it is in it at neither end of the step. A collider or body removed while it touches ends the contact at once, and the end event, `removed: true` (Rapier's `CollisionEventFlags::REMOVED`), is delivered at the end of the next step, still naming both colliders. `collisionGroups` keeps a pair apart; `solverGroups` lets it be seen and fire events without being solved. Both take a packed `collisionGroups(memberships, filter)` number (16 + 16 bits, as Rapier's JavaScript build packs them) or `interactionGroups(memberships, filter, testMode)`, 32 bits wide as Rapier's Rust `InteractionGroups` is: masks or lists of group indices 0 to 31, tested by `'and'` (each side's memberships share a bit with the other's filter, the default) or `'or'` (either way; used only when both colliders ask for it, and a mixed pair tests by `and`). A collider left at its default is in every group. `collider.interactionGroups()` and `solverInteractionGroups()` read them back, and scene queries take either form as `groups`. `contactFilter(a, b)` runs inside the step for each candidate pair of bodies: it may read the world and must not change it, so a step run from it throws, and false lets the pair pass and keeps its sensor events quiet. A body of higher `dominance` is a wall to a dynamic body of lower dominance, in contacts only, and floors still hold it. `body.enabled = false` takes a body out of the world: it keeps its pose and speed, nothing wakes it, its touches end and what rested on it falls, and its joints rest until it comes back, awake. `collider.setEnabled(false)` does the same for one collider, which keeps its mass.
 
 ```ts
 import {Physics, collisionGroups} from 'margoengine/physics';
@@ -1155,9 +1155,28 @@ console.log(winch.enabled, winch.force); // false [0, 0, 0]
 physics.dispose();
 ```
 
+### Snapshots
+
+`physics.takeSnapshot()` copies the whole world (every body, collider, joint, contact, warm start and sleep timer) and `physics.restoreSnapshot(snapshot)` puts it back, as Rapier's `takeSnapshot`, so stepping on gives the same bits as the first time. The snapshot holds the kernel's rows, not your objects: handles, `userData`, meshes, controllers and listeners stay as they are, and a restore needs the same bodies, colliders and joints to exist, or it throws and changes nothing.
+
+```js
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [10, 0.5, 10]}});
+const ball = physics.addBody(null, {position: [0, 3, 0], colliders: {shape: 'sphere', radius: 0.3}});
+const before = physics.takeSnapshot();
+for (let i = 0; i < 60; i++) physics.step();
+const landed = ball.position[1];
+physics.restoreSnapshot(before);
+for (let i = 0; i < 60; i++) physics.step();
+console.log(ball.position[1] === landed); // true: the same run again
+```
+
 ### Debug lines
 
-`physics.debugRender(options)` returns debug-render data: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the outlines of every collider (all shapes, a compound by its parts, a mesh by its edges, a voxel grid by its box), a line across each joint with a line from each anchor to its body (dark red once broken), and each contact point of the last step with a short line along its normal. `boxes: true` adds the world box of each collider; `colliders`, `joints` and `contacts` switch their lines off; `filter` takes a query filter (kind and sensor flags, `exclude`, `groups`, `predicate`) and draws only the colliders it sees, their contacts, and the joints between bodies that are shown. Colours: green awake dynamic bodies, grey fixed, blue kinematic, dim green sleeping, yellow sensors, red joints, magenta contacts, translucent cyan boxes. Draw them with `@margoengine/lines`.
+`physics.debugRender(options)` returns debug-render data (`style` recolours each kind of line and sizes the contact normal and the body axes, `axes: true` draws each body's three axes): `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the outlines of every collider (all shapes, a compound by its parts, a mesh by its edges, a voxel grid by its box), a line across each joint with a line from each anchor to its body (dark red once broken), and each contact point of the last step with a short line along its normal. `boxes: true` adds the world box of each collider; `colliders`, `joints` and `contacts` switch their lines off; `filter` takes a query filter (kind and sensor flags, `exclude`, `groups`, `predicate`) and draws only the colliders it sees, their contacts, and the joints between bodies that are shown. Colours: green awake dynamic bodies, grey fixed, blue kinematic, dim green sleeping, yellow sensors, red joints, magenta contacts, translucent cyan boxes. Draw them with `@margoengine/lines`.
 
 ```ts
 import {Physics} from 'margoengine/physics';

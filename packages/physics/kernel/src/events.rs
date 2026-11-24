@@ -159,6 +159,19 @@ impl World {
         }
     }
 
+    /// Tells a crossing of a sensor that began and ended inside one step, with no pair row: a start and an end.
+    pub(crate) fn push_crossing(&mut self, a: usize, b: usize) {
+        for started in [true, false] {
+            let at = 2 * self.header().events as usize;
+            if at + 2 > 4 * self.header().capacity[3] as usize {
+                return;
+            }
+            self.set_u(EVENTS, at, a as u32 | if started { EVENT_STARTED } else { 0 } | EVENT_SENSOR);
+            self.set_u(EVENTS, at + 1, b as u32);
+            self.header_mut().events += 1;
+        }
+    }
+
     /// Lists an event: two words, the first collider with what happened in its top bits, then the second. The list holds two
     /// events a pair row, which is all a step can make while whoever reads it clears it after each step: one end for a row
     /// that leaves and one event for the pair that takes its place.

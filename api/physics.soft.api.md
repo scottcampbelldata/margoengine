@@ -659,6 +659,8 @@ class ContactModification {
     oneWay(platform: PhysicsCollider, direction: Vec3, angle?: number): void;
 }
 
+type DebugColor = readonly [number, number, number, number];
+
 interface DebugLines {
     vertices: Float32Array;
     colors: Float32Array;
@@ -670,6 +672,22 @@ interface DebugRenderOptions {
     contacts?: boolean;
     boxes?: boolean;
     filter?: QueryFilter;
+    axes?: boolean;
+    style?: DebugStyle;
+}
+
+interface DebugStyle {
+    dynamic?: DebugColor;
+    fixed?: DebugColor;
+    kinematic?: DebugColor;
+    sleeping?: DebugColor;
+    sensor?: DebugColor;
+    joint?: DebugColor;
+    brokenJoint?: DebugColor;
+    contact?: DebugColor;
+    box?: DebugColor;
+    normalLength?: number;
+    axisLength?: number;
 }
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
@@ -1284,6 +1302,8 @@ class Physics implements EnginePlugin, BodyOwner {
     castCollider(moving: PhysicsCollider, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
+    takeSnapshot(): PhysicsSnapshot;
+    restoreSnapshot(snapshot: PhysicsSnapshot): this;
     debugRender(options?: DebugRenderOptions): DebugLines;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -1647,6 +1667,13 @@ interface PhysicsShapeCastOptions extends QueryFilter {
     targetDistance?: number;
     stopAtPenetration?: boolean;
     computeImpactGeometryOnPenetration?: boolean;
+}
+
+interface PhysicsSnapshot {
+    readonly bytes: Uint8Array;
+    readonly bodies: readonly (readonly [number, number])[];
+    readonly colliders: readonly (readonly [number, number])[];
+    readonly joints: readonly number[];
 }
 
 interface PointProjection {

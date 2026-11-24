@@ -280,3 +280,44 @@ fn spinning_ccd_bullets_never_end_past_a_wall_that_comes_at_them() {
         }
     }
 }
+
+/// The events a step listed: collider, other collider, started, sensor.
+fn listed(w: &mut World) -> Vec<(u32, u32, bool, bool)> {
+    let out = (0..w.header().events as usize)
+        .map(|i| {
+            let (word, b) = (w.uu(EVENTS, 2 * i), w.uu(EVENTS, 2 * i + 1));
+            (word & EVENT_COLLIDER, b, word & EVENT_STARTED != 0, word & EVENT_SENSOR != 0)
+        })
+        .collect();
+    w.header_mut().events = 0;
+    out
+}
+
+#[test]
+fn a_fast_ball_through_a_thin_sensor_in_one_step_says_it_entered_and_left() {
+    for fast in [true, false] {
+        let mut w = World::new(4, 4).unwrap();
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        let sensor_body = w.add_body(FIXED).unwrap();
+        let sensor = w.add_collider(sensor_body, SHAPE_BOX, [0.01, 3.0, 3.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+        w.set_u(COLLIDER_FLAGS, sensor as usize, w.uu(COLLIDER_FLAGS, sensor as usize) | COLLIDER_SENSOR);
+        w.set_v(POSITION_X, sensor_body as usize, v3(5.0, 0.0, 0.0));
+        let ball_body = w.add_body(DYNAMIC).unwrap();
+        let ball = w.add_collider(ball_body, SHAPE_BALL, [0.1, 0.0, 0.0], [0.0; 3], IDENTITY, 1.0).unwrap();
+        w.set_v(POSITION_X, ball_body as usize, v3(3.0, 0.0, 0.0));
+        w.update_mass(ball_body);
+        if fast {
+            w.set_u(FLAGS, ball_body as usize, w.flags(ball_body as usize) | CCD);
+        }
+        // 300 m/s: 5 m a step, a hundred times the sensor's thickness and far past it.
+        w.set_v(LINEAR_X, ball_body as usize, v3(300.0, 0.0, 0.0));
+        let mut log = vec![];
+        w.step(DT);
+        log.extend(listed(&mut w));
+        if fast {
+            assert_eq!(log, vec![(ball, sensor, true, true), (ball, sensor, false, true)], "a start and an end in the step it crossed");
+        } else {
+            assert!(log.is_empty(), "without CCD the sensor is simply missed: {log:?}");
+        }
+    }
+}

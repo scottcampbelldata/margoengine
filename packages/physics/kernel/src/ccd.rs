@@ -157,6 +157,7 @@ impl World {
             let path = (motion.c0.min(motion.c1).sub(grow), motion.c0.max(motion.c1).add(grow));
             let (first, hit) = self.first_touch(at, &motion, path, 0.0, false);
             if first >= 1.0 {
+                self.sensor_crossings(at, &motion, 1.0, path);
                 continue;
             }
             let mut pose = motion.at(first);
@@ -177,6 +178,50 @@ impl World {
             self.set_v(POSITION_X, at, pose.p);
             self.set_q(ROTATION_X, at, pose.q);
             self.set_v(CENTER_X, at, pose.apply(motion.local));
+            self.sensor_crossings(at, &motion, first, path);
+        }
+    }
+
+    /// A fast body can cross a sensor between two steps and be in it at neither end. For each sensor the body's solid
+    /// colliders pass through within `until` of the step, whose pair was not touching and is not overlapping now, the
+    /// crossing is told as it happened: a start and an end at once (Rapier's CCD sensor events). A sensor never stops a body,
+    /// so this reads the sweep only; a pair that touches at either end is the step's own events'.
+    fn sensor_crossings(&mut self, at: usize, motion: &Motion, until: f32, (low, high): (V3, V3)) {
+        for body in 0..self.header().rows as usize {
+            let flags = self.uu(FLAGS, body);
+            if body == at || flags & ALIVE == 0 || flags & DISABLED != 0 {
+                continue;
+            }
+            let mut other = self.uu(FIRST_COLLIDER, body);
+            while other != NONE {
+                let o = other as usize;
+                other = self.uu(COLLIDER_NEXT, o);
+                if self.uu(COLLIDER_FLAGS, o) & (COLLIDER_SENSOR | COLLIDER_OFF) != COLLIDER_SENSOR {
+                    continue;
+                }
+                let (a, b) = (self.v(FAT_MIN_X, o), self.v(FAT_MAX_X, o));
+                if !(a.x <= high.x && low.x <= b.x && a.y <= high.y && low.y <= b.y && a.z <= high.z && low.z <= b.z) {
+                    continue;
+                }
+                let theirs = self.motion_of_other(body).from(0.0);
+                let mut c = self.uu(FIRST_COLLIDER, at);
+                while c != NONE {
+                    let own = c as usize;
+                    c = self.uu(COLLIDER_NEXT, own);
+                    if self.uu(COLLIDER_FLAGS, own) & (COLLIDER_SENSOR | COLLIDER_OFF) != 0 || self.touch_verdict(own, o, at, body) == crate::events::PAIR_SKIP {
+                        continue;
+                    }
+                    let pair = self.find_pair(own as u32, o as u32);
+                    if pair != NONE && self.uu(PAIR_FLAGS, pair as usize) & PAIR_TOUCHING != 0 {
+                        continue;
+                    }
+                    let mut crossed = false;
+                    self.each_piece(own, &mut |piece| crossed = crossed || self.sweep_piece(piece, motion, o, &theirs, until) < until);
+                    if crossed && !self.pair_intersects(own, o) {
+                        self.push_crossing(own, o);
+                    }
+                }
+            }
         }
     }
 

@@ -210,6 +210,14 @@ export class ContactModification {
   }
 }
 
+/** A world as {@link Physics.takeSnapshot} took it: the kernel's bytes, and which bodies, colliders and joints it held. */
+export interface PhysicsSnapshot {
+  readonly bytes: Uint8Array;
+  readonly bodies: readonly (readonly [number, number])[];
+  readonly colliders: readonly (readonly [number, number])[];
+  readonly joints: readonly number[];
+}
+
 /** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
 export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
 /** Two colliders began or stopped touching. */
@@ -1963,6 +1971,55 @@ export class Physics implements EnginePlugin, BodyOwner {
     return points;
   }
 
+  /**
+   * The whole world as one copy, for {@link Physics.restoreSnapshot} (Rapier's `takeSnapshot`): every body, collider, joint,
+   * contact, warm start and sleep timer, so stepping on from a restore gives the same bits as the first time. It holds the
+   * kernel's rows, not the JavaScript objects: the handles, `userData`, meshes, controllers and listeners you hold stay what
+   * they are, and a restore needs the same bodies, colliders and joints to exist as when the snapshot was taken.
+   */
+  takeSnapshot(): PhysicsSnapshot {
+    this.live();
+    const c = this.kernel.columns;
+    return {
+      bytes: this.kernel.snapshot(),
+      bodies: [...this.bodies].map((body) => [body.row, c.generation[body.row]!] as const),
+      colliders: [...this.byRow.keys()].map((row) => [row, c.colliderGeneration[row]!] as const),
+      joints: [...this.joints].map((joint) => joint.row),
+    };
+  }
+  /**
+   * Puts the world back as {@link Physics.takeSnapshot} found it. The bodies, colliders and joints must be the ones that were
+   * there: one added or removed since is named in the error, and nothing changes.
+   * @throws MargoError (`state`) when the bodies, colliders or joints are not the snapshot's.
+   * @throws RangeError for bytes that are not a snapshot of this kernel.
+   */
+  restoreSnapshot(snapshot: PhysicsSnapshot): this {
+    this.live();
+    const c = this.kernel.columns,
+      same = (now: readonly (readonly [number, number])[], then: readonly (readonly [number, number])[]): boolean =>
+        now.length === then.length &&
+        now.every(([row, generation]) => then.some((t) => t[0] === row && t[1] === generation));
+    if (
+      !same(
+        [...this.bodies].map((body) => [body.row, c.generation[body.row]!] as const),
+        snapshot.bodies,
+      ) ||
+      !same(
+        [...this.byRow.keys()].map((row) => [row, c.colliderGeneration[row]!] as const),
+        snapshot.colliders,
+      ) ||
+      this.joints.size !== snapshot.joints.length ||
+      ![...this.joints].every((joint) => snapshot.joints.includes(joint.row))
+    )
+      throw new MargoError(
+        'state',
+        'The world has other bodies, colliders or joints than the snapshot: restore it before adding or removing any, or take a new snapshot.',
+      );
+    this.kernel.restore(snapshot.bytes);
+    for (const body of this.bodies) this.meshes.mark(body);
+    this.retired.clear();
+    return this;
+  }
   /**
    * Rapier's debug lines: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the collider
    * outlines, joints and last-step contact points of the world, and with `boxes` the box around each collider. Draw them with
