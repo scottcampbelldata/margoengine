@@ -65,6 +65,12 @@ export interface VehicleOptions {
   groups?: number;
   /** Return false to make the wheels ignore a collider (the chassis's own colliders are always ignored). */
   predicate?: (collider: PhysicsCollider) => boolean;
+  /**
+   * The direction the chassis faces, in its own frame (default [0, 0, 1], +Z), Rapier's `index_forward_axis`: `speed` is the
+   * velocity along it. A chassis that faces another way also gives its wheels an `axle` (the axle is the cross product of up
+   * and forward, so for a chassis facing +X it is [0, 0, 1]); steering turns about the up axis, positive towards `up x forward`.
+   */
+  forward?: Vec3;
 }
 
 /** Driver input for {@link Vehicle.setInput}, each axis normalized. */
@@ -207,6 +213,7 @@ export class Vehicle implements PhysicsAttachment {
   maxSteeringAngle: number;
   private readonly wheels: WheelSetup[] = [];
   private readonly groups?: number;
+  private readonly facing: [number, number, number];
   private readonly predicate?: (collider: PhysicsCollider) => boolean;
   private disposed = false;
   private readonly position = [0, 0, 0];
@@ -230,6 +237,7 @@ export class Vehicle implements PhysicsAttachment {
       );
     if (!chassis.colliders.length)
       throw new TypeError('A vehicle chassis needs a collider to have mass; give the chassis body a box collider.');
+    this.facing = options?.forward ? unit(options.forward, 'Vehicle forward') : [0, 0, 1];
     const wheels = options?.wheels;
     if (!Array.isArray(wheels) || !wheels.length)
       throw new RangeError('A vehicle needs at least one wheel: {wheels: [{position: [0.8, 0, 1.2], radius: 0.35}]}');
@@ -304,15 +312,11 @@ export class Vehicle implements PhysicsAttachment {
     return this;
   }
 
-  /** Forward speed in metres per second along the chassis +Z axis (negative when reversing). */
+  /** Forward speed in metres per second along the chassis's forward axis (+Z unless `forward` says otherwise; negative when reversing). */
   get speed(): number {
     const v = this.chassis.linearVelocity,
-      [x, y, z, w] = this.chassis.rotation;
-    // Chassis +Z in world space: the third column of the rotation matrix.
-    const fx = 2 * (x * z + w * y),
-      fy = 2 * (y * z - w * x),
-      fz = 1 - 2 * (x * x + y * y);
-    return v[0] * fx + v[1] * fy + v[2] * fz;
+      f = rotate(this.chassis.rotation, this.facing);
+    return v[0] * f[0] + v[1] * f[1] + v[2] * f[2];
   }
 
   /** State of wheel `index` after the last step. */

@@ -6,10 +6,16 @@ import type { Physics, QueryFilter, ShapeCastHit } from './physics.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { ShapeOptions } from './shapes.js';
 
+/**
+ * A length that is absolute (metres) or relative to the character's height, Rapier's `CharacterLength`: `{relative: 0.1}` is a
+ * tenth of the height of the character's collider along `up`.
+ */
+export type CharacterLength = number | { relative: number };
+
 /** Options for a kinematic character controller; every field has a default. */
 export interface CharacterControllerOptions {
   /** Gap kept between the character and obstacles (default 0.01). */
-  offset?: number;
+  offset?: CharacterLength;
   /** Up direction (default [0, 1, 0]). */
   up?: Vec3;
   /** Steepest slope the character can walk up, radians (default 45 degrees). */
@@ -17,9 +23,14 @@ export interface CharacterControllerOptions {
   /** Slopes steeper than this make the character slide down, radians (default 30 degrees). */
   minSlopeSlideAngle?: number;
   /** Climb steps automatically, or false to disable (default {maxHeight: 0.3, minWidth: 0.2, includeDynamicBodies: false}). */
-  autostep?: false | { maxHeight: number; minWidth: number; includeDynamicBodies?: boolean };
+  autostep?: false | { maxHeight: CharacterLength; minWidth: CharacterLength; includeDynamicBodies?: boolean };
   /** Snap down to the ground within this distance while walking down stairs and slopes, or false (default 0.2). */
-  snapToGround?: false | number;
+  snapToGround?: false | CharacterLength;
+  /**
+   * A small distance, along the contact normal, the character is pushed every time it slides, so it does not catch on what
+   * it slides along (Rapier's `normal_nudge_factor`; default 0.0001 metres). Raise it if the character sticks.
+   */
+  normalNudgeFactor?: number;
   /** Slide along obstacles instead of stopping (default true). */
   slide?: boolean;
   /** Push dynamic bodies it walks into (default false). */
@@ -48,6 +59,8 @@ export interface CharacterMoveResult {
   grounded: boolean;
   /** Number of obstacles hit while computing the movement. */
   collisions: number;
+  /** The move slid down a slope steeper than `minSlopeSlideAngle` (Rapier's `is_sliding_down_slope`). */
+  slidingDownSlope: boolean;
 }
 
 /** What a move may hit: a query filter without the body to leave out (the character's own is always left out). */
@@ -94,12 +107,19 @@ function multiply(a: readonly number[], b: readonly number[]): [number, number, 
 export class CharacterController {
   private disposed = false;
   private lastGrounded = false;
-  private readonly offset: number;
+  private readonly offsetLength: CharacterLength;
+  private readonly nudge: number;
+  private sliding = false;
+  private lastMovement: V = [0, 0, 0];
   private readonly up: V;
   private readonly maxClimb: number;
   private readonly minSlide: number;
-  private readonly autostep: { maxHeight: number; minWidth: number; includeDynamicBodies: boolean } | null;
-  private readonly snap: number | null;
+  private readonly autostepLengths: {
+    maxHeight: CharacterLength;
+    minWidth: CharacterLength;
+    includeDynamicBodies: boolean;
+  } | null;
+  private readonly snapLength: CharacterLength | null;
   private readonly slide: boolean;
   private readonly pushes: boolean;
   private readonly mass: number;
@@ -120,19 +140,32 @@ export class CharacterController {
     const upLength = length(up);
     if (!(upLength > 0)) throw new RangeError('Up must not be the zero vector');
     this.up = scale(up, 1 / upLength);
-    this.offset = options.offset ?? 0.01;
-    if (!(this.offset >= 0)) throw new RangeError('offset must be zero or more');
+    this.offsetLength = options.offset ?? 0.01;
+    for (const [name, l] of [
+      ['offset', this.offsetLength],
+      ['autostep maxHeight', options.autostep ? options.autostep.maxHeight : 0],
+      ['autostep minWidth', options.autostep ? options.autostep.minWidth : 0],
+      ['snapToGround', options.snapToGround ? options.snapToGround : 0],
+    ] as const) {
+      const value = typeof l === 'number' ? l : l.relative;
+      if (!(value >= 0))
+        throw new RangeError(
+          `${name} must be zero or more, in metres or as {relative: a share of the character's height}`,
+        );
+    }
+    this.nudge = options.normalNudgeFactor ?? 1e-4;
+    if (!(this.nudge >= 0)) throw new RangeError('normalNudgeFactor must be zero or more');
     this.maxClimb = options.maxSlopeClimbAngle ?? Math.PI / 4;
     this.minSlide = options.minSlopeSlideAngle ?? Math.PI / 6;
     const step =
       options.autostep === undefined
         ? { maxHeight: 0.3, minWidth: 0.2, includeDynamicBodies: false }
         : options.autostep;
-    this.autostep = step
+    this.autostepLengths = step
       ? { maxHeight: step.maxHeight, minWidth: step.minWidth, includeDynamicBodies: step.includeDynamicBodies ?? false }
       : null;
     const snap = options.snapToGround === undefined ? 0.2 : options.snapToGround;
-    this.snap = snap === false ? null : snap;
+    this.snapLength = snap === false ? null : snap;
     this.slide = options.slide ?? true;
     this.pushes = options.applyImpulsesToDynamicBodies ?? false;
     this.mass = options.characterMass ?? 1;
@@ -145,6 +178,26 @@ export class CharacterController {
   /** The obstacles the last move met, in order. */
   get collisions(): readonly CharacterCollision[] {
     return this.hits;
+  }
+  /** Whether the last move slid down a slope steeper than `minSlopeSlideAngle` (Rapier's `is_sliding_down_slope`). */
+  get isSlidingDownSlope(): boolean {
+    return this.sliding;
+  }
+  /** The movement the last move allowed (Rapier's `computed_movement`). */
+  computedMovement(): [number, number, number] {
+    return [...this.lastMovement];
+  }
+  /** Whether the last move ended grounded (Rapier's `computed_grounded`). */
+  computedGrounded(): boolean {
+    return this.lastGrounded;
+  }
+  /** How many obstacles the last move met (Rapier's `num_computed_collisions`). */
+  numComputedCollisions(): number {
+    return this.hits.length;
+  }
+  /** The i-th obstacle the last move met (Rapier's `computed_collision`), or undefined past the last. */
+  computedCollision(i: number): CharacterCollision | undefined {
+    return this.hits[i];
   }
 
   private shapeOf(collider: PhysicsCollider): ShapeOptions {
@@ -203,6 +256,23 @@ export class CharacterController {
       cosClimb = Math.cos(this.maxClimb),
       cosSlide = Math.cos(this.minSlide),
       exclude: QueryFilter = { exclude: body, excludeSensors: true, groups: filter?.groups };
+    // The character's height along `up`, for lengths given relative to it.
+    const box = collider.aabb(),
+      height =
+        Math.abs(up[0]) * (box.max[0] - box.min[0]) +
+        Math.abs(up[1]) * (box.max[1] - box.min[1]) +
+        Math.abs(up[2]) * (box.max[2] - box.min[2]);
+    const metres = (l: CharacterLength): number => (typeof l === 'number' ? l : l.relative * height);
+    const offset = metres(this.offsetLength),
+      snap = this.snapLength === null ? null : metres(this.snapLength),
+      autostep = this.autostepLengths
+        ? {
+            maxHeight: metres(this.autostepLengths.maxHeight),
+            minWidth: metres(this.autostepLengths.minWidth),
+            includeDynamicBodies: this.autostepLengths.includeDynamicBodies,
+          }
+        : null;
+    let slidingDown = false;
     const flags = filter?.flags ?? 0;
     if (flags & 1) exclude.excludeFixed = true;
     if (flags & 2) exclude.excludeKinematic = true;
@@ -216,7 +286,7 @@ export class CharacterController {
       direction: Vec3,
       max: number,
       ignoreDynamic = false,
-      target = this.offset,
+      target = offset,
     ): ShapeCastHit | null =>
       this.owner.shapeCast(shape, position, rotation, direction, {
         ...exclude,
@@ -228,8 +298,8 @@ export class CharacterController {
         targetDistance: target,
       });
     const probeGround = (position: Vec3): boolean => {
-      const hit = cast(position, down, this.offset * 2 + 1e-3);
-      return !!hit && dot(hit.normal, up) >= cosClimb - 1e-4 && hit.distance <= this.offset + 1e-3;
+      const hit = cast(position, down, offset * 2 + 1e-3);
+      return !!hit && dot(hit.normal, up) >= cosClimb - 1e-4 && hit.distance <= offset + 1e-3;
     };
 
     this.hits.length = 0;
@@ -277,7 +347,7 @@ export class CharacterController {
       // A step: an obstacle the character cannot walk up, with room above it and ground beyond.
       const horizontal = axpy(remaining, -dot(remaining, up), up),
         horizontalSpan = length(horizontal);
-      const step = this.autostep;
+      const step = autostep;
       if (
         step &&
         cosine < cosClimb &&
@@ -285,18 +355,18 @@ export class CharacterController {
         (step.includeDynamicBodies || hit.body.type !== 'dynamic') &&
         (groundedBefore || probeGround(position))
       ) {
-        const rise = cast(position, up, step.maxHeight, true),
+        const rise = cast(position, up, step.maxHeight, !step.includeDynamicBodies),
           height = rise ? Math.max(0, rise.distance) : step.maxHeight;
         if (height > EPS) {
           const raised = axpy(position, height, up),
             way = scale(horizontal, 1 / horizontalSpan),
             probe = Math.max(horizontalSpan, step.minWidth),
-            ahead = cast(raised, way, probe, true),
+            ahead = cast(raised, way, probe, !step.includeDynamicBodies),
             room = ahead ? Math.max(0, ahead.distance) : probe;
           if (room >= step.minWidth - 1e-5) {
             const run = Math.min(room, Math.max(horizontalSpan, step.minWidth)),
               over = axpy(raised, run, way),
-              land = cast(over, down, height + this.offset + 1e-3, true);
+              land = cast(over, down, height + offset + 1e-3, !step.includeDynamicBodies);
             if (land && dot(land.normal, up) >= cosClimb - 1e-4 && land.distance < height - 1e-4) {
               position = axpy(over, -Math.max(0, land.distance), up);
               remaining = axpy([0, 0, 0], Math.max(0, horizontalSpan - run), way);
@@ -309,6 +379,8 @@ export class CharacterController {
         remaining = [0, 0, 0];
         break;
       }
+      // Sliding along what it met: nudged off it a little, so it does not catch on it.
+      position = axpy(position, this.nudge, normal);
       const angleDown = cosine > 0 && cosine >= cosClimb - 1e-6;
       if (angleDown) {
         // A slope it can climb: keep the horizontal distance, rising or falling with the surface.
@@ -317,6 +389,7 @@ export class CharacterController {
         let result = along;
         const wants = dot(vertical, up);
         if (cosine < cosSlide + 1e-6 || wants > 0) {
+          if (wants < 0 && cosine < cosSlide + 1e-6) slidingDown = true;
           // Steeper than the slide angle lets gravity pull along the surface; a push upward follows it too.
           result = axpy(along, 1, axpy(vertical, -dot(vertical, normal), normal));
         }
@@ -332,8 +405,8 @@ export class CharacterController {
     }
     // Walking down stairs and slopes: follow the ground within the snap distance unless moving up on purpose.
     let grounded = probeGround(position);
-    if (this.snap !== null && !grounded && (groundedBefore || this.lastGrounded) && dot(desired, up) <= EPS) {
-      const hit = cast(position, down, this.snap + this.offset);
+    if (snap !== null && !grounded && (groundedBefore || this.lastGrounded) && dot(desired, up) <= EPS) {
+      const hit = cast(position, down, snap + offset);
       if (hit && dot(hit.normal, up) >= cosClimb - 1e-4) {
         position = axpy(position, Math.max(0, hit.distance), down);
         grounded = true;
@@ -342,7 +415,9 @@ export class CharacterController {
     const movement: V = [position[0] - start[0], position[1] - start[1], position[2] - start[2]];
     body.setNextPosition([bodyPosition[0] + movement[0], bodyPosition[1] + movement[1], bodyPosition[2] + movement[2]]);
     this.lastGrounded = grounded;
-    return { movement, grounded, collisions: this.hits.length };
+    this.sliding = slidingDown;
+    this.lastMovement = movement;
+    return { movement, grounded, collisions: this.hits.length, slidingDownSlope: slidingDown };
   }
 
   dispose(): void {

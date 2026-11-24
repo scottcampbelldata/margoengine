@@ -36,6 +36,7 @@ export type {
 export { CharacterController } from './character.js';
 export type {
   CharacterControllerOptions,
+  CharacterLength,
   CharacterCollision,
   CharacterMoveFilter,
   CharacterMoveResult,

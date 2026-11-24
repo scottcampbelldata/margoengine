@@ -280,26 +280,36 @@ class CharacterController {
     }, body: PhysicsBody, options?: CharacterControllerOptions);
     get grounded(): boolean;
     get collisions(): readonly CharacterCollision[];
+    get isSlidingDownSlope(): boolean;
+    computedMovement(): [number, number, number];
+    computedGrounded(): boolean;
+    numComputedCollisions(): number;
+    computedCollision(i: number): CharacterCollision | undefined;
     move(desired: Vec3, filter?: CharacterMoveFilter): CharacterMoveResult;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
 interface CharacterControllerOptions {
-    offset?: number;
+    offset?: CharacterLength;
     up?: Vec3;
     maxSlopeClimbAngle?: number;
     minSlopeSlideAngle?: number;
     autostep?: false | {
-        maxHeight: number;
-        minWidth: number;
+        maxHeight: CharacterLength;
+        minWidth: CharacterLength;
         includeDynamicBodies?: boolean;
     };
-    snapToGround?: false | number;
+    snapToGround?: false | CharacterLength;
+    normalNudgeFactor?: number;
     slide?: boolean;
     applyImpulsesToDynamicBodies?: boolean;
     characterMass?: number;
 }
+
+type CharacterLength = number | {
+    relative: number;
+};
 
 interface CharacterMoveFilter {
     groups?: number;
@@ -311,6 +321,7 @@ interface CharacterMoveResult {
     movement: [number, number, number];
     grounded: boolean;
     collisions: number;
+    slidingDownSlope: boolean;
 }
 
 interface ColliderDistance {
