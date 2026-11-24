@@ -130,6 +130,14 @@ pub struct World {
     pub kf: Col<f32>,
     /// Tetrahedra and clusters (src/fem.rs).
     pub fem: crate::fem::Fem,
+    // Particles pinned to rigid bodies (src/attach.rs): per attachment, the particle, the body row of the contacts table plus
+    // one (0 for none this step) and the anchor's offset from the body's centre of mass in the world frame.
+    pub at_p: Col<u32>,
+    pub at_row: Col<u32>,
+    pub at_rx: Col<f32>,
+    pub at_ry: Col<f32>,
+    pub at_rz: Col<f32>,
+    pub attachments: usize,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -399,6 +407,7 @@ impl World {
                 }
             }
         }
+        self.pull_attachments(h);
     }
 
     /// Pushes particle `i` out of the surface of body row `c` by `push` along the unit normal `n`, with friction, and gives
@@ -463,7 +472,7 @@ impl World {
     }
 
     /// A body's world inverse inertia applied to a vector.
-    fn inverse_inertia(&self, c: usize, x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    pub(crate) fn inverse_inertia(&self, c: usize, x: f32, y: f32, z: f32) -> (f32, f32, f32) {
         (
             self.iixx[c] * x + self.iixy[c] * y + self.iixz[c] * z,
             self.iixy[c] * x + self.iiyy[c] * y + self.iiyz[c] * z,

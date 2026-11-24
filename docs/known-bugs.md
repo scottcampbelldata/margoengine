@@ -9091,6 +9091,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
+### Open: a rigid chain's stiffness depends on the iterations, the substeps and the mass ratio (physics soft, KB-SOFT-ITER1, found 2026-11-24)
+
+- **Repro:** `SoftBodyDesc.rope([0, 6, 0], [0, 2.2, 0], 20, {bending: false})` pinned at the top, rigid edges, attach its end to a 16 kg crate (`rope.attachParticle(19, crate)`), 600 steps at 1/60 s: with particles of 0.01 kg the rope hangs 4.12 m below the pin at 2 iterations and 8 substeps (3.8 m long, 8% stretch), 3.98 at 8 iterations, 3.85 at 16 substeps; with 0.5 kg particles 3.82. A rope that must not stretch carries a different stretch for each setting.
+- **Cause:** the edges are solved by Gauss-Seidel sweeps in index order (XPBD, Macklin et al. 2016), so a load at one end of a chain reaches the pin one edge a sweep; and a body attached to a particle is pulled once a piece through the particle's mass, so a heavy load on a light rope is coupled by its momentum, not by the tension of the chain.
+- **Fix to land:** Scott asked for stiffness that does not depend on the iteration count: solve chains and the body links in one direct pass (a tridiagonal solve along each chain, Featherstone-style articulation, or a reduced-coordinate rope), and carry a load through a ghost particle with the body's effective mass. Regression test: the hanging crate at 2 and 8 iterations hangs the same length within 1%.
+
+
 ### Fixed 2026-11-24: a swept particle probe missed a surface it started touching, and picked the far side of a thin solid (physics, KB-PHYS-PROBE-THIN1, found 2026-11-24)
 
 - **Repro:** a fixed box of half extents 0.01 by 2 by 2 at x = 3, `physics.kernel.probeParticles([2.97, 1, 0], [3.065, 1, 0], 0.02, {flags: 8})` answered `[null]` (the particle's surface exactly on the wall's, moving into it); `probeParticles([2.9701, 1, 0], [3, 1, 0], 0.02)` answered a `started` contact with normal +1 and the point on the far face, x = 3.01, so a solver pushed the particle through the wall.

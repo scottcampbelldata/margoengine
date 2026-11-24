@@ -16,6 +16,7 @@ static mut WORLD: World = World {
     slz: Col::new(), sw: Col::new(), b_on: Col::new(), b_omega: Col::new(), b_zeta: Col::new(), b_first: Col::new(),
     b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(), kc: Col::new(), knx: Col::new(), kny: Col::new(), knz: Col::new(),
     kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(),
+    at_p: Col::new(), at_row: Col::new(), at_rx: Col::new(), at_ry: Col::new(), at_rz: Col::new(), attachments: 0,
 };
 
 #[allow(static_mut_refs)]
@@ -43,6 +44,7 @@ columns! {
     jx, jy, jz, kx, ky, kz, wm, iixx, iixy, iixz, iiyy, iiyz, iizz,
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
     kc, knx, kny, knz, kpx, kpy, kpz, kvx, kvy, kvz, kf,
+    at_p, at_row, at_rx, at_ry, at_rz,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -54,6 +56,14 @@ pub extern "C" fn soft_reserve(particles: u32, edges: u32, bodies: u32, collider
     w.edges = edges as usize;
     w.bodies = bodies as usize;
     w.colliders = colliders as usize;
+}
+
+/// Makes room for particle attachments and says how many are in use. Views over the memory are stale after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_attach_reserve(attachments: u32) {
+    let w = world();
+    w.reserve_attachments(attachments as usize);
+    w.attachments = attachments as usize;
 }
 
 /// Where a column starts in the memory.

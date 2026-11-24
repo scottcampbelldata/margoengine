@@ -482,3 +482,62 @@ test('collision groups decide which colliders the particles meet', async () => {
   const desc = new SoftBodyDesc([0, 0, 0]);
   assert.throws(() => desc.setCollisionGroups(-1), RangeError);
 });
+
+test('a crate hangs from a rope: the rope carries its weight and the crate stays at the rope end', async () => {
+  const { physics, soft } = await create();
+  const crate = physics.addBody(null, {
+    position: [0, 2, 0],
+    colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], density: 250 },
+  });
+  const mass = crate.mass;
+  const rope = soft.create(
+    SoftBodyDesc.rope([0, 6, 0], [0, 2.2, 0], 20, { bending: false })
+      .setPinnedParticles([0])
+      .setParticleMass(0.1)
+      .setLinearDamping(1)
+      .setParticleRadius(0.01),
+  );
+  rope.attachParticle(19, crate);
+  steps(physics, 600);
+  const end = rope.particlePosition(19),
+    length = Math.hypot(...[0, 1, 2].map((a) => [0, 6, 0][a] - end[a]));
+  // The rope is 3.8 m long and nearly inextensible: the crate hangs at its end, 3.8 m under the pin, and stays still.
+  near(length, 3.8, 0.1, 'the rope end is a rope length below the pin');
+  // The rope was pinned to the crate where it started, 0.2 m above the crate's centre.
+  near(crate.position[1], end[1] - 0.2, 0.1, 'the crate hangs 0.2 m under the rope end');
+  assert.ok(Math.hypot(...crate.linearVelocity) < 0.3, `the crate has come to rest: ${crate.linearVelocity}`);
+  assert.ok(mass > 1, 'the crate is heavy against the rope');
+  assert.equal(rope.detachParticle(19, crate), true);
+  assert.equal(rope.detachParticle(19, crate), false);
+  const before = crate.position[1];
+  steps(physics, 30);
+  assert.ok(crate.position[1] < before - 0.5, 'once let go the crate falls');
+});
+
+test('a pinned particle drags a light crate along, and a fixed body holds a particle where it is', async () => {
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  const crate = physics.addBody(null, {
+    position: [0, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], density: 100 },
+  });
+  const rope = soft.create(
+    SoftBodyDesc.rope([0, 0, 0], [3, 0, 0], 12, { bending: false }).setParticleMass(0.01).setParticleRadius(0.01),
+  );
+  rope.attachParticle(0, crate);
+  // Walk the far end away at 1 m/s: the rope pulls the crate after it.
+  for (let i = 0; i < 120; i++) {
+    rope.setParticleKinematicTarget(11, [3 + (i + 1) / 60, 0, 0]);
+    physics.step();
+  }
+  assert.ok(crate.position[0] > 1.2, `the crate was dragged: ${crate.position[0]}`);
+  const fixed = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 5, 0],
+    colliders: { shape: 'sphere', radius: 0.1 },
+  });
+  const lone = soft.create(new SoftBodyDesc([0.3, 5, 0]).setParticleRadius(0.01));
+  lone.attachParticle(0, fixed);
+  steps(physics, 60);
+  near(lone.particlePosition(0)[0], 0.3, 0.01, 'a fixed body keeps its particle at the anchor');
+  assert.throws(() => lone.attachParticle(3, fixed), RangeError);
+});

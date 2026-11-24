@@ -21,6 +21,7 @@ interface SoftExports extends WebAssembly.Exports {
   soft_finish(): void;
   soft_cloth_reserve(triangles: number, contacts: number): number;
   soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
+  soft_attach_reserve(attachments: number): void;
   soft_torn(): number;
   soft_hash(): number;
   soft_fem_reserve(tets: number, clusters: number, members: number): void;
@@ -55,6 +56,8 @@ const INTEGER_COLUMNS = new Set([
   'b_first',
   'b_count',
   'kc',
+  'at_p',
+  'at_row',
 ]);
 const TORN_CELL = 1;
 const INTEGER_CELL_COLUMNS = new Set(['p0', 'p1', 'p2', 'p3', 'model', 'flags', 'cstart', 'ccount', 'member']);
@@ -822,6 +825,21 @@ export class SoftBody {
     }
     return this;
   }
+  /**
+   * Pins a particle to a rigid body at the point where it is now, as Rapier's `attachParticle`: the body's pose carries the
+   * particle, and the particle's pull is the body's weight on it, so a rope hangs a crate and a crate drags a rope. A particle
+   * may be pinned to several bodies. It ends when the body or this soft body is removed, or with {@link SoftBody.detachParticle}.
+   */
+  attachParticle(index: number, body: PhysicsBody): this {
+    this.check(index);
+    this.owner.attach(this, index, body);
+    return this;
+  }
+  /** Lets a particle go from one rigid body, or from all of them. Returns false when it was not pinned. */
+  detachParticle(index: number, body?: PhysicsBody): boolean {
+    this.check(index);
+    return this.owner.release(this, index, body);
+  }
   isParticlePinned(index: number): boolean {
     this.check(index);
     return (this.c.pflags[this.firstParticle + index]! & PINNED) !== 0;
@@ -1088,7 +1106,8 @@ export class SoftBodies implements PhysicsAttachment {
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
-  private capacity = [0, 0, 0, 0];
+  private capacity = [0, 0, 0, 0, 0];
+  private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
   private particleCount = 0;
   private edgeCount = 0;
   private cellView: Columns | null = null;
@@ -1146,10 +1165,10 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed) throw new MargoError('state', 'SoftBodies was disposed.');
     const buffer = this.exports.memory.buffer;
     if (this.view && this.viewBuffer === buffer) return this.view;
-    const [particles, edges, bodies, colliders] = this.capacity,
+    const [particles, edges, bodies, colliders, attachments] = this.capacity,
       view: Columns = {};
     columnNames.forEach((name, id) => {
-      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!),
+      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!, attachments!),
         at = this.exports.soft_column(id);
       view[name] = (
         INTEGER_COLUMNS.has(name) ? new Uint32Array(buffer, at, rows) : new Float32Array(buffer, at, rows)
@@ -1201,6 +1220,7 @@ export class SoftBodies implements PhysicsAttachment {
       Math.max(this.capacity[1]!, edges),
       Math.max(this.capacity[2]!, bodies),
       Math.max(this.capacity[3]!, colliders),
+      this.capacity[4]!,
     ];
     this.view = null;
   }
@@ -1346,6 +1366,26 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeCellMaterial(body);
     this.syncCloth();
     return body;
+  }
+
+  /** @internal Pins a particle to a point fixed in a rigid body: where the particle is now, in the body's frame. */
+  attach(soft: SoftBody, index: number, body: PhysicsBody): void {
+    if (!body.valid) throw new MargoError('state', 'That rigid body was removed.');
+    if (this.attachments.some((a) => a.soft === soft && a.index === index && a.body === body)) return;
+    const p = soft.particlePosition(index),
+      q = body.rotation,
+      d = [p[0] - body.position[0], p[1] - body.position[1], p[2] - body.position[2]],
+      local = rotate([-q[0], -q[1], -q[2], q[3]], d);
+    this.attachments.push({ soft, index, body, local });
+  }
+
+  /** @internal Lets a particle go: from one body, or from every body it is pinned to. */
+  release(soft: SoftBody, index: number, body?: PhysicsBody): boolean {
+    const before = this.attachments.length;
+    this.attachments = this.attachments.filter(
+      (a) => !(a.soft === soft && a.index === index && (!body || a.body === body)),
+    );
+    return this.attachments.length !== before;
   }
 
   /** Lays the triangles of the bodies that collide with themselves into the kernel's cloth search. */
@@ -1565,6 +1605,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.particleCount = particles;
     this.edgeCount = edges;
     body.removed = true;
+    this.attachments = this.attachments.filter((a) => a.soft !== body);
     body.surface?.remove();
     body.surface = null;
     this.bodies.splice(at, 1);
@@ -1669,7 +1710,14 @@ export class SoftBodies implements PhysicsAttachment {
           });
         }
     }
-    // The bodies the planes belong to get a row each, with what the kernel needs to share a contact with them.
+    // The bodies the planes and the attachments belong to get a row each, with what the kernel needs to share a contact with
+    // them.
+    const live = this.attachments.filter((a) => !a.soft.removed && a.body.valid);
+    for (const a of live) {
+      if (rows.has(a.body.row)) continue;
+      rows.set(a.body.row, bodies.length);
+      bodies.push(a.body);
+    }
     for (const f of found) {
       if (rows.has(f.body)) continue;
       const owner = this.physics.bodyOfCollider(f.collider);
@@ -1677,11 +1725,24 @@ export class SoftBodies implements PhysicsAttachment {
       rows.set(f.body, bodies.length);
       bodies.push(owner);
     }
-    if (bodies.length) {
-      this.reserve(this.particleCount, this.edgeCount, this.bodies.length, bodies.length);
-      c = this.columns();
-      bodies.forEach((owner, row) => this.writeBody(c, row, owner));
-    }
+    this.exports.soft_attach_reserve(live.length);
+    this.capacity[4] = Math.max(this.capacity[4]!, live.length);
+    if (bodies.length) this.reserve(this.particleCount, this.edgeCount, this.bodies.length, bodies.length);
+    this.view = null;
+    c = this.columns();
+    bodies.forEach((owner, row) => this.writeBody(c, row, owner));
+    live.forEach((a, k) => {
+      const lever = rotate(a.body.rotation, [
+        a.local[0] - a.body.centerOfMass[0],
+        a.local[1] - a.body.centerOfMass[1],
+        a.local[2] - a.body.centerOfMass[2],
+      ]);
+      c.at_p[k] = a.soft.firstParticle + a.index;
+      c.at_row[k] = rows.get(a.body.row)! + 1;
+      c.at_rx[k] = lever[0];
+      c.at_ry[k] = lever[1];
+      c.at_rz[k] = lever[2];
+    });
     for (const f of found) {
       const table = rows.get(f.body);
       if (table === undefined) continue;
@@ -1813,7 +1874,9 @@ export class SoftBodies implements PhysicsAttachment {
   /** @internal Nothing to do after the sync: the particles are read on demand. */
   afterSync(): void {}
   /** @internal */
-  bodyRemoved(_body: PhysicsBody): void {}
+  bodyRemoved(_body: PhysicsBody): void {
+    this.attachments = this.attachments.filter((a) => a.body !== _body);
+  }
 
   /** Removes every soft body and leaves the world. */
   dispose(): void {
@@ -1861,7 +1924,15 @@ function inverseMass(body: PhysicsBody): number[] {
   return out;
 }
 
-function rowsOf(name: string, particles: number, edges: number, bodies: number, colliders: number): number {
+function rowsOf(
+  name: string,
+  particles: number,
+  edges: number,
+  bodies: number,
+  colliders: number,
+  attachments: number,
+): number {
+  if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;

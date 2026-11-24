@@ -33,6 +33,8 @@ export class SoftBodies implements PhysicsAttachment {
     columns(): Columns;
     cellColumns(): Columns;
     create(desc: SoftBodyDesc): SoftBody;
+    attach(soft: SoftBody, index: number, body: PhysicsBody): void;
+    release(soft: SoftBody, index: number, body?: PhysicsBody): boolean;
     writeCellMaterial(body: SoftBody): void;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
@@ -93,6 +95,8 @@ export class SoftBody {
     setParticlePosition(index: number, position: Vec3): this;
     setParticleVelocity(index: number, velocity: Vec3): this;
     setParticlePinned(index: number, pinned: boolean): this;
+    attachParticle(index: number, body: PhysicsBody): this;
+    detachParticle(index: number, body?: PhysicsBody): boolean;
     isParticlePinned(index: number): boolean;
     setParticleKinematicTarget(index: number, position: Vec3): this;
     triangles(): Uint32Array;

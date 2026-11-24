@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17620745,
+  "total": 17623829,
   "history": [
     {
       "date": "2026-10-24",
@@ -11451,6 +11451,12 @@
       "commit": "e94540ce8",
       "reason": "soft entry plans contacts once a step from the swept soft-contact query: four planes a particle, groups, moving-collider sweeps. Base 10,871 to 11,113 B, lazy kernel 26,516 to 26,876 B, needed for corners and fast paddles.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "51286228e",
+      "reason": "soft entry gains attachParticle: the kernel pulls a particle to its anchor on a rigid body and gives the body the reaction. Base 11,447 to 11,528 B, lazy kernel 27,683 to 27,965 B.",
+      "grew": 3
     }
   ],
   "items": {
@@ -12210,9 +12216,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 40049,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 11447,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 27683,
+    "@margoengine/physics/soft": 41585,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 11874,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 28804,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
