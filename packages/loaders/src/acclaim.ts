@@ -3,6 +3,7 @@
 // and axes are given in the skeleton's world frame at rest; a bone's motion M turns it in its own frame C, so its
 // world turn is C M C^-1, which lets every joint rest unrotated as BVH's do and tracks compose parent to child.
 import type { BVH, BVHBone, BVHKey, BVHTrack } from './mocap.js';
+import { multiplyQuaternions } from '@margoengine/math/quat';
 import { LoaderError } from './types.js';
 import { type BinaryInput, toText } from './util.js';
 
@@ -61,12 +62,7 @@ export interface AMCOptions {
 }
 
 type Q = [number, number, number, number];
-const qmul = (a: Q, b: Q): Q => [
-  a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
-  a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
-  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
-  a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
-];
+const qmul = (a: Q, b: Q): Q => multiplyQuaternions(a, b);
 const qaxis = (axis: number, radians: number): Q => {
   const q: Q = [0, 0, 0, Math.cos(radians / 2)];
   q[axis] = Math.sin(radians / 2);
@@ -329,7 +325,11 @@ export function parseAMC(input: BinaryInput | string, skeleton: ASFSkeleton, opt
   }
   const flush = () => {
     if ((frames + 1) * tracks.length > maxKeys)
-      throw new LoaderError(M, 'limit', `${frames + 1} frames of ${tracks.length} tracks exceed the limit of ${maxKeys} keys`);
+      throw new LoaderError(
+        M,
+        'limit',
+        `${frames + 1} frames of ${tracks.length} tracks exceed the limit of ${maxKeys} keys`,
+      );
     const time = frames * frameTime;
     for (const i of listed) {
       const d = data[i],
