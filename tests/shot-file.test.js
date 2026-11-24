@@ -733,3 +733,63 @@ test('every Fauld countryside and crater shot file is a valid shot on the Fauld 
     assert.equal(file.shot.page.engine, 'fauldStill.engine', name);
   }
 });
+
+test('every Fauld countryside and crater shot has a lens in a named band, a real f-stop that covers its subject, and moves its subject across the frame', () => {
+  // channel-films rules (section 12 focal bands, section 18 f-stops, section 30 still_hits), read the way the film's
+  // gates read a Margo shot: the vertical field of view on the 24.89 x 14 mm filmback, the subject's centre projected
+  // through the camera over the shot. Regression: the generator took the field of view of a 24 mm high frame (a 24 mm
+  // lens read back as 14 mm) and locked the aim on the subject (0 percent screen move), with no lens at all.
+  const dir = join(root, 'tools/shot/shots'),
+    bands = [
+      [18, 24],
+      [35, 50],
+      [85, 135],
+    ],
+    coc = (0.03 * 24.89) / 36,
+    sub = (a, b) => a.map((v, i) => v - b[i]),
+    dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0),
+    cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    unit = (a) => a.map((v) => v / Math.hypot(...a));
+  let n = 0;
+  for (const name of readdirSync(dir).filter((f) => /^fauld-fr\d+\.json$/.test(f))) {
+    const json = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+    if (json.shot.scene === 'fauld-tunnels') continue;
+    n++;
+    const keys = json.tracks[0].keys,
+      { target, size } = json.shot.subject,
+      query = json.shot.page.query;
+    for (const k of keys) {
+      const focal = 7 / Math.tan((k.fov * Math.PI) / 360);
+      assert.ok(
+        bands.some(([lo, hi]) => focal >= lo - 0.05 && focal <= hi + 0.05),
+        `${name}: ${focal.toFixed(1)} mm`,
+      );
+    }
+    const stop = Number(query.stop),
+      focus = Number(query.focusDistance);
+    assert.ok(size < 20 || (stop >= 8 && stop <= 11), `${name}: f/${stop} on a ${size} m subject`);
+    // The subject's centre on screen at each end, as a share of the frame width (16:9, the vertical fov).
+    const screen = (k, t = 0) => {
+      const f = unit(sub(k.target, k.position)),
+        r = unit(cross(f, [0, 1, 0])),
+        u = cross(r, f),
+        d = sub(target, k.position),
+        z = dot(d, f),
+        tanV = Math.tan((k.fov * Math.PI) / 360);
+      return [dot(d, r) / z / (tanV * (16 / 9)) / 2, dot(d, u) / z / tanV / 2, t];
+    };
+    const a = screen(keys[0]),
+      b = screen(keys[keys.length - 1]);
+    assert.ok(Math.hypot(b[0] - a[0], (b[1] - a[1]) * (9 / 16)) >= 0.03, `${name}: the subject moves under 3 percent`);
+    // Thin lens: the depth of field at the stop and focus covers the subject from both key positions.
+    const focal = 7 / Math.tan((keys[0].fov * Math.PI) / 360),
+      H = (focal * focal) / (stop * coc) / 1000;
+    for (const k of keys) {
+      const d = Math.hypot(...sub(k.position, target)),
+        near = (H * focus) / (H + focus),
+        far = focus >= H ? Infinity : (H * focus) / (H - focus);
+      assert.ok(near <= Math.max(d - size / 2, 0.5) * 1.05 && far >= (d + size / 2) * 0.95, `${name}: sharp ${near.toFixed(0)} to ${far.toFixed(0)} m, subject ${(d - size / 2).toFixed(0)} to ${(d + size / 2).toFixed(0)} m`);
+    }
+  }
+  assert.equal(n, 81);
+});

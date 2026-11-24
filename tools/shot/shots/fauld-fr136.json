@@ -16,11 +16,11 @@
             368.483
           ],
           "target": [
-            0,
+            -2.378,
             2,
-            0
+            1.667
           ],
-          "fov": 10.16
+          "fov": 5.94
         },
         {
           "time": 6.708333333333333,
@@ -30,11 +30,11 @@
             368.483
           ],
           "target": [
-            32.238,
+            34.616,
             2,
-            -22.599
+            -24.265
           ],
-          "fov": 10.16,
+          "fov": 5.94,
           "ease": "smoothstep"
         }
       ]
@@ -54,7 +54,9 @@
         "place": "crater",
         "era": "today",
         "sky": "lowSun",
-        "focus": "0,0"
+        "focus": "0,0",
+        "stop": "8",
+        "focusDistance": "446.2"
       },
       "engine": "fauldStill.engine",
       "ground": "fauldStill.height",
@@ -78,7 +80,7 @@
         2,
         0
       ],
-      "size": 230
+      "size": 83
     }
   }
 }

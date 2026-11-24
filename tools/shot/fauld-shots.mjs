@@ -1,6 +1,7 @@
 // Shot files for the Fauld crater and countryside rows of the recut shot list (channel-films Docs/fauld-shot-list-recut.csv):
 //   node tools/shot/fauld-shots.mjs [--csv=<path>]   writes tools/shot/shots/fauld-frNNN.json, one per row
-// Each row's camera text gives the lens (vertical field of view of a 24 mm high frame), the height (drone N m, N m up),
+// Each row's camera text gives the lens (on the film pipeline's Super 35 filmback, 24.89 x 14 mm: the field of view is
+// that of the 14 mm frame height, so the gates read back the same focal length), the height (drone N m, N m up),
 // the distance (from N m, N km) and the move (dolly, push, pull back, orbit, pan, crane, rise, descend, track, slide,
 // tilt); its visual names the subject (Hanbury, the works, the reservoir, the farm, the crater, the valley, the fields).
 // Camera heights are above the ground under the camera and under the target: the shot tool adds the page's ground
@@ -53,7 +54,8 @@ const PLACES = {
   dove: [-300, -2600],
   fields: [-450, 420],
 };
-// How wide each subject is, metres (the film pipeline's framing and focus checks read `shot.subject`).
+// How wide each subject is, metres (the film pipeline's framing and focus checks read `shot.subject`), at most the
+// frame's width at the subject.
 const SIZES = {
   crater: 230,
   farm: 60,
@@ -89,6 +91,44 @@ const skyOf = (look) => {
   if (/overcast/.test(l)) return 'overcast';
   return 'lowSun';
 };
+// The film's named lens bands (channel-films rules_limits focal_bands_mm, section 12: wide 18 to 24 mm for places,
+// natural 35 to 50, portrait 85 to 135). A lens the shot list names outside them (28 mm, 200 mm) is the nearest
+// band's edge, so every shot is a lens a crew would pick for that framing.
+const FILMBACK = [24.89, 14];
+const BANDS = [
+  [18, 24],
+  [35, 50],
+  [85, 135],
+];
+const inBand = (mm) => {
+  if (BANDS.some(([lo, hi]) => mm >= lo && mm <= hi)) return mm;
+  let best = BANDS[0][0];
+  for (const edge of BANDS.flat()) if (Math.abs(edge - mm) < Math.abs(best - mm)) best = edge;
+  return best;
+};
+// How far the subject crosses the frame over the shot, as a share of the frame width: a real crew's move carries the
+// subject across the frame (the film's still_hits rule: at least 3 percent), so the aim drifts across the subject
+// from one side to the other while the camera moves, never locked to its centre.
+const DRIFT = 0.07;
+// The lens: f/8 to f/11 for a subject 20 m or more across (rules section 18), focused at the harmonic mean of the
+// subject's near and far faces so the depth of field covers it (thin lens, circle of confusion 0.03 mm full frame
+// scaled to the 24.89 mm filmback; Potmesil and Chakravarty, "A lens and aperture camera model for synthetic image
+// generation", SIGGRAPH 1981, https://doi.org/10.1145/965161.806818). f/11 only when f/8 does not cover the subject.
+const COC_MM = (0.03 * FILMBACK[0]) / 36;
+const dofLimits = (focalMm, stop, focusM) => {
+  const H = (focalMm * focalMm) / (stop * COC_MM) / 1000 + focalMm / 1000;
+  return [(H * focusM) / (H + focusM), focusM >= H ? Infinity : (H * focusM) / (H - focusM)];
+};
+const lensFor = (focalMm, distance, size) => {
+  const near = Math.max(distance - size / 2, 0.5),
+    far = distance + size / 2,
+    focusDistance = Math.round((2 * near * far) / (near + far) * 10) / 10;
+  for (const stop of [8, 11]) {
+    const [n, f] = dofLimits(focalMm, stop, focusDistance);
+    if (n <= near && f >= far) return { stop, focusDistance };
+  }
+  return { stop: 11, focusDistance };
+};
 const eraOf = (r) => (r.state === 'today' ? 'today' : r.state === 'morning' ? 'before' : '1944');
 const hash = (s) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261) / 4294967296;
 const round = (v) => v.map((x) => Math.round(x * 1000) / 1000);
@@ -99,8 +139,8 @@ for (const r of parse(csv)) {
     vis = r.visual.toLowerCase(),
     // A whole number of frames at 24 fps (the shot tool's rule).
     dur = Math.max(1, Math.round(Number(r.dur_s) * 24)) / 24,
-    lens = Number(cam.match(/(\d+) mm/)?.[1] ?? (cam.includes('drone') ? 24 : 35)),
-    fov = (2 * Math.atan(12 / lens) * 180) / Math.PI,
+    lens = inBand(Number(cam.match(/(\d+) mm/)?.[1] ?? (cam.includes('drone') ? 24 : 35))),
+    fov = (2 * Math.atan(FILMBACK[1] / 2 / lens) * 180) / Math.PI,
     drone = cam.match(/drone (\d+)(?: to (\d+))? m/),
     up = cam.match(/(\d+(?:\.\d+)?) m (?:up|high)|, (\d+(?:\.\d+)?) m,/),
     km = `${vis} ${cam}`.match(/(\d+(?:\.\d+)?) km/),
@@ -157,12 +197,25 @@ for (const r of parse(csv)) {
   } else if (/descen/.test(cam)) pos1[1] = Math.max(2, h0 - (drone ? h0 * 0.12 : travel));
   if (/tilt up/.test(cam)) tgt1 = [tgt0[0], tgt0[1] + dist * Math.tan(deg), tgt0[2]];
   else if (/tilt/.test(cam)) tgt1 = [tgt0[0], tgt0[1] - dist * Math.tan(deg), tgt0[2]];
+  // The aim drifts across the subject (DRIFT of the frame width at the subject), across the camera's own sideways.
+  const halfWidth = dist * (FILMBACK[0] / 2 / lens),
+    drift = (DRIFT / 2) * 2 * halfWidth;
+  tgt0[0] -= side[0] * drift;
+  tgt0[2] -= side[1] * drift;
+  tgt1[0] += side[0] * drift;
+  tgt1[2] += side[1] * drift;
+  // The subject is what the frame holds of the place: never wider than the frame at the subject's distance (a shot from
+  // among the fields frames a part of them, and a subject wider than the frame would put the camera inside it).
+  const size = Math.min(SIZES[what], Math.round(dist * (FILMBACK[0] / lens))),
+    optics = lensFor(lens, dist, size);
   const place = r.set.endsWith('crater') ? 'crater' : 'countryside',
     query = new URLSearchParams({
       place,
       era: eraOf(r),
       sky: skyOf(r.look),
       focus: `${Math.round(tx)},${Math.round(tz)}`,
+      stop: String(optics.stop),
+      focusDistance: String(optics.focusDistance),
     }),
     people = r.source_tag.includes('PEOPLE') ? ` (fallback until people: ${r.fallback})` : '';
   const file = {
@@ -211,7 +264,7 @@ for (const r of parse(csv)) {
       shutter: 180,
       probes: { mid: Math.round(dur * 12) / 24 },
       // Heights are above the ground, like the camera's (`page.ground`).
-      subject: { target: round(tgt0), size: SIZES[what] },
+      subject: { target: round([tx, tgtH, tz]), size },
     },
   };
   writeFileSync(`tools/shot/shots/fauld-${r.id}.json`, `${JSON.stringify(file, null, 2)}\n`);

@@ -16,11 +16,11 @@
             697.657
           ],
           "target": [
+            -25.323,
             0,
-            0,
-            0
+            -2.077
           ],
-          "fov": 53.13
+          "fov": 32.52
         },
         {
           "time": 5,
@@ -30,11 +30,11 @@
             690.015
           ],
           "target": [
+            25.323,
             0,
-            0,
-            0
+            2.077
           ],
-          "fov": 53.13,
+          "fov": 32.52,
           "ease": "smoothstep"
         }
       ]
@@ -54,7 +54,9 @@
         "place": "crater",
         "era": "1944",
         "sky": "snow",
-        "focus": "0,0"
+        "focus": "0,0",
+        "stop": "8",
+        "focusDistance": "681.1"
       },
       "engine": "fauldStill.engine",
       "ground": "fauldStill.height",

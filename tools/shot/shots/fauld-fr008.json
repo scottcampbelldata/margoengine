@@ -16,11 +16,11 @@
             301.52
           ],
           "target": [
+            -10.582,
             0,
-            0,
-            10
+            0.058
           ],
-          "fov": 53.13
+          "fov": 32.52
         },
         {
           "time": 5.5,
@@ -30,11 +30,11 @@
             285.486
           ],
           "target": [
+            10.582,
             0,
-            0,
-            10
+            19.942
           ],
-          "fov": 53.13,
+          "fov": 32.52,
           "ease": "smoothstep"
         }
       ]
@@ -54,7 +54,9 @@
         "place": "countryside",
         "era": "before",
         "sky": "dawn",
-        "focus": "0,10"
+        "focus": "0,10",
+        "stop": "8",
+        "focusDistance": "397.8"
       },
       "engine": "fauldStill.engine",
       "ground": "fauldStill.height",

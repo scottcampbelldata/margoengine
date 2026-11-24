@@ -16,11 +16,11 @@
             109.854
           ],
           "target": [
-            0,
+            -3.987,
             2,
-            0
+            3.707
           ],
-          "fov": 46.4
+          "fov": 32.52
         },
         {
           "time": 6.208333333333333,
@@ -30,11 +30,11 @@
             105.626
           ],
           "target": [
-            4.547,
+            8.534,
             2,
-            -4.227
+            -7.935
           ],
-          "fov": 46.4,
+          "fov": 32.52,
           "ease": "smoothstep"
         }
       ]
@@ -54,7 +54,9 @@
         "place": "crater",
         "era": "1944",
         "sky": "grey",
-        "focus": "0,0"
+        "focus": "0,0",
+        "stop": "8",
+        "focusDistance": "109.4"
       },
       "engine": "fauldStill.engine",
       "ground": "fauldStill.height",
@@ -78,7 +80,7 @@
         2,
         0
       ],
-      "size": 230
+      "size": 156
     }
   }
 }

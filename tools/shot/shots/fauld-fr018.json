@@ -16,11 +16,11 @@
             -714.472
           ],
           "target": [
-            120,
+            119.328,
             2,
-            -780
+            -779.368
           ],
-          "fov": 16.07
+          "fov": 9.42
         },
         {
           "time": 4.791666666666667,
@@ -30,11 +30,11 @@
             -714.472
           ],
           "target": [
-            125.733,
+            126.405,
             2,
-            -785.397
+            -786.03
           ],
-          "fov": 16.07,
+          "fov": 9.42,
           "ease": "smoothstep"
         }
       ]
@@ -54,7 +54,9 @@
         "place": "countryside",
         "era": "before",
         "sky": "lowSun",
-        "focus": "120,-780"
+        "focus": "120,-780",
+        "stop": "8",
+        "focusDistance": "88.1"
       },
       "engine": "fauldStill.engine",
       "ground": "fauldStill.height",
@@ -78,7 +80,7 @@
         2,
         -780
       ],
-      "size": 200
+      "size": 26
     }
   }
 }
