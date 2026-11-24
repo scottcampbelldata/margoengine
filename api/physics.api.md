@@ -919,6 +919,8 @@ interface JointBase {
     anchorA?: Vec3;
     anchorB?: Vec3;
     contactsEnabled?: boolean;
+    breakForce?: number;
+    breakTorque?: number;
 }
 
 interface JointData {

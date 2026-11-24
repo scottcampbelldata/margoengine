@@ -66,6 +66,8 @@ export interface ConeJointOptions {
     swing: number | readonly [number, number];
     twist?: readonly [number, number];
     contactsEnabled?: boolean;
+    breakForce?: number;
+    breakTorque?: number;
 }
 
 export interface ContactForceEvent {
@@ -110,9 +112,28 @@ export class ContactModification {
     oneWay(platform: PhysicsCollider, direction: Vec3, angle?: number): void;
 }
 
+export interface DebugLines {
+    vertices: Float32Array;
+    colors: Float32Array;
+}
+
+export interface DebugRenderOptions {
+    colliders?: boolean;
+    joints?: boolean;
+    contacts?: boolean;
+    boxes?: boolean;
+}
+
 export interface HullFaces {
     vertices: [number, number, number][];
     faces: number[][];
+}
+
+export interface JointBreakEvent {
+    type: 'jointbreak';
+    joint: PhysicsJoint;
+    bodyA: PhysicsBody;
+    bodyB: PhysicsBody;
 }
 
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
@@ -424,7 +445,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat): boolean;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
-    debugRender(): never;
+    debugRender(options?: DebugRenderOptions): DebugLines;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -580,6 +601,7 @@ export interface PhysicsEventMap {
     contactforce: ContactForceEvent;
     beforestep: number;
     afterstep: number;
+    jointbreak: JointBreakEvent;
 }
 
 export class PhysicsJoint {
@@ -607,6 +629,12 @@ export class PhysicsJoint {
     clearMotor(): this;
     set contactsEnabled(value: boolean);
     get contactsEnabled(): boolean;
+    setBreakLimits(force: number, torque?: number): this;
+    get breakLimits(): [number, number];
+    get broken(): boolean;
+    repair(): this;
+    watched: boolean;
+    reported: boolean;
     remove(): void;
 }
 
@@ -628,6 +656,25 @@ export interface PhysicsOptions {
 export interface PhysicsRaycastOptions extends QueryFilter {
     maxDistance?: number;
     solid?: boolean;
+}
+
+export class PidController {
+    kp: number;
+    ki: number;
+    kd: number;
+    constructor(options?: PidOptions);
+    reset(): this;
+    linearCorrection(dt: number, body: PhysicsBody, target: Vec3, targetVelocity?: Vec3): [number, number, number];
+    applyLinear(dt: number, body: PhysicsBody, target: Vec3, targetVelocity?: Vec3): this;
+    angularCorrection(dt: number, body: PhysicsBody, target: Quat, targetAngularVelocity?: Vec3): [number, number, number];
+    applyAngular(dt: number, body: PhysicsBody, target: Quat, targetAngularVelocity?: Vec3): this;
+}
+
+export interface PidOptions {
+    kp?: number;
+    ki?: number;
+    kd?: number;
+    axes?: readonly [boolean, boolean, boolean];
 }
 
 export interface QueryFilter {
@@ -877,6 +924,8 @@ interface JointBase {
     anchorA?: Vec3;
     anchorB?: Vec3;
     contactsEnabled?: boolean;
+    breakForce?: number;
+    breakTorque?: number;
 }
 
 interface JointOwner {

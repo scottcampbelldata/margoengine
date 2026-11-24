@@ -14,7 +14,6 @@ test('a call that is not served yet says so, and what to use', () => {
     () => physics.addModel(),
     () => physics.createCharacterController(),
     () => physics.removeController(),
-    () => physics.debugRender(),
     () => physics.addBody(null, { colliders: { shape: 'custom', desc: {} } }),
   ])
     assert.throws(call, unsupported);
