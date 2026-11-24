@@ -1,6 +1,7 @@
 // A collider of the own solver. Reads only, so it may use `Math`: nothing here can change a step.
 import { MargoError } from '@margoengine/math/errors';
-import { COLLIDER_OFF, COLLIDER_SENSOR, type KernelWorld } from '../kernel.js';
+import { COLLIDER_OFF, COLLIDER_SENSOR, COLLIDER_TYPES, COLLIDER_TYPES_SHIFT, type KernelWorld } from '../kernel.js';
+import { DEFAULT_PAIR_KINDS, type CollisionPairKind } from '../shapes.js';
 import type { ColliderShape } from '../collider.js';
 import type { PhysicsBody } from './body.js';
 
@@ -11,11 +12,37 @@ function cell(value: number): number {
   return value;
 }
 
+const PAIR_KINDS: readonly CollisionPairKind[] = [
+  'dynamicDynamic',
+  'dynamicKinematic',
+  'dynamicFixed',
+  'kinematicKinematic',
+  'kinematicFixed',
+  'fixedFixed',
+];
+/** The bits a kernel collider holds for the kinds it takes part in: each one that differs from the default. */
+export function pairKindBits(kinds: readonly CollisionPairKind[]): number {
+  let wanted = 0;
+  for (const kind of kinds) {
+    const at = PAIR_KINDS.indexOf(kind);
+    if (at < 0)
+      throw new RangeError(
+        `Unknown collision pair kind ${String(kind)}; use dynamicDynamic, dynamicKinematic, dynamicFixed, kinematicKinematic, kinematicFixed or fixedFixed.`,
+      );
+    wanted |= 1 << at;
+  }
+  return ((wanted ^ 7) << COLLIDER_TYPES_SHIFT) & COLLIDER_TYPES;
+}
+
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
 export class PhysicsCollider {
   private removed = false;
   /** @internal Whether this collider asks for contact and intersection events: a pair says so when either side does. */
   emits = true;
+  /** @internal Whether this collider asks for contact-force events, and the force in newtons a pair must pass. */
+  forceEvents = true;
+  /** @internal */
+  forceThreshold = 0;
   /** @internal */
   constructor(
     private readonly kernel: KernelWorld,
@@ -65,6 +92,45 @@ export class PhysicsCollider {
   /** A disabled collider touches nothing; it keeps its place on the body, and its mass. */
   setEnabled(enabled: boolean): this {
     this.setBit(COLLIDER_OFF, !enabled);
+    return this;
+  }
+  /** The kinds of body pair this collider takes part in. */
+  activeCollisionTypes(): CollisionPairKind[] {
+    const wanted = ((this.columns().colliderFlags[this.handle] & COLLIDER_TYPES) >>> COLLIDER_TYPES_SHIFT) ^ 7;
+    return PAIR_KINDS.filter((_, at) => wanted & (1 << at));
+  }
+  /**
+   * Sets the kinds of body pair this collider takes part in (default dynamic with anything). A pair of colliders is made
+   * when both want its kind, so `kinematicKinematic` and `fixedFixed` need both colliders to name them. What touched ends,
+   * and what overlaps now starts again.
+   */
+  setActiveCollisionTypes(kinds: readonly CollisionPairKind[]): this {
+    const flags = this.columns().colliderFlags[this.handle];
+    this.kernel.setColliderState(this.handle, (flags & ~COLLIDER_TYPES) | pairKindBits(kinds));
+    return this;
+  }
+  /** Which events this collider asks for: contact and intersection starts and ends, and contact forces. */
+  activeEvents(): { collision: boolean; contactForce: boolean } {
+    return { collision: this.emits, contactForce: this.forceEvents };
+  }
+  /** Chooses the events this collider asks for. A pair speaks when either of its colliders asks. */
+  setActiveEvents(events: { collision?: boolean; contactForce?: boolean }): this {
+    this.emits = events.collision ?? this.emits;
+    this.forceEvents = events.contactForce ?? this.forceEvents;
+    return this;
+  }
+  /** The force in newtons a pair needs to pass before a contact-force event is made (default 0). */
+  contactForceEventThreshold(): number {
+    return this.forceThreshold;
+  }
+  /**
+   * Sets the force in newtons a pair needs to pass before a contact-force event is made. A pair uses the larger of its two
+   * colliders' thresholds.
+   * @throws RangeError for a threshold that is negative or not a number.
+   */
+  setContactForceEventThreshold(threshold: number): this {
+    if (!(threshold >= 0)) throw new RangeError(`A contact force threshold is 0 or more newtons (got ${threshold}).`);
+    this.forceThreshold = threshold;
     return this;
   }
   private setBit(bit: number, on: boolean): void {

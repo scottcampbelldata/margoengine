@@ -56,11 +56,11 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Contact manifold read (`contacts()`, `contactPoints`, `touching`) | partial | no per-pair `contactPair(a, b)` with normal and depth per point for any two colliders (touching pairs only) |
 | Friction, restitution, combine rules | full | all four rules |
 | Collision groups, solver groups | full | |
-| Active collision types (which of dynamic, kinematic, fixed pairs collide) | missing | |
+| Active collision types (which of dynamic, kinematic, fixed pairs collide) | full | all six kinds, both colliders must want it; `kernel/tests/collision_types.rs`, `next-collision-types.test.js` |
 | Sensors, intersection events | full | |
 | Contact events, intersection events (start, end) | full | |
-| Active events per collider split into collision and contact-force flags | partial | `events` is one flag |
-| Contact-force events with a threshold | partial | the event exists, the per-collider `contactForceEventThreshold` does not |
+| Active events per collider split into collision and contact-force flags | full | `setActiveEvents`; contact force defaults on, Rapier's is off |
+| Contact-force events with a threshold | full | per-collider threshold, the larger of the pair's two |
 
 ## Continuous collision
 

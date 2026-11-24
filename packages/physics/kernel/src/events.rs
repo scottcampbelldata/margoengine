@@ -20,6 +20,33 @@ pub fn groups_meet(a: u32, b: u32) -> bool {
 
 impl World {
     /// True when a pair may touch: neither side is off, the groups meet, no joint keeps them apart, and the filter agrees.
+    /// The kind of body pair, as the bit `COLLIDER_TYPES` names it.
+    #[inline]
+    fn pair_type(&self, body_a: usize, body_b: usize) -> u32 {
+        let rank = |body: usize| match self.flags(body) & KIND {
+            DYNAMIC => 0,
+            FIXED => 2,
+            _ => 1,
+        };
+        let (a, b) = (rank(body_a), rank(body_b));
+        1 << (match (if a < b { a } else { b }, if a < b { b } else { a }) {
+            (0, 0) => 0,
+            (0, 1) => 1,
+            (0, 2) => 2,
+            (1, 1) => 3,
+            (1, 2) => 4,
+            _ => 5,
+        })
+    }
+
+    /// Whether both colliders take part in the kind of body pair they make (see `COLLIDER_TYPES`).
+    #[inline]
+    pub fn types_allow(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> bool {
+        let kind = self.pair_type(body_a, body_b);
+        let wants = |c: usize| ((self.uu(COLLIDER_FLAGS, c) & COLLIDER_TYPES) >> COLLIDER_TYPES_SHIFT ^ TYPES_DEFAULT) & kind != 0;
+        wants(a) && wants(b)
+    }
+
     /// The filter comes last, as it leaves Wasm.
     #[inline]
     pub fn may_touch(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> bool {
@@ -139,9 +166,19 @@ impl World {
     /// Makes a collider a sensor, or switches it off, or back: what it touched ends as what it was.
     pub fn set_collider_state(&mut self, collider: u32, state: u32) {
         let at = collider as usize;
-        if self.uu(COLLIDER_FLAGS, at) != state {
+        let before = self.uu(COLLIDER_FLAGS, at);
+        if before != state {
             self.end_touches(collider);
             self.set_u(COLLIDER_FLAGS, at, state);
+            // A kind of pair newly wanted may need pairs the broad phase never made (two fixed bodies'), and its boxes
+            // may already overlap, which only a walk of the others finds.
+            if (before ^ state) & COLLIDER_TYPES != 0 && self.uu(COLLIDER_STATE, at) & IN_BROAD != 0 {
+                for other in 0..self.header().collider_rows as usize {
+                    if other != at && self.uu(COLLIDER_STATE, other) & (IN_BROAD | REMOVED) == IN_BROAD && self.boxes_overlap(at, other) {
+                        self.add_pair(collider, other as u32);
+                    }
+                }
+            }
             self.touch_collider(collider);
             self.wake(self.uu(COLLIDER_BODY, at));
         }

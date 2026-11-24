@@ -456,6 +456,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       const colliderA = this.byRow.get(pairA[row]),
         colliderB = this.byRow.get(pairB[row]);
       if (!(impulse > 0) || !colliderA || !colliderB) continue;
+      if (!(colliderA.forceEvents || colliderB.forceEvents)) continue;
+      if (impulse / dt <= Math.max(colliderA.forceThreshold, colliderB.forceThreshold)) continue;
       const bodyA = colliderA.body,
         bodyB = colliderB.body;
       events.push({
@@ -580,6 +582,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.sensor || options.enabled === false)
       this.kernel.setColliderState(row, (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0));
     collider.emits = options.events ?? true;
+    collider.forceEvents = options.contactForceEvents ?? true;
+    collider.forceThreshold = options.contactForceThreshold ?? 0;
+    if (options.contactForceThreshold !== undefined) collider.setContactForceEventThreshold(options.contactForceThreshold);
+    if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
     body.colliders.push(collider);
     this.byRow.set(row, collider);
     return collider;

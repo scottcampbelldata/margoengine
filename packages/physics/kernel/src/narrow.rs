@@ -620,9 +620,9 @@ impl World {
             let meshed = self.uu(COLLIDER_SHAPE, a) == SHAPE_TRIMESH || self.uu(COLLIDER_SHAPE, b) == SHAPE_TRIMESH;
             let compound = self.has_compound(a, b);
             let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
-            // Scripted bodies pass through each other: nothing can push them. A sensor still sees them.
-            let scripted = self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC;
-            if scripted && !sensor || !self.may_touch(a, b, body_a, body_b) {
+            // Pairs of the kinds a collider leaves out pass through each other, and by default so do scripted bodies:
+            // nothing can push them. A sensor still sees them.
+            if !sensor && !self.types_allow(a, b, body_a, body_b) || !self.may_touch(a, b, body_a, body_b) {
                 self.set_u(PAIR_FLAGS, row, flags);
                 self.drop_contacts(row, body_a, body_b);
                 continue;

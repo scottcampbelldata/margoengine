@@ -154,6 +154,9 @@ export const JOINT_DISTANCE = 1 << 27;
 /** Bits of the `colliderFlags` column. */
 export const COLLIDER_SENSOR = 1;
 export const COLLIDER_OFF = 2;
+/** Bits 2 to 7 of a collider's flags: each flips one kind of body pair from its default (layout.rs COLLIDER_TYPES). */
+export const COLLIDER_TYPES_SHIFT = 2;
+export const COLLIDER_TYPES = 63 << COLLIDER_TYPES_SHIFT;
 /** Bit of the `flags` column: the body is out of the world. */
 export const BODY_DISABLED = 1 << 11;
 /** Bits of the `flags` column: continuous collision on, and whether the last step's CCD pass checked the body. */

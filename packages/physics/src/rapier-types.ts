@@ -369,7 +369,7 @@ export interface RapierModule {
   /** Rapier 0.20 and later. */
   SphericalImpulseJoint?: new (rawSet: never, bodySet: never, handle: number) => SphericalImpulseJoint;
   CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
-  ActiveCollisionTypes: { ALL: number };
+  ActiveCollisionTypes: { ALL: number } & Record<string, number>;
   ActiveEvents: { COLLISION_EVENTS: number };
   ActiveHooks: Record<'FILTER_CONTACT_PAIRS' | 'FILTER_INTERSECTION_PAIRS', number>;
 }

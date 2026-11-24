@@ -562,6 +562,8 @@ ball.enabled = false;
 physics.dispose();
 ```
 
+`activeCollisionTypes` on a collider names the kinds of body pair it takes part in, Rapier's `ActiveCollisionTypes`: any of `dynamicDynamic`, `dynamicKinematic`, `dynamicFixed` (the default three), `kinematicKinematic`, `kinematicFixed` and `fixedFixed`. A pair of colliders is made when both name its kind, so two kinematic bodies raise `contactstart` and `contactend` only when both colliders add `kinematicKinematic`, and a floor that leaves out `dynamicFixed` lets a body fall through. A sensor sees every kind. `collider.setActiveCollisionTypes(kinds)` and `activeCollisionTypes()` change and read it. `contactForceEvents` (default true, where Rapier's default is off) and `contactForceThreshold` (newtons, default 0) on a collider choose its contact-force events; a pair speaks when either side asks and its force passes the larger threshold, and `collider.setActiveEvents({collision, contactForce})` and `setContactForceEventThreshold(n)` change them.
+
 `physics.on('contactforce', listener)` says how hard two colliders pressed on each other: after each step with a listener, once a pair, with `bodyA`, `bodyB`, `meshA`, `meshB`, `colliderA`, `colliderB`, `impulse` (the normal impulse of the whole step, N s) and `force` (that over the step's length, N). A box at rest on a floor reads its weight, and the impulses of a landing add up to what stops it. A pair of sleepers is not solved, so it says nothing. Only the own solver has this event.
 
 ```ts

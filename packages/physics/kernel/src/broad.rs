@@ -510,7 +510,7 @@ impl World {
         let (a, b) = if a < b { (a, b) } else { (b, a) };
         let (body_a, body_b) = (self.uu(COLLIDER_BODY, a as usize), self.uu(COLLIDER_BODY, b as usize));
         if body_a == body_b
-            || (self.flags(body_a as usize) & KIND == FIXED && self.flags(body_b as usize) & KIND == FIXED)
+            || (self.flags(body_a as usize) & KIND == FIXED && self.flags(body_b as usize) & KIND == FIXED && !self.types_allow(a as usize, b as usize, body_a as usize, body_b as usize))
             || self.find_pair(a, b) != NONE
         {
             return;
@@ -538,7 +538,8 @@ impl World {
         self.header_mut().pairs += 1;
         self.set_u(PAIR_SLOT, at, NONE);
         let (body_a, body_b) = (body_a as usize, body_b as usize);
-        if self.uu(AWAKE_SLOT, body_a) != NONE || self.uu(AWAKE_SLOT, body_b) != NONE {
+        // Two fixed bodies are never awake, so their pair stays active for as long as it exists.
+        if self.uu(AWAKE_SLOT, body_a) != NONE || self.uu(AWAKE_SLOT, body_b) != NONE || (self.flags(body_a) & KIND == FIXED && self.flags(body_b) & KIND == FIXED) {
             self.activate_pair(row);
         }
     }

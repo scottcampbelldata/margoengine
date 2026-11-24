@@ -385,6 +385,8 @@ export class PhysicsCollider {
     readonly body: PhysicsBody;
     readonly shape: ColliderShape;
     emits: boolean;
+    forceEvents: boolean;
+    forceThreshold: number;
     constructor(kernel: KernelWorld,
     handle: number,
     body: PhysicsBody,
@@ -396,6 +398,18 @@ export class PhysicsCollider {
     setSensor(sensor: boolean): this;
     isEnabled(): boolean;
     setEnabled(enabled: boolean): this;
+    activeCollisionTypes(): CollisionPairKind[];
+    setActiveCollisionTypes(kinds: readonly CollisionPairKind[]): this;
+    activeEvents(): {
+        collision: boolean;
+        contactForce: boolean;
+    };
+    setActiveEvents(events: {
+        collision?: boolean;
+        contactForce?: boolean;
+    }): this;
+    contactForceEventThreshold(): number;
+    setContactForceEventThreshold(threshold: number): this;
     density(): number;
     setDensity(density: number): this;
     translationWrtParent(): {
@@ -655,10 +669,15 @@ interface ColliderSettings {
     collisionGroups?: number;
     solverGroups?: number;
     events?: boolean;
+    activeCollisionTypes?: readonly CollisionPairKind[];
+    contactForceEvents?: boolean;
+    contactForceThreshold?: number;
     enabled?: boolean;
 }
 
 type ColliderShape = ShapeOptions['shape'];
+
+type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
 
 type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 

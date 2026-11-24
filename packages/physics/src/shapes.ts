@@ -102,6 +102,21 @@ const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHul
 /** How two colliders combine their friction or restitution values. */
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
+/**
+ * A kind of body pair a collider can take part in, Rapier's `ActiveCollisionTypes`. A pair of colliders is made when both
+ * want the kind of pair their bodies make.
+ */
+export type CollisionPairKind =
+  | 'dynamicDynamic'
+  | 'dynamicKinematic'
+  | 'dynamicFixed'
+  | 'kinematicKinematic'
+  | 'kinematicFixed'
+  | 'fixedFixed';
+
+/** The kinds a collider takes part in when it names none: dynamic bodies with anything. */
+export const DEFAULT_PAIR_KINDS: readonly CollisionPairKind[] = ['dynamicDynamic', 'dynamicKinematic', 'dynamicFixed'];
+
 /** Everything about a collider except its shape. */
 export interface ColliderSettings {
   /** Collider position relative to the body. */
@@ -128,6 +143,18 @@ export interface ColliderSettings {
   solverGroups?: number;
   /** Emit contact or intersection start and end events (default true). */
   events?: boolean;
+  /**
+   * The kinds of body pair this collider takes part in (default dynamic with anything; a sensor sees every kind). Add
+   * `kinematicKinematic` or `fixedFixed` for events between bodies that cannot push each other.
+   */
+  activeCollisionTypes?: readonly CollisionPairKind[];
+  /**
+   * Whether this collider asks for contact-force events on the own solver (default true; a pair speaks when either side
+   * asks). See `contactForceThreshold`.
+   */
+  contactForceEvents?: boolean;
+  /** The force in newtons a pair must pass before its contact-force event is made; the larger of the two colliders' (default 0). */
+  contactForceThreshold?: number;
   /** Collider enabled (default true). */
   enabled?: boolean;
 }
@@ -524,6 +551,19 @@ export function configureCollider(
   if (options.massless) desc.setMassProperties(0, ZERO, ZERO, IDENTITY);
   else if (options.mass !== undefined) desc.setMass(options.mass);
   else if (options.density !== undefined) desc.setDensity(options.density);
+  if (options.activeCollisionTypes) {
+    const kinds = R.ActiveCollisionTypes as unknown as Record<string, number>;
+    let types = 0;
+    for (const kind of options.activeCollisionTypes) {
+      const name = kind.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase();
+      if (typeof kinds[name] !== 'number')
+        throw new RangeError(
+          `Unknown collision pair kind ${String(kind)}; use dynamicDynamic, dynamicKinematic, dynamicFixed, kinematicKinematic, kinematicFixed or fixedFixed.`,
+        );
+      types |= kinds[name];
+    }
+    desc.setActiveCollisionTypes(types);
+  }
   if (options.sensor) {
     desc.setSensor(true);
     // Let sensors see kinematic and fixed bodies too (character controllers walking into triggers).

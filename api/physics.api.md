@@ -93,6 +93,9 @@ export interface ColliderSettings {
     collisionGroups?: number;
     solverGroups?: number;
     events?: boolean;
+    activeCollisionTypes?: readonly CollisionPairKind[];
+    contactForceEvents?: boolean;
+    contactForceThreshold?: number;
     enabled?: boolean;
 }
 
@@ -536,7 +539,7 @@ export interface RapierModule {
     CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
     ActiveCollisionTypes: {
         ALL: number;
-    };
+    } & Record<string, number>;
     ActiveEvents: {
         COLLISION_EVENTS: number;
     };
@@ -820,6 +823,8 @@ interface ColliderShapeCastHit {
     witness1: Vector;
     normal1: Vector;
 }
+
+type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
 
 interface DynamicRayCastVehicleController {
     updateVehicle(dt: number, flags?: number, groups?: number, predicate?: (collider: Collider) => boolean): void;

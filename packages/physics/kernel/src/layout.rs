@@ -645,6 +645,13 @@ pub const CCD_ACTIVE: u32 = 1 << 14;
 pub const COLLIDER_SENSOR: u32 = 1;
 /// Touches nothing and is seen by nothing.
 pub const COLLIDER_OFF: u32 = 2;
+/// Bits 2 to 7 of COLLIDER_FLAGS: which pairs of body kinds the collider takes part in, each bit flipping the default
+/// (Rapier's `ActiveCollisionTypes`): a pair of colliders is made when both want its kind. The bits are dynamic with
+/// dynamic, dynamic with kinematic, dynamic with fixed, kinematic with kinematic, kinematic with fixed and fixed with
+/// fixed; the default is the first three.
+pub const COLLIDER_TYPES_SHIFT: u32 = 2;
+pub const COLLIDER_TYPES: u32 = 63 << COLLIDER_TYPES_SHIFT;
+pub const TYPES_DEFAULT: u32 = 7;
 
 // Bits of the PAIR_FLAGS column.
 /// It touched at the end of the last step that looked at it.
