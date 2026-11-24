@@ -148,3 +148,68 @@ test('E57 integrity: a flipped byte fails its page checksum; truncated or corrup
   }
   speedBudget('points-e57', { cpu });
 });
+
+test('E57 images2D: pinhole, spherical and cylindrical pictures come back with bytes, mask, pose and parameters', () => {
+  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 0xff, 0xd9]),
+    png = Uint8Array.from({ length: 3000 }, (_, i) => (i * 31) % 256), // spans several 1020-byte pages
+    mask = Uint8Array.from([137, 80, 78, 71, 9]);
+  const pose = { rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], translation: [4, 5, 6] };
+  const file = writeE57([{ name: 'a', positions: new Float64Array([1, 2, 3]) }], {
+    images: [
+      {
+        name: 'front',
+        data: jpeg,
+        format: 'jpeg',
+        projection: 'pinhole',
+        width: 640,
+        height: 480,
+        scan: 0,
+        pose,
+        parameters: { focalLength: 0.0035, pixelWidth: 5e-6, pixelHeight: 5e-6, principalPointX: 320, principalPointY: 240 },
+      },
+      { name: 'pano', data: png, format: 'png', projection: 'spherical', width: 4096, height: 2048, mask, parameters: { pixelWidth: 0.001 } },
+      { data: jpeg, format: 'jpeg', projection: 'cylindrical', width: 100, height: 50, parameters: { radius: 2, principalPointY: 25 } },
+    ],
+  });
+  const e57 = parseE57(file);
+  assert.equal(e57.images.length, 3);
+  const [front, pano, cyl] = e57.images;
+  assert.equal(front.projection, 'pinhole');
+  assert.equal(front.mime, 'image/jpeg');
+  assert.deepEqual([...front.data], [...jpeg]);
+  assert.deepEqual([front.width, front.height], [640, 480]);
+  assert.equal(front.associatedScanGuid, 'scan-0');
+  assert.deepEqual(front.pose.translation, [4, 5, 6]);
+  near(front.pose.rotation[3], Math.SQRT1_2, 1e-12, 'pose z');
+  assert.equal(front.parameters.focalLength, 0.0035);
+  assert.equal(front.parameters.principalPointX, 320);
+  assert.equal(pano.projection, 'spherical');
+  assert.equal(pano.mime, 'image/png');
+  assert.deepEqual([...pano.data], [...png]);
+  assert.deepEqual([...pano.mask], [...mask]);
+  assert.deepEqual(pano.pose.rotation, [1, 0, 0, 0]);
+  assert.equal(cyl.projection, 'cylindrical');
+  assert.equal(cyl.parameters.radius, 2);
+  assert.equal(cyl.name, 'image 2');
+  // The points still read, and images can be skipped.
+  assert.equal(e57.scans[0].count, 1);
+  assert.equal(parseE57(file, { images: false }).images.length, 0);
+  assert.equal(parseE57(writeE57([{ positions: [0, 0, 0] }])).images.length, 0);
+});
+
+test('E57 images2D: a Blob pointing at the wrong section is rejected', () => {
+  const file = writeE57([{ positions: [0, 0, 0] }], {
+    images: [{ data: Uint8Array.of(1, 2, 3), format: 'png', projection: 'pinhole', width: 1, height: 1 }],
+  });
+  assert.equal(parseE57(file).images.length, 1);
+  assert.throws(() => parseE57(corruptBlob(file)), TypeError);
+});
+
+function corruptBlob(file) {
+  const bytes = file.slice(),
+    xml = new TextDecoder().decode(bytes.subarray(readE57Header(bytes).xmlOffset)),
+    offset = Number(/pngImage type="Blob" fileOffset="(\d+)"/.exec(xml)[1]);
+  bytes[offset] = 9; // the section id
+  new DataView(bytes.buffer).setUint32(Math.floor(offset / 1024) * 1024 + 1020, crc32c(bytes.subarray(Math.floor(offset / 1024) * 1024, Math.floor(offset / 1024) * 1024 + 1020)), false);
+  return bytes;
+}

@@ -159,6 +159,36 @@ export interface E57Scan {
   readonly attributes: Readonly<Record<string, Float64Array>>;
 }
 
+/** How an E57 2D image maps pixels to rays. */
+export type E57ImageProjection = 'pinhole' | 'spherical' | 'cylindrical' | 'visualReference';
+
+/** One images2D entry: the encoded picture bytes with the camera pose and projection parameters. */
+export interface E57Image {
+  readonly name: string;
+  readonly guid: string;
+  /** guid of the scan (data3D child) this picture was taken with, when stated. */
+  readonly associatedScanGuid?: string;
+  readonly description?: string;
+  readonly projection: E57ImageProjection;
+  readonly width: number;
+  readonly height: number;
+  /** Encoding of `data`. */
+  readonly format: 'jpeg' | 'png';
+  readonly mime: 'image/jpeg' | 'image/png';
+  /** The encoded picture, ready for `new Blob([data], { type: mime })` or `createImageBitmap`. */
+  readonly data: Uint8Array;
+  /** Optional PNG mask (non-zero pixels are valid). */
+  readonly mask?: Uint8Array;
+  /** Camera pose in the file's world frame (not recentred on `origin`): rotation [w, x, y, z] and translation. */
+  readonly pose: {
+    readonly rotation: readonly [number, number, number, number];
+    readonly translation: readonly [number, number, number];
+  };
+  /** Projection parameters by name: pinhole focalLength, pixelWidth, pixelHeight, principalPointX/Y; spherical
+   * pixelWidth, pixelHeight; cylindrical radius, principalPointY, pixelWidth, pixelHeight. Lengths in metres. */
+  readonly parameters: Readonly<Record<string, number>>;
+}
+
 /** A parsed E57 file. */
 export interface E57File {
   readonly header: E57Header;
@@ -166,6 +196,8 @@ export interface E57File {
   /** World position of local [0, 0, 0]: the centre of every scan's posed bounds unless `origin` was given. */
   readonly origin: readonly [number, number, number];
   readonly scans: readonly E57Scan[];
+  /** The images2D pictures with their poses (empty when the file has none or `images: false`). */
+  readonly images: readonly E57Image[];
   /** Coordinate metadata text of the root, when present. */
   readonly coordinateMetadata?: string;
 }
@@ -178,6 +210,8 @@ export interface E57Options {
   verifyChecksums?: boolean;
   /** Keep points flagged invalid (cartesianInvalidState 2, sphericalInvalidState 2). Default false. */
   keepInvalid?: boolean;
+  /** Read the images2D pictures. Default true. */
+  images?: boolean;
   signal?: AbortSignal;
 }
 
@@ -409,6 +443,78 @@ function unpack(
   carry.bits = bits;
 }
 
+function readPose(e: E57Element): E57Image['pose'] {
+  const pose = child(e, 'pose'),
+    q = pose && child(pose, 'rotation'),
+    t = pose && child(pose, 'translation');
+  let [w, x, y, z] = q
+    ? [num(child(q, 'w'), 1), num(child(q, 'x')), num(child(q, 'y')), num(child(q, 'z'))]
+    : [1, 0, 0, 0];
+  const l = Math.hypot(w, x, y, z) || 1;
+  [w, x, y, z] = [w / l, x / l, y / l, z / l];
+  return {
+    rotation: [w, x, y, z],
+    translation: t ? [num(child(t, 'x')), num(child(t, 'y')), num(child(t, 'z'))] : [0, 0, 0],
+  };
+}
+
+/** Reads a Blob element's bytes: a 16-byte blob section header (id 0, length) then `length` data bytes. */
+function readBlob(file: Logical, blob: E57Element, what: string): Uint8Array {
+  const offset = Number(blob.attributes.fileOffset),
+    length = Number(blob.attributes.length);
+  if (!Number.isFinite(offset) || !Number.isInteger(length) || length < 0)
+    throw new TypeError(`E57 ${what} has an invalid Blob offset or length; the file is corrupt`);
+  const at = toLogical(offset);
+  if (file.read(at, 1)[0] !== 0)
+    throw new TypeError(`E57 ${what} Blob section has the wrong section id; the file is corrupt`);
+  return file.read(at + 16, length);
+}
+
+const representations = [
+  'pinholeRepresentation',
+  'sphericalRepresentation',
+  'cylindricalRepresentation',
+  'visualReferenceRepresentation',
+];
+
+function readImages(file: Logical, images2D: E57Element | undefined, signal?: AbortSignal): E57Image[] {
+  const out: E57Image[] = [];
+  for (const [index, image] of (images2D?.children ?? []).entries()) {
+    signal?.throwIfAborted();
+    const rep = image.children.find((c) => representations.includes(c.name));
+    if (!rep) continue;
+    const what = `image ${index}`,
+      jpeg = child(rep, 'jpegImage'),
+      blob = jpeg ?? child(rep, 'pngImage');
+    if (!blob) continue;
+    const mask = child(rep, 'imageMask'),
+      parameters: Record<string, number> = {};
+    for (const c of rep.children)
+      if (c.attributes.type === 'Float' || c.attributes.type === 'Integer' || c.attributes.type === 'ScaledInteger')
+        parameters[c.name] = num(c);
+    const width = parameters.imageWidth ?? 0,
+      height = parameters.imageHeight ?? 0;
+    delete parameters.imageWidth;
+    delete parameters.imageHeight;
+    out.push({
+      name: child(image, 'name')?.text ?? `image ${index}`,
+      guid: child(image, 'guid')?.text ?? '',
+      associatedScanGuid: child(image, 'associatedData3DGuid')?.text || undefined,
+      description: child(image, 'description')?.text || undefined,
+      projection: rep.name.replace('Representation', '') as E57ImageProjection,
+      width,
+      height,
+      format: jpeg ? 'jpeg' : 'png',
+      mime: jpeg ? 'image/jpeg' : 'image/png',
+      data: readBlob(file, blob, what),
+      mask: mask ? readBlob(file, mask, `${what} mask`) : undefined,
+      pose: readPose(image),
+      parameters,
+    });
+  }
+  return out;
+}
+
 /** Parses an E57 file: every scan's points posed into one world frame. */
 export function parseE57(input: ArrayBuffer | Uint8Array, options: E57Options = {}): E57File {
   options.signal?.throwIfAborted();
@@ -634,7 +740,8 @@ export function parseE57(input: ArrayBuffer | Uint8Array, options: E57Options = 
       }
     return { ...scan, count: n, positions };
   });
-  return { header, xml, origin: o, scans, coordinateMetadata: child(xml, 'coordinateMetadata')?.text };
+  const images = options.images === false ? [] : readImages(file, child(xml, 'images2D'), options.signal);
+  return { header, xml, origin: o, scans, images, coordinateMetadata: child(xml, 'coordinateMetadata')?.text };
 }
 
 /** Fetches and parses an E57 file. Aborts with `options.signal`. */
@@ -666,8 +773,29 @@ export interface E57WriteScan {
   pose?: { rotation?: readonly [number, number, number, number]; translation?: readonly [number, number, number] };
 }
 
+/** A picture for `writeE57`. */
+export interface E57WriteImage {
+  name?: string;
+  /** Encoded JPEG or PNG bytes. */
+  data: Uint8Array;
+  format: 'jpeg' | 'png';
+  projection: 'pinhole' | 'spherical' | 'cylindrical';
+  width: number;
+  height: number;
+  /** PNG mask bytes. */
+  mask?: Uint8Array;
+  /** Index of the scan written with it that this picture belongs to. */
+  scan?: number;
+  pose?: { rotation?: readonly [number, number, number, number]; translation?: readonly [number, number, number] };
+  /** Projection parameters (focalLength, pixelWidth, pixelHeight, principalPointX, principalPointY, radius). */
+  parameters?: Readonly<Record<string, number>>;
+}
+
 /** Writes an E57 file (bitPack codec, one data packet stream per scan). Meant for tools and round-trip tests. */
-export function writeE57(scans: readonly E57WriteScan[], options: { packetBytes?: number } = {}): Uint8Array {
+export function writeE57(
+  scans: readonly E57WriteScan[],
+  options: { packetBytes?: number; images?: readonly E57WriteImage[] } = {},
+): Uint8Array {
   // Logical stream: [48-byte header][sections...][XML]; then paged with CRCs.
   const logical: Uint8Array[] = [];
   let length = 0;
@@ -800,8 +928,31 @@ export function writeE57(scans: readonly E57WriteScan[], options: { packetBytes?
       `<vectorChild type="Structure"><guid type="String"><![CDATA[scan-${s}]]></guid><name type="String">${cdata(scan.name ?? `scan ${s}`)}</name>${pose}${limits}${colorLimits}<points type="CompressedVector" fileOffset="${physical(sectionStart)}" recordCount="${n}"><prototype type="Structure">${fields.map((f) => f.xml).join('')}</prototype><codecs type="Vector" allowHeterogeneousChildren="1"/></points></vectorChild>`,
     );
   }
+  const poseXml = (p: E57WriteImage['pose']) =>
+    p
+      ? `<pose type="Structure"><rotation type="Structure">${['w', 'x', 'y', 'z'].map((k, i) => `<${k} type="Float">${(p.rotation ?? [1, 0, 0, 0])[i]}</${k}>`).join('')}</rotation><translation type="Structure">${['x', 'y', 'z'].map((k, i) => `<${k} type="Float">${(p.translation ?? [0, 0, 0])[i]}</${k}>`).join('')}</translation></pose>`
+      : '';
+  // A Blob section: 16-byte header (id 0, 7 reserved, length), then the bytes padded to a multiple of 4.
+  const blob = (type: string, bytes: Uint8Array) => {
+    const padded = Math.ceil((16 + bytes.length) / 4) * 4,
+      b = new Uint8Array(padded);
+    new DataView(b.buffer).setBigUint64(8, BigInt(padded), true);
+    b.set(bytes, 16);
+    const start = length;
+    push(b);
+    return `<${type} type="Blob" fileOffset="${physical(start)}" length="${bytes.length}"/>`;
+  };
+  const xmlImages = (options.images ?? []).map((img, i) => {
+    const rep = `${img.projection}Representation`,
+      params = Object.entries(img.parameters ?? {})
+        .map(([k, v]) => `<${k} type="Float">${v}</${k}>`)
+        .join(''),
+      data = blob(img.format === 'jpeg' ? 'jpegImage' : 'pngImage', img.data),
+      mask = img.mask ? blob('imageMask', img.mask) : '';
+    return `<vectorChild type="Structure"><guid type="String"><![CDATA[image-${i}]]></guid><name type="String">${cdata(img.name ?? `image ${i}`)}</name>${img.scan === undefined ? '' : `<associatedData3DGuid type="String"><![CDATA[scan-${img.scan}]]></associatedData3DGuid>`}${poseXml(img.pose)}<${rep} type="Structure">${data}${mask}<imageWidth type="Integer">${img.width}</imageWidth><imageHeight type="Integer">${img.height}</imageHeight>${params}</${rep}></vectorChild>`;
+  });
   const xml = new TextEncoder().encode(
-    `<?xml version="1.0" encoding="UTF-8"?>\n<e57Root type="Structure" xmlns="http://www.astm.org/COMMIT/E57/2010-e57-v1.0"><formatName type="String"><![CDATA[ASTM E57 3D Imaging Data File]]></formatName><guid type="String"><![CDATA[margo]]></guid><versionMajor type="Integer">1</versionMajor><versionMinor type="Integer">0</versionMinor><data3D type="Vector" allowHeterogeneousChildren="1">${xmlScans.join('')}</data3D><images2D type="Vector" allowHeterogeneousChildren="1"/></e57Root>`,
+    `<?xml version="1.0" encoding="UTF-8"?>\n<e57Root type="Structure" xmlns="http://www.astm.org/COMMIT/E57/2010-e57-v1.0"><formatName type="String"><![CDATA[ASTM E57 3D Imaging Data File]]></formatName><guid type="String"><![CDATA[margo]]></guid><versionMajor type="Integer">1</versionMajor><versionMinor type="Integer">0</versionMinor><data3D type="Vector" allowHeterogeneousChildren="1">${xmlScans.join('')}</data3D><images2D type="Vector" allowHeterogeneousChildren="1">${xmlImages.join('')}</images2D></e57Root>`,
   );
   const xmlStart = length;
   push(xml);

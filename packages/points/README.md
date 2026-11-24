@@ -408,9 +408,26 @@ for (const scan of e57.scans) {
 | `keepInvalid` | `false` | Keep points flagged invalid. |
 | `signal` | none | `AbortSignal`. |
 
-Codecs other than bitPack, String and Blob prototype fields, and `images2D` are not read (codes `unsupported` or
+Codecs other than bitPack and String and Blob prototype fields are not read (codes `unsupported` or
 skipped). `writeE57` writes double, scaled-integer or spherical scans with intensity, colour, pose and invalid flags,
 for tools and round-trip tests.
+
+### Pictures (`images2D`)
+
+`e57.images` holds every picture the file carries, with its camera pose and projection (`pinhole`, `spherical`,
+`cylindrical` or `visualReference`): the encoded JPEG or PNG bytes, an optional PNG mask, width and height, the
+guid of the scan it belongs to, and the projection parameters by name (`focalLength`, `pixelWidth`, `principalPointX`,
+`radius`, ...). Poses are in the file's world frame; subtract `e57.origin` to match the recentred scan positions.
+`writeE57(scans, { images })` writes them. Pass `images: false` to skip reading them.
+
+```ts
+import { loadE57 } from 'margoengine/points/e57';
+const e57 = await loadE57('/scans/plant-room.e57');
+for (const image of e57.images) {
+  const bitmap = await createImageBitmap(new Blob([image.data], { type: image.mime }));
+  console.log(image.name, image.projection, bitmap.width, bitmap.height, image.pose.translation);
+}
+```
 
 ## Large clouds: octree level of detail (`margoengine/points/octree`)
 
