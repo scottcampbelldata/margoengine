@@ -40,6 +40,8 @@ pub const COROTATED: u32 = 1;
 pub const VOLUME: u32 = 2;
 /// The cell has no torn neighbour and touches no outside face: it is tougher by its material's interior strength.
 pub const INTERIOR_TET: u32 = 2;
+/// The cell is held by the implicit solver (src/implicit.rs) and not by constraints.
+pub const IMPLICIT_TET: u32 = 4;
 /// No neighbour across a face.
 pub const NONE: u32 = u32::MAX;
 
@@ -121,6 +123,8 @@ pub struct Fem {
     pub quat: [Col<f32>; 4],
     pub lin: [Col<f32>; 3],
     pub ang: [Col<f32>; 3],
+    /// The implicit solver's settings and scratch (src/implicit.rs).
+    pub imp: crate::implicit::Implicit,
 }
 
 impl Fem {
@@ -181,6 +185,7 @@ impl Fem {
             quat: [F; 4],
             lin: [F; 3],
             ang: [F; 3],
+            imp: crate::implicit::Implicit::new(),
         }
     }
 }
@@ -191,9 +196,9 @@ impl Default for Fem {
     }
 }
 
-type M3 = [f32; 9];
+pub(crate) type M3 = [f32; 9];
 
-fn mul(a: &M3, b: &M3) -> M3 {
+pub(crate) fn mul(a: &M3, b: &M3) -> M3 {
     let mut o = [0.0; 9];
     for r in 0..3 {
         for c in 0..3 {
@@ -202,13 +207,13 @@ fn mul(a: &M3, b: &M3) -> M3 {
     }
     o
 }
-fn transposed(a: &M3) -> M3 {
+pub(crate) fn transposed(a: &M3) -> M3 {
     [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]]
 }
-fn det(a: &M3) -> f32 {
+pub(crate) fn det(a: &M3) -> f32 {
     a[0] * (a[4] * a[8] - a[5] * a[7]) - a[1] * (a[3] * a[8] - a[5] * a[6]) + a[2] * (a[3] * a[7] - a[4] * a[6])
 }
-fn inverse(a: &M3) -> Option<M3> {
+pub(crate) fn inverse(a: &M3) -> Option<M3> {
     let d = det(a);
     if !(d.abs() > 1e-20) {
         return None;
@@ -226,7 +231,7 @@ fn inverse(a: &M3) -> Option<M3> {
         (a[0] * a[4] - a[1] * a[3]) * i,
     ])
 }
-fn frob(a: &M3) -> f32 {
+pub(crate) fn frob(a: &M3) -> f32 {
     sqrt(a.iter().map(|x| x * x).sum())
 }
 
@@ -250,7 +255,7 @@ fn quaternion_of(r: &M3) -> [f32; 4] {
     }
 }
 
-fn rotation_of(a: &M3) -> M3 {
+pub(crate) fn rotation_of(a: &M3) -> M3 {
     let mut x = *a;
     for _ in 0..12 {
         let Some(inv) = inverse(&x) else { return [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0] };
@@ -308,6 +313,7 @@ impl World {
         for c in f.quat.iter_mut() {
             c.resize(clusters);
         }
+        f.imp.reserve_cells(tets);
         f.member.resize(members);
         for c in f.rest.iter_mut() {
             c.resize(members);
@@ -542,7 +548,7 @@ impl World {
     /// One pass over every live tetrahedron and cluster.
     pub(crate) fn solve_fem(&mut self, h: f32) {
         for t in 0..self.fem.count {
-            if self.fem.flags[t] & TORN_TET != 0 {
+            if self.fem.flags[t] & (TORN_TET | IMPLICIT_TET) != 0 {
                 continue;
             }
             let (mu, lambda, vol) = (self.fem.mu[t], self.fem.lambda[t], self.fem.vol0[t]);

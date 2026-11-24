@@ -11100,6 +11100,10 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 - G. Irving, J. Teran and R. Fedkiw, "Invertible Finite Elements for Robust Simulation of Large Deformation", SCA 2004 (the split of the deformation gradient into an elastic and a plastic part).
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), SIGGRAPH 2005.
 - M. Macklin, M. Müller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", Motion in Games, 2016; M. Macklin et al., "Small Steps in Physics Simulation", SCA 2019.
+- D. Baraff and A. Witkin, "Large Steps in Cloth Simulation", SIGGRAPH 1998 (the linearly implicit step and the conjugate gradient solve of its system).
+- J. Bonet and R. D. Wood, "Nonlinear Continuum Mechanics for Finite Element Analysis", Cambridge University Press, 1997 (nodal forces from the first Piola-Kirchhoff stress); O. C. Zienkiewicz and R. L. Taylor, "The Finite Element Method", vol. 1, ch. 6 (the matrix of a linear tetrahedron).
+- M. R. Hestenes and E. Stiefel, "Methods of Conjugate Gradients for Solving Linear Systems", J. Res. Natl. Bur. Standards 49(6), 1952; J. R. Shewchuk, "An Introduction to the Conjugate Gradient Method Without the Agonizing Pain", 1994 (the preconditioned solve).
+- J. W. S. Rayleigh, "The Theory of Sound", 1877 (damping as a share of the stiffness).
 - N. Molino, Z. Bao and R. Fedkiw, "A Virtual Node Algorithm for Changing Mesh Topology During Simulation", ACM TOG 23(3), SIGGRAPH 2004 (duplicating the particles along a tear, one for each side).
 - T. Moller and B. Trumbore, "Fast, Minimum Storage Ray-Triangle Intersection", J. Graphics Tools 2(1), 1997 (a segment against a triangle, for the blade).
 - H. Kuhn, "Some combinatorial lemmas in topology", IBM J. Res. Dev. 4(5), 1960 (the cube cut into six tetrahedra that match across faces).

@@ -138,6 +138,7 @@ function carry(
   desc.setMaterial(body.material);
   desc.setCellMaterial(body.cellMaterial);
   desc.groups = body.collisionGroups;
+  desc.solver = body.solverKind;
   void local;
 }
 

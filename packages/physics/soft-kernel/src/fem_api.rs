@@ -26,6 +26,7 @@ fem_columns! {
     (e_yield, e_yield), (e_creep, e_creep), (e_max, e_max), (e_flow, e_flow), (e_rest0, e_rest0), (e_force, e_force),
     (e_strain, e_strain), (e_smooth, e_smooth),
     (bd_tear_max, tear_max), (bd_min_piece, min_piece),
+    (imp_beta, imp.beta),
     (cproxy, proxy), (cpx, pos[0]), (cpy, pos[1]), (cpz, pos[2]), (cqx, quat[0]), (cqy, quat[1]), (cqz, quat[2]), (cqw, quat[3]),
     (clx, lin[0]), (cly, lin[1]), (clz, lin[2]), (cax, ang[0]), (cay, ang[1]), (caz, ang[2]),
 }
@@ -85,6 +86,22 @@ pub extern "C" fn soft_fem_reserve_elements(edges: u32, bodies: u32) {
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_step_begin() {
     world().fem_step_begin();
+}
+
+/// Settings of the implicit solver: the relative residual that ends a solve, the most passes of it, and the unknowns at or below which
+/// it runs to the end.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_implicit_settings(tolerance: f32, iterations: u32, dense: u32) {
+    let f = &mut world().fem.imp;
+    f.tolerance = tolerance;
+    f.iterations = iterations;
+    f.dense = dense;
+}
+
+/// Makes room for the implicit solver's scratch for `particles` particles.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_reserve_particles(particles: u32) {
+    world().fem.imp.reserve_particles(particles as usize);
 }
 
 /// Works out where every proxied cluster stands now (its velocities read the last substep of length `h`).

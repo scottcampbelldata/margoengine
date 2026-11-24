@@ -49,6 +49,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_reserve_elements(edges: number, bodies: number): void;
   soft_fem_step_begin(): void;
   soft_fem_proxies(h: number): void;
+  soft_fem_implicit_settings(tolerance: number, iterations: number, dense: number): void;
+  soft_fem_reserve_particles(particles: number): void;
 }
 
 /** The kinds of structural edge a woven sheet has; 0 is any other, with the material's edge softness. */
@@ -100,6 +102,7 @@ const INTEGER_CELL_COLUMNS = new Set([
 const NO_NEIGHBOUR = 0xffffffff;
 const CELL_MODEL = { 'neo-hookean': 0, corotated: 1, volume: 2 } as const;
 const INTERIOR_CELL = 2;
+const IMPLICIT_CELL = 4;
 
 let columnNames: readonly string[] = [];
 let cellColumnNames: readonly string[] = [];
@@ -203,6 +206,13 @@ export class SoftBodyMaterial {
 }
 
 /** The elastic model of a body's cells. */
+/**
+ * How a body's cells are solved: `'constraints'` (default) as XPBD constraints, whose stiffness grows with the substeps and passes
+ * a step is given; `'fem'` as one linear solve a substep (a linearly implicit step, Baraff and Witkin 1998), whose stiffness does not,
+ * the choice for very stiff materials. Cells of the `'volume'` model are always constraints.
+ */
+export type SoftSolver = 'constraints' | 'fem';
+
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
 /**
@@ -425,6 +435,7 @@ export class SoftBodyDesc {
   /** @internal */ clusterHertz = 0;
   /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
   /** @internal A mesh that rides in the cells. */ skin: Skin | null = null;
+  /** @internal */ solver: SoftSolver = 'constraints';
 
   /** Raw particles from flat x, y, z numbers or a list of points; add the elements with `setEdges`. */
   constructor(positions: ArrayLike<number> | readonly Vec3[]) {
@@ -884,6 +895,12 @@ export class SoftBodyDesc {
         }
     return this;
   }
+  /** Picks how the body's cells are solved, Rapier's `setSolver` (see {@link SoftSolver}). */
+  setSolver(solver: SoftSolver): this {
+    if (solver !== 'constraints' && solver !== 'fem') throw new RangeError("Solver is 'constraints' or 'fem'.");
+    this.solver = solver;
+    return this;
+  }
   /** Replaces the cells' material (copied). */
   setCellMaterial(material: CellMaterial): this {
     checkCellMaterial(material);
@@ -1095,6 +1112,7 @@ export class SoftBody {
   /** @internal The skin, and the cells (four particle indices each) it was bound against. */ skin: Skin | null = null;
   /** @internal */ skinCells = new Uint32Array(0);
   /** @internal */ clusterInfo: ClusterInfo[] = [];
+  /** @internal */ solverKind: SoftSolver = 'constraints';
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
   /** @internal */ force: Vec3 = [0, 0, 0];
   /** @internal */ pointForces = new Map<number, Vec3>();
@@ -1298,6 +1316,18 @@ export class SoftBody {
     if (this.isEdgeTorn(edge)) return this;
     const { eflags } = this.c;
     eflags[this.firstEdge + edge] = eflags[this.firstEdge + edge]! | TORN;
+    return this;
+  }
+  /** How the body's cells are solved. */
+  get solver(): SoftSolver {
+    return this.solverKind;
+  }
+  /** Changes how the body's cells are solved, from the next step. */
+  setSolver(solver: SoftSolver): this {
+    this.check();
+    if (solver !== 'constraints' && solver !== 'fem') throw new RangeError("Solver is 'constraints' or 'fem'.");
+    this.solverKind = solver;
+    this.owner.writeCellMaterial(this);
     return this;
   }
   /** Number of clusters. */
@@ -1677,6 +1707,15 @@ export class SoftBodies implements PhysicsAttachment {
    * body, so a block that was struck stops ringing. 0 never settles, and a very large value makes the body feel like putty.
    */
   cellDamping = 10;
+  /** The relative residual that ends the linear solve of the `'fem'` solver (default 1e-5). */
+  femLinearTolerance = 1e-5;
+  /** The most passes of that linear solve (default 20). */
+  femMaxLinearIterations = 20;
+  /**
+   * A body with this many unknowns (three a free particle) or fewer is iterated until its residual is gone, as many passes as it
+   * has unknowns if need be, as a direct solve would finish (default 600).
+   */
+  femMaxDenseDofs = 600;
   /**
    * Whether a tear that parts a body makes pieces of it: `'cells'` (default) for bodies of cells, `'all'` for every body made of
    * edges alone too (a rope in two ropes), `'never'`. A body with triangles (cloth, a trimesh) or a surface collider is never split.
@@ -1821,6 +1860,7 @@ export class SoftBodies implements PhysicsAttachment {
       handle = this.bodies.length;
     this.reserve(firstParticle + particles, firstEdge + edges, handle + 1, 0);
     this.reserveElements(firstEdge + edges, handle + 1);
+    this.exports.soft_fem_reserve_particles(firstParticle + particles);
     this.particleCount += particles;
     this.edgeCount += edges;
     const c = this.columns(),
@@ -1916,6 +1956,7 @@ export class SoftBodies implements PhysicsAttachment {
       range,
       desc.cellMaterial.clone(),
     );
+    body.solverKind = desc.solver;
     body.triangleList = Uint32Array.from(desc.triangles);
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     if (desc.skin) {
@@ -2315,7 +2356,13 @@ export class SoftBodies implements PhysicsAttachment {
       // A cell's shear wave crosses it in size / sqrt(mu / density): damping 2 zeta of that frequency.
       const size = Math.cbrt(6 * f.vol0![t]!),
         wave = Math.sqrt(mu / m.density) / size;
-      f.damp![t] = (m.deformationDamping ?? this.cellDamping) + 2 * m.elasticDampingRatio * wave;
+      const rate = (m.deformationDamping ?? this.cellDamping) + 2 * m.elasticDampingRatio * wave;
+      f.damp![t] = rate;
+      // The implicit solver damps by a factor on the stiffness: the rate over the square of the cell's wave frequency.
+      f.imp_beta![t] = wave > 0 ? rate / (wave * wave) : 0;
+      const flags = f.flags as unknown as Uint32Array;
+      flags[t] =
+        body.solverKind === 'fem' && m.model !== 'volume' ? flags[t]! | IMPLICIT_CELL : flags[t]! & ~IMPLICIT_CELL;
     }
   }
 
@@ -2546,6 +2593,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.exports.soft_fem_reserve(tets, clusters, members);
     this.exports.soft_fem_trim(tets, clusters, members);
     this.exports.soft_fem_reserve_elements(edges, keep.length);
+    this.exports.soft_fem_reserve_particles(particles);
     this.cellCapacity = [tets, clusters, members, edges, keep.length];
     this.view = null;
     this.cellView = null;
@@ -2630,6 +2678,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.reserve(this.particleCount, this.edgeCount, this.bodies.length, 0);
     this.view = null;
     this.exports.soft_fem_damping(this.cellDamping);
+    this.exports.soft_fem_implicit_settings(this.femLinearTolerance, this.femMaxLinearIterations, this.femMaxDenseDofs);
     this.findPlanes(dt, rows, bodies);
     this.takeFromProxies();
     this.exports.soft_fem_step_begin();

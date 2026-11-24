@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Own physics implicit soft solids (2026-11-24): a cantilever 1 m long, 0.25 m square, E = 3 MPa, on the `'fem'` solver (one
+  linear solve a substep, conjugate gradient) sags at its free end to the same 88 percent of the Euler-Bernoulli deflection
+  with one substep of one pass as with eight of four (within 3 percent of each other), where the constraints at one pass sag
+  more than twice as far; a 2 GPa beam at one substep stays finite and sags under a millimetre. Reproduce: `node --test
+  packages/physics/tests/soft-cells.test.js` and `cargo test --release --test fem the_implicit` in
+  `packages/physics/soft-kernel`. No other engine was compared and no speed claim is made.
+
 - Own physics soft solids (2026-11-24): `@margoengine/physics/soft` bodies made of tetrahedral cells (stable Neo-Hookean or
   co-rotated elasticity, plastic flow, tearing, shape-matching clusters). A uniformly loaded cantilever 1 m long with a
   0.25 m square section and E = 3 MPa sags at its free end to 55, 88 and about 99 percent of the Euler-Bernoulli

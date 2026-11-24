@@ -32,6 +32,9 @@ export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 export class SoftBodies implements PhysicsAttachment {
     cellTornByHand: boolean;
     cellDamping: number;
+    femLinearTolerance: number;
+    femMaxLinearIterations: number;
+    femMaxDenseDofs: number;
     splitOnTear: 'cells' | 'all' | 'never';
     substeps: number;
     iterations: number;
@@ -105,6 +108,7 @@ export class SoftBody {
     skin: Skin | null;
     skinCells: Uint32Array<ArrayBuffer>;
     clusterInfo: ClusterInfo[];
+    solverKind: SoftSolver;
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -140,6 +144,8 @@ export class SoftBody {
     bendEdges(): Uint32Array;
     isEdgeTorn(edge: number): boolean;
     tearEdge(edge: number): this;
+    get solver(): SoftSolver;
+    setSolver(solver: SoftSolver): this;
     numClusters(): number;
     addCluster(indices: ArrayLike<number>, hertz?: number): number;
     removeCluster(cluster: number): this;
@@ -201,6 +207,7 @@ export class SoftBodyDesc {
     clusterHertz: number;
     massGiven: boolean;
     skin: Skin | null;
+    solver: SoftSolver;
     constructor(positions: ArrayLike<number> | readonly Vec3[]);
     get particleCount(): number;
     static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
@@ -228,6 +235,7 @@ export class SoftBodyDesc {
     setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
     addCellEdges(): this;
+    setSolver(solver: SoftSolver): this;
     setCellMaterial(material: CellMaterial): this;
     setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
     resolvedMasses(): number[];
@@ -278,6 +286,8 @@ export interface SoftSoftness {
     naturalFrequency: number;
     dampingRatio: number;
 }
+
+export type SoftSolver = 'constraints' | 'fem';
 
 export interface SoftSplit {
     pieces: SoftBody[];

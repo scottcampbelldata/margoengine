@@ -306,6 +306,7 @@ impl World {
         for e in 0..self.edges {
             self.lambda[e] = 0.0;
         }
+        self.fem_implicit(h);
         self.shape_begin();
         self.fem_begin();
         self.volume_begin();

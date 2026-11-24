@@ -22,6 +22,7 @@ mod rigid;
 pub mod collide;
 mod volume;
 pub mod fem;
+mod implicit;
 mod fem_api;
 #[cfg(target_arch = "wasm32")]
 mod heap;

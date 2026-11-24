@@ -304,3 +304,34 @@ fn a_cluster_turns_freely_and_springs_back() {
     let height = (0..n).map(|p| s.y[p]).fold(f32::MIN, f32::max) - (0..n).map(|p| s.y[p]).fold(f32::MAX, f32::min);
     assert!((height - 0.2).abs() < 0.02, "a squashed cluster springs back to {height}");
 }
+
+/// The implicit solver holds a stiffness that does not depend on the passes the step is given: a cantilever of 12 by 3 cells settles at
+/// the same sag with one substep of one pass as with eight, and both are the sag the constraints reach (88 percent of Euler-Bernoulli on
+/// this mesh, the lock of linear tetrahedra), where the constraints with one pass sag far more.
+#[test]
+fn the_implicit_solver_gives_the_same_sag_whatever_the_passes() {
+    let sag = |implicit: bool, substeps: u32, iterations: u32| {
+        let cells = 12;
+        let cell = 0.25 / (cells / 4) as f32;
+        let mut w = bar(cells, cells / 4, cells / 4, cell, 1000.0, 3.0e6, 0.3, 0);
+        clamp(&mut w);
+        w.linear_damping[0] = 4.0;
+        w.fem.damping = 20.0;
+        if implicit {
+            w.fem.imp.reserve_particles(w.particles);
+            for t in 0..w.fem.count {
+                w.fem.flags[t] |= margoengine_soft_kernel::fem::IMPLICIT_TET;
+                // Damping of 20 a second over the cell's shear wave's frequency squared.
+                w.fem.imp.beta[t] = 20.0 / (540.0 * 540.0);
+            }
+        }
+        let far: Vec<usize> = (0..w.particles).filter(|&p| w.x[p] > 0.999).collect();
+        run(&mut w, 6.0, 1.0 / 60.0, substeps, iterations);
+        0.125 - far.iter().map(|&p| w.y[p]).sum::<f32>() / far.len() as f32
+    };
+    let side = 0.25f32;
+    let expected = 1000.0 * 9.81 * side * side / (8.0 * 3.0e6 * (side.powi(4) / 12.0));
+    let (one, many) = (sag(true, 1, 1), sag(true, 8, 4));
+    assert!((one - many).abs() < 0.03 * many, "the sag at one pass is {one}, at many {many}");
+    assert!(many > 0.8 * expected && many < 1.05 * expected, "tip sag {many} against Euler-Bernoulli {expected}");
+}

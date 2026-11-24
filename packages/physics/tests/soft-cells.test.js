@@ -823,3 +823,53 @@ test('a cluster spring that is switched on pulls a twisted body back to its shap
   assert.ok((await twisted(true)) < 1e-3, 'the spring holds the shape');
   assert.ok((await twisted(false)) > 0.02, 'without it the twist stays');
 });
+
+test('the fem solver gives a stiffness that does not depend on the passes, and holds a very stiff material', async () => {
+  const side = 0.25;
+  const sag = async (solver, substeps, iterations, youngsModulus = 3e6, cells = 12) => {
+    const { physics, soft } = await create([0, -9.81, 0], substeps, iterations);
+    const desc = SoftBodyDesc.box(
+      [0, 0, 0],
+      [1, side, side],
+      [cells, cells / 4, cells / 4],
+      rubber({ youngsModulus, density: 1000 }),
+    );
+    desc
+      .setPinnedParticles(plane(desc, 0, 0))
+      .setLinearDamping(4)
+      .setSolver(solver);
+    soft.cellDamping = 20;
+    const body = soft.create(desc);
+    steps(physics, 360);
+    const far = plane(desc, 0, 1);
+    assert.equal(body.solver, solver);
+    return side / 2 - far.reduce((sum, i) => sum + body.particlePosition(i)[1], 0) / far.length;
+  };
+  const expected = (1000 * 9.81 * side * side) / (8 * 3e6 * (side ** 4 / 12));
+  const [one, many] = [await sag('fem', 1, 1), await sag('fem', 8, 4)];
+  assert.ok(Math.abs(one - many) < 0.03 * many, `one pass: ${one}, many: ${many}`);
+  assert.ok(many > 0.8 * expected && many < 1.05 * expected, `tip sag ${many} against Euler-Bernoulli ${expected}`);
+  const constraints = await sag('constraints', 1, 1);
+  assert.ok(constraints > 2 * many, `the constraints with one pass sag far more: ${constraints} against ${many}`);
+  // Steel-like stiffness and one substep: the implicit step does not blow up, and the beam hardly bends.
+  const steel = await sag('fem', 1, 1, 2e9, 8);
+  assert.ok(Number.isFinite(steel) && steel < 0.001, `a stiff beam hardly sags: ${steel}`);
+});
+
+test('the fem solver is switched by body, checked and carried to pieces', async () => {
+  const { soft } = await create();
+  assert.throws(() => SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [1, 1, 1]).setSolver('newton'), RangeError);
+  const body = soft.create(SoftBodyDesc.box([0, 0, 0], [0.4, 0.4, 0.4], [2, 2, 2]).setSolver('fem'));
+  assert.equal(body.solver, 'fem');
+  body.setSolver('constraints');
+  assert.equal(body.solver, 'constraints');
+  assert.throws(() => body.setSolver('x'), RangeError);
+  soft.splitOnTear = 'cells';
+  const event = soft.cut(body.setSolver('fem'), [
+    [0.2, -1, -1],
+    [0.2, 3, -1],
+    [0.2, -1, 3],
+  ]);
+  assert.equal(event.pieces.length, 2);
+  assert.ok(event.pieces.every((piece) => piece.solver === 'fem'));
+});
