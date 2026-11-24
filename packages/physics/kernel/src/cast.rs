@@ -109,6 +109,15 @@ pub struct Cast {
     pub started: bool,
 }
 
+/// How a query shape moves in a turning cast: its centre, in the shape's frame, travels at `linear` while the shape turns about
+/// it at `angular`, a rotation vector a second (Rapier's `NonlinearRigidMotion`).
+#[derive(Clone, Copy)]
+pub struct Turning {
+    pub center: V3,
+    pub linear: V3,
+    pub angular: V3,
+}
+
 /// How far a cast goes and what a start in contact means: Rapier's `ShapeCastOptions`.
 #[derive(Clone, Copy)]
 pub struct CastOptions {
@@ -729,6 +738,79 @@ impl World {
                 }
             }
         }
+    }
+
+    /// The first time in `0..=end` that a query shape starting at `start` and moving as `motion` says (its local `center`
+    /// turning at `angular` radians a second while it travels at `linear`) comes within `o.target` of collider `c`, by
+    /// conservative advancement (Mirtich 1996, "Impulse-based dynamic simulation of rigid body systems", ch. 2; van den Bergen
+    /// 2004): the gap bounds how far time may jump, since no point of the shape moves faster than
+    /// |linear| + |angular| r, r the farthest point from the centre. `o.max` is not read; `end` is the time limit. A start in
+    /// contact is a hit at 0 when `o.stop`, and otherwise one only if the shape is moving into the collider.
+    pub fn cast_collider_turning(&self, c: usize, shape: Shape, start: Pose, motion: &Turning, end: f32, o: &CastOptions) -> Option<Cast> {
+        let mut data = BoxData::new();
+        let solid = self.solid(shape, start, &mut data)?;
+        let (low, high) = bounds(&solid);
+        let center = start.apply(motion.center);
+        let corner = |x: f32, y: f32, z: f32| v3(x, y, z).sub(center);
+        let mut reach = 0.0f32;
+        for i in 0..8 {
+            let p = corner(if i & 1 != 0 { high.x } else { low.x }, if i & 2 != 0 { high.y } else { low.y }, if i & 4 != 0 { high.z } else { low.z });
+            reach = reach.max(sqrt(p.dot(p)));
+        }
+        let speed = sqrt(motion.linear.dot(motion.linear)) + sqrt(motion.angular.dot(motion.angular)) * reach;
+        // The most the gap can fall over the whole motion: a gap beyond it is a miss for good.
+        let window = o.target + speed * end + 1e-3;
+        let pose_at = |t: f32| {
+            let q = Q::from_rotation_vector(motion.angular.scale(t)).mul(start.q);
+            Pose { p: center.add(motion.linear.scale(t)).sub(q.rotate(motion.center)), q }
+        };
+        let probe = |t: f32| -> Option<(f32, Cast)> {
+            let at = pose_at(t);
+            let hit = self.cast_collider(c, shape, at, v3(1.0, 0.0, 0.0), &CastOptions { max: 0.0, target: window, stop: true, geometry: true })?;
+            let apart = hit.on_query.sub(hit.on_target);
+            let gap = if hit.normal.dot(hit.normal) > 0.0 && !self.overlaps(c, shape, at) { sqrt(apart.dot(apart)) } else { 0.0 };
+            Some((gap, Cast { t, ..hit }))
+        };
+        const TOUCH: f32 = 1e-5;
+        let mut t = 0.0f32;
+        for _ in 0..256 {
+            let (gap, hit) = probe(t)?;
+            if gap <= o.target + TOUCH {
+                if t > 0.0 {
+                    return Some(hit);
+                }
+                if o.stop {
+                    return Some(Cast { started: true, ..hit });
+                }
+                // Already touching: a hit only if the shape's touching point is moving into the collider.
+                let lever = hit.on_query.sub(center);
+                let velocity = motion.linear.add(motion.angular.cross(lever));
+                return if velocity.dot(hit.normal) < 0.0 { Some(Cast { started: true, ..hit }) } else { None };
+            }
+            if speed <= 0.0 {
+                return None;
+            }
+            t += (gap - o.target - 0.5 * TOUCH) / speed;
+            if t > end {
+                return None;
+            }
+        }
+        None
+    }
+
+    /// The nearest turning cast hit among the colliders `filter` lets through (see `cast_collider_turning`).
+    pub fn cast_shape_turning(&self, shape: Shape, start: Pose, motion: &Turning, end: f32, o: &CastOptions, filter: &crate::query::Filter) -> Option<(u32, Cast)> {
+        let mut best: Option<(u32, Cast)> = None;
+        self.each_queried(filter, &mut |c| {
+            let limit = best.map_or(end, |(_, b)| b.t);
+            if let Some(hit) = self.cast_collider_turning(c, shape, start, motion, limit, o)
+                && best.is_none_or(|(_, b)| hit.t < b.t)
+            {
+                best = Some((c as u32, hit));
+            }
+            true
+        });
+        best
     }
 
     /// The nearest first touch of a query shape cast from `pose` along unit `r` among the colliders `filter` lets

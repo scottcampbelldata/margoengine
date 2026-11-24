@@ -1120,6 +1120,11 @@ class KernelWorld {
     raycast(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit | null;
     raycastAll(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit[];
     shapeCast(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], direction: readonly number[], cast: KernelCastOptions, flags: number, groups: number, collider: number, body: number): KernelShapeCastHit | null;
+    shapeCastTurning(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], motion: {
+        center: readonly number[];
+        linear: readonly number[];
+        angular: readonly number[];
+    }, end: number, cast: KernelCastOptions, flags: number, groups: number, collider: number, body: number): KernelShapeCastHit | null;
     shapeCastAll(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], direction: readonly number[], cast: KernelCastOptions, flags: number, groups: number, collider: number, body: number): KernelShapeCastHit[];
     projectPoint(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection | null;
     projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[];
@@ -1342,6 +1347,11 @@ class Physics implements EnginePlugin, BodyOwner {
         stop?: (hit: RaycastHit) => boolean;
     }): RaycastHit[];
     shapeCast(shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
+    shapeCastNonlinear(shape: ShapeOptions, position: Vec3, rotation: Quat, motion: {
+        linearVelocity: Vec3;
+        angularVelocity: Vec3;
+        centerOfMass?: Vec3;
+    }, endTime: number, options?: Omit<PhysicsShapeCastOptions, 'maxDistance'>): ShapeCastHit | null;
     projectPoint(point: Vec3, options?: QueryFilter & {
         solid?: boolean;
     }): PointProjection | null;

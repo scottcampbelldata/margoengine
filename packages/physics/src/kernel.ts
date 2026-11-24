@@ -273,6 +273,18 @@ interface KernelExports extends WebAssembly.Exports {
     skip: number,
   ): number;
   query_shape_cast(...words: number[]): number;
+  query_motion(
+    cx: number,
+    cy: number,
+    cz: number,
+    vx: number,
+    vy: number,
+    vz: number,
+    wx: number,
+    wy: number,
+    wz: number,
+  ): void;
+  query_shape_cast_turning(...words: number[]): number;
   query_shape_cast_all(...words: number[]): number;
   query_project_point(
     x: number,
@@ -1792,6 +1804,39 @@ export class KernelWorld {
       direction[1]!,
       direction[2]!,
       cast.max,
+      cast.target,
+      castBits(cast),
+      flags,
+      groups,
+      collider,
+      body,
+    );
+    if (found < 0) throw new RangeError(CAST_REFUSED);
+    return found ? this.readCast(0) : null;
+  }
+  /**
+   * The first touch of a query shape that moves and turns: its `center` (in the shape's frame) travels at `linear` while it turns
+   * about it at `angular`, a rotation vector in radians a second, for up to `end` seconds (Rapier's `cast_shape_nonlinear`).
+   * `distance` of the hit is a time in seconds. `cast.max` is not read.
+   * @throws RangeError for a pose, motion or shape the kernel cannot cast.
+   */
+  shapeCastTurning(
+    shape: KernelQueryShape,
+    position: readonly number[],
+    rotation: readonly number[],
+    motion: { center: readonly number[]; linear: readonly number[]; angular: readonly number[] },
+    end: number,
+    cast: KernelCastOptions,
+    flags: number,
+    groups: number,
+    collider: number,
+    body: number,
+  ): KernelShapeCastHit | null {
+    const { center: c, linear: v, angular: w } = motion;
+    this.api.query_motion(c[0]!, c[1]!, c[2]!, v[0]!, v[1]!, v[2]!, w[0]!, w[1]!, w[2]!);
+    const found = this.api.query_shape_cast_turning(
+      ...this.shapeWords(shape, position, rotation),
+      end,
       cast.target,
       castBits(cast),
       flags,

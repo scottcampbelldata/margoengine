@@ -1552,6 +1552,56 @@ export class Physics implements EnginePlugin, BodyOwner {
     return raw ? this.castHit(raw) : null;
   }
   /**
+   * Sweeps a convex shape that moves and turns, as Rapier's `cast_shape_nonlinear`: the shape starts at `position` and
+   * `rotation`; its `centerOfMass` (in its own frame, default its origin) travels at `linearVelocity` while it turns about
+   * that point at `angularVelocity` (a rotation vector in radians a second), for up to `endTime` seconds. The first collider it
+   * comes within `targetDistance` of is the hit, and `distance` is a time in seconds. A start in contact is a hit at 0 when
+   * `stopAtPenetration` (the default), and otherwise only if the shape is moving into the collider. Found by conservative
+   * advancement (Mirtich 1996; van den Bergen 2004), so no touch within the time is skipped.
+   * @throws RangeError for a number that is not finite or an end time below 0; MargoError `unsupported` for a compound query
+   * shape or a `predicate`.
+   */
+  shapeCastNonlinear(
+    shape: ShapeOptions,
+    position: Vec3,
+    rotation: Quat,
+    motion: { linearVelocity: Vec3; angularVelocity: Vec3; centerOfMass?: Vec3 },
+    endTime: number,
+    options: Omit<PhysicsShapeCastOptions, 'maxDistance'> = {},
+  ): ShapeCastHit | null {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    checkVec(motion.linearVelocity, 'Linear velocity');
+    checkVec(motion.angularVelocity, 'Angular velocity');
+    const center = motion.centerOfMass ?? [0, 0, 0];
+    checkVec(center, 'Center of mass');
+    if (!(endTime >= 0) || !Number.isFinite(endTime))
+      throw new RangeError(
+        `The end time is 0 or more seconds and finite (got ${endTime}); pass how long the shape moves.`,
+      );
+    this.live();
+    if (queryParts(shape) || options.predicate)
+      throw new MargoError(
+        'unsupported',
+        'A turning cast takes one convex shape and no predicate; cast a compound piece by piece, or filter with the query options.',
+      );
+    const raw = this.kernel.shapeCastTurning(
+      queryShape(shape, this.hulls),
+      position,
+      rotation,
+      { center, linear: motion.linearVelocity, angular: motion.angularVelocity },
+      endTime,
+      {
+        max: endTime,
+        target: options.targetDistance ?? 0,
+        stop: options.stopAtPenetration ?? true,
+        geometry: options.computeImpactGeometryOnPenetration ?? true,
+      },
+      ...this.filterWords(options),
+    );
+    return raw ? this.castHit(raw) : null;
+  }
+  /**
    * The point on any collider nearest `point`, or null when no collider is seen. Inside a shape with `solid` true (the
    * default) the point itself; with `solid` false the nearest point of its surface. Inside, `inside` is true and
    * `distance` 0 either way, as on the root entry.

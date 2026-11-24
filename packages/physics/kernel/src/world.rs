@@ -124,6 +124,8 @@ pub struct World {
     /// The upper halves of the next wide queries' groups (`query::QUERY_WIDE`), set by `query_groups_hi`. Not in the arena: a
     /// query leaves no state in the world.
     pub query_groups_hi: u32,
+    /// The motion of the next turning shape cast, set by `query_motion`.
+    pub query_motion: [f32; 9],
 }
 
 impl World {
@@ -146,6 +148,7 @@ impl World {
             modifier: None,
             timing: [0.0; 8],
             query_groups_hi: 0,
+            query_motion: [0.0; 9],
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);

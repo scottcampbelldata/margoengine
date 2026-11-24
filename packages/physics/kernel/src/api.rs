@@ -629,6 +629,35 @@ pub extern "C" fn query_shape_cast(
     }
 }
 
+/// The motion of the next turning shape cast: the centre in the shape's frame, then the linear and the angular velocity.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn query_motion(cx: f32, cy: f32, cz: f32, vx: f32, vy: f32, vz: f32, wx: f32, wy: f32, wz: f32) {
+    world().query_motion = [cx, cy, cz, vx, vy, vz, wx, wy, wz];
+}
+
+/// A shape cast whose shape turns (see `query_motion`): `max` is the time limit in seconds and the direction words are not
+/// read. The hit is written as `query_shape_cast` writes it, its distance a time. -1 for a motion that is not finite.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_shape_cast_turning(
+    kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, max: f32, target: f32, options: u32, flags: u32, groups: u32, collider: u32, body: u32,
+) -> i32 {
+    let Some((shape, pose, _, o, filter)) = cast_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw, 1.0, 0.0, 0.0, max, target, options, flags, groups, collider, body) else { return -1 };
+    let m = world().query_motion;
+    if !m.iter().all(|v| v.is_finite()) || !(max >= 0.0 && max.is_finite()) {
+        return -1;
+    }
+    let motion = crate::cast::Turning { center: v3(m[0], m[1], m[2]), linear: v3(m[3], m[4], m[5]), angular: v3(m[6], m[7], m[8]) };
+    match world().cast_shape_turning(shape, pose, &motion, max, &o, &filter) {
+        Some((c, hit)) => {
+            write_cast(0, c, hit);
+            1
+        }
+        None => 0,
+    }
+}
+
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn cast_args(
     kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, dx: f32, dy: f32, dz: f32, max: f32, target: f32, options: u32, flags: u32,

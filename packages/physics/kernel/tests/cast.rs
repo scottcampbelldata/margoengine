@@ -516,3 +516,46 @@ fn the_world_picks_the_nearest_collider_and_overlaps_follow_gjk() {
         }
     }
 }
+
+#[test]
+fn a_shape_that_turns_hits_what_its_turn_reaches_at_the_time_a_closed_form_gives() {
+    let mut w = world();
+    let body = fixed(&mut w, v3(0.0, 1.5, 0.0), Q::IDENTITY);
+    let ball = w.add_collider(body, SHAPE_BALL, [0.25, 0.0, 0.0], [0.0; 3], ID, 1.0).unwrap();
+    w.broad_update(1.0 / 60.0);
+    // A thin rod along x, 2 m a half length and 0.05 m a half thickness, turning about z at pi rad/s about its middle: its
+    // line is at angle theta, and the ball's centre 1.5 m up is 1.5 cos(theta) from it; they touch at 1.5 cos(theta) = 0.25 + 0.05.
+    let rod = Shape { kind: SHAPE_BOX, size: v3(2.0, 0.05, 0.05), hull: 0, border: 0.0 };
+    let start = Pose { p: v3(0.0, 0.0, 0.0), q: Q::IDENTITY };
+    let spin = Turning { center: ZERO, linear: ZERO, angular: v3(0.0, 0.0, PI) };
+    let o = CastOptions { max: 0.0, target: 0.0, stop: false, geometry: false };
+    let (c, hit) = w.cast_shape_turning(rod, start, &spin, 1.0, &o, &ALL).expect("the turn reaches the ball");
+    let wanted = (0.3f32 / 1.5).acos() / PI;
+    assert!(c == ball && (hit.t - wanted).abs() < 1e-3, "{} against {wanted}", hit.t);
+    assert!(hit.normal.x.abs() > 0.9, "the rod is nearly upright then, so the touch is on its side: {:?}", hit.normal);
+    // The same rod only sliding along x passes under the ball, and only turning 0.4 of a second stops short of it.
+    let slide = Turning { center: ZERO, linear: v3(3.0, 0.0, 0.0), angular: ZERO };
+    assert!(w.cast_shape_turning(rod, start, &slide, 2.0, &o, &ALL).is_none(), "a rod sliding along x misses");
+    assert!(w.cast_shape_turning(rod, start, &spin, 0.4, &o, &ALL).is_none(), "and a turn that ends before the touch misses");
+    // A turn about a centre off the shape: the ball is carried round an axis 3 m away at pi / 2 rad/s, from x = 3 to the ball at y = 1.5.
+    let probe = Shape { kind: SHAPE_BALL, size: v3(0.25, 0.0, 0.0), hull: 0, border: 0.0 };
+    let wheel = Turning { center: v3(-3.0, 0.0, 0.0), linear: ZERO, angular: v3(0.0, 0.0, PI / 2.0) };
+    let (_, hit) = w.cast_shape_turning(probe, Pose { p: v3(0.0, 0.0, 0.0), q: Q::IDENTITY }, &wheel, 4.0, &o, &ALL).expect("the carried ball arrives");
+    // Its centre rides a circle of radius 3 about (-3, 0): it touches the target when the two centres are 0.5 apart.
+    let angle = |t: f32| (PI / 2.0) * t;
+    let at = v3(-3.0 + 3.0 * cos_of(angle(hit.t)), 3.0 * sin_of(angle(hit.t)), 0.0);
+    let apart = sqrt((at.x).powi(2) + (at.y - 1.5).powi(2));
+    assert!((apart - 0.5).abs() < 2e-3, "the centres are {apart} apart when it hits");
+    // A start in contact is a hit at once when the cast stops there, and ignored by one that does not when it moves away.
+    let inside = Pose { p: v3(0.0, 1.6, 0.0), q: Q::IDENTITY };
+    let away = Turning { center: ZERO, linear: v3(0.0, 1.0, 0.0), angular: ZERO };
+    assert!(w.cast_shape_turning(probe, inside, &away, 1.0, &CastOptions { stop: true, ..o }, &ALL).is_some_and(|(_, h)| h.t == 0.0 && h.started));
+    assert!(w.cast_shape_turning(probe, inside, &away, 1.0, &o, &ALL).is_none());
+}
+
+fn cos_of(angle: f32) -> f32 {
+    f64::from(angle).cos() as f32
+}
+fn sin_of(angle: f32) -> f32 {
+    f64::from(angle).sin() as f32
+}
