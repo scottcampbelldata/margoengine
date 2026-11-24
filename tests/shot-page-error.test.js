@@ -86,6 +86,7 @@ const emptyScene = () => ({
 const within = async (ms, promise) => {
   const started = Date.now();
   await promise;
+  // wall-clock: the bound tells a failure at once from the shot's 180 s page timeout.
   assert.ok(Date.now() - started < ms, `took ${Date.now() - started} ms, not under ${ms} ms`);
 };
 
