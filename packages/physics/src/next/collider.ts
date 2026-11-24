@@ -104,7 +104,7 @@ export class PhysicsCollider {
    */
   setShape(options: ColliderOptions): this {
     this.columns();
-    if (!this.reshape) throw new MargoError('state', 'This collider cannot change shape.');
+    if (!this.reshape) throw new MargoError('state', 'This collider cannot change shape; remove it and add another.');
     this.reshape(options);
     return this;
   }
@@ -155,7 +155,9 @@ export class PhysicsCollider {
    */
   setContactSkin(skin: number): this {
     if (!(skin >= 0) || !Number.isFinite(skin))
-      throw new RangeError(`A contact skin is 0 or more metres and finite (got ${skin}).`);
+      throw new RangeError(
+        `A contact skin is 0 or more metres and finite (got ${skin}); pass a few centimetres, such as 0.01.`,
+      );
     this.columns().colliderSkin[this.handle] = skin;
     this.wake();
     return this;
@@ -195,7 +197,10 @@ export class PhysicsCollider {
    * @throws RangeError for a threshold that is negative or not a number.
    */
   setContactForceEventThreshold(threshold: number): this {
-    if (!(threshold >= 0)) throw new RangeError(`A contact force threshold is 0 or more newtons (got ${threshold}).`);
+    if (!(threshold >= 0))
+      throw new RangeError(
+        `A contact force threshold is 0 or more newtons (got ${threshold}); pass 0 for every contact or a force such as 10.`,
+      );
     this.forceThreshold = threshold;
     return this;
   }
