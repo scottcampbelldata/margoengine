@@ -173,3 +173,52 @@ test('a character 2 cm above a floor slides along it without a hit, and a wall s
   assert.equal(wall.collisions, 1);
   physics.dispose();
 });
+
+test('a slope at or above minSlopeSlideAngle slides the character down it, a gentler one holds it, as Rapier does', async () => {
+  const { RapierPhysics } = await import('./oracle.js');
+  const warn = console.warn;
+  console.warn = () => {};
+  await RapierPhysics.load();
+  console.warn = warn;
+  const angle = (25 * Math.PI) / 180;
+  const run = (World, slideAngle) => {
+    const physics = new World(null);
+    physics.addBody(null, {
+      type: 'fixed',
+      rotation: eulerToQuat(0, 0, angle),
+      colliders: { shape: 'box', halfExtents: [10, 0.05, 10] },
+    });
+    const character = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, 1.2, 0],
+      colliders: { shape: 'capsule', halfHeight, radius },
+    });
+    const controller = physics.createCharacterController(character, {
+      minSlopeSlideAngle: slideAngle,
+      maxSlopeClimbAngle: Math.PI / 3,
+      autostep: false,
+      snapToGround: 0.2,
+    });
+    // Settle onto the slope, then let it stand there pulled down a little each step.
+    for (let i = 0; i < 90; i++) {
+      physics.step();
+      controller.move([0, -0.08, 0]);
+    }
+    const [x0] = character.position;
+    for (let i = 0; i < 120; i++) {
+      physics.step();
+      controller.move([0, -0.05, 0]);
+    }
+    const slid = x0 - character.position[0];
+    physics.dispose();
+    return slid;
+  };
+  for (const World of [Physics, RapierPhysics]) {
+    const name = World === Physics ? 'own' : 'Rapier';
+    // 25 degrees is at or above 20 degrees: it slides downhill (towards -x); it is gentler than 40: it holds.
+    const slides = run(World, (20 * Math.PI) / 180),
+      holds = run(World, (40 * Math.PI) / 180);
+    assert.ok(slides > 0.5, `${name}: slid ${slides} m on a slope over the slide angle`);
+    assert.ok(Math.abs(holds) < 0.05, `${name}: moved ${holds} m on a slope under the slide angle`);
+  }
+});

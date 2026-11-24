@@ -61,6 +61,8 @@ export interface CharacterMoveFilter {
 }
 
 const EPS = 1e-6;
+/** How much of a unit motion may point into a surface for the motion to count as along it. */
+const GRAZE = 1e-3;
 type V = [number, number, number];
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const length = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
@@ -209,7 +211,13 @@ export class CharacterController {
     if (flags & 16) exclude.excludeSolids = true;
     const predicate = filter?.predicate;
     if (predicate) exclude.predicate = (_body, hit) => predicate(hit);
-    const cast = (position: Vec3, direction: Vec3, max: number, ignoreDynamic = false): ShapeCastHit | null =>
+    const cast = (
+      position: Vec3,
+      direction: Vec3,
+      max: number,
+      ignoreDynamic = false,
+      target = this.offset,
+    ): ShapeCastHit | null =>
       this.owner.shapeCast(shape, position, rotation, direction, {
         ...exclude,
         excludeDynamic: exclude.excludeDynamic || ignoreDynamic,
@@ -217,7 +225,7 @@ export class CharacterController {
         // The controller rests a skin off what it stands on and slides along it, so a shape that touches without moving into
         // a surface is not an obstacle: only a cast that closes the gap to the target distance stops it.
         stopAtPenetration: false,
-        targetDistance: this.offset,
+        targetDistance: target,
       });
     const probeGround = (position: Vec3): boolean => {
       const hit = cast(position, down, this.offset * 2 + 1e-3);
@@ -233,7 +241,14 @@ export class CharacterController {
       const span = length(remaining);
       if (span < EPS) break;
       const direction = scale(remaining, 1 / span),
-        hit = cast(position, direction, span);
+        first = cast(position, direction, span);
+      // A character resting at its skin distance from a surface is already within the target distance of it, so a cast along
+      // that surface reports a hit at distance 0 although nothing is in the way. A hit that is not approached (the motion
+      // goes along or away from the surface) is no obstacle: cast again to touch, so what really lies ahead still stops it.
+      const hit =
+        first && first.distance <= EPS && dot(direction, first.normal) > -GRAZE
+          ? cast(position, direction, span, false, 0)
+          : first;
       if (!hit) {
         position = axpy(position, 1, remaining);
         remaining = [0, 0, 0];
