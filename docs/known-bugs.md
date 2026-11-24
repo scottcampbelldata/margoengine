@@ -6,17 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-24: a cone joint with a rest pose off its frames drives itself to its limit under a rotation motor (KB-PHYS-SWITCH-CONE1, physics, ragdoll)
+### Fixed 2026-11-24: a cone joint with a rest pose off its frames drives itself to its limit under a rotation motor (KB-PHYS-SWITCH-CONE1, physics, ragdoll)
 
-- **Repro:** body A fixed at identity; body B a 1 m rod (mass 2, box offset 0.5 m along Y) rotated by `R` = 0.15 rad about X; `addJoint(A, B, {type: 'cone', frameA: R * fB, frameB: fB, swing: 3, twist: [-0.5, 0.5]})` with `fB` = the quarter turn about Z that takes frame X to the bone's Y. Every step `setRotationMotor([0, 0, 0, 1], {model: 'force', stiffness: I w^2, damping: 2 I w 0.7, maxForce: 1e6})` (w = 2 pi 8; the target is identity, which is `frameA^-1 * R * frameB` for the rest pose). The rod holds at rest with identity frames, with `frameA = frameB` and with `frameA = R, frameB = identity`, but with the two together it swings to the 3 rad limit within 20 steps (0.15 rad: 2.2, 3.1, 2.0 rad; the acceleration model sits at 3.0). The spherical joint and the cone without the combination hold.
-- **Cause:** not found; the drive rows of a cone (`drive_rows` in `joints.rs`) are the only code that reads frames this way. Ragdolls build exactly this joint (rest rotation `R` and frame X on the bone axis), so on it 29 of 89 ragdoll tests fail (a head "turned 0.71 rad" under its motors, hips drift).
-- **State:** the ragdoll stays on a spherical joint with its own limit projection (5 failing tests: the two limit tests, the two hull silhouettes, the balance sink) until the cone holds this case. Dynamics work in `packages/physics/kernel`.
+- **Repro:** as the entry stood: body A fixed at identity; body B a rod rotated by 0.15 rad about X; a cone with `frameA: R * fB`, `frameB: fB` (a quarter turn about Z), and every step a rotation motor aimed at identity. The rod swung to the 3 rad limit within 20 steps.
+- **Cause:** the motor impulses a joint carries from one substep to the next were pushed along the joint's own rows (a cone's twist and swing rows) instead of the rotation drive's rows. With frames aligned the two sets of axes agree and the push was right; with a rest pose off the frames they do not, and the carried impulse drove the rod away from its target.
+- **Fix:** `carry` in `kernel/src/joints.rs` takes the drive's rows for a joint with a rotation drive. Regression: `packages/physics/tests/next-cone-motor.test.js` ("a cone whose rest pose lies off its frames holds that pose"), which fails without it.
 
 ### Open 2026-11-24: ragdoll balance and push recovery were tuned on Rapier's joints (KB-PHYS-SWITCH-BAL1, ragdoll)
 
 - **Repro:** `node --test packages/ragdoll/tests/balance.test.js`: "without it the character folds up" reads `motors alone sink (0.4004 of 0.4057)` (the kernel's motors hold the standing pose instead of folding), and "pushed to its left it steps that way, catches itself and stands" ends moving at 0.77 m/s.
 - **Cause:** the balance controller's gains, `LEG_INERTIA` and solver passes were measured against Rapier's softer joints and iteration scheme. The kernel's joints and 8 substeps of 2 passes answer differently. `SOLVER_PASSES` is 16 now (8 substeps of the world plus the island's extra substeps).
-- **State:** to retune after the cone rotation motor above lands.
+- **State:** the cone rotation motor now holds (KB-PHYS-SWITCH-CONE1 above); retuning is the open work.
 
 ### Open 2026-11-24: a query with no `groups` misses colliders whose filter is 0 (KB-PHYS-SWITCH-GROUPS1, physics collision)
 
