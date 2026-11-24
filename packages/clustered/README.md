@@ -1056,7 +1056,7 @@ fragment marches a short ray toward each light through the previous frame's scen
 of that light (default 0.8; `setStrengths` sets it per light index, 0 turns a light off). Options: `distance` (0.3),
 `thickness` (0.1), `steps` (12), `bias` (0.01) and `depth`, the scene's single-sample depth texture or a callback for
 it; omitted, it shares the scene-depth capture water and HTML panels use, which SSAO and depth of field refuse (pass
-their stack's `depthTexture` then). It works with or without shadow maps and adds binding 145. It reads one frame late
+their stack's `depthTexture` then). A callback is the form to prefer: a plain `depth` texture belongs to the device it was made on, so after a device restore it is dropped, the march stays off, the loss is reported once through `engine.onError` and `contact.setDepth(texture)` brings it back (docs/conventions.md, "Borrowed GPU objects"). It works with or without shadow maps and adds binding 145. It reads one frame late
 (a moving caster's contact trails it by a frame), only what is on screen casts, and receivers added with
 `receiveShadow: false` skip it.
 

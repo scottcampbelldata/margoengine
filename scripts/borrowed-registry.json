@@ -62,8 +62,8 @@
       "reason": "a live cube object read each frame (a CubeCamera that rebuilds its own view after a restore), the same as a per-frame getter (rule 6)"
     },
     "clustered:ContactLightOptions.depth": {
-      "status": "pending",
-      "reason": "plan site"
+      "status": "ruled",
+      "source": "packages/clustered/src/contact.ts"
     },
     "clustered:LocalShadowPrimitive.alphaSampler": {
       "status": "exempt",

@@ -22,6 +22,7 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
     readonly term = "clusterContact(index,light,l,position,n,pixel)";
     readonly lights: Clustered;
     constructor(options: ContactLightOptions);
+    setDepth(depth: GPUTexture | (() => GPUTexture | undefined)): this;
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: ContactLightOptions): ContactLights;
     get list(): readonly (number | null | undefined)[];

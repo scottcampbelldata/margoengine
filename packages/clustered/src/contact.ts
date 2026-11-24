@@ -15,6 +15,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { acquireDepth } from '../../shared/gpu.js';
+import { TextureOption, type TextureSource2D } from '../../shared/texture-option.js';
 import type { Clustered, ClusteredLightTerm } from './index.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number };
 
@@ -117,6 +118,8 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
   private group?: GPUBindGroup;
   private source?: GPUTexture;
   private shared?: ReturnType<typeof acquireDepth>;
+  /** The caller's `depth`, held by the borrowed-object rule (docs/conventions.md); undefined without the option. */
+  private depthOption?: TextureOption;
   private entries: GPUBindGroupEntry[] = [];
   private readonly header = new Float32Array(HEADER);
   private readonly workspace = new Float64Array(52);
@@ -127,6 +130,21 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
       throw new TypeError('ContactLights needs the Clustered lights: new ContactLights({ lights })');
     this.lights = options.lights;
     this.validate();
+    if (options.depth !== undefined)
+      this.depthOption = new TextureOption(options.depth as TextureSource2D, 'ContactLights depth', 'setDepth');
+  }
+  /**
+   * Replaces `options.depth` from the next frame: the single-sample scene depth, or `() => GPUTexture | undefined` read
+   * every frame. Call it from `onDeviceRestored` with a texture of the new device; a plain texture held at a device
+   * restore is dropped (the march stays off, reported once through `engine.onError`) while the frame keeps drawing.
+   */
+  setDepth(depth: GPUTexture | (() => GPUTexture | undefined)): this {
+    if (typeof depth !== 'function' && typeof depth?.createView !== 'function')
+      throw new TypeError('ContactLights depth must be a GPUTexture or a callback giving one');
+    this.options.depth = depth;
+    if (this.depthOption) this.depthOption.set(depth as TextureSource2D, this.engine?.gpu);
+    else this.depthOption = new TextureOption(depth as TextureSource2D, 'ContactLights depth', 'setDepth');
+    return this;
   }
   get owner(): Engine | undefined {
     return this.engine;
@@ -188,6 +206,7 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
       );
     this.engine = engine;
     this.device = engine.gpu;
+    this.depthOption?.fix(engine.gpu);
     if (this.options.depth === undefined) this.shared = acquireDepth(engine);
     this.staging = this.device.createBuffer({
       size: HEADER_BYTES,
@@ -245,8 +264,11 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
         if (c.view && (c.view.index > 0 || c.view.target)) return;
         for (const old of this.retired.splice(0)) old.destroy();
         this.validate();
-        const depth = this.options.depth,
-          texture = typeof depth === 'function' ? depth() : (depth ?? this.shared?.texture());
+        // The options object is read every frame: a `depth` assigned straight onto it is taken like `setDepth`.
+        const given = this.options.depth;
+        if (given !== undefined && this.depthOption && this.depthOption.value !== given)
+          this.depthOption.set(given as TextureSource2D, c.device);
+        const texture = this.depthOption ? this.depthOption.get(c.device, this.engine) : this.shared?.texture();
         if (texture && texture.sampleCount > 1)
           throw new RangeError('ContactLights needs a single-sample depth texture; pass the resolved scene depth');
         const width = texture?.width ?? 0,
