@@ -78,7 +78,8 @@ export type ShapeOptions2D =
       /**
        * A grid of solid cells, `columns` by `rows`, row by row from the top; `solid[i]` non-zero is a filled cell.
        * Neighbouring cells merge into outlines, so bodies slide across their seams. The grid's top left is the offset.
-       * Outlines have no thickness, so a very fast body needs `ccd: true`.
+       * Contact is by the merged outlines, which have no thickness, so a very fast body needs `ccd: true`; scene queries meet
+       * the filled cells themselves, so a point inside a cell is found. The collider cannot be rotated (turn the body).
        */
       shape: 'voxels';
       cellWidth: number;
@@ -170,7 +171,7 @@ const radiusOf = (value: number | undefined): number => {
   return value;
 };
 
-const KIND = { circle: 0, capsule: 1, segment: 2, rect: 3, polygon: 4, chain: 5, decomposed: 6 } as const;
+const KIND = { circle: 0, capsule: 1, segment: 2, rect: 3, polygon: 4, chain: 5, decomposed: 6, voxels: 7 } as const;
 
 /** A collider ready for the kernel: its shape kind, the eight settings words and the geometry words, in metres. */
 export interface Described {
@@ -429,11 +430,23 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
       for (let i = 0; i < grid.length; i++) grid[i] = solid[i] ? 1 : 0;
       const loops = cellOutlines(grid, columns, rows);
       if (!loops.length) throw new RangeError('voxels has no solid cell; fill at least one.');
-      return loops.map((loop) => {
+      const pieces = loops.map((loop) => {
         const points = loop.map((p): Vec2D => [p[0] * cellWidth, p[1] * cellHeight]);
         points.push(points[0]);
         return describeShape(rest({ shape: 'polyline', points }), scale);
       });
+      // The cells themselves, for queries: the grid is placed by the collider's offset and rotation like its outlines.
+      if (turn !== 0) throw new RangeError('A voxels collider cannot be rotated; turn the body instead.');
+      const words = Math.ceil((columns * rows) / 32);
+      const buffer = new Buffer32(15 + words);
+      buffer.u[0] = columns;
+      buffer.u[1] = rows;
+      buffer.f.set([cellWidth * scale, cellHeight * scale, ox * scale, oy * scale], 2);
+      buffer.u[6] = words;
+      for (let i = 0; i < grid.length; i++) if (grid[i]) buffer.u[7 + (i >> 5)] |= 1 << (i & 31);
+      const first = describeShape(rest({ shape: 'box', width: 1, height: 1 }), scale);
+      pieces.push({ ...first, kind: KIND.voxels, geometry: buffer.u.subarray(0, 7 + words), area: 0, convex: false });
+      return pieces;
     }
     default:
       return [describeShape(options, scale)];

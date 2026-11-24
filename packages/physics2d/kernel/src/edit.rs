@@ -20,8 +20,9 @@ impl World {
         let (before, body) = (shape.clone(), shape.body);
         let s = &mut self.shapes[id as usize];
         s.hooks = def.hooks;
+        let density = if s.grid.is_some() { 0.0 } else { def.density };
         (s.density, s.friction, s.restitution, s.groups, s.solver_groups, s.sensor, s.events, s.active_types, s.force_threshold) =
-            (def.density, def.friction, def.restitution, def.groups, def.solver_groups, def.sensor, def.events, def.active_types, def.force_threshold);
+            (density, def.friction, def.restitution, def.groups, def.solver_groups, def.sensor, def.events, def.active_types, def.force_threshold);
         if let Err(error) = self.update_mass(body) {
             self.shapes[id as usize] = before;
             return Err(error);

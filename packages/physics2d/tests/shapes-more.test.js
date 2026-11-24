@@ -96,7 +96,13 @@ test('voxels merge into outlines: a cup of cells holds a ball', () => {
   // 5 columns by 3 rows: a U.
   const solid = [1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1];
   fixed(physics, { shape: 'voxels', cellWidth: 16, cellHeight: 16, columns: 5, rows: 3, solid }, [0, 100]);
-  // The outline has no thickness: a ray down the cup meets the top of the floor row, and one through a wall meets its edge.
+  // The cells answer queries as solids: points inside a filled cell are found, the cup is empty.
+  assert.equal(physics.overlapPoint([40, 140]).length, 1, 'inside the floor row');
+  assert.equal(physics.overlapPoint([8, 120]).length, 1, 'inside the left wall');
+  assert.equal(physics.overlapPoint([40, 110]).length, 0, 'in the cup');
+  assert.equal(physics.overlapShape({ shape: 'circle', radius: 3 }, [40, 130]).length, 1, 'a circle reaching the floor row');
+  assert.equal(physics.projectPoint([8, 120]).inside, true);
+  // Contact is by the merged outlines: a ray down the cup meets the top of the floor row, and one through a wall its edge.
   assert.ok(Math.abs(physics.raycast([40, 0], [0, 1]).distance - 132) < 0.01, 'the cup is open and its floor is at 132');
   assert.ok(Math.abs(physics.raycast([-10, 120], [1, 0]).distance - 10) < 0.01, 'the left wall starts at x = 0');
   const ball = drop(physics, 40, 0, 5);

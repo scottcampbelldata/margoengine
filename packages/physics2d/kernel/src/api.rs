@@ -273,6 +273,7 @@ const RECT: u32 = 3;
 const POLYGON: u32 = 4;
 const CHAIN: u32 = 5;
 const DECOMPOSED: u32 = 6;
+const VOXELS: u32 = 7;
 
 fn shape_def() -> ShapeDef {
     let flags = io()[5];
@@ -346,6 +347,16 @@ pub extern "C" fn shape_create(handle: i32, body: u32, kind: u32) -> i32 {
                         }
                     }
                 }
+            }
+            VOXELS => {
+                let (cols, rows) = (io()[8], io()[9]);
+                let (cell, origin, n) = (point(10), point(12), io()[14] as usize);
+                if 15 + n > io().len() {
+                    return Err(PhysicsError::InvalidParameter);
+                }
+                let bits: Vec<u32> = io()[15..15 + n].to_vec();
+                let grid = crate::voxel::Grid::new(cols, rows, cell, origin, &bits).ok_or(PhysicsError::InvalidParameter)?;
+                made.push(w.create_voxels(body, grid, &def)?);
             }
             _ => {
                 let core = read_core(kind, 8)?;

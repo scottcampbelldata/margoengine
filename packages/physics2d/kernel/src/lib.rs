@@ -26,6 +26,7 @@ pub mod shape;
 pub mod smooth;
 pub mod snapshot;
 pub mod solver;
+pub mod voxel;
 pub mod world;
 
 /// The Wasm build's memory allocator (kernel-common's size-class heap over linear memory); native builds use the system's.

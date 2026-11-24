@@ -65,7 +65,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Shapes | convex polygon, convex decomposition of concave or large input | `polygon` (convex hull to 8 corners; concave or larger split by ear clipping and Hertel-Mehlhorn) | full |
 | Shapes | polyline | `polyline` (chains with ghost vertices: bodies slide over the joins) | full |
 | Shapes | triangle, round (border radius) cuboid, triangle and convex polygon, trimesh | `triangle`, `borderRadius` on `box`, `polygon` and `triangle`, `trimesh` (triangles by index) | full |
-| Shapes | heightfield, halfspace, compound, voxels, shared shapes | `heightfield` (a smooth chain), `halfspace` (a polygon 200,000 units across), `compound` (parts with their own placement), `voxels` (merged outlines, no thickness); shape options are plain values, so one can be reused on any number of colliders | full, with the accepted differences in limits |
+| Shapes | heightfield, halfspace, compound, voxels, shared shapes | `heightfield` (a smooth chain), `halfspace` (a polygon 200,000 units across), `compound` (parts with their own placement), `voxels` (merged outlines for contact, the cells themselves for queries); shape options are plain values, so one can be reused on any number of colliders | full, with the accepted differences in limits |
 | Shapes | oriented (one-sided) polyline | `polyline` with `oneSided: true` | full |
 | Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
 | Collision | continuous collision detection | `ccd` against fixed, kinematic and dynamic bodies (a dynamic one it meets is put back to the same time) | full |
@@ -144,6 +144,8 @@ npm run check:rust-kernels -- --packages=physics2d
 [Performance history](../../docs/whitepaper/perf-history.md) records the modest paired gain and the remaining Box2D
 loss; the 0.35 ms narrow-phase target has not been met. Browser evidence covers Edge WebGPU/WebGL2 and Firefox
 WebGL2; Firefox WebGPU has no adapter on the test installation.
+
+Rapier 2D is not a dependency of this package. `tests/oracle-rapier.test.js` compares scenes with it live when `RAPIER2D_MODULE` names the `rapier.mjs` of a `@dimforge/rapier2d-compat` 0.21 you installed outside the repository (a black box, for comparison only); without it those tests are listed as not run.
 
 ### Checked Rust input
 

@@ -14,7 +14,7 @@ use margoengine_physics_kernel_common::broad::Bounds;
 
 use crate::error::PhysicsError;
 use crate::manifold::collide;
-use crate::math::{V2, Xf, sqrt};
+use crate::math::{V2, Xf, sqrt, v2};
 use crate::shape::{Core, LINEAR_SLOP};
 use crate::world::{Kind, World, groups_meet};
 
@@ -157,6 +157,36 @@ pub fn ray_core(core: &Core, o: V2, d: V2, max: f32, solid: bool) -> Option<(f32
     (hit.0 <= max).then_some(hit)
 }
 
+/// The first touch of `core` slid from `xf` along the unit `direction` for at most `max` with `target` at `target_xf`.
+fn cast_against(core: &Core, xf: Xf, direction: V2, max: f32, target: &Core, target_xf: Xf) -> Result<Option<CastHit>, PhysicsError> {
+    let tolerance = 0.1 * LINEAR_SLOP;
+    let mut t = 0.0f32;
+    for _ in 0..64 {
+        let at = Xf { p: xf.p.add(direction.scale(t)), q: xf.q };
+        let m = collide(core, at, target, target_xf, 1.0e4)?;
+        let Some(nearest) = m.points[..m.count].iter().copied().reduce(|a, b| if b.separation < a.separation { b } else { a }) else {
+            return Ok(None);
+        };
+        let gap = nearest.separation;
+        let closing = direction.dot(m.normal);
+        // Touching and not closing (sliding along a face, or moving away) is not a hit: the distance of convex shapes
+        // cannot fall from there. Overlapping deeper than the tolerance is.
+        if gap <= tolerance && (closing > 1.0e-6 || gap < -tolerance) {
+            let half = m.normal.scale(0.5 * gap);
+            // `point` lies midway between the surfaces: take the surface points either side of it.
+            return Ok(Some(CastHit { shape: 0, t, point_a: nearest.point.sub(half), point_b: nearest.point.add(half), normal: m.normal }));
+        }
+        if closing <= 0.0 {
+            return Ok(None);
+        }
+        t += gap / closing;
+        if t > max {
+            return Ok(None);
+        }
+    }
+    Ok(None)
+}
+
 /// The closest point of `core` to `p` (in the core's frame) and whether `p` is inside it.
 pub fn project_core(core: &Core, p: V2) -> (V2, bool) {
     let r = core.radius;
@@ -215,7 +245,23 @@ impl World {
             }
             let shape = &self.shapes[id as usize];
             let xf = self.bodies[shape.body as usize].xf;
-            let (local, inside) = project_core(&shape.core, xf.apply_inverse(point));
+            let q = xf.apply_inverse(point);
+            let (local, inside) = match &shape.grid {
+                Some(grid) if grid.contains(q) => (q, true),
+                Some(grid) => {
+                    // The nearest point of the nearest filled cell.
+                    let mut best = (f32::INFINITY, q);
+                    for (c, r) in grid.filled_cells() {
+                        let (p, _) = project_core(&grid.cell_core(c, r), q);
+                        let d = q.sub(p).length_squared();
+                        if d < best.0 {
+                            best = (d, p);
+                        }
+                    }
+                    (best.1, false)
+                }
+                None => project_core(&shape.core, q),
+            };
             let world = if inside { point } else { xf.apply(local) };
             let distance = if inside { 0.0 } else { point.sub(world).length() };
             all.push(Projection { shape: id, point: world, inside, distance });
@@ -292,7 +338,11 @@ impl World {
             let shape = &self.shapes[id as usize];
             let xf = self.bodies[shape.body as usize].xf;
             let (o, d) = (xf.apply_inverse(origin), xf.q.apply_inverse(direction));
-            if let Some((t, n)) = ray_core(&shape.core, o, d, max, solid) {
+            let found = match &shape.grid {
+                Some(grid) => grid.ray(o, d, max, solid),
+                None => ray_core(&shape.core, o, d, max, solid),
+            };
+            if let Some((t, n)) = found {
                 hits.push(RayHit { shape: id, t, normal: xf.q.apply(n) });
             }
         }
@@ -315,7 +365,11 @@ impl World {
         found.retain(|&id| {
             self.accepts(id, filter) && {
                 let shape = &self.shapes[id as usize];
-                core_distance(&shape.core, self.bodies[shape.body as usize].xf.apply_inverse(point)) <= 0.0
+                let local = self.bodies[shape.body as usize].xf.apply_inverse(point);
+                match &shape.grid {
+                    Some(grid) => grid.contains(local),
+                    None => core_distance(&shape.core, local) <= 0.0,
+                }
             }
         });
         Ok(found)
@@ -332,8 +386,28 @@ impl World {
                 continue;
             }
             let shape = &self.shapes[id as usize];
-            let m = collide(core, xf, &shape.core, self.bodies[shape.body as usize].xf, 0.0)?;
-            if m.points[..m.count].iter().any(|p| p.separation <= 0.0) {
+            let target = self.bodies[shape.body as usize].xf;
+            let touching = |other: &Core| -> Result<bool, PhysicsError> {
+                let m = collide(core, xf, other, target, 0.0)?;
+                Ok(m.points[..m.count].iter().any(|p| p.separation <= 0.0))
+            };
+            let hit = match &shape.grid {
+                Some(grid) => {
+                    // The query box in the grid's frame, then each filled cell it reaches.
+                    let local = Xf::inverse_mul(target, xf);
+                    let b = crate::world::bounds_of(core, local)?;
+                    let mut any = false;
+                    for (c, r) in grid.cells_in(v2(b.min[0], b.min[1]), v2(b.max[0], b.max[1])) {
+                        if touching(&grid.cell_core(c, r))? {
+                            any = true;
+                            break;
+                        }
+                    }
+                    any
+                }
+                None => touching(&shape.core)?,
+            };
+            if hit {
                 out.push(id);
             }
         }
@@ -357,38 +431,38 @@ impl World {
         };
         let mut found = Vec::new();
         self.query_boxes(&bounds, &mut found);
-        let tolerance = 0.1 * LINEAR_SLOP;
         let mut hits = Vec::new();
-        'shapes: for id in found {
+        for id in found {
             if !self.accepts(id, filter) {
                 continue;
             }
             let shape = &self.shapes[id as usize];
             let target = self.bodies[shape.body as usize].xf;
-            let mut t = 0.0f32;
-            for _ in 0..64 {
-                let at = Xf { p: xf.p.add(direction.scale(t)), q: xf.q };
-                let m = collide(core, at, &shape.core, target, 1.0e4)?;
-                let Some(nearest) = m.points[..m.count].iter().copied().reduce(|a, b| if b.separation < a.separation { b } else { a }) else {
-                    continue 'shapes;
-                };
-                let gap = nearest.separation;
-                let closing = direction.dot(m.normal);
-                // Touching and not closing (sliding along a face, or moving away) is not a hit: the distance of convex
-                // shapes cannot fall from there. Overlapping deeper than the tolerance is.
-                if gap <= tolerance && (closing > 1.0e-6 || gap < -tolerance) {
-                    let half = m.normal.scale(0.5 * gap);
-                    // `point` lies midway between the surfaces: take the surface points either side of it.
-                    hits.push(CastHit { shape: id, t, point_a: nearest.point.sub(half), point_b: nearest.point.add(half), normal: m.normal });
-                    continue 'shapes;
+            let mut best: Option<CastHit> = None;
+            let mut consider = |hit: Option<CastHit>| {
+                if let Some(h) = hit {
+                    if best.is_none_or(|b| h.t < b.t) {
+                        best = Some(CastHit { shape: id, ..h });
+                    }
                 }
-                if closing <= 0.0 {
-                    continue 'shapes;
+            };
+            match &shape.grid {
+                Some(grid) => {
+                    // The swept box in the grid's frame, then each filled cell it reaches as a box.
+                    let (mut lo, mut hi) = (v2(f32::MAX, f32::MAX), v2(f32::MIN, f32::MIN));
+                    for (x, y) in [(bounds.min[0], bounds.min[1]), (bounds.max[0], bounds.min[1]), (bounds.max[0], bounds.max[1]), (bounds.min[0], bounds.max[1])] {
+                        let p = target.apply_inverse(v2(x, y));
+                        lo = v2(lo.x.min(p.x), lo.y.min(p.y));
+                        hi = v2(hi.x.max(p.x), hi.y.max(p.y));
+                    }
+                    for (c, r) in grid.cells_in(lo, hi) {
+                        consider(cast_against(core, xf, direction, max, &grid.cell_core(c, r), target)?);
+                    }
                 }
-                t += gap / closing;
-                if t > max {
-                    continue 'shapes;
-                }
+                None => consider(cast_against(core, xf, direction, max, &shape.core, target)?),
+            }
+            if let Some(h) = best {
+                hits.push(h);
             }
         }
         hits.sort_by(|a, b| a.t.total_cmp(&b.t).then(a.shape.cmp(&b.shape)));

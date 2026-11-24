@@ -241,6 +241,8 @@ pub(crate) fn pair_allowed(sa: &Shape, ka: Kind, sb: &Shape, kb: Kind) -> bool {
     (sa.active_types & bit) != 0
         && (sb.active_types & bit) != 0
         && groups_meet(sa.groups, sb.groups)
+        && sa.grid.is_none()
+        && sb.grid.is_none()
         && (sa.sensor || sb.sensor || ka == Kind::Dynamic || kb == Kind::Dynamic)
 }
 
@@ -264,6 +266,9 @@ pub struct Shape {
     pub force_threshold: f32,
     pub one_sided: bool,
     pub hooks: u8,
+    /// A grid of solid cells that scene queries meet in place of the core (the core is its bounding box); such a shape
+    /// takes part in no contact.
+    pub grid: Option<alloc::boxed::Box<crate::voxel::Grid>>,
     /// A removed shape keeps its slot until a new shape takes it.
     pub dead: bool,
 }
@@ -680,7 +685,7 @@ impl World {
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, dead: false };
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, grid: None, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {
@@ -700,6 +705,17 @@ impl World {
             return Err(error);
         }
         Ok((id, bounds))
+    }
+
+    /// A grid of solid cells on `body` that queries (points, rays, overlaps, casts) meet cell by cell and that touches
+    /// nothing: pair it with outlines of the same cells for contact. It adds no mass.
+    pub fn create_voxels(&mut self, body: u32, grid: crate::voxel::Grid, def: &ShapeDef) -> Result<u32, PhysicsError> {
+        if !grid.any() {
+            return Err(PhysicsError::Degenerate);
+        }
+        let id = self.create_shape(body, grid.bounds_core(), &ShapeDef { density: 0.0, ..*def })?;
+        self.shapes[id as usize].grid = Some(alloc::boxed::Box::new(grid));
+        Ok(id)
     }
 
     /// A polyline through `points` (the body's frame) as one segment shape a pair of points, each knowing its neighbours'

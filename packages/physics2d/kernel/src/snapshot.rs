@@ -13,7 +13,7 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-const VERSION: u32 = 3;
+const VERSION: u32 = 4;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -216,6 +216,18 @@ impl World {
             for v in [f.min[0], f.min[1], f.max[0], f.max[1]] {
                 w.f32(v);
             }
+            w.bool(sh.grid.is_some());
+            if let Some(g) = &sh.grid {
+                w.u32(g.cols);
+                w.u32(g.rows);
+                w.v2(g.cell);
+                w.v2(g.origin);
+                let bits = g.bits();
+                w.u32(bits.len() as u32);
+                for word in bits {
+                    w.u32(word);
+                }
+            }
         }
         w.u32(self.joints.len() as u32);
         for (j, &id) in self.joints.iter().zip(&self.joint_ids) {
@@ -373,10 +385,22 @@ impl World {
             let (one_sided, hooks, dead) = (r.bool()?, r.u8()?, r.bool()?);
             let has_fat = r.bool()?;
             let f = [r.f32()?, r.f32()?, r.f32()?, r.f32()?];
+            let grid = if r.bool()? {
+                let (cols, rows) = (r.u32()?, r.u32()?);
+                let (cell, origin) = (r.v2()?, r.v2()?);
+                let n = r.count(4)?;
+                let mut bits = Vec::with_capacity(n);
+                for _ in 0..n {
+                    bits.push(r.u32()?);
+                }
+                Some(alloc::boxed::Box::new(crate::voxel::Grid::new(cols, rows, cell, origin, &bits).ok_or(PhysicsError::InvalidParameter)?))
+            } else {
+                None
+            };
             if has_fat {
                 world.broad_place_exact(id as u32, &Bounds { min: [f[0], f[1]], max: [f[2], f[3]] });
             }
-            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, dead });
+            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, grid, dead });
         }
         let n = r.count(40)?;
         for _ in 0..n {
