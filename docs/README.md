@@ -6,7 +6,7 @@ Search all 108 packages by task, package name or public runtime export. Copy ins
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
 Draco/Meshopt support in glTF PBR and synchronous parsing behavior. The core and the stage together measure
-**60,984 bytes raw / 24,797 bytes gzip**, below the 25,000-byte combined gzip ceiling. That figure is the engine, not an app: React, models and optional packages add to it. The
+**60,994 bytes raw / 24,811 bytes gzip**, below the 25,000-byte combined gzip ceiling. That figure is the engine, not an app: React, models and optional packages add to it. The
 [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) list every package entry, and the measured size of a React page is in
 [limits](limits.md).
 
