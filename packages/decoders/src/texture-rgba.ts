@@ -8,7 +8,9 @@ import type { DecodedImage } from './image.js';
  * formats map -1..1 to 0..255, as a normal map stored in an unsigned image does, so a missing channel is 128. Float
  * formats hold linear light, so they clamp to 0..1 and are sRGB encoded.
  *
- * @throws MargoError `unsupported` for ETC, EAC and ASTC blocks, which are not decoded on the CPU.
+ * ETC2 and EAC blocks are decoded on the CPU as well (`etc2-rgb8unorm` to `eac-rg11snorm`, with or without `-srgb`).
+ *
+ * @throws MargoError `unsupported` for ASTC blocks, which are not decoded on the CPU.
  */
 export async function textureFileToRGBA(file: TextureFile): Promise<DecodedImage> {
   const { width, height, data: all } = file.mipmaps[0],
@@ -18,6 +20,10 @@ export async function textureFileToRGBA(file: TextureFile): Promise<DecodedImage
   if (format.startsWith('bc')) {
     const { decodeBC } = await import('./bc.js');
     return decodeBC(format, all, width, height);
+  }
+  if (/^(etc2|eac)-/.test(format)) {
+    const { decodeETC } = await import('./etc.js');
+    return decodeETC(format, all, width, height);
   }
   const { halfToFloat, linearToByte, signedByte } = await import('./bc.js'),
     view = new DataView(all.buffer, all.byteOffset, all.byteLength),

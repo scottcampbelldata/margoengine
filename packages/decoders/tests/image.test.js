@@ -135,7 +135,7 @@ test('decodeImage refuses what it cannot read, by name', async () => {
   await assert.rejects(decodeImage('a.webp'), TypeError);
 });
 
-test('textureFileToRGBA unpacks plain formats and refuses ETC and ASTC', async () => {
+test('textureFileToRGBA unpacks plain formats and refuses ASTC', async () => {
   const of = (format, width, height, data) => ({ format, mipmaps: [{ width, height, data }] }),
     rgba = async (format, data) => [...(await textureFileToRGBA(of(format, 1, 1, data))).data];
   assert.deepEqual(await rgba('rgba8unorm', new Uint8Array([1, 2, 3, 4])), [1, 2, 3, 4]);
@@ -156,10 +156,6 @@ test('textureFileToRGBA unpacks plain formats and refuses ETC and ASTC', async (
     [255, 0, 0, 255],
   );
   await assert.rejects(
-    textureFileToRGBA(of('etc2-rgb8unorm', 4, 4, new Uint8Array(8))),
-    (e) => e.code === 'unsupported',
-  );
-  await assert.rejects(
     textureFileToRGBA(of('astc-4x4-unorm', 4, 4, new Uint8Array(16))),
     (e) => e.code === 'unsupported',
   );
@@ -171,7 +167,8 @@ test('the reference PNGs read', () => {
 
 test('an unknown file is refused with every format decodeImage reads named, JPEG and AVIF included (KB-DECODERS-README-JPEG)', async () => {
   await assert.rejects(decodeImage(new Uint8Array(16)), (error) => {
-    for (const name of ['PNG', 'JPEG', 'WebP', 'AVIF', 'DDS', 'KTX', 'KTX2']) assert.match(error.message, new RegExp(`\\b${name}\\b`), name);
+    for (const name of ['PNG', 'JPEG', 'WebP', 'AVIF', 'DDS', 'KTX', 'KTX2'])
+      assert.match(error.message, new RegExp(`\\b${name}\\b`), name);
     return true;
   });
 });

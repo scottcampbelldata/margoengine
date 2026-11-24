@@ -164,7 +164,7 @@ const {width, height, data} = await decodeImage(jpeg);
 console.log(width, height, Array.from(data.slice(0, 4))); // 2 2 [201, 120, 39, 255]
 ```
 
-Native ETC, EAC and ASTC blocks are refused with code `unsupported`. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
+Native ASTC blocks are refused with code `unsupported`; ETC2 and EAC blocks (`etc2-rgb8unorm`, `etc2-rgb8a1unorm`, `etc2-rgba8unorm`, `eac-r11` and `eac-rg11`, unsigned and signed, with or without `-srgb`) are decoded on the CPU, written from the OpenGL ES 3.0 specification appendix C. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
 
 In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. Install the `webgpu` binding (`npm install webgpu`, tested with 0.6.2) and `@margoengine/headless` alongside Margo. It transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too. This example loads the complete CC0 FlightHelmet by Gary Hsu and Microsoft from a pinned Khronos sample revision:
 
