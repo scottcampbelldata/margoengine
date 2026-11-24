@@ -9213,3 +9213,11 @@ covers the roughness filter and the maximum authored wave offset. The same shade
 runs on WebGPU and the WebGL2 compatibility layer. The browser fixture spans a known
 finite capture edge and verifies the sky outside, rising reflection across the
 transition and the full reflection inside. See the [clean-room record](../clean-room.md#water-planar-capture-edges-2026-11-24).
+
+The package runner gives each browser suite its own ten-minute process limit.
+The Water manifest separates flood and underwater checks, optics and flow
+checks, and surface and ship checks into three suites. Its original command chain
+exceeded the group limit on the WebGL2 path while passing cases in order. The
+suite split keeps each existing browser case and both underwater capture modes,
+with unchanged assertions and per-suite deadlines. The manifest coverage
+regression is in `packages/water/test/browser-root.test.js`.

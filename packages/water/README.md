@@ -287,7 +287,8 @@ The water body uses the scene's ambient floor; a borrowed sky environment carrie
 the matching night sky into Fresnel reflections.
 
 Physical WebGPU all-shore run-up/recession, beach surf (shoaling, depth-limited breaking, foam), deep isolated-basin retention, curved-crest/normal, zero-amplitude, channel, spray, whitecaps and chop, triangle-order, coastal-seam,
-refraction and device-restoration checks: npm run test:gpu --workspace @margoengine/water
+refraction and device-restoration checks. Run every Water browser suite from the repository root with
+`npm run check:gpu-packages -- --only=water`. Set `MARGO_COMPAT=1` for the WebGL2 compatibility layer.
 (build core, post and terrain packages first).
 
 ## A sea from the wind
