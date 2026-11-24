@@ -55,6 +55,8 @@ export type {
 } from './shapes.js';
 export { Vehicle } from './vehicle.js';
 export type { VehicleOptions, VehicleInput, WheelOptions, WheelState } from './vehicle.js';
+export { explosion, WindField } from './fields.js';
+export type { ExplosionOptions, WindOptions } from './fields.js';
 export { DragJoint } from './drag.js';
 export type { DragOptions } from './drag.js';
 export { GearJoint, PulleyJoint, RackAndPinionJoint } from './mechanisms.js';

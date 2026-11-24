@@ -51,15 +51,51 @@ test('a rack and pinion moves the rack a radius a radian', () => {
   assert.ok(rack.position[0] < -0.2, `and it has moved: ${rack.position[0]}`);
 });
 
-test('a pulley lifts the lighter body as the heavier falls, at the acceleration of an Atwood machine', () => {
+test('a rigid pulley lifts the lighter body as the heavier falls, at the acceleration of an Atwood machine to within one percent', () => {
+  for (const [heavyMass, lightMass] of [
+    [3, 1],
+    [1.5, 1],
+    [10, 9],
+  ]) {
+    const physics = new Physics(null);
+    const heavy = physics.addBody(null, {
+      position: [-1, 0, 0],
+      colliders: { shape: 'sphere', radius: 0.2, mass: heavyMass },
+    });
+    const light = physics.addBody(null, {
+      position: [1, 0, 0],
+      colliders: { shape: 'sphere', radius: 0.2, mass: lightMass },
+    });
+    new PulleyJoint(physics, heavy, light, { groundA: [-1, 3, 0], groundB: [1, 3, 0] });
+    for (let i = 0; i < 30; i++) physics.step();
+    const a = ((heavyMass - lightMass) / (heavyMass + lightMass)) * 9.81,
+      t = 0.5;
+    // The impulse lands once at the start of the step while gravity integrates across its substeps, so the fall is out by about
+    // g dt^2 (2.7 mm at 60 Hz) however slow: one percent of it where the machine moves quickly.
+    const fall = 0.5 * a * t * t;
+    near(
+      -heavy.position[1],
+      fall,
+      Math.max(0.01 * fall, (0.8 * 9.81) / 3600),
+      `the heavy body falls ½ a t² (${heavyMass}:${lightMass})`,
+    );
+    near(-heavy.linearVelocity[1], a * t, 0.02 * a * t + (0.2 * 9.81) / 60, `at a t (${heavyMass}:${lightMass})`);
+    near(light.position[1], -heavy.position[1], 0.005, 'and the light one rises as far');
+  }
+});
+
+test('a block and tackle (ratio 2) moves its second body half as far, at the acceleration the energy gives', () => {
   const physics = new Physics(null);
-  const heavy = physics.addBody(null, { position: [-1, 0, 0], colliders: { shape: 'sphere', radius: 0.2, mass: 3 } });
-  const light = physics.addBody(null, { position: [1, 0, 0], colliders: { shape: 'sphere', radius: 0.2, mass: 1 } });
-  new PulleyJoint(physics, heavy, light, { groundA: [-1, 3, 0], groundB: [1, 3, 0] });
+  const a = physics.addBody(null, { position: [-1, 0, 0], colliders: { shape: 'sphere', radius: 0.2, mass: 2 } });
+  const b = physics.addBody(null, { position: [1, 0, 0], colliders: { shape: 'sphere', radius: 0.2, mass: 2 } });
+  new PulleyJoint(physics, a, b, { groundA: [-1, 3, 0], groundB: [1, 3, 0], ratio: 2 });
   for (let i = 0; i < 30; i++) physics.step();
-  const expected = 0.5 * ((3 - 1) / (3 + 1)) * 9.81 * 0.5 * 0.5;
-  near(-heavy.position[1], expected, 0.1 * expected, 'the heavy body falls with the Atwood acceleration');
-  near(light.position[1], -heavy.position[1], 0.03, 'and the light one rises as far');
+  // The length on A plus twice the length on B stays: B rises half as far as A falls, and
+  // a = (mA - mB / ratio) g / (mA + mB / ratio^2) from the energy of the pair.
+  const accel = ((2 - 2 / 2) / (2 + 2 / 4)) * 9.81,
+    fall = 0.5 * accel * 0.25;
+  near(-a.position[1], fall, 0.02 * fall, 'A falls as the energy says');
+  near(b.position[1], fall / 2, 0.02 * fall, 'B rises half as far');
 });
 
 test('a pulley rope goes slack when nothing pulls it and the mechanisms are checked', () => {

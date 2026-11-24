@@ -136,9 +136,27 @@ console.log(crate.position, drag.gripPoint());
 drag.remove();
 ```
 
+## Explosions and wind
+
+`explosion(physics, center, {impulse, radius, falloff = 'linear', lift = 0, filter})` gives every dynamic body within `radius` an impulse away from `center` at its centre of mass, scaled by the falloff (`'linear'` to nothing at the radius, `'inverse-square'` or `'none'`), with `lift` adding an upward share; it returns the bodies it pushed. `new WindField(physics, {velocity, density = 1.2, drag = 1, region, filter})` drags every dynamic body in `region` each step by F = 1/2 rho Cd A |u| u for the air's velocity relative to the body u, with A the area the box of its colliders shows the stream: `velocity` is a vector or a function of the point and the time (gusts, swirls), a heavy body is slower to follow than a light one, a sleeping body is woken only by a wind that would push it a tenth of a metre a second squared, and `remove()` stops it.
+
+```ts
+import {explosion, Physics, WindField} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.gravity = [0, 0, 0];
+const crate = physics.addBody(null, {position: [1, 0, 0], colliders: {shape: 'box', halfExtents: [0.3, 0.3, 0.3], mass: 2}});
+explosion(physics, [0, 0, 0], {impulse: 8, radius: 4});
+const wind = new WindField(physics, {velocity: (_point, time) => [0, 0, 4 + 2 * Math.sin(time)]});
+for (let i = 0; i < 60; i++) physics.step();
+console.log(crate.linearVelocity);
+wind.remove();
+```
+
 ## Gear, rack and pinion, pulley
 
-`new GearJoint(physics, bodyA, bodyB, {axisA, axisB, ratio})` keeps the angle of the first body about its axis plus `ratio` times the angle of the second constant (the two turn against each other at the ratio); `new RackAndPinionJoint(physics, pinion, rack, {pinionAxis, rackAxis, radius})` moves the rack `radius` metres a radian; `new PulleyJoint(physics, bodyA, bodyB, {groundA, groundB, anchorA, anchorB, ratio})` keeps the rope length on one side plus `ratio` times the other constant, as a rope that pulls and never pushes (an Atwood machine). Each is one velocity constraint on the speeds of two bodies, solved every step as the soft constraint of Catto (GDC 2011): rigid by default, or soft with `frequency` and `damping`; `correction` is the share of the position error removed each step. They act next to the joints that guide the bodies (hinge each gear and the pinion, slide the rack), and `remove()` lets go.
+`new GearJoint(physics, bodyA, bodyB, {axisA, axisB, ratio})` keeps the angle of the first body about its axis plus `ratio` times the angle of the second constant (the two turn against each other at the ratio); `new RackAndPinionJoint(physics, pinion, rack, {pinionAxis, rackAxis, radius})` moves the rack `radius` metres a radian; `new PulleyJoint(physics, bodyA, bodyB, {groundA, groundB, anchorA, anchorB, ratio})` keeps the rope length on one side plus `ratio` times the other constant, as a rope that pulls and never pushes (an Atwood machine). Each is one velocity constraint on the speeds of two bodies, solved every step as the soft constraint of Catto (GDC 2011): rigid by default, or soft with `frequency` and `damping`; `correction` is the share of the position error removed each step. They act next to the joints that guide the bodies (hinge each gear and the pinion, slide the rack), and `remove()` lets go. Each solves on the velocity a body will have at the end of the step (its own plus gravity and its applied forces), so a pulley follows an Atwood machine to one percent where it moves quickly; its impulse lands once at the start of the step while gravity integrates across the substeps, so a nearly balanced pair is out by about g dt squared (3 mm at 60 Hz) in its fall.
 
 ```ts
 import {GearJoint, Physics} from 'margoengine/physics';

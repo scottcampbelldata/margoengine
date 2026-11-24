@@ -336,6 +336,14 @@ export interface DragOptions {
     maxForce?: number;
 }
 
+export interface ExplosionOptions {
+    impulse: number;
+    radius: number;
+    falloff?: 'linear' | 'inverse-square' | 'none';
+    lift?: number;
+    filter?: QueryFilter;
+}
+
 export class GearJoint extends Mechanism {
     constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: GearOptions);
     protected measure(): {
@@ -1598,6 +1606,24 @@ export interface WheelState {
     sideImpulse: number;
 }
 
+export class WindField implements PhysicsAttachment {
+    constructor(physics: Physics, options: WindOptions);
+    beforeStep(dt: number): void;
+    remove(): void;
+    dispose(): void;
+}
+
+export interface WindOptions {
+    velocity: Vec3 | ((point: Vec3, time: number) => Vec3);
+    density?: number;
+    drag?: number;
+    region?: {
+        min: Vec3;
+        max: Vec3;
+    };
+    filter?: QueryFilter;
+}
+
 export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, options: MeshCleanOptions): {
     vertices: Float32Array;
     indices: Uint32Array;
@@ -1623,6 +1649,8 @@ export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
+
+export function explosion(physics: Physics, center: Vec3, options: ExplosionOptions): PhysicsBody[];
 
 export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float32Array;
 
@@ -1735,7 +1763,10 @@ abstract class Mechanism implements PhysicsAttachment {
     protected error: number;
     protected absolute: boolean;
     protected last: number;
+    protected step: number;
     protected constructor(physics: Physics, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
+    protected linear(body: PhysicsBody): V;
+    protected angular(body: PhysicsBody): V;
     protected abstract measure(): {
         speed: number;
         inverse: number;
@@ -1766,4 +1797,6 @@ interface PhysicsAttachment {
     bodyRemoved?(body: PhysicsBody): void;
     dispose(): void;
 }
+
+type V = [number, number, number];
 ```

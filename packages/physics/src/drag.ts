@@ -55,10 +55,15 @@ export class DragJoint implements PhysicsAttachment {
     checkVec(point, 'Grab point');
     const { frequency = 5, damping = 0.7, maxForce = Number.POSITIVE_INFINITY } = options;
     if (!(frequency > 0 && Number.isFinite(frequency)))
-      throw new RangeError('Drag frequency is a positive number of hertz.');
-    if (!(damping >= 0 && Number.isFinite(damping))) throw new RangeError('Drag damping ratio is 0 or more.');
-    if (!(maxForce > 0)) throw new RangeError('Drag maxForce is a positive number of newtons.');
-    if (body.type !== 'dynamic') throw new RangeError('A drag joint pulls a dynamic body.');
+      throw new RangeError('Drag frequency is a positive number of hertz; pass options.frequency above 0.');
+    if (!(damping >= 0 && Number.isFinite(damping)))
+      throw new RangeError('Drag damping ratio is 0 or more; pass options.damping of 0 or above.');
+    if (!(maxForce > 0))
+      throw new RangeError(
+        'Drag maxForce is a positive number of newtons; pass options.maxForce above 0 or leave it out.',
+      );
+    if (body.type !== 'dynamic')
+      throw new RangeError('A drag joint pulls a dynamic body; pass a body made with type dynamic.');
     this.omega = 2 * Math.PI * frequency;
     this.ratio = damping;
     this.limit = maxForce;

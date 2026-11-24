@@ -23,7 +23,7 @@ const cross = (a: Vec3, b: Vec3): V => [
 const unit = (a: Vec3, label: string): V => {
   checkVec(a, label);
   const n = Math.hypot(a[0], a[1], a[2]);
-  if (!(n > 0)) throw new RangeError(`${label} must not be zero.`);
+  if (!(n > 0)) throw new RangeError(`${label} must not be zero; pass a vector with a length.`);
   return [a[0] / n, a[1] / n, a[2] / n];
 };
 
@@ -62,6 +62,8 @@ abstract class Mechanism implements PhysicsAttachment {
   private readonly softRatio: number;
   private readonly share: number;
   protected last = 1 / 60;
+  /** The step being solved. */
+  protected step = 1 / 60;
 
   protected constructor(
     protected readonly physics: Physics,
@@ -71,13 +73,38 @@ abstract class Mechanism implements PhysicsAttachment {
   ) {
     const { frequency = 0, damping = 1, correction = 0.2 } = options;
     if (!(frequency >= 0 && Number.isFinite(frequency)))
-      throw new RangeError('Frequency is 0 (rigid) or a number of hertz.');
-    if (!(damping >= 0 && Number.isFinite(damping))) throw new RangeError('Damping ratio is 0 or more.');
-    if (!(correction >= 0 && correction <= 1)) throw new RangeError('Correction is a share from 0 to 1.');
+      throw new RangeError('Frequency is 0 (rigid) or a number of hertz; pass options.frequency of 0 or above.');
+    if (!(damping >= 0 && Number.isFinite(damping)))
+      throw new RangeError('Damping ratio is 0 or more; pass options.damping of 0 or above.');
+    if (!(correction >= 0 && correction <= 1))
+      throw new RangeError('Correction is a share from 0 to 1; pass options.correction between them.');
     this.frequency = frequency;
     this.softRatio = damping;
     this.share = correction;
     physics.attach(this);
+  }
+
+  /**
+   * The velocity a body will have at the end of this step if the constraint did nothing: its own plus what gravity and the forces
+   * on it add over the step. Solving the constraint on that, not on the velocity at the start, keeps the combination exact through
+   * the step (a body falling on a rope is held by the rope's whole pull, not the pull of the speed it had before).
+   */
+  protected linear(body: PhysicsBody): V {
+    const v = body.linearVelocity;
+    if (body.type !== 'dynamic' || !(body.mass > 0)) return v;
+    const g = this.physics.gravity,
+      f = body.appliedForce,
+      s = body.gravityScale;
+    return [
+      v[0] + this.step * (g[0] * s + f[0] / body.mass),
+      v[1] + this.step * (g[1] * s + f[1] / body.mass),
+      v[2] + this.step * (g[2] * s + f[2] / body.mass),
+    ];
+  }
+  protected angular(body: PhysicsBody): V {
+    const w = body.angularVelocity;
+    if (body.type !== 'dynamic') return w;
+    return add(w, scale(inverseInertia(body, body.appliedTorque), this.step));
   }
 
   /** The speed of the constrained combination now, its inverse mass, and where to apply a unit of impulse. */
@@ -87,6 +114,7 @@ abstract class Mechanism implements PhysicsAttachment {
   /** @internal */
   beforeStep(dt: number): void {
     if (this.released || !this.a.valid || !this.b.valid) return;
+    this.step = dt;
     const { speed, inverse } = this.measure();
     // The position error of the combination follows from its speed one step behind.
     if (!this.absolute) this.error += speed * this.last;
@@ -147,7 +175,8 @@ export class GearJoint extends Mechanism {
     this.axisA = unit(options.axisA ?? [0, 0, 1], 'Axis A');
     this.axisB = unit(options.axisB ?? [0, 0, 1], 'Axis B');
     this.ratio = options.ratio ?? 1;
-    if (!Number.isFinite(this.ratio) || this.ratio === 0) throw new RangeError('A gear ratio is a nonzero number.');
+    if (!Number.isFinite(this.ratio) || this.ratio === 0)
+      throw new RangeError('A gear ratio is a nonzero number; pass options.ratio other than 0.');
   }
   private worldAxes(): [V, V] {
     return [local(this.a, this.axisA), local(this.b, this.axisB)];
@@ -155,7 +184,7 @@ export class GearJoint extends Mechanism {
   protected override measure(): { speed: number; inverse: number } {
     const [wa, wb] = this.worldAxes();
     return {
-      speed: dot(this.a.angularVelocity, wa) + this.ratio * dot(this.b.angularVelocity, wb),
+      speed: dot(this.angular(this.a), wa) + this.ratio * dot(this.angular(this.b), wb),
       inverse: dot(wa, inverseInertia(this.a, wa)) + this.ratio * this.ratio * dot(wb, inverseInertia(this.b, wb)),
     };
   }
@@ -191,13 +220,13 @@ export class RackAndPinionJoint extends Mechanism {
     this.rack = unit(options.rackAxis ?? [1, 0, 0], 'Rack axis');
     this.radius = options.radius ?? 1;
     if (!(this.radius > 0 && Number.isFinite(this.radius)))
-      throw new RangeError('Pinion radius is a positive number of metres.');
+      throw new RangeError('Pinion radius is a positive number of metres; pass options.radius above 0.');
   }
   protected override measure(): { speed: number; inverse: number } {
     const wp = local(this.a, this.pinion),
       wr = local(this.b, this.rack);
     return {
-      speed: this.radius * dot(this.a.angularVelocity, wp) + dot(this.b.linearVelocity, wr),
+      speed: this.radius * dot(this.angular(this.a), wp) + dot(this.linear(this.b), wr),
       inverse: this.radius * this.radius * dot(wp, inverseInertia(this.a, wp)) + inverseMass(this.b),
     };
   }
@@ -235,6 +264,7 @@ export class PulleyJoint extends Mechanism {
   private readonly anchorB: V;
   private readonly ratio: number;
   private readonly total: number;
+  private measured = 0;
   constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options: PulleyOptions) {
     super(physics, bodyA, bodyB, options);
     checkVec(options.groundA, 'Ground A');
@@ -244,7 +274,8 @@ export class PulleyJoint extends Mechanism {
     this.anchorA = options.anchorA ? ([...options.anchorA] as V) : [0, 0, 0];
     this.anchorB = options.anchorB ? ([...options.anchorB] as V) : [0, 0, 0];
     this.ratio = options.ratio ?? 1;
-    if (!(this.ratio > 0 && Number.isFinite(this.ratio))) throw new RangeError('A pulley ratio is a positive number.');
+    if (!(this.ratio > 0 && Number.isFinite(this.ratio)))
+      throw new RangeError('A pulley ratio is a positive number; pass options.ratio above 0.');
     this.total = this.lengthA() + this.ratio * this.lengthB();
     this.absolute = true;
   }
@@ -270,10 +301,11 @@ export class PulleyJoint extends Mechanism {
   }
   protected override measure(): { speed: number; inverse: number } {
     const { ua, ub, ra, rb } = this.ropes(),
-      va = add(this.a.linearVelocity, cross(this.a.angularVelocity, ra)),
-      vb = add(this.b.linearVelocity, cross(this.b.angularVelocity, rb)),
+      va = add(this.linear(this.a), cross(this.angular(this.a), ra)),
+      vb = add(this.linear(this.b), cross(this.angular(this.b), rb)),
       speed = dot(ua, va) + this.ratio * dot(ub, vb);
     this.error = this.lengthA() + this.ratio * this.lengthB() - this.total;
+    this.measured = speed;
     const k = (u: V, r: V, body: PhysicsBody): number => {
       const n = cross(r, u);
       return inverseMass(body) + dot(n, inverseInertia(body, n));
@@ -282,7 +314,8 @@ export class PulleyJoint extends Mechanism {
   }
   protected override apply(impulse: number): void {
     // A rope pulls and does not push: only an impulse that shortens the whole (negative along the ropes' growth) is kept.
-    if (impulse > 0 || this.error < -1e-4) return;
+    // Slack through this step: the rope would still be short of taut at the end of it.
+    if (impulse > 0 || this.error + this.measured * this.step < -1e-5) return;
     const { ua, ub, ra, rb } = this.ropes(),
       pa = scale(ua, impulse),
       pb = scale(ub, impulse * this.ratio);
