@@ -178,9 +178,8 @@ decoders.draco.dispose(); decoders.ktx2.dispose(); // when no more loads are exp
 
 ## Physics
 
-`@margoengine/physics` wraps [Rapier](https://rapier.rs) and bundles it (`@dimforge/rapier3d` 0.21.0, Apache-2.0):
-its JavaScript is a lazy chunk and its Wasm a file of its own, `rapier3d.wasm`, which your bundler emits as an asset
-with no configuration. `Physics.load()` fetches and compiles it once:
+`@margoengine/physics` runs on Margo's own Rust kernel, which ships inside the package as a lazy chunk of its
+JavaScript (no Wasm file, no plugin, no peer install). `Physics.load()` compiles it once:
 
 ```ts
 import {Physics} from '@margoengine/physics';
@@ -216,15 +215,14 @@ physics.on('intersectionstart', ({meshA, meshB}) => {
 - **One merged triangle soup.** `worldTriangles(engine, [level])` from `@margoengine/bvh` returns the level's
   world-space `{vertices, indices}`: one trimesh (`physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh',
   ...worldTriangles(engine, [level])}})`) or a navmesh (below).
-- **Optional and not small.** Rapier's Wasm is 1.18 MB gzip and its JavaScript 42 kB gzip (see
-  [Measured numbers](#measured-numbers)), both fetched only by `Physics.load()`; call it only on the pages that need
+- **Optional and not small.** The physics kernel is about 181 kB gzip (see
+  [Measured numbers](#measured-numbers)), fetched only by `Physics.load()`; call it only on the pages that need
   physics. For walking around a static level without rigid bodies, `@margoengine/controls/walk` collides on the bvh
   trees without Wasm.
 - Shapes: box, sphere, capsule, cylinder, cone, convex hull, trimesh, heightfield. Joints: fixed, spherical,
   revolute, prismatic, with limits and motors. Queries (`raycast`, `shapeCast`, ...) return the core `Mesh` hit.
-- Not wrapped, reachable through `physics.world` and `physics.rapier`: vehicles, rope and spring joints, multibody
-  joints, snapshots. There is no built-in debug view; `physics.debugRender()` returns line buffers for
-  `@margoengine/lines`. Details: [physics README](../../packages/physics/README.md).
+- Also in the package: vehicles, ropes, rope and spring joints, multibody joints, snapshots (`physics.kernel`). There is
+  no built-in debug view; `physics.debugRender()` returns line buffers for `@margoengine/lines`. Details: [physics README](../../packages/physics/README.md).
 
 ## The character
 
@@ -273,7 +271,7 @@ for (const side of ['Left', 'Right'])
     },
   });
 
-// Movement: a kinematic capsule on the model root, moved by Rapier's character controller each fixed step.
+// Movement: a kinematic capsule on the model root, moved by the character controller each fixed step.
 const body = physics.addBody(hero.root, {type: 'kinematicPosition', position: [0, 1, 0], colliders: {shape: 'capsule', halfHeight: 0.5, radius: 0.3, offset: [0, 0.8, 0]}});
 const controller = physics.createCharacterController(body, {maxSlopeClimbAngle: Math.PI / 4, snapToGround: 0.3});
 const wish = {x: 0, z: 0, speed: 0};            // set from input every frame (next section)
@@ -590,7 +588,7 @@ The game is static files: build with Vite (or any bundler that copies `new URL(.
 the worker loaders and decoders use) and serve over HTTPS (WebGPU needs a secure context). [docs/deploying.md](../deploying.md)
 has tested Content Security Policy, caching and compression configs for Cloudflare Pages, Netlify, Vercel and Nginx:
 Margo needs `script-src 'wasm-unsafe-eval'` and `worker-src 'self'` (the Draco and KTX2 decoder workers included,
-no `'unsafe-eval'`), and no cross-origin isolation headers are needed. Rapier (`rapier3d.wasm`) also
+no `'unsafe-eval'`), and no cross-origin isolation headers are needed. The physics kernel also
 compiles Wasm; it is not part of that page's CSP check, so test your policy with it.
 An offline asset cache for GLB files and textures is coming; it has not merged.
 ## What you build yourself
@@ -626,9 +624,9 @@ laptop with an Intel Arc 140V integrated GPU, Edge 155, on AC power.
 | Island demo, full tier (4x MSAA) on the same laptop | 45-53 FPS (100k), 40-44 FPS (1M): below 60, which is why the light tier exists | same file |
 | Loading a generated 41 MB GLB (1.28M triangles) while rendering | longest main-thread task 222 ms with `loadGLTF`, 0 ms with `loadGLTFInWorker`; load time 0.60 s vs 0.68 s | [workers.json](../../examples/package-benchmarks/results/workers.json) (`examples/package-benchmarks/workers/run.mjs`) |
 | Screen-space reflections, worst case (glossy floor filling the view) | 2.3 ms GPU at 1280x720 4x MSAA, 5.8 ms at 1920x1080 4x | [ssr-gpu.json](../../examples/package-benchmarks/results/ssr-gpu.json) |
-| Package entries this game imports (min + gzip, each alone; Rapier not included) | gltf/pbr 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
+| Package entries this game imports (min + gzip, each alone; the physics kernel chunk not included) | gltf/pbr 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
 
-| Rapier itself, as `@margoengine/physics` ships it (`@dimforge/rapier3d` 0.21.0) | `rapier3d.wasm` 1,176,707 bytes gzip (3,082,103 raw) plus the `rapier-solver` chunk 42,407 gzip (270,338 raw); until 2026-11-10 one `rapier3d-compat` module with the Wasm inlined, 1,645,573 gzip (4,340,292 raw) | the sizes page ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json), `lazyFiles` and `splits`); the old module in [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) |
+| The physics kernel, as `@margoengine/physics` ships it | a lazy chunk of about 181 kB gzip (`entry-sizes.json`); until 2026-11-24 Rapier, as `rapier3d.wasm` 1,176,707 bytes gzip plus a 42,407 gzip chunk | the sizes page ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json), `lazyFiles` and `splits`); the old module in [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) |
 
 Entry sizes are compressed one at a time, so their sum overstates a combined bundle (shared code compresses once).
 No frame-rate number here describes your game: it depends on your scene, your GPU and the tier. Measure with

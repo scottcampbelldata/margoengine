@@ -1174,9 +1174,8 @@ watchQuality();
 Measured, not estimated (records in `examples/package-benchmarks/results/`):
 
 - **Bytes.** `walk-size.json`: WalkControls, including the OrbitControls it uses for the dollhouse, is about 12 kB
-  min+gzip, about 22 kB when the app does not already ship `@margoengine/bvh`. Rapier as `@margoengine/physics`
-  ships it is about 1.22 MB gzip (3.35 MB raw): its Wasm, 1,176,707 bytes gzip, and its JavaScript chunk, 42,407
-  (`entry-sizes.json`); until 2026-11-10 the inlined `rapier3d-compat` module was about 1.65 MB gzip (4.3 MB raw). Rapier stays the upgrade path for rigid bodies, joints and vehicles.
+  min+gzip, about 22 kB when the app does not already ship `@margoengine/bvh`. `@margoengine/physics`
+  ships its own kernel as a lazy chunk of about 181 kB gzip (`entry-sizes.json`); until 2026-11-24 it shipped Rapier, about 1.22 MB gzip. The package is the upgrade path for rigid bodies, joints and vehicles.
 - **CPU.** `walk-cpu.json` (`node examples/package-benchmarks/walk-cpu.mjs`; Node, one thread, a laptop with other
   work running, so read it as an order of magnitude): `update()` takes a median of 0.01-0.03 ms and at most 0.9 ms a
   frame on the generated two-storey house, a block of 16 such houses (912 meshes) and the 2.45-million-triangle
@@ -1482,9 +1481,8 @@ and builds all five templates, and checks their exact engine dependency closures
 
 To add a capability outside a profile, install its package at the same release version, for example
 `npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
-Optional third-party peers, including React, remain app choices and are never silently installed by a kit. Rapier's
-3D solver comes with `@margoengine/physics`; its optional `@dimforge/rapier3d-compat` peer is only for passing your
-own Rapier through the `rapier` option.
+Optional third-party peers, including React, remain app choices and are never silently installed by a kit. The
+3D solver, Margo's own kernel, comes with `@margoengine/physics`; it has no peer.
 
 Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/kit-web/gltf/pbr'` (or
 `@margoengine/game/gltf/pbr`). The loader is installed with the profile, but a page importing only the root emits
@@ -1493,10 +1491,9 @@ loader entry separate. A model app keeps the full glTF/compression support of th
 core or stage implementation changed.
 
 Physics works the same way: `import {Physics, PhysicsBody, CharacterController} from '@margoengine/game/physics'`
-(or `margoengine/physics` in the full install). `@margoengine/physics` ships Rapier's WebAssembly as its own file,
-`rapier3d.wasm`, which Vite and Rollup copy into the build as soon as they read the module, before tree-shaking. So
-the game kit root no longer re-exports the physics names: a game that imports only the root ships no Wasm, and one
-that imports the physics entry ships exactly `rapier3d.wasm` (`packages/game/tests/physics-entry.test.js`). Before
+(or `margoengine/physics` in the full install). `@margoengine/physics` carries its kernel as a lazy chunk of its JavaScript. The game kit root does not re-export the
+physics names, so a game that imports only the root does not load it, and neither root nor physics entry emits a Wasm
+file (`packages/game/tests/physics-entry.test.js`). Before
 2026-11-10 the root re-exported `Physics`, `PhysicsBody` and `CharacterController`; change those imports to the
 physics subpath.
 

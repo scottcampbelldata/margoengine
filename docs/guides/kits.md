@@ -60,9 +60,8 @@ and builds all five templates, and checks their exact engine dependency closures
 
 To add a capability outside a profile, install its package at the same release version, for example
 `npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
-Optional third-party peers, including React, remain app choices and are never silently installed by a kit. Rapier's
-3D solver comes with `@margoengine/physics`; its optional `@dimforge/rapier3d-compat` peer is only for passing your
-own Rapier through the `rapier` option.
+Optional third-party peers, including React, remain app choices and are never silently installed by a kit. The
+3D solver, Margo's own kernel, comes with `@margoengine/physics`; it has no peer.
 
 Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/kit-web/gltf/pbr'` (or
 `@margoengine/game/gltf/pbr`). The loader is installed with the profile, but a page importing only the root emits
@@ -71,10 +70,9 @@ loader entry separate. A model app keeps the full glTF/compression support of th
 core or stage implementation changed.
 
 Physics works the same way: `import {Physics, PhysicsBody, CharacterController} from '@margoengine/game/physics'`
-(or `margoengine/physics` in the full install). `@margoengine/physics` ships Rapier's WebAssembly as its own file,
-`rapier3d.wasm`, which Vite and Rollup copy into the build as soon as they read the module, before tree-shaking. So
-the game kit root no longer re-exports the physics names: a game that imports only the root ships no Wasm, and one
-that imports the physics entry ships exactly `rapier3d.wasm` (`packages/game/tests/physics-entry.test.js`). Before
+(or `margoengine/physics` in the full install). `@margoengine/physics` carries its kernel as a lazy chunk of its JavaScript. The game kit root does not re-export the
+physics names, so a game that imports only the root does not load it, and neither root nor physics entry emits a Wasm
+file (`packages/game/tests/physics-entry.test.js`). Before
 2026-11-10 the root re-exported `Physics`, `PhysicsBody` and `CharacterController`; change those imports to the
 physics subpath.
 

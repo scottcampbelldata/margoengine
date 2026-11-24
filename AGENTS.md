@@ -106,7 +106,7 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
   libraries (three.js and its ecosystem, Babylon.js, PlayCanvas, the best specialised web library); Godot, Unity,
   Unreal and Blender are export targets only, never the bar. A feature that only partly does what the best
   rival does is a gap to build, never a SKIPPED job; a skip needs the full match proven against the job text and the
-  rivals. Physics resumed on 2026-11-24 with Margo's own kernel (`packages/physics/kernel`), which replaces Rapier in every 3D package; the bar for it is Rapier 3D's capability list, matched row by row in `docs/physics-collision-parity.md`.
+  rivals. Physics resumed on 2026-11-24 with Margo's own kernel (`packages/physics/kernel`), which replaces Rapier in every 3D package; Rapier 3D is a root devDependency that comparison tests load as an oracle and is never shipped (`tests/no-rapier-shipped.test.js`). The bar for the kernel is Rapier 3D's capability list, matched row by row in `docs/physics-collision-parity.md`.
 
 ## CAD formats
 
