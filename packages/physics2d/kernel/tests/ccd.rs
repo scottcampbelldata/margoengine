@@ -80,3 +80,29 @@ fn a_sensor_and_a_filtered_wall_do_not_stop_it() {
     assert!(w.bodies[b as usize].xf.p.x > 12.0);
     let _ = Rot::IDENTITY;
 }
+
+/// A fast ball meets a thin plate that is a dynamic body (not fixed): the ball stops at the plate and the plate is
+/// pushed on, where without the flag the ball passes through it between two steps.
+#[test]
+fn a_fast_ball_stops_at_a_thin_dynamic_plate_and_pushes_it() {
+    let run = |ccd: bool| {
+        let mut w = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
+        let plate = w.create_body(&BodyDef { position: v2(10.0, 0.0), can_sleep: false, ..Default::default() }).unwrap();
+        w.create_shape(plate, Core::rect(0.05, 3.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 20.0, friction: 0.0, ..Default::default() }).unwrap();
+        let ball = w.create_body(&BodyDef { linear_velocity: v2(300.0, 0.0), ccd, can_sleep: false, ..Default::default() }).unwrap();
+        w.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: 0.0, friction: 0.0, ..Default::default() }).unwrap();
+        let mut stopped_at = f32::MAX;
+        for _ in 0..30 {
+            w.step(DT).unwrap();
+            if w.bodies[ball as usize].xf.p.x > w.bodies[plate as usize].xf.p.x {
+                stopped_at = f32::MIN;
+            }
+        }
+        (stopped_at, w.bodies[ball as usize].xf.p.x, w.bodies[plate as usize].xf.p.x)
+    };
+    let (_, ball_x, plate_x) = run(false);
+    assert!(ball_x > plate_x, "control: the ball passes the plate, ball {ball_x}, plate {plate_x}");
+    let (passed, ball_x, plate_x) = run(true);
+    assert!(passed == f32::MAX, "the ball never gets past the plate: ball {ball_x}, plate {plate_x}");
+    assert!(plate_x > 10.5, "and the plate is pushed on by it: {plate_x}");
+}

@@ -68,7 +68,8 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Shapes | heightfield, halfspace, compound, voxels, shared shapes | `heightfield` (a smooth chain), `halfspace` (a polygon 200,000 units across), `compound` (parts with their own placement), `voxels` (merged outlines, no thickness); shape options are plain values, so one can be reused on any number of colliders | full, with the accepted differences in limits |
 | Shapes | oriented (one-sided) polyline | `polyline` with `oneSided: true` | full |
 | Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
-| Collision | continuous collision detection | `ccd` against fixed and kinematic bodies; dynamic bodies are not swept against each other (they rely on the speculative contact margin) | partial |
+| Collision | continuous collision detection | `ccd` against fixed, kinematic and dynamic bodies (a dynamic one it meets is put back to the same time) | full |
+| Collision | soft CCD (a prediction distance per body) | every contact is speculative within 0.02 m; the distance is not a body option | missing |
 | Collision | sensors | `sensor: true` (senses fixed and kinematic bodies too) | full |
 | Collision | collision groups, solver groups, active collision types | `collisionGroups`, `solverGroups`, `activeCollisionTypes` | full |
 | Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |

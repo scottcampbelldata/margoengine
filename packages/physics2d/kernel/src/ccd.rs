@@ -16,7 +16,7 @@ use margoengine_physics_kernel_common::broad::Bounds;
 
 use crate::error::PhysicsError;
 use crate::manifold::collide;
-use crate::math::{Rot, Xf, v2};
+use crate::math::{Rot, V2, Xf, v2};
 use crate::shape::LINEAR_SLOP;
 use crate::world::{Kind, SPECULATIVE, World, bounds_of, pair_allowed};
 
@@ -30,6 +30,8 @@ pub(crate) struct Start {
     pub body: u32,
     pub center: [f64; 2],
     pub q: Rot,
+    /// Whether the body asks for continuous collision; the others are recorded because a body that does may meet them.
+    pub ccd: bool,
 }
 
 /// Normalised linear interpolation along the short arc.
@@ -42,9 +44,13 @@ impl World {
     /// The awake bodies that ask for continuous collision, with their pose now: taken before the solve.
     pub(crate) fn ccd_starts(&self) -> Vec<Start> {
         let mut starts = Vec::new();
+        if !self.bodies.iter().any(|b| b.ccd && b.kind == Kind::Dynamic && b.awake && !b.shapes.is_empty()) {
+            return starts;
+        }
+        // Every awake dynamic body, not only those that ask: a body that does may meet one that moves too.
         for (id, body) in self.bodies.iter().enumerate() {
-            if body.ccd && body.kind == Kind::Dynamic && body.awake && !body.shapes.is_empty() {
-                starts.push(Start { body: id as u32, center: body.exact_center, q: body.xf.q });
+            if body.kind == Kind::Dynamic && body.awake && !body.shapes.is_empty() {
+                starts.push(Start { body: id as u32, center: body.exact_center, q: body.xf.q, ccd: body.ccd });
             }
         }
         starts
@@ -53,7 +59,7 @@ impl World {
     /// Sets each body in `starts` back to its earliest time of impact, when it has one.
     pub(crate) fn solve_ccd(&mut self, starts: &[Start]) -> Result<(), PhysicsError> {
         let mut candidates = Vec::new();
-        for start in starts {
+        for start in starts.iter().filter(|s| s.ccd) {
             let body = &self.bodies[start.body as usize];
             let (end_center, end_q, local_center) = (body.exact_center, body.xf.q, body.local_center);
             let shift = v2((end_center[0] - start.center[0]) as f32, (end_center[1] - start.center[1]) as f32);
@@ -72,6 +78,7 @@ impl World {
             };
             let (cx, cy) = (start.center[0] as f32, start.center[1] as f32);
             let mut earliest = 1.0f32;
+            let mut partner: Option<(u32, [f32; 2], [f32; 2], Rot)> = None;
             for &mine in &body.shapes.clone() {
                 let own = &self.shapes[mine as usize];
                 if own.sensor {
@@ -87,7 +94,7 @@ impl World {
                 for &other in &candidates {
                     let s = &self.shapes[other as usize];
                     let ob = &self.bodies[s.body as usize];
-                    if s.dead || s.body == start.body || s.sensor || ob.kind == Kind::Dynamic {
+                    if s.dead || s.body == start.body || s.sensor {
                         continue;
                     }
                     if !pair_allowed(&own_bits, Kind::Dynamic, s, ob.kind) {
@@ -97,10 +104,30 @@ impl World {
                     if self.joints.iter().any(|j| !j.def.collide && (j.def.a, j.def.b) == (a, b) || !j.def.collide && (j.def.a, j.def.b) == (b, a)) {
                         continue;
                     }
-                    let origin = ob.exact_origin();
-                    let target = Xf { p: v2((origin[0] - start.center[0]) as f32, (origin[1] - start.center[1]) as f32), q: ob.xf.q };
+                    // The other body's pose at time t: a fixed or kinematic one at its end pose, a dynamic one on its way from where
+                    // the step found it (a body that did not move is both ends).
+                    let moves = ob.kind == Kind::Dynamic;
+                    let (o_start, o_q0) = starts.iter().find(|x| x.body == s.body).map_or((ob.exact_center, ob.xf.q), |x| (x.center, x.q));
+                    let rel = |c: [f64; 2]| [(c[0] - start.center[0]) as f32, (c[1] - start.center[1]) as f32];
+                    let (c0, c1) = if moves { (rel(o_start), rel(ob.exact_center)) } else { (rel(ob.exact_center), rel(ob.exact_center)) };
+                    let (o_q0, o_q1) = if moves { (o_q0, ob.xf.q) } else { (ob.xf.q, ob.xf.q) };
+                    let other_lc = if moves { ob.local_center } else { V2::ZERO };
+                    let static_origin = ob.exact_origin();
+                    let origin_at = |t: f32| -> Xf {
+                        if !moves {
+                            return Xf { p: v2((static_origin[0] - start.center[0]) as f32, (static_origin[1] - start.center[1]) as f32), q: ob.xf.q };
+                        }
+                        let q = blend(o_q0, o_q1, t);
+                        Xf { p: v2(c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t).sub(q.apply(other_lc)), q }
+                    };
+                    let other_turn = {
+                        let r = o_q0.inverse_mul(o_q1);
+                        crate::math::atan2(r.s, r.c).abs()
+                    };
+                    let other_travel = if moves { v2(c1[0] - c0[0], c1[1] - c0[1]).length() + other_turn * ob.extent } else { 0.0 };
+                    let together = travel + other_travel;
                     let gap_at = |t: f32| -> Result<f32, PhysicsError> {
-                        let m = collide(&core, pose(t), &s.core, target, 1.0e4)?;
+                        let m = collide(&core, pose(t), &s.core, origin_at(t), 1.0e4)?;
                         Ok(m.points[..m.count].iter().fold(f32::INFINITY, |least, p| least.min(p.separation)))
                     };
                     let first = gap_at(0.0)?;
@@ -110,7 +137,7 @@ impl World {
                     }
                     let (mut t, mut gap, mut found) = (0.0f32, first, None);
                     for i in 0..MAX_ITERATIONS {
-                        t += (gap - 0.5 * TARGET) / travel;
+                        t += (gap - 0.5 * TARGET) / together;
                         if t >= earliest {
                             break;
                         }
@@ -123,10 +150,20 @@ impl World {
                     }
                     if let Some(t) = found {
                         earliest = t;
+                        partner = moves.then_some((s.body, c0, c1, o_q0)).map(|(b, c0, c1, q0)| (b, c0, c1, q0));
                     }
                 }
             }
             if earliest < 1.0 {
+                // A dynamic body it met is put back to the same time, so the two touch where they met and do not overlap.
+                if let Some((other, c0, c1, q0)) = partner {
+                    let t = earliest;
+                    let o = &mut self.bodies[other as usize];
+                    let q1 = o.xf.q;
+                    o.exact_center = [start.center[0] + (c0[0] + (c1[0] - c0[0]) * t) as f64, start.center[1] + (c0[1] + (c1[1] - c0[1]) * t) as f64];
+                    o.xf.q = blend(q0, q1, t);
+                    o.round_pose();
+                }
                 let body = &mut self.bodies[start.body as usize];
                 body.exact_center = [start.center[0] + (shift.x * earliest) as f64, start.center[1] + (shift.y * earliest) as f64];
                 body.xf.q = blend(start.q, end_q, earliest);
