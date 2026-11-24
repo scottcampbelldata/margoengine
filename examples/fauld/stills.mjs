@@ -1,5 +1,5 @@
 // Stills of the Fauld tunnels shots: one PNG per row at its still probe (examples/fauld, @margoengine/scenes/fauld-tunnels).
-//   node examples/fauld/stills.mjs --library=<asset library folder> --out=<folder> [--shots=fr003,fr009] [--w=1920 --h=1080]
+//   node examples/fauld/stills.mjs [--library=<asset library folder, default MARGO_ASSET_LIBRARY or ../../Assets/blender-library>] --out=<folder> [--shots=fr003,fr009] [--w=1920 --h=1080]
 // Serves the repository and the asset library (/asset-library/), renders each row's page and saves <out>/<row>.png,
 // printing the mean and spread of its luma and its clipped and black shares. Run from the repository root after the
 // scenes build; GPU work, so run it under scripts/run-with-timeout.mjs.
@@ -8,8 +8,9 @@ import { join } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 
-const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const library = arg('library', 'C:/Development/Assets/blender-library'),
+const arg = (name, fallback) =>
+  process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
+const library = arg('library', process.env.MARGO_ASSET_LIBRARY ?? '../../Assets/blender-library'),
   out = arg('out', 'test-results/fauld-stills'),
   w = Number(arg('w', 1920)),
   h = Number(arg('h', 1080)),

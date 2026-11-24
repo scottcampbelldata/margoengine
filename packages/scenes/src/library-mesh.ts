@@ -32,7 +32,11 @@ export interface LibraryMeshOptions {
 
 /** A merged library mesh, ready for `BiomeViewOptions.meshes` (`{ 'procedural:rock': [part] }`). */
 export interface LibraryMeshPart {
-  readonly geometry: { readonly positions: Float32Array; readonly normals: Float32Array; readonly indices: Uint32Array };
+  readonly geometry: {
+    readonly positions: Float32Array;
+    readonly normals: Float32Array;
+    readonly indices: Uint32Array;
+  };
   /** Albedo, or the factor that multiplies the base colour map when there is one. */
   readonly color: readonly [number, number, number];
   readonly kind: 'bark' | 'foliage' | 'stone';
@@ -42,12 +46,21 @@ export interface LibraryMeshPart {
   readonly name?: string;
 }
 
-export type Node = { mesh?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] };
+export type Node = {
+  mesh?: number;
+  children?: number[];
+  matrix?: number[];
+  translation?: number[];
+  rotation?: number[];
+  scale?: number[];
+};
 export type Doc = {
   buffers?: { uri?: string; byteLength: number }[];
   bufferViews?: { buffer: number; byteOffset?: number; byteLength: number; byteStride?: number }[];
   accessors?: { bufferView?: number; byteOffset?: number; componentType: number; count: number; type: string }[];
-  meshes?: { primitives: { attributes: Record<string, number>; indices?: number; material?: number; mode?: number }[] }[];
+  meshes?: {
+    primitives: { attributes: Record<string, number>; indices?: number; material?: number; mode?: number }[];
+  }[];
   nodes?: Node[];
   scenes?: { nodes?: number[] }[];
   scene?: number;
@@ -110,16 +123,21 @@ export async function libraryMesh(url: string, options: LibraryMeshOptions = {})
   const get = options.fetch ?? (globalThis.fetch as unknown as NonNullable<LibraryMeshOptions['fetch']>),
     init = options.signal ? { signal: options.signal } : {},
     response = await get(url, init);
-  if (!response.ok) throw new TypeError(`libraryMesh: ${url} answered ${response.status}; check the URL and that the server is up`);
+  if (!response.ok)
+    throw new TypeError(`libraryMesh: ${url} answered ${response.status}; check the URL and that the server is up`);
   const doc = (await response.json()) as Doc,
     base = url.slice(0, url.lastIndexOf('/') + 1),
     buffers: ArrayBuffer[] = [];
   if (!doc.meshes?.length || !doc.accessors || !doc.bufferViews || !doc.buffers || !doc.nodes)
-    throw new TypeError(`libraryMesh: ${url} holds no meshes; pass a .gltf with meshes, accessors, buffer views, buffers and nodes`);
+    throw new TypeError(
+      `libraryMesh: ${url} holds no meshes; pass a .gltf with meshes, accessors, buffer views, buffers and nodes`,
+    );
   // A textured model draws its maps: libraryParts reads them (one part per material), from this same document.
   if (!options.color && doc.materials?.some((m) => m.pbrMetallicRoughness?.baseColorTexture)) {
     const once = async (u: string, i?: { signal?: AbortSignal }) =>
-        u === url ? { ok: true, status: 200, json: async () => doc, arrayBuffer: async () => new ArrayBuffer(0) } : get(u, i),
+        u === url
+          ? { ok: true, status: 200, json: async () => doc, arrayBuffer: async () => new ArrayBuffer(0) }
+          : get(u, i),
       parts = await libraryParts(url, {
         fetch: once,
         signal: options.signal,
@@ -135,21 +153,38 @@ export async function libraryMesh(url: string, options: LibraryMeshOptions = {})
         `libraryMesh: ${url} has ${parts.length} textured materials and one part draws one; load it with libraryParts (one part per material), or pass color to draw it flat`,
       );
     const [p] = parts;
-    return { geometry: p.geometry as LibraryMeshPart['geometry'], color: p.color, kind: p.kind, textures: p.textures, name: p.name };
+    return {
+      geometry: p.geometry as LibraryMeshPart['geometry'],
+      color: p.color,
+      kind: p.kind,
+      textures: p.textures,
+      name: p.name,
+    };
   }
   for (const b of doc.buffers) {
-    if (!b.uri || b.uri.startsWith('data:')) throw new TypeError('libraryMesh reads a .gltf with external buffers; export the glTF with separate .bin buffers');
+    if (!b.uri || b.uri.startsWith('data:'))
+      throw new TypeError(
+        'libraryMesh reads a .gltf with external buffers; export the glTF with separate .bin buffers',
+      );
     const r = await get(base + b.uri, init);
-    if (!r.ok) throw new TypeError(`libraryMesh: ${base + b.uri} answered ${r.status}; check that the buffer file sits beside the .gltf`);
+    if (!r.ok)
+      throw new TypeError(
+        `libraryMesh: ${base + b.uri} answered ${r.status}; check that the buffer file sits beside the .gltf`,
+      );
     buffers.push(await r.arrayBuffer());
   }
   const read = (id: number, components: number, index: boolean): Float32Array | Uint32Array => {
     const a = doc.accessors![id],
       v = a ? doc.bufferViews![a.bufferView ?? -1] : undefined,
       kind = a ? KINDS[a.componentType] : undefined;
-    if (!a || !v) throw new TypeError('libraryMesh: an accessor without a buffer view; export the glTF without sparse or empty accessors');
+    if (!a || !v)
+      throw new TypeError(
+        'libraryMesh: an accessor without a buffer view; export the glTF without sparse or empty accessors',
+      );
     if (!kind || index === (a.componentType === 5126))
-      throw new TypeError(`libraryMesh: unsupported accessor component type ${a.componentType}; use float positions and normals and integer indices`);
+      throw new TypeError(
+        `libraryMesh: unsupported accessor component type ${a.componentType}; use float positions and normals and integer indices`,
+      );
     const [size, at] = kind,
       stride = v.byteStride ?? size * components,
       view = new DataView(buffers[v.buffer], (v.byteOffset ?? 0) + (a.byteOffset ?? 0)),
@@ -190,7 +225,8 @@ export async function libraryMesh(url: string, options: LibraryMeshOptions = {})
             l = Math.hypot(tx, ty, tz) || 1;
           normals.push(tx / l, ty / l, tz / l);
         }
-        const idx = p.indices !== undefined ? read(p.indices, 1, true) : Uint32Array.from({ length: count }, (_, i) => i);
+        const idx =
+          p.indices !== undefined ? read(p.indices, 1, true) : Uint32Array.from({ length: count }, (_, i) => i);
         for (const i of idx) indices.push(first + i);
         const f = doc.materials?.[p.material ?? -1]?.pbrMetallicRoughness?.baseColorFactor;
         if (f) colors.push(f);
@@ -202,9 +238,14 @@ export async function libraryMesh(url: string, options: LibraryMeshOptions = {})
   for (const r of roots) visit(r, identity);
   const triangles = indices.length / 3,
     most = options.maxTriangles ?? 40000;
-  if (!triangles) throw new TypeError(`libraryMesh: ${url} holds no triangles with positions and normals; export triangle meshes with normals`);
+  if (!triangles)
+    throw new TypeError(
+      `libraryMesh: ${url} holds no triangles with positions and normals; export triangle meshes with normals`,
+    );
   if (triangles > most)
-    throw new RangeError(`libraryMesh: ${url} has ${triangles} triangles, over maxTriangles ${most}; export a lighter level of it`);
+    throw new RangeError(
+      `libraryMesh: ${url} has ${triangles} triangles, over maxTriangles ${most}; export a lighter level of it`,
+    );
   let minY = Infinity,
     x0 = Infinity,
     x1 = -Infinity,

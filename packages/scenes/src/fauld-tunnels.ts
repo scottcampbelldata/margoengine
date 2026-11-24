@@ -77,7 +77,12 @@ export interface FauldTunnelsScene extends Disposable {
   /** The state's exposure, EV100 (one per state, metered on a white card at its key mark). */
   readonly ev100: number;
   /** Models loaded, instances drawn and lamps lit (for checks). */
-  readonly counts: { readonly models: number; readonly instances: number; readonly lamps: number; readonly shadowed: number };
+  readonly counts: {
+    readonly models: number;
+    readonly instances: number;
+    readonly lamps: number;
+    readonly shadowed: number;
+  };
   readonly parts: {
     readonly lights: Clustered;
     readonly groups: LightGroups;
@@ -135,12 +140,29 @@ const LAMP_OF_RUN = (name: string): number =>
         ? FAULD_LAMPS.w40
         : FAULD_LAMPS.w60;
 
-type Extra = { scale?: number; pitch?: number; roll?: number; ground?: boolean; dz?: number; avoid?: readonly (readonly number[])[]; aim?: readonly number[]; cone?: number; rgb?: readonly number[]; fire?: boolean };
+type Extra = {
+  scale?: number;
+  pitch?: number;
+  roll?: number;
+  ground?: boolean;
+  dz?: number;
+  avoid?: readonly (readonly number[])[];
+  aim?: readonly number[];
+  cone?: number;
+  rgb?: readonly number[];
+  fire?: boolean;
+};
 type PropRow = readonly [string, string, number, number, number, number, Extra?];
 type LineRow = readonly [string, string, number, number, number, number, number, Extra?];
 type BulbRow = readonly [string, readonly number[], readonly number[], number, Extra?];
 type FxRow = readonly [string, string, number, number, number, number];
-type StateRow = { drop: readonly string[]; props: readonly PropRow[]; lines: readonly LineRow[]; bulbs: readonly BulbRow[]; fx: readonly FxRow[] };
+type StateRow = {
+  drop: readonly string[];
+  props: readonly PropRow[];
+  lines: readonly LineRow[];
+  bulbs: readonly BulbRow[];
+  fx: readonly FxRow[];
+};
 
 /** Plan metres to Margo axes: (x, z, -y). */
 export const toWorld = (x: number, y: number, z: number): Vec3 => [x, z, -y];
@@ -148,18 +170,42 @@ const D = Math.PI / 180;
 
 /** Column-major matrix of a plan placement: yaw about up, then pitch, then roll (Unreal's rotator order), scale. */
 export function placement(x: number, y: number, z: number, yaw = 0, pitch = 0, roll = 0, s = 1): number[] {
-  const cy = Math.cos(yaw * D), sy = Math.sin(yaw * D), cp = Math.cos(pitch * D), sp = Math.sin(pitch * D), cr = Math.cos(roll * D), sr = Math.sin(roll * D);
+  const cy = Math.cos(yaw * D),
+    sy = Math.sin(yaw * D),
+    cp = Math.cos(pitch * D),
+    sp = Math.sin(pitch * D),
+    cr = Math.cos(roll * D),
+    sr = Math.sin(roll * D);
   // In Margo axes yaw turns about +y; pitch about the piece's own -z (plan +Y); roll about its x.
   const Ry = [cy, 0, -sy, 0, 1, 0, sy, 0, cy];
   const Rz = [cp, sp, 0, -sp, cp, 0, 0, 0, 1];
   const Rx = [1, 0, 0, 0, cr, sr, 0, -sr, cr];
   const m3 = (a: number[], b: number[]) =>
     Array.from({ length: 9 }, (_, i) => {
-      const c = Math.floor(i / 3), r = i % 3;
+      const c = Math.floor(i / 3),
+        r = i % 3;
       return a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2];
     });
-  const R = m3(m3(Ry, Rz), Rx), p = toWorld(x, y, z);
-  return [R[0] * s, R[1] * s, R[2] * s, 0, R[3] * s, R[4] * s, R[5] * s, 0, R[6] * s, R[7] * s, R[8] * s, 0, p[0], p[1], p[2], 1];
+  const R = m3(m3(Ry, Rz), Rx),
+    p = toWorld(x, y, z);
+  return [
+    R[0] * s,
+    R[1] * s,
+    R[2] * s,
+    0,
+    R[3] * s,
+    R[4] * s,
+    R[5] * s,
+    0,
+    R[6] * s,
+    R[7] * s,
+    R[8] * s,
+    0,
+    p[0],
+    p[1],
+    p[2],
+    1,
+  ];
 }
 
 /** Points of a line row: from `from` toward `to` every `every` metres (both ends), minus `avoid` circles. */
@@ -237,7 +283,8 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     quality: settings.quality ?? 'film',
     library: settings.library ?? '/asset-library/',
   } as const;
-  if (!FAULD_TUNNEL_STATES.includes(s.state)) throw new RangeError(`Unknown Fauld tunnels state ${s.state}; use one of ${FAULD_TUNNEL_STATES.join(', ')}`);
+  if (!FAULD_TUNNEL_STATES.includes(s.state))
+    throw new RangeError(`Unknown Fauld tunnels state ${s.state}; use one of ${FAULD_TUNNEL_STATES.join(', ')}`);
   if (!(s.time >= 0 && s.time <= 600)) throw new RangeError('Fauld tunnels time is 0 to 600 seconds');
   const film = s.quality === 'film',
     yard = s.state.startsWith('yard'),
@@ -263,7 +310,11 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     engine.lighting.radiance.set([0, 0, 0, 0]);
     engine.lighting.ambient.set([0, 0, 0]);
     // What the lamp-lit gypsum walls and floor bounce back, a little warm light from every side (no sky down here).
-    bounce = HemisphereLight.attach(engine, { sky: [0.02, 0.016, 0.011], ground: [0.012, 0.01, 0.008], intensity: 0.4 } as never);
+    bounce = HemisphereLight.attach(engine, {
+      sky: [0.02, 0.016, 0.011],
+      ground: [0.012, 0.01, 0.008],
+      intensity: 0.4,
+    } as never);
   }
   // Models: one load each, every repeat drawn by GPU instancing.
   let instances = 0;
@@ -274,7 +325,8 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
         model = await loadGLTF(engine, `${root}${asset}/${id}_2k.gltf`, { signal: settings.signal });
       const inst = new PBRInstances(mats.length);
       mats.forEach((m, i) => inst.setMatrixAt(i, m));
-      for (const p of (model as unknown as { primitives: { instances?: PBRInstances }[] }).primitives) p.instances = inst;
+      for (const p of (model as unknown as { primitives: { instances?: PBRInstances }[] }).primitives)
+        p.instances = inst;
       instances += mats.length;
       lights.add(model as never);
       shadows.add(model as never);
@@ -324,13 +376,27 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   // to the blast state's metered exposure (EV100 9: a pale wall 30 m away reads mid grey at about 700 lux, so
   // 700 x 30^2, about 630,000 cd; BLAST_FLASH_CD holds three times that so the near bays clip, as the flash did).
   if (s.state === 'blast')
-    for (const [, kind, x, y, z] of fx)
+    for (const [, kind, x, y] of fx)
       if (kind === 'fire')
-        lampLights.push({ position: toWorld(x, y, 3.1), color: [1, 0.93, 0.82], intensity: BLAST_FLASH_CD, range: 220, radius: 0.6, castShadow: true });
+        lampLights.push({
+          position: toWorld(x, y, 3.1),
+          color: [1, 0.93, 0.82],
+          intensity: BLAST_FLASH_CD,
+          range: 220,
+          radius: 0.6,
+          castShadow: true,
+        });
   const viewer = () => engine.camera.position as unknown as Vec3;
   const bulbs = groups.group('bulbs');
   const budget = () =>
-    bulbs.setLights(shadowBudget(lampLights, { viewer: viewer(), texels: (film ? 1024 : 512) ** 2 * 6 * (film ? 16 : 8), resolution: film ? 1024 : 512, maxLights: film ? 16 : 8 }));
+    bulbs.setLights(
+      shadowBudget(lampLights, {
+        viewer: viewer(),
+        texels: (film ? 1024 : 512) ** 2 * 6 * (film ? 16 : 8),
+        resolution: film ? 1024 : 512,
+        maxLights: film ? 16 : 8,
+      }),
+    );
   budget();
   // One bounce of every shadowed lamp: the lit floor, stacks and whitewash light the arch, the rock and the undersides,
   // as the white gypsum and limewash did (the lamps light only their lower hemisphere).
@@ -339,7 +405,10 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   // The glowing bulbs: a 30 mm sphere at the light's own radiance (flameEmission: intensity over the projected area).
   if (glass.length) {
     const bulb = lampLights.find((l) => (l as SpotLight).outerAngle === Math.PI / 2)!;
-    const mat = new UnlitMaterial({ color: [0, 0, 0], ...flameEmission({ color: TUNGSTEN, intensity: bulb.intensity!, radius: 0.03 }) });
+    const mat = new UnlitMaterial({
+      color: [0, 0, 0],
+      ...flameEmission({ color: TUNGSTEN, intensity: bulb.intensity!, radius: 0.03 }),
+    });
     for (const p of glass) {
       const m = createMesh(engine, sphereGeometry(0.03, 12, 8), mat);
       m.root.setPosition([p[0], p[1] - 0.04, p[2]]);
@@ -355,8 +424,26 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
     // A burning store: flames about 1.6 m long a unit of scale (a crate and its packing, about 1 MW by Heskestad's
     // length), held under the 3.6 m arch, with their own light and smoke on the lamps' groups.
     if (kind === 'fire')
-      fires.push(Fire.attach(engine, { position: p, flameLength: Math.min(3, 1.6 * scale), width: 0.9 * scale, lights: groups, depth: () => stack.depthTexture }));
-    else if (yard) smokes.push(Smoke.attach(engine, { position: p, heat: 2e5 * scale, radius: 0.8 * scale, color: [0.08, 0.075, 0.07], opacity: 0.85, prewarm: true } as never));
+      fires.push(
+        Fire.attach(engine, {
+          position: p,
+          flameLength: Math.min(3, 1.6 * scale),
+          width: 0.9 * scale,
+          lights: groups,
+          depth: () => stack.depthTexture,
+        }),
+      );
+    else if (yard)
+      smokes.push(
+        Smoke.attach(engine, {
+          position: p,
+          heat: 2e5 * scale,
+          radius: 0.8 * scale,
+          color: [0.08, 0.075, 0.07],
+          opacity: 0.85,
+          prewarm: true,
+        } as never),
+      );
   }
   // Dusty air lit by the lamps: fine gypsum dust in the mains states, thick smoke after the blast and in the fire.
   const smoky = s.state === 'fire' || s.state === 'blast' || s.state === 'after';
@@ -389,13 +476,21 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   } else {
     // A lens's veiling glare: a few percent of a bulb's light round it (the clipped bulb itself carries the rest).
     bloom = new Bloom({ threshold: 1.5, strength: 0.025, radius: 0.5 });
-    tonemap = new Tonemap({ curve: 'agx', exposure: Math.log2(exposureFromEV100(ev)), contrast: 1.05, temperature: 3200 } as never);
+    tonemap = new Tonemap({
+      curve: 'agx',
+      exposure: Math.log2(exposureFromEV100(ev)),
+      contrast: 1.05,
+      temperature: 3200,
+    } as never);
     for (const e of [occlusion, dof, bloom, tonemap, smaa]) stack.addEffect(e as never);
   }
   let time = s.time;
   for (const f of [...fires, ...smokes]) (f as unknown as { advance?(t: number): void }).advance?.(time);
   const marks = Object.fromEntries(
-    Object.entries(PLAN.marks as unknown as Record<string, readonly number[]>).map(([k, [x, y, z, size]]) => [k, { position: toWorld(x, y, z), size }]),
+    Object.entries(PLAN.marks as unknown as Record<string, readonly number[]>).map(([k, [x, y, z, size]]) => [
+      k,
+      { position: toWorld(x, y, z), size },
+    ]),
   );
   disposers.push(() => {
     for (const f of fires) f.dispose();

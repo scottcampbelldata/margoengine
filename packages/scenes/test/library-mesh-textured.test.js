@@ -12,13 +12,21 @@ const model = (materials) => {
   p.set([0, 1, 0, 2, 1, 0, 0, 3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
   t.set([0, 0, 1, 0, 0, 1]);
   i.set([0, 1, 2]);
-  const prims = materials.map((_, m) => ({ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3, material: m }));
+  const prims = materials.map((_, m) => ({
+    attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 },
+    indices: 3,
+    material: m,
+  }));
   return {
     bin,
     doc: {
       asset: { version: '2.0' },
       buffers: [{ uri: 'm.bin', byteLength: bin.byteLength }],
-      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 72 }, { buffer: 0, byteOffset: 72, byteLength: 24 }, { buffer: 0, byteOffset: 96, byteLength: 6 }],
+      bufferViews: [
+        { buffer: 0, byteOffset: 0, byteLength: 72 },
+        { buffer: 0, byteOffset: 72, byteLength: 24 },
+        { buffer: 0, byteOffset: 96, byteLength: 6 },
+      ],
       accessors: [
         { bufferView: 0, byteOffset: 0, componentType: 5126, count: 3, type: 'VEC3' },
         { bufferView: 0, byteOffset: 36, componentType: 5126, count: 3, type: 'VEC3' },
@@ -28,7 +36,11 @@ const model = (materials) => {
       meshes: [{ primitives: prims }],
       materials,
       textures: [{ source: 0 }, { source: 1 }, { source: 2 }],
-      images: [{ uri: 'paint_diff.jpg', mimeType: 'image/jpeg' }, { uri: 'paint_nor.jpg', mimeType: 'image/jpeg' }, { uri: 'paint_arm.jpg', mimeType: 'image/jpeg' }],
+      images: [
+        { uri: 'paint_diff.jpg', mimeType: 'image/jpeg' },
+        { uri: 'paint_nor.jpg', mimeType: 'image/jpeg' },
+        { uri: 'paint_arm.jpg', mimeType: 'image/jpeg' },
+      ],
       nodes: [{ mesh: 0 }],
       scenes: [{ nodes: [0] }],
     },
@@ -44,10 +56,19 @@ const serve = ({ doc, bin }) => {
   };
   return { fetch, fetched };
 };
-const decode = async (bytes) => ({ width: 1, height: 1, data: new Uint8Array(4), name: new TextDecoder().decode(bytes) });
+const decode = async (bytes) => ({
+  width: 1,
+  height: 1,
+  data: new Uint8Array(4),
+  name: new TextDecoder().decode(bytes),
+});
 const painted = {
   name: 'TN_BombPaint',
-  pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], baseColorTexture: { index: 0 }, metallicRoughnessTexture: { index: 2 } },
+  pbrMetallicRoughness: {
+    baseColorFactor: [1, 1, 1, 1],
+    baseColorTexture: { index: 0 },
+    metallicRoughnessTexture: { index: 2 },
+  },
   normalTexture: { index: 1 },
 };
 
@@ -69,11 +90,17 @@ test('libraryMesh draws a textured library model with its base colour, normal an
 
 test('libraryMesh draws flat only when asked, and sends a model of several textured materials to libraryParts', async () => {
   const { libraryMesh } = await import('@margoengine/scenes/library');
-  const flat = await libraryMesh('/lib/bomb/bomb_2k.gltf', { fetch: serve(model([painted])).fetch, color: [0.03, 0.05, 0.02] });
+  const flat = await libraryMesh('/lib/bomb/bomb_2k.gltf', {
+    fetch: serve(model([painted])).fetch,
+    color: [0.03, 0.05, 0.02],
+  });
   assert.equal(flat.textures, undefined);
   assert.deepEqual(flat.color, [0.03, 0.05, 0.02]);
   await assert.rejects(
-    libraryMesh('/lib/bomb/bomb_2k.gltf', { fetch: serve(model([painted, { ...painted, name: 'TN_BombBand' }])).fetch, decode }),
+    libraryMesh('/lib/bomb/bomb_2k.gltf', {
+      fetch: serve(model([painted, { ...painted, name: 'TN_BombBand' }])).fetch,
+      decode,
+    }),
     (e) => e.code === 'unsupported' && /2 textured materials/.test(e.message) && /libraryParts/.test(e.message),
   );
 });
