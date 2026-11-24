@@ -16,6 +16,7 @@ export interface BodyOptions {
     angularDamping?: number;
     gravityScale?: number;
     ccd?: boolean;
+    softCcdPrediction?: number;
     canSleep?: boolean;
     sleeping?: boolean;
     lockRotations?: boolean;
@@ -462,6 +463,8 @@ export class PhysicsBody {
     set additionalSolverIterations(passes: number);
     get ccd(): boolean;
     set ccd(enabled: boolean);
+    get softCcdPrediction(): number;
+    set softCcdPrediction(distance: number);
     get ccdActive(): boolean;
     get enabled(): boolean;
     set enabled(value: boolean);
@@ -498,6 +501,8 @@ export class PhysicsCollider {
     setSensor(sensor: boolean): this;
     isEnabled(): boolean;
     setEnabled(enabled: boolean): this;
+    contactSkin(): number;
+    setContactSkin(skin: number): this;
     activeCollisionTypes(): CollisionPairKind[];
     setActiveCollisionTypes(kinds: readonly CollisionPairKind[]): this;
     activeEvents(): {
@@ -757,6 +762,7 @@ interface ColliderDesc {
     setDensity(density: number): ColliderDesc;
     setSensor(sensor: boolean): ColliderDesc;
     setActiveCollisionTypes(types: number): ColliderDesc;
+    setContactSkin?(thickness: number): ColliderDesc;
     setCollisionGroups(groups: number): ColliderDesc;
     setSolverGroups(groups: number): ColliderDesc;
     setActiveEvents(events: number): ColliderDesc;
@@ -783,6 +789,7 @@ interface ColliderSettings {
     sensor?: boolean;
     collisionGroups?: number;
     solverGroups?: number;
+    contactSkin?: number;
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
     modifyContacts?: boolean;

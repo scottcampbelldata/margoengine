@@ -32,6 +32,12 @@ export interface BodyOptions {
   gravityScale?: number;
   /** Continuous collision detection for fast bodies. */
   ccd?: boolean;
+  /**
+   * How far past where it is a body's contacts reach, in metres (default 0), Rapier's soft CCD: shapes this near each other
+   * in the direction of travel get speculative contacts, so a fast body does not tunnel. The own solver already reaches as
+   * far as a step moves a body; this adds to that.
+   */
+  softCcdPrediction?: number;
   canSleep?: boolean;
   sleeping?: boolean;
   lockRotations?: boolean;

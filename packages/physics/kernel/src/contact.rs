@@ -105,6 +105,21 @@ impl World {
     /// Writes a manifold into a pair's rows, with anchors from each body's centre of mass in each body's frame, and each
     /// point carrying what the point it continues had. `ratio` is the new substep over the old.
     pub fn store_manifold(&mut self, row: usize, a: usize, b: usize, manifold: &Manifold, ratio: f32) {
+        // A skin makes each shape thicker by it, along the contact normal: the points move out and the separation shrinks.
+        let (skin_a, skin_b) = (self.s(COLLIDER_SKIN, self.uu(PAIR_A, row) as usize), self.s(COLLIDER_SKIN, self.uu(PAIR_B, row) as usize));
+        let skinned;
+        let manifold = if skin_a + skin_b > 0.0 {
+            let mut thick = *manifold;
+            for point in thick.points.iter_mut().take(thick.count) {
+                point.on_a = point.on_a.add(thick.normal.scale(skin_a));
+                point.on_b = point.on_b.sub(thick.normal.scale(skin_b));
+                point.separation -= skin_a + skin_b;
+            }
+            skinned = thick;
+            &skinned
+        } else {
+            manifold
+        };
         let zero = v3(0.0, 0.0, 0.0);
         let mut old = [Kept { id: 0, anchor_a: zero, normal_impulse: 0.0, tangent_impulse: zero, drift: zero }; MANIFOLD];
         let old_count = self.kept(row, &mut old);

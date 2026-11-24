@@ -519,7 +519,7 @@ impl World {
             let at = self.uu(COLLIDER_BODY, c) as usize;
             let (linear, angular) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
             let rim = self.collider_reach(c);
-            limit += (sqrt(linear.dot(linear)) + sqrt(angular.dot(angular)) * rim) * dt;
+            limit += (sqrt(linear.dot(linear)) + sqrt(angular.dot(angular)) * rim) * dt + self.s(SOFT_CCD, at) + self.s(COLLIDER_SKIN, c);
         }
         limit
     }

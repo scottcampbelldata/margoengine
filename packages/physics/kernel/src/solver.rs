@@ -635,7 +635,8 @@ impl World {
         } else {
             v3(0.0, 0.0, 0.0)
         };
-        Some(RoundCore { middle, half, radius: self.s(COLLIDER_A, collider) })
+        // A skin is part of the radius: the surface the contact is solved against is a skin further out.
+        Some(RoundCore { middle, half, radius: self.s(COLLIDER_A, collider) + self.s(COLLIDER_SKIN, collider) })
     }
 
     /// Gravity's acceleration of b against a: none on a body the solve does not move.

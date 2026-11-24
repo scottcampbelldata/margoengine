@@ -136,6 +136,21 @@ export class PhysicsCollider {
     this.setBit(COLLIDER_OFF, !enabled);
     return this;
   }
+  /** The skin in metres around the collider's shape (default 0). */
+  contactSkin(): number {
+    return this.columns().colliderSkin[this.handle];
+  }
+  /**
+   * Sets the skin: contacts are made and solved as if the shape were this much thicker; two colliders' skins add up. It
+   * takes effect at the next step.
+   * @throws RangeError for a skin that is negative or not finite.
+   */
+  setContactSkin(skin: number): this {
+    if (!(skin >= 0) || !Number.isFinite(skin)) throw new RangeError(`A contact skin is 0 or more metres and finite (got ${skin}).`);
+    this.columns().colliderSkin[this.handle] = skin;
+    this.wake();
+    return this;
+  }
   /** The kinds of body pair this collider takes part in. */
   activeCollisionTypes(): CollisionPairKind[] {
     const wanted = ((this.columns().colliderFlags[this.handle] & COLLIDER_TYPES) >>> COLLIDER_TYPES_SHIFT) ^ 7;

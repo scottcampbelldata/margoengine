@@ -70,6 +70,8 @@ export interface ColliderDesc {
   setDensity(density: number): ColliderDesc;
   setSensor(sensor: boolean): ColliderDesc;
   setActiveCollisionTypes(types: number): ColliderDesc;
+  /** Rapier 0.14 and later. */
+  setContactSkin?(thickness: number): ColliderDesc;
   setCollisionGroups(groups: number): ColliderDesc;
   setSolverGroups(groups: number): ColliderDesc;
   setActiveEvents(events: number): ColliderDesc;
@@ -129,6 +131,8 @@ export interface RigidBodyDesc {
   setLinearDamping(damping: number): RigidBodyDesc;
   setAngularDamping(damping: number): RigidBodyDesc;
   setGravityScale(scale: number): RigidBodyDesc;
+  /** Rapier 0.14 and later. */
+  setSoftCcdPrediction?(distance: number): RigidBodyDesc;
   setCcdEnabled(enabled: boolean): RigidBodyDesc;
   setCanSleep(enabled: boolean): RigidBodyDesc;
   setSleeping(sleeping: boolean): RigidBodyDesc;

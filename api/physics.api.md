@@ -17,6 +17,7 @@ export interface BodyOptions {
     angularDamping?: number;
     gravityScale?: number;
     ccd?: boolean;
+    softCcdPrediction?: number;
     canSleep?: boolean;
     sleeping?: boolean;
     lockRotations?: boolean;
@@ -92,6 +93,7 @@ export interface ColliderSettings {
     sensor?: boolean;
     collisionGroups?: number;
     solverGroups?: number;
+    contactSkin?: number;
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
     modifyContacts?: boolean;
@@ -833,6 +835,7 @@ interface ColliderDesc {
     setDensity(density: number): ColliderDesc;
     setSensor(sensor: boolean): ColliderDesc;
     setActiveCollisionTypes(types: number): ColliderDesc;
+    setContactSkin?(thickness: number): ColliderDesc;
     setCollisionGroups(groups: number): ColliderDesc;
     setSolverGroups(groups: number): ColliderDesc;
     setActiveEvents(events: number): ColliderDesc;
@@ -1006,6 +1009,7 @@ interface RigidBodyDesc {
     setLinearDamping(damping: number): RigidBodyDesc;
     setAngularDamping(damping: number): RigidBodyDesc;
     setGravityScale(scale: number): RigidBodyDesc;
+    setSoftCcdPrediction?(distance: number): RigidBodyDesc;
     setCcdEnabled(enabled: boolean): RigidBodyDesc;
     setCanSleep(enabled: boolean): RigidBodyDesc;
     setSleeping(sleeping: boolean): RigidBodyDesc;

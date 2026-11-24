@@ -53,7 +53,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Broad phase on moving and fixed colliders | full | |
 | Narrow phase for every pair of held shapes, manifolds up to 4 points | full | |
 | Narrow phase for segment, triangle, polyline and half space against every shape | full | a mesh meets no mesh, as on Rapier; a half space meets no mesh or half space |
-| Contact skin / prediction distance as a collider option | missing | the step uses a fixed prediction |
+| Contact skin / prediction distance as a collider option | full | `contactSkin`; contact limit includes the step's motion and the skins |
 | Contact manifold read (`contacts()`, `contactPoints`, `touching`, `contactPair`) | full | `contactPair` works for any two colliders |
 | Friction, restitution, combine rules | full | all four rules |
 | Collision groups, solver groups | full | |
@@ -68,7 +68,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Capability | Status | Notes |
 | --- | --- | --- |
 | CCD for a body | full | |
-| Soft CCD (`softCcdPrediction`) | missing | |
+| Soft CCD (`softCcdPrediction`) | full | the contact limit always includes the step's motion; the option adds to it |
 
 ## Hooks
 

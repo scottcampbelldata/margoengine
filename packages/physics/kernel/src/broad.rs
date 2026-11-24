@@ -104,6 +104,9 @@ impl World {
                 (core.add(v3(a, a, a)), a + b)
             }
         };
+        // Soft CCD: the box reaches that much further every way, so the pair exists when the contacts are asked for.
+        let soft = self.s(SOFT_CCD, at);
+        let extent = extent.add(v3(soft, soft, soft));
         let (mut low, mut high) = (center.sub(extent), center.add(extent));
         let kind = flags & KIND;
         if kind != FIXED {

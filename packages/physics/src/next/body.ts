@@ -348,6 +348,14 @@ export class PhysicsBody {
   set ccd(enabled: boolean) {
     this.world().setCcd(this.row, enabled);
   }
+  /** How far past what a step moves it this body's contacts reach, in metres (default 0): soft CCD, as Rapier's `softCcdPrediction`. */
+  get softCcdPrediction(): number {
+    return this.columns.softCcd[this.row];
+  }
+  set softCcdPrediction(distance: number) {
+    if (!(distance >= 0) || !Number.isFinite(distance)) throw new RangeError(`softCcdPrediction must be 0 or more and finite (got ${distance}).`);
+    this.columns.softCcd[this.row] = distance;
+  }
   /** True when the last step's CCD pass checked this body: CCD is on and it moved further than it is thick. */
   get ccdActive(): boolean {
     return this.world().isCcdActive(this.row);

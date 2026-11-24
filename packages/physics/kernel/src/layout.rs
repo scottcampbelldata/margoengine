@@ -123,6 +123,8 @@ columns! {
     // The next free row; mass given on top of the colliders'; the first of the body's colliders.
     NEXT_FREE u32 Body,
     ADDITIONAL_MASS f32 Body,
+    // How far past what the step moves it a body's contacts reach (soft CCD): added to the pair's contact limit.
+    SOFT_CCD f32 Body,
     FIRST_COLLIDER u32 Body,
     // A solid of the body's own on top of its colliders: mass at a point of its frame, and principal moments along a frame
     // of its own, both in the body's frame. setAdditionalMass and setMassProperties write it.
@@ -179,6 +181,8 @@ columns! {
     COLLIDER_ROTATION_Z f32 Collider,
     COLLIDER_ROTATION_W f32 Collider,
     COLLIDER_DENSITY f32 Collider,
+    // A collider's skin: contacts are made and solved as if every shape were this much thicker (Rapier's contact skin).
+    COLLIDER_SKIN f32 Collider,
     // A box's or hull's border radius (Rapier's round cuboid and round convex); 0 for none. A cylinder's and cone's is C.
     COLLIDER_BORDER f32 Collider,
     // The hull row of a SHAPE_HULL collider.

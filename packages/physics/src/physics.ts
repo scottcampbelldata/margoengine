@@ -684,6 +684,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.angularDamping !== undefined) desc.setAngularDamping(options.angularDamping);
     if (options.gravityScale !== undefined) desc.setGravityScale(options.gravityScale);
     if (options.ccd) desc.setCcdEnabled(true);
+    if (options.softCcdPrediction !== undefined) {
+      if (typeof desc.setSoftCcdPrediction !== 'function')
+        throw new MargoError('unsupported', 'softCcdPrediction needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.');
+      desc.setSoftCcdPrediction(options.softCcdPrediction);
+    }
     if (options.canSleep !== undefined) desc.setCanSleep(options.canSleep);
     if (options.sleeping) desc.setSleeping(true);
     if (options.dominance !== undefined) desc.setDominanceGroup(options.dominance);

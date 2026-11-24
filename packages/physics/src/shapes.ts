@@ -172,6 +172,12 @@ export interface ColliderSettings {
   collisionGroups?: number;
   /** Packed 32-bit solver groups: which pairs generate contact forces (contacts still detected). */
   solverGroups?: number;
+  /**
+   * A skin around the shape in metres (default 0), Rapier's contact skin: contacts are made and solved as if the shape were
+   * this much thicker, so a body rests a skin above what it lies on, and starts touching a skin away. Two colliders'
+   * skins add up.
+   */
+  contactSkin?: number;
   /** Emit contact or intersection start and end events (default true). */
   events?: boolean;
   /**
@@ -647,6 +653,11 @@ export function configureCollider(
     desc.setSensor(true);
     // Let sensors see kinematic and fixed bodies too (character controllers walking into triggers).
     desc.setActiveCollisionTypes(R.ActiveCollisionTypes.ALL);
+  }
+  if (options.contactSkin !== undefined) {
+    if (typeof desc.setContactSkin !== 'function')
+      throw new MargoError('unsupported', 'contactSkin needs Rapier 0.14 or later; upgrade @dimforge/rapier3d-compat or leave it out.');
+    desc.setContactSkin(options.contactSkin);
   }
   if (options.collisionGroups !== undefined) desc.setCollisionGroups(options.collisionGroups);
   if (options.solverGroups !== undefined) desc.setSolverGroups(options.solverGroups);

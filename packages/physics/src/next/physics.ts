@@ -628,6 +628,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.dominance !== undefined) columns.dominance[row] = options.dominance;
     if (options.canSleep !== undefined) kernel.setCanSleep(row, options.canSleep);
     if (options.ccd) kernel.setCcd(row, true);
+    if (options.softCcdPrediction !== undefined) body.softCcdPrediction = options.softCcdPrediction;
     if (options.additionalMass !== undefined) columns.additionalMass[row] = options.additionalMass;
     const angular = options.lockRotations ? 7 : options.enabledRotations ? bits(options.enabledRotations) : 0,
       linear = options.lockTranslations ? 7 : options.enabledTranslations ? bits(options.enabledTranslations) : 0;
@@ -697,6 +698,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     collider.emits = options.events ?? true;
     collider.forceEvents = options.contactForceEvents ?? true;
     collider.forceThreshold = options.contactForceThreshold ?? 0;
+    if (options.contactSkin !== undefined) collider.setContactSkin(options.contactSkin);
     if (options.contactForceThreshold !== undefined) collider.setContactForceEventThreshold(options.contactForceThreshold);
     if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
     if (options.modifyContacts) {
