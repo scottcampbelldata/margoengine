@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17766229,
+  "total": 17768375,
   "history": [
     {
       "date": "2026-10-24",
@@ -11553,6 +11553,12 @@
       "commit": "40a28f692",
       "reason": "soft entry gains dominance, per-body iterations, surface collider and oriented options: loader and a few kernel bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "294881dc0",
+      "reason": "physics: gear, rack and pinion and pulley joints (mechanisms.ts): root entry base budget 66,637 to 66,779 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -12310,7 +12316,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 274236,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 66637,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 68783,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 206519,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/soft": 74503,
