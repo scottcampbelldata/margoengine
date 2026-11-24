@@ -1,0 +1,368 @@
+// The world of soft bodies: every particle, edge and collider of one scene in rows, and the step that moves them.
+
+/// Collider kinds, as TypeScript writes them in `c_kind`.
+pub const SPHERE: u32 = 0;
+pub const BOX: u32 = 1;
+pub const CAPSULE: u32 = 2;
+pub const HALF_SPACE: u32 = 3;
+
+/// Particle flags.
+pub const PINNED: u32 = 1;
+/// A pinned particle that follows its target (`tx`, `ty`, `tz`) over the step.
+pub const TARGETED: u32 = 2;
+/// Edge flags.
+pub const TORN: u32 = 1;
+
+use crate::math::{abs, sign, sqrt};
+use crate::col::Col;
+
+#[derive(Default)]
+pub struct World {
+    // Particles: position, the position a substep started from, velocity, inverse mass, radius, kinematic target.
+    pub x: Col<f32>,
+    pub y: Col<f32>,
+    pub z: Col<f32>,
+    pub px: Col<f32>,
+    pub py: Col<f32>,
+    pub pz: Col<f32>,
+    pub vx: Col<f32>,
+    pub vy: Col<f32>,
+    pub vz: Col<f32>,
+    pub w: Col<f32>,
+    pub radius: Col<f32>,
+    pub tx: Col<f32>,
+    pub ty: Col<f32>,
+    pub tz: Col<f32>,
+    pub pflags: Col<u32>,
+    pub pbody: Col<u32>,
+    // Edges: two particles, the rest length, the softness (natural frequency in rad/s, 0 for rigid, and damping ratio), the
+    // multiplier a substep has gathered, and the strain past which it tears (0 for never).
+    pub ea: Col<u32>,
+    pub eb: Col<u32>,
+    pub rest: Col<f32>,
+    pub omega: Col<f32>,
+    pub zeta: Col<f32>,
+    pub lambda: Col<f32>,
+    pub tear: Col<f32>,
+    pub eflags: Col<u32>,
+    // Soft bodies: what applies to all their particles.
+    pub gravity_scale: Col<f32>,
+    pub linear_damping: Col<f32>,
+    // Colliders handed in for a step: kind, pose, size, friction, the velocity of the body's centre and its spin, the centre.
+    pub c_kind: Col<u32>,
+    pub cx: Col<f32>,
+    pub cy: Col<f32>,
+    pub cz: Col<f32>,
+    pub qx: Col<f32>,
+    pub qy: Col<f32>,
+    pub qz: Col<f32>,
+    pub qw: Col<f32>,
+    pub sx: Col<f32>,
+    pub sy: Col<f32>,
+    pub sz: Col<f32>,
+    pub friction: Col<f32>,
+    pub lvx: Col<f32>,
+    pub lvy: Col<f32>,
+    pub lvz: Col<f32>,
+    pub avx: Col<f32>,
+    pub avy: Col<f32>,
+    pub avz: Col<f32>,
+    pub mx: Col<f32>,
+    pub my: Col<f32>,
+    pub mz: Col<f32>,
+    // What the step pushed on each collider's body: an impulse, and its moment about the body's centre.
+    pub jx: Col<f32>,
+    pub jy: Col<f32>,
+    pub jz: Col<f32>,
+    pub kx: Col<f32>,
+    pub ky: Col<f32>,
+    pub kz: Col<f32>,
+    pub particles: usize,
+    pub edges: usize,
+    pub bodies: usize,
+    pub colliders: usize,
+    /// Edges that tore in the last step.
+    pub torn: u32,
+}
+
+fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
+    v.resize(n);
+}
+
+impl World {
+    pub fn new() -> World {
+        World::default()
+    }
+
+    /// Makes room for at least this many rows of each kind; counts say how many of them are in use.
+    pub fn reserve(&mut self, particles: usize, edges: usize, bodies: usize, colliders: usize) {
+        for v in [
+            &mut self.x, &mut self.y, &mut self.z, &mut self.px, &mut self.py, &mut self.pz, &mut self.vx, &mut self.vy,
+            &mut self.vz, &mut self.w, &mut self.radius, &mut self.tx, &mut self.ty, &mut self.tz,
+        ] {
+            grow(v, particles);
+        }
+        grow(&mut self.pflags, particles);
+        grow(&mut self.pbody, particles);
+        for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear] {
+            grow(v, edges);
+        }
+        grow(&mut self.ea, edges);
+        grow(&mut self.eb, edges);
+        grow(&mut self.eflags, edges);
+        grow(&mut self.gravity_scale, bodies);
+        grow(&mut self.linear_damping, bodies);
+        grow(&mut self.c_kind, colliders);
+        for v in [
+            &mut self.cx, &mut self.cy, &mut self.cz, &mut self.qx, &mut self.qy, &mut self.qz, &mut self.qw, &mut self.sx,
+            &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
+            &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
+            &mut self.kx, &mut self.ky, &mut self.kz,
+        ] {
+            grow(v, colliders);
+        }
+    }
+
+    /// Advances every particle by `dt` seconds in `substeps` pieces of `iterations` passes each.
+    pub fn step(&mut self, dt: f32, substeps: u32, iterations: u32, gravity: [f32; 3]) {
+        let substeps = substeps.max(1);
+        let h = dt / substeps as f32;
+        for c in 0..self.colliders {
+            self.jx[c] = 0.0;
+            self.jy[c] = 0.0;
+            self.jz[c] = 0.0;
+            self.kx[c] = 0.0;
+            self.ky[c] = 0.0;
+            self.kz[c] = 0.0;
+        }
+        self.torn = 0;
+        // A pinned particle with a target travels to it at a steady speed over the step.
+        for i in 0..self.particles {
+            if self.pflags[i] & TARGETED != 0 {
+                self.vx[i] = (self.tx[i] - self.x[i]) / dt;
+                self.vy[i] = (self.ty[i] - self.y[i]) / dt;
+                self.vz[i] = (self.tz[i] - self.z[i]) / dt;
+            }
+        }
+        for _ in 0..substeps {
+            self.substep(h, iterations.max(1), gravity);
+        }
+        for i in 0..self.particles {
+            if self.pflags[i] & TARGETED != 0 {
+                self.x[i] = self.tx[i];
+                self.y[i] = self.ty[i];
+                self.z[i] = self.tz[i];
+                self.pflags[i] &= !TARGETED;
+            }
+        }
+    }
+
+    fn substep(&mut self, h: f32, iterations: u32, gravity: [f32; 3]) {
+        for i in 0..self.particles {
+            self.px[i] = self.x[i];
+            self.py[i] = self.y[i];
+            self.pz[i] = self.z[i];
+            if self.w[i] > 0.0 {
+                let scale = self.gravity_scale[self.pbody[i] as usize];
+                self.vx[i] += h * gravity[0] * scale;
+                self.vy[i] += h * gravity[1] * scale;
+                self.vz[i] += h * gravity[2] * scale;
+                self.x[i] += h * self.vx[i];
+                self.y[i] += h * self.vy[i];
+                self.z[i] += h * self.vz[i];
+            } else if self.pflags[i] & TARGETED != 0 {
+                self.x[i] += h * self.vx[i];
+                self.y[i] += h * self.vy[i];
+                self.z[i] += h * self.vz[i];
+            }
+        }
+        for e in 0..self.edges {
+            self.lambda[e] = 0.0;
+        }
+        for _ in 0..iterations {
+            for e in 0..self.edges {
+                self.solve_edge(e, h);
+            }
+        }
+        for i in 0..self.particles {
+            self.contact(i, h);
+        }
+        let inv = 1.0 / h;
+        for i in 0..self.particles {
+            if self.w[i] > 0.0 {
+                self.vx[i] = (self.x[i] - self.px[i]) * inv;
+                self.vy[i] = (self.y[i] - self.py[i]) * inv;
+                self.vz[i] = (self.z[i] - self.pz[i]) * inv;
+                let damp = 1.0 / (1.0 + h * self.linear_damping[self.pbody[i] as usize]);
+                self.vx[i] *= damp;
+                self.vy[i] *= damp;
+                self.vz[i] *= damp;
+            }
+        }
+    }
+
+    /// One compliant distance constraint, C = |a - b| - rest (Macklin et al. 2016, with the damping of its section 4).
+    fn solve_edge(&mut self, e: usize, h: f32) {
+        if self.eflags[e] & TORN != 0 {
+            return;
+        }
+        let (a, b) = (self.ea[e] as usize, self.eb[e] as usize);
+        let (wa, wb) = (self.w[a], self.w[b]);
+        let w = wa + wb;
+        if w == 0.0 {
+            return;
+        }
+        let dx = self.x[a] - self.x[b];
+        let dy = self.y[a] - self.y[b];
+        let dz = self.z[a] - self.z[b];
+        let len = sqrt(dx * dx + dy * dy + dz * dz);
+        if len < 1e-9 {
+            return;
+        }
+        let rest = self.rest[e];
+        let c = len - rest;
+        if self.tear[e] > 0.0 && c > self.tear[e] * rest {
+            self.eflags[e] |= TORN;
+            self.torn += 1;
+            return;
+        }
+        let (nx, ny, nz) = (dx / len, dy / len, dz / len);
+        let omega = self.omega[e];
+        let (alpha, gamma) = if omega > 0.0 {
+            // alpha_tilde = w_eff / (omega h)^2 and gamma = 2 zeta / (omega h): the spring of a constraint of effective mass 1/w.
+            let wh = omega * h;
+            (w / (wh * wh), 2.0 * self.zeta[e] / wh)
+        } else {
+            (0.0, 0.0)
+        };
+        let rel = (self.x[a] - self.px[a] - (self.x[b] - self.px[b])) * nx
+            + (self.y[a] - self.py[a] - (self.y[b] - self.py[b])) * ny
+            + (self.z[a] - self.pz[a] - (self.z[b] - self.pz[b])) * nz;
+        let d = ((1.0 + gamma) * w + alpha).max(1e-12);
+        let dl = (-c - alpha * self.lambda[e] - gamma * rel) / d;
+        self.lambda[e] += dl;
+        self.x[a] += wa * dl * nx;
+        self.y[a] += wa * dl * ny;
+        self.z[a] += wa * dl * nz;
+        self.x[b] -= wb * dl * nx;
+        self.y[b] -= wb * dl * ny;
+        self.z[b] -= wb * dl * nz;
+    }
+
+    /// Pushes a particle out of every collider it sits in, and gives the body what that cost.
+    fn contact(&mut self, i: usize, h: f32) {
+        let m = if self.w[i] > 0.0 { 1.0 / self.w[i] } else { return };
+        for c in 0..self.colliders {
+            let (d, nx, ny, nz) = self.distance(c, self.x[i], self.y[i], self.z[i]);
+            let gap = d - self.radius[i];
+            if gap >= 0.0 {
+                continue;
+            }
+            let push = -gap;
+            self.x[i] += nx * push;
+            self.y[i] += ny * push;
+            self.z[i] += nz * push;
+            // Friction as a bounded displacement across the surface (Macklin et al. 2014, "Unified Particle Physics").
+            let (rx, ry, rz) = (self.x[i] - self.mx[c], self.y[i] - self.my[c], self.z[i] - self.mz[c]);
+            let sx = self.lvx[c] + self.avy[c] * rz - self.avz[c] * ry;
+            let sy = self.lvy[c] + self.avz[c] * rx - self.avx[c] * rz;
+            let sz = self.lvz[c] + self.avx[c] * ry - self.avy[c] * rx;
+            let mut ux = self.x[i] - self.px[i] - sx * h;
+            let mut uy = self.y[i] - self.py[i] - sy * h;
+            let mut uz = self.z[i] - self.pz[i] - sz * h;
+            let un = ux * nx + uy * ny + uz * nz;
+            ux -= nx * un;
+            uy -= ny * un;
+            uz -= nz * un;
+            let tl = sqrt(ux * ux + uy * uy + uz * uz);
+            let (mut fx, mut fy, mut fz) = (0.0, 0.0, 0.0);
+            if tl > 1e-12 {
+                let limit = self.friction[c] * push;
+                let k = if tl < limit { 1.0 } else { limit / tl };
+                fx = -ux * k;
+                fy = -uy * k;
+                fz = -uz * k;
+                self.x[i] += fx;
+                self.y[i] += fy;
+                self.z[i] += fz;
+            }
+            // The body takes the opposite impulse, at the particle's surface point.
+            let s = m / h;
+            let (jx, jy, jz) = (-(nx * push + fx) * s, -(ny * push + fy) * s, -(nz * push + fz) * s);
+            self.jx[c] += jx;
+            self.jy[c] += jy;
+            self.jz[c] += jz;
+            let (px, py, pz) = (rx - nx * self.radius[i], ry - ny * self.radius[i], rz - nz * self.radius[i]);
+            self.kx[c] += py * jz - pz * jy;
+            self.ky[c] += pz * jx - px * jz;
+            self.kz[c] += px * jy - py * jx;
+        }
+    }
+
+    /// Signed distance from a point to a collider's surface, and the outward normal there.
+    fn distance(&self, c: usize, x: f32, y: f32, z: f32) -> (f32, f32, f32, f32) {
+        let q = [self.qx[c], self.qy[c], self.qz[c], self.qw[c]];
+        let (dx, dy, dz) = (x - self.cx[c], y - self.cy[c], z - self.cz[c]);
+        match self.c_kind[c] {
+            HALF_SPACE => {
+                let (nx, ny, nz) = rotate(q, self.sx[c], self.sy[c], self.sz[c]);
+                (nx * dx + ny * dy + nz * dz, nx, ny, nz)
+            }
+            SPHERE => {
+                let len = sqrt(dx * dx + dy * dy + dz * dz);
+                if len < 1e-9 { (-self.sx[c], 0.0, 1.0, 0.0) } else { (len - self.sx[c], dx / len, dy / len, dz / len) }
+            }
+            CAPSULE => {
+                let (lx, ly, lz) = rotate(conj(q), dx, dy, dz);
+                let hh = self.sy[c];
+                let near = if ly > hh { hh } else if ly < -hh { -hh } else { ly };
+                let (ax, ay, az) = (lx, ly - near, lz);
+                let len = sqrt(ax * ax + ay * ay + az * az);
+                let (nx, ny, nz) = if len < 1e-9 { (1.0, 0.0, 0.0) } else { (ax / len, ay / len, az / len) };
+                let (wx, wy, wz) = rotate(q, nx, ny, nz);
+                (len - self.sx[c], wx, wy, wz)
+            }
+            _ => {
+                let (lx, ly, lz) = rotate(conj(q), dx, dy, dz);
+                let (hx, hy, hz) = (self.sx[c], self.sy[c], self.sz[c]);
+                let (qx, qy, qz) = (abs(lx) - hx, abs(ly) - hy, abs(lz) - hz);
+                let (ox, oy, oz) = (qx.max(0.0), qy.max(0.0), qz.max(0.0));
+                let out = sqrt(ox * ox + oy * oy + oz * oz);
+                let (nx, ny, nz, dist) = if out > 1e-9 {
+                    (ox * sign(lx) / out, oy * sign(ly) / out, oz * sign(lz) / out, out)
+                } else if qx >= qy && qx >= qz {
+                    (sign(lx), 0.0, 0.0, qx)
+                } else if qy >= qz {
+                    (0.0, sign(ly), 0.0, qy)
+                } else {
+                    (0.0, 0.0, sign(lz), qz)
+                };
+                let (wx, wy, wz) = rotate(q, nx, ny, nz);
+                (dist, wx, wy, wz)
+            }
+        }
+    }
+
+    /// A hash of every position's bits, equal wherever a step is.
+    pub fn hash(&self) -> u32 {
+        let mut h: u32 = 0x811c_9dc5;
+        for i in 0..self.particles {
+            for v in [self.x[i], self.y[i], self.z[i]] {
+                h = (h ^ v.to_bits()).wrapping_mul(0x0100_0193);
+            }
+        }
+        h
+    }
+}
+
+fn conj(q: [f32; 4]) -> [f32; 4] {
+    [-q[0], -q[1], -q[2], q[3]]
+}
+
+fn rotate(q: [f32; 4], x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    let (qx, qy, qz, qw) = (q[0], q[1], q[2], q[3]);
+    let tx = 2.0 * (qy * z - qz * y);
+    let ty = 2.0 * (qz * x - qx * z);
+    let tz = 2.0 * (qx * y - qy * x);
+    (x + qw * tx + (qy * tz - qz * ty), y + qw * ty + (qz * tx - qx * tz), z + qw * tz + (qx * ty - qy * tx))
+}

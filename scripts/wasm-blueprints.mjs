@@ -47,6 +47,13 @@ export const BLUEPRINTS = [
     own: 'packages/physics/tests/kernel-blueprint.test.js',
   },
   {
+    name: 'soft-kernel',
+    crate: 'packages/physics/soft-kernel',
+    blueprint: 'packages/physics/src/soft-wasm.ts',
+    script: 'packages/physics/scripts/build-soft-kernel.mjs',
+    deflated: true,
+  },
+  {
     name: 'physics2d-kernel',
     crate: 'packages/physics2d/kernel',
     blueprint: 'packages/physics2d/src/physics2d-kernel.wasm',
