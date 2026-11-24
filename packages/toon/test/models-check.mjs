@@ -149,6 +149,14 @@ try {
   assert.equal(count(styled, green), 0, 'the material style replaces the default colour');
   assert.ok(reds - redBefore > poses[0.1].ring * 1.3, `a red line twice as wide: ${reds - redBefore} pixels`);
   assert.equal(count(none, green), 0, 'outline 0 on the material: no line');
+  // GAP-OUTLINES-INSTANCED: `nodes` limits the hull to a subtree, as drei's Outlines inside one skinnedMesh. The
+  // skinned Fox under its root draws the same ring; under another node it draws none.
+  const underRoot = count(await shot(0.1, WIDTH, { nodes: 'root' }), green),
+    underOther = count(await shot(0.1, WIDTH, { nodes: 'other' }), green),
+    all = count(poses[0.1].lined, green);
+  console.log(JSON.stringify({ underRoot, underOther, all }));
+  assert.equal(underRoot, all, 'nodes [model.root]: the whole skinned model is outlined');
+  assert.equal(underOther, 0, 'nodes elsewhere: no line on the model');
   // Vertex colours: alpha scales the width (0: no line), RGB tints the colour (white line, red paint: red).
   // Outside the box only: the paint tints the box itself too.
   const outside = (test) => (image, i) => !mask[i] && test(image, i),

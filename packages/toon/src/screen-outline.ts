@@ -5,7 +5,7 @@ import { Toon as WorldToon, type ToonPipelineOptions } from './index.js';
 import { ModelOutlines as WorldModelOutlines, type ModelOutlineOptions } from './models.js';
 import { pixelHull as projection } from './pixel-hull.js';
 export type { ToonPipelineOptions } from './index.js';
-export type { ModelOutlineOptions, OutlineStyle } from './models.js';
+export type { ModelOutlineOptions, OutlineNode, OutlineStyle } from './models.js';
 
 /** Core toon shading and inverted hulls in drawing-buffer pixels. Default outline 3; range 0-1024 pixels. */
 export class Toon extends WorldToon {

@@ -18,7 +18,7 @@ engine.camera.far = 1000;
 const model = await loadGLTF(engine, '/examples/assets/khronos/Fox/Fox.glb'),
   animation = Animation.attach(model);
 animation.playing = false;
-let outlines;
+let outlines, other;
 // Frames until every pipeline (the deformer's, the model's, the hull's) is in place; the last is drawn with them all.
 const settle = () =>
   waitForPipelines(async () => {
@@ -40,7 +40,10 @@ const outline = (width, smooth, style = {}) => {
     outlines.dispose();
     outlines = undefined;
   }
-  if (outlines) Object.assign(outlines, { smooth, materials: {}, vertexColors: false }, style);
+  // nodes: 'root' outlines the Fox's subtree, 'other' an engine mesh that holds none of its primitives.
+  const { nodes: pick, ...rest } = style,
+    nodes = pick === 'root' ? [model.root] : pick === 'other' ? [(other ??= engine.createMesh())] : undefined;
+  if (outlines) Object.assign(outlines, { smooth, materials: {}, vertexColors: false }, rest, { nodes });
 };
 window.check = {
   // paint: an RGBA vertex colour for every vertex of a new box (COLOR_0), or none.

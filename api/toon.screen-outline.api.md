@@ -14,6 +14,7 @@ export interface ModelOutlineOptions {
     materials?: Readonly<Record<string, OutlineStyle>>;
     vertexColors?: boolean;
     models?: readonly ModelLike[];
+    nodes?: readonly OutlineNode[];
 }
 
 export class ModelOutlines extends WorldModelOutlines {
@@ -24,6 +25,10 @@ export class ModelOutlines extends WorldModelOutlines {
         backend: 'webgpu';
     }>): void;
     protected outlineShader(code: string): string;
+}
+
+export interface OutlineNode {
+    readonly id: number;
 }
 
 export interface OutlineStyle {
@@ -64,12 +69,14 @@ class ModelOutlines implements EnginePlugin {
     readonly name = "toon:models";
     smooth: boolean;
     vertexColors: boolean;
-    constructor({ outline, color, smooth, materials, vertexColors, models }?: ModelOutlineOptions);
+    constructor({ outline, color, smooth, materials, vertexColors, models, nodes }?: ModelOutlineOptions);
     static attach(engine: EngineKernel, options?: ModelOutlineOptions): ModelOutlines;
     get outline(): number;
     set outline(v: number);
     get color(): readonly [number, number, number];
     set color(v: readonly [number, number, number]);
+    get nodes(): readonly OutlineNode[] | undefined;
+    set nodes(v: readonly OutlineNode[] | undefined);
     get materials(): Readonly<Record<string, OutlineStyle>>;
     set materials(v: Readonly<Record<string, OutlineStyle>>);
     setup(engine: Engine): void;

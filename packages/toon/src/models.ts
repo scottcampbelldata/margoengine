@@ -57,6 +57,16 @@ export interface ModelOutlineOptions {
   vertexColors?: boolean;
   /** The models to outline (glTF PBR `PBRModel`s or materials meshes). Default: every model attached to the engine. */
   models?: readonly ModelLike[];
+  /**
+   * Only the primitives whose node is one of these or a descendant of one (a model's `root` or `nodes` entries, or any
+   * engine mesh above them), as drei's `Outlines` inside one `skinnedMesh`. Default every primitive. Live as `nodes`.
+   */
+  nodes?: readonly OutlineNode[];
+}
+
+/** A node {@link ModelOutlineOptions.nodes} names: an engine mesh, such as a model's `root` or one of its `nodes`. */
+export interface OutlineNode {
+  readonly id: number;
 }
 
 // camera: view projection; flags.x: vertex colours style the line. A draw row is the primitive's world matrix (node x
@@ -120,6 +130,11 @@ function checked(outline: number, color: readonly number[], maximum = 10): void 
       `ModelOutlines outline must be between 0 and ${maximum} and color three channels between 0 and 1; pass finite values in range.`,
     );
 }
+/** Whether node `id` or one of its ancestors (the engine store's parent links) is in `nodes`. */
+function inTree(store: { parents?: ArrayLike<number> }, id: number, nodes: ReadonlySet<number>): boolean {
+  for (let slot = id; slot >= 0; slot = store.parents?.[slot] ?? -1) if (nodes.has(slot)) return true;
+  return false;
+}
 const determinant = (m: ArrayLike<number>): number =>
   m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 
@@ -148,6 +163,8 @@ export class ModelOutlines implements EnginePlugin {
   private width: number;
   private rgb: [number, number, number];
   private readonly only?: readonly ModelLike[];
+  private under?: ReadonlySet<number>;
+  private chosen?: readonly OutlineNode[];
   /** Seam-free outlines (see the option). */
   smooth: boolean;
   /** Vertex colours style the line (see the option). */
@@ -186,6 +203,7 @@ export class ModelOutlines implements EnginePlugin {
     materials = {},
     vertexColors = false,
     models,
+    nodes,
   }: ModelOutlineOptions = {}) {
     checked(outline, color, this.maxOutline);
     if (models !== undefined && (!Array.isArray(models) || !models.every(isModel)))
@@ -196,6 +214,7 @@ export class ModelOutlines implements EnginePlugin {
     this.smooth = !!smooth;
     this.vertexColors = !!vertexColors;
     this.materials = materials;
+    this.nodes = nodes;
   }
   static attach(engine: EngineKernel, options: ModelOutlineOptions = {}): ModelOutlines {
     const effect = new ModelOutlines(options);
@@ -217,6 +236,16 @@ export class ModelOutlines implements EnginePlugin {
   set color(v: readonly [number, number, number]) {
     checked(this.width, v, this.maxOutline);
     this.rgb = [v[0], v[1], v[2]];
+  }
+  /** The nodes whose primitives are outlined (see the option); undefined outlines every primitive. */
+  get nodes(): readonly OutlineNode[] | undefined {
+    return this.chosen;
+  }
+  set nodes(v: readonly OutlineNode[] | undefined) {
+    if (v !== undefined && (!Array.isArray(v) || !v.every((n) => Number.isSafeInteger(n?.id) && n.id >= 0)))
+      throw new TypeError('ModelOutlines nodes must be engine meshes; pass model.root or entries of model.nodes');
+    this.chosen = v && [...v];
+    this.under = v && new Set(v.map((n) => n.id));
   }
   /** Width and colour by material name, over `outline` and `color`. */
   get materials(): Readonly<Record<string, OutlineStyle>> {
@@ -283,6 +312,7 @@ export class ModelOutlines implements EnginePlugin {
       for (const p of model.primitives) {
         const topology = (p as { topology?: string }).topology;
         if (!p.buffers || topology || hiddenInTree(e.store, p.node.id) || !inView(c, p.node)) continue;
+        if (this.under && !inTree(e.store, p.node.id, this.under)) continue;
         const name = (p.material as { name?: string }).name,
           style = name !== undefined && Object.hasOwn(this.styles, name) ? this.styles[name] : undefined,
           width = style?.outline ?? this.width,

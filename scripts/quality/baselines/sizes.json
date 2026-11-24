@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17566302,
+  "total": 17566668,
   "history": [
     {
       "date": "2026-10-24",
@@ -11415,6 +11415,12 @@
       "commit": "b30b3e21f",
       "reason": "soft entry gains createSurfaceCollider (a deformable trimesh follows a cloth or trimesh body, with vertex speeds): loader and builders 7,382 to 7,670 B gzip. Needed so convex hulls and meshes meet a soft surface, as Rapier's deformable colliders do.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "f5b78d2511",
+      "reason": "toon/models gains nodes (subtree filter, GAP-OUTLINES-INSTANCED): entry 4,843 to 4,953 B gzip; the parent walk and setter check are needed for drei parity on skinned parents, and a split entry would repeat the hull pass",
+      "grew": 1
     }
   ],
   "items": {
@@ -12699,7 +12705,7 @@
     "@margoengine/toon": 2411,
     "@margoengine/toon/hatch": 2261,
     "@margoengine/toon/hatch-models": 4558,
-    "@margoengine/toon/models": 4843,
+    "@margoengine/toon/models": 5209,
     "@margoengine/toon/outline": 4793,
     "@margoengine/toon/screen-outline": 6077,
     "@margoengine/transitions": 4701,

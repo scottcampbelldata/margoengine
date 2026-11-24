@@ -103,7 +103,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/tilemap | `.` 44, `./autotile` 18, `./ldtk` 8, `./tiled` 6, `./iso` 13, `./hex` 17, `./path` 9, `./fov` 11, `./objects` 5, `./plane` 2 | 174 |  | 7,685 |
 | @margoengine/tiles | `./properties` 8, `./imagery` 18, `./style` 6, `.` 83, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11, `./features` 7, `./fade` 3 | 194 |  | 16,396 |
 | @margoengine/tonemap | `.` 10, `./grade` 5, `./custom` 2, `./local` 2, `./hue` 3, `./export-cube` 2, `./settings` 13, `./3dl` 4 | 29 |  | 14,153 |
-| @margoengine/toon | `.` 2, `./models` 4, `./screen-outline` 5, `./hatch-models` 2, `./hatch` 3, `./outline` 4 | 10 |  | 2,206 |
+| @margoengine/toon | `.` 2, `./models` 5, `./screen-outline` 6, `./hatch-models` 2, `./hatch` 3, `./outline` 4 | 10 |  | 2,206 |
 | @margoengine/transitions | `./mask` 2, `./custom` 2, `.` 2, `./live` 3, `./presets` 6, `./glsl` 5 | 17 |  | 4,478 |
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6, `./async` 6, `./props` 8, `./timeline` 3, `./control` 3, `./scroll-pin` 6, `./inertia` 5 | 34 |  | 5,574 |
 | @margoengine/ui | `.` 101, `./react` 23, `./world` 10, `./input` 5, `./markup` 11, `./image` 3, `./forms` 12, `./world-gl` 11, `./curved` 4, `./keyboard` 3, `./i18n` 6, `./editor` 5 | 558 |  | 32,956 |

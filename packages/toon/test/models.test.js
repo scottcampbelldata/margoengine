@@ -245,3 +245,32 @@ test('each view of a frame keeps its own draw rows', () => {
     else globalThis[key] = saved;
   }
 });
+
+// GAP-OUTLINES-INSTANCED: drei outlines one skinnedMesh; `nodes` limits the hulls to the primitives under given nodes.
+test('nodes limits the hulls to primitives under those nodes, by the engine store parent links, live', () => {
+  const h = harness(),
+    model = fakeModel(h, [{ id: 1 }, { id: 2 }, { id: 3 }]);
+  // Node 3 hangs under node 2; node 1 under the root (0).
+  h.engine.store.parents ??= new Int32Array(8).fill(-1);
+  h.engine.store.parents[1] = 0;
+  h.engine.store.parents[2] = 0;
+  h.engine.store.parents[3] = 2;
+  const outlines = new ModelOutlines({ models: [model], nodes: [{ id: 2 }] });
+  h.engine.use(outlines);
+  const passes = recordPasses(h),
+    drawn = () => {
+      passes.length = 0;
+      h.frame();
+      return (passes[0]?.calls ?? []).filter((c) => c[0] === 'vertex').map((c) => c[2].label);
+    };
+  assert.deepEqual(drawn(), ['vertex 2', 'vertex 3'], 'node 2 and its child 3');
+  outlines.nodes = [{ id: 0 }];
+  assert.deepEqual(drawn(), ['vertex 1', 'vertex 2', 'vertex 3'], 'everything under the root');
+  outlines.nodes = [{ id: 7 }];
+  assert.deepEqual(drawn(), [], 'a node above none of them');
+  outlines.nodes = undefined;
+  assert.equal(drawn().length, 3, 'undefined: every primitive');
+  assert.throws(() => (outlines.nodes = [{}]), TypeError);
+  assert.throws(() => new ModelOutlines({ nodes: {} }), TypeError);
+  outlines.dispose();
+});
