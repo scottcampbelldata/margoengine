@@ -1130,6 +1130,49 @@ const births = floodBirths(spray, 1 / 24, {cell: [place.size[0] / frame.width, p
 console.log(spray.count, debris.count, births.count);
 ```
 
+### Breaking and plunging fronts: `@margoengine/water/breaking` (FG-04, FG-12)
+
+The flood keeps one height per cell, so its fronts draw as a steep hump and never overturn. `breakingFronts(reading,
+{place})` finds the breaking fronts of a frame (Thuerey et al. 2007's approach for shallow water): cells whose surface
+stands `minHeight` (0.5 m) or more above the water or ground one cell ahead along the flow, where the breaker is at least
+`threshold` (0.3), linked across the flow into lines of crest points. Each point carries its drop `height`, the `depth`
+ahead, the breaking `phase` (the breaker's share above the threshold) and a `curl` from the Iribarren number xi = tan(beta)
+/ sqrt(H / L0) (Battjes 1974; `period` T sets L0 = g T^2 / 2 pi, default 10 s): 0 spilling under xi 0.4, 1 plunging from
+0.7 to 3.3, 0 again surging from 4. `plunge: 0..1` sets the curl by hand (a film's tsunami over flat land spills by the
+numbers; ask for 1 to plunge it).
+
+`breakingWaveGeometry(fronts)` builds the overturning crest as one mesh: a 26-point section (`breakingSection`) at every
+crest point, from the back over the crest along the jet to its tip, back under the jet and down the face to the toe,
+joined along the front, with a tapered section past each end. The jet follows a free fall from the crest (Longuet-Higgins
+1982, Peregrine 1983): out to p R at the phase p, R = sqrt(2 H (h + H)) capped at 2.5 H, dropping H p^2, so at full phase
+it lands on the water ahead and closes a tube. `uvs1` holds the water's thickness there (m) and the white water (0..1).
+
+`BreakingWaveMaterial` draws it (double-sided): a dark grey-green face, light through the thin lip attenuated over its
+thickness by pure water's absorption (Pope and Fry 1997) and spread forward by a Henyey-Greenstein phase about the sun,
+white only on the crest, the tip and the toe (FG-12). `look.sediment` (kg/m^3) adds the absorption of suspended mud
+(Babin et al. 2003) and its brown back-scatter, for flood water churning over soil (FG-13). Draw it with
+`createMesh(engine, breakingWaveGeometry(fronts), material)` from `@margoengine/materials` and call `mesh.setGeometry`
+with each new frame's fronts. `test/breaking.test.js` holds the fronts and sections; `test/breaking.browser.mjs` draws
+the tube on both backends.
+
+```ts
+import {BreakingWaveMaterial, breakingFronts, breakingWaveGeometry} from 'margoengine/water/breaking';
+import type {FloodReading} from 'margoengine/water/flood';
+
+// A bore 3 m high into 1 m of water across a 4 x 2 map of 2 m cells, running +x at 5 m/s.
+const frame = {
+  time: 0, steps: 0, ticks: 0, volume: 0, wetArea: 32, maxDepth: 4, maxSpeed: 5, courant: 0, capped: 0, foamArea: 0,
+  width: 4, height: 2,
+  depth: Float32Array.from([4, 4, 1, 1, 4, 4, 1, 1]), bed: new Float32Array(8),
+  velocity: Float32Array.from([5, 0, 5, 0, 0, 0, 0, 0, 5, 0, 5, 0, 0, 0, 0, 0]), foam: new Float32Array(8),
+  breaker: Float32Array.from([0, 1, 0, 0, 0, 1, 0, 0]),
+} satisfies FloodReading;
+const fronts = breakingFronts(frame, {place: {origin: [0, 0], size: [8, 4]}, plunge: 1});
+const geometry = breakingWaveGeometry(fronts);
+const material = new BreakingWaveMaterial({look: {sediment: 2}});
+console.log(fronts.length, fronts[0].count, geometry.positions.length / 3, material.look.sediment);
+```
+
 ## Ships riding the sea
 
 `@margoengine/water/ships` puts ships on any Water: the open sea, or the Water a `Flood` runs on.
