@@ -572,6 +572,22 @@ export type ShapeOptions = {
     size?: Vec3;
 }
  | {
+    shape: 'segment';
+    a: Vec3;
+    b: Vec3;
+}
+ | {
+    shape: 'triangle';
+    a: Vec3;
+    b: Vec3;
+    c: Vec3;
+}
+ | {
+    shape: 'polyline';
+    vertices: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+}
+ | {
     shape: 'halfSpace';
     normal?: Vec3;
 }
