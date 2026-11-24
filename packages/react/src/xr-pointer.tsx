@@ -107,7 +107,8 @@ export function XRPointerEvents({ picker, ...options }: XRPointerEventsProps): n
       picker,
       scene,
       options.signal,
-      options.types,
+      // By value: an inline `types={['touch']}` is a new array every render and must not attach the pointers again.
+      options.types?.join(),
       options.touchRadius,
       options.grabRadius,
       options.near,

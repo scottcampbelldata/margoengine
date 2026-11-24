@@ -85,7 +85,8 @@ class EngineMesh {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement,
+    assertCore,
+    coreRequirement,
     Engine: {
       async create(canvas, options) {
         const engine = {
@@ -535,11 +536,25 @@ test("SoftShadows maps drei's size, samples and focus onto the soft filter, live
   await act(async () => {});
   const effect = shadows.at(-1);
   // drei's defaults: size 25, samples 10, focus 0; size 25 is Shadows' default lightSize 0.02.
-  assert.deepEqual(effect.options, { distance: 60, filter: 'soft', lightSize: 0.02, samples: 10, blockerSamples: 10, focus: 0 });
+  assert.deepEqual(effect.options, {
+    distance: 60,
+    filter: 'soft',
+    lightSize: 0.02,
+    samples: 10,
+    blockerSamples: 10,
+    focus: 0,
+  });
   view.rerender(tree({ size: 50, samples: 24, focus: 0.3 }));
   await act(async () => {});
   assert.equal(shadows.at(-1), effect, 'edits keep the same shadows');
-  assert.deepEqual(effect.options, { distance: 60, filter: 'soft', lightSize: 0.04, samples: 24, blockerSamples: 24, focus: 0.3 });
+  assert.deepEqual(effect.options, {
+    distance: 60,
+    filter: 'soft',
+    lightSize: 0.04,
+    samples: 24,
+    blockerSamples: 24,
+    focus: 0.3,
+  });
   // Before, an unmounted SoftShadows left its options on shadows another component kept on.
   view.rerender(tree(null));
   await act(async () => {});
@@ -918,7 +933,9 @@ test('SpriteLayer keeps its layer for an equal inline clear colour and recreates
   assert.equal(layers().length, start + 2, 'a new filter recreates the layer');
   assert.equal(layers().at(-1).filter, 'linear');
   assert.deepEqual(
-    layers().at(-1).sprites.map((sprite) => sprite.x),
+    layers()
+      .at(-1)
+      .sprites.map((sprite) => sprite.x),
     [3],
   );
   view.rerender(tree({ clear: [0, 0, 0, 1], filter: 'linear', mipmaps: true }));
@@ -946,4 +963,30 @@ test('an inline colour array with the same values keeps the material; a new valu
   await act(async () => {});
   assert.deepEqual(node.material.color, [0.4, 0.2, 0.3]);
   assert.equal(node.material.roughness, 0.3);
+});
+test('a SpriteLayer made again after an option change draws with the atlas the props hold now, not the first one', async () => {
+  const { SpriteLayer, Sprite } = await import('../dist/ui.js');
+  const first = { width: 1, height: 1, data: new Uint8Array(4) },
+    second = { width: 2, height: 2, data: new Uint8Array(16) };
+  const tree = (atlas, filter) =>
+    React.createElement(
+      MargoCanvas,
+      null,
+      React.createElement(SpriteLayer, { atlas, filter }, React.createElement(Sprite, { x: 3 })),
+    );
+  const layers = () => bindings.filter(([kind]) => kind === 'layer').map(([, layer]) => layer);
+  const start = layers().length;
+  const view = render(tree(first, 'nearest'));
+  for (let i = 0; i < 3; i++) await act(async () => {});
+  assert.equal(layers().at(-1).atlas, first);
+  view.rerender(tree(second, 'nearest'));
+  await act(async () => {});
+  assert.equal(layers().length, start + 1, 'a new atlas swaps in place');
+  assert.equal(layers().at(-1).atlas, second);
+  view.rerender(tree(second, 'linear'));
+  for (let i = 0; i < 3; i++) await act(async () => {});
+  assert.equal(layers().length, start + 2, 'a new filter recreates the layer');
+  assert.equal(layers().at(-1).atlas, second, 'the new layer has the current atlas');
+  view.unmount();
+  await act(async () => {});
 });

@@ -581,6 +581,23 @@ test('positive transmission uses native install on a bridge with the original tr
   assert.notEqual(models.at(-1), first);
   assert.equal(models.at(-1).primitives[0].node, original);
 });
+test('an equal inline volume object keeps the native transmission model; a new thickness builds another', async () => {
+  const ref = createRef(),
+    content = (thicknessFactor) =>
+      h(Mesh, { ref }, h(BoxGeometry), h(MeshTransmissionMaterial, { factor: 0.8, volume: { thicknessFactor } }));
+  const view = render(tree(content(0.5)));
+  await flush();
+  const first = models.at(-1),
+    count = models.length;
+  view.rerender(tree(content(0.5)));
+  await flush();
+  assert.equal(models.length, count, 'the same volume values build no new model');
+  assert.equal(first.disposals, 0);
+  view.rerender(tree(content(0.9)));
+  await flush();
+  assert.equal(first.disposals, 1, 'a changed thickness replaces it');
+  assert.notEqual(models.at(-1), first);
+});
 test('removing positive transmission restores procedural geometry and changing back to zero removes native plugins', async () => {
   const ref = createRef(),
     content = (factor) => h(Mesh, { ref }, h(BoxGeometry), h(MeshTransmissionMaterial, { factor }));

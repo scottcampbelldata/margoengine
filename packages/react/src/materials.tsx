@@ -11,6 +11,7 @@ import type { NormalMapImage } from '@margoengine/environment/reflector';
 import { optionalPeer } from './optional.js';
 import { modelPicking } from './picking.js';
 import { MappedMaterial } from './texture-material.js';
+import { valueKey } from './texture-cache.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { Borrowable } from '../../shared/borrowed.js';
 
@@ -201,7 +202,8 @@ function TransmissionBinding(props: MeshTransmissionMaterialProps) {
       props.factor,
       props.ior,
       props.transmissionTexture,
-      props.volume,
+      // By value: the documented inline `volume={{ thicknessFactor: 0.5 }}` is a new object every render.
+      valueKey(props.volume),
     ],
   );
   return null;
@@ -340,7 +342,10 @@ function ReflectorBinding({ settings }: { settings: MeshReflectorMaterialProps &
           const canvas = engine.canvas,
             longer = Math.max(1, canvas.width, canvas.height);
           if (!(Number.isFinite(s.resolution) && s.resolution >= 8 && s.resolution <= 4096))
-            throw rangeError('MeshReflectorMaterial resolution must be 8 to 4096; pass the capture size in pixels', 'react-arguments');
+            throw rangeError(
+              'MeshReflectorMaterial resolution must be 8 to 4096; pass the capture size in pixels',
+              'react-arguments',
+            );
           native.resolution = Math.min(2, s.resolution / longer);
           native.mixStrength = s.mixStrength ?? 1;
           native.mixBlur = (s.mixBlur ?? 1) * (s.roughness ?? 1);
@@ -383,14 +388,16 @@ function ReflectorBinding({ settings }: { settings: MeshReflectorMaterialProps &
 // F0 of the surface underneath: 0.04 for a dielectric, the base colour for a metal, mixed by metalness (glTF 2.0
 // metallic-roughness, Appendix B).
 function reflectorF0(color: PbrMaterialProps['color'], metalness: number): [number, number, number] {
-  const base = color === undefined ? [1, 1, 1] : typeof color === 'string' ? hexLinear(color) : [color[0], color[1], color[2]];
+  const base =
+    color === undefined ? [1, 1, 1] : typeof color === 'string' ? hexLinear(color) : [color[0], color[1], color[2]];
   const m = Math.min(1, Math.max(0, metalness));
   return [0, 1, 2].map((i) => Math.min(1, Math.max(0, 0.04 * (1 - m) + base[i] * m))) as [number, number, number];
 }
 function hexLinear(hex: string): number[] {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  // '#rgb' and '#rrggbb', as core's material takes them: a three-digit colour is each digit doubled.
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return [1, 1, 1];
-  const n = parseInt(m[1], 16);
+  const n = parseInt(m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1], 16);
   return [n >> 16, (n >> 8) & 255, n & 255].map((c) => {
     const s = c / 255;
     return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
@@ -405,11 +412,37 @@ function hexLinear(hex: string): number[] {
  * `@margoengine/environment/reflector-pbr`; WebGPU and the WebGL2 compatibility layer.
  */
 export function MeshReflectorMaterial({ resolution = 256, ...props }: MeshReflectorMaterialProps) {
-  const { color, roughness, metalness, map, normalMap, roughnessMap, metalRoughnessMap, emissiveMap, emissive, emissiveIntensity, envMap, envMapIntensity } = props;
+  const {
+    color,
+    roughness,
+    metalness,
+    map,
+    normalMap,
+    roughnessMap,
+    metalRoughnessMap,
+    emissiveMap,
+    emissive,
+    emissiveIntensity,
+    envMap,
+    envMapIntensity,
+  } = props;
   return (
     <>
       <PbrMaterial
-        {...{ color, roughness, metalness, map, normalMap, roughnessMap, metalRoughnessMap, emissiveMap, emissive, emissiveIntensity, envMap, envMapIntensity }}
+        {...{
+          color,
+          roughness,
+          metalness,
+          map,
+          normalMap,
+          roughnessMap,
+          metalRoughnessMap,
+          emissiveMap,
+          emissive,
+          emissiveIntensity,
+          envMap,
+          envMapIntensity,
+        }}
       />
       <ReflectorBinding settings={{ ...props, resolution }} />
     </>

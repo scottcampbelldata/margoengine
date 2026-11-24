@@ -87,13 +87,30 @@ function Catcher({
   latest.current = { options, onReady, onError };
   const key = JSON.stringify(options);
   // Live settings: a changed option restarts the cached map.
-  const plugin = useRef<ProductCaustics | null>(null);
+  const plugin = useRef<ProductCaustics | null>(null),
+    applied = useRef<ReadonlySet<string>>(new Set()),
+    resync = useRef(() => {});
   useEffect(() => {
-    const caustics = plugin.current;
-    if (!caustics) return;
-    const { floor, ...rest } = latest.current.options;
-    Object.assign(caustics.options, rest, floor ? { position: floor } : {});
-    caustics.invalidate();
+    resync.current = () => {
+      const caustics = plugin.current;
+      if (!caustics) return;
+      const { floor, ...rest } = latest.current.options,
+        target = caustics.options as Record<string, unknown>;
+      // A prop that is gone puts the catcher's own default back: it reads every option with its default in place. The
+      // floor, gone, goes back to the group's own position.
+      for (const name of applied.current) if (name !== 'floor' && !(name in rest)) delete target[name];
+      if (!floor && applied.current.has('floor')) {
+        const root = live(registry);
+        if (root) {
+          scene.engine.store.tick(false);
+          target.position = [root.matrix[12], root.matrix[13], root.matrix[14]];
+        }
+      }
+      applied.current = new Set(floor ? [...Object.keys(rest), 'floor'] : Object.keys(rest));
+      Object.assign(target, rest, floor ? { position: floor } : {});
+      caustics.invalidate();
+    };
+    resync.current();
   }, [key]);
   useEffect(() => {
     let active = true,
@@ -122,6 +139,7 @@ function Catcher({
         .then(async (api) => {
           if (!active || scene.engine.disposed) return;
           const { floor, ...rest } = latest.current.options,
+            asked = JSON.stringify(latest.current.options),
             m = root.matrix,
             made = await api.ProductCaustics.attach(scene.engine, {
               ...rest,
@@ -134,6 +152,9 @@ function Catcher({
             return;
           }
           caustics = plugin.current = made;
+          applied.current = new Set(floor ? [...Object.keys(rest), 'floor'] : Object.keys(rest));
+          // Props that changed while the catcher was attaching were skipped by the effect above: apply them now.
+          if (JSON.stringify(latest.current.options) !== asked) resync.current();
           latest.current.onReady?.(made);
         })
         .catch(fail)

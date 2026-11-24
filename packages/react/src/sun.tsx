@@ -22,6 +22,11 @@ export function Sun({ direction = [3, 5, 4], color = '#ffffff', intensity = 3 }:
   useCommit(() => {
     if (!Number.isFinite(intensity) || intensity < 0)
       throw rangeError('Sun intensity must be a finite number of 0 or more', 'react-arguments');
+    if (direction.length !== 3 || !direction.every(Number.isFinite) || !direction.some(Boolean))
+      throw rangeError(
+        'Sun direction must be three finite numbers, not all 0; pass the direction towards the light',
+        'react-arguments',
+      );
     const lighting = (world ?? engine).lighting,
       saved = { direction: lighting.direction.slice(), radiance: lighting.radiance.slice() };
     lighting.direction.set([direction[0], direction[1], direction[2], intensity]);

@@ -16,16 +16,35 @@ export function identity(value: object): number {
   if (id === undefined) ids.set(value, (id = serial++));
   return id;
 }
+function plain(value: unknown): unknown {
+  if (typeof value === 'function') return `#${identity(value as object)}`;
+  if (typeof value !== 'object' || value === null) return value;
+  if (Array.isArray(value)) return value.map(plain);
+  const prototype = Object.getPrototypeOf(value);
+  // Textures, typed arrays and any other class instance count by identity; plain data by its content.
+  if (prototype !== Object.prototype && prototype !== null) return `#${identity(value)}`;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, plain(item)]));
+}
+/** A key for an options object: plain numbers, strings, arrays and objects by value (an inline literal is no change), textures and other objects by identity. */
+export function valueKey(value: unknown): string {
+  return JSON.stringify(plain(value)) ?? 'undefined';
+}
 export function own(engine: EngineKernel, textures: Texture[], release?: () => void): void {
   if (engine.disposed) {
     textures.forEach((texture) => texture.dispose());
     release?.();
     throw new DOMException('Canvas disposed', 'AbortError');
   }
-  engine.use({ name: 'react:textures:' + nextId(), setup() {}, dispose() {
-    textures.forEach((texture) => texture.dispose());
-    release?.();
-  } });
+  engine.use({
+    name: 'react:textures:' + nextId(),
+    setup() {},
+    dispose() {
+      textures.forEach((texture) => texture.dispose());
+      release?.();
+    },
+  });
 }
 
-export function nextId(): number { return serial++; }
+export function nextId(): number {
+  return serial++;
+}

@@ -2,12 +2,14 @@
 // suites): world triangles of the children, re-traced on motion, live options and release.
 import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import React, { StrictMode, createRef } from 'react';
+import React, { StrictMode } from 'react';
 import { JSDOM } from 'jsdom';
 const calls = [];
 class FakeCaustics {
+  static hold = null;
   static async attach(engine, options) {
     const made = new FakeCaustics(options);
+    if (FakeCaustics.hold) await FakeCaustics.hold;
     calls.push(['attach', made]);
     return made;
   }
@@ -106,4 +108,45 @@ test('Caustics traces its children in world space, re-traces when one moves and 
   assert.ok(caustics.invalidated > before, 'a changed option restarts the map');
   view.unmount();
   assert.equal(caustics.disposed, true);
+});
+test('Caustics puts the catcher default back for a removed option and the group position for a removed floor', async () => {
+  const s = await scene(),
+    ready = [];
+  const ui = (props) =>
+    tree(
+      s,
+      h(Caustics, { position: [2, 0, 0], onReady: (c) => ready.push(c), ...props }, h(Mesh, null, h(BoxGeometry))),
+    );
+  const view = render(ui({ size: 6, ior: 1.5, floor: [9, 0, 0] }));
+  await frames(s);
+  const caustics = ready[0];
+  assert.deepEqual([caustics.options.size, caustics.options.ior, caustics.options.position], [6, 1.5, [9, 0, 0]]);
+  view.rerender(ui({ ior: 1.5 }));
+  await frames(s, 1);
+  assert.equal('size' in caustics.options, false, 'a removed size is the catcher default again, not the last value');
+  assert.equal(caustics.options.ior, 1.5, 'a kept option stays');
+  assert.deepEqual(caustics.options.position, [2, 0, 0], 'a removed floor is the group position again');
+  view.unmount();
+});
+test('Caustics applies an option that changed while the catcher was still attaching', async () => {
+  const s = await scene(),
+    ready = [];
+  let release;
+  FakeCaustics.hold = new Promise((resolve) => (release = resolve));
+  try {
+    const ui = (ior) =>
+      tree(s, h(Caustics, { position: [2, 0, 0], ior, onReady: (c) => ready.push(c) }, h(Mesh, null, h(BoxGeometry))));
+    const view = render(ui(1.5));
+    await frames(s, 2);
+    assert.equal(ready.length, 0, 'the attach is still pending');
+    view.rerender(ui(1.33));
+    await frames(s, 1);
+    release();
+    await frames(s);
+    assert.equal(ready.length, 1);
+    assert.equal(ready[0].options.ior, 1.33, 'the newer value, not the one the attach began with');
+    view.unmount();
+  } finally {
+    FakeCaustics.hold = null;
+  }
 });

@@ -105,12 +105,18 @@ export const Voxels = /* @__PURE__ */ forwardRef<VoxelRenderer, VoxelsProps>(fun
   }, [attached, ref]);
   useCommit(() => {
     if (!attached) return;
-    attached.renderer.daylight = daylight;
-    if (blockLightColor) attached.renderer.blockLightColor = blockLightColor;
-    attached.renderer.lightmap = lightmap;
+    const renderer = attached.renderer;
+    // The renderer's own block light colour, kept before the prop first changes it, comes back when the prop is removed.
+    if (!defaultLight.has(renderer)) defaultLight.set(renderer, [...renderer.blockLightColor] as Vec3);
+    renderer.daylight = daylight;
+    renderer.blockLightColor = blockLightColor ?? defaultLight.get(renderer)!;
+    renderer.lightmap = lightmap;
   });
   return null;
 });
+
+/** Each renderer's block light colour before `blockLightColor` set it. */
+const defaultLight = new WeakMap<VoxelRenderer, Vec3>();
 
 // One loader for every texture list: the URLs are joined into one cache key, so equal lists share a load.
 const blockTexturesLoader: Loader<BlockTextures> = async (key, { fetch }) =>

@@ -13,6 +13,7 @@ import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { subscribeFrame } from './frame-priority.js';
 import { live, report, useCommit, useMesh, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { trackedFetch } from './assets.js';
 import { fault } from '../../shared/errors.js';
 
 /** The native Clouds of the nearest `<Clouds>`: undefined outside one, null while it loads. */
@@ -116,7 +117,10 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
       made?.dispose();
     };
   }, [scene.engine]);
-  // A URL is fetched and decoded; nothing is drawn until it is.
+  // Bitmaps this component decoded: each is closed once the native Clouds draws another texture, or on unmount.
+  const decoded = useRef(new Set<ImageBitmap>());
+  // A URL is fetched through the Canvas's tracked fetch (so `useProgress` counts it) and decoded; nothing is drawn until
+  // it is. The bitmap decoded here is closed once the Clouds no longer draws it (see the commit below).
   useEffect(() => {
     if (typeof texture !== 'string') {
       setImage(texture ?? null);
@@ -124,7 +128,8 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
     }
     setImage(undefined);
     const controller = new AbortController();
-    fetch(texture, { signal: controller.signal })
+    trackedFetch(scene.assetCache)
+      .then((fetcher) => fetcher(texture, { signal: controller.signal }))
       .then((response) => {
         if (!response.ok)
           throw Object.assign(
@@ -134,10 +139,24 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
         return response.blob();
       })
       .then((blob) => createImageBitmap(blob))
-      .then((bitmap) => !controller.signal.aborted && setImage(bitmap))
+      .then((bitmap) => {
+        // A bitmap decoded after its URL was replaced or the Clouds unmounted is never drawn: close it now.
+        if (controller.signal.aborted) bitmap.close?.();
+        else {
+          decoded.current.add(bitmap);
+          setImage(bitmap);
+        }
+      })
       .catch(fail);
     return () => controller.abort();
-  }, [texture]);
+  }, [texture, scene.assetCache]);
+  useEffect(
+    () => () => {
+      for (const bitmap of decoded.current) bitmap.close?.();
+      decoded.current.clear();
+    },
+    [],
+  );
   const soft = ((options.softness as number | undefined) ?? 0) > 0;
   useEffect(() => {
     if (!soft) return;
@@ -167,6 +186,11 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
       ...(soft && depth ? { depth: () => depth.texture } : {}),
     });
     clouds.setFog(fog ?? null);
+    for (const bitmap of decoded.current)
+      if (bitmap !== image) {
+        bitmap.close?.();
+        decoded.current.delete(bitmap);
+      }
   });
   return (
     <Mesh {...(meshProps as MeshProps)} ref={ref}>

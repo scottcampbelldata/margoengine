@@ -274,6 +274,16 @@ test('Sun sets the sun in linear colour and restores the previous sun on unmount
     () => render(tree(value, h(Sun, { intensity: -1 }))),
     (error) => [error, ...(error.errors ?? [])].some((e) => /intensity must be a finite number/.test(e.message)),
   );
+  for (const direction of [
+    [0, 0, 0],
+    [Number.NaN, 1, 0],
+    [1, Infinity, 0],
+  ])
+    assert.throws(
+      () => render(tree(value, h(Sun, { direction }))),
+      (error) => [error, ...(error.errors ?? [])].some((e) => /direction must be three finite numbers/.test(e.message)),
+    );
+  assert.deepEqual([...lighting.direction], [3, 5, 4, 3], 'a refused direction leaves the sun as it was');
 });
 
 test('AmbientLight, HemisphereLight and Fog attach once, light every PBR model and take live props', async () => {
@@ -310,19 +320,21 @@ test('AmbientLight, HemisphereLight and Fog inside a <Scene> light that scene, n
     lights = [React.createRef(), React.createRef(), React.createRef()];
   value.resources.models.add(model);
   render(
-    tree(
-      { ...value, world },
-      [
-        h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
-        h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
-        h(Fog, { key: 'f', ref: lights[2], far: 50 }),
-      ],
-    ),
+    tree({ ...value, world }, [
+      h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
+      h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
+      h(Fog, { key: 'f', ref: lights[2], far: 50 }),
+    ]),
   );
   await flush();
   assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
-  assert.deepEqual([...world.plugins.values()], lights.map((ref) => ref.current), 'each in the named scene');
-  for (const ref of lights) assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
+  assert.deepEqual(
+    [...world.plugins.values()],
+    lights.map((ref) => ref.current),
+    'each in the named scene',
+  );
+  for (const ref of lights)
+    assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
   assert.equal(lights[0].current.intensity, 0.4, 'live props still apply');
   cleanup();
   await flush();
@@ -359,6 +371,10 @@ test('Voxels attaches the renderer and lighting, updates light from the frame lo
   assert.equal(ref.current, renderer, 'live props keep the renderer');
   assert.equal(renderer.daylight, 0.1);
   assert.deepEqual(renderer.blockLightColor, [1, 0.5, 0.2]);
+  // Removing the prop gives the renderer its own colour back (KB-REACT-VOXELS-LIGHTCOLOR: it kept [1, 0.5, 0.2]).
+  view.rerender(tree(value, h(Voxels, { ref, world, textures, daylight: 0.1, fancyLeaves: false })));
+  await flush();
+  assert.deepEqual(renderer.blockLightColor, [1, 0.8, 0.6]);
   view.rerender(tree(value, h(Voxels, { ref, world, textures, fancyLeaves: true, lighting: false })));
   await flush();
   assert.notEqual(ref.current, renderer, 'a construction option recreates it');

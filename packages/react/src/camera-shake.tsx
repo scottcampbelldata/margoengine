@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { EnginePlugin } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
 import { report, useScene } from './internal.js';
+import { rangeError } from '../../shared/errors.js';
 
 /** Props of `<CameraShake>`; every prop is optional. Angles are radians, frequencies cycles of noise per second. */
 export interface CameraShakeProps {
@@ -68,6 +69,12 @@ function unit(v: Vec3): Vec3 {
   const length = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / length, v[1] / length, v[2] / length];
 }
+// Intensity in 0..1 (a number past either end is clamped); NaN would put NaN into the camera's target and up.
+function intensityOf(value: number): number {
+  if (Number.isNaN(value))
+    throw rangeError('CameraShake intensity must be a number from 0 to 1; pass a number, not NaN', 'react-arguments');
+  return Math.min(1, Math.max(0, value));
+}
 const same = (a: readonly number[], b: readonly number[]) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 type Camera = { position: Vec3; target: Vec3; up: Vec3 };
 let shakes = 0;
@@ -92,20 +99,39 @@ export const CameraShake = /* @__PURE__ */ forwardRef<CameraShakeRef, CameraShak
   },
   ref,
 ) {
+  for (const [name, value] of Object.entries({
+    maxYaw,
+    maxPitch,
+    maxRoll,
+    yawFrequency,
+    pitchFrequency,
+    rollFrequency,
+  }))
+    if (!Number.isFinite(value))
+      throw rangeError(
+        `CameraShake ${name} must be a finite number; pass the angle or frequency in radians or cycles`,
+        'react-arguments',
+      );
+  if (!(decayRate >= 0 && Number.isFinite(decayRate)))
+    throw rangeError(
+      'CameraShake decayRate must be a finite number of 0 or more; the intensity cannot grow while it decays',
+      'react-arguments',
+    );
+  intensityOf(intensity);
   const scene = useScene(),
     options = { maxYaw, maxPitch, maxRoll, yawFrequency, pitchFrequency, rollFrequency, decay, decayRate, onError },
     latest = useRef(options),
     level = useRef(intensity);
   latest.current = options;
   useEffect(() => {
-    level.current = Math.min(1, Math.max(0, intensity));
+    level.current = intensityOf(intensity);
   }, [intensity]);
   useImperativeHandle(
     ref,
     () => ({
       getIntensity: () => level.current,
       setIntensity: (value: number) => {
-        level.current = Math.min(1, Math.max(0, value));
+        level.current = intensityOf(value);
       },
     }),
     [],

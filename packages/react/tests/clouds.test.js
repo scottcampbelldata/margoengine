@@ -25,6 +25,7 @@ const { render, act, cleanup } = await import('@testing-library/react');
 const { Engine, TransformStore } = await import('@margoengine/core/extension');
 const { optionalGPU } = await import('../../../tests/support/optional-gpu.js');
 const { Context } = await import('../dist/internal.js');
+const { createAssetCache } = await import('../dist/assets.js');
 const { Clouds, Cloud } = await import('../dist/clouds.js');
 const h = React.createElement,
   scenes = [];
@@ -37,7 +38,15 @@ async function scene() {
     { position: [0, 0, 4], target: [0, 0, 0] },
     null,
   );
-  const value = { engine, world: null, registry: null, shadows: null, pointerHandlers: new Map(), frames: { callbacks: new Set() } };
+  const value = {
+    engine,
+    world: null,
+    registry: null,
+    shadows: null,
+    pointerHandlers: new Map(),
+    frames: { callbacks: new Set() },
+    assetCache: createAssetCache(engine),
+  };
   scenes.push(value);
   return value;
 }
@@ -71,7 +80,11 @@ test('Clouds draws every child Cloud with one native Clouds; options, seeds and 
   const view = render(ui(3, 8, '#ff0000'));
   await frames(s);
   const clouds = ready.at(-1);
-  assert.equal([...s.engine.plugins.values()].filter((p) => p.name.startsWith('clouds:')).length, 1, 'one native Clouds');
+  assert.equal(
+    [...s.engine.plugins.values()].filter((p) => p.name.startsWith('clouds:')).length,
+    1,
+    'one native Clouds',
+  );
   assert.equal(clouds.options.limit, 50);
   assert.equal(clouds.options.shading, 'unlit');
   assert.equal(clouds.clouds.length, 2);
@@ -113,7 +126,10 @@ test('a texture URL draws nothing until it decodes; softness adds the scene dept
   globalThis.fetch = mock.fn(async () => ({ ok: true, blob: async () => 'blob' }));
   globalThis.createImageBitmap = mock.fn(() => new Promise((r) => (resolve = r)));
   render(
-    tree(s, h(Clouds, { texture: '/puff.png', softness: 0.5, onReady: (c) => ready.push(c) }, h(Cloud, { segments: 3 }))),
+    tree(
+      s,
+      h(Clouds, { texture: '/puff.png', softness: 0.5, onReady: (c) => ready.push(c) }, h(Cloud, { segments: 3 })),
+    ),
   );
   await frames(s);
   const clouds = ready.at(-1);
@@ -127,6 +143,47 @@ test('a texture URL draws nothing until it decodes; softness adds the scene dept
   const live = depths.filter((d) => !d.disposed);
   assert.equal(live.length, 1);
   assert.equal(clouds.options.depth(), live[0].texture);
+  delete globalThis.fetch;
+  delete globalThis.createImageBitmap;
+});
+
+test('a texture URL loads through the Canvas tracker, and each decoded bitmap is closed once it is no longer drawn (KB-REACT-CLOUDS-TEXTURE)', async () => {
+  const s = await scene(),
+    ready = [],
+    made = [];
+  globalThis.fetch = mock.fn(async () => ({ ok: true, status: 200, headers: new Map(), blob: async () => 'blob' }));
+  globalThis.createImageBitmap = mock.fn(async () => {
+    const bitmap = {
+      width: 2,
+      height: 2,
+      closed: 0,
+      close() {
+        this.closed++;
+      },
+    };
+    made.push(bitmap);
+    return bitmap;
+  });
+  const props = (texture) => h(Clouds, { texture, onReady: (c) => ready.push(c) }, h(Cloud, { segments: 3 }));
+  const view = render(tree(s, props('/a.png')));
+  await frames(s);
+  const clouds = ready.at(-1),
+    first = clouds.options.texture;
+  assert.ok(made.includes(first), 'the decoded bitmap is drawn');
+  assert.ok(s.assetCache.tracker.state.total >= 1, 'useProgress counted the texture load');
+  assert.equal(first.closed, 0, 'not closed while drawn');
+  view.rerender(tree(s, props('/b.png')));
+  await frames(s);
+  const second = clouds.options.texture;
+  assert.notEqual(second, first);
+  assert.equal(first.closed, 1, 'the replaced bitmap is closed once');
+  assert.equal(second.closed, 0);
+  view.unmount();
+  assert.equal(second.closed, 1, 'unmount closes the last one');
+  assert.ok(
+    made.every((b) => b.closed === 1),
+    'every decoded bitmap closed exactly once',
+  );
   delete globalThis.fetch;
   delete globalThis.createImageBitmap;
 });

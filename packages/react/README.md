@@ -358,7 +358,8 @@ map drawn on the floor. Floor: `floor` (its centre in world units, default the g
 `height` of the emission plane above it (3). Light: `lightDirection` toward a distant source (default straight up,
 `[0, 1, 0]`) or `lightPosition` for a point source. Quality: `photonSide` (128, squared photons per update),
 `resolution` of the map (128), `frames` of updates (1; `Infinity` keeps tracing), `worldRadius`. Look: `intensity` (1)
-and `color` (linear rgb, white). It re-traces when a child moves or changes, and an option change restarts the map.
+and `color` (linear rgb, white). It re-traces when a child moves or changes, and an option change restarts the map; a
+prop you remove goes back to the default above (a removed `floor` to the group's position).
 `onReady` gets the native catcher (`readMap`, `stats`, `invalidate`). Every Mesh prop applies to the group. Needs
 WebGPU or the WebGL2 compatibility layer.
 
@@ -932,7 +933,7 @@ export function SplitScreen() {
 }
 ```
 
-Lights: `<Sun direction color intensity>` sets the directional sun light every mesh, model and shadow uses (any backend; inside a `<Scene>`, that scene's). `<AmbientLight color intensity>` and `<HemisphereLight sky ground intensity>` light core meshes and models from every direction, and `<Fog color near far density heightFalloff height>` fogs them in their shaders, transparent models included; all three come from `@margoengine/environment`, take live props and need WebGPU. Inside a `<Scene>` they light and fog that scene's meshes only. `<Environment>` also takes `rotation` (radians about +Y, lighting and background together) and `blur` (background, 0 to 1). `<Html>` takes the label options `anchor`, `distanceScale`, `sort`, `frustumCulling`, `followVisibility`, `visible` and `pointerEvents`, all live.
+Lights: `<Sun direction color intensity>` sets the directional sun light every mesh, model and shadow uses (any backend; inside a `<Scene>`, that scene's; `direction` must be three finite numbers, not all 0). `<AmbientLight color intensity>` and `<HemisphereLight sky ground intensity>` light core meshes and models from every direction, and `<Fog color near far density heightFalloff height>` fogs them in their shaders, transparent models included; all three come from `@margoengine/environment`, take live props and need WebGPU. Inside a `<Scene>` they light and fog that scene's meshes only. `<Environment>` also takes `rotation` (radians about +Y, lighting and background together) and `blur` (background, 0 to 1). `<Html>` takes the label options `anchor`, `distanceScale`, `sort`, `frustumCulling`, `followVisibility`, `visible` and `pointerEvents`, all live.
 
 ```tsx
 import { Canvas, Sun } from '@margoengine/react';
@@ -1541,7 +1542,8 @@ export function App() {
 - `CameraShake` turns the view about the camera position with smooth noise, after controls and your frame callbacks
   have placed it, and puts the camera back on unmount. Defaults: `maxYaw`, `maxPitch` and `maxRoll` 0.1 rad, each
   frequency 0.1, `intensity` 1, `decay` false, `decayRate` 0.65 per second. Angles scale with intensity squared, so a
-  decaying shake eases out. Each frame it restores the target and up it set unless something else changed them, so it
+  decaying shake eases out. Angles and frequencies must be finite, `decayRate` 0 or more, and an `intensity` (or
+  `setIntensity` value) that is NaN throws a `RangeError`; a number past 0..1 is clamped. Each frame it restores the target and up it set unless something else changed them, so it
   works with every controls component. The ref has `getIntensity()` and `setIntensity(0..1)`.
 
 ### Visible in the view: useIntersect

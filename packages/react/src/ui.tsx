@@ -119,7 +119,11 @@ export const Sound = /* @__PURE__ */ forwardRef<AudioObject, SoundProps>(functio
     [loaded, setLoaded] = useState<AudioBuffer | null>(null);
   latest.current = props;
   if (positional && !registry)
-    throw fault('state', 'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}', 'react-usage');
+    throw fault(
+      'state',
+      'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}',
+      'react-usage',
+    );
   const sound = useCreated<typeof AudioModule, { sound: AudioObject; release: () => void }>(
     scene,
     {
@@ -226,13 +230,19 @@ export const SpriteLayer = /* @__PURE__ */ forwardRef<SpriteLayerObject, SpriteL
   ref,
 ) {
   const scene = useScene(),
-    first = useRef({ atlas, camera, snap, ySort });
+    latest = useRef({ atlas, camera, snap, ySort }),
+    shown = useRef(atlas);
+  latest.current = { atlas, camera, snap, ySort };
   const layer = useCreated<typeof SpritesModule, SpriteLayerObject>(
     scene,
     {
       load: () => optionalPeer('@margoengine/sprites', () => import('@margoengine/sprites')),
-      create: (api) =>
-        api.SpriteLayer.attach(scene.engine as unknown as EngineKernel, { ...options, ...first.current }),
+      // The values of the latest render, not the first: a layer made again after an option change must draw with the
+      // atlas the props hold now, and `shown` records which one it was made with.
+      create: (api) => {
+        shown.current = latest.current.atlas;
+        return api.SpriteLayer.attach(scene.engine as unknown as EngineKernel, { ...options, ...latest.current });
+      },
       dispose: (value) => value.dispose(),
       onError,
       ref,
@@ -245,7 +255,6 @@ export const SpriteLayer = /* @__PURE__ */ forwardRef<SpriteLayerObject, SpriteL
     if (snap !== undefined) layer.snap = snap;
     if (ySort !== undefined) layer.ySort = ySort;
   }, [layer, camera, snap, ySort]);
-  const shown = useRef(atlas);
   useCommit(() => {
     if (layer && shown.current !== atlas) {
       shown.current = atlas;
@@ -399,7 +408,10 @@ export interface LinePlotProps extends ErrorProps {
   options?: LineLayerOptions;
 }
 /** `figure.line(data, options)` of the enclosing `<Figure>`. The ref is the layer. */
-export const LinePlot = /* @__PURE__ */ forwardRef<LineLayer, LinePlotProps>(function LinePlot({ data, options, onError }, ref) {
+export const LinePlot = /* @__PURE__ */ forwardRef<LineLayer, LinePlotProps>(function LinePlot(
+  { data, options, onError },
+  ref,
+) {
   usePlot('LinePlot', (figure) => figure.line(data, options), [data, byValue(options)], ref, onError);
   return null;
 });

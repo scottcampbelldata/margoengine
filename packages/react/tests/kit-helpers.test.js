@@ -254,8 +254,9 @@ class TextBlock {
     this.font = options.font ?? new Font();
     texts.push(this);
   }
+  // As the native Text: a field given as undefined is left as it is.
   set(options) {
-    Object.assign(this, options);
+    for (const [key, value] of Object.entries(options)) if (value !== undefined) this[key] = value;
     return this;
   }
   setTransform(position, rotation, scale) {
@@ -790,6 +791,26 @@ test('Text shares an optional renderer, attaches to parent meshes and updates co
   assert.equal(renderer.texts.size, 0);
   assert.equal(renderer.removals.length, 2);
   assert.equal(renderer.disposals, 1);
+});
+
+test('Text takes its default again for a prop that turns undefined, as for one that is left out', async () => {
+  const scene = makeScene(),
+    ref = createRef();
+  const view = render(
+    tree(scene, React.createElement(Text, { ref, font: { family: 'serif' }, fontSize: 0.5, color: '#ff0000' }, 'a')),
+  );
+  await flush();
+  assert.equal(ref.current.fontSize, 0.5);
+  view.rerender(
+    tree(
+      scene,
+      React.createElement(Text, { ref, font: { family: 'serif' }, fontSize: undefined, color: undefined }, 'a'),
+    ),
+  );
+  await flush();
+  assert.equal(ref.current.fontSize, 1, 'the default font size, not the last one');
+  assert.equal(ref.current.color, 0xffffff, 'the default colour');
+  view.unmount();
 });
 
 test('Center uses world bounds through nested rotated/scaled groups and keeps its declared position', async () => {
@@ -1451,6 +1472,29 @@ test('CameraShake turns the view within its limits, follows a moved camera, deca
   view.unmount();
   assert.deepEqual(camera.target, [10, 0, 5], 'unmount puts the camera back');
   assert.deepEqual(camera.up, [0, 1, 0]);
+});
+
+test('CameraShake refuses a NaN intensity, a non-finite angle and a decay that grows, so the camera never gets NaN', async () => {
+  const scene = makeScene(),
+    shake = createRef(),
+    camera = scene.engine.camera;
+  Object.assign(camera, { position: [0, 0, 5], target: [0, 0, 0], up: [0, 1, 0] });
+  const view = render(tree(scene, React.createElement(CameraShake, { ref: shake })));
+  await flush();
+  assert.throws(() => shake.current.setIntensity(Number.NaN), RangeError);
+  assert.equal(shake.current.getIntensity(), 1, 'the refused value changes nothing');
+  shake.current.setIntensity(7);
+  assert.equal(shake.current.getIntensity(), 1, 'a number past the end is clamped');
+  for (let i = 0; i < 5; i++) await frame(scene, 0.05);
+  for (const part of [...camera.target, ...camera.up]) assert.ok(Number.isFinite(part));
+  view.unmount();
+  for (const props of [
+    { intensity: Number.NaN },
+    { maxYaw: Number.NaN },
+    { yawFrequency: Infinity },
+    { decay: true, decayRate: -1 },
+  ])
+    assert.throws(() => render(tree(scene, React.createElement(CameraShake, props))), RangeError);
 });
 
 test('Stats opens the readout alone with its options and closes it on unmount', async () => {
