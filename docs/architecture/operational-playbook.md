@@ -9204,3 +9204,12 @@ margin sits at v 0.03 to 0.09 across the eye, at the corners 0.16 to 0.5; after 
 0.01 of v 0 across the middle 16 of 24 columns. Missing: the corner bins keep up to 0.46 (the top shadow narrows to nothing there
 by its Arc); the rest of the photograph's darkening (the ball's own shading, the lashes) is left to the eye material
 and the lash cards, judged on the film's frames.
+
+## Water planar capture edges
+
+The optional `@margoengine/water/reflector` adapter blends finite planar captures
+into the underlying sky reflection at the projected edge. The per-axis blend width
+covers the roughness filter and the maximum authored wave offset. The same shader
+runs on WebGPU and the WebGL2 compatibility layer. The browser fixture spans a known
+finite capture edge and verifies the sky outside, rising reflection across the
+transition and the full reflection inside. See the [clean-room record](../clean-room.md#water-planar-capture-edges-2026-11-24).

@@ -105,6 +105,67 @@ try {
   };
   const redGain = red(images[1]) - red(images[0]);
   assert.ok(redGain > 3, 'offscreen red object appears at its independent mirrored projection: ' + redGain);
+  // A deliberately narrow borrowed projection places a capture boundary on an interior stretch of visible water.
+  // A constant red capture isolates the boundary weighting from texture filtering and scene geometry.
+  await page.evaluate(() => {
+    const t = window.reflectTest;
+    t.adapter.dispose();
+    t.engine.render({ delta: 0 });
+  });
+  const edgeBefore = await page.locator('canvas').screenshot();
+  const edgeSamples = await page.evaluate(() => {
+    const t = window.reflectTest,
+      texture = t.engine.gpu.createTexture({
+        size: [32, 32],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      }),
+      pixels = new Uint16Array(32 * 32 * 4);
+    for (let i = 0; i < pixels.length; i += 4) {
+      pixels[i] = 0x4400; // 4.0 in binary16, red and alpha only.
+      pixels[i + 3] = 0x3c00;
+    }
+    t.engine.gpu.queue.writeTexture({ texture }, pixels, { bytesPerRow: 256 }, [32, 32, 1]);
+    const projection = new Float32Array(16);
+    projection[0] = 0.125;
+    projection[12] = -1;
+    projection[15] = 1;
+    t.edgeTexture = texture;
+    t.edgeAdapter = t.WaterReflection.attach(t.engine, {
+      surface: t.water,
+      reflector: { texture, textureMatrix: projection },
+      roughness: 0.75,
+    });
+    t.engine.render({ delta: 0 });
+    const m = t.engine.camera.matrix;
+    return [-0.8, 0.35, 1.25, 2.45, 4.5].map((x) => {
+      const z = 3,
+        clip = [0, 1, 3].map((r) => m[r] * x + m[8 + r] * z + m[12 + r]);
+      return [
+        Math.floor(((clip[0] / clip[2]) * 0.5 + 0.5) * t.engine.canvas.width),
+        Math.floor((0.5 - (clip[1] / clip[2]) * 0.5) * t.engine.canvas.height),
+      ];
+    });
+  });
+  const edgeAfter = await page.locator('canvas').screenshot();
+  const [withoutEdge, withEdge] = await Promise.all([decodePNG(edgeBefore), decodePNG(edgeAfter)]);
+  const edgeGains = edgeSamples.map(([x, y]) => {
+    assert.ok(x >= 0 && x < withEdge.width && y >= 0 && y < withEdge.height);
+    const i = (y * withEdge.width + x) * 4;
+    return withEdge.data[i] - withoutEdge.data[i];
+  });
+  const [outside, near, inside, inner, solid] = edgeGains;
+  assert.equal(outside, 0, 'outside the capture the sky fallback is exact');
+  assert.ok(solid > 15, 'an interior reflection still contributes strongly');
+  assert.ok(near < inside && inside < inner && inner < solid, 'the border transitions progressively: ' + edgeGains);
+  assert.ok(near < solid * 0.3, 'the first sample inside the border does not jump to the full capture: ' + edgeGains);
+  await page.evaluate(() => {
+    const t = window.reflectTest;
+    t.edgeAdapter.dispose();
+    t.edgeTexture.destroy();
+    t.original = t.mirror.passes;
+    t.adapter = t.WaterReflection.attach(t.engine, { surface: t.water, reflector: t.mirror });
+  });
   // Exercise SSR capture, with independently owned MRT targets, at the scene's actual sample count.
   const lifecycle = await page.evaluate(async () => {
     const t = window.reflectTest,
@@ -190,7 +251,16 @@ try {
   });
   assert.deepEqual(lifecycle, { captured: true, restoredFilter: true, sharedSurvives: true, validation: undefined });
   assert.deepEqual(errors, []);
-  const report = { hardware, first, lifecycle, redGain, visibleChange: true, unreadyExact: true, windBearing: wind };
+  const report = {
+    hardware,
+    first,
+    lifecycle,
+    redGain,
+    edgeGains,
+    visibleChange: true,
+    unreadyExact: true,
+    windBearing: wind,
+  };
   console.log(JSON.stringify(report));
   await writeFile(
     `test-results/water-reflector-${browser.hardware?.compat ? 'compat' : 'webgpu'}.json`,

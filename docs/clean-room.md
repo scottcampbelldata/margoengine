@@ -11040,3 +11040,18 @@ https://doi.org/10.1016/0012-821X(73)90162-3 (the blanket thinning as (r / R)^-3
 thrown up at sqrt(2 g H) and slowed by gravity, h = H (1 - (1 - t / T)^2), T = sqrt(2 H / g). Model choices: the
 dome's shape (1 - (r / 1.3 R)^2)^2, the paraboloid bowl, the crater's growth under constant deceleration from half
 its radius, the lip ramp over the last 15 percent of the radius and the blanket's cut at 5 R. Tests: test/crater.test.js.
+
+## Water planar capture edges (2026-11-24)
+
+The reflection on an open water surface showed the edge of a finite camera capture.
+Morgan McGuire and Michael Mara, *Efficient GPU Screen-Space Ray Tracing* (2014),
+[paper](https://jcgt.org/published/0003/04/04/), describe the coverage limits of a finite viewport.
+Xiaolong Wu, Yanning Xu and Lu Wang, *Stereo-consistent Screen Space Reflection* (2024),
+[paper](https://doi.org/10.1111/cgf.15159), section 4.2, use fading at the viewport edge to prevent abrupt
+changes. Mikkel Gjøl and Mikkel Svendsen, *The Rendering of Inside* (2016),
+[GDC presentation](https://media.gdcvault.com/gdc2016/Presentations/Gjoel_Svendsen_Rendering_of_Inside.pdf),
+also fade screen-space reflections to an environment fallback. Margo's optional Water adapter applies
+that principle to the UV of a planar reflection: use the larger of the filter footprint and the maximum
+wave shift as a transition width on each axis and apply the cubic
+[WGSL smoothstep](https://www.w3.org/TR/WGSL/#smoothstep-builtin). This calculation was written from the
+descriptions without consulting implementation code.

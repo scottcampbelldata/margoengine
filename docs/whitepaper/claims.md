@@ -5152,3 +5152,14 @@ Proof capture (2026-11-18, KB-WATER-SWASH1): the water-ssr --current proof advan
 Proof capture (2026-11-18, KB-POST-GTAO-TERRAINLOOK1): the post-ssr, post-ssr-models, post-stack and quality-presets --current proofs advance to 206cda6acb, whose SSAO ambient replay keeps the lit shader with its lighting in a dead if(false) block and binds every pass binding (it cut the shader at let direct= and bound bindings 18, 8 and 144 only, so a plugin binding read above let direct=, TerrainColors' look uniform, made an invalid bind group every frame). Only the call logs of the cases with an SSAO or GTAO changed (the replay's shader module text and its bind group entries); the ambient term the replay returns is the same expression. Goldens captured again with examples/package-benchmarks/proofs/capture.mjs --only=post-ssr,post-ssr-models,post-stack,quality-presets.
 
 Proof capture (2026-11-19, KB-GLTFA B1): the clustered-area-lights, clustered-light-hooks, clustered-local-shadows, color-output, deformed-shadows, environment-hemisphere, environment-volumetric, gltf-pbr-lighting-hooks, materials-uv-transform, oit-detached, post-ssr, post-ssr-models, post-stack, quality-presets and taa-velocity --current proofs advance to 8c71da0556, the last of the three commits that let a node take a zero scale (glTF 2.0 section 3.5.3). Core's vertex stage, the package normal stages (skinning, VAT, culling, lod imposters, batched materials, toon, selection) and the gltf/pbr vertex stage turn the normal by the cofactor matrix with select(-1.0,1.0,det>=0.0) in place of sign(det) and write world +Y where the flattened matrix maps the normal to zero, so the shader module texts that compose those stages changed; for a nonzero scale the normal is the same vector as before, and no buffer layout, binding or draw call was changed by those commits (the failing runs showed shader module text differences). Goldens captured again with examples/package-benchmarks/proofs/capture.mjs --only= the fifteen proofs above (15 of 15 pass, replayed from the store).
+
+## Water planar capture edges (2026-11-24)
+
+`packages/water/test/reflector.browser.mjs` uses a constant red capture with a known
+projected edge. The red-channel gains at five samples in increasing capture depth
+were `[0, 131, 133, 146, 151]` before the fix on WebGPU. They are
+`[0, 1, 52, 118, 151]` after the fix on both native WebGPU and the WebGL2
+compatibility layer (RTX A6000, Edge 158, Direct3D on the compatibility path).
+The probe covers the sky-only sample, the transition and the interior. It does not
+measure performance or recover reflected objects outside the capture.
+See the [clean-room record](../clean-room.md#water-planar-capture-edges-2026-11-24).

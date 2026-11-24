@@ -11454,6 +11454,12 @@ and an array of its own (`packages/webgl2-compat/test/corpus-inline.test.js`, co
 `scripts/support/wgsl-inline.mjs`). Cold links after KB-COMPAT-FXCTIME1 (RTX A6000, Edge, busy): robot-planning's
 clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.9 s.
 
+## Water planar reflection coverage
+
+`WaterReflection` uses a finite planar capture and an atmospheric reflection fallback.
+Near a capture edge, the filter and distortion determine the width of the transition.
+Reflected objects beyond the captured extent are unavailable to the planar adapter.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

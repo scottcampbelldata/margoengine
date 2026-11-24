@@ -56,6 +56,25 @@ Water.attach(engine, {
 
 The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
 
+For reflections of nearby geometry, attach the optional planar adapter with a
+horizontal capture aligned to the water surface. The adapter fades across the
+capture edge into the base reflection using the filter footprint and projected wave
+offset, so an open surface does not show a hard rectangular edge.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Reflector} from '@margoengine/environment/reflector';
+import {Water} from '@margoengine/water';
+import {WaterReflection} from '@margoengine/water/reflector';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const surface = Water.attach(engine, {size: [80, 80], height: 0});
+const reflector = Reflector.attach(engine, {width: 80, height: 80, captureOnly: true});
+reflector.node.setRotation([-Math.PI / 2, 0, 0]);
+WaterReflection.attach(engine, {surface, reflector});
+engine.start();
+```
+
 `water.depthTexture` exposes borrowed viewport depth including opaque geometry and
 the water surface for subsequent effects, such as `Sky` distance fog. It is
 undefined before the first draw and after disposal/restoration until drawing

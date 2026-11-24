@@ -85,12 +85,17 @@ fn skyColor(direction:vec3f,rough:f32)->vec3f {
  if(clip.w<=0.000001){return fallback;}
  let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5+direction.xz*planarWater.settings.z;
  if(any(uv<vec2f(0))||any(uv>vec2f(1))){return fallback;}
+ // A finite capture has no information outside its rectangle. Hand off to sky across the
+ // filter footprint and maximum wave offset instead of exposing the capture's moving border.
+ let texel=1.0/vec2f(textureDimensions(planarWaterImage));
+ let border=max((2.0+planarWater.settings.w*8.0)*texel,vec2f(planarWater.settings.z));
+ let weight=smoothstep(vec2f(0),border,min(uv,1.0-uv));
  var color=textureSampleLevel(planarWaterImage,planarWaterSampler,uv,0).rgb;
  if(planarWater.settings.w>0.0){
-  let offset=vec2f(planarWater.settings.w*8.0)/vec2f(textureDimensions(planarWaterImage));
+  let offset=planarWater.settings.w*8.0*texel;
   color=color*0.5+(textureSampleLevel(planarWaterImage,planarWaterSampler,uv+vec2f(offset.x,0),0).rgb+textureSampleLevel(planarWaterImage,planarWaterSampler,uv-vec2f(offset.x,0),0).rgb+textureSampleLevel(planarWaterImage,planarWaterSampler,uv+vec2f(0,offset.y),0).rgb+textureSampleLevel(planarWaterImage,planarWaterSampler,uv-vec2f(0,offset.y),0).rgb)*0.125;
  }
- return mix(fallback,color*planarWater.tint.rgb,planarWater.settings.y);
+ return mix(fallback,color*planarWater.tint.rgb,planarWater.settings.y*weight.x*weight.y);
 }
 `;
 
