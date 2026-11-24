@@ -1,10 +1,10 @@
 {
-  "commit": "1be7e748f",
+  "commit": "84304f128d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 60994,
-    "gzip": 24811,
+    "raw": 60984,
+    "gzip": 24797,
     "limit": 25000
   },
   "packages": {
@@ -364,8 +364,8 @@
         "gzip": 2499
       },
       "./io": {
-        "raw": 9851,
-        "gzip": 4124
+        "raw": 10157,
+        "gzip": 4287
       },
       "./workers": {
         "raw": 6542,
@@ -922,12 +922,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53125,
-        "gzip": 22163
+        "raw": 53121,
+        "gzip": 22179
       },
       "./extension": {
-        "raw": 53303,
-        "gzip": 22260
+        "raw": 53302,
+        "gzip": 22248
       }
     },
     "@margoengine/creative": {
@@ -936,8 +936,8 @@
         "gzip": 3089
       },
       ".": {
-        "raw": 64760,
-        "gzip": 19601
+        "raw": 65398,
+        "gzip": 19649
       },
       "./particles": {
         "raw": 1138,
@@ -956,20 +956,20 @@
         "gzip": 7183
       },
       "./grass": {
-        "raw": 18432,
-        "gzip": 6482
+        "raw": 18722,
+        "gzip": 6500
       },
       "./grass-settings": {
         "raw": 4081,
         "gzip": 1814
       },
       "./planet": {
-        "raw": 21273,
-        "gzip": 7263
+        "raw": 21501,
+        "gzip": 7278
       },
       "./stars": {
-        "raw": 5925,
-        "gzip": 2562
+        "raw": 6045,
+        "gzip": 2575
       },
       "./planet-atmosphere": {
         "raw": 7081,
@@ -5206,6 +5206,10 @@
       "./water/flood": {
         "raw": 38,
         "gzip": 58
+      },
+      "./water/flood-bake": {
+        "raw": 43,
+        "gzip": 63
       },
       "./water/sea-state": {
         "raw": 42,
@@ -13312,8 +13316,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 411294,
-        "gzip": 239664
+        "raw": 412326,
+        "gzip": 240198
       },
       "./decomposition": {
         "raw": 26455,
@@ -15017,7 +15021,7 @@
       },
       "./lights": {
         "raw": 3700,
-        "gzip": 1701
+        "gzip": 1698
       },
       "./scene": {
         "raw": 7696,
@@ -15025,7 +15029,7 @@
       },
       "./viewer-extras": {
         "raw": 25920,
-        "gzip": 9804
+        "gzip": 9814
       }
     },
     "@margoengine/stats": {
@@ -16094,8 +16098,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 96718,
-        "gzip": 30365
+        "raw": 97015,
+        "gzip": 30496
       },
       "./fft": {
         "raw": 20442,
@@ -16144,6 +16148,10 @@
       "./flood": {
         "raw": 32946,
         "gzip": 12025
+      },
+      "./flood-bake": {
+        "raw": 5664,
+        "gzip": 2526
       },
       "./sea-state": {
         "raw": 1997,
@@ -16556,9 +16564,9 @@
       "brotli": 12604
     },
     "packages/physics/dist/index.js": {
-      "raw": 411294,
-      "gzip": 239664,
-      "brotli": 230758
+      "raw": 412326,
+      "gzip": 240198,
+      "brotli": 230706
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16938,13 +16946,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 153239,
-        "gzip": 49606
+        "raw": 154219,
+        "gzip": 50065
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 258054,
-        "gzip": 189659,
+        "raw": 258106,
+        "gzip": 189675,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
