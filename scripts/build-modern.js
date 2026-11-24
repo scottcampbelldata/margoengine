@@ -18,6 +18,7 @@ import { stripPackageShaderComments } from './shader-comments.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
 import { clearStamp, packageStamps, writeStamp } from './package-stamps.mjs';
 import { buildCoreKernel, deflateKernel } from './build-core-kernel.mjs';
+import { committedBlueprint } from './committed-blueprint.mjs';
 import { BLUEPRINTS, blueprintBytes } from './wasm-blueprints.mjs';
 import { acquireBuildLock } from './support/build-lock.mjs';
 import { removeStalePackageOutputs } from './support/stale-packages.mjs';
@@ -47,7 +48,14 @@ const wasm = blueprintBytes(BLUEPRINTS.find((entry) => entry.name === 'core-kern
 assert.ok(wasm.length < 30 * 1024, `Kernel exceeds 30 KiB: ${wasm.length}`);
 assert.ok(WebAssembly.validate(wasm), 'Invalid Wasm artifact');
 // -Oz and raw deflate measured smallest for core + stage, with identical kernel output and speed (test-results/wasm-opt-bench.mjs).
-const compressedWasm = deflateKernel(wasm);
+// The committed blueprint's own bytes, never a fresh deflate: the host's zlib would change them (KB-SIZE-PLATFORM1).
+const compressedWasm = committedBlueprint(
+  resolve('packages/core/src/wasm.ts'),
+  'wasmBase64',
+  wasm,
+  inflateRawSync,
+  deflateKernel,
+);
 assert.deepEqual(inflateRawSync(compressedWasm), wasm, 'Kernel compression must be lossless');
 // Build every workspace package in dependency order (scripts/package-order.js reads package.json; a package that needs
 // another's dist at build time must declare it). A package with its own `build` script runs it; the rest use the

@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync, gzipSync } from 'node:zlib';
+import { committedBlueprint } from '../../../scripts/committed-blueprint.mjs';
 import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -57,8 +58,11 @@ function build() {
     assert.ok(!text.includes(leak), `The blueprint holds a build path (${leak})`);
   // RFC 1952 2.3.1: zlib writes its build system's OS code (0x0a on Windows, 3 on Linux, 19 on macOS) into header byte
   // 9, so the committed file differed by system; 255 is "unknown" and the same everywhere.
-  const compressed = gzipSync(wasm);
-  compressed[9] = 255;
+  const compressed = committedBlueprint(resolve(root, 'src/wasm.ts'), 'machineryWasm', wasm, gunzipSync, (bytes) => {
+    const packed = gzipSync(bytes);
+    packed[9] = 255;
+    return packed;
+  });
   assert.deepEqual(gunzipSync(compressed), wasm, 'Kernel compression must be lossless');
   writeFileSync(
     resolve(root, 'src/wasm.ts'),

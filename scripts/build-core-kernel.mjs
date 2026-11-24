@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { committedBlueprint } from './committed-blueprint.mjs';
 import { BLUEPRINTS, writeRecord } from './wasm-blueprints.mjs';
 import { blueprintRustEnv } from './rust-wasm-env.mjs';
 
@@ -15,7 +16,7 @@ const repository = resolve(import.meta.dirname, '..');
 const wasmPath = resolve(repository, 'packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm'),
   optimizedPath = wasmPath.replace('.wasm', '.optimized.wasm');
 
-/** The committed blueprint's raw deflate settings; build-modern.js measures core + stage with the same ones. */
+/** The raw deflate settings a changed kernel is compressed with (committed-blueprint.mjs keeps the committed string otherwise). */
 export const deflateKernel = (wasm) => deflateRawSync(wasm, { level: 9, memLevel: 6, windowBits: 12 });
 
 export function buildCoreKernel() {
@@ -51,7 +52,14 @@ export function buildCoreKernel() {
     { cwd: repository, stdio: 'inherit' },
   );
   const wasm = readFileSync(optimizedPath);
-  const compressed = deflateKernel(wasm);
+  // The committed string stays when it still inflates to this kernel, so a rebuild gives the same bytes on every machine.
+  const compressed = committedBlueprint(
+    resolve(repository, 'packages/core/src/wasm.ts'),
+    'wasmBase64',
+    wasm,
+    inflateRawSync,
+    deflateKernel,
+  );
   assert.deepEqual(inflateRawSync(compressed), wasm, 'Kernel compression must be lossless');
   writeFileSync(
     resolve(repository, 'packages/core/src/wasm.ts'),
