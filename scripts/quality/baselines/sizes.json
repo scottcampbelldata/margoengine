@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17595878,
+  "total": 17616461,
   "history": [
     {
       "date": "2026-10-24",
@@ -11433,6 +11433,12 @@
       "commit": "906a2f0f7",
       "reason": "Soft body collision: Physics.softContacts and the probe buffers in the physics kernel (physics 246,854 to 249,605 B), cloth contacts in the soft kernel (collide.rs and kernel-common cloth.rs; the lazy soft kernel 10,509 to 18,618 B with its column table, the soft entry 19,379 to 27,207 B)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "3fc755de9",
+      "reason": "physics/soft gains tetrahedral cells, plasticity, tearing and clusters: entry 28,024 to 37,206 B gzip budget (base 7,926 to 10,554, kernel blueprint 19,177 to 25,743, which holds the stable Neo-Hookean and co-rotated solvers, the polar decomposition, plastic flow and clusters); a second entry would load the same kernel for any body with cells",
+      "grew": 3
     }
   ],
   "items": {
@@ -12192,9 +12198,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 28024,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 7926,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 19177,
+    "@margoengine/physics/soft": 38323,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 10871,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 26516,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
