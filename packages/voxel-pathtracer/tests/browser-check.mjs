@@ -20,6 +20,8 @@
 //   against independent quadrature (emitter MIS over the full vertex-to-light distance, KB0986d).
 // - bouncelimit: a floor lit only off the ceiling (two scattering events) is black at maxBounces 1 and lit at 2: a
 //   surface vertex past the limit samples no light (KB-L5a-1).
+// - shadowplane: a shadow ray starting exactly on a cell or brick plane, leaving it toward -x, starts in the cell ahead
+//   of it (a sunlit corner beside a block whose face lies on that plane; KB-VPT-SHADOW-PLANE).
 // - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
 //   panel occluding a lit ceiling against view factors;
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
@@ -383,6 +385,27 @@ try {
     assert.equal(r[1].finite, true);
     assert.equal(r[1].max, 0, 'one scattering event: light that needs two adds nothing');
     assert.ok(r[2].finite && r[2].mean > 0.01, 'two scattering events reach the panel off the ceiling');
+  }
+  if (wanted('shadowplane')) {
+    const r = await run('shadowplane');
+    console.log(JSON.stringify(r));
+    for (const [x, plane] of [
+      [4, 'cell'],
+      [8, 'brick'],
+    ]) {
+      const p = r[x];
+      console.log(
+        `  shadow ray from the ${plane} plane x = ${x}: radiance ${p.color.map((v) => v.toFixed(4))} (0.2887)`,
+      );
+      // The scene exercises the plane: the pixel ray lies on it and walks the empty column ahead to the wall (depth 2),
+      // not the block beside it (depth 1).
+      assert.equal(p.originX, x, `${plane}: the pixel-centre ray lies on the plane`);
+      assert.ok(p.directionX < 0, `${plane}: the ray leans toward -x`);
+      assert.equal(p.palette, 1);
+      near(p.depth, 2, 1e-4, `${plane}: first hit on the wall`);
+      // Lit by the point sun: albedo 0.5 x irradiance pi x cos(54.7 degrees) / pi.
+      for (const v of p.color) near(v, 0.5 / Math.sqrt(3), 1e-3, `${plane}: the sun reaches the corner`);
+    }
   }
   if (wanted('arealight')) {
     const r = await run('arealight');

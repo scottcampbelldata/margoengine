@@ -3,6 +3,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {DenoiseML} from '/packages/voxel-pathtracer/dist/denoise-ml.js';
 import {MeshPathTracer} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
 import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 window.run=async(compat=false,fixture)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
@@ -27,8 +28,25 @@ window.run=async(compat=false,fixture)=>{
    try{await tracer.ready;console.log('ml phase raw Box trace');const raw=await tracer.renderImage({width:16,height:16,samples:4,seed:24371,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});console.log('ml phase reference Box trace');const reference=await tracer.renderImage({width:16,height:16,samples:512,seed:24372,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});fixture={raw:serial(raw),reference:Array.from(reference.color),asset:'Khronos metadata Box.gltf, repository licensed fixture',referenceSamples:512};}finally{tracer.dispose();}
   }
   const real=decode(fixture.raw),realResult=await d.denoise(real,{signal:AbortSignal.timeout(120000)}),realMSE={raw:mse(real.color,fixture.reference),network:mse(realResult.color,fixture.reference)};
+  // KB-VPT-DENOISEML-RANGE: renderImage output DenoiseML must take as it is. Dispersive glass weights paths by signed RGB
+  // wavelength weights, so a few-sample pixel mean can be negative; a white wall seen through rough glass has an albedo
+  // guide that must stay a reflectance in [0,1]. Each image goes through DenoiseML and its output is compared on the CPU.
+  const traced={};
+  for(const [name,glass] of [['dispersive glass',{type:'glass',color:[1,1,1],ior:1.5,abbe:5}],['rough glass',{type:'glass',color:[1,1,1],ior:1.5,roughness:0.8}]]){
+   const voxels=new Uint8Array(16*16*4);for(let y=0;y<16;y++)for(let x=0;x<16;x++){voxels[x+16*(0+4*y)]=2;voxels[x+16*(3+4*y)]=1;}
+   const scene={revision:1,models:[{id:'m',revision:1,size:[16,16,4],voxels}],instances:[{id:'m',modelId:'m',matrix:[1,0,0,0,0,1,0,0,0,0,1,0,-8,-8,-2,1]}],
+    materials:[{id:1,...glass},{id:2,type:'diffuse',color:[1,1,1]}],environment:{ground:false,skyIntensity:0,sunDirection:[0.3,0.4,1],sunIntensity:3,sunAngularSize:0}};
+   engine.camera.position=[0,0,12];engine.camera.target=[0,0,0];
+   const tracer=VoxelPathTracer.attach(engine,{scene,denoise:false,maxBounces:8});
+   try{await tracer.ready;console.log('ml phase '+name);
+    const image=await tracer.renderImage({width:32,height:32,samples:2,seed:24311,aovs:true,signal:AbortSignal.timeout(120000)});
+    const row={minColor:Math.min(...image.color),maxAlbedo:Math.max(...image.albedo),minAlbedo:Math.min(...image.albedo),input:serial({width:image.width,height:image.height,color:image.color,albedo:image.albedo,normal:image.normal,samples:image.samples})};
+    try{row.output=Array.from((await d.denoise(image,{signal:AbortSignal.timeout(120000)})).color);}catch(error){row.refused=String(error.message);}
+    traced[name]=row;
+   }finally{tracer.dispose();}
+  }
   const old=engineRuntime(engine).gpu;old.destroy();await old.lost;await engineRuntime(engine).rebootDevice();watch();const restored=await d.denoise(constant,{signal:AbortSignal.timeout(120000)});const replacement=engineRuntime(engine).gpu!==old&&restored.color.every(Number.isFinite);
-  await Promise.all(reports);return {constantError,alphaPreserved,syntheticMSE,synthetic:serial(synthetic),syntheticOutput:Array.from(syntheticResult.color),realMSE,realOutput:Array.from(realResult.color),replacement,errors,messages,fixture};
+  await Promise.all(reports);return {traced,constantError,alphaPreserved,syntheticMSE,synthetic:serial(synthetic),syntheticOutput:Array.from(syntheticResult.color),realMSE,realOutput:Array.from(realResult.color),replacement,errors,messages,fixture};
  }finally{d.dispose();engine.dispose();}
 };window.ready=true;
 </script></html>

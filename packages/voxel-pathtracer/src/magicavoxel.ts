@@ -94,9 +94,15 @@ const num = (d: MagicaVoxelDict | undefined, key: string): number | undefined =>
 };
 const nums = (d: MagicaVoxelDict | undefined, key: string): number[] | undefined => {
   const v = get(d, key);
-  if (v === undefined) return undefined;
+  // An empty value reads as a missing key (as `num` reads it), not as a single 0.
+  if (v === undefined || v.trim() === '') return undefined;
   const parts = v.trim().split(/\s+/).map(Number);
   return parts.every(Number.isFinite) ? parts : undefined;
+};
+/** A vector of `fallback.length` numbers: the file's own, with any it leaves out taken from `fallback`. */
+const padded = (d: MagicaVoxelDict | undefined, key: string, fallback: readonly number[]): number[] => {
+  const v = nums(d, key) ?? [];
+  return fallback.map((f, i) => v[i] ?? f);
 };
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** MagicaVoxel's 8-bit colour to linear with the film gamma (1..5, default 2.2), rather than the sRGB curve. */
@@ -307,9 +313,9 @@ export function magicaVoxelLighting(
     unsupported: string[] = [],
     mode = num(o('_env'), '_mode') ?? 0,
     sunI = num(o('_inf'), '_i') ?? 0.7,
-    angle = nums(o('_inf'), '_angle') ?? [50, 50],
+    angle = padded(o('_inf'), '_angle', [50, 50]),
     elevation = (angle[0] * Math.PI) / 180,
-    azimuth = (((angle[1] ?? 0) - 90) * Math.PI) / 180,
+    azimuth = ((angle[1] - 90) * Math.PI) / 180,
     setting = o('_setting'),
     groundOn = (num(setting, '_ground') ?? 1) !== 0,
     bgOn = (num(setting, '_bg_c') ?? 0) !== 0,
@@ -509,8 +515,8 @@ const ISO_PITCH = -Math.atan(Math.SQRT1_2);
 export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<MagicaVoxelDict> = []): MagicaVoxelCamera {
   let lens: MagicaVoxelDict | undefined;
   for (const o of objects) if (get(o, '_type') === '_lens') lens = o;
-  const focus = nums(camera, '_focus') ?? [0, 0, 0],
-    stored = nums(camera, '_angle') ?? [0, 0, 0],
+  const focus = padded(camera, '_focus', [0, 0, 0]),
+    stored = padded(camera, '_angle', [0, 0, 0]),
     radius = Math.max(1e-3, num(camera, '_radius') ?? 100),
     fov = Math.min(179, Math.max(1, num(lens, '_fov') ?? num(camera, '_fov') ?? 45)),
     mode = get(camera, '_mode') ?? 'pers',
@@ -518,8 +524,8 @@ export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<Mag
     iso = mode === 'iso',
     orthographic = (mode === 'orth' || iso) && lensProjection === 0,
     // Iso: the isometric pitch, the stored yaw and roll.
-    angle = iso ? [(ISO_PITCH * 180) / Math.PI, stored[1] ?? 0, stored[2] ?? 0] : stored,
-    [p, y, r] = angle.map((v) => ((v ?? 0) * Math.PI) / 180),
+    angle = iso ? [(ISO_PITCH * 180) / Math.PI, stored[1], stored[2]] : stored,
+    [p, y, r] = angle.map((v) => (v * Math.PI) / 180),
     offset = [Math.cos(p) * Math.sin(y), -Math.cos(p) * Math.cos(y), -Math.sin(p)],
     // MagicaVoxel's orthographic view is as tall as the radius (measured at a 35-degree lens).
     height = radius,

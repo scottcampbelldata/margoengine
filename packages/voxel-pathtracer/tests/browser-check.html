@@ -812,6 +812,27 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // KB-VPT-SHADOW-PLANE: a shadow ray that starts exactly on a cell plane (x = 4) or a brick plane (x = 8) and leaves it
+ // toward -x starts in the cell ahead of it, as march() does, not in the filled cell behind it. The orthographic camera
+ // sits on the plane (its pixel-centre ray has x exactly 4 or 8 in float32) and looks along -z, 2^-32 toward -x, so the
+ // camera walk takes the empty column ahead and meets a wall's face at the foot of a block whose -x face lies on that
+ // plane. The point sun comes from -x, up and +z: nothing stands between that corner and the sun.
+ async shadowplane(){
+  const out={};
+  for(const x of [4,8]){
+   look([x,0.5,0],[x-2**-22,0.5,-1024],{project:ortho(0.5)});
+   const scene={revision:1,models:[model('m',[16,1,2],(i,j,k)=>k===0||i===x?1:0)],
+    instances:[{id:'m',modelId:'m',matrix:translate(0,0,-3)}],materials:[{id:1,type:'diffuse',color:[0.5,0.5,0.5]}],
+    environment:{skyIntensity:0,sunDirection:[-1,1,1],sunIntensity:Math.PI,sunAngularSize:0,ground:false}};
+   const {o,d}=rays(1,1)(0.5,0.5);
+   out[x]=await withTracer(scene,{denoise:false,maxBounces:1},async(t)=>{
+    const img=await t.renderImage({width:1,height:1,samples:4,seed:5,jitter:false,aovs:true});
+    return {color:Array.from(img.color),palette:img.palette[0],depth:img.depth[0],originX:Math.fround(o[0]),directionX:d[0]};
+   });
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  async arealight(){
   const out={},floor=model('f',[64,1,64],()=>1),mat=[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}];
   // Square panels centred over the origin facing down.

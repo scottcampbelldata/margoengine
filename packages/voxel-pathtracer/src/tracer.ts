@@ -1161,7 +1161,9 @@ export class VoxelPathTracer implements EnginePlugin {
       gpu.capacity = capacity;
       gpu.runs = new Runs(4, capacity);
       gpu.regions.clear();
-      for (const m of s.models) place(m);
+      // Once per packed copy: models that share one (the same contentKey) share its region, and the snapshot was
+      // checked to fit each copy once.
+      for (const m of s.models) if (!gpu.regions.has(m)) place(m);
       gpu.resources++;
     }
     const lights = lightLayout(s),
@@ -1819,7 +1821,18 @@ export class VoxelPathTracer implements EnginePlugin {
     for (const a of job.adds) v.routeKeys.add(a.key);
     (async () => {
       for (const [i, k] of chunks.entries())
-        await route.run(kernel, job.adds[i].inputs, width, k.rows, k.count, this.#settings.maxBounces, check, job.adds[i].key, false, frame);
+        await route.run(
+          kernel,
+          job.adds[i].inputs,
+          width,
+          k.rows,
+          k.count,
+          this.#settings.maxBounces,
+          check,
+          job.adds[i].key,
+          false,
+          frame,
+        );
     })().then(
       () => {
         job.landed = true;
@@ -2237,7 +2250,11 @@ export class VoxelPathTracer implements EnginePlugin {
                 key = `${k.y0}+${k.rows}`;
               let banded = whole ? group! : bands.get(key);
               if (!banded) {
-                banded = this.#traceGroup(gpu, frame, targets, copies, { frame: 0, at: k.y0 * w * 16, size: k.rows * w * 16 });
+                banded = this.#traceGroup(gpu, frame, targets, copies, {
+                  frame: 0,
+                  at: k.y0 * w * 16,
+                  size: k.rows * w * 16,
+                });
                 bands.set(key, banded);
               }
               this.#writeFrame(

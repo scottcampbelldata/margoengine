@@ -45,7 +45,7 @@ def data(seed,n):
   np.mean((albedo-albedo[:,4:5])**2,axis=2,keepdims=True),
   np.clip(1-np.sum(normals*normals[:,4:5],axis=2,keepdims=True),0,2),
   np.broadcast_to(np.log1p(variance/(1+clum*clum)),(n,9,1)),
-  np.broadcast_to(clum/(1+clum),(n,9,1)),lum/(1+lum),
+  np.broadcast_to(clum/(1+np.abs(clum)),(n,9,1)),lum/(1+np.abs(lum)),
   np.abs(alpha-alpha[:,4:5]),np.broadcast_to(1/np.sqrt(spp),(n,9,1)),
   np.broadcast_to(r.choice([.25,.5,1.],(n,1,1)),(n,9,1))
  ],axis=2).astype(np.float32)

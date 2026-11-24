@@ -546,7 +546,7 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  let stp=select(vec3i(-1),vec3i(1),pos);
  let up=select(vec3f(0.0),vec3f(1.0),pos);
  let ad=abs(inv);
- var bc=clamp(vec3i(floor((o+d*tEnter)*0.125)),vec3i(0),nb-1);
+ var bc=clamp(forwardCell((o+d*tEnter)*0.125,d),vec3i(0),nb-1);
  var bn=((vec3f(bc)+up)*8.0-o)*inv;
  var t=tEnter;var depth=0.0;
  // The cell the ray starts in (when it starts inside the model), and whether it is still in the volume it started in
@@ -590,13 +590,13 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
     own=own&&(vol==0u||vol==ue);vol=ue;
     var t1=t;
     if(own&&sunCell){
-     let c0=floor(o+d*t);let cn=(c0+up-o)*inv;t1=min(min(min(cn.x,cn.y),cn.z),tOut);
+     let c0=vec3f(forwardCell(o+d*t,d));let cn=(c0+up-o)*inv;t1=min(min(min(cn.x,cn.y),cn.z),tOut);
      let k=extinction(ue,true);if(k<0.0){return -1.0;}depth+=k*(t1-t);own=false;
     }
     if(t1<tOut){let k=extinction(ue,own);if(k<0.0){return -1.0;}depth+=k*(tOut-t1);}
    } else if(entry==0u){own=false;}
    else {
-    c=clamp(vec3i(floor(o+d*t)),lo,hi);
+    c=clamp(forwardCell(o+d*t,d),lo,hi);
     vn=(vec3f(c)+up-o)*inv;
     vt=t;
     uniform=entry>=0x80000000u;
@@ -986,6 +986,18 @@ fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
 fn evalSurface(m:Mat,n:vec3f,wo:vec3f,wi:vec3f)->Eval {return evalLobes(m,n,wo,wi,3u);}
 // lobe: 0 cosine (diffuse, multiple scattering), 1 microfacet reflection, 2 perfect mirror, 3 dielectric.
 struct Bounce {wi:vec3f,w:vec3f,pdf:f32,transmit:bool,ok:bool,lobe:u32}
+// The albedo guide's factor for an event it follows (mirrors and glass): the mean of the event's estimator weight over
+// its sample, so the guide stays a reflectance in [0,1] and carries no sampling noise. A rough dielectric's weight
+// G2/G1 / norm reaches 1 / E on one sample (a pixel's guide behind rough glass passed 3); its mean is E / norm, E being
+// albedoGlass, the mean of G2/G1 under this sampling (1 when compensated). Every other followed event has a fixed weight.
+fn guideWeight(s:Bounce,alpha:f32,n:vec3f,wo:vec3f,eta:f32,isSmooth:bool)->vec3f {
+ if(isSmooth||s.lobe!=3u){return s.w;}
+ // E / max(E, 0.05) written as min(E / 0.05, 1): exactly 1 when E >= 0.05, where e / e may round past 1 on a GPU (WGSL
+ // allows 2.5 ulp for division). Uncompensated, the mean is E itself, an albedo at most 1 (min holds the table's
+ // bilinear interpolation to it).
+ let e=tableGlass(dot(n,wo),sqrt(alpha),eta);
+ return vec3f(min(select(e/0.05,e,(f.config.z&NO_COMPENSATION)!=0u),1.0));
+}
 // Dielectric interface with relative index eta = n(incident side) / n(other side); smooth or GGX-rough. Rough
 // interfaces divide by their directional albedo, so the energy masking and shadowing would lose comes back.
 fn dielectric(alpha:f32,n:vec3f,wo:vec3f,eta:f32,isSmooth:bool)->Bounce {
@@ -1637,10 +1649,10 @@ fn radiance(px:vec2u)->Path {
       else if(!same(s.wi,entryDir)){deflections++;deflectOk=deflectOk&&prismAt(mInst);}
      } else if(!(clearGlass(mm)&&prismAt(mInst)&&fresnel(dot(n,-d),mm.ior)>=1.0)){chainOk=false;}
      thr*=s.w;
+     if(feature){tint*=guideWeight(s,mm.alpha,n,-d,mm.ior,sm);}
      if(s.transmit){medium=0u;mInst=NONE;o=p-off;}
      else{nir++;if(nir>(f.limits.y>>16u)&&rand()<0.5){break;}o=p+off;}
      d=s.wi;lastPdf=0.0;
-     if(feature){tint*=s.w;}
      bounces++;
      if(bounces>f.config.x||ns>=(f.limits.y&0xffffu)){break;}
      ns++;
@@ -1730,7 +1742,7 @@ fn radiance(px:vec2u)->Path {
    if(h.inst==GROUND){done=true;continue;}
    medium=h.value;mInst=h.inst;o=p-off;if((m.flags&UNTINTED)==0u){thr*=m.color;}
   } else {o=p+off;}
-  if(feature){tint*=s.w;}
+  if(feature){tint*=guideWeight(s,m.alpha,n,wo,etaI/m.ior,(m.flags&SMOOTH)!=0u);}
   d=s.wi;lastPdf=select(0.0,s.pdf,inAir);lastVertex=o;
   bounces++;
   if(bounces>f.config.x||!roulette(&thr,bounces)){done=true;}

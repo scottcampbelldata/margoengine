@@ -905,7 +905,10 @@ Not done or not verified, stated plainly:
   glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
   pixels and very dense air settings by 2-3 levels on average; with the ground off its sky below the horizon is
   within 4.2 levels on average (2-degree blocks), not per pixel.
-- **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
+- **Denoiser:** the `denoise` option is a classical filter (the a-trous wavelet filter under "How it works"); the
+  optional `/denoise-ml` entry adds a small learned one for float images (see
+  [Learned denoiser](#learned-denoiser-margoenginevoxel-pathtracerdenoise-ml)), which the viewport and `capture` do
+  not use. While the camera moves, surfaces it uncovers are noisy for a
   few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than
   without it (numbers under "Viewport"). Averaged over four seeds against 131,072-sample references
   (noise removed in quadrature) it lowers the error x2.46, x2.32, x2.24 at 4, 16, 64 samples on the material scene and
@@ -980,6 +983,61 @@ at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground
 representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
 2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
 discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.
+
+## Learned denoiser (`@margoengine/voxel-pathtracer/denoise-ml`)
+
+`margoengine/voxel-pathtracer/denoise-ml` (or `@margoengine/voxel-pathtracer/denoise-ml`) exports `DenoiseML`, a small
+trained network that reconstructs a float image from `renderImage({ aovs: true })`. For every pixel a 10-16-8-1
+perceptron (321 weights) scores its 3 x 3 neighbours from their radiance, albedo, normal and coverage differences and
+the sample count; the softmax of the scores is a positive kernel, so each output stays within the colours of its
+neighbourhood and a constant image comes back unchanged. The weights ship inside the entry, trained clean-room on
+synthetic patches by `scripts/train-denoise.py` (Bako et al. 2017, kernel-predicting networks; Vogels et al. 2018).
+It runs as one WebGPU compute dispatch, also on the WebGL2 compatibility layer. It is spatial only (no temporal
+history) and separate from the `denoise` option, which the viewport and `capture` keep using.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { VoxelPathTracer } from '@margoengine/voxel-pathtracer';
+import { DenoiseML } from '@margoengine/voxel-pathtracer/denoise-ml';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [6, 5, 8], target: [0, 1, 0] },
+});
+const tracer = VoxelPathTracer.attach(engine, {
+  scene: {
+    revision: 1,
+    models: [{ id: 'block', revision: 1, size: [4, 4, 4], voxels: new Uint8Array(64).fill(1) }],
+    instances: [{ id: 'block-1', modelId: 'block', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2, 0, -2, 1] }],
+    materials: [{ id: 1, type: 'diffuse', color: [0.8, 0.5, 0.3] }],
+    environment: { skyColor: [0.6, 0.75, 1], sunIntensity: 3, sunDirection: [0.4, 0.8, 0.3] },
+  },
+});
+const signal = AbortSignal.timeout(60_000);
+using denoiser = await DenoiseML.create(engine, { signal });
+await tracer.ready;
+const noisy = await tracer.renderImage({ width: 128, height: 128, samples: 4, aovs: true, signal });
+const clean = await denoiser.denoise(noisy, { signal });
+console.log(clean.color.length === noisy.color.length, clean.albedo === noisy.albedo); // true false
+tracer.dispose();
+engine.dispose();
+```
+
+- `DenoiseML.create(engine, { signal? })` compiles the network once the engine has a WebGPU device (`MargoError`
+  `unsupported` otherwise); `signal` (default none) cancels the wait.
+- `denoise(image, { signal? })` returns a new image: `color` reconstructed, every other array (albedo, normal, alpha,
+  depth, instance, palette) copied. The input is copied when the call is made, so it may change afterwards; requests
+  run one at a time in call order. Input: positive integer `width` and `height`, at most 16,777,216 pixels and the
+  device's binding and grid limits; finite `color` with every value within Float32(1e16) of 0, signed (dispersive
+  glass gives a few-sample pixel negative channels; the network's features are defined for either sign); `albedo` in
+  [0, 1]; `normal` components in [-1, 1]; optional `alpha` in [0, 1]; `samples` at least 1. Anything else rejects with
+  `TypeError` or `RangeError` before the GPU is touched.
+- `whenIdle()` resolves once queued requests settle; `dispose()` (or `using`) rejects pending and later work with
+  `MargoError` `disposed` and frees the weights. After a device loss the next request rebuilds them on the new device.
+  GPU failures reject with `MargoError` `failed`, the platform error as its `cause`.
+- Evidence: `tests/denoise-ml.test.js` (CPU evaluation of the shader through the public API) and
+  `tests/denoise-ml-browser.mjs` (WebGPU and the WebGL2 layer against that CPU evaluation; lower error than the raw
+  image on a synthetic field and a 4-sample trace of the Khronos Box sample; tracer output with signed colour and rough
+  glass accepted). It is not claimed to beat other denoisers.
 
 ## Heterogeneous coloured media
 

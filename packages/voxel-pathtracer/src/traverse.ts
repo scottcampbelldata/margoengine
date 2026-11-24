@@ -19,6 +19,12 @@ interface MarchHit {
 
 const TINY = 1e-12;
 const inverse = (d: number) => 1 / (Math.abs(d) < TINY ? (d < 0 ? -TINY : TINY) : d);
+/**
+ * The cell index along one axis of point coordinate p on a ray with direction component d: a point exactly on a cell
+ * plane belongs to the cell ahead of the ray (the shader's forwardCell), so a ray leaving the plane y = k downward
+ * starts in cell k - 1, not in the cell behind it.
+ */
+const forward = (p: number, d: number) => (d < 0 ? Math.ceil(p) - 1 : Math.floor(p));
 
 /**
  * Where o + t d first reaches a half block of cell c that is filled (`fill`) or empty, walking the cell's 2 x 2 x 2
@@ -107,9 +113,9 @@ function march(
     ady = Math.abs(iy),
     adz = Math.abs(iz);
   const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-  let cx = clamp(Math.floor((ox + dx * tEnter) / 8), 0, bx - 1),
-    cy = clamp(Math.floor((oy + dy * tEnter) / 8), 0, by - 1),
-    cz = clamp(Math.floor((oz + dz * tEnter) / 8), 0, bz - 1);
+  let cx = clamp(forward((ox + dx * tEnter) / 8, dx), 0, bx - 1),
+    cy = clamp(forward((oy + dy * tEnter) / 8, dy), 0, by - 1),
+    cz = clamp(forward((oz + dz * tEnter) / 8, dz), 0, bz - 1);
   let tnx = ((cx + upX) * 8 - ox) * ix,
     tny = ((cy + upY) * 8 - oy) * iy,
     tnz = ((cz + upZ) * 8 - oz) * iz,
@@ -146,16 +152,16 @@ function march(
           t,
           u,
           axis,
-          clamp(Math.floor(ox + dx * t), lx, hx),
-          clamp(Math.floor(oy + dy * t), ly, hy),
-          clamp(Math.floor(oz + dz * t), lz, hz),
+          clamp(forward(ox + dx * t, dx), lx, hx),
+          clamp(forward(oy + dy * t, dy), ly, hy),
+          clamp(forward(oz + dz * t, dz), lz, hz),
         );
     } else {
       const base = ((entry & ~SHAPED) - 1) * BRICK_WORDS,
         shaped = (entry & SHAPED) !== 0;
-      let vx = clamp(Math.floor(ox + dx * t), lx, hx),
-        vy = clamp(Math.floor(oy + dy * t), ly, hy),
-        vz = clamp(Math.floor(oz + dz * t), lz, hz),
+      let vx = clamp(forward(ox + dx * t, dx), lx, hx),
+        vy = clamp(forward(oy + dy * t, dy), ly, hy),
+        vz = clamp(forward(oz + dz * t, dz), lz, hz),
         vnx = (vx + upX - ox) * ix,
         vny = (vy + upY - oy) * iy,
         vnz = (vz + upZ - oz) * iz,

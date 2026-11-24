@@ -5698,6 +5698,15 @@ resolved in separate fix commits. Raw device/value evidence: whitepaper/results/
 Root staging is 8,129 B gzip, accumulate 9,314 B, viewer 2,386 B and core plus stage 23,797 B.
 No CPU-heavy loop, photographic quality claim, performance measurement or core change.
 
+### Voxel path tracer guides and shadow start (2026-11-24, lane D audit)
+
+The albedo guide follows mirrors and glass by each event's mean weight (a rough dielectric's E / norm, 1 when
+compensated), never the per-sample estimator weight, so it is a reflectance in [0,1]; shadow rays start in the cell
+ahead of the ray on an exact cell or brick plane, as camera and path rays do (browser-check `shadowplane`, WebGPU and
+the WebGL2 layer). DenoiseML takes signed colour: dispersive glass weights a wavelength by signed RGB, so a few-sample
+pixel can be negative, and its luminance features are x / (1 + |x|), equal to the trained form on nonnegative data.
+Evidence: tests/denoise-ml-browser.mjs tracer phase (GPU against CPU within 1e-4) and tests/denoise-ml.test.js.
+
 ### Batch 99 triangle geometry and section 5 evidence
 
 The optional voxel-pathtracer/mesh entry builds a balanced world-space triangle BVH in one lazy Rust/Wasm feature. The root tracer provides protected scene-storage reservation, append and AOV-decoding hooks. Defaults reserve zero words and retain the original layout and shader. Optional triangles use the existing scene binding and its capture copies, byte accounting, atomic replacement and restoration; no core or stage source changes.

@@ -40,7 +40,7 @@ fn mlScore(input:array<f32,10>)->f32 {
   let offset=vec2f(f32(i32(k%3u)-1),f32(i32(k/3u)-1));
   let features=array<f32,10>(dot(offset,offset)*0.5,log(1.0+dot(delta,delta)/(3.0*denom)),
    dot(da,da)/3.0,clamp(1.0-dot(cn,mlNormal(mlGuideNormal(neighbour))),0.0,2.0),
-   log(1.0+variance/denom),cl/(1.0+cl),nl/(1.0+nl),abs(mlColor(neighbour).a-center.a),
+   log(1.0+variance/denom),cl/(1.0+abs(cl)),nl/(1.0+abs(nl)),abs(mlColor(neighbour).a-center.a),
    inverseSqrt(params.samples),0.25);
   score[k]=mlScore(features);largest=max(largest,score[k]);
  }
