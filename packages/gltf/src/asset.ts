@@ -1026,7 +1026,7 @@ export interface AssetOptions {
    */
   allowedURLs?: readonly string[];
   /**
-   * Most bytes the file, its buffers and embedded or external images may total (default 64 MiB). Decoded accessors,
+   * Most bytes the file, its buffers and embedded or external images may total (default 512 MiB, `assetLimit`). Decoded accessors,
    * packed geometry and decoded images may each use 4x this. Exceeding it throws a RangeError naming this option.
    */
   maxDownloadBytes?: number;
