@@ -691,7 +691,23 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - Per-point colors are stored as RGBA8 by default, so HDR vertex colors are clamped to 0..1; `colorFormat: 'float'` keeps them, at four times the color memory. A float color must be finite and 0 or more.
 - A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (reported once through `engine.onError`, help `borrowed-lost`) until you assign a new texture, or pass `(device) => GPUTexture` so it comes back by itself. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point on their own draw. For correct overlap of translucent clouds, add the plugin to an order-independent pass with `addEffect` from `margoengine/oit/vfx` (weighted blended or moments, and exact per-pixel layers on native WebGPU, where the compatibility layer refuses `ExactOIT` with a coded `unsupported`); otherwise use `alphaTest` or additive blending. Round antialiased edges of opaque points write depth.
-- A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.
+- A plain `PointCloud` keeps its point size when the budget subsamples its blocks unless its material sets `adaptiveSize` (a limit on the growth; see Adaptive size under a budget). The budget is shared again every frame, so raising `pointBudget` draws more points at once. `OctreeCloud` has its own `adaptiveSize`, which sizes points from the node spacing. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.
+
+## Adaptive size under a budget
+
+When `pointBudget` is lower than the points in view, the plugin thins every block and gaps open between the points left. `adaptiveSize` on `PointsMaterial` grows the points to cover them: the diameter and both pixel clamps are multiplied by the square root of visible over drawn points, up to the value you set. 0 or 1 (the default) keeps the size. The multiple is one per cloud, so a cloud whose blocks are thinned unevenly is sized by its average.
+
+```ts
+import {PointCloud, PointsPlugin} from 'margoengine/points';
+
+const plugin=new PointsPlugin({pointBudget:250_000});
+const positions=new Float32Array(3*1_000_000);
+for(let i=0;i<positions.length;i++) positions[i]=Math.random();
+const cloud=new PointCloud({positions,material:{size:2,adaptiveSize:4}});
+plugin.add(cloud);
+// Four times fewer points are drawn than are visible, so each is drawn twice as wide.
+console.log(cloud.material.adaptiveSize); // 4
+```
 
 ## Tests
 

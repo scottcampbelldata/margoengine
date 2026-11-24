@@ -229,6 +229,12 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
   shading?: PointShading;
   /** Eye-dome lighting: darkens depth discontinuities between points in a screen-space pass. Default false. */
   edl?: boolean;
+  /**
+   * Largest multiple of `size` (and of both pixel clamps) a point grows to when the plugin's `pointBudget` draws fewer
+   * points than the cloud has in view, so a thinned cloud still covers its surface. The multiple is the square root of
+   * visible over drawn points, at most this value. 0 or 1 keeps the size (default 0); finite, 0 or more.
+   */
+  adaptiveSize?: number;
 }
 
 /** Point cloud material. Read every frame; change fields freely. */
@@ -243,6 +249,7 @@ export class PointsMaterial extends BaseMaterial {
   vertexColors = true;
   shading: PointShading = 'flat';
   edl = false;
+  adaptiveSize = 0;
 
   constructor(options: PointsMaterialOptions = {}) {
     super(false, true);
@@ -267,6 +274,7 @@ export class PointsMaterial extends BaseMaterial {
     if (options.vertexColors !== undefined) this.vertexColors = options.vertexColors;
     if (options.shading !== undefined) this.shading = options.shading;
     if (options.edl !== undefined) this.edl = options.edl;
+    if (options.adaptiveSize !== undefined) this.adaptiveSize = options.adaptiveSize;
     if (options.ditherFade !== undefined) this.ditherFade = options.ditherFade;
     this.validate();
     return this;
@@ -279,6 +287,8 @@ export class PointsMaterial extends BaseMaterial {
     if (!(this.minPixelSize >= 0) || !(this.maxPixelSize >= this.minPixelSize) || !Number.isFinite(this.maxPixelSize))
       throw new RangeError('Need 0 <= minPixelSize <= maxPixelSize');
     if (!['pixels', 'world'].includes(this.sizeUnits)) throw new RangeError("sizeUnits must be 'pixels' or 'world'");
+    if (!(this.adaptiveSize >= 0) || !Number.isFinite(this.adaptiveSize))
+      throw new RangeError('adaptiveSize must be finite and 0 or more');
     if (!['square', 'round'].includes(this.shape)) throw new RangeError("shape must be 'square' or 'round'");
     if (!['flat', 'sphere'].includes(this.shading)) throw new RangeError("shading must be 'flat' or 'sphere'");
     if (typeof this.vertexColors !== 'boolean' || typeof this.edl !== 'boolean')

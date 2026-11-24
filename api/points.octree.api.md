@@ -264,6 +264,7 @@ class PointsMaterial extends BaseMaterial {
     vertexColors: boolean;
     shading: PointShading;
     edl: boolean;
+    adaptiveSize: number;
     constructor(options?: PointsMaterialOptions);
     get sizeAttenuation(): boolean;
     set sizeAttenuation(value: boolean);
@@ -282,6 +283,7 @@ interface PointsMaterialOptions extends BaseMaterialOptions {
     vertexColors?: boolean;
     shading?: PointShading;
     edl?: boolean;
+    adaptiveSize?: number;
 }
 
 type PointsTextureSource = GPUTexture | ((device: GPUDevice) => GPUTexture) | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;

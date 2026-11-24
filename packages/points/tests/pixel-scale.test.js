@@ -31,3 +31,22 @@ test('world sizes are not pixels: only their pixel clamps scale', () => {
   assert.deepEqual([...uniformOf(plugin, cloud, 2).subarray(20, 23)], [0.5, 2, 64]);
 });
 
+
+test('adaptiveSize: a thinned cloud grows its size and both clamps by the lost spacing, up to the material limit', () => {
+  const plugin = new PointsPlugin(),
+    cloud = new PointCloud({
+      positions: new Float32Array(3),
+      material: { size: 4, minPixelSize: 1, maxPixelSize: 64, adaptiveSize: 3 },
+    });
+  const grown = (grow) => {
+    const writes = [];
+    plugin['device'] = { queue: { writeBuffer: (_b, _o, data) => writes.push(Float32Array.from(data)) } };
+    const floats = new Float32Array(64),
+      r = { floats, uints: new Uint32Array(floats.buffer), written: new Float32Array(64).fill(NaN), uniform: {} };
+    plugin['writeCloudUniform'](cloud, r, new Float32Array(16), false, 1, grow);
+    return [...writes[0].subarray(20, 23)];
+  };
+  assert.deepEqual(grown(1), [4, 1, 64]);
+  assert.deepEqual(grown(2), [8, 2, 128]);
+  assert.throws(() => cloud.material.set({ adaptiveSize: -1 }), RangeError);
+});

@@ -76,6 +76,7 @@ interface CloudDraw {
   view: GPUTextureView;
   first: number;
   end: number;
+  mapped: boolean;
 }
 interface SpriteDraw {
   batch: SpriteBatch;
@@ -1215,6 +1216,7 @@ export class PointsPlugin implements EnginePlugin {
     model: ArrayLike<number>,
     mapped: boolean,
     pixelScale = 1,
+    grow = 1,
   ): void {
     const m = cloud.material,
       f = r.floats,
@@ -1222,9 +1224,9 @@ export class PointsPlugin implements EnginePlugin {
     f.set(model, 0);
     f.set(m.color, 16);
     f[19] = m.opacity;
-    f[20] = m.sizeUnits === 'pixels' ? m.size * pixelScale : m.size;
-    f[21] = m.minPixelSize * pixelScale;
-    f[22] = m.maxPixelSize * pixelScale;
+    f[20] = (m.sizeUnits === 'pixels' ? m.size * pixelScale : m.size) * grow;
+    f[21] = m.minPixelSize * pixelScale * grow;
+    f[22] = m.maxPixelSize * pixelScale * grow;
     f[23] = m.alphaTest;
     u[24] =
       (cloud.colors && m.vertexColors ? FLAG.colors : 0) |
@@ -1382,13 +1384,14 @@ export class PointsPlugin implements EnginePlugin {
         let draw = this.cloudDraws[cloudDrawCount];
         const drawnView = view ?? gpu.whiteView,
           end = entryBlock.length;
-        if (!draw) this.cloudDraws[cloudDrawCount] = draw = { cloud, r, view: drawnView, first, end };
+        if (!draw) this.cloudDraws[cloudDrawCount] = draw = { cloud, r, view: drawnView, first, end, mapped: !!view && cloud.material.map !== null };
         else {
           draw.cloud = cloud;
           draw.r = r;
           draw.view = drawnView;
           draw.first = first;
           draw.end = end;
+          draw.mapped = !!view && cloud.material.map !== null;
         }
         cloudDrawCount++;
       }
@@ -1411,6 +1414,18 @@ export class PointsPlugin implements EnginePlugin {
           a.r.drawn.push(entryBlock[e], allotment[e]);
           a.cloud.stats.pointsDrawn += allotment[e];
         }
+        // A thinned cloud grows its points by the spacing it lost, up to the material's adaptiveSize.
+        const grow = a.cloud.material.adaptiveSize,
+          stats = a.cloud.stats;
+        if (grow > 1 && stats.pointsDrawn > 0 && stats.pointsDrawn < stats.pointsVisible)
+          this.writeCloudUniform(
+            a.cloud,
+            a.r,
+            a.r.model,
+            a.mapped,
+            pixelScale,
+            Math.min(grow, Math.sqrt(stats.pointsVisible / stats.pointsDrawn)),
+          );
       } else {
         draws[i] = draws[kept];
         draws[kept++] = a;

@@ -155,6 +155,7 @@ export class PointsMaterial extends BaseMaterial {
     vertexColors: boolean;
     shading: PointShading;
     edl: boolean;
+    adaptiveSize: number;
     constructor(options?: PointsMaterialOptions);
     get sizeAttenuation(): boolean;
     set sizeAttenuation(value: boolean);
@@ -173,6 +174,7 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
     vertexColors?: boolean;
     shading?: PointShading;
     edl?: boolean;
+    adaptiveSize?: number;
 }
 
 export interface PointsPickHit {
