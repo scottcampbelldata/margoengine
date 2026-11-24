@@ -9150,13 +9150,14 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   claimed batches still occlude only through the captured points.
 - **Needed to close:** the concave-corner receiver plane above.
 
-### An opening light casts no shadow of its reveal and sill, and its bounce follows (clustered, KB-BOUNCE-REVEAL1, found 2026-11-16, open)
+### Fixed 2026-11-24: an opening light cast no shadow of its reveal and sill, and its bounce followed (clustered, KB-BOUNCE-REVEAL1, found 2026-11-16)
 
 - **What:** `openingLight` (`@margoengine/clustered/area`) lights what is in front of an opening with the whole rectangle's light, so snow under a deep sill or reveal takes light its reveal hides. `LightBounce` reflects the opening's light from the texels its centre sees, each with that unshadowed irradiance. In Cabin Hearth the window's bounce at the log crest (0.3, 1.35, 2.65) is 0.0917 R against 0.0647 R with the reveal and sill shading the snow (+42%), 0.1196 R with no shading at all.
 - **Repro:** `node scripts/run-with-timeout.mjs -- node scripts/cabin-hearth-browser-test.mjs`, the `crest.frosted` line: `twinWindow` against `shaded`; `bounceQuadrature('pane')` in that script is the physics.
 - **Cause:** the opening light's irradiance is the polygon integral over the full rectangle (`rectIrradiance`), never clipped to what a point sees through the opening's depth.
 - **Needed to close:** clip the rectangle to the part each receiver sees past the reveal and sill (both `openingLight` and the bounce's opening source), then hold the crest check to the shaded quadrature within 15%.
 - **Package fix (2026-11-16):** `RectAreaLight.recess` and `sill` (and `openingLight`'s) clip the rectangle in `AreaLights` and in `LightBounce`'s `rectIrradiance` (tests: packages/clustered/test/area.test.js, test/bounce.test.js, test/opening-light.test.js, examples/package-benchmarks/area-lights-gpu.mjs). Still open: Cabin Hearth does not pass them yet. With them, the bounce's 32 VPLs read the crest 45% under the same capture's texel-by-texel sum (0.0078 against 0.0141), as one cluster mixed the snow, the sill top and a glazing bar's face and was lifted to the bar (KB-BOUNCE-CLUSTER1, fixed below); the scene's switch follows.
+- **Closed (2026-11-24):** Cabin Hearth's opening passes `recess` 0.218 m (the frame's outer face at z 2.67 in front of the glass) and `sill` 0.09 m (the sill to z 2.76). The window's bounce at the crest is 0.0624 R, 0.0147 G against the shaded quadrature's 0.0647 R, 0.0152 G (-3.6%, both backends, RTX A6000), where it was 0.1035 R (+60%). `scripts/cabin-hearth-browser-test.mjs` now holds it to the shaded quadrature within 15% (it fails on the old scene); the clear-glazing crest and shadowed-snow checks are unchanged.
 
 ### A chain laid out level under a 1000:1 end mass stretches once it is taut
 
