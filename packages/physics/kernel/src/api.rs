@@ -431,8 +431,8 @@ fn shape_args(kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f
     if !(x.is_finite() && y.is_finite() && z.is_finite() && l > 0.0 && l < f32::INFINITY && a.is_finite() && b.is_finite() && c.is_finite()) {
         return None;
     }
-    // A hull has no size of its own, so its first number is its border.
-    let border = if kind == SHAPE_HULL { a.max(0.0) } else { 0.0 };
+    // A hull or a triangle has no size of its own, so its first number is its border.
+    let border = if kind == SHAPE_HULL || kind == SHAPE_TRIMESH { a.max(0.0) } else { 0.0 };
     Some((Shape { kind, size: v3(a, b, c), hull, border }, Pose { p: v3(x, y, z), q: q.normalized() }))
 }
 

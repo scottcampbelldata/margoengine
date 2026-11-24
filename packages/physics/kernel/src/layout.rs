@@ -256,6 +256,11 @@ columns! {
     PAIR_TANGENT_X f32 Pair,
     PAIR_TANGENT_Y f32 Pair,
     PAIR_TANGENT_Z f32 Pair,
+    // The velocity the second collider's surface moves relative to the first's (a conveyor), zero but where the contact modifier
+    // sets it: friction pushes the relative sliding toward it.
+    PAIR_SURFACE_X f32 Pair,
+    PAIR_SURFACE_Y f32 Pair,
+    PAIR_SURFACE_Z f32 Pair,
     SOLVE_PAIRS u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,

@@ -96,7 +96,7 @@ fn feature(s: &Solid, d: V3, corners: &mut Corners) -> Feature {
                 None => Feature::Point(pose.apply(at)),
             }
         }
-        Solid::Triangle([a, b, c]) => {
+        Solid::Triangle([a, b, c]) | Solid::RoundTriangle([a, b, c], _) => {
             let n = b.sub(a).cross(c.sub(a));
             let l = sqrt(n.dot(n));
             if l > 0.0 {
@@ -151,7 +151,7 @@ fn inner(s: &Solid) -> V3 {
     match *s {
         Solid::Round { p, q, .. } => p.add(q).scale(0.5),
         Solid::Poly { poly, pose } | Solid::RoundPoly { poly, pose, .. } => pose.apply(poly.center),
-        Solid::Triangle([a, b, c]) => a.add(b).add(c).scale(1.0 / 3.0),
+        Solid::Triangle([a, b, c]) | Solid::RoundTriangle([a, b, c], _) => a.add(b).add(c).scale(1.0 / 3.0),
         Solid::Revolved { pose, .. } => pose.p,
     }
 }

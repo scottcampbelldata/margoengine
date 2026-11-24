@@ -79,3 +79,31 @@ test('a convex hull from a mesh is the hull of the vertices its triangles use, a
   assert.throws(() => new Physics(null).addBody(null, { colliders: { shape: 'convexHull', vertices, indices: [0, 1, 99] } }), /out of range/);
   for (const w of worlds) w.physics.dispose();
 });
+
+test('a round triangle meets rays, projections, casts and a falling ball where Rapier does', () => {
+  const worlds = both((physics) => {
+    physics.addBody(null, { type: 'fixed', colliders: { shape: 'triangle', a: [-2, 0, -2], b: [-2, 0, 2], c: [3, 0, 0], borderRadius: 0.3 } });
+    const ball = physics.addBody(null, { position: [0, 2, 0], colliders: { shape: 'sphere', radius: 0.25 } });
+    physics.step();
+    return { ball };
+  });
+  const near = (a, b, tol, label) => assert.ok(Math.abs(a - b) <= tol, `${label}: ${a} vs ${b}`);
+  for (const [origin, direction] of [[[0, 5, 0.1], [0, -1, 0]], [[-6, 0.1, 0], [1, 0, 0]], [[3.5, 3, 0], [-0.2, -1, 0]]]) {
+    const [own, rapier] = worlds.map((w) => w.physics.raycast(origin, direction, { predicate: (body) => body !== w.ball }));
+    assert.equal(!!own, !!rapier);
+    if (own) near(own.distance, rapier.distance, 2e-3, `ray ${origin}`);
+  }
+  for (const point of [[0, 0.2, 0], [4, 0.1, 0], [-2.1, 0.4, 1]]) {
+    const [own, rapier] = worlds.map((w) => w.physics.projectPoint(point, { solid: false, predicate: (body) => body !== w.ball }));
+    near(own.distance, rapier.distance, 5e-3, `distance ${point}`);
+  }
+  for (const w of worlds) w.physics.dispose();
+  const rests = both((physics) => {
+    physics.addBody(null, { type: 'fixed', colliders: { shape: 'triangle', a: [-4, 0, -4], b: [-4, 0, 4], c: [4, 0, 0], borderRadius: 0.3 } });
+    const ball = physics.addBody(null, { position: [0, 2, 0], colliders: { shape: 'sphere', radius: 0.25 } });
+    return { ball };
+  });
+  for (let i = 0; i < 240; i++) for (const w of rests) w.physics.step();
+  for (const w of rests) near(w.ball.position[1], 0.55, 0.01, 'rests a border and a radius above');
+  for (const w of rests) w.physics.dispose();
+});

@@ -96,8 +96,8 @@ export type ShapeOptions =
   | { shape: 'voxels'; cells: Int32Array; size?: Vec3 }
   /** A line segment from `a` to `b` in the collider's frame. It has no volume, so no mass; it collides, is raycast and is cast against. */
   | { shape: 'segment'; a: Vec3; b: Vec3 }
-  /** A single triangle `a`, `b`, `c` in the collider's frame, solid on both sides, with no volume and so no mass. */
-  | { shape: 'triangle'; a: Vec3; b: Vec3; c: Vec3 }
+  /** A single triangle `a`, `b`, `c` in the collider's frame, solid on both sides, with no volume and so no mass; `borderRadius` rounds it by that much all round (Rapier's `roundTriangle`). */
+  | { shape: 'triangle'; a: Vec3; b: Vec3; c: Vec3; borderRadius?: number }
   /**
    * A chain or set of segments in the collider's frame: `vertices` (flat x, y, z) joined by `indices` (two a segment), or in
    * order when `indices` is left out. No volume, so no mass.
@@ -504,7 +504,12 @@ export function createColliderDesc(
       checkVec(options.a, 'Triangle a');
       checkVec(options.b, 'Triangle b');
       checkVec(options.c, 'Triangle c');
-      desc = R.ColliderDesc.triangle(vec(options.a), vec(options.b), vec(options.c));
+      {
+        const border = roundness(options.borderRadius, 'Triangle');
+        desc = border
+          ? R.ColliderDesc.roundTriangle(vec(options.a), vec(options.b), vec(options.c), border)
+          : R.ColliderDesc.triangle(vec(options.a), vec(options.b), vec(options.c));
+      }
       break;
     }
     case 'polyline': {

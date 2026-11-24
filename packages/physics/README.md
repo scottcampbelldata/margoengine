@@ -523,7 +523,7 @@ console.log(rock.position[1].toFixed(2), convexHull(points).faces.length); // 0.
 physics.dispose();
 ```
 
-A `segment` (`a`, `b`), a `triangle` (`a`, `b`, `c`) and a `polyline` (`vertices`, optional `indices`) are surfaces in the collider's frame with no volume, so no mass or density: they belong on fixed bodies or with `setMassProperties`. A triangle collides on both sides.
+A `segment` (`a`, `b`), a `triangle` (`a`, `b`, `c`) and a `polyline` (`vertices`, optional `indices`) are surfaces in the collider's frame with no volume, so no mass or density: they belong on fixed bodies or with `setMassProperties`. A triangle collides on both sides, and `borderRadius` rounds it by that much all round (Rapier's `roundTriangle`).
 
 ```ts
 import {Physics} from 'margoengine/physics/next';
@@ -599,7 +599,7 @@ ball.enabled = false;
 physics.dispose();
 ```
 
-A `contactModifier` in the `Physics` options is Rapier's contact modification hook: it is called, each step, for every touching pair that has a collider with `modifyContacts: true`, after the pair's friction and bounce are set and before it is solved. It may change `contact.friction`, `contact.restitution` and `contact.normal` (world space, from `contact.first` to `contact.second`), call `contact.clear()` to drop the pair's contacts for the step, or `contact.oneWay(platform, direction, angle)` to keep only the contacts whose normal, taken from the platform to the other collider, is within `angle` (a quarter turn by default) of `direction`. The object is reused: do not keep it. Rapier's JavaScript has no such hook, so the root entry refuses `modifyContacts`. `contactFilter` (above) remains the pair filter for contacts and intersections.
+A `contactModifier` in the `Physics` options is Rapier's contact modification hook: it is called, each step, for every touching pair that has a collider with `modifyContacts: true`, after the pair's friction and bounce are set and before it is solved. It may change `contact.friction`, `contact.restitution` and `contact.normal` (world space, from `contact.first` to `contact.second`), call `contact.clear()` to drop the pair's contacts for the step, set `contact.surfaceVelocity` (world space, a conveyor: friction brings the sliding of the second collider's surface against the first's to it, for this step), or `contact.oneWay(platform, direction, angle)` to keep only the contacts whose normal, taken from the platform to the other collider, is within `angle` (a quarter turn by default) of `direction`. The object is reused: do not keep it. Rapier's JavaScript has no such hook, so the root entry refuses `modifyContacts`. `contactFilter` (above) remains the pair filter for contacts and intersections.
 
 ```ts
 import {Physics} from 'margoengine/physics/next';

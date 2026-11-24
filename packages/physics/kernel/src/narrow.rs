@@ -478,7 +478,7 @@ impl World {
     #[inline(always)]
     pub(crate) fn is_smoothed(&self, c: usize) -> bool {
         let shape = self.uu(COLLIDER_SHAPE, c);
-        is_revolved(shape) || ((shape == SHAPE_BOX || shape == SHAPE_HULL) && self.s(COLLIDER_BORDER, c) > 0.0)
+        is_revolved(shape) || ((shape == SHAPE_BOX || shape == SHAPE_HULL) && self.s(COLLIDER_BORDER, c) > 0.0) || self.is_round_triangle(c)
     }
 
     /// A collider's frame in world space.

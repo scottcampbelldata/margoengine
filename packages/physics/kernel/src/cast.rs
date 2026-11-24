@@ -43,6 +43,8 @@ pub enum Solid {
     Poly { poly: Poly, pose: Pose },
     /// A polyhedron with a border: every point within `border` of it (Rapier's round cuboid and round convex).
     RoundPoly { poly: Poly, pose: Pose, border: f32 },
+    /// A triangle with a border: every point within `border` of it (Rapier's round triangle).
+    RoundTriangle([V3; 3], f32),
     Triangle([V3; 3]),
     Revolved { shape: Revolved, border: f32, pose: Pose },
 }
@@ -76,6 +78,11 @@ impl Convex for Solid {
                 } else {
                     c
                 }
+            }
+            Solid::RoundTriangle(corners, border) => {
+                let core = Solid::Triangle(corners).support(d);
+                let l = d.dot(d);
+                if border > 0.0 && l > 0.0 { core.add(d.scale(border / sqrt(l))) } else { core }
             }
         }
     }
@@ -195,6 +202,7 @@ fn shifted(s: &Solid, by: V3) -> Solid {
         Solid::Poly { poly, pose } => Solid::Poly { poly, pose: Pose { p: pose.p.add(by), q: pose.q } },
         Solid::RoundPoly { poly, pose, border } => Solid::RoundPoly { poly, pose: Pose { p: pose.p.add(by), q: pose.q }, border },
         Solid::Triangle([a, b, c]) => Solid::Triangle([a.add(by), b.add(by), c.add(by)]),
+        Solid::RoundTriangle([a, b, c], border) => Solid::RoundTriangle([a.add(by), b.add(by), c.add(by)], border),
         Solid::Revolved { shape, border, pose } => Solid::Revolved { shape, border, pose: Pose { p: pose.p.add(by), q: pose.q } },
     }
 }
@@ -205,6 +213,7 @@ pub(crate) fn core(s: &Solid) -> (Solid, f32) {
         Solid::Round { p, q, r } => (Solid::Round { p, q, r: 0.0 }, r),
         Solid::Revolved { shape, border, pose } => (Solid::Revolved { shape, border: 0.0, pose }, border),
         Solid::RoundPoly { poly, pose, border } => (Solid::Poly { poly, pose }, border),
+        Solid::RoundTriangle(corners, border) => (Solid::Triangle(corners), border),
         other => (other, 0.0),
     }
 }
@@ -272,7 +281,7 @@ fn sharpen(a: &Solid, b: &Solid, r: V3, max: f32, margin: f32, mut hit: Cast) ->
                         consider(pose.q.rotate(poly.normal(f)).scale(sign));
                     }
                 }
-                Solid::Triangle([p, q, t]) => {
+                Solid::Triangle([p, q, t]) | Solid::RoundTriangle([p, q, t], _) => {
                     let m = q.sub(p).cross(t.sub(p));
                     let l = m.dot(m);
                     if l > 0.0 {
@@ -406,6 +415,21 @@ pub fn project_convex(s: &Solid, p: V3, solid: bool) -> Projection {
             Projection { point: pose.apply(near.add(d.scale(border / sqrt(l)))), inside: false }
         }
         Solid::Triangle(t) => Projection { point: triangle_closest(t, p), inside: false },
+        Solid::RoundTriangle(t, border) => {
+            let near = triangle_closest(t, p);
+            let d = p.sub(near);
+            let l = d.dot(d);
+            // A point on the triangle itself has no way out of it that is nearer than another, so take the face's.
+            let way = if l > 0.0 {
+                d.scale(1.0 / sqrt(l))
+            } else {
+                let m = t[1].sub(t[0]).cross(t[2].sub(t[0]));
+                let ml = m.dot(m);
+                if ml > 0.0 { m.scale(1.0 / sqrt(ml)) } else { v3(0.0, 1.0, 0.0) }
+            };
+            let inside = l <= border * border;
+            if inside && solid { Projection { point: p, inside } } else { Projection { point: near.add(way.scale(border)), inside } }
+        }
         Solid::Revolved { shape, border, pose } => {
             let (point, inside) = shape.project(pose.unapply(p), border);
             if inside && solid {
@@ -418,7 +442,7 @@ pub fn project_convex(s: &Solid, p: V3, solid: bool) -> Projection {
 
 /// The point of a triangle nearest `p`, by region as `poly_closest`: the plane's foot when it falls inside, otherwise the
 /// nearest point of the three edges.
-fn triangle_closest([a, b, c]: [V3; 3], p: V3) -> V3 {
+pub(crate) fn triangle_closest([a, b, c]: [V3; 3], p: V3) -> V3 {
     let n = b.sub(a).cross(c.sub(a));
     let l = n.dot(n);
     let mut best = (f32::INFINITY, a);
@@ -548,7 +572,8 @@ impl World {
             // A mesh of one triangle is a triangle: a query shape that is a surface, solid on both sides.
             SHAPE_TRIMESH if shape.hull < self.header().mesh_rows[0] && self.is_one_triangle(shape.hull as usize) => {
                 let corners = self.mesh_triangle(shape.hull as usize, 0);
-                Solid::Triangle([pose.apply(corners[0]), pose.apply(corners[1]), pose.apply(corners[2])])
+                let world = [pose.apply(corners[0]), pose.apply(corners[1]), pose.apply(corners[2])];
+                if shape.border > 0.0 { Solid::RoundTriangle(world, shape.border) } else { Solid::Triangle(world) }
             }
             SHAPE_CYLINDER | SHAPE_CONE => {
                 Solid::Revolved { shape: Revolved { cone: shape.kind == SHAPE_CONE, r: shape.size.x, h: shape.size.y }, border: shape.size.z, pose }
@@ -579,7 +604,7 @@ impl World {
         if kind == SHAPE_HALFSPACE {
             return self.cast_halfspace(c, &self.solid(shape, pose, &mut query_data)?, r, o);
         }
-        if kind != SHAPE_TRIMESH {
+        if kind != SHAPE_TRIMESH || self.is_round_triangle(c) {
             let query = self.solid(shape, pose, &mut query_data)?;
             let target = self.solid(self.shape_of(c), frame, &mut target_data)?;
             return cast_convex(&query, &target, r, o);
@@ -738,7 +763,7 @@ impl World {
         if kind == SHAPE_HALFSPACE {
             return Some(self.project_halfspace(c, p, solid));
         }
-        if kind != SHAPE_TRIMESH {
+        if kind != SHAPE_TRIMESH || self.is_round_triangle(c) {
             return Some(project_convex(&self.solid(self.shape_of(c), frame, &mut data)?, p, solid));
         }
         let hit = self.project_triangles(self.uu(COLLIDER_HULL, c) as usize, frame.unapply(p), solid)?;
@@ -838,7 +863,7 @@ impl World {
         if kind == SHAPE_HALFSPACE {
             return self.solid(shape, pose, &mut query_data).is_some_and(|query| self.overlaps_halfspace(c, &query));
         }
-        if kind != SHAPE_TRIMESH {
+        if kind != SHAPE_TRIMESH || self.is_round_triangle(c) {
             let (Some(query), Some(target)) = (self.solid(shape, pose, &mut query_data), self.solid(self.shape_of(c), frame, &mut target_data)) else { return false };
             return meets(&query, &target);
         }

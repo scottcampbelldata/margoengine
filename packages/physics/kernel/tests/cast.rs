@@ -61,6 +61,7 @@ fn moved(s: &Solid, by: V3) -> Solid {
         Solid::Poly { poly, pose } => Solid::Poly { poly, pose: Pose { p: pose.p.add(by), q: pose.q } },
         Solid::RoundPoly { poly, pose, border } => Solid::RoundPoly { poly, pose: Pose { p: pose.p.add(by), q: pose.q }, border },
         Solid::Triangle([a, b, c]) => Solid::Triangle([a.add(by), b.add(by), c.add(by)]),
+        Solid::RoundTriangle([a, b, c], border) => Solid::RoundTriangle([a.add(by), b.add(by), c.add(by)], border),
         Solid::Revolved { shape, border, pose } => Solid::Revolved { shape, border, pose: Pose { p: pose.p.add(by), q: pose.q } },
     }
 }

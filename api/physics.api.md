@@ -518,6 +518,7 @@ export interface RapierModule {
         voxels?(cells: Int32Array, size: Vector): ColliderDesc;
         heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector, flags?: number): ColliderDesc;
         segment(a: Vector, b: Vector): ColliderDesc;
+        roundTriangle(a: Vector, b: Vector, c: Vector, borderRadius: number): ColliderDesc;
         triangle(a: Vector, b: Vector, c: Vector): ColliderDesc;
         polyline(vertices: Float32Array, indices?: Uint32Array | null): ColliderDesc;
         compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
@@ -680,6 +681,7 @@ export type ShapeOptions = {
     a: Vec3;
     b: Vec3;
     c: Vec3;
+    borderRadius?: number;
 }
  | {
     shape: 'polyline';

@@ -31,7 +31,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Polyline | full | a compound of segments; as a query shape see shape cast |
 | Half space | full | closed forms for queries, a laid box for contacts; not against meshes, height fields, voxels or another half space |
 | Round cuboid, round convex hull | partial | `borderRadius` on box and hull colliders, tested against Rapier; not on compound parts or query shapes |
-| Round triangle | missing | |
+| Round triangle | full | `triangle` with `borderRadius`; contacts through the skin, queries through the border |
 | Collider shape change after creation | full | `collider.setShape`; not for compounds |
 | Collider position and rotation relative to its body, set after creation | full | `setTranslationWrtParent`, `setRotationWrtParent` |
 
@@ -76,7 +76,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | --- | --- | --- |
 | Pair filtering (contact pairs and intersection pairs) | full | `contactFilter` |
 | Contact modification: friction, restitution, normals, remove contact | full | `contactModifier`, `modifyContacts` |
-| Contact modification: tangent (surface) velocity, a conveyor | missing | needs a solver row; with the dynamics side |
+| Contact modification: tangent (surface) velocity, a conveyor | full | `contact.surfaceVelocity` |
 | One-way platforms (allowed contact normal) | full | `contact.oneWay` |
 
 ## Scene queries

@@ -348,6 +348,7 @@ export interface RapierModule {
     voxels?(cells: Int32Array, size: Vector): ColliderDesc;
     heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector, flags?: number): ColliderDesc;
     segment(a: Vector, b: Vector): ColliderDesc;
+    roundTriangle(a: Vector, b: Vector, c: Vector, borderRadius: number): ColliderDesc;
     triangle(a: Vector, b: Vector, c: Vector): ColliderDesc;
     polyline(vertices: Float32Array, indices?: Uint32Array | null): ColliderDesc;
     /** Rapier 0.19 and later. */

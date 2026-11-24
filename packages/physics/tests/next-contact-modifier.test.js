@@ -66,3 +66,25 @@ test('modifyContacts needs a modifier, and Rapier has none', () => {
   assert.throws(() => rapier.addBody(null, { colliders: { shape: 'box', halfExtents: [1, 1, 1], modifyContacts: true } }), /own solver/);
   rapier.dispose();
 });
+
+test('a surface velocity carries a box along a belt, and stops when the modifier stops', () => {
+  const belt = (speed) => {
+    const physics = new Physics(null, {
+      contactModifier: (contact) => {
+        // The belt is the pair's fixed collider; the box is the other, whichever of the two comes first.
+        const beltFirst = contact.first.body.type === 'fixed';
+        contact.surfaceVelocity = beltFirst ? [speed, 0, 0] : [-speed, 0, 0];
+      },
+    });
+    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [40, 0.5, 5], friction: 1, modifyContacts: true } });
+    const crate = physics.addBody(null, { position: [0, 0.5, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], friction: 1 } });
+    for (let i = 0; i < 120; i++) physics.step();
+    const result = { x: crate.position[0], speed: crate.linearVelocity?.[0] ?? crate.getLinearVelocity?.()[0] };
+    physics.dispose();
+    return result;
+  };
+  const moving = belt(3);
+  assert.ok(moving.x > 4 && moving.x < 6.5, `carried to ${moving.x}`);
+  assert.ok(Math.abs(belt(0).x) < 0.05, 'a belt at rest holds it');
+  assert.ok(belt(-3).x < -4, 'the other way');
+});

@@ -305,6 +305,7 @@ export function kernelCollider(
     checkVec(options.b, 'Triangle b');
     checkVec(options.c, 'Triangle c');
     size = [hulls.addTrimesh(Float32Array.of(...options.a, ...options.b, ...options.c), Uint32Array.of(0, 1, 2), false)];
+    border = roundness(options.borderRadius, 'Triangle');
   } else if (options.shape === 'polyline') {
     const points = Float32Array.from(options.vertices);
     if (points.length < 6 || points.length % 3) throw new RangeError('A polyline needs at least two vertices, three numbers each.');
@@ -409,7 +410,9 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
     checkVec(options.a, 'Triangle a');
     checkVec(options.b, 'Triangle b');
     checkVec(options.c, 'Triangle c');
-    return { shape: 'trimesh', size: [hulls.addTrimesh(Float32Array.of(...options.a, ...options.b, ...options.c), Uint32Array.of(0, 1, 2), false)] };
+    const round = roundness(options.borderRadius, 'Triangle'),
+      row = hulls.addTrimesh(Float32Array.of(...options.a, ...options.b, ...options.c), Uint32Array.of(0, 1, 2), false);
+    return { shape: 'trimesh', size: round > 0 ? [row, round] : [row] };
   }
   if (options.shape === 'capsule') return { shape: 'capsule', size: [options.radius, options.halfHeight] };
   if (options.shape === 'cylinder' || options.shape === 'cone') return { shape: options.shape, size: revolvedSize(options) };

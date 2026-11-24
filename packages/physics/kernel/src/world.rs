@@ -494,7 +494,8 @@ impl World {
             || self.uu(COLLIDER_STATE, at) & REMOVED != 0
             || self.uu(COLLIDER_STATE, at) & (IN_BROAD | PENDING) == 0
             || !(border >= 0.0 && border < f32::INFINITY)
-            || !matches!(self.uu(COLLIDER_SHAPE, at), SHAPE_BOX | SHAPE_HULL)
+            || !(matches!(self.uu(COLLIDER_SHAPE, at), SHAPE_BOX | SHAPE_HULL)
+                || (self.uu(COLLIDER_SHAPE, at) == SHAPE_TRIMESH && self.is_one_triangle(self.uu(COLLIDER_HULL, at) as usize)))
         {
             return false;
         }

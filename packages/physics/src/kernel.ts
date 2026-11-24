@@ -786,8 +786,8 @@ export class KernelWorld {
     this.checkSize(shape, size);
     this.checkPose(position, rotation);
     const { border } = options;
-    if (border !== undefined && !(border >= 0 && Number.isFinite(border) && (border === 0 || shape === 'box' || shape === 'hull')))
-      throw new RangeError(`A border is 0 or more and finite, and only a box or hull takes one here (got ${border} on a ${shape}).`);
+    if (border !== undefined && !(border >= 0 && Number.isFinite(border) && (border === 0 || shape === 'box' || shape === 'hull' || shape === 'trimesh')))
+      throw new RangeError(`A border is 0 or more and finite, and only a box, hull or single triangle takes one here (got ${border} on a ${shape}).`);
     const row = this.place(body, spec[0], size, options);
     if (border) this.api.collider_set_border(row, border);
     return row;
@@ -1350,7 +1350,7 @@ export class KernelWorld {
         qw * tw - qx * tx - qy * ty - qz * tz,
       ];
     }
-    return [QUERY_KINDS[shape.shape], row ? (shape.shape === 'hull' ? (s[1] ?? 0) : 0) : s[0]!, row ? 0 : (s[1] ?? 0), row ? 0 : (s[2] ?? 0), row ? s[0]! : 0, px, py, pz, qx, qy, qz, qw];
+    return [QUERY_KINDS[shape.shape], row ? (s[1] ?? 0) : s[0]!, row ? 0 : (s[1] ?? 0), row ? 0 : (s[2] ?? 0), row ? s[0]! : 0, px, py, pz, qx, qy, qz, qw];
   }
   private readCast(i: number): KernelShapeCastHit {
     const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 64 * i, 16),

@@ -435,7 +435,7 @@ fn contact_axis(piece: &Solid, target: &Solid, at_start: &Distance) -> Option<V3
                     consider(pose.q.rotate(poly.normal(f)).scale(sign));
                 }
             }
-            Solid::Triangle([p, q, t]) => {
+            Solid::Triangle([p, q, t]) | Solid::RoundTriangle([p, q, t], _) => {
                 let m = q.sub(p).cross(t.sub(p));
                 let l = m.dot(m);
                 if l > 0.0 {

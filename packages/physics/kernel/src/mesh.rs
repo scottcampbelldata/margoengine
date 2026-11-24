@@ -430,6 +430,11 @@ impl World {
         Some((self.uu(MESH_VERTICES, mesh) / (columns + 1) - 1, columns))
     }
 
+    /// Whether a collider is a single triangle with a border (Rapier's round triangle), which the convex routes handle.
+    pub(crate) fn is_round_triangle(&self, c: usize) -> bool {
+        self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH && self.s(COLLIDER_BORDER, c) > 0.0 && self.is_one_triangle(self.uu(COLLIDER_HULL, c) as usize)
+    }
+
     /// Whether a mesh row is one triangle: no height field, no voxel grid.
     pub(crate) fn is_one_triangle(&self, mesh: usize) -> bool {
         self.uu(MESH_TRIANGLES, mesh) == 1 && self.grid_size(mesh).is_none() && !self.is_voxels(mesh)
@@ -609,6 +614,9 @@ impl World {
         }
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
+        // The mesh's own skin reaches triangles that far from the other collider's box.
+        let skin = self.s(COLLIDER_SKIN, mesh_collider);
+        let (low, high) = (low.sub(v3(skin, skin, skin)), high.add(v3(skin, skin, skin)));
         let mut manifold = Manifold::new();
         if let Some((rows, columns)) = self.grid_size(mesh) {
             if let Some([r0, r1, c0, c1]) = self.grid_cells(mesh, rows, columns, low, high) {

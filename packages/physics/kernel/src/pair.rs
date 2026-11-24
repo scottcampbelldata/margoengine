@@ -36,7 +36,7 @@ impl World {
 
     /// Whether two colliders overlap now, whatever their pair says.
     pub fn pair_intersects(&self, a: usize, b: usize) -> bool {
-        let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+        let (shape_a, shape_b) = (self.meshy_shape(a), self.meshy_shape(b));
         if shape_a == SHAPE_HALFSPACE && shape_b == SHAPE_HALFSPACE {
             return false;
         }
@@ -55,7 +55,7 @@ impl World {
     /// colliders, one for each pair of children of a compound, one for each triangle or cell of a mesh near the other
     /// collider. Normals run from `a` to `b`.
     pub fn pair_contacts(&self, a: usize, b: usize, prediction: f32, visit: &mut dyn FnMut(&Manifold)) {
-        let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+        let (shape_a, shape_b) = (self.meshy_shape(a), self.meshy_shape(b));
         if shape_a == SHAPE_COMPOUND || shape_b == SHAPE_COMPOUND {
             let ((first_a, compound_a), (first_b, compound_b)) = (self.side(a), self.side(b));
             let mut ca = first_a;
@@ -115,7 +115,7 @@ impl World {
     /// The distance between two colliders and the nearest point on each, 0 when they overlap; None when either holds
     /// nothing a distance can be read from (a half space against a mesh, say).
     pub fn pair_distance(&self, a: usize, b: usize) -> Option<(f32, V3, V3)> {
-        let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+        let (shape_a, shape_b) = (self.meshy_shape(a), self.meshy_shape(b));
         if shape_a == SHAPE_COMPOUND || shape_b == SHAPE_COMPOUND {
             let ((first_a, compound_a), (first_b, compound_b)) = (self.side(a), self.side(b));
             let mut best: Option<(f32, V3, V3)> = None;
@@ -185,5 +185,13 @@ impl World {
         }
         let d = on_b.sub(on_a);
         (sqrt(d.dot(d)), on_a, on_b)
+    }
+}
+
+impl World {
+    /// A collider's shape as the pair queries see it: a round triangle is a convex shape, not a mesh.
+    fn meshy_shape(&self, c: usize) -> u32 {
+        let shape = self.uu(COLLIDER_SHAPE, c);
+        if shape == SHAPE_TRIMESH && self.is_round_triangle(c) { SHAPE_HULL } else { shape }
     }
 }

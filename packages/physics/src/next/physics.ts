@@ -100,6 +100,20 @@ export class ContactModification {
     if (!(value >= 0 && value <= 1)) throw new RangeError(`Restitution must be from 0 to 1 (got ${value}).`);
     this.kernel.columns.pairRestitution[this.row] = value;
   }
+  /**
+   * The velocity the second collider's surface moves relative to the first's, in world space (default zero): a conveyor
+   * belt. Friction brings the bodies' sliding to it, so a box on a belt is carried at the belt's speed. Only its part along
+   * the contact's surface counts, and it lasts for this step: set it each time the modifier is called.
+   */
+  get surfaceVelocity(): [number, number, number] {
+    const c = this.kernel.columns;
+    return [c.pairSurfaceX[this.row], c.pairSurfaceY[this.row], c.pairSurfaceZ[this.row]];
+  }
+  set surfaceVelocity(value: Vec3) {
+    checkVec(value, 'Surface velocity');
+    const c = this.kernel.columns;
+    [c.pairSurfaceX[this.row], c.pairSurfaceY[this.row], c.pairSurfaceZ[this.row]] = value;
+  }
   /** How many contact points the pair has. */
   get contactCount(): number {
     return this.kernel.columns.pairContacts[this.row];
@@ -698,7 +712,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     collider.emits = options.events ?? true;
     collider.forceEvents = options.contactForceEvents ?? true;
     collider.forceThreshold = options.contactForceThreshold ?? 0;
-    if (options.contactSkin !== undefined) collider.setContactSkin(options.contactSkin);
+    // A round triangle meets what it touches a border away: its contacts are made with that skin, its queries with the border.
+    const skin = (options.contactSkin ?? 0) + (options.shape === 'triangle' ? (placed.border ?? 0) : 0);
+    if (skin > 0) collider.setContactSkin(skin);
     if (options.contactForceThreshold !== undefined) collider.setContactForceEventThreshold(options.contactForceThreshold);
     if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
     if (options.modifyContacts) {
@@ -727,6 +743,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.kernel.setColliderShape(row, shape as KernelShape, size);
     this.kernel.setColliderPose(row, placed.position ?? [0, 0, 0], placed.rotation ?? [0, 0, 0, 1]);
     if (placed.border) this.kernel.setColliderBorder(row, placed.border);
+    if (options.shape === 'triangle') collider.setContactSkin((options.contactSkin ?? 0) + (placed.border ?? 0));
     if (options.mass !== undefined || options.density !== undefined || options.massless) {
       this.kernel.columns.colliderDensity[row] = placed.density ?? 0;
       this.kernel.updateMass(body.row);

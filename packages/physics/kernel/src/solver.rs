@@ -255,6 +255,7 @@ impl World {
             let bounce = Self::combine(self.s(COLLIDER_RESTITUTION, first), self.s(COLLIDER_RESTITUTION, second), higher(rules_a >> 2 & 3, rules_b >> 2 & 3));
             self.set_s(PAIR_FRICTION, row, friction);
             self.set_s(PAIR_RESTITUTION, row, bounce);
+            self.set_v(PAIR_SURFACE_X, row, v3(0.0, 0.0, 0.0));
             if (self.uu(COLLIDER_FLAGS, first) | self.uu(COLLIDER_FLAGS, second)) & COLLIDER_MODIFY != 0 {
                 self.modify_contacts(row);
             }
@@ -415,6 +416,7 @@ impl World {
         let tangent = self.v(PAIR_TANGENT_X, row);
         let other = normal.cross(tangent);
         let friction = self.s(PAIR_FRICTION, row);
+        let surface = self.v(PAIR_SURFACE_X, row);
         let count = self.uu(PAIR_CONTACTS, row) as usize;
         for k in 0..count {
             let at = row * MANIFOLD + (k + turn) % count;
@@ -422,7 +424,8 @@ impl World {
             let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
             let held = self.v(CONTACT_TANGENT_X, at);
             let drift = self.v(CONTACT_DRIFT_X, at);
-            let relative = body_b.at(arm_b).sub(body_a.at(arm_a));
+            // A surface that moves (a conveyor) is a relative velocity that sliding is brought to, not to zero.
+            let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(surface);
             let slide = relative.sub(normal.scale(relative.dot(normal)));
             let (mass_scale, impulse_scale, target) = if biased {
                 (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))

@@ -520,6 +520,12 @@ impl World {
         let hit = match shape {
             SHAPE_BALL => ray_ball(o, d, size.x, max, solid),
             SHAPE_HALFSPACE => self.ray_halfspace(c, o, d, max, solid),
+            SHAPE_TRIMESH if self.is_round_triangle(c) => {
+                let corners = self.mesh_triangle(self.uu(COLLIDER_HULL, c) as usize, 0);
+                let target = crate::cast::Solid::RoundTriangle(corners, border);
+                let reach = corners.iter().fold(0.0f32, |m, v| m.max(sqrt(v.dot(*v)))) + border;
+                ray_round_solid(o, d, &target, |p| crate::cast::triangle_closest(corners, p), reach, max, solid)
+            }
             SHAPE_BOX if border > 0.0 => {
                 let mut data = crate::hull::BoxData::new();
                 ray_round_poly(o, d, &crate::hull::box_poly(size, &mut data), border, max, solid)

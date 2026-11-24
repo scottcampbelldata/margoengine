@@ -99,6 +99,8 @@ export class ContactModification {
     set friction(value: number);
     get restitution(): number;
     set restitution(value: number);
+    get surfaceVelocity(): [number, number, number];
+    set surfaceVelocity(value: Vec3);
     get contactCount(): number;
     get normal(): [number, number, number];
     set normal(value: Vec3);
@@ -710,6 +712,7 @@ export type ShapeOptions = {
     a: Vec3;
     b: Vec3;
     c: Vec3;
+    borderRadius?: number;
 }
  | {
     shape: 'polyline';
