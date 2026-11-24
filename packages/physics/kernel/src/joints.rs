@@ -1381,6 +1381,9 @@ impl World {
     #[allow(clippy::too_many_arguments)]
     fn limit_row(&mut self, row: usize, k: usize, view: &View, h: f32, stiffness: Soft, most: f32, pass: Pass, a: &mut Moving, b: &mut Moving) {
         let (axis, at) = (&view.rows[k], view.at[k]);
+        // A joint of its own softness gives way past its edge as that spring, not as a contact.
+        let own = self.s(JOINT_LIMIT_HERTZ, row);
+        let stiffness = if own > 0.0 { crate::solver::soft(own, self.s(JOINT_LIMIT_ZETA, row), h) } else { stiffness };
         let doubles = self.doubles(row);
         let give = unsafe { *doubles.add(EASE + k) } as f32;
         if !(give > 0.0) {

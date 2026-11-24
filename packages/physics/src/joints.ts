@@ -372,6 +372,26 @@ export class PhysicsJoint {
     return !this.removed && (this.owner.kernel.columns.jointFlags[this.row] & JOINT_CONTACTS) !== 0;
   }
   /**
+   * Lets this joint's limits give way past their edge as a spring of `hertz` and damping ratio `damping` (default 1), where the
+   * default is a stop as stiff as a contact. A softer limit lets a limb go a little past its range under a load and brings it
+   * back, as a ragdoll's limits do. `0` takes the world's contact stiffness again. The limit is still rigid up to its edge.
+   * @throws RangeError unless `hertz` is 0 or above and finite, and `damping` above 0.
+   */
+  setLimitSoftness(hertz: number, damping = 1): this {
+    if (!(hertz >= 0) || !Number.isFinite(hertz) || !(damping > 0) || !Number.isFinite(damping))
+      throw new RangeError('Limit softness needs a frequency of 0 or more hertz (0 is a contact\'s stiffness) and a damping ratio above 0.');
+    const { columns } = this.owner.kernel;
+    columns.jointLimitHertz[this.row] = hertz;
+    columns.jointLimitZeta[this.row] = damping;
+    this.wake();
+    return this;
+  }
+  /** The limit softness as `[hertz, damping]`, hertz 0 for a contact's stiffness. */
+  get limitSoftness(): [number, number] {
+    const { jointLimitHertz, jointLimitZeta } = this.owner.kernel.columns;
+    return [jointLimitHertz[this.row], jointLimitZeta[this.row]];
+  }
+  /**
    * The load that breaks the joint: newtons on its linear rows and newton metres on its angular rows, each `Infinity` for
    * never (the default). The load is what the joint's rows give in a substep over the substep's length, taken at the last
    * substep of a step. A joint that breaks solves nothing from then on, lets its bodies collide, wakes them and raises a

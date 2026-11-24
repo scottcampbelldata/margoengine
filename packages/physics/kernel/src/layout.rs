@@ -466,6 +466,10 @@ columns! {
     JOINT_DRIVE_Y f32 Joint,
     JOINT_DRIVE_Z f32 Joint,
     JOINT_DRIVE_W f32 Joint,
+    // How soft this joint's limits are past their edge: a spring's frequency in hertz and damping ratio; a zero frequency takes the
+    // world's contact stiffness, a rigid stop.
+    JOINT_LIMIT_HERTZ f32 Joint,
+    JOINT_LIMIT_ZETA f32 Joint,
     JOINT_BREAK_FORCE f32 Joint,
     JOINT_BREAK_TORQUE f32 Joint,
     // The step a joint was last listed in, plus one.

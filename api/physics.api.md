@@ -931,6 +931,8 @@ export class PhysicsJoint {
     clearMotor(): this;
     set contactsEnabled(value: boolean);
     get contactsEnabled(): boolean;
+    setLimitSoftness(hertz: number, damping?: number): this;
+    get limitSoftness(): [number, number];
     setBreakLimits(force: number, torque?: number): this;
     get breakLimits(): [number, number];
     get broken(): boolean;
