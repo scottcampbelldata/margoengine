@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Own physics collision kernel (2026-11-24): the shapes, queries, events, filters and hooks of Rapier 3D's public user
+  guide are listed row by row in [the parity table](../physics-collision-parity.md), each row marked full only where a
+  test proves it. The new shapes and queries are checked against Rapier 0.21 as a black box (rest heights, ray and cast
+  distances, projections) and against closed forms. Capability evidence only, no speed claim. Open rows are listed in the
+  table; reproduce with `node --test packages/physics/tests/next-*.test.js` and `cargo test` in `packages/physics/kernel`.
+
 - Batch 170 vfx: a steady frame of 100,000 live particles sends 224 bytes to the GPU in one write; three.quarks 0.17.1
   marks 4,800,000 bytes of instance attributes for upload. Work evidence only, no speed claim.
   [Scope, rival count and reproduction](batch-170-vfx.md).
