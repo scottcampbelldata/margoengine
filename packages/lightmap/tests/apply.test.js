@@ -6,6 +6,7 @@ import { LambertMaterial, PbrMaterial, UnlitMaterial } from '@margoengine/materi
 import { applyLightmap, lightmapTexture } from '../dist/apply.js';
 import { bakeLightmap } from '../dist/index.js';
 import { bakeMeshLightmap } from '../dist/mesh.js';
+import { bakeDirectionalLightmap } from '../dist/directional.js';
 
 const lights = [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 3 }];
 const atlas = await bakeLightmap({ positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]) }, { lights });
@@ -110,7 +111,13 @@ test('bad input is refused before any material changes', () => {
 // KB-OWN-LIGHTMAP1: a device restore gives the engine a new GPUDevice, and WebGPU objects are valid only with the
 // device that made them (W3C WebGPU, section 3.2.1). The model's extension kept the attach-time device's view and
 // sampler, so the model's restore bound them on the new device and failed validation. Each fake object names its device.
-globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+globalThis.GPUTextureUsage ??= {
+  COPY_SRC: 1,
+  COPY_DST: 2,
+  TEXTURE_BINDING: 4,
+  STORAGE_BINDING: 8,
+  RENDER_ATTACHMENT: 16,
+};
 const fakeDevice = () => {
   const device = {
     limits: { maxTextureDimension2D: 8192 },
@@ -135,7 +142,10 @@ const fakeDevice = () => {
 };
 const fakeModel = (engine) => {
   const primitive = { material: { name: 'grey' } };
-  return { primitive, model: { disposed: false, root: { engine }, primitives: [primitive], onDispose: () => () => {} } };
+  return {
+    primitive,
+    model: { disposed: false, root: { engine }, primitives: [primitive], onDispose: () => () => {} },
+  };
 };
 
 test('a lit glTF PBR model binds its lightmap on the device drawing it, also after a device restore', () => {
@@ -175,4 +185,59 @@ test("a live bake's texture went with its device: a restored model binds a black
   assert.equal(extension.textures[0].view.device, second);
   assert.equal(extension.textures[0].sampler.device, second);
   app.dispose();
+});
+
+// Batch 54 gap: a directional bake had no GPU shader (only the CPU directionalIrradiance). On a glTF PBR model it now
+// binds its direction and directional colour maps beside the lightmap and draws directionalIrradiance per pixel.
+const directionalBake = await bakeDirectionalLightmap(
+  {
+    positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+    uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  },
+  { width: 8, lights, radiometry: 'physical' },
+);
+
+test('a directional bake on a glTF PBR model draws its direction and colour maps with the mapped normal', () => {
+  const engine = { gpu: fakeDevice() },
+    { primitive, model } = fakeModel(engine),
+    own = primitive.material,
+    app = applyLightmap(model, directionalBake, { intensity: 2 }),
+    extension = primitive.material.extension;
+  assert.equal(app.directional, true);
+  assert.equal(extension.textures.length, 3, 'lightmap, direction and directional colour');
+  for (const { view, sampler } of extension.textures) {
+    assert.equal(view.device, engine.gpu);
+    assert.equal(sampler.addressModeU, 'clamp-to-edge');
+  }
+  assert.match(extension.wgsl, /materialTexture1/);
+  assert.match(extension.wgsl, /dot\(lmN,lmD\)/, 'the mapped normal reads the main direction');
+  const lambert = 2 / Math.PI;
+  assert.ok(Math.abs(extension.factors[0] - directionalBake.lightmapScale * lambert) < 1e-6);
+  assert.ok(Math.abs(extension.factors[1] - directionalBake.directionalScale * lambert) < 1e-6);
+  app.dispose();
+  assert.equal(primitive.material, own);
+});
+
+test('directional: false draws a directional bake flat, and other targets refuse directional: true', () => {
+  const engine = { gpu: fakeDevice() },
+    { primitive, model } = fakeModel(engine);
+  let app = applyLightmap(model, directionalBake, { directional: false });
+  assert.equal(app.directional, false);
+  assert.equal(primitive.material.extension.textures.length, 1);
+  assert.equal(primitive.material.extension.factors[1], 0);
+  app.dispose();
+  // A materials target draws the flat lightmap: the same light at the vertex normal.
+  const material = new PbrMaterial();
+  app = applyLightmap(material, directionalBake);
+  assert.equal(app.directional, false);
+  app.dispose();
+  assert.throws(() => applyLightmap(material, directionalBake, { directional: true }), /glTF PBR models only/);
+  assert.throws(() => applyLightmap(model, meshBake, { directional: true }), /bakeDirectionalLightmap result/);
+  assert.throws(() => applyLightmap(model, directionalBake, { directional: 1 }), TypeError);
+  assert.throws(
+    () => applyLightmap(model, { ...directionalBake, directionMap: new Uint8Array(4) }),
+    /malformed directional bake/,
+  );
+  assert.equal(material.lightMap, null);
 });

@@ -7457,7 +7457,13 @@ two charts closer than that blend in the gutter (never inside a chart). Overlaps
 colour per texel (world space), not SH or the H-basis: with several lights it is exact only at the unmapped normal and
 approximate under a normal map (exact for one light plus ambient). Ambient light and AO are not directional. It takes
 the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
-quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
+quantizes each component to 1/255 of 2, and the GPU filters it bilinearly before renormalising, so at a texel edge
+between two very different directions the drawn direction is their blend. `applyLightmap` draws it per pixel
+(`directionalIrradiance` on the GPU, 2026-11-24) on glTF PBR models only, WebGPU only like every glTF PBR lightmap;
+materials, `createMesh` and core mesh targets draw the flat lightmap (no normal-map response), and `directional: true`
+on them throws. The directional shader binds two more RGBA8 textures (8 bytes per texel) and took `lightmap/apply` from
+2,442 B to 2,972 B min+gzip (ceiling 2,634 to 3,228 B): the shader and the bake check are worth it, and a separate
+entry would duplicate the extension, device-restore and dispose code it shares with the flat path.
 
 ## Lightmap rough glass, dispersion and bounce caustics (batch 54)
 
@@ -12851,13 +12857,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that drives its height and flux. Papers are cited in `src/surf.ts`. Regression: packages/water/test/surf.browser.mjs
   (breaking in the surf zone, none and no foam deeper than 3 m, shoaling, the depth cap, the bores reaching dry sand).
 
-### Open 2026-11-17: gltf/pbr's model nodes and the facade's meshes are two Mesh types, so parenting one to the other needs a cast (KB-GLTF-MESHTYPE1, gltf, core)
+### Fixed 2026-11-24: gltf/pbr's model nodes and the facade's meshes were two Mesh types, so parenting one to the other needed a cast (KB-GLTF-MESHTYPE1, gltf, core)
 
-- **Repro:** `const model = await loadGLTF(engine, url); model.root.setParent(engine.createMesh());` fails to type-check
+- **Repro:** `const model = await loadGLTF(engine, url); model.root.setParent(engine.createMesh());` failed to type-check
   (TS2740: the facade's `Mesh` lacks `engine`, `id`, `scene`, `born` and 4 more of the engine's internal `Mesh`).
-- **Cause:** `PBRModel.root` and `nodes` are typed with `core/dist/engine`'s `Mesh`, `engine.createMesh` returns
+- **Cause:** `PBRModel.root` and `nodes` were typed with `core/dist/engine`'s `Mesh`, `engine.createMesh` returns
   `core/dist/api`'s; at run time both are the same object.
-- **Workaround:** a cast, as `examples/kitty-hawk/main.ts` does. Fix: type the model's nodes with the public `Mesh`.
+- **Fix:** they are typed `ModelNode`, the engine's `Mesh` and the public `Mesh` at once, so `setParent` takes either
+  and packages that read `model.root.engine` keep working; no core change. Regression: the gltf README example
+  `model.root.setParent(turntable)` / `marker.setParent(model.nodes[0])`, type-checked by `npm run quality`
+  (readme-types), fails with TS2740 on the old typing. `examples/kitty-hawk/main.ts` still carries its old cast.
 
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 

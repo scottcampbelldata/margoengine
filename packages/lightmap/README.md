@@ -96,7 +96,7 @@ light: `directionalIrradiance(baked, texel, mappedNormal, vertexNormal)` gives `
 (max(0, n . d) - max(0, n0 . d))`, exact at the vertex normal and exact for any normal when one light plus ambient
 reaches the texel. The direction is the luminance-weighted mean of the light directions (Sloan 2008's optimal linear
 direction); ambient light and AO stay non-directional. The flat `lightmap` is the one `bakeMeshLightmap` bakes, with
-no extra rays.
+no extra rays. `applyLightmap` draws the bake with this formula per pixel on a glTF PBR model (see below).
 
 ## Progressive GPU baking: `@margoengine/lightmap/gpu`
 
@@ -170,10 +170,39 @@ or a live `GPULightmapBaker`, whose texture is drawn as it improves.
 - **Core meshes.** Core's shader has no UV1 or lightmap, so pass the lightmap UVs as `uv1`: a materials mesh with the
   core mesh's geometry and colour, roughness, metalness and sidedness draws in its place, parented to it (it follows
   the core mesh's transform). The core mesh draws nothing until `dispose()` gives its geometry back.
+- **Directional bakes.** A `bakeDirectionalLightmap` result on a glTF PBR model is drawn directionally by default:
+  the shader reads the lightmap, the main direction and the directional colour on UV1 and adds
+  `irradiance + directional * (max(0, n . d) - max(0, n0 . d))` (at least 0), with `n` the normal-mapped normal and
+  `n0` the vertex normal, so normal maps answer baked light. Without a normal map it is the flat lightmap.
+  `directional: false` draws it flat; materials, `createMesh` and core mesh targets draw it flat (the light at the
+  vertex normal), and `directional: true` on them throws. `app.directional` says which was drawn.
 - **Textures.** `lightmapTexture(baked)` returns the linear `Texture` (RGBA8 for a CPU bake, the live `rgba16float`
   texture of a GPU baker) and the `lightMapIntensity` that decodes it, without mipmaps, for your own materials.
 
-A runnable example comes in the README phase.
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { applyLightmap } from 'margoengine/lightmap/apply';
+import { bakeDirectionalLightmap } from 'margoengine/lightmap/directional';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/model.glb');
+// Bake the floor (its positions, normals and UV1 unwrap) with the scene's lights.
+const baked = await bakeDirectionalLightmap(
+  {
+    positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+    uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  },
+  { width: 64, radiometry: 'physical', lights: [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 2 }] },
+);
+// Normal maps on the model now answer the baked light.
+const app = applyLightmap(model, baked);
+console.log(app.directional); // true
+engine.start();
+// On teardown: app.dispose(); model.dispose(); engine.dispose();
+```
 
 ## More light: `@margoengine/lightmap/global`
 

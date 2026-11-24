@@ -4335,7 +4335,13 @@ two charts closer than that blend in the gutter (never inside a chart). Overlaps
 colour per texel (world space), not SH or the H-basis: with several lights it is exact only at the unmapped normal and
 approximate under a normal map (exact for one light plus ambient). Ambient light and AO are not directional. It takes
 the `bakeMeshLightmap` limits and its direct-light-only scope; bounce light has no direction. The RGBA8 direction map
-quantizes each component to 1/255 of 2. No GPU shader applies it yet: `directionalIrradiance` is the CPU reference.
+quantizes each component to 1/255 of 2, and the GPU filters it bilinearly before renormalising, so at a texel edge
+between two very different directions the drawn direction is their blend. `applyLightmap` draws it per pixel
+(`directionalIrradiance` on the GPU, 2026-11-24) on glTF PBR models only, WebGPU only like every glTF PBR lightmap;
+materials, `createMesh` and core mesh targets draw the flat lightmap (no normal-map response), and `directional: true`
+on them throws. The directional shader binds two more RGBA8 textures (8 bytes per texel) and took `lightmap/apply` from
+2,442 B to 2,972 B min+gzip (ceiling 2,634 to 3,228 B): the shader and the bake check are worth it, and a separate
+entry would duplicate the extension, device-restore and dispose code it shares with the flat path.
 
 ## Lightmap rough glass, dispersion and bounce caustics (batch 54)
 

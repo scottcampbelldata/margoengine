@@ -29,6 +29,12 @@ export interface BakedLightmap {
   lightmapScale: number;
   /** 'physical' irradiance is drawn with the Lambertian response (divided by pi). */
   radiometry?: 'physical';
+  /** A `bakeDirectionalLightmap` result's RGBA8 main light direction per texel (`direction * 0.5 + 0.5`). */
+  directionMap?: Uint8Array;
+  /** A `bakeDirectionalLightmap` result's RGBA8 directional colour per texel, divided by `directionalScale`. */
+  directionalMap?: Uint8Array;
+  /** Multiply the directional map's RGB by this to get the directional colour. */
+  directionalScale?: number;
 }
 
 /** A live GPU bake: a `GPULightmapBaker` (`@margoengine/lightmap/gpu`), drawn as it improves. */
@@ -52,6 +58,13 @@ export interface ApplyLightmapOptions {
   uv1?: ArrayLike<number>;
   /** A glTF PBR model's primitives to light, as indices into `model.primitives` or the primitives. Default all. */
   primitives?: readonly (number | PBRPrimitive)[];
+  /**
+   * Draw a `bakeDirectionalLightmap` bake so normal maps answer its light: `irradiance + directional * (max(0, n . d) -
+   * max(0, n0 . d))` per pixel, with `n` the mapped normal and `n0` the vertex normal (`directionalIrradiance`, on the
+   * GPU). glTF PBR models only; true on any other target throws. Default true for a directional bake on a glTF PBR
+   * model, else false (the flat lightmap: the same light at the vertex normal).
+   */
+  directional?: boolean;
 }
 
 /** What {@link applyLightmap} returns: the lightmap as it is drawn, live until `dispose()` takes it off again. */
@@ -60,6 +73,8 @@ export interface LightmapApplication {
   readonly texture: Texture;
   /** The scale applied to the texture's RGB, response included (pi divided out for 'lambertian'). */
   readonly scale: number;
+  /** Whether the bake is drawn directionally (normal maps answer it); see `ApplyLightmapOptions.directional`. */
+  readonly directional: boolean;
   /** A core mesh's stand-in: the materials mesh that draws it with the lightmap (core meshes only). */
   readonly mesh?: MaterialMesh;
   /** Takes the lightmap off: materials get their previous lightMap back, a core mesh its own geometry. Repeatable. */
@@ -103,13 +118,26 @@ export function applyLightmap(
   baked: BakedLightmap | LiveLightmap,
   options: ApplyLightmapOptions = {},
 ): LightmapApplication {
-  const { intensity = 1, response = baked?.radiometry === 'physical' ? 'lambertian' : 'multiply' } = options ?? {};
+  const {
+    intensity = 1,
+    response = baked?.radiometry === 'physical' ? 'lambertian' : 'multiply',
+    directional,
+  } = options ?? {};
+  if (directional !== undefined && typeof directional !== 'boolean')
+    throw new TypeError('applyLightmap directional must be true or false; pass a boolean or leave it out');
   if (typeof intensity !== 'number' || !(intensity >= 0) || !Number.isFinite(intensity))
     throw new RangeError('applyLightmap intensity must be a finite number 0 or more; pass a nonnegative scale');
   if (response !== 'multiply' && response !== 'lambertian')
     throw new TypeError("applyLightmap response must be 'multiply' or 'lambertian'; pass one of those");
   if (!target || typeof target !== 'object')
     bad('applyLightmap needs a Material, a materials or glTF PBR mesh or a core Mesh; pass one of those');
+  const model = isModel(target);
+  if (directional && (!model || isLive(baked) || !directionalBake(baked)))
+    bad(
+      model
+        ? 'applyLightmap directional needs a bakeDirectionalLightmap result; bake one, or leave directional out'
+        : 'applyLightmap directional draws on glTF PBR models only; leave it out for this target (the flat lightmap)',
+    );
   if (target instanceof Material) return onMaterials([target], baked, intensity, response);
   if (isMaterialMesh(target)) {
     const m = target.material;
@@ -120,9 +148,32 @@ export function applyLightmap(
       response,
     );
   }
-  if (isModel(target)) return onModel(target, baked, intensity, response, options.primitives);
+  if (model)
+    return onModel(
+      target as PBRModel,
+      baked,
+      intensity,
+      response,
+      options.primitives,
+      directional ?? (!isLive(baked) && directionalBake(baked)),
+    );
   if (isCore(target)) return onCore(target, baked, intensity, response, options.uv1);
   return bad('applyLightmap needs a Material, a materials or glTF PBR mesh or a core Mesh; pass one of those');
+}
+
+/** Whether a CPU bake carries well-formed `bakeDirectionalLightmap` maps (checked against its size). */
+function directionalBake(b: BakedLightmap): boolean {
+  const { directionMap: d, directionalMap: c, directionalScale: k, width, height } = b ?? ({} as BakedLightmap);
+  if (d === undefined && c === undefined && k === undefined) return false;
+  if (
+    !(d instanceof Uint8Array) ||
+    !(c instanceof Uint8Array) ||
+    d.length !== width * height * 4 ||
+    c.length !== d.length ||
+    !(typeof k === 'number' && k > 0 && Number.isFinite(k))
+  )
+    bad('applyLightmap got a malformed directional bake; pass a bakeDirectionalLightmap result as it is');
+  return true;
 }
 
 const isLive = (b: unknown): b is LiveLightmap =>
@@ -155,7 +206,13 @@ type CoreMeshOf = CoreMesh & { readonly engine: EngineKernel };
 const isCore = (t: object): t is CoreMeshOf =>
   'setGeometry' in t && 'engine' in t && (t as unknown as CoreMesh).material?.data instanceof Float32Array;
 
-function application(texture: Texture, scale: number, off: () => void, mesh?: MaterialMesh): LightmapApplication {
+function application(
+  texture: Texture,
+  scale: number,
+  off: () => void,
+  mesh?: MaterialMesh,
+  directional = false,
+): LightmapApplication {
   let done = false;
   const dispose = () => {
     if (done) return;
@@ -164,7 +221,7 @@ function application(texture: Texture, scale: number, off: () => void, mesh?: Ma
     // The texture is this application's own: free its GPU copy (a GPU baker's borrowed texture stays the baker's).
     texture.dispose();
   };
-  return { texture, scale, ...(mesh ? { mesh } : {}), dispose, [Symbol.dispose]: dispose };
+  return { texture, scale, directional, ...(mesh ? { mesh } : {}), dispose, [Symbol.dispose]: dispose };
 }
 
 /** One application's lightmap on one material, and what the material held before it. */
@@ -227,6 +284,18 @@ function onMaterials(
 // shaders) and its factor row 0 (x: the scale).
 const lightWGSL =
   's.emissive+=s.base.rgb*(1-s.metal)*s.occlusion*textureSample(materialTexture0,materialSampler0,i.uv.zw).rgb*materialFactors[0].x;';
+// A directional bake (bakeDirectionalLightmap): directionalIrradiance on the GPU. Texture 1 is the main light direction
+// (xyz * 0.5 + 0.5), texture 2 the directional colour (times factor y). `n` is the mapped normal and `n0` the vertex
+// normal, both on the vertex normal's side (surface() turns them to face the viewer on a back face; the bake lit the
+// front). A filtered direction is renormalised; under 1e-3 long (no direct light there) it adds nothing.
+const directionalWGSL =
+  '{let lmUV=i.uv.zw; let lmE=textureSample(materialTexture0,materialSampler0,lmUV).rgb*materialFactors[0].x;' +
+  'let lmD0=textureSample(materialTexture1,materialSampler1,lmUV).xyz*2.0-1.0; let lmL=length(lmD0);' +
+  'let lmD=select(vec3f(0),lmD0/max(lmL,0.001),lmL>0.001);' +
+  'let lmC=textureSample(materialTexture2,materialSampler2,lmUV).rgb*materialFactors[0].y;' +
+  'let lmN0=normalize(i.normal); let lmN=s.n*select(-1.0,1.0,dot(s.n,lmN0)>=0.0);' +
+  'let lmLight=max(vec3f(0),lmE+lmC*(max(0.0,dot(lmN,lmD))-max(0.0,dot(lmN0,lmD))));' +
+  's.emissive+=s.base.rgb*(1-s.metal)*s.occlusion*lmLight;}';
 
 function onModel(
   model: PBRModel,
@@ -234,6 +303,7 @@ function onModel(
   intensity: number,
   response: 'multiply' | 'lambertian',
   which?: readonly (number | PBRPrimitive)[],
+  directional = false,
 ): LightmapApplication {
   if (model.disposed) throw new MargoError('disposed', 'applyLightmap got a disposed model; pass a live PBRModel');
   const device = model.root.engine.gpu;
@@ -253,29 +323,40 @@ function onModel(
   });
   if (isLive(baked)) sameDevice(baked, device);
   const { texture, intensity: own } = lightmapTexture(baked),
-    scale = (own * intensity) / (response === 'lambertian' ? Math.PI : 1),
-    engine = model.root.engine;
+    toLight = intensity / (response === 'lambertian' ? Math.PI : 1),
+    scale = own * toLight,
+    engine = model.root.engine,
+    cpu = baked as BakedLightmap,
+    // The direction and directional colour maps of a directional bake, linear RGBA8 like the lightmap.
+    maps = directional
+      ? [cpu.directionMap!, cpu.directionalMap!].map(
+          (data) => new Texture({ width: cpu.width, height: cpu.height, data }, black),
+        )
+      : [];
   // A chart's light ends at the atlas edge: clamp there, as for the imported bake.
-  texture.wrapS = texture.wrapT = 'clamp';
+  for (const t of [texture, ...maps]) t.wrapS = t.wrapT = 'clamp';
   // WebGPU objects are valid only with the device that made them, and a lost device makes all of them unusable (W3C
   // WebGPU, "valid to use with", section 3.2.1, and "lose the device", section 3.5.2). A device restore brings a new
   // device and the model derives its draws again, reading `textures`: it gets a view and sampler made on the device
   // drawing now. A CPU bake uploads again from its pixels (`Texture` keeps one copy per device). A live bake's texture
   // is its baker's device's and went with it: on a restored device the model draws no baked light (a 1 x 1 black
   // texture) until a new baker, made on `engine.gpu`, is applied.
-  let dark: Texture | undefined, bound: { device: GPUDevice; textures: readonly MaterialExtensionTexture[] } | undefined;
+  let dark: Texture | undefined,
+    bound: { device: GPUDevice; textures: readonly MaterialExtensionTexture[] } | undefined;
   const bind = (gpu: GPUDevice): readonly MaterialExtensionTexture[] => {
     const source =
       isLive(baked) && baked.device !== gpu
         ? (dark ??= new Texture({ width: 1, height: 1, data: new Uint8Array([0, 0, 0, 255]) }, black))
         : texture;
-    const [view, sampler] =
-      source.bind(gpu, false) ?? bad('applyLightmap could not bind its lightmap; apply it on a live engine');
-    return [{ view, sampler }];
+    return [source, ...maps].map((t) => {
+      const [view, sampler] =
+        t.bind(gpu, false) ?? bad('applyLightmap could not bind its lightmap; apply it on a live engine');
+      return { view, sampler };
+    });
   };
   const extension: MaterialExtension = {
-    wgsl: lightWGSL,
-    factors: new Float32Array([scale, 0, 0, 0]),
+    wgsl: directional ? directionalWGSL : lightWGSL,
+    factors: new Float32Array([scale, directional ? cpu.directionalScale! * toLight : 0, 0, 0]),
     get textures() {
       const gpu = engine.gpu ?? device;
       if (bound?.device !== gpu) bound = { device: gpu, textures: bind(gpu) };
@@ -298,8 +379,9 @@ function onModel(
     restore.clear();
     bound = undefined;
     dark?.dispose();
+    for (const t of maps) t.dispose();
   };
-  const app = application(texture, scale, off);
+  const app = application(texture, scale, off, undefined, directional);
   unsubscribe = model.onDispose(() => app.dispose());
   return app;
 }

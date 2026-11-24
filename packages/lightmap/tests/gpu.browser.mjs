@@ -20,7 +20,8 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [noFileWatcher(),
+  plugins: [
+    noFileWatcher(),
     {
       name: 'lightmap-gpu-page',
       configureServer(s) {
@@ -338,6 +339,68 @@ try {
     restoredBaker[Symbol.dispose]();
     out.restoreBack = await halves();
     model.destroy();
+    // A directional bake (bakeDirectionalLightmap) on a normal-mapped glTF PBR quad: the same light everywhere (0.75),
+    // its main direction (1, 0, 1) / sqrt 2 and directional colour 0.75. The normal map tilts the left half's normal to
+    // (-0.6, 0, 0.8) and the right half's to (0.6, 0, 0.8) (tangent +x along U), so directionalIrradiance gives
+    // 0.75 + 0.75 * (n . d - n0 . d): 0.326 on the left, 0.962 on the right; drawn flat both halves get 0.75.
+    const tilted = {
+        asset: { version: '2.0' },
+        scene: 0,
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0 }],
+        meshes: [
+          {
+            primitives: [
+              { attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2, TEXCOORD_1: 2 }, indices: 3, material: 0 },
+            ],
+          },
+        ],
+        materials: [
+          {
+            pbrMetallicRoughness: { baseColorFactor: [0.5, 0.5, 0.5, 1], metallicFactor: 0, roughnessFactor: 1 },
+            normalTexture: { index: 0 },
+          },
+        ],
+        images: [{ uri: 'tilt.png' }],
+        samplers: [{ magFilter: 9728, minFilter: 9728 }],
+        textures: [{ source: 0, sampler: 0 }],
+        buffers: [{ byteLength: buffer.byteLength }],
+        bufferViews: [
+          { buffer: 0, byteOffset: 0, byteLength: 48 },
+          { buffer: 0, byteOffset: 48, byteLength: 48 },
+          { buffer: 0, byteOffset: 96, byteLength: 32 },
+          { buffer: 0, byteOffset: 128, byteLength: 12 },
+        ],
+        accessors: [
+          { bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-1, -1, 0], max: [1, 1, 0] },
+          { bufferView: 1, componentType: 5126, count: 4, type: 'VEC3' },
+          { bufferView: 2, componentType: 5126, count: 4, type: 'VEC2' },
+          { bufferView: 3, componentType: 5123, count: 6, type: 'SCALAR' },
+        ],
+      },
+      tilt = { width: 2, height: 1, data: new Uint8Array([51, 128, 230, 255, 204, 128, 230, 255]) },
+      lit = { width: 4, height: 1, lightmapScale: 0.75, lightmap: new Uint8Array(16).fill(255) },
+      along = Math.round((Math.SQRT1_2 * 0.5 + 0.5) * 255),
+      directionalBaked = {
+        ...lit,
+        directionMap: new Uint8Array(16),
+        directionalMap: new Uint8Array(16).fill(255),
+        directionalScale: 0.75,
+      };
+    for (let t = 0; t < 4; t++) directionalBaked.directionMap.set([along, 128, along, 255], t * 4);
+    const mapped = parseGLTF(engine, tilted, [buffer.buffer], [tilt]);
+    app = applyLightmap(mapped, lit);
+    out.tiltFlat = await halves();
+    app.dispose();
+    app = applyLightmap(mapped, directionalBaked);
+    out.tiltDirectional = app.directional;
+    out.tiltOn = await halves();
+    app.dispose();
+    app = applyLightmap(mapped, directionalBaked, { directional: false });
+    out.tiltForcedFlat = await halves();
+    app.dispose();
+    out.tiltBack = await halves();
+    mapped.destroy();
     // A core mesh: core geometry has no UV1, so a materials stand-in draws it.
     const core = engine.createMesh(),
       geometry = new Geometry(positions, normals, indices);
@@ -381,7 +444,38 @@ try {
   console.log('apply', JSON.stringify(drawn));
   assert.deepEqual(drawn.errors, []);
   // With no live light every target is black but where the lightmap lights it.
-  for (const k of ['meshOff', 'meshBack', 'modelOff', 'modelBack', 'coreOff', 'coreBack', 'restoreBack', 'liveModelLost'])
+  // Batch 54 gap: a directional bake drawn on the GPU answers the normal map (directionalIrradiance per pixel); drawn
+  // flat it does not. The mapped normal turned away from the main direction (left) is darker than flat, the one turned
+  // toward it (right) brighter.
+  assert.equal(drawn.tiltDirectional, true);
+  assert.ok(
+    Math.abs(drawn.tiltFlat[0] - drawn.tiltFlat[1]) < 2,
+    `flat lightmap ignores the normal map: ${drawn.tiltFlat}`,
+  );
+  assert.deepEqual(drawn.tiltForcedFlat, drawn.tiltFlat, 'directional: false draws the flat lightmap');
+  // Expected 8-bit red: base 0.5 times the light (0.326, 0.75, 0.962), less the Khronos PBR Neutral offset 0.04, sRGB
+  // encoded: 98.6, 156.5 and 176.5. A pixel of 8-bit rounding and the 1/255 direction quantisation are allowed.
+  const display = (linear) => {
+    const x = linear - 0.04;
+    return 255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055);
+  };
+  const lit = (change) => 0.5 * (0.75 + 0.75 * change),
+    d = Math.SQRT1_2,
+    expected = [lit(-0.6 * d + 0.8 * d - d), lit(0), lit(0.6 * d + 0.8 * d - d)].map(display);
+  assert.ok(Math.abs(drawn.tiltFlat[0] - expected[1]) < 2, `flat: ${drawn.tiltFlat} vs ${expected[1]}`);
+  assert.ok(Math.abs(drawn.tiltOn[0] - expected[0]) < 2, `turned away is darker: ${drawn.tiltOn} vs ${expected}`);
+  assert.ok(Math.abs(drawn.tiltOn[1] - expected[2]) < 2, `turned toward is brighter: ${drawn.tiltOn} vs ${expected}`);
+  for (const k of [
+    'meshOff',
+    'meshBack',
+    'modelOff',
+    'modelBack',
+    'coreOff',
+    'coreBack',
+    'restoreBack',
+    'liveModelLost',
+    'tiltBack',
+  ])
     assert.ok(drawn[k][0] < 1 && drawn[k][1] < 1, `${k} is dark: ${drawn[k]}`);
   // The lit left half shows, the dark right half adds nothing.
   for (const k of ['meshOn', 'modelOn', 'coreOn']) {

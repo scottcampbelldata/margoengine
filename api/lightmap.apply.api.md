@@ -12,6 +12,7 @@ export interface ApplyLightmapOptions {
     response?: 'multiply' | 'lambertian';
     uv1?: ArrayLike<number>;
     primitives?: readonly (number | PBRPrimitive)[];
+    directional?: boolean;
 }
 
 export interface BakedLightmap {
@@ -23,11 +24,15 @@ export interface BakedLightmap {
     };
     lightmapScale: number;
     radiometry?: 'physical';
+    directionMap?: Uint8Array;
+    directionalMap?: Uint8Array;
+    directionalScale?: number;
 }
 
 export interface LightmapApplication {
     readonly texture: Texture;
     readonly scale: number;
+    readonly directional: boolean;
     readonly mesh?: MaterialMesh;
     dispose(): void;
     [Symbol.dispose](): void;
