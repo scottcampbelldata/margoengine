@@ -65,6 +65,13 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /** JSON Schema of `structuredContent`, so clients can validate and type what the tool returns. */
+  outputSchema?: {
+    type: 'object';
+    properties?: Record<string, Json>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
   /** Hints for clients: whether the tool only reads, and whether it reaches outside the process. */
   annotations?: {
     readOnlyHint?: boolean;
@@ -111,6 +118,13 @@ export interface ResourceProvider {
   list(): readonly ResourceInfo[];
   /** The URI templates, if any. */
   templates?(): readonly ResourceTemplateInfo[];
+  /** Suggestions for one variable of a URI template (`completion/complete`); return the values that match `value`. */
+  complete?(
+    template: string,
+    variable: string,
+    value: string,
+    context: Record<string, string>,
+  ): readonly string[] | Promise<readonly string[]>;
   /** The contents of `uri`, or undefined when there is no such resource. */
   read(uri: string, context: ToolContext): Promise<ResourceContents[] | undefined> | ResourceContents[] | undefined;
 }
@@ -128,6 +142,15 @@ export interface PromptDefinition {
   description?: string;
   /** Its arguments; a required one must be given to prompts/get. */
   arguments?: { name: string; description?: string; required?: boolean }[];
+  /**
+   * Suggestions for one argument as the user types (`completion/complete`). Given the argument name, the text
+   * typed so far and the other arguments already filled in; return the matching values (at most 100 are sent).
+   */
+  complete?(
+    argument: string,
+    value: string,
+    context: Record<string, string>,
+  ): readonly string[] | Promise<readonly string[]>;
   /** The messages for these arguments (all strings; the required ones are present). */
   get(args: Record<string, string>): { description?: string; messages: PromptMessage[] };
 }
@@ -228,6 +251,9 @@ export function createMcpServer(options: McpServerOptions): McpServer {
               tools: { listChanged: false },
               ...(options.resources ? { resources: { subscribe: false, listChanged: false } } : {}),
               ...(options.prompts ? { prompts: { listChanged: false } } : {}),
+              ...(options.prompts?.some((prompt) => prompt.complete) || options.resources?.complete
+                ? { completions: {} }
+                : {}),
             },
             serverInfo: { name: options.name ?? 'margoengine', title: 'Margo Engine', version: VERSION },
             ...(options.instructions ? { instructions: options.instructions } : {}),
@@ -246,6 +272,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
               title: tool.title,
               description: tool.description,
               inputSchema: tool.inputSchema as unknown as Json,
+              ...(tool.outputSchema ? { outputSchema: tool.outputSchema as unknown as Json } : {}),
               ...(tool.annotations ? { annotations: tool.annotations as Json } : {}),
             })),
           },
@@ -289,7 +316,8 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       }
       case 'resources/read': {
         if (!options.resources) return unknownMethod();
-        if (typeof params.uri !== 'string' || !params.uri) return rpcError(id, RPC.invalidParams, 'uri must be a string');
+        if (typeof params.uri !== 'string' || !params.uri)
+          return rpcError(id, RPC.invalidParams, 'uri must be a string');
         if (running.has(id)) return rpcError(id, RPC.invalidRequest, 'Request id is already active in this session');
         const controller = new AbortController();
         const abort = () => controller.abort();
@@ -331,8 +359,47 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           return rpcError(id, RPC.invalidParams, 'arguments must be an object of strings');
         const missing = (prompt.arguments ?? []).filter((arg) => arg.required && !(args[arg.name] as string)?.trim());
         if (missing.length)
-          return rpcError(id, RPC.invalidParams, `Missing required argument: ${missing.map((arg) => arg.name).join(', ')}`);
+          return rpcError(
+            id,
+            RPC.invalidParams,
+            `Missing required argument: ${missing.map((arg) => arg.name).join(', ')}`,
+          );
         return { jsonrpc: '2.0', id, result: prompt.get(args as Record<string, string>) as unknown as Json };
+      }
+      case 'completion/complete': {
+        const ref = params.ref;
+        const argument = params.argument;
+        if (
+          !isRecord(ref) ||
+          !isRecord(argument) ||
+          typeof argument.name !== 'string' ||
+          typeof argument.value !== 'string'
+        )
+          return rpcError(id, RPC.invalidParams, 'completion/complete needs ref and argument { name, value }');
+        const given = isRecord(params.context) && isRecord(params.context.arguments) ? params.context.arguments : {};
+        if (Object.values(given).some((value) => typeof value !== 'string'))
+          return rpcError(id, RPC.invalidParams, 'context.arguments must be an object of strings');
+        const filled = given as Record<string, string>;
+        let found: readonly string[] | Promise<readonly string[]> | undefined;
+        if (ref.type === 'ref/prompt') {
+          const prompt = typeof ref.name === 'string' ? prompts.get(ref.name) : undefined;
+          if (!prompt) return rpcError(id, RPC.invalidParams, `Unknown prompt: ${String(ref.name)}`);
+          if (!prompt.arguments?.some((arg) => arg.name === argument.name))
+            return rpcError(id, RPC.invalidParams, `Unknown argument: ${argument.name}`);
+          found = prompt.complete?.(argument.name, argument.value, filled);
+        } else if (ref.type === 'ref/resource') {
+          const uri = typeof ref.uri === 'string' ? ref.uri : '';
+          const known = options.resources?.templates?.().find((template) => template.uriTemplate === uri);
+          if (!known) return rpcError(id, RPC.invalidParams, `Unknown resource template: ${uri}`);
+          found = options.resources?.complete?.(uri, argument.name, argument.value, filled);
+        } else return rpcError(id, RPC.invalidParams, 'ref.type must be ref/prompt or ref/resource');
+        const all = [...((await found) ?? [])];
+        const values = all.slice(0, 100);
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: { completion: { values, total: all.length, hasMore: all.length > values.length } },
+        };
       }
       default:
         return unknownMethod();

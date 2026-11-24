@@ -284,3 +284,51 @@ test('dispose cancels what is running and refuses later messages with a disposed
   assert.equal(later.id, 2);
   assert.match(later.error.message, /The server was disposed; see https:\/\/margoengine\.com\/errors#mcp/);
 });
+
+test('outputSchema is listed and completion/complete answers prompt and resource-template arguments', async () => {
+  const schema = { type: 'object', properties: { n: { type: 'number' } }, required: ['n'] };
+  const server = createMcpServer({
+    tools: [{ ...echo, name: 'typed', outputSchema: schema }],
+    prompts: [
+      {
+        name: 'start',
+        arguments: [{ name: 'pkg', required: true }],
+        complete: (arg, value, ctx) => ['core', 'gltf', 'physics'].filter((n) => n.startsWith(value) && ctx.x !== 'no'),
+        get: () => ({ messages: [] }),
+      },
+      { name: 'plain', arguments: [{ name: 'a' }], get: () => ({ messages: [] }) },
+    ],
+    resources: {
+      list: () => [],
+      templates: () => [{ uriTemplate: 'margo://docs/{page}', name: 'page' }],
+      complete: (_t, variable, value) =>
+        variable === 'page' ? ['limits', 'lanes'].filter((n) => n.startsWith(value)) : [],
+      read: () => undefined,
+    },
+  });
+  const init = await server.handle(request(1, 'initialize', { protocolVersion: PROTOCOL_VERSIONS[0] }));
+  assert.deepEqual(init.result.capabilities.completions, {});
+  const list = await server.handle(request(2, 'tools/list'));
+  assert.deepEqual(list.result.tools[0].outputSchema, schema);
+  const ask = (id, ref, name, value, context) =>
+    server.handle(
+      request(id, 'completion/complete', { ref, argument: { name, value }, ...(context ? { context } : {}) }),
+    );
+  let r = await ask(3, { type: 'ref/prompt', name: 'start' }, 'pkg', 'g');
+  assert.deepEqual(r.result.completion, { values: ['gltf'], total: 1, hasMore: false });
+  r = await ask(4, { type: 'ref/prompt', name: 'start' }, 'pkg', '', { arguments: { x: 'no' } });
+  assert.deepEqual(r.result.completion.values, []);
+  r = await ask(5, { type: 'ref/prompt', name: 'plain' }, 'a', '');
+  assert.deepEqual(r.result.completion.values, []);
+  r = await ask(6, { type: 'ref/resource', uri: 'margo://docs/{page}' }, 'page', 'li');
+  assert.deepEqual(r.result.completion.values, ['limits']);
+  assert.equal((await ask(7, { type: 'ref/prompt', name: 'nope' }, 'a', '')).error.code, RPC.invalidParams);
+  assert.equal((await ask(8, { type: 'ref/prompt', name: 'start' }, 'zzz', '')).error.code, RPC.invalidParams);
+  assert.equal(
+    (await ask(9, { type: 'ref/resource', uri: 'margo://other' }, 'page', '')).error.code,
+    RPC.invalidParams,
+  );
+  assert.equal((await ask(10, { type: 'ref/other' }, 'a', '')).error.code, RPC.invalidParams);
+  const none = createMcpServer({ tools: [echo] });
+  assert.equal((await none.handle(request(1, 'initialize', {}))).result.capabilities.completions, undefined);
+});

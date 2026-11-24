@@ -246,6 +246,36 @@ Add the same block to `.cursor/mcp.json` in the project (or `~/.cursor/mcp.json`
 Any client that starts a stdio server works: command `npx`, arguments `-y @margoengine/mcp`. In VS Code, put the
 block in `.vscode/mcp.json` under the key `servers` instead of `mcpServers`.
 
+### Completion and output schemas
+
+A prompt's `complete(argument, value, context)` and a resource provider's `complete(template, variable, value, context)`
+suggest values while the user types; the server then declares the `completions` capability and answers
+`completion/complete` with at most 100 values, `total` and `hasMore`. An unknown prompt, argument or template is `-32602`.
+
+```ts
+import { createMcpServer } from '@margoengine/mcp';
+
+const server = createMcpServer({
+  tools: [],
+  prompts: [
+    {
+      name: 'start',
+      arguments: [{ name: 'pkg', required: true }],
+      complete: (_argument, value) => ['core', 'gltf', 'physics'].filter((name) => name.startsWith(value)),
+      get: (args) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Help with ${args.pkg}` } }] }),
+    },
+  ],
+});
+const answer = await server.handle({
+  jsonrpc: '2.0',
+  id: 1,
+  method: 'completion/complete',
+  params: { ref: { type: 'ref/prompt', name: 'start' }, argument: { name: 'pkg', value: 'g' } },
+});
+console.log(answer); // result.completion.values: ['gltf']
+server.dispose();
+```
+
 ## Use it from code
 
 The server is a plain function from messages to responses, so you can embed it or test against it.
@@ -292,7 +322,8 @@ A failed tool call is a normal result with `isError: true`, a `structuredContent
 Implemented from the published specification: JSON-RPC 2.0, one message per line over stdio, `initialize` (versions
 2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05), `ping`, `tools/list`, `tools/call`,
 `resources/list`, `resources/templates/list`, `resources/read`, `prompts/list`, `prompts/get` (paged with a cursor)
-and `notifications/cancelled`. Requests run side by side. Nothing but protocol messages goes to stdout.
+`completion/complete` (offered when a prompt or the resource provider supplies `complete`) and
+`notifications/cancelled`. A tool may declare an `outputSchema` for its `structuredContent`. Requests run side by side. Nothing but protocol messages goes to stdout.
 
 ### Scene of the result
 

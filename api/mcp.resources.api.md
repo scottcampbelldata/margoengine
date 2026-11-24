@@ -55,6 +55,7 @@ interface PromptDefinition {
         description?: string;
         required?: boolean;
     }[];
+    complete?(argument: string, value: string, context: Record<string, string>): readonly string[] | Promise<readonly string[]>;
     get(args: Record<string, string>): {
         description?: string;
         messages: PromptMessage[];
@@ -88,6 +89,7 @@ interface ResourceInfo {
 interface ResourceProvider {
     list(): readonly ResourceInfo[];
     templates?(): readonly ResourceTemplateInfo[];
+    complete?(template: string, variable: string, value: string, context: Record<string, string>): readonly string[] | Promise<readonly string[]>;
     read(uri: string, context: ToolContext): Promise<ResourceContents[] | undefined> | ResourceContents[] | undefined;
 }
 

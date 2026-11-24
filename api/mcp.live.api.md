@@ -65,6 +65,12 @@ interface ToolDefinition {
         required?: string[];
         additionalProperties?: boolean;
     };
+    outputSchema?: {
+        type: 'object';
+        properties?: Record<string, Json>;
+        required?: string[];
+        additionalProperties?: boolean;
+    };
     annotations?: {
         readOnlyHint?: boolean;
         destructiveHint?: boolean;

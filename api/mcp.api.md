@@ -126,6 +126,7 @@ export interface PromptDefinition {
         description?: string;
         required?: boolean;
     }[];
+    complete?(argument: string, value: string, context: Record<string, string>): readonly string[] | Promise<readonly string[]>;
     get(args: Record<string, string>): {
         description?: string;
         messages: PromptMessage[];
@@ -168,6 +169,7 @@ export interface ResourceInfo {
 export interface ResourceProvider {
     list(): readonly ResourceInfo[];
     templates?(): readonly ResourceTemplateInfo[];
+    complete?(template: string, variable: string, value: string, context: Record<string, string>): readonly string[] | Promise<readonly string[]>;
     read(uri: string, context: ToolContext): Promise<ResourceContents[] | undefined> | ResourceContents[] | undefined;
 }
 
@@ -236,6 +238,12 @@ export interface ToolDefinition {
     inputSchema: {
         type: 'object';
         properties: Record<string, Json>;
+        required?: string[];
+        additionalProperties?: boolean;
+    };
+    outputSchema?: {
+        type: 'object';
+        properties?: Record<string, Json>;
         required?: string[];
         additionalProperties?: boolean;
     };
