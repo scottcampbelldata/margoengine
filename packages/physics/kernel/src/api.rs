@@ -161,6 +161,16 @@ pub extern "C" fn world_awake() -> u32 {
 pub extern "C" fn world_islands() -> u32 {
     world().header().islands
 }
+/// Sets how far apart two shapes may be and still have contacts made, in metres; false for a distance that is negative or
+/// not finite. Every box is fitted again at the next step.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_prediction(distance: f32) -> u32 {
+    world().set_prediction(distance) as u32
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_prediction() -> f32 {
+    world().header().prediction
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn world_set_sleep(energy: f32, time: f32) {
     let header = world().header_mut();

@@ -138,6 +138,11 @@ impl World {
     /// Writes a collider's fat box when what the step can reach has left it, or it has grown far too big. True when it did.
     fn refresh(&mut self, c: usize, dt: f32) -> bool {
         let (low, high) = self.reach_fitting(c, dt);
+        if self.header().refit != 0 {
+            // The prediction changed: every box is fitted again, to the new margin.
+            self.fit(c, low, high);
+            return true;
+        }
         let (fat_low, fat_high) = (self.v(FAT_MIN_X, c), self.v(FAT_MAX_X, c));
         let inside = low.x >= fat_low.x
             && low.y >= fat_low.y
@@ -146,7 +151,8 @@ impl World {
             && high.y <= fat_high.y
             && high.z <= fat_high.z;
         if inside {
-            let need = high.sub(low).add(v3(2.0 * MARGIN, 2.0 * MARGIN, 2.0 * MARGIN)).scale(REFIT);
+            let margin = self.header().prediction;
+            let need = high.sub(low).add(v3(2.0 * margin, 2.0 * margin, 2.0 * margin)).scale(REFIT);
             let size = fat_high.sub(fat_low);
             if size.x <= need.x && size.y <= need.y && size.z <= need.z {
                 return false;
@@ -182,7 +188,8 @@ impl World {
 
     #[inline(always)]
     fn fit(&mut self, c: usize, low: V3, high: V3) {
-        let margin = v3(MARGIN, MARGIN, MARGIN);
+        let prediction = self.header().prediction;
+        let margin = v3(prediction, prediction, prediction);
         self.set_v(FAT_MIN_X, c, low.sub(margin));
         self.set_v(FAT_MAX_X, c, high.add(margin));
     }
@@ -260,6 +267,7 @@ impl World {
         if fresh > 0 {
             self.join(fresh, dt);
         }
+        self.header_mut().refit = 0;
     }
 
     /// One end walks from where it sat to where its value belongs. Each min end and max end it passes is a crossing.

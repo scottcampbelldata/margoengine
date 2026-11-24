@@ -46,6 +46,11 @@ pub struct Header {
     /// A body sleeps under this kinetic energy per unit of mass, in J/kg, held for this many seconds.
     pub sleep_energy: f32,
     pub sleep_time: f32,
+    /// How far apart two shapes may be and still have contacts made, in metres: the margin of every fat box and the base of
+    /// every contact limit (Rapier's `predictionDistance`). Default `broad::MARGIN`.
+    pub prediction: f32,
+    /// Set when the prediction changed: the next broad phase fits every box again.
+    pub refit: u32,
     /// Rows of hulls, vertices, half-edges and faces handed out so far.
     pub hull_rows: [u32; 4],
     /// The substep the carried impulses were made for, zero before the first step.
@@ -147,6 +152,8 @@ impl World {
                 islands: 0,
                 sleep_energy: SLEEP_ENERGY_DEFAULT,
                 sleep_time: 0.5,
+                prediction: crate::broad::MARGIN,
+                refit: 0,
                 hull_rows: [0; 4],
                 contact_substep: 0.0,
                 contact_hertz: 120.0,
@@ -512,6 +519,21 @@ impl World {
         self.set_s(COLLIDER_BORDER, at as usize, border);
         self.mark_pending(compound);
         self.wake(self.uu(COLLIDER_BODY, compound as usize));
+        true
+    }
+
+    /// Sets the prediction distance (see `api::world_set_prediction`).
+    pub fn set_prediction(&mut self, distance: f32) -> bool {
+        if !(distance >= 0.0 && distance < 1.0e6) {
+            return false;
+        }
+        self.header_mut().prediction = distance;
+        self.header_mut().refit = 1;
+        for c in 0..self.header().collider_rows {
+            if self.uu(COLLIDER_STATE, c as usize) & (IN_BROAD | REMOVED) == IN_BROAD {
+                self.mark_pending(c);
+            }
+        }
         true
     }
 

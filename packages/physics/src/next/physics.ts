@@ -78,6 +78,8 @@ export interface PhysicsOptions {
    * a slippery patch). The object is reused, so keep what you need, not the object.
    */
   contactModifier?: (contact: ContactModification) => void;
+  /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04), Rapier's `predictionDistance`. */
+  predictionDistance?: number;
 }
 
 /** A touching pair shown to `PhysicsOptions.contactModifier`, valid only inside the call. */
@@ -422,6 +424,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.world.setGravity(...gravity);
     const filter = options.contactFilter;
     if (filter) this.world.contactFilter = (a, b) => filter(this.byRow.get(a)!.body, this.byRow.get(b)!.body);
+    if (options.predictionDistance !== undefined) this.world.setPredictionDistance(options.predictionDistance);
     const modifier = options.contactModifier;
     if (modifier) {
       const world = this.world,
@@ -458,6 +461,13 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   get isDisposed(): boolean {
     return this.disposed;
+  }
+  /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04). */
+  get predictionDistance(): number {
+    return this.kernel.predictionDistance;
+  }
+  set predictionDistance(distance: number) {
+    this.kernel.setPredictionDistance(distance);
   }
   get gravity(): [number, number, number] {
     return this.kernel.gravity;

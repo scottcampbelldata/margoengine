@@ -37,6 +37,8 @@ interface KernelExports extends WebAssembly.Exports {
   world_awake(): number;
   world_islands(): number;
   world_set_sleep(energy: number, time: number): void;
+  world_set_prediction(distance: number): number;
+  world_prediction(): number;
   world_sleep_energy(): number;
   world_sleep_time(): number;
   world_set_solver(index: number, value: number): number;
@@ -814,6 +816,23 @@ export class KernelWorld {
   /** Groups of touching bodies still awake after the last step. Fixed and kinematic bodies join none. */
   get islandCount(): number {
     return this.api.world_islands();
+  }
+  /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04), Rapier's `predictionDistance`. */
+  get predictionDistance(): number {
+    return this.api.world_prediction();
+  }
+  /**
+   * Sets how far apart two shapes may be and still have contacts made, in metres: a contact inside it is speculative, kept
+   * from sinking in but pushing nothing until the shapes close. A larger distance finds contacts earlier and costs more
+   * pairs; every box is fitted again at the next step.
+   * @throws RangeError unless it is finite and between 0 and 1,000,000.
+   */
+  setPredictionDistance(distance: number): this {
+    if (!this.api.world_set_prediction(distance))
+      throw new RangeError(
+        `The prediction distance is a length from 0 to 1,000,000 metres (got ${distance}); 0.04 is the default.`,
+      );
+    return this;
   }
   /** Kinetic energy per unit of mass under which a body counts as still, in J/kg (default 0.0002, a slide of 0.02 m/s). */
   get sleepEnergy(): number {

@@ -298,6 +298,8 @@ export class KernelWorld {
     get solvingPairs(): number;
     get awakeCount(): number;
     get islandCount(): number;
+    get predictionDistance(): number;
+    setPredictionDistance(distance: number): this;
     get sleepEnergy(): number;
     get sleepTime(): number;
     setSleep(energy: number, time: number): this;
@@ -425,6 +427,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     constructor(engine: EngineKernel | null, options?: PhysicsOptions);
     get kernel(): KernelWorld;
     get isDisposed(): boolean;
+    get predictionDistance(): number;
+    set predictionDistance(distance: number);
     get gravity(): [number, number, number];
     set gravity(value: Vec3);
     get alpha(): number;
@@ -704,6 +708,7 @@ export interface PhysicsOptions {
     name?: string;
     contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
     contactModifier?: (contact: ContactModification) => void;
+    predictionDistance?: number;
 }
 
 export interface PhysicsRaycastOptions extends QueryFilter {

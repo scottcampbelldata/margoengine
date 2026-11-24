@@ -1,7 +1,6 @@
 // The narrow phase: for each pair the broad phase found near, one manifold, a set of points that share a normal. One-shot,
 // as Gregorius 2015 sets out: find the touching features, then clip one face against the side planes of the other, so a
 // box resting on a box has all its points from the first frame, with no artificial torque while they gather.
-use crate::broad::MARGIN;
 use crate::events::groups_meet;
 use crate::gjk::{Posed, Segment, epa, gjk};
 use crate::hull::{BoxData, Poly, box_poly};
@@ -514,7 +513,7 @@ impl World {
     fn contact_limit(&self, a: usize, b: usize, dt: f32) -> f32 {
         let g = self.header().gravity;
         let pull = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) * dt * dt;
-        let mut limit = MARGIN + 2.0 * pull;
+        let mut limit = self.header().prediction + 2.0 * pull;
         for c in [a, b] {
             let at = self.uu(COLLIDER_BODY, c) as usize;
             let (linear, angular) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
