@@ -1384,7 +1384,15 @@ export class PointsPlugin implements EnginePlugin {
         let draw = this.cloudDraws[cloudDrawCount];
         const drawnView = view ?? gpu.whiteView,
           end = entryBlock.length;
-        if (!draw) this.cloudDraws[cloudDrawCount] = draw = { cloud, r, view: drawnView, first, end, mapped: !!view && cloud.material.map !== null };
+        if (!draw)
+          this.cloudDraws[cloudDrawCount] = draw = {
+            cloud,
+            r,
+            view: drawnView,
+            first,
+            end,
+            mapped: !!view && cloud.material.map !== null,
+          };
         else {
           draw.cloud = cloud;
           draw.r = r;
@@ -1408,24 +1416,29 @@ export class PointsPlugin implements EnginePlugin {
     let kept = 0;
     for (let i = 0; i < cloudDrawCount; i++) {
       const a = draws[i];
-      if (this.takes(a.cloud.material)) {
-        for (let e = a.first; e < a.end; e++) {
-          if (!allotment[e]) continue;
-          a.r.drawn.push(entryBlock[e], allotment[e]);
-          a.cloud.stats.pointsDrawn += allotment[e];
-        }
-        // A thinned cloud grows its points by the spacing it lost, up to the material's adaptiveSize.
-        const grow = a.cloud.material.adaptiveSize,
-          stats = a.cloud.stats;
-        if (grow > 1 && stats.pointsDrawn > 0 && stats.pointsDrawn < stats.pointsVisible)
+      // A thinned cloud, drawn by this plugin or by the transparency hook, grows its points by the spacing it lost,
+      // up to the material's adaptiveSize.
+      const grow = a.cloud.material.adaptiveSize;
+      if (grow > 1) {
+        let drawn = 0;
+        for (let e = a.first; e < a.end; e++) drawn += allotment[e];
+        const visible = a.cloud.stats.pointsVisible;
+        if (drawn > 0 && drawn < visible)
           this.writeCloudUniform(
             a.cloud,
             a.r,
             a.r.model,
             a.mapped,
             pixelScale,
-            Math.min(grow, Math.sqrt(stats.pointsVisible / stats.pointsDrawn)),
+            Math.min(grow, Math.sqrt(visible / drawn)),
           );
+      }
+      if (this.takes(a.cloud.material)) {
+        for (let e = a.first; e < a.end; e++) {
+          if (!allotment[e]) continue;
+          a.r.drawn.push(entryBlock[e], allotment[e]);
+          a.cloud.stats.pointsDrawn += allotment[e];
+        }
       } else {
         draws[i] = draws[kept];
         draws[kept++] = a;

@@ -484,6 +484,45 @@ async function styleFilters() {
   return 'Attribute filters and style expressions hide, recolour, update, restore and extract points on the GPU';
 }
 
+async function adaptiveSizeBudget() {
+  const { PointCloud } = await import('../dist/index.js');
+  const { engine, frame, end } = await rig(),
+    points = PointsPlugin.attach(engine);
+  const cloud = points.add(
+    new PointCloud({
+      positions: square(100),
+      material: { size: 2, minPixelSize: 1, maxPixelSize: 64, adaptiveSize: 3 },
+    }),
+  );
+  const uniform = () => {
+    const f = points['ensureCloud'](cloud).floats;
+    return [f[20], f[21], f[22]];
+  };
+  const near = (a, b) => Math.abs(a - b) < 1e-4;
+  points.pointBudget = 2500;
+  await frame();
+  const { pointsVisible, pointsDrawn } = cloud.stats,
+    grow = Math.sqrt(pointsVisible / pointsDrawn);
+  assert(pointsDrawn < pointsVisible, `the budget thins the cloud: ${pointsDrawn} of ${pointsVisible}`);
+  let [size, lo, hi] = uniform();
+  assert(near(size, 2 * grow) && near(lo, grow) && near(hi, 64 * grow), `grown by ${grow}: ${size} ${lo} ${hi}`);
+  cloud.material.adaptiveSize = 1.5;
+  await frame();
+  [size, lo, hi] = uniform();
+  assert(near(size, 3) && near(lo, 1.5) && near(hi, 96), `capped at the limit 1.5: ${size} ${lo} ${hi}`);
+  points.pointBudget = 1_000_000;
+  await frame();
+  [size, lo, hi] = uniform();
+  assert(cloud.stats.pointsDrawn === cloud.stats.pointsVisible, 'the raised budget draws every visible point');
+  assert(near(size, 2) && near(lo, 1) && near(hi, 64), `back to the material's size: ${size} ${lo} ${hi}`);
+  cloud.material.adaptiveSize = 0;
+  points.pointBudget = 2500;
+  await frame();
+  assert(near(uniform()[0], 2), 'adaptiveSize 0 keeps the size under a budget');
+  await end();
+  return 'adaptiveSize multiplies a thinned plain cloud by sqrt(visible/drawn) up to its limit and returns to 1 when the budget covers it';
+}
+
 window.runFeatures = async () => {
   const checks = [];
   for (const check of [
@@ -497,6 +536,7 @@ window.runFeatures = async () => {
     mipmaps,
     clipVolumes,
     styleFilters,
+    adaptiveSizeBudget,
   ])
     checks.push(await check());
   return checks;
