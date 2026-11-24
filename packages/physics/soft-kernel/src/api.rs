@@ -18,7 +18,7 @@ static mut WORLD: World = World {
     kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(),
     at_p: Col::new(), at_row: Col::new(), at_rx: Col::new(), at_ry: Col::new(), at_rz: Col::new(), attachments: 0,
     vtri: Col::new(), vb_on: Col::new(), vb_first: Col::new(), vb_count: Col::new(), vb_target: Col::new(), vb_omega: Col::new(),
-    vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(), rg: crate::rigid::Rigid::new(), gs: Col::new(),
+    vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(), rg: crate::rigid::Rigid::new(), gs: Col::new(), dom: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -47,7 +47,7 @@ columns! {
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
     kc, knx, kny, knz, kpx, kpy, kpz, kvx, kvy, kvz, kf,
     at_p, at_row, at_rx, at_ry, at_rz,
-    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda, gs,
+    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda, gs, dom,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.

@@ -464,6 +464,14 @@ export class SoftBodyDesc {
   /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
+  /** @internal Dominance group: a body of a higher one is not pushed by this one, and one of a lower one is pushed whole. */
+  dominance = 0;
+  /** @internal Extra constraint passes for this body's step. */
+  additionalIterations = 0;
+  /** @internal The collider of the body's own surface, made when it is created (null: none, the default). */
+  surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null = null;
+  /** @internal Whether the surface knows its outside (undefined: when the surface is closed). */
+  oriented: boolean | undefined = undefined;
   /** @internal Every edge resists stretch only (true), or just the listed ones (indices of the edges, then the bend edges). */
   tension: boolean | number[] = false;
   /** @internal */ triangles: number[] = [];
@@ -847,6 +855,50 @@ export class SoftBodyDesc {
           throw new RangeError(`Edge ${e} is not one of the ${total} edges.`);
     }
     this.tension = typeof edges === 'boolean' ? edges : [...edges];
+    return this;
+  }
+
+  /**
+   * The dominance group of the body, from -128 to 127 as a rigid body's (default 0): the particles do not give way to a rigid
+   * body of a higher group (it is as immovable to them as a fixed one), and a rigid body of a lower group is moved by the whole
+   * correction while the particles hold their place.
+   */
+  setDominanceGroup(group: number): this {
+    if (!Number.isInteger(group) || group < -128 || group > 127)
+      throw new RangeError('A dominance group is a whole number from -128 to 127.');
+    this.dominance = group;
+    return this;
+  }
+
+  /**
+   * Extra constraint passes for this body each piece of a step (Rapier's `setAdditionalSolverIterations`): the world runs
+   * `iterations` plus the most any of its soft bodies ask for.
+   */
+  setAdditionalSolverIterations(passes: number): this {
+    count(passes, 'passes', 0);
+    this.additionalIterations = passes;
+    return this;
+  }
+
+  /** Gives the body a surface collider of its own when it is created (see {@link SoftBodies.createSurfaceCollider}); the default is none. */
+  setSurfaceCollider(settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {}): this {
+    this.surfaceSettings = { ...settings };
+    return this;
+  }
+
+  /** The body has no surface collider of its own (the default). */
+  setNoSurfaceCollider(): this {
+    this.surfaceSettings = null;
+    return this;
+  }
+
+  /**
+   * Whether the surface collider knows its outside (Rapier's `setOriented`), so a point inside a closed surface is found
+   * inside by queries; false makes a shell. Left out, it is oriented when the surface is closed (a body that holds a volume
+   * or has a skin).
+   */
+  setOriented(oriented: boolean): this {
+    this.oriented = oriented;
     return this;
   }
 
@@ -1272,6 +1324,9 @@ export class SoftBody {
   /** @internal The packed groups the particles meet colliders by; undefined meets every collider. */ collisionGroups:
     | number
     | undefined = undefined;
+  /** @internal */ dominance = 0;
+  /** @internal */ additionalIterations = 0;
+  /** @internal */ oriented: boolean | undefined = undefined;
   /** @internal Whether its triangles are in the cloth contact search, and how rough the cloth is. */ selfContacts = false;
   /** @internal */ selfFriction = 0;
 
@@ -1865,6 +1920,7 @@ export class SoftBodies implements PhysicsAttachment {
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0];
+  private rowGroups: number[] = [];
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
   private bound: BoundMesh[] = [];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
@@ -2152,6 +2208,9 @@ export class SoftBodies implements PhysicsAttachment {
       body.volumeOn = true;
     }
     body.selfFriction = desc.selfFriction;
+    body.dominance = desc.dominance;
+    body.additionalIterations = desc.additionalIterations;
+    body.oriented = desc.oriented;
     if (cells) {
       const [mu, lambda] = desc.cellMaterial.lame(),
         model = CELL_MODEL[desc.cellMaterial.model];
@@ -2196,6 +2255,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeCellMaterial(body);
     this.syncCloth();
     this.syncVolume(desc.volumeFactor);
+    if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
     return body;
   }
 
@@ -2866,8 +2926,11 @@ export class SoftBodies implements PhysicsAttachment {
     this.takeFromProxies();
     this.exports.soft_fem_step_begin();
     this.exports.soft_begin(dt);
+    // The passes of the body that asks for the most are the world's (the passes of a coupled island are the largest asked).
+    let extra = 0;
+    for (const b of this.bodies) extra = Math.max(extra, b.additionalIterations);
     for (let piece = 0; piece < this.substeps; piece++) {
-      this.exports.soft_pre(h, this.iterations, g[0], g[1], g[2]);
+      this.exports.soft_pre(h, this.iterations + extra, g[0], g[1], g[2]);
       this.exports.soft_apply(h, h * (piece + 1));
       this.exports.soft_post(h);
     }
@@ -2875,7 +2938,8 @@ export class SoftBodies implements PhysicsAttachment {
     this.giveToProxies(dt);
     const c = this.columns();
     bodies.forEach((body, row) => {
-      if (body.type !== 'dynamic') return;
+      // A body of a higher dominance group than the soft body's is not pushed by it.
+      if (body.type !== 'dynamic' || body.dominance > (this.rowGroups[row] ?? 0)) return;
       const j: Vec3 = [c.jx[row]!, c.jy[row]!, c.jz[row]!],
         k: Vec3 = [c.kx[row]!, c.ky[row]!, c.kz[row]!];
       if (j[0] === 0 && j[1] === 0 && j[2] === 0 && k[0] === 0 && k[1] === 0 && k[2] === 0) return;
@@ -2883,7 +2947,16 @@ export class SoftBodies implements PhysicsAttachment {
         torque: Vec3 = [k[0] / dt, k[1] / dt, k[2] / dt];
       body.addForce(force);
       body.addTorque(torque);
-      this.pushes.set(body, [force, torque]);
+      const had = this.pushes.get(body);
+      this.pushes.set(
+        body,
+        had
+          ? [
+              [had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]],
+              [had[1][0] + torque[0], had[1][1] + torque[1], had[1][2] + torque[2]],
+            ]
+          : [force, torque],
+      );
     });
     const cellsTorn = this.exports.soft_fem_torn();
     if (this.exports.soft_torn() > 0 || cellsTorn !== this.cellsTornSeen || this.cellTornByHand) {
@@ -2909,6 +2982,7 @@ export class SoftBodies implements PhysicsAttachment {
       slot: number;
       collider: number;
       body: number;
+      soft: SoftBody;
       normal: Vec3;
       point: Vec3;
       velocity: Vec3;
@@ -2953,6 +3027,7 @@ export class SoftBodies implements PhysicsAttachment {
             slot,
             collider: hit.collider[at]!,
             body: hit.body[at]!,
+            soft,
             normal: [hit.normal[at * 3]!, hit.normal[at * 3 + 1]!, hit.normal[at * 3 + 2]!],
             point: [hit.point[at * 3]!, hit.point[at * 3 + 1]!, hit.point[at * 3 + 2]!],
             velocity: [hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!],
@@ -2961,18 +3036,23 @@ export class SoftBodies implements PhysicsAttachment {
     }
     // The bodies the planes and the attachments belong to get a row each, with what the kernel needs to share a contact with
     // them.
+    // A row is one rigid body as one soft body's dominance group sees it, so two groups at one body have two rows.
+    const key = (bodyRow: number, soft: SoftBody): number => bodyRow * 256 + ((soft.dominance + 128) & 255);
+    this.rowGroups = [];
     const live = this.attachments.filter((a) => !a.soft.removed && a.body.valid);
     for (const a of live) {
-      if (rows.has(a.body.row)) continue;
-      rows.set(a.body.row, bodies.length);
+      if (rows.has(key(a.body.row, a.soft))) continue;
+      rows.set(key(a.body.row, a.soft), bodies.length);
       bodies.push(a.body);
+      this.rowGroups.push(a.soft.dominance);
     }
     for (const f of found) {
-      if (rows.has(f.body)) continue;
+      if (rows.has(key(f.body, f.soft))) continue;
       const owner = this.physics.bodyOfCollider(f.collider);
       if (!owner) continue;
-      rows.set(f.body, bodies.length);
+      rows.set(key(f.body, f.soft), bodies.length);
       bodies.push(owner);
+      this.rowGroups.push(f.soft.dominance);
     }
     this.exports.soft_attach_reserve(live.length);
     this.capacity[4] = Math.max(this.capacity[4]!, live.length);
@@ -2987,13 +3067,13 @@ export class SoftBodies implements PhysicsAttachment {
         a.local[2] - a.body.centerOfMass[2],
       ]);
       c.at_p[k] = a.soft.firstParticle + a.index;
-      c.at_row[k] = rows.get(a.body.row)! + 1;
+      c.at_row[k] = rows.get(key(a.body.row, a.soft))! + 1;
       c.at_rx[k] = lever[0];
       c.at_ry[k] = lever[1];
       c.at_rz[k] = lever[2];
     });
     for (const f of found) {
-      const table = rows.get(f.body);
+      const table = rows.get(key(f.body, f.soft));
       if (table === undefined) continue;
       const k = f.row * 4 + f.slot;
       c.kc[k] = table + 1;
@@ -3025,6 +3105,11 @@ export class SoftBodies implements PhysicsAttachment {
     c.avx[row] = av[0];
     c.avy[row] = av[1];
     c.avz[row] = av[2];
+    // Dominance: a rigid body of a higher group than the soft body's is immovable to its particles; of a lower one, it takes the
+    // whole correction while the particles hold.
+    const group = this.rowGroups[row] ?? 0;
+    if (body.dominance > group) for (let k = 0; k < 7; k++) inverse[k] = 0;
+    c.dom[row] = group > body.dominance ? 1 : 0;
     c.wm[row] = inverse[0]!;
     c.gs[row] = body.gravityScale;
     c.iixx[row] = inverse[1]!;
@@ -3079,6 +3164,7 @@ export class SoftBodies implements PhysicsAttachment {
         vertices: skin ? body.meshVertices() : body.particlePositions(),
         indices: skin ? body.meshIndices() : body.triangleList,
         deformable: true,
+        oriented: body.oriented ?? (body.volumeOn || skin),
         ...settings,
       },
     });

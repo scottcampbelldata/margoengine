@@ -898,3 +898,71 @@ test('a body with a skin collides by its skin', async () => {
   near(hit.point[1], 1, 0.02, 'at its top face');
   assert.equal(collider.shape, 'trimesh');
 });
+
+test('dominance decides who gives way: the soft body holds against a lower group, and a higher group goes through', async () => {
+  const drop = async (softGroup, boxGroup) => {
+    const { physics, soft } = await create();
+    const n = 12,
+      d = 0.1;
+    const cloth = soft.create(
+      SoftBodyDesc.cloth([-0.55, 1, -0.55], [d, 0, 0], [0, 0, d], n, n)
+        .setPinnedParticles([0, n - 1, (n - 1) * n, n * n - 1])
+        .setLinearDamping(3)
+        .setParticleMass(0.02)
+        .setParticleRadius(0.04)
+        .setDominanceGroup(softGroup),
+    );
+    const box = physics.addBody(null, {
+      position: [0, 1.4, 0],
+      dominance: boxGroup,
+      colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], density: 400 },
+    });
+    steps(physics, 300);
+    return { box: box.position[1], cloth: cloth.particlePosition(6 * n + 6)[1] };
+  };
+  const equal = await drop(0, 0),
+    softWins = await drop(5, 0),
+    boxWins = await drop(0, 5);
+  assert.ok(
+    softWins.cloth > equal.cloth + 0.03,
+    `a dominant cloth sags less under the box: ${softWins.cloth} against ${equal.cloth}`,
+  );
+  assert.ok(softWins.box > 0.8, `and the box rests on it: ${softWins.box}`);
+  assert.ok(boxWins.box < 0.2, `a dominant box is not held by the cloth and falls past it: ${boxWins.box}`);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setDominanceGroup(300), RangeError);
+});
+
+test('extra solver iterations stiffen a sheet, a surface collider can be made with the body, and a closed surface is oriented', async () => {
+  const hang = async (extra) => {
+    const { physics, soft } = await create({ gravity: [0, -9.81, 0] });
+    const n = 10;
+    const cloth = soft.create(
+      SoftBodyDesc.cloth([0, 3, 0], [0.1, 0, 0], [0, -0.1, 0], n, n)
+        .setPinnedParticles(Array.from({ length: n }, (_, i) => i * n))
+        .setParticleMass(0.2)
+        .setLinearDamping(1)
+        .setAdditionalSolverIterations(extra),
+    );
+    steps(physics, 200);
+    return 3 - cloth.particlePosition((n - 1) * n + n - 1)[1];
+  };
+  const loose = await hang(0),
+    tight = await hang(30);
+  assert.ok(tight < loose, `more passes hold the sheet shorter: ${tight} against ${loose}`);
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setAdditionalSolverIterations(-1), RangeError);
+
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  const plain = soft.create(SoftBodyDesc.cloth([0, 0, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3));
+  assert.equal(plain.surface, null, 'no surface collider unless asked');
+  const withSurface = soft.create(
+    SoftBodyDesc.cloth([3, 0, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3).setSurfaceCollider({ friction: 0.5 }),
+  );
+  assert.ok(withSurface.surface, 'the body made with one has it');
+  const oriented = soft.create(SoftBodyDesc.sphere([10, 0, 0], 1, 1).setSurfaceCollider());
+  const shell = soft.create(SoftBodyDesc.sphere([20, 0, 0], 1, 1).setOriented(false).setSurfaceCollider());
+  physics.step();
+  assert.ok(physics.intersectPoint([10, 0, 0]).length > 0, 'a point inside a closed, oriented surface is found inside');
+  assert.equal(physics.intersectPoint([20, 0, 0]).length, 0, 'inside a shell it is not');
+  void oriented;
+  void shell;
+});

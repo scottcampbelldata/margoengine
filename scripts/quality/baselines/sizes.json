@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17764042,
+  "total": 17766229,
   "history": [
     {
       "date": "2026-10-24",
@@ -11547,6 +11547,12 @@
       "commit": "a565f3c0c",
       "reason": "physics: DragJoint (drag.ts, the soft constraint of a mouse joint): root entry budget 265,708 to 266,248 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "40a28f692",
+      "reason": "soft entry gains dominance, per-body iterations, surface collider and oriented options: loader and a few kernel bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12307,9 +12313,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 66637,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 206519,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 72231,
+    "@margoengine/physics/soft": 74503,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 23132,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 50930,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 50845,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

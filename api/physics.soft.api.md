@@ -124,6 +124,9 @@ export class SoftBody {
     volumeOn: boolean;
     surfaceRest: number;
     collisionGroups: number | undefined;
+    dominance: number;
+    additionalIterations: number;
+    oriented: boolean | undefined;
     selfContacts: boolean;
     selfFriction: number;
     get valid(): boolean;
@@ -206,6 +209,10 @@ export class SoftBodyDesc {
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
+    dominance: number;
+    additionalIterations: number;
+    surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null;
+    oriented: boolean | undefined;
     tension: boolean | number[];
     triangles: number[];
     cells: number[];
@@ -236,6 +243,11 @@ export class SoftBodyDesc {
     }): SoftBodyDesc;
     setVolumeFactor(factor: number | null): this;
     setTensionOnly(edges?: boolean | readonly number[]): this;
+    setDominanceGroup(group: number): this;
+    setAdditionalSolverIterations(passes: number): this;
+    setSurfaceCollider(settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): this;
+    setNoSurfaceCollider(): this;
+    setOriented(oriented: boolean): this;
     setShapeMatching(on: boolean): this;
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;

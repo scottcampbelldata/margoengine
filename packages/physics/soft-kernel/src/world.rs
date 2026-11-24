@@ -157,6 +157,8 @@ pub struct World {
     pub rg: crate::rigid::Rigid,
     /// Per body row: how much gravity pulls the body, so it falls through the step with the particles that hang from it.
     pub gs: Col<f32>,
+    /// Per body row: 1 when the soft body dominates the body (the particle is immovable to it), else 0.
+    pub dom: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -217,7 +219,7 @@ impl World {
             &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
             &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
             &mut self.kx, &mut self.ky, &mut self.kz, &mut self.wm, &mut self.iixx, &mut self.iixy, &mut self.iixz,
-            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs,
+            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom,
         ] {
             grow(v, colliders);
         }
@@ -472,6 +474,15 @@ impl World {
         let (ax, ay, az) = (qy * nz - qz * ny, qz * nx - qx * nz, qx * ny - qy * nx);
         let (ix, iy, iz) = self.inverse_inertia(c, ax, ay, az);
         let wb = self.wm[c] + ax * ix + ay * iy + az * iz;
+        if self.dom[c] > 0.0 {
+            // The soft body dominates this body: the particle does not give way, and the body takes the whole correction at the
+            // contact point, as an impulse that moves it by `push` there.
+            if wb > 0.0 {
+                let s = push / (wb * h);
+                self.apply_to_body(c, [-nx * s, -ny * s, -nz * s], [qx, qy, qz]);
+            }
+            return;
+        }
         let share = self.w[i] / (self.w[i] + wb);
         self.x[i] += nx * push * share;
         self.y[i] += ny * push * share;
@@ -511,6 +522,26 @@ impl World {
             self.lvx[c] += jx * self.wm[c];
             self.lvy[c] += jy * self.wm[c];
             self.lvz[c] += jz * self.wm[c];
+            let (wx, wy, wz) = self.inverse_inertia(c, kx, ky, kz);
+            self.avx[c] += wx;
+            self.avy[c] += wy;
+            self.avz[c] += wz;
+        }
+    }
+
+    /// Gives body row `c` an impulse `j` at the point `q` from its centre of mass, and moves its velocities on.
+    pub(crate) fn apply_to_body(&mut self, c: usize, j: [f32; 3], q: [f32; 3]) {
+        self.jx[c] += j[0];
+        self.jy[c] += j[1];
+        self.jz[c] += j[2];
+        let (kx, ky, kz) = (q[1] * j[2] - q[2] * j[1], q[2] * j[0] - q[0] * j[2], q[0] * j[1] - q[1] * j[0]);
+        self.kx[c] += kx;
+        self.ky[c] += ky;
+        self.kz[c] += kz;
+        if self.wm[c] > 0.0 {
+            self.lvx[c] += j[0] * self.wm[c];
+            self.lvy[c] += j[1] * self.wm[c];
+            self.lvz[c] += j[2] * self.wm[c];
             let (wx, wy, wz) = self.inverse_inertia(c, kx, ky, kz);
             self.avx[c] += wx;
             self.avy[c] += wy;
