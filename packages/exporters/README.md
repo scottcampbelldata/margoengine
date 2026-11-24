@@ -371,7 +371,7 @@ The MTL writes `Kd`, `Ks`/`Ns` (Phong), `Ke`, `Pr`/`Pm`, `d` (1 for opaque mater
 `exportOBJ` names those files in `opacityMaps`; `await writeOpacityMaps(result)` encodes each from its PNG's alpha
 into `result.textures`.
 
-A loaded model's base colour may be held in WebP, KTX2 (Basis Universal) or DDS, or sit in a file beside a `.gltf`. Decoding and fetching take time and `exportOBJ` is synchronous, so the MTL names a `.png` for each and the file waits in `undecoded`. `await writeTextures(result)` fetches and decodes them into `textures`. A PNG or JPEG fallback in the model is taken first and needs neither. AVIF has no decoder yet, so `writeTextures` throws on it. `writeOpacityMaps` runs `writeTextures` first.
+A loaded model's base colour may be held in WebP, AVIF, KTX2 (Basis Universal) or DDS, or sit in a file beside a `.gltf`. Decoding and fetching take time and `exportOBJ` is synchronous, so the MTL names a `.png` for each and the file waits in `undecoded`. `await writeTextures(result)` fetches and decodes them into `textures`. A PNG or JPEG fallback in the model is taken first and needs neither. AVIF is decoded by `@margoengine/decoders/avif`. `writeOpacityMaps` runs `writeTextures` first.
 
 ```ts
 import {Engine} from 'margoengine/core';

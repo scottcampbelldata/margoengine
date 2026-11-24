@@ -1,5 +1,5 @@
 import { materialEngine as headless } from './helpers.js';
-// exportOBJ of a loaded model whose base colour is held in WebP, KTX2, DDS or a file beside it: writeTextures decodes each
+// exportOBJ of a loaded model whose base colour is held in WebP, AVIF, KTX2, DDS or a file beside it: writeTextures decodes each
 // to the PNG the MTL names. The images are real files: cwebp's and the Khronos sample textures of @margoengine/decoders.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -84,6 +84,17 @@ const held = (extension, bytes, mimeType) =>
 for (const [name, file, mimeType, extension] of [
   ['WebP', webp, 'image/webp', 'EXT_texture_webp'],
   ['KTX2', () => fixture('Dot_C.ktx2'), 'image/ktx2', 'KHR_texture_basisu'],
+  [
+    'AVIF',
+    () =>
+      new Uint8Array(
+        readFileSync(
+          new URL('../../decoders/native/avif/tests/fixtures/fox.profile0.8bpc.yuv420.avif', import.meta.url),
+        ),
+      ),
+    'image/avif',
+    'EXT_texture_avif',
+  ],
   [
     'DDS',
     () => dds({ width: 16, height: 16, fourCC: 'DXT1', data: new Uint8Array(128) }),
