@@ -81,6 +81,22 @@ test('flameEmission: a hurricane lantern flame shows 17,000 cd/m2, its intensity
     assert.throws(() => flameEmission(light, area), RangeError);
 });
 
+// KB-FAULD-EMISSIVE1: a light colour above 1 (Fauld's 2700 K bulbs, [1.98, 0.786, 0.188] of luminance 1) gave an
+// emissive colour above 1, which UnlitMaterial rejects ("Material emissive must be in [0, 1]"), so no bulb could show
+// its light. The colour is scaled to a top channel of 1 and the scale moves into the intensity.
+test('flameEmission: a light colour above 1 gives an emissive colour in [0, 1] of the same radiance', async () => {
+  const { flameEmission } = await import('../dist/flicker.js'),
+    bulb = { color: [1.98, 0.786, 0.188], intensity: 47.6, radius: 0.03 },
+    emission = flameEmission(bulb),
+    area = Math.PI * 0.03 ** 2;
+  assert.deepEqual(emission.emissive, [1, 0.786 / 1.98, 0.188 / 1.98]);
+  for (let i = 0; i < 3; i++)
+    assert.ok(Math.abs(emission.emissive[i] * emission.emissiveIntensity - (bulb.color[i] * bulb.intensity) / area) < 1e-9);
+  assert.ok(emission.emissive.every((c) => c >= 0 && c <= 1));
+  // A black light shows nothing and still gives a usable colour.
+  assert.deepEqual(flameEmission({ color: [0, 0, 0], intensity: 1, radius: 0.01 }).emissive, [0, 0, 0]);
+});
+
 test('animateFlicker flickers each light emitter with its light and puts its steady value back', async () => {
   const { animateFlicker } = await import('../dist/flicker.js');
   let frame;

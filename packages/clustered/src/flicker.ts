@@ -194,7 +194,9 @@ export interface FlameEmission {
  * light is (`pi radius^2`, the area a sphere light of that radius shows from every side, so the flame is as bright as
  * the light it gives, and as bright as its highlights on a mirror). A hurricane lantern's 6.5 cd over its 11 mm flame
  * (Mills, LBNL 2003) is 6.5 / (pi 0.011^2) = 17,000 cd/m2 averaged over its flicker. Draw the flame with the same
- * projected area: an ellipsoid with semi-axes `a` across and `b` up shows `pi a b` from the side.
+ * projected area: an ellipsoid with semi-axes `a` across and `b` up shows `pi a b` from the side. A light colour above
+ * 1 (one of luminance 1, say) comes back scaled to a top channel of 1 with the scale in `emissiveIntensity`, since a
+ * material's emissive colour is in [0, 1]; the radiance, colour times intensity, is the same.
  * @example
  * const lantern = {position: [0, 1.2, 0], ...hurricaneLantern()};
  * const flame = new UnlitMaterial({color: [0, 0, 0], ...flameEmission(lantern)});
@@ -208,9 +210,13 @@ export function flameEmission(
 ): FlameEmission {
   if (!(area > 0 && Number.isFinite(area)) || !(light.intensity >= 0 && Number.isFinite(light.intensity)))
     throw new RangeError('Invalid flame emission; give a light with a radius above 0 (or an area above 0, m2) and an intensity of 0 or more.');
+  // A material's emissive colour is in [0, 1]; a light colour may be above 1 (a colour of luminance 1, say), so the
+  // colour is scaled to a top channel of 1 and the scale moves into the intensity: the radiance is unchanged.
+  const top = Math.max(light.color[0], light.color[1], light.color[2]),
+    scale = top > 0 ? top : 1;
   return Object.freeze({
-    emissive: [light.color[0], light.color[1], light.color[2]] as Vec3,
-    emissiveIntensity: light.intensity / area,
+    emissive: [light.color[0] / scale, light.color[1] / scale, light.color[2] / scale] as Vec3,
+    emissiveIntensity: (light.intensity * scale) / area,
   });
 }
 /** A surface that flickers with a light: anything with a live `emissiveIntensity`, such as a materials `Material`. */
