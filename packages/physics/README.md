@@ -796,7 +796,7 @@ physics.dispose();
 
 ## Parity with Rapier 3D
 
-Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table is the work list until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
+Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table shows what is left until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
 
 ### Dynamics and joints
 
