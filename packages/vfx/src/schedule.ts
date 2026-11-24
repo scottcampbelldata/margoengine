@@ -1,4 +1,5 @@
 import type { VFXExtension } from './base.js';
+import { lowbias32 } from './hash.js';
 /** Most expanded burst cycles in an effect; bounds authoring and replay work. */
 export const MAX_BURST_EVENTS = 16384;
 /** A repeated timed birth event. All settings are captured at attachment. */
@@ -31,12 +32,7 @@ const number = (v: unknown, name: string, min: number, max: number, whole = fals
       `VFX schedule ${name} must be ${min}..${max}${whole ? ' whole' : ''}; pass a finite value in range`,
     );
 };
-const hash = (value: number) => {
-  let n = value >>> 0;
-  n = Math.imul(n ^ (n >>> 16), 0x7feb352d);
-  n = Math.imul(n ^ (n >>> 15), 0x846ca68b);
-  return (n ^ (n >>> 16)) >>> 0;
-};
+const hash = lowbias32;
 /** Prewarm by ordinary submitted simulation steps, plus deterministic time/cycle/probability bursts. */
 export const schedule: VFXExtension<VFXSchedule> = {
   validate(value, options) {

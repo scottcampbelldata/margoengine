@@ -499,6 +499,41 @@ const hash = (seed: number): number => {
   h ^= h >>> 16;
   return h >>> 0;
 };
+/**
+ * Blocks over the ground: a cell of R / 11 holds a block with chance 0.45, a squarish slab up to 0.3 of the cell across
+ * whose flat top stands 0.8 of its half width (thrown-back cap rock), metres of height at (x, z).
+ */
+function craterBlocks(x: number, z: number, radius: number, seed: number): number {
+  const cell = radius / 11,
+    i = Math.floor(x / cell),
+    j = Math.floor(z / cell);
+  let top = 0;
+  for (let a = i - 1; a <= i + 1; a++)
+    for (let b = j - 1; b <= j + 1; b++) {
+      const h = hash(hash((a + Math.imul(b, 0x27d4eb2d) + Math.imul(seed, 0x9e3779b1)) >>> 0));
+      if ((h & 0xffff) / 65536 > 0.45) continue;
+      const u = ((h >>> 16) & 0xff) / 256,
+        v = (h >>> 24) / 256,
+        half = cell * (0.12 + 0.18 * u),
+        cx = (a + 0.5 + (v - 0.5) * 0.6) * cell,
+        cz = (b + 0.5 + (u - 0.5) * 0.6) * cell,
+        d = Math.max(Math.abs(x - cx), Math.abs(z - cz)) / half;
+      if (d < 1) top = Math.max(top, 0.8 * half * Math.min(1, 4 * (1 - d)));
+    }
+  return top;
+}
+/** Secondary pits: a cell of R / 6 holds a pit with chance 0.3, radius up to 0.25 of the cell, 0.35 of it deep. */
+function craterPits(x: number, z: number, radius: number, seed: number): number {
+  const cell = radius / 6,
+    i = Math.floor(x / cell),
+    j = Math.floor(z / cell),
+    h = hash(hash((i + Math.imul(j, 0x165667b1) + Math.imul(seed + 5, 0x9e3779b1)) >>> 0));
+  if ((h & 0xffff) / 65536 > 0.3) return 0;
+  const a = cell * (0.1 + 0.15 * (((h >>> 16) & 0xff) / 256)),
+    d = Math.hypot(x - (i + 0.5) * cell, z - (j + 0.5) * cell) / a;
+  // A small bowl with a low lip (the same shape as the crater, h ~ -(1 - d^2) inside, a rim to 1.3 a).
+  return d < 1 ? -0.35 * a * (1 - d * d) + 0.05 * a * smooth(0.8, 1, d) : d < 1.3 ? 0.05 * a * smooth(1.3, 1, d) : 0;
+}
 /** Value noise 0 to 1 at (x, z) in lattice units, seeded. */
 export function groundNoise(x: number, z: number, seed: number): number {
   const fx = Math.floor(x),
@@ -884,9 +919,20 @@ export function sampleEvent(e: ResolvedEvent, x: number, z: number, t: number, b
     }
     case 'crater': {
       const c = (e.source as CraterEvent).center,
-        r = Math.hypot(x - c[0], z - c[1]),
+        dx = x - c[0],
+        dz = z - c[1],
+        r = Math.hypot(dx, dz),
         age = t - e.start,
-        rim = o.radius * (1 + rough * 0.15 * wobble(x, z, o.radius * 0.5, o.seed));
+        // Irregularity in proportion to roughness, full at the default 0.35; 0 keeps the ideal crater of the laws.
+        k = rough / 0.35,
+        cos = r > 0 ? dx / r : 1,
+        sin = r > 0 ? dz / r : 0,
+        // Noise around the circle: n turns of lattice per radian of arc, so ring(1.2) gives about 7 lobes and ring(3)
+        // about 19 scallops (the slumped, scalloped rim of the 1944 photographs).
+        ring = (n: number, s: number) => wobble(cos * n * o.radius, sin * n * o.radius, o.radius, o.seed + s),
+        rim =
+          o.radius *
+          (1 + rough * 0.15 * wobble(x, z, o.radius * 0.5, o.seed) + k * (0.22 * ring(1.2, 11) + 0.1 * ring(3, 13)));
       if (age < o.heaveTime) {
         const tau = age / o.heaveTime,
           rho = r / (o.domeSpread * rim);
@@ -900,14 +946,29 @@ export function sampleEvent(e: ResolvedEvent, x: number, z: number, t: number, b
       let dh = rhoD < 1 ? o.heave * (1 - q) * (1 - rhoD * rhoD) ** 2 : 0,
         soil = 0;
       if (rho < 1) {
-        // The bowl, its lip rising over the last 15 percent of the radius to the blanket's height at the rim.
-        dh += -o.depth * q * (1 - rho * rho) + o.rim * q * smooth(0.85, 1, rho);
+        // The bowl, its lip rising over the last 15 percent of the radius to the blanket's height at the rim. Rough
+        // walls slump into three benches whose edges wander around the bowl (the terraced walls of large explosion
+        // craters, Glasstone and Dolan 1977, ch. 6; a model choice).
+        const bowl = 1 - rho * rho,
+          s = bowl * 3 + Math.min(k, 1) * 1.2 * ring(2, 17),
+          f = s - Math.floor(s),
+          benches = Math.min(Math.max((Math.floor(s) + smooth(0.3, 0.7, f)) / 3, 0), 1),
+          profile = bowl + Math.min(k, 1) * 0.6 * (benches - bowl);
+        dh += -o.depth * q * profile + o.rim * q * smooth(0.85, 1, rho);
         soil = 1;
       } else if (rho < 5) {
-        const blanket = (o.rim * q * (rho ** -3 - 1 / 125)) / (1 - 1 / 125);
+        // The blanket in rays and patches: thicker tongues and thinner gaps around the crater, as the 1944 aerial view
+        // shows (a model choice), and the old cover showing through where it is thin.
+        const rays = 1 + Math.min(k, 1) * (1.2 * ring(6, 19) + 0.9 * wobble(x, z, o.radius * 0.6, o.seed + 23)),
+          blanket = (o.rim * q * Math.max(rays, 0) * (rho ** -3 - 1 / 125)) / (1 - 1 / 125);
         dh += blanket;
-        soil = smooth(0, 0.05, blanket);
+        soil = k > 0 ? smooth(0.02, 0.4, blanket) : smooth(0, 0.05, blanket);
+        // Secondary pits where big clods landed, scattered over the blanket out to 4 R.
+        if (k > 0 && rho < 4) dh += q * Math.min(k, 1) * craterPits(x, z, o.radius, o.seed);
       }
+      // Blocks and rubble on the floor, the walls and the rim: thrown-back slabs of the cap rock (a model choice).
+      if (k > 0 && rho < 1.6)
+        dh += q * Math.min(k, 1) * craterBlocks(x, z, o.radius, o.seed) * (rho < 1 ? 1 : smooth(1.6, 1, rho));
       out[0] += dh;
       cover(out, 'soil', soil);
       return;

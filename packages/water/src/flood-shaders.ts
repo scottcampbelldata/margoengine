@@ -21,7 +21,7 @@ export const MAX_FLOOD_WAVE_MAKERS = 4;
 /**
  * Bytes of the `Flood` uniform: 96 B of settings, 16 sources of 16 B, 16 walls of 32 B. The floats before the sources are
  * dt (0), stage (1), cell (2, 3), the four side kinds (4 to 7: 0 wall, 1 open, 2 sea), roughness (8), dry depth (9),
- * source and wall counts (10, 11), origin (12, 13), the sea (16 to 18: the outer surface in world y, the tsunami's part of
+ * source and wall counts (10, 11), origin (12, 13), the mud's yield and viscous terms (14, 15; 0 for water), the sea (16 to 18: the outer surface in world y, the tsunami's part of
  * it in metres, the first level the water starts at) and the wind and rain (20, 21: wind stress over the water's density in
  * m^2/s^2 along x and z, 22: rain in m/s). After the walls: the swell head (the swell clock in seconds, the train count, the
  * wave maker count, 0), 8 swell trains of 32 B as Water holds them (direction x, z, amplitude, wavenumber; steepness,
@@ -29,7 +29,8 @@ export const MAX_FLOOD_WAVE_MAKERS = 4;
  * the tick's middle, angular frequency, band width in metres or 0 for the default, half length in metres or 0 for the
  * whole line)).
  */
-export const FLOOD_UNIFORM_BYTES = 96 + MAX_FLOOD_SOURCES * 16 + MAX_FLOOD_WALLS * 32 + 16 + MAX_FLOOD_SWELLS * 32 + MAX_FLOOD_WAVE_MAKERS * 32;
+export const FLOOD_UNIFORM_BYTES =
+  96 + MAX_FLOOD_SOURCES * 16 + MAX_FLOOD_WALLS * 32 + 16 + MAX_FLOOD_SWELLS * 32 + MAX_FLOOD_WAVE_MAKERS * 32;
 /** The float where the sources start, and the byte distance between the slices of the uniform ring (a uniform offset is a multiple of 256). */
 export const FLOOD_SOURCE_FLOAT = 24;
 export const FLOOD_SWELL_FLOAT = FLOOD_SOURCE_FLOAT + MAX_FLOOD_SOURCES * 4 + MAX_FLOOD_WALLS * 8;
@@ -45,7 +46,7 @@ const common =
   swellAtWave +
   `
 struct Wave {wave:vec4f,shape:vec4f}
-struct Flood {dt:f32,stage:f32,cell:vec2f,boundary:vec4f,roughness:f32,dry:f32,sources:f32,walls:f32,origin:vec2f,pad:vec2f,sea:vec4f,wind:vec4f,
+struct Flood {dt:f32,stage:f32,cell:vec2f,boundary:vec4f,roughness:f32,dry:f32,sources:f32,walls:f32,origin:vec2f,mud:vec2f,sea:vec4f,wind:vec4f,
  source:array<vec4f,${MAX_FLOOD_SOURCES}>,wall:array<vec4f,${MAX_FLOOD_WALLS * 2}>,swell:vec4f,waves:array<Wave,${MAX_FLOOD_SWELLS}>,
  maker:array<vec4f,${MAX_FLOOD_WAVE_MAKERS * 2}>}
 @group(0) @binding(0) var<uniform> flood:Flood;
@@ -300,8 +301,13 @@ const FOAM_LIFE=3.0;
  if(flood.stage>0.5){U=0.5*(vec3f(base.x,bm.y,bm.w)+U);frictionDt=flood.dt*0.5;carried=0.5*(base.z*base.x+carried);}
  var depth=U.x;var mu=U.y;var mv=U.z;
  if(depth<=flood.dry){depth=max(0.0,depth);mu=0.0;mv=0.0;}
- else if(flood.roughness>0.0){
-  let damp=1.0+frictionDt*G*flood.roughness*flood.roughness*length(vec2f(mu,mv))/depth/pow(depth,4.0/3.0);mu/=damp;mv/=damp;
+ else if(flood.roughness>0.0||flood.mud.x>0.0||flood.mud.y>0.0){
+  // The quadratic rheology (O'Brien, Julien and Fullerton 1993): g h S_f of the Manning term g n^2 |q| q / h^(7/3) and
+  // the viscous K eta q / (8 rho_m h^2), semi-implicit; then the yield stress takes tau_y / rho_m off |q| and holds the
+  // flow at rest where it would reverse it. Water has mud = 0 and keeps Manning alone.
+  let q=length(vec2f(mu,mv));
+  let damp=1.0+frictionDt*(G*flood.roughness*flood.roughness*q/depth/pow(depth,4.0/3.0)+flood.mud.y/(depth*depth));mu/=damp;mv/=damp;
+  let held=length(vec2f(mu,mv));let keep=select(0.0,max(held-frictionDt*flood.mud.x,0.0)/held,held>0.0);mu*=keep;mv*=keep;
  }
  // The foam: what the water carried in, and never less than the white water breaking here now (the breaker channel).
  let breaker=breaking(p,size);

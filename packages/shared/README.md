@@ -60,6 +60,10 @@ limits, cancellation and detachment. It runs in verify and check:merge.
 
 ## Settings rows
 
+`film-time.js` checks the film time of the seekable effects (vfx `Debris`, weather `BlastCloud`): `filmTime(value,
+fail, what)` returns a finite time of 0 or more and otherwise calls the package's own `fail` with "<what> must be 0 or
+more.".
+
 `settings.js` is the row shape every package's `/settings` entry shares (the model is `@margoengine/sky/settings`), so one
 slider panel can list and drive any package. A row has `name`, `group`, `kind` (`number`, `color`, `choice`, `gradient`),
 `default`, `min`, `max`, `step`, `choices`, `unit`, `about` and `live`: true when writing it every frame creates no pipeline,

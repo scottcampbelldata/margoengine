@@ -50,6 +50,7 @@
 // the ICAO standard one (`standardAtmosphere`), whose N^2 = g / T (dT/dz + g / c_p) stops the rise. The wind drifts the
 // cap as the 1/7 power of height to the tropopause, as `Eruption`.
 import { standardAtmosphere } from './eruption.js';
+import { filmTime } from '../../shared/film-time.js';
 
 const G = 9.80665;
 const C_AIR = 1005;
@@ -394,14 +395,12 @@ export class BlastCloud {
 
   /** Sets the film time; the cloud is a function of it alone. */
   seek(t: number): void {
-    if (!finite(t) || t < 0) bad('seek time must be 0 or more.');
-    this.film = t;
+    this.film = filmTime(t, bad, 'seek time');
   }
 
   /** Moves the film time on by `delta` seconds. */
   update(delta: number): void {
-    if (!finite(delta) || delta < 0) bad('update delta must be 0 or more.');
-    this.film += delta;
+    this.film += filmTime(delta, bad, 'update delta');
   }
 
   /** Each source's thermal at film time `t` (default now), in source order. */

@@ -149,6 +149,10 @@
       "types": "./dist/clouds.d.ts",
       "import": "./dist/clouds.js"
     },
+    "./debris": {
+      "types": "./dist/debris.d.ts",
+      "import": "./dist/debris.js"
+    },
     "./blown-sand": {
       "types": "./dist/blown-sand.d.ts",
       "import": "./dist/blown-sand.js"

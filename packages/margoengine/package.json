@@ -5275,6 +5275,10 @@
       "types": "./dist/vfx/clouds.d.ts",
       "import": "./dist/vfx/clouds.js"
     },
+    "./vfx/debris": {
+      "types": "./dist/vfx/debris.d.ts",
+      "import": "./dist/vfx/debris.js"
+    },
     "./vfx/blown-sand": {
       "types": "./dist/vfx/blown-sand.d.ts",
       "import": "./dist/vfx/blown-sand.js"

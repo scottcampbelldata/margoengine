@@ -701,6 +701,22 @@ layer. Over open water a wave keeps its height: a 0.1 m crest 18 m wide keeps it
 - `obstacles(x, z)`: buildings and blocks, the height a block stands above the ground, read once per cell. Water goes
   round them and never into them.
 - `sources` (at most 16, `setSources` live): inflows in m^3/s over a footprint, as `water/rivers` takes them.
+- `mud` (null): a mud or debris flow in place of water, `{sediment, concentration, resistance, grainDensity}`, read
+  every frame. Its friction is the quadratic rheology of O'Brien, Julien and Fullerton (1993): the yield stress over
+  rho_m h, the viscous K eta V / (8 rho_m h^2) and a turbulent-dispersive Manning term n_td = n 0.0538 exp(6.0896 Cv),
+  with tau_y and eta of the named sediment measured by O'Brien and Julien (1988) (`MUD_SEDIMENTS`: 'aspen-natural-soil'
+  default, 'aspen-pit-1', 'glenwood-4' and seven more; `concentration` Cv 0.4, `resistance` K 2,285, `grainDensity`
+  2,650 kg/m^3). Mud stops where its yield stress holds its slope: released on flat ground it comes to rest in the
+  yield profile h^2 = 2 tau_y (x_f - x) / (rho_m g) (test/flood-mud.browser.mjs). `mudRheology(mud)` gives the SI
+  yield stress, viscosity, mixture density and n_td factor. Colour the surface brown with the Water's own colour
+  options; carried timber and stones read the flow through `@margoengine/water/query`.
+
+  ```ts
+  import { mudRheology } from 'margoengine/water/flood';
+
+  const r = mudRheology({ sediment: 'aspen-natural-soil', concentration: 0.45 });
+  console.log(Math.round(r.yieldStress)); // 69 Pa: a mud that stands in heaps
+  ```
 - `roughness`: Manning n, default 0.03 (earth channel), read every frame. `boundary`: per map side 'wall' (default),
   'open' (zero gradient) or 'sea' (an open boundary held at the sea level, see below).
 - `maxDepth` (20 m) and `maxSpeed` (15 m/s) set the fixed step, `1 / (120 m)` s with `m` the least whole number that

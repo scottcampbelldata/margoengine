@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17356178,
+  "total": 17362871,
   "history": [
     {
       "date": "2026-10-24",
@@ -11271,6 +11271,12 @@
       "commit": "3d350786d2",
       "reason": "KB-SKY-OVERCAST2: the overcast deck and the fog under cloud integrate the clear sky (clearSkyLevel, 15 daySky directions, and the Bruneton zenith column) so a low sun no longer turns them orange; sky/clouds 2011 to 2350 B and sky/fog 3077 to 3333 B gzip (fog carries the same overcastLight WGSL when the sky draws no clouds). biomes 16819 to 16833 B: PaintLayer.ecotone, a per-layer paint blend so hedges and lanes keep their width. A split would only move the same WGSL into another lazily loaded chunk of the same entry.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "7d8a8737e2",
+      "reason": "vfx/debris ballistic debris entry; water/flood mud mode; terrain crater rim noise, benches, blocks and pits; weather BlastCloud; vfx clouds relief",
+      "grew": 5
     }
   ],
   "items": {
@@ -12486,7 +12492,7 @@
     "@margoengine/terrain/deform": 5488,
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/dunes": 2250,
-    "@margoengine/terrain/ground-change": 15506,
+    "@margoengine/terrain/ground-change": 16379,
     "@margoengine/terrain/ground-change-settings": 2159,
     "@margoengine/terrain/height-grid": 1641,
     "@margoengine/terrain/holes": 1539,
@@ -12601,8 +12607,9 @@
     "@margoengine/vfx": 37954,
     "@margoengine/vfx/base": 13139,
     "@margoengine/vfx/blown-sand": 10823,
-    "@margoengine/vfx/clouds": 8262,
+    "@margoengine/vfx/clouds": 8867,
     "@margoengine/vfx/curves": 1816,
+    "@margoengine/vfx/debris": 3160,
     "@margoengine/vfx/depth-collide": 2195,
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/events": 2601,
@@ -12619,7 +12626,7 @@
     "@margoengine/vfx/obstacles": 1311,
     "@margoengine/vfx/over-life": 1831,
     "@margoengine/vfx/ribbons": 2854,
-    "@margoengine/vfx/schedule": 1198,
+    "@margoengine/vfx/schedule": 1197,
     "@margoengine/vfx/settings": 9979,
     "@margoengine/vfx/shadows": 3061,
     "@margoengine/vfx/shapes": 3848,
@@ -12723,7 +12730,7 @@
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
-    "@margoengine/water/flood": 11466,
+    "@margoengine/water/flood": 12177,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 18041,
@@ -12744,7 +12751,7 @@
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 7011,
-    "@margoengine/weather/eruption": 8457,
+    "@margoengine/weather/eruption": 9802,
     "@margoengine/weather/gltf": 5981,
     "@margoengine/weather/hail": 5136,
     "@margoengine/weather/lava": 12346,

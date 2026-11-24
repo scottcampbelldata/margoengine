@@ -9894,6 +9894,36 @@ Written from the standards and from web-ifc's public API and typings (`web-ifc-a
 - Rival feature lists, documentation only: That Open Engine docs (docs.thatopen.com, IFC editing and export with web-ifc), xeokit SDK docs (xeokit.io, metadata only, no IFC write-back), IfcOpenShell `ifcopenshell.api` documentation (pset.edit_pset, pset.remove_pset, attribute.edit_attributes, owner history handling) as a reference for what BIM editors offer; not a web rival and none of its code read.
 Compared: editing a shared property set in place (every element using it changes, as a plain WriteLine of the set does) against copy on write (only the element edited changes). Copy on write was chosen, at three levels (relationship, set, property), so per-element edits are exact, and the type object's own ID remains the way to change every occurrence. Observed web-ifc 0.0.78 behaviour the code relies on or corrects: an attribute left undefined is written as `*`, so every new entity sets each attribute ($ when unset) and leaves only IfcSIUnit.Dimensions derived; a single reference must be web-ifc's Handle class, so references are made with the constructor of one the model holds; a value object not made by CreateIfcType silently drops its whole line, so every value goes through CreateIfcType; reals with an exponent are written without a decimal point, which `saveIFC` corrects; DeleteLine leaves the line in GetLineIDsWithType, so this package's readers skip lines it deleted.
 
+## Mud flow: water/flood mud mode (2026-11-24)
+
+Written from the sources' text only; no other model's or tool's code was read. J. S. O'Brien and P. Y. Julien,
+"Laboratory analysis of mudflow properties", J. Hydraul. Eng. 114(8), 877-887, 1988 (the yield stress and viscosity
+of natural mud samples as a2 exp(b2 Cv) dyne/cm^2 and a1 exp(b1 Cv) poise); its coefficients were not reachable at
+the source (ASCE paywall, colostate copies refused), so they were read from the tables that reprint them: FLO-2D
+Software, "FLO-2D Pro Reference Manual", 2021, ch. 4, tables 12 and 13, and "Simulating Mudflow Guidelines", 2021,
+tables 2 and 3, https://documentation.flo-2d.com/ (both cite O'Brien and Julien 1988; the ten Aspen and Glenwood rows
+agree between them). J. S. O'Brien, P. Y. Julien and W. T. Fullerton, "Two-dimensional water flood and mudflow
+simulation", J. Hydraul. Eng. 119(2), 244-261, 1993 (the quadratic rheology's friction slope tau_y / (gamma_m h) +
+K eta V / (8 gamma_m h^2) + n_td^2 V^2 / h^(4/3)), read through the FLO-2D manuals' statement of it, with
+n_td = n 0.0538 exp(6.0896 Cv) and the laminar resistance K table (24 for smooth surfaces, 2,285 calibrated on the
+Rudd Creek mudflow). Model choices: the yield term applied after the semi-implicit Manning and viscous damping as a
+cut of tau_y / rho_m dt off the unit discharge that stops at rest (no reversal), the mixture density from Cv and the
+grain density. Tests: test/flood-mud.test.js (the rheology against the tables) and test/flood-mud.browser.mjs (a mud
+column stops in the static yield profile within 15 percent; water from the same column reaches the far wall).
+
+## Ballistic debris: vfx/debris (2026-11-24)
+
+Written from the papers' text only; no other engine's or tool's code was read. L. G. Mastin, "A simple calculator of
+ballistic trajectories for blocks ejected during volcanic eruptions", USGS Open-File Report 01-45, 2001,
+https://pubs.usgs.gov/of/2001/0045/ (a block decelerated by 1/2 rho_a Cd A v^2, Cd about 1); K. R. Housen, R. M. Schmidt
+and K. A. Holsapple, J. Geophys. Res. 88(B3), 2485-2499, 1983, https://doi.org/10.1029/JB088iB03p02485, and K. R. Housen
+and K. A. Holsapple, Icarus 211, 856-875, 2011, https://doi.org/10.1016/j.icarus.2010.09.017 (ejecta speed falling as
+(x / R)^(-1 / mu), mu about 0.41 for dry soil, launch near 45 degrees); Glasstone and Dolan 1977, ch. 2 and 6 (the
+throw-out of a buried burst). Paths are fourth-order Runge-Kutta at 1/60 s read back by cubic Hermite interpolation.
+Model choices: log-uniform sizes, the inner-first launch delay (x / R)^2 x `spread`, the tumble, and the landing puff
+growing as the cube root of its age to `puffScale` x (impact energy)^(1/3). Tests: test/debris.test.js (flight time
+2 v sin(el) / g without drag, the speed law, drag shortening the throw, determinism over film time).
+
 ## Puff clouds: vfx/clouds and react/clouds (2026-11-16)
 
 Written from the papers and documentation below; drei's Clouds and Cloud were read from their public documentation

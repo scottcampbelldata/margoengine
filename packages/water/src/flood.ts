@@ -41,7 +41,13 @@ import { compute, group } from '../../shared/gpu.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number; COPY_DST: number };
-declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
+declare const GPUBufferUsage: {
+  STORAGE: number;
+  UNIFORM: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  MAP_READ: number;
+};
 declare const GPUMapMode: { READ: number };
 
 const G = 9.81;
@@ -145,6 +151,12 @@ export interface FloodOptions {
   obstacles?: (x: number, z: number) => number | undefined;
   /** Manning roughness n (s m^-1/3), 0..0.2. Default 0.03 (earth channel, Chow 1959); read every frame. */
   roughness?: number;
+  /**
+   * Mud and debris flow in place of water: the quadratic rheology of O'Brien, Julien and Fullerton (1993), a yield
+   * stress, a viscous term and a turbulent-dispersive Manning term, for a named sediment at a volume concentration.
+   * Mud stops where its yield stress holds its slope, in heaps and lobes. Read every frame. Default null (water).
+   */
+  mud?: FloodMud | null;
   /** Live multiplier of every inflow's discharge, 0..100: 0 turns the sources off, 2 doubles them. Default 1; read every frame. */
   inflow?: number;
   /** Rain on the whole map, mm/h, 0..2,000. Default null: follows `setRainRate` (the weather's), 0 until it is called. */
@@ -229,7 +241,10 @@ const BOUNDARY = { wall: 0, open: 1, sea: 2 } as const;
  * is zero outside `at .. at + period`, and `leading: 'crest'` runs it backwards. `shape: 'solitary'` is one crest of `height`,
  * height sech^2(1.5 tau) (Synolakis 1987, https://doi.org/10.1017/S002211208700329X), centred in the window.
  */
-export function tsunamiElevation(t: number, tsunami: { height: number; period: number; at: number; leading: 'trough' | 'crest'; shape?: 'n-wave' | 'solitary' }): number {
+export function tsunamiElevation(
+  t: number,
+  tsunami: { height: number; period: number; at: number; leading: 'trough' | 'crest'; shape?: 'n-wave' | 'solitary' },
+): number {
   let tau = (N_HALF * 2 * (t - tsunami.at)) / tsunami.period - N_HALF;
   if (tau < -N_HALF || tau > N_HALF) return 0;
   if (tsunami.shape === 'solitary') {
@@ -278,11 +293,87 @@ interface Tsunami {
   leading: 'trough' | 'crest';
   shape: 'n-wave' | 'solitary';
 }
+/**
+ * Sediments of O'Brien and Julien (1988), J. Hydraul. Eng. 114(8), 877-887, as the FLO-2D Pro Reference Manual (2021,
+ * table 13) and Simulating Mudflow Guidelines (2021, table 3) tabulate them: yield stress tau_y = a2 exp(b2 Cv) in
+ * dyne/cm^2 and viscosity eta = a1 exp(b1 Cv) in poise, as [a2, b2, a1, b1], measured for Cv about 0.1 to 0.45.
+ */
+export const MUD_SEDIMENTS = {
+  'aspen-pit-1': [0.181, 25.7, 0.036, 22.1],
+  'aspen-pit-2': [2.72, 10.4, 0.0538, 14.5],
+  'aspen-natural-soil': [0.152, 18.7, 0.00136, 28.4],
+  'aspen-mine-fill': [0.0473, 21.1, 0.128, 12.0],
+  'aspen-watershed': [0.0383, 19.7, 0.000495, 27.1],
+  'aspen-mine-source': [0.291, 14.3, 0.000201, 33.1],
+  'glenwood-1': [0.0345, 20.1, 0.00283, 23.0],
+  'glenwood-2': [0.0765, 16.9, 0.648, 8.2],
+  'glenwood-3': [0.000707, 29.8, 0.00632, 19.9],
+  'glenwood-4': [0.00172, 29.5, 0.000602, 33.1],
+} as const satisfies Record<string, readonly [number, number, number, number]>;
+/** A sediment of {@link MUD_SEDIMENTS}. */
+export type MudSediment = keyof typeof MUD_SEDIMENTS;
+/** Mud mode of {@link FloodOptions.mud}. Every field has a default. */
+export interface FloodMud {
+  /** Sediment whose measured rheology the mud takes. Default 'aspen-natural-soil' (a mud flood, FLO-2D's suggestion). */
+  sediment?: MudSediment;
+  /** Sediment volume concentration Cv, 0.05..0.6. Default 0.4. */
+  concentration?: number;
+  /** Laminar resistance K, 24..50,000: 24 smooth, 2,285 a built-up area (FLO-2D's Rudd Creek calibration). Default 2,285. */
+  resistance?: number;
+  /** Density of the sediment grains, kg/m^3, 1,500..3,500. Default 2,650 (quartz). */
+  grainDensity?: number;
+}
+/** The rheology of a {@link FloodMud}: SI values the flood steps with. */
+export interface MudRheology {
+  /** Yield stress tau_y, Pa. */
+  yieldStress: number;
+  /** Viscosity eta, Pa s. */
+  viscosity: number;
+  /** Mixture density rho_m, kg/m^3. */
+  density: number;
+  /** Turbulent-dispersive Manning n_td over the water's n: 0.0538 exp(6.0896 Cv) (FLO-2D, after O'Brien et al. 1993). */
+  turbulence: number;
+}
+/** The rheology of `mud` (O'Brien and Julien 1988; O'Brien, Julien and Fullerton 1993), checked. */
+export function mudRheology(mud: FloodMud = {}): MudRheology {
+  if (typeof mud !== 'object' || mud === null)
+    throw typeError('Flood mud must be an object or null; pass { concentration }', 'geometry');
+  const sediment = mud.sediment ?? 'aspen-natural-soil',
+    row = MUD_SEDIMENTS[sediment];
+  if (!row)
+    throw rangeError(
+      `Flood mud sediment ${String(sediment)} is unknown; pass one of ${Object.keys(MUD_SEDIMENTS).join(', ')}`,
+      'geometry',
+    );
+  const cv = finite(mud.concentration, 0.4, 'mud.concentration', 0.05, 0.6),
+    grain = finite(mud.grainDensity, 2650, 'mud.grainDensity', 1500, 3500);
+  finite(mud.resistance, 2285, 'mud.resistance', 24, 50000);
+  // dyne/cm^2 to Pa and poise to Pa s are both a tenth.
+  return {
+    yieldStress: 0.1 * row[0] * Math.exp(row[1] * cv),
+    viscosity: 0.1 * row[2] * Math.exp(row[3] * cv),
+    density: RHO_WATER + cv * (grain - RHO_WATER),
+    turbulence: 0.0538 * Math.exp(6.0896 * cv),
+  };
+}
+/** The three friction terms of the flood uniform: Manning n (n_td in mud), tau_y / rho_m and K eta / (8 rho_m). */
+function frictionTerms(roughness: number, mud: FloodMud | null | undefined): [number, number, number] {
+  if (mud == null) return [roughness, 0, 0];
+  const r = mudRheology(mud);
+  return [
+    roughness * r.turbulence,
+    r.yieldStress / r.density,
+    ((mud.resistance ?? 2285) * r.viscosity) / (8 * r.density),
+  ];
+}
+
 /** Everything the flood reads, as it stands from `tick` on. */
 interface Inputs {
   tick: number;
   base: number;
   roughness: number;
+  /** Manning n in force (n_td in mud), the yield term tau_y / rho_m (m^2/s^2) and the viscous K eta / (8 rho_m) (m^2/s). */
+  friction: readonly [number, number, number];
   /** Wind stress over the water's density, m^2/s^2 along x and z. */
   stress: readonly [number, number];
   rain: number;
@@ -312,7 +403,12 @@ export function waveMakerSignal(
   const ease = maker.ramp > 0 ? smooth(Math.min(1, since / maker.ramp, left / maker.ramp)) : 1;
   return maker.amplitude * ease * Math.sin((2 * Math.PI * since) / maker.period + maker.phase);
 }
-const surgeAt = (s: Surge, t: number) => (s.rise > 0 ? s.from + (s.to - s.from) * smooth(Math.min(1, Math.max(0, (t - s.at) / s.rise))) : t >= s.at ? s.to : s.from);
+const surgeAt = (s: Surge, t: number) =>
+  s.rise > 0
+    ? s.from + (s.to - s.from) * smooth(Math.min(1, Math.max(0, (t - s.at) / s.rise)))
+    : t >= s.at
+      ? s.to
+      : s.from;
 
 /**
  * A flood on a Water's terrain: dam breaks, bores, hydraulic jumps, run-up and wetting and drying from the shallow-water
@@ -361,11 +457,13 @@ export class Flood implements EnginePlugin {
     const surface = options.surface as unknown as { options?: { terrain?: unknown }; setWaveHeight?: unknown };
     if (!surface || typeof surface.setWaveHeight !== 'function')
       throw fault('state', 'Flood needs a Water as surface; pass the Water whose terrain the flood runs on');
-    if (!surface.options?.terrain) throw fault('state', 'Flood needs a Water with a terrain option (its heightmap is the bed)');
+    if (!surface.options?.terrain)
+      throw fault('state', 'Flood needs a Water with a terrain option (its heightmap is the bed)');
     if (options.obstacles != null && typeof options.obstacles !== 'function')
       throw typeError('Flood obstacles must be a function (x, z) => height above the ground in metres', 'geometry');
     this.options = { ...options };
     finite(options.roughness, 0.03, 'roughness', 0, 0.2);
+    if (options.mud != null) mudRheology(options.mud);
     finite(options.maxDepth, 20, 'maxDepth', 0.01, 1000);
     finite(options.maxSpeed, 15, 'maxSpeed', 0, 200);
     finite(options.rain, 0, 'rain', 0, 2000);
@@ -403,7 +501,11 @@ export class Flood implements EnginePlugin {
     const surface = this.options.surface;
     if (!engine.hasPlugin(surface.name)) throw fault('state', 'Attach the Water surface to this engine before Flood');
     if (waterSolvers.has(surface))
-      throw fault('attached', 'This Water already has a flood solver; dispose it before attaching another Flood', 'state');
+      throw fault(
+        'attached',
+        'This Water already has a flood solver; dispose it before attaching another Flood',
+        'state',
+      );
     this.engine = engine;
     waterSolvers.set(surface, this.factory);
   }
@@ -458,7 +560,8 @@ export class Flood implements EnginePlugin {
   /** Adds a wall (at most 16) and returns its index; it stands from the next tick. */
   wall(wall: FloodWall, log = true): number {
     this.live();
-    if (this.walls.length >= MAX_FLOOD_WALLS) throw rangeError(`Flood takes at most ${MAX_FLOOD_WALLS} walls`, 'geometry');
+    if (this.walls.length >= MAX_FLOOD_WALLS)
+      throw rangeError(`Flood takes at most ${MAX_FLOOD_WALLS} walls`, 'geometry');
     if (!wall || typeof wall !== 'object') throw typeError('Flood wall must be { from, to, top }', 'geometry');
     this.walls.push({
       from: point(wall.from, 'wall from'),
@@ -506,14 +609,27 @@ export class Flood implements EnginePlugin {
    * arrives (Tadepalli and Synolakis 1994). It lifts the sea level of the Water as well, so the open sea beyond the map
    * rides on it.
    */
-  tsunami({ height = 3, period = 300, leading = 'trough', at = this.seconds, shape = 'n-wave' }: FloodTsunami = {}): void {
+  tsunami({
+    height = 3,
+    period = 300,
+    leading = 'trough',
+    at = this.seconds,
+    shape = 'n-wave',
+  }: FloodTsunami = {}): void {
     this.live();
     const b = this.options.boundary;
     if (![b?.west, b?.east, b?.south, b?.north].includes('sea'))
-      throw fault('state', "A tsunami arrives through a 'sea' side: set boundary { west: 'sea' } (or another side) first", 'state');
-    if (this.tsunamis.length >= MAX_TSUNAMIS) throw rangeError(`Flood takes at most ${MAX_TSUNAMIS} tsunamis`, 'geometry');
-    if (leading !== 'trough' && leading !== 'crest') throw rangeError("Flood tsunami leading must be 'trough' or 'crest'", 'geometry');
-    if (shape !== 'n-wave' && shape !== 'solitary') throw rangeError("Flood tsunami shape must be 'n-wave' or 'solitary'", 'geometry');
+      throw fault(
+        'state',
+        "A tsunami arrives through a 'sea' side: set boundary { west: 'sea' } (or another side) first",
+        'state',
+      );
+    if (this.tsunamis.length >= MAX_TSUNAMIS)
+      throw rangeError(`Flood takes at most ${MAX_TSUNAMIS} tsunamis`, 'geometry');
+    if (leading !== 'trough' && leading !== 'crest')
+      throw rangeError("Flood tsunami leading must be 'trough' or 'crest'", 'geometry');
+    if (shape !== 'n-wave' && shape !== 'solitary')
+      throw rangeError("Flood tsunami shape must be 'n-wave' or 'solitary'", 'geometry');
     this.tsunamis.push({
       shape,
       height: finite(height, 3, 'tsunami height', 0, 100),
@@ -530,7 +646,8 @@ export class Flood implements EnginePlugin {
    */
   waveMaker(maker: FloodWaveMaker): number {
     this.live();
-    if (this.makers.length >= MAX_FLOOD_WAVE_MAKERS) throw rangeError(`Flood takes at most ${MAX_FLOOD_WAVE_MAKERS} wave makers`, 'geometry');
+    if (this.makers.length >= MAX_FLOOD_WAVE_MAKERS)
+      throw rangeError(`Flood takes at most ${MAX_FLOOD_WAVE_MAKERS} wave makers`, 'geometry');
     this.makers.push(this.checkMaker(maker));
     this.commit();
     return this.makers.length - 1;
@@ -558,7 +675,10 @@ export class Flood implements EnginePlugin {
       length: finite(m.length, 0, 'wave maker length', 0, 1e6),
       width: finite(m.width, 0, 'wave maker width', 0, 1e5),
       at: finite(m.at, this.seconds, 'wave maker at', 0, Number.MAX_VALUE),
-      duration: m.duration === null || m.duration === undefined ? null : finite(m.duration, 0, 'wave maker duration', 0, Number.MAX_VALUE),
+      duration:
+        m.duration === null || m.duration === undefined
+          ? null
+          : finite(m.duration, 0, 'wave maker duration', 0, Number.MAX_VALUE),
       ramp: finite(m.ramp, 2 * period, 'wave maker ramp', 0, 86400),
     };
   }
@@ -574,7 +694,8 @@ export class Flood implements EnginePlugin {
     let direction = this.wind.direction;
     if (wind.direction !== undefined) {
       direction = point(wind.direction, 'wind direction');
-      if (Math.hypot(direction[0], direction[1]) === 0) throw rangeError('Flood wind direction must not be [0, 0]', 'geometry');
+      if (Math.hypot(direction[0], direction[1]) === 0)
+        throw rangeError('Flood wind direction must not be [0, 0]', 'geometry');
     }
     this.wind = { speed, direction };
     this.commit();
@@ -635,6 +756,7 @@ export class Flood implements EnginePlugin {
         tick,
         base: this.base,
         roughness: finite(o.roughness, 0.03, 'roughness', 0, 0.2),
+        friction: frictionTerms(finite(o.roughness, 0.03, 'roughness', 0, 0.2), o.mud),
         stress: [(speed * this.wind.direction[0]) / length, (speed * this.wind.direction[1]) / length],
         rain: rain / 3.6e6,
         inflow: finite(o.inflow, 1, 'inflow', 0, 100),
@@ -660,7 +782,8 @@ export class Flood implements EnginePlugin {
     const b = this.options.boundary,
       values = (this.options.surface as unknown as { values?: Float32Array }).values;
     // A disposed Water keeps the trains it last had.
-    if (!this.surfaceGone && values) this.trains = Array.from(values.subarray(32, 32 + Math.min(MAX_FLOOD_SWELLS, values[23] | 0) * 8));
+    if (!this.surfaceGone && values)
+      this.trains = Array.from(values.subarray(32, 32 + Math.min(MAX_FLOOD_SWELLS, values[23] | 0) * 8));
     if (scale === 0 || ![b?.west, b?.east, b?.south, b?.north].includes('sea')) return [];
     const out = this.trains.map((v, i) => (i % 8 === 2 ? v * scale : v));
     return out.some((v, i) => i % 8 === 2 && v > 0) ? out : [];
@@ -694,7 +817,9 @@ export class Flood implements EnginePlugin {
       t = k / RATE;
     let moving = false;
     const eta = this.waveAt(s, t);
-    data[8] = s.roughness;
+    data[8] = s.friction[0];
+    data[14] = s.friction[1];
+    data[15] = s.friction[2];
     data[10] = s.sources.length;
     data[11] = s.walls.length;
     data[16] = s.base + surgeAt(s.surge, t) + eta;
@@ -703,7 +828,9 @@ export class Flood implements EnginePlugin {
     data[20] = s.stress[0];
     data[21] = s.stress[1];
     data[22] = s.rain;
-    s.sources.forEach((c, i) => data.set([c.position[0], c.position[1], c.discharge * s.inflow, c.radius], FLOOD_SOURCE_FLOAT + i * 4));
+    s.sources.forEach((c, i) =>
+      data.set([c.position[0], c.position[1], c.discharge * s.inflow, c.radius], FLOOD_SOURCE_FLOAT + i * 4),
+    );
     const trains = s.swell.length / 8;
     data[FLOOD_SWELL_FLOAT] = trains > 0 ? this.swellStart + t : 0;
     data[FLOOD_SWELL_FLOAT + 1] = trains;
@@ -714,7 +841,16 @@ export class Flood implements EnginePlugin {
     const middle = (k + 0.5) / RATE;
     s.makers.forEach((m, i) =>
       data.set(
-        [m.position[0], m.position[1], m.direction[0], m.direction[1], waveMakerSignal(middle, m) * s.waveMaker, (2 * Math.PI) / m.period, m.width, m.length / 2],
+        [
+          m.position[0],
+          m.position[1],
+          m.direction[0],
+          m.direction[1],
+          waveMakerSignal(middle, m) * s.waveMaker,
+          (2 * Math.PI) / m.period,
+          m.width,
+          m.length / 2,
+        ],
         FLOOD_MAKER_FLOAT + i * 8,
       ),
     );
@@ -726,7 +862,10 @@ export class Flood implements EnginePlugin {
         open = b.from + (1 - b.from) * f;
         if (f < 1) moving = true;
       }
-      data.set([w.from[0], w.from[1], w.to[0], w.to[1], w.top, w.width / 2, open, 0], FLOOD_SOURCE_FLOAT + MAX_FLOOD_SOURCES * 4 + i * 8);
+      data.set(
+        [w.from[0], w.from[1], w.to[0], w.to[1], w.top, w.width / 2, open, 0],
+        FLOOD_SOURCE_FLOAT + MAX_FLOOD_SOURCES * 4 + i * 8,
+      );
     });
     return moving;
   }
@@ -742,14 +881,16 @@ export class Flood implements EnginePlugin {
   async settle(): Promise<void> {
     this.live();
     const solver = this.solver;
-    if (!solver || solver.disposed) throw fault('state', 'The flood has not started; render a frame with its Water first');
+    if (!solver || solver.disposed)
+      throw fault('state', 'The flood has not started; render a frame with its Water first');
     await solver.settle();
   }
   /** Reads the water back: volume, wet area, depths, speeds and the Courant number, plus every cell. */
   async read(): Promise<FloodReading> {
     this.live();
     const solver = this.solver;
-    if (!solver || solver.disposed) throw fault('state', 'The flood has not started; render a frame with its Water first');
+    if (!solver || solver.disposed)
+      throw fault('state', 'The flood has not started; render a frame with its Water first');
     return solver.read(this.options);
   }
   private live() {
@@ -761,7 +902,8 @@ export class Flood implements EnginePlugin {
     this.disposed = true;
     const surface = this.options.surface as unknown as { setSeaLevel?: (y: number) => unknown };
     if (waterSolvers.get(this.options.surface) === this.factory) waterSolvers.delete(this.options.surface);
-    if (!this.surfaceGone && typeof surface.setSeaLevel === 'function' && this.written !== this.base) surface.setSeaLevel(this.base);
+    if (!this.surfaceGone && typeof surface.setSeaLevel === 'function' && this.written !== this.base)
+      surface.setSeaLevel(this.base);
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     this.solver = undefined;
@@ -836,7 +978,8 @@ class FloodSolver implements WaterSolver {
     try {
       const own = <T extends { destroy(): void }>(object: T): T => (this.owned.push(object), object);
       const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
-        texture = (format: GPUTextureFormat, use = usage) => own(device.createTexture({ size: [width, height], format, usage: use }));
+        texture = (format: GPUTextureFormat, use = usage) =>
+          own(device.createTexture({ size: [width, height], format, usage: use }));
       // 0 and 1 hold the state between steps (Water reads states[current]); 2 holds U1 between the stages.
       for (let i = 0; i < 3; i++) {
         this.states.push(texture('rgba32float'));
@@ -848,14 +991,23 @@ class FloodSolver implements WaterSolver {
         this.records.push(texture('rgba32float'));
       }
       this.connected = own(
-        device.createBuffer({ size: (width * height + 1) * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC, mappedAtCreation: true }),
+        device.createBuffer({
+          size: (width * height + 1) * 4,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+          mappedAtCreation: true,
+        }),
       );
       // No cell is open sea: the swell's surf and wall spray stay off over a flood.
       new Uint32Array(this.connected.getMappedRange()).fill(1);
       this.connected.unmap();
       const upload = (data: Float32Array) => {
         const t = texture('r32float', GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST);
-        device.queue.writeTexture({ texture: t }, data as Float32Array<ArrayBuffer>, { bytesPerRow: width * 4, rowsPerImage: height }, [width, height]);
+        device.queue.writeTexture(
+          { texture: t },
+          data as Float32Array<ArrayBuffer>,
+          { bytesPerRow: width * 4, rowsPerImage: height },
+          [width, height],
+        );
         return t;
       };
       const blocks = new Float32Array(width * height);
@@ -864,20 +1016,52 @@ class FloodSolver implements WaterSolver {
           for (let i = 0; i < width; i++) {
             const v = o.obstacles(place.origin[0] + (i + 0.5) * dx, place.origin[1] + (j + 0.5) * dz);
             if (v !== undefined && v !== null && (!Number.isFinite(v) || v < 0))
-              throw rangeError('Flood obstacles must return a finite height of 0 or more metres, or undefined', 'geometry');
+              throw rangeError(
+                'Flood obstacles must return a finite height of 0 or more metres, or undefined',
+                'geometry',
+              );
             blocks[j * width + i] = v ?? 0;
           }
       const obstacles = upload(blocks),
         fill = upload(input.fill ?? new Float32Array(width * height).fill(-1e30));
-      this.ring = own(device.createBuffer({ size: RING_PAIRS * 2 * FLOOD_UNIFORM_STRIDE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+      this.ring = own(
+        device.createBuffer({
+          size: RING_PAIRS * 2 * FLOOD_UNIFORM_STRIDE,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        }),
+      );
       const sides = o.boundary ?? {},
-        start = own(device.createBuffer({ size: FLOOD_UNIFORM_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
-      this.work.set([this.dt, 0, dx, dz, BOUNDARY[sides.west ?? 'wall'], BOUNDARY[sides.east ?? 'wall'], BOUNDARY[sides.south ?? 'wall'], BOUNDARY[sides.north ?? 'wall'], 0, DRY, 0, 0, place.origin[0], place.origin[1]]);
+        start = own(
+          device.createBuffer({ size: FLOOD_UNIFORM_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        );
+      this.work.set([
+        this.dt,
+        0,
+        dx,
+        dz,
+        BOUNDARY[sides.west ?? 'wall'],
+        BOUNDARY[sides.east ?? 'wall'],
+        BOUNDARY[sides.south ?? 'wall'],
+        BOUNDARY[sides.north ?? 'wall'],
+        0,
+        DRY,
+        0,
+        0,
+        place.origin[0],
+        place.origin[1],
+      ]);
       flood.writeUniform(this.work, 0);
       device.queue.writeBuffer(start, 0, this.work as Float32Array<ArrayBuffer>);
       const view = (t: GPUTexture) => t.createView();
       this.first = compute(device, floodInitialize);
-      this.firstGroup = group(device, this.first, [{ buffer: start }, view(terrain), view(obstacles), view(fill), view(this.states[0]), view(this.fluxes[0])]);
+      this.firstGroup = group(device, this.first, [
+        { buffer: start },
+        view(terrain),
+        view(obstacles),
+        view(fill),
+        view(this.states[0]),
+        view(this.fluxes[0]),
+      ]);
       this.stage = compute(device, floodStage);
       this.recorder = compute(device, floodRecord(1 / RATE, DRY));
       this.resources = [view(terrain), view(obstacles), ...this.states.map(view), ...this.fluxes.map(view)];
@@ -912,7 +1096,13 @@ class FloodSolver implements WaterSolver {
     let g = this.recordGroups.get(key);
     if (!g) {
       const view = (t: GPUTexture) => t.createView();
-      g = group(this.device, this.recorder, [view(this.states[c]), view(this.fluxes[c]), view(this.records[k]), view(this.velocities[1 - k]), view(this.records[1 - k])]);
+      g = group(this.device, this.recorder, [
+        view(this.states[c]),
+        view(this.fluxes[c]),
+        view(this.records[k]),
+        view(this.velocities[1 - k]),
+        view(this.records[1 - k]),
+      ]);
       this.recordGroups.set(key, g);
     }
     return g;
@@ -927,7 +1117,11 @@ class FloodSolver implements WaterSolver {
     this.last.set(work);
     for (let s = 0; s < 2; s++) {
       work[1] = s;
-      this.device.queue.writeBuffer(this.ring, (this.pair * 2 + s) * FLOOD_UNIFORM_STRIDE, work as Float32Array<ArrayBuffer>);
+      this.device.queue.writeBuffer(
+        this.ring,
+        (this.pair * 2 + s) * FLOOD_UNIFORM_STRIDE,
+        work as Float32Array<ArrayBuffer>,
+      );
     }
   }
   /** Records up to `limit` owed ticks into `encoder`; returns how many. */
@@ -983,8 +1177,14 @@ class FloodSolver implements WaterSolver {
       encoder = device.createCommandEncoder(),
       steps = this.steps;
     try {
-      encoder.copyTextureToBuffer({ texture: this.states[this.current] }, { buffer, bytesPerRow: row }, [width, height]);
-      encoder.copyTextureToBuffer({ texture: this.fluxes[this.current] }, { buffer, offset: size, bytesPerRow: row }, [width, height]);
+      encoder.copyTextureToBuffer({ texture: this.states[this.current] }, { buffer, bytesPerRow: row }, [
+        width,
+        height,
+      ]);
+      encoder.copyTextureToBuffer({ texture: this.fluxes[this.current] }, { buffer, offset: size, bytesPerRow: row }, [
+        width,
+        height,
+      ]);
       device.queue.submit([encoder.finish()]);
       await buffer.mapAsync(GPUMapMode.READ);
       const data = new Float32Array(buffer.getMappedRange().slice(0)),
@@ -1023,7 +1223,11 @@ class FloodSolver implements WaterSolver {
               speed = Math.hypot(u, v);
             velocity[k * 2] = u;
             velocity[k * 2 + 1] = v;
-            courant = Math.max(courant, ((Math.abs(u) + Math.sqrt(G * h)) * this.dt) / dx, ((Math.abs(v) + Math.sqrt(G * h)) * this.dt) / dz);
+            courant = Math.max(
+              courant,
+              ((Math.abs(u) + Math.sqrt(G * h)) * this.dt) / dx,
+              ((Math.abs(v) + Math.sqrt(G * h)) * this.dt) / dz,
+            );
             if (h > 1e-3) {
               wet++;
               if (speed > fastest) fastest = speed;

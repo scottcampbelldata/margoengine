@@ -466,12 +466,20 @@ class Flood implements EnginePlugin {
 
 type FloodBoundary = 'wall' | 'open' | 'sea';
 
+interface FloodMud {
+    sediment?: MudSediment;
+    concentration?: number;
+    resistance?: number;
+    grainDensity?: number;
+}
+
 interface FloodOptions {
     surface: Water;
     sources?: readonly FloodSource[];
     walls?: readonly FloodWall[];
     obstacles?: (x: number, z: number) => number | undefined;
     roughness?: number;
+    mud?: FloodMud | null;
     inflow?: number;
     rain?: number | null;
     surge?: number | null;
@@ -643,6 +651,21 @@ interface IcebergOptions extends BuoyancyOptions {
     pitch?: FloaterResponse;
     material?: IceMaterial;
 }
+
+const MUD_SEDIMENTS: {
+    readonly 'aspen-pit-1': readonly [0.181, 25.7, 0.036, 22.1];
+    readonly 'aspen-pit-2': readonly [2.72, 10.4, 0.0538, 14.5];
+    readonly 'aspen-natural-soil': readonly [0.152, 18.7, 0.00136, 28.4];
+    readonly 'aspen-mine-fill': readonly [0.0473, 21.1, 0.128, 12];
+    readonly 'aspen-watershed': readonly [0.0383, 19.7, 0.000495, 27.1];
+    readonly 'aspen-mine-source': readonly [0.291, 14.3, 0.000201, 33.1];
+    readonly 'glenwood-1': readonly [0.0345, 20.1, 0.00283, 23];
+    readonly 'glenwood-2': readonly [0.0765, 16.9, 0.648, 8.2];
+    readonly 'glenwood-3': readonly [0.000707, 29.8, 0.00632, 19.9];
+    readonly 'glenwood-4': readonly [0.00172, 29.5, 0.000602, 33.1];
+};
+
+type MudSediment = keyof typeof MUD_SEDIMENTS;
 
 class SeaIce {
     readonly kind: SeaIceKind;

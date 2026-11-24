@@ -1234,6 +1234,31 @@ console.log(clouds.clouds.length); // 2
   It is computed per puff on the CPU, so a cloud of a few hundred puffs costs microseconds; the soft fade uses
   Lorach's symmetric contrast curve ("Soft Particles", NVIDIA 2007).
 
+### Ballistic debris
+
+`Debris` (`@margoengine/vfx/debris`) throws earth clods, rock blocks or timber out of an explosion or an impact over
+film time: `count` pieces leave from within `radius` of `origin`, the inner ones first and fastest (launch speed
+`speed (x / R)^(-1 / mu)`, Housen and Holsapple 2011), fly through air drag (`1/2 rho Cd A v^2`, Mastin 2001), tumble,
+land on `ground` and raise a dust puff that grows and fades. Every path is solved once when the Debris is made, so
+`seek(t)` shows the same pieces from any frame in any order. `draw(instances)` writes the pieces into a gltf
+`PBRInstances` of any unit-sized mesh; `drawPuffs(clouds)` puts the landing dust into a `Clouds`.
+
+```ts
+import { Debris } from 'margoengine/vfx/debris';
+
+const debris = new Debris({ origin: [0, 0, 0], radius: 60, count: 400, speed: 35, size: [0.3, 2], density: 2300 });
+debris.seek(4);
+const flying = debris.pieces().filter((p) => p.state === 'flying').length;
+console.log(flying > 0); // true: four seconds after the throw, clods are in the air
+```
+
+Options (all optional): `origin` ([0, 0, 0]), `radius` (30 m), `count` (300, up to 20,000), `start` (0 s), `spread`
+(1.5 s over which the pieces leave, inner first), `speed` (40 m/s at the rim), `maxSpeed` (4 x `speed`), `mu` (0.41),
+`angle` (50 degrees) and `angleSpread` (12), `size` ([0.2, 1.2] m, log-uniform), `density` (1,800 kg/m^3), `drag` (1),
+`airDensity` (1.2), `ground` ((x, z) => height; default flat at the origin), `tumble` (6 rad/s), `color`, `puffLife`
+(6 s), `puffColor`, `puffScale` (0.04 m per cube root of joule) and `seed`. `pieces(t)` gives each piece's position,
+velocity, size, state, launch and landing times; `puffs(t)` the live landing puffs.
+
 ### Wind-blown sand
 
 `BlownSand` (`@margoengine/vfx/blown-sand`) draws sand that the wind lifts off bare ground: streaks of saltating grains
