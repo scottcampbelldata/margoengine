@@ -1,7 +1,7 @@
 // What a collider's options mean to the kernel. On the step path, as a game can add colliders in its step: no `Math`.
 import { MargoError } from '@margoengine/math/errors';
 import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from '../kernel.js';
-import { checkVec, type Vec3 } from '../math.js';
+import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { bounds, geometryPositions, roundness, usedVertices, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
 import { buildHull } from './hull.js';
 import { cleanTrimesh, wantsClean } from './mesh-clean.js';
@@ -31,14 +31,14 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
 const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull', 'trimesh', 'heightfield', 'voxels'];
 
 type Quat4 = readonly [number, number, number, number];
-const multiply = (a: Quat4, b: Quat4): [number, number, number, number] => [
+export const multiply = (a: Quat4, b: Quat4): [number, number, number, number] => [
   a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
   a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
   a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
   a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
 ];
 /** `v` turned by the unit quaternion `q`. */
-function turn(q: Quat4, v: Vec3): Vec3 {
+export function turn(q: Quat4, v: Vec3): Vec3 {
   const t = [2 * (q[1] * v[2] - q[2] * v[1]), 2 * (q[2] * v[0] - q[0] * v[2]), 2 * (q[0] * v[1] - q[1] * v[0])];
   return [
     v[0] + q[3] * t[0] + q[1] * t[2] - q[2] * t[1],
@@ -385,6 +385,20 @@ export function kernelCollider(
       border,
     },
   };
+}
+
+/**
+ * The convex pieces of a query shape that is a compound, each a shape with its place in the compound's frame, or null for a
+ * shape that is not a compound (or a decomposed mesh).
+ */
+export function queryParts(options: ShapeOptions): { shape: ShapeOptions; offset: Vec3; rotation: Quat4 }[] | null {
+  if ((options.shape !== 'compound' && options.shape !== 'convexDecomposition') || !options.parts) return null;
+  if (!options.parts.length) throw new RangeError("A compound query shape needs at least one part: {shape: 'compound', parts: [{shape: 'box', halfExtents: [1, 1, 1]}]}");
+  return options.parts.map((part) => {
+    const { offset = [0, 0, 0], rotation = [0, 0, 0, 1], ...rest } = part as CompoundPart & { offset?: Vec3; rotation?: Quat };
+    checkVec(offset, 'Compound part offset');
+    return { shape: rest as ShapeOptions, offset, rotation: [...rotation] as unknown as Quat4 };
+  });
 }
 
 /**

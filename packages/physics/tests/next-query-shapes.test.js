@@ -48,3 +48,30 @@ test('overlaps with a segment, a triangle and a round box match Rapier', () => {
     assert.equal(own, rapier, `${JSON.stringify(shape)} at ${position}`);
   }
 });
+
+test('a compound as the query shape casts and overlaps piece by piece, as on Rapier', () => {
+  const compound = {
+    shape: 'compound',
+    parts: [
+      { shape: 'sphere', radius: 0.3 },
+      { shape: 'box', halfExtents: [0.2, 0.2, 0.2], offset: [0, 1, 0] },
+      { shape: 'capsule', halfHeight: 0.4, radius: 0.15, offset: [0, -1, 0.2], rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2] },
+    ],
+  };
+  const turned = [0.2, 0.3, 0.1, 0.926];
+  for (const [position, rotation, direction] of [
+    [[0, 0, 0], [0, 0, 0, 1], [1, 0, 0]],
+    [[0, 0, 0], turned, [1, 0.1, 0]],
+    [[0, 3, 0], [0, 0, 0, 1], [0, 0, 1]],
+  ]) {
+    const [own, rapier] = worlds.map((w) => w.shapeCast(compound, position, rotation, direction, { maxDistance: 50 }));
+    assert.equal(!!own, !!rapier, `${position}`);
+    // A compound's cast is the nearest of its pieces', each within the 2e-3 of the casts above; Rapier's own nearest may differ by a few of them.
+    if (own) assert.ok(Math.abs(own.distance - rapier.distance) < 6e-3, `compound ${position}: ${own.distance} vs ${rapier.distance}`);
+  }
+  for (const position of [[4.9, 0, 0], [4.9, 2.1, 0], [0, 6.4, 0], [-4, -4, -4]]) {
+    const [own, rapier] = worlds.map((w) => w.intersectShape(compound, position).length);
+    assert.equal(own, rapier, `overlap at ${position}`);
+  }
+  assert.throws(() => worlds[0].shapeCast({ shape: 'compound', parts: [] }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]), /at least one part/);
+});

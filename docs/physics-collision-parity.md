@@ -84,10 +84,10 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Capability | Status | Notes |
 | --- | --- | --- |
 | Ray cast, all hits, solid flag, max time of impact | full | |
-| Shape cast, all hits, target distance, stop at penetration | partial | every convex query shape (ball, box, capsule, cylinder, cone, segment, triangle, hull, round box and hull), tested against Rapier's casts; a non-convex query shape (mesh, height field, compound, half space) is open |
+| Shape cast, all hits, target distance, stop at penetration | partial | every convex query shape (ball, box, capsule, cylinder, cone, segment, triangle, hull, round box and hull), tested against Rapier's casts; a compound of them is cast piece by piece; a mesh, height field, voxel grid or half space as the query shape is open |
 | Point projection, all hits | full | a trimesh holds no point |
 | Point containment (`intersectPoint`) | full | |
-| Shape intersection (`intersectShape`) | partial | the same convex query shapes; non-convex ones open |
+| Shape intersection (`intersectShape`) | partial | the same query shapes; a mesh, height field, voxel grid or half space as the query shape is open |
 | AABB intersection (colliders whose box meets a box) | full | `intersectAabb`, `collider.aabb()` |
 | Collider-to-collider distance and closest points | full | `colliderDistance`; convex, compound, mesh, half space |
 | Collider-to-collider contact (`contactPair`) and intersection tests | full | `contactPair`, `intersectionPair`, any two colliders; a mesh gives each triangle's own normal |

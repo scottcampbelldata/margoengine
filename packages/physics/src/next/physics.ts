@@ -31,7 +31,7 @@ import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
 import { type NextJointOptions, PhysicsJoint, createJoint } from './joint.js';
-import { kernelCollider, queryShape, shapeServed, type HullRows } from './shapes.js';
+import { kernelCollider, multiply, queryParts, queryShape, shapeServed, turn, type HullRows } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
 /** Options for creating a Physics world; every field has a default. */
@@ -929,6 +929,17 @@ export class Physics implements EnginePlugin, BodyOwner {
     checkRotation(rotation);
     checkVec(direction, 'Cast direction');
     this.live();
+    const parts = queryParts(shape);
+    if (parts) {
+      // A compound is cast piece by piece: the first touch is the nearest of its pieces'.
+      let best: ShapeCastHit | null = null;
+      for (const part of parts) {
+        const moved = turn(rotation, part.offset),
+          hit = this.shapeCast(part.shape, [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]], multiply(rotation, part.rotation), direction, options);
+        if (hit && (!best || hit.distance < best.distance)) best = hit;
+      }
+      return best;
+    }
     const query = queryShape(shape, this.hulls),
       cast = {
         max: options.maxDistance ?? Infinity,
@@ -988,6 +999,16 @@ export class Physics implements EnginePlugin, BodyOwner {
     checkVec(position, 'Shape position');
     checkRotation(rotation);
     this.live();
+    const parts = queryParts(shape);
+    if (parts) {
+      const found = new Set<PhysicsBody>();
+      for (const part of parts) {
+        const moved = turn(rotation, part.offset);
+        for (const body of this.intersectShape(part.shape, [position[0] + moved[0], position[1] + moved[1], position[2] + moved[2]], multiply(rotation, part.rotation), options)) found.add(body);
+      }
+      // In the order the bodies were added, as every query lists them.
+      return [...this.bodies].filter((body) => found.has(body));
+    }
     const query = queryShape(shape, this.hulls);
     return this.bodiesOf(this.kernel.intersectShape(query, position, rotation, ...this.filterWords(options)), options.predicate);
   }
