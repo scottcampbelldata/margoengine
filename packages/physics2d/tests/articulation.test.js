@@ -204,3 +204,48 @@ test('articulation arguments are checked', () => {
   assert.throws(() => arm.positions(), { name: 'MargoError', code: 'state' });
   physics.dispose();
 });
+
+/** A humanoid-shaped tree hanging by the head from a fixed hook (y points down, so everything is below it): head, torso, two arms of two links, two legs of three. */
+function humanoid(physics, torsoDensity) {
+  const hook = physics.addBody(null, { type: 'fixed', position: [0, -6], colliders: [] });
+  const body = (x, y, hx, hy, density) =>
+    physics.addBody(null, { position: [x, -y], canSleep: false, colliders: { shape: 'box', width: 2 * hx, height: 2 * hy, density, collisionGroups: 0 } });
+  const specs = [];
+  const bodies = [];
+  const add = (b, parent, anchorParent, anchorChild) => {
+    bodies.push(b);
+    specs.push({ body: b, parent, joint: { type: 'revolute', anchorParent, anchorChild } });
+    return bodies.length - 1;
+  };
+  const head = add(body(0, 5.7, 0.15, 0.15, 1), -1, [0, 0], [0, -0.3]);
+  const torso = add(body(0, 5, 0.25, 0.5, torsoDensity), head, [0, 0.15], [0, -0.5]);
+  const limb = (from, anchor, x, y, links, hx, hy) => {
+    let parent = from,
+      a = anchor;
+    for (let i = 0; i < links; i++) {
+      parent = add(body(x, y - i * 2 * hy - hy, hx, hy, 1), parent, a, [0, -hy]);
+      a = [0, hy];
+    }
+  };
+  limb(torso, [-0.25, -0.4], -0.25, 5.4, 2, 0.07, 0.25);
+  limb(torso, [0.25, -0.4], 0.25, 5.4, 2, 0.07, 0.25);
+  limb(torso, [-0.12, 0.5], -0.12, 4.5, 3, 0.08, 0.3);
+  limb(torso, [0.12, 0.5], 0.12, 4.5, 3, 0.08, 0.3);
+  return { arm: physics.addArticulation(hook, specs), bodies };
+}
+
+test('a branched tree with a 1000:1 mass ratio across its branch stays closed: every joint within 1 percent of a link', () => {
+  const physics = world();
+  const { arm, bodies } = humanoid(physics, 1000);
+  assert.equal(arm.dof, 12);
+  let worst = 0;
+  for (let i = 0; i < 360; i++) {
+    physics.step();
+    if (i < 60) continue;
+    // Forward kinematics of the joint positions, from the root, against where the bodies are: the tree is closed when they agree.
+    const poses = arm.forwardKinematics();
+    bodies.forEach((b, k) => (worst = Math.max(worst, Math.hypot(poses[k].position[0] - b.position[0], poses[k].position[1] - b.position[1]))));
+  }
+  assert.ok(worst < 0.005, `the tree's joints opened by ${worst} m against links of 0.5 m or more`);
+  physics.dispose();
+});

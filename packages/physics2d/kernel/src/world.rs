@@ -522,6 +522,8 @@ pub struct Counts {
     pub overflow: u64,
     pub islands: u64,
     pub awake_bodies: u64,
+    /// Joints solved as branched trees this step (joint.rs, `tree`).
+    pub tree_joints: u64,
 }
 
 pub struct World {
@@ -535,6 +537,10 @@ pub struct World {
     pub force_events: Vec<ForceEvent>,
     /// Stop events of pairs that lost a shape between steps; the next step reports them first.
     pub(crate) pending_events: Vec<Event>,
+    /// Solve every acyclic set of joints as a tree, chains too (the chains' own sweep is the same algebra; for the tests).
+    pub solve_chains_as_trees: bool,
+    /// Leave branched trees of joints to block Gauss-Seidel, as before the tree solve (for the tests' control).
+    pub no_joint_trees: bool,
     /// Asked about the pairs of shapes with hook flags; none by default.
     pub hook: Option<alloc::boxed::Box<dyn Hook>>,
     pub(crate) free_bodies: Vec<u32>,
@@ -604,6 +610,8 @@ impl World {
             force_events: Vec::new(),
             pending_events: Vec::new(),
             hook: None,
+            solve_chains_as_trees: false,
+            no_joint_trees: false,
             free_bodies: Vec::new(),
             free_shapes: Vec::new(),
             joint_ids: Vec::new(),

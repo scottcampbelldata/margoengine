@@ -491,6 +491,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     // Joint passes: relaxing unless marked biased.
     let mut paths = core::mem::take(&mut world.scratch.paths);
     joint::build_paths(world, &mut paths);
+    world.counts.tree_joints = paths.tree_joints as u64;
     let joint_pass = Pass {
         h,
         inv_h,

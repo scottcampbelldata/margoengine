@@ -15,9 +15,9 @@
 // Lagrange Multipliers", SIGGRAPH 1996), so block elimination solves every lock of the path exactly in one sweep, in
 // time linear in its length. Gauss-Seidel moves a load one joint a pass, so a light chain under a heavy end stretches. A
 // path is a run of joints whose dynamic bodies each carry at most two locked joints; a static or kinematic body ends a
-// path, as its infinite mass couples nothing, and a body with three or more (a branch, the joint grid's every node) ends
-// every path through it, as do rings (the joint that would close one). Those joints are solved by block Gauss-Seidel,
-// one joint's locks at a time: in the 30 by 30 grid, long paths snaking through the mesh fought the cross joints and
+// path, as its infinite mass couples nothing. A set of joints with a branch (a body with three or more) and no ring is a
+// tree, and `tree.rs` solves it exactly in one sweep too (Baraff's tree elimination). A ring (a joint that closes a loop)
+// and every joint of a component that has one are solved by block Gauss-Seidel, one joint's locks at a time: in the 30 by 30 grid, long paths snaking through the mesh fought the cross joints and
 // left 8.7 mm gaps where joint-by-joint blocks leave 3.96. Every lock is warm started.
 //
 // The exact sweep alone does not hold a chain under a heavy load: the 1000:1 chain of 50 still flew to 69 times its
@@ -498,6 +498,8 @@ pub fn joint_spring(hertz: f32, damping: f32, h: f32) -> Soft {
 
 // ---- Paths ----
 
+mod tree;
+
 type M3 = [[f64; 3]; 3];
 
 /// The joints split into paths for the exact sweep (see the header), rebuilt each step.
@@ -521,9 +523,14 @@ pub struct Paths {
     x: Vec<[f64; 3]>,
     /// Per body: the inverse inertia the joints solve with, the body's own raised by its geometric stiffness.
     inv_i: Vec<f32>,
+    /// The trees with a branch, solved whole by `tree::solve`.
+    trees: tree::Trees,
     /// Paths built and joints in them, for the tests.
     pub count: u32,
     pub joints: u32,
+    /// Trees built and joints in them, for the tests.
+    pub tree_count: u32,
+    pub tree_joints: u32,
 }
 
 #[inline]
@@ -578,9 +585,45 @@ pub(crate) fn build_paths(world: &World, paths: &mut Paths) {
             paths.degree[def.b as usize] = paths.degree[def.b as usize].saturating_add(1);
         }
     }
+    // Components of dynamic bodies joined by locked joints: one with no cycle and a branch is solved as a tree. Rings
+    // and meshes keep the paths and Gauss-Seidel, where the 30 by 30 grid's snaking paths fought its cross joints.
+    let mut tparent: Vec<u32> = (0..nb as u32).collect();
+    let mut cyclic = alloc::vec![false; nb];
+    let mut branchy = alloc::vec![false; nb];
+    for joint in &world.joints {
+        let def = &joint.def;
+        if locked(&def.kind) && active(world, def) && world.bodies[def.a as usize].is_dynamic() && world.bodies[def.b as usize].is_dynamic() {
+            let (ra, rb) = (find(&mut tparent, def.a), find(&mut tparent, def.b));
+            if ra == rb {
+                cyclic[ra as usize] = true;
+            } else {
+                tparent[ra as usize] = rb;
+                cyclic[rb as usize] |= cyclic[ra as usize];
+            }
+        }
+    }
+    for b in 0..nb {
+        if paths.degree[b] > 2 && world.bodies[b].is_dynamic() {
+            let r = find(&mut tparent, b as u32);
+            branchy[r as usize] = true;
+        }
+    }
+    let mut in_tree = alloc::vec![false; nj];
     for (j, joint) in world.joints.iter().enumerate() {
         let def = &joint.def;
         if !locked(&def.kind) || !active(world, def) {
+            continue;
+        }
+        let dynamic_end = if world.bodies[def.a as usize].is_dynamic() { def.a } else { def.b };
+        let r = find(&mut tparent, dynamic_end) as usize;
+        in_tree[j] = !world.no_joint_trees && !cyclic[r] && (branchy[r] || world.solve_chains_as_trees);
+    }
+    tree::build(world, &in_tree, &mut paths.trees);
+    paths.tree_count = paths.trees.count;
+    paths.tree_joints = paths.trees.joints;
+    for (j, joint) in world.joints.iter().enumerate() {
+        let def = &joint.def;
+        if !locked(&def.kind) || !active(world, def) || in_tree[j] {
             continue;
         }
         let (da, db) = (world.bodies[def.a as usize].is_dynamic(), world.bodies[def.b as usize].is_dynamic());
@@ -840,7 +883,7 @@ pub(crate) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
         let mut joint = world.joints[i];
         solve_rows(&mut joint, &mut pair, pass);
         pair.store(world, &def);
-        if locked(&def.kind) && !paths.in_path[i] {
+        if locked(&def.kind) && !paths.in_path[i] && !paths.trees.member.get(i).copied().unwrap_or(false) {
             let pair = Pair::of(world, &paths.inv_i, &def);
             let l = locks(&def, &pair);
             let inv = invert(&own(world, &paths.inv_i, &def, &l), l.n);
@@ -857,6 +900,7 @@ pub(crate) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
         let (s, e) = (paths.starts[p] as usize, paths.starts[p + 1] as usize);
         sweep(world, paths, s, e, pass);
     }
+    tree::solve(world, paths, pass);
 }
 
 /// The exact solve of one path's locks: block LDL^T of the block tridiagonal K, forward and back.

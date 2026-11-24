@@ -106,3 +106,70 @@ test('articulations: a three-link arm swings as Rapier 2D joints do (and not as 
   world.free();
   physics.dispose();
 });
+
+test('articulations: a branched tree hangs as Rapier 2D joints hold it', { skip }, () => {
+  const build = (torsoDensity) => {
+    const spec = [];
+    // y points down: every height below is a height up the person, negated.
+    const add = (x, yUp, hx, hy, density, parent, anchorParent, anchorChild) => spec.push({ x, y: -yUp, hx, hy, density, parent, anchorParent, anchorChild });
+    add(0, 5.7, 0.15, 0.15, 1, -1, [0, 0], [0, -0.3]);
+    add(0, 5, 0.25, 0.5, torsoDensity, 0, [0, 0.15], [0, -0.5]);
+    const limb = (from, anchor, x, y, links, hx, hy) => {
+      let parent = from,
+        a = [anchor[0], -anchor[1]];
+      for (let i = 0; i < links; i++) {
+        add(x, y - i * 2 * hy - hy, hx, hy, 1, parent, a, [0, -hy]);
+        parent = spec.length - 1;
+        a = [0, hy];
+      }
+    };
+    limb(1, [-0.25, 0.4], -0.25, 5.4, 2, 0.07, 0.25);
+    limb(1, [0.25, 0.4], 0.25, 5.4, 2, 0.07, 0.25);
+    limb(1, [-0.12, -0.5], -0.12, 4.5, 3, 0.08, 0.3);
+    limb(1, [0.12, -0.5], 0.12, 4.5, 3, 0.08, 0.3);
+    return spec;
+  };
+  const spec = build(1000);
+  const world = new R.World({ x: 0, y: 9.81 });
+  world.timestep = 1 / 60;
+  const hook = world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(0, -6));
+  const theirs_ = spec.map((s) => {
+    const b = world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(s.x, s.y).setCanSleep(false));
+    world.createCollider(R.ColliderDesc.cuboid(s.hx, s.hy).setDensity(s.density).setCollisionGroups(0), b);
+    return b;
+  });
+  spec.forEach((s, i) => {
+    const parent = s.parent < 0 ? hook : theirs_[s.parent];
+    world.createImpulseJoint(R.JointData.revolute({ x: s.anchorParent[0], y: s.anchorParent[1] }, { x: s.anchorChild[0], y: s.anchorChild[1] }), parent, theirs_[i], true);
+  });
+  const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, 9.81] });
+  const root = physics.addBody(null, { type: 'fixed', position: [0, -6], colliders: [] });
+  const bodies = spec.map((s) => physics.addBody(null, { position: [s.x, s.y], canSleep: false, colliders: { shape: 'box', width: 2 * s.hx, height: 2 * s.hy, density: s.density, collisionGroups: 0 } }));
+  physics.addArticulation(root, spec.map((s, i) => ({ body: bodies[i], parent: s.parent, joint: { type: 'revolute', anchorParent: s.anchorParent, anchorChild: s.anchorChild } })));
+  const rotate = (v, a) => [Math.cos(a) * v[0] - Math.sin(a) * v[1], Math.sin(a) * v[0] + Math.cos(a) * v[1]];
+  // How far each joint is open: the gap between its two anchors in the world.
+  const gaps = (pos, angle, parentOf) =>
+    spec.map((s, i) => {
+      const [pp, pa] = parentOf(s.parent);
+      const a = rotate(s.anchorParent, pa),
+        b = rotate(s.anchorChild, angle(i));
+      return Math.hypot(pp[0] + a[0] - pos(i)[0] - b[0], pp[1] + a[1] - pos(i)[1] - b[1]);
+    });
+  let ours = 0,
+    theirs = 0;
+  for (let step = 0; step < 240; step++) {
+    world.step();
+    physics.step();
+    // The figure's joints start a few centimetres open: measure after they have closed.
+    if (step < 60) continue;
+    ours = Math.max(ours, ...gaps((i) => bodies[i].position, (i) => bodies[i].rotation, (p) => (p < 0 ? [[0, -6], 0] : [bodies[p].position, bodies[p].rotation])));
+    theirs = Math.max(theirs, ...gaps((i) => [theirs_[i].translation().x, theirs_[i].translation().y], (i) => theirs_[i].rotation(), (p) => (p < 0 ? [[0, -6], 0] : [[theirs_[p].translation().x, theirs_[p].translation().y], theirs_[p].rotation()])));
+  }
+  // The tree has a 1000:1 mass ratio across its branch: ours keeps every joint closed to a few millimetres, where Rapier 2D's
+  // impulse joints (block Gauss-Seidel) leave them open by far more.
+  if (process.env.DEBUG_ORACLE) console.log('tree gaps: ours', ours, 'Rapier', theirs);
+  assert.ok(ours < 0.005, `our joints opened by ${ours} m`);
+  assert.ok(theirs > ours, `Rapier's joints opened by ${theirs} m, ours by ${ours} m`);
+  world.free();
+  physics.dispose();
+});

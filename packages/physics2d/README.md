@@ -84,7 +84,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Bodies | soft CCD | none | missing |
 | Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
 | Joints | generic joint (any mix of the x, y and angle locks, in turned frames), pin-slot | `type: 'generic'`, `type: 'slot'` | full |
-| Joints | multibody joints: joint space, joint motors and limits, kinematics, inverse kinematics | `addArticulation` (`Articulation2D`: positions and velocities, motors, limits, forward and inverse kinematics, Jacobian); solved by the exact joint paths, not by reduced coordinates | full, with the accepted difference in limits |
+| Joints | multibody joints: joint space, joint motors and limits, kinematics, inverse kinematics | `addArticulation` (`Articulation2D`: positions and velocities, motors, limits, forward and inverse kinematics, Jacobian) over exact maximal-coordinate trees: chains and branched trees solve in one sweep, so a 1000:1 mass ratio across a branch keeps every joint closed | full, see limits |
 | Tools | PID controller | `PidController2D` | full |
 | Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
 | World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
@@ -116,7 +116,7 @@ console.log(reached, arm.pointAt(1, [20, 0]));
 physics.dispose();
 ```
 
-The links stay ordinary bodies and the kernel's joints hold them together (exactly along chains), so contacts of any link act on the whole arm; see [limits](../../docs/limits.md) for how this differs from reduced coordinates.
+The links stay ordinary bodies and the kernel's joints hold them together, solved exactly in one sweep over the whole tree (Baraff 1996: sparse block elimination over the tree), so a 1000:1 mass ratio across a branch keeps every joint closed and contacts of any link act on the whole arm. Margo uses exact maximal-coordinate trees rather than reduced coordinates so that contacts stay in the one solver; [limits](../../docs/limits.md) has the measured accuracy against the closed forms and against Rapier 2D.
 
 ## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)
 
