@@ -1,10 +1,10 @@
 {
-  "commit": "8fb3b07b38",
+  "commit": "1be7e748f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 60984,
-    "gzip": 24797,
+    "raw": 60994,
+    "gzip": 24811,
     "limit": 25000
   },
   "packages": {
@@ -922,12 +922,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53121,
-        "gzip": 22179
+        "raw": 53125,
+        "gzip": 22163
       },
       "./extension": {
-        "raw": 53302,
-        "gzip": 22248
+        "raw": 53303,
+        "gzip": 22260
       }
     },
     "@margoengine/creative": {
@@ -936,8 +936,8 @@
         "gzip": 3089
       },
       ".": {
-        "raw": 65398,
-        "gzip": 19649
+        "raw": 64760,
+        "gzip": 19601
       },
       "./particles": {
         "raw": 1138,
@@ -956,20 +956,20 @@
         "gzip": 7183
       },
       "./grass": {
-        "raw": 18722,
-        "gzip": 6500
+        "raw": 18432,
+        "gzip": 6482
       },
       "./grass-settings": {
         "raw": 4081,
         "gzip": 1814
       },
       "./planet": {
-        "raw": 21501,
-        "gzip": 7278
+        "raw": 21273,
+        "gzip": 7263
       },
       "./stars": {
-        "raw": 6045,
-        "gzip": 2575
+        "raw": 5925,
+        "gzip": 2562
       },
       "./planet-atmosphere": {
         "raw": 7081,
@@ -13312,8 +13312,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 396248,
-        "gzip": 232979
+        "raw": 411294,
+        "gzip": 239664
       },
       "./decomposition": {
         "raw": 26455,
@@ -13686,8 +13686,8 @@
     },
     "@margoengine/ragdoll": {
       ".": {
-        "raw": 19197,
-        "gzip": 7374
+        "raw": 19484,
+        "gzip": 7420
       },
       "./powered": {
         "raw": 8314,
@@ -15017,7 +15017,7 @@
       },
       "./lights": {
         "raw": 3700,
-        "gzip": 1698
+        "gzip": 1701
       },
       "./scene": {
         "raw": 7696,
@@ -15025,7 +15025,7 @@
       },
       "./viewer-extras": {
         "raw": 25920,
-        "gzip": 9814
+        "gzip": 9804
       }
     },
     "@margoengine/stats": {
@@ -16556,9 +16556,9 @@
       "brotli": 12604
     },
     "packages/physics/dist/index.js": {
-      "raw": 396248,
-      "gzip": 232979,
-      "brotli": 224900
+      "raw": 411294,
+      "gzip": 239664,
+      "brotli": 230758
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16938,13 +16938,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 142064,
-        "gzip": 46160
+        "raw": 153239,
+        "gzip": 49606
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 254183,
-        "gzip": 186944,
+        "raw": 258054,
+        "gzip": 189659,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

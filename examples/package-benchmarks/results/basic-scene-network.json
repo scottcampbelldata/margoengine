@@ -1,7 +1,7 @@
 {
-  "commit": "8fb3b07b38",
+  "commit": "1be7e748f",
   "dirty": false,
-  "browser": "msedge 158.0.4370.33 headless",
+  "browser": "chromium 156.0.8078.4 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
       "file": "assets/dist-DIfg33G1.js",
@@ -105,12 +105,12 @@
       ]
     },
     "../../../packages/gltf/dist/index.js": {
-      "file": "assets/dist-CLs5Stje.js",
+      "file": "assets/dist-C48JG6B1.js",
       "name": "dist",
       "src": "../../../packages/gltf/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
-        "_geometry-BGTjAxRm.js",
+        "_geometry-k6Eafjtg.js",
         "_extension-Bn1Wm_pY.js",
         "_node-matrix-DeiKheBW-Cj_xL6KP.js",
         "_errors-THVaUwlL-C81vxm_p.js",
@@ -315,8 +315,8 @@
         "_version-YYhCZP03.js"
       ]
     },
-    "_geometry-BGTjAxRm.js": {
-      "file": "assets/geometry-BGTjAxRm.js",
+    "_geometry-k6Eafjtg.js": {
+      "file": "assets/geometry-k6Eafjtg.js",
       "name": "geometry",
       "imports": [
         "_version-YYhCZP03.js"
@@ -395,13 +395,13 @@
       ]
     },
     "index.html": {
-      "file": "assets/index--CQBPpV_.js",
+      "file": "assets/index-CcQ2RcB4.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_geometry-BGTjAxRm.js",
+        "_geometry-k6Eafjtg.js",
         "_preload-helper-CRzLMJPS.js"
       ],
       "dynamicImports": [
@@ -411,7 +411,7 @@
       ]
     }
   },
-  "adapter": "nvidia ampere",
+  "adapter": "apple metal-3",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
@@ -424,13 +424,13 @@
       "brotli": 2282
     },
     {
-      "path": "assets/dist-CLs5Stje.js",
+      "path": "assets/dist-C48JG6B1.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 5507,
+      "transferred": 5506,
       "raw": 13617,
-      "gzip": 5135,
-      "brotli": 4660
+      "gzip": 5134,
+      "brotli": 4662
     },
     {
       "path": "assets/errors-THVaUwlL-C81vxm_p.js",
@@ -451,22 +451,22 @@
       "brotli": 113
     },
     {
-      "path": "assets/geometry-BGTjAxRm.js",
+      "path": "assets/geometry-k6Eafjtg.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2420,
-      "raw": 3990,
-      "gzip": 2050,
-      "brotli": 1858
+      "transferred": 2410,
+      "raw": 3956,
+      "gzip": 2040,
+      "brotli": 1846
     },
     {
-      "path": "assets/index--CQBPpV_.js",
+      "path": "assets/index-CcQ2RcB4.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27147,
-      "raw": 64929,
-      "gzip": 26765,
-      "brotli": 23613
+      "transferred": 27114,
+      "raw": 64941,
+      "gzip": 26732,
+      "brotli": 23629
     },
     {
       "path": "assets/node-matrix-DeiKheBW-Cj_xL6KP.js",
@@ -508,10 +508,10 @@
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 969,
-      "raw": 719,
-      "gzip": 412,
-      "brotli": 266
+      "transferred": 955,
+      "raw": 705,
+      "gzip": 401,
+      "brotli": 249
     },
     {
       "path": "model.glb",
@@ -525,10 +525,10 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46054,
-    "raw": 96065,
-    "gzip": 40507,
-    "brotli": 35771
+    "transferred": 45996,
+    "raw": 96029,
+    "gzip": 40452,
+    "brotli": 35760
   },
   "notFetched": [
     {
@@ -552,12 +552,12 @@
       "raw": 4294
     },
     {
-      "path": "assets/data-DahV1vVU.js",
-      "raw": 335
-    },
-    {
       "path": "assets/data-DYZnmghD-CnqB9AsR.js",
       "raw": 21285
+    },
+    {
+      "path": "assets/data-DahV1vVU.js",
+      "raw": 335
     },
     {
       "path": "assets/dds-Dg-e4ZGI.js",
