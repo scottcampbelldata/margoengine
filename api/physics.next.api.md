@@ -274,6 +274,10 @@ export class KernelWorld {
     intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null;
     intersectAabb(low: readonly number[], high: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
+    colliderRay(collider: number, origin: readonly number[], direction: readonly number[], max: number, solid: boolean): KernelRayHit | null;
+    colliderProject(collider: number, point: readonly number[], solid: boolean): KernelProjection | null;
+    colliderShapeCast(collider: number, shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], direction: readonly number[], cast: KernelCastOptions): KernelShapeCastHit | null;
+    colliderOverlaps(collider: number, shape: KernelQueryShape, position: readonly number[], rotation: readonly number[]): boolean;
     pairIntersects(a: number, b: number): boolean;
     pairContacts(a: number, b: number, prediction: number): KernelManifold[];
     pairDistance(a: number, b: number): KernelDistance | null;
@@ -373,6 +377,20 @@ export class Physics implements EnginePlugin, BodyOwner {
     contactPair(a: PhysicsCollider, b: PhysicsCollider, prediction?: number): ContactManifold[];
     intersectionPair(a: PhysicsCollider, b: PhysicsCollider): boolean;
     colliderDistance(a: PhysicsCollider, b: PhysicsCollider): ColliderDistance | null;
+    raycastCollider(collider: PhysicsCollider, origin: Vec3, direction: Vec3, options?: {
+        maxDistance?: number;
+        solid?: boolean;
+    }): RaycastHit | null;
+    projectPointOnCollider(collider: PhysicsCollider, point: Vec3, options?: {
+        solid?: boolean;
+    }): {
+        point: [number, number, number];
+        inside: boolean;
+        distance: number;
+    } | null;
+    colliderContainsPoint(collider: PhysicsCollider, point: Vec3): boolean;
+    castShapeAtCollider(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
+    colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat): boolean;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
     debugRender(): never;

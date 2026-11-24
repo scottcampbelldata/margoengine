@@ -687,3 +687,68 @@ pub extern "C" fn pair_distance(a: u32, b: u32) -> i32 {
         None => 0,
     }
 }
+
+/// A ray against one collider (see `query_ray`): 1 with the hit in the buffer, 0 for a miss, -1 for a zero or not finite ray
+/// or a collider that is gone.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_ray(collider: u32, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32, max: f32, solid: u32) -> i32 {
+    let Some((origin, dir, _)) = ray_args(ox, oy, oz, dx, dy, dz, 0, u32::MAX, crate::world::NONE, crate::world::NONE) else { return -1 };
+    if !collider_alive(collider) {
+        return -1;
+    }
+    match world().ray_collider(collider as usize, origin, dir, max, solid != 0) {
+        Some(hit) => {
+            write_hit(0, collider, hit, origin, dir);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// The nearest point of one collider to a point (see `query_project_point`): 1, 0 when nothing can be projected, -1 for a
+/// point that is not finite or a collider that is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_project(collider: u32, x: f32, y: f32, z: f32, solid: u32) -> i32 {
+    if !(x.is_finite() && y.is_finite() && z.is_finite()) || !collider_alive(collider) {
+        return -1;
+    }
+    match world().project_collider(collider as usize, v3(x, y, z), solid != 0) {
+        Some(hit) => {
+            write_projection(0, collider, hit, v3(x, y, z), solid != 0);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// A shape cast against one collider (see `query_shape_cast`): 1 with the hit in the buffer, 0 for none, -1 as
+/// `query_shape_cast` refuses or the collider is gone.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_shape_cast(
+    collider: u32, kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, dx: f32, dy: f32, dz: f32, max: f32, target: f32, options: u32,
+) -> i32 {
+    let Some((shape, pose, dir, o, _)) = cast_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw, dx, dy, dz, max, target, options, 0, u32::MAX, crate::world::NONE, crate::world::NONE) else { return -1 };
+    if !collider_alive(collider) {
+        return -1;
+    }
+    match world().cast_collider(collider as usize, shape, pose, dir, &o) {
+        Some(hit) => {
+            write_cast(0, collider, hit);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// Whether a shape at a pose overlaps one collider: 1, 0, or -1 as `query_shape_all` refuses or the collider is gone.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_overlaps(collider: u32, kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> i32 {
+    let Some((shape, pose)) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw) else { return -1 };
+    if !collider_alive(collider) || world().solid(shape, pose, &mut BoxData::new()).is_none() {
+        return -1;
+    }
+    world().overlaps(collider as usize, shape, pose) as i32
+}

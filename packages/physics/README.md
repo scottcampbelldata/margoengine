@@ -376,6 +376,8 @@ console.log(physics.intersectionPair(ball, box), box.aabb().min); // false [2.5,
 physics.dispose();
 ```
 
+A query can also be limited to one collider, as Rapier's `collider.castRay`, `projectPoint`, `containsPoint`, `castShape` and `intersectsShape`: `physics.raycastCollider(collider, origin, direction, {maxDistance, solid})`, `projectPointOnCollider(collider, point, {solid})`, `colliderContainsPoint(collider, point)`, `castShapeAtCollider(collider, shape, position, rotation, direction, options)` and `colliderIntersectsShape(collider, shape, position, rotation)`, with what the world's queries take and give. A query reads the poses as they are, so a pose set by hand (`body.setPosition`) is seen at once, with no query pipeline to update.
+
 `ccd: true` on `addBody`, or `body.ccd = true`, turns on continuous collision for a body (default off), as Rapier's `enableCcd`: after each step a dynamic body that moved further than its thinnest piece is thick is swept from where the step began to where it ended and put back to its first touch, its velocity kept, so a fast thin body cannot pass a wall, a mesh or a height field. A slow body moves exactly as it would without it. `body.ccdActive` is true when the last step's sweep checked the body.
 
 ```ts

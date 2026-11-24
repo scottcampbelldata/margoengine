@@ -989,6 +989,64 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.live();
     return this.kernel.pairDistance(this.rowOf(a), this.rowOf(b));
   }
+  /**
+   * A ray against one collider, as Rapier's `collider.castRay`: the hit or null. `maxDistance` defaults to unbounded and
+   * `solid` to true.
+   * @throws RangeError for an origin or direction that is not three finite numbers, a zero direction or a removed collider.
+   */
+  raycastCollider(collider: PhysicsCollider, origin: Vec3, direction: Vec3, options: { maxDistance?: number; solid?: boolean } = {}): RaycastHit | null {
+    checkVec(origin, 'Ray origin');
+    checkVec(direction, 'Ray direction');
+    this.live();
+    const raw = this.kernel.colliderRay(this.rowOf(collider), origin, direction, options.maxDistance ?? Infinity, options.solid ?? true);
+    return raw ? this.rayHit(raw) : null;
+  }
+  /**
+   * The point of one collider nearest `point`, as Rapier's `collider.projectPoint`: inside, with `solid` true (the default)
+   * the point itself. Null when nothing can be projected (a mesh holds no inside).
+   * @throws RangeError for a point that is not three finite numbers or a removed collider.
+   */
+  projectPointOnCollider(collider: PhysicsCollider, point: Vec3, options: { solid?: boolean } = {}): { point: [number, number, number]; inside: boolean; distance: number } | null {
+    checkVec(point, 'Point');
+    this.live();
+    const raw = this.kernel.colliderProject(this.rowOf(collider), point, options.solid ?? true);
+    return raw ? { point: raw.point, inside: raw.inside, distance: raw.inside ? 0 : raw.distance } : null;
+  }
+  /**
+   * Whether `point` is inside one collider, as Rapier's `collider.containsPoint`; a mesh or height field holds no point.
+   * @throws RangeError for a point that is not three finite numbers or a removed collider.
+   */
+  colliderContainsPoint(collider: PhysicsCollider, point: Vec3): boolean {
+    return this.projectPointOnCollider(collider, point, { solid: true })?.inside ?? false;
+  }
+  /**
+   * A shape cast against one collider, as Rapier's `collider.castShape`, with the options of `shapeCast`.
+   * @throws RangeError for a pose or direction that is not finite, a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
+   */
+  castShapeAtCollider(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options: PhysicsShapeCastOptions = {}): ShapeCastHit | null {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    checkVec(direction, 'Cast direction');
+    this.live();
+    const query = queryShape(shape, this.hulls),
+      raw = this.kernel.colliderShapeCast(this.rowOf(collider), query, position, rotation, direction, {
+        max: options.maxDistance ?? Infinity,
+        target: options.targetDistance ?? 0,
+        stop: options.stopAtPenetration ?? true,
+        geometry: options.computeImpactGeometryOnPenetration ?? true,
+      });
+    return raw ? this.castHit(raw) : null;
+  }
+  /**
+   * Whether a convex shape overlaps one collider, as Rapier's `collider.intersectsShape`.
+   * @throws RangeError for a pose that is not finite or a removed collider; MargoError `unsupported` for a query shape the solver does not hold.
+   */
+  colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat = [0, 0, 0, 1]): boolean {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    this.live();
+    return this.kernel.colliderOverlaps(this.rowOf(collider), queryShape(shape, this.hulls), position, rotation);
+  }
   /** A collider's row, for the kernel; refuses what is not this world's. */
   private rowOf(collider: PhysicsCollider): number {
     if (!collider.valid || this.byRow.get(collider.handle) !== collider)

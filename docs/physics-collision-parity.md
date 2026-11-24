@@ -52,7 +52,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | --- | --- | --- |
 | Broad phase on moving and fixed colliders | full | |
 | Narrow phase for every pair of held shapes, manifolds up to 4 points | full | |
-| Narrow phase for the missing shapes (segment, triangle, polyline, half space) against every shape | missing | |
+| Narrow phase for segment, triangle, polyline and half space against every shape | full | a mesh meets no mesh, as on Rapier; a half space meets no mesh or half space |
 | Contact skin / prediction distance as a collider option | missing | the step uses a fixed prediction |
 | Contact manifold read (`contacts()`, `contactPoints`, `touching`, `contactPair`) | full | `contactPair` works for any two colliders |
 | Friction, restitution, combine rules | full | all four rules |
@@ -92,7 +92,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Collider-to-collider distance and closest points | full | `colliderDistance`; convex, compound, mesh, half space |
 | Collider-to-collider contact (`contactPair`) and intersection tests | full | `contactPair`, `intersectionPair`, any two colliders; a mesh gives each triangle's own normal |
 | Filter flags, groups, predicate, exclude collider and body | full | |
-| Ray cast on a ray against a single collider, shape cast of one collider | missing | |
-| Query pipeline updated on demand (`updateQueryPipeline`) | partial | queries read the last step's poses |
+| Ray cast, point projection, containment, shape cast and overlap against a single collider | full | `raycastCollider` and the rest |
+| Query pipeline updated on demand (`updateQueryPipeline`) | full | there is no pipeline: queries read the poses as they are, tested after `setPosition` |
 
 This table is updated as each gap lands; the end state is every row full.

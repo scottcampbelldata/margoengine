@@ -133,6 +133,10 @@ interface KernelExports extends WebAssembly.Exports {
   query_buffer(): number;
   collider_aabb(collider: number): number;
   query_aabb(lx: number, ly: number, lz: number, hx: number, hy: number, hz: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
+  collider_ray(collider: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number): number;
+  collider_project(collider: number, x: number, y: number, z: number, solid: number): number;
+  collider_shape_cast(collider: number, ...words: number[]): number;
+  collider_overlaps(collider: number, ...words: number[]): number;
   pair_intersects(a: number, b: number): number;
   pair_contacts(a: number, b: number, prediction: number): number;
   pair_distance(a: number, b: number): number;
@@ -1217,6 +1221,30 @@ export class KernelWorld {
       (skip) => this.api.query_aabb(low[0]!, low[1]!, low[2]!, high[0]!, high[1]!, high[2]!, flags, groups, collider, body, skip),
       'A box query needs finite corners with low at or under high on every axis; pass [x, y, z] corners.',
     );
+  }
+  /** A ray against one collider: the hit, or null. @throws RangeError for a ray that is not finite and nonzero, or a collider that is gone. */
+  colliderRay(collider: number, origin: readonly number[], direction: readonly number[], max: number, solid: boolean): KernelRayHit | null {
+    const found = this.api.collider_ray(collider, origin[0]!, origin[1]!, origin[2]!, direction[0]!, direction[1]!, direction[2]!, max, solid ? 1 : 0);
+    if (found < 0) throw new RangeError(`${PAIR_REFUSED} A ray also needs a finite origin and a finite nonzero direction.`);
+    return found ? this.readHit(0) : null;
+  }
+  /** The point of one collider nearest `point`: null when nothing can be projected. @throws RangeError for a point that is not finite or a collider that is gone. */
+  colliderProject(collider: number, point: readonly number[], solid: boolean): KernelProjection | null {
+    const found = this.api.collider_project(collider, point[0]!, point[1]!, point[2]!, solid ? 1 : 0);
+    if (found < 0) throw new RangeError(`${PAIR_REFUSED} A point also needs three finite numbers.`);
+    return found ? this.readProjection(0) : null;
+  }
+  /** A shape cast against one collider, or null. @throws RangeError as {@link KernelWorld.shapeCast}, or for a collider that is gone. */
+  colliderShapeCast(collider: number, shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], direction: readonly number[], cast: KernelCastOptions): KernelShapeCastHit | null {
+    const found = this.api.collider_shape_cast(collider, ...this.shapeWords(shape, position, rotation), direction[0]!, direction[1]!, direction[2]!, cast.max, cast.target, castBits(cast));
+    if (found < 0) throw new RangeError(CAST_REFUSED);
+    return found ? this.readCast(0) : null;
+  }
+  /** Whether a query shape at a pose overlaps one collider. @throws RangeError as {@link KernelWorld.shapeCast}, or for a collider that is gone. */
+  colliderOverlaps(collider: number, shape: KernelQueryShape, position: readonly number[], rotation: readonly number[]): boolean {
+    const found = this.api.collider_overlaps(collider, ...this.shapeWords(shape, position, rotation));
+    if (found < 0) throw new RangeError(CAST_REFUSED);
+    return found === 1;
   }
   /** Whether two colliders overlap now. @throws RangeError for a collider row that is gone. */
   pairIntersects(a: number, b: number): boolean {
