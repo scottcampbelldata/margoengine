@@ -6,7 +6,23 @@
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
 
+export class CellMaterial {
+    youngsModulus: number;
+    poissonRatio: number;
+    model: CellModel;
+    density: number;
+    yieldStrain: number;
+    creep: number;
+    tearStrain: number;
+    clone(): CellMaterial;
+    lame(): [number, number];
+}
+
+export type CellModel = 'neo-hookean' | 'corotated';
+
 export class SoftBodies implements PhysicsAttachment {
+    cellTornByHand: boolean;
+    cellDamping: number;
     substeps: number;
     iterations: number;
     private constructor();
@@ -15,7 +31,9 @@ export class SoftBodies implements PhysicsAttachment {
     onTear(listener: (event: SoftTearEvent) => void): () => void;
     hash(): number;
     columns(): Columns;
+    cellColumns(): Columns;
     create(desc: SoftBodyDesc): SoftBody;
+    writeCellMaterial(body: SoftBody): void;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
@@ -41,6 +59,8 @@ export class SoftBody {
     structural: number;
     masses: Float32Array;
     material: SoftBodyMaterial;
+    cellRange: CellRange;
+    cellMaterial: CellMaterial;
     constructor(owner: SoftBodies,
     handle: number,
     firstParticle: number,
@@ -49,8 +69,11 @@ export class SoftBody {
     edgeTotal: number,
     structural: number,
     masses: Float32Array,
-    material: SoftBodyMaterial);
+    material: SoftBodyMaterial,
+    cellRange?: CellRange,
+    cellMaterial?: CellMaterial);
     removed: boolean;
+    cellsTornSeen: Set<number>;
     force: Vec3;
     pointForces: Map<number, Vec3>;
     tornSeen: Set<number>;
@@ -74,6 +97,15 @@ export class SoftBody {
     bendEdges(): Uint32Array;
     isEdgeTorn(edge: number): boolean;
     tearEdge(edge: number): this;
+    numCells(): number;
+    cells(): Uint32Array;
+    isCellTorn(cell: number): boolean;
+    tornCells(): number[];
+    tearCell(cell: number): this;
+    volume(): number;
+    restVolume(): number;
+    setCellMaterial(material: CellMaterial): this;
+    getCellMaterial(): CellMaterial;
     setMaterial(material: SoftBodyMaterial): this;
     getMaterial(): SoftBodyMaterial;
     setGravityScale(scale: number): this;
@@ -101,6 +133,11 @@ export class SoftBodyDesc {
     shift: Vec3;
     shapeMatching: boolean;
     triangles: number[];
+    cells: number[];
+    cellMaterial: CellMaterial;
+    clusterGroups: number[][];
+    clusterHertz: number;
+    massGiven: boolean;
     constructor(positions: ArrayLike<number> | readonly Vec3[]);
     get particleCount(): number;
     static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
@@ -112,6 +149,12 @@ export class SoftBodyDesc {
         bending?: boolean;
     }): SoftBodyDesc;
     setShapeMatching(on: boolean): this;
+    static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
+    static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
+    setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
+    setCellMaterial(material: CellMaterial): this;
+    setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
+    resolvedMasses(): number[];
     setEdges(pairs: ArrayLike<number>): this;
     setBendEdges(pairs: ArrayLike<number>): this;
     addEdges(pairs: ArrayLike<number>): this;
@@ -146,6 +189,7 @@ export interface SoftSoftness {
 export interface SoftTearEvent {
     body: SoftBody;
     edges: number[];
+    cells: number[];
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -185,6 +229,15 @@ interface BodyOwner {
 }
 
 type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
+
+interface CellRange {
+    first: number;
+    count: number;
+    clusterFirst: number;
+    clusterCount: number;
+    memberFirst: number;
+    memberCount: number;
+}
 
 interface CharacterCollision {
     collider: PhysicsCollider;
