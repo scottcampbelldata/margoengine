@@ -432,6 +432,28 @@ for (const [path, bytes] of textures) save(path, bytes);
   exported (skinned and morphed meshes keep their base geometry). Metallic-roughness and normal textures, emissive
   textures, double-sidedness and a second UV set are not written either. An empty or fully hidden scene throws.
 
+A loaded, textured model is refused from the engine (`exportDAE` and `exportUSDZ` name the route in their error), since a
+live texture has no encoded bytes to hand over. Write it with `exportModel(model, {binary: true})` first: `exportUSDZ`
+takes those GLB bytes, and `exportDAEOfGLB(glb, options)` from `@margoengine/exporters/dae-glb` reads them into a scene and writes it, PNG and JPEG images
+included, returning `{dae, textures, skipped}`. `skipped` names what the GLB held that the scene reader left out: a
+primitive that is not triangles or lines, a texture not PNG or JPEG, vertex colours under a base colour texture. An
+untextured loaded model exports straight from the engine with either.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {exportDAEOfGLB} from 'margoengine/exporters/dae-glb';
+import {exportModel} from 'margoengine/exporters/model';
+import {exportUSDZ} from 'margoengine/exporters/usdz';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const model = await loadGLTF(engine, '/SciFiHelmet.glb');
+const glb = await exportModel(model, {binary: true});
+const usdz = exportUSDZ(glb);
+const {dae, textures, skipped} = exportDAEOfGLB(glb, {texturePrefix: 'textures/'});
+console.log(usdz.byteLength, dae.length, textures.size, skipped);
+```
+
 ## Data-scene samplers, unlit materials, cameras and lights
 
 `TextureData` takes `magFilter` and `minFilter` (`'nearest'` or `'linear'`, default linear), `mipmaps` (default true)

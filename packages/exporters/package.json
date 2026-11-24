@@ -63,6 +63,10 @@
       "types": "./dist/dae.d.ts",
       "import": "./dist/dae.js"
     },
+    "./dae-glb": {
+      "types": "./dist/dae-glb.d.ts",
+      "import": "./dist/dae-glb.js"
+    },
     "./capture": {
       "types": "./dist/capture.d.ts",
       "import": "./dist/capture.js"

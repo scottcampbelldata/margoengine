@@ -611,6 +611,10 @@
       "types": "./dist/exporters/dae.d.ts",
       "import": "./dist/exporters/dae.js"
     },
+    "./exporters/dae-glb": {
+      "types": "./dist/exporters/dae-glb.d.ts",
+      "import": "./dist/exporters/dae-glb.js"
+    },
     "./exporters/capture": {
       "types": "./dist/exporters/capture.d.ts",
       "import": "./dist/exporters/capture.js"

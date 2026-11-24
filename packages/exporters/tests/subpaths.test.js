@@ -46,3 +46,12 @@ test('Unity delivery subpath exposes only file generators and never loads a rend
   assert.doesNotMatch(entry, /from ['"]\.\/(?:index|gltf|capture|model|scene)\.js['"]/);
   assert.doesNotMatch(entry, /from ['"]node:|requestAdapter\(|child_process|writeFile\(/);
 });
+
+test('DAE-of-GLB subpath holds the GLB route apart from the DAE serializer', async () => {
+  const isolated = await import('@margoengine/exporters/dae-glb');
+  assert.deepEqual(Object.keys(isolated), ['exportDAEOfGLB']);
+  const entry = await readFile(new URL('../dist/dae-glb.js', import.meta.url), 'utf8');
+  assert.match(entry, /from ['"]\.\/dae\.js['"]/);
+  assert.match(entry, /from ['"]\.\/glb-scene\.js['"]/);
+  assert.doesNotMatch(await readFile(new URL('../dist/dae.js', import.meta.url), 'utf8'), /glb-scene/);
+});
