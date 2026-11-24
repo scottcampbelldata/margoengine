@@ -11477,6 +11477,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   are gone. The fix needs a design choice in scatter and post (an occlusion term the blended blades take, or a coverage
   depth the GTAO pass reads), so it is left to a dedicated change.
 
+### Fixed 2026-11-24: the Fauld store's bulbs drew a 30 mm sphere at the lamp's whole candela, past the half-float headroom (KB-FAULD-GLOBE1, scenes)
+
+- **What:** `@margoengine/scenes/fauld-tunnels` drew each mains lamp as a 30 mm glowing sphere at the light's candela over its projected area: about 26,000 in the pre-exposed frame (36,000 at night), past the /8 headroom the store keeps under half-float's 65,504 for bloom and the 3,200 K white balance. Hand lamps were 40 mm sources (147,000 in the after state) and the cradle's bowl lamp a hand lamp's.
+- **Cause:** the emitter was the filament bulb. A 60 or 100 W lamp in a 140 mm opal well glass glows over the globe, a hand lamp over its 104 mm lens and a deep bowl over its mouth. Also, after, flooded and sealed were set to EV 1 by hand when the hand lamps were lifted to chest height: their key card (2 m along the first hand lamp's beam, the lighting plan's key_after) read 7.4, 2.9 stops over; the night yard's read 1.33.
+- **Fix:** the lamps hang in `tn_wellglass` (a 1940s well-glass bulkhead modelled in Blender, channel-films tunnels_kit_blender.py `well_glass`; the globe measured at 0.07 m), whose glass is the emitter at the same lumens (`WELL_GLASS_RADIUS`, 4,700 to 7,900); `HANDLAMP_LENS_RADIUS` 0.052 and `DEEP_BOWL_RADIUS` 0.16; after, flooded and sealed metered to EV 3.9, the night yard to 1.9 (Lagarde and de Rousiers, Moving Frostbite to PBR, SIGGRAPH 2014, section 5.1, pre-exposure).
+- **Test:** packages/scenes/test/fauld-tunnels.test.js, "the well glass is the emitter, each lamp keeping its luminous power" and "the key card of each lamp-lit state reads 1.0 at its EV"; the /8 headroom test unchanged.
+
+### Fixed 2026-11-24: LightBounce bounced the first four of a row of equal lamps wherever the camera stood (KB-BOUNCE-NEAREST1, clustered)
+
+- **What:** in the Fauld store's 56-lamp rows the lamps by the camera bounced nothing, so the arch and the stack sides near the camera stayed black.
+- **Cause:** `LightBounce` kept the most powerful lights; equal lamps tied and list order won.
+- **Fix:** it ranks by power over the squared distance from the camera, the many-light importance of Lightcuts (Walter et al., SIGGRAPH 2005) and the many-light survey (Dachsbacher et al., CGF 2014).
+- **Test:** packages/clustered/test/bounce.test.js (the nearest lamps of an equal row bounce).
+
 ### Fixed 2026-11-19: on the WebGL2 layer a page's first frames with a large shadow map threw "stopped at its work budget" (KB-COMPAT-CPUBUDGET1, shadows)
 
 - **Repro (before):** `MARGO_COMPAT=1 node packages/scenes/test/dune-coast-still.mjs` (dune coast, 4,096 shadow map, four
