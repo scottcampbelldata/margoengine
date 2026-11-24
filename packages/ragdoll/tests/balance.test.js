@@ -437,6 +437,30 @@ rtest('what it adds to the solver stays on the character and goes with dispose',
   rig.dispose();
 });
 
+// The swing foot's motor target used to be its standing rotation in the world, heading included, never clamped: under a body
+// turned about the vertical it asked the ankle for more twist than the cone has, and once a cone joint held the ankle, motor
+// and limit fought through the shin (KB-PHYS-SWITCH-BAL1). The target is now level, heads with the hips, and stays inside.
+rtest('a swing foot is sent a level target inside its ankle limits, however far the body has turned', async () => {
+  const { rig, keeper } = await standing();
+  const about = (axis, angle) => [...axis.map((v) => v * Math.sin(angle / 2)), Math.cos(angle / 2)];
+  for (const leg of keeper.legs) {
+    const spec = leg.foot.spec,
+      axis = leg.foot.axis;
+    for (const yaw of [-2.5, -1, -0.3, 0.3, 1, 2.5]) {
+      const turned = multiplyQuaternions(about([0, 1, 0], yaw), keeper.standing),
+        target = keeper.levelFoot(leg, turned, keeper.standing),
+        d = multiplyQuaternions(conjugateQuaternion(leg.foot.rest), target);
+      if (d[3] < 0) for (let k = 0; k < 4; k++) d[k] = -d[k];
+      const along = d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2],
+        twist = 2 * Math.atan2(along, d[3]),
+        swing = 2 * Math.atan2(Math.hypot(d[0] - axis[0] * along, d[1] - axis[1] * along, d[2] - axis[2] * along), Math.hypot(along, d[3]));
+      assert.ok(swing <= spec.swing + 1e-6, `yaw ${yaw}: swing ${swing} inside ${spec.swing}`);
+      assert.ok(twist >= spec.twist[0] - 1e-6 && twist <= spec.twist[1] + 1e-6, `yaw ${yaw}: twist ${twist} inside ${spec.twist}`);
+    }
+  }
+  rig.dispose();
+});
+
 for (const [label, x, z] of [
   ['forward', 0, 1.5],
   ['backward', 0, -1.5],
