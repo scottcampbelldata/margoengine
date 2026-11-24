@@ -303,6 +303,62 @@ The result is a storage like any other, so `SaveSlots` runs over it. With both c
 A write costs two reads, a write and a read back, and a key takes twice the room. The CRC finds accidents; it is no
 signature, and someone editing a save can make a matching one.
 
+## Signed saves
+
+`signedStorage` from `@margoengine/save/signed` is `safeStorage` with an HMAC-SHA-256 tag on every copy, so an edited save
+is refused instead of read. The tag covers the copy, its physical key and its generation. Pass a secret key of at least 32 random
+bytes, or an HMAC-SHA-256 `CryptoKey` of 256 bits or more with `sign` and `verify` usages; the key is never saved. A forged or torn
+newest copy goes to `onRecover` and the older signed copy is read. With no signed copy left a read rejects with `MargoError`
+`'failed'`. WebCrypto is `crypto.subtle` unless you pass `options.subtle`; without it the call throws `'unsupported'`. Unsigned
+legacy data is never accepted.
+
+```ts
+import { loadGame, memoryStorage, saveGame, type SaveDocument } from 'margoengine/save';
+import { signedStorage } from 'margoengine/save/signed';
+
+const disk = memoryStorage();
+const key = crypto.getRandomValues(new Uint8Array(32)); // keep this secret outside the save, and the same between runs
+const storage = signedStorage(disk, key, { onRecover: ({ key, reason }) => console.warn(key, 'fell back:', reason) });
+const game = (title: string): SaveDocument => ({ format: 'margo-save', version: 1, meta: { title }, entities: [] });
+
+await saveGame(storage, 'slot-1', game('older'));
+await saveGame(storage, 'slot-1', game('newer'));
+
+const copy = (await disk.read('slot-1~a')) ?? (await disk.read('slot-1~b'));
+console.log(copy !== null); // true: the signed frame is on disk
+await disk.write('slot-1~b', new Uint8Array(40)); // someone's edit, with no valid tag
+const save = await loadGame(storage, 'slot-1');
+console.log(save?.meta?.title); // older: the edited copy fails its tag
+```
+
+Signing proves a save was written with your key; it does not encrypt it, and it cannot tell a copy from an older one
+written under the same key and slot (a player can put back an old signed file). Anyone with the key in the page can sign.
+
+## Browser file storage
+
+`opfsStorage` from `@margoengine/save/opfs` keeps each save as one file in the origin private file system, with no size
+limit of Web Storage and no database to open. A write goes to a temporary stream whose close swaps it into place, so a
+failed or aborted write keeps the previous file. Operations on one key run in call order for one adapter; two tabs or
+adapters on one key are last-close-wins. An abort is checked after each step and before the close, the point of no
+return. Pass `namespace` to pick the directory (default `'margo-saves'`) or `directory` to give a handle you opened, as a
+worker does. A browser without OPFS throws `MargoError` `'unsupported'`; a file with a damaged frame throws `'failed'`;
+a key over 175 UTF-8 bytes is a `RangeError`.
+
+```ts
+import { loadGame, saveGame, type SaveDocument } from 'margoengine/save';
+import { opfsStorage } from 'margoengine/save/opfs';
+
+const storage = opfsStorage({ namespace: 'readme-saves' });
+const game: SaveDocument = { format: 'margo-save', version: 1, meta: { title: 'OPFS' }, entities: [] };
+await saveGame(storage, 'slot-1', game);
+console.log((await loadGame(storage, 'slot-1'))?.meta?.title); // OPFS
+console.log(await storage.keys()); // ['slot-1']
+await storage.delete('slot-1');
+```
+
+Wrap it in `safeStorage` or `signedStorage` for two copies and tamper checks.
+
+
 ## Cloud saves
 
 `remoteStorage` from `@margoengine/save/remote` keeps saves on an HTTP server: GET, PUT and DELETE on
@@ -417,6 +473,7 @@ share one interface, `read`, `write`,
 | `memoryStorage()` | a Map (tests, servers, undo snapshots) | yes |
 | `webStorage(storage = localStorage, prefix = 'margo-save:')` | Web Storage, base64; about 5 MB per origin | one `setItem` |
 | `indexedDBStorage({database, store, factory})` | IndexedDB, binary, large; several stores in one database each get theirs (the database is opened one version up to add a store, and a connection closes when another needs a newer version) | one transaction |
+| `opfsStorage({namespace, directory})` from `margoengine/save/opfs` | the origin private file system, one file per key | temporary stream swapped in on close |
 | `fileStorage(directory, {maxBytes})` from `margoengine/save/node` | one file per key | temporary file, made exclusively, renamed into place; a read refuses a file past `maxBytes` (default 256 MiB) from its size, before reading it; one writer per folder; `keys()` lists only file names it writes; on Windows a save another program has open cannot be replaced, so the write rejects and the old save stands |
 
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
