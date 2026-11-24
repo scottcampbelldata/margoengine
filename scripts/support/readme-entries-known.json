@@ -32,7 +32,6 @@
   "mesh-edit": ["./section","./boolean-batch","./repair","./hull"],
   "mixer": ["./stereo","./analyser","./fx","./dynamics","./pitch"],
   "navmesh": ["./queries","./wasm","./obstacles"],
-  "netcode": ["./lobby","./presence","./generate-rust","./migrate"],
   "oit": ["./peel","./precise"],
   "pixel": ["./follow"],
   "points": ["./clip"],

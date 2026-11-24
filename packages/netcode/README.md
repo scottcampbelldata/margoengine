@@ -856,7 +856,158 @@ rooms.close();
 - A token works once; each reconnect gives a new one. It holds 128 random bits from `crypto.getRandomValues`, and whoever has it can take the seat, so keep it private to the player.
 - No seat is kept after a clean `leave()`, a kick, a protocol or rate-limit close, or a hook that threw: the seat is for a link that was lost.
 - A client that comes back before the server noticed the loss takes over: its old connection closes with `CloseCode.removed`, and neither `onDrop` nor `onLeave` runs.
-- A seat is held for the client that had it. Reserving a seat ahead for a player who has not joined yet (for example from a matchmaker) is not built.
+- A seat is held for the client that had it. To hold a seat ahead for a player who has not joined yet (for example from a matchmaker), use `LobbyRoom` below.
+
+### Lobby listings and reserved seats
+
+`@margoengine/netcode/lobby` adds a room list and one-time seat reservations, the two things a matchmaker needs.
+Subclass `LobbyRoom` in place of `Room`, give it searchable `setMetadata({...})`, and serve `RoomLobby.list()` from
+your own authenticated HTTP API. `reserve(roomId, options)` holds a seat for a player who has not connected yet: the
+seat counts against `maxClients` (so a public join cannot take it), keeps an empty room alive, and runs out after
+`lifetime` milliseconds (default 15,000). The player joins with `joinById(roomId, { seatToken })`; `onAuth` and
+`onJoin` get the options given at reservation, never options the player sends.
+
+```ts
+import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { RoomsClient, RoomServer, type RoomClient, type RoomOptions } from '@margoengine/netcode/rooms';
+import { LobbyRoom, RoomLobby } from '@margoengine/netcode/lobby';
+
+const schema = defineSchema({
+  types: { Player: { team: 'uint' }, State: { players: { type: 'map', of: 'Player', maxSize: 8 } } },
+} as const);
+interface State {
+  players: Map<number, { team: number }>;
+}
+
+class Match extends LobbyRoom<State> {
+  schema = schema;
+  stateType = 'State';
+  maxClients = 2;
+  onCreate() {
+    this.setState({ players: new Map() });
+    this.setMetadata({ mode: 'duel', map: 'harbour' });
+  }
+  onJoin(client: RoomClient, options: RoomOptions) {
+    this.state.players.set(this.idOf(client), { team: Number(options.team) });
+  }
+}
+
+const network = new LoopbackNetwork({ latency: 10 });
+const rooms = new RoomServer().define('match', Match);
+network.listen().onconnection = (connection) => rooms.accept(connection);
+const lobby = new RoomLobby(rooms);
+const tick = setInterval(() => network.advance(10), 5);
+
+// The matchmaker (server code): find a duel, hold a seat with the team it chose.
+const room = await rooms.create('match');
+console.log(lobby.list({ metadata: { mode: 'duel' } }).length, 'duel room open');
+const seat = lobby.reserve(room.roomId, { team: 2 }, 10_000);
+
+// The player, told roomId and seatToken over your authenticated API:
+const client = new RoomsClient(async () => network.connect());
+const joined = await client.joinById<State>(seat.roomId, { seatToken: seat.seatToken }, { schema, stateType: 'State' });
+console.log('joined', joined.roomId === room.roomId);
+clearInterval(tick);
+rooms.close();
+```
+
+- The token holds 256 random bits and is good once; whoever holds it takes the reserved join identity, so send it to
+  the player alone over TLS. `cancelReservation(seatToken)` frees a seat at once; expiry and room disposal free it too.
+- The seat stays counted while the room's async `onAuth` runs, so slow authentication cannot overbook the room.
+- Listings are exact-match filters on name and scalar metadata; locked, full and `privateRoom` rooms are left out,
+  and a private room is still joinable by id or reservation. Plain `Room` subclasses are listed with empty metadata
+  but cannot be reserved in.
+- Reservations live in the memory of the one server process, as held seats do: a restart loses them.
+
+### Many server processes: presence
+
+`@margoengine/netcode/presence` lists and reserves rooms across several `RoomServer` processes. Wrap each server in a
+`RoomNode` with its public `endpoint` and a shared `RoomPresence`; `run()` keeps a leased directory entry fresh and
+serves reservation requests for the rooms it owns. Any node's `list()` sees the open rooms of every live process, and
+`reserve(roomId)` is carried to the owning process, which grants the seat and returns its endpoint with the token.
+`MemoryPresence` shares one process (tests, a single host with several servers); `openSqlitePresence(file)` shares
+processes on one host through a SQLite WAL file; for several hosts implement `PresenceStore` (`set`, `get`, `keys`,
+an atomic `take`, `delete`) on your database and pass it to `StorePresence`.
+
+```ts
+import { defineSchema } from '@margoengine/netcode';
+import { RoomServer } from '@margoengine/netcode/rooms';
+import { LobbyRoom } from '@margoengine/netcode/lobby';
+import { MemoryPresence, RoomNode } from '@margoengine/netcode/presence';
+
+const schema = defineSchema({ types: { State: { joined: 'uint' } } } as const);
+class Match extends LobbyRoom<{ joined: number }> {
+  schema = schema;
+  stateType = 'State';
+  maxClients = 2;
+  onCreate() {
+    this.setState({ joined: 0 });
+    this.setMetadata({ mode: 'duel' });
+  }
+}
+
+using presence = new MemoryPresence();
+using east = new RoomServer().define('match', Match);
+using west = new RoomServer().define('match', Match);
+await using a = new RoomNode(east, { presence, endpoint: 'wss://east.example.com' });
+await using b = new RoomNode(west, { presence, endpoint: 'wss://west.example.com' });
+const room = await east.create('match');
+const serving = a.run();
+await a.sync(); // publish now instead of at the next heartbeat
+
+const [open] = await b.list({ metadata: { mode: 'duel' } }); // west sees east's room
+const seat = await b.reserve(open.roomId, { team: 1 }); // granted by east, the owner
+console.log(seat.endpoint, seat.roomId === room.roomId); // connect there, then joinById with seat.seatToken
+await a.close();
+await serving;
+```
+
+- Leases default to 10,000 ms and heartbeats to 1,000 ms (the heartbeat must be shorter); a process that stops
+  renewing drops out of every list when its lease ends. Lists are eventually consistent: call `sync()` after creating
+  or changing a room to publish at once.
+- Only the owner grants a seat, so two nodes can never hand out the same seat. A request that failed or timed out is
+  never sent again, since it may have reached the owner; its seat then frees itself when the reservation expires.
+- The directory is trusted server code. Authenticate the HTTP endpoints that call `list` and `reserve`.
+
+### Peer-to-peer host migration
+
+`@margoengine/netcode/migrate` keeps a peer-to-peer game going when its host leaves. Every peer makes a
+`HostMigration` with the same schema, starting state and roster, over reliable links to every other peer. The host
+calls `confirm(state, frame)` at its checkpoints, which prepares and commits that state on every connected peer. When
+the host drops, the surviving peers pick the lowest id, restore the newest checkpoint they all hold, and resume from
+it; `handoff(id)` moves authority on purpose.
+
+```ts
+import { defineSchema, LoopbackNetwork, type Connection } from '@margoengine/netcode';
+import { HostMigration } from '@margoengine/netcode/migrate';
+
+const schema = defineSchema({ types: { State: { score: 'uint' } } } as const);
+const network = new LoopbackNetwork({ latency: 10 });
+const [ab, ba] = network.pair(),
+  [ac, ca] = network.pair(),
+  [bc, cb] = network.pair();
+const peer = (local: number, peers: [number, Connection][]) =>
+  new HostMigration({ schema, stateType: 'State', local, peers: new Map(peers), initial: { score: 0 } });
+const a = peer(1, [[2, ab], [3, ac]]),
+  b = peer(2, [[1, ba], [3, bc]]),
+  c = peer(3, [[1, ca], [2, cb]]);
+
+const saved = a.confirm({ score: 9 }, 120); // the host checkpoints frame 120
+network.advance(5000);
+await saved;
+a.close(); // the host leaves
+network.advance(5000);
+const resumed = await b.waitForHost();
+console.log(resumed.host, resumed.frame, resumed.state.score, c.isHost); // 2 120 9 false
+b.close();
+c.close();
+```
+
+- Only the peer whose `isHost` is true may simulate and publish; others wait with `waitForHost()`. `confirmed` is the
+  last locally committed checkpoint; await `confirm` before treating it as held by everyone.
+- Up to 64 peers; checkpoints up to `maxSnapshotBytes` (default 1 MiB, at most 16 MiB). Peers are trusted and the
+  surviving mesh must stay connected: this is not consensus, so a split network or a lying peer needs your own
+  membership and fencing. A peer cannot join a live session; start a new one.
 
 ## Signalling for WebRTC
 
@@ -917,8 +1068,8 @@ On Node, `listenWebSocket` gives the server its connections: `listener.onconnect
 exactly the bytes `schema.encode` does, with no import at all (it runs in Node as is, since it uses only erasable
 syntax). Use it where loading the runtime schema compiler is not wanted, or as the reference for a generator in
 another language: `schema.json` is the normalized definition, and README "Wire format" says how each field is written.
-A Rust generator would read the same JSON and produce the same bytes; the tests compare the generated module with the
-runtime codec on random values, deltas and corrupted input. Any struct name the schema takes works, Map and Uint8Array
+`@margoengine/netcode/generate-rust` reads the same JSON and writes a Rust module that produces the same bytes (below); the
+tests compare each generated module with the runtime codec on random values, deltas and corrupted input. Any struct name the schema takes works, Map and Uint8Array
 included; only a pair such as `Player` and `PlayerDelta` is refused with a TypeError, since both would define
 `encodePlayerDelta`.
 
@@ -929,8 +1080,30 @@ import { generateTypeScript } from '@margoengine/netcode/generate';
 const schema = defineSchema({ types: { Ping: { at: 'f64', from: { type: 'string', maxLength: 16 } } } });
 const source = generateTypeScript(schema, { source: 'ping schema' });
 console.log(source.length, 'characters; write it to ping.protocol.ts');
-console.log(JSON.stringify(schema.json)); // what a Rust generator reads
+console.log(JSON.stringify(schema.json)); // what the Rust generator reads
 ```
+
+### Rust
+
+`generateRust(schema)` (or `generateRust(schema.json)`) writes one standalone Rust 2021 file for a Rust server or
+tool: no crate dependencies, Rust 1.82 or newer. Each struct becomes `Msg<Name>` with fields `f_<name>`; maps are
+`BTreeMap<u32, T>`, enums their `u32` wire index and optionals `Option<Box<T>>`. Each type has `encode`, `decode`,
+`encode_delta`, `decode_delta` and `same`, writing the bytes `schema.encode` writes, and the module carries the
+schema's `SCHEMA_HASH`, so a Rust room server and a TypeScript client agree or refuse to talk.
+
+```ts
+import { defineSchema } from '@margoengine/netcode';
+import { generateRust } from '@margoengine/netcode/generate-rust';
+
+const schema = defineSchema({ types: { Ping: { at: 'f64', from: { type: 'string', maxLength: 16 } } } });
+const rust = generateRust(schema, { source: 'ping schema' });
+console.log(rust.includes('pub struct MsgPing'), 'write it to src/ping_protocol.rs');
+```
+
+- Decoding returns `margo_wire::Result`: limits are checked, and trailing bytes, invalid UTF-8, non-finite floats and
+  malformed map masks are errors, never a partial value. Nesting past 256 codec calls is an error, so untrusted input
+  cannot recurse without bound.
+- `f32` fields use Rust's `f32`; quantized fields decode to `f64`.
 
 ## The arena demo
 
@@ -988,9 +1161,8 @@ Opened straight from disk (`file://`) the page cannot run modules and says so, w
 - The WebSocket server has no compression extension (snapshots are small and already delta coded) and no TLS of its
   own (use a reverse proxy). The WebRTC transport is tested here with stand-in channels; signalling is not included.
 - Rooms send the state to each client at the patch rate as a delta against the last state that client got (reliable
-  channel), so a room's cost grows with clients times state size; rooms have no reconnection or seat reservation yet.
-- The Rust generator is not written yet: `schema.json`, the wire format above and the TypeScript generator (with its
-  tests against the runtime codec) are the contract it will follow.
+  channel), so a room's cost grows with clients times state size. Held seats (`reconnectWindow`) and reserved seats
+  (`LobbyRoom`) live in the memory of one server process; a restart loses them.
 
 ## Wire format
 
