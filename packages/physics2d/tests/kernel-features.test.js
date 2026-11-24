@@ -357,3 +357,18 @@ test('body setters, setType, projectPoint, intersectionsWithBox, contactPairs an
   assert.ok(Math.abs(result.hits[0].normal[1] + 1) < 0.01, `normal out of the floor (up on screen): ${result.hits[0].normal}`);
   physics.dispose();
 });
+
+test('soft CCD holds a fast body at a thick wall without a sweep', () => {
+  const through = (softCcd) => {
+    const physics = world({ gravity: [0, 0] });
+    physics.addBody(null, { type: 'fixed', position: [320, 0], colliders: { shape: 'box', width: 26, height: 400 } });
+    const ball = physics.addBody(null, { linearVelocity: [9600, 0], canSleep: false, softCcd, colliders: { shape: 'circle', radius: 4, restitution: 0 } });
+    run(physics, 20);
+    const x = ball.position[0];
+    physics.dispose();
+    return x;
+  };
+  assert.ok(through(0) > 340, 'control: 160 units a step pass a 26 unit wall');
+  assert.ok(through(200) < 310, `held at the wall: ${through(200)}`);
+  assert.throws(() => world().addBody(null, { softCcd: -1 }), RangeError);
+});

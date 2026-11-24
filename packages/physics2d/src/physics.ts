@@ -481,6 +481,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
         throw error;
       }
     }
+    if (options.softCcd) {
+      try {
+        body.softCcd = options.softCcd;
+      } catch (error) {
+        this.removeBody(body);
+        throw error;
+      }
+    }
     if (options.additionalMass) {
       try {
         body.additionalMass = options.additionalMass;

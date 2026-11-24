@@ -106,3 +106,24 @@ fn a_fast_ball_stops_at_a_thin_dynamic_plate_and_pushes_it() {
     assert!(passed == f32::MAX, "the ball never gets past the plate: ball {ball_x}, plate {plate_x}");
     assert!(plate_x > 10.5, "and the plate is pushed on by it: {plate_x}");
 }
+
+/// A soft CCD distance makes a fast body's contacts reach a step ahead: the solver stops it at a wall it would pass in one
+/// step, with no sweep and no time of impact.
+#[test]
+fn a_soft_ccd_distance_stops_a_fast_ball_at_a_thick_wall() {
+    let run = |reach: f32| {
+        let mut w = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
+        let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(10.0, 0.0), ..Default::default() }).unwrap();
+        w.create_shape(wall, Core::rect(0.4, 5.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+        let ball = w.create_body(&BodyDef { linear_velocity: v2(300.0, 0.0), can_sleep: false, ..Default::default() }).unwrap();
+        w.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: 0.0, friction: 0.0, ..Default::default() }).unwrap();
+        w.set_soft_ccd(ball, reach).unwrap();
+        for _ in 0..20 {
+            w.step(DT).unwrap();
+        }
+        w.bodies[ball as usize].xf.p.x
+    };
+    assert!(run(0.0) > 11.0, "control: it passes a 0.8 m wall at 5 m a step");
+    let x = run(6.0);
+    assert!(x < 9.7, "held in front of the wall: {x}");
+}

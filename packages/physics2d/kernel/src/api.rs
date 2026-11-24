@@ -166,6 +166,7 @@ pub extern "C" fn body_create(handle: i32, kind: u32, flags: u32) -> i32 {
             fixed_rotation: flags & 2 != 0,
             ccd: flags & 4 != 0,
             dominance: (io()[10] as i32).clamp(-127, 127) as i8,
+            soft_ccd: 0.0,
         };
         if def.linear_damping < 0.0 || def.angular_damping < 0.0 {
             return Err(PhysicsError::InvalidParameter);
@@ -705,4 +706,10 @@ pub extern "C" fn contacts_of(handle: i32, shape: u32) -> i32 {
         }
         Ok(rows.len() as i32)
     })
+}
+
+/// How far ahead, in metres, a body's contacts reach beyond the world's own margin (0 for none).
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_soft_ccd(handle: i32, body: u32, distance: f32) -> i32 {
+    with_world!(handle, |w| w.set_soft_ccd(body, distance).map(|()| 0))
 }

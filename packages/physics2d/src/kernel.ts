@@ -40,6 +40,7 @@ interface Exports {
   body_sleep(world: number, body: number): number;
   body_set_additional_mass(world: number, body: number, mass: number): number;
   body_set_kind(world: number, body: number, kind: number): number;
+  body_set_soft_ccd(world: number, body: number, distance: number): number;
   project_point(world: number): number;
   aabb_query(world: number): number;
   contacts_of(world: number, shape: number): number;

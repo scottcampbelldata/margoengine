@@ -13,7 +13,7 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-const VERSION: u32 = 2;
+const VERSION: u32 = 3;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -167,7 +167,7 @@ impl World {
             w.f64(b.exact_center[0]);
             w.f64(b.exact_center[1]);
             w.v2(b.linear_velocity);
-            for v in [b.angular_velocity, b.mass, b.inv_mass, b.inertia, b.inv_inertia, b.extent, b.linear_damping, b.angular_damping, b.gravity_scale, b.additional_mass, b.torque, b.sleep_time] {
+            for v in [b.angular_velocity, b.mass, b.inv_mass, b.inertia, b.inv_inertia, b.extent, b.linear_damping, b.angular_damping, b.gravity_scale, b.additional_mass, b.torque, b.sleep_time, b.soft_ccd] {
                 w.f32(v);
             }
             w.v2(b.force);
@@ -336,8 +336,8 @@ impl World {
             let (center, local_center) = (r.v2()?, r.v2()?);
             let exact_center = [r.f64()?, r.f64()?];
             let linear_velocity = r.v2()?;
-            let [angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, additional_mass, torque, sleep_time] =
-                [r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?];
+            let [angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, additional_mass, torque, sleep_time, soft_ccd] =
+                [r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?];
             let force = r.v2()?;
             let (can_sleep, fixed_rotation, ccd) = (r.bool()?, r.bool()?, r.bool()?);
             let dominance = r.u8()? as i8;
@@ -349,7 +349,7 @@ impl World {
             for _ in 0..k {
                 shapes.push(r.u32()?);
             }
-            world.bodies.push(Body { kind, xf, center, local_center, exact_center, linear_velocity, angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, can_sleep, fixed_rotation, ccd, dominance, additional_mass, force, torque, next_target: has_next.then_some((np, nq)), awake, sleep_time, shapes, dead });
+            world.bodies.push(Body { kind, xf, center, local_center, exact_center, linear_velocity, angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, can_sleep, fixed_rotation, ccd, dominance, soft_ccd, additional_mass, force, torque, next_target: has_next.then_some((np, nq)), awake, sleep_time, shapes, dead });
         }
         let n = r.count(100)?;
         for id in 0..n {

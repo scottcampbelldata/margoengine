@@ -53,6 +53,9 @@ pub struct BodyDef {
     pub ccd: bool,
     /// In a contact with a body of lower dominance, a body acts as if it had infinite mass.
     pub dominance: i8,
+    /// How far apart shapes of this body still get contact points, in metres, when that is more than the world's own
+    /// margin (`SPECULATIVE`): a fast body's contacts reach one step ahead, so the solver stops it at what it would hit.
+    pub soft_ccd: f32,
 }
 
 impl Default for BodyDef {
@@ -70,6 +73,7 @@ impl Default for BodyDef {
             fixed_rotation: false,
             ccd: false,
             dominance: 0,
+            soft_ccd: 0.0,
         }
     }
 }
@@ -101,6 +105,7 @@ pub struct Body {
     pub fixed_rotation: bool,
     pub ccd: bool,
     pub dominance: i8,
+    pub soft_ccd: f32,
     /// Mass added to what the shapes weigh; the inertia grows in proportion (a heavier body of the same build).
     pub additional_mass: f32,
     /// A force and a torque that act every step until reset.
@@ -630,6 +635,7 @@ impl World {
             fixed_rotation: def.fixed_rotation,
             ccd: def.ccd,
             dominance: def.dominance,
+            soft_ccd: def.soft_ccd,
             additional_mass: 0.0,
             force: V2::ZERO,
             torque: 0.0,
@@ -1058,6 +1064,14 @@ impl World {
         Ok(())
     }
 
+    /// Sets how far ahead (metres) this body's contacts reach, beyond the world's own margin; 0 for the margin alone.
+    pub fn set_soft_ccd(&mut self, body: u32, distance: f32) -> Result<(), PhysicsError> {
+        if !distance.is_finite() { return Err(PhysicsError::NotFinite); }
+        if distance < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        self.live_body(body)?.soft_ccd = distance;
+        self.wake(body)
+    }
+
     /// Adds `mass` kilograms to what the body's shapes weigh (0 takes it away) and works the mass out again.
     pub fn set_additional_mass(&mut self, body: u32, mass: f32) -> Result<(), PhysicsError> {
         if !mass.is_finite() { return Err(PhysicsError::NotFinite); }
@@ -1213,7 +1227,7 @@ impl World {
             let body = &self.bodies[self.shapes[s].body as usize];
             if !self.shapes[s].dead && body.kind != Kind::Static && body.awake {
                 let tight = bounds_from_validated(&self.shapes[s].core, body.xf)?;
-                self.broad.place(s as u32, &tight, BOX_MARGIN);
+                self.broad.place(s as u32, &tight.grown(body.soft_ccd), BOX_MARGIN);
             }
         }
         // The body pairs joints keep apart, sorted once, so each pair's filter is a binary search, not a scan of every
@@ -1290,7 +1304,8 @@ impl World {
             let (oa, ob) = (ba.exact_origin(), bb.exact_origin());
             let xa = Xf { p: v2((oa[0] - from[0]) as f32, (oa[1] - from[1]) as f32), q: ba.xf.q };
             let xb = Xf { p: v2((ob[0] - from[0]) as f32, (ob[1] - from[1]) as f32), q: bb.xf.q };
-            if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 {
+            let spec = SPECULATIVE.max(ba.soft_ccd).max(bb.soft_ccd);
+            if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 && spec == SPECULATIVE {
                 inputs[queued] = Some((&sa.core, xa, &sb.core, xb, reference_flip(&contact.manifold)));
                 pending[queued] = Some(contact);
                 queued += 1;
@@ -1306,14 +1321,14 @@ impl World {
             // A chain segment takes its ghosts (smooth.rs); with the chain second, the pair is solved the other way round
             // and the normal turned back, so it still runs from `a` to `b`.
             let manifold = if sa.chain {
-                let mut m = collide_smooth_trusted(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE)?;
+                let mut m = collide_smooth_trusted(&sa.core, sa.ghosts, xa, &sb.core, xb, spec)?;
                 // A one-sided chain is solid on the side its segments' right-hand normals point to.
                 if sa.one_sided && m.count > 0 && xa.q.apply(sa.core.normals[0]).dot(m.normal) < 0.0 {
                     m = Manifold::default();
                 }
                 m
             } else if sb.chain {
-                let mut m = collide_smooth_trusted(&sb.core, sb.ghosts, xb, &sa.core, xa, SPECULATIVE)?;
+                let mut m = collide_smooth_trusted(&sb.core, sb.ghosts, xb, &sa.core, xa, spec)?;
                 if sb.one_sided && m.count > 0 && xb.q.apply(sb.core.normals[0]).dot(m.normal) < 0.0 {
                     m = Manifold::default();
                 }
@@ -1321,7 +1336,7 @@ impl World {
                 m
             } else {
                 // Last step's reference face is kept within the hysteresis, so resting points keep their ids.
-                collide_coherent_trusted(&sa.core, xa, &sb.core, xb, SPECULATIVE, reference_flip(&contact.manifold))?
+                collide_coherent_trusted(&sa.core, xa, &sb.core, xb, spec, reference_flip(&contact.manifold))?
             };
             cold += contact.refresh(manifold);
         }

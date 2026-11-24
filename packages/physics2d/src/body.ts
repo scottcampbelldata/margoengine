@@ -35,6 +35,11 @@ export interface BodyOptions2D {
   gravityScale?: number;
   /** Continuous collision detection for fast bodies. */
   ccd?: boolean;
+  /**
+   * Soft CCD: how far ahead, in world units, the body's contacts reach, so the solver holds a fast body at what it would
+   * hit one step on; set it to about the body's speed times the step. Default 0: the world's own margin, 0.02 m.
+   */
+  softCcd?: number;
   canSleep?: boolean;
   lockRotation?: boolean;
   /**
@@ -274,6 +279,16 @@ export class Body2D {
   set ccd(value: boolean) {
     this.setParams({ ccd: value });
   }
+  /** Soft CCD reach in world units, see `BodyOptions2D.softCcd`. */
+  get softCcd(): number {
+    return this.soft;
+  }
+  set softCcd(value: number) {
+    const { x, h, kernel, scale } = this.k;
+    kernel.ok(x.body_set_soft_ccd(h, this.handle, encode(value, 'softCcd') * scale));
+    this.soft = value;
+  }
+  private soft = 0;
   get dominance(): number {
     return this.params.dominance;
   }

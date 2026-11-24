@@ -69,7 +69,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Shapes | oriented (one-sided) polyline | `polyline` with `oneSided: true` | full |
 | Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
 | Collision | continuous collision detection | `ccd` against fixed, kinematic and dynamic bodies (a dynamic one it meets is put back to the same time) | full |
-| Collision | soft CCD (a prediction distance per body) | every contact is speculative within 0.02 m; the distance is not a body option | missing |
+| Collision | soft CCD (a prediction distance per body) | `softCcd` (world units a body's contacts reach ahead) | full |
 | Collision | sensors | `sensor: true` (senses fixed and kinematic bodies too) | full |
 | Collision | collision groups, solver groups, active collision types | `collisionGroups`, `solverGroups`, `activeCollisionTypes` | full |
 | Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |
