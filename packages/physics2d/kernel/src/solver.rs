@@ -350,7 +350,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
             inv_mass_b: imb,
             inv_i_b: iib,
             normal: n,
-            friction: sqrt_product(sa.friction, sb.friction),
+            friction: contact.friction.unwrap_or_else(|| sqrt_product(sa.friction, sb.friction)),
             k: [0.0; 3],
             points: [Point::default(); 2],
             count: m.count as u8,
@@ -359,7 +359,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
             pushed: 0,
         };
         let mut bounce = Bounce {
-            restitution: sa.restitution.max(sb.restitution),
+            restitution: contact.restitution.unwrap_or_else(|| sa.restitution.max(sb.restitution)),
             approach: [0.0; 2],
         };
         let (ma, mb) = (

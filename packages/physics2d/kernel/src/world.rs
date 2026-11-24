@@ -169,7 +169,13 @@ pub struct ShapeDef {
     /// For a chain: only the side its segments' right-hand normals point to is solid (a one-way platform or a one-sided
     /// terrain); a body on the other side passes.
     pub one_sided: bool,
+    /// `HOOK_FILTER` and `HOOK_CONTACT`: ask the world's hook about the pairs this shape is in.
+    pub hooks: u8,
 }
+
+/// `ShapeDef::hooks` bits: the hook may veto a pair, and may change a pair's contact.
+pub const HOOK_FILTER: u8 = 1;
+pub const HOOK_CONTACT: u8 = 2;
 
 /// `ShapeDef::events` bits.
 pub const EVENT_COLLISION: u8 = 1;
@@ -197,6 +203,7 @@ impl Default for ShapeDef {
             active_types: ACTIVE_DEFAULT,
             force_threshold: 0.0,
             one_sided: false,
+            hooks: 0,
         }
     }
 }
@@ -251,8 +258,33 @@ pub struct Shape {
     pub active_types: u8,
     pub force_threshold: f32,
     pub one_sided: bool,
+    pub hooks: u8,
     /// A removed shape keeps its slot until a new shape takes it.
     pub dead: bool,
+}
+
+/// What a hook may change about one contact of the step: whether it pushes at all, its friction and restitution, and a
+/// direction it lets bodies through from (a one-way contact: it pushes only while the normal, from shape a to shape b,
+/// has a positive part along it).
+#[derive(Clone, Copy, Debug)]
+pub struct ContactMod {
+    pub a: u32,
+    pub b: u32,
+    /// The contact's normal from `a` to `b` and its point count, to decide with.
+    pub normal: V2,
+    pub points: usize,
+    pub solver_active: bool,
+    pub friction: Option<f32>,
+    pub restitution: Option<f32>,
+    pub one_way: Option<V2>,
+}
+
+/// Code the world asks about pairs whose shapes have `ShapeDef::hooks` set, in the same order every step.
+pub trait Hook {
+    /// Whether the pair may meet at all (false: no contact, no events).
+    fn filter(&mut self, a: u32, b: u32) -> bool;
+    /// Changes a touching contact for this step.
+    fn contact(&mut self, change: &mut ContactMod);
 }
 
 /// Whether a pair began or stopped touching.
@@ -303,6 +335,9 @@ pub struct Contact {
     /// The normal impulse over the whole last step, summed over substeps and points; only kept while a shape asks for
     /// contact force events.
     pub total_impulse: f32,
+    /// Friction and restitution a hook set for this step, replacing the shapes' own.
+    pub friction: Option<f32>,
+    pub restitution: Option<f32>,
 }
 
 /// A contact starts when its closest point is nearer than this, and stops when it is farther than `TOUCH_OFF`.
@@ -485,6 +520,8 @@ pub struct World {
     pub force_events: Vec<ForceEvent>,
     /// Stop events of pairs that lost a shape between steps; the next step reports them first.
     pub(crate) pending_events: Vec<Event>,
+    /// Asked about the pairs of shapes with hook flags; none by default.
+    pub hook: Option<alloc::boxed::Box<dyn Hook>>,
     pub(crate) free_bodies: Vec<u32>,
     pub(crate) free_shapes: Vec<u32>,
     /// Each joint's stable id, by index, and the index of each id (`NONE` once removed).
@@ -551,6 +588,7 @@ impl World {
             events: Vec::new(),
             force_events: Vec::new(),
             pending_events: Vec::new(),
+            hook: None,
             free_bodies: Vec::new(),
             free_shapes: Vec::new(),
             joint_ids: Vec::new(),
@@ -636,7 +674,7 @@ impl World {
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, dead: false };
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {
@@ -1165,11 +1203,20 @@ impl World {
         let bodies = &self.bodies;
         let apart = &self.apart;
         let mut invalid_handle = false;
+        let mut hook = self.hook.take();
         self.broad.pairs(&mut pairs, |a, b| {
             let (Some(sa), Some(sb)) = (shapes.get(a as usize), shapes.get(b as usize)) else { invalid_handle = true; return false; };
             let (ba, bb) = (sa.body, sb.body);
-            ba != bb && pair_allowed(sa, bodies[ba as usize].kind, sb, bodies[bb as usize].kind) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err())
+            let allowed = ba != bb && pair_allowed(sa, bodies[ba as usize].kind, sb, bodies[bb as usize].kind) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err());
+            // A hook is asked only about a pair that would meet, and only when one of its shapes asks for it.
+            if allowed && (sa.hooks | sb.hooks) & HOOK_FILTER != 0 {
+                if let Some(hook) = hook.as_mut() {
+                    return hook.filter(a, b);
+                }
+            }
+            allowed
         });
+        self.hook = hook;
         if invalid_handle { self.pairs = pairs; return Err(PhysicsError::InvalidHandle); }
         debug_assert!(pairs.iter().all(|&(a, b)| self.may_touch(a, b)));
         self.counts.compared = self.broad.compared();
@@ -1185,7 +1232,7 @@ impl World {
             if i < old.len() && (old[i].a, old[i].b) == (a, b) {
                 next.push(old[i]);
             } else {
-                next.push(Contact { a, b, manifold: Manifold::default(), normal_impulse: [0.0; 2], tangent_impulse: [0.0; 2], solved: true, overlap: false, primed: false, total_impulse: 0.0 });
+                next.push(Contact { a, b, manifold: Manifold::default(), normal_impulse: [0.0; 2], tangent_impulse: [0.0; 2], solved: true, overlap: false, primed: false, total_impulse: 0.0, friction: None, restitution: None });
             }
         }
         // A pair that left the list stops touching, if it was.
@@ -1261,8 +1308,34 @@ impl World {
         }
         self.counts.manifolds = built;
         self.counts.cold_points = cold;
+        self.apply_hooks();
         self.touch_events();
         Ok(())
+    }
+
+    /// Asks the hook about each touching contact whose shapes ask for it, and applies its answer for this step.
+    fn apply_hooks(&mut self) {
+        let Some(mut hook) = self.hook.take() else { return };
+        for contact in self.contacts.iter_mut() {
+            let (sa, sb) = (&self.shapes[contact.a as usize], &self.shapes[contact.b as usize]);
+            if (sa.hooks | sb.hooks) & HOOK_CONTACT == 0 || (!self.bodies[sa.body as usize].awake && !self.bodies[sb.body as usize].awake) {
+                continue;
+            }
+            contact.friction = None;
+            contact.restitution = None;
+            if contact.manifold.count == 0 {
+                continue;
+            }
+            let mut change = ContactMod { a: contact.a, b: contact.b, normal: contact.manifold.normal, points: contact.manifold.count, solver_active: true, friction: None, restitution: None, one_way: None };
+            hook.contact(&mut change);
+            let open = change.one_way.is_none_or(|way| contact.manifold.normal.dot(way) > 0.0);
+            if !change.solver_active || !open {
+                contact.solved = false;
+            }
+            contact.friction = change.friction.filter(|f| f.is_finite() && *f >= 0.0);
+            contact.restitution = change.restitution.filter(|r| r.is_finite() && *r >= 0.0);
+        }
+        self.hook = Some(hook);
     }
 
     /// Reads each contact's closest point against `TOUCH_ON` and `TOUCH_OFF`, reports the pairs that began or stopped,

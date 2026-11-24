@@ -86,6 +86,31 @@ export interface Physics2DEventMap {
   afterstep: number;
 }
 
+/** What a `modifyContact` hook sees of a touching contact and may change for the step. */
+export interface ContactChange2D {
+  readonly colliderA: Collider2D;
+  readonly colliderB: Collider2D;
+  /** The contact normal from A to B. */
+  readonly normal: [number, number];
+  /** Contact points in the manifold (1 or 2). */
+  readonly points: number;
+  /** Set false to let the bodies through each other this step (events still fire). Default true. */
+  solverActive: boolean;
+  /** Replaces the colliders' combined friction. */
+  friction?: number;
+  /** Replaces the colliders' combined restitution. */
+  restitution?: number;
+  /** A direction the contact lets bodies through from: it pushes only while the normal has a positive part along it. */
+  oneWay?: Vec2D;
+}
+/** Code the world asks about pairs of colliders that have `hooks` set; it must be fast and must not change the world. */
+export interface Physics2DHooks {
+  /** Whether the pair may meet at all; false removes the contact and its events. */
+  filterPair?(colliderA: Collider2D, colliderB: Collider2D): boolean;
+  /** Changes a touching contact for this step: one-way platforms, conveyors' friction, sticky or slippery pairs. */
+  modifyContact?(change: ContactChange2D): void;
+}
+
 /** Lines that draw a world: four numbers a line, and a colour code a line. */
 export interface DebugLines2D {
   vertices: Float32Array;
@@ -288,7 +313,12 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.emit('beforestep', dt);
     if (this.disposed) return;
     const { kernel } = this;
-    kernel.ok(kernel.exports.world_step(this.handle, dt));
+    if (this.hookSet) this.installHooks();
+    try {
+      kernel.ok(kernel.exports.world_step(this.handle, dt));
+    } finally {
+      kernel.hooks = null;
+    }
     this.stepCount++;
     this.readPoses();
     const outer = this.dispatching,
@@ -511,6 +541,54 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.movers = null;
     this.kernel.exports.body_remove(this.handle, body.handle);
     body.markRemoved();
+  }
+
+  /** The hooks asked about colliders that set `hooks` (see {@link Physics2DHooks}); null for none. */
+  get hooks(): Physics2DHooks | null {
+    return this.hookSet;
+  }
+  set hooks(value: Physics2DHooks | null) {
+    this.live();
+    this.hookSet = value;
+    const { kernel } = this;
+    kernel.ok(kernel.exports.world_set_hooks(this.handle, value ? 1 : 0));
+    this.installHooks();
+  }
+  private hookSet: Physics2DHooks | null = null;
+  /** Points the kernel's page hooks at this world, for the length of a step. */
+  private installHooks(): void {
+    this.kernel.hooks = this.hookSet
+      ? {
+          filter: (a, b) => {
+            const ca = this.byShape.get(a),
+              cb = this.byShape.get(b);
+            return !ca || !cb || !this.hookSet?.filterPair || this.hookSet.filterPair(ca, cb) !== false;
+          },
+          contact: (a, b, nx, ny, points) => {
+            const ca = this.byShape.get(a),
+              cb = this.byShape.get(b);
+            if (!ca || !cb || !this.hookSet?.modifyContact) return 0;
+            const change: ContactChange2D = { colliderA: ca, colliderB: cb, normal: [nx, ny], points, solverActive: true };
+            this.hookSet.modifyContact(change);
+            let bits = change.solverActive ? 0 : 1;
+            const io = this.kernel.current(4);
+            if (change.friction !== undefined) {
+              io.f[0] = change.friction;
+              bits |= 2;
+            }
+            if (change.restitution !== undefined) {
+              io.f[1] = change.restitution;
+              bits |= 4;
+            }
+            if (change.oneWay) {
+              io.f[2] = change.oneWay[0];
+              io.f[3] = change.oneWay[1];
+              bits |= 8;
+            }
+            return bits;
+          },
+        }
+      : null;
   }
 
   /** @internal Holds `body` at its position on the axes picked, with a generic joint to a fixed body no one sees. */

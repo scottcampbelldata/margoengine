@@ -68,11 +68,11 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Shapes | heightfield, halfspace, compound, voxels, shared shapes | `heightfield` (a smooth chain), `halfspace` (a polygon 200,000 units across), `compound` (parts with their own placement), `voxels` (merged outlines, no thickness); shape options are plain values, so one can be reused on any number of colliders | full, with the accepted differences in limits |
 | Shapes | oriented (one-sided) polyline | `polyline` with `oneSided: true` | full |
 | Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
-| Collision | continuous collision detection | `ccd` against fixed and kinematic bodies; dynamic bodies are not swept against each other | partial |
+| Collision | continuous collision detection | `ccd` against fixed and kinematic bodies; dynamic bodies are not swept against each other (they rely on the speculative contact margin) | partial |
 | Collision | sensors | `sensor: true` (senses fixed and kinematic bodies too) | full |
 | Collision | collision groups, solver groups, active collision types | `collisionGroups`, `solverGroups`, `activeCollisionTypes` | full |
 | Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |
-| Collision | physics hooks (filter and modify contact pairs, one-way platforms) | none | missing |
+| Collision | physics hooks (filter and modify contact pairs, one-way platforms) | `physics.hooks = {filterPair, modifyContact}` for colliders with `hooks` set; `oneWay`, `friction`, `restitution`, `solverActive` per contact | full |
 | Queries | ray cast with normal (solid or not), point, shape intersection, shape cast, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `QueryFilter2D` | full |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
 | Bodies | damping, gravity scale, locked rotation, can sleep, dominance | `BodyOptions2D` | full |

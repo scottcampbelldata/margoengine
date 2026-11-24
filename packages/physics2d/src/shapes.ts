@@ -121,6 +121,11 @@ export interface ColliderSettings2D {
   activeCollisionTypes?: number;
   /** Report `contactforce` events when the contact's total force passes this many newtons. Default: no force events. */
   contactForceThreshold?: number;
+  /**
+   * Which questions `Physics2D.hooks` is asked about this collider's pairs: `filterPair` (may the pair meet at all) and
+   * `modifyContact` (change a touching contact). Default: neither; a hook is only called for colliders that ask.
+   */
+  hooks?: { filterPair?: boolean; modifyContact?: boolean };
 }
 
 /** Options for a collider: shape plus settings. */
@@ -305,7 +310,7 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
   settings.u[4] = options.solverGroups ?? 0xffffffff;
   // A sensor also senses fixed and kinematic bodies, so a walking character can enter a trigger.
   const active = options.activeCollisionTypes ?? (sensor ? 63 : 7);
-  settings.u[5] = events | ((active & 0xff) << 8) | (sensor ? 1 << 16 : 0) | (oneSided ? 1 << 17 : 0);
+  settings.u[5] = events | ((active & 0xff) << 8) | (sensor ? 1 << 16 : 0) | (oneSided ? 1 << 17 : 0) | (options.hooks?.filterPair ? 1 << 18 : 0) | (options.hooks?.modifyContact ? 1 << 19 : 0);
   settings.f[6] = options.contactForceThreshold ?? 0;
   return { kind, settings: settings.u, geometry: geometry.u, area, convex };
 }

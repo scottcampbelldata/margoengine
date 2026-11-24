@@ -677,7 +677,8 @@ fn dynamic_body(world: &World, ids: &[u32], body: usize) -> bool {
 /// Frame-fixed eligibility. In particular, never read mutable World velocities after joint passes.
 fn fixed_domain(world: &World, c: &Constraint, bounce: &Bounce) -> bool {
     let contact = &world.contacts[c.contact as usize];
-    world.shapes[contact.a as usize].restitution == 0.0
+    contact.restitution.unwrap_or(0.0) == 0.0
+        && world.shapes[contact.a as usize].restitution == 0.0
         && world.shapes[contact.b as usize].restitution == 0.0
         && bounce.approach[..c.count as usize]
             .iter()

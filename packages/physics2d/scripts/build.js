@@ -33,7 +33,7 @@ const kernelInterface = (() => {
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
   return hash >>> 0;
 })();
-const kernelVersion = String(new WebAssembly.Instance(kernelModule, {}).exports.api_version());
+const kernelVersion = String(new WebAssembly.Instance(kernelModule, { env: { hook_filter: () => 1, hook_contact: () => 0 } }).exports.api_version());
 // The source marks the Wasm URL @vite-ignore so this build leaves it alone; the app's bundler must see it.
 const exposeWasmUrl = {
   name: 'expose-wasm-url',

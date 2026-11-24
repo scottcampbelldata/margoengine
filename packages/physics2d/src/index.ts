@@ -5,6 +5,8 @@ export type {
   KernelWasmSource,
   ContactForceEvent2D,
   DebugLines2D,
+  Physics2DHooks,
+  ContactChange2D,
   Physics2DEventMap,
   CollisionEvent2D,
   CollisionEventType2D,

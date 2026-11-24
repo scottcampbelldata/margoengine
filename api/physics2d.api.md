@@ -143,6 +143,10 @@ export interface ColliderSettings2D {
     solverGroups?: number;
     activeCollisionTypes?: number;
     contactForceThreshold?: number;
+    hooks?: {
+        filterPair?: boolean;
+        modifyContact?: boolean;
+    };
 }
 
 export interface CollisionEvent2D {
@@ -155,6 +159,17 @@ export interface CollisionEvent2D {
 }
 
 export type CollisionEventType2D = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+
+export interface ContactChange2D {
+    readonly colliderA: Collider2D;
+    readonly colliderB: Collider2D;
+    readonly normal: [number, number];
+    readonly points: number;
+    solverActive: boolean;
+    friction?: number;
+    restitution?: number;
+    oneWay?: Vec2D;
+}
 
 export interface ContactForceEvent2D {
     bodyA: Body2D;
@@ -269,6 +284,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
     removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
+    get hooks(): Physics2DHooks | null;
+    set hooks(value: Physics2DHooks | null);
     lockTranslation(body: Body2D, x: boolean, y: boolean): void;
     addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D;
     removeJoint(joint: Joint2D): void;
@@ -300,6 +317,11 @@ export interface Physics2DEventMap {
     contactforce: ContactForceEvent2D;
     beforestep: number;
     afterstep: number;
+}
+
+export interface Physics2DHooks {
+    filterPair?(colliderA: Collider2D, colliderB: Collider2D): boolean;
+    modifyContact?(change: ContactChange2D): void;
 }
 
 export interface Physics2DLoadOptions {
@@ -524,6 +546,7 @@ interface Exports {
     body_wake(world: number, body: number): number;
     body_sleep(world: number, body: number): number;
     body_set_additional_mass(world: number, body: number, mass: number): number;
+    world_set_hooks(world: number, on: number): number;
     world_snapshot(world: number): number;
     world_restore(world: number, bytes: number): number;
     debug_lines(world: number, what: number): number;
@@ -544,10 +567,17 @@ interface Exports {
 }
 
 class Kernel {
+    hooks: KernelHooks | null;
     constructor(x: Exports);
     io(words: number): Words;
+    current(words: number): Words;
     ok(result: number): number;
     get exports(): Exports;
+}
+
+interface KernelHooks {
+    filter(a: number, b: number): boolean;
+    contact(a: number, b: number, nx: number, ny: number, points: number): number;
 }
 
 interface TileBox {

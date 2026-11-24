@@ -12,7 +12,7 @@ use crate::joint::{JointDef, JointKind, Motor};
 use crate::math::{Rot, V2, Xf, v2};
 use crate::query::QueryFilter;
 use crate::shape::Core;
-use crate::world::{BodyDef, EventKind, Kind, Settings, ShapeDef, World};
+use crate::world::{BodyDef, ContactMod, EventKind, Hook, Kind, Settings, ShapeDef, World};
 
 /// The version the loader checks; bump it when an export or the buffer layout changes.
 pub const API_VERSION: u32 = 1;
@@ -286,6 +286,7 @@ fn shape_def() -> ShapeDef {
         sensor: flags & (1 << 16) != 0,
         force_threshold: f(6),
         one_sided: flags & (1 << 17) != 0,
+        hooks: ((flags >> 18) & 3) as u8,
     }
 }
 
@@ -566,7 +567,11 @@ pub extern "C" fn world_restore(handle: i32, len: u32) -> i32 {
     }
     bytes.truncate(len);
     match World::from_snapshot(&bytes) {
-        Ok(restored) => {
+        Ok(mut restored) => {
+            // The hook is not part of a snapshot: the world keeps the one it had.
+            if let Ok(old) = world(handle) {
+                restored.hook = old.hook.take();
+            }
             state().worlds[handle as usize] = Some(Box::new(restored));
             0
         }
@@ -584,5 +589,46 @@ pub extern "C" fn debug_lines(handle: i32, what: u32) -> i32 {
             put(i, *v);
         }
         Ok((lines.len() / 5) as i32)
+    })
+}
+
+// The world's hook asks the page: `hook_filter` says whether a pair may meet, `hook_contact` changes a touching contact.
+// The page answers a contact through the first words of the buffer (friction, restitution, a one-way direction), and the
+// return value says which of them it set: 1 the contact does not push, 2 friction, 4 restitution, 8 a one-way direction.
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn hook_filter(a: u32, b: u32) -> u32;
+    fn hook_contact(a: u32, b: u32, nx: f32, ny: f32, points: u32) -> u32;
+}
+
+struct PageHook;
+
+impl Hook for PageHook {
+    fn filter(&mut self, a: u32, b: u32) -> bool {
+        // SAFETY: the import is the page's callback; it takes and returns plain numbers.
+        unsafe { hook_filter(a, b) != 0 }
+    }
+    fn contact(&mut self, change: &mut ContactMod) {
+        // SAFETY: as above; the page reads and writes the buffer's first words while this call runs.
+        let answer = unsafe { hook_contact(change.a, change.b, change.normal.x, change.normal.y, change.points as u32) };
+        change.solver_active = answer & 1 == 0;
+        if answer & 2 != 0 {
+            change.friction = Some(f(0));
+        }
+        if answer & 4 != 0 {
+            change.restitution = Some(f(1));
+        }
+        if answer & 8 != 0 {
+            change.one_way = Some(point(2));
+        }
+    }
+}
+
+/// Turns the page's hook on or off for a world: shapes with hook flags ask it about their pairs.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_hooks(handle: i32, on: u32) -> i32 {
+    with_world!(handle, |w| {
+        w.hook = (on != 0).then(|| Box::new(PageHook) as Box<dyn Hook>);
+        Ok(0)
     })
 }

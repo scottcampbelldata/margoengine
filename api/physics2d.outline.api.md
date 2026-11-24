@@ -47,6 +47,10 @@ interface ColliderSettings2D {
     solverGroups?: number;
     activeCollisionTypes?: number;
     contactForceThreshold?: number;
+    hooks?: {
+        filterPair?: boolean;
+        modifyContact?: boolean;
+    };
 }
 
 type CompoundPart2D = ShapeOptions2D & {

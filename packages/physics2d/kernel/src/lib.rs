@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate self as margoengine_physics2d_kernel;
 
 pub(crate) mod ccd;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "api"))]
 pub mod api;
 pub mod debug;
 pub mod decompose;

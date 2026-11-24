@@ -8,6 +8,11 @@ publish = false
 [dependencies]
 margoengine-physics-kernel-common = { path = "../../physics/kernel-common" }
 
+[features]
+# The Wasm interface (src/api.rs) and the page imports it calls. The checks of wasm-check/ run without it.
+default = ["api"]
+api = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

@@ -241,3 +241,66 @@ test('a PID controller steers a body to a point and an angle', async () => {
   assert.throws(() => new PidController2D({ kp: NaN }), RangeError);
   physics.dispose();
 });
+
+test('hooks: filterPair vetoes a pair, modifyContact makes a one-way platform and sets friction', () => {
+  const physics = world();
+  const ground = physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: { shape: 'box', width: 400, height: 10, hooks: { filterPair: true, modifyContact: true } } });
+  const platform = ground.colliders[0];
+  const ghost = physics.addBody(null, { position: [-50, 0], colliders: { shape: 'circle', radius: 4, hooks: { filterPair: true } } });
+  const solid = physics.addBody(null, { position: [50, 0], colliders: { shape: 'circle', radius: 4, hooks: { filterPair: true } } });
+  const asked = [];
+  physics.hooks = {
+    filterPair: (a, b) => {
+      asked.push([a.handle, b.handle]);
+      return a.body !== ghost && b.body !== ghost;
+    },
+    modifyContact: (change) => {
+      // The normal runs from A to B: up (screen) from the platform to a body on top, whichever collider comes first.
+      change.oneWay = change.colliderA === platform ? [0, -1] : [0, 1];
+    },
+  };
+  run(physics, 240);
+  assert.ok(ghost.position[1] > 300, `the vetoed pair does not meet: ${ghost.position[1]}`);
+  assert.ok(Math.abs(solid.position[1] - 91) < 1, `the allowed one rests on top: ${solid.position[1]}`);
+  assert.ok(asked.length > 0);
+  // A one-way platform: thrown up from below, the ball passes, then lands on top.
+  const jumper = physics.addBody(null, { position: [0, 160], linearVelocity: [0, -700], colliders: { shape: 'circle', radius: 4 } });
+  let top = Infinity;
+  for (let i = 0; i < 400; i++) {
+    physics.step();
+    top = Math.min(top, jumper.position[1]);
+  }
+  assert.ok(top < 80, `went up through the platform to ${top}`);
+  assert.ok(Math.abs(jumper.position[1] - 91) < 1, `and stands on it: ${jumper.position[1]}`);
+  // Hooks survive a restore, and clearing them frees the pairs.
+  const bytes = physics.snapshot();
+  physics.restore(bytes);
+  run(physics, 5);
+  physics.hooks = null;
+  assert.equal(physics.hooks, null);
+  physics.dispose();
+});
+
+test('hooks: modifyContact sets friction and can turn a contact off for a step', () => {
+  const slide = (friction) => {
+    const physics = world();
+    physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: { shape: 'box', width: 600, height: 10, friction: 0, hooks: { modifyContact: true } } });
+    const crate = physics.addBody(null, { position: [0, 90], linearVelocity: [120, 0], canSleep: false, colliders: { shape: 'box', width: 16, height: 16, friction: 0, hooks: { modifyContact: true } } });
+    physics.hooks = { modifyContact: (change) => void (friction !== undefined && (change.friction = friction)) };
+    run(physics, 120);
+    const x = crate.position[0];
+    physics.dispose();
+    return x;
+  };
+  const free = slide(undefined),
+    sticky = slide(2);
+  assert.ok(free > 200, `frictionless keeps its speed: ${free}`);
+  assert.ok(sticky < 80, `friction 2 stops it: ${sticky}`);
+  const physics = world();
+  physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: { shape: 'box', width: 600, height: 10, hooks: { modifyContact: true } } });
+  const falling = physics.addBody(null, { position: [0, 50], colliders: { shape: 'circle', radius: 4 } });
+  physics.hooks = { modifyContact: (change) => void (change.solverActive = false) };
+  run(physics, 240);
+  assert.ok(falling.position[1] > 200, 'a contact switched off lets it through');
+  physics.dispose();
+});

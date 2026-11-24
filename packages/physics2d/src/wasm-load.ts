@@ -18,6 +18,8 @@ export interface KernelBuild {
   version: string;
   /** A hash of the module's exports and imports. */
   interface: number;
+  /** What the module imports: the page's hook functions. */
+  imports: WebAssembly.Imports;
 }
 
 /** FNV-1a over the module's exports and imports. */
@@ -45,8 +47,8 @@ interface Compiled {
   instance: WebAssembly.Instance;
 }
 
-async function fromBytes(bytes: BufferSource): Promise<Compiled> {
-  const { module, instance } = await WebAssembly.instantiate(bytes, {});
+async function fromBytes(bytes: BufferSource, build: KernelBuild): Promise<Compiled> {
+  const { module, instance } = await WebAssembly.instantiate(bytes, build.imports);
   return { module, instance };
 }
 
@@ -56,16 +58,16 @@ async function fromResponse(source: Response, signal: AbortSignal, build: Kernel
   // A server that labels the file application/wasm lets the browser compile it while it downloads; any other label
   // makes instantiateStreaming refuse it, so the bytes are read first.
   if (typeof WebAssembly.instantiateStreaming === 'function' && /^application\/wasm\b/i.test(source.headers.get('content-type') ?? ''))
-    return WebAssembly.instantiateStreaming(source, {}).then(({ module, instance }) => ({ module, instance }));
+    return WebAssembly.instantiateStreaming(source, build.imports).then(({ module, instance }) => ({ module, instance }));
   const bytes = await source.arrayBuffer();
   signal.throwIfAborted();
-  return fromBytes(bytes);
+  return fromBytes(bytes, build);
 }
 
 async function compile(source: KernelWasmSource, signal: AbortSignal, build: KernelBuild): Promise<Compiled> {
-  if (source instanceof WebAssembly.Module) return { module: source, instance: await WebAssembly.instantiate(source, {}) };
+  if (source instanceof WebAssembly.Module) return { module: source, instance: await WebAssembly.instantiate(source, build.imports) };
   if (typeof Response === 'function' && source instanceof Response) return fromResponse(source, signal, build);
-  if (source instanceof ArrayBuffer || ArrayBuffer.isView(source)) return fromBytes(source as BufferSource);
+  if (source instanceof ArrayBuffer || ArrayBuffer.isView(source)) return fromBytes(source as BufferSource, build);
   let url: URL;
   try {
     url = new URL(source as string | URL, (globalThis as { location?: { href: string } }).location?.href);
@@ -82,7 +84,7 @@ async function compile(source: KernelWasmSource, signal: AbortSignal, build: Ker
       if (signal.aborted) throw signal.reason;
       throw failure(build, `could not be read from ${url.href}`, error);
     }
-    return fromBytes(bytes as BufferSource);
+    return fromBytes(bytes as BufferSource, build);
   }
   let fetched: Response;
   try {

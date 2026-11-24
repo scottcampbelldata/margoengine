@@ -39,6 +39,7 @@ interface Exports {
   body_wake(world: number, body: number): number;
   body_sleep(world: number, body: number): number;
   body_set_additional_mass(world: number, body: number, mass: number): number;
+  world_set_hooks(world: number, on: number): number;
   world_snapshot(world: number): number;
   world_restore(world: number, bytes: number): number;
   debug_lines(world: number, what: number): number;
@@ -75,6 +76,13 @@ function kernelError(code: number): Error {
   return Object.assign(new RangeError(`Physics2D: ${help}. (${name})`), { code: name });
 }
 
+/** The two questions the kernel puts to the page while it steps (see `Physics2D.hooks`). @internal */
+export interface KernelHooks {
+  filter(a: number, b: number): boolean;
+  /** Answers through the buffer: friction, restitution, a one-way direction; returns the bits of what it set. */
+  contact(a: number, b: number, nx: number, ny: number, points: number): number;
+}
+
 /** One word of the buffer as a float or as an integer. */
 export interface Words {
   readonly f: Float32Array;
@@ -83,13 +91,21 @@ export interface Words {
 
 /** The kernel's exports with their errors thrown. One per app; worlds are handles into it. */
 export class Kernel {
+  private at = 0;
+  /** What the kernel asks of the page while it steps: whether a pair may meet, and how to change a contact. @internal */
+  hooks: KernelHooks | null = null;
   /** @internal */
   constructor(private readonly x: Exports) {}
   /** The buffer's words, at least `words` long. Read it again after any call: memory may have grown. */
   io(words: number): Words {
-    const at = this.x.io_reserve(words);
+    const at = (this.at = this.x.io_reserve(words));
     const buffer = this.x.memory.buffer;
     return { f: new Float32Array(buffer, at, words), u: new Uint32Array(buffer, at, words) };
+  }
+  /** @internal The buffer as it was last given out, for a hook that runs inside a call (no call into the kernel). */
+  current(words: number): Words {
+    const buffer = this.x.memory.buffer;
+    return { f: new Float32Array(buffer, this.at, words), u: new Uint32Array(buffer, this.at, words) };
   }
   /** The checked result of a call: its non-negative value, or the kernel's error thrown. */
   ok(result: number): number {
@@ -103,10 +119,19 @@ export class Kernel {
 
 /** Compiles the kernel's Wasm from `source` and returns the ready kernel. `signal` cancels the download and the wait. */
 export async function startKernel(source: KernelWasmSource, signal: AbortSignal): Promise<Kernel> {
+  let kernel: Kernel | null = null;
   const exports = await instantiateKernel(source, signal, {
     file: 'physics2d.wasm',
     version: __KERNEL_VERSION__,
     interface: __KERNEL_INTERFACE__,
+    imports: {
+      env: {
+        hook_filter: (a: number, b: number) => (kernel?.hooks ? (kernel.hooks.filter(a, b) ? 1 : 0) : 1),
+        hook_contact: (a: number, b: number, nx: number, ny: number, points: number) =>
+          kernel?.hooks ? kernel.hooks.contact(a, b, nx, ny, points) : 0,
+      },
+    },
   });
-  return new Kernel(exports as unknown as Exports);
+  kernel = new Kernel(exports as unknown as Exports);
+  return kernel;
 }

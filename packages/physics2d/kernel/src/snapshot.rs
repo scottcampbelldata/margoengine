@@ -13,7 +13,7 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -207,6 +207,7 @@ impl World {
             w.u8(sh.events);
             w.u8(sh.active_types);
             w.bool(sh.one_sided);
+            w.u8(sh.hooks);
             w.bool(sh.dead);
             // The fat box the broad phase keeps for it, which only changes when the shape leaves it.
             let fat = if sh.dead { None } else { self.broad_fat(index as u32) };
@@ -283,6 +284,10 @@ impl World {
             w.bool(c.solved);
             w.bool(c.overlap);
             w.bool(c.primed);
+            for o in [c.friction, c.restitution] {
+                w.bool(o.is_some());
+                w.f32(o.unwrap_or(0.0));
+            }
         }
         for list in [&self.free_bodies, &self.free_shapes] {
             w.u32(list.len() as u32);
@@ -365,13 +370,13 @@ impl World {
             let (groups, solver_groups) = (r.u32()?, r.u32()?);
             let sensor = r.bool()?;
             let (events, active_types) = (r.u8()?, r.u8()?);
-            let (one_sided, dead) = (r.bool()?, r.bool()?);
+            let (one_sided, hooks, dead) = (r.bool()?, r.u8()?, r.bool()?);
             let has_fat = r.bool()?;
             let f = [r.f32()?, r.f32()?, r.f32()?, r.f32()?];
             if has_fat {
                 world.broad_place_exact(id as u32, &Bounds { min: [f[0], f[1]], max: [f[2], f[3]] });
             }
-            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, dead });
+            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, dead });
         }
         let n = r.count(40)?;
         for _ in 0..n {
@@ -417,10 +422,16 @@ impl World {
             }
             let [n0, n1, t0, t1, total_impulse] = [r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?];
             let (solved, overlap, primed) = (r.bool()?, r.bool()?, r.bool()?);
+            let mut over = [None; 2];
+            for slot in over.iter_mut() {
+                let some = r.bool()?;
+                let v = r.f32()?;
+                *slot = some.then_some(v);
+            }
             if count > 2 || a as usize >= world.shapes.len() || b as usize >= world.shapes.len() {
                 return Err(PhysicsError::InvalidParameter);
             }
-            world.contacts.push(Contact { a, b, manifold: Manifold { normal, points, count }, normal_impulse: [n0, n1], tangent_impulse: [t0, t1], solved, overlap, primed, total_impulse });
+            world.contacts.push(Contact { a, b, manifold: Manifold { normal, points, count }, normal_impulse: [n0, n1], tangent_impulse: [t0, t1], solved, overlap, primed, total_impulse, friction: over[0], restitution: over[1] });
         }
         for which in 0..2 {
             let n = r.count(4)?;
