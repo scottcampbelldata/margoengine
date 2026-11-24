@@ -56,11 +56,11 @@ test('the limits win when the target lies outside the cone, and the twist stops 
   const reached = swingOf(swung.body.rotation);
   assert.ok(reached > 0.45 && reached < 0.51, `swing ${reached} stops at the 0.5 edge`);
   const twisted = rod();
-  twisted.joint.setRotationMotor(about([1, 0, 0], 0.2), gains);
+  twisted.joint.setRotationMotor(about([0, -1, 0], 0.2), gains);
   run(twisted.physics, 300);
   assert.ok(Math.abs(Math.abs(twistOf(twisted.body.rotation)) - 0.2) < 0.01, `twist ${twistOf(twisted.body.rotation)}`);
   const over = rod();
-  over.joint.setRotationMotor(about([1, 0, 0], 1.2), gains);
+  over.joint.setRotationMotor(about([0, -1, 0], 1.2), gains);
   run(over.physics, 300);
   assert.ok(
     Math.abs(Math.abs(twistOf(over.body.rotation)) - 0.4) < 0.01,
@@ -145,7 +145,7 @@ test('a cone whose rest pose lies off its frames holds that pose under a motor a
     const w = 2 * Math.PI * 8;
     let widest = 0;
     for (let i = 0; i < 120; i++) {
-      joint.setRotationMotor([0, 0, 0, 1], { model, stiffness: model === 'force' ? 0.67 * w * w : w * w, damping: model === 'force' ? 2 * 0.67 * w * 0.7 : 2 * w * 0.7, maxForce: 1e6 });
+      joint.setRotationMotor(rest, { model, stiffness: model === 'force' ? 0.67 * w * w : w * w, damping: model === 'force' ? 2 * 0.67 * w * 0.7 : 2 * w * 0.7, maxForce: 1e6 });
       physics.step();
       // The rod's turn from where it was placed.
       const q = product([-rest[0], -rest[1], -rest[2], rest[3]], rod.rotation);

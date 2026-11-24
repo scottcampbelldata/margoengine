@@ -1129,13 +1129,13 @@ impl World {
         }
     }
 
-    /// The turning rows of a rotation drive: the axes of frame A turned by the target, and what is left of the turn from there
-    /// to frame B, as a rotation vector along them. It is the measure of a free ball joint whose frame A sat on the target,
-    /// read without moving frame A, so a cone's own frames and rows stay as its limits want them.
+    /// The turning rows of a rotation drive: the axes of body A's frame turned by the target, and what is left of the turn from
+    /// there to body B, as a rotation vector along them. It is the measure of a free ball joint whose frame A sat on the target,
+    /// read without moving any frame, and it takes the joint's frames out of it: the target is a rotation of body B in body A's
+    /// frame, as a spherical joint's is, so a cone's frames (which hold its axis and its rest) do not change what it means.
     fn drive_rows(&self, row: usize, a: usize, b: usize, rows: &mut [Row; 6], at: &mut [f32; 6]) {
-        let (frame_a, frame_b) = (self.q(ROTATION_X, a).mul(self.q(JOINT_FRAME_A_X, row)), self.q(ROTATION_X, b).mul(self.q(JOINT_FRAME_B_X, row)));
-        let target = frame_a.mul(self.q(JOINT_DRIVE_X, row));
-        let mut left = target.conjugate().mul(frame_b);
+        let target = self.q(ROTATION_X, a).mul(self.q(JOINT_DRIVE_X, row));
+        let mut left = target.conjugate().mul(self.q(ROTATION_X, b));
         if left.w < 0.0 {
             left = Q { x: -left.x, y: -left.y, z: -left.z, w: -left.w };
         }

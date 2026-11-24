@@ -744,10 +744,28 @@ export class Ragdoll implements EnginePlugin {
           );
         cone = { swing, min, max };
       }
+      if (!cone)
+        return {
+          joint: physics.addJoint(parent, child, { type: 'spherical', anchorA, anchorB: [0, 0, 0] }),
+          cone,
+          spec: { type: 'free' },
+        };
+      // The solver's own cone joint holds the swing and the twist. Its frame X is the bone axis (+Y) at rest, so the
+      // swing is measured from the rest pose, as the limits are read.
+      const frameB = arc([1, 0, 0], [0, 1, 0], new Float64Array(4)),
+        frameA = mul(rest, frameB, new Float64Array(4));
       return {
-        joint: physics.addJoint(parent, child, { type: 'spherical', anchorA, anchorB: [0, 0, 0] }),
-        cone,
-        spec: cone ? { type: 'cone', swing: cone.swing, twist: [cone.min, cone.max] } : { type: 'free' },
+        joint: physics.addJoint(parent, child, {
+          type: 'cone',
+          anchorA,
+          anchorB: [0, 0, 0],
+          frameA: [frameA[0], frameA[1], frameA[2], frameA[3]],
+          frameB: [frameB[0], frameB[1], frameB[2], frameB[3]],
+          swing: cone.swing,
+          twist: [cone.min, cone.max],
+        }),
+        cone: null,
+        spec: { type: 'cone', swing: cone.swing, twist: [cone.min, cone.max] },
       };
     }
     if (spec?.type !== 'hinge') throw new TypeError("Unknown ragdoll joint type; use 'cone', 'hinge' or 'free'.");
