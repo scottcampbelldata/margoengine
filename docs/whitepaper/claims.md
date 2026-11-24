@@ -28,6 +28,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   Reproduce with `node packages/physics/scripts/compare-rapier-floors.mjs --limit=60 --floors=20,100,400` (floor
   half-widths in metres; each engine in its own process under a hard limit; needs `npm run build --workspace
   @margoengine/physics` and the test oracle, `node packages/physics/scripts/build-oracle.js`).
+- Own physics compound colliders with a triangle mesh part (2026-11-24): a compound collider with one triangle mesh part
+  (one two-triangle floor) aborts Rapier 0.21's JavaScript when the collider is made (`RuntimeError: unreachable`, thrown by
+  `ColliderDesc.compound` through `createCollider`); the same compound rests a ball at 0.5 m on the own kernel. With a height
+  field or a voxel part instead Rapier builds the compound, and the own kernel agrees with it on the rest height (within
+  2 mm) and on rays (within 1 mm). One scene shape and one version of Rapier (the one the test oracle loads); Rapier's
+  documentation does not mention the abort. No speed claim. Reproduce with `node --test
+  packages/physics/tests/next-compound-meshes.test.js` (the oracle is built by `node packages/physics/scripts/build-oracle.js`).
 - Own physics dynamics (2026-11-24): the rigid body, solver, joint, multibody, PID, determinism, snapshot and debug-render
   capabilities of Rapier 3D's public user guide are listed row by row in the dynamics table of
   `packages/physics/README.md` (Parity with Rapier 3D), each marked full only where a test proves it. Checked against

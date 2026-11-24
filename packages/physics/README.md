@@ -515,7 +515,7 @@ for (let i = 0; i < 120; i++) physics.step();
 console.log(ball.position[1].toFixed(2)); // 0.50: resting on the field
 ```
 
-A `compound` takes `parts`: boxes, spheres, capsules, cylinders, cones and convex hulls (a box or hull with a `borderRadius` too), and on this entry a `trimesh`, `heightfield` or `voxels` part as well (a surface, for a fixed body's scenery: a voxel part weighs nothing here; Rapier's JavaScript aborts on such a compound, so the root entry refuses it). A mesh part meets the convex colliders and the parts of other compounds, and no mesh at all. A `halfSpace` is a part too (the plane through its offset): an endless floor beside a box. each with its own `offset` and `rotation` in the collider's frame, never fitted to the mesh. It is one collider, as in Rapier: one handle, one pair and one set of events against each other collider, and one `density` (or `mass`, spread by volume) for every part. Each part that touches keeps its own contact points and warm start, and parts are culled by their own boxes, so the gaps between them are empty. Its mass, centre and inertia match Rapier's for the same parts (a test holds them to 1e-5) and are the same bits as the parts added as colliders of their own. `boundingRadius` is null, as on the root entry. `KernelWorld.addCompound(body, parts, options)` is the kernel's view of it.
+A `compound` takes `parts`: boxes, spheres, capsules, cylinders, cones and convex hulls (a box or hull with a `borderRadius` too), and a `trimesh`, `heightfield` or `voxels` part as well (a surface, for a fixed body's scenery: a voxel part weighs nothing here; Rapier 0.21's JavaScript aborts when a compound has a triangle mesh part, and builds one with a height field or voxel part, which this solver matches). A mesh part meets the convex colliders and the parts of other compounds, and no mesh at all. A `halfSpace` is a part too (the plane through its offset): an endless floor beside a box. each with its own `offset` and `rotation` in the collider's frame, never fitted to the mesh. It is one collider, as in Rapier: one handle, one pair and one set of events against each other collider, and one `density` (or `mass`, spread by volume) for every part. Each part that touches keeps its own contact points and warm start, and parts are culled by their own boxes, so the gaps between them are empty. Its mass, centre and inertia match Rapier's for the same parts (a test holds them to 1e-5) and are the same bits as the parts added as colliders of their own. `boundingRadius` is null, as on the root entry. `KernelWorld.addCompound(body, parts, options)` is the kernel's view of it.
 
 ```js
 import {Physics} from 'margoengine/physics';
@@ -1036,49 +1036,49 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 
 ### Dynamics and joints
 
-| Capability (Rapier 3D) | Kernel and `margoengine/physics` | Status |
-| --- | --- | --- |
-| Body types: dynamic, fixed, kinematic position-based, kinematic velocity-based | `addBody`, `setType`, `setNextPosition` | full |
-| Pose, linear and angular velocity, teleport with or without waking | `setPosition`, `setRotation`, `setLinearVelocity`, `setAngularVelocity` | full |
-| Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addForceAtPoint`, `addTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques` | full |
-| Linear and angular damping, gravity scale | body options | full |
-| Dominance groups | `dominance` | full |
-| Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` (options, and readable and settable on a body) | full |
-| Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full |
-| Additional solver iterations per body | `additionalSolverIterations` | full |
-| Maximum linear and angular velocity per body | `maxLinearSpeed`, `maxAngularSpeed` | full |
-| Sleep thresholds, can sleep, put to sleep, wake up | `sleepThreshold`, `sleepTime`, `canSleep`, `sleep`, `wakeUp` | full |
-| Enabled flag | `enabled` | full |
-| Continuous collision detection | `ccd` | full |
-| Islands | island forest, an island sleeps together | full |
-| Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full |
-| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full |
-| Integration parameters: prediction distance, length unit, maximum CCD substeps | `predictionDistance` (`tests/next-prediction.test.js`), `lengthUnit`, `maxCcdSubsteps` (`tests/next-parameters.test.js`) | full (a value above 1 of `maxCcdSubsteps` is the same as 1: the one pass resolves a whole sweep) |
-| Step timing counters | `timing` | partial: the step and its seven phases; not Rapier's finer solver and CCD timers |
-| Iterating the active bodies | `forEachActiveBody` | full |
-| User data on bodies and colliders | `userData` | full |
-| Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full |
-| Joint limits, per axis | `setLimits`, `setAxisLimits` | full |
-| Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |
-| Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full |
-| Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full |
-| Multibody (reduced-coordinate) joints and inverse kinematics | `addMultibody`, `coordinates`, `setCoordinates`, `inverseKinematics` | full |
-| Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full |
-| Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |
-| PID controller | `PidController` | full |
-| Debug-render data: colliders, joints, contacts, boxes | `debugRender` | full |
+| Capability (Rapier 3D) | Kernel and `margoengine/physics` | Status | Tests |
+| --- | --- | --- | --- |
+| Body types: dynamic, fixed, kinematic position-based, kinematic velocity-based | `addBody`, `setType`, `setNextPosition` | full | `next-bodies.test.js`, `next-events.test.js` |
+| Pose, linear and angular velocity, teleport with or without waking | `setPosition`, `setRotation`, `setLinearVelocity`, `setAngularVelocity` | full | `next-bodies.test.js`, `next-dynamics.test.js` |
+| Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addForceAtPoint`, `addTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques` | full | `next-dynamics.test.js` |
+| Linear and angular damping, gravity scale | body options | full | angular damping and gravity scale 0: `next-dynamics.test.js`, `physics.test.js`; none yet for linear damping or a gravity scale other than 0 |
+| Dominance groups | `dominance` | full | `next-dynamics.test.js` |
+| Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` (options, and readable and settable on a body) | full | `next-dynamics.test.js` |
+| Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full | `next-bodies.test.js`, `next-collider-api.test.js` |
+| Additional solver iterations per body | `additionalSolverIterations` | full | `next-bodies.test.js` |
+| Maximum linear and angular velocity per body | `maxLinearSpeed`, `maxAngularSpeed` | full | `next-speed-caps.test.js` |
+| Sleep thresholds, can sleep, put to sleep, wake up | `sleepThreshold`, `sleepTime`, `canSleep`, `sleep`, `wakeUp` | full | `next-sleep-thresholds.test.js`, `kernel-sleep.test.js`, `next-bodies.test.js` |
+| Enabled flag | `enabled` | full | `next-dynamics.test.js` |
+| Continuous collision detection | `ccd` | full | `next-ccd.test.js` |
+| Islands | island forest, an island sleeps together | full | `kernel-sleep.test.js`, `next-bodies.test.js` |
+| Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full | `frames.test.js`, `next-physics.test.js` |
+| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full | `next-parameters.test.js`, `kernel-solver.test.js`; `jointShare` is read back only, none yet for `jointLooseShare` and `jointMaxPush` |
+| Integration parameters: prediction distance, length unit, maximum CCD substeps | `predictionDistance` (`tests/next-prediction.test.js`), `lengthUnit`, `maxCcdSubsteps` (`tests/next-parameters.test.js`) | full (a value above 1 of `maxCcdSubsteps` is the same as 1: the one pass resolves a whole sweep) | `next-prediction.test.js` |
+| Step timing counters | `timing` | partial: the step and its seven phases; not Rapier's finer solver and CCD timers | `next-parameters.test.js` |
+| Iterating the active bodies | `forEachActiveBody` | full | `next-parameters.test.js` |
+| User data on bodies and colliders | `userData` | full | `next-parameters.test.js`, `next-collider-api.test.js` |
+| Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full | `next-joints.test.js` |
+| Joint limits, per axis | `setLimits`, `setAxisLimits` | full | `next-joints.test.js` |
+| Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full | `next-joints.test.js`, `next-cone-motor.test.js`, `next-cone-motor-oracle.test.js` |
+| Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full | `next-joints.test.js`, `frames.test.js` |
+| Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full | `next-joint-break.test.js` |
+| Multibody (reduced-coordinate) joints and inverse kinematics | `addMultibody`, `coordinates`, `setCoordinates`, `inverseKinematics` | full | `next-multibody.test.js`, `next-multibody-oracle.test.js` |
+| Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full | `replay.test.js`, `kernel-step.test.js` |
+| Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full | `kernel-solver.test.js`, `next-joints.test.js`, `next-parameters.test.js` |
+| PID controller | `PidController` | full | `next-pid.test.js` |
+| Debug-render data: colliders, joints, contacts, boxes | `debugRender` | full | `next-debug-render.test.js`, `next-debug-filter.test.js` |
 
 ### Features written over the kernel
 
-| Capability (Rapier 3D) | `margoengine/physics` | Status |
-| --- | --- | --- |
-| Kinematic character controller: offset, up vector, autostep, maximum slope climb angle, minimum slope slide angle, snap to ground, sliding | `createCharacterController` and `move` | full |
-| Character controller: pushing dynamic bodies, character mass, the collisions of a move | `applyImpulsesToDynamicBodies`, `characterMass`, `controller.collisions` | full |
-| Dynamic ray-cast vehicle controller: suspension, engine, brake, steering, wheel friction | `Vehicle` | full |
-| Ragdoll with cone joints, motors and balance | `@margoengine/ragdoll` | partial: powered ragdolls on the cone joint differ from the spherical one, see KB-PHYS-SWITCH-CONE1 |
-| Convex decomposition of a concave mesh | `convexDecomposition` from `margoengine/physics/decomposition` (CoACD) | full: build-time, never a bare mesh on `addBody` |
-| Colliders for a glTF model, one body or one per node | `addModel` | full |
-| A body that follows a mesh | `follow: true` | full |
+| Capability (Rapier 3D) | `margoengine/physics` | Status | Tests |
+| --- | --- | --- | --- |
+| Kinematic character controller: offset, up vector, autostep, maximum slope climb angle, minimum slope slide angle, snap to ground, sliding | `createCharacterController` and `move` | full | `next-character.test.js`; none yet for `minSlopeSlideAngle` |
+| Character controller: pushing dynamic bodies, character mass, the collisions of a move | `applyImpulsesToDynamicBodies`, `characterMass`, `controller.collisions` | full | `next-character.test.js` |
+| Dynamic ray-cast vehicle controller: suspension, engine, brake, steering, wheel friction | `Vehicle` | full | `next-vehicle.test.js` |
+| Ragdoll with cone joints, motors and balance | `@margoengine/ragdoll` | partial: powered ragdolls on the cone joint differ from the spherical one, see KB-PHYS-SWITCH-CONE1 | `packages/ragdoll/tests` |
+| Convex decomposition of a concave mesh | `convexDecomposition` from `margoengine/physics/decomposition` (CoACD) | full: build-time, never a bare mesh on `addBody` | `next-decomposition.test.js` |
+| Colliders for a glTF model, one body or one per node | `addModel` | full | none yet for `addModel` |
+| A body that follows a mesh | `follow: true` | full | `nested.test.js` |
 
 ## Limits
 

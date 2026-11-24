@@ -139,7 +139,7 @@ export type CompoundPart = (
 
 const ZERO = { x: 0, y: 0, z: 0 },
   IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
-const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'];
+const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull', 'trimesh', 'heightfield', 'voxels'];
 
 /** How two colliders combine their friction or restitution values. */
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
@@ -460,11 +460,6 @@ export function createColliderDesc(
         positions: Vector[] = [],
         rotations: Rotation[] = [];
       for (const part of parts as readonly CompoundPart[]) {
-        if (part?.shape === 'trimesh' || part?.shape === 'heightfield' || part?.shape === 'voxels')
-          throw new MargoError(
-            'unsupported',
-            `A ${part.shape} part in a compound needs the own solver: import {Physics} from '@margoengine/physics/next'. Rapier's JavaScript fails on a compound with a mesh in it.`,
-          );
         if (!CONVEX_PARTS.includes(part?.shape))
           throw new TypeError(
             `Compound part shape ${String(part?.shape)} cannot be a part; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield or voxels parts.`,
@@ -481,6 +476,8 @@ export function createColliderDesc(
         positions.push(vec(offset));
         rotations.push(quat(part.rotation));
       }
+      // Rapier 0.21 aborts (`RuntimeError: unreachable`) when a collider is made from a compound with a triangle mesh part, while
+      // height field and voxel parts work (tests/next-compound-meshes.test.js). Rapier's documentation does not mention it.
       desc = R.ColliderDesc.compound(shapes, positions, rotations);
       break;
     }

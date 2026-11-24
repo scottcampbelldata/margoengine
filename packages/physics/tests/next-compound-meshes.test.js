@@ -1,5 +1,6 @@
-// A compound with a mesh, height field or voxel grid among its parts. Rapier's JavaScript fails on such a compound (checked:
-// its `ColliderDesc.compound` aborts inside the Wasm), so each answer is compared with the same parts as colliders of their
+// A compound with a mesh, height field or voxel grid among its parts. Rapier 0.21's JavaScript builds a compound with a height
+// field or voxel part, and the answers below are compared with its own; its `ColliderDesc.compound` aborts inside the Wasm
+// when a part is a triangle mesh (checked, last test), so a mesh part is compared with the same parts as colliders of their
 // own, which the other tests hold to Rapier.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -141,14 +142,71 @@ test('a half space is a part of a compound: an endless floor beside a box', () =
   physics.dispose();
 });
 
-test('a custom shape cannot be a part, and Rapier says so for a mesh part instead of aborting', () => {
+const voxelPart = {
+  shape: 'voxels',
+  cells: Int32Array.from([-5, -1, -5, -4, -1, -5, -3, -1, -5, -2, -1, -5, -1, -1, -5, 0, -1, -5, 1, -1, -5, 2, -1, -5]),
+  size: [1, 1, 1],
+};
+for (const [name, part] of [
+  ['a height field', field],
+  ['a voxel grid', voxelPart],
+])
+  test(`a compound with ${name} part rests a ball and answers rays as Rapier's compound does`, () => {
+    const make = (World) => {
+      const physics = new World(null, { gravity: [0, -10, 0] });
+      physics.addBody(null, {
+        type: 'fixed',
+        colliders: {
+          shape: 'compound',
+          parts: [
+            { ...part, offset: [0, 0, 0] },
+            { ...wall, offset: [8, 1, 0] },
+          ],
+        },
+      });
+      const ball = physics.addBody(null, { position: [0, 2, -4.5], colliders: { shape: 'sphere', radius: 0.5 } });
+      for (let i = 0; i < 120; i++) physics.step();
+      return { physics, ball };
+    };
+    const own = make(Physics),
+      rapier = make(RapierPhysics);
+    assert.ok(
+      Math.abs(own.ball.position[1] - rapier.ball.position[1]) < 2e-3,
+      `${own.ball.position[1]} vs Rapier ${rapier.ball.position[1]}`,
+    );
+    for (const origin of [
+      [-3, 5, -4.5],
+      [1, 5, -4.5],
+      [8, 5, 1],
+    ]) {
+      const [a, b] = [own, rapier].map(({ physics }) => physics.raycast(origin, [0, -1, 0], { maxDistance: 20 }));
+      assert.equal(!!a, !!b, `ray from ${origin}`);
+      if (a) assert.ok(Math.abs(a.distance - b.distance) < 1e-3, `${a.distance} vs ${b.distance}`);
+    }
+    own.physics.dispose();
+    rapier.physics.dispose();
+  });
+
+test('Rapier 0.21 aborts on a compound with a triangle mesh part, and the own solver holds one', () => {
+  const rapier = new RapierPhysics(null);
+  assert.throws(
+    () => rapier.addBody(null, { colliders: { shape: 'compound', parts: [{ ...ground }] } }),
+    /unreachable/,
+  );
+  rapier.dispose();
+  const physics = new Physics(null, { gravity: [0, -10, 0] });
+  physics.addBody(null, { type: 'fixed', colliders: { shape: 'compound', parts: [{ ...ground, offset: [0, 0, 0] }] } });
+  const ball = physics.addBody(null, { position: [0, 2, 0], colliders: { shape: 'sphere', radius: 0.5 } });
+  for (let i = 0; i < 120; i++) physics.step();
+  assert.ok(Math.abs(ball.position[1] - 0.5) < 2e-3, `${ball.position[1]}`);
+  physics.dispose();
+});
+
+test('a custom shape cannot be a part', () => {
   const physics = new Physics(null);
   assert.throws(
     () => physics.addBody(null, { colliders: { shape: 'compound', parts: [{ shape: 'custom', desc: {} }] } }),
     /cannot be a part/,
   );
   physics.dispose();
-  const rapier = new RapierPhysics(null);
-  assert.throws(() => rapier.addBody(null, { colliders: { shape: 'compound', parts: [{ ...ground }] } }), /own solver/);
-  rapier.dispose();
 });

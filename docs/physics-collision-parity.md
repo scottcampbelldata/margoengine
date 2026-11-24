@@ -37,7 +37,7 @@ type declarations. What the check found and closed: `FIX_INTERNAL_EDGES_TWO_SIDE
 | Triangle mesh (trimesh) | full | every creation flag below | `tests/next-trimesh.test.js`, `tests/next-trimesh-flags.test.js`, `kernel/tests/mesh.rs` |
 | Height field | full | Rapier's layout and split | `tests/next-heightfield.test.js`, `kernel/tests/mesh.rs` |
 | Compound | full | convex parts | `tests/next-compound.test.js`, `kernel/tests/compound.rs` |
-| Compound with non-convex parts (trimesh, height field, voxels, half space as part) | full | mesh, height field, voxel and half space parts (`next-compound-meshes.test.js`); Rapier's JavaScript aborts on a compound with a mesh part | `tests/next-compound-meshes.test.js` |
+| Compound with non-convex parts (trimesh, height field, voxels, half space as part) | full | mesh, height field, voxel and half space parts (`next-compound-meshes.test.js`); a ball's rest height and rays match Rapier 0.21's own compound for height field and voxel parts; Rapier's JavaScript aborts (`RuntimeError: unreachable`) when a compound has a triangle mesh part, so that part is checked against the same parts as colliders of their own | `tests/next-compound-meshes.test.js` |
 | Voxels | full | edit, combine, propagate | `tests/next-voxels.test.js`, `kernel/tests/voxel.rs` |
 | Segment | full | a capsule with no radius; `next-segments.test.js` against Rapier | `tests/next-segments.test.js` |
 | Triangle | full | a one-triangle mesh, both sides; ray and rest tested against Rapier | `tests/next-segments.test.js` |
