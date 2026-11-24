@@ -32,8 +32,8 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Half space | full | closed forms for queries, a laid box for contacts; not against meshes, height fields, voxels or another half space |
 | Round cuboid, round convex hull | partial | `borderRadius` on box and hull colliders, tested against Rapier; not on compound parts or query shapes |
 | Round triangle | missing | |
-| Collider shape change after creation | missing | |
-| Collider position and rotation relative to its body, set after creation | partial | read only |
+| Collider shape change after creation | full | `collider.setShape`; not for compounds |
+| Collider position and rotation relative to its body, set after creation | full | `setTranslationWrtParent`, `setRotationWrtParent` |
 
 ## Trimesh flags
 

@@ -133,7 +133,7 @@ impl World {
     }
 
     /// Everything a collider touches ends now, and wakes: what rested on it has to find out.
-    fn end_touches(&mut self, collider: u32) {
+    pub(crate) fn end_touches(&mut self, collider: u32) {
         let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
         while pair != NONE {
             let row = pair as usize;

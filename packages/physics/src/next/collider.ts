@@ -3,6 +3,8 @@ import { MargoError } from '@margoengine/math/errors';
 import { COLLIDER_OFF, COLLIDER_SENSOR, COLLIDER_TYPES, COLLIDER_TYPES_SHIFT, type KernelWorld } from '../kernel.js';
 import { DEFAULT_PAIR_KINDS, type CollisionPairKind } from '../shapes.js';
 import type { ColliderShape } from '../collider.js';
+import { checkVec, type Quat, type Vec3 } from '../math.js';
+import type { ColliderOptions } from '../shapes.js';
 import type { PhysicsBody } from './body.js';
 
 /** A cell coordinate, checked: a whole number in 32 bits. */
@@ -51,8 +53,10 @@ export class PhysicsCollider {
     /** The body this collider belongs to. */
     readonly body: PhysicsBody,
     /** What it is, as named in its options. */
-    readonly shape: ColliderShape,
+    public shape: ColliderShape,
   ) {}
+  /** @internal Set by the world: rebuilds this collider's shape from options. */
+  reshape: ((options: ColliderOptions) => void) | null = null;
   /** False once the collider or its body was removed. */
   get valid(): boolean {
     return !this.removed;
@@ -87,6 +91,34 @@ export class PhysicsCollider {
     const box = this.kernel.colliderAabb(this.handle);
     if (!box) throw new MargoError('state', 'Collider is not in the world yet; step the world once after adding it.');
     return { min: box[0], max: box[1] };
+  }
+  /**
+   * Gives the collider another shape, with its offset and rotation in the body's frame as `options` say (zero and none when
+   * it leaves them out). Friction, groups, events and the other settings stay. What it touched ends, and the body's mass is
+   * worked out again from its density (`mass` or `density` in `options` replaces it). A compound cannot be made or changed
+   * this way: remove the collider and add one.
+   * @throws MargoError (`unsupported`, `state`) for a shape the solver does not hold or a collider that was removed.
+   */
+  setShape(options: ColliderOptions): this {
+    this.columns();
+    if (!this.reshape) throw new MargoError('state', 'This collider cannot change shape.');
+    this.reshape(options);
+    return this;
+  }
+  /** Moves the collider in its body's frame, and works the body's mass out again. */
+  setTranslationWrtParent(position: Vec3): this {
+    checkVec(position, 'Collider position');
+    const c = this.columns(),
+      h = this.handle;
+    this.kernel.setColliderPose(h, position, [c.colliderRotationX[h], c.colliderRotationY[h], c.colliderRotationZ[h], c.colliderRotationW[h]]);
+    return this;
+  }
+  /** Turns the collider in its body's frame by a unit quaternion [x, y, z, w], and works the body's mass out again. */
+  setRotationWrtParent(rotation: Quat): this {
+    const c = this.columns(),
+      h = this.handle;
+    this.kernel.setColliderPose(h, [c.colliderX[h], c.colliderY[h], c.colliderZ[h]], rotation);
+    return this;
   }
   isSensor(): boolean {
     return (this.columns().colliderFlags[this.handle] & COLLIDER_SENSOR) !== 0;

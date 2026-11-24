@@ -131,6 +131,8 @@ interface KernelExports extends WebAssembly.Exports {
   voxels_combine(a: number, b: number, sx: number, sy: number, sz: number): number;
   voxels_propagate(a: number, b: number, x: number, y: number, z: number, sx: number, sy: number, sz: number): number;
   query_buffer(): number;
+  collider_set_shape(collider: number, shape: number, a: number, b: number, c: number): number;
+  collider_set_pose(collider: number, x: number, y: number, z: number, qx: number, qy: number, qz: number, qw: number): number;
   collider_aabb(collider: number): number;
   query_aabb(lx: number, ly: number, lz: number, hx: number, hy: number, hz: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
   collider_ray(collider: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number): number;
@@ -1220,6 +1222,32 @@ export class KernelWorld {
     if (!this.api.collider_aabb(collider)) return null;
     const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 6);
     return [[f[0]!, f[1]!, f[2]!], [f[3]!, f[4]!, f[5]!]];
+  }
+  /**
+   * Gives a live collider another shape, as {@link KernelWorld.addCollider} takes `shape` and `size`: what it touched ends,
+   * its border goes and the body's mass is worked out again, so read views from `columns` after this call.
+   * @throws RangeError for a collider that is gone or a compound, or a shape or size the kernel cannot use.
+   */
+  setColliderShape(collider: number, shape: KernelShape, size: readonly number[]): void {
+    const spec = Object.hasOwn(shapes, shape) ? shapes[shape] : undefined;
+    if (!spec) throw new RangeError(`Unknown shape ${String(shape)}; use one of ${Object.keys(shapes).join(', ')}.`);
+    this.checkSize(shape, size);
+    if (!this.api.collider_set_shape(collider, spec[0], size[0] ?? 0, size[1] ?? 0, size[2] ?? 0))
+      throw new RangeError(`Row ${collider} holds no collider that can change shape (a compound cannot); use a row addCollider returned.`);
+  }
+  /** Gives a box or hull a border (see {@link KernelColliderOptions.border}). @throws RangeError for a collider that cannot have one. */
+  setColliderBorder(collider: number, border: number): void {
+    if (!this.api.collider_set_border(collider, border))
+      throw new RangeError(`Row ${collider} holds no box or hull that can have a border of ${border}; use a row addCollider returned and a border of 0 or more.`);
+  }
+  /**
+   * Moves a live collider in its body's frame and works the body's mass out again.
+   * @throws RangeError for a collider that is gone, a position that is not finite or a rotation that is not a unit quaternion.
+   */
+  setColliderPose(collider: number, position: readonly number[], rotation: readonly number[]): void {
+    this.checkPose(position, rotation);
+    if (!this.api.collider_set_pose(collider, position[0]!, position[1]!, position[2]!, rotation[0]!, rotation[1]!, rotation[2]!, rotation[3]!))
+      throw new RangeError(`Row ${collider} holds no collider; use a row addCollider returned.`);
   }
   /** The collider rows whose tight box meets the box `low` to `high`, in row order. @throws RangeError for a box that is not finite or is inside out. */
   intersectAabb(low: readonly number[], high: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {

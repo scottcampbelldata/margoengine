@@ -428,6 +428,65 @@ impl World {
         Some(row)
     }
 
+    /// Gives a live collider another shape: a size for a ball, box, capsule, cylinder, cone or half space, or a hull or mesh
+    /// row in `size[0]`. The border goes, what it touched ends and the body's mass is worked out again. False for a collider
+    /// that is gone or is, or would become, a compound, or a shape the kernel does not hold.
+    pub fn set_collider_shape(&mut self, collider: u32, shape: u32, size: [f32; 3]) -> bool {
+        let at = collider as usize;
+        let held = matches!(shape, SHAPE_BALL | SHAPE_BOX | SHAPE_CAPSULE | SHAPE_HULL | SHAPE_TRIMESH | SHAPE_CYLINDER | SHAPE_CONE | SHAPE_HALFSPACE);
+        if collider >= self.header().collider_rows
+            || self.uu(COLLIDER_STATE, at) & REMOVED != 0
+            || self.uu(COLLIDER_STATE, at) & (IN_BROAD | PENDING) == 0
+            || self.uu(COLLIDER_SHAPE, at) == SHAPE_COMPOUND
+            || !held
+            || !size.iter().all(|v| v.is_finite())
+        {
+            return false;
+        }
+        self.end_touches(collider);
+        self.set_u(COLLIDER_SHAPE, at, shape);
+        self.set_s(COLLIDER_BORDER, at, 0.0);
+        if shape == SHAPE_HULL || shape == SHAPE_TRIMESH {
+            self.set_u(COLLIDER_HULL, at, size[0] as u32);
+            self.set_s(COLLIDER_A, at, 0.0);
+            self.set_s(COLLIDER_B, at, 0.0);
+            self.set_s(COLLIDER_C, at, 0.0);
+        } else {
+            self.set_s(COLLIDER_A, at, size[0]);
+            self.set_s(COLLIDER_B, at, size[1]);
+            self.set_s(COLLIDER_C, at, size[2]);
+        }
+        self.mark_pending(collider);
+        self.update_mass(self.uu(COLLIDER_BODY, at));
+        self.wake(self.uu(COLLIDER_BODY, at));
+        true
+    }
+
+    /// Moves a live collider in its body's frame (see `api::collider_set_pose`). False for a collider that is gone, a turn
+    /// that is not a unit quaternion or numbers that are not finite.
+    pub fn set_collider_pose(&mut self, collider: u32, position: [f32; 3], rotation: [f32; 4]) -> bool {
+        let at = collider as usize;
+        let length = rotation.iter().map(|v| v * v).sum::<f32>();
+        if collider >= self.header().collider_rows
+            || self.uu(COLLIDER_STATE, at) & REMOVED != 0
+            || self.uu(COLLIDER_STATE, at) & (IN_BROAD | PENDING) == 0
+            || !position.iter().chain(rotation.iter()).all(|v| v.is_finite())
+            || !(0.99..=1.01).contains(&length)
+        {
+            return false;
+        }
+        for k in 0..3 {
+            self.set_s(COLLIDER_X + k, at, position[k]);
+        }
+        for k in 0..4 {
+            self.set_s(COLLIDER_ROTATION_X + k, at, rotation[k]);
+        }
+        self.mark_pending(collider);
+        self.update_mass(self.uu(COLLIDER_BODY, at));
+        self.wake(self.uu(COLLIDER_BODY, at));
+        true
+    }
+
     /// Sets a box's or hull's border (see `api::collider_set_border`).
     pub fn set_collider_border(&mut self, collider: u32, border: f32) -> bool {
         let at = collider as usize;

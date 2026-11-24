@@ -274,6 +274,9 @@ export class KernelWorld {
     intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null;
+    setColliderShape(collider: number, shape: KernelShape, size: readonly number[]): void;
+    setColliderBorder(collider: number, border: number): void;
+    setColliderPose(collider: number, position: readonly number[], rotation: readonly number[]): void;
     intersectAabb(low: readonly number[], high: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     colliderRay(collider: number, origin: readonly number[], direction: readonly number[], max: number, solid: boolean): KernelRayHit | null;
     colliderProject(collider: number, point: readonly number[], solid: boolean): KernelProjection | null;
@@ -472,7 +475,7 @@ export class PhysicsBody {
 export class PhysicsCollider {
     readonly handle: number;
     readonly body: PhysicsBody;
-    readonly shape: ColliderShape;
+    shape: ColliderShape;
     emits: boolean;
     forceEvents: boolean;
     forceThreshold: number;
@@ -480,6 +483,7 @@ export class PhysicsCollider {
     handle: number,
     body: PhysicsBody,
     shape: ColliderShape);
+    reshape: ((options: ColliderOptions) => void) | null;
     get valid(): boolean;
     markRemoved(): void;
     get boundingRadius(): number | null;
@@ -487,6 +491,9 @@ export class PhysicsCollider {
         min: [number, number, number];
         max: [number, number, number];
     };
+    setShape(options: ColliderOptions): this;
+    setTranslationWrtParent(position: Vec3): this;
+    setRotationWrtParent(rotation: Quat): this;
     isSensor(): boolean;
     setSensor(sensor: boolean): this;
     isEnabled(): boolean;

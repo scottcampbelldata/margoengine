@@ -261,6 +261,17 @@ pub extern "C" fn collider_add(
 pub extern "C" fn collider_set_border(collider: u32, border: f32) -> u32 {
     world().set_collider_border(collider, border) as u32
 }
+/// Gives a live collider another shape (see `World::set_collider_shape`), `a`, `b`, `c` as `collider_add` takes them; false
+/// when it cannot.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_set_shape(collider: u32, shape: u32, a: f32, b: f32, c: f32) -> u32 {
+    world().set_collider_shape(collider, shape, [a, b, c]) as u32
+}
+/// Moves a live collider in its body's frame; false when it cannot.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_set_pose(collider: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> u32 {
+    world().set_collider_pose(collider, [x, y, z], [qx, qy, qz, qw]) as u32
+}
 /// Adds a convex child to a compound collider, placed in the compound's frame: its row, or -1 when the rows are used up,
 /// the compound is gone or the shape is not a ball, box, capsule or hull.
 #[unsafe(no_mangle)]

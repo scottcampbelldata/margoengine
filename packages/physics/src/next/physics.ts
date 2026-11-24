@@ -693,6 +693,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.solverGroups !== undefined) this.kernel.columns.colliderSolverGroups[row] = options.solverGroups;
     if (options.sensor || options.enabled === false)
       this.kernel.setColliderState(row, (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0));
+    collider.reshape = (next) => this.reshapeCollider(body, collider, next);
     collider.emits = options.events ?? true;
     collider.forceEvents = options.contactForceEvents ?? true;
     collider.forceThreshold = options.contactForceThreshold ?? 0;
@@ -705,6 +706,30 @@ export class Physics implements EnginePlugin, BodyOwner {
     body.colliders.push(collider);
     this.byRow.set(row, collider);
     return collider;
+  }
+  /** @internal use `collider.setShape`. */
+  private reshapeCollider(body: PhysicsBody, collider: PhysicsCollider, options: ColliderOptions): void {
+    const { mesh } = body,
+      fitted =
+        (options.shape === 'box' && !options.halfExtents) ||
+        (options.shape === 'sphere' && options.radius === undefined) ||
+        (options.shape === 'convexHull' && !options.points && !options.vertices && !options.geometry),
+      fit =
+        mesh && fitted
+          ? colliderGeometry(mesh, body.fitScale)
+          : { geometry: null, scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const) };
+    if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
+    const { name, shape, size, parts, options: placed } = kernelCollider(options, fit, this.hulls);
+    if (parts) throw new MargoError('unsupported', 'A collider cannot become a compound; remove it and add a compound collider to the body.');
+    const row = collider.handle;
+    this.kernel.setColliderShape(row, shape as KernelShape, size);
+    this.kernel.setColliderPose(row, placed.position ?? [0, 0, 0], placed.rotation ?? [0, 0, 0, 1]);
+    if (placed.border) this.kernel.setColliderBorder(row, placed.border);
+    if (options.mass !== undefined || options.density !== undefined || options.massless) {
+      this.kernel.columns.colliderDensity[row] = placed.density ?? 0;
+      this.kernel.updateMass(body.row);
+    }
+    collider.shape = name;
   }
   /** @internal use `body.removeCollider`. */
   removeCollider(body: PhysicsBody, collider: PhysicsCollider): void {
