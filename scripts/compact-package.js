@@ -11,14 +11,25 @@ import { distDir } from './support/dist-dir.mjs';
 // /private/var/folders/...), so both sides of the shared-helper test are compared as real paths.
 const real = (path) => (existsSync(path) ? realpathSync(path) : path);
 
-export async function compactPackage(name, directory = `packages/${name}`, dist = distDir(directory)) {
+/**
+ * `list` reads the build folder's file names (tests swap it). The names are sorted by code unit because the order of the
+ * library entries decides how rolldown orders the shared imports and names the locals, so it changes the bytes, and a
+ * directory listing's order belongs to the file system, not to Node (NTFS collates names case-insensitively, so `_`
+ * and capitals already sort differently there than by code unit). tests/compact-package-order.test.js (KB-SIZE-PLATFORM1).
+ */
+export async function compactPackage(
+  name,
+  directory = `packages/${name}`,
+  dist = distDir(directory),
+  { list = readdir } = {},
+) {
   const root = resolve(dist),
     // Every packages/shared helper core and the stage import is bundled into them (shared is not published, so a
     // ../../shared import left in dist breaks an installed package; tests/dts-self-contained.test.js). Everything else stays
     // an import. A fixed list once missed the stage's glTF route and lights helpers.
     sharedDir = real(resolve(directory, '../shared')),
     isShared = (path) => dirname(real(path)) === sharedDir,
-    files = (await readdir(root)).filter((file) => file.endsWith('.js'));
+    files = (await list(root)).filter((file) => file.endsWith('.js')).sort();
   for (const file of files)
     await writeFile(
       `${root}/${file}`,
@@ -43,8 +54,7 @@ export async function compactPackage(name, directory = `packages/${name}`, dist 
       },
       rollupOptions: {
         external: (id, importer) =>
-          !!importer &&
-          ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
+          !!importer && ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
         output: { ...compactOutput, comments: { annotation: true } },
       },
     },
