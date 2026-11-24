@@ -195,7 +195,7 @@ fn terrainDisplace(position:vec3f,normal:vec3f)->vec3f {
   }
   var hit=d1;if(f1>=0.0&&f1>f0){hit=d0+(d1-d0)*(-f0)/(f1-f0);}
   let p=position+ray*hit;terrainDisplaced=true;
-  let l=normalize(frame.light.xyz);terrainDisplaceLift=p+l*max(dot(position-p,normal),0.0)/max(dot(l,normal),0.05);${shadows ? 'terrainDisplaceShadow=terrainDisplaceSunArea(p,normal,depth);' : ''}
+  let l=frame.light.xyz;terrainDisplaceLift=p+l*max(dot(position-p,normal),0.0)/max(dot(l,normal),0.05);${shadows ? 'terrainDisplaceShadow=terrainDisplaceSunArea(p,normal,depth);' : ''}
   return p;
 }`;
 /** Builds one level of the maximum mipmap: level 0 from the surface maps' height (alpha), the rest from the level below. */

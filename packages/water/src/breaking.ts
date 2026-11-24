@@ -445,7 +445,7 @@ fn shade(i:Out,s:Surface)->Surface {
  let through=exp(-sigma*thick);
  let back=uniforms.waveScatter.rgb+mud*0.02*vec3f(0.55,0.42,0.3);
  let body=back*(1.0-through*0.5);
- let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);
+ let v=normalize(f.eye.xyz-i.position);let l=f.light.xyz;
  let phase=waveHG(dot(v,-l),uniforms.waveLook.z)*12.566371;
  let lit=through*f.radiance.rgb*phase*uniforms.waveLook.y*(1.0-white);
  o.base=vec4f(mix(body,uniforms.waveFoam.rgb,white),o.base.a);
