@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17364587,
+  "total": 17381685,
   "history": [
     {
       "date": "2026-10-24",
@@ -11295,6 +11295,18 @@
       "commit": "f3865d702d",
       "reason": "vfx/flame 11877 to 11997 B: blackbodyLuminousEfficacy, flameLuminousFlux and heskestadHeat, the luminous flux a fire emits; a split entry would cost a second import for one function",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "d9b20115ba",
+      "reason": "xr/occlusion: new optional entry, AR occlusion by real depth (2942 B gzip); xr 9909 to 9946 B: eye targets carry the scene depth and binding. Also records physics/next 188444 to 188914 B as measured on origin/main d9b20115ba (grown by the physics kernel commits there without a size record)",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "6237d1e861",
+      "reason": "physics/next 194582 to 196124 B as measured on origin/main 6237d1e861: physics commits there grew it without a size record",
+      "grew": 1
     }
   ],
   "items": {
@@ -12054,7 +12066,7 @@
     "@margoengine/physics base (without Rapier solver JavaScript)": 20430,
     "@margoengine/physics lazy Rapier solver JavaScript": 41104,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/next": 188444,
+    "@margoengine/physics/next": 202008,
     "@margoengine/physics2d": 45639,
     "@margoengine/physics2d base (without Rapier 2D solver JavaScript)": 8679,
     "@margoengine/physics2d lazy Rapier 2D solver JavaScript": 37086,
@@ -12810,7 +12822,7 @@
     "@margoengine/worker/auto": 4176,
     "@margoengine/worker/canvas": 2049,
     "@margoengine/worker/rpc": 2408,
-    "@margoengine/xr": 9909,
+    "@margoengine/xr": 10245,
     "@margoengine/xr/ar": 2828,
     "@margoengine/xr/ar-extra": 3289,
     "@margoengine/xr/device-check": 2344,
@@ -12819,6 +12831,7 @@
     "@margoengine/xr/layers": 4353,
     "@margoengine/xr/locomotion": 3390,
     "@margoengine/xr/models": 3600,
+    "@margoengine/xr/occlusion": 3198,
     "@margoengine/xr/performance": 1582,
     "@margoengine/xr/pointer": 2675,
     "leak @margoengine/animation -> @margoengine/gltf/pbr-model": 1,

@@ -96,8 +96,8 @@ export interface XRNativeSession extends EventTarget {
     /** The projection layer, and with the WebXR Layers module any composition layers around it. */
     layers?: readonly object[];
     baseLayer?: unknown;
-  /** Runtime foveation, from zero to one; null or absent when unsupported. */
-  fixedFoveation?: number | null;
+    /** Runtime foveation, from zero to one; null or absent when unsupported. */
+    fixedFoveation?: number | null;
     depthNear?: number;
     depthFar?: number;
   }): void;
@@ -142,6 +142,23 @@ export interface XRBinding {
   projection?(view: XRView): ArrayLike<number>;
   /** Shows the frame's sub-images, on a binding that does not draw straight into the session's layer. */
   present?(layer: XRProjectionLayer): void;
+  /**
+   * GPU-optimized depth for `view` (WebXR Depth Sensing Module, XRGPUDepthInformation), on a session started with
+   * usagePreference ['gpu-optimized']; null while the device has none this frame.
+   */
+  getDepthInformation?(view: XRView): XRGPUDepthLike | null;
+}
+/** The browser's XRGPUDepthInformation, as far as Margo reads it: an r32float or r16uint texture valid this frame. */
+export interface XRGPUDepthLike {
+  readonly width: number;
+  readonly height: number;
+  readonly rawValueToMeters: number;
+  readonly normDepthBufferFromNormView: { readonly matrix: Float32Array };
+  readonly texture: GPUTexture;
+  getViewDescriptor?(): GPUTextureViewDescriptor;
+  /** XRViewGeometry of the sensor, where it differs from the view. */
+  readonly projectionMatrix?: Float32Array;
+  readonly transform?: { readonly matrix: Float32Array; readonly inverse: { readonly matrix: Float32Array } };
 }
 /** One input source with its target-ray and grip poses. */
 export interface XRInputPose {

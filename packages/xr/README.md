@@ -180,6 +180,35 @@ enter.onclick=async()=>{
 
 Each `create` throws a coded error naming the feature to ask for when the session lacks it.
 
+## AR occlusion by real depth
+
+`@margoengine/xr/occlusion` hides the scene where the real world is in front of it, so a virtual box behind a real chair disappears behind the chair. It reads the session's depth sensing each frame and runs one full-screen pass per eye after the scene draws, on both XR routes and on the WebGL2 layer.
+
+- CPU-optimized depth (`DEPTH_SENSING`, `float32`, `unsigned-short` or `luminance-alpha`) is uploaded to a small texture each frame; GPU-optimized depth (`usagePreference: ['gpu-optimized']`, `float32` or `unsigned-short`) is read where the browser leaves it, with no copy.
+- Each drawn sample of the eye's depth becomes a point, carried into the depth sensor's own view (its pose and projection when they differ from the eye's), and compared with the real depth there. Pixels with no depth (0, invalid) hide nothing.
+- `feather` (metres, default `0.05`) fades a surface from shown to hidden around equal depth, which hides the sensor's noise along the contact line; `0` gives a hard edge. `enabled = false` skips the pass.
+- Content that writes no depth has nothing to compare and is kept: a `Line` needs `depthWrite: true` to be hidden. A pixel with colour but no depth sample of its own (the antialiased fringe of a line or an edge) takes its neighbours' verdict.
+
+```ts
+import {Engine,PbrMaterial,box} from 'margoengine/core';
+import {XR} from 'margoengine/xr';
+import {DEPTH_SENSING} from 'margoengine/xr/ar';
+import {AROcclusion} from 'margoengine/xr/occlusion';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+engine.createMesh().setGeometry(box(0.3,0.3,0.3)).setMaterial(new PbrMaterial({color:'#e8a04f'})).setPosition([0,0,-1.5]);
+const xr=await XR.create(engine);
+const enter=document.createElement('button');enter.textContent='Enter AR';document.body.append(enter);
+enter.onclick=async()=>{
+  await xr.requestSession('immersive-ar',{requiredFeatures:['depth-sensing'],init:{depthSensing:DEPTH_SENSING}});
+  const occlusion=AROcclusion.create(xr,{feather:0.05});
+  // occlusion.enabled=false shows the scene over everything again; occlusion.dispose() stops it.
+};
+```
+
+`AROcclusion.create` throws `state` without a session and `unsupported` when the session has no depth sensing, or has GPU depth in `luminance-alpha`, which WebGPU cannot read. Tested with stand-in sessions on real GPUs (`npm run test:gpu:occlusion`); not yet run on an AR device.
+
 ## Layers, haptics, video and locomotion
 
 `@margoengine/xr/layers` adds WebXR composition layers, controller vibration and teleport movement. Layers are drawn by the headset's compositor at their own resolution, so text and video stay sharp. Ask for `optionalFeatures: ['layers']`.

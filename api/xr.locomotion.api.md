@@ -40,6 +40,19 @@ interface XRAnchor {
     delete(): void;
 }
 
+interface XRBinding {
+    getPreferredColorFormat(): GPUTextureFormat;
+    createProjectionLayer(init: {
+        colorFormat: GPUTextureFormat;
+        depthStencilFormat: GPUTextureFormat;
+        scaleFactor?: number;
+    }): XRProjectionLayer;
+    getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
+    projection?(view: XRView): ArrayLike<number>;
+    present?(layer: XRProjectionLayer): void;
+    getDepthInformation?(view: XRView): XRGPUDepthLike | null;
+}
+
 interface XRCompositionLayer {
     readonly layout?: string;
     readonly needsRedraw?: boolean;
@@ -48,12 +61,21 @@ interface XRCompositionLayer {
     destroy(): void;
 }
 
+interface XREyeSceneDepth {
+    readonly texture: GPUTexture;
+    readonly projection: ArrayLike<number>;
+    readonly origin: readonly [number, number];
+    readonly clear: number;
+}
+
 interface XREyeTarget {
     readonly index: number;
     readonly device: GPUDevice;
     readonly encoder: GPUCommandEncoder;
     readonly image: XRSubImage;
     readonly view: XRView;
+    readonly scene?: XREyeSceneDepth;
+    readonly binding?: XRBinding;
 }
 
 interface XRFrameState {
@@ -62,6 +84,24 @@ interface XRFrameState {
     frame: XRNativeFrame;
     viewer: XRViewerPose | null;
     inputs: XRInputPose[];
+}
+
+interface XRGPUDepthLike {
+    readonly width: number;
+    readonly height: number;
+    readonly rawValueToMeters: number;
+    readonly normDepthBufferFromNormView: {
+        readonly matrix: Float32Array;
+    };
+    readonly texture: GPUTexture;
+    getViewDescriptor?(): GPUTextureViewDescriptor;
+    readonly projectionMatrix?: Float32Array;
+    readonly transform?: {
+        readonly matrix: Float32Array;
+        readonly inverse: {
+            readonly matrix: Float32Array;
+        };
+    };
 }
 
 interface XRHitTestResult {
@@ -176,6 +216,12 @@ interface XRPose {
         };
     };
     emulatedPosition: boolean;
+}
+
+interface XRProjectionLayer {
+    baseLayer?: unknown;
+    fixedFoveation?: number | null;
+    destroy(): void;
 }
 
 interface XRRayLike {

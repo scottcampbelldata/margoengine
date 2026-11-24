@@ -152,7 +152,8 @@ export class StereoRenderer {
           resource.count * 24,
         );
     }
-    const encoder = device.createCommandEncoder();
+    const encoder = device.createCommandEncoder(),
+      discards: Array<() => void> = [];
     for (let eye = 0; eye < viewer.views.length; eye++) {
       const view = viewer.views[eye],
         image = binding.getViewSubImage(layer, view),
@@ -240,7 +241,14 @@ export class StereoRenderer {
       });
       if (layers !== undefined) {
         const box = image.viewport;
-        frame.view = { id: `xr-${eye}`, camera, viewport: [box.x, box.y, box.width, box.height], index: eye, count: viewer.views.length, layers };
+        frame.view = {
+          id: `xr-${eye}`,
+          camera,
+          viewport: [box.x, box.y, box.width, box.height],
+          index: eye,
+          count: viewer.views.length,
+          layers,
+        };
       }
       const context = {
         ...this.context!,
@@ -343,15 +351,30 @@ export class StereoRenderer {
       depthPass.setBindGroup(0, frame.depthGroup!);
       depthPass.draw(3);
       depthPass.end();
-      encoder
-        .beginRenderPass({
-          colorAttachments: [],
-          depthStencilAttachment: { view: frame.depthView!, depthLoadOp: 'load', depthStoreOp: 'discard' },
-        })
-        .end();
+      // The multisampled eye depth is not needed after the frame: let a tiled GPU drop it, after any eye effect read it.
+      const discard = () =>
+        encoder
+          .beginRenderPass({
+            colorAttachments: [],
+            depthStencilAttachment: { view: frame.depthView!, depthLoadOp: 'load', depthStoreOp: 'discard' },
+          })
+          .end();
+      if (onEye) discards.push(discard);
+      else discard();
     }
-    if (onEye) for (const [index, view] of viewer.views.entries())
-      if (onEye({ index, device, encoder, image: binding.getViewSubImage(layer, view), view }) === false) return;
+    if (onEye)
+      for (const [index, view] of viewer.views.entries()) {
+        const image = binding.getViewSubImage(layer, view),
+          frame = this.eyes[index];
+        const scene = {
+          texture: frame.depth!,
+          projection: binding.projection?.(view) ?? view.projectionMatrix,
+          origin: [image.viewport.x, image.viewport.y] as const,
+          clear: 1,
+        };
+        if (onEye({ index, device, encoder, image, view, scene, binding }) === false) return;
+      }
+    for (const discard of discards) discard();
     device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
   }

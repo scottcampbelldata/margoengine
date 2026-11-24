@@ -85,6 +85,7 @@ export interface XRBinding {
     getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
     projection?(view: XRView): ArrayLike<number>;
     present?(layer: XRProjectionLayer): void;
+    getDepthInformation?(view: XRView): XRGPUDepthLike | null;
 }
 
 export class XRController {
@@ -115,6 +116,8 @@ export interface XREyeTarget {
     readonly encoder: GPUCommandEncoder;
     readonly image: XRSubImage;
     readonly view: XRView;
+    readonly scene?: XREyeSceneDepth;
+    readonly binding?: XRBinding;
 }
 
 export interface XRFrameState {
@@ -317,4 +320,31 @@ export interface XRViewerPose extends XRPose {
 export function createXREngine(canvas: HTMLCanvasElement, options?: Omit<EngineOptions, 'backend'>): Promise<EngineKernel>;
 
 export function useXRSession(manager: XR, mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
+
+// Not exported from this entry, but used by the exports above:
+
+interface XREyeSceneDepth {
+    readonly texture: GPUTexture;
+    readonly projection: ArrayLike<number>;
+    readonly origin: readonly [number, number];
+    readonly clear: number;
+}
+
+interface XRGPUDepthLike {
+    readonly width: number;
+    readonly height: number;
+    readonly rawValueToMeters: number;
+    readonly normDepthBufferFromNormView: {
+        readonly matrix: Float32Array;
+    };
+    readonly texture: GPUTexture;
+    getViewDescriptor?(): GPUTextureViewDescriptor;
+    readonly projectionMatrix?: Float32Array;
+    readonly transform?: {
+        readonly matrix: Float32Array;
+        readonly inverse: {
+            readonly matrix: Float32Array;
+        };
+    };
+}
 ```
