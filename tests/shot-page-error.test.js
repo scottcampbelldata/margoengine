@@ -71,6 +71,18 @@ function standIn({ throws = null, asks = true, driver = {} } = {}) {
   return { page, server: { config: { server: { port: 5193 } } }, hardware: { webgpu: { vendor: 'test' } } };
 }
 
+// An engine with an empty scene graph: the measure reads it for the scene record (scene-record.mjs).
+const emptyScene = () => ({
+  meshes: new Map(),
+  plugins: new Map(),
+  stats: { drawCalls: 0, visible: 0 },
+  lighting: {
+    direction: new Float32Array([3, 5, 4, 3]),
+    radiance: new Float32Array([1, 1, 1, 0.15]),
+    ambient: new Float32Array([1, 1, 1]),
+  },
+});
+
 const within = async (ms, promise) => {
   const started = Date.now();
   await promise;
@@ -100,7 +112,7 @@ test('a measure fails at once with the page error, the same way', { timeout: 500
 
 test("a measure gives the camera's clip planes and the ground under every kept frame's camera and target", async () => {
   const driver = {
-    shotScene: { engine: { camera: { near: 0.5, far: 40000 } } },
+    shotScene: { engine: { camera: { near: 0.5, far: 40000 }, scene: emptyScene() } },
     page: { height: (x, z) => x * 0.5 + z },
   };
   const m = await measureOpen(standIn({ driver }), shotFile({ ground: 'page.height' }));
@@ -113,6 +125,13 @@ test("a measure gives the camera's clip planes and the ground under every kept f
   assert.ok(m.cameras.every((c) => c.ground[0] >= 5 && c.ground[0] <= 10 && c.ground[1] === 0));
   assert.deepEqual(m.errors, []);
   assert.equal(m.subjectGround, null, 'the shot names no subject');
+  assert.equal(m.version, 2);
+  assert.equal(m.scene.version, 1, 'the measure carries the scene record');
+  assert.deepEqual(
+    m.loaded,
+    ['/asset-library/fauld/a b.glb', '/tools/shot/test/scene.html'],
+    'and what the page loaded',
+  );
   const s = await measureOpen(
     standIn({ driver }),
     shotFile({ ground: 'page.height' }, { subject: { target: [4, 1, 2], size: 2 } }),
@@ -121,7 +140,7 @@ test("a measure gives the camera's clip planes and the ground under every kept f
 });
 
 test('a shot without page.ground measures world heights, and a page ground that is not a function fails', async () => {
-  const driver = { shotScene: { engine: { camera: { near: 0.1, far: 1000 } } } };
+  const driver = { shotScene: { engine: { camera: { near: 0.1, far: 1000 }, scene: emptyScene() } } };
   const m = await measureOpen(standIn({ driver }), shotFile());
   assert.equal(m.heights, 'world');
   assert.ok(m.cameras.every((c) => c.ground === null));

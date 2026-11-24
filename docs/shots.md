@@ -207,6 +207,36 @@ target]` from the page's ground function, `subjectGround` the ground under `shot
 height over the ground, the near clip and the page loading with no error on the current build. It exits 1 naming
 the page's error. It writes no picture.
 
+The measure (`version` 2) also carries `loaded`, every file the page loaded from its own origin (URL paths, as a
+stills render records them), and `scene`, the scene record a film pipeline's scene audit judges
+(`tools/shot/scene-record.mjs`). The record is read from the page engine's own scene graph after the warm-up, never
+from a report the page writes, so every page gets it with no page code:
+
+- `lights`: the scene's sun (`direction`, `intensity`, linear `colour`) and ambient (`intensity` and the colour of
+  the ambient term, the sun colour times `scene.lighting.ambient`), each with its correlated colour `temperature` in
+  Kelvin by McCamy's cubic (null for a neutral grey or black colour).
+- `plugins`: every plugin attached to the scene, in attach order: `name`, `enabled` when the plugin has one, the
+  plain values of its `options` (or `settings`) object one level deep (a function option reads `'function'`), the
+  size and format of the GPU textures it keeps in a `textures` field, and the `effects` of a post stack, each recorded
+  the same way. Post strengths (bloom, tonemap exposure, vignette, grain and fringing, lens flare), the depth of field
+  lens (`dof`: `aperture`, `focalDistance`, `focalLength`), fog, sky and terrain extents are read from here.
+- `meshes`: every mesh of the scene with geometry or a glTF model behind it: `name`, `visible`, `kind` (`core` or
+  `model`), `triangles` (instances counted), `vertices`, `lods` (the levels of its `MSFT_lod`, 1 without),
+  `tangents` (true when every primitive that draws a normal map has a `TANGENT` attribute; null for core meshes),
+  `materials` (indices into `materials`), `bounds` (world box, metres) and `ground`, the page ground under the box's
+  base at its centre and at four points `GROUND_STEP` (0.5 m) out toward its corners (null without
+  `shot.page.ground`).
+- `materials`: core and glTF materials by identity: base `colour`, `roughness`, `metalness`, `doubleSided`,
+  `alphaMode`, `ior` and `specular` (`KHR_materials_ior` and `KHR_materials_specular`, glTF defaults 1.5 and 1), the
+  glTF `extensions` it uses and its `maps` (slot, texture size, GPU format and label). The values are the ones the
+  model draws with, so a change made in code after loading is what is measured.
+- `drawCalls` and `visible`: the scene's counts of its last drawn frame.
+
+Sources: C. S. McCamy, "Correlated color temperature as an explicit function of chromaticity coordinates", Color
+Research and Application 17(2), 1992, https://doi.org/10.1002/col.5080170211; The Khronos Group, glTF 2.0
+specification (metallic-roughness material, alpha modes, TANGENT and MSFT_lod), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html;
+KHR_materials_ior and KHR_materials_specular, https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos.
+
 ## Masks (AOVs)
 
 A shot that lists `aovs` writes one 8-bit grey PNG per mask beside every kept frame, `aovs/<name>/frame_NNNN.png`,
