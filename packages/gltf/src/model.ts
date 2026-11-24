@@ -10,7 +10,7 @@ import {
 import { markedClipDistances } from '../../shared/section.js';
 import { currentMaterialDraw, runMaterialDraw, inheritMaterialDraw } from './material-draw-state.js';
 import type { GLTFPrimitive, GLTFMesh, GLTFNode, GLTFMaterial, GLTFTextureInfo } from '../../shared/gltf.js';
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, Mesh as PublicMesh } from '@margoengine/core';
 import {
   engineRuntime,
   type Engine,
@@ -2236,6 +2236,12 @@ function outsideView(planes: Float32Array | undefined, p: PBRPrimitive): boolean
   return false;
 }
 /**
+ * A node of a {@link PBRModel}: the engine's mesh, also the public `Mesh` that `engine.createMesh()` returns, so either
+ * parents the other without a cast (KB-GLTF-MESHTYPE1).
+ */
+export type ModelNode = Mesh & PublicMesh;
+
+/**
  * A glTF model attached to an engine as a plugin: its nodes, materials, variants, animation targets and picking data. Dispose it to release the GPU resources.
  */
 export class PBRModel implements EnginePlugin {
@@ -2255,8 +2261,13 @@ export class PBRModel implements EnginePlugin {
     for (const model of models ?? []) model.draw(context, 'beauty', context.color, context.depth, 'blend');
   }
   readonly name = 'gltf/pbr:' + modelId++;
-  readonly root: Mesh;
-  readonly nodes: Mesh[] = [];
+  /**
+   * The model's root and its glTF nodes in file order. Typed as both of core's Mesh types (one object at run time), so
+   * `model.root.setParent(engine.createMesh())` and `engine.createMesh().setParent(model.root)` need no cast
+   * (KB-GLTF-MESHTYPE1).
+   */
+  readonly root: ModelNode;
+  readonly nodes: ModelNode[] = [];
   readonly primitives: PBRPrimitive[] = [];
   /**
    * The nodes that draw the model's triangle `primitives`, each once, in primitive order: the meshes `@margoengine/gltf`'s

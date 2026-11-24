@@ -5,7 +5,7 @@
 ```ts
 import { Clustered, PointLight } from "@margoengine/clustered";
 import { IESLights, IESProfile } from "@margoengine/clustered/ies";
-import { EngineKernel } from "@margoengine/core";
+import { EngineKernel, Mesh } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, TranscodedKTX2Result } from "@margoengine/decoders";
 import { CubeFaces, Environment, EnvironmentBackground, EnvironmentLighting } from "@margoengine/environment";
@@ -832,6 +832,8 @@ interface MaterialExtensionTexture {
 
 type MaterialSide = 'front' | 'back' | 'double';
 
+type ModelNode = Mesh & PublicMesh;
+
 interface PBRCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
@@ -969,8 +971,8 @@ class PBRModel implements EnginePlugin {
     static cancelOpaquePass(context: Context): void;
     static endOpaquePass(context: Context): void;
     readonly name: string;
-    readonly root: Mesh;
-    readonly nodes: Mesh[];
+    readonly root: ModelNode;
+    readonly nodes: ModelNode[];
     readonly primitives: PBRPrimitive[];
     get meshes(): readonly Mesh[];
     prepareDeformation?: (context: PBRDeformationContext) => void;

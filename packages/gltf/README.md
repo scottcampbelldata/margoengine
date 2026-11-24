@@ -290,6 +290,22 @@ console.log(model.meshes.length); // the drawn nodes, as from the light loader
 Shadows.attach(engine).add(model.root); // the root is a group: every node below it casts
 ```
 
+The root and every node are also core's public `Mesh`, the type `engine.createMesh()` returns, so a model parents to a
+mesh of yours, or yours to one of its nodes, without a cast:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
+const turntable = engine.createMesh();
+model.root.setParent(turntable); // the whole model turns with it
+turntable.setRotation([0, Math.PI / 4, 0]);
+const marker = engine.createMesh();
+marker.setParent(model.nodes[0]); // and a mesh of yours follows a node of the model
+```
+
 `Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
 primitive nodes automatically. `selection.set([primitive.node])` also discovers
 their model; explicit `add(model)` remains supported and is deduplicated.
