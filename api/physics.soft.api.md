@@ -598,7 +598,17 @@ interface KernelParticleContact {
     normal: [number, number, number];
     depth: number;
     point: [number, number, number];
+    velocity: [number, number, number];
     started: boolean;
+    triangle: number;
+}
+
+interface KernelParticleViews {
+    from: ArrayLike<number>;
+    to: ArrayLike<number>;
+    radius: number | ArrayLike<number>;
+    margin?: number | ArrayLike<number>;
+    groups?: ArrayLike<number>;
 }
 
 interface KernelProbeOptions {
@@ -640,6 +650,19 @@ interface KernelShapeCastHit {
     queryPoint: [number, number, number];
     queryNormal: [number, number, number];
     started: boolean;
+}
+
+interface KernelSoftContacts {
+    k: number;
+    collider: Uint32Array;
+    body: Uint32Array;
+    t: Float32Array;
+    normal: Float32Array;
+    depth: Float32Array;
+    point: Float32Array;
+    velocity: Float32Array;
+    started: Uint8Array;
+    triangle: Uint32Array;
 }
 
 interface KernelSolverOptions {
@@ -749,7 +772,9 @@ class KernelWorld {
     colliderVolume(collider: number): number;
     colliderMass(collider: number): number;
     pairDistance(a: number, b: number): KernelDistance | null;
+    softContacts(views: KernelParticleViews, k?: number, options?: KernelProbeOptions): KernelSoftContacts;
     probeParticles(from: ArrayLike<number>, to: ArrayLike<number>, radius: number | ArrayLike<number>, options?: KernelProbeOptions): (KernelParticleContact | null)[];
+    get probeDepth(): number;
     get probeCapacity(): number;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
@@ -930,6 +955,12 @@ class Physics implements EnginePlugin, BodyOwner {
     } | null;
     colliderContainsPoint(collider: PhysicsCollider, point: Vec3): boolean;
     castShapeAtCollider(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
+    softContacts(views: KernelParticleViews, k?: number, options?: {
+        groups?: number;
+        exclude?: PhysicsBody;
+        flags?: number;
+    }): KernelSoftContacts;
+    colliderOf(row: number): PhysicsCollider | undefined;
     colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat): boolean;
     getColliders(): PhysicsCollider[];
     contactPairsWith(collider: PhysicsCollider): PhysicsCollider[];

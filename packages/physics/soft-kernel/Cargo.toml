@@ -5,6 +5,10 @@ edition = "2024"
 license = "Apache-2.0"
 publish = false
 
+[dependencies]
+# Cloth contacts, shared with the physics kernel's tests (packages/physics/kernel-common/src/cloth.rs).
+margoengine-physics-kernel-common = { path = "../kernel-common" }
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

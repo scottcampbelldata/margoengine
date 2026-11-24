@@ -1,8 +1,10 @@
 // Particle probes for soft bodies: where a particle of radius r, moving from one position to another over a step, meets the
-// colliders of the world. A sweep of a ball (van den Bergen 2004, the cast of cast.rs) gives the first touch, so a fast particle
-// never tunnels; a particle that ends the move inside a collider's reach, or starts in contact, gets the nearest point of the
-// surface and the depth. One contact a particle: the solver asks again after it has moved the particle, which finds the next
-// one in a corner.
+// colliders of the world. For each collider within reach, a sweep of a ball (van den Bergen 2004, the cast of cast.rs) gives
+// the first touch, so a fast particle never tunnels; a particle that ends the move within reach of a surface, or inside a
+// solid, gets the nearest point of the surface. Each contact is a plane (the point and the normal out of the collider) with the
+// gap or depth to it, the velocity of the surface there (a rigid body's, and a deformable mesh's vertices') and the time of
+// the touch. A soft solver asks once a step and applies the planes through its substeps, or asks again after it has moved
+// the particle.
 //
 // The batch reads and writes two fixed buffers in the kernel's memory (`probe_input`, `probe_output`), so a soft solver fills
 // a typed array over Wasm memory, makes one call, and reads another: no call a particle, no copy through the host.
@@ -11,16 +13,21 @@ use crate::layout::*;
 use crate::math::*;
 use crate::query::Filter;
 use crate::sat::Pose;
-use crate::world::World;
+use crate::world::{NONE, World};
 
 /// Particles one call takes.
-pub const PROBE_MAX: usize = 4096;
-/// Words of an input record: x0, y0, z0, x1, y1, z1, radius, one spare.
-pub const PROBE_IN_WORDS: usize = 8;
-/// Words of an output record: collider (NONE for no contact), body, then as floats: the fraction of the move at which the
-/// touch happens (0 to 1), the unit normal out of the collider (x, y, z), the depth the move's end is inside the radius
-/// (positive: push out along the normal by that much), the point on the collider's surface (x, y, z), a started flag.
-pub const PROBE_OUT_WORDS: usize = 12;
+pub const PROBE_MAX: usize = 1024;
+/// Contacts a particle may be given at most.
+pub const PROBE_K: usize = 4;
+/// Words of an input record: x0, y0, z0 (where the particle was), x1, y1, z1 (where it ends), radius, margin (how far past its
+/// radius a surface still counts: how far it can travel in the step), groups (as `collisionGroups` packs them, or all ones to
+/// meet everything), and two spare.
+pub const PROBE_IN_WORDS: usize = 12;
+/// Words of an output record, a particle's K contacts each: collider (NONE for no contact), body, then as floats the fraction of
+/// the move at which the touch happens, the unit normal out of the collider (x, y, z), the depth the end of the move is inside
+/// the radius (negative: the gap still open), the point on the surface (x, y, z), the surface's velocity there (x, y, z), a
+/// started flag, the triangle of a mesh it touches (NONE for none).
+pub const PROBE_OUT_WORDS: usize = 16;
 
 /// What a particle's move meets.
 #[derive(Clone, Copy, Debug)]
@@ -33,16 +40,23 @@ pub struct ParticleContact {
     pub normal: V3,
     /// The point on the collider's surface.
     pub point: V3,
-    /// How far the end of the move is inside the particle's radius from that surface, along the normal: push out by this
-    /// when positive, nothing to do when not.
+    /// How far the end of the move is inside the particle's radius from that surface, along the normal: push out by this when
+    /// positive, a gap of this much still open when negative.
     pub depth: f32,
     pub started: bool,
 }
 
 impl World {
-    /// The first contact of a ball of `radius` moving from `from` to `to` among the colliders `filter` lets through, or None
-    /// when it meets nothing and ends clear of everything.
-    pub fn probe_particle(&self, from: V3, to: V3, radius: f32, filter: &Filter) -> Option<ParticleContact> {
+    /// The contact of a ball of `radius` moving from `from` to `to` with collider `c`, or None when the collider is further than
+    /// `margin` past the radius at the end of the move and the sweep touches nothing.
+    pub fn probe_collider(&self, c: usize, from: V3, to: V3, radius: f32, margin: f32) -> Option<ParticleContact> {
+        let reach = radius + margin.max(0.0);
+        // The collider's box against the box of the move, grown by reach: most colliders end here.
+        let (low, high) = (self.v(FAT_MIN_X, c), self.v(FAT_MAX_X, c));
+        let (lo, hi) = (from.min(to).sub(v3(reach, reach, reach)), from.max(to).add(v3(reach, reach, reach)));
+        if low.x > hi.x || low.y > hi.y || low.z > hi.z || lo.x > high.x || lo.y > high.y || lo.z > high.z {
+            return None;
+        }
         let step = to.sub(from);
         let length = sqrt(step.dot(step));
         let identity = Pose { p: from, q: Q::IDENTITY };
@@ -50,52 +64,172 @@ impl World {
         if length > 1e-9 && self.query_valid(ball, identity) {
             let direction = step.scale(1.0 / length);
             let options = CastOptions { max: length, target: 0.0, stop: true, geometry: false };
-            if let Some((collider, hit)) = self.cast_shape(ball, identity, direction, &options, filter) {
+            if let Some(hit) = self.cast_collider(c, ball, identity, direction, &options) {
                 if hit.started {
                     // Touching at the start: the end of the move says whether it still is, and where the surface is.
-                    return self.probe_overlap(to, radius, filter).map(|c| ParticleContact { t: 0.0, started: true, ..c });
+                    return self.probe_overlap(c, to, radius, margin).map(|p| ParticleContact { t: 0.0, started: true, ..p });
                 }
                 let depth = radius - to.sub(hit.on_target).dot(hit.normal);
-                return Some(ParticleContact { collider, t: (hit.t / length).min(1.0), normal: hit.normal, point: hit.on_target, depth, started: false });
+                return Some(ParticleContact { collider: c as u32, t: (hit.t / length).min(1.0), normal: hit.normal, point: hit.on_target, depth, started: false });
             }
         }
-        self.probe_overlap(to, radius, filter)
+        self.probe_overlap(c, to, radius, margin)
     }
 
-    /// Where a ball of `radius` at `at` sits against the nearest collider within its reach, or inside a solid: the point on the
-    /// surface, the normal out of it and the depth. None when it is clear of everything.
-    fn probe_overlap(&self, to: V3, radius: f32, filter: &Filter) -> Option<ParticleContact> {
-        let (collider, nearest) = self.project_point(to, false, filter)?;
+    /// Where a ball of `radius` at `to` sits against collider `c`: within `margin` past its radius of the surface, or inside a
+    /// solid. None when it is clear.
+    fn probe_overlap(&self, c: usize, to: V3, radius: f32, margin: f32) -> Option<ParticleContact> {
+        let nearest = self.project_collider(c, to, false)?;
         let offset = to.sub(nearest.point);
         let distance = sqrt(offset.dot(offset));
         if nearest.inside {
             // From inside, out through the nearest face.
             let normal = if distance > 1e-9 { offset.scale(-1.0 / distance) } else { v3(0.0, 1.0, 0.0) };
-            return Some(ParticleContact { collider, t: 1.0, normal, point: nearest.point, depth: radius + distance, started: false });
+            return Some(ParticleContact { collider: c as u32, t: 1.0, normal, point: nearest.point, depth: radius + distance, started: false });
         }
-        if distance >= radius {
+        if distance >= radius + margin.max(0.0) {
             return None;
         }
         let normal = if distance > 1e-9 { offset.scale(1.0 / distance) } else { v3(0.0, 1.0, 0.0) };
-        Some(ParticleContact { collider, t: 1.0, normal, point: nearest.point, depth: radius - distance, started: false })
+        Some(ParticleContact { collider: c as u32, t: 1.0, normal, point: nearest.point, depth: radius - distance, started: false })
     }
+
+    /// The velocity of collider `c`'s surface at a world `point`: its body's linear velocity plus its spin about the centre of
+    /// mass, and for a deformable mesh aimed for this step the motion of the triangle `triangle` besides. Also that triangle.
+    pub fn surface_velocity(&self, c: usize, point: V3) -> (V3, u32) {
+        let body = self.uu(COLLIDER_BODY, c) as usize;
+        let r = point.sub(self.v(CENTER_X, body));
+        let mut v = self.v(LINEAR_X, body).add(self.v(ANGULAR_X, body).cross(r));
+        let mut triangle = NONE;
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH {
+            let mesh = self.uu(COLLIDER_HULL, c) as usize;
+            if self.uu(MESH_FLAGS, mesh) & MESH_AIMED != 0 {
+                let local = self.collider_pose(c).unapply(point);
+                if let Some(t) = self.nearest_triangle(mesh, local) {
+                    triangle = t as u32;
+                    v = v.add(self.mesh_surface_velocity(c, t));
+                }
+            }
+        }
+        (v, triangle)
+    }
+
+    /// The triangle of a mesh nearest a point in the mesh's frame, by walking its tree nearest box first.
+    fn nearest_triangle(&self, mesh: usize, p: V3) -> Option<usize> {
+        let (n0, v0, t0) = (self.uu(MESH_FIRST_NODE, mesh) as usize, self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_FIRST_TRIANGLE, mesh) as usize);
+        if self.uu(MESH_NODES, mesh) == 0 {
+            return None;
+        }
+        let box_distance = |node: usize| {
+            let (lo, hi) = (self.v(NODE_MIN_X, n0 + node), self.v(NODE_MAX_X, n0 + node));
+            let d = lo.sub(p).max(v3(0.0, 0.0, 0.0)).max(p.sub(hi));
+            d.dot(d)
+        };
+        let mut best: Option<(f32, usize)> = None;
+        let mut stack = [0usize; 64];
+        let mut top = 1;
+        while top > 0 {
+            top -= 1;
+            let node = stack[top];
+            if best.is_some_and(|(b, _)| box_distance(node) > b) {
+                continue;
+            }
+            let (first, count) = (self.uu(NODE_FIRST, n0 + node) as usize, self.uu(NODE_COUNT, n0 + node) as usize);
+            if count == 0 {
+                if top + 2 <= stack.len() {
+                    stack[top] = first + 1;
+                    stack[top + 1] = first;
+                    top += 2;
+                }
+                continue;
+            }
+            for k in first..first + count {
+                let t = self.uu(TRIANGLE_ORDER, t0 + k) as usize;
+                let [a, b, c] = self.triangle_corners(v0, t0 + t);
+                let d = closest_distance_squared(p, a, b, c);
+                if best.is_none_or(|(b, _)| d < b) {
+                    best = Some((d, t));
+                }
+            }
+        }
+        best.map(|(_, t)| t)
+    }
+
+    /// Every contact of a ball moving from `from` to `to` among the colliders `filter` lets through, nearest first (the most
+    /// depth first), at most K of them, as `(contact, surface velocity, triangle)`.
+    pub fn probe_particle(&self, from: V3, to: V3, radius: f32, margin: f32, filter: &Filter, out: &mut [(ParticleContact, V3, u32); PROBE_K]) -> usize {
+        let mut count = 0;
+        self.each_queried(filter, &mut |c| {
+            if let Some(contact) = self.probe_collider(c, from, to, radius, margin) {
+                // Kept sorted by depth, deepest first; one past the last place falls off.
+                let mut at = count.min(PROBE_K);
+                while at > 0 && out[at - 1].0.depth < contact.depth {
+                    at -= 1;
+                }
+                if at < PROBE_K {
+                    let end = count.min(PROBE_K - 1);
+                    for k in (at..end).rev() {
+                        out[k + 1] = out[k];
+                    }
+                    let (velocity, triangle) = self.surface_velocity(c, contact.point);
+                    out[at] = (contact, velocity, triangle);
+                    if count < PROBE_K {
+                        count += 1;
+                    }
+                }
+            }
+            true
+        });
+        count
+    }
+}
+
+/// The squared distance from a point to a triangle (Ericson 5.1.5).
+fn closest_distance_squared(p: V3, a: V3, b: V3, c: V3) -> f32 {
+    let (ab, ac, ap) = (b.sub(a), c.sub(a), p.sub(a));
+    let (d1, d2) = (ab.dot(ap), ac.dot(ap));
+    let point = if d1 <= 0.0 && d2 <= 0.0 {
+        a
+    } else {
+        let bp = p.sub(b);
+        let (d3, d4) = (ab.dot(bp), ac.dot(bp));
+        if d3 >= 0.0 && d4 <= d3 {
+            b
+        } else if d1 * d4 - d3 * d2 <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+            a.add(ab.scale(d1 / (d1 - d3)))
+        } else {
+            let cp = p.sub(c);
+            let (d5, d6) = (ab.dot(cp), ac.dot(cp));
+            if d6 >= 0.0 && d5 <= d6 {
+                c
+            } else if d5 * d2 - d1 * d6 <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+                a.add(ac.scale(d2 / (d2 - d6)))
+            } else if d3 * d6 - d5 * d4 <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0 {
+                b.add(c.sub(b).scale((d4 - d3) / ((d4 - d3) + (d5 - d6))))
+            } else {
+                let sum = (d3 * d6 - d5 * d4) + (d5 * d2 - d1 * d6) + (d1 * d4 - d3 * d2);
+                let denominator = 1.0 / sum;
+                a.add(ab.scale((d5 * d2 - d1 * d6) * denominator)).add(ac.scale((d1 * d4 - d3 * d2) * denominator))
+            }
+        }
+    };
+    let d = p.sub(point);
+    d.dot(d)
 }
 
 #[cfg(target_arch = "wasm32")]
 mod batch {
     use super::*;
-    use crate::layout::*;
-    use crate::world::NONE;
 
     static mut PROBE_IN: [f32; PROBE_IN_WORDS * PROBE_MAX] = [0.0; PROBE_IN_WORDS * PROBE_MAX];
-    static mut PROBE_OUT: [u32; PROBE_OUT_WORDS * PROBE_MAX] = [0; PROBE_OUT_WORDS * PROBE_MAX];
+    static mut PROBE_OUT: [u32; PROBE_OUT_WORDS * PROBE_K * PROBE_MAX] = [0; PROBE_OUT_WORDS * PROBE_K * PROBE_MAX];
 
     /// Where the input records go.
     #[unsafe(no_mangle)]
     pub extern "C" fn probe_input() -> u32 {
         core::ptr::addr_of!(PROBE_IN) as u32
     }
-    /// Where the output records are.
+    /// Where the output records are: K a particle, in the order of the input.
     #[unsafe(no_mangle)]
     pub extern "C" fn probe_output() -> u32 {
         core::ptr::addr_of!(PROBE_OUT) as u32
@@ -105,42 +239,55 @@ mod batch {
     pub extern "C" fn probe_capacity() -> u32 {
         PROBE_MAX as u32
     }
-
-    /// Probes `count` particles, the records JS wrote at `probe_input`; the records at `probe_output` answer them one for one.
-    /// `flags` and `groups` are a query filter's (see `query.rs`), `body` a body whose colliders are left out (NONE for none).
-    /// Returns how many particles touch something, or -1 for a count past the capacity.
+    /// Contacts a particle gets at most.
     #[unsafe(no_mangle)]
-    pub extern "C" fn soft_probe(count: u32, flags: u32, groups: u32, body: u32) -> i32 {
-        if count as usize > PROBE_MAX {
+    pub extern "C" fn probe_depth() -> u32 {
+        PROBE_K as u32
+    }
+
+    /// Probes `count` particles, the records JS wrote at `probe_input`; the records at `probe_output` answer them, `k` for each
+    /// (at most `probe_depth`). `flags` are a query filter's flags (see `query.rs`; sensors are always left out), `body` a body
+    /// whose colliders are left out (NONE for none). Returns how many contacts were found, or -1 for a count or k past the
+    /// capacity.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn soft_probe(count: u32, k: u32, flags: u32, body: u32) -> i32 {
+        if count as usize > PROBE_MAX || k as usize > PROBE_K || k == 0 {
             return -1;
         }
         let world = crate::api::world();
-        let filter = Filter { flags, groups, collider: NONE, body };
         let input = core::ptr::addr_of!(PROBE_IN) as *const f32;
         let output = core::ptr::addr_of_mut!(PROBE_OUT) as *mut u32;
-        let mut touching = 0;
+        let mut found = 0;
         for i in 0..count as usize {
             // SAFETY: one thread, and i < PROBE_MAX keeps both records inside their buffers.
             let r = unsafe { core::slice::from_raw_parts(input.add(PROBE_IN_WORDS * i), PROBE_IN_WORDS) };
-            let (from, to, radius) = (v3(r[0], r[1], r[2]), v3(r[3], r[4], r[5]), r[6]);
-            let out = unsafe { core::slice::from_raw_parts_mut(output.add(PROBE_OUT_WORDS * i), PROBE_OUT_WORDS) };
+            let out = unsafe { core::slice::from_raw_parts_mut(output.add(PROBE_OUT_WORDS * k as usize * i), PROBE_OUT_WORDS * k as usize) };
             out.fill(0);
-            out[0] = NONE;
-            out[1] = NONE;
-            let finite = [r[0], r[1], r[2], r[3], r[4], r[5], radius].iter().all(|v| v.is_finite());
-            if !finite || !(radius >= 0.0) {
+            for slot in 0..k as usize {
+                out[PROBE_OUT_WORDS * slot] = NONE;
+                out[PROBE_OUT_WORDS * slot + 1] = NONE;
+                out[PROBE_OUT_WORDS * slot + 14] = NONE;
+            }
+            let finite = r[..8].iter().all(|v| v.is_finite());
+            if !finite || !(r[6] >= 0.0) {
                 continue;
             }
-            if let Some(c) = world.probe_particle(from, to, radius, &filter) {
-                touching += 1;
-                out[0] = c.collider;
-                out[1] = world.uu(COLLIDER_BODY, c.collider as usize);
-                for (k, v) in [c.t, c.normal.x, c.normal.y, c.normal.z, c.depth, c.point.x, c.point.y, c.point.z].iter().enumerate() {
-                    out[2 + k] = v.to_bits();
+            let groups = r[8].to_bits();
+            let filter = Filter { flags: flags | crate::query::EXCLUDE_SENSORS | crate::query::NO_GROUPS * (groups == u32::MAX) as u32, groups, collider: NONE, body };
+            let mut list = [(ParticleContact { collider: NONE, t: 0.0, normal: v3(0.0, 0.0, 0.0), point: v3(0.0, 0.0, 0.0), depth: 0.0, started: false }, v3(0.0, 0.0, 0.0), NONE); PROBE_K];
+            let n = world.probe_particle(v3(r[0], r[1], r[2]), v3(r[3], r[4], r[5]), r[6], r[7], &filter, &mut list).min(k as usize);
+            for (slot, (c, v, triangle)) in list.iter().take(n).enumerate() {
+                let base = PROBE_OUT_WORDS * slot;
+                out[base] = c.collider;
+                out[base + 1] = world.uu(COLLIDER_BODY, c.collider as usize);
+                for (j, value) in [c.t, c.normal.x, c.normal.y, c.normal.z, c.depth, c.point.x, c.point.y, c.point.z, v.x, v.y, v.z].iter().enumerate() {
+                    out[base + 2 + j] = value.to_bits();
                 }
-                out[10] = c.started as u32;
+                out[base + 13] = c.started as u32;
+                out[base + 14] = *triangle;
+                found += 1;
             }
         }
-        touching
+        found
     }
 }

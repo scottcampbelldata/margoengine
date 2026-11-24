@@ -37,6 +37,7 @@ pub const EDGE_EDGE: u32 = 1;
 /// the thickness: 0 for a pair that already is, 1 for one that only ends the step so. `depth` is how far inside the thickness
 /// they are then. `zone` is the vertex that names the group of contacts connected through shared vertices.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(C)]
 pub struct ClothContact {
     pub kind: u32,
     pub v: [u32; 4],

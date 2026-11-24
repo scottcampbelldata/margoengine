@@ -28,6 +28,8 @@ import {
   type KernelLoadOptions,
   type KernelShape,
   type KernelSolverOptions,
+  type KernelParticleViews,
+  type KernelSoftContacts,
 } from './kernel.js';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
 import { multiplyMatrices } from '@margoengine/math/mat4';
@@ -1708,6 +1710,31 @@ export class Physics implements EnginePlugin, BodyOwner {
         geometry: options.computeImpactGeometryOnPenetration ?? true,
       });
     return raw ? this.castHit(raw) : null;
+  }
+  /**
+   * The contacts of a batch of soft body particles with the colliders of this world, one call a step: for each particle of
+   * radius r moving from one position to another, up to `k` colliders (the deepest first), each as a plane (the point on its
+   * surface and the normal out of it) with the depth to it (negative: a gap still open, listed when within `margin` past the
+   * radius), the velocity of the surface there (a rigid body's, and a deformable mesh's vertices') and the time of the touch.
+   * Every shape is met, a fast particle is swept so it never tunnels, sensors and disabled colliders never are, and
+   * `groups` (one packed word for all, or one each in `views.groups`) and the query flags are honoured. `exclude` leaves a body
+   * out, such as the rigid frame of the soft body itself. Returns arrays with `k` slots a particle; a slot without a contact
+   * has `collider` 0xffffffff, and a collider row maps to a body through `body` and `colliderOf`.
+   */
+  softContacts(
+    views: KernelParticleViews,
+    k = 1,
+    options: { groups?: number; exclude?: PhysicsBody; flags?: number } = {},
+  ): KernelSoftContacts {
+    return this.kernel.softContacts(views, k, {
+      flags: options.flags,
+      groups: options.groups,
+      excludeBody: options.exclude ? options.exclude.row : undefined,
+    });
+  }
+  /** The collider a {@link Physics.softContacts} slot names by its row, or undefined for no contact. */
+  colliderOf(row: number): PhysicsCollider | undefined {
+    return this.byRow.get(row);
   }
   /**
    * Whether a convex shape overlaps one collider, as Rapier's `collider.intersectsShape`.

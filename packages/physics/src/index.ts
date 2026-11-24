@@ -79,6 +79,8 @@ export type {
   KernelLoadOptions,
   KernelRayHit,
   KernelParticleContact,
+  KernelParticleViews,
+  KernelSoftContacts,
   KernelProbeOptions,
   KernelShape,
   KernelSolverOptions,

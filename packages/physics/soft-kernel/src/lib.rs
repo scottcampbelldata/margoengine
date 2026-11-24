@@ -17,6 +17,7 @@ extern crate alloc;
 
 pub mod api;
 mod col;
+pub mod collide;
 #[cfg(target_arch = "wasm32")]
 mod heap;
 mod math;

@@ -175,3 +175,128 @@ test('a batch is answered one for one, in chunks past the capacity, and bad inpu
   assert.throws(() => kernel.probeParticles([0, Number.NaN, 0], [0, 0, 0], R), /finite/);
   physics.dispose();
 });
+
+test('softContacts lists up to k colliders a particle, deepest first, with the plane, the depth, the surface velocity and the time', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+  });
+  const wall = physics.addBody(null, {
+    type: 'fixed',
+    position: [1.55, 1, 0],
+    colliders: { shape: 'box', halfExtents: [0.5, 1, 5] },
+  });
+  physics.step();
+  // In the corner: 0.03 into the floor's reach and 0.06 into the wall's, a radius of 0.1.
+  const at = [1.0 - 0.0, 0.07, 0];
+  const c = physics.softContacts({ from: at, to: at, radius: 0.1 }, 4);
+  assert.equal(c.k, 4);
+  assert.notEqual(c.collider[0], 0xffffffff);
+  assert.notEqual(c.collider[1], 0xffffffff);
+  assert.equal(c.collider[2], 0xffffffff, 'only two colliders are near');
+  assert.ok(c.depth[0] >= c.depth[1], 'deepest first');
+  const depths = [c.depth[0], c.depth[1]].sort();
+  near(depths[0], 0.03, 2e-3, 'the floor');
+  near(depths[1], 0.1 - (1.05 - 1.0), 2e-3, 'the wall: its near face is at x = 1.05');
+  const floor = [0, 1].find((s) => Math.abs(c.normal[3 * s + 1] - 1) < 1e-3);
+  assert.ok(floor !== undefined, 'one normal points up');
+  assert.equal(
+    physics.colliderOf(c.collider[0]).body.row === wall.row || physics.colliderOf(c.collider[1]).body.row === wall.row,
+    true,
+  );
+  physics.dispose();
+});
+
+test('a collider within the margin is listed with a negative depth, and none beyond it', () => {
+  const { physics, kernel } = world({ shape: 'box', halfExtents: [1, 1, 1] });
+  const at = [0, 1.3, 0];
+  assert.equal(kernel.softContacts({ from: at, to: at, radius: 0.1 }, 1).collider[0], 0xffffffff);
+  const near1 = kernel.softContacts({ from: at, to: at, radius: 0.1, margin: 0.25 }, 1);
+  assert.notEqual(near1.collider[0], 0xffffffff);
+  near(near1.depth[0], 0.1 - 0.3, 1e-4, 'a gap of 0.2 still open');
+  assert.equal(kernel.softContacts({ from: at, to: at, radius: 0.1, margin: 0.15 }, 1).collider[0], 0xffffffff);
+  physics.dispose();
+});
+
+test('the surface velocity at the contact is the body’s velocity and spin about its centre', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const spinner = physics.addBody(null, {
+    type: 'kinematicVelocity',
+    position: [0, 0, 0],
+    linearVelocity: [1, 0, 0],
+    angularVelocity: [0, 0, 2],
+    colliders: { shape: 'box', halfExtents: [1, 1, 1] },
+  });
+  physics.step();
+  const at = [1.05, 0, 0.3];
+  const c = physics.softContacts({ from: at, to: at, radius: 0.1 }, 1);
+  assert.notEqual(c.collider[0], 0xffffffff);
+  // The point on the face is (1, 0, 0.3): v = lin + w x r = (1, 0, 0) + (0, 0, 2) x (1, 0, 0.3) = (1, 2, 0).
+  const p = [c.point[0], c.point[1], c.point[2]];
+  // About the body's centre, which has moved with it: w x r = (-2 ry, 2 rx, 0).
+  const r = [p[0] - spinner.position[0], p[1] - spinner.position[1]];
+  near(c.velocity[0], 1 - 2 * r[1], 2e-3, 'vx');
+  near(c.velocity[1], 2 * r[0], 2e-3, 'vy');
+  near(c.velocity[2], 0, 1e-4, 'vz');
+  physics.dispose();
+});
+
+test('sensors are never met, a disabled collider neither, and per-particle groups choose what each meets', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0, 0],
+    colliders: { shape: 'box', halfExtents: [1, 1, 1], sensor: true },
+  });
+  const red = physics.addBody(null, {
+    type: 'fixed',
+    position: [10, 0, 0],
+    colliders: { shape: 'box', halfExtents: [1, 1, 1], collisionGroups: collisionGroups([1], [1]) },
+  });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [20, 0, 0],
+    colliders: { shape: 'box', halfExtents: [1, 1, 1], collisionGroups: collisionGroups([2], [2]) },
+  });
+  physics.step();
+  const kernel = physics.kernel,
+    from = [0, 1.05, 0, 10, 1.05, 0, 20, 1.05, 0, 10, 1.05, 0],
+    groups = Uint32Array.of(
+      0xffffffff,
+      collisionGroups([1], [1]),
+      collisionGroups([1], [1]),
+      collisionGroups([2], [2]),
+    );
+  const c = kernel.softContacts({ from, to: from, radius: 0.1, groups }, 1);
+  assert.equal(c.collider[0], 0xffffffff, 'a sensor is passed through');
+  assert.notEqual(c.collider[1], 0xffffffff, 'a group 1 particle meets the group 1 box');
+  assert.equal(c.collider[2], 0xffffffff, 'and not the group 2 box');
+  assert.equal(c.collider[3], 0xffffffff, 'a group 2 particle does not meet the group 1 box');
+  void red;
+  assert.throws(() => kernel.softContacts({ from, to: from, radius: 0.1 }, 9), /1 to 4/);
+  physics.dispose();
+});
+
+test('a deformable mesh gives the velocity of its surface, by the triangle the contact is on', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const sheet = physics.addBody(null, {
+    type: 'fixed',
+    colliders: {
+      shape: 'trimesh',
+      vertices: [-5, 0, -5, 5, 0, -5, 5, 0, 5, -5, 0, 5],
+      indices: [0, 2, 1, 0, 3, 2],
+      deformable: true,
+    },
+  });
+  physics.step();
+  // The sheet rises 0.06 m over a step of 1/60 s: 3.6 m/s.
+  sheet.colliders[0].setVertices([-5, 0.06, -5, 5, 0.06, -5, 5, 0.06, 5, -5, 0.06, 5]);
+  const at = [1, 0.05, 1];
+  const c = physics.softContacts({ from: at, to: at, radius: 0.1 }, 1);
+  assert.notEqual(c.collider[0], 0xffffffff);
+  assert.notEqual(c.triangle[0], 0xffffffff);
+  near(c.velocity[1], 3.6, 1e-2, 'the sheet rises at 3.6 m/s');
+  physics.dispose();
+});

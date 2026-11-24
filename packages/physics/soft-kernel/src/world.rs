@@ -261,6 +261,7 @@ impl World {
             }
             self.solve_shape(h);
         }
+        self.collide(h);
     }
 
     /// The second half of a piece of a step, after the contacts: the bodies the particles pushed on move on, and the

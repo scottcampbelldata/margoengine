@@ -24,6 +24,15 @@ export function softColumns() {
   return [...body.matchAll(/[a-z_0-9]+/g)].map(([name]) => name);
 }
 
+/** The shared kernel parts (cloth contacts) are a path dependency outside the crate: cargo names their files by absolute path, so
+ * that folder is remapped too, and the bytes do not depend on where the repository is checked out. */
+function kernelEnv() {
+  const common = resolve(root, 'kernel-common');
+  const env = blueprintRustEnv(kernel, RUSTFLAGS);
+  env.RUSTFLAGS += ` --remap-path-prefix=${common}=physics/kernel-common`;
+  return env;
+}
+
 function build() {
   execFileSync(
     'cargo',
@@ -36,7 +45,7 @@ function build() {
       'wasm32-unknown-unknown',
       '--release',
     ],
-    { stdio: 'inherit', env: blueprintRustEnv(kernel, RUSTFLAGS) },
+    { stdio: 'inherit', env: kernelEnv() },
   );
   const wasmPath = resolve(kernel, 'target/wasm32-unknown-unknown/release/margoengine_soft_kernel.wasm');
   const optimized = wasmPath.replace('.wasm', '.optimized.wasm');

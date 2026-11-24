@@ -154,7 +154,8 @@ interface KernelExports extends WebAssembly.Exports {
   probe_input(): number;
   probe_output(): number;
   probe_capacity(): number;
-  soft_probe(count: number, flags: number, groups: number, body: number): number;
+  probe_depth(): number;
+  soft_probe(count: number, k: number, flags: number, body: number): number;
   collider_set_shape(collider: number, shape: number, a: number, b: number, c: number): number;
   collider_set_pose(
     collider: number,
@@ -508,20 +509,54 @@ export interface KernelParticleContact {
   t: number;
   /** The unit normal out of the collider. */
   normal: [number, number, number];
-  /** How far the end of the move is inside the particle's radius from the surface, along the normal: push out by this when positive. */
+  /** How far the end of the move is inside the particle's radius from the surface, along the normal: push out by this when positive; a gap still open when negative. */
   depth: number;
   /** The point on the collider's surface. */
   point: [number, number, number];
+  /** The velocity of the surface at that point: the body's, and a deformable mesh's vertices'. */
+  velocity: [number, number, number];
   /** The particle started the move touching. */
   started: boolean;
+  /** The triangle of a deformable mesh it touches, or 0xffffffff. */
+  triangle: number;
 }
-/** Options of {@link KernelWorld.probeParticles}: a query filter's words (`QUERY_` flags, packed groups) and a body to leave out. */
+/** Options of {@link KernelWorld.probeParticles} and {@link KernelWorld.softContacts}: a query filter's flags and a body to leave out. */
 export interface KernelProbeOptions {
   flags?: number;
-  /** Packed interaction groups; left out, every collider is seen. */
+  /** Packed interaction groups of every particle (as `collisionGroups`); left out, every collider is met. */
   groups?: number;
   /** A body row whose colliders are left out (a soft body's own rigid frame). */
   excludeBody?: number;
+}
+/**
+ * The particles of a soft body for {@link KernelWorld.softContacts}: packed x, y, z where each was and where each ends the step,
+ * a radius (one for all, or one each), and how far past its radius a surface still counts (default 0).
+ */
+export interface KernelParticleViews {
+  from: ArrayLike<number>;
+  to: ArrayLike<number>;
+  radius: number | ArrayLike<number>;
+  margin?: number | ArrayLike<number>;
+  /** One packed groups word each (a `Uint32Array` ok), for particles of different groups; else `options.groups` serves all. */
+  groups?: ArrayLike<number>;
+}
+/** The answer of {@link KernelWorld.softContacts}: `k` slots for each particle, in the order of the particles. A slot with no contact has `collider` 0xffffffff. */
+export interface KernelSoftContacts {
+  k: number;
+  collider: Uint32Array;
+  body: Uint32Array;
+  /** Fraction of the move at which the touch happens. */
+  t: Float32Array;
+  /** Three numbers a slot: the unit normal out of the collider. */
+  normal: Float32Array;
+  /** Depth the end of the move is inside the radius (negative: still a gap). */
+  depth: Float32Array;
+  /** Three numbers a slot: the point on the surface. */
+  point: Float32Array;
+  /** Three numbers a slot: the velocity of the surface there. */
+  velocity: Float32Array;
+  started: Uint8Array;
+  triangle: Uint32Array;
 }
 /** Filter bits of the kernel's queries (`KernelWorld.raycast`), as Rapier's `QueryFilterFlags`. */
 export const QUERY_EXCLUDE_FIXED = 1,
@@ -2098,16 +2133,89 @@ export class KernelWorld {
     return { collider: words[0]!, inside: words[1] === 1, point: [f[2]!, f[3]!, f[4]!], distance: f[5]! };
   }
   /**
-   * Where each of a batch of particles of radius r, moving from one position to another over a step, first meets the
-   * colliders: a sweep of a ball (so a fast particle never tunnels), and for one that ends within its radius of a surface, or
-   * inside a solid, the nearest surface point and depth. One contact a particle, the nearest collider the filter lets through;
-   * a solver that has moved the particle asks again to find the next. The batch is read and answered through two buffers in
-   * the kernel's memory, so it is one call for up to {@link KernelWorld.probeCapacity} particles (more go in chunks).
-   * @param from Packed x, y, z of where each particle starts.
-   * @param to Packed x, y, z of where each ends.
-   * @param radius One radius for all, or one a particle.
-   * @returns One entry a particle: its contact, or null for none.
-   * @throws RangeError for arrays that are not the same length, or a number that is not finite.
+   * The contacts of a batch of soft body particles with the colliders: for each particle of radius r that moves from one
+   * position to another over a step, up to `k` colliders (at most {@link KernelWorld.probeDepth}), the deepest first, each as a
+   * plane (the point on its surface and the normal out of it) with the depth to it, the velocity of its surface there (a rigid
+   * body's, plus a deformable mesh's vertices') and the time of the touch. Every shape is met; sensors and disabled colliders
+   * never are; groups and flags are honoured. A particle is swept, so a fast one never tunnels, and a collider within `margin`
+   * past the radius of where it ends is listed even when it does not touch yet (depth negative), so one call a step serves the
+   * substeps: apply each plane as a constraint with the surface moving at its velocity. Read and answered through two buffers in
+   * the kernel's memory, up to {@link KernelWorld.probeCapacity} particles a call (more go in chunks).
+   * @throws RangeError for arrays that are not the same length, a `k` out of range, or a number that is not finite.
+   */
+  softContacts(views: KernelParticleViews, k = 1, options: KernelProbeOptions = {}): KernelSoftContacts {
+    const { from, to, radius, margin = 0, groups } = views;
+    const count = from.length / 3;
+    if (!Number.isInteger(count) || to.length !== from.length)
+      throw new RangeError(
+        `softContacts takes packed x, y, z for each particle in both arrays, the same number (got ${from.length} and ${to.length}); pass 3 numbers a particle.`,
+      );
+    for (const [name, value] of [['radii', radius], ['margins', margin], ['groups words', groups]] as const)
+      if (value !== undefined && typeof value !== 'number' && value.length !== count)
+        throw new RangeError(`softContacts got ${value.length} ${name} for ${count} particles; pass one or one each.`);
+    if (this.api.world_layout() !== this.layout) this.bind();
+    const depth = this.api.probe_depth();
+    if (!Number.isInteger(k) || k < 1 || k > depth)
+      throw new RangeError(`softContacts gives each particle 1 to ${depth} contacts; ${k} is out of that range.`);
+    const capacity = this.api.probe_capacity(),
+      slots = count * k,
+      out: KernelSoftContacts = {
+        k,
+        collider: new Uint32Array(slots),
+        body: new Uint32Array(slots),
+        t: new Float32Array(slots),
+        normal: new Float32Array(3 * slots),
+        depth: new Float32Array(slots),
+        point: new Float32Array(3 * slots),
+        velocity: new Float32Array(3 * slots),
+        started: new Uint8Array(slots),
+        triangle: new Uint32Array(slots),
+      };
+    const { flags = 0, groups: shared, excludeBody = 0xffffffff } = options;
+    const all = shared === undefined ? 0xffffffff : shared >>> 0;
+    for (let start = 0; start < count; start += capacity) {
+      const n = capacity < count - start ? capacity : count - start,
+        input = new Float32Array(this.api.memory.buffer, this.api.probe_input(), 12 * n),
+        words = new Uint32Array(input.buffer, input.byteOffset, 12 * n);
+      for (let i = 0; i < n; i++) {
+        const p = start + i,
+          at = 12 * i;
+        for (let axis = 0; axis < 3; axis++) {
+          input[at + axis] = from[3 * p + axis]!;
+          input[at + 3 + axis] = to[3 * p + axis]!;
+        }
+        input[at + 6] = typeof radius === 'number' ? radius : radius[p]!;
+        input[at + 7] = typeof margin === 'number' ? margin : margin[p]!;
+        words[at + 8] = groups ? groups[p]! >>> 0 : all;
+        input[at + 9] = input[at + 10] = input[at + 11] = 0;
+        for (let j = 0; j < 8; j++)
+          if (!Number.isFinite(input[at + j]!)) throw new RangeError('softContacts needs finite positions, radii and margins.');
+      }
+      this.api.soft_probe(n, k, flags, excludeBody);
+      const answer = new Uint32Array(this.api.memory.buffer, this.api.probe_output(), 16 * k * n),
+        floats = new Float32Array(answer.buffer, answer.byteOffset, answer.length);
+      for (let i = 0; i < n; i++)
+        for (let slot = 0; slot < k; slot++) {
+          const w = 16 * (k * i + slot),
+            o = k * (start + i) + slot;
+          out.collider[o] = answer[w]!;
+          out.body[o] = answer[w + 1]!;
+          out.t[o] = floats[w + 2]!;
+          for (let axis = 0; axis < 3; axis++) {
+            out.normal[3 * o + axis] = floats[w + 3 + axis]!;
+            out.point[3 * o + axis] = floats[w + 7 + axis]!;
+            out.velocity[3 * o + axis] = floats[w + 10 + axis]!;
+          }
+          out.depth[o] = floats[w + 6]!;
+          out.started[o] = answer[w + 13]! ? 1 : 0;
+          out.triangle[o] = answer[w + 14]!;
+        }
+    }
+    return out;
+  }
+  /**
+   * The first contact of each of a batch of particles, as {@link KernelWorld.softContacts} with one slot a particle and no margin
+   * (only a touching or a penetrating particle is listed): one entry a particle, its contact or null.
    */
   probeParticles(
     from: ArrayLike<number>,
@@ -2115,53 +2223,30 @@ export class KernelWorld {
     radius: number | ArrayLike<number>,
     options: KernelProbeOptions = {},
   ): (KernelParticleContact | null)[] {
-    const count = from.length / 3;
-    if (!Number.isInteger(count) || to.length !== from.length)
-      throw new RangeError(
-        `probeParticles takes packed x, y, z for each particle in both arrays, the same number (got ${from.length} and ${to.length}); pass 3 numbers a particle.`,
-      );
-    if (typeof radius !== 'number' && radius.length !== count)
-      throw new RangeError(`probeParticles got ${radius.length} radii for ${count} particles; pass one or one each.`);
-    if (this.api.world_layout() !== this.layout) this.bind();
-    const capacity = this.api.probe_capacity(),
-      out: (KernelParticleContact | null)[] = [];
-    const { flags = 0, groups, excludeBody = 0xffffffff } = options;
-    const queryFlags = groups === undefined ? flags | QUERY_NO_GROUPS : flags;
-    for (let start = 0; start < count; start += capacity) {
-      const n = capacity < count - start ? capacity : count - start,
-        input = new Float32Array(this.api.memory.buffer, this.api.probe_input(), 8 * n);
-      for (let i = 0; i < n; i++) {
-        const k = start + i;
-        for (let axis = 0; axis < 3; axis++) {
-          input[8 * i + axis] = from[3 * k + axis]!;
-          input[8 * i + 3 + axis] = to[3 * k + axis]!;
-        }
-        input[8 * i + 6] = typeof radius === 'number' ? radius : radius[k]!;
-        input[8 * i + 7] = 0;
+    const c = this.softContacts({ from, to, radius }, 1, options),
+      result: (KernelParticleContact | null)[] = [];
+    for (let i = 0; i < c.collider.length; i++) {
+      if (c.collider[i] === 0xffffffff) {
+        result.push(null);
+        continue;
       }
-      for (let i = 0; i < 8 * n; i++)
-        if (!Number.isFinite(input[i]!)) throw new RangeError('probeParticles needs finite positions and radii.');
-      this.api.soft_probe(n, queryFlags, (groups ?? 0xffffffff) >>> 0, excludeBody);
-      const words = new Uint32Array(this.api.memory.buffer, this.api.probe_output(), 12 * n),
-        floats = new Float32Array(words.buffer, words.byteOffset, 12 * n);
-      for (let i = 0; i < n; i++) {
-        const w = 12 * i;
-        out.push(
-          words[w] === 0xffffffff
-            ? null
-            : {
-                collider: words[w]!,
-                body: words[w + 1]!,
-                t: floats[w + 2]!,
-                normal: [floats[w + 3]!, floats[w + 4]!, floats[w + 5]!],
-                depth: floats[w + 6]!,
-                point: [floats[w + 7]!, floats[w + 8]!, floats[w + 9]!],
-                started: words[w + 10] === 1,
-              },
-        );
-      }
+      result.push({
+        collider: c.collider[i]!,
+        body: c.body[i]!,
+        t: c.t[i]!,
+        normal: [c.normal[3 * i]!, c.normal[3 * i + 1]!, c.normal[3 * i + 2]!],
+        depth: c.depth[i]!,
+        point: [c.point[3 * i]!, c.point[3 * i + 1]!, c.point[3 * i + 2]!],
+        velocity: [c.velocity[3 * i]!, c.velocity[3 * i + 1]!, c.velocity[3 * i + 2]!],
+        started: c.started[i] === 1,
+        triangle: c.triangle[i]!,
+      });
     }
-    return out;
+    return result;
+  }
+  /** Contacts a particle gets at most from {@link KernelWorld.softContacts}. */
+  get probeDepth(): number {
+    return this.api.probe_depth();
   }
   /** Particles one {@link KernelWorld.probeParticles} chunk holds. */
   get probeCapacity(): number {
