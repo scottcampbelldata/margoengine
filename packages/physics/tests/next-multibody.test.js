@@ -285,3 +285,124 @@ test('a multibody replays bit for bit', async () => {
   };
   assert.equal(hash(), hash());
 });
+
+test('the mass matrix, the Jacobian and inverse dynamics of a pendulum match the closed forms', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  const { bodies, multibody } = chain(physics, 1);
+  const [body] = bodies,
+    m = body.mass,
+    inertia = body.principalInertia[2];
+  // Hanging a metre below the pivot, hinge about Z: H = I + m L^2, and the torque that holds it still at an angle q from hanging is m g L sin q.
+  const h = multibody.massMatrix();
+  near(h[0][0], inertia + m, 1e-4, 'the pendulum mass matrix is its inertia about the pivot');
+  multibody.setCoordinates([Math.PI / 2]);
+  near(multibody.inverseDynamics()[0], m * G * 1, 1e-3, 'it takes m g L to hold a pendulum horizontal');
+  near(
+    Math.abs(multibody.inverseDynamics([2])[0] - multibody.inverseDynamics([0])[0]),
+    2 * (inertia + m),
+    1e-3,
+    'an acceleration costs H times it',
+  );
+  // Forward dynamics undoes inverse dynamics.
+  const torque = multibody.inverseDynamics([3]);
+  near(multibody.forwardDynamics(torque)[0], 3, 1e-6, 'forward dynamics gives back the acceleration');
+  // The Jacobian of the bob's origin: a turn about Z at a metre moves it a metre a radian, along the tangent.
+  const j = multibody.jacobian(body);
+  near(Math.hypot(j[0][0], j[1][0], j[2][0]), 1, 1e-4, 'a radian carries the bob a metre');
+  near(Math.abs(j[5][0]), 1, 1e-6, 'and turns it a radian');
+});
+
+test('the mass matrix of a double pendulum, its bias and its Jacobian agree with the motion the engine makes', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  const { bodies, multibody } = chain(physics, 2);
+  multibody.setCoordinates([0.6, -0.9]);
+  const h = multibody.massMatrix(),
+    n = multibody.dof;
+  assert.equal(n, 2);
+  near(h[0][1], h[1][0], 1e-9, 'the mass matrix is symmetric');
+  assert.ok(h[0][0] > 0 && h[0][0] * h[1][1] > h[0][1] * h[1][0], 'and positive definite');
+  // The Jacobian against the motion a small change of the coordinates makes (forward kinematics through setCoordinates).
+  const j = multibody.jacobian(bodies[1]),
+    q = multibody.coordinates();
+  for (let k = 0; k < n; k++) {
+    // A central difference: positions are single precision, so the step is not small.
+    const step = 1e-3,
+      plus = [...q],
+      minus = [...q];
+    plus[k] += step;
+    minus[k] -= step;
+    multibody.setCoordinates(plus);
+    const ahead = bodies[1].position;
+    multibody.setCoordinates(minus);
+    const behind = bodies[1].position;
+    for (let r = 0; r < 3; r++)
+      near((ahead[r] - behind[r]) / (2 * step), j[r][k], 2e-3, `Jacobian row ${r} column ${k}`);
+    multibody.setCoordinates(q);
+  }
+  // Kinetic energy: half the speeds times H times the speeds is the energy of the bodies (rotation about Z and translation).
+  multibody.setCoordinates([0.6, -0.9]);
+  const speeds = [1.3, -0.7];
+  // Give the bodies the velocities those joint speeds mean: the first turns at 1.3 about the pivot, the second adds -0.7 about its own pivot.
+  const [a, b] = bodies,
+    w1 = speeds[0],
+    w2 = speeds[0] + speeds[1],
+    pivot2 = [a.position[0], a.position[1], a.position[2]],
+    r1 = [a.position[0], a.position[1], a.position[2]],
+    r2 = [b.position[0] - pivot2[0], b.position[1] - pivot2[1], b.position[2] - pivot2[2]];
+  a.setAngularVelocity([0, 0, w1]);
+  a.setLinearVelocity([-w1 * r1[1], w1 * r1[0], 0]);
+  b.setAngularVelocity([0, 0, w2]);
+  b.setLinearVelocity([-w1 * r1[1] - w2 * r2[1], w1 * r1[0] + w2 * r2[0], 0]);
+  const half = 0.5 * speeds.reduce((sum, s, i) => sum + s * (h[i][0] * speeds[0] + h[i][1] * speeds[1]), 0);
+  let kinetic = 0;
+  for (const body of bodies) {
+    const v = body.linearVelocity,
+      w = body.angularVelocity;
+    kinetic += 0.5 * body.mass * (v[0] ** 2 + v[1] ** 2 + v[2] ** 2) + 0.5 * body.principalInertia[2] * w[2] ** 2;
+  }
+  near(half, kinetic, 1e-4, 'the mass matrix gives the kinetic energy');
+  // Inverse dynamics under no gravity at rest is H qdd; the bias is the same at rest as with the speeds set to zero.
+  const rest = multibody.inverseDynamics([1, 2], { gravity: [0, 0, 0] });
+  const damped = [0, 1].map((r) => h[r][0] * 1 + h[r][1] * 2);
+  // With speeds present the bias adds the Coriolis terms; check them against H qdd by removing them.
+  const bias = multibody.inverseDynamics(undefined, { gravity: [0, 0, 0] });
+  near(rest[0] - bias[0], damped[0], 1e-6, 'the acceleration part is H qdd, row 0');
+  near(rest[1] - bias[1], damped[1], 1e-6, 'and row 1');
+});
+
+test('a tree that is given its inverse dynamics torques follows the accelerations it was asked for', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  const { multibody } = chain(physics, 2);
+  multibody.setCoordinates([0.3, 0.4]);
+  // The accelerations a free swing has now: forward dynamics at zero torque, then the torques that reproduce them.
+  const free = multibody.forwardDynamics([0, 0]);
+  const torques = multibody.inverseDynamics(free);
+  near(torques[0], 0, 1e-6, 'the free swing needs no torque, joint 0');
+  near(torques[1], 0, 1e-6, 'joint 1');
+  assert.throws(() => multibody.inverseDynamics([1]), RangeError);
+  assert.throws(() => multibody.forwardDynamics([1]), RangeError);
+});
+
+test('a slider has the mass matrix and the torques of its closed forms', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  const root = physics.addBody(null, { type: 'fixed', colliders: [] });
+  const slider = physics.addBody(null, { position: [0, 0, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 2 } });
+  const mb = physics.addMultibody(root, [
+    { body: slider, joint: { type: 'prismatic', axis: [1, 0, 0], anchorA: [0, 0, 0], anchorB: [0, 0, 0] } },
+  ]);
+  near(mb.massMatrix()[0][0], 2, 1e-6, 'a slider has its mass');
+  near(mb.inverseDynamics([3], { gravity: [0, 0, 0] })[0], 6, 1e-6, 'a force of m a along the axis');
+  near(
+    mb.inverseDynamics([0], { gravity: [-9.81, 0, 0] })[0],
+    -2 * -9.81,
+    1e-4,
+    'and m g to hold it against gravity along the axis',
+  );
+  const j = mb.jacobian(slider);
+  near(j[0][0], 1, 1e-9, 'one metre a metre');
+  near(j[3][0], 0, 1e-9, 'with no spin');
+});

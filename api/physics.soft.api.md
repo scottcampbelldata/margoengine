@@ -1081,6 +1081,14 @@ class Multibody {
     kinematicBranch(body: PhysicsBody): PhysicsBody[];
     velocities(): number[];
     inverseKinematics(link: PhysicsBody, target: IkTarget, options?: IkOptions): IkResult;
+    massMatrix(): number[][];
+    jacobian(link: PhysicsBody, point?: Vec3): number[][];
+    inverseDynamics(accelerations?: readonly number[], options?: {
+        gravity?: Vec3;
+    }): number[];
+    forwardDynamics(torques: readonly number[], options?: {
+        gravity?: Vec3;
+    }): number[];
     remove(): void;
     markRemoved(): void;
 }

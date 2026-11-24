@@ -507,8 +507,8 @@ The standard floor every physics engine with multibodies ships, built here on th
 
 | Row | Feature | Who has it | Paper | WebGPU | WebGL2 | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| X-66 | Inverse dynamics (recursive Newton-Euler) | Bullet, MuJoCo | Walker and Orin, "Efficient Dynamic Computer Simulation of Robotic Mechanisms", J. Dyn. Sys. Meas. Control 104(3) 1982 | Wasm | Wasm | MISSING |
-| X-67 | Mass matrix and Jacobian queries | Bullet, MuJoCo | Featherstone, "Rigid Body Dynamics Algorithms", Springer 2008 | Wasm | Wasm | PARTIAL: the 2D point Jacobian `Articulation2D.jacobian`, `packages/physics2d/tests/articulation.test.js` "a long chain under a heavy end does not stretch, and the Jacobian matches finite motion". Open: the mass matrix, and any public Jacobian query in 3D (`multibody.inverseKinematics` uses one internally). |
+| X-66 | Inverse dynamics (recursive Newton-Euler) | Bullet, MuJoCo | Walker and Orin, "Efficient Dynamic Computer Simulation of Robotic Mechanisms", J. Dyn. Sys. Meas. Control 104(3) 1982 | Wasm | Wasm | DONE: `multibody.inverseDynamics(accelerations, {gravity})` and `forwardDynamics(torques)` (recursive Newton-Euler in world coordinates from each link's centre of mass), proven by `packages/physics/tests/next-multibody.test.js` "the mass matrix, the Jacobian and inverse dynamics of a pendulum match the closed forms", "the mass matrix of a double pendulum, its bias and its Jacobian agree with the motion the engine makes", "a tree that is given its inverse dynamics torques follows the accelerations it was asked for", "a slider has the mass matrix and the torques of its closed forms"; the root is the tree's frame and does not accelerate |
+| X-67 | Mass matrix and Jacobian queries | Bullet, MuJoCo | Featherstone, "Rigid Body Dynamics Algorithms", Springer 2008 | Wasm | Wasm | DONE: `multibody.massMatrix()` (symmetric positive definite, half the speeds times it times the speeds is the kinetic energy) and `multibody.jacobian(link, point)` (six rows by dof columns, matching the motion of forward kinematics), proven by `packages/physics/tests/next-multibody.test.js` "the mass matrix of a double pendulum, its bias and its Jacobian agree with the motion the engine makes"; the 2D point Jacobian `Articulation2D.jacobian` stays in physics2d |
 
 ## Solvers, scale and stepping
 
@@ -542,7 +542,7 @@ Counted from the rows on 2026-11-24 by `node scripts/check-rapier-parity.mjs`, o
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED | MISSING | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1, Rapier parity | 254 | 170 | 49 | 0 | 0 | 29 | 6 |
-| 2, beyond Rapier | 83 | 5 | 30 | 0 | 0 | 48 | 0 |
+| 2, beyond Rapier | 83 | 7 | 29 | 0 | 0 | 47 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The 2D rows have a finer page-by-page audit in [rapier-parity-2d.md](rapier-parity-2d.md), and the 3D collision and query rows a table of their own in [physics-collision-parity.md](physics-collision-parity.md).
 

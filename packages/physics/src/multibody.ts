@@ -2,6 +2,8 @@
 // This file builds and removes the tree and writes its columns; reading and setting its coordinates and the inverse
 // kinematics are in next/kinematics.ts.
 import { MargoError } from '@margoengine/math/errors';
+import { forwardDynamics, inverseDynamics, jacobian, massMatrix } from './dynamics.js';
+import type { Vec3 } from './math.js';
 import type { JointOptions } from './joints.js';
 import type { KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
@@ -170,6 +172,52 @@ export class Multibody {
   inverseKinematics(link: PhysicsBody, target: IkTarget, options: IkOptions = {}): IkResult {
     this.check();
     return inverseKinematics(this.owner.kernel, this, link, target, options);
+  }
+  /**
+   * The mass matrix H in joint coordinates (`dof` by `dof`, symmetric positive definite): the kinetic energy of the tree is
+   * half of `velocities()` times H times `velocities()`. The root is the frame of the tree and is not a coordinate. Needs every
+   * link to carry mass and inertia.
+   */
+  massMatrix(): number[][] {
+    this.check();
+    return massMatrix(this.owner.kernel, this);
+  }
+  /**
+   * The Jacobian of a point of a link: six rows (the point's velocity along x, y, z, then the link's angular velocity) by
+   * `dof` columns, so the point moves at J times `velocities()`. `point` is in the link's own frame (default its origin).
+   * @throws RangeError for a link that is not in this tree.
+   */
+  jacobian(link: PhysicsBody, point: Vec3 = [0, 0, 0]): number[][] {
+    this.check();
+    return jacobian(this.owner.kernel, this, link, point);
+  }
+  /**
+   * Inverse dynamics (the recursive Newton-Euler method): the torque of each joint coordinate (newtons for a slide, newton metres
+   * for a turn, in the order of `coordinates()`) that gives the joint accelerations `accelerations` (default none) at the tree's
+   * present coordinates and speeds, under `gravity` (default the world's). With no accelerations it is what holds the tree still
+   * against gravity and the speeds' Coriolis and centrifugal terms, the bias of the equation H qdd + bias = tau.
+   */
+  inverseDynamics(accelerations?: readonly number[], options: { gravity?: Vec3 } = {}): number[] {
+    this.check();
+    const dof = this.dof;
+    if (accelerations && accelerations.length !== dof)
+      throw new RangeError(`Give ${dof} joint accelerations, one for each coordinate.`);
+    return inverseDynamics(
+      this.owner.kernel,
+      this,
+      this.velocities(),
+      accelerations ?? new Array<number>(dof).fill(0),
+      options.gravity ?? [0, -9.81, 0],
+    );
+  }
+  /**
+   * Forward dynamics: the joint accelerations that `torques` give at the tree's present coordinates and speeds, under `gravity`
+   * (default 0, 0 and -9.81 down the y axis): H qdd = tau - bias.
+   */
+  forwardDynamics(torques: readonly number[], options: { gravity?: Vec3 } = {}): number[] {
+    this.check();
+    if (torques.length !== this.dof) throw new RangeError(`Give ${this.dof} joint torques, one for each coordinate.`);
+    return forwardDynamics(this.owner.kernel, this, this.velocities(), torques, options.gravity ?? [0, -9.81, 0]);
   }
   /** Releases the tree: the bodies stay, with their joints as ordinary joints that are no longer held to reduced coordinates. */
   remove(): void {

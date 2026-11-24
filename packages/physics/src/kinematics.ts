@@ -92,7 +92,7 @@ const unit: readonly Vec3[] = [
 ];
 
 /** A joint of the tree as the kernel holds it. */
-interface Link {
+export interface Link {
   index: number;
   parent: number;
   body: number;
@@ -107,7 +107,7 @@ interface Link {
   limits: ([number, number] | null)[];
 }
 
-function describe(kernel: KernelWorld, multibody: Multibody): { links: Link[] } {
+export function describe(kernel: KernelWorld, multibody: Multibody): { links: Link[] } {
   const c = kernel.columns,
     rows = [multibody.root.row, ...multibody.links.map((link) => link.body.row)],
     links: Link[] = [];
@@ -141,7 +141,7 @@ function describe(kernel: KernelWorld, multibody: Multibody): { links: Link[] } 
   return { links };
 }
 
-const poseOf = (kernel: KernelWorld, row: number): { p: V; q: Q } => {
+export const poseOf = (kernel: KernelWorld, row: number): { p: V; q: Q } => {
   const c = kernel.columns;
   return {
     p: [c.positionX[row]!, c.positionY[row]!, c.positionZ[row]!],
