@@ -54,6 +54,8 @@ export type {
 } from './shapes.js';
 export { Vehicle } from './vehicle.js';
 export type { VehicleOptions, VehicleInput, WheelOptions, WheelState } from './vehicle.js';
+export { DragJoint } from './drag.js';
+export type { DragOptions } from './drag.js';
 export { Rope } from './rope.js';
 export type { RopeOptions } from './rope.js';
 export { eulerToQuat } from './math.js';

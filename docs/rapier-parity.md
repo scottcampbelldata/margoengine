@@ -410,7 +410,7 @@ Every feature here is an optional, tree-shakable entry or package, never core an
 
 | Row | Feature | Who has it | Paper | WebGPU | WebGL2 | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| X-13 | Mouse or drag joint (pick and drag a body with a soft spring) | Box2D v3, Bullet picking | Catto, "Soft Constraints", GDC 2011 | Wasm | Wasm | MISSING: a `spring` joint to a kinematic body is the nearest thing; no pick-and-drag joint |
+| X-13 | Mouse or drag joint (pick and drag a body with a soft spring) | Box2D v3, Bullet picking | Catto, "Soft Constraints", GDC 2011 | Wasm | Wasm | DONE: `new DragJoint(physics, body, point, {frequency, damping, maxForce})` with `setTarget`, `gripPoint` and `remove`, proven by `packages/physics/tests/drag-joint.test.js` "a dragged body follows its target and hangs a little below it by gravity over the stiffness, whatever its mass" and "a drag joint takes the body by a point off its centre and turns it, and lets go on remove" |
 | X-14 | Breakable joints (break at a force or torque) with an event | Jolt, PhysX, Bullet | none needed; threshold on the solved impulse | Wasm | Wasm | DONE: `breakForce` and `breakTorque` on joints raise a `jointbreak` event once, and `repair` restores the joint (3D only), proven by `packages/physics/tests/next-joint-break.test.js` "a hanging weight of 98.1 N breaks a 50 N joint, once, and holds under a 200 N one"; 2D joints do not break |
 | X-15 | Gear joint | Jolt, Bullet | Baraff, "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996 | Wasm | Wasm | MISSING |
 | X-16 | Rack and pinion joint | Jolt | Baraff 1996 | Wasm | Wasm | MISSING |
@@ -542,7 +542,7 @@ Counted from the rows on 2026-11-24 by `node scripts/check-rapier-parity.mjs`, o
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED | MISSING | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1, Rapier parity | 254 | 184 | 42 | 0 | 0 | 22 | 6 |
-| 2, beyond Rapier | 83 | 7 | 29 | 0 | 0 | 47 | 0 |
+| 2, beyond Rapier | 83 | 8 | 29 | 0 | 0 | 46 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The 2D rows have a finer page-by-page audit in [rapier-parity-2d.md](rapier-parity-2d.md), and the 3D collision and query rows a table of their own in [physics-collision-parity.md](physics-collision-parity.md).
 

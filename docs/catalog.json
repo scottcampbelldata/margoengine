@@ -2803,6 +2803,7 @@
     "exports": [
       "CharacterController",
       "ContactModification",
+      "DragJoint",
       "HeightfieldCell",
       "KernelWorld",
       "Multibody",

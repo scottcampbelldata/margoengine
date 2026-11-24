@@ -300,6 +300,24 @@ export interface DebugRenderOptions {
     filter?: QueryFilter;
 }
 
+export class DragJoint implements PhysicsAttachment {
+    readonly body: PhysicsBody;
+    constructor(physics: Physics, body: PhysicsBody, point: Vec3, options?: DragOptions);
+    get targetPoint(): Vec3;
+    setTarget(point: Vec3): this;
+    gripPoint(): Vec3;
+    beforeStep(dt: number): void;
+    bodyRemoved(body: PhysicsBody): void;
+    remove(): void;
+    dispose(): void;
+}
+
+export interface DragOptions {
+    frequency?: number;
+    damping?: number;
+    maxForce?: number;
+}
+
 export interface HalfEdgeTopology {
     vertex: Uint32Array;
     twin: Uint32Array;

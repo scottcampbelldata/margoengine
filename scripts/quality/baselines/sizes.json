@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17755514,
+  "total": 17764042,
   "history": [
     {
       "date": "2026-10-24",
@@ -11541,6 +11541,12 @@
       "commit": "ec32ed7c9",
       "reason": "soft entry gains mesh bindings and skin collision: loader code only, the kernel is unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "a565f3c0c",
+      "reason": "physics: DragJoint (drag.ts, the soft constraint of a mouse joint): root entry budget 265,708 to 266,248 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -12297,7 +12303,7 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 265708,
+    "@margoengine/physics": 274236,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 66637,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 206519,
     "@margoengine/physics/decomposition": 11130,
