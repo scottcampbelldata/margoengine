@@ -47,6 +47,14 @@ export class SoftBodies implements PhysicsAttachment {
     setVolume(body: SoftBody, factor: number | null): void;
     attach(soft: SoftBody, index: number, body: PhysicsBody): void;
     release(soft: SoftBody, index: number, body?: PhysicsBody): boolean;
+    writeClusterSprings(body: SoftBody): void;
+    rewriteClusters(body: SoftBody, infos: ClusterInfo[], keep: number[], extra?: {
+        members: number[];
+        hertz: number;
+    }): void;
+    addCluster(body: SoftBody, indices: ArrayLike<number>, hertz: number): number;
+    removeCluster(body: SoftBody, cluster: number): void;
+    clusterProxy(body: SoftBody, cluster: number): PhysicsBody;
     relinkCells(body: SoftBody): void;
     writeCellMaterial(body: SoftBody): void;
     writeMaterial(body: SoftBody): void;
@@ -94,6 +102,10 @@ export class SoftBody {
     cellMaterial?: CellMaterial);
     removed: boolean;
     cellsTornSeen: Set<number>;
+    skin: Skin | null;
+    skinCells: Uint32Array<ArrayBuffer>;
+    clusterInfo: ClusterInfo[];
+    rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
     tornSeen: Set<number>;
@@ -128,6 +140,19 @@ export class SoftBody {
     bendEdges(): Uint32Array;
     isEdgeTorn(edge: number): boolean;
     tearEdge(edge: number): this;
+    numClusters(): number;
+    addCluster(indices: ArrayLike<number>, hertz?: number): number;
+    removeCluster(cluster: number): this;
+    clusterProxy(cluster: number): PhysicsBody;
+    rootBody(): PhysicsBody;
+    setClusterStiffnessScale(cluster: number, scale: number): this;
+    setClusterEdgeSoftness(cluster: number, softness: SoftSoftness | null): this;
+    setClusterTearResistance(cluster: number, scale: number): this;
+    enableClusterShapeMatching(cluster: number, on?: boolean, hertz?: number): this;
+    setClusterPinned(cluster: number, pinned: boolean): this;
+    setClusterKinematicTarget(cluster: number, position: Vec3, rotation?: Quat): this;
+    meshVertices(): Float32Array;
+    meshIndices(): Uint32Array;
     numCells(): number;
     cells(): Uint32Array;
     isCellTorn(cell: number): boolean;
@@ -175,6 +200,7 @@ export class SoftBodyDesc {
     clusterGroups: number[][];
     clusterHertz: number;
     massGiven: boolean;
+    skin: Skin | null;
     constructor(positions: ArrayLike<number> | readonly Vec3[]);
     get particleCount(): number;
     static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
@@ -197,6 +223,9 @@ export class SoftBodyDesc {
     setShapeMatching(on: boolean): this;
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
+    static cuboid(centre: Vec3, halfExtents: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
+    static volumetric(vertices: ArrayLike<number>, indices: ArrayLike<number>, size: number, skinned?: boolean, material?: CellMaterial): SoftBodyDesc;
+    setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
     addCellEdges(): this;
     setCellMaterial(material: CellMaterial): this;
@@ -367,6 +396,18 @@ interface CharacterMoveResult {
     grounded: boolean;
     collisions: number;
     slidingDownSlope: boolean;
+}
+
+interface ClusterInfo {
+    members: number[];
+    hertz: number;
+    matching: boolean;
+    stiffness: number;
+    edgeSoftness: SoftSoftness | null;
+    tearResistance: number;
+    proxy: PhysicsBody | null;
+    lin: Vec3;
+    ang: Vec3;
 }
 
 interface ColliderDistance {
@@ -1538,6 +1579,13 @@ type ShapeOptions = {
     shape: 'halfSpace';
     normal?: Vec3;
 };
+
+interface Skin {
+    vertices: Float32Array;
+    indices: Uint32Array;
+    cell: Uint32Array;
+    weight: Float32Array;
+}
 
 type Vec3 = readonly [number, number, number];
 ```

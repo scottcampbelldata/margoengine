@@ -621,3 +621,205 @@ test('a rope torn through becomes two ropes when asked to split edges too', asyn
   assert.deepEqual(event.pieces.map((piece) => piece.numParticles()).sort(), [5, 6]);
   assert.equal(event.destination(4)[0].body, event.pieces[0]);
 });
+
+// A closed, outward mesh of a box [0,1] x [0,0.5] x [0,0.5], twelve triangles.
+const boxMesh = (sx = 1, sy = 0.5, sz = 0.5) => {
+  const v = [];
+  for (const x of [0, sx]) for (const y of [0, sy]) for (const z of [0, sz]) v.push(x, y, z);
+  // Corner index: x * 4 + y * 2 + z.
+  const quads = [
+    [0, 1, 3, 2],
+    [4, 6, 7, 5],
+    [0, 4, 5, 1],
+    [2, 3, 7, 6],
+    [0, 2, 6, 4],
+    [1, 5, 7, 3],
+  ];
+  const i = [];
+  for (const [a, b, c, d] of quads) i.push(a, b, c, a, c, d);
+  return { vertices: v, indices: i };
+};
+
+test('volumetric fills a closed mesh with cells that hold it, and a skin rides in them', async () => {
+  const { physics, soft } = await create([0, 0, 0], 8, 4);
+  const { vertices, indices } = boxMesh();
+  const desc = SoftBodyDesc.volumetric(vertices, indices, 0.25, true);
+  const body = soft.create(desc);
+  // The cells hold the mesh: their volume is the box's, to the lattice's size.
+  assert.ok(body.restVolume() >= 0.25 - 1e-6, `the cells contain the box: ${body.restVolume()}`);
+  assert.ok(body.restVolume() < 0.25 * 2, `and not much more: ${body.restVolume()}`);
+  const skin = body.meshVertices();
+  assert.equal(skin.length, vertices.length);
+  for (let i = 0; i < skin.length; i++) near(skin[i], vertices[i], 1e-5, `skin vertex ${i} starts where the mesh is`);
+  assert.deepEqual([...body.meshIndices()], indices);
+  // The skin follows the cells: shifting every particle by a metre moves the skin by a metre.
+  for (let i = 0; i < body.numParticles(); i++)
+    body.setParticlePosition(i, [
+      body.particlePosition(i)[0] + 1,
+      body.particlePosition(i)[1],
+      body.particlePosition(i)[2],
+    ]);
+  const moved = body.meshVertices();
+  for (let i = 0; i < moved.length; i += 3) near(moved[i], vertices[i] + 1, 1e-4, `skin vertex ${i / 3} follows`);
+  steps(physics, 1);
+});
+
+test('volumetric and cuboid are checked, and a cuboid is a box', async () => {
+  const { vertices, indices } = boxMesh();
+  assert.throws(() => SoftBodyDesc.volumetric(vertices, [0, 1], 0.2), RangeError);
+  assert.throws(() => SoftBodyDesc.volumetric(vertices, indices, 0), RangeError);
+  assert.throws(() => SoftBodyDesc.volumetric(vertices, [0, 1, 99], 0.2), RangeError);
+  const { soft } = await create();
+  const a = soft.create(SoftBodyDesc.cuboid([0, 0, 0], [0.2, 0.1, 0.1], [2, 1, 1]));
+  near(a.restVolume(), 0.4 * 0.2 * 0.2, 1e-6, 'a cuboid of half extents fills them');
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setSkin(vertices, indices), RangeError);
+});
+
+const all = (body) => Array.from({ length: body.numParticles() }, (_, i) => i);
+
+test('a cluster has a rigid proxy that follows it and, joined to the world, holds it up', async () => {
+  const hang = async (joined) => {
+    const { physics, soft } = await create([0, -9.81, 0], 8, 4);
+    const body = soft.create(
+      SoftBodyDesc.box([-0.2, 1.8, -0.2], [0.4, 0.4, 0.4], [2, 2, 2], rubber({ youngsModulus: 1e5 })),
+    );
+    const cluster = body.addCluster(all(body), 20);
+    assert.equal(cluster, 0);
+    assert.equal(body.numClusters(), 1);
+    const proxy = body.clusterProxy(cluster);
+    assert.equal(body.clusterProxy(cluster), proxy, 'the same proxy every time');
+    near(proxy.mass, body.mass(), 1e-4, 'the proxy weighs what the cluster does');
+    if (joined) {
+      const anchor = physics.addBody(null, { type: 'fixed', position: [0, 2, 0] });
+      physics.addJoint(anchor, proxy, { type: 'spherical', anchorA: [0, 0, 0], anchorB: [0, 0, 0] });
+    }
+    steps(physics, 120);
+    return { body, proxy };
+  };
+  const free = await hang(false),
+    held = await hang(true);
+  near(free.proxy.position[1], free.body.centerOfMass()[1], 0.05, 'the proxy stands at the cluster');
+  assert.ok(free.body.centerOfMass()[1] < 1.2, `the body falls: ${free.body.centerOfMass()[1]}`);
+  assert.ok(
+    Math.abs(held.body.centerOfMass()[1] - 2) < 0.3,
+    `a joint to the proxy holds the body up: ${held.body.centerOfMass()[1]}`,
+  );
+});
+
+test('cluster settings reach the cells and edges inside the cluster', async () => {
+  const sag = async (scale) => {
+    const { physics, soft } = await create([0, -9.81, 0], 20, 8);
+    const desc = SoftBodyDesc.box([0, 0, 0], [1, 0.25, 0.25], [8, 2, 2], rubber({ youngsModulus: 3e5 }));
+    desc.setPinnedParticles(plane(desc, 0, 0)).setLinearDamping(4);
+    soft.cellDamping = 20;
+    const body = soft.create(desc);
+    body.setClusterStiffnessScale(body.addCluster(all(body)), scale);
+    steps(physics, 240);
+    const far = plane(desc, 0, 1);
+    return 0.125 - far.reduce((sum, i) => sum + body.particlePosition(i)[1], 0) / far.length;
+  };
+  const soft1 = await sag(1),
+    stiff = await sag(10);
+  assert.ok(
+    soft1 / stiff > 5 && soft1 / stiff < 20,
+    `ten times the stiffness sags about a tenth: ${soft1} against ${stiff}`,
+  );
+  const tears = async (resistance) => {
+    const { physics, soft } = await create([0, 0, 0], 20, 4);
+    const desc = SoftBodyDesc.box(
+      [0, 0, 0],
+      [0.6, 0.1, 0.1],
+      [6, 1, 1],
+      rubber({ youngsModulus: 5e4, tearStrain: 0.6 }),
+    );
+    const right = plane(desc, 0, 0.6);
+    desc.setPinnedParticles([...plane(desc, 0, 0), ...right]);
+    const body = soft.create(desc);
+    body.setClusterTearResistance(body.addCluster(all(body)), resistance);
+    for (let step = 0; step < 180; step++) {
+      const t = Math.min(step / 60, 1);
+      for (const i of right)
+        body.setParticleKinematicTarget(i, [0.6 * (1 + 0.7 * t), desc.positions[i * 3 + 1], desc.positions[i * 3 + 2]]);
+      physics.step();
+    }
+    return body.tornCells().length;
+  };
+  assert.ok(
+    (await tears(1)) > 0 && (await tears(10)) === 0,
+    'a cluster that is ten times as tough holds where the body tears',
+  );
+  const { physics, soft } = await create([0, -9.81, 0], 8, 4);
+  const rope = soft.create(SoftBodyDesc.rope([0, 3, 0], [0, 1, 0], 11, { bending: false }).setPinnedParticles([0]));
+  const loose = rope.addCluster(all(rope));
+  rope.setClusterEdgeSoftness(loose, { naturalFrequency: 4, dampingRatio: 1 });
+  steps(physics, 240);
+  assert.ok(
+    rope.particlePosition(10)[1] < 0.9,
+    `soft edges in the cluster let the rope stretch: ${rope.particlePosition(10)[1]}`,
+  );
+  rope.setClusterEdgeSoftness(loose, null);
+});
+
+test('a cluster is pinned, driven to a pose, given a spring and removed', async () => {
+  const { physics, soft } = await create([0, 0, 0], 8, 4);
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.4, 0.4, 0.4], [2, 2, 2], rubber({ youngsModulus: 1e5 }));
+  const body = soft.create(desc),
+    cluster = body.addCluster(all(body));
+  body.setClusterKinematicTarget(cluster, [1, 2, 3], [0, 0, 0, 1]);
+  steps(physics, 2);
+  const centre = body.centerOfMass();
+  near(centre[0], 1, 1e-3, 'the cluster went to the target x');
+  near(centre[1], 2, 1e-3, 'y');
+  near(centre[2], 3, 1e-3, 'and z');
+  assert.ok(body.isParticlePinned(0), 'it stays pinned there');
+  body.setClusterPinned(cluster, false);
+  assert.ok(!body.isParticlePinned(0));
+  const proxy = body.clusterProxy(cluster);
+  body.removeCluster(cluster);
+  assert.equal(body.numClusters(), 0);
+  assert.equal(proxy.valid, false, 'the proxy goes with the cluster');
+  assert.throws(() => body.clusterProxy(0), RangeError);
+  // The root body is the cluster of everything, once.
+  const root = body.rootBody();
+  assert.equal(body.rootBody(), root);
+  assert.equal(body.numClusters(), 1);
+  soft.remove(body);
+  assert.equal(root.valid, false, 'removing the body removes its root body');
+});
+
+test('a cluster spring that is switched on pulls a twisted body back to its shape', async () => {
+  const twisted = async (on) => {
+    const { physics, soft } = await create([0, 0, 0], 8, 4);
+    const desc = SoftBodyDesc.box(
+      [0, 0.5, 0],
+      [0.4, 0.4, 0.4],
+      [4, 4, 4],
+      rubber({ youngsModulus: 2e3 }),
+    ).setLinearDamping(1);
+    const body = soft.create(desc),
+      cluster = body.addCluster(all(body), 30);
+    body.enableClusterShapeMatching(cluster, on);
+    for (let i = 0; i < desc.particleCount; i++) {
+      const [x, y, z] = [desc.positions[i * 3], desc.positions[i * 3 + 1], desc.positions[i * 3 + 2]],
+        angle = x > 0.2 ? 0.6 : 0,
+        c = Math.cos(angle),
+        s = Math.sin(angle);
+      body.setParticlePosition(i, [0.2 + (x - 0.2) * c - (z - 0.2) * s, y, 0.2 + (x - 0.2) * s + (z - 0.2) * c]);
+    }
+    steps(physics, 300);
+    const p = body.particlePositions(),
+      centre = body.centerOfMass();
+    let worst = 0;
+    for (let i = 0; i < desc.particleCount; i++)
+      worst = Math.max(
+        worst,
+        Math.abs(
+          Math.hypot(p[i * 3] - centre[0], p[i * 3 + 1] - centre[1], p[i * 3 + 2] - centre[2]) -
+            Math.hypot(desc.positions[i * 3] - 0.2, desc.positions[i * 3 + 1] - 0.7, desc.positions[i * 3 + 2] - 0.2),
+        ),
+      );
+    return worst;
+  };
+  assert.ok((await twisted(true)) < 1e-3, 'the spring holds the shape');
+  assert.ok((await twisted(false)) > 0.02, 'without it the twist stays');
+});

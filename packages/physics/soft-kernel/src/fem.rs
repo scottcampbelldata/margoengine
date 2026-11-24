@@ -114,6 +114,13 @@ pub struct Fem {
     pub comega: Col<f32>,
     pub member: Col<u32>,
     pub rest: [Col<f32>; 3],
+    /// Per cluster: whether a rigid proxy follows it (1) and, when it does, where the group stands (centre, rotation as a
+    /// quaternion x y z w), how fast its centre moves and how fast it turns, as the substep that ran last left them.
+    pub proxy: Col<u32>,
+    pub pos: [Col<f32>; 3],
+    pub quat: [Col<f32>; 4],
+    pub lin: [Col<f32>; 3],
+    pub ang: [Col<f32>; 3],
 }
 
 impl Fem {
@@ -169,6 +176,11 @@ impl Fem {
             comega: F,
             member: U,
             rest: [F; 3],
+            proxy: U,
+            pos: [F; 3],
+            quat: [F; 4],
+            lin: [F; 3],
+            ang: [F; 3],
         }
     }
 }
@@ -220,6 +232,24 @@ fn frob(a: &M3) -> f32 {
 
 /// The rotation of the polar decomposition a = R S, a fixed number of scaled Newton steps (Higham 1986); the identity for a
 /// matrix with no inverse. An orthogonal factor with determinant -1 (an inverted element) is turned to a rotation by its sign.
+/// The unit quaternion x y z w of a rotation matrix (Shepperd's method, which keeps the largest term in the divisor).
+fn quaternion_of(r: &M3) -> [f32; 4] {
+    let trace = r[0] + r[4] + r[8];
+    if trace > 0.0 {
+        let s = 2.0 * sqrt(trace + 1.0);
+        [(r[7] - r[5]) / s, (r[2] - r[6]) / s, (r[3] - r[1]) / s, 0.25 * s]
+    } else if r[0] > r[4] && r[0] > r[8] {
+        let s = 2.0 * sqrt(1.0 + r[0] - r[4] - r[8]);
+        [0.25 * s, (r[1] + r[3]) / s, (r[2] + r[6]) / s, (r[7] - r[5]) / s]
+    } else if r[4] > r[8] {
+        let s = 2.0 * sqrt(1.0 + r[4] - r[0] - r[8]);
+        [(r[1] + r[3]) / s, 0.25 * s, (r[5] + r[7]) / s, (r[2] - r[6]) / s]
+    } else {
+        let s = 2.0 * sqrt(1.0 + r[8] - r[0] - r[4]);
+        [(r[2] + r[6]) / s, (r[5] + r[7]) / s, 0.25 * s, (r[3] - r[1]) / s]
+    }
+}
+
 fn rotation_of(a: &M3) -> M3 {
     let mut x = *a;
     for _ in 0..12 {
@@ -271,6 +301,13 @@ impl World {
             c.resize(clusters);
         }
         f.comega.resize(clusters);
+        f.proxy.resize(clusters);
+        for c in f.pos.iter_mut().chain(f.lin.iter_mut()).chain(f.ang.iter_mut()) {
+            c.resize(clusters);
+        }
+        for c in f.quat.iter_mut() {
+            c.resize(clusters);
+        }
         f.member.resize(members);
         for c in f.rest.iter_mut() {
             c.resize(members);
@@ -604,6 +641,91 @@ impl World {
         }
     }
 
+    /// The mass, centre of mass and best-fit rotation (polar decomposition of the covariance, Mueller et al. 2005) of cluster `c`.
+    fn cluster_frame(&self, c: usize) -> (f32, [f32; 3], M3) {
+        let (start, count) = (self.fem.cstart[c] as usize, self.fem.ccount[c] as usize);
+        let (mut mass, mut cx, mut cy, mut cz) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+        for k in 0..count {
+            let p = self.fem.member[start + k] as usize;
+            let m = if self.w[p] > 0.0 { 1.0 / self.w[p] } else { 1e6 };
+            mass += m;
+            cx += m * self.x[p];
+            cy += m * self.y[p];
+            cz += m * self.z[p];
+        }
+        let centre = [cx / mass, cy / mass, cz / mass];
+        let mut a = [0.0f32; 9];
+        for k in 0..count {
+            let p = self.fem.member[start + k] as usize;
+            let m = if self.w[p] > 0.0 { 1.0 / self.w[p] } else { 1e6 };
+            let d = [self.x[p] - centre[0], self.y[p] - centre[1], self.z[p] - centre[2]];
+            let q = [self.fem.rest[0][start + k], self.fem.rest[1][start + k], self.fem.rest[2][start + k]];
+            for r in 0..3 {
+                for s in 0..3 {
+                    a[3 * r + s] += m * d[r] * q[s];
+                }
+            }
+        }
+        (mass, centre, rotation_of(&a))
+    }
+
+    /// Where every proxied cluster stands and how it moves, from the particles after this substep's solve and contacts.
+    fn proxy_outputs(&mut self, h: f32) {
+        for c in 0..self.fem.clusters {
+            if self.fem.proxy[c] == 0 || self.fem.ccount[c] == 0 {
+                continue;
+            }
+            let (start, count) = (self.fem.cstart[c] as usize, self.fem.ccount[c] as usize);
+            let (mass, centre, r) = self.cluster_frame(c);
+            let inv = 1.0 / h;
+            let (mut vx, mut vy, mut vz) = (0.0f32, 0.0f32, 0.0f32);
+            for k in 0..count {
+                let p = self.fem.member[start + k] as usize;
+                let m = if self.w[p] > 0.0 { 1.0 / self.w[p] } else { 1e6 };
+                vx += m * (self.x[p] - self.px[p]) * inv;
+                vy += m * (self.y[p] - self.py[p]) * inv;
+                vz += m * (self.z[p] - self.pz[p]) * inv;
+            }
+            let v = [vx / mass, vy / mass, vz / mass];
+            // Angular momentum and inertia about the centre, then omega = I^-1 L.
+            let (mut l, mut inertia) = ([0.0f32; 3], [0.0f32; 9]);
+            for k in 0..count {
+                let p = self.fem.member[start + k] as usize;
+                let m = if self.w[p] > 0.0 { 1.0 / self.w[p] } else { 1e6 };
+                let d = [self.x[p] - centre[0], self.y[p] - centre[1], self.z[p] - centre[2]];
+                let u = [(self.x[p] - self.px[p]) * inv - v[0], (self.y[p] - self.py[p]) * inv - v[1], (self.z[p] - self.pz[p]) * inv - v[2]];
+                l[0] += m * (d[1] * u[2] - d[2] * u[1]);
+                l[1] += m * (d[2] * u[0] - d[0] * u[2]);
+                l[2] += m * (d[0] * u[1] - d[1] * u[0]);
+                let dd = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+                for a in 0..3 {
+                    for b in 0..3 {
+                        inertia[3 * a + b] += m * (if a == b { dd } else { 0.0 } - d[a] * d[b]);
+                    }
+                }
+            }
+            let omega = match inverse(&inertia) {
+                Some(i) => [i[0] * l[0] + i[1] * l[1] + i[2] * l[2], i[3] * l[0] + i[4] * l[1] + i[5] * l[2], i[6] * l[0] + i[7] * l[1] + i[8] * l[2]],
+                None => [0.0; 3],
+            };
+            let q = quaternion_of(&r);
+            let f = &mut self.fem;
+            for k in 0..3 {
+                f.pos[k][c] = centre[k];
+                f.lin[k][c] = v[k];
+                f.ang[k][c] = omega[k];
+            }
+            for k in 0..4 {
+                f.quat[k][c] = q[k];
+            }
+        }
+    }
+
+    /// Works out the pose and speeds of every proxied cluster from where the particles are.
+    pub fn fem_proxies(&mut self, h: f32) {
+        self.proxy_outputs(h);
+    }
+
     /// Starts a step: every body may tear as many elements as its material allows.
     pub fn fem_step_begin(&mut self) {
         for b in 0..self.fem.bodies {
@@ -680,6 +802,7 @@ impl World {
         }
         self.edges_end(h);
         self.tear_over_threshold();
+        self.proxy_outputs(h);
     }
 
     /// Plastic flow and the tear load of every edge.

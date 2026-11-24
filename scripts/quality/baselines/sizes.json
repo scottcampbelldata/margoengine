@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17698532,
+  "total": 17710240,
   "history": [
     {
       "date": "2026-10-24",
@@ -11499,6 +11499,12 @@
       "commit": "8befd3e01",
       "reason": "soft entry gains the exact solve of rigid edges and body links (conjugate gradient with Newton steps): lazy kernel 35,674 to 41,105 B gzip, the loader slightly.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "2912aa6fd",
+      "reason": "physics/soft: clusters with rigid proxies and per-cluster settings, volumetric builders with skins: entry 59,915 to 63,603 B gzip budget (base 16,877 to 20,011, kernel blueprint 42,339 to 43,412: the cluster frame, its velocities and the quaternion are computed in the kernel so the step stays on its exact operations); a second entry would load the same kernel",
+      "grew": 3
     }
   ],
   "items": {
@@ -12259,9 +12265,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 59915,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 16877,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 42339,
+    "@margoengine/physics/soft": 65512,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 20612,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 44715,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

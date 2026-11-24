@@ -26,6 +26,8 @@ fem_columns! {
     (e_yield, e_yield), (e_creep, e_creep), (e_max, e_max), (e_flow, e_flow), (e_rest0, e_rest0), (e_force, e_force),
     (e_strain, e_strain), (e_smooth, e_smooth),
     (bd_tear_max, tear_max), (bd_min_piece, min_piece),
+    (cproxy, proxy), (cpx, pos[0]), (cpy, pos[1]), (cpz, pos[2]), (cqx, quat[0]), (cqy, quat[1]), (cqz, quat[2]), (cqw, quat[3]),
+    (clx, lin[0]), (cly, lin[1]), (clz, lin[2]), (cax, ang[0]), (cay, ang[1]), (caz, ang[2]),
 }
 
 /// Makes room for tetrahedra, clusters and cluster members. Views over the memory are stale after it, and so are the soft world's.
@@ -83,6 +85,12 @@ pub extern "C" fn soft_fem_reserve_elements(edges: u32, bodies: u32) {
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_step_begin() {
     world().fem_step_begin();
+}
+
+/// Works out where every proxied cluster stands now (its velocities read the last substep of length `h`).
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_proxies(h: f32) {
+    world().fem_proxies(h);
 }
 
 /// The number of tetrahedra in use.
