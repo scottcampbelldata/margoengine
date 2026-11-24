@@ -172,3 +172,57 @@ test('a mesh, a height field and a voxel grid as the query shape cast and overla
     assert.equal(own, rapier, `overlap of ${shape.shape} at ${position}`);
   }
 });
+
+test('a shape sliding along a surface it does not touch is no hit, whatever the contact margin, as on Rapier', () => {
+  const floors = {
+    box: [{ shape: 'box', halfExtents: [20, 0.5, 20] }, -0.5],
+    hull: [
+      {
+        shape: 'convexHull',
+        points: [-20, -1, -20, 20, -1, -20, 20, 0, -20, -20, 0, -20, -20, -1, 20, 20, -1, 20, 20, 0, 20, -20, 0, 20],
+      },
+      0,
+    ],
+    mesh: [
+      { shape: 'trimesh', vertices: [-20, 0, -20, -20, 0, 20, 20, 0, -20, 20, 0, 20], indices: [0, 1, 2, 2, 1, 3] },
+      0,
+    ],
+  };
+  const casters = [
+    [{ shape: 'sphere', radius: 0.5 }, 0.5],
+    [{ shape: 'box', halfExtents: [0.5, 0.5, 0.5] }, 0.5],
+    [{ shape: 'capsule', halfHeight: 0.5, radius: 0.3 }, 0.8],
+  ];
+  for (const [name, [floor, y]] of Object.entries(floors)) {
+    const pair = [new Physics(null, { gravity: [0, 0, 0] }), new RapierPhysics(null, { gravity: [0, 0, 0] })];
+    for (const physics of pair) {
+      physics.addBody(null, { type: 'fixed', position: [0, y, 0], colliders: floor });
+      physics.step();
+    }
+    for (const gap of [0.005, 0.02, 0.05]) {
+      for (const [shape, rest] of casters) {
+        const [own, rapier] = pair.map((p) =>
+          p.shapeCast(shape, [0, rest + gap, 0], [0, 0, 0, 1], [1, 0, 0], { maxDistance: 10, stopAtPenetration: true }),
+        );
+        assert.equal(rapier, null, `Rapier ${name} ${shape.shape} at ${gap}`);
+        assert.equal(own, null, `${name}: a ${shape.shape} ${gap} m above slides without a hit`);
+      }
+    }
+    // Overlapping, the same cast is a hit at 0; falling onto the floor it hits where the gap says.
+    for (const [shape, rest] of casters) {
+      const [own, rapier] = pair.map((p) =>
+        p.shapeCast(shape, [0, rest - 0.02, 0], [0, 0, 0, 1], [1, 0, 0], { maxDistance: 10, stopAtPenetration: true }),
+      );
+      assert.equal(own?.distance, 0, `${name} ${shape.shape} inside`);
+      assert.equal(rapier?.distance, 0);
+      const [fall, rfall] = pair.map((p) =>
+        p.shapeCast(shape, [0, rest + 0.3, 0], [0, 0, 0, 1], [0, -1, 0], { maxDistance: 10 }),
+      );
+      assert.ok(
+        Math.abs(fall.distance - 0.3) < 2e-3 && Math.abs(fall.distance - rfall.distance) < 2e-3,
+        `${name} ${shape.shape} falls ${fall.distance} vs ${rfall.distance}`,
+      );
+    }
+    for (const p of pair) p.dispose();
+  }
+});

@@ -125,7 +125,7 @@ pub struct Projection {
     pub inside: bool,
 }
 
-const TOLERANCE: f32 = 1e-6;
+const TOLERANCE: f32 = 1e-12;
 const ITERATIONS: usize = 64;
 
 /// The first touch of `a` moving along unit `r` with still `b` (one frame), within `max`, stopping `margin` short:
