@@ -431,3 +431,54 @@ test('self contacts need triangles', async () => {
     RangeError,
   );
 });
+
+test('a fast particle does not pass through a thin wall', async () => {
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [3, 1, 0],
+    colliders: { shape: 'box', halfExtents: [0.01, 2, 2], friction: 0 },
+  });
+  const ball = soft.create(new SoftBodyDesc([0, 1, 0]).setParticleRadius(0.02));
+  // 60 m/s moves it a metre a step: the 2 cm wall is crossed inside one step.
+  ball.setParticleVelocity(0, [60, 0, 0]);
+  steps(physics, 20);
+  const x = ball.particlePosition(0)[0];
+  assert.ok(x < 3, `it is held on this side of the wall: ${x}`);
+});
+
+test('a fast paddle carries a particle along instead of passing it', async () => {
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  const paddle = physics.addBody(null, {
+    type: 'kinematicVelocity',
+    position: [0, 0, 0],
+    colliders: { shape: 'box', halfExtents: [1, 0.01, 1], friction: 0 },
+  });
+  const ball = soft.create(new SoftBodyDesc([0, 0.5, 0]).setParticleRadius(0.02));
+  // 40 m/s up: it moves two thirds of a metre a step, past the particle's 0.5 m in one step.
+  paddle.setLinearVelocity([0, 40, 0]);
+  steps(physics, 4);
+  assert.ok(
+    ball.particlePosition(0)[1] > paddle.position[1],
+    `the particle is on top of the paddle: ${ball.particlePosition(0)[1]} over ${paddle.position[1]}`,
+  );
+});
+
+test('collision groups decide which colliders the particles meet', async () => {
+  const run = async (groups) => {
+    const { physics, soft } = await create();
+    // A floor in group 1 that meets group 1.
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [5, 0.5, 5], collisionGroups: 0x00010001 },
+    });
+    const ball = soft.create(new SoftBodyDesc([0, 1, 0]).setParticleRadius(0.02).setCollisionGroups(groups));
+    steps(physics, 120);
+    return ball.particlePosition(0)[1];
+  };
+  assert.ok((await run(0x00010001)) > 0, 'a particle of the same group rests on the floor');
+  assert.ok((await run(0x00020002)) < -1, 'a particle of another group falls through it');
+  const desc = new SoftBodyDesc([0, 0, 0]);
+  assert.throws(() => desc.setCollisionGroups(-1), RangeError);
+});

@@ -80,6 +80,7 @@ export class SoftBody {
     triangleList: Uint32Array<ArrayBuffer>;
     surface: PhysicsBody | null;
     matched: boolean;
+    collisionGroups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
     get valid(): boolean;
@@ -134,6 +135,7 @@ export class SoftBodyDesc {
     damping: number;
     shift: Vec3;
     shapeMatching: boolean;
+    groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
     triangles: number[];
@@ -155,6 +157,7 @@ export class SoftBodyDesc {
     setSelfContacts(on: boolean, { friction }?: {
         friction?: number;
     }): this;
+    setCollisionGroups(groups: number): this;
     setShapeMatching(on: boolean): this;
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;

@@ -15,7 +15,7 @@ static mut WORLD: World = World {
     iiyz: Col::new(), iizz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0, fem: crate::fem::Fem::new(), rx: Col::new(), ry: Col::new(), rz: Col::new(), slx: Col::new(), sly: Col::new(),
     slz: Col::new(), sw: Col::new(), b_on: Col::new(), b_omega: Col::new(), b_zeta: Col::new(), b_first: Col::new(),
     b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(), kc: Col::new(), knx: Col::new(), kny: Col::new(), knz: Col::new(),
-    kd: Col::new(), kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kf: Col::new(),
+    kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -42,7 +42,7 @@ columns! {
     c_kind, cx, cy, cz, qx, qy, qz, qw, sx, sy, sz, friction, lvx, lvy, lvz, avx, avy, avz, mx, my, mz,
     jx, jy, jz, kx, ky, kz, wm, iixx, iixy, iixz, iiyy, iiyz, iizz,
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
-    kc, knx, kny, knz, kd, kpx, kpy, kpz, kf,
+    kc, knx, kny, knz, kpx, kpy, kpz, kvx, kvy, kvz, kf,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -80,8 +80,8 @@ pub extern "C" fn soft_pre(h: f32, iterations: u32, gx: f32, gy: f32, gz: f32) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn soft_apply(h: f32) {
-    world().apply_contacts(h);
+pub extern "C" fn soft_apply(h: f32, tau: f32) {
+    world().apply_contacts(h, tau);
 }
 
 #[unsafe(no_mangle)]

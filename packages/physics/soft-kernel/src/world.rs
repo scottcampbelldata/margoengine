@@ -14,6 +14,8 @@ pub const TARGETED: u32 = 2;
 pub const TORN: u32 = 1;
 /// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
 pub const NONE: u32 = 0;
+/// Planes held for each particle.
+pub const SLOTS: usize = 4;
 
 use crate::math::{abs, sign, sqrt};
 use crate::col::Col;
@@ -112,16 +114,19 @@ pub struct World {
     pub bqy: Col<f32>,
     pub bqz: Col<f32>,
     pub bqw: Col<f32>,
-    // The contact each particle meets in the staged step (`apply_contacts`): the body row of the contacts table plus one (0 for
-    // none), the unit normal out of the surface, how far to push along it, the surface point and the friction coefficient.
+    // The planes each particle meets in the staged step, `SLOTS` a particle (slot `s` of particle `i` at row `i * SLOTS + s`):
+    // the body row of the contacts table plus one (0 for none), the unit normal out of the surface, a point on it at the start
+    // of the step, its velocity there and the friction coefficient. `apply_contacts` keeps a particle on the outer side of each.
     pub kc: Col<u32>,
     pub knx: Col<f32>,
     pub kny: Col<f32>,
     pub knz: Col<f32>,
-    pub kd: Col<f32>,
     pub kpx: Col<f32>,
     pub kpy: Col<f32>,
     pub kpz: Col<f32>,
+    pub kvx: Col<f32>,
+    pub kvy: Col<f32>,
+    pub kvz: Col<f32>,
     pub kf: Col<f32>,
     /// Tetrahedra and clusters (src/fem.rs).
     pub fem: crate::fem::Fem,
@@ -153,10 +158,13 @@ impl World {
         grow(&mut self.b_on, bodies);
         grow(&mut self.b_first, bodies);
         grow(&mut self.b_count, bodies);
-        for v in [&mut self.knx, &mut self.kny, &mut self.knz, &mut self.kd, &mut self.kpx, &mut self.kpy, &mut self.kpz, &mut self.kf] {
-            grow(v, particles);
+        for v in [
+            &mut self.knx, &mut self.kny, &mut self.knz, &mut self.kpx, &mut self.kpy, &mut self.kpz, &mut self.kvx, &mut self.kvy,
+            &mut self.kvz, &mut self.kf,
+        ] {
+            grow(v, particles * SLOTS);
         }
-        grow(&mut self.kc, particles);
+        grow(&mut self.kc, particles * SLOTS);
         grow(&mut self.pflags, particles);
         grow(&mut self.pbody, particles);
         for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear] {
@@ -357,30 +365,45 @@ impl World {
                 continue;
             }
             let friction = self.friction[c];
-            self.resolve(i, c, [nx, ny, nz], -gap, friction, h);
+            // The surface moves as the body does: its velocity plus its spin about the point.
+            let (rx, ry, rz) = (self.x[i] - self.mx[c], self.y[i] - self.my[c], self.z[i] - self.mz[c]);
+            let surface = [
+                self.lvx[c] + self.avy[c] * rz - self.avz[c] * ry,
+                self.lvy[c] + self.avz[c] * rx - self.avx[c] * rz,
+                self.lvz[c] + self.avx[c] * ry - self.avy[c] * rx,
+            ];
+            self.resolve(i, c, [nx, ny, nz], -gap, surface, friction, h);
         }
     }
 
-    /// Meets the contact each particle holds (`kc` to `kf`) and clears it: the host found these with its own queries.
-    pub fn apply_contacts(&mut self, h: f32) {
+    /// Keeps every particle on the outer side of the planes it holds (`kc` to `kf`), each plane's point carried along its
+    /// velocity for `tau` seconds since the start of the step: the host found them once for the step with its own query.
+    pub fn apply_contacts(&mut self, h: f32, tau: f32) {
         for i in 0..self.particles {
-            let c = self.kc[i];
-            if c == NONE {
-                continue;
-            }
-            self.kc[i] = NONE;
-            let c = c - 1;
             if self.w[i] <= 0.0 {
                 continue;
             }
-            let (n, push, friction) = ([self.knx[i], self.kny[i], self.knz[i]], self.kd[i], self.kf[i]);
-            self.resolve(i, c as usize, n, push, friction, h);
+            for s in 0..SLOTS {
+                let k = i * SLOTS + s;
+                let c = self.kc[k];
+                if c == NONE {
+                    continue;
+                }
+                let n = [self.knx[k], self.kny[k], self.knz[k]];
+                let v = [self.kvx[k], self.kvy[k], self.kvz[k]];
+                let p = [self.kpx[k] + v[0] * tau, self.kpy[k] + v[1] * tau, self.kpz[k] + v[2] * tau];
+                let d = (self.x[i] - p[0]) * n[0] + (self.y[i] - p[1]) * n[1] + (self.z[i] - p[2]) * n[2] - self.radius[i];
+                if d < 0.0 {
+                    let friction = self.kf[k];
+                    self.resolve(i, (c - 1) as usize, n, -d, v, friction, h);
+                }
+            }
         }
     }
 
     /// Pushes particle `i` out of the surface of body row `c` by `push` along the unit normal `n`, with friction, and gives
     /// the body what that cost.
-    fn resolve(&mut self, i: usize, c: usize, n: [f32; 3], push: f32, friction: f32, h: f32) {
+    fn resolve(&mut self, i: usize, c: usize, n: [f32; 3], push: f32, surface: [f32; 3], friction: f32, h: f32) {
         let m = 1.0 / self.w[i];
         let (nx, ny, nz) = (n[0], n[1], n[2]);
         // The contact point, from the body's centre of mass, and how easily the body gives way there along the normal:
@@ -398,10 +421,7 @@ impl World {
         self.y[i] += ny * push * share;
         self.z[i] += nz * push * share;
         // Friction as a bounded displacement across the surface (Macklin et al. 2014, "Unified Particle Physics").
-        let (rx, ry, rz) = (self.x[i] - self.mx[c], self.y[i] - self.my[c], self.z[i] - self.mz[c]);
-        let sx = self.lvx[c] + self.avy[c] * rz - self.avz[c] * ry;
-        let sy = self.lvy[c] + self.avz[c] * rx - self.avx[c] * rz;
-        let sz = self.lvz[c] + self.avx[c] * ry - self.avy[c] * rx;
+        let (sx, sy, sz) = (surface[0], surface[1], surface[2]);
         let mut ux = self.x[i] - self.px[i] - sx * h;
         let mut uy = self.y[i] - self.py[i] - sy * h;
         let mut uz = self.z[i] - self.pz[i] - sz * h;

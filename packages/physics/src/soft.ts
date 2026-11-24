@@ -16,7 +16,7 @@ interface SoftExports extends WebAssembly.Exports {
   soft_step(dt: number, substeps: number, iterations: number, gx: number, gy: number, gz: number): void;
   soft_begin(dt: number): void;
   soft_pre(h: number, iterations: number, gx: number, gy: number, gz: number): void;
-  soft_apply(h: number): void;
+  soft_apply(h: number, tau: number): void;
   soft_post(h: number): void;
   soft_finish(): void;
   soft_cloth_reserve(triangles: number, contacts: number): number;
@@ -236,6 +236,7 @@ export class SoftBodyDesc {
   /** @internal */ damping = 0;
   /** @internal */ shift: Vec3 = [0, 0, 0];
   /** @internal */ shapeMatching = false;
+  /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
   /** @internal */ triangles: number[] = [];
@@ -398,6 +399,18 @@ export class SoftBodyDesc {
     if (!(friction >= 0 && Number.isFinite(friction))) throw new RangeError('Friction is 0 or more.');
     this.selfContacts = on;
     this.selfFriction = friction;
+    return this;
+  }
+
+  /**
+   * Which colliders the particles meet, as a collider's packed `collisionGroups` word (membership in the high 16 bits, the
+   * filter in the low 16): a particle meets a collider when each one's filter has a group the other is a member of.
+   * Left out, every collider is met.
+   */
+  setCollisionGroups(groups: number): this {
+    if (!Number.isInteger(groups) || groups < 0 || groups > 0xffffffff)
+      throw new RangeError("Collision groups is a packed 32-bit word, as a collider's collisionGroups.");
+    this.groups = groups;
     return this;
   }
 
@@ -715,6 +728,9 @@ export class SoftBody {
   /** @internal The fixed body that holds this body's surface collider, once it has one. */
   surface: PhysicsBody | null = null;
   /** @internal Whether shape matching holds this body. */ matched = false;
+  /** @internal The packed groups the particles meet colliders by; undefined meets every collider. */ collisionGroups:
+    | number
+    | undefined = undefined;
   /** @internal Whether its triangles are in the cloth contact search, and how rough the cloth is. */ selfContacts = false;
   /** @internal */ selfFriction = 0;
 
@@ -1295,6 +1311,7 @@ export class SoftBodies implements PhysicsAttachment {
     );
     body.triangleList = Uint32Array.from(desc.triangles);
     body.matched = desc.shapeMatching;
+    body.collisionGroups = desc.groups;
     body.selfContacts = desc.selfContacts;
     body.selfFriction = desc.selfFriction;
     if (cells) {
@@ -1565,11 +1582,11 @@ export class SoftBodies implements PhysicsAttachment {
     this.reserve(this.particleCount, this.edgeCount, this.bodies.length, 0);
     this.view = null;
     this.exports.soft_fem_damping(this.cellDamping);
+    this.findPlanes(dt, rows, bodies);
     this.exports.soft_begin(dt);
     for (let piece = 0; piece < this.substeps; piece++) {
       this.exports.soft_pre(h, this.iterations, g[0], g[1], g[2]);
-      // Two asks a piece: the second finds what the first's push-out ran the particle into (a corner).
-      for (let pass = 0; pass < 2; pass++) this.meet(h, rows, bodies);
+      this.exports.soft_apply(h, h * (piece + 1));
       this.exports.soft_post(h);
     }
     this.exports.soft_finish();
@@ -1590,64 +1607,97 @@ export class SoftBodies implements PhysicsAttachment {
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, c);
   }
 
-  /** Asks the rigid world what each free particle's move met, hands the kernel the contacts and lets it resolve them. */
-  private meet(h: number, rows: Map<number, number>, bodies: PhysicsBody[]): void {
+  /**
+   * Asks the rigid world once for the step what each free particle will meet: up to four planes each, from the rigid world's
+   * swept contact query (every shape, a moving collider swept along its own motion, a deformable mesh's vertex speeds), and
+   * hands them to the kernel, which keeps the particle outside every one at each piece of the step.
+   */
+  private findPlanes(dt: number, rows: Map<number, number>, bodies: PhysicsBody[]): void {
     let c = this.columns();
-    const kernel = this.physics.kernel;
+    c.kc.fill(0);
+    const g = this.physics.gravity;
+    interface Found {
+      row: number;
+      slot: number;
+      collider: number;
+      body: number;
+      normal: Vec3;
+      point: Vec3;
+      velocity: Vec3;
+    }
+    const found: Found[] = [];
     for (const soft of this.bodies) {
       const free: number[] = [];
       for (let i = 0; i < soft.particles; i++) if (c.w[soft.firstParticle + i]! > 0) free.push(soft.firstParticle + i);
       if (free.length === 0) continue;
-      const from = new Float32Array(free.length * 3),
+      const scale = c.gravity_scale[soft.handle]!,
+        from = new Float32Array(free.length * 3),
         to = new Float32Array(free.length * 3),
-        radius = new Float32Array(free.length);
+        radius = new Float32Array(free.length),
+        margin = new Float32Array(free.length);
       free.forEach((row, k) => {
-        from[k * 3] = c.px[row]!;
-        from[k * 3 + 1] = c.py[row]!;
-        from[k * 3 + 2] = c.pz[row]!;
-        to[k * 3] = c.x[row]!;
-        to[k * 3 + 1] = c.y[row]!;
-        to[k * 3 + 2] = c.z[row]!;
+        const v = [c.vx[row]! + g[0] * scale * dt, c.vy[row]! + g[1] * scale * dt, c.vz[row]! + g[2] * scale * dt];
+        from[k * 3] = c.x[row]!;
+        from[k * 3 + 1] = c.y[row]!;
+        from[k * 3 + 2] = c.z[row]!;
+        to[k * 3] = c.x[row]! + v[0]! * dt;
+        to[k * 3 + 1] = c.y[row]! + v[1]! * dt;
+        to[k * 3 + 2] = c.z[row]! + v[2]! * dt;
         radius[k] = c.radius[row]!;
+        // A particle may end the step elsewhere than this guess (other forces, the edges), so planes within twice its move are kept.
+        margin[k] = Math.max(0.03, 2 * Math.hypot(v[0]! * dt, v[1]! * dt, v[2]! * dt) + c.radius[row]!);
       });
       // Sensors are left out (query flag 8), and so is the body's own surface collider.
-      const contacts = kernel.probeParticles(from, to, radius, { flags: 8, excludeBody: soft.surface?.row });
-      contacts.forEach((contact, k) => {
-        if (!contact) return;
-        const row = free[k]!,
-          n = contact.normal,
-          // Past a thin wall the move ends beyond the surface: push the end back onto the plane the sweep touched.
-          push = Math.max(
-            contact.depth,
-            (contact.point[0] - to[k * 3]!) * n[0] +
-              (contact.point[1] - to[k * 3 + 1]!) * n[1] +
-              (contact.point[2] - to[k * 3 + 2]!) * n[2] +
-              radius[k]!,
-          );
-        if (!(push > 0)) return;
-        const owner = this.physics.bodyOfCollider(contact.collider);
-        if (!owner) return;
-        let table = rows.get(contact.body);
-        if (table === undefined) {
-          table = bodies.length;
-          rows.set(contact.body, table);
-          bodies.push(owner);
-          this.reserve(this.particleCount, this.edgeCount, this.bodies.length, bodies.length);
-          c = this.columns();
-          this.writeBody(c, table, owner);
-        }
-        c.kc[row] = table + 1;
-        c.knx[row] = n[0];
-        c.kny[row] = n[1];
-        c.knz[row] = n[2];
-        c.kd[row] = push;
-        c.kpx[row] = contact.point[0];
-        c.kpy[row] = contact.point[1];
-        c.kpz[row] = contact.point[2];
-        c.kf[row] = owner.colliders.find((collider) => collider.handle === contact.collider)?.friction() ?? 0.5;
+      const hit = this.physics.softContacts({ from, to, radius, margin }, 4, {
+        dt,
+        flags: 8,
+        groups: soft.collisionGroups,
+        exclude: soft.surface ?? undefined,
       });
+      for (let k = 0; k < free.length; k++)
+        for (let slot = 0; slot < 4; slot++) {
+          const at = k * 4 + slot;
+          if (hit.collider[at] === 0xffffffff) continue;
+          found.push({
+            row: free[k]!,
+            slot,
+            collider: hit.collider[at]!,
+            body: hit.body[at]!,
+            normal: [hit.normal[at * 3]!, hit.normal[at * 3 + 1]!, hit.normal[at * 3 + 2]!],
+            point: [hit.point[at * 3]!, hit.point[at * 3 + 1]!, hit.point[at * 3 + 2]!],
+            velocity: [hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!],
+          });
+        }
     }
-    this.exports.soft_apply(h);
+    // The bodies the planes belong to get a row each, with what the kernel needs to share a contact with them.
+    for (const f of found) {
+      if (rows.has(f.body)) continue;
+      const owner = this.physics.bodyOfCollider(f.collider);
+      if (!owner) continue;
+      rows.set(f.body, bodies.length);
+      bodies.push(owner);
+    }
+    if (bodies.length) {
+      this.reserve(this.particleCount, this.edgeCount, this.bodies.length, bodies.length);
+      c = this.columns();
+      bodies.forEach((owner, row) => this.writeBody(c, row, owner));
+    }
+    for (const f of found) {
+      const table = rows.get(f.body);
+      if (table === undefined) continue;
+      const k = f.row * 4 + f.slot;
+      c.kc[k] = table + 1;
+      c.knx[k] = f.normal[0];
+      c.kny[k] = f.normal[1];
+      c.knz[k] = f.normal[2];
+      c.kpx[k] = f.point[0];
+      c.kpy[k] = f.point[1];
+      c.kpz[k] = f.point[2];
+      c.kvx[k] = f.velocity[0];
+      c.kvy[k] = f.velocity[1];
+      c.kvz[k] = f.velocity[2];
+      c.kf[k] = this.physics.colliderOf(f.collider)?.friction() ?? 0.5;
+    }
   }
 
   /** Writes what the kernel needs to share a contact with a body: where it turns, how it moves, how heavy it is. */
@@ -1812,6 +1862,7 @@ function inverseMass(body: PhysicsBody): number[] {
 }
 
 function rowsOf(name: string, particles: number, edges: number, bodies: number, colliders: number): number {
+  if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (
