@@ -20,6 +20,10 @@
 // no buffer write changed and no configuration with a nonzero scale draws differently.
 // Recorded again with the fog's cloud haze (2026-11-24, Fauld recut): the fog WGSL mixes in the light under a cloud cover
 // (cloudHaze), so fog and fogColour changed text; no buffer write changed, and without clouds they draw as before.
+// Recorded again with KB-SKY-OVERCAST2 (2026-11-24, Fauld recut): the overcast deck's top takes the clear sky's own
+// light (the cloud WGSL gained clearSkyLevel, a 15-direction quadrature of daySky, and the fog reads the same
+// overcastLight), so every configuration of the full Sky, whose code carries the cloud WGSL, changed text; no command
+// and no buffer write changed, and only a sky at 80 percent cover or more, or fog under clouds, draws differently.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

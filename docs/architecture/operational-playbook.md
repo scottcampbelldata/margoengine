@@ -9089,6 +9089,18 @@ overcast gradation (Moon and Spencer 1942; CIE S 011/E:2003 type 1) of the two-s
 engine sun fades by the same smoothstep (`overcastShare`). Evidence: `features-check.mjs overcast` on an RTX A6000,
 WebGPU and `MARGO_COMPAT=1` alike, every pixel within 0.92 to 1.09 of the CPU twin `overcastDeck`. Cost: one more
 branch and four noise lookups per sky pixel above 80 percent cover; no new pass, buffer or binding.
+KB-SKY-OVERCAST2 (2026-11-24, Fauld recut): the deck's top was lit in the sun's colour alone (the clear sky's share a
+scalar 1 / (1 - 0.165) of the sun), so a 4 to 15 degree sun turned the deck, the SH ambient and the fog orange-brown.
+The top now takes the sun on level ground plus the clear sky's own E / pi, `clearSkyLevel`: three-point Gauss-Legendre
+in sin^2 of the zenith angle times an eight-point azimuth trapezoid about the sun's vertical, mirrored (15 daySky
+evaluations; within 6 percent of a dense integral of the Preetham reference, 2 to 80 degree suns, turbidity 2 and 6).
+The clear term is in the model's own units: the Bruneton deck divides it by its units, recomputed in the shader by the
+CPU's 64-step zenith column through the sky's extinction, so no uniform changed. The fog reads the same
+`overcastLight`. Evidence: `features-check.mjs overcast`, RTX A6000, WebGPU and `MARGO_COMPAT=1`, every pixel within
+0.93 to 1.10 of the twin fed the clear sky read from the GPU at the rule's directions; test/overcast.test.js (deck blue
+over red 0.78 to 0.89 under a 4 to 15 degree sun at turbidity 3, against 0.09 to 0.55 before). Cost: 15 day-sky
+evaluations and a 64-step column per deck pixel and per fog pixel under clouds; a per-frame table would remove it
+(not built: it needs a binding in every sky pipeline).
 
 ## Hurricanes in the volumetric clouds, and haze by the air crossed (section 5 evidence, 2026-11-17)
 

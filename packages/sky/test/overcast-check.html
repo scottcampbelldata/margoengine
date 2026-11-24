@@ -3,14 +3,16 @@
 // The overcast deck (KB-SKY-OVERCAST1) on a real GPU: a Preetham sky with the cloud sheet at full cover, the sun 45
 // degrees up, drawn into a PostStack's HDR scene target (linear, before any tone map). Three views: up the sky away
 // from the sun, toward the sun, and along the horizon. Each pixel is compared with overcastDeck (the CPU twin) for its
-// ray, under the Preetham sky and the Bruneton sky (whose deck is in its own sun units). Driven by features-check.mjs.
+// ray, under the Preetham sky and the Bruneton sky (whose deck is in its own sun units). The deck's top takes the clear
+// sky's own light too (KB-SKY-OVERCAST2): the twin gets it from the same sky drawn clear (coverage 0) and read at the
+// directions of CLEAR_SKY_RULE, each the centre of a view looking that way. Driven by features-check.mjs.
 import {Engine} from '/packages/core/dist/index.js';
 import {sceneSamples} from '/packages/core/dist/quality.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {Sky} from '/packages/sky/dist/base.js';
 import {preetham} from '/packages/sky/dist/preetham.js';
 import {bruneton} from '/packages/sky/dist/bruneton.js';
-import {clouds,overcastDeck,DECK_DEPTH} from '/packages/sky/dist/clouds.js';
+import {clouds,overcastDeck,clearSkyLevel,CLEAR_SKY_RULE,DECK_DEPTH} from '/packages/sky/dist/clouds.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.6,0],target:[0,1.6,-1],fov:60,near:0.1,far:1000}}),device=engine.gpu,errors=[];
 engine.stop();
@@ -35,7 +37,17 @@ window.check={samples:sceneSamples,
  async run({coverage=1,depth,model='preetham'}={}){
   device.pushErrorScope('validation');
   const sun=[Math.SQRT1_2*Math.sin(0.5),Math.SQRT1_2,-Math.SQRT1_2*Math.cos(0.5)];
-  const sky=Sky.attach(engine,{timeScale:0,sunDirection:sun,turbidity:6,model,clouds:{coverage,...(depth===undefined?{}:{depth})}},{preetham,bruneton,clouds}),out={views:{}};
+  const look=async(d)=>{engine.camera.target=[d[0],1.6+d[1],d[2]];engine.render({delta:0});engine.render({delta:0});
+   const {w,h,v}=await scene(),c=[0,0,0];for(const [x,y] of [[w/2-1,h/2-1],[w/2,h/2-1],[w/2-1,h/2],[w/2,h/2]]){const i=(y*w+x)*4;for(let k=0;k<3;k++)c[k]+=v[i+k]/4;}return c;};
+  const bare=Sky.attach(engine,{timeScale:0,sunDirection:sun,turbidity:6,model,clouds:{coverage:0,...(depth===undefined?{}:{depth})}},{preetham,bruneton,clouds}),seen=new Map();
+  for(const [x,y,z] of CLEAR_SKY_RULE){const f=Math.hypot(sun[0],sun[2]),a=[sun[0]/f,sun[2]/f],d=[x*a[0]-z*a[1],y,x*a[1]+z*a[0]];// The rule's middle ring is 45 degrees up, where this check's sun is: toward the sun, the mean of two views 0.1 rad either side
+   // in azimuth, clear of the disc and its glow (the shaders' daySky has neither).
+   const key=d.map(n=>n.toFixed(6)).join();
+   if(d[0]*sun[0]+d[1]*sun[1]+d[2]*sun[2]>0.999){const turn=(t)=>[d[0]*Math.cos(t)-d[2]*Math.sin(t),d[1],d[0]*Math.sin(t)+d[2]*Math.cos(t)],p=await look(turn(0.1)),q=await look(turn(-0.1));seen.set(key,p.map((v,k)=>(v+q[k])/2));}
+   else seen.set(key,await look(d));}
+  bare.dispose();
+  const clear=clearSkyLevel(d=>seen.get(d.map(n=>n.toFixed(6)).join()),sun);
+  const sky=Sky.attach(engine,{timeScale:0,sunDirection:sun,turbidity:6,model,clouds:{coverage,...(depth===undefined?{}:{depth})}},{preetham,bruneton,clouds}),out={views:{},clear};
   for(const [name,yaw,pitch] of [['away',0.5+Math.PI,0.9],['sun',0.5,Math.PI/4],['horizon',0.5+Math.PI/2,0.35]]){
    const f=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
    engine.camera.target=[f[0],1.6+f[1],f[2]];
@@ -44,7 +56,7 @@ window.check={samples:sceneSamples,
    const {w,h,v}=await scene(),sunlight=[...sky.values.subarray(60,63)],units=sky.values[35]*(1+0.075*(depth??DECK_DEPTH)),ratios=[];let worst=0,warm=0;
    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     const d=ray(x,y,w,h,yaw,pitch);if(d[1]<0.02)continue;
-    const i=(y*w+x)*4,c=[v[i],v[i+1],v[i+2]],want=overcastDeck(sunlight,sun[1],d[1],depth??DECK_DEPTH,units);
+    const i=(y*w+x)*4,c=[v[i],v[i+1],v[i+2]],want=overcastDeck(sunlight,sun[1],d[1],depth??DECK_DEPTH,units,clear);
     ratios.push(lum(c)/lum(want));
     // Chroma against the deck's own: an orange glow toward the sun raises red over blue.
     warm=Math.max(warm,(c[0]/c[2])/(want[0]/want[2]));

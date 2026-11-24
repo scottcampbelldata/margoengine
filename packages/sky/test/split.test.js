@@ -23,6 +23,9 @@ const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[na
 // projection the ground's light; the same commands in every trace.
 // night-fog, afterlight and preetham-clouds-fog recorded again with the fog's cloud haze (2026-11-24): the fog WGSL mixes
 // in the light under a cloud cover; the same commands in every trace.
+// night-fog, stage-sky, afterlight, meadow, preetham and preetham-clouds-fog recorded again with KB-SKY-OVERCAST2
+// (2026-11-24): the cloud WGSL's deck and the fog under it take the clear sky's own light (clearSkyLevel); WGSL text
+// only, the same commands and uploads in every trace.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);

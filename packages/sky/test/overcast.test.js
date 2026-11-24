@@ -2,7 +2,9 @@
 // The GPU draws the same deck (features-check.mjs overcast, both backends); here its CPU twin against the sources.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clouds, overcastDeck, DECK_ABOVE, DECK_DEPTH, DECK_VARIATION } from '../dist/clouds.js';
+import { clouds, overcastDeck, clearSkyLevel, CLEAR_SKY_RULE, DECK_ABOVE, DECK_DEPTH, DECK_VARIATION } from '../dist/clouds.js';
+import { sunlight } from '../dist/index.js';
+import { preethamRGB } from './preetham-reference.js';
 import { cloudTransmission } from '../dist/volumetric-clouds.js';
 import { SKY_SETTINGS } from '../dist/settings.js';
 import { Sky, overcastShare } from '../dist/index.js';
@@ -10,19 +12,92 @@ import { dayLight } from '../dist/day-presets.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { wgsl } from '../../core/src/shaders.ts';
 
-test('the deck lights level ground with the two-stream share of the light above it', () => {
+test('the deck lights level ground with the two-stream share of the light above it: the sun and the clear sky', () => {
   for (const depth of [1, DECK_DEPTH, 60, 200])
     for (const sunUp of [0.2, Math.SQRT1_2, 1]) {
       // E / pi under the deck: the integral of L cos over the hemisphere, by the midpoint rule in elevation.
       let e = 0;
-      const n = 4000;
+      const n = 4000,
+        clear = [0.1, 0.2, 0.3];
       for (let i = 0; i < n; i++) {
         const h = ((i + 0.5) / n) * (Math.PI / 2);
-        e += overcastDeck([1, 1, 1], sunUp, Math.sin(h), depth)[1] * Math.sin(h) * Math.cos(h) * 2 * Math.PI * (Math.PI / 2 / n);
+        e +=
+          overcastDeck([1, 1, 1], sunUp, Math.sin(h), depth, 1, clear)[1] *
+          Math.sin(h) *
+          Math.cos(h) *
+          2 *
+          Math.PI *
+          (Math.PI / 2 / n);
       }
-      const want = cloudTransmission(depth) * DECK_ABOVE * sunUp;
+      const want = cloudTransmission(depth) * (DECK_ABOVE * sunUp + clear[1]);
       assert.ok(Math.abs(e / Math.PI / want - 1) < 1e-4, `depth ${depth}, sun ${sunUp}: ${e / Math.PI} vs ${want}`);
     }
+});
+// KB-SKY-OVERCAST2 (Fauld recut, 2026-11-24): a 4 to 15 degree November sun under a full overcast turned the sky, its
+// ambient and the fog orange-brown, because the deck's top was lit in the sun's colour alone (the clear sky's share a
+// scalar of it). Measured overcast daylight is near D65 and bluer, not redder, than the direct sun (Henderson and
+// Hodgkiss 1963; Hernandez-Andres et al. 2001): the clear sky's own blue light on the deck's top carries it.
+test('the clear-sky rule integrates the sky on level ground: within 6 percent of a dense integral, 2 to 80 degree suns', () => {
+  const weights = CLEAR_SKY_RULE.reduce((a, r) => a + r[3], 0);
+  assert.ok(Math.abs(weights - 1) < 1e-12, `weights ${weights}`);
+  assert.deepEqual(clearSkyLevel(() => [1, 1, 1], [0, 1, 0]).map((v) => +v.toFixed(12)), [1, 1, 1]);
+  for (const t of [2, 6])
+    for (const deg of [2, 5, 10, 20, 45, 80]) {
+      const r = (deg * Math.PI) / 180,
+        s = [Math.cos(r) * 0.6, Math.sin(r), Math.cos(r) * 0.8],
+        e = [0, 0, 0],
+        n = 240;
+      for (let i = 0; i < n; i++) {
+        const th = ((i + 0.5) / n) * (Math.PI / 2);
+        for (let j = 0; j < n; j++) {
+          const ph = ((j + 0.5) / n) * 2 * Math.PI,
+            l = preethamRGB([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)], s, t),
+            k = (Math.cos(th) * Math.sin(th) * (Math.PI / 2 / n) * ((2 * Math.PI) / n)) / Math.PI;
+          for (let c = 0; c < 3; c++) e[c] += l[c] * k;
+        }
+      }
+      const q = clearSkyLevel((d) => preethamRGB(d, s, t), s);
+      for (let c = 0; c < 3; c++) assert.ok(Math.abs(q[c] / e[c] - 1) < 0.06, `turbidity ${t}, ${deg} degrees, ${c}: ${q[c] / e[c]}`);
+    }
+});
+test('under a low November sun the overcast deck is daylight grey, not the sun orange (KB-SKY-OVERCAST2)', () => {
+  for (const deg of [4, 8, 15]) {
+    const r = (deg * Math.PI) / 180,
+      s = [0, Math.sin(r), -Math.cos(r)],
+      sun = [...sunlight(s[1], 0.05, 3)],
+      clear = clearSkyLevel((d) => preethamRGB(d, s, 3), s),
+      deck = overcastDeck(sun, s[1], 0.5, DECK_DEPTH, 1, clear),
+      sunOnly = overcastDeck(sun, s[1], 0.5, DECK_DEPTH, 1);
+    // The sun alone is orange (blue over red well under 0.6 below 15 degrees, 0.09 at 4); the deck it lights with the
+    // sky is near white: blue over red 0.75 to 1.3 at turbidity 3 (0.78 to 0.89 measured), toward overcast daylight's
+    // chromaticity near D65 (linear sRGB white is 1, 1, 1).
+    assert.ok(sunOnly[2] / sunOnly[0] < 0.6, `${deg} degrees: the sun alone ${sunOnly[2] / sunOnly[0]}`);
+    assert.ok(deck[2] / deck[0] > 0.75 && deck[2] / deck[0] < 1.3, `${deg} degrees: the deck's blue over red ${deck[2] / deck[0]}`);
+    // And brighter than the sun's share alone: the clear sky's light is most of what a low sun gives level ground.
+    assert.ok(deck[1] > sunOnly[1] * 1.5, `${deg} degrees: ${deck[1]} vs ${sunOnly[1]}`);
+  }
+});
+test('the sky shader integrates the clear sky by the same rule', () => {
+  const h = optionalGPU(),
+    device = h.engine.gpu,
+    module = device.createShaderModule,
+    codes = [];
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
+  device.createShaderModule = (d) => (codes.push(d.code), module.call(device, d));
+  const sky = new Sky({ clouds: { coverage: 1 } });
+  try {
+    h.engine.use(sky);
+    sky.onPreUpdate(0);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  } finally {
+    sky.dispose();
+  }
+  const code = codes.find((c) => c.includes('fn cloudDeck('));
+  assert.ok(code, 'the sky compiled its deck');
+  assert.equal(code.match(/sum\+=[0-9.]+\*daySky\(/g)?.length, CLEAR_SKY_RULE.length, 'one daySky per rule direction');
+  assert.ok(code.includes('overcastLight(1.0-clamp(frame.sun.w,0.0,1.0))'), 'the deck reads the clear sky by day');
 });
 test('the deck follows the CIE overcast sky: the horizon a third of the zenith, no sun, nothing below the horizon', () => {
   const z = overcastDeck([0.9, 1, 1.1], 0.6, 1)[1],

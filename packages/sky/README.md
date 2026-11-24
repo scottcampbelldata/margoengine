@@ -92,7 +92,10 @@ From 80 to 100 percent `coverage` the sheet closes into an overcast deck (`depth
 200, default 20, a stratus deck). Under a full overcast the sky is one even grey with no holes and no sun disc: the CIE
 standard overcast sky (Moon and Spencer 1942; CIE S 011/E:2003 type 1), L(h) = Lz (1 + 2 sin h) / 3, of the
 two-stream light the deck passes, T = 1 / (1 + 0.075 depth) of the light on its top (Meador and Weaver 1980; Bohren
-1987), so level ground under it gets T of the light above; the sheet's shape octaves shade it within 12 percent, a
+1987), so level ground under it gets T of the light above. The light on its top is the sun on level ground plus the
+clear sky's own light there, integrated from the sky model (`clearSkyLevel`, 15 directions), so under a low sun the
+deck, the ambient it gives and the fog under it stay daylight grey instead of the sun's orange (Henderson and Hodgkiss
+1963; Hernandez-Andres et al. 2001). The sheet's shape octaves shade it within 12 percent, a
 stratus base's soft undulations, fading into the haze with distance. The engine's sun fades out with the deck (no
 direct light under a full overcast) and the ground is lit by the sky's own picture. `overcastDeck` from
 `@margoengine/sky/clouds` is the deck's radiance on the CPU; the `clouds.depth` slider row sets the depth.
@@ -105,8 +108,10 @@ import {overcastDeck} from '@margoengine/sky/clouds';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 
 const sky = Sky.attach(engine, {hours: 11, clouds: {coverage: 1, depth: 30}});
-// The zenith of the deck under a sun 45 degrees up, per unit of the clouds' sun: about 0.74 of each channel.
+// The zenith of the deck under a sun 45 degrees up, per unit of the clouds' sun, the sun's share only: about 0.62.
 console.log(overcastDeck([1, 1, 1], Math.SQRT1_2, 1, 30));
+// With a clear sky of E / pi 0.3 grey-blue on its top as well (clearSkyLevel gives it from any radiance function):
+console.log(overcastDeck([1, 1, 1], Math.SQRT1_2, 1, 30, 1, [0.25, 0.3, 0.4]));
 ```
 `@margoengine/shadows/light-function` darkens the ground under these clouds. For clouds you can fly through, see [Volumetric clouds](#volumetric-clouds).
 
