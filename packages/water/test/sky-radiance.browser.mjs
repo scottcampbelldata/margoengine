@@ -97,9 +97,35 @@ try {
   const dimBody = await body(0.5);
   const brightBody = await body(1);
   assert.ok(dimBody > 0.005 && brightBody > dimBody * 1.5, `HDR illuminates the water body: ${dimBody}, ${brightBody}`);
+  await page.evaluate(async () => {
+    const { engine, sea } = window.skyTest;
+    const { Environment } = await import('/packages/environment/dist/index.js');
+    const width = 64;
+    const height = 64;
+    const data = new Float32Array(width * height * 4);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const color = y < 28 ? [1, 0.01, 0.01, 1] : [0, 0.02, 0.24, 1];
+        data.set(color, (y * width + x) * 4);
+      }
+    const levels = await Environment.attach(
+      engine,
+      { width, height, data },
+      { name: 'reflection-elevation', size: 16, specularSize: 16 },
+    );
+    sea.options.reflection = () => levels.equirectTexture;
+  });
+  await page.evaluate(() => window.skyTest.sea.setGlitterRoughness(0.12));
+  const narrow = (await frame(false, 0))[1];
+  await page.evaluate(() => window.skyTest.sea.setGlitterRoughness(0.6));
+  const wide = (await frame(false, 0))[1];
+  assert.ok(
+    wide[0] > narrow[0] + 20 && narrow[2] > narrow[0] + 20,
+    `The callback reflection lobe must sample the red sky above its blue horizon: ${narrow} to ${wide}`,
+  );
   const validation = await page.evaluate(async () => (await window.skyTest.engine.gpu.popErrorScope())?.message);
   assert.equal(validation, undefined);
-  console.log(JSON.stringify({ legacy, initial, turned, dimBody, brightBody }));
+  console.log(JSON.stringify({ legacy, initial, turned, dimBody, brightBody, narrow, wide }));
 } finally {
   await page.evaluate(() => window.skyTest?.engine.dispose());
   await closeAll({ browser });

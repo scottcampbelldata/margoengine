@@ -401,10 +401,22 @@ fn noise(p:vec2f)->vec3f {
 }
 // One ripple layer's world-space slope. Each layer turns the wind frame by its own angle (cos, sin) and scales it by
 // non-integer ratios, so no two layers share a lattice axis or spacing.
-fn rippleSlope(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f)->vec2f {
+fn rippleSlope(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->vec2f {
  let w=frame.waves[0].wave.xy;let along=vec2f(w.x*turn.x-w.y*turn.y,w.x*turn.y+w.y*turn.x);let across=vec2f(-along.y,along.x);
- let n=noise(vec2f(dot(xz,along),dot(xz,across))*scale+frame.settings.x*drift+offset).yz*scale;
- return along*n.x+across*n.y;
+ let basis=mat2x2f(along,across);let local=transpose(basis);
+ let width=max(length((local*pixelX)*scale),length((local*pixelY)*scale));
+ let detail=1.0-smoothstep(0.25,1.0,width);
+ if(detail<=0.0){return vec2f(0);}
+ let n=noise((local*xz)*scale+frame.settings.x*drift+offset).yz*scale;
+ return (basis*n)*detail;
+}
+// A short gravity wave lives in the shading normal. Its phase warp bends and breaks the visible crest.
+fn shortWaveSlope(p:vec2f,pixelX:vec2f,pixelY:vec2f,k:vec2f,height:f32,warp:vec3f)->vec2f {
+ let gradient=k+warp.yz;
+ let width=max(abs(dot(gradient,pixelX)),abs(dot(gradient,pixelY)));
+ let keep=1.0-smoothstep(0.9,3.14159265,width);
+ let phase=dot(k,p)-sqrt(9.81*length(k))*frame.settings.x+warp.x;
+ return gradient*(height*cos(phase)*keep);
 }
 fn fresnel(cosine:f32)->f32 {return 0.02+0.98*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
 fn landNearby(xz:vec2f)->f32 {
@@ -447,21 +459,21 @@ fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
 // Resolve the reflected lobe over a solid angle for a detailed photographic sky. Raw Sky textures keep their
 // established azimuthal sampling. Below-horizon rays see the horizon instead of the HDRI's photographed ground.
 ${skyCoordinates}
-fn skyTap(direction:vec3f)->vec3f {
- let d=normalize(vec3f(direction.x,max(0.0,direction.y),direction.z));
- return textureSampleLevel(environment,skySampler,seaSkyUv(d,hdrSkyTurn()),0.0).rgb;
+fn skyTap(direction:vec3f,horizon:f32,turn:f32)->vec3f {
+ let d=normalize(vec3f(direction.x,max(horizon,direction.y),direction.z));
+ return textureSampleLevel(environment,skySampler,seaSkyUv(d,turn),0.0).rgb;
 }
-fn hdrSky(direction:vec3f,rough:f32)->vec3f {
- let r=normalize(vec3f(direction.x,max(1e-6,direction.y),direction.z));
+fn skyLobe(direction:vec3f,rough:f32,horizon:f32,turn:f32)->vec3f {
+ let r=normalize(vec3f(direction.x,max(max(1e-6,horizon),direction.y),direction.z));
  let across=normalize(cross(select(vec3f(0,1,0),vec3f(1,0,0),r.y>0.999),r));
  let up=cross(r,across);
  let width=rough*rough*1.41421356;
- let sum=skyTap(r)*0.5+(skyTap(r+across*width)+skyTap(r-across*width)+skyTap(r+up*width)+skyTap(r-up*width))*0.125;
- return sum*hdrSkyScale();
+ return skyTap(r,horizon,turn)*0.5+(skyTap(r+across*width,horizon,turn)+skyTap(r-across*width,horizon,turn)+
+        skyTap(r+up*width,horizon,turn)+skyTap(r-up*width,horizon,turn))*0.125;
 }
 fn reflectionRay(r:vec3f)->vec3f {return normalize(vec3f(r.x,max(0.02,r.y),r.z));}
-fn skyColorBase(direction:vec3f,rough:f32)->vec3f {
- if(frame.color.w>0.5&&hdrSkyScale()>0.0){return hdrSky(direction,rough);}
+fn incidentSky(direction:vec3f,rough:f32)->vec3f {
+ if(frame.color.w>0.5&&hdrSkyScale()>0.0){return skyLobe(direction,rough,0.0,hdrSkyTurn())*hdrSkyScale();}
  let r=reflectionRay(direction);
  if(frame.color.w>0.5){let uv=seaSkyUv(r,0.0);let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
  return mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(max(0.0,r.y)))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));
@@ -471,12 +483,12 @@ fn skyColorBase(direction:vec3f,rough:f32)->vec3f {
 // The sea's body is lit by this light, so a night sky, however its ambient is set, lights it only as much as it lights
 // the sky the sea reflects (a sea that glowed above the sky it mirrors was the night-sea bug).
 fn skyAmbient()->f32 {
- let a=skyColorBase(vec3f(0.866,0.5,0),0.4);let b=skyColorBase(vec3f(0.5,0.866,0),0.4);
+ let a=incidentSky(vec3f(0.866,0.5,0),0.4);let b=incidentSky(vec3f(0.5,0.866,0),0.4);
  return clamp(dot((a+b)*0.5,vec3f(0.2126,0.7152,0.0722))/0.02,0.0,1.0);
 }
 fn foamSky()->vec3f {
  var sum=vec3f(0);
- for(var k=0u;k<8u;k++){let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);sum+=skyColorBase(vec3f(cos(a)*side,up,sin(a)*side),0.4);}
+ for(var k=0u;k<8u;k++){let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);sum+=incidentSky(vec3f(cos(a)*side,up,sin(a)*side),0.4);}
  return sum*0.125;
 }
 // Eight equally weighted samples in the cosine-weighted hemisphere, stratified in squared radius and azimuth.
@@ -484,9 +496,13 @@ fn hdrDiffuse()->vec3f {
  var sum=vec3f(0);
  for(var k=0u;k<8u;k++){
   let up=sqrt(select(0.25,0.75,(k&1u)==1u));let side=sqrt(1.0-up*up);let a=f32(k)*0.78539816;
-  sum+=skyTap(vec3f(cos(a)*side,up,sin(a)*side));
+  sum+=skyTap(vec3f(cos(a)*side,up,sin(a)*side),0.0,hdrSkyTurn());
  }
  return sum*(0.125*hdrSkyScale());
+}
+fn skyColorBase(direction:vec3f,rough:f32)->vec3f {
+ if(frame.color.w>0.5&&hdrSkyScale()<=0.0){return skyLobe(direction,rough,0.02,0.0);}
+ return incidentSky(direction,rough);
 }
 fn skyColor(direction:vec3f,rough:f32)->vec3f {return skyColorBase(direction,rough);}
 struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
@@ -502,7 +518,8 @@ ${displayShader}
   gap=mix(gap,min(gap,bed),select(sample.ocean,1.0,isCoast));
   if(isCoast){dry=select(v.x<0.003,sample.edge<=0.0,STILL);gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;open=1.0-sample.blend.z;}
  }
- let footprint=max(length(dpdx(i.world.xz)),length(dpdy(i.world.xz)));
+ let pixelX=dpdx(i.world.xz);let pixelY=dpdy(i.world.xz);
+ let footprint=max(length(pixelX),length(pixelY));
  // A depth discontinuity outside the contact band is not a shoreline.
  let contactRadius=max(0.03,frame.settings.z);
  let edge=clamp(fwidth(min(gap,contactRadius))*1.5,0.015,contactRadius*0.5);
@@ -538,16 +555,31 @@ ${displayShader}
  }
  var shown=foam;if(frame.foam.z>0.0){shown=pow(foam,1.0-0.4*frame.foam.z);}
  var ripple=vec3f(0);
- if(footprint<6.0){
+ // The coarsest layer is at least 0.075 cycles/m in any direction. Past this point all five filters are zero.
+ if(footprint<13.334){
  // Agitation, chop and two micro layers turned 11, -21, 30 and -41 degrees from the wind. Weights keep the former
  // value-noise slope (RMS 0.39 per axis against gradient noise's 0.62).
  let p=i.world.xz;
- let slope=rippleSlope(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0))*0.186*(1.0-smoothstep(0.25,1.0,footprint*0.22))
-  +rippleSlope(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23))*0.062*(1.0-smoothstep(0.25,1.0,footprint*0.57))
-  +(rippleSlope(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0))*0.0112+rippleSlope(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71))*0.0037*(1.0-smoothstep(0.12,0.5,footprint)))*(1.0-smoothstep(0.2,1.0,footprint));
+ let slope=rippleSlope(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0),pixelX,pixelY)*0.186
+  +rippleSlope(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23),pixelX,pixelY)*0.062
+  +rippleSlope(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0),pixelX,pixelY)*0.0112
+  +rippleSlope(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71),pixelX,pixelY)*0.0037;
  let chop=frame.grid.w;
- let windSea=rippleSlope(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4))*0.5*(1.0-smoothstep(0.25,1.0,footprint*0.11));
- let agitated=slope*(1.0+3.0*chop)+windSea*chop;
+ let windSea=rippleSlope(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4),pixelX,pixelY)*0.5;
+ let w=frame.waves[0].wave.xy;let basis=mat2x2f(w,vec2f(-w.y,w.x));let local=transpose(basis);let q=local*p;
+ // A broad, advecting wind patch varies the short-wave slope. Long-wave displacement stays in the authored trains.
+ var shortWaves=vec2f(0);var gain=1.0;
+ if(chop>0.0){
+  let scale=vec3f(1.0,0.041,0.073);
+  let windPatch=noise(q*scale.yz-vec2f(frame.settings.x*0.095,0))*scale;
+  let gust=smoothstep(-0.48,0.48,windPatch.x);
+  gain=mix(1.0,mix(0.4,1.6,gust),sqrt(chop));
+  let dx=local*pixelX;let dy=local*pixelY;
+  let a=shortWaveSlope(q,dx,dy,vec2f(1.48,0.81),0.060,windPatch*4.1);
+  let b=shortWaveSlope(q,dx,dy,vec2f(1.63,-2.21),0.029,vec3f(2.1,0,0)-windPatch*3.4);
+  shortWaves=(basis*(a+b))*(chop*gain*(1.0-smoothstep(7.0,13.333334,footprint)));
+ }
+ let agitated=(slope*(1.0+3.0*chop)+windSea*chop)*gain+shortWaves;
  ripple=vec3f(-agitated.x,0,-agitated.y)*(1.0-shown);
  }
  let n=normalize(i.normal+ripple);
@@ -557,7 +589,7 @@ ${displayShader}
  let variance=(dot(normalDx,normalDx)+dot(normalDy,normalDy))/12.0;
  // Keep all quad lanes alive until the derivatives of both the shoreline and water normal have been read.
  if(dry){discard;}
- let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
+ let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);
  // Sand the swell lifts off the bed hangs in the water: a grey, nearly flat extinction of up to 1.4 per metre over
  // clear water's (murk, from surf.ts), so a surf zone reads as turbid green-grey water, not a clear lagoon over sand.
  var optical=min(50.0,gap/max(0.15,abs(v.y)));var opticalGap=gap;
@@ -587,6 +619,11 @@ ${displayShader}
  let baseRough=clamp(max(frame.foam.w,0.12+normalWidth*0.6+footprint*0.025),frame.foam.w,max(0.4,frame.foam.w));
  let alpha=baseRough*baseRough;
  let rough=min(sqrt(sqrt(alpha*alpha+2.0*variance)),max(0.55,frame.foam.w));
+ // A down-going reflection on an open wave is partly blocked by neighbouring water. A broad transition
+ // with residual skylight approximates the light returned by other facets without tracing secondary rays.
+ let reflectedY=reflect(-v,n).y;
+ let skyVisible=1.0-0.34*smoothstep(0.0,0.18+1.41421356*rough*rough,-reflectedY);
+ let reflection=fresnel(nv)*mix(1.0,skyVisible,open);
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
  // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
  var shade=1.0;if(foam>0.002||max(glint.x,max(glint.y,glint.z))>0.002){shade=waterShadow(i.world);}

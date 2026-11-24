@@ -220,6 +220,20 @@ test('ripple normals use gradient noise on five separately turned lattices (the 
     }
   water.dispose();
 });
+test('water filters short slopes in their own footprint and keeps the distant wind layer through six metres', () => {
+  const h = optionalGPU(),
+    water = new Water({ segments: 4, chop: 0.5 });
+  h.engine.use(water);
+  h.frame();
+  const code = h.pipelines.find((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  assert.doesNotMatch(code, /footprint\s*<\s*6\.0/);
+  assert.match(code, /length\(\(local\*pixelX\)\*scale\),length\(\(local\*pixelY\)\*scale\)/);
+  assert.match(code, /let gradient=k\+warp\.yz/);
+  assert.match(code, /abs\(dot\(gradient,pixelX\)\),abs\(dot\(gradient,pixelY\)\)/);
+  assert.match(code, /sqrt\(9\.81\*length\(k\)\)\*frame\.settings\.x/);
+  assert.match(code, /fresnel\(nv\)\*mix\(1\.0,skyVisible,open\)/);
+  water.dispose();
+});
 test('foam takes N.L lighting, and a shadow source shades glints and foam from bind group 1', async () => {
   const h = optionalGPU(),
     entries = [

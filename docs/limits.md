@@ -7319,6 +7319,20 @@ On the public base, water measured 30,644 B gzip and water/underwater 8,754 B. T
 and 9,087 B respectively, with ceilings of 32,297 B and 9,360 B. Both share their existing rendering, capture and
 resource paths. Moving them behind separate entries would duplicate that work. Core and stage remain at 24,797 B.
 
+## Short wind waves and sky reflection
+
+Each of the five baseline ripple lattices fades over a projected pixel width of 0.25 to 1.0 lattice
+cells. The broadest keeps detail out to 13.33 m per pixel along its least sampled axis. Nonzero
+`chop` adds normal detail at wavelengths near 3.7 m and 2.3 m, with nominal amplitudes of 0.060 m and
+0.029 m before chop and wind-patch gain. Each band filters from 0.9 to pi radians of phase change per
+pixel. Short-wave depth and forces are outside this shading model.
+
+The reflection uses five taps in an angular lobe from either supplied sky type. Down-going rays on
+open water lose at most 34% of their sky weight. This is an approximation of surface occlusion and
+secondary reflection. There is one water fragment path and no extra binding, texture, or pass.
+
+The root water entry measures 32,655 B minified and gzipped, up from 32,150 B. Its ceiling is 33,635 B.
+
 ## Web template bundle
 
 The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must stay below

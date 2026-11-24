@@ -1,3 +1,16 @@
+### Section 5 evidence: short wind waves and sky reflection (2026-11-24)
+
+Water now filters each ripple against its rotated pixel footprint. The old common six-metre
+cutoff removed the longest wind ripple while that band still had visible energy. Nonzero chop
+also shades two short gravity-wave bands whose curved crests vary across a moving wind field.
+The normal and the roughness derived from it are shared by the beauty and SSR paths.
+
+The procedural sky callback now samples the same two angular axes as HDR reflection. Its
+real GPU witness changes roughness over a blue horizon with red above it and checks the
+red contribution. The previous shader leaves that contribution at zero. Coarse surface
+depth, authored swell, and water-query geometry follow their existing paths. No benchmark
+claim is made. See the [clean-room record](../clean-room.md#short-wind-waves-and-open-water-reflection-2026-11-24).
+
 ### Section 5 evidence: discoloured water behind a ship (2026-11-23)
 
 `ShipWakes` has a per-ship linear RGB tint for the turbulent stern trail. It shades the part of the water body

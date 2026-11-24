@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Short wind waves and sky reflection (2026-11-24). Ripples have band-specific footprint filters, and
+  the procedural-sky reflection broadens in elevation as well as azimuth. In the blue-horizon fixture,
+  red moves from 0 to 87 display codes as roughness moves from 0.12 to 0.60, against 0 to 0 before the
+  change. Build the packages and run `node packages/water/test/sky-radiance.browser.mjs` in WebGPU and
+  with `MARGO_COMPAT=1` for WebGL2. This number is from the synthetic sky fixture.
+  [Method and sources](../clean-room.md#short-wind-waves-and-open-water-reflection-2026-11-24).
+
 - Stern tint (2026-11-23). Live per-ship colour follows the existing turbulent trail, including on a paused clock.
   The GPU fixture checks recolouring, clearing, unchanged foam density, and unaffected pixels away from the trail.
   Build the packages, then run `node packages/water/test/ships.browser.mjs` on WebGPU and with `MARGO_COMPAT=1`

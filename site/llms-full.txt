@@ -10444,6 +10444,20 @@ On the public base, water measured 30,644 B gzip and water/underwater 8,754 B. T
 and 9,087 B respectively, with ceilings of 32,297 B and 9,360 B. Both share their existing rendering, capture and
 resource paths. Moving them behind separate entries would duplicate that work. Core and stage remain at 24,797 B.
 
+## Short wind waves and sky reflection
+
+Each of the five baseline ripple lattices fades over a projected pixel width of 0.25 to 1.0 lattice
+cells. The broadest keeps detail out to 13.33 m per pixel along its least sampled axis. Nonzero
+`chop` adds normal detail at wavelengths near 3.7 m and 2.3 m, with nominal amplitudes of 0.060 m and
+0.029 m before chop and wind-patch gain. Each band filters from 0.9 to pi radians of phase change per
+pixel. Short-wave depth and forces are outside this shading model.
+
+The reflection uses five taps in an angular lobe from either supplied sky type. Down-going rays on
+open water lose at most 34% of their sky weight. This is an approximation of surface occlusion and
+secondary reflection. There is one water fragment path and no extra binding, texture, or pass.
+
+The root water entry measures 32,655 B minified and gzipped, up from 32,150 B. Its ceiling is 33,635 B.
+
 ## Web template bundle
 
 The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must stay below
@@ -30635,7 +30649,7 @@ A separate WebGPU water grid evaluates up to eight swell trains with analytical 
 import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
+const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0, chop: 0.35});
 ```
 
 For an open ocean, set `horizon: true`. The central 75% of each grid axis keeps
@@ -30651,6 +30665,11 @@ together over those rows as the cells grow too large to resolve the wavelength.
 The default grid remains bounded and centred on the origin for ponds and finite
 surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 `size` of the camera, where the cells are regular.
+
+The five ripple layers fade according to their projected screen footprint in
+the direction of each layer. A nonzero `chop` adds two short crossing wave
+bands whose crests and strength vary across travelling wind patches. This is
+shading detail, with the swell trains still controlling the mesh, depth and buoyancy.
 
 ```ts
 import {Bloom} from 'margoengine/post/bloom';
@@ -30670,16 +30689,6 @@ const sea = Water.attach(engine, {
 Directions are XZ, dimensions/amplitudes are world units, wavelengths are positive, and phase is radians. A configured wave supplies the dominant direction and wavelength of its train; its three component amplitudes sum to the configured amplitude. Steepness defaults to 0.5 and must be 0..1. For N configured trains, each must satisfy `steepness * amplitude * (2 * Math.PI / wavelength) <= 1 / N`. Folding input and `setWaveHeight` changes reject atomically with code `failed` and a geometry help link; authored values are never silently clamped. The crest bend includes analytical derivatives and a displacement margin to preserve that bound. Agitation and micro-ripples follow the first wave's direction; each of their four layers is turned by its own angle (11° to 41°) and scaled by non-integer ratios, so no two noise lattices line up into visible streaks. Open-water sky reflections clamp below-horizon rays to the horizon and soften with roughness. Fresnel inputs are saturated before exponentiation so floating-point roundoff cannot feed a negative base into `pow`. Default water owns a shared sampleable scene-depth target with HTML. With Bloom/SSAO/DOF, pass `depth: () => effect.depthTexture` explicitly; dimensions must match the viewport. Water is opaque and Y-up. It seeds its own depth target from opaque scene depth and writes that target to resolve overlapping wave triangles; the original scene depth stays available for shoreline comparisons. Default foam history is screen-space and resets on resize/restoration. Each engine view keeps its own foam history; a view not drawn for a frame releases it.
 
 For the sandbox optics, connect the optional packages:
-
-```ts
-const bloom = Bloom.attach(engine), sky = Sky.attach(engine);
-Water.attach(engine, {
-  depth: () => bloom.depthTexture,
-  sceneColor: () => bloom.sceneTexture,
-  reflection: () => sky.reflectionTexture,
-  lights: sky.lights,
-});
-```
 
 [README continues: https://margoengine.com/llms/packages/water.md]
 

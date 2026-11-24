@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17442877,
+  "total": 17444215,
   "history": [
     {
       "date": "2026-10-24",
@@ -11415,6 +11415,12 @@
       "commit": "wake-tint",
       "reason": "water/ships 10,619 to 10,931 B min+gzip. Ship tint reuses the existing two bindings and turbulent stern sample. A split would repeat trail sampling or add a second rendering pass.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "e16934f329",
+      "reason": "Water 32,150 to 32,655 B gzip. Projected ripple footprints, two short wind bands, and the filtered sky lobe share the same fragment as depth, foam, and SSR. A split would require a second shader variant or a pass across the same samples.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12870,7 +12876,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 32297,
+    "@margoengine/water": 33635,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,

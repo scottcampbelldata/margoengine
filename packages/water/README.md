@@ -10,7 +10,7 @@ A separate WebGPU water grid evaluates up to eight swell trains with analytical 
 import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
+const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0, chop: 0.35});
 ```
 
 For an open ocean, set `horizon: true`. The central 75% of each grid axis keeps
@@ -26,6 +26,11 @@ together over those rows as the cells grow too large to resolve the wavelength.
 The default grid remains bounded and centred on the origin for ponds and finite
 surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 `size` of the camera, where the cells are regular.
+
+The five ripple layers fade according to their projected screen footprint in
+the direction of each layer. A nonzero `chop` adds two short crossing wave
+bands whose crests and strength vary across travelling wind patches. This is
+shading detail, with the swell trains still controlling the mesh, depth and buoyancy.
 
 ```ts
 import {Bloom} from 'margoengine/post/bloom';
@@ -65,7 +70,7 @@ for the capture limits.
 
 The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
 
-Pass an `Environment` as `reflectionEnvironment` to use the same longitude, live rotation, and HDR radiance scale as `EnvironmentBackground`. The water filters its reflection across both angular axes using a lobe widened by the screen footprint of the wave normals and uses the sky at the horizon for below-horizon reflections. The HDR sky also lights the water body and refracted seabed through a cosine-weighted irradiance estimate. Keep the `() => sky.reflectionTexture` form for the procedural `Sky` package.
+Pass an `Environment` as `reflectionEnvironment` to use the same longitude, live rotation, and HDR radiance scale as `EnvironmentBackground`. Use `() => sky.reflectionTexture` for the procedural `Sky` package. Both forms filter reflections across azimuth and elevation with a lobe widened by the wave normals' screen footprint. On open water, a down-going reflection samples horizon radiance with a softer weight to approximate occlusion by nearby waves. The HDR sky also lights the water body and refracted seabed through a cosine-weighted irradiance estimate.
 
 The same HDR environment lights the surface and appears in Snell's window below it through `@margoengine/water/underwater`.
 

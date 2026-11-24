@@ -1,5 +1,29 @@
 # Clean room
 
+### Short wind waves and open-water reflection (2026-11-24)
+
+Eric Bruneton, Fabrice Neyret and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless
+Transitions from Geometry to BRDF](https://doi.org/10.1111/j.1467-8659.2009.01618.x), 2010, separate
+resolved displacement, normal-scale detail and filtered reflection as the projected footprint grows. Fabrice
+Veron and W. Kendall Melville, [Experiments on the stability and transition of wind-driven water
+surfaces](https://www.cambridge.org/core/product/D92FEDDAD93AB36787C4EE22469873E1), 2001, observe rough
+patches forming and moving under wind gusts. Eric Heitz, [Understanding the Masking-Shadowing Function
+in Microfacet-Based BRDFs](https://jcgt.org/published/0003/02/03/), 2014, explains the directional
+loss of visible facets that plain normal mapping omits.
+
+Water projects each screen derivative into the ripple's rotated lattice, then fades that band over its
+own footprint. Two additional short gravity-wave bands use the deep-water law `omega = sqrt(g k)`
+and a low-frequency travelling phase warp. The shader includes the warp's spatial derivative when
+filtering and shading the wave. The scale, strength and direction of the authored bands and the rough
+patch field are procedural parameters. They affect normals. Mesh displacement, depth and buoyancy
+continue to use the swell trains.
+
+Both environment paths sample an angular lobe in azimuth and elevation. Down-going rays on the open
+surface contribute progressively less sky reflection. The soft reduction is capped at 34% as an
+approximation of light returned by other facets. This model traces no secondary water hits and uses no
+measured lake roughness field. The regional sky lighting and shoreline blend retain their existing
+paths. See the [limits](limits.md#short-wind-waves-and-sky-reflection).
+
 ### Colour in the stern wake (2026-11-23)
 
 Amanda T. Nylund, Lars Arneborg, Anders Tengberg, Ulf Mallast and Ida-Maja Hassellöv, [In situ observations of turbulent ship wakes and their spatiotemporal extent](https://doi.org/10.5194/os-17-1285-2021), 2021, characterize the trail of mixed water and its relation to the bubble wake. Yingfei Liu and Ruru Deng, [Ship Wakes in Optical Images](https://doi.org/10.1175/JTECH-D-18-0021.1), 2018, identify the surface trail separately from the divergent waves. Morgan F. Gelinas, Henry Bokuniewicz, John G. Rapaglia and Kamazima M. M. Lwiza, [Sediment Resuspension by Ship Wakes in the Venice Lagoon](https://digitalcommons.sacredheart.edu/bio_fac/28/), 2013, measure suspended material associated with ship passages in shallow water.
