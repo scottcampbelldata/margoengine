@@ -254,6 +254,22 @@ console.log(fbx.byteLength);
 
 A perspective camera is written as a 1 inch film and the lens that gives its `yfov`. `OrthoZoom` is the wider side of the view in metres, in a file of any unit. Light intensity is written as the percentage FBX has, times 100, so 3 is 300; point and spot lights are written with quadratic decay, glTF's fall-off, and `range` as far attenuation. Cone angles are doubled into the whole cone, in degrees. An open far plane has no FBX form: it is written a million near planes out. A camera or light that glTF would refuse is refused here with the same message. Curves on lens, colour or intensity are not written, and a `defaultCamera` flag does not become the file's default camera.
 
+A lens pull or a light fade is a `propertyClips` entry: curves on a perspective camera's `yfov` (written as both `FieldOfView` and the `FocalLength` it gives), a light's `intensity` or its `color` (three values per key), each on the node that carries the camera or light. A clip shares the stack of a node clip with the same `name`, or makes its own. A curve on a node that holds no matching camera or light, or a `yfov` on an orthographic camera, throws a `TypeError`. Keys are `STEP` or `LINEAR`.
+
+```ts
+import {exportFBX} from 'margoengine/fbx/export';
+const shot = {name: 'Shot', camera: {type: 'perspective' as const, perspective: {yfov: 0.8, znear: 0.1, zfar: 100}}};
+const key = {name: 'Key', light: {type: 'point' as const, color: [1, 0.9, 0.8], intensity: 3}};
+const {fbx} = await exportFBX({nodes: [shot, key]}, {
+  propertyClips: [{name: 'Rack', channels: [
+    {node: shot, property: 'yfov', times: [0, 2], values: [0.8, 0.4]},
+    {node: key, property: 'intensity', times: [0, 2], values: [3, 0]},
+  ]}],
+});
+console.log(fbx.byteLength);
+```
+
+
 Proof: Blender reads a binary file from `exportFBX` in its own importer, which shares no code with this package. `test/fixtures/blender-read-export.py` prints what landed, and position, aim, up, field of view on both sides, clip planes, ortho scale, light kind, colour, energy, cone and blend all match the scene given.
 
 Children of a node with an uneven scale get `InheritType` 1, the plain parent x local product a scene means. This importer reads them as well. Blender reads binary FBX only, so use the ASCII form with other tools.

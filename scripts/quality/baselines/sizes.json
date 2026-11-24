@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17381685,
+  "total": 17382333,
   "history": [
     {
       "date": "2026-10-24",
@@ -11307,6 +11307,12 @@
       "commit": "6237d1e861",
       "reason": "physics/next 194582 to 196124 B as measured on origin/main 6237d1e861: physics commits there grew it without a size record",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "5e7e8d9d6e",
+      "reason": "fbx/export: propertyClips camera and light curves, 8525 -> 8905 B min+gzip; a split entry would duplicate the curve writer",
+      "grew": 1
     }
   ],
   "items": {
@@ -11695,7 +11701,7 @@
     "@margoengine/fbx/character-creator": 5542,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
-    "@margoengine/fbx/export": 8525,
+    "@margoengine/fbx/export": 9173,
     "@margoengine/fbx/large": 794,
     "@margoengine/fbx/layers": 4780,
     "@margoengine/fbx/legacy": 6648,

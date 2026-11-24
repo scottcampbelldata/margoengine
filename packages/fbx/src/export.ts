@@ -15,8 +15,31 @@ import type {
 } from '@margoengine/exporters/collect';
 import { inverse, multiply } from './math.js';
 
+/** One curve on a camera's or light's own property: the node holds the camera or light, `values` run with `times`. */
+export interface FBXPropertyChannel {
+  /** The scene node that carries the camera (for `yfov`) or the light (for `intensity` and `color`). */
+  node: ExportNode;
+  /**
+   * `yfov`: a perspective camera's vertical field of view in radians (written as FBX `FieldOfView` and the `FocalLength`
+   * it gives); `intensity`: candela or lux, as `LightData.intensity`; `color`: linear rgb in [0, 1], three values per key.
+   */
+  property: 'yfov' | 'intensity' | 'color';
+  interpolation?: 'STEP' | 'LINEAR';
+  /** Nonnegative, strictly increasing seconds. */
+  times: ArrayLike<number>;
+  /** One value per key (three for `color`). */
+  values: ArrayLike<number>;
+}
+/** Camera and light curves written into the animation stack named `name`; it shares the stack of a node clip of that name. */
+export interface FBXPropertyClip {
+  name?: string;
+  channels: readonly FBXPropertyChannel[];
+}
+
 /** Options of {@link exportFBX}, on top of the options shared by every scene exporter. */
 export interface FBXExportOptions extends SceneOptions {
+  /** Lens, light intensity and light colour curves, which node clips cannot hold. Default none. */
+  propertyClips?: readonly FBXPropertyClip[];
   /** Write the ASCII form instead of binary. Default false. */
   ascii?: boolean;
   /** Put texture bytes inside the file. false names them by a relative path and returns them in `textures`. Default true. */
@@ -315,7 +338,16 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     embed = options.embedTextures ?? true,
     roots = collect(source, options),
     scene = Array.isArray((source as ExportScene).nodes) ? (source as ExportScene) : undefined,
-    clips = scene?.animations ?? [],
+    propertyClips = options.propertyClips ?? [],
+    named = scene?.animations ?? [],
+    clips = [
+      ...named,
+      ...propertyClips
+        .filter((p) => !named.some((n) => n.name === p.name))
+        .filter((p, i, all) => all.findIndex((q) => q.name === p.name) === i)
+        .map((p) => ({ name: p.name, channels: [] as readonly never[] })),
+    ],
+    attributes = new Map<ExportNode, { id: bigint; kind: 'Camera' | 'Light'; camera?: CameraData }>(),
     objects: Rec[] = [],
     connections: Rec[] = [],
     counts = new Map<string, number>(),
@@ -628,7 +660,14 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     return id;
   };
 
-  const attach = (name: string, kind: string, rotation: number[], properties: Rec[], parentId: bigint, inherit: boolean) => {
+  const attach = (
+    name: string,
+    kind: string,
+    rotation: number[],
+    properties: Rec[],
+    parentId: bigint,
+    inherit: boolean,
+  ) => {
     const id = add('Model', name, 'Model', kind, [
       ['Version', [int(232)]],
       [
@@ -643,14 +682,13 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
       ['Culling', ['CullingOff']],
     ]);
     link(id, parentId);
-    link(
-      add('NodeAttribute', name, 'NodeAttribute', kind, [
-        ['TypeFlags', [kind]],
-        ['GeometryVersion', [int(124)]],
-        ['Properties70', [], properties],
-      ]),
-      id,
-    );
+    const attribute = add('NodeAttribute', name, 'NodeAttribute', kind, [
+      ['TypeFlags', [kind]],
+      ['GeometryVersion', [int(124)]],
+      ['Properties70', [], properties],
+    ]);
+    link(attribute, id);
+    return attribute;
   };
 
   const visit = (node: Node, parentId: bigint, inheritParentScale: boolean) => {
@@ -687,10 +725,28 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     const passOn = inheritParentScale || uneven(node.s) || (!!node.source && stretched.has(node.source));
     // A glTF camera and light look down -Z, an FBX camera down +X and an FBX light down -Y. A child model turns one into
     // the other: the node keeps its own transform, curves and children, and may hold a mesh as well.
-    if (node.camera)
-      attach(node.camera.name ?? `${node.name ?? 'Node'} camera`, 'Camera', [0, 90, 0], cameraProperties(node.camera), id, passOn);
-    if (node.light)
-      attach(node.light.name ?? `${node.name ?? 'Node'} light`, 'Light', [90, 0, 0], lightProperties(node.light), id, passOn);
+    if (node.camera) {
+      const attribute = attach(
+        node.camera.name ?? `${node.name ?? 'Node'} camera`,
+        'Camera',
+        [0, 90, 0],
+        cameraProperties(node.camera),
+        id,
+        passOn,
+      );
+      if (node.source) attributes.set(node.source, { id: attribute, kind: 'Camera', camera: node.camera });
+    }
+    if (node.light) {
+      const attribute = attach(
+        node.light.name ?? `${node.name ?? 'Node'} light`,
+        'Light',
+        [90, 0, 0],
+        lightProperties(node.light),
+        id,
+        passOn,
+      );
+      if (node.source) attributes.set(node.source, { id: attribute, kind: 'Light' });
+    }
     for (const child of node.children) visit(child, id, passOn);
   };
   for (const root of roots) visit(root, 0n, false);
@@ -773,6 +829,56 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
         curve(baked.times, values, step, curveNode, AXES[axis]);
       }
     }
+    for (const group of propertyClips.filter((p) => p.name === clip.name))
+      for (const channel of group.channels) {
+        const target = attributes.get(channel.node);
+        if (target === undefined)
+          throw new TypeError(
+            `A ${channel.property} curve targets ${channel.node.name ?? 'a node'}, which holds no ${channel.property === 'yfov' ? 'camera' : 'light'} in the scene; point it at the node that carries one`,
+          );
+        const width = channel.property === 'color' ? 3 : 1,
+          step = channel.interpolation === 'STEP';
+        if (target.kind !== (channel.property === 'yfov' ? 'Camera' : 'Light'))
+          throw new TypeError(
+            `A ${channel.property} curve targets ${channel.node.name ?? 'a node'}, which holds a ${target.kind.toLowerCase()}; use ${target.kind === 'Camera' ? 'yfov' : 'intensity or color'}`,
+          );
+        if (channel.property === 'yfov' && !target.camera!.perspective)
+          throw new TypeError(
+            `A yfov curve needs a perspective camera; ${channel.node.name ?? 'the node'} holds an orthographic one`,
+          );
+        const keys = channelKeys(
+          {
+            path: channel.property,
+            interpolation: channel.interpolation,
+            times: channel.times,
+            values: channel.values,
+          },
+          width,
+        );
+        end = Math.max(end, keys.times[keys.times.length - 1]);
+        const count = keys.times.length,
+          column = (index: number, convert: (v: number) => number) =>
+            Float32Array.from({ length: count }, (_, i) => convert(keys.values[i * width + index])),
+          write = (property: string, axes: string[], columns: Float32Array[]) => {
+            const curveNode = track(
+              property,
+              axes,
+              columns.map((c) => c[0]),
+            );
+            linkProperty(curveNode, target.id, property);
+            columns.forEach((values, i) => curve(keys.times, values, step, curveNode, axes[i]));
+          };
+        if (channel.property === 'yfov') {
+          write('FieldOfView', ['d|FieldOfView'], [column(0, (v) => v * DEGREES)]);
+          write('FocalLength', ['d|FocalLength'], [column(0, (v) => (FILM_INCH * INCH_MM) / (2 * Math.tan(v / 2)))]);
+        } else if (channel.property === 'intensity') write('Intensity', ['d|Intensity'], [column(0, (v) => v * 100)]);
+        else
+          write(
+            'Color',
+            AXES,
+            [0, 1, 2].map((i) => column(i, (v) => v)),
+          );
+      }
     const span = BigInt(Math.round(end * TICKS));
     stackProperties.push(P('LocalStop', 'KTime', 'Time', '', span), P('ReferenceStop', 'KTime', 'Time', '', span));
     takes.push([
