@@ -592,11 +592,6 @@ test('an Environment without children loads none of the capture binding, CubeCam
         `import {createElement as h} from 'react';
   import {Environment${children ? ',Lightformer' : ''}} from '@margoengine/react/environment';
   export const App=()=>h(Environment,{src:'studio.hdr'}${children ? ',h(Lightformer)' : ''});`,
-        // Open in docs/known-bugs.md: the environment root re-exports its decoders, so react's lazy import of it
-        // keeps them with it. This fails once that is fixed; then drop the expectation.
-        [
-          '[INEFFECTIVE_DYNAMIC_IMPORT] environment/dist/loaders.js is dynamically imported by environment/dist/main.js but also statically imported by environment/dist/index.js, dynamic import will not move module into another chunk.',
-        ],
       );
       const initial = staticChunks(outputs)
           .map((chunk) => chunk.code)
@@ -627,6 +622,33 @@ test('module-level React factories carry a pure annotation, so unused components
   }
   assert.deepEqual(offenders, []);
 });
+
+test('lights and fog load the environment entry without image decoders (KB-REACT-ENVDECODERS1)', async () =>
+  temporary(async (directory) => {
+    // They took the environment root, whose re-exported Radiance HDR, OpenEXR and UltraHDR decoders then joined their
+    // lazy chunk (and the build warned of an ineffective dynamic import); only `<Environment src>` reads image files.
+    const outputs = await bundle(
+      directory,
+      'lights-only',
+      `import {createElement as h} from 'react';
+  import {Canvas} from '@margoengine/react';
+  import {AmbientLight,Fog} from '@margoengine/react/environment';
+  export const App=()=>h(Canvas,null,h(AmbientLight),h(Fog));`,
+    );
+    // The decoders may stay a chunk of their own (loaded for a URL source); they must not share a chunk with the classes.
+    const together = outputs.filter((chunk) => {
+      const ids = Object.keys(chunk.modules ?? {}).map((id) => id.replaceAll('\\', '/'));
+      return (
+        ids.some((id) => /environment\/(src|dist)\/loaders\.(ts|js)$/.test(id)) &&
+        ids.some((id) => /environment\/(src|dist)\/main\.(ts|js)$/.test(id))
+      );
+    });
+    assert.deepEqual(
+      together.map((chunk) => chunk.fileName),
+      [],
+      'no chunk holds both the environment classes and the decoders',
+    );
+  }));
 
 test('OrbitControls loads the orbit controls entry only, never the controls index and its BVH raycaster', async () =>
   temporary(async (directory) => {

@@ -89,7 +89,12 @@ Depth.prototype.onResize = function (listener) {
 };
 mock.module('@margoengine/post/depth', { namedExports: { DepthTexture: Depth } });
 mock.module('@margoengine/post/mrt', { namedExports: { SceneTargets: plugin('targets') } });
-mock.module('@margoengine/environment', {
+// The bindings load the decoder-free entry; the tests stand in for both it and the root.
+const mockEnvironment = (options) => {
+  mock.module('@margoengine/environment', options);
+  mock.module('@margoengine/environment/main', options);
+};
+mockEnvironment({
   namedExports: {
     AmbientLight: plugin('ambient', { color: '#ffffff', intensity: 1 }),
     HemisphereLight: plugin('hemisphere', { sky: '#ffffff', ground: undefined, intensity: 1 }),

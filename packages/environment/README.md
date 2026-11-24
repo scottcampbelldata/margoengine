@@ -8,7 +8,7 @@ Build from source with `npm run build` in `packages/environment`.
 
 Decodes Radiance `.hdr` (RGBE), OpenEXR (single-part scanline EXR with NONE, RLE, ZIPS, ZIP or PIZ, tiled or mipmapped EXR through `/exr-tiled`, and PXR24, B44 and DWAA/DWAB through the asynchronous `/exr-codecs` worker, see Limits) and UltraHDR gain-map JPEG images, prefilters them into image-based lighting (`Environment`, `EnvironmentLighting`), and draws a background (the environment with `exposure`, `rotation` and `blur`, or a color) and fog (linear, exponential-squared and height fog), plus froxel volumetric fog with light shafts in the optional `/volumetric` entry.
 
-The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras"), and `/lightformer` an emissive studio card for cube captures (see "Lightformer"); `/exr-write` writes EXR files (see "Writing EXR") and `/exr-tiled` reads tiled and mipmapped ones (see "Reading tiled and mipmapped EXR").
+The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras"), and `/lightformer` an emissive studio card for cube captures (see "Lightformer"); `/main` is the root without the image decoders, for code that reads no image file (an app that never names a decoder gets that split from the root too; `@margoengine/react`'s lights, fog and cube camera use it); `/exr-write` writes EXR files (see "Writing EXR") and `/exr-tiled` reads tiled and mipmapped ones (see "Reading tiled and mipmapped EXR").
 
 ```ts
 import {Engine} from 'margoengine/core';

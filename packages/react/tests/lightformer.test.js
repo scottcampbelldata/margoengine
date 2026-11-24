@@ -90,7 +90,12 @@ class FakeLighting {
     this.disposed = true;
   }
 }
-mock.module('@margoengine/environment', {
+// The bindings load the decoder-free entry; the tests stand in for both it and the root.
+const mockEnvironment = (options) => {
+  mock.module('@margoengine/environment', options);
+  mock.module('@margoengine/environment/main', options);
+};
+mockEnvironment({
   namedExports: {
     EnvironmentBackground: FakeBackground,
     ColorBackground: FakeColorBackground,

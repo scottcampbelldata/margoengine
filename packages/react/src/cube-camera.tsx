@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cube-camera';
-import type * as EnvironmentModule from '@margoengine/environment';
+import type * as EnvironmentModule from '@margoengine/environment/main';
 import type { EnvironmentBackground, Fog as FogPlugin, FogOptions } from '@margoengine/environment';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { live, report, useMesh, useResourceEffect, useScene, type Scene } from './internal.js';
@@ -69,7 +69,13 @@ function dropFog(scene: Scene, own: OwnFog): void {
   own.fog.dispose();
   own.fog = undefined;
 }
-function withFog(scene: Scene, api: typeof EnvironmentModule, own: OwnFog, options: CubeCameraFog | false, capture: () => void): void {
+function withFog(
+  scene: Scene,
+  api: typeof EnvironmentModule,
+  own: OwnFog,
+  options: CubeCameraFog | false,
+  capture: () => void,
+): void {
   let fog: FogPlugin | undefined;
   for (const plugin of scene.engine.plugins.values()) if (plugin instanceof api.Fog && plugin !== own.fog) fog = plugin;
   if (fog) dropFog(scene, own);
@@ -157,7 +163,7 @@ function CubeBinding({ settings, publish }: { settings: Settings; publish: (text
   useEffect(() => {
     if (!wantsFog) return;
     let active = true;
-    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment'))
+    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main'))
       .then((api) => {
         if (active) fogApi.current = api;
       })
@@ -251,7 +257,10 @@ export const CubeCamera = /* @__PURE__ */ forwardRef<MeshRef, CubeCameraProps>(f
   ref,
 ) {
   if (!(frames === Infinity || (Number.isInteger(frames) && frames > 0)))
-    throw rangeError('CubeCamera frames must be a positive integer or Infinity; pass how many frames to capture', 'react-arguments');
+    throw rangeError(
+      'CubeCamera frames must be a positive integer or Infinity; pass how many frames to capture',
+      'react-arguments',
+    );
   const [texture, setTexture] = useState<GPUTexture | null>(null);
   return (
     <Mesh {...props} ref={ref}>

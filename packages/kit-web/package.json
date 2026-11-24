@@ -491,6 +491,10 @@
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"
     },
+    "./environment/main": {
+      "types": "./dist/environment/main.d.ts",
+      "import": "./dist/environment/main.js"
+    },
     "./environment/probes": {
       "types": "./dist/environment/probes.d.ts",
       "import": "./dist/environment/probes.js"

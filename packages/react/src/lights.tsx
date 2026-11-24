@@ -5,13 +5,13 @@ import type {
   Fog as FogPlugin,
   FogOptions,
   HemisphereLight as HemispherePlugin,
-} from '@margoengine/environment';
+} from '@margoengine/environment/main';
 import { useCommit, useCreated, useModelSources, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { attachBinding } from './package-binding.js';
 
-type EnvironmentApi = typeof import('@margoengine/environment');
-const load = () => optionalPeer('@margoengine/environment', () => import('@margoengine/environment'));
+type EnvironmentApi = typeof import('@margoengine/environment/main');
+const load = () => optionalPeer('@margoengine/environment/main', () => import('@margoengine/environment/main'));
 interface ErrorProps {
   /** Loading `@margoengine/environment` or attaching failed (these lights need WebGPU). */
   onError?: (error: unknown) => void;
@@ -68,31 +68,30 @@ export interface HemisphereLightProps extends ErrorProps {
  * HemisphereLight) on core meshes and models. Live; the ref is the live light. Inside a `<Scene>` it lights that
  * scene's meshes. WebGPU only.
  */
-export const HemisphereLight = /* @__PURE__ */ forwardRef<HemispherePlugin, HemisphereLightProps>(function HemisphereLight(
-  { sky = '#ffffff', ground, intensity = 1, onError },
-  ref,
-) {
-  const scene = useScene();
-  const light = useCreated<EnvironmentApi, HemispherePlugin>(
-    scene,
-    {
-      load,
-      create: (api) => attachBinding(scene, new api.HemisphereLight()),
-      dispose: (value) => value.dispose(),
-      ref,
-      onError,
-    },
-    [scene.world],
-  );
-  useModelSources(scene, scene.world ? null : light);
-  useCommit(() => {
-    if (!light) return;
-    light.sky = sky;
-    light.ground = ground;
-    light.intensity = intensity;
-  });
-  return null;
-});
+export const HemisphereLight = /* @__PURE__ */ forwardRef<HemispherePlugin, HemisphereLightProps>(
+  function HemisphereLight({ sky = '#ffffff', ground, intensity = 1, onError }, ref) {
+    const scene = useScene();
+    const light = useCreated<EnvironmentApi, HemispherePlugin>(
+      scene,
+      {
+        load,
+        create: (api) => attachBinding(scene, new api.HemisphereLight()),
+        dispose: (value) => value.dispose(),
+        ref,
+        onError,
+      },
+      [scene.world],
+    );
+    useModelSources(scene, scene.world ? null : light);
+    useCommit(() => {
+      if (!light) return;
+      light.sky = sky;
+      light.ground = ground;
+      light.intensity = intensity;
+    });
+    return null;
+  },
+);
 
 /** Props of `<Fog>`: linear (`near`, `far`), exponential-squared (`density`) and height fog, all live. */
 export interface FogProps extends Omit<FogOptions, 'name'>, ErrorProps {

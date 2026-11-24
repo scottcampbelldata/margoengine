@@ -255,7 +255,12 @@ const orbitExports = {
 };
 mock.module('@margoengine/controls/orbit', { namedExports: orbitExports });
 mock.module('@margoengine/controls/profiles', { namedExports: { PROFILES: {} } });
-mock.module('@margoengine/environment', {
+// The bindings load the decoder-free entry; the tests stand in for both it and the root.
+const mockEnvironment = (options) => {
+  mock.module('@margoengine/environment', options);
+  mock.module('@margoengine/environment/main', options);
+};
+mockEnvironment({
   namedExports: {
     async loadEnvironmentImage(src, { signal }) {
       const request = { src, signal };
