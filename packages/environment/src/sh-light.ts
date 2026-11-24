@@ -3,8 +3,8 @@
 // irradiance over pi (Ramamoorthi and Hanrahan 2001, "An Efficient Representation for Irradiance Environment Maps",
 // SIGGRAPH, https://graphics.stanford.edu/papers/envmap/; band factors 1, 2/3, 1/4), so a surface of albedo `a`
 // reflects `a x E(n) / pi x intensity`. Basis order and constants: Sloan 2008, "Stupid Spherical Harmonics (SH)
-// Tricks", GDC, https://www.ppsloan.org/publications/StupidSH36.pdf (the same order as three.js SphericalHarmonics3,
-// so its nine coefficients carry over unchanged).
+// Tricks", GDC, https://www.ppsloan.org/publications/StupidSH36.pdf (the standard real SH order, so coefficients
+// from other tools carry over unchanged).
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
@@ -21,7 +21,7 @@ export type SHCoefficients = readonly (readonly [number, number, number])[] | Ar
 export interface SHLightOptions {
   /**
    * L2 SH radiance coefficients, linear, in the order (l,m) = (0,0), (1,-1) y, (1,0) z, (1,1) x, (2,-2) xy, (2,-1) yz,
-   * (2,0) 3z^2-1, (2,1) xz, (2,2) x^2-y^2 (three.js SphericalHarmonics3 and `projectEquirectSH` order). Default: all
+   * (2,0) 3z^2-1, (2,1) xz, (2,2) x^2-y^2 (the standard real SH order, as `projectEquirectSH` writes it). Default: all
    * zero (no light).
    */
   coefficients?: SHCoefficients;
@@ -56,7 +56,7 @@ function flatten(value: SHCoefficients): Float32Array<ArrayBuffer> {
 }
 
 /**
- * Light probe from nine RGB L2 spherical-harmonic coefficients (three.js `LightProbe`): the diffuse ambient light of a
+ * Light probe from nine RGB L2 spherical-harmonic coefficients: the diffuse ambient light of a
  * whole environment in 27 numbers, the same at every point. `engine.use(light)` (or `SHLight.attach`) lights core
  * meshes and terrain; `light.add(model)` adds gltf/pbr models, materials meshes and VAT crowds. It takes the ambient
  * slot exactly as {@link HemisphereLight} does (in place of the built-in ambient, added to IBL, the fallback outside
