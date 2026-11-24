@@ -25138,7 +25138,7 @@ asctime dates were read as local time (RFC 9110 5.6.7, RFC 9111 5.3); `If-Range`
 `Prefetcher.settle()` hung while paused; `AssetBundles.load` kept downloading every file after one failed; HashedAssets
 and AssetBundles dropped a `Request` input's signal and headers; `throttle` left one abort listener per chunk.
 
-### Open: cache findings not fixed in the audit
+### Closed 2026-11-24: cache audit findings (every item below is Fixed, Verified or an Accepted difference with its regression or pinning test)
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
@@ -25192,7 +25192,7 @@ frame; they compare `Math.fround(value)`. A linked Aseprite cel took the z-index
 orders by each cel's own z). A Spine IK key without `mix` kept the setup mix (0 stayed 0; the JSON export format
 says assume 1) and one without `softness` interpolated toward 1 (format: assume 0).
 
-### Open: sprites findings not fixed in the audit
+### Closed 2026-11-24: sprites audit findings (every item below is Fixed, Verified or an Accepted difference with its regression or pinning test)
 
 - Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
   because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
