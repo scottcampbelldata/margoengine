@@ -248,6 +248,13 @@ impl World {
             let kind = self.flags(at) & KIND;
             let position = self.v(POSITION_X, at);
             let rotation = self.q(ROTATION_X, at);
+            // A dynamic body whose pose was pushed in the last step is not at rest, though its velocity is.
+            if kind == DYNAMIC && self.flags(at) & (CAN_SLEEP | ASKED_TO_SLEEP) == CAN_SLEEP {
+                let (limit, energy) = (self.s(SLEEP_LIMIT, at), self.pose_energy(at, dt));
+                if energy > if limit > 0.0 { limit } else { self.header().sleep_energy } {
+                    self.set_s(SLEEP_TIME, at, 0.0);
+                }
+            }
             self.set_v(PREVIOUS_X, at, position);
             self.set_q(PREVIOUS_ROTATION_X, at, rotation);
             self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));

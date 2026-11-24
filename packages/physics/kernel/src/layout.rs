@@ -711,6 +711,8 @@ pub const RESTING: u32 = 1 << 12;
 pub const CCD: u32 = 1 << 13;
 /// Set by the last step's CCD pass on the bodies it checked: CCD on and moved further than thick (`is_ccd_active`).
 pub const CCD_ACTIVE: u32 = 1 << 14;
+/// Asked to sleep (`sleep`): ready at once, whatever the pose was pushed through, until it sleeps or wakes.
+pub const ASKED_TO_SLEEP: u32 = 1 << 15;
 
 // Bits of the COLLIDER_FLAGS column.
 /// Sees overlaps and pushes nothing.

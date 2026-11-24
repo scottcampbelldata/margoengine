@@ -6,6 +6,12 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-24: a body a joint or a contact was still pulling home fell asleep short of it (KB-PHYS-SLEEP-PUSH1, physics kernel)
+
+- **Repro:** a fixed body and a 10 kg ball at y = -2 with a spherical joint whose anchors lie 1.5 m apart (`anchorA: [0, 0.5, 0]`, `anchorB: [0, 1, 0]`, canSleep default); `physics.step()` 200 times. The ball closes the error at the joint's push speed (3 m/s, 0.05 m a step) and stopped at y = -0.55, asleep, 0.05 m from the joint's home at -0.5. With `canSleep: false` it reached -0.5.
+- **Cause:** the soft solver closes a joint's or a contact's error by moving the pose and leaves no velocity behind, and the sleep test (Erleben 2005, 6.5) read velocity alone, so the ball counted as at rest while it moved 0.05 m every step. The 0.5 s window ended before the 0.5 s of travel had.
+- **Fix:** `begin_step` in `kernel/src/integrate.rs` resets a dynamic body's sleep timer when the pose it moved through in the last step, over the step, has kinetic energy per unit of mass above the body's own sleep threshold (`pose_energy` in `kernel/src/island.rs`); a body asked to sleep (`sleep`) is ready at once whatever its pose last did (`ASKED_TO_SLEEP`). Regression: `packages/physics/tests/next-sleep-pushed.test.js` "a body a joint pulls home from 1.5 m away does not fall asleep on the way", which fails without it. A box on a ground with `allowedPenetration: 0.03` now rests at 0.030017 m (the contact's 17 micrometres of give) in place of the 0.03 m or less it read when it slept early, so `next-parameters.test.js` bounds it at 0.0301.
+
 ### Fixed 2026-11-24: a character standing on a slope steeper than minSlopeSlideAngle did not slide down it (KB-PHYS-CHARACTER-SLIDE1, physics character controller)
 
 - **Repro:** a fixed box (halfExtents 10, 0.05, 10) turned 25 degrees about z; a kinematic position capsule (halfHeight 0.4, radius 0.3) above it; `physics.createCharacterController(capsule, {minSlopeSlideAngle: 20 degrees, maxSlopeClimbAngle: 60 degrees, autostep: false, snapToGround: 0.2})`; every step `controller.move([0, -0.08, 0])`. The capsule stayed where it landed with `movement` [0, 0, 0]; Rapier 0.21's controller on the same scene slides it downhill by about 0.031 m a step. With `minSlopeSlideAngle` 40 degrees (above the slope) both hold still.
@@ -101,17 +107,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   affected packages that have tests. A full reason (core, stage, check code and the rest) still runs every package.
   Regression: `tests/check-merge-affected.test.js` ("test:changed picks the changed packages ...").
 
-### Fixed 2026-11-24: parseGLTFAsync of a file in memory fetched its external URIs from the page's directory (KB-GLTFA B7, gltf/pbr)
+### Open: parseGLTFAsync of a file in memory fetches its external URIs from the page's directory (KB-GLTFA B7, gltf/pbr)
 
-- **Repro (before):** `parseGLTFAsync(engine, docWithImageUri)` from `@margoengine/gltf/pbr` on a page at
-  `https://app.test/editor/` with `images: [{ uri: 'secret/tex.png' }]` requested `https://app.test/editor/secret/tex.png`
-  and failed with `glTF download request failed: HTTP 404`, which did not say that the file has no location.
-- **Cause:** `loadAsset` (`packages/gltf/src/asset.ts`) resolved URIs against `globalThis.location` when no URL was given.
-- **Fix:** `AssetOptions.baseURL` names what a file in memory resolves against; without it an external buffer or image
-  URI (not `data:`) is refused with a coded `state` error that names `baseURL` and `loadGLTF`, and nothing is fetched.
-  `loadGLTF` and the other loaders that fetch the file know its location and ignore the option. This changes the
-  documented "resolves against the page" behaviour on purpose (manager ruling 2026-11-24).
-- **Regression:** packages/gltf/test/in-memory-base.test.js; test/download-budget.test.js now passes `baseURL`.
+- **Repro:** `parseGLTFAsync(engine, docWithImageUri)` from `@margoengine/gltf/pbr` on a page at
+  `https://app.test/editor/` with `images: [{ uri: 'secret/tex.png' }]` requests `https://app.test/editor/secret/tex.png`
+  and fails with `glTF download request failed: HTTP 404`, which does not say that the file has no location.
+- **Cause:** `loadAsset` (`packages/gltf/src/asset.ts`) resolves URIs against `globalThis.location` when no URL is
+  given. This is documented on `parseGLTFAsync` ("resolves external URIs against the page") and matches what loaders
+  people switch from do with an empty path, so it stays; the light loader refuses instead ("needs the file location;
+  use loadGLTF"). Open as an API question: a refusal naming `loadGLTF` and the `buffers` option would change documented
+  behaviour.
 
 ### Fixed 2026-11-19: loadAuto held a large file twice while gltf/pbr loaded it (KB-GLTFA B14, gltf)
 
@@ -126,16 +131,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   when loadAuto returns it forgets everything. The same load now holds 104,867,300 B (one copy). Regression:
   `packages/gltf/test/auto.test.js` ("downloaded once and held once"; the declared-length move keeps the redirect URL).
 
-### Fixed 2026-11-24: loadAuto on an engine with no GPU device reported gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
+### Open: loadAuto on an engine with no GPU device reports gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
 
-- **Repro (before):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour map:
-  `gltf/textured` refused with `unsupported` (naming `install()` from `@margoengine/webgl2-compat`), `loadAuto` moved to
-  gltf/pbr, which failed with `PBRModel requires WebGPU`, and the first reason was dropped.
-- **Cause:** the move to gltf/pbr rethrew its error as it was.
-- **Fix:** when gltf/pbr also refuses with `unsupported`, `loadAuto` throws an `unsupported` MargoError whose message is
-  the light loader's reason followed by `gltf/pbr cannot load it here either: <gltf/pbr's message>`. The move itself is
-  unchanged, so engines with a device still reach gltf/pbr (the existing "a texture on WebGL does too" test holds).
-- **Regression:** packages/gltf/test/auto.test.js ("with no GPU device for gltf/pbr either ...").
+- **Repro (by reading):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour
+  map: `gltf/textured` refuses with `unsupported` (it names `install()` from `@margoengine/webgl2-compat`), `loadAuto`
+  moves to gltf/pbr, which fails with `PBRModel requires WebGPU`, and the first reason is dropped.
+- **Cause:** `loadAuto` moves on any `unsupported` refusal without checking that gltf/pbr can run on the engine. The
+  current test "a texture on WebGL does too" (`packages/gltf/test/auto.test.js`) asserts the move, so changing it is
+  a decision on what loadAuto should do on an engine without a GPU device.
 
 ### Fixed 2026-11-19: a node with a zero scale on any axis stopped the whole glTF load, in both loaders (KB-GLTFA B1, core + gltf)
 
@@ -1816,19 +1819,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that scene, not the default one"), and on a real GPU, natively and with MARGO_COMPAT=1,
   `npm run test:browser:reflections --workspace @margoengine/react -- --mode=scene-fog` (centre green; grey before).
 
-### Fixed 2026-11-24: react's lazy environment bindings fetched the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
+### Open 2026-11-16: react's lazy environment bindings fetch the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
 
-- **Repro (before):** build an app with Vite that renders `<AmbientLight>`, `<Fog>`, `<CubeCamera>` or an
-  `<Environment>` with children (`@margoengine/react/environment`). Vite printed `INEFFECTIVE_DYNAMIC_IMPORT` for
-  `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load held the Radiance HDR, OpenEXR and
-  UltraHDR decoders (36 KB raw) although none of them reads an image file.
-- **Cause:** each binding loaded the whole environment root, whose `index.js` re-exports `loaders.js` beside `main.js`;
-  taking the namespace kept every export, so the decoders joined the chunk and `EnvironmentLighting.load`'s own
-  `import('./loaders.js')` split could not happen.
-- **Fix:** `@margoengine/environment/main` is a new entry: everything the root exports except the decoders. The lights,
-  Fog, CubeCamera and children-capture bindings import it; only `<Environment src>` (which decodes a file) takes the root.
-- **Regression:** packages/react/tests/subpaths.test.js ("lights and fog load the environment entry without image
-  decoders"; it fails with the old import) and "an Environment without children ..." no longer expects the warning.
+- **Repro:** build an app with Vite from the workspace that renders `<AmbientLight>`, `<Fog>`, `<CubeCamera>` or an
+  `<Environment>` with children and no `src` (`@margoengine/react/environment`). Vite prints
+  `INEFFECTIVE_DYNAMIC_IMPORT` for `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load holds
+  the Radiance HDR, OpenEXR and UltraHDR decoders (environment `dist/loaders.js`, 36 KB raw) although none of them reads
+  an image file. A packed install prints no warning but builds the same chunk.
+- **Cause:** each binding loads the whole environment root, `import('@margoengine/environment')`, whose `index.js`
+  re-exports `loaders.js` beside `main.js`. Taking the namespace keeps every export, so the decoders join the chunk and
+  `EnvironmentLighting.load`'s own `import('./loaders.js')` split cannot happen. Only `<Environment src>` needs them.
+- **Fix needed:** a path to the environment classes without the decoders for the bindings that read no file (an entry
+  of the environment package, or imports the bundler can trim), then drop the expected warning in react
+  `tests/subpaths.test.js` ("an Environment without children ..."), which fails once the warning is gone.
 
 ### Fixed 2026-11-16: an `<Environment>` app bundled CubeCamera, Lightformer and the children capture up front (KB-REACT-PURE1, react)
 
@@ -9100,13 +9103,12 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
-### Fixed 2026-11-24: a rigid chain's stiffness depended on the iterations, the substeps and the mass ratio (physics soft, KB-SOFT-ITER1)
+### Open: a rigid chain's stiffness depends on the iterations, the substeps and the mass ratio (physics soft, KB-SOFT-ITER1, found 2026-11-24)
 
-- **Repro:** `node packages/physics/scripts/soft-stretch-sweep.mjs` on the commit before the fix: a 3.8 m rope pinned at the top with rigid edges and a 16 kg crate attached to its end hung 4.12 m below the pin at 2 iterations and 8 substeps with particles of 0.01 kg (8% stretch), 3.98 at 8 iterations, 3.85 at 16 substeps, 3.95 at 0.05 kg, 3.82 at 0.5 kg.
-- **Cause:** the edges were solved by Gauss-Seidel sweeps in index order (XPBD, Macklin et al. 2016), which move a correction one edge a sweep, and a body attached to a particle was pulled once a piece through the particle's mass, so a heavy load on a light rope was coupled by the particle's momentum and not by the chain's tension.
-- **Fix:** every rigid edge of a component with no loop (a rope, a tree of them), and every particle attached to a body, is one constraint of a single linear system K lambda = -C, K = J W J^T, solved to a tolerance by the preconditioned conjugate gradient method, with Newton steps for the curve of the distances (`soft-kernel/src/rigid.rs`; Hestenes and Stiefel 1952, Shewchuk 1994, Baraff and Witkin 1998; Baraff 1996 for the direct tree solve it matches). The attached body is a heavy ghost particle at the end of the chain (its inverse mass at the anchor along each axis); the body takes the reaction as a force over the step, not an impulse at its start (an impulse that cancels a step's weight at its start let gravity pull the body back through the step, and it crept up half a g dt squared each time). Sheets, whose edges form loops, keep the sweep.
-- **Now:** the same sweep reads 3.790 m at every setting and every mass ratio from 32 to 1,600 (a rope that does not stretch is 3.8 m; the 0.01 m is a one-step lag in the support of the crate, constant, not stretch).
-- **Regression tests:** `packages/physics/soft-kernel/tests/rigid.rs` (a 20-edge chain under 1,600:1 and 16,000:1 loads stretches by less than 1 mm at every setting; a body integrated alongside hangs without stretch or sag) and `packages/physics/tests/soft.test.js` "the stretch of a rope under a heavy load does not depend on the iterations, the substeps or the mass ratio".
+- **Repro:** `SoftBodyDesc.rope([0, 6, 0], [0, 2.2, 0], 20, {bending: false})` pinned at the top, rigid edges, attach its end to a 16 kg crate (`rope.attachParticle(19, crate)`), 600 steps at 1/60 s: with particles of 0.01 kg the rope hangs 4.12 m below the pin at 2 iterations and 8 substeps (3.8 m long, 8% stretch), 3.98 at 8 iterations, 3.85 at 16 substeps; with 0.5 kg particles 3.82. A rope that must not stretch carries a different stretch for each setting.
+- **Cause:** the edges are solved by Gauss-Seidel sweeps in index order (XPBD, Macklin et al. 2016), so a load at one end of a chain reaches the pin one edge a sweep; and a body attached to a particle is pulled once a piece through the particle's mass, so a heavy load on a light rope is coupled by its momentum, not by the tension of the chain.
+- **Fix to land:** Scott asked for stiffness that does not depend on the iteration count: solve chains and the body links in one direct pass (a tridiagonal solve along each chain, Featherstone-style articulation, or a reduced-coordinate rope), and carry a load through a ghost particle with the body's effective mass. Regression test: the hanging crate at 2 and 8 iterations hangs the same length within 1%.
+
 
 ### Fixed 2026-11-24: a swept particle probe missed a surface it started touching, and picked the far side of a thin solid (physics, KB-PHYS-PROBE-THIN1, found 2026-11-24)
 
@@ -13571,7 +13573,7 @@ asctime dates were read as local time (RFC 9110 5.6.7, RFC 9111 5.3); `If-Range`
 `Prefetcher.settle()` hung while paused; `AssetBundles.load` kept downloading every file after one failed; HashedAssets
 and AssetBundles dropped a `Request` input's signal and headers; `throttle` left one abort listener per chunk.
 
-### Closed 2026-11-24: cache audit findings (every item below is Fixed, Verified or an Accepted difference with its regression or pinning test)
+### Open: cache findings not fixed in the audit
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
@@ -13625,7 +13627,7 @@ frame; they compare `Math.fround(value)`. A linked Aseprite cel took the z-index
 orders by each cel's own z). A Spine IK key without `mix` kept the setup mix (0 stayed 0; the JSON export format
 says assume 1) and one without `softness` interpolated toward 1 (format: assume 0).
 
-### Closed 2026-11-24: sprites audit findings (every item below is Fixed, Verified or an Accepted difference with its regression or pinning test)
+### Open: sprites findings not fixed in the audit
 
 - Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
   because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an

@@ -138,8 +138,8 @@ impl World {
     /// Wakes a sleeping body and the whole ring it sleeps in; does nothing to one that is awake.
     pub fn wake(&mut self, body: u32) {
         let flags = self.flags(body as usize);
-        if flags & RESTING != 0 {
-            self.set_u(FLAGS, body as usize, flags & !RESTING);
+        if flags & (RESTING | ASKED_TO_SLEEP) != 0 {
+            self.set_u(FLAGS, body as usize, flags & !(RESTING | ASKED_TO_SLEEP));
             self.set_s(SLEEP_TIME, body as usize, 0.0);
         }
         if flags & SLEEPING == 0 {
@@ -196,16 +196,25 @@ impl World {
             self.set_v(ANGULAR_X, at, v3(0.0, 0.0, 0.0));
             self.set_s(SLEEP_TIME, at, self.header().sleep_time);
             self.set_s(SLEEP_ENERGY, at, 0.0);
-            if flags & KIND != DYNAMIC {
-                self.set_u(FLAGS, at, flags | RESTING);
-            }
+            self.set_u(FLAGS, at, if flags & KIND != DYNAMIC { flags | RESTING } else { flags | ASKED_TO_SLEEP });
         }
     }
 
     /// Kinetic energy per unit of mass, which weighs linear and turning motion in one number (Erleben 2005, 6.5).
     fn energy(&self, at: usize) -> f32 {
-        let linear = self.v(LINEAR_X, at);
-        let angular = self.v(ANGULAR_X, at);
+        self.weigh(at, self.v(LINEAR_X, at), self.v(ANGULAR_X, at))
+    }
+
+    /// The same number for the motion a body's pose made in the last step. The soft solver closes a joint's or a contact's error by
+    /// moving the pose and leaves no velocity behind, so a body still being pulled home reads as still by `energy`.
+    pub fn pose_energy(&self, at: usize, dt: f32) -> f32 {
+        let moved = self.v(POSITION_X, at).sub(self.v(PREVIOUS_X, at)).scale(1.0 / dt);
+        let turn = self.q(ROTATION_X, at).mul(self.q(PREVIOUS_ROTATION_X, at).conjugate());
+        let turned = v3(turn.x, turn.y, turn.z).scale(if turn.w < 0.0 { -2.0 / dt } else { 2.0 / dt });
+        self.weigh(at, moved, turned)
+    }
+
+    fn weigh(&self, at: usize, linear: V3, angular: V3) -> f32 {
         let inverse_mass = self.s(INVERSE_MASS, at);
         if inverse_mass == 0.0 {
             return 0.5 * (linear.dot(linear) + angular.dot(angular));
@@ -512,7 +521,7 @@ impl World {
             let row = body as usize;
             self.unlist_awake(body);
             self.set_u(ISLAND_NEXT, row, self.uu(ISLAND_BODIES, first + (i + 1) % count));
-            self.set_u(FLAGS, row, self.flags(row) | SLEEPING);
+            self.set_u(FLAGS, row, (self.flags(row) | SLEEPING) & !ASKED_TO_SLEEP);
             self.set_v(LINEAR_X, row, v3(0.0, 0.0, 0.0));
             self.set_v(ANGULAR_X, row, v3(0.0, 0.0, 0.0));
             self.set_v(PREVIOUS_X, row, self.v(POSITION_X, row));
