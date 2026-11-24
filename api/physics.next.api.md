@@ -129,6 +129,27 @@ export interface HullFaces {
     faces: number[][];
 }
 
+export interface IkOptions {
+    point?: Vec3;
+    damping?: number;
+    iterations?: number;
+    positionTolerance?: number;
+    rotationTolerance?: number;
+    maxStep?: number;
+}
+
+export interface IkResult {
+    converged: boolean;
+    iterations: number;
+    positionError: number;
+    rotationError: number;
+}
+
+export interface IkTarget {
+    position?: Vec3;
+    rotation?: Quat;
+}
+
 export interface JointBreakEvent {
     type: 'jointbreak';
     joint: PhysicsJoint;
@@ -363,6 +384,32 @@ export interface MotorOptions {
     maxForce?: number;
 }
 
+export class Multibody {
+    readonly root: PhysicsBody;
+    readonly links: readonly MultibodyLink[];
+    constructor(owner: MultibodyOwner, root: PhysicsBody, links: readonly MultibodyLink[]);
+    get valid(): boolean;
+    get dof(): number;
+    coordinates(): number[];
+    setCoordinates(values: readonly number[]): this;
+    velocities(): number[];
+    inverseKinematics(link: PhysicsBody, target: IkTarget, options?: IkOptions): IkResult;
+    remove(): void;
+    markRemoved(): void;
+}
+
+export interface MultibodyLink {
+    readonly body: PhysicsBody;
+    readonly parent: PhysicsBody;
+    readonly joint: PhysicsJoint;
+}
+
+export interface MultibodyLinkOptions {
+    body: PhysicsBody;
+    parent?: PhysicsBody;
+    joint: JointOptions;
+}
+
 export type NextJointOptions = JointOptions | ConeJointOptions;
 
 export class Physics implements EnginePlugin, BodyOwner {
@@ -412,6 +459,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void;
     addModel(): never;
     addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint;
+    addMultibody(root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody;
+    removeMultibody(multibody: Multibody): void;
     removeJoint(joint: PhysicsJoint): void;
     createCharacterController(): never;
     removeController(): never;
@@ -984,6 +1033,12 @@ interface KernelShapeCastHit {
     queryPoint: [number, number, number];
     queryNormal: [number, number, number];
     started: boolean;
+}
+
+interface MultibodyOwner {
+    readonly kernel: KernelWorld;
+    addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
+    removeMultibody(multibody: Multibody): void;
 }
 
 interface PhysicsAttachment {

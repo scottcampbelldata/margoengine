@@ -2824,6 +2824,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/physics2d@1.0.0",
     "imports": "import { Body2D } from '@margoengine/physics2d';",
     "exports": [
+      "Articulation2D",
       "Body2D",
       "CharacterController2D",
       "Collider2D",

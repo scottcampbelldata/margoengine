@@ -11526,6 +11526,10 @@ A joint's break load is read at the last substep of a step, from the impulses it
 
 A cone joint's rotation motor is three turning motor rows along the axes of the target frame, with their own carried impulses, and the joint's limits solve after them in the same pass. A force-model motor stiffer than the limit's own soft stiffness (the effective mass times (2 pi 120 Hz) squared, held under a quarter of the substep rate) pushes past a limit by that ratio, so a light limb with a very stiff force-model motor can leave its cone by a few degrees; the acceleration model scales both alike and keeps the limit. The cone's twist motor and its rotation motor share the gains of the twist axis.
 
+## Physics multibody joints (own solver)
+
+A multibody holds at most 39 links beside its root and 64 free joint speeds, and its joints are `fixed`, `revolute`, `prismatic`, `spherical` or `generic` (locks only; cone, rope and spring joints are not in one). The pose pass puts a link back only once it is more than 1 mm or 1 mrad from where its joints place it (`DRIFT` in `multibody.rs`): a smaller correction every substep took 0.5 percent of a pendulum's energy a second, so a joint of a tree can stand open by up to a millimetre, and a hinge may stand past its limit by up to 1 mrad. A joint with two free turning axes keeps its rotation whole in the pose pass and drifts as a plain joint does. A broken joint in the tree leaves the whole tree to the plain joint solver until it is repaired or removed. The velocity projection costs O(links times speeds squared) a substep, about 40 links of 64 speeds. Inverse kinematics poses the tree where it ends and keeps no velocities; it keeps hinge and slider limits but not a ball joint's cone. Rapier's own multibody ignores a body's speed and pose when the joint is made, which the oracle test works around by starting both chains from a tilted root at rest.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

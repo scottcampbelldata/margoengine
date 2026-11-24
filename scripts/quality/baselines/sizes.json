@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17341646,
+  "total": 17356211,
   "history": [
     {
       "date": "2026-10-24",
@@ -11325,6 +11325,12 @@
       "commit": "d3148e8ef",
       "reason": "physics/next 208605 to 211569 B gzip: PID controller (about 1 KB), joint breaking (0.5 KB with 0.7 KB of Wasm) and debug lines (1.5 KB); a split would cost a second lazy entry for each, and none loads in a page that does not import margoengine/physics/next. physics2d entries recorded as measured on public main.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "f5bab77b4",
+      "reason": "physics/next 217917 to 221883 B gzip: multibody joints with inverse kinematics (about 3 KB of TypeScript: coordinates, forward and inverse kinematics) and 1 KB of Wasm for the joint-space projection; a split into a lazy entry would cost a second import for every ragdoll, which needs them. physics2d entries recorded as measured on public main.",
+      "grew": 3
     }
   ],
   "items": {
@@ -12084,9 +12090,9 @@
     "@margoengine/physics base (without Rapier solver JavaScript)": 21396,
     "@margoengine/physics lazy Rapier solver JavaScript": 41104,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/next": 217917,
-    "@margoengine/physics2d": 16748,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 15127,
+    "@margoengine/physics/next": 228540,
+    "@margoengine/physics2d": 18716,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
