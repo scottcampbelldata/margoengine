@@ -123,7 +123,7 @@ export interface EmitNode {
 
 export type EnvCombine = 'multiply' | 'mix' | 'add';
 
-export type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture;
+export type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture | ((device: GPUDevice) => Texture | EnvironmentMap | CubeTarget | GPUTexture);
 
 export interface EnvironmentMap {
     readonly specularView: GPUTextureView;
@@ -647,7 +647,7 @@ export class NodeMaterialInstallation implements EnginePlugin {
 }
 
 export interface NodeMaterialOptions {
-    opaqueColor?: GPUTextureView;
+    opaqueColor?: Borrowable<GPUTextureView>;
 }
 
 export interface NodeVolume {
@@ -788,6 +788,7 @@ export class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
+    setSource(source: GPUTexture | CubeTarget | ((device: GPUDevice) => GPUTexture | CubeTarget)): void;
     sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
@@ -823,7 +824,7 @@ export interface TextureRegion {
     depth?: number;
 }
 
-export type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource;
+export type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource | ((device: GPUDevice) => GPUTexture | CubeTarget);
 
 export { TextureTransform } from "@margoengine/gltf";
 
@@ -912,7 +913,7 @@ export interface TransmissionOptions extends TransmissionPassOptions {
     factor?: number;
     ior?: number;
     dispersion?: number;
-    opaqueColor?: GPUTextureView;
+    opaqueColor?: Borrowable<GPUTextureView>;
     transmissionTexture?: ClearcoatTexture;
     volume?: VolumeOptions;
 }
@@ -1001,6 +1002,8 @@ export function materialShader(source: string, group: number, shading: Shading):
 
 export function nodeMaterial(graph: MaterialGraph, options?: NodeMaterialOptions): MaterialExtension;
 
+export function noteEngine(engine: Engine): void;
+
 export function packAtlas(images: readonly (Pixels | CanvasImageSource)[], { padding, maxSize }?: AtlasOptions): Atlas;
 
 export function packGeometry(g: MeshGeometry): PreparedGeometry;
@@ -1031,6 +1034,8 @@ export function transformUVs(uvs: ArrayLike<number>, { offset, scale, rotation }
 export function transmission(options?: TransmissionOptions): MaterialExtension;
 
 // Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 
 type CasterDisplacement =
   | {

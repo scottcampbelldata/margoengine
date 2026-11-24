@@ -53,7 +53,7 @@
     "test:fog-beam-continuity:browser": "npm run build && node scripts/test-browser.js --page=volumetric-beam-continuity && node scripts/test-browser.js --page=volumetric-beam-continuity --compat",
     "test:reflection-shapes:browser": "npm run build && node scripts/test-browser.js --page=reflection-shapes",
     "test:bright:browser": "npm run build && node scripts/test-browser.js --page=bright",
-    "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js && node scripts/env-mirror-gpu-check.js --compat && node packages/environment/tests/review56-browser.mjs && node packages/environment/tests/review56-browser.mjs --compat && node packages/environment/tests/capture-stability-browser.mjs && node packages/environment/tests/capture-stability-browser.mjs --compat",
+    "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js && node scripts/env-mirror-gpu-check.js --compat && node packages/environment/tests/review56-browser.mjs && node packages/environment/tests/review56-browser.mjs --compat && node packages/environment/tests/capture-stability-browser.mjs && node packages/environment/tests/capture-stability-browser.mjs --compat && node packages/environment/tests/cube-source-restore-browser.mjs && node packages/environment/tests/cube-source-restore-browser.mjs --compat",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js",
     "test:fog-far:browser": "npm run build && cd ../.. && node packages/environment/tests/volumetric-far.browser.mjs && node packages/environment/tests/volumetric-far.browser.mjs --compat",
     "test:settings:browser": "npm run build && cd ../.. && node packages/environment/tests/settings.browser.mjs && node packages/environment/tests/settings.browser.mjs --compat"

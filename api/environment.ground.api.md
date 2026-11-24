@@ -77,6 +77,7 @@ class Environment implements EnginePlugin {
     irradianceAt(normal: readonly [number, number, number]): [number, number, number];
     onChange(listener: (environment: Environment) => void): () => void;
     restore(target: GPUDevice | EngineKernel): Promise<void>;
+    setSource(source: CubeTextureSource, target?: GPUDevice | EngineKernel): Promise<void>;
     refresh(): Promise<void>;
     get refreshPending(): boolean;
     setup(engine: EngineKernel): void;

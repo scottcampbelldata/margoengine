@@ -1,3 +1,4 @@
+import type { Borrowable } from '../../shared/borrowed.js';
 import type { MaterialExtensionTexture } from '@margoengine/gltf/pbr';
 
 /** A linear RGBA constant, stored in the optional material factors block. */
@@ -102,7 +103,12 @@ export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | Clearcoa
 export interface MaterialGraph {
   nodes: readonly MaterialNode[];
 }
-/** GPU resources remain caller-owned. Installation supplies its own scene capture. */
+/**
+ * GPU resources remain caller-owned. Installation supplies its own scene capture. `opaqueColor` is a view or
+ * `(device) => view`, called once per device and again after a device restore; a plain view belongs to the device that
+ * made it and is dropped after a restore (reported once through `engine.onError`, `'state'`, `borrowed-lost`, and read as
+ * white meanwhile), by `@margoengine/gltf/pbr`'s material extension, which holds it.
+ */
 export interface NodeMaterialOptions {
-  opaqueColor?: GPUTextureView;
+  opaqueColor?: Borrowable<GPUTextureView>;
 }

@@ -214,8 +214,8 @@
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
     "environment:CubeTextureSource.texture": {
-      "status": "pending",
-      "reason": "found by the class check; rule it or exempt it with a reason"
+      "status": "ruled",
+      "source": "packages/environment/src/environment.ts"
     },
     "environment:PlanarOptions.normalMap": {
       "status": "ruled",
@@ -526,36 +526,36 @@
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
     "materials:CubeTarget.texture": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/built-material.ts"
     },
     "materials:CubeTarget.view": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/built-material.ts"
     },
     "materials:EnvironmentMap.sampler": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/built-material.ts"
     },
     "materials:EnvironmentMap.specularView": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/built-material.ts"
     },
     "materials:MaterialOptions.envMap": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/built-material.ts"
     },
     "materials:NodeMaterialOptions.opaqueColor": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/node-types.ts"
     },
     "materials:Texture.source": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/built-material.ts"
     },
     "materials:TransmissionOptions.opaqueColor": {
-      "status": "pending",
-      "reason": "Mac lane"
+      "status": "ruled",
+      "source": "packages/materials/src/transmission.ts"
     },
     "physics:ModelPrimitiveLike.buffers": {
       "status": "exempt",
