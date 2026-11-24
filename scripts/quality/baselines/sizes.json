@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17727425,
+  "total": 17740815,
   "history": [
     {
       "date": "2026-10-24",
@@ -11523,6 +11523,12 @@
       "commit": "e26ee7380",
       "reason": "physics: multibody dynamics (mass matrix, Jacobian, inverse and forward dynamics): root entry base budget 53,176 to 54,436 B gzip (dynamics.ts: recursive Newton-Euler, mass matrix from Jacobians, Cholesky solve)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "b7734e7df",
+      "reason": "physics: multibody dynamics (mass matrix, Jacobian, inverse and forward dynamics) in the root entry: dynamics.ts",
+      "grew": 2
     }
   ],
   "items": {
@@ -12279,8 +12285,8 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 257094,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 56070,
+    "@margoengine/physics": 265708,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 60846,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/soft": 72231,

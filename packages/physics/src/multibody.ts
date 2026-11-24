@@ -3,7 +3,6 @@
 // kinematics are in next/kinematics.ts.
 import { MargoError } from '@margoengine/math/errors';
 import { forwardDynamics, inverseDynamics, jacobian, massMatrix } from './dynamics.js';
-import type { Vec3 } from './math.js';
 import type { JointOptions } from './joints.js';
 import type { KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
