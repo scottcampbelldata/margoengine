@@ -5,6 +5,45 @@
 ```ts
 import { EngineKernel, EnginePlugin } from "@margoengine/core";
 
+export class Articulation2D {
+    readonly root: Body2D;
+    readonly joints: Joint2D[];
+    constructor(physics: Physics2D, root: Body2D, links: readonly ArticulationLink2D[]);
+    get dof(): number;
+    positions(): number[];
+    velocities(): number[];
+    forwardKinematics(q?: readonly number[]): LinkPose2D[];
+    pointAt(link: number, local: Vec2D, q?: readonly number[]): [number, number];
+    jacobian(link: number, local: Vec2D, q?: readonly number[]): [number[], number[]];
+    solveIK(link: number, local: Vec2D, target: Vec2D, options?: IKOptions2D): {
+        q: number[];
+        reached: boolean;
+        error: number;
+    };
+    setPositions(q: readonly number[]): this;
+    driveTo(q: readonly number[], { stiffness, damping, maxForce }?: {
+        stiffness?: number;
+        damping?: number;
+        maxForce?: number;
+    }): this;
+    setMotor(joint: number, motor: MotorOptions2D): this;
+    setLimits(joint: number, min: number, max: number): this;
+    remove(): void;
+}
+
+export interface ArticulationLink2D {
+    body: Body2D;
+    parent?: number;
+    joint: {
+        type: 'revolute' | 'prismatic';
+        anchorParent?: Vec2D;
+        anchorChild?: Vec2D;
+        axis?: Vec2D;
+        limits?: readonly [number, number];
+        motor?: MotorOptions2D;
+    };
+}
+
 export class Body2D {
     readonly handle: number;
     readonly sprite: SpriteLike | null;
@@ -236,6 +275,12 @@ export interface Hit2D {
     collider: Collider2D;
 }
 
+export interface IKOptions2D {
+    iterations?: number;
+    tolerance?: number;
+    damping?: number;
+}
+
 export class Joint2D {
     readonly handle: number;
     readonly bodyA: Body2D;
@@ -291,6 +336,11 @@ export type JointOptions2D = {
 
 export type KernelWasmSource = string | URL | Response | ArrayBuffer | ArrayBufferView | WebAssembly.Module;
 
+export interface LinkPose2D {
+    position: [number, number];
+    rotation: number;
+}
+
 export interface MotorOptions2D {
     targetVelocity?: number;
     factor?: number;
@@ -338,6 +388,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     lockTranslation(body: Body2D, x: boolean, y: boolean): void;
     addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D;
     removeJoint(joint: Joint2D): void;
+    addArticulation(root: Body2D, links: readonly ArticulationLink2D[]): Articulation2D;
     createCharacterController(body: Body2D, options?: CharacterOptions2D): CharacterController2D;
     writeFilter(f?: QueryFilter2D): void;
     raycast(origin: Vec2D, direction: Vec2D, options?: RaycastOptions2D): CastHit2D | null;

@@ -4,6 +4,7 @@ import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { SharedLoad } from '../../shared/shared-load.js';
 import type { Kernel, KernelWasmSource } from './kernel.js';
 import { Body2D, Collider2D, type BodyOptions2D, type BodyOwner2D, type BodyType2D, type SpriteLike } from './body.js';
+import { Articulation2D, type ArticulationLink2D } from './articulation.js';
 import { CharacterController2D, type CharacterOptions2D } from './character.js';
 import { Joint2D, writeJoint, type JointOptions2D } from './joint.js';
 import { describeShape, describeShapes, type ColliderOptions2D, type Described, type ShapeOptions2D, type Vec2D } from './shapes.js';
@@ -757,6 +758,18 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   removeJoint(joint: Joint2D): void {
     if (!this.joints.delete(joint)) return;
     joint.free();
+  }
+
+  /**
+   * Joins bodies into a tree of one-degree-of-freedom joints hanging from `root` and gives the whole its joint space: see
+   * {@link Articulation2D}. `links` come parent before child.
+   */
+  addArticulation(root: Body2D, links: readonly ArticulationLink2D[]): Articulation2D {
+    this.live();
+    if (!this.bodies.has(root)) throw new MargoError('state', 'The root must be a body of this Physics2D and not removed.');
+    for (const link of links)
+      if (!this.bodies.has(link.body)) throw new MargoError('state', 'Every link body must belong to this Physics2D and not be removed.');
+    return new Articulation2D(this, root, links);
   }
 
   /** A character controller for a kinematic position body that has a collider. */

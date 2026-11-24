@@ -84,13 +84,39 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Bodies | soft CCD | none | missing |
 | Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
 | Joints | generic joint (any mix of the x, y and angle locks, in turned frames), pin-slot | `type: 'generic'`, `type: 'slot'` | full |
-| Joints | reduced-coordinate multibody joints | `multibody: true` is accepted; every chain of joints already solves exactly (a 50-link chain under a 1000:1 end mass stretches 0.55 percent), but there is no articulation object | partial |
+| Joints | multibody joints: joint space, joint motors and limits, kinematics, inverse kinematics | `addArticulation` (`Articulation2D`: positions and velocities, motors, limits, forward and inverse kinematics, Jacobian); solved by the exact joint paths, not by reduced coordinates | full, with the accepted difference in limits |
 | Tools | PID controller | `PidController2D` | full |
 | Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
 | World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
 | World | snapshots (serialise and restore the world) | `snapshot()`, `restore()`: a restored world steps bit for bit as the original | full |
 | World | debug render data | `debugRender()` | full |
 | Tools | tile map and sprite outline colliders | `addTileMap`, `outlineColliders` | full |
+
+## Articulations
+
+`physics.addArticulation(root, links)` joins bodies into a tree of revolute and prismatic joints and gives it a joint space: positions, velocities, motors, limits, forward and inverse kinematics.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { gravity: [0, 0] });
+const base = physics.addBody(null, { type: 'fixed', colliders: [] });
+const link = (x: number) => physics.addBody(null, { position: [x, 0], colliders: { shape: 'box', width: 40, height: 6, collisionGroups: 0 } });
+const [upper, lower] = [link(20), link(60)];
+const arm = physics.addArticulation(base, [
+  { body: upper, joint: { type: 'revolute', anchorChild: [-20, 0], limits: [-2.5, 2.5] } },
+  { body: lower, parent: 0, joint: { type: 'revolute', anchorParent: [20, 0], anchorChild: [-20, 0], limits: [-2.5, 2.5] } },
+]);
+// Joint positions that put the lower arm's tip on a point, then let the motors take the arm there.
+const { q, reached } = arm.solveIK(1, [20, 0], [50, 40]);
+arm.driveTo(q);
+for (let i = 0; i < 240; i++) physics.step();
+console.log(reached, arm.pointAt(1, [20, 0]));
+physics.dispose();
+```
+
+The links stay ordinary bodies and the kernel's joints hold them together (exactly along chains), so contacts of any link act on the whole arm; see [limits](../../docs/limits.md) for how this differs from reduced coordinates.
 
 ## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)
 

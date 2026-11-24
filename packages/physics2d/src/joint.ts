@@ -24,8 +24,8 @@ export type JointOptions2D = {
   collide?: boolean;
   /**
    * Accepted for code written for Rapier's multibody joints and ignored: every chain of joints solves exactly (block
-   * elimination along the chain), so a long chain under a heavy end does not stretch, which is what reduced-coordinate
-   * joints are for.
+   * elimination along the chain), so a long chain under a heavy end does not stretch. For joint-space control and inverse
+   * kinematics use `Physics2D.addArticulation`.
    */
   multibody?: boolean;
 } & (
