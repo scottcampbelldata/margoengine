@@ -5,6 +5,7 @@ import { bruneton } from './bruneton.js';
 import { clouds } from './clouds.js';
 import { night } from './night.js';
 import { fog } from './fog.js';
+export { cloudHaze } from './fog.js';
 import { reflection } from './reflection.js';
 import { lighting } from './lighting.js';
 import { look } from './look.js';

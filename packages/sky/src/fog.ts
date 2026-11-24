@@ -1,11 +1,13 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
+import { DECK_ABOVE } from './clouds.js';
 import { perSample, sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 // Exponential and EXP2 distance fog beyond `start` as the OpenGL fog equations; the height boost
-// (1 + max(-y, 0) h) is Margo's.
+// (1 + max(-y, 0) h) is Margo's. Under a cloud cover the haze takes the light of the cloud's underside by the cover's
+// share (cloudHaze), not the clear sky behind the cloud: a low sun under an overcast no longer tints it gold.
 const fragment = `
 @group(0) @binding(3) var sceneDepth:texture_depth_2d;
 @group(0) @binding(4) var<uniform> fog:array<vec4f,2>;
@@ -16,9 +18,36 @@ const fragment = `
  let opacity=1.0-exp(-select(optical*optical,optical,fog[0].z>0.5));
  // shortcut: homogeneous distance haze, use volumetric scattering for local weather and light shafts.
  // A zero footprint takes the sky's gradient without the stylized night's stars and moon.
- let ray=offset/max(distance,0.0001);var color=fog[1].rgb;if(fog[1].w<0.5){color=skyRadiance(normalize(vec3f(ray.x,max(0.0001,ray.y),ray.z)),0.0)*exp2(frame.settings.y);}
+ let ray=offset/max(distance,0.0001);var color=fog[1].rgb;if(fog[1].w<0.5){color=skyRadiance(normalize(vec3f(ray.x,max(0.0001,ray.y),ray.z)),0.0);
+ let T=max(frame.moonColor.w,0.0);
+ if(T>0.0){let under=(frame.sunlight.rgb*(${DECK_ABOVE.toFixed(6)}*max(frame.sun.y,0.0)*T*${(9 / 7).toFixed(6)})*((1.0+2.0*max(ray.y,0.0))/3.0)+vec3f(0.006,0.01,0.02)*T)*(1.0-clamp(frame.sun.w,0.0,1.0));color=mix(color,under,clamp(frame.clouds.x,0.0,1.0));}
+ color=color*exp2(frame.settings.y);}
  if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);}return vec4f(color,opacity);
 }`;
+/**
+ * The sky fog's colour under a cloud cover, as the fog shader draws it (before the sky's exposure): the clear sky's
+ * radiance `clear` toward the ray mixed by the cover `coverage` (0 to 1) toward the light under the cloud, the CIE
+ * overcast gradation of the two-stream light through a deck of transmission `T` (`overcastDeck`) for the clouds' sun
+ * `sunlight` at sine of elevation `sunUp`, seen at sine of elevation `up`. `T` 0 (no `clouds` option) keeps `clear`.
+ * Sources: CIE S 011/E:2003 overcast sky; the two-stream deck of clouds.ts. Fauld recut (2026-11-24): a 2 to 4 degree
+ * November sun under an overcast washed the whole valley gold through the haze.
+ * @example cloudHaze([0.8, 0.5, 0.2], [1, 0.9, 0.8], 0.1, 0, 1, 0.3); // the deck's grey, not the clear sky's gold
+ */
+export function cloudHaze(
+  clear: readonly number[],
+  sunlight: readonly number[],
+  sunUp: number,
+  up: number,
+  coverage: number,
+  T: number,
+): [number, number, number] {
+  if (!(T > 0)) return [clear[0], clear[1], clear[2]];
+  const k = DECK_ABOVE * Math.max(sunUp, 0) * T * (9 / 7) * ((1 + 2 * Math.max(up, 0)) / 3),
+    floor = [0.006, 0.01, 0.02],
+    c = Math.min(1, Math.max(0, coverage));
+  return [0, 1, 2].map((i) => clear[i] * (1 - c) + (sunlight[i] * k + floor[i] * T) * c) as [number, number, number];
+}
+
 /** Distance and height fog over the scene depth (`fog` option), in the sky's colour or a fixed one. */
 export const fog: NonNullable<SkyFeatures['fog']> = {
   validate(fog) {
