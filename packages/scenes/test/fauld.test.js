@@ -117,3 +117,20 @@ test('every Fauld tunnel shot file names its place, era and lighting state and k
     }
   }
 });
+
+// Fauld recut round 5: the volumetric stratus default (300 to 900 m) put the 400 to 700 m drone cameras inside the
+// cloud, so fr074 and every aerial row read as thick haze. The grey deck's base clears every camera over the highest
+// ground of the height grid (176.2 m, OS Terrain 50 tiles SK12, SK13, SK22, SK23).
+test('the overcast deck stands above every Fauld camera', () => {
+  const { bottom, top } = countryside.FAULD_CLOUD_DECK;
+  assert.equal(crater.FAULD_CLOUD_DECK, countryside.FAULD_CLOUD_DECK);
+  assert.ok(top > bottom);
+  let highest = 0;
+  for (const name of readdirSync(shots).filter((f) => /^fauld-fr\d+\.json$/.test(f))) {
+    const json = JSON.parse(readFileSync(new URL(name, shots), 'utf8'));
+    if (json.shot.scene === 'fauld-tunnels') continue;
+    for (const k of json.tracks[0].keys) highest = Math.max(highest, k.position[1]);
+  }
+  assert.ok(highest >= 400, `the drone rows fly at ${highest} m`);
+  assert.ok(bottom > highest + 176.2, `deck base ${bottom} m over a camera ${highest} m above ground up to 176.2 m`);
+});

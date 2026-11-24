@@ -186,6 +186,15 @@ const SKY: Readonly<
   mist: { hour: 8.6, weather: { ...WEATHER_PRESETS.fog, fog: 0.4 }, preset: 'overcast', clouds: 'stratus' },
 };
 
+/**
+ * The overcast deck of a grey November day, metres above the ground: a stratocumulus sheet, the common winter overcast
+ * over the English Midlands, with its base at 1,000 m and tops at 1,600 m (WMO International Cloud Atlas 2017,
+ * stratocumulus: base usually 500 to 2,000 m, https://cloudatlas.wmo.int/en/stratocumulus.html). The volumetric
+ * stratus default (300 to 900 m) put the film's 400 to 700 m drone cameras inside the cloud, so every aerial shot read
+ * as thick haze; a drone films under the deck, so its base stays above the highest camera plus the highest ground.
+ */
+export const FAULD_CLOUD_DECK = Object.freeze({ bottom: 1000, top: 1600 });
+
 /** Hedge shrubs and hedge trees by library file. */
 const MODELS: Readonly<Record<string, string>> = {
   oak: 'trees/oak',
@@ -481,6 +490,8 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
       sky: preset.sky as never,
       type: sky.clouds,
       coverage: Math.min(0.95, (sky.weather.cloud ?? 0.4) + 0.05),
+      // The grey deck is a stratocumulus sheet over the film's highest drone camera (FAULD_CLOUD_DECK), never round it.
+      ...(sky.clouds === 'stratus' ? FAULD_CLOUD_DECK : {}),
     });
     disposers.push(() => clouds.dispose());
     const weather = new WeatherMachine(

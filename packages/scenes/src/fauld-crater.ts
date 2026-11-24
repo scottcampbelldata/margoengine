@@ -6,7 +6,15 @@
 import type { EngineKernel } from '@margoengine/core';
 import { attachFauldWorld, type FauldWorld, type FauldWorldSettings } from './fauld-world.js';
 
-export { FAULD_CENTRE, FAULD_PLACES, FAULD_SIZE, FAULD_SLOTS, type FauldEra, type FauldSky } from './fauld-world.js';
+export {
+  FAULD_CENTRE,
+  FAULD_CLOUD_DECK,
+  FAULD_PLACES,
+  FAULD_SIZE,
+  FAULD_SLOTS,
+  type FauldEra,
+  type FauldSky,
+} from './fauld-world.js';
 
 /** Settings of {@link attach}: the shared Fauld settings; the era defaults to `1944` (the fresh crater). */
 export type FauldCraterSettings = FauldWorldSettings;
