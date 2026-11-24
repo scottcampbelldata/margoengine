@@ -33,7 +33,18 @@ import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
 import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
 import { type NextJointOptions, type PhysicsJoint, createJoint } from './joint.js';
-import { kernelCollider, multiply, queryParts, queryShape, shapeServed, turn, type HullRows } from './shapes.js';
+import {
+  PI,
+  cosine,
+  kernelCollider,
+  multiply,
+  queryParts,
+  queryShape,
+  root,
+  shapeServed,
+  turn,
+  type HullRows,
+} from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
 /** Options for creating a Physics world; every field has a default. */
@@ -128,8 +139,9 @@ export class ContactModification {
   }
   set normal(value: Vec3) {
     checkVec(value, 'Contact normal');
-    const length = Math.hypot(value[0], value[1], value[2]);
-    if (!(length > 1e-6)) throw new RangeError('A contact normal needs a direction; pass a vector of some length.');
+    const squared = value[0] * value[0] + value[1] * value[1] + value[2] * value[2],
+      length = root(squared);
+    if (!(squared > 1e-12)) throw new RangeError('A contact normal needs a direction; pass a vector of some length.');
     const c = this.kernel.columns;
     [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]] = [
       value[0] / length,
@@ -147,16 +159,17 @@ export class ContactModification {
    * dropped. A body rising through the underside meets nothing, and standing on top it rests.
    * @throws RangeError when `platform` is neither collider of the pair.
    */
-  oneWay(platform: PhysicsCollider, direction: Vec3, angle = Math.PI / 2): void {
+  oneWay(platform: PhysicsCollider, direction: Vec3, angle = PI / 2): void {
     checkVec(direction, 'Platform direction');
     if (platform !== this.colliderA && platform !== this.colliderB)
       throw new RangeError('That collider is not in this pair; pass colliderA or colliderB of the contact.');
     const [nx, ny, nz] = this.normal,
       sign = platform === this.colliderA ? 1 : -1,
-      length = Math.hypot(direction[0], direction[1], direction[2]);
-    if (!(length > 0)) throw new RangeError('A platform direction needs some length.');
+      squared = direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2],
+      length = root(squared);
+    if (!(squared > 0)) throw new RangeError('A platform direction needs some length.');
     const along = (sign * (nx * direction[0] + ny * direction[1] + nz * direction[2])) / length;
-    if (along < Math.cos(angle)) this.clear();
+    if (along < cosine(angle)) this.clear();
   }
 }
 
@@ -629,7 +642,9 @@ export class Physics implements EnginePlugin, BodyOwner {
         colliderB = this.byRow.get(pairB[row]);
       if (!(impulse > 0) || !colliderA || !colliderB) continue;
       if (!(colliderA.forceEvents || colliderB.forceEvents)) continue;
-      if (impulse / dt <= Math.max(colliderA.forceThreshold, colliderB.forceThreshold)) continue;
+      const threshold =
+        colliderA.forceThreshold > colliderB.forceThreshold ? colliderA.forceThreshold : colliderB.forceThreshold;
+      if (impulse / dt <= threshold) continue;
       const bodyA = colliderA.body,
         bodyB = colliderB.body;
       events.push({

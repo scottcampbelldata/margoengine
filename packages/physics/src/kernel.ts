@@ -1054,11 +1054,12 @@ export class KernelWorld {
           `A ${shape} needs [radius, halfHeight, borderRadius], the first two above zero and the border 0 or more (got ${String(size)}).`,
         );
     } else if (shape === 'halfspace') {
-      const length =
+      // A unit normal: its square within 0.2% of 1.
+      const squared =
         Array.isArray(size) && size.length === 3 && size.every(Number.isFinite)
-          ? Math.hypot(size[0], size[1], size[2])
+          ? size[0]! * size[0]! + size[1]! * size[1]! + size[2]! * size[2]!
           : NaN;
-      if (!(Math.abs(length - 1) < 1e-3))
+      if (!(squared > 0.998 && squared < 1.002))
         throw new RangeError(`A halfspace needs [x, y, z], the unit normal out of the solid (got ${String(size)}).`);
     } else if (shape === 'capsule') {
       // A radius of 0 is a segment: no volume, and it touches, is cast and is hit as the line it is.

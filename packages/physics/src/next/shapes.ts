@@ -15,7 +15,7 @@ import {
 import { buildHull } from './hull.js';
 import { cleanTrimesh, wantsClean } from './mesh-clean.js';
 
-const PI = 3.141592653589793;
+export const PI = 3.141592653589793;
 
 /** The shapes the own solver holds so far, by the name their options use. */
 const served: Readonly<Record<string, KernelShape | 'compound'>> = {
@@ -109,7 +109,7 @@ export function shapeServed(shape: ShapeOptions['shape']): boolean {
 }
 
 /** A square root by Newton's steps from above, as `Math.sqrt` is not promised to round the same everywhere. */
-function root(squared: number): number {
+export function root(squared: number): number {
   let value = squared > 1 ? squared : 1;
   for (let i = 0; i < 64 && value * value > squared * (1 + 1e-15); i++) value = (value + squared / value) / 2;
   return value;
@@ -604,4 +604,18 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
     'unsupported',
     `A ${String(options?.shape)} query shape is not in the own solver yet; cast or overlap a sphere, box, capsule, cylinder, cone, segment, triangle or convexHull with its size or points given, or use @margoengine/physics.`,
   );
+}
+
+/** The cosine of an angle by halving it until a series serves (cos x = 2 cos^2(x / 2) - 1), by operations every engine rounds alike. */
+export function cosine(angle: number): number {
+  let x = angle < 0 ? -angle : angle,
+    halvings = 0;
+  while (x > 0.125) {
+    x /= 2;
+    halvings++;
+  }
+  const x2 = x * x;
+  let value = 1 - (x2 / 2) * (1 - (x2 / 12) * (1 - (x2 / 30) * (1 - (x2 / 56) * (1 - x2 / 90))));
+  for (; halvings > 0; halvings--) value = 2 * value * value - 1;
+  return value;
 }
