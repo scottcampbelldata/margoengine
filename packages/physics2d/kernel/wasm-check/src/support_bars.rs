@@ -51,8 +51,7 @@ pub(super) fn run(payload: f32, contact_lanes: bool) -> Result<Metrics, PhysicsE
             &ShapeDef {
                 density: if i == 3 { payload } else { 1.0 },
                 friction: 0.6,
-                restitution: 0.0,
-            },
+                restitution: 0.0, ..Default::default() },
         )?;
     }
     let mut at_one = boxes.map(|b| world.bodies[b as usize].xf.p);

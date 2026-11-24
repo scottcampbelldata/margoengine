@@ -117,7 +117,7 @@ fn invalid_input_checks() -> bool {
     if world.create_shape(ground, floor, &ShapeDef { friction: 0.0, ..ShapeDef::default() }).is_err() { return false; }
     let Ok(body) = world.create_body(&BodyDef { position: v2(0.0, 1.0e9), linear_velocity: v2(0.0, -1.0), angular_velocity: 1.0e30, ..BodyDef::default() }) else { return false; };
     let Ok(circle) = Core::circle(V2::ZERO, 1.0e9) else { return false; };
-    if world.create_shape(body, circle, &ShapeDef { density: 1.0e-40, friction: 0.0, restitution: 0.0 }).is_err() { return false; }
+    if world.create_shape(body, circle, &ShapeDef { density: 1.0e-40, friction: 0.0, restitution: 0.0, ..Default::default() }).is_err() { return false; }
     if world.step(1.0 / 60.0) != Err(PhysicsError::ArithmeticOverflow) { return false; }
     let mut world = World::default();
     world.settings.gravity = v2(f32::MAX, 0.0);

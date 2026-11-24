@@ -461,6 +461,8 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     let starts = colouring.starts;
     // The colours go to the four-lane solve, the overflow one at a time after them, in the same order as one at a time.
     let lanes = settings.contact_lanes || cfg!(target_arch = "wasm32");
+    let want_force = world.shapes.iter().any(|s| s.events & crate::world::EVENT_CONTACT_FORCE != 0);
+    let mut totals: Vec<f32> = Vec::new();
     let single = if lanes { starts[COLOURS] as usize } else { 0 };
     let mut blocks = core::mem::take(&mut scratch.blocks);
     blocks.blocks.clear();
@@ -554,6 +556,25 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 )?;
                 block += b;
                 sequential += s;
+            }
+        }
+        if want_force {
+            if lanes {
+                let mut first = 0;
+                for k in 0..COLOURS {
+                    first += blocks.write_back(
+                        first,
+                        &mut constraints,
+                        &order[starts[k] as usize..starts[k + 1] as usize],
+                    );
+                }
+            }
+            // The normal impulse the biased pass gave each substep, summed over the step: the force events' force.
+            totals.resize(constraints.len(), 0.0);
+            for (c, total) in constraints.iter().zip(totals.iter_mut()) {
+                for p in &c.points[..c.count as usize] {
+                    *total += p.normal_impulse;
+                }
             }
         }
         if let Some(plan) = &support_plan {
@@ -682,12 +703,14 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     }
     write_velocities(world, &bodies, &ids);
 
-    for c in &constraints {
+    for (index, c) in constraints.iter().enumerate() {
         let contact = &mut world.contacts[c.contact as usize];
+        contact.total_impulse = totals.get(index).copied().unwrap_or(0.0);
         for k in 0..c.count as usize {
             contact.normal_impulse[k] = c.points[k].normal_impulse;
             contact.tangent_impulse[k] = c.points[k].tangent_impulse;
         }
+
     }
     for &id in &ids[..moving] {
         world.bodies[id as usize].round_pose();

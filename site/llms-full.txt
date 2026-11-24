@@ -5032,6 +5032,10 @@ Reflections entry: 3,252 B gzip, budget 3,483 B.
 
 Optional `@margoengine/lighting2d/soft` adds 2D soft shadows with penumbra edges that soften with distance from the occluder. Penumbra width scales with emitter radius (`sourceRadius`) and distance from occluder edges; 0 gives hard shadows. Up to 64 radial samples per light on GPU and CPU. Occluders support polygon, polyline, segment, box and circle shapes. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU form. LIM-592.
 
+## Own 2D collision filtering, sensors and events (2026-11-24)
+
+The own 2D kernel (`packages/physics2d/kernel`) filters pairs by collision groups (memberships in the high 16 bits, the filter in the low 16; each shape's filter must hold a membership of the other), by active collision types (`ACTIVE_*` bits, a pair needs both shapes to allow its body kinds; the default is dynamic with anything, and a pair with no dynamic body is kept only when one shape is a sensor) and by solver groups (a pair whose solver groups do not meet reports contact but pushes nothing). A sensor reports an overlap and pushes nothing. Events are listed in shape id order for the last step: a pair starts when its closest point is nearer than `TOUCH_ON` (0.5 linear slop) and stops beyond `TOUCH_OFF` (1.5 linear slop), or when its pair leaves the broad phase. Contact force events carry the normal impulse of each substep's biased pass, summed over the step and divided by its length, so an impact inside the step is counted; the relax pass's small corrections are not. Accepted difference: events fire for either shape asking, as Rapier does. Tests: `packages/physics2d/kernel/tests/events.rs`.
+
 ## Own 2D sustained contact support
 
 The recovery cap applies to the combined elastic residual, `max(beta*s+C*lambda,-P)`, rather than penetration

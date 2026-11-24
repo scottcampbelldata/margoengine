@@ -20,7 +20,7 @@ fn ground(world: &mut World, at: V2, half_width: f32) -> u32 {
 
 fn boxed(world: &mut World, at: V2, hx: f32, hy: f32, density: f32, friction: f32) -> u32 {
     let b = world.create_body(&BodyDef { position: at, ..Default::default() }).unwrap();
-    world.create_shape(b, Core::rect(hx, hy, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density, friction, restitution: 0.0 }).unwrap();
+    world.create_shape(b, Core::rect(hx, hy, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density, friction, restitution: 0.0, ..Default::default() }).unwrap();
     b
 }
 
@@ -164,7 +164,7 @@ fn a_card_house_stands() {
         let body = world.create_body(&BodyDef { position: at, rotation: q, ..Default::default() }).unwrap();
         // A card is a segment rounded by half its thickness: thinner than the polygon weld allows as a box.
         let core = if flat { Core::capsule(v2(-half, 0.0), v2(half, 0.0), 0.5 * thickness) } else { Core::capsule(v2(0.0, -half), v2(0.0, half), 0.5 * thickness) };
-        world.create_shape(body, core.unwrap(), &ShapeDef { density: 1000.0, friction, restitution: 0.0 }).unwrap();
+        world.create_shape(body, core.unwrap(), &ShapeDef { density: 1000.0, friction, restitution: 0.0, ..Default::default() }).unwrap();
         cards.push(body);
     };
     // A leaning card's top corner sits on the pair's ridge; its foot lies height * sin(angle) out from it.

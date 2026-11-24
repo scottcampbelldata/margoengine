@@ -79,7 +79,7 @@ fn rect(world: &mut World, kind: Kind, at: V2, hx: f32, hy: f32, turn: usize, de
 pub fn pyramid(rows: usize) -> World {
     let mut world = World::default();
     rect(&mut world, Kind::Static, v2(0.0, -0.5), 500.0, 0.5, 0, &ShapeDef::default());
-    let def = ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0 };
+    let def = ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0, ..Default::default() };
     for row in 0..rows {
         let count = rows - row;
         for i in 0..count {
@@ -123,12 +123,12 @@ pub fn mixed() -> World {
     let floor = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
     let points: Vec<V2> = (0..=40).map(|i| v2(i as f32 - 20.0, 0.3 * f32::from_bits(WAVE[i]))).collect();
     world.create_chain(floor, &points, false, &ShapeDef::default()).unwrap();
-    let def = ShapeDef { density: 1.0, friction: 0.5, restitution: 0.0 };
+    let def = ShapeDef { density: 1.0, friction: 0.5, restitution: 0.0, ..Default::default() };
     for i in 0..30 {
         let x = -15.0 + i as f32;
         rect(&mut world, Kind::Dynamic, v2(x, 1.5 + (i % 3) as f32), 0.4, 0.3, i, &def);
     }
-    let bouncy = ShapeDef { density: 1.0, friction: 0.3, restitution: 0.7 };
+    let bouncy = ShapeDef { density: 1.0, friction: 0.3, restitution: 0.7, ..Default::default() };
     for i in 0..10 {
         let b = world.create_body(&BodyDef { position: v2(-10.0 + 2.0 * i as f32, 6.0), linear_velocity: v2(1.0, 0.0), ..Default::default() }).unwrap();
         world.create_shape(b, Core::circle(V2::ZERO, 0.3).unwrap(), &bouncy).unwrap();

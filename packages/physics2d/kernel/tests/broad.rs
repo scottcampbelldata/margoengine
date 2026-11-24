@@ -81,7 +81,7 @@ fn pyramid(settings: Settings, rows: usize) -> (World, Vec<u32>) {
         for i in 0..count {
             let x = i as f32 - 0.5 * (count as f32 - 1.0);
             let b = world.create_body(&BodyDef { position: v2(x, 0.5 + row as f32), ..Default::default() }).unwrap();
-            world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0 }).unwrap();
+            world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0, ..Default::default() }).unwrap();
             boxes.push(b);
         }
     }

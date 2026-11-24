@@ -118,8 +118,7 @@ fn copy_public(source: &World, ncp_control: bool) -> World {
             &ShapeDef {
                 density: shape.density,
                 friction: shape.friction,
-                restitution: if ncp_control { 1.0 } else { shape.restitution },
-            },
+                restitution: if ncp_control { 1.0 } else { shape.restitution }, ..Default::default() },
         )
         .unwrap();
     }

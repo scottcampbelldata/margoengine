@@ -1173,6 +1173,7 @@ mod tests {
                     density: if i == 3 { 1000.0 } else { 1.0 },
                     friction: 0.6,
                     restitution: 0.0,
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -1225,6 +1226,7 @@ mod tests {
                     density: if i == 3 { load } else { 1.0 },
                     friction: 0.6,
                     restitution: 0.0,
+                    ..Default::default()
                 },
             )
             .unwrap();

@@ -135,12 +135,80 @@ pub struct ShapeDef {
     pub density: f32,
     pub friction: f32,
     pub restitution: f32,
+    /// Collision groups: memberships in the high 16 bits, the filter in the low 16. Two shapes meet when each one's
+    /// filter holds a membership of the other.
+    pub groups: u32,
+    /// Solver groups, laid out as `groups`: a pair whose solver groups do not meet still reports contacts but pushes
+    /// nothing.
+    pub solver_groups: u32,
+    /// A sensor reports overlaps and pushes nothing.
+    pub sensor: bool,
+    /// `EVENT_COLLISION` and `EVENT_CONTACT_FORCE`: which events the shape asks for. A pair reports when either asks.
+    pub events: u8,
+    /// The pairs of body kinds this shape meets, `ACTIVE_*` bits; a pair of shapes needs both to allow it.
+    pub active_types: u8,
+    /// A contact force event fires above this total force.
+    pub force_threshold: f32,
 }
+
+/// `ShapeDef::events` bits.
+pub const EVENT_COLLISION: u8 = 1;
+pub const EVENT_CONTACT_FORCE: u8 = 2;
+/// `ShapeDef::active_types` bits, one for each pair of body kinds.
+pub const ACTIVE_DYNAMIC_DYNAMIC: u8 = 1;
+pub const ACTIVE_DYNAMIC_KINEMATIC: u8 = 2;
+pub const ACTIVE_DYNAMIC_FIXED: u8 = 4;
+pub const ACTIVE_KINEMATIC_KINEMATIC: u8 = 8;
+pub const ACTIVE_KINEMATIC_FIXED: u8 = 16;
+pub const ACTIVE_FIXED_FIXED: u8 = 32;
+pub const ACTIVE_DEFAULT: u8 = ACTIVE_DYNAMIC_DYNAMIC | ACTIVE_DYNAMIC_KINEMATIC | ACTIVE_DYNAMIC_FIXED;
+pub const ACTIVE_ALL: u8 = ACTIVE_DEFAULT | ACTIVE_KINEMATIC_KINEMATIC | ACTIVE_KINEMATIC_FIXED | ACTIVE_FIXED_FIXED;
 
 impl Default for ShapeDef {
     fn default() -> Self {
-        ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0 }
+        ShapeDef {
+            density: 1.0,
+            friction: 0.6,
+            restitution: 0.0,
+            groups: u32::MAX,
+            solver_groups: u32::MAX,
+            sensor: false,
+            events: 0,
+            active_types: ACTIVE_DEFAULT,
+            force_threshold: 0.0,
+        }
     }
+}
+
+/// Whether two group words meet: each one's filter (low 16 bits) holds a membership (high 16 bits) of the other.
+#[inline]
+pub fn groups_meet(a: u32, b: u32) -> bool {
+    (a >> 16) & (b & 0xffff) != 0 && (b >> 16) & (a & 0xffff) != 0
+}
+
+/// Which `ACTIVE_*` bit covers a pair of body kinds.
+#[inline]
+fn active_bit(a: Kind, b: Kind) -> u8 {
+    use Kind::*;
+    match (a, b) {
+        (Dynamic, Dynamic) => ACTIVE_DYNAMIC_DYNAMIC,
+        (Dynamic, Kinematic) | (Kinematic, Dynamic) => ACTIVE_DYNAMIC_KINEMATIC,
+        (Dynamic, Static) | (Static, Dynamic) => ACTIVE_DYNAMIC_FIXED,
+        (Kinematic, Kinematic) => ACTIVE_KINEMATIC_KINEMATIC,
+        (Kinematic, Static) | (Static, Kinematic) => ACTIVE_KINEMATIC_FIXED,
+        (Static, Static) => ACTIVE_FIXED_FIXED,
+    }
+}
+
+/// Whether two shapes on bodies of these kinds may meet: groups, active types, and a body that moves unless one is a
+/// sensor.
+#[inline]
+fn pair_allowed(sa: &Shape, ka: Kind, sb: &Shape, kb: Kind) -> bool {
+    let bit = active_bit(ka, kb);
+    (sa.active_types & bit) != 0
+        && (sb.active_types & bit) != 0
+        && groups_meet(sa.groups, sb.groups)
+        && (sa.sensor || sb.sensor || ka == Kind::Dynamic || kb == Kind::Dynamic)
 }
 
 #[derive(Clone, Debug)]
@@ -155,6 +223,40 @@ pub struct Shape {
     /// `None` at a chain's open end, and for every other shape.
     pub ghosts: [Option<V2>; 2],
     pub chain: bool,
+    pub groups: u32,
+    pub solver_groups: u32,
+    pub sensor: bool,
+    pub events: u8,
+    pub active_types: u8,
+    pub force_threshold: f32,
+}
+
+/// Whether a pair began or stopped touching.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EventKind {
+    Started,
+    Stopped,
+}
+
+/// A pair of shapes that began or stopped touching in the last step (`sensor` when either is a sensor: an overlap
+/// rather than a contact). Listed in shape id order, so two worlds built alike report alike.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Event {
+    pub kind: EventKind,
+    pub a: u32,
+    pub b: u32,
+    pub sensor: bool,
+}
+
+/// A pair whose contact pushed with more total force than a shape's `force_threshold` in the last step.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct ForceEvent {
+    pub a: u32,
+    pub b: u32,
+    /// The normal impulse over the step divided by its length, in newtons (summed from the biased pass of each substep).
+    pub force: f32,
+    /// The normal, from `a` to `b`.
+    pub normal: V2,
 }
 
 /// What two shapes keep between steps: the manifold and each point's impulses, matched by point id.
@@ -167,7 +269,21 @@ pub struct Contact {
     pub manifold: Manifold,
     pub normal_impulse: [f32; 2],
     pub tangent_impulse: [f32; 2],
+    /// Whether the pair pushes: false for a sensor and for solver groups that do not meet. Such a contact keeps its
+    /// overlap in `overlap` and an empty manifold, so the solver and the islands never see it.
+    pub solved: bool,
+    /// The shapes are touching, with the hysteresis of `TOUCH_ON` and `TOUCH_OFF`; the last event reported it.
+    pub overlap: bool,
+    /// Whether the manifold has been built once: a sensor pair of resting bodies is still checked when it first appears.
+    pub primed: bool,
+    /// The normal impulse over the whole last step, summed over substeps and points; only kept while a shape asks for
+    /// contact force events.
+    pub total_impulse: f32,
 }
+
+/// A contact starts when its closest point is nearer than this, and stops when it is farther than `TOUCH_OFF`.
+pub const TOUCH_ON: f32 = 0.5 * LINEAR_SLOP;
+pub const TOUCH_OFF: f32 = 1.5 * LINEAR_SLOP;
 
 impl Contact {
     #[inline]
@@ -322,6 +438,9 @@ pub struct World {
     pub shapes: Vec<Shape>,
     pub contacts: Vec<Contact>,
     pub joints: Vec<Joint>,
+    /// What began or stopped touching in the last step, and what pushed past a force threshold.
+    pub events: Vec<Event>,
+    pub force_events: Vec<ForceEvent>,
     pub counts: Counts,
     pub steps: u64,
     broad: Broad,
@@ -372,6 +491,8 @@ impl World {
             shapes: Vec::new(),
             contacts: Vec::new(),
             joints: Vec::new(),
+            events: Vec::new(),
+            force_events: Vec::new(),
             counts: Counts::default(),
             steps: 0,
             broad: if settings.broad_phase == BroadPhase::Sweep { Broad::Sweep(SweepPrune::new()) } else { Broad::Tree(Tree::new()) },
@@ -432,9 +553,9 @@ impl World {
         let target = self.bodies.get(body as usize).ok_or(PhysicsError::InvalidHandle)?;
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
-        if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL { return Err(PhysicsError::InvalidParameter); }
         let id = self.shapes.len() as u32;
-        self.shapes.push(Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false });
+        self.shapes.push(Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold });
         self.bodies[body as usize].shapes.push(id);
         if let Err(error) = self.update_mass(body) {
             self.bodies[body as usize].shapes.pop();
@@ -585,8 +706,8 @@ impl World {
     /// Whether a contact between the two shapes' bodies can do anything: two shapes of one body, or two bodies that
     /// nothing moves, never touch.
     fn may_touch(&self, a: u32, b: u32) -> bool {
-        let (ba, bb) = (self.shapes[a as usize].body, self.shapes[b as usize].body);
-        ba != bb && (self.bodies[ba as usize].is_dynamic() || self.bodies[bb as usize].is_dynamic())
+        let (sa, sb) = (&self.shapes[a as usize], &self.shapes[b as usize]);
+        sa.body != sb.body && pair_allowed(sa, self.bodies[sa.body as usize].kind, sb, self.bodies[sb.body as usize].kind)
     }
 
     /// Checks the shared World::step and public solver entry boundary before either mutates physics state.
@@ -641,12 +762,15 @@ impl World {
             return Ok(());
         }
         self.counts = Counts::default();
+        self.events.clear();
+        self.force_events.clear();
         self.steps = self.steps.checked_add(1).ok_or(PhysicsError::ArithmeticOverflow)?;
         self.broad_phase()?;
         self.narrow_phase()?;
         self.wake_and_join();
         solver::solve_validated(self, dt)?;
         self.validate_solver_outputs()?;
+        self.force_events(dt);
         self.sleep(dt);
         if self.bodies.iter().any(|body| !finite_body(body) || !nonzero_rotation(body.xf.q)) { return Err(PhysicsError::ArithmeticOverflow); }
         Ok(())
@@ -676,7 +800,7 @@ impl World {
         self.broad.pairs(&mut pairs, |a, b| {
             let (Some(sa), Some(sb)) = (shapes.get(a as usize), shapes.get(b as usize)) else { invalid_handle = true; return false; };
             let (ba, bb) = (sa.body, sb.body);
-            ba != bb && (bodies[ba as usize].is_dynamic() || bodies[bb as usize].is_dynamic()) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err())
+            ba != bb && pair_allowed(sa, bodies[ba as usize].kind, sb, bodies[bb as usize].kind) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err())
         });
         if invalid_handle { self.pairs = pairs; return Err(PhysicsError::InvalidHandle); }
         debug_assert!(pairs.iter().all(|&(a, b)| self.may_touch(a, b)));
@@ -693,7 +817,13 @@ impl World {
             if i < old.len() && (old[i].a, old[i].b) == (a, b) {
                 next.push(old[i]);
             } else {
-                next.push(Contact { a, b, manifold: Manifold::default(), normal_impulse: [0.0; 2], tangent_impulse: [0.0; 2] });
+                next.push(Contact { a, b, manifold: Manifold::default(), normal_impulse: [0.0; 2], tangent_impulse: [0.0; 2], solved: true, overlap: false, primed: false, total_impulse: 0.0 });
+            }
+        }
+        // A pair that left the list stops touching, if it was.
+        for contact in &old {
+            if contact.overlap && pairs.binary_search(&(contact.a, contact.b)).is_err() {
+                self.push_event(contact, EventKind::Stopped);
             }
         }
         self.contacts = next;
@@ -710,9 +840,11 @@ impl World {
         for contact in self.contacts.iter_mut() {
             let (sa, sb) = (&self.shapes[contact.a as usize], &self.shapes[contact.b as usize]);
             let (ba, bb) = (&self.bodies[sa.body as usize], &self.bodies[sb.body as usize]);
-            if !ba.awake && !bb.awake {
+            if !ba.awake && !bb.awake && (contact.primed || !(sa.sensor || sb.sensor)) {
                 continue;
             }
+            contact.primed = true;
+            contact.solved = !(sa.sensor || sb.sensor) && groups_meet(sa.solver_groups, sb.solver_groups);
             built += 1;
             // In a frame at A's centre of mass with world axes, the offsets rounded once from doubles.
             let from = ba.exact_center;
@@ -753,7 +885,58 @@ impl World {
         }
         self.counts.manifolds = built;
         self.counts.cold_points = cold;
+        self.touch_events();
         Ok(())
+    }
+
+    /// Reads each contact's closest point against `TOUCH_ON` and `TOUCH_OFF`, reports the pairs that began or stopped,
+    /// and takes the manifold away from a contact that does not push.
+    fn touch_events(&mut self) {
+        for index in 0..self.contacts.len() {
+            let c = self.contacts[index];
+            let m = &c.manifold;
+            let nearest = m.points[..m.count].iter().fold(f32::INFINITY, |least, p| least.min(p.separation));
+            let touching = if c.overlap { nearest <= TOUCH_OFF } else { nearest <= TOUCH_ON };
+            if touching != c.overlap {
+                self.contacts[index].overlap = touching;
+                self.push_event(&c, if touching { EventKind::Started } else { EventKind::Stopped });
+            }
+            if !c.solved {
+                let contact = &mut self.contacts[index];
+                contact.manifold.count = 0;
+                contact.normal_impulse = [0.0; 2];
+                contact.tangent_impulse = [0.0; 2];
+            }
+        }
+    }
+
+    fn push_event(&mut self, contact: &Contact, kind: EventKind) {
+        let (sa, sb) = (&self.shapes[contact.a as usize], &self.shapes[contact.b as usize]);
+        if (sa.events | sb.events) & EVENT_COLLISION == 0 {
+            return;
+        }
+        self.events.push(Event { kind, a: contact.a, b: contact.b, sensor: sa.sensor || sb.sensor });
+    }
+
+    /// After the solve: contact force events, from each pushing contact's normal impulses over the substep.
+    fn force_events(&mut self, dt: f32) {
+        for c in &self.contacts {
+            if !c.solved || c.manifold.count == 0 {
+                continue;
+            }
+            let (sa, sb) = (&self.shapes[c.a as usize], &self.shapes[c.b as usize]);
+            if !self.bodies[sa.body as usize].awake && !self.bodies[sb.body as usize].awake {
+                continue;
+            }
+            if (sa.events | sb.events) & EVENT_CONTACT_FORCE == 0 {
+                continue;
+            }
+            let force = c.total_impulse / dt;
+            let threshold = if sa.events & EVENT_CONTACT_FORCE != 0 { sa.force_threshold } else { 0.0 }.max(if sb.events & EVENT_CONTACT_FORCE != 0 { sb.force_threshold } else { 0.0 });
+            if force > threshold {
+                self.force_events.push(ForceEvent { a: c.a, b: c.b, force, normal: c.manifold.normal });
+            }
+        }
     }
 
     /// Islands of dynamic bodies joined by touching contacts. An island any awake body is in, or that an awake body

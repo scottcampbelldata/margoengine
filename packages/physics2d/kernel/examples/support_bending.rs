@@ -63,6 +63,7 @@ fn column(payload: f32) -> Result<Column, Box<dyn std::error::Error>> {
                 density: if i == 4 { payload } else { 1.0 },
                 friction: 0.6,
                 restitution: 0.0,
+                ..Default::default()
             },
         )?;
         let body = &world.bodies[id as usize];
