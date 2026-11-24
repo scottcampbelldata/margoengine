@@ -194,7 +194,8 @@ async function groundImage(url: string, signal?: AbortSignal): Promise<GroundIma
     bitmap = await createImageBitmap(blob, { resizeWidth: size, resizeHeight: size, resizeQuality: 'high' }),
     canvas = new OffscreenCanvas(size, size),
     context = canvas.getContext('2d');
-  if (!context) throw new Error('fauld: no 2D canvas to decode the ground scans');
+  if (!context)
+    throw new TypeError('fauld: no 2D canvas to decode the ground scans; run the scene in a browser with OffscreenCanvas 2D.');
   context.drawImage(bitmap, 0, 0);
   bitmap.close();
   return { width: size, height: size, data: context.getImageData(0, 0, size, size).data };
@@ -283,7 +284,7 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
   if (!['before', '1944', 'today'].includes(era))
     throw new RangeError(`fauld: unknown era ${era}; pass 'before', '1944' or 'today'.`);
   if (!(radius >= 200 && radius <= 3000))
-    throw new RangeError(`fauld: radius ${radius} is outside 200 to 3,000 metres.`);
+    throw new RangeError(`fauld: radius ${radius} is outside 200 to 3,000 metres; pass a radius in that range.`);
   try {
     const demAt = await loadDem(settings.dem ?? join(library, 'dem/os-terrain-50/fauld_sk12_sk23.f32'), signal),
       // The crater model gives only its heights (the terrain draws the crater, textured like the ground round it).
