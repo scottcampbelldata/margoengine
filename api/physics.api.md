@@ -673,6 +673,13 @@ export interface KernelSolverOptions {
     maxLinearSpeed?: number;
     staticContactHertz?: number;
     staticContactDamping?: number;
+    frictionInBiasPass?: boolean;
+    internalStabilizationIterations?: number | null;
+    frictionModel?: 'coulomb' | 'simplified';
+    minCcdDt?: number;
+    ccdTolerance?: number;
+    ccdMaxAdvances?: number;
+    quarantine?: boolean;
 }
 
 export interface KernelTrimeshOptions {
@@ -736,6 +743,13 @@ export class KernelWorld {
         solver: number;
         ccd: number;
         events: number;
+        assembly: number;
+        resolution: number;
+        update: number;
+        writeback: number;
+        ccdBroad: number;
+        ccdToi: number;
+        ccdSolver: number;
     };
     get maxCcdSubsteps(): number;
     set maxCcdSubsteps(substeps: number);
@@ -822,6 +836,9 @@ export class KernelWorld {
     touch(body: number): this;
     stepSeconds: number;
     step(dt: number): this;
+    detect(): this;
+    get quarantinedCount(): number;
+    quarantinedBodies(): number[];
     get bytes(): number;
     get hash(): number;
     snapshot(): Uint8Array;
@@ -976,6 +993,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     onPreUpdate(delta: number): void;
     update(delta: number): number;
     step(): void;
+    detectCollisions(): void;
+    get quarantined(): readonly PhysicsBody[];
     sync(alpha?: number): void;
     addBody(mesh: Mesh | null, options?: BodyOptions): PhysicsBody;
     bodyOf(mesh: Mesh): PhysicsBody | undefined;
@@ -1329,6 +1348,7 @@ export interface PhysicsEventMap {
     beforestep: number;
     afterstep: number;
     jointbreak: JointBreakEvent;
+    quarantine: QuarantineEvent;
 }
 
 export class PhysicsJoint {
@@ -1974,5 +1994,10 @@ interface PhysicsAttachment {
     afterSync?(): void;
     bodyRemoved?(body: PhysicsBody): void;
     dispose(): void;
+}
+
+interface QuarantineEvent {
+    type: 'quarantine';
+    body: PhysicsBody;
 }
 ```
