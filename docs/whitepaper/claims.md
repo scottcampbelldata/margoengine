@@ -9,6 +9,14 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Own physics ragdoll balance (2026-11-24): on the kernel's cone joint, whose ankle limits hold under the weight, a powered
+  Knight recovers a 1.5 m/s push of its upper body in each of four directions in all 120 cases of a solver sweep
+  (iterations 2 to 6, substeps 4, 8 and 16, warm start on and off), ending upright with a foot stepped that way. Rapier's
+  ragdoll recovered the same push only because its own limit projection let the stance ankle turn to -2.76 rad of twist
+  against a +-0.2 limit (A/B with the same rig, push and seed). Knight only; capability evidence, no speed claim. Reproduce:
+  `node packages/ragdoll/scripts/balance-ab.mjs --sweep` and `node --test packages/ragdoll/tests/balance.test.js`
+  (docs/limits.md, Ragdoll ankles on the kernel hold their limits).
+
 - Own physics dynamics (2026-11-24): the rigid body, solver, joint, multibody, PID, determinism, snapshot and debug-render
   capabilities of Rapier 3D's public user guide are listed row by row in the dynamics table of
   `packages/physics/README.md` (Parity with Rapier 3D), each marked full only where a test proves it. Checked against
