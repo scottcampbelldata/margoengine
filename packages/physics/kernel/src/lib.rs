@@ -13,6 +13,7 @@ pub mod compound;
 pub mod contact;
 pub mod events;
 pub mod gjk;
+pub mod halfspace;
 pub mod hull;
 pub mod integrate;
 pub mod island;

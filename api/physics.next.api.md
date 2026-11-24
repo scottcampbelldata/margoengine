@@ -159,7 +159,7 @@ export interface KernelRayHit {
     point: [number, number, number];
 }
 
-export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
 
 export interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;

@@ -29,7 +29,7 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Segment | full | a capsule with no radius; `next-segments.test.js` against Rapier |
 | Triangle | full | a one-triangle mesh, both sides; ray and rest tested against Rapier |
 | Polyline | full | a compound of segments; as a query shape see shape cast |
-| Half space | missing | root entry has it |
+| Half space | full | closed forms for queries, a laid box for contacts; not against meshes, height fields, voxels or another half space |
 | Round cuboid, round convex hull | partial | `borderRadius` on box and hull colliders, tested against Rapier; not on compound parts or query shapes |
 | Round triangle | missing | |
 | Collider shape change after creation | missing | |

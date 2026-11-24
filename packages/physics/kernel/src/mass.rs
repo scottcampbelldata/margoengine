@@ -247,7 +247,7 @@ impl World {
             }
             // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none; `each_solid` adds a voxel
             // grid's cells.
-            SHAPE_TRIMESH | SHAPE_COMPOUND => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
+            SHAPE_TRIMESH | SHAPE_COMPOUND | SHAPE_HALFSPACE => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
             SHAPE_CYLINDER | SHAPE_CONE => {
                 let (mass, _, moments) = revolved_mass(self.revolved(c), size.z, density);
                 Solid { mass, moments }

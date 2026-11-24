@@ -15,13 +15,14 @@ test('a call that is not served yet says so, and what to use', () => {
     () => physics.createCharacterController(),
     () => physics.removeController(),
     () => physics.debugRender(),
-    () => physics.addBody(null, { colliders: { shape: 'halfSpace' } }),
+    () => physics.addBody(null, { colliders: { shape: 'custom', desc: {} } }),
   ])
     assert.throws(call, unsupported);
   assert.equal(physics.bodyCount, 1, 'a refused body leaves nothing behind');
   body.ccd = true;
   assert.equal(body.ccd, true);
-  assert.equal(physics.supportsShape('halfSpace'), false);
+  assert.equal(physics.supportsShape('custom'), false);
+  assert.equal(physics.supportsShape('halfSpace'), true);
   assert.equal(physics.supportsShape('cylinder'), true);
   assert.equal(physics.supportsShape('capsule'), true);
   assert.throws(() => new Physics(null, { rapier: {} }), TypeError);

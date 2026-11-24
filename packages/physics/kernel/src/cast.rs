@@ -571,6 +571,9 @@ impl World {
         }
         let frame = self.collider_pose(c);
         let (mut query_data, mut target_data) = (BoxData::new(), BoxData::new());
+        if kind == SHAPE_HALFSPACE {
+            return self.cast_halfspace(c, &self.solid(shape, pose, &mut query_data)?, r, o);
+        }
         if kind != SHAPE_TRIMESH {
             let query = self.solid(shape, pose, &mut query_data)?;
             let target = self.solid(self.shape_of(c), frame, &mut target_data)?;
@@ -727,6 +730,9 @@ impl World {
         }
         let frame = self.collider_pose(c);
         let mut data = BoxData::new();
+        if kind == SHAPE_HALFSPACE {
+            return Some(self.project_halfspace(c, p, solid));
+        }
         if kind != SHAPE_TRIMESH {
             return Some(project_convex(&self.solid(self.shape_of(c), frame, &mut data)?, p, solid));
         }
@@ -820,6 +826,9 @@ impl World {
         let frame = self.collider_pose(c);
         let (mut query_data, mut target_data) = (BoxData::new(), BoxData::new());
         let meets = |a: &Solid, b: &Solid| gjk(a, b, ZERO, 0.0).overlap;
+        if kind == SHAPE_HALFSPACE {
+            return self.solid(shape, pose, &mut query_data).is_some_and(|query| self.overlaps_halfspace(c, &query));
+        }
         if kind != SHAPE_TRIMESH {
             let (Some(query), Some(target)) = (self.solid(shape, pose, &mut query_data), self.solid(self.shape_of(c), frame, &mut target_data)) else { return false };
             return meets(&query, &target);

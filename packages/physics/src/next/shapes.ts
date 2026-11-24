@@ -24,6 +24,7 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   segment: 'capsule',
   triangle: 'trimesh',
   polyline: 'compound',
+  halfSpace: 'halfspace',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
 const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'];
@@ -128,7 +129,7 @@ function revolvedVolume(cone: boolean, r: number, h: number, b: number): number 
 function volume(shape: KernelShape, size: readonly number[], hullVolume: (row: number) => number): number {
   if (shape === 'box') return 8 * size[0] * size[1] * size[2];
   if (shape === 'hull') return hullVolume(size[0]);
-  if (shape === 'trimesh') return 0;
+  if (shape === 'trimesh' || shape === 'halfspace') return 0;
   if (shape === 'cylinder' || shape === 'cone') return revolvedVolume(shape === 'cone', size[0], size[1], size[2]);
   const [radius, halfLength = 0] = size;
   return PI * radius * radius * ((4 / 3) * radius + 2 * halfLength);
@@ -221,7 +222,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition, voxels, segment, triangle, polyline or halfSpace, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -233,7 +234,7 @@ export function kernelCollider(
     voxels: number | undefined,
     segment: { middle: Vec3; rotation: Quat4 } | undefined,
     border = 0;
-  const surface = options.shape === 'segment' || options.shape === 'triangle' || options.shape === 'polyline';
+  const surface = options.shape === 'segment' || options.shape === 'triangle' || options.shape === 'polyline' || options.shape === 'halfSpace';
   if (surface && (options.mass !== undefined || options.density !== undefined))
     throw new RangeError(
       `A ${options.shape} has no volume, so no mass or density; give the body its mass with setMassProperties, or use a convexHull or box.`,
@@ -287,6 +288,13 @@ export function kernelCollider(
     const frame = segmentFrame(options.a, options.b, 'Segment');
     size = [0, frame.half];
     segment = frame;
+  } else if (options.shape === 'halfSpace') {
+    const normal = options.normal ?? [0, 1, 0];
+    checkVec(normal, 'Half space normal');
+    const squared = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2],
+      length = root(squared);
+    if (!(squared > 0)) throw new RangeError('A half space needs a nonzero normal; pass the direction out of the solid.');
+    size = [normal[0] / length, normal[1] / length, normal[2] / length];
   } else if (options.shape === 'triangle') {
     checkVec(options.a, 'Triangle a');
     checkVec(options.b, 'Triangle b');

@@ -54,6 +54,9 @@ impl World {
     /// acceleration, and a turn of its centre about the body's. Macklin et al. 2019 predict the frame's motion this way,
     /// so that detection once a frame serves every substep.
     fn reach(&self, c: usize, dt: f32) -> (V3, V3) {
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_HALFSPACE {
+            return self.halfspace_reach(c);
+        }
         let at = self.uu(COLLIDER_BODY, c) as usize;
         let flags = self.flags(at);
         let rotation = self.q(ROTATION_X, at);

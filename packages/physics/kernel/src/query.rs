@@ -519,6 +519,7 @@ impl World {
         let border = self.s(COLLIDER_BORDER, c);
         let hit = match shape {
             SHAPE_BALL => ray_ball(o, d, size.x, max, solid),
+            SHAPE_HALFSPACE => self.ray_halfspace(c, o, d, max, solid),
             SHAPE_BOX if border > 0.0 => {
                 let mut data = crate::hull::BoxData::new();
                 ray_round_poly(o, d, &crate::hull::box_poly(size, &mut data), border, max, solid)

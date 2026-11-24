@@ -516,6 +516,20 @@ console.log(ball.position[0].toFixed(1), ball.position[1].toFixed(2)); // '0.0' 
 physics.dispose();
 ```
 
+A `halfSpace` (`normal`, default up; the collider's origin is a point on the plane) is everything behind the plane, solid and with no volume, so it belongs on a fixed body: an endless floor. It meets every convex shape, and rays, casts, point projection and overlaps use the plane's closed forms. A mesh, height field, voxel grid or another half space does not collide with it. Contacts use a box laid under the other shape for each pair, so they cost what a box's do.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', colliders: {shape: 'halfSpace', normal: [0, 1, 0]}});
+const ball = physics.addBody(null, {position: [0, 3, 0], colliders: {shape: 'sphere', radius: 0.4}});
+for (let i = 0; i < 240; i++) physics.step();
+console.log(ball.position[1].toFixed(2)); // '0.40': resting on the plane
+physics.dispose();
+```
+
 A `box` and a `convexHull` take `borderRadius` (default 0) too, Rapier's `roundCuboid` and `roundConvexHull`: the shape is every point within the border of the box or hull, so edges and corners are rounded and the box rests a border above where a sharp one does. A round box or hull weighs its core, as in Rapier; the border is not in `halfExtents`. It works in contacts, rays, point projection, shape casts and CCD; a compound part and a query shape (the shape given to `shapeCast` or `intersectShape`) cannot have one yet.
 
 A `cylinder` and a `cone` stand along their local Y, `halfHeight` each way, a cone's apex at the top. `borderRadius` rounds every edge with a border outside `radius` and `halfHeight`, Rapier's `roundCylinder` and `roundCone`, and `collider.borderRadius()` reads it back. A round shape weighs its border too, where Rapier weighs only its core, so give `mass` to match a Rapier scene's weights. A cap or base on a floor holds a full manifold, so the shape stands; rays, `shapeCast` and point queries meet the exact surface.

@@ -548,6 +548,7 @@ impl World {
                 self.s(MESH_RADIUS, mesh) + sqrt(center.dot(center))
             }
             SHAPE_CYLINDER | SHAPE_CONE => sqrt(x * x + y * y) + z,
+            SHAPE_HALFSPACE => 0.0,
             _ => x + y,
         };
         sqrt(offset.dot(offset)) + radius
@@ -574,6 +575,10 @@ impl World {
     pub fn collide(&self, a: usize, b: usize, limit: f32, out: &mut Manifold) {
         out.count = 0;
         let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+        if shape_a == SHAPE_HALFSPACE || shape_b == SHAPE_HALFSPACE {
+            self.collide_halfspace(a, b, limit, out);
+            return;
+        }
         let polyhedral = |shape: u32| shape == SHAPE_BOX || shape == SHAPE_HULL;
         let (mut data_a, mut data_b) = (BoxData::new(), BoxData::new());
         if self.is_smoothed(a) || self.is_smoothed(b) {
@@ -625,7 +630,16 @@ impl World {
             }
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
-            let meshed = self.uu(COLLIDER_SHAPE, a) == SHAPE_TRIMESH || self.uu(COLLIDER_SHAPE, b) == SHAPE_TRIMESH;
+            let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+            let meshed = shape_a == SHAPE_TRIMESH || shape_b == SHAPE_TRIMESH;
+            // A half space meets every convex shape, and nothing it cannot be laid under: a mesh, or another half space.
+            if (shape_a == SHAPE_HALFSPACE || shape_b == SHAPE_HALFSPACE)
+                && (meshed || (shape_a == SHAPE_HALFSPACE && shape_b == SHAPE_HALFSPACE))
+            {
+                self.set_u(PAIR_FLAGS, row, flags);
+                self.drop_contacts(row, body_a, body_b);
+                continue;
+            }
             let compound = self.has_compound(a, b);
             let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
             // Pairs of the kinds a collider leaves out pass through each other, and by default so do scripted bodies:

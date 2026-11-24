@@ -597,6 +597,9 @@ pub const SHAPE_CYLINDER: u32 = 6;
 /// A cone along local Y, its apex at +B and its base disk of radius A at -B, C its border radius (Rapier's `cone` and
 /// `roundCone`).
 pub const SHAPE_CONE: u32 = 7;
+/// A half space: A, B, C the unit normal out of the solid in the collider's frame, the plane through its origin (Rapier's
+/// `HalfSpace`). No volume; see halfspace.rs.
+pub const SHAPE_HALFSPACE: u32 = 8;
 
 /// MESH_FLAGS: contacts on a triangle's inner edges keep to the normals the surface allows (fixInternalEdges).
 pub const MESH_FIX_EDGES: u32 = 1;

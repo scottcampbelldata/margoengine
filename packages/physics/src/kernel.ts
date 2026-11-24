@@ -178,7 +178,7 @@ export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinema
  * row from {@link KernelWorld.addHull}; a mesh's row from {@link KernelWorld.addTrimesh} or
  * {@link KernelWorld.addHeightfield}.
  */
-export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh' | 'halfspace';
 
 /** One convex child of {@link KernelWorld.addCompound}: a shape and size as {@link KernelWorld.addCollider} takes them. */
 export interface KernelCompoundPart {
@@ -199,6 +199,7 @@ const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
   trimesh: [4, 1],
   cylinder: [6, 3],
   cone: [7, 3],
+  halfspace: [8, 3],
 };
 /** The `colliderShape` value of a compound (layout.rs SHAPE_COMPOUND). */
 export const SHAPE_COMPOUND = 5;
@@ -811,6 +812,10 @@ export class KernelWorld {
     } else if (shape === 'cylinder' || shape === 'cone') {
       if (!Array.isArray(size) || size.length !== 3 || !size.every(Number.isFinite) || !(size[0] > 0 && size[1] > 0 && size[2] >= 0))
         throw new RangeError(`A ${shape} needs [radius, halfHeight, borderRadius], the first two above zero and the border 0 or more (got ${String(size)}).`);
+    } else if (shape === 'halfspace') {
+      const length = Array.isArray(size) && size.length === 3 && size.every(Number.isFinite) ? Math.hypot(size[0], size[1], size[2]) : NaN;
+      if (!(Math.abs(length - 1) < 1e-3))
+        throw new RangeError(`A halfspace needs [x, y, z], the unit normal out of the solid (got ${String(size)}).`);
     } else if (shape === 'capsule') {
       // A radius of 0 is a segment: no volume, and it touches, is cast and is hit as the line it is.
       if (!Array.isArray(size) || size.length !== 2 || !size.every(Number.isFinite) || !(size[0] >= 0 && size[1] > 0))
