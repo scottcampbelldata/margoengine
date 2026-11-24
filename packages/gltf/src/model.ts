@@ -10,7 +10,7 @@ import {
 import { markedClipDistances } from '../../shared/section.js';
 import { currentMaterialDraw, runMaterialDraw, inheritMaterialDraw } from './material-draw-state.js';
 import type { GLTFPrimitive, GLTFMesh, GLTFNode, GLTFMaterial, GLTFTextureInfo } from '../../shared/gltf.js';
-import type { EngineKernel, Mesh as PublicMesh } from '@margoengine/core';
+import type { EngineKernel, Mesh as PublicMesh, Scene as CoreScene } from '@margoengine/core';
 import {
   engineRuntime,
   type Engine,
@@ -2342,6 +2342,11 @@ export class PBRModel implements EnginePlugin {
     readonly asset: GLTFAsset,
     private readonly images: readonly GLTFImage[] = [],
     prepared?: readonly (readonly PreparedPrimitive[])[],
+    /**
+     * The scene the model's meshes are created in (`scene.use(model)` then adds it as a plugin there). Default: the
+     * engine's default scene, as `engine.use(model)` expects (GAP-REACT-SCENEMODELS).
+     */
+    scene?: CoreScene,
   ) {
     for (const image of images)
       if (
@@ -2423,10 +2428,10 @@ export class PBRModel implements EnginePlugin {
       };
     for (const id of roots) visit(id);
     try {
-      this.root = this.engine.createMesh();
+      this.root = this.engine.createMesh(null, scene as Parameters<Engine['createMesh']>[1]);
       this.created.push(this.root);
       for (let i = 0; i < defs.length; i++) {
-        const node = this.engine.createMesh();
+        const node = this.engine.createMesh(null, scene as Parameters<Engine['createMesh']>[1]);
         this.nodes.push(node);
         this.created.push(node);
         node.name = defs[i].name ?? '';

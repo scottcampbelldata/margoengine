@@ -14,8 +14,8 @@ export interface SceneProps {
 /**
  * A separate set of meshes drawn only by the `<RenderView>`s that name it: a HUD overlay, an item preview, a picture in
  * picture (core's `engine.createScene`). `<Mesh>`, `Box`, `Sphere`, `Plane` and `Group` inside are created in it;
- * `<Sun>`, the lights, Fog, Line, Points, Outline and Splat inside apply to it. Models and other plugins stay in the
- * default scene. Disposed with its meshes on unmount.
+ * `<Sun>`, the lights, Fog, Line, Points, Outline and Splat inside apply to it, and so do glTF and FBX models. Other
+ * plugins stay in the default scene. Disposed with its meshes on unmount.
  */
 export function Scene({ name, background, children }: SceneProps) {
   const parent = useScene(),
@@ -33,7 +33,6 @@ export function Scene({ name, background, children }: SceneProps) {
       if (views.scenes.get(name) === created) views.scenes.delete(name);
       views.revision++;
       for (const listener of views.listeners) listener();
-      setWorld((current) => (current === created ? null : current));
       if (!engine.disposed) created.dispose();
     };
   }, [engine, views, name]);
@@ -112,7 +111,11 @@ export function RenderView({
       queueMicrotask(() => {
         if (views.entries.has(key) && !views.scenes.has(scene) && !engine.disposed)
           engine.onError(
-            fault('state', `<RenderView scene="${scene}"> names no <Scene name="${scene}"> in this Canvas; add that <Scene>`, 'react-usage'),
+            fault(
+              'state',
+              `<RenderView scene="${scene}"> names no <Scene name="${scene}"> in this Canvas; add that <Scene>`,
+              'react-usage',
+            ),
           );
       });
       return;

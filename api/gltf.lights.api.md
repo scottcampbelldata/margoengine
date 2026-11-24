@@ -5,7 +5,7 @@
 ```ts
 import { Clustered, PointLight } from "@margoengine/clustered";
 import { IESLights, IESProfile } from "@margoengine/clustered/ies";
-import { EngineKernel, Mesh } from "@margoengine/core";
+import { EngineKernel, Mesh, Scene } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, TranscodedKTX2Result } from "@margoengine/decoders";
 import { CubeFaces, Environment, EnvironmentBackground, EnvironmentLighting } from "@margoengine/environment";
@@ -990,7 +990,8 @@ class PBRModel implements EnginePlugin {
     }[];
     splats: readonly GLTFSplatCloud[];
     sceneSky: boolean;
-    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedPrimitive[])[]);
+    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedPrimitive[])[],
+    scene?: CoreScene);
     get bounds(): Float32Array;
     attachSplats(signal?: AbortSignal): Promise<void>;
     get raw(): {

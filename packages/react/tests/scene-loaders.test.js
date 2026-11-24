@@ -38,7 +38,8 @@ function mesh(engine) {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement,
+    assertCore,
+    coreRequirement,
     Engine: {
       async create(canvas) {
         const engine = {
@@ -73,6 +74,33 @@ mock.module('@margoengine/core/extension', {
           createMesh() {
             return mesh(this);
           },
+          scenes: new Set(),
+          createScene(name) {
+            const world = {
+              engine,
+              name,
+              plugins: new Map(),
+              createMesh() {
+                return mesh(engine);
+              },
+              use(plugin) {
+                assert.ok(!this.plugins.has(plugin.name));
+                this.plugins.set(plugin.name, plugin);
+                return this;
+              },
+              removePlugin(name) {
+                const plugin = this.plugins.get(name);
+                this.plugins.delete(name);
+                plugin?.dispose();
+              },
+              dispose() {
+                for (const key of [...this.plugins.keys()]) this.removePlugin(key);
+                engine.scenes.delete(this);
+              },
+            };
+            engine.scenes.add(world);
+            return world;
+          },
         };
         engines.push(engine);
         return engine;
@@ -85,8 +113,9 @@ mock.module('@margoengine/core/extension', {
     meshRuntime: (node) => node,
   },
 });
-function model(engine, asset = { doc: { images: [] } }) {
+function model(engine, asset = { doc: { images: [] } }, scene) {
   const result = {
+    scene,
     name: 'loader:' + models.length,
     asset,
     root: mesh(engine),
@@ -101,7 +130,7 @@ function model(engine, asset = { doc: { images: [] } }) {
       if (this.disposed) return;
       this.disposed = true;
       this.disposals++;
-      engine.removePlugin(this.name);
+      (scene ?? engine).removePlugin(this.name);
       this.root.dispose();
     },
   };
@@ -119,8 +148,8 @@ async function load(kind, engine, src, { signal }) {
 mock.module('@margoengine/gltf/pbr', {
   namedExports: {
     PBRModel: class {
-      constructor(engine, asset) {
-        return model(engine, asset);
+      constructor(engine, asset, images, prepared, scene) {
+        return model(engine, asset, scene);
       }
     },
     loadGLTF: (...args) => load('gltf', ...args),
@@ -245,4 +274,40 @@ test('FBX load errors report through both component and Canvas callbacks without
   await flush();
   assert.deepEqual(errors, [failure, failure]);
   assert.match(view.getByRole('alert').textContent, /Invalid native FBX/);
+});
+
+test('a Gltf inside a named Scene is built and added in that Scene, not the default one (GAP-REACT-SCENEMODELS)', async () => {
+  const { Scene } = await import('@margoengine/react');
+  const before = models.length;
+  render(
+    tree(
+      React.createElement(
+        Scene,
+        { name: 'item' },
+        React.createElement(Suspense, { fallback: null }, React.createElement(Gltf, { src: '/scene-model.glb' })),
+      ),
+    ),
+  );
+  await flush();
+  const mine = models.slice(before).filter((value) => value.scene);
+  assert.equal(mine.length, 1, 'the model was constructed for a scene');
+  const [engine] = engines.slice(-1);
+  const [world] = [...engine.scenes];
+  assert.equal(mine[0].scene, world);
+  assert.equal(world.plugins.get(mine[0].name), mine[0], 'the plugin is in the Scene');
+  assert.equal(engine.plugins.has(mine[0].name), false, 'not in the default scene');
+});
+
+test('a Gltf that suspends under a Suspense above its Scene does not reset the Scene (KB-REACT-SCENESUSPEND1)', async () => {
+  const { Scene } = await import('@margoengine/react');
+  deferred = true;
+  const before = models.length;
+  render(tree(React.createElement(Scene, { name: 'item' }, React.createElement(Gltf, { src: '/scene-suspend.glb' }))));
+  await flush();
+  await act(async () => requests.at(-1).resolve());
+  await flush();
+  const mine = models.slice(before).filter((value) => value.scene && !value.disposed);
+  assert.equal(mine.length, 1, 'one live model in the Scene');
+  const [engine] = engines.slice(-1);
+  assert.equal(engine.scenes.size, 1, 'the Scene was not rebuilt in a loop');
 });

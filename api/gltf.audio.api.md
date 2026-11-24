@@ -4,7 +4,7 @@
 
 ```ts
 import { Audio, AudioListener } from "@margoengine/audio";
-import { EngineKernel, Mesh } from "@margoengine/core";
+import { EngineKernel, Mesh, Scene } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, TranscodedKTX2Result } from "@margoengine/decoders";
 import { Splats } from "@margoengine/splats";
@@ -964,7 +964,8 @@ class PBRModel implements EnginePlugin {
     }[];
     splats: readonly GLTFSplatCloud[];
     sceneSky: boolean;
-    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedPrimitive[])[]);
+    constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedPrimitive[])[],
+    scene?: CoreScene);
     get bounds(): Float32Array;
     attachSplats(signal?: AbortSignal): Promise<void>;
     get raw(): {

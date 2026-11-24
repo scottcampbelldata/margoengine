@@ -13342,19 +13342,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/react/tests/textures.test.js ("an inline colour or emissive array with the same values
   keeps the material mesh; a new value replaces it").
 
-### Open 2026-11-16: a glTF or FBX `<Model>` inside a named `<Scene>` is drawn in the default scene (GAP-REACT-SCENEMODELS, react)
+### Fixed 2026-11-24: a glTF or FBX `<Model>` inside a named `<Scene>` was drawn in the default scene (GAP-REACT-SCENEMODELS, react, gltf/pbr)
 
-- **Repro:** `<RenderView scene="item" /><Scene name="item"><Gltf src="a.glb" /></Scene>`: the model joins the default
-  scene, so the item view does not show it; under a `<Mesh>` inside that Scene the load fails with core's
+- **Repro (before):** `<RenderView scene="item" /><Scene name="item"><Gltf src="a.glb" /></Scene>`: the model joined the
+  default scene, so the item view did not show it; under a `<Mesh>` inside that Scene the load failed with core's
   `Foreign parent` TypeError, reported through `onError`.
-- **Cause:** `instantiateModel` (packages/react/src/model-assets.ts) builds the gltf/pbr model on the engine, whose
-  root mesh and draw plugin belong to the default scene; the model binding has no scene argument to pass on.
-  React Three Fiber's portals take any object. Plugins other than the lights, Fog, Line, Points, Outline and Splat
-  bindings also stay in the default scene; the same holds inside `<Hud>` and `<RenderTexture>`
-  (packages/react/src/portals.tsx), whose proxied engine still hands `use` the default scene, although Hud's TSDoc
-  says models and plugins render in its overlay scene.
-- **Next:** create the model inside the enclosing Scene (gltf/pbr then has to place its root and plugin there) and
-  add a named-scene case to the model tests.
+- **Cause:** `PBRModel` created its meshes with `engine.createMesh()` (the default scene) and `instantiateModel` added it
+  with `engine.use`; neither took a scene.
+- **Fix:** `PBRModel`'s constructor takes an optional last `scene` argument that its root and nodes are created in, and
+  `<Gltf>`/`<Fbx>` inside a `<Scene>` build their own model there and add it with `scene.use(model)` (the loader's
+  first model lives in the default scene and is not reused). Plugins other than models, and `<Hud>` and
+  `<RenderTexture>` proxies, still hand `use` the default scene (not changed here).
+- **Regression:** packages/react/tests/scene-loaders.test.js ("a Gltf inside a named Scene is built and added in that
+  Scene").
+
+### Fixed 2026-11-24: a `<Scene>` reset and unmounted its children when one of them suspended under a Suspense above it (KB-REACT-SCENESUSPEND1, react)
+
+- **Repro (before):** `<Canvas><Suspense><Scene name="item"><Gltf src="a.glb" /></Scene></Suspense></Canvas>`: while the
+  model loaded, React hid the boundary, `Scene`'s commit cleanup set its world to null, its children unmounted, and on
+  reveal they mounted and suspended again until React reported "Maximum update depth exceeded".
+- **Cause:** `Scene` (packages/react/src/views.tsx) cleared its world state in the commit cleanup, which also runs when a
+  boundary above it is hidden, and rendered nothing while the world was null.
+- **Fix:** the cleanup no longer clears the world; the effect that runs again on reveal makes a new scene and the
+  children follow it.
+- **Regression:** packages/react/tests/scene-loaders.test.js ("a Gltf that suspends under a Suspense above its Scene").
 
 ### Fixed 2026-11-16: `AmbientLight`, `HemisphereLight` and `Fog` inside a `<Scene>` lit the default scene (KB-REACT-SCENELIGHT1, react)
 

@@ -1,4 +1,4 @@
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, Scene as CoreScene } from '@margoengine/core';
 import type { GLTFImage, PBRModel } from '@margoengine/gltf/pbr';
 import {
   closeImages,
@@ -80,8 +80,13 @@ async function loadModel(
     throw error;
   }
 }
-export async function instantiateModel(source: ModelSource, engine: EngineKernel): Promise<PBRModel> {
-  if (source.first) {
+export async function instantiateModel(
+  source: ModelSource,
+  engine: EngineKernel,
+  scene?: CoreScene | null,
+): Promise<PBRModel> {
+  // The loader's first model lives in the default scene, and a mesh cannot change scene: a named Scene builds its own.
+  if (source.first && !scene) {
     const model = source.first;
     source.first = null;
     return model;
@@ -89,8 +94,8 @@ export async function instantiateModel(source: ModelSource, engine: EngineKernel
   const images = await copyImages(source.images);
   let model: PBRModel | undefined;
   try {
-    model = new source.api.PBRModel(engine, source.asset, images);
-    engine.use(model);
+    model = new source.api.PBRModel(engine, source.asset, images, undefined, scene ?? undefined);
+    (scene ?? engine).use(model);
     return model;
   } catch (error) {
     if (model) model.dispose();
