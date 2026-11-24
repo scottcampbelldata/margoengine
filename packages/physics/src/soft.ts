@@ -3068,14 +3068,16 @@ export class SoftBodies implements PhysicsAttachment {
   createSurfaceCollider(body: SoftBody, settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {}): PhysicsCollider {
     if (body.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
     if (body.surface) throw new MargoError('state', 'This soft body already has a surface collider.');
-    if (body.triangleList.length === 0)
-      throw new RangeError('This body has no triangles; build it with trimesh, cloth or clothTube.');
+    // A body with a skin collides by its skin (Rapier's skin collision): the mesh a game draws is the mesh that is met.
+    const skin = body.skin !== null;
+    if (!skin && body.triangleList.length === 0)
+      throw new RangeError('This body has no triangles or skin; build it with trimesh, cloth, clothTube or setSkin.');
     const host = this.physics.addBody(null, {
       type: 'fixed',
       colliders: {
         shape: 'trimesh',
-        vertices: body.particlePositions(),
-        indices: body.triangleList,
+        vertices: skin ? body.meshVertices() : body.particlePositions(),
+        indices: skin ? body.meshIndices() : body.triangleList,
         deformable: true,
         ...settings,
       },
@@ -3207,6 +3209,21 @@ export class SoftBodies implements PhysicsAttachment {
   }
 
   private moveSurface(body: SoftBody, c: Columns): void {
+    if (body.skin) {
+      // The skin's vertices ride the cells; their speeds are the cells' corners' speeds by the same weights.
+      const positions = body.meshVertices(),
+        velocities = new Float32Array(positions.length);
+      for (let i = 0; i < body.skin.cell.length; i++)
+        for (let k = 0; k < 4; k++) {
+          const row = body.firstParticle + body.skinCells[body.skin.cell[i]! * 4 + k]!,
+            w = body.skin.weight[i * 4 + k]!;
+          velocities[i * 3] = velocities[i * 3]! + w * c.vx[row]!;
+          velocities[i * 3 + 1] = velocities[i * 3 + 1]! + w * c.vy[row]!;
+          velocities[i * 3 + 2] = velocities[i * 3 + 2]! + w * c.vz[row]!;
+        }
+      body.surface!.colliders[0]!.setVertices(positions, { velocities });
+      return;
+    }
     const positions = new Float32Array(body.particles * 3),
       velocities = new Float32Array(body.particles * 3);
     for (let i = 0; i < body.particles; i++) {

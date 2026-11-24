@@ -64,6 +64,10 @@ export class SoftBodies implements PhysicsAttachment {
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
     createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
+    createDeformableCollider(soft: SoftBody, mesh: {
+        vertices: ArrayLike<number>;
+        indices: ArrayLike<number>;
+    }, binding: SoftMeshBinding, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
     tear(body: SoftBody, { cells, edges }?: {
         cells?: readonly number[];
         edges?: readonly number[];
@@ -285,6 +289,16 @@ export class SoftBodyMaterial {
 export interface SoftDestination {
     body: SoftBody;
     particle: number;
+}
+
+export class SoftMeshBinding {
+    readonly mode: 'direct' | 'directByPosition' | 'skinned';
+    readonly particles: readonly number[];
+    readonly eps: number;
+    private constructor();
+    static direct(particles: ArrayLike<number>): SoftMeshBinding;
+    static directByPosition(eps: number): SoftMeshBinding;
+    static skinned(): SoftMeshBinding;
 }
 
 export interface SoftSoftness {

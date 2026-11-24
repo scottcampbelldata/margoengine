@@ -882,3 +882,19 @@ test('a deformable collider bound to a soft body follows it: direct, direct by p
   soft.remove(cloth);
   assert.equal(direct.valid, false, 'a deformable collider goes with its body');
 });
+
+test('a body with a skin collides by its skin', async () => {
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  const block = soft.create(
+    SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [2, 2, 2]).setSkin(
+      [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
+      [0, 2, 3, 0, 3, 1, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4, 2, 6, 7, 2, 7, 3, 0, 4, 6, 0, 6, 2, 1, 3, 7, 1, 7, 5],
+    ),
+  );
+  const collider = soft.createSurfaceCollider(block);
+  physics.step();
+  const hit = physics.raycast([0.5, 3, 0.5], [0, -1, 0], { maxDistance: 10 });
+  assert.ok(hit, 'a ray from above meets the skin');
+  near(hit.point[1], 1, 0.02, 'at its top face');
+  assert.equal(collider.shape, 'trimesh');
+});
