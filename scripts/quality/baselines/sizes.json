@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17566668,
+  "total": 17568325,
   "history": [
     {
       "date": "2026-10-24",
@@ -11421,6 +11421,12 @@
       "commit": "f5b78d2511",
       "reason": "toon/models gains nodes (subtree filter, GAP-OUTLINES-INSTANCED): entry 4,843 to 4,953 B gzip; the parent walk and setter check are needed for drei parity on skinned parents, and a split entry would repeat the hull pass",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "022bcb703",
+      "reason": "soft entry now meets every collider shape through the kernel swept particle probe instead of its own primitive tests: entry 18,392 to 18,814 B gzip, lazy kernel chunk 9,839 to 10,202 B (staged step exports and the shared contact resolve). Needed for parity with Rapier contacts against every shape.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12180,9 +12186,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 18392,
+    "@margoengine/physics/soft": 19379,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 7926,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 9839,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 10509,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

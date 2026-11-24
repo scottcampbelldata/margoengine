@@ -18,6 +18,8 @@ impl<T: Copy> Col<T> {
         if n <= self.len {
             return;
         }
+        // Grow by doubling, so rows that are added one at a time do not each leave a block behind.
+        let n = if n > 2 * self.len { n } else { 2 * self.len };
         let layout = Layout::array::<T>(n).unwrap_or_else(|_| arch_trap());
         let block = unsafe { alloc_zeroed(layout) } as *mut T;
         if block.is_null() {

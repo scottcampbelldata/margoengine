@@ -96,3 +96,31 @@ fn a_pinned_particle_follows_its_target() {
     w.step(1.0 / 60.0, 5, 1, G);
     assert_eq!((w.x[0], w.y[0]), (1.0, 2.0));
 }
+
+#[test]
+fn a_contact_found_by_the_host_pushes_a_particle_out_and_loads_its_body() {
+    // The host finds a surface at y = 0 under a particle that fell 5 mm into it, and says so through the staged step.
+    let mut w = World::new();
+    w.reserve(1, 0, 1, 1);
+    w.particles = 1;
+    w.bodies = 1;
+    w.colliders = 1;
+    w.gravity_scale[0] = 1.0;
+    w.x[0] = 0.0;
+    w.y[0] = 0.025 - 0.005;
+    w.w[0] = 1.0;
+    w.radius[0] = 0.025;
+    let h = 1.0 / 480.0;
+    w.begin(1.0 / 60.0);
+    w.substep_pre(h, 1, [0.0, -9.81, 0.0]);
+    let depth = 0.025 - w.y[0];
+    w.kc[0] = 1;
+    w.kny[0] = 1.0;
+    w.kd[0] = depth;
+    w.apply_contacts(h);
+    w.substep_post(h);
+    w.finish();
+    assert!((w.y[0] - 0.025).abs() < 1e-6, "the particle sits on the surface: {}", w.y[0]);
+    assert!(w.jy[0] < 0.0, "the body feels it push down: {}", w.jy[0]);
+    assert_eq!(w.kc[0], 0, "the contact is spent");
+}

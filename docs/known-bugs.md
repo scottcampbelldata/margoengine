@@ -9080,6 +9080,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
+### Open: a swept particle probe misses a surface it starts touching, and picks the far side of a thin solid (physics, KB-PHYS-PROBE-THIN1, found 2026-11-24)
+
+- **Repro:** a fixed box of half extents 0.01 by 2 by 2 at x = 3, `physics.kernel.probeParticles([2.97, 1, 0], [3.065, 1, 0], 0.02, {flags: 8})` answers `[null]` (the particle's surface is exactly on the wall's, moving into it); `probeParticles([2.9701, 1, 0], [3, 1, 0], 0.02)` answers a `started` contact with normal +1 and the point on the far face, x = 3.01, so a solver pushes the particle through the wall. A soft body particle at 60 m/s (`new SoftBodyDesc([0, 1, 0])` with velocity 60 m/s along x, gravity 0) passes a 2 cm wall at x = 3 and ends at x = 15.9 after 20 steps.
+- **Cause:** the sweep of a ball treats a start that touches at exactly the radius as no hit, and a start inside the radius picks the nearest face of the end position, not the face on the side the move came from. Owner: the collision session (`softContacts` and `probe_particles` in the kernel).
+- **Regression test to land with the fix:** `packages/physics/tests/soft.test.js`, "a fast particle does not pass through a thin wall" (written, not yet in the file: it fails until the probe is fixed).
+
+
 ### Open 2026-11-19: the Boulder climber's arm enters the torso on the green route (KB-BOULDER-ARMBODY1, scripts/test-boulder-browser.mjs, boulder demo rig; people work is stopped)
 
 - **Repro:** `node scripts/test-boulder-browser.mjs` on main 6ea99b03bf (WebGPU, RTX A6000) fails at line 331 with

@@ -12,6 +12,8 @@ pub const PINNED: u32 = 1;
 pub const TARGETED: u32 = 2;
 /// Edge flags.
 pub const TORN: u32 = 1;
+/// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
+pub const NONE: u32 = 0;
 
 use crate::math::{abs, sign, sqrt};
 use crate::col::Col;
@@ -110,6 +112,17 @@ pub struct World {
     pub bqy: Col<f32>,
     pub bqz: Col<f32>,
     pub bqw: Col<f32>,
+    // The contact each particle meets in the staged step (`apply_contacts`): the body row of the contacts table plus one (0 for
+    // none), the unit normal out of the surface, how far to push along it, the surface point and the friction coefficient.
+    pub kc: Col<u32>,
+    pub knx: Col<f32>,
+    pub kny: Col<f32>,
+    pub knz: Col<f32>,
+    pub kd: Col<f32>,
+    pub kpx: Col<f32>,
+    pub kpy: Col<f32>,
+    pub kpz: Col<f32>,
+    pub kf: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -138,6 +151,10 @@ impl World {
         grow(&mut self.b_on, bodies);
         grow(&mut self.b_first, bodies);
         grow(&mut self.b_count, bodies);
+        for v in [&mut self.knx, &mut self.kny, &mut self.knz, &mut self.kd, &mut self.kpx, &mut self.kpy, &mut self.kpz, &mut self.kf] {
+            grow(v, particles);
+        }
+        grow(&mut self.kc, particles);
         grow(&mut self.pflags, particles);
         grow(&mut self.pbody, particles);
         for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear] {
@@ -160,10 +177,21 @@ impl World {
         }
     }
 
-    /// Advances every particle by `dt` seconds in `substeps` pieces of `iterations` passes each.
+    /// Advances every particle by `dt` seconds in `substeps` pieces of `iterations` passes each, meeting the colliders of the
+    /// table. A host that finds its contacts elsewhere calls `begin`, then `substep_pre`, `apply_contacts` and `substep_post`
+    /// for each piece, then `finish`.
     pub fn step(&mut self, dt: f32, substeps: u32, iterations: u32, gravity: [f32; 3]) {
         let substeps = substeps.max(1);
         let h = dt / substeps as f32;
+        self.begin(dt);
+        for _ in 0..substeps {
+            self.substep(h, iterations.max(1), gravity);
+        }
+        self.finish();
+    }
+
+    /// Starts a step: clears what the bodies are owed and sends targeted particles toward their targets.
+    pub fn begin(&mut self, dt: f32) {
         for c in 0..self.colliders {
             self.jx[c] = 0.0;
             self.jy[c] = 0.0;
@@ -181,9 +209,10 @@ impl World {
                 self.vz[i] = (self.tz[i] - self.z[i]) / dt;
             }
         }
-        for _ in 0..substeps {
-            self.substep(h, iterations.max(1), gravity);
-        }
+    }
+
+    /// Ends a step: targeted particles land on their targets.
+    pub fn finish(&mut self) {
         for i in 0..self.particles {
             if self.pflags[i] & TARGETED != 0 {
                 self.x[i] = self.tx[i];
@@ -195,6 +224,15 @@ impl World {
     }
 
     fn substep(&mut self, h: f32, iterations: u32, gravity: [f32; 3]) {
+        self.substep_pre(h, iterations, gravity);
+        for i in 0..self.particles {
+            self.contact(i, h);
+        }
+        self.substep_post(h);
+    }
+
+    /// The first half of a piece of a step: move every particle under gravity, then solve the constraints.
+    pub fn substep_pre(&mut self, h: f32, iterations: u32, gravity: [f32; 3]) {
         for i in 0..self.particles {
             self.px[i] = self.x[i];
             self.py[i] = self.y[i];
@@ -223,9 +261,11 @@ impl World {
             }
             self.solve_shape(h);
         }
-        for i in 0..self.particles {
-            self.contact(i, h);
-        }
+    }
+
+    /// The second half of a piece of a step, after the contacts: the bodies the particles pushed on move on, and the
+    /// particles take the velocity they ended with.
+    pub fn substep_post(&mut self, h: f32) {
         // A body that the particles pushed on has a new velocity; it carries its collider along for the rest of the step.
         for c in 0..self.colliders {
             if self.wm[c] > 0.0 {
@@ -299,73 +339,100 @@ impl World {
         self.z[b] -= wb * dl * nz;
     }
 
-    /// Pushes a particle out of every collider it sits in, and gives the body what that cost.
+    /// Pushes a particle out of every collider of the table it sits in.
     fn contact(&mut self, i: usize, h: f32) {
-        let m = if self.w[i] > 0.0 { 1.0 / self.w[i] } else { return };
+        if self.w[i] <= 0.0 {
+            return;
+        }
         for c in 0..self.colliders {
             let (d, nx, ny, nz) = self.distance(c, self.x[i], self.y[i], self.z[i]);
             let gap = d - self.radius[i];
             if gap >= 0.0 {
                 continue;
             }
-            let push = -gap;
-            // The contact point, from the body's centre of mass, and how easily the body gives way there along the normal:
-            // the particle takes the share of the correction its inverse mass leaves it (Macklin et al. 2014, section 4).
-            let (qx, qy, qz) = (
-                self.x[i] - self.mx[c] - nx * self.radius[i],
-                self.y[i] - self.my[c] - ny * self.radius[i],
-                self.z[i] - self.mz[c] - nz * self.radius[i],
-            );
-            let (ax, ay, az) = (qy * nz - qz * ny, qz * nx - qx * nz, qx * ny - qy * nx);
-            let (ix, iy, iz) = self.inverse_inertia(c, ax, ay, az);
-            let wb = self.wm[c] + ax * ix + ay * iy + az * iz;
-            let share = self.w[i] / (self.w[i] + wb);
-            self.x[i] += nx * push * share;
-            self.y[i] += ny * push * share;
-            self.z[i] += nz * push * share;
-            // Friction as a bounded displacement across the surface (Macklin et al. 2014, "Unified Particle Physics").
-            let (rx, ry, rz) = (self.x[i] - self.mx[c], self.y[i] - self.my[c], self.z[i] - self.mz[c]);
-            let sx = self.lvx[c] + self.avy[c] * rz - self.avz[c] * ry;
-            let sy = self.lvy[c] + self.avz[c] * rx - self.avx[c] * rz;
-            let sz = self.lvz[c] + self.avx[c] * ry - self.avy[c] * rx;
-            let mut ux = self.x[i] - self.px[i] - sx * h;
-            let mut uy = self.y[i] - self.py[i] - sy * h;
-            let mut uz = self.z[i] - self.pz[i] - sz * h;
-            let un = ux * nx + uy * ny + uz * nz;
-            ux -= nx * un;
-            uy -= ny * un;
-            uz -= nz * un;
-            let tl = sqrt(ux * ux + uy * uy + uz * uz);
-            let (mut fx, mut fy, mut fz) = (0.0, 0.0, 0.0);
-            if tl > 1e-12 {
-                let limit = self.friction[c] * push;
-                let k = if tl < limit { 1.0 } else { limit / tl };
-                fx = -ux * k;
-                fy = -uy * k;
-                fz = -uz * k;
-                self.x[i] += fx * share;
-                self.y[i] += fy * share;
-                self.z[i] += fz * share;
+            let friction = self.friction[c];
+            self.resolve(i, c, [nx, ny, nz], -gap, friction, h);
+        }
+    }
+
+    /// Meets the contact each particle holds (`kc` to `kf`) and clears it: the host found these with its own queries.
+    pub fn apply_contacts(&mut self, h: f32) {
+        for i in 0..self.particles {
+            let c = self.kc[i];
+            if c == NONE {
+                continue;
             }
-            // The body takes the opposite impulse, at the particle's surface point, and moves on with it.
-            let s = share * m / h;
-            let (jx, jy, jz) = (-(nx * push + fx) * s, -(ny * push + fy) * s, -(nz * push + fz) * s);
-            self.jx[c] += jx;
-            self.jy[c] += jy;
-            self.jz[c] += jz;
-            let (kx, ky, kz) = (qy * jz - qz * jy, qz * jx - qx * jz, qx * jy - qy * jx);
-            self.kx[c] += kx;
-            self.ky[c] += ky;
-            self.kz[c] += kz;
-            if self.wm[c] > 0.0 {
-                self.lvx[c] += jx * self.wm[c];
-                self.lvy[c] += jy * self.wm[c];
-                self.lvz[c] += jz * self.wm[c];
-                let (wx, wy, wz) = self.inverse_inertia(c, kx, ky, kz);
-                self.avx[c] += wx;
-                self.avy[c] += wy;
-                self.avz[c] += wz;
+            self.kc[i] = NONE;
+            let c = c - 1;
+            if self.w[i] <= 0.0 {
+                continue;
             }
+            let (n, push, friction) = ([self.knx[i], self.kny[i], self.knz[i]], self.kd[i], self.kf[i]);
+            self.resolve(i, c as usize, n, push, friction, h);
+        }
+    }
+
+    /// Pushes particle `i` out of the surface of body row `c` by `push` along the unit normal `n`, with friction, and gives
+    /// the body what that cost.
+    fn resolve(&mut self, i: usize, c: usize, n: [f32; 3], push: f32, friction: f32, h: f32) {
+        let m = 1.0 / self.w[i];
+        let (nx, ny, nz) = (n[0], n[1], n[2]);
+        // The contact point, from the body's centre of mass, and how easily the body gives way there along the normal:
+        // the particle takes the share of the correction its inverse mass leaves it (Macklin et al. 2014, section 4).
+        let (qx, qy, qz) = (
+            self.x[i] - self.mx[c] - nx * self.radius[i],
+            self.y[i] - self.my[c] - ny * self.radius[i],
+            self.z[i] - self.mz[c] - nz * self.radius[i],
+        );
+        let (ax, ay, az) = (qy * nz - qz * ny, qz * nx - qx * nz, qx * ny - qy * nx);
+        let (ix, iy, iz) = self.inverse_inertia(c, ax, ay, az);
+        let wb = self.wm[c] + ax * ix + ay * iy + az * iz;
+        let share = self.w[i] / (self.w[i] + wb);
+        self.x[i] += nx * push * share;
+        self.y[i] += ny * push * share;
+        self.z[i] += nz * push * share;
+        // Friction as a bounded displacement across the surface (Macklin et al. 2014, "Unified Particle Physics").
+        let (rx, ry, rz) = (self.x[i] - self.mx[c], self.y[i] - self.my[c], self.z[i] - self.mz[c]);
+        let sx = self.lvx[c] + self.avy[c] * rz - self.avz[c] * ry;
+        let sy = self.lvy[c] + self.avz[c] * rx - self.avx[c] * rz;
+        let sz = self.lvz[c] + self.avx[c] * ry - self.avy[c] * rx;
+        let mut ux = self.x[i] - self.px[i] - sx * h;
+        let mut uy = self.y[i] - self.py[i] - sy * h;
+        let mut uz = self.z[i] - self.pz[i] - sz * h;
+        let un = ux * nx + uy * ny + uz * nz;
+        ux -= nx * un;
+        uy -= ny * un;
+        uz -= nz * un;
+        let tl = sqrt(ux * ux + uy * uy + uz * uz);
+        let (mut fx, mut fy, mut fz) = (0.0, 0.0, 0.0);
+        if tl > 1e-12 {
+            let limit = friction * push;
+            let k = if tl < limit { 1.0 } else { limit / tl };
+            fx = -ux * k;
+            fy = -uy * k;
+            fz = -uz * k;
+            self.x[i] += fx * share;
+            self.y[i] += fy * share;
+            self.z[i] += fz * share;
+        }
+        // The body takes the opposite impulse, at the particle's surface point, and moves on with it.
+        let s = share * m / h;
+        let (jx, jy, jz) = (-(nx * push + fx) * s, -(ny * push + fy) * s, -(nz * push + fz) * s);
+        self.jx[c] += jx;
+        self.jy[c] += jy;
+        self.jz[c] += jz;
+        let (kx, ky, kz) = (qy * jz - qz * jy, qz * jx - qx * jz, qx * jy - qy * jx);
+        self.kx[c] += kx;
+        self.ky[c] += ky;
+        self.kz[c] += kz;
+        if self.wm[c] > 0.0 {
+            self.lvx[c] += jx * self.wm[c];
+            self.lvy[c] += jy * self.wm[c];
+            self.lvz[c] += jz * self.wm[c];
+            let (wx, wy, wz) = self.inverse_inertia(c, kx, ky, kz);
+            self.avx[c] += wx;
+            self.avy[c] += wy;
+            self.avz[c] += wz;
         }
     }
 

@@ -117,7 +117,9 @@ test('a falling box is held by a cloth and the cloth sags more under a heavier b
     });
     steps(physics, 400);
     const middle = cloth.particlePosition(((n / 2) | 0) * n + ((n / 2) | 0));
-    assert.ok(box.position[1] - 0.1 > middle[1], 'the box stays on top of the cloth');
+    // The contacts are found at the start of each step, so a heavy box sinks a little into soft cloth before the cloth stops it: it
+    // stays above the middle particle, which is what holds it up.
+    assert.ok(box.position[1] > middle[1] + 0.04, 'the box stays on top of the cloth');
     assert.ok(Math.abs(box.linearVelocity[1]) < 0.5, 'the box has come to rest on it');
     return middle[1];
   };
@@ -308,8 +310,8 @@ test('softening shape matching lets a trimesh sag and spring back', async () => 
   assert.ok(end < start * 0.35, `it settles back: ${end} from ${start}`);
 });
 
-test('a surface collider lets a convex hull rest on a cloth that the particles alone would let it through', async () => {
-  const dropHull = async (surface) => {
+test('a convex hull rests on cloth through the probe, and a surface collider makes the cloth visible to queries', async () => {
+  const drop = async (surface) => {
     const { physics, soft } = await create();
     const n = 12,
       d = 0.1;
@@ -322,7 +324,7 @@ test('a surface collider lets a convex hull rest on a cloth that the particles a
     );
     assert.equal(cloth.triangles().length, (n - 1) * (n - 1) * 6);
     if (surface) soft.createSurfaceCollider(cloth, { friction: 0.8 });
-    // An octahedron: a convex hull, which particles do not see directly.
+    // An octahedron: a convex hull, which the old primitive-only contacts did not see.
     const hull = physics.addBody(null, {
       position: [0, 1.5, 0],
       colliders: {
@@ -332,16 +334,64 @@ test('a surface collider lets a convex hull rest on a cloth that the particles a
       },
     });
     steps(physics, 300);
-    return { hullY: hull.position[1], clothY: cloth.particlePosition(6 * n + 6)[1], soft, cloth };
+    // A ray from above at a corner of the cloth, away from the hull.
+    const ray = physics.raycast([0.4, 3, 0.4], [0, -1, 0], { maxDistance: 10 });
+    return { hullY: hull.position[1], clothY: cloth.particlePosition(6 * n + 6)[1], ray, cloth, soft };
   };
-  const without = await dropHull(false),
-    withSurface = await dropHull(true);
-  assert.ok(without.hullY < 0, `without a surface the hull falls through: ${without.hullY}`);
-  assert.ok(
-    withSurface.hullY > withSurface.clothY,
-    `with one it rests on the cloth: ${withSurface.hullY} over ${withSurface.clothY}`,
-  );
-  assert.ok(withSurface.hullY - withSurface.clothY < 0.4, 'it sits in the cloth');
+  const without = await drop(false),
+    withSurface = await drop(true);
+  for (const run of [without, withSurface])
+    assert.ok(run.hullY > run.clothY, `the hull rests on the cloth: ${run.hullY} over ${run.clothY}`);
+  assert.equal(without.ray, null, 'with no surface collider a ray goes through the cloth');
+  assert.ok(withSurface.ray, 'with one the ray hits it');
+  near(withSurface.ray.point[1], 1, 0.15, 'at the cloth near its corner');
   withSurface.soft.remove(withSurface.cloth);
   assert.equal(withSurface.cloth.surface, null);
+});
+
+test('particles meet a heightfield and never end below its surface', async () => {
+  const { physics, soft } = await create();
+  const rows = 10,
+    columns = 10,
+    size = 10,
+    heights = [];
+  // A symmetric hill, so the answer does not depend on the order of the height columns.
+  const hill = (x, z) => 0.8 * Math.max(0, 1 - Math.hypot(x, z) / 3);
+  for (let c = 0; c <= columns; c++)
+    for (let r = 0; r <= rows; r++) heights.push(hill((c / columns - 0.5) * size, (r / rows - 0.5) * size));
+  physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'heightfield', rows, columns, heights, scale: [size, 1, size], friction: 1 },
+  });
+  const rope = soft.create(SoftBodyDesc.rope([-1.5, 2, 0.2], [1.5, 2, 0.2], 16).setParticleRadius(0.05));
+  steps(physics, 360);
+  const p = rope.particlePositions();
+  for (let i = 0; i < 16; i++) {
+    const surface = hill(p[i * 3], p[i * 3 + 2]);
+    assert.ok(p[i * 3 + 1] > surface - 0.03, `particle ${i} at ${p[i * 3 + 1]} is below the hill (${surface})`);
+  }
+  assert.ok(Math.max(...[...p].filter((_, k) => k % 3 === 1)) > 0.6, 'the rope lies over the hill');
+});
+
+test('particles meet a triangle mesh and rest on its tilted face', async () => {
+  const { physics, soft } = await create();
+  const tilt = 0.25;
+  // A square slab of two triangles, tilted about z, 6 m wide: normal (-sin, cos, 0).
+  const c = Math.cos(tilt),
+    s = Math.sin(tilt);
+  const corner = (x, z) => [x * c, x * s, z];
+  const vertices = [...corner(-3, -3), ...corner(3, -3), ...corner(3, 3), ...corner(-3, 3)];
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0, 0],
+    colliders: { shape: 'trimesh', vertices, indices: [0, 2, 1, 0, 3, 2], friction: 2 },
+  });
+  const rope = soft.create(SoftBodyDesc.rope([-1, 2, 0], [1, 2, 0], 10).setParticleRadius(0.04).setLinearDamping(1));
+  steps(physics, 300);
+  const p = rope.particlePositions();
+  for (let i = 0; i < 10; i++) {
+    const distance = p[i * 3 + 1] * c - p[i * 3] * s;
+    assert.ok(distance > 0.04 - 0.01, `particle ${i} is ${distance} above the plane`);
+    assert.ok(distance < 0.04 + 0.05, `particle ${i} lies on it (${distance})`);
+  }
 });

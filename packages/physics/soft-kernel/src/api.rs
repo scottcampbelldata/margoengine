@@ -14,7 +14,8 @@ static mut WORLD: World = World {
     kz: Col::new(), wm: Col::new(), iixx: Col::new(), iixy: Col::new(), iixz: Col::new(), iiyy: Col::new(),
     iiyz: Col::new(), iizz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0, rx: Col::new(), ry: Col::new(), rz: Col::new(), slx: Col::new(), sly: Col::new(),
     slz: Col::new(), sw: Col::new(), b_on: Col::new(), b_omega: Col::new(), b_zeta: Col::new(), b_first: Col::new(),
-    b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(),
+    b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(), kc: Col::new(), knx: Col::new(), kny: Col::new(), knz: Col::new(),
+    kd: Col::new(), kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kf: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -41,6 +42,7 @@ columns! {
     c_kind, cx, cy, cz, qx, qy, qz, qw, sx, sy, sz, friction, lvx, lvy, lvz, avx, avy, avz, mx, my, mz,
     jx, jy, jz, kx, ky, kz, wm, iixx, iixy, iixz, iiyy, iiyz, iizz,
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
+    kc, knx, kny, knz, kd, kpx, kpy, kpz, kf,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -63,6 +65,33 @@ pub extern "C" fn soft_column(id: u32) -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_step(dt: f32, substeps: u32, iterations: u32, gx: f32, gy: f32, gz: f32) {
     world().step(dt, substeps, iterations, [gx, gy, gz]);
+}
+
+/// Starts a step; with `soft_pre`, `soft_apply`, `soft_post` and `soft_finish` it is `soft_step` with the contacts found by
+/// the host.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_begin(dt: f32) {
+    world().begin(dt);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_pre(h: f32, iterations: u32, gx: f32, gy: f32, gz: f32) {
+    world().substep_pre(h, iterations.max(1), [gx, gy, gz]);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_apply(h: f32) {
+    world().apply_contacts(h);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_post(h: f32) {
+    world().substep_post(h);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_finish() {
+    world().finish();
 }
 
 #[unsafe(no_mangle)]

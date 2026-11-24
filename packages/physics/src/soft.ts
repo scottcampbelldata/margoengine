@@ -14,17 +14,30 @@ interface SoftExports extends WebAssembly.Exports {
   soft_reserve(particles: number, edges: number, bodies: number, colliders: number): void;
   soft_column(id: number): number;
   soft_step(dt: number, substeps: number, iterations: number, gx: number, gy: number, gz: number): void;
+  soft_begin(dt: number): void;
+  soft_pre(h: number, iterations: number, gx: number, gy: number, gz: number): void;
+  soft_apply(h: number): void;
+  soft_post(h: number): void;
+  soft_finish(): void;
   soft_torn(): number;
   soft_hash(): number;
 }
 
-const SPHERE = 0;
-const BOX = 1;
-const CAPSULE = 2;
 const PINNED = 1;
 const TARGETED = 2;
 const TORN = 1;
-const INTEGER_COLUMNS = new Set(['pflags', 'pbody', 'ea', 'eb', 'eflags', 'c_kind', 'b_on', 'b_first', 'b_count']);
+const INTEGER_COLUMNS = new Set([
+  'pflags',
+  'pbody',
+  'ea',
+  'eb',
+  'eflags',
+  'c_kind',
+  'b_on',
+  'b_first',
+  'b_count',
+  'kc',
+]);
 
 let columnNames: readonly string[] = [];
 // The blueprint (the deflated kernel) is a chunk of its own: an app that imports this entry but never attaches soft bodies
@@ -950,56 +963,119 @@ export class SoftBodies implements PhysicsAttachment {
     this.bodies.splice(at, 1);
   }
 
-  /** @internal Steps with the world: forces first, then the kernel, then what the particles did to the rigid bodies. */
+  /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */
   beforeStep(dt: number): void {
     if (this.particleCount === 0) return;
-    const c0 = this.columns();
-    this.applyForces(c0, dt);
-    const colliders = this.gather(c0, dt);
-    this.reserve(this.particleCount, this.edgeCount, this.bodies.length, colliders.length);
+    this.applyForces(this.columns(), dt);
+    const h = dt / this.substeps,
+      g = this.physics.gravity,
+      rows = new Map<number, number>(),
+      bodies: PhysicsBody[] = [];
+    this.reserve(this.particleCount, this.edgeCount, this.bodies.length, 0);
+    this.view = null;
+    this.exports.soft_begin(dt);
+    for (let piece = 0; piece < this.substeps; piece++) {
+      this.exports.soft_pre(h, this.iterations, g[0], g[1], g[2]);
+      // Two asks a piece: the second finds what the first's push-out ran the particle into (a corner).
+      for (let pass = 0; pass < 2; pass++) this.meet(h, rows, bodies);
+      this.exports.soft_post(h);
+    }
+    this.exports.soft_finish();
     const c = this.columns();
-    colliders.forEach((row, i) => {
-      c.c_kind[i] = row.kind;
-      c.cx[i] = row.p[0];
-      c.cy[i] = row.p[1];
-      c.cz[i] = row.p[2];
-      c.qx[i] = row.q[0];
-      c.qy[i] = row.q[1];
-      c.qz[i] = row.q[2];
-      c.qw[i] = row.q[3];
-      c.sx[i] = row.s[0];
-      c.sy[i] = row.s[1];
-      c.sz[i] = row.s[2];
-      c.friction[i] = row.friction;
-      c.lvx[i] = row.lv[0];
-      c.lvy[i] = row.lv[1];
-      c.lvz[i] = row.lv[2];
-      c.avx[i] = row.av[0];
-      c.avy[i] = row.av[1];
-      c.avz[i] = row.av[2];
-      c.mx[i] = row.m[0];
-      c.my[i] = row.m[1];
-      c.mz[i] = row.m[2];
-      c.wm[i] = row.inverse[0];
-      c.iixx[i] = row.inverse[1];
-      c.iixy[i] = row.inverse[2];
-      c.iixz[i] = row.inverse[3];
-      c.iiyy[i] = row.inverse[4];
-      c.iiyz[i] = row.inverse[5];
-      c.iizz[i] = row.inverse[6];
+    bodies.forEach((body, row) => {
+      if (body.type !== 'dynamic') return;
+      const j: Vec3 = [c.jx[row]!, c.jy[row]!, c.jz[row]!],
+        k: Vec3 = [c.kx[row]!, c.ky[row]!, c.kz[row]!];
+      if (j[0] !== 0 || j[1] !== 0 || j[2] !== 0) body.applyImpulse(j, [c.mx[row]!, c.my[row]!, c.mz[row]!]);
+      if (k[0] !== 0 || k[1] !== 0 || k[2] !== 0) body.applyTorqueImpulse(k);
     });
-    const g = this.physics.gravity;
-    this.exports.soft_step(dt, this.substeps, this.iterations, g[0], g[1], g[2]);
-    const after = this.columns();
-    colliders.forEach((row, i) => {
-      if (row.body.type !== 'dynamic') return;
-      const j: Vec3 = [after.jx[i]!, after.jy[i]!, after.jz[i]!],
-        k: Vec3 = [after.kx[i]!, after.ky[i]!, after.kz[i]!];
-      if (j[0] !== 0 || j[1] !== 0 || j[2] !== 0) row.body.applyImpulse(j, row.m);
-      if (k[0] !== 0 || k[1] !== 0 || k[2] !== 0) row.body.applyTorqueImpulse(k);
-    });
-    if (this.exports.soft_torn() > 0) this.report(after);
-    for (const body of this.bodies) if (body.surface) this.moveSurface(body, after);
+    if (this.exports.soft_torn() > 0) this.report(c);
+    for (const body of this.bodies) if (body.surface) this.moveSurface(body, c);
+  }
+
+  /** Asks the rigid world what each free particle's move met, hands the kernel the contacts and lets it resolve them. */
+  private meet(h: number, rows: Map<number, number>, bodies: PhysicsBody[]): void {
+    let c = this.columns();
+    const kernel = this.physics.kernel;
+    for (const soft of this.bodies) {
+      const free: number[] = [];
+      for (let i = 0; i < soft.particles; i++) if (c.w[soft.firstParticle + i]! > 0) free.push(soft.firstParticle + i);
+      if (free.length === 0) continue;
+      const from = new Float32Array(free.length * 3),
+        to = new Float32Array(free.length * 3),
+        radius = new Float32Array(free.length);
+      free.forEach((row, k) => {
+        from[k * 3] = c.px[row]!;
+        from[k * 3 + 1] = c.py[row]!;
+        from[k * 3 + 2] = c.pz[row]!;
+        to[k * 3] = c.x[row]!;
+        to[k * 3 + 1] = c.y[row]!;
+        to[k * 3 + 2] = c.z[row]!;
+        radius[k] = c.radius[row]!;
+      });
+      // Sensors are left out (query flag 8), and so is the body's own surface collider.
+      const contacts = kernel.probeParticles(from, to, radius, { flags: 8, excludeBody: soft.surface?.row });
+      contacts.forEach((contact, k) => {
+        if (!contact) return;
+        const row = free[k]!,
+          n = contact.normal,
+          // Past a thin wall the move ends beyond the surface: push the end back onto the plane the sweep touched.
+          push = Math.max(
+            contact.depth,
+            (contact.point[0] - to[k * 3]!) * n[0] +
+              (contact.point[1] - to[k * 3 + 1]!) * n[1] +
+              (contact.point[2] - to[k * 3 + 2]!) * n[2] +
+              radius[k]!,
+          );
+        if (!(push > 0)) return;
+        const owner = this.physics.bodyOfCollider(contact.collider);
+        if (!owner) return;
+        let table = rows.get(contact.body);
+        if (table === undefined) {
+          table = bodies.length;
+          rows.set(contact.body, table);
+          bodies.push(owner);
+          this.reserve(this.particleCount, this.edgeCount, this.bodies.length, bodies.length);
+          c = this.columns();
+          this.writeBody(c, table, owner);
+        }
+        c.kc[row] = table + 1;
+        c.knx[row] = n[0];
+        c.kny[row] = n[1];
+        c.knz[row] = n[2];
+        c.kd[row] = push;
+        c.kpx[row] = contact.point[0];
+        c.kpy[row] = contact.point[1];
+        c.kpz[row] = contact.point[2];
+        c.kf[row] = owner.colliders.find((collider) => collider.handle === contact.collider)?.friction() ?? 0.5;
+      });
+    }
+    this.exports.soft_apply(h);
+  }
+
+  /** Writes what the kernel needs to share a contact with a body: where it turns, how it moves, how heavy it is. */
+  private writeBody(c: Columns, row: number, body: PhysicsBody): void {
+    const r = rotate(body.rotation, body.centerOfMass),
+      lv = body.linearVelocity,
+      av = body.angularVelocity,
+      inverse = inverseMass(body);
+    c.mx[row] = body.position[0] + r[0];
+    c.my[row] = body.position[1] + r[1];
+    c.mz[row] = body.position[2] + r[2];
+    c.lvx[row] = lv[0];
+    c.lvy[row] = lv[1];
+    c.lvz[row] = lv[2];
+    c.avx[row] = av[0];
+    c.avy[row] = av[1];
+    c.avz[row] = av[2];
+    c.wm[row] = inverse[0]!;
+    c.iixx[row] = inverse[1]!;
+    c.iixy[row] = inverse[2]!;
+    c.iixz[row] = inverse[3]!;
+    c.iiyy[row] = inverse[4]!;
+    c.iiyz[row] = inverse[5]!;
+    c.iizz[row] = inverse[6]!;
+    c.jx[row] = c.jy[row] = c.jz[row] = c.kx[row] = c.ky[row] = c.kz[row] = 0;
   }
 
   private applyForces(c: Columns, dt: number): void {
@@ -1023,58 +1099,6 @@ export class SoftBodies implements PhysicsAttachment {
         c.vz[row] = c.vz[row]! + fz * dt;
       }
     }
-  }
-
-  private gather(c: Columns, dt: number): ColliderRow[] {
-    const min: number[] = [Infinity, Infinity, Infinity],
-      max: number[] = [-Infinity, -Infinity, -Infinity];
-    let reach = 0;
-    for (let i = 0; i < this.particleCount; i++) {
-      const p: Vec3 = [c.x[i]!, c.y[i]!, c.z[i]!];
-      for (let a = 0; a < 3; a++) {
-        min[a] = Math.min(min[a]!, p[a]!);
-        max[a] = Math.max(max[a]!, p[a]!);
-      }
-      reach = Math.max(reach, c.radius[i]! + Math.hypot(c.vx[i]!, c.vy[i]!, c.vz[i]!) * dt);
-    }
-    const margin = reach + 0.05,
-      rows: ColliderRow[] = [];
-    // Whatever overlaps the cloud of particles, grown by how far one step can take them.
-    const bodies = this.physics.intersectAabb(
-      [min[0] - margin, min[1] - margin, min[2] - margin],
-      [max[0] + margin, max[1] + margin, max[2] + margin],
-    );
-    for (const body of bodies) {
-      const q = body.rotation,
-        com = body.centerOfMass,
-        r = rotate(q, com),
-        m: Vec3 = [body.position[0] + r[0], body.position[1] + r[1], body.position[2] + r[2]],
-        lv = body.linearVelocity,
-        av = body.angularVelocity,
-        inverse = inverseMass(body);
-      for (const collider of body.colliders) {
-        if (collider.isSensor() || !collider.isEnabled()) continue;
-        const t = collider.translation(),
-          o = collider.rotation(),
-          base = {
-            body,
-            p: [t.x, t.y, t.z] as Vec3,
-            q: [o.x, o.y, o.z, o.w] as [number, number, number, number],
-            friction: collider.friction(),
-            lv,
-            av,
-            m,
-            inverse,
-          };
-        if (collider.shape === 'sphere') rows.push({ ...base, kind: SPHERE, s: [collider.radius(), 0, 0] });
-        else if (collider.shape === 'box') {
-          const h = collider.halfExtents()!;
-          rows.push({ ...base, kind: BOX, s: [h.x, h.y, h.z] });
-        } else if (collider.shape === 'capsule')
-          rows.push({ ...base, kind: CAPSULE, s: [collider.radius(), collider.halfHeight(), 0] });
-      }
-    }
-    return rows;
   }
 
   /**
@@ -1150,20 +1174,6 @@ export class SoftBodies implements PhysicsAttachment {
   [Symbol.dispose](): void {
     this.dispose();
   }
-}
-
-interface ColliderRow {
-  body: PhysicsBody;
-  kind: number;
-  p: Vec3;
-  q: [number, number, number, number];
-  s: Vec3;
-  friction: number;
-  lv: Vec3;
-  av: Vec3;
-  m: Vec3;
-  /** Inverse mass, then xx, xy, xz, yy, yz, zz of the world inverse inertia: all 0 for a body that does not move. */
-  inverse: number[];
 }
 
 /** What a dynamic body's inverse mass and world inverse inertia are, for the kernel to share a contact's correction with it. */
