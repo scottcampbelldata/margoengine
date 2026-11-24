@@ -61,7 +61,8 @@ export interface AnimatedUSDZOptions extends USDZOptions {
 /** What {@link exportAnimatedUSDZ} left out of the file. */
 export interface AnimatedUSDZSkip {
   /**
-   * `'morph-weights'`: a channel of morph target weights, which this entry does not write. `'not-exported'`: a channel of a
+   * `'morph-weights'`: a channel of morph target weights for a mesh that is not skinned (UsdSkel's blend shapes need a
+   * skeleton, so a morphed mesh with no skin is written at its rest weights). `'not-exported'`: a channel of a
    * node the scene did not collect. `'primitive'`, `'texture'`, `'colors'` and `'channel'`, for GLB input: a primitive that
    * is not triangles, a texture not PNG or JPEG, vertex colours under a base colour texture, a channel with no node, such as
    * one of KHR_animation_pointer.
@@ -213,7 +214,82 @@ const drawn = (node: Node): { geometry: Geo; material?: Mat }[] => [
 const skinned = (node: Node, geometry: Geo): boolean =>
   !!node.skin && !!geometry.joints && !!geometry.weights && !geometry.topology;
 
-/** The skin's joints in tree order, parents first, each with a unique path, and how the skin's indices map to that order. */
+/** True for a node whose skin moves a primitive that carries morph targets: the ones UsdSkel's blend shapes can drive. */
+const morphed = (node: Node): boolean =>
+  drawn(node).some(({ geometry }) => skinned(node, geometry) && !!geometry.morphs?.length);
+
+/**
+ * The weights of a node's morph targets at each frame: its `weights` channel sampled as glTF 2.0 section 3.11 says (STEP,
+ * LINEAR, CUBICSPLINE), else the node's own `morphWeights`, else zero. `count` is the number of targets.
+ */
+function weightsOf(node: Node, count: number, track: Track | undefined, fps: number): (frame: number) => number[] {
+  const out = new Float32Array(count);
+  if (track) {
+    const per = track.interpolation === 'CUBICSPLINE' ? 3 : 1;
+    if (track.values.length !== track.times.length * count * per)
+      throw new RangeError(
+        `The weights channel of ${node.name ?? 'a node'} holds ${track.values.length} values for ${track.times.length} keys of ${count} targets`,
+      );
+  }
+  return (frame) => {
+    if (!track) return Array.from({ length: count }, (_, k) => node.morphWeights?.[k] ?? 0);
+    sampleTrackInto(track.times, track.values, count, frame / fps, track.interpolation, false, out);
+    return Array.from(out);
+  };
+}
+
+/**
+ * A morph target as a `BlendShape` prim (OpenUSD UsdSkel, "BlendShape": `offsets`, `normalOffsets` and `pointIndices`), with
+ * `space` applied to the deltas as it is to the points: its linear part to the offsets, its inverse transpose to the normal
+ * offsets. A target that moves fewer points than the mesh has lists them in `pointIndices`.
+ */
+function blendShape(
+  name: string,
+  morph: NonNullable<Geo['morphs']>[number],
+  space: Float64Array | undefined,
+): string[] {
+  const { positions, normals } = morph,
+    count = positions.length / 3,
+    moved: number[] = [];
+  for (let v = 0; v < count; v++)
+    if (
+      positions[v * 3] ||
+      positions[v * 3 + 1] ||
+      positions[v * 3 + 2] ||
+      (normals && (normals[v * 3] || normals[v * 3 + 1] || normals[v * 3 + 2]))
+    )
+      moved.push(v);
+  const sparse = moved.length < count,
+    list = sparse ? moved : Array.from({ length: count }, (_, v) => v),
+    inverse = space ? invertMatrix(space) : undefined,
+    through = (values: Float32Array, v: number, normal: boolean): number[] => {
+      const x = values[v * 3],
+        y = values[v * 3 + 1],
+        z = values[v * 3 + 2];
+      if (!space) return [x, y, z];
+      if (!normal || !inverse) return [0, 1, 2].map((r) => space[r] * x + space[4 + r] * y + space[8 + r] * z);
+      return [0, 1, 2].map((r) => inverse[r * 4] * x + inverse[r * 4 + 1] * y + inverse[r * 4 + 2] * z);
+    };
+  return [
+    `    def BlendShape "${name}" {`,
+    `        uniform vector3f[] offsets = ${tuples(
+      list.flatMap((v) => through(positions as Float32Array, v, false)),
+      3,
+    )}`,
+    ...(normals
+      ? [
+          `        uniform vector3f[] normalOffsets = ${tuples(
+            list.flatMap((v) => through(normals as Float32Array, v, true)),
+            3,
+          )}`,
+        ]
+      : []),
+    ...(sparse ? [`        uniform int[] pointIndices = [${list.join(', ')}]`] : []),
+    '    }',
+  ];
+}
+
+/** A skin's joints in tree order, parents first, each with a unique path, and how the skin's indices map to that order. */
 function skeleton(
   skin: SkinData,
   order: readonly Node[],
@@ -380,6 +456,7 @@ function skelRoot(
   meshes: readonly string[],
   space: Float64Array | undefined,
   extents: readonly string[],
+  blends: { tokens: string[]; frames: string[] },
   signal: AbortSignal | undefined,
 ): string[] {
   const root = `/Margo/Skin_${index}`,
@@ -449,6 +526,12 @@ function skelRoot(
     ...attribute('float3[]', 'translations', translations).map((line) => `    ${line}`),
     ...attribute('quatf[]', 'rotations', rotations).map((line) => `    ${line}`),
     ...attribute('half3[]', 'scales', scales).map((line) => `    ${line}`),
+    ...(blends.tokens.length
+      ? [
+          `        uniform token[] blendShapes = [${blends.tokens.map((token) => JSON.stringify(token)).join(', ')}]`,
+          ...attribute('float[]', 'blendShapeWeights', blends.frames).map((line) => `    ${line}`),
+        ]
+      : []),
     '    }',
     ...meshes,
     '}',
@@ -565,18 +648,26 @@ export async function exportAnimatedUSDZ(
   const roots = collect(scene, options, undefined, 'refuse', ['points', 'lines']),
     { order, parents } = walked(roots),
     byExport = new Map(order.flatMap((node) => (node.source ? [[node.source, node] as const] : []))),
-    tracks = new Map<Node, Tracks>();
+    tracks = new Map<Node, Tracks>(),
+    weightTracks = new Map<Node, Track>();
   let duration = 0;
   for (const { node: target, path, times, values, interpolation = 'LINEAR' } of animation.channels) {
     const node = byExport.get(target);
-    if (path === 'weights' || !node) {
+    if (!node || (path === 'weights' && !morphed(node))) {
       skipped.push({ kind: node ? 'morph-weights' : 'not-exported', target: target.name });
       continue;
     }
     const data = Float32Array.from(times);
     // glTF 2.0 3.11: key times are finite and strictly increasing; at least one sets the clip's length.
     if (!data.length || data.some((t, i) => !Number.isFinite(t) || (i > 0 && !(t > data[i - 1]!))))
-      throw new RangeError(`Animation channel of ${target.name ?? 'a node'} needs finite, strictly increasing key times`);
+      throw new RangeError(
+        `Animation channel of ${target.name ?? 'a node'} needs finite, strictly increasing key times`,
+      );
+    if (path === 'weights') {
+      weightTracks.set(node, { times: data, values: Float32Array.from(values), interpolation });
+      duration = Math.max(duration, data[data.length - 1]);
+      continue;
+    }
     if (!tracks.has(node)) tracks.set(node, {});
     tracks.get(node)![PATHS[path]] = { times: data, values: Float32Array.from(values), interpolation };
     duration = Math.max(duration, data[data.length - 1]);
@@ -688,6 +779,8 @@ export async function exportAnimatedUSDZ(
       space = restSpace(skin, byExport, rest),
       index = skinIndex++,
       lines: string[] = [];
+    const blendTokens: string[] = [],
+      blendWeights: ((frame: number) => number[])[] = [];
     for (const node of users)
       for (const { geometry, material = fallback } of drawn(node)) {
         if (!skinned(node, geometry)) continue;
@@ -706,9 +799,46 @@ export async function exportAnimatedUSDZ(
             `    rel skel:skeleton = </Margo/Skin_${index}/Skeleton>`,
           ],
         });
+        const morphs = geometry.morphs;
+        if (!morphs?.length) continue;
+        // UsdSkel's blend shapes: BlendShape children of the mesh, named by the mesh's `skel:blendShapes` and driven by the
+        // SkelAnimation's `blendShapeWeights`, one weight for each name in the animation's own order.
+        const names = morphs.map((_, k) => `Blend_${i}_${k}`),
+          closing = lines.pop();
+        lines.push(
+          ...morphs.flatMap((morph, k) => blendShape(names[k], morph, space)),
+          `    uniform token[] skel:blendShapes = [${names.map((n) => JSON.stringify(n)).join(', ')}]`,
+          `    rel skel:blendShapeTargets = [${names.map((n) => `</Margo/Skin_${index}/Mesh_${i}/${n}>`).join(', ')}]`,
+          closing!,
+        );
+        blendTokens.push(...names);
+        blendWeights.push(weightsOf(node, morphs.length, weightTracks.get(node), fps));
       }
     body.push(
-      ...skelRoot(index, shape, skin, frames, poses, rest, parents, lines, space, reach.extents.get(skin)!, signal),
+      ...skelRoot(
+        index,
+        shape,
+        skin,
+        frames,
+        poses,
+        rest,
+        parents,
+        lines,
+        space,
+        reach.extents.get(skin)!,
+        {
+          tokens: blendTokens,
+          frames: Array.from(
+            { length: blendTokens.length ? frames : 0 },
+            (_, frame) =>
+              `[${blendWeights
+                .flatMap((at) => at(frame))
+                .map(num)
+                .join(', ')}]`,
+          ),
+        },
+        signal,
+      ),
     );
   }
   if (!meshes) throw new RangeError('USDZ requires at least one mesh');

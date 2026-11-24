@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17552603,
+  "total": 17553375,
   "history": [
     {
       "date": "2026-10-24",
@@ -11778,7 +11778,7 @@
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
     "@margoengine/exporters/usdz": 21381,
-    "@margoengine/exporters/usdz-anim": 24808,
+    "@margoengine/exporters/usdz-anim": 25615,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24529,
     "@margoengine/fbx dist/workers/fbx.js": 127915,
@@ -11978,7 +11978,7 @@
     "@margoengine/loaders/materialx": 8687,
     "@margoengine/loaders/md2": 2265,
     "@margoengine/loaders/mmcif": 3430,
-    "@margoengine/loaders/mocap": 4480,
+    "@margoengine/loaders/mocap": 4445,
     "@margoengine/loaders/mtl": 10028,
     "@margoengine/loaders/nrrd": 7006,
     "@margoengine/loaders/nurbs": 2763,

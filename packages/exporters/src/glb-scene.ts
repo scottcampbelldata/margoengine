@@ -157,6 +157,17 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
         data.joints = readAccessor(parts, JOINTS_0).values;
         data.weights = floats(readAccessor(parts, WEIGHTS_0));
       }
+      if (Array.isArray(primitive.targets) && primitive.targets.length) {
+        const names = json.meshes[mesh].extras?.targetNames;
+        data.morphs = (primitive.targets as JSONObject[]).map((target, k) => ({
+          ...(Array.isArray(names) && typeof names[k] === 'string' ? { name: names[k] as string } : {}),
+          positions:
+            target.POSITION === undefined
+              ? new Float32Array(positions.length)
+              : floats(readAccessor(parts, target.POSITION)),
+          ...(target.NORMAL === undefined ? {} : { normals: floats(readAccessor(parts, target.NORMAL)) }),
+        }));
+      }
       geometries.set(key, data);
       return data;
     };
@@ -202,6 +213,8 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
     });
     if (!primitives.length) return;
     node.primitives = primitives;
+    const weights = record.weights ?? json.meshes[record.mesh].weights;
+    if (Array.isArray(weights)) node.morphWeights = weights;
     if (record.skin !== undefined) node.skin = skins[record.skin];
   });
   const animations: AnimationData[] = (json.animations ?? []).map(

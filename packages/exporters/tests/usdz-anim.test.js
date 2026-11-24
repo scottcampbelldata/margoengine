@@ -8,6 +8,9 @@ import { exportGLB, joinGLB, splitGLB } from '@margoengine/exporters';
 import { compressDraco } from '@margoengine/exporters/draco';
 import { exportAnimatedUSDZ } from '@margoengine/exporters/usdz-anim';
 import { sceneOfGLB } from '../dist/glb-scene.js';
+import { parseUSDFiles } from '@margoengine/usdz/compose';
+import { skeletons } from '@margoengine/usdz/skel';
+import { nodeOf, pose, vertices } from '../../usdz/tests/pose.js';
 
 const quad = {
   positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
@@ -171,8 +174,14 @@ test('a channel with no key times, or times out of order, is refused rather than
   // glTF 2.0 3.11: animation input times are strictly increasing.
   for (const [times, values] of [
     [[], []],
-    [[0.5, 0.25], [0, 0, 0, 1, 0, 0]],
-    [[0, NaN], [0, 0, 0, 1, 0, 0]],
+    [
+      [0.5, 0.25],
+      [0, 0, 0, 1, 0, 0],
+    ],
+    [
+      [0, NaN],
+      [0, 0, 0, 1, 0, 0],
+    ],
   ]) {
     const node = { name: 'box', geometry: quad };
     await assert.rejects(
@@ -408,7 +417,9 @@ test('a skin in another space than the world rests in the world and still moves 
     normal = numbers(/normal3f\[\] normals = (\[[^\]]*\])/.exec(text)[1]);
   // Sizes here are up to 400, so a Float32 step is about 3e-5, over a few steps.
   want.forEach((point, v) => point.forEach((value, r) => near(got[v][r], value, 2e-3, `vertex ${v}`)));
-  apply(rigWorld, [...geometry.positions.subarray(6, 9)]).forEach((value, r) => near(points[6 + r], value, 1e-3, 'rest'));
+  apply(rigWorld, [...geometry.positions.subarray(6, 9)]).forEach((value, r) =>
+    near(points[6 + r], value, 1e-3, 'rest'),
+  );
   [0, -1, 0].forEach((value, r) => near(normal[r], value, 1e-6, 'normal turned with the points'));
 });
 
@@ -834,4 +845,94 @@ test('a skin that lists one joint twice is refused, as glTF requires distinct jo
     }),
     /Skin joints must be distinct/,
   );
+});
+
+// UsdSkel blend shapes (OpenUSD UsdSkel schema: BlendShape offsets, normalOffsets and pointIndices on the prim; the mesh's
+// skel:blendShapes and skel:blendShapeTargets; the SkelAnimation's blendShapes and blendShapeWeights).
+test('morph targets of a skinned mesh become BlendShape prims driven by the clip weights', async () => {
+  const { lower, upper, mesh, geometry } = arm(),
+    vertices = geometry.positions.length / 3,
+    lift = new Float32Array(geometry.positions.length),
+    swell = new Float32Array(geometry.positions.length);
+  lift.set([0, 0, 0.5], 3); // vertex 1 only: a sparse target
+  for (let v = 0; v < vertices; v++) swell.set([0.1, 0, 0], v * 3); // every vertex: a dense one
+  geometry.morphs = [
+    { name: 'lift', positions: lift },
+    { name: 'swell', positions: swell, normals: swell },
+  ];
+  const result = await exportAnimatedUSDZ({
+      nodes: [upper, mesh],
+      animations: [
+        {
+          channels: [
+            { node: lower, path: 'translation', times: [0, 1], values: [0, 0, 0, 0, 0, 0] },
+            { node: mesh, path: 'weights', times: [0, 1], values: [0, 1, 1, 0] },
+          ],
+        },
+      ],
+    }),
+    text = await usda(result);
+  assert.equal(count(text, /def BlendShape /g), 2);
+  assert.match(text, /uniform token\[\] skel:blendShapes = \["Blend_0_0", "Blend_0_1"\]/);
+  assert.match(
+    text,
+    /rel skel:blendShapeTargets = \[<\/Margo\/Skin_0\/Mesh_0\/Blend_0_0>, <\/Margo\/Skin_0\/Mesh_0\/Blend_0_1>\]/,
+  );
+  assert.match(text, /uniform int\[\] pointIndices = \[1\]/);
+  assert.match(text, /uniform token\[\] blendShapes = \["Blend_0_0", "Blend_0_1"\]/);
+  const weights = samples(text, 'float[] blendShapeWeights');
+  assert.deepEqual(weights[0], [0, 1]);
+  assert.deepEqual(weights.at(-1), [1, 0]);
+  assert.equal(result.skipped.length, 0);
+});
+
+test('weights of a mesh with no skin stay skipped by name', async () => {
+  const node = { name: 'plain', geometry: { ...quad, morphs: [{ positions: new Float32Array(12) }] } },
+    result = await exportAnimatedUSDZ({
+      nodes: [node],
+      animations: [
+        {
+          channels: [
+            { node, path: 'weights', times: [0, 1], values: [0, 1] },
+            { node, path: 'translation', times: [0, 1], values: [0, 0, 0, 1, 0, 0] },
+          ],
+        },
+      ],
+    });
+  assert.deepEqual(result.skipped, [{ kind: 'morph-weights', target: 'plain' }]);
+});
+
+test('the import side reads the blend shapes back: a corner moves by weight times its offset', async () => {
+  const geometry = {
+      ...quad,
+      joints: new Uint8Array(16),
+      weights: new Float32Array(16).map((_, i) => (i % 4 ? 0 : 1)),
+      morphs: [{ positions: new Float32Array([0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0]) }],
+    },
+    joint = { name: 'joint' },
+    mesh = { name: 'mesh', geometry, skin: { joints: [joint], inverseBindMatrices: IDENTITY } },
+    { usdz } = await exportAnimatedUSDZ({
+      nodes: [joint, mesh],
+      animations: [
+        {
+          channels: [
+            { node: joint, path: 'translation', times: [0, 1], values: [0, 0, 0, 0, 0, 0] },
+            { node: mesh, path: 'weights', times: [0, 1], values: [0, 1] },
+          ],
+        },
+      ],
+    }),
+    text = await readZipEntry(usdz, readZipDirectory(usdz)[0]),
+    asset = await parseUSDFiles('scene.usda', (id) => (id === 'scene.usda' ? text : undefined), {
+      extensions: [skeletons()],
+    }),
+    id = nodeOf(asset, '/Margo/Skin_0/Mesh_0');
+  assert.deepEqual(asset.issues, []);
+  // The importer unindexes the quad's two triangles: corner 1 of the first triangle is the quad's vertex 1.
+  for (const [seconds, z] of [
+    [0, 0],
+    [0.5, 0.25],
+    [1, 0.5],
+  ])
+    near(vertices(asset, id, pose(asset, seconds))[1][2], z, 1e-6, `corner z at ${seconds} s`);
 });
