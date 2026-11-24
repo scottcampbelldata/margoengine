@@ -1008,3 +1008,36 @@ test('a still body falls asleep, stays where it is, and wakes when it is touched
   ball.canSleep = false;
   assert.equal(ball.sleeping, false, 'a body that may not sleep is awake');
 });
+
+test('a contact hook edits or drops the contacts of colliders that ask for it', async () => {
+  const { physics, soft } = await create();
+  // A platform at y = 1 that a particle passes going up and lands on coming down: a one-way platform.
+  const platform = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0.9, 0],
+    colliders: { shape: 'box', halfExtents: [3, 0.1, 3], friction: 0.5 },
+  });
+  const seen = [];
+  soft.setContactHook((contact) => {
+    seen.push(contact.particleVelocity[1]);
+    if (contact.particleVelocity[1] > 0) contact.enabled = false;
+  });
+  const ball = soft.create(new SoftBodyDesc([0, 0.2, 0]).setParticleRadius(0.02));
+  ball.setParticleVelocity(0, [0, 8, 0]);
+  steps(physics, 30);
+  // Without the hook asking, the platform is met by an upward ball; with it, nothing yet: the collider does not ask.
+  assert.equal(seen.length, 0, 'a collider that does not ask is not hooked');
+  assert.ok(ball.particlePosition(0)[1] < 1, 'the ball is stopped under the platform');
+  platform.colliders[0].setActiveHooks({ modifyContacts: true });
+  ball.setParticleVelocity(0, [0, 8, 0]);
+  ball.setParticlePosition(0, [0, 0.2, 0]);
+  steps(physics, 120);
+  assert.ok(seen.length > 0, 'a collider that asks is hooked');
+  near(
+    ball.particlePosition(0)[1],
+    1.02,
+    0.03,
+    'the ball passes up through the platform and comes to rest on top of it',
+  );
+  soft.setContactHook(null);
+});

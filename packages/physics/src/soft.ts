@@ -232,6 +232,26 @@ export class SoftMeshBinding {
   }
 }
 
+/**
+ * What a soft contact hook may edit about one contact of a particle with a collider before the step uses it (Rapier's
+ * `modify_solver_contacts` for soft bodies): the plane (`normal` out of the collider, `point` on it, both at the start of
+ * the step), the speed of the surface there, the friction, and whether it counts at all.
+ */
+export interface SoftContact {
+  readonly soft: SoftBody;
+  /** The particle, by its index in the body. */
+  readonly particle: number;
+  readonly collider: PhysicsCollider;
+  /** The particle's velocity now. */
+  readonly particleVelocity: Vec3;
+  normal: Vec3;
+  point: Vec3;
+  velocity: Vec3;
+  friction: number;
+  /** Set false to leave the contact out: the particle passes through. */
+  enabled: boolean;
+}
+
 /** A deformable collider bound to a soft body: where each vertex gets its place. @internal */
 interface BoundMesh {
   soft: SoftBody;
@@ -1982,6 +2002,7 @@ export class SoftBodies implements PhysicsAttachment {
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0];
   private rowGroups: number[] = [];
+  private contactHook: ((contact: SoftContact) => void) | null = null;
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
   private bound: BoundMesh[] = [];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
@@ -2319,6 +2340,16 @@ export class SoftBodies implements PhysicsAttachment {
     this.syncVolume(desc.volumeFactor);
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
     return body;
+  }
+
+  /**
+   * Calls `hook` for each contact a particle has with a collider that asks for it (`collider.setActiveHooks({modifyContacts:
+   * true})`), once a step before it is used, so a one-way platform, a conveyor or a sticky patch can edit or drop it (Rapier's
+   * `modify_solver_contacts`). Pass null to stop. Rapier's soft hook also offers its edge, vertex and volume-patch candidates,
+   * which are its contact solver's own; here a contact is the plane a particle meets.
+   */
+  setContactHook(hook: ((contact: SoftContact) => void) | null): void {
+    this.contactHook = hook;
   }
 
   /** @internal Puts a body to sleep or wakes it: its particles are left out of the prediction while it sleeps. */
@@ -3086,6 +3117,7 @@ export class SoftBodies implements PhysicsAttachment {
       normal: Vec3;
       point: Vec3;
       velocity: Vec3;
+      friction?: number;
     }
     const found: Found[] = [];
     for (const soft of this.bodies) {
@@ -3141,6 +3173,40 @@ export class SoftBodies implements PhysicsAttachment {
     }
     // The bodies the planes and the attachments belong to get a row each, with what the kernel needs to share a contact with
     // them.
+    if (this.contactHook) {
+      const hook = this.contactHook,
+        kept: typeof found = [];
+      for (const f of found) {
+        const collider = this.physics.colliderOf(f.collider);
+        if (!collider || !collider.activeHooks().modifyContacts) {
+          kept.push(f);
+          continue;
+        }
+        const row = f.row,
+          contact: SoftContact = {
+            soft: f.soft,
+            particle: row - f.soft.firstParticle,
+            collider,
+            particleVelocity: [c.vx[row]!, c.vy[row]!, c.vz[row]!],
+            normal: [...f.normal],
+            point: [...f.point],
+            velocity: [...f.velocity],
+            friction: collider.friction(),
+            enabled: true,
+          };
+        hook(contact);
+        if (!contact.enabled) continue;
+        const length = Math.hypot(...contact.normal);
+        if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('A contact normal has a length.');
+        f.normal = [contact.normal[0] / length, contact.normal[1] / length, contact.normal[2] / length];
+        f.point = [...contact.point];
+        f.velocity = [...contact.velocity];
+        f.friction = contact.friction;
+        kept.push(f);
+      }
+      found.length = 0;
+      found.push(...kept);
+    }
     // A row is one rigid body as one soft body's dominance group sees it, so two groups at one body have two rows.
     const key = (bodyRow: number, soft: SoftBody): number => bodyRow * 256 + ((soft.dominance + 128) & 255);
     this.rowGroups = [];
@@ -3191,7 +3257,7 @@ export class SoftBodies implements PhysicsAttachment {
       c.kvx[k] = f.velocity[0];
       c.kvy[k] = f.velocity[1];
       c.kvz[k] = f.velocity[2];
-      c.kf[k] = this.physics.colliderOf(f.collider)?.friction() ?? 0.5;
+      c.kf[k] = f.friction ?? this.physics.colliderOf(f.collider)?.friction() ?? 0.5;
     }
   }
 

@@ -46,6 +46,7 @@ export class SoftBodies implements PhysicsAttachment {
     columns(): Columns;
     cellColumns(): Columns;
     create(desc: SoftBodyDesc): SoftBody;
+    setContactHook(hook: ((contact: SoftContact) => void) | null): void;
     setSleep(body: SoftBody, asleep: boolean): void;
     surfaceVolume(body: SoftBody): number;
     setVolume(body: SoftBody, factor: number | null): void;
@@ -309,6 +310,18 @@ export class SoftBodyMaterial {
     minPiece: number;
     static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
     clone(): SoftBodyMaterial;
+}
+
+export interface SoftContact {
+    readonly soft: SoftBody;
+    readonly particle: number;
+    readonly collider: PhysicsCollider;
+    readonly particleVelocity: Vec3;
+    normal: Vec3;
+    point: Vec3;
+    velocity: Vec3;
+    friction: number;
+    enabled: boolean;
 }
 
 export interface SoftDestination {
