@@ -99,10 +99,13 @@ test('a skin stored in millimetres is written in metres', async () => {
   // robot-expressive's hands are 6 cm of mesh under a joint scale of 100; with the bind pose out of them they span arm to arm.
   const { size, usdz } = await exportAnimatedUSDZ(asset(ROBOT), { clip: 'Idle' }),
     text = await usda(usdz),
-    meshes = [...text.matchAll(/primvars:skel:jointIndices/g)].length;
+    meshes = [...text.matchAll(/primvars:skel:jointIndices = .*\r?\n\s+elementSize = 4/g)].length,
+    rigid = [...text.matchAll(/primvars:skel:jointIndices = \[0\] \(\r?\n\s+elementSize = 1/g)].length;
   nearAll(size, [3.1, 4.461, 2.687], 0.01, 'size');
   assert.equal(meshes, 4);
-  const skinned = text.slice(text.indexOf('def SkelRoot')),
+  // The face's three meshes have expressions and no skin: each binds rigidly to a one-joint skeleton.
+  assert.equal(rigid, 3);
+  const skinned = text.slice(text.indexOf('def SkelRoot "Skin_')),
     { min, max } = boxOfPoints(skinned);
   assert.ok(max[0] - min[0] > 6, `the hands are ${max[0] - min[0]} apart`);
   near(min[1], 2.057, 0.01, 'hands stand at arm height');
