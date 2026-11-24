@@ -1,11 +1,13 @@
 // Margo's parity adapters (bench/scenes/parity/margo-*.js) build every case of the matrix. A builder that throws
 // 'unsupported:' reports Margo missing in docs/whitepaper/perf-vs-threejs.md, so each one left must name its open entry
 // in docs/known-bugs.md here. KB6250b: p-compute and p-color-grading threw although shader had the APIs they need.
+// KB6250c: p-light-probe threw until environment's SHLight took nine RGB coefficients; none is left open.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 
-const OPEN = { 'p-light-probe': 'KB6250c' };
+/** @type {Record<string, string>} */
+const OPEN = {};
 
 test('every Margo parity adapter builds its case, except those with an open known-bugs entry', () => {
   const refused = {};

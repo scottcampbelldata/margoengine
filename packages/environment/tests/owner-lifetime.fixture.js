@@ -8,7 +8,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 export async function fixtures(load = (entry) => import(entry)) {
   const { Environment, EnvironmentBackground, ImageBackground, ColorBackground, TransparentCanvas, EnvironmentLighting,
-    Fog, HemisphereLight, AmbientLight, ColorOutput } = await load('../dist/index.js');
+    Fog, HemisphereLight, AmbientLight, SHLight, ColorOutput } = await load('../dist/index.js');
   const { GroundProjectedBackground } = await load('../dist/ground.js');
   const { EnvironmentBlend } = await load('../dist/blend.js');
   const { LightProbes } = await load('../dist/probes.js');
@@ -38,6 +38,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   own('Fog', () => new Fog());
   own('HemisphereLight', () => new HemisphereLight());
   own('AmbientLight', () => new AmbientLight());
+  own('SHLight', () => new SHLight({ coefficients: Array(27).fill(0.1) }));
   own('ColorOutput', () => new ColorOutput());
   own('ImageBackground', () => new ImageBackground({ shape: 'sphere',
     images: [{ width: 2, height: 2, data: new Uint8Array(16).fill(128) }] }));

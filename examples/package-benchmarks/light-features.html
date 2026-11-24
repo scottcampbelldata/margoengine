@@ -3,7 +3,7 @@
 // Driven by light-features-gpu.mjs. A grey Lambert floor (materials plane, base/pi BRDF, lit through lights.add), a Lambert
 // sphere and a core box; core's sun and ambient are off, so every lit pixel is one of the new lights alone: a spot or point
 // light (decay 2, unlimited range), an extra directional light, an IES-profiled point light, a projector spot, or the
-// hemisphere light (sphere and box only). unproject() turns pixel centres into floor points and view rays.
+// hemisphere light or an SH light probe (sphere and box only). unproject() turns pixel centres into floor points and view rays.
 import {createStage} from '/packages/stage/dist/index.js';
 import {box,PbrMaterial} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
@@ -17,7 +17,7 @@ import {ProjectorLights} from '/packages/clustered/dist/projector.js';
 import {AreaLights} from '/packages/clustered/dist/area.js';
 import {AreaLightTextures} from '/packages/clustered/dist/area-texture.js';
 import {LightLayers} from '/packages/clustered/dist/layers.js';
-import {HemisphereLight} from '/packages/environment/dist/index.js';
+import {HemisphereLight,SHLight} from '/packages/environment/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,5,4],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=0;
@@ -32,7 +32,7 @@ const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();}
 const inverse=new Float32Array(16),workspace=new Float64Array(52);
 const transform=(m,v)=>[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);
 window.check={
-  // scene: {clustered, area (rectangle lights), areaTexture ({width,height,data:[...],colorSpace} or null), layers ({lights:[masks],floor:mask} or null: the floor through layers.add), directional, ies (LM-63 text or null), projector ({width,height,data:[...]} or null), hemisphere ({sky,ground,intensity} or null), objects}.
+  // scene: {clustered, area (rectangle lights), areaTexture ({width,height,data:[...],colorSpace} or null), layers ({lights:[masks],floor:mask} or null: the floor through layers.add), directional, ies (LM-63 text or null), projector ({width,height,data:[...]} or null), hemisphere ({sky,ground,intensity} or null), sh ({coefficients,intensity} or null: an SHLight in the same ambient slot), objects}.
   async render(scene){
     device.pushErrorScope('validation');
     floor.root.visible=scene.objects!=='shapes';ball.root.visible=cube.visible=scene.objects==='shapes';
@@ -46,6 +46,7 @@ window.check={
     if(want!==floorLayers){removeFloor();removeFloor=want===null?lights.add(floor):layers.add(floor,{layers:want});floorLayers=want;}
     if(hemisphere){for(const r of removeHemisphere)r();engine.removePlugin(hemisphere.name);hemisphere=null;removeHemisphere=[];}
     if(scene.hemisphere){hemisphere=HemisphereLight.attach(engine,scene.hemisphere);removeHemisphere=[hemisphere.add(ball)];}
+    else if(scene.sh){hemisphere=SHLight.attach(engine,scene.sh);removeHemisphere=[hemisphere.add(ball)];}
     for(let i=0;i<3;i++)await frame();
     const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),eye:[...engine.camera.position]};
   },

@@ -1,6 +1,6 @@
 {
   "benchmark": "light-features-gpu",
-  "recordedAt": "2026-10-20T17:34:36.773Z",
+  "recordedAt": "2026-11-24T13:24:19.451Z",
   "hardware": {
     "vendor": "nvidia",
     "architecture": "ampere",
@@ -8,7 +8,7 @@
     "description": "",
     "fallback": false
   },
-  "browser": "chromium 155.0.4283.62",
+  "browser": "chromium 158.0.4370.33",
   "resolution": [
     640,
     480
@@ -47,6 +47,12 @@
     },
     {
       "check": "hemisphere",
+      "samples": 79,
+      "lit": 79,
+      "maxDiff": 1
+    },
+    {
+      "check": "sh",
       "samples": 79,
       "lit": 79,
       "maxDiff": 1

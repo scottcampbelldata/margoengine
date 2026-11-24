@@ -102,10 +102,18 @@ export const builders = {
     return app(engine, () => {}, { camera: data.camera, note: 'clustered AreaLights (LTC) + core sun' });
   },
 
-  async 'p-light-probe'() {
-    throw new Error(
-      'unsupported: a light probe from given SH coefficients (environment LightProbes bake their SH from the scene; no API takes 9 coefficients)',
-    );
+  async 'p-light-probe'(canvas, data, marks) {
+    const engine = await engineFor(canvas, data.camera, data.items.length + 8, marks),
+      s = performance.now(),
+      { SHLight } = await import('@margoengine/environment');
+    meshes(engine, data, palette(data));
+    noSun(engine);
+    SHLight.attach(engine, { coefficients: data.sh });
+    marks.buildMs = ms(s);
+    return app(engine, () => {}, {
+      camera: data.camera,
+      note: 'environment SHLight (9 RGB coefficients) only, core sun off',
+    });
   },
 
   async 'p-ies'(canvas, data, marks) {

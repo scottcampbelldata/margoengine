@@ -393,6 +393,31 @@ export interface RGBA8Image {
     data: Uint8Array | Uint8ClampedArray;
 }
 
+export type SHCoefficients = readonly (readonly [number, number, number])[] | ArrayLike<number>;
+
+export class SHLight extends ShaderEffect {
+    static attach(engine: EngineKernel, options?: SHLightOptions): SHLight;
+    constructor(options?: SHLightOptions);
+    get coefficients(): Float32Array;
+    set coefficients(value: SHCoefficients);
+    get intensity(): number;
+    set intensity(value: number);
+    irradiance(normal: readonly [number, number, number]): [number, number, number];
+    protected get device(): GPUDevice | undefined;
+    protected entries(): GPUBindGroupEntry[];
+    protected patch(source: string, group: number): string;
+    protected hooks(group: number): PBRHooks;
+    setup(engine: EngineKernel): void;
+    onDeviceRestored(engine: EngineKernel): void;
+    dispose(): void;
+}
+
+export interface SHLightOptions {
+    coefficients?: SHCoefficients;
+    intensity?: number;
+    name?: string;
+}
+
 export const SH_BASIS: readonly [0.282094792, 0.488602512, 0.488602512, 0.488602512, 1.092548431, 1.092548431, 0.315391565, 1.092548431, 0.546274215];
 
 export const SH_IRRADIANCE_BANDS: readonly [1, number, number, number, 0.25, 0.25, 0.25, 0.25, 0.25];

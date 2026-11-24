@@ -40,6 +40,22 @@ const builtIn = /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?|\*skyAmbient\.rg
   zeroed = /(i\.color\*\(1\.0-i\.material\.y\)|base)\*0\.0(?:\*frame\.ambient\.rgb)?/;
 
 /**
+ * Puts `declarations` (which define `margoSkyLight(n)`) in place of the built-in ambient of a core-family shader: the
+ * frame's ambient term, or a light probe's fallback copy of it; else, when an IBL-style effect zeroed it, the term joins
+ * its light. Shared by every light that owns the ambient slot (hemisphere, ambient, SH); a second one throws.
+ */
+export function patchAmbient(name: string, source: string, declarations: string): string {
+  if (source.includes('fn margoSkyLight('))
+    throw new MargoError(
+      'attached',
+      `${name}: an ambient light (HemisphereLight, AmbientLight or SHLight) already lights this shader; use one per engine`,
+    );
+  let code = source.replace(builtIn, `*${HEMISPHERE_TERM}`);
+  if (code === source) code = source.replace(zeroed, `$1*${HEMISPHERE_TERM}`);
+  return code === source ? source : declarations + code;
+}
+
+/**
  * Hemisphere light: ambient light of `sky` colour from above and `ground` colour from below,
  * blended by `0.5 + 0.5 n.y` and scaled by `intensity`. `engine.use(light)` lights core meshes and terrain and owns the
  * GPU uniform; `light.add(model)` adds gltf/pbr models, materials meshes and VAT crowds. It replaces the built-in
@@ -117,16 +133,7 @@ export class HemisphereLight extends ShaderEffect {
     return this.entry!;
   }
   protected patch(source: string, group: number): string {
-    if (source.includes('fn margoSkyLight('))
-      throw new MargoError(
-        'attached',
-        `${this.name}: a hemisphere light already lights this shader; use one per engine`,
-      );
-    // The built-in ambient wherever it is (the frame's ambient term, or a light probe's fallback copy of it); else, when an
-    // IBL-style effect zeroed it, the hemisphere joins its light.
-    let code = source.replace(builtIn, `*${HEMISPHERE_TERM}`);
-    if (code === source) code = source.replace(zeroed, `$1*${HEMISPHERE_TERM}`);
-    return code === source ? source : wgsl(group) + code;
+    return patchAmbient(this.name, source, wgsl(group));
   }
   protected hooks(group: number): PBRHooks {
     return { declarations: wgsl(group), sky: 'margoSkyLight(n)' };

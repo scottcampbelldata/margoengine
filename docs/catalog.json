@@ -1173,6 +1173,7 @@
       "IBL_BINDING",
       "IBL_WGSL",
       "ImageBackground",
+      "SHLight",
       "SH_BASIS",
       "SH_IRRADIANCE_BANDS",
       "Skybox",

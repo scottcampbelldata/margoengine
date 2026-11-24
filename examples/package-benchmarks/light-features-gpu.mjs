@@ -9,7 +9,9 @@
 //    localShadowMatrix gives (test/projector-reference.js), bilinear;
 // 5. hemisphere gradient (@margoengine/environment HemisphereLight): a Lambert sphere and a core box lit by it alone,
 //    base x mix(ground, sky, 0.5 + 0.5 n.y) from the analytic sphere normal and the box's face normals;
-// 6. units (@margoengine/clustered/units): an 800 lm spot's centre pixel at base/pi x candelaToLux(lumensToCandela(...)).
+// 6. units (@margoengine/clustered/units): an 800 lm spot's centre pixel at base/pi x candelaToLux(lumensToCandela(...));
+// 7. SH light probe (@margoengine/environment SHLight): the sphere and box lit by nine RGB coefficients alone,
+//    base x SHLight.irradiance(n).
 // Writes results/light-features-gpu.json and the frames to test-results/light-features-*.png.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -20,6 +22,7 @@ import { parseIES, iesCandela } from '../../packages/clustered/dist/ies.js';
 import { lumensToCandela, candelaToLux, exposureFromEV100 } from '../../packages/clustered/dist/units.js';
 import { iesFile, range } from '../../packages/clustered/test/ies-reference.js';
 import { projectorColor, image } from '../../packages/clustered/test/projector-reference.js';
+import { SHLight } from '../../packages/environment/dist/index.js';
 
 const base = 0.6,
   tolerance = 3;
@@ -242,6 +245,31 @@ try {
         b = cube(ray),
         hit = a && (!b || a.t < b.t) ? a : b;
       return hit && !hit.edge ? hemi(hit.n) : null;
+    },
+    40,
+  );
+  // 7. SH light probe: the same sphere and box lit by nine RGB coefficients alone (the parity scene's sky), against
+  // base x SHLight.irradiance(n), the Ramamoorthi-Hanrahan irradiance the CPU tests check against the cosine integral.
+  const coefficients = [
+      [0.6, 0.65, 0.8],
+      [0.1, 0.15, 0.3],
+      [0.2, 0.2, 0.18],
+      [0.15, 0.05, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0.05, 0.05, 0.08],
+      [0, 0, 0],
+      [0, 0, 0],
+    ],
+    probe = new SHLight({ coefficients, intensity: 1.5 });
+  await compare(
+    'sh',
+    { objects: 'shapes', sh: { coefficients, intensity: 1.5 } },
+    (ray) => {
+      const a = sphere(ray),
+        b = cube(ray),
+        hit = a && (!b || a.t < b.t) ? a : b;
+      return hit && !hit.edge ? probe.irradiance(hit.n).map((v) => base * v) : null;
     },
     40,
   );

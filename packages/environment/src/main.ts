@@ -45,3 +45,4 @@ export {
   type HemisphereLightOptions,
   type AmbientLightOptions,
 } from './hemisphere.js';
+export { SHLight, type SHLightOptions, type SHCoefficients } from './sh-light.js';
