@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17668746,
+  "total": 17680100,
   "history": [
     {
       "date": "2026-10-24",
@@ -11481,6 +11481,12 @@
       "commit": "3c5e4de0b6",
       "reason": "new @margoengine/environment/main entry (KB-REACT-ENVDECODERS1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "e505d78a5",
+      "reason": "physics/soft: cell plasticity cap, edge plasticity, reset, tear force, smoothing, interior strength, per-step tear limit and minimum piece, volume cells, damping ratios: entry 45,106 to 49,268 B gzip budget (base 12,869 to 13,862, kernel blueprint 31,370 to 34,634); the edge and body tear logic must sit with the cells' pass so tears are chosen most-loaded first across both",
+      "grew": 3
     }
   ],
   "items": {
@@ -12241,9 +12247,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 45106,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 12869,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 31370,
+    "@margoengine/physics/soft": 50747,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 14278,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 35674,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
