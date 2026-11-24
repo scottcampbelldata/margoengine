@@ -40,13 +40,25 @@ const kinds = [
   ['ray all', (w, o) => w.raycastAll([0, 0, 0], [1, 0, 0], { maxDistance: 20, ...o }), (r) => r.length],
   [
     'shape cast',
-    (w, o) => w.shapeCast({ shape: 'sphere', radius: 0.25 }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0], { maxDistance: 20, ...o }),
+    (w, o) =>
+      w.shapeCast({ shape: 'sphere', radius: 0.25 }, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0], { maxDistance: 20, ...o }),
     (r) => !!r,
   ],
   ['project point', (w, o) => w.projectPoint([8, 0, 0], o), (r) => !!r && r.point[0] < 6],
   ['intersect point', (w, o) => w.intersectPoint([5, 0, 0], o), (r) => r.length],
-  ['intersect shape', (w, o) => w.intersectShape({ shape: 'sphere', radius: 0.4 }, [5, 0, 0], undefined, o), (r) => r.length],
-  ['intersect box', (w, o) => (w.intersectAabb ? w.intersectAabb([4, -1, -1], [6, 1, 1], o) : w.intersectShape({ shape: 'box', halfExtents: [1, 1, 1] }, [5, 0, 0], undefined, o)), (r) => r.length],
+  [
+    'intersect shape',
+    (w, o) => w.intersectShape({ shape: 'sphere', radius: 0.4 }, [5, 0, 0], undefined, o),
+    (r) => r.length,
+  ],
+  [
+    'intersect box',
+    (w, o) =>
+      w.intersectAabb
+        ? w.intersectAabb([4, -1, -1], [6, 1, 1], o)
+        : w.intersectShape({ shape: 'box', halfExtents: [1, 1, 1] }, [5, 0, 0], undefined, o),
+    (r) => r.length,
+  ],
 ];
 for (const [name, query, seen] of kinds) {
   test(`a ${name} query without groups sees a collider whose filter is 0, and with groups does not, as Rapier's`, () => {

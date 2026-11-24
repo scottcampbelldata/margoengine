@@ -276,6 +276,7 @@ export interface DebugRenderOptions {
     joints?: boolean;
     contacts?: boolean;
     boxes?: boolean;
+    filter?: QueryFilter;
 }
 
 export interface Hit {
@@ -447,7 +448,7 @@ export class KernelWorld {
     firstPair(collider: number): number;
     nextPair(row: number, collider: number): number;
     contacts(): KernelContact[];
-    set contactFilter(filter: ((a: number, b: number) => boolean) | null);
+    set contactFilter(filter: ((a: number, b: number) => boolean | 'noForces') | null);
     get eventCount(): number;
     clearEvents(): void;
     setColliderState(collider: number, state: number): void;
@@ -950,7 +951,7 @@ export interface PhysicsOptions {
     iterations?: number;
     solverIterations?: number;
     name?: string;
-    contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+    contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean | 'noForces';
     intersectionFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
     contactModifier?: (contact: ContactModification) => void;
     predictionDistance?: number;

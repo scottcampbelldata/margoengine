@@ -643,13 +643,14 @@ impl World {
             let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
             // Pairs of the kinds a collider leaves out pass through each other, and by default so do scripted bodies:
             // nothing can push them. A sensor still sees them.
-            if !sensor && !self.types_allow(a, b, body_a, body_b) || !self.may_touch(a, b, body_a, body_b) {
+            let verdict = if !sensor && !self.types_allow(a, b, body_a, body_b) { crate::events::PAIR_SKIP } else { self.touch_verdict(a, b, body_a, body_b) };
+            if verdict == crate::events::PAIR_SKIP {
                 self.set_u(PAIR_FLAGS, row, flags);
                 self.drop_contacts(row, body_a, body_b);
                 continue;
             }
             // A pair nothing solves needs to know only that it overlaps.
-            if sensor || !groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b)) {
+            if sensor || verdict == crate::events::PAIR_EVENTS_ONLY || !groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b)) {
                 manifold.held_count = 0;
                 manifold.feature = 0;
                 let overlaps = if compound {

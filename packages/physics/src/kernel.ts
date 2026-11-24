@@ -646,7 +646,7 @@ export class KernelWorld {
   private readonly api: KernelExports;
   private layout = -1;
   private stepping = false;
-  private filter: ((a: number, b: number) => boolean) | null = null;
+  private filter: ((a: number, b: number) => boolean | 'noForces') | null = null;
   private hullRows = 0;
   private meshRows = 0;
   /** Sleepers whose kind changed: they wake before the next step, as Rapier's do. */
@@ -686,7 +686,8 @@ export class KernelWorld {
   /** The step asks about a pair. Finding pairs can have grown the world, and a filter may read the columns. */
   private ask(a: number, b: number): number {
     if (this.api.world_layout() !== this.layout) this.bind();
-    return this.filter!(a, b) ? 1 : 0;
+    const answer = this.filter!(a, b);
+    return answer === 'noForces' ? 2 : answer ? 1 : 0;
   }
 
   private bind(): void {
@@ -769,10 +770,11 @@ export class KernelWorld {
     return out;
   }
   /**
-   * Decides each pair of collider rows the step looks at; false keeps them from touching, sensor pairs too. It runs inside
+   * Decides each pair of collider rows the step looks at; false keeps them from touching, sensor pairs too, and 'noForces'
+   * finds their contacts and fires their events but pushes nothing, as Rapier's hook answering with no solver flags. It runs inside
    * the step, so it may read the world and must not change it. Null, the default, asks nothing.
    */
-  set contactFilter(filter: ((a: number, b: number) => boolean) | null) {
+  set contactFilter(filter: ((a: number, b: number) => boolean | 'noForces') | null) {
     this.filter = filter;
     this.api.world_set_filtering(filter ? 1 : 0);
   }

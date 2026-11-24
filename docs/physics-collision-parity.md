@@ -1,12 +1,12 @@
 # Physics collision and query parity
 
-What Margo's own 3D collision kernel (`packages/physics/kernel`, shipped as `@margoengine/physics/next`) holds against
+What Margo's own 3D collision kernel (`packages/physics/kernel`, the root entry of `@margoengine/physics`) holds against
 what Rapier 3D offers. The list of Rapier capabilities comes from Rapier's public user guide and JavaScript API
 documentation (rapier.rs, "Colliders", "Scene queries", "Contact and intersection events", "Physics hooks", "Continuous
 collision detection", "Geometric queries"); no source of Rapier, parry or any other engine was read. A row is **full**
 only when a test proves it, **partial** when part of it is held, **missing** when none of it is. Partial counts as a gap.
-The root entry (`@margoengine/physics`) still runs on Rapier, so "root" below means that entry's current option, which the
-switch must keep.
+The root entry runs on the own kernel; "root" below means an option the entry already had before the switch, which the
+switch kept.
 
 Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `packages/physics/tests` (JS) and
 `packages/physics/kernel/tests` (Rust).
@@ -114,5 +114,24 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Contact detail: friction, restitution, per-point normal and tangent impulses | full | `contactPair` | `tests/next-collider-api.test.js` |
 | Contact force event totals: total force, maximum force and its direction | full | `totalForce`, `maxForceMagnitude`, `maxForceDirection`; the solver's last substep scaled to the step | `tests/next-collider-api.test.js` |
 | Iterate every collider | full | `getColliders()` | `tests/next-collider-api.test.js` |
+| Pair filter answers: skip the pair, solve it, or find its contacts and fire its events with no forces (a hook answering with no solver flags) | full | `contactFilter` returns `false`, `true` or `'noForces'`; Rapier's hook agrees on the same scene | `tests/next-pair-no-forces.test.js` |
+| Query filter with no groups applies no group test | full | `groups` left out means every collider is seen, even one whose filter is 0 | `tests/next-query-no-groups.test.js`, `kernel/tests/query.rs` |
+| Debug render filtered by query flags, groups and a predicate | full | `debugRender({filter})`: colliders, their contacts and the joints between shown bodies | `tests/next-debug-filter.test.js` |
+
+## Soft bodies (Rapier's Soft-bodies guide page)
+
+None of this page is built: ropes are rigid link chains (`Rope`), not soft bodies. Each row below is in progress as its own piece of work; the deformable-collider row needs this kernel's mesh refit and contacts against vertices that move each step.
+
+| Capability | Status | Notes | Tests |
+| --- | --- | --- | --- |
+| Builders: rope, cloth (and anisotropic, tube), grid, cuboid, polygon, disk, sphere, trimesh, polyline, volumetric | missing, in progress | `SoftBodyDesc` constructors | |
+| Lattice elements: edges, bend edges, dihedrals, cells, surface, wire, skin; merging builders | missing, in progress | `setEdges`, `setCells`, `append` and the rest | |
+| Builder settings: pinned particles, softness, masses, particle radius, surface collider, self contacts, damping, gravity scale, dominance, sleep | missing, in progress | `setPinnedParticles`, `setSoftness`, `setParticleMass` and the rest | |
+| Materials and plasticity: shape matching, bend, edge and volume softness, Young modulus, Poisson ratio, damping, plastic yield, creep and flow | missing, in progress | `SoftBodyMaterial` | |
+| Tearing and cutting: edge and cell tears, tear events, splitting into pieces | missing, in progress | `tearEdge`, `tearCell`, `tearSoftBody`, `cutSoftBody` | |
+| Solvers and cell models: constraints solver, finite elements, volume, corotational and neo-Hookean cells; recovery settings | missing, in progress | `SoftBodySolver`, `SoftBodyCellModel` | |
+| Clusters and root frames: frame bodies, stiffness scales, pinning, kinematic targets, spring joints | missing, in progress | `addSoftBodyCluster` and the cluster setters | |
+| Particle API: positions, velocities, pin, kinematic target, attach and detach, forces and impulses (radial too) | missing, in progress | `particlePosition`, `applyParticleImpulse` and the rest | |
+| Skinning and deformable colliders: a collider whose vertices move each step (`TriMeshFlags.DEFORMABLE`, `PolylineFlags.DEFORMABLE`), mesh bindings (skinned, direct) | missing, in progress | `createDeformableCollider`, `SoftMeshBinding`; needs the narrow phase to refit a mesh and meet moving vertices each step | |
 
 This table is updated as each gap lands; the end state is every row full. A test named `next-x` is `packages/physics/tests/next-x.test.js`, one named `kernel/tests/x.rs` is in `packages/physics/kernel/tests`.

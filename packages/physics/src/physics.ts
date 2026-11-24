@@ -78,8 +78,12 @@ export interface PhysicsOptions {
   solverIterations?: number;
   /** Plugin name (default 'physics'). */
   name?: string;
-  /** Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet. */
-  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+  /**
+   * Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet,
+   * true solves them, and `'noForces'` (Rapier's hook answering with no solver flags) finds their contacts and fires their
+   * events but pushes nothing.
+   */
+  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean | 'noForces';
   /**
    * Decides each candidate pair with a sensor in it, as Rapier's `filterIntersectionPair`: false lets them pass and keeps their
    * intersection events quiet. Left out, `contactFilter` decides those pairs too. A collider can leave a hook out with

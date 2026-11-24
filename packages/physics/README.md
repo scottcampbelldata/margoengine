@@ -154,7 +154,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 - **Disposed meshes.** A body whose mesh was disposed is removed at the next sync.
 - **Colliders.** Boxes and spheres without a size, and convex hulls and trimeshes without points, are fitted to static mesh geometry (core `Geometry` interleaves position and normal, stride 6; raw arrays are packed xyz). A geometry-free root fits its static descendants, while a node with its own geometry uses that node. Scale is captured at collider creation. A mesh body without a `colliders` option gets one fitted box; an unsuccessful fit removes the new body and any colliders already created.
 - **Events.** Every collider emits collision events unless `events: false`. After each step the queue is drained and dispatched as `contactstart` and `contactend` (solid pairs) or `intersectionstart` and `intersectionend` (pairs with a sensor), with both bodies, both meshes and both colliders. Sensors also see kinematic and fixed bodies, so a character controller walking into a trigger fires it.
-- **Contact filter.** `contactFilter(a, b)` is asked for every candidate pair; returning false makes the pair pass through each other and suppresses its sensor events.
+- **Contact filter.** `contactFilter(a, b)` is asked for every candidate pair; returning false makes the pair pass through each other and suppresses its sensor events, and returning `'noForces'` (Rapier's hook answering with no solver flags) finds the pair's contacts and fires its events but pushes nothing.
 - **Debug drawing.** There is no built-in debug pass. `physics.debugRender()` returns line buffers (boxes, spheres, capsules, cylinders and cones as themselves, every other shape as the box around it), which `@margoengine/lines` draws directly: `lines.add(new Line({mode: 'segments', positions: vertices, colors, width: 1}))`, updated each frame with `setPositions` and `setColors`.
 - **Lifecycle.** `dispose()` (or `engine.removePlugin('physics')` or `engine.dispose()`) removes every character controller, joint, collider and body, then the world. Handles become invalid (`body.valid === false`) and methods on them throw.
 - **SSR safety.** Nothing touches `window`, `document`, `navigator` or GPU globals at import or construction time. `new Physics(null)` runs headless, for servers, workers and tests; call `physics.update(delta)` yourself.
@@ -187,7 +187,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | `timeScale` | `1` | Slow motion or fast forward |
 | `paused` | `false` | Paused worlds keep their meshes but do not step |
 | `substeps` | `8` | Equal pieces each step is split into; more is stiffer stacks and joints. `iterations` (default 2) are the solver passes in each. `physics.substeps` reads and sets it later (`solverIterations` is its old name); `body.additionalSolverIterations` (default 0) adds passes for that body's island alone |
-| `contactFilter` | none | `(a, b) => boolean` per candidate pair |
+| `contactFilter` | none | `(a, b) => boolean \| 'noForces'` per candidate pair |
 | `name` | `'physics'` | Plugin name, for more than one world per engine |
 
 `physics.addBody(mesh | null, options)`: `type` (`'dynamic'`, `'fixed'`, `'kinematicPosition'`, `'kinematicVelocity'`), `position`, `rotation` (quaternion; both default to the mesh), `colliders` (one or an array; `[]` for none), `linearVelocity`, `angularVelocity`, `linearDamping`, `angularDamping`, `gravityScale`, `ccd`, `canSleep`, `sleeping`, `lockRotations`, `lockTranslations`, `enabledRotations`, `enabledTranslations`, `additionalMass`, `dominance`, `follow`, `userData`.
@@ -599,6 +599,20 @@ ball.enabled = false;
 physics.dispose();
 ```
 
+A `contactFilter` may also answer `'noForces'`: the pair's contacts are found and its `contactstart` and `contactend` events fire, but nothing pushes (Rapier's `filterContactPair` answering with no solver flags). `false` still lets the pair pass through with no events, and `true` solves it.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null, {contactFilter: (a, b) => (a.userData === 'ghost' || b.userData === 'ghost' ? 'noForces' : true)});
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [5, 0.5, 5]}});
+const ghost = physics.addBody(null, {position: [0, 2, 0], userData: 'ghost', colliders: {shape: 'sphere', radius: 0.5}});
+physics.on('contactstart', () => console.log('touched, no force'));
+for (let i = 0; i < 120; i++) physics.step(); // the ghost sinks through the floor and logs once
+console.log(ghost.position[1] < -1);
+```
+
 A `contactModifier` in the `Physics` options is a contact modification hook: it is called, each step, for every touching pair that has a collider with `modifyContacts: true`, after the pair's friction and bounce are set and before it is solved. It may change `contact.friction`, `contact.restitution` and `contact.normal` (world space, from `contact.first` to `contact.second`), call `contact.clear()` to drop the pair's contacts for the step, set `contact.surfaceVelocity` (world space, a conveyor: friction brings the sliding of the second collider's surface against the first's to it, for this step), or `contact.oneWay(platform, direction, angle)` to keep only the contacts whose normal, taken from the platform to the other collider, is within `angle` (a quarter turn by default) of `direction`. The object is reused: do not keep it. Rapier's JavaScript has no such hook, so the root entry refuses `modifyContacts`. `contactFilter` (above) remains the pair filter for contacts and intersections.
 
 ```ts
@@ -879,7 +893,7 @@ physics.dispose();
 
 ### Debug lines
 
-`physics.debugRender(options)` returns debug-render data: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the outlines of every collider (all shapes, a compound by its parts, a mesh by its edges, a voxel grid by its box), a line across each joint with a line from each anchor to its body (dark red once broken), and each contact point of the last step with a short line along its normal. `boxes: true` adds the world box of each collider; `colliders`, `joints` and `contacts` switch their lines off. Colours: green awake dynamic bodies, grey fixed, blue kinematic, dim green sleeping, yellow sensors, red joints, magenta contacts, translucent cyan boxes. Draw them with `@margoengine/lines`.
+`physics.debugRender(options)` returns debug-render data: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the outlines of every collider (all shapes, a compound by its parts, a mesh by its edges, a voxel grid by its box), a line across each joint with a line from each anchor to its body (dark red once broken), and each contact point of the last step with a short line along its normal. `boxes: true` adds the world box of each collider; `colliders`, `joints` and `contacts` switch their lines off; `filter` takes a query filter (kind and sensor flags, `exclude`, `groups`, `predicate`) and draws only the colliders it sees, their contacts, and the joints between bodies that are shown. Colours: green awake dynamic bodies, grey fixed, blue kinematic, dim green sleeping, yellow sensors, red joints, magenta contacts, translucent cyan boxes. Draw them with `@margoengine/lines`.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -970,7 +984,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.
 - Debug drawing is a line buffer from `debugRender()` for `@margoengine/lines`, not a renderer.
-- Not in the solver: multibody joints, PID controllers, soft bodies and cloth. The kernel's snapshots (`physics.kernel.snapshot()`) cover serialization.
+- Not built: soft bodies and cloth (Rapier's Soft-bodies page: builders, materials, tearing, finite elements, deformable colliders), see [docs/physics-collision-parity.md](../../docs/physics-collision-parity.md). Multibody joints, PID controllers and snapshots are built (see Parity with Rapier 3D).
 - Ropes are rigid links, not soft bodies: a rope of many segments costs one body and one joint per segment.
 - A `convexDecomposition` collider takes the result of `convexDecomposition` from `@margoengine/physics/decomposition`, not a bare mesh.
 - The character controller, the vehicle and the rope are helpers written over the world with `Math.sin` and `Math.cos` for steering and slope maths; the world itself (the kernel and the TypeScript of a step) uses none, so a replay is the same bit for bit in every browser as long as no helper is in the scene.

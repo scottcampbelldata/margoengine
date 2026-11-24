@@ -13,6 +13,11 @@ unsafe extern "C" {
     fn contact_modify(row: u32);
 }
 
+/// What a pair's filter may answer: leave it out, solve it, or find its contacts and fire its events without forces.
+pub const PAIR_SKIP: u32 = 0;
+pub const PAIR_SOLVE: u32 = 1;
+pub const PAIR_EVENTS_ONLY: u32 = 2;
+
 /// True when two packed groups meet: each one's memberships, the high 16 bits, are in the other's filter, the low 16.
 #[inline(always)]
 pub fn groups_meet(a: u32, b: u32) -> bool {
@@ -56,14 +61,29 @@ impl World {
         fa & off == 0 || fb & off == 0
     }
 
-    /// The filter comes last, as it leaves Wasm.
+    /// What may become of a pair: `PAIR_SKIP` (neither side is off, the groups meet, no joint keeps them apart and the filter
+    /// agrees fail one of those), `PAIR_SOLVE` (it may touch and its contacts are solved) or `PAIR_EVENTS_ONLY` (it may touch,
+    /// its contacts are found and its events fire, but nothing pushes: the filter answered 2, as Rapier's hook answering
+    /// with no solver flags). The filter comes last, as it leaves Wasm.
     #[inline]
-    pub fn may_touch(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> bool {
-        (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_OFF == 0
+    pub fn touch_verdict(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> u32 {
+        let base = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_OFF == 0
             && (self.flags(body_a) | self.flags(body_b)) & DISABLED == 0
             && groups_meet(self.uu(COLLIDER_GROUPS, a), self.uu(COLLIDER_GROUPS, b))
-            && !self.joined(body_a, body_b)
-            && (self.header().filtering == 0 || !self.asks_filter(a, b) || self.filter_says(a as u32, b as u32))
+            && !self.joined(body_a, body_b);
+        if !base {
+            return PAIR_SKIP;
+        }
+        if self.header().filtering == 0 || !self.asks_filter(a, b) {
+            return PAIR_SOLVE;
+        }
+        self.filter_says(a as u32, b as u32)
+    }
+
+    /// Whether a pair may touch at all, solved or not.
+    #[inline]
+    pub fn may_touch(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> bool {
+        self.touch_verdict(a, b, body_a, body_b) != PAIR_SKIP
     }
 
     /// Shows a pair to the contact modifier, which may change its friction, bounce and normal in the pair's columns, or clear
@@ -81,12 +101,15 @@ impl World {
 
     #[cfg(target_arch = "wasm32")]
     #[inline(always)]
-    fn filter_says(&self, a: u32, b: u32) -> bool {
-        unsafe { contact_filter(a, b) != 0 }
+    fn filter_says(&self, a: u32, b: u32) -> u32 {
+        unsafe { contact_filter(a, b).min(PAIR_EVENTS_ONLY) }
     }
     #[cfg(not(target_arch = "wasm32"))]
-    fn filter_says(&self, a: u32, b: u32) -> bool {
-        self.filter.is_none_or(|filter| filter(a, b))
+    fn filter_says(&self, a: u32, b: u32) -> u32 {
+        match self.filter {
+            Some(filter) if !filter(a, b) => PAIR_SKIP,
+            _ => PAIR_SOLVE,
+        }
     }
 
     /// Lists an event: two words, the first collider with what happened in its top bits, then the second. The list holds two

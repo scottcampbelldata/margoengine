@@ -42,7 +42,7 @@ export interface PhysicsOptions {
   /** Solver iterations per step (Rapier default 4). */
   solverIterations?: number;
   /** Return false to make a pair of bodies pass through each other (and suppress sensor events). Runs for every candidate pair, so keep it cheap. */
-  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean | 'noForces';
   /** Plugin name (default 'physics'). */
   name?: string;
 }
@@ -282,8 +282,14 @@ export class Physics implements EnginePlugin, BodyOwner {
           b = this.byHandle.get(h2)?.body;
         return !a || !b || filter(a, b) !== false;
       };
+      const solves = (h1: number, h2: number): number | null => {
+        const a = this.byHandle.get(h1)?.body,
+          b = this.byHandle.get(h2)?.body,
+          verdict = a && b ? filter(a, b) : true;
+        return verdict === false ? null : verdict === 'noForces' ? 0 : R.SolverFlags.COMPUTE_IMPULSE;
+      };
       this.hooks = {
-        filterContactPair: (h1: number, h2: number) => (allow(h1, h2) ? R.SolverFlags.COMPUTE_IMPULSE : null),
+        filterContactPair: solves,
         filterIntersectionPair: allow,
       };
     }

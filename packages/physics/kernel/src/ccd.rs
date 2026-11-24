@@ -199,7 +199,7 @@ impl World {
                     let mut c = self.uu(FIRST_COLLIDER, at);
                     while c != NONE {
                         let own = c as usize;
-                        if self.uu(COLLIDER_FLAGS, own) & (COLLIDER_SENSOR | COLLIDER_OFF) == 0 && self.solid_pair(own, o) && self.may_touch(own, o, at, body) {
+                        if self.uu(COLLIDER_FLAGS, own) & (COLLIDER_SENSOR | COLLIDER_OFF) == 0 && self.solid_pair(own, o) && self.touch_verdict(own, o, at, body) == crate::events::PAIR_SOLVE {
                             self.each_piece(own, &mut |piece| {
                                 let t = self.sweep_piece(piece, mine, o, &theirs, first);
                                 if t < first {

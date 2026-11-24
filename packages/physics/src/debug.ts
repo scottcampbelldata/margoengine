@@ -3,6 +3,8 @@
 import type { KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsJoint } from './joints.js';
+import type { PhysicsCollider } from './collider.js';
+import type { QueryFilter } from './physics.js';
 
 /** What {@link Physics.debugRender} draws. */
 export interface DebugRenderOptions {
@@ -14,6 +16,13 @@ export interface DebugRenderOptions {
   contacts?: boolean;
   /** The world-space box around each collider (default false). */
   boxes?: boolean;
+  /**
+   * Draw only the colliders a query with this filter would see, as Rapier's debug render filters by query flags and a
+   * predicate: the kind, sensor and `exclude` options, `groups` (when given, tested both ways) and `predicate`. Joints are
+   * drawn when both bodies are shown (a body is shown when one of its colliders is, or it has none), contacts when both
+   * colliders are.
+   */
+  filter?: QueryFilter;
 }
 
 /** Line segments: `vertices` hold x, y, z, two vertices a segment, and `colors` hold r, g, b, a for each vertex. */
@@ -44,6 +53,11 @@ const COS = [
     -0.5, -0.7071068, -0.8660254, -0.9659258, -1, -0.9659258, -0.8660254, -0.7071068, -0.5, -0.258819,
   ],
   NONE = 0xffffffff;
+
+/** Packed groups meet when each one's memberships (high 16 bits) are in the other's filter (low 16). */
+function groupsMeet(a: number, b: number): boolean {
+  return ((a >>> 16) & b) !== 0 && ((b >>> 16) & a) !== 0;
+}
 
 function rotate(q: Q, v: V): V {
   const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
@@ -110,9 +124,45 @@ export function debugLines(
   joints: Iterable<PhysicsJoint>,
   options: DebugRenderOptions = {},
 ): DebugLines {
-  const { colliders = true, joints: drawJoints = true, contacts = true, boxes = false } = options,
+  const { colliders = true, joints: drawJoints = true, contacts = true, boxes = false, filter } = options,
     out = new Lines(),
-    c = world.columns;
+    c = world.columns,
+    list = [...bodies],
+    seen = new Set<number>(),
+    shown = new Set<PhysicsBody>();
+  const sees = (body: PhysicsBody, collider: PhysicsCollider): boolean => {
+    if (!filter) return true;
+    const sensor = collider.isSensor(),
+      type = body.type,
+      kinematic = type !== 'dynamic' && type !== 'fixed',
+      only = filter.onlyDynamic || filter.onlyKinematic || filter.onlyFixed;
+    return !(
+      (filter.exclude && filter.exclude === body) ||
+      (filter.excludeCollider && filter.excludeCollider === collider) ||
+      (sensor && filter.excludeSensors) ||
+      (!sensor && filter.excludeSolids) ||
+      (type === 'fixed' && filter.excludeFixed) ||
+      (kinematic && filter.excludeKinematic) ||
+      (type === 'dynamic' && filter.excludeDynamic) ||
+      (only &&
+        !(
+          (type === 'dynamic' && filter.onlyDynamic) ||
+          (kinematic && filter.onlyKinematic) ||
+          (type === 'fixed' && filter.onlyFixed)
+        )) ||
+      (filter.groups !== undefined && !groupsMeet(filter.groups >>> 0, c.colliderGroups[collider.handle]!)) ||
+      (filter.predicate && !filter.predicate(body, collider))
+    );
+  };
+  for (const body of list) {
+    let any = body.colliders.length === 0;
+    for (const collider of body.colliders)
+      if (sees(body, collider)) {
+        seen.add(collider.handle);
+        any = true;
+      }
+    if (any) shown.add(body);
+  }
   const shape = (row: number, body: V, turn: Q, color: Color, local: boolean): void => {
     const lp: V = [c.colliderX[row]!, c.colliderY[row]!, c.colliderZ[row]!],
       lq: Q = [
@@ -253,7 +303,6 @@ export function debugLines(
       r = rotate(q, local);
     return [p[0] + r[0], p[1] + r[1], p[2] + r[2]];
   };
-  const list = [...bodies];
   if (colliders || boxes)
     for (const body of list) {
       const { p, q } = bodyPose(body),
@@ -267,6 +316,7 @@ export function debugLines(
                 : KINEMATIC;
       for (const collider of body.colliders) {
         const row = collider.handle;
+        if (!seen.has(row)) continue;
         if (colliders) {
           const tint = c.colliderFlags[row]! & 1 ? SENSOR : color;
           if (c.colliderShape[row] === 5) {
@@ -287,6 +337,7 @@ export function debugLines(
     }
   if (drawJoints)
     for (const joint of joints) {
+      if (!shown.has(joint.bodyA) || !shown.has(joint.bodyB)) continue;
       const a = worldAnchor(joint.bodyA, joint.anchorA),
         b = worldAnchor(joint.bodyB, joint.anchorB),
         color = joint.broken ? BROKEN : JOINT;
@@ -295,11 +346,13 @@ export function debugLines(
       out.segment(b, bodyPose(joint.bodyB).p, color);
     }
   if (contacts)
-    for (const manifold of world.contacts())
+    for (const manifold of world.contacts()) {
+      if (!seen.has(manifold.colliderA) || !seen.has(manifold.colliderB)) continue;
       for (const point of manifold.points) {
         const [x, y, z] = point.position,
           n = manifold.normal;
         out.segment([x, y, z], [x + n[0] * 0.1, y + n[1] * 0.1, z + n[2] * 0.1], CONTACT);
       }
+    }
   return out.finish();
 }
