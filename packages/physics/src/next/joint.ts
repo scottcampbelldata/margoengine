@@ -204,7 +204,7 @@ export class PhysicsJoint {
    */
   setRotationMotor(rotation: Quat, motor: RotationMotorOptions = {}): this {
     if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'spherical' && this.type !== 'cone') throw new TypeError('Rotation motors need a spherical or cone joint; use setMotor on a hinge.');
+    if (this.type !== 'spherical' && this.type !== 'cone') throw new TypeError('Rotation motors need a spherical joint or a cone joint; use setMotor on a hinge.');
     const [x, y, z, w] = rotation;
     const squared = x * x + y * y + z * z + w * w;
     if (!(squared > 0.998 && squared < 1.002))
