@@ -2051,6 +2051,10 @@
       "types": "./dist/humans/fit.d.ts",
       "import": "./dist/humans/fit.js"
     },
+    "./humans/wardrobe": {
+      "types": "./dist/humans/wardrobe.d.ts",
+      "import": "./dist/humans/wardrobe.js"
+    },
     "./ifc": {
       "types": "./dist/ifc.d.ts",
       "import": "./dist/ifc.js"

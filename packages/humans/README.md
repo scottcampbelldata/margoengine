@@ -265,3 +265,80 @@ person.hands?.right.set(grip(0.035), {blend: 0.3}); // a 35 mm rail, closed over
 
 `person.animation` and `person.animator` are the `@margoengine/animation` and `@margoengine/animator` objects, for
 layers, IK and look-at. A model with no clips gets no Animator.
+
+## Imported clothing and the Character Creator workflow
+
+Use `@margoengine/humans/wardrobe` for mesh construction and offline checks on clothing made in Blender or
+generated in Tripo. Existing procedural outfits use the [fit entry](#fit-outfits-to-a-rig). A finished GLB
+uses `addPerson` for playback in Margo.
+
+1. **Export a matching body.** In Character Creator, export the character as FBX for Blender in its
+   bind pose. Keep the same pose, skeleton and scale when bringing the garment back. Reallusion uses an
+   A-pose for imported clothes and a separate AI-cloth A-pose for its generator. If using an existing
+   CC garment as a template, keep its shoulder and elbow anatomy and adapt its shell in the same pose.
+2. **Construct the wearable shell in Blender.** Separate generated garments. Inspect each expected neck,
+   cuff, waist or hem opening. Remove the cap or joined faces, then retopologize around the opening and
+   joints. On a damaged generated sleeve, cut back to a clean seam and rebuild to the wrist.
+   Model a small inward fold at the edge, and maintain clear space for the layers beneath.
+   Use the source garment as the reference for silhouette, seams and cloth textures.
+3. **Bind and calibrate.** Import the Blender mesh as an accessory in CC and use Transfer Skin Weights.
+   Use the arm layer to isolate sleeve weights from the trunk. Inspect weight errors in the Calibrate
+   poses and refine the garment and weights. When binding in Blender, transfer from the same CC rig
+   and check it through elbow flexion, forearm twist and shoulder elevation. Measure both along the
+   forearm and across it. Check both wrists before trimming permanently covered skin.
+4. **Check the actual moving layers.** Sample the body and the worn garments in the walking, lifting
+   or talking takes. If an apron or coat panel needs drape, use a pinned single-surface Blender cloth
+   proxy and transfer it to the render mesh. Test the resulting outer mesh against the posed inner
+   layers. A vertex-only clearance sample can miss intersections between triangles. Use sufficiently
+   dense geometry and review the fabric silhouette throughout motion.
+5. **Export and inspect in Margo.** Export animation, skin and any baked shape keys into the GLB.
+   When matching a GLB authored with linear blend skinning, use
+   `addPerson(engine, model, { skinning: 'linear' })`. View the actual takes from the front, side and rear.
+   Check the wrist position and hand opening, the elbow and underarm, and the lower garment during a
+   full stride or bend.
+
+For new Tripo assets, generate one garment at a time from consistent front, side and back views.
+Show the sleeves clear of the torso and use the same pose and scale in every image. Inspect
+the resulting openings before fitting. [Tripo image-to-3D guide](https://www.tripo3d.ai/help/features/how-to-get-better-image-to-3d-results).
+
+If a Character Creator step fails, first check the current manual and search the
+[Reallusion forums](https://discussions.reallusion.com/) for the CC version and the exact symptom.
+Check the documented bind pose, garment type and transfer preset before changing the mesh or rig.
+
+Reallusion sources. [Custom clothes and binding](https://manual.reallusion.com/Temp/CC5.2_Only/Content/ENU/5.0/08_Cloth/Creating_Custom_Clothes_OBJ.htm),
+[opening AI clothing](https://manual.reallusion.com/Temp/CC5.2_Only/Content/ENU/5.2/08-AI-Mesh-Gen/Opening-AI-Generated-Clothing.htm),
+[arm-layer transfer](https://manual.reallusion.com/Character-Creator-5/Content/ENU/5.0/08-Creating-Custom-Assets/Arms-Layer-for-Transferring-Skin-Weight.htm),
+and [modeling](https://wiki.reallusion.com/Content_Dev:CC_Clothing_Modeling_Guidelines).
+Production references include Waggoner and de Goes, 2022,
+[*Revamping the Cloth Tailoring Pipeline at Pixar*](https://research.pixar.com/docs/2022.SiggraphTalks.WG.pdf),
+and Abdrashitov et al., 2024,
+[*Robust Skin Weights Transfer via Weight Inpainting*](https://www.dgp.toronto.edu/~rinat/projects/RobustSkinWeightsTransfer/).
+Tripo's developers show the weight and collision tradeoffs in their
+[dress-up asset case study](https://developers.tripo3d.com/en/cookbook/ai-tailor-dressup-game).
+
+```ts
+import { buildSleeve, inspectGarment, measureCuff } from '@margoengine/humans/wardrobe';
+
+const sleeve = buildSleeve([
+  { centre: [0, 0, 0], radii: [.065, .060], forearm: 0 },
+  { centre: [0, 0, .22], radii: [.060, .054], forearm: .5 },
+  { centre: [0, 0, .45], radii: [.043, .037], forearm: 1 },
+], { thickness: .003, turnback: .012, upperJoint: 18, forearmJoint: 19 });
+
+const { openings } = inspectGarment(sleeve);
+const cuff = measureCuff(sleeve.positions, openings[1], [0, 0, .22], [0, 0, .45]);
+console.log(cuff.axialOffset, cuff.radialOffset);
+```
+
+| Function | Use |
+| --- | --- |
+| `inspectGarment(shell)` | Reports open rings, irregular boundaries, zero-area triangles, and nonmanifold or inconsistent edges in indexed triangles. Exact duplicate positions, such as UV splits, are joined for inspection. |
+| `measureCuff(positions, opening, elbow, wrist)` | Reports wrist alignment, depth and minimum ring radius in the input units. Use the exposed rim or account for the width of a turned lip when inspecting its inner boundary. |
+| `buildSleeve(stations, options)` | Builds a cuff and skin-weighted sleeve from bind-pose centres and radii. The first rim is ready to sew to the garment. Specify the upper and forearm joint indices in the receiving skin's joint palette. |
+| `clearGarmentLayer(positions, collider, options)` | Projects selected vertices about an axis to clear the farthest hit of the posed inner surface. A `MeshBVH` from `@margoengine/bvh/tree` supplies the collider. Use `limited` to check the allowed push and review the corrected silhouette. |
+
+The layer projection is suitable for tubular panels such as closed coats or skirt sections. It works on a
+single combined pose and leaves motion caching and solving to the authoring application. All coordinates
+and ease must use the same units, typically metres. The output positions are in the posed coordinate
+space. To bake as glTF morph targets, map their displacements back through the vertex skinning transform
+before writing the bind-space shape deltas.

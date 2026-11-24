@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21739020,
+  "total": 21741804,
   "history": [
     {
       "date": "2026-10-24",
@@ -15527,6 +15527,12 @@
       "commit": "lane-e-shrub-stems",
       "reason": "KB-SHRUB-TUNDRA1: shrub leaf blades and woody stems shared by the shrub and the tundra shrub (procedural/tree, which holds the shared foliage module, to 6,418 B).",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "76d178d998",
+      "reason": "Add the optional clothes authoring entry for cuff topology and posed layer clearance, 2528 bytes gzip, with no core or stage additions.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16047,6 +16053,7 @@
     "@margoengine/humans/cast": 15351,
     "@margoengine/humans/crowd": 1516,
     "@margoengine/humans/fit": 31398,
+    "@margoengine/humans/wardrobe": 2784,
     "@margoengine/ifc": 3434,
     "@margoengine/ifc dist/workers/ifc-stream.js": 4259,
     "@margoengine/ifc dist/workers/ifc.js": 4075,

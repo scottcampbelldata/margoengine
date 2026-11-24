@@ -48,6 +48,10 @@
     "./fit": {
       "types": "./dist/fit.d.ts",
       "import": "./dist/fit.js"
+    },
+    "./wardrobe": {
+      "types": "./dist/wardrobe.d.ts",
+      "import": "./dist/wardrobe.js"
     }
   },
   "files": [
