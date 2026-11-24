@@ -979,6 +979,15 @@ frictionless 1 : 10 beach to 0.89 m, under Shen and Meyer's U0^2 / 2g = 1.02 m (
 https://doi.org/10.1017/S0022112063000628), and the wetting record is never below the depth and dries only the cells the
 run-up left.
 
+Bared ground takes as long as the water needs to run off it. A plane of 1 m of water on a 1 in 1,000 slope (Manning n
+0.045) drains at 8 m cells to within 3 mm of the same plane at 2 m cells in the JavaScript reference (0.40 m left 200 m
+from its top after 800 s; 4 m and 2 m cells agree within 3 mm), so the cell size leaves no film behind. A drawback bares
+flats only when its trough lasts longer than the flats take to drain: roughly their width over the Manning speed
+h^(2/3) S^(1/2) / n (Chow 1959), about 1.8 m/s for 1.5 m of water on a 1 in 250 surface slope at n 0.045. A tsunami trough
+of 100 s over flats 500 m wide leaves most of their water (Doggerland's 260 s N-wave over 8 m cells kept 1.3 m of its 2
+m there; none of it sat in a closed basin), so give the wave the period the scene needs (Storegga's run-in periods were
+tens of minutes) or a smoother bed (lower `roughness`) rather than finer cells (FG-09).
+
 ### Sliders for the flood: `FLOOD_SETTINGS`
 
 `@margoengine/water/settings` also lists the flood's live controls on the same row shape as `WATER_SETTINGS`:

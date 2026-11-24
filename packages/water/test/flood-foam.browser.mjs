@@ -8,13 +8,16 @@
 //    for no longer than the run;
 //  - a bore run up a frictionless beach never climbs above U0^2 / 2g of its shoreline speed at the toe (Shen and Meyer
 //    1963, J. Fluid Mech. 16(1) 113-125, https://doi.org/10.1017/S0022112063000628);
-//  - a uniform supercritical chute has no breaker or foam once its front has run out (FG-07: fast flow alone is not white).
+//  - a uniform supercritical chute has no breaker or foam once its front has run out (FG-07: fast flow alone is not white);
+//  - a plane of 8 m cells drains as the same plane at 2 m cells does in the JavaScript reference: the cell size leaves no
+//    film of water behind (FG-09).
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 import { openBrowser } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { boreRunup } from './flood-analytic.js';
+import { FloodReference } from './flood-reference.js';
 
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' }),
   { page } = browser,
@@ -223,6 +226,22 @@ try {
       out.chute = { breaker, foam, froude, wet, maxSpeed: r.maxSpeed };
       m.dispose();
     }
+    // 5. Drying at film cell size (FG-09): 1 m of water over a 1 in 1,000 plane of 8 m cells, 4 km long, a wall at the
+    // top and open at the foot, Manning n 0.045, left to drain for 800 s.
+    {
+      const S = 0.001,
+        m = strip(
+          500,
+          8,
+          (x) => -S * x,
+          { maxDepth: 1.5, maxSpeed: 2, roughness: 0.045, boundary: { east: 'open' } },
+          (x) => 1 - S * x,
+        );
+      await m.run(800, 1);
+      const r = await m.flood.read();
+      out.drain = [50, 100, 200, 400, 800].map((x) => ({ x, h: r.depth[Math.floor(x / 8) + 500] }));
+      m.dispose();
+    }
     for (const t of textures) t.destroy();
     out.validation = String(await d.popErrorScope().then((e) => e?.message ?? ''));
     return out;
@@ -247,6 +266,24 @@ try {
     dam.late < 0.05 && dam.late < dam.foam,
     `the foam decays once the water calms: ${dam.late} (speed ${dam.lateSpeed})`,
   );
+  // The same plane in the plain JavaScript reference at 2 m cells, which 4 m cells already match within 3 mm: the water
+  // the 8 m cells hold at 800 s is the water the plane still holds, not a film the cell size leaves behind.
+  const fine = new FloodReference({
+    nx: 2000,
+    dx: 2,
+    bed: (x) => -0.001 * x,
+    h: () => 1,
+    roughness: 0.045,
+    boundary: { east: 'open' },
+  });
+  fine.runTo(800, FloodReference.step(2, 1.5, 2));
+  for (const { x, h } of result.drain) {
+    const want = fine.h[Math.floor(x / 2)];
+    assert.ok(
+      Math.abs(h - want) <= 0.02 * want + 0.005,
+      `drying at 8 m cells: ${h.toFixed(3)} m at ${x} m against ${want.toFixed(3)} m at 2 m cells (FG-09)`,
+    );
+  }
   const chute = result.chute;
   assert.ok(chute.wet === 165 && chute.froude > 1.2, `the chute runs full and supercritical: ${JSON.stringify(chute)}`);
   assert.ok(
