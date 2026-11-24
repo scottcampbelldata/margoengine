@@ -142,7 +142,8 @@ console.log(FAULD_TUNNEL_STATES.length, working.lamps.length, FAULD_STATE_EV.wor
 
 `attach(engine, settings)` (async) loads the state's models and draws them with clustered lights: each bulkhead bulb
 a 2700 K lamp of the lighting plan's catalogue (40 W 400 lm, 60 W 690 lm, 100 W 1,250 lm, light output 0.65, lower
-hemisphere only) in candela, hand lamps as 40 lm cones, the nearest and brightest lamps shadowed (`LocalShadows` with
+hemisphere only) in candela, hand lamps as 40 lm cones standing on the floor in their `tn_handlamp` fitting (the film has
+no people, so no lamp hangs in the air at chest height; `HANDLAMP_ASSET`, `HANDLAMP_STAND`), the nearest and brightest lamps shadowed (`LocalShadows` with
 `shadowBudget`, 16 in `film`, 8 in `preview`), one `LightBounce`, a glowing bulb at each fitting (`flameEmission`),
 lamp-lit `VolumetricFog` (gypsum dust, or smoke after the blast and in the fire), `Fire` and `Smoke` of the state,
 and a `PostStack` of `GTAO`, `DOF`, `Bloom`, an AgX `Tonemap` white-balanced to 3200 K at the state's one metered
@@ -263,7 +264,9 @@ resampled to 5 m; Open Government Licence v3.0, "Contains OS data (c) Crown copy
 quilt of `@margoengine/biomes/farmland` (hedged fields, hedge oaks, ashes and hollies, lanes that end at a junction, the
 edge or a gate), hedgerows and woods grown by the biome view from library trees with Poly Haven bark maps, fields,
 lanes, mud and woodland floor from Poly Haven ground scans (CC0) at their own repeats, and an overcast late-November
-sky, clouds and weather calibrated to photographs of the area. `fauld-crater` stamps the 1944 crater (`era: '1944'`, bare
+sky, clouds and weather calibrated to photographs of the area; the haze lies in the boundary layer, thinning by e
+every 500 m over the ground round the subject (`FAULD_HAZE_SCALE_HEIGHT`, the sky fog's `scaleHeight`), so drone views
+look down through thin air. `fauld-crater` stamps the 1944 crater (`era: '1944'`, bare
 marl and gypsum) or the wooded hollow today (`era: 'today'`) into the terrain from its model's heights. Models, scans and
 the height grid are served from `library` (default `/asset-library/`, which holds `margo-library/fauld/` and `dem/`);
 the buildings, the fire tender, the WVS van and a grazing herd stand in their slots (`FAULD_SLOTS`, each with its eras),

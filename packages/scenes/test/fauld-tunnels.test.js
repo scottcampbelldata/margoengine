@@ -193,3 +193,24 @@ test('fauld-tunnels: the key card of each lamp-lit state reads 1.0 at its EV', (
     assert.ok(Math.abs(stops) <= 1 / 3, `${state}: the key card reads ${2 ** stops} (${stops.toFixed(2)} stops)`);
   }
 });
+
+// No people in the Fauld film (Scott, 2026-11-24: "Build the entire video with no people"): a hand lamp lit at chest
+// height with nobody holding it floated. Every hand lamp stands on the floor in its own fitting, lens toward its aim.
+test('fauld-tunnels: every hand lamp stands on the floor in a tn_handlamp fitting', () => {
+  let n = 0;
+  for (const state of m.FAULD_TUNNEL_STATES) {
+    const d = m.dressState(state),
+      fittings = d.pieces.get(m.HANDLAMP_ASSET) ?? [];
+    for (const lamp of d.lamps) {
+      if (!lamp.extra?.aim || lamp.run === 'yard_lamp' || lamp.run === 'bulbs_cradle') continue;
+      n++;
+      assert.ok(Math.abs(lamp.at[2] - (m.HANDLAMP_STAND[0] - m.HANDLAMP_STAND[2])) < 1e-9, `${state} ${lamp.run} lens height ${lamp.at[2]}`);
+      const w = m.toWorld(...lamp.at);
+      assert.ok(
+        fittings.some((f) => Math.hypot(f[12] - w[0], f[14] - w[2]) < 0.05 && Math.abs(f[13] - m.HANDLAMP_STAND[0]) < 1e-9),
+        `${state} ${lamp.run}: no fitting under the lamp`,
+      );
+    }
+  }
+  assert.ok(n >= 10, `hand lamps checked: ${n}`);
+});

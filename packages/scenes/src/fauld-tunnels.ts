@@ -119,6 +119,15 @@ export const WELL_GLASS_RADIUS = 0.07;
 export const DEEP_BOWL_RADIUS = 0.16;
 /** Lamps at or over this plan height (m) hang in a well-glass fitting; lower ones are lanterns and work lamps. */
 export const HUNG_Z = 2.0;
+/** The kit's battery hand lamp (tunnels_kit_blender.py `handlamp`): its beam along +X, its origin at the handle's top. */
+export const HANDLAMP_ASSET = 'fauld-1944/tunnels/tn_handlamp';
+/**
+ * A hand lamp standing on the floor, measured on the model: its origin 0.27 m over its base, the lens 0.046 m forward
+ * of the origin and 0.05 m under it (TN_Water spans x 0.044 to 0.048, y -0.102 to 0.002).
+ */
+export const HANDLAMP_STAND = [0.27, 0.046, 0.05] as const;
+/** Aimed lamps that are fixed fittings, not hand lamps: the night yard's hooded well glass and the cradle's deep bowl. */
+const FIXED_AIMED_RUNS = new Set(['yard_lamp', 'bulbs_cradle']);
 /** The model of the mains fitting, its pivot at the globe's centre (the light's place), the conduit up to the arch. */
 export const WELL_GLASS_ASSET = 'fauld-1944/tunnels/tn_wellglass';
 /**
@@ -300,7 +309,27 @@ export function dressState(state: FauldTunnelState) {
       add('fauld-1944/tunnels/tp_baulk', placement(126.2, y, 2.475, 0));
     }
   const lamps: { run: string; at: number[]; extra?: Extra }[] = [];
-  for (const row of bulbs) for (const at of bulbPoints(row)) lamps.push({ run: row[0], at, extra: row[4] });
+  for (const row of bulbs)
+    for (const at of bulbPoints(row)) {
+      const extra = row[4];
+      // A hand lamp stands on the floor in its own fitting, its lens toward its aim: the film has no people (Scott,
+      // 2026-11-24: "Build the entire video with no people"), and a lamp at chest height with nobody holding it floated.
+      if (extra?.aim && !FIXED_AIMED_RUNS.has(row[0])) {
+        const yaw = Math.atan2(extra.aim[1] - at[1], extra.aim[0] - at[0]);
+        add(HANDLAMP_ASSET, placement(at[0], at[1], HANDLAMP_STAND[0], yaw / D));
+        lamps.push({
+          run: row[0],
+          at: [
+            at[0] + HANDLAMP_STAND[1] * Math.cos(yaw),
+            at[1] + HANDLAMP_STAND[1] * Math.sin(yaw),
+            HANDLAMP_STAND[0] - HANDLAMP_STAND[2],
+          ],
+          extra,
+        });
+        continue;
+      }
+      lamps.push({ run: row[0], at, extra });
+    }
   return { pieces, lamps, fx: st.fx };
 }
 
