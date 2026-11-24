@@ -21,7 +21,8 @@ pub const PROBE_MAX: usize = 1024;
 pub const PROBE_K: usize = 4;
 /// Words of an input record: x0, y0, z0 (where the particle was), x1, y1, z1 (where it ends), radius, margin (how far past its
 /// radius a surface still counts: how far it can travel in the step), groups (as `collisionGroups` packs them, or all ones to
-/// meet everything), and two spare.
+/// meet everything), the length of the step in seconds (0 to meet every collider where it is, not along its own motion), and two
+/// spare.
 pub const PROBE_IN_WORDS: usize = 12;
 /// Words of an output record, a particle's K contacts each: collider (NONE for no contact), body, then as floats the fraction of
 /// the move at which the touch happens, the unit normal out of the collider (x, y, z), the depth the end of the move is inside
@@ -48,16 +49,42 @@ pub struct ParticleContact {
 
 impl World {
     /// The contact of a ball of `radius` moving from `from` to `to` with collider `c`, or None when the collider is further than
-    /// `margin` past the radius at the end of the move and the sweep touches nothing.
-    pub fn probe_collider(&self, c: usize, from: V3, to: V3, radius: f32, margin: f32) -> Option<ParticleContact> {
+    /// `margin` past the radius at the end of the move and the sweep touches nothing. A collider whose body moves (`dt` seconds a
+    /// step, at its linear and angular velocity) is met in its own frame: the contact's point and normal are in the collider's
+    /// pose at the start of the step, and the surface goes on from there at the velocity `surface_velocity` gives.
+    pub fn probe_collider(&self, c: usize, from: V3, to: V3, radius: f32, margin: f32, dt: f32) -> Option<ParticleContact> {
         let reach = radius + margin.max(0.0);
-        // The collider's box against the box of the move, grown by reach: most colliders end here.
-        let (low, high) = (self.v(FAT_MIN_X, c), self.v(FAT_MAX_X, c));
+        let body = self.uu(COLLIDER_BODY, c) as usize;
+        let (com, v, w) = (self.v(CENTER_X, body), self.v(LINEAR_X, body), self.v(ANGULAR_X, body));
+        let moving = dt > 0.0 && self.flags(body) & KIND != FIXED && v.dot(v) + w.dot(w) > 1e-12;
+        // The collider's box against the box of the move, grown by reach: most colliders end here. (A moving collider's box is
+        // grown by how far it can reach in the step: its travel, and its spin about the centre of mass at its farthest point.)
+        let (mut low, mut high) = (self.v(FAT_MIN_X, c), self.v(FAT_MAX_X, c));
+        if moving {
+            let far = high.sub(low).scale(0.5);
+            let radius_of_box = length_of(far) + length_of(low.add(far).sub(com));
+            let grow = (length_of(v) + length_of(w) * radius_of_box) * dt;
+            low = low.sub(v3(grow, grow, grow));
+            high = high.add(v3(grow, grow, grow));
+        }
         let (lo, hi) = (from.min(to).sub(v3(reach, reach, reach)), from.max(to).add(v3(reach, reach, reach)));
         if low.x > hi.x || low.y > hi.y || low.z > hi.z || lo.x > high.x || lo.y > high.y || lo.z > high.z {
             return None;
         }
-        let step = to.sub(from);
+        // The particle at a fraction `t` of the step, in the collider's frame as it was at the start: the collider has moved by
+        // its linear velocity and turned about its centre of mass by the first-order rotation of its angular velocity (the
+        // pose update of the solver), so the particle is taken back by the same.
+        let frame = |t: f32| -> V3 {
+            let p = from.add(to.sub(from).scale(t));
+            if !moving {
+                return p;
+            }
+            let half = 0.5 * t * dt;
+            let turn = Q { x: half * w.x, y: half * w.y, z: half * w.z, w: 1.0 }.normalized();
+            turn.unrotate(p.sub(com).sub(v.scale(t * dt))).add(com)
+        };
+        let end = if moving { frame(1.0) } else { to };
+        let step = end.sub(from);
         let length = sqrt(step.dot(step));
         // A ball that starts touching the collider, or inside its radius, has no sweep to make: the surface it touches is the one
         // nearest where it is now, on the side it started on, and the move says whether it goes into it. (A thin solid has two
@@ -68,12 +95,8 @@ impl World {
             let gap = if start.inside { -distance - radius } else { distance - radius };
             if gap <= 1e-5 * (1.0 + radius) {
                 let away = if length > 1e-9 { step.scale(-1.0 / length) } else { v3(0.0, 1.0, 0.0) };
-                let normal = if distance > 1e-9 {
-                    offset.scale(if start.inside { -1.0 } else { 1.0 } / distance)
-                } else {
-                    away
-                };
-                let depth = radius - to.sub(start.point).dot(normal);
+                let normal = if distance > 1e-9 { offset.scale(if start.inside { -1.0 } else { 1.0 } / distance) } else { away };
+                let depth = radius - end.sub(start.point).dot(normal);
                 // Going into it, or still within reach at the end.
                 if step.dot(normal) < 0.0 || depth > -margin.max(0.0) {
                     return Some(ParticleContact { collider: c as u32, t: 0.0, normal, point: start.point, depth, started: true });
@@ -81,19 +104,50 @@ impl World {
                 return None;
             }
         }
-        let identity = Pose { p: from, q: Q::IDENTITY };
-        let ball = Shape { kind: SHAPE_BALL, size: v3(radius, 0.0, 0.0), hull: 0, border: 0.0 };
-        if length > 1e-9 && self.query_valid(ball, identity) {
-            let direction = step.scale(1.0 / length);
-            let options = CastOptions { max: length, target: 0.0, stop: true, geometry: false };
-            if let Some(hit) = self.cast_collider(c, ball, identity, direction, &options) {
-                if !hit.started {
-                    let depth = radius - to.sub(hit.on_target).dot(hit.normal);
-                    return Some(ParticleContact { collider: c as u32, t: (hit.t / length).min(1.0), normal: hit.normal, point: hit.on_target, depth, started: false });
+        if moving {
+            // Conservative advancement in the collider's frame (Mirtich 1996), as the halving of first_within: the signed gap
+            // changes no faster than the particle's own speed plus the collider's, its linear speed and its spin at the farthest
+            // the particle can be from the centre of mass.
+            let reach_from_centre = {
+                let (a, b) = (from.sub(com), to.sub(com));
+                sqrt(a.dot(a)).max(sqrt(b.dot(b))) + sqrt(v.dot(v)) * dt
+            };
+            let speed = length_of(to.sub(from)) + (sqrt(v.dot(v)) + sqrt(w.dot(w)) * reach_from_centre) * dt;
+            let gap_at = |t: f32| -> f32 {
+                let q = frame(t);
+                match self.project_collider(c, q, false) {
+                    Some(nearest) => {
+                        let d = length_of(q.sub(nearest.point));
+                        if nearest.inside { -d - radius } else { d - radius }
+                    }
+                    None => f32::MAX,
+                }
+            };
+            if let Some(t) = first_within(&gap_at, speed, 1e-6) {
+                let q = frame(t);
+                if let Some(nearest) = self.project_collider(c, q, false) {
+                    let offset = q.sub(nearest.point);
+                    let distance = length_of(offset);
+                    let normal = if distance > 1e-9 { offset.scale(if nearest.inside { -1.0 } else { 1.0 } / distance) } else { v3(0.0, 1.0, 0.0) };
+                    let depth = radius - end.sub(nearest.point).dot(normal);
+                    return Some(ParticleContact { collider: c as u32, t, normal, point: nearest.point, depth, started: false });
+                }
+            }
+        } else {
+            let identity = Pose { p: from, q: Q::IDENTITY };
+            let ball = Shape { kind: SHAPE_BALL, size: v3(radius, 0.0, 0.0), hull: 0, border: 0.0 };
+            if length > 1e-9 && self.query_valid(ball, identity) {
+                let direction = step.scale(1.0 / length);
+                let options = CastOptions { max: length, target: 0.0, stop: true, geometry: false };
+                if let Some(hit) = self.cast_collider(c, ball, identity, direction, &options) {
+                    if !hit.started {
+                        let depth = radius - to.sub(hit.on_target).dot(hit.normal);
+                        return Some(ParticleContact { collider: c as u32, t: (hit.t / length).min(1.0), normal: hit.normal, point: hit.on_target, depth, started: false });
+                    }
                 }
             }
         }
-        self.probe_overlap(c, to, radius, margin)
+        self.probe_overlap(c, end, radius, margin)
     }
 
     /// Where a ball of `radius` at `to` sits against collider `c`: within `margin` past its radius of the surface, or inside a
@@ -177,10 +231,10 @@ impl World {
 
     /// Every contact of a ball moving from `from` to `to` among the colliders `filter` lets through, nearest first (the most
     /// depth first), at most K of them, as `(contact, surface velocity, triangle)`.
-    pub fn probe_particle(&self, from: V3, to: V3, radius: f32, margin: f32, filter: &Filter, out: &mut [(ParticleContact, V3, u32); PROBE_K]) -> usize {
+    pub fn probe_particle(&self, from: V3, to: V3, radius: f32, margin: f32, dt: f32, filter: &Filter, out: &mut [(ParticleContact, V3, u32); PROBE_K]) -> usize {
         let mut count = 0;
         self.each_queried(filter, &mut |c| {
-            if let Some(contact) = self.probe_collider(c, from, to, radius, margin) {
+            if let Some(contact) = self.probe_collider(c, from, to, radius, margin, dt) {
                 // Kept sorted by depth, deepest first; one past the last place falls off.
                 let mut at = count.min(PROBE_K);
                 while at > 0 && out[at - 1].0.depth < contact.depth {
@@ -202,6 +256,34 @@ impl World {
         });
         count
     }
+}
+
+fn length_of(v: V3) -> f32 {
+    sqrt(v.dot(v))
+}
+
+/// The first fraction of the step in [0, 1] at which `gap` is within `reach`, for a gap that changes by at most `speed` over
+/// the whole step. An interval whose middle is further than reach plus what half the interval can change is dropped, the
+/// others are halved, earliest first, down to a width below rounding (the inclusion search of cloth.rs).
+fn first_within(gap: &dyn Fn(f32) -> f32, speed: f32, reach: f32) -> Option<f32> {
+    let mut stack = [(0.0f32, 1.0f32); 80];
+    let mut top = 1;
+    while top > 0 {
+        top -= 1;
+        let (lo, hi) = stack[top];
+        let half = 0.5 * (hi - lo);
+        let mid = lo + half;
+        if gap(mid) - half * speed > reach {
+            continue;
+        }
+        if half < 1e-6 || top + 2 > stack.len() {
+            return Some(lo);
+        }
+        stack[top] = (mid, hi);
+        stack[top + 1] = (lo, mid);
+        top += 2;
+    }
+    None
 }
 
 /// The squared distance from a point to a triangle (Ericson 5.1.5).
@@ -295,7 +377,7 @@ mod batch {
             let groups = r[8].to_bits();
             let filter = Filter { flags: flags | crate::query::EXCLUDE_SENSORS | crate::query::NO_GROUPS * (groups == u32::MAX) as u32, groups, collider: NONE, body };
             let mut list = [(ParticleContact { collider: NONE, t: 0.0, normal: v3(0.0, 0.0, 0.0), point: v3(0.0, 0.0, 0.0), depth: 0.0, started: false }, v3(0.0, 0.0, 0.0), NONE); PROBE_K];
-            let n = world.probe_particle(v3(r[0], r[1], r[2]), v3(r[3], r[4], r[5]), r[6], r[7], &filter, &mut list).min(k as usize);
+            let n = world.probe_particle(v3(r[0], r[1], r[2]), v3(r[3], r[4], r[5]), r[6], r[7], r[9], &filter, &mut list).min(k as usize);
             for (slot, (c, v, triangle)) in list.iter().take(n).enumerate() {
                 let base = PROBE_OUT_WORDS * slot;
                 out[base] = c.collider;

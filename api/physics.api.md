@@ -438,6 +438,7 @@ export interface KernelProbeOptions {
     flags?: number;
     groups?: number;
     excludeBody?: number;
+    dt?: number;
 }
 
 export interface KernelRayHit {
@@ -757,6 +758,7 @@ export class Physics implements EnginePlugin, BodyOwner {
         groups?: number;
         exclude?: PhysicsBody;
         flags?: number;
+        dt?: number;
     }): KernelSoftContacts;
     colliderOf(row: number): PhysicsCollider | undefined;
     colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat): boolean;

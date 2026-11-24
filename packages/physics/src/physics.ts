@@ -1717,16 +1717,19 @@ export class Physics implements EnginePlugin, BodyOwner {
    * surface and the normal out of it) with the depth to it (negative: a gap still open, listed when within `margin` past the
    * radius), the velocity of the surface there (a rigid body's, and a deformable mesh's vertices') and the time of the touch.
    * Every shape is met, a fast particle is swept so it never tunnels, sensors and disabled colliders never are, and
-   * `groups` (one packed word for all, or one each in `views.groups`) and the query flags are honoured. `exclude` leaves a body
+   * `groups` (one packed word for all, or one each in `views.groups`) and the query flags are honoured. With `dt` (the step's
+   * seconds) every collider is met along its own linear and angular motion over the step, so a fast bat or a spinning paddle
+   * cannot pass a particle. `exclude` leaves a body
    * out, such as the rigid frame of the soft body itself. Returns arrays with `k` slots a particle; a slot without a contact
    * has `collider` 0xffffffff, and a collider row maps to a body through `body` and `colliderOf`.
    */
   softContacts(
     views: KernelParticleViews,
     k = 1,
-    options: { groups?: number; exclude?: PhysicsBody; flags?: number } = {},
+    options: { groups?: number; exclude?: PhysicsBody; flags?: number; dt?: number } = {},
   ): KernelSoftContacts {
     return this.kernel.softContacts(views, k, {
+      dt: options.dt,
       flags: options.flags,
       groups: options.groups,
       excludeBody: options.exclude ? options.exclude.row : undefined,

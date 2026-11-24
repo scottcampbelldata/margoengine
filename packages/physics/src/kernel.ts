@@ -527,6 +527,13 @@ export interface KernelProbeOptions {
   groups?: number;
   /** A body row whose colliders are left out (a soft body's own rigid frame). */
   excludeBody?: number;
+  /**
+   * The length of the step in seconds. Given, each particle is swept against every collider along that collider's own motion over
+   * the step (its linear and angular velocity, in the collider's frame), so a fast bat or a spinning paddle cannot pass a
+   * particle; the contact's point and normal are then in the collider's pose at the start of the step, and the plane goes on at
+   * `velocity`. Left out (0), every collider is met where it is.
+   */
+  dt?: number;
 }
 /**
  * The particles of a soft body for {@link KernelWorld.softContacts}: packed x, y, z where each was and where each ends the step,
@@ -2171,7 +2178,8 @@ export class KernelWorld {
         started: new Uint8Array(slots),
         triangle: new Uint32Array(slots),
       };
-    const { flags = 0, groups: shared, excludeBody = 0xffffffff } = options;
+    const { flags = 0, groups: shared, excludeBody = 0xffffffff, dt = 0 } = options;
+    if (!(dt >= 0) || !Number.isFinite(dt)) throw new RangeError(`softContacts takes a step length of zero or more seconds (got ${dt}).`);
     const all = shared === undefined ? 0xffffffff : shared >>> 0;
     for (let start = 0; start < count; start += capacity) {
       const n = capacity < count - start ? capacity : count - start,
@@ -2187,7 +2195,8 @@ export class KernelWorld {
         input[at + 6] = typeof radius === 'number' ? radius : radius[p]!;
         input[at + 7] = typeof margin === 'number' ? margin : margin[p]!;
         words[at + 8] = groups ? groups[p]! >>> 0 : all;
-        input[at + 9] = input[at + 10] = input[at + 11] = 0;
+        input[at + 9] = dt;
+        input[at + 10] = input[at + 11] = 0;
         for (let j = 0; j < 8; j++)
           if (!Number.isFinite(input[at + j]!)) throw new RangeError('softContacts needs finite positions, radii and margins.');
       }

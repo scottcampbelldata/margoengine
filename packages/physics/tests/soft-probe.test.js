@@ -354,3 +354,86 @@ test('softContacts with several slots gives a thin wall the same side, from both
   near(c.point[3 * 3], 3.01, 1e-5, 'and meets the far face');
   physics.dispose();
 });
+
+// A collider that moves is met along its own motion over the step (the relative sweep, conservative advancement in the
+// collider's frame: Mirtich 1996), so a fast bat or a spinning paddle cannot pass particles.
+test('a fast thin box sweeping up through a column of resting particles hits every one', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const bat = physics.addBody(null, {
+    type: 'kinematicVelocity',
+    position: [0, -0.5, 0],
+    linearVelocity: [0, 150, 0],
+    colliders: { shape: 'box', halfExtents: [2, 0.01, 2] },
+  });
+  physics.step();
+  // The step moved it; put it back to its start pose so the probe is asked at the start of a step.
+  bat.setPosition([0, -0.5, 0]);
+  bat.setLinearVelocity([0, 150, 0]);
+  const count = 20,
+    radius = 0.01,
+    dt = 1 / 60,
+    from = [];
+  for (let i = 0; i < count; i++) from.push(0, 0.04 * (i + 1), 0);
+  const swept = physics.softContacts({ from, to: from, radius }, 1, { dt });
+  const still = physics.softContacts({ from, to: from, radius }, 1);
+  const top = -0.49,
+    travel = 150 * dt;
+  for (let i = 0; i < count; i++) {
+    const y = 0.04 * (i + 1);
+    assert.notEqual(swept.collider[i], 0xffffffff, `particle ${i} is hit`);
+    assert.equal(still.collider[i], 0xffffffff, `and a static query misses it, as before`);
+    near(swept.t[i], (y - radius - top) / travel, 5e-3, `particle ${i}: the time the top face reaches it`);
+    near(swept.normal[3 * i + 1], 1, 1e-3, `particle ${i}: pushed up`);
+    near(swept.velocity[3 * i + 1], 150, 1e-2, `particle ${i}: the plane goes on up at 150 m/s`);
+    // The plane at the end of the step has passed the particle: pushed out along the normal by the way it went, to ride on top.
+    near(swept.depth[i], radius - (y - travel - top), 1e-3, `particle ${i}: depth`);
+  }
+  physics.dispose();
+});
+
+test('a spinning paddle catches the particles in its sweep and not those outside it', () => {
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const paddle = physics.addBody(null, {
+    type: 'kinematicVelocity',
+    position: [0, 0, 0],
+    angularVelocity: [0, 30, 0],
+    colliders: { shape: 'box', halfExtents: [1, 0.1, 0.01] },
+  });
+  physics.step();
+  paddle.setRotation([0, 0, 0, 1]);
+  paddle.setAngularVelocity([0, 30, 0]);
+  const dt = 1 / 60,
+    sweep = 30 * dt,
+    radius = 0.01,
+    from = [],
+    angles = [0.05, 0.1, 0.2, 0.3, 0.4, 0.45, 0.6, 0.8];
+  // A positive spin about y turns +x towards -z, so the paddle sweeps the particles placed at -z.
+  for (const a of angles) from.push(0.6 * Math.cos(a), 0, -0.6 * Math.sin(a));
+  const swept = physics.softContacts({ from, to: from, radius }, 1, { dt });
+  const still = physics.softContacts({ from, to: from, radius }, 1);
+  let last = -1;
+  angles.forEach((a, i) => {
+    if (a < sweep - 0.02) {
+      assert.notEqual(swept.collider[i], 0xffffffff, `angle ${a}: caught`);
+      // The face reaches a particle when the paddle has turned by a minus (radius + half thickness) / 0.6.
+      near(swept.t[i], (a - 0.02 / 0.6) / sweep, 0.03, `angle ${a}: time`);
+      assert.ok(swept.t[i] > last, 'later for a particle further round');
+      last = swept.t[i];
+      // The face the particle is on: its normal is the paddle's -z face, and the surface moves along -z about x = 0.6 at 18 m/s.
+      near(swept.normal[3 * i + 2], -1, 0.05, `angle ${a}: normal`);
+      near(swept.velocity[3 * i + 2], -30 * 0.6, 0.5, `angle ${a}: the surface speed there`);
+    } else if (a > sweep + 0.05) {
+      assert.equal(swept.collider[i], 0xffffffff, `angle ${a}: outside the sweep`);
+    }
+    assert.equal(still.collider[i], 0xffffffff, `angle ${a}: a static query meets nothing`);
+  });
+  physics.dispose();
+});
+
+test('a collider that does not move is met where it is whatever dt says, and dt must be a length of time', () => {
+  const { physics, kernel } = world({ shape: 'box', halfExtents: [1, 1, 1] });
+  const at = [0, 1.05, 0];
+  assert.equal(kernel.softContacts({ from: at, to: at, radius: 0.1 }, 1, { dt: 1 / 60 }).collider[0], 0);
+  assert.throws(() => kernel.softContacts({ from: at, to: at, radius: 0.1 }, 1, { dt: -1 }), /step length/);
+  physics.dispose();
+});
