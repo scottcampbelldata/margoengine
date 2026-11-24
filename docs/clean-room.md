@@ -1,5 +1,16 @@
 # Clean room
 
+### Kelvin wake crest phase (2026-11-23)
+
+Fritz Ursell, [On Kelvin's ship-wave pattern](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/volume/840945DCC46FC5078D12D1BB82B7E65D?pageNum=2), 1960, derives the two stationary points and their coalescence. Marc Rabaud and Frédéric Moisy, [Ship Wakes: Kelvin or Mach Angle?](https://doi.org/10.1103/PhysRevLett.110.214503), 2013, give the deep-water dispersion and the angle constraints. Ravindra Pethiyagoda, Timothy J. Moroney, Christopher J. Lustri and Scott W. McCue, [Kelvin wake pattern at small Froude numbers](https://doi.org/10.1017/jfm.2021.193), 2021, distinguish the transverse and diverging branches. Michael V. Berry and Christopher J. Howls, [NIST DLMF §36.13](https://dlmf.nist.gov/36.13), 2010, give an independent caustic formulation.
+
+For aft distance `x > 0` and absolute side distance `y`, the wave vector's longitudinal and lateral projections
+have opposite signs. With `T = tan(theta)` and `tau = y / x`, the phase up to sign is
+`k_g x sqrt(1 + T²) (1 − tau T)`. Its derivative vanishes at `tau = T / (1 + 2 T²)`. The previous plus
+sign paired the existing roots with a phase that is nonstationary at those roots. The CPU and WGSL use the same
+corrected projection. The cusp regression evaluates the coalesced phase directly. The amplitude envelope, hull filter,
+and near-hull waterline and stern foam are independent of this correction.
+
 ### Animated flow paths in Lines (2026-11-22)
 
 Bruno Jobard and Wilfrid Lefer, [Unsteady Flow Visualization by Animating Evenly-Spaced Streamlines](https://doi.org/10.1111/1467-8659.00395), 2000, show how a cyclic pattern moving along a streamline conveys direction. Greg Turk and David Banks, [Image-Guided Streamline Placement](https://doi.org/10.1145/237170.237285), 1996, describe using line density and visual contrast to make trajectories readable. Jobard and Lefer, [Creating Evenly-Spaced Streamlines of Arbitrary Density](https://web.cs.ucdavis.edu/~ma/SIGGRAPH02/course23/notes/papers/Jobard.pdf), 1997, discuss regular spacing by distance.

@@ -75,6 +75,32 @@ test('the drawn wake is brightest on the Kelvin ray at low Froude numbers and qu
   }
 });
 
+test('the Kelvin cusp uses the coalesced stationary phase on both sides of a long hull', () => {
+  const speed = 4.5;
+  const hull = { length: 128, beam: 15.85, draft: 5.42 };
+  const wakes = new ShipWakes({
+    surface: fakeWater(),
+    look: { sternWaves: 0, bowWave: 0, waterlineFoam: 0, turbulentWake: 0 },
+    ships: [{ hull, pose: { position: [0, 0, 0], heading: 0, speed } }],
+  });
+  // At the cusp the two wavenumbers coincide at 3 kg / 2. The phase
+  // k · r gives kg * x * sqrt(3/2) * (1 - 1/4), with x measured aft.
+  const kg = 9.81 / speed ** 2;
+  const aft = (20 * Math.PI) / (kg * Math.sqrt(1.5) * 0.75);
+  const side = aft * Math.tan(KELVIN_ANGLE);
+  const radius = Math.hypot(aft, side);
+  const amplitude =
+    0.5 *
+    bowWave(speed, hull).height *
+    Math.sqrt(hull.length / Math.max(radius, hull.length)) *
+    (kg * radius) ** (1 / 6) *
+    Math.exp((-kg * hull.draft) / 4);
+  for (const x of [-side, side]) {
+    const observed = wakes.sample(x, hull.length / 2 - aft).height;
+    assert.ok(Math.abs(observed - amplitude) < 1e-7, `cusp height ${observed}, expected ${amplitude}`);
+  }
+});
+
 test('the drawn wake narrows as Rabaud and Moisy measured above Fr 0.49 (the hull excites no k below 2 pi / L)', () => {
   for (const fr of [0.8, 1, 1.5, 2]) {
     const { at } = brightestAngle(fr);

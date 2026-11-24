@@ -7,8 +7,9 @@
 // Sources (clean room, from the papers):
 // - Kelvin wake by stationary phase: Lord Kelvin, "On ship waves", Proc. Inst. Mech. Eng. 38 (1887); Lighthill, Waves
 //   in Fluids (Cambridge 1978), section 3.10. A wave of direction theta to the track is steady in the ship's frame when
-//   U cos(theta) = sqrt(g / k), so k = k_g sec^2(theta) with k_g = g / U^2; the phase k_g x sec(theta) (1 + tan(theta)
-//   y / x) is stationary where y / x = T / (1 + 2 T^2), T = tan(theta), which has two roots (transverse and diverging)
+//   U cos(theta) = sqrt(g / k), so k = k_g sec^2(theta) with k_g = g / U^2; with x measured aft and y to the side,
+//   the phase k_g x sec(theta) (1 - tan(theta) y / x) is stationary where y / x = T / (1 + 2 T^2), T = tan(theta).
+//   This has two roots (transverse and diverging)
 //   inside the cusp y / x = 1 / sqrt(8), the Kelvin half-angle 19.47 degrees, and none outside.
 // - The hull as a filter of wavenumbers: Rabaud and Moisy, "Ship wakes: Kelvin or Mach angle?", Phys. Rev. Lett. 110,
 //   214503 (2013), https://doi.org/10.1103/PhysRevLett.110.214503 (arXiv:1304.2653): a hull of length L excites no
@@ -142,7 +143,7 @@ function waveAt(x: number, y: number, u: number, l: number, d: number): number {
   const spread = Math.sqrt(l / Math.max(r, l));
   const disc = 1 - 8 * tau * tau;
   const wave = (t: number) =>
-    hullWeight(kg * (1 + t * t), k0, kl, d) * Math.cos(kg * x * Math.sqrt(1 + t * t) * (1 + tau * t));
+    hullWeight(kg * (1 + t * t), k0, kl, d) * Math.cos(kg * x * Math.sqrt(1 + t * t) * (1 - tau * t));
   if (disc >= 0) {
     const q = Math.sqrt(disc),
       c = Math.pow(Math.max(disc, eps), -0.25);
@@ -469,7 +470,7 @@ struct ShipData {head:vec4f,look:vec4f,foam:vec4f,ships:array<ShipRecord,${MAX_S
 fn shipSmooth(a:f32,b:f32,x:f32)->f32 {return smoothstep(a,b,x);}
 fn shipHullWeight(k:f32,k0:f32,kl:f32,d:f32)->f32 {return shipSmooth(0.85*kl,kl,k)*exp(-(k-k0)*d*0.5);}
 fn shipWaveTerm(t:f32,kg:f32,k0:f32,kl:f32,d:f32,x:f32,tau:f32)->f32 {
- return shipHullWeight(kg*(1.0+t*t),k0,kl,d)*cos(kg*x*sqrt(1.0+t*t)*(1.0+tau*t));
+ return shipHullWeight(kg*(1.0+t*t),k0,kl,d)*cos(kg*x*sqrt(1.0+t*t)*(1.0-tau*t));
 }
 fn shipWaveAt(x:f32,y:f32,u:f32,l:f32,d:f32)->f32 {
  if(x<=0.0||u<=0.05){return 0.0;}

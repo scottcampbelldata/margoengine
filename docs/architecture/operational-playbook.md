@@ -1,3 +1,12 @@
+### Section 5 evidence: Kelvin wake crest phase (2026-11-23)
+
+`ShipWakes` now uses the correct sign for the lateral part of the phase when distance along the trail is measured aft.
+The positive stationary roots were previously evaluated with the opposite projection, which pitched the crests into
+strong, linear breaks in a view down a long hull. The CPU test checks the closed-form cusp on both sides of a 128 m ship.
+The water GPU fixture compares sampled heights to the CPU law over a grid on open and flooded water, on WebGPU and WebGL2.
+The hull and foam terms are independent of the phase change. See the
+[clean-room record](../clean-room.md#kelvin-wake-crest-phase-2026-11-23).
+
 ### Section 5 evidence: open-ocean horizon depth (2026-11-23)
 
 Water keeps its original homogeneous depth on the displaced grid. A separate flat quad fills the remaining ocean
