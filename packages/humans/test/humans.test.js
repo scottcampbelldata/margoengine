@@ -10,7 +10,21 @@ import { figure } from './figure.js';
 
 test('the cast files get skin, eyes and strand hair on the materials named for them', () => {
   // Daniels' materials (blender-library station-daniels-v2.glb): no beard, a moustache, clothes that stay plain.
-  const daniels = ['Brows', 'EyeL', 'EyeR', 'Cap', 'Teeth', 'Tongue', 'Skin', 'Hair', 'Lashes', 'Moustache', 'Shoes', 'Suit', 'Trousers'];
+  const daniels = [
+    'Brows',
+    'EyeL',
+    'EyeR',
+    'Cap',
+    'Teeth',
+    'Tongue',
+    'Skin',
+    'Hair',
+    'Lashes',
+    'Moustache',
+    'Shoes',
+    'Suit',
+    'Trousers',
+  ];
   assert.deepEqual(personMaterials(daniels), {
     Skin: 'skin',
     EyeL: 'eyes',
@@ -62,8 +76,19 @@ test('addPerson checks its options before it changes anything', async (t) => {
 
 test("Character Creator's hair materials (<name>_Transparency) get the hair look", () => {
   // The material names of a CC5 GLB export (Fauld civ_gypsum_b): every hair mesh's material ends in _Transparency.
-  const cc = ['Boots', 'Brows_Hair_Transparency', 'Brows_Base_Transparency', 'Brows_Color_Transparency', 'Std_Skin_Head',
-    'Std_Eyelash', 'TR_jumper', 'Hair_Transparency', 'Hair_Clap_Transparency', 'Hairband_Opaque', 'Std_Hair_Transparency_Mask'];
+  const cc = [
+    'Boots',
+    'Brows_Hair_Transparency',
+    'Brows_Base_Transparency',
+    'Brows_Color_Transparency',
+    'Std_Skin_Head',
+    'Std_Eyelash',
+    'TR_jumper',
+    'Hair_Transparency',
+    'Hair_Clap_Transparency',
+    'Hairband_Opaque',
+    'Std_Hair_Transparency_Mask',
+  ];
   assert.deepEqual(personMaterials(cc), {
     Std_Skin_Head: 'skin',
     Brows_Hair_Transparency: 'hair',
@@ -74,13 +99,24 @@ test("Character Creator's hair materials (<name>_Transparency) get the hair look
   });
   assert.deepEqual(personMaterials(cc, { hair: false }), { Std_Skin_Head: 'skin' });
   // A hair list of your own covers its CC materials the same way, and leaves the defaults' names alone.
-  assert.deepEqual(personMaterials(['Beard_Transparency', 'Hair_Transparency', 'Wig_Transparency'], { materials: { hair: ['Wig'] } }), {
-    Wig_Transparency: 'hair',
-  });
+  assert.deepEqual(
+    personMaterials(['Beard_Transparency', 'Hair_Transparency', 'Wig_Transparency'], { materials: { hair: ['Wig'] } }),
+    {
+      Wig_Transparency: 'hair',
+    },
+  );
 });
 
 test('Character Creator names get their looks, and a skinned CC eyeball is fitted and follows its joint', async (t) => {
-  const cc = ['Std_Skin_Head', 'Std_Skin_Body', 'Std_Eye_R', 'Std_Cornea_R', 'Std_Tearline_R', 'Std_Eye_Occlusion_R', 'Boxers'];
+  const cc = [
+    'Std_Skin_Head',
+    'Std_Skin_Body',
+    'Std_Eye_R',
+    'Std_Cornea_R',
+    'Std_Tearline_R',
+    'Std_Eye_Occlusion_R',
+    'Boxers',
+  ];
   assert.deepEqual(personMaterials(cc), {
     Std_Skin_Head: 'skin',
     Std_Skin_Body: 'skin',
@@ -103,7 +139,11 @@ test('Character Creator names get their looks, and a skinned CC eyeball is fitte
     for (let s = 0; s <= segments; s++) {
       const b = (2 * Math.PI * s) / segments,
         th = (a * Math.PI) / 180;
-      positions.push(centre[0] + radius * Math.sin(th) * Math.cos(b), centre[1] + radius * Math.sin(th) * Math.sin(b), centre[2] + radius * Math.cos(th));
+      positions.push(
+        centre[0] + radius * Math.sin(th) * Math.cos(b),
+        centre[1] + radius * Math.sin(th) * Math.sin(b),
+        centre[2] + radius * Math.cos(th),
+      );
       uvs.push(0.5 + rho(a) * Math.cos(b), 0.5 + rho(a) * Math.sin(b));
     }
   }
@@ -111,7 +151,11 @@ test('Character Creator names get their looks, and a skinned CC eyeball is fitte
   for (let s = 0; s < segments; s++) {
     const b = (2 * Math.PI * s) / segments,
       th = (25 * Math.PI) / 180;
-    positions.push(centre[0] + radius * Math.sin(th) * Math.cos(b), centre[1] + radius * Math.sin(th) * Math.sin(b), centre[2] + radius * Math.cos(th));
+    positions.push(
+      centre[0] + radius * Math.sin(th) * Math.cos(b),
+      centre[1] + radius * Math.sin(th) * Math.sin(b),
+      centre[2] + radius * Math.cos(th),
+    );
     uvs.push(0.5 + 0.123 * Math.cos(b), 0.5 + 0.123 * Math.sin(b));
   }
   for (let r = 0; r < rings; r++)
@@ -126,7 +170,13 @@ test('Character Creator names get their looks, and a skinned CC eyeball is fitte
   const add = (data, type, componentType = 5126, extra = {}) => {
     buffers.push(new Uint8Array(data.buffer));
     bufferViews.push({ buffer: buffers.length - 1, byteLength: data.byteLength });
-    accessors.push({ bufferView: buffers.length - 1, componentType, count: data.length / { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[type], type, ...extra });
+    accessors.push({
+      bufferView: buffers.length - 1,
+      componentType,
+      count: data.length / { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[type],
+      type,
+      ...extra,
+    });
     return accessors.length - 1;
   };
   const low = [0, 1, 2].map((i) => centre[i] - radius),
@@ -134,16 +184,64 @@ test('Character Creator names get their looks, and a skinned CC eyeball is fitte
   const attributes = {
     POSITION: add(new Float32Array(positions), 'VEC3', 5126, { min: low, max: high }),
     TEXCOORD_0: add(new Float32Array(uvs), 'VEC2'),
-    JOINTS_0: add(new Uint16Array(count * 4).map((_, k) => (k % 4 ? 0 : 1)), 'VEC4', 5123),
-    WEIGHTS_0: add(new Float32Array(count * 4).map((_, k) => (k % 4 ? 0 : 1)), 'VEC4'),
+    JOINTS_0: add(
+      new Uint16Array(count * 4).map((_, k) => (k % 4 ? 0 : 1)),
+      'VEC4',
+      5123,
+    ),
+    WEIGHTS_0: add(
+      new Float32Array(count * 4).map((_, k) => (k % 4 ? 0 : 1)),
+      'VEC4',
+    ),
   };
   // The eye joint sits at the eyeball's centre; its inverse bind matrix undoes that.
-  const ibm = add(new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -centre[0], -centre[1], -centre[2], 1]), 'MAT4');
+  const ibm = add(
+    new Float32Array([
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      -centre[0],
+      -centre[1],
+      -centre[2],
+      1,
+    ]),
+    'MAT4',
+  );
   const doc = {
     asset: { version: '2.0' },
     scene: 0,
     scenes: [{ nodes: [0, 1, 3] }],
-    nodes: [{ name: 'root' }, { name: 'CC_Base_R_Eye', translation: centre, children: [] }, {}, { name: 'CC_Base_Eye', mesh: 0, skin: 0 }],
+    nodes: [
+      { name: 'root' },
+      { name: 'CC_Base_R_Eye', translation: centre, children: [] },
+      {},
+      { name: 'CC_Base_Eye', mesh: 0, skin: 0 },
+    ],
     skins: [{ joints: [0, 1], inverseBindMatrices: ibm }],
     meshes: [{ primitives: [{ attributes, indices: add(new Uint32Array(indices), 'SCALAR', 5125), material: 0 }] }],
     materials: [{ name: 'Std_Eye_R' }],
@@ -171,7 +269,9 @@ test('Character Creator names get their looks, and a skinned CC eyeball is fitte
   // At rest the joint's skin matrix is the identity; turned 90 degrees about y and lifted, it carries the eye along.
   engine.store.tick(false);
   const rest = fit.follow();
-  [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1].forEach((v, i) => assert.ok(Math.abs(rest[i] - v) < 1e-6, `rest ${[...rest]}`));
+  [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1].forEach((v, i) =>
+    assert.ok(Math.abs(rest[i] - v) < 1e-6, `rest ${[...rest]}`),
+  );
   const joint = model.nodes[1];
   joint.rotation.set(0, Math.PI / 2, 0);
   joint.position.set(centre[0], centre[1] + 0.05, centre[2]);
@@ -179,7 +279,9 @@ test('Character Creator names get their looks, and a skinned CC eyeball is fitte
   const m = fit.follow(),
     at = [0, 1, 2].map((r) => m[r] * centre[0] + m[4 + r] * centre[1] + m[8 + r] * centre[2] + m[12 + r]),
     look = [0, 1, 2].map((r) => m[8 + r]);
-  at.forEach((v, i) => assert.ok(Math.abs(v - [centre[0], centre[1] + 0.05, centre[2]][i]) < 1e-6, `moved centre ${at}`));
+  at.forEach((v, i) =>
+    assert.ok(Math.abs(v - [centre[0], centre[1] + 0.05, centre[2]][i]) < 1e-6, `moved centre ${at}`),
+  );
   look.forEach((v, i) => assert.ok(Math.abs(v - [1, 0, 0][i]) < 1e-6, `turned axis ${look}`));
   await assert.rejects(personEye(model, {}), TypeError);
 });
@@ -197,14 +299,22 @@ test('eyeLidMargin finds the upper lid margin a head skin leaves over an eye', (
       s1 = -1 + (k + 1) / 80,
       base = positions.length / 3;
     // A column of skin from the arc up to two radii above the centre, 1.2 radii in front of it.
-    for (const [s, h] of [[s0, arc(s0)], [s1, arc(s1)], [s1, 2], [s0, 2]])
+    for (const [s, h] of [
+      [s0, arc(s0)],
+      [s1, arc(s1)],
+      [s1, 2],
+      [s0, 2],
+    ])
       positions.push(center[0] + radius * s, center[1] + radius * h, center[2] + 1.2 * radius);
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
   const lid = eyeLidMargin({ center, axis: [0, 0, 1], radius }, { positions, indices });
   // Nine columns from -0.6 to 0.6; at -0.6 the arc is below the axis (the skin hides the axis point), so that one is left out.
   assert.equal(lid.columns, 8);
-  assert.ok(Math.abs(lid.height - 0.2) < 0.002 && Math.abs(lid.tilt - 0.1) < 0.002 && Math.abs(lid.curve + 0.4) < 0.005, JSON.stringify(lid));
+  assert.ok(
+    Math.abs(lid.height - 0.2) < 0.002 && Math.abs(lid.tilt - 0.1) < 0.002 && Math.abs(lid.curve + 0.4) < 0.005,
+    JSON.stringify(lid),
+  );
   // No skin in front: no lid.
   assert.equal(eyeLidMargin({ center, axis: [0, 0, 1], radius }, { positions: [], indices: [] }), undefined);
 });
@@ -221,11 +331,22 @@ test('eyeLidMargin finds the lower lid margin under the eye the same way', () =>
       s1 = -1 + (k + 1) / 80;
     // Skin above the upper arc and below the lower one, 1.2 radii in front of the centre.
     for (const quad of [
-      [[s0, upperArc(s0)], [s1, upperArc(s1)], [s1, 2], [s0, 2]],
-      [[s0, -2], [s1, -2], [s1, lowerArc(s1)], [s0, lowerArc(s0)]],
+      [
+        [s0, upperArc(s0)],
+        [s1, upperArc(s1)],
+        [s1, 2],
+        [s0, 2],
+      ],
+      [
+        [s0, -2],
+        [s1, -2],
+        [s1, lowerArc(s1)],
+        [s0, lowerArc(s0)],
+      ],
     ]) {
       const base = positions.length / 3;
-      for (const [s, h] of quad) positions.push(center[0] + radius * s, center[1] + radius * h, center[2] + 1.2 * radius);
+      for (const [s, h] of quad)
+        positions.push(center[0] + radius * s, center[1] + radius * h, center[2] + 1.2 * radius);
       indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
   }
