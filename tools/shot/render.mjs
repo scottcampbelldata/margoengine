@@ -119,6 +119,113 @@ function pageUrl(origin, file) {
 }
 
 /**
+ * One frame of a render, run in the shot page (page.evaluate serializes it, so it reads nothing from this module): each
+ * of `subs` drawn on its own clock time and camera, the shot's settings written through `settingsHook` and the cutscene
+ * state through `apply` first, the GPU settled between them, and a kept frame captured from all of them. Exported for
+ * the tests, which run it against a stand-in `globalThis.__margoShot`.
+ */
+export const shotStep = async ({
+  subs,
+  kept,
+  capture = true,
+  engine,
+  apply,
+  settingsHook,
+  ground,
+  canvas,
+  png,
+  expectHash,
+  thumbnail,
+  warmup,
+  masks,
+  viewProjection,
+  recordSky,
+  skyCoverage,
+}) => {
+  const shot = globalThis.__margoShot;
+  let result = null,
+    drawn = null;
+  for (let sub = 0; sub < subs.length; sub++) {
+    const { time, state, settings } = subs[sub];
+    let { camera } = subs[sub];
+    // Heights above the ground (shot.page.ground): the page's ground added under the camera and the target,
+    // as onGround in shot-file.mjs does. The page may give its ground only once it has loaded it.
+    if (camera && ground) {
+      const at = shot.get(ground);
+      if (typeof at !== 'function') {
+        if (!warmup)
+          throw new Error(`${ground} is not a function in the page; set shot.page.ground to the page's ground`);
+        camera = null;
+      } else {
+        const a = at(camera.position[0], camera.position[2]),
+          b = at(camera.target[0], camera.target[2]);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`${ground} gave ${a} and ${b}, not metres`);
+        camera = {
+          ...camera,
+          position: [camera.position[0], camera.position[1] + a, camera.position[2]],
+          target: [camera.target[0], camera.target[1] + b, camera.target[2]],
+        };
+      }
+    }
+    if (camera) drawn = camera;
+    if (camera) {
+      const target = shot.get(engine)?.camera;
+      // The engine may appear only after the page's first frames, while it still loads.
+      if (!target && !warmup) throw new Error(`no engine at ${engine}; set shot.page.engine to the page's engine`);
+      if (target) {
+        target.position = camera.position;
+        target.target = camera.target;
+        target.fov = camera.fov;
+        target.up = camera.up;
+      }
+    }
+    // The shot's settings through each package's own apply function, before page.apply (docs/shots.md).
+    if (settings && settingsHook) {
+      const write = shot.get(settingsHook);
+      if (typeof write !== 'function') throw new Error(`${settingsHook} is not a function in the page`);
+      await write(settings, { time: time.seconds, kept });
+    }
+    if (state && apply) {
+      const hook = shot.get(apply);
+      if (typeof hook !== 'function') throw new Error(`${apply} is not a function in the page`);
+      await hook(state, { time: time.seconds, kept });
+    }
+    // The sky's own coverage record, for skyClip of a shot with no page sky mask: on before the frame is drawn.
+    if (recordSky) shot.recordSky(engine);
+    const ran = shot.frame(time.ms);
+    if (!ran) {
+      if (warmup) return { idle: true };
+      throw new Error('the page stopped asking for frames (its loop ended; see the page errors)');
+    }
+    if (kept !== null && capture) {
+      // capture() starts its copy before its first await, so the frame is read before the browser presents it.
+      const { size, via, render, done } = await shot.capture(canvas, { sub, subs: subs.length });
+      if (done) {
+        result = { size, via, render, samples: shot.samples, sha256: await shot.hash() };
+        if (thumbnail !== undefined) shot.thumbnail(thumbnail);
+        if (png || (expectHash && result.sha256 !== expectHash)) result.png = await shot.png();
+        if (masks) result.aovs = await shot.masks({ ...masks, engine, png });
+        if (skyCoverage) {
+          const covered = await shot.skyCoverage({ engine, png });
+          if (covered) result.aovs = { ...result.aovs, ...covered };
+        }
+        // A probe's camera as core drew it, for the look checks' analytic horizon (P4): the column-major
+        // view-projection core computed for this frame, at the canvas's aspect.
+        if (viewProjection) {
+          const matrix = shot.get(engine)?.camera?.matrix;
+          if (matrix?.length !== 16) throw new Error(`no engine camera at ${engine} for the probe's view-projection`);
+          result.viewProjection = Array.from(matrix);
+        }
+        // The camera as drawn (heights above sea level, the ground added), for the stills' record.
+        if (drawn) result.camera = { position: [...drawn.position], target: [...drawn.target], fov: drawn.fov };
+      }
+    }
+    await shot.settle();
+  }
+  return result;
+};
+
+/**
  * One render of a shot in an open page: load, warm up, then every frame of shotFrames(). `write` keeps PNG files;
  * `expect` (another render's hashes) writes the frames that differ from it into `out/mismatch`. `only` (a set of
  * kept frame indices, the probes of a production render) captures and hashes just those: every frame up to the
@@ -162,107 +269,7 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     await page.waitForFunction(() => globalThis.__margoShot.queued > 0, null, { timeout: 180_000, polling: 250 });
     // One frame of the render: each of `subs` (one, or a kept frame's sub-frames over the shutter) drawn on its own
     // clock time and camera, the GPU settled between them, and a kept frame captured from all of them.
-    const step = (args) =>
-      page.evaluate(
-        async ({
-          subs,
-          kept,
-          capture = true,
-          engine,
-          apply,
-          settingsHook,
-          ground,
-          canvas,
-          png,
-          expectHash,
-          thumbnail,
-          warmup,
-          masks,
-          viewProjection,
-          recordSky,
-          skyCoverage,
-        }) => {
-          const shot = globalThis.__margoShot;
-          let result = null,
-            drawn = null;
-          for (let sub = 0; sub < subs.length; sub++) {
-            const { time, state, settings } = subs[sub];
-            let { camera } = subs[sub];
-            // Heights above the ground (shot.page.ground): the page's ground added under the camera and the target,
-            // as onGround in shot-file.mjs does. The page may give its ground only once it has loaded it.
-            if (camera && ground) {
-              const at = shot.get(ground);
-              if (typeof at !== 'function') {
-                if (!warmup)
-                  throw new Error(`${ground} is not a function in the page; set shot.page.ground to the page's ground`);
-                camera = null;
-              } else {
-                const a = at(camera.position[0], camera.position[2]),
-                  b = at(camera.target[0], camera.target[2]);
-                if (!Number.isFinite(a) || !Number.isFinite(b))
-                  throw new Error(`${ground} gave ${a} and ${b}, not metres`);
-                camera = {
-                  ...camera,
-                  position: [camera.position[0], camera.position[1] + a, camera.position[2]],
-                  target: [camera.target[0], camera.target[1] + b, camera.target[2]],
-                };
-              }
-            }
-            if (camera) drawn = camera;
-            if (camera) {
-              const target = shot.get(engine)?.camera;
-              // The engine may appear only after the page's first frames, while it still loads.
-              if (!target && !warmup)
-                throw new Error(`no engine at ${engine}; set shot.page.engine to the page's engine`);
-              if (target) {
-                target.position = camera.position;
-                target.target = camera.target;
-                target.fov = camera.fov;
-                target.up = camera.up;
-              }
-            }
-            if (state && apply) {
-              const hook = shot.get(apply);
-              if (typeof hook !== 'function') throw new Error(`${apply} is not a function in the page`);
-              await hook(state, { time: time.seconds, kept });
-            }
-            // The sky's own coverage record, for skyClip of a shot with no page sky mask: on before the frame is drawn.
-            if (recordSky) shot.recordSky(engine);
-            const ran = shot.frame(time.ms);
-            if (!ran) {
-              if (warmup) return { idle: true };
-              throw new Error('the page stopped asking for frames (its loop ended; see the page errors)');
-            }
-            if (kept !== null && capture) {
-              // capture() starts its copy before its first await, so the frame is read before the browser presents it.
-              const { size, via, render, done } = await shot.capture(canvas, { sub, subs: subs.length });
-              if (done) {
-                result = { size, via, render, samples: shot.samples, sha256: await shot.hash() };
-                if (thumbnail !== undefined) shot.thumbnail(thumbnail);
-                if (png || (expectHash && result.sha256 !== expectHash)) result.png = await shot.png();
-                if (masks) result.aovs = await shot.masks({ ...masks, engine, png });
-                if (skyCoverage) {
-                  const covered = await shot.skyCoverage({ engine, png });
-                  if (covered) result.aovs = { ...result.aovs, ...covered };
-                }
-                // A probe's camera as core drew it, for the look checks' analytic horizon (P4): the column-major
-                // view-projection core computed for this frame, at the canvas's aspect.
-                if (viewProjection) {
-                  const matrix = shot.get(engine)?.camera?.matrix;
-                  if (matrix?.length !== 16)
-                    throw new Error(`no engine camera at ${engine} for the probe's view-projection`);
-                  result.viewProjection = Array.from(matrix);
-                }
-                // The camera as drawn (heights above sea level, the ground added), for the stills' record.
-                if (drawn) result.camera = { position: [...drawn.position], target: [...drawn.target], fov: drawn.fov };
-              }
-            }
-            await shot.settle();
-          }
-          return result;
-        },
-        args,
-      );
+    const step = (args) => page.evaluate(shotStep, args);
     // A shot with no page sky mask asks the page's sky (if it has one) where it drew, for skyClip (KB-HEARTH-CLIP1).
     const recordSky = !shot.aovs.includes('sky') && probes.size > 0,
       common = {
