@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17832331,
+  "total": 17843515,
   "history": [
     {
       "date": "2026-10-24",
@@ -11643,6 +11643,18 @@
       "commit": "db39abcdd",
       "reason": "physics gains debug modes for solver contacts, pseudo normals and soft bodies",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "b1c571c69",
+      "reason": "physics gains compound internal edges",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "b1c571c69",
+      "reason": "physics gains compound internal edges and height field pseudo normals",
+      "grew": 1
     }
   ],
   "items": {
@@ -12401,8 +12413,8 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 293955,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 73246,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 215980,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 75653,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 224757,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 1249,
     "@margoengine/physics/soft": 80691,

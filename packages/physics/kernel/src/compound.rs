@@ -79,7 +79,12 @@ impl World {
                         _ => (cb, NONE),
                     };
                     let limit = self.contact_limit_of(x, y, dt);
-                    if !self.touch_part(row, key, ratio, bodies, &mut manifold, |w, m| w.collide(x, y, limit, m)) {
+                    if !self.touch_part(row, key, ratio, bodies, &mut manifold, |w, m| {
+                        w.collide(x, y, limit, m);
+                        if (w.uu(COLLIDER_FLAGS, x) | w.uu(COLLIDER_FLAGS, y)) & COLLIDER_CUTS != 0 {
+                            w.fix_cut_contacts(x, y, m);
+                        }
+                    }) {
                         return;
                     }
                 }

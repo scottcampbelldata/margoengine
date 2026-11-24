@@ -12,6 +12,7 @@ pub mod ccd;
 pub mod compound;
 pub mod contact;
 pub mod couplings;
+pub mod cuts;
 pub mod events;
 pub mod gjk;
 pub mod halfspace;

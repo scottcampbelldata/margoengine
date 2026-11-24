@@ -123,6 +123,7 @@ export class ContactPointModification {
   /** @internal */
   constructor(
     private readonly kernel: KernelWorld,
+    private readonly row: number,
     private readonly at: number,
   ) {}
   /** Where the point is on the first body, from its centre of mass and in the body's frame. */
@@ -157,7 +158,7 @@ export class ContactPointModification {
     if (!Number.isFinite(value))
       throw new RangeError(`A contact distance is a finite number of metres (got ${value}).`);
     const c = this.kernel.columns,
-      row = Math.floor(this.at / 4),
+      row = this.row,
       body = c.colliderBody[c.pairB[row]!]!,
       shift = value - c.contactSeparation[this.at]!,
       n = [c.pairNormalX[row]! * shift, c.pairNormalY[row]! * shift, c.pairNormalZ[row]! * shift] as const,
@@ -269,7 +270,7 @@ export class ContactModification {
       throw new RangeError(
         `This pair has ${this.contactCount} contact points; pass k from 0 to ${this.contactCount - 1}.`,
       );
-    return new ContactPointModification(this.kernel, this.row * 4 + k);
+    return new ContactPointModification(this.kernel, this.row, this.row * 4 + k);
   }
   /**
    * Makes the collider `platform` a one-way platform: contacts whose normal, taken from the platform to the other collider,
@@ -1151,6 +1152,7 @@ export class Physics implements EnginePlugin, BodyOwner {
         ? this.kernel.addCompound(body.row, parts, placed)
         : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
       collider = new PhysicsCollider(this.kernel, row, body, name);
+    if (parts && 'fixInternalEdges' in options && options.fixInternalEdges) this.kernel.fixCompoundEdges(row);
     if (options.collisionGroups !== undefined) writeGroups(this.kernel, row, options.collisionGroups, false);
     if (options.solverGroups !== undefined) writeGroups(this.kernel, row, options.solverGroups, true);
     if (options.sensor || options.enabled === false)

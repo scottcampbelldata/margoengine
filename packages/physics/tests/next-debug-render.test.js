@@ -150,7 +150,11 @@ test('solver contacts draw a gap line and a normal tick a point, and pseudo norm
     },
   });
   const normals = world.debugRender({ colliders: false, contacts: false, pseudoNormals: true });
-  assert.equal(segments(normals), 3, 'a tick at each of the two triangles and one at the edge they share');
+  assert.equal(
+    segments(normals),
+    2 + 1 + 4,
+    'a tick at each of the two triangles, one at the edge they share and one at each of the four corners',
+  );
   const plain = new Physics(null);
   plain.addBody(null, {
     type: 'fixed',
@@ -162,5 +166,47 @@ test('solver contacts draw a gap line and a normal tick a point, and pseudo norm
     'a mesh without fixInternalEdges has none',
   );
   world.dispose();
+  plain.dispose();
+});
+
+test('a height field draws a normal at each triangle, shared edge and vertex, and leaves out what a cell status removed', async () => {
+  await Physics.load();
+  const field = (cellStatus) => {
+    const physics = new Physics(null);
+    physics.addBody(null, {
+      type: 'fixed',
+      colliders: {
+        shape: 'heightfield',
+        rows: 2,
+        columns: 2,
+        heights: new Array(9).fill(0),
+        scale: [2, 1, 2],
+        fixInternalEdges: true,
+        cellStatus,
+      },
+    });
+    const lines = physics.debugRender({ colliders: false, contacts: false, pseudoNormals: true });
+    physics.dispose();
+    return lines;
+  };
+  // Eight triangles, the eight edges two of them share (four diagonals and four borders), and nine vertices.
+  const whole = field(undefined);
+  assert.equal(segments(whole), 8 + 8 + 9);
+  for (let i = 0; i < whole.vertices.length; i += 6) {
+    const dy = whole.vertices[i + 4] - whole.vertices[i + 1];
+    assert.ok(Math.abs(dy - 0.1) < 1e-5, `a flat field's normals are up (${dy})`);
+  }
+  // The corner cell removed: six triangles, five shared edges, eight vertices.
+  assert.equal(segments(field([6, 0, 0, 0])), 6 + 5 + 8);
+  const plain = new Physics(null);
+  plain.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'heightfield', rows: 1, columns: 1, heights: [0, 0, 0, 0], scale: [1, 1, 1] },
+  });
+  assert.equal(
+    segments(plain.debugRender({ colliders: false, contacts: false, pseudoNormals: true })),
+    0,
+    'a field without fixInternalEdges has none',
+  );
   plain.dispose();
 });

@@ -176,6 +176,7 @@ interface KernelExports extends WebAssembly.Exports {
     qw: number,
   ): number;
   collider_aabb(collider: number): number;
+  compound_fix_edges(compound: number): number;
   collider_aabb_at(
     collider: number,
     x: number,
@@ -1668,6 +1669,14 @@ export class KernelWorld {
       );
     this.meshRows = row + 1;
     return row;
+  }
+  /**
+   * Reads the hull parts of a compound collider against each other and mends their joins (Rapier's `FIX_INTERNAL_EDGES` for
+   * compounds): contacts on a face another part covers are dropped, and contacts on a flat edge of the union take the outline's
+   * normal. Each part's hull must be its own. @returns How many cut faces it found.
+   */
+  fixCompoundEdges(compound: number): number {
+    return this.api.compound_fix_edges(compound);
   }
   /** Sets the upper halves of the groups of the next queries that carry QUERY_WIDE_GROUPS. */
   setQueryGroupsHi(hi: number): void {

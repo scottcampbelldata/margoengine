@@ -262,6 +262,10 @@ impl World {
                 return HULL_BAD_INDEX;
             }
             self.set_u(EDGE_TWIN, e0 + e, NONE);
+            self.set_u(EDGE_SNAP, e0 + e, 0);
+        }
+        for f in 0..faces as usize {
+            self.set_u(FACE_CUT, f0 + f, 0);
         }
         // The vertices' middle is a point inside, which the mass integrals start from.
         let mut sum = v3(0.0, 0.0, 0.0);

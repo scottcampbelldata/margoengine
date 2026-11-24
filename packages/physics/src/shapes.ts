@@ -107,7 +107,17 @@ export type ShapeOptions =
    * Several convex parts welded into one collider (one handle, one set of events), each with its own offset and
    * rotation in the collider's frame: a chair from boxes, a dumbbell from two spheres and a cylinder.
    */
-  | { shape: 'compound'; parts: readonly CompoundPart[] }
+  | {
+      shape: 'compound';
+      parts: readonly CompoundPart[];
+      /**
+       * Treat the faces where two hull parts meet as inside the union, as Rapier's `CompoundFlags.FIX_INTERNAL_EDGES` (default
+       * false; the cuts of a convex decomposition): a contact on such a face is dropped, and one on an edge beside it, where the
+       * outline goes on flat, is clamped to the outline's normal, so a ball or a box rolls over the join with no catch. A one-off
+       * pass over the parts' faces; only hull parts are read.
+       */
+      fixInternalEdges?: boolean;
+    }
   /**
    * A concave mesh split into convex pieces, so dynamic bodies get a hollow cup or a torus right. Takes `parts`, the
    * result of `convexDecomposition` from `@margoengine/physics/decomposition` (the own decomposition, which
@@ -120,6 +130,8 @@ export type ShapeOptions =
       geometry?: ColliderGeometry;
       vertices?: ArrayLike<number>;
       indices?: ArrayLike<number>;
+      /** As on `compound`: the cuts between the convex pieces are inside the union (default false). */
+      fixInternalEdges?: boolean;
     }
   /**
    * A grid of filled cells: terrain and other block worlds. `cells` holds integer x, y, z cell coordinates, three per

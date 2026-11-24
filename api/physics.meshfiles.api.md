@@ -205,6 +205,7 @@ type ShapeOptions = {
  | {
     shape: 'compound';
     parts: readonly CompoundPart[];
+    fixInternalEdges?: boolean;
 }
  | {
     shape: 'convexDecomposition';
@@ -212,6 +213,7 @@ type ShapeOptions = {
     geometry?: ColliderGeometry;
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
+    fixInternalEdges?: boolean;
 }
  | {
     shape: 'voxels';

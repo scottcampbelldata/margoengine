@@ -309,7 +309,7 @@ export class ContactModification {
 }
 
 export class ContactPointModification {
-    constructor(kernel: KernelWorld, at: number);
+    constructor(kernel: KernelWorld, row: number, at: number);
     get anchorA(): [number, number, number];
     set anchorA(value: Vec3);
     get anchorB(): [number, number, number];
@@ -744,6 +744,7 @@ export class KernelWorld {
     aimCollider(collider: number, motion: number): void;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
+    fixCompoundEdges(compound: number): number;
     setQueryGroupsHi(hi: number): void;
     setCellStatus(collider: number, row: number, column: number, status: number): void;
     cellStatus(collider: number, row: number, column: number): number;
@@ -1609,6 +1610,7 @@ export type ShapeOptions = {
  | {
     shape: 'compound';
     parts: readonly CompoundPart[];
+    fixInternalEdges?: boolean;
 }
  | {
     shape: 'convexDecomposition';
@@ -1616,6 +1618,7 @@ export type ShapeOptions = {
     geometry?: ColliderGeometry;
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
+    fixInternalEdges?: boolean;
 }
  | {
     shape: 'voxels';

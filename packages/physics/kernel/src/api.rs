@@ -789,6 +789,13 @@ pub extern "C" fn query_shape_all(
     count as i32
 }
 
+/// Reads the hull children of a compound collider against each other and mends their joins (`World::fix_compound_cuts`): the
+/// count of cut faces found.
+#[unsafe(no_mangle)]
+pub extern "C" fn compound_fix_edges(compound: u32) -> u32 {
+    world().fix_compound_cuts(compound)
+}
+
 /// Gives a live collider mass properties of its own, in place of its shape's at its density: a mass in kilograms (below 0
 /// takes them off), the centre of mass in the collider's frame, the principal moments of inertia and the unit quaternion
 /// that turns their axes. False for a collider that is gone, or numbers that cannot be a body.

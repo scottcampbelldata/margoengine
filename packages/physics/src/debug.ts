@@ -488,7 +488,11 @@ function solverLines(world: KernelWorld, seen: ReadonlySet<number>, out: Lines, 
   }
 }
 
-/** The normals of a `fixInternalEdges` triangle mesh: one at each triangle's middle, one at each shared edge's middle. */
+/**
+ * The normals of a `fixInternalEdges` triangle mesh or height field: one at each triangle's middle, one at the middle of each edge
+ * two triangles share (the mean of their faces' normals), and one at each vertex (the faces round it, weighted by their angle
+ * there, Baerentzen and Aanaes 2005). A removed or split height field cell draws what is left of it.
+ */
 function pseudoNormalLines(
   world: KernelWorld,
   row: number,
@@ -499,44 +503,88 @@ function pseudoNormalLines(
 ): void {
   const c = world.columns,
     mesh = c.colliderHull[row]!;
-  if (!(c.meshFlags[mesh]! & 1) || c.meshColumns[mesh]! !== 0 || c.meshTriangles[mesh]! === 0) return;
+  if (!(c.meshFlags[mesh]! & 1)) return;
   const v0 = c.meshFirstVertex[mesh]!,
-    t0 = c.meshFirstTriangle[mesh]!,
+    columns = c.meshColumns[mesh]!,
     local = (i: number): V => [c.meshVertexX[v0 + i]!, c.meshVertexY[v0 + i]!, c.meshVertexZ[v0 + i]!],
-    place = (v: V): V => {
+    triangles: [number, number, number][] = [];
+  if (columns === 0) {
+    const t0 = c.meshFirstTriangle[mesh]!;
+    for (let t = 0; t < c.meshTriangles[mesh]!; t++)
+      triangles.push([c.triangleA[t0 + t]!, c.triangleB[t0 + t]!, c.triangleC[t0 + t]!]);
+  } else {
+    // A height field: two triangles a cell, split and thinned as the cell's status says (the kernel's own split).
+    const rows = c.meshVertices[mesh]! / (columns + 1) - 1,
+      at = (r: number, k: number): number => r + (rows + 1) * k,
+      first = c.voxelFirst[mesh]!;
+    for (let k = 0; k < columns; k++)
+      for (let r = 0; r < rows; r++) {
+        const cell = r + rows * k,
+          status = (c.voxelWord[first + (cell >>> 2)]! >>> (8 * (cell & 3))) & 0xff,
+          [a, b, d, e] = [at(r, k), at(r + 1, k), at(r, k + 1), at(r + 1, k + 1)];
+        const [left, right]: [number[], number[]] =
+          status & 1
+            ? [
+                [a, b, e],
+                [a, e, d],
+              ]
+            : [
+                [a, b, d],
+                [b, e, d],
+              ];
+        if (!(status & 2)) triangles.push(left as [number, number, number]);
+        if (!(status & 4)) triangles.push(right as [number, number, number]);
+      }
+  }
+  const place = (v: V): V => {
       const r = rotate(pose.q, v);
       return [pose.p[0] + r[0], pose.p[1] + r[1], pose.p[2] + r[2]];
-    },
-    face = (t: number): { n: V; mid: V; corners: V[] } => {
-      const [a, b, d] = [local(c.triangleA[t0 + t]!), local(c.triangleB[t0 + t]!), local(c.triangleC[t0 + t]!)],
-        u: V = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
-        w: V = [d[0] - a[0], d[1] - a[1], d[2] - a[2]],
-        x: V = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
-        l = Math.hypot(x[0], x[1], x[2]) || 1;
-      return {
-        n: [x[0] / l, x[1] / l, x[2] / l],
-        mid: [(a[0] + b[0] + d[0]) / 3, (a[1] + b[1] + d[1]) / 3, (a[2] + b[2] + d[2]) / 3],
-        corners: [a, b, d],
-      };
     },
     tick = (from: V, n: V): void => {
       const start = place(from),
         r = rotate(pose.q, n);
       out.segment(start, [start[0] + r[0] * length, start[1] + r[1] * length, start[2] + r[2] * length], color);
-    };
-  for (let t = 0; t < c.meshTriangles[mesh]!; t++) {
-    const f = face(t);
-    tick(f.mid, f.n);
+    },
+    unit = (x: V): V => {
+      const l = Math.hypot(x[0], x[1], x[2]) || 1;
+      return [x[0] / l, x[1] / l, x[2] / l];
+    },
+    normals = triangles.map(([a, b, d]) => {
+      const [p, q, r] = [local(a), local(b), local(d)],
+        u: V = [q[0] - p[0], q[1] - p[1], q[2] - p[2]],
+        w: V = [r[0] - p[0], r[1] - p[1], r[2] - p[2]];
+      return unit([u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]);
+    }),
+    vertexSum = new Map<number, V>(),
+    edges = new Map<string, number>();
+  triangles.forEach((tri, t) => {
+    const n = normals[t]!,
+      mid: V = [0, 0, 0];
     for (let k = 0; k < 3; k++) {
-      const other = [c.triangleAcross0, c.triangleAcross1, c.triangleAcross2][k]![t0 + t]!;
-      // Each shared edge once, from the lower triangle.
-      if (other === 0xffffffff || other < t) continue;
-      const g = face(other),
-        p = f.corners[k]!,
-        q = f.corners[(k + 1) % 3]!,
-        sum: V = [f.n[0] + g.n[0], f.n[1] + g.n[1], f.n[2] + g.n[2]],
-        l = Math.hypot(sum[0], sum[1], sum[2]) || 1;
-      tick([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2], [sum[0] / l, sum[1] / l, sum[2] / l]);
+      const p = local(tri[k]!),
+        previous = local(tri[(k + 2) % 3]!),
+        next = local(tri[(k + 1) % 3]!),
+        e1 = unit([next[0] - p[0], next[1] - p[1], next[2] - p[2]]),
+        e2 = unit([previous[0] - p[0], previous[1] - p[1], previous[2] - p[2]]),
+        angle = Math.acos(Math.max(-1, Math.min(1, e1[0] * e2[0] + e1[1] * e2[1] + e1[2] * e2[2]))),
+        sum = vertexSum.get(tri[k]!) ?? [0, 0, 0];
+      vertexSum.set(tri[k]!, [sum[0] + n[0] * angle, sum[1] + n[1] * angle, sum[2] + n[2] * angle]);
+      mid[0] += p[0] / 3;
+      mid[1] += p[1] / 3;
+      mid[2] += p[2] / 3;
+      const from = tri[k]!,
+        to = tri[(k + 1) % 3]!,
+        key = from < to ? `${from},${to}` : `${to},${from}`,
+        other = edges.get(key);
+      if (other === undefined) edges.set(key, t);
+      else {
+        const m = normals[other]!,
+          a = local(from),
+          b = local(to);
+        tick([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], unit([n[0] + m[0], n[1] + m[1], n[2] + m[2]]));
+      }
     }
-  }
+    tick(mid, n);
+  });
+  for (const [vertex, sum] of vertexSum) tick(local(vertex), unit(sum));
 }

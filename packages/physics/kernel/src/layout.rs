@@ -388,11 +388,16 @@ columns! {
     EDGE_TWIN u32 HullEdge,
     EDGE_FACE u32 HullEdge,
     EDGE_CHAIN u32 HullEdge,
+    // 1 on a half-edge whose face is an outline face of a compound and whose twin's face is a cut face the compound's other parts
+    // cover, where the outline goes on flat: a contact on that edge is clamped to this face's normal (cuts.rs).
+    EDGE_SNAP u32 HullEdge,
     FACE_EDGE u32 HullFace,
     FACE_NORMAL_X f32 HullFace,
     FACE_NORMAL_Y f32 HullFace,
     FACE_NORMAL_Z f32 HullFace,
     FACE_OFFSET f32 HullFace,
+    // 1 on a face another part of the same compound covers face to face: it is inside the union (cuts.rs).
+    FACE_CUT u32 HullFace,
     // Joints: two bodies, the JOINT_ bits below, and the chain of each body's joints. A free row has its next in JOINT_NEXT_A.
     JOINT_A u32 Joint,
     JOINT_B u32 Joint,
@@ -819,6 +824,9 @@ pub const COLLIDER_SOLVER_OR: u32 = 1 << 13;
 /// halves are in COLLIDER_GROUPS_HI (or COLLIDER_SOLVER_GROUPS_HI).
 pub const COLLIDER_GROUPS_WIDE: u32 = 1 << 14;
 pub const COLLIDER_SOLVER_WIDE: u32 = 1 << 15;
+/// Bit 16 of COLLIDER_FLAGS: a hull part of a compound whose internal edges are fixed (`World::fix_compound_cuts`): contacts on its
+/// cut faces are dropped, and on the edges of its cuts clamped to the outline.
+pub const COLLIDER_CUTS: u32 = 1 << 16;
 pub const TYPES_DEFAULT: u32 = 7;
 
 // Bits of the PAIR_FLAGS column.

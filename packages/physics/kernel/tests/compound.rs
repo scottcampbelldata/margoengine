@@ -242,3 +242,62 @@ fn removing_a_compound_frees_its_children() {
     // A body with no collider left weighs nothing.
     assert_eq!(w.s(INVERSE_MASS, body as usize), 0.0);
 }
+
+/// A hull of a slab from `x0` to `x1`, 0.5 thick with its top at `top`, 6 deep: eight points and six quads.
+fn slab(w: &mut World, x0: f32, x1: f32, top: f32) -> f32 {
+    let mut vertices = vec![];
+    for x in [x0, x1] {
+        for y in [top - 0.5, top] {
+            for z in [-3.0, 3.0] {
+                vertices.push([x, y, z]);
+            }
+        }
+    }
+    // Vertex i is (x bit 2, y bit 1, z bit 0); faces counter-clockwise from outside.
+    let faces: [&[u32]; 6] = [&[0, 1, 3, 2], &[4, 6, 7, 5], &[0, 4, 5, 1], &[2, 3, 7, 6], &[0, 2, 6, 4], &[1, 5, 7, 3]];
+    w.add_hull(&vertices, &faces) as f32
+}
+
+#[test]
+fn parts_that_meet_face_to_face_have_cuts_and_flat_edges_marked_and_a_step_has_none() {
+    for (lower, cuts, snaps) in [(0.0f32, 2u32, 8usize), (-0.3, 0, 0)] {
+        let mut w = World::new(8, 8).unwrap();
+        let body = w.add_body(FIXED).unwrap();
+        let parent = w.add_collider(body, SHAPE_COMPOUND, [0.0; 3], [0.0; 3], ID, 1.0).unwrap();
+        let (a, b) = (slab(&mut w, -4.0, 0.0, 0.0), slab(&mut w, 0.0, 4.0, lower));
+        w.add_compound_part(parent, SHAPE_HULL, [a, 0.0, 0.0], [0.0; 3], ID).unwrap();
+        w.add_compound_part(parent, SHAPE_HULL, [b, 0.0, 0.0], [0.0; 3], ID).unwrap();
+        assert_eq!(w.fix_compound_cuts(parent), cuts, "cut faces with the second slab's top at {lower}");
+        let marked = (0..w.header().hull_rows[2] as usize).filter(|&e| w.uu(EDGE_SNAP, e) != 0).count();
+        assert_eq!(marked, snaps, "flat edges beside the cuts");
+    }
+}
+
+#[test]
+fn a_ball_over_the_join_of_two_flat_parts_gets_the_outline_normal_and_one_over_a_step_does_not() {
+    for (lower, flat) in [(0.0f32, true), (-0.3, false)] {
+        let mut w = World::new(8, 8).unwrap();
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        let body = w.add_body(FIXED).unwrap();
+        let parent = w.add_collider(body, SHAPE_COMPOUND, [0.0; 3], [0.0; 3], ID, 1.0).unwrap();
+        let (a, b) = (slab(&mut w, -4.0, 0.0, 0.0), slab(&mut w, 0.0, 4.0, lower));
+        w.add_compound_part(parent, SHAPE_HULL, [a, 0.0, 0.0], [0.0; 3], ID).unwrap();
+        w.add_compound_part(parent, SHAPE_HULL, [b, 0.0, 0.0], [0.0; 3], ID).unwrap();
+        w.fix_compound_cuts(parent);
+        // The ball's centre is a hair past the first slab's edge, so its nearest point on that slab is the edge itself.
+        let ball = awake(&mut w, DYNAMIC, v3(0.05, 0.3, 0.0));
+        w.add_collider(ball, SHAPE_BALL, [0.3, 0.0, 0.0], [0.0; 3], ID, 1.0).unwrap();
+        w.step(DT);
+        // Its contact with the first slab is up when the join is flat, and leans over the edge when the other part is lower.
+        let leaning = (0..w.header().pair_rows as usize)
+            .filter(|&r| w.uu(PAIR_A, r) != NONE && w.uu(PAIR_CONTACTS, r) > 0)
+            .map(|r| w.v(PAIR_NORMAL_X, r).y.abs())
+            .fold(f32::INFINITY, f32::min);
+        if flat {
+            assert!(leaning > 0.9999, "every contact is up over a flat join ({leaning})");
+        } else {
+            // The step is no join: the edge keeps the normal it has, which is not up.
+            assert!(leaning < 0.9999, "the edge of a step leans ({leaning})");
+        }
+    }
+}
