@@ -360,6 +360,8 @@ Pass `fetch: manager.fetch` from `@margoengine/cache/manager`'s `LoadingManager`
 
 `createMeshes` gives core `PbrMaterial` colours only. For textures, `@margoengine/loaders/mtl` builds `@margoengine/materials` meshes (an optional peer dependency: install it to use this entry). One call fetches the .obj, its `mtllib` files next to it and every texture relative to its .mtl file, and draws each `usemtl` group with its material:
 
+A textured quad from `packages/loaders/tests/fixtures/mtl-gpu` (an OBJ, its MTL and a 2 x 2 `map_Kd` image) is drawn on a real GPU, natively and on the WebGL2 layer, and each quadrant is checked for its texel's colour (`npm run test:gpu:mtl -w @margoengine/loaders`).
+
 ```ts
 import {loadOBJ} from 'margoengine/loaders/mtl';
 import {Engine} from 'margoengine/core';
