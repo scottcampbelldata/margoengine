@@ -154,7 +154,7 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
     if (part.shape === 'box') {
       if (!part.halfExtents) throw new TypeError('A compound box part needs halfExtents; parts are never fitted to the mesh.');
       checkVec(part.halfExtents, 'Compound box halfExtents');
-      return { shape: 'box', size: [...part.halfExtents], ...placed };
+      return { shape: 'box', size: [...part.halfExtents], border: roundness(part.borderRadius, 'Compound box'), ...placed };
     }
     if (part.shape === 'sphere') {
       if (part.radius === undefined) throw new TypeError('A compound sphere part needs a radius; parts are never fitted to the mesh.');
@@ -164,7 +164,7 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
     if (part.shape === 'cylinder' || part.shape === 'cone') return { shape: part.shape, size: revolvedSize(part), ...placed };
     if (!part.points) throw new TypeError('A compound convexHull part needs points; parts are never fitted to the mesh.');
     const { vertices, faces } = buildHull(Float32Array.from(part.points));
-    return { shape: 'hull', size: [hulls.addHull(vertices, faces)], ...placed };
+    return { shape: 'hull', size: [hulls.addHull(vertices, faces)], border: roundness(part.borderRadius, 'Compound hull'), ...placed };
   });
 }
 

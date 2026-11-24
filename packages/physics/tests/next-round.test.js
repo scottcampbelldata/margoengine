@@ -107,3 +107,35 @@ test('a round triangle meets rays, projections, casts and a falling ball where R
   for (const w of rests) near(w.ball.position[1], 0.55, 0.01, 'rests a border and a radius above');
   for (const w of rests) w.physics.dispose();
 });
+
+test('a compound with round box and hull parts meets rays and a falling ball where Rapier does', () => {
+  const worlds = both((physics) => {
+    physics.addBody(null, {
+      type: 'fixed',
+      colliders: {
+        shape: 'compound',
+        parts: [
+          { shape: 'box', halfExtents: [0.5, 0.5, 0.5], borderRadius: 0.2, offset: [-2, 0, 0] },
+          { shape: 'convexHull', points: cube, borderRadius: 0.3, offset: [2, 0, 0] },
+          { shape: 'sphere', radius: 0.4, offset: [0, 3, 0] },
+        ],
+      },
+    });
+    const ball = physics.addBody(null, { position: [-2, 3, 0], colliders: { shape: 'sphere', radius: 0.25 } });
+    physics.step();
+    return { ball };
+  });
+  for (const [origin, direction] of [[[-6, 0.1, 0.1], [1, 0, 0]], [[6, 0.2, 0], [-1, 0, 0]], [[-2, 5, 0.1], [0, -1, 0]]]) {
+    const [own, rapier] = worlds.map((w) => w.physics.raycast(origin, direction, { predicate: (body) => body !== w.ball }));
+    assert.ok(own && rapier, `${origin}`);
+    assert.ok(Math.abs(own.distance - rapier.distance) < 2e-3, `${origin}: ${own.distance} vs ${rapier.distance}`);
+  }
+  for (let i = 0; i < 180; i++) for (const w of worlds) w.physics.step();
+  // The ball lands on the round box's top: 0.5 + 0.2 + 0.25.
+  for (const w of worlds) assert.ok(Math.abs(w.ball.position[1] - 0.95) < 0.015, `${w.ball.position[1]}`);
+  assert.throws(
+    () => new Physics(null).addBody(null, { colliders: { shape: 'compound', parts: [{ shape: 'box', halfExtents: [1, 1, 1], borderRadius: -1 }] } }),
+    /borderRadius/,
+  );
+  for (const w of worlds) w.physics.dispose();
+});

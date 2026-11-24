@@ -122,6 +122,7 @@ export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 export type CompoundPart = ({
     shape: 'box';
     halfExtents: Vec3;
+    borderRadius?: number;
 } | {
     shape: 'sphere';
     radius: number;
@@ -142,6 +143,7 @@ export type CompoundPart = ({
 } | {
     shape: 'convexHull';
     points: ArrayLike<number>;
+    borderRadius?: number;
 }) & {
     offset?: Vec3;
     rotation?: Quat;

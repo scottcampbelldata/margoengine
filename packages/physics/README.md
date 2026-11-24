@@ -551,7 +551,7 @@ console.log(ball.position[1].toFixed(2)); // '0.40': resting on the plane
 physics.dispose();
 ```
 
-A `box` and a `convexHull` take `borderRadius` (default 0) too, Rapier's `roundCuboid` and `roundConvexHull`: the shape is every point within the border of the box or hull, so edges and corners are rounded and the box rests a border above where a sharp one does. A round box or hull weighs its core, as in Rapier; the border is not in `halfExtents`. It works in contacts, rays, point projection, shape casts and CCD; a compound part and a query shape (the shape given to `shapeCast` or `intersectShape`) cannot have one yet.
+A `box` and a `convexHull` take `borderRadius` (default 0) too, Rapier's `roundCuboid` and `roundConvexHull`: the shape is every point within the border of the box or hull, so edges and corners are rounded and the box rests a border above where a sharp one does. A round box or hull weighs its core, as in Rapier; the border is not in `halfExtents`. It works in contacts, rays, point projection, shape casts and CCD; a box or convexHull part of a compound takes `borderRadius` too, and so does a query shape.
 
 A `cylinder` and a `cone` stand along their local Y, `halfHeight` each way, a cone's apex at the top. `borderRadius` rounds every edge with a border outside `radius` and `halfHeight`, Rapier's `roundCylinder` and `roundCone`, and `collider.borderRadius()` reads it back. A round shape weighs its border too, where Rapier weighs only its core, so give `mass` to match a Rapier scene's weights. A cap or base on a floor holds a full manifold, so the shape stands; rays, `shapeCast` and point queries meet the exact surface.
 

@@ -487,6 +487,28 @@ impl World {
         true
     }
 
+    /// Gives a box or hull child of a compound a border (see `api::collider_set_part_border`). False when the child is not
+    /// in the compound's chain or cannot have one.
+    pub fn set_part_border(&mut self, compound: u32, child: u32, border: f32) -> bool {
+        if compound >= self.header().collider_rows
+            || self.uu(COLLIDER_SHAPE, compound as usize) != SHAPE_COMPOUND
+            || !(border >= 0.0 && border < f32::INFINITY)
+        {
+            return false;
+        }
+        let mut at = self.uu(COLLIDER_HULL, compound as usize);
+        while at != NONE && at != child {
+            at = self.uu(COLLIDER_NEXT, at as usize);
+        }
+        if at == NONE || !matches!(self.uu(COLLIDER_SHAPE, at as usize), SHAPE_BOX | SHAPE_HULL) {
+            return false;
+        }
+        self.set_s(COLLIDER_BORDER, at as usize, border);
+        self.mark_pending(compound);
+        self.wake(self.uu(COLLIDER_BODY, compound as usize));
+        true
+    }
+
     /// Sets a box's or hull's border (see `api::collider_set_border`).
     pub fn set_collider_border(&mut self, collider: u32, border: f32) -> bool {
         let at = collider as usize;

@@ -89,6 +89,7 @@ interface KernelExports extends WebAssembly.Exports {
     density: number,
   ): number;
   collider_set_border(collider: number, border: number): number;
+  collider_set_part_border(compound: number, child: number, border: number): number;
   collider_add_part(
     compound: number,
     shape: number,
@@ -201,6 +202,8 @@ export interface KernelCompoundPart {
   position?: readonly [number, number, number];
   /** Unit quaternion, x, y, z, w, in the compound's frame (default none). */
   rotation?: readonly [number, number, number, number];
+  /** A box's or hull's border (see {@link KernelColliderOptions.border}); default 0. */
+  border?: number;
 }
 
 /** How many numbers each shape's size takes, and its value in the `colliderShape` column. */
@@ -836,10 +839,13 @@ export class KernelWorld {
             rotation[2],
             rotation[3],
           );
-      if (add() < 0) {
+      let child = add();
+      if (child < 0) {
         this.reserve(this.capacity, this.colliderCapacity * 2);
-        add();
+        child = add();
       }
+      if (part.border && !this.api.collider_set_part_border(row, child, part.border))
+        throw new RangeError(`A compound part's border is 0 or more, and only a box or hull part takes one (got ${part.border} on a ${part.shape}).`);
     });
     return row;
   }

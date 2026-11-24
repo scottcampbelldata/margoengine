@@ -261,6 +261,11 @@ pub extern "C" fn collider_add(
 pub extern "C" fn collider_set_border(collider: u32, border: f32) -> u32 {
     world().set_collider_border(collider, border) as u32
 }
+/// Gives a box or hull child of a compound a border, as `collider_set_border`; false when it cannot.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_set_part_border(compound: u32, child: u32, border: f32) -> u32 {
+    world().set_part_border(compound, child, border) as u32
+}
 /// Gives a live collider another shape (see `World::set_collider_shape`), `a`, `b`, `c` as `collider_add` takes them; false
 /// when it cannot.
 #[unsafe(no_mangle)]

@@ -113,12 +113,12 @@ export type ShapeOptions =
 
 /** One part of a `compound` collider: a convex primitive or hull placed in the collider's frame. */
 export type CompoundPart = (
-  | { shape: 'box'; halfExtents: Vec3 }
+  | { shape: 'box'; halfExtents: Vec3; borderRadius?: number }
   | { shape: 'sphere'; radius: number }
   | { shape: 'capsule'; halfHeight: number; radius: number }
   | { shape: 'cylinder'; halfHeight: number; radius: number; borderRadius?: number }
   | { shape: 'cone'; halfHeight: number; radius: number; borderRadius?: number }
-  | { shape: 'convexHull'; points: ArrayLike<number> }
+  | { shape: 'convexHull'; points: ArrayLike<number>; borderRadius?: number }
 ) & {
   /** Part position in the collider's frame (default origin). */
   offset?: Vec3;

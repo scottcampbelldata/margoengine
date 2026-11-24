@@ -808,6 +808,7 @@ type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 type CompoundPart = ({
     shape: 'box';
     halfExtents: Vec3;
+    borderRadius?: number;
 } | {
     shape: 'sphere';
     radius: number;
@@ -828,6 +829,7 @@ type CompoundPart = ({
 } | {
     shape: 'convexHull';
     points: ArrayLike<number>;
+    borderRadius?: number;
 }) & {
     offset?: Vec3;
     rotation?: Quat;
@@ -856,6 +858,7 @@ interface KernelCompoundPart {
     size: readonly number[];
     position?: readonly [number, number, number];
     rotation?: readonly [number, number, number, number];
+    border?: number;
 }
 
 interface KernelHeightfieldOptions {
