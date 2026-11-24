@@ -170,7 +170,10 @@ Presets: `blowup` (the defaults), `calm-august` (no fire, late morning), `red-fl
 afternoon), `aftermath` (two days later, the fire burned out, under smoke). The town draws no buildings: its 1910 frame
 and brick blocks, depot, mine works and locomotive have no models yet; the lots are laid out, burn as structures and
 keep the forest off. `libraryMesh(url, options)` of `@margoengine/scenes/library` loads a library glTF as one mesh part
-(base on the ground, one colour) for `meshes`, so a rock or plant model draws by key:
+(base on the ground) for `meshes`, so a rock or plant model draws by key. A model whose material has a base colour map
+keeps its maps: the part carries `textures` (its uvs and its base colour, normal and occlusion-roughness-metal images)
+and draws textured; one of several textured materials goes to `libraryParts` (a coded `unsupported` error says so).
+Pass `color` to draw it as one flat colour instead, as here:
 
 ```ts
 import {libraryMesh} from 'margoengine/scenes/library';

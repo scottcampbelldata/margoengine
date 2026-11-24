@@ -1,15 +1,23 @@
 // A model from the asset library as one mesh part for a biome scatter (`BiomeViewOptions.meshes`): read from its .gltf
-// and buffers, merged under its node transforms, its base on y = 0. Part of the `/library` entry.
+// and buffers, merged under its node transforms, its base on y = 0. A model whose material has a base colour map draws
+// with its PBR maps (base colour, normal, occlusion-roughness-metal) through libraryParts, never as one flat colour
+// (Fauld recut gap 5). Part of the `/library` entry.
+import type { ScatterImage, ScatterTextures } from '@margoengine/scatter';
+import { margoError } from '../../shared/errors.js';
+import { libraryParts } from './library-parts.js';
 
 /** Options of {@link libraryMesh}. */
 export interface LibraryMeshOptions {
   /** The look the part takes in a biome scatter. Default `'stone'`. */
   readonly kind?: 'bark' | 'foliage' | 'stone';
   /**
-   * Albedo, linear RGB 0..1. Default: the mean of the materials' `baseColorFactor`. A model coloured by a texture
-   * (most scans) needs its mean texture colour here: the biome scatter draws one colour a part.
+   * Albedo, linear RGB 0..1: the part draws this one colour and no maps. Default: a model whose material has a base
+   * colour map draws its maps (the part carries `textures`; a model of several textured materials needs
+   * `libraryParts`, one part per material); any other model draws the mean of its materials' `baseColorFactor`.
    */
   readonly color?: readonly [number, number, number];
+  /** Decodes a map's file (textured models). Default `createImageBitmap` on the fetched bytes. */
+  readonly decode?: (bytes: ArrayBuffer, mimeType: string) => Promise<ScatterImage>;
   /** Most triangles the merged mesh may hold (it is drawn once per placed object). Default 40,000. */
   readonly maxTriangles?: number;
   /** Uniform scale to metres. Default 1. */
@@ -25,8 +33,13 @@ export interface LibraryMeshOptions {
 /** A merged library mesh, ready for `BiomeViewOptions.meshes` (`{ 'procedural:rock': [part] }`). */
 export interface LibraryMeshPart {
   readonly geometry: { readonly positions: Float32Array; readonly normals: Float32Array; readonly indices: Uint32Array };
+  /** Albedo, or the factor that multiplies the base colour map when there is one. */
   readonly color: readonly [number, number, number];
   readonly kind: 'bark' | 'foliage' | 'stone';
+  /** The model's maps and texture coordinates, when its material has a base colour map and no `color` was given. */
+  readonly textures?: ScatterTextures;
+  /** The glTF material name of a textured part. */
+  readonly name?: string;
 }
 
 export type Node = { mesh?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] };
@@ -38,7 +51,7 @@ export type Doc = {
   nodes?: Node[];
   scenes?: { nodes?: number[] }[];
   scene?: number;
-  materials?: { pbrMetallicRoughness?: { baseColorFactor?: number[] } }[];
+  materials?: { pbrMetallicRoughness?: { baseColorFactor?: number[]; baseColorTexture?: { index: number } } }[];
 };
 
 /** Column-major 4x4 of a node's matrix, or of its translation, rotation and scale (glTF 2.0 section 5.25). */
@@ -85,7 +98,8 @@ export const KINDS: Record<number, [number, (d: DataView, o: number) => number]>
 /**
  * Loads a glTF model (`.gltf` with external buffers) as one merged mesh part for a biome scatter: every triangle
  * primitive of the default scene under its node transforms, its base on y = 0 and centred on x = z = 0, so a placed
- * object stands on the ground. Textures are not read (see `color`).
+ * object stands on the ground. A model with a base colour map (and no `color`) keeps its maps: the part carries its
+ * texture coordinates and its base colour, normal and occlusion-roughness-metal images, so it draws textured.
  * @throws TypeError for a document with no triangles with float positions and normals; RangeError for a mesh over
  *   `maxTriangles`; Error for a file that does not load.
  * @example
@@ -102,6 +116,27 @@ export async function libraryMesh(url: string, options: LibraryMeshOptions = {})
     buffers: ArrayBuffer[] = [];
   if (!doc.meshes?.length || !doc.accessors || !doc.bufferViews || !doc.buffers || !doc.nodes)
     throw new TypeError(`libraryMesh: ${url} holds no meshes; pass a .gltf with meshes, accessors, buffer views, buffers and nodes`);
+  // A textured model draws its maps: libraryParts reads them (one part per material), from this same document.
+  if (!options.color && doc.materials?.some((m) => m.pbrMetallicRoughness?.baseColorTexture)) {
+    const once = async (u: string, i?: { signal?: AbortSignal }) =>
+        u === url ? { ok: true, status: 200, json: async () => doc, arrayBuffer: async () => new ArrayBuffer(0) } : get(u, i),
+      parts = await libraryParts(url, {
+        fetch: once,
+        signal: options.signal,
+        scale: options.scale,
+        maxTriangles: options.maxTriangles ?? 40000,
+        decode: options.decode,
+        kind: options.kind === 'bark' ? 'bark' : 'stone',
+        ...(options.kind === 'foliage' ? { foliage: () => true } : {}),
+      });
+    if (parts.length !== 1)
+      throw margoError(
+        'unsupported',
+        `libraryMesh: ${url} has ${parts.length} textured materials and one part draws one; load it with libraryParts (one part per material), or pass color to draw it flat`,
+      );
+    const [p] = parts;
+    return { geometry: p.geometry as LibraryMeshPart['geometry'], color: p.color, kind: p.kind, textures: p.textures, name: p.name };
+  }
   for (const b of doc.buffers) {
     if (!b.uri || b.uri.startsWith('data:')) throw new TypeError('libraryMesh reads a .gltf with external buffers; export the glTF with separate .bin buffers');
     const r = await get(base + b.uri, init);
