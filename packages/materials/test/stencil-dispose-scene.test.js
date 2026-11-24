@@ -14,12 +14,8 @@ test('StencilBuffer.dispose() removes itself from a non-active scene', async (t)
       undefined,
       null,
     );
-  t.after(() => {
-    engine.dispose();
-    gpu.cleanup();
-  });
-  const scene = engine.createScene('other'),
-    plugin = new StencilBuffer();
+  t.after(() => { engine.dispose(); gpu.cleanup(); });
+  const scene = engine.createScene('other'), plugin = new StencilBuffer();
   scene.use(plugin);
   assert.equal(engine.sceneOf(plugin), scene);
   plugin.dispose();

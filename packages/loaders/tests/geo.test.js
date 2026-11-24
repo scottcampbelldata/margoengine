@@ -15,16 +15,7 @@ test('pre-aborted GeoJSON parsing does not invoke caller object conversion', () 
   const signal = AbortSignal.abort('vector parsing cancelled');
   let converted = false;
   assert.throws(
-    () =>
-      parseGeoJSON(
-        {
-          toJSON() {
-            converted = true;
-            return {};
-          },
-        },
-        { signal },
-      ),
+    () => parseGeoJSON({ toJSON() { converted = true; return {}; } }, { signal }),
     { code: 'aborted' },
   );
   assert.equal(converted, false, 'cancellation precedes caller object conversion');

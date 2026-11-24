@@ -66,8 +66,7 @@ test('relay: 16 peers on one link each stay in step, and a spectator sees every 
   const seen = Math.min(frames, watcher.frame);
   for (let frame = 1; frame <= seen; frame++) {
     const sum = w.confirmed.get(1).get(frame);
-    for (const player of players)
-      assert.equal(w.confirmed.get(player).get(frame), sum, `peer ${player} frame ${frame}`);
+    for (const player of players) assert.equal(w.confirmed.get(player).get(frame), sum, `peer ${player} frame ${frame}`);
     assert.equal(sums.get(frame), sum, `the spectator at frame ${frame}`);
   }
   assert.ok(w.relay.stats.forwarded > 1000);

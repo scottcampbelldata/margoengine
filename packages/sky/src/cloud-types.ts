@@ -49,11 +49,7 @@ const unit = (value: number | undefined, name: string): number => {
   return v;
 };
 // The three weights, written into `w` without allocating (the clouds' deck hook calls it every frame).
-function weightsInto(
-  weather: CloudWeather,
-  w: { cumulus: number; stratus: number; storm: number },
-  type?: CloudType,
-): void {
+function weightsInto(weather: CloudWeather, w: { cumulus: number; stratus: number; storm: number }, type?: CloudType): void {
   if (type !== undefined) {
     w.cumulus = type === 'cumulus' ? 1 : 0;
     w.stratus = type === 'stratus' ? 1 : 0;

@@ -30,9 +30,7 @@ try {
       if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;
       if (c.data[k] !== b.data[k] || c.data[k + 1] !== b.data[k + 1] || c.data[k + 2] !== b.data[k + 2]) spheres++;
     }
-    console.log(
-      `step ${i} ${r.label}: ${differing} differ (spheres ${spheres}), ${r.box} rods by box, ${r.sphere} by sphere`,
-    );
+    console.log(`step ${i} ${r.label}: ${differing} differ (spheres ${spheres}), ${r.box} rods by box, ${r.sphere} by sphere`);
     assert.equal(differing, 0, `${r.label}: box-culled frame differs from core`);
     assert.equal(spheres, 0, `${r.label}: sphere-culled frame differs from core`);
     assert.ok(r.box <= r.sphere, `${r.label}: boxes only ever drop more`);

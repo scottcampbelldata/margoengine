@@ -89,7 +89,7 @@ Depth.prototype.onResize = function (listener) {
 };
 mock.module('@margoengine/post/depth', { namedExports: { DepthTexture: Depth } });
 mock.module('@margoengine/post/mrt', { namedExports: { SceneTargets: plugin('targets') } });
-const environmentMock = {
+mock.module('@margoengine/environment', {
   namedExports: {
     AmbientLight: plugin('ambient', { color: '#ffffff', intensity: 1 }),
     HemisphereLight: plugin('hemisphere', { sky: '#ffffff', ground: undefined, intensity: 1 }),
@@ -103,15 +103,7 @@ const environmentMock = {
       enabled: true,
     }),
   },
-};
-// The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of [
-  '@margoengine/environment',
-  '@margoengine/environment/main',
-  '@margoengine/environment/loaders',
-  '@margoengine/environment/load',
-])
-  mock.module(id, environmentMock);
+});
 const Renderer = plugin('voxels', { daylight: 1, blockLightColor: [1, 0.8, 0.6], lightmap: undefined });
 const lightings = [];
 mock.module('@margoengine/voxel/render', { namedExports: { VoxelRenderer: Renderer } });
@@ -318,71 +310,23 @@ test('AmbientLight, HemisphereLight and Fog inside a <Scene> light that scene, n
     lights = [React.createRef(), React.createRef(), React.createRef()];
   value.resources.models.add(model);
   render(
-    tree({ ...value, world }, [
-      h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
-      h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
-      h(Fog, { key: 'f', ref: lights[2], far: 50 }),
-    ]),
+    tree(
+      { ...value, world },
+      [
+        h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
+        h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
+        h(Fog, { key: 'f', ref: lights[2], far: 50 }),
+      ],
+    ),
   );
   await flush();
   assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
-  assert.deepEqual(
-    [...world.plugins.values()],
-    lights.map((ref) => ref.current),
-    'each in the named scene',
-  );
-  for (const ref of lights)
-    assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
+  assert.deepEqual([...world.plugins.values()], lights.map((ref) => ref.current), 'each in the named scene');
+  for (const ref of lights) assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
   assert.equal(lights[0].current.intensity, 0.4, 'live props still apply');
   cleanup();
   await flush();
   assert.equal(world.plugins.size, 0, 'unmount detaches them from the named scene');
-});
-
-test('BatchedMesh and Voxels inside a <Scene> attach their plugin to that scene, not the default one', async () => {
-  const value = scene(),
-    world = owner({ engine: value.engine }),
-    base = value.engine.use,
-    batch = React.createRef(),
-    voxels = React.createRef();
-  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
-  let active = null;
-  value.engine.use = (effect) => (active ? active.use(effect) : base.call(value.engine, effect));
-  const use = world.use;
-  world.use = (effect) => {
-    const outer = active;
-    active = world;
-    try {
-      use(effect);
-      effect.setup?.(value.engine);
-    } finally {
-      active = outer;
-    }
-  };
-  world.removePlugin = (name) => {
-    const effect = world.plugins.get(name);
-    world.plugins.delete(name);
-    effect?.dispose?.();
-  };
-  value.world = world;
-  render(
-    tree(value, [
-      h(BatchedMesh, { key: 'b', ref: batch, maxItems: 2, maxVertices: 9 }),
-      h(Voxels, {
-        key: 'v',
-        ref: voxels,
-        world: { name: 'voxel world' },
-        textures: { name: 'textures' },
-        lighting: false,
-      }),
-    ]),
-  );
-  await flush();
-  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
-  assert.deepEqual([...world.plugins.values()], [batch.current, voxels.current], 'both in the named scene');
-  cleanup();
-  await flush();
-  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
 });
 
 test('Voxels attaches the renderer and lighting, updates light from the frame loop, and keeps them through live props', async () => {
@@ -422,91 +366,4 @@ test('Voxels attaches the renderer and lighting, updates light from the frame lo
   assert.equal(lighting.disposals, 1, 'and disposes its lighting');
   assert.equal(lightings.at(-1), lighting, 'lighting: false attaches none');
   assert.equal(value.frames.callbacks.size, 0);
-});
-
-test('DepthTexture and SceneTargets inside a <Scene> attach to that scene and leave the default scene models alone', async () => {
-  const value = scene(),
-    world = owner({ engine: value.engine }),
-    base = value.engine.use;
-  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
-  let active = null;
-  value.engine.use = (effect) => (active ? active.use(effect) : base.call(value.engine, effect));
-  const use = world.use;
-  world.use = (effect) => {
-    const outer = active;
-    active = world;
-    try {
-      use(effect);
-      effect.setup?.(value.engine);
-    } finally {
-      active = outer;
-    }
-  };
-  world.removePlugin = (name) => {
-    const effect = world.plugins.get(name);
-    world.plugins.delete(name);
-    effect?.dispose?.();
-  };
-  value.world = world;
-  value.resources.models.add({ disposed: false });
-  const view = render(tree(value, [h(DepthTexture, { key: 'd' }), h(SceneTargets, { key: 't', outputs: ['normal'] })]));
-  await flush();
-  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
-  const inWorld = [...world.plugins.values()];
-  assert.deepEqual(
-    inWorld.map((plugin) => plugin.kind),
-    ['depth', 'targets'],
-    'both in the named scene',
-  );
-  for (const plugin of inWorld) assert.equal(plugin.sources.size, 0, 'the default scene models are left alone');
-  view.unmount();
-  await flush();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
-});
-
-test('SpriteLayer and Figure inside a <Scene> draw in that scene, not the default one', async () => {
-  mock.module('@margoengine/sprites', { namedExports: { SpriteLayer: plugin('sprites') } });
-  mock.module('@margoengine/sciviz', { namedExports: { Figure: plugin('figure', { ready: async () => {} }) } });
-  const { SpriteLayer, Figure } = await import('@margoengine/react/ui');
-  const value = scene(),
-    world = owner({ engine: value.engine }),
-    base = value.engine.use;
-  // Core's scene scope: while a scene sets a plugin up, `engine.use` adds to that scene.
-  let active = null;
-  value.engine.use = (effect) => (active ? active.use(effect) : base.call(value.engine, effect));
-  const use = world.use;
-  world.use = (effect) => {
-    const outer = active;
-    active = world;
-    try {
-      use(effect);
-      effect.setup?.(value.engine);
-    } finally {
-      active = outer;
-    }
-  };
-  world.removePlugin = (name) => {
-    const effect = world.plugins.get(name);
-    world.plugins.delete(name);
-    effect?.dispose?.();
-  };
-  value.world = world;
-  const view = render(
-    tree(value, [
-      h(SpriteLayer, { key: 's', atlas: { width: 1, height: 1, data: new Uint8Array(4) } }),
-      h(Figure, { key: 'f' }),
-    ]),
-  );
-  await flush();
-  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
-  assert.deepEqual(
-    [...world.plugins.values()].map((plugin) => plugin.kind),
-    ['sprites', 'figure'],
-    'both in the named scene',
-  );
-  view.unmount();
-  await flush();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(world.plugins.size, 0, 'unmount removes them from the named scene');
 });

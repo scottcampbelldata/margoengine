@@ -23,16 +23,10 @@ export interface GLTFWeatherOptions {
 }
 
 class PuddleValues extends Puddles {
-  packed(): Float32Array {
-    this.write();
-    return this.values;
-  }
+  packed(): Float32Array { this.write(); return this.values; }
 }
 class SnowValues extends Snow {
-  packed(): Float32Array {
-    this.write();
-    return this.values;
-  }
+  packed(): Float32Array { this.write(); return this.values; }
 }
 
 /**
@@ -64,9 +58,7 @@ export class GLTFWeather implements EnginePlugin {
   }
 
   /** Engine owning the shader resources, checked by PBRModel.addLighting. */
-  get owner(): Engine | undefined {
-    return this.engine;
-  }
+  get owner(): Engine | undefined { return this.engine; }
 
   private alive(): void {
     if (this.disposed) throw new MargoError('disposed', 'GLTFWeather is disposed; attach a new effect');
@@ -78,10 +70,7 @@ export class GLTFWeather implements EnginePlugin {
     if (!this.engine) throw new MargoError('state', 'Attach GLTFWeather before adding models');
     if (this.removers.has(model)) return this.removers.get(model)!;
     const remove = model.addLighting(this);
-    const detach = () => {
-      remove();
-      this.removers.delete(model);
-    };
+    const detach = () => { remove(); this.removers.delete(model); };
     this.removers.set(model, detach);
     return detach;
   }
@@ -121,8 +110,7 @@ export class GLTFWeather implements EnginePlugin {
     this.alive();
     const start = source.indexOf('fn surface(i:Out,front:bool)->Surface {');
     const end = source.indexOf('return s;', start);
-    if (start < 0 || end < 0)
-      throw new MargoError('unsupported', 'GLTFWeather needs the standard gltf/pbr surface shader');
+    if (start < 0 || end < 0) throw new MargoError('unsupported', 'GLTFWeather needs the standard gltf/pbr surface shader');
     const wet = this.options.puddles?.wetSurfaces ?? true;
     const edit = `{
       let weatherWater=weather_puddle_surface(i.position,s.n,s.base.rgb,s.roughness,s.metal,${wet},weatherPuddles);
@@ -138,10 +126,8 @@ export class GLTFWeather implements EnginePlugin {
     const projection = 'o.clip=f.camera*p; o.position=p.xyz;';
     if (code.split(projection).length !== 2)
       throw new MargoError('unsupported', 'GLTFWeather snow needs the standard gltf/pbr vertex projection');
-    code = code.replace(
-      projection,
-      'var weatherPosition=p;weatherPosition.y+=weather_snow_depth(p.xz,1.0,weatherSnow);o.clip=f.camera*weatherPosition;o.position=weatherPosition.xyz;',
-    );
+    code = code.replace(projection,
+      'var weatherPosition=p;weatherPosition.y+=weather_snow_depth(p.xz,1.0,weatherSnow);o.clip=f.camera*weatherPosition;o.position=weatherPosition.xyz;');
     const weatherShader = `${source.includes('fn weather_noise(') ? '' : noiseWGSL}
       ${puddleWGSL.slice(noiseWGSL.length)}${snowWGSL.slice(noiseWGSL.length)}
       struct WeatherGLTFUniform { puddles:WeatherPuddles, snow:WeatherSnow }
@@ -153,9 +139,7 @@ export class GLTFWeather implements EnginePlugin {
   /** Current uniform resource for gltf\/pbr's group 2. */
   bindings(): GPUBindGroupEntry[] {
     this.alive();
-    return this.uniform
-      ? [{ binding: 160, resource: { buffer: this.uniform } }, ...(this.options.cover?.bindings() ?? [])]
-      : [];
+    return this.uniform ? [{ binding: 160, resource: { buffer: this.uniform } }, ...(this.options.cover?.bindings() ?? [])] : [];
   }
 
   onDeviceRestored(engine: Engine): void {
@@ -175,7 +159,5 @@ export class GLTFWeather implements EnginePlugin {
   }
 
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {
-    this.dispose();
-  }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
 }

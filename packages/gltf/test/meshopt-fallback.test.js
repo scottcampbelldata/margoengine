@@ -27,8 +27,7 @@ for (const name of names) {
 
   test(`${name} skips a marked external fallback rather than fetching discarded bytes`, () =>
     headlessModels(async () => {
-      const doc = document(name),
-        requests = [];
+      const doc = document(name), requests = [];
       doc.buffers[1].uri = 'fallback.bin';
       const engine = await headless();
       try {
@@ -54,31 +53,14 @@ for (const name of names) {
       mutate(doc);
       assert.throws(() => new GLTFAsset(doc, [packed]).view(0), pattern);
     };
-    rejects((doc) => {
-      doc.buffers[1].extensions[name].fallback = 'true';
-    }, /Invalid glTF meshopt fallback/);
-    rejects((doc) => {
-      delete doc.bufferViews[0].extensions;
-    }, /fallback references/);
-    rejects((doc) => {
-      doc.bufferViews[0].extensions[name].buffer = 1;
-    }, /fallback references/);
-    rejects((doc) => {
-      doc.buffers[1].byteLength = 35;
-    }, /bufferView bounds/);
-    rejects((doc) => {
-      doc.bufferViews[0].extensions[name].byteLength = packed.length + 1;
-    }, /source bounds/);
-    rejects((doc) => {
-      delete doc.buffers[1].extensions;
-      delete doc.extensionsRequired;
-    }, /Truncated glTF buffer/);
-    rejects((doc) => {
-      doc.buffers[1].extensions[names.find((n) => n !== name)] = { fallback: true };
-    }, /meshopt extensions/);
-    rejects((doc) => {
-      doc.bufferViews[0].extensions[names.find((n) => n !== name)] = { ...doc.bufferViews[0].extensions[name] };
-    }, /meshopt extensions/);
+    rejects((doc) => { doc.buffers[1].extensions[name].fallback = 'true'; }, /Invalid glTF meshopt fallback/);
+    rejects((doc) => { delete doc.bufferViews[0].extensions; }, /fallback references/);
+    rejects((doc) => { doc.bufferViews[0].extensions[name].buffer = 1; }, /fallback references/);
+    rejects((doc) => { doc.buffers[1].byteLength = 35; }, /bufferView bounds/);
+    rejects((doc) => { doc.bufferViews[0].extensions[name].byteLength = packed.length + 1; }, /source bounds/);
+    rejects((doc) => { delete doc.buffers[1].extensions; delete doc.extensionsRequired; }, /Truncated glTF buffer/);
+    rejects((doc) => { doc.buffers[1].extensions[names.find((n) => n !== name)] = { fallback: true }; }, /meshopt extensions/);
+    rejects((doc) => { doc.bufferViews[0].extensions[names.find((n) => n !== name)] = { ...doc.bufferViews[0].extensions[name] }; }, /meshopt extensions/);
     rejects((doc) => {
       const other = names.find((n) => n !== name);
       doc.bufferViews[0].extensions[other] = doc.bufferViews[0].extensions[name];

@@ -953,10 +953,7 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
       cycle.push(x);
       x = x.next;
     }
-    if (x !== h)
-      throw new RangeError(
-        `splitting face ${f.name} left an open chain of edges; move one body slightly and try again`,
-      );
+    if (x !== h) throw new RangeError(`splitting face ${f.name} left an open chain of edges; move one body slightly and try again`);
     cycles.push(cycle);
   }
   // Where a region comes out thinner than its edges' samples stray from their curves (a band 50 nm wide between two
@@ -979,9 +976,7 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     } else next = (within ?? cycles.flat().reduce((m, h) => Math.max(m, strayOf(h.piece)), 0)) / 16;
     if (k === 3 || !(next > 0)) {
       if (traced) return traced;
-      throw new RangeError(
-        `splitting face ${f.name}: a loop does not bound a region on its left; move one body slightly and try again`,
-      );
+      throw new RangeError(`splitting face ${f.name}: a loop does not bound a region on its left; move one body slightly and try again`);
     }
     within = next;
   }
@@ -1010,9 +1005,7 @@ function regionsOf(f: Face, fuv: FaceUV, cycles: Half[][], within?: number): Omi
   const vPeriod = fuv.surface.vPeriod,
     cut = vPeriod ? gaps(loops.map(vRange), vPeriod)[0] : undefined;
   if (vPeriod && cut === undefined)
-    throw new RangeError(
-      `splitting face ${f.name}: a loop goes round a torus's tube: not supported yet; move one body slightly and try again`,
-    );
+    throw new RangeError(`splitting face ${f.name}: a loop goes round a torus's tube: not supported yet; move one body slightly and try again`);
   const open = cut === undefined ? loops : loops.map((l) => shiftV(l, cut, vPeriod)),
     vBounds: readonly [number, number] = cut === undefined ? fuv.surface.vDomain : [cut, cut + vPeriod],
     sides = ([u, v]: UV) => open.map((l) => (leftOf(l, fuv.period, u, v) ? '1' : '0')).join('');

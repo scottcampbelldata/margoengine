@@ -29,19 +29,10 @@ const optionalGPU = () => {
 };
 
 test('the rows: lifetime is read at attach, the rest are live; the wind follows the weather at null', () => {
-  assert.deepEqual(
-    SMOKE_SETTINGS.filter((r) => !r.live).map((r) => r.name),
-    ['lifetime'],
-  );
+  assert.deepEqual(SMOKE_SETTINGS.filter((r) => !r.live).map((r) => r.name), ['lifetime']);
   assert.equal(SMOKE_LIVE_SETTINGS.length, SMOKE_SETTINGS.length - 1);
   for (const row of SMOKE_SETTINGS) assert.ok(row.about.length > 15 && row.max > row.min, row.name);
-  assert.deepEqual(
-    SMOKE_SETTINGS.filter((r) => r.weather).map((r) => [r.name, r.weather]),
-    [
-      ['wind.x', 'wind'],
-      ['wind.z', 'wind'],
-    ],
-  );
+  assert.deepEqual(SMOKE_SETTINGS.filter((r) => r.weather).map((r) => [r.name, r.weather]), [['wind.x', 'wind'], ['wind.z', 'wind']]);
   assert.throws(() => applySmokeSettings({ options: {} }, { nope: 1 }), TypeError);
   assert.throws(() => applySmokeSettings({ options: {} }, { opacity: 2 }), RangeError);
 });
@@ -95,10 +86,7 @@ test('with the wind rows at null one weather wind slider bends the column; a val
     const U = Math.hypot(x, z);
     assert.ok(Math.abs(U - speed) < 0.1 * speed && U > last, `puffs take ${speed} m/s: ${x} ${z}`);
     last = U;
-    assert.ok(
-      Math.abs(smoke.column(30).rise - plumeRise(30, buoyancyFlux(5e6), U, 2).rise) < 1e-9,
-      'the column bends in it',
-    );
+    assert.ok(Math.abs(smoke.column(30).rise - plumeRise(30, buoyancyFlux(5e6), U, 2).rise) < 1e-9, 'the column bends in it');
     assert.deepEqual(own.effect.options.wind, [3, 0], 'its own wind stays');
   }
   applySmokeSettings(own, {});

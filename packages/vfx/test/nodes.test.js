@@ -216,14 +216,7 @@ test('nodes rejects a finite double that is not a finite f32', () => {
     (error) => error instanceof RangeError && link.test(error.message) && /const\[0\]/.test(error.message),
   );
   assert.throws(
-    () =>
-      evaluateNodes(
-        [
-          { op: 'const', value: NaN },
-          { op: 'force', inputs: [0] },
-        ],
-        sample,
-      ),
+    () => evaluateNodes([{ op: 'const', value: NaN }, { op: 'force', inputs: [0] }], sample),
     TypeError,
   );
   assert.throws(
@@ -259,9 +252,6 @@ test('nodes rejects a finite double that is not a finite f32', () => {
   });
   h.frame();
   effect.options.nodes.graph[0].value = [1e40, 0, 0];
-  assert.throws(
-    () => h.frame(),
-    (error) => error instanceof RangeError && link.test(error.message),
-  );
+  assert.throws(() => h.frame(), (error) => error instanceof RangeError && link.test(error.message));
   effect.dispose();
 });

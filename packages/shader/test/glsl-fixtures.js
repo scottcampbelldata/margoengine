@@ -84,7 +84,6 @@ vec4 legacy(vec2 uv, float t) {
 export const fixtureImage = () => {
   const bytes = new Uint8Array(8 * 8 * 4);
   for (let y = 0; y < 8; y++)
-    for (let x = 0; x < 8; x++)
-      bytes.set([x * 32 + 16, y * 32 + 16, ((x * 5 + y * 3) % 8) * 32, 255 - x * 8 - y * 16], (y * 8 + x) * 4);
+    for (let x = 0; x < 8; x++) bytes.set([x * 32 + 16, y * 32 + 16, (x * 5 + y * 3) % 8 * 32, 255 - x * 8 - y * 16], (y * 8 + x) * 4);
   return bytes;
 };

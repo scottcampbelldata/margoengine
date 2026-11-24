@@ -143,11 +143,7 @@ export class StateMachine<C> {
       const nested = this.states[path[i]].plan?.(event);
       if (nested) return nested;
       for (const transition of this.transitions)
-        if (
-          transition.event === event &&
-          transition.from === path[i] &&
-          (!transition.guard || transition.guard(this.context))
-        )
+        if (transition.event === event && transition.from === path[i] && (!transition.guard || transition.guard(this.context)))
           return () => this.change(transition.to, transition.duration ?? 0, transition);
     }
     return null;

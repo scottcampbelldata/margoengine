@@ -76,20 +76,15 @@ const text = (pattern: string | RegExp, value: string | undefined): boolean => {
 };
 const isType = (e: IFCElement) => e.type.toUpperCase().endsWith('TYPE') || e.type.toUpperCase().endsWith('STYLE');
 
+
 /** The predefined type as IDS 1.0 resolves it: the type object's first, then the element's own; USERDEFINED takes the custom name (a type's ElementType, ProcessType or ResourceType, an occurrence's ObjectType). */
 export function effectivePredefinedType(data: IFCData, id: number): string | undefined {
   const element = data.elements.get(id);
   if (!element) return;
   const own = (e: IFCElement, custom: string | undefined) =>
-    e.predefinedType === 'USERDEFINED'
-      ? (custom ?? 'USERDEFINED')
-      : e.predefinedType === 'NOTDEFINED'
-        ? undefined
-        : e.predefinedType;
+    e.predefinedType === 'USERDEFINED' ? (custom ?? 'USERDEFINED') : e.predefinedType === 'NOTDEFINED' ? undefined : e.predefinedType;
   const type = element.typeId !== undefined ? data.elements.get(element.typeId) : undefined;
-  return (
-    (type && own(type, type.elementType)) ?? own(element, isType(element) ? element.elementType : element.objectType)
-  );
+  return (type && own(type, type.elementType)) ?? own(element, isType(element) ? element.elementType : element.objectType);
 }
 
 /** The chain of wholes above an element: container, aggregate, nest, the opening it fills, the element it voids. */
@@ -138,8 +133,7 @@ function compare(property: IFCProperty | undefined, condition: IFCPropertyCondit
   const want = condition.value;
   const test = (v: IFCValue): boolean => {
     if (want instanceof RegExp) return typeof v === 'string' && text(want, v);
-    if (op === 'contains')
-      return typeof v === 'string' && typeof want === 'string' && v.toLowerCase().includes(want.toLowerCase());
+    if (op === 'contains') return typeof v === 'string' && typeof want === 'string' && v.toLowerCase().includes(want.toLowerCase());
     if (op === 'matches') return typeof v === 'string' && typeof want === 'string' && new RegExp(want).test(v);
     if (typeof v === 'number' && typeof want === 'number') {
       if (op === '=') return nearlyEqual(v, want);
@@ -174,16 +168,13 @@ export function findElements(data: IFCData, query: IFCQuery = {}): number[] {
       storeys.flatMap((s) =>
         typeof s === 'number'
           ? [s]
-          : [...data.elements.values()]
-              .filter((e) => same(e.type, 'IfcBuildingStorey') && e.name === s)
-              .map((e) => e.id),
+          : [...data.elements.values()].filter((e) => same(e.type, 'IfcBuildingStorey') && e.name === s).map((e) => e.id),
       ),
     );
   const out: number[] = [];
   for (const e of data.elements.values()) {
     if ((query.occurrencesOnly ?? true) && isType(e)) continue;
-    if (types && !types.some((t) => ((query.subtypes ?? true) ? isSubtypeOf(data, e.type, t) : same(e.type, t))))
-      continue;
+    if (types && !types.some((t) => (query.subtypes ?? true ? isSubtypeOf(data, e.type, t) : same(e.type, t)))) continue;
     if (predefined && !predefined.some((p) => same(effectivePredefinedType(data, e.id), p))) continue;
     if (typeObject && (e.typeId === undefined || !typeObject.includes(e.typeId))) continue;
     if (storeyIds && (e.storey === undefined || !storeyIds.has(e.storey))) continue;
@@ -224,11 +215,7 @@ export function findElements(data: IFCData, query: IFCQuery = {}): number[] {
  * classification code or a property's value. An element with several materials or classifications is in each of
  * their groups; one without the key is under `''`. `ids` limits the grouping (default: every occurrence).
  */
-export function groupElements(
-  data: IFCData,
-  by: IFCGroupBy,
-  ids: Iterable<number> = findElements(data),
-): Map<string, number[]> {
+export function groupElements(data: IFCData, by: IFCGroupBy, ids: Iterable<number> = findElements(data)): Map<string, number[]> {
   const groups = new Map<string, number[]>();
   const add = (key: string, id: number) => {
     const group = groups.get(key) ?? groups.set(key, []).get(key)!;

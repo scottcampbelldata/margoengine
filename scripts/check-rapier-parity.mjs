@@ -8,12 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 export const COLUMNS = ['DONE', 'PARTIAL', 'BUILDING', 'PLANNED', 'MISSING', 'N/A'];
 
-const cells = (line) =>
-  line
-    .trim()
-    .replace(/^\||\|$/g, '')
-    .split('|')
-    .map((cell) => cell.trim());
+const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
 
 /** Counts per part: { 1: {rows, DONE, ...}, 2: {...} }. */
 export function countParity(text) {
@@ -40,10 +35,7 @@ export function countParity(text) {
     if (status >= 0) kind = /^(DONE|PARTIAL|BUILDING|PLANNED|MISSING|N\/A)\b/.exec(row[status])?.[1];
     else if (batch >= 0) kind = /^(DONE|PARTIAL|BUILDING|PLANNED|MISSING|N\/A)\b/.exec(row[batch])?.[1] ?? 'MISSING';
     else continue;
-    if (!kind)
-      throw new Error(
-        `rapier-parity: row ${row[0]} has a Status that starts with none of ${COLUMNS.join(', ')}: ${row[status]}`,
-      );
+    if (!kind) throw new Error(`rapier-parity: row ${row[0]} has a Status that starts with none of ${COLUMNS.join(', ')}: ${row[status]}`);
     counts[part] ??= Object.fromEntries([['rows', 0], ...COLUMNS.map((c) => [c, 0])]);
     counts[part].rows++;
     counts[part][kind]++;
@@ -55,10 +47,7 @@ export function countParity(text) {
 export function readSummary(text) {
   const at = text.search(/^## Summary/m);
   if (at < 0) throw new Error('rapier-parity: no ## Summary section');
-  const lines = text
-      .slice(at)
-      .split(/\r?\n/)
-      .filter((line) => line.startsWith('|')),
+  const lines = text.slice(at).split(/\r?\n/).filter((line) => line.startsWith('|')),
     header = cells(lines[0]),
     summary = {};
   for (const line of lines.slice(2)) {

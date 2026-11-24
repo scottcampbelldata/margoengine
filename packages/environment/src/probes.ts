@@ -619,12 +619,7 @@ export class LightProbes extends ShaderEffect {
   readonly environment?: Environment;
   /** The sky lighting what the probes do not ({@link LightProbeOptions.sky}). */
   readonly sky?: ProbeSkyLight;
-  private skyEntries?: {
-    sky: GPUBindGroupEntry[];
-    own: GPUBindGroupEntry[];
-    length: number;
-    entries: GPUBindGroupEntry[];
-  };
+  private skyEntries?: { sky: GPUBindGroupEntry[]; own: GPUBindGroupEntry[]; length: number; entries: GPUBindGroupEntry[] };
   readonly volume?: Readonly<IrradianceVolume>;
   readonly reflections: readonly Readonly<ReflectionProbe & { min: Vec3; max: Vec3; blend: number }>[];
   /** How overlapping reflection probes combine ({@link LightProbeOptions.reflectionBlend}). */
@@ -1013,8 +1008,8 @@ export class LightProbes extends ShaderEffect {
     // Ground (0.35, 0.3, 0.25) and the 0.5 specular weight are Margo design choices.
     const ambient =
       this.environment || this.sky
-        ? 'vec3f(0)'
-        : '(s.base.rgb*(1.0-s.metal)+mix(s.f0,s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
+      ? 'vec3f(0)'
+      : '(s.base.rgb*(1.0-s.metal)+mix(s.f0,s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
     return {
       declarations: shadingWgsl(
         group,

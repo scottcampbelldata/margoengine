@@ -41,11 +41,7 @@ const SIDES: readonly (readonly [RegExp, 'L' | 'R'])[] = [
 function sideOf(name: string): { side: 'L' | 'R' | null; key: string } {
   for (const [pattern, side] of SIDES) {
     const match = pattern.exec(name);
-    if (match)
-      return {
-        side,
-        key: name.replace(pattern, (found, lead = '') => `${typeof lead === 'string' ? lead : ''}*`).toLowerCase(),
-      };
+    if (match) return { side, key: name.replace(pattern, (found, lead = '') => `${typeof lead === 'string' ? lead : ''}*`).toLowerCase() };
   }
   return { side: null, key: name.toLowerCase() };
 }
@@ -127,7 +123,9 @@ export function addMirror(animator: Animator, mirror: Mirror = {}): MirrorHandle
     const local = animator.restRotation(i) as number[];
     return (restWorld[i] = parentOf[i] === -1 ? local.slice() : multiplyQuaternions(worldOf(parentOf[i]), local));
   };
-  const corrections = nodes.map((_, j) => multiplyQuaternions(inverse(reflect(worldOf(pairs[j]))), worldOf(j)));
+  const corrections = nodes.map((_, j) =>
+    multiplyQuaternions(inverse(reflect(worldOf(pairs[j]))), worldOf(j)),
+  );
   const undo = corrections.map(inverse),
     restPlaces = nodes.map((_, i) => animator.restPosition(i)),
     identity = [0, 0, 0, 1],
@@ -142,10 +140,7 @@ export function addMirror(animator: Animator, mirror: Mirror = {}): MirrorHandle
   const morphPairs = new Map<number, Int32Array>();
   if (mirror.morphs ?? true)
     (doc.nodes ?? []).forEach((node, i) => {
-      const names =
-        node.mesh === undefined
-          ? undefined
-          : (doc.meshes?.[node.mesh]?.extras as { targetNames?: string[] })?.targetNames;
+      const names = node.mesh === undefined ? undefined : (doc.meshes?.[node.mesh]?.extras as { targetNames?: string[] })?.targetNames;
       if (!names) return;
       const partners = mirrorPairs(names);
       if (partners.some((partner, target) => partner !== target)) morphPairs.set(i, partners);
@@ -153,7 +148,8 @@ export function addMirror(animator: Animator, mirror: Mirror = {}): MirrorHandle
   const positions = nodes.map(() => [0, 0, 0]),
     rotations = nodes.map(() => [0, 0, 0, 1]),
     scales = nodes.map(() => [1, 1, 1]);
-  const active = () => (mirror.enabled ?? true) && (!mirror.states || mirror.states.includes(animator.state));
+  const active = () =>
+    (mirror.enabled ?? true) && (!mirror.states || mirror.states.includes(animator.state));
   const removeStep = animator.addLateStep((pose: Pose) => {
     if (!active()) return;
     for (let j = 0; j < count; j++) {

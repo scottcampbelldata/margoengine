@@ -106,10 +106,7 @@ test('folders the first write made are fsynced in their parents too', async (t) 
   const path = await folder(t),
     deep = join(path, 'a', 'b'),
     log = await posix(() => fileStorage(deep).write('game', new Uint8Array([1])));
-  assert.deepEqual(
-    log.filter((line) => line.startsWith('sync')),
-    [`sync ${deep}`, `sync ${dirname(deep)}`, `sync ${path}`],
-  );
+  assert.deepEqual(log.filter((line) => line.startsWith('sync')), [`sync ${deep}`, `sync ${dirname(deep)}`, `sync ${path}`]);
 });
 
 test('a file system with no fsync of a folder is no failure, and any other error is', async (t) => {

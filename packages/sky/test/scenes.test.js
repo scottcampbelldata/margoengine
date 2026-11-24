@@ -32,11 +32,7 @@ test('invalid presets throw before anything is attached', () => {
   assert.throws(() => PresetScene.attach(engine, 'constructor'), /Unknown scene preset/);
   assert.throws(() => PresetScene.attach(engine, { ...SCENE_PRESETS.noon, fog: 2 }), /Invalid scene preset/);
   assert.throws(
-    () =>
-      PresetScene.attach(engine, {
-        ...SCENE_PRESETS.noon,
-        tonemap: { ...SCENE_PRESETS.noon.tonemap, temperature: 100 },
-      }),
+    () => PresetScene.attach(engine, { ...SCENE_PRESETS.noon, tonemap: { ...SCENE_PRESETS.noon.tonemap, temperature: 100 } }),
     /Invalid scene preset/,
   );
 });

@@ -239,14 +239,8 @@ test('createMesh that throws leaves the chunk pending and its previous meshes dr
   fail = true;
   terrain.sculpt([8, 12, 8], 4, -1);
   assert.throws(() => view.update(), /GPU out of memory/);
-  assert.ok(
-    first.every((m) => !m.disposed),
-    'the previous meshes stay drawn',
-  );
-  assert.ok(
-    made.filter((m) => m.round === 2).every((m) => m.disposed),
-    'the partial new meshes are freed',
-  );
+  assert.ok(first.every((m) => !m.disposed), 'the previous meshes stay drawn');
+  assert.ok(made.filter((m) => m.round === 2).every((m) => m.disposed), 'the partial new meshes are freed');
   assert.ok(terrain.dirty.has('0,0,0'), 'the chunk is still pending');
   assert.equal(view.stats.chunks, 1);
   fail = false;

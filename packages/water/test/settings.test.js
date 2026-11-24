@@ -14,10 +14,10 @@ import {
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const byName = new Map(WATER_SETTINGS.map((s) => [s.name, s]));
-// The uniform a frame writes: 576 B of the Water's values.
+// The uniform a frame writes: 560 B of the Water's values.
 // Index 20 is the wave clock, which every frame advances; the rest is what the settings write.
 const frameValues = (h) => {
-  const v = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 576).data).slice();
+  const v = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 560).data).slice();
   v[20] = 0;
   return v;
 };
@@ -41,11 +41,7 @@ test('every row is well formed, names are unique, every row is live', () => {
     if (s.kind === 'number') {
       assert.ok(s.min < s.max && s.step > 0, s.name);
       if (s.default !== null) assert.ok(s.min <= s.default && s.default <= s.max, s.name);
-    } else
-      assert.ok(
-        s.default.every((x) => x >= s.min && x <= s.max),
-        s.name,
-      );
+    } else assert.ok(s.default.every((x) => x >= s.min && x <= s.max), s.name);
   }
 });
 
@@ -91,10 +87,7 @@ test('each row moves what it names', () => {
   const differs = (a, b) => a.some((v, i) => v !== b[i]);
   assert.ok(differs(moved({ windSpeed: 20 }), base), 'windSpeed');
   assert.equal(water.wind.speed, 20);
-  assert.ok(
-    differs(moved({ windSpeed: 20, windDirection: 90 }), moved({ windSpeed: 20, windDirection: 0 })),
-    'windDirection',
-  );
+  assert.ok(differs(moved({ windSpeed: 20, windDirection: 90 }), moved({ windSpeed: 20, windDirection: 0 })), 'windDirection');
   assert.ok(differs(moved({ fetch: 2000 }), moved({ fetch: 200000 })), 'fetch');
   const stormy = moved({ windSpeed: 25 });
   assert.equal(stormy[130] > 0, true, 'wind foam');
@@ -102,10 +95,7 @@ test('each row moves what it names', () => {
   assert.equal(moved({ windSpeed: 25, whitecaps: 0.4 })[130], Math.fround(0.4), 'whitecaps 0.4');
   assert.equal(moved({ chop: 0.7 })[131], Math.fround(0.7), 'chop');
   const trains = (v) => Math.max(...Array.from({ length: 8 }, (_, i) => v[34 + i * 8]));
-  assert.ok(
-    Math.abs(trains(moved({ windSpeed: 6, waveHeight: 0.1 })) - 0.1) < 1e-6,
-    'waveHeight scales the largest train',
-  );
+  assert.ok(Math.abs(trains(moved({ windSpeed: 6, waveHeight: 0.1 })) - 0.1) < 1e-6, 'waveHeight scales the largest train');
   assert.ok(trains(moved({ windSpeed: 6 })) > 0.1, 'waveHeight null gives the wind amplitudes back');
   assert.deepEqual([...moved({ color: [0.5, 0.25, 0.125] }).slice(24, 27)], [0.5, 0.25, 0.125]);
   assert.equal(moved({ foamDistance: 7 })[22], 7);
@@ -248,17 +238,13 @@ test('applying every live row each frame for 60 frames creates no pipeline, buff
   });
   fresh.h.frame();
   const once = frameValues(fresh.h);
-  for (const i of [21, 22, 24, 25, 26, 34, 130, 131, 134, 135, 136, 137, 138, 139])
-    assert.equal(once[i], last[i], `value ${i}`);
+  for (const i of [21, 22, 24, 25, 26, 34, 130, 131, 134, 135, 136, 137, 138, 139]) assert.equal(once[i], last[i], `value ${i}`);
 });
 
 test('waterSettingDefaults is a fresh object of every default', () => {
   const a = waterSettingDefaults(),
     b = waterSettingDefaults();
-  assert.deepEqual(
-    Object.keys(a),
-    WATER_SETTINGS.map((s) => s.name),
-  );
+  assert.deepEqual(Object.keys(a), WATER_SETTINGS.map((s) => s.name));
   assert.notEqual(a, b);
   assert.notEqual(a.color, b.color);
   assert.equal(a.windSpeed, null);
@@ -268,19 +254,7 @@ test('waterSettingDefaults is a fresh object of every default', () => {
 test('a sea wind given a value is held from the weather drive; null hands it back', async () => {
   const { heldFromWeather } = await import('../../shared/settings.js');
   const noop = () => undefined,
-    water = {
-      wind: { speed: 6 },
-      setWind: noop,
-      setWhitecaps: noop,
-      setChop: noop,
-      setWaveHeight: noop,
-      setSeaLevel: noop,
-      setColor: noop,
-      setFoamDistance: noop,
-      setGlitterRoughness: noop,
-      setFoamSoftness: noop,
-      setShallow: noop,
-    };
+    water = { wind: { speed: 6 }, setWind: noop, setWhitecaps: noop, setChop: noop, setWaveHeight: noop, setSeaLevel: noop, setColor: noop, setFoamDistance: noop, setGlitterRoughness: noop, setFoamSoftness: noop, setShallow: noop };
   applyWaterSettings(water, { windSpeed: 12 });
   assert.equal(heldFromWeather(water, 'wind'), true);
   applyWaterSettings(water, {});
@@ -295,24 +269,13 @@ test('glitter roughness, foam softness and the shallow band are rows the frame c
   assert.equal(at()[135], Math.fround(0.12), 'the default glitter floor is the sea floor');
   assert.equal(at()[134], 0);
   assert.equal(at()[139], 0, 'the shallow band is off by default');
-  applyWaterSettings(water, {
-    glitterRoughness: 0.3,
-    foamSoftness: 0.5,
-    shallowColor: [0.1, 0.4, 0.5],
-    shallowDepth: 3,
-  });
+  applyWaterSettings(water, { glitterRoughness: 0.3, foamSoftness: 0.5, shallowColor: [0.1, 0.4, 0.5], shallowDepth: 3 });
   h.frame();
   const v = at();
   assert.equal(v[135], Math.fround(0.3));
   assert.equal(v[134], Math.fround(0.5));
   assert.deepEqual([...v.slice(136, 140)], [0.1, 0.4, 0.5, 3].map(Math.fround));
-  for (const bad of [
-    { glitterRoughness: 0.01 },
-    { glitterRoughness: 0.7 },
-    { foamSoftness: 1.1 },
-    { shallowDepth: 101 },
-    { shallowColor: [2, 0, 0] },
-  ])
+  for (const bad of [{ glitterRoughness: 0.01 }, { glitterRoughness: 0.7 }, { foamSoftness: 1.1 }, { shallowDepth: 101 }, { shallowColor: [2, 0, 0] }])
     assert.throws(() => applyWaterSettings(water, bad), RangeError, JSON.stringify(bad));
   const look = WATER_LOOKS.animatedFeature;
   assert.ok(look.glitterRoughness > 0.12 && look.foamSoftness > 0 && look.shallowDepth > 0, 'the look sets all three');

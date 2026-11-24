@@ -13,16 +13,7 @@ if (!globalThis.navigator?.gpu)
 
 /** Enough of a device and engine to count what `supersample` asks of them. Each render runs the camera's update, as the engine does. */
 function fake({ width = 3, height = 2, onRender } = {}) {
-  const log = {
-      dispatches: 0,
-      destroyed: 0,
-      textures: [],
-      submits: 0,
-      renders: [],
-      matrices: [],
-      pipelines: 0,
-      modules: 0,
-    },
+  const log = { dispatches: 0, destroyed: 0, textures: [], submits: 0, renders: [], matrices: [], pipelines: 0, modules: 0 },
     pass = {
       setPipeline() {},
       setBindGroup() {},

@@ -1,15 +1,7 @@
 // @margoengine/biomes: biome maps from a heightmap and a few climate settings. Everything that decides the output is
 // integer arithmetic (spec decision D9), so the same seed gives the same bytes on every platform. The integer toolkit
 // itself (fixed point, hashes, noise) is the `/toolkit` entry.
-export type {
-  IslandOptions,
-  Relief,
-  ReliefIsland,
-  ReliefOptions,
-  RiaOptions,
-  RiverLine,
-  ValleyOptions,
-} from './relief.js';
+export type { IslandOptions, Relief, ReliefIsland, ReliefOptions, RiaOptions, RiverLine, ValleyOptions } from './relief.js';
 export {
   continentality,
   degreeDays,

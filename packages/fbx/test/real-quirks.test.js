@@ -11,9 +11,7 @@ const bytes = (text) => new TextEncoder().encode(text);
 test('a cluster with no lists keeps its joint: writers keep it for the skeleton', async () => {
   const full = rigFixture({ morph: false, animation: false }),
     at = full.indexOf('"SubDeformer::Tip"'),
-    source =
-      full.slice(0, at) +
-      full.slice(at).replace(/Indexes: \*3 \{\n a: 0,1,2\n\}\s*Weights: \*3 \{\n a: [^\n]*\n\}/, '');
+    source = full.slice(0, at) + full.slice(at).replace(/Indexes: \*3 \{\n a: 0,1,2\n\}\s*Weights: \*3 \{\n a: [^\n]*\n\}/, '');
   assert.equal(source.split('Indexes: *3').length, 2, 'the fixture lost its lists');
   const { doc } = readGLB(await convertFBX(bytes(source)));
   assert.equal(doc.skins[0].joints.length, 2);

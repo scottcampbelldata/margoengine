@@ -176,10 +176,7 @@ test('fur casters move on top of an inherited displacementMap and give TAA a vel
       move: record.move,
       binding: record.program.next,
     });
-    assert.match(
-      velocity,
-      /var margoPosition=i\.position\.xyz\+i\.normal\.xyz\*margoDisplacement\(i\.uv\)\+margoFurMove\(/,
-    );
+    assert.match(velocity, /var margoPosition=i\.position\.xyz\+i\.normal\.xyz\*margoDisplacement\(i\.uv\)\+margoFurMove\(/);
     assert.match(velocity, /margoFurMoveWith\(nduBefore\.shape,nduBefore\.gravity,nduBefore\.wind,nduBefore\.clock,/);
     assert.match(velocity, /@group\(1\) @binding\(181\) var<uniform> nduBefore:NdUniforms;/);
     assert.match(velocity, /alias NdUniforms=MargoFur;/);

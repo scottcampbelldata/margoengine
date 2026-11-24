@@ -18,14 +18,7 @@
 //   days); the default e-folding time of 3 hours sits in that range, and a shot sets a shorter one through `dryTime`.
 // The record is read with textureLoad and blended bilinearly between texel centres (rgba32float is not filterable).
 import { requireWebGPU } from '../../shared/require-webgpu.js';
-import {
-  numberSetting,
-  liveSettings,
-  settingDefaults,
-  settingIndex,
-  checkSettings,
-  type SettingRow,
-} from '../../shared/settings.js';
+import { numberSetting, liveSettings, settingDefaults, settingIndex, checkSettings, type SettingRow } from '../../shared/settings.js';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
@@ -63,9 +56,7 @@ const RANGES: Record<keyof WetGroundLook, Pair> = { darkening: [0, 1], gloss: [0
 const fragmentHead = '@fragment fn fragment(i:Output)->@location(0) vec4f {',
   colorHead = 'fn terrainColor(position:vec3f,normal:vec3f)->vec3f {';
 const finitePair = (p: unknown, positive: boolean): boolean =>
-  Array.isArray(p) &&
-  p.length === 2 &&
-  p.every((v) => typeof v === 'number' && Number.isFinite(v) && (!positive || v > 0));
+  Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === 'number' && Number.isFinite(v) && (!positive || v > 0));
 
 let nextId = 0;
 /**
@@ -99,14 +90,11 @@ export class WetGround implements EnginePlugin, TerrainLighting, Disposable {
     if (!terrain || typeof terrain.addLighting !== 'function')
       throw new TypeError('WetGround needs a clipmap Terrain (@margoengine/terrain); pass the terrain to attach');
     if (!options || typeof options.record !== 'function')
-      throw new TypeError(
-        'WetGround needs record: a function returning the wetting record texture, such as () => flood.wetTexture',
-      );
+      throw new TypeError('WetGround needs record: a function returning the wetting record texture, such as () => flood.wetTexture');
     if (!finitePair(options.origin, false) || !finitePair(options.size, true))
       throw new RangeError('WetGround needs a finite [x, z] origin and a positive finite [width, depth] size');
     const binding = options.binding ?? 116;
-    if (!Number.isInteger(binding) || binding < 0 || binding > 998)
-      throw new RangeError('WetGround binding must be an integer 0 to 998');
+    if (!Number.isInteger(binding) || binding < 0 || binding > 998) throw new RangeError('WetGround binding must be an integer 0 to 998');
     this.#terrain = terrain;
     this.#record = options.record;
     this.origin = [options.origin[0], options.origin[1]];
@@ -195,10 +183,7 @@ export class WetGround implements EnginePlugin, TerrainLighting, Disposable {
       cached = this.#shaders.get(key);
     if (cached) return cached;
     if (source.split(fragmentHead).length !== 2 || source.split(colorHead).length !== 2)
-      throw new MargoError(
-        'unsupported',
-        "WetGround needs the terrain's lit fragment shader and its terrainColor; attach it before effects that replace them",
-      );
+      throw new MargoError('unsupported', "WetGround needs the terrain's lit fragment shader and its terrainColor; attach it before effects that replace them");
     const s = '_w' + this.name.slice(this.name.indexOf(':') + 1),
       b = this.binding;
     const own = /* wgsl */ `
@@ -252,47 +237,18 @@ export interface WetGroundSetting extends SettingRow {
   readonly group: 'wet';
   readonly default: number;
 }
-const row = (
-  name: string,
-  value: number,
-  min: number,
-  max: number,
-  step: number,
-  unit: string,
-  about: string,
-): WetGroundSetting => numberSetting(name, 'wet', value, min, max, step, unit, about) as WetGroundSetting;
+const row = (name: string, value: number, min: number, max: number, step: number, unit: string, about: string): WetGroundSetting =>
+  numberSetting(name, 'wet', value, min, max, step, unit, about) as WetGroundSetting;
 /** Every wet ground control, in panel order; defaults are what WetGround uses without the option. */
 export const WET_GROUND_SETTINGS: readonly WetGroundSetting[] = [
-  row(
-    'wet.darkening',
-    LOOK.darkening,
-    0,
-    1,
-    0.01,
-    '',
-    'Albedo of fully wet ground as a share of dry (1 is no darkening).',
-  ),
+  row('wet.darkening', LOOK.darkening, 0, 1, 0.01, '', 'Albedo of fully wet ground as a share of dry (1 is no darkening).'),
   row('wet.gloss', LOOK.gloss, 0, 1, 0.01, '', 'Share by which fully wet ground is smoother (shinier).'),
-  row(
-    'wet.dryTime',
-    LOOK.dryTime,
-    1,
-    604800,
-    1,
-    's',
-    'Seconds over which wet ground dries to 1/e once the water has gone.',
-  ),
+  row('wet.dryTime', LOOK.dryTime, 1, 604800, 1, 's', 'Seconds over which wet ground dries to 1/e once the water has gone.'),
 ];
 /** The rows that can change every frame (all of them). */
-export const WET_GROUND_LIVE_SETTINGS: readonly WetGroundSetting[] = liveSettings(
-  WET_GROUND_SETTINGS,
-) as WetGroundSetting[];
+export const WET_GROUND_LIVE_SETTINGS: readonly WetGroundSetting[] = liveSettings(WET_GROUND_SETTINGS) as WetGroundSetting[];
 const BY_NAME = settingIndex(WET_GROUND_SETTINGS) as Map<string, WetGroundSetting>;
-const KEYS: Record<string, keyof WetGroundLook> = {
-  'wet.darkening': 'darkening',
-  'wet.gloss': 'gloss',
-  'wet.dryTime': 'dryTime',
-};
+const KEYS: Record<string, keyof WetGroundLook> = { 'wet.darkening': 'darkening', 'wet.gloss': 'gloss', 'wet.dryTime': 'dryTime' };
 /** Every setting at its default, as a fresh object to edit (a slider panel's state). */
 export function wetGroundSettingDefaults(): Record<string, number> {
   return settingDefaults(WET_GROUND_SETTINGS) as Record<string, number>;

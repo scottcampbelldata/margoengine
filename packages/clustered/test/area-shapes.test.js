@@ -33,24 +33,12 @@ test('disk and sphere shadows coexist with rectangles, cache and honour unshadow
   assert.equal(local['layers'], 16, 'five rectangle, five disk and six sphere faces');
   assert.match(lights.pbr(1).declarations, /clusterShapeShadow\(j,position,n,a,r,u,light.a.w<0.5\)/);
   assert.doesNotMatch(lights['unshadowed'].pbr(1).declarations, /clusterAreaShadow/);
-  assert.deepEqual(
-    shapes.shadowLights().map((s) => [s.index, s.twoSided, s.width]),
-    [
-      [64, false, 0],
-      [65, true, 32],
-    ],
-  );
+  assert.deepEqual(shapes.shadowLights().map((s) => [s.index, s.twoSided, s.width]), [[64, false, 0], [65, true, 32]]);
   const maps = local['dirtyLayers'];
-  assert.equal(
-    maps.slice(0, 16).reduce((a, b) => a + b),
-    0,
-  );
+  assert.equal(maps.slice(0, 16).reduce((a, b) => a + b), 0);
   h.context.shader = wgsl;
   h.engine.frameGraph.execute(h.context);
-  assert.equal(
-    maps.slice(0, 16).reduce((a, b) => a + b),
-    0,
-  );
+  assert.equal(maps.slice(0, 16).reduce((a, b) => a + b), 0);
   for (const effect of [shapes, rect, local, lights]) effect.dispose();
 });
 
@@ -59,12 +47,9 @@ test('invalid shadow entries never replace existing shaped lights or shadow fram
     good = { shape: 'sphere', position: [0, 3, 0], radius: 0.5, castShadow: true };
   shapes.setLights([good]);
   assert.doesNotMatch(shapes.declarations(0), /shapeTube|shapeArc|ShapeArc/);
-  const frames = shapes.shadowLights(),
-    before = Array.from(shapes.data);
+  const frames = shapes.shadowLights(), before = Array.from(shapes.data);
   for (const bad of [
-    { ...good, radius: 0 },
-    { ...good, castShadow: 1 },
-    { ...good, shadow: { near: 2, far: 1 } },
+    { ...good, radius: 0 }, { ...good, castShadow: 1 }, { ...good, shadow: { near: 2, far: 1 } },
     { shape: 'tube', start: [0, 0, 0], end: [0, 1, 0], radius: 1, castShadow: true },
   ]) {
     assert.throws(() => shapes.setLights([bad]));

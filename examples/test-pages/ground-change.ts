@@ -17,59 +17,15 @@ const say = (text: string) => (status.textContent = text);
 const button = (id: string) => document.getElementById(id) as HTMLButtonElement;
 
 const grid = { size: [300, 300] as [number, number], origin: [-150, -150] as [number, number], resolution: 384 };
-const hills = (x: number, z: number) =>
-  0.06 * z + 5 * Math.sin(x * 0.021) * Math.cos(z * 0.017) + 1.5 * Math.sin(x * 0.07 + z * 0.05);
+const hills = (x: number, z: number) => 0.06 * z + 5 * Math.sin(x * 0.021) * Math.cos(z * 0.017) + 1.5 * Math.sin(x * 0.07 + z * 0.05);
 const events: GroundEvent[] = [
-  {
-    kind: 'gully',
-    path: [
-      [-90, -110],
-      [-70, -40],
-      [-80, 20],
-    ],
-    width: 6,
-    depth: 2.5,
-    duration: 60,
-  },
-  {
-    kind: 'bank',
-    path: [
-      [-150, 110],
-      [150, 125],
-    ],
-    river: 'left',
-    retreat: 10,
-    bed: 2,
-    duration: 90,
-  },
+  { kind: 'gully', path: [[-90, -110], [-70, -40], [-80, 20]], width: 6, depth: 2.5, duration: 60 },
+  { kind: 'bank', path: [[-150, 110], [150, 125]], river: 'left', retreat: 10, bed: 2, duration: 90 },
   { kind: 'scour', center: [40, -30], radius: 7, depth: 3, flow: [0, 1], start: 10 },
   { kind: 'slide', from: [100, 100], to: [110, 20], width: 26, depth: 4, start: 30 },
-  {
-    kind: 'mud',
-    shore: [
-      [-150, -140],
-      [150, -140],
-    ],
-    land: 'right',
-    reach: 120,
-    thickness: 0.3,
-    duration: 60,
-    drying: 600,
-  },
+  { kind: 'mud', shore: [[-150, -140], [150, -140]], land: 'right', reach: 120, thickness: 0.3, duration: 60, drying: 600 },
   { kind: 'ash', vent: [120, -110], thickness: 0.06, half: 60, wind: [5, 2], start: 20, duration: 60 },
-  {
-    kind: 'lava',
-    path: [
-      [120, -110],
-      [80, -60],
-      [20, -50],
-    ],
-    width: 12,
-    thickness: 2,
-    start: 20,
-    duration: 100,
-    cooling: 20,
-  },
+  { kind: 'lava', path: [[120, -110], [80, -60], [20, -50]], width: 12, thickness: 2, start: 20, duration: 100, cooling: 20 },
   { kind: 'burn', ignition: [-60, 60], wind: [5, -1], rate: 0.5, start: 5, duration: 200, ashing: 300 },
 ];
 
@@ -99,13 +55,7 @@ async function start() {
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const n = change.side;
     let worst = 0;
-    for (const [i, j] of [
-      [64, 64],
-      [192, 100],
-      [300, 200],
-      [120, 320],
-      [260, 40],
-    ]) {
+    for (const [i, j] of [[64, 64], [192, 100], [300, 200], [120, 320], [260, 40]]) {
       const x = grid.origin[0] + (i / (n - 1)) * grid.size[0],
         z = grid.origin[1] + (j / (n - 1)) * grid.size[1];
       worst = Math.max(worst, Math.abs(change.change[j * n + i] - change.sample(x, z, change.time).change));

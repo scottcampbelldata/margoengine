@@ -29,7 +29,10 @@ test('a hinge reads its bend from rest to pose, clamps past both ends, and ignor
   near(weigh(correctives, about(X, 2.6))[0].weight, 1);
   near(weigh(correctives, about(X, -1))[0].weight, 0);
   near(weigh(correctives, about(Y, 1.2))[0].weight, 0, 1e-9);
-  assert.deepEqual(Object.keys(weigh(correctives, [0, 0, 0, 1])[0]).sort(), ['node', 'target', 'weight']);
+  assert.deepEqual(
+    Object.keys(weigh(correctives, [0, 0, 0, 1])[0]).sort(),
+    ['node', 'target', 'weight'],
+  );
 });
 
 test('a sign flipped quaternion reads the same, and a rest away from identity is measured from', () => {
@@ -38,22 +41,10 @@ test('a sign flipped quaternion reads the same, and a rest away from identity is
     correctives = new Correctives({ shapes: [{ node: 1, target: 0, joint: 2, pose, rest }] });
   near(weigh(correctives, rest)[0].weight, 0);
   near(weigh(correctives, about(Y, 1))[0].weight, 0.5);
-  near(
-    weigh(
-      correctives,
-      about(Y, 1).map((v) => -v),
-    )[0].weight,
-    0.5,
-  );
+  near(weigh(correctives, about(Y, 1).map((v) => -v))[0].weight, 0.5);
   // With no rest of its own, the joint's rest from the rig is used.
   const rigged = new Correctives({ shapes: [{ node: 1, target: 0, joint: 2, pose }] });
-  near(
-    rigged.evaluate(
-      () => about(Y, 1),
-      () => rest,
-    )[0].weight,
-    0.5,
-  );
+  near(rigged.evaluate(() => about(Y, 1), () => rest)[0].weight, 0.5);
 });
 
 test('start, smooth curve, amount and cone shape the reading', () => {
@@ -114,14 +105,7 @@ test('a pose space gives each sample exactly its weights and blends between', ()
   }
   const halfway = weigh(correctives, about(Z, 0.7));
   assert.ok(halfway[0].weight > 0.2 && halfway[0].weight < 0.9, `${halfway[0].weight}`);
-  near(
-    weigh(
-      correctives,
-      about(Z, 1.4).map((v) => -v),
-    )[0].weight,
-    1,
-    1e-9,
-  );
+  near(weigh(correctives, about(Z, 1.4).map((v) => -v))[0].weight, 1, 1e-9);
 });
 
 test('bad settings are refused', () => {
@@ -204,9 +188,7 @@ test('on a real rig (stand-in shape): a clip bends a Fox leg joint and the shape
     engine.dispose();
   });
   const node = f.doc.nodes.findIndex((n) => n.mesh === 0),
-    tracked = clip.tracks.find(
-      (track) => track.path === 'rotation' && /leg|knee|thigh/i.test(f.doc.nodes[track.node]?.name ?? ''),
-    );
+    tracked = clip.tracks.find((track) => track.path === 'rotation' && /leg|knee|thigh/i.test(f.doc.nodes[track.node]?.name ?? ''));
   assert.ok(tracked, 'the clip turns a leg joint');
   const joint = tracked.node,
     rest = animator.restRotation(joint),
@@ -219,8 +201,7 @@ test('on a real rig (stand-in shape): a clip bends a Fox leg joint and the shape
     frames.push(rotation());
   }
   // The pose of the frame farthest from rest is where the shape is full.
-  const angle = (q) =>
-      2 * Math.acos(Math.min(1, Math.abs(q[0] * rest[0] + q[1] * rest[1] + q[2] * rest[2] + q[3] * rest[3]))),
+  const angle = (q) => 2 * Math.acos(Math.min(1, Math.abs(q[0] * rest[0] + q[1] * rest[1] + q[2] * rest[2] + q[3] * rest[3]))),
     pose = frames.reduce((a, b) => (angle(b) > angle(a) ? b : a));
   assert.ok(angle(pose) > 0.05, `the leg moves: ${angle(pose)}`);
   const handle = addCorrectives(animator, { shapes: [{ node, target: 0, joint, pose }] }),
@@ -230,10 +211,7 @@ test('on a real rig (stand-in shape): a clip bends a Fox leg joint and the shape
     animator.onPreUpdate(1 / 30);
     seen.push(primitive.weights[0]);
   }
-  assert.ok(
-    Math.max(...seen) > 0.8 && Math.min(...seen) < Math.max(...seen) - 0.2,
-    `${Math.min(...seen)} to ${Math.max(...seen)}`,
-  );
+  assert.ok(Math.max(...seen) > 0.8 && Math.min(...seen) < Math.max(...seen) - 0.2, `${Math.min(...seen)} to ${Math.max(...seen)}`);
   handle.dispose();
   assert.equal(primitive.weights[0], 0);
   animator.onPreUpdate(1 / 30);

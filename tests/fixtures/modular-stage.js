@@ -17,17 +17,5 @@ globalThis.modularStage = {
   createStage,
   Geometry,
   DirectGeometry,
-  features: {
-    addGLTF,
-    addSky,
-    addParticles,
-    addEffects,
-    addEnvironment,
-    addShadows,
-    addXRButton,
-    addViewer,
-    addPhysics,
-    addBody,
-    addScene,
-  },
+  features: { addGLTF, addSky, addParticles, addEffects, addEnvironment, addShadows, addXRButton, addViewer, addPhysics, addBody, addScene },
 };

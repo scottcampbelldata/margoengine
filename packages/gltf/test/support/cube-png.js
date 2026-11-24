@@ -17,7 +17,8 @@ export function pngOf(size, pixel) {
   header.writeUInt32BE(size, 0);
   header.writeUInt32BE(size, 4);
   header.set([8, 6, 0, 0, 0], 8);
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) rows.set(pixel(x, y), y * (1 + size * 4) + 1 + x * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) rows.set(pixel(x, y), y * (1 + size * 4) + 1 + x * 4);
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),

@@ -233,11 +233,7 @@ test('interest: a held-back entity never goes back to an older value on the clie
 test('interest: entities near the edge of the budget still converge once the world stops', async () => {
   const game = world({ count: 150, spacing: 0.1, moving: false }),
     interest = new InterestManager(game, { collections: { things: { position } }, radius: 40, budget: 150 }),
-    { run, clients, server } = await play(
-      game,
-      { view: interest.view },
-      { conditions: { latency: 40, loss: 0.2, seed: 9 } },
-    );
+    { run, clients, server } = await play(game, { view: interest.view }, { conditions: { latency: 40, loss: 0.2, seed: 9 } });
   run(5000);
   const held = clients[0].authoritative.things;
   assert.equal(held.size, server.state.things.size - 0);
@@ -333,10 +329,7 @@ test('interest: a bad option or a bad value says what to fix', () => {
   assert.throws(() => make({ collections: { round: { position } }, radius: 5 }), /not a map of structs/);
   assert.throws(() => make({ collections: { things: {} }, radius: 5 }), /position/);
   const state = (x) => ({ things: new Map([[1, { x, y: 0, z: 0, n: 0 }]]), items: new Map(), round: 0 });
-  assert.throws(
-    () => make({ collections: { things: { position: () => [1] } }, radius: 5 }).view(state(0), 1),
-    RangeError,
-  );
+  assert.throws(() => make({ collections: { things: { position: () => [1] } }, radius: 5 }).view(state(0), 1), RangeError);
   assert.throws(() => make({ collections, radius: 5 }).view(state(Number.NaN), 1), /not finite/);
   assert.throws(() => make({ collections, radius: 5, budget: () => 0 }).view(state(0), 1), RangeError);
   const two = state(0);

@@ -55,11 +55,7 @@ const routeUsers = new Set<Stage>();
  */
 function routeOf(stage: Stage): Promise<unknown> | undefined {
   if (!route) {
-    const {
-      navigator: { xr = undefined, gpu = undefined } = {},
-      XRGPUBinding: binding,
-      XRWebGLLayer: layer,
-    } = globalThis as unknown as {
+    const { navigator: { xr = undefined, gpu = undefined } = {}, XRGPUBinding: binding, XRWebGLLayer: layer } = globalThis as unknown as {
       navigator?: { xr?: unknown; gpu?: { xrRoute?(): Promise<{ dispose(): void }> } };
       XRGPUBinding?: unknown;
       XRWebGLLayer?: unknown;
@@ -74,15 +70,12 @@ function routeOf(stage: Stage): Promise<unknown> | undefined {
 function whyNot(stage: Stage, mode: string, kind: string): { reason: string; label?: string } {
   const page = globalThis as unknown as { navigator?: { xr?: unknown; gpu?: unknown }; XRGPUBinding?: unknown };
   if (stage.engine.backend !== 'webgpu')
-    return {
-      reason:
-        'XR needs a WebGPU stage; on WebGL2 run the page on the WebGL2 compatibility layer, which has an XR route.',
-    };
+    return { reason: 'XR needs a WebGPU stage; on WebGL2 run the page on the WebGL2 compatibility layer, which has an XR route.' };
   if (!page.navigator?.xr) return { reason: 'This browser has no WebXR, or the page is not on HTTPS.' };
   if (!page.XRGPUBinding)
     return {
       reason:
-        'This browser has WebXR but not its WebGPU binding; run the page on the WebGL2 compatibility layer, which gives XR a route.',
+        "This browser has WebXR but not its WebGPU binding; run the page on the WebGL2 compatibility layer, which gives XR a route.",
       label: `${kind} needs WebXR's WebGPU binding`,
     };
   return { reason: `This browser or device cannot start ${mode}.` };

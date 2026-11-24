@@ -183,10 +183,7 @@ test('a plain primitive that deforms or gains instances leaves the list, and a l
     primitives = [p, q, r];
   CulledModels.attach(h.engine, [{ primitives }]);
   h.run();
-  assert.deepEqual(
-    [p, q, r].map((x) => x.culled.offset),
-    [0, 20, 40],
-  );
+  assert.deepEqual([p, q, r].map((x) => x.culled.offset), [0, 20, 40]);
   p.deformed = {};
   q.instances = { count: 3, capacity: 256, upload: () => ({ size: 96 * 3 }) };
   primitives.length = 2;

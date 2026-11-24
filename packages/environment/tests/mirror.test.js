@@ -92,60 +92,35 @@ const ndc = (m, p) => {
 };
 const close = (a, b, eps = 1e-5) => Math.abs(a - b) <= eps;
 
-test('capture-only surfaces retain matching projection metadata without drawing their rectangle', async (t) => {
-  const e = await engine(t);
-  assert.throws(() => new Reflector({ captureOnly: 1 }), /boolean/);
-  const mirror = Reflector.attach(e, { captureOnly: true, roughness: 0 });
-  assert.equal(mirror.textureMatrix, undefined);
-  assert.equal(mirror.update(), true);
-  assert.deepEqual(Array.from(mirror.textureMatrix), Array.from(mirror.camera.matrix));
-  const snapshot = Array.from(mirror.textureMatrix);
-  mirror.camera.position = [200, 100, 50];
-  mirror.camera.update(2);
-  assert.deepEqual(
-    Array.from(mirror.textureMatrix),
-    snapshot,
-    'metadata belongs to the image, not mutable camera state',
-  );
-  let created = 0;
-  const create = e.gpu.createRenderPipeline;
-  e.gpu.createRenderPipeline = (...args) => {
-    created++;
-    return create(...args);
-  };
-  e.render({ delta: 0 });
-  assert.equal(created, 0, 'capture-only does not build a rectangle pipeline');
-  mirror.captureOnly = false;
-  e.render({ delta: 0 });
-  assert.ok(created > 0, 'the regular surface can be enabled');
-  mirror.onDeviceRestored();
-  assert.equal(mirror.texture, undefined);
-  assert.equal(mirror.textureMatrix, undefined);
+test('capture-only surfaces retain matching projection metadata without drawing their rectangle', async t => {
+  const e=await engine(t);
+  assert.throws(()=>new Reflector({captureOnly:1}),/boolean/);
+  const mirror=Reflector.attach(e,{captureOnly:true,roughness:0});
+  assert.equal(mirror.textureMatrix,undefined);
+  assert.equal(mirror.update(),true);
+  assert.deepEqual(Array.from(mirror.textureMatrix),Array.from(mirror.camera.matrix));
+  const snapshot=Array.from(mirror.textureMatrix);
+  mirror.camera.position=[200,100,50];mirror.camera.update(2);
+  assert.deepEqual(Array.from(mirror.textureMatrix),snapshot,'metadata belongs to the image, not mutable camera state');
+  let created=0;const create=e.gpu.createRenderPipeline;
+  e.gpu.createRenderPipeline=(...args)=>{created++;return create(...args);};
+  e.render({delta:0});assert.equal(created,0,'capture-only does not build a rectangle pipeline');
+  mirror.captureOnly=false;e.render({delta:0});assert.ok(created>0,'the regular surface can be enabled');
+  mirror.onDeviceRestored();assert.equal(mirror.texture,undefined);assert.equal(mirror.textureMatrix,undefined);
 });
 
-test('scene captures own their target viewport and restore the outer background view', async (t) => {
-  const e = await engine(t),
-    seen = [];
-  e.scene.background = '#ffffff';
-  for (const order of [0.5, 1e301])
-    e.frameGraph.add({
-      name: `capture-view-${order}`,
-      order,
-      execute: (c) => seen.push({ width: c.width, height: c.height, viewport: c.view?.viewport, clear: c.view?.clear }),
-    });
-  const mirror = Reflector.attach(e, { resolution: 0.25, passes: () => true });
-  assert.equal(mirror.update(), true);
-  assert.deepEqual(seen, [
-    { width: 100, height: 50, viewport: [0, 0, 100, 50], clear: { color: '#ffffff' } },
-    { width: 400, height: 200, viewport: [0, 0, 400, 200], clear: { color: '#ffffff' } },
+test('scene captures own their target viewport and restore the outer background view',async(t)=>{
+  const e=await engine(t),seen=[];
+  e.scene.background='#ffffff';
+  for(const order of [0.5,1e301])e.frameGraph.add({name:`capture-view-${order}`,order,execute:c=>seen.push({width:c.width,height:c.height,viewport:c.view?.viewport,clear:c.view?.clear})});
+  const mirror=Reflector.attach(e,{resolution:.25,passes:()=>true});
+  assert.equal(mirror.update(),true);
+  assert.deepEqual(seen,[
+    {width:100,height:50,viewport:[0,0,100,50],clear:{color:'#ffffff'}},
+    {width:400,height:200,viewport:[0,0,400,200],clear:{color:'#ffffff'}},
   ]);
-  assert.equal(mirror.texture.width, 100);
-  assert.equal(mirror.texture.height, 50);
-  assert.deepEqual(
-    mirror.target.scene.viewContext.view.viewport,
-    [0, 0, 100, 50],
-    'MSAA depth copies use the capture viewport too',
-  );
+  assert.equal(mirror.texture.width,100);assert.equal(mirror.texture.height,50);
+  assert.deepEqual(mirror.target.scene.viewContext.view.viewport,[0,0,100,50],'MSAA depth copies use the capture viewport too');
 });
 // Records which passes ran in each render.
 function spies(e, orders) {

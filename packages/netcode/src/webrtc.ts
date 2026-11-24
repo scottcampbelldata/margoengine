@@ -34,7 +34,6 @@ class DataChannelConnection implements Connection {
   onmessage: ((data: Uint8Array, channel: Delivery) => void) | null = null;
   onclose: ((code: number, reason: string) => void) | null = null;
   private closed = false;
-  private readonly listening: Array<[RTCDataChannel, 'message' | 'close', (event: Event) => void]> = [];
   constructor(
     private readonly channels: DataChannels,
     private readonly dropAbove: number,
@@ -45,18 +44,14 @@ class DataChannelConnection implements Connection {
     ] as const) {
       if (!channel) continue;
       channel.binaryType = 'arraybuffer';
-      const message = (event: Event) => {
+      channel.addEventListener('message', (event: MessageEvent) => {
         if (this.closed) return;
-        const data = (event as MessageEvent).data;
-        if (!(data instanceof ArrayBuffer)) return this.close(CloseCode.protocol, 'text message');
-        this.onmessage?.(new Uint8Array(data), kind);
-      };
+        if (!(event.data instanceof ArrayBuffer)) return this.close(CloseCode.protocol, 'text message');
+        this.onmessage?.(new Uint8Array(event.data), kind);
+      });
       // Either channel closing ends the connection, and the other channel is closed with it, so neither end is left
       // holding a half-open pair (a closed unreliable channel would otherwise leave the reliable one open).
-      const closing = () => this.close(CloseCode.normal, 'data channel closed');
-      channel.addEventListener('message', message);
-      channel.addEventListener('close', closing);
-      this.listening.push([channel, 'message', message], [channel, 'close', closing]);
+      channel.addEventListener('close', () => this.close(CloseCode.normal, 'data channel closed'));
     }
   }
   get open(): boolean {
@@ -73,9 +68,6 @@ class DataChannelConnection implements Connection {
   }
   close(code: number = CloseCode.normal, reason = ''): void {
     if (this.closed) return;
-    // Off the channels first: closing one fires its close event, which must not close this again. A closed connection
-    // leaves no listener on them.
-    this.release();
     this.channels.unreliable?.close();
     this.channels.reliable.close();
     this.finish(code, reason);
@@ -83,11 +75,7 @@ class DataChannelConnection implements Connection {
   private finish(code: number, reason: string): void {
     if (this.closed) return;
     this.closed = true;
-    this.release();
     this.onclose?.(code, reason);
-  }
-  private release(): void {
-    for (const [channel, type, listener] of this.listening.splice(0)) channel.removeEventListener(type, listener);
   }
 }
 

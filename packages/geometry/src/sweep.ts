@@ -150,13 +150,7 @@ class Surface {
   }
 
   /** Adds a flat cap over the points of `row`, with UVs from the flat points `flat` fitted to the unit square. */
-  cap(
-    row: readonly number[],
-    flat: readonly MutableVec2[],
-    triangles: readonly number[],
-    normal: MutableVec3,
-    flip: boolean,
-  ) {
+  cap(row: readonly number[], flat: readonly MutableVec2[], triangles: readonly number[], normal: MutableVec3, flip: boolean) {
     let minX = Infinity,
       minY = Infinity,
       maxX = -Infinity,
@@ -296,11 +290,9 @@ export function sweepGeometry(profile: SweepProfile, path: Curve<Vec>, options: 
     towards = up && normalize([up[0], up[1], up[2]] as MutableVec3),
     grids: number[][][] = rings.map(() => []),
     v: number[] = [];
-  if (towards && !(dot(towards, towards) > 0.5))
-    throw new RangeError('Invalid up; pass a finite vector that is not zero');
+  if (towards && !(dot(towards, towards) > 0.5)) throw new RangeError('Invalid up; pass a finite vector that is not zero');
   let lastSide: MutableVec3 | undefined;
-  let firstSide = frames.normals[0],
-    firstLift = frames.binormals[0];
+  let firstSide = frames.normals[0], firstLift = frames.binormals[0];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps,
       centre = to3(path.getPointAt(closed && i === steps ? 0 : t)),
@@ -326,14 +318,8 @@ export function sweepGeometry(profile: SweepProfile, path: Curve<Vec>, options: 
     }
     // The end row is another copy of the initial frame, including the up-parallel fallback.
     // Reusing it avoids choosing a different side from the last interior row at the same point.
-    if (i === 0) {
-      firstSide = side;
-      firstLift = lift;
-    }
-    if (closed && i === steps) {
-      side = firstSide;
-      lift = firstLift;
-    }
+    if (i === 0) { firstSide = side; firstLift = lift; }
+    if (closed && i === steps) { side = firstSide; lift = firstLift; }
     v.push(t);
     rings.forEach((ring, r) => {
       const row: number[] = [];
@@ -353,14 +339,7 @@ export function sweepGeometry(profile: SweepProfile, path: Curve<Vec>, options: 
   }
   const surface = new Surface();
   rings.forEach((ring, r) =>
-    surface.strip(
-      grids[r],
-      arcShares(ring, closedProfile),
-      corners(ring, closedProfile, crease),
-      closedProfile,
-      closed,
-      v,
-    ),
+    surface.strip(grids[r], arcShares(ring, closedProfile), corners(ring, closedProfile, crease), closedProfile, closed, v),
   );
   if (caps && closedProfile && !closed) {
     const flat = rings.flat(),
@@ -418,16 +397,12 @@ function sectionRings(section: LoftSection, index: number, segments: number): Mu
     if (ring.length < 3) throw new RangeError(`Loft section of ${ring.length} points; pass at least 3`);
     return [ring];
   }
-  const {
-    profile,
-    position = [0, 0, index],
-    normal = [0, 0, 1],
-    scale = 1,
-  } = (placed ? section : { profile: section }) as LoftPlacement;
+  const { profile, position = [0, 0, index], normal = [0, 0, 1], scale = 1 } = (
+    placed ? section : { profile: section }
+  ) as LoftPlacement;
   const rings = profileRings(profile, segments, true),
     facingWay = normalize([normal[0], normal[1], normal[2]] as MutableVec3);
-  if (!(dot(facingWay, facingWay) > 0.5))
-    throw new RangeError('Invalid section normal; pass a finite vector that is not zero');
+  if (!(dot(facingWay, facingWay) > 0.5)) throw new RangeError('Invalid section normal; pass a finite vector that is not zero');
   const [sizeX, sizeY] = sizeOf(scale),
     [across, upward] = planeAxes(facingWay);
   return rings.map((ring) =>
@@ -494,7 +469,9 @@ function sharedShares(allShares: readonly (readonly number[])[]): number[] {
 
 /** Uniform Catmull-Rom through p1 and p2. */
 function spline(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  return p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
+  return (
+    p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)))
+  );
 }
 
 /**
@@ -518,9 +495,7 @@ export function loftGeometry(sections: readonly LoftSection[], options: LoftOpti
     surface = new Surface();
   for (const set of sets)
     if (set.length !== holes + 1)
-      throw new RangeError(
-        `Loft sections with ${holes} and ${set.length - 1} holes; pass the same number in every section`,
-      );
+      throw new RangeError(`Loft sections with ${holes} and ${set.length - 1} holes; pass the same number in every section`);
   /** Skins one ring of every section, and gives the rows of the surface. Holes run the other way, so walls face the solid's outside. */
   const skin = (given: readonly MutableVec3[][], sign: number): number[][] => {
     const rings = given.map((ring) => ring.slice());
@@ -533,7 +508,9 @@ export function loftGeometry(sections: readonly LoftSection[], options: LoftOpti
     });
     if (align) for (let i = 1; i < rings.length; i++) rings[i] = aligned(rings[i], rings[i - 1]);
     const ringShares = rings.map((ring) => arcShares(ring, true)),
-      shares = segments ? Array.from({ length: segments }, (_, j) => j / segments) : sharedShares(ringShares),
+      shares = segments
+        ? Array.from({ length: segments }, (_, j) => j / segments)
+        : sharedShares(ringShares),
       grid = rings.map((ring, r) => shares.map((share) => ringPoint(ring, ringShares[r], share))),
       sharp = grid.map((row) => corners(row, true, crease)),
       hard = shares.map((_, j) => sharp.every((row) => row[j])),
@@ -569,19 +546,8 @@ export function loftGeometry(sections: readonly LoftSection[], options: LoftOpti
     );
     return rows;
   };
-  const skins = [
-    skin(
-      sets.map(([outline]) => outline),
-      1,
-    ),
-  ];
-  for (let hole = 1; hole <= holes; hole++)
-    skins.push(
-      skin(
-        sets.map((set) => set[hole]),
-        -1,
-      ),
-    );
+  const skins = [skin(sets.map(([outline]) => outline), 1)];
+  for (let hole = 1; hole <= holes; hole++) skins.push(skin(sets.map((set) => set[hole]), -1));
   if (caps && !closed)
     for (const [at, flip] of [
       [0, true],
@@ -597,13 +563,7 @@ export function loftGeometry(sections: readonly LoftSection[], options: LoftOpti
         [across, upward] = planeAxes(facingWay),
         flat = rings.map((ring) => ring.map((p) => [dot(p, across), dot(p, upward)] as MutableVec2)),
         { indices } = triangulateConstrained(flat[0], flat.slice(1));
-      surface.cap(
-        rows.flat(),
-        flat.flat(),
-        indices,
-        flip ? [-facingWay[0], -facingWay[1], -facingWay[2]] : facingWay,
-        flip,
-      );
+      surface.cap(rows.flat(), flat.flat(), indices, flip ? [-facingWay[0], -facingWay[1], -facingWay[2]] : facingWay, flip);
     }
   return surface.done();
 }

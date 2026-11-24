@@ -16,15 +16,9 @@ function bone(translation, axis, degrees, stretch = [1, 0, 0, 0, 1, 0, 0, 0, 1])
     t = 1 - c,
     [x, y, z] = axis,
     r = [
-      t * x * x + c,
-      t * x * y - s * z,
-      t * x * z + s * y,
-      t * x * y + s * z,
-      t * y * y + c,
-      t * y * z - s * x,
-      t * x * z - s * y,
-      t * y * z + s * x,
-      t * z * z + c,
+      t * x * x + c, t * x * y - s * z, t * x * z + s * y,
+      t * x * y + s * z, t * y * y + c, t * y * z - s * x,
+      t * x * z - s * y, t * y * z + s * x, t * z * z + c,
     ],
     out = new Float32Array(16);
   for (let i = 0; i < 3; i++)
@@ -60,12 +54,7 @@ test('one bone: the encoded slot moves points exactly as its matrix, whatever th
   bones.forEach((m, b) => {
     const slot = encodeDualQuaternions(m.slice());
     assert.ok(Math.abs(Math.hypot(...slot.subarray(0, 4)) - 1) < 1e-6, `bone ${b} has a unit rotation`);
-    for (const point of [
-      [0, 0, 0],
-      [1, 0, 0],
-      [0.3, -2, 5],
-      [-4, 1, 1],
-    ])
+    for (const point of [[0, 0, 0], [1, 0, 0], [0.3, -2, 5], [-4, 1, 1]])
       near(skinDualQuaternion(slot, [0], [1], point).position, apply(m, point), 2e-5, `bone ${b} at ${point}`);
   });
 });
@@ -206,12 +195,7 @@ test('the skinning option reaches the shader and the bones, and models of both m
     device.queue.writeBuffer = writeBuffer;
   });
   const context = { backend: 'webgpu', device, encoder: device.createCommandEncoder() };
-  context.encoder.beginComputePass ??= () => ({
-    setPipeline() {},
-    setBindGroup() {},
-    dispatchWorkgroups() {},
-    end() {},
-  });
+  context.encoder.beginComputePass ??= () => ({ setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, end() {} });
   dq['upload'](context);
   const palette = dq['resources'][0].palette;
   // Joint 1 turned 45 degrees about +Z: the slot's rotation, not a matrix.

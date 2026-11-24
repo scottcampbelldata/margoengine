@@ -783,19 +783,12 @@ every `Scatter` option, with `blades` shading on by default.
   Prefiltered Lines", GPU Gems 2, 2005), blended by Porter and Duff's over. The radius is one pixel, and two for a
   blade under 8 pixels tall (mixed over 4 pixels), the prefiltering of far vegetation (Bruneton and Neyret,
   Eurographics 2012). The near ring draws each blade's core (a filter radius in from its edges) opaque with depth
-  first, then the whole blade blended over it. After all the blending a depth-only pass writes every covered blade's
-  depth where its coverage passes a hash of the blade (a hashed alpha test, Wyman and McGuire, I3D 2017, on the
-  coverage; the alpha-tested depth pass of blended hair, Nguyen and Donnelly, GPU Gems 2, 2005), so a pixel keeps
-  depth with the chance of its coverage and overlapping blades leave it bare with the chance over leaves its colour
-  bare (stochastic transparency, Enderton, Sintorn, Shirley and Luebke, I3D 2010), and the pattern stays on the blade
-  as the camera moves. Ambient occlusion (`@margoengine/post` GTAO, which reads only depth), depth of field, fog and
-  meshes drawn later see the grass while its colour keeps the blended coverage (KB-SCENES-DUNE-GTAO1); see
-  `docs/limits.md`.
+  first, then the whole blade blended over it; the middle and far rings write no depth (see `docs/limits.md`).
   Dune grass (1.6 cm leaves) to 230 m at 480 x 270 without MSAA: 4,902 lone pixels per million before, 0 after on
   WebGPU and 7.8 on the WebGL2 layer, mean luma within 0.31 codes of the same view drawn at 4 x 4 the pixels. Shadows
   keep a pixel floor with a hashed keep (Persson 2012; Cook, Halstead, Planck and Ryu, SIGGRAPH 2007), as does a
-  colour stage that cannot carry coverage (several render targets). Cost: the near ring is drawn three times and the
-  middle and far rings twice (the extra draw is the depth pass), and a covered fragment blends.
+  colour stage that cannot carry coverage (several render targets). Cost: the near ring is drawn twice, and a covered
+  fragment blends.
 - Normals turn across the width (`round`) so flat blades shade round; wind, ground alignment and blade shading are the
   plain `Scatter`'s.
 - The shape is compiled into the shaders: make a new `GrassScatter` to change it.

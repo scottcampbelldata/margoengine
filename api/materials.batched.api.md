@@ -111,7 +111,7 @@ type DepthPacking = 'basic' | 'rgba';
 
 type EnvCombine = 'multiply' | 'mix' | 'add';
 
-type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture | ((device: GPUDevice) => Texture | EnvironmentMap | CubeTarget | GPUTexture);
+type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture;
 
 interface EnvironmentMap {
     readonly specularView: GPUTextureView;
@@ -595,7 +595,6 @@ class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
-    setSource(source: GPUTexture | CubeTarget | ((device: GPUDevice) => GPUTexture | CubeTarget)): void;
     sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
@@ -624,7 +623,7 @@ interface TextureRegion {
     depth?: number;
 }
 
-type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource | ((device: GPUDevice) => GPUTexture | CubeTarget);
+type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource;
 
 interface TranscodedMip {
     data: Uint8Array;

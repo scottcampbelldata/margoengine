@@ -289,10 +289,7 @@ try {
             shadow: { far: 20 },
             ...(kind === 'spot' ? { direction: aim, outerAngle: 0.5 } : {}),
           },
-          { values } = await visibility(
-            { meshes: ['floor', 'bar'], local: { resolution: 256 }, points: [light] },
-            ramp3,
-          ),
+          { values } = await visibility({ meshes: ['floor', 'bar'], local: { resolution: 256 }, points: [light] }, ramp3),
           i = values.findIndex((v, j) => j > 0 && values[j - 1] < 0.5 && v >= 0.5),
           x50 = ramp3[i - 1][0] + ((0.5 - values[i - 1]) / (values[i] - values[i - 1])) * 0.0025,
           // The texel size the shader offsets by: a 90-degree cube face, or the spot's cone with its 2-texel margins,
@@ -389,24 +386,15 @@ try {
           intensity: 5,
           castShadow: true,
           shadow: { far: 20 },
-          ...(kind === 'spot'
-            ? { direction: [3.7, -2, 0].map((v, _i, a) => v / Math.hypot(...a)), outerAngle: 0.5 }
-            : {}),
+          ...(kind === 'spot' ? { direction: [3.7, -2, 0].map((v, _i, a) => v / Math.hypot(...a)), outerAngle: 0.5 } : {}),
         },
-        { values } = await visibility(
-          { meshes: ['floor', 'pebble'], local: { resolution: 1024 }, points: [lamp] },
-          behind,
-        ),
+        { values } = await visibility({ meshes: ['floor', 'pebble'], local: { resolution: 1024 }, points: [lamp] }, behind),
         brightest = Math.max(...values);
-      check(
-        `${kind} 1024 px: the floor behind a 0.1-high pebble stays in its shadow (no peter-panning)`,
-        brightest <= 0.001,
-        {
-          brightest,
-          at: behind[values.indexOf(brightest)][0],
-          values: values.map((v) => +v.toFixed(3)),
-        },
-      );
+      check(`${kind} 1024 px: the floor behind a 0.1-high pebble stays in its shadow (no peter-panning)`, brightest <= 0.001, {
+        brightest,
+        at: behind[values.indexOf(brightest)][0],
+        values: values.map((v) => +v.toFixed(3)),
+      });
     }
     // KB-SUNSHADOW-OFFSET1: directional hard shadow edges stay on their casters too. A sun at 58 degrees from the floor's
     // normal (travelling +x, down) casts the bar's far top corner (0.5, 1.525) onto the floor at 0.5 + 1.525 tan(theta),
@@ -428,10 +416,7 @@ try {
           castShadow: true,
           shadow: { bounds: { min: [-4 + dx, -0.2, -1], max: [4 + dx, 2, 1] } },
         },
-        { values } = await visibility(
-          { meshes: ['floor', 'bar'], local: { resolution: 256 }, suns: [sunLight] },
-          ramp4,
-        ),
+        { values } = await visibility({ meshes: ['floor', 'bar'], local: { resolution: 256 }, suns: [sunLight] }, ramp4),
         i = values.findIndex((v, j) => j > 0 && values[j - 1] < 0.5 && v >= 0.5),
         x50 = ramp4[i - 1][0] + ((0.5 - values[i - 1]) / (values[i] - values[i - 1])) * 0.0025;
       sunEdge.shifts.push(sunEdgeX - x50);
@@ -449,7 +434,7 @@ try {
         crossingsCm: sunEdge.shifts.map((s) => +(s * 100).toFixed(2)),
       };
       check(
-        "directional 256 px hard edge at 58 degrees: the mean 50% crossing within a quarter texel of the 0.25-texel normal offset's shift",
+        'directional 256 px hard edge at 58 degrees: the mean 50% crossing within a quarter texel of the 0.25-texel normal offset\'s shift',
         Math.abs(off) < 0.25 * texel,
         hardEdges.directional,
       );
@@ -475,14 +460,7 @@ try {
             {
               meshes: ['floor'],
               local: { resolution: 256, ...options },
-              suns: [
-                {
-                  direction: [Math.sin(a), -Math.cos(a), 0],
-                  intensity: 3,
-                  castShadow: true,
-                  shadow: { bounds: { min: [-2, -0.2, -1], max: [2, 0.2, 1] } },
-                },
-              ],
+              suns: [{ direction: [Math.sin(a), -Math.cos(a), 0], intensity: 3, castShadow: true, shadow: { bounds: { min: [-2, -0.2, -1], max: [2, 0.2, 1] } } }],
             },
             grazing,
           );
@@ -509,27 +487,16 @@ try {
           {
             meshes: ['floor', 'pebble'],
             local: { resolution: 1024 },
-            suns: [
-              {
-                direction: [3.5, -2, 0],
-                intensity: 3,
-                castShadow: true,
-                shadow: { bounds: { min: [-1, -0.2, -1], max: [1, 0.3, 1] } },
-              },
-            ],
+            suns: [{ direction: [3.5, -2, 0], intensity: 3, castShadow: true, shadow: { bounds: { min: [-1, -0.2, -1], max: [1, 0.3, 1] } } }],
           },
           behind,
         ),
         brightest = Math.max(...values);
-      check(
-        'directional 1024 px: the floor behind a 0.1-high pebble stays in its shadow (no peter-panning)',
-        brightest <= 0.001,
-        {
-          brightest,
-          at: behind[values.indexOf(brightest)][0],
-          values: values.map((v) => +v.toFixed(3)),
-        },
-      );
+      check('directional 1024 px: the floor behind a 0.1-high pebble stays in its shadow (no peter-panning)', brightest <= 0.001, {
+        brightest,
+        at: behind[values.indexOf(brightest)][0],
+        values: values.map((v) => +v.toFixed(3)),
+      });
     }
     const softWidths = {};
     for (const [kind, R, H] of [

@@ -125,83 +125,18 @@ interface KernelExports extends WebAssembly.Exports {
   mesh_end_grid(rows: number, columns: number, flags: number): number;
   mesh_next(rows: number): number;
   voxels_begin(cells: number): number;
-  voxels_end(
-    x: number,
-    y: number,
-    z: number,
-    dx: number,
-    dy: number,
-    dz: number,
-    sx: number,
-    sy: number,
-    sz: number,
-  ): number;
+  voxels_end(x: number, y: number, z: number, dx: number, dy: number, dz: number, sx: number, sy: number, sz: number): number;
   voxels_set(collider: number, x: number, y: number, z: number, filled: number): number;
   voxels_combine(a: number, b: number, sx: number, sy: number, sz: number): number;
   voxels_propagate(a: number, b: number, x: number, y: number, z: number, sx: number, sy: number, sz: number): number;
   query_buffer(): number;
-  query_ray(
-    ox: number,
-    oy: number,
-    oz: number,
-    dx: number,
-    dy: number,
-    dz: number,
-    max: number,
-    solid: number,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): number;
-  query_ray_all(
-    ox: number,
-    oy: number,
-    oz: number,
-    dx: number,
-    dy: number,
-    dz: number,
-    max: number,
-    solid: number,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-    skip: number,
-  ): number;
+  query_ray(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number): number;
+  query_ray_all(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
   query_shape_cast(...words: number[]): number;
   query_shape_cast_all(...words: number[]): number;
-  query_project_point(
-    x: number,
-    y: number,
-    z: number,
-    solid: number,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): number;
-  query_project_point_all(
-    x: number,
-    y: number,
-    z: number,
-    solid: number,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-    skip: number,
-  ): number;
-  query_point_all(
-    x: number,
-    y: number,
-    z: number,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-    skip: number,
-  ): number;
+  query_project_point(x: number, y: number, z: number, solid: number, flags: number, groups: number, collider: number, body: number): number;
+  query_project_point_all(x: number, y: number, z: number, solid: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
+  query_point_all(x: number, y: number, z: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
   query_shape_all(...words: number[]): number;
   hull_count(): number;
   mesh_count(): number;
@@ -527,8 +462,7 @@ export class KernelWorld {
   constructor(bodies = 1024, colliders = bodies) {
     const module = compiled.value;
     if (!module) throw new MargoError('state', 'The physics kernel is not loaded; call await loadKernel() first.');
-    this.api = new WebAssembly.Instance(module, { env: { contact_filter: (a: number, b: number) => this.ask(a, b) } })
-      .exports as KernelExports;
+    this.api = new WebAssembly.Instance(module, { env: { contact_filter: (a: number, b: number) => this.ask(a, b) } }).exports as KernelExports;
     if (!Number.isSafeInteger(bodies) || !Number.isSafeInteger(colliders) || !this.api.world_new(bodies, colliders))
       throw new RangeError(
         `Bodies and colliders must be integers from 1 to 4194304; use a smaller world (got ${bodies}, ${colliders}).`,
@@ -674,9 +608,7 @@ export class KernelWorld {
    */
   setSleep(energy: number, time: number): this {
     if (!(energy >= 0) || !(time >= 0) || !Number.isFinite(energy) || !Number.isFinite(time))
-      throw new RangeError(
-        `Sleep needs a finite energy and time, not negative; the defaults are 0.0002 and 0.5 (got ${energy}, ${time}).`,
-      );
+      throw new RangeError(`Sleep needs a finite energy and time, not negative; the defaults are 0.0002 and 0.5 (got ${energy}, ${time}).`);
     this.api.world_set_sleep(energy, time);
     return this;
   }
@@ -731,9 +663,7 @@ export class KernelWorld {
   }
   set substeps(substeps: number) {
     if (!Number.isInteger(substeps) || substeps < 1 || substeps > 0xffff)
-      throw new RangeError(
-        `Substeps must be a whole number from 1 to 65535; use 8 unless you measured (got ${substeps}).`,
-      );
+      throw new RangeError(`Substeps must be a whole number from 1 to 65535; use 8 unless you measured (got ${substeps}).`);
     this.api.world_set_substeps(substeps);
   }
   /** Solver passes in each substep (default 2). More holds a tall stack stiffer, at that much more solver time. */
@@ -742,9 +672,7 @@ export class KernelWorld {
   }
   set iterations(iterations: number) {
     if (!Number.isInteger(iterations) || iterations < 1 || iterations > 0xffff)
-      throw new RangeError(
-        `Iterations must be a whole number from 1 to 65535; use 2 unless you measured (got ${iterations}).`,
-      );
+      throw new RangeError(`Iterations must be a whole number from 1 to 65535; use 2 unless you measured (got ${iterations}).`);
     this.api.world_set_iterations(iterations);
   }
   /** Gravity as `[x, y, z]`, in m/s^2 (default `[0, -9.81, 0]`, read back as f32). */
@@ -829,9 +757,7 @@ export class KernelWorld {
       const shape: string = part?.shape,
         spec = shape !== 'trimesh' && Object.hasOwn(shapes, shape) ? shapes[shape as KernelShape] : undefined;
       if (!spec)
-        throw new RangeError(
-          `A compound part is a ball, box, capsule, cylinder, cone or hull (got ${String(part?.shape)}); pass one of those.`,
-        );
+        throw new RangeError(`A compound part is a ball, box, capsule, cylinder, cone or hull (got ${String(part?.shape)}); pass one of those.`);
       this.checkSize(part.shape, part.size);
       this.checkPose(part.position ?? [0, 0, 0], part.rotation ?? [0, 0, 0, 1]);
       codes.push(spec[0]);
@@ -872,20 +798,9 @@ export class KernelWorld {
       if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.meshRows)
         throw new RangeError(`A trimesh collider needs [row], a row addTrimesh returned (got ${size.join(', ')}).`);
     } else if (shape === 'cylinder' || shape === 'cone') {
-      if (
-        !Array.isArray(size) ||
-        size.length !== 3 ||
-        !size.every(Number.isFinite) ||
-        !(size[0] > 0 && size[1] > 0 && size[2] >= 0)
-      )
-        throw new RangeError(
-          `A ${shape} needs [radius, halfHeight, borderRadius], the first two above zero and the border 0 or more (got ${String(size)}).`,
-        );
-    } else if (
-      !Array.isArray(size) ||
-      size.length !== numbers ||
-      !size.every((value) => value > 0 && Number.isFinite(value))
-    )
+      if (!Array.isArray(size) || size.length !== 3 || !size.every(Number.isFinite) || !(size[0] > 0 && size[1] > 0 && size[2] >= 0))
+        throw new RangeError(`A ${shape} needs [radius, halfHeight, borderRadius], the first two above zero and the border 0 or more (got ${String(size)}).`);
+    } else if (!Array.isArray(size) || size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
       throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${String(size)}).`);
   }
 
@@ -895,9 +810,7 @@ export class KernelWorld {
     const [qx, qy, qz, qw] = rotation,
       squared = qx * qx + qy * qy + qz * qz + qw * qw;
     if (!(squared >= 0.998001 && squared <= 1.002001))
-      throw new RangeError(
-        `A collider rotation must be a unit quaternion; normalize it (its length squared is ${squared}).`,
-      );
+      throw new RangeError(`A collider rotation must be a unit quaternion; normalize it (its length squared is ${squared}).`);
   }
 
   /** Adds a collider of shape `code` once its size and pose are checked. */
@@ -916,9 +829,7 @@ export class KernelWorld {
     if (!(friction >= 0) || !Number.isFinite(friction))
       throw new RangeError(`Friction must be finite and not negative; 0.5 is a common start (got ${friction}).`);
     if (!(restitution >= 0 && restitution <= 1))
-      throw new RangeError(
-        `Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`,
-      );
+      throw new RangeError(`Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`);
     const frictionRule = combines.indexOf(frictionCombine),
       restitutionRule = combines.indexOf(restitutionCombine);
     if (frictionRule < 0 || restitutionRule < 0)
@@ -966,9 +877,7 @@ export class KernelWorld {
     if (!vertices.every((vertex) => vertex.length === 3 && vertex.every(Number.isFinite)))
       throw new RangeError('A hull vertex must be three finite numbers; check what fed it.');
     if (!api.hull_begin(vertices.length, faces.length, edges))
-      throw new RangeError(
-        `Memory cannot hold a hull of ${vertices.length} vertices; free another world, or simplify the hull.`,
-      );
+      throw new RangeError(`Memory cannot hold a hull of ${vertices.length} vertices; free another world, or simplify the hull.`);
     if (api.world_layout() !== this.layout) this.bind();
     const c = this.columns,
       [v0, e0, f0] = [api.hull_next(0), api.hull_next(1), api.hull_next(2)];
@@ -981,10 +890,7 @@ export class KernelWorld {
     faces.forEach((face, f) => {
       c.faceEdge[f0 + f] = edge;
       for (const index of face) {
-        if (!Number.isInteger(index) || index < 0)
-          throw new RangeError(
-            `A hull face index must be a whole number; use a place in the vertex list (got ${index}).`,
-          );
+        if (!Number.isInteger(index) || index < 0) throw new RangeError(`A hull face index must be a whole number; use a place in the vertex list (got ${index}).`);
         c.edgeOrigin[e0 + edge++] = index;
       }
     });
@@ -1008,9 +914,7 @@ export class KernelWorld {
       count = vertices.length / 3,
       triangles = indices.length / 3;
     if (!Number.isInteger(count) || !Number.isInteger(triangles))
-      throw new RangeError(
-        `A trimesh takes three numbers a vertex and three indices a triangle (got ${vertices.length} and ${indices.length}); pass whole vertices and whole triangles.`,
-      );
+      throw new RangeError(`A trimesh takes three numbers a vertex and three indices a triangle (got ${vertices.length} and ${indices.length}); pass whole vertices and whole triangles.`);
     for (let i = 0; i < indices.length; i++) {
       const index = indices[i];
       if (!Number.isInteger(index) || index < 0 || index >= count)
@@ -1019,9 +923,7 @@ export class KernelWorld {
     // The edges' neighbours serve only the internal edge rule, so a mesh without it skips finding them.
     const across = fixInternalEdges ? trianglesAcross(vertices, indices) : null;
     if (!api.mesh_begin(count, triangles))
-      throw new RangeError(
-        `Memory cannot hold a trimesh of ${triangles} triangles; free another world, or simplify the mesh.`,
-      );
+      throw new RangeError(`Memory cannot hold a trimesh of ${triangles} triangles; free another world, or simplify the mesh.`);
     if (api.world_layout() !== this.layout) this.bind();
     const c = this.columns,
       [v0, t0] = [api.mesh_next(0), api.mesh_next(1)],
@@ -1063,32 +965,17 @@ export class KernelWorld {
   ): number {
     const { api } = this,
       { fixInternalEdges = false } = options;
-    if (
-      !Number.isInteger(rows) ||
-      !Number.isInteger(columns) ||
-      rows < 1 ||
-      columns < 1 ||
-      2 * rows * columns >= 0xffffffff
-    )
-      throw new RangeError(
-        `A heightfield takes whole rows and columns of cells from 1 up, under 2^31 cells (got ${rows} and ${columns}); pass the cells along z and along x.`,
-      );
+    if (!Number.isInteger(rows) || !Number.isInteger(columns) || rows < 1 || columns < 1 || 2 * rows * columns >= 0xffffffff)
+      throw new RangeError(`A heightfield takes whole rows and columns of cells from 1 up, under 2^31 cells (got ${rows} and ${columns}); pass the cells along z and along x.`);
     const count = (rows + 1) * (columns + 1);
     if (heights.length !== count)
-      throw new RangeError(
-        `A heightfield of ${rows} by ${columns} cells takes (rows + 1) * (columns + 1) = ${count} heights (got ${heights.length}); pass one a grid point, column major.`,
-      );
+      throw new RangeError(`A heightfield of ${rows} by ${columns} cells takes (rows + 1) * (columns + 1) = ${count} heights (got ${heights.length}); pass one a grid point, column major.`);
     if (scale.length !== 3 || !scale.every((value) => value > 0 && Number.isFinite(value)))
-      throw new RangeError(
-        `A heightfield scale is three finite sizes above zero (got ${scale.join(', ')}); pass the field's width, height factor and depth.`,
-      );
+      throw new RangeError(`A heightfield scale is three finite sizes above zero (got ${scale.join(', ')}); pass the field's width, height factor and depth.`);
     for (let i = 0; i < count; i++)
-      if (!Number.isFinite(heights[i]))
-        throw new RangeError(`Heightfield height ${i} is ${heights[i]}; pass finite heights.`);
+      if (!Number.isFinite(heights[i])) throw new RangeError(`Heightfield height ${i} is ${heights[i]}; pass finite heights.`);
     if (!api.mesh_begin(count, 0))
-      throw new RangeError(
-        `Memory cannot hold a heightfield of ${count} points; free another world, or use fewer cells.`,
-      );
+      throw new RangeError(`Memory cannot hold a heightfield of ${count} points; free another world, or use fewer cells.`);
     if (api.world_layout() !== this.layout) this.bind();
     const c = this.columns,
       v0 = api.mesh_next(0),
@@ -1118,13 +1005,9 @@ export class KernelWorld {
   addVoxels(cells: Int32Array, size: readonly [number, number, number]): number {
     const { api } = this;
     if (!(cells instanceof Int32Array) || cells.length % 3)
-      throw new RangeError(
-        `Voxel cells are an Int32Array of x, y, z cell coordinates, three per cell (got ${cells?.length} numbers); pass whole cells.`,
-      );
+      throw new RangeError(`Voxel cells are an Int32Array of x, y, z cell coordinates, three per cell (got ${cells?.length} numbers); pass whole cells.`);
     if (size.length !== 3 || !size.every((value) => value > 0 && Number.isFinite(value)))
-      throw new RangeError(
-        `A voxel size is three finite sizes above zero (got ${size.join(', ')}); pass one cell's width, height and depth.`,
-      );
+      throw new RangeError(`A voxel size is three finite sizes above zero (got ${size.join(', ')}); pass one cell's width, height and depth.`);
     const low = [0, 0, 0],
       high = [0, 0, 0];
     for (let i = 0; i < cells.length; i++) {
@@ -1136,13 +1019,9 @@ export class KernelWorld {
     const dims = [high[0] - low[0] + 1, high[1] - low[1] + 1, high[2] - low[2] + 1],
       count = dims[0] * dims[1] * dims[2];
     if (count > 0x40000000)
-      throw new RangeError(
-        `A voxel grid spans at most 2^30 cells of its box (these span ${count}); split the world into chunks, one grid each.`,
-      );
+      throw new RangeError(`A voxel grid spans at most 2^30 cells of its box (these span ${count}); split the world into chunks, one grid each.`);
     if (!api.voxels_begin(count))
-      throw new RangeError(
-        `Memory cannot hold a voxel grid of ${count} cells; free another world, or split the grid into chunks.`,
-      );
+      throw new RangeError(`Memory cannot hold a voxel grid of ${count} cells; free another world, or split the grid into chunks.`);
     if (api.world_layout() !== this.layout) this.bind();
     const words = this.columns.voxelWord,
       first = api.mesh_next(3);
@@ -1151,10 +1030,7 @@ export class KernelWorld {
       words[first + (index >>> 2)] |= 1 << (8 * (index & 3));
     }
     const row = api.voxels_end(low[0], low[1], low[2], dims[0], dims[1], dims[2], size[0], size[1], size[2]);
-    if (row < 0)
-      throw new RangeError(
-        'This voxel grid was refused; pass cells whose box fits 32-bit cell numbers, and a positive size.',
-      );
+    if (row < 0) throw new RangeError('This voxel grid was refused; pass cells whose box fits 32-bit cell numbers, and a positive size.');
     this.meshRows = row + 1;
     return row;
   }
@@ -1171,16 +1047,8 @@ export class KernelWorld {
     this.voxelDone(this.api.voxels_combine(a, b, shift[0], shift[1], shift[2]), 'combineVoxelStates');
   }
   /** Tells voxel collider `b`, coupled at `shift`, that cell `at` of `a` changed. */
-  propagateVoxel(
-    a: number,
-    b: number,
-    at: readonly [number, number, number],
-    shift: readonly [number, number, number],
-  ): void {
-    this.voxelDone(
-      this.api.voxels_propagate(a, b, at[0], at[1], at[2], shift[0], shift[1], shift[2]),
-      'propagateVoxelChange',
-    );
+  propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void {
+    this.voxelDone(this.api.voxels_propagate(a, b, at[0], at[1], at[2], shift[0], shift[1], shift[2]), 'propagateVoxelChange');
   }
   /**
    * The nearest ray hit among the colliders the filter words let through, or null. The direction need not be unit
@@ -1188,69 +1056,20 @@ export class KernelWorld {
    * collider row and a body row to leave out (0xffffffff for none).
    * @throws RangeError for an origin or direction that is not finite, or a zero direction.
    */
-  raycast(
-    origin: readonly number[],
-    direction: readonly number[],
-    max: number,
-    solid: boolean,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): KernelRayHit | null {
-    const found = this.api.query_ray(
-      origin[0]!,
-      origin[1]!,
-      origin[2]!,
-      direction[0]!,
-      direction[1]!,
-      direction[2]!,
-      max,
-      solid ? 1 : 0,
-      flags,
-      groups,
-      collider,
-      body,
-    );
-    if (found < 0)
-      throw new RangeError('A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.');
+  raycast(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit | null {
+    const found = this.api.query_ray(origin[0]!, origin[1]!, origin[2]!, direction[0]!, direction[1]!, direction[2]!, max, solid ? 1 : 0, flags, groups, collider, body);
+    if (found < 0) throw new RangeError('A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.');
     return found ? this.readHit(0) : null;
   }
   /**
    * Each collider's ray hit, in row order (not sorted), with the same words as {@link KernelWorld.raycast}.
    * @throws RangeError for an origin or direction that is not finite, or a zero direction.
    */
-  raycastAll(
-    origin: readonly number[],
-    direction: readonly number[],
-    max: number,
-    solid: boolean,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): KernelRayHit[] {
+  raycastAll(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit[] {
     const hits: KernelRayHit[] = [];
     for (let skip = 0, total = 1; skip < total; ) {
-      total = this.api.query_ray_all(
-        origin[0]!,
-        origin[1]!,
-        origin[2]!,
-        direction[0]!,
-        direction[1]!,
-        direction[2]!,
-        max,
-        solid ? 1 : 0,
-        flags,
-        groups,
-        collider,
-        body,
-        skip,
-      );
-      if (total < 0)
-        throw new RangeError(
-          'A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.',
-        );
+      total = this.api.query_ray_all(origin[0]!, origin[1]!, origin[2]!, direction[0]!, direction[1]!, direction[2]!, max, solid ? 1 : 0, flags, groups, collider, body, skip);
+      if (total < 0) throw new RangeError('A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.');
       const page = total - skip < QUERY_HITS ? total - skip : QUERY_HITS;
       for (let i = 0; i < page; i++) hits.push(this.readHit(i));
       skip += page;
@@ -1275,19 +1094,7 @@ export class KernelWorld {
     collider: number,
     body: number,
   ): KernelShapeCastHit | null {
-    const found = this.api.query_shape_cast(
-      ...this.shapeWords(shape, position, rotation),
-      direction[0]!,
-      direction[1]!,
-      direction[2]!,
-      cast.max,
-      cast.target,
-      castBits(cast),
-      flags,
-      groups,
-      collider,
-      body,
-    );
+    const found = this.api.query_shape_cast(...this.shapeWords(shape, position, rotation), direction[0]!, direction[1]!, direction[2]!, cast.max, cast.target, castBits(cast), flags, groups, collider, body);
     if (found < 0) throw new RangeError(CAST_REFUSED);
     return found ? this.readCast(0) : null;
   }
@@ -1306,20 +1113,7 @@ export class KernelWorld {
     const hits: KernelShapeCastHit[] = [],
       words = this.shapeWords(shape, position, rotation);
     for (let skip = 0, total = 1; skip < total; ) {
-      total = this.api.query_shape_cast_all(
-        ...words,
-        direction[0]!,
-        direction[1]!,
-        direction[2]!,
-        cast.max,
-        cast.target,
-        castBits(cast),
-        flags,
-        groups,
-        collider,
-        body,
-        skip,
-      );
+      total = this.api.query_shape_cast_all(...words, direction[0]!, direction[1]!, direction[2]!, cast.max, cast.target, castBits(cast), flags, groups, collider, body, skip);
       if (total < 0) throw new RangeError(CAST_REFUSED);
       const page = total - skip < QUERY_HITS / 2 ? total - skip : QUERY_HITS / 2;
       for (let i = 0; i < page; i++) hits.push(this.readCast(i));
@@ -1332,49 +1126,16 @@ export class KernelWorld {
    * (`solid` true) the point itself.
    * @throws RangeError for a point that is not finite.
    */
-  projectPoint(
-    point: readonly number[],
-    solid: boolean,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): KernelProjection | null {
-    const found = this.api.query_project_point(
-      point[0]!,
-      point[1]!,
-      point[2]!,
-      solid ? 1 : 0,
-      flags,
-      groups,
-      collider,
-      body,
-    );
+  projectPoint(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection | null {
+    const found = this.api.query_project_point(point[0]!, point[1]!, point[2]!, solid ? 1 : 0, flags, groups, collider, body);
     if (found < 0) throw new RangeError(POINT_REFUSED);
     return found ? this.readProjection(0) : null;
   }
   /** Each collider's nearest point to `point`, in row order, as {@link KernelWorld.projectPoint}. */
-  projectPointAll(
-    point: readonly number[],
-    solid: boolean,
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): KernelProjection[] {
+  projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[] {
     const hits: KernelProjection[] = [];
     for (let skip = 0, total = 1; skip < total; ) {
-      total = this.api.query_project_point_all(
-        point[0]!,
-        point[1]!,
-        point[2]!,
-        solid ? 1 : 0,
-        flags,
-        groups,
-        collider,
-        body,
-        skip,
-      );
+      total = this.api.query_project_point_all(point[0]!, point[1]!, point[2]!, solid ? 1 : 0, flags, groups, collider, body, skip);
       if (total < 0) throw new RangeError(POINT_REFUSED);
       const page = total - skip < QUERY_HITS ? total - skip : QUERY_HITS;
       for (let i = 0; i < page; i++) hits.push(this.readProjection(i));
@@ -1384,21 +1145,10 @@ export class KernelWorld {
   }
   /** The collider rows that hold `point`, in row order. @throws RangeError for a point that is not finite. */
   intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {
-    return this.rows(
-      (skip) => this.api.query_point_all(point[0]!, point[1]!, point[2]!, flags, groups, collider, body, skip),
-      POINT_REFUSED,
-    );
+    return this.rows((skip) => this.api.query_point_all(point[0]!, point[1]!, point[2]!, flags, groups, collider, body, skip), POINT_REFUSED);
   }
   /** The collider rows a query shape at a pose overlaps, in row order. @throws RangeError as {@link KernelWorld.shapeCast}. */
-  intersectShape(
-    shape: KernelQueryShape,
-    position: readonly number[],
-    rotation: readonly number[],
-    flags: number,
-    groups: number,
-    collider: number,
-    body: number,
-  ): number[] {
+  intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {
     const words = this.shapeWords(shape, position, rotation);
     return this.rows((skip) => this.api.query_shape_all(...words, flags, groups, collider, body, skip), CAST_REFUSED);
   }
@@ -1414,26 +1164,9 @@ export class KernelWorld {
     }
     return rows;
   }
-  private shapeWords(
-    shape: KernelQueryShape,
-    p: readonly number[],
-    q: readonly number[],
-  ): [number, number, number, number, number, number, number, number, number, number, number, number] {
+  private shapeWords(shape: KernelQueryShape, p: readonly number[], q: readonly number[]): [number, number, number, number, number, number, number, number, number, number, number, number] {
     const s = shape.size;
-    return [
-      QUERY_KINDS[shape.shape],
-      shape.shape === 'hull' ? 0 : s[0]!,
-      s[1] ?? 0,
-      s[2] ?? 0,
-      shape.shape === 'hull' ? s[0]! : 0,
-      p[0]!,
-      p[1]!,
-      p[2]!,
-      q[0]!,
-      q[1]!,
-      q[2]!,
-      q[3]!,
-    ];
+    return [QUERY_KINDS[shape.shape], shape.shape === 'hull' ? 0 : s[0]!, s[1] ?? 0, s[2] ?? 0, shape.shape === 'hull' ? s[0]! : 0, p[0]!, p[1]!, p[2]!, q[0]!, q[1]!, q[2]!, q[3]!];
   }
   private readCast(i: number): KernelShapeCastHit {
     const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 64 * i, 16),
@@ -1456,21 +1189,12 @@ export class KernelWorld {
   private readHit(i: number): KernelRayHit {
     const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 32 * i, 8),
       floats = new Float32Array(words.buffer, words.byteOffset, 8);
-    return {
-      collider: words[0]!,
-      distance: floats[1]!,
-      normal: [floats[2]!, floats[3]!, floats[4]!],
-      point: [floats[5]!, floats[6]!, floats[7]!],
-    };
+    return { collider: words[0]!, distance: floats[1]!, normal: [floats[2]!, floats[3]!, floats[4]!], point: [floats[5]!, floats[6]!, floats[7]!] };
   }
   private voxelDone(code: number, what: string): void {
     if (this.api.world_layout() !== this.layout) this.bind();
-    if (code === -2)
-      throw new RangeError(`${what} works on voxels colliders only; call it on a collider made with shape 'voxels'.`);
-    if (code < 0)
-      throw new RangeError(
-        `Memory cannot grow this voxel grid for ${what}; free another world, or keep edits inside the grid.`,
-      );
+    if (code === -2) throw new RangeError(`${what} works on voxels colliders only; call it on a collider made with shape 'voxels'.`);
+    if (code < 0) throw new RangeError(`Memory cannot grow this voxel grid for ${what}; free another world, or keep edits inside the grid.`);
   }
   /**
    * Removes a collider and works out its body's mass again. Its row comes back after the next step.
@@ -1488,8 +1212,7 @@ export class KernelWorld {
   addJoint(a: number, b: number, flags: number): number {
     const { api } = this,
       row = api.joint_add(a, b, flags);
-    if (row < 0)
-      throw new RangeError(`Rows ${a} and ${b} cannot take a joint; use two rows addBody returned, or free memory.`);
+    if (row < 0) throw new RangeError(`Rows ${a} and ${b} cannot take a joint; use two rows addBody returned, or free memory.`);
     if (api.world_layout() !== this.layout) this.bind();
     return row;
   }
@@ -1540,20 +1263,7 @@ export class KernelWorld {
    * `additionalMass` column goes to 0. With no collider mass these figures are the body's, exactly.
    */
   setOwnSolid(body: number, mass: number, center: Vec3, inertia: Vec3, frame: Quat = [0, 0, 0, 1]): this {
-    this.api.body_set_own(
-      body,
-      mass,
-      center[0],
-      center[1],
-      center[2],
-      inertia[0],
-      inertia[1],
-      inertia[2],
-      frame[0],
-      frame[1],
-      frame[2],
-      frame[3],
-    );
+    this.api.body_set_own(body, mass, center[0], center[1], center[2], inertia[0], inertia[1], inertia[2], frame[0], frame[1], frame[2], frame[3]);
     return this;
   }
   /**
@@ -1610,8 +1320,7 @@ export class KernelWorld {
       this.stepping = false;
     }
     if (this.api.world_layout() !== this.layout) this.bind();
-    if (failed)
-      throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
+    if (failed) throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
     const lost = this.api.world_lost();
     if (lost >= 0)
       throw new MargoError(
@@ -1649,10 +1358,7 @@ export class KernelWorld {
       words.getUint32(4, true) !== bytes
     )
       throw new RangeError('These bytes are not a snapshot of this kernel; use what snapshot() returned.');
-    if (!api.world_ensure(bytes))
-      throw new RangeError(
-        `Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`,
-      );
+    if (!api.world_ensure(bytes)) throw new RangeError(`Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`);
     new Uint8Array(api.memory.buffer, base, bytes).set(snapshot);
     this.bind();
     // Rows handed out, not rows of room: a collider must not name a row no hull or mesh was written to.
@@ -1666,9 +1372,7 @@ export class KernelWorld {
    */
   reserve(bodies: number, colliders: number = this.colliderCapacity): this {
     if (!Number.isSafeInteger(bodies) || !Number.isSafeInteger(colliders) || !this.api.world_reserve(bodies, colliders))
-      throw new RangeError(
-        `Cannot reserve ${bodies} bodies and ${colliders} colliders; the limit of each is 4194304 and what memory allows.`,
-      );
+      throw new RangeError(`Cannot reserve ${bodies} bodies and ${colliders} colliders; the limit of each is 4194304 and what memory allows.`);
     this.bind();
     return this;
   }

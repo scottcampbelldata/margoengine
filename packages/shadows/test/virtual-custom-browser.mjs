@@ -22,8 +22,7 @@ const show = async (name, kind, still) => {
 // Pixels the shadow darkens under half their light; pixels with no floor light (the casters' own faces) do not count.
 const shadowMask = (open, shaded) => {
   const out = new Uint8Array(open.width * open.height);
-  for (let i = 0; i < out.length; i++)
-    out[i] = open.data[i * 4 + 1] > 40 && shaded.data[i * 4 + 1] < open.data[i * 4 + 1] * 0.73 ? 1 : 0;
+  for (let i = 0; i < out.length; i++) out[i] = open.data[i * 4 + 1] > 40 && shaded.data[i * 4 + 1] < open.data[i * 4 + 1] * 0.73 ? 1 : 0;
   return out;
 };
 try {
@@ -47,9 +46,7 @@ try {
       count += reference[i];
     }
     const overlap = both / either;
-    console.log(
-      JSON.stringify({ name, still, shadowPixels: count, overlap: +overlap.toFixed(4), stats: virtual.stats }),
-    );
+    console.log(JSON.stringify({ name, still, shadowPixels: count, overlap: +overlap.toFixed(4), stats: virtual.stats }));
     assert.ok(count > 1500, `${name}: only ${count} shadow pixels, so nothing is measured`);
     // At 384 pixels over 60 units a page texel is finer than a pixel at the levels this view asks for: the two shadows may
     // differ by a pixel along their edge, several hundred pixels around these casters.

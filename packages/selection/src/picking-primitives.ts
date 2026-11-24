@@ -393,10 +393,7 @@ export class PickingPrimitives {
     }
     for (const record of draws.splice(primitives.length)) retire(this.device!, record.uniform);
     const pass = c.encoder.beginRenderPass({
-      colorAttachments: [
-        { view: c.color, loadOp: 'load', storeOp: 'store' },
-        ...(options.surface?.views.map((view) => ({ view, loadOp: 'load' as const, storeOp: 'store' as const })) ?? []),
-      ],
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }, ...(options.surface?.views.map(view => ({view, loadOp:'load' as const, storeOp:'store' as const})) ?? [])],
       depthStencilAttachment: {
         view: c.depth,
         depthLoadOp: 'load',
@@ -463,15 +460,9 @@ export class PickingPrimitives {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: options.surface
-            ? options.surface.buffers(casterBuffers(80, displaced), 'primitive')
-            : casterBuffers(80, displaced),
+          buffers: options.surface ? options.surface.buffers(casterBuffers(80, displaced), 'primitive') : casterBuffers(80, displaced),
         },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [{ format: options.format }, ...(options.surface?.targets ?? [])],
-        },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }, ...(options.surface?.targets ?? [])] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
         multisample: { count: options.sampleCount ?? 1 },
         depthStencil: {

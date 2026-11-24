@@ -151,10 +151,7 @@ try {
     half.dispose();
     result.shadow = { dark, expectedDark, clear, of: hole28.length };
     ensure(dark > 0 && clear > 0, `Through the hole, ${dark} of ${hole28.length} pixels are shaded and ${clear} lit`);
-    ensure(
-      Math.abs(dark - expectedDark) <= 1,
-      `The cut-out shades ${dark} pixels, its solid half alone ${expectedDark}`,
-    );
+    ensure(Math.abs(dark - expectedDark) <= 1, `The cut-out shades ${dark} pixels, its solid half alone ${expectedDark}`);
     casters.forEach((remove) => remove());
     shadows.dispose();
     instance.lighting.direction.set(sun);
@@ -193,10 +190,7 @@ try {
       ]),
     );
     pixels(left);
-    ensure(
-      engine.stats.drawCalls === 2,
-      `The claim's first frame counts the box and one draw: ${engine.stats.drawCalls}`,
-    );
+    ensure(engine.stats.drawCalls === 2, `The claim's first frame counts the box and one draw: ${engine.stats.drawCalls}`);
     const row = Array.from({ length: size }, (_, x) => [x, 32]),
       first = pixels(...row).findIndex((pixel) => near(pixel, expected));
     ensure(first >= 0 && first < left[0], `The left instance draws left of the quad's place: ${first}`);
@@ -217,11 +211,7 @@ try {
     // EXT_mesh_gpu_instancing: placements of one mesh are one core draw, each at its own place, the node's scale over them.
     const offsets = new Float32Array([-1.5, 0, 0, 1.5, 0, 0, 0, 9, 0]),
       forest = file({ pbrMetallicRoughness: pbr({ baseColorFactor: [0.2158, 0.0513, 0.5271, 1] }) }, undefined, [
-        {
-          mesh: 0,
-          scale: [0.5, 0.5, 0.5],
-          extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 4 } } },
-        },
+        { mesh: 0, scale: [0.5, 0.5, 0.5], extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 4 } } } },
       ]);
     forest.extensionsRequired = ['EXT_mesh_gpu_instancing'];
     forest.buffers = [...forest.buffers, { byteLength: offsets.byteLength }];
@@ -253,9 +243,7 @@ try {
     ensure(light.loader === 'gltf', `A masked map stays light: ${light.loader}`);
     ensure(near(pixels(left)[0], expected), 'The light result draws');
     light.model.dispose();
-    const proFile = serve(
-        file({ emissiveFactor: [0, 1, 0], pbrMetallicRoughness: pbr({ baseColorFactor: [0, 0, 0, 1] }) }),
-      ),
+    const proFile = serve(file({ emissiveFactor: [0, 1, 0], pbrMetallicRoughness: pbr({ baseColorFactor: [0, 0, 0, 1] }) })),
       pro = await loadAuto(instance, url, proFile);
     ensure(pro.loader === 'gltf/pbr', `Emission moves to gltf/pbr: ${pro.loader}`);
     ensure(proFile.asked.length === 2, `Each URL once: ${proFile.asked}`);
@@ -276,19 +264,12 @@ try {
         maxNodes: 2,
         fetch: async (target) =>
           new Response(
-            String(target).endsWith('quad.bin')
-              ? bytes
-              : String(target).endsWith('offsets.bin')
-                ? offsets
-                : JSON.stringify(grown),
+            String(target).endsWith('quad.bin') ? bytes : String(target).endsWith('offsets.bin') ? offsets : JSON.stringify(grown),
           ),
       });
     ensure(many.loader === 'gltf/pbr', `Instances past maxNodes move to gltf/pbr: ${many.loader}`);
     const [manyWest, manyMiddle, manyEast] = pixels(left, [32, 32], right);
-    ensure(
-      !near(manyWest, boxOnly, 8) && !near(manyEast, boxOnly, 8),
-      `gltf/pbr draws both instances: ${manyWest}, ${manyEast}`,
-    );
+    ensure(!near(manyWest, boxOnly, 8) && !near(manyEast, boxOnly, 8), `gltf/pbr draws both instances: ${manyWest}, ${manyEast}`);
     ensure(near(manyMiddle, boxOnly, 8), `Nothing draws between them: ${manyMiddle}`);
     result.autoInstances = { reason: many.reason, west: manyWest, east: manyEast };
     many.model.dispose();

@@ -45,8 +45,7 @@ try {
       format: 'r32float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
     });
-    const water = (m) =>
-      device.queue.writeTexture({ texture: depth }, new Float32Array(16).fill(m), { bytesPerRow: 16 }, [4, 4]);
+    const water = (m) => device.queue.writeTexture({ texture: depth }, new Float32Array(16).fill(m), { bytesPerRow: 16 }, [4, 4]);
     const beach = (sand) => {
       const mesh = engine
         .createMesh()
@@ -144,20 +143,11 @@ try {
   assert.deepEqual(result.errors, []);
   assert.deepEqual(pageErrors, []);
   const near = (a, b, tolerance, what) =>
-    assert.ok(
-      Math.abs(a - b) <= tolerance * b,
-      `${what}: ${a.toFixed(2)} against ${b.toFixed(2)} (within ${tolerance * 100}%)`,
-    );
+    assert.ok(Math.abs(a - b) <= tolerance * b, `${what}: ${a.toFixed(2)} against ${b.toFixed(2)} (within ${tolerance * 100}%)`);
   const { back, glare, predicted } = result;
-  assert.ok(
-    Math.abs(predicted.filmGone - predicted.filmGoneHelper) < 1e-9,
-    'wetSandAfter gives the darkening the record holds',
-  );
+  assert.ok(Math.abs(predicted.filmGone - predicted.filmGoneHelper) < 1e-9, 'wetSandAfter gives the darkening the record holds');
   assert.ok(back.dry > 40, `the sand is lit (${back.dry.toFixed(1)})`);
-  assert.ok(
-    back.wet < back.dry * 0.85,
-    `water darkens the sand (${back.wet.toFixed(1)} against ${back.dry.toFixed(1)} dry)`,
-  );
+  assert.ok(back.wet < back.dry * 0.85, `water darkens the sand (${back.wet.toFixed(1)} against ${back.dry.toFixed(1)} dry)`);
   // The bug: on main the sand was back to dry one second after the water left.
   near(back.afterOne, back.wet, 0.02, 'one second after the water left, the sand is as dark as under water');
   near(back.filmGone, back.refFilmGone, 0.02, 'eleven seconds on, the sand matches sand at the predicted darkening');
@@ -165,10 +155,7 @@ try {
   assert.ok(back.drying > back.filmGone + 2, 'the sand pales as it dries');
   near(back.dried, back.dry, 0.01, 'dried sand matches dry sand');
   // Toward the light: the water film shines, and once it has drained the sand is matte at its darkening.
-  assert.ok(
-    glare.wet > glare.refWetAlbedo * 1.05,
-    `the wet film shines (${glare.wet.toFixed(1)} against ${glare.refWetAlbedo.toFixed(1)} matte)`,
-  );
+  assert.ok(glare.wet > glare.refWetAlbedo * 1.05, `the wet film shines (${glare.wet.toFixed(1)} against ${glare.refWetAlbedo.toFixed(1)} matte)`);
   near(glare.filmGone, glare.refFilmGone, 0.02, 'with the film drained the sand is matte at the predicted darkening');
   near(glare.dried, glare.dry, 0.01, 'dried sand matches dry sand toward the light');
   const f = (v) => v.toFixed(1);

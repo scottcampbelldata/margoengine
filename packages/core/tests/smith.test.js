@@ -63,10 +63,7 @@ test("core's GGX D keeps a2 / pi where the half vector faces away from the norma
       const a2 = roughness ** 4,
         h = [Math.sqrt(1 - c * c), 0, c],
         want = a2 / 3.14159265; // the shader's pi literal
-      assert.ok(
-        Math.abs(d(n, h, 0, a2) / want - 1) < 1e-12,
-        `D at dot(n, h) ${c}, roughness ${roughness}: ${d(n, h, 0, a2)} vs ${want}`,
-      );
+      assert.ok(Math.abs(d(n, h, 0, a2) / want - 1) < 1e-12, `D at dot(n, h) ${c}, roughness ${roughness}: ${d(n, h, 0, a2)} vs ${want}`);
     }
   // Facing half vectors keep the precise form: the textbook D at nh = 0.9.
   const a2 = 0.2 ** 4,
@@ -83,10 +80,7 @@ test("core's G2 keeps the exact value on smooth surfaces at grazing angles, and 
     for (const nv of [1e-4, 0.001, 0.01, 0.5])
       for (const a2 of [1e-10, 1e-8, 1e-6, 1e-4]) {
         const want = correlatedG2(nl, nv, a2);
-        assert.ok(
-          Math.abs(coreG(nl, nv, a2) / want - 1) < 1e-9,
-          `G at nl ${nl}, nv ${nv}, a2 ${a2}: ${coreG(nl, nv, a2)} vs ${want}`,
-        );
+        assert.ok(Math.abs(coreG(nl, nv, a2) / want - 1) < 1e-9, `G at nl ${nl}, nv ${nv}, a2 ${a2}: ${coreG(nl, nv, a2)} vs ${want}`);
       }
   assert.equal(coreG(0, 0.5, 0), 0);
   const floor = Number(/,([0-9.e+-]+)\)$/.exec(/let g=([^;]+);/.exec(wgsl)[1])[1]);

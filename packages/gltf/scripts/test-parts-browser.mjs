@@ -733,10 +733,7 @@ ${out}`;
       console.log(JSON.stringify({ compat, selfRepeat: result.selfRepeat }));
       for (const [size, views] of Object.entries(result.selfRepeat))
         for (const [view, counts] of Object.entries(views))
-          assert.ok(
-            counts.every((n) => n === 0),
-            `reference${size} ${view}: frames of the same stream differ (${counts})`,
-          );
+          assert.ok(counts.every((n) => n === 0), `reference${size} ${view}: frames of the same stream differ (${counts})`);
       return;
     }
     console.log(JSON.stringify({ compat, memory, ...result }));

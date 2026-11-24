@@ -32,20 +32,20 @@ test('quantized reads every POSITION integer form, normalized or not', async () 
   try {
     const cases = [
       [UNSIGNED_BYTE, false, Uint8Array, 4, [0, 0, 0, 0, 255, 2, 0, 0, 1, 255, 3, 0], [0, 0, 0, 255, 2, 0, 1, 255, 3]],
-      [UNSIGNED_BYTE, true, Uint8Array, 4, [0, 0, 0, 0, 255, 51, 0, 0, 0, 255, 0, 0], [0, 0, 0, 1, 0.2, 0, 0, 1, 0]],
+      [
+        UNSIGNED_BYTE,
+        true,
+        Uint8Array,
+        4,
+        [0, 0, 0, 0, 255, 51, 0, 0, 0, 255, 0, 0],
+        [0, 0, 0, 1, 0.2, 0, 0, 1, 0],
+      ],
       [BYTE, false, Int8Array, 4, [-128, 0, 0, 0, 127, 0, 0, 0, 0, 1, 0, 0], [-128, 0, 0, 127, 0, 0, 0, 1, 0]],
       // -128 and -32768 clamp to -1: the specification's max(c / 127, -1).
       [BYTE, true, Int8Array, 4, [-128, 0, 0, 0, 127, 0, 0, 0, 0, -127, 0, 0], [-1, 0, 0, 1, 0, 0, 0, -1, 0]],
       [SHORT, false, Int16Array, 8, [-300, 0, 0, 0, 300, 0, 0, 0, 0, 7, 0, 0], [-300, 0, 0, 300, 0, 0, 0, 7, 0]],
       [SHORT, true, Int16Array, 8, [-32768, 0, 0, 0, 32767, 0, 0, 0, 0, -32767, 0, 0], [-1, 0, 0, 1, 0, 0, 0, -1, 0]],
-      [
-        UNSIGNED_SHORT,
-        false,
-        Uint16Array,
-        8,
-        [0, 0, 0, 0, 65535, 0, 0, 0, 0, 9, 0, 0],
-        [0, 0, 0, 65535, 0, 0, 0, 9, 0],
-      ],
+      [UNSIGNED_SHORT, false, Uint16Array, 8, [0, 0, 0, 0, 65535, 0, 0, 0, 0, 9, 0, 0], [0, 0, 0, 65535, 0, 0, 0, 9, 0]],
       [UNSIGNED_SHORT, true, Uint16Array, 8, [0, 0, 0, 0, 65535, 0, 0, 0, 0, 65535, 0, 0], [0, 0, 0, 1, 0, 0, 0, 1, 0]],
     ];
     for (const [type, normalized, Type, stride, values, expected] of cases) {
@@ -168,11 +168,7 @@ test('quantized keeps the bounds checks: a stride or count past the view is a Ra
 test('loadGLTF takes extensions, for its early check and for the parse', async () => {
   const { engine } = await headlessEngine();
   try {
-    const { doc, bytes } = file({
-      data: new Uint8Array([0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]),
-      type: UNSIGNED_BYTE,
-      stride: 4,
-    });
+    const { doc, bytes } = file({ data: new Uint8Array([0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]), type: UNSIGNED_BYTE, stride: 4 });
     doc.buffers[0].uri = 'model.bin';
     const get = async (url) =>
       new Response(String(url).endsWith('.bin') ? bytes : JSON.stringify(doc), { status: 200 });

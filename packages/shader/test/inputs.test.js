@@ -40,22 +40,13 @@ test('view-space, tangent and depth inputs compile in both stages', () => {
     assert.ok(m.fragmentCode.includes('s.emissive') && m.vertexCode.includes('f.'));
   }
   const m = new NodeMaterial({ emissiveNode: tangentLocal, opacityNode: linearDepth });
-  assert.match(
-    m.vertexCode,
-    /o\.ndv0 = margoTangent\(normalize\(i\.normal\.xyz\), i\.tangent\.xyz\);/,
-    'tangentLocal reaches the fragment as a varying',
-  );
+  assert.match(m.vertexCode, /o\.ndv0 = margoTangent\(normalize\(i\.normal\.xyz\), i\.tangent\.xyz\);/, 'tangentLocal reaches the fragment as a varying');
   assert.ok(m.fragmentCode.includes('(-(f.view * vec4f(i.position, 1.0)).z)'));
 });
 
 test('matrices and camera planes read the frame, through one helper for the projection', () => {
   const m = new NodeMaterial({
-      emissiveNode: modelMatrix
-        .mul(viewMatrix)
-        .mul(projectionMatrix)
-        .mul(vec4(1, 0, 0, 1))
-        .xyz.mul(cameraNear)
-        .mul(cameraFar),
+      emissiveNode: modelMatrix.mul(viewMatrix).mul(projectionMatrix).mul(vec4(1, 0, 0, 1)).xyz.mul(cameraNear).mul(cameraFar),
     }),
     code = m.shader(pbrShader, 2);
   assert.equal(code.split('fn margoProjection()').length, 2);
@@ -68,10 +59,7 @@ test('the built-in vertex inputs join the Input struct only when a graph reads t
   const m = new NodeMaterial({ emissiveNode: vec3(vertexIndex.toFloat(), instanceIndex.toFloat(), 0) });
   for (const source of [pbrShader, extendedPBRShader, physicalShader()]) {
     const code = m.shader(source, 2);
-    assert.match(
-      code,
-      /struct Input \{[^}]*@builtin\(vertex_index\) ndVertex:u32,\n\s*@builtin\(instance_index\) ndInstance:u32\n\}/,
-    );
+    assert.match(code, /struct Input \{[^}]*@builtin\(vertex_index\) ndVertex:u32,\n\s*@builtin\(instance_index\) ndInstance:u32\n\}/);
   }
   assert.match(m.varyingFields, /@interpolate\(flat\) ndv0:u32/);
 });
@@ -104,9 +92,7 @@ test('cube and 3D textures declare their own kind, and the wrong kind is refused
     ),
     flat = new Texture({ data: new Uint8Array(16), width: 2, height: 2 }),
     cube = { bind: () => undefined, dimension: 'cube' };
-  const m = new NodeMaterial({
-      emissiveNode: texture3D(volume, vec3(0.5)).rgb.add(textureCube(cube, vec3(0, 1, 0)).rgb),
-    }),
+  const m = new NodeMaterial({ emissiveNode: texture3D(volume, vec3(0.5)).rgb.add(textureCube(cube, vec3(0, 1, 0)).rgb) }),
     code = m.shader(pbrShader, 2);
   assert.ok(code.includes('texture_3d<f32>') && code.includes('texture_cube<f32>'));
   assert.throws(() => textureCube(flat, vec3(0, 1, 0)), /dimension cube, not 2d/);
@@ -121,14 +107,8 @@ test('a depth pass reads the vertex index, and inputs it does not have leave tha
   assert.match(code, /struct In \{[^}]*@builtin\(vertex_index\) ndVertex:u32\}/);
   for (const node of [tangentWorld, instanceUV.xyz])
     assert.equal(new NodeMaterial({ positionNode: positionLocal.add(node) }).caster(device), undefined);
-  assert.ok(
-    new NodeMaterial({ positionNode: positionLocal.add(positionView) }).caster(device),
-    'the main camera is there',
-  );
-  assert.equal(
-    new NodeMaterial({ positionNode: modelMatrix.mul(vec4(positionLocal, 1)).xyz }).caster(device),
-    undefined,
-  );
+  assert.ok(new NodeMaterial({ positionNode: positionLocal.add(positionView) }).caster(device), 'the main camera is there');
+  assert.equal(new NodeMaterial({ positionNode: modelMatrix.mul(vec4(positionLocal, 1)).xyz }).caster(device), undefined);
   assert.ok(new NodeMaterial({ colorNode: discard(linearDepth.lessThan(1), vec3(1)) }).caster(device).cuts);
   const kept = new NodeMaterial({ colorNode: discard(varying(tangentWorld).x.lessThan(0), vec3(uv(), 1)) });
   assert.equal(kept.caster(device), undefined, 'a varying the depth pass cannot compute takes its cut with it');

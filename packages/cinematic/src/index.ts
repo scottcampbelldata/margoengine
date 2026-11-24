@@ -193,8 +193,7 @@ export class Cinematic implements EnginePlugin {
     this.remaining = Math.max(0, this.remaining - delta);
     const shake = this.amplitude * (this.remaining / this.shakeDuration) ** 2;
     for (let i = 0; i < 3; i++) {
-      this.cameraPosition[i] =
-        this.position[i] + Math.sin(this.elapsed * this.frequency * (1 + i * 0.37) + i * 2) * shake;
+      this.cameraPosition[i] = this.position[i] + Math.sin(this.elapsed * this.frequency * (1 + i * 0.37) + i * 2) * shake;
       this.cameraTarget[i] = this.lookAt[i];
     }
     const dy = this.cameraPosition[1] - this.lookAt[1];

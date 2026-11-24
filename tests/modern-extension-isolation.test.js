@@ -21,10 +21,7 @@ async function pbrOnlyModules(external = []) {
     pbrOnly = (await bundle('packages/gltf/dist/pbr.js', external)).modules.filter(
       (m) => m.includes('/packages/gltf/') && !basic.has(m),
     );
-  assert.ok(
-    pbrOnly.some((m) => m.endsWith('/packages/gltf/dist/pbr.js')),
-    'gltf/pbr graph found',
-  );
+  assert.ok(pbrOnly.some((m) => m.endsWith('/packages/gltf/dist/pbr.js')), 'gltf/pbr graph found');
   return pbrOnly;
 }
 

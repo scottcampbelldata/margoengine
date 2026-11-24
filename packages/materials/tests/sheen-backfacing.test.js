@@ -28,12 +28,9 @@ const code = anisotropy({ strength: 0.6 }).declarations,
   ],
   eye = [0, 0, 2],
   l = unit([0.4, 0.7, 0.6]),
-  shader = wgslModule(
-    [wgslConst(code, 'materialLobesSheenAlbedoTable'), ...names.map((n) => wgslFunction(code, n))].join('\n'),
-    {
-      f: { eye: [...eye, 1], light: [...l, 1], radiance: [1, 1, 1, 0] },
-    },
-  ),
+  shader = wgslModule([wgslConst(code, 'materialLobesSheenAlbedoTable'), ...names.map((n) => wgslFunction(code, n))].join('\n'), {
+    f: { eye: [...eye, 1], light: [...l, 1], radiance: [1, 1, 1, 0] },
+  }),
   v = [0, 0, 1],
   i = { position: [0, 0, 0] },
   inputs = (sheen, n) => ({
@@ -46,13 +43,7 @@ const code = anisotropy({ strength: 0.6 }).declarations,
     viewCos: dot(n, v),
   }),
   direct = (n, sheen) =>
-    shader.call(
-      'materialLobesDirect',
-      i,
-      { n, base: [0, 0, 0.5, 1], metal: 0, roughness: 0.75 },
-      [0, 0, 0],
-      inputs(sheen, n),
-    );
+    shader.call('materialLobesDirect', i, { n, base: [0, 0, 0.5, 1], metal: 0, roughness: 0.75 }, [0, 0, 0], inputs(sheen, n));
 
 /** A unit normal with n.v = nv and n.l = nl. */
 function normal(nv, nl) {

@@ -69,11 +69,7 @@ function verify(r, { whole, small, bits, real }) {
     });
     assert.equal(list.filter((i) => r.elect[i]).length, 1, 'one lane is elected');
   }
-  assert.equal(
-    r.total,
-    bits.reduce((sum, x) => sum + (x % 1000), 0),
-    'one atomic per subgroup adds up',
-  );
+  assert.equal(r.total, bits.reduce((sum, x) => sum + (x % 1000), 0), 'one atomic per subgroup adds up');
   // Real numbers: f16 keeps 11 bits, so a sum near 0.5 lands within 2^-10 of the f32 answer, and something must round.
   const third = Math.fround(1 / 3);
   let worst = 0;
@@ -96,9 +92,7 @@ try {
     assert.ok(!fast.supported && !fast.half, 'the WebGL2 layer offers neither subgroups nor shader-f16');
     const a = verify(fast, inputs);
     assert.equal(a.lanes, 1, 'asking the layer for subgroups gives one-lane subgroups');
-    console.log(
-      'compat: no subgroups or shader-f16 on the WebGL2 layer, "more than one lane" and "f16 rounds" skipped',
-    );
+    console.log('compat: no subgroups or shader-f16 on the WebGL2 layer, "more than one lane" and "f16 rounds" skipped');
     console.log('ok requested on compat: one lane, f32 off by', a.worst.toExponential(2));
   } else {
     assert.ok(fast.supported && fast.half, 'this check is meant for an adapter with subgroups and shader-f16');

@@ -14,10 +14,7 @@ export interface OutlineProps extends Omit<SelectionOptions, 'name'> {
 }
 let serial = 0;
 /** Outline a selection with jump flooding or morphology, including optional dashed hidden edges. */
-export const Outline = /* @__PURE__ */ forwardRef<Selection, OutlineProps>(function Outline(
-  { selection, onError, ...options },
-  ref,
-) {
+export const Outline = /* @__PURE__ */ forwardRef<Selection, OutlineProps>(function Outline({ selection, onError, ...options }, ref) {
   const scene = useScene();
   const effect = useCreated(
     scene,

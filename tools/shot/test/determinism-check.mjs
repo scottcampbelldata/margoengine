@@ -17,6 +17,8 @@
 // 6. Production renders: one full render, and a second that captures only the probe frames and stops after the last
 //    of them, drawing every frame before it; the probes identical, and a page the shot does not control still fails,
 //    naming a probe frame.
+// 8. Stills (docs/shots.md, Stills): --stills writes only the probe frames, each byte-identical to the probe a full
+//    render of the same shot keeps (case 1), with stills.json naming each one's frame and sha256.
 // 7. Sky coverage (KB-HEARTH-CLIP1): a shot with no sky mask on a page with a Sky gets `sky-coverage` on its probes,
 //    the pixels the sky drew: the exact complement of the page's geometry mask, the same on both renders, and the
 //    mask skyClip measures inside, which look.md names. A page without a sky gets none.
@@ -27,6 +29,7 @@ import { join, resolve } from 'node:path';
 import { Camera } from '@margoengine/core';
 import { Cutscene } from '@margoengine/cutscene';
 import { parseShot, renderSize } from '../shot-file.mjs';
+import { shootStills } from '../stills.mjs';
 import { CLOCK_EPOCH, CLOCK_START, openShotPage, renderOnce, shoot } from '../render.mjs';
 import { lookShot } from '../look.mjs';
 import { decodePNG } from '@margoengine/headless/compare';
@@ -381,5 +384,23 @@ const outDir = (id) => join(root, 'test-results', 'shots', id);
     'a page without a sky gets no mask',
   );
   console.log('ok 7: sky coverage on the probes, the complement of the geometry, named by look.md; none without a sky');
+}
+
+// 8. Stills: the probe frames only, the same bytes as the full render's probes.
+{
+  const file = shotFile('test-scene'),
+    full = outDir('test-scene'),
+    out = outDir('test-scene-stills');
+  rmSync(out, { recursive: true, force: true });
+  const manifest = await shootStills(file, { out, source: 'determinism-check', log: quiet });
+  assert.equal(manifest.format, 'margo-shot-stills');
+  assert.deepEqual(Object.keys(manifest.stills), ['start', 'late']);
+  assert.equal(manifest.stills.late.frame, 24);
+  for (const name of ['start', 'late'])
+    assert.deepEqual(readFileSync(join(out, `${name}.png`)), readFileSync(join(full, `probes/${name}.png`)), name);
+  assert.deepEqual(JSON.parse(readFileSync(join(out, 'stills.json'), 'utf8')), manifest);
+  assert.equal(existsSync(join(out, '.stills-work')), false, 'no frames are left behind');
+  assert.equal(existsSync(join(out, 'frames')), false);
+  console.log('ok 8: stills are the probe frames only, byte-identical to a full render');
 }
 console.log('shot tool determinism check passed');

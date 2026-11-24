@@ -112,9 +112,7 @@ export function parsePly(input: ArrayBuffer | ArrayBufferView): SplatData {
   while (index.has(`f_rest_${rest}`)) rest++;
   const perChannel = rest / 3 + 1;
   if (rest % 3 || ![1, 4, 9, 16, 25].includes(perChannel))
-    throw new RangeError(
-      'Splat PLY f_rest_* must hold 3, 8, 15 or 24 coefficients per colour channel (SH degree 1-4).',
-    );
+    throw new RangeError('Splat PLY f_rest_* must hold 3, 8, 15 or 24 coefficients per colour channel (SH degree 1-4).');
   // Read every vertex's properties as numbers, from binary records or ascii lines.
   const width = properties.length,
     values = new Float64Array(count * width);

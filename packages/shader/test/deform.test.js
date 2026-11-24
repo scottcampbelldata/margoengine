@@ -27,11 +27,7 @@ test('skinning reads four bones per vertex through the vertex index, in the vert
     code = m.shader(pbrShader, 2);
   assert.ok(m.vertexCode.includes('i.ndVertex'));
   assert.equal(m.fragmentCode.includes('ndb'), false, 'the fragment stage reads no skin buffer');
-  assert.equal(
-    code.split('var<storage, read>').length,
-    4,
-    'bones, joints and weights, read only as a vertex stage needs',
-  );
+  assert.equal(code.split('var<storage, read>').length, 4, 'bones, joints and weights, read only as a vertex stage needs');
 });
 
 test('morphing folds its targets in a bounded loop, each target a block of vertices', () => {

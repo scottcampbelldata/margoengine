@@ -74,12 +74,9 @@ function skinOf(model: SkinnedModel, root: Mesh): RagdollSkin {
   const { doc } = model.asset,
     id = (doc.skins ?? []).findIndex((skin) => skin.joints.some((joint) => model.nodes[joint] === root));
   if (id < 0)
-    throw new RangeError(
-      "No skin of this model holds the ragdoll's root bone; pass the model the skeleton belongs to.",
-    );
+    throw new RangeError("No skin of this model holds the ragdoll's root bone; pass the model the skeleton belongs to.");
   const primitives = model.primitives.filter((p) => doc.nodes?.[p.nodeIndex]?.skin === id);
-  if (!primitives.length)
-    throw new RangeError('No mesh of this model uses the skin; there is nothing to fit shapes to.');
+  if (!primitives.length) throw new RangeError('No mesh of this model uses the skin; there is nothing to fit shapes to.');
   const { joints: ids, inverseBindMatrices } = doc.skins![id],
     sets = primitives.some((p) => p.definition.attributes?.JOINTS_1 !== undefined) ? 2 : 1,
     influences = sets * 4,
@@ -171,10 +168,7 @@ function boxAround(points: ArrayLike<number>, axis: ArrayLike<number>): RagdollS
     smallest = size;
     best = {
       type: 'box',
-      center: rotateByQuaternion(
-        [0, 1, 2].map((k) => (low[k] + high[k]) / 2),
-        rotation,
-      ) as Vec3,
+      center: rotateByQuaternion([0, 1, 2].map((k) => (low[k] + high[k]) / 2), rotation) as Vec3,
       halfExtents: [(high[0] - low[0]) / 2, (high[1] - low[1]) / 2, (high[2] - low[2]) / 2],
       rotation,
     };
@@ -210,8 +204,7 @@ export function fitRagdollShapes(
     // Only bones the skin has a bind pose for can hold vertices: the matrix is what brings them into the bone's frame.
     bound = new Map(nodes.flatMap((node) => (bones.has(node.id) ? [[node.id, bones.get(node.id)!] as const] : []))),
     matrices = new Float32Array(ragdoll.bones.length * 16);
-  if (!bound.size)
-    throw new RangeError('The skin holds none of the ragdoll bones; pass the model the skeleton belongs to.');
+  if (!bound.size) throw new RangeError('The skin holds none of the ragdoll bones; pass the model the skeleton belongs to.');
   for (let i = 0; i < ragdoll.bones.length; i++) matrices.set(IDENTITY, i * 16);
   nodes.forEach((node, j) => {
     const part = bound.get(node.id);

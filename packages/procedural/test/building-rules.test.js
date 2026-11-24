@@ -34,17 +34,13 @@ test('every style at every detail builds finite, indexed geometry with tangents'
         const n = g.positions.length / 3;
         assert.ok(g.indices.length > 0 && g.indices.length % 3 === 0, `${style} ${name}`);
         assert.ok(g.positions.every(Number.isFinite) && g.normals.every(Number.isFinite), `${style} ${name} finite`);
-        assert.ok(
-          g.indices.every((i) => i < n),
-          `${style} ${name} indices`,
-        );
+        assert.ok(g.indices.every((i) => i < n), `${style} ${name} indices`);
         assert.equal(g.tangents.length, n * 4);
         assert.equal(g.uvs.length, n * 2);
         for (let i = 0; i < g.normals.length; i += 3)
           assert.ok(Math.abs(Math.hypot(g.normals[i], g.normals[i + 1], g.normals[i + 2]) - 1) < 1e-4);
       }
-      for (const part of ['walls', 'interior', 'roof', 'glass', 'base'])
-        assert.ok(b.parts[part], `${style} ${detail} ${part}`);
+      for (const part of ['walls', 'interior', 'roof', 'glass', 'base']) assert.ok(b.parts[part], `${style} ${detail} ${part}`);
     }
   // More detail is more geometry.
   const count = (detail) => Object.values(generateBuilding({ detail }).parts).reduce((a, g) => a + g.indices.length, 0);
@@ -83,10 +79,7 @@ test('2011 Japanese concrete building and fish market shed: storey heights, stri
   assert.ok(w.eaves >= 5.5, 'a tall single storey');
   const big = w.openings.filter((o) => o.kind === 'door');
   assert.equal(big.length, 2);
-  assert.ok(
-    big.every((d) => d.width >= 4 && d.height >= 4),
-    'roller doors a truck fits through',
-  );
+  assert.ok(big.every((d) => d.width >= 4 && d.height >= 4), 'roller doors a truck fits through');
 });
 
 test('1910 frame house: ceilings, pitch, porch steps per IRC R311.7.5 and a chimney per IRC R1003.9', () => {
@@ -191,11 +184,7 @@ test('walls have thickness and glass sits back by the reveal', () => {
       if (w.normals[a + 2] < 0.99 || Math.abs(w.positions[a + 2] - D / 2) > 1e-6) continue;
       const xs = [0, 1, 2].map((k) => w.positions[w.indices[t + k] * 3]),
         ys = [0, 1, 2].map((k) => w.positions[w.indices[t + k] * 3 + 1]);
-      const inside =
-        o.centre[0] > Math.min(...xs) + 1e-6 &&
-        o.centre[0] < Math.max(...xs) - 1e-6 &&
-        o.centre[1] > Math.min(...ys) + 1e-6 &&
-        o.centre[1] < Math.max(...ys) - 1e-6;
+      const inside = o.centre[0] > Math.min(...xs) + 1e-6 && o.centre[0] < Math.max(...xs) - 1e-6 && o.centre[1] > Math.min(...ys) + 1e-6 && o.centre[1] < Math.max(...ys) - 1e-6;
       assert.ok(!inside, 'a wall cell over an opening');
     }
   }
@@ -221,17 +210,8 @@ test('placement, determinism and option errors', () => {
 test('townBuildings: one building a lot, inside it, its door toward the street', () => {
   const lots = [];
   for (let i = 0; i < 12; i++)
-    lots.push({
-      centre: [i * 16, 0],
-      size: [14, 18],
-      along: [1, 0],
-      floor: 1 + i * 0.1,
-      front: i % 2 ? [0, 1] : [0, -1],
-    });
-  const opts = townBuildings(lots, {
-    styles: { 'japan-2011-house': 2, 'japan-2011-warehouse': 0, 'japan-2011-concrete': 1 },
-    margin: 1,
-  });
+    lots.push({ centre: [i * 16, 0], size: [14, 18], along: [1, 0], floor: 1 + i * 0.1, front: i % 2 ? [0, 1] : [0, -1] });
+  const opts = townBuildings(lots, { styles: { 'japan-2011-house': 2, 'japan-2011-warehouse': 0, 'japan-2011-concrete': 1 }, margin: 1 });
   assert.equal(opts.length, lots.length);
   for (let i = 0; i < lots.length; i++) {
     const o = opts[i],

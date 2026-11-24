@@ -128,3 +128,4 @@ export function flameRamp(options: FlameRampOptions = {}): FlameStop[] {
     return { at, color: blackbodyColor(kelvin).map((v) => v * scale) as [number, number, number] };
   });
 }
+

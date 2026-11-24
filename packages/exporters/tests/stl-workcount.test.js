@@ -44,15 +44,8 @@ test('STL binary/ASCII axis conversions and OBJ/PLY keep their original bytes', 
     ['y', false, '9c1a32d0f0403332428da840247e44660c138431a9f466693ae6ba2a22120eb2'],
     ['z', true, 'f777914288cb7dcb6f5ad312e296cf919b38328cdcf59c8fb2360f3d58d938f5'],
     ['z', false, 'ee1ea329be06a6e417532ac02957971d483d64d12d2f4f716af281fe6275874d'],
-  ])
-    assert.equal(hash(exportSTL(source, { upAxis, binary })), expected);
+  ]) assert.equal(hash(exportSTL(source, { upAxis, binary })), expected);
   assert.equal(hash(exportOBJ(source).obj), 'a0408a794abc5bd027b496801ae12e247093de45437ce008a160ac9f211200ba');
-  assert.equal(
-    hash(exportPLY(source, { binary: true })),
-    'b2380b152fd2f5adf0a11cdcf4b6afaa84df412ba327e74135db43d1faf091b5',
-  );
-  assert.throws(
-    () => exportSTL({ nodes: [{ geometry: { ...geometry, normals: [Infinity, ...geometry.normals.slice(1)] } }] }),
-    RangeError,
-  );
+  assert.equal(hash(exportPLY(source, { binary: true })), 'b2380b152fd2f5adf0a11cdcf4b6afaa84df412ba327e74135db43d1faf091b5');
+  assert.throws(() => exportSTL({ nodes: [{ geometry: { ...geometry, normals: [Infinity, ...geometry.normals.slice(1)] } }] }), RangeError);
 });

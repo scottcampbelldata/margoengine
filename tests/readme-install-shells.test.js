@@ -14,11 +14,7 @@ test('every PowerShell block in the README runs in Windows PowerShell 5.1 and ne
   for (const { code } of shells) {
     assert.doesNotMatch(code, /&&|\|\|/, 'PowerShell 5.1 has no && or || between commands');
     for (const line of code.split('\n').filter((l) => /\*\.tgz/.test(l)))
-      assert.match(
-        line,
-        /\(Get-ChildItem [^)]*\*\.tgz\)\.FullName/,
-        `npm gets the tarball names, not the pattern: ${line}`,
-      );
+      assert.match(line, /\(Get-ChildItem [^)]*\*\.tgz\)\.FullName/, `npm gets the tarball names, not the pattern: ${line}`);
   }
 });
 

@@ -12,7 +12,6 @@ export const demoPages = [
   'windy-meadow',
   'split-screen',
   'minimap',
-  'hud-preview',
   'batched-mesh',
   'clipping-planes',
   'scene-targets',
@@ -107,3 +106,4 @@ export function resolveRoute(served, path) {
   for (const candidate of [clean, `${clean}.html`, `${clean}/index.html`]) if (served.has(candidate)) return candidate;
   return null;
 }
+

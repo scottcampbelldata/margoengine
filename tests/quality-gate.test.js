@@ -9,14 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanRoomGate, ENGINES } from '../scripts/quality/clean-room.js';
 import { FAMILIES, normalise, duplicatesGate } from '../scripts/quality/duplicates.js';
-import {
-  BASELINES,
-  compare,
-  frozenItems,
-  readBaseline,
-  staleTotal,
-  updateBaseline,
-} from '../scripts/quality/ratchet.js';
+import { BASELINES, compare, frozenItems, readBaseline, staleTotal, updateBaseline } from '../scripts/quality/ratchet.js';
 import { headroom } from '../scripts/quality/sizes.js';
 
 test('compare fails on new and worse items and lists improvements', () => {

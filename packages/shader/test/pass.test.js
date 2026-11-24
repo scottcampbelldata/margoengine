@@ -47,10 +47,7 @@ test('the capture shader returns one value per target and declares what a materi
   assert.equal(tail.includes('var<private> margoOutglow'), false, 'the material holds this one');
   assert.ok(tail.includes('var<private> margoOutmask:vec4f;'));
   assert.ok(tail.includes('MargoCapture(margoOutglow,margoOutmask)'));
-  assert.ok(
-    tail.includes('@location(1) o1:vec4f'),
-    'an output name never reaches WGSL bare: `loop` is a reserved word',
-  );
+  assert.ok(tail.includes('@location(1) o1:vec4f'), 'an output name never reaches WGSL bare: `loop` is a reserved word');
   assert.ok(declarations(pbrShader).includes('var<private> margoOutglow:vec4f;'), 'a plain material writes nothing');
 });
 
@@ -122,15 +119,7 @@ test('a ScenePass takes a model an SSR-like effect already captures', () => {
 
 test('sceneColor reads linear light and undoes the sRGB curve only on an encoded target', () => {
   const engine = { gpu: {}, frameGraph: {}, sceneOf: () => undefined, use() {}, removePlugin() {} };
-  assert.throws(
-    () =>
-      sceneColor({
-        use() {
-          throw new Error('needs WebGPU');
-        },
-      }),
-    /needs WebGPU/,
-  );
+  assert.throws(() => sceneColor({ use() { throw new Error('needs WebGPU'); } }), /needs WebGPU/);
   const behind = sceneColor(engine),
     code = new NodeMaterial({ transparent: true, emissiveNode: behind.read() }).fragmentCode;
   assert.match(code, /f\.settings\.w/);

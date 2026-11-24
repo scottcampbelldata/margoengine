@@ -80,12 +80,7 @@ const mismatches = (shadows) =>
 const checked = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 for (const [Kind, name, options, scopes] of [
-  [
-    Shadows,
-    'one cascade (bounds)',
-    { resolution: 64, bounds: { min: [-2, -2, -2], max: [2, 2, 2] }, colored: true },
-    false,
-  ],
+  [Shadows, 'one cascade (bounds)', { resolution: 64, bounds: { min: [-2, -2, -2], max: [2, 2, 2] }, colored: true }, false],
   [Shadows, 'two cascades', { resolution: 64, cascades: 2, colored: true }, false],
   [VirtualShadows, 'a one-level page table', { poolSize: 1024, levels: 1 }, false],
   [VirtualShadows, 'a four-level page table', { poolSize: 1024, levels: 4 }, false],
@@ -97,10 +92,7 @@ for (const [Kind, name, options, scopes] of [
       shadows.setup(h.engine);
       shadows.add(h.cube);
       h.frame(shadows);
-      assert.ok(
-        shadows.bindings().some((e) => e.resource?.texture),
-        'receivers bind textures',
-      );
+      assert.ok(shadows.bindings().some((e) => e.resource?.texture), 'receivers bind textures');
       assert.deepEqual(mismatches(shadows), []);
       if (scopes) {
         await checked();

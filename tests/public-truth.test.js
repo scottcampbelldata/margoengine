@@ -90,10 +90,7 @@ test('restating sets every package count to the catalog, and leaves partial coun
     Object.entries(files).map(([path, text]) => [path, restatePackageCount(text, 1105)]),
   );
   assert.deepEqual(packageCountProblems(restated, 1105), []);
-  assert.equal(
-    restated['a.md'],
-    '1,105 packages in 12 layers, the same as the catalog.\nSearch all 1,105 packages by task.',
-  );
+  assert.equal(restated['a.md'], '1,105 packages in 12 layers, the same as the catalog.\nSearch all 1,105 packages by task.');
   assert.equal(restated['c.md'], files['c.md']);
   assert.equal(restated['d.md'], '1,105 packages, 312 entries');
   const read = packageCountFiles(fileURLToPath(new URL('..', import.meta.url)));

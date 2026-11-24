@@ -90,21 +90,12 @@ for (const compat of [false, true])
         ['all', { whitePoint: white, toe: 0.6, shoulder: 0.5 }, [0.6, 0.5, true]],
       ]) {
         const got = await frame(options);
-        results[name] = {
-          off: worst(got.row, expected(...args)),
-          changed: got.row.filter((c, x) => c !== plain.row[x]).length,
-        };
-        assert.ok(
-          results[name].off <= 2,
-          `${name}: the frame is the plain curve through the spline (${results[name].off} codes off)`,
-        );
+        results[name] = { off: worst(got.row, expected(...args)), changed: got.row.filter((c, x) => c !== plain.row[x]).length };
+        assert.ok(results[name].off <= 2, `${name}: the frame is the plain curve through the spline (${results[name].off} codes off)`);
         assert.ok(results[name].changed > 20, `${name} changes the frame`);
         if (name === 'whitePoint' || name === 'all') {
           assert.equal(got.row[column], 255, `${name}: the white point is 255`);
-          assert.ok(
-            got.row.slice(column).every((c) => c === 255),
-            `${name}: brighter than the white point stays 255`,
-          );
+          assert.ok(got.row.slice(column).every((c) => c === 255), `${name}: brighter than the white point stays 255`);
           assert.ok(got.row[column - 80] < 255, `${name}: below the white point is under 255`);
         }
         for (let x = 1; x < W; x++) assert.ok(got.row[x] >= got.row[x - 1], `${name}: monotone at column ${x}`);

@@ -223,8 +223,7 @@ export class CameraTransitions {
     options: TransitionOptions,
     zoom?: number,
   ): Promise<boolean> {
-    if (this.disposed)
-      throw new MargoError('disposed', 'Camera transitions are disposed; create new controls from /transitions');
+    if (this.disposed) throw new MargoError('disposed', 'Camera transitions are disposed; create new controls from /transitions');
     const host = this.host,
       camera = host.camera,
       roll = this.rolling();
@@ -232,7 +231,7 @@ export class CameraTransitions {
       to = snapshot({
         position: vector(position),
         target: vector(target),
-        up: roll ? (options.up ?? camera.up) : [0, 1, 0],
+        up: roll ? options.up ?? camera.up : [0, 1, 0],
       });
     const duration = options.duration ?? 0.6;
     if (!(duration >= 0) || !Number.isFinite(duration)) fail('duration must be finite and nonnegative');

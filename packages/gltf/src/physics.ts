@@ -247,8 +247,7 @@ export function filterMasks(filters: readonly Filter[]): { memberships: number; 
     throw new RangeError(
       'KHR_physics_rigid_bodies: more than 15 distinct collision filters; merge filters that act alike in the file',
     );
-  const listed = (a: Filter, list: string[]) =>
-      !!a.collisionSystems?.length && a.collisionSystems.every((s) => list.includes(s)),
+  const listed = (a: Filter, list: string[]) => !!a.collisionSystems?.length && a.collisionSystems.every((s) => list.includes(s)),
     lets = (b: Filter, a: Filter) =>
       (!b.collideWithSystems || listed(a, b.collideWithSystems)) &&
       (!b.notCollideWithSystems || !listed(a, b.notCollideWithSystems)),
@@ -303,8 +302,7 @@ export function shapeCollider(shape: ImplicitShape, scale: Vec3): { collider: Co
         halfHeight = (height / 2) * sy;
       if (round && even(top, bottom)) return { collider: { shape: 'cylinder', halfHeight, radius: top * sx } };
       if (round && !top) return { collider: { shape: 'cone', halfHeight, radius: bottom * sx } };
-      if (round && !bottom)
-        return { collider: { shape: 'cone', halfHeight, radius: top * sx, rotation: [1, 0, 0, 0] } };
+      if (round && !bottom) return { collider: { shape: 'cone', halfHeight, radius: top * sx, rotation: [1, 0, 0, 0] } };
       const points: number[] = [];
       ring(height / 2, top, scale, points, 32);
       ring(-height / 2, bottom, scale, points, 32);
@@ -323,18 +321,15 @@ export function shapeCollider(shape: ImplicitShape, scale: Vec3): { collider: Co
     }
     case 'plane': {
       const { sizeX, sizeZ, doubleSided } = shape.plane ?? {};
-      if (sizeX === undefined && sizeZ === undefined && !doubleSided) return { collider: { shape: 'halfSpace' } };
+      if (sizeX === undefined && sizeZ === undefined && !doubleSided)
+        return { collider: { shape: 'halfSpace' } };
       // A face has no thickness to solve against, so it is a box 2 mm thick with its top on the plane; an open side goes 1 km.
       const half = 0.001,
         wide = 1000;
       return {
         collider: {
           shape: 'box',
-          halfExtents: [
-            sizeX === undefined ? wide : (sizeX * sx) / 2,
-            half,
-            sizeZ === undefined ? wide : (sizeZ * sz) / 2,
-          ],
+          halfExtents: [sizeX === undefined ? wide : (sizeX * sx) / 2, half, sizeZ === undefined ? wide : (sizeZ * sz) / 2],
           offset: [0, doubleSided ? 0 : -half, 0],
         },
         note: 'a finite or double sided plane is a box 2 mm thick',
@@ -427,8 +422,7 @@ function sampleTrack({ times, values, mode }: Track, time: number): number {
 
 const drivePointer =
   /^\/extensions\/KHR_physics_rigid_bodies\/physicsJoints\/(\d+)\/drives\/(\d+)\/(maxForce|positionTarget|velocityTarget|stiffness|damping)$/;
-const motionPointer =
-  /^\/nodes\/(\d+)\/extensions\/KHR_physics_rigid_bodies\/motion\/(linearVelocity|angularVelocity|gravityFactor)$/;
+const motionPointer = /^\/nodes\/(\d+)\/extensions\/KHR_physics_rigid_bodies\/motion\/(linearVelocity|angularVelocity|gravityFactor)$/;
 
 /**
  * Builds a model's KHR_physics_rigid_bodies in a physics world: a node with a motion is a body that moves it, with its
@@ -460,11 +454,7 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     physics = options.physics ?? scope.run(() => World.attach(engine)),
     doc = model.asset.doc as GLTFDocument & Record<string, any>,
     nodes = (doc.nodes ?? []) as NodeDoc[],
-    root = ((doc.extensions as any)?.KHR_physics_rigid_bodies ?? {}) as {
-      physicsMaterials?: Material[];
-      collisionFilters?: Filter[];
-      physicsJoints?: JointDef[];
-    },
+    root = ((doc.extensions as any)?.KHR_physics_rigid_bodies ?? {}) as { physicsMaterials?: Material[]; collisionFilters?: Filter[]; physicsJoints?: JointDef[] },
     shapes: ImplicitShape[] = (doc.extensions as any)?.KHR_implicit_shapes?.shapes ?? [],
     materials: Material[] = root.physicsMaterials ?? [],
     filters: Filter[] = root.collisionFilters ?? [],
@@ -490,9 +480,7 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     const mesh = model.nodes[i];
     if (mesh) return Float64Array.from(mesh.matrix);
     const parent = parents[i];
-    return parent < 0
-      ? localMatrix(nodes[i])
-      : multiplyMatrices(world(parent), localMatrix(nodes[i]), new Float64Array(16));
+    return parent < 0 ? localMatrix(nodes[i]) : multiplyMatrices(world(parent), localMatrix(nodes[i]), new Float64Array(16));
   };
   const carrier = (i: number): number => {
     for (let n = i; n >= 0; n = parents[n]) if (data(n)?.motion) return n;
@@ -645,8 +633,7 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     if (collider) attach(i, collider.geometry, settings(i, collider.collisionFilter, collider.physicsMaterial));
     if (trigger?.nodes) for (const child of trigger.nodes) triggerOf.set(child, i);
     // A trigger detects and has no mass.
-    if (trigger?.geometry)
-      attach(i, trigger.geometry, { ...settings(i, trigger.collisionFilter), sensor: true, density: 0 });
+    if (trigger?.geometry) attach(i, trigger.geometry, { ...settings(i, trigger.collisionFilter), sensor: true, density: 0 });
   });
   // The solver puts a slow body to sleep, and a drive that is still pulling it would stop short of its target.
   const driven = new Set<number>();
@@ -666,13 +653,7 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
       made =
         mesh && type !== 'fixed' && !follows
           ? physics.addBody(mesh, { type, colliders, ...awake })
-          : physics.addBody(null, {
-              type: follows ? 'kinematicPosition' : type,
-              position,
-              rotation,
-              colliders,
-              ...awake,
-            });
+          : physics.addBody(null, { type: follows ? 'kinematicPosition' : type, position, rotation, colliders, ...awake });
     present.forEach(({ part }, k) => {
       part.made = made.colliders[k];
       colliderNode.set(made.colliders[k], part.node);
@@ -826,31 +807,29 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     onTrigger(listener) {
       // A compound trigger is one volume: a collider enters with its first part and leaves with its last.
       const inside = new Map<string, number>();
-      const tell =
-        (entered: boolean) =>
-        (event: { colliderA: Collider; colliderB: Collider; bodyA: PhysicsBody; bodyB: PhysicsBody }) => {
-          for (const [sensor, other, body] of [
-            [event.colliderA, event.colliderB, event.bodyB],
-            [event.colliderB, event.colliderA, event.bodyA],
-          ] as const) {
-            const part = colliderNode.get(sensor);
-            if (part === undefined || !sensor.isSensor() || other.isSensor()) continue;
-            const nodeIndex = outermost(part),
-              key = `${nodeIndex}/${other.handle}`,
-              count = (inside.get(key) ?? 0) + (entered ? 1 : -1);
-            if (count) inside.set(key, count);
-            else inside.delete(key);
-            if (count !== (entered ? 1 : 0)) continue;
-            const colliderNodeIndex = colliderNode.get(other) ?? -1;
-            listener({
-              entered,
-              nodeIndex,
-              colliderNodeIndex,
-              motionNodeIndex: colliderNodeIndex < 0 ? -1 : carrier(colliderNodeIndex),
-              body,
-            });
-          }
-        };
+      const tell = (entered: boolean) => (event: { colliderA: Collider; colliderB: Collider; bodyA: PhysicsBody; bodyB: PhysicsBody }) => {
+        for (const [sensor, other, body] of [
+          [event.colliderA, event.colliderB, event.bodyB],
+          [event.colliderB, event.colliderA, event.bodyA],
+        ] as const) {
+          const part = colliderNode.get(sensor);
+          if (part === undefined || !sensor.isSensor() || other.isSensor()) continue;
+          const nodeIndex = outermost(part),
+            key = `${nodeIndex}/${other.handle}`,
+            count = (inside.get(key) ?? 0) + (entered ? 1 : -1);
+          if (count) inside.set(key, count);
+          else inside.delete(key);
+          if (count !== (entered ? 1 : 0)) continue;
+          const colliderNodeIndex = colliderNode.get(other) ?? -1;
+          listener({
+            entered,
+            nodeIndex,
+            colliderNodeIndex,
+            motionNodeIndex: colliderNodeIndex < 0 ? -1 : carrier(colliderNodeIndex),
+            body,
+          });
+        }
+      };
       const stops = [physics.on('intersectionstart', tell(true)), physics.on('intersectionend', tell(false))],
         stop = () => stops.forEach((off) => off());
       removers.push(stop);

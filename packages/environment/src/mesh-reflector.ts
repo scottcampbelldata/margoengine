@@ -230,15 +230,12 @@ export class MeshReflector extends Reflector {
   }
   override set roughness(value: number) {
     // The base constructor sets its default; after construction only `blur` drives the mip chain.
-    if (this.constructed)
-      throw new TypeError('MeshReflector takes blur and mixBlur, not roughness; set blurSize and mixBlur instead');
+    if (this.constructed) throw new TypeError('MeshReflector takes blur and mixBlur, not roughness; set blurSize and mixBlur instead');
     super.roughness = value;
   }
   protected override aim(main: Camera): boolean {
     if (this.minDepth >= this.maxDepth && this.depthScaleValue > 0)
-      throw new RangeError(
-        'MeshReflector minDepthThreshold must be below maxDepthThreshold while depthScale is above 0; lower minDepthThreshold or raise maxDepthThreshold',
-      );
+      throw new RangeError('MeshReflector minDepthThreshold must be below maxDepthThreshold while depthScale is above 0; lower minDepthThreshold or raise maxDepthThreshold');
     const o = this.origin,
       n = this.normal,
       k = this.offset;
@@ -282,11 +279,7 @@ export class MeshReflector extends Reflector {
   protected override get surfaceShader(): string {
     const base = super.surfaceShader,
       start = base.indexOf('  let c=textureSampleLevel(image,clampSampler,uv,u.size.z).rgb*u.tint.rgb;');
-    if (start < 0)
-      throw new MargoError(
-        'state',
-        'MeshReflector found no planar surface colour line to replace; rebuild @margoengine/environment so reflector and reflector-pbr match',
-      );
+    if (start < 0) throw new MargoError('state', 'MeshReflector found no planar surface colour line to replace; rebuild @margoengine/environment so reflector and reflector-pbr match');
     return (
       base
         .slice(0, start)

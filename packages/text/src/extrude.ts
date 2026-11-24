@@ -611,6 +611,7 @@ function extrudeShapeGeometry(
 // Extruded Text High-Level API
 // ---------------------------------------------------------------------------
 
+
 /**
  * Creates 3D extruded geometry for text with front/back caps, side walls and optional bevels.
  * Material group 0 is front and back caps; material group 1 is side and bevel walls.
@@ -656,67 +657,42 @@ export function extrudeText(text: string, options: ExtrudeTextOptions): Extruded
   }
 
   const lines = text.split('\n');
-  type Positioned = {
-    index: number;
-    advance: number;
-    yAdvance: number;
-    xOffset: number;
-    yOffset: number;
-    cluster?: number;
-  };
+  type Positioned = { index: number; advance: number; yAdvance: number; xOffset: number; yOffset: number; cluster?: number };
   const lineMetrics: { glyphs: Positioned[]; width: number }[] = [];
   const shaped = options.shapedRuns ?? font.shape?.(text);
   if (shaped !== undefined) {
-    for (let i = 0; i < lines.length; i++) lineMetrics.push({ glyphs: [], width: 0 });
+    for (let i=0;i<lines.length;i++) lineMetrics.push({glyphs:[],width:0});
     for (const run of shaped) {
       const line = run.line ?? 0;
-      if (!Number.isInteger(line) || line < 0 || line >= lines.length)
-        fontError('shaping run line is outside the text');
+      if (!Number.isInteger(line) || line < 0 || line >= lines.length) fontError('shaping run line is outside the text');
       for (const g of run.glyphs) {
-        const values = [g.xAdvance, g.yAdvance ?? 0, g.xOffset ?? 0, g.yOffset ?? 0];
-        if (
-          !Number.isInteger(g.glyphIndex) ||
-          g.glyphIndex < 0 ||
-          (font instanceof FontOutlines && g.glyphIndex >= font.glyphCount) ||
-          !values.every(Number.isFinite) ||
-          (g.cluster !== undefined && (!Number.isInteger(g.cluster) || g.cluster < 0 || g.cluster > text.length))
-        )
+        const values=[g.xAdvance,g.yAdvance??0,g.xOffset??0,g.yOffset??0];
+        if (!Number.isInteger(g.glyphIndex) || g.glyphIndex < 0 || (font instanceof FontOutlines && g.glyphIndex >= font.glyphCount) || !values.every(Number.isFinite) ||
+          (g.cluster !== undefined && (!Number.isInteger(g.cluster) || g.cluster < 0 || g.cluster > text.length)))
           fontError('shaping run glyph ID, cluster or position is invalid');
-        lineMetrics[line].glyphs.push({
-          index: g.glyphIndex,
-          advance: g.xAdvance * size,
-          yAdvance: (g.yAdvance ?? 0) * size,
-          xOffset: (g.xOffset ?? 0) * size,
-          yOffset: (g.yOffset ?? 0) * size,
-          cluster: g.cluster,
-        });
+        lineMetrics[line].glyphs.push({index:g.glyphIndex,advance:g.xAdvance*size,yAdvance:(g.yAdvance??0)*size,
+          xOffset:(g.xOffset??0)*size,yOffset:(g.yOffset??0)*size,cluster:g.cluster});
       }
     }
-    for (const line of lineMetrics)
-      for (let i = 0; i < line.glyphs.length; i++) {
-        const g = line.glyphs[i],
-          next = line.glyphs[i + 1];
-        if (next && (g.cluster === undefined || g.cluster !== next.cluster)) g.advance += letterSpacing * size;
-        line.width += g.advance;
-      }
+    for (const line of lineMetrics) for (let i=0;i<line.glyphs.length;i++) {
+      const g=line.glyphs[i],next=line.glyphs[i+1];
+      if (next && (g.cluster===undefined || g.cluster!==next.cluster)) g.advance += letterSpacing*size;
+      line.width += g.advance;
+    }
   }
 
-  if (shaped === undefined)
-    for (const line of lines) {
-      const glyphs: Positioned[] = [];
-      let lineWidth = 0;
-      for (const char of line) {
-        const index = font.glyphIndex(char);
-        const advance = font.glyphAdvance(index) * size;
-        glyphs.push({ index, advance: advance + letterSpacing * size, yAdvance: 0, xOffset: 0, yOffset: 0 });
-        lineWidth += advance + letterSpacing * size;
-      }
-      if (glyphs.length > 0) {
-        lineWidth -= letterSpacing * size;
-        glyphs[glyphs.length - 1].advance -= letterSpacing * size;
-      }
-      lineMetrics.push({ glyphs, width: lineWidth });
+  if (shaped === undefined) for (const line of lines) {
+    const glyphs: Positioned[] = [];
+    let lineWidth = 0;
+    for (const char of line) {
+      const index = font.glyphIndex(char);
+      const advance = font.glyphAdvance(index) * size;
+      glyphs.push({ index, advance: advance + letterSpacing*size, yAdvance:0, xOffset:0, yOffset:0 });
+      lineWidth += advance + letterSpacing * size;
     }
+    if (glyphs.length > 0) { lineWidth -= letterSpacing * size; glyphs[glyphs.length-1].advance -= letterSpacing*size; }
+    lineMetrics.push({ glyphs, width: lineWidth });
+  }
 
   const maxLineWidth = Math.max(0, ...lineMetrics.map((l) => l.width));
 

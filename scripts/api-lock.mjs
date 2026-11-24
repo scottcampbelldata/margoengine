@@ -378,12 +378,10 @@ export function assessChange(lock, breaks, packageName, entry, changes, update =
   if (!lines.length) lines.push(`${entry}: compatible report text change; run api:update`);
   // A watched package may warn on breaks while the surface settles, but an export or member added without api:update
   // is a record gap: the check fails on it, as it does for a package that is not watched.
-  const unrecorded =
-    !update &&
-    changes.additive.some(
-      // A changed declaration also lists its new text as added; that is a break, not a new export.
-      (item) => item.change === 'added' && !changes.breaking.some((b) => b.symbol === item.symbol),
-    );
+  const unrecorded = !update && changes.additive.some(
+    // A changed declaration also lists its new text as added; that is a break, not a new export.
+    (item) => item.change === 'added' && !changes.breaking.some((b) => b.symbol === item.symbol),
+  );
   return {
     fail: locked ? unapproved.length > 0 || !update : (!watch || unrecorded) && !update,
     lines: watch ? lines.map((line) => `would fail: ${line}`) : lines,

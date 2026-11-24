@@ -146,10 +146,7 @@ export function bumpNormal(height: NodeInput<'f32'>, options: BumpOptions = {}):
     r2 = cross(normal, dp1),
     det = dot(dp1, r1),
     side = select<'f32'>(det.lessThan(0), -1, 1),
-    gradient = r1
-      .mul(dpdx(h))
-      .add(r2.mul(dpdy(h)))
-      .mul(side);
+    gradient = r1.mul(dpdx(h)).add(r2.mul(dpdy(h))).mul(side);
   return normalize(normal.mul(det.abs()).sub(gradient));
 }
 /**
@@ -163,9 +160,7 @@ export function triplanar(
   const { position = positionWorld, normal = normalWorld, scale = 1, sharpness = 4 } = options,
     read = typeof map === 'function' ? map : (coord: Node<'vec2f'>) => texture(map, coord),
     p = cast(position, 'vec3f', 'triplanar position').mul(cast(scale, 'f32', 'triplanar scale')),
-    w = cast(normal, 'vec3f', 'triplanar normal')
-      .abs()
-      .pow(cast(sharpness, 'f32', 'triplanar sharpness')),
+    w = cast(normal, 'vec3f', 'triplanar normal').abs().pow(cast(sharpness, 'f32', 'triplanar sharpness')),
     weights = w.div(w.x.add(w.y).add(w.z));
   return read(p.zy).mul(weights.x).add(read(p.xz).mul(weights.y)).add(read(p.xy).mul(weights.z));
 }
@@ -259,12 +254,7 @@ export function equirectUV(direction: NodeInput<'vec3f'>, options: EquirectOptio
     x = select<'f32'>(d.x.equal(0), 0, d.x),
     z = select<'f32'>(d.z.equal(0), select<'f32'>(d.x.equal(0), 1, 0), d.z.negate()),
     v = acos(clamp(d.y, -1, 1)).div(Math.PI);
-  return vec2(
-    atan2(x, z)
-      .div(Math.PI * 2)
-      .add(0.5),
-    (options.flipY ?? true) ? v.oneMinus() : v,
-  );
+  return vec2(atan2(x, z).div(Math.PI * 2).add(0.5), (options.flipY ?? true) ? v.oneMinus() : v);
 }
 
 /** Brightness of a linear colour, by the Rec. 709 weights. */
@@ -360,10 +350,6 @@ export const oscSquare = (t: NodeInput<'f32'> = time): Node<'f32'> =>
   step(0.5, fract(cast(t, 'f32', 'oscSquare time'))).oneMinus();
 /** 0 at the start of each period, 1 half way, 0 at the end. */
 export const oscTriangle = (t: NodeInput<'f32'> = time): Node<'f32'> =>
-  fract(cast(t, 'f32', 'oscTriangle time'))
-    .mul(2)
-    .sub(1)
-    .abs()
-    .oneMinus();
+  fract(cast(t, 'f32', 'oscTriangle time')).mul(2).sub(1).abs().oneMinus();
 /** Climbs from 0 to 1 over each period, then drops. */
 export const oscSawtooth = (t: NodeInput<'f32'> = time): Node<'f32'> => fract(cast(t, 'f32', 'oscSawtooth time'));

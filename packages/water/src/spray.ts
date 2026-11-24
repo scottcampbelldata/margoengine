@@ -7,7 +7,6 @@ import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
 import { perSample } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
-import { skyCoordinates } from './sky-radiance.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -103,7 +102,6 @@ const render =
 @group(0) @binding(2) var surface:texture_depth_2d;
 @group(0) @binding(3) var environment:texture_2d<f32>;
 @group(0) @binding(4) var skySampler:sampler;
-${skyCoordinates}
 struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec4f,@location(1) alpha:f32,@location(2) sky:vec3f}
 fn sprayNoise(p:vec2f)->f32 {
  let c=floor(p);let f=fract(p);let u=f*f*(3.0-2.0*f);let k=bitcast<vec2u>(vec2i(c));
@@ -115,7 +113,7 @@ fn spraySky()->vec3f {
  var sum=vec3f(0);
  for(var k=0u;k<8u;k++){
   let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);let r=vec3f(cos(a)*side,up,sin(a)*side);
-  if(frame.color.w>0.5){sum+=textureSampleLevel(environment,skySampler,seaSkyUv(r,hdrSkyTurn()),0.0).rgb*select(1.0,hdrSkyScale(),hdrSkyScale()>0.0);}
+  if(frame.color.w>0.5){sum+=textureSampleLevel(environment,skySampler,vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(r.y)/3.14159265),0.0).rgb;}
   else{sum+=mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(r.y))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));}
  }
  return sum*0.125;

@@ -248,7 +248,8 @@ function readFile(
       if (word === '!COLOUR') readColour(words, palette);
       else if (word === '!LDRAW_ORG') {
         if (/^(Unofficial_)?(Part|Shortcut)$/i.test(words[2] ?? '')) current!.part = true;
-      } else if (word === '!TEXMAP' || word === '!:') warn('texture maps are not read');
+      }
+      else if (word === '!TEXMAP' || word === '!:') warn('texture maps are not read');
       else if (word === 'BFC') {
         for (const option of words.slice(2))
           if (option === 'CERTIFY') certified = true;
@@ -302,7 +303,8 @@ function multiply(parent: Matrix, child: Matrix): Matrix {
   const out = new Array<number>(12);
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++)
-      out[r * 3 + c] = parent[r * 3] * child[c] + parent[r * 3 + 1] * child[3 + c] + parent[r * 3 + 2] * child[6 + c];
+      out[r * 3 + c] =
+        parent[r * 3] * child[c] + parent[r * 3 + 1] * child[3 + c] + parent[r * 3 + 2] * child[6 + c];
     out[9 + r] =
       parent[r * 3] * child[9] + parent[r * 3 + 1] * child[10] + parent[r * 3 + 2] * child[11] + parent[9 + r];
   }
@@ -487,8 +489,7 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
       throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${maxVertices}`);
     out.triangles += count;
     triangles += count;
-    if (triangles > maxTriangles)
-      throw new LoaderError(F, 'limit', `triangle count exceeds the limit of ${maxTriangles}`);
+    if (triangles > maxTriangles) throw new LoaderError(F, 'limit', `triangle count exceeds the limit of ${maxTriangles}`);
     for (let c = 0; c < corners; c++) point(out.positions, m, shape.points, c * 3);
     let bucket = out.buckets.get(entry.code);
     if (!bucket) out.buckets.set(entry.code, (bucket = uints()));
@@ -539,7 +540,7 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
           throw new LoaderError(F, 'limit', `the model expands to more than ${maxInstances} sub-file references`);
         const flips = determinant(command.matrix) < 0,
           next = multiply(m, command.matrix),
-          turned = (inverted !== flips) !== command.invert,
+          turned = inverted !== flips !== command.invert,
           code = command.code === MAIN ? parent : command.code === EDGE ? color(EDGE, parent).code : command.code,
           clips = clipped && command.clip,
           certifies = child.part === true || (certified && command.certified);
@@ -555,22 +556,10 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
             out = whole;
           }
           place.matrices.push(
-            next[0],
-            next[3],
-            next[6],
-            0,
-            next[1],
-            next[4],
-            next[7],
-            0,
-            next[2],
-            next[5],
-            next[8],
-            0,
-            next[9],
-            next[10],
-            next[11],
-            1,
+            next[0], next[3], next[6], 0,
+            next[1], next[4], next[7], 0,
+            next[2], next[5], next[8], 0,
+            next[9], next[10], next[11], 1,
           );
         } else walk(child, next, turned, code, depth + 1, clips, certifies);
       } else if (command.kind === 3 || command.kind === 4) polygon(command, m, inverted, parent, clipped && certified);

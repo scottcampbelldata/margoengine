@@ -1,13 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  Eruption,
-  ashFallSpeed,
-  mastinHeight,
-  mastinRate,
-  standardAtmosphere,
-  validateEruption,
-} from '../dist/eruption.js';
+import { Eruption, ashFallSpeed, mastinHeight, mastinRate, standardAtmosphere, validateEruption } from '../dist/eruption.js';
 
 const steady = (o) => {
   const e = new Eruption({ rise: 1, wind: 0, ...o });
@@ -25,9 +18,7 @@ test('the ICAO standard atmosphere and the fall-speed regimes', () => {
   assert.ok(Math.abs(T11 - 216.65) < 1e-9 && Math.abs(T20 - 216.65) < 1e-9 && Math.abs(T32 - 228.65) < 1e-9);
   // ICAO Doc 7488: 22,632 Pa at 11 km.
   assert.ok(Math.abs(P11 - 22632.06) < 0.5, `${P11} Pa at 11 km`);
-  assert.ok(
-    Math.abs(standardAtmosphere(20000)[1] - 5474.89) < 0.5 && Math.abs(standardAtmosphere(32000)[1] - 868.02) < 0.5,
-  );
+  assert.ok(Math.abs(standardAtmosphere(20000)[1] - 5474.89) < 0.5 && Math.abs(standardAtmosphere(32000)[1] - 868.02) < 0.5);
   // Stokes for 10 micrometres: rho g d^2 / (18 mu) = 7.57 mm/s; a 1 mm grain falls turbulently near 8 m/s.
   const stokes = (2500 * 9.80665 * 1e-10) / (18 * 1.8e-5);
   assert.ok(Math.abs(ashFallSpeed(1e-5, 2500, 1.2) - stokes) / stokes < 1e-12);
@@ -48,10 +39,7 @@ test("the column's height follows Mastin et al.'s (2009) fit within its 50 perce
     const c = steady({ massRate: M }).column(),
       fit = mastinHeight(M);
     assert.ok(!c.collapse, `${M} kg/s is buoyant`);
-    assert.ok(
-      c.steadyTop / fit < band && fit / c.steadyTop < band,
-      `${M} kg/s: ${c.steadyTop} m against Mastin ${fit} m`,
-    );
+    assert.ok(c.steadyTop / fit < band && fit / c.steadyTop < band, `${M} kg/s: ${c.steadyTop} m against Mastin ${fit} m`);
     assert.ok(c.steadyTop > last, 'a stronger eruption stands higher');
     last = c.steadyTop;
   }
@@ -68,23 +56,13 @@ test("the column's height follows Mastin et al.'s (2009) fit within its 50 perce
 });
 
 test("Costa et al. (2016)'s strong plume reaches near 37 km; the weak plume bends in the wind and stands lower", () => {
-  const strong = steady({
-    massRate: 1.5e9,
-    ventAltitude: 1500,
-    exitVelocity: 275,
-    exitTemperature: 1053,
-    gasFraction: 0.05,
-  }).column();
+  const strong = steady({ massRate: 1.5e9, ventAltitude: 1500, exitVelocity: 275, exitTemperature: 1053, gasFraction: 0.05 }).column();
   assert.ok(Math.abs(strong.steadyTop - 37000) / 37000 < 0.15, `strong plume ${strong.steadyTop} m against 37 km`);
-  const weak = (wind) =>
-    steady({ massRate: 1.5e6, ventAltitude: 1500, exitVelocity: 135, exitTemperature: 1273, gasFraction: 0.03, wind });
+  const weak = (wind) => steady({ massRate: 1.5e6, ventAltitude: 1500, exitVelocity: 135, exitTemperature: 1273, gasFraction: 0.03, wind });
   const calm = weak(0).column(),
     windy = weak(10).column();
   assert.ok(windy.steadyTop < calm.steadyTop, `wind ${windy.steadyTop} m, calm ${calm.steadyTop} m`);
-  assert.ok(
-    Math.abs(windy.steadyTop - 6000) / 6000 < 0.3,
-    `weak plume in a 10 m/s wind ${windy.steadyTop} m against 6 km`,
-  );
+  assert.ok(Math.abs(windy.steadyTop - 6000) / 6000 < 0.3, `weak plume in a 10 m/s wind ${windy.steadyTop} m against 6 km`);
   const top = windy.samples.at(-1).position,
     base = windy.samples[0].position;
   assert.ok(top[2] - base[2] > 1000, 'the plume bends downwind (+Z)');
@@ -134,8 +112,7 @@ test('ash falls downwind, coarse first; the ground holds every kilogram that has
   // Integrate the load over a square around the fall: it holds the erupted mass of the classes that have landed.
   let sum = 0;
   const cell = 400;
-  for (let x = -60000; x <= 60000; x += cell)
-    for (let z = -60000; z <= 240000; z += cell) sum += e.ashLoad(x, z) * cell * cell;
+  for (let x = -60000; x <= 60000; x += cell) for (let z = -60000; z <= 240000; z += cell) sum += e.ashLoad(x, z) * cell * cell;
   const landed = e.erupted(40000);
   assert.ok(sum > 0.9 * landed && sum < 1.01 * landed, `ground ${sum} kg of ${landed} kg erupted`);
   // In calm air the deposit is round about the vent.
@@ -150,10 +127,7 @@ test('ash falls downwind, coarse first; the ground holds every kilogram that has
   f.seek(0);
   const clear = f.visibility(0, 20000);
   f.seek(3000);
-  assert.ok(
-    f.visibility(0, 20000) < 0.1 * clear,
-    `${f.visibility(0, 20000)} m in the fall 20 km downwind, ${clear} m before`,
-  );
+  assert.ok(f.visibility(0, 20000) < 0.1 * clear, `${f.visibility(0, 20000)} m in the fall 20 km downwind, ${clear} m before`);
   assert.ok(f.airAsh(0, 20000) > 0);
 });
 
@@ -177,10 +151,7 @@ test('plume lightning: deterministic strikes in proportion to the rate, fired on
   // 6 per minute at 1e7 kg/s, ten times that at 1e8: 60 a minute, 600 in ten minutes.
   assert.ok(Math.abs(list.length - 600) < 60, `${list.length} strikes`);
   assert.deepEqual(new Eruption({ massRate: 1e8, rise: 1, wind: 0, lightningRate: 6, seed: 7 }).strikes(0, 600), list);
-  assert.notDeepEqual(
-    new Eruption({ massRate: 1e8, rise: 1, wind: 0, lightningRate: 6, seed: 8 }).strikes(0, 600),
-    list,
-  );
+  assert.notDeepEqual(new Eruption({ massRate: 1e8, rise: 1, wind: 0, lightningRate: 6, seed: 8 }).strikes(0, 600), list);
   assert.ok(list.every((s, i) => s.time > 0 && s.time <= 600 && (i === 0 || s.time >= list[i - 1].time)));
   const vents = list.filter((s) => s.kind === 'vent').length;
   assert.ok(vents > 0.2 * list.length && vents < 0.4 * list.length, `${vents} vent discharges`);
@@ -255,8 +226,7 @@ test('validation', () => {
 });
 
 test('every slider row is read: a value off its default changes the eruption; null wind rows follow the weather', async () => {
-  const { ERUPTION_SETTINGS, ERUPTION_LOOKS, applyEruptionSettings, eruptionSettingDefaults, eruptionSettingValues } =
-    await import('../dist/settings.js');
+  const { ERUPTION_SETTINGS, ERUPTION_LOOKS, applyEruptionSettings, eruptionSettingDefaults, eruptionSettingValues } = await import('../dist/settings.js');
   const weather = { state: { wind: 6, windDirection: 0 } };
   const make = (values) => {
     const e = new Eruption({ weather });
@@ -264,38 +234,13 @@ test('every slider row is read: a value off its default changes the eruption; nu
     e.seek(e.options.start ?? 0);
     e.update(900);
     const c = e.column();
-    return JSON.stringify([
-      c.top,
-      c.massRate,
-      e.umbrella(),
-      e.ashLoad(0, 20000),
-      e.ashThickness(0, 20000),
-      e.strikes(0, e.time).length,
-      e.strikes(0, e.time).filter((s) => s.kind === 'vent').length,
-      e.time,
-      e.end,
-    ]);
+    return JSON.stringify([c.top, c.massRate, e.umbrella(), e.ashLoad(0, 20000), e.ashThickness(0, 20000), e.strikes(0, e.time).length, e.strikes(0, e.time).filter((s) => s.kind === 'vent').length, e.time, e.end]);
   };
   const base = make({});
   for (const row of ERUPTION_SETTINGS) {
     const d = row.default ?? row.min,
       v = d === row.max ? row.min : Math.min(row.max, d === 0 ? row.max / 4 : d * (d < row.max / 2 ? 2 : 0.5));
-    const value =
-      row.default === null
-        ? row.name === 'height'
-          ? 20000
-          : row.max / 4
-        : row.name === 'start'
-          ? 100
-          : row.name === 'duration'
-            ? 600
-            : row.name === 'timeScale'
-              ? 2
-              : row.name === 'airTemperature'
-                ? 250
-                : row.name === 'tropopause'
-                  ? 15000
-                  : v;
+    const value = row.default === null ? (row.name === 'height' ? 20000 : row.max / 4) : row.name === 'start' ? 100 : row.name === 'duration' ? 600 : row.name === 'timeScale' ? 2 : row.name === 'airTemperature' ? 250 : row.name === 'tropopause' ? 15000 : v;
     assert.notEqual(make({ [row.name]: value }), base, `${row.name} = ${value} changes nothing`);
   }
   assert.equal(Object.keys(eruptionSettingDefaults()).length, ERUPTION_SETTINGS.length);

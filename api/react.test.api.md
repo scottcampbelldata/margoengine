@@ -141,7 +141,6 @@ interface Registry {
     current: EngineMesh | null;
     children: Set<EngineMesh>;
     attachments: Set<(mesh: EngineMesh) => void>;
-    model?: PBRModel | null;
     register(mesh: EngineMesh): void;
     unregister(mesh: EngineMesh): void;
     geometry?: Geometry | null;

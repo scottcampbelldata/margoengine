@@ -6,7 +6,6 @@ import type { BlockTextures, VoxelRenderer, VoxelRendererOptions } from '@margoe
 import type { Loader } from './assets.js';
 import { useLoader } from './hooks.js';
 import { assignRef, useCommit, useCreated, useScene } from './internal.js';
-import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 
 type RenderApi = typeof import('@margoengine/voxel/render');
@@ -66,18 +65,16 @@ export const Voxels = /* @__PURE__ */ forwardRef<VoxelRenderer, VoxelsProps>(fun
           lighting ? optionalPeer('@margoengine/voxel', () => import('@margoengine/voxel/light')) : null,
         ]),
       create: ([render, light]) => {
-        const renderer = inScene(scene, () =>
-          render.VoxelRenderer.attach(scene.engine as unknown as EngineKernel, {
-            world,
-            textures,
-            workers,
-            maxQuadBytes,
-            fancyLeaves,
-            bevel,
-            daylight,
-            lightmap,
-          }),
-        );
+        const renderer = render.VoxelRenderer.attach(scene.engine as unknown as EngineKernel, {
+          world,
+          textures,
+          workers,
+          maxQuadBytes,
+          fancyLeaves,
+          bevel,
+          daylight,
+          lightmap,
+        });
         let lit: VoxelLighting | null = null;
         try {
           lit = light ? light.VoxelLighting.attach(world, typeof lighting === 'object' ? lighting : {}) : null;

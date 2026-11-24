@@ -22,9 +22,7 @@ const glTFAxes = ([x, y, z]) => [x, z, -y];
 
 function near(actual, expected, tolerance, label) {
   assert.equal(actual.length, expected.length, label);
-  actual.forEach((value, i) =>
-    assert.ok(Math.abs(value - expected[i]) <= tolerance, `${label}: ${actual} vs ${expected}`),
-  );
+  actual.forEach((value, i) => assert.ok(Math.abs(value - expected[i]) <= tolerance, `${label}: ${actual} vs ${expected}`));
 }
 
 async function shot(name) {
@@ -62,14 +60,8 @@ for (const name of ['blender-shot.fbx', 'blender-shot-zup.fbx'])
       top = model.cameras.find((c) => c.name === 'Top');
     check(hero, 'Hero');
     check(top, 'Top');
-    check(
-      model.lights.find((l) => l.name === 'Beam'),
-      'Beam',
-    );
-    check(
-      model.lights.find((l) => l.name === 'Sky'),
-      'Sky',
-    );
+    check(model.lights.find((l) => l.name === 'Beam'), 'Beam');
+    check(model.lights.find((l) => l.name === 'Sky'), 'Sky');
     // The file holds degrees and inches as doubles from Float32 values: 1e-6 of a radian covers the rounding.
     assert.ok(Math.abs(hero.perspective.yfov - truth.Hero.yfov) < 1e-6);
     assert.ok(Math.abs(hero.perspective.znear - 0.25) < 1e-6);
@@ -169,8 +161,7 @@ const lightAttribute = (...lines) => `NodeAttribute: 10, "NodeAttribute::Lamp", 
  }`;
 const number = (name, value) => `P: "${name}", "double", "Number", "", ${value}`;
 // A file of cameras and lights has no binary chunk, which readGLB expects.
-const json = (glb) =>
-  JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, new DataView(glb).getUint32(12, true))));
+const json = (glb) => JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, new DataView(glb).getUint32(12, true))));
 const read = async (bytes) => json(await convertFBX(bytes, { extensions }));
 
 test('a file with only a camera converts with the extension and still reports no mesh without it', async () => {
@@ -220,8 +211,7 @@ test('a camera whose view cannot be worked out is an error, with the fix', async
 });
 
 test('the orthographic zoom is metres at any file unit, across the wider side of the view', async () => {
-  const orthographic = (...more) =>
-      cameraAttribute('P: "CameraProjectionType", "enum", "", "", 1', number('OrthoZoom', 8), ...more),
+  const orthographic = (...more) => cameraAttribute('P: "CameraProjectionType", "enum", "", "", 1', number('OrthoZoom', 8), ...more),
     of = async (text) => (await read(text)).cameras[0].orthographic;
   // Blender's default export is a centimetre file, and it still writes an 8 metre view as 8.
   const wide = await of(fbx([orthographic(number('AspectWidth', 2), number('AspectHeight', 1))]));
@@ -266,11 +256,7 @@ test('the worker runs the extension when the page names it', () =>
   headlessModels(async () => {
     const worker = new URL('../dist/workers/fbx.js', import.meta.url),
       input = new Uint8Array(file('blender-shot.fbx')).buffer,
-      prepared = await runParseWorker(worker, {
-        input,
-        resourcePath: 'https://example.test/',
-        extensions: ['scene-extras'],
-      }),
+      prepared = await runParseWorker(worker, { input, resourcePath: 'https://example.test/', extensions: ['scene-extras'] }),
       model = modelFromPrepared(await headless(), prepared);
     assert.equal(model.cameras.length, 2);
     assert.equal(model.lights.length, 4);

@@ -27,7 +27,6 @@ export interface Horse {
     readonly distance: number;
     readonly pose: HorsePose;
     frame(): HorseFrame;
-    flickTail(strength?: number, side?: 'left' | 'right'): void;
     advanceTime(delta: number): this;
     seek(time: number): this;
     onStep(step: (dt: number, horse: Horse) => void, reset?: () => void): () => void;
@@ -103,7 +102,6 @@ export class HorseMotion {
         fade?: number;
     });
     pick(speed: number, forced: Gait | 'auto'): Gait | 'stand';
-    speedAfter(dt: number, target: number): number;
     step(dt: number, target: {
         speed: number;
         heading: number;
@@ -114,7 +112,6 @@ export class HorseMotion {
 }
 
 export interface HorseOptions extends HorseModelOptions {
-    readonly skin?: HorseSkin;
     position?: readonly [number, number];
     heading?: number;
     ground?: (x: number, z: number) => number;
@@ -130,7 +127,6 @@ export interface HorseOptions extends HorseModelOptions {
 export interface HorsePose {
     readonly rotations: readonly (readonly [number, number, number, number])[];
     readonly bodyOffset: readonly [number, number, number];
-    readonly scapulaOffsets?: readonly [Readonly<V3>, Readonly<V3>];
 }
 
 export interface HorseReceiver {
@@ -144,12 +140,6 @@ export interface HorseSkeleton {
     readonly ground: readonly (readonly [number, number, number])[];
     readonly saddle: readonly [number, number, number];
     index(name: string): number;
-}
-
-export interface HorseSkin {
-    readonly model: PBRModel;
-    readonly skeleton: HorseSkeleton;
-    applyPose(pose: HorsePose): void;
 }
 
 export type HorseType = 'draft' | 'cavalry' | 'riding';
@@ -186,6 +176,4 @@ interface HorseProportions {
     readonly cannon: number;
     readonly dock: number;
 }
-
-type V3 = [number, number, number];
 ```

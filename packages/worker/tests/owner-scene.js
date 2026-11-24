@@ -5,12 +5,9 @@ export function createScene({ canvas, data, signal }) {
   canvas.addEventListener('pointerdown', listener);
   signal.addEventListener('abort', () => canvas.removeEventListener('pointerdown', listener), { once: true });
   return {
-    dispose: () =>
-      new Promise((resolve) =>
-        setTimeout(() => {
-          data.disposals++;
-          resolve();
-        }, 5),
-      ),
+    dispose: () => new Promise((resolve) => setTimeout(() => {
+      data.disposals++;
+      resolve();
+    }, 5)),
   };
 }

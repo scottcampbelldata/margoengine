@@ -2,7 +2,7 @@
 
 Horses built in code from published equine measurements. `addHorse(engine)` builds a riding horse, a cavalry remount or
 a heavy draft horse to its breed group's proportions, with a coat, white markings, a mane and tail of hair cards shaded
-as strand hair, a 37-joint rig and walk, trot, canter and gallop taken from equine biomechanics. Its gait follows its
+as strand hair, a 32-joint rig and walk, trot, canter and gallop taken from equine biomechanics. Its gait follows its
 speed, a stance hoof stays where it struck, and film time seeks exactly. A rider seat gives a person the saddle, stirrups
 and reins and a hip that rides the horse's back; `addHorseCrowd` draws hundreds in one call.
 
@@ -15,50 +15,6 @@ horse.speed = 4; // eases into a trot at 3 m/s^2
 horse.advanceTime(1 / 30); // or horse.seek(12.5) for a film frame
 console.log(horse.currentGait, horse.body.mass.toFixed(0)); // 'walk' as it sets off, 'trot' near 4 m/s; about 459 kg
 ```
-
-An existing skinned horse can use the same controller through `skin`. Provide its loaded model in the same engine,
-its fitted skeleton in metres facing +Z, and a function that applies the solved pose to its joint map. The controller
-sets root position and yaw, attaches its skinning pass, and keeps the authored materials. The tightest of the four
-fitted limbs determines whether the stride must shorten to keep the same speed at a quicker cadence. Fit the skeleton
-in metres in a naturally bent stance so the package can measure extension in both directions. The caller owns the model.
-
-```ts
-import type { Engine } from 'margoengine';
-import { addHorse, type HorseSkin } from 'margoengine/horses';
-
-export async function startImportedHorse(engine: Engine, skin: HorseSkin) {
-  const horse = await addHorse(engine, { skin });
-  horse.speed = 3;
-  horse.advanceTime(1);
-  return horse;
-}
-```
-
-Pass `ground(x, z)` for an uneven path. The controller holds each stance hoof at its world-space landing point
-through turns, then releases the horizontal correction over 0.18 seconds. It conforms the hoof to the local grade and
-retains toe breakover and swing clearance. The back and saddle lean with the wider ground slope. Supply a stable,
-continuous height field in metres for deterministic seeks. Jumps, large risers, and overhangs require separate route
-planning. Limb reach and splay constraints still apply.
-
-```ts
-import type { Engine } from 'margoengine';
-import { addHorse } from 'margoengine/horses';
-
-export async function walkOnAGrade(engine: Engine) {
-  const horse = await addHorse(engine, { ground: (x, z) => 0.08 * z - 0.06 * x + 0.04 * Math.sin(2 * z) });
-  horse.gait = 'walk';
-  horse.speed = 1.4;
-  horse.seek(2.4);
-  return horse;
-}
-```
-
-The terrain pass follows the world-space plant and continuous correction approach of [Kovar, Schreiner and Gleicher,
-Footskate Cleanup for Motion Capture Editing (2002)](https://research.cs.wisc.edu/graphics/Papers/Gleicher/Mocap/cleanup.pdf).
-Its separate support frames and trunk sampling draw on [Coros, Karpathy, Jones, Reveret and van de Panne,
-Locomotion Skills for Simulated Quadrupeds (2011)](https://www.cs.ubc.ca/~van/papers/2011-TOG-quadruped/index.html)
-and [Miller, Holden, Al-Ashqar, Dubach, Mitchell and Komura, Carpet Unrolling for Character Control on Uneven Terrain
-(2015)](https://www.pure.ed.ac.uk/ws/portalfiles/portal/21937045/MIG_2015_paper_22.pdf).
 
 ## Anatomy (`./anatomy`)
 
@@ -105,84 +61,11 @@ console.log(gaitFor(body, 7), s.length.toFixed(2), s.duty.toFixed(2), hoovesDown
 
 `horseDocument(options)` returns the horse as a glTF 2.0 document and its buffers, for `parseGLTFAsync(engine, doc,
 buffers)`; `horseGLB(options)` returns a `.glb` file. Five materials (`Coat` with vertex colours for points and markings,
-`Hoof`, `Mane`, `Tail`, `Eye`), a skin of 37 joints (the fore limb swings from the scapula, the hind from the pelvis),
+`Hoof`, `Mane`, `Tail`, `Eye`), a skin of 32 joints (the fore limb swings from the scapula, the hind from the pelvis),
 a `saddle` node on the trunk, and the clips `stand`, `walk`, `trot`, `canter` and `gallop`, each one stride long at its
-speed (`speeds` sets them). A pair of planar inverse-kinematic solves places each elbow or stifle and then the
-lower-leg hinge. The fore carpus stays nearly straight through loaded stance and flexes in early swing. The hind
-hock folds on the opposite side of the limb and extends toward landing. Through late stance and lift-off the hoof
-rolls about the toe and transitions continuously to the swing arc. The kinematics follow the swing and support
-phases described in [The forelimb in walking horses, Hodson, Clayton and Lanovaz (2000)](https://pubmed.ncbi.nlm.nih.gov/10952376/),
-[The hindlimb in walking horses, Hodson, Clayton and Lanovaz (2001)](https://doi.org/10.2746/042516401776767485), and
-[Forelimb kinematics and net joint moments during the swing phase of the trot, Lanovaz, Clayton, Colborne and Schamhardt (1999)](https://doi.org/10.1111/j.2042-3306.1999.tb05225.x).
-The gait curves are approximations of these patterns. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
-
-The two forelegs straighten the carpus under weight, including if a skinned model's bind pose already bends it.
-For a typical walk, the engine targets about 55 degrees of carpal fold, peaking near 76% of the full stride.
-The fetlock drive follows at about 81%, and the elbow and coffin joint drive follow near 84%. The trot has a
-larger carpal swing around 76 degrees and decelerates into landing. The angles and order follow [Hodson, Clayton
-and Lanovaz, The Forelimb in Walking Horses: Kinematics and Ground Reaction Forces (2000)](https://doi.org/10.2746/042516400777032237),
-[Clayton, Sha, Stick and Mullineaux, Three-Dimensional Carpal Kinematics of Trotting Horses
-(2004)](https://doi.org/10.2746/0425164044848037), and the walking range summarized in [Jose L. Mendez-Angulo,
-Effect of Water Level on Kinematics of Healthy Horses (2012), Table 1](https://conservancy.umn.edu/bitstreams/3a03b69d-656f-4f98-be2c-9706192aa746/download).
-
-`fitHorseHooves` runs the leg solve directly for authored contact targets in model space. Pitch and roll are in
-radians about +X and +Z, with zero as the default trunk slope. Each target applies its terrain angles to the base
-hoof motion. The leg lengths and original bending sides are preserved. Turning the whole chain laterally is capped
-at 0.35 radians. The live terrain controller uses this same method.
-
-```ts
-import { horseBody } from 'margoengine/horses/anatomy';
-import { fitHorseHooves, horsePose, horseSkeleton, type HorseHoofTarget } from 'margoengine/horses/model';
-
-const rig = horseSkeleton(horseBody());
-const targets: HorseHoofTarget[] = rig.ground.map(([x, , z]) => ({
-  point: [x, 0.1 * z, z],
-  pitch: -Math.atan(0.1),
-  roll: 0,
-}));
-const standingOnTheGrade = fitHorseHooves(rig, horsePose(rig, null), targets, -Math.atan(0.1));
-console.log(standingOnTheGrade.rotations.length); // 37
-```
-
-Swing matches the planted hoof's local fore-aft velocity at lift-off and touchdown. During a gait change, the
-controller matches hoof positions and short-term travel to select the incoming phase. The outgoing cadence eases out
-as the new gait takes over. Timing comes from the support sequences in [*Symmetrical Gaits of Horses*, Milton Hildebrand
-(1965)](https://pubmed.ncbi.nlm.nih.gov/5844074/). The contact and transition treatment draws on [*Footskate Cleanup for
-Motion Capture Editing*, Lucas Kovar, John Schreiner and Michael Gleicher (2002)](https://graphics.cs.wisc.edu/Papers/2002/KSG02/)
-and [*Automated Semi-Procedural Animation for Character Locomotion*, Rune Skovbo Johansen (2009)](https://runevision.com/thesis/rune_skovbo_johansen_thesis.pdf).
-
-In a walk the fore fetlock yields as weight transfers and tucks relative to the cannon during swing.
-The pose solver combines the cannon, pastern, and hoof at their local angles to maintain the planned sole path,
-including the established departure from and return to the plant. It preserves segment lengths and leaves
-the carpus and coffin flexion timed separately. References are [Hodson, Clayton and Lanovaz, *The Forelimb
-in Walking Horses: 1. Kinematics and Ground Reaction Forces* (2000)](https://doi.org/10.2746/042516400777032237),
-[Clayton, Hodson and Lanovaz, *The Forelimb in Walking Horses: 2. Net Joint Moments and Joint Powers*
-(2000)](https://doi.org/10.2746/042516400777032174), and [Clayton, Sha, Stick and Elvin, *3D Kinematics of the
-Equine Metacarpophalangeal Joint at Walk and Trot* (2007)](https://pubmed.ncbi.nlm.nih.gov/17546207/).
-
-The scapula glides against the thorax through loading and swing. Both scapula translation channels are exported,
-and the runtime solves the forelimbs from the changing attachment. The reference range for scapula glide is
-[Lawson and Marlin, Preliminary Report Into the Function of the Shoulder Using a Novel Imaging Approach (2010)](https://doi.org/10.1111/j.2042-3306.2010.00289.x).
-
-Three dock joints lead a stride-driven sway and five weighted hair joints follow with a phase lag.
-Call `horse.flickTail(strength, side)` for a stronger swish at any gait. It lifts from the dock, sweeps toward
-the chosen flank, and settles with a smaller return. The event is recorded on the timeline and survives `seek`.
-Authored skins get the follow-through when their `applyPose` maps all eight tail joints. The measured separation
-of the dock and trailing hair follows [Matherne, Cockerill, Zhou, Bellamkonda and Hu,
-*Mammals Repel Mosquitoes with Their Tails* (2018)](https://doi.org/10.1242/jeb.178905). The flexible chain is a
-kinematic approximation of bending and drag, informed by [Bertails, Audoly, Cani, Querleux, Leroy and
-Lévêque, *Super-Helices for Predicting the Dynamics of Natural Hair* (2006)](https://doi.org/10.1145/1179352.1142012).
-
-```ts
-function swishOnTheWalk(horse: import('margoengine/horses').Horse) {
-  horse.gait = 'walk';
-  horse.speed = 1.5;
-  horse.advanceTime(2);
-  horse.flickTail(0.8, 'left');
-  horse.advanceTime(0.32);
-  return horse.pose;
-}
-```
+speed (`speeds` sets them). The legs are posed by two-bone inverse kinematics: a stance hoof keeps still while the body
+passes over it, the hoof breaks over its toe in the last fifth of the stance, a swing hoof lifts and folds at the
+fetlock. `detail` 2, 1 or 0 gives about 11,000, 4,000 or 1,300 vertices.
 
 | Option | Default |
 | --- | --- |

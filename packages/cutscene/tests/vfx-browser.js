@@ -51,11 +51,7 @@ window.check = async () => {
   const installed = installGPU({ gpu: navigator.gpu }),
     engine = await Engine.create(createHeadlessCanvas({ width: 256, height: 192 }), { backend: 'webgpu' }),
     errors = [],
-    cube = engine
-      .createMesh()
-      .setGeometry(box())
-      .setMaterial(new PbrMaterial({ color: '#3f7fd0' }))
-      .setPosition([-1.5, 0, 0]),
+    cube = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#3f7fd0' })).setPosition([-1.5, 0, 0]),
     effect = VFX.attach(engine, {
       capacity: 4096,
       position: [0.5, 0, 0],
@@ -69,23 +65,16 @@ window.check = async () => {
     }),
     cutscene = new Cutscene(scene, { tracks: [vfxTrack(), activationTrack()] }),
     player = new CutscenePlayer(cutscene),
-    director = new VfxDirector(
-      cutscene,
-      { sparks: effect },
-      { step: (delta) => engine.render({ delta }), stepSize: STEP },
-    );
+    director = new VfxDirector(cutscene, { sparks: effect }, { step: (delta) => engine.render({ delta }), stepSize: STEP });
   engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
 
   // The optional compatibility route loads asynchronously. Both captures must use the same arithmetic path:
   // recording the CPU fallback before its import finishes and replaying on the GPU differs by a few float bits.
   // This fixture intentionally probes the private route to wait on actual readiness, never on a fixed frame count.
-  await waitForPipelines(
-    async () => {
-      engine.render({ delta: 0 });
-      await engine.gpu.queue.onSubmittedWorkDone();
-    },
-    { ready: () => !globalThis.__margoCompat || Boolean(effect.route) },
-  );
+  await waitForPipelines(async () => {
+    engine.render({ delta: 0 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+  }, { ready: () => !globalThis.__margoCompat || Boolean(effect.route) });
   effect.reset();
 
   const draw = () => {

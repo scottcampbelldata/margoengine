@@ -63,10 +63,7 @@ export class PostStack implements EnginePlugin {
     const runtime = engineRuntime(engine);
     // A scene holds one stack (a sky preset, water caustics or a camera may have made it): name the way to add to it.
     if (runtime.hasPlugin('post:stack'))
-      throw margoError(
-        'attached',
-        'This scene already has a PostStack; add effects to it with addEffect or PostStack.join',
-      );
+      throw margoError('attached', 'This scene already has a PostStack; add effects to it with addEffect or PostStack.join');
     const stack = new PostStack(effects);
     runtime.use(stack);
     return stack;

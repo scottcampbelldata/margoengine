@@ -71,15 +71,9 @@ assert.equal(report.checks.frames.seconds, count / 60);
 assert.deepEqual(report.checks.gop.firstKeyframes, [0, 30, 60], 'YouTube: a closed GOP of fps / 2');
 assert.equal(report.checks.gop.x264.bframes, 2);
 assert.ok(report.checks.gop.longestBRun <= 2 && report.checks.gop.bFrames > 0);
-for (const { index, mean } of report.frameDeltaE)
-  assert.ok(mean < 1, `frame ${index} decodes back at a mean CIEDE2000 of ${mean}`);
-assert.ok(
-  report.proxyFlags.some((flag) => flag.endsWith('at 3 Mbps')),
-  `single-pixel sparks were not flagged at 3 Mbps: ${JSON.stringify(report.proxy)}`,
-);
-console.log(
-  `ok: master ${report.bitrateMbps} Mbps, chart mean dE ${report.checks.chart.meanDeltaE}, ${report.proxyFlags.length} flags (${report.proxyFlags[0]})`,
-);
+for (const { index, mean } of report.frameDeltaE) assert.ok(mean < 1, `frame ${index} decodes back at a mean CIEDE2000 of ${mean}`);
+assert.ok(report.proxyFlags.some((flag) => flag.endsWith('at 3 Mbps')), `single-pixel sparks were not flagged at 3 Mbps: ${JSON.stringify(report.proxy)}`);
+console.log(`ok: master ${report.bitrateMbps} Mbps, chart mean dE ${report.checks.chart.meanDeltaE}, ${report.proxyFlags.length} flags (${report.proxyFlags[0]})`);
 console.log('shot encode check passed');
 
 // T7 in the look family: the same shot naming `animatedFeature` is held to the family's floor of 0.6 and fails its master
@@ -88,16 +82,11 @@ assert.equal(report.checks.detailKept, undefined, 'a natural shot only flags: no
 {
   const { readFileSync } = await import('node:fs');
   const manifest = JSON.parse(readFileSync(join(frames, 'manifest.json'), 'utf8'));
-  writeFileSync(
-    join(frames, 'manifest.json'),
-    JSON.stringify({ ...manifest, header: { lookFamily: 'animatedFeature' } }),
-  );
+  writeFileSync(join(frames, 'manifest.json'), JSON.stringify({ ...manifest, header: { lookFamily: 'animatedFeature' } }));
   const family = await encodeShot(frames);
   assert.equal(family.checks.detailKept.floor, 0.6);
   assert.equal(family.checks.detailKept.family, 'animatedFeature');
   assert.equal(family.checks.detailKept.pass, false, 'the sparks keep under 0.6 of their detail at 3 Mbps');
   assert.equal(family.pass, false);
-  console.log(
-    `ok: animatedFeature holds the floor of ${family.checks.detailKept.floor}: worst ${family.checks.detailKept.worst}, master fails`,
-  );
+  console.log(`ok: animatedFeature holds the floor of ${family.checks.detailKept.floor}: worst ${family.checks.detailKept.worst}, master fails`);
 }

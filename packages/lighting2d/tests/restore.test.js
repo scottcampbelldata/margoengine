@@ -181,10 +181,7 @@ for (const kind of kinds)
     assert.ok(!e.written(from).includes(target), 'nothing is drawn into the lost target');
     assert.equal(second.counts.groups, made, 'nothing is bound for a pass with no target');
     assert.equal(e.lost().length, 1, 'one report');
-    assert.match(
-      e.lost()[0].message,
-      new RegExp(`^${kind.name} target lost with the device; pass a function or call setTarget`),
-    );
+    assert.match(e.lost()[0].message, new RegExp(`^${kind.name} target lost with the device; pass a function or call setTarget`));
     assert.equal(e.lost()[0].code, 'state');
     // A new texture through the setter, given from the caller's own restore hook (engine.gpu is the new device).
     const again = second.texture();
@@ -229,10 +226,7 @@ for (const kind of kinds.filter((k) => k.normals))
     );
     assert.ok(e.written(0).includes(second.engine.gpu.target), 'the light still reaches the target, flat');
     assert.equal(e.lost().length, 1, 'one report');
-    assert.match(
-      e.lost()[0].message,
-      new RegExp(`^${kind.name} normals lost with the device; pass a function or call setNormals`),
-    );
+    assert.match(e.lost()[0].message, new RegExp(`^${kind.name} normals lost with the device; pass a function or call setNormals`));
     const normals = second.texture();
     pass.setNormals(normals);
     e.frame();

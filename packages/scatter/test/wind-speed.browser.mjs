@@ -29,18 +29,13 @@ try {
     canvas.width = canvas.height = 192;
     canvas.style.cssText = 'width:192px;height:192px;display:block';
     document.body.replaceChildren(canvas);
-    const engine = await Engine.create(canvas, {
-      camera: { position: [0, 3, 9], target: [0, 0.5, 0], near: 0.1, far: 100 },
-    });
+    const engine = await Engine.create(canvas, { camera: { position: [0, 3, 9], target: [0, 0.5, 0], near: 0.1, far: 100 } });
     engine.stop();
     engine.lighting.direction.set([1, 1, 0.3]);
     const d = engine.gpu,
       found = [];
     d.addEventListener?.('uncapturederror', (e) => found.push(e.error.message));
-    const floor = engine
-      .createMesh()
-      .setGeometry(box(30, 0.1, 30))
-      .setPosition([0, -0.05, 0]);
+    const floor = engine.createMesh().setGeometry(box(30, 0.1, 30)).setPosition([0, -0.05, 0]);
     const shadows = Shadows.attach(engine, { distance: 20 });
     shadows.add(floor, { castShadow: false });
     let field, remove;
@@ -65,7 +60,7 @@ try {
   const show = async (wind, delta) => {
     const r = await page.evaluate(([w, dt]) => window.check.show(w, dt), [wind, delta]);
     assert.deepEqual(r.errors, []);
-    return { ...r, png: await decodePNG(await page.locator('canvas').screenshot()) };
+    return { ...r, png: await decodePNG(await page.locator("canvas").screenshot()) };
   };
   const diff = (a, b) => {
     let n = 0;

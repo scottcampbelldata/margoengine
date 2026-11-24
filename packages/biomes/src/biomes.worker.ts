@@ -6,7 +6,6 @@ import { typeError } from '../../shared/errors.js';
 import { type BiomeTile, BiomeWorld, type BiomeWorldOptions } from './world.js';
 import { BiomePlacement, type PlacedTile, type PlacementOptions } from './placement.js';
 import { canopyCorners, canopyCover, darkenTile } from './cover.js';
-import type { PlacementGraph } from './graph.js';
 import { overviewRows, viewTile } from './view.js';
 
 let world: BiomeWorld | undefined,
@@ -180,8 +179,7 @@ async function run(m: Message): Promise<unknown> {
       return made;
     }
     case 'cover':
-      if (m.graph) await import('./graph.js');
-      return canopyCover(world!, m.step as number, m.graph as PlacementGraph | undefined);
+      return canopyCover(world!, m.step as number);
     case 'overview':
       // A band of texel rows of a view's far-field ground weights (from the region fields, never a cached tile).
       return overviewRows(

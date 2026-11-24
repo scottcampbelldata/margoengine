@@ -17,13 +17,7 @@ import {
   seaRockField,
 } from '../dist/rocks.js';
 import { ROCK_LOOK_DEFAULTS, ROCK_TYPES, RockSurface } from '../dist/rock-surface.js';
-import {
-  ROCK_SETTINGS,
-  applyRockSettings,
-  rockLookOf,
-  rockSettingDefaults,
-  rockShapeOf,
-} from '../dist/rock-settings.js';
+import { ROCK_SETTINGS, applyRockSettings, rockLookOf, rockSettingDefaults, rockShapeOf } from '../dist/rock-settings.js';
 import { heldFromWeather } from '../../shared/settings.js';
 
 const N = 257;
@@ -98,10 +92,7 @@ test('cliffs stand on the steep high ground, face the sea and span foot to crest
     const g = rockGround(ground),
       [x, , z] = c.position,
       [fx, fz] = c.facing;
-    assert.ok(
-      g.height(x + fx * 4, z + fz * 4) < g.height(x - fx * 4, z - fz * 4) - 4,
-      'faces down the slope: ' + c.facing,
-    );
+    assert.ok(g.height(x + fx * 4, z + fz * 4) < g.height(x - fx * 4, z - fz * 4) - 4, 'faces down the slope: ' + c.facing);
     assert.ok(c.slope >= 50 && c.relief >= 8, `steep and high: ${c.slope}, ${c.relief}`);
     assert.ok(c.top - c.base > 24, `foot to crest: ${c.base} to ${c.top}`);
     assert.ok(Math.abs(c.position[1] - (c.base + c.top) / 2) < 1e-6);
@@ -110,8 +101,7 @@ test('cliffs stand on the steep high ground, face the sea and span foot to crest
   let nearest = Infinity;
   for (const a of sites.cliffs)
     for (const b of sites.cliffs)
-      if (a !== b)
-        nearest = Math.min(nearest, Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]));
+      if (a !== b) nearest = Math.min(nearest, Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]));
   assert.ok(nearest >= 18 - 1e-9, 'nearest pieces ' + nearest);
   assert.equal(findRockSites(ground, { cliffSlope: 80 }).cliffs.length, 0, 'nothing on the coast is 80 degrees steep');
   assert.equal(findRockSites(ground, { cliffRelief: 60 }).cliffs.length, 0, 'nor 60 m of relief within 16 m');
@@ -120,8 +110,7 @@ test('cliffs stand on the steep high ground, face the sea and span foot to crest
 test('sea rocks stand in their depth band off the shore, spaced; stacks off the cliffs rise high; boulders lie at the foot', () => {
   const g = rockGround(ground),
     land = [];
-  for (let j = 0; j < N; j++)
-    for (let i = 0; i < N; i++) if (ground.heights[j * N + i] >= 0) land.push([i - 128, j - 128]);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (ground.heights[j * N + i] >= 0) land.push([i - 128, j - 128]);
   assert.ok(sites.seaRocks.length >= 10, 'sea rocks: ' + sites.seaRocks.length);
   for (const r of sites.seaRocks) {
     const [x, bed, z] = r.position,
@@ -136,10 +125,7 @@ test('sea rocks stand in their depth band off the shore, spaced; stacks off the 
   for (const a of sites.seaRocks)
     for (const b of sites.seaRocks)
       if (a !== b) assert.ok(Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]) >= 14 - 1e-6);
-  assert.ok(
-    sites.seaRocks.some((r) => r.kind === 'stack'),
-    'stacks off the cliffed headland',
-  );
+  assert.ok(sites.seaRocks.some((r) => r.kind === 'stack'), 'stacks off the cliffed headland');
   assert.ok(sites.boulders.length >= sites.cliffs.length * 2);
   for (const b of sites.boulders) {
     const c = sites.cliffs[b.cliff],
@@ -183,15 +169,9 @@ test('a cliff face covers the heightfield, leans out by its overhang and closes 
     plain = cliffField(site, ground, { ...clean, overhang: 0 }),
     leaning = cliffField(site, ground, { ...clean, overhang: 4 }),
     big = cliffField(site, ground, { ...clean, overhang: 12 });
-  assert.ok(
-    front(leaning, 0, hi) - front(plain, 0, hi) > 3.4,
-    `overhang 4: ${front(leaning, 0, hi) - front(plain, 0, hi)}`,
-  );
+  assert.ok(front(leaning, 0, hi) - front(plain, 0, hi) > 3.4, `overhang 4: ${front(leaning, 0, hi) - front(plain, 0, hi)}`);
   assert.ok(Math.abs(front(leaning, 0, lo) - front(plain, 0, lo)) < 0.05, 'the lower face is where it was');
-  assert.ok(
-    front(big, 0, hi) > front(big, 0, lo) + 1,
-    `a true overhang: the top stands past the face below: ${front(big, 0, hi)} vs ${front(big, 0, lo)}`,
-  );
+  assert.ok(front(big, 0, hi) > front(big, 0, lo) + 1, `a true overhang: the top stands past the face below: ${front(big, 0, hi)} vs ${front(big, 0, lo)}`);
   assert.ok(front(plain, 0, hi) < front(plain, 0, lo), 'without one the face leans back like the ground');
   // Strata ledges: hard beds stand out, so the face steps (its spread along the height grows by about the ledges).
   const spread = (f) => {
@@ -199,10 +179,7 @@ test('a cliff face covers the heightfield, leans out by its overhang and closes 
     for (let y = site.base + 4; y < site.top - 4; y += 0.1) d.push(front(f, 0, y) - front(plain, 0, y));
     return Math.max(...d) - Math.min(...d);
   };
-  assert.ok(
-    spread(cliffField(site, ground, { ...clean, overhang: 0, strata: 1.5, ledges: 0.8 })) > 0.5,
-    'ledges step the face',
-  );
+  assert.ok(spread(cliffField(site, ground, { ...clean, overhang: 0, strata: 1.5, ledges: 0.8 })) > 0.5, 'ledges step the face');
   // A mesh in blocks (a 0.2 m cell needs over 127 samples up the face): closed, faces out, no seam between blocks.
   const rock = buildCliff(site, ground, { cell: 0.2, roughness: 0.2 }),
     { open, edges } = openEdges(rock.geometry);
@@ -244,12 +221,7 @@ test('a sea stack has its wave-cut notch at the sea surface, a rounded top and a
     for (let i = 1; i < rock.geometry.vertices.length; i += 6) low = Math.min(low, rock.geometry.vertices[i]);
     assert.ok(low < -0.8 && low > -1.3, kind + ' reaches 1 m into the bed: ' + low);
   }
-  assert.ok(
-    Math.abs(
-      radius(notched, 0.1) - radius(seaRockField({ ...stack, seaLevel: 5 }, { ...clean, notchDepth: 1.2 }), 5.1),
-    ) < 0.25,
-    'the notch follows the sea level',
-  );
+  assert.ok(Math.abs(radius(notched, 0.1) - radius(seaRockField({ ...stack, seaLevel: 5 }, { ...clean, notchDepth: 1.2 }), 5.1)) < 0.25, 'the notch follows the sea level');
 });
 
 test('a boulder is a closed, faceted block partly buried in the ground', () => {
@@ -268,40 +240,8 @@ test('a boulder is a closed, faceted block partly buried in the ground', () => {
   // Facets: the field is flat between edges, so most surface normals cluster on the planes (not a sphere).
   const f = boulderField(site, { roughness: 0 });
   assert.ok(f.sd(0, 0, 0) < -0.9, 'solid inside');
-  const all = buildRocks(
-    {
-      ...sites,
-      cliffs: sites.cliffs.slice(0, 1),
-      seaRocks: sites.seaRocks.slice(0, 2),
-      boulders: sites.boulders.slice(0, 2),
-    },
-    ground,
-  );
+  const all = buildRocks({ ...sites, cliffs: sites.cliffs.slice(0, 1), seaRocks: sites.seaRocks.slice(0, 2), boulders: sites.boulders.slice(0, 2) }, ground);
   assert.equal(all.length, 5);
-});
-
-test('fallen boulders keep a broad bearing face and seeded fracture profiles', () => {
-  const site = { kind: 'boulder', position: [3, 2, -1], radius: 2, cliff: 0 };
-  const fields = [1, 17, 27, 1234].map((seed) => boulderField(site, { seed, roughness: 0, rounding: 0 }));
-  for (const { sd } of fields) {
-    for (const [x, z] of [
-      [0, 0],
-      [-0.4, 0.3],
-      [0.4, -0.3],
-    ]) {
-      assert.ok(Math.abs(sd(x, -1.68, z)) < 1e-7, 'the same bedding plane lies under the whole footprint');
-      assert.ok(sd(x, -1.58, z) < 0 && sd(x, -1.78, z) > 0);
-    }
-  }
-  const profiles = fields.map(({ sd }) =>
-    [
-      [0.45, 1.25, 0],
-      [-0.45, 1.25, 0],
-    ]
-      .map((p) => sd(...p))
-      .join('/'),
-  );
-  assert.equal(new Set(profiles).size, fields.length);
 });
 
 test('bad input throws RangeError with the README section', () => {
@@ -323,11 +263,7 @@ test('rock look: types, defaults and checks', () => {
   assert.throws(() => surface.setLook({ bump: 4 }), RangeError);
   assert.throws(() => surface.setLook({ shine: 1 }), TypeError);
   assert.throws(() => new RockSurface({ rain: 2 }), RangeError);
-  for (const t of Object.values(ROCK_TYPES))
-    assert.ok(
-      t.color.every((c) => c > 0 && c < 0.8),
-      'albedo of real rock',
-    );
+  for (const t of Object.values(ROCK_TYPES)) assert.ok(t.color.every((c) => c > 0 && c < 0.8), 'albedo of real rock');
   assert.ok(ROCK_TYPES.basalt.color[0] < ROCK_TYPES.chalk.color[0] / 5);
 });
 
@@ -335,8 +271,7 @@ test('rock settings: the shared row shape, live look rows, shape rows for the bu
   for (const row of ROCK_SETTINGS) {
     assert.ok(row.name && row.group && row.kind && row.about, row.name);
     assert.equal(typeof row.live, 'boolean');
-    if (row.kind === 'number' && row.default !== null)
-      assert.ok(row.default >= row.min && row.default <= row.max, row.name);
+    if (row.kind === 'number' && row.default !== null) assert.ok(row.default >= row.min && row.default <= row.max, row.name);
   }
   const rain = ROCK_SETTINGS.find((r) => r.name === 'wet.rain');
   assert.equal(rain.default, null);
@@ -345,9 +280,7 @@ test('rock settings: the shared row shape, live look rows, shape rows for the bu
   const surface = new RockSurface(),
     defaults = rockSettingDefaults();
   // Every live row at its default draws the look RockSurface starts from.
-  const look = rockLookOf(
-    Object.fromEntries(Object.entries(defaults).filter(([k]) => ROCK_SETTINGS.find((r) => r.name === k).live)),
-  );
+  const look = rockLookOf(Object.fromEntries(Object.entries(defaults).filter(([k]) => ROCK_SETTINGS.find((r) => r.name === k).live)));
   for (const [k, v] of Object.entries(look)) assert.deepEqual(v, ROCK_LOOK_DEFAULTS[k], k);
   applyRockSettings(surface, { 'detail.bump': 1.5, 'wet.rain': 0.4 });
   assert.equal(surface.look.bump, 1.5);
@@ -361,14 +294,8 @@ test('rock settings: the shared row shape, live look rows, shape rows for the bu
   });
   // Every shape row is an option of its builder: building with all of them at their defaults gives the default mesh.
   const shape = rockShapeOf(Object.fromEntries(ROCK_SETTINGS.filter((r) => !r.live).map((r) => [r.name, r.default])));
-  assert.deepEqual(
-    buildCliff(sites.cliffs[0], ground, shape.cliff).geometry.vertices,
-    buildCliff(sites.cliffs[0], ground).geometry.vertices,
-  );
-  assert.deepEqual(
-    buildSeaRock(sites.seaRocks[0], shape.seaRock).geometry.vertices,
-    buildSeaRock(sites.seaRocks[0]).geometry.vertices,
-  );
+  assert.deepEqual(buildCliff(sites.cliffs[0], ground, shape.cliff).geometry.vertices, buildCliff(sites.cliffs[0], ground).geometry.vertices);
+  assert.deepEqual(buildSeaRock(sites.seaRocks[0], shape.seaRock).geometry.vertices, buildSeaRock(sites.seaRocks[0]).geometry.vertices);
   assert.throws(() => applyRockSettings(surface, { 'detail.shine': 1 }), TypeError);
   assert.throws(() => applyRockSettings(surface, { 'detail.bump': 9 }), RangeError);
 });

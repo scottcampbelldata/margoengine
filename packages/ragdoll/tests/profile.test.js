@@ -34,56 +34,52 @@ async function knight() {
   return rig;
 }
 
-rtest(
-  'a tuned ragdoll comes back the same on a fresh rig through JSON, and two loads fall the same to the last bit',
-  async () => {
-    const first = await knight(),
-      tuned = Ragdoll.attach(first.physics, {
-        ...ragdollOptions(humanoidProfile(first.model.nodes, { bones: kaykit(first), mass: 82 }), first.model.nodes),
-        friction: 0.9,
-        linearDamping: 0.1,
-        angularDamping: 1.2,
-        limitStiffness: 0.3,
-      });
-    fitRagdollShapes(tuned, first.model);
-    tuned.setShape(first.node('foot.l'), {
-      type: 'box',
-      center: [0, 0.05, 0],
-      halfExtents: [0.05, 0.1, 0.04],
-      rotation: [0, 0, 0, 1],
+rtest('a tuned ragdoll comes back the same on a fresh rig through JSON, and two loads fall the same to the last bit', async () => {
+  const first = await knight(),
+    tuned = Ragdoll.attach(first.physics, {
+      ...ragdollOptions(humanoidProfile(first.model.nodes, { bones: kaykit(first), mass: 82 }), first.model.nodes),
+      friction: 0.9,
+      linearDamping: 0.1,
+      angularDamping: 1.2,
+      limitStiffness: 0.3,
     });
-    const saved = JSON.stringify(saveRagdollProfile(tuned)),
-      second = await knight(),
-      third = await knight(),
-      again = Ragdoll.attach(second.physics, ragdollOptions(JSON.parse(saved), second.model.nodes)),
-      twin = Ragdoll.attach(third.physics, ragdollOptions(JSON.parse(saved), third.model.nodes));
-    assert.deepEqual(again.settings, tuned.settings);
-    assert.equal(again.bones.length, tuned.bones.length);
-    tuned.bones.forEach((part, i) => {
-      const copy = again.bones[i];
-      assert.equal(copy.node.name, part.node.name);
-      assert.deepEqual(copy.spec, part.spec);
-      for (const key of ['length', 'radius', 'mass', 'parent'])
-        assert.equal(copy[key], part[key], `${part.node.name} ${key}`);
-      assert.equal(copy.shape.type, part.shape.type);
-      assert.ok(Math.abs(copy.body.mass - part.body.mass) < 1e-6);
-    });
-    // Two loads of one profile are the same ragdoll. The tuned one is not compared: it swapped colliders while live, so
-    // The solver holds them under other handles and solves its contacts in another order.
-    for (const [rig, ragdoll] of [
-      [third, twin],
-      [second, again],
-    ]) {
-      ragdoll.activate();
-      ragdoll.part(rig.node('chest')).body.applyImpulse([0, 0, -30]);
-      rig.frames(120);
-    }
-    twin.bones.forEach((part, i) => assert.deepEqual(again.bones[i].body.position, part.body.position, part.node.name));
-    first.dispose();
-    second.dispose();
-    third.dispose();
-  },
-);
+  fitRagdollShapes(tuned, first.model);
+  tuned.setShape(first.node('foot.l'), {
+    type: 'box',
+    center: [0, 0.05, 0],
+    halfExtents: [0.05, 0.1, 0.04],
+    rotation: [0, 0, 0, 1],
+  });
+  const saved = JSON.stringify(saveRagdollProfile(tuned)),
+    second = await knight(),
+    third = await knight(),
+    again = Ragdoll.attach(second.physics, ragdollOptions(JSON.parse(saved), second.model.nodes)),
+    twin = Ragdoll.attach(third.physics, ragdollOptions(JSON.parse(saved), third.model.nodes));
+  assert.deepEqual(again.settings, tuned.settings);
+  assert.equal(again.bones.length, tuned.bones.length);
+  tuned.bones.forEach((part, i) => {
+    const copy = again.bones[i];
+    assert.equal(copy.node.name, part.node.name);
+    assert.deepEqual(copy.spec, part.spec);
+    for (const key of ['length', 'radius', 'mass', 'parent']) assert.equal(copy[key], part[key], `${part.node.name} ${key}`);
+    assert.equal(copy.shape.type, part.shape.type);
+    assert.ok(Math.abs(copy.body.mass - part.body.mass) < 1e-6);
+  });
+  // Two loads of one profile are the same ragdoll. The tuned one is not compared: it swapped colliders while live, so
+  // The solver holds them under other handles and solves its contacts in another order.
+  for (const [rig, ragdoll] of [
+    [third, twin],
+    [second, again],
+  ]) {
+    ragdoll.activate();
+    ragdoll.part(rig.node('chest')).body.applyImpulse([0, 0, -30]);
+    rig.frames(120);
+  }
+  twin.bones.forEach((part, i) => assert.deepEqual(again.bones[i].body.position, part.body.position, part.node.name));
+  first.dispose();
+  second.dispose();
+  third.dispose();
+});
 
 rtest('the humanoid preset weighs what was asked, by published shares, with every bone of the body', async () => {
   const rig = await knight(),
@@ -97,7 +93,10 @@ rtest('the humanoid preset weighs what was asked, by published shares, with ever
   // wrist is no humanoid bone, but the hand hangs from it, so it joins the hand's share.
   assert.ok(Math.abs(mass('wrist.l') + mass('hand.l') - 80 * 0.0061) < 1e-9);
   const ragdoll = Ragdoll.attach(rig.physics, ragdollOptions(profile, rig.model.nodes));
-  assert.deepEqual(ragdoll.bones.map((part) => part.node.name).sort(), profile.bones.map((bone) => bone.name).sort());
+  assert.deepEqual(
+    ragdoll.bones.map((part) => part.node.name).sort(),
+    profile.bones.map((bone) => bone.name).sort(),
+  );
   assert.ok(ragdoll.part(rig.node('head')), 'a head with no child bone is a bone here');
   rig.dispose();
 });
@@ -131,10 +130,7 @@ for (const [bone, label, push] of [
     ]) {
       const rig = await realRig(KNIGHT, { gravity: [0, 0, 0] });
       rig.frames(1);
-      const ragdoll = Ragdoll.attach(
-          rig.physics,
-          ragdollOptions(humanoidProfile(rig.model.nodes, { bones: kaykit(rig) }), rig.model.nodes),
-        ),
+      const ragdoll = Ragdoll.attach(rig.physics, ragdollOptions(humanoidProfile(rig.model.nodes, { bones: kaykit(rig) }), rig.model.nodes)),
         part = ragdoll.part(rig.node(bone));
       assert.equal(part.spec.type, 'hinge');
       rig.frames(5);
@@ -156,10 +152,7 @@ for (const [bone, label, push] of [
 
 rtest('the preset lies down on the floor with its knees and elbows inside their ranges', async () => {
   const rig = await knight(),
-    ragdoll = Ragdoll.attach(
-      rig.physics,
-      ragdollOptions(humanoidProfile(rig.model.nodes, { bones: kaykit(rig) }), rig.model.nodes),
-    );
+    ragdoll = Ragdoll.attach(rig.physics, ragdollOptions(humanoidProfile(rig.model.nodes, { bones: kaykit(rig) }), rig.model.nodes));
   fitRagdollShapes(ragdoll, rig.model);
   ragdoll.activate();
   ragdoll.part(rig.node('chest')).body.applyImpulse([0, 0, -300]);

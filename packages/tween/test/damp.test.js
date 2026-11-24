@@ -148,8 +148,7 @@ test('huge finite coordinates do not overflow the speed limit', () => {
 // below measure the frame loop's steady state whatever the machine's load.
 function untilOptimized(run) {
   const { isTurbofan, status } = v8Tiers();
-  for (const deadline = performance.now() + 30_000; !isTurbofan(smoothDamp) && performance.now() < deadline; )
-    run(1000);
+  for (const deadline = performance.now() + 30_000; !isTurbofan(smoothDamp) && performance.now() < deadline; ) run(1000);
   assert.ok(isTurbofan(smoothDamp), `smoothDamp never reached Turbofan (status ${status(smoothDamp)})`);
 }
 

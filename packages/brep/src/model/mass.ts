@@ -235,8 +235,7 @@ function faceIntegrals(face: Face, c: XYZ, fuv = new FaceUV(face)): Float64Array
   if (!face.loops.length) {
     const [u0, u1] = s.uPeriod ? [0, s.uPeriod] : s.uDomain,
       [v0, v1] = s.vPeriod ? [0, s.vPeriod] : s.vDomain;
-    if (![u0, u1, v0, v1].every(Number.isFinite))
-      throw new RangeError(`${face.name}: an unbounded face has no mass; pass a closed body`);
+    if (![u0, u1, v0, v1].every(Number.isFinite)) throw new RangeError(`${face.name}: an unbounded face has no mass; pass a closed body`);
     const row = new Float64Array(K);
     alongU(
       (u) => {

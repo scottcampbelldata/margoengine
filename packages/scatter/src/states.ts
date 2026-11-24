@@ -92,13 +92,7 @@ export interface PlantMarks {
   readonly wetness?: number;
 }
 const MARKS: Record<keyof PlantMarks, [number, number]> = {
-  scorch: [0, 100],
-  char: [0, 100],
-  intensity: [0, 1000],
-  ash: [0, 1],
-  water: [0, 100],
-  debris: [0, 1],
-  wetness: [0, 1],
+  scorch: [0, 100], char: [0, 100], intensity: [0, 1000], ash: [0, 1], water: [0, 100], debris: [0, 1], wetness: [0, 1],
 };
 
 /** One kind of plant's response, set per Scatter (`plant()`); every field is live (`PlantStateSource.set`). */
@@ -166,24 +160,13 @@ const MAP_RANGE: Record<string, [number, number, boolean?]> = {
   groundChar: [0, 100],
   groundMud: [0, 100],
 };
-const MAP_DEFAULTS = {
-  ambient: 25,
-  wind: 2,
-  manning: 0.035,
-  dryTime: 3600,
-  groundScorch: 4,
-  groundChar: 1,
-  groundMud: 0.4,
-};
+const MAP_DEFAULTS = { ambient: 25, wind: 2, manning: 0.035, dryTime: 3600, groundScorch: 4, groundChar: 1, groundMud: 0.4 };
 type MapNumbers = typeof MAP_DEFAULTS;
 const COLORS = ['scorch', 'char', 'ash', 'mud', 'debris'] as const;
 
 function checkNumber(name: string, v: unknown, [lo, hi, open]: [number, number, boolean?], what: string): number {
   if (typeof v !== 'number' || !Number.isFinite(v) || v > hi || (open ? v <= lo : v < lo))
-    throw rangeError(
-      `${what} ${name} must be a number ${open ? 'above' : 'from'} ${lo}${hi < 1e9 ? ` ${open ? 'and at most' : 'to'} ${hi}` : ''}`,
-      'scatter',
-    );
+    throw rangeError(`${what} ${name} must be a number ${open ? 'above' : 'from'} ${lo}${hi < 1e9 ? ` ${open ? 'and at most' : 'to'} ${hi}` : ''}`, 'scatter');
   return v;
 }
 function checkColor(name: string, v: unknown): Color {
@@ -192,8 +175,7 @@ function checkColor(name: string, v: unknown): Color {
   return [v[0], v[1], v[2]];
 }
 function checkMarks(marks: unknown): Partial<Record<keyof PlantMarks, number>> {
-  if (!marks || typeof marks !== 'object')
-    throw typeError('Plant marks must be an object such as { scorch: 3, ash: 1 }', 'scatter');
+  if (!marks || typeof marks !== 'object') throw typeError('Plant marks must be an object such as { scorch: 3, ash: 1 }', 'scatter');
   const out: Partial<Record<keyof PlantMarks, number>> = {};
   for (const [key, value] of Object.entries(marks)) {
     if (value === undefined) continue;
@@ -204,10 +186,7 @@ function checkMarks(marks: unknown): Partial<Record<keyof PlantMarks, number>> {
 }
 function checkRect(name: string, b: unknown): Rect {
   if (!Array.isArray(b) || b.length !== 4 || !b.every(Number.isFinite) || b[2] <= b[0] || b[3] <= b[1])
-    throw rangeError(
-      `Plant states ${name} must be a world rectangle [minX, minZ, maxX, maxZ] with max above min`,
-      'scatter',
-    );
+    throw rangeError(`Plant states ${name} must be a world rectangle [minX, minZ, maxX, maxZ] with max above min`, 'scatter');
   return [b[0], b[1], b[2], b[3]];
 }
 
@@ -346,10 +325,7 @@ export function plantStatePoseCode(code: string, group: number, binding: number)
     code
       .slice(at)
       .replace(POSED, POSED + SHAPE)
-      .replace(
-        RETURN,
-        'var plantOut=ScatterPose(world,$1);plantOut.normal=plantTurn(plantOut.normal,plantK,plantA);return plantOut;',
-      );
+      .replace(RETURN, 'var plantOut=ScatterPose(world,$1);plantOut.normal=plantTurn(plantOut.normal,plantK,plantA);return plantOut;');
   if (out.includes('o.color=')) {
     if (!/o\.color=[^;]+;/.test(out) || !out.includes('let data=instances['))
       throw typeError('plantStatePoseCode takes a scatter vertex stage', 'scatter');
@@ -397,11 +373,7 @@ export function fireSource(fire: FireLike): FireStateSource {
 interface FloodLike {
   readonly wetTexture?: GPUTexture;
   readonly velocityTexture?: GPUTexture;
-  readonly options: {
-    readonly surface: {
-      readonly options: { readonly terrain?: { origin: readonly number[]; size: readonly number[] } };
-    };
-  };
+  readonly options: { readonly surface: { readonly options: { readonly terrain?: { origin: readonly number[]; size: readonly number[] } } } };
 }
 /** The plant state source of a Flood: its wetting record and current over its terrain. */
 export function floodSource(flood: FloodLike): FloodStateSource {
@@ -455,8 +427,7 @@ export class PlantStates implements Disposable {
   }
   constructor(engine: EngineKernel, options: PlantStatesOptions) {
     if (!engine || typeof engine !== 'object') throw typeError('PlantStates needs an engine', 'scatter');
-    if (!options || typeof options !== 'object')
-      throw typeError('PlantStates options must be an object with bounds', 'scatter');
+    if (!options || typeof options !== 'object') throw typeError('PlantStates options must be an object with bounds', 'scatter');
     this.bounds = checkRect('bounds', options.bounds);
     const r = options.resolution ?? 256,
       res = typeof r === 'number' ? [r, r] : r;
@@ -486,14 +457,10 @@ export class PlantStates implements Disposable {
   /** Replaces the fire, flood and ground sources (a key left out removes that source). */
   setSources(sources: Pick<PlantStatesOptions, 'fire' | 'flood' | 'ground'>): this {
     const { fire, flood, ground } = sources;
-    if (fire !== undefined && typeof fire?.texture !== 'function')
-      throw typeError('PlantStates fire needs texture: () => GPUTexture', 'scatter');
-    if (flood !== undefined && typeof flood?.wet !== 'function')
-      throw typeError('PlantStates flood needs wet: () => GPUTexture', 'scatter');
-    if (flood?.velocity !== undefined && typeof flood.velocity !== 'function')
-      throw typeError('PlantStates flood velocity must be a function', 'scatter');
-    if (ground !== undefined && typeof ground?.covers !== 'function')
-      throw typeError('PlantStates ground needs covers: () => GPUTexture', 'scatter');
+    if (fire !== undefined && typeof fire?.texture !== 'function') throw typeError('PlantStates fire needs texture: () => GPUTexture', 'scatter');
+    if (flood !== undefined && typeof flood?.wet !== 'function') throw typeError('PlantStates flood needs wet: () => GPUTexture', 'scatter');
+    if (flood?.velocity !== undefined && typeof flood.velocity !== 'function') throw typeError('PlantStates flood velocity must be a function', 'scatter');
+    if (ground !== undefined && typeof ground?.covers !== 'function') throw typeError('PlantStates ground needs covers: () => GPUTexture', 'scatter');
     if (fire) checkRect('fire.bounds', fire.bounds);
     if (flood) checkRect('flood.bounds', flood.bounds);
     if (ground) checkRect('ground.bounds', ground.bounds);
@@ -659,21 +626,13 @@ export class PlantStates implements Disposable {
     this.#uniform ??= d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     d.queue.writeBuffer(this.#uniform, 0, this.#words);
     this.#kernel ??= compute(d, composeShader);
-    this.#blank ??= d.createTexture({
-      size: [1, 1],
-      format: 'rgba32float',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
+    this.#blank ??= d.createTexture({ size: [1, 1], format: 'rgba32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
     const textures = [fire, wet, flow, covers].map((t) => t ?? this.#blank!),
       key = textures.map(idOf).join('|');
     let bind = this.#groups.get(key);
     if (!bind) {
       if (this.#groups.size > 16) this.#groups.clear();
-      bind = group(d, this.#kernel, [
-        { buffer: this.#uniform },
-        { buffer: map },
-        ...textures.map((t) => t.createView()),
-      ]);
+      bind = group(d, this.#kernel, [{ buffer: this.#uniform }, { buffer: map }, ...textures.map((t) => t.createView())]);
       this.#groups.set(key, bind);
     }
     const pass = c.encoder.beginComputePass();
@@ -779,20 +738,8 @@ export class PlantStateSource implements ScatterStateSource, Disposable {
       this.#uniform,
       0,
       new Float32Array([
-        ...r.scorch,
-        r.crownBase,
-        ...r.char,
-        r.foliarMoisture,
-        ...r.ash,
-        r.trunkRadius,
-        ...r.mud,
-        r.stiffness,
-        ...r.debris,
-        r.flatten,
-        r.bareShrink,
-        r.wetDarkening,
-        r.stainBand,
-        r.edge,
+        ...r.scorch, r.crownBase, ...r.char, r.foliarMoisture, ...r.ash, r.trunkRadius,
+        ...r.mud, r.stiffness, ...r.debris, r.flatten, r.bareShrink, r.wetDarkening, r.stainBand, r.edge,
       ]),
     );
     this.#dirty = false;
@@ -819,167 +766,48 @@ export interface PlantStateSetting extends SettingRow {
   readonly group: PlantStateSettingGroup;
   readonly default: number | Color;
 }
-const num = (
-  name: string,
-  group: PlantStateSettingGroup,
-  value: number,
-  min: number,
-  max: number,
-  step: number,
-  unit: string,
-  about: string,
-) => numberSetting(name, group, value, min, max, step, unit, about) as PlantStateSetting;
+const num = (name: string, group: PlantStateSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string) =>
+  numberSetting(name, group, value, min, max, step, unit, about) as PlantStateSetting;
 /**
  * The plant state controls on the shared slider row shape, all live (read from the next frame). The `fire`, `flood` and
  * `ground` rows set a {@link PlantStates} map; the `plant` and `colors` rows a {@link PlantStateSource}.
  */
 export const PLANT_STATE_SETTINGS: readonly PlantStateSetting[] = [
-  num(
-    'fire.ambient',
-    'fire',
-    25,
-    -40,
-    59,
-    1,
-    'deg C',
-    'Air temperature at the fire: hotter air leaves less heat needed to kill foliage, so it scorches higher (Van Wagner 1973).',
-  ),
-  num(
-    'fire.wind',
-    'fire',
-    2,
-    0,
-    40,
-    0.1,
-    'm/s',
-    'Midflame wind: it bends and cools the plume, so the scorch is lower.',
-  ),
-  num(
-    'flood.manning',
-    'flood',
-    0.035,
-    0.01,
-    0.2,
-    0.001,
-    '',
-    "Manning's n of the flooded ground: rougher ground puts more shear on the plants at one speed.",
-  ),
-  num(
-    'flood.dryTime',
-    'flood',
-    3600,
-    1,
-    864000,
-    1,
-    's',
-    'Seconds for flood wetness to fall to 1/e once the water has gone.',
-  ),
+  num('fire.ambient', 'fire', 25, -40, 59, 1, 'deg C', 'Air temperature at the fire: hotter air leaves less heat needed to kill foliage, so it scorches higher (Van Wagner 1973).'),
+  num('fire.wind', 'fire', 2, 0, 40, 0.1, 'm/s', 'Midflame wind: it bends and cools the plume, so the scorch is lower.'),
+  num('flood.manning', 'flood', 0.035, 0.01, 0.2, 0.001, '', "Manning's n of the flooded ground: rougher ground puts more shear on the plants at one speed."),
+  num('flood.dryTime', 'flood', 3600, 1, 864000, 1, 's', 'Seconds for flood wetness to fall to 1/e once the water has gone.'),
   num('ground.scorch', 'ground', 4, 0, 100, 0.1, 'm', 'Scorch height of a fully charred GroundChange burn cell.'),
   num('ground.char', 'ground', 1, 0, 100, 0.05, 'm', 'Char height of a fully charred GroundChange burn cell.'),
   num('ground.mud', 'ground', 0.4, 0, 100, 0.01, 'm', 'High-water mark of a full GroundChange mud cell.'),
-  num(
-    'plant.crownBase',
-    'plant',
-    0,
-    0,
-    100,
-    0.1,
-    'm',
-    'Crown base height: a crown fire needs (0.010 CBH (460 + 25.9 FMC))^1.5 kW/m (Van Wagner 1977). 0 burns the whole plant.',
-  ),
-  num(
-    'plant.foliarMoisture',
-    'plant',
-    100,
-    50,
-    300,
-    1,
-    '%',
-    'Foliar moisture: wetter needles need a hotter fire to crown.',
-  ),
-  num(
-    'plant.trunkRadius',
-    'plant',
-    0.1,
-    0,
-    1000,
-    0.01,
-    'mesh units',
-    'Vertices this near the axis are stem (charred, never stripped); the rest is crown.',
-  ),
-  num(
-    'plant.stiffness',
-    'plant',
-    0.05,
-    0.0001,
-    1e7,
-    0.0001,
-    'N m^2',
-    'Flexural rigidity MEI: the flow flattens the plant past the critical shear velocity of Kouwen and Li 1980.',
-  ),
+  num('plant.crownBase', 'plant', 0, 0, 100, 0.1, 'm', 'Crown base height: a crown fire needs (0.010 CBH (460 + 25.9 FMC))^1.5 kW/m (Van Wagner 1977). 0 burns the whole plant.'),
+  num('plant.foliarMoisture', 'plant', 100, 50, 300, 1, '%', 'Foliar moisture: wetter needles need a hotter fire to crown.'),
+  num('plant.trunkRadius', 'plant', 0.1, 0, 1000, 0.01, 'mesh units', 'Vertices this near the axis are stem (charred, never stripped); the rest is crown.'),
+  num('plant.stiffness', 'plant', 0.05, 0.0001, 1e7, 0.0001, 'N m^2', 'Flexural rigidity MEI: the flow flattens the plant past the critical shear velocity of Kouwen and Li 1980.'),
   num('plant.flatten', 'plant', 1.4, 0, Math.PI / 2, 0.01, 'rad', 'Turn of a fully flattened plant about its root.'),
-  num(
-    'plant.bareShrink',
-    'plant',
-    0.85,
-    0,
-    1,
-    0.01,
-    '',
-    'Share of its reach a fully consumed crown loses toward the stem (bare branches).',
-  ),
-  num(
-    'plant.wetDarkening',
-    'plant',
-    0.55,
-    0,
-    1,
-    0.01,
-    '',
-    'Albedo of fully wet parts below the water mark (1 is no darkening).',
-  ),
+  num('plant.bareShrink', 'plant', 0.85, 0, 1, 0.01, '', 'Share of its reach a fully consumed crown loses toward the stem (bare branches).'),
+  num('plant.wetDarkening', 'plant', 0.55, 0, 1, 0.01, '', 'Albedo of fully wet parts below the water mark (1 is no darkening).'),
   num('plant.stainBand', 'plant', 0.06, 0, 10, 0.01, 'm', 'Height of the darker stain line above the water mark.'),
   num('plant.edge', 'plant', 0.12, 0.001, 10, 0.01, 'm', 'Soft edge of the scorch and char lines.'),
-  ...COLORS.map(
-    (name) =>
-      colorSetting(
-        `colors.${name}`,
-        'colors',
-        RESPONSE[name],
-        0,
-        1,
-        {
-          scorch: 'Heat-killed foliage (red-brown dead needles and leaves).',
-          char: 'Charred bark and stripped crowns (albedo about 0.02 to 0.04).',
-          ash: 'Ash settled on upward faces.',
-          mud: 'Flood mud below the water mark.',
-          debris: 'Debris caught on upstream faces.',
-        }[name],
-      ) as PlantStateSetting,
-  ),
+  ...COLORS.map((name) => colorSetting(`colors.${name}`, 'colors', RESPONSE[name], 0, 1, {
+    scorch: 'Heat-killed foliage (red-brown dead needles and leaves).',
+    char: 'Charred bark and stripped crowns (albedo about 0.02 to 0.04).',
+    ash: 'Ash settled on upward faces.',
+    mud: 'Flood mud below the water mark.',
+    debris: 'Debris caught on upstream faces.',
+  }[name]) as PlantStateSetting),
 ];
 const BY_NAME = settingIndex(PLANT_STATE_SETTINGS) as Map<string, PlantStateSetting>;
 const MAP_KEYS: Record<string, keyof MapNumbers> = {
-  'fire.ambient': 'ambient',
-  'fire.wind': 'wind',
-  'flood.manning': 'manning',
-  'flood.dryTime': 'dryTime',
-  'ground.scorch': 'groundScorch',
-  'ground.char': 'groundChar',
-  'ground.mud': 'groundMud',
+  'fire.ambient': 'ambient', 'fire.wind': 'wind', 'flood.manning': 'manning', 'flood.dryTime': 'dryTime',
+  'ground.scorch': 'groundScorch', 'ground.char': 'groundChar', 'ground.mud': 'groundMud',
 };
 /** Named looks, each only values of {@link PLANT_STATE_SETTINGS}. */
 export const PLANT_STATE_LOOKS = {
   /** Today's defaults. */
   natural: {},
   /** Old-growth conifers: high crown base, wet needles, stiff trunks (a surface fire scorches, it seldom crowns). */
-  conifer: {
-    'plant.crownBase': 6,
-    'plant.foliarMoisture': 110,
-    'plant.trunkRadius': 0.15,
-    'plant.stiffness': 2e5,
-    'plant.flatten': 1.2,
-  },
+  conifer: { 'plant.crownBase': 6, 'plant.foliarMoisture': 110, 'plant.trunkRadius': 0.15, 'plant.stiffness': 2e5, 'plant.flatten': 1.2 },
   /** Chaparral and sage scrub: crown to the ground, dry foliage, bendable stems. */
   chaparral: { 'plant.crownBase': 0, 'plant.foliarMoisture': 70, 'plant.trunkRadius': 0.04, 'plant.stiffness': 5 },
   /** Grass and reeds: whole plant burns, lies flat in a modest flow. */
@@ -1007,8 +835,7 @@ export function applyPlantStateSettings(
   if (plant) {
     const r: Record<string, number | Color> = {};
     for (const row of PLANT_STATE_SETTINGS)
-      if (row.group === 'plant' || row.group === 'colors')
-        r[row.name.slice(row.name.indexOf('.') + 1)] = v(row.name) as number | Color;
+      if (row.group === 'plant' || row.group === 'colors') r[row.name.slice(row.name.indexOf('.') + 1)] = v(row.name) as number | Color;
     plant.set(r as PlantResponse);
   }
 }

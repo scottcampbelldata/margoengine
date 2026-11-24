@@ -43,13 +43,12 @@ test('zero shoulder contains the oblique review triangle and every interior heig
     b = [v[bi * 6], v[bi * 6 + 2]],
     c = [v[ci * 6], v[ci * 6 + 2]];
   const edge = (p, q, x, z) => (q[0] - p[0]) * (z - p[1]) - (q[1] - p[1]) * (x - p[0]);
-  let inside = 0,
-    reviewInside = 0;
+  let inside = 0, reviewInside = 0;
   for (let i = 0; i < ground.positions.length; i += 3) {
     const x = ground.positions[i],
       z = ground.positions[i + 2];
     const signs = [edge(a, b, x, z), edge(b, c, x, z), edge(c, a, x, z)];
-    if (signs.every((n) => n > 1e-5) || signs.every((n) => n < -1e-5)) reviewInside++;
+    if(signs.every(n=>n>1e-5)||signs.every(n=>n< -1e-5)) reviewInside++;
     if (signs.every((n) => n > 0) || signs.every((n) => n < 0)) {
       inside++;
       near(ground.positions[i + 1], 2, 'heightfield interior');

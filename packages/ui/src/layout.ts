@@ -371,13 +371,7 @@ interface Item {
 const alignOf = (node: LayoutNode): Align => node.style.align ?? (isRow(node) ? 'center' : 'stretch');
 
 /** Flex items of `flow` with their base sizes along `node`'s main axis. */
-function flexItems(
-  cache: SizeCache,
-  node: LayoutNode,
-  flow: LayoutNode[],
-  innerMain: number,
-  innerCross: number,
-): Item[] {
+function flexItems(cache: SizeCache, node: LayoutNode, flow: LayoutNode[], innerMain: number, innerCross: number): Item[] {
   const row = isRow(node),
     parentAlign = alignOf(node);
   return flow.map((child) => {
@@ -560,8 +554,7 @@ function placeLine(cache: SizeCache, node: LayoutNode, items: Item[], inner: Rec
     if (fixed !== undefined) cross = fixed;
     else if (crossStyle === 'fill' || align === 'stretch') cross = space;
     else cross = row ? heightAt(cache, it.child, it.size) : sizeOf(cache, it.child, space).width;
-    if (row && fixed === undefined && crossStyle !== 'fill' && align !== 'stretch')
-      cross = heightAt(cache, it.child, it.size);
+    if (row && fixed === undefined && crossStyle !== 'fill' && align !== 'stretch') cross = heightAt(cache, it.child, it.size);
     cross = clamp(cross, crossMin, crossMax);
     const crossPos = align === 'center' ? (space - cross) / 2 : align === 'end' ? space - cross : 0;
     const mainStart = (row ? inner.x : inner.y) + cursor + (row ? it.m[3] : it.m[0]),

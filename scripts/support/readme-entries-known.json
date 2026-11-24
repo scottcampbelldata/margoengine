@@ -67,7 +67,7 @@
   "voxel-edit": ["./formats-extra"],
   "voxel-net": ["./rooms","./replay","./webrtc","./server-runtimes"],
   "voxel-pathtracer": ["./mesh-pbr","./denoise-ml"],
-  "water": ["./ripples","./reflector","./rivers"],
+  "water": ["./ripples","./reflector","./underwater","./rivers"],
   "weather": ["./gltf"],
   "wfc": ["./assemble","./tileset","./overlapping3d","./hex"],
   "worker": ["./rpc","./auto"]

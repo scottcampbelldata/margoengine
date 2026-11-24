@@ -88,13 +88,7 @@ export function objectFit(
   if (fit === 'fill') return { rect: [...box], source: [0, 0, 1, 1] };
   const contain = Math.min(bw / pw, bh / ph),
     scale =
-      fit === 'contain'
-        ? contain
-        : fit === 'cover'
-          ? Math.max(bw / pw, bh / ph)
-          : fit === 'none'
-            ? 1
-            : Math.min(1, contain);
+      fit === 'contain' ? contain : fit === 'cover' ? Math.max(bw / pw, bh / ph) : fit === 'none' ? 1 : Math.min(1, contain);
   // The drawn picture's size in pixels, then the part of it inside the box (both centred).
   const dw = pw * scale,
     dh = ph * scale,
@@ -209,8 +203,7 @@ export class Video implements EnginePlugin {
   }
   private place(r: Rect, at: number, what: string): void {
     if (this.disposed) throw new MargoError('disposed', `Video is disposed; create a new Video before ${what}().`);
-    if (!inside(r))
-      throw new RangeError(`Video ${what} needs [x, y, width, height] inside 0 to 1 with a positive size`);
+    if (!inside(r)) throw new RangeError(`Video ${what} needs [x, y, width, height] inside 0 to 1 with a positive size`);
     this.rectangle.set(r, at);
     if (this.uniform) this.engine?.gpu?.queue.writeBuffer(this.uniform, 0, this.rectangle as Float32Array<ArrayBuffer>);
   }

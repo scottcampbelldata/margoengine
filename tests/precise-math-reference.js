@@ -497,10 +497,7 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
       uh = F(s * rh),
       [ux, uy] = twoSum(th, uh),
       tl = F(
-        F(
-          F(F(productError(s, hh, th) + F(s * hl)) + F(sl * hh)) +
-            F(F(productError(s, rh, uh) + F(s * rl)) + F(sl * rh)),
-        ) + uy,
+        F(F(F(productError(s, hh, th) + F(s * hl)) + F(sl * hh)) + F(F(productError(s, rh, uh) + F(s * rl)) + F(sl * rh))) + uy,
       );
     // log2(x) = e + log2(e) (f - hfsq + t), each product with log2(e) as an exact pair plus the small rest.
     const ah = F(f * LOG2E),

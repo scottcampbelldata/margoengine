@@ -520,20 +520,12 @@ window.runEnvironmentTests = async () => {
       second = await Environment.create(device, flat, lutOptions);
     assert(first.brdfLut === second.brdfLut, 'two environments of one device hold one BRDF LUT');
     first.dispose();
-    assert(
-      JSON.stringify(await bits(second.brdfLut)) === JSON.stringify(alone),
-      'the LUT changed when its first holder went',
-    );
+    assert(JSON.stringify(await bits(second.brdfLut)) === JSON.stringify(alone), 'the LUT changed when its first holder went');
     second.dispose();
     const third = await Environment.create(device, flat, lutOptions);
-    assert(
-      JSON.stringify(await bits(third.brdfLut)) === JSON.stringify(alone),
-      'a fresh fill differs from the shared LUT',
-    );
+    assert(JSON.stringify(await bits(third.brdfLut)) === JSON.stringify(alone), 'a fresh fill differs from the shared LUT');
     third.dispose();
-    report.checks.push(
-      'Environments of one device share one BRDF LUT, which outlives its first holder and equals a fresh fill',
-    );
+    report.checks.push('Environments of one device share one BRDF LUT, which outlives its first holder and equals a fresh fill');
   }
 
   // 4c. Every cell of the default 128 x 128 LUT (512 samples) against an f64 CPU integration of the same Hammersley
@@ -541,16 +533,12 @@ window.runEnvironmentTests = async () => {
   {
     const size = 128,
       samples = 512,
-      environment = await Environment.create(
-        device,
-        equirect(64, 32, () => [1, 1, 1]),
-        {
-          size: 16,
-          samples: 64,
-          brdfSize: size,
-          brdfSamples: samples,
-        },
-      ),
+      environment = await Environment.create(device, equirect(64, 32, () => [1, 1, 1]), {
+        size: 16,
+        samples: 64,
+        brdfSize: size,
+        brdfSamples: samples,
+      }),
       lut = await readLut(device, environment.brdfLut),
       expected = brdfHammersley(size, samples);
     environment.dispose();
@@ -570,15 +558,8 @@ window.runEnvironmentTests = async () => {
       }
     }
     assert(worst.excess <= 0, `BRDF LUT vs f64 Hammersley integration: ${JSON.stringify(worst)}`);
-    report.brdfHammersley = {
-      worstOverF16: worst.excess + LUT_F32_ALLOWANCE,
-      worstError: worst.error,
-      worstCell: [worst.x, worst.y, worst.c],
-      smoothRowsError: smoothRows,
-    };
-    report.checks.push(
-      'every BRDF LUT cell matches an f64 integration of the same Hammersley samples within f16 storage rounding',
-    );
+    report.brdfHammersley = { worstOverF16: worst.excess + LUT_F32_ALLOWANCE, worstError: worst.error, worstCell: [worst.x, worst.y, worst.c], smoothRowsError: smoothRows };
+    report.checks.push('every BRDF LUT cell matches an f64 integration of the same Hammersley samples within f16 storage rounding');
   }
 
   // 5. Background pass rendered directly: directions, rotation, exposure, blur, HDR and 8-bit outputs, depth.

@@ -34,22 +34,7 @@ test('a family is applied by name through each package apply function, to the pa
     weather = { set: (state) => (weather.state = state) },
     sand = { options: {} },
     smoke = { options: {} },
-    fire = {
-      particles: {
-        flames: {
-          options: {
-            size: 0.2,
-            intensity: 40,
-            curves: {
-              color: [
-                { at: 0, color: [1, 0.8, 0.3] },
-                { at: 1, color: [0.8, 0.2, 0.05] },
-              ],
-            },
-          },
-        },
-      },
-    },
+    fire = { particles: { flames: { options: { size: 0.2, intensity: 40, curves: { color: [{ at: 0, color: [1, 0.8, 0.3] }, { at: 1, color: [0.8, 0.2, 0.05] }] } } } } },
     tonemap = { options: {} },
     grade = { options: {} };
   applyLookFamily('animatedFeature', { sky: { sky }, weather, sand, smoke, fire, tonemap: { tonemap, grade } });
@@ -73,17 +58,7 @@ test('a family is applied by name through each package apply function, to the pa
 });
 
 test('KB-VFX-FRONTSMOKE-LOOK1: a fire front as the smoke part gets the look on its columns, their heat and radius kept', () => {
-  const column = {
-      options: {
-        heat: 3e8,
-        radius: 22,
-        lifetime: 300,
-        rate: 16,
-        stability: 1.5e-4,
-        color: [0.24, 0.22, 0.2],
-        opacity: 0.6,
-      },
-    },
+  const column = { options: { heat: 3e8, radius: 22, lifetime: 300, rate: 16, stability: 1.5e-4, color: [0.24, 0.22, 0.2], opacity: 0.6 } },
     front = {
       options: { wind: [12, 0] },
       smokeColumns: [column],

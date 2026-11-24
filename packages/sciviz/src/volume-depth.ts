@@ -6,9 +6,9 @@ import { ViewStates } from '../../shared/view-rect.js';
 import type { Drawable, GpuContext } from './render.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
-const captures = new WeakMap<object, VolumeDepthCapture>();
+const captures = new WeakMap<Engine, VolumeDepthCapture>();
 
-// One capture per scene, shared by the figures in it. Existing post captures are borrowed.
+// One capture per engine, shared by figures. Existing post captures are borrowed.
 export class VolumeDepthCapture implements EnginePlugin {
   readonly name = 'sciviz-volume-depth';
   readonly members = new Set<Drawable>();
@@ -31,31 +31,14 @@ export class VolumeDepthCapture implements EnginePlugin {
     },
   );
   #active: SceneTarget | undefined;
-  #key: object | undefined;
-  /**
-   * The capture of the scene `owner` (a plugin of a figure) lives in, made on first use in the engine's active scene, so
-   * call it inside `inSceneOf(engine, owner, ...)`; the engine's own scene without an owner.
-   */
-  static attach(engine: Engine, owner?: EnginePlugin): VolumeDepthCapture {
-    const scene = owner && engine.sceneOf?.(owner);
-    const key = scene && scene !== engine.scene ? scene : engine;
-    let capture = captures.get(key);
+  static attach(engine: Engine): VolumeDepthCapture {
+    let capture = captures.get(engine);
     if (!capture) {
-      const made = new VolumeDepthCapture();
-      capture = made;
-      made.#key = key;
-      engine.use(made);
-      captures.set(key, capture);
+      capture = new VolumeDepthCapture();
+      engine.use(capture);
+      captures.set(engine, capture);
     }
     return capture;
-  }
-  /** Takes an idle capture (no layer uses it) out of its scene and out of the cache; the next layer makes a new one. */
-  static release(engine: Engine, capture: VolumeDepthCapture): void {
-    if (capture.members.size || !capture.#key) return;
-    captures.delete(capture.#key);
-    capture.#key = undefined;
-    const scene = engine.sceneOf?.(capture);
-    if (scene) engine.removePlugin(capture.name, scene);
   }
   setup(engine: Engine): void {
     requireWebGPU(engine, 'Volume depth capture');

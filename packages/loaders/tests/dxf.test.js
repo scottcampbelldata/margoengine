@@ -275,15 +275,7 @@ test('regression: binary DXF before R13 has one-byte group codes, and the versio
   string(2, 'ENTITIES');
   string(0, 'LINE');
   string(8, '0');
-  for (const [code, value] of [
-    [10, 0],
-    [20, 0],
-    [30, 0],
-    [11, 3],
-    [21, 4],
-    [31, 0],
-  ])
-    double(code, value);
+  for (const [code, value] of [[10, 0], [20, 0], [30, 0], [11, 3], [21, 4], [31, 0]]) double(code, value);
   // 255 announces a two-byte code: 1000 is a string of extended data.
   bytes.push(255, 1000 & 255, 1000 >> 8, ...encoder.encode('note'), 0);
   string(0, 'ENDSEC');
@@ -296,28 +288,14 @@ test('regression: binary DXF before R13 has one-byte group codes, and the versio
 test('a SPLINE whose knots or weights cannot make a curve stays its control polygon', () => {
   const body = ['0', 'SECTION', '2', 'ENTITIES', '0', 'SPLINE', '71', '2', '72', '6', '73', '3'];
   for (const k of [0, 0, 0, 2, 1, 1]) body.push('40', String(k));
-  for (const [x, y] of [
-    [0, 0],
-    [1, 2],
-    [3, 0],
-  ])
-    body.push('10', String(x), '20', String(y), '30', '0');
+  for (const [x, y] of [[0, 0], [1, 2], [3, 0]]) body.push('10', String(x), '20', String(y), '30', '0');
   body.push('0', 'ENDSEC', '0', 'EOF');
   assert.equal(parseDXF(new TextEncoder().encode(body.join('\n'))).lines.positions.length, 4 * 3);
 });
 
 test('$INSUNITS 21 to 24 are the US survey foot, inch, yard and mile', () => {
   const unit = (code) =>
-    parseDXF(
-      new TextEncoder().encode(
-        dxf([
-          ...section('HEADER', [
-            [9, '$INSUNITS'],
-            [70, code],
-          ]),
-        ]),
-      ),
-    ).unit;
+    parseDXF(new TextEncoder().encode(dxf([...section('HEADER', [[9, '$INSUNITS'], [70, code]])]))).unit;
   assert.equal(unit(21), 1200 / 3937);
   assert.equal(unit(22), 100 / 3937);
   assert.equal(unit(23), 3600 / 3937);

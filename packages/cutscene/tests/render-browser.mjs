@@ -15,16 +15,12 @@ try {
   await waitReady(page, pageErrors);
   for (const format of ['webm', 'mp4']) {
     const { file, ...result } = await page.evaluate((name) => window.check(name), format);
-    if (process.env.MARGO_KEEP_VIDEO)
-      await writeFile(`${process.env.MARGO_KEEP_VIDEO}.${format}`, Uint8Array.from(file));
+    if (process.env.MARGO_KEEP_VIDEO) await writeFile(`${process.env.MARGO_KEEP_VIDEO}.${format}`, Uint8Array.from(file));
     assert.deepEqual(result.errors, [], 'no validation errors');
     assert.deepEqual(pageErrors, []);
     // 2 s at 30 frames a second, and frame i shows i / 30 exactly.
     assert.equal(result.frames, 60);
-    assert.deepEqual(
-      result.times,
-      Array.from({ length: 60 }, (_, i) => i / 30),
-    );
+    assert.deepEqual(result.times, Array.from({ length: 60 }, (_, i) => i / 30));
     assert.equal(result.progress.at(-1), 60);
     assert.ok(Math.abs(result.duration - 2) < 0.1, `duration ${result.duration}`);
     // The player fired every instant once, in order, on the file's own clock.

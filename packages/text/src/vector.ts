@@ -9,24 +9,12 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 import { overlayPass } from '../../shared/pass.js';
-import { createFrameUniform } from '../../shared/frame-uniform.js';
 import { GlyphFieldFont, type GlyphFieldFontLoadOptions, type GlyphFieldFontOptions } from './outline.js';
 import { Text } from './text.js';
 import { toQuadratics, VectorGlyphStore, type VectorGlyph } from './vector-glyph.js';
 import { vectorTextShader } from './vector-shader.js';
 
-export {
-  toQuadratics,
-  vectorCoverage,
-  VectorGlyphStore,
-  CUBIC_TOLERANCE,
-  MAX_BANDS,
-  BAND_TARGET,
-  ROOT_CODES,
-  WINDOW_SLOTS,
-  DEFAULT_RAYS,
-  SMALL_PPEM,
-} from './vector-glyph.js';
+export { toQuadratics, vectorCoverage, VectorGlyphStore, CUBIC_TOLERANCE, MAX_BANDS, BAND_TARGET, ROOT_CODES, WINDOW_SLOTS, DEFAULT_RAYS, SMALL_PPEM } from './vector-glyph.js';
 export type { Quadratic, VectorGlyph, VectorCoverageOptions } from './vector-glyph.js';
 export { vectorTextShader } from './vector-shader.js';
 
@@ -35,10 +23,8 @@ declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number } | undefined;
 
 const STAGE_VERTEX = typeof GPUShaderStage !== 'undefined' ? GPUShaderStage.VERTEX : 1;
 const STAGE_FRAGMENT = typeof GPUShaderStage !== 'undefined' ? GPUShaderStage.FRAGMENT : 2;
-const UNIFORM_COPY =
-  typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : 0x0040 | 0x0008;
-const STORAGE_COPY =
-  typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST : 0x0080 | 0x0008;
+const UNIFORM_COPY = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : 0x0040 | 0x0008;
+const STORAGE_COPY = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST : 0x0080 | 0x0008;
 const GLYPH_FLOATS = 12,
   BLOCK_BYTES = 160,
   FRAME_BYTES = 112;
@@ -181,12 +167,7 @@ export class VectorTextRenderer implements EnginePlugin {
   private readonly view = new Float32Array(16);
   private readonly depthTexts: Array<Resources> = [];
   private readonly topTexts: Array<Resources> = [];
-  private readonly frameTexts: Array<{
-    text: Text;
-    font: VectorFont;
-    parent: Float32Array | null;
-    built?: { data: Float32Array; count: number };
-  }> = [];
+  private readonly frameTexts: Array<{ text: Text; font: VectorFont; parent: Float32Array | null; built?: { data: Float32Array; count: number } }> = [];
   private readonly descriptor = overlayPass();
   private readonly colorAttachment = this.descriptor.colorAttachments[0];
   private readonly depthAttachment = this.descriptor.depthStencilAttachment;
@@ -204,9 +185,7 @@ export class VectorTextRenderer implements EnginePlugin {
     this.dilation = options.dilation ?? 0;
     this.rays = options.rays ?? 'auto';
     if (!this.name || typeof this.name !== 'string' || !Number.isFinite(this.order))
-      throw new TypeError(
-        'Invalid VectorTextRenderer options; give name a non-empty string and order a finite number.',
-      );
+      throw new TypeError('Invalid VectorTextRenderer options; give name a non-empty string and order a finite number.');
     this.checkOptions();
   }
 
@@ -253,29 +232,21 @@ export class VectorTextRenderer implements EnginePlugin {
     const block = device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: both, buffer: { type: 'uniform', minBindingSize: BLOCK_BYTES } },
-        {
-          binding: 1,
-          visibility: STAGE_VERTEX,
-          buffer: { type: 'read-only-storage', minBindingSize: GLYPH_FLOATS * 4 },
-        },
+        { binding: 1, visibility: STAGE_VERTEX, buffer: { type: 'read-only-storage', minBindingSize: GLYPH_FLOATS * 4 } },
         { binding: 2, visibility: STAGE_FRAGMENT, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
       ],
     });
     this.layouts = { frame, block, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, block] }) };
     this.module = device.createShaderModule({ code: vectorTextShader });
-    [this.frameBuffer, this.frameGroup] = createFrameUniform(device, frame, FRAME_BYTES, UNIFORM_COPY);
+    this.frameBuffer = device.createBuffer({ size: FRAME_BYTES, usage: UNIFORM_COPY });
+    this.frameGroup = device.createBindGroup({ layout: frame, entries: [{ binding: 0, resource: { buffer: this.frameBuffer } }] });
   }
 
   registerPasses(graph: FrameGraph): void {
     graph.add({ name: `${this.name}:draw`, order: this.order, execute: this.execute });
   }
 
-  private pipeline(
-    format: GPUTextureFormat,
-    depthFormat: GPUTextureFormat,
-    onTop: boolean,
-    count: number,
-  ): GPURenderPipeline {
+  private pipeline(format: GPUTextureFormat, depthFormat: GPUTextureFormat, onTop: boolean, count: number): GPURenderPipeline {
     const key = `${format}|${depthFormat}|${onTop}|${count}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -287,11 +258,7 @@ export class VectorTextRenderer implements EnginePlugin {
         fragment: { module, entryPoint: 'fragment', targets: [{ format, blend: { color: blend, alpha: blend } }] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
         multisample: { count },
-        depthStencil: {
-          format: depthFormat,
-          depthWriteEnabled: false,
-          depthCompare: onTop ? 'always' : 'greater-equal',
-        },
+        depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: onTop ? 'always' : 'greater-equal' },
       });
       this.pipelines.set(key, pipeline);
     }
@@ -307,30 +274,16 @@ export class VectorTextRenderer implements EnginePlugin {
     if (!gpu || gpu.capacity < bytes) {
       const limit = device.limits.maxStorageBufferBindingSize;
       if (bytes > limit)
-        throw new MargoError(
-          'unsupported',
-          `VectorFont bands need ${bytes} bytes, over this device's ${limit}-byte storage binding limit; draw fewer distinct glyphs per font`,
-        );
+        throw new MargoError('unsupported', `VectorFont bands need ${bytes} bytes, over this device's ${limit}-byte storage binding limit; draw fewer distinct glyphs per font`);
       let capacity = Math.max(65536, gpu?.capacity ?? 0);
       while (capacity < bytes) capacity *= 2;
       capacity = Math.min(capacity, limit - (limit % 16));
       gpu?.buffer.destroy();
-      gpu = {
-        buffer: device.createBuffer({ size: capacity, usage: STORAGE_COPY }),
-        capacity,
-        uploaded: 0,
-        generation: (gpu?.generation ?? 0) + 1,
-      };
+      gpu = { buffer: device.createBuffer({ size: capacity, usage: STORAGE_COPY }), capacity, uploaded: 0, generation: (gpu?.generation ?? 0) + 1 };
       this.fonts.set(font, gpu);
     }
     if (gpu.uploaded < store.length) {
-      device.queue.writeBuffer(
-        gpu.buffer,
-        gpu.uploaded * 4,
-        store.data as Uint32Array<ArrayBuffer>,
-        gpu.uploaded,
-        store.length - gpu.uploaded,
-      );
+      device.queue.writeBuffer(gpu.buffer, gpu.uploaded * 4, store.data as Uint32Array<ArrayBuffer>, gpu.uploaded, store.length - gpu.uploaded);
       this.stats.bufferWrites++;
       this.stats.bytesWritten += (store.length - gpu.uploaded) * 4;
       gpu.uploaded = store.length;
@@ -342,8 +295,7 @@ export class VectorTextRenderer implements EnginePlugin {
     const device = this.device!;
     let r = this.resources.get(text);
     if (r && r.capacity >= count && r.font === font && r.fontGeneration === gpu.generation) return r;
-    const capacity =
-      r && r.capacity >= count ? r.capacity : Math.max(16, 2 ** Math.ceil(Math.log2(Math.max(1, count))));
+    const capacity = r && r.capacity >= count ? r.capacity : Math.max(16, 2 ** Math.ceil(Math.log2(Math.max(1, count))));
     const created: GPUBuffer[] = [];
     try {
       const make = (size: number, usage: number) => {
@@ -464,19 +416,14 @@ export class VectorTextRenderer implements EnginePlugin {
       text.validate();
       if (text.outlineWidth > 0 && text.outlineOpacity > 0 && !warnedOutline) {
         warnedOutline = true;
-        console.warn(
-          '@margoengine/text/vector: outlineWidth is not drawn by VectorTextRenderer; use TextRenderer for outlined text.',
-        );
+        console.warn('@margoengine/text/vector: outlineWidth is not drawn by VectorTextRenderer; use TextRenderer for outlined text.');
       }
       const mesh = text.attachedMesh,
         parent = mesh ? meshWorldMatrix(engine, mesh) : null;
       if (mesh && !parent) continue;
       text.layout;
       const r = this.resources.get(text),
-        built =
-          !r || r.written !== text.layoutVersion || r.font !== font
-            ? this.build(text, font, r?.instances ?? new Float32Array(0))
-            : undefined;
+        built = !r || r.written !== text.layoutVersion || r.font !== font ? this.build(text, font, r?.instances ?? new Float32Array(0)) : undefined;
       frame.push({ text, font, parent, built });
     }
     for (const entry of frame) this.syncFont(entry.font);

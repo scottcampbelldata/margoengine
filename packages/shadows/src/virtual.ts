@@ -391,21 +391,22 @@ export class VirtualShadows implements EnginePlugin {
     }
     const taken = this.sources.find((r) => r.source === runtime);
     // A mesh the walk below another node already casts becomes this source; the walk skips it from the next frame.
-    if (taken && !taken.grouped) throw new MargoError('attached', 'Duplicate shadow source; add each source once');
+    if (taken && !taken.grouped)
+      throw new MargoError('attached', 'Duplicate shadow source; add each source once');
     if (taken) this.unregister(taken);
     const r = this.register(runtime, { static: cached, castShadow, receiveShadow });
     // A mesh with its own geometry casts itself and every mesh below it, those parented later too.
-    const unwatch =
-      'id' in runtime && (runtime as unknown as Mesh).geometry
-        ? this.below(runtime as unknown as Mesh, { static: cached, castShadow, receiveShadow })
-        : undefined;
+    const unwatch = 'id' in runtime && (runtime as unknown as Mesh).geometry ? this.below(runtime as unknown as Mesh, { static: cached, castShadow, receiveShadow }) : undefined;
     return () => {
       unwatch?.();
       this.unregister(r);
     };
   }
   /** Casts every mesh with geometry below `node` with `options`, as they are parented and until the remover runs. */
-  private below(node: Mesh, options: { static: boolean; castShadow: boolean; receiveShadow: boolean }): () => void {
+  private below(
+    node: Mesh,
+    options: { static: boolean; castShadow: boolean; receiveShadow: boolean },
+  ): () => void {
     return this.groups.add(
       node,
       (mesh) => {
@@ -602,8 +603,7 @@ export class VirtualShadows implements EnginePlugin {
       { binding: 3, resource: this.sampler },
       { binding: 31, resource: this.tableTexture.createView({ dimension: '2d-array' }) },
     ];
-    for (const effect of this.effects)
-      effect.setup?.(device, { width: size, height: size, layers: 1, engine: this.engine });
+    for (const effect of this.effects) effect.setup?.(device, { width: size, height: size, layers: 1, engine: this.engine });
     this.entries.push(...effectEntries(this.effects as readonly ShadowEffect[]));
     if ((o.filter ?? 'soft') === 'soft' && compatibilityLevel(device))
       this.entries.push({ binding: 30, resource: poolView });

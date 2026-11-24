@@ -118,7 +118,7 @@ test('render pass clears of a layer of a 6-layer texture are draws there; a sing
 // binary16 by truncation before an 8 or 10-bit UNORM conversion: a draw clear of 0.1 into rgba8unorm stored 25 where
 // native WebGPU's clear stores 26 (features-browser.mjs clearByDraw, 16 of 60 clears one step low). The draw now
 // writes the colour rounded to the format's steps, which survives that narrowing on any GPU.
-test("a clear by draw writes the colour rounded to the target format's steps", async () => {
+test('a clear by draw writes the colour rounded to the target format\'s steps', async () => {
   const gl = losingContext();
   const { device: d } = await device(gl);
   const clearOf = (format, clearValue) => {

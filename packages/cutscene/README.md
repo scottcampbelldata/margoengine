@@ -153,6 +153,60 @@ engine.render({ delta: 1 / 30 });
 - Exact only for state that is a clock. History on the GPU (particles alive, foam, ripples) and history of the view
   (TAA, auto exposure) come from the scene's own warm-up frames; `docs/limits.md` lists each with its bound.
 
+## Film captions and chapter cards
+
+A documentary shows its words on film time: captions under the narration, a chapter card at each chapter ("03 / 13",
+the title and a place and date line) and a closing card. `@margoengine/cutscene/film-titles` draws them with
+`@margoengine/ui`, as a pure function of film time, so a film rendered shot by shot (each shot a fresh page started at
+its own film time) shows exactly what one continuous run shows at that second.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { FilmTitles, filmTitlesAt } from 'margoengine/cutscene/film-titles';
+import { parseSrt } from 'margoengine/text/captions';
+import { Ui, UiRenderer } from 'margoengine/ui';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const ui = new Ui({ scale: { reference: [1920, 1080], match: 0.5 } });
+UiRenderer.attach(engine, ui);
+const srt = '1\n00:00:01,000 --> 00:00:04,000\nNovember 1944.\n';
+const titles = new FilmTitles(ui, {
+  title: 'Fauld',
+  cues: parseSrt(srt).cues,
+  chapters: [
+    { start: 0, title: 'Cold open', card: false },
+    { start: 43, title: 'Gentle country', place: 'Fauld, Staffordshire, 1944' },
+  ],
+  chapterCount: 13,
+  closing: { start: 880 },
+});
+// A shot that starts 44 s into the film shows the card "01 / 13" from its first frame.
+let filmTime = 44;
+engine.onFrame((_, dt) => {
+  filmTime += dt;
+  titles.update(filmTime);
+});
+filmTitlesAt(titles.spec, 2).caption; // { text: 'November 1944.', opacity: 1 }
+```
+
+- Cues are `{ start, end, text }`, `[start, end, text]` tuples or the cues of `@margoengine/text/captions`
+  (`{ start, end, lines }`, lines joined by newlines), in seconds, `end` exclusive; order does not matter, and where two
+  overlap the one that starts first shows.
+- Captions and cards fade in over `fadeIn` (default 0.22 s) and out over `fadeOut` (default 0.24 s), each held inside
+  half of a short cue so it still reaches full opacity. The closing card fades in over `closingFade` (default 1 s) and
+  stays.
+- Chapters are in film order. A card numbers each chapter by its place in the list from `firstNumber` (default 0, so a
+  cold open is 00) unless it sets `number`; the count is `chapterCount` (default the highest number), both padded to
+  two digits. A card holds `chapterHold` seconds (default 4, or the chapter's `hold`) and ends early at the next
+  chapter; `card: false` shows none.
+- The closing card's lines default to `defaultClosingLines(title)`: "Made with Margo Engine", the title and "Please
+  subscribe"; pass `closing.lines` (`{ text, size, color }`) for others.
+- The third argument sets the looks (`captionSize` 39, `titleSize` 64, `placeSize` 32, `numberSize` 30, `background`
+  `#111a23cf`, `captionMargin` `[0, 0, 74, 97]`, `cardMargin` `[0, 0, 200, 98]`, for a 1920 by 1080 reference UI).
+- A bad spec throws a `TypeError` when it is made ([film-titles](https://margoengine.com/errors#film-titles));
+  `checkFilmTitles(spec)` checks one without drawing. `dispose()` (or `using`) removes the panels from the UI, and
+  `update` after it throws a `MargoError` with code `disposed`.
+
 ## Playing
 
 `CutscenePlayer` adds a time and a signed `speed` (negative plays backwards; `reverse()` flips it) and fires

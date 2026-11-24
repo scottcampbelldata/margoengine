@@ -1,5 +1,5 @@
 // The former early colour resolve is the control. Compare every canvas byte within each backend;
-// no tolerance, timing, shader substitution or smaller workload.
+// no tolerance, timing, shader substitution or smaller workload. 
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { postBrowser } from './post-browser.mjs';

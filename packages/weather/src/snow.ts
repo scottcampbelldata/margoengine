@@ -104,12 +104,7 @@ export function validateSnow(o: SnowOptions): void {
 }
 
 /** Ground height and snow depth of `field` at world (x, z), bilinear between samples (the edge's within half a cell past it); undefined further out. */
-export function snowFieldAt(
-  field: SnowFieldSource,
-  x: number,
-  z: number,
-  slack = 0,
-): [ground: number, depth: number] | undefined {
+export function snowFieldAt(field: SnowFieldSource, x: number, z: number, slack = 0): [ground: number, depth: number] | undefined {
   const W = field.width,
     rx = (x - field.origin[0]) / field.cellSize,
     rz = (z - field.origin[1]) / field.cellSize;
@@ -141,29 +136,14 @@ export function snowFieldAt(
  * `slack` 0 (the shader reads the position at the centroid, on the triangle); a `slack` widens both tests by that
  * many metres (the x and z slack must be equal here).
  */
-export function snowFieldCover(
-  field: SnowFieldSource,
-  x: number,
-  y: number,
-  z: number,
-  cover: number,
-  band = 0.05,
-  slack: readonly [number, number, number] = [0, 0, 0],
-): number {
+export function snowFieldCover(field: SnowFieldSource, x: number, y: number, z: number, cover: number, band = 0.05, slack: readonly [number, number, number] = [0, 0, 0]): number {
   const g = snowFieldAt(field, x, z, Math.max(slack[0], slack[2]));
   if (!g || y - slack[1] > g[0] + g[1] + band) return cover;
   return smoothstep(0.003, 0.03, g[1]);
 }
 
 /** The lift of a vertex at world (x, y, z) with a field: the field's depth on its ground (within `band`), else {@link snowDepthAt} on flat ground. */
-export function snowFieldDepth(
-  field: SnowFieldSource,
-  x: number,
-  y: number,
-  z: number,
-  cover: number,
-  o: SnowOptions = {},
-): number {
+export function snowFieldDepth(field: SnowFieldSource, x: number, y: number, z: number, cover: number, o: SnowOptions = {}): number {
   const g = snowFieldAt(field, x, z);
   if (!g || y > g[0] + (o.band ?? 0.05)) return snowDepthAt(x, z, 1, cover, o);
   return g[1];
@@ -284,11 +264,7 @@ function centroidPosition(source: string): { source: string; name: string } | un
   return {
     name,
     source: source
-      .replace(
-        OUTPUT,
-        (_, body: string) =>
-          `struct Output {${body},@location(${next}) @interpolate(perspective,centroid) ${name}:vec3f}`,
-      )
+      .replace(OUTPUT, (_, body: string) => `struct Output {${body},@location(${next}) @interpolate(perspective,centroid) ${name}:vec3f}`)
       .replace(SET_POSITION, () => `${SET_POSITION}o.${name}=p.xyz;`),
   };
 }

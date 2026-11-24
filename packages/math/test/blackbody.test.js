@@ -38,10 +38,5 @@ test('chromaticityToLinearSRGB keeps the hue of a colour outside sRGB, and bad i
   assert.equal(c[0], 1);
   assert.ok(c[1] >= 0 && c[2] === 0);
   for (const kelvin of [1000, 1666, 25001, NaN, '2000']) assert.throws(() => blackbodyColor(kelvin), RangeError);
-  for (const [x, y] of [
-    [0.3, 0],
-    [0.7, 0.4],
-    [-0.1, 0.3],
-  ])
-    assert.throws(() => chromaticityToLinearSRGB(x, y), RangeError);
+  for (const [x, y] of [[0.3, 0], [0.7, 0.4], [-0.1, 0.3]]) assert.throws(() => chromaticityToLinearSRGB(x, y), RangeError);
 });

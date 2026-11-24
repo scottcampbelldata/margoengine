@@ -63,14 +63,7 @@ test('a timeline holds values, replaces them and lets go of what it drops', () =
 });
 
 test('the ring refuses a bad size', () => {
-  for (const args of [
-    [1],
-    [65537],
-    [2.5],
-    [4, new Float64Array(2)],
-    [4, new Float64Array(8), 0],
-    [4, new Float64Array(8), 3],
-  ])
+  for (const args of [[1], [65537], [2.5], [4, new Float64Array(2)], [4, new Float64Array(8), 0], [4, new Float64Array(8), 3]])
     assert.throws(() => new TimeRing(...args), RangeError, String(args));
   assert.throws(() => new Timeline(1), RangeError);
 });

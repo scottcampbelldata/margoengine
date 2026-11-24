@@ -862,7 +862,7 @@ try {
   assert.equal(exact.wrong, 0, 'the 1-texel checker reads back exactly');
   assert.equal(exact.colors, 2, 'no MSAA: a tilted box shows only its face colour and the background');
 
-  // The multi-view demos (examples/split-screen, minimap, hud-preview) held still by reduced motion: picks through each
+  // The multi-view demos (examples/split-screen, minimap) held still by reduced motion: picks through each
   // view hit what that view shows, a mesh on a layer a view leaves out is never picked through it, and the frame time
   // (median of 60 frames, each awaited on the GPU) is recorded.
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -894,15 +894,6 @@ try {
         [1, 0.5, 0.5, 'Car marker'],
       ],
     ],
-    [
-      'hud-preview',
-      'hudPreview',
-      [
-        [0, 0.5, 0.95, 'Ground'],
-        [1, 0.5, 0.92, 'Slot 2 icon'],
-        [2, 0.45, 0.25, 'Sapphire'],
-      ],
-    ],
   ]) {
     const before = errors.length;
     await page.goto(`${new URL(page.url()).origin}/examples/${file}.html`);
@@ -926,19 +917,6 @@ try {
       assert.ok(!(await scan(name, 1)).includes('Player 1 marker'), "player 2's view leaves out player 1's marker");
     if (file === 'minimap')
       assert.ok(!(await scan(name, 0)).includes('Car marker'), 'the chase view leaves out the map-only marker');
-    // Scenes and layers: the ruin never picks the HUD or the items; the preview draws only the selected item.
-    if (file === 'hud-preview') {
-      const ruin = await scan(name, 0),
-        preview = await scan(name, 2);
-      assert.ok(
-        !ruin.some((n) => /^(Health|Stamina|Slot|Crosshair|Gold|Sapphire|Potion|Key)/.test(n ?? '')),
-        'the ruin view draws only the default scene',
-      );
-      assert.ok(
-        preview.every((n) => n === null || /^(Gold band|Sapphire)$/.test(n)),
-        'the preview draws only the selected item',
-      );
-    }
     assert.deepEqual(errors.slice(before), [], `${file}: no page errors`);
   }
 

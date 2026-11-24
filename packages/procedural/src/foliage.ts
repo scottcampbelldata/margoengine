@@ -1,5 +1,4 @@
 import { coneGeometry, cylinderGeometry, sphereGeometry, icosahedronGeometry } from '@margoengine/geometry/primitives';
-import { createRandom } from '@margoengine/math/mathutils';
 import {
   geometryData,
   mergeGeometries,
@@ -10,7 +9,6 @@ import {
   applyMatrix4,
   type GeometryData,
 } from '@margoengine/geometry/utils';
-import { Noise } from './noise.js';
 
 export function placed(
   data: GeometryData,
@@ -494,22 +492,7 @@ function sprayWhorl(
       halfWidth = upright ? across : len * Math.tan((Math.PI / count) * 0.75),
       first = positions.length / 3;
     if (shoot) {
-      branchShoots(
-        positions,
-        uvs,
-        indices,
-        cx,
-        cy,
-        cz,
-        dx,
-        dz,
-        len,
-        halfWidth,
-        droop,
-        shoot,
-        (n) => hash(b * 131 + n),
-        upright,
-      );
+      branchShoots(positions, uvs, indices, cx, cy, cz, dx, dz, len, halfWidth, droop, shoot, (n) => hash(b * 131 + n), upright);
       continue;
     }
     const columns = upright ? 2 : across;
@@ -534,7 +517,9 @@ function sprayWhorl(
         indices.push(a, a + 1, c, c, a + 1, c + 1);
       }
   }
-  const data = computeVertexNormals(geometryData(positions, new Array<number>(positions.length).fill(0), uvs, indices));
+  const data = computeVertexNormals(
+    geometryData(positions, new Array<number>(positions.length).fill(0), uvs, indices),
+  );
   const n = data.normals,
     p = data.positions;
   for (let i = 0; i < p.length; i += 3) {
@@ -681,11 +666,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
         options?.shoots === true
           ? near
           : options?.shoots === 'coarse'
-            ? {
-                spacing: near.spacing * coarseFactor,
-                tooth: 0.15,
-                coarse: { widen: detail === 2 ? 1.55 : 1, ratio: coarseFactor },
-              }
+            ? { spacing: near.spacing * coarseFactor, tooth: 0.15, coarse: { widen: detail === 2 ? 1.55 : 1, ratio: coarseFactor } }
             : undefined;
     for (let tier = 0; tier < 6; tier++) {
       const y = 1.8 + tier * 0.9,
@@ -694,9 +675,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
         at = (h: number): [number, number, number] => [h * h * 0.008, h, Math.sin(h * 0.7) * 0.1];
       leaves.push(sprayWhorl(...at(top), reach, 7, tier * 2.399963, reach * 0.62, along, across, shoot));
       if (detail === 2)
-        leaves.push(
-          sprayWhorl(...at(top - 0.45), reach * 0.82, 5, tier * 2.399963 + 0.45, reach * 0.55, along, across, shoot),
-        );
+        leaves.push(sprayWhorl(...at(top - 0.45), reach * 0.82, 5, tier * 2.399963 + 0.45, reach * 0.55, along, across, shoot));
     }
     // The crown's top: the youngest whorl, where the next tier's would stand, the whorl between (detail 2), and the
     // leader above them. Their reach closes the crown from the last tier's to the leader's tip.
@@ -708,18 +687,7 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
     leaves.push(sprayWhorl(...at(whorl), reachAt(whorl), 5, 6 * 2.399963, reachAt(whorl) * 0.62, along, across, shoot));
     if (detail === 2) {
       const between = whorl - 0.45;
-      leaves.push(
-        sprayWhorl(
-          ...at(between),
-          reachAt(between),
-          5,
-          6 * 2.399963 + 0.45,
-          reachAt(between) * 0.55,
-          along,
-          across,
-          shoot,
-        ),
-      );
+      leaves.push(sprayWhorl(...at(between), reachAt(between), 5, 6 * 2.399963 + 0.45, reachAt(between) * 0.55, along, across, shoot));
     }
     leaves.push(sprayWhorl(...at(whorl), LEADER, 2, 0.3, 0, along, LEADER_HALF, shoot, true));
   } else if (kind === 'conifer') {
@@ -866,76 +834,9 @@ export function generateShrubMesh(options?: MeshDetailOptions): GeometryData {
   return computeTangents(mergeGeometries(lobes));
 }
 
-/** Dominant shape of a fieldstone. Pebbles are the more rounded, water-worn form. */
-export type RockForm = 'block' | 'slab' | 'wedge' | 'shard' | 'pebble';
-
-// Half-axis proportions, edge wear, pitch of the upper fracture and number of side fractures.
-const ROCK_FORMS = {
-  block: [1.02, 0.66, 0.79, 0.095, 0.19, 5],
-  slab: [1.24, 0.29, 0.87, 0.075, 0.11, 5],
-  wedge: [1.13, 0.53, 0.73, 0.08, 0.8, 4],
-  shard: [1.36, 0.43, 0.41, 0.065, 0.41, 4],
-  pebble: [0.93, 0.55, 0.76, 0.38, 0.18, 7],
-} as const satisfies Record<RockForm, readonly number[]>;
-const ROCK_FORM_ORDER: readonly RockForm[] = ['wedge', 'block', 'slab', 'shard', 'pebble'];
-
-/**
- * A fieldstone with fracture faces, softened edges and seeded proportions, centered on the placement origin (+Y up).
- * The mesh retains its UV layout, tangent frame and 180-triangle budget.
- * @param seed - Unsigned 32-bit seed for the proportions, fracture planes and weathering. Default 1.
- * @param form - Dominant shape. If omitted, the seed selects the form (seed 1 selects a block).
- * @throws RangeError for an invalid seed or form.
- */
-export function generateRockMesh(seed = 1, form?: RockForm): GeometryData {
-  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
-    throw new RangeError('Invalid rock seed; pass an integer from 0 to 4294967295.');
-  const shape = form === undefined ? ROCK_FORM_ORDER[seed % ROCK_FORM_ORDER.length] : form;
-  if (typeof shape !== 'string' || !Object.hasOwn(ROCK_FORMS, shape))
-    throw new RangeError('Invalid rock form; pass block, slab, wedge, shard or pebble.');
-  const random = createRandom(seed),
-    noise = new Noise(seed),
-    data = icosahedronGeometry(1, 2),
-    [halfX, halfY, halfZ, edgeWear, roofPitch, sideCount] = ROCK_FORMS[shape],
-    yaw = random() * 0.7 - 0.35,
-    length = halfX * (0.89 + 0.24 * random()),
-    height = halfY * (0.87 + 0.26 * random()),
-    width = halfZ * (0.86 + 0.25 * random()),
-    rounding = edgeWear * (0.85 + 0.35 * random()),
-    planes: Array<readonly [number, number, number, number]> = [
-      [roofPitch, 1, 0.26 * (random() - 0.5), 0.79 + 0.09 * random()],
-      [0.08 * (random() - 0.5), -1, 0, 0.73 + 0.07 * random()],
-    ];
-  // Broad joint faces set the form; narrow oblique cuts leave broken corners and unequal shoulders.
-  for (let side = 0; side < sideCount; side++) {
-    const angle = yaw + ((side + (random() - 0.5) * 0.56) * 2 * Math.PI) / sideCount,
-      tilt = 0.67 * (random() - 0.5);
-    planes.push([Math.cos(angle), tilt, Math.sin(angle), 0.74 + 0.23 * random()]);
-  }
-  const chip = yaw + (1 + 2 * random()) * Math.PI,
-    heel = chip + 1.6 + random() * 1.9;
-  planes.push([0.71 * Math.cos(chip), 0.72, 0.71 * Math.sin(chip), 0.68 + 0.23 * random()]);
-  planes.push([0.74 * Math.cos(heel), -0.66, 0.74 * Math.sin(heel), 0.72 + 0.21 * random()]);
-  for (let i = 0; i < data.positions.length; i += 3) {
-    const x = data.positions[i],
-      y = data.positions[i + 1],
-      z = data.positions[i + 2];
-    let face = -Infinity,
-      neighbour = -Infinity;
-    for (const [nx, ny, nz, distance] of planes) {
-      const plane = (nx * x + ny * y + nz * z) / distance;
-      if (plane > face) {
-        neighbour = face;
-        face = plane;
-      } else neighbour = Math.max(neighbour, plane);
-    }
-    // Smooth only around the closest two planes: rounding the whole shape loses the broad faces.
-    const edge = Math.max(0, rounding - (face - neighbour)),
-      wear = 0.045 * noise.simplex(2.1 * x, 3.2 * y, 2.6 * z) + 0.018 * noise.simplex(6 * x, 7 * y, 5 * z),
-      radius = (1 + wear) / (face + (edge * edge) / (4 * rounding));
-    data.positions[i] = x * radius * length;
-    data.positions[i + 1] = y * radius * height;
-    data.positions[i + 2] = z * radius * width;
-  }
+/** Deformed fieldstone with averaged surface normals and preserved UV seams. */
+export function generateRockMesh(): GeometryData {
+  const data = placed(perturb(icosahedronGeometry(1, 2)), 0, 0, 0, 1.15, 0.72, 0.82);
   const smooth = computeVertexNormals(mergeVertices(data, { positionOnly: true }));
   // Welding is only for normals; retain split UVs and triangle order in the rendered geometry.
   for (let i = 0; i < data.indices.length; i++) {

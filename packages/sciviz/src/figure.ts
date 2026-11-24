@@ -5,7 +5,6 @@
 // sciviz's own pipelines. A 2D chart looks straight down through an off-centre orthographic projection that maps the
 // data window onto the canvas inside its margins, and clips to that rectangle with the engine's view scissor.
 import { Engine } from '@margoengine/core';
-import type { EnginePlugin } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math/color';
 import type { EngineKernel } from '@margoengine/core';
 import type { PointCloud, PointsPlugin } from '@margoengine/points';
@@ -52,8 +51,7 @@ import {
 } from './layer.js';
 import { panWindow, zoomWindow } from './plot-window.js';
 import { positionBounds } from './extent.js';
-import { type Drawable, SciRenderer, requireGPU } from './render.js';
-import { inSceneOf } from './scene-owner.js';
+import { SciRenderer, requireGPU } from './render.js';
 import { SurfaceLayer, type SurfaceLayerOptions } from './surface.js';
 import { VolumeLayer, type VolumeLayerOptions } from './volume.js';
 
@@ -382,18 +380,6 @@ export class Figure extends EventTarget {
   #axes: Axes | undefined;
   #points: Promise<PointsPlugin> | undefined;
   #lines: Promise<Lines> | undefined;
-  // The lines and points plugins this figure added to the engine; it takes them out again when it is disposed.
-  readonly #plugins = new Set<EnginePlugin>();
-  // Ties the figure to its renderer: when the engine or the scene takes the renderer out, the figure's own state (the 2D
-  // views, the camera hook, the frame callback, the axes and panels) goes with it instead of staying on the engine.
-  readonly #lifetime: Drawable = {
-    visible: false,
-    transparent: false,
-    center: () => [0, 0, 0],
-    restore() {},
-    draw() {},
-    dispose: () => this.dispose(),
-  };
   #model: Float32Array;
   #bounds: Bounds = [-1, 1, -1, 1, -1, 1];
   #ownsEngine = false;
@@ -502,9 +488,7 @@ export class Figure extends EventTarget {
     this.#options = options;
     this.renderer = renderer ?? new SciRenderer();
     (engine as unknown as Engine).use(this.renderer);
-    this.renderer.add(this.#lifetime);
-    if (options.axes ?? true)
-      this.#axes = new Axes(engine, this.theme, options, () => this.#linesPlugin(), this.renderer);
+    if (options.axes ?? true) this.#axes = new Axes(engine, this.theme, options, () => this.#linesPlugin());
     this.#model = dataToScene(this.#bounds, aspect);
     const canvas = (engine as unknown as { canvas?: HTMLCanvasElement }).canvas;
     if (canvas) trackFigureCanvas(this, canvas);
@@ -628,9 +612,7 @@ export class Figure extends EventTarget {
       this.#check();
       this.#axes?.dispose();
       this.#axes =
-        options === false
-          ? undefined
-          : new Axes(this.engine, this.theme, options, () => this.#linesPlugin(), this.renderer);
+        options === false ? undefined : new Axes(this.engine, this.theme, options, () => this.#linesPlugin());
       await this.#axes?.update(this.#bounds, this.#model, this.#flat, this.#scales);
     });
     this.#pending = pending;
@@ -951,23 +933,10 @@ export class Figure extends EventTarget {
     return this.#model;
   }
 
-  // Keeps a plugin this figure added until it is disposed; one added after that (a layer was still loading) goes at once.
-  #own<P extends EnginePlugin>(plugin: P): P {
-    if (this.#disposed) this.#release(plugin);
-    else this.#plugins.add(plugin);
-    return plugin;
-  }
-
-  #release(plugin: EnginePlugin): void {
-    this.engine.sceneOf(plugin)?.removePlugin(plugin.name);
-  }
-
   // The one lines plugin per figure, shared by line layers and the axes.
   #linesPlugin(): Promise<Lines> {
     requireGPU(this.renderer);
-    return (this.#lines ??= import('@margoengine/lines').then(({ Lines }) =>
-      this.#own(inSceneOf(this.engine, this.renderer, () => Lines.attach(this.engine))),
-    ));
+    return (this.#lines ??= import('@margoengine/lines').then(({ Lines }) => Lines.attach(this.engine)));
   }
 
   /** Adds a layer built by an optional entry; it joins the figure's bounds and `remove()`. */
@@ -1186,11 +1155,7 @@ export class Figure extends EventTarget {
         ? map.sample(0.6)
         : this.#nextColour();
     const plugin = await (this.#points ??= import('@margoengine/points').then(({ PointsPlugin }) => {
-      const points = this.#own(
-        inSceneOf(this.engine, this.renderer, () =>
-          PointsPlugin.attach(this.engine, { pointBudget: this.#options.pointBudget ?? 2_000_000 }),
-        ),
-      );
+      const points = PointsPlugin.attach(this.engine, { pointBudget: this.#options.pointBudget ?? 2_000_000 });
       // Scatter sizes are CSS pixels, on screen and in export alike (SciRenderer.cssScale).
       points.pixelScale = (context) => this.renderer.cssScale(context.width);
       return points;
@@ -1983,8 +1948,6 @@ export class Figure extends EventTarget {
     for (const layer of layers) this.#free(layer);
     for (const bar of this.#bars) bar.dispose();
     this.#axes?.dispose();
-    for (const plugin of this.#plugins) this.#release(plugin);
-    this.#plugins.clear();
     this.#legend?.dispose();
     this.#timeline?.dispose();
     this.#offFrame?.();

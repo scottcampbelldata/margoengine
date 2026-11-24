@@ -130,9 +130,7 @@ export function customEase(data: EaseCurve | string): CustomEase {
     if (kind === 'bezier') {
       const s = solvers![i]((t - x0) / (x1 - x0)),
         r = 1 - s;
-      return (
-        r * r * r * y0 + 3 * r * r * s * points[i * 3 + 1][1] + 3 * r * s * s * points[i * 3 + 2][1] + s * s * s * y1
-      );
+      return r * r * r * y0 + 3 * r * r * s * points[i * 3 + 1][1] + 3 * r * s * s * points[i * 3 + 2][1] + s * s * s * y1;
     }
     const h = x1 - x0,
       u = (t - x0) / h,

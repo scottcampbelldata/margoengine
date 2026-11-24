@@ -43,24 +43,11 @@ await postBrowser(
       engineRuntime(engine).lighting.radiance.set([6, 5.5, 5, 0.3]);
       const white = new PbrMaterial({ color: '#f2f2f2', roughness: 0.4 });
       for (const [size, position] of [
-        [
-          [2, 2, 2],
-          [0, 1, 0],
-        ],
-        [
-          [0.6, 0.6, 0.6],
-          [1.6, 0.3, 1.2],
-        ],
-        [
-          [12, 0.2, 12],
-          [0, -0.1, 0],
-        ],
+        [[2, 2, 2], [0, 1, 0]],
+        [[0.6, 0.6, 0.6], [1.6, 0.3, 1.2]],
+        [[12, 0.2, 12], [0, -0.1, 0]],
       ])
-        engine
-          .createMesh()
-          .setGeometry(box(...size))
-          .setPosition(position)
-          .setMaterial(white);
+        engine.createMesh().setGeometry(box(...size)).setPosition(position).setMaterial(white);
       const device = engine.gpu;
       device.pushErrorScope('validation');
       const made = { pipelines: 0, buffers: 0, textures: 0 };
@@ -103,10 +90,7 @@ await postBrowser(
         contactShadows: () => ContactShadows.attach(engine),
         // A hot plume between the camera and the big box, so the rows bend the frame. Its clock is held (a plume's
         // `time`, as a Flame gives its own), so a frame is the rows' alone and not the effect's running clock.
-        heatHaze: () =>
-          HeatHaze.attach(engine, {
-            sources: [{ position: [1.2, 0, 2.2], length: 1.5, footprint: [0.6, 0.6], time: 0 }],
-          }),
+        heatHaze: () => HeatHaze.attach(engine, { sources: [{ position: [1.2, 0, 2.2], length: 1.5, footprint: [0.6, 0.6], time: 0 }] }),
         smaa: () => SMAA.attach(engine),
       };
       window.t = { engine, settings, cases, made, device };
@@ -155,10 +139,7 @@ await postBrowser(
             const values = {};
             for (const r of window.t.rows) {
               const base = r.default ?? FALLBACK[r.name];
-              if (r.kind === 'choice')
-                values[r.name] = r.name.endsWith('.enabled')
-                  ? 'on'
-                  : r.choices[Math.floor(u * 0.999 * r.choices.length)];
+              if (r.kind === 'choice') values[r.name] = r.name.endsWith('.enabled') ? 'on' : r.choices[Math.floor(u * 0.999 * r.choices.length)];
               else if (r.kind === 'color') values[r.name] = base.map((x) => Math.min(r.max, x * (1 - 0.4 * u)));
               else {
                 const to = TARGET[r.name] ?? Math.min(r.max, base * 1.5 + r.step);
@@ -241,8 +222,7 @@ await postBrowser(
         { group, name, value },
       );
       const after = await t(() => ({ ...window.t.made }));
-      rebuilt[name] =
-        after.pipelines + after.buffers + after.textures - (before.pipelines + before.buffers + before.textures);
+      rebuilt[name] = after.pipelines + after.buffers + after.textures - (before.pipelines + before.buffers + before.textures);
       await t(() => window.t.e.dispose());
     }
     // 4. Named looks change the frame of the glow they set.
@@ -274,19 +254,13 @@ await postBrowser(
     for (const [group, r] of Object.entries(result)) {
       assert.equal(r.control, 0, `${group}: the same effect twice draws the same frame`);
       assert.equal(r.defaultsDiffer, 0, `${group}: the defaults written leave the frame exact`);
-      assert.deepEqual(
-        r.counts.after,
-        r.counts.before,
-        `${group}: 60 frames of every live row made GPU objects: ${JSON.stringify(r.counts)}`,
-      );
+      assert.deepEqual(r.counts.after, r.counts.before, `${group}: 60 frames of every live row made GPU objects: ${JSON.stringify(r.counts)}`);
       assert.equal(r.onceDiffers, 0, `${group}: the sweep's last frame is what writing its values once draws`);
     }
     for (const group of ['bloom', 'lens', 'anamorphic', 'gtao', 'ssao', 'dof'])
       assert.ok(result[group].changed > 100, `${group}: the swept rows change the frame (${result[group].changed})`);
-    for (const [name, made] of Object.entries(rebuilt))
-      assert.ok(made > 0, `${name} is live: false because it makes GPU objects`);
-    for (const [look, changed] of Object.entries(looks))
-      assert.ok(changed > 100, `${look} changes the bloom frame (${changed})`);
+    for (const [name, made] of Object.entries(rebuilt)) assert.ok(made > 0, `${name} is live: false because it makes GPU objects`);
+    for (const [look, changed] of Object.entries(looks)) assert.ok(changed > 100, `${look} changes the bloom frame (${changed})`);
   },
   { seconds: 540 },
 );

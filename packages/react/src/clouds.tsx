@@ -12,7 +12,6 @@ import type { EngineKernel } from '@margoengine/core';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { subscribeFrame } from './frame-priority.js';
 import { live, report, useCommit, useMesh, useScene } from './internal.js';
-import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { fault } from '../../shared/errors.js';
 
@@ -106,7 +105,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
     optionalPeer('@margoengine/vfx', () => import('@margoengine/vfx/clouds'))
       .then(({ Clouds: Native }) => {
         if (!active || scene.engine.disposed) return;
-        made = inScene(scene, () => Native.attach(scene.engine as unknown as EngineKernel, { range: 0 }));
+        made = Native.attach(scene.engine as unknown as EngineKernel, { range: 0 });
         setClouds(made);
         latest.current.onReady?.(made);
       })
@@ -116,7 +115,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
       setClouds(null);
       made?.dispose();
     };
-  }, [scene.engine, scene.world]);
+  }, [scene.engine]);
   // A URL is fetched and decoded; nothing is drawn until it is.
   useEffect(() => {
     if (typeof texture !== 'string') {
@@ -147,7 +146,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
     optionalPeer('@margoengine/post', () => import('@margoengine/post/depth'))
       .then((api) => {
         if (!active || scene.engine.disposed) return;
-        made = inScene(scene, () => api.DepthTexture.attach(scene.engine as unknown as EngineKernel));
+        made = api.DepthTexture.attach(scene.engine as unknown as EngineKernel);
         setDepth(made);
       })
       .catch((error) => active && fail(error));
@@ -156,7 +155,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
       setDepth(null);
       made?.dispose();
     };
-  }, [scene.engine, scene.world, soft]);
+  }, [scene.engine, soft]);
   useCommit(() => {
     if (!clouds) return;
     const waiting = image === undefined || (soft && !depth);

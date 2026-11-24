@@ -325,10 +325,6 @@ export async function loadCorpus(file?: string | URL, signal?: AbortSignal): Pro
   try {
     return JSON.parse(text) as Corpus;
   } catch {
-    throw fault(
-      'failed',
-      `The documentation corpus ${String(target)} is not JSON; rebuild or reinstall @margoengine/mcp`,
-      'mcp',
-    );
+    throw fault('failed', `The documentation corpus ${String(target)} is not JSON; rebuild or reinstall @margoengine/mcp`, 'mcp');
   }
 }

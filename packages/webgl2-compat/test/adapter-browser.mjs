@@ -61,10 +61,7 @@ try {
     }),
   );
   for (const name of ['sky', 'fog'])
-    assert.ok(
-      result.levels[name].largest <= 4,
-      `the ${name} frame stays within the capture's rounding, got ${JSON.stringify(result.levels[name])}`,
-    );
+    assert.ok(result.levels[name].largest <= 4, `the ${name} frame stays within the capture's rounding, got ${JSON.stringify(result.levels[name])}`);
   assert.ok(result.levels.fogFullDrawn.count > 6000, 'the fog changes the full-level frame');
   assert.ok(result.levels.fogDrawn.count > 6000, 'the fog changes the frame at the level');
   // Surfels at 4x: the level packs the front depth into rgba8unorm and adds the sums in two rg16float targets, the same
@@ -73,10 +70,7 @@ try {
   // 255 (red 3, blue 4) on 2026-11-11, A6000 D3D12.
   console.log('surfels', JSON.stringify({ surfels: result.levels.surfels, bare: result.levels.surfelsBare }));
   assert.ok(result.levels.surfelsBare.count > 3000, 'the surfels reach the frame at the level');
-  assert.ok(
-    result.levels.surfels.largest <= 4,
-    `the surfel frame stays within the capture's rounding, got ${JSON.stringify(result.levels.surfels)}`,
-  );
+  assert.ok(result.levels.surfels.largest <= 4, `the surfel frame stays within the capture's rounding, got ${JSON.stringify(result.levels.surfels)}`);
   // Each of these runs on the level.
   for (const name of [
     'core alone',

@@ -12,7 +12,7 @@ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
 engine.createMesh().setGeometry(box(400,0.2,400)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,-60]);
 for(const x of [-30,-10,10,30])engine.createMesh().setGeometry(box(4,40,4)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.6})).setPosition([x,20,-60]);
-const sky=new Sky({hours:10,timeScale:0,fog:{color:[1,0,1],falloff:'exp',start:10,density:0.05}});
+const sky=new Sky({hours:10,timeScale:0,fog:{depth:()=>post.depthTexture,color:[1,0,1],falloff:'exp',start:10,density:0.05}});
 engine.use(sky);
 const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
 const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
@@ -32,9 +32,6 @@ window.check={async run(){
  aim(-6);const limit=performance.now()+20000;let before=await frame(),prior;
  do{prior=before;before=await frame();}while((!fogOn(before)||!same(prior,before))&&performance.now()<limit);
  aim(6);const moving=await frame();const still=await frame();
- sky.options.fog.depth=()=>post.depthTexture;const explicit=await frame();
- sky.options.fog.depth=()=>undefined;const unavailable=await frame();
- delete sky.options.fog.depth;
  const error=await device.popErrorScope();
  let differing=0,moved=0,fogged=0;
  for(let p=0;p<still.length;p+=4){
@@ -42,8 +39,7 @@ window.check={async run(){
   if(d>1/255)differing++;if(m>0.05)moved++;
   if(still[p]>0.5&&still[p+2]>0.5&&still[p+1]<0.3)fogged++;
  }
- return {samples:sceneSamples(),error:error?.message??null,errors:errors.splice(0),differing,moved,fogged,pixels:still.length/4,
-  matchesExplicit:same(still,explicit),overrideUnavailable:!fogOn(unavailable)};
+ return {samples:sceneSamples(),error:error?.message??null,errors:errors.splice(0),differing,moved,fogged,pixels:still.length/4};
 }};
 window.ready=true;
 </script></body></html>

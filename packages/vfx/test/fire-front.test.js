@@ -21,8 +21,7 @@ import {
 
 const MPH = 0.44704,
   CHAIN_H = 20.1168 / 3600; // m/s per chain/hour
-const near = (a, b, rel, msg) =>
-  assert.ok(Math.abs(a - b) <= rel * Math.abs(b), `${msg ?? ''} ${a} vs ${b} (within ${rel * 100}%)`);
+const near = (a, b, rel, msg) => assert.ok(Math.abs(a - b) <= rel * Math.abs(b), `${msg ?? ''} ${a} vs ${b} (within ${rel * 100}%)`);
 // Albini 1976's 1974 computations (the INT-30 nomographs, reprinted unchanged with midflame wind labels in Rothermel 1983,
 // INT-143, appendix A) and Anderson 1982's rates taken from them used INT-30 table 7, which prints FM7's live surface-area-
 // to-volume ratio as 1,550 1/ft; the standard model (Andrews 2018 table 8a, BehavePlus) and FUEL_MODELS.FM7 use 1,500. The
@@ -42,19 +41,9 @@ const INT30 = {
 // held to 0.5 percent (ours: 20.48, 72.84, 12.95, 42.70).
 test('the 13 fuel models against Andrews 2018 tables 8b and 22: characteristic SAV, bulk density, packing, wind factor', () => {
   const table8b = {
-    FM1: [3500, 0.03, 0.25],
-    FM2: [2784, 0.18, 1.14],
-    FM3: [1500, 0.06, 0.21],
-    FM4: [1739, 0.12, 0.52],
-    FM5: [1683, 0.08, 0.33],
-    FM6: [1564, 0.11, 0.43],
-    FM7: [1552, 0.09, 0.34],
-    FM8: [1889, 1.15, 5.17],
-    FM9: [2484, 0.8, 4.5],
-    FM10: [1764, 0.55, 2.35],
-    FM11: [1182, 0.53, 1.62],
-    FM12: [1145, 0.69, 2.06],
-    FM13: [1159, 0.89, 2.68],
+    FM1: [3500, 0.03, 0.25], FM2: [2784, 0.18, 1.14], FM3: [1500, 0.06, 0.21], FM4: [1739, 0.12, 0.52], FM5: [1683, 0.08, 0.33],
+    FM6: [1564, 0.11, 0.43], FM7: [1552, 0.09, 0.34], FM8: [1889, 1.15, 5.17], FM9: [2484, 0.8, 4.5], FM10: [1764, 0.55, 2.35],
+    FM11: [1182, 0.53, 1.62], FM12: [1145, 0.69, 2.06], FM13: [1159, 0.89, 2.68],
   };
   for (const [name, [sav, density, packing]] of Object.entries(table8b)) {
     const bed = fuelBed(FUEL_MODELS[name], 0.08, 1, 0.08, 0.08);
@@ -62,12 +51,7 @@ test('the 13 fuel models against Andrews 2018 tables 8b and 22: characteristic S
     assert.ok(Math.abs(bed.beta * 32 - density) <= 0.005, `${name} bulk density ${bed.beta * 32} vs ${density}`);
     assert.ok(Math.abs(bed.ratio - packing) <= 0.01, `${name} relative packing ratio ${bed.ratio} vs ${packing}`);
   }
-  for (const [name, mph, factor] of [
-    ['FM2', 6, 20.5],
-    ['FM2', 12, 72.8],
-    ['FM9', 6, 12.9],
-    ['FM9', 12, 42.7],
-  ]) {
+  for (const [name, mph, factor] of [['FM2', 6, 20.5], ['FM2', 12, 72.8], ['FM9', 6, 12.9], ['FM9', 12, 42.7]]) {
     const phi = windFactor(fuelBed(FUEL_MODELS[name], 0.08), mph * MPH);
     assert.ok(Math.abs(phi - factor) <= 0.005 * factor, `${name} wind factor at ${mph} mi/h ${phi} vs ${factor}`);
   }
@@ -84,27 +68,11 @@ test('the 13 fuel models against Andrews 2018 tables 8b and 22: characteristic S
 // not the model as published: the published model is pinned against Andrews 2018 above (KB-FIRE-FM7, docs/limits.md).
 test('Rothermel with Albini mixing: the rate of spread of each fuel model against the published value', () => {
   const published = {
-    FM1: [78, 0.05],
-    FM2: [35, 0.08],
-    FM3: [104, 0.03],
-    FM4: [75, 0.06],
-    FM5: [18, 0.2],
-    FM6: [32, 0.08],
-    FM7: [20, 0.3],
-    FM8: [1.6, 0.1],
-    FM9: [7.5, 0.02],
-    FM10: [7.9, 0.01],
-    FM11: [6, 0.08],
-    FM12: [13, 0.09],
+    FM1: [78, 0.05], FM2: [35, 0.08], FM3: [104, 0.03], FM4: [75, 0.06], FM5: [18, 0.2], FM6: [32, 0.08], FM7: [20, 0.3],
+    FM8: [1.6, 0.1], FM9: [7.5, 0.02], FM10: [7.9, 0.01], FM11: [6, 0.08], FM12: [13, 0.09],
   };
   for (const [name, [rate, tolerance]] of Object.entries(published)) {
-    const b = fireBehaviour(INT30[name], {
-      moisture: 0.08,
-      moisture10: 0.08,
-      moisture100: 0.08,
-      liveMoisture: 1,
-      wind: 5 * MPH,
-    });
+    const b = fireBehaviour(INT30[name], { moisture: 0.08, moisture10: 0.08, moisture100: 0.08, liveMoisture: 1, wind: 5 * MPH });
     near(b.rate / CHAIN_H, rate, tolerance, name);
   }
 });
@@ -122,14 +90,7 @@ test('Rothermel with Albini mixing: the rate of spread of each fuel model agains
 // test above; KB-FIRE-FM7, closed as a reference difference in docs/limits.md). This pins the measured differences so a
 // change to any of them shows.
 test('FM13 and the wind lines of Albini 1976 charts 2 and 13: the measured differences', () => {
-  const at8 = (name) =>
-    fireBehaviour(FUEL_MODELS[name], {
-      moisture: 0.08,
-      moisture10: 0.08,
-      moisture100: 0.08,
-      liveMoisture: 1,
-      wind: 5 * MPH,
-    });
+  const at8 = (name) => fireBehaviour(FUEL_MODELS[name], { moisture: 0.08, moisture10: 0.08, moisture100: 0.08, liveMoisture: 1, wind: 5 * MPH });
   const fm13 = at8('FM13'),
     fm2 = at8('FM2');
   const overAnderson = fm13.rate / CHAIN_H / 13.5;
@@ -190,13 +151,7 @@ test('FM7 against Albini 1976 chart 7: the measured difference in rate', () => {
     [0.2, 0.5, 18.86],
     [0.24, 0.5, 16.69],
   ]) {
-    const b = fireBehaviour(INT30.FM7, {
-      moisture: m,
-      moisture10: m,
-      moisture100: m,
-      liveMoisture: live,
-      wind: 5 * MPH,
-    });
+    const b = fireBehaviour(INT30.FM7, { moisture: m, moisture10: m, moisture100: m, liveMoisture: live, wind: 5 * MPH });
     const ratio = b.rate / CHAIN_H / rate;
     assert.ok(ratio > 1.2 && ratio < 1.32, `FM7 ${m}/${live}: ours over the chart ${ratio}`);
   }
@@ -207,105 +162,18 @@ test('FM7 against Albini 1976 chart 7: the measured difference in rate', () => {
 // standard value of Andrews 2018 table 8a (INT-30 prints 1,550; see INT30 above). A typed value that drifts fails here.
 test('fuel models hold the values of Anderson 1982 table 1 and Albini 1976 table 7', () => {
   const table = {
-    FM1: [[0.74, 3500]],
-    FM2: [
-      [2, 3000],
-      [1, 109],
-      [0.5, 30],
-      [0.5, 1500],
-    ],
-    FM3: [[3.01, 1500]],
-    FM4: [
-      [5.01, 2000],
-      [4.01, 109],
-      [2, 30],
-      [5.01, 1500],
-    ],
-    FM5: [
-      [1, 2000],
-      [0.5, 109],
-      [2, 1500],
-    ],
-    FM6: [
-      [1.5, 1750],
-      [2.5, 109],
-      [2, 30],
-    ],
-    FM7: [
-      [1.13, 1750],
-      [1.87, 109],
-      [1.5, 30],
-      [0.37, 1500],
-    ],
-    FM8: [
-      [1.5, 2000],
-      [1, 109],
-      [2.5, 30],
-    ],
-    FM9: [
-      [2.92, 2500],
-      [0.41, 109],
-      [0.15, 30],
-    ],
-    FM10: [
-      [3.01, 2000],
-      [2, 109],
-      [5.01, 30],
-      [2, 1500],
-    ],
-    FM11: [
-      [1.5, 1500],
-      [4.51, 109],
-      [5.51, 30],
-    ],
-    FM12: [
-      [4.01, 1500],
-      [14.03, 109],
-      [16.53, 30],
-    ],
-    FM13: [
-      [7.01, 1500],
-      [23.04, 109],
-      [28.05, 30],
-    ],
+    FM1: [[0.74, 3500]], FM2: [[2, 3000], [1, 109], [0.5, 30], [0.5, 1500]], FM3: [[3.01, 1500]],
+    FM4: [[5.01, 2000], [4.01, 109], [2, 30], [5.01, 1500]], FM5: [[1, 2000], [0.5, 109], [2, 1500]],
+    FM6: [[1.5, 1750], [2.5, 109], [2, 30]], FM7: [[1.13, 1750], [1.87, 109], [1.5, 30], [0.37, 1500]],
+    FM8: [[1.5, 2000], [1, 109], [2.5, 30]], FM9: [[2.92, 2500], [0.41, 109], [0.15, 30]],
+    FM10: [[3.01, 2000], [2, 109], [5.01, 30], [2, 1500]],
+    FM11: [[1.5, 1500], [4.51, 109], [5.51, 30]], FM12: [[4.01, 1500], [14.03, 109], [16.53, 30]], FM13: [[7.01, 1500], [23.04, 109], [28.05, 30]],
   };
-  const depth = {
-    FM1: 1,
-    FM2: 1,
-    FM3: 2.5,
-    FM4: 6,
-    FM5: 2,
-    FM6: 2.5,
-    FM7: 2.5,
-    FM8: 0.2,
-    FM9: 0.2,
-    FM10: 1,
-    FM11: 1,
-    FM12: 2.3,
-    FM13: 3,
-  };
-  const extinction = {
-    FM1: 12,
-    FM2: 15,
-    FM3: 25,
-    FM4: 20,
-    FM5: 20,
-    FM6: 25,
-    FM7: 40,
-    FM8: 30,
-    FM9: 25,
-    FM10: 25,
-    FM11: 15,
-    FM12: 20,
-    FM13: 25,
-  };
+  const depth = { FM1: 1, FM2: 1, FM3: 2.5, FM4: 6, FM5: 2, FM6: 2.5, FM7: 2.5, FM8: 0.2, FM9: 0.2, FM10: 1, FM11: 1, FM12: 2.3, FM13: 3 };
+  const extinction = { FM1: 12, FM2: 15, FM3: 25, FM4: 20, FM5: 20, FM6: 25, FM7: 40, FM8: 30, FM9: 25, FM10: 25, FM11: 15, FM12: 20, FM13: 25 };
   for (const [name, rows] of Object.entries(table)) {
     const m = FUEL_MODELS[name];
-    assert.deepEqual(
-      m.classes.map((c) => [c.load, c.sav]),
-      rows,
-      name,
-    );
+    assert.deepEqual(m.classes.map((c) => [c.load, c.sav]), rows, name);
     assert.equal(m.depth, depth[name], `${name} depth`);
     assert.equal(Math.round(m.extinction * 100), extinction[name], `${name} extinction`);
   }
@@ -315,10 +183,7 @@ test('moisture, wind and slope move the rate the way Rothermel says; moisture of
   const dry = fireBehaviour(FUEL_MODELS.FM1, { moisture: 0.03 }),
     damp = fireBehaviour(FUEL_MODELS.FM1, { moisture: 0.11 });
   assert.ok(dry.rate0 > 3 * damp.rate0, 'damper fuel spreads slower');
-  assert.ok(
-    fireBehaviour(FUEL_MODELS.FM1, { moisture: 0.12 }).rate0 < 1e-9,
-    'at the moisture of extinction there is no spread',
-  );
+  assert.ok(fireBehaviour(FUEL_MODELS.FM1, { moisture: 0.12 }).rate0 < 1e-9, 'at the moisture of extinction there is no spread');
   const bed = fuelBed(FUEL_MODELS.FM1, 0.06);
   assert.ok(windFactor(bed, 4) > windFactor(bed, 2) && windFactor(bed, 2) > 0);
   near(slopeFactor(bed, 0.8) / slopeFactor(bed, 0.4), 4, 1e-12, 'phi_s grows with the slope squared');
@@ -342,15 +207,7 @@ test('Richards ellipse: the head is the full rate, the flank less, the back slow
 
 // A plain FM1 field with one ignition at the centre, run for `until` seconds.
 const field = (extra = {}, until = 600) => {
-  const front = FireFront.create({
-    size: [800, 800],
-    cell: 4,
-    fuel: 'FM1',
-    moisture: 0.06,
-    ignitions: [{ at: [0, 0], radius: 4 }],
-    spotting: 0,
-    ...extra,
-  });
+  const front = FireFront.create({ size: [800, 800], cell: 4, fuel: 'FM1', moisture: 0.06, ignitions: [{ at: [0, 0], radius: 4 }], spotting: 0, ...extra });
   front.advanceTime(until);
   return front;
 };
@@ -364,16 +221,7 @@ const speed = (front, x, z) => {
 test('no wind, flat: the fire spreads round at the no-wind rate in every direction (16 neighbours keep the grid out of it)', () => {
   const front = field({}, 2400),
     r0 = fuelBed(FUEL_MODELS.FM1, 0.06).rate0;
-  for (const [x, z] of [
-    [40, 0],
-    [0, 40],
-    [-40, 0],
-    [28, 28],
-    [-28, 28],
-    [36, 16],
-    [16, -36],
-  ])
-    near(speed(front, x, z), r0, 0.15, `direction ${x},${z}`);
+  for (const [x, z] of [[40, 0], [0, 40], [-40, 0], [28, 28], [-28, 28], [36, 16], [16, -36]]) near(speed(front, x, z), r0, 0.15, `direction ${x},${z}`);
 });
 
 test('head fire against backing fire: a wind drives the head at R0 (1 + phi_w) and the back at the ellipse rate', () => {
@@ -403,16 +251,7 @@ test('upslope against downslope by phi_s: a fire runs up a 22 degree slope faste
 });
 
 test('fixed steps: any split of the same time gives the same fire; the same seed gives the same embers', () => {
-  const make = (seed = 1) =>
-    FireFront.create({
-      size: [400, 400],
-      cell: 4,
-      fuel: 'FM4',
-      wind: [12, 0],
-      spotting: 0.05,
-      seed,
-      ignitions: [{ at: [-100, 0], radius: 8 }],
-    });
+  const make = (seed = 1) => FireFront.create({ size: [400, 400], cell: 4, fuel: 'FM4', wind: [12, 0], spotting: 0.05, seed, ignitions: [{ at: [-100, 0], radius: 8 }] });
   const a = make(),
     b = make();
   a.advanceTime(120);
@@ -426,13 +265,7 @@ test('fixed steps: any split of the same time gives the same fire; the same seed
 });
 
 test('settle: runs until nothing burns and resolves with the fire time; every caught cell is burnt', async () => {
-  const front = FireFront.create({
-    size: [200, 200],
-    cell: 4,
-    fuel: 'FM1',
-    moisture: 0.03,
-    ignitions: [{ at: [0, 0], radius: 4 }],
-  });
+  const front = FireFront.create({ size: [200, 200], cell: 4, fuel: 'FM1', moisture: 0.03, ignitions: [{ at: [0, 0], radius: 4 }] });
   assert.equal(front.active, true);
   const t = await front.settle(40000);
   assert.equal(front.active, false);
@@ -471,25 +304,14 @@ test('the burn texture rows: arrival, burn-out, intensity and state per cell; un
 });
 
 test('smoke segments: heat is 0.7 of the reaction intensity over the burning area, hottest first, at the front', () => {
-  const front = FireFront.create({
-    size: [400, 400],
-    cell: 4,
-    fuel: 'FM1',
-    wind: [5, 0],
-    spotting: 0,
-    ignitions: [{ at: [-100, 0], radius: 6 }],
-  });
+  const front = FireFront.create({ size: [400, 400], cell: 4, fuel: 'FM1', wind: [5, 0], spotting: 0, ignitions: [{ at: [-100, 0], radius: 6 }] });
   front.advanceTime(60);
   const segs = front.segments(),
     cells = front.burningCells,
     ir = fireBehaviour(FUEL_MODELS.FM1, { moisture: 0.06 }).reactionIntensity * 1000;
   assert.ok(segs.length >= 1);
   for (let k = 1; k < segs.length; k++) assert.ok(segs[k - 1].heat >= segs[k].heat);
-  near(
-    segs.reduce((s, g) => s + g.heat, 0),
-    0.7 * ir * 16 * cells,
-    1e-9,
-  );
+  near(segs.reduce((s, g) => s + g.heat, 0), 0.7 * ir * 16 * cells, 1e-9);
   assert.ok(segs.every((g) => g.x > -110 && g.x < 200));
 });
 
@@ -497,15 +319,8 @@ test('embers: a hot fire in a wind throws embers downwind that start spot fires;
   const spots = [];
   const make = (spotting) =>
     FireFront.create({
-      size: [1000, 400],
-      cell: 5,
-      fuel: 'FM4',
-      moisture: 0.04,
-      wind: [14, 0],
-      spotting,
-      seed: 3,
-      ignitions: [{ at: [-300, 0], radius: 10 }],
-      onSpot: (s) => spots.push(s),
+      size: [1000, 400], cell: 5, fuel: 'FM4', moisture: 0.04, wind: [14, 0], spotting, seed: 3,
+      ignitions: [{ at: [-300, 0], radius: 10 }], onSpot: (s) => spots.push(s),
     });
   const calm = make(0);
   calm.advanceTime(120);
@@ -513,30 +328,15 @@ test('embers: a hot fire in a wind throws embers downwind that start spot fires;
   const fire = make(0.05);
   fire.advanceTime(120);
   assert.ok(fire.embers > 20 && fire.spots > 0, `embers ${fire.embers}, spot fires ${fire.spots}`);
-  assert.ok(
-    spots.some((s) => s.ignited && s.to[0] > s.from[0] + 15),
-    'a spot fire starts well downwind of its source',
-  );
-  assert.ok(
-    spots.every((s) => s.to[0] >= s.from[0] - 10),
-    'no ember goes upwind',
-  );
+  assert.ok(spots.some((s) => s.ignited && s.to[0] > s.from[0] + 15), 'a spot fire starts well downwind of its source');
+  assert.ok(spots.every((s) => s.to[0] >= s.from[0] - 10), 'no ember goes upwind');
 });
 
 test('structures: a building ignites from flame within 1.5 flame lengths and burns for its burn time; one off the path does not', () => {
   const front = FireFront.create({
-    size: [400, 200],
-    cell: 4,
-    fuel: 'FM4',
-    moisture: 0.05,
-    wind: [4, 0],
-    spotting: 0,
-    structureBurnTime: 600,
-    structureExposure: 20,
-    structures: [
-      { at: [60, 0], radius: 6 },
-      { at: [150, 80], radius: 6 },
-    ],
+    size: [400, 200], cell: 4, fuel: 'FM4', moisture: 0.05, wind: [4, 0], spotting: 0,
+    structureBurnTime: 600, structureExposure: 20,
+    structures: [{ at: [60, 0], radius: 6 }, { at: [150, 80], radius: 6 }],
     ignitions: [{ at: [-80, 0], radius: 8 }],
   });
   assert.equal(front.state(60, 0), UNBURNT);
@@ -575,14 +375,7 @@ test('moisture10 and moisture100 set the dead classes apart from the 1-hour valu
 });
 
 test('smokeEmission: 0 before ignition, then the fuel burned (heat over 18,622 kJ/kg) times smokeYield grams per kilogram', () => {
-  const front = FireFront.create({
-    size: [400, 400],
-    cell: 4,
-    fuel: 'FM1',
-    wind: [5, 0],
-    spotting: 0,
-    ignitions: [{ at: [-100, 0], radius: 6 }],
-  });
+  const front = FireFront.create({ size: [400, 400], cell: 4, fuel: 'FM1', wind: [5, 0], spotting: 0, ignitions: [{ at: [-100, 0], radius: 6 }] });
   assert.equal(front.smokeEmission, 0, 'nothing burns before the first step');
   front.advanceTime(60);
   const segments = front.segments();
@@ -590,15 +383,7 @@ test('smokeEmission: 0 before ignition, then the fuel burned (heat over 18,622 k
   const watts = segments.reduce((s, x) => s + x.heat, 0) / 0.7;
   near(front.smokeEmission, (15 * watts) / 18.622e6, 1e-9, 'grams per second');
   assert.ok(front.smokeEmission > 5, `a grass fire of this size gives off ${front.smokeEmission} g/s`);
-  const double = FireFront.create({
-    size: [400, 400],
-    cell: 4,
-    fuel: 'FM1',
-    wind: [5, 0],
-    spotting: 0,
-    ignitions: [{ at: [-100, 0], radius: 6 }],
-    smokeYield: 30,
-  });
+  const double = FireFront.create({ size: [400, 400], cell: 4, fuel: 'FM1', wind: [5, 0], spotting: 0, ignitions: [{ at: [-100, 0], radius: 6 }], smokeYield: 30 });
   double.advanceTime(60);
   near(double.smokeEmission, 2 * front.smokeEmission, 1e-9, 'the yield scales it');
   assert.throws(() => FireFront.create({ smokeYield: -1 }), RangeError);
@@ -637,13 +422,7 @@ test('crown fire: passive torching blends R_s + CFB (R_c - R_s); active runs at 
   const r0 = passive.initiation / (surface.firelineIntensity / surface.rate);
   near(passive.fraction, 1 - Math.exp(-0.23 * 60 * (surface.rate - r0)), 1e-9, 'CFB = 1 - exp(-0.23 (R - R0))');
   near(passive.rate, surface.rate + passive.fraction * (rc - surface.rate), 1e-9, 'passive rate');
-  const gale = crownBehaviour(
-    fireBehaviour(FUEL_MODELS.FM10, { moisture: 0.05, wind: 8 }),
-    canopy,
-    1,
-    crownRate10({ moisture: 0.05, wind: 20 }),
-    20,
-  );
+  const gale = crownBehaviour(fireBehaviour(FUEL_MODELS.FM10, { moisture: 0.05, wind: 8 }), canopy, 1, crownRate10({ moisture: 0.05, wind: 20 }), 20);
   assert.equal(gale.type, 'active');
   assert.equal(gale.fraction, 1);
   near(gale.flameLength, 0.0266 * gale.firelineIntensity ** (2 / 3), 1e-9, 'Thomas 1963');
@@ -667,14 +446,7 @@ test('crown fire rate in a 20 m/s gale against Rothermel 1991, the Sundance run 
 test('FireFront crowns: under a gale a timber stand burns as a running crown fire at the crown rate; crown: false stays on the ground', () => {
   const make = (crown, fuel = 'FM10', canopy) =>
       FireFront.create({
-        size: [2400, 800],
-        cell: 8,
-        fuel,
-        moisture: 0.05,
-        wind: [20, 0],
-        spotting: 0,
-        crown,
-        ...(canopy ? { canopy } : {}),
+        size: [2400, 800], cell: 8, fuel, moisture: 0.05, wind: [20, 0], spotting: 0, crown, ...(canopy ? { canopy } : {}),
         ignitions: [{ at: [-1100, 0], radius: 16 }],
       }),
     head = (f) => {
@@ -711,15 +483,7 @@ test('conditional crown fire (Scott and Reinhardt 2001): a crown fire runs on in
   // fire at the gale's crown rate once one runs in from the FM10 stand upwind.
   const fuel = (x) => (x < -600 ? 'FM10' : 'FM8'),
     mk = (ignite) =>
-      FireFront.create({
-        size: [2400, 400],
-        cell: 8,
-        fuel,
-        moisture: 0.05,
-        wind: [20, 0],
-        spotting: 0,
-        ignitions: [{ at: [ignite, 0], radius: 16 }],
-      }),
+      FireFront.create({ size: [2400, 400], cell: 8, fuel, moisture: 0.05, wind: [20, 0], spotting: 0, ignitions: [{ at: [ignite, 0], radius: 16 }] }),
     fed = mk(-1100),
     alone = mk(-200);
   fed.advanceTime(900);
@@ -732,27 +496,14 @@ test('conditional crown fire (Scott and Reinhardt 2001): a crown fire runs on in
 test('crown options are checked: foliarMoisture range, crown a boolean, canopy values', () => {
   assert.throws(() => FireFront.create({ foliarMoisture: 0.1 }), RangeError);
   assert.throws(() => FireFront.create({ crown: 1 }), TypeError);
-  assert.throws(
-    () => FireFront.create({ size: [64, 64], canopy: () => ({ baseHeight: -1, bulkDensity: 0.1, height: 10 }) }),
-    RangeError,
-  );
+  assert.throws(() => FireFront.create({ size: [64, 64], canopy: () => ({ baseHeight: -1, bulkDensity: 0.1, height: 10 }) }), RangeError);
 });
 
 // KB-FIRE-SPOTCELL1: embers were thrown per burning cell, so a 4 m grid threw four times the embers of an 8 m grid over
 // the same fire (timber-valley's film grid spotted four times as hard as its preview).
 test('embers do not depend on the grid: the same fire on 4 m and 8 m cells throws about the same embers', () => {
   const run = (cell) => {
-    const f = FireFront.create({
-      size: [800, 400],
-      cell,
-      fuel: 'FM4',
-      moisture: 0.04,
-      wind: [14, 0],
-      spotting: 0.05,
-      crown: false,
-      seed: 5,
-      ignitions: [{ at: [-300, 0], radius: 12 }],
-    });
+    const f = FireFront.create({ size: [800, 400], cell, fuel: 'FM4', moisture: 0.04, wind: [14, 0], spotting: 0.05, crown: false, seed: 5, ignitions: [{ at: [-300, 0], radius: 12 }] });
     f.advanceTime(60);
     return f.embers;
   };
@@ -768,33 +519,17 @@ test('a diagonal fire line draws as a volume along the line, not over its box', 
   // A drip-torch line lit along x = -z, the wind across it toward +x+z.
   const line = [];
   for (let k = -150; k <= 150; k += 6) line.push({ at: [k, -k], radius: 4 });
-  const front = FireFront.create({
-    size: [800, 800],
-    cell: 8,
-    fuel: 'FM1',
-    moisture: 0.05,
-    wind: [5, 5],
-    spotting: 0,
-    segment: 400,
-    crown: false,
-    ignitions: line,
-  });
+  const front = FireFront.create({ size: [800, 800], cell: 8, fuel: 'FM1', moisture: 0.05, wind: [5, 5], spotting: 0, segment: 400, crown: false, ignitions: line });
   let f;
   for (let t = 0; t < 60 && !(f && f.cells > 30); t += 0.5) {
     front.advanceTime(0.5);
     f = front.flames().find((g) => g.kind === 'front');
   }
-  let minX = 1e9,
-    maxX = -1e9,
-    minZ = 1e9,
-    maxZ = -1e9;
+  let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
   for (let z = -396; z < 400; z += 8)
     for (let x = -396; x < 400; x += 8)
       if (front.state(x, z) === BURNING) {
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minZ = Math.min(minZ, z);
-        maxZ = Math.max(maxZ, z);
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
       }
   const box = (maxX - minX + 8) * (maxZ - minZ + 8),
     area = f.footprint[0] * f.footprint[1],

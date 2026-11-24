@@ -24,56 +24,27 @@ await postBrowser(
         errors = [];
       const scenes = {
         // A floor 400 m across.
-        floor: {
-          camera: { position: [0, 6, 8], target: [0, 0, 0] },
-          boxes: [
-            [
-              [400, 0.2, 400],
-              [0, -0.1, 0],
-            ],
-          ],
-        },
+        floor: { camera: { position: [0, 6, 8], target: [0, 0, 0] }, boxes: [[[400, 0.2, 400], [0, -0.1, 0]]] },
         // A slope tilted 30 degrees about x, seen square on.
         slope: {
           camera: { position: [0, 7, 9], target: [0, 0, 0] },
-          boxes: [
-            [
-              [400, 0.2, 400],
-              [0, -0.1, 0],
-              [Math.PI / 6, 0, 0],
-            ],
-          ],
+          boxes: [[[400, 0.2, 400], [0, -0.1, 0], [Math.PI / 6, 0, 0]]],
         },
         // The floor meeting a wall 40 m high whose face is the plane z = 0, the crease at the middle of the frame.
         crease: {
           camera: { position: [0, 6, 8], target: [0, 0, 0] },
           boxes: [
-            [
-              [400, 0.2, 400],
-              [0, -0.1, 0],
-            ],
-            [
-              [400, 40, 2],
-              [0, 20, -1],
-            ],
+            [[400, 0.2, 400], [0, -0.1, 0]],
+            [[400, 40, 2], [0, 20, -1]],
           ],
         },
         // A slot along z, 2 m wide between walls 2 m high, seen from straight above its middle.
         slot: {
           camera: { position: [0, 9, 0.01], target: [0, 0, 0] },
           boxes: [
-            [
-              [60, 0.2, 400],
-              [0, -0.1, 0],
-            ],
-            [
-              [20, 2, 400],
-              [-11, 1, 0],
-            ],
-            [
-              [20, 2, 400],
-              [11, 1, 0],
-            ],
+            [[60, 0.2, 400], [0, -0.1, 0]],
+            [[20, 2, 400], [-11, 1, 0]],
+            [[20, 2, 400], [11, 1, 0]],
           ],
         },
       };
@@ -101,16 +72,7 @@ await postBrowser(
           encoder = gpu.createCommandEncoder(),
           pass = encoder.beginComputePass();
         pass.setPipeline(pipeline);
-        pass.setBindGroup(
-          0,
-          gpu.createBindGroup({
-            layout,
-            entries: [
-              { binding: 0, resource: view },
-              { binding: 1, resource: { buffer: storage } },
-            ],
-          }),
-        );
+        pass.setBindGroup(0, gpu.createBindGroup({ layout, entries: [{ binding: 0, resource: view }, { binding: 1, resource: { buffer: storage } }] }));
         pass.dispatchWorkgroups(1);
         pass.end();
         encoder.copyBufferToBuffer(storage, 0, readback, 0, 324);
@@ -129,11 +91,7 @@ await postBrowser(
         engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
         const grey = new PbrMaterial({ color: '#c0c0c0', roughness: 1 });
         for (const [size, position, rotation] of scene.boxes) {
-          const mesh = engine
-            .createMesh()
-            .setGeometry(box(...size))
-            .setPosition(position)
-            .setMaterial(grey);
+          const mesh = engine.createMesh().setGeometry(box(...size)).setPosition(position).setMaterial(grey);
           if (rotation) mesh.setRotation(rotation);
         }
         const gtao = GTAO.attach(engine, { slices: 4, steps: 16, skySteps: 32 }),
@@ -165,18 +123,8 @@ await postBrowser(
     const share = (r) => r.on.map((on, i) => on / r.off[i]);
     const analytic = Math.sin(Math.atan(1 / 2)),
       result = {
-        floor: {
-          off: mean(floor.off),
-          on: mean(floor.on),
-          min: Math.min(...share(floor)),
-          max: Math.max(...share(floor)),
-        },
-        slope: {
-          off: mean(slope.off),
-          on: mean(slope.on),
-          min: Math.min(...share(slope)),
-          max: Math.max(...share(slope)),
-        },
+        floor: { off: mean(floor.off), on: mean(floor.on), min: Math.min(...share(floor)), max: Math.max(...share(floor)) },
+        slope: { off: mean(slope.off), on: mean(slope.on), min: Math.min(...share(slope)), max: Math.max(...share(slope)) },
         slot: { off: centre(slot.off), on: centre(slot.on), share: centre(slot.on) / centre(slot.off), analytic },
         plain: {
           floor: [Math.min(...floor.off), Math.max(...floor.off)],

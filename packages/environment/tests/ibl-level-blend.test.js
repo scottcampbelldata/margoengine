@@ -15,9 +15,7 @@ test('iblPrefiltered reads the lod of the GGX alpha blend', () => {
   assert.ok(IBL_WGSL.includes('let x = clamp(roughness, 0.0, 1.0) * params.z;'));
   assert.ok(IBL_WGSL.includes('let k = min(floor(x), max(params.z - 1.0, 0.0));'));
   assert.ok(
-    IBL_WGSL.includes(
-      'textureSampleLevel(specular, s, iblRotate(r, params), k + (x * x - k * k) / (2.0 * k + 1.0)).rgb',
-    ),
+    IBL_WGSL.includes('textureSampleLevel(specular, s, iblRotate(r, params), k + (x * x - k * k) / (2.0 * k + 1.0)).rgb'),
   );
   assert.ok(!IBL_WGSL.includes('clamp(roughness, 0.0, 1.0) * params.z).rgb'), 'the lod linear in roughness is gone');
 });
@@ -28,15 +26,11 @@ test('each mip is read alone at its own roughness, and the two mips mix to the m
     for (let m = 0; m < mips; m++) assert.equal(lod(top ? m / top : 0, top), m, `${mips} mips, mip ${m}`);
     let last = -1;
     for (let i = 0; i <= 1000; i++) {
-      const r = i / 1000,
-        l = lod(r, top),
-        k = Math.min(Math.floor(l), Math.max(top - 1, 0)),
-        w = l - k;
+      const r = i / 1000, l = lod(r, top), k = Math.min(Math.floor(l), Math.max(top - 1, 0)), w = l - k;
       assert.ok(l >= last - 1e-12 && l <= top + 1e-12 && w >= -1e-12 && w <= 1 + 1e-12, `${mips}: ${r}`);
       last = l;
       if (top === 0) continue;
-      const a0 = (k / top) ** 2,
-        a1 = ((k + 1) / top) ** 2;
+      const a0 = (k / top) ** 2, a1 = ((k + 1) / top) ** 2;
       assert.ok(Math.abs(a0 + (a1 - a0) * w - r * r) < 1e-12, `${mips} mips at ${r}: mixed alpha`);
     }
   }

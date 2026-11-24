@@ -49,10 +49,7 @@ async function draw(name, file) {
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
           });
         // Materials meshes put image row 0 at v = 1, so the upload flips them.
-        device.queue.copyExternalImageToTexture({ source: bitmap, flipY: true }, { texture }, [
-          bitmap.width,
-          bitmap.height,
-        ]);
+        device.queue.copyExternalImageToTexture({ source: bitmap, flipY: true }, { texture }, [bitmap.width, bitmap.height]);
         textures.push(texture);
         return { view: texture.createView() };
       },

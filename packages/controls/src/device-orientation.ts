@@ -70,10 +70,7 @@ export class DeviceOrientationControls extends Controls {
       (options.smoothTime ?? 0.1) < 0 ||
       !Number.isFinite(options.alphaOffset ?? 0)
     )
-      throw rangeError(
-        'Device look needs finite smoothTime >= 0 and alphaOffset; pass valid values',
-        'controls-arguments',
-      );
+      throw rangeError('Device look needs finite smoothTime >= 0 and alphaOffset; pass valid values', 'controls-arguments');
     super(source, options.element);
     this.source =
       options.source === undefined

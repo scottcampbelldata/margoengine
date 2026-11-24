@@ -57,10 +57,7 @@ test('an output sized for the filtered matches is enough, and a smaller one thro
   const { world, position, frozen } = scene();
   const query = new Query(world, { with: [position], without: [frozen] });
   assert.equal(query.run(new Uint32Array(2)), 2);
-  assert.throws(
-    () => query.run(new Uint32Array(1)),
-    (error) => error instanceof RangeError && /;/.test(error.message),
-  );
+  assert.throws(() => query.run(new Uint32Array(1)), (error) => error instanceof RangeError && /;/.test(error.message));
 });
 
 test('forEach gives the row of every term and -1 for a missing optional', () => {
@@ -92,10 +89,7 @@ test('forEach survives destroying and removing during the loop and passes over w
       gone.add(entities[8]);
     }
   });
-  assert.deepEqual(
-    seen.sort((x, y) => x - y),
-    [0, 1, 2, 3, 4, 5, 6, 7],
-  );
+  assert.deepEqual(seen.sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7]);
 });
 
 test('a query cannot re-enter itself, recovers after a throw, and a second query may nest', () => {
@@ -105,17 +99,9 @@ test('a query cannot re-enter itself, recovers after a throw, and a second query
     state = (error) => error.code === 'state' && /second Query/.test(error.message);
   assert.throws(() => query.forEach(() => query.run(new Uint32Array(8))), state);
   assert.throws(() => query.forEach(() => query.forEach(() => {})), state);
-  assert.throws(
-    () =>
-      query.forEach(() => {
-        throw new Error('boom');
-      }),
-    /boom/,
-  );
+  assert.throws(() => query.forEach(() => { throw new Error('boom'); }), /boom/);
   let nested = 0;
-  query.forEach(() => {
-    nested += inner.forEach(() => {});
-  });
+  query.forEach(() => { nested += inner.forEach(() => {}); });
   assert.equal(nested, 3);
 });
 
@@ -128,10 +114,7 @@ test('terms must be of this world and with must not be empty', () => {
     { with: [position], without: [foreign] },
     { with: [position], optional: [foreign] },
   ])
-    assert.throws(
-      () => new Query(world, terms),
-      (error) => error instanceof TypeError && /;/.test(error.message),
-    );
+    assert.throws(() => new Query(world, terms), (error) => error instanceof TypeError && /;/.test(error.message));
 });
 
 test('seeded scenes match a filter over every entity', () => {

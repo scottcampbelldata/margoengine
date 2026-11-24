@@ -65,11 +65,7 @@ test('locomotive: Whyte wheel counts, standard gauge wheels, MCB coupler and fla
   let inner = Infinity;
   for (let i = 0; i < g.positions.length; i += 3) {
     const r = Math.hypot(g.positions[i + 1] - c.wheels[0].diameter / 2, g.positions[i] - c.wheels[0].x);
-    if (
-      Math.abs(g.positions[i] - c.wheels[0].x) < 1 &&
-      r > c.wheels[0].diameter * 0.45 &&
-      r < c.wheels[0].diameter * 0.5
-    )
+    if (Math.abs(g.positions[i] - c.wheels[0].x) < 1 && r > c.wheels[0].diameter * 0.45 && r < c.wheels[0].diameter * 0.5)
       inner = Math.min(inner, Math.abs(g.positions[i + 2]));
   }
   near(2 * inner, BACK_TO_BACK, 0.002, 'measured back-to-back');
@@ -92,23 +88,12 @@ test('freight cars: 36 ft MCB box car, arch bar trucks of 5 ft wheelbase and 33 
     near(vehicleBounds(w.parts, ['trucks']).lo[1], -1 * IN, 1e-4, `${kind} flanges`);
   }
   const box = generateWagon();
-  near(
-    vehicleBounds(box.parts, ['body']).hi[0] - vehicleBounds(box.parts, ['body']).lo[0],
-    36 * FT,
-    0.01,
-    'box car body',
-  );
+  near(vehicleBounds(box.parts, ['body']).hi[0] - vehicleBounds(box.parts, ['body']).lo[0], 36 * FT, 0.01, 'box car body');
   // About 8 ft inside height over the deck.
   near(vehicleBounds(box.parts, ['body']).hi[1] - box.deck, 8 * FT + 4 * IN, 0.1, 'box car side height');
   assert.ok(generateWagon({ kind: 'log-car' }).parts.load && generateWagon({ kind: 'gondola' }).parts.load);
-  assert.deepEqual(
-    generateWagon({ kind: 'log-car', seed: 3 }).parts.load.positions,
-    generateWagon({ kind: 'log-car', seed: 3 }).parts.load.positions,
-  );
-  assert.notDeepEqual(
-    generateWagon({ kind: 'log-car', seed: 3 }).parts.load.positions,
-    generateWagon({ kind: 'log-car', seed: 4 }).parts.load.positions,
-  );
+  assert.deepEqual(generateWagon({ kind: 'log-car', seed: 3 }).parts.load.positions, generateWagon({ kind: 'log-car', seed: 3 }).parts.load.positions);
+  assert.notDeepEqual(generateWagon({ kind: 'log-car', seed: 3 }).parts.load.positions, generateWagon({ kind: 'log-car', seed: 4 }).parts.load.positions);
   assert.throws(() => generateWagon({ length: 30 }), RangeError);
 });
 
@@ -124,10 +109,7 @@ test('touring car: 100 in wheelbase, 56 in track and 30 in wheels measured on th
     near(t.hi[2] - t.lo[2] - 3.5 * IN, 56 * IN, 1e-3, '56 in track');
     assert.ok(c.size[0] > 3.2 && c.size[0] < 3.6 && c.size[2] < 2.2, `size ${c.size}`);
   }
-  assert.ok(
-    vehicleBounds(generateTouringCar().parts, ['top']).hi[1] >
-      vehicleBounds(generateTouringCar({ top: 'down' }).parts, ['top']).hi[1] + 0.5,
-  );
+  assert.ok(vehicleBounds(generateTouringCar().parts, ['top']).hi[1] > vehicleBounds(generateTouringCar({ top: 'down' }).parts, ['top']).hi[1] + 0.5);
   assert.throws(() => generateTouringCar({ top: 'off' }), RangeError);
 });
 
@@ -135,10 +117,7 @@ test('kei truck: inside the kei class, the Carry DA63T catalogue sizes, 145R12 t
   for (const gates of ['closed', 'open']) {
     const k = generateKeiTruck({ gates });
     for (const g of Object.values(k.parts)) ok(g);
-    const body = vehicleBounds(
-        k.parts,
-        Object.keys(k.parts).filter((p) => p !== 'mirrors'),
-      ),
+    const body = vehicleBounds(k.parts, Object.keys(k.parts).filter((p) => p !== 'mirrors')),
       L = body.hi[0] - body.lo[0],
       W = body.hi[2] - body.lo[2],
       H = body.hi[1] - body.lo[1];
@@ -165,8 +144,7 @@ test('vending machine: coin, bill, change and keypad inside the ADA forward reac
   for (const rows of [2, 3, 4]) {
     const v = generateVendingMachine({ rows, width: 1.2 });
     for (const g of Object.values(v.parts)) ok(g);
-    for (const h of [v.controls.coin, v.controls.bill, v.controls.change, ...v.keypad])
-      assert.ok(h >= 15 * IN && h <= 48 * IN, `reach ${h}`);
+    for (const h of [v.controls.coin, v.controls.bill, v.controls.change, ...v.keypad]) assert.ok(h >= 15 * IN && h <= 48 * IN, `reach ${h}`);
     near(v.size[2], 1.86, 0.001, 'height with its canopy');
     near(v.size[1], 1.24, 0.001, 'width');
     assert.ok(v.samples >= rows * 6);

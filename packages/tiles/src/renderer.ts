@@ -207,9 +207,9 @@ export class TilesRenderer implements EnginePlugin {
     // The renderer joins the scene this call started in, not the one active after the fetch.
     const scope = captureScene(engine),
       tileset = await Tileset.load(url, {
-        ...options,
-        content: (content, tile, signal) => renderer!.createContent(content, tile, signal),
-      });
+      ...options,
+      content: (content, tile, signal) => renderer!.createContent(content, tile, signal),
+    });
     renderer = new TilesRenderer(tileset, options);
     scope.run(() => engine.use(renderer!));
     return renderer;

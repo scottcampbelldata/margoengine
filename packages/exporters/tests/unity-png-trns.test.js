@@ -24,9 +24,7 @@ function member(pattern) {
   }
   return out.join('\n');
 }
-const reader = [/static void Need\(/, /static int Be32\(/, /static byte\[\] OriginalPngPixels\(/]
-  .map(member)
-  .join('\n');
+const reader = [/static void Need\(/, /static int Be32\(/, /static byte\[\] OriginalPngPixels\(/].map(member).join('\n');
 
 const crc = (bytes) => {
   let c = ~0;

@@ -33,10 +33,7 @@ const oneBit = (bits) => bits > 0 && (bits & (bits - 1)) === 0;
  */
 export function v8Tiers() {
   const [interpreted, maglev, turbofan] = JSON.parse(
-      execFileSync(process.execPath, ['--allow-natives-syntax', '-e', CALIBRATE], {
-        encoding: 'utf8',
-        timeout: 30_000,
-      }),
+      execFileSync(process.execPath, ['--allow-natives-syntax', '-e', CALIBRATE], { encoding: 'utf8', timeout: 30_000 }),
     ),
     bits = { turbofan: turbofan & ~maglev, maglev: maglev & ~turbofan, optimized: turbofan & maglev & ~interpreted };
   if (!Object.values(bits).every(oneBit))

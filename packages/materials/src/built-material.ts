@@ -1,6 +1,5 @@
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { compatTier } from '../../shared/compat.js';
-import { borrow, isOptionObject, lend, relend, type BorrowSlot } from '../../shared/borrowed.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
@@ -51,13 +50,7 @@ import {
 } from './texture-kinds.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { copyExternal } from '../../shared/copy-external.js';
-import {
-  clipStatement,
-  hardwarePlanes,
-  markClipDistances,
-  planeCapacity,
-  sectionShader,
-} from '../../shared/section.js';
+import { clipStatement, hardwarePlanes, markClipDistances, planeCapacity, sectionShader } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf/pbr';
 export {
   packAtlas,
@@ -87,21 +80,8 @@ declare const GPUTextureUsage: {
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** Raw pixels for `new Texture({ data, width, height })`: tightly packed RGBA8 rows, top row first. */
 export type RawImage = { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
-/**
- * What `Material.envMap` takes: a cube Texture (CubeTexture), an Environment, a cube render target or a six-layer
- * GPUTexture, or `(device) => one of those`, called once per device and again after a device restore. A plain object
- * (a six-layer GPUTexture, a `{texture, view}` target or an Environment-shaped literal) belongs to the device that made
- * it: after a restore it is dropped, reported once through `engine.onError` (`'state'`, `borrowed-lost`) while the frame
- * keeps drawing, and the material reflects black until `material.envMap = ...` gives it a new one. A Texture, an
- * `@margoengine/environment` Environment and a `CubeCamera` are live objects that remake their own GPU objects, so they
- * need no function.
- */
-export type EnvMapSource =
-  | Texture
-  | EnvironmentMap
-  | CubeTarget
-  | GPUTexture
-  | ((device: GPUDevice) => Texture | EnvironmentMap | CubeTarget | GPUTexture);
+/** What `Material.envMap` takes: a cube Texture (CubeTexture), an Environment, a cube render target or a six-layer GPUTexture. */
+export type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture;
 /** A browser image a texture or cube face uploads with copyExternalImageToTexture. */
 export type ImageSource =
   | ImageBitmap
@@ -120,12 +100,9 @@ export type CubeSource =
 /**
  * ImageData and `{data,width,height}` upload as raw RGBA8 rows (row 0 at UV v=0); other images use
  * copyExternalImageToTexture. A `DataImage` with a `format` or `depth` uploads float, one- or two-channel, 3D or array
- * texels. A GPUTexture (such as `KTX2Decoder.createTexture` output) or a `CubeTarget` is borrowed as is, or
- * `(device) => GPUTexture | CubeTarget` is called once per device and again after a device restore (give `dimension`
- * for a cube, a 3D or an array texture; the size reads 0 until the first device has made it). A plain texture belongs
- * to the device that made it: after a restore it is dropped, reported once through `engine.onError` (`'state'`,
- * `borrowed-lost`), the slot reads its default, and `texture.setSource(...)` gives it a new one. A `TranscodedTexture`
- * (`KTX2Decoder.transcode` output) uploads its compressed mips on each device; a `CubeSource` makes a cube map.
+ * texels. A GPUTexture (such as `KTX2Decoder.createTexture` output) or a `CubeTarget` is borrowed as is; a
+ * `TranscodedTexture` (`KTX2Decoder.transcode` output) uploads its compressed mips on each device; a `CubeSource` makes
+ * a cube map.
  */
 export type TextureSource =
   | ImageSource
@@ -135,8 +112,7 @@ export type TextureSource =
   | GPUTexture
   | CubeTarget
   | TranscodedTexture
-  | CubeSource
-  | ((device: GPUDevice) => GPUTexture | CubeTarget);
+  | CubeSource;
 /** Texture wrap mode on one axis: `'clamp'` (default, to the edge), `'repeat'` or `'mirror'`. */
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
 /** How `parallaxMap` is marched: one offset step, stepped occlusion mapping, or relief mapping refined by bisection. */
@@ -180,8 +156,6 @@ export interface TextureRegion {
 }
 interface Slot {
   texture?: GPUTexture;
-  /** A borrowed GPU source on this device: the object `lend` returned and what was made of it. */
-  lent?: { from: unknown; texture: GPUTexture; view?: GPUTextureView };
   /** WebGL2 compressed textures cannot reinterpret sRGB: one upload per sampled colour space. */
   transcoded?: Map<string, GPUTexture>;
   /** The mipmaps option the GPU copy was made with. */
@@ -206,14 +180,7 @@ interface Slot {
 /** What a non-image source is, fixed at construction (absent for images and raw RGBA8, the original path). */
 type Kind =
   | { type: 'data'; format: DataFormat; dimension: '2d' | '2d-array' | '3d' }
-  | {
-      type: 'gpu';
-      /** The caller's object or function, held by the borrowed-object rule (docs/conventions.md). */
-      slot: BorrowSlot<GPUTexture | CubeTarget, TextureSource>;
-      /** The last texture made of it, for sizes before and after a restore (undefined until a function has run). */
-      texture?: GPUTexture;
-      dimension: TextureDimension;
-    }
+  | { type: 'gpu'; texture: GPUTexture; view?: GPUTextureView; dimension: TextureDimension }
   | { type: 'ktx2'; base: string; dimension: '2d' | '2d-array' | 'cube'; own: boolean }
   | { type: 'faces'; format?: DataFormat }
   | { type: 'equirect'; source: Texture; size: number };
@@ -333,8 +300,6 @@ const tooLarge = (w: number, h: number, limit: number) =>
   new RangeError(
     `Texture is ${w} x ${h} pixels; this device allows ${limit} per side (maxTextureDimension2D); resize it to fit`,
   );
-const borrowedSource = (source: TextureSource) =>
-  borrow<GPUTexture | CubeTarget, TextureSource>(source, 'Texture source', 'texture.setSource(...)');
 const gpuTexture = (s: unknown): s is GPUTexture =>
   !!s &&
   typeof (s as GPUTexture).createView === 'function' &&
@@ -347,15 +312,12 @@ function kindOf(source: TextureSource, o: TextureOptions): Kind | undefined {
     equirect?: unknown;
     size?: number;
   };
-  if (typeof source === 'function')
-    return { type: 'gpu', slot: borrowedSource(source), dimension: o.dimension ?? '2d' };
-  if (gpuTexture(source))
-    return { type: 'gpu', slot: borrowedSource(source), texture: source, dimension: gpuDimension(source, o.dimension) };
+  if (gpuTexture(source)) return { type: 'gpu', texture: source, dimension: gpuDimension(source, o.dimension) };
   if (gpuTexture(s.texture) && s.view) {
     if (o.dimension !== undefined && o.dimension !== 'cube')
       throw new TypeError("Texture CubeTarget is a cube; omit dimension or pass 'cube'");
     if (s.texture.depthOrArrayLayers !== 6) throw new TypeError('Texture CubeTarget texture must have six layers');
-    return { type: 'gpu', slot: borrowedSource(source), texture: s.texture, dimension: 'cube' };
+    return { type: 'gpu', texture: s.texture, view: s.view, dimension: 'cube' };
   }
   if (Array.isArray(s.mipmaps) && typeof s.target === 'string') {
     const result = source as TranscodedTexture,
@@ -454,12 +416,6 @@ const changeStamp = (): number => ++stamps;
 // reaction holds only the device and this set, which a texture leaves on dispose: one reaction per texture and device
 // kept every disposed texture alive as long as the device (docs/known-bugs.md).
 const lostTextures = new WeakMap<GPUDevice, Set<Texture>>();
-/** The engine each device belongs to, noted when its materials bind: where a lost borrowed object is reported. */
-const engines = new WeakMap<GPUDevice, Engine>();
-/** @internal Notes `engine` as the owner of its current device, for `engine.onError` reports from textures. */
-export function noteEngine(engine: Engine): void {
-  if (engine.gpu) engines.set(engine.gpu, engine);
-}
 function watchTextureLost(device: GPUDevice, texture: Texture): void {
   let set = lostTextures.get(device);
   if (!set) {
@@ -494,7 +450,7 @@ export class Texture {
       [w, h] = dimensions(source as ImageDimensions);
     if (
       !source ||
-      (typeof source !== 'object' && typeof source !== 'function') ||
+      typeof source !== 'object' ||
       !(Object.keys(textureOptions) as (keyof TextureOptions)[]).every((k) => textureOptions[k][0](o[k]))
     )
       throw new TypeError(
@@ -513,7 +469,7 @@ export class Texture {
     const k = this.kind,
       s = this.source as DataImage & CubeTarget & { faces: ImageDimensions[] };
     if (!k) return [...dimensions(s as ImageDimensions), 1];
-    if (k.type === 'gpu') return [k.texture?.width ?? 0, k.texture?.height ?? 0, k.texture?.depthOrArrayLayers ?? 0];
+    if (k.type === 'gpu') return [k.texture.width, k.texture.height, k.texture.depthOrArrayLayers];
     if (k.type === 'faces') return [...dimensions(s.faces[0]), 6];
     if (k.type === 'equirect') return [k.size, k.size, 6];
     if (k.type === 'ktx2') return [s.width, s.height, (s as unknown as TranscodedTexture).layers ?? 1];
@@ -541,7 +497,7 @@ export class Texture {
       ? unfilterable(k.format ?? '')
       : k?.type === 'ktx2'
         ? unfilterable(k.base)
-        : k?.type === 'gpu' && !!k.texture && unfilterable(k.texture.format);
+        : k?.type === 'gpu' && unfilterable(k.texture.format);
   }
   get isVideo(): boolean {
     return typeof (this.source as HTMLVideoElement).videoWidth === 'number';
@@ -598,7 +554,7 @@ export class Texture {
   /** Default: true for images and cubes, false for videos and data; a GPUTexture or KTX2 file keeps its own levels. */
   get mipmaps(): boolean {
     const k = this.kind;
-    if (k?.type === 'gpu') return !!k.texture && k.texture.mipLevelCount > 1;
+    if (k?.type === 'gpu') return k.texture.mipLevelCount > 1;
     if (k?.type === 'ktx2') return (this.source as TranscodedTexture).mipmaps.length > 1;
     if (k?.type === 'faces' && unfilterable(k.format ?? '')) return this.options.mipmaps ?? false;
     return this.options.mipmaps ?? (k ? k.type !== 'data' : !this.isVideo);
@@ -723,7 +679,7 @@ export class Texture {
   /** @internal The GPU copy on `device` after a `bind` (the borrowed texture for a GPUTexture source). */
   gpuTexture(device: GPUDevice): GPUTexture | undefined {
     return this.kind?.type === 'gpu'
-      ? this.slots.get(device)?.lent?.texture
+      ? this.kind.texture
       : (this.slots.get(device)?.p3 ?? this.slots.get(device)?.texture);
   }
   /** The per-device slot, made on first use, with its sampler rebuilt after a sampler option or mip chain change. */
@@ -754,64 +710,14 @@ export class Texture {
     if (!view) slot.views.set(key, (view = texture.createView({ format, dimension })));
     return view;
   }
-  /** Checks what a borrowed source made on a device (the object or `{texture, view}`) against this texture's dimension. */
-  private lentOf(k: Extract<Kind, { type: 'gpu' }>, made: GPUTexture | CubeTarget): NonNullable<Slot['lent']> {
-    if (gpuTexture(made)) {
-      gpuDimension(made, k.dimension);
-      return { from: made, texture: made };
-    }
-    const target = made as CubeTarget;
-    if (!gpuTexture(target?.texture) || !target.view)
-      throw new TypeError('Texture source function must return a GPUTexture or a {texture, view} target');
-    if (k.dimension !== 'cube')
-      throw new TypeError("Texture source function returned a cube target; pass dimension: 'cube'");
-    if (target.texture.depthOrArrayLayers !== 6) throw new TypeError('Texture CubeTarget texture must have six layers');
-    return { from: made, texture: target.texture, view: target.view };
-  }
-  /**
-   * Gives a GPUTexture or CubeTarget source (or a function making one) a new object: the way back after a device
-   * restore dropped a plain one (`'state'` report, `borrowed-lost`). The dimension stays what the texture was made with.
-   */
-  setSource(source: GPUTexture | CubeTarget | ((device: GPUDevice) => GPUTexture | CubeTarget)): void {
-    const k = this.kind;
-    if (k?.type !== 'gpu')
-      throw new TypeError(
-        'Texture setSource needs a texture made from a GPUTexture, a CubeTarget or a function; create a new Texture',
-      );
-    if (typeof source !== 'function') {
-      const own = kindOf(source, { dimension: k.dimension });
-      if (own?.type !== 'gpu') throw new TypeError('Texture setSource needs a GPUTexture or a {texture, view} target');
-      k.texture = own.texture;
-    }
-    relend(k.slot, source);
-    (this as { source: TextureSource }).source = source;
-    this.slots.clear();
-    this.stamp = changeStamp();
-    this.samplerVersion++;
-  }
   /** `bind` for data, borrowed, KTX2 and cube sources. */
   private bindKind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined {
     const k = this.kind!,
       o = this.options,
       [w, h, d] = this.size();
     if (k.type === 'gpu') {
-      const made = lend(k.slot, device, engines.get(device)) as GPUTexture | CubeTarget | undefined;
-      if (!made) return undefined;
-      let slot = this.slots.get(device);
-      if (slot?.lent?.from !== made) {
-        const lent = this.lentOf(k, made);
-        if (unfilterable(lent.texture.format) && !device.features.has('float32-filterable'))
-          throw new MargoError(
-            'unsupported',
-            'Texture samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features or use a 16-bit float format',
-          );
-        slot = this.slotFor(device, lent.texture.mipLevelCount > 1);
-        slot.lent = lent;
-        slot.views.clear();
-        k.texture = lent.texture;
-      }
-      const { texture, view } = slot!.lent!;
-      return [view ?? this.viewOf(slot!, texture, texture.format, k.dimension), slot!.sampler];
+      const slot = this.slotFor(device, k.texture.mipLevelCount > 1);
+      return [k.view ?? this.viewOf(slot, k.texture, k.texture.format, k.dimension), slot.sampler];
     }
     const levels = Math.floor(Math.log2(Math.max(w, h, 1))) + 1,
       mips = this.mipmaps,
@@ -986,8 +892,7 @@ export class Texture {
       slot = this.slots.get(device),
       t = slot?.texture;
     if (!slot || slot.samplerVersion !== this.samplerVersion) return Number.NaN;
-    if (k?.type === 'gpu')
-      return slot.lent && slot.samplerMips === slot.lent.texture.mipLevelCount > 1 ? this.stamp : Number.NaN;
+    if (k?.type === 'gpu') return slot.samplerMips === k.texture.mipLevelCount > 1 ? this.stamp : Number.NaN;
     if (
       !t ||
       slot.version !== this.version ||
@@ -2104,12 +2009,8 @@ function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
 /** Feature map `k`'s view and sampler; a map still loading reads white (alpha, bump) or black (displacement, light). */
 const featureTexture = (m: Material, k: number, device: GPUDevice) =>
   // The displacement map moves vertices by the mesh's own UVs, which no projection replaces.
-  m['featureTextures'][k]!.sampled(
-    device,
-    k === 3,
-    featureMaps[k],
-    k !== 2 && projected(m, m['featureValues'], 4 + k * 8),
-  ) ?? fallback(device, k < 2 ? 0 : 3);
+  m['featureTextures'][k]!.sampled(device, k === 3, featureMaps[k], k !== 2 && projected(m, m['featureValues'], 4 + k * 8)) ??
+  fallback(device, k < 2 ? 0 : 3);
 /** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
 function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
   const maps = featureMapsUsed(m),
@@ -2293,7 +2194,10 @@ function bareShader(source: string): string {
     name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)',
   );
   if (count !== 5 || dropped.some((name) => new RegExp(`\\b${name}\\b`).test(out!)))
-    throw new MargoError('unsupported', 'Materials require the standard gltf/pbr shader; draw the mesh with gltf/pbr');
+    throw new MargoError(
+      'unsupported',
+      'Materials require the standard gltf/pbr shader; draw the mesh with gltf/pbr',
+    );
   if (bareCode.size >= 64) bareCode.clear();
   bareCode.set(source, out);
   return out;
@@ -2402,8 +2306,6 @@ export class Material {
   /** The environment map and how it is read (env-map.ts). */
   private readonly env: {
     map: EnvMapSource | null;
-    /** Holds `map` by the borrowed-object rule when it is a function, a GPUTexture or a plain object; null for live objects. */
-    slot: BorrowSlot<Exclude<EnvMapSource, (device: GPUDevice) => unknown>, EnvMapSource> | null;
     intensity: number;
     rotation: number;
     mode: 'reflection' | 'refraction';
@@ -2412,7 +2314,6 @@ export class Material {
     reflectivity: number;
   } = {
     map: null,
-    slot: null,
     intensity: 1,
     rotation: 0,
     mode: 'reflection',
@@ -2515,8 +2416,7 @@ export class Material {
   }
   set clippingPlanes(v: readonly (readonly number[])[]) {
     if (!Array.isArray(v)) throw new TypeError('Material clippingPlanes must be an array of [a, b, c, d] planes');
-    if (v.length > maxPlanes)
-      throw new RangeError(`Material clippingPlanes holds at most ${maxPlanes} planes; pass fewer`);
+    if (v.length > maxPlanes) throw new RangeError(`Material clippingPlanes holds at most ${maxPlanes} planes; pass fewer`);
     const flat: number[] = [];
     for (const p of v) {
       if (
@@ -3483,13 +3383,7 @@ export class Material {
   set envMap(v: EnvMapSource | null) {
     if (v != null && !['standard', 'basic', 'lambert', 'phong'].includes(this.shading))
       throw new TypeError(`Material envMap needs standard, basic, lambert or phong shading, not '${this.shading}'`);
-    const map = v == null ? null : envSource(v);
-    this.env.map = map;
-    // A Texture, an Environment and a CubeCamera are live objects; the rest belongs to one device.
-    this.env.slot =
-      map && (typeof map === 'function' || gpuTexture(map) || isOptionObject(map))
-        ? borrow(map, 'Material envMap', 'set material.envMap')
-        : null;
+    this.env.map = v == null ? null : envSource(v);
   }
   /** Scales the envMap's light, finite and >= 0 (default 1). */
   get envMapIntensity(): number {
@@ -3732,11 +3626,7 @@ export class Material {
       const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer } }];
       // One sampler per texture: it repeats under triplanar when any UV0 slot reads the texture.
       const tiled = (texture: Texture) =>
-        mapSlots.some(
-          (k, i) =>
-            this[k] === texture &&
-            projected(this, this.uvt.length > i * 8 ? this.uvt : this.uvDefault, this.uvt.length > i * 8 ? i * 8 : 0),
-        );
+        mapSlots.some((k, i) => this[k] === texture && projected(this, this.uvt.length > i * 8 ? this.uvt : this.uvDefault, this.uvt.length > i * 8 ? i * 8 : 0));
       const bound = plan.textures.map(({ texture, srgb, fallback: role }) => {
         const pair = texture.sampled(device, srgb, 'map', tiled(texture));
         if (pair) return pair;
@@ -3754,13 +3644,8 @@ export class Material {
     for (let i = 0; i < (this.shading === 'matcap' ? 6 : 5); i++) {
       const texture = this[slots[i]],
         // The matcap is read by the view normal, never by the UVs.
-        tile =
-          i < 5 &&
-          projected(this, this.uvt.length > i * 8 ? this.uvt : this.uvDefault, this.uvt.length > i * 8 ? i * 8 : 0),
-        bound = texture?.sampled(device, i === 0 || i >= 4, slots[i], tile) ?? [
-          i === 2 ? d.normal : d.white,
-          d.sampler,
-        ];
+        tile = i < 5 && projected(this, this.uvt.length > i * 8 ? this.uvt : this.uvDefault, this.uvt.length > i * 8 ? i * 8 : 0),
+        bound = texture?.sampled(device, i === 0 || i >= 4, slots[i], tile) ?? [i === 2 ? d.normal : d.white, d.sampler];
       entries.push({ binding: 32 + i * 2, resource: bound[0] }, { binding: 33 + i * 2, resource: bound[1] });
     }
     if (this.shading === 'depth' || this.shading === 'distance') {
@@ -4205,7 +4090,6 @@ const envSamplers = new WeakMap<GPUDevice, GPUSampler>(),
   blackCubes = new WeakMap<GPUDevice, GPUTextureView>();
 /** Checks an envMap value: a cube Texture, an Environment, a cube render target or a six-layer GPUTexture. */
 function envSource(v: unknown): EnvMapSource {
-  if (typeof v === 'function') return v as EnvMapSource;
   if (v instanceof Texture) {
     if (v.dimension !== 'cube')
       throw new TypeError(`Material envMap must be a cube Texture, not a ${v.dimension} one; use a CubeTexture`);
@@ -4222,36 +4106,17 @@ function envSource(v: unknown): EnvMapSource {
     'Material envMap must be a CubeTexture, an Environment, a cube render target {texture, view} or a six-layer GPUTexture; pass one of those or null',
   );
 }
-/** A 1 x 1 black cube: what a cube whose images are still loading, or whose plain object was lost, reflects. */
-function blackCube(device: GPUDevice): GPUTextureView {
-  let black = blackCubes.get(device);
-  if (!black) {
-    const texture = device.createTexture({
-      size: [1, 1, 6],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-    device.queue.writeTexture({ texture }, new Uint8Array(24), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 6]);
-    blackCubes.set(device, (black = texture.createView({ dimension: 'cube' })));
-  }
-  return black;
-}
 /** The envMap's cube, sampler and uniform for `m` on `device` (188-190). */
 function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGroupEntry[] {
-  const e = m['env'];
-  let map: Exclude<EnvMapSource, (device: GPUDevice) => unknown> | undefined;
-  if (e.slot) {
-    const made = lend(e.slot, device, owner as Engine);
-    map = made === undefined ? undefined : (envSource(made) as typeof map);
-  } else map = e.map as typeof map;
+  const e = m['env'],
+    map = e.map!;
   let view: GPUTextureView,
     sampler: GPUSampler | undefined,
     levels = 1,
     sh: ArrayLike<number> | undefined,
     rotation = e.rotation,
     intensity = e.intensity;
-  if (!map) view = blackCube(device);
-  else if (map instanceof Texture) {
+  if (map instanceof Texture) {
     if (map.unfilterable && !device.features.has('float32-filterable'))
       throw new MargoError(
         'unsupported',
@@ -4261,7 +4126,18 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
     levels = map.gpuTexture(device)?.mipLevelCount ?? 1;
     if (pair) [view, sampler] = pair;
     else {
-      view = blackCube(device);
+      // A cube whose face images are still loading reflects black.
+      let black = blackCubes.get(device);
+      if (!black) {
+        const texture = device.createTexture({
+          size: [1, 1, 6],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        device.queue.writeTexture({ texture }, new Uint8Array(24), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 6]);
+        blackCubes.set(device, (black = texture.createView({ dimension: 'cube' })));
+      }
+      view = black;
     }
   } else if ('specularView' in map) {
     view = map.specularView;
@@ -4271,7 +4147,7 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
     rotation += map.rotation;
     intensity *= map.intensity * (map.radianceScale ?? 1);
   } else {
-    const texture = 'view' in map ? map.texture : (map as GPUTexture);
+    const texture = 'view' in map ? map.texture : map;
     levels = texture.mipLevelCount;
     if ('view' in map) view = map.view;
     else {
@@ -4483,9 +4359,8 @@ class MaterialShading implements PBRMaterialShading {
   }
   bindings(): GPUBindGroupEntry[] {
     const m = this.m,
-      runtime = this.runtime;
-    noteEngine(runtime);
-    const entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
+      runtime = this.runtime,
+      entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
       all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries,
       out = m['clipping'].length ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }] : all;
     if (!m['added'].length) return out;

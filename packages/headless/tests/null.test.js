@@ -140,3 +140,4 @@ test('creation cancellation and invalid options preserve globals', async () => {
   await assert.rejects(createNullStage({ width: 0 }), RangeError);
   await assert.rejects(createNullStage({ onError: 'bad' }), TypeError);
 });
+

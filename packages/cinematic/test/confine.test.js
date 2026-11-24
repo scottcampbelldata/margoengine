@@ -176,16 +176,7 @@ test('a camera held on the margin stays there, and a repeated outline point does
 });
 
 test('a point already well inside does not move', () => {
-  const area = new CameraConfiner(
-      {
-        area: [
-          [0, 0],
-          [10, 0],
-          [5, 10],
-        ],
-      },
-      { margin: 0.5 },
-    ),
+  const area = new CameraConfiner({ area: [[0, 0], [10, 0], [5, 10]] }, { margin: 0.5 }),
     p = at(5, 7, 3);
   area.update(p);
   assert.deepEqual([...p.position], [5, 7, 3]);
@@ -228,49 +219,8 @@ test('errors say what to pass', () => {
   assert.throws(() => new CameraConfiner({ min: [1, 0, 0], max: [0, 1, 1] }), fixes(/bounds/));
   assert.throws(() => new CameraConfiner({ min: [NaN, 0, 0], max: [0, 1, 1] }), fixes(/box/));
   assert.throws(() => new CameraConfiner({ min: [0, 0, 0] }), fixes(/box/));
-  assert.throws(
-    () =>
-      new CameraConfiner({
-        area: [
-          [0, 0],
-          [1, 1],
-        ],
-      }),
-    fixes(/area/),
-  );
-  assert.throws(
-    () =>
-      new CameraConfiner({
-        area: [
-          [0, 0],
-          [1, 1],
-          [NaN, 2],
-        ],
-      }),
-    fixes(/area/),
-  );
-  assert.throws(
-    () =>
-      new CameraConfiner({
-        area: [
-          [0, 0],
-          [1, 1],
-          [2, 2],
-        ],
-      }),
-    fixes(/area/),
-  );
-  assert.throws(
-    () =>
-      new CameraConfiner({
-        area: [
-          [0, 0],
-          [1, 0],
-          [0, 1],
-        ],
-        bottom: 3,
-        top: 1,
-      }),
-    fixes(/bounds/),
-  );
+  assert.throws(() => new CameraConfiner({ area: [[0, 0], [1, 1]] }), fixes(/area/));
+  assert.throws(() => new CameraConfiner({ area: [[0, 0], [1, 1], [NaN, 2]] }), fixes(/area/));
+  assert.throws(() => new CameraConfiner({ area: [[0, 0], [1, 1], [2, 2]] }), fixes(/area/));
+  assert.throws(() => new CameraConfiner({ area: [[0, 0], [1, 0], [0, 1]], bottom: 3, top: 1 }), fixes(/bounds/));
 });

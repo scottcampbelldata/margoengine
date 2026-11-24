@@ -4,21 +4,9 @@ import type { Geometry, Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { Text as TextBlock, TextOptions, TextRenderer, Font } from '@margoengine/text';
 import type { ExtrudeTextOptions, FontLike, FontOutlines } from '@margoengine/text/extrude';
 import { Mesh, PbrMaterial, type MeshProps, type MeshRef, type PbrMaterialProps } from './components.js';
-import {
-  useScene,
-  useCommit,
-  useLiveRef,
-  useMesh,
-  live,
-  setGeometry,
-  assignRef,
-  zero,
-  report,
-  type Scene,
-} from './internal.js';
+import { useScene, useCommit, useLiveRef, useMesh, live, setGeometry, assignRef, zero, report, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { fault } from '../../shared/errors.js';
-import { sceneOwner } from './scene-owner.js';
 
 interface ErrorProps {
   onError?: (error: unknown) => void;
@@ -28,10 +16,9 @@ interface TextRendererLease {
   users: number;
   promise: Promise<{ renderer: TextRenderer; api: typeof import('@margoengine/text') }>;
 }
-// One renderer per scene the Text sits in: the enclosing <Scene>'s world, else the engine's default scene.
-const renderers = new WeakMap<object, TextRendererLease>();
+const renderers = new WeakMap<Scene['engine'], TextRendererLease>();
 function acquireTextRenderer(scene: Scene): TextRendererLease {
-  let entry = renderers.get(sceneOwner(scene));
+  let entry = renderers.get(scene.engine);
   if (!entry) {
     entry = {
       users: 0,
@@ -39,11 +26,11 @@ function acquireTextRenderer(scene: Scene): TextRendererLease {
         if (scene.engine.disposed)
           throw fault('disposed', 'Canvas is disposed; render the component inside a live <Canvas>', 'react-usage');
         const renderer = new api.TextRenderer({ name: 'margoengine-react:text' });
-        sceneOwner(scene).use(renderer);
+        scene.engine.use(renderer);
         return { renderer, api };
       }),
     };
-    renderers.set(sceneOwner(scene), entry);
+    renderers.set(scene.engine, entry);
   }
   entry.users++;
   return entry;
@@ -51,11 +38,11 @@ function acquireTextRenderer(scene: Scene): TextRendererLease {
 function releaseTextRenderer(scene: Scene, entry: TextRendererLease): void {
   if (--entry.users) return;
   queueMicrotask(() => {
-    if (entry.users || renderers.get(sceneOwner(scene)) !== entry) return;
-    renderers.delete(sceneOwner(scene));
+    if (entry.users || renderers.get(scene.engine) !== entry) return;
+    renderers.delete(scene.engine);
     void entry.promise.then(
       ({ renderer }) => {
-        sceneOwner(scene).removePlugin(renderer.name);
+        scene.engine.removePlugin(renderer.name);
         renderer.dispose();
       },
       () => {},
@@ -158,7 +145,7 @@ export const Text = /* @__PURE__ */ forwardRef<TextBlock, TextProps>(function Te
       }
       releaseTextRenderer(scene, entry);
     };
-  }, [scene.engine, scene.world, scene.registry]);
+  }, [scene.engine, scene.registry]);
   useCommit(() => {
     if (item) apply.current(item);
   });
@@ -216,11 +203,7 @@ function loadFont(api: ExtrudeApi, url: string, variations: object | undefined):
     font = fetch(url)
       .then((response) => {
         if (!response.ok)
-          throw fault(
-            'failed',
-            `Text3D: ${url} answered ${response.status}; pass the URL of a TTF or OTF font`,
-            'react-usage',
-          );
+          throw fault('failed', `Text3D: ${url} answered ${response.status}; pass the URL of a TTF or OTF font`, 'react-usage');
         return response.arrayBuffer();
       })
       .then(async (bytes) => api.parseFontOutlines(bytes, { openType: await readersFor(bytes, variations) }));
@@ -235,24 +218,7 @@ function Text3DGeometry({ text, options }: { text: string; options: Omit<Text3DP
     registry = useMesh(),
     latest = useRef(options);
   latest.current = options;
-  const {
-      font,
-      height,
-      onError,
-      onBuild,
-      smooth,
-      smoothAngle = 180,
-      position,
-      rotation,
-      scale,
-      castShadow,
-      receiveShadow,
-      layers,
-      color,
-      roughness,
-      metalness,
-      ...extrusion
-    } = options,
+  const { font, height, onError, onBuild, smooth, smoothAngle = 180, position, rotation, scale, castShadow, receiveShadow, layers, color, roughness, metalness, ...extrusion } = options,
     url = typeof font === 'string' || font instanceof URL ? String(font) : null;
   const key = JSON.stringify([text, url, height, smooth, smoothAngle, extrusion]);
   // Bytes and parsed fonts count by identity: a new one rebuilds the text.
@@ -264,31 +230,18 @@ function Text3DGeometry({ text, options }: { text: string; options: Omit<Text3DP
       if (geometry) setGeometry(registry, mesh, geometry);
     };
     // Core is loaded here, not at the top, so the entry's Text alone does not reach for the Geometry class.
-    Promise.all([
-      optionalPeer('@margoengine/text', () => import('@margoengine/text/extrude')),
-      import('@margoengine/core/extension'),
-    ])
+    Promise.all([optionalPeer('@margoengine/text', () => import('@margoengine/text/extrude')), import('@margoengine/core/extension')])
       .then(async ([api, core]) => {
-        const source =
-          url !== null
-            ? await loadFont(api, url, extrusion.variations)
-            : (fontObject as Exclude<Text3DFont, string | URL>);
+        const source = url !== null ? await loadFont(api, url, extrusion.variations) : (fontObject as Exclude<Text3DFont, string | URL>);
         const bytes = source instanceof ArrayBuffer || ArrayBuffer.isView(source) ? source : null,
           openType = bytes ? await readersFor(bytes, extrusion.variations) : undefined;
         if (!active || scene.engine.disposed) return;
         const { height: alias, depth = alias, onBuild: built } = latest.current,
-          data = api.extrudeText(text, {
-            ...extrusion,
-            ...(depth === undefined ? {} : { depth }),
-            font: source,
-            openType,
-          });
+          data = api.extrudeText(text, { ...extrusion, ...(depth === undefined ? {} : { depth }), font: source, openType });
         if (smooth !== undefined) {
           const utils = await optionalPeer('@margoengine/geometry', () => import('@margoengine/geometry/utils'));
           if (!active || scene.engine.disposed) return;
-          data.normals.set(
-            utils.creasedNormals(data.positions, { indices: data.indices, tolerance: smooth, angle: smoothAngle }),
-          );
+          data.normals.set(utils.creasedNormals(data.positions, { indices: data.indices, tolerance: smooth, angle: smoothAngle }));
         }
         geometry = data.toGeometry(core.Geometry) as Geometry;
         registry.attachments.add(attach);
@@ -314,26 +267,15 @@ function Text3DGeometry({ text, options }: { text: string; options: Omit<Text3DP
  * are the text; other children (a material) go inside the mesh. The ref is the mesh.
  */
 export const Text3D = /* @__PURE__ */ forwardRef<MeshRef, Text3DProps>(function Text3D(props, ref) {
-  const { children, text, position, rotation, scale, castShadow, receiveShadow, layers, color, roughness, metalness } =
-      props,
+  const { children, text, position, rotation, scale, castShadow, receiveShadow, layers, color, roughness, metalness } = props,
     parts = Children.toArray(children),
     content = text ?? parts.filter((part) => typeof part === 'string' || typeof part === 'number').join(''),
     rest = parts.filter((part) => typeof part !== 'string' && typeof part !== 'number'),
     { children: _children, text: _text, ...options } = props;
   return (
-    <Mesh
-      ref={ref}
-      position={position}
-      rotation={rotation}
-      scale={scale}
-      castShadow={castShadow}
-      receiveShadow={receiveShadow}
-      layers={layers}
-    >
+    <Mesh ref={ref} position={position} rotation={rotation} scale={scale} castShadow={castShadow} receiveShadow={receiveShadow} layers={layers}>
       <Text3DGeometry text={content} options={options} />
-      {(color !== undefined || roughness !== undefined || metalness !== undefined) && (
-        <PbrMaterial color={color} roughness={roughness} metalness={metalness} />
-      )}
+      {(color !== undefined || roughness !== undefined || metalness !== undefined) && <PbrMaterial color={color} roughness={roughness} metalness={metalness} />}
       {rest}
     </Mesh>
   );

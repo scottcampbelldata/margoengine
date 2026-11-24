@@ -35,43 +35,20 @@ export interface EncoderOptions {
 export const H264_COLOUR_TAGS =
   'h264_metadata=colour_primaries=1:transfer_characteristics=13:matrix_coefficients=1:video_full_range_flag=0:chroma_sample_loc_type=0';
 
-const X264_PRESETS = [
-    'ultrafast',
-    'superfast',
-    'veryfast',
-    'faster',
-    'fast',
-    'medium',
-    'slow',
-    'slower',
-    'veryslow',
-    'placebo',
-  ],
+const X264_PRESETS = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'],
   NVENC_PRESETS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
 
 // Constant quality on each: x264's CRF, NVENC's variable rate with a target CQ and no rate cap, AMF's constant QP, QSV's
 // intelligent constant quality; each takes the frame in system memory in a pixel format it reads.
-const ENCODERS: Record<
-  FFmpegEncoder,
-  { codec: string; format: string; presets?: string[]; args: (q: number, preset?: string) => string[] }
-> = {
-  x264: {
-    codec: 'libx264',
-    format: 'yuv420p',
-    presets: X264_PRESETS,
-    args: (q, p) => [...(p ? ['-preset', p] : []), '-crf', String(q)],
-  },
+const ENCODERS: Record<FFmpegEncoder, { codec: string; format: string; presets?: string[]; args: (q: number, preset?: string) => string[] }> = {
+  x264: { codec: 'libx264', format: 'yuv420p', presets: X264_PRESETS, args: (q, p) => [...(p ? ['-preset', p] : []), '-crf', String(q)] },
   nvenc: {
     codec: 'h264_nvenc',
     format: 'yuv420p',
     presets: NVENC_PRESETS,
     args: (q, p = 'p5') => ['-preset', p, '-tune', 'hq', '-rc', 'vbr', '-cq', String(q), '-b:v', '0'],
   },
-  amf: {
-    codec: 'h264_amf',
-    format: 'nv12',
-    args: (q) => ['-quality', 'quality', '-rc', 'cqp', '-qp_i', String(q), '-qp_p', String(q), '-qp_b', String(q)],
-  },
+  amf: { codec: 'h264_amf', format: 'nv12', args: (q) => ['-quality', 'quality', '-rc', 'cqp', '-qp_i', String(q), '-qp_p', String(q), '-qp_b', String(q)] },
   qsv: { codec: 'h264_qsv', format: 'nv12', args: (q) => ['-global_quality', String(q)] },
 };
 
@@ -80,31 +57,13 @@ const ENCODERS: Record<
  * left chroma as encodeWithFFmpeg's default, the stream's VUI rewritten by {@link H264_COLOUR_TAGS} whatever the encoder
  * writes, and `+faststart`. Pass them as encodeWithFFmpeg's `args`.
  */
-export function encoderArguments(
-  encoder: FFmpegEncoder = 'x264',
-  { quality = 20, preset }: EncoderOptions = {},
-): string[] {
+export function encoderArguments(encoder: FFmpegEncoder = 'x264', { quality = 20, preset }: EncoderOptions = {}): string[] {
   const e = Object.hasOwn(ENCODERS, encoder) ? ENCODERS[encoder] : undefined;
   if (!e) throw rangeError(`Unknown encoder ${String(encoder)}; use 'x264', 'nvenc', 'amf' or 'qsv'`, 'headless');
-  if (!Number.isInteger(quality) || quality < 1 || quality > 51)
-    throw rangeError('Encoder quality must be a whole number from 1 to 51', 'headless');
+  if (!Number.isInteger(quality) || quality < 1 || quality > 51) throw rangeError('Encoder quality must be a whole number from 1 to 51', 'headless');
   if (preset !== undefined && !e.presets?.includes(preset))
-    throw rangeError(
-      e.presets ? `The ${encoder} preset is one of ${e.presets.join(', ')}` : `The ${encoder} encoder takes no preset`,
-      'headless',
-    );
-  return [
-    '-vf',
-    colourFilter(e.format),
-    ...COLOUR_TAGS,
-    '-c:v',
-    e.codec,
-    ...e.args(quality, preset),
-    '-bsf:v',
-    H264_COLOUR_TAGS,
-    '-movflags',
-    '+faststart',
-  ];
+    throw rangeError(e.presets ? `The ${encoder} preset is one of ${e.presets.join(', ')}` : `The ${encoder} encoder takes no preset`, 'headless');
+  return ['-vf', colourFilter(e.format), ...COLOUR_TAGS, '-c:v', e.codec, ...e.args(quality, preset), '-bsf:v', H264_COLOUR_TAGS, '-movflags', '+faststart'];
 }
 
 /** Options shared by the file tools. */
@@ -127,11 +86,7 @@ function runFFmpeg(args: readonly string[], { ffmpeg = 'ffmpeg', signal }: FFmpe
     child.stderr!.setEncoding('utf8').on('data', (text: string) => (log = (log + text).slice(-4096)));
     child.once('error', (error: NodeJS.ErrnoException) => {
       signal?.removeEventListener('abort', stop);
-      fail(
-        error.code === 'ENOENT'
-          ? Object.assign(fault('unsupported', 'ffmpeg was not found', 'headless'), { cause: error })
-          : error,
-      );
+      fail(error.code === 'ENOENT' ? Object.assign(fault('unsupported', 'ffmpeg was not found', 'headless'), { cause: error }) : error);
     });
     child.once('close', (code) => {
       signal?.removeEventListener('abort', stop);
@@ -144,10 +99,7 @@ function runFFmpeg(args: readonly string[], { ffmpeg = 'ffmpeg', signal }: FFmpe
 
 /** Writes through a temporary file beside `output`, renamed in place once ffmpeg succeeds, so a failure leaves no half file. */
 async function writeVia(output: string, make: (temp: string) => Promise<void>): Promise<void> {
-  const temp = join(
-    dirname(output),
-    `.${basename(output)}.${process.pid}.part${/\.[^./\\]+$/.exec(output)?.[0] ?? ''}`,
-  );
+  const temp = join(dirname(output), `.${basename(output)}.${process.pid}.part${/\.[^./\\]+$/.exec(output)?.[0] ?? ''}`);
   try {
     await make(temp);
     await rename(temp, output);
@@ -283,8 +235,7 @@ export async function readVideoTrack(path: string): Promise<VideoTrack> {
           for (let i = 0; i < count; i++) offset.push(value);
         }
       const sync = stss ? new Set<number>() : undefined;
-      if (stss)
-        for (let e = 0, n = m.readUInt32BE(stss.body + 4); e < n; e++) sync!.add(m.readUInt32BE(stss.body + 8 + e * 4));
+      if (stss) for (let e = 0, n = m.readUInt32BE(stss.body + 4); e < n; e++) sync!.add(m.readUInt32BE(stss.body + 8 + e * 4));
       for (let i = 0; i < decode.length; i++) key.push(!sync || sync.has(i + 1));
       // Movie fragments (section 8.8): defaults from trex, then each moof's traf for this track.
       const trex = boxes(m, child(m, moov, 'mvex')?.body ?? 0, child(m, moov, 'mvex')?.end ?? 0).find(
@@ -319,8 +270,7 @@ export async function readVideoTrack(path: string): Promise<VideoTrack> {
               const duration = rf & 0x100 ? f.readUInt32BE(q) : defaultDuration;
               if (rf & 0x100) q += 4;
               if (rf & 0x200) q += 4;
-              const sampleFlags =
-                rf & 0x400 ? f.readUInt32BE(q) : i === 0 && first !== undefined ? first : defaultFlags;
+              const sampleFlags = rf & 0x400 ? f.readUInt32BE(q) : i === 0 && first !== undefined ? first : defaultFlags;
               if (rf & 0x400) q += 4;
               const cto = rf & 0x800 ? (version ? f.readInt32BE(q) : f.readUInt32BE(q)) : 0;
               if (rf & 0x800) q += 4;
@@ -395,14 +345,11 @@ export type SpanCheck = { ok: true; reason?: undefined } | { ok: false; reason: 
 
 const spanOf = (options: SpanOptions) => {
   const { start, frames, fps } = options;
-  if (!(start >= 0) || !Number.isFinite(start))
-    throw rangeError('The span start must be 0 or more seconds', 'headless');
-  if (!Number.isInteger(frames) || frames < 1)
-    throw rangeError('The span needs a whole number of frames, 1 or more', 'headless');
+  if (!(start >= 0) || !Number.isFinite(start)) throw rangeError('The span start must be 0 or more seconds', 'headless');
+  if (!Number.isInteger(frames) || frames < 1) throw rangeError('The span needs a whole number of frames, 1 or more', 'headless');
   if (!(fps > 0) || !Number.isFinite(fps)) throw rangeError('Invalid span fps', 'headless');
   const timescale = options.timescale ?? mp4Timescale(fps);
-  if (!Number.isInteger(timescale) || timescale < 1)
-    throw rangeError('The span timescale must be a whole number above 0', 'headless');
+  if (!Number.isInteger(timescale) || timescale < 1) throw rangeError('The span timescale must be a whole number above 0', 'headless');
   return { start, frames, fps, timescale };
 };
 
@@ -418,11 +365,9 @@ export async function checkSpan(path: string, options: SpanOptions): Promise<Spa
 }
 
 /** checkSpan's work, with the key frame's own time when the span can be copied. */
-async function inspectSpan(
-  path: string,
-  { start, frames, fps, timescale }: Required<SpanOptions>,
-): Promise<SpanCheck & { key?: number }> {
-  const track = await readVideoTrack(name(path, 'a file', 'checkSpan')),
+async function inspectSpan(path: string, { start, frames, fps, timescale }: Required<SpanOptions>): Promise<SpanCheck & { key?: number }> {
+  const
+    track = await readVideoTrack(name(path, 'a file', 'checkSpan')),
     no = (reason: string): SpanCheck => ({ ok: false, reason }),
     half = 0.5 / timescale;
   if (track.codec !== 'avc1' && track.codec !== 'avc3') return no(`it is ${track.codec}, not H.264`);
@@ -434,10 +379,7 @@ async function inspectSpan(
   for (const s of span) {
     const k = Math.round((s.time - start) * fps);
     if (k < 0) return no(`a frame before ${start} s is decoded after its key frame (an open GOP)`);
-    if (k >= frames || seen.has(k))
-      return no(
-        `its first ${frames} frames from ${start} s are not the ${frames} frames of the span: the next key frame is not at its end`,
-      );
+    if (k >= frames || seen.has(k)) return no(`its first ${frames} frames from ${start} s are not the ${frames} frames of the span: the next key frame is not at its end`);
     if (Math.abs(s.time - start - k / fps) >= half)
       return no(`a frame time is off the 1/${fps} s steps by more than half a tick of ${timescale}`);
     seen.add(k);
@@ -458,41 +400,20 @@ export async function copySpan(input: string, output: string, options: CopySpanO
   name(output, 'an output file', 'copySpan');
   const span = spanOf(options),
     check = await inspectSpan(input, span);
-  if (!check.ok)
-    throw fault(
-      'unsupported',
-      `${basename(input)} cannot be stream copied from ${span.start} s: ${check.reason}`,
-      'headless',
-    );
+  if (!check.ok) throw fault('unsupported', `${basename(input)} cannot be stream copied from ${span.start} s: ${check.reason}`, 'headless');
   // Seek to the key frame's own time rounded up to ffmpeg's microseconds, so the seek, which takes the last key frame
   // at or before its time, never lands on the key frame before.
   const seek = (Math.ceil(check.key! * 1e6) / 1e6).toFixed(6);
   await writeVia(output, (temp) =>
     runFFmpeg(
       [
-        '-y',
-        '-v',
-        'error',
-        '-nostdin',
-        '-ss',
-        seek,
-        '-i',
-        input,
-        '-map',
-        '0:v:0',
-        '-an',
-        '-sn',
-        '-dn',
-        '-frames:v',
-        String(span.frames),
-        '-c',
-        'copy',
-        '-bsf:v',
-        H264_COLOUR_TAGS,
-        '-video_track_timescale',
-        String(span.timescale),
-        '-movflags',
-        '+faststart',
+        '-y', '-v', 'error', '-nostdin',
+        '-ss', seek, '-i', input,
+        '-map', '0:v:0', '-an', '-sn', '-dn',
+        '-frames:v', String(span.frames),
+        '-c', 'copy', '-bsf:v', H264_COLOUR_TAGS,
+        '-video_track_timescale', String(span.timescale),
+        '-movflags', '+faststart',
         temp,
       ],
       options,
@@ -515,57 +436,24 @@ export interface JoinOptions extends FFmpegFileOptions {
  * `+faststart`. The files must share codec, size and frame rate, as chunks of one render do. Resolves the sample
  * entry written for H.264 MP4 or MOV inputs (`'avc1'` or `'avc3'`), else undefined.
  */
-export async function joinVideos(
-  inputs: readonly string[],
-  output: string,
-  options: JoinOptions = {},
-): Promise<'avc1' | 'avc3' | undefined> {
+export async function joinVideos(inputs: readonly string[], output: string, options: JoinOptions = {}): Promise<'avc1' | 'avc3' | undefined> {
   if (!Array.isArray(inputs) || !inputs.length) throw typeError('joinVideos needs one or more input files', 'headless');
   for (const input of inputs) name(input, 'input files', 'joinVideos');
   name(output, 'an output file', 'joinVideos');
   const mode = options.sampleEntry ?? 'auto';
   if (!['auto', 'avc1', 'avc3'].includes(mode)) throw rangeError("sampleEntry is 'auto', 'avc1' or 'avc3'", 'headless');
   options.signal?.throwIfAborted();
-  const configs = await Promise.all(
-      inputs.map((f) =>
-        readVideoTrack(f).then(
-          (t) => t.avcConfig,
-          () => undefined,
-        ),
-      ),
-    ),
+  const configs = await Promise.all(inputs.map((f) => readVideoTrack(f).then((t) => t.avcConfig, () => undefined))),
     h264 = configs.every((c) => c !== undefined),
     differ = h264 && configs.some((c) => Buffer.compare(c!, configs[0]!) !== 0),
     entry = !h264 ? undefined : mode === 'auto' ? (differ ? 'avc3' : 'avc1') : mode;
   // The concat list (ffmpeg's ffconcat format): absolute paths in single quotes, a quote written as '\''.
   const list = join(dirname(resolve(output)), `.${basename(output)}.${process.pid}.ffconcat`);
-  await writeFile(
-    list,
-    'ffconcat version 1.0\n' + inputs.map((f) => `file '${resolve(f).replace(/'/g, "'\\''")}'\n`).join(''),
-  );
+  await writeFile(list, 'ffconcat version 1.0\n' + inputs.map((f) => `file '${resolve(f).replace(/'/g, "'\\''")}'\n`).join(''));
   try {
     await writeVia(output, (temp) =>
       runFFmpeg(
-        [
-          '-y',
-          '-v',
-          'error',
-          '-nostdin',
-          '-f',
-          'concat',
-          '-safe',
-          '0',
-          '-i',
-          list,
-          '-map',
-          '0',
-          '-c',
-          'copy',
-          ...(entry ? ['-tag:v', entry] : []),
-          '-movflags',
-          '+faststart',
-          temp,
-        ],
+        ['-y', '-v', 'error', '-nostdin', '-f', 'concat', '-safe', '0', '-i', list, '-map', '0', '-c', 'copy', ...(entry ? ['-tag:v', entry] : []), '-movflags', '+faststart', temp],
         options,
       ),
     );
@@ -591,12 +479,7 @@ export interface AddSoundOptions extends FFmpegFileOptions {
  * Lays the sound file `sound` (WAV, FLAC, MP3, AAC or any file ffmpeg reads; its first audio stream) under the video
  * `video` without encoding the picture again (`-c:v copy`), into `output`. Any sound the video had is replaced.
  */
-export async function addSound(
-  video: string,
-  sound: string,
-  output: string,
-  options: AddSoundOptions = {},
-): Promise<void> {
+export async function addSound(video: string, sound: string, output: string, options: AddSoundOptions = {}): Promise<void> {
   name(video, 'a video file', 'addSound');
   name(sound, 'a sound file', 'addSound');
   name(output, 'an output file', 'addSound');
@@ -604,34 +487,19 @@ export async function addSound(
     codec = options.codec ?? (webm ? 'opus' : 'aac'),
     bitrate = options.bitrate ?? 192_000,
     offset = options.offset ?? 0;
-  if (!['aac', 'opus', 'copy'].includes(codec))
-    throw rangeError("addSound codec is 'aac', 'opus' or 'copy'", 'headless');
+  if (!['aac', 'opus', 'copy'].includes(codec)) throw rangeError("addSound codec is 'aac', 'opus' or 'copy'", 'headless');
   if (!(bitrate > 0) || !Number.isFinite(bitrate)) throw rangeError('Invalid addSound bitrate', 'headless');
-  if (!(offset >= 0) || !Number.isFinite(offset))
-    throw rangeError('addSound offset must be 0 or more seconds', 'headless');
-  const audio =
-    codec === 'copy'
-      ? ['-c:a', 'copy']
-      : ['-c:a', codec === 'opus' ? 'libopus' : 'aac', '-b:a', String(Math.round(bitrate))];
+  if (!(offset >= 0) || !Number.isFinite(offset)) throw rangeError('addSound offset must be 0 or more seconds', 'headless');
+  const audio = codec === 'copy' ? ['-c:a', 'copy'] : ['-c:a', codec === 'opus' ? 'libopus' : 'aac', '-b:a', String(Math.round(bitrate))];
   await writeVia(output, (temp) =>
     runFFmpeg(
       [
-        '-y',
-        '-v',
-        'error',
-        '-nostdin',
-        '-i',
-        video,
+        '-y', '-v', 'error', '-nostdin',
+        '-i', video,
         ...(offset ? ['-itsoffset', String(offset)] : []),
-        '-i',
-        sound,
-        '-map',
-        '0:v:0',
-        '-map',
-        '1:a:0',
-        '-c:v',
-        'copy',
-        ...audio,
+        '-i', sound,
+        '-map', '0:v:0', '-map', '1:a:0',
+        '-c:v', 'copy', ...audio,
         ...(options.shortest ? ['-shortest'] : []),
         ...(webm ? [] : ['-movflags', '+faststart']),
         temp,

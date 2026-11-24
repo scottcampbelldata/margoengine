@@ -54,8 +54,7 @@ export function isSubtypeOf(schema: string | IFCSchemaSource, type: string, ance
     schema = schema.schema;
   }
   const { classes } = treeOf(schema);
-  for (let at: string | undefined = type.toUpperCase(); at !== undefined; at = classes.get(at)?.parent)
-    if (at === want) return true;
+  for (let at: string | undefined = type.toUpperCase(); at !== undefined; at = classes.get(at)?.parent) if (at === want) return true;
   return false;
 }
 
@@ -63,8 +62,7 @@ export function isSubtypeOf(schema: string | IFCSchemaSource, type: string, ance
 export function supertypesOf(schema: string, type: string): string[] {
   const { classes } = treeOf(schema),
     out: string[] = [];
-  for (let at = classes.get(type.toUpperCase())?.parent; at !== undefined; at = classes.get(at)?.parent)
-    out.push(classes.get(at)!.name);
+  for (let at = classes.get(type.toUpperCase())?.parent; at !== undefined; at = classes.get(at)?.parent) out.push(classes.get(at)!.name);
   return out;
 }
 

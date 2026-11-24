@@ -26,12 +26,7 @@ test('float colours default to linear, and may say otherwise; bytes are 0..255',
   assert.equal(new PointCloud({ positions }).colorSpace, 'srgb');
   const bytes = new PointCloud({ positions, colors: new Uint8Array(9).fill(255), colorFormat: 'float' });
   assert.deepEqual([...bytes.floatColors.slice(0, 4)], [1, 1, 1, 1]);
-  const four = new PointCloud({
-    positions,
-    colors: new Float32Array(12).fill(2),
-    colorComponents: 4,
-    colorFormat: 'float',
-  });
+  const four = new PointCloud({ positions, colors: new Float32Array(12).fill(2), colorComponents: 4, colorFormat: 'float' });
   assert.equal(four.floatColors[3], 2);
 });
 
@@ -64,14 +59,7 @@ test('reorder moves all four floats of a colour with its point', () => {
     xyz.set([i, (i * 7) % 13, (i * 3) % 11], i * 3);
     colors.set([i, i + 0.25, i + 0.5, i + 0.75], i * 4);
   }
-  const cloud = new PointCloud({
-      positions: xyz,
-      colors,
-      colorComponents: 4,
-      colorFormat: 'float',
-      reorder: true,
-      blockSize: 64,
-    }),
+  const cloud = new PointCloud({ positions: xyz, colors, colorComponents: 4, colorFormat: 'float', reorder: true, blockSize: 64 }),
     floats = cloud.floatColors;
   for (let i = 0; i < n; i++) {
     assert.equal(floats[i * 4], cloud.positions[i * 3], `colour of point ${i}`);

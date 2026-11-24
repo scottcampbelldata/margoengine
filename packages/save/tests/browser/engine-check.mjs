@@ -83,7 +83,7 @@ try {
     const { Animator } = await import('/packages/animator/dist/index.js');
     const { captureSceneState, restoreSceneState } = await import('/packages/save/dist/scene-state.js');
     const animated = await loadGLTF(engine, '/examples/assets/khronos/Fox/Fox.glb');
-    animated.root.setScale([0.02, 0.02, 0.02]);
+    animated.root.setScale([0.02,0.02,0.02]);
     const player = Animation.attach(animated);
     if (!player.clips.length) throw Error('Fox fixture needs animation clips');
     const clip = player.clips[0].name;

@@ -164,7 +164,7 @@ interface SkyFeatures {
 }
 
 interface SkyFogOptions {
-    depth?: () => GPUTexture | undefined;
+    depth: () => GPUTexture | undefined;
     density?: number;
     start?: number;
     falloff?: 'exp' | 'exp2';

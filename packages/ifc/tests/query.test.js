@@ -49,16 +49,11 @@ test('findElements property conditions compare SI values with the IDS tolerance,
   assert.deepEqual(findElements(data, { where: [{ name: 'Status', value: 'NEW' }] }), [60, 61, 62]);
   assert.deepEqual(findElements(data, { where: [{ name: /Thermal/, op: '<=', value: 1.5 }] }), [60, 61, 62]);
   assert.deepEqual(findElements(data, { where: [{ name: 'FireRating', op: 'contains', value: 'hr' }] }), [25]);
-  assert.deepEqual(
-    findElements(data, { type: 'IfcWindow', where: [{ name: 'FireRating', op: 'missing' }] }),
-    [60, 61, 62],
-  );
+  assert.deepEqual(findElements(data, { type: 'IfcWindow', where: [{ name: 'FireRating', op: 'missing' }] }), [60, 61, 62]);
   assert.deepEqual(findElements(data, { where: [{ name: 'FireRating', op: 'matches', value: '^[0-9]HR$' }] }), [25]);
   assert.ok(nearlyEqual(-10.000005, -10) && !nearlyEqual(-10.0001, -10) && !nearlyEqual(0.0000011, 0));
   // Negative targets get the same band as positive ones, v -/+ (|v| 1e-6 + 1e-6): -1 equals itself and -1.0000015.
-  assert.ok(
-    nearlyEqual(-1, -1) && nearlyEqual(-1.0000015, -1) && nearlyEqual(-0.9999985, -1) && !nearlyEqual(-1.0000021, -1),
-  );
+  assert.ok(nearlyEqual(-1, -1) && nearlyEqual(-1.0000015, -1) && nearlyEqual(-0.9999985, -1) && !nearlyEqual(-1.0000021, -1));
   assert.ok(nearlyEqual(-10.00001, -10) && nearlyEqual(-9.99999, -10) && !nearlyEqual(-10.0000111, -10));
 });
 
@@ -70,40 +65,18 @@ test('effective predefined types, ancestors, descendants and classifier groups',
   assert.deepEqual(findElements(data, { predefinedType: 'solidwall' }), [25]);
   assert.deepEqual(ancestorsOf(data, 25), [40, 32, 30, 1]);
   assert.deepEqual(descendantsOf(data, 32), [25, 40, 45, 60, 61, 62]);
-  assert.deepEqual(
-    [...groupElements(data, 'type')],
-    [
-      ['IfcProject', [1]],
-      ['IfcWall', [25]],
-      ['IfcSite', [30]],
-      ['IfcBuilding', [32]],
-      ['IfcBuildingStorey', [40]],
-      ['IfcSpace', [45]],
-      ['IfcWindow', [60, 61, 62]],
-    ],
-  );
-  assert.deepEqual(
-    groupElements(data, 'storey', [25, 60, 30]),
-    new Map([
-      ['Level 1', [25, 60]],
-      ['', [30]],
-    ]),
-  );
-  assert.deepEqual(
-    groupElements(data, 'material', [25, 60]),
-    new Map([
-      ['Concrete', [25]],
-      ['Insulation', [25]],
-      ['Glass', [60]],
-    ]),
-  );
-  assert.deepEqual(
-    groupElements(data, { set: 'Pset_WallCommon', name: 'IsExternal' }, [25, 60]),
-    new Map([
-      ['true', [25]],
-      ['', [60]],
-    ]),
-  );
+  assert.deepEqual([...groupElements(data, 'type')], [
+    ['IfcProject', [1]],
+    ['IfcWall', [25]],
+    ['IfcSite', [30]],
+    ['IfcBuilding', [32]],
+    ['IfcBuildingStorey', [40]],
+    ['IfcSpace', [45]],
+    ['IfcWindow', [60, 61, 62]],
+  ]);
+  assert.deepEqual(groupElements(data, 'storey', [25, 60, 30]), new Map([['Level 1', [25, 60]], ['', [30]]]));
+  assert.deepEqual(groupElements(data, 'material', [25, 60]), new Map([['Concrete', [25]], ['Insulation', [25]], ['Glass', [60]]]));
+  assert.deepEqual(groupElements(data, { set: 'Pset_WallCommon', name: 'IsExternal' }, [25, 60]), new Map([['true', [25]], ['', [60]]]));
   assert.deepEqual(groupElements(data, 'typeObject', [25]), new Map([['Concrete 200', [25]]]));
 });
 
@@ -124,13 +97,8 @@ test('class filters match subtypes by the schema inheritance, or the exact class
   // Each schema's own tree: IFC4X3 renames the parent to IfcBuiltElement and puts IfcBuilding under IfcFacility.
   assert.ok(isSubtypeOf('IFC4X3', 'IfcWallStandardCase', 'IfcBuiltElement'));
   assert.ok(!isSubtypeOf('IFC4', 'IfcWall', 'IfcBuiltElement'));
-  assert.ok(
-    isSubtypeOf('IFC4X3_ADD2', 'IFCBUILDING', 'IfcFacility') && !isSubtypeOf('IFC4', 'IfcBuilding', 'IfcFacility'),
-  );
-  assert.ok(
-    isSubtypeOf('IFC2X3', 'IfcUnknownClass', 'IFCUNKNOWNCLASS') &&
-      !isSubtypeOf('IFC2X3', 'IfcUnknownClass', 'IfcProduct'),
-  );
+  assert.ok(isSubtypeOf('IFC4X3_ADD2', 'IFCBUILDING', 'IfcFacility') && !isSubtypeOf('IFC4', 'IfcBuilding', 'IfcFacility'));
+  assert.ok(isSubtypeOf('IFC2X3', 'IfcUnknownClass', 'IFCUNKNOWNCLASS') && !isSubtypeOf('IFC2X3', 'IfcUnknownClass', 'IfcProduct'));
   // IFC2X3 models follow the IFC4 tree for the classes both schemas share.
   assert.deepEqual(supertypesOf('IFC2X3', 'IfcWallStandardCase'), [
     'IfcWall',
@@ -150,13 +118,7 @@ test('no IFC2X3 schema data ships: IFC2X3 models use the IFC4 tree, and IFC2X3-o
   const dist = new URL('../dist/', import.meta.url);
   for (const file of readdirSync(dist).filter((f) => f.endsWith('.js'))) {
     const shipped = readFileSync(new URL(file, dist), 'utf8');
-    for (const only2x3 of [
-      'ElectricalElement',
-      'EquipmentElement',
-      'BuildingElementComponent',
-      'GasTerminalType',
-      'IFC2X3_TREE',
-    ])
+    for (const only2x3 of ['ElectricalElement', 'EquipmentElement', 'BuildingElementComponent', 'GasTerminalType', 'IFC2X3_TREE'])
       assert.ok(!shipped.includes(only2x3), `dist/${file} holds the IFC2X3-only name ${only2x3}`);
   }
   assert.ok(!isSubtypeOf('IFC2X3', 'IfcElectricalElement', 'IfcElement'));

@@ -4,14 +4,7 @@ import { readFileSync } from 'node:fs';
 import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 
 const SIZES = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 },
-  TYPES = {
-    5120: Int8Array,
-    5121: Uint8Array,
-    5122: Int16Array,
-    5123: Uint16Array,
-    5125: Uint32Array,
-    5126: Float32Array,
-  };
+  TYPES = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
 
 function accessorReader(doc, bin) {
   return (index) => {
@@ -71,10 +64,7 @@ export function realSkin(url, pick = () => true) {
       p = accessor(primitive.attributes.POSITION),
       js = accessor(primitive.attributes.JOINTS_0),
       ws = accessor(primitive.attributes.WEIGHTS_0),
-      list =
-        primitive.indices === undefined
-          ? Array.from({ length: p.length / 3 }, (_, i) => i)
-          : accessor(primitive.indices),
+      list = primitive.indices === undefined ? Array.from({ length: p.length / 3 }, (_, i) => i) : accessor(primitive.indices),
       scale = { 5121: 255, 5123: 65535 }[doc.accessors[primitive.attributes.WEIGHTS_0].componentType] ?? 1;
     positions.push(...p);
     parts.push({ first: base, count: p.length / 3, indices: Uint32Array.from(list) });
@@ -219,9 +209,7 @@ export function realFigure(url, skip = () => false) {
         else positions.push(x, y, z);
       }
       const list =
-        primitive.indices === undefined
-          ? Array.from({ length: p.length / 3 }, (_, k) => k)
-          : accessor(primitive.indices);
+        primitive.indices === undefined ? Array.from({ length: p.length / 3 }, (_, k) => k) : accessor(primitive.indices);
       for (const k of list) indices.push(base + k);
     }
   });

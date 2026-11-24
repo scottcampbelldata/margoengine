@@ -20,26 +20,6 @@ class FakeOutline {
   }
 }
 mock.module('@margoengine/toon/outline', { namedExports: { MeshOutline: FakeOutline } });
-const modelMade = [];
-const fakeModelOutlines = (kind) =>
-  class {
-    static attach(engine, options) {
-      const outline = new this(options);
-      modelMade.push(outline);
-      return outline;
-    }
-    constructor(options) {
-      this.kind = kind;
-      this.options = options;
-      this.outline = options.outline;
-      this.disposed = false;
-    }
-    dispose() {
-      this.disposed = true;
-    }
-  };
-mock.module('@margoengine/toon/models', { namedExports: { ModelOutlines: fakeModelOutlines('world') } });
-mock.module('@margoengine/toon/screen-outline', { namedExports: { ModelOutlines: fakeModelOutlines('pixel') } });
 const dom = new JSDOM('<!doctype html><body></body>', { url: 'http://localhost' });
 Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
 const { render, act, cleanup } = await import('@testing-library/react');
@@ -55,14 +35,7 @@ async function scene() {
       backend: 'webgl2',
       fallback: () => ({ backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} }),
     });
-  const value = {
-    engine,
-    world: null,
-    registry: null,
-    shadows: null,
-    pointerHandlers: new Map(),
-    frames: { callbacks: new Set() },
-  };
+  const value = { engine, world: null, registry: null, shadows: null, pointerHandlers: new Map(), frames: { callbacks: new Set() } };
   scenes.push(value);
   return value;
 }
@@ -72,7 +45,6 @@ afterEach(() => {
   for (const s of scenes) s.engine.dispose();
   scenes.length = 0;
   made.length = 0;
-  modelMade.length = 0;
 });
 const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 const live = () => made.filter((o) => !o.disposed);
@@ -146,45 +118,4 @@ test('Outlines inside Instances outlines every drawn instance and follows mounts
   assert.equal(live().length, 1, 'instances past limit draw no outline');
   view.unmount();
   assert.equal(live().length, 0);
-});
-
-// drei outlines a skinnedMesh parent. Inside a <Model> the line is the model's own (ModelOutlines draws every
-// primitive from its deformer's vertices of the frame); MeshOutline drew the core mesh's CPU geometry, so a skinned
-// parent got nothing. A <Mesh> nearer than the model keeps the mesh outline.
-test('Outlines inside a Model outlines the whole model through ModelOutlines, live, and releases on unmount', async () => {
-  const { ModelContext } = await import('../dist/internal.js');
-  const s = await scene(),
-    model = { disposed: false };
-  const ui = (props, screenspace) =>
-    tree(s, h(ModelContext.Provider, { value: model }, h(Outlines, { color: '#ffffff', ...props, screenspace })));
-  const view = render(ui({ thickness: 0.2 }));
-  await settle();
-  const live2 = () => modelMade.filter((o) => !o.disposed);
-  assert.equal(live2().length, 1, 'one ModelOutlines');
-  assert.equal(live().length, 0, 'no MeshOutline');
-  const outline = live2()[0];
-  assert.equal(outline.kind, 'world');
-  assert.deepEqual(outline.options.models, [model]);
-  assert.equal(outline.options.outline, 0.2);
-  view.rerender(ui({ thickness: 0.4, color: [0, 1, 0], angle: 0 }));
-  await settle();
-  assert.equal(live2().length, 1, 'a prop edit keeps the outline');
-  assert.equal(outline.outline, 0.4);
-  assert.deepEqual(outline.color, [0, 1, 0]);
-  assert.equal(outline.smooth, false);
-  view.rerender(ui({ thickness: 3 }, true));
-  await settle();
-  assert.equal(live2().length, 1);
-  assert.equal(live2()[0].kind, 'pixel', 'screenspace draws the pixel-width variant');
-  view.unmount();
-  assert.equal(live2().length, 0);
-});
-
-test('Outlines in a Mesh inside a Model still outlines that mesh', async () => {
-  const { ModelContext } = await import('../dist/internal.js');
-  const s = await scene();
-  render(tree(s, h(ModelContext.Provider, { value: { disposed: false } }, h(Mesh, null, h(BoxGeometry), h(Outlines)))));
-  await settle();
-  assert.equal(live().length, 1);
-  assert.equal(modelMade.length, 0);
 });

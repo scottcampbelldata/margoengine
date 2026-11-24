@@ -19,9 +19,7 @@ export function float32Clears() {
     const colorAttachments = [...(descriptor.colorAttachments ?? [])].map((a) => {
       const c = a?.clearValue;
       if (!c) return a;
-      const clearValue = Array.isArray(c)
-        ? c.map(round)
-        : { r: round(c.r), g: round(c.g), b: round(c.b), a: round(c.a) };
+      const clearValue = Array.isArray(c) ? c.map(round) : { r: round(c.r), g: round(c.g), b: round(c.b), a: round(c.a) };
       return { ...a, clearValue };
     });
     return begin.call(this, { ...descriptor, colorAttachments });

@@ -12,21 +12,14 @@ export async function frameDiff(page, shot, a = 'a', b = 'b') {
   const samples = await page.evaluate(([x, y]) => window.msaaDiff(x, y), [a, b]);
   if (samples) return { ...samples, mode: 'samples' };
   // On WebGPU the samples must be there: a silent fall back to the resolved frame would hide a broken hook.
-  if (!compatRun())
-    throw new Error('no multisampled colour was seen for the canvases: msaa-samples.js did not hook the engines');
+  if (!compatRun()) throw new Error('no multisampled colour was seen for the canvases: msaa-samples.js did not hook the engines');
   const [x, y] = [await shot(a), await shot(b)],
     at = [];
   let differing = 0;
   for (let k = 0; k < x.data.length; k += 4) {
     if (x.data[k] === y.data[k] && x.data[k + 1] === y.data[k + 1] && x.data[k + 2] === y.data[k + 2]) continue;
     differing++;
-    if (at.length < 6)
-      at.push([
-        (k / 4) % x.width,
-        Math.floor(k / 4 / x.width),
-        [...x.data.subarray(k, k + 3)],
-        [...y.data.subarray(k, k + 3)],
-      ]);
+    if (at.length < 6) at.push([(k / 4) % x.width, Math.floor(k / 4 / x.width), [...x.data.subarray(k, k + 3)], [...y.data.subarray(k, k + 3)]]);
   }
   return { differing, at, pixels: x.data.length / 4, mode: 'resolved' };
 }

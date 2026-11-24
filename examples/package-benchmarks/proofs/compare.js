@@ -49,9 +49,7 @@ const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.
 
 /** Packages folded into another since a proof's refs. Proofs name today's folder and entry; a ref from before the fold
  * holds them in the old folder (under the old entry name), which is where `git show` reads them. */
-const folded = {
-  gltf: { before: 'gltf-pro', entries: { 'src/pbr.ts': 'src/index.ts', 'src/pbr-instancing.ts': 'src/instancing.ts' } },
-};
+const folded = { gltf: { before: 'gltf-pro', entries: { 'src/pbr.ts': 'src/index.ts', 'src/pbr-instancing.ts': 'src/instancing.ts' } } };
 /** Where package `name`'s `entry` lives at `ref`: unchanged, or its place before a fold when the ref predates it. */
 export function placeAt(name, entry, ref) {
   const fold = folded[name],

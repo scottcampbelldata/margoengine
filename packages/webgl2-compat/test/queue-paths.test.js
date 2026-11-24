@@ -16,15 +16,12 @@ async function device() {
       getExtension: (name) => (name === 'EXT_color_buffer_float' ? {} : null),
       getParameter: (p) => values.get(p) ?? '',
       getShaderPrecisionFormat: (_s, type) =>
-        type === 0x8df2
-          ? { precision: 23, rangeMin: 127, rangeMax: 127 }
-          : { precision: 0, rangeMin: 31, rangeMax: 30 },
+        type === 0x8df2 ? { precision: 23, rangeMin: 127, rangeMax: 127 } : { precision: 0, rangeMin: 31, rangeMax: 30 },
     },
     gl = new Proxy(context, {
       get: (t, k) => {
         if (k in t) return t[k];
-        if (!made.has(k))
-          made.set(k, typeof k === 'string' && /^[A-Z0-9_]+$/.test(k) ? 0x9000 + made.size : () => ({}));
+        if (!made.has(k)) made.set(k, typeof k === 'string' && /^[A-Z0-9_]+$/.test(k) ? 0x9000 + made.size : () => ({}));
         return made.get(k);
       },
     });
@@ -67,11 +64,9 @@ test('a submit that fails on a destroyed resource runs nothing and the next subm
   d.addEventListener('uncapturederror', (e) => (e.preventDefault(), errors.push(e.error.message)));
   const target = d.createTexture({ size: [2, 2], format: 'rgba8unorm', usage: 0x10 }),
     encoder = d.createCommandEncoder();
-  encoder
-    .beginRenderPass({
-      colorAttachments: [{ view: target.createView(), clearValue: [0, 0, 0, 1], loadOp: 'clear', storeOp: 'store' }],
-    })
-    .end();
+  encoder.beginRenderPass({
+    colorAttachments: [{ view: target.createView(), clearValue: [0, 0, 0, 1], loadOp: 'clear', storeOp: 'store' }],
+  }).end();
   const doomed = encoder.finish();
   target.destroy();
   const before = d.passes.run;

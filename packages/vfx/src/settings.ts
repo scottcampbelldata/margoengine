@@ -66,32 +66,14 @@ export const VFX_SETTINGS: readonly VfxSetting[] = [
     nullable: true,
   },
   n('spread', 'emission', 1, 0, 50, 0.01, 'm/s', 'Random speed added to each birth.'),
-  n(
-    'emissionExtent.x',
-    'emission',
-    0,
-    0,
-    100,
-    0.01,
-    'm',
-    'Half width of the box births are spread over (0 is a point).',
-  ),
+  n('emissionExtent.x', 'emission', 0, 0, 100, 0.01, 'm', 'Half width of the box births are spread over (0 is a point).'),
   n('emissionExtent.y', 'emission', 0, 0, 100, 0.01, 'm', 'Half height of the box births are spread over.'),
   n('emissionExtent.z', 'emission', 0, 0, 100, 0.01, 'm', 'Half depth of the box births are spread over.'),
   n('velocity.x', 'motion', 0, -100, 100, 0.01, 'm/s', 'Launch velocity, east-west.'),
   n('velocity.y', 'motion', 3, -100, 100, 0.01, 'm/s', 'Launch velocity, up: smoke rises at this speed.'),
   n('velocity.z', 'motion', 0, -100, 100, 0.01, 'm/s', 'Launch velocity, north-south.'),
   n('gravity.x', 'motion', 0, -100, 100, 0.01, 'm/s2', 'Acceleration east-west.'),
-  n(
-    'gravity.y',
-    'motion',
-    -9.81,
-    -100,
-    100,
-    0.01,
-    'm/s2',
-    'Acceleration up: -9.81 falls like Earth, a small positive number makes smoke buoyant.',
-  ),
+  n('gravity.y', 'motion', -9.81, -100, 100, 0.01, 'm/s2', 'Acceleration up: -9.81 falls like Earth, a small positive number makes smoke buoyant.'),
   n('gravity.z', 'motion', 0, -100, 100, 0.01, 'm/s2', 'Acceleration north-south.'),
   n('turbulence', 'motion', 0.5, 0, 20, 0.01, 'm/s2', 'Curl-noise acceleration; 0 turns it off.'),
   n('frequency', 'motion', 1, 0, 20, 0.01, '1/m', 'How fine the curl noise is, per metre.'),
@@ -99,16 +81,7 @@ export const VFX_SETTINGS: readonly VfxSetting[] = [
   n('ground', 'motion', 0, -1000, 1000, 0.1, 'm', 'Height of the collision plane.'),
   n('angularVelocity', 'motion', 0, -50, 50, 0.01, 'rad/s', 'Billboard spin; each particle starts at a random angle.'),
   followsWeather(
-    n(
-      'wind.x',
-      'wind',
-      0,
-      -100,
-      100,
-      0.1,
-      'm/s',
-      'Wind east-west (+X). Particles lean as they relax toward it in 0.25 s; null follows the weather. With wind.z, one given and the other null reads the null one as 0.',
-    ),
+    n('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind east-west (+X). Particles lean as they relax toward it in 0.25 s; null follows the weather. With wind.z, one given and the other null reads the null one as 0.'),
     'wind',
   ) as VfxSetting,
   followsWeather(
@@ -203,16 +176,7 @@ export function vfxSettingValues(target: VfxSettingTarget): Record<string, VfxSe
       const a = o[key];
       if (a) (['x', 'y', 'z'] as const).forEach((c, i) => (v[`${key}.${c}`] = a[i]!));
     };
-  for (const key of [
-    'spread',
-    'turbulence',
-    'frequency',
-    'bounce',
-    'ground',
-    'angularVelocity',
-    'size',
-    'intensity',
-  ] as const)
+  for (const key of ['spread', 'turbulence', 'frequency', 'bounce', 'ground', 'angularVelocity', 'size', 'intensity'] as const)
     if (o[key] !== undefined) v[key] = o[key]!;
   if (o.rate !== undefined) v.rate = o.rate;
   axes('emissionExtent');
@@ -265,102 +229,24 @@ const nullableRow = (row: SandSetting, weather?: string): SandSetting =>
 
 /** Every blown-sand control, in panel order. */
 export const SAND_SETTINGS: readonly SandSetting[] = [
-  nullableRow(
-    sn(
-      'wind.speed',
-      'wind',
-      0,
-      0,
-      60,
-      0.1,
-      'm/s',
-      'Mean wind at windHeight; null follows the weather. Sand moves above the threshold (6.6 m/s for 0.25 mm sand at 10 m).',
-    ),
-    'wind',
-  ),
-  nullableRow(
-    sn(
-      'wind.direction',
-      'wind',
-      0,
-      0,
-      360,
-      1,
-      'degrees',
-      'Compass direction the wind blows toward: 0 is +Z, 90 is +X; null follows the weather.',
-    ),
-    'windDirection',
-  ),
-  nullableRow(
-    sn('wind.gust', 'wind', 0.35, 0, 1, 0.01, '', 'Gustiness of the wind; null follows the weather.'),
-    'gust',
-  ),
+  nullableRow(sn('wind.speed', 'wind', 0, 0, 60, 0.1, 'm/s', 'Mean wind at windHeight; null follows the weather. Sand moves above the threshold (6.6 m/s for 0.25 mm sand at 10 m).'), 'wind'),
+  nullableRow(sn('wind.direction', 'wind', 0, 0, 360, 1, 'degrees', 'Compass direction the wind blows toward: 0 is +Z, 90 is +X; null follows the weather.'), 'windDirection'),
+  nullableRow(sn('wind.gust', 'wind', 0.35, 0, 1, 0.01, '', 'Gustiness of the wind; null follows the weather.'), 'gust'),
   sn('wind.gustPeriod', 'wind', 8, 0.5, 600, 0.5, 's', 'Seconds between gusts.'),
   nullableRow(sn('gustiness', 'wind', 0.35, 0, 1, 0.01, '', 'How far gusts swing the sand; null takes the wind gust.')),
-  nullableRow(
-    sn(
-      'threshold',
-      'grain',
-      6.6,
-      0.1,
-      60,
-      0.1,
-      'm/s',
-      'Wind speed at which dry sand starts to move (Bagnold); null is the one grainSize and windHeight give.',
-    ),
-  ),
-  sn(
-    'grainSize',
-    'grain',
-    0.00025,
-    0.00006,
-    0.002,
-    0.00001,
-    'm',
-    'Grain diameter: 0.06 mm fine sand to 2 mm coarse; sets the default threshold.',
-  ),
+  nullableRow(sn('threshold', 'grain', 6.6, 0.1, 60, 0.1, 'm/s', 'Wind speed at which dry sand starts to move (Bagnold); null is the one grainSize and windHeight give.')),
+  sn('grainSize', 'grain', 0.00025, 0.00006, 0.002, 0.00001, 'm', 'Grain diameter: 0.06 mm fine sand to 2 mm coarse; sets the default threshold.'),
   sn('windHeight', 'grain', 10, 0.5, 100, 0.5, 'm', 'Height the wind speed is given at.'),
   colorSetting('color', 'look', [0.5, 0.42, 0.29], 0, 1, 'Grain colour, linear RGB (terrain dry sand).') as SandSetting,
   sn('streak', 'look', 0.6, 0.05, 5, 0.01, 'm', 'Length of a streak of moving sand.'),
-  sn(
-    'height',
-    'look',
-    0.3,
-    0.02,
-    3,
-    0.01,
-    'm',
-    'Height under which most sand moves; crest plumes rise about 4 times it.',
-  ),
+  sn('height', 'look', 0.3, 0.02, 3, 0.01, 'm', 'Height under which most sand moves; crest plumes rise about 4 times it.'),
   sn('opacity', 'look', 0.6, 0, 1, 0.01, '', 'Opacity of the sand.'),
-  nullableRow(
-    sn(
-      'fog',
-      'look',
-      0,
-      0,
-      1,
-      0.0001,
-      '1/m',
-      'Fog density the sand fades by with distance; null follows the weather (the air, dust included).',
-    ),
-    'visibility',
-  ),
+  nullableRow(sn('fog', 'look', 0, 0, 1, 0.0001, '1/m', 'Fog density the sand fades by with distance; null follows the weather (the air, dust included).'), 'visibility'),
   sn('amount', 'layout', 1, 0, 1, 0.01, '', 'Density of the blowing sand; lays the particles out again.', false),
   sn('seed', 'layout', 1, 0, 2147483647, 1, '', 'The same seed and time draw the same sand.', false),
   sn('limit', 'layout', 32768, 1, 1048576, 1, 'particles', 'Most particles drawn.', false),
   sn('range', 'layout', 250, 10, 2000, 1, 'm', 'Radius around the camera with blowing sand.', false),
-  sn(
-    'softness',
-    'layout',
-    0,
-    0,
-    100,
-    0.1,
-    'm',
-    'Fade in front of the surface behind (needs the scene depth); 0 is off.',
-    false,
-  ),
+  sn('softness', 'layout', 0, 0, 100, 0.1, 'm', 'Fade in front of the surface behind (needs the scene depth); 0 is off.', false),
 ];
 /** The sand rows that may change every frame. */
 export const SAND_LIVE_SETTINGS: readonly SandSetting[] = liveSettings(SAND_SETTINGS) as SandSetting[];
@@ -414,18 +300,7 @@ export function applySandSettings(target: VfxSettingTarget, values: VfxSettingVa
     if (value(key) === null) delete o[key];
     else o[key] = value(key);
   }
-  for (const key of [
-    'grainSize',
-    'windHeight',
-    'streak',
-    'height',
-    'opacity',
-    'amount',
-    'seed',
-    'limit',
-    'range',
-    'softness',
-  ])
+  for (const key of ['grainSize', 'windHeight', 'streak', 'height', 'opacity', 'amount', 'seed', 'limit', 'range', 'softness'])
     o[key] = value(key);
   o.color = [...(value('color') as readonly number[])];
 }
@@ -440,25 +315,11 @@ export function sandSettingValues(target: VfxSettingTarget): Record<string, VfxS
   const wind = o.wind as { speed?: number; direction?: number; gust?: number; gustPeriod?: number } | undefined;
   if (wind && !('options' in wind) && typeof wind.speed === 'number' && wind.speed > 0) {
     v['wind.speed'] = wind.speed;
-    v['wind.direction'] = (((((wind.direction ?? 0) * 180) / Math.PI) % 360) + 360) % 360;
+    v['wind.direction'] = ((((wind.direction ?? 0) * 180) / Math.PI) % 360 + 360) % 360;
     if (wind.gust !== undefined) v['wind.gust'] = wind.gust;
     if (wind.gustPeriod !== undefined) v['wind.gustPeriod'] = wind.gustPeriod;
   }
-  for (const key of [
-    'gustiness',
-    'threshold',
-    'fog',
-    'grainSize',
-    'windHeight',
-    'streak',
-    'height',
-    'opacity',
-    'amount',
-    'seed',
-    'limit',
-    'range',
-    'softness',
-  ])
+  for (const key of ['gustiness', 'threshold', 'fog', 'grainSize', 'windHeight', 'streak', 'height', 'opacity', 'amount', 'seed', 'limit', 'range', 'softness'])
     if (typeof o[key] === 'number') v[key] = o[key] as number;
   if (Array.isArray(o.color)) v.color = [o.color[0], o.color[1], o.color[2]];
   return v;
@@ -494,70 +355,18 @@ const mn = (
 
 /** Every smoke column control, in panel order. Defaults are what `Smoke.attach({position})` does. */
 export const SMOKE_SETTINGS: readonly SmokeSetting[] = [
-  mn(
-    'heat',
-    'source',
-    5e6,
-    0,
-    1e11,
-    1000,
-    'W',
-    'Convective heat release: it sets the rise (Briggs buoyancy flux). 20 kW a hearth, 5 MW a house, 1 GW a wildfire head.',
-  ),
+  mn('heat', 'source', 5e6, 0, 1e11, 1000, 'W', 'Convective heat release: it sets the rise (Briggs buoyancy flux). 20 kW a hearth, 5 MW a house, 1 GW a wildfire head.'),
   mn('radius', 'source', 2, 0.05, 2000, 0.05, 'm', 'Radius of the source; the column starts this wide.'),
-  mn(
-    'rate',
-    'source',
-    20,
-    0.1,
-    10000,
-    0.1,
-    'puffs/s',
-    'Puffs born a second (at most the capacity attach made, rate x lifetime).',
-  ),
-  mn(
-    'lifetime',
-    'source',
-    60,
-    1,
-    3600,
-    1,
-    's',
-    'Seconds a puff lives: the column is its rise at this age. Sets the capacity.',
-    false,
-  ),
+  mn('rate', 'source', 20, 0.1, 10000, 0.1, 'puffs/s', 'Puffs born a second (at most the capacity attach made, rate x lifetime).'),
+  mn('lifetime', 'source', 60, 1, 3600, 1, 's', 'Seconds a puff lives: the column is its rise at this age. Sets the capacity.', false),
   mn('airTemperature', 'air', 288.15, 200, 330, 0.1, 'K', 'Air temperature, for the buoyancy flux.'),
-  mn(
-    'stability',
-    'air',
-    0,
-    0,
-    0.01,
-    0.00001,
-    '1/s2',
-    'Air stability (g/T) dtheta/dz: above 0 the column levels off and spreads (Briggs final rise). 0 is neutral.',
-  ),
-  followsWeather(
-    mn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind east-west; null follows the fire or the weather.'),
-    'wind',
-  ) as SmokeSetting,
-  followsWeather(
-    mn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind north-south; null follows the fire or the weather.'),
-    'wind',
-  ) as SmokeSetting,
+  mn('stability', 'air', 0, 0, 0.01, 0.00001, '1/s2', 'Air stability (g/T) dtheta/dz: above 0 the column levels off and spreads (Briggs final rise). 0 is neutral.'),
+  followsWeather(mn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind east-west; null follows the fire or the weather.'), 'wind') as SmokeSetting,
+  followsWeather(mn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind north-south; null follows the fire or the weather.'), 'wind') as SmokeSetting,
   colorSetting('color', 'look', [0.3, 0.29, 0.28], 0, 1, 'Smoke colour, linear RGB.') as SmokeSetting,
   mn('opacity', 'look', 0.5, 0, 1, 0.01, '', 'Opacity of a puff.'),
   mn('turbulence', 'look', 0.4, 0, 20, 0.01, 'm/s2', 'Curl-noise churn; 0 is a smooth column.'),
-  mn(
-    'glow',
-    'look',
-    1,
-    0,
-    10,
-    0.01,
-    '',
-    'Glow of the fire on the column from below: a multiple of its radiated power (0.3 of the release, Drysdale 2011). 0 turns it off.',
-  ),
+  mn('glow', 'look', 1, 0, 10, 0.01, '', 'Glow of the fire on the column from below: a multiple of its radiated power (0.3 of the release, Drysdale 2011). 0 turns it off.'),
 ];
 /** The smoke rows that may change every frame. */
 export const SMOKE_LIVE_SETTINGS: readonly SmokeSetting[] = liveSettings(SMOKE_SETTINGS) as SmokeSetting[];
@@ -577,16 +386,7 @@ export const SMOKE_LOOKS = {
   /** A burning house: a thick grey-brown column. */
   houseFire: { heat: 5e6, radius: 3, rate: 20, color: [0.22, 0.2, 0.18], opacity: 0.6 },
   /** A wildfire head: a broad column that tops out in the stable air above the mixed layer. */
-  wildfire: {
-    heat: 1e9,
-    radius: 40,
-    rate: 30,
-    lifetime: 240,
-    stability: 0.0003,
-    color: [0.33, 0.29, 0.25],
-    opacity: 0.6,
-    turbulence: 1,
-  },
+  wildfire: { heat: 1e9, radius: 40, rate: 30, lifetime: 240, stability: 0.0003, color: [0.33, 0.29, 0.25], opacity: 0.6, turbulence: 1 },
   /** Burning oil or tyres: black. */
   oil: { heat: 2e7, radius: 4, rate: 25, color: [0.03, 0.03, 0.03], opacity: 0.8 },
   /** The animatedFeature family: a soft lit column in one large shape, little small-scale turbulence. */
@@ -606,17 +406,7 @@ export interface SmokeColumnsTarget {
 /** What {@link applySmokeSettings} writes to: a `Smoke`, or a `FireFront`'s smoke columns. */
 export type SmokeSettingTarget = VfxSettingTarget | SmokeColumnsTarget;
 
-const SMOKE_NUMBERS = [
-  'heat',
-  'radius',
-  'rate',
-  'lifetime',
-  'airTemperature',
-  'stability',
-  'opacity',
-  'turbulence',
-  'glow',
-] as const;
+const SMOKE_NUMBERS = ['heat', 'radius', 'rate', 'lifetime', 'airTemperature', 'stability', 'opacity', 'turbulence', 'glow'] as const;
 // The rows a fire front owns on each of its columns: the heat and the radius of the burning ground of its segment.
 const FRONT_OWNED = new Set<string>(['heat', 'radius']);
 // What each front column was built with, taken the first time a look writes it, so a row left out gives it back.
@@ -670,17 +460,7 @@ export function applySmokeSettings(target: SmokeSettingTarget, values: VfxSettin
 export function smokeSettingValues(target: VfxSettingTarget): Record<string, VfxSettingValue> {
   const o = target.options as Record<string, unknown>,
     v = smokeSettingDefaults();
-  for (const key of [
-    'heat',
-    'radius',
-    'rate',
-    'lifetime',
-    'airTemperature',
-    'stability',
-    'opacity',
-    'turbulence',
-    'glow',
-  ])
+  for (const key of ['heat', 'radius', 'rate', 'lifetime', 'airTemperature', 'stability', 'opacity', 'turbulence', 'glow'])
     if (typeof o[key] === 'number') v[key] = o[key] as number;
   if (Array.isArray(o.color)) v.color = [o.color[0], o.color[1], o.color[2]];
   if (Array.isArray(o.wind)) {
@@ -719,133 +499,19 @@ const fn = (
 
 /** Every fire front control, in panel order. Defaults are what `FireFront.attach()` does. */
 export const FIRE_SETTINGS: readonly FireSetting[] = [
-  followsWeather(
-    fn(
-      'moisture',
-      'fuel',
-      0.06,
-      0,
-      1,
-      0.005,
-      '',
-      'Dead 1-hour fuel moisture, a fraction of dry weight (Rothermel 1972). 0.03 is a red-flag day, 0.12 the edge of grass spreading, 0.3 rain-soaked. Null follows the weather (a WeatherDrive dries and wets it from the humidity, temperature and rain), 0.06 without one.',
-    ),
-    'humidity',
-  ) as FireSetting,
-  followsWeather(
-    fn(
-      'moisture10',
-      'fuel',
-      0.07,
-      0,
-      4,
-      0.005,
-      '',
-      'Dead 10-hour fuel moisture (a quarter to one inch). Null follows the weather, or the 1-hour value plus 0.01 without one.',
-    ),
-    'humidity',
-  ) as FireSetting,
-  followsWeather(
-    fn(
-      'moisture100',
-      'fuel',
-      0.08,
-      0,
-      4,
-      0.005,
-      '',
-      'Dead 100-hour fuel moisture (one to three inches). Null follows the weather, or the 1-hour value plus 0.02 without one.',
-    ),
-    'humidity',
-  ) as FireSetting,
-  fn(
-    'liveMoisture',
-    'fuel',
-    0.9,
-    0,
-    4,
-    0.05,
-    '',
-    'Live fuel moisture, a fraction of dry weight. Late-season chaparral is 0.6 to 0.9, green growth 1.5 and more.',
-  ),
-  fn(
-    'foliarMoisture',
-    'fuel',
-    1,
-    0.3,
-    4,
-    0.05,
-    '',
-    'Foliar moisture of the tree crowns, a fraction of dry weight (Van Wagner 1977): 1 is 100 percent, 0.8 late-summer drought (crowns catch from a weaker surface fire), 1.3 new growth.',
-  ),
-  followsWeather(
-    fn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind 10 m up, east-west; null follows the weather.'),
-    'wind',
-  ) as FireSetting,
-  followsWeather(
-    fn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind 10 m up, north-south; null follows the weather.'),
-    'wind',
-  ) as FireSetting,
-  fn(
-    'windReduction',
-    'wind',
-    0.4,
-    0,
-    1,
-    0.01,
-    '',
-    'Midflame wind as a fraction of the 10 m wind (Albini and Baughman 1979): 0.4 under a canopy, 0.6 in open brush, 1 in open grass.',
-  ),
-  fn(
-    'spotting',
-    'embers',
-    0.02,
-    0,
-    100,
-    0.001,
-    '1/s',
-    'Embers a second from each 64 m2 of burning ground (an 8 m cell) per 1,000 kW/m of fireline intensity over 1,000, whatever the cell size. 0 turns spotting off.',
-  ),
-  fn(
-    'spotSpread',
-    'embers',
-    0.7,
-    0,
-    3,
-    0.01,
-    '',
-    'Spread of the landing distance (lognormal sigma): larger throws more embers far and near.',
-  ),
-  fn(
-    'emberIgnition',
-    'embers',
-    0.3,
-    0,
-    1,
-    0.01,
-    '',
-    'Chance an ember that lands on dry fuel starts a fire (scaled by how far the fuel is from its moisture of extinction).',
-  ),
-  fn(
-    'smokeYield',
-    'smoke',
-    15,
-    0,
-    1000,
-    0.5,
-    'g/kg',
-    'Fine smoke (PM2.5) a kilogram of fuel gives: 15 is the extratropical forest value of Akagi et al. 2011 (it varies by 7.5). A WeatherDrive raises the weather smoke from it.',
-  ),
-  fn(
-    'structureExposure',
-    'structures',
-    90,
-    1,
-    86400,
-    1,
-    's',
-    'Seconds of flame within 1.5 flame lengths before a building ignites (Cohen and Butler 1998).',
-  ),
+  followsWeather(fn('moisture', 'fuel', 0.06, 0, 1, 0.005, '', 'Dead 1-hour fuel moisture, a fraction of dry weight (Rothermel 1972). 0.03 is a red-flag day, 0.12 the edge of grass spreading, 0.3 rain-soaked. Null follows the weather (a WeatherDrive dries and wets it from the humidity, temperature and rain), 0.06 without one.'), 'humidity') as FireSetting,
+  followsWeather(fn('moisture10', 'fuel', 0.07, 0, 4, 0.005, '', 'Dead 10-hour fuel moisture (a quarter to one inch). Null follows the weather, or the 1-hour value plus 0.01 without one.'), 'humidity') as FireSetting,
+  followsWeather(fn('moisture100', 'fuel', 0.08, 0, 4, 0.005, '', 'Dead 100-hour fuel moisture (one to three inches). Null follows the weather, or the 1-hour value plus 0.02 without one.'), 'humidity') as FireSetting,
+  fn('liveMoisture', 'fuel', 0.9, 0, 4, 0.05, '', 'Live fuel moisture, a fraction of dry weight. Late-season chaparral is 0.6 to 0.9, green growth 1.5 and more.'),
+  fn('foliarMoisture', 'fuel', 1, 0.3, 4, 0.05, '', 'Foliar moisture of the tree crowns, a fraction of dry weight (Van Wagner 1977): 1 is 100 percent, 0.8 late-summer drought (crowns catch from a weaker surface fire), 1.3 new growth.'),
+  followsWeather(fn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind 10 m up, east-west; null follows the weather.'), 'wind') as FireSetting,
+  followsWeather(fn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind 10 m up, north-south; null follows the weather.'), 'wind') as FireSetting,
+  fn('windReduction', 'wind', 0.4, 0, 1, 0.01, '', 'Midflame wind as a fraction of the 10 m wind (Albini and Baughman 1979): 0.4 under a canopy, 0.6 in open brush, 1 in open grass.'),
+  fn('spotting', 'embers', 0.02, 0, 100, 0.001, '1/s', 'Embers a second from each 64 m2 of burning ground (an 8 m cell) per 1,000 kW/m of fireline intensity over 1,000, whatever the cell size. 0 turns spotting off.'),
+  fn('spotSpread', 'embers', 0.7, 0, 3, 0.01, '', 'Spread of the landing distance (lognormal sigma): larger throws more embers far and near.'),
+  fn('emberIgnition', 'embers', 0.3, 0, 1, 0.01, '', 'Chance an ember that lands on dry fuel starts a fire (scaled by how far the fuel is from its moisture of extinction).'),
+  fn('smokeYield', 'smoke', 15, 0, 1000, 0.5, 'g/kg', 'Fine smoke (PM2.5) a kilogram of fuel gives: 15 is the extratropical forest value of Akagi et al. 2011 (it varies by 7.5). A WeatherDrive raises the weather smoke from it.'),
+  fn('structureExposure', 'structures', 90, 1, 86400, 1, 's', 'Seconds of flame within 1.5 flame lengths before a building ignites (Cohen and Butler 1998).'),
   fn('structureBurnTime', 'structures', 1800, 1, 86400, 1, 's', 'Seconds a building burns once alight.'),
 ];
 /** The fire rows that may change every step (all of them). */
@@ -894,8 +560,7 @@ export function applyFireSettings(target: VfxSettingTarget, values: VfxSettingVa
 export function fireSettingValues(target: VfxSettingTarget): Record<string, VfxSettingValue> {
   const o = target.options as Record<string, unknown>,
     v = fireSettingDefaults();
-  for (const row of FIRE_SETTINGS)
-    if (!row.name.includes('.') && typeof o[row.name] === 'number') v[row.name] = o[row.name] as number;
+  for (const row of FIRE_SETTINGS) if (!row.name.includes('.') && typeof o[row.name] === 'number') v[row.name] = o[row.name] as number;
   if (Array.isArray(o.wind)) {
     v['wind.x'] = o.wind[0];
     v['wind.z'] = o.wind[1];
@@ -937,125 +602,19 @@ const fl = (
 
 /** Every flame control, in panel order. Defaults leave the fire as its kit built it. */
 export const FLAME_SETTINGS: readonly FlameSetting[] = [
-  fl(
-    'flames.size',
-    'flames',
-    1,
-    0.1,
-    8,
-    0.01,
-    'x',
-    "Flame billboard size as a multiple of the kit's: larger flames read as big soft shapes.",
-  ),
-  fl(
-    'flames.radiance',
-    'flames',
-    1,
-    0,
-    4,
-    0.01,
-    'x',
-    "Brightness of the flames as a multiple of the kit's; under 1 keeps the core from blowing out to white.",
-  ),
+  fl('flames.size', 'flames', 1, 0.1, 8, 0.01, 'x', "Flame billboard size as a multiple of the kit's: larger flames read as big soft shapes."),
+  fl('flames.radiance', 'flames', 1, 0, 4, 0.01, 'x', "Brightness of the flames as a multiple of the kit's; under 1 keeps the core from blowing out to white."),
   fl('flames.opacity', 'flames', 1, 0, 1, 0.01, 'x', "Opacity at birth as a multiple of the kit's."),
-  fl(
-    'flames.ramp',
-    'flames',
-    0,
-    0,
-    1,
-    0.01,
-    '',
-    "How far the colour curve is pulled toward the edge colour by the end of a flame's life: 0 keeps the kit's curve, 1 ends at the edge colour (a clear core-to-edge ramp).",
-  ),
-  colorSetting(
-    'flames.edgeColor',
-    'flames',
-    [0.55, 0.12, 0.04],
-    0,
-    1,
-    'The colour the flame edge ramps to (linear RGB), used while flames.ramp is above 0.',
-  ) as FlameSetting,
-  fl(
-    'flames.core',
-    'flames',
-    2200,
-    1200,
-    3000,
-    10,
-    'K',
-    'Temperature of the hot core (its blackbody colour, through the camera shoulder, sets the yellow-white of the core). At 2200 a hearth keeps its own colours.',
-  ),
-  fl(
-    'flames.edge',
-    'flames',
-    1000,
-    600,
-    2000,
-    10,
-    'K',
-    'Temperature of the cool edge and the tips (deep orange to red). At 1000 a hearth keeps its own colours.',
-  ),
-  fl(
-    'flames.peak',
-    'flames',
-    1,
-    0.05,
-    16,
-    0.01,
-    '',
-    'The brightest channel a flame pixel may show, scene-linear: 1 is display white on an 8-bit target; raise it under a tonemap so the core blooms.',
-  ),
-  fl(
-    'flames.flicker',
-    'flames',
-    1,
-    0,
-    3,
-    0.01,
-    'x',
-    'Puffing of the flames and flicker of their light as a multiple of the physical (Cetegen and Ahmed 1993); 0 holds them steady.',
-  ),
-  fl(
-    'flames.tongues',
-    'flames',
-    1,
-    0.25,
-    4,
-    0.01,
-    'x',
-    'Size of the flame tongues as a multiple of the default (0.22 of the flame length across): smaller is busier.',
-  ),
-  fl(
-    'flames.glow',
-    'flames',
-    1,
-    0,
-    8,
-    0.01,
-    'x',
-    'Light a flame volume throws into the smoky air and onto the ground around it, as a multiple of the physical (Sun et al. 2005); 0 turns it off. Hearth flames have none.',
-  ),
-  fl(
-    'flames.haze',
-    'flames',
-    1,
-    0,
-    20,
-    0.01,
-    'x',
-    "Haze of the air around a flame volume as a multiple of its own (a Flame 0.0005 per metre, a FireFront's flames 0.003): thicker haze glows more round the fire.",
-  ),
-  fl(
-    'embers.size',
-    'embers',
-    1,
-    0.1,
-    8,
-    0.01,
-    'x',
-    "Ember size as a multiple of the kit's: fewer, larger embers read better at a distance.",
-  ),
+  fl('flames.ramp', 'flames', 0, 0, 1, 0.01, '', "How far the colour curve is pulled toward the edge colour by the end of a flame's life: 0 keeps the kit's curve, 1 ends at the edge colour (a clear core-to-edge ramp)."),
+  colorSetting('flames.edgeColor', 'flames', [0.55, 0.12, 0.04], 0, 1, 'The colour the flame edge ramps to (linear RGB), used while flames.ramp is above 0.') as FlameSetting,
+  fl('flames.core', 'flames', 2200, 1200, 3000, 10, 'K', 'Temperature of the hot core (its blackbody colour, through the camera shoulder, sets the yellow-white of the core). At 2200 a hearth keeps its own colours.'),
+  fl('flames.edge', 'flames', 1000, 600, 2000, 10, 'K', 'Temperature of the cool edge and the tips (deep orange to red). At 1000 a hearth keeps its own colours.'),
+  fl('flames.peak', 'flames', 1, 0.05, 16, 0.01, '', 'The brightest channel a flame pixel may show, scene-linear: 1 is display white on an 8-bit target; raise it under a tonemap so the core blooms.'),
+  fl('flames.flicker', 'flames', 1, 0, 3, 0.01, 'x', 'Puffing of the flames and flicker of their light as a multiple of the physical (Cetegen and Ahmed 1993); 0 holds them steady.'),
+  fl('flames.tongues', 'flames', 1, 0.25, 4, 0.01, 'x', 'Size of the flame tongues as a multiple of the default (0.22 of the flame length across): smaller is busier.'),
+  fl('flames.glow', 'flames', 1, 0, 8, 0.01, 'x', 'Light a flame volume throws into the smoky air and onto the ground around it, as a multiple of the physical (Sun et al. 2005); 0 turns it off. Hearth flames have none.'),
+  fl('flames.haze', 'flames', 1, 0, 20, 0.01, 'x', "Haze of the air around a flame volume as a multiple of its own (a Flame 0.0005 per metre, a FireFront's flames 0.003): thicker haze glows more round the fire."),
+  fl('embers.size', 'embers', 1, 0.1, 8, 0.01, 'x', "Ember size as a multiple of the kit's: fewer, larger embers read better at a distance."),
   fl('embers.count', 'embers', 1, 0, 4, 0.01, 'x', "Embers born a second as a multiple of the kit's rate."),
   fl('embers.radiance', 'embers', 1, 0, 4, 0.01, 'x', "Ember brightness as a multiple of the kit's."),
 ];
@@ -1126,13 +685,7 @@ function baseOf(o: Record<string, unknown>): FlameBase {
   return base;
 }
 // A numeric option as a multiple of what it was built with; at 1 with nothing built in, the option is left unset.
-function scaled(
-  o: Record<string, unknown>,
-  key: string,
-  base: number | undefined,
-  factor: number,
-  fallback: number,
-): void {
+function scaled(o: Record<string, unknown>, key: string, base: number | undefined, factor: number, fallback: number): void {
   if (factor === 1 && base === undefined) delete o[key];
   else o[key] = (base ?? fallback) * factor;
 }
@@ -1150,10 +703,8 @@ function applyHearthFlames(flames: VfxSettingTarget, value: (name: string) => un
     cool = value('flames.edge') as number,
     peak = value('flames.peak') as number,
     blackbody = core !== 2200 || cool !== 1000 || peak !== 1;
-  if (ramp > 0 && !fb.stops)
-    throw new TypeError('Flame setting flames.ramp needs flames with a colour curve (curves.color); use 0');
-  if (blackbody && !fb.stops)
-    throw new TypeError('Flame settings flames.core, edge and peak need flames with a colour curve (curves.color)');
+  if (ramp > 0 && !fb.stops) throw new TypeError('Flame setting flames.ramp needs flames with a colour curve (curves.color); use 0');
+  if (blackbody && !fb.stops) throw new TypeError('Flame settings flames.core, edge and peak need flames with a colour curve (curves.color)');
   scaled(fo, 'size', fb.size, value('flames.size') as number, 0.1);
   scaled(fo, 'intensity', fb.intensity, value('flames.radiance') as number, 1);
   scaled(fo, 'turbulence', fb.turbulence, value('flames.flicker') as number, 0);
@@ -1221,226 +772,43 @@ export interface GunfireSetting extends SettingRow {
   readonly kind: 'number' | 'color';
   readonly default: number | readonly [number, number, number] | null;
 }
-const gn = (
-  name: string,
-  group: GunfireSettingGroup,
-  value: number,
-  min: number,
-  max: number,
-  step: number,
-  unit: string,
-  about: string,
-): GunfireSetting => numberSetting(name, group, value, min, max, step, unit, about) as GunfireSetting;
+const gn = (name: string, group: GunfireSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string): GunfireSetting =>
+  numberSetting(name, group, value, min, max, step, unit, about) as GunfireSetting;
 const windRows = (who: string): GunfireSetting[] => [
-  followsWeather(
-    gn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', `Wind east-west on the ${who}; null follows the weather.`),
-    'wind',
-  ) as GunfireSetting,
-  followsWeather(
-    gn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', `Wind north-south on the ${who}; null follows the weather.`),
-    'wind',
-  ) as GunfireSetting,
+  followsWeather(gn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', `Wind east-west on the ${who}; null follows the weather.`), 'wind') as GunfireSetting,
+  followsWeather(gn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', `Wind north-south on the ${who}; null follows the weather.`), 'wind') as GunfireSetting,
 ];
 
 /** The battery's rows (all live). */
 export const GUNFIRE_SETTINGS: readonly GunfireSetting[] = [
-  gn(
-    'flashSize',
-    'flash',
-    1,
-    0,
-    10,
-    0.01,
-    '',
-    'Flash size, a multiple of the fireball of the gas of the charge at its explosion temperature (Noble and Abel 1875).',
-  ),
-  gn(
-    'flashRadiance',
-    'flash',
-    40,
-    0,
-    3000,
-    0.1,
-    '',
-    'Peak radiance of the flash (HDR); averaged over the shutter, so a flash shorter than a frame still shows.',
-  ),
-  gn(
-    'flashDuration',
-    'flash',
-    0.04,
-    0.001,
-    1,
-    0.001,
-    's',
-    'Fade time of the secondary flash: tens of milliseconds for large guns (Klingenberg and Heimerl 1992).',
-  ),
-  gn(
-    'flashLight',
-    'flash',
-    1,
-    0,
-    100,
-    0.01,
-    '',
-    'The light of the flash on the scene, a multiple of a sphere light as bright as the flash.',
-  ),
-  gn(
-    'shutter',
-    'flash',
-    0.5,
-    0,
-    1,
-    0.01,
-    'frame',
-    'Shutter open time as a share of the frame (0.5 a 180 degree shutter).',
-  ),
-  gn(
-    'extinction',
-    'smoke',
-    3,
-    0,
-    100,
-    0.01,
-    'm2/g',
-    'Mass extinction of the white salt smoke (56% of the powder burns to solids): how thick a bank looks.',
-  ),
-  colorSetting(
-    'smokeColor',
-    'smoke',
-    [0.97, 0.95545, 0.9312],
-    0,
-    1,
-    'Colour of the powder smoke, linear RGB (smokeColor(0)).',
-  ) as GunfireSetting,
-  gn(
-    'dispersion',
-    'smoke',
-    0.5,
-    0,
-    5,
-    0.01,
-    '',
-    'Richardson constant: how fast the turbulence of the air spreads and thins a bank (Batchelor 1952).',
-  ),
+  gn('flashSize', 'flash', 1, 0, 10, 0.01, '', 'Flash size, a multiple of the fireball of the gas of the charge at its explosion temperature (Noble and Abel 1875).'),
+  gn('flashRadiance', 'flash', 40, 0, 3000, 0.1, '', 'Peak radiance of the flash (HDR); averaged over the shutter, so a flash shorter than a frame still shows.'),
+  gn('flashDuration', 'flash', 0.04, 0.001, 1, 0.001, 's', 'Fade time of the secondary flash: tens of milliseconds for large guns (Klingenberg and Heimerl 1992).'),
+  gn('flashLight', 'flash', 1, 0, 100, 0.01, '', 'The light of the flash on the scene, a multiple of a sphere light as bright as the flash.'),
+  gn('shutter', 'flash', 0.5, 0, 1, 0.01, 'frame', 'Shutter open time as a share of the frame (0.5 a 180 degree shutter).'),
+  gn('extinction', 'smoke', 3, 0, 100, 0.01, 'm2/g', 'Mass extinction of the white salt smoke (56% of the powder burns to solids): how thick a bank looks.'),
+  colorSetting('smokeColor', 'smoke', [0.97, 0.95545, 0.9312], 0, 1, 'Colour of the powder smoke, linear RGB (smokeColor(0)).') as GunfireSetting,
+  gn('dispersion', 'smoke', 0.5, 0, 5, 0.01, '', 'Richardson constant: how fast the turbulence of the air spreads and thins a bank (Batchelor 1952).'),
   gn('smokeLife', 'smoke', 600, 1, 7200, 1, 's', 'Seconds a bank lives at most.'),
-  gn(
-    'stability',
-    'air',
-    1e-4,
-    0,
-    0.01,
-    0.00001,
-    '1/s2',
-    'Air stability N^2: the warm rise of a bank levels off (from the next shot).',
-  ),
-  gn(
-    'heatFraction',
-    'air',
-    0.4,
-    0,
-    1,
-    0.01,
-    '',
-    'Share of the heat of explosion still in the gas at the muzzle: the buoyancy of a bank (from the next shot).',
-  ),
-  gn(
-    'entrainment',
-    'air',
-    0.25,
-    0.05,
-    1,
-    0.01,
-    '',
-    'Puff radius over distance travelled (Richards 1965, Scorer 1957): how soon the jet stops (from the next shot).',
-  ),
-  gn(
-    'sparks',
-    'flash',
-    1,
-    0,
-    10,
-    0.01,
-    '',
-    'Burning powder grains thrown out with the flash, a multiple of the 2% of the charge that leaves the bore alight.',
-  ),
+  gn('stability', 'air', 1e-4, 0, 0.01, 0.00001, '1/s2', 'Air stability N^2: the warm rise of a bank levels off (from the next shot).'),
+  gn('heatFraction', 'air', 0.4, 0, 1, 0.01, '', 'Share of the heat of explosion still in the gas at the muzzle: the buoyancy of a bank (from the next shot).'),
+  gn('entrainment', 'air', 0.25, 0.05, 1, 0.01, '', 'Puff radius over distance travelled (Richards 1965, Scorer 1957): how soon the jet stops (from the next shot).'),
+  gn('sparks', 'flash', 1, 0, 10, 0.01, '', 'Burning powder grains thrown out with the flash, a multiple of the 2% of the charge that leaves the bore alight.'),
   gn('sparkRadiance', 'flash', 30, 0, 3000, 0.1, '', 'Radiance of a burning grain (HDR).'),
-  gn(
-    'sparkSize',
-    'flash',
-    0.3,
-    0.01,
-    2,
-    0.01,
-    'm',
-    'Drawn width of a burning grain streak: its flame and the halation round it.',
-  ),
-  gn(
-    'grain',
-    'flash',
-    0.003,
-    0.0005,
-    0.02,
-    0.0001,
-    'm',
-    'Powder grain size: a grain burns d / (2 x 1 cm/s) and its drag stops it (from the next shot).',
-  ),
-  gn(
-    'splinters',
-    'hits',
-    1,
-    0,
-    10,
-    0.01,
-    '',
-    'Splinters a strike on a ship throws, a multiple of the hole timber in hand-sized pieces.',
-  ),
+  gn('sparkSize', 'flash', 0.3, 0.01, 2, 0.01, 'm', 'Drawn width of a burning grain streak: its flame and the halation round it.'),
+  gn('grain', 'flash', 0.003, 0.0005, 0.02, 0.0001, 'm', 'Powder grain size: a grain burns d / (2 x 1 cm/s) and its drag stops it (from the next shot).'),
+  gn('splinters', 'hits', 1, 0, 10, 0.01, '', 'Splinters a strike on a ship throws, a multiple of the hole timber in hand-sized pieces.'),
   ...windRows('banks'),
 ];
 /** The hull fire's rows (all live). */
 export const HULL_FIRE_SETTINGS: readonly GunfireSetting[] = [
   gn('spread', 'fire', 0.03, 0, 10, 0.001, 'm/s', 'How fast the fire runs along the hull.'),
   gn('burnTime', 'fire', 2400, 1, 1e6, 1, 's', 'Seconds a stretch of hull burns at full before it dies down.'),
-  gn(
-    'deckHeat',
-    'fire',
-    250000,
-    0,
-    5e6,
-    1000,
-    'W/m2',
-    'Heat release of the burning deck: the flames stand at the Heskestad height of it.',
-  ),
-  gn(
-    'soot',
-    'smoke',
-    0.35,
-    0,
-    1,
-    0.01,
-    '',
-    'Soot share of the smoke (Mulholland and Croarkin 2000): 0 white, 0.35 wood and tar, 1 black.',
-  ),
+  gn('deckHeat', 'fire', 250000, 0, 5e6, 1000, 'W/m2', 'Heat release of the burning deck: the flames stand at the Heskestad height of it.'),
+  gn('soot', 'smoke', 0.35, 0, 1, 0.01, '', 'Soot share of the smoke (Mulholland and Croarkin 2000): 0 white, 0.35 wood and tar, 1 black.'),
   gn('opacity', 'smoke', 0.7, 0, 1, 0.01, '', 'Opacity of a smoke puff.'),
-  gn(
-    'charRate',
-    'fire',
-    0.5,
-    0,
-    5,
-    0.01,
-    'mm/min',
-    'Char rate of the hull timber under the flames: 0.5 hardwood, 0.65 softwood (EN 1995-1-2).',
-  ),
-  gn(
-    'mastFall',
-    'fire',
-    600,
-    0,
-    1e6,
-    1,
-    's',
-    'Seconds after the fire reaches a mast that its burnt stays let it fall.',
-  ),
+  gn('charRate', 'fire', 0.5, 0, 5, 0.01, 'mm/min', 'Char rate of the hull timber under the flames: 0.5 hardwood, 0.65 softwood (EN 1995-1-2).'),
+  gn('mastFall', 'fire', 600, 0, 1e6, 1, 's', 'Seconds after the fire reaches a mast that its burnt stays let it fall.'),
   ...windRows('fire'),
 ];
 const GUNFIRE_BY_NAME = settingIndex(GUNFIRE_SETTINGS) as Map<string, GunfireSetting>,
@@ -1464,13 +832,7 @@ export const GUNFIRE_LOOKS = {
   /** A fresh breeze: banks that thin and blow clear within a minute or two. */
   breezy: { stability: 0, dispersion: 1, extinction: 2.5, smokeLife: 300 },
   /** The animatedFeature family: bigger, softer flashes and a creamy bank, little fine detail. */
-  animatedFeature: {
-    flashSize: 1.4,
-    flashRadiance: 60,
-    flashDuration: 0.06,
-    smokeColor: [0.95, 0.92, 0.86],
-    extinction: 3.5,
-  },
+  animatedFeature: { flashSize: 1.4, flashRadiance: 60, flashDuration: 0.06, smokeColor: [0.95, 0.92, 0.86], extinction: 3.5 },
 } as const satisfies Record<string, VfxSettingValues>;
 /** Named looks of a burning hull, values of {@link HULL_FIRE_SETTINGS}. */
 export const HULL_FIRE_LOOKS = {
@@ -1482,13 +844,7 @@ export const HULL_FIRE_LOOKS = {
   animatedFeature: { soot: 0.45, opacity: 0.6 },
 } as const satisfies Record<string, VfxSettingValues>;
 
-const applyRows = (
-  rows: Map<string, GunfireSetting>,
-  list: readonly GunfireSetting[],
-  target: VfxSettingTarget,
-  values: VfxSettingValues,
-  entry: string,
-): void => {
+const applyRows = (rows: Map<string, GunfireSetting>, list: readonly GunfireSetting[], target: VfxSettingTarget, values: VfxSettingValues, entry: string): void => {
   checkSettings(rows, values, 'vfx', `${entry} in @margoengine/vfx/settings`);
   const o = target.options as Record<string, unknown>;
   for (const row of list) {
@@ -1502,11 +858,7 @@ const applyRows = (
   else o.wind = [wx ?? 0, wz ?? 0];
   holdFromWeather(o, 'wind', wx !== null || wz !== null);
 };
-const valuesOf = (
-  list: readonly GunfireSetting[],
-  defaults: Record<string, VfxSettingValue>,
-  target: VfxSettingTarget,
-): Record<string, VfxSettingValue> => {
+const valuesOf = (list: readonly GunfireSetting[], defaults: Record<string, VfxSettingValue>, target: VfxSettingTarget): Record<string, VfxSettingValue> => {
   const o = target.options as Record<string, unknown>;
   for (const row of list) {
     const v = o[row.name];

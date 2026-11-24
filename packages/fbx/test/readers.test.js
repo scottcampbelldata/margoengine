@@ -367,10 +367,7 @@ test('ASCII strings keep backslashes raw, as Autodesk files write paths: a trail
   const BS = '\\',
     text = ascii
       .replace('"Model::Triangle"', `"Model::C:${BS}rig${BS}"`)
-      .replace(
-        '   P: "Visibility"',
-        `   P: "Path", "KString", "", "", "${BS}${BS}server${BS}share${BS}a.png"\n   P: "Visibility"`,
-      );
+      .replace('   P: "Visibility"', `   P: "Path", "KString", "", "", "${BS}${BS}server${BS}share${BS}a.png"\n   P: "Visibility"`);
   const doc = await parseDocument(encode(text)),
     model = doc.objects.get(2n);
   assert.equal(objectName(model), `C:${BS}rig${BS}`);
@@ -380,10 +377,7 @@ test('ASCII strings keep backslashes raw, as Autodesk files write paths: a trail
 test('ASCII punctuation inside a quoted string is text: "{", "}", "," and "*" values do not break the file', async () => {
   const text = ascii
     .replace('"Model::Triangle"', '"Model::{,}*"')
-    .replace(
-      '   P: "Visibility"',
-      '   P: "Mark", "KString", "", "", "}"\n   P: "Star", "KString", "", "", "*"\n   P: "Visibility"',
-    );
+    .replace('   P: "Visibility"', '   P: "Mark", "KString", "", "", "}"\n   P: "Star", "KString", "", "", "*"\n   P: "Visibility"');
   const doc = await parseDocument(encode(text)),
     model = doc.objects.get(2n);
   assert.equal(objectName(model), '{,}*');

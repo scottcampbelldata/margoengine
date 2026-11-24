@@ -48,17 +48,11 @@ test('an example that only sets the GPU up writes no file and is not asked for o
   // node-check.mjs asked every example for a picture, so the adapter example (it only prints the adapter) failed it.
   const examples = nodeExamples(readme),
     setup = examples.filter((code) => !needs(code).writes);
-  assert.ok(
-    setup.length >= 1 && setup.every((code) => code.includes('adapterInfo')),
-    'the adapter example writes nothing',
-  );
+  assert.ok(setup.length >= 1 && setup.every((code) => code.includes('adapterInfo')), 'the adapter example writes nothing');
   assert.ok(examples.filter((code) => needs(code).writes).length >= 5);
   assert.equal(needs("await writeFile('cube.png', png);").writes, true);
   assert.equal(needs("encodeWithFFmpeg(f, { output: 'clip.webm' });").writes, true);
-  assert.equal(
-    needs('for await (const { name, bytes } of imageSequence(frames)) await writeFile(name, bytes);').writes,
-    true,
-  );
+  assert.equal(needs('for await (const { name, bytes } of imageSequence(frames)) await writeFile(name, bytes);').writes, true);
   assert.equal(needs('console.log(engine.gpu.adapterInfo?.device);').writes, false);
 });
 

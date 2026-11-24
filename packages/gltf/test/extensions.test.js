@@ -600,10 +600,7 @@ test('physical extensions select the physical shader variant, its maps and the t
       'opaque plain material draws first with the base shader, its tests behind constants',
     );
     // Transmission (5w.f): the transmissive physical variant, drawn twice: the background times the tint, then the lit surface added.
-    assert.equal(
-      pipelines[1].vertex.module.code,
-      viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(glass.maps)))),
-    );
+    assert.equal(pipelines[1].vertex.module.code, viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(glass.maps)))));
     assert.equal(pipelines[2].vertex.module, pipelines[1].vertex.module);
     assert.deepEqual(
       pipelines.slice(1).map((p) => [p.fragment.entryPoint, p.fragment.targets[0].blend.color]),

@@ -139,12 +139,7 @@ export async function fetchResource(url: string | URL, options: FetchOptions = {
     throw new LoaderError(F, 'range', 'maxBytes must be a non-negative integer');
   if (!Number.isSafeInteger(maxRedirects) || maxRedirects < 0)
     throw new LoaderError(F, 'range', 'maxRedirects must be a non-negative integer');
-  const guarded = !!(
-      options.protocols ||
-      options.publicOnly ||
-      options.allowHost ||
-      options.maxRedirects !== undefined
-    ),
+  const guarded = !!(options.protocols || options.publicOnly || options.allowHost || options.maxRedirects !== undefined),
     doFetch = options.fetch ?? globalThis.fetch,
     signal = options.signal;
   if (typeof doFetch !== 'function') throw new LoaderError(F, 'unsupported', 'fetch is not available');
@@ -162,11 +157,7 @@ export async function fetchResource(url: string | URL, options: FetchOptions = {
       guard(target, options, redirects);
     }
     try {
-      response = await doFetch(target, {
-        ...options.init,
-        ...(guarded ? { redirect: 'manual' as const } : {}),
-        signal,
-      });
+      response = await doFetch(target, { ...options.init, ...(guarded ? { redirect: 'manual' as const } : {}), signal });
     } catch (error) {
       if (signal?.aborted)
         throw new LoaderError(F, 'aborted', `aborted while fetching ${short(target)}`, { cause: error });
@@ -186,8 +177,7 @@ export async function fetchResource(url: string | URL, options: FetchOptions = {
       throw new LoaderError(F, 'fetch', `${short(target)} answered HTTP ${response.status} with no Location`, {
         status: response.status,
       });
-    if (redirects >= maxRedirects)
-      throw new LoaderError(F, 'limit', `more than ${maxRedirects} redirects from ${short(url)}`);
+    if (redirects >= maxRedirects) throw new LoaderError(F, 'limit', `more than ${maxRedirects} redirects from ${short(url)}`);
     target = new URL(location, target);
     redirects++;
   }
@@ -195,12 +185,7 @@ export async function fetchResource(url: string | URL, options: FetchOptions = {
     type = response.headers.get('content-type') ?? '';
   if (!response.ok) {
     void response.body?.cancel().catch(() => {});
-    throw new LoaderError(
-      F,
-      'fetch',
-      `request for ${short(where)} returned HTTP ${response.status}`,
-      httpRefusal(response),
-    );
+    throw new LoaderError(F, 'fetch', `request for ${short(where)} returned HTTP ${response.status}`, httpRefusal(response));
   }
   if (options.accept && !accepted(type, options.accept)) {
     void response.body?.cancel().catch(() => {});
@@ -247,7 +232,8 @@ async function readBody(
   } catch (error) {
     void reader.cancel(error).catch(() => {});
     if (error instanceof LoaderError) throw error;
-    if (signal?.aborted) throw new LoaderError(F, 'aborted', `aborted while reading ${short(url)}`, { cause: error });
+    if (signal?.aborted)
+      throw new LoaderError(F, 'aborted', `aborted while reading ${short(url)}`, { cause: error });
     throw new LoaderError(F, 'fetch', `reading ${short(url)} failed (${(error as Error)?.message ?? error})`, {
       cause: error,
     });

@@ -24,8 +24,7 @@ export function separateRoughness(texture: Texture, fallback: Texture): Material
   return {
     name: 'react:roughness',
     shader(code, group) {
-      return (
-        `struct ReactRoughnessUV {a:vec4f,b:vec4f}
+      return `struct ReactRoughnessUV {a:vec4f,b:vec4f}
 @group(${group}) @binding(700) var reactRoughness:texture_2d<f32>;
 @group(${group}) @binding(701) var reactRoughnessSampler:sampler;
 @group(${group}) @binding(702) var<uniform> reactRoughnessUV:ReactRoughnessUV;
@@ -33,12 +32,7 @@ fn reactRoughUV(i:Out)->vec2f {
 let p=vec3f(select(i.uv.xy,i.uv.zw,reactRoughnessUV.a.w>0.5),1);
 return vec2f(dot(reactRoughnessUV.a.xyz,p),dot(reactRoughnessUV.b.xyz,p));
 }
-` +
-        code.replaceAll(
-          'mr.g*f.factors.x',
-          'textureSample(reactRoughness,reactRoughnessSampler,reactRoughUV(i)).g*f.factors.x',
-        )
-      );
+` + code.replaceAll('mr.g*f.factors.x', 'textureSample(reactRoughness,reactRoughnessSampler,reactRoughUV(i)).g*f.factors.x');
     },
     bindings(device, _, material) {
       const [view, sampler] = texture.bind(device, false) ?? fallback.bind(device, false)!;
@@ -50,18 +44,12 @@ return vec2f(dot(reactRoughnessUV.a.xyz,p),dot(reactRoughnessUV.b.xyz,p));
       }
       row.values.set(material.uvt.slice(8, 16));
       device.queue.writeBuffer(row.buffer, 0, row.values);
-      return [
-        { binding: 700, resource: view },
-        { binding: 701, resource: sampler },
-        { binding: 702, resource: { buffer: row.buffer } },
-      ];
+      return [{ binding: 700, resource: view }, { binding: 701, resource: sampler }, { binding: 702, resource: { buffer: row.buffer } }];
     },
     detach() {
       // Core records and submits synchronously. End this task before retiring a buffer a draw may still reference.
-      for (const [device, row] of buffers)
-        lostWatch.get(device)?.delete(buffers), queueMicrotask(() => row.buffer.destroy());
-      buffers.clear();
-      queueMicrotask(() => fallback.dispose());
+      for (const [device, row] of buffers) lostWatch.get(device)?.delete(buffers), queueMicrotask(() => row.buffer.destroy());
+      buffers.clear(); queueMicrotask(() => fallback.dispose());
     },
   };
 }

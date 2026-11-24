@@ -13,11 +13,7 @@ const cube = (half = 0.5, extra = {}) => ({ shape: 'box', halfExtents: [half, ha
 /** A world with a wide floor whose top is at y = 0. */
 function floored(options) {
   const physics = new Physics(null, options);
-  physics.floor = physics.addBody(null, {
-    type: 'fixed',
-    position: [0, -0.5, 0],
-    colliders: { shape: 'box', halfExtents: [50, 0.5, 50] },
-  });
+  physics.floor = physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [50, 0.5, 50] } });
   return physics;
 }
 
@@ -92,7 +88,10 @@ test('setAdditionalMass adds a point at the centre of mass, with inertia of its 
   for (let k = 0; k < 3; k++) near(crate.principalInertia[k], 1, 1e-5, 'a point at the centre turns nothing');
   crate.setAdditionalMass(4, [1, 2, 3]);
   near(crate.mass, 10, 1e-5, 'a second call replaces the first');
-  assert.deepEqual(crate.principalInertia.map((value) => Math.round(value * 1e5) / 1e5).sort(), [2, 3, 4]);
+  assert.deepEqual(
+    crate.principalInertia.map((value) => Math.round(value * 1e5) / 1e5).sort(),
+    [2, 3, 4],
+  );
   crate.setAdditionalMass(0);
   near(crate.mass, 6, 1e-5, '0 removes it');
   near(crate.principalInertia[1], 1, 1e-5, 'and its inertia');
@@ -101,11 +100,7 @@ test('setAdditionalMass adds a point at the centre of mass, with inertia of its 
   crate.addCollider(cube(0.5, { mass: 12, offset: [3, 0, 0] }));
   near(crate.mass, 24, 1e-4, 'total');
   near(crate.centerOfMass[0], 1.5, 1e-5, 'centre: (6 * 0 + 6 * 0 + 12 * 3) / 24');
-  const twisted = physics.addBody(null, {
-    position: [5, 4, 0],
-    colliders: cube(0.5, { density: 6 }),
-    additionalMass: 6,
-  });
+  const twisted = physics.addBody(null, { position: [5, 4, 0], colliders: cube(0.5, { density: 6 }), additionalMass: 6 });
   near(twisted.principalInertia[0], 2, 1e-5, 'the additionalMass option spreads as the colliders do');
   twisted.setAdditionalMass(6);
   near(twisted.principalInertia[0], 1, 1e-5, 'setAdditionalMass takes the option out');
@@ -146,16 +141,14 @@ test('setMassProperties: mass alone scales the inertia, every figure given is th
 /** A pile and a pendulum on one box, another pile far off, and the bodies to read. */
 function scene(iterations, extra) {
   const physics = floored({ iterations }),
-    pile = (x) =>
-      [0, 1, 2].map((k) => physics.addBody(null, { position: [x, 0.5 + k * 1.02, 0.1 * k], colliders: cube() }));
+    pile = (x) => [0, 1, 2].map((k) => physics.addBody(null, { position: [x, 0.5 + k * 1.02, 0.1 * k], colliders: cube() }));
   const first = pile(0),
     second = pile(20),
     bob = physics.addBody(null, { position: [1.5, 2.6, 0], colliders: { shape: 'sphere', radius: 0.2 } });
   physics.addJoint(first[2], bob, { type: 'spherical', anchorA: [0.5, 0.5, 0], anchorB: [-1, 0, 0] });
   first[0].additionalSolverIterations = extra;
   for (let i = 0; i < 90; i++) physics.step();
-  const read = (bodies) =>
-    bodies.flatMap((body) => [...body.position, ...body.rotation, ...body.linearVelocity, ...body.angularVelocity]);
+  const read = (bodies) => bodies.flatMap((body) => [...body.position, ...body.rotation, ...body.linearVelocity, ...body.angularVelocity]);
   const out = { first: read([...first, bob]), second: read(second) };
   physics.dispose();
   return out;
@@ -170,11 +163,7 @@ test('extra passes give an island what a world of that many passes would, and le
     const asked = scene(iterations, extra),
       more = scene(iterations + extra, 0),
       plain = scene(iterations, 0);
-    assert.deepEqual(
-      asked.first,
-      more.first,
-      `${iterations} passes and ${extra} extra are ${iterations + extra} passes`,
-    );
+    assert.deepEqual(asked.first, more.first, `${iterations} passes and ${extra} extra are ${iterations + extra} passes`);
     assert.deepEqual(asked.second, plain.second, `the other island keeps ${iterations} passes`);
     assert.notDeepEqual(asked.first, plain.first, 'the extra passes did something');
   }
@@ -213,11 +202,7 @@ test('a generic joint holds its limits and drives its motors: the README door, a
   const physics = new Physics(null),
     wall = physics.addBody(null, { type: 'fixed', colliders: [] }),
     // A door left to sleep would stop as its approach slows under the sleep threshold, a few thousandths short.
-    door = physics.addBody(null, {
-      position: [1, 0, 0],
-      colliders: { shape: 'box', halfExtents: [1, 1, 0.05] },
-      canSleep: false,
-    }),
+    door = physics.addBody(null, { position: [1, 0, 0], colliders: { shape: 'box', halfExtents: [1, 1, 0.05] }, canSleep: false }),
     hinge = physics.addJoint(wall, door, {
       type: 'generic',
       anchorB: [-1, 0, 0],
@@ -258,11 +243,7 @@ test('a generic joint holds its limits and drives its motors: the README door, a
 /** Sleep reads through a kind change, the same calls on either entry: before, after setType, after one step, much later. */
 function switchReads(Engine, from, to, wakeUp) {
   const physics = new Engine(null);
-  physics.addBody(null, {
-    type: 'fixed',
-    position: [0, -0.5, 0],
-    colliders: { shape: 'box', halfExtents: [50, 0.5, 50] },
-  });
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [50, 0.5, 50] } });
   const body = physics.addBody(null, { type: from, position: [0, 0.5, 0], colliders: cube() }),
     top = physics.addBody(null, { position: [0, 1.5, 0], colliders: cube() }),
     reads = () => [body.sleeping, top.sleeping];
@@ -291,8 +272,7 @@ test('setType honours wakeUp as the root entry does: asleep until the step, whic
           what = `${from} to ${to}, wakeUp ${wakeUp}`;
         assert.deepEqual(own[0], root[0], `${what}: before`);
         assert.equal(own[1][0], root[1][0], `${what}: the body right after setType`);
-        if (!wakeUp || to === 'fixed')
-          assert.equal(own[1][1], root[1][1], `${what}: the body on top right after setType`);
+        if (!wakeUp || to === 'fixed') assert.equal(own[1][1], root[1][1], `${what}: the body on top right after setType`);
         assert.deepEqual(own[2], root[2], `${what}: after one step`);
         assert.deepEqual(own[3], root[3], `${what}: much later`);
       }

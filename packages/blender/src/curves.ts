@@ -1,19 +1,28 @@
 // @margoengine/blender/curves: the curves, point clouds and volumes a Blender scene exports with "Curves, points and
 // volumes" on (header flag 2), as data for the engine's own line, point and volume packages, plus the scene's meshes
 // drawn as parseMargo draws them. evaluateSpline turns a spline into the polyline Blender draws at its resolution.
-import type { EngineKernel } from '@margoengine/core';
-import { parsePreparedPBR, type PBRModel } from '@margoengine/gltf/pbr-model';
-import { countLimit, checkCount } from '../../shared/limits.js';
-import { readResponse } from '../../shared/loading.js';
-import { captureScene } from '../../shared/scene-scope.js';
-import { decodeImages, maxBytes, readContainer, shapesFlag, type MargoSection } from './container.js';
-import type { MargoAsset, MargoOptions } from './index.js';
-import { decodeScene } from './scene.js';
+import type { EngineKernel } from "@margoengine/core";
+import {
+  parsePreparedPBR,
+  type PBRModel,
+} from "@margoengine/gltf/pbr-model";
+import { countLimit, checkCount } from "../../shared/limits.js";
+import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
+import {
+  decodeImages,
+  maxBytes,
+  readContainer,
+  shapesFlag,
+  type MargoSection,
+} from "./container.js";
+import type { MargoAsset, MargoOptions } from "./index.js";
+import { decodeScene } from "./scene.js";
 
 /** Blender's curve types: `catmullRom` (hair's default), `poly`, `bezier` and `nurbs`. */
-export type MargoSplineType = 'catmullRom' | 'poly' | 'bezier' | 'nurbs';
+export type MargoSplineType = "catmullRom" | "poly" | "bezier" | "nurbs";
 /** Blender's NURBS knot modes: `normal` (Uniform), `endpoint`, `bezier` and `endpointBezier`. */
-export type MargoKnotMode = 'normal' | 'endpoint' | 'bezier' | 'endpointBezier';
+export type MargoKnotMode = "normal" | "endpoint" | "bezier" | "endpointBezier";
 
 /** One spline of a curves object, its control points in the object's Y-up metres (views of the file's bytes). */
 export interface MargoSpline {
@@ -74,16 +83,17 @@ export interface MargoShapes {
 }
 
 type Bag = Record<string, unknown>;
-const bag = (value: unknown): value is Bag => typeof value === 'object' && value !== null && !Array.isArray(value);
+const bag = (value: unknown): value is Bag =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 const bad = (what: string): never => {
   throw new TypeError(
     `Invalid .margo ${what}; the file is corrupt, so re-export it from Blender with Curves, points and volumes on`,
   );
 };
 const whole = (value: unknown, lo: number, hi: number) =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= lo && value <= hi;
-const types: readonly MargoSplineType[] = ['catmullRom', 'poly', 'bezier', 'nurbs'],
-  modes: readonly MargoKnotMode[] = ['normal', 'endpoint', 'bezier', 'endpointBezier'],
+  typeof value === "number" && Number.isSafeInteger(value) && value >= lo && value <= hi;
+const types: readonly MargoSplineType[] = ["catmullRom", "poly", "bezier", "nurbs"],
+  modes: readonly MargoKnotMode[] = ["normal", "endpoint", "bezier", "endpointBezier"],
   widths: Record<string, number> = {
     position: 3,
     handleLeft: 3,
@@ -102,22 +112,10 @@ function trs(node: Bag): Float32Array<ArrayBuffer> {
     [qx, qy, qz, qw] = (node.rotation as number[]) ?? [0, 0, 0, 1],
     [sx, sy, sz] = (node.scale as number[]) ?? [1, 1, 1];
   return new Float32Array([
-    (1 - 2 * (qy * qy + qz * qz)) * sx,
-    2 * (qx * qy + qz * qw) * sx,
-    2 * (qx * qz - qy * qw) * sx,
-    0,
-    2 * (qx * qy - qz * qw) * sy,
-    (1 - 2 * (qx * qx + qz * qz)) * sy,
-    2 * (qy * qz + qx * qw) * sy,
-    0,
-    2 * (qx * qz + qy * qw) * sz,
-    2 * (qy * qz - qx * qw) * sz,
-    (1 - 2 * (qx * qx + qy * qy)) * sz,
-    0,
-    x,
-    y,
-    z,
-    1,
+    (1 - 2 * (qy * qy + qz * qz)) * sx, 2 * (qx * qy + qz * qw) * sx, 2 * (qx * qz - qy * qw) * sx, 0,
+    2 * (qx * qy - qz * qw) * sy, (1 - 2 * (qx * qx + qz * qz)) * sy, 2 * (qy * qz + qx * qw) * sy, 0,
+    2 * (qx * qz + qy * qw) * sz, 2 * (qy * qz - qx * qw) * sz, (1 - 2 * (qx * qx + qy * qy)) * sz, 0,
+    x, y, z, 1,
   ]);
 }
 
@@ -134,23 +132,23 @@ export function decodeMargoCurves(
   input: ArrayBuffer | ArrayBufferView,
   { maxNodes = 100_000 }: MargoOptions = {},
 ): MargoShapes {
-  countLimit('maxNodes', maxNodes);
+  countLimit("maxNodes", maxNodes);
   const { buffer, sections, manifest, flags } = readContainer(input, shapesFlag);
-  if (!bag(manifest) || !Array.isArray(manifest.nodes)) return bad('scene');
+  if (!bag(manifest) || !Array.isArray(manifest.nodes)) return bad("scene");
   const doc = manifest,
     nodes = doc.nodes as unknown[];
-  checkCount('Too many .margo nodes', nodes.length, maxNodes, 'maxNodes');
-  const kinds = ['curves', 'pointClouds', 'volumes'] as const;
+  checkCount("Too many .margo nodes", nodes.length, maxNodes, "maxNodes");
+  const kinds = ["curves", "pointClouds", "volumes"] as const;
   for (const kind of kinds)
     if (doc[kind] !== undefined && (flags !== shapesFlag || !Array.isArray(doc[kind]))) bad(kind);
   const section = (id: unknown, type: number): MargoSection =>
     whole(id, 1, sections.length - 1) && sections[id as number].type === type
       ? sections[id as number]
-      : bad('shape section reference');
+      : bad("shape section reference");
   const views = (record: Bag, count: number) => {
     const data = section(record.section, 6),
       found: Record<string, Float32Array> = {};
-    if (!bag(record.attributes)) return bad('shape attributes');
+    if (!bag(record.attributes)) return bad("shape attributes");
     for (const [name, view] of Object.entries(record.attributes)) {
       const width = widths[name];
       if (
@@ -162,25 +160,17 @@ export function decodeMargoCurves(
         (view.byteOffset as number) + count * width * 4 > data.bytes.byteLength
       )
         bad(`shape attribute ${name}`);
-      const values = new Float32Array(
-        buffer,
-        data.bytes.byteOffset + (view as Bag & { byteOffset: number }).byteOffset,
-        count * width,
-      );
+      const values = new Float32Array(buffer, data.bytes.byteOffset + (view as Bag & { byteOffset: number }).byteOffset, count * width);
       for (const v of values) if (!Number.isFinite(v)) bad(`shape attribute ${name}`);
       found[name] = values;
     }
-    if (!found.position) bad('shape positions');
+    if (!found.position) bad("shape positions");
     return found;
   };
   const owners = new Map<string, number>();
   nodes.forEach((node, index) => {
     if (!bag(node)) return;
-    for (const [key, kind] of [
-      ['curves', 'curves'],
-      ['points', 'pointClouds'],
-      ['volume', 'volumes'],
-    ] as const)
+    for (const [key, kind] of [["curves", "curves"], ["points", "pointClouds"], ["volume", "volumes"]] as const)
       if (node[key] !== undefined) {
         const list = doc[kind] as unknown[] | undefined;
         if (!list || !whole(node[key], 0, list.length - 1)) bad(`node ${key} reference`);
@@ -191,11 +181,11 @@ export function decodeMargoCurves(
     const node = owners.get(`${kind}:${index}`);
     if (node === undefined) return bad(`${kind} without a node`);
     const owner = nodes[node] as Bag;
-    return { node, name: typeof owner.name === 'string' ? owner.name : '', matrix: trs(owner) };
+    return { node, name: typeof owner.name === "string" ? owner.name : "", matrix: trs(owner) };
   };
   const curves = ((doc.curves as unknown[] | undefined) ?? []).map((record, index): MargoCurves => {
     if (!bag(record) || !whole(record.count, 1, 50_000_000) || !Array.isArray(record.splines) || !record.splines.length)
-      return bad('curves');
+      return bad("curves");
     const count = record.count as number,
       found = views(record, count);
     let first = 0;
@@ -204,62 +194,58 @@ export function decodeMargoCurves(
         !bag(spline) ||
         !types.includes(spline.type as MargoSplineType) ||
         !whole(spline.points, 1, count - first) ||
-        typeof spline.cyclic !== 'boolean' ||
+        typeof spline.cyclic !== "boolean" ||
         !whole(spline.resolution, 1, 1024) ||
-        (spline.type === 'nurbs'
+        (spline.type === "nurbs"
           ? !whole(spline.order, 2, 64) || !modes.includes(spline.knots as MargoKnotMode)
           : spline.order !== undefined || spline.knots !== undefined)
       )
-        bad('spline');
+        bad("spline");
       const n = spline.points as number,
         slice = (name: string) => found[name]?.subarray(first * widths[name], (first + n) * widths[name]);
-      if (spline.type === 'bezier' && (!found.handleLeft || !found.handleRight)) bad('Bezier handles');
+      if (spline.type === "bezier" && (!found.handleLeft || !found.handleRight)) bad("Bezier handles");
       const result: MargoSpline = {
         type: spline.type as MargoSplineType,
         cyclic: spline.cyclic as boolean,
         resolution: spline.resolution as number,
-        order: spline.type === 'nurbs' ? (spline.order as number) : 0,
-        knots: spline.type === 'nurbs' ? (spline.knots as MargoKnotMode) : undefined,
-        positions: slice('position')!,
-        radius: slice('radius'),
-        tilt: slice('tilt'),
-        weight: slice('weight'),
-        handleLeft: slice('handleLeft'),
-        handleRight: slice('handleRight'),
-        handleTypeLeft: slice('handleTypeLeft'),
-        handleTypeRight: slice('handleTypeRight'),
+        order: spline.type === "nurbs" ? (spline.order as number) : 0,
+        knots: spline.type === "nurbs" ? (spline.knots as MargoKnotMode) : undefined,
+        positions: slice("position")!,
+        radius: slice("radius"),
+        tilt: slice("tilt"),
+        weight: slice("weight"),
+        handleLeft: slice("handleLeft"),
+        handleRight: slice("handleRight"),
+        handleTypeLeft: slice("handleTypeLeft"),
+        handleTypeRight: slice("handleTypeRight"),
       };
       first += n;
       return result;
     });
-    if (first !== count) bad('spline point counts');
-    return { ...shape('curves', index), splines };
+    if (first !== count) bad("spline point counts");
+    return { ...shape("curves", index), splines };
   });
   const points = ((doc.pointClouds as unknown[] | undefined) ?? []).map((record, index): MargoPointCloud => {
-    if (!bag(record) || !whole(record.count, 1, 50_000_000)) return bad('point cloud');
+    if (!bag(record) || !whole(record.count, 1, 50_000_000)) return bad("point cloud");
     const found = views(record, record.count as number);
-    return { ...shape('pointClouds', index), positions: found.position, radius: found.radius, colors: found.color };
+    return { ...shape("pointClouds", index), positions: found.position, radius: found.radius, colors: found.color };
   });
   const volumes = ((doc.volumes as unknown[] | undefined) ?? []).map((record, index): MargoVolume => {
-    if (!bag(record) || !Array.isArray(record.grids) || !record.grids.every((g) => typeof g === 'string'))
-      return bad('volume');
-    return { ...shape('volumes', index), grids: record.grids as string[], vdb: section(record.section, 7).bytes };
+    if (!bag(record) || !Array.isArray(record.grids) || !record.grids.every((g) => typeof g === "string"))
+      return bad("volume");
+    return { ...shape("volumes", index), grids: record.grids as string[], vdb: section(record.section, 7).bytes };
   });
   // The meshes: the same scene without the shape records, checked and decoded as decodeMargo does.
   let asset: MargoAsset | undefined;
   if (Array.isArray(doc.meshes) && doc.meshes.length) {
-    const plain: Bag = {
-      ...doc,
-      nodes: nodes.map((node) => {
-        if (!bag(node)) return node;
-        const { curves: _c, points: _p, volume: _v, ...rest } = node;
-        return rest;
-      }),
-    };
+    const plain: Bag = { ...doc, nodes: nodes.map((node) => {
+      if (!bag(node)) return node;
+      const { curves: _c, points: _p, volume: _v, ...rest } = node;
+      return rest;
+    }) };
     for (const kind of kinds) delete plain[kind];
     asset = decodeScene(buffer, sections, plain, maxNodes);
-  } else if (!curves.length && !points.length && !volumes.length)
-    bad('scene: it has no meshes, curves, points or volumes');
+  } else if (!curves.length && !points.length && !volumes.length) bad("scene: it has no meshes, curves, points or volumes");
   return { asset, curves, points, volumes };
 }
 
@@ -268,10 +254,7 @@ function bezier(out: number[], p: Float32Array, a: number, h1: Float32Array, h2:
   const s = 1 - t;
   for (let axis = 0; axis < 3; axis++)
     out.push(
-      s * s * s * p[a * 3 + axis] +
-        3 * s * s * t * h1[a * 3 + axis] +
-        3 * s * t * t * h2[b * 3 + axis] +
-        t * t * t * p[b * 3 + axis],
+      s * s * s * p[a * 3 + axis] + 3 * s * s * t * h1[a * 3 + axis] + 3 * s * t * t * h2[b * 3 + axis] + t * t * t * p[b * 3 + axis],
     );
 }
 
@@ -292,16 +275,15 @@ export function evaluateSpline(spline: MargoSpline): Float32Array<ArrayBuffer> {
     r = spline.resolution,
     out: number[] = [],
     segments = spline.cyclic ? n : n - 1;
-  if (spline.type === 'poly' || n === 1) return Float32Array.from(p);
-  if (spline.type === 'bezier') {
-    const left = spline.handleLeft!,
-      right = spline.handleRight!;
+  if (spline.type === "poly" || n === 1) return Float32Array.from(p);
+  if (spline.type === "bezier") {
+    const left = spline.handleLeft!, right = spline.handleRight!;
     for (let i = 0; i < segments; i++) {
       const b = (i + 1) % n;
       if (spline.handleTypeRight?.[i] === 2 && spline.handleTypeLeft?.[b] === 2) bezier(out, p, i, right, left, b, 0);
       else for (let j = 0; j < r; j++) bezier(out, p, i, right, left, b, j / r);
     }
-  } else if (spline.type === 'catmullRom') {
+  } else if (spline.type === "catmullRom") {
     const at = (i: number, axis: number) => {
       if (spline.cyclic) return p[((i + n) % n) * 3 + axis];
       // An open end repeats its end point, as Blender does.
@@ -311,38 +293,29 @@ export function evaluateSpline(spline: MargoSpline): Float32Array<ArrayBuffer> {
     };
     for (let i = 0; i < segments; i++)
       for (let j = 0; j < r; j++) {
-        const t = j / r,
-          t2 = t * t,
-          t3 = t2 * t;
+        const t = j / r, t2 = t * t, t3 = t2 * t;
         for (let axis = 0; axis < 3; axis++) {
-          const p0 = at(i - 1, axis),
-            p1 = at(i, axis),
-            p2 = at(i + 1, axis),
-            p3 = at(i + 2, axis);
-          out.push(
-            0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3),
-          );
+          const p0 = at(i - 1, axis), p1 = at(i, axis), p2 = at(i + 1, axis), p3 = at(i + 2, axis);
+          out.push(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3));
         }
       }
   } else {
     const k = spline.order;
-    if (spline.knots === 'bezier' || spline.knots === 'endpointBezier')
+    if (spline.knots === "bezier" || spline.knots === "endpointBezier")
       throw new RangeError(
         "evaluateSpline does not evaluate NURBS with Bezier knots yet; set the spline's knot mode to Uniform or Endpoint in Blender",
       );
-    if (spline.cyclic && spline.knots === 'endpoint')
+    if (spline.cyclic && spline.knots === "endpoint")
       throw new RangeError(
-        'evaluateSpline does not evaluate a cyclic NURBS with Endpoint knots yet; set its knot mode to Uniform in Blender',
+        "evaluateSpline does not evaluate a cyclic NURBS with Endpoint knots yet; set its knot mode to Uniform in Blender",
       );
     if (n < k)
       throw new RangeError(`A NURBS spline of order ${k} needs at least ${k} points; lower its order in Blender`);
     const count = spline.cyclic ? n + k - 1 : n,
       knots = new Float64Array(count + k);
     for (let i = 0; i < knots.length; i++)
-      knots[i] = spline.knots === 'endpoint' ? Math.min(Math.max(i - k + 1, 0), n - k + 1) : i;
-    const start = knots[k - 1],
-      end = knots[count],
-      samples = spline.cyclic ? r * n : r * (n - k + 1) + 1,
+      knots[i] = spline.knots === "endpoint" ? Math.min(Math.max(i - k + 1, 0), n - k + 1) : i;
+    const start = knots[k - 1], end = knots[count], samples = spline.cyclic ? r * n : r * (n - k + 1) + 1,
       w = new Float64Array(k * 4);
     for (let j = 0; j < samples; j++) {
       const u = start + ((end - start) * j) / (spline.cyclic ? samples : samples - 1);
@@ -350,15 +323,13 @@ export function evaluateSpline(spline: MargoSpline): Float32Array<ArrayBuffer> {
       while (s < count - 1 && u >= knots[s + 1]) s++;
       // de Boor on homogeneous points (x w, y w, z w, w).
       for (let i = 0; i < k; i++) {
-        const c = (s - k + 1 + i) % n,
-          weight = spline.weight?.[c] ?? 1;
+        const c = (s - k + 1 + i) % n, weight = spline.weight?.[c] ?? 1;
         for (let axis = 0; axis < 3; axis++) w[i * 4 + axis] = p[c * 3 + axis] * weight;
         w[i * 4 + 3] = weight;
       }
       for (let level = 1; level < k; level++)
         for (let i = k - 1; i >= level; i--) {
-          const at = s - k + 1 + i,
-            span = knots[at + k - level] - knots[at],
+          const at = s - k + 1 + i, span = knots[at + k - level] - knots[at],
             a = span ? (u - knots[at]) / span : 0;
           for (let c = 0; c < 4; c++) w[i * 4 + c] = (1 - a) * w[(i - 1) * 4 + c] + a * w[i * 4 + c];
         }
@@ -377,7 +348,7 @@ export interface MargoCurvesOptions extends MargoOptions {
   signal?: AbortSignal;
 }
 /** parseMargoCurves' result: the meshes' model (undefined without meshes) and the shapes to hand to other packages. */
-export interface MargoCurvesScene extends Omit<MargoShapes, 'asset'> {
+export interface MargoCurvesScene extends Omit<MargoShapes, "asset"> {
   readonly model: PBRModel | undefined;
 }
 
@@ -424,14 +395,14 @@ export async function loadMargoCurves(
   options.signal?.throwIfAborted();
   const scope = captureScene(engine),
     target = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(target.protocol))
+  if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
-      '.margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoCurves',
+      ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoCurves",
     );
   const bytes = await readResponse(await get(target, { signal: options.signal }), {
     maxBytes,
     signal: options.signal,
-    label: '.margo download',
+    label: ".margo download",
   });
   // Parsed in the scene this call started in, not the one active once the download is done.
   return scope.run(() => parseMargoCurves(engine, bytes, options));

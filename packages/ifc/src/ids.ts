@@ -141,8 +141,7 @@ const fail = (code: IDSErrorCode, message: string): never => {
 
 // Reading.
 
-const kids = (e: XMLElement, name: string, ns = IDS_NS) =>
-  e.children.filter((c) => c.localName === name && c.namespaceURI === ns);
+const kids = (e: XMLElement, name: string, ns = IDS_NS) => e.children.filter((c) => c.localName === name && c.namespaceURI === ns);
 const kid = (e: XMLElement, name: string) => kids(e, name)[0];
 const textOf = (e: XMLElement | undefined) => (e ? e.textContent : undefined);
 
@@ -166,14 +165,10 @@ function readValue(e: XMLElement | undefined, where: string): IDSValue | undefin
       restriction[name] = value;
     else if (name === 'length' || name === 'minLength' || name === 'maxLength') {
       const n = Number(value);
-      if (!Number.isInteger(n) || n < 0)
-        return fail('syntax', `${where}: xs:${name} must be a non-negative integer; fix the value`);
+      if (!Number.isInteger(n) || n < 0) return fail('syntax', `${where}: xs:${name} must be a non-negative integer; fix the value`);
       restriction[name] = n;
     } else if (name !== 'annotation' && name !== 'totalDigits' && name !== 'fractionDigits' && name !== 'whiteSpace')
-      return fail(
-        'syntax',
-        `${where}: xs:${name} is not an IDS restriction; use enumeration, pattern, bounds or lengths`,
-      );
+      return fail('syntax', `${where}: xs:${name} is not an IDS restriction; use enumeration, pattern, bounds or lengths`);
   }
   return { restriction };
 }
@@ -184,10 +179,7 @@ function need<T>(value: T | undefined, what: string): T {
 }
 
 function readEntity(e: XMLElement): IDSEntityFacet {
-  const facet: IDSEntityFacet = {
-    facet: 'entity',
-    name: need(readValue(kid(e, 'name'), 'entity name'), 'entity name'),
-  };
+  const facet: IDSEntityFacet = { facet: 'entity', name: need(readValue(kid(e, 'name'), 'entity name'), 'entity name') };
   const predefined = readValue(kid(e, 'predefinedType'), 'entity predefinedType');
   if (predefined) facet.predefinedType = predefined;
   return facet;
@@ -210,10 +202,7 @@ function readFacet(e: XMLElement): IDSFacet | undefined {
     case 'entity':
       return readEntity(e);
     case 'attribute': {
-      const facet: IDSAttributeFacet = {
-        facet: 'attribute',
-        name: need(readValue(kid(e, 'name'), 'attribute name'), 'attribute name'),
-      };
+      const facet: IDSAttributeFacet = { facet: 'attribute', name: need(readValue(kid(e, 'name'), 'attribute name'), 'attribute name') };
       return optional(facet, 'value', readValue(kid(e, 'value'), 'attribute value'));
     }
     case 'classification': {
@@ -242,8 +231,7 @@ function readFacet(e: XMLElement): IDSFacet | undefined {
       const facet: IDSPartOfFacet = { facet: 'partOf', entity: readEntity(need(entity, 'partOf entity')) };
       const relation = e.getAttribute('relation');
       if (relation !== null) {
-        if (!RELATIONS.includes(relation))
-          fail('syntax', `partOf relation ${relation} is not an IDS 1.0 relation; use one of ${RELATIONS.join(', ')}`);
+        if (!RELATIONS.includes(relation)) fail('syntax', `partOf relation ${relation} is not an IDS 1.0 relation; use one of ${RELATIONS.join(', ')}`);
         facet.relation = relation as IDSRelation;
       }
       return facet;
@@ -255,8 +243,7 @@ const occurs = (value: string | null, fallback: number): number | 'unbounded' =>
   if (value === null) return fallback;
   if (value === 'unbounded') return value;
   const n = Number(value);
-  if (!Number.isInteger(n) || n < 0)
-    fail('syntax', `occurrence ${value} must be a non-negative integer or unbounded; fix it`);
+  if (!Number.isInteger(n) || n < 0) fail('syntax', `occurrence ${value} must be a non-negative integer or unbounded; fix it`);
   return n;
 };
 
@@ -271,8 +258,7 @@ export interface IDSParseOptions {
  * ids.xsd requires with `LoaderError` (format `IDS`, code `syntax`).
  */
 export function parseIDS(source: string | Uint8Array, options: IDSParseOptions = {}): IDSDocument {
-  if (typeof source !== 'string' && !(source instanceof Uint8Array))
-    fail('range', 'expected IDS text or bytes; read the .ids file first');
+  if (typeof source !== 'string' && !(source instanceof Uint8Array)) fail('range', 'expected IDS text or bytes; read the .ids file first');
   const text = typeof source === 'string' ? source : new TextDecoder().decode(source);
   const doc = parseXMLDocument(text.replace(/^﻿/, ''), {
     maxElements: options.maxElements ?? 1_000_000,
@@ -292,9 +278,7 @@ export function parseIDS(source: string | Uint8Array, options: IDSParseOptions =
     const applicability = need(kid(s, 'applicability'), 'specification applicability');
     const spec: IDSSpecification = {
       name: need(s.getAttribute('name') ?? undefined, 'specification name'),
-      ifcVersion: need(s.getAttribute('ifcVersion') ?? undefined, 'specification ifcVersion')
-        .trim()
-        .split(/\s+/),
+      ifcVersion: need(s.getAttribute('ifcVersion') ?? undefined, 'specification ifcVersion').trim().split(/\s+/),
       minOccurs: occurs(applicability.getAttribute('minOccurs'), 1) as number,
       maxOccurs: occurs(applicability.getAttribute('maxOccurs'), 1),
       applicability: [],
@@ -334,27 +318,17 @@ export function parseIDS(source: string | Uint8Array, options: IDSParseOptions =
 // Writing.
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const attr = (name: string, value: string | number | undefined) =>
-  value === undefined ? '' : ` ${name}="${esc(String(value))}"`;
+const attr = (name: string, value: string | number | undefined) => (value === undefined ? '' : ` ${name}="${esc(String(value))}"`);
 
 function writeValue(tag: string, value: IDSValue | undefined, pad: string): string {
   if (!value) return '';
-  if ('simpleValue' in value)
-    return `${pad}<ids:${tag}><ids:simpleValue>${esc(value.simpleValue)}</ids:simpleValue></ids:${tag}>\n`;
+  if ('simpleValue' in value) return `${pad}<ids:${tag}><ids:simpleValue>${esc(value.simpleValue)}</ids:simpleValue></ids:${tag}>\n`;
   const r = value.restriction,
     inner = `${pad}    `;
   let body = '';
   for (const v of r.enumeration ?? []) body += `${inner}<xs:enumeration value="${esc(v)}"/>\n`;
   for (const v of r.pattern ?? []) body += `${inner}<xs:pattern value="${esc(v)}"/>\n`;
-  for (const key of [
-    'minExclusive',
-    'minInclusive',
-    'maxExclusive',
-    'maxInclusive',
-    'length',
-    'minLength',
-    'maxLength',
-  ] as const)
+  for (const key of ['minExclusive', 'minInclusive', 'maxExclusive', 'maxInclusive', 'length', 'minLength', 'maxLength'] as const)
     if (r[key] !== undefined) body += `${inner}<xs:${key} value="${esc(String(r[key]))}"/>\n`;
   return `${pad}<ids:${tag}>\n${pad}  <xs:restriction base="${esc(r.base)}">\n${body}${pad}  </xs:restriction>\n${pad}</ids:${tag}>\n`;
 }
@@ -386,8 +360,7 @@ const ordered = <T extends IDSFacet>(facets: readonly T[]) =>
 
 /** Writes an IDS 1.0 document as XML, facets in the order ids.xsd's sequences require. parseIDS reads it back unchanged. */
 export function writeIDS(ids: IDSDocument): string {
-  if (!ids || !ids.info || !Array.isArray(ids.specifications))
-    fail('range', 'expected an IDSDocument with info and specifications');
+  if (!ids || !ids.info || !Array.isArray(ids.specifications)) fail('range', 'expected an IDSDocument with info and specifications');
   if (!ids.specifications.length) fail('range', 'an IDS needs at least one specification; add one');
   let out =
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -459,12 +432,9 @@ export interface IDSCheckOptions {
 type Raw = any;
 const refOf = (v: Raw): number | undefined => (v && v.type === 5 && typeof v.value === 'number' ? v.value : undefined);
 const refsOf = (v: Raw): number[] =>
-  Array.isArray(v)
-    ? v.map(refOf).filter((x): x is number => x !== undefined)
-    : refOf(v) !== undefined
-      ? [refOf(v)!]
-      : [];
+  Array.isArray(v) ? v.map(refOf).filter((x): x is number => x !== undefined) : refOf(v) !== undefined ? [refOf(v)!] : [];
 const str = (v: Raw): string | undefined => (v && typeof v.value === 'string' && v.type !== 5 ? v.value : undefined);
+
 
 // The value regular expressions of the IDS DataTypes table (XML base types).
 const DOUBLE = /^([-+]?[0-9]*\.?[0-9]*([eE][-+]?[0-9]+)?|NaN|\+INF|-INF)$/;
@@ -475,10 +445,7 @@ const parseDouble = (s: string): number | undefined => {
 };
 
 /** An IFC value as IDS compares it: text, a real, an integer or a boolean. */
-type Atom =
-  | { kind: 'string'; value: string }
-  | { kind: 'real' | 'integer'; value: number }
-  | { kind: 'boolean'; value: boolean };
+type Atom = { kind: 'string'; value: string } | { kind: 'real' | 'integer'; value: number } | { kind: 'boolean'; value: boolean };
 
 function atomOf(value: IFCValue, dataType: string | undefined): Atom | undefined {
   if (typeof value === 'string') return { kind: 'string', value };
@@ -506,8 +473,7 @@ const INTEGER_TYPES = new Set([
 /** Whether a simple IDS value string equals an IFC atom, casting the string to the atom's type. */
 function equalsSimple(text: string, atom: Atom): boolean {
   if (atom.kind === 'string') return atom.value === text;
-  if (atom.kind === 'boolean')
-    return text === 'true' || text === '1' ? atom.value : text === 'false' || text === '0' ? !atom.value : false;
+  if (atom.kind === 'boolean') return text === 'true' || text === '1' ? atom.value : text === 'false' || text === '0' ? !atom.value : false;
   if (atom.kind === 'integer') return INTEGER.test(text) && Number(text) === atom.value;
   const v = parseDouble(text);
   return v !== undefined && nearly(atom.value, v);
@@ -564,8 +530,7 @@ function matches(spec: IDSValue, atom: Atom): boolean {
   return true;
 }
 /** Whether a name (class, set, property, system) satisfies an IDS value; names are always text. */
-const matchesText = (spec: IDSValue, text: string | undefined) =>
-  text !== undefined && matches(spec, { kind: 'string', value: text });
+const matchesText = (spec: IDSValue, text: string | undefined) => text !== undefined && matches(spec, { kind: 'string', value: text });
 const describe = (v: IDSValue) =>
   'simpleValue' in v
     ? v.simpleValue
@@ -626,8 +591,7 @@ class Model {
   }
   nameOfCode(code: number): string {
     let name = this.codes.get(code);
-    if (name === undefined)
-      this.codes.set(code, (name = native('reading a type name', () => this.model.api.GetNameFromTypeCode(code))));
+    if (name === undefined) this.codes.set(code, (name = native('reading a type name', () => this.model.api.GetNameFromTypeCode(code))));
     return name;
   }
   /** The class of an entity in upper case. */
@@ -635,9 +599,7 @@ class Model {
     let t = this.typeOfId.get(id);
     if (t === undefined) {
       const e = this.data.elements.get(id);
-      t = (
-        e ? e.type : this.nameOfCode(native('reading a line type', () => this.model.api.GetLineType(this.model.id, id)))
-      ).toUpperCase();
+      t = (e ? e.type : this.nameOfCode(native('reading a line type', () => this.model.api.GetLineType(this.model.id, id)))).toUpperCase();
       this.typeOfId.set(id, t);
     }
     return t;
@@ -649,9 +611,7 @@ class Model {
     return out;
   }
   allIds(): number[] {
-    return (this.all ??= this.ids(native('listing lines', () => this.model.api.GetAllLines(this.model.id))).sort(
-      (a, b) => a - b,
-    ));
+    return (this.all ??= this.ids(native('listing lines', () => this.model.api.GetAllLines(this.model.id))).sort((a, b) => a - b));
   }
   /** Entities of one class (not its subtypes). */
   ofClass(name: string): number[] {
@@ -663,8 +623,7 @@ class Model {
   /** Every class present in the model, upper case. */
   classes(): string[] {
     const out = new Set<string>();
-    for (const t of native('listing classes', () => this.model.api.GetAllTypesOfModel(this.model.id)))
-      out.add(String(t.typeName).toUpperCase());
+    for (const t of native('listing classes', () => this.model.api.GetAllTypesOfModel(this.model.id))) out.add(String(t.typeName).toUpperCase());
     return [...out];
   }
   /** Property sets of an IfcMaterial: IfcMaterialProperties (IFC4) or IfcExtendedMaterialProperties (IFC2X3). */
@@ -691,8 +650,7 @@ class Model {
   hasMaterialLink(id: number): boolean {
     if (!this.materialLinks) {
       this.materialLinks = new Set();
-      for (const rel of this.ofClass('IFCRELASSOCIATESMATERIAL'))
-        for (const target of refsOf(this.line(rel)?.RelatedObjects)) this.materialLinks.add(target);
+      for (const rel of this.ofClass('IFCRELASSOCIATESMATERIAL')) for (const target of refsOf(this.line(rel)?.RelatedObjects)) this.materialLinks.add(target);
     }
     return this.materialLinks.has(id);
   }
@@ -731,8 +689,7 @@ function predefinedTypesOf(m: Model, id: number): string[] {
 
 function entityVerdict(m: Model, f: IDSEntityFacet, id: number): Verdict {
   const names = classNames(m, id);
-  if (!names.some((n) => matchesText(f.name, n)))
-    return no(`is ${names[names.length - 1]}, expected ${describe(f.name)}`);
+  if (!names.some((n) => matchesText(f.name, n))) return no(`is ${names[names.length - 1]}, expected ${describe(f.name)}`);
   if (f.predefinedType) {
     const types = predefinedTypesOf(m, id);
     if (!types.some((p) => matchesText(f.predefinedType!, p)))
@@ -755,8 +712,7 @@ function entityCandidates(m: Model, f: IDSEntityFacet): number[] {
     for (const id of m.ofClass(name)) out.add(id);
     if (m.ifc2x3)
       for (const typeId of m.ofClass(`${name}TYPE`))
-        for (const e of m.data.elements.values())
-          if (e.typeId === typeId && IFC2X3_GENERIC.has(e.type.toUpperCase())) out.add(e.id);
+        for (const e of m.data.elements.values()) if (e.typeId === typeId && IFC2X3_GENERIC.has(e.type.toUpperCase())) out.add(e.id);
   }
   return [...out];
 }
@@ -766,8 +722,7 @@ const SKIP_KEYS = new Set(['expressID', 'type']);
 function attributeAtom(m: Model, raw: Raw): Atom | 'empty' | 'object' {
   if (raw === null || raw === undefined) return 'empty';
   if (Array.isArray(raw)) return raw.length ? 'object' : 'empty';
-  if (typeof raw !== 'object')
-    return typeof raw === 'string' ? (raw === '' ? 'empty' : { kind: 'string', value: raw }) : 'object';
+  if (typeof raw !== 'object') return typeof raw === 'string' ? (raw === '' ? 'empty' : { kind: 'string', value: raw }) : 'object';
   if (raw.type === 5) return 'object';
   const name = typeof raw.name === 'string' ? raw.name.toUpperCase() : undefined;
   if (raw.type === 3 && (name === 'IFCBOOLEAN' || name === 'IFCLOGICAL')) {
@@ -781,10 +736,7 @@ function attributeAtom(m: Model, raw: Raw): Atom | 'empty' | 'object' {
     // Measures compare in the IDS units table's SI unit.
     const unitType = unitTypeOfMeasure(name),
       unit = unitType ? (m.data.units.byType[unitType] ?? siUnit(unitType)) : undefined;
-    return {
-      kind: name && INTEGER_TYPES.has(name) ? 'integer' : 'real',
-      value: unit ? value * unit.scale + unit.shift : value,
-    };
+    return { kind: name && INTEGER_TYPES.has(name) ? 'integer' : 'real', value: unit ? value * unit.scale + unit.shift : value };
   }
   if (typeof raw.value === 'string') return raw.value === '' ? 'empty' : { kind: 'string', value: raw.value };
   return 'object';
@@ -834,34 +786,22 @@ function classificationsOfEntity(m: Model, id: number): { system?: string; codes
   };
   const element = m.data.elements.get(id);
   if (!element) return m.resourceClassifications(id).map(read);
-  const own = element.classifications.map((c) => ({
-    system: c.system,
-    codes: [c.code, ...(c.parents ?? [])].filter((x): x is string => x !== undefined),
-  }));
+  const own = element.classifications.map((c) => ({ system: c.system, codes: [c.code, ...(c.parents ?? [])].filter((x): x is string => x !== undefined) }));
   const type = element.typeId !== undefined ? m.data.elements.get(element.typeId) : undefined;
   const systems = new Set(own.map((c) => c.system));
   const inherited = (type?.classifications ?? [])
     .filter((c) => !systems.has(c.system))
-    .map((c) => ({
-      system: c.system,
-      codes: [c.code, ...(c.parents ?? [])].filter((x): x is string => x !== undefined),
-    }));
+    .map((c) => ({ system: c.system, codes: [c.code, ...(c.parents ?? [])].filter((x): x is string => x !== undefined) }));
   return [...own, ...inherited];
 }
 
 function classificationVerdict(m: Model, f: IDSClassificationFacet, id: number): Verdict {
   const all = classificationsOfEntity(m, id);
   if (!all.length) return no('has no classification');
-  const hit = all.some(
-    (c) =>
-      (!f.system || matchesText(f.system, c.system)) &&
-      (!f.value || c.codes.some((code) => matchesText(f.value!, code))),
-  );
+  const hit = all.some((c) => (!f.system || matchesText(f.system, c.system)) && (!f.value || c.codes.some((code) => matchesText(f.value!, code))));
   if (hit) return yes;
   const found = all.map((c) => `${c.system ?? '?'} ${c.codes[0] ?? ''}`.trim()).join(', ');
-  return no(
-    `is classified ${found}, expected ${[f.system && describe(f.system), f.value && describe(f.value)].filter(Boolean).join(' ')}`,
-  );
+  return no(`is classified ${found}, expected ${[f.system && describe(f.system), f.value && describe(f.value)].filter(Boolean).join(' ')}`);
 }
 
 /** Quantity classes compare as the measure their value is in. */
@@ -899,8 +839,7 @@ const isEmpty = (v: IFCValue) => v === null || v === '' || (Array.isArray(v) && 
  * and a bounds restriction needs its whole range inside.
  */
 function propertyValueVerdict(f: IDSPropertyFacet, p: IFCProperty, label: string): Verdict {
-  if (p.kind === 'complex' || p.kind === 'reference')
-    return no(`${label} is a ${p.kind} property, which IDS does not check`);
+  if (p.kind === 'complex' || p.kind === 'reference') return no(`${label} is a ${p.kind} property, which IDS does not check`);
   // Each column of values with its data type: a table has two, everything else one.
   const columns: { values: IFCValue[]; dataType?: string }[] =
     p.kind === 'table'
@@ -920,14 +859,10 @@ function propertyValueVerdict(f: IDSPropertyFacet, p: IFCProperty, label: string
   const filled = columns.filter((c) => c.values.length);
   if (!filled.length) return no(`${label} is empty`);
   const typed = f.dataType ? filled.filter((c) => c.dataType === f.dataType) : filled;
-  if (!typed.length)
-    return no(`${label} is ${filled.map((c) => c.dataType ?? 'untyped').join(' and ')}, expected ${f.dataType}`);
+  if (!typed.length) return no(`${label} is ${filled.map((c) => c.dataType ?? 'untyped').join(' and ')}, expected ${f.dataType}`);
   if (!f.value) return yes;
   const spec = f.value;
-  const shown = typed
-    .flatMap((c) => c.values)
-    .map(String)
-    .join(', ');
+  const shown = typed.flatMap((c) => c.values).map(String).join(', ');
   if (p.kind === 'bounded' && isBounds(spec)) {
     const lower = p.lower ?? undefined,
       upper = p.upper ?? undefined;
@@ -936,13 +871,8 @@ function propertyValueVerdict(f: IDSPropertyFacet, p: IFCProperty, label: string
       ? yes
       : no(`${label} is ${lower} to ${upper}, expected ${describe(spec)}`);
   }
-  const atoms = typed.flatMap((c) =>
-    c.values.map((v) => atomOf(v, c.dataType)).filter((a): a is Atom => a !== undefined),
-  );
-  const ok =
-    isBounds(spec) && p.kind !== 'single' && p.kind !== 'quantity'
-      ? atoms.length > 0 && atoms.every((a) => matches(spec, a))
-      : atoms.some((a) => matches(spec, a));
+  const atoms = typed.flatMap((c) => c.values.map((v) => atomOf(v, c.dataType)).filter((a): a is Atom => a !== undefined));
+  const ok = isBounds(spec) && p.kind !== 'single' && p.kind !== 'quantity' ? atoms.length > 0 && atoms.every((a) => matches(spec, a)) : atoms.some((a) => matches(spec, a));
   return ok ? yes : no(`${label} is ${shown}, expected ${describe(spec)}`);
 }
 
@@ -976,9 +906,7 @@ function materialVerdict(m: Model, f: IDSMaterialFacet, id: number): Verdict {
   const names = materialNames(m, id);
   if (!names) return no('has no material');
   if (!f.value) return yes;
-  return names.some((n) => matchesText(f.value!, n))
-    ? yes
-    : no(`has materials ${names.join(', ') || '(unnamed)'}, expected ${describe(f.value)}`);
+  return names.some((n) => matchesText(f.value!, n)) ? yes : no(`has materials ${names.join(', ') || '(unnamed)'}, expected ${describe(f.value)}`);
 }
 
 /** The wholes above an entity by one IDS relation (or every relation), nearest first, recursively. */
@@ -1034,17 +962,10 @@ function present(m: Model, f: IDSFacet, id: number): boolean {
     case 'attribute': {
       const l = m.line(id);
       // Only a null ($) attribute is absent; an empty string is a value that fails.
-      return (
-        !!l &&
-        Object.keys(l).some((k) => !SKIP_KEYS.has(k) && matchesText(f.name, k) && l[k] !== null && l[k] !== undefined)
-      );
+      return !!l && Object.keys(l).some((k) => !SKIP_KEYS.has(k) && matchesText(f.name, k) && l[k] !== null && l[k] !== undefined);
     }
     case 'property':
-      return propertySetsOf(m, id).some(
-        (s) =>
-          matchesText(f.propertySet, s.name) &&
-          Object.values(s.properties).some((p) => matchesText(f.baseName, p.name)),
-      );
+      return propertySetsOf(m, id).some((s) => matchesText(f.propertySet, s.name) && Object.values(s.properties).some((p) => matchesText(f.baseName, p.name)));
     case 'classification':
       return classificationsOfEntity(m, id).length > 0;
     case 'material':
@@ -1082,14 +1003,7 @@ export function checkIDS(model: IFCModel, ids: IDSDocument, options: IDSCheckOpt
   const specifications: IDSSpecificationResult[] = [];
   for (const spec of ids.specifications) {
     checkAbort(options.signal);
-    const result: IDSSpecificationResult = {
-      specification: spec,
-      status: 'pass',
-      applicable: [],
-      passed: [],
-      failures: [],
-      warnings: [],
-    };
+    const result: IDSSpecificationResult = { specification: spec, status: 'pass', applicable: [], passed: [], failures: [], warnings: [] };
     specifications.push(result);
     // The specification is still checked: the IDS test cases check IFC4 files against IFC2X3 specifications.
     if (!spec.ifcVersion.some((v) => v.toUpperCase() === schema))
@@ -1182,8 +1096,7 @@ export interface IDSBCFOptions {
  */
 export function bcfTopicsFromIDS(report: IDSReport, options: IDSBCFOptions): BCFTopic[] {
   if (!report || !Array.isArray(report.specifications)) fail('range', 'expected an IDSReport from checkIDS');
-  if (typeof options?.author !== 'string' || !options.author)
-    fail('range', 'bcfTopicsFromIDS needs an author; pass { author }');
+  if (typeof options?.author !== 'string' || !options.author) fail('range', 'bcfTopicsFromIDS needs an author; pass { author }');
   const date = options.date ?? new Date().toISOString();
   const topics: BCFTopic[] = [];
   for (const result of report.specifications) {
@@ -1209,9 +1122,7 @@ export function bcfTopicsFromIDS(report: IDSReport, options: IDSBCFOptions): BCF
       bitmaps: [],
     };
     if (options.camera) viewpoint.camera = options.camera;
-    viewpoint.selection = viewpoint.selection.filter(
-      (c, i, all) => all.findIndex((x) => x.ifcGuid === c.ifcGuid) === i,
-    );
+    viewpoint.selection = viewpoint.selection.filter((c, i, all) => all.findIndex((x) => x.ifcGuid === c.ifcGuid) === i);
     topics.push({
       guid: newBCFGuid(),
       type: options.type ?? 'Issue',

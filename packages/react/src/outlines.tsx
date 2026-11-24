@@ -1,17 +1,15 @@
-import { useContext, useEffect, useRef, type ReactElement } from 'react';
-import type { PBRModel } from '@margoengine/gltf/pbr';
-import type { ModelOutlines } from '@margoengine/toon/models';
+import { useEffect, useRef } from 'react';
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { MeshOutline, MeshOutlineOptions } from '@margoengine/toon/outline';
-import { colorKey, live, ModelContext, report, useMesh, useScene } from './internal.js';
-import { inScene } from './scene-owner.js';
+import { colorKey, live, report, useMesh, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { subscribeFrame } from './frame-priority.js';
 import { rangeError } from '../../shared/errors.js';
 
 /** Props of `<Outlines>`: drei's names, every one optional. */
-export interface OutlinesProps extends Omit<MeshOutlineOptions, 'mesh' | 'geometry' | 'color'> {
+export interface OutlinesProps
+  extends Omit<MeshOutlineOptions, 'mesh' | 'geometry' | 'color'> {
   /** Line colour: `#rgb`/`#rrggbb` (sRGB) or linear RGB numbers 0 or more. Default black. */
   color?: string | readonly [number, number, number];
   /** Called with the native `MeshOutline` of `@margoengine/toon/outline` once it is attached. */
@@ -25,11 +23,7 @@ export function outlineRGB(color: OutlinesProps['color']): [number, number, numb
   if (color === undefined) return [0, 0, 0];
   if (typeof color !== 'string') return [color[0], color[1], color[2]];
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color)?.[1];
-  if (!hex)
-    throw rangeError(
-      `Outlines color '${color}' is not #rgb or #rrggbb; pass a hex colour or three numbers`,
-      'react-arguments',
-    );
+  if (!hex) throw rangeError(`Outlines color '${color}' is not #rgb or #rrggbb; pass a hex colour or three numbers`, 'react-arguments');
   const full = hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex;
   return [0, 2, 4].map((i) => srgb(parseInt(full.slice(i, i + 2), 16) / 255)) as [number, number, number];
 }
@@ -39,70 +33,7 @@ export function outlineRGB(color: OutlinesProps['color']): [number, number, numb
  * `MeshOutline` of `@margoengine/toon/outline`. It follows the mesh's transform, geometry and visibility; a prop change
  * applies live (`renderOrder` re-attaches). Needs WebGPU or the WebGL2 compatibility layer and `@margoengine/toon`.
  */
-export function Outlines(props: OutlinesProps): ReactElement {
-  const model = useContext(ModelContext),
-    registry = useScene().registry;
-  // Inside a <Model> (and no nearer <Mesh>): the model's own primitives, from the vertices their deformer wrote this
-  // frame, so a skinned or morphed character keeps its line in every pose.
-  return model && registry?.model !== model ? <ModelOutline model={model} {...props} /> : <MeshOutlines {...props} />;
-}
-
-/** `<Outlines>` of a whole loaded model: one `ModelOutlines`, from `thickness`, `color`, `screenspace` and `angle`. */
-function ModelOutline({ model, onReady, onError, ...props }: OutlinesProps & { model: PBRModel }): null {
-  const scene = useScene(),
-    latest = useRef({ props, onReady, onError }),
-    plugin = useRef<ModelOutlines | null>(null);
-  latest.current = { props, onReady, onError };
-  const apply = (outline: ModelOutlines) => {
-    const { color, thickness, angle } = latest.current.props;
-    // ponytail: `angle` is all or nothing here (ModelOutlines has seam-free smoothing or none); `toneMapped`,
-    // `opacity`, `transparent` and `polygonOffset` are MeshOutline's and do not reach a model's line.
-    outline.color = outlineRGB(color);
-    if (thickness !== undefined) outline.outline = thickness;
-    outline.smooth = angle !== 0;
-  };
-  const key = JSON.stringify({ ...props, color: colorKey(props.color) });
-  useEffect(() => {
-    try {
-      if (plugin.current) apply(plugin.current);
-    } catch (error) {
-      report(scene, error, latest.current.onError);
-    }
-  }, [key]);
-  useEffect(() => {
-    let active = true,
-      outline: ModelOutlines | null = null;
-    const screenspace = !!latest.current.props.screenspace;
-    optionalPeer<{ ModelOutlines: typeof ModelOutlines }>('@margoengine/toon', () =>
-      screenspace ? import('@margoengine/toon/screen-outline') : import('@margoengine/toon/models'),
-    )
-      .then((api) => {
-        if (!active || scene.engine.disposed) return;
-        const { color, thickness, angle } = latest.current.props;
-        outline = plugin.current = inScene(scene, () =>
-          api.ModelOutlines.attach(scene.engine, {
-            models: [model],
-            color: outlineRGB(color),
-            // drei's default width is 0.05 world units; the pixel variant keeps its own default of 3.
-            ...(thickness !== undefined ? { outline: thickness } : screenspace ? {} : { outline: 0.05 }),
-            smooth: angle !== 0,
-          }),
-        );
-        latest.current.onReady?.(outline as unknown as MeshOutline);
-      })
-      .catch((error) => {
-        if (active && !scene.engine.disposed) report(scene, error, latest.current.onError);
-      });
-    return () => {
-      active = false;
-      outline?.dispose();
-      plugin.current = null;
-    };
-  }, [scene, model, !!props.screenspace]);
-  return null;
-}
-
-function MeshOutlines({ onReady, onError, ...props }: OutlinesProps): null {
+export function Outlines({ onReady, onError, ...props }: OutlinesProps): null {
   const scene = useScene(),
     registry = useMesh(),
     latest = useRef({ props, onReady, onError }),
@@ -160,7 +91,7 @@ function MeshOutlines({ onReady, onError, ...props }: OutlinesProps): null {
         }
       for (const m of meshes)
         if (!each.has(m)) {
-          const o = inScene(scene, () => api!.MeshOutline.attach(scene.engine, options(m, true)));
+          const o = api.MeshOutline.attach(scene.engine, options(m, true));
           each.set(m, o);
           latest.current.onReady?.(o);
         }
@@ -179,7 +110,7 @@ function MeshOutlines({ onReady, onError, ...props }: OutlinesProps): null {
         .then((api) => {
           if (!active || mesh !== target || scene.engine.disposed) return;
           if (registry.instanceMeshes) return follow();
-          outline = plugin.current = inScene(scene, () => api.MeshOutline.attach(scene.engine, options(target, false)));
+          outline = plugin.current = api.MeshOutline.attach(scene.engine, options(target, false));
           latest.current.onReady?.(outline);
         })
         .catch(fail);

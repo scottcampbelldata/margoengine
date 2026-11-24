@@ -587,8 +587,7 @@ export function decodeVP8(bytes: Uint8Array, start: number, end: number): VP8Fra
   u.fill(127, 0, uvStride);
   v.fill(127, 0, uvStride);
   for (let row = 0; row < mbHeight * 16; row++) y[yOffset + row * yStride - 1] = 129;
-  for (let row = 0; row < mbHeight * 8; row++)
-    u[uvOffset + row * uvStride - 1] = v[uvOffset + row * uvStride - 1] = 129;
+  for (let row = 0; row < mbHeight * 8; row++) u[uvOffset + row * uvStride - 1] = v[uvOffset + row * uvStride - 1] = 129;
 
   const aboveModes = new Uint8Array(mbWidth * 4),
     leftModes = new Uint8Array(4),

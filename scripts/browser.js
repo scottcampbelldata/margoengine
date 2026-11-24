@@ -636,16 +636,12 @@ export async function openBrowser({
         await server.waitForRequestsIdle();
       }
     }
-    const missing = noAdapterReason(
-      browserName === 'chromium' ? resolveBrowser({ name: channel }).engine : browserName,
-      hardware,
-      {
-        softwareAdapterOk,
-        args,
-        // Looked up only when there is no adapter, to name the cause.
-        session: hardware?.webgpu ? null : windowsSession(),
-      },
-    );
+    const missing = noAdapterReason(browserName === 'chromium' ? resolveBrowser({ name: channel }).engine : browserName, hardware, {
+      softwareAdapterOk,
+      args,
+      // Looked up only when there is no adapter, to name the cause.
+      session: hardware?.webgpu ? null : windowsSession(),
+    });
     if (missing)
       throw Object.assign(new Error(missing), {
         code: NO_WEBGPU_ADAPTER,

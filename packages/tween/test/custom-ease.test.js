@@ -7,27 +7,14 @@ const curve = (kind, points) => ({ version: 1, kind, points });
 const near = (a, b, eps = 1e-12) => assert.ok(Math.abs(a - b) <= eps, `${a} vs ${b}`);
 
 test('linear runs straight between the points', () => {
-  const ease = customEase(
-    curve('linear', [
-      [0, 0],
-      [0.25, 1],
-      [1, 0],
-    ]),
-  );
+  const ease = customEase(curve('linear', [[0, 0], [0.25, 1], [1, 0]]));
   near(ease(0.125), 0.5);
   near(ease(0.25), 1);
   near(ease(0.625), 0.5);
 });
 
 test('smooth passes through every point, and stays between neighbours where the data does', () => {
-  const points = [
-      [0, 0],
-      [0.1, 0.5],
-      [0.15, 0.55],
-      [0.6, 0.6],
-      [0.65, 1],
-      [1, 1],
-    ],
+  const points = [[0, 0], [0.1, 0.5], [0.15, 0.55], [0.6, 0.6], [0.65, 1], [1, 1]],
     ease = customEase(curve('smooth', points));
   for (const [x, y] of points) near(ease(x), y);
   // Rising data gives a rising curve: a plain spline through these points rises past 0.6 and falls back.
@@ -38,34 +25,15 @@ test('smooth passes through every point, and stays between neighbours where the 
     previous = y;
   }
   // A peak stays a peak: the curve does not overshoot it.
-  const hill = customEase(
-    curve('smooth', [
-      [0, 0],
-      [0.5, 1],
-      [1, 0],
-    ]),
-  );
+  const hill = customEase(curve('smooth', [[0, 0], [0.5, 1], [1, 0]]));
   for (let i = 0; i <= 1000; i++) assert.ok(hill(i / 1000) <= 1);
   // A flat stretch stays flat.
-  const flat = customEase(
-    curve('smooth', [
-      [0, 0],
-      [0.3, 0.5],
-      [0.7, 0.5],
-      [1, 1],
-    ]),
-  );
+  const flat = customEase(curve('smooth', [[0, 0], [0.3, 0.5], [0.7, 0.5], [1, 1]]));
   for (let i = 0; i <= 100; i++) near(flat(0.3 + (i / 100) * 0.4), 0.5);
 });
 
 test('smooth has no kink at a point: the slope is the same from both sides', () => {
-  const ease = customEase(
-      curve('smooth', [
-        [0, 0],
-        [0.4, 0.3],
-        [1, 1],
-      ]),
-    ),
+  const ease = customEase(curve('smooth', [[0, 0], [0.4, 0.3], [1, 1]])),
     h = 1e-6;
   const left = (ease(0.4) - ease(0.4 - h)) / h,
     right = (ease(0.4 + h) - ease(0.4)) / h;
@@ -74,28 +42,13 @@ test('smooth has no kink at a point: the slope is the same from both sides', () 
 });
 
 test('one bezier segment is the same curve as cubicBezier', () => {
-  const ease = customEase(
-      curve('bezier', [
-        [0, 0],
-        [0.42, 0],
-        [0.58, 1],
-        [1, 1],
-      ]),
-    ),
+  const ease = customEase(curve('bezier', [[0, 0], [0.42, 0], [0.58, 1], [1, 1]])),
     css = cubicBezier(0.42, 0, 0.58, 1);
   for (let i = 0; i <= 200; i++) near(ease(i / 200), css(i / 200), 1e-9);
 });
 
 test('bezier segments join, and a curve can overshoot and end away from 1', () => {
-  const points = [
-      [0, 0],
-      [0.1, 1.4],
-      [0.3, 1.4],
-      [0.5, 1],
-      [0.6, 0.8],
-      [0.8, 0.5],
-      [1, 0.5],
-    ],
+  const points = [[0, 0], [0.1, 1.4], [0.3, 1.4], [0.5, 1], [0.6, 0.8], [0.8, 0.5], [1, 0.5]],
     ease = customEase(curve('bezier', points));
   near(ease(0.5), 1, 1e-9);
   near(ease(1), 0.5);
@@ -106,12 +59,7 @@ test('bezier segments join, and a curve can overshoot and end away from 1', () =
 });
 
 test('outside 0..1 it holds the end values, and every value is finite', () => {
-  const ease = customEase(
-    curve('smooth', [
-      [0, 0.2],
-      [1, 0.8],
-    ]),
-  );
+  const ease = customEase(curve('smooth', [[0, 0.2], [1, 0.8]]));
   assert.equal(ease(-1), 0.2);
   assert.equal(ease(0), 0.2);
   assert.equal(ease(1), 0.8);
@@ -120,23 +68,9 @@ test('outside 0..1 it holds the end values, and every value is finite', () => {
 
 test('the JSON round trip gives the same curve, from text or from the object', () => {
   for (const data of [
-    curve('smooth', [
-      [0, 0],
-      [0.4, 1],
-      [0.7, 0.8],
-      [1, 1],
-    ]),
-    curve('linear', [
-      [0, 0],
-      [0.5, 2],
-      [1, 1],
-    ]),
-    curve('bezier', [
-      [0, 0],
-      [0.2, 0.9],
-      [0.4, 1.2],
-      [1, 1],
-    ]),
+    curve('smooth', [[0, 0], [0.4, 1], [0.7, 0.8], [1, 1]]),
+    curve('linear', [[0, 0], [0.5, 2], [1, 1]]),
+    curve('bezier', [[0, 0], [0.2, 0.9], [0.4, 1.2], [1, 1]]),
   ]) {
     const ease = customEase(data),
       text = JSON.stringify(ease),
@@ -147,22 +81,12 @@ test('the JSON round trip gives the same curve, from text or from the object', (
     for (let i = 0; i <= 100; i++) assert.equal(back(i / 100), ease(i / 100));
   }
   // Inside an object too.
-  const saved = JSON.stringify({
-    hop: customEase(
-      curve('linear', [
-        [0, 0],
-        [1, 1],
-      ]),
-    ),
-  });
+  const saved = JSON.stringify({ hop: customEase(curve('linear', [[0, 0], [1, 1]])) });
   assert.equal(JSON.parse(saved).hop.kind, 'linear');
 });
 
 test('changing the data afterwards does not change the ease', () => {
-  const points = [
-      [0, 0],
-      [1, 1],
-    ],
+  const points = [[0, 0], [1, 1]],
     ease = customEase(curve('linear', points));
   points[1][1] = 5;
   near(ease(0.5), 0.5);
@@ -172,16 +96,7 @@ test('changing the data afterwards does not change the ease', () => {
 test('it drives a tween like any easing', () => {
   const tween = new Tween(),
     light = { intensity: 0 };
-  tween.to(light, 'intensity', 2, {
-    duration: 1,
-    easing: customEase(
-      curve('linear', [
-        [0, 0],
-        [0.5, 1],
-        [1, 1],
-      ]),
-    ),
-  });
+  tween.to(light, 'intensity', 2, { duration: 1, easing: customEase(curve('linear', [[0, 0], [0.5, 1], [1, 1]])) });
   tween.update(0.25);
   near(light.intensity, 1);
 });
@@ -213,104 +128,30 @@ test('a stroke is scaled to 0..1, loses the samples that went back, and thins ou
     near(ease(t), t * t * (3 - 2 * t), 0.004);
   }
   // A straight stroke needs only its two ends.
-  assert.equal(
-    easeFromStroke([
-      [0, 0],
-      [1, 1],
-      [2, 2],
-      [3, 3],
-    ]).curve.points.length,
-    2,
-  );
+  assert.equal(easeFromStroke([[0, 0], [1, 1], [2, 2], [3, 3]]).curve.points.length, 2);
 });
 
 test('bad curves throw', () => {
   const bad = [
     null,
-    {
-      kind: 'smooth',
-      points: [
-        [0, 0],
-        [1, 1],
-      ],
-    },
-    curve('steps', [
-      [0, 0],
-      [1, 1],
-    ]),
+    { kind: 'smooth', points: [[0, 0], [1, 1]] },
+    curve('steps', [[0, 0], [1, 1]]),
     curve('smooth', [[0, 0]]),
     curve('smooth', 'x'),
-    curve('smooth', [
-      [0.1, 0],
-      [1, 1],
-    ]),
-    curve('smooth', [
-      [0, 0],
-      [0.9, 1],
-    ]),
-    curve('smooth', [
-      [0, 0],
-      [0.5, 1],
-      [0.5, 2],
-      [1, 1],
-    ]),
-    curve('linear', [
-      [0, 0],
-      [0.6, 1],
-      [0.5, 2],
-      [1, 1],
-    ]),
-    curve('smooth', [
-      [0, NaN],
-      [1, 1],
-    ]),
+    curve('smooth', [[0.1, 0], [1, 1]]),
+    curve('smooth', [[0, 0], [0.9, 1]]),
+    curve('smooth', [[0, 0], [0.5, 1], [0.5, 2], [1, 1]]),
+    curve('linear', [[0, 0], [0.6, 1], [0.5, 2], [1, 1]]),
+    curve('smooth', [[0, NaN], [1, 1]]),
     curve('smooth', [[0], [1, 1]]),
-    curve('bezier', [
-      [0, 0],
-      [0.5, 0],
-      [1, 1],
-    ]),
-    curve('bezier', [
-      [0, 0],
-      [1.2, 0],
-      [0.5, 1],
-      [1, 1],
-    ]),
-    curve('bezier', [
-      [0, 0],
-      [0.5, 0],
-      [-0.1, 1],
-      [1, 1],
-    ]),
+    curve('bezier', [[0, 0], [0.5, 0], [1, 1]]),
+    curve('bezier', [[0, 0], [1.2, 0], [0.5, 1], [1, 1]]),
+    curve('bezier', [[0, 0], [0.5, 0], [-0.1, 1], [1, 1]]),
   ];
   for (const data of bad) assert.throws(() => customEase(data), RangeError, JSON.stringify(data));
   assert.throws(() => customEase('{not json'), SyntaxError);
   assert.throws(() => easeFromStroke([[0, 0]]), RangeError);
-  assert.throws(
-    () =>
-      easeFromStroke([
-        [0, 1],
-        [1, 1],
-      ]),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      easeFromStroke(
-        [
-          [0, 0],
-          [1, 1],
-        ],
-        -1,
-      ),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      easeFromStroke([
-        [0, 0],
-        [NaN, 1],
-      ]),
-    RangeError,
-  );
+  assert.throws(() => easeFromStroke([[0, 1], [1, 1]]), RangeError);
+  assert.throws(() => easeFromStroke([[0, 0], [1, 1]], -1), RangeError);
+  assert.throws(() => easeFromStroke([[0, 0], [NaN, 1]]), RangeError);
 });

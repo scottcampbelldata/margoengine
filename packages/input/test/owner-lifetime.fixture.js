@@ -1,10 +1,7 @@
 import { lifetimeFault, ownedByEngine, watchTimers } from '../../../tests/support/owner-shell.js';
 
 const actions = { jump: [{ type: 'key', code: 'Space' }], aim: [{ type: 'control', id: 'pen', axis: 'x' }] };
-const quiet = (promise) => {
-  promise?.catch?.(() => {});
-  return promise;
-};
+const quiet = (promise) => { promise?.catch?.(() => {}); return promise; };
 
 export async function fixtures(load = (entry) => import(entry)) {
   const { Input, Gestures } = await load('../dist/index.js');
@@ -19,26 +16,16 @@ export async function fixtures(load = (entry) => import(entry)) {
   const entries = [];
   const input = () => new Input(actions, { target: new EventTarget(), gamepads: () => [] });
   // `make` returns { release, cleanup? } and runs, like the release, with timers watched.
-  const own = (name, make) =>
-    entries.push({
-      name,
-      create({ scene }) {
-        const timers = watchTimers(),
-          made = timers.scope(() => make({ timers }));
-        return ownedByEngine(scene, name, () => timers.scope(made.release), {
-          async cleanup() {
-            // Pending promises settle and clear their own timers a few microtasks after the disposal.
-            await new Promise((resolve) => setTimeout(resolve, 5));
-            made.cleanup?.();
-            timers.expectNone(`a disposed ${name}`);
-          },
-        });
-      },
-    });
-  own('Input', () => {
-    const i = input();
-    return { release: () => i.dispose() };
-  });
+  const own = (name, make) => entries.push({ name, create({ scene }) {
+    const timers = watchTimers(), made = timers.scope(() => make({ timers }));
+    return ownedByEngine(scene, name, () => timers.scope(made.release), { async cleanup() {
+      // Pending promises settle and clear their own timers a few microtasks after the disposal.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      made.cleanup?.();
+      timers.expectNone(`a disposed ${name}`);
+    } });
+  } });
+  own('Input', () => { const i = input(); return { release: () => i.dispose() }; });
   own('VectorInput', () => {
     const i = new VectorInput({ move: wasd() }, { target: new EventTarget(), gamepads: () => [] });
     return { release: () => i.dispose() };
@@ -49,64 +36,38 @@ export async function fixtures(load = (entry) => import(entry)) {
     return { release: () => players.dispose() };
   });
   own('Gyro', () => {
-    const gyro = new Gyro({ target: new EventTarget() }),
-      host = input();
+    const gyro = new Gyro({ target: new EventTarget() }), host = input();
     gyro.attach(host);
     // A calibration still waiting on its timer when the sensor is disposed.
     quiet(gyro.calibrate({ duration: 60_000 }));
-    return {
-      release: () => {
-        gyro.dispose();
-        host.dispose();
-      },
-    };
+    return { release: () => { gyro.dispose(); host.dispose(); } };
   });
   own('InputRecorder', () => {
-    const host = input(),
-      recorder = new InputRecorder(host);
+    const host = input(), recorder = new InputRecorder(host);
     host.update();
     recorder.capture();
     return { release: () => host.dispose() };
   });
   own('InputReplay', () => {
-    const host = input(),
-      recorder = new InputRecorder(host);
+    const host = input(), recorder = new InputRecorder(host);
     host.update();
     recorder.capture();
     // The app's signal outlives the replay: its abort listener goes with the replay.
-    const controller = new AbortController(),
-      replay = new InputReplay(host, recorder.clip(), { loop: true, signal: controller.signal });
-    return {
-      release: () => {
-        replay.stop();
-        host.dispose();
-      },
-    };
+    const controller = new AbortController(), replay = new InputReplay(host, recorder.clip(), { loop: true, signal: controller.signal });
+    return { release: () => { replay.stop(); host.dispose(); } };
   });
   own('Pen', () => {
-    const pen = new Pen(new EventTarget()),
-      host = input();
+    const pen = new Pen(new EventTarget()), host = input();
     pen.attach(host);
-    return {
-      release: () => {
-        pen.dispose();
-        host.dispose();
-      },
-    };
+    return { release: () => { pen.dispose(); host.dispose(); } };
   });
   own('PointerLock', () => {
     const document = Object.assign(new EventTarget(), { pointerLockElement: null, exitPointerLock() {} });
     const element = { ownerDocument: document, requestPointerLock: () => new Promise(() => {}) };
-    const lock = new PointerLock(element),
-      host = input();
+    const lock = new PointerLock(element), host = input();
     lock.attach(host);
     quiet(lock.request());
-    return {
-      release: () => {
-        lock.dispose();
-        host.dispose();
-      },
-    };
+    return { release: () => { lock.dispose(); host.dispose(); } };
   });
   own('KeyboardLabels', () => {
     const keyboard = Object.assign(new EventTarget(), { getLayoutMap: () => new Promise(() => {}) });
@@ -115,16 +76,10 @@ export async function fixtures(load = (entry) => import(entry)) {
     return { release: () => labels.dispose() };
   });
   own('XRBindings', () => {
-    const session = Object.assign(new EventTarget(), { inputSources: [] }),
-      host = input();
+    const session = Object.assign(new EventTarget(), { inputSources: [] }), host = input();
     const xr = new XRBindings(session);
     xr.attach(host);
-    return {
-      release: () => {
-        xr.dispose();
-        host.dispose();
-      },
-    };
+    return { release: () => { xr.dispose(); host.dispose(); } };
   });
   own('Gestures', () => {
     const gestures = new Gestures(new EventTarget());

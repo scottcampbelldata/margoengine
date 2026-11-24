@@ -316,9 +316,7 @@ export class LightShafts implements EnginePlugin {
     }
     const maskKey = `${depth.samples}:${!!clouds}:${!!field}`;
     if (this.maskKey !== maskKey) {
-      const module = d.createShaderModule({
-        code: withStorm(maskShader(depthWGSL(1, depth.samples), !!clouds), field),
-      });
+      const module = d.createShaderModule({ code: withStorm(maskShader(depthWGSL(1, depth.samples), !!clouds), field) });
       this.maskPipeline = d.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },

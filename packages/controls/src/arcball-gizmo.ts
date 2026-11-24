@@ -75,8 +75,7 @@ export class ArcballGizmo {
   }
   constructor(controls: ArcballGizmoTarget, options: ArcballGizmoOptions = {}) {
     const engine = controls.engine;
-    if (!engine)
-      throw typeError('ArcballGizmo needs controls made on an engine, not a bare Camera', 'controls-arguments');
+    if (!engine) throw typeError('ArcballGizmo needs controls made on an engine, not a bare Camera', 'controls-arguments');
     this.controls = controls;
     this.engine = engine;
     this.autoHide = options.autoHide ?? true;

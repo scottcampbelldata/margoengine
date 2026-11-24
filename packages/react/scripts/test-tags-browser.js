@@ -78,11 +78,7 @@ try {
   };
   await page.mouse.move(...at(0.3));
   const hover = await events(4, true);
-  assert.deepEqual(
-    hover,
-    ['box over', 'group over', 'group enter', 'box enter'],
-    'over bubbles, enter goes outside in',
-  );
+  assert.deepEqual(hover, ['box over', 'group over', 'group enter', 'box enter'], 'over bubbles, enter goes outside in');
   await page.mouse.click(...at(0.3));
   const boxClick = await events(2);
   assert.deepEqual(boxClick, ['box click true', 'group click on child'], 'a click on the box bubbles to its group');
@@ -97,14 +93,9 @@ try {
   // Textured shapes: a Plane with a real JPEG and a Box with a real PNG. A texture shows as colours that vary across
   // the face (samples inside each face only), where an untextured face is one colour lit evenly; the box click comes
   // from its drawn child.
-  const across = (image, from, to) =>
-    Array.from({ length: 7 }, (_, i) => sample(image, from + ((to - from) * i) / 6, 0.5, 2));
-  const spread = (samples) =>
-    Math.max(...[0, 1, 2].map((c) => Math.max(...samples.map((s) => s[c])) - Math.min(...samples.map((s) => s[c]))));
-  const textured = await shot(
-    'textured',
-    (i) => spread(across(i, 0.29, 0.47)) > 40 && spread(across(i, 0.61, 0.71)) > 20,
-  );
+  const across = (image, from, to) => Array.from({ length: 7 }, (_, i) => sample(image, from + ((to - from) * i) / 6, 0.5, 2));
+  const spread = (samples) => Math.max(...[0, 1, 2].map((c) => Math.max(...samples.map((s) => s[c])) - Math.min(...samples.map((s) => s[c]))));
+  const textured = await shot('textured', (i) => spread(across(i, 0.29, 0.47)) > 40 && spread(across(i, 0.61, 0.71)) > 20);
   const plane = across(textured, 0.29, 0.47),
     boxFace = across(textured, 0.61, 0.71);
   assert.ok(spread(plane) > 40, `the JPEG shows on the plane, samples ${JSON.stringify(plane)}`);
@@ -150,14 +141,7 @@ try {
   await page.waitForFunction(() => window.tags.state.sound?.isPlaying, null, { timeout: 30_000 });
   const sound = await page.evaluate(() => ({ playing: window.tags.state.sound.isPlaying }));
   assert.equal(sound.playing, true, '<Sound> plays the decoded WAV');
-  result.checks.push({
-    name: 'UI, audio, sprite and sciviz bindings draw and play',
-    red,
-    green,
-    uiPixels,
-    figurePixels,
-    sound,
-  });
+  result.checks.push({ name: 'UI, audio, sprite and sciviz bindings draw and play', red, green, uiPixels, figurePixels, sound });
 
   await page.evaluate(() => window.tags.unmount());
   assert.deepEqual(await page.evaluate(() => window.tags.state.errors), []);

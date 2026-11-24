@@ -11,23 +11,8 @@ import { subdivideMesh } from '../packages/mesh-edit/dist/modeling.js';
 const blender = process.argv.find((a) => a.startsWith('--blender='))?.slice(10);
 assert.ok(blender, 'Supply --blender=<path to blender executable>');
 const grid = {
-  vertices: [
-    [0, 0, 0],
-    [1, 0, 0],
-    [2, 0, 0],
-    [0, 1, 0],
-    [1, 1, 0],
-    [2, 1, 0],
-    [0, 2, 0],
-    [1, 2, 0],
-    [2, 2, 0],
-  ],
-  faces: [
-    [0, 1, 4, 3],
-    [1, 2, 5, 4],
-    [3, 4, 7, 6],
-    [4, 5, 8, 7],
-  ].map((vertices, i) => ({
+  vertices: [[0, 0, 0], [1, 0, 0], [2, 0, 0], [0, 1, 0], [1, 1, 0], [2, 1, 0], [0, 2, 0], [1, 2, 0], [2, 2, 0]],
+  faces: [[0, 1, 4, 3], [1, 2, 5, 4], [3, 4, 7, 6], [4, 5, 8, 7]].map((vertices, i) => ({
     id: `g${i}`,
     vertices,
     uv: vertices.map(() => [0, 0]),
@@ -48,9 +33,7 @@ try {
     script = join(dir, 'run.py');
   writeFileSync(
     input,
-    JSON.stringify(
-      cases.map((c) => ({ levels: c.levels, v: c.mesh.vertices, f: c.mesh.faces.map((f) => f.vertices) })),
-    ),
+    JSON.stringify(cases.map((c) => ({ levels: c.levels, v: c.mesh.vertices, f: c.mesh.faces.map((f) => f.vertices) }))),
   );
   writeFileSync(
     script,

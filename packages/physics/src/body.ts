@@ -252,9 +252,7 @@ export class PhysicsBody {
   setAdditionalMass(mass: number, inertia: Vec3 = [0, 0, 0]): this {
     checkVec(inertia, 'Inertia');
     if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
-      throw new RangeError(
-        'Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².',
-      );
+      throw new RangeError('Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².');
     this.check().setAdditionalMassProperties(mass, this.raw.localCom(), vec(inertia), { x: 0, y: 0, z: 0, w: 1 }, true);
     return this;
   }
@@ -281,8 +279,7 @@ export class PhysicsBody {
       { mass, centerOfMass, inertia, inertiaFrame } = properties,
       computed = raw.mass(),
       total = mass ?? computed;
-    if (!(total >= 0) || total === Infinity)
-      throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
+    if (!(total >= 0) || total === Infinity) throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
     if (centerOfMass) checkVec(centerOfMass, 'Centre of mass');
     if (inertia) {
       checkVec(inertia, 'Inertia');
@@ -293,11 +290,7 @@ export class PhysicsBody {
       over = computed > 0 ? total / computed : 0;
     const center = centerOfMass ? vec(centerOfMass) : raw.localCom(),
       moments = inertia ? vec(inertia) : vec([principal.x * over, principal.y * over, principal.z * over]),
-      frame = inertiaFrame
-        ? quat(inertiaFrame)
-        : inertia
-          ? { x: 0, y: 0, z: 0, w: 1 }
-          : raw.principalInertiaLocalFrame();
+      frame = inertiaFrame ? quat(inertiaFrame) : inertia ? { x: 0, y: 0, z: 0, w: 1 } : raw.principalInertiaLocalFrame();
     for (const collider of this.colliders) collider.setDensity(0);
     raw.setAdditionalMassProperties(total, center, moments, frame, true);
     raw.recomputeMassPropertiesFromColliders();
@@ -318,9 +311,7 @@ export class PhysicsBody {
   set additionalSolverIterations(passes: number) {
     // Rapier keeps the count in 32 bits: a larger one would wrap to a few passes without a word.
     if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
-      throw new RangeError(
-        'Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.',
-      );
+      throw new RangeError('Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.check().setAdditionalSolverIterations(passes);
   }
   get gravityScale(): number {

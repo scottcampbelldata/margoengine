@@ -160,16 +160,12 @@ test('section planes, section box and storey plans clip every material', async (
   assert.deepEqual(scene.materials.opaque.clippingPlanes, planes);
   assert.deepEqual(scene.materials.translucent.clippingPlanes, planes);
   assert.throws(() => (scene.clippingPlanes = new Array(17).fill([0, 1, 0, 0])), /at most 16/);
-  const storey = [...data.elements.values()].find(
-    (e) => e.type === 'IfcBuildingStorey' && data.elements.get(25)?.storey === e.id,
-  );
+  const storey = [...data.elements.values()].find((e) => e.type === 'IfcBuildingStorey' && data.elements.get(25)?.storey === e.id);
   const plan = scene.storeyPlan(storey.id, { cutHeight: 1.5 });
   assert.equal(plan.cut, plan.elevation + 1.5);
   assert.deepEqual(plan.clippingPlanes, [[0, -1, 0, plan.cut]]);
   assert.equal(scene.stateOf(25).hidden, false);
-  assert.ok(
-    scene.elements.filter((id) => data.elements.get(id).storey !== storey.id).every((id) => scene.stateOf(id).hidden),
-  );
+  assert.ok(scene.elements.filter((id) => data.elements.get(id).storey !== storey.id).every((id) => scene.stateOf(id).hidden));
   assert.equal(plan.camera.type, 'orthogonal');
   assert.ok(plan.camera.height > 0);
   assert.throws(() => scene.storeyPlan(25), /not an IfcBuildingStorey/);
@@ -197,10 +193,7 @@ test('applyBCFView and bcfView carry a viewpoint both ways', async () => {
   assert.equal(fresh.stateOf(window).hidden, true);
   assert.equal(fresh.stateOf(wall).selected, true);
   assert.ok(Math.abs(fresh.stateOf(wall).opacity - 0.5) <= 1 / 255, 'BCF stores alpha in 8 bits');
-  assert.deepEqual(
-    fresh.stateOf(wall).color.map((c) => Math.round(c * 255)),
-    [255, 0, 0],
-  );
+  assert.deepEqual(fresh.stateOf(wall).color.map((c) => Math.round(c * 255)), [255, 0, 0]);
   assert.equal(fresh.clippingPlanes.length, 1);
   for (const [a, b] of fresh.clippingPlanes[0].map((v, i) => [v, [0, -1, 0, 2][i]])) assert.ok(Math.abs(a - b) < 1e-9);
   scene.dispose();

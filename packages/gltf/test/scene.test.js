@@ -44,8 +44,7 @@ function inSecondScene(engine, start) {
   return { scene, started };
 }
 // A failed deepEqual on scenes would print the whole engine; compare identity and name the scene instead.
-const inside = (mesh, scene, what) =>
-  assert.ok(mesh.scene === scene, `${what} is in scene ${mesh.scene.name}, not ${scene.name}`);
+const inside = (mesh, scene, what) => assert.ok(mesh.scene === scene, `${what} is in scene ${mesh.scene.name}, not ${scene.name}`);
 const sceneOfMeshes = (scene) => [...scene.meshes.values()];
 const names = (scene) => [...scene.plugins.keys()].filter((name) => name !== 'loader');
 
@@ -53,9 +52,7 @@ test('parseGLTFAsync started in a second scene builds its meshes there', async (
   const { engine } = await headlessEngine();
   try {
     const { doc, bytes } = plain(),
-      { scene, started } = inSecondScene(engine, () =>
-        parseGLTFAsync(engine, doc, [bytes], { extensions: [{ handles: [], load: async () => {} }] }),
-      );
+      { scene, started } = inSecondScene(engine, () => parseGLTFAsync(engine, doc, [bytes], { extensions: [{ handles: [], load: async () => {} }] }));
     const model = await started;
     inside(model.meshes[0], scene, 'the mesh');
     inside(model.root, scene, 'the root');
@@ -80,14 +77,12 @@ test('a load started in the default scene stays there and one started outside an
   }
 });
 
-test("the textured draw of a load started in a second scene is that scene's plugin", async (t) => {
+test('the textured draw of a load started in a second scene is that scene\'s plugin', async (t) => {
   withBitmaps(t);
   const { engine } = await gpuEngine(t);
   try {
     const { doc, bytes } = withTexture(),
-      { scene, started } = inSecondScene(engine, () =>
-        parseGLTFAsync(engine, doc, [bytes], { extensions: [textured] }),
-      ),
+      { scene, started } = inSecondScene(engine, () => parseGLTFAsync(engine, doc, [bytes], { extensions: [textured] })),
       model = await started;
     assert.deepEqual(names(scene), ['gltf-textured']);
     assert.deepEqual([...engine.scene.plugins.keys()], []);
@@ -135,10 +130,7 @@ test('two loads in flight in two scenes each land in their own', async () => {
     const third = parseGLTFAsync(engine, doc, [bytes], { extensions: [slow] });
     gate.resolve();
     const models = await Promise.all([first.started, second, third]);
-    assert.deepEqual(
-      models.map((m) => m.root.scene.name),
-      [first.scene.name, other.name, engine.scene.name],
-    );
+    assert.deepEqual(models.map((m) => m.root.scene.name), [first.scene.name, other.name, engine.scene.name]);
     for (const model of models) model.dispose();
   } finally {
     engine.dispose();
@@ -151,13 +143,7 @@ test('an abort mid-load leaves nothing in either scene', async (t) => {
   try {
     const { doc, bytes } = withTexture(),
       controller = new AbortController(),
-      slow = {
-        handles: [],
-        load: async () => {
-          controller.abort();
-          await Promise.resolve();
-        },
-      },
+      slow = { handles: [], load: async () => { controller.abort(); await Promise.resolve(); } },
       { scene, started } = inSecondScene(engine, () =>
         parseGLTFAsync(engine, doc, [bytes], { extensions: [textured, slow], signal: controller.signal }),
       );

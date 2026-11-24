@@ -100,3 +100,4 @@ export function decodeGIF(bytes) {
   assert.equal(p, bytes.length, 'nothing after the trailer');
   return { width, height, loop, frames };
 }
+

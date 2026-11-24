@@ -108,18 +108,10 @@ test('body check culling: the same verdicts as sampling every piece, on valid an
     ],
     [
       insideOut(coneish()),
-      [
-        {
-          name: 'cs/face:s0/e0',
-          problem: 'its shell faces into its material (it encloses -7.141e-7 m^3, not more than 0)',
-        },
-      ],
+      [{ name: 'cs/face:s0/e0', problem: 'its shell faces into its material (it encloses -7.141e-7 m^3, not more than 0)' }],
     ],
     [
-      together('pierced', [
-        coneish(),
-        box('bar', [20 * mm, 2 * mm, 2 * mm], frameOf([-10 * mm, -1 * mm, 4 * mm], [0, 0, 1], [1, 0, 0])),
-      ]),
+      together('pierced', [coneish(), box('bar', [20 * mm, 2 * mm, 2 * mm], frameOf([-10 * mm, -1 * mm, 4 * mm], [0, 0, 1], [1, 0, 0]))]),
       [
         passes('-z:+y', 's0/e1', '0.00453818, 0.00100000, 0.00400000'),
         passes('-z:+y', 's0/e3', '-0.00453818, 0.00100000, 0.00400000'),

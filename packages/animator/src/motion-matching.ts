@@ -259,9 +259,7 @@ export class MotionDatabase {
     const nodes = animator.animation.model.nodes,
       joint = (index: unknown, label: string): number => {
         if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= nodes.length)
-          throw new RangeError(
-            `Motion database ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`,
-          );
+          throw new RangeError(`Motion database ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`);
         return index as number;
       };
     const root = joint(options?.root, 'root'),
@@ -277,21 +275,14 @@ export class MotionDatabase {
     if (!(rate >= 1 && rate <= 240)) throw new RangeError('Motion database rate must be from 1 to 240 rows a second');
     if (!Array.isArray(ahead) || !ahead.length || ahead.some((t) => !(t > 0 && t < Infinity)))
       throw new RangeError('Motion database trajectory must list seconds ahead, each above 0');
-    if (!(smoothing >= 0 && smoothing < Infinity))
-      throw new RangeError('Motion database smoothing must be 0 seconds or more');
+    if (!(smoothing >= 0 && smoothing < Infinity)) throw new RangeError('Motion database smoothing must be 0 seconds or more');
     finiteVector(forward, 3, 'Motion database forward');
-    const list = (options.clips ?? animator.animation.clips.map((clip) => clip.name)).map(
-      (item): Required<MotionClip> => {
-        const entry = typeof item === 'string' ? { clip: item } : item;
-        if (!(entry.speed === undefined || (entry.speed >= 0 && entry.speed < Infinity)))
-          throw new RangeError('Motion database clip speed must be 0 or more');
-        return {
-          clip: entry.clip,
-          loop: entry.loop ?? animator.animation.options.loop ?? true,
-          speed: entry.speed ?? 0,
-        };
-      },
-    );
+    const list = (options.clips ?? animator.animation.clips.map((clip) => clip.name)).map((item): Required<MotionClip> => {
+      const entry = typeof item === 'string' ? { clip: item } : item;
+      if (!(entry.speed === undefined || (entry.speed >= 0 && entry.speed < Infinity)))
+        throw new RangeError('Motion database clip speed must be 0 or more');
+      return { clip: entry.clip, loop: entry.loop ?? animator.animation.options.loop ?? true, speed: entry.speed ?? 0 };
+    });
     const skeleton = skeletonOf(animator),
       local = new Float32Array(4),
       rest = skeleton.model(
@@ -309,26 +300,16 @@ export class MotionDatabase {
       blocks: MotionBlock[] = [];
     for (const { clip: name, loop, speed } of list) {
       const clip = animator.animation.clips.find((c) => c.name === name);
-      if (!clip)
-        throw new RangeError(`Motion database clip "${name}" is not one of the Animation's clips; pass its name`);
+      if (!clip) throw new RangeError(`Motion database clip "${name}" is not one of the Animation's clips; pass its name`);
       const duration = clip.duration;
-      if (!(duration > 0))
-        throw new RangeError(`Motion database clip "${name}" has no length; pass clips with a duration`);
+      if (!(duration > 0)) throw new RangeError(`Motion database clip "${name}" has no length; pass clips with a duration`);
       const tracks = new Map<string, Track>();
       for (const track of clip.tracks) tracks.set(`${track.node}:${track.path}`, track);
       const sample = (i: number, path: string, time: number, fallback: ArrayLike<number>): ArrayLike<number> => {
         const track = tracks.get(`${i}:${path}`);
         if (!track) return fallback;
         return Array.from(
-          sampleTrackInto(
-            track.times,
-            track.values,
-            track.width,
-            time,
-            track.interpolation,
-            path === 'rotation',
-            local,
-          ),
+          sampleTrackInto(track.times, track.values, track.width, time, track.interpolation, path === 'rotation', local),
         );
       };
       const at = (bone: number, time: number) =>
@@ -647,25 +628,18 @@ export function addMotionMatching(animator: Animator, matching: MotionMatching):
     throw new TypeError('Motion matching needs a database; pass one from MotionDatabase.build');
   for (const { clip } of database.clips)
     if (animator.options.states[clip] !== clip)
-      throw new RangeError(
-        `Motion matching needs a state per clip, and "${clip}" has none; pass states: motionStates(animation)`,
-      );
+      throw new RangeError(`Motion matching needs a state per clip, and "${clip}" has none; pass states: motionStates(animation)`);
   if (!database.clips.some((block) => block.clip === animator.state))
-    throw new RangeError(
-      `Motion matching needs the Animator in a database clip, not "${animator.state}"; pass initial: a clip name`,
-    );
+    throw new RangeError(`Motion matching needs the Animator in a database clip, not "${animator.state}"; pass initial: a clip name`);
   const read = () => {
     const interval = matching.interval ?? 0.1,
       response = matching.response ?? 0.5,
       stickiness = matching.stickiness ?? 1;
     finiteVector(matching.velocity, 3, 'Motion matching velocity');
     if (matching.facing) finiteVector(matching.facing, 3, 'Motion matching facing');
-    if (!(interval > 0 && interval < Infinity))
-      throw new RangeError('Motion matching interval must be above 0 seconds');
-    if (!(response > 0 && response < Infinity))
-      throw new RangeError('Motion matching response must be above 0 seconds');
-    if (!(stickiness >= 0 && stickiness < Infinity))
-      throw new RangeError('Motion matching stickiness must be 0 or more');
+    if (!(interval > 0 && interval < Infinity)) throw new RangeError('Motion matching interval must be above 0 seconds');
+    if (!(response > 0 && response < Infinity)) throw new RangeError('Motion matching response must be above 0 seconds');
+    if (!(stickiness >= 0 && stickiness < Infinity)) throw new RangeError('Motion matching stickiness must be 0 or more');
     return { interval, damping: 4 / response, stickiness };
   };
   read();

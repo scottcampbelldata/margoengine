@@ -26,8 +26,7 @@ test('a package declares every package its packages/shared imports reach', async
       throw error;
     });
     for (const [, name] of text.matchAll(/from '(@margoengine\/[\w-]+)/g)) names.add(name);
-    for (const [, next] of text.matchAll(/from '\.\/([\w.-]+\.js)'/g))
-      for (const name of await reach(next)) names.add(name);
+    for (const [, next] of text.matchAll(/from '\.\/([\w.-]+\.js)'/g)) for (const name of await reach(next)) names.add(name);
     return names;
   };
   const missing = [];

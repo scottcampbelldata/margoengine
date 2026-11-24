@@ -25,13 +25,7 @@ function fakeDevice({ limit = 1 << 27 } = {}) {
     limits: { maxStorageBufferBindingSize: limit, maxBufferSize: limit, maxComputeWorkgroupsPerDimension: 65535 },
     queue: { writeBuffer: (buffer, offset, data) => writes.push({ buffer, offset, data }) },
     createBuffer(descriptor) {
-      const buffer = {
-        ...descriptor,
-        destroyed: false,
-        destroy() {
-          this.destroyed = true;
-        },
-      };
+      const buffer = { ...descriptor, destroyed: false, destroy() { this.destroyed = true; } };
       made.push(buffer);
       return buffer;
     },
@@ -99,18 +93,10 @@ test('refit uploads the topology of its tree and runs a dispatch per level', asy
 
 test('stride and offset reach the shader; a plain GPUMeshBVH still reads three floats', async () => {
   const device = fakeDevice(),
-    dynamic = await GPUDynamicBVH.create(device, {
-      vertices: { size: 512 },
-      indices: mesh.indices,
-      stride: 8,
-      offset: 2,
-    }),
+    dynamic = await GPUDynamicBVH.create(device, { vertices: { size: 512 }, indices: mesh.indices, stride: 8, offset: 2 }),
     params = device.writes.find(({ buffer }) => buffer === dynamic.tree.params).data;
   assert.deepEqual([...params], [8, 2, 2, 3]);
-  const plain = await GPUMeshBVH.create(
-      device,
-      MeshBVH.build({ positions: mesh.positions, indices: [...mesh.indices] }),
-    ),
+  const plain = await GPUMeshBVH.create(device, MeshBVH.build({ positions: mesh.positions, indices: [...mesh.indices] })),
     own = device.writes.find(({ buffer }) => buffer === plain.params).data;
   assert.deepEqual([...own].slice(0, 2), [3, 0]);
 });
@@ -127,13 +113,8 @@ test('bad options say what to pass', async () => {
   await assert.rejects(create({ mode: 'other' }), TypeError);
   await assert.rejects(create({ mode: 'refit' }), TypeError);
   await assert.rejects(create({ vertices: { size: 12 } }), RangeError);
-  await assert.rejects(
-    GPUDynamicBVH.create(fakeDevice({ limit: 64 }), { vertices: { size: 48 }, indices: mesh.indices }),
-    RangeError,
-  );
-  await assert.rejects(GPUDynamicBVH.create({}, { vertices: vertices(), indices: mesh.indices }), {
-    code: 'unsupported',
-  });
+  await assert.rejects(GPUDynamicBVH.create(fakeDevice({ limit: 64 }), { vertices: { size: 48 }, indices: mesh.indices }), RangeError);
+  await assert.rejects(GPUDynamicBVH.create({}, { vertices: vertices(), indices: mesh.indices }), { code: 'unsupported' });
 });
 
 test('fromPrimitive reads the stride and offset of a deformed primitive, and needs a deformer', async () => {
@@ -159,10 +140,7 @@ test('fromModel makes a tree per deforming primitive, in order, and leaves the r
     first = primitiveOf(),
     last = primitiveOf({ deformedOffset: 0 }),
     trees = await GPUDynamicBVH.fromModel(device, { primitives: [first, primitiveOf({ deformed: undefined }), last] });
-  assert.deepEqual(
-    trees.map((tree) => tree.primitive),
-    [first, last],
-  );
+  assert.deepEqual(trees.map((tree) => tree.primitive), [first, last]);
   for (const tree of trees) tree.dispose();
 });
 

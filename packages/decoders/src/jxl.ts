@@ -100,9 +100,7 @@ export class JXLDecoder {
       { hasAlpha, animated, width, height } = readJXLHeader(bytes),
       maxPixels = options.maxPixels ?? 2 ** 26;
     if (width * height > maxPixels)
-      throw new RangeError(
-        `JPEG XL is ${width} x ${height}, over maxPixels ${maxPixels}; raise maxPixels to decode it`,
-      );
+      throw new RangeError(`JPEG XL is ${width} x ${height}, over maxPixels ${maxPixels}; raise maxPixels to decode it`);
     if (this.browser && browserReads) {
       const decoded = await decodeInBrowser(bytes);
       if (decoded) return { ...decoded, hasAlpha, animated, decoder: 'browser' };

@@ -27,11 +27,7 @@ async function snapshot(name, text) {
   );
 }
 const image = () => new Texture({ data: new Uint8Array(64 * 4), width: 8, height: 8 }, { colorSpace: 'linear' });
-const slug = (name) =>
-  name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const refusal = (fn, pattern, line, column) =>
   assert.throws(fn, (e) => {
     assert.equal(e.name, 'MargoError');
@@ -78,10 +74,7 @@ test('toGLSL returns the layer program of a NodePass and of a NodeMaterial that 
   await snapshot('glsl-pass.frag', stable(program.fragment.source));
   const { pbrShader } = await import('../../gltf/src/shader.ts');
   const tint = glslFn(glslFixtures[0].source);
-  const material = new NodeMaterial({
-    colorNode: tint(uv(), 0.25).rgb,
-    positionNode: positionLocal.add(tint(uv(), 0.5).xyz.mul(0.01)),
-  });
+  const material = new NodeMaterial({ colorNode: tint(uv(), 0.25).rgb, positionNode: positionLocal.add(tint(uv(), 0.5).xyz.mul(0.01)) });
   assert.throws(
     () => toGLSL(material, compat),
     (e) => e.name === 'MargoError' && e.code === 'state' && /drawn once/.test(e.message),
@@ -129,12 +122,7 @@ test('a texture read by texture() and by GLSL binds once', () => {
 
 test('refusals carry the line and column of the source as written', () => {
   refusal(() => glslToWGSL('float f(float x) {\n  return x +;\n}'), /Unexpected expression token ;/, 2, 13);
-  refusal(
-    () => glslToWGSL('uniform float k;\nfloat f(float x) {\n  return x * k;\n}'),
-    /uniform .*pass it as an argument/,
-    1,
-    1,
-  );
+  refusal(() => glslToWGSL('uniform float k;\nfloat f(float x) {\n  return x * k;\n}'), /uniform .*pass it as an argument/, 1, 1);
   refusal(
     () => glslToWGSL('// a comment\nfloat f(float x) {\n  return gl_FragCoord.x;\n}'),
     /gl_FragCoord is not available inside a function; pass it as an argument/,
@@ -142,10 +130,7 @@ test('refusals carry the line and column of the source as written', () => {
     10,
   );
   refusal(
-    () =>
-      glslToWGSL('float f(float x) { return x; }\n#define N 2\nvoid g(out float y) { y = 1.0; }', {
-        defines: { M: 1 },
-      }),
+    () => glslToWGSL('float f(float x) { return x; }\n#define N 2\nvoid g(out float y) { y = 1.0; }', { defines: { M: 1 } }),
     /parameter y of g is out/,
     3,
     6,
@@ -153,20 +138,14 @@ test('refusals carry the line and column of the source as written', () => {
   refusal(() => glslToWGSL('\n\nfloat f(float x[2]) { return x[0]; }'), /parameter x has type float\[2\]/, 3, 7);
   refusal(() => glslToWGSL('void f(float x) { }'), /f returns void/, 1, 6);
   refusal(() => glslToWGSL('float f(float x) { return x; }', { name: 'g' }), /defines no function g/, 1, 1);
-  assert.throws(
-    () => glslToWGSL('#version 310 es\nfloat f(float x) { return x; }'),
-    (e) => e.code === 'unsupported',
-  );
+  assert.throws(() => glslToWGSL('#version 310 es\nfloat f(float x) { return x; }'), (e) => e.code === 'unsupported');
 });
 
 test('options: name, defines, flipY and strict', () => {
   const two = `float a(float x) { return x; } float b(float x) { return -x; }`;
   assert.match(glslToWGSL(two).code, /glsl\d+_entry\(a0:f32\)->f32\{return glsl\d+_function_1\(a0\)/);
   assert.match(glslToWGSL(two, { name: 'a' }).code, /glsl\d+_entry\(a0:f32\)->f32\{return glsl\d+_function_0\(a0\)/);
-  assert.match(
-    glslToWGSL('float f(float x) { return x * SCALE; }', { defines: { SCALE: 3 } }).code,
-    /f32\(3\.?0?\)|3\.0|\b3\b/,
-  );
+  assert.match(glslToWGSL('float f(float x) { return x * SCALE; }', { defines: { SCALE: 3 } }).code, /f32\(3\.?0?\)|3\.0|\b3\b/);
   assert.throws(() => glslToWGSL('float f(float x) { return x; }', { defines: { 'no-name': 1 } }), TypeError);
   assert.throws(() => glslToWGSL('float f(float x) { return x; }', { defines: { A: '1\n#define B 2' } }), TypeError);
   const read = `vec4 f(sampler2D s, vec2 p) { return texture(s, p) + texelFetch(s, ivec2(p), 0); }`;

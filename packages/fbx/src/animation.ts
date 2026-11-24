@@ -171,31 +171,31 @@ function keepQuaternionHemisphere(previous: Float32Array, next: Float32Array): v
 
 /** Whether a straight glTF segment from a to b passes through p, a sample at `alpha` of it. */
 function partsAgree(a: Parts, b: Parts, p: Parts, alpha: number): boolean {
-  for (const key of ['translation', 'scale'] as const)
-    for (let k = 0; k < 3; k++) {
-      const expected = a[key][k] * (1 - alpha) + b[key][k] * alpha;
-      if (Math.abs(p[key][k] - expected) > 1e-5 * Math.max(1, Math.abs(p[key][k]), Math.abs(expected))) return false;
+    for (const key of ['translation', 'scale'] as const)
+      for (let k = 0; k < 3; k++) {
+        const expected = a[key][k] * (1 - alpha) + b[key][k] * alpha;
+        if (Math.abs(p[key][k] - expected) > 1e-5 * Math.max(1, Math.abs(p[key][k]), Math.abs(expected))) return false;
+      }
+    let dot = 0;
+    for (let k = 0; k < 4; k++) dot += a.rotation[k] * b.rotation[k];
+    const sign = dot < 0 ? -1 : 1;
+    dot = Math.min(1, Math.abs(dot));
+    let x = 1 - alpha,
+      y = alpha;
+    if (dot < 0.9995) {
+      const angle = Math.acos(dot),
+        s = Math.sin(angle);
+      x = Math.sin((1 - alpha) * angle) / s;
+      y = Math.sin(alpha * angle) / s;
     }
-  let dot = 0;
-  for (let k = 0; k < 4; k++) dot += a.rotation[k] * b.rotation[k];
-  const sign = dot < 0 ? -1 : 1;
-  dot = Math.min(1, Math.abs(dot));
-  let x = 1 - alpha,
-    y = alpha;
-  if (dot < 0.9995) {
-    const angle = Math.acos(dot),
-      s = Math.sin(angle);
-    x = Math.sin((1 - alpha) * angle) / s;
-    y = Math.sin(alpha * angle) / s;
-  }
-  let length = 0,
-    agreement = 0;
-  for (let k = 0; k < 4; k++) {
-    const v = a.rotation[k] * x + b.rotation[k] * y * sign;
-    length += v * v;
-    agreement += v * p.rotation[k];
-  }
-  return 1 - Math.min(1, Math.abs(agreement) / Math.sqrt(length)) <= 1.25e-9; // angular error <= 1e-4 radians
+    let length = 0,
+      agreement = 0;
+    for (let k = 0; k < 4; k++) {
+      const v = a.rotation[k] * x + b.rotation[k] * y * sign;
+      length += v * v;
+      agreement += v * p.rotation[k];
+    }
+    return 1 - Math.min(1, Math.abs(agreement) / Math.sqrt(length)) <= 1.25e-9; // angular error <= 1e-4 radians
 }
 
 /** Adds keys until straight segments meet `acceptable`; the segment of a jump stays as it is. */
@@ -408,13 +408,8 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
       const seed = commonTimes(all),
         times =
           interpolation === 'LINEAR'
-            ? refineTimes(
-                seed,
-                sampleLocal,
-                partsAgree,
-                jumpStarts(all),
-                (start, end) =>
-                  (turning ?? []).some((c) => c && !c.wrapped && Math.abs(sample(c, end) - sample(c, start)) > 45),
+            ? refineTimes(seed, sampleLocal, partsAgree, jumpStarts(all), (start, end) =>
+                (turning ?? []).some((c) => c && !c.wrapped && Math.abs(sample(c, end) - sample(c, start)) > 45),
                 !!turning?.some((c) => c?.wrapped),
               )
             : seed;
@@ -446,8 +441,7 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
                 seed,
                 at,
                 (a, b, p, alpha) =>
-                  (!a.helper || partsAgree(a.helper, b.helper!, p.helper!, alpha)) &&
-                  partsAgree(a.own, b.own, p.own, alpha),
+                  (!a.helper || partsAgree(a.helper, b.helper!, p.helper!, alpha)) && partsAgree(a.own, b.own, p.own, alpha),
                 jumpStarts(all),
                 (start, end) =>
                   (turning ?? []).some((c) => c && !c.wrapped && Math.abs(sample(c, end) - sample(c, start)) > 45),

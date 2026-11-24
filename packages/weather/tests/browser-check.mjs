@@ -12,6 +12,8 @@
 // snow-drift: Snow draws a SnowDrift field: the field WGSL matches its JavaScript twins, an empty field changes nothing,
 // the drifted ridge's skyline rises by the snow depth in the lee and not on the scoured crest, a later time re-uploads it,
 // and the cornice mesh draws.
+// blast: BlastCloud draws two releases' caps, stems and fire into vfx Clouds, dark against a pale sky; a seek back and
+// clear restore the picture.
 // eruption: drawPlume puts the rising column and the umbrella into vfx Clouds; a seek back and clearPlume restore the picture.
 // lava: a LavaFlow's lavaEvent glows on a GroundChange and grows down the slope, clots and bombs draw as glowing
 // instances, the glow lights brighten the ground through Clustered, and a seek back or clearing restores the picture.
@@ -130,6 +132,21 @@ const checks = {
     assert.equal(r.seekBack, 0, 'a seek back draws the earlier column again');
     assert.equal(r.cleared, 0, 'clearPlume leaves the picture as it was');
     return `eruption column ${r.columnChanged} px, umbrella ${Math.round(r.umbrella)} m ${r.umbrellaChanged} px`;
+  },
+  blast(r) {
+    assert.ok(
+      r.earlyChanged > 30 && r.risenChanged > r.earlyChanged,
+      `the cloud draws and grows: ${r.earlyChanged} then ${r.risenChanged} pixels`,
+    );
+    assert.ok(
+      r.darker < 0.5,
+      `the column stands dark against the pale overcast: ${r.darker.toFixed(3)} of the sky's light`,
+    );
+    assert.ok(r.moved > 100, `it rises: ${r.moved} pixels differ from 1 s to 30 s`);
+    assert.equal(r.sameTwice, 0, 'the same frame twice is the same');
+    assert.equal(r.seekBack, 0, 'a seek back draws the earlier cloud again');
+    assert.equal(r.cleared, 0, 'clear leaves the picture as it was');
+    return `blast cloud ${r.earlyChanged} then ${r.risenChanged} px, ${r.darker.toFixed(3)} of the sky's light`;
   },
   lava(r) {
     assert.equal(r.validation, null);

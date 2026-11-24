@@ -8,8 +8,7 @@ import * as G from '../dist/primitives.js';
 const fixtures = JSON.parse(readFileSync(new URL('./fixtures/primitive-workcount.json', import.meta.url)));
 for (const { name, args, sha256 } of fixtures) {
   test(`${name} retains parent geometry bytes for ${JSON.stringify(args)}`, () => {
-    const g = G[name](...args),
-      hash = createHash('sha256');
+    const g = G[name](...args), hash = createHash('sha256');
     for (const key of ['positions', 'normals', 'uvs', 'indices'])
       hash.update(new Uint8Array(g[key].buffer, g[key].byteOffset, g[key].byteLength));
     hash.update(JSON.stringify(g.groups ?? []));
@@ -18,17 +17,10 @@ for (const { name, args, sha256 } of fixtures) {
 }
 
 test('angular work scales with columns plus profile rows, not their product', () => {
-  const sin = Math.sin,
-    cos = Math.cos;
+  const sin = Math.sin, cos = Math.cos;
   let calls = 0;
-  Math.sin = (...args) => {
-    calls++;
-    return sin(...args);
-  };
-  Math.cos = (...args) => {
-    calls++;
-    return cos(...args);
-  };
+  Math.sin = (...args) => { calls++; return sin(...args); };
+  Math.cos = (...args) => { calls++; return cos(...args); };
   try {
     const check = (build, expected) => {
       calls = 0;

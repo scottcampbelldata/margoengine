@@ -356,12 +356,13 @@ export const builders = {
       ]);
       // One LDR NodePass after the display transform: add brightness, scale contrast about mid grey, then saturation
       // (Rec. 709 luminance) and hue (rotation about the grey axis), each a live uniform.
-      const c = inputColor().rgb.add(uniform(brightness).xxx).sub(vec3(0.5)).mul(uniform(contrast).xxx).add(vec3(0.5)),
+      const c = inputColor()
+          .rgb.add(uniform(brightness).xxx)
+          .sub(vec3(0.5))
+          .mul(uniform(contrast).xxx)
+          .add(vec3(0.5)),
         graded = utils.hue(utils.saturation(c, uniform(saturation)), uniform(hue));
-      await stack(engine, [
-        await post.tonemap(),
-        new NodePass(vec4(graded, inputColor().a), { name: 'parity:grading' }),
-      ]);
+      await stack(engine, [await post.tonemap(), new NodePass(vec4(graded, inputColor().a), { name: 'parity:grading' })]);
       return {
         note: `PostStack [Tonemap, NodePass grading {brightness ${brightness}, contrast ${contrast}, saturation ${saturation}, hue ${hue} rad}] (shader/utils saturation and hue).`,
       };

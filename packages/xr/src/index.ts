@@ -316,9 +316,7 @@ export class XR implements EnginePlugin {
     this.space = space;
   }
   /** The active immersive projection layer, including its baseLayer on compatibility; undefined otherwise. */
-  get projectionLayer(): XRProjectionLayer | undefined {
-    return this.layer;
-  }
+  get projectionLayer(): XRProjectionLayer | undefined { return this.layer; }
   /** The immersive session's WebGPU binding and the device its layers use; undefined otherwise. For `XRLayers`. */
   get layerBinding(): { binding: XRBinding; device: GPUDevice } | undefined {
     return this.session && this.binding && this.layer ? { binding: this.binding, device: this.device } : undefined;
@@ -372,10 +370,7 @@ export class XR implements EnginePlugin {
       throw new TypeError(
         "Unknown XR reference space; use 'viewer', 'local', 'local-floor', 'bounded-floor' or 'unbounded'",
       );
-    if (
-      options.framebufferScale !== undefined &&
-      (!Number.isFinite(Math.fround(options.framebufferScale)) || Math.fround(options.framebufferScale) <= 0)
-    )
+    if (options.framebufferScale !== undefined && (!Number.isFinite(Math.fround(options.framebufferScale)) || Math.fround(options.framebufferScale) <= 0))
       throw new RangeError('framebufferScale must be finite and positive; pass 1 for the runtime recommendation');
     this.pending = true;
     let session: XRNativeSession | undefined;
@@ -422,11 +417,7 @@ export class XR implements EnginePlugin {
       }
       this.binding = new (platform().XRGPUBinding!)(session, this.device);
       const colorFormat = this.binding.getPreferredColorFormat();
-      this.layer = this.binding.createProjectionLayer({
-        colorFormat,
-        depthStencilFormat: 'depth24plus',
-        ...(options.framebufferScale === undefined ? {} : { scaleFactor: options.framebufferScale }),
-      });
+      this.layer = this.binding.createProjectionLayer({ colorFormat, depthStencilFormat: 'depth24plus', ...(options.framebufferScale === undefined ? {} : { scaleFactor: options.framebufferScale }) });
       session.updateRenderState({
         ...(this.layer.baseLayer ? { baseLayer: this.layer.baseLayer } : { layers: [this.layer] }),
         depthNear: this.engine.camera.near,
@@ -497,35 +488,14 @@ export class XR implements EnginePlugin {
   /** Render the current tracked eyes (or mirror) from onFrame. Return false there to suppress the automatic draw. */
   renderFrame(): void {
     if (!this.insideFrame || this.disposed || !this.session)
-      throw new MargoError(
-        'state',
-        'renderFrame requires an active XR frame; call it inside the session onFrame callback.',
-      );
+      throw new MargoError('state', 'renderFrame requires an active XR frame; call it inside the session onFrame callback.');
     const { viewer, delta } = this.state;
     if (this.mode !== 'inline' && this.eyes) {
-      if (viewer)
-        this.eyes.render(
-          this.binding!,
-          this.layer!,
-          viewer,
-          delta,
-          this.mode === 'immersive-ar' || this.seeThrough,
-          this.drawEye,
-          this.mask,
-        );
+      if (viewer) this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye, this.mask);
     } else if (this.mode !== 'inline') {
       this.renderOptions.delta = delta;
       this.engine.render(this.renderOptions);
-      if (viewer)
-        this.renderer!.render(
-          this.engine,
-          this.binding!,
-          this.layer!,
-          viewer,
-          this.mode === 'immersive-ar' || this.seeThrough,
-          this.drawEye,
-          this.mask,
-        );
+      if (viewer) this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye, this.mask);
     }
   }
   private readonly sourcesChanged = (): void => {

@@ -17,7 +17,8 @@ test('every margoengine.com link in the tracked sources names a page and anchor 
 });
 
 test('the error anchors the packages link to exist on the errors page', () => {
-  const links = (anchors) => anchors.map((id) => `https://margoengine.com/errors#${id}`).join('\n');
+  const links = (anchors) =>
+    anchors.map((id) => `https://margoengine.com/errors#${id}`).join('\n');
   const dir = mkdtempSync(join(tmpdir(), 'site-links-'));
   try {
     mkdirSync(join(dir, 'site'), { recursive: true });

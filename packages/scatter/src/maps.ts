@@ -78,13 +78,9 @@ export function checkTextures(textures: unknown, vertexCounts: readonly number[]
   const t = textures as ScatterTextures;
   for (const key of ['baseColor', 'normal', 'occlusionRoughnessMetal'] as const)
     if (t[key] !== undefined && !isImage(t[key]))
-      throw typeError(
-        `Scatter textures.${key} must be an ImageBitmap, canvas, image or { width, height, data }`,
-        'scatter',
-      );
+      throw typeError(`Scatter textures.${key} must be an ImageBitmap, canvas, image or { width, height, data }`, 'scatter');
   const cut = t.alphaCutoff ?? 0;
-  if (!Number.isFinite(cut) || cut < 0 || cut > 1)
-    throw rangeError('Scatter textures.alphaCutoff must be 0 to 1', 'scatter');
+  if (!Number.isFinite(cut) || cut < 0 || cut > 1) throw rangeError('Scatter textures.alphaCutoff must be 0 to 1', 'scatter');
   const ring = (t.uvs as ArrayLike<unknown>)?.[0];
   const list =
     typeof ring === 'object' && ring !== null ? (t.uvs as readonly ArrayLike<number>[]) : [t.uvs, t.uvs, t.uvs];
@@ -206,8 +202,7 @@ export function pixelsOf(image: ScatterImage): { width: number; height: number; 
     height = raw.height,
     canvas = new OffscreenCanvas(width, height),
     ctx = canvas.getContext('2d');
-  if (!ctx)
-    throw typeError('Scatter textures need a 2D canvas to read an image; pass { width, height, data }', 'scatter');
+  if (!ctx) throw typeError('Scatter textures need a 2D canvas to read an image; pass { width, height, data }', 'scatter');
   ctx.drawImage(image as CanvasImageSource, 0, 0);
   return { width, height, data: ctx.getImageData(0, 0, width, height).data };
 }
@@ -215,10 +210,7 @@ export function pixelsOf(image: ScatterImage): { width: number; height: number; 
 /** Uploads a mip chain to a new texture of `format`. */
 export function uploadChain(d: GPUDevice, chain: MipChain, format: GPUTextureFormat): GPUTexture {
   let first = 0;
-  while (
-    chain.width >> first > d.limits.maxTextureDimension2D ||
-    chain.height >> first > d.limits.maxTextureDimension2D
-  )
+  while ((chain.width >> first) > d.limits.maxTextureDimension2D || (chain.height >> first) > d.limits.maxTextureDimension2D)
     first++;
   const levels = chain.levels.slice(first),
     width = Math.max(1, chain.width >> first),

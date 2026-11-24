@@ -10,33 +10,12 @@ import { ownedByEngine, lifetimeFault } from '../../../tests/support/owner-shell
 
 // Two closed boxes as OBJ objects, small enough for PartInstancer to pack.
 const box = (name, o) => {
-  const v = [
-    [0, 0, 0],
-    [1, 0, 0],
-    [1, 1, 0],
-    [0, 1, 0],
-    [0, 0, 1],
-    [1, 0, 1],
-    [1, 1, 1],
-    [0, 1, 1],
-  ];
-  const f = [
-    [1, 4, 3, 2],
-    [5, 6, 7, 8],
-    [1, 2, 6, 5],
-    [4, 8, 7, 3],
-    [1, 5, 8, 4],
-    [2, 3, 7, 6],
-  ];
-  return [
-    `o ${name}`,
-    ...v.map(([x, y, z]) => `v ${x + o} ${y} ${z}`),
-    ...f.map((q) => `f ${q.map((i) => i - 9).join(' ')}`),
-  ].join('\n');
+  const v = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
+  const f = [[1, 4, 3, 2], [5, 6, 7, 8], [1, 2, 6, 5], [4, 8, 7, 3], [1, 5, 8, 4], [2, 3, 7, 6]];
+  return [`o ${name}`, ...v.map(([x, y, z]) => `v ${x + o} ${y} ${z}`), ...f.map((q) => `f ${q.map((i) => i - 9).join(' ')}`)].join('\n');
 };
 const obj = [box('a', 0), box('b', 2)].join('\n') + '\n';
-const stl =
-  'solid t\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid t\n';
+const stl = 'solid t\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid t\n';
 const served = (text) => async (input, init) => {
   init?.signal?.throwIfAborted();
   return new Response(text, { headers: { 'content-length': String(new TextEncoder().encode(text).byteLength) } });
@@ -65,22 +44,14 @@ export async function fixtures(load = (entry) => import(entry)) {
   const entries = [
     model('parseCAD stl', (engine) => parseCAD(engine, stl, 'stl')),
     model('parseCAD obj', (engine) => parseCAD(engine, obj, 'obj')),
-    model('loadCAD', (engine) =>
-      loadCAD(engine, 'https://assets.example/part.obj', { fetch: served(obj), signal: signal() }),
-    ),
+    model('loadCAD', (engine) => loadCAD(engine, 'https://assets.example/part.obj', { fetch: served(obj), signal: signal() })),
     {
       name: 'PartInstancer.attach',
       async create({ engine, dependency }) {
         // The assembly is the app's, not the plugin's: its meshes' GPU buffers count against the app until it disposes it.
         const parts = dependency(() => parseCAD(engine, obj, 'obj'));
         const plugin = PartInstancer.attach(engine);
-        return {
-          plugin,
-          dispose() {
-            plugin.dispose();
-            parts.dispose();
-          },
-        };
+        return { plugin, dispose() { plugin.dispose(); parts.dispose(); } };
       },
     },
   ];

@@ -137,91 +137,89 @@ function at(
  * path or at `focus`. Set `offset` to ease there, or write `current` through `useMotion()` or the ref yourself (in
  * `useFrame`, from a scroll position, ...). A mesh is turned so its +Z faces the look-at point.
  */
-export const MotionPathControls = /* @__PURE__ */ forwardRef<MotionState, MotionPathControlsProps>(
-  function MotionPathControls(
-    { curves, object, focus, offset, damping = 0.2, focusDamping = 0.1, loop = true, children },
-    ref,
-  ) {
-    check(curves, offset, damping, focusDamping);
-    const scene = useScene(),
-      [state] = useState<MotionState>(() => ({
-        current: offset ?? 0,
-        curves,
-        point: [0, 0, 0],
-        tangent: [0, 0, 1],
-        focus: [0, 0, 0],
-      })),
-      props = useRef({ curves, object, focus, offset, damping, focusDamping, loop });
-    props.current = { curves, object, focus, offset, damping, focusDamping, loop };
-    (state as { curves: readonly MotionCurve[] }).curves = curves;
-    useImperativeHandle(ref, () => state, [state]);
-    useEffect(() => {
-      let lengths: number[] = [],
-        total = 0,
-        measured: readonly MotionCurve[] | null = null,
-        fresh = true;
-      const ahead: Point = [0, 0, 0],
-        wanted: Point = [0, 0, 0];
-      return subscribeFrame(scene.frames, (_, delta) => {
-        const p = props.current;
-        if (measured !== p.curves) {
-          lengths = p.curves.map((c) => c.getLength());
-          total = lengths.reduce((a, b) => a + b, 0);
-          measured = p.curves;
+export const MotionPathControls = /* @__PURE__ */ forwardRef<MotionState, MotionPathControlsProps>(function MotionPathControls(
+  { curves, object, focus, offset, damping = 0.2, focusDamping = 0.1, loop = true, children },
+  ref,
+) {
+  check(curves, offset, damping, focusDamping);
+  const scene = useScene(),
+    [state] = useState<MotionState>(() => ({
+      current: offset ?? 0,
+      curves,
+      point: [0, 0, 0],
+      tangent: [0, 0, 1],
+      focus: [0, 0, 0],
+    })),
+    props = useRef({ curves, object, focus, offset, damping, focusDamping, loop });
+  props.current = { curves, object, focus, offset, damping, focusDamping, loop };
+  (state as { curves: readonly MotionCurve[] }).curves = curves;
+  useImperativeHandle(ref, () => state, [state]);
+  useEffect(() => {
+    let lengths: number[] = [],
+      total = 0,
+      measured: readonly MotionCurve[] | null = null,
+      fresh = true;
+    const ahead: Point = [0, 0, 0],
+      wanted: Point = [0, 0, 0];
+    return subscribeFrame(scene.frames, (_, delta) => {
+      const p = props.current;
+      if (measured !== p.curves) {
+        lengths = p.curves.map((c) => c.getLength());
+        total = lengths.reduce((a, b) => a + b, 0);
+        measured = p.curves;
+      }
+      if (p.offset !== undefined) {
+        let gap = p.offset - state.current;
+        if (p.loop) gap -= Math.round(gap);
+        state.current += gap * ease(p.damping, delta);
+      }
+      if (p.loop) state.current -= Math.floor(state.current);
+      else state.current = Math.min(Math.max(state.current, 0), 1);
+      at(p.curves, lengths, total, state.current, state.point, state.tangent);
+      const look = p.focus;
+      if (look && 'current' in look) {
+        const mesh = look.current;
+        if (mesh) {
+          const m = mesh.engine.store.matrices,
+            o = mesh.id * 16;
+          wanted[0] = m[o + 12];
+          wanted[1] = m[o + 13];
+          wanted[2] = m[o + 14];
         }
-        if (p.offset !== undefined) {
-          let gap = p.offset - state.current;
-          if (p.loop) gap -= Math.round(gap);
-          state.current += gap * ease(p.damping, delta);
+      } else if (look) {
+        wanted[0] = look[0];
+        wanted[1] = look[1];
+        wanted[2] = look[2];
+      } else {
+        // A small step ahead along the path (behind it at the very end).
+        const step = Math.min(1e-3, 1 / Math.max(total, 1e-9));
+        at(p.curves, lengths, total, Math.min(state.current + step, 1), ahead);
+        if (state.current + step > 1) {
+          at(p.curves, lengths, total, state.current - step, ahead);
+          for (let i = 0; i < 3; i++) ahead[i] = 2 * state.point[i] - ahead[i];
         }
-        if (p.loop) state.current -= Math.floor(state.current);
-        else state.current = Math.min(Math.max(state.current, 0), 1);
-        at(p.curves, lengths, total, state.current, state.point, state.tangent);
-        const look = p.focus;
-        if (look && 'current' in look) {
-          const mesh = look.current;
-          if (mesh) {
-            const m = mesh.engine.store.matrices,
-              o = mesh.id * 16;
-            wanted[0] = m[o + 12];
-            wanted[1] = m[o + 13];
-            wanted[2] = m[o + 14];
-          }
-        } else if (look) {
-          wanted[0] = look[0];
-          wanted[1] = look[1];
-          wanted[2] = look[2];
-        } else {
-          // A small step ahead along the path (behind it at the very end).
-          const step = Math.min(1e-3, 1 / Math.max(total, 1e-9));
-          at(p.curves, lengths, total, Math.min(state.current + step, 1), ahead);
-          if (state.current + step > 1) {
-            at(p.curves, lengths, total, state.current - step, ahead);
-            for (let i = 0; i < 3; i++) ahead[i] = 2 * state.point[i] - ahead[i];
-          }
-          for (let i = 0; i < 3; i++) wanted[i] = ahead[i];
-        }
-        const k = fresh || !look ? 1 : ease(p.focusDamping, delta);
-        fresh = false;
-        for (let i = 0; i < 3; i++) state.focus[i] += (wanted[i] - state.focus[i]) * k;
-        const target = p.object?.current;
-        if (target) {
-          const forward: Point = [
-              state.focus[0] - state.point[0],
-              state.focus[1] - state.point[1],
-              state.focus[2] - state.point[2],
-            ],
-            l = Math.hypot(...forward);
-          target.setPosition(state.point);
-          if (l > 1e-9) target.setQuaternion(facing([forward[0] / l, forward[1] / l, forward[2] / l]));
-        } else if (!p.object) {
-          // New arrays: the camera's may be the caller's own (a Canvas camera prop), never written in place.
-          const camera = scene.engine.camera as unknown as { position: Vec3; target: Vec3 };
-          camera.position = [state.point[0], state.point[1], state.point[2]];
-          camera.target = [state.focus[0], state.focus[1], state.focus[2]];
-        }
-      });
-    }, [scene.frames, scene.engine, state]);
-    return <MotionContext.Provider value={state}>{children}</MotionContext.Provider>;
-  },
-);
+        for (let i = 0; i < 3; i++) wanted[i] = ahead[i];
+      }
+      const k = fresh || !look ? 1 : ease(p.focusDamping, delta);
+      fresh = false;
+      for (let i = 0; i < 3; i++) state.focus[i] += (wanted[i] - state.focus[i]) * k;
+      const target = p.object?.current;
+      if (target) {
+        const forward: Point = [
+            state.focus[0] - state.point[0],
+            state.focus[1] - state.point[1],
+            state.focus[2] - state.point[2],
+          ],
+          l = Math.hypot(...forward);
+        target.setPosition(state.point);
+        if (l > 1e-9) target.setQuaternion(facing([forward[0] / l, forward[1] / l, forward[2] / l]));
+      } else if (!p.object) {
+        // New arrays: the camera's may be the caller's own (a Canvas camera prop), never written in place.
+        const camera = scene.engine.camera as unknown as { position: Vec3; target: Vec3 };
+        camera.position = [state.point[0], state.point[1], state.point[2]];
+        camera.target = [state.focus[0], state.focus[1], state.focus[2]];
+      }
+    });
+  }, [scene.frames, scene.engine, state]);
+  return <MotionContext.Provider value={state}>{children}</MotionContext.Provider>;
+});

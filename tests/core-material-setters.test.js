@@ -187,9 +187,7 @@ test('the cull mode follows mirrored rows exactly through moves, hides and shows
   try {
     const single = new PbrMaterial({ doubleSided: false }),
       cube = box();
-    const meshes = [0, 1, 2].map((i) =>
-      engine.createMesh().setGeometry(cube).setMaterial(single).setPosition([i, 0, 0]),
-    );
+    const meshes = [0, 1, 2].map((i) => engine.createMesh().setGeometry(cube).setMaterial(single).setPosition([i, 0, 0]));
     const frame = () => {
       log.culls.length = 0;
       engine.render();

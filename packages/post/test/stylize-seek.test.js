@@ -17,10 +17,7 @@ function world() {
   // A live frame: the engine's update with the frame's delta, then the draw.
   const frame = () => {
     effect.onPreUpdate(1 / FPS);
-    return written(
-      h.gpu.record(() => h.frame()),
-      64,
-    );
+    return written(h.gpu.record(() => h.frame()), 64);
   };
   return { h, effect, frame };
 }

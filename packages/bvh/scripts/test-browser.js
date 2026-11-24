@@ -32,12 +32,7 @@ assert.ok(
   `consumer build did not emit the worker: ${emitted.join(', ')}`,
 );
 
-const server = await createServer({
-  plugins: [noFileWatcher()],
-  configFile: config,
-  logLevel: 'error',
-  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
-});
+const server = await createServer({ plugins: [noFileWatcher()], configFile: config, logLevel: 'error', server: { port: 0 } });
 await server.listen();
 const productionServer = await preview({
   configFile: config,

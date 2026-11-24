@@ -73,13 +73,10 @@ function largestTriangle(canopy, from, below = false) {
   let largest = 0;
   for (let t = 0; t < I.length; t += 3) {
     const [a, b, c] = [I[t] * 3, I[t + 1] * 3, I[t + 2] * 3];
-    if ([a, b, c].some((v) => p[v + 1] >= from === below)) continue;
+    if ([a, b, c].some((v) => (p[v + 1] >= from) === below)) continue;
     const e = [0, 1, 2].map((k) => p[b + k] - p[a + k]),
       f = [0, 1, 2].map((k) => p[c + k] - p[a + k]);
-    largest = Math.max(
-      largest,
-      Math.hypot(e[1] * f[2] - e[2] * f[1], e[2] * f[0] - e[0] * f[2], e[0] * f[1] - e[1] * f[0]) / 2,
-    );
+    largest = Math.max(largest, Math.hypot(e[1] * f[2] - e[2] * f[1], e[2] * f[0] - e[0] * f[2], e[0] * f[1] - e[1] * f[0]) / 2);
   }
   return largest;
 }
@@ -106,10 +103,7 @@ test('the top tenth of a spruce crown has the needle colour, snow and gaps of th
       }
       // No solid cone faces: no triangle of the top tenth is larger than the tiers' largest shoot triangle.
       const cut = high - (high - low) / TENTHS;
-      assert.ok(
-        largestTriangle(canopy, cut) <= largestTriangle(canopy, cut, true),
-        `detail ${detail}, shoots ${shoots}: a solid face at the top`,
-      );
+      assert.ok(largestTriangle(canopy, cut) <= largestTriangle(canopy, cut, true), `detail ${detail}, shoots ${shoots}: a solid face at the top`);
       // The leader reaches the crown top it reached before, so a tree's height and scale stay as they were.
       assert.ok(Math.abs(high - 8.55) < 0.01, `detail ${detail}, shoots ${shoots}: top ${high.toFixed(3)} m`);
     }
@@ -121,9 +115,6 @@ test('the plain sprays carry the same top: the leader is a shoot, not a cone', (
       { low, high, rows } = tenths(canopy),
       cut = high - (high - low) / TENTHS;
     assert.ok(rows[0].snow > 0.5, `detail ${detail}: top tenth snow ${rows[0].snow.toFixed(3)}`);
-    assert.ok(
-      largestTriangle(canopy, cut) <= largestTriangle(canopy, cut, true),
-      `detail ${detail}: a solid face at the top`,
-    );
+    assert.ok(largestTriangle(canopy, cut) <= largestTriangle(canopy, cut, true), `detail ${detail}: a solid face at the top`);
   }
 });

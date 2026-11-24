@@ -9,8 +9,7 @@ import net from 'node:net';
 import { endTree } from './shutdown.mjs';
 
 /** A line that names a problem. The lines of a clean Vite, Next.js or Node server never match. */
-export const BAD_LINE =
-  /\(!\)|\berror\b|\bwarn(ing)?\b|⚠|failed|cannot find|could not resolve|not found|no matching export|deprecat/i;
+export const BAD_LINE = /\(!\)|\berror\b|\bwarn(ing)?\b|⚠|failed|cannot find|could not resolve|not found|no matching export|deprecat/i;
 
 export function killTree(child) {
   if (child.exitCode !== null || child.pid === undefined) return;
@@ -25,13 +24,7 @@ export function get(url, { insecure = false, timeout = 30_000 } = {}) {
     const request = client.get(url, { rejectUnauthorized: !insecure, timeout }, (response) => {
       const chunks = [];
       response.on('data', (chunk) => chunks.push(chunk));
-      response.on('end', () =>
-        done({
-          status: response.statusCode,
-          type: response.headers['content-type'] ?? '',
-          body: Buffer.concat(chunks).toString('utf8'),
-        }),
-      );
+      response.on('end', () => done({ status: response.statusCode, type: response.headers['content-type'] ?? '', body: Buffer.concat(chunks).toString('utf8') }));
     });
     request.on('timeout', () => request.destroy(new Error(`${url}: no answer in ${timeout / 1000} s`)));
     request.on('error', fail);
@@ -77,8 +70,7 @@ function referencedUrls(text, base, html) {
   const markup = !html ? '' : text.replace(/<script(?![^>]*\ssrc=)[^>]*>[\s\S]*?<\/script>/g, '');
   for (const [, reference] of markup.matchAll(/<(?:script|link)\b[^>]*?\s(?:src|href)="([^"]+)"/g)) add(reference);
   if (!isThirdParty(base))
-    for (const [, reference] of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\/[^"']+|\.{1,2}\/[^"']+)["']/g))
-      add(reference);
+    for (const [, reference] of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\/[^"']+|\.{1,2}\/[^"']+)["']/g)) add(reference);
   return found;
 }
 
@@ -89,31 +81,11 @@ function referencedUrls(text, base, html) {
  *   `page` is the full first URL (or '' for a server with no web page: it must then give `tcpPort`). `end` ends the
  *   server's tree and resolves to the pids still running (default: endTree, which waits until they are gone).
  */
-export async function probe({
-  command,
-  args,
-  cwd,
-  env = process.env,
-  page,
-  tcpPort,
-  host = '127.0.0.1',
-  insecure = false,
-  listenLimitMs = 60_000,
-  limitMs = 120_000,
-  settleMs = 6_000,
-  end = endTree,
-}) {
+export async function probe({ command, args, cwd, env = process.env, page, tcpPort, host = '127.0.0.1', insecure = false, listenLimitMs = 60_000, limitMs = 120_000, settleMs = 6_000, end = endTree }) {
   const lines = [];
   const problems = [];
   const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  const onData = (chunk) =>
-    lines.push(
-      ...chunk
-        .toString()
-        .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
-        .split(/\r?\n/)
-        .filter((line) => line.trim()),
-    );
+  const onData = (chunk) => lines.push(...chunk.toString().replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').split(/\r?\n/).filter((line) => line.trim()));
   child.stdout.on('data', onData);
   child.stderr.on('data', onData);
   child.on('error', (error) => problems.push(`could not start: ${error.message}`));
@@ -125,10 +97,7 @@ export async function probe({
       if (child.exitCode !== null || problems.length) throw new Error(`exited ${child.exitCode} before it answered`);
       if (Date.now() - started > listenLimitMs) throw new Error(`no answer within ${listenLimitMs / 1000} s`);
       const up = page
-        ? await get(page, { insecure, timeout: 5_000 }).then(
-            () => true,
-            () => false,
-          )
+        ? await get(page, { insecure, timeout: 5_000 }).then(() => true, () => false)
         : await tcpOpen(tcpPort, host);
       if (up) break;
       await new Promise((r) => setTimeout(r, 300));
@@ -141,9 +110,7 @@ export async function probe({
       const queue = [page];
       const seen = new Set(queue);
       const unfinished = () =>
-        new Error(
-          `the crawl from ${page} did not finish within ${limitMs / 1000} s (${seen.size} URLs reached, ${queue.length} still queued)`,
-        );
+        new Error(`the crawl from ${page} did not finish within ${limitMs / 1000} s (${seen.size} URLs reached, ${queue.length} still queued)`);
       while (queue.length) {
         if (outOfTime) throw unfinished();
         const url = queue.shift();
@@ -152,8 +119,7 @@ export async function probe({
         });
         if (answer.status !== 200) problems.push(`${url} answered ${answer.status}`);
         else if (/html|javascript|css/.test(answer.type))
-          for (const next of referencedUrls(answer.body, url, /html/.test(answer.type)))
-            if (!seen.has(next)) seen.add(next), queue.push(next);
+          for (const next of referencedUrls(answer.body, url, /html/.test(answer.type))) if (!seen.has(next)) (seen.add(next), queue.push(next));
       }
     }
     // The dependency scan and pre-bundling report after the first request; give them time to settle.
@@ -161,9 +127,7 @@ export async function probe({
     // Only a server still running now answered: one that lost its port to another process exits, and the pages read
     // above came from that other process.
     if (child.exitCode !== null || child.signalCode !== null)
-      throw new Error(
-        `exited ${child.exitCode ?? child.signalCode} during the probe, so another process answered on its port`,
-      );
+      throw new Error(`exited ${child.exitCode ?? child.signalCode} during the probe, so another process answered on its port`);
   } catch (error) {
     problems.push(error instanceof Error ? error.message : String(error));
   } finally {
@@ -185,24 +149,11 @@ export function runToEnd({ command, args, cwd, env = process.env, limitMs = 400_
     const lines = [];
     const problems = [];
     const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    const onData = (chunk) =>
-      lines.push(
-        ...chunk
-          .toString()
-          .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
-          .split(/\r?\n/)
-          .filter((line) => line.trim()),
-      );
+    const onData = (chunk) => lines.push(...chunk.toString().replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').split(/\r?\n/).filter((line) => line.trim()));
     child.stdout.on('data', onData);
     child.stderr.on('data', onData);
-    const timer = setTimeout(
-      () => (problems.push(`hard limit of ${limitMs / 1000} s reached`), killTree(child)),
-      limitMs,
-    );
-    child.on(
-      'error',
-      (error) => (problems.push(`could not start: ${error.message}`), clearTimeout(timer), done({ problems, lines })),
-    );
+    const timer = setTimeout(() => (problems.push(`hard limit of ${limitMs / 1000} s reached`), killTree(child)), limitMs);
+    child.on('error', (error) => (problems.push(`could not start: ${error.message}`), clearTimeout(timer), done({ problems, lines })));
     child.on('close', (code) => {
       clearTimeout(timer);
       if (code !== 0) problems.push(`exit ${code}`);
@@ -218,9 +169,5 @@ export function runToEnd({ command, args, cwd, env = process.env, limitMs = 400_
  * must not dirty the tree whoever runs it.
  */
 export function humanEnv(env = process.env) {
-  return Object.fromEntries(
-    Object.entries(env).filter(
-      ([key]) => !/^(AI_AGENT|CLAUDE|CODEX|CURSOR|GEMINI|OPENCODE|GOOSE|AUGMENT|REPL_ID|COPILOT|AMP_)/i.test(key),
-    ),
-  );
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !/^(AI_AGENT|CLAUDE|CODEX|CURSOR|GEMINI|OPENCODE|GOOSE|AUGMENT|REPL_ID|COPILOT|AMP_)/i.test(key)));
 }

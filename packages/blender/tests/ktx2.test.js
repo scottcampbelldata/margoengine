@@ -20,45 +20,23 @@ const table = (bytes) => {
 
 test('every PNG section becomes a KTX2 section and the scene keeps its geometry and materials', () => {
   assert.ok(plain.images.length >= 2, 'the fixture has textures');
-  assert.deepEqual(
-    table(compressed).filter((t) => t === 4),
-    [],
-  );
+  assert.deepEqual(table(compressed).filter((t) => t === 4), []);
   assert.equal(table(compressed).filter((t) => t === 8).length, plain.images.length);
-  assert.deepEqual(
-    asset.document.images.map((i) => i.mimeType),
-    plain.images.map(() => 'image/ktx2'),
-  );
+  assert.deepEqual(asset.document.images.map((i) => i.mimeType), plain.images.map(() => 'image/ktx2'));
   assert.deepEqual(asset.document.materials, plain.document.materials);
-  assert.deepEqual(
-    asset.geometry.map((m) => m.map((p) => [...p.vertices])),
-    plain.geometry.map((m) => m.map((p) => [...p.vertices])),
-  );
-  for (const bytes of asset.images)
-    assert.deepEqual(
-      [...bytes.subarray(0, 12)],
-      [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a],
-    );
+  assert.deepEqual(asset.geometry.map((m) => m.map((p) => [...p.vertices])), plain.geometry.map((m) => m.map((p) => [...p.vertices])));
+  for (const bytes of asset.images) assert.deepEqual([...bytes.subarray(0, 12)], [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
 });
 
 test('each KTX2 image transcodes to its PNG within the codec loss, sRGB for colour and linear for data', async () => {
   const textures = plain.document.textures,
     slot = (index) => {
       const material = plain.document.materials.find((m) =>
-        [
-          m.pbrMetallicRoughness?.baseColorTexture,
-          m.pbrMetallicRoughness?.metallicRoughnessTexture,
-          m.normalTexture,
-        ].some((t) => t && textures[t.index].source === index),
-      );
-      return material.pbrMetallicRoughness?.baseColorTexture &&
-        textures[material.pbrMetallicRoughness.baseColorTexture.index].source === index
-        ? 'srgb'
-        : 'linear';
+        [m.pbrMetallicRoughness?.baseColorTexture, m.pbrMetallicRoughness?.metallicRoughnessTexture, m.normalTexture].some((t) => t && textures[t.index].source === index));
+      return material.pbrMetallicRoughness?.baseColorTexture && textures[material.pbrMetallicRoughness.baseColorTexture.index].source === index ? 'srgb' : 'linear';
     };
   for (const [index, png] of plain.images.entries()) {
-    const want = decodePNG(png),
-      got = await nodeKTX2.transcode(asset.images[index]);
+    const want = decodePNG(png), got = await nodeKTX2.transcode(asset.images[index]);
     assert.equal(got.width, want.width);
     assert.equal(got.height, want.height);
     const pixels = got.mipmaps[0].data;
@@ -68,17 +46,13 @@ test('each KTX2 image transcodes to its PNG within the codec loss, sRGB for colo
     assert.ok(mean < 4, `image ${index} differs by a mean of ${mean} of 255`);
     const header = new DataView(asset.images[index].buffer, asset.images[index].byteOffset);
     // KTX2 data format descriptor transfer function: 2 sRGB, 1 linear.
-    const dfd = header.getUint32(48, true),
-      transfer = asset.images[index][dfd + 4 + 10];
+    const dfd = header.getUint32(48, true), transfer = asset.images[index][dfd + 4 + 10];
     assert.equal(transfer === 2 ? 'srgb' : 'linear', slot(index), `image ${index} colour space`);
   }
 });
 
 test('the static reader refuses a KTX2 file by name, and ETC1S is smaller than the PNGs', async () => {
-  assert.throws(
-    () => decodeMargo(compressed),
-    /KTX2 textures; load it with parseMargoKTX2 or loadMargoKTX2 from @margoengine\/blender\/ktx2/,
-  );
+  assert.throws(() => decodeMargo(compressed), /KTX2 textures; load it with parseMargoKTX2 or loadMargoKTX2 from @margoengine\/blender\/ktx2/);
   const small = await compressMargo(source);
   const pngBytes = plain.images.reduce((n, b) => n + b.byteLength, 0),
     ktxBytes = decodeMargoKTX2(small).images.reduce((n, b) => n + b.byteLength, 0);
@@ -86,17 +60,10 @@ test('the static reader refuses a KTX2 file by name, and ETC1S is smaller than t
 });
 
 test('a corrupt KTX2 section and animated or shapes files are refused by name', async () => {
-  const broken = new Uint8Array(compressed),
-    view = new DataView(broken.buffer);
+  const broken = new Uint8Array(compressed), view = new DataView(broken.buffer);
   const at = table(compressed).indexOf(8);
   broken[view.getUint32(68 + at * 16, true)] = 0;
   assert.throws(() => decodeMargoKTX2(broken), /Invalid \.margo KTX2 image/);
-  await assert.rejects(
-    compressMargo(await readFile(new URL('./fixtures/anim.margo', import.meta.url))),
-    /Animated \.margo/,
-  );
-  await assert.rejects(
-    compressMargo(await readFile(new URL('./fixtures/curves.margo', import.meta.url))),
-    /curves, point clouds or volumes/,
-  );
+  await assert.rejects(compressMargo(await readFile(new URL('./fixtures/anim.margo', import.meta.url))), /Animated \.margo/);
+  await assert.rejects(compressMargo(await readFile(new URL('./fixtures/curves.margo', import.meta.url))), /curves, point clouds or volumes/);
 });

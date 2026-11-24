@@ -425,10 +425,12 @@ export class XRLayers {
             const { x, y, width, height } = viewport,
               size = imageSize(source);
             // A video in a browser that refuses one as the source (Firefox) goes through a canvas.
-            copyExternal(host.device, { source }, { texture: image.colorTexture, origin: [x, y, base + face] }, [
-              Math.min(width, size[0]),
-              Math.min(height, size[1]),
-            ]);
+            copyExternal(
+              host.device,
+              { source },
+              { texture: image.colorTexture, origin: [x, y, base + face] },
+              [Math.min(width, size[0]), Math.min(height, size[1])],
+            );
           }
         }
       }

@@ -6,7 +6,7 @@ process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 for (const compat of [false, true]) {
   const browser = await openBrowser({ startPath: '/packages/audio/tests/audio.html', port: 'free', compat });
   const errors = [];
-  browser.page.on('pageerror', (error) => errors.push(error.message));
+  browser.page.on('pageerror', error => errors.push(error.message));
   try {
     const result = await browser.page.evaluate(async () => {
       const { Engine } = await import('/packages/core/dist/index.js');
@@ -15,9 +15,7 @@ for (const compat of [false, true]) {
       canvas.style.cssText = 'width:64px;height:64px';
       document.body.append(canvas);
       const engine = await Engine.create(canvas, { exactSize: [64, 64] });
-      const check = (value, message) => {
-        if (!value) throw new Error(message);
-      };
+      const check = (value, message) => { if (!value) throw new Error(message); };
       try {
         const first = AudioListener.attach(engine, { autoResume: false });
         const owner = engine.sceneOf(first);
@@ -35,10 +33,7 @@ for (const compat of [false, true]) {
         check(engine.sceneOf(replacement) === owner, 'Foreign scene disposal removed the active listener');
         replacement.dispose();
         check(engine.sceneOf(replacement) === undefined, 'Replacement disposal retained its registration');
-        check(
-          !first.hasContext && !foreign.hasContext && !replacement.hasContext,
-          'Ownership cleanup created an audio context',
-        );
+        check(!first.hasContext && !foreign.hasContext && !replacement.hasContext, 'Ownership cleanup created an audio context');
         engine.render();
         return { backend: engine.backend, released: 3, contextCreated: false };
       } finally {

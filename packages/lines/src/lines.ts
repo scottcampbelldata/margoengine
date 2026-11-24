@@ -210,8 +210,7 @@ export class Lines implements EnginePlugin {
   advanceTime(delta: number): void {
     if (!(delta > 0)) return;
     this.elapsed += delta;
-    for (const line of this.members)
-      if (line.visible) (line as { advanceTime?: (delta: number) => void }).advanceTime?.(delta);
+    for (const line of this.members) if (line.visible) (line as { advanceTime?: (delta: number) => void }).advanceTime?.(delta);
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);

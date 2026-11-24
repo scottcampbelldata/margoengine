@@ -513,9 +513,7 @@ export class Clustered implements EnginePlugin {
     if (sized !== this.sized) {
       this.sized = sized;
       this.stride = sized ? 20 : 16;
-      this.data = new Float32Array(
-        Math.max(pages, this.data.length / (LIGHT_PAGE * (sized ? 16 : 20))) * LIGHT_PAGE * this.stride,
-      );
+      this.data = new Float32Array(Math.max(pages, this.data.length / (LIGHT_PAGE * (sized ? 16 : 20))) * LIGHT_PAGE * this.stride);
       this.reset();
     }
     const stride = this.stride;

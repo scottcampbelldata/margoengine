@@ -39,6 +39,13 @@
 //   patterns", 8th Conf. Fire and Forest Meteorology); fresh char whitens to ash as it ages (the burn severity classes of
 //   Key and Benson 2006, "Landscape Assessment: ground measure of severity, the Composite Burn Index; and remote sensing
 //   of severity, the Normalized Burn Ratio", USDA RMRS-GTR-164-CD).
+// - Crater: a buried charge first lifts the ground into a dome, the spalled surface rising ballistically, h = v0 t -
+//   g t^2 / 2, to its height H at sqrt(2 H / g) seconds, then the dome vents and the crater opens, its depth and radius
+//   growing under constant deceleration (a model choice) while the ejecta land beyond the rim (S. Glasstone and P. J.
+//   Dolan 1977, "The Effects of Nuclear Weapons", 3rd ed., ch. 2 and 6: the mound, venting, apparent crater, lip and
+//   ejecta of buried bursts). The bowl is a paraboloid of the apparent radius and depth; the ejecta blanket thins as
+//   h_r (r / R)^-3 (McGetchin, Settle and Head 1973, "Radial thickness variation in impact crater ejecta", Earth and
+//   Planetary Science Letters 20), out to 5 R, its volume `ejecta` times the bowl's (the rest compacted or blown away).
 // Edges carry deterministic value noise (an integer lattice hashed with lowbias32, C. Wellons, "Prospecting for Hash
 // Functions") so no event draws a perfect geometric outline.
 
@@ -236,6 +243,23 @@ export interface BurnEvent extends Timed {
   /** Litter and duff burned off at full severity, metres 0 to 1. Default 0.03. */
   consume?: number;
 }
+/** A buried explosion: the ground heaves into a dome, then the crater opens with a raised lip and an ejecta blanket. */
+export interface CraterEvent extends Timed {
+  kind: 'crater';
+  center: GroundPoint;
+  /** Apparent crater radius at the rim, metres above 0. Default 30. */
+  radius?: number;
+  /** Apparent crater depth below the old ground, metres above 0. Default 10. */
+  depth?: number;
+  /** Height of the heave dome before it vents, metres 0 or more (0: no dome). Default 0.4 of `depth`. */
+  heave?: number;
+  /** Seconds the dome rises, above 0. Default sqrt(2 heave / g), the spalled surface's ballistic rise (1.43 s for 10 m). */
+  heaveTime?: number;
+  /** Radius of the heave dome over the crater's, 1 to 3. Default 1.3. */
+  domeSpread?: number;
+  /** Volume of the ejecta blanket over the bowl's, 0 to 1.5. Default 0.7. */
+  ejecta?: number;
+}
 /** Every event the ground can take. */
 export type GroundEvent =
   | GullyEvent
@@ -245,7 +269,8 @@ export type GroundEvent =
   | MudEvent
   | AshEvent
   | LavaEvent
-  | BurnEvent;
+  | BurnEvent
+  | CraterEvent;
 /** The kinds of {@link GroundEvent}. */
 export type GroundEventKind = GroundEvent['kind'];
 
@@ -259,6 +284,7 @@ export const GROUND_DURATIONS: Readonly<Record<GroundEventKind, number>> = {
   ash: 120,
   lava: 120,
   burn: 600,
+  crater: 6,
 };
 
 /** The surface a point shows: shares 0 to 1. */
@@ -580,6 +606,21 @@ export function resolveEvent(event: GroundEvent, order: number, top: number): Re
       const pad = o.radius * (dir ? 3.4 : 1.4);
       return make([c[0] - pad, c[1] - pad, c[0] + pad, c[1] + pad], end, { dir });
     }
+    case 'crater': {
+      if (!point(e.center)) bad(kind, 'center must be an [x, z] point.');
+      o.radius = number(e, 'radius', 30, 0, 1e5, true);
+      o.depth = number(e, 'depth', 10, 0, 1e4, true);
+      o.heave = number(e, 'heave', 0.4 * o.depth, 0, 1e4);
+      o.heaveTime = number(e, 'heaveTime', o.heave > 0 ? Math.sqrt((2 * o.heave) / 9.80665) : 0.001, 0, 60, true);
+      o.domeSpread = number(e, 'domeSpread', 1.3, 1, 3);
+      o.ejecta = number(e, 'ejecta', 0.7, 0, 1.5);
+      // The blanket h_r ((r / R)^-3 - 1/125) / (1 - 1/125) from R to 5 R holds 2 pi R^2 h_r (0.8 - 0.096) / 0.992;
+      // the bowl pi R^2 D / 2.
+      o.rim = (o.ejecta * o.depth) / (4 * (0.704 / 0.992));
+      const c = e.center as GroundPoint,
+        pad = o.radius * 5.5;
+      return make([c[0] - pad, c[1] - pad, c[0] + pad, c[1] + pad], end + o.heaveTime);
+    }
     case 'slide': {
       if (!point(e.from) || !point(e.to)) bad(kind, 'from and to must be [x, z] points.');
       const a = e.from as GroundPoint,
@@ -836,6 +877,36 @@ export function sampleEvent(e: ResolvedEvent, x: number, z: number, t: number, b
           dh += lift;
           soil = Math.max(soil, smooth(0, 0.05, lift));
         }
+      }
+      out[0] += dh;
+      cover(out, 'soil', soil);
+      return;
+    }
+    case 'crater': {
+      const c = (e.source as CraterEvent).center,
+        r = Math.hypot(x - c[0], z - c[1]),
+        age = t - e.start,
+        rim = o.radius * (1 + rough * 0.15 * wobble(x, z, o.radius * 0.5, o.seed));
+      if (age < o.heaveTime) {
+        const tau = age / o.heaveTime,
+          rho = r / (o.domeSpread * rim);
+        if (rho < 1) out[0] += o.heave * runoutProgress(tau) * (1 - rho * rho) ** 2;
+        return;
+      }
+      const q = runoutProgress(clamp01((age - o.heaveTime) / e.duration)),
+        R = rim * (0.5 + 0.5 * q),
+        rhoD = r / (o.domeSpread * rim),
+        rho = r / R;
+      let dh = rhoD < 1 ? o.heave * (1 - q) * (1 - rhoD * rhoD) ** 2 : 0,
+        soil = 0;
+      if (rho < 1) {
+        // The bowl, its lip rising over the last 15 percent of the radius to the blanket's height at the rim.
+        dh += -o.depth * q * (1 - rho * rho) + o.rim * q * smooth(0.85, 1, rho);
+        soil = 1;
+      } else if (rho < 5) {
+        const blanket = (o.rim * q * (rho ** -3 - 1 / 125)) / (1 - 1 / 125);
+        dh += blanket;
+        soil = smooth(0, 0.05, blanket);
       }
       out[0] += dh;
       cover(out, 'soil', soil);

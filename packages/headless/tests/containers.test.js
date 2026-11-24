@@ -99,11 +99,7 @@ function boxes(bytes, from = 0, to = bytes.length) {
       size = Number(view.getBigUint64(from + 8));
       head = 16;
     }
-    out.push({
-      type: String.fromCharCode(...bytes.subarray(from + 4, from + 8)),
-      start: from + head,
-      end: from + size,
-    });
+    out.push({ type: String.fromCharCode(...bytes.subarray(from + 4, from + 8)), start: from + head, end: from + size });
     from += size;
   }
   return out;
@@ -231,12 +227,8 @@ test('AV1 units are stored without temporal delimiters or padding, and an AV1 MP
   assert.deepEqual([u32(mp4, stsz.start + 12), u32(mp4, stsz.start + 16)], [SEQUENCE_HEADER.length + 4, 4]);
   assert.deepEqual([...mp4.subarray(mdat.start, mdat.end)], [...SEQUENCE_HEADER, ...FRAME, ...FRAME]);
 
-  const webm = (
-    await encodeVideo([frame()], {
-      codec: 'av01.0.04M.08',
-      webCodecs: codecs({ payload: () => unit(0).subarray(0, -1) }),
-    })
-  ).bytes;
+  const webm = (await encodeVideo([frame()], { codec: 'av01.0.04M.08', webCodecs: codecs({ payload: () => unit(0).subarray(0, -1) }) }))
+    .bytes;
   const segment = elements(webm).find((one) => one.id === 0x18538067),
     [cluster] = inside(webm, segment, 0x1f43b675),
     [block] = inside(webm, cluster, 0xa3);
@@ -245,43 +237,14 @@ test('AV1 units are stored without temporal delimiters or padding, and an AV1 MP
 
 test('an AV1 unit that cannot be walked is stored as the encoder gave it', async () => {
   const broken = Uint8Array.of(0x12, 0x00, 0x32, 0x09, 0x10); // A frame OBU whose size runs past the end
-  const mp4 = (
-    await encodeVideo([frame()], {
-      format: 'mp4',
-      codec: 'av01.0.04M.08',
-      webCodecs: codecs({ payload: () => broken }),
-    })
-  ).bytes;
+  const mp4 = (await encodeVideo([frame()], { format: 'mp4', codec: 'av01.0.04M.08', webCodecs: codecs({ payload: () => broken }) }))
+    .bytes;
   const mdat = find(mp4, null, 'mdat');
   assert.deepEqual([...mp4.subarray(mdat.start, mdat.end)], [...broken]);
 });
 
 test('H.265 in MP4: an hvc1 or hev1 entry with the encoder record as hvcC, asked for in length-prefixed form', async () => {
-  const record = Uint8Array.of(
-    1,
-    1,
-    0x60,
-    0,
-    0,
-    0,
-    0x90,
-    0,
-    0,
-    0,
-    0,
-    0,
-    93,
-    0xf0,
-    0,
-    0xfc,
-    0xfd,
-    0xf8,
-    0xf8,
-    0,
-    0,
-    0x0f,
-    0,
-  );
+  const record = Uint8Array.of(1, 1, 0x60, 0, 0, 0, 0x90, 0, 0, 0, 0, 0, 93, 0xf0, 0, 0xfc, 0xfd, 0xf8, 0xf8, 0, 0, 0x0f, 0);
   for (const codec of ['hvc1.1.6.L93.B0', 'hev1.1.6.L93.B0']) {
     const asked = [],
       webCodecs = codecs({ payload: () => Uint8Array.of(0, 0, 0, 2, 0x26, 0x01) });
@@ -297,11 +260,7 @@ test('H.265 in MP4: an hvc1 or hev1 entry with the encoder record as hvcC, asked
     };
     const video = await encodeVideo([frame()], { format: 'mp4', codec, webCodecs }),
       bytes = video.bytes,
-      stbl = find(
-        bytes,
-        find(bytes, find(bytes, find(bytes, find(bytes, null, 'moov'), 'trak'), 'mdia'), 'minf'),
-        'stbl',
-      ),
+      stbl = find(bytes, find(bytes, find(bytes, find(bytes, find(bytes, null, 'moov'), 'trak'), 'mdia'), 'minf'), 'stbl'),
       entry = find(bytes, find(bytes, stbl, 'stsd'), codec.slice(0, 4), 8),
       hvcC = find(bytes, entry, 'hvcC', 78);
     assert.deepEqual(asked[0].hevc, { format: 'hevc' });
@@ -310,52 +269,23 @@ test('H.265 in MP4: an hvc1 or hev1 entry with the encoder record as hvcC, asked
     assert.equal(video.mimeType, `video/mp4; codecs="${codec}"`);
   }
   const silent = codecs();
-  await assert.rejects(
-    encodeVideo([frame()], { format: 'mp4', codec: 'hvc1.1.6.L93.B0', webCodecs: silent }),
-    /H\.265/,
-  );
+  await assert.rejects(encodeVideo([frame()], { format: 'mp4', codec: 'hvc1.1.6.L93.B0', webCodecs: silent }), /H\.265/);
   await assert.rejects(encodeVideo([frame()], { codec: 'hvc1.1.6.L93.B0', webCodecs: silent }), /does not fit/);
 });
 
 /** A sequence header OBU (AV1 5.5) with tier-high level 8, 4:2:0 at sample position 2, profile 0, 8 bits. */
 function sequenceHeader() {
   const fields = [
-    [0, 3],
-    [0, 1],
-    [0, 1], // profile, still_picture, reduced_still_picture_header
-    [0, 1],
-    [0, 1],
-    [0, 5], // timing_info_present_flag, initial_display_delay_present_flag, operating_points_cnt_minus_1
-    [0, 12],
-    [8, 5],
-    [1, 1], // operating_point_idc, seq_level_idx, seq_tier
-    [15, 4],
-    [15, 4],
-    [639, 16],
-    [359, 16], // frame size bits and maxima
-    [0, 1],
-    [0, 1],
-    [1, 1],
-    [1, 1], // frame ids, 128x128, filter intra, intra edge
-    [0, 4],
-    [1, 1],
-    [0, 2], // compound and warp tools, enable_order_hint, jnt_comp and ref_frame_mvs
-    [1, 1],
-    [1, 1],
-    [6, 3], // choose screen content tools, choose integer mv, order_hint_bits_minus_1
-    [0, 1],
-    [1, 1],
-    [1, 1], // superres, cdef, restoration
-    [0, 1],
-    [0, 1],
-    [1, 1],
-    [1, 8],
-    [13, 8],
-    [1, 8], // high_bitdepth, mono_chrome, colour description
-    [0, 1],
-    [2, 2],
-    [0, 1],
-    [1, 1], // color_range, chroma_sample_position, separate_uv_delta_q, trailing one
+    [0, 3], [0, 1], [0, 1], // profile, still_picture, reduced_still_picture_header
+    [0, 1], [0, 1], [0, 5], // timing_info_present_flag, initial_display_delay_present_flag, operating_points_cnt_minus_1
+    [0, 12], [8, 5], [1, 1], // operating_point_idc, seq_level_idx, seq_tier
+    [15, 4], [15, 4], [639, 16], [359, 16], // frame size bits and maxima
+    [0, 1], [0, 1], [1, 1], [1, 1], // frame ids, 128x128, filter intra, intra edge
+    [0, 4], [1, 1], [0, 2], // compound and warp tools, enable_order_hint, jnt_comp and ref_frame_mvs
+    [1, 1], [1, 1], [6, 3], // choose screen content tools, choose integer mv, order_hint_bits_minus_1
+    [0, 1], [1, 1], [1, 1], // superres, cdef, restoration
+    [0, 1], [0, 1], [1, 1], [1, 8], [13, 8], [1, 8], // high_bitdepth, mono_chrome, colour description
+    [0, 1], [2, 2], [0, 1], [1, 1], // color_range, chroma_sample_position, separate_uv_delta_q, trailing one
   ];
   const bits = fields.flatMap(([value, size]) => Array.from({ length: size }, (_, i) => (value >> (size - 1 - i)) & 1));
   while (bits.length % 8) bits.push(0);
@@ -369,9 +299,8 @@ test('the AV1 record is read from the sequence header the encoder wrote, which f
     unit = () => Uint8Array.from([...TEMPORAL_DELIMITER, ...header, ...FRAME]),
     expected = [0x81, 8, 0x80 | 0x08 | 0x04 | 2, 0, ...header];
   // The codec string names level 5.1 main tier; the stream says level 8 (4.0) high tier.
-  const mp4 = (
-    await encodeVideo([frame()], { format: 'mp4', codec: 'av01.0.13M.08', webCodecs: codecs({ payload: unit }) })
-  ).bytes;
+  const mp4 = (await encodeVideo([frame()], { format: 'mp4', codec: 'av01.0.13M.08', webCodecs: codecs({ payload: unit }) }))
+    .bytes;
   const stbl = find(mp4, find(mp4, find(mp4, find(mp4, find(mp4, null, 'moov'), 'trak'), 'mdia'), 'minf'), 'stbl'),
     entry = find(mp4, find(mp4, stbl, 'stsd'), 'av01', 8),
     av1C = find(mp4, entry, 'av1C', 78);
@@ -388,9 +317,8 @@ test('a sequence header that ends before its colour fields leaves the AV1 record
   const whole = sequenceHeader(),
     cut = [whole[0], 6, ...whole.slice(2, 8)],
     unit = () => Uint8Array.from([...TEMPORAL_DELIMITER, ...cut, ...FRAME]);
-  const mp4 = (
-    await encodeVideo([frame()], { format: 'mp4', codec: 'av01.0.13M.08', webCodecs: codecs({ payload: unit }) })
-  ).bytes;
+  const mp4 = (await encodeVideo([frame()], { format: 'mp4', codec: 'av01.0.13M.08', webCodecs: codecs({ payload: unit }) }))
+    .bytes;
   const stbl = find(mp4, find(mp4, find(mp4, find(mp4, find(mp4, null, 'moov'), 'trak'), 'mdia'), 'minf'), 'stbl'),
     entry = find(mp4, find(mp4, stbl, 'stsd'), 'av01', 8),
     av1C = find(mp4, entry, 'av1C', 78);
@@ -399,11 +327,7 @@ test('a sequence header that ends before its colour fields leaves the AV1 record
 
 test('frames with their own times: variable durations in MP4 and WebM, keys by time, times from the first frame', async () => {
   const timed = (times, last) =>
-      times.map((timestamp, i) => ({
-        ...frame(i),
-        timestamp,
-        ...(i === times.length - 1 && last ? { duration: last } : {}),
-      })),
+      times.map((timestamp, i) => ({ ...frame(i), timestamp, ...(i === times.length - 1 && last ? { duration: last } : {}) })),
     mp4 = await encodeVideo(timed([1, 1.1, 1.25, 1.3]), {
       format: 'mp4',
       codec: 'vp09.00.10.08',
@@ -429,10 +353,7 @@ test('frames with their own times: variable durations in MP4 and WebM, keys by t
     [2, 500],
   ]);
   // A key frame once keyFrameInterval seconds have passed since the last: at 0 and 0.25 seconds.
-  assert.deepEqual(
-    [u32(mp4.bytes, stss.start + 4), u32(mp4.bytes, stss.start + 8), u32(mp4.bytes, stss.start + 12)],
-    [2, 1, 3],
-  );
+  assert.deepEqual([u32(mp4.bytes, stss.start + 4), u32(mp4.bytes, stss.start + 8), u32(mp4.bytes, stss.start + 12)], [2, 1, 3]);
 
   const webm = await encodeVideo(timed([0, 0.1, 0.25, 0.3], 0.2), { fps: 10, webCodecs: codecs() }),
     segment = elements(webm.bytes).find((one) => one.id === 0x18538067),

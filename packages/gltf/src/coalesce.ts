@@ -106,7 +106,12 @@ function bakeVertex(
   dst.set(src.subarray(12, 20), o + 12);
 }
 
-function batchPrimitive(node: Mesh, material: PBRMaterial, vertices: Float32Array, indices: Uint32Array): PBRPrimitive {
+function batchPrimitive(
+  node: Mesh,
+  material: PBRMaterial,
+  vertices: Float32Array,
+  indices: Uint32Array,
+): PBRPrimitive {
   return {
     node,
     nodeIndex: -1,

@@ -124,8 +124,7 @@ const f = (v: number) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
  *
  * A stage with `coverDeclaration` (a ring `GrassScatter` draws by coverage) keeps every blade instead, draws it the
  * filter's radius wider on each side across its screen axis and hands the fragment its pixel distance across and true
- * half width for the tent filter of `coverCode`, so a blade adds its true share of each pixel, and a hash of the blade
- * as the coverage above which its coverage-depth stage writes depth (`coverCode` with `depth`). A stage with
+ * half width for the tent filter of `coverCode`, so a blade adds its true share of each pixel. A stage with
  * `splitDeclaration` alone draws the blade's opaque core, the filter's radius in from each edge, writing depth.
  */
 export function grassPoseCode(code: string, shape: GrassShape = {}): string {
@@ -155,17 +154,17 @@ fn grassVertex(p:vec3f,position:vec4f,wide:f32,pix:f32,view:vec3f)->GrassVertex 
  let heading=grassHash(seed^0xb5297a4du)*6.2831853;let dir=vec3f(cos(heading),0.0,sin(heading));let right=vec3f(-dir.z,0.0,dir.x);
  let foot=1.5*pix;let w=${f(s.width)};let face=sqrt(max(1.0-dot(view,right)*dot(view,right),0.0));let seen=max(face,0.25);let wp=w*face;
 ${
-  cover || split
-    ? ` let grow=1.0;let t=along;
+   cover || split
+     ? ` let grow=1.0;let t=along;
 `
-    : ` var keep=select(select(wp*wp/(wp*wp+foot*foot),wp/(2.0*foot),wp<foot),1.0,foot<=0.0);
+     : ` var keep=select(select(wp*wp/(wp*wp+foot*foot),wp/(2.0*foot),wp<foot),1.0,foot<=0.0);
  keep=select(keep,0.0,face<0.25&&wp<foot);
  let t=along;
  let band=max(min(0.05,2.0*min(keep,1.0-keep)),1e-6);
  let grow=select(clamp((keep-grassHash(seed^0x2c1b3c6du))/band+0.5,0.0,1.0),1.0,keep>=1.0);
  if(grow<=0.0){return GrassVertex(vec3f(0.0),vec3f(0.0,1.0,0.0));}
 `
-} let height=grow*${f(s.height)}*(1.0-${f(s.heightVariance)}*grassHash(seed^0x1b56c4e9u));
+ } let height=grow*${f(s.height)}*(1.0-${f(s.heightVariance)}*grassHash(seed^0x1b56c4e9u));
  let lean=${f(s.lean)}*(0.25+0.75*grassHash(seed^0x7f4a7c15u));
  // Root (0,0,0), control point straight above at the blade's height, tip leaning along dir at the same length.
  let ctrl=vec3f(0.0,height,0.0);let tip=vec3f(0.0,height*sqrt(1.0-lean*lean),0.0)+dir*(height*lean);
@@ -181,18 +180,17 @@ ${
  perp=select(perp,-perp,dot(perp,right)<0.0);let rp=dot(right,perp);let h=0.5*wt*rp/max(pix,1e-30);
  let far=clamp((8.0-height/max(pix,1e-30))/4.0,0.0,1.0);let fr=select(1.0,2.0,far>0.0);
 ${
-  cover
-    ? // Covered: the true strip plus the filter's radius each side, with the pixel distance from the centre line
-      // and the true half width in pixels; w, the blade's hashed depth threshold (`coverCode` depth), so a blade
-      // writes depth with the chance of its coverage and the pattern holds still on the blade.
-      ` let across=select(right*(side*0.5*wt),right*(side*0.5*wt)+perp*(side*fr*pix),pix>0.0);
- scatterCover=select(vec4f(0.0,65536.0,0.0,0.5),vec4f(side*(h+fr),h,far,grassHash(seed^0x3c6ef372u)),pix>0.0);
+   cover
+     ? // Covered: the true strip plus the filter's radius each side, with the pixel distance from the centre line
+       // and the true half width in pixels.
+       ` let across=select(right*(side*0.5*wt),right*(side*0.5*wt)+perp*(side*fr*pix),pix>0.0);
+ scatterCover=select(vec3f(0.0,65536.0,0.0),vec3f(side*(h+fr),h,far),pix>0.0);
 `
-    : // The opaque core of a split ring: the strip less the filter's radius each side, which the covered stage
-      // covers fully.
-      ` let across=right*(side*select(0.5*wt,max(h-fr,0.0)*pix/max(rp,1e-3),pix>0.0));
+     : // The opaque core of a split ring: the strip less the filter's radius each side, which the covered stage
+       // covers fully.
+       ` let across=right*(side*select(0.5*wt,max(h-fr,0.0)*pix/max(rp,1e-3),pix>0.0));
 `
-}`
+ }`
      : ` let drawn=max(wt,foot/seen);let across=right*(side*0.5*drawn);
 `
  } let at=vec3f((root.x+spine.x)/wide,spine.y,(root.z+spine.z)/wide)+vec3f(across.x,across.y*wide,across.z);

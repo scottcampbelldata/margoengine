@@ -195,42 +195,10 @@ function slabs(rects: readonly Rect[], z: number, grouped: boolean, frame: Rect)
       [0, 0, -1],
     );
     // The four edges, each facing out of its rectangle.
-    quad(
-      [
-        [x0, y0, -z],
-        [x0, y0, z],
-        [x0, y1, z],
-        [x0, y1, -z],
-      ],
-      [-1, 0, 0],
-    );
-    quad(
-      [
-        [x1, y0, z],
-        [x1, y0, -z],
-        [x1, y1, -z],
-        [x1, y1, z],
-      ],
-      [1, 0, 0],
-    );
-    quad(
-      [
-        [x0, y1, z],
-        [x1, y1, z],
-        [x1, y1, -z],
-        [x0, y1, -z],
-      ],
-      [0, 1, 0],
-    );
-    quad(
-      [
-        [x0, y0, -z],
-        [x1, y0, -z],
-        [x1, y0, z],
-        [x0, y0, z],
-      ],
-      [0, -1, 0],
-    );
+    quad([[x0, y0, -z], [x0, y0, z], [x0, y1, z], [x0, y1, -z]], [-1, 0, 0]);
+    quad([[x1, y0, z], [x1, y0, -z], [x1, y1, -z], [x1, y1, z]], [1, 0, 0]);
+    quad([[x0, y1, z], [x1, y1, z], [x1, y1, -z], [x0, y1, -z]], [0, 1, 0]);
+    quad([[x0, y0, -z], [x1, y0, -z], [x1, y0, z], [x0, y0, z]], [0, -1, 0]);
   }
   const data: GeometryData = {
     positions: Float32Array.from(positions),

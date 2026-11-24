@@ -28,12 +28,7 @@ const fakeDevice = (features = []) => {
     features: new Set(features),
     lost: new Promise(() => {}),
     createTexture(d) {
-      const texture = {
-        ...d,
-        destroyed: false,
-        createView: () => ({ of: texture }),
-        destroy: () => (texture.destroyed = true),
-      };
+      const texture = { ...d, destroyed: false, createView: () => ({ of: texture }), destroy: () => (texture.destroyed = true) };
       made.push(texture);
       return texture;
     },
@@ -56,10 +51,7 @@ test('a store is textureStore into a write-only binding, and a load in another p
     read = new ComputePass(t.pixels, (i) => out.store(i, t.load(t.coord(i))));
   assert.equal(t.pixels, 128);
   assert.match(write.code, /var ndw0:texture_storage_2d<rgba8unorm, write>;/);
-  assert.match(
-    write.code,
-    /textureStore\(ndw0, vec2u\(gid\.x % 16u, gid\.x \/ 16u\), vec4f\(1\.0, 0\.0, 0\.0, 1\.0\)\);/,
-  );
+  assert.match(write.code, /textureStore\(ndw0, vec2u\(gid\.x % 16u, gid\.x \/ 16u\), vec4f\(1\.0, 0\.0, 0\.0, 1\.0\)\);/);
   assert.match(read.code, /var ndr\d:texture_2d<f32>;/);
   assert.match(read.code, /textureLoad\(ndr\d, vec2u\(.*\), 0\)/);
 });
@@ -143,12 +135,7 @@ test('texture() samples the front image in materials, passes and compute; format
   assert.match(new NodePass(texture(t, uv()).rgb).code(), /textureSample\(/);
   const [view, sampler] = t.bind(device);
   assert.equal(view.of, t.texture(device));
-  assert.deepEqual(sampler.sampler, {
-    magFilter: 'nearest',
-    minFilter: 'nearest',
-    addressModeU: 'repeat',
-    addressModeV: 'repeat',
-  });
+  assert.deepEqual(sampler.sampler, { magFilter: 'nearest', minFilter: 'nearest', addressModeU: 'repeat', addressModeV: 'repeat' });
   assert.equal(t.bind(device)[1], sampler, 'one sampler per device');
   t.swap();
   assert.notEqual(t.bind(device)[0], view);

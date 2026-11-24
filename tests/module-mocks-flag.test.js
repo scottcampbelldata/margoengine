@@ -19,8 +19,7 @@ export function testScripts() {
   const found = [];
   for (const manifest of manifests) {
     const scripts = JSON.parse(readFileSync(join(root, manifest), 'utf8')).scripts ?? {};
-    for (const [name, command] of Object.entries(scripts))
-      if (/\bnode\b[^&|]*\s--test(\s|$)/.test(command)) found.push([manifest, name, command]);
+    for (const [name, command] of Object.entries(scripts)) if (/\bnode\b[^&|]*\s--test(\s|$)/.test(command)) found.push([manifest, name, command]);
   }
   return found;
 }
@@ -36,9 +35,7 @@ export function filesOf(manifest, command) {
         if (segment === '..' || !segment.includes('*')) return [join(path, segment)];
         if (!existsSync(path) || !statSync(path).isDirectory()) return [];
         const pattern = new RegExp(`^${segment.replace(/\./g, '\.').replace(/\*/g, '.*')}$`);
-        return readdirSync(path)
-          .filter((entry) => pattern.test(entry))
-          .map((entry) => join(path, entry));
+        return readdirSync(path).filter((entry) => pattern.test(entry)).map((entry) => join(path, entry));
       });
     }
     files.push(...paths.filter((path) => existsSync(path) && statSync(path).isFile()));
@@ -69,8 +66,7 @@ test('no package script runs a file that mocks a module without the module-mocks
   for (const [manifest, name, command] of testScripts()) {
     if (command.includes(FLAG)) continue;
     for (const file of filesOf(manifest, command))
-      if (mocksHere(readFileSync(file, 'utf8')))
-        problems.push(`${manifest} ${name} runs ${relative(root, file)} without ${FLAG}`);
+      if (mocksHere(readFileSync(file, 'utf8'))) problems.push(`${manifest} ${name} runs ${relative(root, file)} without ${FLAG}`);
   }
   assert.deepEqual(problems, []);
 });

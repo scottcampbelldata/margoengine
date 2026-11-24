@@ -93,30 +93,16 @@ test('a skin sets the shape in STL, and the skinned node own transform does not 
 
 test('OBJ, PLY and DAE write the same shape', () => {
   const obj = exportOBJ(bent()).obj,
-    vertex = obj
-      .split('\n')
-      .filter((line) => line.startsWith('v '))[1]
-      .split(' ')
-      .slice(1)
-      .map(Number);
+    vertex = obj.split('\n').filter((line) => line.startsWith('v '))[1].split(' ').slice(1).map(Number);
   near(vertex, [0, 1, 0], 1e-6, 'obj');
   const ply = exportPLY(bent(), { ...raw, binary: false });
   assert.match(ply, /\n-?[\d.e-]+ 1 -?[\d.e-]+/, 'a PLY vertex at y = 1');
   const dae = exportDAE(bent()),
-    floats = /<float_array[^>]*positions[^>]*>([^<]*)</
-      .exec(dae.dae ?? dae.text ?? dae)[1]
-      .trim()
-      .split(/\s+/)
-      .map(Number),
+    floats = /<float_array[^>]*positions[^>]*>([^<]*)</.exec(dae.dae ?? dae.text ?? dae)[1].trim().split(/\s+/).map(Number),
     matrix = /<matrix[^>]*>([^<]*)</.exec((dae.dae ?? dae.text ?? dae).split('strip').slice(-1)[0]);
   const m = matrix ? matrix[1].trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     [x, y, z] = floats.slice(3, 6);
-  near(
-    [0, 1, 2].map((r) => m[r * 4] * x + m[r * 4 + 1] * y + m[r * 4 + 2] * z + m[r * 4 + 3]),
-    [0, 1, 0],
-    1e-5,
-    'dae',
-  );
+  near([0, 1, 2].map((r) => m[r * 4] * x + m[r * 4 + 1] * y + m[r * 4 + 2] * z + m[r * 4 + 3]), [0, 1, 0], 1e-5, 'dae');
 });
 
 test('weights that do not add to one are normalized, and morph weights apply before the skin', () => {
@@ -160,17 +146,11 @@ test('RobotExpressive stands up in STL and PLY by default: readers take Z as up,
   near(min, [-1.521, -1.416, -0.02], 2e-3, 'min');
   near(max, [1.579, 1.269, 4.441], 2e-3, 'max');
   const { faces } = readSTL(exportSTL(engine));
-  for (const {
-    normal,
-    corners: [a, b, c],
-  } of faces.slice(0, 500)) {
+  for (const { normal, corners: [a, b, c] } of faces.slice(0, 500)) {
     const u = b.map((v, i) => v - a[i]),
       w = c.map((v, i) => v - a[i]),
       cross = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
-    assert.ok(
-      cross[0] * normal[0] + cross[1] * normal[1] + cross[2] * normal[2] >= 0,
-      'stored normal agrees with the winding',
-    );
+    assert.ok(cross[0] * normal[0] + cross[1] * normal[1] + cross[2] * normal[2] >= 0, 'stored normal agrees with the winding');
   }
   const ply = exportPLY(engine).split('\n'),
     first = ply.indexOf('end_header') + 1,
@@ -237,10 +217,7 @@ test('Fox as OBJ: its shape and UVs without asking for more, its own texture byt
 test('RobotExpressive as OBJ: the skinned shape, and one MTL entry for each material the file has', async () => {
   const { engine, model } = await load('robot-expressive.glb'),
     { obj, mtl } = exportOBJ(engine, { materials: true }),
-    points = obj
-      .split('\n')
-      .filter((line) => line.startsWith('v '))
-      .map((line) => line.split(' ').slice(1).map(Number));
+    points = obj.split('\n').filter((line) => line.startsWith('v ')).map((line) => line.split(' ').slice(1).map(Number));
   near(box(points).max, [1.579, 4.441, 1.416], 2e-3, 'max');
   assert.equal(mtl.split('\n').filter((line) => line.startsWith('newmtl ')).length, model.asset.doc.materials.length);
 });

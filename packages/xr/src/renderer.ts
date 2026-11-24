@@ -240,14 +240,7 @@ export class StereoRenderer {
       });
       if (layers !== undefined) {
         const box = image.viewport;
-        frame.view = {
-          id: `xr-${eye}`,
-          camera,
-          viewport: [box.x, box.y, box.width, box.height],
-          index: eye,
-          count: viewer.views.length,
-          layers,
-        };
+        frame.view = { id: `xr-${eye}`, camera, viewport: [box.x, box.y, box.width, box.height], index: eye, count: viewer.views.length, layers };
       }
       const context = {
         ...this.context!,
@@ -357,9 +350,8 @@ export class StereoRenderer {
         })
         .end();
     }
-    if (onEye)
-      for (const [index, view] of viewer.views.entries())
-        if (onEye({ index, device, encoder, image: binding.getViewSubImage(layer, view), view }) === false) return;
+    if (onEye) for (const [index, view] of viewer.views.entries())
+      if (onEye({ index, device, encoder, image: binding.getViewSubImage(layer, view), view }) === false) return;
     device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
   }

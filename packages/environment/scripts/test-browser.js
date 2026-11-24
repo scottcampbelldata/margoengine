@@ -15,7 +15,7 @@ const server = await createServer({
   plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
-  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
+  server: { port: 0 },
 });
 await server.listen();
 let browser;
@@ -47,7 +47,10 @@ try {
   const report = await page.evaluate((fn) => window[fn](), run);
   report.browser = browser.version();
   assert.deepEqual(errors, []);
-  await writeFile(resolve(results, `${name}-browser.json`), JSON.stringify(report, null, 2));
+  await writeFile(
+    resolve(results, `${name}-browser.json`),
+    JSON.stringify(report, null, 2),
+  );
   console.log(JSON.stringify(report, null, 2));
   console.log(`${report.checks.length} browser checks passed`);
 } finally {

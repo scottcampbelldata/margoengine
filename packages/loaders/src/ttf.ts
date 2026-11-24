@@ -41,30 +41,15 @@ export interface VariationState {
   readonly coordinates: number[];
   readonly hasGlyphVariations: boolean;
   advance(glyph: number): number | undefined;
-  deltas(
-    glyph: number,
-    points: readonly (readonly number[])[],
-    ends: readonly number[],
-    composite?: boolean,
-  ): [number[], number[]];
+  deltas(glyph: number, points: readonly (readonly number[])[], ends: readonly number[], composite?: boolean): [number[], number[]];
 }
 
 /** What `openType` holds (internal: only `@margoengine/loaders/font-opentype` builds it). */
 export interface OpenTypeReaderSet extends OpenTypeReaders {
-  cff(
-    table: BinaryReader,
-    cff2: boolean,
-    glyphCount: number,
-    unitsPerEm: number,
-    coordinates: readonly number[],
-  ): {
+  cff(table: BinaryReader, cff2: boolean, glyphCount: number, unitsPerEm: number, coordinates: readonly number[]): {
     commands(glyph: number): OutlineCommand[];
   };
-  variations(
-    tables: Map<string, BinaryReader>,
-    glyphCount: number,
-    values: Readonly<Record<string, number>>,
-  ): VariationState;
+  variations(tables: Map<string, BinaryReader>, glyphCount: number, values: Readonly<Record<string, number>>): VariationState;
 }
 
 /** What `parseTTFSource` reads: an `OutlineFontSource` plus the font's variation state and raw tables. */
@@ -460,10 +445,7 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
       deltas: () => [[], []],
     };
   }
-  const cff =
-    kind === 'glyf'
-      ? undefined
-      : readers!.cff(view(all.get(kind)!), kind === 'CFF2', glyphCount, unitsPerEm, variations.coordinates);
+  const cff = kind === 'glyf' ? undefined : readers!.cff(view(all.get(kind)!), kind === 'CFF2', glyphCount, unitsPerEm, variations.coordinates);
   const glyf = kind === 'glyf' ? need(all, 'glyf', 0) : undefined,
     loca = kind === 'glyf' ? need(all, 'loca', 2) : undefined;
   if (loca && loca.length < (glyphCount + 1) * (longOffsets ? 4 : 2))
@@ -563,8 +545,7 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
     }
     // Composite: components, each with a transform and an offset or matched points. All are read first, because a
     // variable font's gvar moves each component's offset by one delta per component.
-    const parts: { flags: number; glyph: number; arg1: number; arg2: number; m: [number, number, number, number] }[] =
-      [];
+    const parts: { flags: number; glyph: number; arg1: number; arg2: number; m: [number, number, number, number] }[] = [];
     let p = at + 10,
       flags: number;
     do {

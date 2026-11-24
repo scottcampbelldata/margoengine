@@ -138,12 +138,6 @@ CPU machinery tools work with either backend. Section rendering requires WebGPU;
 
 `SectionPlanes` also clips native primitives loaded by `@margoengine/gltf/pbr` and their directional shadows from `@margoengine/shadows`. Both renderers reuse the existing section uniform and world-space plane test. Use `{ cap: false }` for loaded models: stencil caps currently draw core geometry only. Attached sections redraw the directional shadow atlas each frame so editing planes or `enabled` cannot leave stale shadows; removing sections restores normal caching.
 
-Scene sections reserve their own mesh-shader uniform binding so they can run with directional shadows and clustered
-lights. The section pass runs before the lighting passes so clipped objects cast matching shadows. The GPU
-regression draws both a capped solid and an open sheet with both light providers active. See the W3C specifications
-for the [WGSL resource interface](https://www.w3.org/TR/WGSL/#resource-interface) and
-[WebGPU pipeline layout validation](https://www.w3.org/TR/webgpu/#pipeline-layout).
-
 Three more entries draw on top of the scene:
 
 - `margoengine/machinery/edges`: `FeatureEdges`, CAD feature lines (faces meeting above an angle, plus open boundaries) drawn with GPU culling and level of detail; `featureEdges(geometry, angle)` returns the edge index pairs on the CPU.

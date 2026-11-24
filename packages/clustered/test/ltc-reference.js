@@ -210,28 +210,12 @@ export function blocked(q, p, { center, right, up, recess, sill }) {
     boxes = [];
   if (recess > 0)
     boxes.push(
-      [
-        [-big, -big, 0],
-        [-1, big, recess],
-      ],
-      [
-        [1, -big, 0],
-        [big, big, recess],
-      ],
-      [
-        [-1, 1, 0],
-        [1, big, recess],
-      ],
-      [
-        [-1, -big, 0],
-        [1, -1, recess],
-      ],
+      [[-big, -big, 0], [-1, big, recess]],
+      [[1, -big, 0], [big, big, recess]],
+      [[-1, 1, 0], [1, big, recess]],
+      [[-1, -big, 0], [1, -1, recess]],
     );
-  if (sill > 0)
-    boxes.push([
-      [-big, -big, recess],
-      [big, -1, recess + sill],
-    ]);
+  if (sill > 0) boxes.push([[-big, -big, recess], [big, -1, recess + sill]]);
   return boxes.some(([lo, hi]) => {
     let t0 = 1e-9,
       t1 = 1 - 1e-9;

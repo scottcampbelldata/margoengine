@@ -9,19 +9,11 @@ import { parseBVH } from '../packages/loaders/dist/mocap.js';
 import { addRootMotion } from '../packages/animator/dist/index.js';
 import { addDistanceWarp, addWarping } from '../packages/animator/dist/warping.js';
 import { addMotionMatching, MotionDatabase } from '../packages/animator/dist/motion-matching.js';
-import {
-  animatorDocument,
-  animatorRun,
-  CMU_SCALE,
-  largestGap,
-  mocapClip,
-  mocapJoints,
-} from './support/animator-rig.js';
+import { animatorDocument, animatorRun, CMU_SCALE, largestGap, mocapClip, mocapJoints } from './support/animator-rig.js';
 
 const DT = 1 / 120;
 const FEET = ['LeftFoot', 'RightFoot'];
-const take = (name) =>
-  parseBVH(readFileSync(new URL(`fixtures/cmu-mocap/${name}.bvh`, import.meta.url)), { scale: CMU_SCALE });
+const take = (name) => parseBVH(readFileSync(new URL(`fixtures/cmu-mocap/${name}.bvh`, import.meta.url)), { scale: CMU_SCALE });
 const mm = (metres) => `${(metres * 1000).toFixed(1)} mm`;
 const span = (points) => {
   const range = (c) => Math.max(...points.map((p) => p[c])) - Math.min(...points.map((p) => p[c]));
@@ -36,11 +28,7 @@ async function player(bvh) {
     i = (name) => f.index.get(name);
   f.pelvis = i('Hips');
   f.spine = [i('Spine'), i('Spine1')];
-  f.legs = ['Left', 'Right'].map((side) => ({
-    hip: i(`${side}UpLeg`),
-    knee: i(`${side}Leg`),
-    ankle: i(`${side}Foot`),
-  }));
+  f.legs = ['Left', 'Right'].map((side) => ({ hip: i(`${side}UpLeg`), knee: i(`${side}Leg`), ankle: i(`${side}Foot`) }));
   return f;
 }
 // The ankle under 0.2 m/s for over 8 frames counts as planted: no label in the file says so.
@@ -123,13 +111,7 @@ test('the takes are what the lab says: a person in metres, walking on real feet'
   assert.ok(own > 0.01 && own < 0.025, `the capture's own foot slide is ${mm(own)}: real feet do not hold still`);
 });
 
-for (const [speed, limit] of [
-  [0.7, 0.03],
-  [1, 0.03],
-  [1.4, 0.03],
-  [1.8, 0.045],
-  [3, 0.055],
-]) {
+for (const [speed, limit] of [[0.7, 0.03], [1, 0.03], [1.4, 0.03], [1.8, 0.045], [3, 0.055]]) {
   test(`a real walk at ${speed} m/s keeps its planted feet near the capture's own slide, and without the warp does not`, async () => {
     const warped = await walked(walk, walkPlants, { speed }),
       bare = await walked(walk, walkPlants, { speed, warped: false });
@@ -138,10 +120,7 @@ for (const [speed, limit] of [
   });
 }
 
-for (const [degrees, limit] of [
-  [45, 0.04],
-  [90, 0.055],
-]) {
+for (const [degrees, limit] of [[45, 0.04], [90, 0.055]]) {
   test(`a real walk ${degrees} degrees off the facing holds its feet`, async () => {
     const { worst } = await walked(walk, walkPlants, { speed: 1.3, angle: (degrees * Math.PI) / 180 });
     assert.ok(worst < limit, `slid ${mm(worst)}`);
@@ -188,16 +167,7 @@ test('a real stop, driven by distance, follows the distance left to its mark', a
 });
 
 // Motion matching on the same lab's clips, with no speed labelled by hand.
-const TAKES = {
-  Slow: '16_15',
-  Walk: '16_47',
-  Fast: '16_21',
-  Jog: '16_36',
-  Run: '16_45',
-  Veer: '16_11',
-  Begin: '16_32',
-  Stop: '16_57',
-};
+const TAKES = { Slow: '16_15', Walk: '16_47', Fast: '16_21', Jog: '16_36', Run: '16_45', Veer: '16_11', Begin: '16_32', Stop: '16_57' };
 const takes = Object.fromEntries(Object.entries(TAKES).map(([clip, file]) => [clip, take(file)]));
 const clipPlants = {};
 for (const [clip, bvh] of Object.entries(takes)) clipPlants[clip] = await contacts(bvh);
@@ -223,14 +193,8 @@ test('the table measures the takes: a row of the jog is about 2.7 m ahead a seco
   t.after(() => f.release());
   const { database } = f,
     path = database.trajectoryAt,
-    ahead = (frame) =>
-      database.features[frame * database.width + path + 5] / database.scales[path + 5] + database.centres[path + 5];
-  for (const [clip, time, speed] of [
-    ['Slow', 1, 1.1],
-    ['Walk', 1, 1.3],
-    ['Fast', 1, 1.7],
-    ['Jog', 0.3, 2.7],
-  ]) {
+    ahead = (frame) => database.features[frame * database.width + path + 5] / database.scales[path + 5] + database.centres[path + 5];
+  for (const [clip, time, speed] of [['Slow', 1, 1.1], ['Walk', 1, 1.3], ['Fast', 1, 1.7], ['Jog', 0.3, 2.7]]) {
     const measured = ahead(database.frameAt(clip, time));
     assert.ok(Math.abs(measured - speed) < 0.15, `${clip} ${measured}`);
   }
@@ -296,13 +260,7 @@ async function steady(velocity, stickiness) {
   return result;
 }
 
-for (const [speed, clip] of [
-  [1.1, 'Slow'],
-  [1.3, 'Walk'],
-  [1.7, 'Fast'],
-  [2.7, 'Jog'],
-  [4, 'Run'],
-]) {
+for (const [speed, clip] of [[1.1, 'Slow'], [1.3, 'Walk'], [1.7, 'Fast'], [2.7, 'Jog'], [4, 'Run']]) {
   test(`a request for ${speed} m/s plays the take recorded at that speed and covers the ground`, async () => {
     const result = await steady([0, 0, speed]);
     assert.ok(result.played[clip] >= 300, `${JSON.stringify(result.played)}`);

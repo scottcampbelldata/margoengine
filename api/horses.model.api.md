@@ -34,12 +34,6 @@ export interface HorseDocument {
     readonly vertices: number;
 }
 
-export interface HorseHoofTarget {
-    readonly point: Readonly<V3>;
-    readonly pitch: number;
-    readonly roll: number;
-}
-
 export interface HorseJoint {
     readonly name: string;
     readonly parent: number;
@@ -64,7 +58,6 @@ export interface HorseModelOptions extends HorseBodyOptions {
 export interface HorsePose {
     readonly rotations: readonly (readonly [number, number, number, number])[];
     readonly bodyOffset: readonly [number, number, number];
-    readonly scapulaOffsets?: readonly [Readonly<V3>, Readonly<V3>];
 }
 
 export interface HorseSkeleton {
@@ -84,19 +77,13 @@ export function coatAtlas(): {
 
 export function coatAtlasUV(coat: HorseCoat, row: 'body' | 'points' | 'mane' | 'hoof'): [number, number];
 
-export function fitHorseHooves(skeleton: HorseSkeleton, pose: HorsePose, targets: readonly HorseHoofTarget[], pitch?: number, roll?: number): HorsePose;
-
 export function horseDocument(options?: HorseModelOptions): HorseDocument;
 
 export function horseGLB(options?: HorseModelOptions): Uint8Array;
 
-export function horseJointTranslation(skeleton: HorseSkeleton, pose: HorsePose, index: number): V3;
+export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase?: number, time?: number): HorsePose;
 
-export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase?: number, time?: number, amplitude?: number): HorsePose;
-
-export function horseSkeleton(body: HorseBody, tailLength?: number): HorseSkeleton;
-
-export function horseTailFlick(skeleton: HorseSkeleton, pose: HorsePose, seconds: number, strength?: number, side?: -1 | 1): HorsePose;
+export function horseSkeleton(body: HorseBody): HorseSkeleton;
 
 export function poseHooves(skeleton: HorseSkeleton, pose: HorsePose): [number, number, number][];
 
@@ -166,6 +153,4 @@ interface Stride {
     readonly strike: readonly [number, number, number, number];
     readonly pattern: GaitPattern;
 }
-
-type V3 = [number, number, number];
 ```

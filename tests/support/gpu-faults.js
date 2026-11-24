@@ -58,8 +58,7 @@ function uncaptured(error) {
  */
 export function injectGPUFaults(device, plan = {}) {
   for (const key of Object.keys(plan))
-    if (key !== 'error' && key !== 'select' && !METHODS.includes(key))
-      throw new RangeError(`Unknown fault target ${key}`);
+    if (key !== 'error' && key !== 'select' && !METHODS.includes(key)) throw new RangeError(`Unknown fault target ${key}`);
   const filter = plan.error ?? 'out-of-memory',
     select = plan.select ?? (() => true);
   if (typeof select !== 'function') throw new TypeError('select must be a function (method, descriptor, buffer)');

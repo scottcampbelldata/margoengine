@@ -26,10 +26,7 @@ try {
     assert.deepEqual(r.errors, [], `GPU errors at n = ${n}`);
     assert.deepEqual(r.zero, [0, 0, 0], 'warm-up frames move no clock');
     assert.equal(r.steps, n - 150);
-    assert.ok(
-      r.clocks.includes(r.name) && !r.unseekable.includes(r.name),
-      `the effect is replayed: ${JSON.stringify(r)}`,
-    );
+    assert.ok(r.clocks.includes(r.name) && !r.unseekable.includes(r.name), `the effect is replayed: ${JSON.stringify(r)}`);
     assert.ok(Object.is(r.timeB, r.timeA), `clocks ${r.timeA} and ${r.timeB}`);
     assert.ok(r.uniformEqual, 'the last simulate uniform is equal');
     assert.equal(r.birthsB, r.birthsA, 'births per step equal');
@@ -39,10 +36,7 @@ try {
     assert.ok(r.liveA > 500, `the fixture keeps particles alive: ${r.liveA}`);
     assert.ok(off <= 0.05, `live counts ${r.liveA} and ${r.liveB} differ by ${(off * 100).toFixed(2)} %`);
     assert.equal(r.keptB, r.keptA, `live slots read back: ${r.keptA} continuous, ${r.keptB} after the seek`);
-    assert.ok(
-      r.sameParticles,
-      `${r.shared} of ${r.keptA} live particles equal after the seek and warm-up (GAP-FILM-VFXSEED)`,
-    );
+    assert.ok(r.sameParticles, `${r.shared} of ${r.keptA} live particles equal after the seek and warm-up (GAP-FILM-VFXSEED)`);
     console.log(
       `ok vfx seek n = ${n}: births ${r.birthsA} equal, live ${r.liveA} continuous, ${r.liveB} after seek and prewarm (${(off * 100).toFixed(2)} %), ${r.liveC} prewarm alone; ${r.shared} of ${r.keptA} particles equal bit for bit`,
     );

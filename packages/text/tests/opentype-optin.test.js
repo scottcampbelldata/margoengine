@@ -14,10 +14,7 @@ test('TrueType extrudes without the OpenType readers; CFF and variable instances
   const mesh = extrudeText('Ag', { font: bytes('SourceSans3-Regular.ttf') });
   assert.ok(mesh.indices.length > 0);
   assert.throws(() => extrudeText('Ag', { font: bytes('SourceSans3-Regular.otf') }), needsReaders);
-  assert.throws(
-    () => parseFontOutlines(bytes('SourceSans3VF-Upright.ttf')).withVariations({ wght: 700 }),
-    needsReaders,
-  );
+  assert.throws(() => parseFontOutlines(bytes('SourceSans3VF-Upright.ttf')).withVariations({ wght: 700 }), needsReaders);
   assert.ok(extrudeText('Ag', { font: bytes('SourceSans3-Regular.otf'), openType }).indices.length > 0);
   const bold = parseFontOutlines(bytes('SourceSans3VF-Upright.ttf'), { openType }).withVariations({ wght: 700 });
   assert.ok(bold.varied);

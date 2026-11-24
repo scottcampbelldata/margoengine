@@ -14,16 +14,8 @@ const maps = Object.values(await import(`../dist/${chunk}`)).filter((v) => v ins
 
 const setup = (options = {}) => {
   const h = optionalGPU(),
-    terrain = h.engine.gpu.createTexture({
-      size: [16, 16],
-      format: 'r32float',
-      usage: GPUTextureUsage.TEXTURE_BINDING,
-    }),
-    water = new Water({
-      segments: 4,
-      terrain: { heightmap: () => terrain, origin: [-8, -8], size: [16, 16] },
-      ...options,
-    });
+    terrain = h.engine.gpu.createTexture({ size: [16, 16], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
+    water = new Water({ segments: 4, terrain: { heightmap: () => terrain, origin: [-8, -8], size: [16, 16] }, ...options });
   h.engine.use(water);
   return { h, terrain, water };
 };
@@ -31,11 +23,7 @@ const setup = (options = {}) => {
 const fakeSolver = (log) => (input) => {
   const { device, terrain } = input,
     make = () =>
-      device.createTexture({
-        size: [terrain.width, terrain.height],
-        format: 'rgba32float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
-      }),
+      device.createTexture({ size: [terrain.width, terrain.height], format: 'rgba32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC }),
     states = [make(), make()],
     fluxes = [make(), make()],
     solver = {
@@ -75,7 +63,7 @@ test('a solver on the bridge replaces the coastal flow, and Water goes back to i
   assert.ok(bridge, 'one bridge map hands Water a solver');
   const [{ input, solver }] = log;
   assert.equal(input.terrain, terrain);
-  assert.equal(input.uniform.size, 576, 'the solver gets the frame uniform');
+  assert.equal(input.uniform.size, 560, 'the solver gets the frame uniform');
   assert.ok(own.destroyed, 'the coastal flow is released');
   assert.equal(water.coastalDepthTexture, solver.states[0]);
   assert.equal(solver.steps, 1);
@@ -96,25 +84,13 @@ test('a solver on the bridge replaces the coastal flow, and Water goes back to i
 });
 
 test('sprayCount sizes the droplet pool; a count that is not a multiple of 64 from 64 to 65,536 throws', () => {
-  for (const [count, bytes] of [
-    [undefined, 4096 * 32],
-    [16384, 16384 * 32],
-    [64, 64 * 32],
-  ]) {
+  for (const [count, bytes] of [[undefined, 4096 * 32], [16384, 16384 * 32], [64, 64 * 32]]) {
     const { h, terrain, water } = setup({ spray: true, ...(count ? { sprayCount: count } : {}) });
     h.frame();
-    assert.ok(
-      h.resources.some((r) => r.size === bytes && !r.destroyed),
-      `a pool of ${bytes} B`,
-    );
+    assert.ok(h.resources.some((r) => r.size === bytes && !r.destroyed), `a pool of ${bytes} B`);
     water.dispose();
     terrain.destroy();
   }
   for (const sprayCount of [0, 32, 100, 65600, 1.5, '64'])
-    assert.throws(
-      () =>
-        new Water({ spray: true, sprayCount, terrain: { heightmap: () => undefined, origin: [0, 0], size: [1, 1] } }),
-      TypeError,
-      String(sprayCount),
-    );
+    assert.throws(() => new Water({ spray: true, sprayCount, terrain: { heightmap: () => undefined, origin: [0, 0], size: [1, 1] } }), TypeError, String(sprayCount));
 });

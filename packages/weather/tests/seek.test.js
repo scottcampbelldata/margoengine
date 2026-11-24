@@ -25,11 +25,7 @@ function state(value, seen = new Set()) {
   if (seen.has(value)) return '[seen]';
   seen.add(value);
   if (Array.isArray(value)) return value.map((v) => state(v, seen));
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([k, v]) => [k, state(v, seen)])
-      .filter(([, v]) => v !== undefined),
-  );
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, state(v, seen)]).filter(([, v]) => v !== undefined));
 }
 
 function world() {

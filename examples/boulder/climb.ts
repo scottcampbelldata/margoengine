@@ -199,12 +199,25 @@ export type ClimbEvent = 'contact' | 'short' | 'landed';
  * Call `update` every frame. A frame allocates nothing; a move's planning does, a little, on the click that starts it.
  */
 export class Climb {
-  readonly contacts: Vec[] = [vec(), vec(), vec(), vec()];
-  readonly targets: Vec[] = [vec(), vec(), vec(), vec()];
+  readonly contacts: Vec[] = [
+    vec(),
+    vec(),
+    vec(),
+    vec(),
+  ];
+  readonly targets: Vec[] = [
+    vec(),
+    vec(),
+    vec(),
+    vec(),
+  ];
   /** Which hold each limb is on; -1 for a free limb or a foot on the mat. */
   readonly on: number[] = [-1, -1, -1, -1];
   /** The wall's outward normal under the hold each hand is on or on its way to. */
-  readonly handNormals: Vec[] = [vec(0, 0, 1), vec(0, 0, 1)];
+  readonly handNormals: Vec[] = [
+    vec(0, 0, 1),
+    vec(0, 0, 1),
+  ];
   /** False for an arm that hangs free (after a fall). */
   readonly bound = [true, true, true, true];
   readonly pelvis = vec();

@@ -269,13 +269,13 @@ export function convertVRM0(source: Uint8Array | VRMDocument): VRM0Conversion {
           node,
           type:
             (
-              {
-                Auto: 'auto',
-                Both: 'both',
-                FirstPersonOnly: 'firstPersonOnly',
-                ThirdPersonOnly: 'thirdPersonOnly',
-              } as Record<string, 'auto' | 'both' | 'firstPersonOnly' | 'thirdPersonOnly'>
-            )[a.firstPersonFlag ?? 'Auto'] ?? 'auto',
+              { Auto: 'auto', Both: 'both', FirstPersonOnly: 'firstPersonOnly', ThirdPersonOnly: 'thirdPersonOnly' } as Record<
+                string,
+                'auto' | 'both' | 'firstPersonOnly' | 'thirdPersonOnly'
+              >
+            )[
+              a.firstPersonFlag ?? 'Auto'
+            ] ?? 'auto',
         })),
       ),
     };

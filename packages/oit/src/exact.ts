@@ -17,13 +17,7 @@ import { compatTier, compatibilityLevel } from '../../shared/compat.js';
 
 export type { TransparentPass };
 
-declare const GPUBufferUsage: {
-  UNIFORM: number;
-  COPY_DST: number;
-  COPY_SRC: number;
-  STORAGE: number;
-  MAP_READ: number;
-};
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -272,15 +266,17 @@ export class ExactOIT extends TransparentPass {
     const buffer = this.readback!;
     this.copied = false;
     this.mapping = true;
-    buffer.mapAsync(GPUMapMode.READ).then(() => {
-      if (this.readback !== buffer) return this.mapEnded();
-      const fragments = new Uint32Array(buffer.getMappedRange())[0];
-      buffer.unmap();
-      const room = this.capacity - 1;
-      this.counted = { fragments, dropped: Math.max(0, fragments - room) };
-      if (fragments > room) this.wanted = Math.ceil(fragments * 1.25) + 1;
-      this.mapping = false;
-    }, this.mapEnded);
+    buffer
+      .mapAsync(GPUMapMode.READ)
+      .then(() => {
+        if (this.readback !== buffer) return this.mapEnded();
+        const fragments = new Uint32Array(buffer.getMappedRange())[0];
+        buffer.unmap();
+        const room = this.capacity - 1;
+        this.counted = { fragments, dropped: Math.max(0, fragments - room) };
+        if (fragments > room) this.wanted = Math.ceil(fragments * 1.25) + 1;
+        this.mapping = false;
+      }, this.mapEnded);
   }
   protected render(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.

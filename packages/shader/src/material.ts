@@ -303,7 +303,8 @@ const inputFields = (code: string) =>
 const varyingCode = (list: readonly Node[]) =>
   list
     .map(
-      (x, i) => `,\n  @location(${8 + i})${scalarOf(x.type) === 'f32' ? '' : ' @interpolate(flat)'} ndv${i}:${x.type}`,
+      (x, i) =>
+        `,\n  @location(${8 + i})${scalarOf(x.type) === 'f32' ? '' : ' @interpolate(flat)'} ndv${i}:${x.type}`,
     )
     .join('');
 
@@ -571,10 +572,7 @@ export class NodeMaterial extends Material {
             `var margoPosition=i.position.xyz;{\n${this.depthVertex.replaceAll('i.ndVertex', 'index')}\n}`,
         )
         .replace(/(struct Out \{[^}]*)\}/, (_, body) => body + this.depthFields + '}')
-        .replace(
-          /(struct Input \{[^}]*)\}/,
-          (_, body) => body + (this.depthVertex.includes('i.ndInstance') ? inputFields('i.ndInstance') : '') + '}',
-        )
+        .replace(/(struct Input \{[^}]*)\}/, (_, body) => body + (this.depthVertex.includes('i.ndInstance') ? inputFields('i.ndInstance') : '') + '}')
         .replace(
           /@fragment fn fragment\((i:\w+)\)([^{]*)\{/,
           (_, input, result) =>
@@ -598,7 +596,10 @@ export class NodeMaterial extends Material {
       move: this.depthMove,
       program: this.program,
       layout: () => (layout ??= device.createBindGroupLayout({ entries: [...reached.values()] })),
-      entries: () => this.program.entries(device, frameHost(engine)).filter((entry) => reached.has(entry.binding)),
+      entries: () =>
+        this.program
+          .entries(device, frameHost(engine))
+          .filter((entry) => reached.has(entry.binding)),
     };
     this.depthRecord = { device, record };
     return record;
@@ -607,7 +608,9 @@ export class NodeMaterial extends Material {
     // The uniforms upload here for every pass, and a block only the depth passes read stays out of the colour pass's group.
     return [
       ...super.bindings(device, engine),
-      ...this.program.entries(device, frameHost(engine)).filter((entry) => entry.binding < this.colourBindings),
+      ...this.program
+        .entries(device, frameHost(engine))
+        .filter((entry) => entry.binding < this.colourBindings),
     ];
   }
 }

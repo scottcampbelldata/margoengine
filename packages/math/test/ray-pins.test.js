@@ -14,13 +14,7 @@ const box = (lo, hi) => new Box3(v3(lo), v3(hi));
 
 test('Ray: defaults, set, copy, clone, at, lookAt, recast, equals', () => {
   const d = new Ray();
-  assert.deepEqual(
-    [arr(d.origin), arr(d.direction)],
-    [
-      [0, 0, 0],
-      [0, 0, -1],
-    ],
-  );
+  assert.deepEqual([arr(d.origin), arr(d.direction)], [[0, 0, 0], [0, 0, -1]]);
   const r = ray([1, 2, 3], [0, 1, 0]);
   assert.deepEqual(arr(r.at(2.5, new Vector3())), [1, 4.5, 3]);
   assert.deepEqual(arr(r.at(-1, new Vector3())), [1, 1, 3]);
@@ -130,11 +124,7 @@ test('Ray: box intersection matches a reference slab test over seeded rays', () 
       misses++;
     } else {
       hits++;
-      nearV(
-        got,
-        o.map((c, k) => c + dir[k] * want),
-        1e-9,
-      );
+      nearV(got, o.map((c, k) => c + dir[k] * want), 1e-9);
     }
   }
   assert.ok(hits > 200 && misses > 200, `${hits} hits, ${misses} misses`);
@@ -153,23 +143,11 @@ test('Ray: box intersection matches a reference slab test over seeded rays', () 
   assert.equal(ray([0, 0, 5], [0, 0, 1]).intersectsBox(open), false);
   // the same line approaching a corner from different sides rounds consistently
   const unit = box([0, 0, 0], [1, 1, 1]);
-  for (const dir of [
-    [1, 1, 1],
-    [-1, -1, -1],
-    [1, 1, -1],
-    [-1, 1, 1],
-  ]) {
+  for (const dir of [[1, 1, 1], [-1, -1, -1], [1, 1, -1], [-1, 1, 1]]) {
     const l = Math.hypot(...dir);
     const corner = dir.map((c) => (c > 0 ? 0 : 1));
     const o = corner.map((c, k) => c - (dir[k] / l) * 3);
-    assert.equal(
-      ray(
-        o,
-        dir.map((c) => c / l),
-      ).intersectsBox(unit),
-      true,
-      dir.join(),
-    );
+    assert.equal(ray(o, dir.map((c) => c / l)).intersectsBox(unit), true, dir.join());
   }
 });
 
@@ -184,21 +162,13 @@ const refTriangle = (o, d, a, b, c, cull) => {
   const t = dot(n, sub(a, o)) / nd;
   if (t < 0) return null;
   const p = o.map((x, i) => x + d[i] * t);
-  const inside = [
-    [a, b],
-    [b, c],
-    [c, a],
-  ].every(([u, w]) => dot(cross(sub(w, u), sub(p, u)), n) >= 0);
+  const inside = [[a, b], [b, c], [c, a]].every(([u, w]) => dot(cross(sub(w, u), sub(p, u)), n) >= 0);
   return inside ? t : null;
 };
 
 test('Ray: triangle intersection matches a plane-and-edge reference, with and without culling', () => {
   const rand = createLcgRandom(777);
-  const tri = [
-    [-1, -1, 0],
-    [2, -1, 0.5],
-    [0, 2, -0.5],
-  ];
+  const tri = [[-1, -1, 0], [2, -1, 0.5], [0, 2, -0.5]];
   let hit = 0;
   for (let i = 0; i < 3000; i++) {
     const o = [rand() * 6 - 3, rand() * 6 - 3, (rand() < 0.5 ? -1 : 1) * (rand() * 3 + 0.2)];
@@ -211,11 +181,7 @@ test('Ray: triangle intersection matches a plane-and-edge reference, with and wi
       const got = ray(o, dir).intersectTriangle(v3(tri[0]), v3(tri[1]), v3(tri[2]), cull, new Vector3());
       if (want === null) assert.equal(got, null, `${i} cull ${cull}`);
       else {
-        nearV(
-          got,
-          o.map((c, k) => c + dir[k] * want),
-          1e-9,
-        );
+        nearV(got, o.map((c, k) => c + dir[k] * want), 1e-9);
         if (!cull) hit++;
       }
     }
@@ -255,7 +221,7 @@ test('Ray: sphere tests with a slanted ray, a larger radius and tangent-at-the-o
   assert.equal(r.intersectsSphere(s), true);
   assert.equal(r.intersectsSphere({ center: v3([4, 8, 9]), radius: 0.1 }), true);
   const off = { center: v3([4, 8, 9 + 2.5]), radius: 2 };
-  const along = (4 - 1 + 2 * (8 - 2) + 2 * (11.5 - 3)) / 3;
+  const along = ((4 - 1) + 2 * (8 - 2) + 2 * (11.5 - 3)) / 3;
   const l2 = 9 + 36 + 72.25;
   const miss = Math.sqrt(l2 - along * along);
   assert.equal(r.intersectsSphere(off), miss <= 2);
@@ -282,19 +248,13 @@ test('Ray: closest point and distance with a slanted ray and an offset origin', 
   const t = Math.max(0, (3 * 1 + -3 * 2 + 2 * 2) / 3);
   const want = [1 + t / 3, 2 + (2 * t) / 3, 3 + (2 * t) / 3];
   nearV(r.closestPointToPoint(p, new Vector3()), want);
-  near(
-    r.distanceSqToPoint(p),
-    want.reduce((s, c, i) => s + (c - arr(p)[i]) ** 2, 0),
-  );
+  near(r.distanceSqToPoint(p), want.reduce((s, c, i) => s + (c - arr(p)[i]) ** 2, 0));
   const behind = v3([-5, -4, -2]);
   nearV(r.closestPointToPoint(behind, new Vector3()), [1, 2, 3]);
   near(r.distanceSqToPoint(behind), 36 + 36 + 25);
   const pos = v3([8, 14, 15]);
   nearV(r.closestPointToPoint(pos, new Vector3()), want.length && arr(r.closestPointToPoint(pos, new Vector3())));
-  near(
-    r.distanceToPoint(pos),
-    Math.hypot(...[7, 12, 12].map((c, i) => c - [1 / 3, 2 / 3, 2 / 3][i] * ((7 + 24 + 24) / 3) * 1)),
-  );
+  near(r.distanceToPoint(pos), Math.hypot(...[7, 12, 12].map((c, i) => c - [1 / 3, 2 / 3, 2 / 3][i] * ((7 + 24 + 24) / 3) * 1)));
 });
 
 test('Ray: box edges, touching and slab rounding at corners', () => {
@@ -322,22 +282,10 @@ test('Ray: box edges, touching and slab rounding at corners', () => {
   // rays aimed at a corner whose slab times round apart still hit, as the padded test promises
   const unit = box([0, 0, 0], [1, 1, 1]);
   for (const [o, d] of [
-    [
-      [-2.822901111551946, -0.7308470005497487, 1.1168329435732274],
-      [0.8077997746812694, 0.49529819210817555, -0.31959227919219674],
-    ],
-    [
-      [3.33068158385787, 2.5929466123275455, 1.014290301994247],
-      [-0.7890701757289091, -0.614293737642465, -0.0033855085879325743],
-    ],
-    [
-      [1.8040069003547687, 0.7282245695532413, -1.3728998065097815],
-      [-0.45950063829607335, -0.41619002820118384, 0.78463050146639],
-    ],
-    [
-      [2.1010084976162178, 0.8255601339208474, 1.5584641963146584],
-      [-0.7413481763590983, -0.5558789973756677, -0.3760338039135068],
-    ],
+    [[-2.822901111551946, -0.7308470005497487, 1.1168329435732274], [0.8077997746812694, 0.49529819210817555, -0.31959227919219674]],
+    [[3.33068158385787, 2.5929466123275455, 1.014290301994247], [-0.7890701757289091, -0.614293737642465, -0.0033855085879325743]],
+    [[1.8040069003547687, 0.7282245695532413, -1.3728998065097815], [-0.45950063829607335, -0.41619002820118384, 0.78463050146639]],
+    [[2.1010084976162178, 0.8255601339208474, 1.5584641963146584], [-0.7413481763590983, -0.5558789973756677, -0.3760338039135068]],
   ]) {
     assert.equal(refBox(o, d, [0, 0, 0], [1, 1, 1]), null, 'the plain slab test misses it');
     assert.equal(ray(o, d).intersectsBox(unit), true);
@@ -361,11 +309,7 @@ test('Ray: triangle tests with every coordinate non-zero, shared vertices and cu
       const got = ray(o, dir).intersectTriangle(v3(a), v3(b), v3(c), cull, new Vector3());
       if (want === null) assert.equal(got, null, `${i} ${cull}`);
       else {
-        nearV(
-          got,
-          o.map((x, k) => x + dir[k] * want),
-          1e-9,
-        );
+        nearV(got, o.map((x, k) => x + dir[k] * want), 1e-9);
         hit++;
       }
     }
@@ -382,8 +326,7 @@ test('Ray: triangle tests with every coordinate non-zero, shared vertices and cu
   assert.deepEqual(arr(ray([0.2, 0.2, 0], [0, 0, -1]).intersectTriangle(A, B, C, true, new Vector3())), [0.2, 0.2, 0]);
   assert.deepEqual(arr(ray([0.2, 0.2, 0], [0, 0, 1]).intersectTriangle(A, B, C, false, new Vector3())), [0.2, 0.2, 0]);
   // parallel to the plane: never a hit, culling or not
-  for (const cull of [true, false])
-    assert.equal(ray([0.2, 0.2, 1], [1, 0, 0]).intersectTriangle(A, B, C, cull, new Vector3()), null);
+  for (const cull of [true, false]) assert.equal(ray([0.2, 0.2, 1], [1, 0, 0]).intersectTriangle(A, B, C, cull, new Vector3()), null);
   assert.equal(ray([0.2, 0.2, 0], [1, 0, 0]).intersectTriangle(A, B, C, true, new Vector3()), null);
   assert.equal(ray([0.2, 0.2, 0], [1, 0, 0]).intersectTriangle(A, B, C, false, new Vector3()), null);
 });

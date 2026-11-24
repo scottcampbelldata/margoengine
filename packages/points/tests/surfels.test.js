@@ -61,17 +61,11 @@ test('multisampled targets read multisampled textures, the resolve per sample', 
   plugin.add(new PointCloud({ positions }));
   const log = frame(),
     code = log.filter((e) => e[0] === 'module').map((e) => e[2].code);
-  assert.equal(code.length, 5, 'one splat module and one resolve module per sample (KB2481)');
+  assert.equal(code.length, 2, 'one splat and one resolve module');
   assert.ok(code[0].includes('var front:texture_multisampled_2d<f32>'));
-  for (let sample = 0; sample < 4; sample++) {
-    assert.ok(code[1 + sample].includes('var sums:texture_multisampled_2d<f32>'));
-    assert.ok(code[1 + sample].includes(`textureLoad(sums,q,${sample})`));
-  }
-  assert.ok(
-    pipelines(log)
-      .slice(0, 2)
-      .every((p) => p.multisample.count === 4),
-  );
+  assert.ok(code[1].includes('var sums:texture_multisampled_2d<f32>'));
+  assert.ok(code[1].includes('i32(sample)'));
+  assert.ok(pipelines(log).slice(0, 2).every((p) => p.multisample.count === 4));
   assert.ok(!surfelShader.includes('multisampled') && !resolveShader.includes('multisampled'));
 });
 
@@ -91,7 +85,7 @@ test('add and remove own the cloud; removing frees its buffers; dispose keeps it
   assert.equal(plugin.pointClouds.size, 1);
   assert.throws(() => plugin.add({}), TypeError);
   frame();
-  const buffers = [...(plugin['cloudGpu'].get(cloud).normals ? [plugin['cloudGpu'].get(cloud).normals] : [])];
+  const buffers = [...plugin['cloudGpu'].get(cloud).normals ? [plugin['cloudGpu'].get(cloud).normals] : []];
   assert.equal(buffers.length, 1, 'normals reach the GPU');
   cloud.dispose();
   assert.equal(plugin.pointClouds.size, 0);

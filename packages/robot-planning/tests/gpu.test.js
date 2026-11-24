@@ -14,12 +14,7 @@ globalThis.GPUBufferUsage ??= { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 
 globalThis.GPUMapMode ??= { READ: 1 };
 
 /** Records what a real device would receive; `reply` fills the read buffer for a dispatch of `count` poses. */
-function fakeDevice({
-  limit = 1 << 27,
-  groups = 65535,
-  reply = (count) => new Float32Array(count),
-  dropped = () => null,
-} = {}) {
+function fakeDevice({ limit = 1 << 27, groups = 65535, reply = (count) => new Float32Array(count), dropped = () => null } = {}) {
   const scopes = [];
   const device = {
     buffers: [],
@@ -71,8 +66,7 @@ function fakeDevice({
       // `dropped(dispatch)` is a message for a dispatch the device refuses, reported to its error scope as a device does.
       submit() {
         const message = dropped(device.dispatches.length - 1);
-        if (message)
-          scopes.findLast((scope) => scope.filter === 'internal').error ??= { name: 'GPUInternalError', message };
+        if (message) scopes.findLast((scope) => scope.filter === 'internal').error ??= { name: 'GPUInternalError', message };
       },
     },
   };
@@ -185,9 +179,7 @@ test('minClearance reaches the kernel as a stop, and none means no stop', async 
 });
 
 test('a baked field goes up by its corners; a mesh and a function are refused', () => {
-  const positions = new Float32Array([
-      -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
-    ]),
+  const positions = new Float32Array([-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1]),
     indices = new Uint32Array([
       0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
     ]),
@@ -213,7 +205,10 @@ test('a baked field goes up by its corners; a mesh and a function are refused', 
   assert.equal(data.length, 32 + field.size[0] * field.size[1] * field.size[2]);
   const at = (x, y, z) => data[32 + x + field.size[0] * (y + field.size[1] * z)];
   // Each sample is the field at that corner, x fastest.
-  close(at(1, 2, 3), field.distance([0, 1, 2].map((k) => field.min[k] + [1, 2, 3][k] * field.spacing[k])));
+  close(
+    at(1, 2, 3),
+    field.distance([0, 1, 2].map((k) => field.min[k] + [1, 2, 3][k] * field.spacing[k])),
+  );
   assert.throws(() => new GPUClearance(fakeDevice(), arm(), [new MeshVolume({ bvh })]), /bake a mesh/);
   assert.throws(() => new GPUClearance(fakeDevice(), arm(), [new SDFVolume({ field: { distance: () => 1 } })]), /bake/);
 });
@@ -239,8 +234,7 @@ test('bad arguments are refused, and dispose frees every buffer once', async () 
 
 test('a dispatch the device drops rejects with the cause and the fix, never silent zeros', async () => {
   const device = fakeDevice({
-      dropped: (dispatch) =>
-        dispatch === 1 ? 'A compute dispatch stopped at its work budget of 1000 invocations' : null,
+      dropped: (dispatch) => (dispatch === 1 ? 'A compute dispatch stopped at its work budget of 1000 invocations' : null),
     }),
     clearance = new GPUClearance(device, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], { batch: 100 });
   await assert.rejects(
@@ -265,22 +259,10 @@ test('a dispatch the device drops rejects with the cause and the fix, never sile
 // function now has one call site, and each fixed loop bound adds params.zero, a uniform that is always 0.
 test('the kernel calls each costly function from one site, in loops no compiler can count (KB-COMPAT-FXCTIME1)', async () => {
   const device = fakeDevice(),
-    clearance = new GPUClearance(device, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], {
-      selfCollision: true,
-    });
+    clearance = new GPUClearance(device, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], { selfCollision: true });
   await clearance.evaluate(new Float64Array(2));
   const { copies, size } = inlinedCopies(device.code, 'main');
-  for (const name of [
-    'measure',
-    'gjk',
-    'supportPair',
-    'support',
-    'reduce',
-    'closerFace',
-    'outside',
-    'segmentField',
-    'turn',
-  ])
+  for (const name of ['measure', 'gjk', 'supportPair', 'support', 'reduce', 'closerFace', 'outside', 'segmentField', 'turn'])
     assert.equal(copies.get(name), 1, name);
   // The segment and hull field reads, and the edge test of a segment and of a face.
   assert.equal(copies.get('fieldRead'), 2);

@@ -19,9 +19,6 @@ import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; INDIRECT: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
-// Reserve a scene-shader slot outside the lighting ranges. The clip pass runs before shadow and light passes,
-// so the number of bindings already present cannot tell it which binding numbers later passes will use.
-const SCENE_SECTION_BINDING = 232;
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
 type Pipelines = {
   back: GPURenderPipeline;
@@ -177,14 +174,15 @@ export class SectionPlanes implements EnginePlugin {
       if (context.backend !== 'webgpu') return;
       this.validate();
       this.base = context.shader.split('@fragment')[0];
+      const binding = context.bindings.length + 1;
       this.active = this.enabled && !this.warming.has(this.capKey);
       context.shader =
-        declaration(SCENE_SECTION_BINDING) +
+        declaration(binding) +
         context.shader.replace(
           'let facing=',
           `for(var p=0u;p<u32(section.settings.x);p++){if(dot(section.planes[p].xyz,i.position)+section.planes[p].w<0){discard;}}\nlet facing=`,
         );
-      context.bindings.push({ binding: SCENE_SECTION_BINDING, resource: this.bindings[0][0].resource });
+      context.bindings.push({ binding, resource: this.bindings[0][0].resource });
       this.upload(context);
     };
     graph.add({ name: 'sections:clip', order: -30, execute: clip, prepare: clip });
@@ -441,12 +439,6 @@ export class SectionPlanes implements EnginePlugin {
         (descriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = context.color;
         descriptor.depthStencilAttachment!.view = context.depth;
         pass = context.encoder.beginRenderPass(descriptor);
-        // The view being drawn: its viewport and scissor, as core's own draw of the same call uses them.
-        const target = context.view;
-        if (target) {
-          pass.setViewport(...target.viewport, 0, 1);
-          pass.setScissorRect(...(target.scissor ?? target.viewport));
-        }
         pass.setPipeline(pipelines.cap);
         pass.setBindGroup(0, pipelines.fills[i]);
         pass.draw(3);
@@ -475,16 +467,10 @@ export class SectionPlanes implements EnginePlugin {
     }
   }
   onDeviceRestored(engine: Engine): void {
-    this.release();
+    this.dispose();
     this.setup(engine);
   }
   dispose(): void {
-    const engine = this.engine;
-    this.release();
-    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
-    engine?.sceneOf(this)?.removePlugin(this.name);
-  }
-  private release(): void {
     for (const buffer of this.buffers) buffer.destroy();
     this.stencil?.destroy();
     this.mask?.destroy();

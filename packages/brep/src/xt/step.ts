@@ -614,7 +614,7 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
       const p = b.degrees[0],
         n = b.points.length,
         U = knotVector(b.knots[0], b.multiplicities[0]);
-      if (U.length !== n + p + 1) throw new TypeError('its B-curve needs as many knots as its vertices plus its order');
+      if (U.length !== n + p + 1) throw new TypeError("its B-curve needs as many knots as its vertices plus its order");
       const homogeneous = new Float64Array(n * 4);
       b.points.forEach((q, k) => {
         const wgt = b.weights?.[k] ?? 1;
@@ -642,8 +642,7 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
             [last, vec(trimmed?.fields.point_2)],
           ].map(([q, end]) => (end ? Math.hypot(...sub(q!, end)) : 0)),
         );
-      if (!(miss <= reach))
-        throw new TypeError(`it passes ${miss.toPrecision(3)} m from its trimmed ends, not within the edge's reach`);
+      if (!(miss <= reach)) throw new TypeError(`it passes ${miss.toPrecision(3)} m from its trimmed ends, not within the edge's reach`);
       // A few chords to each B-curve span it covers, then halved wherever the curve bends away from them.
       const spans = new Set(U.slice(p, n + 1)).size - 1,
         count = Math.max(2, Math.ceil(2 * Math.max(p, 1) * spans * Math.min(1, Math.abs(t1 - t0) / (hi - lo)))),

@@ -28,18 +28,7 @@ export async function flush(rounds = 6) {
   for (let i = 0; i < rounds; i++) await new Promise((resolve) => setImmediate(resolve));
 }
 
-const BUFFER = {
-  MAP_READ: 1,
-  MAP_WRITE: 2,
-  COPY_SRC: 4,
-  COPY_DST: 8,
-  INDEX: 16,
-  VERTEX: 32,
-  UNIFORM: 64,
-  STORAGE: 128,
-  INDIRECT: 256,
-  QUERY_RESOLVE: 512,
-};
+const BUFFER = { MAP_READ: 1, MAP_WRITE: 2, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256, QUERY_RESOLVE: 512 };
 const TEXTURE = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
 class GPUError extends Error {}
 class GPUValidationError extends GPUError {}
@@ -150,9 +139,7 @@ export function createWorld(seed) {
     world.step(`startup ${step} of create ${fault.create}: ${fault.action}`);
     if (fault.action === 'lose') d?.lose(`lost at ${step}`);
     if (fault.action === 'hold')
-      return new Promise((release) =>
-        world.held.push({ step, release: () => (world.step(`release ${step}`), release()) }),
-      );
+      return new Promise((release) => world.held.push({ step, release: () => (world.step(`release ${step}`), release()) }));
     return null;
   };
 
@@ -229,12 +216,7 @@ export function createWorld(seed) {
       });
     const device = stub(d, 'device', {
       features: new Set(),
-      limits: {
-        maxTextureArrayLayers: 256,
-        maxBufferSize: 1 << 28,
-        maxStorageBufferBindingSize: 1 << 27,
-        maxTextureDimension2D: 8192,
-      },
+      limits: { maxTextureArrayLayers: 256, maxBufferSize: 1 << 28, maxStorageBufferBindingSize: 1 << 27, maxTextureDimension2D: 8192 },
       lost,
       addEventListener: (type, listener) => type === 'uncapturederror' && listeners.add(listener),
       removeEventListener: (type, listener) => listeners.delete(listener),
@@ -300,12 +282,7 @@ export function createWorld(seed) {
   };
   // A texture made outside any device (the canvas texture): its calls belong to the configured device.
   const canvasTexture = (descriptor) =>
-    stub(context.device, 'canvas-texture', {
-      width: descriptor.size[0],
-      height: descriptor.size[1],
-      format: descriptor.format,
-      destroy() {},
-    });
+    stub(context.device, 'canvas-texture', { width: descriptor.size[0], height: descriptor.size[1], format: descriptor.format, destroy() {} });
   world.context = context;
   world.canvas = {
     width: 64,
@@ -353,8 +330,7 @@ export function createWorld(seed) {
     world.frames.clear();
     world.time += 16;
     for (const callback of due) callback(world.time);
-    if (world.pending() > 1)
-      world.violate(`${world.pending()} frame callbacks wait after one refresh (expected at most 1)`);
+    if (world.pending() > 1) world.violate(`${world.pending()} frame callbacks wait after one refresh (expected at most 1)`);
     return world.submits - before;
   };
   /** Releases every held startup step. */
@@ -366,8 +342,7 @@ export function createWorld(seed) {
   world.report = (error) => {
     world.step(`onError ${describe(error)}`);
     // After dispose the engine has nothing left to fail: only an error the app itself threw may still arrive.
-    if (world.closed && !world.expected.includes(error))
-      world.violate(`an error was reported after dispose: ${describe(error)}`);
+    if (world.closed && !world.expected.includes(error)) world.violate(`an error was reported after dispose: ${describe(error)}`);
     world.reports.push(error);
   };
   /** `error` must be reported exactly once by the end of the run. */
@@ -392,8 +367,7 @@ export function createWorld(seed) {
           world.violate(
             `pick resolved ${mesh ? `mesh ${mesh.id}` : 'null'}, expected ${expected ? `mesh ${expected.id}` : 'null'} (readback ${read?.outcome ?? 'none'})`,
           );
-        if (!read && !world.closed && !entry.allowNoRead)
-          world.violate('pick resolved without a readback on a live engine');
+        if (!read && !world.closed && !entry.allowNoRead) world.violate('pick resolved without a readback on a live engine');
       },
       (error) => {
         entry.settled = true;
@@ -422,7 +396,7 @@ export function createWorld(seed) {
 
   /** The invariants every run ends with. */
   world.finish = async () => {
-    for (const r of world.readbacks) r.done(), await flush(1);
+    for (const r of world.readbacks) (r.done(), await flush(1));
     await flush();
     for (const pick of world.picks) if (!pick.settled) world.violate('a pick never settled');
     for (const error of world.expected) {
@@ -497,10 +471,7 @@ export async function stress(name, base, runs, scenario) {
     }
     if ((failure || world.violations.length) && process.env.MARGO_STRESS_ALL) {
       // Survey mode (proof runs): every failing seed is kept, then one failure lists each violation with its seeds.
-      survey.push({
-        seed,
-        lines: [...new Set([...world.violations, ...(failure ? [`threw ${describe(failure)}`] : [])])],
-      });
+      survey.push({ seed, lines: [...new Set([...world.violations, ...(failure ? [`threw ${describe(failure)}`] : [])])] });
       continue;
     }
     if (failure || world.violations.length)

@@ -41,11 +41,7 @@ test('every texture slot writes its own KHR_texture_transform, and the file requ
 });
 
 test('a transform on one slot leaves the other slots alone, and round trips through a GLB read', () => {
-  const material = {
-      normalTexture: atlas,
-      normalTextureTransform: { offset: [0.5, 0], scale: [2, 2] },
-      baseColorTexture: atlas,
-    },
+  const material = { normalTexture: atlas, normalTextureTransform: { offset: [0.5, 0], scale: [2, 2] }, baseColorTexture: atlas },
     { json } = readGLB(exportGLB({ nodes: [{ geometry: quad, material }] }));
   assert.equal(json.materials[0].pbrMetallicRoughness.baseColorTexture.extensions, undefined);
   assert.deepEqual(json.materials[0].normalTexture.extensions.KHR_texture_transform, {

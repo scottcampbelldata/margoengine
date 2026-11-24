@@ -308,12 +308,7 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
       position = [position[0] + offset[0], position[1] + offset[1], position[2] + offset[2]];
       rotation = multiplyQuaternions(rotation, turn);
       axes = [0, 1, 2].map((a) =>
-        place(
-          rotateByQuaternion(
-            [0, 1, 2].map((c) => (c === a ? local[l + 7 + a] : 0)),
-            turn,
-          ),
-        ),
+        place(rotateByQuaternion([0, 1, 2].map((c) => (c === a ? local[l + 7 + a] : 0)), turn)),
       );
     }
     return { position, rotation };

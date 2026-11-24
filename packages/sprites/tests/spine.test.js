@@ -401,29 +401,14 @@ test('modern unified constraint timelines and animation sliders sample without r
   const data = base();
   data.skeleton.spine = '4.3.0';
   data.bones.push({ name: 'control', x: 0.5 });
-  data.constraints = [
-    {
-      type: 'slider',
-      name: 'control-slider',
-      animation: 'shape',
-      bone: 'control',
-      property: 'x',
-      local: true,
-      mix: 0.5,
-    },
-  ];
+  data.constraints = [{ type: 'slider', name: 'control-slider', animation: 'shape', bone: 'control', property: 'x', local: true, mix: 0.5 }];
   data.animations.shape = { bones: { root: { translatex: [{ value: 4 }, { time: 1, value: 12 }] } } };
-  data.animations.idle = {
-    bones: { root: { translatey: [{ value: 3 }, { time: 1, value: 5 }] } },
-    constraints: { 'control-slider': { mix: [{ value: 0 }, { time: 1, value: 1 }] } },
-  };
+  data.animations.idle = { bones: { root: { translatey: [{ value: 3 }, { time: 1, value: 5 }] } }, constraints: { 'control-slider': { mix: [{ value: 0 }, { time: 1, value: 1 }] } } };
   const rig = parseSpineJSON(data).createSkeleton();
   rig.pose('idle', 0.5, { loop: false });
   close([rig.bone('root').x, rig.bone('root').y], [4, -4]);
-  rig.pose('idle', 0, { loop: false });
-  close([rig.bone('root').x, rig.bone('root').y], [0, -3]);
-  rig.pose('idle', 1, { loop: false });
-  close([rig.bone('root').x, rig.bone('root').y], [8, -5]);
+  rig.pose('idle', 0, { loop: false }); close([rig.bone('root').x, rig.bone('root').y], [0, -3]);
+  rig.pose('idle', 1, { loop: false }); close([rig.bone('root').x, rig.bone('root').y], [8, -5]);
 });
 test('malformed references, arrays, curves and resource limits reject with a coded help-linked error', () => {
   const changes = [

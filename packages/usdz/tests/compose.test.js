@@ -109,12 +109,9 @@ test('payloads: false leaves them out, as a stage opened with LoadNone', () => {
 });
 
 test('a reference cycle ends with an issue, not a hang', () => {
-  const asset = parseUSDA(
-    `#usda 1.0\ndef "A" (references = </B>) {}\ndef "B" (references = </A>) {}\n${quad('Kept')}`,
-    {
-      extensions: [composition()],
-    },
-  );
+  const asset = parseUSDA(`#usda 1.0\ndef "A" (references = </B>) {}\ndef "B" (references = </A>) {}\n${quad('Kept')}`, {
+    extensions: [composition()],
+  });
   assert.equal(asset.meshes.length, 1);
   assert.ok(asset.issues.some((issue) => issue.code === 'cycle'));
 });
@@ -204,9 +201,7 @@ def Material "B" {
   );
   const [mesh] = asset.meshes,
     { primitives } = asset.document.meshes[0],
-    colors = primitives.map((p) =>
-      asset.document.materials[p.material].pbrMetallicRoughness.baseColorFactor.slice(0, 3),
-    );
+    colors = primitives.map((p) => asset.document.materials[p.material].pbrMetallicRoughness.baseColorFactor.slice(0, 3));
   assert.deepEqual(colors, [
     [0, 1, 0],
     [1, 0, 0],

@@ -6,498 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Fixed 2026-11-23: a shoulder could exceed its range between two accepted poses (rigging/contact)
-
-- **Repro:** keep a sleeve above a torso capsule. Aim the upper arm diagonally backward to opposite sides in two poses. Both poses pass the shoulder direction limit, but the interpolated arm points directly backward in between.
-- **Cause:** the swept check captured capsule endpoints only. The shoulder limit was available solely to the single-pose check.
-- **Fix:** snapshot the joint vector and body axis, interpolate the axis on its short arc, and conservatively advance against the directional margin as well as the capsule distance.
-- **Regression:** `packages/rigging/tests/limb-collision.test.js` covers static and turning references, the first violation time, opposed axes, a legal turn, and legacy snapshots.
-
-### Fixed 2026-11-21: water displacement and stern foam faded too early at harbor speeds (water/ships)
-
-- **Repro:** advance a 68 m hull at 1.5 m/s. Sample just ahead of the stem and 0.75 m or so outboard at the shoulder. The bow footprint misses the stem samples and the narrow side rise ends before the shoulder sample. The stern trail is hard to distinguish as it ages.
-- **Cause:** the bow support shrank quadratically with speed, the side profile had a narrow fixed beam fraction, and the stern ramp gave slow propulsion little initial foam. The common surface mask spread a low density evenly across each trail section.
-- **Fix:** broaden the slow profiles around the same bow crest, produce stern foam at harbor speed, and concentrate thin foam into patches during shading.
-- **Regression:** `packages/water/test/ships.test.js` checks the slow bow, both sides, decay and rest. `packages/water/test/ships.browser.mjs` reads slow heights and visible foam on both GPU backends.
-
-### Fixed 2026-11-21: Lines and vector Text duplicated frame uniform setup (lines, text)
-
-- **Repro:** `npm run quality -- --gate=duplicates` reports `lines | text` after the formatted renderers line up. Make LineBatches' device throw while creating its frame bind group to isolate a buffer left by a failed setup.
-- **Cause:** both renderers allocated and bound the same kind of frame uniform inline. The group could fail after the buffer was allocated.
-- **Fix:** share the buffer-and-group setup. Retire the just-created buffer when making its group throws.
-- **Regression:** the duplicate gate finds the original block, and `packages/lines/tests/batch.test.js` checks failure cleanup.
-
-### Fixed 2026-11-21: the umbrella generator disagreed with its formatted import map (tools)
-
-- **Repro:** `node scripts/umbrella.mjs --check` reports `packages/margoengine/src/importmap.ts` as stale after `2428ebbafc`.
-- **Cause:** formatting changed the generated TypeScript while the template still emitted the earlier layout.
-- **Fix:** emit the checked-in TypeScript layout directly from the template.
-- **Regression:** `tests/umbrella.test.js` checks that all generated files match the generator output.
-
-### Fixed 2026-11-21: the bow displacement faded before it reached the sides (water/ships)
-
-- **Repro:** advance a 68 m, 15.5 m beam hull at 3 m/s in calm water. With Kelvin height off, sample 0.25 m outboard at a station 18 m aft of the stem. The height is effectively zero.
-- **Cause:** the near-field displacement ended at the bow. The rest of the waterline had foam and the deep-water wake, with no hull-following displacement.
-- **Fix:** extend the speed-dependent surface rise behind the crest, with a narrow outboard trough and a smooth fade toward the stern.
-- **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check lift on both sides, outboard drawdown and a quiet surface farther from the hull.
-
-### Open: standalone PostProcessing grades and presents the whole canvas for every view (KB-CREATIVE-POSTVIEW1, creative)
-
-- **Repro:** `PostProcessing.attach(engine)` (or `new PostStack([new PostProcessing()])`) and render two views with different scissors (`engine.render({views: [...]})`): the present pass clears the full target and draws a full-canvas triangle, so pixels outside the second view's scissor change (the owner harness reports "no pixel writes outside either view scissor", on both). With atmosphere or focus on, the world position is also rebuilt from a uv over the whole canvas rather than the view's rectangle.
-- **Cause:** `apply()` (standalone and stacked) and the grade shader work on the whole target and ignore `context.view`.
-- **Needs:** the view rectangle in the grade uniform and shader (uv and clamps relative to it) and the present pass drawn through the view's scissor with `loadOp: 'load'`. Until then PostProcessing is not an owner-lifetime entry (docs/limits.md).
-
-### Fixed 2026-11-21: disposing ToonShading or Stars left them registered, and the starfield ignored the view (KB-CREATIVE-DISPOSE1, creative)
-
-- **Repro:** `ToonShading.attach(engine).dispose()` or `Stars.attach(engine).dispose()`, then `engine.sceneOf(plugin)` still returned the scene and the frame pass kept running on freed buffers (ToonShading's pass then threw on `this.entry!`). With two views, the starfield also drew over the whole target (the harness: "draw restores the current viewport").
-- **Cause:** both `dispose()` freed their buffers and never called `removePlugin`, which `onDeviceRestored` shared with them; Stars' pass never called `applyView`.
-- **Fix:** a private `release()` for the device resources (used by `onDeviceRestored`), and `dispose()` removes the plugin from the scene it was attached to, then releases. Stars and Planet set the view's viewport and scissor.
-- **Regression:** `packages/creative/tests/dispose-scene.test.js` "ToonShading.dispose takes it out of its own scene, once" and the Stars twin; `npm run check:owners -- --packages=creative`.
-
-### Fixed 2026-11-21: GrassField and Planet refused an offscreen target of the other 8-bit canvas format (KB-CREATIVE-TARGETFMT1, creative)
-
-- **Repro:** on a device whose preferred canvas format is `bgra8unorm` (Windows), draw a GrassField or Planet into an `rgba8unorm` texture: "Unsupported grass target format". The owner harness' target is `rgba8unorm`.
-- **Cause:** the variant check allowed only `navigator.gpu.getPreferredCanvasFormat()` and the HDR formats, though the pipeline and shader are the same for both 8-bit formats WebGPU defines for a canvas.
-- **Fix:** `rgba8unorm` and `bgra8unorm` are both accepted (other formats and sample counts are still refused).
-- **Regression:** `tests/modern-grass.test.js` "GrassField builds only its initial variant" (draws both formats); `npm run check:owners -- --packages=creative` on WebGPU and the WebGL2 layer.
-
-### Fixed 2026-11-21: horse crowds and army crowds drew into the active scene and leaked their coat atlas on scene disposal (KB-HORSES-CROWDOWN1, horses, armies)
-
-- **Repro:** `addHorseCrowd`, `addHorse`, `PersonCrowd.attach` and `addArmy`, called from inside a scene (a plugin setup of a non-default scene), put their model and crowd draws into whichever scene was active after the lazy imports finished; the new owner fixtures failed "exercises a real registration". Disposing the owner scene or engine of a horse crowd, with `herd.dispose()` never called, left the coat atlas texture alive ("no leaked GPU buffers, textures or query sets").
-- **Cause:** the calls did not keep the scene they were made for across their awaits (`captureScene` in gltf and blender does); the atlas was owned by the herd handle only, not by the draw plugin the scene disposes.
-- **Fix:** each call captures its scene before the first await and runs the registration in it; the herd's crowd draw is a subclass whose `dispose()` also releases the atlas, once.
-- **Regression:** `packages/horses/test/horses.test.js` "crowd: the coat atlas goes with the draw however the draw is let go, once"; `npm run check:owners -- --packages=horses,armies`.
-
-### Fixed 2026-11-21: formatting moved the visual scorch division annotation (biomes)
-
-- **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` flagged the float division in `disturbanceStates` after `5757affe45`.
-- **Cause:** the annotation was attached to the end of a render-state object. Formatting put the annotated division and the comment on different lines.
-- **Fix:** name the scorch height calculation and keep its float-division annotation on the same line. The formula still runs only during the burn window.
-- **Regression:** the existing no-raw-division test checks the formatted source and still rejects unannotated variable division.
-
-### Fixed 2026-11-21: Water's WebGL2 browser suite could exhaust one GPU step (water tests)
-
-- **Repro:** run `npm run check:gpu-packages -- --select=water/test:gpu --no-build` with `MARGO_COMPAT=1` on the RTX A6000 workstation. The old step reached the surf check and was ended at 600 s.
-- **Cause:** the GPU runner assigned one ten-minute limit to all 49 browser launches. The elapsed time included WebGL2 shader compilation, browser startup and teardown for each check.
-- **Fix:** run the same checks in three package scripts of 16, 16 and 17 checks. The runner still gives each script ten minutes. The preview script keeps its separate slot.
-- **Regression:** `packages/water/test/browser-root.test.js` checks that each browser command appears exactly once across the groups, including both underwater modes.
-
-### Fixed 2026-11-21: the bow wave extended sideways in a straight line (water/ships)
-
-- **Repro:** a 68 m hull at 3 m/s leaves a raised stripe at the same distance aft of the stem across the near-field bow wave.
-- **Cause:** the longitudinal contact profile used the same phase at every lateral position. The outboard falloff only reduced its height.
-- **Fix:** sweep the profile aft and fade its height and foam to zero as it leaves the current hull. Use the current hull frame for the waterline mask when a ship turns.
-- **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` test separation of the hull crest, swept shoulder and old transverse line.
-
-### Fixed 2026-11-21: turbulent foam was already old at the stern (water/ships)
-
-- **Repro:** move a 72 m hull at 3 m/s with a 9.5-second foam life. Sample within one metre aft of the transom after the ship has moved one hull length.
-- **Cause:** the foam used the time at which the bow passed each point. The newest churning water was treated as roughly 24 seconds old. Stationary samples in a path also fell back to a due-north heading and could put a false turn in the wake near the berth.
-- **Fix:** sample the position and time of the stern as it passed. Keep the bow trajectory for the Kelvin and bow wave systems. Carry the last moving heading through stationary history samples.
-- **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check fresh and aging foam and reject points outside the trail. The CPU test also checks that an eastbound ship leaves no diagonal wake at its starting berth.
-
-### Fixed 2026-11-21: a Figure in a scene of its own put its lines, points, label and depth plugins in the engine's scene (KB-SCIVIZ-SCENE1, sciviz)
-- **Repro:** make a scene with `engine.createScene()`, add `Figure.attach(engine)` to it from a plugin's `setup`, add a line or scatter layer and wait for `figure.ready()`: `engine.sceneOf(figure.renderer)` was the new scene, but the lines plugin, the points plugin, the axes' label renderer (and, for a volume, the depth capture) were in the engine's own scene, so disposing the scene left them behind. The new owner fixture `packages/sciviz/tests/owner-lifetime.fixture.js` failed "async factory retains its originating scene" and "releases its registration".
-- **Cause:** those plugins are made after a dynamic `import()` has settled, when the engine's active scene is the default one again, and `Lines.attach(engine)` joins the active scene. `SciRenderer.dispose` also removed itself from the active scene instead of the scene it joined, so a figure disposed from outside its scene stayed registered there.
-- **Fix:** `packages/sciviz/src/scene-owner.ts` `inSceneOf(engine, owner, make)` runs the attach with the owner's scene active; the figure, its axes, point clouds, geo-vector labels and the progressive controller use it, the depth capture is one per scene, and the renderer leaves the scene `engine.sceneOf(this)` names.
-- **Regression:** `packages/sciviz/tests/scene-owner.test.js` (the scene a made plugin joins, the capture per scene); `npm run check:owners -- --packages=sciviz` on the CPU model, WebGPU and the WebGL2 layer.
-
-### Fixed 2026-11-21: disposing a Figure left its lines and points plugins, and an engine that removed its renderer left the figure running (KB-SCIVIZ-PLUGINS1, sciviz)
-- **Repro:** `const figure = Figure.attach(engine); await figure.line(...); figure.dispose();`: the lines plugin stayed registered on the engine (and the points plugin after a scatter, the depth capture after the last volume). A 2D figure whose renderer the engine or scene removed (`engine.removePlugin(figure.renderer.name)`, `scene.dispose()`) kept `engine.views` and the camera's `project` hook, because only `Figure.dispose` undid them.
-- **Cause:** `Figure.dispose` freed its layers, axes and panels but never the plugins it had added, and nothing tied the figure to its renderer's removal.
-- **Fix:** the figure keeps the lines and points plugins it makes and removes them when it is disposed (one that finishes loading afterwards goes at once); an idle depth capture leaves its scene (`VolumeDepthCapture.release`); the figure registers a hidden drawable on its renderer, whose disposal disposes the figure.
-- **Regression:** `packages/sciviz/tests/scene-owner.test.js` (`release` of an idle capture); the owner fixture's `Figure.2d` and 3D entries in every disposal mode.
-
-### Fixed 2026-11-21: a Figure disposed while its axes were loading ended in an unhandled "Engine disposed" rejection (KB-SCIVIZ-AXESDISPOSE1, sciviz)
-- **Repro:** add a graph layer (its bounds queue an axes update), then dispose the engine before the axes' dynamic imports finish: the queued update rejected with `MargoError disposed` from `Lines.attach`, which nothing awaited, and Node ended the process.
-- **Cause:** `Axes.update` awaited the plugin loads and rethrew whatever they threw, also after the axes had been disposed.
-- **Fix:** an update whose axes were disposed while the plugins loaded draws nothing and does not reject.
-- **Regression:** the owner fixture's `graphLayer` entry (the `cycles` case failed the run); `packages/sciviz/tests/axes-dispose.test.js` still passes.
-
-### Fixed 2026-11-21: connectVoxelNet left its listeners on a socket that had closed (KB-VOXELNET-WSLISTENERS1, voxel-net)
-- **Repro:** `const client = connectVoxelNet(url, world); client.close();` and wait for `onClose`: the closed WebSocket still held its `open`, `message` and `close` listeners, and each of them kept the client, the world and the resume loop reachable from the socket. The new owner fixture `packages/voxel-net/tests/owner-lifetime.fixture.js` (`connectVoxelNet`, `VoxelShardClient`) failed with "no leaked event listeners (3: open on WebSocket, message on WebSocket, close on WebSocket)" in every case.
-- **Cause:** `open()` in `packages/voxel-net/src/client.ts` added three anonymous listeners to each socket and never removed them, neither when the socket closed nor when a resume replaced it.
-- **Fix:** the three listeners are named, and the `close` listener (the last event a socket delivers) removes all three before it tells the client, so a client's `onClose` finds the socket released; a replaced socket's own close does the same.
-- **Regression:** `packages/voxel-net/tests/on-close.test.js` "connectVoxelNet takes its listeners off a socket once it closed, before onClose" (fails on the old code with 3 listeners left); `npm run check:owners -- --packages=voxel-net` on the CPU model, WebGPU and the WebGL2 layer.
-
-### Fixed 2026-11-21: the upstream-reports README check rejected a hyphenated report id (KB-UPSTREAM-IDS1, tests)
-
-- **Repro (before):** after bfa6c541b added docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1, `node --test tests/upstream-reports.test.js`
-  failed "the README table lists exactly the report folders": the folder was on disk and in the README, but the table regex missed it.
-- **Cause:** the test matched README rows with `KB\w+`, which stops at a hyphen, while docs/known-bugs.md uses both KB1042f-style and
-  KB-AREA-NAME1-style ids.
-- **Fix:** the row pattern is `KB[\w-]+` (the coordinator, 2026-11-21).
-- **Regression:** tests/upstream-reports.test.js (fails on the old pattern with the KB-WATER-FLOODFILM-COMPAT1 folder present).
-
-### Fixed 2026-11-21: FeatureEdges and the SectionPlanes caps ignored the view's viewport and scissor (KB-MACHINERY-VIEWPORT1, machinery)
-- **Repro:** render a view with a viewport smaller than the canvas with FeatureEdges (or SectionPlanes with caps) attached; the owner fixture `packages/machinery/test/owner-lifetime.fixture.js` failed in the browser leaf with "draw restores the current viewport".
-- **Cause:** their render passes never set the pass viewport and scissor, so edges and cap fills were drawn over the whole target instead of the view's rectangle.
-- **Fix:** both passes set `context.view`'s viewport and scissor the way core's own draw does.
-- **Regression:** `npm run check:owners -- --packages=machinery` on WebGPU and the WebGL2 layer (the harness checks every draw's viewport and scissor).
-
-### Fixed 2026-11-21: disposing a machinery plugin left it registered in its scene (KB-MACHINERY-DISPOSE1, machinery)
-- **Repro:** `const view = ExplodedView.attach(engine, parts); view.dispose();` then `engine.sceneOf(view)` still returned the scene; the same for Kinematics, SurfacePhysics, TelemetryChannel, FeatureEdges, SectionPlanes and EngineeringAnnotations. The new owner fixture `packages/machinery/test/owner-lifetime.fixture.js` failed with "releases its registration" for each. Dimensions removed its plugins from the active scene, not the one it was attached to.
-- **Cause:** `dispose()` cleared the plugin's own fields but never called `removePlugin`, unlike Scatter and SculptView; Dimensions called `engine.removePlugin(name)`, which uses the active scene.
-- **Fix:** each `dispose()` clears its fields, then removes the plugin from its own scene (the repeated dispose that `removePlugin` triggers finds nothing to do). FeatureEdges and SectionPlanes keep their device-restore path on a private release that does not unregister.
-- **Regression:** `packages/machinery/test/scene.test.js` "disposing Kinematics, ExplodedView, SurfacePhysics or TelemetryChannel takes the plugin out of its scene"; `npm run check:owners -- --packages=machinery` on WebGPU and the WebGL2 layer.
-
-### Fixed 2026-11-21: disposing a GeometryGenerator left its plugin and frame pass in the scene (KB-GEOMETRY-GENDISPOSE1, geometry)
-- **Repro:** `const generator = GeometryGenerator.attach(engine); generator.dispose();` then `engine.sceneOf(generator)` still returned the scene and its compute pass stayed registered; the new owner fixture `packages/geometry/tests/owner-lifetime.fixture.js` failed with "releases its registration" in every direct-disposal case.
-- **Cause:** `dispose()` freed the items' buffers and cleared the engine and device but never called `removePlugin`, unlike every other plugin's `dispose` (Scatter, SculptView). It also kept the read-back copy pipeline of the old device.
-- **Fix:** `dispose()` clears its fields, then removes the plugin from its scene (the repeated dispose that `removePlugin` triggers finds nothing to do) and drops the copy pipeline.
-- **Regression:** `packages/geometry/tests/gpu.test.js` "disposing the generator takes its plugin out of the scene, once"; `npm run check:owners -- --packages=geometry` on WebGPU and the WebGL2 layer.
-
-### Fixed 2026-11-21: a closed WebSocket or data-channel connection kept its listeners on the socket and channels (KB-NETCODE-LISTENERS1, netcode)
-
-- **Repro:** `openWebSocket` a socket (or `dataChannelConnection` two channels), close the connection, count the listeners on the socket or
-  channels: 2 (message and close) on a socket, 4 on the channel pair, still attached. The netcode owner/lifetime fixture (`listenWebSocket` entry, real
-  loopback socket; `dataChannelConnection` entry) failed "no leaked event listeners" in every case.
-- **Cause:** the connections added anonymous arrow listeners in their constructors and never removed them, so a closed connection stayed reachable
-  from its socket or channels until they were collected (and a channel that dispatches `close` synchronously re-entered `close()`).
-- **Fix:** the listeners are fields and `finish()` removes them (`packages/netcode/src/websocket.ts`, `webrtc.ts`); `DataChannelConnection.close()`
-  takes them off before it closes the channels.
-- **Regression:** packages/netcode/tests/connection-listeners.test.js (four cases) and the netcode owner/lifetime fixture.
-
-### Fixed 2026-11-21: RemoteTarget, PackageEditor and ShaderEditor disposal left them registered in their scene (KB-INSPECTOR-REMOTE-OWNER1, inspector)
-
-- **Repro:** `RemoteTarget.attach(engine, { transport })` in a scene, `target.dispose()`: `engine.sceneOf(target)` still returned the scene and
-  `scene.plugins` still held `inspector:remote`; `PackageEditor.dispose()` (`inspector:packages`) and `ShaderEditor.dispose()` (`inspector:shaders`) did the same. The inspector owner/lifetime fixture failed "<entry> releases its registration" for all three.
-- **Cause:** each `dispose()` stopped its timer, transport or panel, but never removed itself from the scene (FrameDebugger, the
-  animation and GL panels, the camera tools, the scene editor and the gizmo do).
-- **Fix:** `dispose()` removes the plugin from the scene that holds it (`engine.sceneOf(this)?.removePlugin(this.name)`), after setting its own
-  disposed flag, so a second call and the engine's own disposal stay harmless (`packages/inspector/src/remote.ts`, `packages.ts`, `shaders.ts`).
-- **Regression:** packages/inspector/test/dispose-scene.test.js (all three, in a scene other than the active one, twice, with a same-name
-  plugin in a third scene), packages/inspector/test/remote.test.js "disposing a target takes it off the scene...", and the inspector
-  owner/lifetime fixture.
-
-### Fixed 2026-11-21: a submerged ledge cast a bright silhouette through Water (KB-WATER-REFRACTDEPTH1, water)
-- **Repro:** run `node packages/water/test/refraction-depth.browser.mjs` on the previous shader. A slab in the straight view ray changes the water color where the bent ray hits only the seabed.
-- **Cause:** Water used the straight ray's depth gap for attenuation and for the first bent lookup. The opaque depth at the bent lookup could belong to a different surface.
-- **Fix:** intersect the bent ray with sampled depth and require the hit to project to the same texel. The validated hit supplies both color and path length. The direct depth gap still feeds contact foam.
-- **Regression:** `packages/water/test/refraction-depth.browser.mjs` on WebGPU and with `--compat` for the WebGL2 layer.
-
-### Fixed 2026-11-21: a full budget run had no provenance of its own in the WebGL2 demos table (KB-COMPAT-FRAMELINE1, webgl2-compat)
-
-- **Repro (before):** run `npm run visual:compat -- --write` on one machine, then a full `npm run visual:compat:budget -- --write`
-  on another machine or day: the frame column was rewritten but the table's one "Last recorded" line still named the
-  pixel run, so the frame numbers read as measured where the pixels were.
-- **Cause:** both full runs shared the single whole-table line, which only the pixel run wrote
-  (scripts/support/visual-compat-doc.js).
-- **Fix:** a full budget run writes its own "Frames last recorded <date> at <commit> on <gpu> (<browser>)" line, a full
-  pixel run writes only the "Last recorded" line, and neither touches the other; per-row stamps are unchanged and a doc
-  without the frame line still parses. The frame numbers now in docs/webgl2-compat-demos.md got the provenance of the
-  line they were recorded under.
-- **Regression:** tests/visual-compat-status.test.js ("a full frame run writes its own whole-table line and a full
-  pixel run leaves it alone").
-
-### Fixed 2026-11-21: waitForPipelines failed a page that had nothing pending after one long frame (KB-GPUREADY-CALM, scripts)
-
-- **Repro:** on a loaded machine, run `MARGO_COMPAT=1 node packages/water/test/sky-radiance.browser.mjs` a few
-  times in a row. It threw `not ready after 23364 ms: 0 pipelines compiling` in 2 of 5 runs,
-  then in 3 of 3 runs. contact-foam.browser.mjs, the water owner/lifetime fixture "PostStack of Caustics and
-  Underwater" and webgl2-compat README examples failed the same way.
-- **Cause:** a per-frame trace showed the wait drew exactly one frame. That frame's `engine.render()` ran synchronously
-  for 25 to 29 s on the WebGL2 layer: 6 programs, 54 passes, 7 compute dispatches (one on the CPU tier) and 6
-  synchronous reads. It started no async pipeline, left none compiling and `ready()` held. The time limit counted that
-  frame's own duration, and `waitForPipelines` threw whenever the limit had passed and the page had not yet seen two
-  calm frames. A calm first frame (calm count 1) was therefore failed before its confirming frame was drawn.
-- **Fix:** `scripts/support/gpu-ready.js` throws only when the limit has passed and the last frame left something
-  outstanding: a pipeline compiling, one started during that frame, or `ready()` false. A calm frame always gets its
-  confirming frame. The message names the label of each pipeline still compiling, the number started in the last
-  frame, the frame count and a false `ready()`. `scripts/support/compat-shim.js` records the labels on the layer too.
-  The limit and the two-frame rule are unchanged. A frame that never returns is still caught by the caller's hard
-  time limit. After the fix, sky-radiance passed 3 of 3 runs and contact-foam 2 of 2 under the same load. The long
-  first frame on the layer is work, not a wait, and stays a speed-phase item.
-- **Regression:** `tests/gpu-ready.test.js` uses a simulated clock to put a frame beyond the limit with nothing pending
-  (it fails on the old code with `not ready after 95 ms: 0 pipelines compiling`). It also covers a pipeline that never
-  compiles (fails, naming its label), a page that starts a pipeline every frame, and a `ready()` that stays false.
-
-### Fixed 2026-11-21: the web starter exceeded its bundle ceiling (create-margo)
-
-- **Repro:** on public main at `5ff5dc647f`, build packages and run `node --test --test-name-pattern="the web template" tests/create-margo.test.js`. The web template builds to 84,025 B gzip against a limit of 83,000 B. Its bundle does not load Water.
-- **Cause:** the template's Environment graph reaches all the lazy HDR image formats despite using a generated lighting image. The total test counts the initial bundle and all lazy chunks, including 11,659 B of loader code. Changing just the template import to the Environment main subpath still produces 83,954 B.
-- **Fix:** Scott approved an 85,000 B ceiling for the starter. The same test measures every lazy chunk and continues to enforce the limit.
-
-### Fixed 2026-11-21: planar water captures ended in a hard line (water)
-
-- **Repro:** aim a planar capture so that the bounds of its image cross water near a reflective object. The image ends abruptly where the warped UV leaves the capture.
-- **Cause:** the blend used a binary texture bound. Its warp also used the absolute world ray, and the planar image was sampled for ambient sky light.
-- **Fix:** feather the capture bounds over the filter footprint, project the change in reflected direction into the capture, and use sky radiance for ambient and foam lighting. The underwater camera uses the sky once it passes below the capture plane.
-- **Regression:** `packages/water/test/reflector.browser.mjs` verifies a full interior, partial edge, and unchanged exterior.
-
-### Fixed 2026-11-21: HDR overcast seas lost cloud light in wave troughs (water)
-
-- **Repro:** use a bright overcast HDR environment with deep-blue water and sloping waves. The sky lights their reflections while the troughs remain dark.
-- **Cause:** the legacy sky tint was reduced to two luminance samples and clamped, so the diffuse body stopped responding to HDR illumination beyond the clamp.
-- **Fix:** estimate cosine-weighted HDR irradiance from the same sky as the reflection and use it to illuminate the water body.
-- **Regression:** `packages/water/test/sky-radiance.browser.mjs` isolates body radiance by subtracting a black-water frame at two HDR light levels.
-
-### Fixed 2026-11-21: HDR ocean reflected a different sky direction (water)
-
-- **Repro:** use the same asymmetric HDR photograph for EnvironmentBackground and Water. The surface can reflect another quadrant, creating a colour discontinuity at the horizon.
-- **Cause:** Environment equirectangular maps are centred on -Z and have a live rotation and radiance scale. The water lookup assumed the +X convention of the procedural Sky callback.
-- **Fix:** pass the Environment through Water's `reflectionEnvironment` and Underwater's `skyEnvironment`. The package applies the source convention and live transform. The same stage also resolves partial pixel coverage at the camera's near-plane waterline.
-- **Regression:** `packages/water/test/sky-radiance.browser.mjs` and `packages/water/test/underwater.browser.mjs`.
-
-### Fixed 2026-11-21: contact foam outlined fully submerged geometry (water)
-
-- **Repro:** a flat sea and a fully submerged block made the block's screen silhouette leave 360 pixels in the foam mask.
-- **Cause:** a derivative of the full depth gap could span the block and open sea, expanding the contact threshold by metres.
-- **Fix:** compute the derivative on the bounded contact field. With the same fixture the deep block leaves zero foam pixels and a block near the surface leaves 4,289.
-- **Regression:** `packages/water/test/contact-foam.browser.mjs` checks the GPU foam target at both depths.
-
-### Fixed 2026-11-21: a --only budget run made other rows' frame numbers look measured on its machine (KB-COMPAT-BUDGETSTAMP1, webgl2-compat)
-
-- **Repro (before):** `scripts/visual-compat-budget.mjs --only <demo>` (one demo, or a run on another machine) wrote
-  frame numbers into docs/webgl2-compat-demos.md, and the table's Last recorded line then claimed every row's frame
-  numbers for that machine and date.
-- **Cause:** the frame column was attributed to the machine and date on the table's single Last recorded line, so a
-  partial run changed what that line said about rows it never wrote.
-- **Fix:** 5ff5dc647. Frame stamps live in a seventh column; a `--only` run stamps only the rows it wrote, a full run
-  clears them and the global line is untouched. The commit also formats the test with biome.
-- **Regression:** tests/visual-compat-status.test.js
-
-### Fixed 2026-11-21: a --only visual:compat pixel run rewrote the whole table's Last recorded line (KB-COMPAT-PIXELSTAMP1, webgl2-compat)
-
-- **Repro (before):** a `--only` pixel run of `scripts/visual-compat.mjs` rewrote the Last recorded line of
-  docs/webgl2-compat-demos.md for the whole table, though it measured only its own rows.
-- **Cause:** the doc writer stamped the global line on every run, partial or full.
-- **Fix:** fb45900a9. A `--only` run stamps its own rows and leaves the line alone; the doc restores the 2026-11-16
-  nvidia line and gives hud-preview its own stamp (2026-11-21, 0e11055b5, intel xe-2lpg, msedge 157.0.4341.46).
-- **Regression:** tests/visual-compat-status.test.js
-
-### Fixed 2026-11-21: the example type check printed hundreds of TS2307 on an unbuilt checkout (KB-EXAMPLES-NOTBUILT1, examples)
-
-- **Repro (before):** on a checkout whose packages were not built (or built before the last pull) the example type
-  check printed one TS2307 per import, hundreds for the all-entries project.
-- **Cause:** not a resolution bug: a fresh checkout after `npm ci` and `npm run build:packages` passes every project,
-  so the report was a skipped build step that the check did not name.
-- **Fix:** e66d9f84b. When every error is such an import, the check prints one `EXAMPLE_TYPES_PACKAGES_NOT_BUILT`
-  line with the fix.
-- **Regression:** tests/check-example-types.test.js
-
-### Fixed 2026-11-21: a stale docs/catalog.json export list was caught by no fast check (KB-HYGIENE-CATALOGSTALE1, hygiene)
-
-- **Repro (before):** materials gained `noteEngine` and docs/catalog.json (its export lists come from dist) was left
-  stale, so every `npm run build:packages` rewrote the tracked file.
-- **Cause:** nothing compared a catalog entry with the exports its api report declares before the build.
-- **Fix:** 5ff16b2b2. hygiene reports a catalog entry missing an export its api report declares and names
-  `npm run build:packages`. The stale entry itself was committed in 5067bd189.
-- **Regression:** tests/package-records.test.js
-
-### Fixed 2026-11-21: ContactLights depth and an Environment GPU cube source broke the frame after a device restore (rows of KB-RESTORE-BORROWED1, clustered, environment)
-
-- **Repro (before):** after a device restore, a plain depth texture given to ContactLights, or a plain `{ texture }`
-  cube source of an Environment, was bound on the new device: a validation error from the depth copy, or a failed
-  rebuild. Two more rows of KB-RESTORE-BORROWED1 (see that entry for the rule).
-- **Cause:** such a texture belongs to the device that made it, and the old code did not follow the borrowed-object rule.
-- **Fix:** 8cde748ff. Each is dropped, reported once through `engine.onError` (#borrowed-lost) and the frame goes on;
-  a callback depth and a live cube source (CubeCamera) are read again by themselves; `options.depth = texture` and the
-  additive `Environment.setSource(source, target?)` bring a new one back.
-- **Regression:** packages/clustered/test/contact-borrowed-restore-browser.mjs and
-  packages/environment/tests/cube-source-restore-browser.mjs
-
-### Fixed 2026-11-21: the nature AO probe's shader replace matched nothing after positiveColor renamed the fragment parameter (KB-TESTS-NATUREPROBE1, tests)
-
-- **Repro (before):** `tests/nature.browser.mjs` failed on main with the WGSL error "unresolved call target
-  'lighting'".
-- **Cause:** positiveColor (scatter instances.ts) renames the fragment entry's parameter from `i` to `varyings`, so
-  the probe's text replace of `@fragment fn fragment(i:Output,...)` matched nothing and `lighting()` was never declared.
-- **Fix:** 8a443f7ea. The probe matches the entry under either parameter name and throws if it finds none, so a
-  renamed entry fails with that message instead of an unrelated WGSL error.
-- **Regression:** tests/nature.browser.mjs
-
-### Fixed 2026-11-21: the sheen albedo test kept the old history-reading case beside its replacement (KB-SHEEN-HISTORY2, materials)
-
-- **Repro (before):** `node --test packages/materials/test/sheen-albedo-fit.test.js` threw a ReferenceError on every
-  checkout (follow-up to KB-SHEEN-HISTORY1).
-- **Cause:** cd727fe31 added the in-repo closed-form reference case but left the old case that read a private-only
-  commit out of git history, after removing that case's `closedFormAlbedoCommit` and `execFileSync` imports; it also
-  reformatted the file to double quotes against the repo's style.
-- **Fix:** ddb0109a2. The old case is removed (the new one keeps the same assertions), the unused import goes and
-  biome restores the style. All 6 cases pass.
-- **Regression:** packages/materials/test/sheen-albedo-fit.test.js
-
-### Fixed 2026-11-21: environment/main and /loaders had no importing test, so quality tests failed on main (KB-ENV-ENTRYTEST1, environment)
-
-- **Repro (before):** the quality tests gate failed on main with 2 new unimported entries.
-- **Cause:** bd916175a (KB-REACT-ENVDECODERS1) added `@margoengine/environment/main` and `/loaders` with no test
-  importing either.
-- **Fix:** a6e0fe9f8. A new test imports both entries and holds the split's promise: /loaders holds the image
-  decoders, /main holds none of them, and the root re-exports exactly the two entries' objects.
-- **Regression:** packages/environment/tests/entries.test.js
-
-### Fixed 2026-11-21: the react subpaths build check failed under load on rolldown's plugin-timings report (KB-REACT-PLUGINTIMINGS1, react)
-
-- **Repro (before):** packages/react/tests/subpaths.test.js, which asserts the Vite build prints no warnings, passed or
-  failed with machine load: on a loaded machine rolldown added a `[PLUGIN_TIMINGS]` note (plugin callbacks took 61% of
-  the build).
-- **Cause:** that note reports build speed, not the code under test.
-- **Fix:** d9cb43729. `checks.pluginTimings` is off in the test's build; every other warning, Vite's and the
-  bundler's, stays asserted.
-- **Regression:** packages/react/tests/subpaths.test.js
-
-### Fixed 2026-11-21: react tests mocked only @margoengine/environment after the bindings moved to /main and /loaders (KB-REACT-ENVMOCK1, react)
-
-- **Repro (before):** 16 react tests failed on main, e.g. "addLighting is not a function" and
-  "this.engine?.sceneOf is not a function".
-- **Cause:** bd916175a moved react's environment bindings to `@margoengine/environment/main` and `/loaders`, but five
-  test files still mocked only `@margoengine/environment`, so their fakes no longer applied and the real environment
-  code ran against the tests' fake models.
-- **Fix:** 286e420cc. Each mock is one object registered under all three specifiers, so a binding moving between the
-  entries keeps the tests valid. An unused import in cube-camera-capture.test.js goes too. React's full suite: 381
-  pass, 0 fail.
-- **Regression:** packages/react/tests/extras.test.js
-
-### Fixed 2026-11-20: the sheen albedo test needed a commit that only the private history has (KB-SHEEN-HISTORY1, materials)
-
-- **Repro (before):** `node --test packages/materials/test/sheen-albedo-fit.test.js` failed on public main in every
-  checkout: "the GPU check reference is the pinned closed form the table replaced" ran
-  `git show 5cef0a120^:packages/shared/sheen.js`, and that commit is not in the public repository (public main
-  arrived as a squashed sync).
-- **Cause:** the test read its reference out of git history, which a repository's own tests cannot rely on.
-- **Fix:** the test holds a literal copy of the closed-form albedo the table replaced and compares
-  `closedFormAlbedoWGSL` (scripts/sheen-albedo-fit.mjs) with it, byte for byte as before; the other assertions
-  (the shipped table differs from it, the GPU check takes no reference from history) are unchanged. No tolerance moved.
-  The other tests that run `git show` use `HEAD` or commits present here.
-- **Regression:** packages/materials/test/sheen-albedo-fit.test.js, which fails if the script's closed form changes
-  or is swapped for another revision.
-
-### Open (below Margo): the WebGL2 layer on ANGLE Direct3D 11 gives the flood film another state from one browser launch to the next (KB-WATER-FLOODFILM-COMPAT1, water, 2026-11-21)
-
-- **Repro:** `MARGO_COMPAT=1 node packages/water/test/flood-film.browser.mjs` (WebGL2 layer, Intel Arc 140V through
-  ANGLE D3D11) failed once in four runs, under load (four agents and a `test:changed` run on the 8-core machine): the
-  two 30 fps runs hashed c9b4539d (volume 4,535.639080 m^3) and the 60 fps run 2859cbf7 (4,535.639329), so "1,200
-  frames at 60 fps equal 600 at 30 fps" failed. The other three runs, two of them on the code before
-  KB-WATER-SURGEVOL1's change and one after, hashed eee49ae9 (4,535.639200) for every run and the seek. The flood's
-  kernels take no surf WGSL (dist/flood.js imports swell-wgsl only). The check stays bit for bit as it is.
-- **Cause:** below Margo, in what the browser's WebGL2 stack (ANGLE's Direct3D 11 back end, the HLSL compiler or the
-  driver) makes of the same GLSL and the same inputs. Upstream draft: `docs/upstream-reports/KB-WATER-FLOODFILM-COMPAT1/report.md`.
-  Evidence (2026-11-21, renderer string `ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11
-  vs_5_0 ps_5_0, D3D11)`, the check's scene with each 4 s reading hashed too, up to four GPU runs at once on the
-  8-core machine):
-  - The state is not the same from one launch to the next. In 32 WebGL2 launches the first 30 fps run ended at
-    eee49ae9 (26), c9b4539d (4), d9a15081 (1) and a1e8cf94 (1); the 10 s restore leg at 362bba19 (28), 867ef247 (3)
-    and 92525196 (1). The launches already differ at the first reading, 4 s in. 20 of 20 native WebGPU launches in
-    the same hours gave 43f2d001 (restore 2e640161) exactly.
-  - Inside a launch the legs agree in 31 of 32: the two 30 fps runs, the 60 fps run, the seek and the device restore.
-    In one launch the first 30 fps run (a1e8cf94) differed from the rest (eee49ae9), as the logged run's 60 fps leg did.
-  - What Margo hands WebGL2 is the same in every launch: the GLSL of the stage, first and record kernels compared equal
-    across launches; ANGLE's translated HLSL of the stage's two programs (WEBGL_debug_shaders, Edge started with
-    `--enable-privileged-webgl-extensions`) hashed daee9534 and 4db8f6b2 in all 7 launches captured; the uniform ring's
-    bytes (2,886 writes), the float texture uploads and the kernels' size uniforms hashed the same in all 7 launches
-    measured. No clock, timer or random number reaches the flood, Water or core (none in their sources), and the stage
-    is a gather that writes only its own texel of render targets no draw also reads, so no read can race a write in
-    GL's in-order command stream.
-  - Gap: the 6 varying launches were the first 6 after the build; every launch after them gave eee49ae9, including all
-    those with the HLSL and GL-stream probes, so no HLSL or GL-stream capture exists yet from inside a varying launch.
-    Which layer gives the other rounding (ANGLE's pixel executable, the HLSL compiler or the driver's compile) is not
-    known, and GLSL ES 3.00 has no `precise` to pin it.
-- **Fix condition:** an ANGLE or driver change that compiles the same GLSL to the same rounding in every launch, or a
-  standalone page that shows the varying launch and names the layer; until then the check can fail on this layer.
-### Fixed 2026-11-21: Blender's TANH math node gave NaN for large inputs on native WebGPU (KB-BLENDER-TANH1, blender)
-
-- **Fix:** `TANH` is `tanh(clamp(a,-10.0,10.0))`. For |x| over 9.01, 1 - |tanh x| = 2 / (e^2|x| + 1) is under 2^-25, so
-  f32 tanh rounds to +-1 (IEEE 754-2019 round to nearest) and the clamp changes no correctly rounded value. It is the
-  only tanh the blender package emits.
-- **Regression:** `packages/blender/tests/nodes.test.js` fails on a bare tanh in the emitted WGSL;
-  `packages/blender/tests/nodes-browser.mjs` renders TANH of 100, -100 and 395 and expects +-1, not NaN.
-- **Repro (before):** a WGSL compute shader writing `tanh(x)` for runtime x on native WebGPU (adapter `intel` `xe-2lpg`): 1 at
-  x = 50, NaN at x = 100, 395 and -100 (sinh and cosh return infinity there; found under KB-WATER-SURGEVOL1).
-  `packages/blender/src/nodes-wgsl.ts` mapped the math node's `TANH` to a bare `tanh(a)`, so a node graph feeding it a
-  value over about 88.7 in size got NaN where Blender gives +-1.
-- **Cause:** the GPU's tanh overflows f32 in sinh or cosh for |x| over about 88.7.
-
-### Fixed 2026-11-21: the surge check's sea held half its water on native WebGPU (KB-WATER-SURGEVOL1, water)
-
-- **Repro (before):** `node packages/water/test/surge.browser.mjs` (native WebGPU, adapter `intel` `xe-2lpg`) failed
-  "the surge brings water in from the sea": volume 1,679.1 m^3 at the peak against 1,430.8 calm (1.17 times; it asked
-  over 1.2). The same numbers, bit for bit, on the code before KB-SCENES-DUNE-ARCHANG1's change; the WebGL2 layer
-  passed.
-- **The physics:** the beach (64 rows, ground -2.95 + 0.1 i m) at rest at level L holds 64 x sum (L - ground) over the
-  cells below L: 2,880 m^3 at 0 and 5,120 m^3 at 1 m, a ratio of 1.78 (the 5 mm swell adds under 0.3%). The WebGL2
-  layer measured 2,880.2 and 5,133.9, and test/coast-reference.js (the flow in float64, no surf) 2,880 at rest. So 1.2
-  was a loose bound, not a wrong one: native WebGPU had lost half the sea at rest, and the beach probe alone (0.607 m at
-  ground 0.45 m) still passed.
-- **Cause:** the surf's WGSL (`packages/water/src/surf.ts`) took tanh of unbounded arguments, and native WebGPU on this
-  GPU returns NaN for tanh(x) once sinh and cosh overflow f32 (measured: 1 at x = 50, NaN at x = 100). The Ruessink et
-  al. 2012 wave phase `tanh(0.815 / Ur^0.672)` passes x = 89 where the Ursell number is under about 1e-3, as under the
-  test's 5 mm, 20 m swell in water 2.4 m deep or more. There `surfSea` returned NaN; the integrate kernel's relaxation target `max(0, sea - ground)`
-  read 0, so the open sea next to the map's deep edge relaxed toward empty (the edge column held 0 m over 2.95 m of
-  ground) and the beach cells sloshed meters deep. Found by writing `surfSea` into the state's spare channels: NaN in
-  the six columns 2.45 m deep or more, finite beyond. Fenton and McKee's `tanh((k0 d)^0.75)` (in `surfK` and the field
-  builder's `waveK`) would do the same at k0 d over 397, a 20 m swell over 1.26 km of water.
-- **Fix:** every tanh in the surf's WGSL takes `min(x, 10.0)`. For x over 9.01, 1 - tanh x = 2 / (e^2x + 1) is under
-  2^-25, half an f32 ulp below 1, so tanh x rounds to 1 (IEEE 754-2019 round to nearest) and the clamp changes no
-  correctly rounded value; the Ruessink phase then reads 0, the symmetric wave of its Ur -> 0 limit. The water surface
-  and the wave queries share this WGSL, so a calm deep sea's surface no longer reads NaN there either.
-- **After:** native WebGPU and the WebGL2 layer give the same volumes to six digits: 2,880.15 m^3 at rest, 5,133.87 at
-  the peak, 2,881.35 after the fall; the beach floods to 0.606 m and drains to 0.008 m.
-- **Regression:** `packages/water/test/surge.browser.mjs` now asks for the still-water volumes themselves (within 1% at
-  rest and 2% at the peak, in place of the 1.2 ratio; the drained run's 1,430.8 fails it), and
-  `packages/water/test/coast-runup.test.js` fails on any tanh in water's sources whose argument is not bounded by `min(`
-  or `clamp(` (it lists the three bare ones before the fix).
-
-### Fixed 2026-11-21: the dune coast's camp view hung the WebGPU device on a laptop GPU (KB-SCENES-DUNE-ARCHANG1, water)
-
-- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (native WebGPU, laptop
-  GPU, adapter `intel` `xe-2lpg`): within about 3 s of the page's start "the page's WebGPU device was lost
-  (DXGI_ERROR_DEVICE_HUNG)", the restore's `requestDevice` then failed with DXGI_ERROR_DEVICE_REMOVED and the frame was
-  black. Three runs out of three on 2026-11-20 (with and without KB-SCENES-DUNE-GTAO1's scatter change); small WebGPU
-  pages passed between them, and the WebGL2 layer ran the view.
-- **Cause:** found by timing every render and compute pass of the page's frames with timestamp queries: on the first
-  frame one compute pass, the `Water` coastal flow's `step` (`packages/water/src/coastal.ts`), ran 4,403 ms; every other
-  pass was under 61 ms, and later frames' `step` 7 ms. On its first step the flow records its whole set-up into the
-  frame's one command buffer: the initial state and the sea's connectivity, the surf field's 2 + 1,024 relaxation sweeps
-  of the 512 x 512 shore grid and the 40 s spin-up (600 frames of 3 substeps, 3,600 flow dispatches), about 4,600 grid
-  dispatches. Windows resets a GPU that cannot finish or preempt one DMA packet within 2 s (Microsoft, "Timeout
-  detection and recovery (TDR)", https://learn.microsoft.com/windows-hardware/drivers/display/timeout-detection-and-recovery,
-  and "TdrDelay", https://learn.microsoft.com/windows-hardware/drivers/display/tdr-registry-keys), so the packet hung
-  the device whenever the scheduler asked to preempt it (another process's GPU work, the desktop) and it could not yield.
-  A quiet run of the page can survive it, as one probe run here did; the scene's check did not.
-- **Fix:** `CoastalFlow.setUp` (`packages/water/src/coastal.ts`, with `SurfFieldBuilder.build` in `surf.ts`) records
-  the same set-up commands in the same order, but into command buffers of at most `SETUP_WORKGROUPS` (2^18, 64 grid
-  dispatches of a 512 x 512 map) workgroups, each submitted on its own (Dawn records the buffers of one submit into one
-  D3D12 command list) ahead of the frame's commands; the frame's own three substeps stay in the frame. On this GPU the
-  first frame is now 74 submissions of the set-up, none over 84 ms, 4.4 to 4.8 s of GPU time in all as before. The
-  set-up reads the heightmap and the uniform as the queue holds them when the step runs (the upload, and the uniform
-  written just before), not a heightmap the same frame's encoder writes earlier on the GPU; no package feeds Water one.
-- **After:** the camp check passes on native WebGPU on this GPU ("dune coast still check passed": ground sRGB 154, 141,
-  110; occlusion mean 177.2 against 180.6 open, 10.2 percent of pixels darker), which finishes verifying
-  KB-SCENES-DUNE-GTAO1 there. `packages/water/test/surf.browser.mjs` gives the same swash run-up as before (0.126 m, in
-  the first wave period too).
-- **Regression:** `packages/water/test/surf.browser.mjs` counts the compute workgroups of every queue submission of the
-  first frame: none holds more than 2^18 and all of them hold at least the set-up's (fails on the code before: one
-  submission of 18,986,279 workgroups).
-
-### Fixed 2026-11-20: ambient occlusion no longer darkened the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter)
-
-- **Repro (before):** `MARGO_COMPAT=1 node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` failed
-  "the occluded camp view is darker: mean 181.1 against 180.7": with the default `occlusion` 1.5, 0.4 percent of the
-  camp view's pixels were darker than with `occlusion: 0` (on 2026-11-19, 193.8 against 193.3 and 0.7 percent; before
-  KB-SCATTER-SUBPIXEL1, 186.4 against 193.2 and 20 percent).
-- **Cause:** found by bisecting scenes, post, sky, terrain, environment, shadows, core, shared, water and scatter: the
-  first bad commit was KB-SCATTER-SUBPIXEL1's, which draws grass blades by their prefiltered pixel coverage, blended
-  over the scene. Blended blades wrote no depth (only the near ring's opaque cores did), and GTAO finds occluders only
-  in the depth buffer (Jimenez, Wu, Pesce and Jarabo 2016), so the grass did not occlude: the dark grass feet and the
-  shade the clumps cast on the sand were gone.
-- **Fix:** `packages/scatter/src/index.ts` and `cover.ts`: after all the blended draws a depth-only pass draws every
-  covered ring again with the same pose (`coverCode(code, lit, at, true)`, colour write mask 0) and keeps a fragment
-  whose coverage passes the pose's threshold, `scatterCover.w` (now a `vec4f`; 0.5 by default). `GrassScatter` sets it
-  to a hash of the blade (`grass.ts`), an object-space hashed alpha test of the coverage (Wyman and McGuire, "Hashed
-  Alpha Testing", I3D 2017; the alpha-tested depth pass of blended hair: Nguyen and Donnelly, GPU Gems 2, 2005), so a
-  pixel keeps depth with the chance of its coverage and overlapping blades leave it bare with the chance over leaves
-  its colour bare (stochastic transparency: Enderton, Sintorn, Shirley and Luebke, I3D 2010), and the pattern holds
-  still on the blade as the camera moves. Drawn after the blending, the depth hides no blade that blends later, so the
-  colour and the anti-aliasing are unchanged: `packages/scatter/test/grass-pixel.browser.mjs` still reads 0 ppm speckle,
-  mean luma 184.54 against 184.90 (diffuse) and 185.12 against 185.41 (PBR) on WebGPU. The camp check on the WebGL2
-  layer now reads mean 177.0 against 180.6 open and 10.5 percent of pixels darker; the open frame is the same as before
-  (180.6 against 180.7). On native WebGPU, once KB-SCENES-DUNE-ARCHANG1 let the view run (2026-11-21, adapter `intel`
-  `xe-2lpg`): mean 177.2 against 180.6 open, 10.2 percent of pixels darker.
-- **Regression:** `packages/scatter/test/grass.test.js` ("coverCode depth: ...", fails on the code before: no depth
-  stage) and `packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (fails on the code before, above).
-- **Limit:** a pixel the depth pass leaves bare keeps the ground's depth, and the grass is not in GTAO's ambient replay,
-  so it occludes the sand but is not darkened itself; recorded in `docs/limits.md`.
+### Open 2026-11-19: ambient occlusion no longer darkens the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter, post, scenes)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (WebGPU or `MARGO_COMPAT=1`) fails
+  "the occluded camp view is darker: mean 193.8 against 193.3": with the default `occlusion` 1.5, 0.7 percent of the
+  camp view's pixels are darker than with `occlusion: 0`; before, 186.4 against 193.2 and 20 percent.
+- **Cause:** found by bisecting scenes, post, sky, terrain, environment, shadows, core, shared, water and scatter
+  between 598fd47113 (passes) and 3452515cd6: the first bad commit is 9af8d017af (KB-SCATTER-SUBPIXEL1), which draws
+  grass blades by their prefiltered pixel coverage, blended over the scene. Blended blades write no depth (only the near
+  ring's opaque cores do) and are not lit through the ambient replay GTAO reads, so the grass is neither an occluder nor
+  occluded: the dark grass feet and the shade the clumps cast on the sand, most of the darkening the check measured,
+  are gone. The fix needs a design choice in scatter and post (an occlusion term the blended blades take, or a coverage
+  depth the GTAO pass reads), so it is left to a dedicated change.
 
 ### Fixed 2026-11-19: on the WebGL2 layer a page's first frames with a large shadow map threw "stopped at its work budget" (KB-COMPAT-CPUBUDGET1, shadows)
 
@@ -551,20 +71,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   when loadAuto returns it forgets everything. The same load now holds 104,867,300 B (one copy). Regression:
   `packages/gltf/test/auto.test.js` ("downloaded once and held once"; the declared-length move keeps the redirect URL).
 
-### Fixed 2026-11-20: loadAuto on an engine with no GPU device reports gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
+### Open: loadAuto on an engine with no GPU device reports gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
 
-- **Repro (before):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour
+- **Repro (by reading):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour
   map: `gltf/textured` refuses with `unsupported` (it names `install()` from `@margoengine/webgl2-compat`), `loadAuto`
   moves to gltf/pbr, which fails with `PBRModel requires WebGPU`, and the first reason is dropped.
 - **Cause:** `loadAuto` moves on any `unsupported` refusal without checking that gltf/pbr can run on the engine. The
   current test "a texture on WebGL does too" (`packages/gltf/test/auto.test.js`) asserts the move, so changing it is
   a decision on what loadAuto should do on an engine without a GPU device.
-- **Fix:** `packages/gltf/src/auto.ts` (`choose`'s `heavy`): when gltf/pbr refuses as `unsupported` on an engine with no
-  GPU device, loadAuto throws one `unsupported` MargoError that names the light loader's reason and gltf/pbr's refusal.
-  loadAuto still moves to gltf/pbr, so the existing test "a texture on WebGL does too" stands; the entry's open
-  question on what loadAuto should do there is answered by keeping that move.
-- **Regression:** `packages/gltf/test/auto.test.js` ("loadAuto without a GPU device names the light loader reason and
-  gltf/pbr refusal"), which fails without the fix.
 
 ### Fixed 2026-11-19: a node with a zero scale on any axis stopped the whole glTF load, in both loaders (KB-GLTFA B1, core + gltf)
 
@@ -1723,15 +1237,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that drives its height and flux. Papers are cited in `src/surf.ts`. Regression: packages/water/test/surf.browser.mjs
   (breaking in the surf zone, none and no foam deeper than 3 m, shoaling, the depth cap, the bores reaching dry sand).
 
-### Fixed 2026-11-20: gltf/pbr's model nodes and the facade's meshes were two Mesh types, so parenting one to the other needed a cast (KB-GLTF-MESHTYPE1, gltf)
+### Open 2026-11-17: gltf/pbr's model nodes and the facade's meshes are two Mesh types, so parenting one to the other needs a cast (KB-GLTF-MESHTYPE1, gltf, core)
 
-- **Repro:** `const model = await loadGLTF(engine, url); model.root.setParent(engine.createMesh());` failed to type-check
+- **Repro:** `const model = await loadGLTF(engine, url); model.root.setParent(engine.createMesh());` fails to type-check
   (TS2740: the facade's `Mesh` lacks `engine`, `id`, `scene`, `born` and 4 more of the engine's internal `Mesh`).
-- **Cause:** `PBRModel.root` and `nodes` were typed with `core/dist/engine`'s `Mesh`, whose `setParent` takes that
-  internal type; `engine.createMesh` returns `core/dist/api`'s. At run time both are the same object.
-- **Fix:** no core change and no change to a locked export: `PBRModel.root` and `nodes` in `@margoengine/gltf` are typed
-  `Mesh & FacadeMesh` (the internal class and the public interface), so `setParent` accepts either. `examples/kitty-hawk`
-  lost its cast. Regression: tests/public-engine-types.test.js (KB-GLTF-MESHTYPE1).
+- **Cause:** `PBRModel.root` and `nodes` are typed with `core/dist/engine`'s `Mesh`, `engine.createMesh` returns
+  `core/dist/api`'s; at run time both are the same object.
+- **Workaround:** a cast, as `examples/kitty-hawk/main.ts` does. Fix: type the model's nodes with the public `Mesh`.
 
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 
@@ -2194,54 +1706,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/react/tests/textures.test.js ("an inline colour or emissive array with the same values
   keeps the material mesh; a new value replaces it").
 
-### Fixed 2026-11-20: a glTF or FBX `<Model>` inside a named `<Scene>` is drawn in the default scene (GAP-REACT-SCENEMODELS, react)
+### Open 2026-11-16: a glTF or FBX `<Model>` inside a named `<Scene>` is drawn in the default scene (GAP-REACT-SCENEMODELS, react)
 
-- **Repro (before):** `<RenderView scene="item" /><Scene name="item"><Gltf src="a.glb" /></Scene>`: the model joins the default
+- **Repro:** `<RenderView scene="item" /><Scene name="item"><Gltf src="a.glb" /></Scene>`: the model joins the default
   scene, so the item view does not show it; under a `<Mesh>` inside that Scene the load fails with core's
   `Foreign parent` TypeError, reported through `onError`.
-- **Cause:** `instantiateModel` (packages/react/src/model-assets.ts) built the gltf/pbr model on the engine outside any
-  scene, so its root mesh and draw plugin belonged to the default scene; the model binding had no scene to pass on.
-- **Fix:** `instantiateModel` takes the enclosing Scene's world and builds the PBRModel and its `engine.use` inside
-  `sceneScope(engine, world)`, the scope gltf/pbr uses for its own loads. The first model a load builds in the default
-  scene is disposed for a named scene, and `Model` reloads when its world changes. `<Hud>` and `<RenderTexture>` pass their
-  portal world the same way; that path has no test of its own yet. FBX uses the same path.
-- **Regression:** packages/react/tests/scene-loaders.test.js ("a Model inside a named <Scene> is built and drawn in that
-  scene, not the default one").
-- **Follow-up:** the other plugin bindings are fixed under GAP-REACT-SCENEPLUGINS, next entry.
-
-### Fixed 2026-11-21: react bindings other than models attached to the default scene inside `<Scene>`, `<Hud>` and `<RenderTexture>` (GAP-REACT-SCENEPLUGINS, react)
-
-- **Repro (before):** `<Sky>`, `<Clouds>`, `<Text>`, `<BatchedMesh>`, `<Voxels>` or another binding that called
-  `engine.use` or `X.attach(engine)` directly, placed inside `<Scene name="item">`, landed in the default scene, so the
-  item view did not draw it.
-- **Cause:** those bindings used the engine's default scene (`engine.use`, `engine.removePlugin`) instead of the
-  enclosing scene's world, as `attachBinding` (packages/react/src/package-binding.ts) does.
-- **Fix:** `sceneOwner(scene)` (the world, else the engine) adds and removes the plugins the bindings build themselves
-  (Sky, ContactShadows, the shared Text renderer, now one per scene, Animation, Physics), and `inScene(scene, work)` runs
-  `X.attach(engine, ...)` inside `sceneScope`, the scope `instantiateModel` uses (Clouds and its soft-particle depth,
-  BatchedMesh, Voxels, AmbientShadows, Caustics, ModelOutlines and MeshOutline). `useCreated` recreates its object when
-  the world changes. `<Hud>` and `<RenderTexture>` pass their world the same way.
-- **Regression:** packages/react/tests/kit-helpers.test.js ("Sky and Text inside a named <Scene>"),
-  packages/react/tests/extras.test.js ("BatchedMesh and Voxels inside a <Scene>") and
-  packages/react/tests/clouds.test.js ("Clouds inside a named <Scene>", on a real core scene).
-- **Second change (2026-11-21), the rest:** `<Environment>` (its lighting, background, captured children and the
-  default sun and ambient it writes), `<CubeCamera>` (its `envMap` background and private fog) and the environment
-  capture attach to, and write the lighting of, the enclosing scene (`sceneOwner`), and leave the Canvas's glTF models
-  alone inside a named Scene. `<DepthTexture>`, `<SceneTargets>`, the `<EffectComposer>` stack and its effects,
-  `<SpriteLayer>` and `<Figure>` attach with `inScene`. `<Shadows>` and `<SoftShadows>` inside a `<Scene>` make that
-  scene's own cascaded shadows (`useSceneShadows`, packages/react/src/scene-shadows.ts); a mesh's `castShadow` and
-  `receiveShadow` in that scene go to them, where they went to the default scene's shadows before.
-- **Canvas-wide on purpose (documented in the react README, "Views and scenes"):** `<Html>` is one DOM overlay per
-  canvas; the devtools (`<Stats>`, the inspector) read the engine, not one scene; picking and XR pointers route one
-  pointer to whichever scene's mesh it hits (`engine.meshes` holds every scene's meshes, so XR pointers and Controller
-  already reach a mesh in a named Scene); the audio listener is one per canvas and follows the camera; the ViewCube is
-  an overlay of one camera; `<CameraShake>` moves the Canvas camera. None of these draws into or reads a single scene.
-- **Regression (second change):** packages/react/tests/lightformer.test.js ("Environment inside a named <Scene>"),
-  cube-camera.test.js ("CubeCamera inside a named <Scene>", private fog), extras.test.js ("DepthTexture and
-  SceneTargets inside a <Scene>", "SpriteLayer and Figure inside a <Scene>"), post.test.js ("an EffectComposer inside a
-  <Scene>") and scene-loaders.test.js ("Shadows inside a named <Scene>").
-- **Still open:** nothing. ContactShadows, AccumulativeShadows, Caustics, outlines, Animation and Physics have no
-  named-scene test of their own; they use the helpers the tests above cover.
+- **Cause:** `instantiateModel` (packages/react/src/model-assets.ts) builds the gltf/pbr model on the engine, whose
+  root mesh and draw plugin belong to the default scene; the model binding has no scene argument to pass on.
+  React Three Fiber's portals take any object. Plugins other than the lights, Fog, Line, Points, Outline and Splat
+  bindings also stay in the default scene; the same holds inside `<Hud>` and `<RenderTexture>`
+  (packages/react/src/portals.tsx), whose proxied engine still hands `use` the default scene, although Hud's TSDoc
+  says models and plugins render in its overlay scene.
+- **Next:** create the model inside the enclosing Scene (gltf/pbr then has to place its root and plugin there) and
+  add a named-scene case to the model tests.
 
 ### Fixed 2026-11-16: `AmbientLight`, `HemisphereLight` and `Fog` inside a `<Scene>` lit the default scene (KB-REACT-SCENELIGHT1, react)
 
@@ -2256,41 +1733,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that scene, not the default one"), and on a real GPU, natively and with MARGO_COMPAT=1,
   `npm run test:browser:reflections --workspace @margoengine/react -- --mode=scene-fog` (centre green; grey before).
 
-### Fixed 2026-11-20: loading one environment format pulled all three image decoders (KB-ENVDECODERS2, environment)
-
-- **Repro:** bundle `import { loadEnvironmentImage } from '@margoengine/environment/loaders'` with Vite and load a
-  `.hdr` file: the build held the Radiance HDR, OpenEXR and UltraHDR decoders together.
-- **Cause:** `load.ts` imported `parseHDR`, `parseEXR` and `decodeUltraHDR` statically, and `dist/loaders.js` was
-  one file with all three inside, so no bundler could leave an unused one out.
-- **Fix:** `loadEnvironmentImage` picks the decoder from the file signature and `import()`s it, from its own built
-  file (`hdr.js`, `exr.js`, `ultrahdr.js`). It lives in a new entry, `@margoengine/environment/load`, with no static
-  decoder import: Vite's bundler keeps a module in the entry chunk once any static import reaches it, even an unused
-  re-export, so `/loaders` (which re-exports the decoders) cannot be lazy. `/loaders` and the root re-export the same
-  function; results, signatures, errors and the direct decoder exports are unchanged. The synchronous
-  `parseEnvironmentImage` moved to its own file and keeps the HDR and EXR parsers. `@margoengine/react`'s
-  `<Environment src>` first kept `/loaders` for fear of changing the locked `EnvironmentSource` type, then (2026-11-21,
-  Scott: "Do whatever is best practice") moved to `/load` with that type unchanged: `environment-asset.ts` only casts
-  its `api` object to the declared type, since the code reads just `.Environment` from it. No locked export changed
-  (`api:check` clean, no api/breaks.json line).
-- **Regression:** environment `tests/lazy-decoders.test.js` (a Vite build of an app that loads files through `/load`
-  keeps each decoder in its own lazy chunk; fails without the entry and on a static decoder import), and react
-  `tests/subpaths.test.js` "<Environment src> keeps the decoders a file does not need in lazy chunks" (fails on
-  `/loaders`, where all three share one chunk).
-
-### Fixed 2026-11-20: react's lazy environment bindings fetched the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
+### Open 2026-11-16: react's lazy environment bindings fetch the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
 
 - **Repro:** build an app with Vite from the workspace that renders `<AmbientLight>`, `<Fog>`, `<CubeCamera>` or an
-  `<Environment>` with children and no `src` (`@margoengine/react/environment`). Vite printed
-  `INEFFECTIVE_DYNAMIC_IMPORT` for `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load held
-  the Radiance HDR, OpenEXR and UltraHDR decoders (36 KB raw) although none of them reads an image file.
-- **Cause:** each binding loaded the whole environment root, `import('@margoengine/environment')`, whose `index.js`
-  re-exports `loaders.js` beside `main.js`. Taking the namespace keeps every export, so the decoders joined the chunk.
-- **Fix:** the environment package exports its two built files, `@margoengine/environment/main` (all but the decoders) and
-  `/loaders` (the decoders); react's bindings import `/main`, and only the `src` load (`environment-asset.ts`) also
-  imports `/loaders`. The `margoengine` umbrella and kits mirror both entries (`scripts/umbrella.mjs`).
-- **Test:** react `tests/subpaths.test.js` "the bindings that read no environment file bundle none of the image
-  decoders" (fails on the old imports: decoders in the build, plus the warning), and "an Environment without children
-  ..." now runs with no expected warning and checks the decoders stay off the initial chunk graph.
+  `<Environment>` with children and no `src` (`@margoengine/react/environment`). Vite prints
+  `INEFFECTIVE_DYNAMIC_IMPORT` for `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load holds
+  the Radiance HDR, OpenEXR and UltraHDR decoders (environment `dist/loaders.js`, 36 KB raw) although none of them reads
+  an image file. A packed install prints no warning but builds the same chunk.
+- **Cause:** each binding loads the whole environment root, `import('@margoengine/environment')`, whose `index.js`
+  re-exports `loaders.js` beside `main.js`. Taking the namespace keeps every export, so the decoders join the chunk and
+  `EnvironmentLighting.load`'s own `import('./loaders.js')` split cannot happen. Only `<Environment src>` needs them.
+- **Fix needed:** a path to the environment classes without the decoders for the bindings that read no file (an entry
+  of the environment package, or imports the bundler can trim), then drop the expected warning in react
+  `tests/subpaths.test.js` ("an Environment without children ..."), which fails once the warning is gone.
 
 ### Fixed 2026-11-16: an `<Environment>` app bundled CubeCamera, Lightformer and the children capture up front (KB-REACT-PURE1, react)
 
@@ -2408,7 +1863,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/html/test/texture.test.js` ("reports a failed raster through engine.onError"; failing on
   the old code with an uncaught exception).
 
-### Fixed 2026-11-20: `npm run measure:size` printed different core + stage bytes on macOS and on Windows for one commit (scripts)
+### Open 2026-11-16: `npm run measure:size` prints different core + stage bytes on macOS and on Windows for one commit (scripts)
 
 - **Repro:** at fea5924d5, `npm run build:packages` then `npm run measure:size` on an Apple M6 (macOS, Node 26.13.0)
   prints core + stage 24,859 B gzip / 61,056 B raw and core alone 22,208 B, while the Windows workstation measured
@@ -2416,30 +1871,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `examples/package-benchmarks/results/entry-sizes.json` as committed by 073f98cb9 and afc7f204d). The record measured
   on macOS in c6dbebe9f says 24,859, so `tests/public-size-claims.test.js` fails on whichever machine did not write the
   public figures (README, docs/limits.md, site/index.html and the rest still say 24,841).
-- **Cause:** `compactPackage` (`scripts/compact-package.js`, run by `build:packages` for core and the stage) took its
-  bundler entries from `readdir` of dist and used that order as given. NTFS lists names sorted; APFS does not, so the
-  entry order, and with it the order of the shared-helper imports and of the code in the shared chunks, differed
-  between the machines. Shown on Windows by listing the entries in reverse: raw 60,984 B became 60,987 B and gzip
-  24,797 B became 24,831 B for the same sources. Line endings, the embedded kernel and gzip were ruled out earlier.
-- **Fix:** the entry list is sorted, so the bundle no longer depends on the file system. The Windows figure is
-  unchanged (24,797 B gzip, 60,984 B raw), so no public figure moves. A macOS rerun of `npm run build:packages` and
-  `npm run measure:size` should confirm it prints the same bytes.
-- **Regression:** `tests/compact-package.test.js` ("compaction output is the same whatever order readdir lists the
-  entries in"; failing on the old code with a different import order in the compacted entries).
+- **Cause, not yet found:** the raw bytes differ too (10 B), so it is the bundle, not gzip. Ruled out on macOS: the
+  embedded kernel (its raw deflate in `packages/core/src/wasm.ts` is byte-identical when recompressed here) and line
+  endings (core, stage, shared and math sources converted to CRLF build to the same 61,056 / 24,859 bytes). Left to
+  check on the workstation: the two bundles side by side (`measureCoreStage()` output), to find the differing bytes.
+  Until then the public figures are not changed from one machine.
 
-### Fixed 2026-11-20: `Outlines` drew nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
+### Open 2026-11-16: `Outlines` draws nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
 
-- **Repro:** `<Model src="hero.glb"><Outlines /></Model>` (a skinned model): no line, or an error without a `<Mesh>`. drei
-  outlines `skinnedMesh` parents.
+- **Repro:** `<Outlines />` inside a node of a skinned `Model`: no line. drei outlines `skinnedMesh` parents.
 - **Cause:** `MeshOutline` (`@margoengine/toon/outline`) draws one hull from the core mesh's matrix and CPU geometry;
   it does not read a deformer's vertices of the frame. `ModelOutlines` (`@margoengine/toon/models`) already does for
-  whole models; the React binding did not route a model to it.
-- **Fix:** `<Outlines>` inside a `<Model>` (and no nearer `<Mesh>`) attaches one `ModelOutlines` for that model
-  (`ModelOutlines` of `@margoengine/toon/screen-outline` with `screenspace`), live in `thickness`, `color` and `angle`
-  (0 turns `smooth` off), released on unmount. `Mesh` records the model it sits in on its registry so a nearer
-  `<Mesh>` keeps its mesh outline. Toon itself is unchanged.
-- **Regression:** `packages/react/tests/outlines.test.js` ("Outlines inside a Model outlines the whole model through
-  ModelOutlines"; fails on the old code).
+  whole models; the React binding does not route a skinned node to it yet.
 
 ### Fixed 2026-11-16: `Outlines` drew nothing inside `<Instances>` (react)
 
@@ -3427,7 +2870,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression tests:** `packages/vfx/test/events.test.js` ("on the WebGL2 route the route lists the events") and the
   events cases of `packages/vfx/test/features-check.mjs --compat`, which now wait for the route.
 
-### Fixed 2026-11-20: a caller's GPU object held at a device restore stopped the frame loop, warned or failed silently, by package (KB-RESTORE-BORROWED1, sprites, tilemap, points, shader, post, shadows, terrain, environment, clustered, water, lighting2d, pixel, loaders, gltf/pbr, materials, tonemap and others)
+### Open 2026-11-15: a caller's GPU object held at a device restore stopped the frame loop, warned or failed silently, by package (KB-RESTORE-BORROWED1, sprites, tilemap, points, shader, post, shadows, terrain, environment, clustered, water, lighting2d, pixel, loaders, gltf/pbr, materials, tonemap and others)
 
 - **Repro:** `SpriteLayer.attach(engine, { atlas: engine.gpu.createTexture(...) })`, draw a frame, destroy the device
   and `await engine.rebootDevice()`: the next frame throws `'state'` and the frame loop stops. The same with a plain
@@ -3439,10 +2882,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   "Borrowed GPU objects": a function form called once per device, a plain object dropped and reported once through
   `engine.onError` (margoengine.com/errors#borrowed-lost) while the frame keeps drawing, and a setter for a new one.
   `packages/shared/borrowed.js` holds it (`tests/borrowed.test.js`). `tests/borrowed-gpu.test.js` finds every public
-  member that can hold a caller GPU object and holds it to `scripts/borrowed-registry.json`; this entry stayed open
-  while any row there was `pending`, and each package's push ruled its rows with a GPU regression test on WebGPU and
+  member that can hold a caller GPU object and holds it to `scripts/borrowed-registry.json`; this entry stays open
+  while any row there is `pending`, and each package's push rules its rows with a GPU regression test on WebGPU and
   the WebGL2 compatibility layer.
-- **Progress:** ruled so far: voxel (2), post (5, 2026-11-16: decals, material-decals, lens-flare, lens), shader raw (4, 2026-11-16: raw textures, raw storage buffer, GLSL sampler uniforms), Shadertoy channels (5, 2026-11-16: a texture channel holds its texture in a slot named for the channel, `toy.setChannel` replaces it; the toy's own buffers, Cube A and feeds are made again by themselves); exempt after a check, vfx (9, 2026-11-16: VFXState's buffers and `shadows.buffer` are the effect's own, the soft and sort features are factories called with each device, a skinned primitive's `deformed` is the deformer's per-frame record; pinned by packages/vfx/test/restore.test.js)), lighting2d (7 ruled, 2026-11-16 or later: the target and normals options of the root, cookie, GI, height and emissive passes, and SDFScene2D `source` and `emission` through one `TextureOption` in packages/lighting2d/src/resources.ts, with `setTarget`, `setNormals` and the accessors; a plain texture lost with its device skips the pass and is reported once, a function is read each frame; the two accessor rows left the registry; the cap in tests/borrowed-gpu.test.js fell from 51 to 42; pinned by packages/lighting2d/tests/restore.test.js, 17 cases that fail on the old code); exempt after a check, terrain (6), procedural (5), sciviz (3), weather (3), decoders (1), react (1) and loaders (2) (2026-11-17: each is an output, a factory result or a hook result handed on, never a plain caller object; terrain's `textures(device)` is the function form, called once per device; pinned by packages/terrain/test/borrowed-restore.test.js, packages/procedural/test/borrowed-restore.test.js, the KTX2 stream, cover and MaterialX tests, and the sciviz reboot checks; the cap fell from 42 to 21); pixel (5 ruled, 2026-11-17: `source` and `target` of PixelScale, CRT and PaletteQuantize and the `target` of Render3D through one `TextureOption` in packages/shared/texture-option.js, which lighting2d now uses too; `setSource` and `setTarget` on every pass, a lost plain texture skips the pass (Render3D: the picture goes to its own `output`) and is reported once, a function is read each frame; pinned by packages/pixel/tests/restore.test.js, 10 cases of which 6 fail on the old code, and packages/pixel/tests/pixel-restore-check.mjs on WebGPU and the WebGL2 compatibility layer); water (2 ruled, 2026-11-17: `ParticleSource.positions` and `.velocities` take a plain GPUBuffer (lost at a restore, reported once, replaced through `update(particles)`), a holder read live, or `(device) => buffer` called once per device; lost positions draw no particles and lost velocities no whitewater; pinned by packages/water/test/liquid.test.js, 3 of 4 new cases failing on the old code, and packages/water/test/liquid-restore-load.test.js); gltf (2 ruled, 2026-11-17: `MaterialExtensionTexture.view` and `.sampler` take a plain object (lost at a restore, reported once, a white texture and linear sampler stand in) or `(device) => object`, and `createRenderer(device)` accepts the function form for another device; pinned by packages/gltf/test/extension-textures-restore.test.js, which fails on the old code); the cap fell from 14 to 12; materials (8 ruled, 2026-11-20: `Material.envMap` and `Texture` GPU sources take a plain object (lost at a restore, reported once; an envMap reflects black, a map reads as no map), `(device) => object` called once per device, and a setter (`material.envMap = ...`, `texture.setSource(...)`); Texture, Environment and CubeCamera envMaps are live objects and need none; the `opaqueColor` options take the function form and pass it to gltf's ruled extension view; pinned by packages/materials/test/borrowed-restore-browser.mjs on WebGPU and the WebGL2 layer, which fails on the old code, and packages/materials/tests/borrowed.test.js); tonemap (1 ruled, 1 exempt, 2026-11-20: `autoExposure.mask` takes a plain texture (lost at a restore, reported once, the meter keeps its last exposure; a new `autoExposure.mask` brings it back) or `(device) => texture` called once per device, through `borrow`/`lend` in packages/tonemap/src/index.ts; `TonemapPassContext.source` is exempt, the frame's HDR source Tonemap hands each extension's `encode` every frame and the extension never keeps; pinned by packages/tonemap/tests/borrowed-restore-browser.mjs on WebGPU and the WebGL2 compatibility layer, which throws a validation error on the old code); the cap fell from 12 to 4 and, with tonemap, to 2.; ruled last (2026-11-20): clustered ContactLights `depth` (a plain depth texture is dropped and reported once, the march stays off until `options.depth = texture`; a callback is read live; packages/clustered/test/contact-borrowed-restore-browser.mjs) and environment `CubeTextureSource.texture` (a plain cube is dropped, reported once and the environment reads as restoring until `environment.setSource(...)`; a live source such as a CubeCamera is read again; packages/environment/tests/cube-source-restore-browser.mjs). No row is pending; the entry is closed.
+- **Progress:** ruled so far: voxel (2), post (5, 2026-11-16: decals, material-decals, lens-flare, lens), shader raw (4, 2026-11-16: raw textures, raw storage buffer, GLSL sampler uniforms), Shadertoy channels (5, 2026-11-16: a texture channel holds its texture in a slot named for the channel, `toy.setChannel` replaces it; the toy's own buffers, Cube A and feeds are made again by themselves); exempt after a check, vfx (9, 2026-11-16: VFXState's buffers and `shadows.buffer` are the effect's own, the soft and sort features are factories called with each device, a skinned primitive's `deformed` is the deformer's per-frame record; pinned by packages/vfx/test/restore.test.js)), lighting2d (7 ruled, 2026-11-16 or later: the target and normals options of the root, cookie, GI, height and emissive passes, and SDFScene2D `source` and `emission` through one `TextureOption` in packages/lighting2d/src/resources.ts, with `setTarget`, `setNormals` and the accessors; a plain texture lost with its device skips the pass and is reported once, a function is read each frame; the two accessor rows left the registry; the cap in tests/borrowed-gpu.test.js fell from 51 to 42; pinned by packages/lighting2d/tests/restore.test.js, 17 cases that fail on the old code); exempt after a check, terrain (6), procedural (5), sciviz (3), weather (3), decoders (1), react (1) and loaders (2) (2026-11-17: each is an output, a factory result or a hook result handed on, never a plain caller object; terrain's `textures(device)` is the function form, called once per device; pinned by packages/terrain/test/borrowed-restore.test.js, packages/procedural/test/borrowed-restore.test.js, the KTX2 stream, cover and MaterialX tests, and the sciviz reboot checks; the cap fell from 42 to 21); pixel (5 ruled, 2026-11-17: `source` and `target` of PixelScale, CRT and PaletteQuantize and the `target` of Render3D through one `TextureOption` in packages/shared/texture-option.js, which lighting2d now uses too; `setSource` and `setTarget` on every pass, a lost plain texture skips the pass (Render3D: the picture goes to its own `output`) and is reported once, a function is read each frame; pinned by packages/pixel/tests/restore.test.js, 10 cases of which 6 fail on the old code, and packages/pixel/tests/pixel-restore-check.mjs on WebGPU and the WebGL2 compatibility layer); water (2 ruled, 2026-11-17: `ParticleSource.positions` and `.velocities` take a plain GPUBuffer (lost at a restore, reported once, replaced through `update(particles)`), a holder read live, or `(device) => buffer` called once per device; lost positions draw no particles and lost velocities no whitewater; pinned by packages/water/test/liquid.test.js, 3 of 4 new cases failing on the old code, and packages/water/test/liquid-restore-load.test.js); gltf (2 ruled, 2026-11-17: `MaterialExtensionTexture.view` and `.sampler` take a plain object (lost at a restore, reported once, a white texture and linear sampler stand in) or `(device) => object`, and `createRenderer(device)` accepts the function form for another device; pinned by packages/gltf/test/extension-textures-restore.test.js, which fails on the old code); the cap fell from 14 to 12.
 
 ### Fixed 2026-11-15: validateMachine listed problems a machine document does not have (KB-FSM-DOC1, fsm)
 
@@ -3928,10 +3371,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `KHR_parallel_shader_compile`; Khronos WebGL 2.0, draw validation (uniform blocks, fragment output types).
 - **Regression:** packages/webgl2-compat/test/d3d11-warm.test.js (fails without the fix: the pipeline resolved at
   link with no warm draw), and `MARGO_COMPAT=1 npm run test:gpu:mesh-pbr-lobes -w @margoengine/voxel-pathtracer`.
-- **Later (2026-11-21, KB6016e):** on an Intel Arc 140V (Edge, ANGLE Direct3D 11) a draw with rasterizer discard on
-  compiled nothing: a warmed 1-output pipeline still paid 131 to 152 ms at its first real draw. The warm draw now
-  rasterizes into the 1 x 1 targets (scissor test off, viewport 1 x 1, all colour channels written), and a program
-  with no colour target is warmed too, into a 1 x 1 depth-stencil buffer. Its own entry, KB6016e, has the figures.
 
 ### Fixed 2026-11-15: a Tonemap removed by its scene kept its LocalExposure textures (KB-OWN-TONE1, tonemap)
 
@@ -6130,7 +5569,7 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   test:gpu:flare's own arguments and of --record, and the script's text; no GPU), which fails on the old script.
 - **Landed:** fe59e4dbe.
 
-### Fixed 2026-11-20: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
+### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 
 - **Repro:** on the AMD mini PC, with two other helpers testing, `decoders test:browser` (packages/decoders/scripts/test-browser.js)
   failed once with page console errors only: `WebSocket connection to 'ws://127.0.0.1:61962/?token=...' failed: ...
@@ -6142,11 +5581,10 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   `createServer` with HMR on) is in the browser scripts of audio, bvh, controls (3), creative, decoders (4), environment,
   exporters (3), html, labels, lines, loaders (2), mesh-edit, mixer, physics (2), points, post (4), taa (8) and text (3);
   `scripts/browser.js` keeps its socket on purpose (it counts full reloads).
-- **Fix:** every package browser script that starts a Vite server (44 of them, found by a search of `packages/`) now passes
-  `server: { host: '127.0.0.1', port: ..., hmr: false, watch: null }`, as cache's, the README runner's and the visual suites'
-  servers have; `scripts/browser.js` keeps its socket on purpose and is not touched.
-- **Regression:** `tests/vite-test-servers-no-hmr.test.js` fails on any package script that imports Vite's `createServer`
-  without `hmr: false`.
+- **Fix (not landed):** `server: { host: '127.0.0.1', port: 0, hmr: false, watch: null }` as cache's, the README runner's
+  and the visual suites' servers have, with a root check that every package browser script's Vite server turns HMR off.
+  Blocked on this machine: a decoders change runs decoders' AVIF and Draco `cargo test`, which need the MSVC linker
+  (the landing notes); the fix and its check go together, so they land on the workstation or after Build Tools are installed here.
 
 ### Fixed 2026-11-12: Radeon 680M, biomes flythrough on the WebGL2 layer took 0.5 to 0.75 s a frame (AMD GPU hunt row 34)
 
@@ -6478,47 +5916,8 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
 - **Later on 2026-11-19, again:** each subset's light program `sample` takes an instance's two transforms from one
   motion rotation and the guided `post` builds its guide boxes once (KB-L5a-10's fourth progress note: with every
   feature `sample` 30.6 to 25.3 s of fxc).
-- **Reproduced 2026-11-21 on a laptop** (Intel Arc 140V, Edge 157, ANGLE Direct3D 11 as the run printed it; three
-  other agents' jobs on the machine, so the seconds are loaded figures) on fa9dd5ee7, with
-  `MARGO_COMPAT=1 node scripts/run-with-timeout.mjs -- node packages/voxel-pathtracer/tests/compose-browser.mjs
-  --backend=native`:
-  - The default run (8 subsets at once, the native default, since the leg is not the script's own layer leg): subsets
-    0 to 3 started together and rendered at 635 s; the media subsets 4 to 7 waited inside
-    `ComposedVoxelPathTracer.create` until then, and their programs were still compiling at 1,226 s. About 160 s a
-    subset.
-  - `--parallel=1 --phase=ids`, the layer's own default: subsets 0, 1 and 2 took 104, 206 and 210 s; the run stopped at
-    its 10 minute limit in subset 3. About the same rate, so choosing 1 for this leg would not close the gap and was
-    not changed.
-  - Where the time goes: every subset's programs (`ids`, the nine loop programs, the census) become ready one after
-    another, never side by side, with the page idle between. A probe page (one 160-step loop program, the shader text
-    new each time) showed this backend's pattern: the link reports complete after 58 to 74 ms and the first draw then
-    takes 194 to 346 ms more (later draws 2 to 4 ms), for 1 and for 4 colour outputs alike, and binding the 4-target
-    framebuffer before `linkProgram` changed nothing (draw 264 to 339 ms against 268 to 336 ms). So the shader compile
-    that counts runs at first use on the browser's GPU thread, one program at a time, whatever the layer binds at link.
-    The probe also shows that here a 1-output program pays that compile at its first draw too, which
-    `LinkedProgram.warmed` (packages/webgl2-compat/src/device/render.ts) did not warm, as it assumed only programs with
-    2 or more colour targets compile again (measured on an RTX A6000, where a 1-output first draw took 2 ms). Fixed
-    2026-11-21: every program with a colour target is warmed there, so its compile falls before `ready`, not in the
-    first frame after it (regression: packages/webgl2-compat/test/d3d11-warm.test.js and
-    packages/webgl2-compat/test/first-draw-browser.mjs). This moves compiles, it adds none, so this entry's total is
-    unchanged.
-  - Depth-only programs, measured later on 2026-11-21 (same laptop, a probe of a 256-step loop, new shader text each
-    run, three runs a kind): a program with a fragment stage and no colour output (it discards) reported its link
-    complete after 45 to 53 ms and its first draw then took 128 to 174 ms more; a program with no fragment stage took
-    1 to 4 ms at its first draw. The same probe found the warm draw itself compiled nothing here: with rasterizer
-    discard on, a warmed 1-output pipeline still took 131 to 152 ms at its first real draw. Fixed the same day: the
-    warm draw rasterizes into its 1 x 1 throwaway targets, and every program is warmed there, a program with no
-    colour target into a 1 x 1 depth-stencil buffer. After it the link-to-ready time is 179 to 205 ms for both kinds
-    and the first draw 1.2 to 2.1 ms (regression: packages/webgl2-compat/test/d3d11-warm.test.js and
-    packages/webgl2-compat/test/first-draw-browser.mjs, which count rasterizing warm draws). This also moves
-    compiles and adds none.
-  - So at this rate the 32 subsets need about 85 minutes against the 12 minute limit, about 7 times over. Nothing
-    hangs: each compile finishes, and every subset that rendered passed its checks. No Margo-side defect was found
-    beyond the program sizes the entry already names.
 - **Next:** cut the compile work per program further (`surface`, `hit`, `shadow`, `vertex`) and prove it with a
-  program-size or call-site count, then rerun the repro. The test and its limits stay as they are. A gap of about 7
-  times will not close by trimming alone, so changing the step's scope or limit on Direct3D 11 is a decision for
-  Scott (escalated 2026-11-21).
+  program-size or call-site count, then rerun the repro. The test and its limits stay as they are.
 
 ### Fixed 2026-11-11: a git that Windows could not start stopped the dev server with a bare "Command failed" (KB-L5a-6)
 
@@ -9059,7 +8458,6 @@ Release exception: Windows tears down an ended Chromium late under GPU load.
 - **Workaround (the mechanism is gone, not the symptom):** `scripts/support/browser-host.mjs`. Playwright's browser server now runs in a host process of its own, which holds everything that waits on the browser process (its handle, its pipes, the WebSocket server, the temporary profile). The suite keeps the same connected browser as before. At close it reads Chromium's process list while connected, the host ends every process (`TerminateProcess` through its handle, each listed child by pid) and acknowledges at once (3 ms measured), the client disconnects (3 ms), and the suite waits for the host's proof that all are gone only up to `TEARDOWN_GRACE_MS` (2,000 ms). Past that the host carries on alone with the native waits, finishes Playwright's cleanup, and after `REAP_MS` (120 s) records any survivor in `test-results/browser-host-survivors.log` and ends. The 30,000 ms budget, the 5,000 ms process-list bound and every assertion are unchanged; no retry, no raised budget, no swallowed error (a host that dies fails the close with `HOST_GONE`).
 - **Evidence:** 40 cycles on the new path under the same load (2026-11-10 01:32 to 01:34): 0 timeouts, 0 leaks; close 347 ms median, 2,130 ms maximum; 5 cycles handed off at the grace, in which the kernel needed up to 9.3 s after the close to finish with the browser (cycles 33 to 35: 9,338, 4,950 and 5,230 ms), every browser, child and host process gone by then and no survivor file written; no Node process or pipe handle left in the suite. `tests/browser-host.test.js` (a real host process; a browser the kernel never finishes with is logged as a survivor at the bound, in the host) and `tests/browser-teardown.test.js` ("a browser process the kernel has not finished tearing down cannot hold the close past the grace"; the in-process design it replaces asserted `SHUTDOWN_TIMEOUT` for that case in its own test, and `tests/browser-host.test.js` runs it through `launchBrowser` against a real host whose browser never exits).
 - **False survivor, fixed 2026-11-10 (batch 217, lane P):** the host's waiter reported a listed child as a survivor 677 ms after the end, which failed the close with `SHUTDOWN_TIMEOUT` at `scripts/lib/browser.mjs:344`. The waiter read each pid's start time to tell ours from a newer process, and took a start time it could not read (PowerShell's getter gives `$null`) for a survivor. Measured as a black box: a process the waiter has found and the kernel then finishes with has no readable start time (its object already signalled: `WaitForExit(0)` true), while every process Chromium starts as this user stays readable through its teardown (9 of 9 listed; an 8 GB process killed mid-read stayed readable until it was gone); and 135 of 958 processes on the workstation (services such as svchost, WmiPrvSE, SearchProtocolHost) are unreadable, so a pid such a service takes over was reported too. Both mean the pid names no process of ours, so the waiter now skips it. A survivor is still reported only after the waiter's bound. Regressions in `tests/browser-teardown.test.js`: "Windows waiter: an ended process gone before its start time was read is not a survivor" (the race widened by ending the process between lookup and read) and "a pid held by a process this user cannot query is not reported as ours" (pid 4); both fail on the parent with the pid reported.
-- **check:readme-run timed out "while closing browser", fixed 2026-11-21:** under load (four agents on the 8-core laptop), `npm run check:readme-run -- --packages=<pkg>` failed a different page example each run with `Example did not finish within 20 s while closing browser` (webgl2-compat readme-lost-contexts and readme-margoengine-webgl2-compat, post projected-decals and depth-texture, react readme-pointer-events-and-picking), next to the host's "had not finished tearing it down" line, and each passed alone with `--only`; the deadline handler then stopped the whole run. Cause: `runInPage` in `scripts/run-readme-examples.mjs` closed the example's own browser inside the example's 20 s deadline, so the bounded close (up to 5 s listing, the 2 s grace and the client close, all within `CLOSE_LIMIT_MS`) was counted against an example that had already launched, run and read its errors under load. The host and its close were working as designed; the runner waited on them under the wrong clock. Fix: the deadline bounds the example's own work, page close included; the browser close runs after it under its own limit, and a close that fails there (the limit's kill, `SHUTDOWN_TIMEOUT` naming the killed host and browser pids) fails that example with the error, without stopping the run. Regressions in `tests/run-readme-examples.test.js`: "a browser the OS tears down after the example deadline does not fail an example whose checks passed" (a stand-in browser whose close resolves 200 ms after a 50 ms deadline; failed on the parent with the reported message) and "a browser close that hangs past its own limit fails the example and names what was killed". Evidence: `--packages=post,webgl2-compat` beside three other agents (CPU at 99%), 45 closes past the grace and 30 survivor lines (processes with 0 handles still present 120 s on), none failing an example; that run stopped on `while creating page` (launch and `newPage` past 20 s), a time-only miss under load that is not this bug.
 - **Still open:** why the kernel takes over 30 s in that machine state is not Margo's to find or fix. A line in `test-results/browser-host-survivors.log` is the signal to look at the Edge version or the driver; a following GPU job can start while the kernel may still be freeing the ended browser's allocations (docs/limits.md).
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB1703/report.md` with `teardown-latency.mjs` and `load.html`. On a quiet 2026-11-11 PC it does not give the multi-second case (median exit 104 ms with 4 busy browsers, 253 ms with 12, max 470 ms); the report says a Windows trace from a slow run is still needed.
 
@@ -9353,7 +8751,7 @@ Earlier record:
 
 **Status:** open (owner: usdz).
 
-- **What:** generated stress stages (`packages/usdz/tests/oracle/generate-stages.py`) against OpenUSD 26.11 (usd-core from PyPI, black box): none of the 149 OpenUSD opens differ in a property of some prim with seed 1942 (44 before KB1942, 33 before KB1942b, 24 before KB1942c, 23 before its part 2, 22 before its part 3, 20 before its part 6, 13 before its part 8, 12 before its part 10, 5 before its part 25, 3 before its part 26, 2 before its part 28, 1 before its part 30), none of 150 with seed 7 (54, then 48, then 40, then 36, then 31, then 29, then 28, then 15, then 3, then 2, then 1 before part 29). OpenUSD itself stops on stage 142 of seed 1942 (`PcpCompareSiblingNodeStrength` reports a failed verification, "Did not find copied specialize node", and the stage does not open), so that stage has no answer to compare and is not counted as a difference. They nest classes, variants and references far past real files. No real file in the corpus shows it. `packages/usdz/tests/stress-stages.test.js` builds both seeds (`tests/stress-stages.js`, the same files byte for byte), compares them with OpenUSD readings recorded in `tests/fixtures/stress/openusd-<seed>.json.gz` and holds the stages that still differ in a list that may only shrink, empty since part 30: a stage that matches today and differs after a change fails it.
+- **What:** generated stress stages (`packages/usdz/tests/oracle/generate-stages.py`) against OpenUSD 26.11 (usd-core from PyPI, black box): 11 of 150 differ in a property of some prim with seed 1942 (44 before KB1942, 33 before KB1942b, 24 before KB1942c, 23 before its part 2, 22 before its part 3, 20 before its part 6, 13 before its part 8, 12 before its part 10), 12 of 150 with seed 7 (54, then 48, then 40, then 36, then 31, then 29, then 28, then 15). OpenUSD itself stops on stage 142 of seed 1942 (`PcpCompareSiblingNodeStrength` reports a failed verification, "Did not find copied specialize node", and the stage does not open), so that stage has no answer to compare and is not counted as a difference. They nest classes, variants and references far past real files. No real file in the corpus shows it. `packages/usdz/tests/stress-stages.test.js` builds both seeds (`tests/stress-stages.js`, the same files byte for byte), compares them with OpenUSD readings recorded in `tests/fixtures/stress/openusd-<seed>.json.gz` and holds the stages that still differ in a list that may only shrink: a stage that matches today and differs after a change fails it.
 - **Fixed (KB1942):** where an authored specializes arc ranks against the copies it implies upstream. Pinned on 42 black-box stages (`packages/usdz/tests/specializes-family.test.js`): the implied copies come first, in stack order, unless the arc was authored under a variant or a reference whose own prim sits shallower in its namespace than the stage prim holding the outermost reference (a reference inside a variant counts from the variant's prim). Eleven stages of seed 1942 and six of seed 7 now match; none that matched before differs now.
 - **Fixed (KB1942b):** relationship targets reached through a class arc that an ancestor's inherit implies in a stack above. Pinned on 10 black-box stages (`packages/usdz/tests/implied-class-targets.test.js`, fixture `implied-class-targets.json`): the implied arc keeps the ancestor's own pair (the class root to the ancestor), its prim mapped by the arcs on the way where they can and left as authored where they cannot, so `/C/b` maps to `/M/b` and an authored `/M/...` target, which would not map back to itself, drops. Nine stages of seed 1942 and eight of seed 7 now match; none that matched before differs now. `packages/usdz/tests/fixtures/open-difference` now composes as OpenUSD does (`/Q/b/c/c/c/a/c/a.v0` is 642).
 - **Fixed (KB1942c, part 1):** relationship targets through a chain of internal arcs (an internal reference, or a class arc, under another). Pinned on 10 black-box stages (`packages/usdz/tests/internal-chain-targets.test.js`, fixture `internal-chain-targets.json`): OpenUSD maps a target once through the chain's composed map function, each arc's pairs plus the root identity an internal arc carries, not arc by arc; `/M/a` authored on `/Shared` drops on `/M`, which references `/Shared`, but stays `/M/a` on `/Y`, which references `/M`, and `/Y/c` drops there. Stage 99 of seed 1942 and stages 36, 124, 128 and 135 of seed 7 now match; none that matched before differs now.
@@ -9380,14 +8778,8 @@ Earlier record:
 - **Fixed (KB1942c, part 22):** the order of two implied class arcs on one node. Margo ranked them in the order they were made. OpenUSD (black box) ranks them as the arcs they were implied from do: `/P/b/c` payloads `l2.usda</M/a>`, `l2.usda /M` inherits `/C` and payloads `l1.usda`, whose `/M/a` inherits `/C`; root `/C`, implied from `l2.usda /C`, comes before root `/C/a`, implied from the ancestral `l2.usda /C/a` that ranks after it (Margo gave root `/C/a` first, as it was made first). An arc implied from deeper in the same stack ranks where the placeholder it passes would sit. Pinned on 2 black-box stages (`packages/usdz/tests/implied-origin-order.test.js`, fixture `implied-origin-order.json`), each failing without one half of the change. Stages 0, 31 and 46 of seed 7 now match OpenUSD in values and leave the stress known list; prims whose stack differs: 17 of 15,579, 28 of 19,448 (45 before); nothing that matched differs.
 - **Fixed (KB1942c, part 23):** the namespace depth sibling class arcs below the index root rank by. Margo ranked them by the depth of the stage prim. OpenUSD (black box) counts an arc authored at its node from that node's prim in its own stack, and one implied from under a reference or payload of the same prim from that reference's depth: `/P` payloads `l1.usda</M/a>`, `l1.usda /M/a` inherits `/C` and `/M/a/a` payloads `l0.usda</M>`, which inherits `/C`; at `/P/a` the inherit implied into `l1.usda` counts 3 and comes before the ancestral `l1.usda /C/a` (2) (Margo gave `l1.usda /C/a` first). Pinned on 2 black-box stages (`packages/usdz/tests/implied-reference-depth.test.js`, fixture `implied-reference-depth.json`), each failing without one half of the change. Stage 10 of seed 7 now matches OpenUSD and leaves the stress known list; prims whose stack differs: 16 of 15,579 (17 before), 21 of 19,448 (28 before); nothing that matched differs.
 - **Fixed (KB1942c, part 24):** which carried class arc takes a site at a child prim. Margo kept every implied inherit carried down from the parent prim on its site, so a stronger carried specializes arc that implies one of those sites at the child left only placeholders. OpenUSD (black box) implies the carried inherits below the index root again, strongest carried authored arc first: `/R` references `l1.usda</M/a>`, whose payload `l0.usda</M>` has `/M/a` inheriting `/C`; `/R/a` references `l2.usda</M/a>`, which reaches `l0.usda /M`, which specializes `/C/a`. At `/R/a/a` the specializes arc takes `/C/a/a` in `l1.usda`, `l2.usda` and the root stack and the carried inherits are gone (Margo gave root `/C/a/a` as an inherit, second). An arc placed for the child prim takes no site from them, and a carried placeholder that made no family at the parent prim takes only the sites of carried inherits made before it, none when its site has no specs at the child or its node authors a specializes arc there. Pinned on 6 black-box stages (`packages/usdz/tests/carried-implied-again.test.js`, fixture `carried-implied-again.json`), each failing without one part of the change. Prims whose stack differs: 14 of 15,579 (16 before; stage 48 of seed 1942 keeps `/R/a/a/c`), 21 of 19,448; nothing that matched differs on either seed.
-- **Fixed (KB1942c, part 25):** relationship targets through a class arc implied from another implied class arc. KB1942b kept the pair of the arc an implied arc stands for only when that arc was authored; OpenUSD (black box) keeps it for an implied arc carried down from an ancestor prim too: `l1.usda /M` specializes `/C`, `l2.usda /M` payloads `l1.usda</M>` (so `l2.usda /C` stands for it, `/C` to `/M`), and `root.usda /P/c` references `l2.usda</M/a>`; the arc implied into the root stack keeps `/C` to `/M`, so `/C/z` authored on `root.usda /C/a/b` maps to `/M/z` on `/P/c/b` and `/M/a` drops (Margo gave `/C/z` and kept `/M/a`). Pinned on 5 black-box stages (`packages/usdz/tests/implied-implied-targets.test.js`, fixture `implied-implied-targets.json`, reduced from stage 114 of seed 1942), 4 of which fail without the change. Stages 24 and 114 of seed 1942 and 134 of seed 7 now match OpenUSD and leave the stress known list; prim stacks do not change (the change moves only target mapping); nothing that matched differs.
-- **Fixed (KB1942c, part 26):** an implied specializes arc that reaches a placeholder whose site an inherit of the same stack holds. Part 3 made such a placeholder imply nothing, but an arc implied up from a stack below went on through it. OpenUSD (black box) stops it there: `/P/a` references `l2.usda</M>`, whose stack (it sublayers `l0.usda`) specializes `/C/a` and payloads `l0.usda</M>`, which specializes `/C/a` too, and `/P` references `l2.usda</M>`, whose `/M/a` inherits `/C/a`; at `/P/a` root `/C/a` comes in through the inherit, second strongest (Margo gave it as a specializes arc, implied from `l0.usda` through the `l2.usda` placeholder, weak). A placeholder whose node has a class arc of its own still passes the arc on. Pinned on 4 black-box stages (`packages/usdz/tests/implied-through-held.test.js`, fixture `implied-through-held.json`, reduced from stage 68 of seed 7 and stage 9 of seed 1942), 2 of which fail without the change. Stage 9 of seed 1942 and stage 68 of seed 7 now match OpenUSD and leave the stress known list; nothing that matched differs.
-- **Fixed (KB1942c, part 27, found on the way):** a reference or payload to an ancestor or a descendant of a site on its way up never finished composing. Margo counted an arc as a cycle only when it led back to the same site, so `/M/a` referencing `/M` brought `/M/a` back under itself one prim deeper each time. OpenUSD (black box) reports such an arc as a cycle ("CANNOT reference") and composes the prim without it; Margo now does too, and lists a `cycle` issue. Pinned on 6 black-box stages (`packages/usdz/tests/namespace-cycles.test.js`, fixture `namespace-cycles.json`, composed in a worker with a time limit): a child referencing its parent, a parent its child, a payload to the parent, and the same reached through a reference and through another layer; all 6 fail without the change. The stress values do not change.
-- **Fixed (KB1942c, part 28):** where class arcs implied up from a node under a variant rank, when the variant's holder is in the same stack. Margo ranked such an implied arc by the namespace depth of the stage prim, and the arcs implied from it by where the variant sits among its holder's children. OpenUSD (black box) ranks it from the variant's holder, as it does a specializes family's (part 15), and the arcs implied from it as the placeholder it implies on that holder would rank among the holder's class arcs: `/Q` references `l2.usda</M/a>`, whose `/M/a/b` references `l1.usda</M/a>`; `l1.usda /M` inherits `/C` and selects `vs = "y"`, whose `a` payloads `l0.usda`, where `/M` inherits `/C`; at `/Q/b` root `/C` comes before root `/C/a` and `l2.usda /C` before `l2.usda /C/a` (Margo gave the reverse). Pinned on 3 black-box stages (`packages/usdz/tests/implied-variant-holder.test.js`, fixture `implied-variant-holder.json`, reduced from stage 25 of seed 1942), 1 of which fails without the change, each half of it needed. Stage 25 of seed 1942 now matches OpenUSD and leaves the stress known list; nothing that matched differs.
-- **Fixed (KB1942c, part 29):** the namespace depth of a class arc implied below the index root. Parts 23 and 28 counted an implied arc from the stage prim, or from the reference or payload it was implied across when that was deeper, and an authored one from its node's prim in its own stack. OpenUSD (black box, its public prim index dump) counts both alike: the depth of the parent node's path, variant selections left out, when the arc was placed there, kept when the node is carried down to a child prim. `root.usda /R/a` selects `vs = "x"`, whose `c` selects `vs = "x"`, whose `b` payloads `l2.usda</M/a>`; `l2.usda /M/a` inherits `/C` and references `l0.usda`, whose `/M` inherits `/C/a`; the inherit implied into `l2.usda` hangs from the payload's `/M/a` and counts 2, not the stage prim's 4, so the authored `l2.usda /C` comes before it at `/R/a/c/b` and `l2.usda /C/c` (754) beats `l2.usda /C/a/c` (512) at `/R/a/c/b/c` (Margo gave 512). One rule now stands for the three in `ns()` of `stage.ts`. Pinned on 4 black-box stages (`packages/usdz/tests/implied-parent-depth.test.js`, fixture `implied-parent-depth.json`, reduced from stage 51 of seed 7), 3 of which fail without the change. Stage 51 of seed 7 now matches OpenUSD and leaves the stress known list, so every stage of seed 7 matches; nothing that matched differs on either seed.
-- **Fixed (KB1942c, part 30):** where an implied class arc that stands for another implied arc reads the selections for its class's ancestral variants. Part 14 read them for a chain of implied inherits only, at the class's parent in the chain's other stacks, and a specializes chain read none. OpenUSD (black box, its public prim index dump) reads them across the prim index built so far, strongest first, the new arc in its place among them: the class's parent maps to the root namespace through the new arc's map function, each node reads at the path that maps back into it, the arcs of the chain at their class's parent, and class arcs off the chain are not read. In the reduced form of stage 48 of seed 1942 the specializes arc implied into the root stack keeps the pair `/C/a` to `/Q/a/b`, so `/Q/a/b` is read across the index, where the reference's `l1.usda /M/b` selects `vs = "x"`, and `/Q/a/b/c` gets `root.usda /C/a{vs=x}a`, whose target `/Shared` now stays. Found on the way: the same stage with an inherit for the specializes arc, where Margo gave the implied inherit of the root stack no variant, and an inherit chain under `/R`, which inherits `/C`, where Margo read `/C/b`'s selection through the inherit carried down from `/R` and OpenUSD reads a payload's. Pinned on 6 black-box stages (`packages/usdz/tests/implied-chain-variants.test.js`, fixture `implied-chain-variants.json`, each checked on values and targets and on its marked prim stacks), 4 of which fail without the change. Stage 48 of seed 1942 now matches OpenUSD and the stress known list is empty: every stage of both seeds that OpenUSD opens composes to the same prims, values and targets; nothing that matched differs.
-- **Still open (KB1942c):** (c), (d) and (e), fixed in parts 7, 8 and 9. No stress stage differs in values or targets now, but the order of a prim's specs still differs from OpenUSD's on a few prims where no value shows it: stage 139 of seed 7, and `/R/a/c` and `/R/a/a/c` of stage 48 of seed 1942, where two specs trade places.
-- **Repro:** generate seed 1942 with `packages/usdz/tests/oracle/generate-stages.py`, mark stage 48 with `packages/usdz/tests/prim-stack-marks.js` and compose it with `composition()` and with OpenUSD's `Usd.Stage.Open`: the marked values of `/R/a/c`, read back with `prim-stack-order.js`, give two of its specs in the other order from OpenUSD's (the stress test compares values and targets only, so it does not see this).
+- **Still open (KB1942c):** (c), (d) and (e), fixed in parts 7, 8 and 9; stage 139 of seed 7 still differs on 8 prims, though its values match. The other stages (seed 1942: 9 24 25 48 114; seed 7: 51 68 134) are not reduced again since part 6.
+- **Repro:** generate seed 1942 with `packages/usdz/tests/oracle/generate-stages.py`, compose stage 25 with `composition()` and compare with OpenUSD's `Usd.Stage.Open` of the same root: `/M/a/a.v1` is 634 where OpenUSD gives 28. Its reduced form: `root.usda` sublayers `l1.usda` and `l0.usda`; `l1.usda` selects variant `y` on `/M`, whose `a` carries a payload to `l0.usda` and selects its own variant `y`, whose `a` specializes `/C/a` with `v1 = 634`; `l0.usda` has `/M` inheriting `/C` and `/C/a` with `v1 = 28`.
 - **Cause:** the AOUSD USD Core Specification v1.1.0 does not say how a path is mapped through an implied class arc that stands for an ancestral one. The rules in `packages/usdz/src/stage.ts` come from watching OpenUSD on our own stages and are marked there as seen, not specified.
 - **Needed to close:** more black-box stages that pin each kind, or an answer from the specification (an erratum request to the AOUSD issue tracker). Never OpenUSD's source.
 
@@ -9629,7 +9021,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   forbids people and suit work, so nobody is on it. The script's final `process.exit(0)` stays on the KB-OWN-EXIT2 owed
   list until this passes.
 
-### Fixed 2026-11-21: Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16)
+### Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16, open: the concave-corner receiver plane)
 
 - **Repro:** `node scripts/cabin-hearth-browser-test.mjs` (WebGPU or `MARGO_COMPAT=1`) fails "the shadowed snow keeps
   its light" once the crest check before it passes (KB-BOUNCE-FRAMETWIN1): clear glazing, at (-1.2, 0.05, 4.0) the
@@ -9692,61 +9084,15 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   texel; it needs more map resolution near walls or a receiver-side corner test. The capture-point subset (at most
   4,096) no longer matters for core meshes, which are drawn exactly; surfaces a vertex hook displaces (Snow) and
   claimed batches still occlude only through the captured points.
-  4. **The texel's surface (fixed 2026-11-21, the wall or a lower floor).** Measured per VPL, the corner leaks are
-     receivers past the texel's depth whose plane test passes while the texel holds another surface: the wall's foot
-     where the plane meets it (the table room's (0.3, 4.4): the centre ray meets the wall at y 0.05, the true ray at
-     y 0.17), or the floor 5 cm under the plane past it. `buildVisibility` now keeps each texel's surface normal beside
-     its depth (one float, hemi-octahedral at 4,095 levels: Meyer, Suessmuth, Sussner, Stamminger and Greiner, "On
-     Floating-Point Normal Vectors", EGSR 2010; Cigolle, Donow, Evangelakos, Mara, McGuire and Meyer, JCGT 3(2) 2014),
-     as an object-ID shadow buffer keeps which surface it holds (Hourcade and Nicolas, "Algorithms for Antialiased
-     Cast Shadows", Computers & Graphics 9(3), 1985), and a receiver past the depth is lit only if one flat or convex
-     surface can join it to the texel's point H: normals within 60 degrees, H behind the receiver's plane by at most
-     |H - x| sin(angle) + 2 cm (a convex chord runs between its tangents). The test of the normal alone (within 26
-     degrees, H within 2 cm of the plane) hid 29% of the window's bounce at Cabin Hearth's log crest, whose texel
-     holds the log's lower face 39 degrees round; an offset from H's own plane hid 10% of a faceted log's crest, its
-     captured normal 9 degrees off. Tests (packages/clustered/test/bounce.test.js): the table room outside the wall at
-     y 0.05, flat and on a drift tilted 20 degrees, 0% to 0.09% of unblocked at (2, 4.2), (0.3, 4.4), (0.6, 4.6),
-     (5.7, 4.3) (0.9%, 5.5%, 4.0%, 3.8% flat and up to 1.5% tilted with depths alone); the floor inside within 10% of
-     the traced visibility; a 0.15 m log's crest over lit snow within 10% of traced for three lights. Cabin Hearth:
-     the crest checks as before (see the playbook entry of 2026-11-21).
-  5. **The floor level with the snow behind the wall (fixed 2026-11-21).** Cabin Hearth's snow 0.25 to 0.35 m from the
-     front wall, (-1.5, 0.163, 3.0) and (-2.5, 0.172, 2.9), took 0.0013 R and 0.0007 R (twin, albedo 0.9 / pi) where
-     the cast gives 0.00003 R: the texels of the back wall's VPLs held the plank floor at y 0.15 just inside the wall,
-     1.3 to 2.2 cm under the snow and parallel to it, so by one depth the snow's own plane, and the joined-surface test
-     passed. The ray to the snow passes the wall about 2 degrees above its foot, under a third of a 32-texel map's 7, so
-     finer maps near walls (adaptive shadow maps, Fernando, Fernandez, Bala and Greenberg, SIGGRAPH 2001,
-     doi:10.1145/383259.383302; logarithmic perspective shadow maps, Lloyd, Govindaraju, Quammen, Molnar and Manocha,
-     ACM TOG 27(4) 2008, doi:10.1145/1409625.1409628) would need some 16 times the texels round every wall and still
-     place the edge to a texel. Instead, once the centre texel's surface joins the receiver, `bounceIrradiance` and
-     `clusterBounceLighting` (one WGSL for WebGPU and the WebGL2 layer) ask the texel beside it on each axis, toward
-     the ray to the receiver: where the two texels' points form a valley (each in front of the other's plane by over
-     2 cm: the floor and the wall standing on it) and the receiver lies over 2 cm behind the second one's plane, the
-     ray meets that wall between them. The two planes place the edge inside the texel pair, as shadow silhouette maps
-     store an edge inside a texel (Sen, Cammarano and Hanrahan, ACM TOG 22(3) 2003,
-     https://graphics.stanford.edu/papers/silmap/); the taps are percentage-closer filtering's (Reeves, Salesin and
-     Cook, SIGGRAPH 1987) but decide visibility only for a valley, since every tap of a 2 x 2 block as an occluder had
-     darkened the floor under a table by 14%. A convex edge is never a valley, so a log's crest keeps its bounce. Test
-     (packages/clustered/test/bounce.test.js): Cabin Hearth's front wall, door, floor and snow with VPLs over its back
-     and side walls: 0 at both points where the traced visibility is 0 (5.5% of unblocked at (-1.5, 3.0) before), the
-     snow along the wall 0.06% of unblocked, the floor and the wall's foot inside within 10% of traced. The table room
-     level with its floor, (0.3, 4.4), (5.7, 4.3) and (3, 4.1): 0%, 0% and 2.8% (1.9% to 5.8% before). Cabin Hearth
-     (scripts/cabin-hearth-browser-test.mjs, both points added to its shadowed-snow check, bound 0.0005): see the
-     playbook entry of 2026-11-21.
-  What is left is the depth bias every shadow map has, recorded in docs/limits.md, not a defect: a receiver behind a
-  surface thinner than 2 cm and 2% of its distance (the table room's zero-thickness wall: (3, 0.05, 4.05) 5 cm behind
-  it, 43%, and (3, 4.1) 10 cm behind, 2.8%) lies within that slack of the texel's depth and is lit; a wall thicker than
-  the slack, as every wall of Cabin Hearth is, hides it. On the lit side a receiver within about one texel's footprint of a concave corner loses some (one texel of edge
-  placement, the same with depths alone).
+- **Needed to close:** the concave-corner receiver plane above.
 
-### Fixed 2026-11-20: an opening light cast no shadow of its reveal and sill, and its bounce followed (clustered, KB-BOUNCE-REVEAL1, found 2026-11-16)
+### An opening light casts no shadow of its reveal and sill, and its bounce follows (clustered, KB-BOUNCE-REVEAL1, found 2026-11-16, open)
 
 - **What:** `openingLight` (`@margoengine/clustered/area`) lights what is in front of an opening with the whole rectangle's light, so snow under a deep sill or reveal takes light its reveal hides. `LightBounce` reflects the opening's light from the texels its centre sees, each with that unshadowed irradiance. In Cabin Hearth the window's bounce at the log crest (0.3, 1.35, 2.65) is 0.0917 R against 0.0647 R with the reveal and sill shading the snow (+42%), 0.1196 R with no shading at all.
 - **Repro:** `node scripts/run-with-timeout.mjs -- node scripts/cabin-hearth-browser-test.mjs`, the `crest.frosted` line: `twinWindow` against `shaded`; `bounceQuadrature('pane')` in that script is the physics.
 - **Cause:** the opening light's irradiance is the polygon integral over the full rectangle (`rectIrradiance`), never clipped to what a point sees through the opening's depth.
 - **Needed to close:** clip the rectangle to the part each receiver sees past the reveal and sill (both `openingLight` and the bounce's opening source), then hold the crest check to the shaded quadrature within 15%.
-- **Package fix (2026-11-16):** `RectAreaLight.recess` and `sill` (and `openingLight`'s) clip the rectangle in `AreaLights` and in `LightBounce`'s `rectIrradiance` (tests: packages/clustered/test/area.test.js, test/bounce.test.js, test/opening-light.test.js, examples/package-benchmarks/area-lights-gpu.mjs). With them, the bounce's 32 VPLs first read the crest 45% under the same capture's texel-by-texel sum (0.0078 against 0.0141), as one cluster mixed the snow, the sill top and a glazing bar's face and was lifted to the bar (KB-BOUNCE-CLUSTER1, fixed).
-- **Fix (2026-11-20):** Cabin Hearth's opening light carries its frame: `recess` 0.218 m (the opening at z 2.452 to the frame's outer face at z 2.67) and `sill` 0.09 m (the sill's front edge at z 2.76), so `AreaLights` and the bounce's opening source (its capture now looks out from the frame's mouth) clip the rectangle to what each point sees past them. The crest check now holds the window's bounce to the shaded quadrature within 15% (it was held between shaded and bare, and to the unclipped capture model): Intel Arc 140V laptop GPU (the browser's default adapter), WebGPU and the WebGL2 layer alike, `twinWindow` 0.0624 R, 0.0147 G against `shaded` 0.0647 R, 0.0152 G (-3.6%; bare 0.1196 R), the frame equal to its twin to 2%. The same script's under-window snow (KB-CABIN-WINDOWGLOW1) and frosted patch edge checks now take their form factor from the part of the pane each point sees past the frame and sill (`paneFormFactor`, traced over 840 patches) instead of the bare rectangle's Lambert form: the snow under the window reads 0.1160 R against the traced 0.1012 R (+15%, the check's band 0.8 to 1.25; the bare form gave 0.1174 R; the clip's sill edge sits level with the opening's lower edge, 2 cm under the real sill top, and the snow's specular adds some), the patch edge 1.517 m against the traced 1.596 m (half of it the bound).
-- **Regression:** tests/cabin-hearth-opening.test.js (the demo's opening keeps its recess and sill; fails on the old main.ts), and scripts/cabin-hearth-browser-test.mjs, the `crest.frosted` line (the old scene reads +42% over `shaded`).
+- **Package fix (2026-11-16):** `RectAreaLight.recess` and `sill` (and `openingLight`'s) clip the rectangle in `AreaLights` and in `LightBounce`'s `rectIrradiance` (tests: packages/clustered/test/area.test.js, test/bounce.test.js, test/opening-light.test.js, examples/package-benchmarks/area-lights-gpu.mjs). Still open: Cabin Hearth does not pass them yet. With them, the bounce's 32 VPLs read the crest 45% under the same capture's texel-by-texel sum (0.0078 against 0.0141), as one cluster mixed the snow, the sill top and a glazing bar's face and was lifted to the bar (KB-BOUNCE-CLUSTER1, fixed below); the scene's switch follows.
 
 ### A chain laid out level under a 1000:1 end mass stretches once it is taut
 
@@ -10453,7 +9799,7 @@ Measured but not fixed. Their history, sources and rerun commands are in
 The entries below were measured with `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu` (busy
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
-- **Upstream reports (drafts, nothing filed):** `docs/upstream-reports/KB2481/report.md` (this entry) and `docs/upstream-reports/KB3508/report.md` (the NVIDIA repro page `msaa-blend-repeat.html`, which has no Margo code). On 2026-11-11 the page still reproduces on the RTX A6000 (WebGPU: 299 of 299 frames differ, 36 distinct images; with `mask: 7` none). The Intel Arc half has a hand-written repro since 2026-11-21, `docs/upstream-reports/KB2481/msaa-additive-repeat.html` (found through the surfel level check, entry "surfels at 4x on a compatibility-level WebGPU device" below); on an Arc 140V `msaa-blend-repeat.html` stays exact (0 of 299 frames, WebGPU, 2026-11-21). `SurfelPlugin` works around it since 2026-11-21: its full level at 4x resolves by a masked draw per sample (4 draws for 1), which repeats on the Arc (same entry).
+- **Upstream reports (drafts, nothing filed):** `docs/upstream-reports/KB2481/report.md` (this entry) and `docs/upstream-reports/KB3508/report.md` (the NVIDIA repro page `msaa-blend-repeat.html`, which has no Margo code). On 2026-11-11 the page still reproduces on the RTX A6000 (WebGPU: 299 of 299 frames differ, 36 distinct images; with `mask: 7` none). The Intel Arc half has no hand-written repro and could not be run here.
 
 ### createInstancedMesh draws 50,000 boxes slower than three.js
 
@@ -13934,19 +13280,7 @@ Platform defect below the compatibility layer, proven at the WebGL call level (b
 - Batch 164 SSAO resolve control (2026-11-10): `node packages/post/test/ssao-resolve-browser.mjs` with `MARGO_COMPAT=1` fails default ANGLE D3D11 exact pixels after odd-size 4x resize (59 channels, max two display levels). Its three unchanged historical-control frames also vary by the same 59 channels and two levels; native and ANGLE Vulkan (`BROWSER_ARGS=["--use-angle=vulkan"]`) pass all 12 pairs. This is consistent with the recorded D3D resolve defect above, but this fixture still needs a raw GL command replay to isolate the cause. Control evidence: `test-results/bp164-compat-diagnostic.log`; native `bp164-ssao-pixels.log` and actual Vulkan `bp164-compat-vulkan-real.log` (the earlier `bp164-compat-vulkan.log` did not forward the backend argument and is not Vulkan evidence). Under Scott's 2026-11-10 control-variance ruling, D3D11 cannot prove or disprove this change's identical output; the exact native and Vulkan checks supply that proof. The original exact test and assertion remain unchanged. This is a landing exception, not a repaired driver claim.
 
 - KB6016c lane (2026-11-11, sweep-l4): the compat leg of `materials/test:gpu:dispersion` at the KB6016c tree failed 4 exact 4x checks (loaded glTF vs constructed; groups, instances and mirror device restoration) with the same max 0.000244140625 signature; the native leg passed. Same open defect: the shader text the compared draws use is identical within each comparison, and nothing was rerun to green.
-- Second vendor, same ANGLE D3D11 (2026-11-21, Intel Arc 140V laptop, Edge 157.0.4341.46, default ANGLE Direct3D 11, origin/main 772fcc4f4, as each run printed): every repro this entry names is exact. `node scripts/material-dispersion-gpu-check.js --backend=compat`: 278 of 278 checks, 254 captures, no failures (the reset image included). `packages/sciviz/tests/geo-lod-browser.mjs`: refinement, cache budget and restore pass on both backends. `packages/sciviz/tests/atmosphere-browser.mjs`: exact restoration passes on WebGPU and WebGL2. `MARGO_COMPAT=1 node packages/post/test/ssao-resolve-browser.mjs`: 12 of 12 pairs byte-identical. `docs/upstream-reports/KB3508/msaa-blend-repeat.html?api=webgl2&frames=300`: 0 of 299 frames changed, 1 image, at 640x480 and at 1024x768. The layer has no vendor branch (only the capability tier changes formats, and this run was the full tier; `endPass` resolves with one `blitFramebuffer` per resolve target, `resolveForSampling` with one blit per stale copy), so the same Margo GL stream on the same ANGLE D3D11 backend is repeatable on Intel and not on the RTX A6000. With the earlier results (ANGLE Vulkan and D3D11on12 exact on the A6000, AMD exact, Dawn D3D12 on the A6000 also varying in KB3508), this places the defect in the NVIDIA D3D11/D3D12 driver path, not in `@margoengine/webgl2-compat` and not in ANGLE's D3D11 backend alone. No layer change: a regression check of two reads of one resolved texture passes on the old code here and cannot fail on any machine but the A6000. Escalated to Scott (driver defect, no Margo-side cause).
-- Next step: report to NVIDIA (copy ANGLE) with a self-contained replay of the recorded session (full payloads, not hashes), run on the A6000. Until then this stays a release blocker for exact compat captures on Windows D3D11 with NVIDIA. Never raise the bound for it.
-
-### Open, outside Margo, worked around 2026-11-21: surfels at 4x on a compatibility-level WebGPU device differed from the full level by up to 33 of 255 on the Intel Arc 140V
-
-- Repro (2026-11-21, origin/main 772fcc4f4, Intel Arc 140V laptop, Edge 157, native WebGPU): `node packages/webgl2-compat/test/adapter-browser.mjs` (the first file of `npm run test:gpu` in `packages/webgl2-compat`) fails at line 73: `the surfel frame stays within the capture's rounding, got {"count":4456,"largest":33,"channels":[33,15,32,0]}`. The bound is 4 of 255 (measured 3 and 4 on the A6000, D3D12, when the 4x surfel level path landed, bug sweep L3). Two runs gave the same largest difference (33; 4,456 and 4,458 channels), so it is not a timing failure. Every other level comparison in the same check holds on this machine (shadows 0, post 2, sky 3, fog 4, eye-dome 0), and the package cases all draw.
-- Scope: this is native WebGPU at `featureLevel: 'compatibility'` against the full level (`SurfelPlugin`'s rgba8unorm-packed front depth, two rg16float sum targets and the masked per-sample resolve), not the WebGL2 layer. Nearly every surfel pixel differs (4,456 of the 4,623 the surfels touch), but by the capture's rounding (up to 4, as on the sky frame); the 33 is on a few dozen pixels only (about 80 channels), as traced below.
-- Cause (traced 2026-11-21 on the same laptop, origin/main 28284065a, Edge 157.0.4341.46, Dawn D3D12, adapter `intel xe-2lpg` as the runs printed): below Margo, the Arc's 4x MSAA blending (the Intel half of KB2481, "4x MSAA blending is not repeatable"). The full level's frame is the one that moves, not the level's:
-  - The full level does not repeat itself. One engine drawing the unchanged surfel scene eight times gives 52 to 112 channels per frame apart from its first frame, by up to 33 of 255 over PostStack's capture and up to 71 without PostStack (4x is the default). Two full-level engines are as far apart as full and level (78 and 95 channels, 33 of 255).
-  - Not the level's code path: the full-level device with `core-features-and-limits` hidden (so every package takes its level route, rg11b10ufloat capture included) and a real level device agree within 4 of 255 (4,417 channels, the capture's rounding, as on the sky frame), while that device and its own unhidden run differ by 33 again.
-  - Which pass: read back after each frame, the front depth is the same every frame and so are the sums at every pixel that moved (bit for bit, all four samples), while the frame there changed by up to 64 of 255. The `sample_index` resolve (one draw shaded per sample, alpha blended over the 4x scene) gives different pixels from the same sums. The level's resolve, one draw per sample with `multisample.mask`, gives frames identical to its first in 7 of 7, both with its own two rg16float sums and with the full level's rgba16float sums forced in place of them. The rgba16float additive sums themselves also move by 1 ulp of a half float in 119 to 163 values from frame to frame, which no shown pixel resolves to more than 1 of 255.
-  - No Margo code needed: `docs/upstream-reports/KB2481/msaa-additive-repeat.html` (576 instanced discs added into a 4x rgba16float target, then laid over a 4x bgra8unorm target per sample, all in one encoder). On this laptop, 120 frames: the source samples change in 119 of 119 frames (up to 3,989 of the 65,536 floats in a frame) with no command or input changed, and the frames differ by up to 18 of 255 with the `sample_index` draw against 1 of 255 with the four masked draws. With the same source written by plain masked writes (in each frame's encoder or once) both routes give one image in 60 of 60 frames. Additive blending in primitive order cannot change between identical frames, and the per-sample draw over the same samples cannot spread further than the masked draws over them.
-- **Workaround (2026-11-21, in `@margoengine/points`):** on native WebGPU at 4x, `SurfelPlugin`'s full level resolves with the same masked draw per sample as the level (`packages/points/src/surfels.ts`, `masked`), reading its one rgba16float sum target per sample, so the one `sample_index` draw the fault moves is gone. The WebGL2 layer ignores sample masks and keeps its one draw; 1x is unchanged. Cost, as a work count: the resolve is 4 draws in place of 1 (4 resolve pipelines in place of 1, made once), passes unchanged (depth, blend, resolve); the adapter check's surfel frame is 11 draws and 10 passes in place of 8 and 10. Evidence on the same laptop (adapter `intel xe-2lpg`, Edge 157.0.4341.46, as the runs printed): `node packages/webgl2-compat/test/adapter-browser.mjs` passes with the unchanged bound of 4 (3 runs: largest 4, 4,414 to 4,416 channels, against 33 before); one full-level engine drawing the adapter check's surfel scene over PostStack gave 8 of 8 frames bit for bit its own in 3 page loads, one image across all 3 (against 58 to 118 channels, 33 of 255, frame to frame before). Regression: `surfelRepeat` in `packages/points/tests/features-browser.js` (`node packages/points/scripts/test-browser.js`, 4x page) fails on the old route here (41 to 69 channels, up to 61 of 255 apart from the first frame) and passes now. The masked draws give the same pixels as the `sample_index` draw by construction (each sample shaded from its own sums and blended over its own destination either way), but that is not measured on a GPU without the fault: this laptop has no software WebGPU adapter (SwiftShader answered no adapter in Edge and in Playwright's Chromium). Open outside Margo: the Arc's 4x additive blending itself (KB2481, `docs/upstream-reports/KB2481/`); rerun `adapter-browser.mjs` and the regression on the RTX A6000 to show its pixels unchanged.
+- Next step: report to ANGLE/NVIDIA with a self-contained replay of the recorded session (full payloads, not hashes). Until then this stays a release blocker for exact compat captures on Windows D3D11. Never raise the bound for it.
 
 Fixed 2026-11-10: Batch 181 gate observation. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
@@ -14068,21 +13402,6 @@ Cause: the table was left out of KB6016 because it moves every image-based-light
 environment budget (already 1 over, KB3574), which needs a re-record ruling. Fix to build: integrate G2 in the table
 (Heitz 2014 eq. 99), recapture the environment proofs and re-record the IBL budget under a ruling.
 
-**Status (2026-11-20):** The fix is ready to make. In `packages/environment/src/shaders.ts`, `brdfLut` replaces
-`let g = smithG1(nv, a2) * smithG1(l.z, a2);` with core's height-correlated G2 (`packages/core/src/shaders.ts` line 28,
-the same as `smithGCorrelatedFloat` in `packages/shared/light-terms.js`), and the `smithG1` helper is removed. The
-table's format and size do not change. With it, `tests/smith-shaders.test.js` drops its exception
-`'packages/environment/src/shaders.ts': 1`, and the f64 LUT reference in `packages/environment/tests/environment-browser.js`
-moves to G2. Measured effect (f64 integration of the table with both G): scale plus bias rises by +4.3% / +0.3% at
-roughness 0.5 (NdotV 0.1 / 0.5), +13.7% / +2.4% at roughness 0.75, +36.3% / +10.2% at roughness 1.0. Every
-image-based-lighting picture and the multiple-scattering compensation change. It waits on two things: a re-record of
-the batch 160 environment budgets (`docs/whitepaper/results/batch-160-environment.json` and
-`batch-160-environment-decomposition.json`, pinned by `tests/reference-environment.test.js`, checked by
-`scripts/reference-rendering/environment.mjs`), and a proof recapture (`proofs/capture.mjs`) of the stories that carry
-the LUT shader text (likely environment-hemisphere, probes-decals, gltf-pbr-lighting-hooks, binding-limit). Both need
-Scott's ruling and the NVIDIA RTX A6000 workstation, which is not available as of 2026-11-20. The code, tests, docs,
-budgets and proofs land in one commit there. The entry stays Open.
-
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 
 Base dab36e5f9, Apple silicon Mac. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
@@ -14121,7 +13440,7 @@ Cause: packages/stage/src/controls.ts `orbit` and `pan` work in Y-up spherical c
 a view along Y. The README does not say Y up. Fix to build: build the orbit frame from `camera.up` (or document Y up
 and refuse another up).
 
-## Batch 132 audit: cache (fixed)
+## Batch 132 audit: cache (fixed and open)
 
 Fixed in this commit (regressions in packages/cache/test/audit-132.test.js, each failing before its fix): `delete`
 and `clear` of AssetCache and `clear` of RangeCache ran before writes already queued, so a file answered just before
@@ -14132,7 +13451,7 @@ asctime dates were read as local time (RFC 9110 5.6.7, RFC 9111 5.3); `If-Range`
 `Prefetcher.settle()` hung while paused; `AssetBundles.load` kept downloading every file after one failed; HashedAssets
 and AssetBundles dropped a `Request` input's signal and headers; `throttle` left one abort listener per chunk.
 
-### Fixed: cache findings not fixed in the audit
+### Open: cache findings not fixed in the audit
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
@@ -14172,7 +13491,7 @@ materials `test:gpu:features`, compatibility pass, failed "a triangle edge chose
 ### Fixed: J6 product implicit-sampler footprint
 The red 121 versus 120 product probe came from webgl2-compat replacing implicit textureSample footprint selection with a Euclidean derivative LOD estimate. The first resolved scene HDR red was binary16 0x3329 on native and 0x3321 on both ANGLE backends. Keeping hardware implicit sampling repairs the owning emitter; explicit mip interpolation stays unchanged. The glsl.test.js regression fails before repair; the oblique implicitFootprint GPU case changes from native 0x3e99f89a versus old compatibility 0x3ed98258 to 0x3e99f89a on all three paths. Product's existing exact cross-backend and restoration probes now pass, with zero tracked allocations after disposal. Intermediate HDR bit equality is not claimed. Reproduction and raw centre copies: docs/integration-product.md.
 
-## Batch 132 audit: sprites (fixed; accepted difference)
+## Batch 132 audit: sprites (fixed and open)
 
 Fixed with regressions in `packages/sprites/tests/audit-132.test.js` (all 8 fail on the code before the fix):
 `SpriteLayer`, `BillboardLayer` and `SkeletalLayer` `dispose()` removed the active scene's plugin of the same name
@@ -14186,7 +13505,7 @@ frame; they compare `Math.fround(value)`. A linked Aseprite cel took the z-index
 orders by each cel's own z). A Spine IK key without `mix` kept the setup mix (0 stayed 0; the JSON export format
 says assume 1) and one without `softness` interpolated toward 1 (format: assume 0).
 
-### Fixed (multiply two-draw cost accepted): sprites findings not fixed in the audit
+### Open: sprites findings not fixed in the audit
 
 - Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
   because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
@@ -14213,7 +13532,7 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
   so full-opacity groups need no image). Regression: packages/sprites/tests/aseprite.test.js (KB6013d case); doc:
   packages/sprites/README.md.
 
-## Batch 132 audit: behavior (fixed)
+## Batch 132 audit: behavior (fixed and open)
 
 Fixed with regressions in `packages/behavior/tests/audit-132.test.js` (all 3 fail on the code before the fix):
 `FlowField.stamp` undo wrote back the costs it saw when it was placed, so overlapping stamps undone oldest first left
@@ -14229,7 +13548,7 @@ steps keeps x[0] === x[1]); Reynolds 1987 gives no direction for a zero offset, 
 row-order independence `flock` promises. `avoidObstacles` scales its push by `1 + (reach - along) / reach` and
 `min(1, clearance / radius + 0.5)`, Margo's own heuristic with no source or measurement behind the 0.5.
 
-## Batch 132 audit: culling (fixed)
+## Batch 132 audit: culling (fixed and open)
 
 Fixed with regressions in `packages/culling/test/audit-132.test.js` (all 7 fail on the code before the fix):
 `CulledInstances`, `DynamicInstances`, `LodInstances`, `CulledMeshes`, `CulledModels`, `FrontToBack` and
@@ -14271,7 +13590,7 @@ buffers gained COPY_SRC) to the byte, and checks each list is in ascending insta
 lod.test.js checks the three entry points and no atomics. lod-check also gained a compat branch (the WebGL2 layer draws
 every shown instance at the first level by design, so core's side does too and "every level drew" is skipped).
 
-## Batch 132 audit: input (fixed)
+## Batch 132 audit: input (fixed and open)
 
 Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on the code before the fix):
 - Chorded mouse buttons. `Input` set and cleared button bits only on `pointerdown` and `pointerup` (index.ts:179-187
@@ -14297,7 +13616,7 @@ Fixed with regressions in `packages/input/test/audit-132.test.js` (all 5 fail on
   Caveat: the same specification's informative vehicle example gives a turn about y as `gamma`; the normative getter
   steps were followed. Not yet checked on a real phone.
 
-Formerly open (all closed since the audit):
+Open (not fixed in the audit):
 - Closed, lane L (2026-11-10): on the M6, `packages/input/test/input-browser.mjs` (and `packages/worker/tests/browser-check.mjs`)
   failed before their pixel steps because Chromium rejected `requestPointerLock` with `WrongDocumentError`. Root cause
   is outside Margo: the Mac's console was locked (`ioreg` CGSSessionScreenIsLocked true, front app
@@ -14309,7 +13628,7 @@ Formerly open (all closed since the audit):
   action's size matches across browsers. Regression: packages/input/test/input.test.js (wheel deltaMode test).
 - Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.
 
-## Batch 132 audit: net (fixed)
+## Batch 132 audit: net (fixed and open)
 
 Fixed with a regression in `packages/netcode/tests/interpolation-audit-132.test.js` (fails on the code before the fix): `SnapshotBuffer.sample`
 drew the cubic Hermite position but returned the straight blend of the two snapshots' velocities, so the velocity was
@@ -14332,7 +13651,7 @@ Fixed with a regression in `packages/gltf/test/audit-132.test.js` (fails on the 
 accessor had no bufferView failed to load. It now reads as zeros; a sparse accessor without a view is still refused
 as unsupported by the light loader.
 
-## Batch 132 audit: oit (fixed)
+## Batch 132 audit: oit (fixed and open)
 
 - Fixed: `TransparentPass.dispose` (packages/oit/src/pass.ts:137, so `OIT`, `ExactOIT`, `PeelOIT`, `PreciseOIT`,
   `MomentOIT`) and `TransparentDepth.dispose` (depth.ts:180) called `engine.removePlugin(this.name)`, which acts on the
@@ -14557,7 +13876,7 @@ frame-graph passes gated on `backend` with no `requireWebGPU` refusal in setup a
 refuse in setup through `requireWebGPU` (b061399b78). `node scripts/check-preview-contract.mjs` reports all 162 owners
 refusing during setup or holding a tested preview route.
 
-## Batch 132 audit: gltf/pbr (fixed)
+## Batch 132 audit: gltf/pbr (fixed and open)
 
 - Fixed: `applyGLTFLightExtensions` (packages/gltf/src/lights.ts, the aimed-profile cache) keyed fixtures by profile format + profile name + aim. Two EXT_lights_ies profiles with the default name "" and the same LM-63 first line, on nodes aimed alike, shared the first profile: input `LightProfile.ies` (peak 8500 cd) and a second profile peaking at 5250 cd; the second fixture drew at 8500 cd with the first one's beam. Cause: the name is optional and not unique. Fix: the loop is now `placeIESLights`, keyed by the parsed profile object (one per `lights` index) and the aim. Regression: packages/gltf/test/lights.test.js, "two unnamed profiles of one format aimed alike keep their own candela" (fails with the old key).
 - Settled 2026-11-11 (KB6284a): EXT_lights_image_based says each saved image "must be flipped about its vertical axis"; the reader swaps rows (a flip about the horizontal axis). The real EnvironmentTest decides it: its mip-0 cube projected onto the real SH basis (Ramamoorthi and Hanrahan 2001) has the sign of all 9 l = 1 values and all 9 xy, yz and xz values the file states only with rows swapped; read as saved, with columns swapped, or with both, 6 or more of those signs are wrong. The l = 1 magnitudes are 1.84 to 2.17 times ours, so the file's scale is still unknown and `irradianceCoefficients` stays data. Regression: packages/gltf/test/lights.test.js, "KB6284a" (fails for each of the other three readings).

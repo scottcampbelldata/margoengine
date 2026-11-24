@@ -28,15 +28,7 @@ export function indexLibrary(root) {
       if (kind === 'hdri') {
         for (const f of readdirSync(base).sort()) {
           const m = /^(.+?)(_[0-9]k)?\.hdr$/.exec(f);
-          if (m)
-            add({
-              id: m[1],
-              subject,
-              kind,
-              type: 'sky',
-              file: `${subject}/${kind}/${f}`,
-              bytes: statSync(join(base, f)).size,
-            });
+          if (m) add({ id: m[1], subject, kind, type: 'sky', file: `${subject}/${kind}/${f}`, bytes: statSync(join(base, f)).size });
         }
         continue;
       }
@@ -44,24 +36,13 @@ export function indexLibrary(root) {
         const file = readdirSync(join(base, id))
           .filter((f) => f.endsWith('.gltf'))
           .sort()[0];
-        if (file)
-          add({
-            id,
-            subject,
-            kind,
-            type: 'model',
-            file: `${subject}/${kind}/${id}/${file}`,
-            bytes: statSync(join(base, id, file)).size,
-          });
+        if (file) add({ id, subject, kind, type: 'model', file: `${subject}/${kind}/${id}/${file}`, bytes: statSync(join(base, id, file)).size });
       }
     }
   return { index: { version: 1, assets }, repeats };
 }
 
-if (
-  import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/')}` ||
-  process.argv[1]?.endsWith('library-index.mjs')
-) {
+if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/')}` || process.argv[1]?.endsWith('library-index.mjs')) {
   const root = process.argv[2] && resolve(process.argv[2]);
   if (!root) {
     console.error('Usage: node tools/library-index.mjs <library folder>');
@@ -69,8 +50,6 @@ if (
   } else {
     const { index, repeats } = indexLibrary(root);
     writeFileSync(join(root, 'library.json'), JSON.stringify(index));
-    console.log(
-      `${index.assets.length} assets written to ${join(root, 'library.json')}${repeats.length ? `; repeated ids kept once: ${repeats.join(', ')}` : ''}`,
-    );
+    console.log(`${index.assets.length} assets written to ${join(root, 'library.json')}${repeats.length ? `; repeated ids kept once: ${repeats.join(', ')}` : ''}`);
   }
 }

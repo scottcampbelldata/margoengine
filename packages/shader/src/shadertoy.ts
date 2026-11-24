@@ -15,12 +15,7 @@ import { fault } from '../../shared/errors.js';
 import { copyExternal } from '../../shared/copy-external.js';
 import type { StageOutput } from '../../shared/stack.js';
 import { ShaderPass, type ShaderPassOptions } from './glsl-pass.js';
-import {
-  GLSLMaterial,
-  type ShaderMaterialOptions,
-  type ShaderUniform,
-  type ShaderUniformValue,
-} from './glsl/material.js';
+import { GLSLMaterial, type ShaderMaterialOptions, type ShaderUniform, type ShaderUniformValue } from './glsl/material.js';
 // The type only: a toy's material is the program core, which `instanceof ShaderMaterial` accepts.
 import type { ShaderMaterial } from './glsl-material.js';
 import type { GLSLTexelFilter } from './glsl/program.js';
@@ -30,12 +25,7 @@ import type { ShadertoySound } from './shadertoy/sound.js';
 
 export type { ShadertoySound };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
-declare const GPUTextureUsage: {
-  RENDER_ATTACHMENT: number;
-  TEXTURE_BINDING: number;
-  COPY_SRC: number;
-  COPY_DST: number;
-};
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number; COPY_DST: number };
 declare const GPUShaderStage: { FRAGMENT: number };
 
 /** A buffer tab: Buffer A to D. */
@@ -57,15 +47,7 @@ export interface ShadertoyAudio {
  * it: after a restore the channel reads opaque black, `engine.onError` hears of it once (`'state'`, #borrowed-lost),
  * and `toy.setChannel(index, texture)` gives it a new one.
  */
-export type ShadertoyInput =
-  | RawTextureInput
-  | 'input'
-  | ShadertoyBuffer
-  | 'cubeA'
-  | 'keyboard'
-  | ShadertoyMedia
-  | ShadertoyAudio
-  | null;
+export type ShadertoyInput = RawTextureInput | 'input' | ShadertoyBuffer | 'cubeA' | 'keyboard' | ShadertoyMedia | ShadertoyAudio | null;
 /** One of iChannel0 to iChannel3 with its sampling. */
 export interface ShadertoyChannel {
   /** What the channel reads. */
@@ -174,8 +156,7 @@ function invert(m: ArrayLike<number>, out: number[]): void {
     a[p] = a[c]!;
     a[c] = row;
     for (let k = 0; k < 8; k++) row[k] = row[k]! / d;
-    for (const other of a)
-      if (other !== row) for (let k = 0, f = other[c]!; k < 8; k++) other[k] = other[k]! - f * row[k]!;
+    for (const other of a) if (other !== row) for (let k = 0, f = other[c]!; k < 8; k++) other[k] = other[k]! - f * row[k]!;
   }
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) out[c * 4 + r] = a[r]![4 + c]!;
 }
@@ -205,12 +186,7 @@ class Blanks {
         format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       });
-      device.queue.writeTexture(
-        { texture },
-        new Uint8Array(layers * 4).fill(255).map((v, i) => (i % 4 === 3 ? v : 0)),
-        { bytesPerRow: 4, rowsPerImage: 1 },
-        [1, 1, layers],
-      );
+      device.queue.writeTexture({ texture }, new Uint8Array(layers * 4).fill(255).map((v, i) => (i % 4 === 3 ? v : 0)), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, layers]);
     }
     return texture;
   }
@@ -237,9 +213,7 @@ class Mips {
   make(encoder: GPUCommandEncoder, texture: GPUTexture): void {
     const device = this.device,
       format = texture.format;
-    this.layout ??= device.createBindGroupLayout({
-      entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } }],
-    });
+    this.layout ??= device.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } }] });
     let pipeline = this.pipelines.get(format);
     if (!pipeline) {
       const module = device.createShaderModule({ label: 'shader:shadertoy:mips', code: mipCode });
@@ -256,10 +230,7 @@ class Mips {
       steps = [];
       for (let l = 1; l < texture.mipLevelCount; l++)
         steps.push({
-          group: device.createBindGroup({
-            layout: this.layout,
-            entries: [{ binding: 0, resource: texture.createView({ baseMipLevel: l - 1, mipLevelCount: 1 }) }],
-          }),
+          group: device.createBindGroup({ layout: this.layout, entries: [{ binding: 0, resource: texture.createView({ baseMipLevel: l - 1, mipLevelCount: 1 }) }] }),
           view: texture.createView({ baseMipLevel: l, mipLevelCount: 1 }),
         });
       this.groups.set(texture, steps);
@@ -291,8 +262,7 @@ function fits(texture: unknown, type: Channel['type']): boolean {
 const misfit = (name: string, type: Channel['type']) =>
   `Shadertoy ${name} is a ${type === '2d' ? 'sampler2D' : samplerType[type]} channel; give it ${type === '3d' ? 'a 3D texture' : type === 'cube' ? 'a 2D texture of six layers' : 'a 2D texture'}`;
 // A materials Texture (an object that binds itself; a function's own `bind` is Function.prototype's).
-const isTexture = (v: unknown): v is BindableTexture =>
-  !!v && typeof v === 'object' && typeof (v as BindableTexture).bind === 'function';
+const isTexture = (v: unknown): v is BindableTexture => !!v && typeof v === 'object' && typeof (v as BindableTexture).bind === 'function';
 const isBuffer = (v: unknown): v is ShadertoyBuffer => (letters as readonly unknown[]).includes(v);
 function kindOf(texture: ShadertoyInput): Kind {
   if (texture === 'input') return 'input';
@@ -301,64 +271,37 @@ function kindOf(texture: ShadertoyInput): Kind {
   if (isBuffer(texture)) return 'buffer';
   if (texture && typeof texture === 'object') {
     if ('getByteFrequencyData' in texture) return 'audio';
-    if (!('createView' in texture) && !('bind' in texture) && ('videoWidth' in texture || 'width' in texture))
-      return 'media';
+    if (!('createView' in texture) && !('bind' in texture) && ('videoWidth' in texture || 'width' in texture)) return 'media';
   }
   return 'texture';
 }
-function channelOf(
-  given: ShadertoyChannel | ShadertoyInput | undefined,
-  name: string,
-  setter: string,
-  tabs: readonly string[],
-): Channel {
-  const c = (
-    isOptionObject(given) && 'texture' in given ? given : { texture: (given ?? null) as ShadertoyInput }
-  ) as ShadertoyChannel;
+function channelOf(given: ShadertoyChannel | ShadertoyInput | undefined, name: string, setter: string, tabs: readonly string[]): Channel {
+  const c = (isOptionObject(given) && 'texture' in given ? given : { texture: (given ?? null) as ShadertoyInput }) as ShadertoyChannel;
   const texture = c.texture,
     kind = kindOf(texture),
-    gpu =
-      kind === 'texture' && texture && typeof texture === 'object' && 'createView' in texture
-        ? (texture as GPUTexture)
-        : undefined,
+    gpu = kind === 'texture' && texture && typeof texture === 'object' && 'createView' in texture ? (texture as GPUTexture) : undefined,
     fixedType = kind === 'cubemap' ? 'cube' : '2d',
     type = c.type ?? (kind === 'cubemap' ? 'cube' : gpu?.dimension === '3d' ? '3d' : '2d');
   if (!(type in samplerType)) throw new TypeError(`Shadertoy ${name} type must be '2d', 'cube' or '3d'`);
   if (kind === 'texture' && !fits(texture, type)) throw new TypeError(misfit(name, type));
   if (kind !== 'texture' && type !== fixedType)
-    throw new TypeError(
-      `Shadertoy ${name}: ${kind === 'cubemap' ? 'Cube A' : kind === 'buffer' ? 'a buffer' : kind === 'input' ? "the stack's colour" : 'this channel'} is a ${fixedType} channel; leave type out or use '${fixedType}'`,
-    );
-  if (kind === 'buffer' && !tabs.includes(texture as string))
-    throw new TypeError(
-      `Shadertoy ${name} reads Buffer ${texture as string}, which this toy does not have; add buffer${texture as string}`,
-    );
-  if (kind === 'cubemap' && !tabs.includes('cubeA'))
-    throw new TypeError(`Shadertoy ${name} reads Cube A, which this toy does not have; add cubeA`);
+    throw new TypeError(`Shadertoy ${name}: ${kind === 'cubemap' ? 'Cube A' : kind === 'buffer' ? 'a buffer' : kind === 'input' ? "the stack's colour" : 'this channel'} is a ${fixedType} channel; leave type out or use '${fixedType}'`);
+  if (kind === 'buffer' && !tabs.includes(texture as string)) throw new TypeError(`Shadertoy ${name} reads Buffer ${texture as string}, which this toy does not have; add buffer${texture as string}`);
+  if (kind === 'cubemap' && !tabs.includes('cubeA')) throw new TypeError(`Shadertoy ${name} reads Cube A, which this toy does not have; add cubeA`);
   const filter = c.filter ?? 'linear',
     wrap = c.wrap ?? 'clamp',
     address = wrap === 'repeat' ? 'repeat' : 'clamp-to-edge',
     linear = filter === 'nearest' ? 'nearest' : 'linear';
-  if (filter !== 'nearest' && filter !== 'linear' && filter !== 'mipmap')
-    throw new TypeError(`Shadertoy ${name} filter must be 'nearest', 'linear' or 'mipmap'`);
+  if (filter !== 'nearest' && filter !== 'linear' && filter !== 'mipmap') throw new TypeError(`Shadertoy ${name} filter must be 'nearest', 'linear' or 'mipmap'`);
   if (wrap !== 'clamp' && wrap !== 'repeat') throw new TypeError(`Shadertoy ${name} wrap must be 'clamp' or 'repeat'`);
   // A texture channel's size is read from what it binds (Shadertoy.sizeOf); a given resolution wins.
   const resolution = c.resolution ?? sizes[kind];
-  const sampler: GPUSamplerDescriptor = {
-    magFilter: linear,
-    minFilter: linear,
-    addressModeU: address,
-    addressModeV: address,
-    addressModeW: address,
-  };
+  const sampler: GPUSamplerDescriptor = { magFilter: linear, minFilter: linear, addressModeU: address, addressModeV: address, addressModeW: address };
   // GL reads only the base level unless the min filter names mipmaps (OpenGL ES 3.0.6 section 3.8.10); a WebGPU
   // sampler would pick a level by the footprint, so a texture with mip levels is clamped to its base level here.
   if (filter === 'mipmap') sampler.mipmapFilter = 'linear';
   else sampler.lodMaxClamp = 0;
-  const slot =
-    kind === 'texture'
-      ? borrow<Lent, RawTextureInput>(texture as RawTextureInput | null, `Shadertoy ${name}`, setter)
-      : undefined;
+  const slot = kind === 'texture' ? borrow<Lent, RawTextureInput>(texture as RawTextureInput | null, `Shadertoy ${name}`, setter) : undefined;
   return { kind, texture, type, filter, wrap, sampler, resolution, ...(slot && { slot }) };
 }
 // The program around a tab: the documented inputs, then Common, then the source, then a main that calls mainImage at
@@ -384,12 +327,10 @@ const calls = {
     'else if(shadertoyF==3)shadertoyD=vec3(shadertoyT.x,-1.0,-shadertoyT.y);else if(shadertoyF==4)shadertoyD=vec3(shadertoyT.x,-shadertoyT.y,1.0);' +
     'mainCubemap(shadertoyOut,shadertoyP,vec3(0.0),normalize(shadertoyD))',
   // Sample numbers run along the block's rows from its first row.
-  sound:
-    'int shadertoyN=shadertoySoundBase+int(gl_FragCoord.y)*512+int(gl_FragCoord.x);shadertoyOut=vec4(clamp(mainSound(',
+  sound: 'int shadertoyN=shadertoySoundBase+int(gl_FragCoord.y)*512+int(gl_FragCoord.x);shadertoyOut=vec4(clamp(mainSound(',
 } as const;
 // `vec2 mainSound(int samp, float time)`; the older form takes the time alone.
-const soundTakesSample = (source: string) =>
-  /\bmainSound\s*\(\s*(?:(?:in|const|highp|mediump|lowp)\s+)*int\b/.test(source);
+const soundTakesSample = (source: string) => /\bmainSound\s*\(\s*(?:(?:in|const|highp|mediump|lowp)\s+)*int\b/.test(source);
 function wrap(source: string, channels: readonly Channel[], mode: Mode, common: string, vr = false): string {
   const samplers = channels.map((c, i) => `uniform ${samplerType[c.type]} iChannel${i};`).join(''),
     call =
@@ -423,9 +364,7 @@ const meshVertex = (vr: boolean) =>
 // The channels that read buffers bind as unfilterable textures and filter by texel loads, so a buffer reads the same
 // on every device, with or without float32-filterable.
 const unfilterable = (channels: readonly Channel[]) =>
-  Object.fromEntries(
-    channels.flatMap((c, i) => (c.kind === 'buffer' ? [[channelNames[i]!, { filter: c.filter, wrap: c.wrap }]] : [])),
-  );
+  Object.fromEntries(channels.flatMap((c, i) => (c.kind === 'buffer' ? [[channelNames[i]!, { filter: c.filter, wrap: c.wrap }]] : [])));
 // A {value} whose value is read when the program draws.
 const live = (read: () => ShaderUniformValue): ShaderUniform =>
   ({
@@ -433,9 +372,7 @@ const live = (read: () => ShaderUniformValue): ShaderUniform =>
       return read();
     },
     set value(_) {
-      throw new TypeError(
-        'Shadertoy inputs are read only here; set toy.time, toy.frame, toy.mouse or toy.date instead',
-      );
+      throw new TypeError('Shadertoy inputs are read only here; set toy.time, toy.frame, toy.mouse or toy.date instead');
     },
   }) as ShaderUniform;
 const output = (): StageOutput => ({ view: undefined!, format: 'rgba32float', multisample: { count: 1 }, hdr: false });
@@ -521,15 +458,7 @@ class Chain {
    * read, so the program reads its last frame from the cube while it draws. Mip levels are made in the atlas, where a
    * 2 x 2 box never crosses a face of a power of two size, and copied level by level.
    */
-  cube?: {
-    pass: ShadertoyPass;
-    size: number;
-    mips: boolean;
-    atlas?: GPUTexture;
-    target?: GPUTextureView;
-    texture?: GPUTexture;
-    view?: GPUTextureView;
-  };
+  cube?: { pass: ShadertoyPass; size: number; mips: boolean; atlas?: GPUTexture; target?: GPUTextureView; texture?: GPUTexture; view?: GPUTextureView };
   private readonly held = new Map<ShadertoyBuffer, Held>();
   private device?: GPUDevice;
   private step?: number;
@@ -543,12 +472,7 @@ class Chain {
   ) {}
   /** The view a channel reading buffer `letter` binds: its latest image. */
   view(letter: ShadertoyBuffer): BindableTexture {
-    return {
-      bind: () => {
-        const h = this.held.get(letter);
-        return h && [h.views[h.front]!, undefined!];
-      },
-    };
+    return { bind: () => { const h = this.held.get(letter); return h && [h.views[h.front]!, undefined!]; } };
   }
   run(c: Context, input: GPUTextureView | undefined): void {
     const [width, height] = this.fixed ?? [c.width, c.height];
@@ -564,15 +488,7 @@ class Chain {
     const step = this.toy.step();
     if (step === this.step) return;
     this.step = step;
-    if (this.frame?.base !== c)
-      this.frame = {
-        base: c,
-        context: Object.create(c, {
-          width: { value: width },
-          height: { value: height },
-          view: { value: undefined },
-        }) as Context,
-      };
+    if (this.frame?.base !== c) this.frame = { base: c, context: Object.create(c, { width: { value: width }, height: { value: height }, view: { value: undefined } }) as Context };
     for (const { letter, pass, mips } of this.passes) {
       const h = this.held.get(letter)!;
       this.out.view = h.targets[1 - h.front]!;
@@ -584,27 +500,14 @@ class Chain {
     if (q) {
       const s = q.size;
       this.half.view = q.target!;
-      q.pass.drawInto(
-        Object.create(c, { width: { value: 3 * s }, height: { value: 2 * s }, view: { value: undefined } }) as Context,
-        input!,
-        this.half,
-      );
+      q.pass.drawInto(Object.create(c, { width: { value: 3 * s }, height: { value: 2 * s }, view: { value: undefined } }) as Context, input!, this.half);
       if (q.mips) (this.mips ??= new Mips(c.device)).make(c.encoder, q.atlas!);
       for (let l = 0; l < q.texture!.mipLevelCount; l++)
         for (let f = 0, e = s >> l; f < 6; f++)
-          c.encoder.copyTextureToTexture(
-            { texture: q.atlas!, mipLevel: l, origin: [(f % 3) * e, Math.floor(f / 3) * e, 0] },
-            { texture: q.texture!, mipLevel: l, origin: [0, 0, f] },
-            [e, e, 1],
-          );
+          c.encoder.copyTextureToTexture({ texture: q.atlas!, mipLevel: l, origin: [(f % 3) * e, Math.floor(f / 3) * e, 0] }, { texture: q.texture!, mipLevel: l, origin: [0, 0, f] }, [e, e, 1]);
     }
   }
-  private readonly half: StageOutput = {
-    view: undefined!,
-    format: 'rgba16float',
-    multisample: { count: 1 },
-    hdr: false,
-  };
+  private readonly half: StageOutput = { view: undefined!, format: 'rgba16float', multisample: { count: 1 }, hdr: false };
   private makeCube(device: GPUDevice, q: NonNullable<Chain['cube']>): void {
     const s = q.size,
       mipLevelCount = q.mips ? levels(s, s) : 1;
@@ -636,12 +539,7 @@ class Chain {
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
         }),
       );
-    return {
-      textures,
-      views: textures.map((t) => t.createView()),
-      targets: textures.map((t) => t.createView({ baseMipLevel: 0, mipLevelCount: 1 })),
-      front: 0,
-    };
+    return { textures, views: textures.map((t) => t.createView()), targets: textures.map((t) => t.createView({ baseMipLevel: 0, mipLevelCount: 1 })), front: 0 };
   }
   /** Drops the textures (on a new device or size); they start again at zero. */
   release(): void {
@@ -738,12 +636,7 @@ export class Shadertoy implements EnginePlugin {
   private materials = 0;
   private own?: Chain;
   private readonly targets = new Map<GPUDevice, { texture: GPUTexture; view: GPUTextureView; sampler: GPUSampler }>();
-  private readonly output: StageOutput = {
-    view: undefined!,
-    format: 'rgba8unorm',
-    multisample: { count: 1 },
-    hdr: false,
-  };
+  private readonly output: StageOutput = { view: undefined!, format: 'rgba8unorm', multisample: { count: 1 }, hdr: false };
   private frameContext?: { base: Context; context: Context };
   private readonly made: { dispose(): void }[] = [];
   private readonly feeds = new Map<Channel, Feed>();
@@ -770,14 +663,11 @@ export class Shadertoy implements EnginePlugin {
     const o: ShadertoyOptions = typeof options === 'string' ? { image: { source: options } } : options;
     const source = o?.image?.source;
     if (typeof source !== 'string' || !/\bmainImage\b/.test(source))
-      throw new TypeError(
-        'Shadertoy needs the Image source with void mainImage(out vec4 fragColor, in vec2 fragCoord)',
-      );
+      throw new TypeError('Shadertoy needs the Image source with void mainImage(out vec4 fragColor, in vec2 fragCoord)');
     const [w, h] = o.resolution ?? [512, 512];
     if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 8192 || h > 8192)
       throw new RangeError('Shadertoy resolution must be two integers from 1 to 8192');
-    if (o.common !== undefined && typeof o.common !== 'string')
-      throw new TypeError('Shadertoy common must be GLSL text');
+    if (o.common !== undefined && typeof o.common !== 'string') throw new TypeError('Shadertoy common must be GLSL text');
     this.source = source;
     this.common = o.common ?? '';
     this.resolution = [w, h];
@@ -787,56 +677,31 @@ export class Shadertoy implements EnginePlugin {
       given: string[] = [...buffers];
     for (const l of buffers)
       if (typeof o[`buffer${l}`]?.source !== 'string' || !/\bmainImage\b/.test(o[`buffer${l}`]!.source))
-        throw new TypeError(
-          `Shadertoy buffer${l} needs a source with void mainImage(out vec4 fragColor, in vec2 fragCoord)`,
-        );
+        throw new TypeError(`Shadertoy buffer${l} needs a source with void mainImage(out vec4 fragColor, in vec2 fragCoord)`);
     const cube = o.cubeA,
       size = (this.cubeSize = cube?.size ?? 1024);
     if (cube !== undefined) {
       if (typeof cube?.source !== 'string' || !/\bmainCubemap\b/.test(cube.source))
-        throw new TypeError(
-          'Shadertoy cubeA needs a source with void mainCubemap(out vec4 fragColor, in vec2 fragCoord, in vec3 rayOri, in vec3 rayDir)',
-        );
-      if (!Number.isInteger(size) || size < 1 || size > 2048 || size & (size - 1))
-        throw new RangeError('Shadertoy cubeA size must be a power of two from 1 to 2048');
+        throw new TypeError('Shadertoy cubeA needs a source with void mainCubemap(out vec4 fragColor, in vec2 fragCoord, in vec3 rayOri, in vec3 rayDir)');
+      if (!Number.isInteger(size) || size < 1 || size > 2048 || size & (size - 1)) throw new RangeError('Shadertoy cubeA size must be a power of two from 1 to 2048');
       given.push('cubeA');
     }
     if (o.sound !== undefined && (typeof o.sound?.source !== 'string' || !/\bmainSound\b/.test(o.sound.source)))
       throw new TypeError('Shadertoy sound needs a source with vec2 mainSound(int samp, float time)');
     this.vr = o.vr === true;
     if (this.vr && !/\bmainVR\b/.test(source))
-      throw new TypeError(
-        'Shadertoy vr: true needs void mainVR(out vec4 fragColor, in vec2 fragCoord, in vec3 fragRayOri, in vec3 fragRayDir) in the Image source',
-      );
+      throw new TypeError('Shadertoy vr: true needs void mainVR(out vec4 fragColor, in vec2 fragCoord, in vec3 fragRayOri, in vec3 fragRayDir) in the Image source');
     const tab = (t: Tab, p: ShadertoyPassSource) => ({
       tab: t,
       source: p.source,
-      channels: channelNames.map((n, i) =>
-        channelOf(
-          p[n],
-          `${t === 'image' ? '' : t + ' '}${n}`,
-          `toy.setChannel(${i}, texture${t === 'image' ? '' : `, '${t}'`})`,
-          given,
-        ),
-      ),
+      channels: channelNames.map((n, i) => channelOf(p[n], `${t === 'image' ? '' : t + ' '}${n}`, `toy.setChannel(${i}, texture${t === 'image' ? '' : `, '${t}'`})`, given)),
     });
-    this.tabs = [
-      ...letters.filter((l) => given.includes(l)).map((l) => tab(`buffer${l}`, o[`buffer${l}`]!)),
-      ...(cube ? [tab('cubeA', cube)] : []),
-      tab('image', o.image),
-    ];
+    this.tabs = [...letters.filter((l) => given.includes(l)).map((l) => tab(`buffer${l}`, o[`buffer${l}`]!)), ...(cube ? [tab('cubeA', cube)] : []), tab('image', o.image)];
     const image = this.tabs.at(-1)!.channels;
     this.fragmentShader = wrap(source, image, 'screen', this.common);
     if (this.vr) this.vrShader = wrap(source, image, 'screen', this.common, true);
-    this.meshShaders = {
-      vertexShader: meshVertex(this.vr),
-      fragmentShader: wrap(source, image, 'mesh', this.common, this.vr),
-    };
-    this.buffers = Object.fromEntries(
-      this.tabs
-        .filter((t) => t.tab.startsWith('buffer'))
-        .map((t) => [t.tab.slice(6), wrap(t.source, t.channels, 'buffer', this.common)]),
-    );
+    this.meshShaders = { vertexShader: meshVertex(this.vr), fragmentShader: wrap(source, image, 'mesh', this.common, this.vr) };
+    this.buffers = Object.fromEntries(this.tabs.filter((t) => t.tab.startsWith('buffer')).map((t) => [t.tab.slice(6), wrap(t.source, t.channels, 'buffer', this.common)]));
     if (cube) this.cubeShader = wrap(cube.source, this.tabs.at(-2)!.channels, 'cube', this.common);
     if (o.sound) {
       const t = (this.soundTab = tab('sound', o.sound)),
@@ -909,8 +774,7 @@ export class Shadertoy implements EnginePlugin {
         if (c.kind !== 'keyboard' && c.kind !== 'media' && c.kind !== 'audio') continue;
         let feed = this.feeds.get(c);
         if (!feed) this.feeds.set(c, (feed = {}));
-        if (this.fill(device, c, feed) && c.filter === 'mipmap')
-          (this.mips ??= new Mips(device)).make(encoder, feed.texture!);
+        if (this.fill(device, c, feed) && c.filter === 'mipmap') (this.mips ??= new Mips(device)).make(encoder, feed.texture!);
       }
     this.keys.pressed.fill(0);
   }
@@ -965,12 +829,7 @@ export class Shadertoy implements EnginePlugin {
     this.mips = this.feedDevice = undefined;
   }
   // The uniforms of one program: the shared inputs read live, iResolution of its own target, channels of its tab.
-  private uniforms(
-    size: readonly number[],
-    blanks: Blanks,
-    channels: readonly Channel[],
-    chain?: Chain,
-  ): Record<string, ShaderUniform> {
+  private uniforms(size: readonly number[], blanks: Blanks, channels: readonly Channel[], chain?: Chain): Record<string, ShaderUniform> {
     const channelResolution = new Array<number>(12).fill(0),
       channelTime = [0, 0, 0, 0],
       out: Record<string, ShaderUniform> = {
@@ -982,8 +841,7 @@ export class Shadertoy implements EnginePlugin {
         iChannelTime: live(() => {
           channels.forEach((c, i) => {
             const t = c.texture as { currentTime?: number; context?: { currentTime?: number } };
-            channelTime[i] =
-              (c.kind === 'media' ? t.currentTime : c.kind === 'audio' ? t.context?.currentTime : 0) ?? 0;
+            channelTime[i] = (c.kind === 'media' ? t.currentTime : c.kind === 'audio' ? t.context?.currentTime : 0) ?? 0;
           });
           return channelTime;
         }),
@@ -1012,12 +870,7 @@ export class Shadertoy implements EnginePlugin {
       };
     channels.forEach((c, i) => {
       if (c.kind === 'input') return;
-      const feed: BindableTexture = {
-          bind: (d, srgb) => {
-            const v = this.feeds.get(c)?.view;
-            return v ? [v, undefined!] : blanks.flat.bind(d, srgb);
-          },
-        },
+      const feed: BindableTexture = { bind: (d, srgb) => { const v = this.feeds.get(c)?.view; return v ? [v, undefined!] : blanks.flat.bind(d, srgb); } },
         // A texture channel binds what its slot lends on the device drawing (the blanks learn it before each draw), as a
         // view of its sampler type; a lost or missing one reads the blank.
         lent = (): RawTextureSource | null => {
@@ -1031,9 +884,7 @@ export class Shadertoy implements EnginePlugin {
       const pair = {
         // Cube A binds its cube view itself (a materials Texture is 2D only), once the chain has made it.
         get texture() {
-          return (
-            (c.kind === 'cubemap' ? chain!.cube?.view : c.kind === 'texture' ? lent() : texture) ?? blanks.of(c.type)
-          );
+          return (c.kind === 'cubemap' ? chain!.cube?.view : c.kind === 'texture' ? lent() : texture) ?? blanks.of(c.type);
         },
         sampler: c.sampler,
       };
@@ -1059,12 +910,8 @@ export class Shadertoy implements EnginePlugin {
   // iChannelResolution of a texture channel: the size of what it binds, [0, 0, 0] when it binds nothing or a view.
   private sizeOf(c: Channel, device: GPUDevice | undefined): readonly number[] {
     const value = c.slot!.value,
-      t = (device ? this.lent(c, device) : typeof value === 'function' ? undefined : value) as
-        | Partial<GPUTexture>
-        | undefined;
-    return typeof t?.width === 'number' && typeof t.height === 'number'
-      ? [t.width, t.height, c.type === '3d' ? (t.depthOrArrayLayers ?? 1) : 1]
-      : [0, 0, 0];
+      t = (device ? this.lent(c, device) : typeof value === 'function' ? undefined : value) as Partial<GPUTexture> | undefined;
+    return typeof t?.width === 'number' && typeof t.height === 'number' ? [t.width, t.height, c.type === '3d' ? (t.depthOrArrayLayers ?? 1) : 1] : [0, 0, 0];
   }
   /** @internal A pass of this toy was attached to `engine`: its texture channels report there and belong to its device. */
   adopt(engine: Engine): void {
@@ -1072,9 +919,7 @@ export class Shadertoy implements EnginePlugin {
     this.fixSlots(engine.gpu);
   }
   private fixSlots(device: GPUDevice | null | undefined): void {
-    if (device)
-      for (const t of [...this.tabs, ...(this.soundTab ? [this.soundTab] : [])])
-        for (const c of t.channels) if (c.slot) fix(c.slot, device);
+    if (device) for (const t of [...this.tabs, ...(this.soundTab ? [this.soundTab] : [])]) for (const c of t.channels) if (c.slot) fix(c.slot, device);
   }
   /**
    * Gives channel `index` (0 to 3) of `tab` (default the Image tab) something new to read, of the kind it was made
@@ -1105,15 +950,7 @@ export class Shadertoy implements EnginePlugin {
       if (feed) feed.copied = undefined;
       return;
     }
-    const reads = {
-      texture: 'a texture',
-      media: 'a video or image',
-      audio: 'an AnalyserNode',
-      input: "the stack's colour",
-      buffer: `Buffer ${String(c.texture)}`,
-      cubemap: 'Cube A',
-      keyboard: 'the keyboard',
-    }[c.kind];
+    const reads = { texture: 'a texture', media: 'a video or image', audio: 'an AnalyserNode', input: "the stack's colour", buffer: `Buffer ${String(c.texture)}`, cubemap: 'Cube A', keyboard: 'the keyboard' }[c.kind];
     throw new TypeError(
       c.kind === 'texture'
         ? `Shadertoy ${name} reads a texture; setChannel gives it a texture, a function or null`
@@ -1125,11 +962,7 @@ export class Shadertoy implements EnginePlugin {
   private refuseInput(where: string): void {
     for (const t of this.tabs) {
       const i = t.channels.findIndex((c) => c.kind === 'input');
-      if (i >= 0)
-        throw new MargoError(
-          'failed',
-          `Shadertoy ${t.tab} iChannel${i} reads the stack's colour, which only toy.pass() has; give ${where} a texture`,
-        );
+      if (i >= 0) throw new MargoError('failed', `Shadertoy ${t.tab} iChannel${i} reads the stack's colour, which only toy.pass() has; give ${where} a texture`);
     }
   }
   // A program of tab `t`; a syntax or link error names the line of its tab (or of Common), not of the program around it.
@@ -1154,57 +987,25 @@ export class Shadertoy implements EnginePlugin {
       const letter = t.tab.slice(6) as ShadertoyBuffer,
         blanks = new Blanks(),
         input = t.channels.findIndex((c) => c.kind === 'input'),
-        mips = this.tabs.some((u) =>
-          u.channels.some(
-            (c) =>
-              c.filter === 'mipmap' &&
-              (t.tab === 'cubeA' ? c.kind === 'cubemap' : c.kind === 'buffer' && c.texture === letter),
-          ),
-        );
+        mips = this.tabs.some((u) => u.channels.some((c) => c.filter === 'mipmap' && (t.tab === 'cubeA' ? c.kind === 'cubemap' : c.kind === 'buffer' && c.texture === letter)));
       if (t.tab === 'cubeA') {
         const size = [this.cubeSize, this.cubeSize, 1];
-        const pass = this.program(
-          t,
-          () =>
-            new ShadertoyPass(
-              this,
-              this.cubeShader!,
-              size,
-              blanks,
-              this.uniforms(size, blanks, t.channels, chain),
-              {
-                builtins: false,
-                input: input < 0 ? null : channelNames[input]!,
-                unfilterable: unfilterable(t.channels),
-                name: `${this.name}:cubeA`,
-                clipSpace: 'webgpu',
-              } as ShaderPassOptions,
-              undefined,
-              'fixed',
-            ),
-        );
+        const pass = this.program(t, () => new ShadertoyPass(this, this.cubeShader!, size, blanks, this.uniforms(size, blanks, t.channels, chain), {
+          builtins: false,
+          input: input < 0 ? null : channelNames[input]!,
+          unfilterable: unfilterable(t.channels),
+          name: `${this.name}:cubeA`,
+          clipSpace: 'webgpu',
+        } as ShaderPassOptions, undefined, 'fixed'));
         chain.cube = { pass, size: this.cubeSize, mips };
         continue;
       }
-      const pass = this.program(
-        t,
-        () =>
-          new ShadertoyPass(
-            this,
-            this.buffers[letter]!,
-            chain.size,
-            blanks,
-            this.uniforms(chain.size, blanks, t.channels, chain),
-            {
-              builtins: false,
-              input: input < 0 ? null : channelNames[input]!,
-              unfilterable: unfilterable(t.channels),
-              name: `${this.name}:buffer${letter}`,
-            },
-            undefined,
-            true,
-          ),
-      );
+      const pass = this.program(t, () => new ShadertoyPass(this, this.buffers[letter]!, chain.size, blanks, this.uniforms(chain.size, blanks, t.channels, chain), {
+        builtins: false,
+        input: input < 0 ? null : channelNames[input]!,
+        unfilterable: unfilterable(t.channels),
+        name: `${this.name}:buffer${letter}`,
+      }, undefined, true));
       chain.passes.push({ letter, pass, mips });
     }
     return chain;
@@ -1227,58 +1028,28 @@ export class Shadertoy implements EnginePlugin {
     const pass = this.program(
       t,
       () =>
-        new ShadertoyPass(
-          this,
-          this.vrShader ?? this.fragmentShader,
-          size,
-          blanks,
-          {
-            ...this.uniforms(size, blanks, t.channels, chain),
-            ...(rays && {
-              shadertoyEye: live(() => rays.eye),
-              shadertoyEyePosition: live(() => rays.position as number[]),
-            }),
-          },
-          {
-            ...options,
-            builtins: false,
-            input: input < 0 ? null : channelNames[input]!,
-            unfilterable: unfilterable(t.channels),
-          },
-          chain ?? this.feedless(),
-          false,
-          rays,
-        ),
+        new ShadertoyPass(this, this.vrShader ?? this.fragmentShader, size, blanks, {
+          ...this.uniforms(size, blanks, t.channels, chain),
+          ...(rays && { shadertoyEye: live(() => rays.eye), shadertoyEyePosition: live(() => rays.position as number[]) }),
+        }, {
+          ...options,
+          builtins: false,
+          input: input < 0 ? null : channelNames[input]!,
+          unfilterable: unfilterable(t.channels),
+        }, chain ?? this.feedless(), false, rays),
     );
     this.made.push(pass);
     return pass;
   }
   // A pass with no buffers still fills its keyboard, video and audio channels: an empty chain runs them.
   private feedless(): Chain | undefined {
-    return this.tabs.some((t) =>
-      t.channels.some((c) => c.kind === 'keyboard' || c.kind === 'media' || c.kind === 'audio'),
-    )
-      ? new Chain(this)
-      : undefined;
+    return this.tabs.some((t) => t.channels.some((c) => c.kind === 'keyboard' || c.kind === 'media' || c.kind === 'audio')) ? new Chain(this) : undefined;
   }
   /**
    * The program as a mesh material: fragCoord is the mesh's uv times `resolution`. Attach the toy
    * (`engine.use(toy)`) so its clock and buffers run. Options are ShaderMaterial's render state.
    */
-  material(
-    options: Omit<
-      ShaderMaterialOptions,
-      | 'vertexShader'
-      | 'fragmentShader'
-      | 'uniforms'
-      | 'builtins'
-      | 'glslVersion'
-      | 'unfilterable'
-      | 'lights'
-      | 'fog'
-      | 'velocity'
-    > = {},
-  ): ShaderMaterial {
+  material(options: Omit<ShaderMaterialOptions, 'vertexShader' | 'fragmentShader' | 'uniforms' | 'builtins' | 'glslVersion' | 'unfilterable' | 'lights' | 'fog' | 'velocity'> = {}): ShaderMaterial {
     this.refuseInput('toy.material()');
     const t = this.imageTab(),
       blanks = new Blanks();
@@ -1310,22 +1081,13 @@ export class Shadertoy implements EnginePlugin {
       const t = this.imageTab(),
         blanks = new Blanks();
       this.own ??= this.chain(this.resolution);
-      this.image = this.program(
-        t,
-        () =>
-          new ShadertoyPass(
-            this,
-            this.fragmentShader,
-            [0, 0, 1],
-            blanks,
-            this.uniforms([...this.resolution, 1], blanks, t.channels, this.own),
-            {
-              builtins: false,
-              input: null,
-              unfilterable: unfilterable(t.channels),
-              name: this.name + ':image',
-            },
-          ),
+      this.image = this.program(t, () =>
+        new ShadertoyPass(this, this.fragmentShader, [0, 0, 1], blanks, this.uniforms([...this.resolution, 1], blanks, t.channels, this.own), {
+          builtins: false,
+          input: null,
+          unfilterable: unfilterable(t.channels),
+          name: this.name + ':image',
+        }),
       );
     }
     return this.view;
@@ -1346,14 +1108,7 @@ export class Shadertoy implements EnginePlugin {
           format: 'rgba8unorm',
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
         });
-      this.targets.set(
-        device,
-        (t = {
-          texture,
-          view: texture.createView(),
-          sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
-        }),
-      );
+      this.targets.set(device, (t = { texture, view: texture.createView(), sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }) }));
     }
     return t;
   }
@@ -1381,48 +1136,24 @@ export class Shadertoy implements EnginePlugin {
   async sound(options: ShadertoySoundOptions = {}): Promise<ShadertoySound> {
     const t = this.soundTab,
       { seconds = 180, signal } = options;
-    if (!t)
-      throw new MargoError(
-        'failed',
-        'Shadertoy has no Sound tab; give new Shadertoy({image, sound: {source}}) a source with vec2 mainSound(int samp, float time)',
-      );
-    if (!(seconds > 0 && seconds <= 600))
-      throw new RangeError('Shadertoy sound seconds must be above 0 and at most 600');
-    if (!this.engine)
-      throw new MargoError('state', 'toy.sound() renders while the toy is attached; call engine.use(toy) first');
+    if (!t) throw new MargoError('failed', 'Shadertoy has no Sound tab; give new Shadertoy({image, sound: {source}}) a source with vec2 mainSound(int samp, float time)');
+    if (!(seconds > 0 && seconds <= 600)) throw new RangeError('Shadertoy sound seconds must be above 0 and at most 600');
+    if (!this.engine) throw new MargoError('state', 'toy.sound() renders while the toy is attached; call engine.use(toy) first');
     signal?.throwIfAborted();
     const { SoundJob, EDGE } = await import('./shadertoy/sound.js'),
       at = { base: 0 },
       size = [EDGE, EDGE, 1],
       blanks = new Blanks();
-    const pass = this.program(
-      t,
-      () =>
-        new ShadertoyPass(
-          this,
-          this.soundShader!,
-          size,
-          blanks,
-          { ...this.uniforms(size, blanks, t.channels), shadertoySoundBase: live(() => at.base) },
-          {
-            builtins: false,
-            input: null,
-            name: this.name + ':sound',
-            clipSpace: 'webgpu',
-          } as ShaderPassOptions,
-          undefined,
-          'fixed',
-        ),
-    );
-    const job = new SoundJob(
-      Math.ceil(seconds * this.sampleRate),
-      this.sampleRate,
-      (c, base, output) => {
-        at.base = base;
-        pass.drawInto(c, undefined!, output);
-      },
-      signal,
-    );
+    const pass = this.program(t, () => new ShadertoyPass(this, this.soundShader!, size, blanks, { ...this.uniforms(size, blanks, t.channels), shadertoySoundBase: live(() => at.base) }, {
+      builtins: false,
+      input: null,
+      name: this.name + ':sound',
+      clipSpace: 'webgpu',
+    } as ShaderPassOptions, undefined, 'fixed'));
+    const job = new SoundJob(Math.ceil(seconds * this.sampleRate), this.sampleRate, (c, base, output) => {
+      at.base = base;
+      pass.drawInto(c, undefined!, output);
+    }, signal);
     this.jobs.add(job);
     try {
       return await job.done;
@@ -1437,14 +1168,7 @@ export class Shadertoy implements EnginePlugin {
     this.drawn = this.ticks;
     const [width, height] = this.resolution;
     if (this.frameContext?.base !== c)
-      this.frameContext = {
-        base: c,
-        context: Object.create(c, {
-          width: { value: width },
-          height: { value: height },
-          view: { value: undefined },
-        }) as Context,
-      };
+      this.frameContext = { base: c, context: Object.create(c, { width: { value: width }, height: { value: height }, view: { value: undefined } }) as Context };
     this.refresh(c.device, c.encoder);
     this.own?.run(this.frameContext.context, undefined);
     if (!this.image) return;
@@ -1454,9 +1178,7 @@ export class Shadertoy implements EnginePlugin {
   }
   /** Resolves when the programs made so far have compiled. */
   async ready(): Promise<void> {
-    await Promise.all(
-      [this.image, ...this.made, this.own].map((m) => (m as { ready?: () => Promise<unknown> } | undefined)?.ready?.()),
-    );
+    await Promise.all([this.image, ...this.made, this.own].map((m) => (m as { ready?: () => Promise<unknown> } | undefined)?.ready?.()));
   }
   onDeviceRestored(): void {
     for (const t of this.targets.values()) t.texture.destroy();
@@ -1468,8 +1190,7 @@ export class Shadertoy implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const job of this.jobs)
-      job.stop(new MargoError('disposed', `${this.name} was disposed during toy.sound(); create a new Shadertoy`));
+    for (const job of this.jobs) job.stop(new MargoError('disposed', `${this.name} was disposed during toy.sound(); create a new Shadertoy`));
     for (const t of this.targets.values()) t.texture.destroy();
     this.targets.clear();
     this.releaseFeeds();

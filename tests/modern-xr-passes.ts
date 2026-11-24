@@ -222,15 +222,10 @@ function camera(view: XRView, near: number, far: number): Camera {
 }
 async function frames(xr: XR, mode: 'immersive-vr' | 'immersive-ar', n = 4, manual = false): Promise<void> {
   let seen = 0;
-  await xr.requestSession(mode, {
-    onFrame: () => {
-      seen++;
-      if (manual) {
-        xr.renderFrame();
-        return false;
-      }
-    },
-  });
+  await xr.requestSession(mode, { onFrame: () => {
+    seen++;
+    if (manual) { xr.renderFrame(); return false; }
+  } });
   while (seen < n) {
     if (gpuErrors.length || errors.length) throw new Error([...errors, ...gpuErrors].join('\n'));
     await new Promise(requestAnimationFrame);

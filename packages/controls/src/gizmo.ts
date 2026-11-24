@@ -230,8 +230,7 @@ function layout(f: GizmoFrame): Handle[] {
   const lit = (name: HandleName, color: RGBA): RGBA => {
     if (!f.axis) return color;
     // A hovered plane also lights the two arrows that span it.
-    if (f.axis === name || (PLANE_NAMES.has(f.axis) && name.length === 1 && f.axis.includes(name)))
-      return f.hover ?? YELLOW;
+    if (f.axis === name || (PLANE_NAMES.has(f.axis) && name.length === 1 && f.axis.includes(name))) return f.hover ?? YELLOW;
     return f.dragging ? tint(color, 0.35) : color;
   };
   const screenU = normalize(cross(f.up, eye)),

@@ -4,13 +4,7 @@
 // the model which tools to use. Written from the MCP specification 2025-11-25, Server, Resources and Prompts.
 import { typeError } from '../../shared/errors.js';
 import type { Corpus } from './corpus.js';
-import type {
-  PromptDefinition,
-  ResourceContents,
-  ResourceInfo,
-  ResourceProvider,
-  ResourceTemplateInfo,
-} from './server.js';
+import type { PromptDefinition, ResourceContents, ResourceInfo, ResourceProvider, ResourceTemplateInfo } from './server.js';
 
 /** The URI scheme of the docs resources: `margo://packages/<id>/readme`, `margo://docs/<path>`. */
 export const RESOURCE_SCHEME = 'margo://';
@@ -39,22 +33,12 @@ export function createDocResources(corpus: Pick<Corpus, 'readme' | 'packages' | 
   const add = (info: Omit<ResourceInfo, 'mimeType' | 'size'>, text: () => string) =>
     texts.set(info.uri, { info: { ...info, mimeType: MARKDOWN, size: bytes(text()) }, text });
   add(
-    {
-      uri: `${RESOURCE_SCHEME}readme`,
-      name: 'readme',
-      title: 'Margo Engine README',
-      description: 'What Margo is, how to install it and the package map.',
-    },
+    { uri: `${RESOURCE_SCHEME}readme`, name: 'readme', title: 'Margo Engine README', description: 'What Margo is, how to install it and the package map.' },
     () => corpus.readme,
   );
   for (const pkg of corpus.packages) {
     add(
-      {
-        uri: `${RESOURCE_SCHEME}packages/${pkg.id}/readme`,
-        name: `${pkg.id}/readme`,
-        title: `${pkg.name} README`,
-        description: pkg.description,
-      },
+      { uri: `${RESOURCE_SCHEME}packages/${pkg.id}/readme`, name: `${pkg.id}/readme`, title: `${pkg.name} README`, description: pkg.description },
       () => pkg.readme,
     );
     if (pkg.entries.length)
@@ -69,10 +53,7 @@ export function createDocResources(corpus: Pick<Corpus, 'readme' | 'packages' | 
       );
   }
   for (const doc of corpus.docs)
-    add(
-      { uri: docUri(doc.path), name: doc.path, title: doc.title, ...(doc.summary ? { description: doc.summary } : {}) },
-      () => doc.text,
-    );
+    add({ uri: docUri(doc.path), name: doc.path, title: doc.title, ...(doc.summary ? { description: doc.summary } : {}) }, () => doc.text);
   const list = [...texts.values()].map((entry) => entry.info);
   const templates: ResourceTemplateInfo[] = [
     {
@@ -123,12 +104,7 @@ export function createStarterPrompts(): PromptDefinition[] {
       name: 'start_scene',
       title: 'Start a Margo scene',
       description: 'Sets up a first scene with the stage: a canvas, objects, lights and camera controls.',
-      arguments: [
-        {
-          name: 'idea',
-          description: 'What the scene should show (default: a lit box on a ground with orbit controls).',
-        },
-      ],
+      arguments: [{ name: 'idea', description: 'What the scene should show (default: a lit box on a ground with orbit controls).' }],
       get(args) {
         const idea = argument(args, 'idea') || 'a lit box on a ground plane with orbit controls';
         return {
@@ -186,11 +162,7 @@ export function createStarterPrompts(): PromptDefinition[] {
       title: 'Add a Margo feature',
       description: 'Finds the optional package for a feature and adds it to existing code.',
       arguments: [
-        {
-          name: 'feature',
-          description: 'The feature to add (shadows, physics, a sky, post-processing).',
-          required: true,
-        },
+        { name: 'feature', description: 'The feature to add (shadows, physics, a sky, post-processing).', required: true },
         { name: 'code', description: 'The code to add it to, if any.' },
       ],
       get(args) {

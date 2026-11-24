@@ -92,10 +92,7 @@ test('distDir is dist unless build:packages names dist-next, and rejects any oth
 
 test('swapDist moves new files in, keeps unchanged ones, removes stale ones and handles a file that became a folder', async (t) => {
   const root = scratch(t);
-  put(
-    join(root, 'package.json'),
-    JSON.stringify({ exports: { '.': { import: './dist/index.js', types: './dist/index.d.ts' } } }),
-  );
+  put(join(root, 'package.json'), JSON.stringify({ exports: { '.': { import: './dist/index.js', types: './dist/index.d.ts' } } }));
   put(join(root, 'dist/index.js'), 'old entry');
   put(join(root, 'dist/same.js'), 'same bytes');
   put(join(root, 'dist/stale.js'), 'gone in the new build');
@@ -152,12 +149,11 @@ test('build:packages never leaves a reader without a package dist file while it 
   const stop = join(scratch(t), 'stop');
   const reader = startReader(stop, files);
   await reader.ready;
-  const build = spawnSync(process.execPath, ['scripts/build-modern.js', '--precompiled', '--only=taa,fsm'], {
-    cwd: repository,
-    encoding: 'utf8',
-    timeout: 600_000,
-    env: { ...process.env, [DIST_DIR_ENV]: '' },
-  });
+  const build = spawnSync(
+    process.execPath,
+    ['scripts/build-modern.js', '--precompiled', '--only=taa,fsm'],
+    { cwd: repository, encoding: 'utf8', timeout: 600_000, env: { ...process.env, [DIST_DIR_ENV]: '' } },
+  );
   const seen = await reader.stop();
   assert.equal(build.status, 0, build.stderr);
   for (const file of files) {
@@ -169,18 +165,11 @@ test('build:packages never leaves a reader without a package dist file while it 
   }
   for (const name of ['taa', 'fsm']) {
     const dist = join(repository, 'packages', name, 'dist');
-    assert.equal(
-      existsSync(join(repository, 'packages', name, STAGING_DIR)),
-      false,
-      `${name}/dist-next was swapped in`,
-    );
+    assert.equal(existsSync(join(repository, 'packages', name, STAGING_DIR)), false, `${name}/dist-next was swapped in`);
     // Nothing built names the staging folder (a worker once took its published name from it).
     for (const file of readdirSync(dist, { recursive: true }))
       if (statSync(join(dist, file)).isFile())
-        assert.ok(
-          !readFileSync(join(dist, file), 'utf8').includes(STAGING_DIR),
-          `${name}/dist/${file} names dist-next`,
-        );
+        assert.ok(!readFileSync(join(dist, file), 'utf8').includes(STAGING_DIR), `${name}/dist/${file} names dist-next`);
   }
 });
 
@@ -193,11 +182,7 @@ test('tsconfigFor emits into dist-next and keeps the package own entry names on 
     join(root, 'package.json'),
     JSON.stringify({
       name: '@margoengine/demo',
-      exports: {
-        '.': { import: './dist/index.js' },
-        './extra': { import: './dist/extra.js' },
-        './data': './data.json',
-      },
+      exports: { '.': { import: './dist/index.js' }, './extra': { import: './dist/extra.js' }, './data': './data.json' },
     }),
   );
   assert.equal(tsconfigFor(root, join(root, 'dist')), join(root, 'tsconfig.json'));
@@ -232,8 +217,7 @@ test('no package build script or build helper writes a literal dist folder; they
     for (const [, script] of command.matchAll(/node\s+(\S+\.m?js)/g)) scripts.add(resolve(repository, dir, script));
   }
   assert.ok(scripts.size >= 30, `found the package build scripts (${scripts.size})`);
-  const literal =
-    /(?:root|directory|packageRoot|import\.meta\.dirname)\s*,\s*['"`]dist(?:['"`/])|['"`]\.\.\/dist(?:['"`/])/;
+  const literal = /(?:root|directory|packageRoot|import\.meta\.dirname)\s*,\s*['"`]dist(?:['"`/])|['"`]\.\.\/dist(?:['"`/])/;
   const offenders = [];
   for (const file of scripts) {
     const lines = readFileSync(file, 'utf8').split('\n');

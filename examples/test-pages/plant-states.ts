@@ -27,9 +27,7 @@ async function start() {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   canvas.width = canvas.clientWidth * devicePixelRatio;
   canvas.height = canvas.clientHeight * devicePixelRatio;
-  const engine = await Engine.create(canvas, {
-    camera: { position: [0, 60, 110], target: [0, 0, 0], near: 0.5, far: 1000 },
-  });
+  const engine = await Engine.create(canvas, { camera: { position: [0, 60, 110], target: [0, 0, 0], near: 0.5, far: 1000 } });
   engine.lighting.direction.set([0.5, 0.7, 0.3, 3]);
   const ground = engine
     .createMesh()
@@ -38,54 +36,17 @@ async function start() {
   const change = GroundChange.attach(engine, ground, {
     grid,
     events: [
-      {
-        kind: 'mud',
-        shore: [
-          [10, 80],
-          [80, 80],
-        ],
-        land: 'left',
-        reach: 50,
-        thickness: 0.3,
-        duration: 60,
-        drying: 600,
-      },
+      { kind: 'mud', shore: [[10, 80], [80, 80]], land: 'left', reach: 50, thickness: 0.3, duration: 60, drying: 600 },
       { kind: 'burn', ignition: [40, -40], rate: 0.2, duration: 200 },
     ],
   });
-  const fire = FireFront.attach(engine, {
-    ground: hills,
-    origin: [-80, -80],
-    size: [80, 160],
-    cell: 2,
-    fuel: 'FM4',
-    ignitions: [{ at: [-40, 0] }],
-  });
-  const states = PlantStates.create(engine, {
-    bounds,
-    resolution: 160,
-    fire: fireSource(fire),
-    ground: change.plantCovers(),
-  });
+  const fire = FireFront.attach(engine, { ground: hills, origin: [-80, -80], size: [80, 160], cell: 2, fuel: 'FM4', ignitions: [{ at: [-40, 0] }] });
+  const states = PlantStates.create(engine, { bounds, resolution: 160, fire: fireSource(fire), ground: change.plantCovers() });
   const pines = states.plant({ crownBase: 1.5, trunkRadius: 0.12, stiffness: 2e4 }),
     grass = states.plant({ stiffness: 0.02, trunkRadius: 0 });
   const tree = box(0.25, 3, 0.25);
-  Scatter.attach(engine, tree, {
-    count: 1600,
-    area: [160, 160],
-    scale: [0.8, 1.4],
-    material: new PbrMaterial({ color: [0.1, 0.3, 0.08] }),
-    ...change.scatterGround(),
-    states: pines,
-  });
-  Scatter.attach(engine, box(0.05, 0.5, 0.05), {
-    count: 40000,
-    area: [160, 160],
-    blades: {},
-    material: new PbrMaterial({ color: [0.25, 0.4, 0.1] }),
-    ...change.scatterGround(),
-    states: grass,
-  });
+  Scatter.attach(engine, tree, { count: 1600, area: [160, 160], scale: [0.8, 1.4], material: new PbrMaterial({ color: [0.1, 0.3, 0.08] }), ...change.scatterGround(), states: pines });
+  Scatter.attach(engine, box(0.05, 0.5, 0.05), { count: 40000, area: [160, 160], blades: {}, material: new PbrMaterial({ color: [0.25, 0.4, 0.1] }), ...change.scatterGround(), states: grass });
   engine.start();
 
   // The map back from the GPU: the fire layer's scorch at the ignition and the water mark on the mud shore.

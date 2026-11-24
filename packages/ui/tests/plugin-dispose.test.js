@@ -14,21 +14,10 @@ for (const [name, make] of Object.entries({
   GlWorldPanels: (engine) => GlWorldPanels.attach(engine),
 })) {
   test(`${name}.dispose() also removes the plugin from its engine, so the next frame does not run it`, async () => {
-    const adapter = await nodeLifetimeAdapter(),
-      host = await adapter.create(),
-      { engine } = host;
+    const adapter = await nodeLifetimeAdapter(), host = await adapter.create(), { engine } = host;
     try {
-      const plugin = make(engine),
-        view = [
-          {
-            id: 'a',
-            scene: engine.scene,
-            camera: engine.camera,
-            pixels: true,
-            viewport: [0, 0, 32, 32],
-            scissor: [0, 0, 16, 32],
-          },
-        ];
+      const plugin = make(engine), view = [{ id: 'a', scene: engine.scene, camera: engine.camera, pixels: true,
+        viewport: [0, 0, 32, 32], scissor: [0, 0, 16, 32] }];
       await host.render(view);
       plugin.dispose();
       assert.equal(engine.sceneOf(plugin), undefined);
@@ -47,12 +36,9 @@ for (const [name, make] of Object.entries({
   GlWorldPanels: (engine) => GlWorldPanels.attach(engine),
 }))
   test(`${name} drawn only in a later view is disposed and restored without a camera slot for the earlier view`, async () => {
-    const adapter = await nodeLifetimeAdapter(),
-      host = await adapter.create(),
-      { engine } = host;
+    const adapter = await nodeLifetimeAdapter(), host = await adapter.create(), { engine } = host;
     try {
-      const plugin = make(engine),
-        other = engine.createScene('other');
+      const plugin = make(engine), other = engine.createScene('other');
       plugin.add(new WorldPanel(new Ui({ width: 64, height: 32 }), { width: 1, height: 0.5, position: [0, 0, -2] }));
       // View 0 shows another scene, so the panels draw only in view 1.
       const views = [

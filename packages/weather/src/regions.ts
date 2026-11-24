@@ -214,9 +214,7 @@ export class WeatherRegions implements Disposable {
   addStorm(storm: WeatherStorm): () => void {
     this.alive();
     if (typeof storm !== 'object' || storm === null || typeof storm.weatherAt !== 'function')
-      throw new TypeError(
-        'A weather storm needs weatherAt(x, z, t); pass a Hurricane or a Tornado from @margoengine/sky',
-      );
+      throw new TypeError('A weather storm needs weatherAt(x, z, t); pass a Hurricane or a Tornado from @margoengine/sky');
     this.stormList.push(storm);
     return () => {
       this.stormList = this.stormList.filter((x) => x !== storm);
@@ -286,9 +284,7 @@ export class WeatherRegions implements Disposable {
     for (const storm of this.stormList) {
       const { weight, ...fields } = storm.weatherAt(x, z, t);
       if (!(weight >= 0 && weight <= 1))
-        throw new RangeError(
-          'A weather storm weight must be a number from 0 to 1; return {weight, ...state fields} from weatherAt',
-        );
+        throw new RangeError('A weather storm weight must be a number from 0 to 1; return {weight, ...state fields} from weatherAt');
       if (fields.wind !== undefined) fields.wind = Math.min(60, fields.wind);
       if (weight > 0) state = blendStates(state, resolveState(fields, state), weight, 'linear');
     }

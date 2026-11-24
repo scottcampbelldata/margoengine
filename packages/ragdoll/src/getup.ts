@@ -173,10 +173,7 @@ export class GetUp {
   start(options: GetUpStartOptions = {}): Promise<GetUpResult> {
     this.live();
     if (!this.ragdoll.active)
-      throw new MargoError(
-        'state',
-        'The ragdoll is not limp, so there is nothing to get up from; call activate first.',
-      );
+      throw new MargoError('state', 'The ragdoll is not limp, so there is nothing to get up from; call activate first.');
     if (this.watching) throw new MargoError('state', 'A get-up is already running; wait for its promise.');
     options.signal?.throwIfAborted();
     const side = options.side ?? this.pick(),
@@ -255,8 +252,6 @@ export class GetUp {
  */
 export function addGetUp(ragdoll: Ragdoll, animator: Animator, options: GetUpOptions): GetUp {
   if (!ragdoll?.bones || typeof animator?.transition !== 'function' || !options)
-    throw new TypeError(
-      'addGetUp needs a Ragdoll, an Animator and options: addGetUp(ragdoll, animator, {faceUp, faceDown}).',
-    );
+    throw new TypeError("addGetUp needs a Ragdoll, an Animator and options: addGetUp(ragdoll, animator, {faceUp, faceDown}).");
   return new GetUp(ragdoll, animator, options);
 }

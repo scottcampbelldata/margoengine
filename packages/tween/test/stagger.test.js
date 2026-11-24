@@ -50,10 +50,7 @@ test('random is a shuffle: every slot once, the same for a seed, another for ano
   const a = staggerDelays(32, { each: 1, from: 'random', seed: 7 }),
     b = staggerDelays(32, { each: 1, from: 'random', seed: 7 }),
     c = staggerDelays(32, { each: 1, from: 'random', seed: 8 });
-  close(
-    sorted(a),
-    Array.from({ length: 32 }, (_, i) => i),
-  );
+  close(sorted(a), Array.from({ length: 32 }, (_, i) => i));
   assert.deepEqual(a, b);
   assert.notDeepEqual(a, c);
   assert.notDeepEqual([...a], sorted(a));

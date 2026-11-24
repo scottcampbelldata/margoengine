@@ -17,7 +17,7 @@ function frameFor(view, matrix = IDENTITY) {
     },
     renderer = new SciRenderer();
   let pass;
-  renderer.setup({ gpu: device, removePlugin() {}, sceneOf() {} });
+  renderer.setup({ gpu: device, removePlugin() {} });
   renderer.registerPasses({ add: (p) => (pass = p) });
   renderer.add({ transparent: false, visible: true, restore() {}, center: () => [0, 0, 0], draw() {}, dispose() {} });
   const encoder = { setViewport() {}, setScissorRect() {}, setBindGroup() {}, end() {} };
@@ -50,9 +50,7 @@ test('the frame uniform carries the size and origin of the view being drawn', { 
   assert.deepEqual([...split.subarray(40, 42)], [400, 100]);
 });
 
-test('a singular camera matrix rejects with a linked RangeError instead of drawing with a stale inverse', {
-  timeout: 1000,
-}, () => {
+test('a singular camera matrix rejects with a linked RangeError instead of drawing with a stale inverse', { timeout: 1000 }, () => {
   // A custom Camera.project that flattens depth: view rays cannot be rebuilt from it.
   const flat = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
   assert.throws(

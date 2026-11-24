@@ -32,13 +32,7 @@ test('death events patch the simulation, count free slots every frame and upload
   });
   h.frame();
   const wgsl = code(h);
-  for (const name of [
-    'fn eventScan',
-    'fn eventCompact',
-    'raiseEvent(p)',
-    'storeEvents(id.x)',
-    'events[4u+eventGroups()*257u+e]',
-  ])
+  for (const name of ['fn eventScan', 'fn eventCompact', 'raiseEvent(p)', 'storeEvents(id.x)', 'events[4u+eventGroups()*257u+e]'])
     assert.ok(wgsl.includes(name), name);
   assert.ok(!wgsl.includes('-p.velocitySize.y>bitcast<f32>(ev.control.z)'), 'no collision test for death events');
   const list = h.resources.find((r) => r.size === (4 + 3 * 257 + 600) * 4);

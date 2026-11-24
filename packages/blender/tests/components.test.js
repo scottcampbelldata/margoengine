@@ -64,11 +64,7 @@ test('tags become KHR_implicit_shapes, KHR_physics_rigid_bodies and KHR_lights_p
   assert.deepEqual(light('Spot').spot, { innerConeAngle: 0.2, outerConeAngle: 0.5 });
   assert.deepEqual(
     scripts.map((s) => [s.name, document.nodes[s.nodeIndex].name]),
-    [
-      ['door', 'Pad'],
-      ['glow', 'Pad'],
-      ['door', 'Sun'],
-    ],
+    [['door', 'Pad'], ['glow', 'Pad'], ['door', 'Sun']],
   );
   assert.equal(scripts[0].properties['margo:trigger'], true);
   // The source document is not changed, and exported nodes keep their indices.
@@ -103,27 +99,15 @@ test('the real solver drops the crate and the ball onto the floor and holds the 
 });
 
 test('a tag that cannot be read names the object and the property', () => {
-  rejects(
-    'Crate',
-    { 'margo:body': 'floating' },
-    "Object 'Crate': 'margo:body' must be one of static, dynamic, kinematic",
-  );
+  rejects('Crate', { 'margo:body': 'floating' }, "Object 'Crate': 'margo:body' must be one of static, dynamic, kinematic");
   rejects('Crate', { 'margo:collider': 'mesh' }, "'margo:collider' must be one of box, sphere, capsule, cylinder");
   rejects('Crate', { 'margo:body': 'static', 'margo:mass': 3 }, "'margo:mass' must be on a dynamic body");
   rejects('Crate', { 'margo:friction': 0.3 }, "'margo:friction' must be on an object with margo:collider");
   rejects('Crate', { 'margo:collider': 'box', 'margo:size': [1, 0, 1] }, "'margo:size' must be 3 positive numbers");
-  rejects(
-    'Crate',
-    { 'margo:colider': 'box' },
-    "'margo:colider' must be spelt as a component tag (did you mean 'margo:collider'?)",
-  );
+  rejects('Crate', { 'margo:colider': 'box' }, "'margo:colider' must be spelt as a component tag (did you mean 'margo:collider'?)");
   rejects('Lamp', { 'margo:light': 'area' }, "'margo:light' must be one of point, spot, directional");
   rejects('Lamp', { 'margo:light': 'directional', 'margo:range': 4 }, "'margo:range' must be on a point or spot light");
-  rejects(
-    'Lamp',
-    { 'margo:light': 'spot', 'margo:inner_cone': 0.6, 'margo:outer_cone': 0.5 },
-    "'margo:outer_cone' must be above",
-  );
+  rejects('Lamp', { 'margo:light': 'spot', 'margo:inner_cone': 0.6, 'margo:outer_cone': 0.5 }, "'margo:outer_cone' must be above");
   rejects('Lamp', { 'margo:intensity': 4 }, "'margo:intensity' must be on an object with margo:light");
   rejects('Lamp', { 'margo:light': 'point', 'margo:color': [1, 1] }, "'margo:color' must be 3 numbers");
   rejects('Pad', { 'margo:script': ' ' }, "'margo:script' must be a script name");
@@ -154,8 +138,6 @@ test('sizes, capsules and cylinders follow the tags, and an untagged scene is un
 test('a script the scene names but the caller did not register fails before any GPU work', async () => {
   await assert.rejects(
     parseMargoComponents(null, bytes, { scripts: { door() {} } }),
-    (error) =>
-      error.name === 'TypeError' &&
-      error.message === "Object 'Pad': script 'glow' is not registered; pass it in the scripts option",
+    (error) => error.name === 'TypeError' && error.message === "Object 'Pad': script 'glow' is not registered; pass it in the scripts option",
   );
 });

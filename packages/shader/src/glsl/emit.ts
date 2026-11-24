@@ -41,18 +41,12 @@ const samplers: Record<string, string> = {
 };
 // GLSL ES 3.00 4.1.7: isampler and usampler read signed and unsigned integer textures.
 for (const k of ['i', 'u'])
-  for (const [d, w] of [
-    ['2D', '2d'],
-    ['3D', '3d'],
-    ['Cube', 'cube'],
-    ['2DArray', '2d_array'],
-  ])
+  for (const [d, w] of [['2D', '2d'], ['3D', '3d'], ['Cube', 'cube'], ['2DArray', '2d_array']])
     samplers[`${k}sampler${d}`] = `texture_${w}<${k}32>`;
 // The float sampler type of the same dimension: isampler2D and sampler2DShadow look up as sampler2D does.
 const dimensionOf = (kind: string) => kind.replace(/^[iu]/, '').replace('Shadow', '');
 // What a lookup returns (8.8): a float for a shadow sampler, ivec4 or uvec4 for an integer one, vec4 otherwise.
-const texelType = (kind: string) =>
-  kind.endsWith('Shadow') ? 'float' : /^[iu]/.test(kind) ? kind[0] + 'vec4' : 'vec4';
+const texelType = (kind: string) => (kind.endsWith('Shadow') ? 'float' : /^[iu]/.test(kind) ? kind[0] + 'vec4' : 'vec4');
 const wgsl = (type: string): string => {
   const array = /^(.*)\[([^\]]+)\]$/.exec(type);
   if (array) return `array<${wgsl(array[1]!)},${array[2]}>`;
@@ -182,8 +176,7 @@ export class GLSLEmitter {
   }
   private assign(lhs: Expression, rhs: Value, op = '=', known?: Value): string[] {
     // Only a variable, element, field or swizzle is an l-value (5.8); anything else would assign a temporary.
-    if (!['name', 'index', 'member'].includes(lhs.op))
-      this.fail('Assignment needs a variable, element, field or swizzle');
+    if (!['name', 'index', 'member'].includes(lhs.op)) this.fail('Assignment needs a variable, element, field or swizzle');
     const left = known ?? this.expr(lhs);
     const v = this.convert(rhs, left.type);
     const lines = [...left.before, ...v.before];
@@ -224,11 +217,7 @@ export class GLSLEmitter {
           return value(`${a.code}__${k}`, array[1]!, a.before);
         }
         const i = this.temp();
-        return value(`margo_pick(${a.code},${array[2]},${i})`, array[1]!, [
-          ...a.before,
-          ...b.before,
-          `let ${i}=${b.code};`,
-        ]);
+        return value(`margo_pick(${a.code},${array[2]},${i})`, array[1]!, [...a.before, ...b.before, `let ${i}=${b.code};`]);
       }
       const t = array ? array[1]! : a.type.startsWith('mat') ? 'vec' + a.type.at(-1) : scalar(a.type);
       return value(`${a.code}[${b.code}]`, t, [...a.before, ...b.before]);
@@ -389,18 +378,15 @@ export class GLSLEmitter {
     };
     if (Object.hasOwn(this.host.colorReaders, n)) return get(n === 'getToColor');
     const lookup = /^(texture2D|texture)(Proj)?(Lod|Grad|Offset)?$/.exec(n);
-    if (lookup && Object.hasOwn(samplers, first.type)) return this.lookup(!!lookup[2], lookup[3] ?? '', v, before);
+    if (lookup && Object.hasOwn(samplers, first.type))
+      return this.lookup(!!lookup[2], lookup[3] ?? '', v, before);
     if (n === 'texelFetch' || n === 'textureSize') return this.texel(n, v, before);
     const array = /^(.*)\[(\d+)\]$/.exec(n);
     if (array) {
       // GLSL ES 3.00 5.4.4: one argument per element, each converted to the element type.
       if (v.length !== Number(array[2])) this.fail(`${n} needs ${array[2]} elements`);
       const elements = v.map((x) => this.convert(x, array[1]!));
-      return value(
-        `${wgsl(n)}(${elements.map((x) => x.code).join(',')})`,
-        n,
-        elements.flatMap((x) => x.before),
-      );
+      return value(`${wgsl(n)}(${elements.map((x) => x.code).join(',')})`, n, elements.flatMap((x) => x.before));
     }
     if (this.program.structs.has(n)) return value(`${wgsl(n)}(${codes.join(',')})`, n, before);
     if (/^(float|int|uint|bool|[ibu]?vec[234]|mat[234](x[234])?)$/.test(n)) {
@@ -451,12 +437,7 @@ export class GLSLEmitter {
         return value(`${wgsl(n)}(${parts.slice(0, count).join(',')})`, n, prep);
       }
       // A scalar from a vector or matrix takes its first component (5.4.1).
-      if (
-        !n.startsWith('mat') &&
-        width(n) === 1 &&
-        v.length === 1 &&
-        (width(first.type) > 1 || /^mat/.test(first.type))
-      )
+      if (!n.startsWith('mat') && width(n) === 1 && v.length === 1 && (width(first.type) > 1 || /^mat/.test(first.type)))
         return this.convert(
           value(`(${first.code})${first.type.startsWith('mat') ? '[0].x' : '.x'}`, scalar(first.type), before),
           n,
@@ -483,9 +464,7 @@ export class GLSLEmitter {
         this.fail(`${fn.name} takes a sampler array element; index it with a constant`);
       // A host that samples itself passes each texture with its sampler, named the texture's name plus "s".
       const paired = (p: Value) =>
-        this.host.sample && Object.hasOwn(samplers, p.type)
-          ? `${p.code},${this.host.samplerOf?.(p.code) ?? p.code + 's'}${this.host.samplerMode ? ',' + this.host.samplerMode(p.code) : ''}`
-          : p.code;
+        this.host.sample && Object.hasOwn(samplers, p.type) ? `${p.code},${this.host.samplerOf?.(p.code) ?? p.code + 's'}${this.host.samplerMode ? ',' + this.host.samplerMode(p.code) : ''}` : p.code;
       const code = `${this.names.get(fn)}(${params.map(paired).join(',')})`;
       const out = fn.params.some((p) => /\b(out|inout)\b/.test(p.qualifier));
       if (!out) return value(code, fn.type, prep);
@@ -519,10 +498,11 @@ export class GLSLEmitter {
       const w = width(first.type),
         u = wgsl(vector('uint', w)),
         t = this.temp();
-      return value(`((${t}&${u}(0x7fffffffu))${n === 'isnan' ? '>' : '=='}${u}(0x7f800000u))`, vector('bool', w), [
-        ...before,
-        `let ${t}=bitcast<${u}>(${first.code});`,
-      ]);
+      return value(
+        `((${t}&${u}(0x7fffffffu))${n === 'isnan' ? '>' : '=='}${u}(0x7f800000u))`,
+        vector('bool', w),
+        [...before, `let ${t}=bitcast<${u}>(${first.code});`],
+      );
     }
     if (n === 'modf' && v.length === 2) {
       const t = this.temp();
@@ -598,11 +578,7 @@ export class GLSLEmitter {
         dFdy: 'dpdy',
         roundEven: 'round',
       };
-      return value(
-        `${n === 'dFdy' && (this.host.yUp ?? this.flipY) ? '-' : ''}${mapped[n] ?? n}(${codes.join(',')})`,
-        first.type,
-        before,
-      );
+      return value(`${n === 'dFdy' && (this.host.yUp ?? this.flipY) ? '-' : ''}${mapped[n] ?? n}(${codes.join(',')})`, first.type, before);
     }
     if (n === 'atan') return value(`${v.length === 2 ? 'atan2' : 'atan'}(${codes.join(',')})`, first.type, before);
     if (['length', 'distance', 'dot', 'determinant'].includes(n))
@@ -668,12 +644,10 @@ export class GLSLEmitter {
     if (!coords || rest.length < extra || rest.length > extra + (variant === 'Lod' || variant === 'Grad' ? 0 : 1))
       this.fail(`texture${proj ? 'Proj' : ''}${variant} has the wrong number of arguments`);
     if (proj && kind !== 'sampler2D' && kind !== 'sampler3D') this.fail('A projective lookup needs a 2D or 3D sampler');
-    if (proj && shadow && width(coords.type) !== 4)
-      this.fail('textureProj of a sampler2DShadow takes vec4 coordinates');
+    if (proj && shadow && width(coords.type) !== 4) this.fail('textureProj of a sampler2DShadow takes vec4 coordinates');
     if (width(coords.type) !== (proj ? size + 1 : size) && !(proj && kind === 'sampler2D' && width(coords.type) === 4))
       this.fail(`${image!.type} lookups take vec${proj ? size + 1 : size} coordinates`);
-    if (/^[iu]samplerCube/.test(image!.type))
-      this.fail(`${image!.type} lookups need a cube texture of integers, which WGSL cannot read; use a 2D array`);
+    if (/^[iu]samplerCube/.test(image!.type)) this.fail(`${image!.type} lookups need a cube texture of integers, which WGSL cannot read; use a 2D array`);
     let uv = proj
       ? `(${coords.code}.${size === 2 ? 'xy' : 'xyz'}/${coords.code}.${width(coords.type) === 4 ? 'w' : 'z'})`
       : coords.code;
@@ -687,22 +661,16 @@ export class GLSLEmitter {
       uv = n === 2 ? `${t}.xy` : `${t}.xyz`;
     }
     const at = size - (shadow ? 1 : 0);
-    const flip = (c: string) =>
-      this.flipY && kind !== 'samplerCube' && kind !== 'sampler3D'
-        ? `vec${at}f(${c}.x,1.0-${c}.y${at === 3 ? `,${c}.z` : ''})`
-        : c;
+    const flip = (c: string) => (this.flipY && kind !== 'samplerCube' && kind !== 'sampler3D' ? `vec${at}f(${c}.x,1.0-${c}.y${at === 3 ? `,${c}.z` : ''})` : c);
     const sample = this.host.sample;
-    const options: { lod?: string; bias?: string; ddx?: string; ddy?: string; offset?: string; compare?: string } =
-      compare ? { compare } : {};
+    const options: { lod?: string; bias?: string; ddx?: string; ddy?: string; offset?: string; compare?: string } = compare ? { compare } : {};
     if (variant === 'Lod') options.lod = rest[0]!.code;
     else if (variant === 'Grad') {
       // A y flip reverses the y axis of the coordinates' derivatives too.
-      const d = (x: Value) =>
-        this.flipY && kind !== 'samplerCube' && kind !== 'sampler3D' ? `vec2f(${x.code}.x,-${x.code}.y)` : x.code;
+      const d = (x: Value) => (this.flipY && kind !== 'samplerCube' && kind !== 'sampler3D' ? `vec2f(${x.code}.x,-${x.code}.y)` : x.code);
       options.ddx = d(rest[0]!);
       options.ddy = d(rest[1]!);
-    } else if (variant === 'Offset')
-      options.offset = this.flipY ? `vec2i(${rest[0]!.code}.x,-${rest[0]!.code}.y)` : rest[0]!.code;
+    } else if (variant === 'Offset') options.offset = this.flipY ? `vec2i(${rest[0]!.code}.x,-${rest[0]!.code}.y)` : rest[0]!.code;
     if (rest.length > extra) options.bias = rest[extra]!.code;
     if (!sample) {
       // The transition contract's sample() reads the nearest texel of a one-level image: lod, bias and gradients
@@ -741,10 +709,7 @@ export class GLSLEmitter {
     const coords = this.convert(a!, kind === 'sampler2D' ? 'ivec2' : 'ivec3');
     const prep = [...before, ...coords.before, `let ${t}=${coords.code};`, `let ${lod}=${level.code};`];
     // GLSL numbers rows from the bottom; the y flip numbers them from the top.
-    const xy =
-      this.flipY && kind !== 'sampler3D'
-        ? `vec2i(${t}.x,i32(textureDimensions(${image!.code},${lod}).y)-1-${t}.y)`
-        : `${t}.xy`;
+    const xy = this.flipY && kind !== 'sampler3D' ? `vec2i(${t}.x,i32(textureDimensions(${image!.code},${lod}).y)-1-${t}.y)` : `${t}.xy`;
     const code =
       kind === 'sampler2DArray'
         ? `textureLoad(${image!.code},${xy},${t}.z,${lod})`
@@ -759,9 +724,7 @@ export class GLSLEmitter {
     const name = `margo_inverse${n}`;
     const t = `mat${n}x${n}<f32>`;
     if (n === 2)
-      this.helpers.add(
-        `fn ${name}(m:${t})->${t}{return ${t}(m[1][1],-m[0][1],-m[1][0],m[0][0])*(1.0/determinant(m));}`,
-      );
+      this.helpers.add(`fn ${name}(m:${t})->${t}{return ${t}(m[1][1],-m[0][1],-m[1][0],m[0][0])*(1.0/determinant(m));}`);
     else {
       // Entry (c, r) of the inverse is the cofactor of entry (r, c) of m: the signed determinant of m without column r
       // and row c, over det(m).
@@ -771,7 +734,8 @@ export class GLSLEmitter {
         return `determinant(mat${n - 1}x${n - 1}<f32>(${cols.map((c) => `vec${n - 1}f(${rows.map((r) => `m[${c}][${r}]`).join(',')})`).join(',')}))`;
       };
       const cells: string[] = [];
-      for (let c = 0; c < n; c++) for (let r = 0; r < n; r++) cells.push(`${(r + c) % 2 ? '-' : ''}${minor(r, c)}`);
+      for (let c = 0; c < n; c++)
+        for (let r = 0; r < n; r++) cells.push(`${(r + c) % 2 ? '-' : ''}${minor(r, c)}`);
       this.helpers.add(`fn ${name}(m:${t})->${t}{return ${t}(${cells.join(',')})*(1.0/determinant(m));}`);
     }
     return name;
@@ -977,14 +941,6 @@ export class GLSLEmitter {
         f.params.every((p, i) => p.type === want.params[i]),
     );
     if (!entry) this.fail(this.host.missingEntry);
-    return [
-      structs,
-      globals,
-      results,
-      this.host.prologue,
-      [...this.helpers].join(NL),
-      functions,
-      this.host.epilogue(this.names.get(entry)!),
-    ].join(NL);
+    return [structs, globals, results, this.host.prologue, [...this.helpers].join(NL), functions, this.host.epilogue(this.names.get(entry)!)].join(NL);
   }
 }

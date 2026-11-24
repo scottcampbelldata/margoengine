@@ -5,7 +5,8 @@ import { encodeEXR, encodeJPEG, encodeWebP, linearPixels, readTexture } from '..
 
 const image = (width, height, paint) => {
   const data = new Uint8Array(width * height * 4);
-  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) data.set(paint(x, y), (y * width + x) * 4);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) data.set(paint(x, y), (y * width + x) * 4);
   return { width, height, data };
 };
 const gradient = (width = 37, height = 21) => image(width, height, (x, y) => [x * 6, y * 11, (x + y) * 4, 255]);
@@ -97,11 +98,7 @@ test('encoders refuse what they cannot write', async () => {
   const huge = { width: 16385, height: 1, data: new Uint8Array(16385 * 4) };
   await assert.rejects(encodeWebP(huge), /too large/);
   await assert.rejects(encodeWebP(gradient(), { quality: 2 }), RangeError);
-  await assert.rejects(
-    encodeWebP(gradient(), { quality: 0.5 }),
-    { code: 'unsupported' },
-    'Node has no OffscreenCanvas',
-  );
+  await assert.rejects(encodeWebP(gradient(), { quality: 0.5 }), { code: 'unsupported' }, 'Node has no OffscreenCanvas');
   await assert.rejects(encodeEXR({ width: 1, height: 1, data: new Float32Array(3) }), /match its size/);
   await assert.rejects(encodeEXR({ width: 1, height: 1, data: new Uint8Array(4) }), /match its size/);
   await assert.rejects(encodeEXR({ width: 1, height: 1, data: new Float32Array(4) }, { type: 'x' }), TypeError);
@@ -149,11 +146,7 @@ test('EXR files carry the pixels, in half or float, read back by the environment
 });
 
 test('linearPixels undoes the sRGB curve and leaves alpha linear', () => {
-  const { data, width, height } = linearPixels({
-    width: 2,
-    height: 1,
-    data: Uint8Array.of(0, 255, 188, 128, 10, 10, 10, 51),
-  });
+  const { data, width, height } = linearPixels({ width: 2, height: 1, data: Uint8Array.of(0, 255, 188, 128, 10, 10, 10, 51) });
   assert.deepEqual([width, height], [2, 1]);
   assert.equal(data[0], 0);
   assert.equal(data[1], 1);
@@ -185,17 +178,12 @@ test('readTexture drops the row padding and decodes half and float', async () =>
     read = await readTexture({ gpu: device }, { format: 'rgba16float', width: 1, height: 2 });
   assert.deepEqual([...read.data], [1, 2, 65504, -2, 1, 2, 65504, -2]);
   const floats = new Uint8Array(new Float32Array([1.5, 0, 0, 1]).buffer),
-    wide = await readTexture(
-      { gpu: floatDevice('rgba32float', [floats]) },
-      { format: 'rgba32float', width: 1, height: 1 },
-    );
+    wide = await readTexture({ gpu: floatDevice('rgba32float', [floats]) }, { format: 'rgba32float', width: 1, height: 1 });
   assert.deepEqual([...wide.data], [1.5, 0, 0, 1]);
 });
 
 test('readTexture refuses other formats, a missing GPU, and an aborted read', async () => {
-  await assert.rejects(readTexture({ gpu: {} }, { format: 'rgba8unorm', width: 1, height: 1 }), {
-    code: 'unsupported',
-  });
+  await assert.rejects(readTexture({ gpu: {} }, { format: 'rgba8unorm', width: 1, height: 1 }), { code: 'unsupported' });
   await assert.rejects(readTexture({}, { format: 'rgba16float', width: 1, height: 1 }), { code: 'unsupported' });
   const stop = new AbortController();
   stop.abort(new Error('enough'));

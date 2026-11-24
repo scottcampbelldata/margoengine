@@ -43,11 +43,7 @@ export class ContactGround implements EnginePlugin {
   ) {}
   setup(engine: Engine): void {
     if (!engine.gpu)
-      throw fault(
-        'unsupported',
-        'ContactShadows requires WebGPU; use an engine created with a WebGPU backend',
-        'react-usage',
-      );
+      throw fault('unsupported', 'ContactShadows requires WebGPU; use an engine created with a WebGPU backend', 'react-usage');
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
@@ -75,10 +71,7 @@ export class ContactGround implements EnginePlugin {
       color.length !== 3 ||
       color.some((value) => !Number.isFinite(value) || value < 0)
     )
-      throw rangeError(
-        'ContactShadows: width and height must be above 0, opacity between 0 and 1, and color three numbers >= 0',
-        'react-arguments',
-      );
+      throw rangeError('ContactShadows: width and height must be above 0, opacity between 0 and 1, and color three numbers >= 0', 'react-arguments');
     if (opacity === 0) return;
     const key =
       context.format +

@@ -47,20 +47,9 @@ try {
       (error) => error.code,
     );
     await merged.write('slot 1', new Uint8Array([1]));
-    return {
-      conflict,
-      title: (await loadGame(two, 'slot 1')).meta.title,
-      keys: await one.keys(),
-      gone: await one.delete('slot 1'),
-    };
+    return { conflict, title: (await loadGame(two, 'slot 1')).meta.title, keys: await one.keys(), gone: await one.delete('slot 1') };
   }, url);
-  console.log(
-    JSON.stringify({
-      ...result,
-      requests: seen.length,
-      preflights: seen.filter((method) => method === 'OPTIONS').length,
-    }),
-  );
+  console.log(JSON.stringify({ ...result, requests: seen.length, preflights: seen.filter((method) => method === 'OPTIONS').length }));
   assert.deepEqual(errors, []);
   assert.deepEqual(result, { conflict: 'state', title: 'second', keys: ['slot 1'], gone: true });
   assert.ok(seen.includes('OPTIONS'), 'the browser sent a real preflight');

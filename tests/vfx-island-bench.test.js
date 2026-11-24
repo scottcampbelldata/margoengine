@@ -11,10 +11,7 @@ const bench = readFileSync(new URL('../scripts/benchmark-vfx-island.js', import.
 test('the island bench pins the full tier, whose VFX keeps the 1,000,000 default', () => {
   assert.match(bench, /capacity = 1_000_000/);
   assert.match(bench, /127\.0\.0\.1:5199\/\?quality=high/);
-  assert.equal(
-    applyQualityTier({ search: '?quality=high', page: '/', storage: null, session: null, userAgent: '' }),
-    'high',
-  );
+  assert.equal(applyQualityTier({ search: '?quality=high', page: '/', storage: null, session: null, userAgent: '' }), 'high');
   assert.equal(QUALITY_PRESETS.high.vfx?.capacity, undefined);
   assert.equal(applyQualityTier({ search: '', page: '/', storage: null, session: null, userAgent: '' }), 'light');
   assert.equal(QUALITY_PRESETS.light.vfx.capacity, 100_000);

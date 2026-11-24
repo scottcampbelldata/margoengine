@@ -36,30 +36,17 @@ async function start() {
   const berg = new Iceberg({ mesh: shape, material: ice, heading: 30 });
   const bergMesh = createMesh(engine, shape, ice);
   const foam = BergFoam.attach(engine, { surface: sea, bergs: [berg] });
-  const vfx = VFX.attach(engine, {
-    capacity: 20000,
-    rate: 0,
-    size: 0.2,
-    lifetime: [0.8, 2],
-    color: [0.9, 0.95, 1, 0.8],
-    turbulence: 0,
-  });
+  const vfx = VFX.attach(engine, { capacity: 20000, rate: 0, size: 0.2, lifetime: [0.8, 2], color: [0.9, 0.95, 1, 0.8], turbulence: 0 });
   const spray = new BergSpray({ berg, particles: vfx, waveDirection: [1, 0.25] });
 
   // Sea ice: pancakes and brash downwind of the berg, floes beyond.
   const wind = { speed: 9, direction: [1, 0.25] as [number, number] };
   const fields = [
-    {
-      field: new SeaIce({ kind: 'pancake', centre: [120, 40], size: [160, 160], wind, seed: 1, maxPieces: 12000 }),
-      shape: pancakeShape(),
-    },
+    { field: new SeaIce({ kind: 'pancake', centre: [120, 40], size: [160, 160], wind, seed: 1, maxPieces: 12000 }), shape: pancakeShape() },
     { field: new SeaIce({ kind: 'brash', centre: [70, -30], size: [60, 60], wind, seed: 2 }), shape: brashShape() },
     { field: new SeaIce({ kind: 'floe', centre: [420, 0], size: [500, 500], wind, seed: 3 }), shape: floeShape() },
   ];
-  const seaIce = new IceMaterial({
-    notch: false,
-    look: { wetHeight: 0.15, scallopDepth: 0.1, blueIce: 0.1, subsurface: 0.5 },
-  });
+  const seaIce = new IceMaterial({ notch: false, look: { wetHeight: 0.15, scallopDepth: 0.1, blueIce: 0.1, subsurface: 0.5 } });
   const instanced = fields.map(({ field, shape }) => createInstancedMesh(engine, shape, seaIce, field.pieces.length));
 
   let playing = false,
@@ -96,12 +83,10 @@ async function start() {
   const check = async (what: string) => {
     await settle();
     const b = berg.buoyancy;
-    if (Math.abs(b.submergedFraction - 900 / 1027) > 1e-6)
-      console.warn(`BUG: the berg floats with ${b.submergedFraction} under water, not 900 / 1027`);
+    if (Math.abs(b.submergedFraction - 900 / 1027) > 1e-6) console.warn(`BUG: the berg floats with ${b.submergedFraction} under water, not 900 / 1027`);
     if (berg.floater.aground) console.warn(`BUG: the berg found no water after ${what}`);
     const water = query?.heightAt(berg.floater.position[0], berg.floater.position[2]);
-    if (water !== undefined && Math.abs(berg.floater.position[1] - water) > 3)
-      console.warn(`BUG: the berg's waterline is ${berg.floater.position[1]} m against the sea's ${water} m`);
+    if (water !== undefined && Math.abs(berg.floater.position[1] - water) > 3) console.warn(`BUG: the berg's waterline is ${berg.floater.position[1]} m against the sea's ${water} m`);
     say(
       `${what}: ${(b.submergedFraction * 100).toFixed(1)}% under water, draft ${b.draft.toFixed(1)} m, freeboard ${b.freeboard.toFixed(1)} m, ` +
         `${b.stable ? 'stable' : 'UNSTABLE'} (GM roll ${b.rollMetacentricHeight.toFixed(1)} m, pitch ${b.pitchMetacentricHeight.toFixed(1)} m), sea ice clock ${fields[0].field.time.toFixed(1)} s, ` +
@@ -124,12 +109,9 @@ async function start() {
     const flat = { sample: () => ({ height: 0 }) };
     probe.setTime(50);
     for (let i = 0; i < 300; i++) probe.update(flat, 1 / 30);
-    const seek = new SeaIce({ kind: 'pancake', centre: [120, 40], size: [160, 160], wind, seed: 1, maxPieces: 12000 })
-      .setTime(60)
-      .update(flat, 0);
+    const seek = new SeaIce({ kind: 'pancake', centre: [120, 40], size: [160, 160], wind, seed: 1, maxPieces: 12000 }).setTime(60).update(flat, 0);
     let worst = 0;
-    for (let k = 0; k < probe.matrices.length; k++)
-      worst = Math.max(worst, Math.abs(probe.matrices[k] - seek.matrices[k]));
+    for (let k = 0; k < probe.matrices.length; k++) worst = Math.max(worst, Math.abs(probe.matrices[k] - seek.matrices[k]));
     if (worst > 1e-3) console.warn(`BUG: stepping to 60 s laid out other sea ice than a seek (${worst} m)`);
     for (const { field } of fields) field.setTime(60);
     await check('Stepped 50 to 60 s');
@@ -145,16 +127,13 @@ async function start() {
     applyIceSettings({ material: ice, foam, spray, water: sea }, ICE_LOOKS.gale);
     applyWaterSettings(sea, { windSpeed: 20 });
     await check('Gale');
-    if (spray.sprayRate !== 8000 || foam.look.waveHeight !== 7)
-      console.warn('BUG: the gale look did not reach the foam and spray');
+    if (spray.sprayRate !== 8000 || foam.look.waveHeight !== 7) console.warn('BUG: the gale look did not reach the foam and spray');
   };
   button('btnFollow').onclick = async () => {
-    for (const { field } of fields)
-      applyIceSettings({ seaIce: field, water: sea }, { driftWind: null, waveHeight: null });
+    for (const { field } of fields) applyIceSettings({ seaIce: field, water: sea }, { driftWind: null, waveHeight: null });
     applyIceSettings({ foam, water: sea }, { waveHeight: null });
     await check('Follow the weather');
-    if (foam.look.waveHeight !== null || fields[0].field.wind.speed !== sea.wind?.speed)
-      console.warn('BUG: null rows did not hand the foam and the drift back to the wind');
+    if (foam.look.waveHeight !== null || fields[0].field.wind.speed !== sea.wind?.speed) console.warn('BUG: null rows did not hand the foam and the drift back to the wind');
   };
   button('btnClose').onclick = async () => {
     // Close on the waterline at the weather face: the notch, the wet band and the foam.

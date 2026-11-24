@@ -37,27 +37,15 @@ test('options at their defaults compile the same program and write the same unif
     assert.equal(hash(set.code), hash(tonemapShader));
     assert.deepEqual(Array.from(set.h.writes.slice(0, 16)), Array.from(plain.h.writes.slice(0, 16)));
   }
-  assert.deepEqual(
-    [7, 11, 15].map((i) => plain.h.writes[i]),
-    [0, 0, 0],
-    'the slots that were unused stay 0',
-  );
+  assert.deepEqual([7, 11, 15].map((i) => plain.h.writes[i]), [0, 0, 0], 'the slots that were unused stay 0');
   for (const options of [{ whitePoint: 4 }, { toe: 0.5 }, { shoulder: 0.5 }]) {
     const set = program(options);
     assert.notEqual(set.code, plain.code);
     assert.match(set.code, /fn margoShape/);
-    assert.equal(
-      set.code
-        .replace(/fn margoCurveAt[\s\S]*?\n}\nfn margoShape[\s\S]*?\n}\n/, '')
-        .replace('color=margoShape(color);\n  ', ''),
-      plain.code,
-    );
+    assert.equal(set.code.replace(/fn margoCurveAt[\s\S]*?\n}\nfn margoShape[\s\S]*?\n}\n/, '').replace('color=margoShape(color);\n  ', ''), plain.code);
   }
   const set = program({ whitePoint: 4, toe: 0.5, shoulder: 0.25 });
-  assert.deepEqual(
-    [7, 11, 15].map((i) => set.h.writes[i]),
-    [4, -0.5, -0.75],
-  );
+  assert.deepEqual([7, 11, 15].map((i) => set.h.writes[i]), [4, -0.5, -0.75]);
 });
 
 test('the spline is monotone, hits black and white, and has the slopes set', () => {
@@ -76,12 +64,8 @@ test('the spline is monotone, hits black and white, and has the slopes set', () 
       assert.ok(Math.abs(shapeCurve(e, toe, shoulder) / e - toe) < 1e-4, `slope at black ${toe}`);
       assert.ok(Math.abs((1 - shapeCurve(1 - e, toe, shoulder)) / e - shoulder) < 1e-4, `slope at white ${shoulder}`);
     }
-  for (let i = 0; i <= 10; i++)
-    assert.ok(Math.abs(shapeCurve(i / 10) - i / 10) < 1e-15, 'toe 1 and shoulder 1 is the identity');
-  assert.ok(
-    shapeCurve(0.1, 0.5, 1) < 0.1 && shapeCurve(0.9, 1, 0.5) > 0.9 - 1e-12,
-    'a soft toe darkens the shadows, a soft shoulder holds the highlights',
-  );
+  for (let i = 0; i <= 10; i++) assert.ok(Math.abs(shapeCurve(i / 10) - i / 10) < 1e-15, 'toe 1 and shoulder 1 is the identity');
+  assert.ok(shapeCurve(0.1, 0.5, 1) < 0.1 && shapeCurve(0.9, 1, 0.5) > 0.9 - 1e-12, 'a soft toe darkens the shadows, a soft shoulder holds the highlights');
 });
 
 test('the cubic is monotone for every slope pair in the square 0..3 by 0..3 (the derivative never goes below 0)', () => {
@@ -106,45 +90,26 @@ test('the cubic is monotone for every slope pair in the square 0..3 by 0..3 (the
 
 test('the Reinhard curve takes the paper white point (Eq. 4), the others divide by their value at W', () => {
   const code = shapeShader(tonemapShader);
-  assert.match(
-    code,
-    /if\(p\.grade\.z==3\.0\)\{let w=max\(white,0\.01\);x=x\*\(1\.0\+x\/\(max\(vec3f\(1\)-x,vec3f\(0\.000001\)\)\*w\*w\)\);\}/,
-  );
+  assert.match(code, /if\(p\.grade\.z==3\.0\)\{let w=max\(white,0\.01\);x=x\*\(1\.0\+x\/\(max\(vec3f\(1\)-x,vec3f\(0\.000001\)\)\*w\*w\)\);\}/);
   // Eq. 4 on the output c = L / (1 + L): c (1 + c / ((1 - c) W^2)) is L (1 + L / W^2) / (1 + L), and W lands on 1.
   const eq4 = (L, W) => (L * (1 + L / (W * W))) / (1 + L),
-    onC = (L, W) => (L / (1 + L)) * (1 + L / (1 + L) / ((1 - L / (1 + L)) * W * W));
+    onC = (L, W) => ((L / (1 + L)) * (1 + L / (1 + L) / ((1 - L / (1 + L)) * W * W)));
   for (const W of [1.5, 4, 11.2])
     for (const L of [0.1, 0.5, 1, 3, W]) assert.ok(Math.abs(eq4(L, W) - onC(L, W)) < 1e-12);
   assert.ok(Math.abs(eq4(4, 4) - 1) < 1e-12);
-  assert.ok(
-    Math.abs(eq4(2, 4) - 0.75) < 1e-12 && Math.abs(2 / 3 / (4 / 5) - 0.75) > 0.05,
-    'dividing x / (1 + x) by its value at W is a different curve',
-  );
+  assert.ok(Math.abs(eq4(2, 4) - 0.75) < 1e-12 && Math.abs((2 / 3) / (4 / 5) - 0.75) > 0.05, 'dividing x / (1 + x) by its value at W is a different curve');
 });
 
 test('the shader holds the same cubic and the white point division', () => {
   const code = shapeShader(tonemapShader);
   assert.match(code, /x=\(x3-2\.0\*x2\+x\)\*a\+\(3\.0\*x2-2\.0\*x3\)\+\(x3-x2\)\*b;/);
   assert.match(code, /x=x\/max\(margoCurveAt\(vec3f\(max\(white,0\.01\)\)\),vec3f\(0\.000001\)\);/);
-  assert.ok(
-    code.includes('color=margoShape(color);\n  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(1));'),
-  );
-  assert.ok(
-    shapeShader(outputShader).includes(
-      'color=margoShape(color);\n  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(white));',
-    ),
-  );
+  assert.ok(code.includes('color=margoShape(color);\n  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(1));'));
+  assert.ok(shapeShader(outputShader).includes('color=margoShape(color);\n  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(white));'));
   assert.throws(() => shapeShader('fn nothing(){}'), /no contrast step/);
 });
 
 test('out of range controls are refused when the frame draws', () => {
-  for (const options of [
-    { whitePoint: -1 },
-    { whitePoint: 65 },
-    { toe: -0.1 },
-    { toe: 3.1 },
-    { shoulder: NaN },
-    { shoulder: 4 },
-  ])
+  for (const options of [{ whitePoint: -1 }, { whitePoint: 65 }, { toe: -0.1 }, { toe: 3.1 }, { shoulder: NaN }, { shoulder: 4 }])
     assert.throws(() => program(options), RangeError, JSON.stringify(options));
 });

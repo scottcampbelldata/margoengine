@@ -16,8 +16,7 @@ const usno = (h) => {
 };
 
 test('twilight illuminance follows USNO Circular 171: 756 lux at sunset, 2.99 at -6, 0.0044 at -12', () => {
-  for (const h of [0, -1, -3, -6, -9, -12, -18])
-    assert.ok(Math.abs(twilightIlluminance(h * r) / usno(h) - 1) < 1e-12, `${h}`);
+  for (const h of [0, -1, -3, -6, -9, -12, -18]) assert.ok(Math.abs(twilightIlluminance(h * r) / usno(h) - 1) < 1e-12, `${h}`);
   assert.ok(Math.abs(twilightIlluminance(0) - 756.6) < 0.1);
   assert.ok(Math.abs(twilightIlluminance(-6 * r) - 2.992) < 0.001);
   assert.ok(Math.abs(twilightIlluminance(-12 * r) - 0.004365) < 1e-5);
@@ -52,20 +51,14 @@ test('the sky lights the scene through twilight: the engine light takes it once 
   assert.equal(h.engine.lighting.direction[3], tw.direction[3], 'the engine light takes it');
   sky.options.lighting.twilight = { cloudCover: 1, brightness: 2 };
   h.frame();
-  assert.ok(
-    Math.abs(horizontal() / (share * usno(elevation / r) * 2 * cloudTransmittance(1)) - 1) < 1e-5,
-    'cloud and brightness',
-  );
+  assert.ok(Math.abs(horizontal() / (share * usno(elevation / r) * 2 * cloudTransmittance(1)) - 1) < 1e-5, 'cloud and brightness');
   sky.options.lighting.twilight = false;
   h.frame();
   assert.equal(tw.direction[3], 0);
   assert.equal(h.engine.lighting.direction[3], 0, 'off: no light after sunset, as before');
   sky.options.lighting = { twilight: {} };
   h.frame();
-  assert.ok(
-    Math.abs(horizontal() / ((share * usno(elevation / r)) / SUN_ILLUMINANCE) - 1) < 1e-5,
-    'intensity 1: a share of noon',
-  );
+  assert.ok(Math.abs(horizontal() / ((share * usno(elevation / r)) / SUN_ILLUMINANCE) - 1) < 1e-5, 'intensity 1: a share of noon');
   sky.options.hours = 12;
   h.frame();
   assert.equal(tw.direction[3], 0, 'none while the sun is up');
@@ -103,8 +96,7 @@ test('twilight grows in with the night blend, so sky light is handed over, never
     // And on the ground the engine light, beam plus glow, changes smoothly too: within 0.2% of noon's beam (217 lux) per step.
     const d = h.engine.lighting.direction,
       ground = Math.max(0, d[1]) * d[3] * luminance(h.engine.lighting.radiance);
-    if (i)
-      assert.ok(Math.abs(ground - previousGround) < 0.002 * SUN_ILLUMINANCE, `ground step at ${sky.options.hours}`);
+    if (i) assert.ok(Math.abs(ground - previousGround) < 0.002 * SUN_ILLUMINANCE, `ground step at ${sky.options.hours}`);
     if (share > 0 && share < 1) steps++;
     previous = now;
     previousGround = ground;

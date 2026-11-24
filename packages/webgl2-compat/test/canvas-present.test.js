@@ -121,9 +121,7 @@ for (const alphaMode of ['opaque', 'premultiplied'])
     const names = calls.map((c) => c[0]);
     assert.ok(!names.includes('blitFramebuffer'), `present blits: ${names.join(' ')}`);
     assert.ok(!names.includes('clear'), `present clears: ${names.join(' ')}`);
-    assert.ok(
-      !names.includes('colorMask') || calls.filter((c) => c[0] === 'colorMask').every((c) => c.slice(1).every(Boolean)),
-    );
+    assert.ok(!names.includes('colorMask') || calls.filter((c) => c[0] === 'colorMask').every((c) => c.slice(1).every(Boolean)));
     const draw = calls.filter((c) => c[0] === 'drawArrays');
     assert.deepEqual(draw, [['drawArrays', 4, 0, 3]]);
     assert.ok(!calls.some((c) => c[0] === 'bindFramebuffer' && c[1] === gl.DRAW_FRAMEBUFFER && c[2] !== null));

@@ -53,10 +53,7 @@ class OpaqueColor implements EnginePlugin {
     descriptor: GPURenderPipelineDescriptor;
   };
   private disposed = false;
-  constructor(
-    private readonly engine: Engine,
-    private readonly graph: FrameGraph,
-  ) {}
+  constructor(private readonly engine: Engine, private readonly graph: FrameGraph) {}
   get view(): GPUTextureView {
     return this.capture?.view ?? this.placeholderView!;
   }

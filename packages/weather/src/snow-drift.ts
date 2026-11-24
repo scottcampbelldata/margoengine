@@ -316,8 +316,7 @@ const RANGES: Record<string, readonly [number, number]> = {
 
 /** Throws for any invalid field of `o`. */
 export function validateSnowDrift(o: SnowDriftOptions): void {
-  if (typeof o !== 'object' || o === null)
-    throw new TypeError('SnowDrift options must be an object with width and depth');
+  if (typeof o !== 'object' || o === null) throw new TypeError('SnowDrift options must be an object with width and depth');
   for (const key of ['width', 'depth'] as const)
     if (!Number.isInteger(o[key]) || o[key] < 2 || o[key] > 2048)
       throw new RangeError(`SnowDrift ${key} must be a whole number of samples from 2 to 2048`);
@@ -333,25 +332,19 @@ export function validateSnowDrift(o: SnowDriftOptions): void {
     if (typeof o.ground !== 'object' || o.ground === null || o.ground.length !== o.width * o.depth)
       throw new TypeError('SnowDrift ground needs width * depth heights, row by row along x');
     for (let k = 0; k < o.ground.length; k++)
-      if (!Number.isFinite(o.ground[k]))
-        throw new RangeError(`SnowDrift ground height ${k} is not finite; pass finite heights in metres`);
+      if (!Number.isFinite(o.ground[k])) throw new RangeError(`SnowDrift ground height ${k} is not finite; pass finite heights in metres`);
   }
   for (const [key, [min, max]] of Object.entries(RANGES)) {
     const v = (o as unknown as Record<string, unknown>)[key];
     if (v === undefined || v === null) continue;
     if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
-      throw new RangeError(
-        `SnowDrift ${key} must be a number from ${min} to ${max}${key in NULLABLE ? ' or null' : ''}`,
-      );
+      throw new RangeError(`SnowDrift ${key} must be a number from ${min} to ${max}${key in NULLABLE ? ' or null' : ''}`);
   }
-  if (o.inflow !== undefined && typeof o.inflow !== 'boolean')
-    throw new TypeError('SnowDrift inflow must be true or false');
+  if (o.inflow !== undefined && typeof o.inflow !== 'boolean') throw new TypeError('SnowDrift inflow must be true or false');
   if (o.weather !== undefined) {
     const s = (o.weather as { state?: Record<string, unknown> } | null)?.state;
     if (!s || !['snow', 'wind', 'windDirection', 'temperature', 'humidity'].every((k) => typeof s[k] === 'number'))
-      throw new TypeError(
-        'SnowDrift weather needs a state with snow, wind, windDirection, temperature and humidity; pass a WeatherMachine',
-      );
+      throw new TypeError('SnowDrift weather needs a state with snow, wind, windDirection, temperature and humidity; pass a WeatherMachine');
   }
 }
 const NULLABLE = { wind: 1, windDirection: 1, snowfall: 1, temperature: 1, humidity: 1, threshold: 1 };
@@ -461,8 +454,7 @@ export class SnowDrift implements SnowFieldSource {
   }
   /** Advances by `delta` film seconds. */
   update(delta: number): void {
-    if (!(delta >= 0) || !Number.isFinite(delta))
-      throw new RangeError('SnowDrift delta must be a finite number of 0 or more seconds');
+    if (!(delta >= 0) || !Number.isFinite(delta)) throw new RangeError('SnowDrift delta must be a finite number of 0 or more seconds');
     this.seek(this.film + delta);
   }
 
@@ -471,8 +463,7 @@ export class SnowDrift implements SnowFieldSource {
    * only on the options and the weather along the way, never on how it was reached (while those stay the same).
    */
   seek(time: number): void {
-    if (!(time >= 0) || !Number.isFinite(time))
-      throw new RangeError('SnowDrift time must be a finite number of 0 or more seconds');
+    if (!(time >= 0) || !Number.isFinite(time)) throw new RangeError('SnowDrift time must be a finite number of 0 or more seconds');
     validateSnowDrift(this.options);
     if (this.fixedKey() !== this.fixed) {
       this.fixed = this.fixedKey();
@@ -734,13 +725,7 @@ export class SnowDrift implements SnowFieldSource {
     this.budget.cornices -= mass * this.cellSize;
     const i = k % this.width,
       j = (k - i) / this.width;
-    this.falls.push({
-      time: this.film,
-      cell: k,
-      x: this.origin[0] + i * this.cellSize,
-      z: this.origin[1] + j * this.cellSize,
-      mass,
-    });
+    this.falls.push({ time: this.film, cell: k, x: this.origin[0] + i * this.cellSize, z: this.origin[1] + j * this.cellSize, mass });
   }
 
   // Snow on a surface steeper than the angle of repose slides to its lower neighbours in proportion to the drop past
@@ -972,14 +957,8 @@ export class SnowDrift implements SnowFieldSource {
       // On a square metre of slope that weight is load cos psi: load sin psi cos psi along it, load cos^2 psi across it.
       tau = load * Math.sin(psi) * Math.cos(psi) + (m > 0 ? (o.trigger ?? 0) : 0),
       sigma = load * Math.cos(psi) * Math.cos(psi),
-      strength =
-        (o.weakLayer ?? 500) + (o.weakFriction ?? 0.2) * sigma + ((o.sintering ?? 15) * this.weakAge[k]!) / 3600;
-    return [
-      strength,
-      tau,
-      (psi * 180) / Math.PI,
-      m > 0 && tau > 0 ? Math.min(STABILITY_MAX, strength / tau) : STABILITY_MAX,
-    ];
+      strength = (o.weakLayer ?? 500) + (o.weakFriction ?? 0.2) * sigma + ((o.sintering ?? 15) * this.weakAge[k]!) / 3600;
+    return [strength, tau, (psi * 180) / Math.PI, m > 0 && tau > 0 ? Math.min(STABILITY_MAX, strength / tau) : STABILITY_MAX];
   }
 
   /** The slide state of every cell now (Foehn's stability index on the top weak layer). */

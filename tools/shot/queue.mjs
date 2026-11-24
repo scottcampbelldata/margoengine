@@ -17,17 +17,7 @@
 // Render queue). Each job's shot tool already starts as a new process from the checkout.
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import {
-  closeSync,
-  existsSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -91,19 +81,11 @@ export function runnerCodeStamp({ dir = import.meta.dirname, repo = resolve(impo
     for (const name of readdirSync(dir)
       .filter((file) => /\.(mjs|js)$/.test(file))
       .sort())
-      hash
-        .update(`${name}\0`)
-        .update(readFileSync(join(dir, name)))
-        .update('\0');
+      hash.update(`${name}\0`).update(readFileSync(join(dir, name))).update('\0');
   } catch (error) {
     hash.update(`unreadable ${error.code ?? error.message}\0`);
   }
-  const head = spawnSync('git', ['rev-parse', 'HEAD'], {
-    cwd: repo,
-    encoding: 'utf8',
-    timeout: 10_000,
-    windowsHide: true,
-  });
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8', timeout: 10_000, windowsHide: true });
   hash.update(head.status === 0 ? `commit ${head.stdout.trim()}` : 'no commit');
   return hash.digest('hex');
 }
@@ -118,17 +100,13 @@ export function validateJob(job) {
   if (job.format !== JOB_FORMAT) issues.push(`format must be '${JOB_FORMAT}'`);
   if (job.version !== 1) issues.push('version must be 1');
   if (typeof job.shot !== 'string' || !/^[\w][\w./-]*\.json$/.test(job.shot) || job.shot.includes('..'))
-    issues.push(
-      'shot must be the path of a shot file in the repository, for example tools/shot/shots/orrery-dolly.json',
-    );
+    issues.push('shot must be the path of a shot file in the repository, for example tools/shot/shots/orrery-dolly.json');
   if ('seconds' in job && !(typeof job.seconds === 'number' && job.seconds > 0 && job.seconds < MAX_JOB_SECONDS))
     issues.push(`seconds must be above 0 and under ${MAX_JOB_SECONDS}`);
-  if ('day' in job && !(typeof job.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(job.day)))
-    issues.push('day must be YYYY-MM-DD');
+  if ('day' in job && !(typeof job.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(job.day))) issues.push('day must be YYYY-MM-DD');
   if ('once' in job && typeof job.once !== 'boolean') issues.push('once must be true or false');
   if ('production' in job && typeof job.production !== 'boolean') issues.push('production must be true or false');
-  if (job.once === true && job.production === true)
-    issues.push('once and production: pick one (production renders once and checks its probes)');
+  if (job.once === true && job.production === true) issues.push('once and production: pick one (production renders once and checks its probes)');
   if ('encode' in job && typeof job.encode !== 'boolean') issues.push('encode must be true or false');
   const known = new Set(['format', 'version', 'shot', 'seconds', 'day', 'once', 'production', 'encode', 'submitted']);
   for (const key of Object.keys(job)) if (!known.has(key)) issues.push(`${key} is not a job field`);
@@ -175,11 +153,7 @@ function killTree(child) {
  * job moved back to the queue when the shot paused at its hold's limit). An abort of `signal` (the runner was ended)
  * ends the shot and its browser, and the job fails as stopped.
  */
-export async function runJob(
-  queue,
-  name,
-  { repo, env = process.env, now = () => new Date(), limitMs = jobLimitMs, signal } = {},
-) {
+export async function runJob(queue, name, { repo, env = process.env, now = () => new Date(), limitMs = jobLimitMs, signal } = {}) {
   if (signal?.aborted) return null;
   const dirs = Object.fromEntries(['running', 'done', 'failed', 'logs'].map((dir) => [dir, join(queue, dir)]));
   for (const dir of Object.values(dirs)) mkdirSync(dir, { recursive: true });
@@ -243,9 +217,7 @@ export async function runJob(
       ended: ended.toISOString(),
       minutes: Math.round(((ended - started) / 60_000) * 100) / 100,
       log: `logs/${base}.log`,
-      ...(stopped
-        ? { stopped: true, error: 'the runner was ended (its scheduled task stopped) while the job ran' }
-        : {}),
+      ...(stopped ? { stopped: true, error: 'the runner was ended (its scheduled task stopped) while the job ran' } : {}),
     };
   return finish(code === 0 && !timedOut && !stopped ? 'done' : 'failed', record);
 }
@@ -298,9 +270,7 @@ export async function runQueue({
   };
   const moved = () => {
     if (codeStamp() === loaded) return false;
-    log(
-      `${new Date().toISOString()} the runner's code changed (the checkout moved): exiting for a runner on the new code`,
-    );
+    log(`${new Date().toISOString()} the runner's code changed (the checkout moved): exiting for a runner on the new code`);
     return true;
   };
   try {
@@ -312,10 +282,7 @@ export async function runQueue({
         if (moved()) return CODE_CHANGED;
         log(`${new Date().toISOString()} start ${name}`);
         const record = await runJob(queue, name, { repo, env, signal: ended.signal });
-        if (record)
-          log(
-            `${record.ended ?? ''} ${name}: code ${record.code ?? '-'}${record.timedOut ? ' (timed out)' : ''}${record.stopped ? ' (stopped: the runner was ended)' : ''} ${record.minutes ?? ''} min`,
-          );
+        if (record) log(`${record.ended ?? ''} ${name}: code ${record.code ?? '-'}${record.timedOut ? ' (timed out)' : ''}${record.stopped ? ' (stopped: the runner was ended)' : ''} ${record.minutes ?? ''} min`);
       }
       if (gone()) return PARENT_GONE;
       if (!watch) return;
@@ -344,9 +311,7 @@ export async function runQueue({
 export function submit(shot, { seconds, day, once, production, encode, host = 'dev', remote, env = process.env } = {}) {
   remote ??= env[REMOTE_QUEUE_VARIABLE];
   if (typeof remote !== 'string' || !remote)
-    throw new TypeError(
-      `No queue folder on ${host}: pass --remote <dir> or set ${REMOTE_QUEUE_VARIABLE} (the render checkout's .lane/queue)`,
-    );
+    throw new TypeError(`No queue folder on ${host}: pass --remote <dir> or set ${REMOTE_QUEUE_VARIABLE} (the render checkout's .lane/queue)`);
   const job = {
     format: JOB_FORMAT,
     version: 1,
@@ -366,20 +331,13 @@ export function submit(shot, { seconds, day, once, production, encode, host = 'd
   writeFileSync(local, JSON.stringify(job, null, 2) + '\n');
   try {
     // To a hidden name first, then renamed, so the runner never reads a half-copied job.
-    const copy = spawnSync('scp', ['-q', '-o', 'BatchMode=yes', local, `${host}:${remote}/.${name}`], {
-      stdio: 'inherit',
-      timeout: 120_000,
-    });
+    const copy = spawnSync('scp', ['-q', '-o', 'BatchMode=yes', local, `${host}:${remote}/.${name}`], { stdio: 'inherit', timeout: 120_000 });
     if (copy.status !== 0) throw new Error(`scp to ${host}:${remote} failed (exit ${copy.status})`);
     const win = remote.replace(/\//g, '\\');
-    const move = spawnSync(
-      'ssh',
-      ['-o', 'BatchMode=yes', host, `cmd /c move /y "${win}\\.${name}" "${win}\\${name}"`],
-      {
-        stdio: ['ignore', 'ignore', 'inherit'],
-        timeout: 120_000,
-      },
-    );
+    const move = spawnSync('ssh', ['-o', 'BatchMode=yes', host, `cmd /c move /y "${win}\\.${name}" "${win}\\${name}"`], {
+      stdio: ['ignore', 'ignore', 'inherit'],
+      timeout: 120_000,
+    });
     if (move.status !== 0) throw new Error(`renaming the job on ${host} failed (exit ${move.status})`);
   } finally {
     rmSync(local, { force: true });
@@ -428,9 +386,7 @@ async function main() {
       // Returns CODE_CHANGED once the checkout moved (the scheduled task starts a runner on the new code), PARENT_GONE once the task was ended.
       await runQueue({ queue: resolve(values.queue ?? join(repo, '.lane', 'queue')), repo, watch: values.watch });
     } else {
-      console.error(
-        'usage: node tools/shot/queue.mjs submit <shot.json> [--seconds s] [--day YYYY-MM-DD] [--once | --production] [--encode] [--host dev] [--remote <dir>]\n       node tools/shot/queue.mjs run [--queue <dir>] [--watch]',
-      );
+      console.error('usage: node tools/shot/queue.mjs submit <shot.json> [--seconds s] [--day YYYY-MM-DD] [--once | --production] [--encode] [--host dev] [--remote <dir>]\n       node tools/shot/queue.mjs run [--queue <dir>] [--watch]');
       return 2;
     }
   } catch (error) {

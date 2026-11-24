@@ -20,17 +20,10 @@ test('every row is well formed, live, and its default is what a Scatter uses wit
     assert.ok(!names.has(row.name));
     names.add(row.name);
     assert.equal(row.name.slice(0, row.name.indexOf('.')), row.group);
-    assert.equal(
-      row.live,
-      !['blades.translucency', 'variation.hue', 'variation.value', 'variation.clusters'].includes(row.name),
-    );
+    assert.equal(row.live, !['blades.translucency', 'variation.hue', 'variation.value', 'variation.clusters'].includes(row.name));
     assert.ok(row.about.length > 20);
   }
-  assert.equal(
-    SCATTER_LIVE_SETTINGS.length,
-    SCATTER_SETTINGS.length - 4,
-    'translucency, variation and clusters may build a pipeline',
-  );
+  assert.equal(SCATTER_LIVE_SETTINGS.length, SCATTER_SETTINGS.length - 4, 'translucency, variation and clusters may build a pipeline');
   const plain = new Scatter(box());
   assert.equal(plain.density, 1);
   assert.deepEqual([...plain.color], [0.12, 0.35, 0.08]);
@@ -47,8 +40,7 @@ test('every row is well formed, live, and its default is what a Scatter uses wit
   assert.equal(lit.variationValue, 0);
   assert.equal(lit.clusters, 0);
   assert.equal(defaults['blades.widen'], 1);
-  for (const name of ['blades.translucency', 'variation.hue', 'variation.value', 'variation.clusters'])
-    assert.equal(defaults[name], 0);
+  for (const name of ['blades.translucency', 'variation.hue', 'variation.value', 'variation.clusters']) assert.equal(defaults[name], 0);
 });
 
 test('applying writes the values the next frame reads, and the defaults leave the uniform as built', () => {
@@ -71,15 +63,9 @@ test('applying writes the values the next frame reads, and the defaults leave th
 
 test('bad values and targets are refused with the row named', () => {
   const s = new Scatter(box());
-  assert.throws(() => applyScatterSettings(s, { 'scatter.density': 2 }), {
-    name: 'RangeError',
-    message: /scatter.density/,
-  });
+  assert.throws(() => applyScatterSettings(s, { 'scatter.density': 2 }), { name: 'RangeError', message: /scatter.density/ });
   assert.throws(() => applyScatterSettings(s, { nope: 1 }), TypeError);
-  assert.throws(
-    () => applyScatterSettings(s, { 'wind.strength': 0.5, 'wind.directionX': 0, 'wind.directionZ': 0 }),
-    RangeError,
-  );
+  assert.throws(() => applyScatterSettings(s, { 'wind.strength': 0.5, 'wind.directionX': 0, 'wind.directionZ': 0 }), RangeError);
   assert.throws(() => applyScatterSettings(s, { 'blades.rootShade': 0.2 }), { name: 'TypeError', message: /blades/ });
   assert.throws(() => (s.rootShade = 0.2), { code: 'state' });
   assert.throws(() => (s.color = [1, 2, 0]), RangeError);
@@ -89,31 +75,15 @@ test('bad values and targets are refused with the row named', () => {
 test('widen, translucency, variation and clusters write the values the next frame reads', () => {
   const material = new PbrMaterial();
   const field = new Scatter(box(), { blades: { widen: 1 }, material, lod: [30, 60, 120] });
-  const built = new Scatter(box(), {
-    blades: { widen: 3, translucency: 0.4 },
-    material,
-    lod: [30, 60, 120],
-    variation: { hue: 0.1, value: 0.2 },
-    clusters: 0.5,
-  });
-  applyScatterSettings(field, {
-    'blades.widen': 3,
-    'blades.translucency': 0.4,
-    'variation.hue': 0.1,
-    'variation.value': 0.2,
-    'variation.clusters': 0.5,
-  });
+  const built = new Scatter(box(), { blades: { widen: 3, translucency: 0.4 }, material, lod: [30, 60, 120], variation: { hue: 0.1, value: 0.2 }, clusters: 0.5 });
+  applyScatterSettings(field, { 'blades.widen': 3, 'blades.translucency': 0.4, 'variation.hue': 0.1, 'variation.value': 0.2, 'variation.clusters': 0.5 });
   assert.equal(field.values[77], built.values[77], 'widen reaches the frame uniform as the constructor writes it');
   assert.equal(field.values[35], built.values[35], 'the cull reach follows the widest blades');
   assert.equal(field.values[75], 0.5);
   assert.equal(field.translucencyAmount, 0.4);
   assert.equal([field.variationHue, field.variationValue].join(), '0.1,0.2');
   applyScatterSettings(field, {});
-  assert.equal(
-    field.values[35],
-    new Scatter(box(), { blades: {}, material, lod: [30, 60, 120] }).values[35],
-    'the defaults restore the reach',
-  );
+  assert.equal(field.values[35], new Scatter(box(), { blades: {}, material, lod: [30, 60, 120] }).values[35], 'the defaults restore the reach');
   assert.equal(field.clusters, 0);
 });
 
@@ -130,10 +100,7 @@ test('a widen moved on a tile mesh that shares its culling updates the shared re
 test('these rows need what they shade through, and bad values are refused', () => {
   const bare = new Scatter(box());
   for (const name of ['blades.widen', 'blades.translucency', 'variation.hue', 'variation.value', 'variation.clusters'])
-    assert.throws(() => applyScatterSettings(bare, { [name]: name === 'blades.widen' ? 2 : 0.2 }), {
-      name: 'TypeError',
-      message: new RegExp(name),
-    });
+    assert.throws(() => applyScatterSettings(bare, { [name]: name === 'blades.widen' ? 2 : 0.2 }), { name: 'TypeError', message: new RegExp(name) });
   assert.throws(() => (bare.widen = 2), { code: 'state' });
   assert.throws(() => (bare.translucencyAmount = 0.2), { code: 'state' });
   assert.throws(() => (bare.variationHue = 0.2), { code: 'state' });

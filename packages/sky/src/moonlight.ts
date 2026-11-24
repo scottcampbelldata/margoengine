@@ -104,8 +104,7 @@ export function moonlightColor(
       X = 0.4124 * r + 0.3576 * g + 0.1805 * b,
       Y = 0.2126 * r + 0.7152 * g + 0.0722 * b,
       sum = X + Y + 0.0193 * r + 0.1192 * g + 0.9505 * b;
-    if (!(sum > 0 && Number.isFinite(sum)))
-      throw new RangeError('Invalid moonlight source colour; give non-negative linear RGB, not black.');
+    if (!(sum > 0 && Number.isFinite(sum))) throw new RangeError('Invalid moonlight source colour; give non-negative linear RGB, not black.');
     x = X / sum;
     y = Y / sum;
   }
@@ -237,9 +236,7 @@ export function moonLook(
   } else if (brightness === 'dim') light = THIN_CLOUD;
   else if (typeof brightness === 'number' && brightness >= 0 && Number.isFinite(brightness)) light = brightness;
   else
-    throw new RangeError(
-      `Invalid moon brightness ${String(brightness)}; give a number of 0 or more, 'bright' or 'dim'.`,
-    );
+    throw new RangeError(`Invalid moon brightness ${String(brightness)}; give a number of 0 or more, 'bright' or 'dim'.`);
   // The disc's surface brightness changes with everything but the distance.
   let surface = light / (size * size);
   if (color === 'blood') {

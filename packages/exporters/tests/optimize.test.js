@@ -271,11 +271,7 @@ test('simplify keeps the fraction asked, a subset of the source vertices, and th
   // A collapse removes at most two triangles, so the count lands on the target or the one above it.
   assert.ok(stats.trianglesAfter <= Math.ceil(16 * 16 * 2 * 0.25) + 1, `${stats.trianglesAfter} triangles`);
   assert.ok(stats.trianglesAfter >= 16 * 16 * 2 * 0.25 - 2);
-  assert.equal(
-    readAccessor(parts, primitive.indices).count / 3,
-    stats.trianglesAfter,
-    'the file holds what the stats say',
-  );
+  assert.equal(readAccessor(parts, primitive.indices).count / 3, stats.trianglesAfter, 'the file holds what the stats say');
   assert.equal(readAccessor(parts, primitive.attributes.WEIGHTS_0).count, positions.count);
   await clean(glb);
 });
@@ -761,11 +757,7 @@ test('a non-indexed primitive of two vertices keeps its accessors and gets no em
   for (const name of Object.keys(primitive.attributes)) {
     const accessor = parts.json.accessors[primitive.attributes[name]];
     accessor.count = 2;
-    if (name === 'POSITION')
-      [accessor.min, accessor.max] = [
-        [0, 0, 0],
-        [1, 0, 0],
-      ];
+    if (name === 'POSITION') [accessor.min, accessor.max] = [[0, 0, 0], [1, 0, 0]];
   }
   assert.ok(position);
   const { glb } = await optimizeGLB(joinGLB(parts)),

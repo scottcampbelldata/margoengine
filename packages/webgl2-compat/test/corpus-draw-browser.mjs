@@ -27,10 +27,7 @@ try {
   const { page } = context;
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   if (parts.includes('render')) {
-    const result = await page.evaluate(({ records, sources }) => window.drawAll(records, sources), {
-      records,
-      sources,
-    });
+    const result = await page.evaluate(({ records, sources }) => window.drawAll(records, sources), { records, sources });
     const later = Object.entries(result.waiting)
       .map(([reason, n]) => `  ${n} x ${reason}`)
       .join('\n');

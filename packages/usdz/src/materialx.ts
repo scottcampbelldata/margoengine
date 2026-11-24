@@ -17,14 +17,7 @@ import {
 import { LoaderError } from '@margoengine/loaders/common';
 import { SRGBToLinear } from '@margoengine/math/color';
 import type { Specs } from './crate.js';
-import type {
-  ExtensionHooks,
-  ForeignLayer,
-  SurfaceRead,
-  USDExtension,
-  USDImagePlacement,
-  USDSurface,
-} from './extension.js';
+import type { ExtensionHooks, ForeignLayer, SurfaceRead, USDExtension, USDImagePlacement, USDSurface } from './extension.js';
 import type { USDAsset } from './index.js';
 import { anchored } from './stage.js';
 
@@ -75,9 +68,7 @@ function layerSpecs(doc: MaterialXDocument): Specs {
   const authored = (input: MaterialXInput) => ({
     typeName: typed(input),
     ...(input.value === undefined ? {} : { default: input.value }),
-    ...(input.colorspace && (input.type === 'filename' || /^color/.test(input.type))
-      ? { colorSpace: input.colorspace }
-      : {}),
+    ...(input.colorspace && (input.type === 'filename' || /^color/.test(input.type)) ? { colorSpace: input.colorspace } : {}),
   });
   /** Writes a node at `path`. `where` finds the prim of what its inputs connect to. */
   const writeNode = (path: string, node: MaterialXNode, where: (input: MaterialXInput) => string | undefined) => {
@@ -85,10 +76,7 @@ function layerSpecs(doc: MaterialXDocument): Specs {
     property(path + '.info:id', { typeName: 'token', default: shaderId(node), variability: 1 });
     for (const input of Object.values(node.inputs)) {
       const target = where(input);
-      property(
-        `${path}.inputs:${input.name}`,
-        target ? { typeName: typed(input), connectionPaths: [target] } : authored(input),
-      );
+      property(`${path}.inputs:${input.name}`, target ? { typeName: typed(input), connectionPaths: [target] } : authored(input));
     }
   };
   /** Writes a node graph, with the top-level nodes its nodes read beside it under `outer`. */
@@ -104,10 +92,7 @@ function layerSpecs(doc: MaterialXDocument): Specs {
     for (const node of Object.values(graph.nodes)) writeNode(`${path}/${node.name}`, node, where);
     for (const output of Object.values(graph.outputs)) {
       const target = where(output);
-      property(`${path}.outputs:${output.name}`, {
-        typeName: typed(output),
-        ...(target ? { connectionPaths: [target] } : {}),
-      });
+      property(`${path}.outputs:${output.name}`, { typeName: typed(output), ...(target ? { connectionPaths: [target] } : {}) });
     }
   };
   /** Copies a shader or top-level node under `scope`, with everything it reads, and gives its prim. */
@@ -127,8 +112,7 @@ function layerSpecs(doc: MaterialXDocument): Specs {
     });
     return path;
   };
-  for (const graph of Object.values(doc.graphs))
-    writeGraph(`${ROOT}/NodeGraphs/${graph.name}`, graph, (name) => `${ROOT}/Shaders/${name}`);
+  for (const graph of Object.values(doc.graphs)) writeGraph(`${ROOT}/NodeGraphs/${graph.name}`, graph, (name) => `${ROOT}/Shaders/${name}`);
   for (const node of Object.values(doc.nodes)) {
     if (node.category === 'surfacematerial') continue;
     prim(`${ROOT}/Shaders/${node.name}`, 'Shader');
@@ -144,10 +128,7 @@ function layerSpecs(doc: MaterialXDocument): Specs {
     for (const input of Object.values(shader.inputs)) {
       if (input.value === undefined) continue;
       property(`${path}.inputs:${input.name}`, authored(input));
-      property(`${at}.inputs:${input.name}`, {
-        typeName: typed(input),
-        connectionPaths: [`${path}.inputs:${input.name}`],
-      });
+      property(`${at}.inputs:${input.name}`, { typeName: typed(input), connectionPaths: [`${path}.inputs:${input.name}`] });
     }
   }
   return specs;
@@ -158,13 +139,9 @@ function missing(name: string): never {
 
 /** Gives a document with no working colour space the one it was included under. */
 function inherit(doc: MaterialXDocument, colorspace: string): void {
-  const nodes = [
-    ...Object.values(doc.nodes),
-    ...Object.values(doc.graphs).flatMap((graph) => Object.values(graph.nodes)),
-  ];
+  const nodes = [...Object.values(doc.nodes), ...Object.values(doc.graphs).flatMap((graph) => Object.values(graph.nodes))];
   for (const node of nodes)
-    for (const input of Object.values(node.inputs))
-      if (input.type === 'filename' || /^color/.test(input.type)) input.colorspace ??= colorspace;
+    for (const input of Object.values(node.inputs)) if (input.type === 'filename' || /^color/.test(input.type)) input.colorspace ??= colorspace;
 }
 
 /** A `.mtlx` file and what it includes, as one document. */
@@ -211,24 +188,7 @@ const WRAPS = lookup({
   mirror: 33648,
   mirrored_repeat: 33648,
 });
-const CHANNELS = lookup({
-  r: 0,
-  g: 1,
-  b: 2,
-  a: 3,
-  x: 0,
-  y: 1,
-  z: 2,
-  w: 3,
-  outr: 0,
-  outg: 1,
-  outb: 2,
-  outa: 3,
-  outx: 0,
-  outy: 1,
-  outz: 2,
-  outw: 3,
-});
+const CHANNELS = lookup({ r: 0, g: 1, b: 2, a: 3, x: 0, y: 1, z: 2, w: 3, outr: 0, outg: 1, outb: 2, outa: 3, outx: 0, outy: 1, outz: 2, outw: 3 });
 
 /** The colour spaces read here. The working space is linear Rec.709; `data` and its alias `none` mean no conversion. */
 const SRGB_SPACES = new Set(['srgb_texture', 'srgb_rec709_scene', 'sRGB']);
@@ -246,9 +206,7 @@ function numbers(value: unknown): number[] | undefined {
 }
 /** Two values channel by channel: one of width 1 stands for all channels. */
 const zip = (a: number[], b: number[], op: (x: number, y: number) => number) =>
-  Array.from({ length: Math.max(a.length, b.length) }, (_, i) =>
-    op(a[a.length === 1 ? 0 : i] ?? 0, b[b.length === 1 ? 0 : i] ?? 0),
-  );
+  Array.from({ length: Math.max(a.length, b.length) }, (_, i) => op(a[a.length === 1 ? 0 : i] ?? 0, b[b.length === 1 ? 0 : i] ?? 0));
 
 /** One bound material's network. */
 class Network {
@@ -271,9 +229,7 @@ class Network {
   }
   private text(prim: string, name: string): string | undefined {
     const target = this.read.connection(prim, name),
-      value = target
-        ? this.read.attr(target.slice(0, target.lastIndexOf('.')), target.slice(target.lastIndexOf('.') + 1))
-        : this.read.attr(prim, name);
+      value = target ? this.read.attr(target.slice(0, target.lastIndexOf('.')), target.slice(target.lastIndexOf('.') + 1)) : this.read.attr(prim, name);
     return typeof value === 'string' ? value : undefined;
   }
   /** An input of a prim, reduced. `slot` names it in what is listed. */
@@ -297,8 +253,7 @@ class Network {
   }
   private image(prim: string, kind: string, type: string, output: string, slot: string): Reduced {
     const file = this.text(prim, 'inputs:file');
-    const fallback = () =>
-      numbers(this.read.attr(prim, kind === 'UsdUVTexture' ? 'inputs:fallback' : 'inputs:default')) ?? [0];
+    const fallback = () => numbers(this.read.attr(prim, kind === 'UsdUVTexture' ? 'inputs:fallback' : 'inputs:default')) ?? [0];
     if (!file) return fallback();
     if (!this.read.has(file)) {
       this.read.soft('missing texture ' + file);
@@ -323,13 +278,11 @@ class Network {
         tile = this.plain(prim, 'inputs:realworldtilesize');
       // The specification gives these inputs no formula, so nothing is made up for them.
       if (offset?.some(Boolean)) this.read.soft(`uvoffset of ${prim} is not applied`);
-      if (image && tile && image.some((v, i) => v !== tile[i]))
-        this.read.soft(`real world sizes of ${prim} are not applied`);
+      if (image && tile && image.some((v, i) => v !== tile[i])) this.read.soft(`real world sizes of ${prim} are not applied`);
       if (su !== 1 || sv !== 1) where.transform = { offset: [0, 1 - sv], rotation: 0, scale: [su, sv] };
     }
     const source = kind === 'UsdUVTexture' ? this.read.attr(prim, 'inputs:sourceColorSpace') : undefined,
-      space =
-        source === undefined || source === 'auto' ? this.read.specs[`${prim}.inputs:file`]?.fields.colorSpace : source,
+      space = source === undefined || source === 'auto' ? this.read.specs[`${prim}.inputs:file`]?.fields.colorSpace : source,
       single = type === 'float' || output in CHANNELS;
     const out: Sampled = { file, factor: [1], where };
     if (kind === 'UsdUVTexture') {
@@ -359,9 +312,7 @@ class Network {
     }
     if (kind === 'geompropvalue') return this.text(owner, 'inputs:geomprop');
     if (kind === 'UsdPrimvarReader') return this.text(owner, 'inputs:varname');
-    this.read.soft(
-      `computed texture coordinates at ${owner} on ${slot} have no PBR form; materialGraph() can hold more`,
-    );
+    this.read.soft(`computed texture coordinates at ${owner} on ${slot} have no PBR form; materialGraph() can hold more`);
     return;
   }
   private node(prim: string, id: string, output: string, slot: string): Reduced {
@@ -394,8 +345,7 @@ class Network {
       case 'separate3':
       case 'separate4': {
         const inner = arg('in'),
-          index =
-            kind === 'extract' ? (numbers(this.read.attr(prim, 'inputs:index'))?.[0] ?? 0) : (CHANNELS[output] ?? 0);
+          index = kind === 'extract' ? (numbers(this.read.attr(prim, 'inputs:index'))?.[0] ?? 0) : (CHANNELS[output] ?? 0);
         if (Array.isArray(inner)) return [inner[index] ?? 0];
         if (sampled(inner) && inner.channel === undefined) return { ...inner, channel: index };
         return inner === undefined ? undefined : refuse();
@@ -602,12 +552,7 @@ const SHADERS = lookup<Slots>({
     left: ['specular'],
   },
 });
-const UNLIT = lookup<{
-  color: [string, number[]];
-  weight?: [string, number];
-  opacity: [string, number[]];
-  threshold?: string;
-}>({
+const UNLIT = lookup<{ color: [string, number[]]; weight?: [string, number]; opacity: [string, number[]]; threshold?: string }>({
   surface_unlit: { color: ['emission_color', WHITE], weight: ['emission', 1], opacity: ['opacity', [1]] },
   realitykit_unlit_surfaceshader: { color: ['color', WHITE], opacity: ['opacity', [1]], threshold: 'opacityThreshold' },
 });
@@ -640,8 +585,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     read.soft(`unsupported surface shader ${String(id)} at ${shader}`);
     return undefined;
   }
-  const get = (name: string | undefined, fallback?: number[]): Reduced =>
-      name ? (network.value(shader, name, name) ?? fallback) : fallback,
+  const get = (name: string | undefined, fallback?: number[]): Reduced => (name ? (network.value(shader, name, name) ?? fallback) : fallback),
     /** A constant, or what the slot falls back to when an image there cannot be used. */
     constant = (name: string, fallback: number) => {
       const value = get(name, [fallback]);
@@ -665,8 +609,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       if (color.channel) read.soft(`channel ${color.channel} of ${color.file} reads as the image's colour`);
       // With no colour space anywhere above it an image is left to its file, which glTF reads as sRGB.
       const lit = color.space !== undefined && LINEAR_SPACES.has(color.space);
-      if (color.space !== undefined && !lit && !SRGB_SPACES.has(color.space))
-        read.soft(`colour space ${color.space} of ${color.file} is not converted`);
+      if (color.space !== undefined && !lit && !SRGB_SPACES.has(color.space)) read.soft(`colour space ${color.space} of ${color.file} is not converted`);
       p.baseColorTexture = texture(color, lit);
       p.baseColorFactor = [...three(color.factor), opacity];
     } else p.baseColorFactor = [...three(color!).map(fit), opacity];
@@ -687,10 +630,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       opacity = alpha(...flat.opacity),
       color = get(flat.color[0], flat.color[1]),
       threshold = flat.threshold ? constant(flat.threshold, 0) : 0;
-    base(
-      sampled(color) ? { ...color, factor: color.factor.map((x) => x * weight) } : three(color!).map((x) => x * weight),
-      opacity,
-    );
+    base(sampled(color) ? { ...color, factor: color.factor.map((x) => x * weight) } : three(color!).map((x) => x * weight), opacity);
     if (opacity < 1) seeThrough(threshold);
     uses(read, 'KHR_materials_unlit');
     extensions.KHR_materials_unlit = {};
@@ -699,14 +639,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
   }
   const mode = kind === 'gltf_pbr' ? constant('alpha_mode', 0) : undefined,
     opacity = slots.opacity && mode !== 0 ? alpha(...slots.opacity) : 1,
-    threshold =
-      mode === undefined
-        ? slots.threshold
-          ? constant(slots.threshold, 0)
-          : 0
-        : mode === 1
-          ? constant('alpha_cutoff', 0.5)
-          : 0,
+    threshold = mode === undefined ? (slots.threshold ? constant(slots.threshold, 0) : 0) : mode === 1 ? constant('alpha_cutoff', 0.5) : 0,
     weight = slots.weight ? constant(...slots.weight) : 1,
     coat = slots.coat ? constant(...slots.coat) : 0,
     transmission = slots.transmission ? constant(...slots.transmission) : 0;
@@ -738,19 +671,14 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     if (!Array.isArray(tint)) read.soft(`an image on ${slots.transmissionColor} is not read`);
     else if (depth > 0) {
       uses(read, 'KHR_materials_volume');
-      extensions.KHR_materials_volume = {
-        thicknessFactor: depth,
-        attenuationDistance: depth,
-        attenuationColor: three(tint).map(fit),
-      };
+      extensions.KHR_materials_volume = { thicknessFactor: depth, attenuationDistance: depth, attenuationColor: three(tint).map(fit) };
     } else if (Array.isArray(color)) color = zip(color, tint, (x, y) => x + (y - x) * transmission);
     else read.soft(`an image on ${slots.transmissionColor} is not read`);
   }
   base(color, opacity);
   if (mode === 1) seeThrough(threshold);
   else if (opacity < 1 || mode === 2) seeThrough(threshold);
-  const coatRough =
-    slots.coatAffect && coat > 0 ? constant('coat_affect_roughness', 0) * coat * constant(...slots.coatRoughness!) : 0;
+  const coatRough = slots.coatAffect && coat > 0 ? constant('coat_affect_roughness', 0) * coat * constant(...slots.coatRoughness!) : 0;
   const rough = slots.roughness ? get(slots.roughness[0], [slots.roughness[1]]) : [1],
     metal = slots.metal ? get(slots.metal[0], [slots.metal[1]]) : [0];
   if (coatRough > 0 && Array.isArray(rough)) rough[0] += (1 - rough[0]) * coatRough;
@@ -779,18 +707,10 @@ function surface(read: SurfaceRead): USDSurface | undefined {
   if (sampled(occlusion)) material.occlusionTexture = texture(occlusion);
   if (slots.emissive) {
     const light = get(slots.emissive[0], slots.emissive[1])!,
-      strength = slots.emissiveWeight
-        ? constant(...slots.emissiveWeight)
-        : kind === 'open_pbr_surface'
-          ? constant('emission_luminance', 0) / 1000
-          : 1;
+      strength = slots.emissiveWeight ? constant(...slots.emissiveWeight) : kind === 'open_pbr_surface' ? constant('emission_luminance', 0) / 1000 : 1;
     if (sampled(light)) {
       material.emissiveTexture = texture(light);
-      material.emissiveFactor = three(zip(light.factor, [Math.min(1, strength)], (x, y) => x * y)) as [
-        number,
-        number,
-        number,
-      ];
+      material.emissiveFactor = three(zip(light.factor, [Math.min(1, strength)], (x, y) => x * y)) as [number, number, number];
     } else {
       const lit = three(light).map((x, i) => x * strength * coatTint[i]),
         most = Math.max(...lit);
@@ -843,10 +763,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       const sheenColorFactor = three(Array.isArray(tint) ? tint : WHITE).map((x) => fit(x * amount));
       if (sheenColorFactor.some(Boolean)) {
         uses(read, 'KHR_materials_sheen');
-        extensions.KHR_materials_sheen = {
-          sheenColorFactor,
-          sheenRoughnessFactor: fit(constant(...slots.sheenRoughness!)),
-        };
+        extensions.KHR_materials_sheen = { sheenColorFactor, sheenRoughnessFactor: fit(constant(...slots.sheenRoughness!)) };
       }
     }
   }
@@ -879,10 +796,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     }
     if (strength > 0) {
       uses(read, 'KHR_materials_anisotropy');
-      extensions.KHR_materials_anisotropy = {
-        anisotropyStrength: fit(strength),
-        anisotropyRotation: constant('anisotropy_rotation', 0),
-      };
+      extensions.KHR_materials_anisotropy = { anisotropyStrength: fit(strength), anisotropyRotation: constant('anisotropy_rotation', 0) };
     }
     if (dispersion > 0) {
       uses(read, 'KHR_materials_dispersion');
@@ -902,9 +816,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
 function outputType(id: string, category: string): string {
   if (category === 'extract' || /^separate/.test(category)) return 'float';
   if (category === 'normalmap') return 'vector3';
-  const found = [
-    ...id.matchAll(/(?:^|_)(float|integer|boolean|color[34]|vector[234]|matrix33|matrix44|surfaceshader)/g),
-  ];
+  const found = [...id.matchAll(/(?:^|_)(float|integer|boolean|color[34]|vector[234]|matrix33|matrix44|surfaceshader)/g)];
   return found.at(-1)?.[1] ?? 'surfaceshader';
 }
 
@@ -915,12 +827,7 @@ function networkOf(read: SurfaceRead, shader: string): SavedNetwork {
       if (nodes[path]) return;
       const id = String(read.attr(path, 'info:id') ?? ''),
         category = shaderKind(id).replace(/_(?:color|vector)[234].*$|_(?:float|integer|boolean).*$/, ''),
-        node: MaterialXNode = {
-          category: IMAGE_NODES[category] ?? category,
-          name: path,
-          type: outputType(id, category),
-          inputs: lookup({}),
-        };
+        node: MaterialXNode = { category: IMAGE_NODES[category] ?? category, name: path, type: outputType(id, category), inputs: lookup({}) };
       nodes[path] = node;
       const prefix = path + '.inputs:';
       for (const key in read.specs) {
@@ -937,17 +844,10 @@ function networkOf(read: SurfaceRead, shader: string): SavedNetwork {
           input.output = target!.slice(target!.indexOf('.outputs:') + 9);
           visit(owner);
         } else {
-          const value = target
-              ? read.attr(owner!, target.slice(target.lastIndexOf('.') + 1))
-              : read.attr(path, 'inputs:' + name),
+          const value = target ? read.attr(owner!, target.slice(target.lastIndexOf('.') + 1)) : read.attr(path, 'inputs:' + name),
             list = numbers(value);
           if (value === undefined) continue;
-          input.value =
-            typeof value === 'string'
-              ? value
-              : list?.length === 1 && !/^(?:color|vector)/.test(input.type)
-                ? list[0]
-                : list;
+          input.value = typeof value === 'string' ? value : list?.length === 1 && !/^(?:color|vector)/.test(input.type) ? list[0] : list;
         }
         node.inputs[name] = input;
       }
@@ -969,11 +869,7 @@ export interface MaterialGraphOptions extends MaterialXConvertOptions {}
  * `@margoengine/materials`. `material` is a material's index in the document or its prim path. Without `options.texture`
  * images are listed in `skipped`. Undefined for a material with no MaterialX network.
  */
-export async function materialGraph(
-  asset: USDAsset,
-  material: number | string,
-  options: MaterialGraphOptions = {},
-): Promise<MaterialXConversion | undefined> {
+export async function materialGraph(asset: USDAsset, material: number | string, options: MaterialGraphOptions = {}): Promise<MaterialXConversion | undefined> {
   const { materials = [] } = asset.document,
     found = typeof material === 'number' ? materials[material] : materials.find((item) => item.name === material),
     saved = (found?.extras as { materialX?: SavedNetwork } | undefined)?.materialX;

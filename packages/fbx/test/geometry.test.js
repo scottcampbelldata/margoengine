@@ -214,11 +214,7 @@ test('a zero tangent, or one along the normal, becomes a unit vector across the 
     [0, 0, 1],
   ]) {
     const result = buildGeometry(
-      mesh(
-        [0, 0, 0, 1, 0, 0, 0, 1, 0],
-        [0, 1, -3],
-        [layer('LayerElementTangent', 'AllSame', 'Direct', 'Tangents', given)],
-      ),
+      mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, -3], [layer('LayerElementTangent', 'AllSame', 'Direct', 'Tangents', given)]),
     );
     const t = result.primitives[0].geometry.tangents;
     assert.ok(Math.abs(Math.hypot(t[0], t[1], t[2]) - 1) < 1e-6);
@@ -243,7 +239,10 @@ test('FBX tangent frame reverses handedness when V is flipped', () => {
 test('malformed geometry and unbounded expansion reject predictably', () => {
   assert.throws(() => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, 2])), /terminator/);
   assert.throws(() => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, -4])), /control point/);
-  assert.throws(() => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 2, 0, 0], [0, 1, -3])), /contains no triangles/);
+  assert.throws(
+    () => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 2, 0, 0], [0, 1, -3])),
+    /contains no triangles/,
+  );
   assert.throws(() => buildGeometry(mesh({ length: 3_000_003 }, [0, 1, -3])), /geometry budget exceeded/);
   assert.throws(
     () =>

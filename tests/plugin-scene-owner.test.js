@@ -62,14 +62,8 @@ test('open sites pass only by file and exact call; a listed site that is gone fa
   // The same call text in another file, or another call in a listed file, is a finding.
   const moved = [{ ...site, file: 'packages/physics/src/other.ts' }, ...OPEN.slice(1)];
   const findings = pluginSceneOwnerFindings(root, moved);
-  assert.ok(
-    findings.some((f) => f.startsWith(`${site.file}:`) && f.endsWith(site.call)),
-    findings.join('\n'),
-  );
-  assert.ok(
-    findings.some((f) => f.includes('packages/physics/src/other.ts: listed open site')),
-    findings.join('\n'),
-  );
+  assert.ok(findings.some((f) => f.startsWith(`${site.file}:`) && f.endsWith(site.call)), findings.join('\n'));
+  assert.ok(findings.some((f) => f.includes('packages/physics/src/other.ts: listed open site')), findings.join('\n'));
   const stale = [...OPEN, { file: site.file, call: 'engine.removePlugin(gone)', bug: site.bug }];
   assert.deepEqual(pluginSceneOwnerFindings(root, stale), [
     `${site.file}: listed open site "engine.removePlugin(gone)" is gone; drop it from OPEN`,
@@ -81,11 +75,7 @@ test('hygiene runs the check and every open site cites its known-bugs entry', ()
   const bugs = readFileSync(resolve(root, 'docs/known-bugs.md'), 'utf8');
   assert.ok(OPEN.length > 0);
   for (const { file, call, bug } of OPEN) {
-    assert.match(
-      file,
-      /^packages\/(physics|physics2d|ragdoll|sciviz)\/src\/[\w/-]+\.ts$/,
-      'only physics and sciviz may stay open',
-    );
+    assert.match(file, /^packages\/(physics|physics2d|ragdoll|sciviz)\/src\/[\w/-]+\.ts$/, 'only physics and sciviz may stay open');
     assert.ok(call.includes('removePlugin('), file);
     const id = /"(plugin scene owner \((?:physics|sciviz)\))"/.exec(bug)?.[1];
     assert.ok(id && bugs.includes(`### ${id}`), `${file}: docs/known-bugs.md needs the "${id}" entry it cites`);
@@ -98,19 +88,7 @@ test('hygiene runs the check and every open site cites its known-bugs entry', ()
 // own scene. A site that goes back to the active-scene form fails the test above; this list keeps the count honest if
 // a file moves.
 const FIXED = {
-  clustered: [
-    'area-texture',
-    'area',
-    'contact',
-    'directional',
-    'ies',
-    'index',
-    'layers',
-    'projector',
-    'shadows',
-    'shapes',
-    'stochastic',
-  ],
+  clustered: ['area-texture', 'area', 'contact', 'directional', 'ies', 'index', 'layers', 'projector', 'shadows', 'shapes', 'stochastic'],
   lighting2d: ['cookie', 'emissive', 'gi', 'height', 'soft'],
   materials: ['stencil-buffer'],
   sky: ['night-backdrop'],
@@ -129,6 +107,6 @@ test('each site fixed with the check removes its plugin through the scene it joi
       const path = `packages/${pkg}/src/${file}.ts`;
       const source = readFileSync(resolve(root, path), 'utf8');
       assert.deepEqual(engineRemovals(source, path), [], path);
-      assert.match(source, /sceneOf(\?\.)?\(/, `${path} detaches through its scene`);
+      assert.match(source, /sceneOf(\?\.)?\(/,`${path} detaches through its scene`);
     }
 });

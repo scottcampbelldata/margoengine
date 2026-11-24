@@ -1,13 +1,13 @@
 {
  "proof": "water-ssr",
- "ref": "1de24300d9",
- "revision": "1de24300d9c630c9643933435196e5b27e20c1c7",
- "capturedAt": "1de24300d9c630c9643933435196e5b27e20c1c7",
+ "ref": "8e9572277b",
+ "revision": "8e9572277bfe9d56873913fe537fcbac38a05780",
+ "capturedAt": "0134fdb8ef4d65620c5e349f5314c026aee62b7b",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "{}": "9a99a12c0ff7749ee058ee3fea5482a4de7b8216aa93fa2b166c75cd2404adef",
-  "{\"terrain\":true}": "ba68ce1fda665f33ce0fb04a29d5b8ef5dfd26eb11a87ed0e70dbfd49d6b49fc",
-  "{\"reflection\":true,\"shadows\":true}": "3b68aa8082b2780ce8c4fecc0bfe6dedecd9fdc2f7dde2948f3b75a76968981f"
+  "{}": "889943347c81838eaccd7ca606ed333a183293ac236fb91e4ed8d4a80888c61d",
+  "{\"terrain\":true}": "2d59a724138638a4f370194149d7fd383653921f6f080bfe784898845b79f8d1",
+  "{\"reflection\":true,\"shadows\":true}": "1fac831c68959f43abf62562bb00e6e83c6c3ce894fd62772e49e522435e3b38"
  }
 }

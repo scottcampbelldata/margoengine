@@ -154,23 +154,3 @@ test('through the HTTP relay: a target and a viewer edit by token, a wrong token
   assert.match(errors[0]?.message ?? '', /Relay refused the stream \(401\)/);
   await assert.rejects(createRemoteRelay({ token: 'short' }), /16 or more characters/);
 });
-
-// KB-INSPECTOR-REMOTE-OWNER1: dispose() left the target registered in its scene (the owner/lifetime fixture found it).
-test('disposing a target takes it off the scene that holds it and leaves a same-name plugin in another scene', async (t) => {
-  const { dom, engine } = await scene();
-  t.after(() => {
-    engine.dispose();
-    dom.window.close();
-  });
-  const [phone, , close] = pair();
-  t.after(close);
-  const second = engine.createScene('remote-owner'),
-    target = RemoteTarget.attach(engine, { transport: phone, statsIntervalMs: 0 });
-  assert.equal(engine.sceneOf(target), engine.scene);
-  const neighbour = { name: target.name, setup() {}, dispose() {} };
-  second.use(neighbour);
-  target.dispose();
-  target.dispose();
-  assert.equal(engine.sceneOf(target), undefined, 'the disposed target is off its scene');
-  assert.equal(second.plugins.get(target.name), neighbour, 'the same-name plugin of another scene stays');
-});

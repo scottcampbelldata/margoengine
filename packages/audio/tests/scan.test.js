@@ -8,10 +8,7 @@ import { decodeWav, encodeWav } from '../dist/wav.js';
 
 const rate = 48000;
 const tone = (seconds, amplitude, hz = 220) =>
-  Float32Array.from(
-    { length: Math.round(seconds * rate) },
-    (_, i) => amplitude * Math.sin((2 * Math.PI * hz * i) / rate),
-  );
+  Float32Array.from({ length: Math.round(seconds * rate) }, (_, i) => amplitude * Math.sin((2 * Math.PI * hz * i) / rate));
 const join = (...parts) => {
   const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
   let at = 0;
@@ -72,12 +69,7 @@ test('findSilences finds the gap inside speech, with times to the window, its le
 test('findSilences looks only inside spans and never joins a silence across a span edge', () => {
   const signal = join(tone(1, 0.3), new Float32Array(rate * 4), tone(1, 0.3));
   assert.deepEqual(
-    findSilences(signal, rate, {
-      spans: [
-        [0, 3],
-        [3, 6],
-      ],
-    }).map((s) => [s.start, s.end]),
+    findSilences(signal, rate, { spans: [[0, 3], [3, 6]] }).map((s) => [s.start, s.end]),
     [
       [1, 3],
       [3, 5],

@@ -27,18 +27,10 @@ test('a basic scene fetches the routed @margoengine/gltf graph; gltf/pbr, animat
   assert.deepEqual(graph.gltf, ['gltf.js', 'shared.js', 'cycle.js', 'parse.js']);
   assert.deepEqual([...graph.deferredChunks].sort(), ['anim.js', 'pbr.js']);
   assert.deepEqual([...graph.deferredAssets].sort(), ['codec.wasm', 'codec.worker.js']);
-  assert.deepEqual([...graph.emittedFiles].sort(), [
-    'anim.js',
-    'app.js',
-    'codec.js',
-    'codec.wasm',
-    'codec.worker.js',
-    'cycle.js',
-    'gltf.js',
-    'parse.js',
-    'pbr.js',
-    'shared.js',
-  ]);
+  assert.deepEqual(
+    [...graph.emittedFiles].sort(),
+    ['anim.js', 'app.js', 'codec.js', 'codec.wasm', 'codec.worker.js', 'cycle.js', 'gltf.js', 'parse.js', 'pbr.js', 'shared.js'],
+  );
 });
 
 test('the network check passes only the exact basic requests and names a fetched gltf/pbr or animation loader', () => {
@@ -46,20 +38,9 @@ test('the network check passes only the exact basic requests and names a fetched
     expected = new Set(requests);
   checkFetched(requests, expected, graph);
   assert.throws(() => checkFetched([...requests, 'pbr.js'], expected, graph), /fetched a deferred glTF feature loader/);
-  assert.throws(
-    () => checkFetched([...requests, 'anim.js'], expected, graph),
-    /fetched a deferred glTF feature loader/,
-  );
+  assert.throws(() => checkFetched([...requests, 'anim.js'], expected, graph), /fetched a deferred glTF feature loader/);
   assert.throws(() => checkFetched([...requests, 'codec.js'], expected, graph), /exactly the HTML/);
-  assert.throws(
-    () =>
-      checkFetched(
-        requests.filter((p) => p !== 'gltf.js'),
-        expected,
-        graph,
-      ),
-    /exactly the HTML/,
-  );
+  assert.throws(() => checkFetched(requests.filter((p) => p !== 'gltf.js'), expected, graph), /exactly the HTML/);
   assert.throws(() => checkFetched([...requests, 'model.glb'], expected, graph), /each file once/);
 });
 

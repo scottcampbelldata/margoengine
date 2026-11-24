@@ -234,7 +234,8 @@ if (libraryFlyer) {
   const model = await loadGLTF(engine, `${LIBRARY}flyer-1903/flyer-1903${lod}.glb`);
   for (const m of casters) m.visible = false;
   casters.length = 0;
-  model.root.setParent(body);
+  // gltf/pbr types its nodes with the engine's internal Mesh; the page's meshes come from the public facade.
+  model.root.setParent(body as unknown as Parameters<typeof model.root.setParent>[0]);
   casters.push(model.root);
   scene.parts.occlusion?.add(model);
   const node = (name: string) => {

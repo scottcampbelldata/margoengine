@@ -85,21 +85,9 @@ test('writing a real file back changes nothing but what was edited', () => {
 // A plain GLB holding a humanoid hierarchy, with no VRM in it.
 function plainGLB() {
   const names = [
-      'hips',
-      'spine',
-      'head',
-      'leftUpperLeg',
-      'leftLowerLeg',
-      'leftFoot',
-      'rightUpperLeg',
-      'rightLowerLeg',
-      'rightFoot',
-      'leftUpperArm',
-      'leftLowerArm',
-      'leftHand',
-      'rightUpperArm',
-      'rightLowerArm',
-      'rightHand',
+      'hips', 'spine', 'head',
+      'leftUpperLeg', 'leftLowerLeg', 'leftFoot', 'rightUpperLeg', 'rightLowerLeg', 'rightFoot',
+      'leftUpperArm', 'leftLowerArm', 'leftHand', 'rightUpperArm', 'rightLowerArm', 'rightHand',
     ],
     at = Object.fromEntries(names.map((name, i) => [name, i])),
     nodes = names.map((name) => ({ name })),
@@ -156,65 +144,23 @@ test('what breaks the specification is named and refused', () => {
       return avatar;
     },
     issues = (edit) => checkVRM(make(edit), json(bytes)).join(' ');
+  assert.match(issues((a) => delete a.humanoid.humanBones.head), /head is required/);
+  assert.match(issues((a) => (a.meta.name = '')), /meta.name/);
+  assert.match(issues((a) => (a.meta.authors = [])), /author/);
+  assert.match(issues((a) => (a.humanoid.humanBones.head.node = 99)), /does not exist/);
+  assert.match(issues((a) => (a.humanoid.humanBones.head.node = a.humanoid.humanBones.spine.node)), /share node/);
   assert.match(
-    issues((a) => delete a.humanoid.humanBones.head),
-    /head is required/,
-  );
-  assert.match(
-    issues((a) => (a.meta.name = '')),
-    /meta.name/,
-  );
-  assert.match(
-    issues((a) => (a.meta.authors = [])),
-    /author/,
-  );
-  assert.match(
-    issues((a) => (a.humanoid.humanBones.head.node = 99)),
-    /does not exist/,
-  );
-  assert.match(
-    issues((a) => (a.humanoid.humanBones.head.node = a.humanoid.humanBones.spine.node)),
-    /share node/,
-  );
-  assert.match(
-    issues(
-      (a) =>
-        ([a.humanoid.humanBones.leftHand, a.humanoid.humanBones.leftFoot] = [
-          a.humanoid.humanBones.leftFoot,
-          a.humanoid.humanBones.leftHand,
-        ]),
-    ),
+    issues((a) => ([a.humanoid.humanBones.leftHand, a.humanoid.humanBones.leftFoot] = [a.humanoid.humanBones.leftFoot, a.humanoid.humanBones.leftHand])),
     /must descend/,
   );
-  assert.match(
-    issues((a) => (a.humanoid.humanBones.tail = { node: 1 })),
-    /not a humanoid bone/,
-  );
-  assert.match(
-    issues((a) => (a.lookAt = { type: 'eyes' })),
-    /lookAt.type/,
-  );
+  assert.match(issues((a) => (a.humanoid.humanBones.tail = { node: 1 })), /not a humanoid bone/);
+  assert.match(issues((a) => (a.lookAt = { type: 'eyes' })), /lookAt.type/);
   // Batch 132: range maps and the offset are checked against the lookAt schema.
-  assert.match(
-    issues((a) => (a.lookAt = { type: 'bone', rangeMapVerticalUp: { inputMaxValue: 200, outputScale: 10 } })),
-    /rangeMapVerticalUp.inputMaxValue/,
-  );
-  assert.match(
-    issues((a) => (a.lookAt = { type: 'bone', rangeMapHorizontalInner: { inputMaxValue: -1 } })),
-    /rangeMapHorizontalInner.inputMaxValue/,
-  );
-  assert.match(
-    issues((a) => (a.lookAt = { type: 'bone', rangeMapHorizontalOuter: { outputScale: 'ten' } })),
-    /outputScale/,
-  );
-  assert.match(
-    issues((a) => (a.lookAt = { type: 'bone', offsetFromHeadBone: [0, 0.06] })),
-    /offsetFromHeadBone/,
-  );
-  assert.equal(
-    issues((a) => (a.lookAt = { type: 'bone', rangeMapVerticalUp: { inputMaxValue: 90 } })),
-    '',
-  );
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', rangeMapVerticalUp: { inputMaxValue: 200, outputScale: 10 } })), /rangeMapVerticalUp.inputMaxValue/);
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', rangeMapHorizontalInner: { inputMaxValue: -1 } })), /rangeMapHorizontalInner.inputMaxValue/);
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', rangeMapHorizontalOuter: { outputScale: 'ten' } })), /outputScale/);
+  assert.match(issues((a) => (a.lookAt = { type: 'bone', offsetFromHeadBone: [0, 0.06] })), /offsetFromHeadBone/);
+  assert.equal(issues((a) => (a.lookAt = { type: 'bone', rangeMapVerticalUp: { inputMaxValue: 90 } })), '');
   assert.match(
     issues((a) => (a.expressions = { custom: { happy: {} } })),
     /preset's name/,
@@ -227,22 +173,8 @@ test('what breaks the specification is named and refused', () => {
     issues((a) => (a.expressions = { preset: { aa: { textureTransformBinds: [{ material: 3 }] } } })),
     /material 3/,
   );
-  assert.throws(
-    () =>
-      writeVRM(
-        bytes,
-        make((a) => delete a.humanoid.humanBones.hips),
-      ),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      writeVRM(
-        new Uint8Array(4),
-        make(() => {}),
-      ),
-    TypeError,
-  );
+  assert.throws(() => writeVRM(bytes, make((a) => delete a.humanoid.humanBones.hips)), RangeError);
+  assert.throws(() => writeVRM(new Uint8Array(4), make(() => {})), TypeError);
   assert.throws(() => readVRM(new Uint8Array(40)), TypeError);
   assert.throws(() => readVRM({ extensions: {} }), /no VRMC_vrm/);
   assert.throws(() => readVRM({ extensions: { VRM: {} } }), { code: 'unsupported' });
@@ -331,10 +263,7 @@ test('accumulation adds morphs, and colours and texture moves as differences fro
   assert.equal(out.transforms[0].parts[0].value, 1);
   assert.deepEqual(out.transforms[0].parts[0].scale, [1, 1]);
   // At rest every bind is still listed, so a morph goes back to 0.
-  assert.deepEqual(
-    new VRMExpressions(avatar).evaluate().morphs.map((m) => m.weight),
-    [0, 0],
-  );
+  assert.deepEqual(new VRMExpressions(avatar).evaluate().morphs.map((m) => m.weight), [0, 0]);
 });
 
 test('gaze: yaw and pitch in LookAt space, through the range maps', () => {
@@ -485,7 +414,7 @@ test('addVRM on the real pixiv sample: the eye bones follow the target by their 
     handle = addVRM(animation, avatar, { springs: false }),
     { head, leftEye } = avatar.humanoid.humanBones,
     eye = model.nodes[leftEye.node],
-    rest = [...(doc.nodes[leftEye.node].rotation ?? [0, 0, 0, 1])];
+    rest = [...doc.nodes[leftEye.node].rotation ?? [0, 0, 0, 1]];
   assert.equal(handle.springs, null);
   store.tick(false);
   const at = positionOf(model, head.node);

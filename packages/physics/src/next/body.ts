@@ -80,9 +80,7 @@ export class PhysicsBody {
   setType(type: BodyType, wakeUp = true): this {
     const kernel = this.world();
     if (typeof type !== 'string' || !['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
-      throw new TypeError(
-        `Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`,
-      );
+      throw new TypeError(`Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
     if (type === this.kind) return this;
     kernel.setKind(this.row, type, wakeUp !== false);
     this.kind = type;
@@ -126,12 +124,7 @@ export class PhysicsBody {
     checkVec(position, 'Position');
     const { targetRotationX, targetRotationY, targetRotationZ, targetRotationW } = this.columns,
       { row } = this;
-    this.world().setTarget(row, position, [
-      targetRotationX[row],
-      targetRotationY[row],
-      targetRotationZ[row],
-      targetRotationW[row],
-    ]);
+    this.world().setTarget(row, position, [targetRotationX[row], targetRotationY[row], targetRotationZ[row], targetRotationW[row]]);
     return this;
   }
   setNextRotation(rotation: Quat): this {
@@ -275,9 +268,7 @@ export class PhysicsBody {
   setAdditionalMass(mass: number, inertia: Vec3 = [0, 0, 0]): this {
     checkVec(inertia, 'Inertia');
     if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
-      throw new RangeError(
-        'Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².',
-      );
+      throw new RangeError('Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².');
     this.world().setOwnSolid(this.row, mass, this.centerOfMass, inertia);
     return this;
   }
@@ -310,8 +301,7 @@ export class PhysicsBody {
       { mass, centerOfMass, inertia, inertiaFrame } = properties,
       computed = this.mass,
       total = mass ?? computed;
-    if (!(total >= 0) || total === Infinity)
-      throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
+    if (!(total >= 0) || total === Infinity) throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
     if (centerOfMass) checkVec(centerOfMass, 'Centre of mass');
     if (inertia) {
       checkVec(inertia, 'Inertia');
@@ -344,9 +334,7 @@ export class PhysicsBody {
   }
   set additionalSolverIterations(passes: number) {
     if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
-      throw new RangeError(
-        'Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.',
-      );
+      throw new RangeError('Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.columns.extraPasses[this.row] = passes;
   }
   /**

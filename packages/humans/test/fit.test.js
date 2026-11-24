@@ -47,13 +47,7 @@ test('every outfit of the cast kit dresses the body with one call: layered, skin
       assert.equal(g.faces.length, g.indices.length / 3);
       assert.ok(g.positions.every(Number.isFinite), `${name} ${g.spec.name} positions are finite`);
       // Every normal is a unit vector: the waistcoat's neckline band once had zero normals, which glTF loaders reject.
-      for (let v = 0; v < n; v++)
-        near(
-          Math.hypot(g.normals[v * 3], g.normals[v * 3 + 1], g.normals[v * 3 + 2]),
-          1,
-          1e-4,
-          `${name} ${g.spec.name} normal ${v}`,
-        );
+      for (let v = 0; v < n; v++) near(Math.hypot(g.normals[v * 3], g.normals[v * 3 + 1], g.normals[v * 3 + 2]), 1, 1e-4, `${name} ${g.spec.name} normal ${v}`);
       for (let v = 0; v < n; v++) {
         let sum = 0;
         for (let i = 0; i < 4; i++) {
@@ -80,14 +74,8 @@ test('the clothes move with the skeleton: four poses, no garment over 5 mm into 
     const fit = F.fitOutfit(body, name);
     for (const [label, rotations] of Object.entries(posesFor(pose))) {
       const r = F.fitPenetration(body, fit, label === 'rest' ? undefined : poseSkin(body, rotations));
-      assert.ok(
-        r.body <= 0.005,
-        `${name} (${pose}) ${label}: ${(r.body * 1000).toFixed(2)} mm into the body (${r.worst.body})`,
-      );
-      assert.ok(
-        r.layers <= 0.0001,
-        `${name} (${pose}) ${label}: ${(r.layers * 1000).toFixed(2)} mm through a layer (${r.worst.layers})`,
-      );
+      assert.ok(r.body <= 0.005, `${name} (${pose}) ${label}: ${(r.body * 1000).toFixed(2)} mm into the body (${r.worst.body})`);
+      assert.ok(r.layers <= 0.0001, `${name} (${pose}) ${label}: ${(r.layers * 1000).toFixed(2)} mm through a layer (${r.worst.layers})`);
     }
   }
 });
@@ -124,23 +112,13 @@ test('skin weights come from the body under each ring: chest cloth follows the c
   const fit = F.fitOutfit(T, 'townsman-1910'),
     shirt = fit.garments.find((g) => g.spec.name === 'shirt'),
     boneAt = (g, test) => {
-      for (let v = 0; v < g.positions.length / 3; v++)
-        if (test(g.positions[v * 3], g.positions[v * 3 + 1], g.positions[v * 3 + 2])) return BONES[g.joints[v * 4]];
+      for (let v = 0; v < g.positions.length / 3; v++) if (test(g.positions[v * 3], g.positions[v * 3 + 1], g.positions[v * 3 + 2])) return BONES[g.joints[v * 4]];
       return undefined;
     };
-  assert.equal(
-    boneAt(shirt, (x, y, z) => Math.abs(x) < 0.01 && Math.abs(y - 1.25) < 0.02 && z > 0.1),
-    'chest',
-  );
-  assert.equal(
-    boneAt(shirt, (x, y) => x > 0.6 && Math.abs(y - 1.41) < 0.06),
-    'leftLowerArm',
-  );
+  assert.equal(boneAt(shirt, (x, y, z) => Math.abs(x) < 0.01 && Math.abs(y - 1.25) < 0.02 && z > 0.1), 'chest');
+  assert.equal(boneAt(shirt, (x, y) => x > 0.6 && Math.abs(y - 1.41) < 0.06), 'leftLowerArm');
   const trousers = fit.garments.find((g) => g.spec.name === 'trousers');
-  assert.equal(
-    boneAt(trousers, (x, y) => x < -0.05 && Math.abs(y - 0.3) < 0.02),
-    'rightLowerLeg',
-  );
+  assert.equal(boneAt(trousers, (x, y) => x < -0.05 && Math.abs(y - 0.3) < 0.02), 'rightLowerLeg');
   assert.ok(shirt.matched > 0.6, `most of the shirt is matched directly: ${shirt.matched}`);
 });
 
@@ -150,10 +128,7 @@ test('a body in centimetres facing -z is fitted the same, and the garments come 
     positions: T.positions.map((v, i) => (i % 3 === 1 ? v * 100 : -v * 100)),
     normals: T.normals.map((v, i) => (i % 3 === 1 ? v : -v)),
     indices: T.indices,
-    bones: T.bones.map((b) => ({
-      ...b,
-      bind: b.bind.map((v, i) => (i === 12 || i === 14 ? -v * 100 : i === 13 ? v * 100 : v)),
-    })),
+    bones: T.bones.map((b) => ({ ...b, bind: b.bind.map((v, i) => (i === 12 || i === 14 ? -v * 100 : i === 13 ? v * 100 : v)) })),
   };
   const a = F.fitOutfit(T, 'miner-1910'),
     b = F.fitOutfit(turned, 'miner-1910');
@@ -195,8 +170,7 @@ test('the slider rows share the settings shape and loosen or tighten the fit', (
   const reach = (fit) => {
     const coat = fit.garments.find((g) => g.spec.name === 'coat');
     let most = 0;
-    for (let v = 0; v < coat.positions.length / 3; v++)
-      if (Math.abs(coat.positions[v * 3 + 1] - 1.25) < 0.01) most = Math.max(most, coat.positions[v * 3 + 2]);
+    for (let v = 0; v < coat.positions.length / 3; v++) if (Math.abs(coat.positions[v * 3 + 1] - 1.25) < 0.01) most = Math.max(most, coat.positions[v * 3 + 2]);
     return most;
   };
   const tight = reach(F.fitOutfit(T, 'townsman-1910', F.applyFitSettings({ fit: 0.5 }))),
@@ -212,22 +186,13 @@ test('riggedBody joins a body split over several skins and finds an unweighted h
   const at = (i) => [T.bones[i].bind[12], T.bones[i].bind[13], T.bones[i].bind[14]],
     hips = BONES.indexOf('hips'),
     names = [...BONES, 'pelvisShare'],
-    parentName = (name) =>
-      name === 'pelvisShare'
-        ? 'hips'
-        : T.bones[BONES.indexOf(name)].parent < 0
-          ? undefined
-          : BONES[T.bones[BONES.indexOf(name)].parent],
+    parentName = (name) => (name === 'pelvisShare' ? 'hips' : T.bones[BONES.indexOf(name)].parent < 0 ? undefined : BONES[T.bones[BONES.indexOf(name)].parent]),
     position = (name) => (name === 'pelvisShare' ? at(hips) : at(BONES.indexOf(name))),
     nodes = names.map((name) => {
       const up = parentName(name),
         p = position(name),
         q = up ? position(up) : [0, 0, 0];
-      return {
-        name,
-        translation: [p[0] - q[0], p[1] - q[1], p[2] - q[2]],
-        children: names.filter((c) => parentName(c) === name).map((c) => names.indexOf(c)),
-      };
+      return { name, translation: [p[0] - q[0], p[1] - q[1], p[2] - q[2]], children: names.filter((c) => parentName(c) === name).map((c) => names.indexOf(c)) };
     }),
     // Both skins leave hips out; the second lists its joints in reverse.
     first = names.filter((name) => name !== 'hips').map((name) => names.indexOf(name)),
@@ -241,8 +206,7 @@ test('riggedBody joins a body split over several skins and finds an unweighted h
       return out;
     },
     // The body's own bone -> the skin's joint index (hips weights go to pelvisShare).
-    jointsFor = (joints) =>
-      Float32Array.from(T.joints, (bone) => joints.indexOf(names.indexOf(bone === hips ? 'pelvisShare' : BONES[bone]))),
+    jointsFor = (joints) => Float32Array.from(T.joints, (bone) => joints.indexOf(names.indexOf(bone === hips ? 'pelvisShare' : BONES[bone]))),
     n = T.positions.length / 3,
     vertices = new Float32Array(n * 20);
   for (let v = 0; v < n; v++) {
@@ -252,30 +216,16 @@ test('riggedBody joins a body split over several skins and finds an unweighted h
   const half = Math.floor(T.indices.length / 6) * 3,
     accessors = [ibm(first), jointsFor(first), Float32Array.from(T.weights), ibm(second), jointsFor(second)],
     doc = {
-      nodes: [
-        ...nodes,
-        { name: 'BodyA', mesh: 0, skin: 0 },
-        { name: 'BodyB', mesh: 1, skin: 1 },
-        { name: 'RootNode', children: [hips, names.length, names.length + 1] },
-      ],
+      nodes: [...nodes, { name: 'BodyA', mesh: 0, skin: 0 }, { name: 'BodyB', mesh: 1, skin: 1 }, { name: 'RootNode', children: [hips, names.length, names.length + 1] }],
       meshes: [{ name: 'a' }, { name: 'b' }],
       skins: [
         { joints: first, inverseBindMatrices: 0 },
         { joints: second, inverseBindMatrices: 3 },
       ],
     },
-    primitive = (node, indices, joints) => ({
-      material: { name: 'Std_Skin_Body' },
-      nodeIndex: node,
-      vertices,
-      indices,
-      definition: { attributes: { JOINTS_0: joints, WEIGHTS_0: 2 } },
-    }),
+    primitive = (node, indices, joints) => ({ material: { name: 'Std_Skin_Body' }, nodeIndex: node, vertices, indices, definition: { attributes: { JOINTS_0: joints, WEIGHTS_0: 2 } } }),
     model = {
-      primitives: [
-        primitive(names.length, T.indices.subarray(0, half), 1),
-        primitive(names.length + 1, T.indices.subarray(half), 4),
-      ],
+      primitives: [primitive(names.length, T.indices.subarray(0, half), 1), primitive(names.length + 1, T.indices.subarray(half), 4)],
       asset: { doc, accessor: (id) => accessors[id] },
     },
     body = F.riggedBody(model);
@@ -283,15 +233,8 @@ test('riggedBody joins a body split over several skins and finds an unweighted h
   assert.equal(body.indices.length, T.indices.length);
   const index = body.bones.findIndex((b) => b.name === 'hips');
   assert.ok(index >= 0, 'the unweighted hips is a bone');
-  assert.equal(
-    body.bones.some((b) => b.name === 'RootNode'),
-    false,
-    'nodes above the meshes are not bones',
-  );
-  assert.deepEqual(
-    [...body.bones[index].bind].slice(12, 15).map((c) => Math.round(c * 1e6) / 1e6),
-    at(hips).map((c) => Math.round(c * 1e6) / 1e6),
-  );
+  assert.equal(body.bones.some((b) => b.name === 'RootNode'), false, 'nodes above the meshes are not bones');
+  assert.deepEqual([...body.bones[index].bind].slice(12, 15).map((c) => Math.round(c * 1e6) / 1e6), at(hips).map((c) => Math.round(c * 1e6) / 1e6));
   assert.equal(body.bones[body.bones.findIndex((b) => b.name === 'pelvisShare')].parent, index);
   // Every vertex keeps its bone by name through either skin.
   for (let k = 0; k < n * 4; k += 7) {
@@ -303,10 +246,7 @@ test('riggedBody joins a body split over several skins and finds an unweighted h
 });
 
 test('bad bodies and options fail with coded messages', () => {
-  assert.throws(
-    () => F.fitOutfit({ ...T, bones: T.bones.map((b, i) => ({ ...b, name: `b${i}` })) }, 'miner-1910'),
-    /humanoid skeleton/,
-  );
+  assert.throws(() => F.fitOutfit({ ...T, bones: T.bones.map((b, i) => ({ ...b, name: `b${i}` })) }, 'miner-1910'), /humanoid skeleton/);
   assert.throws(() => F.fitOutfit(T, 'pirate-1700'), TypeError);
   assert.throws(() => F.fitOutfit(T, 'miner-1910', { ease: -1 }), RangeError);
   assert.throws(() => F.fitOutfit({ ...T, weights: T.weights.slice(4) }, 'miner-1910'), TypeError);
@@ -323,9 +263,7 @@ test('riggedBody reads a loaded model: the skin found by its material, or by its
       vertices.set(T.normals.subarray(v * 3, v * 3 + 3), v * 20 + 4);
     }
     const ibm = new Float32Array(T.bones.length * 16);
-    T.bones.forEach((b, i) =>
-      ibm.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -b.bind[12], -b.bind[13], -b.bind[14], 1], i * 16),
-    );
+    T.bones.forEach((b, i) => ibm.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -b.bind[12], -b.bind[13], -b.bind[14], 1], i * 16));
     const accessors = [ibm, Float32Array.from(T.joints), Float32Array.from(T.weights)],
       bones = T.bones.map((b) => ({ name: b.name })),
       doc = {
@@ -335,13 +273,7 @@ test('riggedBody reads a loaded model: the skin found by its material, or by its
       };
     return {
       primitives: [
-        {
-          material: material === undefined ? undefined : { name: material },
-          nodeIndex: bones.length,
-          vertices,
-          indices: T.indices,
-          definition: { attributes: { JOINTS_0: 1, WEIGHTS_0: 2 } },
-        },
+        { material: material === undefined ? undefined : { name: material }, nodeIndex: bones.length, vertices, indices: T.indices, definition: { attributes: { JOINTS_0: 1, WEIGHTS_0: 2 } } },
       ],
       asset: { doc, accessor: (id) => accessors[id] },
     };
@@ -380,16 +312,13 @@ function girthAt(g, y, part) {
     },
     h = [...chain(order), ...chain([...order].reverse())];
   let p = 0;
-  for (let i = 0; i < h.length; i++)
-    p += Math.hypot(xs[h[(i + 1) % h.length]] - xs[h[i]], zs[h[(i + 1) % h.length]] - zs[h[i]]);
+  for (let i = 0; i < h.length; i++) p += Math.hypot(xs[h[(i + 1) % h.length]] - xs[h[i]], zs[h[(i + 1) % h.length]] - zs[h[i]]);
   return p;
 }
 /** The highest vertex of a garment among those `keep` picks. */
 function highest(g, keep) {
   let y = -Infinity;
-  for (let v = 0; v < g.positions.length / 3; v++)
-    if (keep(g.positions[v * 3], g.positions[v * 3 + 1], g.positions[v * 3 + 2], v))
-      y = Math.max(y, g.positions[v * 3 + 1]);
+  for (let v = 0; v < g.positions.length / 3; v++) if (keep(g.positions[v * 3], g.positions[v * 3 + 1], g.positions[v * 3 + 2], v)) y = Math.max(y, g.positions[v * 3 + 1]);
   return y;
 }
 
@@ -411,9 +340,7 @@ test('the neck girth is the narrowest ring square to the neck between the clavic
 // slice there (no shoulder slope, collar, neck opening or lapels), hung as a wide tube, the shirt collar and the vest
 // were hidden, and the trousers hung straight down from the thigh at about twice a 1900s leg.
 const suit = F.fitOutfit(T, 'townsman-1910'),
-  [shirt, vest, coat, trousers] = ['shirt', 'vest', 'coat', 'trousers'].map((name) =>
-    suit.garments.find((g) => g.spec.name === name),
-  ),
+  [shirt, vest, coat, trousers] = ['shirt', 'vest', 'coat', 'trousers'].map((name) => suit.garments.find((g) => g.spec.name === name)),
   centre = (front) => (x, y, z) => Math.abs(x) < 0.012 && (front ? z > 0 : z < 0),
   neckBase = 1.47; // the test body's torso narrows into its neck there
 test('the townsman suit shows its collars and opens in a V with lapels, the high-cut vest above the break', () => {
@@ -465,10 +392,7 @@ test('the townsman wears a four-in-hand: the knot at the collar front, the blade
   // The blade reaches down under the vest to near the waist.
   assert.ok(low < fit.measures.waistHeight + 0.05, `blade end ${low} near the waist ${fit.measures.waistHeight}`);
   // Over the shirt and under the vest (the measure reads every tie vertex against both faces of each).
-  assert.ok(
-    shirtG && vest && tie.spec.layer > shirtG.spec.layer && tie.spec.layer < vest.spec.layer,
-    'the tie is a layer between the shirt and the vest',
-  );
+  assert.ok(shirtG && vest && tie.spec.layer > shirtG.spec.layer && tie.spec.layer < vest.spec.layer, 'the tie is a layer between the shirt and the vest');
   const rest = F.fitPenetration(T, fit);
   assert.ok(rest.layers < 1e-4, `nothing through anything at rest: ${JSON.stringify(rest.worst)} ${rest.layers}`);
 });
@@ -487,13 +411,7 @@ test('the rows folded onto a V neckline cut stay one point when the body moves',
       for (let i = 0; i < 4; i++) {
         const w = g.weights[v * 4 + i],
           m = g.joints[v * 4 + i] * 16;
-        for (let d = 0; d < 3; d++)
-          posed[v * 3 + d] +=
-            w *
-            (skin[m + d] * g.positions[v * 3] +
-              skin[m + 4 + d] * g.positions[v * 3 + 1] +
-              skin[m + 8 + d] * g.positions[v * 3 + 2] +
-              skin[m + 12 + d]);
+        for (let d = 0; d < 3; d++) posed[v * 3 + d] += w * (skin[m + d] * g.positions[v * 3] + skin[m + 4 + d] * g.positions[v * 3 + 1] + skin[m + 8 + d] * g.positions[v * 3 + 2] + skin[m + 12 + d]);
       }
       const key = [0, 1, 2].map((d) => g.positions[v * 3 + d].toFixed(6)).join();
       (groups.get(key) ?? groups.set(key, []).get(key)).push(v);
@@ -503,15 +421,7 @@ test('the rows folded onto a V neckline cut stay one point when the body moves',
     for (const list of groups.values()) {
       if (list.length < 3) continue;
       folded++;
-      for (const v of list)
-        apart = Math.max(
-          apart,
-          Math.hypot(
-            posed[v * 3] - posed[list[0] * 3],
-            posed[v * 3 + 1] - posed[list[0] * 3 + 1],
-            posed[v * 3 + 2] - posed[list[0] * 3 + 2],
-          ),
-        );
+      for (const v of list) apart = Math.max(apart, Math.hypot(posed[v * 3] - posed[list[0] * 3], posed[v * 3 + 1] - posed[list[0] * 3 + 1], posed[v * 3 + 2] - posed[list[0] * 3 + 2]));
     }
     assert.ok(folded > 10, `${name}: folded points ${folded}`);
     assert.ok(apart < 1e-5, `${name}: folded points part by ${apart} m in a turn and lean`);
@@ -543,9 +453,7 @@ test('the coat lapels roll: the folded edge stands off the forepart toward the g
     const r = Math.hypot(x, z),
       a = Math.atan2(z, x);
     let under = -Infinity;
-    for (const [px, py, pz] of outer)
-      if (Math.abs(py - y) < 0.012 && Math.abs(Math.atan2(pz, px) - a) < 0.1)
-        under = Math.max(under, Math.hypot(px, pz));
+    for (const [px, py, pz] of outer) if (Math.abs(py - y) < 0.012 && Math.abs(Math.atan2(pz, px) - a) < 0.1) under = Math.max(under, Math.hypot(px, pz));
     return r - under;
   };
   let top = 0,
@@ -572,8 +480,7 @@ test('the townsman coat slopes from the side of the neck down to the shoulder po
     bodyTop = (x) => highest({ positions: T.positions }, (px, py, pz) => at(x)(px, py, pz) && py < 1.5),
     [c08, c12, c16] = [0.08, 0.12, 0.16].map(coatTop);
   assert.ok(c08 > c12 && c12 > c16 && c08 - c16 > 0.02, `shoulder drop ${c08}, ${c12}, ${c16}`);
-  for (const x of [0.08, 0.12, 0.16])
-    assert.ok(coatTop(x) > bodyTop(x) + 0.005, `coat ${coatTop(x)} over body ${bodyTop(x)} at x ${x}`);
+  for (const x of [0.08, 0.12, 0.16]) assert.ok(coatTop(x) > bodyTop(x) + 0.005, `coat ${coatTop(x)} over body ${bodyTop(x)} at x ${x}`);
 });
 
 // Dressed Wilbur showed his skin at both shoulder points: the shoulder's cap weighs to the arm, so the yoke (the trunk's
@@ -589,15 +496,8 @@ function skinned(positions, normals, joints, weights, skin) {
         m = joints[v * 4 + i] * 16;
       if (!w) continue;
       for (let r = 0; r < 3; r++) {
-        p[v * 3 + r] +=
-          w *
-          (skin[m + r] * positions[v * 3] +
-            skin[m + 4 + r] * positions[v * 3 + 1] +
-            skin[m + 8 + r] * positions[v * 3 + 2] +
-            skin[m + 12 + r]);
-        q[v * 3 + r] +=
-          w *
-          (skin[m + r] * normals[v * 3] + skin[m + 4 + r] * normals[v * 3 + 1] + skin[m + 8 + r] * normals[v * 3 + 2]);
+        p[v * 3 + r] += w * (skin[m + r] * positions[v * 3] + skin[m + 4 + r] * positions[v * 3 + 1] + skin[m + 8 + r] * positions[v * 3 + 2] + skin[m + 12 + r]);
+        q[v * 3 + r] += w * (skin[m + r] * normals[v * 3] + skin[m + 4 + r] * normals[v * 3 + 1] + skin[m + 8 + r] * normals[v * 3 + 2]);
       }
     }
     const l = Math.hypot(q[v * 3], q[v * 3 + 1], q[v * 3 + 2]) || 1;
@@ -644,10 +544,7 @@ function bareShoulders(body, fit, skin) {
   return { checked, bare };
 }
 test('the townsman coat covers the shoulder points, from the yoke into the sleeves', () => {
-  for (const [pose, body, fit] of [
-    ['T', T, suit],
-    ['A', A, F.fitOutfit(A, 'townsman-1910')],
-  ]) {
+  for (const [pose, body, fit] of [['T', T, suit], ['A', A, F.fitOutfit(A, 'townsman-1910')]]) {
     const { checked, bare } = bareShoulders(body, fit);
     assert.ok(checked > 100, `${pose}: ${checked} shoulder vertices checked`);
     assert.deepEqual(bare, [], `${pose}: bare skin over the shoulders at ${bare.slice(0, 4).join('; ')}`);
@@ -660,16 +557,10 @@ test('the townsman coat covers the shoulder points, from the yoke into the sleev
 /** The outer faces of `g`'s sleeves (parts 2 and 3) as a mesh of their vertices: positions, normals and skin. */
 function sleevesOf(g) {
   const keep = new Uint8Array(g.positions.length / 3);
-  for (let t = 0; t < g.faces.length; t++)
-    if (g.faces[t] === F.FACE.outer) for (let c = 0; c < 3; c++) keep[g.indices[t * 3 + c]] = 1;
+  for (let t = 0; t < g.faces.length; t++) if (g.faces[t] === F.FACE.outer) for (let c = 0; c < 3; c++) keep[g.indices[t * 3 + c]] = 1;
   const vs = [...keep.keys()].filter((v) => keep[v] && (g.parts[v] === 2 || g.parts[v] === 3)),
     pick = (a, n) => Float32Array.from(vs.flatMap((v) => Array.from(a.subarray(v * n, v * n + n))));
-  return {
-    positions: pick(g.positions, 3),
-    normals: pick(g.normals, 3),
-    joints: Uint32Array.from(vs.flatMap((v) => Array.from(g.joints.subarray(v * 4, v * 4 + 4)))),
-    weights: pick(g.weights, 4),
-  };
+  return { positions: pick(g.positions, 3), normals: pick(g.normals, 3), joints: Uint32Array.from(vs.flatMap((v) => Array.from(g.joints.subarray(v * 4, v * 4 + 4)))), weights: pick(g.weights, 4) };
 }
 test('the coat sleeve covers the shirt sleeve at the shoulder seam: no shirt shows between yoke and sleeve', () => {
   for (const [pose, body, drop] of [
@@ -679,16 +570,10 @@ test('the coat sleeve covers the shirt sleeve at the shoulder seam: no shirt sho
     const fit = F.fitOutfit(body, 'townsman-1910'),
       shirt = sleevesOf(fit.garments.find((x) => x.spec.name === 'shirt'));
     for (const deg of [0, drop]) {
-      const skin = deg
-          ? poseSkin(body, { leftUpperArm: quat([0, 0, 1], -deg), rightUpperArm: quat([0, 0, 1], deg) })
-          : undefined,
+      const skin = deg ? poseSkin(body, { leftUpperArm: quat([0, 0, 1], -deg), rightUpperArm: quat([0, 0, 1], deg) }) : undefined,
         { checked, bare } = bareShoulders(shirt, fit, skin);
       assert.ok(checked > 50, `${pose} ${deg}: ${checked} shirt sleeve vertices checked`);
-      assert.deepEqual(
-        bare,
-        [],
-        `${pose} ${deg}: shirt showing at the shoulder seam at ${bare.slice(0, 4).join('; ')}`,
-      );
+      assert.deepEqual(bare, [], `${pose} ${deg}: shirt showing at the shoulder seam at ${bare.slice(0, 4).join('; ')}`);
     }
   }
 });
@@ -723,8 +608,7 @@ test('the townsman coat hangs plumb from the chest on a lean body: no column com
       g = fit.garments.find((x) => x.spec.name === 'coat'),
       P = g.positions,
       outer = new Uint8Array(P.length / 3);
-    for (let t = 0; t < g.faces.length; t++)
-      if (g.faces[t] === F.FACE.outer) for (let c = 0; c < 3; c++) outer[g.indices[t * 3 + c]] = 1;
+    for (let t = 0; t < g.faces.length; t++) if (g.faces[t] === F.FACE.outer) for (let c = 0; c < 3; c++) outer[g.indices[t * 3 + c]] = 1;
     let hem = Infinity;
     for (let v = 0; v < P.length / 3; v++) if (outer[v] && g.parts[v] === 0) hem = Math.min(hem, P[v * 3 + 1]);
     /** Half breadth, front and back of the coat's trunk within a centimetre of `y` (front and back on the centre line). */
@@ -762,8 +646,7 @@ function bellied(pose, by) {
     P = Float32Array.from(body.positions);
   for (let v = 0; v < P.length / 3; v++) {
     const y = P[v * 3 + 1];
-    if (y > 0.86 && y < 1.4 && Math.abs(P[v * 3]) < 0.19)
-      P[v * 3 + 2] += by * (Math.max(0, 1 - ((y - 1.13) / 0.08) ** 2) - Math.max(0, 1 - ((y - 0.98) / 0.07) ** 2));
+    if (y > 0.86 && y < 1.4 && Math.abs(P[v * 3]) < 0.19) P[v * 3 + 2] += by * (Math.max(0, 1 - ((y - 1.13) / 0.08) ** 2) - Math.max(0, 1 - ((y - 0.98) / 0.07) ** 2));
   }
   return { ...body, positions: P };
 }
@@ -787,11 +670,7 @@ function sliceOuter(g, y) {
 }
 /** The most forward z of a slice on the vertical line `x`. */
 const frontOf = (segs, x) =>
-  Math.max(
-    ...segs
-      .filter(([x0, , x1]) => (x0 - x) * (x1 - x) <= 0 && x0 !== x1)
-      .map(([x0, z0, x1, z1]) => z0 + ((z1 - z0) * (x - x0)) / (x1 - x0)),
-  );
+  Math.max(...segs.filter(([x0, , x1]) => (x0 - x) * (x1 - x) <= 0 && x0 !== x1).map(([x0, z0, x1, z1]) => z0 + ((z1 - z0) * (x - x0)) / (x1 - x0)));
 test('the townsman coat hangs plumb all round the front over a belly: no column comes back in below the waist', () => {
   for (const pose of ['T', 'A']) {
     const fit = F.fitOutfit(bellied(pose, 0.04), 'townsman-1910'),
@@ -804,10 +683,7 @@ test('the townsman coat hangs plumb all round the front over a belly: no column 
       const segs = sliceOuter(g, y);
       columns.forEach((x, i) => {
         const z = frontOf(segs, x);
-        assert.ok(
-          z >= most[i] - 0.001,
-          `${pose}: front ${z.toFixed(4)} at x ${x}, ${y.toFixed(3)} is back in from ${most[i].toFixed(4)} above`,
-        );
+        assert.ok(z >= most[i] - 0.001, `${pose}: front ${z.toFixed(4)} at x ${x}, ${y.toFixed(3)} is back in from ${most[i].toFixed(4)} above`);
         most[i] = Math.max(most[i], z);
       });
     }
@@ -833,29 +709,19 @@ test('the townsman coat hangs from the chest as worn with the arms down, not fro
       skin = poseSkin(body, { leftUpperArm: quat([0, 0, 1], -drop), rightUpperArm: quat([0, 0, 1], drop) }),
       bp = skinned(body.positions, body.normals, body.joints, body.weights, skin).positions,
       cp = skinned(coat.positions, coat.normals, coat.joints, coat.weights, skin).positions,
-      arm = new Set(
-        ['leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand'].map((b) =>
-          BONES.indexOf(b),
-        ),
-      ),
-      trunk = (v) =>
-        [0, 1, 2, 3].reduce((s, i) => s + (arm.has(body.joints[v * 4 + i]) ? body.weights[v * 4 + i] : 0), 0) < 0.5,
+      arm = new Set(['leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand'].map((b) => BONES.indexOf(b))),
+      trunk = (v) => [0, 1, 2, 3].reduce((s, i) => s + (arm.has(body.joints[v * 4 + i]) ? body.weights[v * 4 + i] : 0), 0) < 0.5,
       halfBreadth = (P, keep, y) => {
         let x = 0;
-        for (let v = 0; v < P.length / 3; v++)
-          if (keep(v) && Math.abs(P[v * 3 + 1] - y) < 0.01) x = Math.max(x, Math.abs(P[v * 3]));
+        for (let v = 0; v < P.length / 3; v++) if (keep(v) && Math.abs(P[v * 3 + 1] - y) < 0.01) x = Math.max(x, Math.abs(P[v * 3]));
         return x;
       },
       m = fit.measures;
     let chest = 0;
-    for (let y = m.waistHeight; y <= m.chestHeight + 0.04; y += 0.01)
-      chest = Math.max(chest, halfBreadth(bp, trunk, y));
+    for (let y = m.waistHeight; y <= m.chestHeight + 0.04; y += 0.01) chest = Math.max(chest, halfBreadth(bp, trunk, y));
     for (let y = m.waistHeight; y >= m.hipHeight; y -= 0.02) {
       const off = halfBreadth(cp, (v) => coat.parts[v] === 0, y) - chest;
-      assert.ok(
-        off <= stack + 0.004,
-        `${pose}: the coat stands ${off.toFixed(4)} m off the lowered chest at ${y.toFixed(2)} (layers ${stack.toFixed(4)})`,
-      );
+      assert.ok(off <= stack + 0.004, `${pose}: the coat stands ${off.toFixed(4)} m off the lowered chest at ${y.toFixed(2)} (layers ${stack.toFixed(4)})`);
     }
   }
 });
@@ -864,17 +730,11 @@ test('the townsman coat hangs from the chest as worn with the arms down, not fro
 /** The outer-face vertices of `g` on `part`: position, normal and uv (u round the ring, v along the tube). */
 function outerOf(g, part) {
   const keep = new Uint8Array(g.positions.length / 3);
-  for (let t = 0; t < g.faces.length; t++)
-    if (g.faces[t] === F.FACE.outer) for (let c = 0; c < 3; c++) keep[g.indices[t * 3 + c]] = 1;
+  for (let t = 0; t < g.faces.length; t++) if (g.faces[t] === F.FACE.outer) for (let c = 0; c < 3; c++) keep[g.indices[t * 3 + c]] = 1;
   const out = [];
   for (let v = 0; v < keep.length; v++)
     if (keep[v] && g.parts[v] === part)
-      out.push({
-        p: [0, 1, 2].map((i) => g.positions[v * 3 + i]),
-        n: [0, 1, 2].map((i) => g.normals[v * 3 + i]),
-        u: g.uvs[v * 2],
-        v: g.uvs[v * 2 + 1],
-      });
+      out.push({ p: [0, 1, 2].map((i) => g.positions[v * 3 + i]), n: [0, 1, 2].map((i) => g.normals[v * 3 + i]), u: g.uvs[v * 2], v: g.uvs[v * 2 + 1] });
   return out;
 }
 /** How often a sequence of turns changes sign (turns under `by` left out): 0 on a smooth convex surface. */
@@ -893,19 +753,13 @@ test('the outer garments drape in folds: flutes round the coat, creases behind t
   // Round the coat's ring nearest the seat a smooth convex shell's normal turns one way all round; flutes turn it back
   // and forth (the cloth goes concave between them).
   const coatPts = outerOf(coat, 0),
-    rowY = coatPts.reduce(
-      (best, q) => (Math.abs(q.p[1] - m.hipHeight) < Math.abs(best - m.hipHeight) ? q.p[1] : best),
-      Infinity,
-    ),
+    rowY = coatPts.reduce((best, q) => (Math.abs(q.p[1] - m.hipHeight) < Math.abs(best - m.hipHeight) ? q.p[1] : best), Infinity),
     ring = coatPts.filter((q) => Math.abs(q.p[1] - rowY) < 1e-5 && q.u < 1).sort((a, b) => a.u - b.u),
     turns = ring.map((q, i) => {
       const n = ring[(i + 1) % ring.length].n;
       return q.n[2] * n[0] - q.n[0] * n[2];
     });
-  assert.ok(
-    reversals(turns, 1e-3) >= 4,
-    `coat flutes round the seat: ${reversals(turns, 1e-3)} reversals over ${ring.length} vertices`,
-  );
+  assert.ok(reversals(turns, 1e-3) >= 4, `coat flutes round the seat: ${reversals(turns, 1e-3)} reversals over ${ring.length} vertices`);
   // Down the back (and the front) of the left trouser leg the normal tips up and down over each crease.
   const leg = outerOf(trousers, 6),
     column = (u, from, to) =>
@@ -963,20 +817,14 @@ test('the townsman wears a derby: its crown rounds over from about halfway up, 5
     const want = base + (top - base) * f;
     let y = Infinity,
       r = 0;
-    for (let v = 0; v < P.length / 3; v++)
-      if (P[v * 3 + 1] > base + 0.004 && Math.abs(P[v * 3 + 1] - want) < Math.abs(y - want)) y = P[v * 3 + 1];
-    for (let v = 0; v < P.length / 3; v++)
-      if (Math.abs(P[v * 3 + 1] - y) < 1e-4)
-        r = Math.max(r, Math.hypot(P[v * 3] - centre[0], P[v * 3 + 2] - centre[1]));
+    for (let v = 0; v < P.length / 3; v++) if (P[v * 3 + 1] > base + 0.004 && Math.abs(P[v * 3 + 1] - want) < Math.abs(y - want)) y = P[v * 3 + 1];
+    for (let v = 0; v < P.length / 3; v++) if (Math.abs(P[v * 3 + 1] - y) < 1e-4) r = Math.max(r, Math.hypot(P[v * 3] - centre[0], P[v * 3 + 2] - centre[1]));
     return r;
   };
   near(top - base, 5.25 * 0.0254, 0.008, 'crown height over the brim');
   const band = reach(0.2);
   assert.ok(reach(0.45) > 0.95 * band, `straight sides to about halfway: ${reach(0.45)} against the band's ${band}`);
-  assert.ok(
-    reach(0.85) < 0.8 * band && reach(0.85) > 0.4 * band,
-    `rounded over near the top: ${reach(0.85)} against the band's ${band}`,
-  );
+  assert.ok(reach(0.85) < 0.8 * band && reach(0.85) > 0.4 * band, `rounded over near the top: ${reach(0.85)} against the band's ${band}`);
   near(brim - band, 2 * 0.0254, 0.006, 'brim width');
 });
 test("the townsman's wool is a dark grey-brown cloth, not black", () => {

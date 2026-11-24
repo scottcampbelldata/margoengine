@@ -27,17 +27,14 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 if (library)
   // Matched on the path: a page URL whose query names an /asset-library/ model must still load the page itself.
-  await page.route(
-    (url) => url.pathname.startsWith('/asset-library/'),
-    async (route) => {
-      const path = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/asset-library\//, ''));
-      try {
-        await route.fulfill({ body: await readFile(join(library, path)) });
-      } catch {
-        await route.fulfill({ status: 404, body: '' });
-      }
-    },
-  );
+  await page.route((url) => url.pathname.startsWith('/asset-library/'), async (route) => {
+    const path = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/asset-library\//, ''));
+    try {
+      await route.fulfill({ body: await readFile(join(library, path)) });
+    } catch {
+      await route.fulfill({ status: 404, body: '' });
+    }
+  });
 await page.setViewportSize({ width: Math.max(w, 1440), height: Math.max(h, 1100) });
 if (out) await mkdir(out, { recursive: true });
 console.log('device', context.hardware?.compat ? 'webgl2-compat layer' : 'webgpu');
@@ -67,14 +64,7 @@ try {
     const { r, png, img } = await still(view);
     if (out) await writeFile(join(out, `${view}.png`), png);
     const { mean, sd } = spread(img);
-    console.log(
-      view,
-      `built in ${Math.round(r.built)} ms`,
-      `${r.lots} lots`,
-      'fire',
-      JSON.stringify(r.fire),
-      `mean ${mean.toFixed(1)} sd ${sd.toFixed(1)}`,
-    );
+    console.log(view, `built in ${Math.round(r.built)} ms`, `${r.lots} lots`, 'fire', JSON.stringify(r.fire), `mean ${mean.toFixed(1)} sd ${sd.toFixed(1)}`);
     assert.ok(mean > 15 && mean < 245, `${view}: not blank (mean ${mean.toFixed(1)})`);
     assert.ok(sd > 8, `${view}: the picture has structure, not one flat colour (sd ${sd.toFixed(1)})`);
     assert.ok(r.lots > 0, 'the town lots are laid out');
@@ -87,8 +77,7 @@ try {
   assert.equal(none.r.fire, null);
   let changed = 0;
   for (let i = 0; i < burning.data.length; i += 4)
-    if (Math.abs(burning.data[i] - none.img.data[i]) + Math.abs(burning.data[i + 2] - none.img.data[i + 2]) > 30)
-      changed++;
+    if (Math.abs(burning.data[i] - none.img.data[i]) + Math.abs(burning.data[i + 2] - none.img.data[i + 2]) > 30) changed++;
   console.log('fire changes', ((400 * changed) / burning.data.length).toFixed(1), 'percent of the fire-line view');
   assert.ok(changed / (burning.data.length / 4) > 0.02, `the fire shows: ${changed} pixels`);
   // The mesh registry draws a .gltf model by key on the GPU.

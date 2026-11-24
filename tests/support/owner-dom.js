@@ -7,9 +7,7 @@ export async function fixtureDocument() {
     document.body.append(root);
     return { root, view: window, done: () => root.remove() };
   }
-  const name = 'jsdom',
-    { JSDOM } = await import(name);
-  const dom = new JSDOM('<main></main>', { pretendToBeVisual: true }),
-    view = dom.window;
+  const name = 'jsdom', { JSDOM } = await import(name);
+  const dom = new JSDOM('<main></main>', { pretendToBeVisual: true }), view = dom.window;
   return { root: view.document.querySelector('main'), view, done: () => view.close() };
 }

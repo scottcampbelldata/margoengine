@@ -17,11 +17,7 @@ test('SplatSequence checks its cloud, frames and rate', () => {
   assert.throws(() => new SplatSequence(cloud, []), RangeError, 'one frame or more');
   assert.throws(() => new SplatSequence(cloud, [frame(3)]), RangeError, 'frames of the cloud size');
   assert.throws(() => new SplatSequence(cloud, [frame(2)], { fps: 0 }), RangeError);
-  assert.throws(
-    () => new SplatSequence(cloud, [{ ...frame(2), colors: new Float32Array(8).fill(2) }]),
-    RangeError,
-    'a valid frame',
-  );
+  assert.throws(() => new SplatSequence(cloud, [{ ...frame(2), colors: new Float32Array(8).fill(2) }]), RangeError, 'a valid frame');
   assert.throws(() => new SplatSequence(cloud, [frame(2)]).setup({}), { code: 'unsupported' });
 });
 
@@ -48,18 +44,10 @@ test('SplatSkin checks joints, indices and weights', () => {
   assert.throws(() => new SplatSkin({}, ok), TypeError);
   assert.throws(() => new SplatSkin(cloud, { ...ok, joints: 0 }), RangeError);
   assert.throws(() => new SplatSkin(cloud, { ...ok, indices: [0, 0, 0, 0] }), RangeError, '4 per splat');
-  assert.throws(
-    () => new SplatSkin(cloud, { ...ok, indices: [0, 2, 0, 0, 0, 0, 0, 0] }),
-    RangeError,
-    'an index past the joints',
-  );
+  assert.throws(() => new SplatSkin(cloud, { ...ok, indices: [0, 2, 0, 0, 0, 0, 0, 0] }), RangeError, 'an index past the joints');
   assert.throws(() => new SplatSkin(cloud, { ...ok, weights: [1, -1, 0, 0, 0, 0, 0, 0] }), RangeError);
   const skin = new SplatSkin(cloud, ok);
-  assert.deepEqual(
-    [...skin.matrices.subarray(16, 32)],
-    [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    'identity joints',
-  );
+  assert.deepEqual([...skin.matrices.subarray(16, 32)], [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 'identity joints');
   assert.equal(skin.rebind(), skin);
   assert.throws(() => skin.setup({}), { code: 'unsupported' });
 });

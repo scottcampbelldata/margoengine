@@ -159,8 +159,7 @@ const smoothstep = (a: number, b: number, x: number) => {
   const t = clamp01((x - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
-const inRange = (v: unknown, lo: number, hi: number) =>
-  typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+const inRange = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 /** The numbers the storm's formulas use, resolved from the options with their defaults (shared with the GPU uniform). */
 export interface ResolvedHurricane {
   cx: number;
@@ -205,8 +204,7 @@ export interface ResolvedHurricane {
  * @throws TypeError for a bad pair; RangeError for a value outside its range (each named in the message).
  */
 export function resolveHurricane(o: HurricaneOptions = {}): ResolvedHurricane {
-  if (typeof o !== 'object' || o === null)
-    throw new TypeError('Hurricane options must be an object; pass {} for the defaults.');
+  if (typeof o !== 'object' || o === null) throw new TypeError('Hurricane options must be an object; pass {} for the defaults.');
   const pair = (v: readonly [number, number] | undefined, name: string, limit: number): readonly [number, number] => {
     if (v === undefined) return [0, 0];
     if (!Array.isArray(v) || v.length !== 2 || !inRange(v[0], -limit, limit) || !inRange(v[1], -limit, limit))
@@ -222,8 +220,7 @@ export function resolveHurricane(o: HurricaneOptions = {}): ResolvedHurricane {
     velocity = pair(o.velocity, 'velocity', 50),
     rmax = num(o.maxWindRadius, 'maxWindRadius', 5000, 200000, 30000),
     latitude = num(o.latitude, 'latitude', -60, 60, 20);
-  if (Math.abs(latitude) < 1)
-    throw new RangeError('Invalid Hurricane latitude; pass 1 to 60 north or -1 to -60 south.');
+  if (Math.abs(latitude) < 1) throw new RangeError('Invalid Hurricane latitude; pass 1 to 60 north or -1 to -60 south.');
   const bands = num(o.bands, 'bands', 0, 8, 3);
   if (!Number.isInteger(bands)) throw new RangeError('Invalid Hurricane bands; pass a whole number from 0 to 8.');
   const outer = num(o.outerEyewall, 'outerEyewall', 0, 400000, 0);
@@ -307,16 +304,12 @@ export function hurricaneCover(
     top = (t: number) => 1 - smoothstep(t - 0.1, t, h);
   out.eye = s.eyeCloud * (1 - smoothstep(edge - 0.1 * w, edge, r)) * (1 - smoothstep(800, 2000, height));
   out.eyewall = smoothstep(edge - 0.1 * w, edge + 0.1 * w, r) * (1 - smoothstep(edge + 0.5 * w, edge + 1.1 * w, r));
-  out.outerEyewall =
-    s.outer > 0 ? s.outerStrength * Math.exp(-(((r - s.outer - lean) / (0.45 * w)) ** 2)) * top(0.85) : 0;
-  out.moat =
-    s.moat * smoothstep(edge, edge + 0.5 * w, r) * (1 - smoothstep(0.9 * s.bandStart, s.bandStart, r)) * top(0.25);
+  out.outerEyewall = s.outer > 0 ? s.outerStrength * Math.exp(-(((r - s.outer - lean) / (0.45 * w)) ** 2)) * top(0.85) : 0;
+  out.moat = s.moat * smoothstep(edge, edge + 0.5 * w, r) * (1 - smoothstep(0.9 * s.bandStart, s.bandStart, r)) * top(0.25);
   out.band = 0;
   if (s.bands > 0 && r > 0) {
     const k = Math.tan(s.pitch),
-      phase =
-        (s.bands * (s.spin * theta + Math.log(r / s.bandStart) / k + s.bandRotation + s.bandDrift * time)) /
-        (2 * Math.PI),
+      phase = (s.bands * (s.spin * theta + Math.log(r / s.bandStart) / k + s.bandRotation + s.bandDrift * time)) / (2 * Math.PI),
       index = (((Math.floor(phase + 0.5) % s.bands) + s.bands) % s.bands) | 0,
       u = Math.abs(phase + 0.5 - Math.floor(phase + 0.5) - 0.5),
       across = r * (Math.exp((2 * Math.PI * k) / s.bands) - 1) * Math.cos(s.pitch),
@@ -336,10 +329,7 @@ export function hurricaneCover(
     (1 - smoothstep(0.7 * s.extent, s.extent, r)) *
     top(0.35);
   out.canopy =
-    s.canopy *
-    smoothstep(edge, edge + 0.3 * w, r) *
-    (1 - smoothstep(0.55 * s.extent, 0.85 * s.extent, r)) *
-    smoothstep(0.78, 0.86, h);
+    s.canopy * smoothstep(edge, edge + 0.3 * w, r) * (1 - smoothstep(0.55 * s.extent, 0.85 * s.extent, r)) * smoothstep(0.78, 0.86, h);
   out.cover = Math.max(out.eye, out.eyewall, out.outerEyewall, out.moat, out.band, out.shield, out.canopy);
   return out;
 }
@@ -376,8 +366,7 @@ export class Hurricane {
     const s = this.resolved,
       [r, theta, dx, dz] = this.polar(x, z, t, s),
       parts = hurricaneCover(s, r, theta, 0, 0, t),
-      outer =
-        s.outer > 0 ? s.outerStrength * hollandMaxWind(s) * Math.exp(-(((r - s.outer) / (0.6 * s.wall)) ** 2)) : 0,
+      outer = s.outer > 0 ? s.outerStrength * hollandMaxWind(s) * Math.exp(-(((r - s.outer) / (0.6 * s.wall)) ** 2)) : 0,
       speed = s.surface * Math.max(hollandWind(r, s), outer),
       convective = Math.max(parts.eyewall, parts.outerEyewall, parts.band),
       gust = speed * (1 + (s.gust - 1) * (1 + 0.5 * convective));
@@ -405,13 +394,7 @@ export class Hurricane {
     return s.rainMax * profile * Math.max(p.eyewall, p.outerEyewall, 0.9 * p.band, 0.2 * p.shield, 0.05 * p.moat);
   }
   /** The cover parts at world `(x, z)`, `height` metres above the cloud base of a layer `depth` metres deep (the hurricane type's 14,500 by default). */
-  coverAt(
-    x: number,
-    z: number,
-    height = 0,
-    t = 0,
-    depth = HURRICANE_LAYER.top - HURRICANE_LAYER.bottom,
-  ): HurricaneCover {
+  coverAt(x: number, z: number, height = 0, t = 0, depth = HURRICANE_LAYER.top - HURRICANE_LAYER.bottom): HurricaneCover {
     const s = this.resolved,
       [r, theta] = this.polar(x, z, t, s);
     return hurricaneCover(s, r, theta, height, clamp01(height / depth), t);
@@ -445,10 +428,7 @@ export class Hurricane {
       rate = this.rainAt(x, z, t),
       eye = 1 - smoothstep(s.eye - 0.1 * s.wall, s.eye + 0.1 * s.wall, r),
       convective = Math.max(base.eyewall, base.outerEyewall, base.band),
-      cloud = Math.max(
-        base.cover,
-        s.canopy * smoothstep(s.eye, s.eye + s.wall, r) * (1 - smoothstep(0.55 * s.extent, 0.85 * s.extent, r)),
-      );
+      cloud = Math.max(base.cover, s.canopy * smoothstep(s.eye, s.eye + s.wall, r) * (1 - smoothstep(0.55 * s.extent, 0.85 * s.extent, r)));
     return {
       weight: 1 - smoothstep(0.8 * s.extent, s.extent, r),
       wind: Math.min(60, wind.speed),

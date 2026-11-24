@@ -22,14 +22,8 @@ function halfBall(r, start) {
       v,
     );
   assert.deepEqual(s.frame.z, [0, 0, 1], 'the sphere poles lie on z');
-  shell
-    .add(new Face('dome', s, true))
-    .loop()
-    .use(rim, true);
-  shell
-    .add(new Face('disc', { kind: 'plane', frame: frameOf([0, 0, 0], [-1, 0, 0], [0, 1, 0]) }, true))
-    .loop()
-    .use(rim, false);
+  shell.add(new Face('dome', s, true)).loop().use(rim, true);
+  shell.add(new Face('disc', { kind: 'plane', frame: frameOf([0, 0, 0], [-1, 0, 0], [0, 1, 0]) }, true)).loop().use(rim, false);
   return body;
 }
 
@@ -93,14 +87,8 @@ function splineBar(r, h) {
   const f = shell.add(new Face('side', side, false));
   f.loop().use(bottom, true);
   f.loop().use(top, false);
-  shell
-    .add(new Face('base', { kind: 'plane', frame: frameOf([0, 0, 0], [0, 0, -1], [1, 0, 0]) }, true))
-    .loop()
-    .use(bottom, false);
-  shell
-    .add(new Face('lid', { kind: 'plane', frame: frameOf([0, 0, h], [0, 0, 1], [1, 0, 0]) }, true))
-    .loop()
-    .use(top, true);
+  shell.add(new Face('base', { kind: 'plane', frame: frameOf([0, 0, 0], [0, 0, -1], [1, 0, 0]) }, true)).loop().use(bottom, false);
+  shell.add(new Face('lid', { kind: 'plane', frame: frameOf([0, 0, h], [0, 0, 1], [1, 0, 0]) }, true)).loop().use(top, true);
   return body;
 }
 

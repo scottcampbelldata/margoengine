@@ -17,21 +17,11 @@ try {
     const { box, Engine, PbrMaterial } = await import('/packages/core/dist/index.js');
     const canvas = document.body.appendChild(document.createElement('canvas'));
     canvas.style.cssText = 'display:block;width:64px;height:64px';
-    const engine = await Engine.create(canvas, {
-        backend: 'webgpu',
-        camera: { position: [0, 0, 3], target: [0, 0, 0] },
-      }),
+    const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0] } }),
       errors = [];
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
-    const first = engine
-      .createMesh()
-      .setGeometry(box())
-      .setMaterial(new PbrMaterial({ color: '#ff2000' }));
-    engine
-      .createMesh()
-      .setGeometry(box(0.2, 0.2, 0.2))
-      .setPosition([0.9, 0, 0.6])
-      .setMaterial(new PbrMaterial({ color: '#2060ff' }));
+    const first = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#ff2000' }));
+    engine.createMesh().setGeometry(box(0.2, 0.2, 0.2)).setPosition([0.9, 0, 0.6]).setMaterial(new PbrMaterial({ color: '#2060ff' }));
     engine.render({ delta: 0 });
     const names = (m) => (m === null ? null : m === first ? 'first' : 'second');
     const out = {

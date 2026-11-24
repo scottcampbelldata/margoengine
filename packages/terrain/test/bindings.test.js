@@ -17,7 +17,8 @@ function rig(virtual) {
     createBuffer = gpu.device.createBuffer.bind(gpu.device);
   // Ground change reads the heightmap back once; the recorder has no mapping, so the read stays pending.
   gpu.device.createBuffer = (d) => Object.assign(createBuffer(d), { mapAsync: () => new Promise(() => {}) });
-  const engine = {
+  const
+    engine = {
       gpu: gpu.device,
       lighting: { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) },
       stats: { drawCalls: 0 },
@@ -44,10 +45,7 @@ function rig(virtual) {
     entries.push(rvt);
   } else {
     const materials = new TerrainMaterials(terrain, {
-        textures: (device) => ({
-          normals: texture(device, 'rgba8unorm', layers),
-          surface: texture(device, 'rgba8unorm', layers),
-        }),
+        textures: (device) => ({ normals: texture(device, 'rgba8unorm', layers), surface: texture(device, 'rgba8unorm', layers) }),
       }),
       displacement = new TerrainDisplacement(terrain, materials, {});
     materials.setup(engine);
@@ -75,19 +73,7 @@ for (const virtual of [false, true])
       declared = [...code.matchAll(/@group\(1\) @binding\((\d+)\)/g)].map((m) => Number(m[1])),
       bound = [...terrain.lighting].flatMap((effect) => effect.bindings().map((entry) => entry.binding));
     assert.ok(declared.length >= (virtual ? 14 : 16), `declared: ${declared}`);
-    assert.deepEqual(
-      declared.filter((b, i) => declared.indexOf(b) !== i),
-      [],
-      `shader declares a binding twice: ${declared}`,
-    );
-    assert.deepEqual(
-      bound.filter((b, i) => bound.indexOf(b) !== i),
-      [],
-      `entries bind a slot twice: ${bound}`,
-    );
-    assert.deepEqual(
-      [...bound].sort((a, b) => a - b),
-      [...declared].sort((a, b) => a - b),
-      'every binding is declared and bound',
-    );
+    assert.deepEqual(declared.filter((b, i) => declared.indexOf(b) !== i), [], `shader declares a binding twice: ${declared}`);
+    assert.deepEqual(bound.filter((b, i) => bound.indexOf(b) !== i), [], `entries bind a slot twice: ${bound}`);
+    assert.deepEqual([...bound].sort((a, b) => a - b), [...declared].sort((a, b) => a - b), 'every binding is declared and bound');
   });

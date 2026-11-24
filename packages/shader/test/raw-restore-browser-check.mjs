@@ -21,10 +21,7 @@ const centre = async () => {
   return [...png.data.slice(o, o + 3)];
 };
 const is = (actual, expected, label) =>
-  assert.ok(
-    actual.every((v, i) => Math.abs(v - expected[i]) <= 2),
-    `${label}: [${actual}] vs [${expected}]`,
-  );
+  assert.ok(actual.every((v, i) => Math.abs(v - expected[i]) <= 2), `${label}: [${actual}] vs [${expected}]`);
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -32,11 +29,7 @@ try {
   await step('frames');
   await step('build');
   is(await centre(), [255, 255, 0], 'a texture given at construction plus the green buffer');
-  assert.deepEqual(
-    await page.evaluate(() => window.check.errors()),
-    [],
-    'a texture given at construction binds (KB-COMPAT-RAWFIRST1)',
-  );
+  assert.deepEqual(await page.evaluate(() => window.check.errors()), [], 'a texture given at construction binds (KB-COMPAT-RAWFIRST1)');
   await step('plain');
   is(await centre(), [255, 255, 0], 'the red texture plus the green buffer');
   assert.ok(await step('restore'), 'the engine restored a new device');

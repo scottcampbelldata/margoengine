@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { openBrowser } from './browser.js';
 import { OWNER_FIXTURES, selectOwnerPackages } from './support/owner-lifetime-registry.mjs';
 import { showHelp } from './support/help.mjs';
@@ -31,18 +30,7 @@ if (
   const own =
     selected.length === 1 && OWNER_FIXTURES[selected[0]].replace(/owner-lifetime\.fixture\.js$/, 'owner-lifetime.html');
   const startPath = own && existsSync(own) ? `/${own}` : '/tests/modern-game.html';
-  // A fixture whose programs take minutes to compile on the Direct3D 11 route of the WebGL2 layer (the voxel-pathtracer trace
-  // kernel, 100 to 270 s each, past this leaf's 180 s) names the ANGLE backend its compatibility leaf launches on, as
-  // compose-browser.mjs does on Windows: `export const compatAngle = 'vulkan'`. Native WebGPU runs are not affected.
-  const angle =
-    process.env.MARGO_COMPAT && selected.length === 1
-      ? (await import(pathToFileURL(resolve(OWNER_FIXTURES[selected[0]])).href)).compatAngle
-      : undefined;
-  const browser = await openBrowser({
-    startPath,
-    port: 'free',
-    ...(angle && process.platform === 'win32' ? { args: [`--use-angle=${angle}`] } : {}),
-  });
+  const browser = await openBrowser({ startPath, port: 'free' });
   const errors = [],
     receipt = { results: [], failures: [], errors };
   browser.page.on('pageerror', (e) => errors.push(e.message));

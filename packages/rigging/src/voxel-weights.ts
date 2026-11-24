@@ -8,19 +8,7 @@
 import { boneSegments, checkRig, resolveJoints, segmentDistance2, type RigJoint } from './rig.js';
 import { weld, type WeightMesh, type Welded } from './mesh.js';
 import { WeightMap } from './weight-map.js';
-import {
-  fill,
-  Heap,
-  INSIDE_VOTES,
-  makeGrid,
-  markTriangles,
-  NEIGHBOURS,
-  OUTSIDE,
-  SHELL,
-  SOLID,
-  votes,
-  type Grid,
-} from './voxels.js';
+import { fill, Heap, INSIDE_VOTES, makeGrid, markTriangles, NEIGHBOURS, OUTSIDE, SHELL, SOLID, votes, type Grid } from './voxels.js';
 
 /** Options for {@link voxelWeights}. */
 export interface VoxelWeightsOptions {
@@ -168,8 +156,7 @@ export async function voxelWeights(
     throw new RangeError('Voxel closing must be an integer from 0 to 8');
   signal?.throwIfAborted();
   const skipped = new Set(resolveJoints(joints, skip, 'Voxel weights skip'));
-  if (skipped.size === joints.length)
-    throw new RangeError('Voxel weights skip every joint; leave at least one to move');
+  if (skipped.size === joints.length) throw new RangeError('Voxel weights skip every joint; leave at least one to move');
   const welded = weld(mesh, options.weld),
     grid = makeGrid(welded, joints, resolution),
     { nx, ny, nz, cell, origin, state } = grid;

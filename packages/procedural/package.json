@@ -122,10 +122,6 @@
       "types": "./dist/marching-cubes.d.ts",
       "import": "./dist/marching-cubes.js"
     },
-    "./coral": {
-      "types": "./dist/coral.d.ts",
-      "import": "./dist/coral.js"
-    },
     "./conifer-species": {
       "types": "./dist/conifer-species.d.ts",
       "import": "./dist/conifer-species.js"
@@ -133,10 +129,6 @@
     "./conifers": {
       "types": "./dist/conifers.d.ts",
       "import": "./dist/conifers.js"
-    },
-    "./fir-sprays": {
-      "types": "./dist/fir-sprays.d.ts",
-      "import": "./dist/fir-sprays.js"
     },
     "./conifer-settings": {
       "types": "./dist/conifer-settings.d.ts",

@@ -200,9 +200,7 @@ type Primitive = PBRModel['primitives'][number];
  */
 export async function personEye(model: PBRModel, p: Primitive): Promise<EyeOptions> {
   if (!model || !Array.isArray(model.primitives) || !model.primitives.includes(p))
-    throw new TypeError(
-      'personEye needs a loaded model and one of its primitives: personEye(model, model.primitives[k])',
-    );
+    throw new TypeError('personEye needs a loaded model and one of its primitives: personEye(model, model.primitives[k])');
   const cc = ((p.material as { name?: string }).name ?? '').startsWith('Std_Eye_');
   const v = p.vertices,
     count = v.length / 20,
@@ -292,12 +290,7 @@ function lidFromHead(
       base = positions.length / 3;
     for (let k = 0; k < v.length; k += 20) {
       const [x, y, z] = [v[k], v[k + 1], v[k + 2]];
-      if (m)
-        positions.push(
-          m[0] * x + m[4] * y + m[8] * z + m[12],
-          m[1] * x + m[5] * y + m[9] * z + m[13],
-          m[2] * x + m[6] * y + m[10] * z + m[14],
-        );
+      if (m) positions.push(m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]);
       else positions.push(x, y, z);
     }
     for (let k = 0; k < head.indices.length; k++) indices.push(head.indices[k] + base);
@@ -369,18 +362,14 @@ const receiver = (value: unknown, what: string): PersonReceiver | undefined => {
  */
 export async function addPerson(engine: Engine, model: PBRModel, options: PersonOptions = {}): Promise<Person> {
   if (!model || !Array.isArray(model.primitives) || !Array.isArray(model.nodes) || model.root?.engine !== engine)
-    throw new TypeError(
-      'addPerson needs a loaded gltf/pbr model of this engine: addPerson(engine, await loadGLTF(engine, url))',
-    );
+    throw new TypeError('addPerson needs a loaded gltf/pbr model of this engine: addPerson(engine, await loadGLTF(engine, url))');
   const fade = options.fade ?? 0.3;
-  if (!(fade >= 0 && fade < Infinity))
-    throw new RangeError('addPerson fade must be a finite number of seconds, 0 or more');
+  if (!(fade >= 0 && fade < Infinity)) throw new RangeError('addPerson fade must be a finite number of seconds, 0 or more');
   if (options.skinning !== undefined && options.skinning !== 'dual-quaternion' && options.skinning !== 'linear')
     throw new TypeError("addPerson skinning must be 'dual-quaternion' or 'linear'");
   const shadows =
     options.shadows === undefined
-      ? (options.scene?.parts.shadows ??
-        (engine.sceneOf(model as never)?.plugins.get('shadows') as PersonReceiver | undefined))
+      ? (options.scene?.parts.shadows ?? (engine.sceneOf(model as never)?.plugins.get('shadows') as PersonReceiver | undefined))
       : receiver(options.shadows, 'shadows');
   const occlusion =
     options.occlusion === undefined ? options.scene?.parts.occlusion : receiver(options.occlusion, 'occlusion');
@@ -438,14 +427,9 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
   const animation = new Animation(model, options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }),
     clips = animation.clips.map((c) => c.name);
   if (options.clip !== undefined && !clips.includes(options.clip))
-    throw new RangeError(
-      `addPerson clip "${options.clip}" is not in the model; it has ${clips.join(', ') || 'no clips'}`,
-    );
+    throw new RangeError(`addPerson clip "${options.clip}" is not in the model; it has ${clips.join(', ') || 'no clips'}`);
   const animator = clips.length
-    ? new Animator(animation, {
-        initial: options.clip ?? clips[0],
-        states: Object.fromEntries(clips.map((c) => [c, c])),
-      })
+    ? new Animator(animation, { initial: options.clip ?? clips[0], states: Object.fromEntries(clips.map((c) => [c, c])) })
     : undefined;
 
   const cleanups: Array<() => void> = [];
@@ -526,8 +510,7 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
       return animator ? animator.time : animation.time;
     },
     set time(value: number) {
-      if (!(value >= 0 && value < Infinity))
-        throw new RangeError('Person time must be a finite number of seconds, 0 or more');
+      if (!(value >= 0 && value < Infinity)) throw new RangeError('Person time must be a finite number of seconds, 0 or more');
       if (animator) animator.time = value;
       else animation.seek(value);
       if (hands) hands.time = value;

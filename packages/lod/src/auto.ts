@@ -623,14 +623,7 @@ async function riggedLevel(
       () =>
         new Model(
           model.root.engine,
-          new GLTFAsset(
-            levelled.doc,
-            [...asset.buffers, bytes],
-            undefined,
-            asset.hooks,
-            asset.maxBytes,
-            asset.maxNodes,
-          ),
+          new GLTFAsset(levelled.doc, [...asset.buffers, bytes], undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
           levelled.images,
         ),
     );
@@ -811,10 +804,7 @@ async function autoModelLOD(
       if (map)
         for (const level of levels) {
           const order = level.sources ?? Uint32Array.from({ length: level.vertices.length / 20 }, (_, i) => i);
-          levelSources.set(
-            level,
-            order.map((i) => map[i]),
-          );
+          levelSources.set(level, order.map((i) => map[i]));
         }
       simplified.set(p.definition, levels);
     }

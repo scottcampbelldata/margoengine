@@ -16,18 +16,15 @@ export function declareCoreRequirement(code, version, filename = 'package.js') {
   assert.equal(parsed.errors.length, 0, `Cannot declare core requirement in ${filename}`);
   // Classic workers are Script programs, not module attachment boundaries. An ESM import would break them.
   if (parsed.program.sourceType === 'script') return code;
-  const edits = [],
-    wrappers = [];
+  const edits = [], wrappers = [];
   const used = new Set();
   const fresh = (prefix) => {
-    let name = prefix,
-      serial = 0;
+    let name = prefix, serial = 0;
     while (code.includes(name) || used.has(name)) name = prefix + ++serial;
     used.add(name);
     return name;
   };
-  const core = fresh('__margoCoreRequirement'),
-    check = fresh('__margoAssertCore');
+  const core = fresh('__margoCoreRequirement'), check = fresh('__margoAssertCore');
   for (const node of parsed.program.body) {
     if (node.type !== 'ImportDeclaration' || node.source.value !== '@margoengine/core/extension') continue;
     for (const specifier of node.specifiers) {
@@ -35,9 +32,7 @@ export function declareCoreRequirement(code, version, filename = 'package.js') {
       const imported = fresh('__margoRuntime');
       edits.push({ at: specifier.start, end: specifier.end, text: `engineRuntime as ${imported}` });
       // Preserve the original lexical binding. Local shadows, aliases and callbacks need no call-site rewriting.
-      wrappers.push(
-        `const ${specifier.local.name}=(engine,version=${JSON.stringify(version)},source=import.meta.url)=>${imported}(engine,version,source);`,
-      );
+      wrappers.push(`const ${specifier.local.name}=(engine,version=${JSON.stringify(version)},source=import.meta.url)=>${imported}(engine,version,source);`);
     }
   }
   const requirement = `${core}(${JSON.stringify(version)},import.meta.url)`;
@@ -45,19 +40,14 @@ export function declareCoreRequirement(code, version, filename = 'package.js') {
   function walk(node) {
     if (!node || typeof node !== 'object') return;
     if (['ClassDeclaration', 'ClassExpression'].includes(node.type)) {
-      if (
-        node.body.body.some((member) => method(member) && !member.static && key(member) === 'setup') &&
-        !node.body.body.some((member) => key(member) === 'coreRequirement')
-      ) {
+      if (node.body.body.some((member) => method(member) && !member.static && key(member) === 'setup') &&
+          !node.body.body.some((member) => key(member) === 'coreRequirement')) {
         insert(node.body.start + 1, `coreRequirement=${requirement};`);
       }
     }
     if (node.type === 'ObjectExpression') {
-      if (
-        node.properties.some((member) => key(member) === 'setup') &&
-        node.properties.some((member) => key(member) === 'name') &&
-        !node.properties.some((member) => key(member) === 'coreRequirement')
-      ) {
+      if (node.properties.some((member) => key(member) === 'setup') && node.properties.some((member) => key(member) === 'name') &&
+          !node.properties.some((member) => key(member) === 'coreRequirement')) {
         insert(node.start + 1, `coreRequirement:/*@__PURE__*/${requirement},`);
       }
     }

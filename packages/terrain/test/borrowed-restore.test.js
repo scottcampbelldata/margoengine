@@ -49,7 +49,6 @@ test('a device restore calls the textures factory again with the new device and 
   assert.equal(terrain.holes.device, e.gpu);
   assert.ok(terrain.weights.every((texture) => texture.device === e.gpu));
   assert.notEqual(terrain.heightmap, first.heightmap);
-  for (const texture of [first.heightmap, ...first.weights, first.holes])
-    assert.ok(texture.destroyed, 'old texture freed');
+  for (const texture of [first.heightmap, ...first.weights, first.holes]) assert.ok(texture.destroyed, 'old texture freed');
   terrain.dispose();
 });

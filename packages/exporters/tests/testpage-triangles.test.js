@@ -11,30 +11,15 @@ test('test-page 42: every reported exporter rejects incomplete indexed triangles
         const indices = ArrayType.from({ length: count }, (_, i) => i % 3);
         const geometry = { positions, normals, indices };
         const before = structuredClone(geometry);
-        for (const scale of [
-          [1, 1, 1],
-          [-1, 1, 1],
-        ]) {
-          assert.throws(
-            () => write({ nodes: [{ geometry, scale }] }),
-            (error) => error instanceof RangeError && /complete triangles/.test(error.message),
-          );
+        for (const scale of [[1, 1, 1], [-1, 1, 1]]) {
+          assert.throws(() => write({ nodes: [{ geometry, scale }] }),
+            error => error instanceof RangeError && /complete triangles/.test(error.message));
           assert.deepEqual(geometry, before);
         }
       }
     }
-    assert.doesNotThrow(() =>
-      write({
-        nodes: [
-          {
-            geometry: {
-              positions,
-              normals,
-              indices: new Uint32Array([0, 1, 2]),
-            },
-          },
-        ],
-      }),
-    );
+    assert.doesNotThrow(() => write({ nodes: [{ geometry: {
+      positions, normals, indices: new Uint32Array([0, 1, 2]),
+    } }] }));
   }
 });

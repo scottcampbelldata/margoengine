@@ -18,20 +18,7 @@ function rle(bytes) {
   return out;
 }
 
-function pcx({
-  width,
-  height,
-  bits,
-  planes,
-  lineBytes,
-  data,
-  version = 5,
-  encoding = 1,
-  header = [],
-  palette,
-  x0 = 0,
-  y0 = 0,
-}) {
+function pcx({ width, height, bits, planes, lineBytes, data, version = 5, encoding = 1, header = [], palette, x0 = 0, y0 = 0 }) {
   const head = new Uint8Array(128),
     view = new DataView(head.buffer);
   head.set([10, version, encoding, bits]);
@@ -48,9 +35,7 @@ const PALETTE = Array.from({ length: 768 }, (_, i) => (i * 5) & 255);
 const rgb = (index) => [PALETTE[index * 3], PALETTE[index * 3 + 1], PALETTE[index * 3 + 2], 255];
 
 test('an 8-bit image reads through the palette after the image, as Quake skins do', () => {
-  const image = parsePCX(
-    pcx({ width: 3, height: 2, bits: 8, planes: 1, lineBytes: 4, data: [1, 2, 200, 0, 7, 7, 7, 0], palette: PALETTE }),
-  );
+  const image = parsePCX(pcx({ width: 3, height: 2, bits: 8, planes: 1, lineBytes: 4, data: [1, 2, 200, 0, 7, 7, 7, 0], palette: PALETTE }));
   assert.deepEqual([image.width, image.height], [3, 2]);
   assert.deepEqual([...image.data], [1, 2, 200, 7, 7, 7].flatMap(rgb), 'the padding byte of each line is dropped');
 });
@@ -61,13 +46,9 @@ test('an 8-bit image without a palette reads as grey, and a window off zero keep
 });
 
 test('RGB and RGBA hold each plane in turn on every line', () => {
-  const three = parsePCX(
-    pcx({ width: 2, height: 2, bits: 8, planes: 3, lineBytes: 2, data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }),
-  );
+  const three = parsePCX(pcx({ width: 2, height: 2, bits: 8, planes: 3, lineBytes: 2, data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }));
   assert.deepEqual([...three.data], [1, 3, 5, 255, 2, 4, 6, 255, 7, 9, 11, 255, 8, 10, 12, 255]);
-  const four = parsePCX(
-    pcx({ width: 2, height: 1, bits: 8, planes: 4, lineBytes: 2, data: [1, 2, 3, 4, 5, 6, 128, 0] }),
-  );
+  const four = parsePCX(pcx({ width: 2, height: 1, bits: 8, planes: 4, lineBytes: 2, data: [1, 2, 3, 4, 5, 6, 128, 0] }));
   assert.deepEqual([...four.data], [1, 3, 5, 128, 2, 4, 6, 0]);
 });
 
@@ -75,20 +56,10 @@ const HEADER = Array.from({ length: 48 }, (_, i) => i + 1);
 const header = (index) => [HEADER[index * 3], HEADER[index * 3 + 1], HEADER[index * 3 + 2], 255];
 
 test('16-colour images pack two pixels a byte, or one bit in each of four planes', () => {
-  const packed = parsePCX(
-    pcx({ width: 3, height: 1, bits: 4, planes: 1, lineBytes: 2, data: [0x1f, 0x20], header: HEADER }),
-  );
+  const packed = parsePCX(pcx({ width: 3, height: 1, bits: 4, planes: 1, lineBytes: 2, data: [0x1f, 0x20], header: HEADER }));
   assert.deepEqual([...packed.data], [1, 15, 2].flatMap(header));
   const planar = parsePCX(
-    pcx({
-      width: 2,
-      height: 1,
-      bits: 1,
-      planes: 4,
-      lineBytes: 1,
-      data: [0b10000000, 0b01000000, 0b10000000, 0b11000000],
-      header: HEADER,
-    }),
+    pcx({ width: 2, height: 1, bits: 1, planes: 4, lineBytes: 1, data: [0b10000000, 0b01000000, 0b10000000, 0b11000000], header: HEADER }),
   );
   assert.deepEqual([...planar.data], [0b1101, 0b1010].flatMap(header));
 });
@@ -105,10 +76,7 @@ test('a version 3 file means the standard EGA colours, and a 1-bit image is blac
     ].flat(),
   );
   const mono = parsePCX(pcx({ width: 9, height: 1, bits: 1, planes: 1, lineBytes: 2, data: [0b10100000, 0b10000000] }));
-  assert.deepEqual(
-    [...mono.data].filter((_, i) => i % 4 === 0),
-    [255, 0, 255, 0, 0, 0, 0, 0, 255],
-  );
+  assert.deepEqual([...mono.data].filter((_, i) => i % 4 === 0), [255, 0, 255, 0, 0, 0, 0, 0, 255]);
 });
 
 test('a run crosses scanlines, and an uncompressed file reads as it stands', () => {

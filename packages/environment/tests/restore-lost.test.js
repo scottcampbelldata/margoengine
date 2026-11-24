@@ -83,11 +83,7 @@ test('a device lost during an environment rebuild is not reported; the next rest
     await new Promise((resolve) => setTimeout(resolve, 5));
     assert.equal(pending, true);
     second.lose();
-    await assert.rejects(rebuilding, {
-      name: 'MargoError',
-      code: 'failed',
-      message: /device was lost.*errors#gpu-lost/,
-    });
+    await assert.rejects(rebuilding, { name: 'MargoError', code: 'failed', message: /device was lost.*errors#gpu-lost/ });
     await new Promise((resolve) => setTimeout(resolve, 5));
     assert.deepEqual(errors, [], 'the lost rebuild reached engine.onError');
     assert.equal(environment.device, null, 'nothing of the lost device is kept');

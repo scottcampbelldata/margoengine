@@ -87,12 +87,7 @@ export function modelPipeline(
     vertex: {
       module,
       entryPoint: 'vertex',
-      buffers: surface
-        ? surface.buffers(
-            [{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }],
-            'model',
-          )
-        : [{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }],
+      buffers: surface ? surface.buffers([{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }], 'model') : [{ arrayStride: 80, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }],
     },
     fragment: { module, entryPoint: 'fragment', targets: [{ format }, ...(surface?.targets ?? [])] },
     primitive: { topology: 'triangle-list', cullMode: 'none' },

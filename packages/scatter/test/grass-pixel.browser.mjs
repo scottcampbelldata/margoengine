@@ -67,8 +67,7 @@ await runSuite(
       await writeFile(`test-results/grass-pixel-${lit ? 'pbr' : 'diffuse'}.png`, small.png);
       const big = await make(1920, 1080, lit);
       const down = new Float64Array(480 * 270);
-      for (let r = 0; r < 1080; r++)
-        for (let x = 0; x < 1920; x++) down[(r >> 2) * 480 + (x >> 2)] += big.y[r * 1920 + x] / 16;
+      for (let r = 0; r < 1080; r++) for (let x = 0; x < 1920; x++) down[(r >> 2) * 480 + (x >> 2)] += big.y[r * 1920 + x] / 16;
       const row = {
         speckle: +speckle(small.image, small.y).toFixed(1),
         mean: +mean(small.y).toFixed(2),

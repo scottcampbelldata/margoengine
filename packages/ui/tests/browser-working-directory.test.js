@@ -18,15 +18,11 @@ for (const name of readdirSync(directory).filter((name) => name.endsWith('-brows
       try { await import(${JSON.stringify(driver)}); }
       catch (error) { if (error.message !== 'ui-browser-root-probe') throw error; }
     `;
-    const child = spawnSync(
-      process.execPath,
-      ['--experimental-test-module-mocks', '--input-type=module', '--eval', probe],
-      {
-        cwd: fileURLToPath(new URL('../', import.meta.url)),
-        encoding: 'utf8',
-        timeout: 15000,
-      },
-    );
+    const child = spawnSync(process.execPath, ['--experimental-test-module-mocks', '--input-type=module', '--eval', probe], {
+      cwd: fileURLToPath(new URL('../', import.meta.url)),
+      encoding: 'utf8',
+      timeout: 15000,
+    });
     assert.equal(child.status, 0, child.stderr);
     const repository = fileURLToPath(new URL('../../..', import.meta.url));
     assert.equal(realpathSync(JSON.parse(child.stdout.trim())).toLowerCase(), realpathSync(repository).toLowerCase());

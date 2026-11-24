@@ -79,10 +79,7 @@ export class WideAngleCubeMap {
   /** Half extent of the output plane, across and up. */
   readonly halfWidth: number;
   readonly halfHeight: number;
-  constructor(
-    aspect: number,
-    { mode = 'equidistant', fov = 180, distance = 1, circle = true }: WideAngleCubeMapOptions = {},
-  ) {
+  constructor(aspect: number, { mode = 'equidistant', fov = 180, distance = 1, circle = true }: WideAngleCubeMapOptions = {}) {
     if (!(mode in MODES))
       throw new RangeError(
         "Invalid wide angle mode; use 'panini', 'equidistant', 'equisolid', 'stereographic' or 'orthographic'",

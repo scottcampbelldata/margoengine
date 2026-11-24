@@ -7,9 +7,7 @@ import type { PhysicsBody } from './body.js';
 /** A cell coordinate, checked: a whole number in 32 bits. */
 function cell(value: number): number {
   if (!Number.isInteger(value) || value < -(2 ** 31) || value >= 2 ** 31)
-    throw new RangeError(
-      `A voxel cell coordinate is a whole number in 32 bits (got ${value}); pass cell numbers, not metres.`,
-    );
+    throw new RangeError(`A voxel cell coordinate is a whole number in 32 bits (got ${value}); pass cell numbers, not metres.`);
   return value;
 }
 
@@ -50,8 +48,7 @@ export class PhysicsCollider {
       a = this.handle;
     if (this.shape === 'box') return Math.hypot(colliderA[a], colliderB[a], colliderC[a]);
     if (this.shape === 'capsule') return colliderA[a] + colliderB[a];
-    if (this.shape === 'cylinder' || this.shape === 'cone')
-      return Math.hypot(colliderA[a], colliderB[a]) + colliderC[a];
+    if (this.shape === 'cylinder' || this.shape === 'cone') return Math.hypot(colliderA[a], colliderB[a]) + colliderC[a];
     return this.shape === 'sphere' ? colliderA[a] : null;
   }
   isSensor(): boolean {
@@ -138,9 +135,7 @@ export class PhysicsCollider {
    */
   setRestitution(restitution: number): this {
     if (!(restitution >= 0 && restitution <= 1))
-      throw new RangeError(
-        `Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`,
-      );
+      throw new RangeError(`Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`);
     this.columns().colliderRestitution[this.handle] = restitution;
     this.wake();
     return this;

@@ -369,6 +369,55 @@ Mastin's rate for that height), with the looks `weather`, `plinian`, `weakPlume`
 2016's test eruptions), `collapsing` and `slowMotion`. `mastinRate(height)`, `mastinHeight(rate)`,
 `standardAtmosphere(z)` (ICAO) and `ashFallSpeed(d, rho, air)` are exported too.
 
+## Explosion clouds (instantaneous releases)
+
+`BlastCloud` from `margoengine/weather/eruption` is the mushroom cloud of one or more instantaneous releases (an
+ammunition dump, a quarry blast, a buried charge) over film time. Each source is a buoyant thermal (Morton, Taylor and
+Turner 1956): the heat it puts into the air makes a cloud that rises, spreads as b = alpha z (Scorer 1957, alpha 0.25),
+carries the ambient air it pushes aside (Escudier and Maxworthy 1973) and slows in the stable standard atmosphere until
+it stops at a height that scales as B^(1/4) N^(-1/2). Its cap is a dark vortex ring (Turner 1957) over a stem of
+thrown earth and a base surge, with a fire at its base for `fireDuration` seconds. `draw(clouds, fire)` lays every
+source's caps in one cloud and stems in another of a `Clouds` from `margoengine/vfx/clouds`, so the caps shadow each
+other; attach the fire's `Clouds` (`shading: 'unlit'`) first so the smoke draws over it. `thermals(t)` gives each cap's
+centre, radius, speed and buoyancy. `seek` to any time gives the same cloud however it got there.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Clouds } from 'margoengine/vfx/clouds';
+import { BlastCloud } from 'margoengine/weather/eruption';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [-2500, 40, -900], target: [0, 700, 0], near: 5, far: 200000 },
+});
+engine.scene.background = '#c9cbcc';
+// Two releases 2 s apart, about 1,600 and 500 tonnes of TNT, thrown up at 45 and 35 m/s.
+const blast = new BlastCloud({
+  sources: [
+    { at: 0, tnt: 1.6e6, speed: 45 },
+    { at: 2, tnt: 5e5, position: [70, 0, 15], speed: 35 },
+  ],
+  wind: 4,
+  windDirection: 60,
+});
+const fire = Clouds.attach(engine, { limit: 400, shading: 'unlit' });
+const smoke = Clouds.attach(engine, { limit: 2000, lightDirection: [-0.3, 1, -0.2], ambient: 0.6, density: 1.4 });
+engine.onFrame((_, delta) => {
+  blast.update(delta);
+  blast.draw(smoke, fire);
+});
+blast.seek(30);
+const [first] = blast.thermals();
+console.log(first.height, first.radius); // about 700 m up, 300 m across the cap
+```
+
+Options (every one optional): `sources` (1 to 8 of `{ at, position, tnt, radius, speed }`; `radius` defaults to
+tnt^(1/3) m, `speed` to 0), `altitude` (0), `heatShare` (0.4 of the charge's energy heats the air), `entrainment`
+(0.25), `addedMass` (0.5), `airTemperature` (288.15 K), `tropopause` (11,000 m), `stability` (null follows the ICAO
+atmosphere; a value holds N^2), `wind` (0 m/s at 10 m) and `windDirection` (0 degrees, toward +Z), `horizon` (900 s
+solved), `fireDuration` (4 s), `color` (near-black smoke), `stemColor` (dark brown earth), `fireColor` and `seed`.
+`draw`'s third argument sets the puff counts (`cap` 220, `stem` 160, `fire` 60 per source). `airStability(z)` and
+`thermalTop(B, N2)` are exported too.
+
 ## Lava flows, fountains and bombs
 
 `LavaFlow` from `margoengine/weather/lava` is lava from one vent over film time. The flow runs down your ground by the

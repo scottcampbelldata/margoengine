@@ -28,14 +28,8 @@ const bonds = (m) =>
   Array.from({ length: m.bonds.length / 2 }, (_, i) => `${m.bonds[i * 2]}:${m.bonds[i * 2 + 1]}`).sort();
 
 test('real CC0 1CRN PDB and mmCIF have all 327 identical atoms, 337 bonds and 46 residue ids', () => {
-  const source = JSON.parse(readFileSync(new URL('source.json', fixture)));
-  for (const [path, info] of Object.entries(source.files))
-    assert.equal(
-      createHash('sha256')
-        .update(readFileSync(new URL(path, fixture)))
-        .digest('hex'),
-      info.sha256,
-    );
+  const source=JSON.parse(readFileSync(new URL('source.json',fixture)));
+  for(const [path,info] of Object.entries(source.files))assert.equal(createHash('sha256').update(readFileSync(new URL(path,fixture))).digest('hex'),info.sha256);
   const a = parsePDB(readFileSync(new URL('1crn.pdb', fixture))),
     b = parseMMCIF(readFileSync(new URL('1crn.cif', fixture)));
   assert.equal(a.atoms.length, 327);
@@ -52,7 +46,7 @@ test('real CC0 1CRN PDB and mmCIF have all 327 identical atoms, 337 bonds and 46
   assert.deepEqual(b.warnings, []);
 });
 test('CIF quotes, comments, semicolon fields, author ids, insertion codes, alternate locations and models', () => {
-  const prefix = 'data_test\n_struct.title\n;A multiline\ncrystal title\n;\n# comment\n'.replace(/\n/g, '\r\n');
+  const prefix = 'data_test\n_struct.title\n;A multiline\ncrystal title\n;\n# comment\n'.replace(/\n/g,'\r\n');
   const m = parseMMCIF(
     make(
       [
@@ -79,10 +73,8 @@ test('CIF quotes, comments, semicolon fields, author ids, insertion codes, alter
     make(['ATOM 1 C C ALA A 1 0 0 0 1 A ? . 1']) + make(['ATOM 2 O O HOH B 1 9 0 0 1 B ? . 1'], 'data_other\n');
   assert.equal(parseMMCIF(blocks).atoms[0].element, 'C');
   assert.equal(parseMMCIF(blocks, { block: 'OTHER' }).atoms[0].element, 'O');
-  const literal = parseMMCIF(make(["ATOM 1 C C ALA A 1 0 0 0 '.' '?' ? . 1"], "data_literal\n_struct.title '?'\n"));
-  assert.equal(literal.title, '?');
-  assert.equal(literal.atoms[0].residueId, '.');
-  assert.equal(literal.atoms[0].chain, '?');
+  const literal=parseMMCIF(make(["ATOM 1 C C ALA A 1 0 0 0 '.' '?' ? . 1"],"data_literal\n_struct.title '?'\n"));
+  assert.equal(literal.title,'?');assert.equal(literal.atoms[0].residueId,'.');assert.equal(literal.atoms[0].chain,'?');
 });
 test('explicit identity struct_conn bonds survive disabled inference, symmetry mates do not join the asymmetric unit', () => {
   let text = make(['ATOM 1 S SG CYS A 1 0 0 0 1 A ? . 1', 'ATOM 2 S SG CYS A 2 20 0 0 2 A ? . 1']);

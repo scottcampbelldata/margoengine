@@ -66,10 +66,7 @@ await postBrowser(
             format: 'rgba16float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
           }),
-          read = device.createBuffer({
-            size: size * size * 8,
-            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-          });
+          read = device.createBuffer({ size: size * size * 8, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
         device.queue.writeTexture({ texture: input }, data, { bytesPerRow: size * 8 }, [size, size]);
         const bloom = new Bloom({ threshold: 1, strength: 0.8 }),
           encoder = device.createCommandEncoder();

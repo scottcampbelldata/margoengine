@@ -14,14 +14,12 @@ const here = dirname(fileURLToPath(import.meta.url)),
   encode = (text) => new TextEncoder().encode(text),
   image = encode('stands in for an image, which is only decoded in a browser');
 /** Reads a real file's folder. Images are not stored here, so `images` says whether they count as present. */
-const reader =
-  (folder, images = true, extra = {}) =>
-  (id) => {
-    if (extra[id] !== undefined) return encode(extra[id]);
-    if (/\.(png|jpe?g|exr)$/i.test(id)) return images ? image : undefined;
-    const at = resolve(folder, id);
-    return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
-  };
+const reader = (folder, images = true, extra = {}) => (id) => {
+  if (extra[id] !== undefined) return encode(extra[id]);
+  if (/\.(png|jpe?g|exr)$/i.test(id)) return images ? image : undefined;
+  const at = resolve(folder, id);
+  return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
+};
 const mesh = (material) => `def Mesh "Mesh" (prepend apiSchemas = ["MaterialBindingAPI"])
 {
     rel material:binding = <${material}>
@@ -41,18 +39,12 @@ def Scope "MaterialX" (references = @./${basename(file)}@</MaterialX>)
 ${over}
 }
 ${mesh(`/MaterialX/Materials/${name}`)}`,
-    asset = await parseUSDFiles('stage.usda', reader(join(real, dirname(file)), images, { 'stage.usda': stage }), {
-      extensions: [materialX()],
-    });
+    asset = await parseUSDFiles('stage.usda', reader(join(real, dirname(file)), images, { 'stage.usda': stage }), { extensions: [materialX()] });
   return { asset, material: asset.document.materials[asset.meshes[0].material] };
 };
 /** A stage that holds its network in USD. */
 const inline = async (network, name = '/Look') => {
-  const asset = await parseUSDFiles(
-    'stage.usda',
-    reader(here, true, { 'stage.usda': `#usda 1.0\n${network}\n${mesh(name)}` }),
-    { extensions: [materialX()] },
-  );
+  const asset = await parseUSDFiles('stage.usda', reader(here, true, { 'stage.usda': `#usda 1.0\n${network}\n${mesh(name)}` }), { extensions: [materialX()] });
   return { asset, material: asset.document.materials[asset.meshes[0].material] };
 };
 const near = (a, b, message) => {
@@ -69,12 +61,10 @@ function producer(specs, prim, name) {
     at = next;
   }
   const owner = at.slice(0, at.lastIndexOf('.'));
-  if (at.includes('.outputs:'))
-    return { node: specs[owner + '.info:id'].fields.default, prim: owner.split('/').at(-1) };
+  if (at.includes('.outputs:')) return { node: specs[owner + '.info:id'].fields.default, prim: owner.split('/').at(-1) };
   return { value: specs[at]?.fields.default };
 }
-const kind = (id) =>
-  id.replace(/^ND_/, '').replace(/_(?:float|integer|boolean|color[34]|vector[234]|surfaceshader).*$/, '');
+const kind = (id) => id.replace(/^ND_/, '').replace(/_(?:float|integer|boolean|color[34]|vector[234]|surfaceshader).*$/, '');
 
 for (const [file, want] of Object.entries(truth.files)) {
   if (!Object.keys(want).length || !existsSync(join(real, file.replace('usd-wg/', '')))) continue;
@@ -85,8 +75,7 @@ for (const [file, want] of Object.entries(truth.files)) {
       let target = specs[path + '.outputs:mtlx:surface']?.fields.connectionPaths?.[0];
       assert.ok(target, `${path} has a surface`);
       // A surface may come out of a node graph, through its outputs.
-      while (!specs[target.slice(0, target.lastIndexOf('.')) + '.info:id'])
-        target = specs[target].fields.connectionPaths[0];
+      while (!specs[target.slice(0, target.lastIndexOf('.')) + '.info:id']) target = specs[target].fields.connectionPaths[0];
       const shader = target.slice(0, target.lastIndexOf('.'));
       assert.equal(shader.split('/').at(-1), material.shader);
       assert.equal(kind(specs[shader + '.info:id'].fields.default), kind(material.id));
@@ -95,12 +84,9 @@ for (const [file, want] of Object.entries(truth.files)) {
         if (input.node) {
           assert.equal(kind(got.node ?? ''), kind(input.node), `${path} ${name}`);
           assert.equal(got.prim, input.prim, `${path} ${name}`);
-        } else if (Array.isArray(input.value))
-          near(got.value.flat?.() ?? Array.from(got.value), input.value, `${path} ${name}`);
-        else if (typeof input.value === 'number')
-          assert.ok(Math.abs(got.value - input.value) < 1e-5, `${path} ${name}`);
-        else if (typeof input.value === 'string' && typeof got.value === 'string')
-          assert.equal(basename(got.value), input.value, `${path} ${name}`);
+        } else if (Array.isArray(input.value)) near(got.value.flat?.() ?? Array.from(got.value), input.value, `${path} ${name}`);
+        else if (typeof input.value === 'number') assert.ok(Math.abs(got.value - input.value) < 1e-5, `${path} ${name}`);
+        else if (typeof input.value === 'string' && typeof got.value === 'string') assert.equal(basename(got.value), input.value, `${path} ${name}`);
         // USD text writes a bool as 0 or 1, and the readers take both; OpenUSD's Python hands back a bool.
         else if (typeof input.value === 'boolean') assert.equal(Boolean(got.value), input.value, `${path} ${name}`);
         else assert.equal(got.value, input.value, `${path} ${name}`);
@@ -115,10 +101,7 @@ test('a real chess piece opens with its colour, metal, rough and normal maps', a
   assert.notEqual(material.pbrMetallicRoughness.baseColorTexture, undefined);
   assert.notEqual(material.pbrMetallicRoughness.metallicRoughnessTexture, undefined);
   assert.notEqual(material.normalTexture, undefined);
-  assert.deepEqual(
-    asset.issues.filter((issue) => /no PBR form|unsupported/.test(issue.message)),
-    [],
-  );
+  assert.deepEqual(asset.issues.filter((issue) => /no PBR form|unsupported/.test(issue.message)), []);
   const [color, packed] = asset.sources;
   assert.match(color.path, /pawn_black_base_color\.jpg$/);
   assert.equal(color.linearColor, undefined);
@@ -132,15 +115,8 @@ test('an image with no colour space in a linear document is linear, so it is enc
 });
 
 test('a missing image is listed, with the fileprefix as OpenUSD applies it', async () => {
-  const { asset, material } = await bound(
-    'test_assets/MaterialXTest/standard_surface_brass_tiled.mtlx',
-    'Tiled_Brass',
-    { images: false },
-  );
-  assert.ok(
-    asset.issues.some((issue) => /missing texture textures\/\.?\/?textures\/brass_color\.jpg/.test(issue.message)),
-    JSON.stringify(asset.issues),
-  );
+  const { asset, material } = await bound('test_assets/MaterialXTest/standard_surface_brass_tiled.mtlx', 'Tiled_Brass', { images: false });
+  assert.ok(asset.issues.some((issue) => /missing texture textures\/\.?\/?textures\/brass_color\.jpg/.test(issue.message)), JSON.stringify(asset.issues));
   assert.equal(material.pbrMetallicRoughness.baseColorTexture, undefined);
 });
 
@@ -199,11 +175,7 @@ for (const [id, base, rough, metal] of [
     const { material } = await inline(look(id)),
       want = truth.defaults[id],
       weight = want.base ?? want.base_weight ?? 1;
-    near(
-      material.pbrMetallicRoughness.baseColorFactor.slice(0, 3),
-      want[base].map((x) => x * weight),
-      'colour',
-    );
+    near(material.pbrMetallicRoughness.baseColorFactor.slice(0, 3), want[base].map((x) => x * weight), 'colour');
     assert.ok(Math.abs(material.pbrMetallicRoughness.roughnessFactor - want[rough]) < 1e-6);
     assert.equal(material.pbrMetallicRoughness.metallicFactor, want[metal]);
   });
@@ -271,18 +243,9 @@ for (const [id, weight, color, depth] of [
   ['ND_open_pbr_surface_surfaceshader', 'transmission_weight', 'transmission_color', 'transmission_depth'],
 ])
   test(`with a depth the transmission colour of ${id} belongs to the medium, not the surface`, async () => {
-    const { material } = await inline(
-      look(
-        id,
-        `float inputs:${weight} = 1\n        color3f inputs:${color} = (0, 0.5, 1)\n        float inputs:${depth} = 2`,
-      ),
-    );
+    const { material } = await inline(look(id, `float inputs:${weight} = 1\n        color3f inputs:${color} = (0, 0.5, 1)\n        float inputs:${depth} = 2`));
     near(material.pbrMetallicRoughness.baseColorFactor.slice(0, 3), [0.8, 0.8, 0.8], 'surface');
-    assert.deepEqual(material.extensions.KHR_materials_volume, {
-      thicknessFactor: 2,
-      attenuationDistance: 2,
-      attenuationColor: [0, 0.5, 1],
-    });
+    assert.deepEqual(material.extensions.KHR_materials_volume, { thicknessFactor: 2, attenuationDistance: 2, attenuationColor: [0, 0.5, 1] });
   });
 
 test('OpenPBR gives its thin film in micrometres, with a weight, and its emission in nits', async () => {
@@ -314,9 +277,7 @@ test('gltf_pbr reads alpha by its alpha_mode', async () => {
   assert.equal(mask.alphaMode, 'MASK');
   assert.equal(mask.alphaCutoff, 0.5);
   assert.equal(mask.pbrMetallicRoughness.baseColorFactor[3], 0.25);
-  const cut = await read(
-    'float inputs:alpha = 0.25\n        int inputs:alpha_mode = 1\n        float inputs:alpha_cutoff = 0.125',
-  );
+  const cut = await read('float inputs:alpha = 0.25\n        int inputs:alpha_mode = 1\n        float inputs:alpha_cutoff = 0.125');
   assert.equal(cut.alphaCutoff, 0.125);
   const blend = await read('float inputs:alpha = 0.25\n        int inputs:alpha_mode = 2');
   assert.equal(blend.alphaMode, 'BLEND');
@@ -344,11 +305,7 @@ test('gltf_pbr holds the extensions of glTF as they are', async () => {
   assert.equal(e.KHR_materials_iridescence.iridescenceFactor, 0.5);
   assert.equal(e.KHR_materials_iridescence.iridescenceThicknessMaximum, 100);
   assert.ok(Math.abs(e.KHR_materials_iridescence.iridescenceIor - 1.3) < 1e-6);
-  assert.deepEqual(e.KHR_materials_volume, {
-    thicknessFactor: 2,
-    attenuationDistance: 3,
-    attenuationColor: [1, 0.5, 0],
-  });
+  assert.deepEqual(e.KHR_materials_volume, { thicknessFactor: 2, attenuationDistance: 3, attenuationColor: [1, 0.5, 0] });
   assert.deepEqual(e.KHR_materials_anisotropy, { anisotropyStrength: 0.5, anisotropyRotation: 1 });
   assert.deepEqual(e.KHR_materials_dispersion, { dispersion: 0.25 });
   assert.equal((await inline(look('ND_gltf_pbr_surfaceshader'))).material.extensions, undefined);
@@ -356,37 +313,20 @@ test('gltf_pbr holds the extensions of glTF as they are', async () => {
 
 test('colour spaces go by the names of the specification, old and new', async () => {
   const value = async (space) =>
-    (
-      await inline(
-        look(
-          'ND_standard_surface_surfaceshader',
-          `color3f inputs:base_color = (0.5, 0.5, 0.5) (colorSpace = "${space}")`,
-        ),
-      )
-    ).material.pbrMetallicRoughness.baseColorFactor[0];
+    (await inline(look('ND_standard_surface_surfaceshader', `color3f inputs:base_color = (0.5, 0.5, 0.5) (colorSpace = "${space}")`))).material.pbrMetallicRoughness.baseColorFactor[0];
   assert.ok(Math.abs((await value('srgb_texture')) - 0.21404114) < 1e-6);
   assert.ok(Math.abs((await value('srgb_rec709_scene')) - 0.21404114) < 1e-6);
   assert.equal(await value('lin_rec709_scene'), 0.5);
   assert.equal(await value('data'), 0.5);
-  const other = await inline(
-    look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color = (0.5, 0.5, 0.5) (colorSpace = "acescg")'),
-  );
+  const other = await inline(look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color = (0.5, 0.5, 0.5) (colorSpace = "acescg")'));
   assert.ok(other.asset.issues.some((issue) => /colour space acescg/.test(issue.message)));
   const image = async (space) =>
-    (
-      await inline(
-        look(
-          'ND_standard_surface_surfaceshader',
-          'color3f inputs:base_color.connect = </Look/Map.outputs:out>',
-          `def Shader "Map"
+    (await inline(look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color.connect = </Look/Map.outputs:out>', `def Shader "Map"
     {
         uniform token info:id = "ND_image_color3"
         asset inputs:file = @map.png@ (colorSpace = "${space}")
         color3f outputs:out
-    }`,
-        ),
-      )
-    ).asset.sources[0].linearColor;
+    }`))).asset.sources[0].linearColor;
   assert.equal(await image('lin_rec709_scene'), true);
   assert.equal(await image('data'), true);
   assert.equal(await image('srgb_rec709_scene'), undefined);
@@ -401,14 +341,7 @@ test('a UsdUVTexture scales, and its colour space and fallback are its own input
         ${extra.lines ?? ''}
         color3f outputs:rgb
     }`,
-    read = (extra) =>
-      inline(
-        look(
-          'ND_UsdPreviewSurface_surfaceshader',
-          'color3f inputs:diffuseColor.connect = </Look/Map.outputs:rgb>',
-          map(extra),
-        ),
-      );
+    read = (extra) => inline(look('ND_UsdPreviewSurface_surfaceshader', 'color3f inputs:diffuseColor.connect = </Look/Map.outputs:rgb>', map(extra)));
   const scaled = await read({ lines: 'float4 inputs:scale = (0.5, 0.25, 1, 1)' });
   near(scaled.material.pbrMetallicRoughness.baseColorFactor, [0.5, 0.25, 1, 1], 'scale');
   assert.equal(scaled.asset.sources[0].linearColor, true);
@@ -425,22 +358,15 @@ test('a UsdUVTexture scales, and its colour space and fallback are its own input
 });
 
 test('an image that cannot be read gives its default, which is zero when unset', async () => {
-  const stage = (lines) =>
-      `#usda 1.0\n${look(
-        'ND_standard_surface_surfaceshader',
-        'color3f inputs:base_color.connect = </Look/Map.outputs:out>',
-        `def Shader "Map"
+  const stage = (lines) => `#usda 1.0\n${look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color.connect = </Look/Map.outputs:out>', `def Shader "Map"
     {
         uniform token info:id = "ND_image_color3"
         asset inputs:file = @map.png@
         ${lines}
         color3f outputs:out
-    }`,
-      )}\n${mesh('/Look')}`,
+    }`)}\n${mesh('/Look')}`,
     open = async (lines) => {
-      const asset = await parseUSDFiles('stage.usda', reader(here, false, { 'stage.usda': stage(lines) }), {
-        extensions: [materialX()],
-      });
+      const asset = await parseUSDFiles('stage.usda', reader(here, false, { 'stage.usda': stage(lines) }), { extensions: [materialX()] });
       return asset.document.materials[asset.meshes[0].material].pbrMetallicRoughness.baseColorFactor;
     };
   near(await open(''), [0, 0, 0, 1], 'unset');
@@ -449,20 +375,12 @@ test('an image that cannot be read gives its default, which is zero when unset',
 
 test('multiply takes zero for an unset in1 and one for an unset in2, by the Standard Nodes', async () => {
   const read = async (lines) =>
-    (
-      await inline(
-        look(
-          'ND_standard_surface_surfaceshader',
-          'float inputs:metalness.connect = </Look/Times.outputs:out>',
-          `def Shader "Times"
+    (await inline(look('ND_standard_surface_surfaceshader', 'float inputs:metalness.connect = </Look/Times.outputs:out>', `def Shader "Times"
     {
         uniform token info:id = "ND_multiply_float"
         ${lines}
         float outputs:out
-    }`,
-        ),
-      )
-    ).material.pbrMetallicRoughness.metallicFactor;
+    }`))).material.pbrMetallicRoughness.metallicFactor;
   assert.equal(await read('float inputs:in2 = 0.5'), 0);
   assert.equal(await read('float inputs:in1 = 0.5'), 0.5);
 });
@@ -542,9 +460,7 @@ const chain = `def Shader "Map"
     }`;
 
 test('a graph that comes to an image scaled by a constant is that image, tiled, on the primvar it names', async () => {
-  const { asset, material } = await inline(
-      look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color.connect = </Look/Pick.outputs:out>', chain),
-    ),
+  const { asset, material } = await inline(look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color.connect = </Look/Pick.outputs:out>', chain)),
     { baseColorTexture, baseColorFactor } = material.pbrMetallicRoughness;
   near(baseColorFactor, [0.5, 0.5, 0.5, 1], 'factor');
   assert.deepEqual(baseColorTexture.extensions.KHR_texture_transform, { offset: [0, -3], rotation: 0, scale: [2, 4] });
@@ -580,17 +496,10 @@ test('a constant graph folds, by the formulas of the Standard Nodes', async () =
 
 test('what a PBR material cannot hold is listed, and the rest still reads', async () => {
   const { asset, material } = await inline(
-    look(
-      'ND_standard_surface_surfaceshader',
-      'color3f inputs:base_color.connect = </Look/Noise.outputs:out>\n        float inputs:metalness = 1',
-      'def Shader "Noise"\n    {\n        uniform token info:id = "ND_noise2d_color3"\n        color3f outputs:out\n    }',
-    ),
+    look('ND_standard_surface_surfaceshader', 'color3f inputs:base_color.connect = </Look/Noise.outputs:out>\n        float inputs:metalness = 1', 'def Shader "Noise"\n    {\n        uniform token info:id = "ND_noise2d_color3"\n        color3f outputs:out\n    }'),
   );
   assert.equal(material.pbrMetallicRoughness.metallicFactor, 1);
-  assert.ok(
-    asset.issues.some((issue) => /ND_noise2d_color3 .* no PBR form/.test(issue.message)),
-    JSON.stringify(asset.issues),
-  );
+  assert.ok(asset.issues.some((issue) => /ND_noise2d_color3 .* no PBR form/.test(issue.message)), JSON.stringify(asset.issues));
 });
 
 test('a material with both outputs takes the MaterialX one, and a plain preview surface stays as it was', async () => {
@@ -645,11 +554,7 @@ ${mesh('/MaterialX/Materials/Shared')}`,
 <surfacematerial name="Shared" type="material"><input name="surfaceshader" type="surfaceshader" nodename="S"/></surfacematerial></materialx>`,
     },
     asset = await parseUSDFiles('stage.usda', reader(here, true, extra), { extensions: [materialX()] });
-  near(
-    asset.document.materials[asset.meshes[0].material].pbrMetallicRoughness.baseColorFactor,
-    [0, 0, 1, 1],
-    'included',
-  );
+  near(asset.document.materials[asset.meshes[0].material].pbrMetallicRoughness.baseColorFactor, [0, 0, 1, 1], 'included');
 });
 
 test('an included document takes the working colour space of the one that includes it, unless it names its own', async () => {
@@ -672,32 +577,20 @@ ${mesh('/MaterialX/Materials/Shared')}`,
 
 test('without the entry a .mtlx layer stays unsupported', async () => {
   const stage = `#usda 1.0\ndef Scope "MaterialX" (references = @./a.mtlx@</MaterialX>) {}\n${mesh('/MaterialX/Materials/A')}`,
-    asset = await parseUSDFiles(
-      'stage.usda',
-      reader(here, true, { 'stage.usda': stage, 'a.mtlx': '<materialx version="1.39"/>' }),
-    );
+    asset = await parseUSDFiles('stage.usda', reader(here, true, { 'stage.usda': stage, 'a.mtlx': '<materialx version="1.39"/>' }));
   assert.ok(asset.issues.some((issue) => issue.code === 'unsupported-layer'));
 });
 
 test('a .mtlx that cannot be read is listed, and the stage opens', async () => {
   const stage = `#usda 1.0\ndef Scope "MaterialX" (references = @./a.mtlx@</MaterialX>) {}\n${mesh('/MaterialX/Materials/A')}`,
-    extra = {
-      'stage.usda': stage,
-      'a.mtlx':
-        '<materialx version="1.39"><standard_surface name="S" type="surfaceshader"><input name="base" type="float" value="x"/></standard_surface></materialx>',
-    },
+    extra = { 'stage.usda': stage, 'a.mtlx': '<materialx version="1.39"><standard_surface name="S" type="surfaceshader"><input name="base" type="float" value="x"/></standard_surface></materialx>' },
     asset = await parseUSDFiles('stage.usda', reader(here, true, extra), { extensions: [materialX()] });
-  assert.ok(
-    asset.issues.some((issue) => issue.code === 'bad-layer' && /a\.mtlx/.test(issue.message)),
-    JSON.stringify(asset.issues),
-  );
+  assert.ok(asset.issues.some((issue) => issue.code === 'bad-layer' && /a\.mtlx/.test(issue.message)), JSON.stringify(asset.issues));
 });
 
 test('a node kind named after an Object member is an unknown kind', async () => {
   const { asset } = await inline(look('ND_constructor_surfaceshader'));
-  assert.ok(
-    asset.issues.some((issue) => /unsupported surface shader ND_constructor_surfaceshader/.test(issue.message)),
-  );
+  assert.ok(asset.issues.some((issue) => /unsupported surface shader ND_constructor_surfaceshader/.test(issue.message)));
 });
 
 test('materialGraph gives the whole network as a node material graph', async () => {
@@ -722,13 +615,7 @@ test('materialGraph gives the whole network as a node material graph', async () 
 });
 
 test('materialGraph holds a RealityKit surface and lists an image it has no hook for', async () => {
-  const { asset } = await inline(
-      look(
-        'ND_realitykit_pbr_surfaceshader',
-        'color3f inputs:baseColor.connect = </Look/Map.outputs:out>\n        float inputs:roughness = 0.75',
-        'def Shader "Map"\n    {\n        uniform token info:id = "ND_image_color3"\n        asset inputs:file = @map.png@\n        color3f outputs:out\n    }',
-      ),
-    ),
+  const { asset } = await inline(look('ND_realitykit_pbr_surfaceshader', 'color3f inputs:baseColor.connect = </Look/Map.outputs:out>\n        float inputs:roughness = 0.75', 'def Shader "Map"\n    {\n        uniform token info:id = "ND_image_color3"\n        asset inputs:file = @map.png@\n        color3f outputs:out\n    }')),
     result = await materialGraph(asset, 0);
   assert.equal(result.graph.nodes[0].metalRough.roughness.value, 0.75);
   assert.ok(result.skipped.some((item) => /needs options.texture/.test(item.reason)));
@@ -751,9 +638,7 @@ test('0 minus an image is not read as the image, while the image minus 0 and 0 p
   const map = '.connect = </Look/Map.outputs:out>',
     zero = ' = (0, 0, 0)',
     base = 'color3f inputs:base_color.connect = </Look/Op.outputs:out>';
-  const negative = await inline(
-    look('ND_standard_surface_surfaceshader', base, graph('ND_subtract_color3', zero, map)),
-  );
+  const negative = await inline(look('ND_standard_surface_surfaceshader', base, graph('ND_subtract_color3', zero, map)));
   assert.equal(negative.material.pbrMetallicRoughness.baseColorTexture, undefined);
   assert.ok(negative.asset.issues.some((issue) => /ND_subtract_color3 .* has no PBR form/.test(issue.message)));
   for (const [id, first, second] of [

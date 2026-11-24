@@ -891,10 +891,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       colorAttachments: [{ view: viewOf(target), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
     });
     show.setPipeline(this.#show);
-    show.setBindGroup(
-      1,
-      this.#groups.get(device, 'show', this.#showLayout!, [{ binding: 0, resource: viewOf(this.#sum) }]),
-    );
+    show.setBindGroup(1, this.#groups.get(device, 'show', this.#showLayout!, [{ binding: 0, resource: viewOf(this.#sum) }]));
     show.draw(3);
     show.end();
     if (!commandEncoder) {

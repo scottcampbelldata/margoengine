@@ -119,8 +119,7 @@ export class AsyncTween extends Tween implements PromiseLike<void>, Disposable {
   /** Advance operations present at the start of this update. Failures reject their task and propagate. */
   override update(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Tween delta must be finite and >= 0');
-    if (this.stepping)
-      throw new MargoError('state', 'Recursive AsyncTween.update; call update after the callback returns');
+    if (this.stepping) throw new MargoError('state', 'Recursive AsyncTween.update; call update after the callback returns');
     this.stepping = true;
     const count = this.pending.length;
     try {
@@ -141,8 +140,7 @@ export class AsyncTween extends Tween implements PromiseLike<void>, Disposable {
   }
   /** Drop settled operations without allocating a new list. */
   override compact(): void {
-    if (this.stepping)
-      throw new MargoError('state', 'Cannot compact during an update; call compact after update returns');
+    if (this.stepping) throw new MargoError('state', 'Cannot compact during an update; call compact after update returns');
     let count = 0;
     for (const entry of this.pending) if (!entry.done) this.pending[count++] = entry;
     this.pending.length = count;
@@ -250,9 +248,7 @@ export class AsyncTimeline implements PromiseLike<void>, Disposable {
   /** Add a playback callback (not fired on seek). */
   call(callback: () => void, at?: number | string): this {
     if (typeof callback !== 'function') throw new TypeError('call needs a function; pass a callback');
-    this.timeline.call(() => {
-      if (!this.settled) callback();
-    }, at);
+    this.timeline.call(() => { if (!this.settled) callback(); }, at);
     return this;
   }
   /** Seek without settling the promise. */

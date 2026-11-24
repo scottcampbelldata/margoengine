@@ -4,5 +4,5 @@ import test from 'node:test';
 import { assertLeavesOwnScene, attachIn } from '../../../tests/support/scene-owner-decoy.js';
 import { VFX } from '../dist/index.js';
 
-test("VFX disposal leaves the scene it joined and keeps the active scene's same-name plugin", (t) =>
+test('VFX disposal leaves the scene it joined and keeps the active scene\'s same-name plugin', (t) =>
   assertLeavesOwnScene(t, () => new VFX()));

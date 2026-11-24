@@ -22,16 +22,10 @@ export function own(engine: EngineKernel, textures: Texture[], release?: () => v
     release?.();
     throw new DOMException('Canvas disposed', 'AbortError');
   }
-  engine.use({
-    name: 'react:textures:' + nextId(),
-    setup() {},
-    dispose() {
-      textures.forEach((texture) => texture.dispose());
-      release?.();
-    },
-  });
+  engine.use({ name: 'react:textures:' + nextId(), setup() {}, dispose() {
+    textures.forEach((texture) => texture.dispose());
+    release?.();
+  } });
 }
 
-export function nextId(): number {
-  return serial++;
-}
+export function nextId(): number { return serial++; }

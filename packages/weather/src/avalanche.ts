@@ -214,20 +214,7 @@ interface Parcel {
   m: number;
 }
 
-const FIXED = [
-  'width',
-  'depth',
-  'cellSize',
-  'origin',
-  'ground',
-  'snow',
-  'cover',
-  'release',
-  'releaseDepth',
-  'step',
-  'coverDensity',
-  'density',
-] as const;
+const FIXED = ['width', 'depth', 'cellSize', 'origin', 'ground', 'snow', 'cover', 'release', 'releaseDepth', 'step', 'coverDensity', 'density'] as const;
 type Range = readonly [number, number];
 const RANGES: Record<string, Range> = {
   cellSize: [0.1, 100],
@@ -258,8 +245,7 @@ const RANGES: Record<string, Range> = {
 
 /** Throws for any invalid field of `o`. */
 export function validateAvalanche(o: AvalancheOptions): void {
-  if (typeof o !== 'object' || o === null)
-    throw new TypeError('Avalanche options must be an object; pass {snow} or {width, depth, ground}');
+  if (typeof o !== 'object' || o === null) throw new TypeError('Avalanche options must be an object; pass {snow} or {width, depth, ground}');
   for (const [k, [lo, hi]] of Object.entries(RANGES)) {
     const v = (o as unknown as Record<string, unknown>)[k];
     if (v !== undefined && !(typeof v === 'number' && v >= lo && v <= hi))
@@ -272,17 +258,13 @@ export function validateAvalanche(o: AvalancheOptions): void {
     D = o.depth ?? s?.depth;
   if (!Number.isInteger(W) || !Number.isInteger(D) || W! < 3 || D! < 3 || W! > 2048 || D! > 2048 || W! * D! > 4194304)
     throw new RangeError('Avalanche width and depth must be whole numbers from 3 to 2048 (at most 4,194,304 samples)');
-  if (o.ground !== undefined && o.ground.length !== W! * D!)
-    throw new RangeError(`Avalanche ground needs ${W! * D!} heights`);
-  if (
-    typeof o.cover === 'number' ? !(o.cover >= 0 && o.cover <= 50) : o.cover !== undefined && o.cover.length !== W! * D!
-  )
+  if (o.ground !== undefined && o.ground.length !== W! * D!) throw new RangeError(`Avalanche ground needs ${W! * D!} heights`);
+  if (typeof o.cover === 'number' ? !(o.cover >= 0 && o.cover <= 50) : o.cover !== undefined && o.cover.length !== W! * D!)
     throw new RangeError(`Avalanche cover must be 0 to 50 m, or ${W! * D!} depths`);
   const r = o.release;
   if (r === 'unstable' && !s) throw new RangeError("Avalanche release 'unstable' needs a snow (a SnowDrift)");
   if (r !== undefined && r !== 'unstable') {
-    if (!Array.isArray(r.at) || !r.at.every(Number.isFinite))
-      throw new RangeError('Avalanche release.at must be [x, z]');
+    if (!Array.isArray(r.at) || !r.at.every(Number.isFinite)) throw new RangeError('Avalanche release.at must be [x, z]');
     if (r.size !== undefined && !(r.size.length === 2 && r.size[0] > 0 && r.size[1] > 0))
       throw new RangeError('Avalanche release.size must be two half sizes above 0');
   }
@@ -345,10 +327,7 @@ export class Avalanche implements SnowFieldSource {
   private fixed: unknown[] = [];
   private field?: Float32Array;
   private fieldVersion = -1;
-  private readonly clouds = new Map<
-    number,
-    { readonly options: Record<string, unknown>; readonly matrix: Float32Array }
-  >();
+  private readonly clouds = new Map<number, { readonly options: Record<string, unknown>; readonly matrix: Float32Array }>();
   private cloudTarget?: PowderCloudTarget;
 
   constructor(readonly options: AvalancheOptions) {
@@ -430,15 +409,13 @@ export class Avalanche implements SnowFieldSource {
   }
   /** Advances by `delta` film seconds. */
   update(delta: number): void {
-    if (!(delta >= 0) || !Number.isFinite(delta))
-      throw new RangeError('Avalanche delta must be a finite number of 0 or more seconds');
+    if (!(delta >= 0) || !Number.isFinite(delta)) throw new RangeError('Avalanche delta must be a finite number of 0 or more seconds');
     this.seek(this.film + delta);
   }
 
   /** Shows the avalanche at film time `time`: steps forward, or replays from 0 to go back. */
   seek(time: number): void {
-    if (!(time >= 0) || !Number.isFinite(time))
-      throw new RangeError('Avalanche time must be a finite number of 0 or more seconds');
+    if (!(time >= 0) || !Number.isFinite(time)) throw new RangeError('Avalanche time must be a finite number of 0 or more seconds');
     validateAvalanche(this.options);
     if (!this.sameFixed()) {
       this.fixed = this.fixedKey();
@@ -465,9 +442,7 @@ export class Avalanche implements SnowFieldSource {
     const o = this.options,
       r = o.release ?? 'unstable',
       rhoF = o.density ?? 300;
-    let slabDepth: ArrayLike<number> | undefined,
-      slabMass: ArrayLike<number> | undefined,
-      index: ArrayLike<number> | undefined;
+    let slabDepth: ArrayLike<number> | undefined, slabMass: ArrayLike<number> | undefined, index: ArrayLike<number> | undefined;
     if (r === 'unstable') ({ slabDepth, slabMass, index } = o.snow!.slide());
     const rhoC = o.coverDensity ?? 200,
       dA = this.cellSize * this.cellSize;
@@ -567,18 +542,7 @@ export class Avalanche implements SnowFieldSource {
     if (!flowing && this.parcels.length === 0 && this.released) this.stopped = true;
   }
 
-  private substep(
-    dt: number,
-    bed: Float64Array,
-    k0: number,
-    mu: number,
-    xi: number,
-    kappa: number,
-    share: number,
-    rhoF: number,
-    rhoC: number,
-    dA: number,
-  ): void {
+  private substep(dt: number, bed: Float64Array, k0: number, mu: number, xi: number, kappa: number, share: number, rhoF: number, rhoC: number, dA: number): void {
     const W = this.width,
       D = this.depth,
       n = this.n,
@@ -586,8 +550,7 @@ export class Avalanche implements SnowFieldSource {
       h = this.flow,
       qx = this.qx,
       qz = this.qz,
-      [nh, nqx, nqz] =
-        this.scratch.length > 2 ? (this.scratch.slice(2) as [Float64Array, Float64Array, Float64Array]) : this.grow();
+      [nh, nqx, nqz] = this.scratch.length > 2 ? (this.scratch.slice(2) as [Float64Array, Float64Array, Float64Array]) : this.grow();
     nh.set(h);
     nqx.set(qx);
     nqz.set(qz);
@@ -699,11 +662,7 @@ export class Avalanche implements SnowFieldSource {
 
   private grow(): [Float64Array, Float64Array, Float64Array] {
     const n = this.n,
-      made: [Float64Array, Float64Array, Float64Array] = [
-        new Float64Array(n),
-        new Float64Array(n),
-        new Float64Array(n),
-      ];
+      made: [Float64Array, Float64Array, Float64Array] = [new Float64Array(n), new Float64Array(n), new Float64Array(n)];
     this.scratch.push(...made);
     return made;
   }
@@ -795,11 +754,7 @@ export class Avalanche implements SnowFieldSource {
       p.z += (p.uz + wind[1]) * dt;
       const rho = AIR + p.m / V1;
       this.peak[k] = Math.max(this.peak[k]!, rho * U * U);
-      const inside =
-        p.x >= this.origin[0] &&
-        p.z >= this.origin[1] &&
-        p.x <= this.origin[0] + (this.width - 1) * this.cellSize &&
-        p.z <= this.origin[1] + (this.depth - 1) * this.cellSize;
+      const inside = p.x >= this.origin[0] && p.z >= this.origin[1] && p.x <= this.origin[0] + (this.width - 1) * this.cellSize && p.z <= this.origin[1] + (this.depth - 1) * this.cellSize;
       // A parcel too thin to see (optical depth under 0.002) has settled out: what it holds lies where it is.
       const tau = ((3 * (p.m / V1)) / (2 * ICE * (o.grain ?? 1e-4))) * p.h;
       if (p.m > 1 && tau > 0.002 && inside) kept.push(p);
@@ -925,8 +880,7 @@ export class Avalanche implements SnowFieldSource {
       p = o.breakPressure ?? 100000,
       b = o.buryDepth ?? 2,
       out = new Float32Array(this.n);
-    for (let k = 0; k < this.n; k++)
-      out[k] = (1 - smoothstep(0.5 * p, p, this.peak[k]!)) * (1 - smoothstep(0.5 * b, b, this.deposit[k]!));
+    for (let k = 0; k < this.n; k++) out[k] = (1 - smoothstep(0.5 * p, p, this.peak[k]!)) * (1 - smoothstep(0.5 * b, b, this.deposit[k]!));
     return out;
   }
   /**
@@ -971,8 +925,7 @@ export class Avalanche implements SnowFieldSource {
         j0 = Math.floor(k0 / W);
       for (let b = Math.max(0, j0 - reach); b <= Math.min(this.depth - 1, j0 + reach); b++)
         for (let a = Math.max(0, i0 - reach); a <= Math.min(W - 1, i0 + reach); a++)
-          if (((a - i0) ** 2 + (b - j0) ** 2) * dx * dx <= (aspect * p.h) ** 2)
-            push(b * W + a, rho * U * U, p.ux, p.uz);
+          if (((a - i0) ** 2 + (b - j0) ** 2) * dx * dx <= (aspect * p.h) ** 2) push(b * W + a, rho * U * U, p.ux, p.uz);
     }
     const kept = this.plantsKept();
     for (let k = 0; k < this.n; k++) {
@@ -1068,14 +1021,7 @@ export class Avalanche implements SnowFieldSource {
       live.add(p.id);
       let c = this.clouds.get(p.id);
       if (!c) {
-        c = clouds.add({
-          seed: p.id,
-          segments: puffs,
-          bounds: [2 * aspect, 1, 2 * aspect],
-          volume: 1.4,
-          color: [0.92, 0.94, 0.97],
-          concentrate: 'inside',
-        });
+        c = clouds.add({ seed: p.id, segments: puffs, bounds: [2 * aspect, 1, 2 * aspect], volume: 1.4, color: [0.92, 0.94, 0.97], concentrate: 'inside' });
         this.clouds.set(p.id, c);
       }
       c.options.opacity = Math.min(1, p.opacity);
@@ -1134,12 +1080,7 @@ export class AvalancheScatter implements EnginePlugin {
     this.name = `weather-avalanche-scatter:${AvalancheScatter.count++}`;
     const a = avalanche,
       h = a.cellSize / 2;
-    this.bounds = [
-      a.origin[0] - h,
-      a.origin[1] - h,
-      a.origin[0] + (a.width - 1) * a.cellSize + h,
-      a.origin[1] + (a.depth - 1) * a.cellSize + h,
-    ];
+    this.bounds = [a.origin[0] - h, a.origin[1] - h, a.origin[0] + (a.width - 1) * a.cellSize + h, a.origin[1] + (a.depth - 1) * a.cellSize + h];
   }
 
   /** Makes the maps on an engine and keeps them up to date. */
@@ -1156,8 +1097,7 @@ export class AvalancheScatter implements EnginePlugin {
 
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'AvalancheScatter is disposed; create a new AvalancheScatter');
-    if (!engine.gpu)
-      throw new MargoError('unsupported', 'AvalancheScatter requires WebGPU or its WebGL2 compatibility device');
+    if (!engine.gpu) throw new MargoError('unsupported', 'AvalancheScatter requires WebGPU or its WebGL2 compatibility device');
     this.engine = engine;
     this.seen = -1;
   }

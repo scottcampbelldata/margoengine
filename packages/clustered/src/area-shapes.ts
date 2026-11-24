@@ -65,8 +65,7 @@ export class AreaShapes extends ShapeLights {
   /** LTC shader, with shadow visibility multiplied into each emitter before summing. */
   override declarations(group: number, shadow?: string): string {
     // This entry has no tubes. Exclude their tangent-hull integration and pointer-heavy arc walks from compilation.
-    const code = super
-      .declarations(group)
+    const code = super.declarations(group)
       .replace(/struct ShapeArc \{[^}]+\}\n/, '')
       .replace(/fn shapeArc\([\s\S]*?fn clusterShapeLighting\(/, 'fn clusterShapeLighting(')
       .replace('else{form=shapeTube(local,lobe,a,light.b.xyz-position,r);}', 'else{continue;}');

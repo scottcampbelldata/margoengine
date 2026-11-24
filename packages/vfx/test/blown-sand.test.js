@@ -27,7 +27,7 @@ const crest = stoss - 2, // just upwind of the brink
   slipFace = stoss + lee / 2;
 const wind = (speed, gust = 0.35) => ({ speed, direction: 0, gust });
 
-test("the threshold is Bagnold's fluid threshold carried up the log profile: 6.6 m/s at 10 m for 0.25 mm sand", () => {
+test('the threshold is Bagnold\'s fluid threshold carried up the log profile: 6.6 m/s at 10 m for 0.25 mm sand', () => {
   const u = sandThreshold();
   // u*t = 0.1 sqrt((2650 - 1.225) / 1.225 * 9.81 * 0.00025) = 0.2303 m/s; u(10) = u*t / 0.4 ln(10 / 0.0001).
   assert.ok(Math.abs(u - (0.2303 / 0.4) * Math.log(1e5)) < 0.01, `threshold ${u}`);
@@ -42,8 +42,7 @@ test("the threshold is Bagnold's fluid threshold carried up the log profile: 6.6
 test('no sand moves below the threshold, anywhere and at any time', () => {
   // The largest speed-up is sqrt(3) and the largest gust 1.35: 2.5 m/s times both stays under 6.6 m/s.
   const options = { ground: dunes, wind: wind(2.5) };
-  for (const z of [crest, trough, windward, slipFace, 7, 31])
-    assert.equal(sandEmission(options, 3, z).flux, 0, `z ${z}`);
+  for (const z of [crest, trough, windward, slipFace, 7, 31]) assert.equal(sandEmission(options, 3, z).flux, 0, `z ${z}`);
   const sand = new BlownSand(options);
   for (const t of [0, 0.7, 3.1, 19.4, 120]) {
     sand.time = t;
@@ -101,10 +100,7 @@ test('the same seed and time draw the same sand, from any camera path', () => {
     gb = b.grains([0, 2, 0]);
   assert.equal(ga.length, gb.length);
   assert.deepEqual(ga, gb);
-  assert.ok(
-    ga.some((g) => g.alpha > 0),
-    'sand moves at 11 m/s',
-  );
+  assert.ok(ga.some((g) => g.alpha > 0), 'sand moves at 11 m/s');
   b.time = 12.6;
   assert.notDeepEqual(b.grains([0, 2, 0]), ga, 'a tenth of a second later the sand has moved');
   const c = make(5);
@@ -127,9 +123,7 @@ test('near the threshold gusts make transport come and go', () => {
   for (let t = 0; t < 60; t += 2.5) {
     sand.time = t;
     // Within 6 m of one place: gusts are patches tens of metres long swept past by the wind.
-    moving.push(
-      sand.grains([0, 2, 0]).filter((g) => g.alpha > 0 && Math.hypot(g.position[0], g.position[2]) < 6).length,
-    );
+    moving.push(sand.grains([0, 2, 0]).filter((g) => g.alpha > 0 && Math.hypot(g.position[0], g.position[2]) < 6).length);
   }
   assert.ok(Math.min(...moving) < 0.5 * Math.max(...moving), `moving particles over time ${moving}`);
   assert.ok(Math.max(...moving) > 0);

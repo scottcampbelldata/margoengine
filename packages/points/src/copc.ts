@@ -141,8 +141,8 @@ export class CopcSource implements OctreeSource {
               throw new RangeError(`COPC hierarchy page at ${offset} is listed twice; the file is corrupt`);
             seen.add(offset);
             pages.push([offset, bytes]);
-          } else if (count < 0)
-            throw new RangeError('COPC hierarchy holds a negative point count; the file is corrupt');
+          }
+          else if (count < 0) throw new RangeError('COPC hierarchy holds a negative point count; the file is corrupt');
           else made(d, x, y, z, count, offset, bytes);
         }
       }

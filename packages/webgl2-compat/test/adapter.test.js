@@ -66,10 +66,7 @@ test('no full adapter: the same request again at compatibility level', async () 
     { gpu, calls } = browser((options) => (options?.featureLevel === 'compatibility' ? older : null));
   allow();
   assert.equal(await gpu.requestAdapter({ powerPreference: 'low-power' }), older);
-  assert.deepEqual(calls, [
-    { powerPreference: 'low-power' },
-    { powerPreference: 'low-power', featureLevel: 'compatibility' },
-  ]);
+  assert.deepEqual(calls, [{ powerPreference: 'low-power' }, { powerPreference: 'low-power', featureLevel: 'compatibility' }]);
 });
 
 test('no adapter at all stays null, so a fallback still runs', async () => {
@@ -107,8 +104,7 @@ test('a compatibility device takes flat varyings without first-vertex sampling',
     { gpu } = browser(() => older);
   allow({ force: true });
   const device = await (await gpu.requestAdapter()).requestDevice(),
-    code =
-      '@location(4) @interpolate(flat) a:u32,@location(5) @interpolate( flat ) b:u32,@interpolate(flat, first) c:u32';
+    code = '@location(4) @interpolate(flat) a:u32,@location(5) @interpolate( flat ) b:u32,@interpolate(flat, first) c:u32';
   assert.deepEqual(device.createShaderModule({ label: 'pick', code }), { label: 'pick' });
   assert.deepEqual(older.seen.code, [
     '@location(4) @interpolate(flat, either) a:u32,@location(5) @interpolate(flat, either) b:u32,@interpolate(flat, first) c:u32',
@@ -153,15 +149,9 @@ test('dispose puts the browser back, once, and a new call works', async () => {
 test('a second call while one is active says so, and no WebGPU says so', () => {
   browser(() => null);
   allow();
-  assert.throws(
-    () => allowCompatibilityAdapters(),
-    (error) => error.code === 'state',
-  );
+  assert.throws(() => allowCompatibilityAdapters(), (error) => error.code === 'state');
   Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
-  assert.throws(
-    () => allowCompatibilityAdapters(),
-    (error) => error.code === 'unsupported',
-  );
+  assert.throws(() => allowCompatibilityAdapters(), (error) => error.code === 'unsupported');
 });
 
 /** A device from a fake adapter, through allowCompatibilityAdapters; `features` are the device's. */
@@ -191,8 +181,7 @@ test('at the level a depth texture only loaded becomes float, each load taking .
 
 test('at the level a depth texture a sampler reads, or nothing loads, stays as written', async () => {
   const { createShaderModule } = await device([]),
-    code =
-      'var a:texture_depth_2d;var b:texture_depth_2d;fn f(){textureSampleCompareLevel(a,s,u,0.5);textureLoad(a,q,0);textureDimensions(b);}';
+    code = 'var a:texture_depth_2d;var b:texture_depth_2d;fn f(){textureSampleCompareLevel(a,s,u,0.5);textureLoad(a,q,0);textureDimensions(b);}';
   assert.equal(createShaderModule({ code }), code);
 });
 
@@ -203,9 +192,7 @@ test('a device at the full level keeps its shaders', async () => {
 });
 
 test('a device asks for rg11b10ufloat-renderable when the adapter has it, for PostStack', async () => {
-  assert.deepEqual((await device([], ['rg11b10ufloat-renderable'])).descriptor.requiredFeatures, [
-    'rg11b10ufloat-renderable',
-  ]);
+  assert.deepEqual((await device([], ['rg11b10ufloat-renderable'])).descriptor.requiredFeatures, ['rg11b10ufloat-renderable']);
   for (const handle of open.splice(0)) handle.dispose();
   assert.deepEqual((await device([])).descriptor.requiredFeatures, []);
 });

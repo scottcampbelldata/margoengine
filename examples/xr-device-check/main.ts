@@ -30,11 +30,7 @@ function show(run: XRRun): void {
 const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' }),
   material = new PbrMaterial({ color: '#84d6bd' }),
   pressed = new PbrMaterial({ color: '#e0a03c' }),
-  cube = engine
-    .createMesh()
-    .setGeometry(box(0.3, 0.3, 0.3))
-    .setMaterial(material)
-    .setPosition([0, 0, -1]);
+  cube = engine.createMesh().setGeometry(box(0.3, 0.3, 0.3)).setMaterial(material).setPosition([0, 0, -1]);
 engine.start();
 const xr = await XR.create(engine);
 for (const [id, mode] of [

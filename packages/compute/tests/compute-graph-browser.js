@@ -14,8 +14,7 @@ const check = async (name, run) => {
 };
 const same = (a, b, label) => {
   if (a.length !== b.length) throw new Error(`${label}: length ${a.length} != ${b.length}`);
-  for (let i = 0; i < a.length; i++)
-    if (a[i] !== b[i]) throw new Error(`${label}[${i}]: gpu ${a[i]}, expected ${b[i]}`);
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) throw new Error(`${label}[${i}]: gpu ${a[i]}, expected ${b[i]}`);
 };
 const rng = (seed) => {
   let s = seed | 0 || 1;

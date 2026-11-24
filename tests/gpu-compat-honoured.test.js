@@ -56,7 +56,7 @@ export function ignoringCompat(files) {
 }
 
 test('a script that opens its own page without the shim is caught, one with it or a reason is not', () => {
-  const own = 'const browser = await launchBrowser();\nconst page = await browser.newPage();\nawait page.goto(url);';
+  const own = "const browser = await launchBrowser();\nconst page = await browser.newPage();\nawait page.goto(url);";
   assert.ok(opensPage(own) && !honoursCompat(own), 'its MARGO_COMPAT=1 run would be native WebGPU');
   assert.ok(honoursCompat(own + '\nif (compatRun()) await page.addInitScript(compatShim);'));
   assert.ok(honoursCompat('// MARGO_COMPAT not applicable: the page makes no GPU calls\n' + own));

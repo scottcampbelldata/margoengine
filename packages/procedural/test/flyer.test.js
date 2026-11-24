@@ -3,14 +3,7 @@
 // groundspeed and airspeed in the 27 mph wind.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  generateWrightFlyer,
-  wrightFlightPose,
-  wrightGustRoll,
-  restrainingWire,
-  WRIGHT_FLIGHTS_1903,
-  WRIGHT_RAIL,
-} from '../dist/flyer.js';
+import { generateWrightFlyer, wrightFlightPose, wrightGustRoll, restrainingWire, WRIGHT_FLIGHTS_1903, WRIGHT_RAIL } from '../dist/flyer.js';
 
 const FT = 0.3048,
   MPH = 1609.344 / 3600;
@@ -30,27 +23,19 @@ function wellFormed(g, name) {
   const n = g.positions.length / 3;
   assert.ok(n > 0 && g.indices.length > 0 && g.indices.length % 3 === 0, `${name} has triangles`);
   assert.equal(g.normals.length, g.positions.length, `${name} normals`);
-  assert.equal(g.uvs.length, n * 2, `${name} uvs`);
+  assert.equal(g.uvs.length, (n * 2), `${name} uvs`);
   for (const i of g.indices) assert.ok(i < n, `${name} index in range`);
   for (const v of g.positions) assert.ok(Number.isFinite(v), `${name} finite`);
 }
 
 test('generateWrightFlyer: 40 ft 4 in span, 21 ft 1 in long, under 9 ft 3 in tall, skids on y = 0', () => {
   const f = generateWrightFlyer();
-  const all = [
-    f.wings,
-    f.frame,
-    f.engine,
-    f.cradle,
-    f.elevator.geometry,
-    f.rudder.geometry,
-    ...f.propellers.map((p) => p.geometry),
-  ];
+  const all = [f.wings, f.frame, f.engine, f.cradle, f.elevator.geometry, f.rudder.geometry, ...f.propellers.map((p) => p.geometry)];
   for (const [i, g] of all.entries()) wellFormed(g, `part ${i}`);
   const [x0, y0, z0, x1, y1, z1] = bounds(all);
   assert.ok(Math.abs(x1 - x0 - (40 * FT + 4 * 0.0254)) < 0.02, `span ${x1 - x0}`);
   assert.ok(Math.abs(z1 - z0 - (21 * FT + 0.0254)) < 0.1, `length ${z1 - z0}`);
-  assert.ok(y1 - y0 > 2.4 && y1 - y0 <= 9 * FT + 3 * 0.0254, `height ${y1 - y0}`);
+  assert.ok(y1 - y0 > 2.4 && y1 - y0 <= (9 * FT + 3 * 0.0254), `height ${y1 - y0}`);
   assert.ok(Math.abs(y0) < 1e-6, 'skids on y = 0');
   assert.ok(Math.abs(x0 + x1) < 1e-6, 'symmetric about x = 0');
 });
@@ -58,8 +43,7 @@ test('generateWrightFlyer: 40 ft 4 in span, 21 ft 1 in long, under 9 ft 3 in tal
 test('generateWrightFlyer: the wing tips droop by the option, and the propellers turn opposite ways on their own pivots', () => {
   const tipLow = (f) => {
     let y = Infinity;
-    for (let i = 0; i < f.wings.positions.length; i += 3)
-      if (Math.abs(f.wings.positions[i]) > 6.1) y = Math.min(y, f.wings.positions[i + 1]);
+    for (let i = 0; i < f.wings.positions.length; i += 3) if (Math.abs(f.wings.positions[i]) > 6.1) y = Math.min(y, f.wings.positions[i + 1]);
     return y;
   };
   const level = generateWrightFlyer({ droop: 0 }),
@@ -108,10 +92,7 @@ test('wrightFlightPose: every flight leaves the rail after the 40 ft run and lan
       prev = p;
     }
     assert.ok(liftoff && Math.abs(liftoff.z - WRIGHT_RAIL.run) < 0.2, `flight ${f.n} lift-off ${liftoff?.z}`);
-    assert.ok(
-      landing && Math.abs(landing.z - WRIGHT_RAIL.run - f.distance) < 0.2,
-      `flight ${f.n} landing ${landing?.z}`,
-    );
+    assert.ok(landing && Math.abs(landing.z - WRIGHT_RAIL.run - f.distance) < 0.2, `flight ${f.n} landing ${landing?.z}`);
     assert.ok(Math.abs(landing.t - liftoff.t - f.seconds) < 0.05, `flight ${f.n} air time ${landing.t - liftoff.t}`);
   }
 });
@@ -143,10 +124,7 @@ const centreX = (g) => {
 
 test("generateWrightFlyer: the engine is on the pilot's right and his hip cradle on his left, as in 1903 (glTF space)", () => {
   const right = cross([0, 0, 1], [0, 1, 0]);
-  assert.deepEqual(
-    right.map((v) => v + 0),
-    [-1, 0, 0],
-  );
+  assert.deepEqual(right.map((v) => v + 0), [-1, 0, 0]);
   const f = generateWrightFlyer(),
     side = (x) => Math.sign(x * right[0]); // +1 on the pilot's right, -1 on his left
   assert.equal(side(centreX(f.engine)), 1, `engine centre x ${centreX(f.engine)}`);
@@ -178,23 +156,17 @@ test('generateWrightFlyer: each propeller pushes the Flyer forward when it turns
   }
 });
 
-test("generateWrightFlyer: the elevator lever stands at the pilot's left hand ahead of the cradle, and the restraint tie is at the skids' rear", () => {
+test('generateWrightFlyer: the elevator lever stands at the pilot\'s left hand ahead of the cradle, and the restraint tie is at the skids\' rear', () => {
   const f = generateWrightFlyer();
   wellFormed(f.lever.geometry, 'lever');
   const [x0, y0, z0, x1, y1, z1] = bounds([f.lever.geometry]);
-  assert.ok(
-    x0 > f.pilot.hips[0] && x1 < f.pilot.hips[0] + 0.5,
-    `lever left of the hips (pilot's left is +X): ${x0} ${x1}`,
-  );
+  assert.ok(x0 > f.pilot.hips[0] && x1 < f.pilot.hips[0] + 0.5, `lever left of the hips (pilot's left is +X): ${x0} ${x1}`);
   assert.ok(z0 > f.pilot.hips[2] && z1 < f.pilot.head[2] + 0.2, `lever ahead of the hips, by the head: ${z0} ${z1}`);
   assert.ok(y1 - y0 > 0.35 && y1 - y0 < 0.6, `lever height ${y1 - y0}`);
   assert.deepEqual(f.lever.axis, [1, 0, 0]);
   assert.ok(Math.abs(f.lever.pivot[1] - y0) < 0.05, 'the lever turns about its foot');
   // The skids run back to 0.3 m behind the rear spar (the wing's trailing edge less 0.12 m).
-  assert.ok(
-    f.restraint.tie[2] < -1.1 && f.restraint.tie[2] > -1.3 && f.restraint.tie[1] < 0.2,
-    `tie at the skids' rear: ${f.restraint.tie}`,
-  );
+  assert.ok(f.restraint.tie[2] < -1.1 && f.restraint.tie[2] > -1.3 && f.restraint.tie[1] < 0.2, `tie at the skids' rear: ${f.restraint.tie}`);
 });
 
 test('restrainingWire: taut runs straight, slack sags an eighth of its length and lies on the sand', () => {
@@ -217,24 +189,15 @@ test('generateWrightFlyer wrecked: the right wings crushed toward the sand, ribs
   for (const k of ['wings', 'frame', 'ribs', 'wires', 'engine']) wellFormed(wreck[k], `wrecked ${k}`);
   const tipHeight = (g, side) => {
     let y = -Infinity;
-    for (let i = 0; i < g.positions.length; i += 3)
-      if (side * g.positions[i] > 5.5) y = Math.max(y, g.positions[i + 1]);
+    for (let i = 0; i < g.positions.length; i += 3) if (side * g.positions[i] > 5.5) y = Math.max(y, g.positions[i + 1]);
     return y;
   };
   assert.ok(tipHeight(wreck.wings, -1) < tipHeight(whole.wings, -1) - 0.5, 'right tip crushed down');
   assert.equal(tipHeight(wreck.wings, 1), tipHeight(whole.wings, 1), 'left tip as flown');
   assert.ok(wreck.ribs.indices.length < whole.ribs.indices.length * 0.95, 'ribs broken out');
   assert.notDeepEqual(bounds([wreck.engine]), bounds([whole.engine]), 'engine knocked askew');
-  assert.deepEqual(
-    generateWrightFlyer({ wrecked: true }).wings.positions,
-    wreck.wings.positions,
-    'the same seed, the same wreck',
-  );
-  assert.notDeepEqual(
-    generateWrightFlyer({ wrecked: true, seed: 7 }).wings.positions,
-    wreck.wings.positions,
-    'another seed, another wreck',
-  );
+  assert.deepEqual(generateWrightFlyer({ wrecked: true }).wings.positions, wreck.wings.positions, 'the same seed, the same wreck');
+  assert.notDeepEqual(generateWrightFlyer({ wrecked: true, seed: 7 }).wings.positions, wreck.wings.positions, 'another seed, another wreck');
 });
 
 test('wrightGustRoll: the left wing lifts, the Flyer turns over its tips once and rests, rolling on its tips', () => {

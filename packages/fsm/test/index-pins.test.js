@@ -63,16 +63,12 @@ test('the clock is the floating-point sum of the deltas, even when a delay ends 
 });
 
 test('100,000 delayed transitions in one update are allowed and one more throws', () => {
-  const pingPong = () =>
-    new StateMachine({ a: {}, b: {} }, 'a', {}, [
-      { from: 'a', to: 'b', after: 1 },
-      { from: 'b', to: 'a', after: 1 },
-    ]);
+  const pingPong = () => new StateMachine({ a: {}, b: {} }, 'a', {}, [
+    { from: 'a', to: 'b', after: 1 },
+    { from: 'b', to: 'a', after: 1 },
+  ]);
   const m = pingPong();
   m.update(100000);
   assert.deepEqual([m.state, m.clock], ['a', 100000]);
-  assert.throws(
-    () => pingPong().update(100001),
-    (e) => e.code === 'state' && /without end/.test(e.message),
-  );
+  assert.throws(() => pingPong().update(100001), (e) => e.code === 'state' && /without end/.test(e.message));
 });

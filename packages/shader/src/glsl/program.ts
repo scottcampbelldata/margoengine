@@ -7,14 +7,7 @@ import { GLSLParser, type Declaration, type Program } from './parser.js';
 import { GLSLEmitter } from './emit.js';
 import { preprocessGLSL, type GLSLSourceInfo } from './preprocess.js';
 import type { GLSLHost, GLSLHostName, GLSLSampleOptions } from './host.js';
-import {
-  presets,
-  presetNames,
-  semantics,
-  type GLSLAttributeSemantic,
-  type GLSLBuiltins,
-  type GLSLPreset,
-} from './presets.js';
+import { presets, presetNames, semantics, type GLSLAttributeSemantic, type GLSLBuiltins, type GLSLPreset } from './presets.js';
 export type { GLSLAttributeSemantic, GLSLBuiltins } from './presets.js';
 
 /** The two stages of a GLSL program. */
@@ -171,12 +164,7 @@ const textureKinds: Record<string, [GLSLProgramTexture['dimension'], GLSLProgram
   samplerCubeShadow: ['cube', 'depth'],
   sampler2DArrayShadow: ['2d-array', 'depth'],
 };
-for (const [d, w] of [
-  ['2D', '2d'],
-  ['Cube', 'cube'],
-  ['3D', '3d'],
-  ['2DArray', '2d-array'],
-] as const) {
+for (const [d, w] of [['2D', '2d'], ['Cube', 'cube'], ['3D', '3d'], ['2DArray', '2d-array']] as const) {
   textureKinds['sampler' + d] = [w];
   textureKinds['isampler' + d] = [w, 'sint'];
   textureKinds['usampler' + d] = [w, 'uint'];
@@ -206,12 +194,7 @@ export const rect = (t: string) => /^mat([234])x([234])$/.exec(t)?.slice(1).map(
 const numbers = (t: string) => (rect(t) ? rect(t)![0] * rect(t)![1] : t.startsWith('mat') ? width(t) ** 2 : width(t));
 // Arrays a uniform array holds as it is: elements 16 bytes apart in WGSL as in GLSL's layout.
 const direct = /^(?:[iu]?vec[34]|mat[34])\[\d+\]$/;
-const kind = (t: string) =>
-  /^(int|ivec)/.test(t) || /^vec\di$|^i32$/.test(t)
-    ? 'i'
-    : /^(uint|uvec)/.test(t) || /^vec\du$|^u32$/.test(t)
-      ? 'u'
-      : 'f';
+const kind = (t: string) => (/^(int|ivec)/.test(t) || /^vec\di$|^i32$/.test(t) ? 'i' : /^(uint|uvec)/.test(t) || /^vec\du$|^u32$/.test(t) ? 'u' : 'f');
 const wgslType = (t: string) => {
   const n = width(t),
     k = kind(t);
@@ -279,40 +262,26 @@ const chunks: Record<string, string> = {
 };
 function include(stage: GLSLStage, code: string, source: GLSLProgramSource, included: Set<string>, depth = 0): string {
   const given = source.includes ?? {};
-  return code.replace(
-    /^[ \t]*#[ \t]*include[ \t]*(?:<([^>\n]*)>|"([^"\n]*)")[^\n]*$/gm,
-    (line, a?: string, b?: string) => {
-      const name = (a ?? b)!.trim();
-      if (Object.hasOwn(given, name)) {
-        if (depth >= 8)
-          throw fault(
-            'failed',
-            `GLSL program: ${subject(stage)}: #include <${name}> nests more than 8 deep; an include includes itself`,
-          );
-        return include(stage, given[name]!, source, included, depth + 1).replace(/\r?\n/g, ' ');
-      }
-      if (chunks[name]) {
-        if (stage !== 'fragment')
-          throw fault('failed', `GLSL program: ${subject(stage)}: #include <${name}> belongs in the fragmentShader`);
-        included.add(name);
-        const out = /^\s*#\s*version\s+300/m.test(source.fragmentShader)
-          ? (/^\s*(?:layout\s*\([^)]*\)\s*)?out\s+(?:(?:highp|mediump|lowp)\s+)?vec4\s+([A-Za-z_]\w*)/m.exec(
-              code,
-            )?.[1] ??
-            /\bout\s+(?:(?:highp|mediump|lowp)\s+)?vec4\s+([A-Za-z_]\w*)/.exec(source.fragmentShader)?.[1] ??
-            'gl_FragColor')
-          : 'gl_FragColor';
-        return chunks[name]!.replaceAll('MARGO_OUT', out);
-      }
-      throw Object.assign(
-        fault(
-          'failed',
-          `GLSL program: ${subject(stage)}: #include <${name}> is not known; pass its text in includes, or remove it`,
-        ),
-        { stage, line: code.slice(0, code.indexOf(line)).split('\n').length, column: 1 },
-      );
-    },
-  );
+  return code.replace(/^[ \t]*#[ \t]*include[ \t]*(?:<([^>\n]*)>|"([^"\n]*)")[^\n]*$/gm, (line, a?: string, b?: string) => {
+    const name = (a ?? b)!.trim();
+    if (Object.hasOwn(given, name)) {
+      if (depth >= 8) throw fault('failed', `GLSL program: ${subject(stage)}: #include <${name}> nests more than 8 deep; an include includes itself`);
+      return include(stage, given[name]!, source, included, depth + 1).replace(/\r?\n/g, ' ');
+    }
+    if (chunks[name]) {
+      if (stage !== 'fragment') throw fault('failed', `GLSL program: ${subject(stage)}: #include <${name}> belongs in the fragmentShader`);
+      included.add(name);
+      const out = /^\s*#\s*version\s+300/m.test(source.fragmentShader)
+        ? /^\s*(?:layout\s*\([^)]*\)\s*)?out\s+(?:(?:highp|mediump|lowp)\s+)?vec4\s+([A-Za-z_]\w*)/m.exec(code)?.[1] ??
+          /\bout\s+(?:(?:highp|mediump|lowp)\s+)?vec4\s+([A-Za-z_]\w*)/.exec(source.fragmentShader)?.[1] ?? 'gl_FragColor'
+        : 'gl_FragColor';
+      return chunks[name]!.replaceAll('MARGO_OUT', out);
+    }
+    throw Object.assign(
+      fault('failed', `GLSL program: ${subject(stage)}: #include <${name}> is not known; pass its text in includes, or remove it`),
+      { stage, line: code.slice(0, code.indexOf(line)).split('\n').length, column: 1 },
+    );
+  });
 }
 function parse(stage: GLSLStage, code: string, source: GLSLProgramSource, extra: readonly string[] = []): StageUnit {
   if (typeof code !== 'string' || !code.trim() || code.length > 65536)
@@ -329,19 +298,9 @@ function parse(stage: GLSLStage, code: string, source: GLSLProgramSource, extra:
   const info: GLSLSourceInfo = { version: 100 },
     text = preprocessGLSL(lines.length ? lines.join('\n') + '\n' + code : code, info);
   if (versioned && source.glslVersion !== undefined && source.glslVersion !== info.version)
-    throw fault(
-      'failed',
-      `GLSL program: ${subject(stage)} declares #version ${info.version} but glslVersion is ${source.glslVersion}; drop one`,
-    );
+    throw fault('failed', `GLSL program: ${subject(stage)} declares #version ${info.version} but glslVersion is ${source.glslVersion}; drop one`);
   try {
-    return {
-      stage,
-      text,
-      header: lines.length,
-      version: info.version,
-      included,
-      program: new GLSLParser(text, subject(stage)).parse(),
-    };
+    return { stage, text, header: lines.length, version: info.version, included, program: new GLSLParser(text, subject(stage)).parse() };
   } catch (error) {
     // The parser counts lines of the text it read; the source starts after the lines put before it.
     if (typeof (error as { line?: unknown })?.line === 'number') {
@@ -360,8 +319,7 @@ export const uses = (unit: StageUnit, name: string) => new RegExp(`\\b${name}\\b
 export function read(u: GLSLProgramUniform): string {
   const m = `uniforms.${u.member}`,
     r = rect(u.glsl);
-  if (r)
-    return `mat${r[0]}x${r[1]}f(${Array.from({ length: r[0] }, (_, c) => `${m}[${c}].${'xyzw'.slice(0, r[1])}`).join(',')})`;
+  if (r) return `mat${r[0]}x${r[1]}f(${Array.from({ length: r[0] }, (_, c) => `${m}[${c}].${'xyzw'.slice(0, r[1])}`).join(',')})`;
   if (u.glsl === 'bool') return `(${m}!=0u)`;
   if (u.glsl.startsWith('bvec')) return `(${m}!=vec${width(u.glsl)}u(0u))`;
   if (u.glsl === 'mat2') return `mat2x2f(${m}.xy,${m}.zw)`;
@@ -390,8 +348,7 @@ const lookup =
       off = o.offset ? `,${o.offset}` : '',
       head = `${t},${samplerOf(t)},${at}`;
     // A shadow lookup compares its reference with the texel (WGSL takes no bias or gradients there: level 0).
-    if (o.compare)
-      return `textureSampleCompare${!implicit || o.lod || o.ddx ? 'Level' : ''}(${head},${o.compare}${off})`;
+    if (o.compare) return `textureSampleCompare${!implicit || o.lod || o.ddx ? 'Level' : ''}(${head},${o.compare}${off})`;
     if (/^[iu]/.test(k)) {
       // An integer texture is read at its nearest texel (GL requires nearest filtering of one), level 0, clamped to its
       // edge: GLSL ES 3.00 8.8 with OpenGL ES 3.0.6 3.8.10.
@@ -429,16 +386,10 @@ if(d>=q){return a;}
 return mix(a,margoBilinear(t,uv,i32(d)+1,o,m),l-d);}
 fn margoTapsAuto(t:texture_2d<f32>,uv:vec2f,bias:f32,o:vec2i,m:u32)->vec4f{return margoTaps(t,uv,vec4f(dpdx(uv),dpdy(uv)),vec2f(bias,0.0),o,m);}
 `;
-const tapMode = (f: GLSLTexelFilter) =>
-  (f.filter === 'nearest' ? 0 : f.filter === 'linear' ? 2 : 4) + (f.wrap === 'repeat' ? 1 : 0);
+const tapMode = (f: GLSLTexelFilter) => (f.filter === 'nearest' ? 0 : f.filter === 'linear' ? 2 : 4) + (f.wrap === 'repeat' ? 1 : 0);
 
 // The GLSL value of an attribute from a mesh attribute of WGSL type `type` (absent: GL's generic default 0, 0, 0, 1).
-function adapt(
-  code: string | undefined,
-  type: string | undefined,
-  glsl: string,
-  fallback: readonly number[] = [0, 0, 0, 1],
-): string {
+function adapt(code: string | undefined, type: string | undefined, glsl: string, fallback: readonly number[] = [0, 0, 0, 1]): string {
   const n = width(glsl),
     target = wgslType(glsl);
   if (!code || !type) {
@@ -453,11 +404,7 @@ function adapt(
 // The interstage form of a varying: WGSL carries f32, i32 and u32 scalars and vectors, integers flat.
 function varyingType(unit: StageUnit, d: Declaration): string {
   if (!/^(float|u?int|[iu]?vec[234])$/.test(d.type))
-    refuse(
-      unit,
-      `varying ${d.name} has type ${d.type}; pass float, int or uint scalars and vectors between the stages`,
-      d.name,
-    );
+    refuse(unit, `varying ${d.name} has type ${d.type}; pass float, int or uint scalars and vectors between the stages`, d.name);
   if (kind(d.type) !== 'f' && !has(d.qualifier, 'flat'))
     refuse(unit, `integer varying ${d.name} must be flat (GLSL ES 3.00 4.3.6)`, d.name);
   return wgslType(d.type);
@@ -489,16 +436,7 @@ export interface GLSLSceneLink {
   readonly now: string;
   readonly velocity: boolean;
   /** The velocity entry, from the vertex entry's parameters, attribute statements, copies, main and point code. */
-  entry(
-    params: string,
-    lines: string,
-    copy: string,
-    main: string,
-    gl: boolean,
-    sprite: string,
-    vs: StageUnit,
-    names: Record<string, GLSLHostName>,
-  ): string;
+  entry(params: string, lines: string, copy: string, main: string, gl: boolean, sprite: string, vs: StageUnit, names: Record<string, GLSLHostName>): string;
 }
 /** @internal Starts a link's scene part, or returns undefined when `source` sets no scene option. */
 export type GLSLSceneLinker = (source: GLSLProgramSource) => GLSLSceneLink | undefined;
@@ -525,24 +463,16 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
   } = source;
   const scene = sceneLinker?.(source);
   if (!scene && (source.lights || source.fog || source.velocity))
-    throw new TypeError(
-      'lights, fog and velocity are options of ShaderMaterial from shader/glsl-material; draw with that ShaderMaterial to use them',
-    );
+    throw new TypeError('lights, fog and velocity are options of ShaderMaterial from shader/glsl-material; draw with that ShaderMaterial to use them');
   for (const [k, v] of Object.entries(unfilterable))
     if (!v || !['nearest', 'linear', 'mipmap'].includes(v.filter) || !['clamp', 'repeat'].includes(v.wrap))
-      throw new TypeError(
-        `ShaderMaterial unfilterable.${k} needs filter 'nearest', 'linear' or 'mipmap' and wrap 'clamp' or 'repeat'`,
-      );
+      throw new TypeError(`ShaderMaterial unfilterable.${k} needs filter 'nearest', 'linear' or 'mipmap' and wrap 'clamp' or 'repeat'`);
   if (builtins !== false && builtins !== 'auto' && !presetNames.includes(builtins))
-    throw new TypeError(
-      `ShaderMaterial builtins must be ${presetNames.map((n) => `'${n}'`).join(', ')}, 'auto' or false`,
-    );
-  if (outputColorSpace !== 'srgb' && outputColorSpace !== 'linear')
-    throw new TypeError("ShaderMaterial outputColorSpace must be 'srgb' or 'linear'");
+    throw new TypeError(`ShaderMaterial builtins must be ${presetNames.map((n) => `'${n}'`).join(', ')}, 'auto' or false`);
+  if (outputColorSpace !== 'srgb' && outputColorSpace !== 'linear') throw new TypeError("ShaderMaterial outputColorSpace must be 'srgb' or 'linear'");
   if (!Array.isArray(uniformNames)) throw new TypeError('ShaderMaterial uniformNames must be an array of names');
   for (const [k, v] of Object.entries(semanticOf))
-    if (!semantics.includes(v))
-      throw new TypeError(`ShaderMaterial attributes.${k} must be one of ${semantics.join(', ')}`);
+    if (!semantics.includes(v)) throw new TypeError(`ShaderMaterial attributes.${k} must be one of ${semantics.join(', ')}`);
   for (const [k, v] of Object.entries(defaultAttributeValues))
     if (!Array.isArray(v) || !v.length || v.length > 4 || v.some((x) => !Number.isFinite(x)))
       throw new TypeError(`ShaderMaterial defaultAttributeValues.${k} needs 1 to 4 finite numbers`);
@@ -554,8 +484,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       throw new TypeError(`ShaderMaterial define ${k} needs an identifier and a one-line string, number or boolean`);
   if (typeof flipY !== 'boolean' || typeof strict !== 'boolean')
     throw new TypeError('ShaderMaterial flipY and strict must be booleans');
-  if (clipSpace !== 'gl' && clipSpace !== 'webgpu')
-    throw new TypeError("ShaderMaterial clipSpace must be 'gl' or 'webgpu'");
+  if (clipSpace !== 'gl' && clipSpace !== 'webgpu') throw new TypeError("ShaderMaterial clipSpace must be 'gl' or 'webgpu'");
   if (glslVersion !== undefined && glslVersion !== 100 && glslVersion !== 300)
     throw new TypeError('ShaderMaterial glslVersion must be 100 or 300');
   const cacheKey = JSON.stringify([
@@ -584,8 +513,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
   const own = new Set(uniformNames),
     gl = clipSpace === 'gl';
   // The convention: named, or the one whose names the program uses.
-  let preset: GLSLPreset | undefined,
-    chosen: Exclude<GLSLBuiltins, 'auto'> = false;
+  let preset: GLSLPreset | undefined, chosen: Exclude<GLSLBuiltins, 'auto'> = false;
   const matches = (p: GLSLPreset) => {
     const found: string[] = [];
     for (const unit of [vs, fs]) {
@@ -593,12 +521,10 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       for (const [name, u] of Object.entries(p.uniforms)) {
         if (own.has(name)) continue;
         const d = declared.get(name);
-        if (d ? has(d.qualifier, 'uniform') && d.type === u.glsl : u.implicit?.includes(unit.stage) && uses(unit, name))
-          found.push(name);
+        if (d ? has(d.qualifier, 'uniform') && d.type === u.glsl : u.implicit?.includes(unit.stage) && uses(unit, name)) found.push(name);
       }
       if (unit.stage === 'vertex')
-        for (const [name, a] of Object.entries(p.attributes))
-          if (a.implicit && !declared.has(name) && uses(unit, name)) found.push(name);
+        for (const [name, a] of Object.entries(p.attributes)) if (a.implicit && !declared.has(name) && uses(unit, name)) found.push(name);
     }
     return found;
   };
@@ -619,12 +545,10 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       const declared = new Set(unit.program.globals.map((d) => d.name)),
         lines: string[] = [];
       for (const [name, u] of Object.entries(preset!.uniforms))
-        if (!own.has(name) && u.implicit?.includes(unit.stage) && !declared.has(name) && uses(unit, name))
-          lines.push(`uniform ${u.glsl} ${name};`);
+        if (!own.has(name) && u.implicit?.includes(unit.stage) && !declared.has(name) && uses(unit, name)) lines.push(`uniform ${u.glsl} ${name};`);
       if (unit.stage === 'vertex')
         for (const [name, a] of Object.entries(preset!.attributes))
-          if (a.implicit && !declared.has(name) && uses(unit, name))
-            lines.push(`${unit.version === 300 ? 'in' : 'attribute'} ${a.glsl} ${name};`);
+          if (a.implicit && !declared.has(name) && uses(unit, name)) lines.push(`${unit.version === 300 ? 'in' : 'attribute'} ${a.glsl} ${name};`);
       return lines;
     };
     extraVertex.push(...implicit(vs));
@@ -634,10 +558,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
   if (scene) extraVertex.push(...scene.declare(vs, fs, own, preset));
   if (extraVertex.length) vs = parse('vertex', source.vertexShader, source, extraVertex);
   if (vs.version !== fs.version)
-    refuse(
-      fs,
-      `the vertexShader is GLSL ES ${vs.version === 300 ? '3.00' : '1.00'} and the fragmentShader ${fs.version === 300 ? '3.00' : '1.00'}; use one version in both`,
-    );
+    refuse(fs, `the vertexShader is GLSL ES ${vs.version === 300 ? '3.00' : '1.00'} and the fragmentShader ${fs.version === 300 ? '3.00' : '1.00'}; use one version in both`);
   // Uniforms of both stages, joined by name; a name declared in both has one type (GLSL ES 3.00 4.3.5).
   const uniforms = new Map<string, GLSLProgramUniform>(),
     textures = new Map<string, GLSLProgramTexture>(),
@@ -663,14 +584,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
     return t.startsWith('mat') ? `mat${width(t)}x${width(t)}f` : wgslType(t);
   };
   // The leaves of a struct or array uniform, one raw member each, and the WGSL that builds its value from them.
-  const flatten = (
-    unit: StageUnit,
-    root: string,
-    t: string,
-    name: string,
-    member: string,
-    path: GLSLProgramUniform['path'] & unknown[],
-  ): string => {
+  const flatten = (unit: StageUnit, root: string, t: string, name: string, member: string, path: GLSLProgramUniform['path'] & unknown[]): string => {
     const array = /^(.*)\[(\d+)\]$/.exec(t);
     if (array) {
       const [, element, n] = array,
@@ -679,17 +593,11 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
     }
     const fields = unit.program.structs.get(t);
     if (fields) {
-      if (fields.some((f) => /sampler/.test(f.type)))
-        refuse(unit, `uniform ${root} holds a sampler in a struct; declare each sampler as its own uniform`, root);
+      if (fields.some((f) => /sampler/.test(f.type))) refuse(unit, `uniform ${root} holds a sampler in a struct; declare each sampler as its own uniform`, root);
       return `user_${t}(${fields.map((f) => flatten(unit, root, f.type, `${name}.${f.name}`, `${member}__${f.name}`, [...path, f.name])).join(',')})`;
     }
     const type = uniformTypes[t] ?? (rect(t) ? 'mat4x4f' : undefined);
-    if (!type)
-      refuse(
-        unit,
-        `uniform ${root} has a member of type ${t}; use scalars, vectors, matrices, structs and arrays of them`,
-        root,
-      );
+    if (!type) refuse(unit, `uniform ${root} has a member of type ${t}; use scalars, vectors, matrices, structs and arrays of them`, root);
     const leaf: GLSLProgramUniform = { name, glsl: t, type, member, root, path };
     uniforms.set(name, leaf);
     return read(leaf);
@@ -700,11 +608,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       const builtin = own.has(d.name) ? undefined : preset?.uniforms[d.name];
       if (builtin) {
         if (builtin.glsl !== d.type)
-          refuse(
-            unit,
-            `uniform ${d.name} is the engine's ${builtin.glsl} under builtins '${chosen}'; declare it ${builtin.glsl}, or list it in uniforms to set it yourself`,
-            d.name,
-          );
+          refuse(unit, `uniform ${d.name} is the engine's ${builtin.glsl} under builtins '${chosen}'; declare it ${builtin.glsl}, or list it in uniforms to set it yourself`, d.name);
         engine[d.name] = { code: builtin.code, type: builtin.glsl };
         builtin.helpers?.forEach((h) => helpers.add(h));
         continue;
@@ -712,12 +616,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       const known = declared.get(d.name),
         shape = shapeOf(unit, d.type);
       if (known) {
-        if (known.shape !== shape)
-          refuse(
-            unit,
-            `uniform ${d.name} is ${known.type} in the vertexShader and ${d.type} here; declare one type`,
-            d.name,
-          );
+        if (known.shape !== shape) refuse(unit, `uniform ${d.name} is ${known.type} in the vertexShader and ${d.type} here; declare one type`, d.name);
         continue;
       }
       if (scene?.uniform(unit, d, own)) sceneNames.push(d.name);
@@ -733,8 +632,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       if (textureKinds[d.type]) texture(d.name, d.type, member);
       else if (samplerArray && textureKinds[samplerArray[1]!])
         // Element k binds as its own texture, user_<name>__k (the emitter's name for maps[k]).
-        for (let k = 0; k < +samplerArray[2]!; k++)
-          texture(`${d.name}[${k}]`, samplerArray[1]!, `${member}__${k}`, { root: d.name, index: k });
+        for (let k = 0; k < +samplerArray[2]!; k++) texture(`${d.name}[${k}]`, samplerArray[1]!, `${member}__${k}`, { root: d.name, index: k });
       else if (uniformTypes[d.type] || rect(d.type))
         uniforms.set(d.name, { name: d.name, glsl: d.type, type: uniformTypes[d.type] ?? 'mat4x4f', member });
       else if (direct.test(d.type)) {
@@ -743,12 +641,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       } else if (/\[\d+\]$/.test(d.type) || unit.program.structs.has(d.type))
         // A struct, block instance or other array is built from its leaves into a private variable when a stage starts.
         entry.copy = [wgslOf(unit, d.type), flatten(unit, d.name, d.type, d.name, member, [])];
-      else
-        refuse(
-          unit,
-          `uniform ${d.name} has type ${d.type}; use a scalar, vector, matrix, sampler, struct or array of them`,
-          d.name,
-        );
+      else refuse(unit, `uniform ${d.name} has type ${d.type}; use a scalar, vector, matrix, sampler, struct or array of them`, d.name);
     }
   // Vertex inputs, and the values the vertex stage hands on, in declaration order.
   const attributes: GLSLProgramAttribute[] = [],
@@ -758,15 +651,8 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
     const q = d.qualifier;
     if (has(q, 'attribute') || has(q, 'in')) {
       if (!/^(float|u?int|[iu]?vec[234]|mat[234])$/.test(d.type))
-        refuse(
-          vs,
-          `attribute ${d.name} has type ${d.type}; use a float, int or uint scalar or vector, or a mat2, mat3 or mat4`,
-          d.name,
-        );
-      const semantic =
-        semanticOf[d.name] ??
-        preset?.attributes[d.name]?.semantic ??
-        (semantics.includes(d.name as GLSLAttributeSemantic) ? (d.name as GLSLAttributeSemantic) : undefined);
+        refuse(vs, `attribute ${d.name} has type ${d.type}; use a float, int or uint scalar or vector, or a mat2, mat3 or mat4`, d.name);
+      const semantic = semanticOf[d.name] ?? preset?.attributes[d.name]?.semantic ?? (semantics.includes(d.name as GLSLAttributeSemantic) ? (d.name as GLSLAttributeSemantic) : undefined);
       attributes.push(semantic ? { name: d.name, glsl: d.type, semantic } : { name: d.name, glsl: d.type });
     } else if (has(q, 'varying') || has(q, 'out')) {
       varyingType(vs, d);
@@ -781,81 +667,46 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       const v = varyings.find((x) => x.name === d.name);
       // An input the fragment stage reads needs the vertex stage's output of the same type and interpolation.
       if (!v) {
-        if (
-          new RegExp(`\\b${d.name}\\b`, 'g').exec(fs.text) &&
-          [...fs.text.matchAll(new RegExp(`\\b${d.name}\\b`, 'g'))].length > 1
-        )
+        if (new RegExp(`\\b${d.name}\\b`, 'g').exec(fs.text) && [...fs.text.matchAll(new RegExp(`\\b${d.name}\\b`, 'g'))].length > 1)
           refuse(fs, `varying ${d.name} is read but the vertexShader does not write it; declare it there too`, d.name);
         continue;
       }
-      if (v.glsl !== d.type)
-        refuse(fs, `varying ${d.name} is ${v.glsl} in the vertexShader and ${d.type} here`, d.name);
+      if (v.glsl !== d.type) refuse(fs, `varying ${d.name} is ${v.glsl} in the vertexShader and ${d.type} here`, d.name);
       if (vs.version === 300 && v.interpolation !== interpolation(q))
         refuse(fs, `varying ${d.name} has other interpolation qualifiers than in the vertexShader`, d.name);
       inputs.push(v);
     } else if (has(q, 'out')) outputs.push(d);
   }
   if (outputs.length > 1)
-    refuse(
-      fs,
-      `${outputs.length} colour outputs; the scene pass has one colour target, so declare one output`,
-      outputs[1]!.name,
-    );
+    refuse(fs, `${outputs.length} colour outputs; the scene pass has one colour target, so declare one output`, outputs[1]!.name);
   const output = outputs[0];
-  if (output && !/^(float|vec[234])$/.test(output.type))
-    refuse(
-      fs,
-      `output ${output.name} has type ${output.type}; the scene's colour target takes float vectors`,
-      output.name,
-    );
+  if (output && (!/^(float|vec[234])$/.test(output.type)))
+    refuse(fs, `output ${output.name} has type ${output.type}; the scene's colour target takes float vectors`, output.name);
   if (/\bgl_FragData\s*\[\s*[^0\s]/.test(fs.text))
     refuse(fs, 'gl_FragData above 0 needs more colour targets; the scene pass has one', 'gl_FragData');
   const hostNames: Record<string, GLSLHostName> = { ...engine };
-  for (const u of uniforms.values())
-    if (!u.root) hostNames[u.name] = { code: u.count ? `uniforms.${u.member}` : read(u), type: u.glsl };
+  for (const u of uniforms.values()) if (!u.root) hostNames[u.name] = { code: u.count ? `uniforms.${u.member}` : read(u), type: u.glsl };
   for (const t of textures.values()) if (t.root === undefined) hostNames[t.name] = { code: t.binding, type: t.glsl };
-  for (const [name, d] of declared)
-    if (d.copy || /sampler\w*\[/.test(d.type)) hostNames[name] = { code: 'user_' + name, type: d.type };
+  for (const [name, d] of declared) if (d.copy || /sampler\w*\[/.test(d.type)) hostNames[name] = { code: 'user_' + name, type: d.type };
   // Each stage declares the copies it reads and fills them before main.
   const copies = (unit: StageUnit) => [...declared].filter(([name, d]) => d.copy && uses(unit, name));
-  const copyDeclarations = (unit: StageUnit) =>
-    copies(unit)
-      .map(([name, d]) => `var<private> user_${name}:${d.copy![0]};\n`)
-      .join('');
-  const copyStatements = (unit: StageUnit) =>
-    copies(unit)
-      .map(([name, d]) => `user_${name}=${d.copy![1]};\n`)
-      .join('');
+  const copyDeclarations = (unit: StageUnit) => copies(unit).map(([name, d]) => `var<private> user_${name}:${d.copy![0]};\n`).join('');
+  const copyStatements = (unit: StageUnit) => copies(unit).map(([name, d]) => `user_${name}=${d.copy![1]};\n`).join('');
   // Linearly filtered unfilterable textures by binding (nearest is the device's non-filtering sampler), and the mode of
   // each lookup: a uniform's is known, an argument's is passed.
-  const modes = new Map(
-    [...textures.values()]
-      .filter((t) => t.sampleType === 'unfilterable-float')
-      .map((t) => [t.binding, tapMode(unfilterable[t.name]!)] as const)
-      .filter(([, m]) => m > 1),
-  );
+  const modes = new Map([...textures.values()].filter((t) => t.sampleType === 'unfilterable-float').map((t) => [t.binding, tapMode(unfilterable[t.name]!)] as const).filter(([, m]) => m > 1));
   if (modes.size) helpers.add(tapCode);
-  const modeOf = modes.size
-    ? (t: string) => (t.startsWith('argument_') ? t + 'm' : `${modes.get(t) ?? 0}u`)
-    : undefined;
+  const modeOf = modes.size ? (t: string) => (t.startsWith('argument_') ? t + 'm' : `${modes.get(t) ?? 0}u`) : undefined;
   const helperCode = [...helpers].join('');
   let vertexMain = '',
     fragmentMain = '';
-  const translate = (
-    unit: StageUnit,
-    names: Record<string, GLSLHostName>,
-    prologue: string,
-    capture: (n: string) => void,
-  ) => {
+  const translate = (unit: StageUnit, names: Record<string, GLSLHostName>, prologue: string, capture: (n: string) => void) => {
     const text = unit.text;
     for (const [name, [low, high]] of Object.entries(maxima))
       if (uses(unit, name)) names[name] = { code: `i32(${unit.version === 300 ? high : low})`, type: 'int' };
     if (uses(unit, 'gl_DepthRange')) {
       // gl_DepthRange (GLSL ES 1.00 7.5): the window depth range, 0 to 1.
-      unit.program.structs.set(
-        'gl_DepthRangeParameters',
-        ['near', 'far', 'diff'].map((name) => ({ name, type: 'float', qualifier: '' })),
-      );
+      unit.program.structs.set('gl_DepthRangeParameters', ['near', 'far', 'diff'].map((name) => ({ name, type: 'float', qualifier: '' })));
       names.gl_DepthRange = { code: 'user_gl_DepthRangeParameters(0.0,1.0,1.0)', type: 'gl_DepthRangeParameters' };
     }
     const host: GLSLHost = {
@@ -877,10 +728,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
       wgsl = new GLSLEmitter(unit.program, host, unit.version).emit();
     } catch (error) {
       if ((error as { code?: string })?.code === 'failed')
-        (error as Error).message = (error as Error).message.replace(
-          'GLSL translation: ',
-          `GLSL translation: ${subject(unit.stage)}: `,
-        );
+        (error as Error).message = (error as Error).message.replace('GLSL translation: ', `GLSL translation: ${subject(unit.stage)}: `);
       throw error;
     }
     return strict ? wgsl : wgsl.replace(/^fn /gm, '@diagnostic(off,derivative_uniformity) fn ');
@@ -896,9 +744,7 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
   const vertexBody = translate(
     vs,
     vertexNames,
-    'var<private> glsl_Position:vec4f;\nvar<private> glsl_PointSize:f32;\nvar<private> glsl_VertexID:i32;\nvar<private> glsl_InstanceID:i32;\n' +
-      copyDeclarations(vs) +
-      motionCode,
+    'var<private> glsl_Position:vec4f;\nvar<private> glsl_PointSize:f32;\nvar<private> glsl_VertexID:i32;\nvar<private> glsl_InstanceID:i32;\n' + copyDeclarations(vs) + motionCode,
     (n) => (vertexMain = n),
   );
   const fragmentNames: Record<string, GLSLHostName> = {
@@ -917,14 +763,11 @@ export function linkGLSLProgram(source: GLSLProgramSource, sceneLinker?: GLSLSce
   const fragmentBody = translate(
     fs,
     fragmentNames,
-    'var<private> glsl_FragCoord:vec4f;\nvar<private> glsl_FrontFacing:bool;\nvar<private> glsl_PointCoord:vec2f=vec2f(0.5);\nvar<private> glsl_FragColor:vec4f;\nvar<private> glsl_FragData:array<vec4f,1>;\nvar<private> glsl_FragDepth:f32;\n' +
-      copyDeclarations(fs),
+    'var<private> glsl_FragCoord:vec4f;\nvar<private> glsl_FrontFacing:bool;\nvar<private> glsl_PointCoord:vec2f=vec2f(0.5);\nvar<private> glsl_FragColor:vec4f;\nvar<private> glsl_FragData:array<vec4f,1>;\nvar<private> glsl_FragDepth:f32;\n' + copyDeclarations(fs),
     (n) => (fragmentMain = n),
   );
   const struct = (list: readonly GLSLProgramVarying[]) =>
-    list
-      .map((v) => `,@location(${v.location}) ${interpolate(v.interpolation)}v${v.location}:${wgslType(v.glsl)}`)
-      .join('');
+    list.map((v) => `,@location(${v.location}) ${interpolate(v.interpolation)}v${v.location}:${wgslType(v.glsl)}`).join('');
   // OpenGL ES 3.0.6 3.4: a point is a square of gl_PointSize pixels (at least 1) around its centre, and is dropped whole
   // when its centre is outside the clip volume.
   const spriteCode = `let c=o.clip;
@@ -948,12 +791,7 @@ else{o.clip=vec4f(c.xy+a.gl_PointCorner*max(glsl_PointSize,1.0)/camera.viewport.
         const n = width(a.glsl),
           columns = Array.from({ length: n }, (_, i) => {
             const m = find(rename(a.name) + i);
-            return adapt(
-              m && 'a.' + m.name,
-              m?.type,
-              `vec${n}`,
-              [0, 1, 2, 3].map((j) => +(i === j)),
-            );
+            return adapt(m && 'a.' + m.name, m?.type, `vec${n}`, [0, 1, 2, 3].map((j) => +(i === j)));
           });
         return `user_${a.name}=mat${n}x${n}f(${columns.join(',')});`;
       }
@@ -962,29 +800,13 @@ else{o.clip=vec4f(c.xy+a.gl_PointCorner*max(glsl_PointSize,1.0)/camera.viewport.
     });
     // A sized point is drawn as a square: one instance a point, six corners from gl_PointCorner (shaderMesh).
     const sprite = points && !!layout?.some((l) => l.name === 'gl_PointCorner');
-    if (ids)
-      lines.push(
-        sprite
-          ? 'glsl_VertexID=i32(margoInstanceIndex);glsl_InstanceID=0;'
-          : 'glsl_VertexID=i32(margoVertexIndex);glsl_InstanceID=i32(margoInstanceIndex);',
-      );
+    if (ids) lines.push(sprite ? 'glsl_VertexID=i32(margoInstanceIndex);glsl_InstanceID=0;' : 'glsl_VertexID=i32(margoVertexIndex);glsl_InstanceID=i32(margoInstanceIndex);');
     const params = [
       ...(layout?.length ? ['a:Attributes'] : []),
-      ...(ids
-        ? ['@builtin(vertex_index) margoVertexIndex:u32', '@builtin(instance_index) margoInstanceIndex:u32']
-        : []),
+      ...(ids ? ['@builtin(vertex_index) margoVertexIndex:u32', '@builtin(instance_index) margoInstanceIndex:u32'] : []),
     ];
     const motion = velocity
-      ? scene!.entry(
-          params.join(','),
-          lines.join('\n'),
-          copyStatements(vs),
-          vertexMain,
-          gl,
-          sprite ? spriteCode : '',
-          vs,
-          vertexNames,
-        )
+      ? scene!.entry(params.join(','), lines.join('\n'), copyStatements(vs), vertexMain, gl, sprite ? spriteCode : '', vs, vertexNames)
       : '';
     return `${vertexBody}\n${varyingStruct}${motion}@vertex fn margoGLSLVertex(${params.join(',')})->GLSLVaryings{
 ${lines.join('\n')}
@@ -998,12 +820,7 @@ return o;
   };
   // The fragment entry: GL window coordinates count rows from the bottom and depth from near (0) to far (1).
   const written = output
-    ? {
-        float: `vec4f(user_${output.name},0.0,0.0,1.0)`,
-        vec2: `vec4f(user_${output.name},0.0,1.0)`,
-        vec3: `vec4f(user_${output.name},1.0)`,
-        vec4: `user_${output.name}`,
-      }[output.type]!
+    ? { float: `vec4f(user_${output.name},0.0,0.0,1.0)`, vec2: `vec4f(user_${output.name},0.0,1.0)`, vec3: `vec4f(user_${output.name},1.0)`, vec4: `user_${output.name}` }[output.type]!
     : fragData
       ? 'glsl_FragData[0]'
       : 'glsl_FragColor';

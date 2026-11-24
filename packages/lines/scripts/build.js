@@ -29,7 +29,6 @@ await build({
         edges: resolve(root, 'src/edges.ts'),
         pick: resolve(root, 'src/pick.ts'),
         trail: resolve(root, 'src/trail.ts'),
-        flow: resolve(root, 'src/flow.ts'),
         batch: resolve(root, 'src/batch.ts'),
         hidden: resolve(root, 'src/hidden.ts'),
         stroke: resolve(root, 'src/stroke.ts'),

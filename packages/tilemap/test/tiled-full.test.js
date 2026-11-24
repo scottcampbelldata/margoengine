@@ -8,10 +8,7 @@ const base = (extra) => ({ width: 2, height: 1, tilewidth: 4, tileheight: 4, til
 
 test('Wang selection preserves relative weights without overflow or subnormal gaps', () => {
   const rules = (weights) => ({
-    mode: 'wang',
-    name: 'weighted',
-    type: 'mixed',
-    colors: [],
+    mode: 'wang', name: 'weighted', type: 'mixed', colors: [],
     tiles: weights.map((weight, tile) => ({ tile, colors: Array(8).fill(0), weight })),
   });
   const choose = (weights) => resolveWang({}, 32, 16, rules(weights), { seed: 13, firstGid: 10 });

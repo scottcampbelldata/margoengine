@@ -24,14 +24,8 @@ function triangle({ material, instanced = false } = {}) {
       { bufferView: 2, componentType: 5126, count: 2, type: 'VEC3' },
     ],
     meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, ...(material && { material: 0 }) }] }],
-    nodes: [
-      {
-        mesh: 0,
-        name: 'triangle',
-        extras: { owner: true },
-        ...(instanced && { extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 2 } } } }),
-      },
-    ],
+    nodes: [{ mesh: 0, name: 'triangle', extras: { owner: true },
+      ...(instanced && { extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 2 } } } }) }],
     ...(material && { materials: [material] }),
     ...(instanced && { extensionsUsed: ['EXT_mesh_gpu_instancing'] }),
   };
@@ -45,8 +39,7 @@ function files(doc, bytes) {
   return async (input, init) => {
     init?.signal?.throwIfAborted();
     const path = new URL(String(input)).pathname;
-    if (path.endsWith('.gltf'))
-      return new Response(JSON.stringify(doc), { headers: { 'content-type': 'model/gltf+json' } });
+    if (path.endsWith('.gltf')) return new Response(JSON.stringify(doc), { headers: { 'content-type': 'model/gltf+json' } });
     if (path.endsWith('.bin')) return new Response(bytes, { headers: { 'content-length': String(bytes.byteLength) } });
     return new Response('missing', { status: 404 });
   };
@@ -63,53 +56,33 @@ export async function fixtures(load = (entry) => import(entry)) {
   const entries = [];
   // A model's meshes, geometry and materials are the loader's; `model.dispose()` releases every one of them. The CPU
   // model draws no geometry, so it would not see a mesh left behind: after disposal every mesh must be gone.
-  const model = (name, make, extra = {}) =>
-    entries.push({
-      name,
-      visible: true,
-      ...extra,
-      async create({ engine, scene }) {
-        const made = await make(engine);
-        const meshes = [made.root, ...made.meshes, ...(made.nodes ?? [])].filter(Boolean);
-        if (!made.meshes.length) throw new Error('OWNER_FIXTURE: the model has no renderable mesh');
-        return ownedByEngine(scene, name, () => made.dispose(), {
-          check({ phase }) {
-            if (phase === 'disposed' && meshes.some((m) => m.engine.meshes.get(m.id) === m))
-              throw new Error('OWNER_LIFETIME: a disposed model leaves meshes in the scene');
-          },
-        });
-      },
-    });
-  model('parseGLTF', (engine) => {
-    const { doc, bytes } = triangle();
-    return parseGLTF(engine, doc, [bytes]);
-  });
+  const model = (name, make, extra = {}) => entries.push({ name, visible: true, ...extra, async create({ engine, scene }) {
+    const made = await make(engine);
+    const meshes = [made.root, ...made.meshes, ...(made.nodes ?? [])].filter(Boolean);
+    if (!made.meshes.length) throw new Error('OWNER_FIXTURE: the model has no renderable mesh');
+    return ownedByEngine(scene, name, () => made.dispose(), { check({ phase }) {
+      if (phase === 'disposed' && meshes.some((m) => m.engine.meshes.get(m.id) === m))
+        throw new Error('OWNER_LIFETIME: a disposed model leaves meshes in the scene');
+    } });
+  } });
+  model('parseGLTF', (engine) => { const { doc, bytes } = triangle(); return parseGLTF(engine, doc, [bytes]); });
   model('parseGLTFAsync.extensions', async (engine) => {
     const { doc, bytes } = triangle({ instanced: true });
-    const made = await parseGLTFAsync(engine, doc, [bytes], {
-      extensions: [meshopt, quantized, instancing, sceneExtras],
-    });
+    const made = await parseGLTFAsync(engine, doc, [bytes], { extensions: [meshopt, quantized, instancing, sceneExtras] });
     if (made.meshes.length !== 2 || !sceneData(made)) throw new Error('OWNER_FIXTURE: two instances and scene data');
     return made;
   });
   model('loadGLTF', (engine) => {
     const { doc, bytes } = triangle();
-    return loadGLTF(engine, 'https://assets.example/triangle.gltf', {
-      fetch: files(doc, bytes),
-      signal: new AbortController().signal,
-    });
+    return loadGLTF(engine, 'https://assets.example/triangle.gltf', { fetch: files(doc, bytes),
+      signal: new AbortController().signal });
   });
   // A file the light loader refuses (BLEND) goes to gltf/pbr; either way the model is the caller's to dispose.
-  for (const [name, material, loader] of [
-    ['loadAuto', undefined, 'gltf'],
-    ['loadAuto.gltf/pbr', blend, 'gltf/pbr'],
-  ])
+  for (const [name, material, loader] of [['loadAuto', undefined, 'gltf'], ['loadAuto.gltf/pbr', blend, 'gltf/pbr']])
     model(name, async (engine) => {
       const { doc, bytes } = triangle({ material });
-      const made = await loadAuto(engine, 'https://assets.example/triangle.gltf', {
-        fetch: files(doc, bytes),
-        signal: new AbortController().signal,
-      });
+      const made = await loadAuto(engine, 'https://assets.example/triangle.gltf', { fetch: files(doc, bytes),
+        signal: new AbortController().signal });
       if (made.loader !== loader) throw new Error(`OWNER_FIXTURE: loadAuto took ${made.loader}, not ${loader}`);
       const { root, meshes = [], nodes = [] } = made.model;
       return { root, meshes: meshes.length ? meshes : nodes, nodes, dispose: () => made.model.dispose() };
@@ -117,31 +90,21 @@ export async function fixtures(load = (entry) => import(entry)) {
   // The textured draw is a plugin of its own, shared by every textured model of a scene and removed with the last.
   // Both loads start before the first await: a load builds in the scene active when it starts (KB-OWN-GLTF1), and
   // after an await that is the default scene again, not the one being set up.
-  for (const count of [1, 2])
-    model(`textured.mask${count === 1 ? '' : '.shared'}`, async (engine) => {
-      const made = await Promise.all(
-        Array.from({ length: count }, () => {
-          const { doc, bytes } = triangle({ material: mask });
-          return parseGLTFAsync(engine, doc, [bytes], { extensions: [textured] });
-        }),
-      );
-      return {
-        meshes: made.flatMap((m) => [m.root, ...m.meshes, ...m.nodes]),
-        dispose: () => {
-          for (const m of made) m.dispose();
-        },
-      };
-    });
+  for (const count of [1, 2]) model(`textured.mask${count === 1 ? '' : '.shared'}`, async (engine) => {
+    const made = await Promise.all(
+      Array.from({ length: count }, () => {
+        const { doc, bytes } = triangle({ material: mask });
+        return parseGLTFAsync(engine, doc, [bytes], { extensions: [textured] });
+      }),
+    );
+    return { meshes: made.flatMap((m) => [m.root, ...m.meshes, ...m.nodes]), dispose: () => { for (const m of made) m.dispose(); } };
+  });
   // @margoengine/gltf/pbr: a PBR model is a plugin the engine draws; disposing it releases what it made.
   const { PBRModel, GLTFAsset } = await load('../dist/pbr.js');
-  entries.push({
-    name: 'PBRModel',
-    visible: true,
-    create({ engine }) {
-      const { doc, buffers } = animatedTriangle();
-      const plugin = new PBRModel(engine, new GLTFAsset(doc, buffers));
-      return { plugin, dispose: () => plugin.dispose() };
-    },
-  });
+  entries.push({ name: 'PBRModel', visible: true, create({ engine }) {
+    const { doc, buffers } = animatedTriangle();
+    const plugin = new PBRModel(engine, new GLTFAsset(doc, buffers));
+    return { plugin, dispose: () => plugin.dispose() };
+  } });
   return entries;
 }

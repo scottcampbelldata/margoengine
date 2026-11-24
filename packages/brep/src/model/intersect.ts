@@ -223,9 +223,7 @@ function planeThroughAxis(o: XYZ, n: XYZ, s: SurfaceDef): SurfaceIntersection | 
       origin: add(origin, scale(w, side * s.radius)),
       direction: unit(add(z, scale(w, side * lean)))!,
     }));
-  return lean !== 0
-    ? { kind: 'curves', curves, crossings: [sub(origin, scale(z, s.radius / lean))] }
-    : { kind: 'curves', curves };
+  return lean !== 0 ? { kind: 'curves', curves, crossings: [sub(origin, scale(z, s.radius / lean))] } : { kind: 'curves', curves };
 }
 
 function planeCylinder(o: XYZ, n: XYZ, c: XYZ, axis: XYZ, x: XYZ, r: number, tolerance: number): SurfaceIntersection {

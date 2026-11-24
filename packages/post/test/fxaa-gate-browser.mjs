@@ -105,10 +105,7 @@ await postBrowser(
     console.log(JSON.stringify(r));
     assert.ok(step <= 1, `a one-code change across the gate moves the output by at most one code (${step})`);
     // Dot 140 among 40: the sub-pixel shift is 0.75, so the fetch is a quarter dot, three quarters surround: 65.
-    assert.ok(
-      Math.abs(r.strongDot - 65) <= 1 && r.strongSpread <= 1,
-      `a strong dot is blended as before (${r.strongDot})`,
-    );
+    assert.ok(Math.abs(r.strongDot - 65) <= 1 && r.strongSpread <= 1, `a strong dot is blended as before (${r.strongDot})`);
     assert.equal(flatMax, 0, 'a flat frame passes unchanged');
   },
 );

@@ -236,11 +236,7 @@ test('point semantics follow the Styling specification: POSITION, POSITION_ABSOL
     positions: new Float32Array([11, 22, 33]),
     constantColor: [255, 0, 0, 51],
     featureTable: new FeatureTable(
-      {
-        POSITION_QUANTIZED: { byteOffset: 0 },
-        QUANTIZED_VOLUME_OFFSET: [...offset],
-        QUANTIZED_VOLUME_SCALE: [1, 1, 1],
-      },
+      { POSITION_QUANTIZED: { byteOffset: 0 }, QUANTIZED_VOLUME_OFFSET: [...offset], QUANTIZED_VOLUME_SCALE: [1, 1, 1] },
       new Uint8Array(),
     ),
     byteLength: 6,
@@ -253,19 +249,13 @@ test('point semantics follow the Styling specification: POSITION, POSITION_ABSOL
     reads.push(result.meta);
     return result;
   };
-  probe
-    .decorate({
-      kind: 'points',
-      cloud: new PointCloud({ positions: quantized.positions }),
-      content: quantized,
-      tile: {},
-    })
+  probe.decorate({ kind: 'points', cloud: new PointCloud({ positions: quantized.positions }), content: quantized, tile: {} })
     .dispose();
   assert.deepEqual([...reads[0].p], [1, 2, 3]);
   assert.deepEqual([...reads[0].a], [11, 22, 33]);
   assert.deepEqual([...reads[0].c], [1, 0, 0, 0.2]);
 });
-test("point styling restores the cloud's colour component count for later updateColors calls", () => {
+test('point styling restores the cloud\'s colour component count for later updateColors calls', () => {
   const cloud = new PointCloud({ positions: [0, 0, 0], colors: new Uint8Array([1, 2, 3]), colorComponents: 3 });
   new TilesStyle({ color: 'color("red")' }).bindPoints(cloud, () => ({})).dispose();
   // Before: dispose left colorComponents at 4, so an RGB update of one point threw (3 values, 4 needed).

@@ -1,11 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import {
-  AtmosphereTables,
-  atmosphereCommon,
-  atmosphereLookups,
-  atmosphereParameters,
-  type AtmosphereParameters,
-} from './atmosphere-luts.js';
+import { AtmosphereTables, atmosphereCommon, atmosphereLookups, atmosphereParameters, type AtmosphereParameters } from './atmosphere-luts.js';
 import { rangeError } from '../../shared/errors.js';
 export type { AtmosphereParameters } from './atmosphere-luts.js';
 declare const GPUShaderStage: { FRAGMENT: number; VERTEX: number };
@@ -55,7 +49,7 @@ fn planetSky(worldDirection:vec3f)->vec3f {
  if(ground>=0.0){let p=o+d*ground;let mu=dot(normalize(p),atmosphere.sun.xyz);light+=result[1]*atmosphere.ground.rgb*(sunTransmittance(atmosphere,p)*max(mu,0.0)+multipleScattering(atmosphere,atmosphere.radii.x,mu))*atmosphere.radii.z/PI;}
  return light*atmosphere.sun.w;
 }
-`.replace(/\bPI\b/g, 'PLANET_PI');
+`.replace(/\bPI\b/g,'PLANET_PI');
 
 /** GPU-owned Hillaire tables and a world-to-planet transform, independent of camera orientation. */
 export class PlanetAtmosphere {
@@ -67,90 +61,42 @@ export class PlanetAtmosphere {
   #disposed = false;
   /** Allocates tables; use WebGPU or the WebGL2 compatibility GPUDevice. */
   constructor(device: GPUDevice) {
-    if (!device || typeof device.createComputePipeline !== 'function')
-      throw rangeError('Planet atmosphere needs a GPUDevice; use WebGPU or webgl2-compat', 'sky');
+    if(!device||typeof device.createComputePipeline!=='function')throw rangeError('Planet atmosphere needs a GPUDevice; use WebGPU or webgl2-compat','sky');
     this.#tables = new AtmosphereTables(device);
-    this.layout = device.createBindGroupLayout({
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
-      ],
-    });
-    this.group = device.createBindGroup({
-      layout: this.layout,
-      entries: [
-        { binding: 0, resource: { buffer: this.#tables.uniform } },
-        { binding: 1, resource: this.#tables.transmittance.createView() },
-        { binding: 2, resource: this.#tables.multiple.createView() },
-        { binding: 3, resource: this.#tables.sampler },
-      ],
-    });
+    this.layout = device.createBindGroupLayout({entries:[
+      {binding:0,visibility:GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}},
+      {binding:1,visibility:GPUShaderStage.FRAGMENT,texture:{}},
+      {binding:2,visibility:GPUShaderStage.FRAGMENT,texture:{}},
+      {binding:3,visibility:GPUShaderStage.FRAGMENT,sampler:{}},
+    ]});
+    this.group = device.createBindGroup({layout:this.layout,entries:[
+      {binding:0,resource:{buffer:this.#tables.uniform}},
+      {binding:1,resource:this.#tables.transmittance.createView()},
+      {binding:2,resource:this.#tables.multiple.createView()},
+      {binding:3,resource:this.#tables.sampler},
+    ]});
   }
   /** Updates the physical frame and encodes table refresh only when the medium changes. */
-  prepare(
-    encoder: GPUCommandEncoder,
-    worldToPlanet: ArrayLike<number>,
-    eye: ArrayLike<number>,
-    sun: ArrayLike<number>,
-    options: { atmosphere?: AtmosphereParameters; illuminance?: number; exposure?: number } = {},
-  ): void {
-    if (this.#disposed) throw rangeError('Planet atmosphere is disposed; create a new instance', 'sky');
-    const illuminance = options.illuminance ?? 20,
-      exposure = options.exposure ?? 0;
-    const a = atmosphereParameters(options.atmosphere);
-    if (Math.hypot(...Array.from(eye)) < a.bottomRadius)
-      throw rangeError('Planet camera lies below ground; keep the observer outside the planet', 'sky');
-    const shell = a.topRadius - a.bottomRadius;
-    const rayleighColumn = -a.rayleighHeight * Math.expm1(-shell / a.rayleighHeight);
-    const mieColumn = -a.mieHeight * Math.expm1(-shell / a.mieHeight);
-    if (
-      a.topRadius > 100000 ||
-      a.rayleigh.some(
-        (value, c) => value * rayleighColumn + (typeof a.mie === 'number' ? a.mie : a.mie[c]) * mieColumn > 6,
-      )
-    )
-      throw rangeError(
-        'Planet atmosphere needs radii at most 100000 km and vertical scattering depth at most 6; reduce the medium',
-        'sky',
-      );
-    if (
-      worldToPlanet.length !== 16 ||
-      eye.length !== 3 ||
-      sun.length !== 3 ||
-      [...Array.from(worldToPlanet), ...Array.from(eye), ...Array.from(sun)].some(
-        (x) => !Number.isFinite(x) || !Number.isFinite(Math.fround(x)),
-      ) ||
-      !(illuminance >= 0 && illuminance <= 1000000) ||
-      !Number.isFinite(exposure) ||
-      Math.abs(exposure) > 20 ||
-      !(Math.hypot(...Array.from(sun)) > 0)
-    )
-      throw rangeError(
-        'Planet frame needs finite transforms, nonzero sun, illuminance 0..1000000 and exposure -20..20',
-        'sky',
-      );
-    const v = this.#tables.values;
-    this.#tables.medium(a, 1);
-    v.set(Array.from(worldToPlanet), 0);
-    v[34] = illuminance;
-    const length = Math.hypot(...Array.from(sun));
-    v.set(
-      Array.from(sun, (x) => x / length),
-      36,
-    );
-    v[39] = 2 ** exposure;
-    v.set(Array.from(eye), 40);
+  prepare(encoder: GPUCommandEncoder, worldToPlanet: ArrayLike<number>, eye: ArrayLike<number>, sun: ArrayLike<number>, options: { atmosphere?: AtmosphereParameters; illuminance?: number; exposure?: number } = {}): void {
+    if(this.#disposed) throw rangeError('Planet atmosphere is disposed; create a new instance','sky');
+    const illuminance=options.illuminance??20, exposure=options.exposure??0;
+    const a=atmosphereParameters(options.atmosphere);
+    if(Math.hypot(...Array.from(eye))<a.bottomRadius)throw rangeError('Planet camera lies below ground; keep the observer outside the planet','sky');
+    const shell=a.topRadius-a.bottomRadius;
+    const rayleighColumn=-a.rayleighHeight*Math.expm1(-shell/a.rayleighHeight);
+    const mieColumn=-a.mieHeight*Math.expm1(-shell/a.mieHeight);
+    if(a.topRadius>100000||a.rayleigh.some((value,c)=>value*rayleighColumn+(typeof a.mie==='number'?a.mie:a.mie[c])*mieColumn>6))
+      throw rangeError('Planet atmosphere needs radii at most 100000 km and vertical scattering depth at most 6; reduce the medium','sky');
+    if(worldToPlanet.length!==16||eye.length!==3||sun.length!==3||
+      [...Array.from(worldToPlanet),...Array.from(eye),...Array.from(sun)].some(x=>!Number.isFinite(x)||!Number.isFinite(Math.fround(x)))||
+      !(illuminance>=0&&illuminance<=1000000)||!Number.isFinite(exposure)||Math.abs(exposure)>20||!(Math.hypot(...Array.from(sun))>0))
+      throw rangeError('Planet frame needs finite transforms, nonzero sun, illuminance 0..1000000 and exposure -20..20','sky');
+    const v=this.#tables.values;
+    this.#tables.medium(a,1);v.set(Array.from(worldToPlanet),0);v[34]=illuminance;
+    const length=Math.hypot(...Array.from(sun));v.set(Array.from(sun,x=>x/length),36);v[39]=2**exposure;v.set(Array.from(eye),40);
     this.#tables.upload(encoder);
   }
   /** Frees tables and uniforms; idempotent. */
-  dispose(): void {
-    if (this.#disposed) return;
-    this.#disposed = true;
-    this.#tables.dispose();
-  }
-  [Symbol.dispose](): void {
-    this.dispose();
-  }
+  dispose(): void {if(this.#disposed)return;this.#disposed=true;this.#tables.dispose();}
+  [Symbol.dispose](): void {this.dispose();}
 }

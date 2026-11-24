@@ -2,7 +2,7 @@
 // before the push. Bug (2026-11-16): @margoengine/scenes landed with four pages still stating 104 packages, no
 // entry-sizes.json row (margoengine.com/sizes.html could not be built), THIRD-PARTY-NOTICES.md a package behind and its
 // example folder in no type-check project; only local CI's full root tests saw any of it, after the push.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { readSizesInputs, sizesPage } from '../build-sizes.js';
 import { collect, noticeAddenda, OUTPUT, render } from '../supply-chain.mjs';
@@ -37,30 +37,6 @@ export function foldersInNoProject(root) {
     );
 }
 
-const RUNTIME_EXPORT =
-  /^export (?:declare )?(?:abstract )?(?:async )?(?:function|class|const|let|var|enum)\s+([\w$]+)/gm;
-
-/**
- * Runtime exports that a package's api/<id>.api.md declares but its docs/catalog.json entry does not list.
- * Bug (2026-11-21): materials gained `noteEngine` and every `npm run build:packages` then rewrote the tracked catalog,
- * because the catalog's export lists come from dist and nothing compared them before the build.
- */
-export function catalogExportProblems(root) {
-  const problems = [];
-  for (const entry of JSON.parse(readFileSync(join(root, 'docs/catalog.json'), 'utf8'))) {
-    const report = join(root, `api/${entry.id}.api.md`);
-    if (!existsSync(report)) continue;
-    const missing = [...readFileSync(report, 'utf8').matchAll(RUNTIME_EXPORT)]
-      .map((match) => match[1])
-      .filter((name) => !entry.exports.includes(name));
-    if (missing.length)
-      problems.push(
-        `docs/catalog.json: ${entry.id} lacks exports ${missing.join(', ')}: run npm run build:packages and commit docs/catalog.json`,
-      );
-  }
-  return problems;
-}
-
 /**
  * Problems with the records under `root` that every package adds to: the stated package counts, the measured entry
  * sizes behind margoengine.com/sizes.html and the example projects. Each names the command that brings it up to date.
@@ -70,7 +46,7 @@ export function packageRecordProblems(root) {
   const files = Object.fromEntries(
     packageCountFiles(root).map((path) => [path, readFileSync(join(root, path), 'utf8')]),
   );
-  const problems = [...packageCountProblems(files, catalog.length), ...catalogExportProblems(root)];
+  const problems = packageCountProblems(files, catalog.length);
   try {
     sizesPage(readSizesInputs(root));
   } catch (error) {

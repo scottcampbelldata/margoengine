@@ -20,7 +20,7 @@ export async function postBrowser(owner, port, open, run, { seconds = 120 } = {}
     configFile: false,
     cacheDir: `test-results/${owner}/vite-cache`,
     optimizeDeps: { noDiscovery: true },
-    server: { host: '127.0.0.1', port, strictPort: true, watch: null, hmr: false },
+    server: { host: '127.0.0.1', port, strictPort: true, watch: null },
     logLevel: 'error',
   });
   await listenWhenFree(() => server.listen(), { port });

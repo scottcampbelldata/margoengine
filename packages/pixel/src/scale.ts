@@ -133,10 +133,7 @@ export class PixelScale extends ScreenPass {
 
 const checkFilter = (filter: ScaleFilter): void => {
   if (!['nearest', 'sharp-bilinear', 'edge', 'xbr3', 'xbr4'].includes(filter))
-    throw rangeError(
-      `PixelScale filter must be nearest, sharp-bilinear, edge, xbr3 or xbr4, got ${filter}`,
-      'pixel-options',
-    );
+    throw rangeError(`PixelScale filter must be nearest, sharp-bilinear, edge, xbr3 or xbr4, got ${filter}`, 'pixel-options');
 };
 
 /** An RGBA picture, 4 bytes a pixel, rows from the top. */

@@ -27,13 +27,7 @@ test('SplatSet hands out free ranges, reuses and merges them, and refuses what d
   assert.throws(() => set.add(cloud(4)), RangeError, 'fragmented');
   set.clouds.find((m) => m.first === 3).remove();
   assert.equal(set.add(cloud(7)).first, 0, 'the freed ranges merged into one of 7');
-  assert.deepEqual(
-    set.clouds.map((m) => [m.first, m.count]),
-    [
-      [7, 3],
-      [0, 7],
-    ],
-  );
+  assert.deepEqual(set.clouds.map((m) => [m.first, m.count]), [[7, 3], [0, 7]]);
   set.dispose();
   assert.throws(() => set.add(cloud(1)), { code: 'disposed' });
   assert.throws(() => c.setMatrix(null), { code: 'disposed' });

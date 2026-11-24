@@ -9,7 +9,8 @@ import { prepareGLTF } from '../dist/prepare.js';
 function grid(n) {
   const positions = new Float32Array((n + 1) * (n + 1) * 3),
     quads = [];
-  for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) positions.set([x, y, 0], (y * (n + 1) + x) * 3);
+  for (let y = 0; y <= n; y++)
+    for (let x = 0; x <= n; x++) positions.set([x, y, 0], (y * (n + 1) + x) * 3);
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const a = y * (n + 1) + x;
@@ -86,10 +87,7 @@ test('a BLEND primitive keeps the order of the file, an opaque one in the same f
   const source = grid(8),
     materials = [{ alphaMode: 'BLEND' }, { alphaMode: 'MASK' }];
   assert.deepEqual(Array.from((await packed(source, { material: 0 }, materials)).indices), Array.from(source.indices));
-  assert.notDeepEqual(
-    Array.from((await packed(source, { material: 1 }, materials)).indices),
-    Array.from(source.indices),
-  );
+  assert.notDeepEqual(Array.from((await packed(source, { material: 1 }, materials)).indices), Array.from(source.indices));
 });
 
 test('points and lines are left alone; strips are ordered as the lists they unroll to', async () => {

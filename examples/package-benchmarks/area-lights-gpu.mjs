@@ -176,15 +176,7 @@ try {
     // KB-BOUNCE-REVEAL1: a window's light set back in its wall, with a sill: the shader clips the rectangle to what each
     // floor point sees through the opening, as the CPU mirror does (the mirror is checked against a traced wall and
     // sill in test/area.test.js). The bare light must differ, so the clip is on.
-    const window = {
-        position: [0, 1, -1.2],
-        direction: [0, 0, 1],
-        width: 1.2,
-        height: 0.8,
-        intensity: 6,
-        recess: 0.25,
-        sill: 0.12,
-      },
+    const window = { position: [0, 1, -1.2], direction: [0, 0, 1], width: 1.2, height: 0.8, intensity: 6, recess: 0.25, sill: 0.12 },
       bareWindow = { ...window, recess: 0, sill: 0 };
     report.recessed = [];
     for (const kind of ['core', 'materials']) {
@@ -198,31 +190,14 @@ try {
       floorPoints.forEach((p, i) => {
         const v = eye.map((e, k) => e - p[k]),
           length = Math.hypot(...v),
-          at = (l) =>
-            output[kind](
-              ltc(
-                l,
-                p,
-                [0, 1, 0],
-                v.map((x) => x / length),
-                [0.6, 0.6, 0.6],
-                0.8,
-                0,
-              ).total,
-            ),
+          at = (l) => output[kind](ltc(l, p, [0, 1, 0], v.map((x) => x / length), [0.6, 0.6, 0.6], 0.8, 0).total),
           want = at(light),
           got = pixel(image, grid[i]);
         worst = Math.max(worst, ...got.map((g, k) => Math.abs(g - want[k])));
         if (want[1] > 20) lit++;
         if (at(bare)[1] > want[1] + 10) shaded++;
       });
-      const row = {
-        floor: kind,
-        samples: grid.length,
-        litSamples: lit,
-        shadedByReveal: shaded,
-        maxDiffVsCpuMirror: worst,
-      };
+      const row = { floor: kind, samples: grid.length, litSamples: lit, shadedByReveal: shaded, maxDiffVsCpuMirror: worst };
       report.recessed.push(row);
       console.log(JSON.stringify(row));
       assert.ok(lit > 40, `${name}: only ${lit} lit samples`);

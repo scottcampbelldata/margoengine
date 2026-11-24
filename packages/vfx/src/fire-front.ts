@@ -89,70 +89,23 @@ const live = (load: number, sav = 1500): FuelClass => ({ load, sav, live: true }
 // conifer of western North America (canopy base height 0.5 to 9 m, bulk density 0.05 to 0.35 kg/m^3): FM8 a closed
 // short-needle stand (Douglas-fir, lodgepole, larch), FM9 an open long-needle pine stand, FM10 a stand with down wood and
 // an understory of young trees that ladders flame into the crowns.
-const stand = (baseHeight: number, bulkDensity: number, height: number): CanopyFuel => ({
-  baseHeight,
-  bulkDensity,
-  height,
-});
+const stand = (baseHeight: number, bulkDensity: number, height: number): CanopyFuel => ({ baseHeight, bulkDensity, height });
 
 /** Anderson 1982's fuel models for grass, brush and timber, by name `FM1` ... `FM13` (loads from table 1 of INT-GTR-122, surface-area-to-volume ratios from table 7 of INT-30 except FM7's live 1,500 1/ft, the standard value of Andrews 2018 table 8a where INT-30 prints 1,550), plus `STRUCTURE`. The timber models FM8, FM9 and FM10 carry a `canopy` for crown fire. */
 export const FUEL_MODELS: Readonly<Record<string, FuelModel>> = Object.freeze({
   FM1: { name: 'FM1', classes: [cls(0.74, 3500)], depth: 1, extinction: 0.12 },
-  FM2: {
-    name: 'FM2',
-    classes: [cls(2, 3000), cls(1, 109, 10), cls(0.5, 30, 100), live(0.5)],
-    depth: 1,
-    extinction: 0.15,
-  },
+  FM2: { name: 'FM2', classes: [cls(2, 3000), cls(1, 109, 10), cls(0.5, 30, 100), live(0.5)], depth: 1, extinction: 0.15 },
   FM3: { name: 'FM3', classes: [cls(3.01, 1500)], depth: 2.5, extinction: 0.25 },
-  FM4: {
-    name: 'FM4',
-    classes: [cls(5.01, 2000), cls(4.01, 109, 10), cls(2, 30, 100), live(5.01)],
-    depth: 6,
-    extinction: 0.2,
-  },
+  FM4: { name: 'FM4', classes: [cls(5.01, 2000), cls(4.01, 109, 10), cls(2, 30, 100), live(5.01)], depth: 6, extinction: 0.2 },
   FM5: { name: 'FM5', classes: [cls(1, 2000), cls(0.5, 109, 10), live(2)], depth: 2, extinction: 0.2 },
   FM6: { name: 'FM6', classes: [cls(1.5, 1750), cls(2.5, 109, 10), cls(2, 30, 100)], depth: 2.5, extinction: 0.25 },
-  FM7: {
-    name: 'FM7',
-    classes: [cls(1.13, 1750), cls(1.87, 109, 10), cls(1.5, 30, 100), live(0.37)],
-    depth: 2.5,
-    extinction: 0.4,
-  },
-  FM8: {
-    name: 'FM8',
-    classes: [cls(1.5, 2000), cls(1, 109, 10), cls(2.5, 30, 100)],
-    depth: 0.2,
-    extinction: 0.3,
-    canopy: stand(4, 0.12, 20),
-  },
-  FM9: {
-    name: 'FM9',
-    classes: [cls(2.92, 2500), cls(0.41, 109, 10), cls(0.15, 30, 100)],
-    depth: 0.2,
-    extinction: 0.25,
-    canopy: stand(6, 0.08, 22),
-  },
-  FM10: {
-    name: 'FM10',
-    classes: [cls(3.01, 2000), cls(2, 109, 10), cls(5.01, 30, 100), live(2)],
-    depth: 1,
-    extinction: 0.25,
-    canopy: stand(2, 0.15, 20),
-  },
+  FM7: { name: 'FM7', classes: [cls(1.13, 1750), cls(1.87, 109, 10), cls(1.5, 30, 100), live(0.37)], depth: 2.5, extinction: 0.4 },
+  FM8: { name: 'FM8', classes: [cls(1.5, 2000), cls(1, 109, 10), cls(2.5, 30, 100)], depth: 0.2, extinction: 0.3, canopy: stand(4, 0.12, 20) },
+  FM9: { name: 'FM9', classes: [cls(2.92, 2500), cls(0.41, 109, 10), cls(0.15, 30, 100)], depth: 0.2, extinction: 0.25, canopy: stand(6, 0.08, 22) },
+  FM10: { name: 'FM10', classes: [cls(3.01, 2000), cls(2, 109, 10), cls(5.01, 30, 100), live(2)], depth: 1, extinction: 0.25, canopy: stand(2, 0.15, 20) },
   FM11: { name: 'FM11', classes: [cls(1.5, 1500), cls(4.51, 109, 10), cls(5.51, 30, 100)], depth: 1, extinction: 0.15 },
-  FM12: {
-    name: 'FM12',
-    classes: [cls(4.01, 1500), cls(14.03, 109, 10), cls(16.53, 30, 100)],
-    depth: 2.3,
-    extinction: 0.2,
-  },
-  FM13: {
-    name: 'FM13',
-    classes: [cls(7.01, 1500), cls(23.04, 109, 10), cls(28.05, 30, 100)],
-    depth: 3,
-    extinction: 0.25,
-  },
+  FM12: { name: 'FM12', classes: [cls(4.01, 1500), cls(14.03, 109, 10), cls(16.53, 30, 100)], depth: 2.3, extinction: 0.2 },
+  FM13: { name: 'FM13', classes: [cls(7.01, 1500), cls(23.04, 109, 10), cls(28.05, 30, 100)], depth: 3, extinction: 0.25 },
   // A wood-frame house: about 20 kg of fuel per square metre of floor in a 3 m deep bed (90 tons per acre), thick
   // members (surface-area-to-volume 60 / ft is a 2 x 4 stud wall), dry enough that moisture is not the limit.
   STRUCTURE: { name: 'STRUCTURE', classes: [cls(90, 60)], depth: 10, extinction: 0.3, structure: true },
@@ -237,17 +190,9 @@ const finiteIn = (v: unknown, name: string, lo: number, hi: number): number => {
  * @throws RangeError for a model with no classes or a non-positive load, depth or surface-area-to-volume ratio, or a
  * moisture outside 0 to 4.
  */
-export function fuelBed(
-  model: FuelModel,
-  moisture: number,
-  liveMoisture = 1,
-  moisture10 = moisture + 0.01,
-  moisture100 = moisture + 0.02,
-): FuelBed {
+export function fuelBed(model: FuelModel, moisture: number, liveMoisture = 1, moisture10 = moisture + 0.01, moisture100 = moisture + 0.02): FuelBed {
   if (!model.classes.length || !(model.depth > 0) || !(model.extinction > 0))
-    throw new RangeError(
-      'Invalid fuel model; give at least one class, a depth above 0 and a moisture of extinction above 0.',
-    );
+    throw new RangeError('Invalid fuel model; give at least one class, a depth above 0 and a moisture of extinction above 0.');
   finiteIn(moisture, 'moisture', 0, 4);
   finiteIn(liveMoisture, 'liveMoisture', 0, 4);
   finiteIn(moisture10, 'moisture10', 0, 4);
@@ -347,13 +292,7 @@ export const slopeFactor = (bed: FuelBed, slope: number): number => 5.275 * bed.
  * @example fireBehaviour(FUEL_MODELS.FM1, { moisture: 0.08, wind: 2.2352 }).rate * 3600 / 20.1168 // about 79 chains/h
  */
 export function fireBehaviour(model: FuelModel, conditions: FireConditions): FireBehaviour {
-  const bed = fuelBed(
-      model,
-      conditions.moisture,
-      conditions.liveMoisture ?? 1,
-      conditions.moisture10,
-      conditions.moisture100,
-    ),
+  const bed = fuelBed(model, conditions.moisture, conditions.liveMoisture ?? 1, conditions.moisture10, conditions.moisture100),
     pw = windFactor(bed, finiteIn(conditions.wind ?? 0, 'wind', 0, 200)),
     ps = slopeFactor(bed, finiteIn(conditions.slope ?? 0, 'slope', 0, 10));
   return behaviourOf(bed, pw, ps, pw + ps);
@@ -365,7 +304,7 @@ function behaviourOf(bed: FuelBed, pw: number, ps: number, effective: number): F
     // Byram: I = IR * R * residence (IR in kW/m^2, R in m/s, residence in s gives kJ/m^2 times m/s = kW/m).
     intensity = bed.ir * IR_TO_KW * rate * bed.residence;
   // The wind that gives phi = effective on its own, for Anderson 1983's length-to-breadth ratio (mph, midflame).
-  const u = effective > 0 ? ((effective * bed.ratio ** bed.windE) / bed.windC) ** (1 / bed.windB) : 0,
+  const u = effective > 0 ? (effective * bed.ratio ** bed.windE / bed.windC) ** (1 / bed.windB) : 0,
     mph = (u * 60) / FT_PER_MILE;
   return {
     rate,
@@ -444,14 +383,7 @@ const CROWN_HEAT = 18000, // kJ/kg, Van Wagner 1977's heat of combustion of foli
  * @param fed True where an active crown fire runs into this stand from a neighbour. Default false.
  * @example crownBehaviour(fireBehaviour(FUEL_MODELS.FM10, { moisture: 0.05, wind: 7 }), FUEL_MODELS.FM10.canopy!, 1, 1.2, 20).type // 'active'
  */
-export function crownBehaviour(
-  surface: FireBehaviour,
-  canopy: CanopyFuel,
-  foliarMoisture: number,
-  crownRate: number,
-  wind10: number,
-  fed = false,
-): CrownBehaviour {
+export function crownBehaviour(surface: FireBehaviour, canopy: CanopyFuel, foliarMoisture: number, crownRate: number, wind10: number, fed = false): CrownBehaviour {
   const z = canopy.baseHeight,
     initiation = (0.01 * Math.max(z, 0) * (460 + 2590 * foliarMoisture)) ** 1.5,
     activeRate = 0.05 / canopy.bulkDensity,
@@ -460,30 +392,10 @@ export function crownBehaviour(
     lbCrown = Math.min(8, 1 + 0.125 * wind10 * U20_PER_U10 * MS_TO_MPH);
   if (fed && crownRate >= activeRate && rs > 0) {
     const intensity = (is / rs + CROWN_HEAT * canopy.bulkDensity * Math.max(canopy.height - z, 0)) * crownRate;
-    return {
-      type: 'active',
-      initiation,
-      activeRate,
-      crownRate,
-      fraction: 1,
-      rate: crownRate,
-      firelineIntensity: intensity,
-      flameLength: Math.max(surface.flameLength, 0.0266 * intensity ** (2 / 3)),
-      lengthToBreadth: Math.max(lbCrown, surface.lengthToBreadth),
-    };
+    return { type: 'active', initiation, activeRate, crownRate, fraction: 1, rate: crownRate, firelineIntensity: intensity, flameLength: Math.max(surface.flameLength, 0.0266 * intensity ** (2 / 3)), lengthToBreadth: Math.max(lbCrown, surface.lengthToBreadth) };
   }
   if (!(is >= initiation) || !(rs > 0))
-    return {
-      type: 'surface',
-      initiation,
-      activeRate,
-      crownRate,
-      fraction: 0,
-      rate: rs,
-      firelineIntensity: is,
-      flameLength: surface.flameLength,
-      lengthToBreadth: surface.lengthToBreadth,
-    };
+    return { type: 'surface', initiation, activeRate, crownRate, fraction: 0, rate: rs, firelineIntensity: is, flameLength: surface.flameLength, lengthToBreadth: surface.lengthToBreadth };
   // The surface rate at which the intensity reaches the critical value: the surface fire's heat per unit area is I / R.
   const hpa = is / rs,
     r0 = initiation / hpa,
@@ -511,18 +423,8 @@ export function crownBehaviour(
  * @param conditions The dead and live moistures; `wind` is the 10 m open wind, m/s; `slope` rise over run.
  */
 export function crownRate10(conditions: FireConditions): number {
-  const bed = fuelBed(
-    FUEL_MODELS.FM10!,
-    conditions.moisture,
-    conditions.liveMoisture ?? 1,
-    conditions.moisture10,
-    conditions.moisture100,
-  );
-  return crownRateOf(
-    bed,
-    finiteIn(conditions.wind ?? 0, 'wind', 0, 200),
-    slopeFactor(bed, finiteIn(conditions.slope ?? 0, 'slope', 0, 10)),
-  );
+  const bed = fuelBed(FUEL_MODELS.FM10!, conditions.moisture, conditions.liveMoisture ?? 1, conditions.moisture10, conditions.moisture100);
+  return crownRateOf(bed, finiteIn(conditions.wind ?? 0, 'wind', 0, 200), slopeFactor(bed, finiteIn(conditions.slope ?? 0, 'slope', 0, 10)));
 }
 const crownWindFactor = (fm10: FuelBed, wind10: number): number => windFactor(fm10, 0.4 * wind10 * U20_PER_U10);
 function crownRateOf(fm10: FuelBed, wind10: number, ps: number): number {
@@ -836,8 +738,7 @@ export class FireFront implements EnginePlugin {
   private readonly houseFlames: Flame[] = [];
   private readonly emberPool: VFX[] = [];
   /** Each ember effect's kit values (rate, size, intensity, velocity), as built. */
-  private readonly emberBase: { rate: number; size: number; intensity: number; velocity: [number, number, number] }[] =
-    [];
+  private readonly emberBase: { rate: number; size: number; intensity: number; velocity: [number, number, number] }[] = [];
   private lightGroups?: { dispose(): void };
   private readonly frontKeys: (number | undefined)[] = [];
   private readonly houseKeys: (number | undefined)[] = [];
@@ -926,10 +827,7 @@ export class FireFront implements EnginePlugin {
     if (f === null || f === undefined) return undefined;
     if (typeof f === 'string') {
       const m = FUEL_MODELS[f];
-      if (!m)
-        throw new TypeError(
-          `Unknown fuel model ${f}; use one of ${Object.keys(FUEL_MODELS).join(', ')} or a FuelModel.`,
-        );
+      if (!m) throw new TypeError(`Unknown fuel model ${f}; use one of ${Object.keys(FUEL_MODELS).join(', ')} or a FuelModel.`);
       return m;
     }
     return f;
@@ -1017,11 +915,7 @@ export class FireFront implements EnginePlugin {
     return n;
   }
   /** The stand over cell `i`, or undefined for none (or crown fire off). */
-  private canopyAt(
-    i: number,
-    model: FuelModel,
-    out: { baseHeight: number; bulkDensity: number; height: number },
-  ): CanopyFuel | undefined {
+  private canopyAt(i: number, model: FuelModel, out: { baseHeight: number; bulkDensity: number; height: number }): CanopyFuel | undefined {
     if (this.options.crown === false || model.structure) return undefined;
     if (!this.stands) return model.canopy;
     const k = i * 3;
@@ -1121,12 +1015,7 @@ export class FireFront implements EnginePlugin {
       out[0] = w[0] as number;
       out[1] = w[1] as number;
     } else {
-      const s = (w as { sample(x: number, y: number, z: number, t: number): ArrayLike<number> }).sample(
-        x,
-        0,
-        z,
-        this.time,
-      );
+      const s = (w as { sample(x: number, y: number, z: number, t: number): ArrayLike<number> }).sample(x, 0, z, this.time);
       out[0] = s[0]!;
       out[1] = s[s.length - 1]!;
     }
@@ -1256,11 +1145,7 @@ export class FireFront implements EnginePlugin {
           // Burning crowns add their foliage to the heat: the heat per unit area grows by the crown's share of it.
           heat = structure
             ? ((0.7 * bed.consumed * HEAT_OF_COMBUSTION) / (o.structureBurnTime ?? 1800)) * area
-            : 0.7 *
-              b.reactionIntensity *
-              1000 *
-              area *
-              (crown ? crown.firelineIntensity / crown.rate / (b.firelineIntensity / b.rate) : 1),
+            : 0.7 * b.reactionIntensity * 1000 * area * (crown ? crown.firelineIntensity / crown.rate / (b.firelineIntensity / b.rate) : 1),
           key = Math.floor((wz - this.origin[1]) / this.seg) * 65536 + Math.floor((wx - this.origin[0]) / this.seg),
           s = this.segs.get(key);
         if (s) {
@@ -1316,14 +1201,7 @@ export class FireFront implements EnginePlugin {
           nz = z + dz,
           j = nz * width + nx;
         // Spreading into a structure goes by flame exposure, not the ground fire's rate; no fuel and burnt cells are done.
-        if (
-          nx < 0 ||
-          nz < 0 ||
-          nx >= width ||
-          nz >= height ||
-          !this.cellFuel[j] ||
-          this.fuels[this.cellFuel[j]! - 1]!.structure
-        ) {
+        if (nx < 0 || nz < 0 || nx >= width || nz >= height || !this.cellFuel[j] || this.fuels[this.cellFuel[j]! - 1]!.structure) {
           acc[k] = 2;
           continue;
         }
@@ -1332,8 +1210,7 @@ export class FireFront implements EnginePlugin {
           continue;
         }
         // A crown fire runs on only into a cell with crowns; into open ground it goes on as the surface fire.
-        const aloft =
-            crown !== undefined && this.canopyAt(j, this.fuels[this.cellFuel[j]! - 1]!, standOut) !== undefined,
+        const aloft = crown !== undefined && this.canopyAt(j, this.fuels[this.cellFuel[j]! - 1]!, standOut) !== undefined,
           head = aloft ? crown!.rate : b.rate,
           e = aloft ? cecc : ecc,
           dist = Math.hypot(dx, dz) * cell,
@@ -1378,14 +1255,7 @@ export class FireFront implements EnginePlugin {
       }
   }
 
-  private throwEmbers(
-    i: number,
-    b: { firelineIntensity: number; flameLength: number },
-    wind: readonly [number, number],
-    t: number,
-    dt: number,
-    rate: number,
-  ): void {
+  private throwEmbers(i: number, b: { firelineIntensity: number; flameLength: number }, wind: readonly [number, number], t: number, dt: number, rate: number): void {
     // Per 64 m^2 of burning ground (an 8 m cell), so a finer grid throws no more embers over the same fire.
     const mean = ((rate * (b.firelineIntensity - 1000)) / 1000) * dt * ((this.cell * this.cell) / 64);
     let count = Math.floor(mean);
@@ -1427,10 +1297,7 @@ export class FireFront implements EnginePlugin {
         z = s.z / s.heat,
         f = this.flameAcc.get(key),
         intensity = f && f.heat > 0 ? f.intensity / f.heat : 0,
-        flameLength =
-          f && f.crown > 0
-            ? Math.max(0.0775 * intensity ** 0.46, 0.0266 * intensity ** (2 / 3))
-            : 0.0775 * intensity ** 0.46;
+        flameLength = f && f.crown > 0 ? Math.max(0.0775 * intensity ** 0.46, 0.0266 * intensity ** (2 / 3)) : 0.0775 * intensity ** 0.46;
       out.push({ x, z, y: ground(x, z), heat: s.heat, cells: s.cells, flameLength });
     }
     return out.sort((a, b) => b.heat - a.heat);
@@ -1465,20 +1332,8 @@ export class FireFront implements EnginePlugin {
           ? [Math.max(this.cell, a.maxX - a.minX), Math.max(this.cell, a.maxZ - a.minZ)]
           : [
               // Never past the cells' box seen along the axis (two clusters at its ends give sqrt(12 var) > their span).
-              Math.max(
-                this.cell,
-                Math.min(
-                  Math.sqrt(12 * Math.max(mid + dev, 0)) + this.cell,
-                  Math.abs(Math.cos(major)) * bw + Math.abs(Math.sin(major)) * bh,
-                ),
-              ),
-              Math.max(
-                this.cell,
-                Math.min(
-                  Math.sqrt(12 * Math.max(mid - dev, 0)) + this.cell,
-                  Math.abs(Math.sin(major)) * bw + Math.abs(Math.cos(major)) * bh,
-                ),
-              ),
+              Math.max(this.cell, Math.min(Math.sqrt(12 * Math.max(mid + dev, 0)) + this.cell, Math.abs(Math.cos(major)) * bw + Math.abs(Math.sin(major)) * bh)),
+              Math.max(this.cell, Math.min(Math.sqrt(12 * Math.max(mid - dev, 0)) + this.cell, Math.abs(Math.sin(major)) * bw + Math.abs(Math.cos(major)) * bh)),
             ],
         intensity = building ? 0 : a.intensity / a.heat,
         // The heat in watts is convective (0.7 of the release): Heskestad's Q is the whole release, kW.
@@ -1491,9 +1346,7 @@ export class FireFront implements EnginePlugin {
             : 0.0775 * intensity ** 0.46;
       // The ground's slope across the stretch, so the flame stands on it instead of being cut by it.
       const e = Math.max(this.cell, 0.25 * Math.max(size[0], size[1])),
-        slope: [number, number] = building
-          ? [0, 0]
-          : [(ground(x + e, z) - ground(x - e, z)) / (2 * e), (ground(x, z + e) - ground(x, z - e)) / (2 * e)];
+        slope: [number, number] = building ? [0, 0] : [(ground(x + e, z) - ground(x - e, z)) / (2 * e), (ground(x, z + e) - ground(x, z - e)) / (2 * e)];
       out.push({
         kind: building ? 'structure' : 'front',
         x,
@@ -1558,8 +1411,7 @@ export class FireFront implements EnginePlugin {
         at[0] = s.x;
         at[1] = s.y + Math.max(2, s.flameLength);
         at[2] = s.z;
-        if (this.smokeRadius)
-          col.options.radius = Math.min(60, Math.max(2, Math.sqrt((s.cells * this.cell * this.cell) / Math.PI)));
+        if (this.smokeRadius) col.options.radius = Math.min(60, Math.max(2, Math.sqrt((s.cells * this.cell * this.cell) / Math.PI)));
         col.setHeat(s.heat);
         if (idle) col.refill();
       }
@@ -1663,16 +1515,7 @@ export class FireFront implements EnginePlugin {
   }
   /** One ember effect per front flame volume: the hearth kit's embers scaled to {@link EMBER_LENGTH}, idle until placed. */
   private async makeEmbers(engine: Engine, count: number): Promise<void> {
-    const [
-      { VFX },
-      { curves },
-      { shapes },
-      { stretch },
-      { schedule },
-      { overLife },
-      { scaleHearthEmbers },
-      { snowNight },
-    ] = await Promise.all([
+    const [{ VFX }, { curves }, { shapes }, { stretch }, { schedule }, { overLife }, { scaleHearthEmbers }, { snowNight }] = await Promise.all([
       import('@margoengine/vfx/base'),
       import('@margoengine/vfx/curves'),
       import('@margoengine/vfx/shapes'),
@@ -1683,10 +1526,7 @@ export class FireFront implements EnginePlugin {
       import('@margoengine/sky/scene-kits'),
     ]);
     if (this.disposed) return;
-    const kit = scaleHearthEmbers(snowNight().hearth.embers as never, EMBER_LENGTH, [
-      EMBER_LENGTH,
-      EMBER_LENGTH,
-    ]) as Record<string, unknown> & {
+    const kit = scaleHearthEmbers(snowNight().hearth.embers as never, EMBER_LENGTH, [EMBER_LENGTH, EMBER_LENGTH]) as Record<string, unknown> & {
       rate: number;
       size: number;
       intensity: number;
@@ -1698,17 +1538,13 @@ export class FireFront implements EnginePlugin {
       delete options.schedule;
       this.emberBase.push({ rate: kit.rate, size: kit.size, intensity: kit.intensity, velocity: [...kit.velocity] });
       this.emberPool.push(
-        VFX.attach(
-          engine as unknown as EngineKernel,
-          { ...(options as object), position: [0, -1e6, 0], rate: 0, wind: [0, 0] } as never,
-          {
-            curves,
-            emitter: shapes,
-            stretch,
-            schedule,
-            overLife,
-          },
-        ),
+        VFX.attach(engine as unknown as EngineKernel, { ...(options as object), position: [0, -1e6, 0], rate: 0, wind: [0, 0] } as never, {
+          curves,
+          emitter: shapes,
+          stretch,
+          schedule,
+          overLife,
+        }),
       );
     }
   }
@@ -1739,22 +1575,13 @@ export class FireFront implements EnginePlugin {
   private syncFlames(): void {
     if (!this.frontFlames.length && !this.houseFlames.length) return;
     const list = this.flames();
-    this.place(
-      this.frontFlames,
-      this.frontKeys,
-      list.filter((f) => f.kind === 'front'),
-    );
+    this.place(this.frontFlames, this.frontKeys, list.filter((f) => f.kind === 'front'));
     this.placeEmbers();
-    this.place(
-      this.houseFlames,
-      this.houseKeys,
-      list.filter((f) => f.kind === 'structure'),
-    );
+    this.place(this.houseFlames, this.houseKeys, list.filter((f) => f.kind === 'structure'));
   }
   private place(pool: Flame[], keys: (number | undefined)[], items: FireFlame[]): void {
     const top = items.slice(0, pool.length);
-    for (let i = 0; i < pool.length; i++)
-      if (keys[i] !== undefined && !top.some((f) => f.key === keys[i])) keys[i] = undefined;
+    for (let i = 0; i < pool.length; i++) if (keys[i] !== undefined && !top.some((f) => f.key === keys[i])) keys[i] = undefined;
     for (const f of top)
       if (!keys.includes(f.key)) {
         let slot = -1;

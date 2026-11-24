@@ -80,11 +80,7 @@ test('KB6013a: under snap the parts of a squeezed or fractional slice share thei
         return [corner, corner + size];
       });
     for (const axis of [0, 1]) {
-      const edges = new Set(
-        spans(axis)
-          .flat()
-          .map((v) => Math.round(v * 1e6) / 1e6),
-      );
+      const edges = new Set(spans(axis).flat().map((v) => Math.round(v * 1e6) / 1e6));
       for (const v of edges) assert.ok(Number.isInteger(v), `axis ${axis}: edge ${v} is a whole pixel`);
       const start = (axis ? 0.4 : options.x) * zoom,
         end = start + (axis ? options.height : options.width) * zoom;
@@ -96,11 +92,7 @@ test('KB6013a: under snap the parts of a squeezed or fractional slice share thei
       // Every inner edge is shared: the left edge of one part is the right edge of another.
       const columns = spans(axis);
       for (const [a] of columns)
-        if (a !== Math.min(...edges))
-          assert.ok(
-            columns.some(([, b]) => Math.abs(b - a) < 1e-6),
-            `axis ${axis}: gap at ${a}`,
-          );
+        if (a !== Math.min(...edges)) assert.ok(columns.some(([, b]) => Math.abs(b - a) < 1e-6), `axis ${axis}: gap at ${a}`);
     }
   }
 });

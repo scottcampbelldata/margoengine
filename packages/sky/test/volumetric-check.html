@@ -50,12 +50,9 @@ window.check={samples:sceneSamples,
   view(...views.inside);await frame();const block=await frame();
   clouds=VolumetricClouds.attach(engine,{sky,coverage:1,density:0.08,depth:()=>post.depthTexture});const blockClouds=await frame();clouds.dispose();
   out.block=diff(blockClouds,block,centre);
-  clouds=VolumetricClouds.attach(engine,{sky,coverage:1,density:0.08});const automaticBlock=await frame();clouds.dispose();
-  clouds=VolumetricClouds.attach(engine,{sky,coverage:1,density:0.08,depth:()=>undefined});const withoutBlockDepth=await frame();clouds.dispose();
-  out.automaticDepth={same:diff(automaticBlock,blockClouds).changed,override:diff(withoutBlockDepth,block,centre).changed};
-  // An unavailable explicit depth still draws just the empty sky: the pillar stays as it was, the sky beside it changes.
+  // Without a depth texture the clouds draw only over the empty sky: the pillar stays as it was, the sky beside it changes.
   view(...views.ground);await frame();const bare=await frame();
-  clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9,depth:()=>undefined});const noDepth=await frame();clouds.dispose();
+  clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9});const noDepth=await frame();clouds.dispose();
   out.noDepth={pillar:diff(noDepth,bare,centre),sky:diff(noDepth,bare,(i)=>i%w<w/4)};
   // A lightning flash in the layer lights the cloud round it from inside; intensity 0 draws exactly as no flash.
   view(...views.ground);clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9,depth:()=>post.depthTexture});await frame();const unlit=await frame();

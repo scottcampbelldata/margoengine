@@ -90,7 +90,7 @@ class FakeLighting {
     this.disposed = true;
   }
 }
-const environmentMock = {
+mock.module('@margoengine/environment', {
   namedExports: {
     EnvironmentBackground: FakeBackground,
     ColorBackground: FakeColorBackground,
@@ -116,15 +116,7 @@ const environmentMock = {
       },
     },
   },
-};
-// The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of [
-  '@margoengine/environment',
-  '@margoengine/environment/main',
-  '@margoengine/environment/loaders',
-  '@margoengine/environment/load',
-])
-  mock.module(id, environmentMock);
+});
 
 const { render, act, cleanup } = await import('@testing-library/react');
 const { Engine, TransformStore } = await import('@margoengine/core/extension');
@@ -301,52 +293,4 @@ test('Environment src with children draws the src environment behind them and li
     [captured],
     'the capture lights the scene, not the bare src',
   );
-});
-
-test('Environment inside a named <Scene> lights and backs that scene only, with or without children', async () => {
-  const { scene, engine, errors, tree, frame } = await context();
-  const world = engine.createScene('item');
-  scene.world = world;
-  const before = {
-    direction: [...engine.scene.lighting.direction],
-    radiance: [...engine.scene.lighting.radiance],
-  };
-  // A bare Environment writes its default lighting to the scene it is in.
-  const bare = render(tree(h(Environment, { exposure: 2 })));
-  await settle();
-  assert.deepEqual([...engine.scene.lighting.direction], before.direction, 'the default scene keeps its sun');
-  assert.deepEqual([...engine.scene.lighting.radiance], before.radiance, 'and its ambient');
-  assert.deepEqual(
-    [...world.lighting.radiance],
-    [2, 2, 2, Math.fround(0.3)],
-    'the named scene takes the Environment lighting',
-  );
-  bare.unmount();
-  await settle();
-  assert.deepEqual([...world.lighting.radiance], before.radiance, 'unmount restores the named scene lighting');
-  // With children: the capture's environment, its lighting and its background join the named scene.
-  const view = render(tree(h(Environment, { resolution: 64 }, h(Lightformer, { position: [0, 2, 0] }))));
-  for (let i = 0; i < 4; i++) {
-    await settle();
-    await frame();
-  }
-  assert.deepEqual(errors, []);
-  const environment = created.find((e) => e.source === cubes.find((c) => !c.disposed));
-  assert.ok(environment, 'the cube becomes the environment');
-  const inWorld = [...world.plugins.values()];
-  assert.ok(inWorld.includes(environment), 'the environment is in the named scene');
-  assert.ok(
-    inWorld.some((p) => p instanceof FakeLighting),
-    'and so is its lighting',
-  );
-  assert.ok(
-    inWorld.some((p) => p instanceof FakeBackground),
-    'and its background',
-  );
-  assert.equal(engine.hasPlugin(environment.name), false, 'none of it is in the default scene');
-  assert.ok(![...engine.plugins.values()].some((p) => p instanceof FakeLighting || p instanceof FakeBackground));
-  view.unmount();
-  await settle();
-  assert.ok(environment.disposed);
-  assert.ok(![...world.plugins.values()].some((p) => p === environment || p instanceof FakeLighting));
 });

@@ -629,10 +629,7 @@ test('the main pass of CulledInstances and CulledParts draws inside the view rec
     h.run();
     const first = calls.findIndex(([kind]) => kind === 'draw');
     assert.ok(first >= 0, 'the batches are drawn');
-    assert.deepEqual(calls.slice(0, first), [
-      ['viewport', 8, 4, 32, 16, 0, 1],
-      ['scissor', 10, 4, 16, 16],
-    ]);
+    assert.deepEqual(calls.slice(0, first), [['viewport', 8, 4, 32, 16, 0, 1], ['scissor', 10, 4, 16, 16]]);
     parts.dispose();
     h.cleanup();
   }

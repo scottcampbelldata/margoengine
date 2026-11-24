@@ -288,22 +288,12 @@ export async function runChecks() {
     near(level(out, 0.05, 0.15), 0.5, 1e-6, 'before voice');
     near(level(out, 0.35, 0.45), 0.05, 1e-5, 'ducked without key leaking');
     near(level(out, 0.9, 1), 0.5, 1e-5, 'released without a scheduling call');
-    near(
-      out.getChannelData(0)[Math.round(0.21 * rate)],
-      0.5 * (0.1 + 0.9 * Math.exp(-((0.01 * rate + 1) / (rate * 0.01)))),
-      2e-5,
-      'attack time constant',
-    );
-    assert(
-      out.getChannelData(0).every((v, i) => v === out.getChannelData(1)[i]),
-      'stereo gain is linked',
-    );
+    near(out.getChannelData(0)[Math.round(0.21 * rate)], 0.5 * (0.1 + 0.9 * Math.exp(-((0.01 * rate + 1) / (rate * 0.01)))), 2e-5, 'attack time constant');
+    assert(out.getChannelData(0).every((v, i) => v === out.getChannelData(1)[i]), 'stereo gain is linked');
   });
   await check('snapshots fade music and underwater filter on the audio clock and restore them', async () => {
     const context = new OfflineAudioContext(2, rate, rate);
-    using mixer = new Mixer(context, {
-      buses: { music: { effects: [{ type: 'filter', filter: 'lowpass', frequency: 10000 }] } },
-    });
+    using mixer = new Mixer(context, { buses: { music: { effects: [{ type: 'filter', filter: 'lowpass', frequency: 10000 }] } } });
     const music = mixer.bus('music');
     const clear = captureSnapshot(mixer);
     music.setGain(-20, { seconds: 0 });
@@ -330,34 +320,20 @@ export async function runChecks() {
       // Await before leaving the using scope so the stage survives the render.
       return await context.startRendering();
     };
-    const compressed = await render(constant(0.1, 0.25), {
-      mode: 'compressor',
-      threshold: -24,
-      knee: 0,
-      ratio: 4,
-      attack: 0,
-      release: 0,
-      ceiling: 0,
-    });
+    const compressed = await render(constant(0.1, 0.25), { mode: 'compressor', threshold: -24, knee: 0, ratio: 4, attack: 0, release: 0, ceiling: 0 });
     const expected = dbToGain(-24 + (20 * Math.log10(0.25) + 24) / 4);
     near(compressed.getChannelData(0)[1000], expected, 3e-8, 'fixed compressor curve, no native make-up');
-    const loud = Float32Array.from({ length: 12000 }, (_, i) => 3 * Math.sin((Math.PI * i) / 2 + Math.PI / 4));
+    const loud = Float32Array.from({ length: 12000 }, (_, i) => 3 * Math.sin(Math.PI * i / 2 + Math.PI / 4));
     assert(measureTruePeak([loud]) > measure(loud).peak * 1.38, 'fixture has inter-sample overs');
     const limited = await render(loud, { ceiling: -6, release: 0.02 });
     const peak = measureTruePeak([limited.getChannelData(0), limited.getChannelData(1)]);
     assert(peak <= dbToGain(-6), `true peak ${peak} exceeds ceiling`);
     assert(peak > 0.05, 'limiter is audible');
-    assert(
-      limited
-        .getChannelData(0)
-        .slice(0, 11)
-        .every((v) => v === 0),
-      '11-sample lookahead',
-    );
+    assert(limited.getChannelData(0).slice(0, 11).every((v) => v === 0), '11-sample lookahead');
   });
   await check('room early reflections and seeded late tail render as the computed stereo impulse', async () => {
     const context = new OfflineAudioContext(2, 12000, rate);
-    const settings = { room: [6, 3, 8], source: [1, 1.5, 2], listener: [3, 1.5, 5], seconds: 0.1, mix: 1, seed: 17 };
+    const settings = { room: [6,3,8], source: [1,1.5,2], listener: [3,1.5,5], seconds: 0.1, mix: 1, seed: 17 };
     using reverb = createRoomReverb(context, settings);
     play(context, impulse(0.25)).connect(reverb.input);
     reverb.output.connect(context.destination);
@@ -365,13 +341,9 @@ export async function runChecks() {
     const reference = roomImpulseResponse(rate, settings);
     for (let c = 0; c < 2; c++) {
       let worst = 0;
-      for (let i = 0; i < reference[c].length; i++)
-        worst = Math.max(worst, Math.abs(out.getChannelData(c)[i] - reference[c][i]));
+      for (let i = 0; i < reference[c].length; i++) worst = Math.max(worst, Math.abs(out.getChannelData(c)[i] - reference[c][i]));
       assert(worst < 2e-5, `convolution error ${worst}`);
-      assert(
-        measure(out.getChannelData(c), 0, Math.round(0.03 * rate)).peak > 0.01,
-        'discrete early arrivals precede the tail',
-      );
+      assert(measure(out.getChannelData(c), 0, Math.round(0.03 * rate)).peak > 0.01, 'discrete early arrivals precede the tail');
     }
   });
   await check('LUFS measures real rendered stereo calibration audio and normalises it by gain', async () => {
@@ -380,36 +352,28 @@ export async function runChecks() {
     const buffer = await context.startRendering();
     const pcm = [buffer.getChannelData(0), buffer.getChannelData(1)];
     const report = measureLoudness(pcm, rate);
-    for (const field of ['integrated', 'momentary', 'shortTerm'])
-      near(report[field], -23, 0.1, `EBU calibration ${field}`);
+    for (const field of ['integrated', 'momentary', 'shortTerm']) near(report[field], -23, 0.1, `EBU calibration ${field}`);
     const adjusted = normalizeLoudness(pcm, rate, { target: -20 });
     near(adjusted.after.integrated, -20, 1e-5, 'normalised LUFS');
     assert(!adjusted.peakLimited, 'ordinary target is reachable by gain');
     assert(adjusted.after.truePeak <= dbToGain(-1), 'normalisation respects its peak cap');
   });
   await check('bus stereo follows normalized mid/side width and the specified equal-power stereo pan', async () => {
-    for (const width of [0, 0.25, 0.5, 0.75, 1])
-      for (const pan of [-1, -0.5, 0, 0.5, 1]) {
-        const context = new OfflineAudioContext(2, 128, rate);
-        using mixer = new Mixer(context, { buses: { x: {} } });
-        using stage = createBusStereo(mixer.bus('x'), { width, pan });
-        const b = context.createBuffer(2, 128, rate);
-        b.getChannelData(0).fill(0.2);
-        b.getChannelData(1).fill(-0.1);
-        const source = new AudioBufferSourceNode(context, { buffer: b });
-        source.connect(mixer.bus('x').input);
-        source.start();
-        const out = await context.startRendering();
-        const l = 0.2 + (1 - 2 * width) * -0.1,
-          r = -0.1 + (1 - 2 * width) * 0.2;
-        const x = pan <= 0 ? pan + 1 : pan;
-        const expected =
-          pan <= 0
-            ? [l + r * Math.cos((x * Math.PI) / 2), r * Math.sin((x * Math.PI) / 2)]
-            : [l * Math.cos((x * Math.PI) / 2), r + l * Math.sin((x * Math.PI) / 2)];
-        for (let c = 0; c < 2; c++)
-          near(out.getChannelData(c)[64], expected[c], 1e-7, `width ${width}, pan ${pan}, channel ${c}`);
-      }
+    for (const width of [0, 0.25, 0.5, 0.75, 1]) for (const pan of [-1, -0.5, 0, 0.5, 1]) {
+      const context = new OfflineAudioContext(2, 128, rate);
+      using mixer = new Mixer(context, { buses: { x: {} } });
+      using stage = createBusStereo(mixer.bus('x'), { width, pan });
+      const b = context.createBuffer(2, 128, rate);
+      b.getChannelData(0).fill(0.2); b.getChannelData(1).fill(-0.1);
+      const source = new AudioBufferSourceNode(context, { buffer: b });
+      source.connect(mixer.bus('x').input); source.start();
+      const out = await context.startRendering();
+      const l = 0.2 + (1 - 2 * width) * -0.1, r = -0.1 + (1 - 2 * width) * 0.2;
+      const x = pan <= 0 ? pan + 1 : pan;
+      const expected = pan <= 0 ? [l + r * Math.cos(x * Math.PI / 2), r * Math.sin(x * Math.PI / 2)]
+        : [l * Math.cos(x * Math.PI / 2), r + l * Math.sin(x * Math.PI / 2)];
+      for (let c = 0; c < 2; c++) near(out.getChannelData(c)[64], expected[c], 1e-7, `width ${width}, pan ${pan}, channel ${c}`);
+    }
   });
   await check('live bus analysis keeps anti-phase stereo, FFT bins, waveform and audio-clock RMS/LUFS', async () => {
     const context = new OfflineAudioContext(2, rate * 4, rate);
@@ -417,144 +381,92 @@ export async function runChecks() {
     using stage = await createBusAnalyser(mixer.bus('x'), { fftSize: 2048, smoothing: 0 });
     const b = context.createBuffer(2, rate * 4, rate);
     const signal = sine(750, 4, 0.1);
-    b.getChannelData(0).set(signal);
-    b.getChannelData(1).set(signal.map((v) => -v));
-    const source = new AudioBufferSourceNode(context, { buffer: b });
-    source.connect(mixer.bus('x').input);
-    source.start();
-    const reported = new Promise((resolve) =>
-      stage.output.port.addEventListener('message', (e) => {
-        if (e.data.frames >= rate * 4) resolve();
-      }),
-    );
+    b.getChannelData(0).set(signal); b.getChannelData(1).set(signal.map(v => -v));
+    const source = new AudioBufferSourceNode(context, { buffer: b }); source.connect(mixer.bus('x').input); source.start();
+    const reported = new Promise(resolve => stage.output.port.addEventListener('message', e => {
+      if (e.data.frames >= rate * 4) resolve();
+    }));
     const suspended = context.suspend(0.25);
     const rendered = context.startRendering();
     await suspended;
     for (let c = 0; c < 2; c++) {
-      const spectrum = stage.spectrum(c),
-        waveform = stage.waveform(c);
-      const max = spectrum.reduce((best, v, i) => (v > spectrum[best] ? i : best), 0);
+      const spectrum = stage.spectrum(c), waveform = stage.waveform(c);
+      const max = spectrum.reduce((best, v, i) => v > spectrum[best] ? i : best, 0);
       near(stage.frequency(max), 750, 0, 'per-channel FFT retains anti-phase tone');
       near(measure(waveform).peak, 0.1, 1e-7, 'waveform peak');
     }
-    await context.resume();
-    const out = await rendered;
-    await reported;
-    const reading = stage.read(),
-      reference = measureLoudness([signal, signal.map((v) => -v)], rate);
+    await context.resume(); const out = await rendered; await reported;
+    const reading = stage.read(), reference = measureLoudness([signal, signal.map(v => -v)], rate);
     near(reading.rms[0], 0.1 / Math.sqrt(2), 1e-7, 'live RMS');
     near(reading.momentary, reference.momentary, 1e-6, 'live momentary LUFS');
     near(reading.shortTerm, reference.shortTerm, 1e-6, 'live short-term LUFS');
-    for (let c = 0; c < 2; c++)
-      assert(
-        out.getChannelData(c).every((v, i) => v === b.getChannelData(c)[i]),
-        'analysis output preserves samples',
-      );
+    for (let c = 0; c < 2; c++) assert(out.getChannelData(c).every((v, i) => v === b.getChannelData(c)[i]), 'analysis output preserves samples');
   });
   await check('JSON modulation and colour effects render analytic signals on the audio thread', async () => {
-    for (const spec of [
-      { type: 'chorus', depth: 0, time: 0.01, mix: 1 },
-      { type: 'flanger', depth: 0, time: 0.001, mix: 1 },
-      { type: 'vibrato', depth: 0, time: 0.005, mix: 1 },
-      { type: 'phaser', depth: 0, mix: 0 },
-      { type: 'auto-filter', mix: 0 },
-      { type: 'tremolo', rate: 0, phase: 90, depth: 1, spread: 0 },
-      { type: 'bitcrusher', bits: 4 },
-      { type: 'auto-pan', rate: 0, phase: 90, depth: 1 },
-    ]) {
+    for (const spec of [{type:'chorus',depth:0,time:0.01,mix:1}, {type:'flanger',depth:0,time:0.001,mix:1},
+      {type:'vibrato',depth:0,time:0.005,mix:1}, {type:'phaser',depth:0,mix:0}, {type:'auto-filter',mix:0},
+      {type:'tremolo',rate:0,phase:90,depth:1,spread:0}, {type:'bitcrusher',bits:4},
+      {type:'auto-pan',rate:0,phase:90,depth:1}]) {
       const context = new OfflineAudioContext(2, 4800, rate);
       using mixer = new Mixer(context);
       using stage = await createBusFX(mixer.master, JSON.parse(JSON.stringify([spec])));
-      play(context, constant(0.1, 0.3)).connect(mixer.master.input);
+      play(context,constant(.1,.3)).connect(mixer.master.input);
       const out = await context.startRendering();
-      const expected = spec.type === 'bitcrusher' ? 0.25 : spec.type === 'auto-pan' ? 0.6 : 0.3;
-      near(out.getChannelData(spec.type === 'auto-pan' ? 1 : 0)[3000], expected, 1e-6, `${spec.type} wet signal`);
-      if (spec.type === 'auto-pan') near(out.getChannelData(0)[3000], 0, 1e-7, 'auto-pan left');
+      const expected = spec.type==='bitcrusher'?.25:spec.type==='auto-pan'?.6:.3;
+      near(out.getChannelData(spec.type==='auto-pan'?1:0)[3000],expected,1e-6,`${spec.type} wet signal`);
+      if(spec.type==='auto-pan')near(out.getChannelData(0)[3000],0,1e-7,'auto-pan left');
     }
-    for (const oversample of ['none', '2x', '4x']) {
+    for (const oversample of ['none','2x','4x']) {
       const context = new OfflineAudioContext(1, 4800, rate);
-      using stage = await createFX(context, { type: 'distortion', amount: 0.4, oversample });
-      play(context, constant(0.1, 0.25)).connect(stage.input);
-      stage.output.connect(context.destination);
+      using stage = await createFX(context,{type:'distortion',amount:.4,oversample});
+      play(context,constant(.1,.25)).connect(stage.input);stage.output.connect(context.destination);
       const out = await context.startRendering();
-      near(out.getChannelData(0)[3000], (41 * 0.25) / (1 + 40 * 0.25), 1e-5, `rational distortion ${oversample}`);
+      near(out.getChannelData(0)[3000],41*.25/(1+40*.25),1e-5,`rational distortion ${oversample}`);
     }
     const context = new OfflineAudioContext(1, 4800, rate);
-    using shaper = await createFX(context, { type: 'waveshaper', curve: [-1, 0, 1] });
-    const data = sine(1000, 0.1, 0.2);
-    play(context, data).connect(shaper.input);
-    shaper.output.connect(context.destination);
+    using shaper = await createFX(context,{type:'waveshaper',curve:[-1,0,1]});
+    const data=sine(1000,.1,.2);play(context,data).connect(shaper.input);shaper.output.connect(context.destination);
     const out = await context.startRendering();
-    out.getChannelData(0).forEach((v, i) => near(v, data[i], 1e-7, 'authored identity curve'));
+    out.getChannelData(0).forEach((v,i)=>near(v,data[i],1e-7,'authored identity curve'));
   });
   await check('exact gate expansion and phase-aligned multiband worklets render on both backends', async () => {
-    for (const spec of [
-      { type: 'gate', threshold: -20, attack: 0, release: 0, hold: 0 },
-      { type: 'expander', threshold: -20, knee: 0, ratio: 2, attack: 0, release: 0 },
-    ]) {
-      const context = new OfflineAudioContext(2, 4800, rate);
+    for (const spec of [{type:'gate',threshold:-20,attack:0,release:0,hold:0},
+      {type:'expander',threshold:-20,knee:0,ratio:2,attack:0,release:0}]) {
+      const context = new OfflineAudioContext(2,4800,rate);
       using mixer = new Mixer(context);
-      using stage = await createBusDynamics(mixer.master, spec);
-      const data = constant(0.1, 0.01);
-      data.fill(0.2, 2400);
-      play(context, data).connect(mixer.master.input);
-      const out = await context.startRendering();
-      near(out.getChannelData(0)[1000], spec.type === 'gate' ? 0 : 0.001, 1e-8, `${spec.type} below threshold`);
-      near(out.getChannelData(0)[3000], 0.2, 1e-7, `${spec.type} above threshold`);
-      assert(
-        out.getChannelData(0).every((v, i) => v === out.getChannelData(1)[i]),
-        'linked stereo dynamics',
-      );
+      using stage = await createBusDynamics(mixer.master,spec);
+      const data=constant(.1,.01);data.fill(.2,2400);play(context,data).connect(mixer.master.input);
+      const out=await context.startRendering();
+      near(out.getChannelData(0)[1000],spec.type==='gate'?0:.001,1e-8,`${spec.type} below threshold`);
+      near(out.getChannelData(0)[3000],.2,1e-7,`${spec.type} above threshold`);
+      assert(out.getChannelData(0).every((v,i)=>v===out.getChannelData(1)[i]),'linked stereo dynamics');
     }
-    const context = new OfflineAudioContext(2, 4800, rate);
-    using multiband = await createMultibandCompressor(context, {
-      low: { ratio: 1 },
-      mid: { ratio: 1 },
-      high: { ratio: 1 },
-    });
-    play(context, sine(1000, 0.1, 0.2)).connect(multiband.input);
-    multiband.output.connect(context.destination);
-    const out = await context.startRendering();
-    near(measure(out.getChannelData(0), 2400, 4800).rms, 0.2 / Math.sqrt(2), 1e-6, 'phase-aligned crossover magnitude');
+    const context = new OfflineAudioContext(2,4800,rate);
+    using multiband = await createMultibandCompressor(context,{low:{ratio:1},mid:{ratio:1},high:{ratio:1}});
+    play(context,sine(1000,.1,.2)).connect(multiband.input);multiband.output.connect(context.destination);
+    const out=await context.startRendering();
+    near(measure(out.getChannelData(0),2400,4800).rms,.2/Math.sqrt(2),1e-6,'phase-aligned crossover magnitude');
   });
-  await check(
-    'pitch shift transposes without changing the audio clock and supports sample-clock automation',
-    async () => {
-      const hz = (data, from, to) => {
-        const crossings = [];
-        for (let i = from + 1; i < to; i++)
-          if (data[i - 1] <= 0 && data[i] > 0) crossings.push(i - 1 - data[i - 1] / (data[i] - data[i - 1]));
-        return ((crossings.length - 1) * rate) / (crossings.at(-1) - crossings[0]);
-      };
-      for (const pitch of [-12, 0, 7, 12]) {
-        const context = new OfflineAudioContext(2, rate, rate);
-        using mixer = new Mixer(context);
-        using stage = await createBusPitchShift(mixer.master, { pitch });
-        const input = sine(400, 1, 0.2);
-        play(context, input).connect(mixer.master.input);
-        const out = await context.startRendering();
-        assert(out.length === input.length, 'same output duration');
-        near(hz(out.getChannelData(0), 12000, 46000), 400 * 2 ** (pitch / 12), 0.05, `pitch ${pitch} output frequency`);
-        if (pitch === 0)
-          assert(
-            out.getChannelData(0).every((v, i) => v === input[i]),
-            'unison is bit-identical',
-          );
-        assert(
-          out.getChannelData(0).every((v, i) => v === out.getChannelData(1)[i]),
-          'pitch read-head phase linked across channels',
-        );
-      }
-      const context = new OfflineAudioContext(2, rate, rate);
-      using mixer = new Mixer(context);
-      using stage = await createBusPitchShift(mixer.master, { pitch: -12 });
-      stage.setPitch(12, { at: 0.5 });
-      play(context, sine(400, 1, 0.2)).connect(mixer.master.input);
-      const out = await context.startRendering();
-      near(hz(out.getChannelData(0), 12000, 22000), 200, 0.05, 'first scheduled pitch');
-      near(hz(out.getChannelData(0), 33000, 46000), 800, 0.05, 'pitch automation on source clock');
-    },
-  );
+  await check('pitch shift transposes without changing the audio clock and supports sample-clock automation', async () => {
+    const hz=(data,from,to)=>{
+      const crossings=[];for(let i=from+1;i<to;i++)if(data[i-1]<=0&&data[i]>0)crossings.push(i-1-data[i-1]/(data[i]-data[i-1]));
+      return (crossings.length-1)*rate/(crossings.at(-1)-crossings[0]);
+    };
+    for(const pitch of [-12,0,7,12]){
+      const context=new OfflineAudioContext(2,rate,rate);using mixer=new Mixer(context);
+      using stage=await createBusPitchShift(mixer.master,{pitch});
+      const input=sine(400,1,.2);play(context,input).connect(mixer.master.input);
+      const out=await context.startRendering();assert(out.length===input.length,'same output duration');
+      near(hz(out.getChannelData(0),12000,46000),400*2**(pitch/12),.05,`pitch ${pitch} output frequency`);
+      if(pitch===0)assert(out.getChannelData(0).every((v,i)=>v===input[i]),'unison is bit-identical');
+      assert(out.getChannelData(0).every((v,i)=>v===out.getChannelData(1)[i]),'pitch read-head phase linked across channels');
+    }
+    const context=new OfflineAudioContext(2,rate,rate);using mixer=new Mixer(context);
+    using stage=await createBusPitchShift(mixer.master,{pitch:-12});stage.setPitch(12,{at:.5});
+    play(context,sine(400,1,.2)).connect(mixer.master.input);const out=await context.startRendering();
+    near(hz(out.getChannelData(0),12000,22000),200,.05,'first scheduled pitch');
+    near(hz(out.getChannelData(0),33000,46000),800,.05,'pitch automation on source clock');
+  });
   device?.destroy();
   return { checks, backend };
 }

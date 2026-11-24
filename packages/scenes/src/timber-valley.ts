@@ -70,8 +70,7 @@ export interface TimberValleySettings {
   readonly signal?: AbortSignal;
 }
 
-type Filled = Readonly<Required<Omit<TimberValleySettings, 'meshes' | 'signal'>>> &
-  Pick<TimberValleySettings, 'meshes'>;
+type Filled = Readonly<Required<Omit<TimberValleySettings, 'meshes' | 'signal'>>> & Pick<TimberValleySettings, 'meshes'>;
 
 /** A named place in the scene: where to stand and where to look, metres. */
 export interface Anchor {
@@ -164,8 +163,7 @@ export function check(settings: TimberValleySettings): Filled {
       throw new RangeError(`timber-valley: unknown ${key}; pass ${spec.options.join(' or ')}.`);
   }
   if (!Number.isInteger(s.houses)) throw new RangeError('timber-valley: houses is not a whole number; pass 0 to 256.');
-  if (!Number.isInteger(s.seed) || s.seed < 0)
-    throw new RangeError('timber-valley: seed must be a whole number 0 or more.');
+  if (!Number.isInteger(s.seed) || s.seed < 0) throw new RangeError('timber-valley: seed must be a whole number 0 or more.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date) || Number.isNaN(Date.parse(s.date)))
     throw new RangeError('timber-valley: date is not a date; pass YYYY-MM-DD.');
   if (s.meshes !== undefined && (typeof s.meshes !== 'object' || s.meshes === null))
@@ -246,10 +244,7 @@ export function layout(world: BiomeWorld, settings: TimberValleySettings = {}): 
           })
         : { villages: [], roads: [], lanes: [], paths: [], exclusions: [] },
     structures = town.villages.flatMap((v) =>
-      v.houses.map((h) => ({
-        at: [h.centre[0], h.centre[1]] as [number, number],
-        radius: Math.max(h.size[0], h.size[1]) / 2,
-      })),
+      v.houses.map((h) => ({ at: [h.centre[0], h.centre[1]] as [number, number], radius: Math.max(h.size[0], h.size[1]) / 2 })),
     ),
     // The fire starts low on the south wall west of the town, in timber, and the gale drives it.
     start = at(250),
@@ -355,12 +350,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
       });
       disposers.push(() => fireFront?.dispose());
     }
-    const drive = WeatherDrive.attach(engine, {
-      weather,
-      listener: engine.camera,
-      clouds,
-      ...(fireFront ? { fires: fireFront } : {}),
-    });
+    const drive = WeatherDrive.attach(engine, { weather, listener: engine.camera, clouds, ...(fireFront ? { fires: fireFront } : {}) });
     disposers.push(() => drive.dispose?.());
     if (fireFront) {
       rollFire(drive, fireFront, s.fireTime);
@@ -384,13 +374,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
           path: 'linear',
           keys: [
             { time: 0, position: [...a.position] as Vec3, target: [...a.target] as Vec3, fov: 45 },
-            {
-              time: shot.seconds,
-              position: [...b.position] as Vec3,
-              target: [...b.target] as Vec3,
-              fov: 45,
-              ease: 'smoothstep',
-            },
+            { time: shot.seconds, position: [...b.position] as Vec3, target: [...b.target] as Vec3, fov: 45, ease: 'smoothstep' },
           ],
         },
       ];
@@ -402,8 +386,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
       views: info.views,
       view(name, fov = 50) {
         const a = anchors[name];
-        if (!a)
-          throw new RangeError(`timber-valley: no anchor ${name}; pass one of ${Object.keys(anchors).join(', ')}.`);
+        if (!a) throw new RangeError(`timber-valley: no anchor ${name}; pass one of ${Object.keys(anchors).join(', ')}.`);
         engine.camera.position = [...a.position] as Vec3;
         engine.camera.target = [...a.target] as Vec3;
         engine.camera.fov = fov;
@@ -416,8 +399,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
       applySettings(values) {
         for (const [target, rows] of Object.entries(values)) {
           if (target === 'weather') applyWeatherSettings(weather, { ...weatherRows(weather), ...rows } as never);
-          else if (target === 'sky')
-            applySkySettings({ sky: preset.sky, clouds, tonemap: preset.tonemap }, rows as never);
+          else if (target === 'sky') applySkySettings({ sky: preset.sky, clouds, tonemap: preset.tonemap }, rows as never);
           else if (target === 'fire') {
             if (fireFront) applyFireSettings(fireFront as never, rows as never);
           } else throw new RangeError(`timber-valley: no settings target ${target}; pass weather, sky or fire.`);
@@ -473,8 +455,7 @@ function weatherRows(weather: WeatherMachine): Record<string, unknown> {
 /** The scene's camera places, from the valley lines and the ground. */
 function anchorsOf(plan: TimberValleyLayout, height: (x: number, z: number) => number): Record<string, Anchor> {
   const at = (along: number) => plan.axis[Math.max(0, Math.min(plan.axis.length - 1, Math.round(along / 16)))],
-    rail = (along: number) =>
-      plan.rail[Math.max(0, Math.min(plan.rail.length - 1, Math.round(along / 16)))] ?? at(along),
+    rail = (along: number) => plan.rail[Math.max(0, Math.min(plan.rail.length - 1, Math.round(along / 16)))] ?? at(along),
     creek = (along: number) => plan.creek[Math.max(0, Math.min(plan.creek.length - 1, Math.round(along / 16)))],
     eye = (p: readonly [number, number], up: number, dx = 0, dz = 0): Vec3 => [
       p[0] + dx,
@@ -493,11 +474,7 @@ function anchorsOf(plan: TimberValleyLayout, height: (x: number, z: number) => n
     'rail-far': a(eye(rail(600), 1.2), eye(rail(1000), 1.5), 'up the rail grade'),
     creek: a(eye(creek(1200), 1.0, 0, 6), eye(creek(1500), 0.5), 'on the creek bank'),
     'creek-up': a(eye(creek(1300), 1.0, 0, 6), eye(creek(1600), 0.5), 'up the creek'),
-    ridge: a(
-      eye(at(1200), 600, 0, -900),
-      eye(at(900), 300, 0, 900),
-      'the north ridge, across the valley to the south wall',
-    ),
+    ridge: a(eye(at(1200), 600, 0, -900), eye(at(900), 300, 0, 900), 'the north ridge, across the valley to the south wall'),
     'ridge-pan': a(eye(at(1300), 600, 0, -900), eye(at(500), 300, 0, 600), 'the north ridge, panning toward the fire'),
     'fire-line': a(eye(fire, 80, 500, -200), eye(fire, 40, 0, -100), 'side on to the front on the south wall'),
     'fire-line-near': a(eye(fire, 60, 400, -100), eye(fire, 40, 0, -150), 'closer on the front'),

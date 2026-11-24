@@ -148,8 +148,7 @@ function loopCrossing(f: Face, fuv: FaceUV): string | undefined {
     dv = (v1 - v0) / side,
     // A margin past each range: a crossing found by rounding just past a range still shares a cell.
     margin = 1e-9 * (u1 - u0 + (v1 - v0)) + 1e-300,
-    cell = (x: number, x0: number, d: number) =>
-      d > 0 ? Math.max(0, Math.min(side - 1, Math.floor((x - x0) / d))) : 0,
+    cell = (x: number, x0: number, d: number) => (d > 0 ? Math.max(0, Math.min(side - 1, Math.floor((x - x0) / d))) : 0),
     cells: number[][] = Array.from({ length: side * side }, () => []),
     range = (lo: number, hi: number, vlo: number, vhi: number, visit: (k: number) => void) => {
       if (hi < u0 - margin || lo > u1 + margin) return;
@@ -304,9 +303,7 @@ function splineCells(fuv: FaceUV): Cells | undefined {
     const am = (a0 + a1) >> 1,
       bm = (b0 + b1) >> 1,
       kids: [Cells, Cells] =
-        a1 - a0 >= b1 - b0
-          ? [build(a0, am, b0, b1), build(am, a1, b0, b1)]
-          : [build(a0, a1, b0, bm), build(a0, a1, bm, b1)],
+        a1 - a0 >= b1 - b0 ? [build(a0, am, b0, b1), build(am, a1, b0, b1)] : [build(a0, a1, b0, bm), build(a0, a1, bm, b1)],
       [x, y] = [kids[0].box, kids[1].box],
       min: XYZ = [Math.min(x.min[0], y.min[0]), Math.min(x.min[1], y.min[1]), Math.min(x.min[2], y.min[2])],
       max: XYZ = [Math.max(x.max[0], y.max[0]), Math.max(x.max[1], y.max[1]), Math.max(x.max[2], y.max[2])];

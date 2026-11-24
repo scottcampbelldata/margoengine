@@ -29,20 +29,11 @@ await runSuite(
     assert.equal(r.hasStates, true, 'a view with a history makes its plant state map');
     assert.ok(r.objects > 1000, `objects streamed: ${r.objects}`);
     // The untouched east half draws as before; the burnt west half loses its green and its light.
-    assert.ok(
-      Math.abs(r.eastBurnt.green - r.eastPlain.green) < 0.01,
-      `east green ${JSON.stringify([r.eastPlain, r.eastBurnt])}`,
-    );
-    assert.ok(
-      Math.abs(r.eastBurnt.luma / r.eastPlain.luma - 1) < 0.03,
-      `east luma ${JSON.stringify([r.eastPlain, r.eastBurnt])}`,
-    );
+    assert.ok(Math.abs(r.eastBurnt.green - r.eastPlain.green) < 0.01, `east green ${JSON.stringify([r.eastPlain, r.eastBurnt])}`);
+    assert.ok(Math.abs(r.eastBurnt.luma / r.eastPlain.luma - 1) < 0.03, `east luma ${JSON.stringify([r.eastPlain, r.eastBurnt])}`);
     assert.ok(r.westBurnt.green < r.westPlain.green - 0.01, `west green ${JSON.stringify([r.westPlain, r.westBurnt])}`);
     assert.ok(r.westBurnt.luma < r.westPlain.luma * 0.99, `west luma ${JSON.stringify([r.westPlain, r.westBurnt])}`);
-    console.log(
-      'ok biomes disturbance:',
-      JSON.stringify({ west: [r.westPlain, r.westBurnt], east: [r.eastPlain, r.eastBurnt] }),
-    );
+    console.log('ok biomes disturbance:', JSON.stringify({ west: [r.westPlain, r.westBurnt], east: [r.eastPlain, r.eastBurnt] }));
   },
   () => context.close(),
 );

@@ -49,10 +49,7 @@ try {
       expected = over(row.layers, row.space);
     console.log({ ...row, png: undefined, before: undefined, actual, expected });
     assert.ok(row.taken > 0, `${name}: the layers drew in the order-independent pass`);
-    assert.ok(
-      Math.abs(actual[0] - expected) <= 1 && actual[1] <= 1 && actual[2] <= 1,
-      `${name}: ${actual} vs ${expected}`,
-    );
+    assert.ok(Math.abs(actual[0] - expected) <= 1 && actual[1] <= 1 && actual[2] <= 1, `${name}: ${actual} vs ${expected}`);
     if (row.late) {
       const before = await centre(row.before);
       assert.ok(

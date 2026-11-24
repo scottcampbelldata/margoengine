@@ -8,14 +8,11 @@ export const deferMutation = (engine: object, notify: () => void): boolean => {
 };
 
 export const sceneMutation = <T>(engine: object, action: () => T): T => {
-  const existing = pending.get(engine),
-    queue = existing ?? [],
-    start = queue.length;
+  const existing = pending.get(engine), queue = existing ?? [], start = queue.length;
   if (!existing) pending.set(engine, queue);
   let result: T;
-  try {
-    result = action();
-  } catch (error) {
+  try { result = action(); }
+  catch (error) {
     queue.length = start;
     if (!existing) pending.delete(engine);
     throw error;

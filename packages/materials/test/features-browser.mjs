@@ -237,10 +237,7 @@ async function runFeatures(compat) {
       const unfollowed = await check('modelFeatures', { feature: 'hair', turn: Math.PI / 2, follow: false });
       console.log('model features hair unfollowed', JSON.stringify(unfollowed));
       assert.deepEqual(unfollowed.errors, []);
-      assert.ok(
-        unfollowed.same > 8,
-        `hair without follow points the wrong way once the joint turns: ${unfollowed.same}`,
-      );
+      assert.ok(unfollowed.same > 8, `hair without follow points the wrong way once the joint turns: ${unfollowed.same}`);
     },
     async character() {
       // Every model answers a clustered light as it answers the sun, within the 8-bit step around these colours.
@@ -482,10 +479,7 @@ async function runFeatures(compat) {
         sunlit = lidSun.values.map((v, k) => v / bareSun.values[k]);
       console.log('lid over ambient', sky, 'over the sun', sunlit);
       assert.deepEqual([...lidAmbient.errors, ...bareAmbient.errors, ...lidSun.errors, ...bareSun.errors], []);
-      assert.ok(
-        Math.min(...bareAmbient.values, ...bareSun.values) > 0.02,
-        `lit: ${bareAmbient.values} ${bareSun.values}`,
-      );
+      assert.ok(Math.min(...bareAmbient.values, ...bareSun.values) > 0.02, `lit: ${bareAmbient.values} ${bareSun.values}`);
       const lidV = (h) => {
           const q = Math.max(0, 0.375 - h) * 6;
           return 0.2015 + 0.7985 * (1 - 1 / (1 + 0.44 * q + 1.15 * q * q));
@@ -515,10 +509,7 @@ async function runFeatures(compat) {
         lowExpected = lowAmbient.seen.map(lowV);
       console.log('lower lid over ambient', ground, 'over a sun from below', under);
       assert.deepEqual([...lowAmbient.errors, ...noneAmbient.errors, ...lowSun.errors, ...noneSun.errors], []);
-      assert.ok(
-        Math.min(...noneAmbient.values, ...noneSun.values) > 0.02,
-        `lit: ${noneAmbient.values} ${noneSun.values}`,
-      );
+      assert.ok(Math.min(...noneAmbient.values, ...noneSun.values) > 0.02, `lit: ${noneAmbient.values} ${noneSun.values}`);
       assert.ok(
         ground.every((v, k) => Math.abs(v - lowExpected[k]) < 0.03) && lowExpected[0] < 0.9 && lowExpected[2] > 0.97,
         `ambient over the lower lid: ${ground} against ${lowExpected}`,

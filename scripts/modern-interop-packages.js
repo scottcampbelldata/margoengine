@@ -7,7 +7,19 @@ assert.ok(npm, 'Run through npm run modern:test:interop:packages');
 const archives = resolve('test-results/interop-packages');
 await mkdir(archives, { recursive: true });
 const fixture = await mkdtemp(resolve('test-results/interop-consumer-'));
-const names = ['core', 'math', 'geometry', 'decoders', 'gltf', 'blender', 'loaders', 'exporters', 'ifc', 'xr', 'usdz'],
+const names = [
+    'core',
+    'math',
+    'geometry',
+    'decoders',
+    'gltf',
+    'blender',
+    'loaders',
+    'exporters',
+    'ifc',
+    'xr',
+    'usdz',
+  ],
   dependencies = { 'web-ifc': '0.0.78' };
 for (const name of names) {
   const [pack] = JSON.parse(

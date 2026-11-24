@@ -20,7 +20,11 @@ import { extendMeshes } from '../dist/mesh.js';
 
 const renderer = () => ({ backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} });
 const engine = async () =>
-  new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(16), renderer());
+  new Engine(
+    { width: 16, height: 16, clientWidth: 16, clientHeight: 16 },
+    await TransformStore.create(16),
+    renderer(),
+  );
 const near = (actual, expected, tolerance = 1e-5) => {
   assert.equal(actual.length, expected.length);
   for (let i = 0; i < actual.length; i++)

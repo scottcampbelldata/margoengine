@@ -5,7 +5,12 @@ import type { EngineKernel } from '@margoengine/core';
 import type { AssetOptions, GLTFImage } from './asset.js';
 import type { GLTFLoadOptions as CompressionOptions } from './compression.js';
 import { withDecoders } from './decoder-default.js';
-import { loadGLTF as loadModel, parseGLTFAsync as parseModel, type GLTFLoadOptions, type PBRModel } from './model.js';
+import {
+  loadGLTF as loadModel,
+  parseGLTFAsync as parseModel,
+  type GLTFLoadOptions,
+  type PBRModel,
+} from './model.js';
 
 export * from './model.js';
 

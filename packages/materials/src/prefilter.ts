@@ -14,10 +14,7 @@ declare const GPUShaderStage: { COMPUTE: number };
 export type PrefilterTarget = GPUDevice | { readonly gpu?: GPUDevice | null };
 /** Options of `prefilterCube`: `size` and the `Environment.create` options that apply to a cube. */
 export interface PrefilterOptions
-  extends Pick<
-    EnvironmentOptions,
-    'specularSize' | 'specularMips' | 'samples' | 'rotation' | 'intensity' | 'keepSource'
-  > {
+  extends Pick<EnvironmentOptions, 'specularSize' | 'specularMips' | 'samples' | 'rotation' | 'intensity' | 'keepSource'> {
   /** Edge of the float copy the filter reads, a power of two from 16 to 2048. Default: the cube's edge rounded up to one, at most 1024. */
   size?: number;
   /** Stops the work before the Environment is built. */

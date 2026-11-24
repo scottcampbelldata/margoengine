@@ -45,10 +45,7 @@ test('the compact direct light is the specification metal/dielectric mix at part
         actual = shader.call('direct_light', { base: [...base, 1], n, roughness, metal }, view, light),
         expected = reference({ base, metal, roughness, n, v: view, l: light });
       actual.forEach((value, c) =>
-        assert.ok(
-          Math.abs(value - expected[c]) < 1e-9 * Math.max(1, expected[c]),
-          `${metal} ${roughness}: ${actual} != ${expected}`,
-        ),
+        assert.ok(Math.abs(value - expected[c]) < 1e-9 * Math.max(1, expected[c]), `${metal} ${roughness}: ${actual} != ${expected}`),
       );
     }
 });

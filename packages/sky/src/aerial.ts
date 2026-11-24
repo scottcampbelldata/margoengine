@@ -231,10 +231,7 @@ export class AerialPerspective implements EnginePlugin {
     v[43] = perUnit / 1000;
     v[44] = (o.maxDistance ?? 64000) / 1000;
     // The planet's centre lies under the camera: radius = ground + height (km), kept above the ground in Float32.
-    v[45] = eyeRadius(
-      a.bottomRadius,
-      (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000,
-    );
+    v[45] = eyeRadius(a.bottomRadius, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
     v[46] = +!linearHdr(c.format);
   }
   private draw(c: Context): void {

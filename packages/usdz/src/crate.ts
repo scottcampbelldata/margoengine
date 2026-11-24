@@ -431,8 +431,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64, fu
           return { offset, scale: view.getFloat64(take(8), true) };
         });
       }
-      if (type === 36 || type === 37 || type === 38 || type === 39 || type === 52 || type === 53 || type === 54)
-        return undefined;
+      if (type === 36 || type === 37 || type === 38 || type === 39 || type === 52 || type === 53 || type === 54) return undefined;
       if (type >= 57) return undefined;
     }
     if (UNSUPPORTED.has(type)) fail('composition, animation or unsupported Crate value');

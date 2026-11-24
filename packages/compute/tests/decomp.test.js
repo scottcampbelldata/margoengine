@@ -116,9 +116,7 @@ test('zero-size factors do no matrix work for any batch count', { timeout: 30000
 });
 // KB5765a: many exactly repeated columns once drove one-sided Jacobi's rounding-level residual columns into the
 // subnormal range, where the relative stopping test could never pass ("Jacobi iteration did not converge").
-test('svd converges on a 512 x 512 matrix of many repeated columns and keeps A = U S V^T', {
-  timeout: 120000,
-}, async () => {
+test('svd converges on a 512 x 512 matrix of many repeated columns and keeps A = U S V^T', { timeout: 120000 }, async () => {
   using ctx = await createCompute({ backend: 'cpu' });
   const n = 512,
     data = new Float32Array(n * n);
@@ -152,9 +150,7 @@ test('svd converges on a 512 x 512 matrix of many repeated columns and keeps A =
 });
 // KB5588a: a missing or corrupt decomp-kernel.wasm surfaced a raw ENOENT or WebAssembly.CompileError instead of a
 // help-linked MargoError. A private copy of dist keeps the shipped files untouched while other tests run.
-test('decomp Wasm read and compile failures reject as coded MargoErrors with the cause kept', {
-  timeout: 60000,
-}, async () => {
+test('decomp Wasm read and compile failures reject as coded MargoErrors with the cause kept', { timeout: 60000 }, async () => {
   const { cp, mkdtemp, rm, writeFile } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
@@ -176,15 +172,9 @@ test('decomp Wasm read and compile failures reject as coded MargoErrors with the
       return true;
     };
     await writeFile(join(dir, 'decomp-kernel.wasm'), new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 255]));
-    await assert.rejects(
-      () => decomp.det(a),
-      coded((cause) => cause instanceof WebAssembly.CompileError),
-    );
+    await assert.rejects(() => decomp.det(a), coded((cause) => cause instanceof WebAssembly.CompileError));
     await rm(join(dir, 'decomp-kernel.wasm'));
-    await assert.rejects(
-      () => decomp.det(a),
-      coded((cause) => cause?.code === 'ENOENT'),
-    );
+    await assert.rejects(() => decomp.det(a), coded((cause) => cause?.code === 'ENOENT'));
     const controller = new AbortController();
     controller.abort();
     await assert.rejects(() => decomp.det(a, { signal: controller.signal }), { name: 'AbortError' });

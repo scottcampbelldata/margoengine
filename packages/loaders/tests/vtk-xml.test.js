@@ -74,9 +74,7 @@ test('PolyData triangleCells follow VTK cell order: verts, lines, polys, then st
 });
 
 test('only vertices make a point cloud', async () => {
-  const model = await parseVTKXML(
-    poly(points([0, 0, 0, 1, 1, 1]) + cells('Verts', [0, 1], [1, 2]), 'NumberOfPoints="2"'),
-  );
+  const model = await parseVTKXML(poly(points([0, 0, 0, 1, 1, 1]) + cells('Verts', [0, 1], [1, 2]), 'NumberOfPoints="2"'));
   assert.equal(model.kind, 'points');
   assert.equal(model.indices, undefined);
 });
@@ -92,29 +90,18 @@ test('inline binary reads with a separate size run, one run, and a 64-bit header
 test('big-endian files swap their values and sizes', async () => {
   const data = Buffer.from(f32(VALUES)).swap32();
   const size = u32(data.length).swap32();
-  await same(
-    triangleFile(tag('binary', '', size.toString('base64') + data.toString('base64')), '', 'byte_order="BigEndian"'),
-  );
+  await same(triangleFile(tag('binary', '', size.toString('base64') + data.toString('base64')), '', 'byte_order="BigEndian"'));
 });
 
 test('appended data reads raw and base64, at an offset, with bytes that look like tags', async () => {
   const data = f32(VALUES);
   const pad = Buffer.from('<<>>_');
-  const raw = Buffer.concat([
-    text('<AppendedData encoding="raw">_'),
-    pad,
-    u32(data.length),
-    data,
-    text('</AppendedData>'),
-  ]);
+  const raw = Buffer.concat([text('<AppendedData encoding="raw">_'), pad, u32(data.length), data, text('</AppendedData>')]);
   await same(triangleFile(tag('appended', `offset="${pad.length}"`), raw));
   const first = u32(data.length).toString('base64') + data.toString('base64');
   const lead = 'AAAA';
   await same(
-    triangleFile(
-      tag('appended', `offset="${lead.length}"`),
-      `<AppendedData encoding="base64">\n _${lead}${first}\n</AppendedData>`,
-    ),
+    triangleFile(tag('appended', `offset="${lead.length}"`), `<AppendedData encoding="base64">\n _${lead}${first}\n</AppendedData>`),
   );
 });
 
@@ -125,11 +112,7 @@ test('zlib blocks read inline and appended, across several blocks', async () => 
     header = u32(3, block, 4, ...parts.map((part) => part.length));
   const compressor = 'compressor="vtkZLibDataCompressor"';
   await same(
-    triangleFile(
-      tag('binary', '', header.toString('base64') + Buffer.concat(parts).toString('base64')),
-      '',
-      compressor,
-    ),
+    triangleFile(tag('binary', '', header.toString('base64') + Buffer.concat(parts).toString('base64')), '', compressor),
   );
   const raw = Buffer.concat([text('<AppendedData encoding="raw">_'), header, ...parts, text('</AppendedData>')]);
   await same(triangleFile(tag('appended', 'offset="0"'), raw, compressor));
@@ -238,7 +221,12 @@ test('every volume cell type closes with its faces looking outward', async () =>
 
 test('surface cells, a pixel, line cells and second-order cells read in a grid', async () => {
   const model = await parseVTKXML(
-    grid([...QUAD, 2, 0, 0, 2, 1, 0], [0, 1, 2, 0, 1, 3, 2, 1, 4, 0, 1, 2, 3, 4, 5], [3, 7, 9, 15], [5, 8, 3, 22]),
+    grid(
+      [...QUAD, 2, 0, 0, 2, 1, 0],
+      [0, 1, 2, 0, 1, 3, 2, 1, 4, 0, 1, 2, 3, 4, 5],
+      [3, 7, 9, 15],
+      [5, 8, 3, 22],
+    ),
   );
   assert.deepEqual([...model.indices.subarray(0, 9)], [0, 1, 2, 0, 1, 2, 0, 2, 3]);
   assert.deepEqual([...model.lines], [1, 4]);
@@ -250,9 +238,10 @@ test('a polyhedron reads its faces array, across a second cell', async () => {
   const tetra = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1];
   const faces = [4, 3, 0, 2, 1, 3, 0, 1, 3, 3, 1, 2, 3, 3, 0, 3, 2];
   const extra = ascii('Int32', 'faces', [...faces, ...faces]) + ascii('Int32', 'faceoffsets', [-1, 17, 34]);
-  const model = await parseVTKXML(grid(tetra, [0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3], [3, 7, 11], [5, 42, 42], extra), {
-    surface: 'all',
-  });
+  const model = await parseVTKXML(
+    grid(tetra, [0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3], [3, 7, 11], [5, 42, 42], extra),
+    { surface: 'all' },
+  );
   assert.equal(model.indices.length / 3, 9);
   await refuses(parseVTKXML(grid(tetra, [0, 1, 2, 3], [4], [42])), 'syntax');
 });
@@ -289,39 +278,13 @@ test('higher-order cells 26 to 37 and the Lagrange and Bezier cells draw from th
     offsets = [];
   let end = 0;
   for (const [, c] of cells) offsets.push((end += c.length));
-  const model = await parseVTKXML(
-    grid(
-      points,
-      connectivity,
-      offsets,
-      cells.map(([t]) => t),
-    ),
-    { surface: 'all' },
-  );
+  const model = await parseVTKXML(grid(points, connectivity, offsets, cells.map(([t]) => t)), { surface: 'all' });
   const counts = new Map();
   for (const cell of model.triangleCells) counts.set(cell, (counts.get(cell) ?? 0) + 1);
   // Triangles per cell: wedge 8, pyramid 6, quads 2, hexahedra 12, triangles 1; the two curves give line segments.
-  assert.deepEqual(
-    [...counts],
-    [
-      [0, 8],
-      [1, 6],
-      [2, 2],
-      [3, 12],
-      [4, 2],
-      [5, 1],
-      [7, 1],
-      [8, 6],
-      [10, 2],
-      [11, 12],
-      [12, 2],
-    ],
-  );
+  assert.deepEqual([...counts], [[0, 8], [1, 6], [2, 2], [3, 12], [4, 2], [5, 1], [7, 1], [8, 6], [10, 2], [11, 12], [12, 2]]);
   assert.deepEqual([...model.lines], [0, 1, 0, 1]);
-  assert.ok(
-    Array.from(model.indices).every((i) => i < 8),
-    'only corner points are drawn',
-  );
+  assert.ok(Array.from(model.indices).every((i) => i < 8), 'only corner points are drawn');
   assert.deepEqual(model.warnings, ['second-order cells are drawn from their corner points']);
 });
 
@@ -370,10 +333,7 @@ test('bad files are named errors', async () => {
   await refuses(parseVTKXML(poly(points(VALUES) + cells('Polys', [0, 1, 9], [3]), counts)), 'range');
   await refuses(parseVTKXML(poly(points(VALUES) + cells('Polys', [0, 1, 2], [9]), counts)), 'range');
   await refuses(parseVTKXML(poly(`${points(VALUES)}<Polys></Polys>`, counts)), 'syntax');
-  await refuses(
-    parseVTKXML(poly(`${points(VALUES)}<PointData>${ascii('Float32', 'x', [1])}</PointData>`, counts)),
-    'syntax',
-  );
+  await refuses(parseVTKXML(poly(`${points(VALUES)}<PointData>${ascii('Float32', 'x', [1])}</PointData>`, counts)), 'syntax');
   await refuses(parseVTKXML(triangleFile(tag('appended', 'offset="0"'))), 'syntax');
   await refuses(parseVTKXML(triangleFile(tag('appended', 'offset="x"'))), 'syntax');
   await refuses(parseVTKXML(triangleFile(tag('binary', '', '!!!!'))), 'syntax');
@@ -387,10 +347,7 @@ test('bad files are named errors', async () => {
 test('sizes are checked before work, and an abort stops the read', async () => {
   const counts = 'NumberOfPoints="3"';
   await refuses(parseVTKXML(poly(points(VALUES), counts), { maxVertices: 2 }), 'limit');
-  await refuses(
-    parseVTKXML(poly(points(VALUES) + cells('Polys', [0, 1, 2], [3]), counts), { maxTriangles: 0 }),
-    'limit',
-  );
+  await refuses(parseVTKXML(poly(points(VALUES) + cells('Polys', [0, 1, 2], [3]), counts), { maxTriangles: 0 }), 'limit');
   const huge = u32(0xfffffff0).toString('base64') + f32(VALUES).toString('base64');
   await refuses(parseVTKXML(triangleFile(tag('binary', '', huge)), { maxVertices: 3, maxTriangles: 3 }), 'limit');
   await refuses(parseVTKXML(poly('', counts), { surface: 'some' }), 'range');

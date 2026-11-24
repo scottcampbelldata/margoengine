@@ -15,9 +15,7 @@ test('the asset library root is MARGO_ASSET_LIBRARY, else Assets/blender-library
   assert.match(assetLibraryRoot({}).replaceAll(sep, '/'), /\/Assets\/blender-library$/);
 });
 
-test('a dev server serves library files at /asset-library/ and refuses paths outside it', {
-  timeout: 120_000,
-}, async () => {
+test('a dev server serves library files at /asset-library/ and refuses paths outside it', { timeout: 120_000 }, async () => {
   const lib = mkdtempSync(join(tmpdir(), 'margo-asset-library-'));
   mkdirSync(join(lib, 'film', 'prop'), { recursive: true });
   const bytes = Buffer.from([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0, 12, 0, 0, 0]);

@@ -103,18 +103,7 @@ export const WEATHER_SETTINGS: readonly WeatherSetting[] = [
       'How far a dark object stays visible (Koschmieder: 2 percent contrast). Sets the fog that leaves it, in the rain and snow set; wins over fog. 23,000 is clear air, about 200 m the thickest fog; rain and snow can leave less than the value asked.',
     ),
   ),
-  follows(
-    n(
-      'fog',
-      'air',
-      0,
-      0,
-      1,
-      0.01,
-      '',
-      'Fog thickness, 0 none to 1 very dense (about 200 m); ignored while visibility is set.',
-    ),
-  ),
+  follows(n('fog', 'air', 0, 0, 1, 0.01, '', 'Fog thickness, 0 none to 1 very dense (about 200 m); ignored while visibility is set.')),
   follows(n('cloud', 'sky', 0, 0, 1, 0.01, '', 'Cloud cover, 0 clear to 1 overcast.')),
   follows(n('lightning', 'sky', 0, 0, 1, 0.01, '', 'Lightning activity, 0 none to 1 constant.')),
   follows(
@@ -177,18 +166,7 @@ export const WEATHER_SETTINGS: readonly WeatherSetting[] = [
       'Relative humidity at 2 m, 0 bone dry to 1 saturated (fog). With the temperature it sets the dead fuel moisture of a fire front (Simard 1968 as the NFDRS gives it): 0.15 at 32 C is a red-flag afternoon (about 2 percent fuel moisture in the sun), 0.5 at 15 C a fair day (about 7 percent), 0.95 under rain.',
     ),
   ),
-  follows(
-    n(
-      'temperature',
-      'air',
-      0,
-      -80,
-      60,
-      0.5,
-      'C',
-      'Air temperature at 2 m. 15 C is the ICAO standard atmosphere at sea level; snow falls mostly below about 1 C (Dai 2008). Warmer air dries fuel faster.',
-    ),
-  ),
+  follows(n('temperature', 'air', 0, -80, 60, 0.5, 'C', 'Air temperature at 2 m. 15 C is the ICAO standard atmosphere at sea level; snow falls mostly below about 1 C (Dai 2008). Warmer air dries fuel faster.')),
 ];
 /** The rows that may change every frame (all of them). */
 export const WEATHER_LIVE_SETTINGS: readonly WeatherSetting[] = liveSettings(WEATHER_SETTINGS) as WeatherSetting[];
@@ -272,21 +250,7 @@ export function weatherStateOf(values: WeatherSettingValues = {}): WeatherState 
   checkSettings(BY_NAME, values, 'weather', 'WEATHER_SETTINGS in @margoengine/weather/settings');
   const v = (name: string) => (name in values ? values[name]! : BY_NAME.get(name)!.default),
     state = stormState(v('storm') as number);
-  for (const key of [
-    'wind',
-    'gust',
-    'snow',
-    'hail',
-    'cloud',
-    'lightning',
-    'fog',
-    'dust',
-    'smoke',
-    'ash',
-    'spray',
-    'humidity',
-    'temperature',
-  ] as const) {
+  for (const key of ['wind', 'gust', 'snow', 'hail', 'cloud', 'lightning', 'fog', 'dust', 'smoke', 'ash', 'spray', 'humidity', 'temperature'] as const) {
     const x = v(key);
     if (x !== null) state[key] = x;
   }

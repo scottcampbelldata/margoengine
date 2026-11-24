@@ -30,7 +30,7 @@ export function deltaE2000([L1, a1, b1], [L2, a2, b2]) {
     ap2 = (1 + G) * a2,
     Cp1 = Math.hypot(ap1, b1),
     Cp2 = Math.hypot(ap2, b2),
-    hue = (b, a) => (b === 0 && a === 0 ? 0 : (((Math.atan2(b, a) / rad) % 360) + 360) % 360),
+    hue = (b, a) => (b === 0 && a === 0 ? 0 : ((Math.atan2(b, a) / rad) % 360 + 360) % 360),
     hp1 = hue(b1, ap1),
     hp2 = hue(b2, ap2),
     dL = L2 - L1,

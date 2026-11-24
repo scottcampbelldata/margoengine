@@ -246,9 +246,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
   };
   links.forEach((link, i) => {
     if (i && linkOf(link) !== i - 1)
-      throw new TypeError(
-        `Full-body IK spine ${i - 1} is not below the joint before it; list joints from the pelvis up`,
-      );
+      throw new TypeError(`Full-body IK spine ${i - 1} is not below the joint before it; list joints from the pelvis up`);
   });
   const limbsOf = (list: readonly FullBodyLimb[] | undefined, kind: string, isLeg: boolean) => {
     if (list !== undefined && (!Array.isArray(list) || list.length > 8))
@@ -262,8 +260,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         throw new TypeError(
           `Full-body IK ${kind} ${i} is not a direct chain; pass a lower joint that is a child of upper and an end that is a child of lower`,
         );
-      if (link === -1)
-        throw new TypeError(`Full-body IK ${kind} ${i} is not below the pelvis; pass a limb that hangs from it`);
+      if (link === -1) throw new TypeError(`Full-body IK ${kind} ${i} is not below the pelvis; pass a limb that hangs from it`);
       return {
         limb,
         isLeg,
@@ -290,8 +287,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
     limbs = [...legs, ...arms];
   const headBone = rig.head ? node(rig.head.joint, 'head joint') : null,
     headLink = headBone ? linkOf(headBone) : -1;
-  if (headBone && headLink === -1)
-    throw new TypeError('Full-body IK head joint is not below the pelvis; pass a joint that hangs from it');
+  if (headBone && headLink === -1) throw new TypeError('Full-body IK head joint is not below the pelvis; pass a joint that hangs from it');
   const read = () => {
     const weight = rig.weight ?? 1,
       maxBend = rig.maxBend ?? 0.8,
@@ -299,8 +295,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       iterations = rig.iterations ?? 12,
       tolerance = rig.tolerance ?? 0.001;
     if (!(weight >= 0 && weight <= 1)) throw new RangeError('Full-body IK weight must be from 0 to 1');
-    if (!(maxBend >= 0 && maxBend <= Math.PI))
-      throw new RangeError('Full-body IK maxBend must be from 0 to pi radians');
+    if (!(maxBend >= 0 && maxBend <= Math.PI)) throw new RangeError('Full-body IK maxBend must be from 0 to pi radians');
     if (!(reach >= 0.5 && reach <= 1)) throw new RangeError('Full-body IK reach must be from 0.5 to 1');
     if (!Number.isInteger(iterations) || iterations < 1 || iterations > 64)
       throw new RangeError('Full-body IK iterations must be an integer from 1 to 64');
@@ -332,14 +327,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
     start: Point[] = links.map(() => [0, 0, 0]),
     relative: number[][] = links.map(() => [0, 0, 0, 1]),
     worlds: number[][] = links.map(() => [0, 0, 0, 1]);
-  const result: FullBodyResult = {
-    reached: true,
-    distance: 0,
-    balanced: true,
-    imbalance: 0,
-    iterations: 0,
-    clear: true,
-  };
+  const result: FullBodyResult = { reached: true, distance: 0, balanced: true, imbalance: 0, iterations: 0, clear: true };
   /** A point hanging from link `link` at `offset` from it in the animated pose, where the solve has it now. */
   const carried = (link: number, offset: ArrayLike<number>): Point =>
     add(places[link], rotateByQuaternion(offset as number[], turns[link]));
@@ -418,15 +406,11 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       item.length = distance(root, knee) + distance(knee, tip);
       item.short = Math.abs(distance(root, knee) - distance(knee, tip));
       // A limb held where the clip has it may stay as straight as the clip has it.
-      item.far = Math.max(
-        item.length * reach,
-        limb.target ? distance(root, tip) * (1 - influence) : distance(root, tip),
-      );
+      item.far = Math.max(item.length * reach, limb.target ? distance(root, tip) * (1 - influence) : distance(root, tip));
       item.rest = tools.rotationOf(end.matrix);
       // Out from the line through the limb: the way it bends, or forward for a leg and down for an arm that is straight.
       const line = subtract(tip, root),
-        along =
-          (subtract(knee, root)[0] * line[0] + subtract(knee, root)[1] * line[1] + subtract(knee, root)[2] * line[2]) /
+        along = (subtract(knee, root)[0] * line[0] + subtract(knee, root)[1] * line[1] + subtract(knee, root)[2] * line[2]) /
           Math.max(1e-12, line[0] * line[0] + line[1] * line[1] + line[2] * line[2]),
         side = subtract(knee, mixPoint(root, tip, along)),
         sideLength = Math.hypot(side[0], side[1], side[2]);
@@ -449,7 +433,8 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       radius = rig.supportRadius ?? firstLeg * 0.1,
       // The shares cover only the segments the rig lists (Winter's sum to 1 for head, trunk, two arms and two legs), so
       // the centre of mass is their weighted mean: each share over the listed total.
-      total = TRUNK_MASS + (headBone ? HEAD_MASS : 0) + legs.length * LEG_MASS + arms.length * ARM_MASS,
+      total =
+        TRUNK_MASS + (headBone ? HEAD_MASS : 0) + legs.length * LEG_MASS + arms.length * ARM_MASS,
       trunkShare = TRUNK_MASS / count / total;
     /** The centre of mass now, into `centre` as Jacobian rows when `rows` is true; returns its place. */
     const massCentre = (withRows: boolean): Point => {
@@ -498,7 +483,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
           near = short * 1.02;
         if (span <= far && span >= near) continue;
         const gap = span - (span > far ? far : near),
-          k = (Math.sign(gap) * Math.min(Math.abs(gap), length * STEP_SHARE)) / Math.max(span, 1e-9),
+          k = Math.sign(gap) * Math.min(Math.abs(gap), length * STEP_SHARE) / Math.max(span, 1e-9),
           error: Point = [toAim[0] * k, toAim[1] * k, toAim[2] * k];
         largest = Math.max(largest, Math.abs(gap));
         rows.fill(0);
@@ -536,87 +521,74 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
       rebuild(maxBend);
     }
     // A rejected limb must not leave the torso or a previously solved limb committed.
-    const guarded = limbs.some(({ limb }) => limb.avoidance !== undefined);
+    const guarded = limbs.some(({limb}) => limb.avoidance !== undefined);
     const transforms = model.root.engine.store.transforms;
-    const saved = guarded
-      ? nodes.map((bone) => ({
-          bone,
-          position: [transforms.x[bone.id], transforms.y[bone.id], transforms.z[bone.id]] as Point,
-          rotation: [transforms.qx[bone.id], transforms.qy[bone.id], transforms.qz[bone.id], transforms.qw[bone.id]],
-        }))
-      : [];
+    const saved = guarded ? nodes.map((bone) => ({bone, position: [transforms.x[bone.id],transforms.y[bone.id],transforms.z[bone.id]] as Point,
+      rotation: [transforms.qx[bone.id],transforms.qy[bone.id],transforms.qz[bone.id],transforms.qw[bone.id]]})) : [];
     let committed = false;
     try {
-      // Write the torso back, from the pelvis up, then finish each limb on it.
-      tools.moveBy(pelvis, subtract(places[0], start[0]));
-      for (let j = 0; j < count; j++) tools.setWorldRotation(links[j], multiplyQuaternions(turns[j], worlds[j]));
-      for (const { limb, upper, lower, end, link, aim, bend, rest, length, wish } of limbs) {
-        if (wish) {
-          const turned = rotateByQuaternion(bend as number[], turns[link]),
-            knee = position(lower);
-          tools.placeLimb(
-            upper,
-            lower,
-            end,
-            aim,
-            limb.pole ?? [knee[0] + turned[0] * length, knee[1] + turned[1] * length, knee[2] + turned[2] * length],
-          );
-          const left = distance(position(end), aim);
-          result.distance = Math.max(result.distance, left);
-          if (left > tolerance) result.reached = false;
-        }
-        const wanted = limb.rotation ?? (wish ? rest : null);
-        if (wanted) {
-          const influence = limb.rotation ? (limb.weight ?? 1) * weight : 1;
-          tools.setWorldRotation(end, influence < 1 ? quaternionBlend(rest, wanted, influence) : wanted);
-        }
-        if (limb.avoidance) {
-          const root = position(upper),
-            knee = position(lower),
-            tip = position(end);
-          const next = limb.avoidance([root, knee, tip]);
-          if (next === null) {
-            result.clear = false;
-            result.reached = false;
-            return;
-          }
-          finiteVector(next, 3, 'Full-body IK avoidance knee');
-          if (
-            Math.abs(distance(root, next) - distance(root, knee)) > tolerance ||
-            Math.abs(distance(next, tip) - distance(knee, tip)) > tolerance
-          )
-            throw new RangeError('Full-body IK avoidance must preserve both bone lengths; return a legal knee or null');
-          tools.placeLimb(upper, lower, end, tip, next);
-          if (wanted)
-            tools.setWorldRotation(
-              end,
-              limb.rotation ? quaternionBlend(rest, wanted, (limb.weight ?? 1) * weight) : wanted,
-            );
-        }
+    // Write the torso back, from the pelvis up, then finish each limb on it.
+    tools.moveBy(pelvis, subtract(places[0], start[0]));
+    for (let j = 0; j < count; j++) tools.setWorldRotation(links[j], multiplyQuaternions(turns[j], worlds[j]));
+    for (const { limb, upper, lower, end, link, aim, bend, rest, length, wish } of limbs) {
+      if (wish) {
+        const turned = rotateByQuaternion(bend as number[], turns[link]),
+          knee = position(lower);
+        tools.placeLimb(
+          upper,
+          lower,
+          end,
+          aim,
+          limb.pole ?? [knee[0] + turned[0] * length, knee[1] + turned[1] * length, knee[2] + turned[2] * length],
+        );
+        const left = distance(position(end), aim);
+        result.distance = Math.max(result.distance, left);
+        if (left > tolerance) result.reached = false;
       }
-      if (headBone) {
-        if (rig.head!.rotation)
-          tools.setWorldRotation(
-            headBone,
-            quaternionBlend(tools.rotationOf(headBone.matrix), rig.head!.rotation, (rig.head!.weight ?? 1) * weight),
-          );
-        if (headAim) {
-          const left = distance(position(headBone), headAim);
-          result.distance = Math.max(result.distance, left);
-          if (left > tolerance) result.reached = false;
+      const wanted = limb.rotation ?? (wish ? rest : null);
+      if (wanted) {
+        const influence = limb.rotation ? (limb.weight ?? 1) * weight : 1;
+        tools.setWorldRotation(end, influence < 1 ? quaternionBlend(rest, wanted, influence) : wanted);
+      }
+      if (limb.avoidance) {
+        const root = position(upper), knee = position(lower), tip = position(end);
+        const next = limb.avoidance([root, knee, tip]);
+        if (next === null) {
+          result.clear = false;
+          result.reached = false;
+          return;
         }
+        finiteVector(next, 3, 'Full-body IK avoidance knee');
+        if (Math.abs(distance(root, next)-distance(root,knee))>tolerance ||
+          Math.abs(distance(next,tip)-distance(knee,tip))>tolerance)
+          throw new RangeError('Full-body IK avoidance must preserve both bone lengths; return a legal knee or null');
+        tools.placeLimb(upper,lower,end,tip,next);
+        if (wanted) tools.setWorldRotation(end, limb.rotation ? quaternionBlend(rest,wanted,(limb.weight ?? 1)*weight) : wanted);
       }
-      if (standing) {
-        const off = offBalance(massCentre(false));
-        result.imbalance = Math.hypot(off[0], off[2]);
-        result.balanced = result.imbalance <= tolerance;
+    }
+    if (headBone) {
+      if (rig.head!.rotation)
+        tools.setWorldRotation(
+          headBone,
+          quaternionBlend(tools.rotationOf(headBone.matrix), rig.head!.rotation, (rig.head!.weight ?? 1) * weight),
+        );
+      if (headAim) {
+        const left = distance(position(headBone), headAim);
+        result.distance = Math.max(result.distance, left);
+        if (left > tolerance) result.reached = false;
       }
-      committed = true;
+    }
+    if (standing) {
+      const off = offBalance(massCentre(false));
+      result.imbalance = Math.hypot(off[0], off[2]);
+      result.balanced = result.imbalance <= tolerance;
+    }
+    committed = true;
     } finally {
       if (!committed && guarded) {
-        for (const { bone, position: original, rotation } of saved) {
+        for (const {bone, position: original, rotation} of saved) {
           bone.setPosition(original);
-          animator.writeNodeRotation(bone, rotation);
+          animator.writeNodeRotation(bone,rotation);
         }
         model.root.engine.store.tick(false);
       }

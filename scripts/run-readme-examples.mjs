@@ -91,9 +91,7 @@ export function readSkips(file = skipFile) {
   const skips = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   for (const [id, reason] of Object.entries(skips))
     if (typeof reason !== 'string' || !/^hardware: \S/.test(reason))
-      throw new Error(
-        `${id}: a skipped example names the hardware it needs ("hardware: ..."); put any other failure on the known list`,
-      );
+      throw new Error(`${id}: a skipped example names the hardware it needs ("hardware: ..."); put any other failure on the known list`);
   return skips;
 }
 
@@ -450,14 +448,7 @@ try {
 </script>`;
 
 /** CommonJS React entries reached by documented bindings must be prebundled before serving native ESM. */
-export const readmeReactDependencies = [
-  'react',
-  'react/jsx-runtime',
-  'react/jsx-dev-runtime',
-  'react-dom',
-  'react-dom/client',
-  'react-dom/test-utils',
-];
+export const readmeReactDependencies = ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client', 'react-dom/test-utils'];
 
 async function startPages(samples, examples) {
   const programs = new Map(examples.map((example) => [`/${example.id}/example.tsx`, example]));
@@ -473,8 +464,7 @@ async function startPages(samples, examples) {
       include: readmeReactDependencies,
     },
     oxc: { jsx: { runtime: 'automatic' } },
-    plugins: [
-      noFileWatcher(),
+    plugins: [noFileWatcher(),
       {
         name: 'readme-samples',
         configureServer(vite) {
@@ -536,10 +526,7 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT, launch =
       // Closing a page does not close its GPU process: pending compiler teardown there can stall the next page's
       // requestAdapter, even with sequential pages. Each example owns a browser, including its GPU process.
       browser ??= await launch({ headless: true, args: ['--enable-unsafe-webgpu'] });
-      if (expiredDeadline) {
-        await closeBrowser();
-        return fail('Browser creation exceeded the example deadline');
-      }
+      if (expiredDeadline) return fail('Browser creation exceeded the example deadline');
       phase = 'creating page';
       page = await browser.newPage();
       if (live) {
@@ -572,55 +559,37 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT, launch =
       result = fail(String(error.message).split('\n')[0].slice(0, 300));
     } finally {
       phase = 'closing page';
-      await traceShutdown(`README page close (${example.id})`, () => page?.close());
+      try {
+        await traceShutdown(`README page close (${example.id})`, () => page?.close());
+      } finally {
+        if (!pages.browser) {
+          phase = 'closing browser';
+          await closeBrowser();
+        }
+      }
     }
     return result;
   })();
   const expired = Symbol('deadline');
-  const firstLine = (error) =>
-    String(error?.message ?? error)
-      .split('\n')[0]
-      .slice(0, 300);
-  let outcome;
   try {
-    // The deadline bounds the example's own work, its page close included, never the browser's teardown after it:
-    // under load Windows finishes tearing down an ended Chromium seconds late (docs/known-bugs.md, KB1703), and that
-    // wait, counted against the example, failed one whose checks had passed, a different one each run. The teardown
-    // has its own hard limit in the bounded close (scripts/lib/browser.mjs, CLOSE_LIMIT_MS), which kills and names a
-    // browser that really hangs; that error fails the example below.
-    outcome = await Promise.race([
+    const outcome = await Promise.race([
       work,
       new Promise((resolve) => {
         timer = setTimeout(() => resolve(expired), timeout);
       }),
     ]);
-  } catch (error) {
-    outcome = fail(firstLine(error));
-  } finally {
-    clearTimeout(timer);
-  }
-  if (outcome === expired) {
+    if (outcome !== expired) return outcome;
     expiredDeadline = true;
     const reason = `Example did not finish within ${timeout / 1000} s while ${phase}${result?.reason ? '; ' + result.reason : ''}`;
     pages.failed = `${example.id}: ${reason}`;
     // The owned browser's bounded close kills its whole process tree, including unresponsive renderers/workers.
-    try {
-      await closeBrowser();
-    } catch (error) {
-      return fail(`${reason}; closing its browser then failed: ${firstLine(error)}`);
-    }
+    await closeBrowser();
     return fail(reason);
+  } catch (error) {
+    return fail(String(error.message).split('\n')[0].slice(0, 300));
+  } finally {
+    clearTimeout(timer);
   }
-  if (!pages.browser) {
-    phase = 'closing browser';
-    try {
-      await closeBrowser();
-    } catch (error) {
-      const before = outcome.result === 'pass' ? 'Every check passed' : outcome.reason;
-      return fail(`${before}; closing its browser failed: ${firstLine(error)}`);
-    }
-  }
-  return outcome;
 }
 
 /** The port an example's server listens on, as written in its code; undefined when it has none. */
@@ -731,8 +700,7 @@ async function run() {
   }
   for (const { id, place, reason } of fresh) console.error(`${id} (${place}): ${reason}`);
   for (const id of gone) console.error(goneLine(id, report));
-  for (const id of unknownSkips)
-    console.error(`${id}: no such example, still on the skip list (scripts/support/readme-run-skip.json)`);
+  for (const id of unknownSkips) console.error(`${id}: no such example, still on the skip list (scripts/support/readme-run-skip.json)`);
   console.log(
     `${passed} of ${report.length - skipped} examples ran: ${inNode} in Node, ${passed - inNode} in a page; ${failed.length} failed, ${fresh.length} not on the known list; ${skipped} skipped for hardware`,
   );

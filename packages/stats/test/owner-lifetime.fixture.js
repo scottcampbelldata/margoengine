@@ -8,21 +8,14 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { PipelineCompiles } = await load('../dist/compile.js');
   const { FramePhases } = await load('../dist/phases.js');
   const entries = [];
-  const own = (name, make) =>
-    entries.push({
-      name,
-      create({ engine }) {
-        const plugin = make(engine);
-        return { plugin, dispose: () => plugin.dispose() };
-      },
-    });
+  const own = (name, make) => entries.push({ name, create({ engine }) {
+    const plugin = make(engine);
+    return { plugin, dispose: () => plugin.dispose() };
+  } });
   own('Stats', () => new Stats({ parent: parent() }));
   own('Stats.attach', (engine) => Stats.attach(engine, { parent: parent() }));
   // Never reaches its frame minimum, so it sends nothing.
-  own(
-    'FrameBeacon',
-    () => new FrameBeacon({ endpoint: 'http://127.0.0.1:9/beacon', intervalMilliseconds: 0, minFrames: 1e9 }),
-  );
+  own('FrameBeacon', () => new FrameBeacon({ endpoint: 'http://127.0.0.1:9/beacon', intervalMilliseconds: 0, minFrames: 1e9 }));
   own('PipelineCompiles', () => new PipelineCompiles());
   own('FramePhases', () => new FramePhases());
   return entries;

@@ -250,13 +250,7 @@ test('rotation keys may be normalized bytes or shorts, as glTF 2.0 3.11 allows (
     buffer.set(bytes, start);
     f.doc.buffers[0].byteLength = buffer.length;
     f.doc.bufferViews.push({ buffer: 0, byteOffset: start, byteLength: bytes.length });
-    f.doc.accessors.push({
-      bufferView: f.doc.bufferViews.length - 1,
-      componentType,
-      normalized,
-      count: 2,
-      type: 'VEC4',
-    });
+    f.doc.accessors.push({ bufferView: f.doc.bufferViews.length - 1, componentType, normalized, count: 2, type: 'VEC4' });
     // Channel 1 turns the head (node 1).
     f.doc.animations[0].samplers[1].output = f.doc.accessors.length - 1;
     return readVRMA(f.doc, { buffers: [buffer] });

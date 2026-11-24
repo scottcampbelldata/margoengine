@@ -174,8 +174,7 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
       throw new TypeError(
         `Warping leg ${i} is not a direct chain; pass a knee that is a child of the hip and an ankle that is a child of the knee`,
       );
-    if (!below(hip, pelvis))
-      throw new TypeError(`Warping leg ${i} hip is not below the pelvis; pass the pelvis that carries both legs`);
+    if (!below(hip, pelvis)) throw new TypeError(`Warping leg ${i} hip is not below the pelvis; pass the pelvis that carries both legs`);
     return { hip, knee, ankle };
   });
   const spine = (warp.spine ?? []).map((joint, i) => node(joint, `spine ${i}`));
@@ -342,24 +341,16 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
 export function addDistanceWarp(animator: Animator, warp: DistanceWarp): DistanceWarpHandle {
   const state = warp?.state;
   if (!Object.hasOwn(animator.options.states, state))
-    throw new RangeError(
-      `Distance warp state "${state}" is not one of this Animator's states; pass a key of options.states`,
-    );
+    throw new RangeError(`Distance warp state "${state}" is not one of this Animator's states; pass a key of options.states`);
   const name = animator.options.states[state];
-  if (typeof name !== 'string')
-    throw new RangeError(`Distance warp state "${state}" plays a blend; pass a state that plays one clip`);
+  if (typeof name !== 'string') throw new RangeError(`Distance warp state "${state}" plays a blend; pass a state that plays one clip`);
   if (animator.hasStateClock(state))
-    throw new RangeError(
-      `Distance warp state "${state}" already has a clock; dispose the group or warp that drives it first`,
-    );
+    throw new RangeError(`Distance warp state "${state}" already has a clock; dispose the group or warp that drives it first`);
   const clip = animator.animation.clips.find((c) => c.name === name)!,
     track = trackOf(clip, warp.joint);
   if (warp.mode !== undefined && warp.mode !== 'stop' && warp.mode !== 'start')
     throw new RangeError("Distance warp mode must be 'stop' or 'start'");
-  if (!track)
-    throw new RangeError(
-      `Distance warp clip "${name}" has no translation on joint ${warp.joint}; pass the bone that carries its travel`,
-    );
+  if (!track) throw new RangeError(`Distance warp clip "${name}" has no translation on joint ${warp.joint}; pass the bone that carries its travel`);
   // Keyed travel in the joint's parent space; along the world ground it is summed so it only ever grows, and summed
   // again whenever the parent's rotation or scale changes.
   const times = Array.from(track.times),
@@ -390,10 +381,7 @@ export function addDistanceWarp(animator: Animator, warp: DistanceWarp): Distanc
         travelled[i] = travelled[i - 1] + groundLength(m, steps[3 * i], steps[3 * i + 1], steps[3 * i + 2]);
     return travelled[times.length - 1];
   };
-  if (!(measure() > 0))
-    throw new RangeError(
-      `Distance warp clip "${name}" does not travel on joint ${warp.joint}; pass the bone that carries its travel`,
-    );
+  if (!(measure() > 0)) throw new RangeError(`Distance warp clip "${name}" does not travel on joint ${warp.joint}; pass the bone that carries its travel`);
   /** Clip seconds at `covered` units of travel. */
   const timeAt = (covered: number): number => {
     if (covered <= 0) return times[0];

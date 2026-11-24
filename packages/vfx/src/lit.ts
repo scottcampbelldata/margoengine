@@ -89,9 +89,7 @@ function checkGlow(g: VFXLit['glow']): void {
     (g.radius !== undefined && !ok(g.radius, 0.01, 1e5)) ||
     (g.color !== undefined && (!Array.isArray(g.color) || g.color.length !== 3 || !g.color.every((v) => ok(v, 0, 16))))
   )
-    throw new RangeError(
-      'VFX lit glow needs {position: [x, y, z], power: watts 0 to 1e13, radius?: 0.01 to 1e5 m, color?: linear [r, g, b] 0 to 16}',
-    );
+    throw new RangeError('VFX lit glow needs {position: [x, y, z], power: watts 0 to 1e13, radius?: 0.01 to 1e5 m, color?: linear [r, g, b] 0 to 16}');
 }
 
 /**

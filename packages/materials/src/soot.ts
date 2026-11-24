@@ -90,9 +90,7 @@ export function sootDensity(source: SootSource, point: Vec3): number {
 }
 function checkSurface(s: SootSurface): void {
   if (!s || typeof s !== 'object' || !finite3(s.origin) || !finite3(s.u) || !finite3(s.v))
-    throw new RangeError(
-      'soot surface needs origin, u and v as three finite numbers each; pass the face in world space',
-    );
+    throw new RangeError('soot surface needs origin, u and v as three finite numbers each; pass the face in world space');
 }
 /**
  * The soot darkness over a surface's UVs as a linear, clamped Texture (red = darkness; texel row 0 is v = 0, which is

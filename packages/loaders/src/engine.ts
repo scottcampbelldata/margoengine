@@ -5,9 +5,7 @@ import { pointsToGeometry, toGeometries, type PointsToGeometryOptions, type ToGe
 import { SRGBToLinear as toLinear } from '@margoengine/math/color';
 
 /** Options of createMeshes: parent, material values, one mesh or one per group, and the geometry options. */
-export interface CreateMeshesOptions
-  extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>,
-    PointsToGeometryOptions {
+export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>, PointsToGeometryOptions {
   /** Parent for every created mesh. */
   parent?: Mesh | null;
   /** Color for meshes without a file color: `#rrggbb` (sRGB) or linear RGB. Default `#b8bcc4`. */
@@ -99,17 +97,12 @@ export function createMeshes(
   ) {
     const group = !options.merge ? undefined : loaded.groups?.length === 1 ? loaded.groups[0] : undefined;
     const color = group?.color ? colorFor(group) : colorFor(undefined);
-    for (const geometry of toGeometries(loaded, { normals: options.normals, maxPartVertices: options.maxPartVertices }))
-      parts.push({ geometry, color });
+    for (const geometry of toGeometries(loaded, { normals: options.normals, maxPartVertices: options.maxPartVertices })) parts.push({ geometry, color });
   } else
     for (const group of loaded.groups) {
       if (!group.count) continue;
       const color = colorFor(group);
-      for (const geometry of toGeometries(loaded, {
-        normals: options.normals,
-        group,
-        maxPartVertices: options.maxPartVertices,
-      }))
+      for (const geometry of toGeometries(loaded, { normals: options.normals, group, maxPartVertices: options.maxPartVertices }))
         parts.push({ geometry, color, name: group.name });
     }
   const meshes: Mesh[] = [];

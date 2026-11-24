@@ -68,9 +68,7 @@ function check(tier: AnimationLODTier, label: string): void {
     tier.interval < 1 ||
     (tier.depth !== undefined && !(Number.isInteger(tier.depth) && tier.depth >= 0))
   )
-    throw new RangeError(
-      `${label} is invalid; use a distance >= 0, an integer interval >= 1 and an integer depth >= 0`,
-    );
+    throw new RangeError(`${label} is invalid; use a distance >= 0, an integer interval >= 1 and an integer depth >= 0`);
 }
 function levelsOf(animation: Animation): Int32Array {
   const nodes = animation.model.asset.doc.nodes ?? [],
@@ -127,7 +125,10 @@ export class AnimationLOD implements EnginePlugin {
     engine.use(lod);
     return lod;
   }
-  constructor({ tiers = defaultLODTiers, hidden = { distance: 0, interval: 16, depth: 1 } }: AnimationLODOptions = {}) {
+  constructor({
+    tiers = defaultLODTiers,
+    hidden = { distance: 0, interval: 16, depth: 1 },
+  }: AnimationLODOptions = {}) {
     if (!Array.isArray(tiers) || !tiers.length) throw new TypeError('AnimationLOD tiers must be a non-empty array');
     tiers.forEach((tier, i) => {
       check(tier, `AnimationLOD tier ${i}`);
@@ -145,8 +146,7 @@ export class AnimationLOD implements EnginePlugin {
   /** Takes over a copy's playback from its current time; `remove` hands it back. */
   add(animation: Animation, { radius = 2 }: AnimationLODMember = {}): this {
     if (this.disposed) throw new MargoError('disposed', 'AnimationLOD is disposed; create a new one');
-    if (!Number.isFinite(radius) || radius < 0)
-      throw new RangeError('AnimationLOD radius must be a finite number >= 0');
+    if (!Number.isFinite(radius) || radius < 0) throw new RangeError('AnimationLOD radius must be a finite number >= 0');
     const member = this.members.get(animation);
     if (member) {
       member.radius = radius;
@@ -182,8 +182,7 @@ export class AnimationLOD implements EnginePlugin {
     return this.members.get(animation)?.tier;
   }
   setup(engine: Engine): void {
-    if (this.disposed)
-      throw new MargoError('disposed', 'AnimationLOD is disposed; create a new controller before attaching');
+    if (this.disposed) throw new MargoError('disposed', 'AnimationLOD is disposed; create a new controller before attaching');
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {

@@ -110,8 +110,7 @@ export function gridHeightField(options: GridHeightOptions): GridHeightField {
     throw new RangeError('Invalid grid height field; width and height are integers from 2 to 65536.');
   if (!heights || typeof heights.length !== 'number' || heights.length !== width * height)
     throw new RangeError(`Invalid grid height field; heights needs ${width * height} numbers, got ${heights?.length}.`);
-  if (!Array.isArray(size) && !ArrayBuffer.isView(size))
-    throw new RangeError('Invalid grid height field; size is [x, z].');
+  if (!Array.isArray(size) && !ArrayBuffer.isView(size)) throw new RangeError('Invalid grid height field; size is [x, z].');
   if (size.length !== 2 || !(size[0] > 0) || !(size[1] > 0) || size[0] > 100000 || size[1] > 100000)
     throw new RangeError('Invalid grid height field; size is [x, z], each above 0 to 100000.');
   if (origin.length !== 2) throw new RangeError('Invalid grid height field; origin is [x, z].');
@@ -119,8 +118,7 @@ export function gridHeightField(options: GridHeightOptions): GridHeightField {
   finite(origin[1], 'origin z');
   finite(base, 'base');
   finite(exaggeration, 'exaggeration');
-  if (noData !== undefined && typeof noData !== 'number')
-    throw new RangeError('Invalid grid height field; noData is a number.');
+  if (noData !== undefined && typeof noData !== 'number') throw new RangeError('Invalid grid height field; noData is a number.');
   if (registration !== 'point' && registration !== 'area')
     throw new RangeError("Invalid grid height field; registration is 'point' or 'area'.");
   if (typeof fill === 'number') finite(fill, 'fill');
@@ -145,13 +143,9 @@ export function gridHeightField(options: GridHeightOptions): GridHeightField {
         missing[target + column] = 1;
         continue;
       }
-      if (!Number.isFinite(value))
-        throw new RangeError(
-          'Invalid grid height field; a height is infinite; mark missing samples with NaN or noData.',
-        );
+      if (!Number.isFinite(value)) throw new RangeError('Invalid grid height field; a height is infinite; mark missing samples with NaN or noData.');
       const world = value * exaggeration + base;
-      if (!Number.isFinite(Math.fround(world)))
-        throw new RangeError('Invalid grid height field; a height times exaggeration plus base is not finite.');
+      if (!Number.isFinite(Math.fround(world))) throw new RangeError('Invalid grid height field; a height times exaggeration plus base is not finite.');
       grid[target + column] = world;
       valid++;
       sum += world;
@@ -162,7 +156,8 @@ export function gridHeightField(options: GridHeightOptions): GridHeightField {
   if (holes) {
     let stand: number;
     if (typeof fill === 'number') stand = fill;
-    else if (!valid) throw new RangeError('Invalid grid height field; no sample is valid, so fill must be a number.');
+    else if (!valid)
+      throw new RangeError('Invalid grid height field; no sample is valid, so fill must be a number.');
     else if (fill === 'min') stand = low;
     else if (fill === 'mean') stand = sum / valid;
     else stand = NaN;

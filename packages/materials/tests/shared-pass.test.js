@@ -60,16 +60,9 @@ test('transmission maps capture and dispose in their model Scene even when insta
     const first = createMesh(w.engine, triangle, new Material());
     const scene = w.engine.createScene('transmission');
     let second;
-    scene.use({
-      name: 'setup-transmission',
-      setup() {
-        second = createMesh(w.engine, triangle, new Material());
-      },
-    });
-    for (const model of [first, second])
-      model.primitives[0].material.transmission = { factor: 0.5, volume: { thicknessFactor: 0.2 } };
-    const a = install(first),
-      b = install(second);
+    scene.use({ name: 'setup-transmission', setup() { second = createMesh(w.engine, triangle, new Material()); } });
+    for (const model of [first, second]) model.primitives[0].material.transmission = { factor: 0.5, volume: { thicknessFactor: 0.2 } };
+    const a = install(first), b = install(second);
     assert.equal(w.engine.sceneOf(a), w.engine.scene);
     assert.equal(w.engine.sceneOf(b), scene);
     assert.notEqual(scene.plugins.get('materials:opaque-color'), w.engine.scene.plugins.get('materials:opaque-color'));
@@ -81,9 +74,7 @@ test('transmission maps capture and dispose in their model Scene even when insta
     first.dispose();
     assert.equal(w.engine.scene.plugins.has(a.name), false);
     assert.equal(w.engine.scene.plugins.has('materials:opaque-color'), false);
-  } finally {
-    w.destroy();
-  }
+  } finally { w.destroy(); }
 });
 
 test('material queues belong to their Scene and disposal removes only that Scene model', async () => {
@@ -93,19 +84,10 @@ test('material queues belong to their Scene and disposal removes only that Scene
     const main = createMesh(w.engine, triangle, material);
     const scene = w.engine.createScene('maps');
     let other;
-    scene.use({
-      name: 'setup-maps',
-      setup() {
-        other = createMesh(w.engine, triangle, material);
-      },
-    });
+    scene.use({ name: 'setup-maps', setup() { other = createMesh(w.engine, triangle, material); } });
     w.store.tick(false);
     w.engine.frameGraph.execute(w.context);
-    assert.equal(
-      w.log.filter((entry) => entry.startsWith('draw')).length,
-      1,
-      'default Scene contains only its own mesh',
-    );
+    assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 1, 'default Scene contains only its own mesh');
     w.log.length = 0;
     scene.frameGraph.execute(w.context);
     assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 1, 'named Scene has its own material queue');
@@ -117,9 +99,7 @@ test('material queues belong to their Scene and disposal removes only that Scene
     assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 0);
     w.engine.frameGraph.execute(w.context);
     assert.equal(w.log.filter((entry) => entry.startsWith('draw')).length, 1);
-  } finally {
-    w.destroy();
-  }
+  } finally { w.destroy(); }
 });
 
 test('ten opaque materials meshes draw in one render pass', async () => {

@@ -20,49 +20,27 @@ function state(value, seen = new Set()) {
   if (value instanceof Map) return [...value].map((v) => state(v, seen));
   if (value instanceof Set) return [...value].map((v) => state(v, seen));
   if (Array.isArray(value)) return value.map((v) => state(v, seen));
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([k, v]) => [k, state(v, seen)])
-      .filter(([, v]) => v !== undefined),
-  );
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, state(v, seen)]).filter(([, v]) => v !== undefined));
 }
 
 function slope(deg = 35, length = 600, cell = 4, across = 5) {
   const depth = Math.round(length / cell) + 1,
     ground = new Float32Array(across * depth);
   for (let j = 0; j < depth; j++)
-    for (let i = 0; i < across; i++)
-      ground[j * across + i] = -Math.tan((deg * Math.PI) / 180) * Math.min(j * cell, 400);
+    for (let i = 0; i < across; i++) ground[j * across + i] = -Math.tan((deg * Math.PI) / 180) * Math.min(j * cell, 400);
   return { width: across, depth, cellSize: cell, ground };
 }
 function ridge(W = 96, D = 8) {
   const g = new Float32Array(W * D);
   for (let j = 0; j < D; j++)
-    for (let i = 0; i < W; i++)
-      g[j * W + i] = i < 40 ? 8 * Math.max(0, 1 - (40 - i) / 30) : 8 * Math.max(0, 1 - (i - 40) / 6);
+    for (let i = 0; i < W; i++) g[j * W + i] = i < 40 ? 8 * Math.max(0, 1 - (40 - i) / 30) : 8 * Math.max(0, 1 - (i - 40) / 6);
   return { width: W, depth: D, ground: g };
 }
 
 const events = {
   // Released 2 s in, so the seek crosses the release, the flow, the cloud and the deposit.
-  Avalanche: () =>
-    new Avalanche({
-      ...slope(),
-      cover: 0.5,
-      coverDensity: 250,
-      release: { at: [8, 120], size: [100, 60] },
-      releaseTime: 2,
-    }),
-  SnowDrift: () =>
-    new SnowDrift({
-      ...ridge(),
-      initialDepth: 0.3,
-      wind: 16,
-      windDirection: 90,
-      snowfall: 2,
-      temperature: -8,
-      timeScale: 60,
-    }),
+  Avalanche: () => new Avalanche({ ...slope(), cover: 0.5, coverDensity: 250, release: { at: [8, 120], size: [100, 60] }, releaseTime: 2 }),
+  SnowDrift: () => new SnowDrift({ ...ridge(), initialDepth: 0.3, wind: 16, windDirection: 90, snowfall: 2, temperature: -8, timeScale: 60 }),
   Eruption: () => new Eruption({ rise: 1, wind: 8, timeScale: 10 }),
 };
 

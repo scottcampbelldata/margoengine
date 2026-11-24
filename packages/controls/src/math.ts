@@ -10,16 +10,12 @@ export const EPS = 1e-6;
 /** Throws a RangeError unless every value is finite, so one NaN from a script cannot reach the camera. */
 export function finiteInput(what: string, ...values: number[]): void {
   for (const value of values)
-    if (!Number.isFinite(value))
-      throw rangeError(`${what} must be finite; pass a finite number, not ${value}`, 'controls-arguments');
+    if (!Number.isFinite(value)) throw rangeError(`${what} must be finite; pass a finite number, not ${value}`, 'controls-arguments');
 }
 /** Throws a RangeError unless a dolly factor is finite and above 0. */
 export function dollyFactor(factor: number): void {
   if (!(factor > 0) || !Number.isFinite(factor))
-    throw rangeError(
-      `Dolly factor must be finite and above 0; pass a positive number, not ${factor}`,
-      'controls-arguments',
-    );
+    throw rangeError(`Dolly factor must be finite and above 0; pass a positive number, not ${factor}`, 'controls-arguments');
 }
 export const madd = (a: readonly number[], b: readonly number[], s: number): V3 => [
   a[0] + b[0] * s,
@@ -66,10 +62,7 @@ export function invertAffine(m: ArrayLike<number>): number[] {
     C = d * h - e * g,
     det = a * A + b * B + c * C;
   if (!det || !Number.isFinite(det))
-    throw rangeError(
-      'Parent matrix is not invertible; use a parent with non-zero scale on every axis',
-      'controls-arguments',
-    );
+    throw rangeError('Parent matrix is not invertible; use a parent with non-zero scale on every axis', 'controls-arguments');
   const r = 1 / det;
   const n = [
     A * r,

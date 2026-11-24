@@ -33,43 +33,18 @@ async function start() {
   const sea = Water.attach(engine, { size: [1200, 1200], segments: 512, wind: { speed: 4, direction: [1, 0.4] } });
   const wakes = ShipWakes.attach(engine, {
     surface: sea,
-    ships: [
-      {
-        hull,
-        path: course,
-        lamps: [
-          { position: [0, 14, 4], intensity: 120 },
-          { position: [0, 5, -19], color: [1, 1, 0.95], intensity: 60 },
-        ],
-      },
-    ],
+    ships: [{ hull, path: course, lamps: [{ position: [0, 14, 4], intensity: 120 }, { position: [0, 5, -19], color: [1, 1, 0.95], intensity: 60 }] }],
     lamps: [{ position: [60, 10, -260], color: [1, 0.85, 0.6], intensity: 900 }],
   });
   const ship = wakes.ships[0];
   // The test primitive hull: a box of the waterline's length and beam with a deckhouse, its origin at the waterline.
   const steel = new PbrMaterial({ color: [0.12, 0.13, 0.15], roughness: 0.6 });
-  const shipHull = engine
-    .createMesh()
-    .setGeometry(box(hull.beam, 6, hull.length))
-    .setMaterial(steel);
-  const house = engine
-    .createMesh()
-    .setGeometry(box(6, 5, 10))
-    .setMaterial(new PbrMaterial({ color: [0.7, 0.68, 0.62], roughness: 0.5 }));
+  const shipHull = engine.createMesh().setGeometry(box(hull.beam, 6, hull.length)).setMaterial(steel);
+  const house = engine.createMesh().setGeometry(box(6, 5, 10)).setMaterial(new PbrMaterial({ color: [0.7, 0.68, 0.62], roughness: 0.5 }));
   const ride = new Floater({ hull, position: [course(0)[0], 0, course(0)[1]] });
   const boat = new Floater({ hull: { length: 6, beam: 2, draft: 0.5 }, position: [30, 0, -120], heading: 80 });
-  const dinghy = engine
-    .createMesh()
-    .setGeometry(box(2, 1, 6))
-    .setMaterial(new PbrMaterial({ color: [0.6, 0.2, 0.1], roughness: 0.7 }));
-  const spray = VFX.attach(engine, {
-    capacity: 20000,
-    rate: 0,
-    size: 0.12,
-    lifetime: [0.6, 1.4],
-    color: [0.9, 0.95, 1, 0.8],
-    turbulence: 0,
-  });
+  const dinghy = engine.createMesh().setGeometry(box(2, 1, 6)).setMaterial(new PbrMaterial({ color: [0.6, 0.2, 0.1], roughness: 0.7 }));
+  const spray = VFX.attach(engine, { capacity: 20000, rate: 0, size: 0.12, lifetime: [0.6, 1.4], color: [0.9, 0.95, 1, 0.8], turbulence: 0 });
   const splash = new ShipSplash({ floater: boat, particles: spray });
 
   let playing = false,
@@ -120,16 +95,12 @@ async function start() {
     frameShip();
     await settle();
     if (ride.aground || boat.aground) console.warn(`BUG: a hull found no water after ${what}`);
-    if (![ride.pitch, ride.roll, boat.pitch, boat.roll].every(Number.isFinite))
-      console.warn(`BUG: a hull pose is not finite after ${what}`);
+    if (![ride.pitch, ride.roll, boat.pitch, boat.roll].every(Number.isFinite)) console.warn(`BUG: a hull pose is not finite after ${what}`);
     const lamps = wakes.lampPositions();
     if (lamps.length !== 3) console.warn(`BUG: ${lamps.length} lamps drawn, not 3`);
     const mast = lamps[0];
-    if (Math.hypot(mast[0] - ride.position[0], mast[2] - ride.position[2]) > 20)
-      console.warn('BUG: the mast-head lamp left the ship');
-    say(
-      `${what}: wake clock ${wakes.time.toFixed(1)} s, ship heading ${ship.pose.heading.toFixed(1)} degrees, pitch ${((ride.pitch * 180) / Math.PI).toFixed(2)}, roll ${((ride.roll * 180) / Math.PI).toFixed(2)}.`,
-    );
+    if (Math.hypot(mast[0] - ride.position[0], mast[2] - ride.position[2]) > 20) console.warn('BUG: the mast-head lamp left the ship');
+    say(`${what}: wake clock ${wakes.time.toFixed(1)} s, ship heading ${ship.pose.heading.toFixed(1)} degrees, pitch ${((ride.pitch * 180) / Math.PI).toFixed(2)}, roll ${((ride.roll * 180) / Math.PI).toFixed(2)}.`);
   };
   // A point on the track a ship length behind the stern, in the turbulent wake.
   const probe = () => {
@@ -173,8 +144,7 @@ async function start() {
   button('btnFollow').onclick = async () => {
     applyShipSettings(wakes, { lampRoughness: null });
     await check('Lamps follow the weather');
-    if (wakes.look.lampRoughness !== null)
-      console.warn('BUG: lampRoughness null did not hand the glints back to the wind');
+    if (wakes.look.lampRoughness !== null) console.warn('BUG: lampRoughness null did not hand the glints back to the wind');
   };
   wakes.setTime(30);
   await check('Start');

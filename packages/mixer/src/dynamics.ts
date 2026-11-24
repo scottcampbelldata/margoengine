@@ -72,18 +72,14 @@ export interface ExtendedDynamicsStage extends Disposable {
   dispose(): void;
 }
 /** JSON choice for optional bus dynamics. */
-export type BusDynamicsSpec =
-  | ({ type: 'gate' } & GateOptions)
-  | ({ type: 'expander' } & ExpanderOptions)
+export type BusDynamicsSpec = ({ type: 'gate' } & GateOptions) | ({ type: 'expander' } & ExpanderOptions)
   | ({ type: 'multiband' } & MultibandOptions);
 
 function band(o: BandDynamics = {}, expansion = false) {
   return {
     threshold: bounded(o.threshold ?? (expansion ? -40 : -24), -120, 0, 'Dynamics threshold'),
-    knee: bounded(o.knee ?? 6, 0, 40, 'Dynamics knee'),
-    ratio: bounded(o.ratio ?? (expansion ? 2 : 4), 1, 100, 'Dynamics ratio'),
-    attack: bounded(o.attack ?? 0.003, 0, 10, 'Dynamics attack'),
-    release: bounded(o.release ?? 0.1, 0, 10, 'Dynamics release'),
+    knee: bounded(o.knee ?? 6, 0, 40, 'Dynamics knee'), ratio: bounded(o.ratio ?? (expansion ? 2 : 4), 1, 100, 'Dynamics ratio'),
+    attack: bounded(o.attack ?? 0.003, 0, 10, 'Dynamics attack'), release: bounded(o.release ?? 0.1, 0, 10, 'Dynamics release'),
     makeup: bounded(o.makeup ?? 0, -24, 24, 'Dynamics makeup'),
   };
 }
@@ -91,25 +87,19 @@ function band(o: BandDynamics = {}, expansion = false) {
 /** Exact downward-expansion dB curve, including soft knee and maximum attenuation; default -40/6/2/80. */
 export function expanderCurve(inputDb: number, options: ExpanderOptions = {}): number {
   if (inputDb !== -Infinity) bounded(inputDb, -Number.MAX_VALUE, Number.MAX_VALUE, 'Expander input dB');
-  const o = band(options, true),
-    range = bounded(options.range ?? 80, 0, 120, 'Expander range');
+  const o = band(options, true), range = bounded(options.range ?? 80, 0, 120, 'Expander range');
   if (inputDb === -Infinity) return -Infinity;
   const d = inputDb - o.threshold;
   let reduction = 0;
   if (d < -o.knee / 2) reduction = (o.ratio - 1) * d;
-  else if (o.knee > 0 && d < o.knee / 2) reduction = (-(o.ratio - 1) * (d - o.knee / 2) ** 2) / (2 * o.knee);
+  else if (o.knee > 0 && d < o.knee / 2) reduction = -(o.ratio - 1) * (d - o.knee / 2) ** 2 / (2 * o.knee);
   return inputDb + Math.max(-range, reduction) + o.makeup;
 }
 
 function cross(frequency: number, rate: number): number[][] {
-  const w = (2 * Math.PI * frequency) / rate,
-    cos = Math.cos(w),
-    alpha = Math.sin(w) / Math.SQRT2,
-    a0 = 1 + alpha;
-  return [
-    [(1 - cos) / 2, 1 - cos, (1 - cos) / 2],
-    [(1 + cos) / 2, -(1 + cos), (1 + cos) / 2],
-  ].map((b) => [b[0] / a0, b[1] / a0, b[2] / a0, (-2 * cos) / a0, (1 - alpha) / a0]);
+  const w = 2 * Math.PI * frequency / rate, cos = Math.cos(w), alpha = Math.sin(w) / Math.SQRT2, a0 = 1 + alpha;
+  return [[(1-cos)/2, 1-cos, (1-cos)/2], [(1+cos)/2, -(1+cos), (1+cos)/2]]
+    .map(b => [b[0]/a0,b[1]/a0,b[2]/a0,-2*cos/a0,(1-alpha)/a0]);
 }
 
 async function create(context: BaseAudioContext, spec: BusDynamicsSpec): Promise<ExtendedDynamicsStage> {
@@ -119,56 +109,29 @@ async function create(context: BaseAudioContext, spec: BusDynamicsSpec): Promise
   if (spec.type === 'gate') {
     const floor = spec.floor ?? -Infinity;
     if (floor !== -Infinity) bounded(floor, -120, 0, 'Gate floor');
-    settings = {
-      threshold: bounded(spec.threshold ?? -40, -120, 0, 'Gate threshold'),
-      hysteresis: bounded(spec.hysteresis ?? 3, 0, 40, 'Gate hysteresis'),
-      floor,
+    settings = { threshold: bounded(spec.threshold ?? -40, -120, 0, 'Gate threshold'),
+      hysteresis: bounded(spec.hysteresis ?? 3, 0, 40, 'Gate hysteresis'), floor,
       holdFrames: Math.round(bounded(spec.hold ?? 0.05, 0, 10, 'Gate hold') * context.sampleRate),
-      attack: bounded(spec.attack ?? 0.001, 0, 10, 'Gate attack'),
-      release: bounded(spec.release ?? 0.1, 0, 10, 'Gate release'),
-    };
-  } else if (spec.type === 'expander')
-    settings = { ...band(spec, true), range: bounded(spec.range ?? 80, 0, 120, 'Expander range') };
+      attack: bounded(spec.attack ?? 0.001, 0, 10, 'Gate attack'), release: bounded(spec.release ?? 0.1, 0, 10, 'Gate release') };
+  } else if (spec.type === 'expander') settings = { ...band(spec, true), range: bounded(spec.range ?? 80, 0, 120, 'Expander range') };
   else if (spec.type === 'multiband') {
-    const frequencies = spec.crossovers ?? [250, 2500];
+    const frequencies = spec.crossovers ?? [250,2500];
     if (!Array.isArray(frequencies) || frequencies.length !== 2)
       throw new TypeError('Multiband needs two crossover frequencies; pass [250,2500]');
     for (const f of frequencies) bounded(f, 10, context.sampleRate * 0.45, 'Crossover Hz');
-    if (frequencies[0] >= frequencies[1])
-      throw new RangeError('Crossovers need increasing frequencies; put low Hz before high Hz');
-    settings = {
-      cross: frequencies.map((f) => cross(f, context.sampleRate)),
-      bands: [band(spec.low), band(spec.mid), band(spec.high)],
-    };
+    if (frequencies[0] >= frequencies[1]) throw new RangeError('Crossovers need increasing frequencies; put low Hz before high Hz');
+    settings = { cross: frequencies.map(f => cross(f, context.sampleRate)), bands: [band(spec.low),band(spec.mid),band(spec.high)] };
   } else throw new TypeError('Unknown dynamics type; use gate, expander or multiband');
-  await loadProcessor(context, 'margo-extended-dynamics-v1', dynamicsProcessor, spec.signal);
-  spec.signal?.throwIfAborted();
-  const output = new AudioWorkletNode(context, 'margo-extended-dynamics-v1', {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    outputChannelCount: [channels],
-    channelCount: channels,
-    channelCountMode: 'explicit',
+  await loadProcessor(context, 'margo-extended-dynamics-v1', dynamicsProcessor, spec.signal); spec.signal?.throwIfAborted();
+  const output = new AudioWorkletNode(context, 'margo-extended-dynamics-v1', { numberOfInputs: 1, numberOfOutputs: 1,
+    outputChannelCount: [channels], channelCount: channels, channelCountMode: 'explicit',
     processorOptions: { ...settings, channels, type: spec.type },
   });
-  const input = context.createGain();
-  input.connect(output);
-  let disposed = false;
-  const stage: ExtendedDynamicsStage = {
-    input,
-    output,
-    latencyFrames: 0,
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      input.disconnect();
-      output.disconnect();
-      output.port.postMessage('dispose');
-      output.port.close();
-    },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+  const input = context.createGain(); input.connect(output); let disposed = false;
+  const stage: ExtendedDynamicsStage = { input, output, latencyFrames: 0,
+    dispose() { if (disposed) return; disposed = true; input.disconnect(); output.disconnect();
+      output.port.postMessage('dispose'); output.port.close(); },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }
@@ -178,34 +141,17 @@ export function createGate(context: BaseAudioContext, options: GateOptions = {})
   return create(context, { ...options, type: 'gate' });
 }
 /** Create linked downward expansion with a fixed soft-knee curve and explicit range/makeup. */
-export function createExpander(
-  context: BaseAudioContext,
-  options: ExpanderOptions = {},
-): Promise<ExtendedDynamicsStage> {
+export function createExpander(context: BaseAudioContext, options: ExpanderOptions = {}): Promise<ExtendedDynamicsStage> {
   return create(context, { ...options, type: 'expander' });
 }
 /** Create LR4 low/mid/high compression with phase compensation on the low branch. Unity gains sum to an allpass. */
-export function createMultibandCompressor(
-  context: BaseAudioContext,
-  options: MultibandOptions = {},
-): Promise<ExtendedDynamicsStage> {
+export function createMultibandCompressor(context: BaseAudioContext, options: MultibandOptions = {}): Promise<ExtendedDynamicsStage> {
   return create(context, { ...options, type: 'multiband' });
 }
 /** Insert owned optional dynamics on any bus, preserving other stages and restoring routing on disposal. */
 export async function createBusDynamics(bus: Bus, spec: BusDynamicsSpec): Promise<ExtendedDynamicsStage> {
-  const stage = await create(bus.input.context, spec);
-  let detach: (() => void) | undefined;
-  const dispose = stage.dispose;
-  stage.dispose = () => {
-    detach?.();
-    dispose();
-  };
-  try {
-    spec.signal?.throwIfAborted();
-    detach = bus.insert(stage);
-  } catch (error) {
-    dispose();
-    throw error;
-  }
+  const stage = await create(bus.input.context, spec); let detach: (() => void) | undefined; const dispose = stage.dispose;
+  stage.dispose = () => { detach?.(); dispose(); };
+  try { spec.signal?.throwIfAborted(); detach = bus.insert(stage); } catch (error) { dispose(); throw error; }
   return stage;
 }

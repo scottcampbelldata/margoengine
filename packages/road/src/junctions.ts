@@ -104,16 +104,8 @@ export async function junctions(
     contour: contour.map(([x, y]): [number, number] => [Math.fround(x), Math.fround(y)]),
     holes: holes.map((ring) => ring.map(([x, y]): [number, number] => [Math.fround(x), Math.fround(y)])),
   }));
-  if (
-    regions.some(({ contour, holes }) =>
-      [contour, ...holes].some((ring) => !(polygonArea([{ contour: ring, holes: [] }]) > 0)),
-    )
-  )
-    throw fault(
-      'failed',
-      'Road boundary collapsed at float32 precision; move the roads closer to their local origin or increase their width',
-      'geometry',
-    );
+  if (regions.some(({contour, holes}) => [contour, ...holes].some(ring => !(polygonArea([{contour:ring,holes:[]}]) > 0))))
+    throw fault('failed', 'Road boundary collapsed at float32 precision; move the roads closer to their local origin or increase their width', 'geometry');
   const data = applyMatrix4(shapeGeometry(polygonShapes(regions)), [
     1,
     0,

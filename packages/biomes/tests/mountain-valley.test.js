@@ -14,7 +14,8 @@ import '../dist/valley.js'; // the entry that makes mountain valleys (BiomeWorld
 import { hydrology } from '../dist/hydrology.js';
 import { presetWorlds, rockiesValleyWorld, rockiesWorld } from '../dist/presets.js';
 
-const valley = (extra = {}, mv = {}) => createRelief({ base: 870, relief: 1000, ...extra, mountainValley: { ...mv } });
+const valley = (extra = {}, mv = {}) =>
+  createRelief({ base: 870, relief: 1000, ...extra, mountainValley: { ...mv } });
 const DX = [1, 1, 0, -1, -1, -1, 0, 1],
   DZ = [0, 1, 1, 1, 0, -1, -1, -1];
 
@@ -107,10 +108,7 @@ test('mountain valley: the median wall slope is 25 to 40 degrees, and rounded ri
       ['rounded', rounded],
       ['sharp', sharp],
     ])
-      assert.ok(
-        median(s) >= 25 && median(s) <= 40,
-        `seed ${seed} ${name}: median wall ${median(s).toFixed(1)} degrees`,
-      );
+      assert.ok(median(s) >= 25 && median(s) <= 40, `seed ${seed} ${name}: median wall ${median(s).toFixed(1)} degrees`);
     // Creep rounds the crests: more of the wall is gentle (under 25 degrees) with rounded ridges.
     const gentle = (s) => s.filter((d) => d < 25).length / s.length;
     assert.ok(gentle(rounded) > gentle(sharp) + 0.03, `seed ${seed}: ${gentle(rounded)} vs ${gentle(sharp)}`);
@@ -155,8 +153,7 @@ test('mountain valley: the rail grade is at most 1.7 percent, level across its b
     for (let k = 0; k < rail.length; k += 2) {
       // Level across the 6 m bed: 3 m either side of the centre line, parallel to the outlet edge.
       const mid = r.height(rail[k], rail[k + 1]);
-      for (const side of [-3000, 3000])
-        assert.equal(r.height(rail[k], rail[k + 1] + side), mid, `seed ${seed} rail ${k / 2}`);
+      for (const side of [-3000, 3000]) assert.equal(r.height(rail[k], rail[k + 1] + side), mid, `seed ${seed} rail ${k / 2}`);
       for (let q = 0; q < creek.length; q += 2)
         nearest = Math.min(nearest, Math.hypot(creek[q] - rail[k], creek[q + 1] - rail[k + 1]));
     }
@@ -216,13 +213,7 @@ test('mountain valley: options are validated', () => {
     assert.throws(() => valley({}, bad), RangeError, JSON.stringify(bad));
   assert.doesNotThrow(() => valley({}, { fall: 0.02, rail: false }));
   assert.throws(() => createRelief({ mountainValley: null }), RangeError);
-  for (const bad of [
-    { coast: 'west' },
-    { rivers: 1 },
-    { coast: 'island' },
-    { coast: 'east', ria: {} },
-    { erosion: {} },
-  ])
+  for (const bad of [{ coast: 'west' }, { rivers: 1 }, { coast: 'island' }, { coast: 'east', ria: {} }, { erosion: {} }])
     assert.throws(() => valley(bad), RangeError, JSON.stringify(bad));
   assert.throws(() => valley({ size: [200, 4096] }), RangeError, 'too small a world');
 });

@@ -21,7 +21,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-xr/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5377, strictPort: true, watch: null, hmr: false },
+  server: { host: '127.0.0.1', port: 5377, strictPort: true, watch: null },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5377 });
@@ -84,10 +84,7 @@ try {
       return { id, camera, viewport: [0, 0, 1, 1], target: { color } };
     };
     const read = async (texture) => {
-      const buffer = device.createBuffer({
-        size: 256 * H * 4,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-      });
+      const buffer = device.createBuffer({ size: 256 * H * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
       const encoder = device.createCommandEncoder();
       encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: 256 * 4 }, [W, H]);
       device.queue.submit([encoder.finish()]);

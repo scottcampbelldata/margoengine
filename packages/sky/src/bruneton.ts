@@ -165,14 +165,14 @@ export const bruneton: NonNullable<SkyFeatures['bruneton']> = {
     // Ping-pong: textures 0/1 hold the current order, 2/3 the running total of orders 2 to 4, 4 the scattering density.
     // Texture 3, the one the sky reads, also holds single scattering without its phases in rows 256 to 767.
     const t = Array.from({ length: 5 }, (_, i) => {
-      const texture = d.createTexture({
-        size: [128, i === 3 ? 768 : 256],
-        format: 'rgba16float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-      });
-      owned.push(texture);
-      return texture;
-    }).map((t) => t.createView());
+        const texture = d.createTexture({
+          size: [128, i === 3 ? 768 : 256],
+          format: 'rgba16float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+        });
+        owned.push(texture);
+        return texture;
+      }).map((t) => t.createView());
     let p1: GPUComputePipeline,
       p2: GPUComputePipeline,
       p2First: GPUComputePipeline,

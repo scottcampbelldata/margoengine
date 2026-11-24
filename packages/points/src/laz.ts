@@ -1639,9 +1639,7 @@ export function decodeLazChunk(
   checkItems(info, header);
   const length = header.pointRecordLength;
   if (!Number.isSafeInteger(count) || count < 0)
-    throw new RangeError(
-      `LAZ chunk point count ${count} is not a whole number of 0 or more; pass the count its index gives`,
-    );
+    throw new RangeError(`LAZ chunk point count ${count} is not a whole number of 0 or more; pass the count its index gives`);
   // A layered chunk states its own count after its first point: compare before allocating count records, so a corrupt
   // index (a COPC hierarchy entry) cannot ask for gigabytes.
   if (count && info.compressor === 3 && chunk.byteLength >= length + 4) {

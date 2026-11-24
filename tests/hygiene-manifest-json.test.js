@@ -24,10 +24,7 @@ test('a missing comma is reported with file and line', () => {
   const found = manifestProblems(files, reader({ 'packages/a/package.json': bad }));
   assert.equal(found.length, 1);
   assert.match(found[0], /^packages\/a\/package\.json: line 4:/);
-  assert.throws(
-    () => assertValidManifests(files, reader({ 'packages/a/package.json': bad })),
-    /packages\/a\/package\.json: line 4/,
-  );
+  assert.throws(() => assertValidManifests(files, reader({ 'packages/a/package.json': bad })), /packages\/a\/package\.json: line 4/);
 });
 
 test('a duplicate key fails even when the JSON parses', () => {

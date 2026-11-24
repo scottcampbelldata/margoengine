@@ -13,8 +13,7 @@ import { Robot, sweepRobot } from '../dist/index.js';
 const translate = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 function box(min, max) {
   const points = [];
-  for (const x of [min[0], max[0]])
-    for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) points.push(x, y, z);
+  for (const x of [min[0], max[0]]) for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) points.push(x, y, z);
   return new ConvexHullVolume({ points });
 }
 /** A planar arm of unit links about +Z with a fixed tip. */
@@ -60,11 +59,7 @@ for (const algorithm of ['rrt-connect', 'rrt', 'prm']) {
       minClearance = 0.02;
     assert.ok(robot.clearance(start, colliders) > minClearance);
     assert.ok(robot.clearance(goal, colliders) > minClearance);
-    assert.equal(
-      sweepRobot(robot, start, goal, colliders, { minClearance }).clear,
-      false,
-      'the straight path collides',
-    );
+    assert.equal(sweepRobot(robot, start, goal, colliders, { minClearance }).clear, false, 'the straight path collides');
     robot.forward(goal);
     const position = [...robot.pointOn(2, [0, 0, 0])],
       local = new JointLimitSolver(robot, { tip: 'tip', colliders, minClearance }).solve(start, { position });
@@ -115,24 +110,9 @@ test('a seven-joint arm with hull links plans among obstacles, keeping off itsel
 test('out of a concave bay: a mesh obstacle with its mouth behind the arm must be backed out of', async () => {
   // A square cup open toward -X, read as a sheet: the arm starts inside and its goal is round the back.
   const quads = [
-      [
-        [0.5, -0.6, -1],
-        [1.4, -0.6, -1],
-        [1.4, -0.6, 1],
-        [0.5, -0.6, 1],
-      ],
-      [
-        [0.5, 0.6, -1],
-        [1.4, 0.6, -1],
-        [1.4, 0.6, 1],
-        [0.5, 0.6, 1],
-      ],
-      [
-        [1.4, -0.6, -1],
-        [1.4, 0.6, -1],
-        [1.4, 0.6, 1],
-        [1.4, -0.6, 1],
-      ],
+      [[0.5, -0.6, -1], [1.4, -0.6, -1], [1.4, -0.6, 1], [0.5, -0.6, 1]],
+      [[0.5, 0.6, -1], [1.4, 0.6, -1], [1.4, 0.6, 1], [0.5, 0.6, 1]],
+      [[1.4, -0.6, -1], [1.4, 0.6, -1], [1.4, 0.6, 1], [1.4, -0.6, 1]],
     ],
     positions = new Float32Array(quads.flat(2)),
     indices = new Uint32Array(quads.flatMap((_, i) => [i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3])),
@@ -147,11 +127,7 @@ test('out of a concave bay: a mesh obstacle with its mouth behind the arm must b
     start = [1, 0],
     goal = [2, 0],
     minClearance = 0.02;
-  assert.equal(
-    sweepRobot(slider, start, goal, [bay], { minClearance }).clear,
-    false,
-    'the back wall stands between them',
-  );
+  assert.equal(sweepRobot(slider, start, goal, [bay], { minClearance }).clear, false, 'the back wall stands between them');
   const plan = await planPath(slider, start, goal, { colliders: [bay], minClearance, seed: 5 });
   assert.equal(plan.status, 'found');
   assertClear(slider, plan.path, [bay], minClearance);
@@ -174,13 +150,8 @@ test('planToPose: reaches a tip target behind an obstacle the local solver canno
   const hand = arm.pointOn(arm.jointIndex('hand'), [0, 0, 0]);
   // The joint-limit solver's default tolerance is what "reached" means.
   assert.ok(Math.hypot(hand[0], hand[1] - 1.6, hand[2]) <= 1e-4);
-  await assert.rejects(planToPose(arm, start, target, { tip: 'hand', signal: AbortSignal.abort() }), {
-    name: 'AbortError',
-  });
-  assert.equal(
-    (await planToPose(arm, [0, 0, 0, 0.05], target, { tip: 'hand', colliders: [plate] })).status,
-    'start-blocked',
-  );
+  await assert.rejects(planToPose(arm, start, target, { tip: 'hand', signal: AbortSignal.abort() }), { name: 'AbortError' });
+  assert.equal((await planToPose(arm, [0, 0, 0, 0.05], target, { tip: 'hand', colliders: [plate] })).status, 'start-blocked');
   const wall = box([-3, 1.4, -3], [3, 3, 3]);
   assert.equal((await planToPose(arm, start, target, { tip: 'hand', colliders: [wall] })).status, 'goal-blocked');
 });
@@ -227,10 +198,7 @@ test('one seed gives one path; another seed gives another; shortcuts never lengt
   assert.equal(a.status, 'found');
   assert.equal(a.path.length, b.path.length);
   a.path.forEach((q, i) => same(q, b.path[i]));
-  assert.notDeepEqual(
-    a.path.map((q) => [...q]),
-    c.path.map((q) => [...q]),
-  );
+  assert.notDeepEqual(a.path.map((q) => [...q]), c.path.map((q) => [...q]));
   assert.ok(a.length <= raw.length, `${a.length} over ${raw.length}`);
   assert.ok(a.path.length < raw.path.length);
   assertClear(robot, a.path, colliders, 0.01);
@@ -238,19 +206,14 @@ test('one seed gives one path; another seed gives another; shortcuts never lengt
 
 test('an AbortSignal stops the search, before it starts and during it', async () => {
   const { robot, colliders, start, goal } = walledScene();
-  await assert.rejects(planPath(robot, start, goal, { colliders, signal: AbortSignal.abort() }), {
-    name: 'AbortError',
-  });
+  await assert.rejects(planPath(robot, start, goal, { colliders, signal: AbortSignal.abort() }), { name: 'AbortError' });
   // The goal is sealed off from the start, so the search has no end of its own and only the signal can stop it.
   const { slider, walls } = sealedScene(),
     busy = new AbortController();
   setTimeout(() => busy.abort(), 30);
-  await assert.rejects(
-    planPath(slider, [0, 0], [1.5, 1.5], { colliders: walls, maxSamples: 1e9, signal: busy.signal }),
-    {
-      name: 'AbortError',
-    },
-  );
+  await assert.rejects(planPath(slider, [0, 0], [1.5, 1.5], { colliders: walls, maxSamples: 1e9, signal: busy.signal }), {
+    name: 'AbortError',
+  });
 });
 
 test('Roadmap: grown once, it answers many queries; a batch of poses joins it the same way', () => {
@@ -290,10 +253,7 @@ test('a continuous joint plans on the line of its value; bad settings are refuse
   same(plan.path.at(-1), [round]);
   assertClear(wheel, plan.path, [post], 0.01);
   const poses = new Roadmap(wheel, { around: [10], seed: 1 }).samplePoses(200);
-  assert.ok(
-    poses.every((q) => Math.abs(q - 10) <= Math.PI),
-    'samples stay one turn each way of the centre',
-  );
+  assert.ok(poses.every((q) => Math.abs(q - 10) <= Math.PI), 'samples stay one turn each way of the centre');
   assert.ok(poses.some((q) => q > 12) && poses.some((q) => q < 8));
   await assert.rejects(planPath(wheel, [0], [0], { algorithm: 'dijkstra' }), /Unknown plan algorithm/);
   await assert.rejects(planPath(wheel, [0, 1], [0]), /numbers/);

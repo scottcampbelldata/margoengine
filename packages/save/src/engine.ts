@@ -193,11 +193,7 @@ function plain(value: unknown, depth = 0): Json | undefined {
 /** Names of the properties a plugin's class chain gives both a getter and a setter. */
 function accessors(plugin: object): string[] {
   const names = new Set<string>();
-  for (
-    let proto = Object.getPrototypeOf(plugin);
-    proto && proto !== Object.prototype;
-    proto = Object.getPrototypeOf(proto)
-  )
+  for (let proto = Object.getPrototypeOf(plugin); proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto))
     for (const [name, property] of Object.entries(Object.getOwnPropertyDescriptors(proto)))
       if (property.get && property.set) names.add(name);
   return [...names].sort();
@@ -283,17 +279,7 @@ const stem = (url: string): string =>
  * @example await saveGame(storage, 'slot-1', captureScene(engine));
  */
 export function captureScene(engine: EngineKernel, options: CaptureOptions = {}): SaveDocument {
-  const {
-      scene = engine.scene,
-      version = 1,
-      meta,
-      camera = true,
-      plugins,
-      filter,
-      components,
-      modelURL,
-      onSkip,
-    } = options,
+  const { scene = engine.scene, version = 1, meta, camera = true, plugins, filter, components, modelURL, onSkip } = options,
     owners = new Map<Mesh, ModelLike>();
   for (const model of modelsOf(scene)) {
     for (const mesh of model.ownedMeshes ?? model.nodes) owners.set(mesh, model);
@@ -318,8 +304,7 @@ export function captureScene(engine: EngineKernel, options: CaptureOptions = {})
     const model = owners.get(mesh);
     if (!model) continue;
     const url = modelURL?.(model) ?? model.asset.baseURL;
-    if (!url)
-      throw new TypeError(`Model '${model.name}' was not loaded from a URL; pass modelURL to say where it lives`);
+    if (!url) throw new TypeError(`Model '${model.name}' was not loaded from a URL; pass modelURL to say where it lives`);
     urls.set(mesh, url);
   }
   const used = new Set(listed.map((mesh) => ids.get(mesh)));
@@ -370,19 +355,13 @@ export function captureScene(engine: EngineKernel, options: CaptureOptions = {})
         parts.geometry = index;
       }
       const { data } = mesh.material;
-      parts.material = {
-        color: [data[0], data[1], data[2]],
-        roughness: data[4],
-        metalness: data[5],
-        doubleSided: !!data[6],
-      };
+      parts.material = { color: [data[0], data[1], data[2]], roughness: data[4], metalness: data[5], doubleSided: !!data[6] };
       const group = shared.indexOf(mesh.material);
       if (group >= 0) parts.sharedMaterial = group;
     }
     const own = components?.(mesh);
     for (const key of Object.keys(own ?? {}))
-      if (RESERVED.includes(key))
-        throw new TypeError(`Component '${key}' is the save binding's; name yours differently`);
+      if (RESERVED.includes(key)) throw new TypeError(`Component '${key}' is the save binding's; name yours differently`);
     entity.components = { ...parts, ...own };
     return entity;
   });
@@ -417,10 +396,7 @@ function readGeometry(saved: unknown, index: number): Geometry {
     throw new TypeError(`meta.engine.geometries[${index}]: must be { vertices, indices } in base64`);
   const words = (text: string): ArrayBuffer => {
     const bytes = fromBase64(text);
-    if (bytes.length % 4)
-      throw new TypeError(
-        `meta.engine.geometries[${index}]: the bytes do not fit; the save is damaged, load an earlier one`,
-      );
+    if (bytes.length % 4) throw new TypeError(`meta.engine.geometries[${index}]: the bytes do not fit; the save is damaged, load an earlier one`);
     return bytes.buffer as ArrayBuffer;
   };
   const vertices = new Float32Array(words(saved.vertices)),
@@ -590,12 +566,7 @@ export async function restoreScene(
   options: RestoreOptions = {},
 ): Promise<RestoredScene> {
   const { scene = engine.scene, migrations, clear = true, camera = true, plugins, filter, onEntity, signal } = options,
-    {
-      load = (url, how) => loadDefault(engine, url, how, scene),
-      clone = cloneDefault,
-      components,
-      strictComponents,
-    } = options,
+    { load = (url, how) => loadDefault(engine, url, how, scene), clone = cloneDefault, components, strictComponents } = options,
     checks: LoadOptions = { components, strictComponents, signal };
   signal?.throwIfAborted();
   const shaped = parseSave(document, {}),
@@ -608,17 +579,13 @@ export async function restoreScene(
     if (geometry !== undefined && !(typeof geometry === 'number' && geometries[geometry]))
       throw new TypeError(`Entity '${entity.id}': no saved geometry ${geometry}; the save is damaged`);
     if (mesh !== undefined && typeof mesh !== 'string')
-      throw new TypeError(
-        `Entity '${entity.id}' mesh: a model URL; shapes are for addScene of @margoengine/stage/scene`,
-      );
+      throw new TypeError(`Entity '${entity.id}' mesh: a model URL; shapes are for addScene of @margoengine/stage/scene`);
   }
   const named = new Map([...scene.plugins.values()].map((plugin) => [plugin.name, plugin])),
     wanted = Object.entries(state.plugins ?? {}).filter(([name]) => bindingOf(plugins, name) !== null);
   for (const [name] of wanted)
     if (!named.has(name) && !bindingOf(plugins, name)?.type)
-      throw new TypeError(
-        `The save has plugin '${name}' and the scene does not; attach it first or pass its type in plugins`,
-      );
+      throw new TypeError(`The save has plugin '${name}' and the scene does not; attach it first or pass its type in plugins`);
   // What leaves at the swap, decided before anything new exists.
   const oldModels = clear ? modelsOf(scene) : [],
     owned = new Set(oldModels.flatMap((model) => [model.root, ...(model.ownedMeshes ?? model.nodes)])),
@@ -663,12 +630,9 @@ export async function restoreScene(
   } catch (error) {
     release();
     if (signal?.aborted) throw signal.reason;
-    throw Object.assign(
-      new MargoError('failed', 'A model of the save did not load; the scene is unchanged, see error.cause'),
-      {
-        cause: error,
-      },
-    );
+    throw Object.assign(new MargoError('failed', 'A model of the save did not load; the scene is unchanged, see error.cause'), {
+      cause: error,
+    });
   }
   const materials = new Map<Json, Mesh['material']>(),
     modelOf = new Map([...models.values()].map((model) => [model.root, model])),
@@ -707,10 +671,7 @@ export async function restoreScene(
           let parent = entity.parent === undefined ? null : get(entity.parent);
           if (node !== undefined) {
             const target = parent ? modelOf.get(parent)?.nodes[node as number] : undefined;
-            if (!target)
-              throw new TypeError(
-                `Entity '${entity.id}' node: ${node} is not a node of '${entity.parent}'; has the model changed since the save?`,
-              );
+            if (!target) throw new TypeError(`Entity '${entity.id}' node: ${node} is not a node of '${entity.parent}'; has the model changed since the save?`);
             parent = target;
           }
           mesh.setParent(parent);

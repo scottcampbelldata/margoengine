@@ -134,18 +134,12 @@ test('parts share one pool of kept indices after the mesh, and a small device lo
     geometry = box(),
     base = geometry.indices.length,
     material = new PbrMaterial(),
-    m = new MeshletMesh([
-      { geometry, material, transforms: new Float32Array([...identity, ...identity, ...identity]) },
-    ]);
+    m = new MeshletMesh([{ geometry, material, transforms: new Float32Array([...identity, ...identity, ...identity]) }]);
   h.engine.use(m);
   h.engine.frameGraph.execute(h.context);
   assert.equal(m.maxKeptTriangles, (base / 3) * 3, 'by default every triangle of every part fits');
   assert.equal(m.clusters.kept.size, (base + 3 * base) * 4, 'the mesh once, then the pool');
-  assert.equal(
-    m.clusters.args.size,
-    3 * 20 + 3 * m.meshlets.count * 4,
-    'draw arguments, then a word per cluster and part',
-  );
+  assert.equal(m.clusters.args.size, 3 * 20 + 3 * m.meshlets.count * 4, 'draw arguments, then a word per cluster and part');
   const words = new Uint32Array(m.clusterValues);
   assert.deepEqual(
     [words[28], words[29], words[31], words[32], words[33], words[34], words[35]],
@@ -198,13 +192,7 @@ test('the place kernel falls back to the whole mesh for a part past the pool, an
 test('occlusion draws last frame’s kept clusters of each shown part as the Hi-Z occluders', () => {
   const h = harness(),
     m = new MeshletMesh(
-      [
-        {
-          geometry: box(),
-          material: new PbrMaterial(),
-          transforms: new Float32Array([...identity, ...identity, ...identity]),
-        },
-      ],
+      [{ geometry: box(), material: new PbrMaterial(), transforms: new Float32Array([...identity, ...identity, ...identity]) }],
       { culling: 'occlusion' },
     ),
     passes = [];
@@ -221,10 +209,7 @@ test('occlusion draws last frame’s kept clusters of each shown part as the Hi-
   h.engine.use(m);
   h.engine.frameGraph.execute(h.context);
   const prepass = () => passes.find((p) => !p.descriptor.colorAttachments.length).calls;
-  assert.ok(
-    prepass().some((c) => c[0] === 'indirect' && c[1] === m.buffers.earlyArgs),
-    'frame one: the parts list',
-  );
+  assert.ok(prepass().some((c) => c[0] === 'indirect' && c[1] === m.buffers.earlyArgs), 'frame one: the parts list');
   passes.length = 0;
   m.setVisible(0, 1, false);
   h.engine.frameGraph.execute(h.context);
@@ -379,8 +364,7 @@ function ball(bands = 24, around = 48) {
     }
   const positions = [],
     normals = [];
-  for (let i = 0; i < vertices.length; i += 6)
-    positions.push(...vertices.slice(i, i + 3)), normals.push(...vertices.slice(i + 3, i + 6));
+  for (let i = 0; i < vertices.length; i += 6) positions.push(...vertices.slice(i, i + 3)), normals.push(...vertices.slice(i + 3, i + 6));
   return new Geometry(positions, normals, indices);
 }
 const row = (count, step) => {

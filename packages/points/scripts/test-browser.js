@@ -15,7 +15,7 @@ const server = await createServer({
   plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
-  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
+  server: { port: 0 },
 });
 await server.listen();
 let browser;
@@ -43,9 +43,7 @@ try {
       if (message.type() === 'error') errors.push(message.text());
     });
     await page.goto(`${server.resolvedUrls.local[0]}tests/points.html`);
-    await page.waitForFunction(
-      () => typeof window.runPointTests === 'function' && typeof window.runFeatures === 'function',
-    );
+    await page.waitForFunction(() => typeof window.runPointTests === 'function' && typeof window.runFeatures === 'function');
     const report = await page.evaluate(() => window.runPointTests());
     assert.equal(report.samples, samples);
     report.checks.push(...(await page.evaluate(() => window.runFeatures())));

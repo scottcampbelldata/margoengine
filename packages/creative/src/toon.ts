@@ -17,7 +17,6 @@ export interface ToonOptions {
  */
 export class ToonShading implements EnginePlugin {
   readonly name = 'toon-shading';
-  private engine?: Engine;
   private buffer?: GPUBuffer;
   private entry?: GPUBindGroupEntry;
   private readonly values: Float32Array;
@@ -39,7 +38,6 @@ export class ToonShading implements EnginePlugin {
         'unsupported',
         'ToonShading requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
-    this.engine = engine;
     this.buffer = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.entry = { binding: 19, resource: { buffer: this.buffer } };
     engine.gpu.queue.writeBuffer(this.buffer, 0, this.values as Float32Array<ArrayBuffer>);
@@ -77,22 +75,15 @@ export class ToonShading implements EnginePlugin {
       },
     });
   }
-  private release(): void {
+  onDeviceRestored(engine: Engine): void {
+    this.dispose();
+    this.setup(engine);
+  }
+  dispose(): void {
     this.buffer?.destroy();
     this.buffer = undefined;
     this.entry = undefined;
     this.shaders.clear();
-  }
-  onDeviceRestored(engine: Engine): void {
-    this.release();
-    this.setup(engine);
-  }
-  dispose(): void {
-    // The scene the effect was attached to, not whichever scene is active now.
-    const scene = this.engine?.sceneOf(this);
-    this.engine = undefined;
-    scene?.removePlugin(this.name);
-    this.release();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

@@ -27,7 +27,8 @@ export async function checkKit(name, entry) {
     assert.equal(typeof entry.Canvas, 'function');
     assert.equal('Voxel' in entry, false, 'the web root must not advertise a renderer outside its installed profile');
     assert.equal('XR' in entry, false);
-  } else {
+  }
+  else {
     for (const [source, names] of KITS[KIT_ROOT[name]].from) {
       const original = await import(source);
       for (const binding of names) assert.equal(entry[binding], original[binding], binding);
@@ -38,20 +39,15 @@ export async function checkKit(name, entry) {
   // Vite's asset discovery away from the root, before its tree-shaker has run.
   if (name !== 'kit-react') {
     const out = await bundle(`export { createStage } from '${manifest.name}';`);
-    assert.ok(
-      out.every((file) => !/wasm|draco|basis/i.test(file.fileName)),
-      manifest.name,
-    );
+    assert.ok(out.every((file) => !/wasm|draco|basis/i.test(file.fileName)), manifest.name);
     const direct = await bundle("export { createStage } from '@margoengine/stage';");
     const bytes = (files) => {
       const byName = new Map(files.filter((f) => f.type === 'chunk').map((f) => [f.fileName, f]));
-      const startup = [],
-        queue = files.filter((f) => f.type === 'chunk' && f.isEntry);
-      for (const chunk of queue)
-        if (!startup.includes(chunk)) {
-          startup.push(chunk);
-          queue.push(...chunk.imports.map((file) => byName.get(file)).filter(Boolean));
-        }
+      const startup = [], queue = files.filter((f) => f.type === 'chunk' && f.isEntry);
+      for (const chunk of queue) if (!startup.includes(chunk)) {
+        startup.push(chunk);
+        queue.push(...chunk.imports.map((file) => byName.get(file)).filter(Boolean));
+      }
       return gzipSync(startup.map((f) => f.code).join('\n')).length;
     };
     assert.ok(Math.abs(bytes(out) - bytes(direct)) <= 64, 'unused kit exports add no engine code');
@@ -60,17 +56,9 @@ export async function checkKit(name, entry) {
 
 async function bundle(code) {
   const out = await build({
-    configFile: false,
-    publicDir: false,
-    logLevel: 'silent',
+    configFile: false, publicDir: false, logLevel: 'silent',
     build: { write: false, target: 'es2022', rollupOptions: { input: 'kit-app', preserveEntrySignatures: 'strict' } },
-    plugins: [
-      {
-        name: 'kit-app',
-        resolveId: (id) => (id === 'kit-app' ? id : null),
-        load: (id) => (id === 'kit-app' ? code : null),
-      },
-    ],
+    plugins: [{ name: 'kit-app', resolveId: (id) => id === 'kit-app' ? id : null, load: (id) => id === 'kit-app' ? code : null }],
   });
   return out.output;
 }

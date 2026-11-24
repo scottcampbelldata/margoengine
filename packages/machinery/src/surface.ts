@@ -230,11 +230,8 @@ export class SurfacePhysics implements EnginePlugin {
     }
   }
   dispose(): void {
-    const engine = this.engine;
     this.engine = undefined;
     this.disposed = true;
-    // After the fields are cleared: removePlugin calls dispose again, which then finds nothing to do.
-    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

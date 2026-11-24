@@ -79,10 +79,7 @@ test('higher accuracy costs more and lands closer', () => {
   const bvh = MeshBVH.build(bumpy()),
     p = [1.6, 0.4, 0.2],
     exact = windingNumber(bvh, p, { accuracy: Infinity });
-  assert.ok(
-    Math.abs(windingNumber(bvh, p, { accuracy: 6 }) - exact) <=
-      Math.abs(windingNumber(bvh, p, { accuracy: 1.2 }) - exact) + 1e-9,
-  );
+  assert.ok(Math.abs(windingNumber(bvh, p, { accuracy: 6 }) - exact) <= Math.abs(windingNumber(bvh, p, { accuracy: 1.2 }) - exact) + 1e-9);
 });
 
 test('a hole barely changes the answer inside, where parity flips', () => {
@@ -111,8 +108,7 @@ function brute(A, B, indices, matrix) {
       matrix[1] * p[0] + matrix[5] * p[1] + matrix[9] * p[2] + matrix[13],
       matrix[2] * p[0] + matrix[6] * p[1] + matrix[10] * p[2] + matrix[14],
     ],
-    vertices = (tree) =>
-      [...Array(tree.positions.length / 3).keys()].map((i) => [...tree.positions.slice(i * 3, i * 3 + 3)]),
+    vertices = (tree) => [...Array(tree.positions.length / 3).keys()].map((i) => [...tree.positions.slice(i * 3, i * 3 + 3)]),
     va = vertices(A),
     vb = vertices(B).map(t),
     moved = MeshBVH.build({ positions: vb.flat(), indices, precision: 'float64' });
@@ -146,8 +142,7 @@ test('edges that pass closest away from any vertex are measured', () => {
   const bar = (axis, z) => {
       const positions = [];
       for (const s of [-5, 5])
-        for (const w of [-0.5, 0.5])
-          positions.push(...(axis ? [w, s, z] : [s, w, z]), ...(axis ? [w, s, z + 1] : [s, w, z + 1]));
+        for (const w of [-0.5, 0.5]) positions.push(...(axis ? [w, s, z] : [s, w, z]), ...(axis ? [w, s, z + 1] : [s, w, z + 1]));
       return positions;
     },
     tube = (positions) => ({
@@ -181,9 +176,7 @@ test('maxDistance answers null past it, minDistance stops early, and a matrix pl
   assert.equal(result.pointB[0], 4, 'in the first mesh space');
   assert.equal(meshDistance(a, b, apart, { maxDistance: 2.9 }), null);
   assert.ok(meshDistance(a, b, apart, { maxDistance: 3 }));
-  assert.ok(
-    meshDistance(MeshBVH.build(bumpy()), MeshBVH.build(bumpy(40, 28, [4, 0, 0])), undefined, { minDistance: 100 }),
-  );
+  assert.ok(meshDistance(MeshBVH.build(bumpy()), MeshBVH.build(bumpy(40, 28, [4, 0, 0])), undefined, { minDistance: 100 }));
 });
 
 test('bad input says what to pass', () => {

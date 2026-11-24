@@ -23,17 +23,10 @@ const pageCanvas = ({ transfer } = {}) => {
     clientWidth: 320,
     clientHeight: 200,
     captures: [],
-    style: {
-      values: {},
-      setProperty(name, value) {
-        this.values[name] = value;
-      },
-    },
+    style: { values: {}, setProperty(name, value) { this.values[name] = value; } },
     offscreen,
     getBoundingClientRect: () => ({ left: 10, top: 20 }),
-    setPointerCapture(id) {
-      this.captures.push(id);
-    },
+    setPointerCapture(id) { this.captures.push(id); },
     transferControlToOffscreen: transfer ?? (() => offscreen),
   });
 };
@@ -57,14 +50,7 @@ const link = () => {
 };
 
 const keep = {};
-const names = [
-  'postMessage',
-  'addEventListener',
-  'removeEventListener',
-  'ResizeObserver',
-  'devicePixelRatio',
-  'margoLow',
-];
+const names = ['postMessage', 'addEventListener', 'removeEventListener', 'ResizeObserver', 'devicePixelRatio', 'margoLow'];
 const open = [];
 beforeEach(() => {
   for (const name of names) keep[name] = globalThis[name];

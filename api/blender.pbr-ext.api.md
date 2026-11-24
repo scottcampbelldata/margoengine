@@ -14,7 +14,7 @@ export function loadMargoPBR(engine: EngineKernel, url: string | URL, { fetch: g
     fetch?: typeof fetch;
 }): Promise<PBRModel>;
 
-export const margoMaterialExtensions: readonly ['KHR_materials_clearcoat', 'KHR_materials_diffuse_transmission', 'KHR_materials_ior', 'KHR_materials_sheen', 'KHR_materials_transmission', 'KHR_materials_volume', 'KHR_materials_volume_scatter'];
+export const margoMaterialExtensions: readonly ["KHR_materials_clearcoat", "KHR_materials_diffuse_transmission", "KHR_materials_ior", "KHR_materials_sheen", "KHR_materials_transmission", "KHR_materials_volume", "KHR_materials_volume_scatter"];
 
 export function parseMargoPBR(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, { signal, maxNodes }?: MargoPBROptions): Promise<PBRModel>;
 

@@ -58,10 +58,7 @@ await build({
 // One lazy clean-room Basis feature, with no third-party encoder wrapper.
 await mkdir(resolve(dist, 'basis-encoder'), { recursive: true });
 await copyFile(resolve(root, 'src/draco-native-encoder.wasm'), resolve(dist, 'draco-native-encoder.wasm'));
-await copyFile(
-  resolve(root, 'native/basis/margo_basis_encoder.wasm'),
-  resolve(dist, 'basis-encoder/margo_basis_encoder.wasm'),
-);
+await copyFile(resolve(root, 'native/basis/margo_basis_encoder.wasm'), resolve(dist, 'basis-encoder/margo_basis_encoder.wasm'));
 await packageDeclarations(root);
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);

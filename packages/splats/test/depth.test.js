@@ -33,12 +33,7 @@ test('SplatDepth needs WebGPU, and writes nothing for a cloud that is not attach
   assert.equal(passes.length, 1);
   assert.equal(passes[0].order, 3.5);
   // A frame with an unattached cloud must not touch the device or the encoder.
-  passes[0].execute({
-    backend: 'webgpu',
-    get device() {
-      throw new Error('touched the device');
-    },
-  });
+  passes[0].execute({ backend: 'webgpu', get device() { throw new Error('touched the device'); } });
   assert.equal(cloud().attached, false);
   depth.dispose();
   assert.throws(() => depth.setup({ gpu: {}, stats: { drawCalls: 0 } }), { code: 'disposed' });

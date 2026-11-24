@@ -8,8 +8,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 
 const fixtures = new URL('./fixtures/', import.meta.url);
 const folders = readdirSync(fixtures).filter(
-  (name) =>
-    statSync(new URL(name, fixtures)).isDirectory() && readdirSync(new URL(`${name}/`, fixtures)).includes('NOTICE.md'),
+  (name) => statSync(new URL(name, fixtures)).isDirectory() && readdirSync(new URL(`${name}/`, fixtures)).includes('NOTICE.md'),
 );
 
 test('verbatim licensed fixtures keep the SHA-256 their NOTICE.md records', () => {
@@ -19,8 +18,7 @@ test('verbatim licensed fixtures keep the SHA-256 their NOTICE.md records', () =
     const notice = readFileSync(new URL('NOTICE.md', root), 'utf8');
     assert.match(notice, /verbatim/, `${folder}/NOTICE.md states the files are verbatim`);
     const rows = new Map();
-    for (const [, file, hash] of notice.matchAll(/^\| ([^|]+?) \|[^\n]*\| `([0-9a-f]{64})` \|$/gm))
-      rows.set(file, hash);
+    for (const [, file, hash] of notice.matchAll(/^\| ([^|]+?) \|[^\n]*\| `([0-9a-f]{64})` \|$/gm)) rows.set(file, hash);
     const files = [];
     const walk = (dir, prefix) => {
       for (const name of readdirSync(dir)) {
@@ -30,15 +28,9 @@ test('verbatim licensed fixtures keep the SHA-256 their NOTICE.md records', () =
       }
     };
     walk(root, '');
-    assert.deepEqual(
-      [...rows.keys()].sort(),
-      files.sort(),
-      `${folder}/NOTICE.md lists exactly the files in the folder`,
-    );
+    assert.deepEqual([...rows.keys()].sort(), files.sort(), `${folder}/NOTICE.md lists exactly the files in the folder`);
     for (const file of files) {
-      const hash = createHash('sha256')
-        .update(readFileSync(new URL(file, root)))
-        .digest('hex');
+      const hash = createHash('sha256').update(readFileSync(new URL(file, root))).digest('hex');
       assert.equal(hash, rows.get(file), `${folder}/${file} was changed; licensed test files are kept verbatim`);
     }
   }

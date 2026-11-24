@@ -99,9 +99,7 @@ window.runTests = async () => {
     assert(threw && blend.t === 1, 't outside 0..1 must throw RangeError and keep the old value');
     blend.dispose();
     assert(out.disposed && !a.disposed && !b.disposed, 'dispose frees the blend output only');
-    report.checks.push(
-      't 0, 0.25, 1: cube and specular mips and SH equal the weighted sources within rgba16float rounding',
-    );
+    report.checks.push('t 0, 0.25, 1: cube and specular mips and SH equal the weighted sources within rgba16float rounding');
     report.checks.push('a save during a reblend holds the lighting as it was when the save was called');
   }
 
@@ -135,10 +133,7 @@ window.runTests = async () => {
       const got = out.irradianceAt(n),
         want = b.irradianceAt(n);
       for (let c = 0; c < 3; c++)
-        assert(
-          Math.abs(got[c] - want[c]) <= 1e-5 * Math.max(1, want[c]),
-          `rotated irradiance at ${n}: ${got} vs ${want}`,
-        );
+        assert(Math.abs(got[c] - want[c]) <= 1e-5 * Math.max(1, want[c]), `rotated irradiance at ${n}: ${got} vs ${want}`);
     }
     const check = rotateSH(b.sh.irradiance, Math.PI / 2, 2);
     for (let k = 0; k < 27; k++) assert(Math.abs(out.sh.irradiance[k] - check[k]) < 1e-6, 'rotateSH matches the blend');
@@ -148,9 +143,7 @@ window.runTests = async () => {
     blend.update();
     await compareMix(device, blend, a, b, 0, 1, 'after update');
     blend.dispose();
-    report.checks.push(
-      'rotation and intensity: a quarter-turned source with intensity 2 matches texel for texel; SH turns with it',
-    );
+    report.checks.push('rotation and intensity: a quarter-turned source with intensity 2 matches texel for texel; SH turns with it');
   }
 
   // 3. Different sizes: the output takes the larger, reads the smaller at the matching level, and each source end
@@ -209,9 +202,7 @@ window.runTests = async () => {
     }
     blend.dispose();
     c.dispose();
-    report.checks.push(
-      'unscaled sources past half-float range: the output is scaled down, finite, and lights the same',
-    );
+    report.checks.push('unscaled sources past half-float range: the output is scaled down, finite, and lights the same');
   }
   await finish();
   a.dispose();

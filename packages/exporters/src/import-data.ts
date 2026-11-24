@@ -160,8 +160,7 @@ export function validateEmbeddedImportData(document: Json, bin: Uint8Array | nul
   }
   const accessors = records(document.accessors, 'GLB accessors');
   for (const accessor of accessors) {
-    if (accessor.sparse !== undefined)
-      unsupported('needs ordinary embedded accessors; repack it dense with denseGLB(bytes)');
+    if (accessor.sparse !== undefined) unsupported('needs ordinary embedded accessors; repack it dense with denseGLB(bytes)');
     const view = views[index(accessor.bufferView, views.length, `${target} accessor bufferView`)];
     const componentBytes = COMPONENT_BYTES[String(accessor.componentType)],
       width = ARITY[String(accessor.type)];

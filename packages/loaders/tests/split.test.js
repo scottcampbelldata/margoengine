@@ -57,10 +57,7 @@ test('splitTriangles keeps order and puts at most limit distinct vertices in eac
     { start: 6, count: 6 },
     { start: 12, count: 3 },
   ]);
-  assert.throws(
-    () => splitTriangles(triangles, 8, false, 2),
-    (e) => e.code === 'range',
-  );
+  assert.throws(() => splitTriangles(triangles, 8, false, 2), (e) => e.code === 'range');
 });
 
 test('a mesh under the core limit gives one geometry equal to toGeometry', () => {
@@ -80,20 +77,14 @@ test('the loaders follow the core cap: a 1,210,000-vertex mesh is one Geometry, 
   assert.equal(toGeometry(big).vertices.length / 6, 1_210_000);
   assert.equal(toGeometries(big).length, 1);
   for (const bad of [2, CORE_MAX_VERTICES + 1, 1.5])
-    assert.throws(
-      () => toGeometries(big, { maxPartVertices: bad }),
-      (e) => e.code === 'range',
-    );
+    assert.throws(() => toGeometries(big, { maxPartVertices: bad }), (e) => e.code === 'range');
   // Flat shading needs 3 per triangle (7,253,406 here): still one part.
   assert.equal(toGeometries(big, { normals: 'flat' }).length, 1);
   // The point-cloud marker default stays 166,666 points (about 1,000,000 vertices).
   const cloud = { kind: 'points', positions: Float32Array.from({ length: 600_000 }, (_, i) => i % 97) };
   assert.equal(pointsToGeometry(cloud).vertices.length / 6, 166_666 * 6);
   assert.equal(pointsToGeometry(cloud, { maxPoints: 200_000 }).vertices.length / 6, 200_000 * 6);
-  assert.throws(
-    () => pointsToGeometry(cloud, { maxPoints: 1_864_136 }),
-    (e) => e.code === 'range',
-  );
+  assert.throws(() => pointsToGeometry(cloud, { maxPoints: 1_864_136 }), (e) => e.code === 'range');
 });
 
 test('toGeometries splits a 1,210,000-vertex mesh at maxPartVertices with seam-free normals', () => {

@@ -508,8 +508,6 @@ export class PackageEditor implements EnginePlugin {
     this.element.remove();
     this.inputs.clear();
     this.objects = [];
-    // Off the scene that holds it, not the active one.
-    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

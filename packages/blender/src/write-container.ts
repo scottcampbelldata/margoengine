@@ -12,7 +12,7 @@ export function writeMargo(
   let length = 64 + all.length * 16;
   for (const s of all) length += pad(s.bytes.byteLength);
   if (length > maxBytes || json.byteLength > 1024 * 1024)
-    throw new RangeError('.margo exceeds 256 MiB or its 1 MiB manifest after compression; split the scene');
+    throw new RangeError(".margo exceeds 256 MiB or its 1 MiB manifest after compression; split the scene");
   const out = new Uint8Array(length),
     view = new DataView(out.buffer);
   [0x4f47524d, 1, length, all.length, 64, flags, 80].forEach((v, i) => view.setUint32(i * 4, v, true));
@@ -27,3 +27,4 @@ export function writeMargo(
   });
   return out;
 }
+

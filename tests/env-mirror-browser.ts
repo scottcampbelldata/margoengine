@@ -44,12 +44,8 @@ const canvas = document.querySelector('canvas')!,
   device = engine.gpu!,
   errors: string[] = [];
 engine.stop();
-const output = canvas.getContext('webgpu')!,
-  configuration = output.getConfiguration()!;
-output.configure({
-  ...configuration,
-  usage: (configuration.usage ?? GPUTextureUsage.RENDER_ATTACHMENT) | GPUTextureUsage.COPY_SRC,
-});
+const output = canvas.getContext('webgpu')!, configuration = output.getConfiguration()!;
+output.configure({...configuration, usage: (configuration.usage ?? GPUTextureUsage.RENDER_ATTACHMENT) | GPUTextureUsage.COPY_SRC});
 engine.onError = (error) => errors.push(String(error));
 device.addEventListener('uncapturederror', (event) => errors.push((event as GPUUncapturedErrorEvent).error.message));
 let sampleCount = 0;
@@ -205,19 +201,16 @@ async function render(state: State & { pristine?: boolean }) {
   }
   // Enqueue the copy in this task, before the canvas texture expires, and map only after the
   // queued work completes. This also waits for a first-use compatibility compute-runtime load.
-  const buffer = device.createBuffer({ size: 320 * 240 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const buffer = device.createBuffer({size: 320 * 240 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ});
   let pixels: number[];
   try {
     const encoder = device.createCommandEncoder();
-    encoder.copyTextureToBuffer({ texture: output.getCurrentTexture() }, { buffer, bytesPerRow: 320 * 4 }, [320, 240]);
+    encoder.copyTextureToBuffer({texture: output.getCurrentTexture()}, {buffer, bytesPerRow: 320 * 4}, [320, 240]);
     device.queue.submit([encoder.finish()]);
     await buffer.mapAsync(GPUMapMode.READ);
-    const bytes = new Uint8Array(buffer.getMappedRange()),
-      bgra = configuration.format.startsWith('bgra');
-    pixels = Array.from(bytes, (_, i) => bytes[bgra && i % 4 !== 3 ? (i & ~3) + 2 - (i % 4) : i]);
-  } finally {
-    buffer.destroy();
-  }
+    const bytes = new Uint8Array(buffer.getMappedRange()), bgra = configuration.format.startsWith('bgra');
+    pixels = Array.from(bytes, (_, i) => bytes[bgra && i % 4 !== 3 ? (i & ~3) + 2 - i % 4 : i]);
+  } finally { buffer.destroy(); }
   const visibility = [red.visible, virtualRed.visible];
   const error = await device.popErrorScope();
   if (error) errors.push(error.message);

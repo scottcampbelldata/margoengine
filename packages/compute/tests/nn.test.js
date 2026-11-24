@@ -103,15 +103,7 @@ async function gradCheck(gpu, leaves, run, { step = 1e-2, tolerance = 2e-2 } = {
 }
 
 const leaf = (gpu, shape, seed) =>
-  parameter(
-    gpu.array(
-      noise(
-        shape.reduce((a, b) => a * b, 1),
-        seed,
-      ),
-      { shape },
-    ),
-  );
+  parameter(gpu.array(noise(shape.reduce((a, b) => a * b, 1), seed), { shape }));
 
 test('element-wise, reshape, permute and reducing methods have the right gradients', async (t) => {
   const gpu = await gpuOf(t);
@@ -141,26 +133,11 @@ test('activations have the right values and gradients', async (t) => {
     values = await x.value.read(),
     read = async (f) => (await f(x).value.read()).slice();
   const sigmoid = (v) => 1 / (1 + Math.exp(-v));
-  near(
-    await read((v) => v.relu()),
-    [...values].map((v) => Math.max(v, 0)),
-    1e-6,
-    'relu',
-  );
-  near(
-    await read((v) => v.leakyRelu(0.2)),
-    [...values].map((v) => (v > 0 ? v : 0.2 * v)),
-    1e-6,
-    'leaky',
-  );
+  near(await read((v) => v.relu()), [...values].map((v) => Math.max(v, 0)), 1e-6, 'relu');
+  near(await read((v) => v.leakyRelu(0.2)), [...values].map((v) => (v > 0 ? v : 0.2 * v)), 1e-6, 'leaky');
   near(await read((v) => v.sigmoid()), [...values].map(sigmoid), 1e-6, 'sigmoid');
   near(await read((v) => v.tanh()), [...values].map(Math.tanh), 1e-6, 'tanh');
-  near(
-    await read((v) => v.silu()),
-    [...values].map((v) => v * sigmoid(v)),
-    1e-6,
-    'silu',
-  );
+  near(await read((v) => v.silu()), [...values].map((v) => v * sigmoid(v)), 1e-6, 'silu');
   const gelu = (v) => 0.5 * v * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (v + 0.044715 * v ** 3)));
   near(await read((v) => v.gelu()), [...values].map(gelu), 1e-6, 'gelu');
   for (const f of [
@@ -192,19 +169,7 @@ test('softmax rows sum to 1 and stay finite on huge logits', async (t) => {
 });
 
 // Direct convolution, as the definition states it.
-function convolve(
-  input,
-  n,
-  c,
-  h,
-  w,
-  weight,
-  out,
-  kh,
-  kw,
-  bias,
-  { stride = [1, 1], padding = [0, 0], dilation = [1, 1] },
-) {
+function convolve(input, n, c, h, w, weight, out, kh, kw, bias, { stride = [1, 1], padding = [0, 0], dilation = [1, 1] }) {
   const oh = Math.floor((h + 2 * padding[0] - dilation[0] * (kh - 1) - 1) / stride[0]) + 1,
     ow = Math.floor((w + 2 * padding[1] - dilation[1] * (kw - 1) - 1) / stride[1]) + 1,
     result = new Float32Array(n * out * oh * ow);
@@ -383,7 +348,8 @@ function attend(q, k, v, t, s, d, causal) {
     const top = Math.max(...scores),
       weights = scores.map((x) => Math.exp(x - top)),
       total = weights.reduce((a, b) => a + b);
-    for (let j = 0; j < s; j++) for (let e = 0; e < d; e++) out[i * d + e] += (weights[j] / total) * v[j * d + e];
+    for (let j = 0; j < s; j++)
+      for (let e = 0; e < d; e++) out[i * d + e] += (weights[j] / total) * v[j * d + e];
   }
   return out;
 }
@@ -563,7 +529,8 @@ test('a small convolutional network learns to tell two patterns apart', async (t
   for (let s = 0; s < n; s++) {
     labels[s] = s % 2;
     for (let y = 0; y < 6; y++)
-      for (let x = 0; x < 6; x++) images[s * 36 + y * 6 + x] = (labels[s] ? x % 2 : y % 2) + r() * 0.2; // stripes one way or the other.
+      for (let x = 0; x < 6; x++)
+        images[s * 36 + y * 6 + x] = (labels[s] ? x % 2 : y % 2) + r() * 0.2; // stripes one way or the other.
   }
   const x = gpu.array(images, { shape: [n, 1, 6, 6] }),
     y = gpu.array(labels);
@@ -610,10 +577,7 @@ test('a training loop allocates nothing that outlives its step', async (t) => {
     opt.zeroGrad();
     using a = crossEntropy(model.forward(tensor(x)), labels);
     a.backward();
-    using b = attention
-      .forward(table.forward(tensor(ids)))
-      .mul(0.5)
-      .mean();
+    using b = attention.forward(table.forward(tensor(ids))).mul(0.5).mean();
     b.backward();
     opt.step();
   };
@@ -738,10 +702,7 @@ test('stateDict and Tensor.read forward an AbortSignal through nested modules', 
   const live = new AbortController();
   const state = await model.stateDict({ signal: live.signal });
   assert.ok(reads.length >= 6, `reads ${reads.length}`);
-  assert.ok(
-    reads.every((signal) => signal === live.signal),
-    'every nested read receives the caller signal',
-  );
+  assert.ok(reads.every((signal) => signal === live.signal), 'every nested read receives the caller signal');
   assert.deepEqual(Object.keys(state).sort(), [
     'layers.0.layers.0.bias',
     'layers.0.layers.0.weight',

@@ -694,16 +694,7 @@ test('regression: a precomposition clips its layers to its w by h rect (Lottie s
     ...inner,
     { id: 'out', layers: [{ ty: 0, refId: 'in', ks: { p: k([5, 0, 0]) }, ip: 0, op: 60, st: 0, w: 4, h: 3 }] },
   ];
-  const layer = {
-    ty: 0,
-    refId: 'out',
-    ks: { p: k([100, 0, 0]), s: k([200, 200, 100]) },
-    ip: 0,
-    op: 60,
-    st: 0,
-    w: 20,
-    h: 10,
-  };
+  const layer = { ty: 0, refId: 'out', ks: { p: k([100, 0, 0]), s: k([200, 200, 100]) }, ip: 0, op: 60, st: 0, w: 20, h: 10 };
   const [item] = one([layer], 0, { assets });
   assert.equal(item.clip.length, 2, 'one rect per precomposition, outermost first');
   assert.deepEqual(box({ commands: item.clip[0] }), [100, 0, 140, 20]);

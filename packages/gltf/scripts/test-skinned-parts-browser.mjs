@@ -55,10 +55,7 @@ await runSuite(
         context.getCurrentTexture = () => (texture = original());
         try {
           instance.render({ culling: false, delta: 0 });
-          const read = device.createBuffer({
-              size: size * 4 * size,
-              usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-            }),
+          const read = device.createBuffer({ size: size * 4 * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
             encoder = device.createCommandEncoder();
           encoder.copyTextureToBuffer({ texture }, { buffer: read, bytesPerRow: size * 4 }, [size, size]);
           device.queue.submit([encoder.finish()]);
@@ -138,8 +135,7 @@ await runSuite(
         for (let j = 0; j < map.length; j++)
           for (let c = 0; c < 20; c++) if (mine[j * 20 + c] !== all[map[j] * 20 + c]) againstWhole++;
         // The far end turned: the deformed position is off the bind pose.
-        for (let j = 0; j < map.length; j++)
-          if (Math.abs(part[j * 20 + 1] - grid.arrays.POSITION[map[j] * 3 + 1]) > 0.05) moved++;
+        for (let j = 0; j < map.length; j++) if (Math.abs(part[j * 20 + 1] - grid.arrays.POSITION[map[j] * 3 + 1]) > 0.05) moved++;
       });
       instance.dispose?.();
       return {

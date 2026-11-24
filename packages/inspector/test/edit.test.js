@@ -188,8 +188,7 @@ test('ambient lights are real scene contributions with copied settings, parent v
 });
 
 test('invalid history finalizers reject before abandoning redo or releasing resources', () => {
-  const history = new EditHistory(),
-    released = [];
+  const history = new EditHistory(), released = [];
   history.record({ label: 'Existing', undo() {}, redo() {}, discard: () => released.push('existing') });
   history.undo();
   assert.throws(() => history.record({ label: 'Invalid', undo() {}, redo() {}, discard: 42 }), TypeError);

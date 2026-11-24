@@ -51,9 +51,7 @@ for (const Plugin of [PointsPlugin, SurfelPlugin])
     assert.throws(
       () => frame(Plugin, cloud(120, 'float'), 1600),
       (e) =>
-        e instanceof RangeError &&
-        /storage limit of 100 points at 16 bytes a point/.test(e.message) &&
-        /rgba8/.test(e.message),
+        e instanceof RangeError && /storage limit of 100 points at 16 bytes a point/.test(e.message) && /rgba8/.test(e.message),
     );
     assert.doesNotThrow(() => frame(Plugin, cloud(120, 'rgba8'), 1600), '120 rgba8 points fit');
     assert.doesNotThrow(() => frame(Plugin, cloud(100, 'float'), 1600), '100 float points fit exactly');

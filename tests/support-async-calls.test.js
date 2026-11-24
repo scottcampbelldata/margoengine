@@ -206,10 +206,7 @@ test('a helper named in a comment is not a call, and a dropped call beside a URL
     'run(); // then probe(page) once more',
     'probe(page);',
   ].join('\n');
-  assert.deepEqual(unawaitedCalls('scripts/x.mjs', source, ['probe']), [
-    'scripts/x.mjs:5 probe',
-    'scripts/x.mjs:7 probe',
-  ]);
+  assert.deepEqual(unawaitedCalls('scripts/x.mjs', source, ['probe']), ['scripts/x.mjs:5 probe', 'scripts/x.mjs:7 probe']);
 });
 
 test('the checker accepts a promise kept in a variable and awaited later in its function, and nothing looser', () => {

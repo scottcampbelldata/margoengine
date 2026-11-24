@@ -22,7 +22,12 @@ test('CookieTexture2D validation and dimensions', () => {
     /length must match width \* height \* 4/,
   );
 
-  const tex = createCookieTexture(2, 2, [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+  const tex = createCookieTexture(2, 2, [
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 0, 255, 255,
+    255, 255, 255, 255,
+  ]);
   assert.equal(tex.width, 2);
   assert.equal(tex.height, 2);
   assert.equal(tex.data[0], 1.0);
@@ -50,7 +55,10 @@ test('Cookie factory presets: window and spot cookies', () => {
 });
 
 test('cookieSample wrap modes: zero, clamp, repeat, mirror', () => {
-  const tex = createCookieTexture(2, 2, [255, 255, 255, 255, 128, 128, 128, 255, 64, 64, 64, 255, 32, 32, 32, 255]);
+  const tex = createCookieTexture(2, 2, [
+    255, 255, 255, 255, 128, 128, 128, 255,
+    64, 64, 64, 255, 32, 32, 32, 255,
+  ]);
 
   // 'zero' wrap mode returns [0, 0, 0, 0] outside [0, 1]
   const oobZero = cookieSample(tex, 1.5, 0.5, 'zero');
@@ -85,12 +93,18 @@ test('CookieLight2D validation and defaults', () => {
   assert.equal(light.cookieWrap, 'zero');
   assert.equal(light.cookieMode, 'multiply');
 
-  assert.throws(() => new CookieLight2D({ cookieScale: [0, 10] }), /Invalid cookieScale: must be finite and positive/);
+  assert.throws(
+    () => new CookieLight2D({ cookieScale: [0, 10] }),
+    /Invalid cookieScale: must be finite and positive/,
+  );
   assert.throws(
     () => new CookieLight2D({ cookieWrap: 'invalid' }),
     /Invalid cookieWrap: use zero, clamp, repeat or mirror/,
   );
-  assert.throws(() => new CookieLight2D({ cookieMode: 'invalid' }), /Invalid cookieMode: use multiply, alpha or color/);
+  assert.throws(
+    () => new CookieLight2D({ cookieMode: 'invalid' }),
+    /Invalid cookieMode: use multiply, alpha or color/,
+  );
 });
 
 test('cookieLightAt with and without cookie', () => {
@@ -111,11 +125,10 @@ test('cookieLightAt with and without cookie', () => {
   assert.ok(Math.abs(standard[2] - cookieNone[2]) < 1e-5);
 
   // With full white cookie, matches standard
-  const whiteCookie = createCookieTexture(
-    2,
-    2,
-    [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-  );
+  const whiteCookie = createCookieTexture(2, 2, [
+    255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255,
+  ]);
   const whiteLight = new CookieLight2D({
     ...baseLight,
     cookie: whiteCookie,
@@ -125,7 +138,10 @@ test('cookieLightAt with and without cookie', () => {
   assert.ok(Math.abs(standard[0] - cookieWhite[0]) < 1e-5);
 
   // With half-intensity red cookie in multiply mode
-  const redCookie = createCookieTexture(2, 2, [255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255]);
+  const redCookie = createCookieTexture(2, 2, [
+    255, 0, 0, 255, 255, 0, 0, 255,
+    255, 0, 0, 255, 255, 0, 0, 255,
+  ]);
   const redLight = new CookieLight2D({
     ...baseLight,
     cookie: redCookie,
@@ -143,7 +159,10 @@ test('cookieLightAt with and without cookie', () => {
 });
 
 test('cookieLightAt with alpha and color blend modes', () => {
-  const cookie = createCookieTexture(2, 2, [255, 0, 0, 128, 255, 0, 0, 128, 255, 0, 0, 128, 255, 0, 0, 128]);
+  const cookie = createCookieTexture(2, 2, [
+    255, 0, 0, 128, 255, 0, 0, 128,
+    255, 0, 0, 128, 255, 0, 0, 128,
+  ]);
   const lightAlpha = new CookieLight2D({
     x: 0,
     y: 0,
@@ -195,10 +214,16 @@ test('CookieLighting2D lifecycle and WebGL2 refusal', () => {
     },
   };
 
-  assert.throws(() => plugin.setup(fakeWebGL2Engine), /CookieLighting2D needs WebGPU/);
+  assert.throws(
+    () => plugin.setup(fakeWebGL2Engine),
+    /CookieLighting2D needs WebGPU/,
+  );
 
   plugin.dispose();
-  assert.throws(() => plugin.addLight({ x: 1, y: 1 }), /CookieLighting2D has been disposed/);
+  assert.throws(
+    () => plugin.addLight({ x: 1, y: 1 }),
+    /CookieLighting2D has been disposed/,
+  );
 });
 
 test('cookieSample picks the texel of an exact edge for a coordinate a few f32 ULP under it (as the GPU computes it)', () => {

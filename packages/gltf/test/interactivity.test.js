@@ -18,14 +18,7 @@ const asset = (graph, extra = {}) =>
     },
     [],
   );
-const types = [
-  { signature: 'float4' },
-  { signature: 'int' },
-  { signature: 'float' },
-  { signature: 'bool' },
-  { signature: 'float3' },
-  { signature: 'ref' },
-];
+const types = [{ signature: 'float4' }, { signature: 'int' }, { signature: 'float' }, { signature: 'bool' }, { signature: 'float3' }, { signature: 'ref' }];
 const [INT, FLOAT3, REF] = [1, 4, 5];
 const onSelect = {
   op: 'event/onSelect',
@@ -51,11 +44,7 @@ test('a file with no graph has nothing to run, and nothing is rejected', () => {
 test('a written property reaches the live hook and reads back', () => {
   const writes = [],
     { graph } = loadBehaviorGraph(
-      asset({
-        types,
-        declarations: [{ op: 'event/onStart' }, { op: 'pointer/set' }],
-        nodes: [{ declaration: 0, flows: { out: { node: 1, socket: 'in' } } }, set(1)],
-      }),
+      asset({ types, declarations: [{ op: 'event/onStart' }, { op: 'pointer/set' }], nodes: [{ declaration: 0, flows: { out: { node: 1, socket: 'in' } } }, set(1)] }),
       { live: (pointer, value) => writes.push([pointer, value]) },
     );
   graph.start();
@@ -69,10 +58,7 @@ test('time moves only through tick, and the first tick starts the graph once', (
       types,
       events: [{ id: 'began' }],
       declarations: [{ op: 'event/onStart' }, { op: 'event/send' }],
-      nodes: [
-        { declaration: 0, flows: { out: { node: 1, socket: 'in' } } },
-        { declaration: 1, configuration: { event: { value: [0] } } },
-      ],
+      nodes: [{ declaration: 0, flows: { out: { node: 1, socket: 'in' } } }, { declaration: 1, configuration: { event: { value: [0] } } }],
     }),
   );
   graph.on('began', () => starts++);
@@ -150,14 +136,8 @@ test('an extension the runtime does not read never reads as enabled', () => {
       declarations: [{ op: 'event/onStart' }, { op: 'pointer/get' }, { op: 'variable/set' }],
       nodes: [
         { declaration: 0, flows: { out: { node: 3, socket: 'in' } } },
-        {
-          declaration: 1,
-          configuration: { pointer: { value: ['/extensionsUsed/KHR_materials_sheen'] }, type: { value: [3] } },
-        },
-        {
-          declaration: 1,
-          configuration: { pointer: { value: ['/extensionsUsed/KHR_made_up'] }, type: { value: [3] } },
-        },
+        { declaration: 1, configuration: { pointer: { value: ['/extensionsUsed/KHR_materials_sheen'] }, type: { value: [3] } } },
+        { declaration: 1, configuration: { pointer: { value: ['/extensionsUsed/KHR_made_up'] }, type: { value: [3] } } },
         {
           declaration: 2,
           configuration: { variables: { value: [0, 1] } },

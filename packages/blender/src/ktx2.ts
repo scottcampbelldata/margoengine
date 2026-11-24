@@ -3,31 +3,26 @@ import { writeMargo } from './write-container.js';
 // smaller and, on an engine created with the texture-compression features, stay compressed on the GPU. compressMargo turns an exported file's PNG sections into KTX2 sections with
 // @margoengine/exporters/ktx2 (Node or browser); parseMargoKTX2 transcodes them with @margoengine/decoders' KTX2Decoder
 // and draws the scene as parseMargo does. Both codecs load only when called.
-import type { EngineKernel } from '@margoengine/core';
-import { parsePreparedPBR, type GLTFImage, type PBRModel } from '@margoengine/gltf/pbr-model';
-import { countLimit } from '../../shared/limits.js';
-import { readResponse } from '../../shared/loading.js';
-import { captureScene } from '../../shared/scene-scope.js';
-import { decodeImages, maxBytes, readContainer } from './container.js';
-import type { MargoAsset, MargoOptions } from './index.js';
-import { decodeScene } from './scene.js';
+import type { EngineKernel } from "@margoengine/core";
+import { parsePreparedPBR, type GLTFImage, type PBRModel } from "@margoengine/gltf/pbr-model";
+import { countLimit } from "../../shared/limits.js";
+import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
+import { decodeImages, maxBytes, readContainer } from "./container.js";
+import type { MargoAsset, MargoOptions } from "./index.js";
+import { decodeScene } from "./scene.js";
 
 /** A KTX2 transcoder: `KTX2Decoder` of @margoengine/decoders, or anything with its `transcode`. */
 export interface MargoKTX2Transcoder {
   transcode(
     data: Uint8Array,
     options?: { signal?: AbortSignal },
-  ): Promise<{
-    width: number;
-    height: number;
-    format: GPUTextureFormat;
-    mipmaps: readonly { data: Uint8Array; width: number; height: number }[];
-  }>;
+  ): Promise<{ width: number; height: number; format: GPUTextureFormat; mipmaps: readonly { data: Uint8Array; width: number; height: number }[] }>;
 }
 /** Options of compressMargo: the Basis Universal settings of @margoengine/exporters/ktx2's encodeKTX2. */
 export interface CompressMargoOptions {
   /** `etc1s` (the default: smallest) or `uastc` (closer to the PNG, larger). */
-  mode?: 'etc1s' | 'uastc';
+  mode?: "etc1s" | "uastc";
   /** Mipmaps for every texture (default true). */
   mipmaps?: boolean;
 }
@@ -40,27 +35,28 @@ export interface MargoKTX2Options extends MargoOptions {
 }
 
 /** Texture slots whose images hold colour (sRGB); every other slot holds linear data. */
-const colourSlots = new Set(['baseColorTexture', 'emissiveTexture', 'sheenColorTexture', 'specularColorTexture']),
-  normalSlots = new Set(['normalTexture', 'clearcoatNormalTexture']);
+const colourSlots = new Set(["baseColorTexture", "emissiveTexture", "sheenColorTexture", "specularColorTexture"]),
+  normalSlots = new Set(["normalTexture", "clearcoatNormalTexture"]);
 
 /** How each image is sampled: by the material slots that read it (the first one wins). */
-function imageUses(doc: Record<string, unknown>): Map<number, 'srgb' | 'linear' | 'normal'> {
+function imageUses(doc: Record<string, unknown>): Map<number, "srgb" | "linear" | "normal"> {
   const textures = (doc.textures as { source?: number }[] | undefined) ?? [],
-    uses = new Map<number, 'srgb' | 'linear' | 'normal'>();
+    uses = new Map<number, "srgb" | "linear" | "normal">();
   const visit = (value: unknown, slot: string) => {
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== "object") return;
     const index = (value as { index?: unknown }).index;
-    if (slot.endsWith('Texture') && typeof index === 'number') {
+    if (slot.endsWith("Texture") && typeof index === "number") {
       const source = textures[index]?.source;
-      if (typeof source === 'number' && !uses.has(source))
-        uses.set(source, colourSlots.has(slot) ? 'srgb' : normalSlots.has(slot) ? 'normal' : 'linear');
+      if (typeof source === "number" && !uses.has(source))
+        uses.set(source, colourSlots.has(slot) ? "srgb" : normalSlots.has(slot) ? "normal" : "linear");
       return;
     }
     for (const [key, child] of Object.entries(value)) visit(child, key);
   };
-  for (const material of (doc.materials as unknown[] | undefined) ?? []) visit(material, '');
+  for (const material of (doc.materials as unknown[] | undefined) ?? []) visit(material, "");
   return uses;
 }
+
 
 /**
  * Returns a copy of a static `.margo` file with every embedded PNG re-encoded as KTX2 (Basis Universal, section type
@@ -74,7 +70,7 @@ function imageUses(doc: Record<string, unknown>): Map<number, 'srgb' | 'linear' 
  */
 export async function compressMargo(
   input: ArrayBuffer | ArrayBufferView,
-  { mode = 'etc1s', mipmaps = true }: CompressMargoOptions = {},
+  { mode = "etc1s", mipmaps = true }: CompressMargoOptions = {},
 ): Promise<Uint8Array<ArrayBuffer>> {
   const { buffer, sections, manifest, flags } = readContainer(input, 0);
   // The checks decodeMargo runs: a file that would not load is not compressed either.
@@ -82,18 +78,18 @@ export async function compressMargo(
   const doc = manifest as Record<string, unknown>,
     images = (doc.images as { section: number; mimeType: string }[] | undefined) ?? [],
     uses = imageUses(doc),
-    { encodeKTX2 } = await import('@margoengine/exporters/ktx2'),
+    { encodeKTX2 } = await import("@margoengine/exporters/ktx2"),
     encoded = new Map<number, Uint8Array>();
   for (const [index, image] of images.entries()) {
-    if (image.mimeType !== 'image/png' || encoded.has(image.section)) continue;
-    const use = uses.get(index) ?? 'srgb';
+    if (image.mimeType !== "image/png" || encoded.has(image.section)) continue;
+    const use = uses.get(index) ?? "srgb";
     encoded.set(
       image.section,
       await encodeKTX2(new Uint8Array(sections[image.section].bytes), {
         mode,
         mipmaps,
-        colorSpace: use === 'srgb' ? 'srgb' : 'linear',
-        normalMap: use === 'normal',
+        colorSpace: use === "srgb" ? "srgb" : "linear",
+        normalMap: use === "normal",
       }),
     );
   }
@@ -103,7 +99,7 @@ export async function compressMargo(
   });
   const out = {
     ...doc,
-    images: images.map((image) => (encoded.has(image.section) ? { ...image, mimeType: 'image/ktx2' } : image)),
+    images: images.map((image) => (encoded.has(image.section) ? { ...image, mimeType: "image/ktx2" } : image)),
   };
   return writeMargo(out, next, flags);
 }
@@ -119,7 +115,7 @@ export function decodeMargoKTX2(
   input: ArrayBuffer | ArrayBufferView,
   { maxNodes = 100_000 }: MargoOptions = {},
 ): MargoAsset {
-  countLimit('maxNodes', maxNodes);
+  countLimit("maxNodes", maxNodes);
   const { buffer, sections, manifest } = readContainer(input, 0);
   return decodeScene(buffer, sections, manifest, maxNodes, true);
 }
@@ -144,13 +140,13 @@ export async function parseMargoKTX2(
   const scope = captureScene(engine),
     asset = decodeMargoKTX2(input, { maxNodes }),
     kinds = ((asset.document.images ?? []) as { mimeType?: string }[]).map((image) => image.mimeType),
-    pngs = asset.images.filter((_, i) => kinds[i] !== 'image/ktx2'),
+    pngs = asset.images.filter((_, i) => kinds[i] !== "image/ktx2"),
     bitmaps = await decodeImages(pngs, signal);
   let owned: { dispose(): void } | undefined;
   try {
     let transcoder = ktx2;
-    if (!transcoder && kinds.includes('image/ktx2')) {
-      const { KTX2Decoder } = await import('@margoengine/decoders');
+    if (!transcoder && kinds.includes("image/ktx2")) {
+      const { KTX2Decoder } = await import("@margoengine/decoders");
       const decoder = new KTX2Decoder({ device: engine.gpu ?? undefined });
       owned = decoder;
       transcoder = decoder;
@@ -159,7 +155,7 @@ export async function parseMargoKTX2(
     let next = 0;
     for (const [i, bytes] of asset.images.entries()) {
       signal?.throwIfAborted();
-      images.push(kinds[i] === 'image/ktx2' ? await transcoder!.transcode(bytes, { signal }) : bitmaps[next++]);
+      images.push(kinds[i] === "image/ktx2" ? await transcoder!.transcode(bytes, { signal }) : bitmaps[next++]);
     }
     signal?.throwIfAborted();
     return scope.run(() => parsePreparedPBR(engine, asset.document, asset.geometry, images, { maxNodes }));
@@ -185,14 +181,14 @@ export async function loadMargoKTX2(
   options.signal?.throwIfAborted();
   const scope = captureScene(engine),
     target = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(target.protocol))
+  if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
-      '.margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoKTX2',
+      ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoKTX2",
     );
   const bytes = await readResponse(await get(target, { signal: options.signal }), {
     maxBytes,
     signal: options.signal,
-    label: '.margo download',
+    label: ".margo download",
   });
   // Parsed in the scene this call started in, not the one active once the download is done.
   return scope.run(() => parseMargoKTX2(engine, bytes, options));

@@ -39,12 +39,10 @@ const CLIPS = {
 };
 const STATES = { still: 'Still', wave: 'Wave', drift: 'Drift' };
 const NAMES = Object.keys(BIPED);
-const partner = (name) =>
-  name.startsWith('Left') ? `Right${name.slice(4)}` : name.startsWith('Right') ? `Left${name.slice(5)}` : name;
+const partner = (name) => (name.startsWith('Left') ? `Right${name.slice(4)}` : name.startsWith('Right') ? `Left${name.slice(5)}` : name);
 const reflected = ([x, y, z]) => [-x, y, z];
 const gap = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-const run = (initial = 'wave', document = animatorDocument(BIPED, CLIPS)) =>
-  animatorRun(document, { initial, states: STATES });
+const run = (initial = 'wave', document = animatorDocument(BIPED, CLIPS)) => animatorRun(document, { initial, states: STATES });
 
 /** The biped with its right arm's bones on other local axes, the skeleton in the same place. */
 function twisted() {
@@ -68,11 +66,7 @@ test('names pair left and right however they are written', () => {
   assert.deepEqual(pairs(['mixamorig:LeftHand', 'mixamorig:RightHand']), [1, 0]);
   assert.deepEqual(pairs(['b_LeftArm_09', 'b_RightArm_06']), [1, 0], 'ids at the end differ');
   assert.deepEqual(pairs(['Clavicle', 'Right', 'Leftover', 'Tail_R']), [0, 1, 2, 3], 'no partner is its own');
-  assert.deepEqual(
-    pairs(['Finger_L_1', 'Finger_L_2', 'Finger_R_1', 'Finger_R_2']),
-    [2, 3, 0, 1],
-    'ids that pair are kept',
-  );
+  assert.deepEqual(pairs(['Finger_L_1', 'Finger_L_2', 'Finger_R_1', 'Finger_R_2']), [2, 3, 0, 1], 'ids that pair are kept');
 });
 
 test('the rest pose stays exactly the rest pose, on other local axes too', async (t) => {
@@ -137,13 +131,7 @@ test('rotations mirror as well as places', async (t) => {
   plain.step(1 / 60, 60);
   const q = plain.rotation('LeftArm'),
     r = f.rotation('RightArm');
-  for (const [c, sign] of [
-    [0, 1],
-    [1, -1],
-    [2, -1],
-    [3, 1],
-  ])
-    assert.ok(Math.abs(r[c] - sign * q[c]) < 1e-5);
+  for (const [c, sign] of [[0, 1], [1, -1], [2, -1], [3, 1]]) assert.ok(Math.abs(r[c] - sign * q[c]) < 1e-5);
   assert.ok(Math.abs(multiplyQuaternions(r, [-r[0], -r[1], -r[2], r[3]])[3] - 1) < 1e-6);
 });
 

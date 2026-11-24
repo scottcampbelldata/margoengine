@@ -40,9 +40,7 @@ function parametricCurve(view: DataView, at: number): ICCCurve | undefined {
   const kind = view.getUint16(at + 8),
     count = [1, 3, 4, 5, 7][kind];
   if (count === undefined) return undefined;
-  const [g, a = 1, b = 0, c = 0, d = 0, e = 0, f = 0] = Array.from({ length: count }, (_, i) =>
-      fixed(view, at + 12 + i * 4),
-    ),
+  const [g, a = 1, b = 0, c = 0, d = 0, e = 0, f = 0] = Array.from({ length: count }, (_, i) => fixed(view, at + 12 + i * 4)),
     power = (x: number) => Math.pow(Math.max(a * x + b, 0), g);
   if (kind === 0) return (x) => Math.pow(Math.max(x, 0), g);
   if (kind === 1) return (x) => (x >= -b / a ? power(x) : 0);
@@ -108,9 +106,7 @@ function srgbEncoding(): Uint8Array {
   encodeTable = new Uint8Array(ENCODE_STEPS + 1);
   for (let i = 0; i <= ENCODE_STEPS; i++) {
     const linear = i / ENCODE_STEPS;
-    encodeTable[i] = Math.round(
-      255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055),
-    );
+    encodeTable[i] = Math.round(255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055));
   }
   return encodeTable;
 }

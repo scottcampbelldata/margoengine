@@ -39,10 +39,8 @@ const EXCEPTIONS = { 'web-ifc': 'MPL-2.0' };
 
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
-  '@dimforge/rapier3d-compat':
-    'Rapier rigid-body solver; optional: @margoengine/physics bundles Rapier, and an app may pass its own through the rapier option',
-  '@dimforge/rapier2d-compat':
-    'Rapier 2D rigid-body solver; optional: @margoengine/physics2d bundles Rapier 2D, and an app may pass its own through the rapier option',
+  '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional: @margoengine/physics bundles Rapier, and an app may pass its own through the rapier option',
+  '@dimforge/rapier2d-compat': 'Rapier 2D rigid-body solver; optional: @margoengine/physics2d bundles Rapier 2D, and an app may pass its own through the rapier option',
   'web-ifc': 'IFC (BIM) parser; the app installs and initializes it, the package only reads its output',
   react: 'React component bindings for the stage',
   'react-dom': 'React DOM root and portal rendering for scene and HTML components',
@@ -60,8 +58,7 @@ export const BUNDLED = [
     licence:
       'Siemens JT Data Format Reference Intellectual Property License Terms; patents royalty-free under the Siemens JT Data Format Reference Patent Clarification Notice',
     files: 'brep: dist/jt/*.js (the JT reader); cad: dist/workers/cad-runtime.js, which bundles it',
-    source:
-      'packages/brep/src/jt: written for Margo from the published JT File Format Reference and ISO 14306; no Siemens code',
+    source: 'packages/brep/src/jt: written for Margo from the published JT File Format Reference and ISO 14306; no Siemens code',
     modified: 'not applicable: no third-party code, the format is read as the reference describes it',
     notices: ['NOTICE'],
   },
@@ -145,15 +142,13 @@ export const BUNDLED = [
   {
     package: '@margoengine/ifc',
     component:
-      "IFC class inheritance (entity names and their SUBTYPE OF parents under IfcObjectDefinition) and the enumeration types of the predefined property sets' attributes, of IFC4 ADD2 TC1 and IFC4X3 ADD2, from the buildingSMART International EXPRESS schemas",
+      'IFC class inheritance (entity names and their SUBTYPE OF parents under IfcObjectDefinition) and the enumeration types of the predefined property sets\' attributes, of IFC4 ADD2 TC1 and IFC4X3 ADD2, from the buildingSMART International EXPRESS schemas',
     licence:
       'buildingSMART technical documentation terms (the IFC4 and IFC4X3 files may be used in software development or translated into another computer language with full attribution); nothing is derived from the IFC2X3 TC1 file, which reserves all rights',
-    files:
-      'dist/query.js (src/schema-tree.ts: class names and parents only) and the readIFCData chunk (src/predefined-enums.ts: attribute and enumeration names only); no definitions, rules or text',
+    files: 'dist/query.js (src/schema-tree.ts: class names and parents only) and the readIFCData chunk (src/predefined-enums.ts: attribute and enumeration names only); no definitions, rules or text',
     source:
       'https://github.com/buildingSMART/Standards-builds IFC/RELEASE/IFC4/ADD2_TC1/EXPRESS/IFC4.exp, IFC/RELEASE/IFC4_3/HTML/IFC4X3_ADD2.exp',
-    modified:
-      'derived: packages/ifc/scripts/schema-tree.mjs extracts each SUBTYPE OF link and each enumerated attribute of an IfcPreDefinedPropertySet subtype; the EXPRESS files are not shipped',
+    modified: 'derived: packages/ifc/scripts/schema-tree.mjs extracts each SUBTYPE OF link and each enumerated attribute of an IfcPreDefinedPropertySet subtype; the EXPRESS files are not shipped',
     notices: ['NOTICE.md'],
   },
   {
@@ -163,8 +158,7 @@ export const BUNDLED = [
     files: 'dist/rapier3d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled)',
     source:
       'devDependency @dimforge/rapier3d 0.21.0 (exact) from npm, https://www.npmjs.com/package/@dimforge/rapier3d/v/0.21.0 (rapier_wasm3d_bg.wasm sha256 17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b); packages/physics/scripts/build.js bundles and copies it',
-    modified:
-      'the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself',
+    modified: 'the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself',
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
   {
@@ -174,8 +168,7 @@ export const BUNDLED = [
     files: 'dist/rapier2d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled)',
     source:
       'devDependency @dimforge/rapier2d 0.21.0 (exact) from npm, https://www.npmjs.com/package/@dimforge/rapier2d/v/0.21.0 (rapier_wasm2d_bg.wasm sha256 322b00649f412e75e047c79741b6b89e6323f6f81034d114a9e8ab872bae7435); packages/physics2d/scripts/build.js bundles and copies it',
-    modified:
-      'the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself',
+    modified: 'the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself',
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
 ];

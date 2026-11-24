@@ -18,8 +18,7 @@ export async function fixtures(load = (entry) => import(entry)) {
       gpu = canvas.getContext('webgpu');
     gpu.configure({ device: engine.gpu, format: 'rgba8unorm', alphaMode: 'premultiplied' });
     const texture = gpu.getCurrentTexture();
-    if (texture.width !== width || texture.height !== height)
-      lifetimeFault('headless canvas texture has the wrong size');
+    if (texture.width !== width || texture.height !== height) lifetimeFault('headless canvas texture has the wrong size');
     const view = new Proxy(engine, { get: (target, key) => (key === 'canvas' ? canvas : Reflect.get(target, key)) });
     return { canvas, gpu, texture, view, release: () => gpu.unconfigure() };
   };

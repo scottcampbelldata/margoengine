@@ -136,9 +136,7 @@ test('with a floating origin every relief read takes the world phase, the self-s
     code = r.displacement.shader(r.materials.shader(r.lit, 1), 1);
   assert.ok(r.lit.includes('wrap:vec4f'), 'the rig has a floating origin');
   const added = code.slice(0, code.indexOf('fn terrainDisplace(position'));
-  const reads = [...added.matchAll(/textureSample(?:Level|Grad)\(terrainPbrSurfaces,terrainSampler,([^,]+),/g)].map(
-    (m) => m[1],
-  );
+  const reads = [...added.matchAll(/textureSample(?:Level|Grad)\(terrainPbrSurfaces,terrainSampler,([^,]+),/g)].map((m) => m[1]);
   // terrainDisplaceRelief (the shadow's single-texel test and its start height) and terrainDisplaceHeight (the view ray).
   assert.equal(reads.length, 2);
   for (const uv of reads) assert.match(uv, /^\(xz\+layerRules\[layer\]\.wrap\.xz\)\*/, uv);

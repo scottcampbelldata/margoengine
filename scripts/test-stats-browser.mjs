@@ -178,33 +178,17 @@ try {
         scene.createMesh().setGeometry(box());
         scene.use(plugin);
         let defaultDisposals = 0;
-        const primary = {
-          name: plugin.name,
-          setup() {},
-          dispose() {
-            defaultDisposals++;
-          },
-        };
+        const primary = { name: plugin.name, setup() {}, dispose() { defaultDisposals++; } };
         instance.use(primary);
         plugin.onDeviceRestored?.(engine);
         engine.render({ views: [{ scene, camera: engine.camera, viewport: [0, 0, 128, 96], pixels: true }] });
         if (remove) scene.removePlugin(plugin.name);
         else plugin.dispose();
         plugin.dispose();
-        ensure(
-          instance.sceneOf(plugin) === undefined && scene.plugins.size === 0,
-          'Disposed stats registration remains',
-        );
-        ensure(
-          engine.scene.plugins.get(primary.name) === primary && defaultDisposals === 0,
-          'Default stats name was removed',
-        );
-        ensure(
-          engine.store.tick === tick &&
-            device.createCommandEncoder === encoder &&
-            device.createRenderPipeline === pipeline,
-          'Stats device/store wrappers remain',
-        );
+        ensure(instance.sceneOf(plugin) === undefined && scene.plugins.size === 0, 'Disposed stats registration remains');
+        ensure(engine.scene.plugins.get(primary.name) === primary && defaultDisposals === 0, 'Default stats name was removed');
+        ensure(engine.store.tick === tick && device.createCommandEncoder === encoder && device.createRenderPipeline === pipeline,
+          'Stats device/store wrappers remain');
         const replacement = { name: plugin.name, setup() {}, dispose() {} };
         scene.use(replacement);
         plugin.dispose();

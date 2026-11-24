@@ -83,8 +83,7 @@ export function scatterSurface(
     if (!inverse) throw new RangeError('Use an invertible source matrix for surface scattering.');
     flip =
       !data.normals.length &&
-      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) <
-        0;
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0;
     const positions = new Float32Array(data.positions.length),
       normals = new Float32Array(data.normals.length);
     for (let i = 0; i < positions.length; i += 3) {

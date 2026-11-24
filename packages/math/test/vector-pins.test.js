@@ -34,48 +34,18 @@ for (const [Ctor, n] of [
     assert.deepEqual(arr(k, n), a);
   });
   test(`Vector${n}: arithmetic matches the per-component reference`, () => {
-    assert.deepEqual(
-      arr(mk(a).add(mk(b)), n),
-      map2((x, y) => x + y),
-    );
-    assert.deepEqual(
-      arr(mk(a).sub(mk(b)), n),
-      map2((x, y) => x - y),
-    );
-    assert.deepEqual(
-      arr(mk(a).multiply(mk(b)), n),
-      map2((x, y) => x * y),
-    );
-    assert.deepEqual(
-      arr(mk(a).addScaledVector(mk(b), 3), n),
-      map2((x, y) => x + y * 3),
-    );
-    assert.deepEqual(
-      arr(mk(a).multiplyScalar(4), n),
-      a.map((x) => x * 4),
-    );
-    assert.deepEqual(
-      arr(mk(a).divideScalar(4), n),
-      a.map((x) => x / 4),
-    );
-    assert.deepEqual(
-      arr(mk(a).negate(), n),
-      a.map((x) => -x),
-    );
+    assert.deepEqual(arr(mk(a).add(mk(b)), n), map2((x, y) => x + y));
+    assert.deepEqual(arr(mk(a).sub(mk(b)), n), map2((x, y) => x - y));
+    assert.deepEqual(arr(mk(a).multiply(mk(b)), n), map2((x, y) => x * y));
+    assert.deepEqual(arr(mk(a).addScaledVector(mk(b), 3), n), map2((x, y) => x + y * 3));
+    assert.deepEqual(arr(mk(a).multiplyScalar(4), n), a.map((x) => x * 4));
+    assert.deepEqual(arr(mk(a).divideScalar(4), n), a.map((x) => x / 4));
+    assert.deepEqual(arr(mk(a).negate(), n), a.map((x) => -x));
     assert.deepEqual(arr(mk(a).min(mk(b)), n), map2(Math.min));
     assert.deepEqual(arr(mk(a).max(mk(b)), n), map2(Math.max));
-    assert.deepEqual(
-      arr(mk(a).lerp(mk(b), 0.25), n),
-      map2((x, y) => x + (y - x) * 0.25),
-    );
-    assert.equal(
-      mk(a).dot(mk(b)),
-      a.reduce((s, x, i) => s + x * b[i], 0),
-    );
-    assert.equal(
-      mk(a).lengthSq(),
-      a.reduce((s, x) => s + x * x, 0),
-    );
+    assert.deepEqual(arr(mk(a).lerp(mk(b), 0.25), n), map2((x, y) => x + (y - x) * 0.25));
+    assert.equal(mk(a).dot(mk(b)), a.reduce((s, x, i) => s + x * b[i], 0));
+    assert.equal(mk(a).lengthSq(), a.reduce((s, x) => s + x * x, 0));
     near(mk(a).length(), Math.sqrt(a.reduce((s, x) => s + x * x, 0)));
     const unit = mk(a).normalize();
     near(unit.length(), 1);
@@ -113,10 +83,7 @@ test('Vector2 and Vector3 per-component helpers and geometry', () => {
       b = B.slice(0, n),
       c = C.slice(0, n);
     const mk = (v) => new Ctor(...v);
-    assert.deepEqual(
-      arr(mk(a).addScalar(5), n),
-      a.map((x) => x + 5),
-    );
+    assert.deepEqual(arr(mk(a).addScalar(5), n), a.map((x) => x + 5));
     assert.deepEqual(
       arr(new Ctor().addVectors(mk(a), mk(b)), n),
       a.map((x, i) => x + b[i]),
@@ -224,10 +191,7 @@ test('Vector3: cross, angleTo, projections, matrices, quaternion and spherical',
   near(rot.z, 0);
   assert.deepEqual(new Vector3().setFromMatrixPosition({ elements: m }).toArray(), [10, 11, 12]);
   assert.deepEqual(new Vector3().setFromMatrixColumn({ elements: m }, 1).toArray(), [4, 5, 6]);
-  assert.deepEqual(
-    new Vector3().setFromMatrixColumn({ elements: [1, 2, 3, 4, 5, 6, 7, 8, 9] }, 2).toArray(),
-    [7, 8, 9],
-  );
+  assert.deepEqual(new Vector3().setFromMatrixColumn({ elements: [1, 2, 3, 4, 5, 6, 7, 8, 9] }, 2).toArray(), [7, 8, 9]);
   const sc = new Vector3().setFromMatrixScale({ elements: m });
   near(sc.x, Math.hypot(1, 2, 3));
   near(sc.y, Math.hypot(4, 5, 6));
@@ -271,41 +235,11 @@ test('Vector3 projections with a slanted axis and non-unit lengths', () => {
   near(q.y, 4 - 3 * s);
   near(q.z, 5 - 4 * s);
   near(q.dot(onto), 0, 1e-12);
-  assert.deepEqual(
-    a
-      .clone()
-      .projectOnVector(new Vector3(0, 0, 2))
-      .toArray(),
-    [0, 0, 5],
-  );
-  assert.deepEqual(
-    a
-      .clone()
-      .projectOnPlane(new Vector3(2, 0, 0))
-      .toArray(),
-    [0, 4, 5],
-  );
-  assert.deepEqual(
-    a
-      .clone()
-      .projectOnPlane(new Vector3(0, 0, 3))
-      .toArray(),
-    [3, 4, 0],
-  );
-  assert.deepEqual(
-    a
-      .clone()
-      .projectOnVector(new Vector3(3, 0, 0))
-      .toArray(),
-    [3, 0, 0],
-  );
-  assert.deepEqual(
-    a
-      .clone()
-      .projectOnVector(new Vector3(0, 0, 0))
-      .toArray(),
-    [0, 0, 0],
-  );
+  assert.deepEqual(a.clone().projectOnVector(new Vector3(0, 0, 2)).toArray(), [0, 0, 5]);
+  assert.deepEqual(a.clone().projectOnPlane(new Vector3(2, 0, 0)).toArray(), [0, 4, 5]);
+  assert.deepEqual(a.clone().projectOnPlane(new Vector3(0, 0, 3)).toArray(), [3, 4, 0]);
+  assert.deepEqual(a.clone().projectOnVector(new Vector3(3, 0, 0)).toArray(), [3, 0, 0]);
+  assert.deepEqual(a.clone().projectOnVector(new Vector3(0, 0, 0)).toArray(), [0, 0, 0]);
 });
 
 test('Vector2.rotateAround with a generic angle and centre', () => {

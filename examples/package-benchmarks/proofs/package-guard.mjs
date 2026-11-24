@@ -16,10 +16,7 @@ const name = basename(process.cwd()),
 
 test(`${manifest.name}: the --current proofs that pin its GPU calls pass`, { timeout: 15 * 60_000 }, () => {
   assert.equal(manifest.name, `@margoengine/${name}`, 'run from a package folder (its npm test script)');
-  assert.ok(
-    proofs.length,
-    `no ongoing proof names ${name}; drop the guard from its test script or list it in ongoing.js`,
-  );
+  assert.ok(proofs.length, `no ongoing proof names ${name}; drop the guard from its test script or list it in ongoing.js`);
   const run = spawnSync(
     process.execPath,
     [resolve(import.meta.dirname, 'run.mjs'), '--current', `--only=${proofs.join(',')}`],

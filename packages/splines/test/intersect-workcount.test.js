@@ -8,10 +8,7 @@ const wave = (n, phase, z = 0) =>
   Array.from({ length: n }, (_, i) => [i / (n - 1), 0.3 * Math.sin(i * 1.7 + phase), z]);
 const curves = [
   () => [new Spline(wave(9, 0)), new Spline(wave(9, 1.3))],
-  () => [
-    new Spline(wave(7, 0.4), { kind: 'bspline' }),
-    new Spline(wave(11, 2), { kind: 'kochanek-bartels', tension: 0.3, bias: -0.2 }),
-  ],
+  () => [new Spline(wave(7, 0.4), { kind: 'bspline' }), new Spline(wave(11, 2), { kind: 'kochanek-bartels', tension: 0.3, bias: -0.2 })],
   () => [new Spline(wave(6, 0), { closed: true }), new Spline(wave(5, 0.9), { kind: 'bspline', closed: true })],
   () => [new Spline(wave(10, 0), { kind: 'bezier' }), new Spline(wave(9, 0.2))],
   () => {
@@ -49,9 +46,7 @@ test('curve-curve intersection reconstructs each segment once', () => {
 
 test('six curve pairs retain every intersection byte from the parent', () => {
   const hash = createHash('sha256');
-  let size = 0,
-    hits = 0,
-    spans = 0;
+  let size = 0, hits = 0, spans = 0;
   for (const make of curves) {
     const [a, b] = make(),
       r = intersectSplines(a, b),

@@ -89,10 +89,7 @@ export function projectorTwin(w: Uint32Array, index: number, light: ClusteredLig
     v = ((dot(rel, y) * fy) / depth) * -0.5 + 0.5;
   if (u < 0 || v < 0 || u > 1 || v > 1) return BLACK;
   const texel = (i: number, j: number) =>
-      texelColour(
-        w[HEADER + offset + Math.min(Math.max(j, 0), height - 1) * width + Math.min(Math.max(i, 0), width - 1)],
-        srgb,
-      ),
+      texelColour(w[HEADER + offset + Math.min(Math.max(j, 0), height - 1) * width + Math.min(Math.max(i, 0), width - 1)], srgb),
     tx = u * width - 0.5,
     ty = v * height - 0.5,
     i = Math.floor(tx),
@@ -179,14 +176,7 @@ export function cubeTwin(w: Uint32Array, index: number, light: ClusteredLightRec
     ty = coord[1] * side - 0.5,
     i = Math.floor(tx),
     j = Math.floor(ty);
-  return bilinear(
-    texel(coord[2], i, j),
-    texel(coord[2], i + 1, j),
-    texel(coord[2], i, j + 1),
-    texel(coord[2], i + 1, j + 1),
-    tx - i,
-    ty - j,
-  );
+  return bilinear(texel(coord[2], i, j), texel(coord[2], i + 1, j), texel(coord[2], i, j + 1), texel(coord[2], i + 1, j + 1), tx - i, ty - j);
 }
 /** `clusterLayer` for core meshes (layer 0): 1 when light `index` is on layer 0. */
 export function layerTwin(w: Uint32Array, index: number): RGB {
@@ -198,12 +188,7 @@ type Packed = ClusteredLightTerm & { name?: string; words?: Uint32Array; cubeWor
  * The factor of `term` for light `index` toward `position`: a built-in term's twin from its words, else the term's own
  * `emission`, else 1.
  */
-export function termEmission(
-  term: ClusteredLightTerm,
-  index: number,
-  light: ClusteredLightRecord,
-  position: V3,
-): readonly number[] {
+export function termEmission(term: ClusteredLightTerm, index: number, light: ClusteredLightRecord, position: V3): readonly number[] {
   const t = term as Packed;
   if (t.words instanceof Uint32Array) {
     if (t.name === 'clustered:ies') return iesTwin(t.words, index, light, position);

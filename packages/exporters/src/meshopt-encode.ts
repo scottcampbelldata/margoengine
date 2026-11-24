@@ -117,8 +117,7 @@ export function encodeTriangles(
   vertexCount: number,
 ): { bytes: Uint8Array; remap: Uint32Array; indices: Uint32Array } {
   const triangles = indices.length / 3;
-  if (!Number.isInteger(triangles) || triangles < 1)
-    throw new RangeError('meshopt triangles are not whole; pass three indices for each triangle, at least one');
+  if (!Number.isInteger(triangles) || triangles < 1) throw new RangeError('meshopt triangles are not whole; pass three indices for each triangle, at least one');
   const map = new Int32Array(vertexCount).fill(-1);
   const edgeA = new Int32Array(16).fill(-1),
     edgeB = new Int32Array(16).fill(-1),
@@ -163,8 +162,7 @@ export function encodeTriangles(
   for (let t = 0; t < triangles; t++) {
     const o = [indices[t * 3], indices[t * 3 + 1], indices[t * 3 + 2]];
     for (const v of o)
-      if (!(v >= 0 && v < vertexCount))
-        throw new RangeError(`meshopt index ${v} is outside the vertices; pass indices below vertexCount`);
+      if (!(v >= 0 && v < vertexCount)) throw new RangeError(`meshopt index ${v} is outside the vertices; pass indices below vertexCount`);
     // Best edge-fifo candidate over the three rotations of the triangle.
     let best = null;
     for (let r = 0; r < 3; r++) {
@@ -248,8 +246,7 @@ export function encodeTriangles(
         l = m;
         return { id: m, code: 15 };
       });
-      if (plan.some((p) => p.code === -1))
-        throw new RangeError('meshopt triangle repeats a vertex; drop triangles with no area first');
+      if (plan.some((p) => p.code === -1)) throw new RangeError('meshopt triangle repeats a vertex; drop triangles with no area first');
       const z = plan[1].code,
         w = plan[2].code;
       const aux = (z << 4) | w;
@@ -260,8 +257,7 @@ export function encodeTriangles(
       if (!aNew && aux === 0) cost = Infinity;
       if (!pick || cost < pick.cost) pick = { r, ids, plan, z, w, aux, table, aNew, cost };
     }
-    if (!pick || pick.cost === Infinity)
-      throw new RangeError('meshopt triangle cannot be coded; drop triangles with no area first');
+    if (!pick || pick.cost === Infinity) throw new RangeError('meshopt triangle cannot be coded; drop triangles with no area first');
     const { ids, plan, z, w, aux, table, aNew } = pick;
     const lo = table >= 0 ? table : aNew ? 14 : 15;
     codes[t] = 0xf0 | lo;

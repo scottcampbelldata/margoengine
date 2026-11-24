@@ -289,8 +289,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       }
       case 'resources/read': {
         if (!options.resources) return unknownMethod();
-        if (typeof params.uri !== 'string' || !params.uri)
-          return rpcError(id, RPC.invalidParams, 'uri must be a string');
+        if (typeof params.uri !== 'string' || !params.uri) return rpcError(id, RPC.invalidParams, 'uri must be a string');
         if (running.has(id)) return rpcError(id, RPC.invalidRequest, 'Request id is already active in this session');
         const controller = new AbortController();
         const abort = () => controller.abort();
@@ -332,11 +331,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           return rpcError(id, RPC.invalidParams, 'arguments must be an object of strings');
         const missing = (prompt.arguments ?? []).filter((arg) => arg.required && !(args[arg.name] as string)?.trim());
         if (missing.length)
-          return rpcError(
-            id,
-            RPC.invalidParams,
-            `Missing required argument: ${missing.map((arg) => arg.name).join(', ')}`,
-          );
+          return rpcError(id, RPC.invalidParams, `Missing required argument: ${missing.map((arg) => arg.name).join(', ')}`);
         return { jsonrpc: '2.0', id, result: prompt.get(args as Record<string, string>) as unknown as Json };
       }
       default:

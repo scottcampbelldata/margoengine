@@ -39,10 +39,7 @@ test('the MToon outline pass lights with the outward normal, not the back face f
   // CPU check of the WGSL only; test:mtoon:browser (mtoon-outline) must confirm the lit side on a GPU.
   const body = mtoonShader(extendedPBRShader, 2, false),
     outline = mtoonShader(extendedPBRShader, 2, true);
-  if (
-    !body.includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);') ||
-    body.includes('let n=-normalize(i.normal)')
-  )
+  if (!body.includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);') || body.includes('let n=-normalize(i.normal)'))
     throw new Error('the body pass keeps the two-sided normal');
   if (!outline.includes('let n=-normalize(i.normal)*select(-1.0,1.0,facing);'))
     throw new Error('the outline pass must undo the back-face flip');
@@ -57,8 +54,7 @@ test('the MToon outline hull builds on the projected o.clip and o.position, so a
   const at = outline.indexOf(projection),
     hull = outline.indexOf('var world=vec4f(o.position,1.0);var clip=o.clip;');
   if (hull < at) throw new Error('the hull starts from the projected position, after the projection');
-  if (/var world=p;|var clip=f\.camera\*p;/.test(outline))
-    throw new Error('the hull must not re-project the raw vertex');
+  if (/var world=p;|var clip=f\.camera\*p;/.test(outline)) throw new Error('the hull must not re-project the raw vertex');
   const lifted = outline.replace(
     projection,
     'var lifted=p;lifted.y+=0.25;o.clip=f.camera*lifted;o.position=lifted.xyz;',

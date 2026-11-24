@@ -8,23 +8,14 @@ const pingPong = (limit) => {
   let raised = 0;
   const forwarded = [];
   let regions;
-  const hook = () => {
-    if (raised++ < limit) regions.raise('ping');
-  };
-  regions = new ParallelRegions(
-    {
-      one: {
-        states: { a: { enter: hook }, b: { enter: hook } },
-        initial: 'a',
-        transitions: [
-          { from: 'a', to: 'b', event: 'ping' },
-          { from: 'b', to: 'a', event: 'ping' },
-        ],
-      },
+  const hook = () => { if (raised++ < limit) regions.raise('ping'); };
+  regions = new ParallelRegions({
+    one: {
+      states: { a: { enter: hook }, b: { enter: hook } },
+      initial: 'a',
+      transitions: [{ from: 'a', to: 'b', event: 'ping' }, { from: 'b', to: 'a', event: 'ping' }],
     },
-    {},
-    { forward: (event) => forwarded.push(event) },
-  );
+  }, {}, { forward: (event) => forwarded.push(event) });
   return { regions, forwarded };
 };
 
@@ -33,10 +24,7 @@ test('10,000 raised events in one delivery are taken; the 10,001st throws and is
   fine.regions.start();
   assert.equal(fine.regions.active.one, 'a', '10,000 pings from a end in a');
   const over = pingPong(10001);
-  assert.throws(
-    () => over.regions.start(),
-    (e) => e.code === 'state' && /raise events for ever/.test(e.message),
-  );
+  assert.throws(() => over.regions.start(), (e) => e.code === 'state' && /raise events for ever/.test(e.message));
   const at = over.regions.active.one;
   over.regions.raise('noop');
   assert.equal(over.regions.active.one, at, 'no waiting ping is delivered after the throw');

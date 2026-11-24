@@ -221,14 +221,7 @@ export function parsePrefilteredIBL(input: ArrayBuffer | ArrayBufferView): Prefi
     cubeCount = mu(8),
     brdfSize = mu(12);
   const version = mu(0);
-  if (
-    (version !== 1 && version !== 2) ||
-    !power(edge) ||
-    edge < size ||
-    cubeCount !== Math.log2(edge) + 1 ||
-    !lutEdge(brdfSize)
-  )
-    fail();
+  if ((version !== 1 && version !== 2) || !power(edge) || edge < size || cubeCount !== Math.log2(edge) + 1 || !lutEdge(brdfSize)) fail();
   const take = (offset: number, length: number): ArrayBuffer => {
     if (offset + length > meta!.length) fail();
     return meta!.slice(offset, offset + length).buffer;

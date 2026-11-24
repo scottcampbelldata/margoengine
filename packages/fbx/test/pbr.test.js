@@ -61,17 +61,11 @@ test('3ds Max PBR material: each value of the file lands in its slot', async () 
 });
 
 test('EmissiveColor above 1 converts with no entry: it goes to the emissive strength', async () => {
-  const { doc } = readGLB(
-    await convertFBX(real('max_pbr_metal_rough_material_7700_ascii.fbx'), {
-      fetch: serve({}),
-      resourcePath: 'https://assets.example/',
-    }),
-  );
+  const { doc } = readGLB(await convertFBX(real('max_pbr_metal_rough_material_7700_ascii.fbx'), { fetch: serve({}), resourcePath: 'https://assets.example/' }));
   const material = doc.materials[0];
   assert.equal(Math.max(...material.emissiveFactor) <= 1, true);
   const bytes = real('maxPbrMaterial_specGloss.fbx'),
-    bright = readGLB(await convertFBX(bytes, { fetch: serve({}), resourcePath: 'https://assets.example/' })).doc
-      .materials[0];
+    bright = readGLB(await convertFBX(bytes, { fetch: serve({}), resourcePath: 'https://assets.example/' })).doc.materials[0];
   close(bright.emissiveFactor, [1, 0, 1], 'normalized');
   assert.ok(Math.abs(bright.extensions.KHR_materials_emissive_strength.emissiveStrength - Math.PI) < 1e-5);
 });
@@ -102,10 +96,7 @@ test('3ds Max PBR maps: separate metal and roughness images pack into green and 
 
 test('3ds Max specular and gloss: the gloss map inverts, and the colours solve to metalness', async () => {
   const image = await flat(200, 200, 200);
-  const glb = await convertFBX(real('maxPbrMaterial_specGloss.fbx'), {
-      ...options(),
-      fetch: async () => new Response(image),
-    }),
+  const glb = await convertFBX(real('maxPbrMaterial_specGloss.fbx'), { ...options(), fetch: async () => new Response(image) }),
     pbr = readGLB(glb).doc.materials[0].pbrMetallicRoughness,
     packed = imageOf(glb, pbr.metallicRoughnessTexture.index);
   assert.equal(packed.data[1], 55);
@@ -141,8 +132,7 @@ test('Stingray PBS: a map switched off stays out, and the file holds its values'
   assert.equal(material.occlusionTexture, undefined);
   const packed = imageOf(glb, pbr.metallicRoughnessTexture.index);
   assert.equal(packed.data[1], Math.round(0.05 * 255));
-  for (let i = 0; i < packed.data.length; i += 4)
-    assert.equal(packed.data[i + 2], metal.data[i], 'blue is the metal map');
+  for (let i = 0; i < packed.data.length; i += 4) assert.equal(packed.data[i + 2], metal.data[i], 'blue is the metal map');
 });
 
 test('layered textures flatten, first layer at the bottom, by blend mode and alpha', async () => {
@@ -162,10 +152,7 @@ test('layered textures flatten, first layer at the bottom, by blend mode and alp
   // 200 x 0.75 = 150 at cover 0.75, modulate having nothing under it. Over: 125, 75, 75 at cover 0.875. Add: the sum
   // counts where there was something under it, so red 125 x 0.875, green 50 + 75 x 0.875, blue 75 x 0.875.
   assert.deepEqual([...pixel], [109, 116, 66, 255]);
-  await assert.rejects(
-    convertFBX(bytes, { resourcePath: 'https://assets.example/', fetch: serve({}) }),
-    /pbrMaterials/,
-  );
+  await assert.rejects(convertFBX(bytes, { resourcePath: 'https://assets.example/', fetch: serve({}) }), /pbrMaterials/);
 });
 
 test('a transparency map beside a colour map goes to the alpha, as a mask when it is all holes', async () => {
@@ -188,15 +175,9 @@ test('a transparency map beside a colour map goes to the alpha, as a mask when i
 test('TGA and TIFF textures become PNG with the entry and stay a named loss without it', async () => {
   // An uncompressed 1 x 1 true colour TGA: blue, green, red.
   const tga = new Uint8Array([0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 24, 0, 30, 20, 10]);
-  const glb = await convertFBX(
-      real('max_pbr_metal_rough_material_7700_ascii.fbx'),
-      options({ 'checkerboard_diffuse.png': tga }),
-    ),
+  const glb = await convertFBX(real('max_pbr_metal_rough_material_7700_ascii.fbx'), options({ 'checkerboard_diffuse.png': tga })),
     material = readGLB(glb).doc.materials[0];
-  assert.deepEqual(
-    [...imageOf(glb, material.pbrMetallicRoughness.baseColorTexture.index).data.slice(0, 3)],
-    [10, 20, 30],
-  );
+  assert.deepEqual([...imageOf(glb, material.pbrMetallicRoughness.baseColorTexture.index).data.slice(0, 3)], [10, 20, 30]);
   const plain = readGLB(
     await convertFBX(real('maya_shaderfx_pbs_material_7700_binary.fbx'), {
       resourcePath: 'https://assets.example/',

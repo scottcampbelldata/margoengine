@@ -92,10 +92,7 @@ test('normals are the field gradient: radial for a ball and straight up for a fl
       n = [v[i * 6 + 3], v[i * 6 + 4], v[i * 6 + 5]],
       r = Math.hypot(...d),
       sin = Math.hypot(n[1] * d[2] - n[2] * d[1], n[2] * d[0] - n[0] * d[2], n[0] * d[1] - n[1] * d[0]) / r;
-    assert.ok(
-      n[0] * d[0] + n[1] * d[1] + n[2] * d[2] > 0 && sin < 1e-5,
-      `ball normal ${i} is ${Math.asin(Math.min(1, sin))} rad off radial`,
-    );
+    assert.ok(n[0] * d[0] + n[1] * d[1] + n[2] * d[2] > 0 && sin < 1e-5, `ball normal ${i} is ${Math.asin(Math.min(1, sin))} rad off radial`);
   }
   const f = floor.current.geometry.vertices;
   for (let i = 0; i < f.length / 6; i++) assert.ok(f[i * 6 + 4] > 1 - 1e-6, `floor normal ${i} points up`);
@@ -194,3 +191,4 @@ test('uvs and colours only when enabled; maxPolyCount keeps the first triangles 
       /MarchingCubes maxPolyCount must be a whole number of at least 1/,
     );
 });
+

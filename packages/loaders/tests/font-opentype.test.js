@@ -16,9 +16,7 @@ const variableReference = JSON.parse(read('variable-reference.json'));
 /** Polyline of a command list: `samples` uniform steps per curve. Returns one point list per contour. */
 function flatten(commands, samples) {
   const loops = [];
-  let loop,
-    x = 0,
-    y = 0;
+  let loop, x = 0, y = 0;
   for (const c of commands) {
     if (c[0] === 'M') loops.push((loop = [[(x = c[1]), (y = c[2])]]));
     else if (c[0] === 'L') loop.push([(x = c[1]), (y = c[2])]);
@@ -40,11 +38,7 @@ function distance([px, py], loops) {
   let best = Infinity;
   for (const loop of loops)
     for (let i = 0; i < loop.length; i++) {
-      const [ax, ay] = loop[i],
-        [bx, by] = loop[(i + 1) % loop.length],
-        dx = bx - ax,
-        dy = by - ay,
-        l = dx * dx + dy * dy;
+      const [ax, ay] = loop[i], [bx, by] = loop[(i + 1) % loop.length], dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
       const t = l ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0;
       best = Math.min(best, Math.hypot(px - ax - t * dx, py - ay - t * dy));
     }
@@ -57,17 +51,13 @@ test('CFF (.otf) glyphs decode to cubic outlines matching the GDI reference', ()
   for (const [char, ref] of Object.entries(expected)) {
     const glyph = font.glyph(char);
     assert.equal(glyph.index, ref.index, char);
-    assert.ok(
-      glyph.commands.some((c) => c[0] === 'C'),
-      `${char} has cubic segments`,
-    );
+    assert.ok(glyph.commands.some((c) => c[0] === 'C'), `${char} has cubic segments`);
     const mine = flatten(glyph.commands, 64);
     assert.equal(mine.length, ref.contours.length, `${char} contour count`);
     // Every reference point (segment ends and curve samples at 1000 ppem, 1 unit per em-thousandth) lies on our outline.
     for (const contour of ref.contours)
       for (const segment of contour)
-        for (let s = 0; s <= 8; s++)
-          assert.ok(distance(bezier(segment, s / 8), mine) < 0.05, `${char} off the outline`);
+        for (let s = 0; s <= 8; s++) assert.ok(distance(bezier(segment, s / 8), mine) < 0.05, `${char} off the outline`);
   }
   assert.ok(font.generateShapes('Ag', 100).length > 0);
 });
@@ -81,22 +71,14 @@ for (const extension of ['ttf', 'otf'])
       const source = parseOpenTypeSource(bytes, { variations: { wght: sample.weight } });
       assert.equal(source.glyphIndex(sample.char.codePointAt(0)), sample.index);
       assert.equal(source.variationCoordinates[0], sample.normalized);
-      const glyph = source.glyph(sample.index),
-        em = source.unitsPerEm;
-      assert.ok(
-        Math.abs(glyph.advance / em - sample.advance) <= 1e-7,
-        `${sample.char}@${sample.weight} advance ${glyph.advance / em}`,
-      );
+      const glyph = source.glyph(sample.index), em = source.unitsPerEm;
+      assert.ok(Math.abs(glyph.advance / em - sample.advance) <= 1e-7, `${sample.char}@${sample.weight} advance ${glyph.advance / em}`);
       const points = flatten(glyph.commands, 12).flat();
       const bounds = [
-        Math.min(...points.map((p) => p[0])),
-        Math.min(...points.map((p) => p[1])),
-        Math.max(...points.map((p) => p[0])),
-        Math.max(...points.map((p) => p[1])),
+        Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1])),
+        Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1])),
       ];
-      bounds.forEach((v, i) =>
-        assert.ok(Math.abs(v / em - sample.bounds[i]) <= 1e-7, `${sample.char}@${sample.weight} bound ${i}`),
-      );
+      bounds.forEach((v, i) => assert.ok(Math.abs(v / em - sample.bounds[i]) <= 1e-7, `${sample.char}@${sample.weight} bound ${i}`));
     }
   });
 
@@ -115,21 +97,13 @@ test('without the OpenType readers: TrueType and the default instance read, CFF 
     e.message.includes("pass { openType } from '@margoengine/loaders/font-opentype' (or call its parseOpenType)") &&
     e.message.includes('GlyphFieldFont.load or VectorFont.load') &&
     e.message.endsWith('see https://margoengine.com/errors#loader-unsupported');
-  assert.throws(
-    () => parseTTF(read('SourceSans3-Regular.otf')),
-    /this font has CFF outlines, which need the OpenType readers/,
-  );
-  assert.throws(
-    () => parseTTF(read('SourceSans3VF-Upright.ttf'), { variations: { wght: 700 } }),
-    /variations were requested/,
-  );
+  assert.throws(() => parseTTF(read('SourceSans3-Regular.otf')), /this font has CFF outlines, which need the OpenType readers/);
+  assert.throws(() => parseTTF(read('SourceSans3VF-Upright.ttf'), { variations: { wght: 700 } }), /variations were requested/);
   assert.throws(() => parseTTF(read('SourceSans3-Regular.otf')), unsupported);
   assert.throws(() => parseTTF(read('SourceSans3VF-Upright.otf')), unsupported);
   assert.throws(() => parseTTF(read('SourceSans3VF-Upright.ttf'), { variations: { wght: 700 } }), unsupported);
   // gvar and HVAR deltas are 0 at the default instance, so the lean path gives the readers' result exactly.
-  const bytes = read('SourceSans3VF-Upright.ttf'),
-    lean = parseTTFSource(bytes),
-    full = parseOpenTypeSource(bytes);
+  const bytes = read('SourceSans3VF-Upright.ttf'), lean = parseTTFSource(bytes), full = parseOpenTypeSource(bytes);
   assert.deepEqual(lean.variationAxes, full.variationAxes);
   for (const char of 'AgjQ&\u00e9') {
     const index = full.glyphIndex(char.codePointAt(0));
@@ -149,8 +123,7 @@ test('raw tables are readable by tag for shapers (GPOS, GSUB, kern)', () => {
 const be16 = (v) => [(v >> 8) & 255, v & 255];
 const be32 = (v) => [...be16(v >>> 16), ...be16(v)];
 function sfnt(tables) {
-  const tags = Object.keys(tables).sort(),
-    out = [...be32(0x10000), ...be16(tags.length), 0, 0, 0, 0, 0, 0];
+  const tags = Object.keys(tables).sort(), out = [...be32(0x10000), ...be16(tags.length), 0, 0, 0, 0, 0, 0];
   let offset = 12 + 16 * tags.length;
   const body = [];
   for (const tag of tags) {
@@ -163,8 +136,7 @@ function sfnt(tables) {
   return Uint8Array.from([...out, ...body]);
 }
 function font(glyphs, cmapTable) {
-  const glyf = [],
-    loca = [];
+  const glyf = [], loca = [];
   for (const g of glyphs) {
     loca.push(...be32(glyf.length));
     glyf.push(...g);
@@ -178,52 +150,18 @@ function font(glyphs, cmapTable) {
   const hhea = Array(36).fill(0);
   hhea.splice(4, 2, ...be16(800));
   hhea.splice(34, 2, ...be16(glyphs.length));
-  const cmap = cmapTable ?? [
-    ...be16(0),
-    ...be16(1),
-    ...be16(3),
-    ...be16(10),
-    ...be32(12),
-    ...be16(12),
-    0,
-    0,
-    ...be32(28),
-    ...be32(0),
-    ...be32(1),
-    ...be32(65),
-    ...be32(65),
-    ...be32(1),
-  ];
+  const cmap = cmapTable ?? [...be16(0), ...be16(1), ...be16(3), ...be16(10), ...be32(12),
+    ...be16(12), 0, 0, ...be32(28), ...be32(0), ...be32(1), ...be32(65), ...be32(65), ...be32(1)];
   return sfnt({
-    head,
-    hhea,
-    cmap,
-    glyf,
-    loca,
+    head, hhea, cmap, glyf, loca,
     maxp: [...be32(0x5000), ...be16(glyphs.length)],
     hmtx: glyphs.flatMap(() => [...be16(500), 0, 0]),
   });
 }
-const square = [
-  ...be16(1),
-  ...Array(8).fill(0),
-  ...be16(3),
-  ...be16(0),
-  1,
-  1,
-  1,
-  1,
-  ...[0, 100, 0, -100].flatMap(be16),
-  ...[0, 0, 100, 0].flatMap(be16),
-];
+const square = [...be16(1), ...Array(8).fill(0), ...be16(3), ...be16(0), 1, 1, 1, 1,
+  ...[0, 100, 0, -100].flatMap(be16), ...[0, 0, 100, 0].flatMap(be16)];
 // A component: ARG_1_AND_2_ARE_WORDS | ARGS_ARE_XY_VALUES plus `flags`, an offset and a 2x2 transform (F2DOT14).
-const component = (glyph, flags, dx, dy, transform = []) => [
-  ...be16(3 | flags),
-  ...be16(glyph),
-  ...be16(dx),
-  ...be16(dy),
-  ...transform.flatMap(be16),
-];
+const component = (glyph, flags, dx, dy, transform = []) => [...be16(3 | flags), ...be16(glyph), ...be16(dx), ...be16(dy), ...transform.flatMap(be16)];
 const composite = (...parts) => [...be16(-1 & 0xffff), ...Array(8).fill(0), ...parts.flat()];
 
 test('ROUND_XY_TO_GRID rounds a scaled component offset to whole font units', () => {
@@ -238,28 +176,8 @@ test('ROUND_XY_TO_GRID rounds a scaled component offset to whole font units', ()
 test('a cmap format 4 glyph pointer past its subtable maps to no glyph, not to the next table bytes', () => {
   // Segments 'A'..'A' with idRangeOffset 4 (pointing just past the 32-byte subtable, at the 'glyf' table, whose first
   // u16 is the square's contour count 1) and the 0xFFFF end segment.
-  const format4 = [
-    ...be16(4),
-    ...be16(32),
-    ...be16(0),
-    ...be16(4),
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    ...be16(65),
-    ...be16(0xffff),
-    0,
-    0,
-    ...be16(65),
-    ...be16(0xffff),
-    ...be16(0),
-    ...be16(1),
-    ...be16(4),
-    ...be16(0),
-  ];
+  const format4 = [...be16(4), ...be16(32), ...be16(0), ...be16(4), 0, 0, 0, 0, 0, 0,
+    ...be16(65), ...be16(0xffff), 0, 0, ...be16(65), ...be16(0xffff), ...be16(0), ...be16(1), ...be16(4), ...be16(0)];
   const bytes = font([square, square], [...be16(0), ...be16(1), ...be16(3), ...be16(1), ...be32(12), ...format4]);
   assert.equal(parseTTF(bytes).glyphIndex('A'), undefined);
 });

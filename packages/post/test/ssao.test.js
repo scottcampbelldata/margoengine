@@ -146,11 +146,7 @@ test('SSAO binds a plugin binding read above let direct= (the material colour) t
   const look = { binding: 41, resource: { buffer: {} } },
     shadow = { binding: 30, resource: {} };
   const shader = wgsl
-    .replace(
-      '@group(0) @binding(0) var<uniform> frame:Frame;',
-      (line) =>
-        `${line}\n@group(0) @binding(41) var<uniform> look:vec4f;\n@group(0) @binding(30) var shadowMap:texture_depth_2d;`,
-    )
+    .replace('@group(0) @binding(0) var<uniform> frame:Frame;', (line) => `${line}\n@group(0) @binding(41) var<uniform> look:vec4f;\n@group(0) @binding(30) var shadowMap:texture_depth_2d;`)
     .replace('let direct=', 'if(look.a<0.0){discard;}let direct=')
     .replace('let linear=direct*', 'let linear=f32(textureDimensions(shadowMap).x)*direct*');
   const s = recorded(shader),

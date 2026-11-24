@@ -24,44 +24,19 @@ try {
   assert.ok(r.back, 'the values read back as written');
   const x = await page.evaluate(() => window.check.exact());
   const same = { differing: 0, max: 0 };
-  assert.deepEqual(
-    { ...x.repeat, lit: 0 },
-    { ...same, lit: 0 },
-    `two renders of one effect differ: ${JSON.stringify(x)}`,
-  );
-  assert.ok(
-    x.apart.differing > 500 && x.apart.lit > 100,
-    `the effect with options should draw differently and show: ${JSON.stringify(x)}`,
-  );
-  assert.deepEqual(
-    { ...x.defaults, lit: 0 },
-    { ...same, lit: 0 },
-    `the default rows draw an unconfigured effect frame exact: ${JSON.stringify(x)}`,
-  );
-  assert.deepEqual(
-    { ...x.written, lit: 0 },
-    { ...same, lit: 0 },
-    `written rows draw the frame of the same options built in: ${JSON.stringify(x)}`,
-  );
-  console.log(
-    `ok vfx frame exact: defaults = unconfigured effect, rows = options built in, 40 frames, options change ${x.apart.differing} bytes`,
-  );
+  assert.deepEqual({ ...x.repeat, lit: 0 }, { ...same, lit: 0 }, `two renders of one effect differ: ${JSON.stringify(x)}`);
+  assert.ok(x.apart.differing > 500 && x.apart.lit > 100, `the effect with options should draw differently and show: ${JSON.stringify(x)}`);
+  assert.deepEqual({ ...x.defaults, lit: 0 }, { ...same, lit: 0 }, `the default rows draw an unconfigured effect frame exact: ${JSON.stringify(x)}`);
+  assert.deepEqual({ ...x.written, lit: 0 }, { ...same, lit: 0 }, `written rows draw the frame of the same options built in: ${JSON.stringify(x)}`);
+  console.log(`ok vfx frame exact: defaults = unconfigured effect, rows = options built in, 40 frames, options change ${x.apart.differing} bytes`);
   const sand = await page.evaluate(() => window.sand());
   assert.deepEqual(sand.errs, [], 'GPU errors on the sand scene');
-  assert.deepEqual(
-    sand.counts,
-    { pipelines: 0, buffers: 0, textures: 0 },
-    `60 frames of every live sand row made GPU objects: ${JSON.stringify(sand)}`,
-  );
+  assert.deepEqual(sand.counts, { pipelines: 0, buffers: 0, textures: 0 }, `60 frames of every live sand row made GPU objects: ${JSON.stringify(sand)}`);
   assert.ok(sand.particles > 100, `the sand shows: ${JSON.stringify(sand)}`);
   assert.equal(sand.differing, 0, `the default sand rows draw the layer's own frame exact: ${JSON.stringify(sand)}`);
-  console.log(
-    `ok sand settings: ${sand.rows} live rows for 60 frames made no pipeline, buffer or texture; defaults frame exact (${sand.particles} particles)`,
-  );
+  console.log(`ok sand settings: ${sand.rows} live rows for 60 frames made no pipeline, buffer or texture; defaults frame exact (${sand.particles} particles)`);
   assert.deepEqual(pageErrors, []);
-  console.log(
-    `ok vfx settings: ${r.rows} live rows for 60 frames made no pipeline, buffer or texture (${JSON.stringify(r.after)})`,
-  );
+  console.log(`ok vfx settings: ${r.rows} live rows for 60 frames made no pipeline, buffer or texture (${JSON.stringify(r.after)})`);
 } finally {
   await context.close();
 }

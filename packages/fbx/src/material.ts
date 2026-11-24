@@ -5,6 +5,7 @@ import { findChild, id, property, objectName, type FBXNode } from './document.js
 import { children, type SceneContext } from './scene.js';
 import type { MaterialRead } from './extension.js';
 
+
 export async function attachMaterials(
   ctx: SceneContext,
   resourcePath: string,
@@ -144,7 +145,8 @@ export async function attachMaterials(
     // DiffuseFactor; the colour is black by default (the class's property template, as Maya writes it in Definitions).
     const explicitOpacity = property(source, 'Opacity', undefined),
       transparent = color('TransparentColor', [0, 0, 0]),
-      transparency = (scalar('TransparencyFactor', 0) * (transparent[0] + transparent[1] + transparent[2])) / 3,
+      transparency =
+        (scalar('TransparencyFactor', 0) * (transparent[0] + transparent[1] + transparent[2])) / 3,
       alpha = explicitOpacity === undefined ? 1 - transparency : scalar('Opacity', 1),
       factor = scalar('DiffuseFactor', 1),
       diffuse = color('DiffuseColor', property(source, 'Diffuse', [1, 1, 1])),
@@ -186,9 +188,7 @@ export async function attachMaterials(
       if (!['DiffuseColor', 'NormalMap'].includes(c.property ?? '')) continue;
       if (t.name !== 'Texture') {
         if (finishers.length) continue;
-        throw new TypeError(
-          'FBX layered texture; pass pbrMaterials from @margoengine/fbx/pbr, or bake it in your 3D tool',
-        );
+        throw new TypeError('FBX layered texture; pass pbrMaterials from @margoengine/fbx/pbr, or bake it in your 3D tool');
       }
       handled.add(c.property!);
       const key = c.property === 'NormalMap' ? 'normalTexture' : 'baseColorTexture';

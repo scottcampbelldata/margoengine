@@ -18,7 +18,7 @@ export interface MargoComponentsDocument {
 export interface MargoComponentsOptions extends MargoOptions {
     signal?: AbortSignal;
     scripts?: Readonly<Record<string, MargoScript>>;
-    physics?: GLTFPhysicsOptions['physics'];
+    physics?: GLTFPhysicsOptions["physics"];
     clustered?: GLTFLightReceiver;
     exposure?: number;
     view?: boolean;
@@ -33,7 +33,7 @@ export interface MargoScene {
 export type MargoScript = (context: MargoScriptContext) => void | (() => void);
 
 export interface MargoScriptContext {
-    readonly node: PBRModel['nodes'][number];
+    readonly node: PBRModel["nodes"][number];
     readonly nodeIndex: number;
     readonly properties: Properties;
     readonly model: PBRModel;

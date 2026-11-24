@@ -27,11 +27,7 @@ function build({ extra = [], int16 = false, big = false } = {}) {
     if (type === TYPE.ascii) return Buffer.from(values + '\0', 'latin1');
     const b = Buffer.alloc(values.length * sizeOf(type));
     values.forEach((v, i) =>
-      type === TYPE.short
-        ? b.writeUInt16LE(v, i * 2)
-        : type === TYPE.long
-          ? b.writeUInt32LE(v, i * 4)
-          : b.writeDoubleLE(v, i * 8),
+      type === TYPE.short ? b.writeUInt16LE(v, i * 2) : type === TYPE.long ? b.writeUInt32LE(v, i * 4) : b.writeDoubleLE(v, i * 8),
     );
     return b;
   };
@@ -68,29 +64,7 @@ function build({ extra = [], int16 = false, big = false } = {}) {
 
 // GeoKeyDirectory: version 1.1.0, then [key, location, count, value]: GTModelType, GTRasterType, ProjectedCSType, and a
 // citation read from the ASCII parameters; VerticalUnits.
-const keys = (model, raster, epsg, extra = []) => [
-  1,
-  1,
-  0,
-  4 + extra.length / 4,
-  1024,
-  0,
-  1,
-  model,
-  1025,
-  0,
-  1,
-  raster,
-  model === 2 ? 2048 : 3072,
-  0,
-  1,
-  epsg,
-  4099,
-  0,
-  1,
-  9001,
-  ...extra,
-];
+const keys = (model, raster, epsg, extra = []) => [1, 1, 0, 4 + extra.length / 4, 1024, 0, 1, model, 1025, 0, 1, raster, model === 2 ? 2048 : 3072, 0, 1, epsg, 4099, 0, 1, 9001, ...extra];
 
 test('the ASCII tags GDAL writes are kept on the page', () => {
   const bytes = build({
@@ -163,18 +137,11 @@ test('a nan no-data text reads as NaN, an absent one as null, a garbage one thro
     [33550, TYPE.double, [1, 1, 0]],
     [33922, TYPE.double, [0, 0, 0, 0, 0, 0]],
   ];
-  assert.ok(
-    Number.isNaN(readGeoTIFF(openTIFF(build({ extra: [...georef, [42113, TYPE.ascii, 'nan']] })).read(0)).noData),
-  );
+  assert.ok(Number.isNaN(readGeoTIFF(openTIFF(build({ extra: [...georef, [42113, TYPE.ascii, 'nan']] })).read(0)).noData));
   assert.ok(Number.isNaN(readGeoTIFF(openTIFF(build({ extra: [[42113, TYPE.ascii, ' NaN ']] })).read(0)).noData));
   assert.equal(readGeoTIFF(openTIFF(build({ extra: georef })).read(0)).noData, null);
-  assert.equal(
-    readGeoTIFF(openTIFF(build({ extra: [[42113, TYPE.ascii, '-3.4028234663852886e+38']] })).read(0)).noData,
-    -3.4028234663852886e38,
-  );
-  assert.throws(() => readGeoTIFF(openTIFF(build({ extra: [[42113, TYPE.ascii, 'none']] })).read(0)), {
-    code: 'failed',
-  });
+  assert.equal(readGeoTIFF(openTIFF(build({ extra: [[42113, TYPE.ascii, '-3.4028234663852886e+38']] })).read(0)).noData, -3.4028234663852886e38);
+  assert.throws(() => readGeoTIFF(openTIFF(build({ extra: [[42113, TYPE.ascii, 'none']] })).read(0)), { code: 'failed' });
 });
 
 test('a page with no georeference tags gives null georeference fields and still its no-data value', () => {
@@ -211,28 +178,10 @@ test('several tie points with no scale are reported, not interpolated', () => {
 
 test('malformed GeoTIFF tags throw a coded failure', () => {
   const read = (extra) => () => readGeoTIFF(openTIFF(build({ extra })).read(0));
-  assert.throws(
-    read([
-      [33550, TYPE.double, [1, 1]],
-      [33922, TYPE.double, [0, 0, 0, 0, 0, 0]],
-    ]),
-    { code: 'failed' },
-  );
-  assert.throws(
-    read([
-      [33550, TYPE.double, [1, 1, 0]],
-      [33922, TYPE.double, [0, 0, 0, 0, 0]],
-    ]),
-    { code: 'failed' },
-  );
+  assert.throws(read([[33550, TYPE.double, [1, 1]], [33922, TYPE.double, [0, 0, 0, 0, 0, 0]]]), { code: 'failed' });
+  assert.throws(read([[33550, TYPE.double, [1, 1, 0]], [33922, TYPE.double, [0, 0, 0, 0, 0]]]), { code: 'failed' });
   assert.throws(read([[34264, TYPE.double, [1, 2, 3]]]), { code: 'failed' });
   assert.throws(read([[34735, TYPE.short, [1, 1, 0, 9, 1024, 0, 1, 1]]]), { code: 'failed' });
   assert.throws(read([[34735, TYPE.short, [2, 1, 0, 0]]]), { code: 'failed' });
-  assert.throws(
-    read([
-      [34735, TYPE.short, [1, 1, 0, 1, 1026, 34737, 40, 0]],
-      [34737, TYPE.ascii, 'short|'],
-    ]),
-    { code: 'failed' },
-  );
+  assert.throws(read([[34735, TYPE.short, [1, 1, 0, 1, 1026, 34737, 40, 0]], [34737, TYPE.ascii, 'short|']]), { code: 'failed' });
 });

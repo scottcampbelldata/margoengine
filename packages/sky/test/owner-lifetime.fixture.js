@@ -4,11 +4,8 @@
 // fixture to 19 entries (247 cases), past the 208 cases a single leaf holds inside its 180 s limit, which never rises.
 export const leafPerEntry = true;
 // A 4 x 2 lunar map: bright maria-free highlands on the left, darker on the right.
-const albedo = () => ({
-  width: 4,
-  height: 2,
-  data: new Uint8Array(32).map((_, i) => (i % 4 === 3 ? 255 : (i >> 2) % 4 < 2 ? 200 : 120)),
-});
+const albedo = () => ({ width: 4, height: 2,
+  data: new Uint8Array(32).map((_, i) => (i % 4 === 3 ? 255 : (i >> 2) % 4 < 2 ? 200 : 120)) });
 
 export async function fixtures(load = (entry) => import(entry)) {
   const { Sky } = await load('../dist/index.js');
@@ -41,63 +38,44 @@ export async function fixtures(load = (entry) => import(entry)) {
     VolumetricClouds: () => new VolumetricClouds(),
     Weather: () => new Weather(),
   };
-  for (const [name, make] of Object.entries(standalone))
-    entries.push({
-      name,
-      create({ engine }) {
-        const plugin = make(engine);
-        return { plugin, dispose: () => plugin.dispose() };
-      },
-    });
+  for (const [name, make] of Object.entries(standalone)) entries.push({ name, create({ engine }) {
+    const plugin = make(engine);
+    return { plugin, dispose: () => plugin.dispose() };
+  } });
   const dependent = {
     AerialPerspective: (source) => new AerialPerspective({ sky: source, depth }),
     LightShafts: (source) => new LightShafts({ sky: source, depth }),
     AstroSky: (source) => new AstroSky({ latitude: degrees(51.5), longitude: degrees(0), sky: source }),
   };
-  for (const [name, make] of Object.entries(dependent))
-    entries.push({
-      name,
-      create({ scene, dependency }) {
-        const source = needs(dependency, scene, Sky);
-        const plugin = make(source);
-        return { plugin, dependencies: [source], dispose: () => plugin.dispose(), cleanup: () => source.dispose() };
-      },
-    });
-  entries.push({
-    name: 'WeatherFX',
-    create({ scene, dependency }) {
-      const source = needs(dependency, scene, Weather);
-      const plugin = new WeatherFX({ weather: source });
-      return { plugin, dependencies: [source], dispose: () => plugin.dispose(), cleanup: () => source.dispose() };
-    },
-  });
+  for (const [name, make] of Object.entries(dependent)) entries.push({ name, create({ scene, dependency }) {
+    const source = needs(dependency, scene, Sky);
+    const plugin = make(source);
+    return { plugin, dependencies: [source], dispose: () => plugin.dispose(), cleanup: () => source.dispose() };
+  } });
+  entries.push({ name: 'WeatherFX', create({ scene, dependency }) {
+    const source = needs(dependency, scene, Weather);
+    const plugin = new WeatherFX({ weather: source });
+    return { plugin, dependencies: [source], dispose: () => plugin.dispose(), cleanup: () => source.dispose() };
+  } });
   const observer = () => ({ latitude: degrees(47), longitude: degrees(8) });
   for (const factory of [false, true]) {
     const suffix = factory ? '.attach' : '';
-    const pick = (Kind, options) => (engine) => (factory ? Kind.attach(engine, options) : new Kind(options));
+    const pick = (Kind, options) => (engine) => factory ? Kind.attach(engine, options) : new Kind(options);
     for (const [name, make] of [
       ['SkyMoon', pick(SkyMoon, { moonDirection: [0.45, 0, -1], moonPhase: 0.85 })],
       ['MilkyWay', pick(MilkyWay, observer())],
       ['Aurora', pick(Aurora, { intensity: 100, red: 0.5 })],
       ['Moon', pick(Moon, { albedo: albedo() })],
-    ])
-      entries.push({
-        name: name + suffix,
-        create({ engine }) {
-          const plugin = make(engine);
-          return { plugin, dispose: () => plugin.dispose() };
-        },
-      });
+    ]) entries.push({ name: name + suffix, create({ engine }) {
+      const plugin = make(engine);
+      return { plugin, dispose: () => plugin.dispose() };
+    } });
   }
   // PresetScene attaches a sky and a post stack (bloom and tonemap); it is no plugin itself, its sky is the handle.
-  for (const name of ['goldenHour', 'noon'])
-    entries.push({
-      name: 'PresetScene.attach ' + name,
-      create({ engine }) {
-        const scene = PresetScene.attach(engine, name);
-        scene.set('overcast');
-        return { plugin: scene.sky, dispose: () => scene.dispose() };
-      },
-    });
+  for (const name of ['goldenHour', 'noon']) entries.push({ name: 'PresetScene.attach ' + name, create({ engine }) {
+    const scene = PresetScene.attach(engine, name);
+    scene.set('overcast');
+    return { plugin: scene.sky, dispose: () => scene.dispose() };
+  } });
   return entries;
 }

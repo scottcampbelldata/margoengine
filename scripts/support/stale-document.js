@@ -36,8 +36,7 @@ export function holdStaleDocumentGpu() {
   const hold = (promise) =>
     promise.then(
       (value) => (left.has(document) ? new Promise((resolve) => held.push(() => resolve(value))) : value),
-      (error) =>
-        left.has(document) ? new Promise((_, reject) => held.push(() => reject(error))) : Promise.reject(error),
+      (error) => (left.has(document) ? new Promise((_, reject) => held.push(() => reject(error))) : Promise.reject(error)),
     );
   const wrap = (prototype, name) => {
     const original = prototype?.[name];

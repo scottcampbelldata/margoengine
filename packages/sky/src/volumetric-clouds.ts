@@ -166,8 +166,9 @@ export interface VolumetricCloudOptions {
    */
   groundAlbedo?: number;
   /**
-   * Override the active scene capture's reversed-Z depth. Omit to use the current frame from PostStack or another
-   * scene capture. Clouds stop at that frame's surfaces. Without sampleable depth they draw over the empty sky.
+   * The scene's reversed-Z depth each frame (for example `bloom.depthTexture`). With it the clouds stop at scene
+   * surfaces, so a camera that flies into the layer sees cloud in front of nearby objects; without it they draw only
+   * over the empty sky.
    */
   depth?: () => GPUTexture | undefined;
   /**
@@ -597,7 +598,9 @@ export function layerOf(
 }
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
 export const CLOUD_FLOATS = 96;
-let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
+let loadedStorm: StormField | undefined,
+  loading: Promise<StormField> | undefined,
+  loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
 export const wantsStorm = (options: VolumetricCloudOptions): boolean =>
   options.hurricane !== undefined || options.type === 'hurricane';
@@ -613,8 +616,7 @@ export function loadStormField(): Promise<StormField> {
 export function stormFieldFor(options: VolumetricCloudOptions): StormField | undefined {
   // A failed load is thrown by every draw that needs it (a draw never waits on it, so it cannot reject there).
   if (loadError !== undefined) throw loadError;
-  if (!loadedStorm && wantsStorm(options))
-    loadStormField().catch((e: unknown) => (loadError = e ?? new Error('storm field failed to load')));
+  if (!loadedStorm && wantsStorm(options)) loadStormField().catch((e: unknown) => (loadError = e ?? new Error('storm field failed to load')));
   return loadedStorm;
 }
 /** The cloud field's WGSL (or any shader holding it) with the storm's functions when `field` is given. */
@@ -625,12 +627,7 @@ export const withStorm = (code: string, field?: StormField): string =>
  * planet radius, base and tops, coverage, density, the noise scales, the drift and the storm at `seconds` on the layer's
  * clock. Shared by the clouds and their shadows, so both read one field.
  */
-export function writeLayer(
-  v: Float32Array,
-  options: VolumetricCloudOptions,
-  drift: ArrayLike<number>,
-  seconds = 0,
-): void {
+export function writeLayer(v: Float32Array, options: VolumetricCloudOptions, drift: ArrayLike<number>, seconds = 0): void {
   const scale = options.scale ?? defaults.scale,
     layer = layerOf(options, writeScratch);
   v[19] = PLANET_RADIUS;
@@ -929,10 +926,7 @@ export class VolumetricClouds implements EnginePlugin {
       if (this.lightSource !== map) {
         this.lightPipeline ??= c.device.createComputePipeline({
           layout: 'auto',
-          compute: {
-            module: c.device.createShaderModule({ code: withStorm(skyLightShader, this.built) }),
-            entryPoint: 'main',
-          },
+          compute: { module: c.device.createShaderModule({ code: withStorm(skyLightShader, this.built) }), entryPoint: 'main' },
         });
         this.lightGroup = c.device.createBindGroup({
           layout: this.lightPipeline.getBindGroupLayout(0),
@@ -971,10 +965,7 @@ export class VolumetricClouds implements EnginePlugin {
     if (!this.deckGroup) {
       this.deckPipeline ??= c.device.createComputePipeline({
         layout: 'auto',
-        compute: {
-          module: c.device.createShaderModule({ code: withStorm(deckShader, this.built) }),
-          entryPoint: 'main',
-        },
+        compute: { module: c.device.createShaderModule({ code: withStorm(deckShader, this.built) }), entryPoint: 'main' },
       });
       this.deckGroup = c.device.createBindGroup({
         layout: this.deckPipeline.getBindGroupLayout(0),
@@ -1036,13 +1027,11 @@ export class VolumetricClouds implements EnginePlugin {
     this.volumes!.fill(c.device, c.encoder);
     this.skyLight(c);
     this.environment(c);
-    const depth = sceneDepth(c, this.options.depth, 'VolumetricClouds'),
+    const depth = this.options.depth ? sceneDepth(c, this.options.depth, 'VolumetricClouds') : undefined,
       samples = c.descriptor.multisample?.count ?? 1,
       key = `${c.format}:${samples}:${depth?.samples ?? 0}:${c.descriptor.depthStencil?.format}`;
     if (this.key !== key) {
-      const module = c.device.createShaderModule({
-        code: withStorm(shader(depth ? depthWGSL(5, depth.samples) : ''), this.built),
-      });
+      const module = c.device.createShaderModule({ code: withStorm(shader(depth ? depthWGSL(5, depth.samples) : ''), this.built) });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },

@@ -416,11 +416,7 @@ test('a repeated point in a strip joins across it instead of drawing two caps', 
     'closed loop',
   );
   // A line that is all one point still draws its round dot.
-  close(
-    triangleArea(expandLine([5, 5, 5, 5], { cap: 'round', width: 10, antialias: false })),
-    fanArea(5, Math.PI) * 2,
-    1e-3,
-  );
+  close(triangleArea(expandLine([5, 5, 5, 5], { cap: 'round', width: 10, antialias: false })), fanArea(5, Math.PI) * 2, 1e-3);
 });
 
 test('distinctNeighbours skips repeats and wraps loops', () => {

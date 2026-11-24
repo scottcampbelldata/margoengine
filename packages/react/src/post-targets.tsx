@@ -2,7 +2,6 @@ import { forwardRef, useRef } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { DepthTexture as DepthPlugin, DepthTextureOptions } from '@margoengine/post/depth';
 import type { SceneTargets as TargetsPlugin, SceneTargetsOptions } from '@margoengine/post/mrt';
-import { inScene } from './scene-owner.js';
 import { useCommit, useCreated, useModelSources, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 
@@ -32,15 +31,14 @@ export const DepthTexture = /* @__PURE__ */ forwardRef<DepthPlugin, DepthTexture
     scene,
     {
       load: () => optionalPeer('@margoengine/post/depth', () => import('@margoengine/post/depth')),
-      create: (api) =>
-        inScene(scene, () => api.DepthTexture.attach(scene.engine as unknown as EngineKernel, { order })),
+      create: (api) => api.DepthTexture.attach(scene.engine as unknown as EngineKernel, { order }),
       dispose: (value) => value.dispose(),
       ref,
       onError,
     },
     [order],
   );
-  useModelSources(scene, scene.world ? null : depth);
+  useModelSources(scene, depth);
   useCommit(() => {
     if (depth) return depth.onResize(() => resized.current?.(depth));
   }, [depth]);
@@ -68,15 +66,13 @@ export const SceneTargets = /* @__PURE__ */ forwardRef<TargetsPlugin, SceneTarge
     {
       load: () => optionalPeer('@margoengine/post/mrt', () => import('@margoengine/post/mrt')),
       create: (api) =>
-        inScene(scene, () =>
-          api.SceneTargets.attach(scene.engine as unknown as EngineKernel, { outputs: latest.current, order }),
-        ),
+        api.SceneTargets.attach(scene.engine as unknown as EngineKernel, { outputs: latest.current, order }),
       dispose: (value) => value.dispose(),
       ref,
       onError,
     },
     [key, order],
   );
-  useModelSources(scene, scene.world ? null : targets);
+  useModelSources(scene, targets);
   return null;
 });

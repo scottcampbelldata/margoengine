@@ -12,10 +12,7 @@ export default defineConfig({
       { find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js') },
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
       { find: /^@margoengine\/labels$/, replacement: resolve(repository, 'packages/labels/dist/index.js') },
-      {
-        find: /^@margoengine\/webgl2-compat\/preview$/,
-        replacement: resolve(repository, 'packages/webgl2-compat/dist/preview.js'),
-      },
+      { find: /^@margoengine\/webgl2-compat\/preview$/, replacement: resolve(repository, 'packages/webgl2-compat/dist/preview.js') },
       { find: /^@margoengine\/html\/texture$/, replacement: resolve(root, 'dist/texture.js') },
       { find: /^@margoengine\/html\/texture-gl$/, replacement: resolve(root, 'dist/texture-gl.js') },
       { find: /^@margoengine\/html\/blend$/, replacement: resolve(root, 'dist/blend.js') },

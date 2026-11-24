@@ -58,8 +58,7 @@ export interface NurbsSurfacePoint {
 
 /** Checks a knot vector and gives it its end knots when the file left them out. */
 function knotVector(source: ArrayLike<number>, count: number, degree: number, name: string): Float64Array {
-  if (!Number.isSafeInteger(degree) || degree < 1)
-    throw new LoaderError(F, 'range', `${name} degree must be 1 or more`);
+  if (!Number.isSafeInteger(degree) || degree < 1) throw new LoaderError(F, 'range', `${name} degree must be 1 or more`);
   if (count <= degree)
     throw new LoaderError(F, 'range', `${name} needs more than ${degree} control points, got ${count}`);
   let knots = Float64Array.from(source);
@@ -347,8 +346,7 @@ export function tessellateNurbsSurface(surface: NurbsSurface, options: NurbsSurf
     rows = us.length,
     vertices = rows * columns,
     triangles = (rows - 1) * (columns - 1) * 2;
-  if (vertices > maxVertices)
-    throw new LoaderError(F, 'limit', `${vertices} vertices exceed the limit of ${maxVertices}`);
+  if (vertices > maxVertices) throw new LoaderError(F, 'limit', `${vertices} vertices exceed the limit of ${maxVertices}`);
   if (triangles > maxTriangles)
     throw new LoaderError(F, 'limit', `${triangles} triangles exceed the limit of ${maxTriangles}`);
   const positions = new Float32Array(vertices * 3),

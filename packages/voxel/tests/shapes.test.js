@@ -574,22 +574,10 @@ test('connectStairs: a stair beside one of its own facing and half keeps a strai
   const v = world(),
     at = (x, z) => (v.getBlock(x, 4, z) >>> 16) & 0x7f;
   v.setBlocks([
-    5,
-    4,
-    5,
-    stairState(STAIR, '+x'),
-    6,
-    4,
-    5,
-    stairState(STAIR, '+z'), // behind: outer toward +z, blocked by (5, 4)
-    5,
-    4,
-    4,
-    stairState(STAIR, '+x', false, 'straight'),
-    4,
-    4,
-    5,
-    stairState(STAIR, '+z', false, 'straight'), // in front: inner toward +z, the cell (5, 6) is free
+    5, 4, 5, stairState(STAIR, '+x'),
+    6, 4, 5, stairState(STAIR, '+z'), // behind: outer toward +z, blocked by (5, 4)
+    5, 4, 4, stairState(STAIR, '+x', false, 'straight'),
+    4, 4, 5, stairState(STAIR, '+z', false, 'straight'), // in front: inner toward +z, the cell (5, 6) is free
   ]);
   connectStairs(v, 5, 4, 5);
   assert.equal(at(5, 5), (1 << 3) | 32);

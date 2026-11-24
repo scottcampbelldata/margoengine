@@ -62,8 +62,8 @@
       "reason": "a live cube object read each frame (a CubeCamera that rebuilds its own view after a restore), the same as a per-frame getter (rule 6)"
     },
     "clustered:ContactLightOptions.depth": {
-      "status": "ruled",
-      "source": "packages/clustered/src/contact.ts"
+      "status": "pending",
+      "reason": "plan site"
     },
     "clustered:LocalShadowPrimitive.alphaSampler": {
       "status": "exempt",
@@ -214,8 +214,8 @@
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
     "environment:CubeTextureSource.texture": {
-      "status": "ruled",
-      "source": "packages/environment/src/environment.ts"
+      "status": "pending",
+      "reason": "found by the class check; rule it or exempt it with a reason"
     },
     "environment:PlanarOptions.normalMap": {
       "status": "ruled",
@@ -526,36 +526,36 @@
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
     "materials:CubeTarget.texture": {
-      "status": "ruled",
-      "source": "packages/materials/src/built-material.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:CubeTarget.view": {
-      "status": "ruled",
-      "source": "packages/materials/src/built-material.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:EnvironmentMap.sampler": {
-      "status": "ruled",
-      "source": "packages/materials/src/built-material.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:EnvironmentMap.specularView": {
-      "status": "ruled",
-      "source": "packages/materials/src/built-material.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:MaterialOptions.envMap": {
-      "status": "ruled",
-      "source": "packages/materials/src/built-material.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:NodeMaterialOptions.opaqueColor": {
-      "status": "ruled",
-      "source": "packages/materials/src/node-types.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:Texture.source": {
-      "status": "ruled",
-      "source": "packages/materials/src/built-material.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "materials:TransmissionOptions.opaqueColor": {
-      "status": "ruled",
-      "source": "packages/materials/src/transmission.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "physics:ModelPrimitiveLike.buffers": {
       "status": "exempt",
@@ -1110,12 +1110,12 @@
       "source": "packages/tilemap/src/renderer.ts"
     },
     "tonemap:AutoExposure.mask": {
-      "status": "ruled",
-      "source": "packages/tonemap/src/index.ts"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "tonemap:TonemapPassContext.source": {
-      "status": "exempt",
-      "reason": "the frame's HDR source, handed to each extension's encode every frame by Tonemap (a per-frame getter result or its own scene target), never kept by the extension (rule 6)"
+      "status": "pending",
+      "reason": "Mac lane"
     },
     "toon:ModelPrimitiveLike.buffers": {
       "status": "exempt",
@@ -1184,10 +1184,6 @@
     "water:WaterPlanarCapture.texture": {
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
-    },
-    "water:WaterSkyEnvironment.equirectTexture": {
-      "status": "exempt",
-      "reason": "an output of Environment, which makes it again on device restoration; Water and Underwater read its live texture each frame"
     },
     "weather:PrecipitationCapture.coverTexture": {
       "status": "exempt",

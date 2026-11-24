@@ -117,7 +117,7 @@ function setup(camera = { position: [0, 0, 10], target: [0, 0, 0] }) {
     },
     hasPlugin: (name) => plugins.has(name),
     // Controls dispose through the scene that owns the exact registered wrapper.
-    sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
+    sceneOf: (plugin) => plugins.get(plugin.name) === plugin ? engine : undefined,
     removePlugin(name) {
       const p = plugins.get(name);
       plugins.delete(name);
@@ -161,7 +161,7 @@ const matrix = (cube) =>
 test('engine fixture finds plugin owners by identity and OrbitControls disposal removes its registration', () => {
   const { engine, plugins } = setup();
   const orbit = new OrbitControls(engine);
-  const registration = [...plugins.values()].find((p) => p.name.startsWith('margoengine-controls:'));
+  const registration = [...plugins.values()].find(p => p.name.startsWith('margoengine-controls:'));
   assert.ok(registration);
   assert.equal(engine.sceneOf(registration), engine);
   assert.equal(engine.sceneOf({ ...registration }), undefined, 'same name is not the registered identity');

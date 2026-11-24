@@ -87,8 +87,5 @@ test('presets: plain frozen options; metals from measured F0, tarnished copper d
   // Weathered wood reflects enough moonlight to read as wood at night: at luminance 0.13 the Cabin Hearth's log walls
   // read black in every outside shot (the page's measured fix was 0.21, sRGB #8b7d6b).
   const [r, g, b] = presets.weatheredWood.color;
-  assert.ok(
-    0.2126 * r + 0.7152 * g + 0.0722 * b >= 0.2,
-    `weathered wood luminance ${0.2126 * r + 0.7152 * g + 0.0722 * b}`,
-  );
+  assert.ok(0.2126 * r + 0.7152 * g + 0.0722 * b >= 0.2, `weathered wood luminance ${0.2126 * r + 0.7152 * g + 0.0722 * b}`);
 });

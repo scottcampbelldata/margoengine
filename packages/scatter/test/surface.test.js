@@ -113,10 +113,7 @@ test('a mirroring matrix keeps a mesh without vertex normals facing out (R5)', (
   for (const normals of [[0, 1, 0, 0, 1, 0, 0, 1, 0], []]) {
     const r = scatterSurface(tri(normals), 4, { matrix, yaw: [0, 0], offset: 0.5 });
     for (let i = 0; i < 4; i++) {
-      assert.deepEqual(
-        Array.from(r.normals.subarray(i * 3, i * 3 + 3)).map((v) => v + 0),
-        [0, 1, 0],
-      );
+      assert.deepEqual(Array.from(r.normals.subarray(i * 3, i * 3 + 3)).map((v) => v + 0), [0, 1, 0]);
       assert.equal(r.transforms[i * 16 + 13], 0.5, 'root half a unit above the surface');
       assert.ok(r.transforms[i * 16 + 5] > 0.99, 'instance +Y up');
     }

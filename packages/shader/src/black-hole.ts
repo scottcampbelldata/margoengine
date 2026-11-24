@@ -106,7 +106,7 @@ export function novikovThorneFlux(r: number, spin: number): number {
   const term = (xi: number, xj: number, xk: number) =>
     ((3 * (xi - a) * (xi - a)) / (xi * (xi - xj) * (xi - xk))) * Math.log((x - xi) / (x0 - xi));
   const bracket = x - x0 - 1.5 * a * Math.log(x / x0) - term(x1, x2, x3) - term(x2, x1, x3) - term(x3, x1, x2);
-  return ((3 / (8 * Math.PI)) * bracket) / (x ** 4 * (x * x * x - 3 * x + 2 * a));
+  return (3 / (8 * Math.PI)) * bracket / (x ** 4 * (x * x * x - 3 * x + 2 * a));
 }
 
 /**
@@ -203,7 +203,7 @@ export interface Geodesic {
  * product test misses it: 0 is not below 0).
  */
 export function crossesEquator(before: number, after: number): boolean {
-  return before < Math.PI / 2 !== after < Math.PI / 2;
+  return (before < Math.PI / 2) !== (after < Math.PI / 2);
 }
 
 /** The step (r_s) at radius r (r_s): small near the horizon, growing with r^2 and at most a fifth of r far out. */
@@ -328,10 +328,7 @@ export function kerrAxisStep(h: number, r: number, theta: number, a: number, b: 
 /** The null condition H of a state (James et al. 2015, eq. A.15's Hamiltonian): 0 for light; its size is the error. */
 export function kerrHamiltonian(y: readonly number[], a: number, b: number, q: number): number {
   const [r, th, pr, pt] = y,
-    s2 =
-      kerrAxial(a, b, q) && Math.sin(th) ** 2 < POLE_BAND * POLE_BAND
-        ? POLE_BAND * POLE_BAND
-        : Math.max(Math.sin(th) ** 2, 1e-8),
+    s2 = kerrAxial(a, b, q) && Math.sin(th) ** 2 < POLE_BAND * POLE_BAND ? POLE_BAND * POLE_BAND : Math.max(Math.sin(th) ** 2, 1e-8),
     c = Math.cos(th),
     a2 = a * a;
   const dl = r * r - 2 * r + a2,
@@ -439,11 +436,7 @@ export function traceGeodesic(
     }
     const h = kerrAxisStep(
       2 * geodesicStep(r / 2, rH / 2) * kerrStepScale(r, a) * Math.min(Math.max(Math.sin(y[1]) * 10, 0.05), 1),
-      r,
-      y[1],
-      a,
-      b,
-      q,
+      r, y[1], a, b, q,
     );
     const at = (k: number[], t: number) => y.map((v, j) => v + k[j] * t);
     const k2 = f(at(k1, h / 2)),
@@ -957,28 +950,8 @@ export class BlackHole {
       vertexShader: shader,
       uniforms: Object.fromEntries(
         [
-          'spin',
-          'accretion',
-          'jet',
-          'jetGamma',
-          'turbulence',
-          'view',
-          'prefilter',
-          'horizon',
-          'isco',
-          'outer',
-          'tPeak',
-          'fluxNorm',
-          'x0',
-          'x1',
-          'x2',
-          'x3',
-          'flareStart',
-          'timeScale',
-          'exposure',
-          'steps',
-          'stars',
-          'galaxy',
+          'spin', 'accretion', 'jet', 'jetGamma', 'turbulence', 'view', 'prefilter', 'horizon', 'isco', 'outer', 'tPeak',
+          'fluxNorm', 'x0', 'x1', 'x2', 'x3', 'flareStart', 'timeScale', 'exposure', 'steps', 'stars', 'galaxy',
         ].map((n) => [n, { value: 0 }]),
       ),
       depthTest: false,

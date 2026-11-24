@@ -107,10 +107,6 @@
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
     },
-    "./animator/ccd": {
-      "types": "./dist/animator/ccd.d.ts",
-      "import": "./dist/animator/ccd.js"
-    },
     "./animator/graph": {
       "types": "./dist/animator/graph.d.ts",
       "import": "./dist/animator/graph.js"
@@ -414,10 +410,6 @@
     "./biomes/graph": {
       "types": "./dist/biomes/graph.d.ts",
       "import": "./dist/biomes/graph.js"
-    },
-    "./biomes/treeline": {
-      "types": "./dist/biomes/treeline.d.ts",
-      "import": "./dist/biomes/treeline.js"
     },
     "./biomes/ecosystem": {
       "types": "./dist/biomes/ecosystem.d.ts",
@@ -1047,6 +1039,10 @@
       "types": "./dist/cutscene/seek.d.ts",
       "import": "./dist/cutscene/seek.js"
     },
+    "./cutscene/film-titles": {
+      "types": "./dist/cutscene/film-titles.d.ts",
+      "import": "./dist/cutscene/film-titles.js"
+    },
     "./decoders/ktx2-hdr6": {
       "types": "./dist/decoders/ktx2-hdr6.d.ts",
       "import": "./dist/decoders/ktx2-hdr6.js"
@@ -1322,18 +1318,6 @@
     "./environment/exr-codecs": {
       "types": "./dist/environment/exr-codecs.d.ts",
       "import": "./dist/environment/exr-codecs.js"
-    },
-    "./environment/main": {
-      "types": "./dist/environment/main.d.ts",
-      "import": "./dist/environment/main.js"
-    },
-    "./environment/loaders": {
-      "types": "./dist/environment/loaders.d.ts",
-      "import": "./dist/environment/loaders.js"
-    },
-    "./environment/load": {
-      "types": "./dist/environment/load.d.ts",
-      "import": "./dist/environment/load.js"
     },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
@@ -2218,10 +2202,6 @@
     "./lines/tiles": {
       "types": "./dist/lines/tiles.d.ts",
       "import": "./dist/lines/tiles.js"
-    },
-    "./lines/flow": {
-      "types": "./dist/lines/flow.d.ts",
-      "import": "./dist/lines/flow.js"
     },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
@@ -3303,10 +3283,6 @@
       "types": "./dist/procedural/marching-cubes.d.ts",
       "import": "./dist/procedural/marching-cubes.js"
     },
-    "./procedural/coral": {
-      "types": "./dist/procedural/coral.d.ts",
-      "import": "./dist/procedural/coral.js"
-    },
     "./procedural/conifer-species": {
       "types": "./dist/procedural/conifer-species.d.ts",
       "import": "./dist/procedural/conifer-species.js"
@@ -3314,10 +3290,6 @@
     "./procedural/conifers": {
       "types": "./dist/procedural/conifers.d.ts",
       "import": "./dist/procedural/conifers.js"
-    },
-    "./procedural/fir-sprays": {
-      "types": "./dist/procedural/fir-sprays.d.ts",
-      "import": "./dist/procedural/fir-sprays.js"
     },
     "./procedural/conifer-settings": {
       "types": "./dist/procedural/conifer-settings.d.ts",
@@ -3570,18 +3542,6 @@
     "./rigging/ik": {
       "types": "./dist/rigging/ik.d.ts",
       "import": "./dist/rigging/ik.js"
-    },
-    "./rigging/contact": {
-      "types": "./dist/rigging/contact.d.ts",
-      "import": "./dist/rigging/contact.js"
-    },
-    "./rigging/joint-limits": {
-      "types": "./dist/rigging/joint-limits.d.ts",
-      "import": "./dist/rigging/joint-limits.js"
-    },
-    "./rigging/swim": {
-      "types": "./dist/rigging/swim.d.ts",
-      "import": "./dist/rigging/swim.js"
     },
     "./rigging/retarget": {
       "types": "./dist/rigging/retarget.d.ts",
@@ -4814,10 +4774,6 @@
     "./terrain/ground-change-settings": {
       "types": "./dist/terrain/ground-change-settings.d.ts",
       "import": "./dist/terrain/ground-change-settings.js"
-    },
-    "./terrain/relief-lighting": {
-      "types": "./dist/terrain/relief-lighting.d.ts",
-      "import": "./dist/terrain/relief-lighting.js"
     },
     "./terrain/wet-ground": {
       "types": "./dist/terrain/wet-ground.d.ts",

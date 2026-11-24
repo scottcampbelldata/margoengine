@@ -28,12 +28,7 @@ import { planCompute } from '../../webgl2-compat/dist/compute.js';
 const near = (a, b, tolerance, what) => assert.ok(Math.abs(a - b) <= tolerance * Math.abs(b), `${what}: ${a} vs ${b}`);
 
 test('scorch height is Van Wagner 1973 in its published English-unit form (Albini 1976, BehavePlus)', () => {
-  for (const [kw, celsius, wind] of [
-    [100, 25, 0],
-    [300, 25, 2],
-    [2000, 35, 5],
-    [800, 10, 1],
-  ]) {
+  for (const [kw, celsius, wind] of [[100, 25, 0], [300, 25, 2], [2000, 35, 5], [800, 10, 1]]) {
     const btu = kw * 0.288894658, // kW/m to Btu/ft/s
       fahrenheit = celsius * 1.8 + 32,
       mph = wind * 2.23693629,
@@ -56,10 +51,7 @@ test('flame length (Byram 1959), crown initiation (Van Wagner 1977) and flatteni
 });
 
 const vertexCodes = (h) =>
-  h.pipelines
-    .filter((p) => p.vertex)
-    .map((p) => p.vertex.module.code)
-    .filter((c) => c.includes('fn scatterPose('));
+  h.pipelines.filter((p) => p.vertex).map((p) => p.vertex.module.code).filter((c) => c.includes('fn scatterPose('));
 
 test('every posing stage reads the map after its own bindings, under the trample edit too', () => {
   const h = optionalGPU(),
@@ -75,28 +67,18 @@ test('every posing stage reads the map after its own bindings, under the trample
   effect.prepareShadow({ context: h.context, matrices: new Float32Array(16), cascades: 1 });
   effect.drawShadow({ context: h.context, pass, matrix: h.context.camera.matrix, cascade: 0 });
   const [colour, shadow, list] = vertexCodes(h);
-  for (const [code, group, at] of [
-    [colour, 1, 2],
-    [shadow, 0, 2],
-    [list, 0, 3],
-  ]) {
+  for (const [code, group, at] of [[colour, 1, 2], [shadow, 0, 2], [list, 0, 3]]) {
     assert.ok(code.includes(`@group(${group}) @binding(${at}) var<storage,read> plantMap:array<vec4f>;`));
     assert.ok(code.includes(`@group(${group}) @binding(${at + 1}) var<uniform> plant:array<vec4f,6>;`));
     assert.ok(code.includes(`@group(${group}) @binding(${at + 2}) var<storage,read> trample:array<vec2f>;`));
     const pose = code.indexOf('fn scatterPose(');
-    assert.ok(
-      code.indexOf('let plantC=', pose) > code.indexOf('let push=tramplePush(', pose),
-      'after the trample turn',
-    );
+    assert.ok(code.indexOf('let plantC=', pose) > code.indexOf('let push=tramplePush(', pose), 'after the trample turn');
     assert.ok(code.indexOf('let plantC=', pose) < code.indexOf('let bend=windBend(', pose), 'before the wind');
     assert.ok(code.includes('plantOut.normal=plantTurn(plantOut.normal,plantK,plantA)'));
   }
   assert.match(colour, /o\.color=plantColor\(/);
   assert.doesNotMatch(shadow, /plantColor\(material/);
-  assert.ok(
-    h.pipelines.some((p) => p.compute?.module.code.includes('var<storage,read_write> map:array<vec4f>')) === false,
-    'no source, no compose pass',
-  );
+  assert.ok(h.pipelines.some((p) => p.compute?.module.code.includes('var<storage,read_write> map:array<vec4f>')) === false, 'no source, no compose pass');
   effect.dispose();
   states.dispose();
   assert.throws(() => plantStatePoseCode('fn main(){}', 0, 2), TypeError);
@@ -176,10 +158,7 @@ function recordingDevice() {
     createBindGroup: () => ({}),
     queue: {
       writeBuffer: (b, offset, data) => {
-        const bytes =
-            data instanceof ArrayBuffer
-              ? new Uint8Array(data)
-              : new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+        const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
           copy = new Float32Array(bytes.slice().buffer);
         writes.push({ b, offset, data: copy });
       },

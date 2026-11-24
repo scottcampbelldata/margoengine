@@ -12,7 +12,8 @@ import { lazChunks, lazInfo } from '../dist/laz.js';
 const folder = new URL('./fixtures/laz/', import.meta.url);
 const expected = JSON.parse(readFileSync(new URL('records.json', folder)));
 const USGS = 'USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz';
-const read = (name) => new Uint8Array(readFileSync(new URL(name === USGS ? `../${name}` : name, folder)));
+const read = (name) =>
+  new Uint8Array(readFileSync(new URL(name === USGS ? `../${name}` : name, folder)));
 const digest = (array) =>
   createHash('sha256')
     .update(new Uint8Array(array.buffer, array.byteOffset, array.byteLength))
@@ -150,14 +151,8 @@ test('lasWaveform reads samples from inside the file and from a .wdp, and refuse
   const beside = new Uint8Array(66);
   new DataView(beside.buffer).setUint16(62, 9, true);
   assert.deepEqual([...lasWaveform(las(4, 0), 0, beside).raw], [0, 9, 0], 'offsets count from the start of a .wdp');
-  assert.throws(
-    () => lasWaveform(las(4, 0), 0, new Uint8Array(10)),
-    (e) => e.code === 'truncated',
-  );
-  assert.throws(
-    () => lasWaveform(las(4, 0, 12), 0, beside),
-    (e) => e.code === 'unsupported',
-  );
+  assert.throws(() => lasWaveform(las(4, 0), 0, new Uint8Array(10)), (e) => e.code === 'truncated');
+  assert.throws(() => lasWaveform(las(4, 0, 12), 0, beside), (e) => e.code === 'unsupported');
 });
 
 test('extra bytes described by several records all read, in record order', async () => {
@@ -165,13 +160,7 @@ test('extra bytes described by several records all read, in record order', async
     extra = lasExtraBytes(records, header);
   assert.equal(records.filter((r) => r.userId === 'LASF_Spec' && r.recordId === 4).length, 2);
   assert.equal(extra.length, 2);
-  assert.deepEqual(
-    extra.map((e) => [e.name, e.offset]),
-    [
-      ['Deviation', 0],
-      ['confidence', 2],
-    ],
-  );
+  assert.deepEqual(extra.map((e) => [e.name, e.offset]), [['Deviation', 0], ['confidence', 2]]);
   assert.match(lasCrs(records).wkt, /Lambert-93/);
 });
 
@@ -179,15 +168,6 @@ test('deprecated pairs and triples of extra bytes read as one field per element,
   const { header, records } = readLASHeader(read('extra-bytes.laz'));
   assert.deepEqual(
     lasExtraBytes(records, header).map((e) => `${e.name}:${e.dataType}:${e.offset}`),
-    [
-      'Colors[0]:3:0',
-      'Colors[1]:3:2',
-      'Colors[2]:3:4',
-      'Reserved:0:6',
-      'Flags[0]:2:13',
-      'Flags[1]:2:14',
-      'Intensity:5:15',
-      'Time:7:19',
-    ],
+    ['Colors[0]:3:0', 'Colors[1]:3:2', 'Colors[2]:3:4', 'Reserved:0:6', 'Flags[0]:2:13', 'Flags[1]:2:14', 'Intensity:5:15', 'Time:7:19'],
   );
 });

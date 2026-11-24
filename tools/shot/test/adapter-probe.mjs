@@ -36,12 +36,7 @@ for (let i = 0; i < launches; i++) {
       return answers;
     });
     const gpu = await browser.newPage();
-    if (
-      await gpu.goto('edge://gpu', { timeout: 20_000 }).then(
-        () => true,
-        () => false,
-      )
-    ) {
+    if (await gpu.goto('edge://gpu', { timeout: 20_000 }).then(() => true, () => false)) {
       // The page fills its feature table in after load: wait until its WebGPU row is there, not for a fixed time.
       const pageText = () => {
         let s = '';
@@ -56,10 +51,7 @@ for (let i = 0; i < launches; i++) {
       // A page that never shows the row is itself a finding of the probe: say so beside the text it did show.
       record.gpuPage = await gpu
         .waitForFunction(`(${pageText})().includes('WebGPU')`, null, { timeout: 20_000, polling: 250 })
-        .then(
-          () => 'ready',
-          () => 'no WebGPU row within 20 s',
-        );
+        .then(() => 'ready', () => 'no WebGPU row within 20 s');
       const text = await gpu.evaluate(pageText);
       writeFileSync(join(out, `gpu-${i}.txt`), text);
     }

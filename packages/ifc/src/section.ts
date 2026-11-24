@@ -57,8 +57,7 @@ const dot = (a: ArrayLike<number>, b: ArrayLike<number>) => a[0] * b[0] + a[1] *
 function checkPlanes(planes: readonly (readonly number[])[]): number[][] {
   if (!Array.isArray(planes)) fail('range', 'section planes must be an array of [a, b, c, d]');
   return planes.map((p) => {
-    if (!Array.isArray(p) || p.length !== 4 || !p.every(Number.isFinite))
-      fail('range', 'a section plane must be four finite numbers [a, b, c, d]');
+    if (!Array.isArray(p) || p.length !== 4 || !p.every(Number.isFinite)) fail('range', 'a section plane must be four finite numbers [a, b, c, d]');
     const l = Math.hypot(p[0], p[1], p[2]);
     if (!(l > 0)) fail('range', 'a section plane needs a non-zero normal [a, b, c]');
     return [p[0] / l, p[1] / l, p[2] / l, p[3] / l];
@@ -78,7 +77,7 @@ function trimPolygon(poly: V3[], planes: number[][], skip: number): V3[] {
         sa = dot(q, a) + q[3],
         sb = dot(q, b) + q[3];
       if (sa >= 0) next.push(a);
-      if (sa >= 0 !== sb >= 0) {
+      if ((sa >= 0) !== (sb >= 0)) {
         const t = sa / (sa - sb);
         next.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
       }
@@ -171,10 +170,7 @@ function joinSegments(segments: V3[][], tolerance: number): { loops: V3[][]; clo
       }
     }
   }
-  return {
-    loops: [...closed.map((l) => straighten(l, true)), ...open.map((l) => straighten(l, false))],
-    closed: closed.length,
-  };
+  return { loops: [...closed.map((l) => straighten(l, true)), ...open.map((l) => straighten(l, false))], closed: closed.length };
 }
 
 /** `loop` without the points that lie on the straight line between their neighbours (a face split into triangles). */
@@ -207,8 +203,7 @@ function inside(ring: number[], x: number, y: number): boolean {
 }
 const ringArea = (ring: number[]) => {
   let s = 0;
-  for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2)
-    s += ring[j] * ring[i + 1] - ring[i] * ring[j + 1];
+  for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) s += ring[j] * ring[i + 1] - ring[i] * ring[j + 1];
   return s / 2;
 };
 
@@ -224,9 +219,7 @@ function capTriangles(loops: V3[][], n: ArrayLike<number>): V3[][] {
     keep = rings.map((r, i) => r.length >= 6 && areas[i] > 0);
   // A loop's parent is the smallest loop around it; its depth is how many loops are around it.
   const around = rings.map((r, i) =>
-    keep[i]
-      ? rings.map((_, j) => j).filter((j) => j !== i && keep[j] && areas[j] > areas[i] && inside(rings[j], r[0], r[1]))
-      : [],
+    keep[i] ? rings.map((_, j) => j).filter((j) => j !== i && keep[j] && areas[j] > areas[i] && inside(rings[j], r[0], r[1])) : [],
   );
   const out: V3[][] = [];
   rings.forEach((outer, i) => {
@@ -260,8 +253,7 @@ export function sectionIFC(
 ): IFCSectionCut[] {
   const list = checkPlanes(planes),
     tolerance = options.tolerance ?? 1e-5;
-  if (!(tolerance >= 0) || !Number.isFinite(tolerance))
-    fail('range', 'tolerance must be a finite number of meters, 0 or more');
+  if (!(tolerance >= 0) || !Number.isFinite(tolerance)) fail('range', 'tolerance must be a finite number of meters, 0 or more');
   const byElement = new Map<number, IFCSectionSource[]>();
   for (const s of sources) {
     const list = byElement.get(s.element);
@@ -297,11 +289,7 @@ export function sectionIFC(
         // The point where edge (behind, front) crosses, always computed from the corner behind.
         const cross = (b: number, f: number): V3 => {
           const t = s[b] / (s[b] - s[f]);
-          return [
-            w[b * 3] + (w[f * 3] - w[b * 3]) * t,
-            w[b * 3 + 1] + (w[f * 3 + 1] - w[b * 3 + 1]) * t,
-            w[b * 3 + 2] + (w[f * 3 + 2] - w[b * 3 + 2]) * t,
-          ];
+          return [w[b * 3] + (w[f * 3] - w[b * 3]) * t, w[b * 3 + 1] + (w[f * 3 + 1] - w[b * 3 + 1]) * t, w[b * 3 + 2] + (w[f * 3 + 2] - w[b * 3 + 2]) * t];
         };
         for (let t = 0; t < indices.length; t += 3) {
           const c = [indices[t], indices[t + 1], indices[t + 2]],
@@ -393,14 +381,10 @@ export class IFCSectionView {
     private readonly scene: IFCScene,
     private readonly options: IFCSectionViewOptions = {},
   ) {
-    this.capColor =
-      options.capColor === undefined || options.capColor === 'element'
-        ? 'element'
-        : rgb(options.capColor, 'capColor', [0, 0, 0]).map(linear);
+    this.capColor = options.capColor === undefined || options.capColor === 'element' ? 'element' : rgb(options.capColor, 'capColor', [0, 0, 0]).map(linear);
     this.edgeColor = rgb(options.edgeColor, 'edgeColor', [0, 0, 0]);
     this.edgeWidth = options.edgeWidth ?? 2;
-    if (!(this.edgeWidth > 0) || !Number.isFinite(this.edgeWidth))
-      fail('range', 'edgeWidth must be a positive number of pixels');
+    if (!(this.edgeWidth > 0) || !Number.isFinite(this.edgeWidth)) fail('range', 'edgeWidth must be a positive number of pixels');
     if (options.edges && (typeof options.edges.Line !== 'function' || typeof options.edges.lines?.add !== 'function'))
       fail('range', 'edges takes { lines, Line } from @margoengine/lines');
     this.material = new Material({ roughness: 1, metalness: 0, doubleSided: true });
@@ -446,12 +430,7 @@ export class IFCSectionView {
     if (edges) {
       const all = this.cuts.flatMap((c) => Array.from(c.edges));
       if (all.length) {
-        const line = new edges.Line({
-          positions: all,
-          mode: 'segments',
-          color: this.edgeColor.map(linear) as [number, number, number],
-          width: this.edgeWidth,
-        });
+        const line = new edges.Line({ positions: all, mode: 'segments', color: this.edgeColor.map(linear) as [number, number, number], width: this.edgeWidth });
         edges.lines.add(line);
         this.lines.push(line);
       }
@@ -475,10 +454,7 @@ export class IFCSectionView {
       const n = this.scene.clippingPlanes[c.plane],
         normals = new Float32Array(c.positions.length);
       for (let i = 0; i < normals.length; i += 3) normals.set([-n[0], -n[1], -n[2]], i);
-      batch.add(
-        { positions: c.positions, normals, indices: c.indices },
-        { matrix: identity, color: this.capColorOf(c.element) },
-      );
+      batch.add({ positions: c.positions, normals, indices: c.indices }, { matrix: identity, color: this.capColorOf(c.element) });
     }
   }
 

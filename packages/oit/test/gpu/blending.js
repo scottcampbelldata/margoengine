@@ -70,7 +70,11 @@ window.check = {
     }
     const meshes = o.layers.map((name, i) => {
       const kind = kinds[name],
-        mesh = createMesh(engine, planeGeometry(1.6, 1.6), new Material(typeof kind === 'function' ? kind() : kind));
+        mesh = createMesh(
+          engine,
+          planeGeometry(1.6, 1.6),
+          new Material(typeof kind === 'function' ? kind() : kind),
+        );
       mesh.root.setPosition([0, 0, 0.6 - i * 0.3]);
       return mesh;
     });

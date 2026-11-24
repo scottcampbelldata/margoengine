@@ -30,8 +30,7 @@ export interface MaterialSetting extends SettingRow {
   readonly group: MaterialSettingGroup;
   readonly default: MaterialSettingValue;
 }
-const number = (...args: Parameters<typeof numberSetting>): MaterialSetting =>
-  numberSetting(...args) as MaterialSetting;
+const number = (...args: Parameters<typeof numberSetting>): MaterialSetting => numberSetting(...args) as MaterialSetting;
 const color = (...args: Parameters<typeof colorSetting>): MaterialSetting => colorSetting(...args) as MaterialSetting;
 const physiology = (name: string, low: number, high: number, step: number, about: string): MaterialSetting =>
   ({
@@ -49,13 +48,7 @@ export const MATERIAL_SETTINGS: readonly MaterialSetting[] = [
     0.001,
     `Volume fraction of melanin in the epidermis (0.002 very fair, about 0.3 dark); null keeps the published profile.${REBUILDS}`,
   ),
-  physiology(
-    'melaninBlend',
-    0,
-    1,
-    0.01,
-    `Share of the melanin that is eumelanin (brown-black), the rest pheomelanin.${REBUILDS}`,
-  ),
+  physiology('melaninBlend', 0, 1, 0.01, `Share of the melanin that is eumelanin (brown-black), the rest pheomelanin.${REBUILDS}`),
   physiology('hemoglobin', 0.001, 0.2, 0.001, `Volume fraction of blood in the dermis.${REBUILDS}`),
   physiology('oxygenation', 0, 1, 0.01, `Share of the hemoglobin carrying oxygen.${REBUILDS}`),
   number(

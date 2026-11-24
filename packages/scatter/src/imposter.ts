@@ -77,7 +77,10 @@ export class ImposterScatter extends Scatter {
   #texture?: GPUTexture;
   #sampler?: GPUSampler;
 
-  constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], options: ImposterScatterOptions) {
+  constructor(
+    geometry: Geometry | readonly [Geometry, Geometry, Geometry],
+    options: ImposterScatterOptions,
+  ) {
     super(geometry, options);
     const imposter = options?.imposter;
     if (!(imposter instanceof Imposter))

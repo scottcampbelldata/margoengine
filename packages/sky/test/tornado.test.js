@@ -67,12 +67,7 @@ test('the modified Rankine wind falls as r^-decay outside the core, and its defi
     close(tornadoWind(400, s) / tornadoWind(200, s), 2 ** -decay, 1e-12, `decay ${decay}`);
     close(tornadoDeficit(0, s), s.rho * vm * vm * (0.5 + 0.5 / decay), 1e-12, 'central deficit');
   }
-  close(
-    tornadoPeakWind(resolveTornado({ profile: 'rankine', decay: 1 })),
-    Math.sqrt(8000 / 1.15),
-    1e-12,
-    'Rankine 1858',
-  );
+  close(tornadoPeakWind(resolveTornado({ profile: 'rankine', decay: 1 })), Math.sqrt(8000 / 1.15), 1e-12, 'Rankine 1858');
 });
 
 test('the pressure is in cyclostrophic balance with the wind, dp/dr = rho v^2 / r, for both profiles', () => {
@@ -100,10 +95,7 @@ test('the funnel edge is the surface where the deficit lifts the air to its cond
   const weak = resolveTornado({ pressureDrop: 40, cloudBase: 1000, wallCloudDrop: 400 }),
     bottom = funnelBottom(weak);
   close(bottom, 600 - 4000 / (weak.rho * G), 1e-12, 'funnel bottom');
-  assert.ok(
-    funnelRadius(bottom + 5, weak) > 0 && funnelRadius(bottom - 5, weak) === 0,
-    'a funnel aloft, not on the ground',
-  );
+  assert.ok(funnelRadius(bottom + 5, weak) > 0 && funnelRadius(bottom - 5, weak) === 0, 'a funnel aloft, not on the ground');
   assert.equal(funnelBottom(s), 0, '90 hPa under a 600 m wall base reaches the ground');
   const table = funnelProfile(s, 1);
   assert.equal(table.length, 32);
@@ -127,14 +119,7 @@ test('the debris cloud reaches out to where the surface wind lofts debris', () =
 });
 
 test('the path is followed through its keys, and the tornado stands still outside them', () => {
-  const s = resolveTornado({
-    path: [
-      [0, 0, 0],
-      [10, 100, 0],
-      [20, 100, 100],
-      [30, 0, 100],
-    ],
-  });
+  const s = resolveTornado({ path: [[0, 0, 0], [10, 100, 0], [20, 100, 100], [30, 0, 100]] });
   assert.deepEqual(tornadoCenter(s, 10), [100, 0]);
   assert.deepEqual(tornadoCenter(s, 20), [100, 100]);
   assert.deepEqual(tornadoCenter(s, -5), [0, 0]);
@@ -143,16 +128,7 @@ test('the path is followed through its keys, and the tornado stands still outsid
   assert.ok(mid[0] > 100 && mid[1] > 0 && mid[1] < 100, `between the keys, bowed out: ${mid}`);
   assert.deepEqual(new Tornado({ center: [5, 6], velocity: [2, -1] }).centerAt(10), [25, -4]);
   assert.throws(() => new Tornado({ path: [[0, 0, 0]] }), TypeError);
-  assert.throws(
-    () =>
-      new Tornado({
-        path: [
-          [5, 0, 0],
-          [5, 1, 1],
-        ],
-      }),
-    TypeError,
-  );
+  assert.throws(() => new Tornado({ path: [[5, 0, 0], [5, 1, 1]] }), TypeError);
 });
 
 test('the funnel lowers as the vortex spins up after touchdown, and rises after liftoff', () => {
@@ -234,16 +210,7 @@ test('the tornado rows write the options, a default or null leaving the key unse
   for (const r of rows) assert.equal(r.live, true, r.name);
   const sky = { options: {} },
     t = new Tornado();
-  applySkySettings(
-    { sky, tornado: t },
-    {
-      'tornado.speed': 10,
-      'tornado.heading': 90,
-      'tornado.coreRadius': 400,
-      'tornado.profile': 'rankine',
-      'tornado.tiltX': 200,
-    },
-  );
+  applySkySettings({ sky, tornado: t }, { 'tornado.speed': 10, 'tornado.heading': 90, 'tornado.coreRadius': 400, 'tornado.profile': 'rankine', 'tornado.tiltX': 200 });
   close(t.options.velocity[0], 10, 1e-12, 'heading 90 is +X');
   assert.equal(t.options.coreRadius, 400);
   assert.equal(t.options.profile, 'rankine');
@@ -254,16 +221,7 @@ test('the tornado rows write the options, a default or null leaving the key unse
 
 test('GAP-FILM-TIME: a TornadoCloud seeked by @margoengine/cutscene/seek is where a continuous run has it, bit for bit', async () => {
   const { seekSync } = await import('../../cutscene/dist/seek.js'),
-    options = () => ({
-      tornado: {
-        path: [
-          [0, -400, 0],
-          [120, 300, 200],
-        ],
-        touchdown: 5,
-        liftoff: 100,
-      },
-    }),
+    options = () => ({ tornado: { path: [[0, -400, 0], [120, 300, 200]], touchdown: 5, liftoff: 100 } }),
     live = new TornadoCloud(options()),
     cut = new TornadoCloud(options()),
     fps = 24,

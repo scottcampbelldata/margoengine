@@ -10,8 +10,7 @@ export {
   type HDRParseOptions,
 } from './hdr.js';
 export { parseEXR, type EXRImage, type EXRChannel, type EXRCompression } from './exr.js';
-export { parseEnvironmentImage } from './parse-image.js';
-export { loadEnvironmentImage } from './load.js';
+export { parseEnvironmentImage, loadEnvironmentImage } from './load.js';
 export {
   parseUltraHDR,
   applyGainMap,

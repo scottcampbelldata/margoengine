@@ -226,9 +226,9 @@ export const WIND_THRASH_FROM = 5.4;
 
 export function clearPlacements(candidates: readonly GroundPlacement[], radius: number, exclusions: readonly (GroundBounds | GroundCircle | GroundPath)[], gap?: number): GroundPlacement[];
 
-export function coverCode(code: string, lit: boolean, at?: number, depth?: boolean): string | undefined;
+export function coverCode(code: string, lit: boolean, at?: number): string | undefined;
 
-export const coverDeclaration = "var<private> scatterCover:vec4f=vec4f(0.0,65536.0,0.0,0.5);\n";
+export const coverDeclaration = "var<private> scatterCover:vec3f=vec3f(0.0,65536.0,0.0);\n";
 
 export function groundTransforms(placements: readonly GroundPlacement[], height: (x: number, z: number) => number, offsetY?: number): Float32Array;
 

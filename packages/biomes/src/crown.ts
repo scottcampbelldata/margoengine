@@ -28,24 +28,6 @@ export function stored(s: BiomeSample, layer: string): number {
   switch (layer) {
     case 'temperature':
       return s.temperature * 100;
-    case 'coldest':
-      return s.coldest * 100;
-    case 'warmest':
-      return s.warmest * 100;
-    case 'gdd5':
-      return s.gdd5;
-    case 'season':
-      return s.season;
-    case 'treeline':
-      return s.treeline * 100;
-    case 'alpha':
-      return s.alpha * 255;
-    case 'exposure':
-      return s.exposure * 255;
-    case 'soil':
-      return s.soil * 100;
-    case 'curvature':
-      return (s.curvature ?? 0) * 10000;
     case 'rainfall':
       return s.rainfall;
     case 'moisture':

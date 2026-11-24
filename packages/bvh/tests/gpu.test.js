@@ -57,7 +57,8 @@ function fakeDevice({ limit = 1 << 27, groups = 65535, reply } = {}) {
 function grid(n = 12) {
   const positions = [],
     indices = [];
-  for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) positions.push(x, y, Math.sin(x * 0.7) * Math.cos(y * 0.9));
+  for (let y = 0; y <= n; y++)
+    for (let x = 0; x <= n; x++) positions.push(x, y, Math.sin(x * 0.7) * Math.cos(y * 0.9));
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const a = y * (n + 1) + x;
@@ -119,11 +120,7 @@ test('positions of any stride and precision upload as three floats a vertex', as
   assert.deepEqual([...new Float32Array(strided.positions.data).subarray(0, 9)], [0, 0, 0, 1, 0, 0, 0, 1, 0]);
   const wide = await GPUMeshBVH.create(
     device,
-    MeshBVH.build({
-      positions: new Float64Array([0.1, 0, 0, 1, 0, 0, 0, 1, 0]),
-      precision: 'float64',
-      indices: [0, 1, 2],
-    }),
+    MeshBVH.build({ positions: new Float64Array([0.1, 0, 0, 1, 0, 0, 0, 1, 0]), precision: 'float64', indices: [0, 1, 2] }),
   );
   assert.equal(new Float32Array(wide.positions.data)[0], Math.fround(0.1));
 });
@@ -132,10 +129,7 @@ test('a tree for a shader uploads at once, with no pipeline, and its own ray cal
   const device = fakeDevice(),
     bvh = MeshBVH.build({ positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: [0, 1, 2] }),
     gpu = GPUMeshBVH.forShader(device, bvh);
-  assert.deepEqual(
-    gpu.bindings(3).map((entry) => entry.binding),
-    [3, 4, 5, 6, 7],
-  );
+  assert.deepEqual(gpu.bindings(3).map((entry) => entry.binding), [3, 4, 5, 6, 7]);
   assert.equal(new Uint32Array(gpu.params.data)[2], 1);
   await assert.rejects(gpu.raycast([{ origin: [0, 0, 1], direction: [0, 0, -1] }]), { code: 'state' });
   gpu.dispose();
@@ -199,9 +193,7 @@ test('two traces in one encoder keep their own settings', async () => {
   gpu.encodeTrace(encoder, rays, hits, 2, { mode: 'any', side: 'front' });
   gpu.encodeTrace(encoder, rays, hits, 1, { side: 'back' });
   gpu.encodeTrace(encoder, rays, hits, 2, { mode: 'any', side: 'front' });
-  const traces = device.buffers
-    .filter((buffer) => buffer.label === 'bvh trace')
-    .map((b) => [...new Uint32Array(b.data)]);
+  const traces = device.buffers.filter((buffer) => buffer.label === 'bvh trace').map((b) => [...new Uint32Array(b.data)]);
   assert.deepEqual(traces, [
     [2, 1, 1, 64],
     [1, 2, 0, 64],
@@ -238,10 +230,7 @@ test('an abort during the readback rejects and still frees the buffers', async (
 });
 
 test('a tree or ray set over the device limit is refused with a RangeError', async () => {
-  await assert.rejects(
-    GPUMeshBVH.create(fakeDevice({ limit: 64 }), MeshBVH.build(grid())),
-    /maxStorageBufferBindingSize/,
-  );
+  await assert.rejects(GPUMeshBVH.create(fakeDevice({ limit: 64 }), MeshBVH.build(grid())), /maxStorageBufferBindingSize/);
   const device = fakeDevice({ limit: 1 << 16 }),
     gpu = await GPUMeshBVH.create(device, MeshBVH.build(grid(2)));
   await assert.rejects(gpu.raycast(new Float32Array(1 << 15)), /trace them in parts/);

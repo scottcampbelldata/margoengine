@@ -37,6 +37,17 @@ export interface BurnEvent extends Timed {
 
 export const COVER_CHANNELS: readonly ['mud', 'ash', 'char', 'lava', 'heat', 'wet', 'soil', 'ashen'];
 
+export interface CraterEvent extends Timed {
+    kind: 'crater';
+    center: GroundPoint;
+    radius?: number;
+    depth?: number;
+    heave?: number;
+    heaveTime?: number;
+    domeSpread?: number;
+    ejecta?: number;
+}
+
 export const GROUND_DURATIONS: Readonly<Record<GroundEventKind, number>>;
 
 export const GROUND_LOOK_DEFAULTS: Readonly<Required<GroundLook>>;
@@ -113,7 +124,7 @@ export interface GroundCover {
     ashen: number;
 }
 
-export type GroundEvent = GullyEvent | BankEvent | ScourEvent | SlideEvent | MudEvent | AshEvent | LavaEvent | BurnEvent;
+export type GroundEvent = GullyEvent | BankEvent | ScourEvent | SlideEvent | MudEvent | AshEvent | LavaEvent | BurnEvent | CraterEvent;
 
 export type GroundEventKind = GroundEvent['kind'];
 
@@ -289,7 +300,6 @@ class Terrain implements EnginePlugin {
     readonly anchor?: readonly [number, number];
     constructor(options: TerrainOptions);
     get shift(): ArrayLike<number>;
-    get surfaceHeightTexture(): GPUTexture | undefined;
     static attach(instance: EngineKernel, options: TerrainOptions): Terrain;
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
@@ -359,8 +369,6 @@ interface TerrainOptions {
     cellSize?: number;
     resolution?: number;
     levels?: number;
-    readonly clipmapAnchor?: readonly [number, number] | 'camera';
-    readonly captureSurfaceHeight?: boolean;
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
 }

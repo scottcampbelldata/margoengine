@@ -545,16 +545,7 @@ type SampleOptions = Required<
 > &
   Pick<EncodeVideoOptions, 'codec' | 'bitrate' | 'signal'>;
 
-function checkOptions({
-  format,
-  fps,
-  maxBytes,
-  keyFrameInterval,
-  bitrate,
-  webCodecs,
-  alpha,
-  codec,
-}: SampleOptions): void {
+function checkOptions({ format, fps, maxBytes, keyFrameInterval, bitrate, webCodecs, alpha, codec }: SampleOptions): void {
   checkFps(fps);
   if (alpha && (format !== 'webm' || (codec !== undefined && !ALPHA.test(codec))))
     throw fault('unsupported', 'Alpha video needs WebM with VP9 or VP8', 'headless');
@@ -694,12 +685,7 @@ async function* encodeSamples(
             if (encodedBytes > maxBytes) return error(rangeError('Encoded video exceeds maxBytes', 'headless'));
             const bytes = new Uint8Array(chunk.byteLength);
             chunk.copyTo(bytes);
-            into.push({
-              data: bytes,
-              timestamp: chunk.timestamp,
-              duration: chunk.duration ?? 0,
-              key: chunk.type === 'key',
-            });
+            into.push({ data: bytes, timestamp: chunk.timestamp, duration: chunk.duration ?? 0, key: chunk.type === 'key' });
             const decoder = metadata?.decoderConfig;
             if (into === colours && decoder?.description) description = copyBytes(decoder.description);
             for (; colours.length && (!alpha || alphas.length); ) {
@@ -756,8 +742,7 @@ async function* encodeSamples(
     for (const one of [encoder, alphaEncoder]) if (one && one.state !== 'closed') one.close();
   }
   const used = config!.codec;
-  if (used.startsWith('avc1') && !description)
-    throw fault('failed', 'The encoder gave no H.264 description', 'headless');
+  if (used.startsWith('avc1') && !description) throw fault('failed', 'The encoder gave no H.264 description', 'headless');
   if ((used.startsWith('hvc1') || used.startsWith('hev1')) && !description)
     throw fault('failed', 'The encoder gave no H.265 description', 'headless');
   return { config: config!, description, end, timed: !!timed };

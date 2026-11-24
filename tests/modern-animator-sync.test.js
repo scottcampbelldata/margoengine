@@ -11,12 +11,10 @@ const JOINTS = { Root: [null, 0, 0, 0], Hips: ['Root', 0, 1, 0], Foot: ['Hips', 
 const DT = 1 / 120;
 const TAU = 2 * Math.PI;
 // The foot's turn about X reads the clip's phase directly: one full turn per cycle, in two half-turn steps.
-const phaseOf =
-  (duration, stepAt = 0.5) =>
-  (t) => {
-    const u = (t / duration) % 1;
-    return u < stepAt ? (u / stepAt) * 0.5 : 0.5 + ((u - stepAt) / (1 - stepAt)) * 0.5;
-  };
+const phaseOf = (duration, stepAt = 0.5) => (t) => {
+  const u = (t / duration) % 1;
+  return u < stepAt ? (u / stepAt) * 0.5 : 0.5 + ((u - stepAt) / (1 - stepAt)) * 0.5;
+};
 const clip = (duration, stepAt, travel = 0) => {
   const phase = phaseOf(duration, stepAt);
   return {
@@ -34,13 +32,7 @@ const CLIPS = {
   Limp: clip(1, 0.7, 1),
   Idle: { duration: 2, tracks: { 'Foot.rotation': () => [0, 0, 0, 1] } },
 };
-const BLEND = {
-  parameter: 'speed',
-  samples: [
-    { value: 0, clip: 'Walk' },
-    { value: 1, clip: 'Run' },
-  ],
-};
+const BLEND = { parameter: 'speed', samples: [{ value: 0, clip: 'Walk' }, { value: 1, clip: 'Run' }] };
 const options = (extra = {}) => ({
   initial: 'move',
   parameters: { speed: 0.5 },
@@ -117,17 +109,7 @@ test('leaving the group starts the next state from 0, and coming back starts at 
 });
 
 test('markers line up clips whose steps fall at different fractions', async (t) => {
-  const f = await rig({
-    states: {
-      move: {
-        parameter: 'speed',
-        samples: [
-          { value: 0, clip: 'Walk' },
-          { value: 1, clip: 'Limp' },
-        ],
-      },
-    },
-  });
+  const f = await rig({ states: { move: { parameter: 'speed', samples: [{ value: 0, clip: 'Walk' }, { value: 1, clip: 'Limp' }] } } });
   t.after(() => f.release());
   const sync = addSyncGroup(f.animator, {
     states: ['move'],
@@ -271,15 +253,7 @@ test('Fox.glb: Walk and Run, real clips of different lengths, run a blended cycl
     f = await animatorRun(file, {
       initial: 'move',
       parameters: { speed: 0.5 },
-      states: {
-        move: {
-          parameter: 'speed',
-          samples: [
-            { value: 0, clip: 'Walk' },
-            { value: 1, clip: 'Run' },
-          ],
-        },
-      },
+      states: { move: { parameter: 'speed', samples: [{ value: 0, clip: 'Walk' }, { value: 1, clip: 'Run' }] } },
     });
   t.after(() => f.release());
   const durations = Object.fromEntries(f.animation.clips.map((c) => [c.name, c.duration]));

@@ -65,10 +65,7 @@ try {
       assert.deepEqual(r.errors, [], `${name} under ${kind}`);
       console.log(JSON.stringify({ name, kind, open: r.open, dark: r.dark }));
       assert.ok(Math.max(...r.open) > 40, `${name} under ${kind} has no light to take away`);
-      assert.ok(
-        Math.max(...r.dark) < Math.max(...r.open) * 0.5,
-        `${name} under ${kind} ignored the pattern: ${r.open} to ${r.dark}`,
-      );
+      assert.ok(Math.max(...r.dark) < Math.max(...r.open) * 0.5, `${name} under ${kind} ignored the pattern: ${r.open} to ${r.dark}`);
     }
   // A device restore (KB-RESTORE-BORROWED1): a plain mask is dropped and reported once, the frame goes on unmasked and
   // setTexture brings it back; a function mask is made again on the new device. Restores come last: they replace the device.
@@ -82,11 +79,7 @@ try {
     console.log(JSON.stringify({ restore: kind, plain: r.plain, made: r.made, reports: r.reports }));
     assert.deepEqual(r.thrown, [], `${kind}: a frame threw after the restore`);
     assert.deepEqual(r.errors, [], `${kind}: validation errors after the restore`);
-    const near = (x, y, what) =>
-      assert.ok(
-        x.every((v, i) => Math.abs(v - y[i]) <= 2),
-        `${kind} ${what}: ${x} against ${y}`,
-      );
+    const near = (x, y, what) => assert.ok(x.every((v, i) => Math.abs(v - y[i]) <= 2), `${kind} ${what}: ${x} against ${y}`);
     assert.ok(Math.max(...r.plain.dark) < Math.max(...r.plain.open) * 0.5, `${kind}: the plain mask did not darken`);
     near(r.plain.lost, r.plain.open, 'lost mask equals no mask');
     near(r.plain.back, r.plain.dark, 'setTexture brings the mask back');

@@ -507,9 +507,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** Last frame: layers re-rendered, caster draws, frames that re-rendered nothing. */
   readonly stats = { layers: 0, draws: 0, cacheHits: 0 };
   /** @internal Optional atlas storage, implemented by the shadow-atlas entry. */
-  protected get atlasMode(): boolean {
-    return false;
-  }
+  protected get atlasMode(): boolean { return false; }
   /** @internal Optional per-frame map planning before camera matrices are built. */
   protected prepare(_context: Context): void {}
   /** @internal Optional per-light resolution policy. */
@@ -519,9 +517,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** @internal Publish map placements; marks in `dirty` each layer whose placement changed. */
   protected placeMaps(_context: Context, _layers: number, _dirty: Uint8Array): void {}
   /** @internal Pixel origin of an atlas face. */
-  protected mapOrigin(_layer: number): readonly [number, number] {
-    return [0, 0];
-  }
+  protected mapOrigin(_layer: number): readonly [number, number] { return [0, 0]; }
   private engine?: Engine;
   private device?: GPUDevice;
   private frame?: GPUBuffer;
@@ -746,11 +742,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       });
     this.layerViews = Array.from({ length: layers }, (_, baseArrayLayer) =>
-      this.map!.createView({
-        dimension: '2d',
-        baseArrayLayer: this.atlasMode ? 0 : baseArrayLayer,
-        arrayLayerCount: 1,
-      }),
+      this.map!.createView({ dimension: '2d', baseArrayLayer: this.atlasMode ? 0 : baseArrayLayer, arrayLayerCount: 1 }),
     );
     if (layers > this.cameraLayers) {
       this.cameras!.destroy();
@@ -851,10 +843,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     // Directional and area lights with castShadow take the layers after the point and spot ones.
     const pointLayers = layers,
       suns = this.lights.directional?.shadowLights?.() ?? noSuns,
-      areas = [
-        ...(this.lights.area?.shadowLights?.() ?? noAreas),
-        ...(this.lights.shapes?.shadowLights?.() ?? noAreas),
-      ],
+      areas = [...(this.lights.area?.shadowLights?.() ?? noAreas), ...(this.lights.shapes?.shadowLights?.() ?? noAreas)],
       sunCount = Math.min(suns.length, MAX_DIRECTIONAL_SHADOWS),
       areaCount = Math.min(areas.length, AREA_SHADOW_SLOTS);
     for (let s = 0; s < sunCount; s++) {
@@ -875,9 +864,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const point = data[at + 13] < 0.5 || hemisphere(data[at + 11]),
         base = bases[slot],
         c = j * 4,
-        dimensions = this.atlasMode
-          ? this.mapResolution('point', j, cameras[c] || size, cameras[c + 1] || size)
-          : undefined,
+        dimensions = this.atlasMode ? this.mapResolution('point', j, cameras[c] || size, cameras[c + 1] || size) : undefined,
         width = dimensions?.[0] ?? (cameras[c] || size),
         height = dimensions?.[1] ?? (cameras[c + 1] || size),
         range = cameras[c + 3] || data[at + 3],
@@ -890,8 +877,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const radius = radii[j];
       let same = slots[s + 11] === base && slots[s + 10] === (point ? 1 : 0) && slots[s + 9] === radius;
       const smaller = width !== size || height !== size;
-      if (this.viewports[base * 2] !== (smaller ? width : 0) || this.viewports[base * 2 + 1] !== (smaller ? height : 0))
-        same = false;
+      if (this.viewports[base * 2] !== (smaller ? width : 0) || this.viewports[base * 2 + 1] !== (smaller ? height : 0)) same = false;
       for (let k = 0; k < 8; k++) if (slots[s + k] !== data[at + (k < 4 ? k : k + 4)]) same = false;
       if (slots[s + 8] !== size) same = false;
       for (let k = 0; k < 4; k++) if (slots[s + 12 + k] !== cameras[c + k]) same = false;
@@ -1123,8 +1109,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       try {
         const width = this.viewports[l * 2];
         if (width) {
-          const [x, y] = this.mapOrigin(l),
-            height = this.viewports[l * 2 + 1];
+          const [x, y] = this.mapOrigin(l), height = this.viewports[l * 2 + 1];
           pass.setViewport(x, y, width, height, 0, 1);
           if (this.atlasMode) pass.setScissorRect(x, y, width, height);
         }
@@ -1192,9 +1177,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const light = suns[s],
         f = light.direction,
         [x, y] = lightBasis(f),
-        dimensions = this.atlasMode
-          ? this.mapResolution('directional', light.index, light.width || size, light.height || size)
-          : undefined,
+        dimensions = this.atlasMode ? this.mapResolution('directional', light.index, light.width || size, light.height || size) : undefined,
         width = dimensions?.[0] ?? (light.width || size),
         height = dimensions?.[1] ?? (light.height || size),
         base = this.sunBases[s],
@@ -1223,16 +1206,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         values[SUN_CASCADES + cascade * 4 + 2] = (height - 2) / size;
         values[SUN_CASCADES + cascade * 4 + 3] = 2 / size;
       });
-      values.set(
-        [base, s + 1, boxes.length, this.options.receiverPlane === false ? 0 : 1 + (this.options.slopeBias ?? 0)],
-        SUN + light.index * 4,
-      );
+      values.set([base, s + 1, boxes.length, this.options.receiverPlane === false ? 0 : 1 + (this.options.slopeBias ?? 0)], SUN + light.index * 4);
     }
     for (let s = 0; s < areaCount; s++) {
       const light = areas[s],
-        dimensions = this.atlasMode
-          ? this.mapResolution('area', light.index, light.width || size, light.height || size)
-          : undefined,
+        dimensions = this.atlasMode ? this.mapResolution('area', light.index, light.width || size, light.height || size) : undefined,
         width = dimensions?.[0] ?? (light.width || size),
         height = dimensions?.[1] ?? (light.height || size),
         base = this.areaBases[s],

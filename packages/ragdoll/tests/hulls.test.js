@@ -89,9 +89,7 @@ async function knight({ prepare, ...options } = {}) {
   assert.ok(Math.abs(bind[hips * 16 + 13] + m[13]) < 1e-3, 'rest pose is bind pose');
   // The head has no child bone to measure, so it needs a length to be a bone, and the toes and hand slots are left out.
   const leaves = /^(toes|handslot)/,
-    bones = rig.model.nodes.filter(
-      (node) => skin.joints.includes(rig.model.nodes.indexOf(node)) && node.name !== 'root',
-    ),
+    bones = rig.model.nodes.filter((node) => skin.joints.includes(rig.model.nodes.indexOf(node)) && node.name !== 'root'),
     ragdoll = Ragdoll.attach(rig.physics, {
       ...options,
       bones: bones
@@ -157,11 +155,7 @@ rtest('every vertex a bone carries is inside its hull, and inside its box', asyn
           // Pulled 1% toward the bone's centre of mass: a corner of the hull is on it, not in it.
           const at = positions.subarray(v * 3, v * 3 + 3),
             centre = part.body.colliders[0].translation(),
-            point = {
-              x: at[0] * 0.99 + centre.x * 0.01,
-              y: at[1] * 0.99 + centre.y * 0.01,
-              z: at[2] * 0.99 + centre.z * 0.01,
-            };
+            point = { x: at[0] * 0.99 + centre.x * 0.01, y: at[1] * 0.99 + centre.y * 0.01, z: at[2] * 0.99 + centre.z * 0.01 };
           assert.ok(part.body.colliders[0].containsPoint(point), `${shape}: vertex ${v} of ${part.node.name}`);
           checked++;
         }
@@ -202,12 +196,7 @@ rtest('setShape swaps the collider, and a refused shape leaves the old one', asy
     before = ragdoll.part(rig.node('upperarm.l')),
     capsule = before.shape;
   assert.deepEqual(capsule, { type: 'capsule' });
-  ragdoll.setShape(before, {
-    type: 'box',
-    center: [0, 0.1, 0],
-    halfExtents: [0.05, 0.1, 0.05],
-    rotation: [0, 0, 0, 1],
-  });
+  ragdoll.setShape(before, { type: 'box', center: [0, 0.1, 0], halfExtents: [0.05, 0.1, 0.05], rotation: [0, 0, 0, 1] });
   assert.equal(before.shape.type, 'box');
   ragdoll.setShape(before.node, capsule);
   assert.equal(before.body.colliders.length, 1);
@@ -217,10 +206,7 @@ rtest('setShape swaps the collider, and a refused shape leaves the old one', asy
     () => ragdoll.setShape(before, { type: 'box', center: [0, 0, 0], halfExtents: [0, 1, 1], rotation: [0, 0, 0, 1] }),
     { name: 'RangeError' },
   );
-  assert.throws(() => ragdoll.setShape(rig.engine.createMesh(), capsule), {
-    name: 'RangeError',
-    message: /not a bone/,
-  });
+  assert.throws(() => ragdoll.setShape(rig.engine.createMesh(), capsule), { name: 'RangeError', message: /not a bone/ });
   assert.equal(before.shape, capsule, 'a refused shape changes nothing');
   assert.equal(before.body.colliders.length, 1);
   rig.dispose();
@@ -289,12 +275,11 @@ rtest('a bone with an uneven scale gets a hull stretched along its own axes', as
     even = fitRagdollShapes(plain.ragdoll, plain.rig.model).find((hull) => hull.part.node.name === 'head').shape;
   plain.rig.dispose();
   const stretched = await knight({ prepare: (rig) => rig.node('head').setScale([1, 2, 1]) }),
-    uneven = fitRagdollShapes(stretched.ragdoll, stretched.rig.model).find(
-      (hull) => hull.part.node.name === 'head',
-    ).shape;
+    uneven = fitRagdollShapes(stretched.ragdoll, stretched.rig.model).find((hull) => hull.part.node.name === 'head').shape;
   const ratio = (axis) => size(uneven.points, axis) / size(even.points, axis);
   assert.ok(Math.abs(ratio(0) - 1) < 1e-4, `x keeps its size (${ratio(0)})`);
   assert.ok(Math.abs(ratio(1) - 2) < 1e-4, `y doubles (${ratio(1)})`);
   assert.ok(Math.abs(ratio(2) - 1) < 1e-4, `z keeps its size (${ratio(2)})`);
   stretched.rig.dispose();
 });
+

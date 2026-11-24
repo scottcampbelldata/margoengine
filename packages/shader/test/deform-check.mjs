@@ -45,10 +45,7 @@ try {
   await same('morph', 'cpuMorph');
   await same('chain', 'cpuChain');
   await same('effect', 'cpuEffect');
-  for (const [stale, right] of [
-    ['cpuStaleNormal', 'cpuNormal'],
-    ['cpuMorphStaleNormal', 'cpuMorphNormal'],
-  ]) {
+  for (const [stale, right] of [['cpuStaleNormal', 'cpuNormal'], ['cpuMorphStaleNormal', 'cpuMorphNormal']]) {
     const { different: moved } = compare(await grab(right), await grab(stale));
     assert.ok(moved > 0.05, `the normals move the picture in ${right}: ${moved}`);
   }

@@ -52,40 +52,25 @@ export async function fixtures(load = (entry) => import(entry)) {
   };
   return [
     model('parseMargo', async ({ engine }) => ({ plugin: await parseMargo(engine, plain, { signal: signal() }) })),
-    model('loadMargo', async ({ engine }) => ({
-      plugin: await loadMargo(engine, url, { fetch: served(plain), signal: signal() }),
-    })),
-    model(
-      'parseMargoNodes',
-      loaded(({ engine }) => parseMargoNodes(engine, nodes, { signal: signal() })),
-    ),
-    model(
-      'loadMargoNodes',
-      loaded(({ engine }) => loadMargoNodes(engine, url, { fetch: served(nodes), signal: signal() })),
-    ),
-    model('parseAnimatedMargo', async ({ engine }) => ({
-      plugin: await parseAnimatedMargo(engine, anim, { signal: signal() }),
-    })),
+    model('loadMargo', async ({ engine }) => ({ plugin: await loadMargo(engine, url, { fetch: served(plain), signal: signal() }) })),
+    model('parseMargoNodes', loaded(({ engine }) => parseMargoNodes(engine, nodes, { signal: signal() }))),
+    model('loadMargoNodes', loaded(({ engine }) => loadMargoNodes(engine, url, { fetch: served(nodes), signal: signal() }))),
+    model('parseAnimatedMargo', async ({ engine }) => ({ plugin: await parseAnimatedMargo(engine, anim, { signal: signal() }) })),
     model('parseMargoCurves', async ({ engine }) => {
       const result = await parseMargoCurves(engine, curves, { signal: signal() });
       return { plugin: result.model };
     }),
     // Scripts that make a mesh in the scene and hand back its cleanup, as a door or a spinner does.
-    model(
-      'parseMargoComponents',
-      loaded(({ engine }) =>
-        parseMargoComponents(engine, components, {
-          signal: signal(),
-          view: false,
-          scripts: {
-            door: ({ model: owner }) => {
-              const mesh = owner.root.engine.createMesh();
-              return () => mesh.dispose();
-            },
-            glow: () => {},
-          },
-        }),
-      ),
-    ),
+    model('parseMargoComponents', loaded(({ engine }) => parseMargoComponents(engine, components, {
+      signal: signal(),
+      view: false,
+      scripts: {
+        door: ({ model: owner }) => {
+          const mesh = owner.root.engine.createMesh();
+          return () => mesh.dispose();
+        },
+        glow: () => {},
+      },
+    }))),
   ];
 }

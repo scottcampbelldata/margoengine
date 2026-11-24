@@ -82,8 +82,7 @@ try {
         back = [data[0], data[1], data[2]];
       let count = 0;
       for (let i = 0; i < data.length; i += 4)
-        if (Math.abs(data[i] - back[0]) + Math.abs(data[i + 1] - back[1]) + Math.abs(data[i + 2] - back[2]) > 12)
-          count++;
+        if (Math.abs(data[i] - back[0]) + Math.abs(data[i + 1] - back[1]) + Math.abs(data[i + 2] - back[2]) > 12) count++;
       return count;
     };
     player.playing = false;
@@ -101,8 +100,7 @@ try {
         chunk = chunks[index],
         n = chunk.positions.length / 3 / 8,
         local = frame % 8,
-        after =
-          local < 7 ? chunk : chunks[index + 1]?.positions.length === chunk.positions.length ? chunks[index + 1] : null,
+        after = local < 7 ? chunk : chunks[index + 1]?.positions.length === chunk.positions.length ? chunks[index + 1] : null,
         to = local < 7 ? local + 1 : after ? 0 : local,
         other = after ?? chunk,
         values = await read();
@@ -167,10 +165,7 @@ try {
   assert.equal(result.swaps, 1, 'one change of mesh');
   assert.equal(result.indexCount, 39 * 39 * 6, 'the new triangles are in place');
   assert.ok(result.pixels[0] > 300, `the first grid should cover pixels, covered ${result.pixels[0]}`);
-  assert.ok(
-    result.pixels[2.3] > result.pixels[0] * 2,
-    `the larger grid should cover more: ${JSON.stringify(result.pixels)}`,
-  );
+  assert.ok(result.pixels[2.3] > result.pixels[0] * 2, `the larger grid should cover more: ${JSON.stringify(result.pixels)}`);
 } finally {
   await browser.close();
 }

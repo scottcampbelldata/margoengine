@@ -24,14 +24,8 @@ test('WFC browser harness serves the repository from a workspace launch', () => 
     mock.module(${JSON.stringify(shutdown)}, { namedExports: { closeAll: async () => {} } });
     await import(${JSON.stringify(script)});
   `;
-  const result = spawnSync(
-    process.execPath,
-    ['--experimental-test-module-mocks', '--input-type=module', '-e', source],
-    {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
-      encoding: 'utf8',
-      timeout: 30000,
-    },
-  );
+  const result = spawnSync(process.execPath, ['--experimental-test-module-mocks', '--input-type=module', '-e', source], {
+    cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8', timeout: 30000,
+  });
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });

@@ -13,10 +13,9 @@ const source = `
 
 for (const mode of ['eval', 'stdin', 'eval with argument']) {
   test(`verify plan imports from ${mode} without starting checks`, { timeout: 15_000 }, () => {
-    const args =
-      mode === 'stdin'
-        ? ['--input-type=module']
-        : ['--input-type=module', '--eval', source, ...(mode === 'eval with argument' ? ['consumer'] : [])];
+    const args = mode === 'stdin'
+      ? ['--input-type=module']
+      : ['--input-type=module', '--eval', source, ...(mode === 'eval with argument' ? ['consumer'] : [])];
     const child = spawnSync(process.execPath, args, {
       cwd: root,
       input: mode === 'stdin' ? source : undefined,

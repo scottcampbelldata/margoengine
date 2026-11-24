@@ -13,13 +13,7 @@ import type { ConstraintVolume } from '@margoengine/kinematics-constraints';
 export { gridData };
 export type { GridColliderData };
 
-declare const GPUBufferUsage: {
-  STORAGE: number;
-  UNIFORM: number;
-  COPY_DST: number;
-  COPY_SRC: number;
-  MAP_READ: number;
-};
+declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
 
 /** Options of {@link GPUClearance}. */
@@ -626,8 +620,7 @@ export class GPUClearance {
   private disposed = false;
 
   constructor(device: GPUDevice, robot: Robot, colliders: readonly ConstraintVolume[], options?: GPUClearanceOptions) {
-    if (!device || typeof device.createBuffer !== 'function')
-      throw typeError('GPUClearance needs a GPUDevice', 'kinematics');
+    if (!device || typeof device.createBuffer !== 'function') throw typeError('GPUClearance needs a GPUDevice', 'kinematics');
     if (!(robot instanceof Robot)) throw typeError('GPUClearance needs a Robot', 'kinematics');
     if (!Array.isArray(colliders)) throw typeError('GPUClearance colliders must be an array of volumes', 'kinematics');
     if (robot.dof === 0) throw rangeError('GPUClearance needs a robot with at least one moving joint', 'kinematics');
@@ -657,8 +650,7 @@ export class GPUClearance {
         for (let i = 0; i < values.length; i += 3) points.push(values[i], values[i + 1], values[i + 2], 0);
         return first;
       };
-    for (const shape of data.shapes)
-      addSet(addPoints(shape.points), shape.points.length / 3, shape.joint + 1, shape.radius);
+    for (const shape of data.shapes) addSet(addPoints(shape.points), shape.points.length / 3, shape.joint + 1, shape.radius);
     for (const volume of colliders) {
       const set = pointSet(volume);
       if (set) {
@@ -682,10 +674,7 @@ export class GPUClearance {
     const usage = GPUBufferUsage,
       upload = (name: string, bytes: ArrayBufferView): GPUBuffer => {
         if (bytes.byteLength > limit)
-          throw rangeError(
-            `GPUClearance ${name} take ${bytes.byteLength} bytes, over this device's ${limit}`,
-            'kinematics',
-          );
+          throw rangeError(`GPUClearance ${name} take ${bytes.byteLength} bytes, over this device's ${limit}`, 'kinematics');
         const buffer = this.buffer(name, Math.max(bytes.byteLength, 16), usage.STORAGE | usage.COPY_DST);
         device.queue.writeBuffer(buffer, 0, bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength);
         return buffer;

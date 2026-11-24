@@ -74,8 +74,7 @@ function radii(value: number | readonly number[], count: number, name: string): 
   if (typeof value === 'number') out.fill(value);
   else if (Array.isArray(value) && value.length === count) out.set(value);
   else throw typeError(`${name} must be a number or one number each for ${count}`, 'kinematics');
-  for (const r of out)
-    if (!(r >= 0) || !Number.isFinite(r)) throw rangeError(`${name} must be 0 or more`, 'kinematics');
+  for (const r of out) if (!(r >= 0) || !Number.isFinite(r)) throw rangeError(`${name} must be 0 or more`, 'kinematics');
   return out;
 }
 
@@ -208,7 +207,14 @@ export function sweepChain(
         at = link ? shape * 3 : spheres[shape - links] * 3,
         a = now.subarray(at, at + 3),
         b = link ? now.subarray(at + 3, at + 6) : a;
-      segmentVolumeInto(volume, a, b, link ? linkRadius[shape] : jointRadius[spheres[shape - links]], scratch, closest);
+      segmentVolumeInto(
+        volume,
+        a,
+        b,
+        link ? linkRadius[shape] : jointRadius[spheres[shape - links]],
+        scratch,
+        closest,
+      );
       return scratch[0];
     },
   };
@@ -346,7 +352,8 @@ export function sweepHull(
       hull.setTransform(matrix);
     },
     gap(_shape, volume) {
-      if (!volume.hullClearanceInto) throw typeError('sweepHull needs colliders with hullClearanceInto', 'kinematics');
+      if (!volume.hullClearanceInto)
+        throw typeError('sweepHull needs colliders with hullClearanceInto', 'kinematics');
       volume.hullClearanceInto(hull, distance);
       return distance[0];
     },

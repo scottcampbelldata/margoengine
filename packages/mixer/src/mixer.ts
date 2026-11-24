@@ -105,16 +105,11 @@ export function audibleBuses(buses: readonly BusState[]): Map<string, boolean> {
   return result;
 }
 
-function rampSettings(
-  context: BaseAudioContext,
-  { at = context.currentTime, seconds = 0.02 }: RampOptions = {},
-): { at: number; seconds: number } {
+function rampSettings(context: BaseAudioContext, { at = context.currentTime, seconds = 0.02 }: RampOptions = {}): { at: number; seconds: number } {
   if (typeof at !== 'number' || typeof seconds !== 'number')
     throw new TypeError('Ramp time and seconds need numbers; pass nonnegative finite audio times');
   if (!Number.isFinite(at) || at < 0 || !Number.isFinite(seconds) || seconds < 0)
-    throw new RangeError(
-      'Ramp time and seconds must be finite and nonnegative; use context.currentTime and a valid fade duration',
-    );
+    throw new RangeError('Ramp time and seconds must be finite and nonnegative; use context.currentTime and a valid fade duration');
   return { at, seconds };
 }
 
@@ -135,8 +130,7 @@ export function rampParam(
   options: RampOptions = {},
 ): void {
   if (typeof value !== 'number') throw new TypeError('Parameter value needs a number; pass a finite float32 value');
-  if (!Number.isFinite(Math.fround(value)))
-    throw new RangeError('Parameter value must fit finite float32; pass a smaller finite number');
+  if (!Number.isFinite(Math.fround(value))) throw new RangeError('Parameter value must fit finite float32; pass a smaller finite number');
   const { at: time, seconds } = rampSettings(context, options);
   param.cancelScheduledValues(time);
   if (seconds === 0 || (time <= context.currentTime && context.state !== 'running')) param.setValueAtTime(value, time);
@@ -178,8 +172,7 @@ export class Bus implements Disposable {
     options: BusOptions,
   ) {
     const context = mixer.context;
-    const gainDb = options.gain ?? 0,
-      gain = linearGain(gainDb);
+    const gainDb = options.gain ?? 0, gain = linearGain(gainDb);
     this.name = name;
     this.input = context.createGain();
     this.preTap = context.createGain();
@@ -217,8 +210,7 @@ export class Bus implements Disposable {
     this.alive();
     if (stage.input.context !== this.input.context || stage.output.context !== this.input.context)
       throw new TypeError('Insert nodes need the bus context; create the stage on bus.input.context');
-    if (this.inserts.has(stage))
-      throw new TypeError('Stage is already inserted; create a separate stage for each insert');
+    if (this.inserts.has(stage)) throw new TypeError('Stage is already inserted; create a separate stage for each insert');
     this.inserts.add(stage);
     this.wireInserts();
     return () => {
@@ -526,10 +518,7 @@ export class Mixer implements Disposable {
     if (this.disposed) return;
     const audible = audibleBuses([...this.all.values()].map((bus) => bus.state));
     for (const bus of this.all.values())
-      rampParam(this.context, bus.gate.gain, audible.get(bus.name) ? 1 : 0, {
-        at: options?.at,
-        seconds: options?.seconds ?? 0.01,
-      });
+      rampParam(this.context, bus.gate.gain, audible.get(bus.name) ? 1 : 0, { at: options?.at, seconds: options?.seconds ?? 0.01 });
   }
 
   /**

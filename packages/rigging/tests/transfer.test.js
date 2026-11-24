@@ -103,13 +103,9 @@ test('influences as input, boneCount, split vertices, and bad input', async () =
     joints[v * 4] = 3;
     influences[v * 4] = 1;
   }
-  const { weights } = await transferWeights(
-    { ...mesh, weights: { joints, weights: influences } },
-    tube({ radius: 0.21 }),
-    {
-      boneCount: 6,
-    },
-  );
+  const { weights } = await transferWeights({ ...mesh, weights: { joints, weights: influences } }, tube({ radius: 0.21 }), {
+    boneCount: 6,
+  });
   assert.equal(weights.boneCount, 6);
   assert.equal(weights.get(0, 3), 1);
   const body = source();
@@ -119,10 +115,7 @@ test('influences as input, boneCount, split vertices, and bad input', async () =
   await assert.rejects(transferWeights(body, mesh, { threshold: 0.6 }), RangeError);
   await assert.rejects(transferWeights(body, mesh, { boneCount: 1 }), RangeError);
   await assert.rejects(transferWeights({ ...body, positions: mesh.positions }, mesh), RangeError);
-  await assert.rejects(
-    transferWeights({ positions: body.positions, weights: body.weights, indices: [] }, mesh),
-    RangeError,
-  );
+  await assert.rejects(transferWeights({ positions: body.positions, weights: body.weights, indices: [] }, mesh), RangeError);
   await assert.rejects(transferWeights(body, mesh, { signal: AbortSignal.abort(new Error('stop')) }), /stop/);
 });
 
@@ -132,10 +125,7 @@ async function fromTheRest({ joints, mesh, authored, parts }, part) {
   const dense = new WeightMap(authored.length, joints.length);
   authored.forEach((row, v) => row.forEach((w, b) => dense.set(v, b, w)));
   const indices = parts.flatMap((other) => (other === part ? [] : Array.from(other.indices, (i) => other.first + i))),
-    target = {
-      positions: mesh.positions.subarray(part.first * 3, (part.first + part.count) * 3),
-      indices: part.indices,
-    },
+    target = { positions: mesh.positions.subarray(part.first * 3, (part.first + part.count) * 3), indices: part.indices },
     { weights } = await transferWeights({ positions: mesh.positions, indices, weights: dense }, target);
   return compare(authored.slice(part.first, part.first + part.count), weights, joints);
 }
@@ -161,10 +151,7 @@ test('the Twist sample: parts that lie on the body come back as authored, and a 
   const skin = realSkin(asset('vrm/VRM1_Constraint_Twist_Sample.vrm'), (n) => n.name === 'Body'),
     { joints, mesh, authored, parts } = skin;
   for (const count of [883, 600]) {
-    const result = await fromTheRest(
-      skin,
-      parts.find((p) => p.count === count),
-    );
+    const result = await fromTheRest(skin, parts.find((p) => p.count === count));
     assert.ok(result.near > 0.99 && result.gap < 0.05, `${count} vertices: ${JSON.stringify(result)}`);
   }
   const dense = new WeightMap(authored.length, joints.length);

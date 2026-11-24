@@ -35,8 +35,7 @@ const W = 96,
 function ridge() {
   const g = new Float32Array(W * D);
   for (let j = 0; j < D; j++)
-    for (let i = 0; i < W; i++)
-      g[j * W + i] = i < 40 ? 8 * Math.max(0, 1 - (40 - i) / 30) : 8 * Math.max(0, 1 - (i - 40) / 6);
+    for (let i = 0; i < W; i++) g[j * W + i] = i < 40 ? 8 * Math.max(0, 1 - (40 - i) / 30) : 8 * Math.max(0, 1 - (i - 40) / 6);
   return g;
 }
 const mean = (a, from, to) => {
@@ -97,16 +96,7 @@ test('threshold, new snow density, snow share and transport match their papers',
 test('the wind scours the windward slope and the crest and drops the snow in the lee, and every kilogram is counted', () => {
   const ground = ridge(),
     calm = new SnowDrift({ width: W, depth: D, ground, initialDepth: 0.3, wind: 0, snowfall: 2, temperature: -8 }),
-    windy = new SnowDrift({
-      width: W,
-      depth: D,
-      ground,
-      initialDepth: 0.3,
-      wind: 16,
-      windDirection: 90,
-      snowfall: 2,
-      temperature: -8,
-    });
+    windy = new SnowDrift({ width: W, depth: D, ground, initialDepth: 0.3, wind: 16, windDirection: 90, snowfall: 2, temperature: -8 });
   calm.seek(3 * 3600);
   windy.seek(3 * 3600);
   const c = calm.snowDepth(),
@@ -141,11 +131,7 @@ test('drifting turns with the wind: a wind toward -X puts the drift on the other
   const e = east.snowDepth(),
     w = west.snowDepth(),
     at = (a, i) => a[4 * V + i],
-    avg = (a, f, t) => {
-      let s = 0;
-      for (let i = f; i < t; i++) s += at(a, i);
-      return s / (t - f);
-    };
+    avg = (a, f, t) => { let s = 0; for (let i = f; i < t; i++) s += at(a, i); return s / (t - f); };
   assert.ok(avg(e, 49, 56) > 1.5 * avg(e, 41, 48), `east lee ${avg(e, 49, 56)} windward ${avg(e, 41, 48)}`);
   assert.ok(avg(w, 41, 48) > 1.5 * avg(w, 49, 56), `west lee ${avg(w, 41, 48)} windward ${avg(w, 49, 56)}`);
   // Mirror image, as the grid is symmetric about x = 48.
@@ -155,16 +141,14 @@ test('drifting turns with the wind: a wind toward -X puts the drift on the other
 test('snow sloughs off ground steeper than the angle of repose', () => {
   // A 60 degree wall 6 m high in calm snowfall: with repose 45 the snow surface slope stays near 45; with 90, it stays on.
   const g = new Float32Array(32 * 4);
-  for (let j = 0; j < 4; j++)
-    for (let i = 0; i < 32; i++) g[j * 32 + i] = Math.min(6, Math.max(0, (i - 10) * Math.tan(Math.PI / 3)));
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 32; i++) g[j * 32 + i] = Math.min(6, Math.max(0, (i - 10) * Math.tan(Math.PI / 3)));
   const slide = new SnowDrift({ width: 32, depth: 4, ground: g, snowfall: 10, temperature: -10, repose: 45 }),
     stick = new SnowDrift({ width: 32, depth: 4, ground: g, snowfall: 10, temperature: -10, repose: 90 });
   slide.seek(6 * 3600);
   stick.seek(6 * 3600);
   const s = slide.snowDepth(),
     t = stick.snowDepth();
-  for (let i = 12; i <= 14; i++)
-    assert.ok(s[2 * 32 + i] < 0.75 * t[2 * 32 + i], `steep cell ${i}: ${s[2 * 32 + i]} against ${t[2 * 32 + i]}`);
+  for (let i = 12; i <= 14; i++) assert.ok(s[2 * 32 + i] < 0.75 * t[2 * 32 + i], `steep cell ${i}: ${s[2 * 32 + i]} against ${t[2 * 32 + i]}`);
   // Where the upper cell holds snow, the snow surface rises no more than repose (tan 45 = 1 per metre) and a little.
   for (let i = 6; i < 18; i++) {
     const rise = slide.surfaceAt(i + 1, 2) - slide.surfaceAt(i, 2);
@@ -173,23 +157,13 @@ test('snow sloughs off ground steeper than the angle of repose', () => {
   // Without sloughing the rise follows the 60 degree ground.
   assert.ok(stick.surfaceAt(12, 2) - stick.surfaceAt(11, 2) > 1.7);
   assert.ok(s[2 * 32 + 10] > 1.2 * t[2 * 32 + 10], 'the foot collects what slid');
-  for (let i = 0; i < 32; i++)
-    assert.ok(Math.abs(t[2 * 32 + i] - t[2 * 32 + 0]) < 1e-9, 'repose 90 keeps an even fall');
+  for (let i = 0; i < 32; i++) assert.ok(Math.abs(t[2 * 32 + i] - t[2 * 32 + 0]) < 1e-9, 'repose 90 keeps an even fall');
   assert.ok(Math.abs(slide.mass - stick.mass) < 1e-6 * stick.mass, 'sloughing moves snow and keeps it');
 });
 
 test('cornices grow on the lee edge, lean downwind, and break off onto the slope below', () => {
   const ground = ridge(),
-    d = new SnowDrift({
-      width: W,
-      depth: D,
-      ground,
-      wind: 18,
-      windDirection: 90,
-      snowfall: 0,
-      initialDepth: 0.5,
-      temperature: -10,
-    });
+    d = new SnowDrift({ width: W, depth: D, ground, wind: 18, windDirection: 90, snowfall: 0, initialDepth: 0.5, temperature: -10 });
   d.seek(1800);
   const early = d.cornices();
   d.seek(4 * 3600);
@@ -198,23 +172,11 @@ test('cornices grow on the lee edge, lean downwind, and break off onto the slope
   for (const c of late) {
     assert.equal(c.x, 40, 'on the crest');
     assert.ok(Math.abs(c.direction[0] - 1) < 1e-9 && Math.abs(c.direction[1]) < 1e-9, 'leaning downwind');
-    assert.ok(
-      Math.abs(c.overhang - Math.sqrt(c.mass / 400 / (0.15 * Math.PI))) < 1e-12 && c.height === 0.6 * c.overhang,
-    );
+    assert.ok(Math.abs(c.overhang - Math.sqrt(c.mass / 400 / (0.15 * Math.PI))) < 1e-12 && c.height === 0.6 * c.overhang);
   }
   assert.ok(late[0].overhang > early[0].overhang * 1.5, `grows: ${early[0].overhang} then ${late[0].overhang}`);
   // A short corniceMax breaks them; the debris lands on the lee cell and nothing is lost.
-  const b = new SnowDrift({
-    width: W,
-    depth: D,
-    ground,
-    wind: 18,
-    windDirection: 90,
-    initialDepth: 0.5,
-    temperature: -10,
-    corniceMax: 0.3,
-    repose: 90,
-  });
+  const b = new SnowDrift({ width: W, depth: D, ground, wind: 18, windDirection: 90, initialDepth: 0.5, temperature: -10, corniceMax: 0.3, repose: 90 });
   b.seek(4 * 3600);
   const falls = b.corniceFalls();
   assert.ok(falls.length >= D, `${falls.length} falls`);
@@ -225,29 +187,13 @@ test('cornices grow on the lee edge, lean downwind, and break off onto the slope
   const still = new SnowDrift({ width: W, depth: D, ground, wind: 0, snowfall: 3 });
   still.seek(7200);
   assert.equal(still.cornices().length, 0);
-  const none = new SnowDrift({
-    width: W,
-    depth: D,
-    ground,
-    wind: 18,
-    windDirection: 90,
-    initialDepth: 0.5,
-    corniceCapture: 0,
-  });
+  const none = new SnowDrift({ width: W, depth: D, ground, wind: 18, windDirection: 90, initialDepth: 0.5, corniceCapture: 0 });
   none.seek(3600);
   assert.equal(none.cornices().length, 0);
 });
 
 test('the cornice mesh is closed, faces outward and reaches past the edge', () => {
-  const d = new SnowDrift({
-    width: W,
-    depth: D,
-    ground: ridge(),
-    wind: 18,
-    windDirection: 90,
-    initialDepth: 0.5,
-    temperature: -10,
-  });
+  const d = new SnowDrift({ width: W, depth: D, ground: ridge(), wind: 18, windDirection: 90, initialDepth: 0.5, temperature: -10 });
   d.seek(4 * 3600);
   const m = d.corniceGeometry(),
     cs = d.cornices(),
@@ -275,16 +221,7 @@ test('the slide state: a slab on a weak layer, the Foehn index, burial, sinterin
   const S = 40,
     g = new Float32Array(S * 4);
   for (let j = 0; j < 4; j++) for (let i = 0; i < S; i++) g[j * S + i] = 0.78 * (S - i);
-  const o = {
-    width: S,
-    depth: 4,
-    ground: g,
-    initialDepth: 0.5,
-    snowfall: 0,
-    temperature: -10,
-    burial: 3600,
-    sintering: 0,
-  };
+  const o = { width: S, depth: 4, ground: g, initialDepth: 0.5, snowfall: 0, temperature: -10, burial: 3600, sintering: 0 };
   const d = new SnowDrift(o);
   d.seek(10);
   let s = d.slide();
@@ -324,17 +261,7 @@ test('the slide state: a slab on a weak layer, the Foehn index, burial, sinterin
 });
 
 test('the snow at a time is the same however it got there, and seeking back replays it', () => {
-  const opts = {
-    width: W,
-    depth: D,
-    ground: ridge(),
-    initialDepth: 0.3,
-    wind: 15,
-    windDirection: 70,
-    snowfall: 2,
-    timeScale: 60,
-    step: 10,
-  };
+  const opts = { width: W, depth: D, ground: ridge(), initialDepth: 0.3, wind: 15, windDirection: 70, snowfall: 2, timeScale: 60, step: 10 };
   const once = new SnowDrift(opts),
     steps = new SnowDrift(opts);
   once.seek(90);
@@ -360,15 +287,7 @@ test('the snow at a time is the same however it got there, and seeking back repl
 test('null rows follow the weather; a value overrides it', () => {
   const machine = new WeatherMachine('blizzard', { seed: 1 }),
     d = new SnowDrift({ width: 16, depth: 4, weather: machine }),
-    w = new SnowDrift({
-      width: 16,
-      depth: 4,
-      wind: machine.state.wind,
-      windDirection: (machine.state.windDirection * 180) / Math.PI,
-      snowfall: snowfallRate(machine.state.snow),
-      temperature: machine.state.temperature,
-      humidity: machine.state.humidity,
-    });
+    w = new SnowDrift({ width: 16, depth: 4, wind: machine.state.wind, windDirection: (machine.state.windDirection * 180) / Math.PI, snowfall: snowfallRate(machine.state.snow), temperature: machine.state.temperature, humidity: machine.state.humidity });
   d.seek(600);
   w.seek(600);
   assert.ok(d.budget.fallen > 0);
@@ -396,16 +315,7 @@ test('bad options throw', () => {
 });
 
 test('Snow draws a drift field: its depth on the field ground, the weather elsewhere', () => {
-  const d = new SnowDrift({
-    width: W,
-    depth: D,
-    ground: ridge(),
-    initialDepth: 0.3,
-    wind: 16,
-    windDirection: 90,
-    snowfall: 2,
-    origin: [-10, -3],
-  });
+  const d = new SnowDrift({ width: W, depth: D, ground: ridge(), initialDepth: 0.3, wind: 16, windDirection: 90, snowfall: 2, origin: [-10, -3] });
   d.seek(3600);
   for (let x = -10; x < 85; x += 1.7) {
     const g = snowFieldAt(d, x, 0.4);
@@ -416,14 +326,8 @@ test('Snow draws a drift field: its depth on the field ground, the weather elsew
   // On the field ground: the field depth and a cover by it; above the band: the weather's.
   const [ground, depth] = snowFieldAt(d, 20, 0);
   assert.equal(snowFieldDepth(d, 20, ground, 0, 0.5, { depth: 0.2 }), depth);
-  assert.equal(
-    snowFieldDepth(d, 20, ground + 1, 0, 0.5, { depth: 0.2, variation: 0 }),
-    snowDepthAt(20, 0, 1, 0.5, { depth: 0.2, variation: 0 }),
-  );
-  assert.equal(
-    snowFieldCover(d, 20, ground + depth, 0, 0.4),
-    depth > 0.03 ? 1 : snowFieldCover(d, 20, ground + depth, 0, 0.4),
-  );
+  assert.equal(snowFieldDepth(d, 20, ground + 1, 0, 0.5, { depth: 0.2, variation: 0 }), snowDepthAt(20, 0, 1, 0.5, { depth: 0.2, variation: 0 }));
+  assert.equal(snowFieldCover(d, 20, ground + depth, 0, 0.4), depth > 0.03 ? 1 : snowFieldCover(d, 20, ground + depth, 0, 0.4));
   assert.equal(snowFieldCover(d, 20, ground + depth + 1, 0, 0.4), 0.4);
   assert.equal(snowFieldCover(d, 200, 0, 0, 0.4), 0.4);
   // The hook: the field functions and their two bindings in the shader, the plain hook without.
@@ -432,18 +336,13 @@ test('Snow draws a drift field: its depth on the field ground, the weather elsew
   // The field's tests read the position at the centroid, a covered sample on the triangle, with no pixel slack: a
   // multisampled edge pixel's centre lies off the triangle, and an extrapolated position there whitened a bare ridge's edge.
   assert.ok(patched.includes('weather_snow_field_cover(i.weatherSnowAt,weatherSnow.a.x)'));
-  assert.match(
-    patched,
-    /struct Output \{[^}]*,@location\(4\) @interpolate\(perspective,centroid\) weatherSnowAt:vec3f\}/,
-  );
+  assert.match(patched, /struct Output \{[^}]*,@location\(4\) @interpolate\(perspective,centroid\) weatherSnowAt:vec3f\}/);
   assert.ok(patched.includes('o.position=p.xyz;o.weatherSnowAt=p.xyz;'));
   assert.ok(!patched.includes('fwidth'), 'no pixel slack in the field tests');
   // Patched twice (another surface hook first) keeps one varying.
   assert.equal(snow.patch(patched).split('weatherSnowAt:vec3f').length, 2);
   assert.ok(patched.includes('weather_snow_field_uniform(p.xyz,weatherSnow)'));
-  assert.ok(
-    snow.shaderDeclarations().includes(`@binding(${SNOW_FIELD_BINDINGS[1]}) var weatherSnowMap:texture_2d<f32>`),
-  );
+  assert.ok(snow.shaderDeclarations().includes(`@binding(${SNOW_FIELD_BINDINGS[1]}) var weatherSnowMap:texture_2d<f32>`));
   const plain = new Snow({});
   assert.ok(!plain.patch(coreShader).includes('weather_snow_field'));
   assert.equal(plain.variant(), '');
@@ -470,18 +369,7 @@ test('settings rows: shared shape, weather rows follow, applying writes the opti
   );
   // Every option of SnowDrift but its grid and weather has a row.
   const rowNames = new Set(SNOW_DRIFT_SETTINGS.map((r) => r.name));
-  for (const key of [
-    'wind',
-    'repose',
-    'corniceMax',
-    'weakLayer',
-    'trigger',
-    'settle',
-    'fetch',
-    'inflow',
-    'burial',
-    'step',
-  ])
+  for (const key of ['wind', 'repose', 'corniceMax', 'weakLayer', 'trigger', 'settle', 'fetch', 'inflow', 'burial', 'step'])
     assert.ok(rowNames.has(key), key);
   const d = new SnowDrift({ width: 8, depth: 8 });
   applySnowDriftSettings(d, SNOW_DRIFT_LOOKS.blizzard);
@@ -493,10 +381,7 @@ test('settings rows: shared shape, weather rows follow, applying writes the opti
   assert.equal(d.options.inflow, false);
   assert.equal(d.options.wind, undefined);
   assert.equal(snowSettingValues(d, true).inflow, 'bare');
-  assert.deepEqual(
-    Object.keys(snowDriftSettingDefaults()),
-    SNOW_DRIFT_SETTINGS.map((r) => r.name),
-  );
+  assert.deepEqual(Object.keys(snowDriftSettingDefaults()), SNOW_DRIFT_SETTINGS.map((r) => r.name));
   assert.throws(() => applySnowDriftSettings(d, { repose: 5 }), RangeError);
   assert.throws(() => applySnowDriftSettings(d, { nope: 1 }), TypeError);
   // Snow: a held cover wins over the weather until handed back.

@@ -24,28 +24,20 @@ test('frames fall at i / fps and the last starts before the end', () => {
   const cutscene = new Cutscene(doc([]));
   const frames = [...cutsceneFrames(cutscene, { fps: 10 })];
   assert.equal(frames.length, 40);
-  assert.deepEqual(
-    frames.map((frame) => frame.time),
-    frames.map((_, i) => i / 10),
-  );
+  assert.deepEqual(frames.map((frame) => frame.time), frames.map((_, i) => i / 10));
   assert.equal(frames[3].state.time, 0.3);
   // 0.3 * 30 is 9.000000000000002 in doubles: rounding must not add a tenth frame.
   assert.equal([...cutsceneFrames(new Cutscene(doc([], { duration: 0.3 })), { fps: 30 })].length, 9);
   // A length that is not a whole number of frames keeps the part frame.
   assert.equal([...cutsceneFrames(cutscene, { fps: 10, from: 1, to: 1.25 })].length, 3);
-  assert.deepEqual(
-    [...cutsceneFrames(cutscene, { fps: 10, from: 1, to: 1.25 })].map((frame) => frame.time),
-    [1, 1.1, 1.2],
-  );
+  assert.deepEqual([...cutsceneFrames(cutscene, { fps: 10, from: 1, to: 1.25 })].map((frame) => frame.time), [1, 1.1, 1.2]);
   assert.throws(() => [...cutsceneFrames(cutscene, { fps: 0 })], /fps must be/);
   assert.throws(() => [...cutsceneFrames(cutscene, { from: 3, to: 2 })], /Render span/);
   assert.throws(() => [...cutsceneFrames(cutscene, { to: 5 })], /Render span/);
 });
 
 test('a clip sounds exactly across its span, at its volume', () => {
-  const { channels, peak, sampleRate } = mix([audio([{ start: 1, duration: 1, sound: 'one', volume: 0.5 }])], {
-    one: flat(1, 2),
-  });
+  const { channels, peak, sampleRate } = mix([audio([{ start: 1, duration: 1, sound: 'one', volume: 0.5 }])], { one: flat(1, 2) });
   assert.equal(sampleRate, RATE);
   assert.equal(channels.length, 2);
   assert.equal(channels[0].length, 4 * RATE);
@@ -57,20 +49,12 @@ test('a clip sounds exactly across its span, at its volume', () => {
 });
 
 test('a clip reads the sound from its offset, one second of sound per second', () => {
-  const { channels } = mix(
-    [audio([{ start: 1, duration: 1, sound: 'ramp', offset: 0.5 }])],
-    { ramp: ramp() },
-    { channels: 1 },
-  );
+  const { channels } = mix([audio([{ start: 1, duration: 1, sound: 'ramp', offset: 0.5 }])], { ramp: ramp() }, { channels: 1 });
   for (const at of [0, 0.25, 0.5, 0.999]) near(channels[0][Math.round((1 + at) * RATE)], (0.5 + at) / 2, 1e-4);
 });
 
 test('fades follow straight lines', () => {
-  const { channels } = mix(
-    [audio([{ start: 0, duration: 2, sound: 'one', fadeIn: 1, fadeOut: 0.5 }])],
-    { one: flat(1, 2) },
-    { channels: 1 },
-  );
+  const { channels } = mix([audio([{ start: 0, duration: 2, sound: 'one', fadeIn: 1, fadeOut: 0.5 }])], { one: flat(1, 2) }, { channels: 1 });
   near(channels[0][RATE / 4], 0.25, 1e-3);
   near(channels[0][RATE / 2], 0.5, 1e-3);
   near(channels[0][1.25 * RATE], 1, 1e-3);
@@ -116,11 +100,7 @@ test('a sound of another rate is read at its own rate, and past its end is silen
 });
 
 test('a span mixes only itself, from its own start', () => {
-  const { channels } = mix(
-    [audio([{ start: 1, duration: 2, sound: 'one' }])],
-    { one: flat(1, 2) },
-    { from: 2, to: 2.5, channels: 1 },
-  );
+  const { channels } = mix([audio([{ start: 1, duration: 2, sound: 'one' }])], { one: flat(1, 2) }, { from: 2, to: 2.5, channels: 1 });
   assert.equal(channels[0].length, RATE / 2);
   assert.equal(channels[0][0], 1);
   assert.equal(channels[0].at(-1), 1);
@@ -140,22 +120,15 @@ test('renderCutscene refuses bad options before it touches the engine', async ()
 test('loading the render entry does not load the video encoder; renderCutscene loads it when a render starts', async () => {
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL(import.meta.resolve('@margoengine/cutscene/render')), 'utf8');
-  const statics = [
-    ...source.matchAll(/^\s*(?:import|export)\b[^;'"]*?from\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm),
-  ].map((match) => match[1] ?? match[2]);
+  const statics = [...source.matchAll(/^\s*(?:import|export)\b[^;'"]*?from\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm)].map(
+    (match) => match[1] ?? match[2],
+  );
   assert.ok(!statics.some((specifier) => specifier.startsWith('@margoengine/headless')), statics.join(', '));
   assert.match(source, /import\(\s*['"]@margoengine\/headless\/video['"]\s*\)/);
 });
 
 // GAP-FILM-TIME commit 8: a span from after 0 starts the world's clocks where a run from 0 has them.
-const clock = () => ({
-  name: 'film:clock',
-  time: 0,
-  setup() {},
-  advanceTime(delta) {
-    this.time += delta;
-  },
-});
+const clock = () => ({ name: 'film:clock', time: 0, setup() {}, advanceTime(delta) { this.time += delta; } });
 const world = (...clocks) => ({ scene: { plugins: new Map(clocks.map((c) => [c.name, c])) } });
 const stepped = (steps, fps) => {
   const c = clock();
@@ -188,7 +161,5 @@ test('renderCutscene from after 0 seeks the engine clocks before the first frame
   for (const time of seen) assert.ok(Object.is(time, stepped(60, 30)), 'frames drawn after the seek');
   const moved = clock();
   moved.advanceTime(1 / 30);
-  await assert.rejects(renderCutscene({ ...world(moved), render() {} }, doc([]), { from: 1, apply() {} }), {
-    code: 'state',
-  });
+  await assert.rejects(renderCutscene({ ...world(moved), render() {} }, doc([]), { from: 1, apply() {} }), { code: 'state' });
 });

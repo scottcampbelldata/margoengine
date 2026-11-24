@@ -101,25 +101,15 @@ await runSuite(
       Shadows.attach(engine, { resolution: 256, cascades: 2, distance: 20 });
       CulledMeshes.attach(engine);
       const lod = LODSystem.attach(engine),
-        ground = engine
-          .createMesh()
-          .setGeometry(box())
-          .setMaterial(new PbrMaterial({ color: '#c8c8c8' }));
+        ground = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#c8c8c8' }));
       ground.setScale([6, 0.1, 6]).setPosition([0, -0.05, 0]);
-      const anchor = engine
-        .createMesh()
-        .setGeometry(box())
-        .setMaterial(new PbrMaterial({ color: '#d04030', metalness: 0.5 }));
+      const anchor = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#d04030', metalness: 0.5 }));
       anchor.setPosition([0, 0.8, 0]);
       lod.add(anchor, [
         { object: anchor, distance: 0 },
         { object: box(), distance: 30 },
       ]);
-      engine
-        .createMesh()
-        .setGeometry(box())
-        .setMaterial(new PbrMaterial({ color: '#3060d0' }))
-        .setPosition([1.2, 0.5, -0.6]);
+      engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#3060d0' })).setPosition([1.2, 0.5, -0.6]);
       const shot = () => {
         engine.render({ delta: 1 / 60 });
         const c = new OffscreenCanvas(size, size).getContext('2d');
@@ -167,28 +157,20 @@ await runSuite(
         return {
           buffers,
           textures,
-          kinds: [...kinds]
-            .filter(([, n]) => n)
-            .map(([kind, n]) => `${n} ${kind}`)
-            .sort(),
+          kinds: [...kinds].filter(([, n]) => n).map(([kind, n]) => `${n} ${kind}`).sort(),
           image,
         };
       };
       // Pixels that differ between two pictures; pixels the scene covers (differ from the background corner).
       const differ = (a, b) => {
           let n = 0;
-          for (let i = 0; i < a.length; i += 4)
-            if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) n++;
+          for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) n++;
           return n;
         },
         drawnPixels = (image) => {
           let n = 0;
           for (let i = 0; i < image.length; i += 4)
-            if (
-              Math.abs(image[i] - image[0]) + Math.abs(image[i + 1] - image[1]) + Math.abs(image[i + 2] - image[2]) >
-              24
-            )
-              n++;
+            if (Math.abs(image[i] - image[0]) + Math.abs(image[i + 1] - image[1]) + Math.abs(image[i + 2] - image[2]) > 24) n++;
           return n;
         };
       await settle();
@@ -245,13 +227,7 @@ await runSuite(
       }
       engine.dispose();
       return {
-        base: {
-          buffers: base.buffers,
-          textures: base.textures,
-          kinds: base.kinds,
-          calls: cases.length,
-          drawn: drawnPixels(base.image),
-        },
+        base: { buffers: base.buffers, textures: base.textures, kinds: base.kinds, calls: cases.length, drawn: drawnPixels(base.image) },
         results,
       };
     }, only);
@@ -263,18 +239,13 @@ await runSuite(
     for (const r of results) {
       const at = `${r.owner} ${r.method} ${r.n}${r.label ? ` (${r.label})` : ''}`;
       if (r.injected !== 1) failures.push(`${at}: the failure was not injected`);
-      if (!r.reported.length)
-        failures.push(`${at}: the failure was neither reported to engine.onError nor thrown by a frame`);
-      else if (r.reportedCount !== 1)
-        failures.push(`${at}: reported ${r.reportedCount} times, not once: ${r.reported.join('; ')}`);
+      if (!r.reported.length) failures.push(`${at}: the failure was neither reported to engine.onError nor thrown by a frame`);
+      else if (r.reportedCount !== 1) failures.push(`${at}: reported ${r.reportedCount} times, not once: ${r.reported.join('; ')}`);
       if (r.thrown) failures.push(`${at}: ${r.thrown} frames threw: the failure stopped the engine`);
-      if (r.drawn < base.drawn / 2)
-        failures.push(`${at}: the frame after the failure drew ${r.drawn} scene pixels, base ${base.drawn}`);
+      if (r.drawn < base.drawn / 2) failures.push(`${at}: the frame after the failure drew ${r.drawn} scene pixels, base ${base.drawn}`);
       if (r.cleanErrors.length) failures.push(`${at}: the clean restore after it reported ${r.cleanErrors.join('; ')}`);
       if (r.buffers !== base.buffers || r.textures !== base.textures || r.kinds)
-        failures.push(
-          `${at}: ${r.buffers} buffers and ${r.textures} textures live after the clean restore, not ${base.buffers} and ${base.textures} ${JSON.stringify(r.kinds ?? '')}`,
-        );
+        failures.push(`${at}: ${r.buffers} buffers and ${r.textures} textures live after the clean restore, not ${base.buffers} and ${base.textures} ${JSON.stringify(r.kinds ?? '')}`);
       if (r.differ) failures.push(`${at}: the picture after the clean restore differs on ${r.differ} pixels`);
     }
     assert.deepEqual(failures, [], `restore fault sweep:\n${failures.join('\n')}`);

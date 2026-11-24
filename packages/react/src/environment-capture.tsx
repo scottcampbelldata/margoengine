@@ -1,17 +1,12 @@
 import { useContext, useEffect, useRef } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { EnginePlugin, Mesh as EngineMesh } from '@margoengine/core/extension';
-import type * as EnvironmentModule from '@margoengine/environment/main';
-import type {
-  ColorBackground,
-  Environment as IBLEnvironment,
-  EnvironmentBackground,
-} from '@margoengine/environment/main';
+import type * as EnvironmentModule from '@margoengine/environment';
+import type { ColorBackground, Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
 import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cube-camera';
 import { descendant } from './cube-camera.js';
 import { LightformerPending } from './lightformer.js';
 import { live, report, useMesh, useScene } from './internal.js';
-import { sceneOwner } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 
 // Loaded by `<Environment>` only when it has children (import() in environment.tsx), so an app with an Environment
@@ -59,7 +54,7 @@ export function EnvironmentCapture({
     let active = true,
       value: CaptureBackground | undefined;
     if (wantsSource && !source) return;
-    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main'))
+    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment'))
       .then((api) => {
         if (!active) return;
         value = source
@@ -133,7 +128,7 @@ export function EnvironmentCapture({
             creating = false;
             if (!active || scene.engine.disposed) return value.dispose();
             environment = value;
-            sceneOwner(scene).use(value as unknown as EnginePlugin);
+            scene.engine.use(value as unknown as EnginePlugin);
             publish({ environment: value, api: module });
           })
           .catch((error) => {
@@ -146,7 +141,7 @@ export function EnvironmentCapture({
     };
     void Promise.all([
       optionalPeer('@margoengine/environment', () => import('@margoengine/environment/cube-camera')),
-      optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main')),
+      optionalPeer('@margoengine/environment', () => import('@margoengine/environment')),
     ])
       .then(([cubeApi, environmentApi]) => {
         if (!active || scene.engine.disposed) return;
@@ -162,8 +157,7 @@ export function EnvironmentCapture({
       scene.frames.callbacks.delete(frame);
       publish(null);
       if (environment) {
-        if (!scene.engine.disposed && sceneOwner(scene).plugins.has(environment.name))
-          sceneOwner(scene).removePlugin(environment.name);
+        if (!scene.engine.disposed && scene.engine.hasPlugin(environment.name)) scene.engine.removePlugin(environment.name);
         environment.dispose();
       }
       cube?.dispose();

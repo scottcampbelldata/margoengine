@@ -217,9 +217,7 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   // The buffer and the hook exist only while some light has an image, so an empty ProjectorLights changes no GPU call.
   // The buffer grows (to a power of two) when the images need more room, and is kept when they need less.
   /** @internal Whether this projector or an optional extension has images. */
-  protected get enabled(): boolean {
-    return this.active;
-  }
+  protected get enabled(): boolean { return this.active; }
   /**
    * @internal Bytes of storage the spot words plus `tail` more words need (a power of two, at least 1 KiB); a
    * RangeError naming `what` when the device cannot bind that much.
@@ -244,9 +242,9 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
       this.buffer?.destroy();
       const size = this.storage(this.tail?.length ?? 0, this.tail ? 'Projector and cube images' : undefined),
         buffer = (this.buffer = this.device!.createBuffer({
-          size,
-          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        }));
+        size,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }));
       this.entries = [{ binding: BINDING, resource: { buffer } }];
       this.dirty = true;
     }

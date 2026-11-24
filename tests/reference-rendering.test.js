@@ -79,7 +79,10 @@ test('the like-for-like transfer swaps only the exact sRGB encode for the viewer
     'let s=select(share*12.92,1.055*pow(share,vec3f(1.0/2.4))-0.055,share>=vec3f(0.0031308));';
   const { code, count } = viewerTransfer(line);
   assert.equal(count, 2);
-  assert.equal(code, 'color=pow(max(color,vec3f(0)),vec3f(1.0/2.2));let s=pow(max(share,vec3f(0)),vec3f(1.0/2.2));');
+  assert.equal(
+    code,
+    'color=pow(max(color,vec3f(0)),vec3f(1.0/2.2));let s=pow(max(share,vec3f(0)),vec3f(1.0/2.2));',
+  );
   // Mismatched identifiers are not an encode and stay as they are.
   const other = 'select(a*12.92,1.055*pow(b,vec3f(1.0/2.4))-0.055,a>=vec3f(0.0031308))';
   assert.deepEqual(viewerTransfer(other), { code: other, count: 0 });
@@ -165,12 +168,7 @@ test('sheen has measured budgets for its entire twenty-primitive scene on both b
   // 1,057,125 and 32,408,128 to 32,409,491, max 171 to 119; like for like 217,478 to 218,842, 3,061,310 to 2,944,566,
   // max 205 to 103. The absolute rise is the viewer's encoded albedo-table ring (KB3297c) that the old floor hid.
   assert.deepEqual(
-    [
-      baseline.metrics.absolute,
-      baseline.compat.metrics.absolute,
-      baseline.metrics.square,
-      baseline.compat.metrics.square,
-    ],
+    [baseline.metrics.absolute, baseline.compat.metrics.absolute, baseline.metrics.square, baseline.compat.metrics.square],
     [1057125, 1057125, 32409491, 32409491],
   );
   for (const row of [baseline, baseline.compat]) {

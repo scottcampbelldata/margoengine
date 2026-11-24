@@ -18,18 +18,9 @@ try {
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
   const tex = await page.evaluate(() => window.check.texture());
   assert.deepEqual(tex.errors, [], `GPU errors: ${tex.errors}`);
-  assert.equal(
-    tex.differing,
-    0,
-    `the burn texture differs from the CPU grid in ${tex.differing} of ${tex.floats} values`,
-  );
-  assert.ok(
-    tex.burning > 10 && tex.burnt > 10 && tex.unburnt > 100,
-    `the texture holds a front: ${JSON.stringify(tex)}`,
-  );
-  console.log(
-    `ok fire burn texture: ${tex.floats} floats equal the CPU grid (${tex.burning} burning, ${tex.burnt} burnt, ${tex.unburnt} unburnt cells)`,
-  );
+  assert.equal(tex.differing, 0, `the burn texture differs from the CPU grid in ${tex.differing} of ${tex.floats} values`);
+  assert.ok(tex.burning > 10 && tex.burnt > 10 && tex.unburnt > 100, `the texture holds a front: ${JSON.stringify(tex)}`);
+  console.log(`ok fire burn texture: ${tex.floats} floats equal the CPU grid (${tex.burning} burning, ${tex.burnt} burnt, ${tex.unburnt} unburnt cells)`);
   const smoke = await page.evaluate(() => window.check.smoke());
   assert.deepEqual(smoke.errors, []);
   assert.equal(smoke.columns, 4);
@@ -40,11 +31,7 @@ try {
   console.log(`ok fire smoke: ${smoke.hot} columns on the front, heat and position exact, ${smoke.lit} pixels`);
   const live = await page.evaluate(() => window.check.live());
   assert.deepEqual(live.errors, []);
-  assert.deepEqual(
-    live.made,
-    { pipelines: 0, buffers: 0, textures: 0 },
-    `60 frames of every live row made GPU objects: ${JSON.stringify(live)}`,
-  );
+  assert.deepEqual(live.made, { pipelines: 0, buffers: 0, textures: 0 }, `60 frames of every live row made GPU objects: ${JSON.stringify(live)}`);
   console.log(`ok fire settings: ${live.rows} live rows for 60 frames made no pipeline, buffer or texture`);
   assert.deepEqual(pageErrors, []);
   console.log('fire-front check passed');

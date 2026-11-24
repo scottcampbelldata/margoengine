@@ -58,10 +58,7 @@ export function parse3dl(text: string, options: Parse3dlOptions = {}): CubeLUT {
     if (!line) continue;
     const tokens = line.split(/\s+/);
     if (tokens[0] === '3DMESH' || tokens[0] === 'Mesh') {
-      if (
-        rows.length ||
-        (tokens[0] === '3DMESH' ? mesh || meshSize || tokens.length !== 1 : meshSize || tokens.length !== 3)
-      )
+      if (rows.length || (tokens[0] === '3DMESH' ? mesh || meshSize || tokens.length !== 1 : meshSize || tokens.length !== 3))
         throw new TypeError('.3dl header is invalid; supply 3DMESH and then Mesh <input bits> <output bits> first');
       if (tokens[0] === '3DMESH') {
         mesh = true;
@@ -102,10 +99,7 @@ export function parse3dl(text: string, options: Parse3dlOptions = {}): CubeLUT {
     if (outBits === undefined) throw new RangeError('.3dl value exceeds 16 bits; supply codes up to 65535');
   }
   const max = 2 ** outBits - 1;
-  if (peak > max)
-    throw new RangeError(
-      `.3dl value exceeds the ${outBits}-bit output maximum ${max}; supply outputBits for the file's depth`,
-    );
+  if (peak > max) throw new RangeError(`.3dl value exceeds the ${outBits}-bit output maximum ${max}; supply outputBits for the file's depth`);
   const data = new Float32Array(size ** 3 * 4);
   let n = 0;
   for (let r = 0; r < size; r++)

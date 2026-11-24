@@ -1,69 +1,29 @@
 // Clean-room shader arithmetic from the Blender manual, Perlin (2002) and Lewis (1989).
 export const mathExpressions: Record<string, string> = {
-  ADD: 'a+b',
-  SUBTRACT: 'a-b',
-  MULTIPLY: 'a*b',
-  DIVIDE: 'bnDiv(a,b)',
-  MULTIPLY_ADD: 'a*b+c',
-  POWER: 'bnPow(a,b)',
-  LOGARITHM: 'bnLog(a,b)',
-  SQRT: 'sqrt(max(a,0.0))',
-  INVERSE_SQRT: 'select(0.0,inverseSqrt(max(a,1e-30)),a>0.0)',
-  ABSOLUTE: 'abs(a)',
-  EXPONENT: 'exp(a)',
-  MINIMUM: 'min(a,b)',
-  MAXIMUM: 'max(a,b)',
-  LESS_THAN: 'select(0.0,1.0,a<b)',
-  GREATER_THAN: 'select(0.0,1.0,a>b)',
-  SIGN: 'sign(a)',
+  ADD: 'a+b', SUBTRACT: 'a-b', MULTIPLY: 'a*b', DIVIDE: 'bnDiv(a,b)', MULTIPLY_ADD: 'a*b+c',
+  POWER: 'bnPow(a,b)', LOGARITHM: 'bnLog(a,b)', SQRT: 'sqrt(max(a,0.0))', INVERSE_SQRT: 'select(0.0,inverseSqrt(max(a,1e-30)),a>0.0)',
+  ABSOLUTE: 'abs(a)', EXPONENT: 'exp(a)', MINIMUM: 'min(a,b)', MAXIMUM: 'max(a,b)',
+  LESS_THAN: 'select(0.0,1.0,a<b)', GREATER_THAN: 'select(0.0,1.0,a>b)', SIGN: 'sign(a)',
   COMPARE: 'select(0.0,1.0,abs(a-b)<=max(c,0.00001))',
-  SMOOTH_MIN: 'bnSmoothMin(a,b,c)',
-  SMOOTH_MAX: '-bnSmoothMin(-a,-b,c)',
-  ROUND: 'floor(a+0.5)',
-  FLOOR: 'floor(a)',
-  CEIL: 'ceil(a)',
-  TRUNC: 'trunc(a)',
-  FRACT: 'fract(a)',
-  MODULO: 'select(0.0,a-trunc(bnDiv(a,b))*b,b!=0.0)',
-  FLOORED_MODULO: 'select(0.0,a-floor(bnDiv(a,b))*b,b!=0.0)',
-  WRAP: 'bnWrap(a,b,c)',
-  SNAP: 'floor(bnDiv(a,b))*b',
-  PINGPONG: 'bnPingPong(a,b)',
-  SINE: 'sin(a)',
-  COSINE: 'cos(a)',
-  TANGENT: 'tan(a)',
-  ARCSINE: 'asin(clamp(a,-1.0,1.0))',
-  ARCCOSINE: 'acos(clamp(a,-1.0,1.0))',
-  ARCTANGENT: 'atan(a)',
-  ARCTAN2: 'atan2(a,b)',
-  SINH: 'sinh(a)',
-  COSH: 'cosh(a)',
-  TANH: 'tanh(clamp(a,-10.0,10.0))',
-  RADIANS: 'radians(a)',
-  DEGREES: 'degrees(a)',
+  SMOOTH_MIN: 'bnSmoothMin(a,b,c)', SMOOTH_MAX: '-bnSmoothMin(-a,-b,c)',
+  ROUND: 'floor(a+0.5)', FLOOR: 'floor(a)', CEIL: 'ceil(a)', TRUNC: 'trunc(a)', FRACT: 'fract(a)',
+  MODULO: 'select(0.0,a-trunc(bnDiv(a,b))*b,b!=0.0)', FLOORED_MODULO: 'select(0.0,a-floor(bnDiv(a,b))*b,b!=0.0)',
+  WRAP: 'bnWrap(a,b,c)', SNAP: 'floor(bnDiv(a,b))*b', PINGPONG: 'bnPingPong(a,b)',
+  SINE: 'sin(a)', COSINE: 'cos(a)', TANGENT: 'tan(a)', ARCSINE: 'asin(clamp(a,-1.0,1.0))',
+  ARCCOSINE: 'acos(clamp(a,-1.0,1.0))', ARCTANGENT: 'atan(a)', ARCTAN2: 'atan2(a,b)',
+  SINH: 'sinh(a)', COSH: 'cosh(a)', TANH: 'tanh(a)', RADIANS: 'radians(a)', DEGREES: 'degrees(a)',
 };
 // A grey has no hue (HSV hue is undefined at saturation 0): HUE and COLOR leave `a` as it is when `b` is grey, and
 // SATURATION leaves a grey `a` grey, instead of reading hue 0 as red.
 export const blendExpressions: Record<string, string> = {
-  MIX: 'b',
-  ADD: 'a+b',
-  MULTIPLY: 'a*b',
-  SUBTRACT: 'a-b',
-  SCREEN: '1.0-(1.0-a)*(1.0-b)',
-  DIVIDE: 'vec3f(bnDiv(a.x,b.x),bnDiv(a.y,b.y),bnDiv(a.z,b.z))',
-  DIFFERENCE: 'abs(a-b)',
-  EXCLUSION: 'a+b-2.0*a*b',
-  DARKEN: 'min(a,b)',
-  LIGHTEN: 'max(a,b)',
+  MIX: 'b', ADD: 'a+b', MULTIPLY: 'a*b', SUBTRACT: 'a-b', SCREEN: '1.0-(1.0-a)*(1.0-b)',
+  DIVIDE: 'vec3f(bnDiv(a.x,b.x),bnDiv(a.y,b.y),bnDiv(a.z,b.z))', DIFFERENCE: 'abs(a-b)',
+  EXCLUSION: 'a+b-2.0*a*b', DARKEN: 'min(a,b)', LIGHTEN: 'max(a,b)',
   OVERLAY: 'select(2.0*a*b,1.0-2.0*(1.0-a)*(1.0-b),a>=vec3f(0.5))',
-  DODGE: 'min(vec3f(1),a/max(1.0-b,vec3f(1e-20)))',
-  BURN: '1.0-min(vec3f(1),(1.0-a)/max(b,vec3f(1e-20)))',
-  HUE: 'select(a,bnRGB(vec3f(bnHSV(b).x,bnHSV(a).yz)),bnHSV(b).y!=0.0)',
-  SATURATION: 'select(a,bnRGB(vec3f(bnHSV(a).x,bnHSV(b).y,bnHSV(a).z)),bnHSV(a).y!=0.0)',
-  VALUE: 'bnRGB(vec3f(bnHSV(a).xy,bnHSV(b).z))',
-  COLOR: 'select(a,bnRGB(vec3f(bnHSV(b).xy,bnHSV(a).z)),bnHSV(b).y!=0.0)',
-  SOFT_LIGHT: '(1.0-a)*a*b+a*(1.0-(1.0-a)*(1.0-b))',
-  LINEAR_LIGHT: 'a+2.0*b-1.0',
+  DODGE: 'min(vec3f(1),a/max(1.0-b,vec3f(1e-20)))', BURN: '1.0-min(vec3f(1),(1.0-a)/max(b,vec3f(1e-20)))',
+  HUE: 'select(a,bnRGB(vec3f(bnHSV(b).x,bnHSV(a).yz)),bnHSV(b).y!=0.0)', SATURATION: 'select(a,bnRGB(vec3f(bnHSV(a).x,bnHSV(b).y,bnHSV(a).z)),bnHSV(a).y!=0.0)',
+  VALUE: 'bnRGB(vec3f(bnHSV(a).xy,bnHSV(b).z))', COLOR: 'select(a,bnRGB(vec3f(bnHSV(b).xy,bnHSV(a).z)),bnHSV(b).y!=0.0)',
+  SOFT_LIGHT: '(1.0-a)*a*b+a*(1.0-(1.0-a)*(1.0-b))', LINEAR_LIGHT: 'a+2.0*b-1.0',
 };
 
 export const nodeHelpers = /* wgsl */ `
@@ -97,11 +57,8 @@ fn bnLocal(p:vec3f)->vec3f {let a=f.model[0].xyz;let b=f.model[1].xyz;let c=f.mo
 // Arbitrary-dimension gradient noise. Quintic interpolation is Perlin's C2 kernel; independent hash/gradient ordering.
 export function noiseHelpers(dim: number): string {
   const offsets = Array.from({ length: 1 << dim }, (_, n) => {
-    const o = Array.from({ length: 4 }, (_, i) => (i < dim ? (n >> i) & 1 : 0));
-    const weight = o
-      .slice(0, dim)
-      .map((v, i) => `${v ? 'w' : '(1.0-w)'}[${i}]`)
-      .join('*');
+    const o = Array.from({ length: 4 }, (_, i) => i < dim ? (n >> i) & 1 : 0);
+    const weight = o.slice(0, dim).map((v, i) => `${v ? 'w' : '(1.0-w)'}[${i}]`).join('*');
     return `{let o=vec4i(${o.join(',')});let h=bnHash(c+o);var g=vec4f(0);for(var k=0u;k<${dim}u;k++){g[k]=select(-1.0,1.0,((h>>k)&1u)!=0u);}value+=dot(g,r-vec4f(o))*${weight};}`;
   }).join('\n');
   return /* wgsl */ `

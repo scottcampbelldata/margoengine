@@ -60,15 +60,7 @@ async function rig(scale) {
   const engine = new Engine(
     { width: 128, height: 96, clientWidth: 128, clientHeight: 96 },
     store,
-    {
-      backend: 'webgpu',
-      gpu: gpu.device,
-      add() {},
-      remove() {},
-      render() {},
-      dispose() {},
-      geometryBuffers: () => buffers,
-    },
+    { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {}, geometryBuffers: () => buffers },
     { position: [0, 2 * scale, 6 * scale], target: [0, 0, 0] },
     null,
   );
@@ -76,12 +68,7 @@ async function rig(scale) {
   const frame = (shadows) => {
     store.tick(false);
     view.begin(0);
-    Object.assign(view.camera, {
-      position: [0, 2 * scale, 6 * scale],
-      target: [0, 0, 0],
-      near: 0.1 * scale,
-      far: 1000 * scale,
-    });
+    Object.assign(view.camera, { position: [0, 2 * scale, 6 * scale], target: [0, 0, 0], near: 0.1 * scale, far: 1000 * scale });
     passes(shadows)(view.c);
     return [...shadows.splits];
   };
@@ -122,10 +109,7 @@ function model(engine, buffers, size) {
 
 test('a model fits the cascades as core meshes do, and its box is read once, not every frame', async () => {
   const { engine, buffers, frame } = await rig(1);
-  const floor = engine
-      .createMesh()
-      .setGeometry(box(6, 0.1, 6))
-      .setPosition([0, -0.05, 0]),
+  const floor = engine.createMesh().setGeometry(box(6, 0.1, 6)).setPosition([0, -0.05, 0]),
     toy = model(engine, buffers, 0.02),
     shadows = new Shadows({ resolution: 64 });
   try {

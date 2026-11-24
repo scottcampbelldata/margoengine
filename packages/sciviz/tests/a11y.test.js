@@ -115,7 +115,7 @@ test('Web Audio owns and releases nodes, retains borrowed contexts and cancels a
   await assert.rejects(pending, (e) => e === reason);
 });
 
-function domFixture(renderer = { ready: async () => {}, add() {}, remove() {}, dispose() {} }) {
+function domFixture(renderer = { ready: async () => {}, dispose() {} }) {
   const dom = new JSDOM('<div><canvas aria-label="Observed data"></canvas></div>'),
     saved = {};
   for (const key of ['document', 'getComputedStyle']) {
@@ -408,8 +408,6 @@ test('a refused attach keeps the current view, and a 2D record outside the windo
       { mode: '2d', axes: false, limits: [0, 1, 0, 1] },
       {
         ready: async () => {},
-        add() {},
-        remove() {},
         dispose() {},
       },
     );
@@ -441,7 +439,7 @@ test('a refused attach keeps the current view, and a 2D record outside the windo
 test('toSVG waits for the renderer like toPNG and rejects with its failure before drawing a frame', async () => {
   let fail;
   const failure = new Error('pipeline failed'),
-    renderer = { ready: () => new Promise((_, reject) => (fail = reject)), add() {}, remove() {}, dispose() {} },
+    renderer = { ready: () => new Promise((_, reject) => (fail = reject)), dispose() {} },
     f = domFixture(renderer);
   try {
     let frames = 0;

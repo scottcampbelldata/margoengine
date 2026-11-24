@@ -192,8 +192,7 @@ function useOrbit<T extends OrbitInstance = OrbitInstance>(
     if (!controls || profile === undefined) return;
     const all = api.current!.PROFILES,
       chosen = typeof profile === 'object' ? profile : all[profile];
-    if (!chosen)
-      throw rangeError(`Unknown navigation profile '${profile}'; use one of ${Object.keys(all)}`, 'react-arguments');
+    if (!chosen) throw rangeError(`Unknown navigation profile '${profile}'; use one of ${Object.keys(all)}`, 'react-arguments');
     controls.setProfile(chosen);
   }, [controls, profile]);
   useCommit(() => {
@@ -297,10 +296,7 @@ export interface CameraControlsProps extends OrbitControlsProps {
 }
 const finite = (label: string, ...values: number[]): void => {
   if (values.some((value) => !Number.isFinite(value)))
-    throw rangeError(
-      `CameraControls.${label} takes finite numbers; pass numbers that are not NaN or Infinity`,
-      'react-arguments',
-    );
+    throw rangeError(`CameraControls.${label} takes finite numbers; pass numbers that are not NaN or Infinity`, 'react-arguments');
 };
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 /**
@@ -345,17 +341,9 @@ export const CameraControls = /* @__PURE__ */ forwardRef<CameraControlsHandle, C
         box = (subject: CameraControlsSubject) => {
           if ('min' in subject && 'max' in subject) return { min: subject.min, max: subject.max };
           const mesh = scene.engine.meshes.get((subject as EngineMesh).id) as EngineMesh | undefined;
-          if (!mesh)
-            throw rangeError(
-              'CameraControls: that mesh is not in this Canvas; pass a box, a sphere or a mesh drawn by this Canvas',
-              'react-arguments',
-            );
+          if (!mesh) throw rangeError('CameraControls: that mesh is not in this Canvas; pass a box, a sphere or a mesh drawn by this Canvas', 'react-arguments');
           const bounds = sceneWorldBounds(scene, mesh);
-          if (!bounds)
-            throw rangeError(
-              'CameraControls: the mesh has no geometry to fit; pass a box or a sphere, or fit after its geometry loads',
-              'react-arguments',
-            );
+          if (!bounds) throw rangeError('CameraControls: the mesh has no geometry to fit; pass a box or a sphere, or fit after its geometry loads', 'react-arguments');
           return { min: [bounds[0], bounds[1], bounds[2]] as V3, max: [bounds[3], bounds[4], bounds[5]] as V3 };
         },
         spherical = (azimuth: number, polar: number, transition?: CameraControlsTransition) => {

@@ -41,13 +41,7 @@ export const ops = new Map<string, PureOp>();
 const def = (name: string, inputs: string, resolve: PureOp['resolve'], run: PureOp['run'], multi?: boolean) =>
   ops.set(name, { inputs: inputs ? inputs.split(' ') : [], resolve, run, multi });
 /** A component-wise float operation with an optional int form. */
-const wise = (
-  name: string,
-  inputs: string,
-  list: string[],
-  f: (...a: number[]) => number,
-  int?: (...a: number[]) => number,
-) => {
+const wise = (name: string, inputs: string, list: string[], f: (...a: number[]) => number, int?: (...a: number[]) => number) => {
   const float = zip(f);
   def(name, inputs, same(int ? [...list, 'int'] : list), (v, t) => (t[0] === 'int' ? int!(...v) : float(v)));
 };
@@ -59,12 +53,7 @@ for (const [name, value] of [
   ['Inf', Infinity],
   ['NaN', NaN],
 ] as const)
-  def(
-    `math/${name}`,
-    '',
-    () => ({ value: 'float' }),
-    () => value,
-  );
+  def(`math/${name}`, '', () => ({ value: 'float' }), () => value);
 
 const clamp = (a: number, b: number, c: number) => Math.min(Math.max(a, Math.min(b, c)), Math.max(b, c));
 const saturate = (a: number) => Math.min(Math.max(a, 0), 1);
@@ -75,42 +64,12 @@ wise('math/floor', 'a', numeric, Math.floor);
 wise('math/ceil', 'a', numeric, Math.ceil);
 wise('math/round', 'a', numeric, (a) => (a < 0 ? -Math.round(-a) : Math.round(a)));
 wise('math/fract', 'a', numeric, (a) => a - Math.floor(a));
-wise(
-  'math/neg',
-  'a',
-  numeric,
-  (a) => -a,
-  (a) => -a | 0,
-);
-wise(
-  'math/add',
-  'a b',
-  numeric,
-  (a, b) => a + b,
-  (a, b) => (a + b) | 0,
-);
-wise(
-  'math/sub',
-  'a b',
-  numeric,
-  (a, b) => a - b,
-  (a, b) => (a - b) | 0,
-);
+wise('math/neg', 'a', numeric, (a) => -a, (a) => -a | 0);
+wise('math/add', 'a b', numeric, (a, b) => a + b, (a, b) => (a + b) | 0);
+wise('math/sub', 'a b', numeric, (a, b) => a - b, (a, b) => (a - b) | 0);
 wise('math/mul', 'a b', numeric, (a, b) => a * b, Math.imul);
-wise(
-  'math/div',
-  'a b',
-  numeric,
-  (a, b) => a / b,
-  (a, b) => (b ? (a / b) | 0 : 0),
-);
-wise(
-  'math/rem',
-  'a b',
-  numeric,
-  (a, b) => a % b,
-  (a, b) => (b ? (a % b) | 0 : 0),
-);
+wise('math/div', 'a b', numeric, (a, b) => a / b, (a, b) => (b ? (a / b) | 0 : 0));
+wise('math/rem', 'a b', numeric, (a, b) => a % b, (a, b) => (b ? (a % b) | 0 : 0));
 wise('math/min', 'a b', numeric, Math.min, Math.min);
 wise('math/max', 'a b', numeric, Math.max, Math.max);
 wise('math/clamp', 'a b c', numeric, clamp, clamp);
@@ -173,7 +132,8 @@ const scaled = (a: number[], k: number) => a.map((x) => x * k);
 const normal = (a: number[]) => scaled(a, 1 / Math.hypot(...a));
 const blend = (a: number[], b: number[], c: number) => a.map((x, i) => (1 - c) * x + c * b[i]);
 /** A unit vector at right angles to `a`. */
-const perpendicular = (a: number[]) => normal(cross(a, Math.abs(a[0]) < Math.abs(a[1]) ? [1, 0, 0] : [0, 1, 0]));
+const perpendicular = (a: number[]) =>
+  normal(cross(a, Math.abs(a[0]) < Math.abs(a[1]) ? [1, 0, 0] : [0, 1, 0]));
 /** Rotates `a` by the unit quaternion `r`, as the specification writes it. */
 const rotate = (a: number[], r: number[]) => {
   const axis = r.slice(0, 3),
@@ -245,8 +205,7 @@ def(
   'math/transform',
   'a b',
   (t) => (vectors.includes(t[0]) && t[1] === `${t[0]}x${t[0].slice(-1)}` ? { value: t[0] } : undefined),
-  ([a, b]) =>
-    a.map((_: number, r: number) => a.reduce((sum: number, x: number, c: number) => sum + b[c * a.length + r] * x, 0)),
+  ([a, b]) => a.map((_: number, r: number) => a.reduce((sum: number, x: number, c: number) => sum + b[c * a.length + r] * x, 0)),
 );
 def(
   'math/slerp',
@@ -365,21 +324,9 @@ for (const [name, type, count] of [
 const bits = (name: string, int: (a: number, b: number) => number, bool: (a: boolean, b: boolean) => boolean) =>
   def(`math/${name}`, 'a b', same(['int', 'bool']), ([a, b], t) => (t[0] === 'int' ? int(a, b) : bool(a, b)));
 def('math/not', 'a', same(['int', 'bool']), ([a], t) => (t[0] === 'int' ? ~a : !a));
-bits(
-  'and',
-  (a, b) => a & b,
-  (a, b) => a && b,
-);
-bits(
-  'or',
-  (a, b) => a | b,
-  (a, b) => a || b,
-);
-bits(
-  'xor',
-  (a, b) => a ^ b,
-  (a, b) => a !== b,
-);
+bits('and', (a, b) => a & b, (a, b) => a && b);
+bits('or', (a, b) => a | b, (a, b) => a || b);
+bits('xor', (a, b) => a ^ b, (a, b) => a !== b);
 const ints = (name: string, inputs: string, f: (...a: number[]) => number) =>
   def(`math/${name}`, inputs, same(['int']), (v) => f(...v));
 ints('asr', 'a b', (a, b) => a >> b);

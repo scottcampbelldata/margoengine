@@ -16,10 +16,7 @@ const repository = resolve(root, '../..');
 const dist = distDir(root);
 await copyLegal(root);
 // One self-contained build per entry, so the optional entries share no chunk with (and never change) the root; the
-// image decoders alone are one file every entry imports (dist/loaders.js), which re-exports each decoder from its own
-// file (dist/hdr.js, exr.js, ultrahdr.js, parse-image.js, load.js) so none is bundled twice. dist/load.js is
-// loadEnvironmentImage alone, importing a decoder on first use, so an app that loads one format downloads one decoder;
-// loaders.js re-exports it and so keeps every decoder in its graph.
+// image decoders alone are one file every entry imports (dist/loaders.js).
 for (const [entry, emptyOutDir] of [
   ['index', true],
   ['volumetric', false],
@@ -31,11 +28,6 @@ for (const [entry, emptyOutDir] of [
   ['exr-tiled', false],
   ['main', false],
   ['loaders', false],
-  ['load', false],
-  ['parse-image', false],
-  ['hdr', false],
-  ['exr', false],
-  ['ultrahdr', false],
   ['blend', false],
   ['ground', false],
   ['gi', false],
@@ -72,9 +64,6 @@ for (const [entry, emptyOutDir] of [
           id === '@margoengine/environment' ||
           id.startsWith('@margoengine/environment/') ||
           (id === './loaders.js' && entry !== 'loaders') ||
-          (['load', 'loaders'].includes(entry) && ['./hdr.js', './exr.js', './ultrahdr.js'].includes(id)) ||
-          (entry === 'parse-image' && ['./hdr.js', './exr.js'].includes(id)) ||
-          (entry === 'loaders' && ['./load.js', './parse-image.js'].includes(id)) ||
           (id === './main.js' && entry === 'index'),
       },
     },

@@ -584,10 +584,7 @@ test('mass properties: a spline face round its poles integrates across the knots
     meridian = { kind: 'circle', frame: frameOf([0, 0, 0], [0, -1, 0], [0, 0, -1]), radius: r },
     seam = new Edge('seam', meridian, south, north),
     seamed = new Body('seamed', 'solid'),
-    loop = seamed
-      .shell()
-      .add(new Face('f', s, true))
-      .loop();
+    loop = seamed.shell().add(new Face('f', s, true)).loop();
   loop.use(seam, true);
   loop.use(seam, false);
   exact(massProperties(seamed), 'seamed');
@@ -614,10 +611,7 @@ test('mass properties: a spline sphere whose seam passes a hair off its poles', 
     north = new Vertex('n', c.at(Math.PI).slice(0, 3)),
     seam = new Edge('seam', meridian, south, north),
     body = new Body('seamed', 'solid'),
-    loop = body
-      .shell()
-      .add(new Face('f', splineSphere(r), true))
-      .loop();
+    loop = body.shell().add(new Face('f', splineSphere(r), true)).loop();
   seam.tolerance = south.tolerance = north.tolerance = 2 * r * tilt;
   loop.use(seam, true);
   loop.use(seam, false);

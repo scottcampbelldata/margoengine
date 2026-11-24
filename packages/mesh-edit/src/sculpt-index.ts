@@ -113,8 +113,7 @@ export class SculptIndex {
       const tri = (tris[f] ?? null) as SurfaceTri | null,
         at = f * 3,
         had = corners[at] !== undefined && corners[at] >= 0;
-      if (had && tri && tri.v[0] === corners[at] && tri.v[1] === corners[at + 1] && tri.v[2] === corners[at + 2])
-        continue;
+      if (had && tri && tri.v[0] === corners[at] && tri.v[1] === corners[at + 1] && tri.v[2] === corners[at + 2]) continue;
       if (had) {
         this.live--;
         for (let c = 0; c < 3; c++) {

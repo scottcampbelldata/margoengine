@@ -70,10 +70,7 @@ try {
             animator.onPreUpdate(0.25);
             check(animator.time === 0.25, 'direct update retained owner');
             check(Math.abs(model.nodes[1].position.x - 0.1) < 1e-6, 'actual clip pose');
-            await engine.render({
-              delta: 0,
-              views: [{ scene, camera: engine.camera, viewport: [0, 0, 64, 64], pixels: true }],
-            });
+            await engine.render({ delta: 0, views: [{ scene, camera: engine.camera, viewport: [0, 0, 64, 64], pixels: true }] });
             await device.queue.onSubmittedWorkDone();
             if (mode === 'direct') handle.dispose();
             else scene.removePlugin(animator.name);
@@ -86,10 +83,7 @@ try {
             handle.dispose();
             check(scene.plugins.get(animator.name) === replacement, 'replacement identity');
             replacement.onPreUpdate(0.25);
-            await engine.render({
-              delta: 0,
-              views: [{ scene, camera: engine.camera, viewport: [0, 0, 64, 64], pixels: true }],
-            });
+            await engine.render({ delta: 0, views: [{ scene, camera: engine.camera, viewport: [0, 0, 64, 64], pixels: true }] });
             await device.queue.onSubmittedWorkDone();
             check((await device.popErrorScope()) === null, 'GPU validation');
             window.ownerFixture = { instance };

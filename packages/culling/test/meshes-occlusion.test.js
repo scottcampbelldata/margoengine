@@ -57,10 +57,7 @@ test('occlusion draws an occluder pass and a pyramid before culling, and every b
   assert.equal(h.counts.buffers, created.buffers, 'no per-frame buffers');
   assert.equal(h.counts.groups, created.groups);
   plugin.dispose();
-  assert.ok(
-    h.resources.every((r) => r.destroyed),
-    'occlusion storage released',
-  );
+  assert.ok(h.resources.every((r) => r.destroyed), 'occlusion storage released');
 });
 
 test('off by default: no prepass, no occlusion pipelines', () => {
@@ -108,10 +105,7 @@ test('occluder bindings follow a new core instance buffer and a resize, and a gr
   assert.ok(h.counts.groups > resized, 'rebinds for the new pyramid');
   h.batches[0].count = 300;
   h.run();
-  assert.ok(
-    h.resources.some((r) => r.size === 512 * 4 && !r.destroyed && r.usage & 32),
-    'occluder list regrown',
-  );
+  assert.ok(h.resources.some((r) => r.size === 512 * 4 && !r.destroyed && r.usage & 32), 'occluder list regrown');
 });
 
 test('occlusion options are checked', () => {

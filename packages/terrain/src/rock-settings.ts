@@ -43,37 +43,20 @@ const n = (
 ): RockSetting => numberSetting(name, group, value, min, max, step, unit, about, live) as RockSetting;
 const c = (name: string, group: RockSettingGroup, value: RockSettingColor, about: string): RockSetting =>
   colorSetting(name, group, value, 0, 1, about) as RockSetting;
-const shape = (
-  name: string,
-  group: RockSettingGroup,
-  value: number,
-  min: number,
-  max: number,
-  step: number,
-  unit: string,
-  about: string,
-) => n(name, group, value, min, max, step, unit, about + ' Rebuilds the meshes.', false);
+const shape = (name: string, group: RockSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string) =>
+  n(name, group, value, min, max, step, unit, about + ' Rebuilds the meshes.', false);
 
 /** Every rock control, in panel order. Defaults are the values the rocks use without the option. */
 export const ROCK_SETTINGS: readonly RockSetting[] = [
   n('detail.bump', 'detail', 1, 0, 3, 0.01, '', 'Strength of the fine relief that holds the rock up close.'),
-  n(
-    'detail.scale',
-    'detail',
-    1.6,
-    0.05,
-    50,
-    0.05,
-    'm',
-    'Wavelength of the largest fine relief; five finer octaves follow.',
-  ),
+  n('detail.scale', 'detail', 1.6, 0.05, 50, 0.05, 'm', 'Wavelength of the largest fine relief; five finer octaves follow.'),
   n('detail.cracks', 'detail', 0.6, 0, 1, 0.01, '', 'How many dark joint cracks show.'),
   n('detail.variation', 'detail', 0.5, 0, 1, 0.01, '', 'Broad tone variation over the rock.'),
   n('detail.strata', 'detail', 0.6, 0, 1, 0.01, '', 'How strongly the beds differ in tone and the bedding lines show.'),
   n('detail.roughness', 'detail', 0.85, 0.3, 1, 0.01, '', 'Surface roughness of dry rock.'),
   n('moss.amount', 'moss', 0.35, 0, 1, 0.01, '', 'Moss or lichen on rock faces that look up.'),
   c('moss.color', 'moss', [0.07, 0.1, 0.03], 'Moss colour (grey-green lichen is about [0.2, 0.22, 0.16]).'),
-  n('tide.height', 'tide', 1.5, 0, 30, 0.05, 'm', "Top of the wet tide band over each rock's sea level."),
+  n('tide.height', 'tide', 1.5, 0, 30, 0.05, 'm', 'Top of the wet tide band over each rock\'s sea level.'),
   n('tide.algae', 'tide', 0.6, 0, 1, 0.01, '', 'Dark algae and weed over the lower tide band.'),
   c('tide.color', 'tide', [0.035, 0.045, 0.02], 'Algae colour.'),
   n('wet.darkening', 'wet', 0.6, 0, 1, 0.01, '', 'Albedo of fully wet rock against dry (1 is no darkening).'),
@@ -95,7 +78,7 @@ export const ROCK_SETTINGS: readonly RockSetting[] = [
   shape('cliff.cell', 'cliff', 0.5, 0.05, 20, 0.05, 'm', 'Polygonizer grid spacing (smaller is finer and slower).'),
   shape('sea.notchDepth', 'sea', 0.6, 0, 20, 0.05, 'm', 'Depth of the wave-cut notch at the sea surface.'),
   shape('sea.notchHeight', 'sea', 1.2, 0.1, 20, 0.05, 'm', 'Height of the notch (the wave and tide band).'),
-  shape('sea.lobes', 'sea', 0.22, 0, 1, 0.01, '', "Lumpiness of a stack's outline, as a share of its radius."),
+  shape('sea.lobes', 'sea', 0.22, 0, 1, 0.01, '', 'Lumpiness of a stack\'s outline, as a share of its radius.'),
   shape('sea.strata', 'sea', 0.9, 0, 100, 0.05, 'm', 'Bed thickness of the sea rocks.'),
   shape('sea.joints', 'sea', 7, 0, 64, 1, '', 'Vertical joints around a sea rock.'),
   shape('sea.roughness', 'sea', 0.25, 0, 20, 0.05, 'm', 'Size of the rough bumps over a sea rock.'),

@@ -63,9 +63,7 @@ test('one moon: the sky draws it where the kit says, normalized, above the horiz
   assert.ok(moon.illuminance > 0, 'the moon lights the scene');
   // The window is warm against the moonlight: the fire's light far outweighs the moon's.
   assert.ok(kit.hearth.light.intensity * luminance(kit.hearth.light.color) > 20 * moon.illuminance);
-  assert.ok(
-    kit.hearth.light.color[0] > kit.hearth.light.color[1] && kit.hearth.light.color[1] > kit.hearth.light.color[2],
-  );
+  assert.ok(kit.hearth.light.color[0] > kit.hearth.light.color[1] && kit.hearth.light.color[1] > kit.hearth.light.color[2]);
 });
 
 test('the snow bounces the moon up: a ground light of albedo times the snow plane irradiance over pi', () => {
@@ -101,10 +99,7 @@ test('the fire option scales the fire light and its particle births', () => {
   for (const fire of [0.25, 1, 2, 4])
     for (const part of ['fire', 'embers', 'steam']) {
       const p = snowNight({ fire }).hearth[part];
-      assert.ok(
-        p.capacity >= p.rate * p.lifetime[1],
-        `${part} at fire ${fire}: ${p.capacity} < ${p.rate * p.lifetime[1]}`,
-      );
+      assert.ok(p.capacity >= p.rate * p.lifetime[1], `${part} at fire ${fire}: ${p.capacity} < ${p.rate * p.lifetime[1]}`);
       assert.ok(p.curves.alpha.at(-1) === 0 && p.curves.alpha[0] === 0, `${part} fades in and out`);
     }
 });
@@ -113,10 +108,7 @@ test('the fire option scales the fire light and its particle births', () => {
 // their tops, and 0.09 m high. The old box reached 0.24 m across, in front of the logs, where the young flames lay over
 // the log faces as a haze (packages/sky/test/fire-base-gpu.mjs measures the rise on a GPU).
 test('the flames are born on the fuel top, not in front of the logs', () => {
-  const {
-    emissionExtent: [x, y, z],
-    emitter,
-  } = snowNight().hearth.fire;
+  const { emissionExtent: [x, y, z], emitter } = snowNight().hearth.fire;
   assert.equal(emitter.shape, 'cone');
   assert.ok(x + emitter.radius <= 0.31, `along the logs ${x + emitter.radius} m`);
   assert.ok(z + emitter.radius <= 0.07, `across the logs ${z + emitter.radius} m`);
@@ -140,10 +132,7 @@ test('the fire burns as flame tongues, not one overexposed blob', () => {
   // 0.4 x 0.2 m bed into one white blob. Flames are now streaks along their rise, few enough to stay apart, and orange
   // at birth, so AgX keeps their colour.
   const { fire, embers } = snowNight().hearth;
-  for (const [name, p] of [
-    ['fire', fire],
-    ['embers', embers],
-  ]) {
+  for (const [name, p] of [['fire', fire], ['embers', embers]]) {
     assert.ok(p.stretch && p.stretch.factor > 0, `${name} particles are streaks`);
     const birth = p.curves.color[0].color;
     assert.ok(birth[2] <= 0.25 * birth[0] && birth[1] <= 0.65 * birth[0], `${name} is orange at birth: ${birth}`);
@@ -166,10 +155,7 @@ test('the kettle steams as one soft plume, not separate bubbles', () => {
 });
 
 test('invalid kit options throw RangeError', () => {
-  assert.throws(
-    () => snowNight({ snowfall: 'blizzard' }),
-    /Unknown snowfall "blizzard"; use one of light, moderate, heavy/,
-  );
+  assert.throws(() => snowNight({ snowfall: 'blizzard' }), /Unknown snowfall "blizzard"; use one of light, moderate, heavy/);
   assert.throws(() => snowNight({ snowfall: 'constructor' }), /Unknown snowfall/);
   assert.throws(() => snowNight({ moonPhase: 2 }), /Invalid snowNight moonPhase 2/);
   assert.throws(() => snowNight({ fire: 0 }), /Invalid snowNight fire/);
@@ -239,10 +225,7 @@ test('whiteoutVisibility moves evenly in log distance from the lull to the storm
 test('the wind blows toward windDirection in the snow and the fog, and the window is warm', () => {
   const kit = whiteout({ wind: 20, windDirection: Math.PI / 2 });
   assert.ok(Math.abs(kit.precipitation.wind[0] - 20) < 1e-12 && Math.abs(kit.precipitation.wind[1]) < 1e-12);
-  assert.deepEqual(
-    kit.fog.wind.map((v) => Math.round(v * 1e9) / 1e9),
-    [20, 0, 0],
-  );
+  assert.deepEqual(kit.fog.wind.map((v) => Math.round(v * 1e9) / 1e9), [20, 0, 0]);
   assert.equal(kit.storm.windDirection, Math.PI / 2);
   const c = kit.window.light.color;
   assert.ok(c[0] > c[1] && c[1] > c[2], 'about 2,000 K');
@@ -267,11 +250,7 @@ function blackbodyLinearSRGB(T) {
   const x = -0.2661239e9 / T ** 3 - 0.2343589e6 / T ** 2 + 0.8776956e3 / T + 0.17991,
     y = -1.1063814 * x ** 3 - 1.3481102 * x ** 2 + 2.18555832 * x - 0.20219683; // 1,667 to 2,222 K
   const [X, Y, Z] = [x / y, 1, (1 - x - y) / y],
-    rgb = [
-      3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
-      -0.969266 * X + 1.8760108 * Y + 0.041556 * Z,
-      0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
-    ],
+    rgb = [3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z, -0.969266 * X + 1.8760108 * Y + 0.041556 * Z, 0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z],
     top = Math.max(...rgb);
   return rgb.map((c) => Math.max(0, c / top));
 }
@@ -281,10 +260,7 @@ test("the window lantern's colour is a kerosene flame's, a 1,900 K blackbody", (
   const { hearth } = snowNight(),
     want = blackbodyLinearSRGB(1900);
   for (let k = 0; k < 3; k++)
-    assert.ok(
-      Math.abs(hearth.lamp.color[k] - want[k]) < 0.003,
-      `lamp ${hearth.lamp.color} against the 1,900 K blackbody ${want.map((c) => c.toFixed(4))}`,
-    );
+    assert.ok(Math.abs(hearth.lamp.color[k] - want[k]) < 0.003, `lamp ${hearth.lamp.color} against the 1,900 K blackbody ${want.map((c) => c.toFixed(4))}`);
   assert.equal(hearth.lamp.flicker.curve, 'candle');
 });
 
@@ -294,17 +270,10 @@ test("the window lantern's colour is a kerosene flame's, a 1,900 K blackbody", (
 test("the hearth glows at a wood fire's 1,860 K and the whiteout window at a kerosene flame's 1,900 K", () => {
   const { light, lamp } = snowNight().hearth,
     window = whiteout().window.light;
-  for (const [name, color, kelvin] of [
-    ['hearth', light.color, 1860],
-    ['window', window.color, 1900],
-    ['lamp', lamp.color, 1900],
-  ]) {
+  for (const [name, color, kelvin] of [['hearth', light.color, 1860], ['window', window.color, 1900], ['lamp', lamp.color, 1900]]) {
     const want = blackbodyLinearSRGB(kelvin);
     for (let k = 0; k < 3; k++)
-      assert.ok(
-        Math.abs(color[k] - want[k]) < 0.003,
-        `${name} ${color} against the ${kelvin} K blackbody ${want.map((c) => c.toFixed(4))}`,
-      );
+      assert.ok(Math.abs(color[k] - want[k]) < 0.003, `${name} ${color} against the ${kelvin} K blackbody ${want.map((c) => c.toFixed(4))}`);
   }
   // The colour changed, not the light: the hearth's peak luminous intensity stays 5.11 cd (9 at the old colour's
   // luminance 0.568), the window's 10.09 cd (16 at 0.630).
@@ -316,13 +285,7 @@ test("the hearth glows at a wood fire's 1,860 K and the whiteout window at a ker
 test('the window lantern is the clustered hurricane lantern, out of step with the fire', () => {
   const { lamp } = snowNight().hearth,
     preset = hurricaneLantern({ seed: 5 });
-  assert.deepEqual(lamp, {
-    color: [...preset.color],
-    intensity: preset.intensity,
-    range: preset.range,
-    radius: preset.radius,
-    flicker: { ...preset.flicker },
-  });
+  assert.deepEqual(lamp, { color: [...preset.color], intensity: preset.intensity, range: preset.range, radius: preset.radius, flicker: { ...preset.flicker } });
 });
 
 // KB-CABIN-GROUNDEDGE1: the lamp was a point, so the window's jambs threw hard-edged light on the snow. It carries its
@@ -341,8 +304,7 @@ test("the window lantern gives a measured hurricane lantern's light, 82 lm (6.5 
   const { lamp } = snowNight().hearth;
   let sum = 0,
     n = 0;
-  for (let t = 0; t < 20000; t += 0.0037, n++)
-    sum += flickerAt(lamp.flicker.curve, t * lamp.flicker.speed, lamp.flicker.seed);
+  for (let t = 0; t < 20000; t += 0.0037, n++) sum += flickerAt(lamp.flicker.curve, t * lamp.flicker.speed, lamp.flicker.seed);
   const candela = lamp.intensity * luminance(lamp.color) * (sum / n);
   assert.ok(Math.abs(candela - 82 / (4 * Math.PI)) < 0.03, `lamp ${candela.toFixed(3)} cd averaged over its flicker`);
 });
@@ -352,10 +314,7 @@ test("the window lantern gives a measured hurricane lantern's light, 82 lm (6.5 
 test("the hearth's flickers average 0.9 (the lantern's candle) and 0.75 (the fire)", async () => {
   const { flickerAt } = await import('../../clustered/dist/flicker.js');
   const { lamp, light } = snowNight().hearth;
-  for (const [flicker, mean] of [
-    [lamp.flicker, 0.9],
-    [light.flicker, 0.75],
-  ]) {
+  for (const [flicker, mean] of [[lamp.flicker, 0.9], [light.flicker, 0.75]]) {
     let sum = 0,
       n = 0;
     for (let t = 0; t < 20000; t += 0.0037, n++) sum += flickerAt(flicker.curve, t * flicker.speed, flicker.seed);

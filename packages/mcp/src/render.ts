@@ -102,8 +102,7 @@ function findProject(folder: string): string | undefined {
  */
 export async function renderSnippet(code: string, options: RenderOptions = {}): Promise<RenderResult> {
   if (typeof code !== 'string' || !code.trim()) throw typeError('render_snippet needs a non-empty code string', 'mcp');
-  if (code.length > MAX_SNIPPET)
-    throw rangeError('The snippet is over 200000 characters; check one file at a time', 'mcp');
+  if (code.length > MAX_SNIPPET) throw rangeError('The snippet is over 200000 characters; check one file at a time', 'mcp');
   const width = options.width ?? 512,
     height = options.height ?? 512,
     timeoutMs = options.timeoutMs ?? 60_000,
@@ -130,11 +129,7 @@ export async function renderSnippet(code: string, options: RenderOptions = {}): 
   if (language === 'ts') {
     const strip = (nodeModule as { stripTypeScriptTypes?: (code: string) => string }).stripTypeScriptTypes;
     if (typeof strip !== 'function')
-      throw fault(
-        'unsupported',
-        'TypeScript snippets need Node 22.13 or newer; pass language js or update Node',
-        'mcp',
-      );
+      throw fault('unsupported', 'TypeScript snippets need Node 22.13 or newer; pass language js or update Node', 'mcp');
     try {
       source = strip(code);
     } catch (error) {
@@ -170,13 +165,7 @@ export async function renderSnippet(code: string, options: RenderOptions = {}): 
           if (error && (error as { name?: string }).name === 'AbortError') {
             if (options.signal?.aborted) fail(error);
             else
-              fail(
-                fault(
-                  'failed',
-                  `The render took longer than ${timeoutMs} ms and was stopped; draw less or raise timeoutMs`,
-                  'mcp',
-                ),
-              );
+              fail(fault('failed', `The render took longer than ${timeoutMs} ms and was stopped; draw less or raise timeoutMs`, 'mcp'));
           } else if (error)
             fail(fault('failed', `The snippet did not render: ${text.slice(-1500) || String(error)}`, 'mcp'));
           else done(text);
@@ -251,11 +240,7 @@ export function createRenderTool(options: RenderToolOptions = {}): ToolDefinitio
       const empty = result.drawnPixels === 0;
       const text = [
         `Rendered ${result.width} x ${result.height} in ${result.ms} ms; ${result.drawnPixels} pixels differ from the corner.`,
-        ...(empty
-          ? [
-              'Every pixel is one colour: nothing is in view. Call stage.fit() after adding objects, or place the camera.',
-            ]
-          : []),
+        ...(empty ? ['Every pixel is one colour: nothing is in view. Call stage.fit() after adding objects, or place the camera.'] : []),
         ...(result.output ? ['Console:', result.output] : []),
       ].join('\n');
       return {

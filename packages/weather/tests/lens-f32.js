@@ -9,10 +9,7 @@ const pcg = (v) => {
   return ((x >>> 22) ^ x) >>> 0;
 };
 const lattice = (cx, cy, shift, layer) =>
-  f(
-    f(pcg((pcg(cx | 0) ^ (((cy | 0) - shift) >>> 0) ^ (Math.imul(layer, 0x9e3779b9) >>> 0)) >>> 0) >>> 8) *
-      f(5.9604645e-8),
-  );
+  f(f(pcg((pcg(cx | 0) ^ (((cy | 0) - shift) >>> 0) ^ (Math.imul(layer, 0x9e3779b9) >>> 0)) >>> 0) >>> 8) * f(5.9604645e-8));
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const smoothstep = (e0, e1, x) => {
   const t = f(clamp01(f(f(x - e0) / f(e1 - e0))));
@@ -52,9 +49,7 @@ export function lensFieldF32(px, py, a, b) {
           length = f(f(b[1]) * 4);
         let trail = 0;
         if (layer === 1 && vy < 0 && vy > f(-1 - length))
-          trail = f(
-            f(1 - smoothstep(f(0.08), f(0.22), Math.abs(vx))) * smoothstep(f(-1 - length), f(f(-0.8) - length), vy),
-          );
+          trail = f(f(1 - smoothstep(f(0.08), f(0.22), Math.abs(vx))) * smoothstep(f(-1 - length), f(f(-0.8) - length), vy));
         const root = f(Math.sqrt(dome));
         rx = f(rx + f(f(f(f(f(vx * root) * head)) + f(vx * trail)) * activation));
         ry = f(ry + f(f(f(vy * root) * head) * activation));

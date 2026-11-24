@@ -13,13 +13,7 @@ function device() {
   const lost = new Promise((resolve) => (lose = resolve));
   return {
     lost: { then: (done, failed) => (reactions++, lost.then(done, failed)) },
-    createBuffer: (descriptor) => ({
-      ...descriptor,
-      destroyed: false,
-      destroy() {
-        this.destroyed = true;
-      },
-    }),
+    createBuffer: (descriptor) => ({ ...descriptor, destroyed: false, destroy() { this.destroyed = true; } }),
     queue: { writeBuffer() {} },
     lose: () => lose({ reason: 'unknown', message: 'test' }),
     reactions: () => reactions,
@@ -50,10 +44,7 @@ test('a detached roughness feature is collected while its device lives; a live o
     assert.equal(gpu.reactions(), 1, 'one reaction for the device, not one per feature');
     gpu.lose();
     await setImmediate();
-    assert.ok(
-      uniforms.every((u) => u.destroyed),
-      'the lost device takes the live uniforms with it',
-    );
+    assert.ok(uniforms.every((u) => u.destroyed), 'the lost device takes the live uniforms with it');
   } finally {
     setFlagsFromString('--no-expose-gc');
   }

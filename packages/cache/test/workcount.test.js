@@ -34,10 +34,7 @@ test('work count: a burst of hits stamps their files in one write, with the reco
   const { factory, modes } = counted();
   globalThis.indexedDB = factory;
   const files = Object.fromEntries(
-      ['/a.glb', '/b.glb', '/c.glb'].map((path, i) => [
-        path,
-        { body: bytes(100 + i), etag: `"${i}"`, control: 'max-age=3600' },
-      ]),
+      ['/a.glb', '/b.glb', '/c.glb'].map((path, i) => [path, { body: bytes(100 + i), etag: `"${i}"`, control: 'max-age=3600' }]),
     ),
     network = server(files),
     cache = new AssetCache({ name: 'burst', fetch: network });

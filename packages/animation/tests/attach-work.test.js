@@ -168,11 +168,7 @@ for (const [label, strip] of [
       assert.ok(a['upload'](context));
       for (const r of skinned) {
         const bones = new Uint8Array(r.slot.page.bones.buffer.data, r.slot.bones.offset * 64, r.joints.length * 64);
-        assert.deepEqual(
-          bones,
-          new Uint8Array(reference(a, r).buffer),
-          `palette of ${r.primitive.node.name} at ${time}`,
-        );
+        assert.deepEqual(bones, new Uint8Array(reference(a, r).buffer), `palette of ${r.primitive.node.name} at ${time}`);
       }
     }
     a.dispose();

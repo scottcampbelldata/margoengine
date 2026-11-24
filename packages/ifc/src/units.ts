@@ -89,9 +89,7 @@ export function unitTypeOfMeasure(measure: string | undefined): string | undefin
   const m = measure && /^IFC(?:POSITIVE|NONNEGATIVE)?([A-Z]+)MEASURE$/.exec(measure.toUpperCase());
   if (!m) return;
   const kind = m[1];
-  if (
-    /^(COUNT|RATIO|NORMALISEDRATIO|PARAMETERVALUE|NUMERIC|COMPOUNDPLANEANGLE|CONTEXTDEPENDENT|DESCRIPTIVE)$/.test(kind)
-  )
+  if (/^(COUNT|RATIO|NORMALISEDRATIO|PARAMETERVALUE|NUMERIC|COMPOUNDPLANEANGLE|CONTEXTDEPENDENT|DESCRIPTIVE)$/.test(kind))
     return;
   return `${kind}UNIT`;
 }
@@ -105,12 +103,7 @@ export const QUANTITY_UNIT: Record<string, string | undefined> = {
   IFCQUANTITYTIME: 'TIMEUNIT',
 };
 
-export function unitOf(
-  l: Raw,
-  line: (id: number | undefined) => Raw,
-  upper: (l: Raw) => string,
-  depth = 0,
-): IFCUnit | undefined {
+export function unitOf(l: Raw, line: (id: number | undefined) => Raw, upper: (l: Raw) => string, depth = 0): IFCUnit | undefined {
   if (!l || depth > 8) return;
   const kind = upper(l),
     unitType = typeof l.UnitType?.value === 'string' ? l.UnitType.value : '';
@@ -127,12 +120,7 @@ export function unitOf(
     if (typeof value !== 'number' || !base) return;
     const offset = kind === 'IFCCONVERSIONBASEDUNITWITHOFFSET' ? Number(decode(l.ConversionOffset) ?? 0) : 0;
     // SI = base.scale * ((v - offset) * value) + base.shift.
-    return {
-      scale: base.scale * value,
-      shift: base.shift - base.scale * value * offset,
-      symbol,
-      name: String(text(l.Name) ?? l.Name?.value ?? ''),
-    };
+    return { scale: base.scale * value, shift: base.shift - base.scale * value * offset, symbol, name: String(text(l.Name) ?? l.Name?.value ?? '') };
   }
   if (kind === 'IFCDERIVEDUNIT') {
     let scale = 1;
@@ -147,11 +135,7 @@ export function unitOf(
   }
 }
 
-export function readUnits(
-  line: (id: number | undefined) => Raw,
-  upper: (l: Raw) => string,
-  ids: (n: string) => number[],
-): IFCUnits {
+export function readUnits(line: (id: number | undefined) => Raw, upper: (l: Raw) => string, ids: (n: string) => number[]): IFCUnits {
   const units: IFCUnits = { byType: {} };
   const project = line(ids('IFCPROJECT')[0]);
   const assignment = project ? line(refOf(project.UnitsInContext)) : undefined;

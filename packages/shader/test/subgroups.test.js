@@ -23,11 +23,7 @@ test('a device with subgroups gets the hardware calls, an enable first and no ea
 
 test('the engine form reads the device from engine.gpu', () => {
   assert.equal(subgroups({ gpu: fast, features: ['subgroups'] }).supported, true);
-  assert.equal(
-    subgroups({ gpu: plain, features: ['subgroups'] }).supported,
-    false,
-    'what was granted, not what was asked',
-  );
+  assert.equal(subgroups({ gpu: plain, features: ['subgroups'] }).supported, false, 'what was granted, not what was asked');
   assert.equal(subgroups({ gpu: null }).supported, false);
   assert.equal(halfFloats({ gpu: fast }).supported, true);
 });
@@ -64,10 +60,7 @@ test('every operation maps to its WGSL builtin', () => {
     assert.ok(pass((i) => u.store(i, op(u.element(i)))).includes(`= ${name}(`), name);
   const lanes = pass((i) => {
     const big = f.element(i).greaterThan(0);
-    return u.store(
-      i,
-      sg.all(big).toUint().add(sg.any(big).toUint()).add(sg.ballot(big).x).add(sg.elect().toUint()).add(sg.id),
-    );
+    return u.store(i, sg.all(big).toUint().add(sg.any(big).toUint()).add(sg.ballot(big).x).add(sg.elect().toUint()).add(sg.id));
   });
   for (const name of ['subgroupAll(', 'subgroupAny(', 'subgroupBallot(', 'subgroupElect()', 'subgroup_invocation_id'])
     assert.ok(lanes.includes(name), name);
@@ -82,10 +75,7 @@ test('a device without subgroups runs the same graph as one-lane subgroups, with
     const x = f.element(i),
       big = x.greaterThan(0);
     return [
-      f.store(
-        i,
-        sg.add(x).add(sg.exclusiveAdd(x)).add(sg.exclusiveMul(x)).add(sg.shuffleUp(x, 1)).add(sg.broadcast(x, 0)),
-      ),
+      f.store(i, sg.add(x).add(sg.exclusiveAdd(x)).add(sg.exclusiveMul(x)).add(sg.shuffleUp(x, 1)).add(sg.broadcast(x, 0))),
       u.store(i, sg.size.add(sg.id).add(sg.ballot(big).x).add(sg.elect().toUint()).add(sg.all(big).toUint())),
     ];
   });
@@ -168,10 +158,7 @@ test('a half float cannot leave a compute pass', () => {
 test('packed halves need no feature', () => {
   const out = storage(128, 'u32'),
     back = storage(128, 'vec2f');
-  const code = pass(
-    (i) => [out.store(i, packHalf2(back.element(i))), back.store(i, unpackHalf2(out.element(i)))],
-    undefined,
-  );
+  const code = pass((i) => [out.store(i, packHalf2(back.element(i))), back.store(i, unpackHalf2(out.element(i)))], undefined);
   assert.match(code, /pack2x16float\(/);
   assert.match(code, /unpack2x16float\(/);
   assert.doesNotMatch(code, /enable/);

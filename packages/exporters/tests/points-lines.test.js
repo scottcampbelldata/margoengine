@@ -29,9 +29,7 @@ function glb(json, arrays) {
   }
   const bin = new Uint8Array(length);
   arrays.forEach((a, i) => bin.set(new Uint8Array(a.buffer, a.byteOffset, a.byteLength), views[i].byteOffset));
-  const text = new TextEncoder().encode(
-      JSON.stringify({ ...json, buffers: [{ byteLength: length }], bufferViews: views }),
-    ),
+  const text = new TextEncoder().encode(JSON.stringify({ ...json, buffers: [{ byteLength: length }], bufferViews: views })),
     jsonLength = Math.ceil(text.length / 4) * 4,
     out = new Uint8Array(12 + 8 + jsonLength + 8 + length),
     dv = new DataView(out.buffer);
@@ -109,8 +107,7 @@ function source() {
 }
 
 const all = (model) => [...model.primitives, ...model.pointsAndLines];
-const position = (p) =>
-  Array.from({ length: p.vertices.length / 20 }, (_, i) => [...p.vertices.subarray(i * 20, i * 20 + 3)]);
+const position = (p) => Array.from({ length: p.vertices.length / 20 }, (_, i) => [...p.vertices.subarray(i * 20, i * 20 + 3)]);
 
 test('exportModel writes loaded points and lines, and strips as indexed lists', () =>
   headlessModels(async () => {
@@ -133,10 +130,7 @@ test('exportModel writes loaded points and lines, and strips as indexed lists', 
     assert.deepEqual(json.materials[1].pbrMetallicRoughness.baseColorFactor, [1, 0.5, 0.25, 1]);
     assert.deepEqual(json.materials[2].emissiveFactor, [0, 1, 0]);
     assert.ok(json.meshes[0].primitives[1].attributes.COLOR_0 !== undefined, 'point colours kept');
-    assert.ok(
-      json.meshes[1].primitives[0].indices !== undefined,
-      'an unindexed triangle strip is written as an indexed list',
-    );
+    assert.ok(json.meshes[1].primitives[0].indices !== undefined, 'an unindexed triangle strip is written as an indexed list');
 
     const copy = await parseGLTFAsync(await headless(), out);
     assert.deepEqual(
@@ -298,13 +292,7 @@ test('USDZ from GLB bytes and the animated USDZ write points and lines as Points
     };
     // sceneOfGLB keeps each primitive's mode, so a GLB goes through exportUSDZ with its points and lines. The reader
     // lists each curve: the strip, the loop and the two separate segments of the cross.
-    assert.deepEqual(await kinds(exportUSDZ(exportGLB(dataScene().scene))), [
-      'points',
-      'curve',
-      'curve',
-      'curve',
-      'curve',
-    ]);
+    assert.deepEqual(await kinds(exportUSDZ(exportGLB(dataScene().scene))), ['points', 'curve', 'curve', 'curve', 'curve']);
     const { node } = dataScene(),
       animated = {
         nodes: [node],
@@ -412,10 +400,7 @@ test('COLLADA writes loaded lines as a <lines> group and warns for points; parse
     const warnings = [],
       { dae } = exportDAE(engine, { colorSpace: 'linear', onWarning: (w) => warnings.push(w) });
     assert.equal(warnings.length, 1, 'COLLADA has no point primitive');
-    assert.match(
-      warnings[0].message,
-      /1 point or line primitives left out; this format writes lines and triangles only/,
-    );
+    assert.match(warnings[0].message, /1 point or line primitives left out; this format writes lines and triangles only/);
     assert.match(dae, /<lines material="[^"]+" count="3">/);
     const back = parseDAE(new TextEncoder().encode(dae)),
       mixed = back.geometries.find((g) => g.lines);
@@ -441,10 +426,7 @@ test('USDZ writes loaded points as UsdGeomPoints and lines as linear BasisCurves
     const entry = readZipDirectory(usdz).find((e) => e.name === 'scene.usda'),
       text = new TextDecoder().decode(await readZipEntry(usdz, entry));
     assert.match(text, /def Points "Points_\d+"/);
-    assert.match(
-      text,
-      /def BasisCurves "BasisCurves_\d+"[^]*?uniform token type = "linear"[^]*?int\[\] curveVertexCounts = \[4\]/,
-    );
+    assert.match(text, /def BasisCurves "BasisCurves_\d+"[^]*?uniform token type = "linear"[^]*?int\[\] curveVertexCounts = \[4\]/);
     const asset = await parseUSDZ(usdz, { extensions: [curves()] }),
       gltf = new GLTFAsset(asset.document, asset.buffers),
       parts = asset.document.meshes.flatMap((m) => m.extras?.usdCurves ?? []),
@@ -460,10 +442,7 @@ test('USDZ writes loaded points as UsdGeomPoints and lines as linear BasisCurves
     assert.deepEqual(read(parts[1], 'points', 3), [SEGMENTS[0], SEGMENTS[1], SEGMENTS[3], SEGMENTS[5]]);
     for (const part of parts) for (const [w] of read(part, 'widths', 1)) assert.ok(Math.abs(w - 0.02) < 1e-7);
     // Point colours: COLOR_0 times the 'dots' base colour (1, 0.5, 0.25).
-    assert.deepEqual(
-      read(parts[0], 'colors', 4)[1].map((v) => Math.round(v * 1e6) / 1e6),
-      [0, 0.5, 0, 1],
-    );
+    assert.deepEqual(read(parts[0], 'colors', 4)[1].map((v) => Math.round(v * 1e6) / 1e6), [0, 0.5, 0, 1]);
     assert.ok(
       asset.document.meshes.some((m) => m.primitives.some((p) => (p.mode ?? 4) === 4)),
       'the triangles are read as a mesh',

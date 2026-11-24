@@ -16,7 +16,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/post-outline/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5343, strictPort: true, watch: null, hmr: false },
+  server: { host: '127.0.0.1', port: 5343, strictPort: true, watch: null },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5343 });

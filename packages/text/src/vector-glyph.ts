@@ -48,10 +48,7 @@ const SQRT3_36 = Math.sqrt(3) / 36;
  * quadratic with control (3(c1 + c2) - p0 - p3) / 4, whose distance from the piece is at most
  * sqrt(3) / 36 |p3 - 3 c2 + 3 c1 - p0| (the difference is d3 t (t - 1/2) (t - 1)); splitting divides d3 by n^3.
  */
-export function toQuadratics(
-  contours: readonly (readonly (readonly number[])[])[],
-  tolerance = CUBIC_TOLERANCE,
-): Quadratic[] {
+export function toQuadratics(contours: readonly (readonly (readonly number[])[])[], tolerance = CUBIC_TOLERANCE): Quadratic[] {
   const out: Quadratic[] = [];
   for (const loop of contours)
     for (const s of loop) {
@@ -90,20 +87,10 @@ export function toQuadratics(
             c1y = start[1] + (h / 3) * d0[1],
             c2x = end[0] - (h / 3) * d1[0],
             c2y = end[1] - (h / 3) * d1[1];
-          out.push([
-            start[0],
-            start[1],
-            (3 * (c1x + c2x) - start[0] - end[0]) / 4,
-            (3 * (c1y + c2y) - start[1] - end[1]) / 4,
-            end[0],
-            end[1],
-          ]);
+          out.push([start[0], start[1], (3 * (c1x + c2x) - start[0] - end[0]) / 4, (3 * (c1y + c2y) - start[1] - end[1]) / 4, end[0], end[1]]);
           start = end;
         }
-      } else
-        throw new RangeError(
-          'Outline segments have 4, 6 or 8 coordinates; pass each line, quadratic or cubic as its points [x0, y0, ..., xn, yn]',
-        );
+      } else throw new RangeError('Outline segments have 4, 6 or 8 coordinates; pass each line, quadratic or cubic as its points [x0, y0, ..., xn, yn]');
     }
   return out;
 }
@@ -199,11 +186,7 @@ export class VectorGlyphStore {
         });
         const along = axis === 0 ? 0 : 1;
         for (const list of lists[axis])
-          list.sort(
-            (i, j) =>
-              Math.max(packed[j][along], packed[j][along + 2], packed[j][along + 4]) -
-              Math.max(packed[i][along], packed[i][along + 2], packed[i][along + 4]),
-          );
+          list.sort((i, j) => Math.max(packed[j][along], packed[j][along + 2], packed[j][along + 4]) - Math.max(packed[i][along], packed[i][along + 2], packed[i][along + 4]));
       }
       return lists;
     };
@@ -309,8 +292,7 @@ export function vectorCoverage(
     stop = -hw - Math.abs(dil),
     choice = options.rays ?? 'auto',
     rays = choice === 'auto' ? (Math.min(ppeX, ppeY) < SMALL_PPEM ? 5 : DEFAULT_RAYS) : choice;
-  if (!Number.isInteger(rays) || rays < 1 || rays > 7 || rays % 2 === 0)
-    throw new RangeError("rays must be 'auto', 1, 3, 5 or 7");
+  if (!Number.isInteger(rays) || rays < 1 || rays > 7 || rays % 2 === 0) throw new RangeError("rays must be 'auto', 1, 3, 5 or 7");
   // Pixel square half-size in em on each axis (with dilation), for the band-cover and hull-touch tests.
   const rx = (1.001 * (hw + Math.abs(dil))) / ppeX,
     ry = (1.001 * (hw + Math.abs(dil))) / ppeY,

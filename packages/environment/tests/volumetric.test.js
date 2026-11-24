@@ -165,12 +165,8 @@ test('uniform: near-plane distance plane, grid, shape, sun and ambient from engi
 test('lightning: the deck the flash lights adds rho E / (2 pi) to the ambient, read every frame', () => {
   const light = { position: [0, 702, -1000], color: [0.5, 0.75, 1], intensity: 0 },
     { fog, frame, record } = rig({ options: { ambient: [0.01, 0.02, 0.03], lightning: { light } } });
-  const ambient = () => [
-    ...uniformWrites(
-      record(() => frame(0)),
-      fog,
-    )[0].subarray(60, 63),
-  ];
+  const ambient = () =>
+    [...uniformWrites(record(() => frame(0)), fog)[0].subarray(60, 63)];
   assert.deepEqual(ambient(), [0.01, 0.02, 0.03].map(Math.fround), 'no flash: the ambient as given');
   light.intensity = 1.43e7;
   // The camera sits at [0, 2, 0]: the light is 700 up and 1000 away, d^2 = 1.49e6.
@@ -245,7 +241,9 @@ test('shadows and clustered lights compose through their declared WGSL and bindi
   const own = rig({
       options: { lights: source((g) => `// clustered group ${g}\nfn clusterShadowVisibility(){}`, lightEntries) },
     }),
-    ownCode = own.record(() => own.frame(0)).find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;
+    ownCode = own
+      .record(() => own.frame(0))
+      .find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;
   assert.match(ownCode, /\*clusterShadowVisibility\(light,a\+w\*u,vec3f\(0\)\)/);
   assert.doesNotMatch(ownCode, /\*clusterShadow\(light/);
   // KB-CABIN-WINDOWGLOW1: with AreaLights on the same Clustered the declarations hold the area lights' storage buffer
@@ -253,10 +251,7 @@ test('shadows and clustered lights compose through their declared WGSL and bindi
   // declared and unused it fell out, the light group failed to build and every frame was lost (Cabin Hearth's window).
   const withArea = rig({
       options: {
-        lights: source(
-          (g) => `// clustered group ${g}\n@group(${g}) @binding(17) var<storage,read> areaLights:AreaLightData;`,
-          lightEntries,
-        ),
+        lights: source((g) => `// clustered group ${g}\n@group(${g}) @binding(17) var<storage,read> areaLights:AreaLightData;`, lightEntries),
       },
     }),
     areaCode = withArea
@@ -277,23 +272,14 @@ test('KB-FOG-HOOK-BINDINGS1: the inject pass keeps every binding of a Clustered 
   const { keepBindings } = await import('../../shared/keep-bindings.js');
   assert.equal(keepBindings(), '');
   assert.equal(
-    keepBindings(
-      '@group(1) @binding(164) var<storage,read> clusterBounce:array<vec4f>;\n@group(1) @binding(40) var iesMap: texture_2d<f32>;',
-      undefined,
-    ),
+    keepBindings('@group(1) @binding(164) var<storage,read> clusterBounce:array<vec4f>;\n@group(1) @binding(40) var iesMap: texture_2d<f32>;', undefined),
     'if(false){_=&clusterBounce;_=iesMap;}',
   );
   // A bounce hook (binding 164) in the lights' declarations, as LightBounce sets: the fog never reads it, but the bind
   // group holds it, so the pass's automatic layout must too. Without the dead-branch use the layout dropped it and the
   // bind group failed validation ("binding index 164 not present in the bind group layout"): no fog, every frame.
-  const source = (declarations, entries) => ({
-      pbr: (group) => ({ declarations: declarations(group) }),
-      bindings: () => entries,
-    }),
-    lightEntries = [
-      { binding: 4, resource: {} },
-      { binding: 164, resource: {} },
-    ];
+  const source = (declarations, entries) => ({ pbr: (group) => ({ declarations: declarations(group) }), bindings: () => entries }),
+    lightEntries = [{ binding: 4, resource: {} }, { binding: 164, resource: {} }];
   const hooked = rig({
       options: {
         lights: source(
@@ -304,7 +290,9 @@ test('KB-FOG-HOOK-BINDINGS1: the inject pass keeps every binding of a Clustered 
         ),
       },
     }),
-    code = hooked.record(() => hooked.frame(0)).find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code,
+    code = hooked
+      .record(() => hooked.frame(0))
+      .find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code,
     body = code.slice(code.indexOf('fn inject('));
   assert.match(body, /if\(false\)\{[^}]*_=&clusterBounce;[^}]*\}/);
 });

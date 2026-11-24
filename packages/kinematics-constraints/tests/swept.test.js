@@ -32,10 +32,7 @@ test('sweepChain: a link swung through a thin post stops at the closed-form cont
     rho = 0.01,
     D = 0.8,
     phi = 1,
-    pose = (angle) => [
-      [0, 0, 0],
-      [Math.cos(angle), Math.sin(angle), 0],
-    ],
+    pose = (angle) => [[0, 0, 0], [Math.cos(angle), Math.sin(angle), 0]],
     post = new CapsuleVolume({
       start: [D * Math.cos(phi), D * Math.sin(phi), -1],
       end: [D * Math.cos(phi), D * Math.sin(phi), 1],
@@ -60,10 +57,7 @@ test('sweepChain: a link swung through a thin post stops at the closed-form cont
 });
 
 test('sweepChain: however thin the wall and fast the slide, a sphere meets it; minClearance stops it early', () => {
-  const at = (x) => [
-      [x, 0, 0],
-      [x, 0, 0],
-    ],
+  const at = (x) => [[x, 0, 0], [x, 0, 0]],
     wall = new ConvexHullVolume({ points: [50, -9, -9, 50, 9, -9, 50, -9, 9, 50, 9, 9] }),
     span = 1e3,
     hit = sweepChain(at(0), at(span), [wall], { radius: 0.1, tolerance: 1e-6 });
@@ -125,18 +119,7 @@ test('sweepHull: a clear result holds on a dense scan, and a contact is the firs
 
 test('sweepChain: a budget that runs out says so and never reads as clear', () => {
   const near = new SphereVolume({ center: [0, 2, 0], radius: 0.99 }),
-    out = sweepChain(
-      [
-        [0, 0, 0],
-        [1, 0, 0],
-      ],
-      [
-        [0, 0, 0],
-        [Math.cos(3), Math.sin(3), 0],
-      ],
-      [near],
-      { radius: 0.01, maxSteps: 2 },
-    );
+    out = sweepChain([[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [Math.cos(3), Math.sin(3), 0]], [near], { radius: 0.01, maxSteps: 2 });
   assert.equal(out.clear, false);
   assert.equal(out.exhausted, true);
   assert.ok(out.time < 1);
@@ -152,16 +135,8 @@ test('sweepChain: bones keep their length through the motion and the chain ends 
         return 1000;
       },
     },
-    from = [
-      [0, 0, 0],
-      [0.6, 0.8, 0],
-      [0.6, 0.8, 2],
-    ],
-    to = [
-      [1, 0, 0],
-      [1, 1, 0],
-      [-1, 1, 0],
-    ],
+    from = [[0, 0, 0], [0.6, 0.8, 0], [0.6, 0.8, 2]],
+    to = [[1, 0, 0], [1, 1, 0], [-1, 1, 0]],
     result = sweepChain(from, to, [spy], { radius: 0 });
   assert.equal(result.clear, true);
   for (const [a, b] of seen) {
@@ -206,16 +181,8 @@ test('sweepChain: a pose the solver accepts in one frame through a thin plate is
 
 test('sweepChain: a joint sphere wider than its links is checked on its own path', () => {
   const ball = new SphereVolume({ center: [Math.SQRT1_2, Math.SQRT1_2, 0.3], radius: 0.1 }),
-    from = [
-      [0, 0, 0],
-      [1, 0, 0],
-      [2, 0, 0],
-    ],
-    to = [
-      [0, 0, 0],
-      [0, 1, 0],
-      [0, 2, 0],
-    ];
+    from = [[0, 0, 0], [1, 0, 0], [2, 0, 0]],
+    to = [[0, 0, 0], [0, 1, 0], [0, 2, 0]];
   // The links turn in the plane z = 0, 0.3 under the ball's centre: 0.15 clear of it at their closest.
   assert.equal(sweepChain(from, to, [ball], { radius: 0.05, minClearance: 0.1 }).clear, true);
   assert.equal(sweepChain(from, to, [ball], { radius: 0.05, minClearance: 0.2 }).clear, false);
@@ -257,32 +224,11 @@ test('sweepHull: a fast shot through a thin plate is caught; scale and turn coun
     grow = sweepHull(grower, translate(0, 0, 0), grown, [near], { tolerance: 1e-6 });
   assert.equal(grow.clear, false);
   assert.ok(Math.abs(0.5 * (1 + 2 * grow.time) - 0.99) < 1e-4);
-  assert.throws(
-    () => sweepHull(grower, [1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], translate(0, 0, 0), []),
-    /no shear/,
-  );
-  assert.throws(
-    () => sweepHull(grower, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], translate(0, 0, 0), []),
-    /no shear/,
-  );
+  assert.throws(() => sweepHull(grower, [1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], translate(0, 0, 0), []), /no shear/);
+  assert.throws(() => sweepHull(grower, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], translate(0, 0, 0), []), /no shear/);
 });
 
 test('a collider that gives NaN stops the check instead of reading clear', () => {
   const broken = { evaluate: () => NaN, segmentClearance: () => NaN };
-  assert.throws(
-    () =>
-      sweepChain(
-        [
-          [0, 0, 0],
-          [1, 0, 0],
-        ],
-        [
-          [0, 0, 0],
-          [0, 1, 0],
-        ],
-        [broken],
-        { radius: 0.01 },
-      ),
-    /finite clearance/,
-  );
+  assert.throws(() => sweepChain([[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [0, 1, 0]], [broken], { radius: 0.01 }), /finite clearance/);
 });

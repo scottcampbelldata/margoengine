@@ -206,10 +206,7 @@ test('a short highp int report (Firefox on macOS: 24, 24) is measured: exact 32-
 
 test('a short highp int report stays refused when the measurement is wrong or cannot run', () => {
   // 24-bit ints: the multiply's high byte lost.
-  for (const words of [
-    [3238976083 & 0xffffff, 2654463870, 2147483651, 766958446],
-    [0, 0, 0, 0],
-  ]) {
+  for (const words of [[3238976083 & 0xffffff, 2654463870, 2147483651, 766958446], [0, 0, 0, 0]]) {
     const caps = webgl2Capabilities(shortIntContext(words));
     assert.equal(caps.highpFragment, false);
     assert.deepEqual(caps.missing, ['highp-fragment']);

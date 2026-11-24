@@ -15,7 +15,8 @@ export { OutlineShaper, scriptTag } from './outline-shape.js';
 export type { FontVariationOptions, FontVariationAxis } from './font-variation.js';
 
 /** Default-ignorable code points (joiners, variation selectors) have no glyph and no advance here. */
-export const IGNORABLE = /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ\u{1bca0}-\u{1bca3}\u{1d173}-\u{1d17a}\u{e0000}-\u{e0fff}]/u;
+export const IGNORABLE =
+  /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ\u{1bca0}-\u{1bca3}\u{1d173}-\u{1d17a}\u{e0000}-\u{e0fff}]/u;
 const CACHE_MAGIC = 0x4d474c59; // "MGLY"
 let names = 0;
 
@@ -94,10 +95,7 @@ export class GlyphFieldFont extends Font {
     const { signal, ...rest } = options;
     const response = await fetch(url, { signal });
     if (!response.ok)
-      throw new MargoError(
-        'failed',
-        `Font download failed with HTTP ${response.status} for ${String(url)}; check the URL and that the server returns the font file. Help: ${FONT_HELP}`,
-      );
+      throw new MargoError('failed', `Font download failed with HTTP ${response.status} for ${String(url)}; check the URL and that the server returns the font file. Help: ${FONT_HELP}`);
     const data = await response.arrayBuffer(),
       head = new Uint8Array(data, 0, Math.min(4, data.byteLength));
     // CFF ('OTTO') files and variable instances need the OpenType readers: load them only then.
@@ -113,9 +111,7 @@ export class GlyphFieldFont extends Font {
   constructor(data: ArrayBuffer | ArrayBufferView, options: GlyphFieldFontOptions = {}) {
     const size = options.size ?? 64;
     if (!Number.isInteger(size) || size < 8 || size > 512)
-      throw new RangeError(
-        'GlyphFieldFont size must be an integer from 8 to 512 pixels per em; 64 suits captions, 128 or 256 large titles',
-      );
+      throw new RangeError('GlyphFieldFont size must be an integer from 8 to 512 pixels per em; 64 suits captions, 128 or 256 large titles');
     const radius = options.radius ?? size / 4;
     if (typeof radius !== 'number' || !(radius > 0 && radius <= size / 2))
       throw new RangeError('GlyphFieldFont radius must be above 0 and at most size / 2 pixels');
@@ -161,10 +157,7 @@ export class GlyphFieldFont extends Font {
     const nfc = pick(text.normalize('NFC'));
     if (nfc.length !== chars.length && nfc.every((char) => outlines.glyphIndex(char) !== 0)) chars = nfc;
     const script = chars.length ? scriptTag(chars[0]) : 'latn';
-    const glyphs = this.shaper.ligatures(
-        chars.map((char) => outlines.glyphIndex(char)),
-        script,
-      ),
+    const glyphs = this.shaper.ligatures(chars.map((char) => outlines.glyphIndex(char)), script),
       x: number[] = [];
     let pen = 0;
     for (let i = 0; i < glyphs.length; i++) {
@@ -229,15 +222,7 @@ export class GlyphFieldFont extends Font {
       if (field) {
         this.stats.rasterized++;
         this.stats.evaluations += field.evaluations;
-        glyph = {
-          cluster,
-          width: field.width,
-          height: field.height,
-          left: field.left,
-          top: field.top,
-          color: false,
-          data: field.data,
-        };
+        glyph = { cluster, width: field.width, height: field.height, left: field.left, top: field.top, color: false, data: field.data };
       }
     }
     this.fields.set(cluster, glyph);
@@ -261,14 +246,7 @@ export class GlyphFieldFont extends Font {
   get key(): string {
     return (this.cacheKey ??= hashBytes(
       this.bytes,
-      JSON.stringify([
-        OUTLINE_SDF_VERSION,
-        this.size,
-        this.radius,
-        this.cutoff,
-        this.buffer,
-        Object.entries(this.variations).sort(),
-      ]),
+      JSON.stringify([OUTLINE_SDF_VERSION, this.size, this.radius, this.cutoff, this.buffer, Object.entries(this.variations).sort()]),
     ));
   }
 
@@ -308,8 +286,7 @@ export class GlyphFieldFont extends Font {
    * @throws MargoError `failed` for bytes with this font's key that are cut short or malformed.
    */
   importGlyphs(bytes: Uint8Array): boolean {
-    if (!(bytes instanceof Uint8Array))
-      throw new TypeError('importGlyphs takes a Uint8Array; pass the bytes exportGlyphs returned');
+    if (!(bytes instanceof Uint8Array)) throw new TypeError('importGlyphs takes a Uint8Array; pass the bytes exportGlyphs returned');
     if (bytes.length < 10) return false;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
       decoder = new TextDecoder();
@@ -317,10 +294,7 @@ export class GlyphFieldFont extends Font {
     const keyLength = view.getUint16(8, true);
     if (bytes.length < 14 + keyLength || decoder.decode(bytes.subarray(10, 10 + keyLength)) !== this.key) return false;
     const broken = (): never => {
-      throw new MargoError(
-        'failed',
-        `Glyph cache bytes for this font are cut short or malformed; rebuild the cache. Help: ${FONT_HELP}`,
-      );
+      throw new MargoError('failed', `Glyph cache bytes for this font are cut short or malformed; rebuild the cache. Help: ${FONT_HELP}`);
     };
     let at = 10 + keyLength;
     const count = view.getUint32(at, true),
@@ -342,11 +316,10 @@ export class GlyphFieldFont extends Font {
       at += width * height;
     }
     if (at !== bytes.length) broken();
-    for (const g of glyphs)
-      if (!this.fields.has(g.cluster)) {
-        this.fields.set(g.cluster, g);
-        this.stats.imported++;
-      }
+    for (const g of glyphs) if (!this.fields.has(g.cluster)) {
+      this.fields.set(g.cluster, g);
+      this.stats.imported++;
+    }
     return true;
   }
 }

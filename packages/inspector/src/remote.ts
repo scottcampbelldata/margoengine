@@ -352,10 +352,7 @@ export class RemoteTarget implements EnginePlugin, Disposable {
     this.disposed = true;
     clearInterval(this.timer);
     this.stop?.();
-    const engine = this.engine;
     this.engine = undefined;
-    // Off the scene that holds it, not the active one, and only while it is still the registered plugin.
-    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();
@@ -472,9 +469,7 @@ export class RemoteInspector implements Disposable {
         );
       }, this.timeout);
       this.waiting.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
-      this.options.transport.send(
-        JSON.stringify({ [tag]: version, id, op, args, token: this.options.token, viewer: this.viewer }),
-      );
+      this.options.transport.send(JSON.stringify({ [tag]: version, id, op, args, token: this.options.token, viewer: this.viewer }));
     });
   }
   /** Says hello and lists the scene. */

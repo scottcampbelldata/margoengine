@@ -206,8 +206,7 @@ const material = new RawShaderMaterial({
   depthTest: false,
   depthWrite: false,
   cull: 'none',
-  name: 'molten-words',
-});
+  name: 'molten-words',});
 const raw = RawShaders.attach(stage.engine);
 raw.add(new RawMesh({ material, vertexCount: 3 }));
 

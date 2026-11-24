@@ -9,11 +9,7 @@ import { WIND_BEND_FULL, WeatherMachine, grassWind, scatterWind, windBend } from
 const angle = (x, z) => Math.atan2(x, z),
   off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) * (180 / Math.PI);
 const sceneWith = (...plugins) => {
-  const engine = {
-    plugins: new Map(plugins.map((p) => [p.name, p])),
-    use: (p) => (engine.plugins.set(p.name, p), p.setup(engine)),
-    removePlugin: () => {},
-  };
+  const engine = { plugins: new Map(plugins.map((p) => [p.name, p])), use: (p) => (engine.plugins.set(p.name, p), p.setup(engine)), removePlugin: () => {} };
   return engine;
 };
 
@@ -29,10 +25,7 @@ test('bend grows with the square of the wind, from 0 to a full bend at 20 m/s', 
 
 test('scatterWind and grassWind give the direction the wind blows toward, and keep it in dead calm', () => {
   const s = scatterWind([3, 4]);
-  assert.deepEqual(
-    s.slice(0, 2).map((v) => +v.toFixed(12)),
-    [0.6, 0.8],
-  );
+  assert.deepEqual(s.slice(0, 2).map((v) => +v.toFixed(12)), [0.6, 0.8]);
   assert.ok(Math.abs(s[2] - windBend(5)) < 1e-12);
   assert.equal(s[3], 5, 'the speed rides along for the thrash clock');
   assert.equal(scatterWind([300, 0])[3], 100, 'capped at the 100 m/s scatter takes');
@@ -58,19 +51,13 @@ test('vane: scatter and grass lean within 5 degrees of the wind field, and harde
     assert.ok(off(angle(scatter.options.wind[0], scatter.options.wind[1]), heading) < 5, `${name} scatter`);
     assert.ok(off(angle(...grass.windDirection), heading) < 5, `${name} grass`);
     assert.ok(Math.abs(Math.hypot(scatter.options.wind[0], scatter.options.wind[1]) - 1) < 1e-9, 'unit direction');
-    assert.ok(
-      off(angle(still.options.wind[0], still.options.wind[1]), heading) < 5,
-      `${name} a scatter built without a wind option is driven too`,
-    );
+    assert.ok(off(angle(still.options.wind[0], still.options.wind[1]), heading) < 5, `${name} a scatter built without a wind option is driven too`);
     assert.deepEqual(still.options.wind, scatter.options.wind, 'the same wind as the one built with it');
     assert.ok(Math.abs(scatter.options.wind[2] - windBend(Math.hypot(w[0], w[2]))) < 1e-9);
     assert.ok(Math.abs(scatter.options.wind[3] - Math.hypot(w[0], w[2])) < 1e-9, 'the speed for the thrash clock');
     (globalThis.__bend ??= {})[name] = [scatter.options.wind[2], grass.windStrength];
   }
-  assert.ok(
-    globalThis.__bend.storm[0] > globalThis.__bend.drizzle[0] &&
-      globalThis.__bend.storm[1] > globalThis.__bend.drizzle[1],
-  );
+  assert.ok(globalThis.__bend.storm[0] > globalThis.__bend.drizzle[0] && globalThis.__bend.storm[1] > globalThis.__bend.drizzle[1]);
 });
 
 test('targets handed in win over discovery, and auto false leaves the scene alone', () => {

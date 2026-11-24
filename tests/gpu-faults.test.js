@@ -163,9 +163,7 @@ test('select counts only the calls it picks, so other code interleaving its call
     select: (method, descriptor) => descriptor?.label?.startsWith('shadow'),
   });
   device.pushErrorScope('out-of-memory');
-  const made = ['other', 'shadow a', 'other', 'other', 'shadow b', 'shadow c'].map((label) =>
-    device.createTexture({ label }),
-  );
+  const made = ['other', 'shadow a', 'other', 'other', 'shadow b', 'shadow c'].map((label) => device.createTexture({ label }));
   const error = await device.popErrorScope();
   assert.match(error.message, /Injected createTexture failure \(call 2\)/);
   assert.deepEqual(

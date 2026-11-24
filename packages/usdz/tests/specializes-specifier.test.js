@@ -47,9 +47,7 @@ const cases = [
 test('a class reached through specializes stays a class before a weaker def, as OpenUSD composes it', async () => {
   for (const [outer, inner, target, isDef] of cases) {
     const text = stage(outer, inner, target);
-    const { specs } = await composeUSDFiles('root.usda', (id) =>
-      id === 'root.usda' ? encoder.encode(text) : undefined,
-    );
+    const { specs } = await composeUSDFiles('root.usda', (id) => (id === 'root.usda' ? encoder.encode(text) : undefined));
     // A class is not a composed prim of the stage, as OpenUSD's default traversal leaves it out.
     assert.equal(specs['/R/b/c']?.fields.specifier, isDef ? 0 : undefined, `${outer} then ${inner} ${target}`);
     assert.equal(specs['/R/b']?.fields.specifier, 0);

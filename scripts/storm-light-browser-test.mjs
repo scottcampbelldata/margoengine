@@ -76,10 +76,7 @@ try {
 
   // The opening strike: every visit flashes once 1.6 s in (the page has run longer than that by now).
   const opening = await page.evaluate(() => window.stormLight.opening());
-  assert.ok(
-    opening && opening.time >= 1.5 && opening.time < 2,
-    'no opening lightning strike: ' + JSON.stringify(opening),
-  );
+  assert.ok(opening && opening.time >= 1.5 && opening.time < 2, 'no opening lightning strike: ' + JSON.stringify(opening));
   // A click strikes toward where the camera looks: Weather's azimuth is 0 toward +Z and pi/2 toward +X, so the heading
   // is atan2(dx, dz) (the page used atan2(dz, dx), which sent the strike off to one side).
   await page.mouse.click(640, 200);
@@ -89,9 +86,7 @@ try {
       [tx, , tz] = engine.camera.target;
     return { azimuth: strike().azimuth, heading: Math.atan2(tx - x, tz - z) };
   });
-  const turn = Math.abs(
-    Math.atan2(Math.sin(clicked.azimuth - clicked.heading), Math.cos(clicked.azimuth - clicked.heading)),
-  );
+  const turn = Math.abs(Math.atan2(Math.sin(clicked.azimuth - clicked.heading), Math.cos(clicked.azimuth - clicked.heading)));
   assert.ok(turn < 0.1, 'a click struck away from the view: ' + JSON.stringify(clicked));
 
   // The slider names the weather.

@@ -33,20 +33,12 @@ export interface StereoStage extends Disposable {
 export function createStereo(context: BaseAudioContext, options: StereoOptions = {}): StereoStage {
   const pan = bounded(options.pan ?? 0, -1, 1, 'Stereo pan');
   const width = bounded(options.width ?? 0.5, 0, 1, 'Stereo width');
-  const input = context.createGain(),
-    split = context.createChannelSplitter(2),
-    merge = context.createChannelMerger(2);
-  input.channelCount = 2;
-  input.channelCountMode = 'explicit';
-  const output = context.createStereoPanner(),
-    control = context.createConstantSource(),
-    scale = context.createGain();
+  const input = context.createGain(), split = context.createChannelSplitter(2), merge = context.createChannelMerger(2);
+  input.channelCount = 2; input.channelCountMode = 'explicit';
+  const output = context.createStereoPanner(), control = context.createConstantSource(), scale = context.createGain();
   const cross = [context.createGain(), context.createGain()];
-  output.pan.value = pan;
-  control.offset.value = width;
-  scale.gain.value = -2;
-  input.connect(split);
-  control.connect(scale);
+  output.pan.value = pan; control.offset.value = width; scale.gain.value = -2;
+  input.connect(split); control.connect(scale);
   for (let c = 0; c < 2; c++) {
     split.connect(merge, c, c);
     split.connect(cross[c], c);
@@ -54,8 +46,7 @@ export function createStereo(context: BaseAudioContext, options: StereoOptions =
     scale.connect(cross[c].gain);
     cross[c].connect(merge, 0, 1 - c);
   }
-  merge.connect(output);
-  control.start();
+  merge.connect(output); control.start();
   let disposed = false;
   const schedule = (param: AudioParam, value: number, low: number, high: number, opts: RampOptions = {}) => {
     if (disposed) throw new MargoError('disposed', 'Stereo stage is disposed; create a new stereo stage');
@@ -67,21 +58,15 @@ export function createStereo(context: BaseAudioContext, options: StereoOptions =
     else param.setTargetAtTime(value, at, seconds / 4);
   };
   const stage: StereoStage = {
-    input,
-    output,
-    pan: output.pan,
-    width: control.offset,
+    input, output, pan: output.pan, width: control.offset,
     setPan: (value, opts) => schedule(output.pan, value, -1, 1, opts),
     setWidth: (value, opts) => schedule(control.offset, value, 0, 1, opts),
     dispose() {
       if (disposed) return;
-      disposed = true;
-      control.stop();
+      disposed = true; control.stop();
       for (const node of [input, split, merge, output, control, scale, ...cross]) node.disconnect();
     },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }
@@ -91,15 +76,8 @@ export function createBusStereo(bus: Bus, options: StereoOptions = {}): StereoSt
   const stage = createStereo(bus.input.context, options);
   let detach: (() => void) | undefined;
   const dispose = stage.dispose;
-  stage.dispose = () => {
-    detach?.();
-    dispose();
-  };
-  try {
-    detach = bus.insert(stage);
-  } catch (error) {
-    dispose();
-    throw error;
-  }
+  stage.dispose = () => { detach?.(); dispose(); };
+  try { detach = bus.insert(stage); }
+  catch (error) { dispose(); throw error; }
   return stage;
 }

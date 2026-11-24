@@ -50,11 +50,7 @@ try {
   assert.deepEqual(errors, []);
   for (const [name, counts] of Object.entries(report)) {
     if (name.startsWith('4x') && nvidia) continue;
-    assert.deepEqual(
-      counts,
-      counts.map(() => 0),
-      `GlassVaseFlowers ${name} repeats exactly: ${counts}`,
-    );
+    assert.deepEqual(counts, counts.map(() => 0), `GlassVaseFlowers ${name} repeats exactly: ${counts}`);
   }
 } finally {
   clearTimeout(timer);

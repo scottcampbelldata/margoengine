@@ -20,10 +20,7 @@ uniform vec3 tint;
 varying vec2 vUv;
 void main() { vec4 c = texture2D(tDiffuse, vec2(1.0 - vUv.x, vUv.y)); gl_FragColor = vec4(c.bgr * tint, 1.0); }`,
     uniforms: { tint: ['vec3', [1, 0.5, 0.25], [0.25, 1, 0.5]] },
-    oracle: {
-      vertex:
-        'uniform mat4 projectionMatrix;\nuniform mat4 modelViewMatrix;\nattribute vec3 position;\nattribute vec2 uv;\n',
-    },
+    oracle: { vertex: 'uniform mat4 projectionMatrix;\nuniform mat4 modelViewMatrix;\nattribute vec3 position;\nattribute vec2 uv;\n' },
     identity: ['projectionMatrix', 'modelViewMatrix'],
   },
   {

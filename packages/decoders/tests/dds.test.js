@@ -551,11 +551,7 @@ test('uploadTexture writes every level of every layer, and names the missing com
 
 test('a DX10 header with dimension and array size left at zero is one 2D texture', () => {
   // Real writers do this: bc1.dds and bc5_snorm.dds of Pillow's test images (tests/real-files/manifest.json).
-  for (const dx10 of [
-    { format: 28, array: 0 },
-    { format: 28, dimension: 0, array: 0 },
-    { format: 28, dimension: 0 },
-  ]) {
+  for (const dx10 of [{ format: 28, array: 0 }, { format: 28, dimension: 0, array: 0 }, { format: 28, dimension: 0 }]) {
     const file = parseDDS(dds({ width: 4, height: 4, dx10, data: sequence(64) }));
     assert.equal(file.format, 'rgba8unorm');
     assert.deepEqual([file.mipmaps.length, file.mipmaps[0].width], [1, 4]);

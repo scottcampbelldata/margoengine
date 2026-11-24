@@ -35,8 +35,7 @@ export interface TerrainStreamChange {
   readonly depth: number;
 }
 
-/** {@link TerrainStream} options: the terrain's own options without `textures`, `origin` and `size`, plus these.
- * The clipmap window defaults to `'camera'`, on the same world lattice as its tiles. */
+/** {@link TerrainStream} options: the terrain's own options without `textures`, `origin` and `size`, plus these. */
 export interface TerrainStreamOptions extends Omit<TerrainOptions, 'textures' | 'origin' | 'size'> {
   /** World size of a tile side, above 0. */
   readonly tileSize: number;
@@ -193,7 +192,6 @@ export class TerrainStream implements EnginePlugin {
     // The terrain reads `origin` every frame; the stream moves this array's values with the window.
     this.terrain = new Terrain({
       ...(rest as unknown as Omit<TerrainOptions, 'textures' | 'origin' | 'size'>),
-      clipmapAnchor: o.clipmapAnchor ?? 'camera',
       origin: this.#origin,
       size: [side, side],
       textures: this.#textures,

@@ -19,8 +19,7 @@ import { collectCorpus } from './support/llms-corpus.mjs';
 import { redirectSources, resolveRoute, siteFiles } from './support/site-routes.mjs';
 
 const TEXT = /\.(?:[cm]?[jt]sx?|md|html|json|rs|txt|css|toml|yml|yaml)$/;
-const SKIP_FILE =
-  /(?:^|\/)(?:private|node_modules|dist|tests?)\/|\.test\.[cm]?[jt]s$|(?:^|\/)package-lock\.json$|^site\/llms-full\.txt$/;
+const SKIP_FILE = /(?:^|\/)(?:private|node_modules|dist|tests?)\/|\.test\.[cm]?[jt]s$|(?:^|\/)package-lock\.json$|^site\/llms-full\.txt$/;
 // An href or src attribute of an HTML page.
 const ATTRIBUTE = /\s(?:href|src|poster)="([^"]*)"/g;
 const LINK = /https?:\/\/(?:www\.)?margoengine\.com(\/[^\s)"'`<>\\,;]*)?/g;
@@ -141,8 +140,7 @@ export function siteLinkFindings(root, { files = trackedFiles(root), pages = sit
         }
         if (fragment !== null) {
           const ids = idsOf(found);
-          if (ids && !ids.has(fragment))
-            findings.push({ file, line: index + 1, url, why: `${found} has no #${fragment}` });
+          if (ids && !ids.has(fragment)) findings.push({ file, line: index + 1, url, why: `${found} has no #${fragment}` });
         }
       }
     });

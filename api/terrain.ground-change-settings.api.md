@@ -62,6 +62,17 @@ interface BurnEvent extends Timed {
 
 type Color = readonly [number, number, number];
 
+interface CraterEvent extends Timed {
+    kind: 'crater';
+    center: GroundPoint;
+    radius?: number;
+    depth?: number;
+    heave?: number;
+    heaveTime?: number;
+    domeSpread?: number;
+    ejecta?: number;
+}
+
 class GroundChange implements EnginePlugin, TerrainLighting {
     readonly options: GroundChangeOptions;
     readonly name: string;
@@ -134,7 +145,7 @@ interface GroundCover {
     ashen: number;
 }
 
-type GroundEvent = GullyEvent | BankEvent | ScourEvent | SlideEvent | MudEvent | AshEvent | LavaEvent | BurnEvent;
+type GroundEvent = GullyEvent | BankEvent | ScourEvent | SlideEvent | MudEvent | AshEvent | LavaEvent | BurnEvent | CraterEvent;
 
 interface GroundGrid {
     size: readonly [number, number];
@@ -279,7 +290,6 @@ class Terrain implements EnginePlugin {
     readonly anchor?: readonly [number, number];
     constructor(options: TerrainOptions);
     get shift(): ArrayLike<number>;
-    get surfaceHeightTexture(): GPUTexture | undefined;
     static attach(instance: EngineKernel, options: TerrainOptions): Terrain;
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
@@ -349,8 +359,6 @@ interface TerrainOptions {
     cellSize?: number;
     resolution?: number;
     levels?: number;
-    readonly clipmapAnchor?: readonly [number, number] | 'camera';
-    readonly captureSurfaceHeight?: boolean;
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
 }

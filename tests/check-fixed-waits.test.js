@@ -155,14 +155,11 @@ test('frame helpers with an explicit nonzero simulation delta advance time rathe
 
 test('HTML markup and strings with braces do not become helper scopes or stall scanning', () => {
   assert.deepEqual(kinds('<!doctype html><style>body{color:#111}</style>'), []);
-  assert.deepEqual(
-    kinds(`<html><style>body{color:#111}</style><script type="module">
+  assert.deepEqual(kinds(`<html><style>body{color:#111}</style><script type="module">
     const marker = "{";
     const frame = () => engine.render({delta:1/30});
     for(let i=0;i<90;i++)frame();
-  </script></html>`),
-    [],
-  );
+  </script></html>`), []);
   assert.deepEqual(kinds('const text = `value ${"{"}`; const kill=()=>child.kill(); setTimeout(kill,100);'), []);
 });
 
@@ -171,7 +168,7 @@ test('HTML markup and strings with braces do not become helper scopes or stall s
 test('a regular expression after && or || is read as one', () => {
   const source =
     "assert.throws(() => f(), (e) => e.code === 'x' && /https:\\/\\/a#/.test(e.message));\n" +
-    'const g = (e) => e || /}`{/.test(e);\nconst t = `${1}`;\n' +
+    "const g = (e) => e || /}`{/.test(e);\nconst t = `${1}`;\n" +
     'for (let i = 0; i < 20; i++) { engine.render({ delta: 0 }); await done(); }\n';
   assert.deepEqual(kinds(source), ['4:frames']);
 });

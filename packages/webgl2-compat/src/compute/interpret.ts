@@ -291,9 +291,7 @@ class Parser {
     if (this.is('(') && this.arrow()) {
       const params = this.params();
       this.need('=>');
-      return this.is('{')
-        ? { k: 'arrow', params, body: this.block() }
-        : { k: 'arrow', params, value: this.assignment() };
+      return this.is('{') ? { k: 'arrow', params, body: this.block() } : { k: 'arrow', params, value: this.assignment() };
     }
     if (this.is('yield')) {
       this.at++;
@@ -970,18 +968,12 @@ class Compiler {
         ? (f) => f[0][slot]
         : depth === 2
           ? (f) => f[0][0][slot]
-          : (
-              (frame) => (f: Frame) =>
-                frame(f)[slot]
-            )(up(depth));
+          : ((frame) => (f: Frame) => frame(f)[slot])(up(depth));
   }
 
   private array(unit: Unit, items: Node[]): Expr {
     if (items.some((n) => n.k === 'spread')) {
-      const list = items.map((n) => ({
-        spread: n.k === 'spread',
-        value: this.expression(unit, n.k === 'spread' ? n.e : n),
-      }));
+      const list = items.map((n) => ({ spread: n.k === 'spread', value: this.expression(unit, n.k === 'spread' ? n.e : n) }));
       return (f) => {
         const out: unknown[] = [];
         for (const x of list)

@@ -44,11 +44,7 @@ void main() {
     attributes: { position: { size: 2, data: flat2(full) }, uv: { size: 2, data: uvOf(flat2(full)) } },
     index: full.index,
     uniforms: {
-      lift: [
-        'mat4',
-        [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.25, 1],
-      ],
+      lift: ['mat4', [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.25, 1]],
       f: ['float', 0.5, 0.75],
       f2: ['vec2', [0.25, 0.5], [0.5, 1]],
       f3: ['vec3', [0, 0.5, 0], [0, 0.25, 0]],
@@ -81,11 +77,7 @@ void main() {
   vec4 c = texture2D(map, vUv);
   gl_FragColor = vec4(mix(c.rgb, tint, 0.25) * 0.75 + vec3(vShade * 0.25), 1.0);
 }`,
-    attributes: {
-      position: { size: 2, data: flat2(full) },
-      uv: { size: 2, data: uvOf(flat2(full)) },
-      w: { size: 1, data: [1, 2, 4, 1.5] },
-    },
+    attributes: { position: { size: 2, data: flat2(full) }, uv: { size: 2, data: uvOf(flat2(full)) }, w: { size: 1, data: [1, 2, 4, 1.5] } },
     index: full.index,
     uniforms: { t: ['float', 0.25, 0.5], tint: ['vec3', [1, 0.5, 0], [0, 0.25, 1]] },
     texture: { name: 'map', filter: 'linear' },

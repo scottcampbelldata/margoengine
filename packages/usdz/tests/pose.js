@@ -62,10 +62,7 @@ export function pose(asset, seconds) {
       let i = 0;
       while (i < times.length - 2 && times[i + 1] <= seconds) i++;
       const j = Math.min(i + 1, times.length - 1),
-        f =
-          j === i || interpolation === 'STEP'
-            ? 0
-            : Math.min(1, Math.max(0, (seconds - times[i]) / (times[j] - times[i]))),
+        f = j === i || interpolation === 'STEP' ? 0 : Math.min(1, Math.max(0, (seconds - times[i]) / (times[j] - times[i]))),
         at = (k) => Array.from(values.subarray(k * width, k * width + width));
       const pointer = target.extensions?.KHR_animation_pointer?.pointer,
         id = pointer ? Number(pointer.split('/')[2]) : target.node;
@@ -99,9 +96,7 @@ export function vertices(asset, id, { world, animated, data }) {
     skin = node.skin === undefined ? undefined : doc.skins[node.skin],
     binds = skin && data(skin.inverseBindMatrices),
     joints = skin?.joints.map((joint, i) => multiply(world[joint], Array.from(binds.subarray(i * 16, i * 16 + 16)))),
-    sets = [0, 1]
-      .filter((i) => attributes['JOINTS_' + i] !== undefined)
-      .map((i) => [data(attributes['JOINTS_' + i]), data(attributes['WEIGHTS_' + i])]),
+    sets = [0, 1].filter((i) => attributes['JOINTS_' + i] !== undefined).map((i) => [data(attributes['JOINTS_' + i]), data(attributes['WEIGHTS_' + i])]),
     out = [];
   for (let v = 0; v < positions.length / 3; v++) {
     const p = [positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]];

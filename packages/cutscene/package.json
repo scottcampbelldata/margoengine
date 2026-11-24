@@ -73,6 +73,10 @@
     "./seek": {
       "types": "./dist/seek.d.ts",
       "import": "./dist/seek.js"
+    },
+    "./film-titles": {
+      "types": "./dist/film-titles.d.ts",
+      "import": "./dist/film-titles.js"
     }
   },
   "files": [
@@ -97,7 +101,8 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
     "@margoengine/input": "^1.0.0",
-    "@margoengine/inspector": "^1.0.0"
+    "@margoengine/inspector": "^1.0.0",
+    "@margoengine/ui": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
@@ -110,6 +115,9 @@
       "optional": true
     },
     "@margoengine/inspector": {
+      "optional": true
+    },
+    "@margoengine/ui": {
       "optional": true
     }
   }

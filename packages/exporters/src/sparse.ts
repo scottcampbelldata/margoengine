@@ -268,8 +268,7 @@ export function denseGLB(bytes: Uint8Array): Uint8Array {
   for (const [index, accessor] of (json.accessors ?? []).entries()) {
     if (!accessor.sparse) continue;
     changed = true;
-    if (!SET[accessor.componentType])
-      throw new TypeError(`glTF accessor ${index} has an unknown componentType; repair the GLB`);
+    if (!SET[accessor.componentType]) throw new TypeError(`glTF accessor ${index} has an unknown componentType; repair the GLB`);
     const { values } = readAccessor(parts, index),
       { bytes: width } = shape(accessor),
       data = new Uint8Array(accessor.count * width),

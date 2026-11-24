@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/horses",
   "version": "1.0.0",
-  "description": "Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 37-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw.",
+  "description": "Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 32-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw.",
   "keywords": [
     "margoengine",
     "webgpu",

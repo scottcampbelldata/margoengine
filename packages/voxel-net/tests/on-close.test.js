@@ -105,7 +105,6 @@ test('onClose still comes when an onError handler throws', (t) => {
     addEventListener(type, listener) {
       listeners[type] = listener;
     }
-    removeEventListener() {}
     close() {}
     send() {}
   };
@@ -132,36 +131,4 @@ test('a server that is not there, or that drops the connection, is an unclean cl
   await wait(50);
   assert.equal(page.closes.length, 1);
   assert.equal(page.errors.length, 1);
-});
-
-// KB-VOXELNET-WSLISTENERS1: a socket that closed keeps none of the listeners connectVoxelNet put on it, and they are gone
-// before the client hears it closed.
-test('connectVoxelNet takes its listeners off a socket once it closed, before onClose', (t) => {
-  const real = globalThis.WebSocket,
-    sockets = [];
-  t.after(() => {
-    globalThis.WebSocket = real;
-  });
-  globalThis.WebSocket = class {
-    readyState = 0;
-    on = new Map();
-    constructor() {
-      sockets.push(this);
-    }
-    addEventListener(type, listener) {
-      this.on.set(type, listener);
-    }
-    removeEventListener(type, listener) {
-      if (this.on.get(type) === listener) this.on.delete(type);
-    }
-    close() {}
-    send() {}
-  };
-  const client = connectVoxelNet('ws://fake', new VoxelWorld({ blocks })),
-    [socket] = sockets,
-    left = [];
-  assert.deepEqual([...socket.on.keys()].sort(), ['close', 'message', 'open']);
-  client.onClose = () => left.push(socket.on.size);
-  socket.on.get('close')({ code: 1006, reason: '' });
-  assert.deepEqual(left, [0], 'no listener is left on the closed socket when onClose is called');
 });

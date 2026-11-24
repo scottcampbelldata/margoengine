@@ -25,13 +25,10 @@ export function archiveMetadata(folder, { platform = process.platform } = {}) {
       { encoding: 'utf8', windowsHide: true, timeout: 60_000, maxBuffer: 256 * 1024 ** 2 },
     );
     native = new Map(
-      text
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line) => {
-          const [name, size, ticks] = line.split('\t');
-          return [name, ticks === undefined ? undefined : { size: Number(size), at: milliseconds(ticks) }];
-        }),
+      text.split(/\r?\n/).filter(Boolean).map((line) => {
+        const [name, size, ticks] = line.split('\t');
+        return [name, ticks === undefined ? undefined : { size: Number(size), at: milliseconds(ticks) }];
+      }),
     );
   }
   return names.flatMap((name) => {

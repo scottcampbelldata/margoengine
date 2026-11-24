@@ -17,12 +17,7 @@ function harness() {
     modules = [],
     create = gpu.createShaderModule.bind(gpu);
   globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2 };
-  globalThis.GPUTextureUsage = {
-    ...globalThis.GPUTextureUsage,
-    COPY_DST: 2,
-    TEXTURE_BINDING: 4,
-    RENDER_ATTACHMENT: 16,
-  };
+  globalThis.GPUTextureUsage = { ...globalThis.GPUTextureUsage, COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
   gpu.limits.maxTextureDimension2D = 8192;
   gpu.createBindGroupLayout = (d) => ({ ...d });
   gpu.createPipelineLayout = (d) => ({ ...d });
@@ -47,17 +42,8 @@ const point = { position: [0, 2, 0], range: 6, color: [1, 0.8, 0.6], intensity: 
 test('light radius: validated, finite and 0 or more', () => {
   const lights = new Clustered();
   for (const radius of [-0.1, Infinity, Number.NaN, '0.1', 1e40])
-    assert.throws(
-      () => lights.setLights([{ ...point, radius }]),
-      /Light radius must be a finite number/,
-      String(radius),
-    );
-  assert.doesNotThrow(() =>
-    lights.setLights([
-      { ...point, radius: 0 },
-      { ...spot, radius: 0.25 },
-    ]),
-  );
+    assert.throws(() => lights.setLights([{ ...point, radius }]), /Light radius must be a finite number/, String(radius));
+  assert.doesNotThrow(() => lights.setLights([{ ...point, radius: 0 }, { ...spot, radius: 0.25 }]));
 });
 
 test('light radius 0 or unset: the same records, shaders, culling and uploads as before, byte for byte', () => {
@@ -71,10 +57,7 @@ test('light radius 0 or unset: the same records, shaders, culling and uploads as
       plainDeclarations = lights.pbr(1).declarations;
     assert.deepEqual(h.modules, [cullingShader], 'one culling module, the point records one');
     assert.equal(plainDeclarations, clusteredSampling(1, undefined, undefined, false, true));
-    assert.equal(
-      clusteredSampling(1),
-      clusteredSampling(1, undefined, undefined, false, false, false, { sized: false }),
-    );
+    assert.equal(clusteredSampling(1), clusteredSampling(1, undefined, undefined, false, false, false, { sized: false }));
     assert.ok(!plainShader.includes('size:vec4f') && !plainShader.includes('light.size'));
     lights.setLights([
       { ...point, radius: 0 },
@@ -114,30 +97,18 @@ test('light radius above 0: 20-float records with the radius, the sphere-light s
     assert.match(sizedCullingShader, /params:vec4f,size:vec4f\}/);
     const declarations = lights.pbr(1).declarations;
     assert.equal(declarations, clusteredSampling(1, undefined, undefined, false, true, false, { sized: true }));
-    assert.match(
-      h.context.shader,
-      /struct ClusterLight \{positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f,size:vec4f\}/,
-    );
+    assert.match(h.context.shader, /struct ClusterLight \{positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f,size:vec4f\}/);
     // Karis 2013 eq. 11: representative point; eq. 10 and 14: alpha' and (alpha / alpha')^2.
-    assert.match(
-      declarations,
-      /let ray=dot\(delta,rr\)\*rr-delta;let sp=delta\+ray\*clamp\(rs\/max\(length\(ray\),0\.000001\),0\.0,1\.0\);/,
-    );
+    assert.match(declarations, /let ray=dot\(delta,rr\)\*rr-delta;let sp=delta\+ray\*clamp\(rs\/max\(length\(ray\),0\.000001\),0\.0,1\.0\);/);
     // ... and its anisotropic form over the half-vector Jacobian (Walter et al. 2007 eq. 14).
     assert.match(
       declarations,
       /let along=spread\/max\(svh,0\.0001\);let ax=max\(min\(a\+spread,1\.0\),spread\);let ay=max\(min\(a\+along,1\.0\),along\);let norm=select\(1\.0,\(a\/ax\)\*\(a\/ay\),rs>0\.0\);/,
     );
-    assert.match(
-      declarations,
-      /let d=a2\/\(3\.14159265\*pow\(max\(dot\(cross\(n,sh\),cross\(n,sh\)\),step\(snh,0\.0\)\)\+a2\*snh\*snh,2\.0\)\)\*norm;/,
-    );
+    assert.match(declarations, /let d=a2\/\(3\.14159265\*pow\(max\(dot\(cross\(n,sh\),cross\(n,sh\)\),step\(snh,0\.0\)\)\+a2\*snh\*snh,2\.0\)\)\*norm;/);
     assert.match(declarations, /pow\(1-svh,5\.0\);/);
     // The BRDF text the material packages rewrite is unchanged (materials' Lambert and Phong, toon, physical lobes).
-    assert.equal(
-      declarations.split('result+=').length,
-      plainShader.slice(0, plainShader.indexOf('fn vertex')).split('result+=').length,
-    );
+    assert.equal(declarations.split('result+=').length, plainShader.slice(0, plainShader.indexOf('fn vertex')).split('result+=').length);
     assert.ok(declarations.includes(clusterBrdfTerm(plainShader)));
     lights.setLights([point, spot]);
     h.frame();
@@ -163,12 +134,7 @@ test('light radius is the default shadow radius of a castShadow light (PCSS); sh
     caster = {
       shadowPrimitives: [
         {
-          node: {
-            id: 0,
-            engine: h.engine,
-            matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
-            check() {},
-          },
+          node: { id: 0, engine: h.engine, matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]), check() {} },
           vertex: {},
           index: {},
           count: 36,
@@ -210,10 +176,7 @@ test('sphere light diffuse: the cap form factor matches Monte Carlo and never ex
       const c = Math.cos((degrees * Math.PI) / 180),
         exact = capFormFactor(c, s2),
         sampled = capFormFactorSampled(c, s2, 400);
-      assert.ok(
-        Math.abs(exact - sampled) <= 4e-3 * Math.PI * s2,
-        `sin^2 sigma ${s2}, ${degrees} deg: ${exact} vs ${sampled}`,
-      );
+      assert.ok(Math.abs(exact - sampled) <= 4e-3 * Math.PI * s2, `sin^2 sigma ${s2}, ${degrees} deg: ${exact} vs ${sampled}`);
     }
   for (const r of [0.02, 0.155, 0.634])
     for (const ratio of [0.01, 0.1, 0.5, 0.99, 1, 1.01, 2, 10, 100])
@@ -226,8 +189,7 @@ test('sphere light diffuse: the cap form factor matches Monte Carlo and never ex
         if (ratio >= 1 && c * c >= 1 / (ratio * ratio)) assert.ok(Math.abs(e * d * d - Math.max(c, 0)) < 1e-12);
       }
   // Continuous through the sphere's surface, and the point light's term is unbounded there.
-  for (const c of [1, 0.5, 0, -0.5])
-    assert.ok(Math.abs(sphereIrradiance(c, 0.634 * (1 - 1e-9), 0.634) - sphereIrradiance(c, 0.634, 0.634)) < 1e-6);
+  for (const c of [1, 0.5, 0, -0.5]) assert.ok(Math.abs(sphereIrradiance(c, 0.634 * (1 - 1e-9), 0.634) - sphereIrradiance(c, 0.634, 0.634)) < 1e-6);
   assert.ok(sphereIrradiance(1, 0.09, 0) / sphereBound(0.634) > 49, 'a point at the firebox back: 50 times the bound');
 });
 
@@ -235,10 +197,7 @@ test('sphere light diffuse: the sized loop writes the cap form factor as its nl;
   const sized = clusteredSampling(1, undefined, undefined, false, false, false, { sized: true }),
     plain = clusteredSampling(1);
   assert.match(sized, /let sfs=min\(rs\*rs\/max\(distance\*distance,0\.000001\),1\.0\);var sfg=max\(sfc,0\.0\);/);
-  assert.match(
-    sized,
-    /sfg=clamp\(\(\(sfc\*acos\(sfy\)-sfx\*sfq\)\*sfs\+atan2\(sfq,sfx\)\)\/\(3\.14159265\*sfs\),0\.0,1\.0\);/,
-  );
+  assert.match(sized, /sfg=clamp\(\(\(sfc\*acos\(sfy\)-sfx\*sfq\)\*sfs\+atan2\(sfq,sfx\)\)\/\(3\.14159265\*sfs\),0\.0,1\.0\);/);
   assert.match(
     sized,
     /let nl=select\(clamp\(dot\(n,l\),0\.0,1\.0\),sfg\*select\(1\.0,max\(distance\*distance,0\.000244140625\)\/\(rs\*rs\),distance<rs\),rs>0\.0\);/,

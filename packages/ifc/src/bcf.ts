@@ -156,9 +156,7 @@ const number = (e: XMLElement | undefined, name: string, where: string): number 
   return Number.isFinite(v) ? v : fail('syntax', `${where} needs a finite ${name}; export the BCF again`);
 };
 const vec = (e: XMLElement | undefined, where: string): Vec3 =>
-  e
-    ? [number(e, 'X', where), number(e, 'Y', where), number(e, 'Z', where)]
-    : fail('syntax', `${where} is missing; export the BCF again`);
+  e ? [number(e, 'X', where), number(e, 'Y', where), number(e, 'Z', where)] : fail('syntax', `${where} is missing; export the BCF again`);
 const component = (c: XMLElement): BCFComponent => {
   const out: BCFComponent = {},
     guid = attr(c, 'IfcGuid'),
@@ -178,8 +176,7 @@ const xml = (source: string | Uint8Array, what: string) =>
 /** Reads a .bcfv viewpoint: BCF 3.0, 2.1 (hints on Components, Color without Components, Bitmap elements) or 1.0. */
 export function parseBCFViewpoint(source: string | Uint8Array): BCFViewpoint {
   const root = xml(source, 'The viewpoint');
-  if (root.localName !== 'VisualizationInfo')
-    fail('syntax', `a viewpoint starts with VisualizationInfo, not ${root.localName}`);
+  if (root.localName !== 'VisualizationInfo') fail('syntax', `a viewpoint starts with VisualizationInfo, not ${root.localName}`);
   const c = kid(root, 'Components'),
     visibility = kid(c, 'Visibility'),
     hints = kid(visibility, 'ViewSetupHints') ?? kid(c, 'ViewSetupHints');
@@ -195,10 +192,7 @@ export function parseBCFViewpoint(source: string | Uint8Array): BCFViewpoint {
       color: attr(color, 'Color') ?? fail('syntax', 'a Color needs its Color attribute; export the BCF again'),
       components: components(kid(color, 'Components') ?? color),
     })),
-    lines: kids(kid(root, 'Lines'), 'Line').map((l) => ({
-      start: vec(kid(l, 'StartPoint'), 'Line'),
-      end: vec(kid(l, 'EndPoint'), 'Line'),
-    })),
+    lines: kids(kid(root, 'Lines'), 'Line').map((l) => ({ start: vec(kid(l, 'StartPoint'), 'Line'), end: vec(kid(l, 'EndPoint'), 'Line') })),
     clippingPlanes: kids(kid(root, 'ClippingPlanes'), 'ClippingPlane').map((p) => ({
       location: vec(kid(p, 'Location'), 'ClippingPlane'),
       direction: vec(kid(p, 'Direction'), 'ClippingPlane'),
@@ -250,22 +244,18 @@ const el = (name: string, body = '', attrs: Record<string, string | number | boo
     .join('');
   return body ? `<${name}${a}>${body}</${name}>` : `<${name}${a}/>`;
 };
-const opt = (name: string, v: string | number | undefined) =>
-  v === undefined || v === '' ? '' : el(name, escapeXML(v));
+const opt = (name: string, v: string | number | undefined) => (v === undefined || v === '' ? '' : el(name, escapeXML(v)));
 const xyz = (name: string, v: readonly number[]) => {
   if (v.length !== 3 || !v.every(Number.isFinite)) fail('range', `${name} needs three finite numbers`);
   return el(name, el('X', String(v[0])) + el('Y', String(v[1])) + el('Z', String(v[2])));
 };
 const writeComponent = (c: BCFComponent) =>
-  el('Component', opt('OriginatingSystem', c.originatingSystem) + opt('AuthoringToolId', c.authoringToolId), {
-    IfcGuid: c.ifcGuid,
-  });
+  el('Component', opt('OriginatingSystem', c.originatingSystem) + opt('AuthoringToolId', c.authoringToolId), { IfcGuid: c.ifcGuid });
 const writeComponents = (list: readonly BCFComponent[]) => list.map(writeComponent).join('');
 const HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const checkGuid = (guid: string, what: string) => {
-  if (!GUID.test(guid))
-    fail('range', `${what} GUID ${JSON.stringify(guid)} must be a lower-case UUID; use newBCFGuid()`);
+  if (!GUID.test(guid)) fail('range', `${what} GUID ${JSON.stringify(guid)} must be a lower-case UUID; use newBCFGuid()`);
 };
 
 /** Options of the BCF writers. */
@@ -292,8 +282,7 @@ export function writeBCFViewpoint(vp: BCFViewpoint, options: BCFWriteOptions = {
   );
   const coloring = vp.coloring.filter((c) => c.components.length);
   for (const c of coloring)
-    if (!/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(c.color))
-      fail('range', `colour ${JSON.stringify(c.color)} must be RRGGBB or AARRGGBB hex`);
+    if (!/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(c.color)) fail('range', `colour ${JSON.stringify(c.color)} must be RRGGBB or AARRGGBB hex`);
   const parts =
     (v3 ? '' : hints) +
     (vp.selection.length ? el('Selection', writeComponents(vp.selection)) : '') +
@@ -315,12 +304,8 @@ export function writeBCFViewpoint(vp: BCFViewpoint, options: BCFWriteOptions = {
     const perspective = cam.type === 'perspective',
       value = perspective ? cam.fieldOfView : cam.viewToWorldScale;
     if (perspective ? !(value! > 0 && value! < 180) : !(value! > 0 && Number.isFinite(value)))
-      fail(
-        'range',
-        perspective ? 'fieldOfView must be degrees in (0, 180)' : 'viewToWorldScale must be a finite size above 0',
-      );
-    if (!(cam.aspectRatio > 0 && Number.isFinite(cam.aspectRatio)))
-      fail('range', 'aspectRatio must be a finite width / height above 0');
+      fail('range', perspective ? 'fieldOfView must be degrees in (0, 180)' : 'viewToWorldScale must be a finite size above 0');
+    if (!(cam.aspectRatio > 0 && Number.isFinite(cam.aspectRatio))) fail('range', 'aspectRatio must be a finite width / height above 0');
     camera = el(
       perspective ? 'PerspectiveCamera' : 'OrthogonalCamera',
       xyz('CameraViewPoint', cam.position) +
@@ -343,16 +328,9 @@ export function writeBCFViewpoint(vp: BCFViewpoint, options: BCFWriteOptions = {
       'VisualizationInfo',
       el('Components', parts) +
         camera +
-        (vp.lines.length
-          ? el('Lines', vp.lines.map((l) => el('Line', xyz('StartPoint', l.start) + xyz('EndPoint', l.end))).join(''))
-          : '') +
+        (vp.lines.length ? el('Lines', vp.lines.map((l) => el('Line', xyz('StartPoint', l.start) + xyz('EndPoint', l.end))).join('')) : '') +
         (vp.clippingPlanes.length
-          ? el(
-              'ClippingPlanes',
-              vp.clippingPlanes
-                .map((p) => el('ClippingPlane', xyz('Location', p.location) + xyz('Direction', p.direction)))
-                .join(''),
-            )
+          ? el('ClippingPlanes', vp.clippingPlanes.map((p) => el('ClippingPlane', xyz('Location', p.location) + xyz('Direction', p.direction))).join(''))
           : '') +
         (v3
           ? vp.bitmaps.length
@@ -410,14 +388,8 @@ export function viewpointFromBCFJSON(json: Json): BCFViewpoint {
     spacesVisible: hints.spaces_visible === true,
     spaceBoundariesVisible: hints.space_boundaries_visible === true,
     openingsVisible: hints.openings_visible === true,
-    coloring: (Array.isArray(c.coloring) ? c.coloring : []).map((x: Json) => ({
-      color: String(x?.color ?? ''),
-      components: jsonComponents(x?.components),
-    })),
-    lines: (json.lines ?? []).map((l: Json) => ({
-      start: jsonVec(l?.start_point, 'line'),
-      end: jsonVec(l?.end_point, 'line'),
-    })),
+    coloring: (Array.isArray(c.coloring) ? c.coloring : []).map((x: Json) => ({ color: String(x?.color ?? ''), components: jsonComponents(x?.components) })),
+    lines: (json.lines ?? []).map((l: Json) => ({ start: jsonVec(l?.start_point, 'line'), end: jsonVec(l?.end_point, 'line') })),
     clippingPlanes: (json.clipping_planes ?? []).map((p: Json) => ({
       location: jsonVec(p?.location, 'clipping plane'),
       direction: jsonVec(p?.direction, 'clipping plane'),
@@ -447,8 +419,7 @@ export function viewpointFromBCFJSON(json: Json): BCFViewpoint {
     if (p) vp.camera.fieldOfView = Number(p.field_of_view);
     else vp.camera.viewToWorldScale = Number(o.view_to_world_scale);
   }
-  if (json.snapshot?.snapshot_data)
-    vp.snapshot = { format: format(json.snapshot.snapshot_type), data: fromBase64(json.snapshot.snapshot_data) };
+  if (json.snapshot?.snapshot_data) vp.snapshot = { format: format(json.snapshot.snapshot_type), data: fromBase64(json.snapshot.snapshot_data) };
   return vp;
 }
 
@@ -465,12 +436,7 @@ export function viewpointToBCFJSON(vp: BCFViewpoint): Record<string, unknown> {
   if (vp.index !== undefined) out.index = vp.index;
   const cam = vp.camera;
   if (cam) {
-    const base = {
-      camera_view_point: v(cam.position),
-      camera_direction: v(cam.direction),
-      camera_up_vector: v(cam.up),
-      aspect_ratio: cam.aspectRatio,
-    };
+    const base = { camera_view_point: v(cam.position), camera_direction: v(cam.direction), camera_up_vector: v(cam.up), aspect_ratio: cam.aspectRatio };
     if (cam.type === 'perspective') out.perspective_camera = { ...base, field_of_view: cam.fieldOfView };
     else out.orthogonal_camera = { ...base, view_to_world_scale: cam.viewToWorldScale };
   }
@@ -522,9 +488,7 @@ const EXT_LISTS: [keyof BCFExtensions, string, string][] = [
 ];
 const textsOf = (list: XMLElement[]) => list.map((e) => e.textContent.trim()).filter(Boolean);
 
-function readMarkup(
-  root: XMLElement,
-): Omit<BCFTopic, 'viewpoints'> & { refs: { guid: string; file?: string; snapshot?: string; index?: number }[] } {
+function readMarkup(root: XMLElement): Omit<BCFTopic, 'viewpoints'> & { refs: { guid: string; file?: string; snapshot?: string; index?: number }[] } {
   const t = kid(root, 'Topic') ?? fail('syntax', 'markup.bcf has no Topic; export the BCF again');
   const required = (name: string) => text(t, name) ?? fail('syntax', `the topic has no ${name}; export the BCF again`);
   const topic: ReturnType<typeof readMarkup> = {
@@ -540,11 +504,7 @@ function readMarkup(
       .concat(kids(kid(root, 'Header'), 'File'))
       .map((f) => {
         const file: BCFFile = { isExternal: bool(attr(f, 'IsExternal') ?? attr(f, 'isExternal'), true) };
-        for (const [key, name] of [
-          ['filename', 'Filename'],
-          ['date', 'Date'],
-          ['reference', 'Reference'],
-        ] as const) {
+        for (const [key, name] of [['filename', 'Filename'], ['date', 'Date'], ['reference', 'Reference']] as const) {
           const v = text(f, name);
           if (v) file[key] = v;
         }
@@ -554,10 +514,7 @@ function readMarkup(
         if (spatial) file.ifcSpatialStructureElement = spatial;
         return file;
       }),
-    documentReferences: [
-      ...kids(kid(t, 'DocumentReferences'), 'DocumentReference'),
-      ...kids(t, 'DocumentReference'),
-    ].map((d) => {
+    documentReferences: [...kids(kid(t, 'DocumentReferences'), 'DocumentReference'), ...kids(t, 'DocumentReference')].map((d) => {
       const out: BCFTopic['documentReferences'][number] = {};
       const guid = attr(d, 'Guid'),
         doc = text(d, 'DocumentGuid'),
@@ -598,15 +555,7 @@ function readMarkup(
       };
     }),
   };
-  const optional = [
-    'Priority',
-    'ModifiedDate',
-    'ModifiedAuthor',
-    'DueDate',
-    'AssignedTo',
-    'Stage',
-    'Description',
-  ] as const;
+  const optional = ['Priority', 'ModifiedDate', 'ModifiedAuthor', 'DueDate', 'AssignedTo', 'Stage', 'Description'] as const;
   for (const name of optional) {
     const v = text(t, name);
     if (v) (topic as unknown as Record<string, string>)[name[0]!.toLowerCase() + name.slice(1)] = v;
@@ -649,11 +598,7 @@ export async function readBCF(bytes: Uint8Array | ArrayBuffer, options: BCFReadO
   const version = attr(await readXML('bcf.version'), 'VersionId') ?? '1.0';
   const archive: BCFArchive = { version, documents: [], topics: [] };
   const project = kid(await readXML('project.bcfp'), 'Project');
-  if (project)
-    archive.project = {
-      id: attr(project, 'ProjectId') ?? '',
-      ...(text(project, 'Name') ? { name: text(project, 'Name') } : {}),
-    };
+  if (project) archive.project = { id: attr(project, 'ProjectId') ?? '', ...(text(project, 'Name') ? { name: text(project, 'Name') } : {}) };
   const extensions = await readXML('extensions.xml');
   if (extensions?.localName === 'Extensions') {
     archive.extensions = {} as BCFExtensions;
@@ -663,12 +608,7 @@ export async function readBCF(bytes: Uint8Array | ArrayBuffer, options: BCFReadO
     const guid = (attr(d, 'Guid') ?? '').toLowerCase(),
       data = await read(`Documents/${guid}`),
       description = text(d, 'Description');
-    archive.documents.push({
-      guid,
-      filename: text(d, 'Filename') ?? guid,
-      ...(description ? { description } : {}),
-      ...(data ? { data } : {}),
-    });
+    archive.documents.push({ guid, filename: text(d, 'Filename') ?? guid, ...(description ? { description } : {}), ...(data ? { data } : {}) });
   }
   for (const entry of entries) {
     const match = /^([^/]+)\/markup\.bcf$/i.exec(entry.name);
@@ -677,11 +617,7 @@ export async function readBCF(bytes: Uint8Array | ArrayBuffer, options: BCFReadO
     const folder = match[1]!;
     const { refs, ...topic } = readMarkup(xml(await readZipEntry(bytes, entry, options), entry.name));
     if (!refs.length && byName.has(`${folder}/viewpoint.bcfv`))
-      refs.push({
-        guid: '',
-        file: 'viewpoint.bcfv',
-        ...(byName.has(`${folder}/snapshot.png`) ? { snapshot: 'snapshot.png' } : {}),
-      });
+      refs.push({ guid: '', file: 'viewpoint.bcfv', ...(byName.has(`${folder}/snapshot.png`) ? { snapshot: 'snapshot.png' } : {}) });
     const viewpoints: BCFViewpoint[] = [];
     for (const ref of refs) {
       const data = ref.file ? await read(`${folder}/${ref.file}`) : undefined;
@@ -712,12 +648,11 @@ export async function readBCF(bytes: Uint8Array | ArrayBuffer, options: BCFReadO
 function zip(files: [string, Uint8Array][]): Uint8Array {
   const encoder = new TextEncoder(),
     dirs = new Set<string>();
-  for (const [name] of files)
-    for (let i = name.indexOf('/'); i > 0; i = name.indexOf('/', i + 1)) dirs.add(name.slice(0, i + 1));
-  const all: [Uint8Array, Uint8Array][] = [
-    ...[...dirs].map((d): [string, Uint8Array] => [d, new Uint8Array()]),
-    ...files,
-  ].map(([n, d]) => [encoder.encode(n), d]);
+  for (const [name] of files) for (let i = name.indexOf('/'); i > 0; i = name.indexOf('/', i + 1)) dirs.add(name.slice(0, i + 1));
+  const all: [Uint8Array, Uint8Array][] = [...[...dirs].map((d): [string, Uint8Array] => [d, new Uint8Array()]), ...files].map(([n, d]) => [
+    encoder.encode(n),
+    d,
+  ]);
   let size = 22;
   for (const [n, d] of all) size += 30 + 46 + 2 * n.length + d.length;
   const out = new Uint8Array(size),
@@ -727,7 +662,7 @@ function zip(files: [string, Uint8Array][]): Uint8Array {
   const header = (signature: number, n: Uint8Array, d: Uint8Array, crc: number, offset?: number) => {
     view.setUint32(at, signature, true);
     let p = at + 4;
-    if (offset !== undefined) view.setUint16(p, 20, true), (p += 2); // made by
+    if (offset !== undefined) (view.setUint16(p, 20, true), (p += 2)); // made by
     view.setUint16(p, n[n.length - 1] === 0x2f ? 20 : 10, true); // needed
     view.setUint16(p + 2, 0x800, true); // UTF-8 names
     view.setUint16(p + 4, 0, true); // stored
@@ -765,23 +700,19 @@ function zip(files: [string, Uint8Array][]): Uint8Array {
  * Writes a .bcf archive of BCF 3.0 (default) or 2.1: bcf.version, project.bcfp, extensions.xml and documents.xml
  * (3.0), one folder per topic with markup.bcf, its viewpoints (`<guid>.bcfv`), snapshots and bitmap images.
  */
-export function writeBCF(
-  archive: Pick<BCFArchive, 'topics'> & Partial<BCFArchive>,
-  options: BCFWriteOptions = {},
-): Uint8Array {
+export function writeBCF(archive: Pick<BCFArchive, 'topics'> & Partial<BCFArchive>, options: BCFWriteOptions = {}): Uint8Array {
   const version = options.version ?? '3.0',
     v3 = version === '3.0';
   const encoder = new TextEncoder(),
     files: [string, Uint8Array][] = [];
-  const add = (name: string, data: string | Uint8Array) =>
-    files.push([name, typeof data === 'string' ? encoder.encode(data) : data]);
-  add('bcf.version', HEAD + el('Version', v3 ? '' : el('DetailedVersion', version), { VersionId: version }));
+  const add = (name: string, data: string | Uint8Array) => files.push([name, typeof data === 'string' ? encoder.encode(data) : data]);
+  add(
+    'bcf.version',
+    HEAD + el('Version', v3 ? '' : el('DetailedVersion', version), { VersionId: version }),
+  );
   if (archive.project) {
     const project = el('Project', opt('Name', archive.project.name), { ProjectId: archive.project.id });
-    add(
-      'project.bcfp',
-      HEAD + (v3 ? el('ProjectInfo', project) : el('ProjectExtension', project + el('ExtensionSchema', ''))),
-    );
+    add('project.bcfp', HEAD + (v3 ? el('ProjectInfo', project) : el('ProjectExtension', project + el('ExtensionSchema', ''))));
   }
   if (v3) {
     if (archive.extensions)
@@ -804,14 +735,7 @@ export function writeBCF(
             'DocumentInfo',
             el(
               'Documents',
-              archive.documents
-                .map(
-                  (d) => (
-                    checkGuid(d.guid, 'A document'),
-                    el('Document', opt('Filename', d.filename) + opt('Description', d.description), { Guid: d.guid })
-                  ),
-                )
-                .join(''),
+              archive.documents.map((d) => (checkGuid(d.guid, 'A document'), el('Document', opt('Filename', d.filename) + opt('Description', d.description), { Guid: d.guid }))).join(''),
             ),
           ),
       );
@@ -849,45 +773,26 @@ export function writeBCF(
         IfcSpatialStructureElement: f.ifcSpatialStructureElement,
         IsExternal: f.isExternal,
       });
-    const header = t.files.length
-      ? el('Header', v3 ? el('Files', t.files.map(file).join('')) : t.files.map(file).join(''))
-      : '';
-    const wrap = (outer: string, inner: string[]) =>
-      inner.length ? (v3 ? el(outer, inner.join('')) : inner.join('')) : '';
+    const header = t.files.length ? el('Header', v3 ? el('Files', t.files.map(file).join('')) : t.files.map(file).join('')) : '';
+    const wrap = (outer: string, inner: string[]) => (inner.length ? (v3 ? el(outer, inner.join('')) : inner.join('')) : '');
     const docs = t.documentReferences.map((d) =>
       v3
-        ? el(
-            'DocumentReference',
-            (d.documentGuid ? opt('DocumentGuid', d.documentGuid) : opt('Url', d.url)) +
-              opt('Description', d.description),
-            {
-              Guid: d.guid ?? newBCFGuid(),
-            },
-          )
-        : el(
-            'DocumentReference',
-            opt('ReferencedDocument', d.url ?? d.documentGuid) + opt('Description', d.description),
-            {
-              Guid: d.guid,
-              isExternal: d.url !== undefined && /^[a-z][a-z0-9+.-]*:/i.test(d.url),
-            },
-          ),
+        ? el('DocumentReference', (d.documentGuid ? opt('DocumentGuid', d.documentGuid) : opt('Url', d.url)) + opt('Description', d.description), {
+            Guid: d.guid ?? newBCFGuid(),
+          })
+        : el('DocumentReference', opt('ReferencedDocument', d.url ?? d.documentGuid) + opt('Description', d.description), {
+            Guid: d.guid,
+            isExternal: d.url !== undefined && /^[a-z][a-z0-9+.-]*:/i.test(d.url),
+          }),
     );
     const s = t.bimSnippet;
     if (s?.data && !s.isExternal) add(`${folder}/${s.reference}`, s.data);
     const body =
-      wrap(
-        'ReferenceLinks',
-        t.referenceLinks.map((l) => el('ReferenceLink', escapeXML(l))),
-      ) +
+      wrap('ReferenceLinks', t.referenceLinks.map((l) => el('ReferenceLink', escapeXML(l)))) +
       el('Title', escapeXML(t.title)) +
       opt('Priority', t.priority) +
       opt('Index', t.index) +
-      (v3
-        ? t.labels.length
-          ? el('Labels', t.labels.map((l) => el('Label', escapeXML(l))).join(''))
-          : ''
-        : t.labels.map((l) => el('Labels', escapeXML(l))).join('')) +
+      (v3 ? (t.labels.length ? el('Labels', t.labels.map((l) => el('Label', escapeXML(l))).join('')) : '') : t.labels.map((l) => el('Labels', escapeXML(l))).join('')) +
       opt('CreationDate', t.creationDate) +
       opt('CreationAuthor', t.creationAuthor) +
       opt('ModifiedDate', t.modifiedDate) +
@@ -903,17 +808,8 @@ export function writeBCF(
           })
         : '') +
       wrap('DocumentReferences', docs) +
-      wrap(
-        'RelatedTopics',
-        t.relatedTopics.map((g) => el('RelatedTopic', '', { Guid: g })),
-      ) +
-      (v3
-        ? wrap('Comments', t.comments.map(comment)) +
-          wrap(
-            'Viewpoints',
-            t.viewpoints.map((vp, i) => el('ViewPoint', refs[i], { Guid: vp.guid })),
-          )
-        : '');
+      wrap('RelatedTopics', t.relatedTopics.map((g) => el('RelatedTopic', '', { Guid: g }))) +
+      (v3 ? wrap('Comments', t.comments.map(comment)) + wrap('Viewpoints', t.viewpoints.map((vp, i) => el('ViewPoint', refs[i], { Guid: vp.guid }))) : '');
     const topic = el('Topic', body, {
       Guid: t.guid,
       ...(v3 && t.serverAssignedId ? { ServerAssignedId: t.serverAssignedId } : {}),
@@ -925,12 +821,7 @@ export function writeBCF(
       HEAD +
         el(
           'Markup',
-          header +
-            topic +
-            (v3
-              ? ''
-              : t.comments.map(comment).join('') +
-                t.viewpoints.map((vp, i) => el('Viewpoints', refs[i], { Guid: vp.guid })).join('')),
+          header + topic + (v3 ? '' : t.comments.map(comment).join('') + t.viewpoints.map((vp, i) => el('Viewpoints', refs[i], { Guid: vp.guid })).join('')),
         ),
     );
   }
@@ -944,9 +835,7 @@ const toEngineDir = ([x, y, z]: readonly number[]): Vec3 => unit([x!, z!, -y!]);
 const toIFCDir = ([x, y, z]: readonly number[]): Vec3 => unit([x!, -z!, y!]);
 function unit(v: Vec3): Vec3 {
   const l = Math.hypot(...v);
-  return l > 0 && Number.isFinite(l)
-    ? [v[0] / l, v[1] / l, v[2] / l]
-    : fail('range', 'a direction must be a finite vector longer than 0');
+  return l > 0 && Number.isFinite(l) ? [v[0] / l, v[1] / l, v[2] / l] : fail('range', 'a direction must be a finite vector longer than 0');
 }
 
 /** A viewpoint as a Margo view: engine axes and the model's rebased origin, components as expressIDs. */
@@ -991,11 +880,7 @@ function partsOf(data: IFCData): Map<number, number[]> {
     const whole = e.aggregate ?? e.nest,
       type = whole === undefined ? undefined : data.elements.get(whole)?.type;
     // A site, building, storey or space is spatial structure, which BCF visibility never follows.
-    if (
-      type === undefined ||
-      isSubtypeOf(data, type, 'IfcSpatialStructureElement') ||
-      isSubtypeOf(data, type, 'IfcSpatialElement')
-    )
+    if (type === undefined || isSubtypeOf(data, type, 'IfcSpatialStructureElement') || isSubtypeOf(data, type, 'IfcSpatialElement'))
       continue;
     (parts.get(whole!) ?? parts.set(whole!, []).get(whole!)!).push(e.id);
   }
@@ -1020,8 +905,7 @@ export function viewFromBCF(vp: BCFViewpoint, data: IFCData, options: BCFViewOpt
   const resolve = (list: readonly BCFComponent[]): Set<number> => {
     const out = new Set<number>();
     for (const c of list) {
-      const id =
-        (c.ifcGuid && data.byGlobalId.get(c.ifcGuid)) || (c.authoringToolId ? byTag.get(c.authoringToolId) : undefined);
+      const id = (c.ifcGuid && data.byGlobalId.get(c.ifcGuid)) || (c.authoringToolId ? byTag.get(c.authoringToolId) : undefined);
       if (id === undefined) {
         unresolved.push(c);
         continue;
@@ -1048,8 +932,7 @@ export function viewFromBCF(vp: BCFViewpoint, data: IFCData, options: BCFViewOpt
   const colors = new Map<number, RGBA>();
   for (const c of vp.coloring) {
     const hex = c.color;
-    if (!/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(hex))
-      fail('range', `colour ${JSON.stringify(hex)} must be RRGGBB or AARRGGBB hex`);
+    if (!/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(hex)) fail('range', `colour ${JSON.stringify(hex)} must be RRGGBB or AARRGGBB hex`);
     const n = (i: number) => parseInt(hex.slice(i, i + 2), 16) / 255,
       a = hex.length === 8;
     const rgba: RGBA = [n(a ? 2 : 0), n(a ? 4 : 2), n(a ? 6 : 4), a ? n(0) : 1];
@@ -1075,11 +958,7 @@ export function viewFromBCF(vp: BCFViewpoint, data: IFCData, options: BCFViewOpt
     view.camera = {
       type: cam.type,
       position,
-      target: [
-        position[0] + direction[0] * distance,
-        position[1] + direction[1] * distance,
-        position[2] + direction[2] * distance,
-      ],
+      target: [position[0] + direction[0] * distance, position[1] + direction[1] * distance, position[2] + direction[2] * distance],
       direction,
       up: toEngineDir(cam.up),
       aspect: cam.aspectRatio,
@@ -1127,9 +1006,7 @@ export function bcfFromView(view: BCFViewInput, data: IFCData, options: BCFViewO
   const origin = options.origin ?? [0, 0, 0];
   const component = (id: number): BCFComponent => {
     const guid = data.elements.get(id)?.globalId;
-    return guid
-      ? { ifcGuid: guid }
-      : fail('range', `element ${id} has no GlobalId in this model; pass expressIDs of its elements`);
+    return guid ? { ifcGuid: guid } : fail('range', `element ${id} has no GlobalId in this model; pass expressIDs of its elements`);
   };
   const hiddenSet = new Set(view.hidden ?? []),
     products = productsOf(data);
@@ -1144,13 +1021,8 @@ export function bcfFromView(view: BCFViewInput, data: IFCData, options: BCFViewO
     defaultVisibility = gone.length < shown.length;
   const groups = new Map<string, number[]>();
   for (const [id, c] of view.colors ?? []) {
-    if (c.length < 3 || !c.every((x) => x >= 0 && x <= 1))
-      fail('range', `the colour of element ${id} needs 3 or 4 numbers from 0 to 1`);
-    const byte = (x: number) =>
-      Math.round(x * 255)
-        .toString(16)
-        .padStart(2, '0')
-        .toUpperCase();
+    if (c.length < 3 || !c.every((x) => x >= 0 && x <= 1)) fail('range', `the colour of element ${id} needs 3 or 4 numbers from 0 to 1`);
+    const byte = (x: number) => Math.round(x * 255).toString(16).padStart(2, '0').toUpperCase();
     const hex = (c[3] !== undefined && c[3] < 1 ? byte(c[3]) : '') + byte(c[0]!) + byte(c[1]!) + byte(c[2]!);
     (groups.get(hex) ?? groups.set(hex, []).get(hex)!).push(id);
   }
@@ -1167,8 +1039,7 @@ export function bcfFromView(view: BCFViewInput, data: IFCData, options: BCFViewO
     clippingPlanes: (view.clippingPlanes ?? []).map((p) => {
       const [a, b, c, d] = p as Plane,
         l2 = a * a + b * b + c * c;
-      if (p.length !== 4 || !p.every(Number.isFinite) || !(l2 > 0))
-        fail('range', 'a clipping plane is four finite numbers [a, b, c, d] with a nonzero normal');
+      if (p.length !== 4 || !p.every(Number.isFinite) || !(l2 > 0)) fail('range', 'a clipping plane is four finite numbers [a, b, c, d] with a nonzero normal');
       const point = [(-d * a) / l2, (-d * b) / l2, (-d * c) / l2];
       return { location: engineToIFC(point, origin), direction: toIFCDir([-a, -b, -c]) };
     }),
@@ -1177,11 +1048,7 @@ export function bcfFromView(view: BCFViewInput, data: IFCData, options: BCFViewO
   if (view.snapshot) vp.snapshot = view.snapshot;
   const cam = view.camera;
   if (cam) {
-    const direction =
-      cam.direction ??
-      (cam.target
-        ? cam.target.map((t, i) => t - cam.position[i]!)
-        : fail('range', 'the camera needs a target or a direction'));
+    const direction = cam.direction ?? (cam.target ? cam.target.map((t, i) => t - cam.position[i]!) : fail('range', 'the camera needs a target or a direction'));
     const type = cam.type ?? 'perspective',
       d = unit(direction as Vec3);
     // BCF wants an up vector that is not parallel to the direction: keep the part of `up` across the view.
@@ -1200,9 +1067,7 @@ export function bcfFromView(view: BCFViewInput, data: IFCData, options: BCFViewO
       direction: toIFCDir(d),
       up: toIFCDir(up),
       aspectRatio: cam.aspect ?? 1,
-      ...(type === 'perspective'
-        ? { fieldOfView: cam.fov ?? 60 }
-        : { viewToWorldScale: cam.height ?? fail('range', 'an orthogonal camera needs its height') }),
+      ...(type === 'perspective' ? { fieldOfView: cam.fov ?? 60 } : { viewToWorldScale: cam.height ?? fail('range', 'an orthogonal camera needs its height') }),
     };
   }
   return vp;

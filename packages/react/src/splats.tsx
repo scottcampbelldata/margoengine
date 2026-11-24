@@ -24,10 +24,7 @@ export const Splat = /* @__PURE__ */ forwardRef<Splats, SplatProps>(function Spl
   // Separate components keep hook order stable when switching between data and a URL.
   return props.src !== undefined ? <SplatURL {...props} ref={ref} /> : <SplatDataBinding {...props} ref={ref} />;
 });
-const SplatURL = /* @__PURE__ */ forwardRef<Splats, SplatProps & { src: string }>(function SplatURL(
-  { src, antialias, onError },
-  ref,
-) {
+const SplatURL = /* @__PURE__ */ forwardRef<Splats, SplatProps & { src: string }>(function SplatURL({ src, antialias, onError }, ref) {
   const data = useLoader(loadSplat, src);
   return <SplatDataBinding data={data} antialias={antialias} onError={onError} ref={ref} />;
 });

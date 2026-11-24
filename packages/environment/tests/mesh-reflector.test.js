@@ -8,19 +8,7 @@ test('MeshReflector takes the mix options with their defaults and checks every v
   const r = new MeshReflector();
   assert.ok(r instanceof Reflector);
   assert.deepEqual(
-    [
-      r.mixStrength,
-      r.mixBlur,
-      r.mixContrast,
-      r.mirror,
-      r.blurSize,
-      r.depthScale,
-      r.minDepthThreshold,
-      r.maxDepthThreshold,
-      r.depthToBlurRatioBias,
-      r.reflectorOffset,
-      r.f0,
-    ],
+    [r.mixStrength, r.mixBlur, r.mixContrast, r.mirror, r.blurSize, r.depthScale, r.minDepthThreshold, r.maxDepthThreshold, r.depthToBlurRatioBias, r.reflectorOffset, r.f0],
     [1, 1, 1, 0, [0, 0], 0, 0.9, 1, 0.25, 0, [0.04, 0.04, 0.04]],
   );
   assert.equal(r.roughness, 0, 'no blur, no mip chain');
@@ -44,17 +32,8 @@ test('MeshReflector takes the mix options with their defaults and checks every v
   assert.throws(() => (r.blurSize = [1]), TypeError);
   assert.throws(() => (r.blurSize = [5000, 0]), RangeError);
   assert.throws(() => (r.f0 = [2, 0, 0]), RangeError);
-  const custom = new MeshReflector({
-    mixStrength: 40,
-    blur: [8, 2],
-    mirror: 0.5,
-    f0: '#ffffff',
-    reflectorOffset: -0.1,
-  });
-  assert.deepEqual(
-    [custom.mixStrength, custom.blurSize, custom.mirror, custom.f0, custom.reflectorOffset],
-    [40, [8, 2], 0.5, [1, 1, 1], -0.1],
-  );
+  const custom = new MeshReflector({ mixStrength: 40, blur: [8, 2], mirror: 0.5, f0: '#ffffff', reflectorOffset: -0.1 });
+  assert.deepEqual([custom.mixStrength, custom.blurSize, custom.mirror, custom.f0, custom.reflectorOffset], [40, [8, 2], 0.5, [1, 1, 1], -0.1]);
 });
 
 test('MeshReflector blends over the mesh: its shader writes weighted colour and a mean weight, and reads capture depth', () => {

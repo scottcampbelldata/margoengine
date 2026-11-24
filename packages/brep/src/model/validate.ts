@@ -196,7 +196,12 @@ function gapBound(curve: CurveDef, surface: SurfaceDef, t0: number, t1: number):
  * only locally: on the near side of a fold (a profile hooking back within micrometres of itself), a few micrometres off
  * an edge lying on the face. A gap is reported only once no foot nearer is found.
  */
-function foot(s: Surface, p: XYZ, hint: readonly number[] | undefined, tolerance: number): [[number, number], number] {
+function foot(
+  s: Surface,
+  p: XYZ,
+  hint: readonly number[] | undefined,
+  tolerance: number,
+): [[number, number], number] {
   const uv = s.parameters(p, hint),
     gap = distance(s.at(uv[0], uv[1]).slice(0, 3) as XYZ, p);
   if (!hint || gap <= tolerance) return [uv, gap];

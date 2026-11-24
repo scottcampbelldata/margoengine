@@ -3,22 +3,22 @@
 // (KHR_materials_transmission, _ior, _clearcoat, _sheen, _diffuse_transmission, _volume and _volume_scatter) draw as
 // authored. `loadMargo` keeps the plain PBR shader and ignores them; this entry pulls in the physical shader's WGSL
 // only for apps that import it.
-import type { EngineKernel } from '@margoengine/core';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr-model';
-import { readResponse } from '../../shared/loading.js';
-import { captureScene } from '../../shared/scene-scope.js';
-import { decodeImages, maxBytes } from './container.js';
-import { decodeMargo, type MargoOptions } from './index.js';
+import type { EngineKernel } from "@margoengine/core";
+import { GLTFAsset, PBRModel } from "@margoengine/gltf/pbr-model";
+import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
+import { decodeImages, maxBytes } from "./container.js";
+import { decodeMargo, type MargoOptions } from "./index.js";
 
 /** The glTF material extensions the Blender add-on writes for the Principled BSDF, in its manifest's `extensionsUsed`. */
 export const margoMaterialExtensions = [
-  'KHR_materials_clearcoat',
-  'KHR_materials_diffuse_transmission',
-  'KHR_materials_ior',
-  'KHR_materials_sheen',
-  'KHR_materials_transmission',
-  'KHR_materials_volume',
-  'KHR_materials_volume_scatter',
+  "KHR_materials_clearcoat",
+  "KHR_materials_diffuse_transmission",
+  "KHR_materials_ior",
+  "KHR_materials_sheen",
+  "KHR_materials_transmission",
+  "KHR_materials_volume",
+  "KHR_materials_volume_scatter",
 ] as const;
 
 /** Options of parseMargoPBR and loadMargoPBR. */
@@ -46,15 +46,15 @@ export async function parseMargoPBR(
     asset = decodeMargo(input, { maxNodes });
   // Both settle before either error is thrown: images decoded while the shader import fails must still be closed.
   const [shader, decoded] = await Promise.allSettled([
-    import('@margoengine/gltf/extended-materials'),
+    import("@margoengine/gltf/extended-materials"),
     decodeImages(asset.images, signal),
   ]);
-  if (shader.status === 'rejected') {
-    if (decoded.status === 'fulfilled') for (const image of decoded.value) image.close();
+  if (shader.status === "rejected") {
+    if (decoded.status === "fulfilled") for (const image of decoded.value) image.close();
     throw shader.reason;
   }
   // decodeImages closes what it decoded before it rejects.
-  if (decoded.status === 'rejected') throw decoded.reason;
+  if (decoded.status === "rejected") throw decoded.reason;
   const { extendedMaterials } = shader.value;
   const images = decoded.value;
   let model: PBRModel | undefined;
@@ -85,14 +85,14 @@ export async function loadMargoPBR(
   options.signal?.throwIfAborted();
   const scope = captureScene(engine),
     target = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(target.protocol))
+  if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
-      '.margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoPBR',
+      ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoPBR",
     );
   const bytes = await readResponse(await get(target, { signal: options.signal }), {
     maxBytes,
     signal: options.signal,
-    label: '.margo download',
+    label: ".margo download",
   });
   // Parsed in the scene this call started in, not the one active once the download is done.
   return scope.run(() => parseMargoPBR(engine, bytes, options));

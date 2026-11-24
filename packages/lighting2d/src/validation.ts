@@ -10,7 +10,7 @@ export function checkNumber(value: number, field: string, minimum = -Infinity): 
   }
 }
 
-export function checkCamera(camera: { x: number; y: number; zoom: number }): void {
+export function checkCamera(camera: {x: number; y: number; zoom: number}): void {
   checkNumber(camera.x, 'camera.x');
   checkNumber(camera.y, 'camera.y');
   checkNumber(camera.zoom, 'camera.zoom', Number.MIN_VALUE);
@@ -30,15 +30,8 @@ function checkMask(m: LightMask2D): void {
     if (m.center && (m.center.length !== 2 || !m.center.every(Number.isFinite)))
       throw rangeError('Invalid circle mask center: use two finite coordinates', 'pixel-lighting');
   } else if (m.kind === 'polygon') {
-    if (
-      !Array.isArray(m.points) ||
-      m.points.length < 3 ||
-      !m.points.every((p) => p.length === 2 && p.every(Number.isFinite))
-    )
-      throw rangeError(
-        'Invalid polygon mask points: use at least three points with two finite coordinates each',
-        'pixel-lighting',
-      );
+    if (!Array.isArray(m.points) || m.points.length < 3 || !m.points.every((p) => p.length === 2 && p.every(Number.isFinite)))
+      throw rangeError('Invalid polygon mask points: use at least three points with two finite coordinates each', 'pixel-lighting');
   } else {
     throw rangeError('Invalid mask kind: use rect, circle or polygon', 'pixel-lighting');
   }

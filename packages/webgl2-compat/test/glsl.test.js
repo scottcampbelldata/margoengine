@@ -254,16 +254,9 @@ test('a continue inside a switch leaves the switch by a flag; the loop continues
   assert.equal(bodies.length, 3);
   for (const body of bodies) assert.doesNotMatch(body, /continue;/, body);
   assert.match(glsl, /bool (_t\d+) = false;\s*switch[\s\S]*\{ \1 = true; break; \}[\s\S]*if \(\1\) continue;/);
-  assert.match(
-    glsl,
-    /if \((_t\d+)\) \{ (_t\d+) = true; break; \}/,
-    'the inner switch hands its continue to the outer one',
-  );
+  assert.match(glsl, /if \((_t\d+)\) \{ (_t\d+) = true; break; \}/, 'the inner switch hands its continue to the outer one');
   // Without a continue the switch is emitted as before.
-  assert.doesNotMatch(
-    frag('', 'var r = 0u; switch (u32(p.x)) { case 1u: { r = 3u; } default: { r = 4u; } } return vec4u(r);'),
-    /bool _t/,
-  );
+  assert.doesNotMatch(frag('', 'var r = 0u; switch (u32(p.x)) { case 1u: { r = 3u; } default: { r = 4u; } } return vec4u(r);'), /bool _t/);
 });
 
 test('pointer lets alias their variable; pointer parameters are inout', () => {
@@ -554,11 +547,7 @@ test('a sampling helper is never called inside its own arguments (ANGLE D3D11 re
   }
   // Without nesting, one helper serves every call.
   const flat = `${head}\n@fragment fn f()->@location(0) vec4f {return textureSampleLevel(a,s,vec2f(0.5),0.0)+textureSampleLevel(b,s,vec2f(0.25),0.0);}`;
-  const helpers = new Set(
-    translateWGSL({ vertex: { source: flat }, fragment: { source: flat } }).fragment.source.match(
-      /\b_g\d+(?=\(highp)/g,
-    ),
-  );
+  const helpers = new Set(translateWGSL({ vertex: { source: flat }, fragment: { source: flat } }).fragment.source.match(/\b_g\d+(?=\(highp)/g));
   assert.equal(helpers.size, 1);
 });
 
@@ -576,19 +565,9 @@ const fragmentOf = (body, ret = '@location(0) vec4f') =>
 
 test('every derivative and implicit-derivative sample of a fragment is pinned into an output', () => {
   for (const call of [
-    'dpdx(p.x)',
-    'dpdy(p.xy)',
-    'fwidth(p.xyz)',
-    'dpdxFine(p)',
-    'dpdyFine(p.x)',
-    'fwidthFine(p.xy)',
-    'dpdxCoarse(p.xy)',
-    'dpdyCoarse(p.xyz)',
-    'fwidthCoarse(p)',
-    'textureSample(t,s,p.xy)',
-    'textureSampleBias(t,s,p.xy,1.0)',
-    'textureSampleGrad(t,s,p.xy,dpdx(p.xy),dpdy(p.xy))',
-    'textureSampleCompare(tc,sc,p.xy,0.5)',
+    'dpdx(p.x)', 'dpdy(p.xy)', 'fwidth(p.xyz)', 'dpdxFine(p)', 'dpdyFine(p.x)', 'fwidthFine(p.xy)', 'dpdxCoarse(p.xy)',
+    'dpdyCoarse(p.xyz)', 'fwidthCoarse(p)', 'textureSample(t,s,p.xy)', 'textureSampleBias(t,s,p.xy,1.0)',
+    'textureSampleGrad(t,s,p.xy,dpdx(p.xy),dpdy(p.xy))', 'textureSampleCompare(tc,sc,p.xy,0.5)',
   ]) {
     const f = fragmentOf(`let d = ${call}; var e = false; if (p.x > 2.0) { e = true; }
       if (e) { var a = 0.0; for (var k = 0; k < i32(p.y); k++) { a += 1.0; } return vec4f(a * length(d)); }
@@ -599,10 +578,7 @@ test('every derivative and implicit-derivative sample of a fragment is pinned in
     // Each derivative and implicit sample in main code is the argument of a pin helper.
     const pinned = new RegExp(`(?:${helpers.join('|')})[(](?:dFdx|dFdy|fwidth|texture)[(]`, 'g');
     const raw = /(?<![\w.])(?:dFdx|dFdy|fwidth|texture)\(/g;
-    const code = f
-      .split('\n')
-      .filter((l) => !/^\w+ _g\d+\(/.test(l))
-      .join('\n');
+    const code = f.split('\n').filter((l) => !/^\w+ _g\d+\(/.test(l)).join('\n');
     assert.equal((code.match(raw) ?? []).length, (code.match(pinned) ?? []).length, `${call}: every derivative pinned`);
     assert.match(f, /_o0 = gl_FragCoord\.w > 0\.0 \? _r : vec4\(_dk\);/, call);
   }
@@ -612,10 +588,7 @@ test('a fragment without derivatives keeps its outputs unchanged and declares no
   const f = fragmentOf('return textureSampleLevel(t,s,p.xy,0.0) + vec4f(p.x);');
   assert.doesNotMatch(f, /_dk/);
   assert.match(f, /_o0 = gl_FragCoord\.w > 0\.0 \? _r : vec4\(0\.0\);/);
-  const v = translateWGSL({
-    vertex: { source: V },
-    fragment: { source: `${V}\n@fragment fn f()->@location(0) vec4f {return vec4f(1.0);}` },
-  });
+  const v = translateWGSL({ vertex: { source: V }, fragment: { source: `${V}\n@fragment fn f()->@location(0) vec4f {return vec4f(1.0);}` } });
   assert.doesNotMatch(v.vertex.source, /_dk/);
 });
 
@@ -632,9 +605,7 @@ test('the pin reaches integer, depth and narrower outputs, and a discard when th
   assert.match(st, /gl_FragDepth = gl_FragCoord\.w > 0\.0 \? _r\.\w+ : _dk\.x;/);
   const none = translateWGSL({
     vertex: { source: V },
-    fragment: {
-      source: `${V}\n@fragment fn f(@builtin(position) p:vec4f) { let d = fwidth(p.x); if (p.y > 1.0) { if (d > 0.5) { discard; } } }`,
-    },
+    fragment: { source: `${V}\n@fragment fn f(@builtin(position) p:vec4f) { let d = fwidth(p.x); if (p.y > 1.0) { if (d > 0.5) { discard; } } }` },
   }).fragment.source;
   assert.match(none, /if \(gl_FragCoord\.w <= 0\.0 && _dk != vec4\(0\.0\)\) discard;/);
 });

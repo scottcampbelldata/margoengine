@@ -55,15 +55,7 @@ function corners(bvh: MeshBVH, at: number, m: ArrayLike<number>, out: Float64Arr
 const SCRATCH = new Float64Array(6);
 
 // Closest points of segments p0-p1 and q0-q1 by clamped parameters, into out: x y z on each. Answers the squared distance.
-function segmentSegment(
-  p: Float64Array,
-  i: number,
-  j: number,
-  q: Float64Array,
-  k: number,
-  l: number,
-  out: Float64Array,
-): number {
+function segmentSegment(p: Float64Array, i: number, j: number, q: Float64Array, k: number, l: number, out: Float64Array): number {
   const d1x = p[j] - p[i],
     d1y = p[j + 1] - p[i + 1],
     d1z = p[j + 2] - p[i + 2],
@@ -180,10 +172,8 @@ export function meshDistance(
   matrix: ArrayLike<number> = IDENTITY,
   { maxDistance = Infinity, minDistance = 0 }: MeshDistanceOptions = {},
 ): MeshDistanceResult | null {
-  if (!(a instanceof MeshBVH) || !(b instanceof MeshBVH))
-    throw new TypeError('Expected two MeshBVH; build one for each mesh.');
-  if (!(maxDistance >= 0) || !(minDistance >= 0))
-    throw new RangeError('Invalid distance; pass maxDistance and minDistance of at least 0.');
+  if (!(a instanceof MeshBVH) || !(b instanceof MeshBVH)) throw new TypeError('Expected two MeshBVH; build one for each mesh.');
+  if (!(maxDistance >= 0) || !(minDistance >= 0)) throw new RangeError('Invalid distance; pass maxDistance and minDistance of at least 0.');
   if (matrix.length !== 16) throw new TypeError('Invalid matrix; pass 16 numbers, column-major.');
   const fa = a.nodeBounds,
     ua = a.nodeData,

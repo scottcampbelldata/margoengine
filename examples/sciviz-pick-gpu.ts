@@ -12,8 +12,7 @@ async function asset(name: string): Promise<Response> {
 const useCompat = new URLSearchParams(location.search).get('backend') === 'webgl2';
 const compat = useCompat ? await import('@margoengine/webgl2-compat') : undefined;
 const create = useCompat
-  ? (canvas: HTMLCanvasElement, options: CreateFigureOptions) =>
-      createFallbackFigure(canvas, { ...options, compat: compat! })
+  ? (canvas: HTMLCanvasElement, options: CreateFigureOptions) => createFallbackFigure(canvas, { ...options, compat: compat! })
   : Figure.create;
 export const stars = await create(element<HTMLCanvasElement>('stars'), {
   mode: '2d',

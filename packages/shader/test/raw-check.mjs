@@ -140,10 +140,7 @@ try {
     most = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
   console.log('glsl taa edge row against wgsl', most(glslRow, wgslRow), 'against no TAA', most(glslRow, plainRow));
   assert.ok(most(glslRow, wgslRow) <= 2, 'glslTAA: the GLSL edges resolve as the WGSL ones do');
-  assert.ok(
-    most(glslRow, plainRow) > 8,
-    'glslTAA: TAA changes the edges, so the comparison above has something to see',
-  );
+  assert.ok(most(glslRow, plainRow) > 8, 'glslTAA: TAA changes the edges, so the comparison above has something to see');
   console.log('ok glslTAA');
 
   // SSAO darkens the ambient light the mesh gave it near the crease; with depth alone it has no light to take away.

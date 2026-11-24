@@ -49,8 +49,7 @@ async function start() {
   });
   engine.start();
 
-  const frames = () =>
-    new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  const frames = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   const check = async (label: string) => {
     await frames();
     const [x, , z] = engine.camera.position,
@@ -98,16 +97,11 @@ async function start() {
       map.update(1); // render() runs no frame hook, so the map takes the same second by hand
     }
     if (Math.abs(map.time - before - 60) > 1 || Math.abs(storm.time - drawn - 60) > 1)
-      console.warn(
-        `BUG: a minute of frames moved the map ${map.time - before} s and the tornado ${storm.time - drawn} s`,
-      );
+      console.warn(`BUG: a minute of frames moved the map ${map.time - before} s and the tornado ${storm.time - drawn} s`);
     await check('A minute later');
   };
   button('btnRope').onclick = async () => {
-    applySkySettings(
-      { sky, tornado: storm },
-      { 'tornado.coreRadius': 35, 'tornado.pressureDrop': 75, 'tornado.meander': 120 },
-    );
+    applySkySettings({ sky, tornado: storm }, { 'tornado.coreRadius': 35, 'tornado.pressureDrop': 75, 'tornado.meander': 120 });
     if (twister.options.coreRadius !== 35) console.warn('BUG: the rows did not reach the tornado');
     await check('A rope');
   };

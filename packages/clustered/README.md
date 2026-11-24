@@ -525,23 +525,7 @@ The method, from four papers:
    faces are skipped, triangles nearer a VPL than 0.02 m are its own patch (the map's near plane), and meshes a
    package draws itself (`@margoengine/materials` glass, gltf-pro, terrain) occlude only through the captures. A receiver is compared where its own
    tangent plane meets the texel's centre ray (adaptive depth bias, Dou et al. 2014), so a floor does not shadow
-   itself and a 0.3 m wall keeps a lit room's bounce out of the next. That plane stands in for the receiver only
-   where the texel holds the receiver's own surface: each texel keeps its surface's normal beside its depth (one
-   float, hemi-octahedral, Meyer et al. 2010; Cigolle et al. 2014), as an object-ID shadow buffer keeps which surface
-   it holds (Hourcade and Nicolas 1985), and a receiver past the texel's depth is lit only if one flat or convex
-   surface can join it to the texel's surface point: the two normals within 60 degrees, and that point behind the
-   receiver's tangent plane by no more than the chord times the sine of the angle between them, plus 2 cm (a convex
-   surface's chord runs between its two tangents). A 0.15 m log's crest keeps the snow's bounce its own lower face
-   stands in for; at a concave corner, snow 0.2 to 0.6 m outside a wall's foot, the plane runs on through the wall
-   into the room and the texel holds the wall (90 degrees) or the floor under that plane (parallel, 5 cm down), so the
-   snow no longer takes the room's bounce through the wall (KB-BOUNCE-SHADOWSNOW1). Snow 1 to 2 cm above a floor on
-   the other side of the wall is, to that one depth, on the floor's own plane, so the joined surface is checked to run
-   on unbroken: the texel beside it on each axis, toward the ray to the receiver, is asked too, and where the two
-   texels' points form a valley (each in front of the other's plane by over 2 cm: the floor and the wall standing on
-   it) and the receiver lies over 2 cm behind the second one's plane, the ray meets that wall between them, as a
-   silhouette map places an edge inside a texel (Sen, Cammarano and Hanrahan 2003). A convex edge is never a valley,
-   so the crest keeps its bounce. A receiver within the 2 cm and 2% depth slack behind a surface still takes it, as
-   any shadow map's bias lets through (docs/limits.md).
+   itself and a 0.3 m wall keeps a lit room's bounce out of the next.
 
 `sampleSurfaces(meshes, vpls, {resolution, budget})` is the occluder sampling on its own (`LightBounce` calls it with
 the frame's batches): vertices in core's layout (position, normal), a column-major world matrix, and `budget` 16384
@@ -565,9 +549,10 @@ In Cabin Hearth (`examples/cabin-hearth`, `scripts/cabin-hearth-browser-test.mjs
 A6000, fire off, the lantern steady: with clear glazing the lantern's bounce is 0.1274 R, 0.0302 G irradiance, 10% over
 a quadrature over the test's snow surface (0.1155, 0.0274: the lantern's 6.5 cd through the window's opening, bars and
 sill, albedo 0.9 / 0.92 / 0.95, the form factor to the crest); with the scene's frosted glass the lantern bounces
-nothing outside and the window's light, set back in its frame (`recess` 0.218, `sill` 0.09), gives 0.0624 R (measured 2026-11-20 on an Intel Arc 140V laptop GPU, WebGPU and the WebGL2 layer alike), 3.6%
-under the quadrature with the frame and sill shading the snow (0.0647; 0.1196 with no shading, what the bare
-rectangle would put on the snow; docs/known-bugs.md KB-BOUNCE-REVEAL1). Read in float at the crest's own point (the HDR capture
+nothing outside and the window's light gives 0.1087 R, 5.4% over the quadrature of the opening's own model (0.1031:
+the snow seen from the opening's mouth, in front of its glazing bars, each element lit by the whole rectangle),
+between the quadrature with the window's reveal and sill shading the snow (0.0647) and without them (0.1196, what the
+opening light, which casts no shadow, puts on the snow; docs/known-bugs.md KB-BOUNCE-REVEAL1). Read in float at the crest's own point (the HDR capture
 over TAA's 8-frame jitter cycle, bilinear between pixel centres), the frame equals the JS twin to 0.1% (0.9989 clear,
 0.9991 frosted, both backends); the bounce there changes 4.2 to 4.7% per pixel down the log. The hearth view's mean
 luminance goes from 0.0529 to 0.0552 on WebGPU and 0.0524 to 0.0553 on the WebGL2 layer (the moving flames shift it
@@ -1072,10 +1057,7 @@ fragment marches a short ray toward each light through the previous frame's scen
 of that light (default 0.8; `setStrengths` sets it per light index, 0 turns a light off). Options: `distance` (0.3),
 `thickness` (0.1), `steps` (12), `bias` (0.01) and `depth`, the scene's single-sample depth texture or a callback for
 it; omitted, it shares the scene-depth capture water and HTML panels use, which SSAO and depth of field refuse (pass
-their stack's `depthTexture` then). A callback is read every frame, so it gives the new device's texture after a device
-restore by itself; a plain texture belongs to the device that made it, so after a restore it is dropped, `engine.onError`
-hears of it once ([#borrowed-lost](https://margoengine.com/errors#borrowed-lost)) and the march stays off until
-`contact.options.depth = newTexture`. It works with or without shadow maps and adds binding 145. It reads one frame late
+their stack's `depthTexture` then). It works with or without shadow maps and adds binding 145. It reads one frame late
 (a moving caster's contact trails it by a frame), only what is on screen casts, and receivers added with
 `receiveShadow: false` skip it.
 

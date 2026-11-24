@@ -33,30 +33,13 @@ try {
       onError: (e) => errors.push(String(e?.message ?? e)),
     });
     const hex = (c) =>
-      '#' +
-      c
-        .map((v) =>
-          Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055))
-            .toString(16)
-            .padStart(2, '0'),
-        )
-        .join('');
-    const add = (g, m) =>
-      stage.mesh(toGeometry(g), { color: hex(m.color), roughness: m.roughness, metalness: m.metalness });
+      '#' + c.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)).toString(16).padStart(2, '0')).join('');
+    const add = (g, m) => stage.mesh(toGeometry(g), { color: hex(m.color), roughness: m.roughness, metalness: m.metalness });
     const plans = [
       { style: 'western-1910-house', plan: 'L', ridge: 'x', width: 11, depth: 8, dormers: 2, tower: 'front-right' },
       { style: 'japan-2011-house', plan: 'T' },
       { style: 'western-1910-depot', plan: 'U', detail: 'far' },
-      {
-        style: 'western-1910-house',
-        plan: 'cross',
-        ridge: 'x',
-        width: 10,
-        depth: 7.5,
-        dormers: 1,
-        dormerKind: 'hip',
-        detail: 'near',
-      },
+      { style: 'western-1910-house', plan: 'cross', ridge: 'x', width: 10, depth: 7.5, dormers: 1, dormerKind: 'hip', detail: 'near' },
     ];
     let x = -12;
     for (const p of plans) {
@@ -66,18 +49,9 @@ try {
       x += span + 20;
     }
     const views = [
-      [
-        [24, 22, 52],
-        [24, 4, 0],
-      ],
-      [
-        [2, 7, 14],
-        [-2, 4, 0],
-      ],
-      [
-        [60, 5, 16],
-        [56, 4, 0],
-      ],
+      [[24, 22, 52], [24, 4, 0]],
+      [[2, 7, 14], [-2, 4, 0]],
+      [[60, 5, 16], [56, 4, 0]],
     ];
     window.view = async (i) => {
       stage.engine.camera.position = views[i][0];
@@ -91,9 +65,7 @@ try {
   });
   assert.deepEqual(result.errors, []);
   const shot = await browser.page.locator('canvas').screenshot();
-  const dir = fileURLToPath(
-    new URL(`../../../test-results/building-plans-browser${compatRun() ? '-compat' : ''}/`, import.meta.url),
-  );
+  const dir = fileURLToPath(new URL(`../../../test-results/building-plans-browser${compatRun() ? '-compat' : ''}/`, import.meta.url));
   await mkdir(dir, { recursive: true });
   await writeFile(dir + 'street.png', shot);
   for (let i = 1; i < 3; i++) {

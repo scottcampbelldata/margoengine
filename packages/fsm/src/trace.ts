@@ -91,11 +91,7 @@ export function snapshotMachine<C>(machine: StateMachine<C>): MachineSnapshot {
       if (regions.busy) throw new MargoError('state', 'Snapshot during a delivery; take it after the hook returns');
       return [
         name,
-        {
-          running: regions.running,
-          starts: [...regions.starts],
-          machines: regionMachines(regions).map(snapshotMachine),
-        },
+        { running: regions.running, starts: [...regions.starts], machines: regionMachines(regions).map(snapshotMachine) },
       ];
     }),
   };
@@ -232,7 +228,13 @@ export class MachineTrace<C> {
       for (const key of Object.keys(regions.machines))
         this.attach(regions.machines[key], `${name ? `${name}/` : ''}${state}/${key}`);
   }
-  private push(machine: string, clock: number, from: string, to: string, transition: Transition<C> | null): void {
+  private push(
+    machine: string,
+    clock: number,
+    from: string,
+    to: string,
+    transition: Transition<C> | null,
+  ): void {
     const record: TraceRecord = {
       machine,
       clock,

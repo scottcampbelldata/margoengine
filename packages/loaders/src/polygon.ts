@@ -28,17 +28,7 @@ export function concaveTriangles(points: ArrayLike<number>, corners: ArrayLike<n
   if (!(ax + ay + az > 0)) return null;
   // Drop the normal's largest axis; swap the other two when the normal points down it, so the turn is kept.
   const [u, w] =
-    az >= ax && az >= ay
-      ? nz >= 0
-        ? [0, 1]
-        : [1, 0]
-      : ax >= ay
-        ? nx >= 0
-          ? [1, 2]
-          : [2, 1]
-        : ny >= 0
-          ? [2, 0]
-          : [0, 2];
+    az >= ax && az >= ay ? (nz >= 0 ? [0, 1] : [1, 0]) : ax >= ay ? (nx >= 0 ? [1, 2] : [2, 1]) : ny >= 0 ? [2, 0] : [0, 2];
   const flat = new Array<number>(n * 2);
   for (let c = 0; c < n; c++) {
     flat[c * 2] = points[corners[c] * 3 + u];

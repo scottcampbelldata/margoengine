@@ -255,7 +255,7 @@ const orbitExports = {
 };
 mock.module('@margoengine/controls/orbit', { namedExports: orbitExports });
 mock.module('@margoengine/controls/profiles', { namedExports: { PROFILES: {} } });
-const environmentMock = {
+mock.module('@margoengine/environment', {
   namedExports: {
     async loadEnvironmentImage(src, { signal }) {
       const request = { src, signal };
@@ -316,15 +316,7 @@ const environmentMock = {
       }
     },
   },
-};
-// The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of [
-  '@margoengine/environment',
-  '@margoengine/environment/main',
-  '@margoengine/environment/loaders',
-  '@margoengine/environment/load',
-])
-  mock.module(id, environmentMock);
+});
 mock.module('@margoengine/html', {
   namedExports: {
     HTML: class {

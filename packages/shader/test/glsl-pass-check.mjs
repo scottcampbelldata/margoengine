@@ -30,14 +30,7 @@ const compare = (actual, expected) => {
     if (d > max) (max = d), (at = i);
     sum += d;
   });
-  return {
-    max,
-    mean: sum / actual.length,
-    pixel:
-      at < 0
-        ? ''
-        : ` at x ${Math.floor(at / 3) % 32}, y ${Math.floor(at / 96)} channel ${at % 3} (${actual[at]} vs ${expected[at]})`,
-  };
+  return { max, mean: sum / actual.length, pixel: at < 0 ? '' : ` at x ${Math.floor(at / 3) % 32}, y ${Math.floor(at / 96)} channel ${at % 3} (${actual[at]} vs ${expected[at]})` };
 };
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
@@ -53,44 +46,28 @@ try {
       assert.equal(got.length, want.length, 'pixel counts');
       assert.ok(new Set(want).size > 16, `${f.name}: the oracle image varies`);
       rows.push(`${f.name} (${which === 1 ? 'first' : 'changed'}): max ${d.max}, mean ${d.mean.toFixed(4)}${d.pixel}`);
-      assert.ok(
-        d.max <= 1,
-        `${f.name} (${which === 1 ? 'first' : 'changed'}) differs from the browser's own WebGL by ${d.max} levels${d.pixel}`,
-      );
+      assert.ok(d.max <= 1, `${f.name} (${which === 1 ? 'first' : 'changed'}) differs from the browser's own WebGL by ${d.max} levels${d.pixel}`);
     }
   }
   // The static factories: the scene alone, then each pass attached by its own attach() inverting it.
   assert.deepEqual(await page.evaluate(() => window.check.plain()), []);
   const scene = await rgb(),
     inverted = scene.map((v) => 255 - v);
-  assert.ok(
-    scene.some((v) => v > 8 && v < 247),
-    'the scene colour is not black or white, so inverting it shows',
-  );
+  assert.ok(scene.some((v) => v > 8 && v < 247), 'the scene colour is not black or white, so inverting it shows');
   for (const kind of ['shader', 'node']) {
     const name = kind === 'shader' ? 'ShaderPass' : 'NodePass',
       { errors: failures, plugins } = await page.evaluate((k) => window.check.attach(k), kind);
     assert.deepEqual(failures, [], name);
-    assert.deepEqual(
-      plugins,
-      [`attached-${kind}-pass`, 'post:stack'],
-      `${name}.attach adds the pass and its own PostStack`,
-    );
+    assert.deepEqual(plugins, [`attached-${kind}-pass`, 'post:stack'], `${name}.attach adds the pass and its own PostStack`);
     const d = compare(await rgb(), inverted);
     rows.push(`${name}.attach (inverts the scene): max ${d.max}, mean ${d.mean.toFixed(4)}${d.pixel}`);
     assert.ok(d.max <= 1, `${name}.attach output differs from the inverted scene by ${d.max} levels${d.pixel}`);
-    assert.deepEqual(
-      await page.evaluate(() => window.check.detach()),
-      [],
-      `disposing the ${name} removes its PostStack`,
-    );
+    assert.deepEqual(await page.evaluate(() => window.check.detach()), [], `disposing the ${name} removes its PostStack`);
   }
   assert.deepEqual(await page.evaluate(() => window.check.close()), []);
   assert.deepEqual(errors, []);
   console.log(rows.join('\n'));
-  console.log(
-    `ShaderPass ${compat ? 'WebGL2 layer' : 'native WebGPU'}: ${passFixtures.length} GLSL passes within 1 level of the browser's own WebGL, before and after a live change; ShaderPass.attach and NodePass.attach within 1 level of the inverted scene`,
-  );
+  console.log(`ShaderPass ${compat ? 'WebGL2 layer' : 'native WebGPU'}: ${passFixtures.length} GLSL passes within 1 level of the browser's own WebGL, before and after a live change; ShaderPass.attach and NodePass.attach within 1 level of the inverted scene`);
 } finally {
   await context.close();
 }

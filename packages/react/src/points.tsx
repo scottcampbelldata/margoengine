@@ -11,10 +11,7 @@ export interface PointsProps extends PointCloudOptions {
 let serial = 0;
 const owners = new WeakMap<PointCloud, () => void>();
 /** A native point cloud: per-point positions, colours and sizes, with the complete PointsMaterial options. */
-export const Points = /* @__PURE__ */ forwardRef<PointCloud, PointsProps>(function Points(
-  { onError, ...options },
-  ref,
-) {
+export const Points = /* @__PURE__ */ forwardRef<PointCloud, PointsProps>(function Points({ onError, ...options }, ref) {
   const scene = useScene();
   useCreated(
     scene,

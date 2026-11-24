@@ -220,10 +220,7 @@ export class MeshBridge {
         unknown &= ~POSITION;
         changed |= POSITION;
       }
-      if (
-        unknown & ROTATION &&
-        (qx[id] !== rx[row] || qy[id] !== ry[row] || qz[id] !== rz[row] || qw[id] !== rw[row])
-      ) {
+      if (unknown & ROTATION && (qx[id] !== rx[row] || qy[id] !== ry[row] || qz[id] !== rz[row] || qw[id] !== rw[row])) {
         unknown &= ~ROTATION;
         changed |= ROTATION;
       }

@@ -12,15 +12,7 @@ function fan(count) {
   for (let i = 0; i < count; i++) {
     const a = (2 * Math.PI * i) / count;
     vertices.push([Math.cos(a), 0, Math.sin(a)]);
-    faces.push({
-      id: `f${i}`,
-      vertices: [0, 1 + ((i + 1) % count), 1 + i],
-      uv: [
-        [0, 0],
-        [1, 0],
-        [0, 1],
-      ],
-    });
+    faces.push({ id: `f${i}`, vertices: [0, 1 + ((i + 1) % count), 1 + i], uv: [[0, 0], [1, 0], [0, 1]] });
   }
   return { vertices, faces };
 }
@@ -57,10 +49,7 @@ test('a bridge loop of 130,000 edges is walked', () => {
     .map((edge) => edge.id);
   assert.equal(rim.length, 130_000);
   // The same loop twice: walking it must succeed before the shared-vertex check can refuse it.
-  assert.throws(
-    () => bridgeMeshEdgeLoops(big, rim, rim),
-    (error) => error instanceof TypeError && /share a vertex/.test(error.message),
-  );
+  assert.throws(() => bridgeMeshEdgeLoops(big, rim, rim), (error) => error instanceof TypeError && /share a vertex/.test(error.message));
 });
 
 test('no source spreads values into Math.min or Math.max', () => {

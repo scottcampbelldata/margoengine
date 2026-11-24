@@ -257,13 +257,7 @@ export function geometryBytes(
   vertices: number,
   width: number,
 ): number {
-  return (
-    controlPoints * 24 +
-    corners * 8 +
-    triangleCorners * 12 +
-    Math.ceil(triangleCorners / 3) * 4 +
-    vertices * (28 + width * 4)
-  );
+  return controlPoints * 24 + corners * 8 + triangleCorners * 12 + Math.ceil(triangleCorners / 3) * 4 + vertices * (28 + width * 4);
 }
 
 /** Converts the first normal and tangent layer, and the first UV and color layer, or as many as glTF here holds with `all`. */

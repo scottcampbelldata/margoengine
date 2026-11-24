@@ -11,14 +11,7 @@ import { Shadertoy } from '../dist/shadertoy.js';
 
 const dist = (name) => fileURLToPath(new URL(`../dist/${name}.js`, import.meta.url));
 // Text only the scene code holds: the light and fog names, the velocity entry's helpers and shaderScene's checks.
-const sceneText = [
-  'sunDirection',
-  'fogHeightFalloff',
-  'margoBeforeNormal',
-  'margoKept_',
-  'shaderScene needs',
-  'setLights needs',
-];
+const sceneText = ['sunDirection', 'fogHeightFalloff', 'margoBeforeNormal', 'margoKept_', 'shaderScene needs', 'setLights needs'];
 
 test('glsl-pass, shadertoy and raw bundle none of the scene code; glsl-material bundles all of it', async () => {
   const material = (await bundleBytes(dist('glsl-material'))).toString();
@@ -29,8 +22,7 @@ test('glsl-pass, shadertoy and raw bundle none of the scene code; glsl-material 
   }
 });
 
-const fragment =
-  'uniform sampler2D tDiffuse;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = texture2D(tDiffuse, vUv); }';
+const fragment = 'uniform sampler2D tDiffuse;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = texture2D(tDiffuse, vUv); }';
 const image = 'void mainImage(out vec4 c, in vec2 p) { c = vec4(p / iResolution.xy, 0.0, 1.0); }';
 
 test('the materials of ShaderPass and Shadertoy are ShaderMaterials to instanceof; a subclass checks as usual', () => {
@@ -42,12 +34,7 @@ test('the materials of ShaderPass and Shadertoy are ShaderMaterials to instanceo
   assert.equal(pass.material.isShaderMaterial, true);
   class Tinted extends ShaderMaterial {}
   assert.equal(pass.material instanceof Tinted, false);
-  assert.ok(
-    new Tinted({
-      vertexShader: 'void main() { gl_Position = vec4(0.0); }',
-      fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }',
-    }) instanceof Tinted,
-  );
+  assert.ok(new Tinted({ vertexShader: 'void main() { gl_Position = vec4(0.0); }', fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }' }) instanceof Tinted);
   assert.equal({} instanceof ShaderMaterial, false);
   pass.dispose?.();
   toy.dispose();
@@ -55,10 +42,7 @@ test('the materials of ShaderPass and Shadertoy are ShaderMaterials to instanceo
 
 test('the scene options are refused where no scene code is loaded', () => {
   const toy = new Shadertoy(image);
-  assert.throws(
-    () => toy.material({ lights: true }),
-    /lights, fog and velocity are options of ShaderMaterial from shader\/glsl-material/,
-  );
+  assert.throws(() => toy.material({ lights: true }), /lights, fog and velocity are options of ShaderMaterial from shader\/glsl-material/);
   assert.throws(() => toy.material({ velocity: true }), TypeError);
   toy.dispose();
 });

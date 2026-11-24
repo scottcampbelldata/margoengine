@@ -6,16 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,12 +29,7 @@ import {
   validateJob,
 } from '../tools/shot/queue.mjs';
 
-const job = (fields = {}) => ({
-  format: JOB_FORMAT,
-  version: 1,
-  shot: 'tools/shot/shots/orrery-dolly.json',
-  ...fields,
-});
+const job = (fields = {}) => ({ format: JOB_FORMAT, version: 1, shot: 'tools/shot/shots/orrery-dolly.json', ...fields });
 
 // The render machine's queue folder comes from the caller, never from a machine path written in the repository
 // (check:banned-terms refused the dev PC's checkout path once written as the default).
@@ -72,8 +58,7 @@ test('job files: the shot in the repository, the options the shot tool takes, an
     [{ maxMinutes: 5 }, /maxMinutes is not a job field/],
     [{ command: 'del' }, /command is not a job field/],
   ];
-  for (const [fields, pattern] of bad)
-    assert.match(validateJob(job(fields)).join('; '), pattern, JSON.stringify(fields));
+  for (const [fields, pattern] of bad) assert.match(validateJob(job(fields)).join('; '), pattern, JSON.stringify(fields));
   assert.deepEqual(validateJob(null), ['a job is {format, version, shot, ...}']);
   assert.deepEqual(jobArguments(job({ seconds: 2, day: '2026-11-14', once: true })), [
     'tools/shot/cli.mjs',
@@ -111,10 +96,7 @@ function shotTool(...extra) {
 
 test('the shot tool takes no hold or owner option: --max-minutes and --owner are bad arguments (exit 2)', () => {
   assert.equal(shotTool('--check').status, 0, 'the shot file is valid');
-  for (const extra of [
-    ['--max-minutes', '5'],
-    ['--owner', 'someone'],
-  ]) {
+  for (const extra of [['--max-minutes', '5'], ['--owner', 'someone']]) {
     const run = shotTool('--check', ...extra);
     assert.equal(run.status, 2, extra[0]);
     assert.match(run.stderr, /Unknown option/, extra[0]);
@@ -247,13 +229,7 @@ test('runnerCodeStamp follows the bytes of the runner folder and the checkout co
         cwd: dir,
         encoding: 'utf8',
         timeout: 30_000,
-        env: {
-          ...process.env,
-          GIT_AUTHOR_NAME: 'Stamp Test',
-          GIT_AUTHOR_EMAIL: 'stamp@example.invalid',
-          GIT_COMMITTER_NAME: 'Stamp Test',
-          GIT_COMMITTER_EMAIL: 'stamp@example.invalid',
-        },
+        env: { ...process.env, GIT_AUTHOR_NAME: 'Stamp Test', GIT_AUTHOR_EMAIL: 'stamp@example.invalid', GIT_COMMITTER_NAME: 'Stamp Test', GIT_COMMITTER_EMAIL: 'stamp@example.invalid' },
       });
       assert.equal(run.status, 0, run.stderr);
     };
@@ -278,10 +254,7 @@ test('runQueue: a checkout that moves while a job runs leaves the next job for a
     assert.equal(outcome, CODE_CHANGED);
     assert.deepEqual(readdirSync(join(s.queue, 'done')), ['1-first.json'], 'the job that was running finishes');
     assert.deepEqual(queuedJobs(s.queue), ['2-second.json'], 'the stale runner claims nothing more');
-    assert.ok(
-      !existsSync(join(s.queue, 'failed')) || readdirSync(join(s.queue, 'failed')).length === 0,
-      'and fails nothing',
-    );
+    assert.ok(!existsSync(join(s.queue, 'failed')) || readdirSync(join(s.queue, 'failed')).length === 0, 'and fails nothing');
     assert.match(lines.at(-1), /code changed \(the checkout moved\): exiting/);
     assert.ok(!existsSync(join(s.queue, 'runner.pid')), 'the next runner is not turned away');
     // The runner the scheduled task starts next, on the new code, takes the job.
@@ -304,14 +277,7 @@ test('runQueue --watch: an idle runner exits at its next poll once its code chan
       return runnerCodeStamp({ dir: join(s.repo, 'tools', 'shot'), repo: s.repo });
     };
     const lines = [];
-    const watching = runQueue({
-      queue: s.queue,
-      repo: s.repo,
-      watch: true,
-      pollMs: 20,
-      log: (line) => lines.push(line),
-      codeStamp,
-    });
+    const watching = runQueue({ queue: s.queue, repo: s.repo, watch: true, pollMs: 20, log: (line) => lines.push(line), codeStamp });
     await twoPolls;
     assert.ok(existsSync(join(s.queue, 'runner.pid')), 'still watching while the code stays');
     appendFileSync(join(s.repo, 'tools', 'shot', 'queue.mjs'), '// the next commit\n');
@@ -325,9 +291,7 @@ test('runQueue --watch: an idle runner exits at its next poll once its code chan
 // "schtasks /End" on the dev PC ended the task's PowerShell wrapper and left its node runner running on its own (pid
 // 47156, 2026-11-14): Windows ends only the process a task started, not the processes under it. The runner watches
 // the process that started it and exits once that is gone, ending a running job's shot first.
-test('runQueue: once the process that started it is gone, the running job is stopped and nothing more is claimed', {
-  timeout: 20_000,
-}, async () => {
+test('runQueue: once the process that started it is gone, the running job is stopped and nothing more is claimed', { timeout: 20_000 }, async () => {
   const s = scratch();
   try {
     s.add('1-first.json', job({ shot: 'shots/hang.json' }));
@@ -336,13 +300,7 @@ test('runQueue: once the process that started it is gone, the running job is sto
     const log = join(s.queue, 'logs', '1-first.log');
     const alive = () => !(existsSync(log) && readFileSync(log, 'utf8').length > 0);
     const lines = [];
-    const outcome = await runQueue({
-      queue: s.queue,
-      repo: s.repo,
-      log: (line) => lines.push(line),
-      parentAlive: alive,
-      parentMs: 20,
-    });
+    const outcome = await runQueue({ queue: s.queue, repo: s.repo, log: (line) => lines.push(line), parentAlive: alive, parentMs: 20 });
     assert.equal(outcome, PARENT_GONE);
     const record = JSON.parse(readFileSync(join(s.queue, 'failed', '1-first.json'), 'utf8'));
     assert.equal(record.stopped, true);
@@ -373,12 +331,10 @@ test('a re-parented runner sees its parent gone, though its new parent runs', ()
     assert.equal(parentRuns(1), true, 'init or launchd answers the probe');
     assert.equal(alive(), false);
   }
-  assert.equal(parentWatch()(), true, "this process is still its parent's child");
+  assert.equal(parentWatch()(), true, 'this process is still its parent\'s child');
 });
 
-test('queue.mjs run --watch exits once the wrapper that started it is ended on its own, as schtasks /End does', {
-  timeout: 60_000,
-}, async () => {
+test('queue.mjs run --watch exits once the wrapper that started it is ended on its own, as schtasks /End does', { timeout: 60_000 }, async () => {
   const queue = mkdtempSync(join(tmpdir(), 'margo-orphan-'));
   const cli = fileURLToPath(new URL('../tools/shot/queue.mjs', import.meta.url));
   // The wrapper pipes the runner's output, as PowerShell's *>> does, and is then ended alone, not its process tree. Its
@@ -410,12 +366,7 @@ c.stdout.resume(); c.stderr.resume(); setInterval(() => {}, 1000);`,
     assert.ok(gone, `the runner ${runner} still runs after its wrapper ended`);
     assert.ok(!existsSync(pidFile), 'and it removed its pid file');
   } finally {
-    if (runner && parentRuns(runner))
-      spawnSync(
-        process.platform === 'win32' ? 'taskkill' : 'kill',
-        process.platform === 'win32' ? ['/F', '/PID', String(runner)] : ['-9', String(runner)],
-        { stdio: 'ignore' },
-      );
+    if (runner && parentRuns(runner)) spawnSync(process.platform === 'win32' ? 'taskkill' : 'kill', process.platform === 'win32' ? ['/F', '/PID', String(runner)] : ['-9', String(runner)], { stdio: 'ignore' });
     wrapper.kill();
     rmSync(queue, { recursive: true, force: true });
   }

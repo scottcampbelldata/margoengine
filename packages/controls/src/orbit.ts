@@ -264,13 +264,8 @@ export class OrbitControls extends Controls {
   }
   set zoom(value: number) {
     const projection = this.zoomed();
-    if (!projection)
-      throw typeError(
-        'OrbitControls.zoom needs a CameraProjection; attach one or set `projection`',
-        'controls-arguments',
-      );
-    if (!(value > 0) || !Number.isFinite(value))
-      throw rangeError('Orbit zoom must be a finite number above 0', 'controls-arguments');
+    if (!projection) throw typeError('OrbitControls.zoom needs a CameraProjection; attach one or set `projection`', 'controls-arguments');
+    if (!(value > 0) || !Number.isFinite(value)) throw rangeError('Orbit zoom must be a finite number above 0', 'controls-arguments');
     const zoom = clamp(value, this.minZoom, this.maxZoom);
     if (zoom === projection.zoom) return;
     projection.zoom = zoom;

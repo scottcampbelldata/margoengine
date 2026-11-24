@@ -6,12 +6,8 @@ try {
   const page = browser.page;
   await page.waitForFunction(() => window.clusteredShadowFixture);
   console.log('area-shapes: fixture ready');
-  const call = (name, ...args) =>
-    page.evaluate(({ name, args }) => window.clusteredShadowFixture[name](...args), { name, args });
-  const points = [
-    [0, 0, 0, 0, 1, 0],
-    [3, 0, 0, 0, 1, 0],
-  ];
+  const call = (name, ...args) => page.evaluate(({ name, args }) => window.clusteredShadowFixture[name](...args), { name, args });
+  const points = [[0, 0, 0, 0, 1, 0], [3, 0, 0, 0, 1, 0]];
   const results = [];
   for (const shape of ['disc', 'sphere']) {
     console.log(`area-shapes: ${shape} unshadowed`);
@@ -23,8 +19,7 @@ try {
     console.log(`area-shapes: ${shape} shadowed`);
     await call('scene', { meshes: ['floor', 'block'], shapes: [{ ...light, castShadow: true }] });
     await call('render', 2);
-    const on = await call('probe', points),
-      compiled = await call('compile');
+    const on = await call('probe', points), compiled = await call('compile');
     assert.deepEqual(compiled, { core: [], probe: [] });
     assert.ok(off[0][0] > 0 && on[0][0] < off[0][0] * 0.05, `${shape}: blocked centre`);
     assert.ok(Math.abs(on[1][0] / off[1][0] - 1) < 0.02, `${shape}: clear receiver`);
@@ -32,6 +27,4 @@ try {
   }
   assert.deepEqual(await page.evaluate(() => window.clusteredShadowFixture.errors), []);
   console.log(JSON.stringify(results));
-} finally {
-  await browser.close();
-}
+} finally { await browser.close(); }

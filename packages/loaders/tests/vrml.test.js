@@ -196,9 +196,7 @@ test('regression: the X3D CAD nodes hold geometry; CATIA exports read as empty b
   </CADAssembly></CADLayer></Scene></X3D>`);
   near(scene.positions, [0, 0, 5, 1, 0, 5, 0, 1, 5, 2, 0, 0, 3, 0, 0, 2, 1, 0], 'positions');
   assert.deepEqual(scene.warnings, []);
-  const vrml = parseVRML(
-    `${H}CADAssembly { children [ CADPart { translation 0 2 0 children [ CADFace { shape Shape { geometry ${TRI} } } ] } ] }`,
-  );
+  const vrml = parseVRML(`${H}CADAssembly { children [ CADPart { translation 0 2 0 children [ CADFace { shape Shape { geometry ${TRI} } } ] } ] }`);
   near(vrml.positions, [0, 2, 0, 1, 2, 0, 0, 3, 0], 'VRML form');
 });
 
@@ -230,60 +228,37 @@ test('regression: convex FALSE faces are ear-clipped, not fanned, in any plane a
     `${H}Shape { geometry IndexedFaceSet { ${extra} coord Coordinate { point ${points} } coordIndex [0 1 2 3 4 -1] } }`;
   const concave = areas(parseVRML(face('convex FALSE')));
   assert.equal(concave.length, 3);
-  assert.ok(
-    concave.every((a) => a > 0),
-    `every triangle keeps the face's turn: ${concave}`,
-  );
+  assert.ok(concave.every((a) => a > 0), `every triangle keeps the face's turn: ${concave}`);
   assert.ok(Math.abs(concave.reduce((s, a) => s + a, 0) - 10) < 1e-9, 'the triangles cover the face exactly');
   const flipped = areas(parseVRML(face('convex FALSE ccw FALSE')));
-  assert.ok(
-    flipped.every((a) => a < 0),
-    'ccw FALSE flips every triangle',
-  );
+  assert.ok(flipped.every((a) => a < 0), 'ccw FALSE flips every triangle');
   // The same notch standing in the y-z plane, facing -x: the projection keeps its turn.
   const wall = parseVRML(face('convex FALSE', '[0 0 0, 0 0 4, 0 4 4, 0 1 2, 0 4 0]'));
   const wallAreas = areas(wall, 2, 1);
-  assert.ok(
-    wallAreas.every((a) => a > 0) && Math.abs(wallAreas.reduce((s, a) => s + a, 0) - 10) < 1e-9,
-    `${wallAreas}`,
-  );
+  assert.ok(wallAreas.every((a) => a > 0) && Math.abs(wallAreas.reduce((s, a) => s + a, 0) - 10) < 1e-9, `${wallAreas}`);
   const x3d = parseX3D(`<X3D><Scene><Shape><IndexedFaceSet convex='false' coordIndex='0 1 2 3 4 -1'>
     <Coordinate point='0 0 0 4 0 0 4 4 0 2 1 0 0 4 0'/></IndexedFaceSet></Shape></Scene></X3D>`);
   assert.deepEqual(areas(x3d), concave, 'X3D reads convex the same way');
-  assert.ok(
-    areas(parseVRML(face(''))).some((a) => a <= 0),
-    'convex TRUE (the default) still fans, as the spec lets it',
-  );
+  assert.ok(areas(parseVRML(face(''))).some((a) => a <= 0), 'convex TRUE (the default) still fans, as the spec lets it');
 });
 
 test('regression: Switch draws only choice[whichChoice] and nothing for -1 (VRML97 6.46)', () => {
-  const at = (x) =>
-    `Shape { geometry IndexedFaceSet { coord Coordinate { point [${x} 0 0, ${x + 1} 0 0, ${x} 1 0] } coordIndex [0 1 2 -1] } }`;
+  const at = (x) => `Shape { geometry IndexedFaceSet { coord Coordinate { point [${x} 0 0, ${x + 1} 0 0, ${x} 1 0] } coordIndex [0 1 2 -1] } }`;
   const choices = `[ ${at(0)} ${at(10)} ${at(20)} ]`;
-  near(
-    parseVRML(`${H}Switch { whichChoice 1 choice ${choices} }`).positions,
-    [10, 0, 0, 11, 0, 0, 10, 1, 0],
-    'choice 1',
-  );
+  near(parseVRML(`${H}Switch { whichChoice 1 choice ${choices} }`).positions, [10, 0, 0, 11, 0, 0, 10, 1, 0], 'choice 1');
   assert.equal(parseVRML(`${H}Switch { choice ${choices} }`).positions.length, 0, 'default -1 draws nothing');
   assert.equal(parseVRML(`${H}Switch { whichChoice 3 choice ${choices} }`).positions.length, 0, 'out of range');
-  const tri = (x) =>
-    `<Shape><IndexedFaceSet coordIndex='0 1 2 -1'><Coordinate point='${x} 0 0 ${x + 1} 0 0 ${x} 1 0'/></IndexedFaceSet></Shape>`;
-  const x3d = parseX3D(
-    `<X3D><Scene><Transform translation='0 0 1'><Switch whichChoice='2'>${tri(0)}${tri(10)}${tri(20)}</Switch></Transform></Scene></X3D>`,
-  );
+  const tri = (x) => `<Shape><IndexedFaceSet coordIndex='0 1 2 -1'><Coordinate point='${x} 0 0 ${x + 1} 0 0 ${x} 1 0'/></IndexedFaceSet></Shape>`;
+  const x3d = parseX3D(`<X3D><Scene><Transform translation='0 0 1'><Switch whichChoice='2'>${tri(0)}${tri(10)}${tri(20)}</Switch></Transform></Scene></X3D>`);
   near(x3d.positions, [20, 0, 1, 21, 0, 1, 20, 1, 1], 'X3D children');
   assert.deepEqual(x3d.warnings, []);
 });
 
 test('regression: LOD draws its first, most detailed level (VRML97 6.26)', () => {
-  const at = (x) =>
-    `Shape { geometry IndexedFaceSet { coord Coordinate { point [${x} 0 0, ${x + 1} 0 0, ${x} 1 0] } coordIndex [0 1 2 -1] } }`;
+  const at = (x) => `Shape { geometry IndexedFaceSet { coord Coordinate { point [${x} 0 0, ${x + 1} 0 0, ${x} 1 0] } coordIndex [0 1 2 -1] } }`;
   const scene = parseVRML(`${H}LOD { range [10] level [ ${at(0)} ${at(10)} ] }`);
   near(scene.positions, [0, 0, 0, 1, 0, 0, 0, 1, 0], 'level 0');
   assert.deepEqual(scene.warnings, []);
-  const x3d = parseX3D(
-    `<X3D><Scene><LOD range='10'><Group><Shape><IndexedFaceSet coordIndex='0 1 2 -1'><Coordinate point='5 0 0 6 0 0 5 1 0'/></IndexedFaceSet></Shape></Group><Shape/></LOD></Scene></X3D>`,
-  );
+  const x3d = parseX3D(`<X3D><Scene><LOD range='10'><Group><Shape><IndexedFaceSet coordIndex='0 1 2 -1'><Coordinate point='5 0 0 6 0 0 5 1 0'/></IndexedFaceSet></Shape></Group><Shape/></LOD></Scene></X3D>`);
   near(x3d.positions, [5, 0, 0, 6, 0, 0, 5, 1, 0], 'X3D children');
 });

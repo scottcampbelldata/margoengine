@@ -18,14 +18,7 @@
 //   posture blended in fixes most of it.
 // - Wheatland, Wang, Song, Neff, Zordan and Joerg, "State of the art in hand and finger modeling and animation",
 //   Computer Graphics Forum 34(2) 2015, https://doi.org/10.1111/cgf.12595: joint ranges and the rest posture's cascade.
-import {
-  multiplyQuaternions,
-  normalizeQuaternion,
-  axisAngleToQuaternion,
-  conjugateQuaternion,
-  rotateByQuaternion,
-  interpolateQuaternions,
-} from '@margoengine/math/quat';
+import { multiplyQuaternions, normalizeQuaternion, axisAngleToQuaternion, conjugateQuaternion, rotateByQuaternion, interpolateQuaternions } from '@margoengine/math/quat';
 import type { Animator } from '@margoengine/animator';
 import { detectSkeleton, humanoidBones, type HumanoidBone, type SkeletonPreset } from './retarget.js';
 
@@ -61,37 +54,16 @@ const TABLES: Record<'relaxed' | 'fist' | 'flat' | 'point' | 'pinch', HandPoseTa
     spread: { index: 3, ring: 3, little: 7 },
   },
   fist: {
-    flex: {
-      thumb: t3(30, 45, 35),
-      index: t3(88, 100, 67),
-      middle: t3(90, 102, 68),
-      ring: t3(92, 104, 69),
-      little: t3(94, 106, 71),
-    },
+    flex: { thumb: t3(30, 45, 35), index: t3(88, 100, 67), middle: t3(90, 102, 68), ring: t3(92, 104, 69), little: t3(94, 106, 71) },
     spread: { index: -2, ring: -2, little: -3 },
   },
-  flat: {
-    flex: { thumb: t3(0, 0, 0), index: t3(0, 0, 0), middle: t3(0, 0, 0), ring: t3(0, 0, 0), little: t3(0, 0, 0) },
-    spread: { index: 0, ring: 0, little: 0 },
-  },
+  flat: { flex: { thumb: t3(0, 0, 0), index: t3(0, 0, 0), middle: t3(0, 0, 0), ring: t3(0, 0, 0), little: t3(0, 0, 0) }, spread: { index: 0, ring: 0, little: 0 } },
   point: {
-    flex: {
-      thumb: t3(25, 35, 30),
-      index: t3(4, 5, 3),
-      middle: t3(80, 100, 67),
-      ring: t3(85, 103, 69),
-      little: t3(90, 105, 70),
-    },
+    flex: { thumb: t3(25, 35, 30), index: t3(4, 5, 3), middle: t3(80, 100, 67), ring: t3(85, 103, 69), little: t3(90, 105, 70) },
     spread: { index: 2, ring: -2, little: -3 },
   },
   pinch: {
-    flex: {
-      thumb: t3(30, 25, 20),
-      index: t3(40, 50, 33),
-      middle: t3(32, 46, 31),
-      ring: t3(36, 50, 33),
-      little: t3(40, 54, 36),
-    },
+    flex: { thumb: t3(30, 25, 20), index: t3(40, 50, 33), middle: t3(32, 46, 31), ring: t3(36, 50, 33), little: t3(40, 54, 36) },
     spread: { index: 0, ring: 2, little: 5 },
   },
 };
@@ -123,16 +95,12 @@ function checkTable(table: HandPoseTable): void {
   if (!table || typeof table !== 'object' || !table.flex || typeof table.flex !== 'object')
     throw new TypeError('A hand pose table needs flex: {index: [base, middle, tip], ...} in degrees');
   for (const [finger, flex] of Object.entries(table.flex)) {
-    if (!(FINGERS as readonly string[]).includes(finger))
-      throw new RangeError(`Unknown finger ${finger}; use ${FINGERS.join(', ')}`);
+    if (!(FINGERS as readonly string[]).includes(finger)) throw new RangeError(`Unknown finger ${finger}; use ${FINGERS.join(', ')}`);
     if (!Array.isArray(flex) || flex.length !== 3 || !flex.every((v) => Number.isFinite(v) && v >= -30 && v <= 130))
       throw new RangeError(`Finger ${finger} flex must be three angles from -30 to 130 degrees`);
   }
   for (const [finger, spread] of Object.entries(table.spread ?? {}))
-    if (
-      !(FINGERS as readonly string[]).includes(finger) ||
-      !(Number.isFinite(spread) && Math.abs(spread as number) <= 40)
-    )
+    if (!(FINGERS as readonly string[]).includes(finger) || !(Number.isFinite(spread) && Math.abs(spread as number) <= 40))
       throw new RangeError(`Finger ${finger} spread must be from -40 to 40 degrees`);
 }
 
@@ -181,11 +149,7 @@ const chain = (lengths: readonly number[], flex: readonly number[]) => {
  * @param lengths the three phalanges, base to tip, metres.
  * @param diameter the bar's, metres.
  */
-export function gripFinger(
-  lengths: readonly [number, number, number],
-  diameter: number,
-  options: FingerGripOptions = {},
-): FingerGrip {
+export function gripFinger(lengths: readonly [number, number, number], diameter: number, options: FingerGripOptions = {}): FingerGrip {
   if (!Array.isArray(lengths) || lengths.length !== 3 || !lengths.every((l) => l > 0 && l < 1))
     throw new RangeError('gripFinger needs three phalanx lengths in metres, each above 0 and below 1');
   if (!(diameter > 0 && diameter < 1)) throw new RangeError('gripFinger diameter must be above 0 and below 1 metre');
@@ -223,7 +187,8 @@ export function gripFinger(
   };
   // Of the places that bring the fingertip onto the bar (within half a millimetre), the one deepest in the palm: a power
   // grip holds the bar against the palm, not hooked on the fingertips. With none, the closest the fingertip gets.
-  let best: FingerGrip | undefined, nearest: FingerGrip | undefined;
+  let best: FingerGrip | undefined,
+    nearest: FingerGrip | undefined;
   for (let along = -r; along <= lengths[0] && !best; along += 0.00025) {
     const g = close(along);
     if (Math.abs(g.tipGap) <= 0.0005) best = g;
@@ -269,11 +234,7 @@ export interface MeasuredHand {
 type V3 = [number, number, number];
 const sub = (a: readonly number[], b: readonly number[]): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: readonly number[], b: readonly number[]): V3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
+const cross = (a: readonly number[], b: readonly number[]): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const unit = (a: readonly number[]): V3 => {
   const l = Math.hypot(a[0], a[1], a[2]);
   return l > 0 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0];
@@ -301,17 +262,10 @@ export function measureHands(
   map?: ReadonlyMap<HumanoidBone, number>,
 ): Partial<Record<HandSide, MeasuredHand>> {
   const { names, parents, rest } = rig ?? ({} as HandRig);
-  if (
-    !Array.isArray(names) ||
-    !Array.isArray(parents) ||
-    parents.length !== names.length ||
-    !rest ||
-    rest.length !== names.length * 10
-  )
+  if (!Array.isArray(names) || !Array.isArray(parents) || parents.length !== names.length || !rest || rest.length !== names.length * 10)
     throw new TypeError('measureHands needs {names, parents, rest} with 10 rest numbers per bone');
   const chosen = map ? undefined : (preset ?? detectSkeleton(names)?.preset);
-  if (!map && !chosen)
-    throw new RangeError('measureHands found no skeleton preset for these bone names; pass one or a bone map');
+  if (!map && !chosen) throw new RangeError('measureHands found no skeleton preset for these bone names; pass one or a bone map');
   const bones = map ?? humanoidBones(names, chosen!);
   const frames: ({ position: V3; rotation: number[]; scale: V3 } | undefined)[] = [];
   const world = (i: number): { position: V3; rotation: number[]; scale: V3 } => {
@@ -327,12 +281,7 @@ export function measureHands(
     else {
       const up = world(parent);
       frame = {
-        position: [
-          ...up.position.map(
-            (v, k) =>
-              v + rotateByQuaternion([p[0] * up.scale[0], p[1] * up.scale[1], p[2] * up.scale[2]], up.rotation)[k],
-          ),
-        ] as V3,
+        position: [...up.position.map((v, k) => v + rotateByQuaternion([p[0] * up.scale[0], p[1] * up.scale[1], p[2] * up.scale[2]], up.rotation)[k])] as V3,
         rotation: normalizeQuaternion(multiplyQuaternions(up.rotation, q)),
         scale: [up.scale[0] * s[0], up.scale[1] * s[1], up.scale[2] * s[2]] as V3,
       };
@@ -368,25 +317,16 @@ export function measureHands(
         let along = ends[k] ? sub(ends[k]!, at(j)) : sub(at(c), at(b));
         along = unit(sub(along, scaled(palm, dot(along, palm))));
         // A turn about along x palm moves the bone toward the palm.
-        return unit(rotateByQuaternion(cross(along, palm), conjugateQuaternion(world(j).rotation))) as readonly [
-          number,
-          number,
-          number,
-        ];
+        return unit(rotateByQuaternion(cross(along, palm), conjugateQuaternion(world(j).rotation))) as readonly [number, number, number];
       });
       let spread: readonly [number, number, number] | null = null;
       if (finger !== 'middle' && finger !== 'thumb') {
         const along = unit(sub(at(b), at(a))),
           away = sub(at(a), at(middle)),
           side3 = unit(sub(sub(away, scaled(along, dot(away, along))), scaled(palm, dot(away, palm))));
-        spread = unit(rotateByQuaternion(cross(along, side3), conjugateQuaternion(world(a).rotation))) as readonly [
-          number,
-          number,
-          number,
-        ];
+        spread = unit(rotateByQuaternion(cross(along, side3), conjugateQuaternion(world(a).rotation))) as readonly [number, number, number];
       }
-      for (const j of [a, b, c])
-        restRotations.set(j, [rest[j * 10 + 3], rest[j * 10 + 4], rest[j * 10 + 5], rest[j * 10 + 6]]);
+      for (const j of [a, b, c]) restRotations.set(j, [rest[j * 10 + 3], rest[j * 10 + 4], rest[j * 10 + 5], rest[j * 10 + 6]]);
       fingers[finger] = { bones: [a, b, c], lengths: [l1, l2, l3], curl, spread };
     }
     out[side] = { side, hand, fingers, palm, rest: restRotations, world: (b) => world(b) };
@@ -400,10 +340,7 @@ export function poseTable(pose: HandPose, hand: MeasuredHand): HandPoseTable {
   if (pose.name === 'table') return pose.table;
   if (pose.name !== 'grip') {
     const table = TABLES[pose.name];
-    if (!table)
-      throw new RangeError(
-        `Unknown hand pose ${String((pose as { name?: unknown }).name)}; pass relaxed(), fist(), grip(0.03) or another pose of this entry`,
-      );
+    if (!table) throw new RangeError(`Unknown hand pose ${String((pose as { name?: unknown }).name)}; pass relaxed(), fist(), grip(0.03) or another pose of this entry`);
     return table;
   }
   const flex: Record<string, readonly [number, number, number]> = { thumb: t3(35, 40, 30) };
@@ -462,11 +399,7 @@ export function fingerTurn(clip: FingerClip, hand: MeasuredHand): number {
       const rest = hand.rest.get(bone)!;
       let total = 0;
       const keys = track.values.length >> 2;
-      for (let k = 0; k < keys; k++)
-        total += turnFromRest(
-          [track.values[k * 4], track.values[k * 4 + 1], track.values[k * 4 + 2], track.values[k * 4 + 3]],
-          rest,
-        );
+      for (let k = 0; k < keys; k++) total += turnFromRest([track.values[k * 4], track.values[k * 4 + 1], track.values[k * 4 + 2], track.values[k * 4 + 3]], rest);
       sum += total / keys;
     }
   }
@@ -541,22 +474,17 @@ const mixTables = (a: HandPoseTable, b: HandPoseTable, t: number): HandPoseTable
   for (const finger of FINGERS) {
     const fa = a.flex[finger],
       fb = b.flex[finger];
-    if (fa && fb)
-      flex[finger] = [fa[0] + (fb[0] - fa[0]) * t, fa[1] + (fb[1] - fa[1]) * t, fa[2] + (fb[2] - fa[2]) * t];
+    if (fa && fb) flex[finger] = [fa[0] + (fb[0] - fa[0]) * t, fa[1] + (fb[1] - fa[1]) * t, fa[2] + (fb[2] - fa[2]) * t];
     else if (fa || fb) flex[finger] = (fa ?? fb)!; // the digit's weight fades it in or out
     spread[finger] = (a.spread?.[finger] ?? 0) + ((b.spread?.[finger] ?? 0) - (a.spread?.[finger] ?? 0)) * t;
   }
   return { flex, spread };
 };
 const checkKey = (key: HandKey) => {
-  if (!key || !(key.time >= 0 && key.time < Infinity))
-    throw new RangeError('A hand key needs a time of 0 or more seconds');
-  if (key.blend !== undefined && !(key.blend >= 0 && key.blend < Infinity))
-    throw new RangeError('A hand key blend must be 0 or more seconds');
-  if (key.weight !== undefined && !(key.weight >= 0 && key.weight <= 1))
-    throw new RangeError('A hand key weight must be from 0 to 1');
-  if (key.pose !== null && (!key.pose || typeof key.pose !== 'object'))
-    throw new TypeError('A hand key pose must be a hand pose or null');
+  if (!key || !(key.time >= 0 && key.time < Infinity)) throw new RangeError('A hand key needs a time of 0 or more seconds');
+  if (key.blend !== undefined && !(key.blend >= 0 && key.blend < Infinity)) throw new RangeError('A hand key blend must be 0 or more seconds');
+  if (key.weight !== undefined && !(key.weight >= 0 && key.weight <= 1)) throw new RangeError('A hand key weight must be from 0 to 1');
+  if (key.pose !== null && (!key.pose || typeof key.pose !== 'object')) throw new TypeError('A hand key pose must be a hand pose or null');
 };
 
 /**
@@ -624,8 +552,7 @@ export function addHands(animator: Animator, options: HandsOptions = {}): Hands 
         t = blend > 0 ? smooth((time - key.time) / blend) : 1;
       if (key.pose && table) for (const finger of FINGERS) weights[finger] = table.flex[finger] ? (key.weight ?? 1) : 0;
       const from = state;
-      for (const finger of FINGERS)
-        weights[finger] = from.weights[finger] + (weights[finger] - from.weights[finger]) * t;
+      for (const finger of FINGERS) weights[finger] = from.weights[finger] + (weights[finger] - from.weights[finger]) * t;
       state = { table: from.table && table ? mixTables(from.table, table, t) : (table ?? from.table), weights };
     }
     return state;
@@ -672,8 +599,7 @@ export function addHands(animator: Animator, options: HandsOptions = {}): Hands 
         for (const bone of f.bones) {
           let q = pose.rotation[bone];
           if (restRotations?.has(bone)) q = interpolateQuaternions(q, restRotations.get(bone)!, restShare, 0.9995);
-          if (keyedRotations?.has(bone) && keyed.weights[finger] > 0)
-            q = interpolateQuaternions(q, keyedRotations.get(bone)!, keyed.weights[finger], 0.9995);
+          if (keyedRotations?.has(bone) && keyed.weights[finger] > 0) q = interpolateQuaternions(q, keyedRotations.get(bone)!, keyed.weights[finger], 0.9995);
           pose.rotation[bone] = q;
         }
       }
@@ -691,8 +617,7 @@ export function addHands(animator: Animator, options: HandsOptions = {}): Hands 
       return clock;
     },
     set time(value: number) {
-      if (!(value >= 0 && value < Infinity))
-        throw new RangeError('Hands time must be a finite number of seconds, 0 or more');
+      if (!(value >= 0 && value < Infinity)) throw new RangeError('Hands time must be a finite number of seconds, 0 or more');
       clock = value;
     },
     flat,

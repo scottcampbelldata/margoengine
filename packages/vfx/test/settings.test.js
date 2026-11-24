@@ -24,11 +24,7 @@ const check = (effect) => effect.validate();
 const optionDefault = (key) => {
   const d = vfxSettingDefaults(),
     axes = (name) => ['x', 'y', 'z'].map((c) => d[`${name}.${c}`]);
-  return ['velocity', 'gravity', 'emissionExtent'].includes(key)
-    ? axes(key)
-    : key === 'lifetime'
-      ? [d['lifetime.min'], d['lifetime.max']]
-      : d[key];
+  return ['velocity', 'gravity', 'emissionExtent'].includes(key) ? axes(key) : key === 'lifetime' ? [d['lifetime.min'], d['lifetime.max']] : d[key];
 };
 
 test('every row is live; the wind rows follow the weather at null; rate has no weather but may be null', () => {
@@ -37,14 +33,13 @@ test('every row is live; the wind rows follow the weather at null; rate has no w
   for (const row of VFX_SETTINGS) {
     assert.ok(row.live && row.about.length > 15 && ['number', 'color'].includes(row.kind), row.name);
     assert.ok(row.kind === 'color' || row.max > row.min, row.name);
-    if (row.name.startsWith('wind.'))
-      assert.ok(row.nullable && row.default === null && row.weather === 'wind', row.name);
+    if (row.name.startsWith('wind.')) assert.ok(row.nullable && row.default === null && row.weather === 'wind', row.name);
     else if (row.name === 'rate') assert.ok(row.nullable && row.default === null && row.weather === undefined);
     else assert.ok(!row.nullable && row.default !== null, row.name);
   }
 });
 
-test("the defaults leave an effect's options exactly as built, and clear what a row set", () => {
+test('the defaults leave an effect\'s options exactly as built, and clear what a row set', () => {
   const effect = new VFX({ capacity: 8 });
   applyVfxSettings(effect, {});
   assert.deepEqual(effect.options, { capacity: 8 });
@@ -53,18 +48,7 @@ test("the defaults leave an effect's options exactly as built, and clear what a 
   for (const row of VFX_SETTINGS) {
     const e = new VFX({ capacity: 8 }),
       quarter = (row.max - row.min) / 4,
-      moved =
-        row.kind === 'color'
-          ? [0.2, 0.3, 0.4]
-          : row.name === 'lifetime.min'
-            ? 0.5
-            : row.name.startsWith('lifetime')
-              ? 6
-              : row.name === 'rate'
-                ? 40
-                : row.default + quarter <= row.max
-                  ? row.default + quarter
-                  : row.default - quarter;
+      moved = row.kind === 'color' ? [0.2, 0.3, 0.4] : row.name === 'lifetime.min' ? 0.5 : row.name.startsWith('lifetime') ? 6 : row.name === 'rate' ? 40 : row.default + quarter <= row.max ? row.default + quarter : row.default - quarter;
     applyVfxSettings(e, { [row.name]: moved });
     assert.notDeepEqual(e.options, { capacity: 8 }, `${row.name} writes an option`);
     check(e);
@@ -73,7 +57,7 @@ test("the defaults leave an effect's options exactly as built, and clear what a 
   }
 });
 
-test("the whole range of every row passes the effect's own validation", () => {
+test('the whole range of every row passes the effect\'s own validation', () => {
   for (const edge of ['min', 'max']) {
     const e = new VFX({ capacity: 8 }),
       values = Object.fromEntries(VFX_SETTINGS.filter((r) => r.kind === 'number').map((r) => [r.name, r[edge]]));
@@ -87,19 +71,7 @@ test("the whole range of every row passes the effect's own validation", () => {
 test('unknown names throw TypeError, bad values RangeError, null only where nullable, a life that ends before it starts', () => {
   const e = new VFX({ capacity: 8 });
   assert.throws(() => applyVfxSettings(e, { speed: 3 }), TypeError);
-  for (const bad of [
-    { size: 0 },
-    { size: 21 },
-    { bounce: 1.5 },
-    { turbulence: -1 },
-    { 'velocity.y': null },
-    { color: [2, 0, 0] },
-    { color: [1, 0] },
-    { intensity: 1001 },
-    { 'wind.x': 101 },
-    { rate: -1 },
-    { alpha: NaN },
-  ])
+  for (const bad of [{ size: 0 }, { size: 21 }, { bounce: 1.5 }, { turbulence: -1 }, { 'velocity.y': null }, { color: [2, 0, 0] }, { color: [1, 0] }, { intensity: 1001 }, { 'wind.x': 101 }, { rate: -1 }, { alpha: NaN }])
     assert.throws(() => applyVfxSettings(e, bad), RangeError, JSON.stringify(bad));
   assert.throws(() => applyVfxSettings(e, { 'lifetime.min': 5, 'lifetime.max': 2 }), RangeError);
   assert.deepEqual(e.options, { capacity: 8 }, 'a refused write changes nothing');
@@ -116,17 +88,8 @@ test('wind: both null leaves the option to the weather, either one given sets it
   assert.equal('wind' in e.options, false);
 });
 
-test("a panel started from an effect's values writes them back unchanged, a Fire's flames, embers and steam included", () => {
-  const plain = new VFX({
-    capacity: 8,
-    velocity: [0, 5, 0],
-    size: 0.3,
-    wind: [2, 1],
-    lifetime: [0.5, 2],
-    color: [0.1, 0.2, 0.3, 0.4],
-    rate: 12,
-    emissionExtent: [1, 2, 3],
-  });
+test('a panel started from an effect\'s values writes them back unchanged, a Fire\'s flames, embers and steam included', () => {
+  const plain = new VFX({ capacity: 8, velocity: [0, 5, 0], size: 0.3, wind: [2, 1], lifetime: [0.5, 2], color: [0.1, 0.2, 0.3, 0.4], rate: 12, emissionExtent: [1, 2, 3] });
   const before = structuredClone(plain.options);
   const values = vfxSettingValues(plain);
   assert.equal(values['velocity.y'], 5);
@@ -136,21 +99,17 @@ test("a panel started from an effect's values writes them back unchanged, a Fire
   assert.deepEqual(plain.options, before);
   const { fire, embers, steam } = snowNight().hearth;
   for (const data of [fire, embers, steam]) {
-    const effect = new BaseVFX(
-        { ...structuredClone(data), position: [0, 0.2, 0] },
-        { curves, emitter: shapes, soft, stretch, schedule },
-      ),
+    const effect = new BaseVFX({ ...structuredClone(data), position: [0, 0.2, 0] }, { curves, emitter: shapes, soft, stretch, schedule }),
       start = structuredClone(effect.options),
       read = vfxSettingValues(effect);
-    applyVfxSettings(effect, { ...read, 'velocity.y': read['velocity.y'] + 0.5 });
+    applyVfxSettings(effect, { ...read, 'velocity.y': (read['velocity.y']) + 0.5 });
     check(effect);
     assert.equal(effect.options.velocity[1], start.velocity[1] + 0.5);
     assert.deepEqual(effect.options.curves, start.curves, 'the structured options are not touched');
     applyVfxSettings(effect, read);
     // Back as it was, except that an option written at its default value is left unset (it does the same).
     for (const key of Object.keys(start))
-      if (!(key in effect.options))
-        assert.deepEqual(start[key], optionDefault(key), `${key} was dropped but is not at its default`);
+      if (!(key in effect.options)) assert.deepEqual(start[key], optionDefault(key), `${key} was dropped but is not at its default`);
       else assert.deepEqual(effect.options[key], start[key], key);
     assert.deepEqual(vfxSettingValues(effect), read);
   }

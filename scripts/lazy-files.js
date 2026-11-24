@@ -804,7 +804,7 @@ export const LAZY_SPLITS = [
     chunk: /^tornado-shader-/,
     lazyLabel: 'tornado shader',
     source: 'packages/sky/src/tornado-shader.ts',
-    baseLabel: "everything a page reading a Tornado's wind and rain loads",
+    baseLabel: 'everything a page reading a Tornado\'s wind and rain loads',
     when: 'the first frame of a TornadoCloud (import() in tornado.ts)',
   },
   {

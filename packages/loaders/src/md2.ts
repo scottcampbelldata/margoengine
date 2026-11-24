@@ -112,7 +112,7 @@ export function parseMD2(input: BinaryInput, options: MD2Options = {}): MD2Model
       if (vertex >= vertexCount) throw new LoaderError(F, 'range', `vertex ${vertex} is outside 0..${vertexCount - 1}`);
       if (coord >= coordCount) throw new LoaderError(F, 'range', `coordinate ${coord} is outside 0..${coordCount - 1}`);
       // MD2 front faces wind clockwise: 0, 2, 1 makes them counter-clockwise.
-      indices[t * 3 + ((3 - k) % 3)] = welder.weld(vertex, coord, 0, 0);
+      indices[t * 3 + (3 - k) % 3] = welder.weld(vertex, coord, 0, 0);
     }
   const count = welder.count,
     keys = welder.keys.array;

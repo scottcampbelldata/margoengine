@@ -69,10 +69,8 @@ const pipelines = new WeakMap<GPUDevice, Map<string, GPUComputePipeline>>();
 function cachedPipeline(device: GPUDevice, code: string, constants?: Record<string, number>): GPUComputePipeline {
   let byKey = pipelines.get(device);
   if (!byKey) pipelines.set(device, (byKey = new Map()));
-  const key = constants
-    ? `${code}
-${JSON.stringify(constants)}`
-    : code;
+  const key = constants ? `${code}
+${JSON.stringify(constants)}` : code;
   let pipeline = byKey.get(key);
   if (!pipeline) {
     pipeline = device.createComputePipeline({

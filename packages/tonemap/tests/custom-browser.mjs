@@ -83,10 +83,7 @@ await postBrowser(
           const reinhard = (x) => x / (1 + x);
           r.wgsl = Math.max(r.wgsl, miss(reinhard, wgsl.data[i + c]));
           r.sampled = Math.max(r.sampled, miss(reinhard, sampled.data[i + c]));
-          r.live = Math.max(
-            r.live,
-            miss((x) => x / (x + 0.25), live.data[i + c]),
-          );
+          r.live = Math.max(r.live, miss((x) => x / (x + 0.25), live.data[i + c]));
           r.plain = Math.max(r.plain, miss(reinhard, plain.data[i + c]));
         }
     r.spread = r.spread.size;

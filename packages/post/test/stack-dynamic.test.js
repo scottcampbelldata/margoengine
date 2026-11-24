@@ -154,20 +154,12 @@ test('add, move and remove on an attached stack draw in the new order from the n
   assert.equal(h.plugins.get('b'), b, 'attached at once');
   log.length = 0;
   h.frame();
-  assert.deepEqual(log, [
-    ['a', true],
-    ['b', true],
-    ['t', false],
-  ]);
+  assert.deepEqual(log, [['a', true], ['b', true], ['t', false]]);
   assert.equal(stack.moveEffect(b, 0), stack);
   assert.equal(b.disposed, undefined, 'a move keeps the instance');
   log.length = 0;
   h.frame();
-  assert.deepEqual(log, [
-    ['b', true],
-    ['a', true],
-    ['t', false],
-  ]);
+  assert.deepEqual(log, [['b', true], ['a', true], ['t', false]]);
   assert.throws(() => stack.moveEffect(t, 0), RangeError);
   assert.throws(() => stack.moveEffect(b, 3), RangeError);
   assert.throws(() => stack.moveEffect(fake('q', 'hdr'), 0), TypeError);
@@ -178,14 +170,7 @@ test('add, move and remove on an attached stack draw in the new order from the n
   assert.equal(stack.removeEffect(t), false);
   log.length = 0;
   h.frame();
-  assert.deepEqual(
-    log,
-    [
-      ['b', true],
-      ['a', false],
-    ],
-    'the last HDR effect tonemaps again',
-  );
+  assert.deepEqual(log, [['b', true], ['a', false]], 'the last HDR effect tonemaps again');
   h.engine.restore();
   h.frame();
   stack.removeEffect(a);
@@ -318,9 +303,7 @@ test('work count: adding compiles only the new effect, and moving or removing co
     last.removeEffect(tonemap);
     g.frame();
   });
-  t.diagnostic(
-    `Bloom alone: ${alone.pipelines} pipelines; removing Tonemap after Bloom: ${pipelines(output)}, ${textures(output)}`,
-  );
+  t.diagnostic(`Bloom alone: ${alone.pipelines} pipelines; removing Tonemap after Bloom: ${pipelines(output)}, ${textures(output)}`);
   assert.ok(pipelines(output) <= alone.pipelines);
   last.dispose();
   await null;

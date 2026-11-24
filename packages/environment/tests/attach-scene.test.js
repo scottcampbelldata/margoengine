@@ -24,24 +24,14 @@ async function setup(t) {
     undefined,
     null,
   );
-  t.after(() => {
-    engine.dispose();
-    gpu.cleanup();
-  });
+  t.after(() => { engine.dispose(); gpu.cleanup(); });
   return engine;
 }
 
 test('Environment.attach installs into the scene active at the call, not the one active when it finishes', async (t) => {
-  const engine = await setup(t),
-    other = engine.createScene('other'),
-    first = engine.scene;
+  const engine = await setup(t), other = engine.createScene('other'), first = engine.scene;
   let pending;
-  other.use({
-    name: 'probe',
-    setup() {
-      pending = Environment.attach(engine, image(), { size: 16 });
-    },
-  });
+  other.use({ name: 'probe', setup() { pending = Environment.attach(engine, image(), { size: 16 }); } });
   const environment = await pending;
   assert.equal(engine.sceneOf(environment), other);
   assert.equal(first.plugins.has(environment.name), false);
@@ -50,17 +40,10 @@ test('Environment.attach installs into the scene active at the call, not the one
 });
 
 test('EnvironmentBlend.attach installs into the scene active at the call, and dispose leaves that scene', async (t) => {
-  const engine = await setup(t),
-    other = engine.createScene('other'),
-    from = await Environment.create(engine, image(), { size: 16 }),
-    to = await Environment.create(engine, image(), { size: 16 });
+  const engine = await setup(t), other = engine.createScene('other'),
+    from = await Environment.create(engine, image(), { size: 16 }), to = await Environment.create(engine, image(), { size: 16 });
   let pending;
-  other.use({
-    name: 'probe',
-    setup() {
-      pending = EnvironmentBlend.attach(engine, from, to);
-    },
-  });
+  other.use({ name: 'probe', setup() { pending = EnvironmentBlend.attach(engine, from, to); } });
   const blend = await pending;
   assert.equal(engine.sceneOf(blend), other);
   blend.dispose();
@@ -70,16 +53,9 @@ test('EnvironmentBlend.attach installs into the scene active at the call, and di
 });
 
 test('EnvironmentLighting.load puts the environment and the lighting in the scene active at the call', async (t) => {
-  const engine = await setup(t),
-    other = engine.createScene('other'),
-    first = engine.scene;
+  const engine = await setup(t), other = engine.createScene('other'), first = engine.scene;
   let pending;
-  other.use({
-    name: 'probe',
-    setup() {
-      pending = EnvironmentLighting.load(engine, image(), { size: 16 });
-    },
-  });
+  other.use({ name: 'probe', setup() { pending = EnvironmentLighting.load(engine, image(), { size: 16 }); } });
   const lighting = await pending;
   assert.equal(engine.sceneOf(lighting), other);
   assert.equal(engine.sceneOf(lighting.environment), other);
@@ -90,17 +66,9 @@ test('EnvironmentLighting.load puts the environment and the lighting in the scen
 });
 
 test('an aborted EnvironmentLighting.load started in a second scene leaves nothing in either scene', async (t) => {
-  const engine = await setup(t),
-    other = engine.createScene('other'),
-    first = engine.scene,
-    abort = new AbortController();
+  const engine = await setup(t), other = engine.createScene('other'), first = engine.scene, abort = new AbortController();
   let pending;
-  other.use({
-    name: 'probe',
-    setup() {
-      pending = EnvironmentLighting.load(engine, image(), { size: 16, signal: abort.signal });
-    },
-  });
+  other.use({ name: 'probe', setup() { pending = EnvironmentLighting.load(engine, image(), { size: 16, signal: abort.signal }); } });
   abort.abort(new Error('stop'));
   await assert.rejects(pending, /stop/);
   assert.deepEqual([...first.plugins.keys()], []);

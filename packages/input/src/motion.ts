@@ -150,8 +150,7 @@ export class Gyro {
    */
   calibrate({ duration = 1000, signal }: { duration?: number; signal?: AbortSignal } = {}): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (!(duration >= 0))
-        return reject(new RangeError('Gyro calibrate duration must be in milliseconds, at least 0'));
+      if (!(duration >= 0)) return reject(new RangeError('Gyro calibrate duration must be in milliseconds, at least 0'));
       if (signal?.aborted) return reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
       const sum = (this.calibration = { alpha: 0, beta: 0, gamma: 0, count: 0 });
       const abort = () => {

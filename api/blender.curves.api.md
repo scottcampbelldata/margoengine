@@ -14,11 +14,11 @@ export interface MargoCurvesOptions extends MargoOptions {
     signal?: AbortSignal;
 }
 
-export interface MargoCurvesScene extends Omit<MargoShapes, 'asset'> {
+export interface MargoCurvesScene extends Omit<MargoShapes, "asset"> {
     readonly model: PBRModel | undefined;
 }
 
-export type MargoKnotMode = 'normal' | 'endpoint' | 'bezier' | 'endpointBezier';
+export type MargoKnotMode = "normal" | "endpoint" | "bezier" | "endpointBezier";
 
 export interface MargoPointCloud extends MargoShape {
     readonly positions: Float32Array;
@@ -55,7 +55,7 @@ export interface MargoSpline {
     readonly handleTypeRight: Float32Array | undefined;
 }
 
-export type MargoSplineType = 'catmullRom' | 'poly' | 'bezier' | 'nurbs';
+export type MargoSplineType = "catmullRom" | "poly" | "bezier" | "nurbs";
 
 export interface MargoVolume extends MargoShape {
     readonly grids: readonly string[];

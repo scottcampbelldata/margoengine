@@ -48,11 +48,7 @@ type Material = {
   name?: string;
   alphaMode?: string;
   alphaCutoff?: number;
-  pbrMetallicRoughness?: {
-    baseColorFactor?: number[];
-    baseColorTexture?: TextureRef;
-    metallicRoughnessTexture?: TextureRef;
-  };
+  pbrMetallicRoughness?: { baseColorFactor?: number[]; baseColorTexture?: TextureRef; metallicRoughnessTexture?: TextureRef };
   normalTexture?: TextureRef;
 };
 type Full = Doc & {
@@ -83,15 +79,11 @@ export async function libraryParts(
 ): Promise<LibraryTexturedPart[]> {
   if (typeof url !== 'string') {
     // Three levels of one model, finest first: each material's part draws one level per LOD ring, the near level's maps.
-    if (!Array.isArray(url) || url.length !== 3)
-      throw new TypeError('libraryParts takes one URL or three; pass a string or [near, middle, far]');
+    if (!Array.isArray(url) || url.length !== 3) throw new TypeError('libraryParts takes one URL or three; pass a string or [near, middle, far]');
     const levels = await Promise.all(url.map((u) => libraryParts(u, options)));
     return levels[0].map((near) => {
       const at = levels.map((l) => l.find((p) => p.name === near.name));
-      if (at.some((p) => !p))
-        throw new TypeError(
-          `libraryParts: material ${near.name} is missing from a level; export every level with the same materials`,
-        );
+      if (at.some((p) => !p)) throw new TypeError(`libraryParts: material ${near.name} is missing from a level; export every level with the same materials`);
       const [a, b, c] = at as LibraryTexturedPart[];
       return {
         ...near,
@@ -103,26 +95,15 @@ export async function libraryParts(
   const get = options.fetch ?? (globalThis.fetch as unknown as NonNullable<LibraryMeshOptions['fetch']>),
     init = options.signal ? { signal: options.signal } : {},
     response = await get(url, init);
-  if (!response.ok)
-    throw margoError(
-      'failed',
-      `libraryParts: ${url} answered ${response.status}; check the URL and that the server serves the file`,
-    );
+  if (!response.ok) throw margoError('failed', `libraryParts: ${url} answered ${response.status}; check the URL and that the server serves the file`);
   const doc = (await response.json()) as Full,
     base = url.slice(0, url.lastIndexOf('/') + 1);
   if (!doc.meshes?.length || !doc.accessors || !doc.bufferViews || !doc.buffers || !doc.nodes)
     throw new TypeError(`libraryParts: ${url} holds no meshes; pass a .gltf with meshes, nodes and buffers`);
   const fetchBytes = async (uri: string) => {
-    if (uri.startsWith('data:'))
-      throw new TypeError(
-        'libraryParts reads a .gltf with external buffers and images; export the model as glTF separate',
-      );
+    if (uri.startsWith('data:')) throw new TypeError('libraryParts reads a .gltf with external buffers and images; export the model as glTF separate');
     const r = await get(base + uri, init);
-    if (!r.ok)
-      throw margoError(
-        'failed',
-        `libraryParts: ${base + uri} answered ${r.status}; check that the file sits beside the .gltf`,
-      );
+    if (!r.ok) throw margoError('failed', `libraryParts: ${base + uri} answered ${r.status}; check that the file sits beside the .gltf`);
     return r.arrayBuffer();
   };
   const buffers = await Promise.all(doc.buffers.map((b) => fetchBytes(b.uri ?? 'data:')));
@@ -130,14 +111,9 @@ export async function libraryParts(
     const a = doc.accessors![id],
       v = a ? doc.bufferViews![a.bufferView ?? -1] : undefined,
       kind = a ? KINDS[a.componentType] : undefined;
-    if (!a || !v)
-      throw new TypeError(
-        'libraryParts: an accessor without a buffer view; use a model whose accessors all have buffer views',
-      );
+    if (!a || !v) throw new TypeError('libraryParts: an accessor without a buffer view; use a model whose accessors all have buffer views');
     if (!kind || index === (a.componentType === 5126))
-      throw new TypeError(
-        `libraryParts: unsupported accessor component type ${a.componentType}; use float vertices and uvs and integer indices`,
-      );
+      throw new TypeError(`libraryParts: unsupported accessor component type ${a.componentType}; use float vertices and uvs and integer indices`);
     const [size, at] = kind,
       stride = v.byteStride ?? size * components,
       view = new DataView(buffers[v.buffer], (v.byteOffset ?? 0) + (a.byteOffset ?? 0)),
@@ -179,18 +155,14 @@ export async function libraryParts(
           g.normals.push(tx / l, ty / l, tz / l);
           g.uvs.push(uv[i * 2], uv[i * 2 + 1]);
         }
-        const idx =
-          p.indices !== undefined ? read(p.indices, 1, true) : Uint32Array.from({ length: count }, (_, i) => i);
+        const idx = p.indices !== undefined ? read(p.indices, 1, true) : Uint32Array.from({ length: count }, (_, i) => i);
         for (const i of idx) g.indices.push(first + i);
       }
     for (const c of node.children ?? []) visit(c, m);
   };
   const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   for (const r of doc.scenes?.[doc.scene ?? 0]?.nodes ?? doc.nodes.map((_, i) => i)) visit(r, identity);
-  if (!groups.size)
-    throw new TypeError(
-      `libraryParts: ${url} holds no triangles with positions, normals and uvs; export the model with normals and TEXCOORD_0`,
-    );
+  if (!groups.size) throw new TypeError(`libraryParts: ${url} holds no triangles with positions, normals and uvs; export the model with normals and TEXCOORD_0`);
   // One frame for every part: the base of the whole model on y = 0, centred on x = z = 0.
   let minY = Infinity,
     x0 = Infinity,
@@ -213,10 +185,7 @@ export async function libraryParts(
     decode =
       options.decode ??
       (async (bytes: ArrayBuffer, mimeType: string) =>
-        createImageBitmap(new Blob([bytes], { type: mimeType }), {
-          colorSpaceConversion: 'none',
-          premultiplyAlpha: 'none',
-        })),
+        createImageBitmap(new Blob([bytes], { type: mimeType }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' })),
     images = new Map<number, Promise<ScatterImage>>();
   const image = (ref: TextureRef | undefined): Promise<ScatterImage> | undefined => {
     const source = ref === undefined ? undefined : doc.textures?.[ref.index]?.source;
@@ -226,9 +195,7 @@ export async function libraryParts(
     if (!images.has(source))
       images.set(
         source,
-        fetchBytes(img.uri).then((b) =>
-          decode(b, img.mimeType ?? (img.uri!.endsWith('.png') ? 'image/png' : 'image/jpeg')),
-        ),
+        fetchBytes(img.uri).then((b) => decode(b, img.mimeType ?? (img.uri!.endsWith('.png') ? 'image/png' : 'image/jpeg'))),
       );
     return images.get(source);
   };

@@ -32,3 +32,4 @@ test('no package keeps a binding in an automatic layout with a phony pointer ass
   }
   assert.deepEqual(found, []);
 });
+

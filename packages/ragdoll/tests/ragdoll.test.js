@@ -371,20 +371,10 @@ const pose = (engine, nodes) => {
 };
 const worst = (a, b) => Math.max(...a.flatMap((m, i) => m.map((v, k) => Math.abs(v - b[i][k]))));
 const turnZ = (angle) => [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)];
-const allNodes = (body) => [
-  body.hips,
-  body.spine,
-  body.head,
-  body.headEnd,
-  ...body.legs.flatMap((leg) => Object.values(leg)),
-];
+const allNodes = (body) => [body.hips, body.spine, body.head, body.headEnd, ...body.legs.flatMap((leg) => Object.values(leg))];
 
 rtest("any positive bone scale is taken, a real exporter's and a large one", async () => {
-  for (const scale of [
-    [0.9995, 1, 0.9986],
-    [1, 2, 1],
-    [0.1, 3, 40],
-  ]) {
+  for (const scale of [[0.9995, 1, 0.9986], [1, 2, 1], [0.1, 3, 40]]) {
     const { engine, physics } = await scene(),
       body = humanoid(engine);
     body.spine.setScale(scale);
@@ -513,10 +503,7 @@ rtest("a real avatar with exporter scales goes limp: Seed-san's skeleton", async
   const ragdoll = Ragdoll.attach(rig.physics, { root: rig.node('hips'), joint: { type: 'free' }, minLength: 0.001 }),
     nodes = ragdoll.bones.map((part) => part.node),
     before = pose(rig.engine, nodes);
-  assert.ok(
-    nodes.some((node) => uneven.includes(node)),
-    'and they are bones of this ragdoll',
-  );
+  assert.ok(nodes.some((node) => uneven.includes(node)), 'and they are bones of this ragdoll');
   ragdoll.activate();
   rig.frames(30);
   const off = worst(before, pose(rig.engine, nodes));
@@ -551,14 +538,7 @@ rtest('attach and dispose use the physics world scene, not the active one', asyn
   const ragdoll = Ragdoll.attach(physics, { root: body.hips });
   assert.ok(engine.sceneOf(ragdoll) === other, 'the ragdoll joined the active scene');
   assert.equal(engine.scene.plugins.has(ragdoll.name), false);
-  const bystander = {
-    name: ragdoll.name,
-    disposed: 0,
-    setup() {},
-    dispose() {
-      this.disposed++;
-    },
-  };
+  const bystander = { name: ragdoll.name, disposed: 0, setup() {}, dispose() { this.disposed++; } };
   engine.use(bystander);
   ragdoll.dispose();
   assert.equal(other.plugins.has(ragdoll.name), false, 'the ragdoll is still in its scene');

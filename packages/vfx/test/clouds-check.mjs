@@ -37,17 +37,13 @@ try {
     assert.ok(off(hard.rows) <= 2, `without softness alpha is 1: ${JSON.stringify(hard.rows)}`);
     assert.ok(off(soft.rows) <= 4, `soft alpha follows the gap: ${JSON.stringify(soft.rows)}`);
     assert.ok(soft.rows[0].got < 60 && soft.rows.at(-1).got > 250, 'low puffs fade, high ones stay');
-    console.log(
-      `ok soft ${samples}x: ${soft.rows.map((row) => `${row.height} m ${row.got}/${Math.round(row.expected)}`).join(', ')}`,
-    );
+    console.log(`ok soft ${samples}x: ${soft.rows.map((row) => `${row.height} m ${row.got}/${Math.round(row.expected)}`).join(', ')}`);
 
     const fade = await page.evaluate((s) => window.checkFade(s), samples);
     clean(fade, `fade ${samples}x`);
     assert.ok(off(fade.rows) <= 3, `near fade: ${JSON.stringify(fade.rows)}`);
     assert.ok(fade.rows[0].got < fade.rows[2].got && fade.rows.at(-1).got >= 253, 'nearer puffs fade more');
-    console.log(
-      `ok fade ${samples}x: ${fade.rows.map((row) => `${row.distance} m ${row.got}/${Math.round(row.expected)}`).join(', ')}`,
-    );
+    console.log(`ok fade ${samples}x: ${fade.rows.map((row) => `${row.distance} m ${row.got}/${Math.round(row.expected)}`).join(', ')}`);
 
     const same = await page.evaluate((s) => window.checkDeterminism(s), samples);
     clean(same, `determinism ${samples}x`);

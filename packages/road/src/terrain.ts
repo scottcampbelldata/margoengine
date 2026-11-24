@@ -81,10 +81,10 @@ export async function fitTerrain(
     let bed = fallback;
     // A vertical ray tests barycentric footprint containment directly, without reconstructing
     // an XZ closest point and requiring its rounding error to have exactly zero length.
-    for (const hit of bvh.raycast({ origin: [x, 1, z], direction: [0, -1, 0] })) {
+    for (const hit of bvh.raycast({origin:[x,1,z],direction:[0,-1,0]})) {
       let height = 0;
-      for (let k = 0; k < 3; k++) height += heights[indices[hit.faceIndex * 3 + k]] * hit.barycoord[k];
-      bed = Math.min(bed, height);
+      for(let k=0;k<3;k++) height += heights[indices[hit.faceIndex*3+k]]*hit.barycoord[k];
+      bed = Math.min(bed,height);
     }
     return bed;
   };

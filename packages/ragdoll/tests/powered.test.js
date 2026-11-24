@@ -258,3 +258,4 @@ rtest('motors hold a pose skewed by an uneven scale', async () => {
   ragdoll.dispose();
   rig.dispose();
 });
+

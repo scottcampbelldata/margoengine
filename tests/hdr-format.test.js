@@ -11,16 +11,7 @@ import { linearHdr } from '../packages/shared/hdr-format.js';
 test('linearHdr holds for every float colour format and no other', () => {
   for (const f of ['rgba16float', 'rgba32float', 'rg11b10ufloat', 'r16float', 'rg16float', 'r32float', 'rg32float'])
     assert.equal(linearHdr(f), true, f);
-  for (const f of [
-    'rgba8unorm',
-    'bgra8unorm',
-    'rgba8unorm-srgb',
-    'bgra8unorm-srgb',
-    'rgb10a2unorm',
-    'r8unorm',
-    '',
-    undefined,
-  ])
+  for (const f of ['rgba8unorm', 'bgra8unorm', 'rgba8unorm-srgb', 'bgra8unorm-srgb', 'rgb10a2unorm', 'r8unorm', '', undefined])
     assert.equal(linearHdr(f), false, String(f));
 });
 

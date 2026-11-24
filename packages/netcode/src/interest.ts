@@ -160,9 +160,7 @@ export class InterestManager<State, Input = unknown> {
     for (const [field, rules] of Object.entries(options.collections ?? {})) {
       const type: NormalizedField | undefined = fields[field];
       if (type?.type !== 'map' || type.of.type !== 'struct')
-        throw new TypeError(
-          `InterestManager collection '${field}' is not a map of structs in ${game.stateType}; fix it`,
-        );
+        throw new TypeError(`InterestManager collection '${field}' is not a map of structs in ${game.stateType}; fix it`);
       if (typeof rules?.position !== 'function')
         throw new TypeError(`InterestManager collection '${field}' needs position(value); pass it`);
       this.managed.push({
@@ -174,8 +172,7 @@ export class InterestManager<State, Input = unknown> {
         places: new Map(),
       });
     }
-    if (!this.managed.length)
-      throw new TypeError('InterestManager needs at least one collection; pass { collections }');
+    if (!this.managed.length) throw new TypeError('InterestManager needs at least one collection; pass { collections }');
   }
 
   /** What the newest snapshot of `player` held, undefined before its first or after it left. */
@@ -197,9 +194,7 @@ export class InterestManager<State, Input = unknown> {
       for (const [id, value] of (state as Record<string, unknown>)[m.field] as Map<number, unknown>) {
         const p = m.rules.position(value, id);
         if (p.length < 2 || p.length > 3)
-          throw new RangeError(
-            `InterestManager position of ${m.field}(${id}) is not 2 or 3 numbers; return [x, y] or [x, y, z]`,
-          );
+          throw new RangeError(`InterestManager position of ${m.field}(${id}) is not 2 or 3 numbers; return [x, y] or [x, y, z]`);
         for (let k = 0; k < p.length; k++)
           if (!Number.isFinite(p[k]))
             throw new RangeError(`InterestManager position of ${m.field}(${id}) is not finite; fix the position`);

@@ -95,8 +95,7 @@ function seamWorld(seed) {
   const world = new VoxelWorld({ blocks }),
     next = random(seed),
     edits = [];
-  for (let cx = 0; cx < 2; cx++)
-    for (let cy = 0; cy < 2; cy++) for (let cz = 0; cz < 2; cz++) world.addChunk(cx, cy, cz);
+  for (let cx = 0; cx < 2; cx++) for (let cy = 0; cy < 2; cy++) for (let cz = 0; cz < 2; cz++) world.addChunk(cx, cy, cz);
   for (let x = 28; x < 36; x++)
     for (let y = 28; y < 36; y++)
       for (let z = 28; z < 36; z++) {
@@ -113,7 +112,7 @@ function seamWorld(seed) {
                   : r < 0.58
                     ? blockState(WATER, (next() * 8) | 0)
                     : r < 0.62
-                      ? blockState(SLAB, (next() * 16) | 0 | (next() < 0.3 ? 0x8000 : 0))
+                      ? blockState(SLAB, ((next() * 16) | 0) | (next() < 0.3 ? 0x8000 : 0))
                       : r < 0.66
                         ? blockState(STAIR, (next() * 64) | 0)
                         : r < 0.68
@@ -133,8 +132,7 @@ test('bevel seams: a chunk mesh border lists exactly the faces its neighbours ch
     for (const seed of [1, 2, 3]) {
       const world = seamWorld(seed),
         keys = [];
-      for (let cx = 0; cx < 2; cx++)
-        for (let cy = 0; cy < 2; cy++) for (let cz = 0; cz < 2; cz++) keys.push(chunkKey(cx, cy, cz));
+      for (let cx = 0; cx < 2; cx++) for (let cy = 0; cy < 2; cy++) for (let cz = 0; cz < 2; cz++) keys.push(chunkKey(cx, cy, cz));
       const meshes = new Map(keys.map((key) => [key, meshChunk(meshInput(world, key))])),
         bordered = await Promise.all(keys.map((key) => mesher.mesh(world, key, 0, undefined, true)));
       keys.forEach((key, k) => {
@@ -145,10 +143,7 @@ test('bevel seams: a chunk mesh border lists exactly the faces its neighbours ch
           inside = (f) => [f.x, f.y, f.z].every((v, a) => v >= lo[a] && v < hi[a]);
         for (const [other, mesh] of meshes) {
           if (other === key) continue;
-          beveled(
-            mesh,
-            other.split(',').map((v) => Number(v) * 32),
-          ).forEach((faces, layer) => {
+          beveled(mesh, other.split(',').map((v) => Number(v) * 32)).forEach((faces, layer) => {
             for (const f of faces)
               if (!inside(f) && touches(f, lo, hi))
                 expected.push(`${f.x - origin[0]},${f.y - origin[1]},${f.z - origin[2]},${f.face},${layer}`);
@@ -158,8 +153,7 @@ test('bevel seams: a chunk mesh border lists exactly the faces its neighbours ch
         assert.ok(expected.length > 20, `seed ${seed} chunk ${key}: the scene puts faces on the seams`);
         assert.deepEqual(actual.sort(), expected.sort(), `seed ${seed} chunk ${key} border`);
         const plain = meshes.get(key);
-        for (const layer of LAYERS)
-          assert.deepEqual([...bordered[k][layer]], [...plain[layer]], 'the quads stay as meshed');
+        for (const layer of LAYERS) assert.deepEqual([...bordered[k][layer]], [...plain[layer]], 'the quads stay as meshed');
       });
     }
     const unasked = await mesher.mesh(seamWorld(1), '0,0,0');
@@ -185,9 +179,7 @@ function measure(meshes) {
         w = [0, 1, 2].map((k) => c[k] - a[k]),
         n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
       area += Math.hypot(...n) / 2;
-      volume +=
-        (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
-        6;
+      volume += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
       triangles++;
       for (const [from, to] of [
         [a, b],
@@ -206,13 +198,12 @@ function measure(meshes) {
     let d = [0, 1, 2].map((k) => to[k] - from[k]);
     const g = d.reduce(gcd, 0),
       flip = d.find(Boolean) < 0;
-    d = d.map((v) => (flip ? -v : v) / g);
+    d = d.map((v) => ((flip ? -v : v) / g));
     const cross = [from[1] * d[2] - from[2] * d[1], from[2] * d[0] - from[0] * d[2], from[0] * d[1] - from[1] * d[0]],
       at = (p) => p[0] * d[0] + p[1] * d[1] + p[2] * d[2],
       key = `${d}|${cross}|${flip}`,
       list = lines.get(key) ?? [];
-    for (let k = count - (edges.get(`${to}>${from}`) ?? 0); k > 0; k--)
-      list.push([Math.min(at(from), at(to)), Math.max(at(from), at(to))]);
+    for (let k = count - (edges.get(`${to}>${from}`) ?? 0); k > 0; k--) list.push([Math.min(at(from), at(to)), Math.max(at(from), at(to))]);
     lines.set(key, list);
   }
   const open = [];
@@ -254,8 +245,7 @@ test('bevel seams: eight chunks beveled with their borders as context form the s
       // The same lumps around the corner of eight chunks, and inside one chunk.
       const split = new VoxelWorld({ blocks }),
         whole = new VoxelWorld({ blocks });
-      for (let cx = 0; cx < 2; cx++)
-        for (let cy = 0; cy < 2; cy++) for (let cz = 0; cz < 2; cz++) split.addChunk(cx, cy, cz);
+      for (let cx = 0; cx < 2; cx++) for (let cy = 0; cy < 2; cy++) for (let cz = 0; cz < 2; cz++) split.addChunk(cx, cy, cz);
       whole.addChunk(0, 0, 0);
       split.setBlocks(lumps([32, 32, 32], seed));
       whole.setBlocks(lumps([16, 16, 16], seed));
@@ -289,10 +279,7 @@ test('bevel seams: eight chunks beveled with their borders as context form the s
           }
           assert.deepEqual(a.open, b.open, `seed ${seed} ${layer} ${label}: the seams open edges one chunk does not`);
           assert.ok(Math.abs(a.area - b.area) < 1e-4, `seed ${seed} ${layer} ${label}: area ${a.area} != ${b.area}`);
-          assert.ok(
-            Math.abs(a.volume - b.volume) < 1e-3,
-            `seed ${seed} ${layer} ${label}: volume ${a.volume} != ${b.volume}`,
-          );
+          assert.ok(Math.abs(a.volume - b.volume) < 1e-3, `seed ${seed} ${layer} ${label}: volume ${a.volume} != ${b.volume}`);
         });
         // The same check without the borders fails, so it does see the seams.
         if (!context) assert.ok(differ > 0, `seed ${seed}: without borders the seams match one chunk`);

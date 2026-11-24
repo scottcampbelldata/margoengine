@@ -256,9 +256,7 @@ test('physicalLobes leaves a shader without lobes alone, and weighs every light 
   assert.match(out, /color=layers\(s,v,l,color\);color\+=clusterLobeLight\*clusterFrame\.intensity\.x;/);
   assert.doesNotMatch(out, /margoDirect/, 'isotropic physical shaders keep the loop BRDF');
   assert.doesNotMatch(out, /clusterAreaLighting/);
-  const full = physicalLobes.finish(
-    `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {}\nfn clusterAreaLighting() {}\n${physical}`,
-  );
+  const full = physicalLobes.finish(`fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {}\nfn clusterAreaLighting() {}\n${physical}`);
   assert.match(full, /let clusterBase=margoDirect\(clusterSurface,v,l\);result\+=clusterBase\*clusterWeight;/);
   assert.match(full, /if\(s\.cc>0\.0\)\{clusterLobeLight\+=s\.cc\*clusterAreaLighting\(/);
 });

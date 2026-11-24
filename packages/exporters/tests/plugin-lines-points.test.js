@@ -20,8 +20,7 @@ import { exportUSDZ } from '../dist/usdz.js';
 import { readGLB, validate } from './helpers.js';
 
 const srgb = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const near = (a, b, label) =>
-  a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-6, `${label}[${i}]: ${v} vs ${b[i]}`));
+const near = (a, b, label) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-6, `${label}[${i}]: ${v} vs ${b[i]}`));
 
 /** A public Engine on the recording mock GPU with Lines and PointsPlugin, a box mesh, and the plugin items. */
 async function scene() {
@@ -51,9 +50,7 @@ async function scene() {
     }),
   );
   // A stroke's per-point widths multiply its width.
-  const stroke = lines.add(
-    new Stroke({ positions: [0, 0, 0, 0, 1, 0, 0, 2, 0], widths: [1, 2, 0.5], width: 0.1, worldUnits: true }),
-  );
+  const stroke = lines.add(new Stroke({ positions: [0, 0, 0, 0, 1, 0, 0, 2, 0], widths: [1, 2, 0.5], width: 0.1, worldUnits: true }));
   // sRGB bytes decoded to linear COLOR_0; the NaN point is drawn nowhere and written nowhere.
   const cloud = points.add(
     new PointCloud({
@@ -68,7 +65,8 @@ async function scene() {
   return { engine, lines, points, box, attached, loop, stroke, cloud };
 }
 
-const primitivesOf = (json) => json.meshes.flatMap((mesh, m) => mesh.primitives.map((p) => ({ ...p, mesh: m })));
+const primitivesOf = (json) =>
+  json.meshes.flatMap((mesh, m) => mesh.primitives.map((p) => ({ ...p, mesh: m })));
 
 test('exportGLB writes plugin lines and clouds with their widths, colours and transforms, and gltf/pbr reads them back', async () => {
   const { engine } = await scene(),
@@ -84,10 +82,7 @@ test('exportGLB writes plugin lines and clouds with their widths, colours and tr
   // The box's mesh: its triangle, then the attached strip as a line list.
   const boxNode = json.nodes.find((n) => n.name === 'Box'),
     boxMesh = json.meshes[boxNode.mesh];
-  assert.deepEqual(
-    boxMesh.primitives.map((p) => p.mode),
-    [4, 1],
-  );
+  assert.deepEqual(boxMesh.primitives.map((p) => p.mode), [4, 1]);
   const strip = boxMesh.primitives[1];
   assert.deepEqual(Array.from(asset.accessor(strip.indices)), [0, 1, 1, 2]);
   assert.deepEqual(strip.extras, { lineWidth: 3, lineWidthUnits: 'pixels' });
@@ -120,12 +115,7 @@ test('exportGLB writes plugin lines and clouds with their widths, colours and tr
 
   // gltf/pbr reads the same lists back; the widths stay on the document it keeps.
   const back = await parseGLTFAsync(engine, glb);
-  assert.deepEqual(back.pointsAndLines.map((p) => p.topology).sort(), [
-    'line-list',
-    'line-list',
-    'line-list',
-    'point-list',
-  ]);
+  assert.deepEqual(back.pointsAndLines.map((p) => p.topology).sort(), ['line-list', 'line-list', 'line-list', 'point-list']);
   const kept = back.asset.doc.meshes.flatMap((m) => m.primitives.map((p) => p.extras)).filter(Boolean);
   assert.deepEqual(
     kept.map((e) => e.lineWidth ?? e.pointSize).sort((a, b) => a - b),
@@ -148,10 +138,7 @@ test('a hidden line or cloud, or one on a hidden mesh, is left out unless onlyVi
 test('a root export keeps only the lines that follow its subtree', async () => {
   const { engine, box } = await scene(),
     json = readGLB(exportGLB(engine, { root: box })).json;
-  assert.deepEqual(
-    primitivesOf(json).map((p) => p.mode),
-    [4, 1],
-  );
+  assert.deepEqual(primitivesOf(json).map((p) => p.mode), [4, 1]);
 });
 
 test('a sheared matrix places the line in world space under an identity node', async () => {

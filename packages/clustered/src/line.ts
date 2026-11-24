@@ -96,8 +96,7 @@ export function gaussLegendre(n: number): { nodes: readonly number[]; weights: r
  * instead of showing as separate copies.
  */
 export function lineShadowRadius(length: number, samples = 2): number {
-  if (!(length >= 0 && Number.isFinite(length)))
-    throw new RangeError('Line length must be a finite number of 0 or more');
+  if (!(length >= 0 && Number.isFinite(length))) throw new RangeError('Line length must be a finite number of 0 or more');
   const { nodes } = gaussLegendre(samples);
   let gap = 0;
   for (let i = 1; i < nodes.length; i++) gap = Math.max(gap, ((nodes[i] - nodes[i - 1]) * length) / 2);
@@ -130,11 +129,7 @@ export function lineLights(options: LineLightOptions): LineLight[] {
   return nodes.map((x, i) => {
     const t = (x + 1) / 2,
       light: LineLight = {
-        position: [
-          start[0] + (end[0] - start[0]) * t,
-          start[1] + (end[1] - start[1]) * t,
-          start[2] + (end[2] - start[2]) * t,
-        ],
+        position: [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t, start[2] + (end[2] - start[2]) * t],
         range,
         intensity: (intensity * weights[i]) / 2,
         // Each point stands for its share of the line: a sphere of that size, so its reflection on a metal a hand

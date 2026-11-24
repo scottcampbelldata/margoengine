@@ -113,8 +113,5 @@ test('a file that is not WebP is refused by name', () => {
     () => parseWebP(new TextEncoder().encode('RIFF....WEBPVP8L')),
     (error) => error.name === 'MargoError' || error instanceof RangeError,
   );
-  assert.throws(
-    () => parseWebP(new Uint8Array(4)),
-    (error) => error.name === 'MargoError' || error instanceof RangeError,
-  );
+  assert.throws(() => parseWebP(new Uint8Array(4)), (error) => error.name === 'MargoError' || error instanceof RangeError);
 });

@@ -32,9 +32,7 @@ try {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 128;
     document.body.replaceChildren(canvas);
-    const engine = await Engine.create(canvas, {
-      camera: { position: [0, 6, 16], target: [0, 1, 0], near: 0.5, far: 200 },
-    });
+    const engine = await Engine.create(canvas, { camera: { position: [0, 6, 16], target: [0, 1, 0], near: 0.5, far: 200 } });
     engine.stop();
     const d = engine.gpu,
       found = [];
@@ -42,11 +40,7 @@ try {
     const W = 64,
       size = [16, 16],
       origin = [-8, -8],
-      terrain = d.createTexture({
-        size: [W, W],
-        format: 'r32float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
+      terrain = d.createTexture({ size: [W, W], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
     d.queue.writeTexture({ texture: terrain }, new Float32Array(W * W), { bytesPerRow: W * 4 }, [W, W]);
     const water = Water.attach(engine, {
       height: -100,
@@ -58,10 +52,7 @@ try {
     });
     const flood = Flood.attach(engine, { surface: water, roughness: 0.03 });
     const states = PlantStates.create(engine, { bounds: [-8, -8, 8, 8], resolution: 16, flood: floodSource(flood) });
-    engine
-      .createMesh()
-      .setGeometry(box(40, 0.1, 40))
-      .setPosition([0, -0.05, 0]);
+    engine.createMesh().setGeometry(box(40, 0.1, 40)).setPosition([0, -0.05, 0]);
     const tree = box(0.3, 3, 0.3);
     const scatter = Scatter.attach(engine, tree, {
       count: 1,
@@ -123,17 +114,11 @@ try {
   assert.deepEqual(r.errors, []);
   assert.ok(r.record[2] === 1 && r.record[0] > 0.2, `the flood reached the tree: ${r.record}`);
   assert.equal(r.water[0], r.record[0], 'the high-water mark is the record of the real flood, bit for bit');
-  assert.ok(
-    Math.abs(r.water[3] - Math.exp(-r.record[1] / r.dryTime)) < 1e-5,
-    `wetness ${r.water[3]} from ${r.record[1]} s`,
-  );
+  assert.ok(Math.abs(r.water[3] - Math.exp(-r.record[1] / r.dryTime)) < 1e-5, `wetness ${r.water[3]} from ${r.record[1]} s`);
   const [u, v, speed, depth] = r.current;
   assert.ok(depth > 0.01 && speed > 0.05, `water still runs past the tree: ${r.current}`);
   const last = shearVelocity(depth, speed, r.manning);
-  assert.ok(
-    r.water[1] >= last * (1 - 1e-4) && r.water[1] > 0.01,
-    `peak shear ${r.water[1]} against the last frame's ${last}`,
-  );
+  assert.ok(r.water[1] >= last * (1 - 1e-4) && r.water[1] > 0.01, `peak shear ${r.water[1]} against the last frame's ${last}`);
   assert.ok(r.dir[0] > 0.9 && Math.abs(r.dir[1]) < 0.3, `the peak flow runs downstream (+X): ${r.dir}`);
   assert.ok(u > 0, `the current runs +X: ${r.current}`);
   const hazard = Math.min(1, Math.max(0, (depth * (speed + 0.5) - 0.75) / 1.25));
@@ -143,9 +128,7 @@ try {
     assert.deepEqual(r.far[1], [0, 0, 0, 0], 'a cell the water never reached has no mark');
   }
   assert.deepEqual(errors, []);
-  console.log(
-    `states-flood: ${r.steps} steps, mark ${r.water[0].toFixed(3)} m, peak shear ${r.water[1].toFixed(3)} m/s, debris ${r.water[2].toFixed(2)}`,
-  );
+  console.log(`states-flood: ${r.steps} steps, mark ${r.water[0].toFixed(3)} m, peak shear ${r.water[1].toFixed(3)} m/s, debris ${r.water[2].toFixed(2)}`);
 } finally {
   await closeAll({ browser });
 }

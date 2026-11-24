@@ -74,16 +74,9 @@ test('an example does not see a name another example declares', (t) => {
   const errors = check(
     t,
     'isolation',
-    [
-      '```ts',
-      "import '@margoengine/math';",
-      'const shared = 1;',
-      '```',
-      '```ts',
-      "import '@margoengine/math';",
-      'shared;',
-      '```',
-    ].join('\n'),
+    ['```ts', "import '@margoengine/math';", 'const shared = 1;', '```', '```ts', "import '@margoengine/math';", 'shared;', '```'].join(
+      '\n',
+    ),
   );
   assert.deepEqual(
     errors.map((e) => e.key),
@@ -92,8 +85,7 @@ test('an example does not see a name another example declares', (t) => {
 });
 
 test('a block without an import carries on the example before it; ts, tsx and js are all examples', () => {
-  const text =
-    '```ts\nimport a from "a";\n```\n```ts\nuse(a);\n```\n```tsx\nimport b from "b";\n```\n```js\nb();\n```\n```sh\nls\n```';
+  const text = '```ts\nimport a from "a";\n```\n```ts\nuse(a);\n```\n```tsx\nimport b from "b";\n```\n```js\nb();\n```\n```sh\nls\n```';
   const examples = readmeExamples(text);
   assert.equal(examples.length, 2);
   assert.match(examples[0], /import a[\s\S]*use\(a\)/);
@@ -156,13 +148,9 @@ test('readmeTypeProblems fails an example that one package types break, and pass
   mkdirSync(join(fake, 'scripts/support'), { recursive: true });
   try {
     writeFileSync(join(fake, 'package.json'), JSON.stringify({ workspaces: ['packages/demo'] }));
-    writeFileSync(
-      join(fake, 'packages/demo/package.json'),
-      JSON.stringify({ name: '@margoengine/demo', type: 'module' }),
-    );
+    writeFileSync(join(fake, 'packages/demo/package.json'), JSON.stringify({ name: '@margoengine/demo', type: 'module' }));
     writeFileSync(join(fake, 'scripts/support/readme-types-known.json'), '{}');
-    const example = (call) =>
-      ['# demo', '', '```js', "import { Vector3 } from '@margoengine/math';", call, '```', ''].join('\n');
+    const example = (call) => ['# demo', '', '```js', "import { Vector3 } from '@margoengine/math';", call, '```', ''].join('\n');
     writeFileSync(readme, example("console.log(new Vector3('1', 0, 2));"));
     const broken = readmeTypeProblems(fake);
     assert.equal(broken.count, 1);
@@ -179,9 +167,7 @@ test('readmeTypeProblems fails an example that one package types break, and pass
 test('a declared stand-in in an example is found, and no package README or guide holds one', () => {
   const fence = '```';
   assert.deepEqual(
-    standIns(
-      `${fence}ts\nimport {a} from 'b';\n  declare const mesh: Mesh;\ndeclare function use(): void;\n${fence}\n`,
-    ),
+    standIns(`${fence}ts\nimport {a} from 'b';\n  declare const mesh: Mesh;\ndeclare function use(): void;\n${fence}\n`),
     ['declare const mesh: Mesh;', 'declare function use(): void;'],
   );
   assert.deepEqual(standIns(`Passes declare const in prose.\n${fence}sh\ndeclare const x: 1;\n${fence}\n`), []);
@@ -208,6 +194,5 @@ test('a closing code fence with text after it is reported, and a clean fence is 
   const broken = ['Intro.', '```js', 'a();', '``` More prose.', '```', ''].join('\r\n');
   assert.deepEqual(unclosedFences(broken), ['line 4: ``` More prose.']);
   for (const { name, folder } of workspacePackages())
-    for (const { document, markdown } of packageMarkdown(folder))
-      assert.deepEqual(unclosedFences(markdown), [], `${name} ${document}`);
+    for (const { document, markdown } of packageMarkdown(folder)) assert.deepEqual(unclosedFences(markdown), [], `${name} ${document}`);
 });

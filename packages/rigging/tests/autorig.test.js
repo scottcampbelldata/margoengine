@@ -22,11 +22,7 @@ function makeHuman() {
     if (row.startsWith('v ')) all.push(row.trim().split(/\s+/).slice(1).map(Number));
     else if (row.startsWith('g ')) group = row.slice(2).trim();
     else if (row.startsWith('f ')) {
-      const face = row
-        .trim()
-        .split(/\s+/)
-        .slice(1)
-        .map((v) => parseInt(v, 10) - 1);
+      const face = row.trim().split(/\s+/).slice(1).map((v) => parseInt(v, 10) - 1);
       if (!groups.has(group)) groups.set(group, []);
       groups.get(group).push(face);
     }
@@ -102,7 +98,7 @@ test('a real mesh nobody rigged gets the joints its authors marked', async () =>
   assert.ok(rig.forward[2] > 0.99, `it faces +z (${rig.forward})`);
   const left = rig.joints[rig.humanoid.leftHand].position,
     right = rig.joints[rig.humanoid.rightHand].position;
-  assert.ok(left[0] > 0 && right[0] < 0, "the left hand is on the figure's left: +x when it faces +z");
+  assert.ok(left[0] > 0 && right[0] < 0, 'the left hand is on the figure\'s left: +x when it faces +z');
 });
 
 const KNIGHT = {
@@ -172,7 +168,7 @@ test('a figure turned about up, or lying with another up, gets the same skeleton
   });
 });
 
-test("left stays the figure's own left when it faces the other way, and forward can be told", async () => {
+test('left stays the figure\'s own left when it faces the other way, and forward can be told', async () => {
   const { mesh } = makeHuman(),
     back = turned(mesh, ([x, y, z]) => [-x, y, -z]),
     rig = await autoRig(back, { weights: 'none' });
@@ -271,9 +267,7 @@ test('what is not a humanoid is refused with a code, and bad options name the fi
   // Stand-in shapes: a box stands on one foot.
   const box = {
     positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 2, 0, 1, 2, 0, 0, 0, 1, 1, 0, 1, 0, 2, 1, 1, 2, 1]),
-    indices: new Uint32Array([
-      0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5,
-    ]),
+    indices: new Uint32Array([0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5]),
   };
   await assert.rejects(autoRig(box), { code: 'failed' });
   await assert.rejects(autoRig(box, { resolution: 8 }), { name: 'RangeError' });

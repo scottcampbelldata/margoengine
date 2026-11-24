@@ -133,10 +133,7 @@ test('stopAll releases fire-and-forget instances; created clips survive natural 
   const context = new FakeAudioContext(),
     listener = new AudioListener({ context }),
     buffer = context.createBuffer(1, 48000, 48000);
-  const bank = new AudioSpriteBank(listener, buffer, {
-    shot: { offset: 0, duration: 0.1 },
-    hit: { offset: 0.2, duration: 0.1 },
-  });
+  const bank = new AudioSpriteBank(listener, buffer, { shot: { offset: 0, duration: 0.1 }, hit: { offset: 0.2, duration: 0.1 } });
   const shots = Array.from({ length: 8 }, () => bank.play('shot'));
   let ended = 0;
   const owned = bank.create('hit', { onEnded: () => ended++ });

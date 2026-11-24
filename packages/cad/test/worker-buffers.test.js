@@ -38,42 +38,15 @@ test('the worker buffers are bit for bit the buffers of core Geometry', () => {
 
 test('the worker buffers refuse what core Geometry refuses, with the same error', () => {
   for (const args of [
-    [
-      [0, 0, 0, 1, 0, 0],
-      [0, 0, 1, 0, 0, 1],
-      [0, 1, 0],
-    ],
-    [
-      [0, 0, 0, 1, 0, 0, 0, 1, 0],
-      [0, 0, 1],
-      [0, 1, 2],
-    ],
-    [
-      [0, 0, 0, 1, 0, 0, 0, 1, Number.NaN],
-      [0, 0, 1, 0, 0, 1, 0, 0, 1],
-      [0, 1, 2],
-    ],
-    [
-      [0, 0, 0, 1, 0, 0, 0, 1, 1e39],
-      [0, 0, 1, 0, 0, 1, 0, 0, 1],
-      [0, 1, 2],
-    ],
-    [
-      [0, 0, 0, 1, 0, 0, 0, 1, 0],
-      [0, 0, 1, 0, 0, 1, 0, 0, 1],
-      [0, 1, 3],
-    ],
-    [
-      [0, 0, 0, 1, 0, 0, 0, 1, 0],
-      [0, 0, 1, 0, 0, 1, 0, 0, 1],
-      [0, 1],
-    ],
+    [[0, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 1], [0, 1, 0]],
+    [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1], [0, 1, 2]],
+    [[0, 0, 0, 1, 0, 0, 0, 1, Number.NaN], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]],
+    [[0, 0, 0, 1, 0, 0, 0, 1, 1e39], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]],
+    [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 3]],
+    [[0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1]],
   ]) {
     let expected;
-    assert.throws(
-      () => new Geometry(...args),
-      (error) => ((expected = error), true),
-    );
+    assert.throws(() => new Geometry(...args), (error) => ((expected = error), true));
     assert.throws(() => meshBuffers(...args), { name: expected.name, message: expected.message });
   }
 });

@@ -61,8 +61,7 @@ export class KTX2GPUDecoder {
   private tables?: GPUBuffer;
 
   constructor(options: KTX2GPUDecoderOptions) {
-    if (!options?.device)
-      throw new TypeError('KTX2GPUDecoder needs a device; pass one in KTX2GPUDecoderOptions.device');
+    if (!options?.device) throw new TypeError('KTX2GPUDecoder needs a device; pass one in KTX2GPUDecoderOptions.device');
     this.device = options.device;
   }
 
@@ -107,9 +106,7 @@ export class KTX2GPUDecoder {
       basisLZ = index.supercompression === 1,
       format: GPUTextureFormat = srgb ? 'rgba8unorm-srgb' : 'rgba8unorm';
     if (Math.max(index.width, index.height) > device.limits.maxTextureDimension2D)
-      throw new RangeError(
-        `Texture ${index.width}x${index.height} exceeds the device's maxTextureDimension2D; request a higher limit`,
-      );
+      throw new RangeError(`Texture ${index.width}x${index.height} exceeds the device's maxTextureDimension2D; request a higher limit`);
     if (layers > device.limits.maxTextureArrayLayers)
       throw new RangeError(
         `Texture of ${layers} layers exceeds the device's maxTextureArrayLayers; request a higher limit or use fewer layers`,
@@ -161,9 +158,7 @@ export class KTX2GPUDecoder {
       blocksY = (height + 3) >> 2,
       blocks = await levelData(bytes, index, level, signal);
     if (blocks.length !== blocksX * blocksY * layers * 16)
-      throw decodeFailed(
-        `KTX2 level ${level} holds ${blocks.length} bytes of UASTC, not whole blocks; re-export the file`,
-      );
+      throw decodeFailed(`KTX2 level ${level} holds ${blocks.length} bytes of UASTC, not whole blocks; re-export the file`);
     for (let at = 0; at < blocks.length; at += 16)
       if (!uastcBlockValid(blocks, at))
         throw decodeFailed('KTX2: a UASTC block uses a reserved mode or partition pattern; re-export the file');
@@ -238,10 +233,7 @@ export class KTX2GPUDecoder {
       blocksX = (width + 3) >> 2,
       blocksY = (height + 3) >> 2,
       limit = device.limits.maxStorageBufferBindingSize;
-    if (rowBytes * 4 > limit)
-      throw deviceUnsupported(
-        `A row of ${width} texels exceeds the device's storage buffer limit; use KTX2LayerDecoder`,
-      );
+    if (rowBytes * 4 > limit) throw deviceUnsupported(`A row of ${width} texels exceeds the device's storage buffer limit; use KTX2LayerDecoder`);
     for (const band of bandsOf(blocksY, layers, rowBytes, limit)) {
       const { inputs, bindings, hasAlpha } = prepare(band),
         rows = band.rows * 4,

@@ -10,7 +10,6 @@ export {
   radialAO,
   type MeshDetail,
   type MeshDetailOptions,
-  type RockForm,
   type TreeMeshShapeOptions,
 } from './foliage.js';
 export {

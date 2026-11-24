@@ -74,9 +74,7 @@ function multiply(a: ArrayLike<number>, b: ArrayLike<number>): Float64Array {
  */
 function split(
   m: ArrayLike<number>,
-):
-  | { position: [number, number, number]; rotation: [number, number, number, number]; scale: [number, number, number] }
-  | undefined {
+): { position: [number, number, number]; rotation: [number, number, number, number]; scale: [number, number, number] } | undefined {
   const sx = Math.hypot(m[0], m[1], m[2]),
     sy = Math.hypot(m[4], m[5], m[6]),
     sz = Math.hypot(m[8], m[9], m[10]),
@@ -276,7 +274,8 @@ function jtJobs(model: JTModel): Job[] {
  * Bodies the kernel cannot mesh count all their faces as failed and leave the rest of the file standing.
  */
 export function readBRep(buffer: ArrayBuffer, format: BRepFormat, options: BRepReadOptions): BRepRead {
-  let jobs: Job[], warnings: string[];
+  let jobs: Job[],
+    warnings: string[];
   if (format === 'jt') {
     const model = parseJT(buffer);
     jobs = jtJobs(model);
@@ -350,9 +349,8 @@ export function readBRep(buffer: ArrayBuffer, format: BRepFormat, options: BRepR
             scale: placed.scale,
           });
         }
-      }
-      // A sheared or singular placement: its own copy of the body with the matrix baked in.
-      else
+      } else
+        // A sheared or singular placement: its own copy of the body with the matrix baked in.
         for (const { color, geometry } of colourGroups(mesh, job.color, options.smoothing, use.matrix)) {
           options.checkParts(placements.length + 1);
           placements.push({

@@ -126,10 +126,7 @@ test('STEP import: an offset of a B-spline is fitted within 1e-7 m, its error no
     );
   // Su x Sv of that patch: u along +x, v along -y, so down; the offset by d down lies on z = 0.
   const flat = body.faces.find((f) => f.surface.kind === 'spline');
-  assert.ok(
-    flat.surface.points.every((q) => Math.abs(q[2]) < 1e-18),
-    'the fitted plane lies on z = 0',
-  );
+  assert.ok(flat.surface.points.every((q) => Math.abs(q[2]) < 1e-18), 'the fitted plane lies on z = 0');
   assert.match(notes[0].note, /fitted within/);
   assert.ok(Number(/fitted within (\S+) m/.exec(notes[0].note)[1]) < 1e-15);
   const m = massProperties(body);
@@ -155,9 +152,7 @@ test('STEP import: an offset of a B-spline sphere is fitted round its poles; one
             `B_SPLINE_CURVE_WITH_KNOTS((3,2,3),(0.,0.5,1.),.UNSPECIFIED.)CURVE()GEOMETRIC_REPRESENTATION_ITEM()` +
             `RATIONAL_B_SPLINE_CURVE((${arc.map((c) => real(c[3])).join(',')}))REPRESENTATION_ITEM(''))`,
         );
-      return add(
-        `SURFACE_OF_REVOLUTION('',${curve},${add(`AXIS1_PLACEMENT('',${add(pt([0, 0, 0]))},${dir(add, [0, 0, 1])})`)})`,
-      );
+      return add(`SURFACE_OF_REVOLUTION('',${curve},${add(`AXIS1_PLACEMENT('',${add(pt([0, 0, 0]))},${dir(add, [0, 0, 1])})`)})`);
     },
     { body, notes } = imported(
       rewrite(text, 'SPHERICAL_SURFACE', (add) => `OFFSET_SURFACE('',${sphereOf(add, r - d)},${real(d)},.F.)`),
@@ -165,14 +160,9 @@ test('STEP import: an offset of a B-spline sphere is fitted round its poles; one
     error = Number(/fitted within (\S+) m/.exec(notes[0].note)[1]);
   assert.ok(error > 0 && error <= 1e-7, notes[0].note);
   const m = massProperties(body);
-  assert.ok(
-    Math.abs(m.volume - (4 / 3) * Math.PI * r ** 3) <= 4 * Math.PI * r * r * error * 1.01,
-    `volume ${m.volume}`,
-  );
+  assert.ok(Math.abs(m.volume - (4 / 3) * Math.PI * r ** 3) <= 4 * Math.PI * r * r * error * 1.01, `volume ${m.volume}`);
   // Moved in by 2 r, past its centre: the offset turns inside out, and the body is left out with the reason.
-  const past = read(
-    rewrite(text, 'SPHERICAL_SURFACE', (add) => `OFFSET_SURFACE('',${sphereOf(add, r)},${real(-2 * r)},.F.)`),
-  );
+  const past = read(rewrite(text, 'SPHERICAL_SURFACE', (add) => `OFFSET_SURFACE('',${sphereOf(add, r)},${real(-2 * r)},.F.)`));
   assert.equal(past.bodies[0], undefined);
   assert.match(past.problems[0].problem, /turns inside out/);
 });

@@ -173,7 +173,10 @@ test('a refused or missing sendBeacon falls back to keepalive fetch without cred
     const { url, init } = b.fetched[0];
     assert.equal(url, endpoint);
     assert.equal(JSON.parse(init.body).frames, 1);
-    assert.deepEqual([init.method, init.keepalive, init.mode, init.credentials], ['POST', true, 'no-cors', 'omit']);
+    assert.deepEqual(
+      [init.method, init.keepalive, init.mode, init.credentials],
+      ['POST', true, 'no-cors', 'omit'],
+    );
     await new Promise(setImmediate);
     assert.equal(beacon.sent, 1);
     beacon.dispose();

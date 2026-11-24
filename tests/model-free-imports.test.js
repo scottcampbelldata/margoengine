@@ -18,9 +18,7 @@ async function bundled(code) {
     publicDir: false,
     logLevel: 'silent',
     build: { write: false, target: 'es2022', minify: true, rollupOptions: { input: 'app' } },
-    plugins: [
-      { name: 'app', resolveId: (id) => (id === 'app' ? id : null), load: (id) => (id === 'app' ? code : null) },
-    ],
+    plugins: [{ name: 'app', resolveId: (id) => (id === 'app' ? id : null), load: (id) => (id === 'app' ? code : null) }],
   });
   const chunks = out.output.filter((file) => file.type === 'chunk' && file.isEntry);
   return {
@@ -36,23 +34,15 @@ for (const [name, code] of [
   test(`a build that imports only ${name} holds no glTF model class or file reader`, { timeout: 120000 }, async () => {
     const app = await bundled(code);
     assert.ok(!app.code.includes(MODEL), 'PBRModel was bundled');
-    assert.deepEqual(
-      app.modules.filter((id) => ASSET.test(id) || MESHOPT.test(id)),
-      [],
-    );
+    assert.deepEqual(app.modules.filter((id) => ASSET.test(id) || MESHOPT.test(id)), []);
   });
 
-test('a mesh drawn with a Material bundles the PBR renderer, so the markers above are live', {
-  timeout: 120000,
-}, async () => {
+test('a mesh drawn with a Material bundles the PBR renderer, so the markers above are live', { timeout: 120000 }, async () => {
   const app = await bundled(
     "import { Material, createMesh } from '@margoengine/materials'; console.log(Material, createMesh);",
   );
   assert.ok(app.code.includes(MODEL), 'PBRModel is in the build');
-  assert.ok(
-    app.modules.some((id) => ASSET.test(id)),
-    'the accessor reader is in the build',
-  );
+  assert.ok(app.modules.some((id) => ASSET.test(id)), 'the accessor reader is in the build');
   assert.deepEqual(
     app.modules.filter((id) => MESHOPT.test(id)),
     [],

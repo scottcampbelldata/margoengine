@@ -1016,9 +1016,7 @@ function splineSurface(file: STEPFile, id: number): Surface {
     uDegree < 1 ||
     vDegree < 1
   )
-    throw new TypeError(
-      `Invalid STEP file: #${id} B-spline surface knots do not match its control net and degrees; export it again from the CAD tool`,
-    );
+    throw new TypeError(`Invalid STEP file: #${id} B-spline surface knots do not match its control net and degrees; export it again from the CAD tool`);
   const points = new Float64Array(nu * nv * 4);
   for (let i = 0; i < nu; i++)
     for (let j = 0; j < nv; j++) {
@@ -1054,10 +1052,7 @@ export function surfaceOf(file: STEPFile, id: number, angleUnit: number, curves:
     case 'CYLINDRICAL_SURFACE':
       return new Cone(frame(file, ref(args[1])), num(args[2]), 0);
     case 'CONICAL_SURFACE':
-      if (!(angleUnit > 0))
-        throw new TypeError(
-          `#${id}: a cone's angle, and the file's context gives no angle unit; add a plane-angle unit to the representation context`,
-        );
+      if (!(angleUnit > 0)) throw new TypeError(`#${id}: a cone's angle, and the file's context gives no angle unit; add a plane-angle unit to the representation context`);
       return new Cone(frame(file, ref(args[1])), num(args[2]), num(args[3]) * angleUnit);
     case 'SPHERICAL_SURFACE':
       return new Sphere(frame(file, ref(args[1])), num(args[2]));

@@ -26,14 +26,8 @@ test('stroke composes widths, world distances, dashes and both depth steps witho
   const { lines, frame, gpu } = rig();
   const line = lines.add(new Stroke({ positions, widths: [0, 1, 2], progress: 0.5, dashed: true, depthWrite: true }));
   const first = frame();
-  assert.ok(
-    first.some((row) => row[0] === 'buffer' && row[2].usage === 136 && row[2].size >= 32),
-    'storage struct has 16-byte alignment even with three widths',
-  );
-  assert.ok(
-    first.some((row) => row[0] === 'module' && row[2].code.includes('stroke.widths[ia]')),
-    'the live renderer applies per-point widths',
-  );
+  assert.ok(first.some(row => row[0] === 'buffer' && row[2].usage === 136 && row[2].size >= 32), 'storage struct has 16-byte alignment even with three widths');
+  assert.ok(first.some(row => row[0] === 'module' && row[2].code.includes('stroke.widths[ia]')), 'the live renderer applies per-point widths');
   assert.equal(line.totalDistance, 4);
   assert.deepEqual([line.points[3], line.points[7], line.points[11]], [0, 1, 4]);
   const extra = lines.resources.get(line).extra;

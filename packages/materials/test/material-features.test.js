@@ -84,8 +84,7 @@ test('clustered point and spot lights shade Lambert and Phong with their own BRD
       ]),
     );
   assert.equal(Object.keys(byShading).length, 3, 'one lit shader per material');
-  const ggx =
-    'result+=((1-mix(max(dielectricF0.r,max(dielectricF0.g,dielectricF0.b)),dielectricF90,pow(1-vh,5.0)))*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*';
+  const ggx = 'result+=((1-mix(max(dielectricF0.r,max(dielectricF0.g,dielectricF0.b)),dielectricF90,pow(1-vh,5.0)))*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*';
   assert.ok(lightLoop(byShading.standard).includes(ggx), 'standard: GGX, as before');
   assert.ok(!byShading.standard.includes('margoLocalBrdf'), 'standard: nothing added');
   for (const shading of ['lambert', 'phong']) {
@@ -121,8 +120,7 @@ test('extra directional lights (clustered/directional) shade Lambert and Phong w
     },
   );
   const lit = codes(s.frame()).filter((code) => code.includes('clusterDirectional.lights[j]')),
-    ggx =
-      'result+=((1-mix(max(dielectricF0.r,max(dielectricF0.g,dielectricF0.b)),dielectricF90,pow(1-vh,5.0)))*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*';
+    ggx = 'result+=((1-mix(max(dielectricF0.r,max(dielectricF0.g,dielectricF0.b)),dielectricF90,pow(1-vh,5.0)))*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*';
   const loops = lit.map((code) => lightLoop(code));
   assert.ok(
     loops.some((loop) => loop.split(ggx).length === 3),

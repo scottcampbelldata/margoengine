@@ -154,7 +154,8 @@ export abstract class ScreenPass implements EnginePlugin {
   #run(c: Context): void {
     const view = c.view,
       toTarget = this.#target.value !== undefined;
-    if (toTarget ? view?.index : view?.target || (view?.layers !== undefined && !(view.layers & this.#layers))) return;
+    if (toTarget ? view?.index : view?.target || (view?.layers !== undefined && !(view.layers & this.#layers)))
+      return;
     if (this.fit !== 'contain' && this.fit !== 'stretch')
       throw rangeError(`${this.#label} fit must be contain or stretch`, 'pixel-options');
     const device = c.device;

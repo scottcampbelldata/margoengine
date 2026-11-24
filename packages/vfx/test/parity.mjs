@@ -83,17 +83,12 @@ try {
     near(Math.hypot(...r.capped.slice(4, 7)), 2);
     near(r.rotated[4], 0);
     near(r.rotated[5], 0.8);
-    console.log(
-      'ok over-life: zero-speed recovery, growth, fixed birth angle, speed cap, reset replay and local rotation',
-    );
+    console.log('ok over-life: zero-speed recovery, growth, fixed birth angle, speed cap, reset replay and local rotation');
     const s = await page.evaluate(() => window.checkDrawnSpin());
     assert.equal(s.error, null);
     assert.deepEqual(s.errors, []);
     // Ribbons, random atlas frames and mesh axes key on the birth angle: it never moves.
-    assert.ok(
-      s.birth.every((b) => b === s.birth[0]),
-      `birth angle moved: ${s.birth}`,
-    );
+    assert.ok(s.birth.every((b) => b === s.birth[0]), `birth angle moved: ${s.birth}`);
     // Age 0.5 of a 1 s life: the curve 2 + 8t integrates to 2(0.5) + 4(0.25) = 2 rad.
     const turn = s.drawn - (s.birth[0] + 2),
       off = Math.abs(Math.atan2(Math.sin(turn), Math.cos(turn)));

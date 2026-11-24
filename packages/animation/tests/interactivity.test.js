@@ -22,11 +22,7 @@ function glb(file) {
   return { doc, asset: new GLTFAsset(doc, [], chunks[1]?.data) };
 }
 // A viewer's camera for the tests that read activeCamera; any real one passes them.
-const camera = () => ({
-  position: [0, 1, 5],
-  rotation: [0, 0, 0, 1],
-  perspective: { aspectRatio: 1.5, yfov: 1, znear: 0.1, zfar: 100 },
-});
+const camera = () => ({ position: [0, 1, 5], rotation: [0, 0, 0, 1], perspective: { aspectRatio: 1.5, yfov: 1, znear: 0.1, zfar: 100 } });
 const advance = (graph, seconds) => {
   for (let i = 0, n = Math.ceil(seconds * 60); i <= n; i++) graph.tick(1 / 60);
 };
@@ -46,18 +42,14 @@ function conformance(file, oracleFile, interact) {
   advance(graph, duration + 0.5);
   assert.equal(graph.halted, undefined, file);
   const subs = subTests(oracle);
-  return {
-    count: subs.length,
-    failed: subs.filter((s) => graph.variable(s.successResultVarId) !== true).map((s) => s.name),
-  };
+  return { count: subs.length, failed: subs.filter((s) => graph.variable(s.successResultVarId) !== true).map((s) => s.name) };
 }
 /** The required input of a UserInteractions file: a select lands on the target node, a hover enters and leaves it. */
 function interactions(graph, doc, oracle) {
   const parent = (i) => doc.nodes.findIndex((n) => n.children?.includes(i));
   for (const step of oracle.requiredInteractions ?? oracle.tests[0].requiredInteractions) {
     const point = [0, 0, 0];
-    for (let i = step.targetNodeId; i >= 0; i = parent(i))
-      (doc.nodes[i].translation ?? [0, 0, 0]).forEach((v, c) => (point[c] += v));
+    for (let i = step.targetNodeId; i >= 0; i = parent(i)) (doc.nodes[i].translation ?? [0, 0, 0]).forEach((v, c) => (point[c] += v));
     if (step.type === 'select') graph.select(step.targetNodeId, { point, origin: [0, 0, 5] });
     else {
       graph.hover(step.targetNodeId);
@@ -72,11 +64,7 @@ test('the committed conformance files pass every sub-test, and the committed inv
   let count = 0;
   for (const name of readdirSync(fixtures).filter((f) => f.endsWith('.glb'))) {
     const base = name.replace('.glb', ''),
-      result = conformance(
-        join(fixtures, name),
-        join(fixtures, base + '.json'),
-        base === 'eventOnSelect' ? interactions : undefined,
-      );
+      result = conformance(join(fixtures, name), join(fixtures, base + '.json'), base === 'eventOnSelect' ? interactions : undefined);
     assert.deepEqual(result.failed, [], name);
     count += result.count;
   }
@@ -84,9 +72,7 @@ test('the committed conformance files pass every sub-test, and the committed inv
   const invalid = readdirSync(join(fixtures, 'invalid'));
   assert.equal(invalid.length, 7);
   for (const name of invalid) {
-    const { graph, rejected } = loadBehaviorGraph(new GLTFAsset(read(join(fixtures, 'invalid', name)), []), {
-      sample: sampleChannel,
-    });
+    const { graph, rejected } = loadBehaviorGraph(new GLTFAsset(read(join(fixtures, 'invalid', name)), []), { sample: sampleChannel });
     assert.equal(graph, undefined, name);
     assert.ok(rejected, name);
   }
@@ -102,20 +88,13 @@ test('the whole conformance suite: 1,155 of 1,156 sub-tests and 187 of 187 inval
   for (const index of ['test-index.json', 'mathtests-index.json'])
     for (const entry of read(join(samples, index))) {
       const base = entry.variants['test-Json'].replace('.json', ''),
-        result = conformance(
-          join(samples, entry.name, 'glTF-Binary', base + '.glb'),
-          join(samples, entry.name, 'test-Json', base + '.json'),
-        );
+        result = conformance(join(samples, entry.name, 'glTF-Binary', base + '.glb'), join(samples, entry.name, 'test-Json', base + '.json'));
       total += result.count;
       failed.push(...result.failed.map((name) => `${entry.name} :: ${name}`));
     }
   for (const base of ['eventOnHover', 'eventOnSelect']) {
     const dir = join(samples, 'UserInteractions', base),
-      result = conformance(
-        join(dir, 'glTF-Binary', base + '.glb'),
-        join(dir, 'test-Json', base + '.json'),
-        interactions,
-      );
+      result = conformance(join(dir, 'glTF-Binary', base + '.glb'), join(dir, 'test-Json', base + '.json'), interactions);
     total += result.count;
     failed.push(...result.failed);
   }
@@ -123,8 +102,7 @@ test('the whole conformance suite: 1,155 of 1,156 sub-tests and 187 of 187 inval
     const dir = join(samples, 'InterGlb', base);
     return {
       oracle: read(join(dir, 'test-Json', base + '.json')),
-      graph: loadBehaviorGraph(glb(join(dir, 'glTF-Binary', base + '.glb')).asset, { sample: sampleChannel, camera })
-        .graph,
+      graph: loadBehaviorGraph(glb(join(dir, 'glTF-Binary', base + '.glb')).asset, { sample: sampleChannel, camera }).graph,
     };
   };
   const a = load('RefEcho_FileA'),
@@ -189,28 +167,22 @@ function file(graph, extra = {}) {
 const [INT, FLOAT3, REF] = [1, 2, 3];
 const paint = {
   types: [{ signature: 'float4' }, { signature: 'int' }, { signature: 'float3' }, { signature: 'ref' }],
-  declarations: [
-    {
-      op: 'event/onSelect',
-      extension: 'KHR_node_selectability',
-      outputValueSockets: {
-        selectedNode: { type: REF },
-        selectionRayOrigin: { type: FLOAT3 },
-        selectionPoint: { type: FLOAT3 },
-        controllerIndex: { type: INT },
-        event: { type: REF },
-      },
-    },
-    { op: 'pointer/set' },
-  ],
+  declarations: [{
+  op: 'event/onSelect',
+  extension: 'KHR_node_selectability',
+  outputValueSockets: {
+    selectedNode: { type: REF },
+    selectionRayOrigin: { type: FLOAT3 },
+    selectionPoint: { type: FLOAT3 },
+    controllerIndex: { type: INT },
+    event: { type: REF },
+  },
+}, { op: 'pointer/set' }],
   nodes: [
     { declaration: 0, configuration: { nodeIndex: { value: [0] } }, flows: { out: { node: 1, socket: 'in' } } },
     {
       declaration: 1,
-      configuration: {
-        pointer: { value: ['/materials/0/pbrMetallicRoughness/baseColorFactor'] },
-        type: { value: [0] },
-      },
+      configuration: { pointer: { value: ['/materials/0/pbrMetallicRoughness/baseColorFactor'] }, type: { value: [0] } },
       values: { value: { type: 0, value: [0, 1, 0, 1] } },
     },
   ],
@@ -233,18 +205,8 @@ async function clickable(bytes, options) {
     picks.push([x, y]);
     return model.nodes[0];
   };
-  const quad = (z) =>
-    new Float32Array(3 * 20).map((_, i) =>
-      i % 20 === 2 ? z : i % 20 === 0 ? [-9, 9, 0][(i / 20) | 0] : i % 20 === 1 ? [-9, -9, 9][(i / 20) | 0] : 0,
-    );
-  model.readPickingGeometry = async () => [
-    {
-      vertices: quad(0),
-      indices: new Uint32Array([0, 1, 2]),
-      matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
-      nodeIndex: 0,
-    },
-  ];
+  const quad = (z) => new Float32Array(3 * 20).map((_, i) => (i % 20 === 2 ? z : i % 20 === 0 ? [-9, 9, 0][(i / 20) | 0] : i % 20 === 1 ? [-9, -9, 9][(i / 20) | 0] : 0));
+  model.readPickingGeometry = async () => [{ vertices: quad(0), indices: new Uint32Array([0, 1, 2]), matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]), nodeIndex: 0 }];
   const behaviour = GLTFInteractivity.attach(model, options),
     press = (type, x, y) => events.dispatchEvent(Object.assign(new Event(type), { clientX: x, clientY: y }));
   return { engine, model, behaviour, press, picks, listeners: events };
@@ -289,10 +251,7 @@ test('a click passes through an unselectable node to the node behind it', async 
     nodes: [{ mesh: 0, extensions: { KHR_node_selectability: { selectable: false } } }, { mesh: 0 }],
   };
   const { behaviour, press, model } = await clickable(
-      file(
-        { ...paint, nodes: [{ ...paint.nodes[0], configuration: { nodeIndex: { value: [1] } } }, paint.nodes[1]] },
-        twoNodes,
-      ),
+      file({ ...paint, nodes: [{ ...paint.nodes[0], configuration: { nodeIndex: { value: [1] } } }, paint.nodes[1]] }, twoNodes),
     ),
     front = await model.readPickingGeometry();
   model.readPickingGeometry = async () => [
@@ -332,9 +291,7 @@ test('dispose stops the input, and pointer: false never listens', async () => {
 });
 
 test('a graph the specification rejects leaves the model drawn and says why', async () => {
-  const { behaviour, model } = await clickable(
-    file({ ...paint, declarations: [{ op: 'pointer/set' }], nodes: [{ declaration: 0 }] }),
-  );
+  const { behaviour, model } = await clickable(file({ ...paint, declarations: [{ op: 'pointer/set' }], nodes: [{ declaration: 0 }] }));
   assert.equal(behaviour.graph, undefined);
   assert.match(behaviour.rejected, /pointer/);
   assert.equal(model.primitives.length, 1);

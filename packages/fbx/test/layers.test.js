@@ -167,9 +167,10 @@ test('a curve on Weight moves the blend, and a layer with an unknown mode is ref
    KeyAttrRefCount: *1 { a: 2 }
   }`,
     bytes = layerFile([{ values: [10, 20] }, { values: [4, 4], props: P('BlendMode', 2) }], extra);
-  const text = new TextDecoder()
-    .decode(bytes)
-    .replace('C: "OO",1,0', 'C: "OO",1,0\n C: "OP",400,101,"Weight"\n C: "OP",401,400,"d|Weight"');
+  const text = new TextDecoder().decode(bytes).replace(
+    'C: "OO",1,0',
+    'C: "OO",1,0\n C: "OP",400,101,"Weight"\n C: "OP",401,400,"d|Weight"',
+  );
   const { at } = track(await convertFBX(encode(text), { extensions }));
   same([at(0), at(0.5), at(1)], [10, 9.5, 4]);
   await assert.rejects(
@@ -265,12 +266,7 @@ async function tcbTrack(keys, times = keys.map((_, i) => i)) {
 }
 
 test('TCB continuity -1 makes corners: the arriving tangent follows the chord before (Kochanek and Bartels 1984, eq. 9 and 10)', async () => {
-  const at = await tcbTrack([
-    [0, 0, -1],
-    [1, 0, -1],
-    [0, 0, -1],
-    [1, 0, -1],
-  ]);
+  const at = await tcbTrack([[0, 0, -1], [1, 0, -1], [0, 0, -1], [1, 0, -1]]);
   // Both tangents of the middle span lie along it, so it is a straight line from 1 to 0.
   for (const time of [1.25, 1.5, 1.75]) assert.ok(Math.abs(at(time) - (2 - time)) < 1e-3, `${time}: ${at(time)}`);
 });

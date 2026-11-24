@@ -1,21 +1,23 @@
 #!/usr/bin/env node
-// node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--once] [--production] [--check] [--encode]
+// node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--once] [--production] [--check] [--encode] [--stills] [--cameras]
 // Renders a shot file to PNG frames twice and checks the two renders match (docs/shots.md). --check only validates
 // the file. Output goes to <MARGO_SHOT_OUT or test-results/shots>/<day>/<id>/ unless --out names a folder.
 // --seconds renders the first part of the shot; --once skips the second render (no determinism verdict);
 // --production renders once in full and checks determinism on the probe frames only (docs/shots.md); --encode
 // then makes and checks the MP4 master (encode.mjs, ffmpeg from MARGO_FFMPEG or the PATH). A shot that names probes
 // gets its look checks after the render (look.mjs): look.md, look.json and look.png beside manifest.json.
+// --stills renders only the probe frames, as <out>/<probe>.png with <out>/stills.json (a film's storyboard stills);
+// --cameras prints the camera of every kept frame as JSON (cameraFrames in shot-file.mjs), with no browser.
 // Exit codes: 0 rendered and identical (and every look check and master check passed), 1 failed, 2 bad arguments or
 // shot file, 3 rendered but a look check failed (look.md says which).
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { firstSeconds, parseShot } from './shot-file.mjs';
+import { cameraFrames, firstSeconds, parseShot } from './shot-file.mjs';
 import { shotOutput } from './platform.mjs';
 
 const usage =
-  'usage: node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--browser=<name>] [--once] [--production] [--check] [--encode]';
+  'usage: node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--browser=<name>] [--once] [--production] [--check] [--encode] [--stills] [--cameras]';
 
 // Renders, checks and encodes as asked; resolves to the exit code above.
 async function main() {
@@ -33,6 +35,8 @@ async function main() {
         production: { type: 'boolean', default: false },
         check: { type: 'boolean', default: false },
         encode: { type: 'boolean', default: false },
+        stills: { type: 'boolean', default: false },
+        cameras: { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
       },
     }));
@@ -50,6 +54,11 @@ async function main() {
     );
     return 2;
   }
+  const alone = values.once || values.production || values.encode || values.check || values.seconds !== undefined;
+  if ((values.stills || values.cameras) && (alone || (values.stills && values.cameras))) {
+    console.error(`--stills and --cameras each stand alone, with no other mode\n${usage}`);
+    return 2;
+  }
   const root = resolve(import.meta.dirname, '../..'),
     source = resolve(positionals[0]);
   let file;
@@ -62,6 +71,15 @@ async function main() {
   } catch (error) {
     console.error(`${relative(root, source)}: ${error.message}`);
     return 2;
+  }
+  if (values.cameras) {
+    try {
+      console.log(JSON.stringify(cameraFrames(file)));
+    } catch (error) {
+      console.error(`${relative(root, source)}: ${error.message}`);
+      return 2;
+    }
+    return 0;
   }
   if (values.check) {
     console.log(
@@ -81,6 +99,21 @@ async function main() {
     return 2;
   }
   const out = resolve(values.out ?? output.frames);
+  if (values.stills) {
+    if (!Object.keys(file.shot.probes).length) {
+      console.error(`${relative(root, source)}: --stills renders the probe frames: name some in shot.probes`);
+      return 2;
+    }
+    const { shootStills } = await import('./stills.mjs');
+    try {
+      const manifest = await shootStills(file, { out, source: relative(root, source).replace(/\\/g, '/') });
+      console.log(`stills of ${manifest.id}: ${Object.keys(manifest.stills).join(', ')} in ${relative(root, out)}`);
+      return 0;
+    } catch (error) {
+      console.error(error.stack ?? String(error));
+      return 1;
+    }
+  }
   const { shoot } = await import('./render.mjs');
   try {
     const manifest = await shoot(file, {

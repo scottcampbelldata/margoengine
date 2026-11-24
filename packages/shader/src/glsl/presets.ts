@@ -35,31 +35,19 @@ export interface GLSLPreset {
 }
 
 /** @internal */
-export const semantics: readonly GLSLAttributeSemantic[] = [
-  'position',
-  'normal',
-  'uv',
-  'uv1',
-  'color',
-  'tangent',
-  'instanceMatrix',
-  'instanceColor',
-];
+export const semantics: readonly GLSLAttributeSemantic[] = ['position', 'normal', 'uv', 'uv1', 'color', 'tangent', 'instanceMatrix', 'instanceColor'];
 /** @internal */
 export const presetNames = ['modelViewMatrix', 'worldViewProjection', 'matrix_model'] as const;
 
 // GL's projection from Margo's: a reversed-Z clip z (near 1, far 0) becomes GL's (near -w, far w), per column
 // z' = w - 2z, so the linked vertex entry's (w - z') / 2 gives Margo's z back. Jitter, XR and custom projections survive.
 /** @internal */
-export const glProjection =
-  'fn margoGLProjection()->mat4x4f{var p=camera.projection;for(var c=0;c<4;c++){p[c].z=p[c].w-2.0*p[c].z;}return p;}\n';
+export const glProjection = 'fn margoGLProjection()->mat4x4f{var p=camera.projection;for(var c=0;c<4;c++){p[c].z=p[c].w-2.0*p[c].z;}return p;}\n';
 const view3 = 'mat3x3f(camera.view[0].xyz,camera.view[1].xyz,camera.view[2].xyz)';
 // The inverse of the rigid view matrix: the transposed rotation and the camera position.
 /** @internal */
 export const viewInverse =
-  'fn margoViewInverse()->mat4x4f{let r=transpose(' +
-  view3 +
-  ');return mat4x4f(vec4f(r[0],0.0),vec4f(r[1],0.0),vec4f(r[2],0.0),vec4f(camera.position,1.0));}\n';
+  'fn margoViewInverse()->mat4x4f{let r=transpose(' + view3 + ');return mat4x4f(vec4f(r[0],0.0),vec4f(r[1],0.0),vec4f(r[2],0.0),vec4f(camera.position,1.0));}\n';
 // 1 / far, far, near and 1 for an orthographic projection, from Margo's reversed-Z projection (clip z = a z + b w).
 const cameraParams =
   'fn margoCameraParams()->vec4f{let p=camera.projection;let a=p[2].z;let b=p[3].z;if(p[3].w>0.5){return vec4f(a/b,b/a,(b-1.0)/a,1.0);}let f=select(b/a,3.4e38,a==0.0);return vec4f(a/b,f,b/(1.0+a),0.0);}\n';

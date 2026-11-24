@@ -129,17 +129,7 @@ try {
               actual = await read(players[i]);
             for (let c = 0; c < 2; c++) {
               if (Math.abs(actual[c] - expected[c]) > Math.max(worst, 1e-5))
-                failure = {
-                  label,
-                  copy: i,
-                  at,
-                  ...members[i],
-                  local,
-                  duration,
-                  expected: expected[c],
-                  actual: actual[c],
-                  c,
-                };
+                failure = { label, copy: i, at, ...members[i], local, duration, expected: expected[c], actual: actual[c], c };
               worst = Math.max(worst, Math.abs(actual[c] - expected[c]));
               byMode[label] = Math.max(byMode[label], Math.abs(actual[c] - expected[c]));
               checks++;

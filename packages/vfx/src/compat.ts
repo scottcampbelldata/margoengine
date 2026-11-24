@@ -59,10 +59,7 @@ export function routeShaders(simulation: string): { flags: string; update: strin
     ['@group(0) @binding(3) var<storage,read_write> alive:array<u32>;\n', ''],
     ['struct Indirect {vertexCount:u32,instanceCount:atomic<u32>,rest:array<u32,3>}\n', ''],
     ['@group(0) @binding(4) var<storage,read_write> indirect:Indirect;\n', ''],
-    [
-      '@group(0) @binding(5) var<storage,read> births:array<u32>;',
-      '@group(0) @binding(5) var<storage,read> tickets:array<u32>;',
-    ],
+    ['@group(0) @binding(5) var<storage,read> births:array<u32>;', '@group(0) @binding(5) var<storage,read> tickets:array<u32>;'],
     ['@group(0) @binding(9) var<storage,read_write> listed:array<u32>;\n', ''],
     ['@group(0) @binding(10) var<storage,read_write> total:array<u32,5>;\n', ''],
   ])
@@ -201,14 +198,7 @@ export class SimulationRoute {
         });
         // Only the bindings the entry point uses: its auto layout holds no others (KB-VFX-COMPATBIND1).
         const used = usedBindings(text);
-        return [
-          pipeline,
-          device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: entries.filter((e) => used.has(e.binding)),
-          }),
-          count,
-        ];
+        return [pipeline, device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: entries.filter((e) => used.has(e.binding)) }), count];
       },
       bind = (binding: number, buffer: GPUBuffer): GPUBindGroupEntry => ({ binding, resource: { buffer } });
     this.deaths = new PrefixCount(device, capacity, owned);

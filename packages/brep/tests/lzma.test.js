@@ -10,10 +10,7 @@ const vectors = JSON.parse(readFileSync(new URL('./fixtures/lzma-vectors.json', 
 const bytes = (base64) => new Uint8Array(Buffer.from(base64, 'base64'));
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 const decode = (input, limit) => (isXZ(input) ? inflateXZ(input, limit) : inflateLZMA(input, limit));
-const corrupt = (what) => ({
-  name: 'TypeError',
-  message: `Invalid JT file: corrupt LZMA data (${what}); export it again from the CAD tool`,
-});
+const corrupt = (what) => ({ name: 'TypeError', message: `Invalid JT file: corrupt LZMA data (${what}); export it again from the CAD tool` });
 const text = (data) => Buffer.from(data).toString('latin1');
 
 test('LZMA vectors: every liblzma stream decodes byte for byte to its payload', () => {

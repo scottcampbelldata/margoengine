@@ -122,12 +122,7 @@ test('cloneModel holds the source image instead of copying it, closing it with t
   vertices.set([0, 0, 0, 1, 0, 0, 1, 0], 0);
   vertices.set([1, 0, 0, 1, 0, 0, 1, 0], 20);
   vertices.set([0, 1, 0, 1, 0, 0, 1, 0], 40);
-  const source = new PBRModel(
-      e,
-      new GLTFAsset(doc, []),
-      [image],
-      [[{ vertices, indices: new Uint32Array([0, 1, 2]) }]],
-    ),
+  const source = new PBRModel(e, new GLTFAsset(doc, []), [image], [[{ vertices, indices: new Uint32Array([0, 1, 2]) }]]),
     created = globalThis.createImageBitmap;
   globalThis.createImageBitmap = () => assert.fail('a clone copied the bitmap');
   try {

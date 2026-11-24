@@ -35,10 +35,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./ccd": {
-      "types": "./dist/ccd-entry.d.ts",
-      "import": "./dist/ccd-entry.js"
-    },
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"

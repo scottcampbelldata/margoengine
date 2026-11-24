@@ -12,7 +12,5 @@ test('headless README references are made only for compareImages examples', () =
     "const result = await compareImages(await readPixels(engine), await readFile('reference.png'));",
   ].join('\n');
   assert.match(headlessReference(compare), /await writeFile\('reference\.png'/);
-  assert.throws(() =>
-    headlessReference("import { compareImages } from '@margoengine/headless/compare';\ncompareImages(a, b);"),
-  );
+  assert.throws(() => headlessReference("import { compareImages } from '@margoengine/headless/compare';\ncompareImages(a, b);"));
 });

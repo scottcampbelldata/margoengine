@@ -241,8 +241,6 @@ function fakeSockets(t) {
     addEventListener(type, listener) {
       this.listeners[type] = listener;
     }
-    // A closed socket's listeners go; the schedule tests still deliver events to an old socket's last listeners.
-    removeEventListener() {}
     close() {
       this.closed = true;
     }

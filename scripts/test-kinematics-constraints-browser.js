@@ -305,8 +305,7 @@ try {
   await app.page.mouse.move(overheadPixels.overhead.x, overheadPixels.overhead.y, { steps: 90 });
   await app.page.mouse.up();
   const overheadHeight =
-    2.3 +
-    (overheadPixels.overhead.y - (await app.page.evaluate(() => window.lastPointer.y))) * overheadPixels.metresPerPixel;
+    2.3 + (overheadPixels.overhead.y - (await app.page.evaluate(() => window.lastPointer.y))) * overheadPixels.metresPerPixel;
   const overhead = await app.page.evaluate(() => {
     const demo = window.kinematicsDemo;
     for (let i = 0; i < 180; i++) {

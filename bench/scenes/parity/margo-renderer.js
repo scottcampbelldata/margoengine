@@ -57,10 +57,7 @@ export const builders = {
     done(marks, s);
     const gl = canvas.getContext('webgl2');
     return {
-      ...app(engine, () => {}, {
-        camera: data.camera,
-        note: `core meshes on ${engine.backend} (@margoengine/webgl2-compat/preview)`,
-      }),
+      ...app(engine, () => {}, { camera: data.camera, note: `core meshes on ${engine.backend} (@margoengine/webgl2-compat/preview)` }),
       gl,
       idle: () => glIdle(gl),
     };

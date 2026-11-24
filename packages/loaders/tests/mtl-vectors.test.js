@@ -41,14 +41,7 @@ const meshCalls = [];
 function createMesh(engine, geometry, materials, options) {
   if (engine?.fail) throw new TypeError('stand-in engine cannot draw');
   // A real materials mesh is a model with onDispose; loadOBJ ties its materials to it.
-  const mesh = {
-    geometry,
-    materials,
-    options,
-    destroyed: false,
-    destroy: () => (mesh.destroyed = true),
-    onDispose: () => () => {},
-  };
+  const mesh = { geometry, materials, options, destroyed: false, destroy: () => (mesh.destroyed = true), onDispose: () => () => {} };
   meshCalls.push(mesh);
   return mesh;
 }

@@ -34,7 +34,7 @@ const image = (width, height, colour) => {
   const data = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
-      const c = typeof colour === 'function' ? colour(x, y) : colour,
+      const c = typeof colour === "function" ? colour(x, y) : colour,
         [r, g, b] = typeof c === 'number' ? [c, c, c] : c;
       data.set([r, g, b, 255], (y * width + x) * 4);
     }
@@ -45,15 +45,13 @@ const mask = (width, height, inside) => {
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) data[y * width + x] = inside(x, y) ? 255 : 0;
   return { width, height, data };
 };
-const mix = (a, b, t) =>
-  typeof a === 'number' ? Math.round(a + (b - a) * t) : a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const mix = (a, b, t) => (typeof a === 'number' ? Math.round(a + (b - a) * t) : a.map((v, i) => Math.round(v + (b[i] - v) * t)));
 /** A frame split by the diagonal line x = y + 8: hard (a pixel is one side or the other) or resolved (4 x 4 coverage). */
 const diagonal = (a, b, resolved, size = 64) =>
   image(size, size, (x, y) => {
     if (!resolved) return x > y + 8 ? b : a;
     let inside = 0;
-    for (let sy = 0; sy < 4; sy++)
-      for (let sx = 0; sx < 4; sx++) if (x + (sx + 0.5) / 4 > y + (sy + 0.5) / 4 + 8) inside++;
+    for (let sy = 0; sy < 4; sy++) for (let sx = 0; sx < 4; sx++) if (x + (sx + 0.5) / 4 > y + (sy + 0.5) / 4 + 8) inside++;
     return mix(a, b, inside / 16);
   });
 const noise = (seed) => () => {
@@ -78,8 +76,7 @@ const sloped = (a, b, slope, offset, resolved, size = 96) =>
   image(size, size, (x, y) => {
     if (!resolved) return y + 0.5 > slope * (x + 0.5) + offset ? b : a;
     let inside = 0;
-    for (let sy = 0; sy < 16; sy++)
-      for (let sx = 0; sx < 16; sx++) if (y + (sy + 0.5) / 16 > slope * (x + (sx + 0.5) / 16) + offset) inside++;
+    for (let sy = 0; sy < 16; sy++) for (let sx = 0; sx < 16; sx++) if (y + (sy + 0.5) / 16 > slope * (x + (sx + 0.5) / 16) + offset) inside++;
     return mix(a, b, inside / 256);
   });
 
@@ -88,32 +85,22 @@ test('T3 stairs: an edge near a pixel axis, resolved to exact coverage, is not a
   // step to the plateau is nine tenths of the climb along the row, which the check once counted as a stair step.
   for (const slope of [0.04, 0.07, 0.13, 0.31, 0.5, 1, 2.3, 7.5, 14]) {
     const steep = slope > 1,
-      resolved = steep
-        ? stairs(sloped(30, 220, 1 / slope, -10 / slope + 1, true))
-        : stairs(sloped(30, 220, slope, 20, true)),
-      hard = steep
-        ? stairs(sloped(30, 220, 1 / slope, -10 / slope + 1, false))
-        : stairs(sloped(30, 220, slope, 20, false));
-    assert.ok(
-      resolved.value <= 1 && resolved.pass,
-      `slope ${slope} resolved ${resolved.value} of ${resolved.detail.edges} edges`,
-    );
+      resolved = steep ? stairs(sloped(30, 220, 1 / slope, -10 / slope + 1, true)) : stairs(sloped(30, 220, slope, 20, true)),
+      hard = steep ? stairs(sloped(30, 220, 1 / slope, -10 / slope + 1, false)) : stairs(sloped(30, 220, slope, 20, false));
+    assert.ok(resolved.value <= 1 && resolved.pass, `slope ${slope} resolved ${resolved.value} of ${resolved.detail.edges} edges`);
     assert.ok(hard.detail.edges > 0, `slope ${slope} has edges`);
     assert.ok(hard.value > 5 && !hard.pass, `slope ${slope} one sample per pixel ${hard.value}`);
   }
 });
 
-const realFrame = async (name) =>
-  decodePNG(new Uint8Array(readFileSync(new URL(`./fixtures/look-real/${name}`, import.meta.url))));
+const realFrame = async (name) => decodePNG(new Uint8Array(readFileSync(new URL(`./fixtures/look-real/${name}`, import.meta.url))));
 
 test('T3 stairs on real engine frames: the supersampled render and its 16 sample reference pass, one sample per pixel fails', async () => {
   // One 400 x 400 crop (lantern railing, cottage, wet cliff) of the storm-light shot, rendered three ways by the shot
   // tool at 720 x 1280: msaa 1 supersample 1, msaa 4 supersample 2 (the film setting), and a 1440 x 2560 render at
   // supersample 2 area-averaged to 720 x 1280 in linear light (16 samples per pixel). Texture detail, thin railings and
   // wave crests used to read 14 to 19% on the two resolved frames.
-  const [one, film, reference] = await Promise.all(
-    ['storm-1sample.png', 'storm-ss2.png', 'storm-16sample.png'].map(realFrame),
-  );
+  const [one, film, reference] = await Promise.all(['storm-1sample.png', 'storm-ss2.png', 'storm-16sample.png'].map(realFrame));
   const read = (frame) => stairs(frame);
   assert.ok(read(reference).value <= 1, `16 sample reference ${read(reference).value}`);
   assert.ok(read(film).value <= 1, `msaa 4 supersample 2 ${read(film).value}`);
@@ -160,8 +147,7 @@ const perspective = (fov, aspect, near, far) => {
 };
 const multiply = (a, b) => {
   const out = new Array(16).fill(0);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return out;
 };
 
@@ -182,16 +168,10 @@ test('depthFromDistance and reprojectionMotion: a camera moved sideways shifts a
   assert.ok(Math.abs(depth[centre] - (far * (8 - near)) / ((far - near) * 8)) < 1e-6, 'centre depth ' + depth[centre]);
   assert.ok(Number.isNaN(depth[0]) && Number.isNaN(depth[1]), 'no distance, no depth');
   // The camera moves 0.5 m to its right: the world moves -0.5 m in x in its view.
-  const moved = multiply(
-      projection,
-      translate(-0.5).map((v, i) => v),
-    ),
+  const moved = multiply(projection, translate(-0.5).map((v, i) => v)),
     motion = reprojectionMotion(depth, projection, moved, width, height),
     expected = (d) => ((-0.5 * (1 / Math.tan(0.5))) / (width / height) / d) * (width / 2);
-  assert.ok(
-    Math.abs(motion.data[centre * 2] - expected(8)) < 1e-2,
-    'centre ' + motion.data[centre * 2] + ' against ' + expected(8),
-  );
+  assert.ok(Math.abs(motion.data[centre * 2] - expected(8)) < 1e-2, 'centre ' + motion.data[centre * 2] + ' against ' + expected(8));
   assert.ok(Math.abs(motion.data[centre * 2 + 1]) < 1e-3);
   // A near pixel moves more than a far one.
   assert.ok(Math.abs(motion.data[(16 * width + 40) * 2]) < Math.abs(motion.data[centre * 2]));
@@ -254,10 +234,7 @@ test('T4 shimmerMoving: the camera motion undone leaves 0, a flickering surface 
   const still = { width, height, data: new Float32Array(width * height * 2) },
     missed = shimmerMoving(frame, { next, motion: still });
   assert.ok(missed.value > 5 && !missed.pass, `missed ${missed.value}`);
-  assert.throws(
-    () => shimmerMoving(frame, { next, motion: { width: 8, height: 8, data: new Float32Array(128) } }),
-    RangeError,
-  );
+  assert.throws(() => shimmerMoving(frame, { next, motion: { width: 8, height: 8, data: new Float32Array(128) } }), RangeError);
   assert.throws(() => reprojectionMotion(depth, new Array(16).fill(0), identity, width, height), RangeError);
 });
 
@@ -266,8 +243,13 @@ test('T4 reprojectionMotion: a nearer pixel moves more than a farther one under 
   const f = 1,
     near = 0.1,
     far = 100,
-    persp = (tx) => [f, 0, 0, 0, 0, f, 0, 0, 0, 0, far / (near - far), -1, tx * f, 0, (near * far) / (near - far), 0],
-    zNdc = (d) => ((far / (near - far)) * -d + (near * far) / (near - far)) / d,
+    persp = (tx) => [
+      f, 0, 0, 0,
+      0, f, 0, 0,
+      0, 0, far / (near - far), -1,
+      tx * f, 0, (near * far) / (near - far), 0,
+    ],
+    zNdc = (d) => (far / (near - far) * -d + (near * far) / (near - far)) / d,
     width = 8,
     height = 8,
     depth = Float32Array.from({ length: width * height }, (_, i) => zNdc(i % 2 ? 40 : 2)),
@@ -297,10 +279,7 @@ test('T8 motionBlur: a sharp mover fails and one smeared across its travel passe
 
 const disc = (size, r, subjectColour, backColour) => {
   const inside = (x, y) => Math.hypot(x - size / 2, y - size / 2) < r;
-  return {
-    frame: image(size, size, (x, y) => (inside(x, y) ? subjectColour : backColour)),
-    subject: mask(size, size, inside),
-  };
+  return { frame: image(size, size, (x, y) => (inside(x, y) ? subjectColour : backColour)), subject: mask(size, size, inside) };
 };
 
 test('T5 silhouette: a dark subject on pale haze has a clear outline, a subject close to its background has none', () => {
@@ -320,9 +299,7 @@ test('T5 silhouetteShape: one value reads as one shape, three bands do not', () 
     inside = (x, y) => Math.hypot(x - 40, y - 40) < 28,
     subject = mask(size, size, inside),
     one = image(size, size, (x, y) => (inside(x, y) ? 40 : 220)),
-    bands = image(size, size, (x, y) =>
-      inside(x, y) ? ([10, 120, 220][Math.min(2, Math.floor((y - 12) / 19))] ?? 10) : 250,
-    ),
+    bands = image(size, size, (x, y) => (inside(x, y) ? [10, 120, 220][Math.min(2, Math.floor((y - 12) / 19))] ?? 10 : 250)),
     good = silhouetteShape(one, { subject }),
     bad = silhouetteShape(bands, { subject });
   assert.equal(good.value, 100);
@@ -401,9 +378,7 @@ test('checkProbe with a family: its bounds apply to the checks that can run, a s
   assert.ok(family.stairs && family.colourEdges);
   const own = byName(checkProbe({ name: 'p', frame }, { grain: 3 }, { family: 'animatedFeature' }));
   assert.deepEqual(own.grain.bound, [-Infinity, 3], "the shot's own bound replaces the family's");
-  const named = byName(
-    checkProbe({ name: 'p', frame }, { silhouette: [80, 100], shimmerMoving: 1 }, { family: 'animatedFeature' }),
-  );
+  const named = byName(checkProbe({ name: 'p', frame }, { silhouette: [80, 100], shimmerMoving: 1 }, { family: 'animatedFeature' }));
   assert.equal(named.silhouette.pass, false);
   assert.equal(named.silhouette.missing, 'the subject mask');
   assert.equal(named.shimmerMoving.missing, 'the next frame and its motion');
@@ -421,11 +396,7 @@ test('checkProbe does not run a mask check on a mask that marks no pixel (KB-LOO
     half = mask(size, size, (x) => x < 32),
     byName = (rows) => Object.fromEntries(rows.map((row) => [row.check, row])),
     rows = byName(
-      checkProbe(
-        { name: 'p', frame, masks: { subject: empty, penumbra: empty, lit: half, shadow: empty } },
-        {},
-        { family: 'animatedFeature' },
-      ),
+      checkProbe({ name: 'p', frame, masks: { subject: empty, penumbra: empty, lit: half, shadow: empty } }, {}, { family: 'animatedFeature' }),
     );
   for (const check of ['silhouette', 'silhouetteShape', 'penumbra', 'bounce', 'shadowTint'])
     assert.equal(rows[check], undefined, `${check} does not run on an empty mask`);
@@ -443,30 +414,13 @@ test('checkProbe runs every clean-frame check once its inputs are there', () => 
       {
         name: 'all',
         frame,
-        masks: {
-          subject,
-          penumbra: mask(size, size, (x) => x < 8),
-          lit: mask(size, size, (x) => x > 56),
-          shadow: subject,
-        },
+        masks: { subject, penumbra: mask(size, size, (x) => x < 8), lit: mask(size, size, (x) => x > 56), shadow: subject },
         moving: { next: frame, motion },
       },
       { nightLuma: 0, nightPeak: 0 },
     ),
     names = rows.map((row) => row.check);
-  for (const name of [
-    'penumbra',
-    'stairs',
-    'colourEdges',
-    'shimmerMoving',
-    'motionBlur',
-    'silhouette',
-    'silhouetteShape',
-    'bounce',
-    'shadowTint',
-    'nightLuma',
-    'nightPeak',
-  ])
+  for (const name of ['penumbra', 'stairs', 'colourEdges', 'shimmerMoving', 'motionBlur', 'silhouette', 'silhouetteShape', 'bounce', 'shadowTint', 'nightLuma', 'nightPeak'])
     assert.ok(names.includes(name), name);
 });
 
@@ -482,20 +436,12 @@ test('checkShot reads lookFamily from the manifest header and a probe moving pai
       'probes/a.motion.f32': new Uint8Array(motion.buffer),
     },
     read = async (path) => files[path] ?? Promise.reject(new Error(`no file ${path}`)),
-    probes = {
-      a: { frame: 0, file: 'probes/a.png', moving: { next: 'probes/a.next.png', motion: 'probes/a.motion.f32' } },
-    },
+    probes = { a: { frame: 0, file: 'probes/a.png', moving: { next: 'probes/a.next.png', motion: 'probes/a.motion.f32' } } },
     rowsOf = (report) => Object.fromEntries(report.json.probes[0].results.map((row) => [row.check, row])),
     plain = rowsOf(await checkShot({ manifest: { probes }, read, thumbWidth: 32 })),
-    family = rowsOf(
-      await checkShot({ manifest: { header: { lookFamily: 'animatedFeature' }, probes }, read, thumbWidth: 32 }),
-    ),
+    family = rowsOf(await checkShot({ manifest: { header: { lookFamily: 'animatedFeature' }, probes }, read, thumbWidth: 32 })),
     own = rowsOf(
-      await checkShot({
-        manifest: { header: { lookFamily: 'animatedFeature', lookBounds: { grain: 3 } }, probes },
-        read,
-        thumbWidth: 32,
-      }),
+      await checkShot({ manifest: { header: { lookFamily: 'animatedFeature', lookBounds: { grain: 3 } }, probes }, read, thumbWidth: 32 }),
     );
   assert.ok(plain.shimmerMoving && plain.motionBlur, 'the moving pair ran');
   assert.equal(plain.grain.pass, true);

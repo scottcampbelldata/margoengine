@@ -6,15 +6,7 @@ import { Tween, easeInQuad } from '../dist/index.js';
 import { MotionPath, motionPath } from '../dist/motion-path.js';
 
 // Knots close together then far apart: a curve parameter crosses them at very different speeds.
-const POINTS = [
-  [0, 0, 0],
-  [0.1, 0.1, 0],
-  [0.3, 0, 0.2],
-  [6, 1, 0],
-  [14, -2, 3],
-  [15, 0, 9],
-  [8, 4, 12],
-];
+const POINTS = [[0, 0, 0], [0.1, 0.1, 0], [0.3, 0, 0.2], [6, 1, 0], [14, -2, 3], [15, 0, 9], [8, 4, 12]];
 const curve = (options) => new Spline(POINTS, { divisions: 2048, ...options });
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 /** Quaternion `[x, y, z, w]` applied to a vector, by the textbook formula, sharing no code with the entry. */
@@ -111,14 +103,7 @@ test('the forward axis lies along the tangent and the rotation is a rotation', (
 
 test('up follows the frame normal, so the object does not flip or spin on the way', () => {
   // A climb that turns through a quarter circle and on, past the vertical where a fixed up vector would flip.
-  const spline = new Spline([
-      [0, 0, 0],
-      [10, 0, 0],
-      [20, 10, 0],
-      [20, 20, 0],
-      [10, 30, 0],
-      [0, 30, 5],
-    ]),
+  const spline = new Spline([[0, 0, 0], [10, 0, 0], [20, 10, 0], [20, 20, 0], [10, 30, 0], [0, 30, 5]]),
     path = new MotionPath(spline),
     frames = path.frames;
   let previous;
@@ -135,10 +120,7 @@ test('up follows the frame normal, so the object does not flip or spin on the wa
 });
 
 test('a camera faces the way it moves with -z', () => {
-  const spline = new Spline([
-      [0, 0, 0],
-      [0, 0, -10],
-    ]),
+  const spline = new Spline([[0, 0, 0], [0, 0, -10]]),
     pose = new MotionPath(spline, { forward: '-z' }).poseAt(5);
   assert.ok(distance(rotate(pose.quaternion, [0, 0, -1]), [0, 0, -1]) <= 1e-12);
   assert.ok(distance(pose.position, [0, 0, -5]) <= 1e-9);
@@ -187,15 +169,7 @@ test('cancel stops it, and a ready MotionPath can be shared', () => {
 });
 
 test('a closed path comes back to where it began', () => {
-  const spline = new Spline(
-      [
-        [0, 0, 0],
-        [4, 0, 0],
-        [4, 0, 4],
-        [0, 0, 4],
-      ],
-      { closed: true },
-    ),
+  const spline = new Spline([[0, 0, 0], [4, 0, 0], [4, 0, 4], [0, 0, 4]], { closed: true }),
     path = new MotionPath(spline);
   assert.ok(distance(path.poseAt(0).position, path.poseAt(path.length).position) <= 1e-9);
 });
@@ -204,16 +178,7 @@ test('bad input throws', () => {
   const spline = curve(),
     tween = new Tween(),
     mesh = follower();
-  assert.throws(
-    () =>
-      new MotionPath(
-        new Spline([
-          [1, 1, 1],
-          [1, 1, 1],
-        ]),
-      ),
-    RangeError,
-  );
+  assert.throws(() => new MotionPath(new Spline([[1, 1, 1], [1, 1, 1]])), RangeError);
   assert.throws(() => new MotionPath(spline, { forward: 'w' }), RangeError);
   assert.throws(() => new MotionPath(spline).poseAt(-1), RangeError);
   assert.throws(() => motionPath(tween, mesh, spline, {}), RangeError);

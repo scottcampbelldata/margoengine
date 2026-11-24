@@ -50,9 +50,7 @@ function textureOn(
     const setter = 'give the material a new MaterialExtension';
     slots = {
       view: borrow(texture.view, `MaterialExtension textures[${index}].view`, setter),
-      sampler: texture.sampler
-        ? borrow(texture.sampler, `MaterialExtension textures[${index}].sampler`, setter)
-        : undefined,
+      sampler: texture.sampler ? borrow(texture.sampler, `MaterialExtension textures[${index}].sampler`, setter) : undefined,
       from: texture.view,
       samplerFrom: texture.sampler,
     };

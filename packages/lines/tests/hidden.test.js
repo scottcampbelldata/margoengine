@@ -21,14 +21,8 @@ test('a hidden line turns the depth test around and biases both lines, leaving a
   assert.equal(source.material.depthBias, 0.001);
   const log = frame(),
     made = pipelines(log);
-  assert.deepEqual(
-    made.map((p) => p.depthStencil.depthCompare),
-    ['greater-equal', 'less'],
-  );
-  assert.deepEqual(
-    made.map((p) => p.depthStencil.depthWriteEnabled),
-    [false, false],
-  );
+  assert.deepEqual(made.map((p) => p.depthStencil.depthCompare), ['greater-equal', 'less']);
+  assert.deepEqual(made.map((p) => p.depthStencil.depthWriteEnabled), [false, false]);
   assert.equal(modules(log).length, 1, 'both share the biased shader');
   assert.match(modules(log)[0], /min\(base\.z\*\(1\.0\+style\.b\.w\),base\.w\)/);
 });
@@ -68,10 +62,9 @@ test('a hidden line follows its source and draws only while the source does', ()
 test('behind takes no depth writes, and depthBias is checked', () => {
   const { lines, frame } = rig();
   lines.add(new Line({ positions, behind: true, depthWrite: true }));
-  assert.deepEqual(
-    pipelines(frame()).map((p) => [p.depthStencil.depthCompare, p.depthStencil.depthWriteEnabled]),
-    [['less', false]],
-  );
+  assert.deepEqual(pipelines(frame()).map((p) => [p.depthStencil.depthCompare, p.depthStencil.depthWriteEnabled]), [
+    ['less', false],
+  ]);
   assert.throws(() => new LineMaterial({ depthBias: -1 }), RangeError);
   assert.throws(() => new LineMaterial({ depthBias: 1 }), RangeError);
   assert.throws(() => new LineMaterial({ behind: 1 }), TypeError);

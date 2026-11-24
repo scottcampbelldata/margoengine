@@ -1,4 +1,4 @@
-import { parseJSON } from '../../shared/json.js';
+import { parseJSON } from "../../shared/json.js";
 
 /** Largest .margo file, decoded geometry and decoded image total, in bytes. */
 export const maxBytes = 256 * 1024 * 1024;
@@ -38,17 +38,19 @@ export function readContainer(
   accept: 0 | typeof animatedFlag | typeof shapesFlag | typeof meshoptFlag,
 ): MargoContainer {
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input))
-    throw new TypeError('Expected .margo bytes; pass an ArrayBuffer or a typed array holding the file');
+    throw new TypeError(
+      "Expected .margo bytes; pass an ArrayBuffer or a typed array holding the file",
+    );
   const buffer = input instanceof ArrayBuffer ? input : input.buffer,
     base = input instanceof ArrayBuffer ? 0 : input.byteOffset,
     length = input.byteLength;
   if (!(buffer instanceof ArrayBuffer) || base % 4 || !littleEndian)
     throw new TypeError(
-      '.margo requires aligned, little-endian ArrayBuffer storage; pass an ArrayBuffer (not a SharedArrayBuffer) whose byte offset is a multiple of 4',
+      ".margo requires aligned, little-endian ArrayBuffer storage; pass an ArrayBuffer (not a SharedArrayBuffer) whose byte offset is a multiple of 4",
     );
   if (length < 64 || length > maxBytes || length % 4)
     throw new RangeError(
-      'Invalid .margo size; the file must be 64 bytes to 256 MiB and a multiple of 4, so re-export it from Blender',
+      "Invalid .margo size; the file must be 64 bytes to 256 MiB and a multiple of 4, so re-export it from Blender",
     );
   const view = new DataView(buffer, base, length);
   if (
@@ -59,40 +61,42 @@ export function readContainer(
     view.getUint32(24, true) !== 80
   )
     throw new TypeError(
-      'Invalid .margo header/version/stride; the input is not a version 1 .margo file, so export it again with the Margo Blender add-on',
+      "Invalid .margo header/version/stride; the input is not a version 1 .margo file, so export it again with the Margo Blender add-on",
     );
   const flags = view.getUint32(20, true);
   if (flags === animatedFlag && accept !== animatedFlag)
     throw new TypeError(
-      'Animated .margo (skins, shape keys or actions); load it with parseAnimatedMargo or loadAnimatedMargo from @margoengine/blender/anim',
+      "Animated .margo (skins, shape keys or actions); load it with parseAnimatedMargo or loadAnimatedMargo from @margoengine/blender/anim",
     );
   if (flags === shapesFlag && accept !== shapesFlag)
     throw new TypeError(
-      '.margo with curves, point clouds or volumes; load it with parseMargoCurves or loadMargoCurves from @margoengine/blender/curves',
+      ".margo with curves, point clouds or volumes; load it with parseMargoCurves or loadMargoCurves from @margoengine/blender/curves",
     );
   if (flags === meshoptFlag && accept !== meshoptFlag)
-    throw new TypeError(
-      'Meshopt .margo geometry; expand it with expandMargoMeshopt or load it with loadMargoMeshopt from @margoengine/blender/meshopt',
-    );
+    throw new TypeError('Meshopt .margo geometry; expand it with expandMargoMeshopt or load it with loadMargoMeshopt from @margoengine/blender/meshopt');
   for (let at = 20; at < 64; at += 4)
-    if (at !== 24 && view.getUint32(at, true) !== 0 && !(at === 20 && flags === accept))
+    if (
+      at !== 24 &&
+      view.getUint32(at, true) !== 0 &&
+      !(at === 20 && flags === accept)
+    )
       throw new TypeError(
-        'Unsupported .margo flags; the file was written by a newer exporter, so update @margoengine/blender or re-export it',
+        "Unsupported .margo flags; the file was written by a newer exporter, so update @margoengine/blender or re-export it",
       );
   const count = view.getUint32(12, true);
   if (count < 3 || count > 4096 || 64 + count * 16 > length)
     throw new RangeError(
-      'Invalid .margo section count; the file is truncated or corrupt, so download or export it again',
+      "Invalid .margo section count; the file is truncated or corrupt, so download or export it again",
     );
   const sections: MargoSection[] = [],
     types =
       flags === meshoptFlag
         ? [1, 2, 3, 4, 5, 6, 7, 8, 9]
         : flags === animatedFlag
-          ? [1, 2, 3, 4, 5]
-          : flags === shapesFlag
-            ? [1, 2, 3, 4, 6, 7]
-            : [1, 2, 3, 4, 8];
+        ? [1, 2, 3, 4, 5]
+        : flags === shapesFlag
+          ? [1, 2, 3, 4, 6, 7]
+          : [1, 2, 3, 4, 8];
   let end = 64 + count * 16;
   for (let i = 0; i < count; i++) {
     const at = 64 + i * 16,
@@ -100,7 +104,14 @@ export function readContainer(
       offset = view.getUint32(at + 4, true),
       size = view.getUint32(at + 8, true),
       sectionFlags = view.getUint32(at + 12, true),
-      stride = type === 2 ? (sectionFlags === 1 ? 24 : 80) : sectionFlags === 1 ? 2 : 4;
+      stride =
+        type === 2
+          ? sectionFlags === 1
+            ? 24
+            : 80
+          : sectionFlags === 1
+            ? 2
+            : 4;
     if (
       !types.includes(type) ||
       sectionFlags > (type === 2 ? 1 : type === 3 ? 2 : 0) ||
@@ -109,7 +120,7 @@ export function readContainer(
       offset + size > length
     )
       throw new RangeError(
-        'Invalid .margo section bounds/type/alignment; the file is truncated or corrupt, so download or export it again',
+        "Invalid .margo section bounds/type/alignment; the file is truncated or corrupt, so download or export it again",
       );
     if (
       (i === 0) !== (type === 1) ||
@@ -117,7 +128,9 @@ export function readContainer(
       (type === 2 && size % stride) ||
       (type === 3 && size % (stride * 3))
     )
-      throw new RangeError('Invalid .margo section layout; the file is corrupt, so re-export it from Blender');
+      throw new RangeError(
+        "Invalid .margo section layout; the file is corrupt, so re-export it from Blender",
+      );
     sections.push({
       type,
       stride,
@@ -129,22 +142,26 @@ export function readContainer(
   }
   if (end !== length)
     throw new RangeError(
-      'Trailing/truncated .margo data; the file has missing or extra bytes, so download or export it again',
+      "Trailing/truncated .margo data; the file has missing or extra bytes, so download or export it again",
     );
   let manifest: unknown;
   try {
-    manifest = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(sections[0].bytes));
+    manifest = parseJSON(
+      new TextDecoder("utf-8", { fatal: true }).decode(sections[0].bytes),
+    );
   } catch {
     // Malformed UTF-8 or JSON: a named error, not TextDecoder's TypeError or JSON.parse's SyntaxError.
     throw new TypeError(
-      'Invalid .margo scene JSON; the scene section is not UTF-8 JSON, so re-export the file from Blender',
+      "Invalid .margo scene JSON; the scene section is not UTF-8 JSON, so re-export the file from Blender",
     );
   }
   return { buffer, base, length, flags, sections, manifest };
 }
 
 /** Checks a PNG section's header (8-bit RGBA, non-interlaced, 1..4096 square bounds) and returns its size. */
-export function pngSize(bytes: Uint8Array<ArrayBuffer>): [width: number, height: number] {
+export function pngSize(
+  bytes: Uint8Array<ArrayBuffer>,
+): [width: number, height: number] {
   const png = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (
     bytes.length < 33 ||
@@ -158,11 +175,15 @@ export function pngSize(bytes: Uint8Array<ArrayBuffer>): [width: number, height:
     bytes[27] ||
     bytes[28]
   )
-    throw new TypeError('Invalid .margo RGBA8 PNG; embed 8-bit RGBA, non-interlaced PNG images');
+    throw new TypeError(
+      "Invalid .margo RGBA8 PNG; embed 8-bit RGBA, non-interlaced PNG images",
+    );
   const width = png.getUint32(16),
     height = png.getUint32(20);
   if (!width || !height || width > 4096 || height > 4096)
-    throw new RangeError('.margo images exceed decoded size limit; use textures of at most 4096 x 4096 pixels');
+    throw new RangeError(
+      ".margo images exceed decoded size limit; use textures of at most 4096 x 4096 pixels",
+    );
   return [width, height];
 }
 
@@ -175,10 +196,13 @@ export async function decodeImages(
   try {
     for (const bytes of pngs) {
       signal?.throwIfAborted();
-      const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), {
-        colorSpaceConversion: 'none',
-        premultiplyAlpha: 'none',
-      }).catch((error) => {
+      const image = await createImageBitmap(
+        new Blob([bytes], { type: "image/png" }),
+        {
+          colorSpaceConversion: "none",
+          premultiplyAlpha: "none",
+        },
+      ).catch((error) => {
         // The browser rejects undecodable bytes with a DOMException: report it as the loader's own error.
         throw new TypeError(
           `.margo image ${images.length} could not be decoded (${error?.message ?? error}); re-export it as a valid PNG`,
@@ -188,7 +212,7 @@ export async function decodeImages(
       const [width, height] = pngSize(bytes);
       if (image.width !== width || image.height !== height)
         throw new RangeError(
-          'Decoded .margo image size mismatch; the PNG header disagrees with its pixels, so re-export the image',
+          "Decoded .margo image size mismatch; the PNG header disagrees with its pixels, so re-export the image",
         );
     }
     signal?.throwIfAborted();
@@ -200,7 +224,10 @@ export async function decodeImages(
 }
 
 /** Expands compact 24-byte vertices to the renderer's 80-byte PBR layout: w = 1, zero tangents and UVs, white. */
-export function expandCompact(packed: Float32Array, count: number): Float32Array<ArrayBuffer> {
+export function expandCompact(
+  packed: Float32Array,
+  count: number,
+): Float32Array<ArrayBuffer> {
   const expanded = new Float32Array(count * 20);
   for (let i = 0; i < count; i++) {
     for (let axis = 0; axis < 3; axis++) {

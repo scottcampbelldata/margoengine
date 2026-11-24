@@ -261,12 +261,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @throws MargoError (`state`) before {@link Physics.load} has finished. */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
     const R = options.rapier ?? solver.value;
-    if (!R)
-      throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
+    if (!R) throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
     if (typeof R.World !== 'function' || !R.ColliderDesc)
-      throw new TypeError(
-        'The rapier option needs the initialized module; leave it out and call await Physics.load().',
-      );
+      throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics.load().');
     this.rapier = R;
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;

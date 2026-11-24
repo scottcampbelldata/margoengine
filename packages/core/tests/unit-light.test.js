@@ -18,14 +18,7 @@ function fakeGPU(t) {
   const context = { configure() {}, unconfigure() {}, getCurrentTexture: () => ({ createView: () => ({}) }) };
   const canvas = { width: 64, height: 64, clientWidth: 64, clientHeight: 64, getContext: () => context };
   const resource = (descriptor) => Object.assign({ destroy() {} }, descriptor);
-  const pass = {
-    setPipeline() {},
-    setBindGroup() {},
-    setVertexBuffer() {},
-    setIndexBuffer() {},
-    drawIndexed() {},
-    end() {},
-  };
+  const pass = { setPipeline() {}, setBindGroup() {}, setVertexBuffer() {}, setIndexBuffer() {}, drawIndexed() {}, end() {} };
   const device = {
     features: new Set(),
     limits: { maxBufferSize: 2 ** 30 },
@@ -56,16 +49,7 @@ function fakeGPU(t) {
       },
     },
   });
-  globalThis.GPUBufferUsage = {
-    UNIFORM: 1,
-    COPY_DST: 2,
-    VERTEX: 4,
-    STORAGE: 8,
-    INDEX: 16,
-    INDIRECT: 32,
-    COPY_SRC: 64,
-    MAP_READ: 128,
-  };
+  globalThis.GPUBufferUsage = { UNIFORM: 1, COPY_DST: 2, VERTEX: 4, STORAGE: 8, INDEX: 16, INDIRECT: 32, COPY_SRC: 64, MAP_READ: 128 };
   globalThis.GPUTextureUsage = { RENDER_ATTACHMENT: 1, COPY_SRC: 2 };
   t.after(() => {
     for (const [key, descriptor] of Object.entries(saved))

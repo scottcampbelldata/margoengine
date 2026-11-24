@@ -123,8 +123,6 @@ export interface SpeciesRule {
   readonly id: string;
   /** Asset key, such as `'procedural:conifer'`. */
   readonly mesh: string;
-  /** Canopy silhouette for a custom tree asset. Built-in tree meshes already name their canopy kind. */
-  readonly canopyKind?: 'broadleaf' | 'conifer' | 'palm';
   /** Plants per hectare at full suitability. */
   readonly density: number;
   /** Crown or footprint radius in metres at reference size (scale 1). */
@@ -302,8 +300,6 @@ function species(list: unknown, what: string): void {
   for (const s of list as SpeciesRule[]) {
     if (!s || typeof s.id !== 'string' || typeof s.mesh !== 'string')
       throw typeError('A species rule needs a string id and mesh', 'biomes');
-    if (s.canopyKind !== undefined && !['broadleaf', 'conifer', 'palm'].includes(s.canopyKind))
-      throw rangeError('A species canopyKind must be broadleaf, conifer or palm', 'biomes');
     if (!(s.density >= 0) || !(s.radius > 0) || (s.shade !== undefined && !(s.shade >= 0 && s.shade <= 1)))
       throw rangeError('A species rule needs density 0 or more, radius above 0 and shade 0..1', 'biomes');
     if (

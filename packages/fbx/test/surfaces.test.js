@@ -274,7 +274,7 @@ const loadersSurface = (points) => ({
   countV: 3,
   knotsU: [0, 0, 0, 1, 1, 1],
   knotsV: [0, 0, 0, 1, 1, 1],
-  points: Array.from({ length: 27 }, (_, k) => points[(((k / 3) % 3) | 0) * 12 + Math.floor(k / 9) * 4 + (k % 3)]),
+  points: Array.from({ length: 27 }, (_, k) => points[((k / 3) % 3 | 0) * 12 + Math.floor(k / 9) * 4 + (k % 3)]),
   weights: Array.from({ length: 9 }, (_, k) => points[(k % 3) * 12 + Math.floor(k / 3) * 4 + 3]),
 });
 test('KB5330b: a blend shape on a NURBS control net morphs every tessellated vertex exactly, at every weight', async () => {
@@ -285,20 +285,12 @@ test('KB5330b: a blend shape on a NURBS control net morphs every tessellated ver
     [
       'Deformer',
       [L(4), 'SubDeformer::Lift', 'BlendShapeChannel'],
-      [
-        ['Version', [I(100)]],
-        ['DeformPercent', [25]],
-        ['FullWeights', [A('d', [100])]],
-      ],
+      [['Version', [I(100)]], ['DeformPercent', [25]], ['FullWeights', [A('d', [100])]]],
     ],
     [
       'Geometry',
       [L(5), 'Geometry::Lift', 'Shape'],
-      [
-        ['Version', [I(100)]],
-        ['Indexes', [A('i', [4, 1])]],
-        ['Vertices', [A('d', shape)]],
-      ],
+      [['Version', [I(100)]], ['Indexes', [A('i', [4, 1])]], ['Vertices', [A('d', shape)]]],
     ],
   );
   tree[1][2].push(['C', ['OO', L(3), L(1)]], ['C', ['OO', L(4), L(3)]], ['C', ['OO', L(5), L(4)]]);

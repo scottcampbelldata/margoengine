@@ -11,10 +11,7 @@ const rand = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 test('the centre of the picture looks along the camera, whatever the mode', () => {
   for (const mode of [...FISHEYE, 'orthographic', 'panini']) {
     const direction = new WideAngleCubeMap(1.5, { mode, fov: 120 }).toDirection(0, 0);
-    assert.deepEqual(
-      direction.map((x) => x + 0),
-      [0, 0, -1],
-    );
+    assert.deepEqual(direction.map((x) => x + 0), [0, 0, -1]);
   }
 });
 

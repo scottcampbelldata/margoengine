@@ -276,9 +276,7 @@ test('segments sets the count, line false or no bolt keeps the one point light',
 });
 
 test('the lightning.bolt and lightning.light.line rows write the weather and hand back at their defaults', () => {
-  const names = SKY_SETTINGS.filter((s) => /^lightning\.(bolt\.|light\.(line|segments))/.test(s.name)).map(
-    (s) => s.name,
-  );
+  const names = SKY_SETTINGS.filter((s) => /^lightning\.(bolt\.|light\.(line|segments))/.test(s.name)).map((s) => s.name);
   assert.deepEqual(names.sort(), [
     'lightning.bolt.branching',
     'lightning.bolt.detail',

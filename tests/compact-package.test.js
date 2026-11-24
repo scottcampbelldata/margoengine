@@ -2,8 +2,6 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import fsp from 'node:fs/promises';
-import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { compactPackage } from '../scripts/compact-package.js';
@@ -114,53 +112,4 @@ test('core compaction ships the canonical clear helper without requiring sibling
   assert.deepEqual(entry.defaultClear, [0.018, 0.023, 0.035, 1]);
   assert.deepEqual(entry.clearColorValue('#2a6cba'), [42 / 255, 108 / 255, 186 / 255, 1]);
   assert.throws(() => entry.clearColorValue('bad'), { name: 'RangeError', message: 'Invalid color; use #rrggbb' });
-});
-
-// The bundle must not depend on the order the file system lists dist (APFS does not sort, NTFS does): the entry order
-// decides chunk layout, which made `npm run measure:size` differ between macOS and Windows for one commit.
-test('compaction output is the same whatever order readdir lists the entries in', async (t) => {
-  const run = async (order) => {
-    const root = await mkdtemp(join(tmpdir(), 'margo-compact-order-')),
-      stage = join(root, 'packages/stage'),
-      dist = join(stage, 'dist'),
-      shared = join(root, 'packages/shared'),
-      realReaddir = fsp.readdir;
-    t.after(() => rm(root, { recursive: true, force: true }));
-    await Promise.all([
-      mkdir(dist, { recursive: true }),
-      mkdir(join(stage, 'src'), { recursive: true }),
-      mkdir(shared, { recursive: true }),
-    ]);
-    await writeFile(join(stage, 'package.json'), '{"type":"module"}');
-    // Three helpers that two entries import in different orders: the order of their code in the shared chunk follows
-    // the order the entries are visited in.
-    for (const name of ['h1', 'h2', 'h3'])
-      await writeFile(join(shared, `${name}.js`), `globalThis.order = (globalThis.order ?? '') + '${name}';`);
-    const use = (...names) => names.map((name) => `import '../../shared/${name}.js';`).join(' ');
-    const modules = {
-      a: `${use('h3', 'h1')} export const a = 1;`,
-      b: `${use('h2', 'h1', 'h3')} export const b = 2;`,
-      c: `${use('h2', 'h3')} export const c = 3;`,
-      index: "export * from './a.js'; export * from './b.js'; export * from './c.js';",
-    };
-    for (const [name, code] of Object.entries(modules))
-      await Promise.all([writeFile(join(stage, `src/${name}.ts`), code), writeFile(join(dist, `${name}.js`), code)]);
-    fsp.readdir = async (path, ...rest) => {
-      const list = await realReaddir(path, ...rest);
-      return resolve(String(path)) === resolve(dist) ? order(list) : list;
-    };
-    syncBuiltinESMExports();
-    try {
-      await compactPackage('stage', stage);
-    } finally {
-      fsp.readdir = realReaddir;
-      syncBuiltinESMExports();
-    }
-    const out = {};
-    for (const file of (await readdir(dist)).sort()) out[file] = await readFile(join(dist, file), 'utf8');
-    return out;
-  };
-  const forward = await run((list) => [...list].sort()),
-    backward = await run((list) => [...list].sort().reverse());
-  assert.deepEqual(backward, forward);
 });

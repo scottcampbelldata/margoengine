@@ -85,10 +85,7 @@ test('an albedo adds the ground irradiance pass per order and rebuilds only when
   } finally {
     sky.dispose();
   }
-  assert.ok(
-    h.resources.every((r) => r.destroyed),
-    'the ground buffer and table are released with the sky',
-  );
+  assert.ok(h.resources.every((r) => r.destroyed), 'the ground buffer and table are released with the sky');
 });
 
 test('device restoration rebuilds the ground passes', () => {

@@ -7,23 +7,8 @@ import { createTileLayer, TileMap } from '../dist/index.js';
 import { GridTileMap } from '../dist/iso.js';
 import { ObjectTileMap } from '../dist/objects.js';
 
-const set = {
-  name: 'g',
-  firstGid: 1,
-  tileWidth: 4,
-  tileHeight: 4,
-  tileCount: 2,
-  columns: 2,
-  image: { source: 'g', width: 8, height: 4 },
-};
-const map = () => ({
-  width: 2,
-  height: 1,
-  tileWidth: 4,
-  tileHeight: 4,
-  tilesets: [set],
-  layers: [createTileLayer('floor', 2, 1, Uint32Array.of(1, 2))],
-});
+const set = { name: 'g', firstGid: 1, tileWidth: 4, tileHeight: 4, tileCount: 2, columns: 2, image: { source: 'g', width: 8, height: 4 } };
+const map = () => ({ width: 2, height: 1, tileWidth: 4, tileHeight: 4, tilesets: [set], layers: [createTileLayer('floor', 2, 1, Uint32Array.of(1, 2))] });
 const atlases = () => ({ g: { width: 8, height: 4, data: new Uint8Array(8 * 4 * 4) } });
 const target = { width: 8, height: 4, format: 'rgba8unorm', createView: () => ({}), destroy() {} };
 for (const [label, make] of [
@@ -36,15 +21,7 @@ for (const [label, make] of [
 
 test('a hidden TileMap draws nothing and costs no draws; showing it again draws it', () => {
   const touched = [];
-  const device = new Proxy(
-    {},
-    {
-      get: (_, key) => {
-        touched.push(String(key));
-        throw new Error('device used');
-      },
-    },
-  );
+  const device = new Proxy({}, { get: (_, key) => { touched.push(String(key)); throw new Error('device used'); } });
   let run;
   const tiles = new TileMap({ map: map(), atlases: atlases(), target });
   tiles.setup({ backend: 'webgpu', frameGraph: { add: (pass) => (run = pass.execute) }, sceneOf: () => undefined });

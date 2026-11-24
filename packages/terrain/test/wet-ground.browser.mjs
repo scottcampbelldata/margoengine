@@ -59,43 +59,23 @@ await runSuite(
             const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 15 }),
               layers = gpu.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
             gpu.queue.writeTexture({ texture: heightmap }, new Float32Array(n * n), { bytesPerRow: n * 4 }, [n, n]);
-            gpu.queue.writeTexture(
-              { texture: layers },
-              new Uint8Array(16).map((_, k) => (k % 4 === 3 ? 255 : layer[k % 4])),
-              { bytesPerRow: 4, rowsPerImage: 1 },
-              [1, 1, 4],
-            );
+            gpu.queue.writeTexture({ texture: layers }, new Uint8Array(16).map((_, k) => (k % 4 === 3 ? 255 : layer[k % 4])), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
             return { heightmap, layers };
           },
         });
         let texture, wet, water, f;
         if (record !== undefined) {
           if (record) {
-            texture = device.createTexture({
-              size: [16, 16],
-              format: 'rgba32float',
-              usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-            });
+            texture = device.createTexture({ size: [16, 16], format: 'rgba32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
             const data = new Float32Array(16 * 16 * 4);
             for (let k = 0; k < 256; k++) data.set([1, record[0], record[1], 0], k * 4);
             device.queue.writeTexture({ texture }, data, { bytesPerRow: 16 * 16 }, [16, 16]);
           }
-          wet = WetGround.attach(engine, terrain, {
-            record: () => texture,
-            origin: [-16, -16],
-            size: [32, 32],
-            ...look,
-          });
+          wet = WetGround.attach(engine, terrain, { record: () => texture, origin: [-16, -16], size: [32, 32], ...look });
         }
         if (flood) {
           // A dam break of 1 m held west of x = -10 m on the terrain's own heightmap, below the camera's view of the ground.
-          water = Water.attach(engine, {
-            height: -50,
-            size: [64, 64],
-            segments: 4,
-            terrain: { heightmap: () => terrain.heightmap, origin: [-16, -16], size: [32, 32] },
-            fill: (x) => (x < -10 ? 1 : undefined),
-          });
+          water = Water.attach(engine, { height: -50, size: [64, 64], segments: 4, terrain: { heightmap: () => terrain.heightmap, origin: [-16, -16], size: [32, 32] }, fill: (x) => (x < -10 ? 1 : undefined) });
           f = Flood.attach(engine, { surface: water, maxDepth: 2, maxSpeed: 6 });
           wet = WetGround.attach(engine, terrain, { record: () => f.wetTexture, origin: [-16, -16], size: [32, 32] });
         }
@@ -113,9 +93,7 @@ await runSuite(
         const c = new OffscreenCanvas(size, size).getContext('2d');
         c.drawImage(canvas, 0, 0);
         await device.queue.onSubmittedWorkDone();
-        const extra = f
-            ? { format: f.wetTexture?.format, wetCells: (await f.read()).depth.filter((d) => d > 0.01).length }
-            : {},
+        const extra = f ? { format: f.wetTexture?.format, wetCells: (await f.read()).depth.filter((d) => d > 0.01).length } : {},
           error = await device.popErrorScope();
         if (error) errors.push(error.message);
         wet?.dispose();
@@ -163,10 +141,7 @@ await runSuite(
       out.glossLuma = [luma(shinyWet), luma(shinyDry)];
       // 4. drying: at dryTime and at 20 x dryTime (100 s here), then live.
       const halfDry = dry.map((v) => toSrgb(toLinear(v) * (1 - 0.45 / Math.E)));
-      out.drying = diff(
-        (await frame({ record: [100, 1], look: { gloss: 0, dryTime: 100 } })).pixels,
-        (await frame({ layer: halfDry })).pixels,
-      );
+      out.drying = diff((await frame({ record: [100, 1], look: { gloss: 0, dryTime: 100 } })).pixels, (await frame({ layer: halfDry })).pixels);
       out.dried = diff((await frame({ record: [2000, 1], look: { gloss: 0, dryTime: 100 } })).pixels, plain);
       const live = await frame({
         record: [0, 1],
@@ -193,14 +168,8 @@ await runSuite(
     assert.ok(result.dark.worst <= 2, `fully wet ground is the layer times 0.55: worst ${result.dark.worst} of 255`);
     assert.ok(result.darkLuma[0] < 0.8 * result.darkLuma[1], `wet ground is darker: ${result.darkLuma}`);
     assert.ok(result.gloss.worst <= 2, `fully wet ground shines as roughness 0.45: worst ${result.gloss.worst} of 255`);
-    assert.ok(
-      result.glossLuma[0] > result.glossLuma[1] + 5,
-      `wet ground under the mirror sun is brighter: ${result.glossLuma}`,
-    );
-    assert.ok(
-      result.drying.worst <= 2,
-      `at dryTime the ground is the layer times 1 - 0.45 / e: worst ${result.drying.worst}`,
-    );
+    assert.ok(result.glossLuma[0] > result.glossLuma[1] + 5, `wet ground under the mirror sun is brighter: ${result.glossLuma}`);
+    assert.ok(result.drying.worst <= 2, `at dryTime the ground is the layer times 1 - 0.45 / e: worst ${result.drying.worst}`);
     assert.ok(result.dried.worst <= 1, `at 20 x dryTime it is dry again: worst ${result.dried.worst}`);
     assert.ok(result.live.worst <= 2, `applyWetGroundSettings moves the look live: worst ${result.live.worst}`);
     assert.equal(result.livePipelines, 0, '30 live frames make no pipeline');

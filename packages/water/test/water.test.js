@@ -42,7 +42,7 @@ test('moon radiance drives wave glints, foam and the water ambient floor', async
   const water = new Water({ segments: 4 });
   h.engine.use(water);
   h.frame();
-  const uniform = h.resources.find((r) => r.size === 576),
+  const uniform = h.resources.find((r) => r.size === 560),
     values = new Float32Array(uniform.data);
   const d = h.engine.lighting.direction,
     k = Math.hypot(d[0], d[1], d[2]);
@@ -77,7 +77,7 @@ test('explicit reflection lights stay separate, update in place and survive rest
   const water = new Water({ segments: 4, lights });
   h.engine.use(water);
   h.frame();
-  const read = () => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 576).data),
+  const read = () => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 560).data),
     first = read().slice(112),
     allocated = { ...h.counts };
   assert.deepEqual(Array.from(first.slice(0, 3)), [Math.fround(0.6), Math.fround(0.8), 0]);
@@ -135,7 +135,7 @@ test('wave height adjusts the existing spectrum atomically and rejects folded su
   h.engine.use(effect);
   effect.setWaveHeight(0.6);
   h.frame();
-  const uniform = h.resources.find((r) => r.size === 576),
+  const uniform = h.resources.find((r) => r.size === 560),
     values = new Float32Array(uniform.data);
   assert.ok(Math.abs(values[34] - 0.6) < 1e-6);
   assert.ok(Math.abs(values[42] - 0.3) < 1e-6);
@@ -188,7 +188,7 @@ test('default reflection lights copy exact uniform bits without creating tempora
     Float32Array.prototype.subarray = original;
   }
   assert.equal(views, 0);
-  const values = new Uint32Array(h.resources.find((r) => r.size === 576).data);
+  const values = new Uint32Array(h.resources.find((r) => r.size === 560).data);
   assert.deepEqual(values.slice(112, 116), values.slice(104, 108));
   assert.deepEqual(values.slice(116, 119), values.slice(108, 111));
   water.dispose();
@@ -218,20 +218,6 @@ test('ripple normals use gradient noise on five separately turned lattices (the 
       const d = (((angles[i] - angles[j]) % quarter) + quarter) % quarter;
       assert.ok(Math.min(d, quarter - d) > (10 * Math.PI) / 180, `layers ${j} and ${i} align`);
     }
-  water.dispose();
-});
-test('water filters short slopes in their own footprint and keeps the distant wind layer through six metres', () => {
-  const h = optionalGPU(),
-    water = new Water({ segments: 4, chop: 0.5 });
-  h.engine.use(water);
-  h.frame();
-  const code = h.pipelines.find((p) => p.fragment?.targets.length === 2).fragment.module.code;
-  assert.doesNotMatch(code, /footprint\s*<\s*6\.0/);
-  assert.match(code, /length\(\(local\*pixelX\)\*scale\),length\(\(local\*pixelY\)\*scale\)/);
-  assert.match(code, /let gradient=k\+warp\.yz/);
-  assert.match(code, /abs\(dot\(gradient,pixelX\)\),abs\(dot\(gradient,pixelY\)\)/);
-  assert.match(code, /sqrt\(9\.81\*length\(k\)\)\*frame\.settings\.x/);
-  assert.match(code, /fresnel\(nv\)\*mix\(1\.0,skyVisible,open\)/);
   water.dispose();
 });
 test('foam takes N.L lighting, and a shadow source shades glints and foam from bind group 1', async () => {
@@ -289,7 +275,7 @@ test('default swells are the 6 m/s sea: the peak train along the wind, the other
     effect = new Water({ segments: 4 });
   h.engine.use(effect);
   h.frame();
-  const v = new Float32Array(h.resources.find((r) => r.size === 576).data);
+  const v = new Float32Array(h.resources.find((r) => r.size === 560).data);
   const along = [1, 0.3].map((x) => x / Math.hypot(1, 0.3));
   const cosines = Array.from({ length: 8 }, (_, i) => v[32 + i * 8] * along[0] + v[33 + i * 8] * along[1]);
   assert.ok(cosines.every((c) => c >= Math.cos((75 * Math.PI) / 180) - 1e-6));
@@ -303,7 +289,7 @@ test('a Water with no options is the sea of a 6 m/s wind, and `waves` keeps its 
       effect = new Water({ segments: 4, ...options });
     h.engine.use(effect);
     h.frame();
-    const v = new Float32Array(h.resources.find((r) => r.size === 576).data);
+    const v = new Float32Array(h.resources.find((r) => r.size === 560).data);
     effect.dispose();
     return { v, effect };
   };
@@ -315,10 +301,7 @@ test('a Water with no options is the sea of a 6 m/s wind, and `waves` keeps its 
   assert.equal(waves.v[23], 1);
   assert.equal(waves.v[34], Math.fround(0.3));
   assert.doesNotThrow(() => new Water({ segments: 4 }).setWind(12));
-  assert.throws(
-    () => new Water({ segments: 4, waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 5 }] }).setWind(12),
-    /setWind needs a Water without options.waves/,
-  );
+  assert.throws(() => new Water({ segments: 4, waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 5 }] }).setWind(12), /setWind needs a Water without options.waves/);
 });
 test('borrowed HDR optics retain resources and copy descriptors between frames', async () => {
   const h = optionalGPU(),
@@ -527,7 +510,7 @@ test('mesh sampling fades short waves without changing their wavelength or heigh
   });
   h.engine.use(effect);
   h.frame();
-  const values = new Float32Array(h.resources.find((r) => r.size === 576).data);
+  const values = new Float32Array(h.resources.find((r) => r.size === 560).data);
   for (let i = 0; i < ratios.length; i++) {
     assert.ok(Math.abs(values[39 + i * 8] - weights[i]) < 1e-6);
     assert.ok(Math.abs(values[35 + i * 8] - (2 * Math.PI) / (ratios[i] * edge)) < 1e-6);
@@ -564,7 +547,7 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
     'WebKit emits an invalid Metal result struct for compare-exchange',
   );
   const allocated = { ...h.counts },
-    uniform = h.resources.find((r) => r.size === 576),
+    uniform = h.resources.find((r) => r.size === 560),
     values = new Float32Array(uniform.data);
   assert.deepEqual(Array.from(values.subarray(96, 100)), [-8, -8, 16, 16]);
   assert.equal(values[103], 1);
@@ -590,23 +573,11 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
   bad.dispose();
 });
 
-test('ocean horizon retains the central grid, grows offshore footprints and appends a flat far quad', async () => {
+test('ocean horizon retains the central grid and supplies larger sample footprints offshore', async () => {
   const bounded = new Water({ size: [160, 160], segments: 32 }),
     ocean = new Water({ size: [160, 160], segments: 32, horizon: true });
-  const far = bounded.positions.length / 3;
-  assert.deepEqual(ocean.triangles.subarray(0, bounded.triangles.length), bounded.triangles);
-  assert.deepEqual(Array.from(ocean.triangles.subarray(bounded.triangles.length)), [
-    far,
-    far + 2,
-    far + 1,
-    far + 1,
-    far + 2,
-    far + 3,
-  ]);
-  assert.deepEqual(
-    Array.from(ocean.positions.subarray(bounded.positions.length)),
-    [-1e7, -1e7, -1, 1e7, -1e7, -1, -1e7, 1e7, -1, 1e7, 1e7, -1],
-  );
+  assert.equal(ocean.positions.length, bounded.positions.length);
+  assert.deepEqual(ocean.triangles, bounded.triangles);
   for (let i = 0; i < bounded.positions.length; i += 3) {
     const x = bounded.positions[i],
       z = bounded.positions[i + 1];
@@ -634,7 +605,7 @@ test('ocean horizon retains the central grid, grows offshore footprints and appe
   h.engine.camera.position = [107, 1, -43];
   h.frame();
   assert.deepEqual(
-    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 576).data).subarray(128, 130)),
+    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 560).data).subarray(128, 130)),
     [105, -45],
   );
   const pipeline = h.pipelines.find((p) => p.fragment?.targets.length === 2);
@@ -652,7 +623,7 @@ test('whitecaps and chop upload 0-1 from the options and their setters and rejec
     effect = new Water({ segments: 4, whitecaps: 0.4, chop: 0.7 });
   h.engine.use(effect);
   h.frame();
-  const uniform = h.resources.find((r) => r.size === 576),
+  const uniform = h.resources.find((r) => r.size === 560),
     values = new Float32Array(uniform.data);
   assert.ok(Math.abs(values[130] - 0.4) < 1e-6 && Math.abs(values[131] - 0.7) < 1e-6);
   effect.setWhitecaps(1).setChop(0);

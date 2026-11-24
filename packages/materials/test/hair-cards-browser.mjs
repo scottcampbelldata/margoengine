@@ -19,10 +19,7 @@ try {
     return [0, 1, 2].map((k) => image.data[at + k]);
   };
   const white = await centre(0, false);
-  assert.ok(
-    white.every((v) => v > 250),
-    `the background is white: ${white}`,
-  );
+  assert.ok(white.every((v) => v > 250), `the background is white: ${white}`);
   // Display-encoded blending (gltf/pbr's default blendSpace): the black card leaves the background times 1 - alpha.
   const alpha = (rgb) => 1 - rgb[0] / white[0];
   for (const cos of [1, 0.5, 0.25, 0.05]) {

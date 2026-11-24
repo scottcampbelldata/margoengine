@@ -20,10 +20,7 @@ class WebGLRestore implements EnginePlugin {
     if (engine.backend !== 'webgl2') return;
     const renderer = glRenderer(engine.canvas);
     if (!renderer)
-      throw new MargoError(
-        'unsupported',
-        'webglRestore needs webglRenderer from @margoengine/webgl2-compat/preview as the fallback',
-      );
+      throw new MargoError('unsupported', 'webglRestore needs webglRenderer from @margoengine/webgl2-compat/preview as the fallback');
     this.engine = engine;
     this.renderer = renderer;
     engine.canvas.addEventListener('webglcontextlost', this.lost);

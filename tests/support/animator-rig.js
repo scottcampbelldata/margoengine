@@ -178,7 +178,9 @@ export function bipedWalk({ duration = 1, speed = 1 } = {}) {
     restDown = Math.atan2(-0.02, 0.44);
   const ankle = (phase) => {
     const p = ((phase % 1) + 1) % 1;
-    return p < 0.5 ? [-0.85, half * (1 - 4 * p)] : [-0.85 + 0.1 * Math.sin(Math.PI * (2 * p - 1)), half * (4 * p - 3)];
+    return p < 0.5
+      ? [-0.85, half * (1 - 4 * p)]
+      : [-0.85 + 0.1 * Math.sin(Math.PI * (2 * p - 1)), half * (4 * p - 3)];
   };
   const angles = (phase) => {
     const [y, z] = ankle(phase),
@@ -214,13 +216,12 @@ export const largestGap = (a, b) => {
 export { Animator };
 
 /** BVH's unit in the CMU files: 1 / 0.45 inches a unit, so a person's leg measures 0.85 m and a walk 1.3 m/s. */
-export const CMU_SCALE = 2.54 / 100 / 0.45;
+export const CMU_SCALE = (2.54 / 100) / 0.45;
 
 /** A joint table like {@link BIPED} from what `parseBVH` returns, under a `Root` that keeps the hips free to move. */
 export function mocapJoints({ bones }) {
   const joints = { Root: [null, 0, 0, 0] };
-  for (const bone of bones)
-    joints[bone.name] = [bone.parent < 0 ? 'Root' : bones[bone.parent].name, ...bone.translation];
+  for (const bone of bones) joints[bone.name] = [bone.parent < 0 ? 'Root' : bones[bone.parent].name, ...bone.translation];
   return joints;
 }
 

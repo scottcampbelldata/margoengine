@@ -75,12 +75,7 @@ export interface IFCEditor {
    */
   setProperty(id: number, set: string, name: string, value: IFCPropertyInput): number;
   /** Sets several properties of one set (null removes one). With `replace`, properties not listed are removed. */
-  setPropertySet(
-    id: number,
-    set: string,
-    values: Record<string, IFCPropertyInput | null>,
-    options?: { replace?: boolean },
-  ): void;
+  setPropertySet(id: number, set: string, values: Record<string, IFCPropertyInput | null>, options?: { replace?: boolean }): void;
   /** Removes a property; a set left empty is removed. False when the element's own sets do not hold it. */
   removeProperty(id: number, set: string, name: string): boolean;
   /** Detaches a property set or quantity set from the element, deleting what nothing else uses. */
@@ -115,8 +110,7 @@ const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$
  * `0-9A-Za-z_$`, most significant first, so the first character holds the top 2 bits (0 to 3).
  */
 export function ifcGuidFromUUID(uuid: string): string {
-  if (typeof uuid !== 'string' || !UUID.test(uuid))
-    fail('range', 'expected a UUID such as 3f2504e0-4f89-11d3-9a0c-0305e82c3301');
+  if (typeof uuid !== 'string' || !UUID.test(uuid)) fail('range', 'expected a UUID such as 3f2504e0-4f89-11d3-9a0c-0305e82c3301');
   let n = BigInt(`0x${uuid.replace(/-/g, '')}`),
     out = '';
   for (let i = 0; i < 22; i++, n >>= 6n) out = GUID_DIGITS[Number(n & 63n)] + out;
@@ -124,8 +118,7 @@ export function ifcGuidFromUUID(uuid: string): string {
 }
 /** Expands an IfcGloballyUniqueId to its lower-case UUID. */
 export function uuidFromIFCGuid(guid: string): string {
-  if (typeof guid !== 'string' || !GUID.test(guid))
-    fail('range', 'expected a 22-character IFC GUID whose first character is 0 to 3');
+  if (typeof guid !== 'string' || !GUID.test(guid)) fail('range', 'expected a 22-character IFC GUID whose first character is 0 to 3');
   let n = 0n;
   for (const c of guid) n = n * 64n + BigInt(GUID_DIGITS.indexOf(c));
   const h = n.toString(16).padStart(32, '0');
@@ -252,10 +245,7 @@ function parseUnit(symbol: string): [string, string | null, string] {
       unit = SI_UNITS[symbol.slice(length)];
     if (prefix && unit && symbol.slice(length) !== 'degC') return [unit[0], prefix, unit[1]];
   }
-  return fail(
-    'range',
-    `unknown unit ${JSON.stringify(symbol)}; use an SI symbol with an optional prefix, such as mm, m2, kg or kPa`,
-  );
+  return fail('range', `unknown unit ${JSON.stringify(symbol)}; use an SI symbol with an optional prefix, such as mm, m2, kg or kPa`);
 }
 
 const QUANTITIES: Record<IFCQuantityKind, [string, string, string]> = {
@@ -295,10 +285,7 @@ const OPTIONAL_TEXT: Record<string, string> = {
   ApplicableOccurrence: 'IFCIDENTIFIER',
 };
 const ENUM_VALUE = /^[A-Z][A-Z0-9_]*$/;
-const SET_KINDS = {
-  property: ['IFCPROPERTYSET', 'HasProperties'],
-  quantity: ['IFCELEMENTQUANTITY', 'Quantities'],
-} as const;
+const SET_KINDS = { property: ['IFCPROPERTYSET', 'HasProperties'], quantity: ['IFCELEMENTQUANTITY', 'Quantities'] } as const;
 type SetKind = keyof typeof SET_KINDS;
 
 /** The SI to file-unit inverse of `si = raw * scale + shift`, rounded to 15 significant digits to drop the 1 ulp
@@ -310,9 +297,7 @@ const toRaw = (si: number, unit: IFCUnit | undefined) =>
 export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEditor {
   checkModel(model);
   const { api, id: modelId } = model;
-  const now = Math.floor(
-    (options.now === undefined ? Date.now() : options.now instanceof Date ? options.now.getTime() : Number.NaN) / 1000,
-  );
+  const now = Math.floor((options.now === undefined ? Date.now() : options.now instanceof Date ? options.now.getTime() : Number.NaN) / 1000);
   if (!Number.isSafeInteger(now)) fail('range', 'now must be a valid Date');
   const ifc2x3 = model.schema.toUpperCase() === 'IFC2X3';
   const lines = new Map<number, Raw>();
@@ -350,8 +335,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
   const names = new Map<number, string>();
   const kindOf = (l: Raw): string => {
     let name = names.get(l.type);
-    if (name === undefined)
-      names.set(l.type, (name = native('reading a type name', () => api.GetNameFromTypeCode(l.type)).toUpperCase()));
+    if (name === undefined) names.set(l.type, (name = native('reading a type name', () => api.GetNameFromTypeCode(l.type)).toUpperCase()));
     return name;
   };
   const ids = (name: string, inherited = false): number[] => {
@@ -379,11 +363,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     try {
       out = api.CreateIfcType(modelId, api.GetTypeCodeFromName(type), value);
     } catch {}
-    if (!out)
-      fail(
-        'range',
-        `${model.schema} has no defined type ${type}; use one of its types, such as IfcLabel or IfcLengthMeasure`,
-      );
+    if (!out) fail('range', `${model.schema} has no defined type ${type}; use one of its types, such as IfcLabel or IfcLengthMeasure`);
     return out;
   };
 
@@ -404,11 +384,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     const entry = indexed.get(expressID);
     if (!entry) return;
     for (const r of entry.refs) counts.set(r, counts.get(r)! - 1);
-    for (const o of entry.objects)
-      byObject.set(
-        o,
-        byObject.get(o)!.filter((rel) => rel !== expressID),
-      );
+    for (const o of entry.objects) byObject.set(o, byObject.get(o)!.filter((rel) => rel !== expressID));
     indexed.delete(expressID);
   };
   for (const name of HOLDERS) for (const holder of ids(name, true)) if (!indexed.has(holder)) index(get(holder));
@@ -465,33 +441,21 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     const existing = firstHistory !== undefined ? refOf(get(firstHistory).OwningUser) : undefined;
     if (!options.user && existing !== undefined) return (user = existing);
     const u = options.user ?? { organization: 'Unknown' };
-    if (typeof u.organization !== 'string' || !u.organization)
-      fail('range', 'user.organization must be a non-empty string');
+    if (typeof u.organization !== 'string' || !u.organization) fail('range', 'user.organization must be a non-empty string');
     const person = put(
       entity('IFCPERSON', {
         FamilyName: u.familyName === undefined ? null : label(u.familyName),
         // IFC2x3 and IFC4 need a family or given name.
-        GivenName:
-          u.givenName === undefined ? (u.familyName === undefined ? label('Unknown') : null) : label(u.givenName),
+        GivenName: u.givenName === undefined ? (u.familyName === undefined ? label('Unknown') : null) : label(u.givenName),
       }),
     );
-    return (user = put(
-      entity('IFCPERSONANDORGANIZATION', {
-        ThePerson: ref(person),
-        TheOrganization: ref(organization(u.organization)),
-      }),
-    ));
+    return (user = put(entity('IFCPERSONANDORGANIZATION', { ThePerson: ref(person), TheOrganization: ref(organization(u.organization)) })));
   };
   const sessionApplication = (): number => {
     if (application !== undefined) return application;
     const existing = firstHistory !== undefined ? refOf(get(firstHistory).OwningApplication) : undefined;
     if (!options.application && existing !== undefined) return (application = existing);
-    const a = options.application ?? {
-      name: 'Margo Engine',
-      version: '1.0.0',
-      identifier: 'margoengine',
-      developer: 'Margo Engine',
-    };
+    const a = options.application ?? { name: 'Margo Engine', version: '1.0.0', identifier: 'margoengine', developer: 'Margo Engine' };
     for (const key of ['name', 'version', 'identifier', 'developer'] as const)
       if (typeof a[key] !== 'string' || !a[key]) fail('range', `application.${key} must be a non-empty string`);
     return (application = put(
@@ -549,8 +513,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
   const siUnitLine = (symbol: string, measure: string): [number, IFCUnit] => {
     const [unitType, prefix, name] = parseUnit(symbol);
     const needed = unitTypeOfMeasure(measure);
-    if (needed !== unitType)
-      fail('range', `unit ${symbol} is a ${unitType}, but ${measure} takes ${needed ?? 'no unit'}`);
+    if (needed !== unitType) fail('range', `unit ${symbol} is a ${unitType}, but ${measure} takes ${needed ?? 'no unit'}`);
     const key = `${unitType} ${prefix} ${name}`;
     let found = unitLines.get(key);
     if (found === undefined) {
@@ -561,11 +524,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
       found ??= put(
         entity(
           'IFCSIUNIT',
-          {
-            UnitType: { type: 3, value: unitType },
-            Prefix: prefix ? { type: 3, value: prefix } : null,
-            Name: { type: 3, value: name },
-          },
+          { UnitType: { type: 3, value: unitType }, Prefix: prefix ? { type: 3, value: prefix } : null, Name: { type: 3, value: name } },
           ['Dimensions'],
         ),
       );
@@ -574,9 +533,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     return [found, { ...siScale(prefix, name), symbol, name: key }];
   };
   const explicitUnit = (unitRef: number | undefined): IFCUnit | undefined =>
-    unitRef === undefined
-      ? undefined
-      : unitOf(get(unitRef), (expressID) => (expressID === undefined ? undefined : get(expressID)), kindOf);
+    unitRef === undefined ? undefined : unitOf(get(unitRef), (expressID) => (expressID === undefined ? undefined : get(expressID)), kindOf);
 
   /** A typed IFC value from an input; `hint` is the type and unit the property has now. */
   const value = (
@@ -585,24 +542,15 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     what: string,
   ): { wrapper: Raw; type: string; unit?: number } => {
     const plain = typeof input !== 'object' || input === null;
-    if (!plain && (typeof input.type !== 'string' || !input.type))
-      fail('range', `${what}: a typed value needs a type such as IfcLabel`);
-    const given = plain ? input : input.raw !== undefined ? input.raw : input.value;
+    if (!plain && (typeof input.type !== 'string' || !input.type)) fail('range', `${what}: a typed value needs a type such as IfcLabel`);
+    const given = plain ? input : (input.raw !== undefined ? input.raw : input.value);
     if (given === undefined) fail('range', `${what}: a typed value needs value or raw`);
     const kindOfValue = given === null ? 'null' : typeof given;
-    if (!['string', 'number', 'boolean', 'null'].includes(kindOfValue))
-      fail('range', `${what}: expected a string, number or boolean`);
+    if (!['string', 'number', 'boolean', 'null'].includes(kindOfValue)) fail('range', `${what}: expected a string, number or boolean`);
     let type = plain ? undefined : input.type.toUpperCase();
     // A plain value keeps the property's type when it fits.
     if (type === undefined && hint.type && fits(hint.type, given)) type = hint.type;
-    type ??=
-      typeof given === 'string'
-        ? [...given].length > 255
-          ? 'IFCTEXT'
-          : 'IFCLABEL'
-        : typeof given === 'boolean'
-          ? 'IFCBOOLEAN'
-          : 'IFCREAL';
+    type ??= typeof given === 'string' ? ([...given].length > 255 ? 'IFCTEXT' : 'IFCLABEL') : typeof given === 'boolean' ? 'IFCBOOLEAN' : 'IFCREAL';
     if (!fits(type, given)) fail('range', `${what}: ${JSON.stringify(given)} is not a valid ${type}`);
     let unit: number | undefined, convert: IFCUnit | undefined;
     if (!plain && input.unit !== undefined) [unit, convert] = siUnitLine(input.unit, type);
@@ -616,33 +564,22 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
 
   // Property sets of an element.
   const objectOf = (id: number) => {
-    if (!Number.isSafeInteger(id) || !objects.has(id))
-      fail('range', `#${id} is not an object or type object; pass an expressID from readIFCData`);
+    if (!Number.isSafeInteger(id) || !objects.has(id)) fail('range', `#${id} is not an object or type object; pass an expressID from readIFCData`);
     return types.has(id);
   };
   const setsOf = (id: number): { set: number; rel?: number }[] => {
     if (types.has(id)) return refsOf(get(id).HasPropertySets).map((set) => ({ set }));
     const out: { set: number; rel?: number }[] = [];
-    for (const rel of byObject.get(id) ?? [])
-      for (const set of refsOf(get(rel).RelatingPropertyDefinition)) out.push({ set, rel });
+    for (const rel of byObject.get(id) ?? []) for (const set of refsOf(get(rel).RelatingPropertyDefinition)) out.push({ set, rel });
     return out;
   };
   const findSet = (id: number, name: string, kind?: SetKind) =>
     setsOf(id).find(({ set }) => {
       const l = get(set);
-      return (
-        text(l.Name) === name &&
-        (kind ? kindOf(l) === SET_KINDS[kind][0] : kindOf(l) in { IFCPROPERTYSET: 1, IFCELEMENTQUANTITY: 1 })
-      );
+      return text(l.Name) === name && (kind ? kindOf(l) === SET_KINDS[kind][0] : kindOf(l) in { IFCPROPERTYSET: 1, IFCELEMENTQUANTITY: 1 });
     });
   const replaceRef = (v: Raw, from: number, to: number | null): Raw =>
-    Array.isArray(v)
-      ? v.flatMap((r) => (refOf(r) === from ? (to === null ? [] : [ref(to)]) : [r]))
-      : refOf(v) === from
-        ? to === null
-          ? null
-          : ref(to)
-        : v;
+    Array.isArray(v) ? v.flatMap((r) => (refOf(r) === from ? (to === null ? [] : [ref(to)]) : [r])) : refOf(v) === from ? (to === null ? null : ref(to)) : v;
   /** Makes the relationship and the set exclusive to the element (copying shared ones) and returns the set's ID. */
   const own = (id: number, found: { set: number; rel?: number }): number => {
     let { set, rel } = found;
@@ -652,22 +589,13 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
         touch(r);
         r.RelatedObjects = replaceRef(r.RelatedObjects, id, null);
         put(r);
-        rel = put(
-          root('IFCRELDEFINESBYPROPERTIES', {
-            Name: r.Name,
-            Description: r.Description,
-            RelatedObjects: [ref(id)],
-            RelatingPropertyDefinition: r.RelatingPropertyDefinition,
-          }),
-          true,
-        );
+        rel = put(root('IFCRELDEFINESBYPROPERTIES', { Name: r.Name, Description: r.Description, RelatedObjects: [ref(id)], RelatingPropertyDefinition: r.RelatingPropertyDefinition }), true);
       }
     }
     if ((counts.get(set) ?? 0) > 1) {
       const old = get(set),
         copy = create(kindOf(old));
-      for (const key of Object.keys(copy))
-        copy[key] = key === 'expressID' || key === 'type' ? copy[key] : (old[key] ?? null);
+      for (const key of Object.keys(copy)) copy[key] = key === 'expressID' || key === 'type' ? copy[key] : (old[key] ?? null);
       copy.GlobalId = typed('IFCGLOBALLYUNIQUEID', newIFCGuid());
       copy.OwnerHistory = addedHistory();
       const next = put(copy, true);
@@ -682,14 +610,16 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
   };
   /** Adds a new set holding `parts` to the element. */
   const addSet = (id: number, kind: SetKind, name: string, parts: number[]): number => {
-    const set = put(root(SET_KINDS[kind][0], { Name: label(name), [SET_KINDS[kind][1]]: parts.map(ref) }), true);
+    const set = put(
+      root(SET_KINDS[kind][0], { Name: label(name), [SET_KINDS[kind][1]]: parts.map(ref) }),
+      true,
+    );
     if (types.has(id)) {
       const t = get(id);
       touch(t);
       t.HasPropertySets = [...(t.HasPropertySets ?? []), ref(set)];
       put(t);
-    } else
-      put(root('IFCRELDEFINESBYPROPERTIES', { RelatedObjects: [ref(id)], RelatingPropertyDefinition: ref(set) }), true);
+    } else put(root('IFCRELDEFINESBYPROPERTIES', { RelatedObjects: [ref(id)], RelatingPropertyDefinition: ref(set) }), true);
     return set;
   };
   /** Detaches a set from the element and deletes it when nothing else uses it. */
@@ -709,15 +639,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
         r.RelatedObjects = replaceRef(r.RelatedObjects, id, null);
         put(r);
         if (defs.length)
-          put(
-            root('IFCRELDEFINESBYPROPERTIES', {
-              Name: r.Name,
-              Description: r.Description,
-              RelatedObjects: [ref(id)],
-              RelatingPropertyDefinition: replaceRef(r.RelatingPropertyDefinition, found.set, null),
-            }),
-            true,
-          );
+          put(root('IFCRELDEFINESBYPROPERTIES', { Name: r.Name, Description: r.Description, RelatedObjects: [ref(id)], RelatingPropertyDefinition: replaceRef(r.RelatingPropertyDefinition, found.set, null) }), true);
       } else if (defs.length) {
         touch(r);
         r.RelatingPropertyDefinition = replaceRef(r.RelatingPropertyDefinition, found.set, null);
@@ -727,13 +649,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     if (!counts.get(found.set)) remove(found.set);
   };
   /** Writes `part` (a new property or quantity line) into the element's set, replacing the part of that name. */
-  const writePart = (
-    id: number,
-    kind: SetKind,
-    setName: string,
-    name: string,
-    build: (old: Raw | undefined) => Raw,
-  ): number => {
+  const writePart = (id: number, kind: SetKind, setName: string, name: string, build: (old: Raw | undefined) => Raw): number => {
     objectOf(id);
     if (typeof setName !== 'string' || !setName) fail('range', 'the set name must be a non-empty string');
     if (typeof name !== 'string' || !name) fail('range', 'the property name must be a non-empty string');
@@ -785,60 +701,39 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
     const what = `property ${name}`;
     const oldKind = old ? kindOf(old) : undefined;
     const many = Array.isArray(input);
-    const enumerated =
-      oldKind === 'IFCPROPERTYENUMERATEDVALUE' &&
-      (many ? input : [input]).every(
-        (v) =>
-          typeof v === 'string' ||
-          (typeof v === 'object' && v !== null && typeof (v as IFCTypedValue).value === 'string'),
-      );
+    const enumerated = oldKind === 'IFCPROPERTYENUMERATEDVALUE' && (many ? input : [input]).every((v) => typeof v === 'string' || (typeof v === 'object' && v !== null && typeof (v as IFCTypedValue).value === 'string'));
     const kind = enumerated ? 'IFCPROPERTYENUMERATEDVALUE' : many ? 'IFCPROPERTYLISTVALUE' : 'IFCPROPERTYSINGLEVALUE';
     const e = entity(kind, {});
-    if (old)
-      for (const key of Object.keys(e))
-        if (key !== 'expressID' && key !== 'type' && key in old) e[key] = old[key] ?? null;
+    if (old) for (const key of Object.keys(e)) if (key !== 'expressID' && key !== 'type' && key in old) e[key] = old[key] ?? null;
     e.Name = typed('IFCIDENTIFIER', name);
-    const firstOld =
-      oldKind === 'IFCPROPERTYSINGLEVALUE' ? old.NominalValue : (old?.ListValues ?? old?.EnumerationValues)?.[0];
-    const hint = {
-      type: typeof firstOld?.name === 'string' ? firstOld.name.toUpperCase() : undefined,
-      unit: refOf(old?.Unit),
-    };
-    const values = (
-      many ? (input as readonly (IFCScalarInput | IFCTypedValue)[]) : [input as IFCScalarInput | IFCTypedValue]
-    ).map((v) => value(v, hint, what));
+    const firstOld = oldKind === 'IFCPROPERTYSINGLEVALUE' ? old.NominalValue : (old?.ListValues ?? old?.EnumerationValues)?.[0];
+    const hint = { type: typeof firstOld?.name === 'string' ? firstOld.name.toUpperCase() : undefined, unit: refOf(old?.Unit) };
+    const values = (many ? (input as readonly (IFCScalarInput | IFCTypedValue)[]) : [input as IFCScalarInput | IFCTypedValue]).map((v) => value(v, hint, what));
     if (!values.length) fail('range', `${what}: a list needs at least one value`);
-    if (values.some((v) => v.type !== values[0]!.type))
-      fail('range', `${what}: every value of a list must have one type`);
+    if (values.some((v) => v.type !== values[0]!.type)) fail('range', `${what}: every value of a list must have one type`);
     if (enumerated) {
       const reference = refOf(old.EnumerationReference);
       if (reference !== undefined) {
         const allowed = (get(reference).EnumerationValues ?? []).map((v: Raw) => decode(v));
         for (const v of values)
-          if (!allowed.includes(decode(v.wrapper)))
-            fail('range', `${what}: ${JSON.stringify(decode(v.wrapper))} is not one of ${allowed.join(', ')}`);
+          if (!allowed.includes(decode(v.wrapper))) fail('range', `${what}: ${JSON.stringify(decode(v.wrapper))} is not one of ${allowed.join(', ')}`);
       }
       e.EnumerationValues = values.map((v) => v.wrapper);
     } else if (many) e.ListValues = values.map((v) => v.wrapper);
     else e.NominalValue = values[0]!.wrapper;
-    if ('Unit' in e && kind !== 'IFCPROPERTYENUMERATEDVALUE')
-      e.Unit = values[0]!.unit === undefined ? null : ref(values[0]!.unit);
+    if ('Unit' in e && kind !== 'IFCPROPERTYENUMERATEDVALUE') e.Unit = values[0]!.unit === undefined ? null : ref(values[0]!.unit);
     return e;
   };
   const quantity = (name: string, input: number | IFCQuantityInput, old: Raw | undefined): Raw => {
     const what = `quantity ${name}`;
     const spec: IFCQuantityInput = typeof input === 'number' ? { value: input } : input;
     if (!spec || typeof spec !== 'object') fail('range', `${what}: expected a number or { kind, value }`);
-    const oldKind = old
-      ? (Object.entries(QUANTITIES).find(([, q]) => q[0] === kindOf(old))?.[0] as IFCQuantityKind | undefined)
-      : undefined;
+    const oldKind = old ? (Object.entries(QUANTITIES).find(([, q]) => q[0] === kindOf(old))?.[0] as IFCQuantityKind | undefined) : undefined;
     const kind: IFCQuantityKind | undefined = spec.kind ?? oldKind;
-    if (!kind || !QUANTITIES[kind])
-      return fail('range', `${what}: a new quantity needs kind (length, area, volume, count, weight, time or number)`);
+    if (!kind || !QUANTITIES[kind]) return fail('range', `${what}: a new quantity needs kind (length, area, volume, count, weight, time or number)`);
     const [entityName, key, measure] = QUANTITIES[kind];
     const e = entity(entityName, {});
-    if (old && kind === oldKind)
-      for (const k of Object.keys(e)) if (k !== 'expressID' && k !== 'type' && k in old) e[k] = old[k] ?? null;
+    if (old && kind === oldKind) for (const k of Object.keys(e)) if (k !== 'expressID' && k !== 'type' && k in old) e[k] = old[k] ?? null;
     e.Name = label(name);
     const given = spec.raw ?? spec.value;
     if (typeof given !== 'number' || !Number.isFinite(given)) fail('range', `${what}: expected a finite number`);
@@ -898,8 +793,7 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
       if (refsOf(current).length || (current && current.type === 5) || (Array.isArray(current) && current.length))
         fail('range', `${name} holds references or a list; setAttribute sets single values`);
       if (input === null) {
-        if (!(name in OPTIONAL_TEXT) || !('GlobalId' in l))
-          fail('range', `${name} cannot be cleared; only optional IfcRoot text attributes can`);
+        if (!(name in OPTIONAL_TEXT) || !('GlobalId' in l)) fail('range', `${name} cannot be cleared; only optional IfcRoot text attributes can`);
         l[name] = null;
       } else if (typeof input === 'object') {
         if (typeof input.type !== 'string') fail('range', 'a typed attribute value needs a type');
@@ -907,12 +801,10 @@ export function editIFC(model: IFCModel, options: IFCEditOptions = {}): IFCEdito
         check(type, input.raw, name);
         l[name] = wrap(type, input.raw);
       } else if (current && current.type === 3 && !current.name) {
-        if (typeof input !== 'string' || !ENUM_VALUE.test(input))
-          fail('range', `${name} is an enumeration; pass a value such as NOTDEFINED`);
+        if (typeof input !== 'string' || !ENUM_VALUE.test(input)) fail('range', `${name} is an enumeration; pass a value such as NOTDEFINED`);
         l[name] = { type: 3, value: input };
       } else if (!current && (name === 'PredefinedType' || name === 'CompositionType')) {
-        if (typeof input !== 'string' || !ENUM_VALUE.test(input))
-          fail('range', `${name} is an enumeration; pass a value such as NOTDEFINED`);
+        if (typeof input !== 'string' || !ENUM_VALUE.test(input)) fail('range', `${name} is an enumeration; pass a value such as NOTDEFINED`);
         l[name] = { type: 3, value: input };
       } else {
         const type = typeof current?.name === 'string' ? current.name.toUpperCase() : OPTIONAL_TEXT[name];
@@ -933,11 +825,7 @@ function fits(type: string, value: unknown): boolean {
   if (type === 'IFCBOOLEAN') return typeof value === 'boolean';
   if (type === 'IFCLOGICAL') return typeof value === 'boolean' || value === null;
   if (value === null) return false;
-  if (
-    /^IFC(LABEL|TEXT|IDENTIFIER|DESCRIPTIVEMEASURE|DATE|DATETIME|TIME|DURATION|URIREFERENCE|GLOBALLYUNIQUEID|PRESENTABLETEXT|BOXALIGNMENT|FONTSTYLE|FONTVARIANT|FONTWEIGHT|TEXTALIGNMENT|TEXTDECORATION|TEXTFONTNAME|TEXTTRANSFORMATION|WELLKNOWNTEXTLITERAL|LANGUAGEID)$/.test(
-      type,
-    )
-  )
+  if (/^IFC(LABEL|TEXT|IDENTIFIER|DESCRIPTIVEMEASURE|DATE|DATETIME|TIME|DURATION|URIREFERENCE|GLOBALLYUNIQUEID|PRESENTABLETEXT|BOXALIGNMENT|FONTSTYLE|FONTVARIANT|FONTWEIGHT|TEXTALIGNMENT|TEXTDECORATION|TEXTFONTNAME|TEXTTRANSFORMATION|WELLKNOWNTEXTLITERAL|LANGUAGEID)$/.test(type))
     return typeof value === 'string';
   return typeof value === 'number';
 }
@@ -949,8 +837,7 @@ function check(type: string, raw: unknown, what: string): void {
     if (INTEGER.test(type) && !Number.isInteger(raw)) fail('range', `${what}: ${type} needs an integer`);
     if (type.startsWith('IFCPOSITIVE') && !(raw > 0)) fail('range', `${what}: ${type} needs a value above 0`);
     if (type.startsWith('IFCNONNEGATIVE') && raw < 0) fail('range', `${what}: ${type} needs a value of 0 or more`);
-    if (type === 'IFCNORMALISEDRATIOMEASURE' && (raw < 0 || raw > 1))
-      fail('range', `${what}: ${type} needs a value from 0 to 1`);
+    if (type === 'IFCNORMALISEDRATIOMEASURE' && (raw < 0 || raw > 1)) fail('range', `${what}: ${type} needs a value from 0 to 1`);
   }
   // IfcLabel and IfcIdentifier are STRING(255) in IFC4 and IFC4X3.
   if (typeof raw === 'string' && (type === 'IFCLABEL' || type === 'IFCIDENTIFIER') && [...raw].length > 255)

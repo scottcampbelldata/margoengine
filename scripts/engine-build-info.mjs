@@ -17,8 +17,7 @@ export function engineBuildInfo(options = {}) {
       command = env.command;
       const file = join(options.root ?? process.cwd(), '.engine', 'manifest.json');
       if (!existsSync(file)) {
-        if (env.command === 'build')
-          throw new Error(`${file} is missing; prepare the verified private engine dependency before building`);
+        if (env.command === 'build') throw new Error(`${file} is missing; prepare the verified private engine dependency before building`);
         return;
       }
       manifest = JSON.parse(readFileSync(file, 'utf8'));

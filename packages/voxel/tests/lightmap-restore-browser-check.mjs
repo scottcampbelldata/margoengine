@@ -19,7 +19,9 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 const near = (a, b, label) =>
-  a.forEach((v, c) => assert.ok(Math.abs(v - b[c]) <= 6, `${label}: [${a.map(Math.round)}] vs [${b.map(Math.round)}]`));
+  a.forEach((v, c) =>
+    assert.ok(Math.abs(v - b[c]) <= 6, `${label}: [${a.map(Math.round)}] vs [${b.map(Math.round)}]`),
+  );
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -31,10 +33,7 @@ try {
   assert.deepEqual(errors, [], 'no validation error or throw from a frame after either restore');
   assert.ok(Math.min(...r.live.chart) > 40, `the live-lit floor is drawn and lit: ${r.live.chart}`);
   const redness = ([red, green]) => red / Math.max(green, 1);
-  assert.ok(
-    redness(r.baked.chart) > redness(r.baked.open) * 1.5,
-    `the chart draws the red baked light: ${r.baked.chart}`,
-  );
+  assert.ok(redness(r.baked.chart) > redness(r.baked.open) * 1.5, `the chart draws the red baked light: ${r.baked.chart}`);
   near(r.baked.open, r.live.open, 'the floor off the chart stays live-lit');
   near(r.lost.chart, r.live.chart, 'a lost plain atlas leaves the live-lit floor');
   assert.equal(r.reportedLost, 1, `one report for the lost atlas: ${JSON.stringify(reported)}`);

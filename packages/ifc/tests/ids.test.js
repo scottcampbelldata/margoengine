@@ -102,22 +102,11 @@ test('a report names each applicable entity, what passed and why each requiremen
   assert.match(back.description, /1 of 1 applicable entities fail/);
   assert.deepEqual(back.viewpoints[0].selection, [{ ifcGuid: '1kTvXnbbzCWw8lcMd1dR4o' }]);
   assert.equal(back.comments.length, 1);
-  assert.match(
-    back.comments[0].comment,
-    /^.+ \(1kTvXnbbzCWw8lcMd1dR4o\): Pset_WallCommon.FireRating is 1HR, expected one of 2HR, 3HR$/,
-  );
+  assert.match(back.comments[0].comment, /^.+ \(1kTvXnbbzCWw8lcMd1dR4o\): Pset_WallCommon.FireRating is 1HR, expected one of 2HR, 3HR$/);
   assert.equal(back.comments[0].viewpoint, back.viewpoints[0].guid);
   assert.throws(() => bcfTopicsFromIDS(report, {}), { code: 'range', message: /author/ });
-  const camera = {
-    type: 'perspective',
-    position: [10, -10, 8],
-    direction: [-0.6, 0.6, -0.5],
-    up: [0, 0, 1],
-    fieldOfView: 60,
-    aspectRatio: 1.5,
-  };
-  const v3 = (await readBCF(writeBCF({ topics: bcfTopicsFromIDS(report, { author: 'checker@example.com', camera }) })))
-    .topics[0];
+  const camera = { type: 'perspective', position: [10, -10, 8], direction: [-0.6, 0.6, -0.5], up: [0, 0, 1], fieldOfView: 60, aspectRatio: 1.5 };
+  const v3 = (await readBCF(writeBCF({ topics: bcfTopicsFromIDS(report, { author: 'checker@example.com', camera }) }))).topics[0];
   assert.deepEqual(v3.viewpoints[0].camera.position, [10, -10, 8]);
   // A specification for another schema is still checked, with a warning.
   assert.equal(other.status, 'pass');
@@ -135,10 +124,7 @@ test('IDS errors are coded: malformed XML, a missing title, a closed model, an a
   assert.throws(() => parseIDS('<other/>'), { code: 'syntax', message: /not an IDS/ });
   assert.throws(() => parseIDS(42), { code: 'range' });
   const ids = parseIDS(readFileSync(new URL('ids/pass-a_minimal_ids_can_check_a_minimal_ifc_2_2.ids', root)));
-  const model = openIFC(
-    api,
-    new Uint8Array(readFileSync(new URL('ids/pass-a_minimal_ids_can_check_a_minimal_ifc_2_2.ifc', root))),
-  );
+  const model = openIFC(api, new Uint8Array(readFileSync(new URL('ids/pass-a_minimal_ids_can_check_a_minimal_ifc_2_2.ifc', root))));
   assert.throws(() => checkIDS(model, ids, { signal: AbortSignal.abort() }), { code: 'aborted' });
   model.close();
   assert.throws(() => checkIDS(model, ids), { code: 'range', message: /closed/ });

@@ -31,11 +31,7 @@ test('the kernel world sphere holds every transformed stored vertex (translation
     store.bounds.set(local.bounds, id * 4);
     store.tick(false);
     // World spheres follow the local ones (columns 31 to 34 of packages/kernel/src/lib.rs, one value per entity).
-    const world = new Float32Array(
-        store.bounds.buffer,
-        store.bounds.byteOffset + 4 * store.capacity * 4,
-        4 * store.capacity,
-      ),
+    const world = new Float32Array(store.bounds.buffer, store.bounds.byteOffset + 4 * store.capacity * 4, 4 * store.capacity),
       [cx, cy, cz, r] = [0, 1, 2, 3].map((k) => world[k * store.capacity + id]),
       m = store.matrices.subarray(id * 16, id * 16 + 16);
     for (let i = 0; i < 3; i++) {

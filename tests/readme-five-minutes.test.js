@@ -51,9 +51,7 @@ test('the Node version, URL and file to edit match the repository', () => {
   assert.ok(section.includes('<http://127.0.0.1:5173/>'), 'the section opens the address the server prints');
   assert.equal(QUICKSTART_PAGE, '/examples/quickstart/');
   assert.ok(existsSync(join(root, 'examples/quickstart/index.html')), 'the page the root redirects to exists');
-  const [, file, from, to] = section.match(
-    /`([\w/.-]+\.ts)` in your editor, change the ball's colour `'(#\w+)'` to `'(#\w+)'`/,
-  );
+  const [, file, from, to] = section.match(/`([\w/.-]+\.ts)` in your editor, change the ball's colour `'(#\w+)'` to `'(#\w+)'`/);
   const source = readFileSync(join(root, file), 'utf8');
   assert.ok(source.includes(`color: '${from}'`), `${file} has the colour the section says to change`);
   assert.notEqual(from, to);

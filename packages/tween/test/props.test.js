@@ -31,11 +31,7 @@ test('from and fromTo render starts immediately and preserve unmentioned keys', 
 
 test('keyframe value lists are explicit starts, with per-segment easing and yoyo', async () => {
   const value = { x: 99, y: 8 };
-  const move = to(
-    value,
-    { x: [0, 10, '+=20'], y: [2, 6] },
-    { duration: 2, repeat: 1, yoyo: true, easing: (t) => t * t },
-  );
+  const move = to(value, { x: [0, 10, '+=20'], y: [2, 6] }, { duration: 2, repeat: 1, yoyo: true, easing: (t) => t * t });
   assert.equal(value.x, 0);
   assert.equal(value.y, 2);
   move.update(0.5);
@@ -50,15 +46,11 @@ test('keyframe value lists are explicit starts, with per-segment easing and yoyo
 
 test('multi-property keys distribute missing offsets and hold endpoints', async () => {
   const value = { x: 0, y: 0 };
-  const move = keyframes(
-    value,
-    [
-      { values: { x: 2 }, offset: 0.2 },
-      { values: { x: 6, y: 4 }, easing: (t) => t * t },
-      { values: { x: 10 }, offset: 0.8 },
-    ],
-    { duration: 10 },
-  );
+  const move = keyframes(value, [
+    { values: { x: 2 }, offset: 0.2 },
+    { values: { x: 6, y: 4 }, easing: (t) => t * t },
+    { values: { x: 10 }, offset: 0.8 },
+  ], { duration: 10 });
   move.update(1);
   assert.equal(value.x, 2);
   move.update(2.5);
@@ -90,14 +82,11 @@ test('validation is atomic and cancellation preserves all current properties', a
 });
 
 test('pause and speed are local, finite dt is required even when paused', async () => {
-  const value = { x: 0 },
-    move = to(value, { x: 10 }, { duration: 1 });
+  const value = { x: 0 }, move = to(value, { x: 10 }, { duration: 1 });
   move.pause().update(0.5);
   assert.equal(value.x, 0);
   assert.throws(() => move.update(NaN), RangeError);
-  assert.throws(() => {
-    move.speed = -1;
-  }, RangeError);
+  assert.throws(() => { move.speed = -1; }, RangeError);
   move.speed = 2;
   move.play().update(0.5);
   await move;

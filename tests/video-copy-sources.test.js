@@ -60,25 +60,20 @@ test('every direct copyExternalImageToTexture call in package sources is a known
       continue;
     }
     for (const file of sources(src))
-      if (CALL.test(readFileSync(file, 'utf8'))) found[relative(root, file).replaceAll('\\', '/')] = true;
+      if (CALL.test(readFileSync(file, 'utf8')))
+        found[relative(root, file).replaceAll('\\', '/')] = true;
   }
   // The WebGL2 layer implements the call; it is not a caller.
   const callers = Object.keys(found)
     .filter((file) => !file.startsWith('packages/webgl2-compat/'))
     .sort();
-  assert.deepEqual(
-    callers,
-    Object.keys(DIRECT).sort(),
-    'a new direct caller: route any video source through shared/copy-external.js, then list it',
-  );
+  assert.deepEqual(callers, Object.keys(DIRECT).sort(), 'a new direct caller: route any video source through shared/copy-external.js, then list it');
 });
 
 test('voxel makes no external copies, and video imports its frames rather than copying them', () => {
   for (const pkg of ['voxel', 'video'])
     for (const file of sources(join(root, 'packages', pkg, 'src')))
       assert.equal(CALL.test(readFileSync(file, 'utf8')), false, file);
-  const video = [...sources(join(root, 'packages', 'video', 'src'))]
-    .map((file) => readFileSync(file, 'utf8'))
-    .join('\n');
+  const video = [...sources(join(root, 'packages', 'video', 'src'))].map((file) => readFileSync(file, 'utf8')).join('\n');
   assert.match(video, /importExternalTexture\(/);
 });

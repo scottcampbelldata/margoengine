@@ -110,68 +110,18 @@ export function mixChannels(channels: readonly Float32Array[], count: number): F
       for (let i = 0; i < length; i++) a[i] += gain * b[i];
     };
   const rules: Record<string, [number, number, number][]> = {
-    '1>2': [
-      [0, 0, 1],
-      [1, 0, 1],
-    ],
-    '1>4': [
-      [0, 0, 1],
-      [1, 0, 1],
-    ],
+    '1>2': [[0, 0, 1], [1, 0, 1]],
+    '1>4': [[0, 0, 1], [1, 0, 1]],
     '1>6': [[2, 0, 1]],
-    '2>4': [
-      [0, 0, 1],
-      [1, 1, 1],
-    ],
-    '2>6': [
-      [0, 0, 1],
-      [1, 1, 1],
-    ],
-    '4>6': [
-      [0, 0, 1],
-      [1, 1, 1],
-      [4, 2, 1],
-      [5, 3, 1],
-    ],
-    '2>1': [
-      [0, 0, 0.5],
-      [0, 1, 0.5],
-    ],
-    '4>1': [
-      [0, 0, 0.25],
-      [0, 1, 0.25],
-      [0, 2, 0.25],
-      [0, 3, 0.25],
-    ],
-    '6>1': [
-      [0, 0, SQRT_HALF],
-      [0, 1, SQRT_HALF],
-      [0, 2, 1],
-      [0, 4, 0.5],
-      [0, 5, 0.5],
-    ],
-    '4>2': [
-      [0, 0, 0.5],
-      [0, 2, 0.5],
-      [1, 1, 0.5],
-      [1, 3, 0.5],
-    ],
-    '6>2': [
-      [0, 0, 1],
-      [0, 2, SQRT_HALF],
-      [0, 4, SQRT_HALF],
-      [1, 1, 1],
-      [1, 2, SQRT_HALF],
-      [1, 5, SQRT_HALF],
-    ],
-    '6>4': [
-      [0, 0, 1],
-      [0, 2, SQRT_HALF],
-      [1, 1, 1],
-      [1, 2, SQRT_HALF],
-      [2, 4, 1],
-      [3, 5, 1],
-    ],
+    '2>4': [[0, 0, 1], [1, 1, 1]],
+    '2>6': [[0, 0, 1], [1, 1, 1]],
+    '4>6': [[0, 0, 1], [1, 1, 1], [4, 2, 1], [5, 3, 1]],
+    '2>1': [[0, 0, 0.5], [0, 1, 0.5]],
+    '4>1': [[0, 0, 0.25], [0, 1, 0.25], [0, 2, 0.25], [0, 3, 0.25]],
+    '6>1': [[0, 0, SQRT_HALF], [0, 1, SQRT_HALF], [0, 2, 1], [0, 4, 0.5], [0, 5, 0.5]],
+    '4>2': [[0, 0, 0.5], [0, 2, 0.5], [1, 1, 0.5], [1, 3, 0.5]],
+    '6>2': [[0, 0, 1], [0, 2, SQRT_HALF], [0, 4, SQRT_HALF], [1, 1, 1], [1, 2, SQRT_HALF], [1, 5, SQRT_HALF]],
+    '6>4': [[0, 0, 1], [0, 2, SQRT_HALF], [1, 1, 1], [1, 2, SQRT_HALF], [2, 4, 1], [3, 5, 1]],
   };
   const rule = from === count ? undefined : rules[`${from}>${count}`];
   if (rule) for (const [to, src, gain] of rule) add(to, src, gain);
@@ -212,10 +162,7 @@ export function resample(audio: ResampleInput, sampleRate: number, options: Resa
     s = rolloff * Math.min(1, sampleRate / from),
     reach = zeroCrossings / s,
     // Kaiser's beta for the stopband attenuation (Kaiser 1974; Oppenheim and Schafer, section 7.6).
-    beta =
-      attenuation > 50
-        ? 0.1102 * (attenuation - 8.7)
-        : 0.5842 * (attenuation - 21) ** 0.4 + 0.07886 * (attenuation - 21),
+    beta = attenuation > 50 ? 0.1102 * (attenuation - 8.7) : 0.5842 * (attenuation - 21) ** 0.4 + 0.07886 * (attenuation - 21),
     table = filterTable(zeroCrossings, beta),
     weights = new Float64Array(Math.ceil(2 * reach) + 2),
     out = channels.map(() => new Float32Array(outLength));

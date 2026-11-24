@@ -25,8 +25,7 @@ test('Mars takes its size, air and light from the Mars Fact Sheet and Sneep and 
   const n = 636 / (1.380649e-23 * 214);
   close(n, 2.153e23, 1e-3, 'number density');
   // CO2's 12.4e-27 cm^2 at 532 nm, as 1 / lambda^4: per km at 680, 550 and 440 nm.
-  for (const [c, l] of [680, 550, 440].entries())
-    close(a.rayleigh[c], 12.4e-31 * (532 / l) ** 4 * n * 1000, 1e-12, `rayleigh ${l}`);
+  for (const [c, l] of [680, 550, 440].entries()) close(a.rayleigh[c], 12.4e-31 * (532 / l) ** 4 * n * 1000, 1e-12, `rayleigh ${l}`);
   close(a.rayleigh[1], 2.336e-4, 1e-3, 'green Rayleigh per km');
   // About 58 times thinner than Earth's air at 550 nm: 1.6% of the pressure, twice the cross section per molecule.
   close(EARTH_ATMOSPHERE.rayleigh[1] / a.rayleigh[1], 58.0, 0.01, 'Earth over Mars');
@@ -59,12 +58,7 @@ test('Martian dust: the optical depth given, red scattered more than blue, forwa
 test('any atmosphere may give Mie scattering and absorption per channel', () => {
   const a = atmosphereParameters({ mie: [0.01, 0.02, 0.03], mieAbsorption: 0.001 });
   assert.deepEqual(a.mie, [0.01, 0.02, 0.03]);
-  for (const bad of [
-    { mie: [0.1, -0.1, 0] },
-    { mieAbsorption: [0.1, 0.1] },
-    { mie: [0.1, Number.NaN, 0] },
-    { mie: -1 },
-  ])
+  for (const bad of [{ mie: [0.1, -0.1, 0] }, { mieAbsorption: [0.1, 0.1] }, { mie: [0.1, Number.NaN, 0] }, { mie: -1 }])
     assert.throws(() => atmosphereParameters(bad), /mie/, JSON.stringify(bad));
 });
 

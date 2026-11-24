@@ -24,13 +24,7 @@ function city(engine, side = 20) {
   const geometry = box(1, 1, 1),
     meshes = [];
   for (let x = 0; x < side; x++)
-    for (let z = 0; z < side; z++)
-      meshes.push(
-        engine
-          .createMesh()
-          .setGeometry(geometry)
-          .setPosition([x * 3, 0, z * 3]),
-      );
+    for (let z = 0; z < side; z++) meshes.push(engine.createMesh().setGeometry(geometry).setPosition([x * 3, 0, z * 3]));
   return meshes;
 }
 
@@ -112,10 +106,7 @@ test('objects added and removed rebuild the tree', async () => {
     meshes = city(engine, 4),
     scene = new SceneBVH(engine);
   scene.update();
-  engine
-    .createMesh()
-    .setGeometry(box(1, 1, 1))
-    .setPosition([40, 0, 40]);
+  engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([40, 0, 40]);
   assert.equal(scene.update(), 'rebuilt');
   assert.equal(scene.size, meshes.length + 1);
   agree(engine, scene, 100, 7);

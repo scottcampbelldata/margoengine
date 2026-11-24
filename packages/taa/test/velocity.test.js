@@ -110,14 +110,7 @@ test('taa.velocity: the velocity texture, the jitter part of every vector, and t
 });
 
 test('velocityOnly: motion vectors with no jitter, capture, history or resolve', () => {
-  const stackDepth = {
-      width: 1280,
-      height: 720,
-      sampleCount: 1,
-      format: 'depth24plus',
-      usage: 4,
-      createView: () => ({}),
-    },
+  const stackDepth = { width: 1280, height: 720, sampleCount: 1, format: 'depth24plus', usage: 4, createView: () => ({}) },
     r = rig({ velocityOnly: true, depth: () => stackDepth }, 1);
   const log = r.gpu.record(() => r.frame());
   assert.doesNotMatch(r.view.c.shader, /taaCamera/, 'the scene shader keeps its own camera');

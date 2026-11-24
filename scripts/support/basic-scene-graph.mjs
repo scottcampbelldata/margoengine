@@ -60,10 +60,7 @@ export function sceneGraph(manifest) {
     gltf = staticFiles(manifest, loader),
     deferredChunks = new Set(deferred.map((key) => manifest[key].file));
   for (const file of [...entry, ...gltf])
-    assert.ok(
-      !deferredChunks.has(file),
-      `${file}, a deferred glTF feature loader, is a static import of the basic scene`,
-    );
+    assert.ok(!deferredChunks.has(file), `${file}, a deferred glTF feature loader, is a static import of the basic scene`);
   return {
     loader,
     entry,
@@ -96,10 +93,6 @@ export function checkFetched(paths, expected, graph) {
     [],
     'the basic scene fetched a deferred glTF feature loader (gltf/pbr or animation)',
   );
-  assert.deepEqual(
-    [...new Set(paths)].sort(),
-    [...expected].sort(),
-    'exactly the HTML, entry chunk, glTF chunk and model',
-  );
+  assert.deepEqual([...new Set(paths)].sort(), [...expected].sort(), 'exactly the HTML, entry chunk, glTF chunk and model');
   assert.equal(paths.length, expected.size, 'each file once');
 }

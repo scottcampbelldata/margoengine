@@ -193,9 +193,7 @@ class Importer {
   /** Angle `value` of `#id` in radians; throws where the body's context gives no plane-angle unit. */
   private angle(id: number, value: number): number {
     if (!(this.angleUnit > 0))
-      throw new RangeError(
-        `${this.name}: #${id} gives an angle, and the file's context no plane-angle unit for it; add a plane-angle unit to the representation context`,
-      );
+      throw new RangeError(`${this.name}: #${id} gives an angle, and the file's context no plane-angle unit for it; add a plane-angle unit to the representation context`);
     return value * this.angleUnit;
   }
   private p(id: number | undefined): XYZ {
@@ -206,9 +204,7 @@ class Importer {
     return { ...f, origin: scale(f.origin, this.unit) };
   }
   private fail(id: number, what: string): never {
-    throw new RangeError(
-      `${this.name}: #${id} ${this.file.typeName(id)} is not a ${what} the modeler has yet; mesh the file with tessellateSTEP instead`,
-    );
+    throw new RangeError(`${this.name}: #${id} ${this.file.typeName(id)} is not a ${what} the modeler has yet; mesh the file with tessellateSTEP instead`);
   }
 
   private curve(id: number): CurveDef {
@@ -357,7 +353,12 @@ class Importer {
    * torus it makes; any other curve (a B-spline, an ellipse, a circle out of such a plane, a line skew to the axis) as
    * the exact rational B-spline surface it sweeps, a line taken as far along it as the face's edges reach.
    */
-  private revolution(id: number, curveId: number, axisId: number | undefined, reach: () => readonly XYZ[]): SurfaceDef {
+  private revolution(
+    id: number,
+    curveId: number,
+    axisId: number | undefined,
+    reach: () => readonly XYZ[],
+  ): SurfaceDef {
     if (axisId === undefined || !this.file.is(axisId, 'AXIS1_PLACEMENT')) return this.fail(id, 'surface');
     const [, location, dir] = this.file.args(axisId, 'AXIS1_PLACEMENT'),
       o = this.p(ref(location)),
@@ -396,8 +397,7 @@ class Importer {
       }
       const lean = dot(c.direction, towards) / along;
       // A cylinder's and a cone's normal point out, STEP's where the line runs up the axis.
-      if (Math.abs(lean) < 1e-12)
-        return this.against(along < 0, { kind: 'cylinder', frame: frameOf(o, z, towards), radius: r });
+      if (Math.abs(lean) < 1e-12) return this.against(along < 0, { kind: 'cylinder', frame: frameOf(o, z, towards), radius: r });
       // Radius r at height h, growing by `lean` per unit along the axis.
       return this.against(along < 0, {
         kind: 'cone',
@@ -424,12 +424,7 @@ class Importer {
           far = points.reduce((a, p) => (length(off(p)) > length(off(a)) ? p : a), points[0]);
         return this.against(side(unit(off(far))), { kind: 'sphere', frame: frameOf(centre, z), radius: c.radius });
       }
-      return this.against(side(radial), {
-        kind: 'torus',
-        frame: frameOf(centre, z, radial),
-        major: rc,
-        minor: c.radius,
-      });
+      return this.against(side(radial), { kind: 'torus', frame: frameOf(centre, z, radial), major: rc, minor: c.radius });
     }
     return revolvedSurface(splineOf(c), o, z);
   }
@@ -481,10 +476,7 @@ class Importer {
         try {
           fit = offsetSpline(s, d, OFFSET_FIT);
         } catch (e) {
-          return this.fail(
-            id,
-            `surface (an offset of a B-spline the fit refused: ${e instanceof Error ? e.message : e})`,
-          );
+          return this.fail(id, `surface (an offset of a B-spline the fit refused: ${e instanceof Error ? e.message : e})`);
         }
         if (!(fit.error <= OFFSET_FIT))
           return this.fail(id, `surface (an offset of a B-spline fitted no closer than ${fit.error.toPrecision(3)} m)`);
@@ -527,8 +519,7 @@ class Importer {
     if (!e) {
       const [, start, end, geometry, sameSense] = this.file.args(id, 'EDGE_CURVE'),
         curve = ref(geometry);
-      if (curve === undefined)
-        throw new RangeError(`${this.name}: edge #${id} has no curve; export it again from the CAD tool`);
+      if (curve === undefined) throw new RangeError(`${this.name}: edge #${id} has no curve; export it again from the CAD tool`);
       e = new Edge(
         `${this.name}/edge:#${id}`,
         this.curve(curve),
@@ -577,7 +568,7 @@ class Importer {
       bounds = list(args[1]).map((b) => ref(b) ?? -1),
       surface = geometry !== undefined ? this.surface(geometry, () => this.reach(bounds)) : this.planeOf(id, bounds);
     // A face its shell turns inside out faces the other way, and its loops run the other way with it.
-    const face = new Face(`${this.name}/face:#${id}`, surface, (sameSense !== flipped) !== this.inverted.has(surface));
+    const face = new Face(`${this.name}/face:#${id}`, surface, sameSense !== flipped !== this.inverted.has(surface));
     for (const b of bounds) {
       const [, loopRef, orientation] = this.file.get(b).args,
         loopId = ref(loopRef) ?? -1,
@@ -592,10 +583,7 @@ class Importer {
       else if (type === 'POLY_LOOP') {
         const pts = list(this.file.get(loopId).args[1]).map((v) => ref(v) ?? -1);
         for (let i = 0; i < pts.length; i++) uses.push(this.polyEdge(pts[i], pts[(i + 1) % pts.length]));
-      } else
-        throw new RangeError(
-          `${this.name}: face bound #${b} is a ${type}, not a loop of edges; export it again from the CAD tool`,
-        );
+      } else throw new RangeError(`${this.name}: face bound #${b} is a ${type}, not a loop of edges; export it again from the CAD tool`);
       // Reversed by its orientation or by the face being turned: run it backwards.
       const runs = isTrue(orientation) !== flipped ? uses : uses.reverse().map((x) => ({ ...x, forward: !x.forward })),
         // A seam the loop runs both ways that ends at a pole or apex (a sphere's meridian, a cone's seam to its tip):

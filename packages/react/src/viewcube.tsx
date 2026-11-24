@@ -9,10 +9,7 @@ export interface GizmoHelperProps extends ViewCubeOptions {
   onError?: (error: unknown) => void;
 }
 /** Interactive view cube with face/edge/corner navigation, drag orbit, roll and projection controls. */
-export const GizmoHelper = /* @__PURE__ */ forwardRef<ViewCube, GizmoHelperProps>(function GizmoHelper(
-  { onError, ...options },
-  ref,
-) {
+export const GizmoHelper = /* @__PURE__ */ forwardRef<ViewCube, GizmoHelperProps>(function GizmoHelper({ onError, ...options }, ref) {
   const scene = useScene();
   useCreated(
     scene,

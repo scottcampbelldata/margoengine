@@ -14,11 +14,7 @@ export interface MoonAlbedo {
 /** Decode a caller-hosted lunar map. No network access occurs on import or construction. */
 export async function loadMoonAlbedo(url: string | URL, options: { signal?: AbortSignal } = {}): Promise<MoonAlbedo> {
   const response = await fetch(url, { signal: options.signal });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      `Moon albedo HTTP ${response.status}: ${url}; use a reachable lunar map URL; see https://margoengine.com/errors#failed`,
-    );
+  if (!response.ok) throw new MargoError('failed', `Moon albedo HTTP ${response.status}: ${url}; use a reachable lunar map URL; see https://margoengine.com/errors#failed`);
   const image = await createImageBitmap(await response.blob(), { colorSpaceConversion: 'none' });
   try {
     options.signal?.throwIfAborted();
@@ -85,8 +81,7 @@ const basis = (o: MoonOptions) => {
     ['intensity', o.intensity ?? 1, 0, 1000],
     ['earthshine', o.earthshine ?? 0.001, 0, 1],
   ] as const)
-    if (!(Number.isFinite(value) && value >= low && value <= high))
-      throw new RangeError(`Invalid Moon ${key}; use the documented finite range.`);
+    if (!(Number.isFinite(value) && value >= low && value <= high)) throw new RangeError(`Invalid Moon ${key}; use the documented finite range.`);
   const d = unit(o.direction ?? [0, 0, -1], 'direction'),
     n = unit(o.north ?? [0, 1, 0], 'north');
   const e = cross(d, n);

@@ -48,31 +48,29 @@ const FEET = [
 ];
 
 test('full-body avoidance clears the whole limb and preserves the reached hand', async (t) => {
-  const f = await rig();
-  t.after(() => f.release());
-  f.left.target = [0.5, 1.3, 0.2];
+  const f=await rig();
+  t.after(()=>f.release());
+  f.left.target=[0.5,1.3,0.2];
   f.step();
-  const obstacle = new SphereVolume({ center: f.world('LeftForeArm'), radius: 0.025 });
-  f.left.avoidance = createLimbAvoidance(
-    new ChainAvoidanceSolver([obstacle], { radius: 0.01, minClearance: 0.005, candidates: 64 }),
-  );
+  const obstacle=new SphereVolume({center:f.world('LeftForeArm'),radius:0.025});
+  f.left.avoidance=createLimbAvoidance(new ChainAvoidanceSolver([obstacle],{radius:0.01,minClearance:0.005,candidates:64}));
   f.step();
-  assert.equal(f.ik.result.clear, true);
-  near(f.world('LeftHand'), f.left.target, 1e-3, 'hand');
-  assert.ok(obstacle.segmentClearance(f.world('LeftArm'), f.world('LeftForeArm'), 0.01) >= 0.005 - 1e-6);
-  assert.ok(obstacle.segmentClearance(f.world('LeftForeArm'), f.world('LeftHand'), 0.01) >= 0.005 - 1e-6);
+  assert.equal(f.ik.result.clear,true);
+  near(f.world('LeftHand'),f.left.target,1e-3,'hand');
+  assert.ok(obstacle.segmentClearance(f.world('LeftArm'),f.world('LeftForeArm'),0.01)>=0.005-1e-6);
+  assert.ok(obstacle.segmentClearance(f.world('LeftForeArm'),f.world('LeftHand'),0.01)>=0.005-1e-6);
 });
 test('a rejected late limb rolls back the torso and previously solved limbs together', async (t) => {
-  const f = await rig();
-  t.after(() => f.release());
+  const f=await rig();
+  t.after(()=>f.release());
   f.step();
-  const before = places(f);
-  f.left.target = [0.3, 1.15, 0.85];
-  f.right.avoidance = () => null;
+  const before=places(f);
+  f.left.target=[0.3,1.15,0.85];
+  f.right.avoidance=()=>null;
   f.step();
-  assert.equal(f.ik.result.clear, false);
-  assert.equal(f.ik.result.reached, false);
-  places(f).forEach((p, i) => near(p, before[i], 1e-6, ALL[i]));
+  assert.equal(f.ik.result.clear,false);
+  assert.equal(f.ik.result.reached,false);
+  places(f).forEach((p,i)=>near(p,before[i],1e-6,ALL[i]));
 });
 const planted = (f) => {
   near(f.world('LeftFoot'), FEET[0], 2e-3, 'left foot');
@@ -204,12 +202,7 @@ test('weight blends from the animated pose', async (t) => {
   f.right.target = [-0.4, 1.2, 0.3];
   f.right.weight = 0.5;
   f.step();
-  near(
-    f.world('RightHand'),
-    animated.map((v, c) => (v + f.right.target[c]) / 2),
-    1e-3,
-    'half way',
-  );
+  near(f.world('RightHand'), animated.map((v, c) => (v + f.right.target[c]) / 2), 1e-3, 'half way');
   f.options.weight = 0;
   f.step();
   near(f.world('RightHand'), animated, 1e-5, 'off');
@@ -246,10 +239,7 @@ test('bad rigs name the fix', async (t) => {
   const good = f.options,
     { left, right } = f;
   assert.throws(() => addFullBodyIK(f.animator, { ...good, pelvis: 99 }), /not one of/);
-  assert.throws(
-    () => addFullBodyIK(f.animator, { ...good, spine: [f.index.get('Chest'), f.index.get('Spine')] }),
-    /spine/,
-  );
+  assert.throws(() => addFullBodyIK(f.animator, { ...good, spine: [f.index.get('Chest'), f.index.get('Spine')] }), /spine/);
   assert.throws(
     () => addFullBodyIK(f.animator, { ...good, arms: [{ upper: left.upper, lower: right.lower, end: left.end }] }),
     /direct chain/,
@@ -270,11 +260,7 @@ test('RiggedFigure.glb: on its real walking clip a hand reaches a point while th
     plain.release();
   });
   const i = (n) => f.index.get(n),
-    limb = (kind, side) => ({
-      upper: i(`${kind}_joint_${side}_1`),
-      lower: i(`${kind}_joint_${side}_2`),
-      end: i(`${kind}_joint_${side}_3`),
-    }),
+    limb = (kind, side) => ({ upper: i(`${kind}_joint_${side}_1`), lower: i(`${kind}_joint_${side}_2`), end: i(`${kind}_joint_${side}_3`) }),
     arm = limb('arm', 'L');
   f.step(1 / 30, 10);
   plain.step(1 / 30, 10);
@@ -294,8 +280,7 @@ test('RiggedFigure.glb: on its real walking clip a hand reaches a point while th
     plain.step(1 / 30);
     near(f.world('arm_joint_L_3'), target, 2e-3, `frame ${frame}`);
     assert.ok(ik.result.reached, `frame ${frame} short by ${ik.result.distance}`);
-    for (const foot of ['leg_joint_L_3', 'leg_joint_R_3'])
-      near(f.world(foot), plain.world(foot), 2e-3, `${foot} frame ${frame}`);
+    for (const foot of ['leg_joint_L_3', 'leg_joint_R_3']) near(f.world(foot), plain.world(foot), 2e-3, `${foot} frame ${frame}`);
   }
 });
 

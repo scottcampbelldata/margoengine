@@ -147,7 +147,6 @@ async function main() {
       ...common,
       origin: [-128 + d, -128 + d],
       size: [256, 256],
-      clipmapAnchor: [pose.position[0], pose.position[2]],
       textures: (gpu) => {
         const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
         gpu.queue.writeTexture({ texture: heightmap }, heights, { bytesPerRow: n * 4 }, [n, n]);

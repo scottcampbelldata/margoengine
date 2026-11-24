@@ -45,14 +45,7 @@ const scene = () => ({
         { time: 2, position: [1, 0, 0] },
       ],
     },
-    {
-      type: 'event',
-      id: 'cues',
-      events: [
-        { time: 0.5, name: 'early' },
-        { time: 1.5, name: 'late' },
-      ],
-    },
+    { type: 'event', id: 'cues', events: [{ time: 0.5, name: 'early' }, { time: 1.5, name: 'late' }] },
     { type: 'audio', id: 'music', clips: [{ start: 1, duration: 1, sound: 'tone' }] },
   ],
 });
@@ -88,10 +81,7 @@ window.check = async (format) => {
     engine = await Engine.create(canvas, { backend: 'webgpu' }),
     errors = [],
     camera = new Camera(),
-    cube = engine
-      .createMesh()
-      .setGeometry(box())
-      .setMaterial(new PbrMaterial({ color: '#e8d44d', roughness: 0.4 })),
+    cube = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#e8d44d', roughness: 0.4 })),
     cutscene = new Cutscene(scene(), { tracks: [shotTrack()] }),
     player = new CutscenePlayer(cutscene),
     fired = [],

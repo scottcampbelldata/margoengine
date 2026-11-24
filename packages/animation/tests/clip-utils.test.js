@@ -84,14 +84,7 @@ test('a whole cubic segment keeps its end slope when the next segment is the one
 test('rotations slerp as the source, and a track with no key in the range holds its value', () => {
   const clip = createKeyframeClip({
       tracks: [
-        {
-          target: 'a',
-          path: 'rotation',
-          keys: [
-            { time: 0, value: axisAngle([0, 0, 1], 0) },
-            { time: 2, value: axisAngle([0, 0, 1], 120) },
-          ],
-        },
+        { target: 'a', path: 'rotation', keys: [{ time: 0, value: axisAngle([0, 0, 1], 0) }, { time: 2, value: axisAngle([0, 0, 1], 120) }] },
         { target: 'b', path: 'translation', keys: [v3(0, 7)] },
         { target: 'c', path: 'translation', keys: [v3(0, 1), v3(2, 2)] },
       ],
@@ -107,39 +100,13 @@ test('markers in the range come along re-timed; property tracks stay bound and b
   const clip = createKeyframeClip({
       tracks: [
         { target: 'a', path: 'translation', blend: 'weighted', keys: [v3(0, 0), v3(2, 2)] },
-        {
-          target: lamp,
-          property: 'intensity',
-          keys: [
-            { time: 0, value: [0] },
-            { time: 2, value: [4] },
-          ],
-        },
-        {
-          target: lamp,
-          name: 'fov',
-          set: (v) => (fov = v[0]),
-          get: () => fov,
-          keys: [
-            { time: 0, value: [10] },
-            { time: 2, value: [30] },
-          ],
-        },
+        { target: lamp, property: 'intensity', keys: [{ time: 0, value: [0] }, { time: 2, value: [4] }] },
+        { target: lamp, name: 'fov', set: (v) => (fov = v[0]), get: () => fov, keys: [{ time: 0, value: [10] }, { time: 2, value: [30] }] },
       ],
-      markers: [
-        { time: 0.25, name: 'early' },
-        { time: 1, name: 'step', data: 7 },
-        { time: 1.5, name: 'edge' },
-      ],
+      markers: [{ time: 0.25, name: 'early' }, { time: 1, name: 'step', data: 7 }, { time: 1.5, name: 'edge' }],
     }),
     part = subclip(clip, 0.5, 1.5);
-  assert.deepEqual(
-    part.markers.map((m) => [m.time, m.name]),
-    [
-      [0.5, 'step'],
-      [1, 'edge'],
-    ],
-  );
+  assert.deepEqual(part.markers.map((m) => [m.time, m.name]), [[0.5, 'step'], [1, 'edge']]);
   assert.equal(part.markers[0].data, 7);
   assert.equal(part.tracks[0].blend, 'weighted');
   applyKeyframeClip(part, 0.5);
@@ -160,33 +127,15 @@ test('an additive clip is identity at its reference, and base plus difference is
       name: 'Nod',
       tracks: [
         { target: 'head', path: 'translation', keys: [v3(0, 1), v3(1, 3)] },
-        {
-          target: 'head',
-          path: 'scale',
-          keys: [
-            { time: 0, value: [2, 2, 2] },
-            { time: 1, value: [4, 2, 1] },
-          ],
-        },
-        {
-          target: 'head',
-          path: 'rotation',
-          keys: [
-            { time: 0, value: axisAngle([0, 1, 0], 30) },
-            { time: 1, value: axisAngle([0, 1, 0], 90) },
-          ],
-        },
+        { target: 'head', path: 'scale', keys: [{ time: 0, value: [2, 2, 2] }, { time: 1, value: [4, 2, 1] }] },
+        { target: 'head', path: 'rotation', keys: [{ time: 0, value: axisAngle([0, 1, 0], 30) }, { time: 1, value: axisAngle([0, 1, 0], 90) }] },
       ],
       markers: [{ time: 0.5, name: 'mid' }],
     }),
     additive = makeAdditive(clip);
   assert.equal(additive.name, 'Nod (additive)');
   assert.equal(additive.markers.length, 1);
-  near(
-    [...sampleKeyframes(additive.tracks[0], 0)],
-    [0, -0, -0].map(() => 0),
-    1e-12,
-  );
+  near([...sampleKeyframes(additive.tracks[0], 0)], [0, -0, -0].map(() => 0), 1e-12);
   near([...sampleKeyframes(additive.tracks[1], 0)], [1, 1, 1], 1e-12);
   sameRotation([...sampleKeyframes(additive.tracks[2], 0)], [0, 0, 0, 1], 1e-12);
   const skeleton = new Skeleton([{ name: 'head', parent: -1 }]);
@@ -247,14 +196,7 @@ test('a reference from another clip, weights, a zero scale axis and weighted app
     turn = makeAdditive(
       createKeyframeClip({
         tracks: [
-          {
-            target: 'a',
-            path: 'rotation',
-            keys: [
-              { time: 0, value: [0, 0, 0, 1] },
-              { time: 1, value: axisAngle([0, 0, 1], 90) },
-            ],
-          },
+          { target: 'a', path: 'rotation', keys: [{ time: 0, value: [0, 0, 0, 1] }, { time: 1, value: axisAngle([0, 0, 1], 90) }] },
           { target: 'a', path: 'translation', keys: [v3(0, 0), v3(1, 8)] },
           { target: 'nobody', path: 'translation', keys: [v3(0, 0), v3(1, 8)] },
         ],
@@ -271,13 +213,7 @@ test('bad input is refused with the fix in the message', () => {
   const clip = createKeyframeClip({ tracks: [{ target: 'a', path: 'translation', keys: [v3(0, 0), v3(1, 1)] }] }),
     other = createKeyframeClip({ tracks: [{ target: 'b', path: 'translation', keys: [v3(0, 0)] }] }),
     skeleton = new Skeleton([{ name: 'a', parent: -1 }]);
-  for (const [a, b] of [
-    [-1, 1],
-    [0.5, 0.5],
-    [0.6, 0.2],
-    [0, 2],
-    [NaN, 1],
-  ])
+  for (const [a, b] of [[-1, 1], [0.5, 0.5], [0.6, 0.2], [0, 2], [NaN, 1]])
     assert.throws(() => subclip(clip, a, b), /use 0 <= start < end/);
   assert.throws(() => subclip(clip, 0, 1, { fps: 0 }), /fps/);
   assert.throws(() => subclipFrames(clip, 0.5, 2), /frames must be integers/);

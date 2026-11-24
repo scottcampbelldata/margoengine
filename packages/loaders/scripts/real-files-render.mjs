@@ -18,14 +18,9 @@ const MIN_CHANGED = (SIZE * SIZE) / 2000;
 /** One buffer: a JSON head with the array lengths, then the arrays, each on a 4-byte boundary. */
 function pack(drawing) {
   const source = drawing.geometry ?? drawing,
-    head = {
-      kind: drawing.kind,
-      pbr: drawing.pbr,
-      groups: source.groups?.map(({ start, count, color }) => ({ start, count, color })),
-      arrays: {},
-    },
+    head = { kind: drawing.kind, pbr: drawing.pbr, groups: source.groups?.map(({ start, count, color }) => ({ start, count, color })), arrays: {} },
     parts = [];
-  const box = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
+  let box = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
   for (let i = 0; i < source.positions.length; i++) {
     const a = (i % 3) * 2;
     box[a] = Math.min(box[a], source.positions[i]);
@@ -55,24 +50,14 @@ function pack(drawing) {
 /** Draws every drawing, writes a PNG per file into `folder` and marks a blank or failing row in `report` as FAIL. */
 export async function renderAll(drawings, folder, report) {
   await mkdir(folder, { recursive: true });
-  const server = await createServer({
-    plugins: [noFileWatcher()],
-    configFile: resolve(here, '../vite.config.js'),
-    logLevel: 'error',
-    server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
-  });
+  const server = await createServer({ plugins: [noFileWatcher()], configFile: resolve(here, '../vite.config.js'), logLevel: 'error', server: { port: 0 } });
   await server.listen();
   let browser;
   try {
-    browser = await launchBrowser({
-      headless: true,
-      args: process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [],
-    });
+    browser = await launchBrowser({ headless: true, args: process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [] });
     const page = await browser.newPage({ viewport: { width: SIZE, height: SIZE }, deviceScaleFactor: 1 });
     let body;
-    await page.route('**/real-files-payload', (route) =>
-      route.fulfill({ body, contentType: 'application/octet-stream' }),
-    );
+    await page.route('**/real-files-payload', (route) => route.fulfill({ body, contentType: 'application/octet-stream' }));
     await page.goto(`${server.resolvedUrls.local[0]}tests/real-files-render.html`);
     await page.waitForFunction(() => typeof window.drawRealFile === 'function');
     const seen = new Map();
@@ -114,8 +99,7 @@ function replayGrid({ calls, width, height, scale, cells }) {
   for (const call of calls) {
     if (call[0] === 'gradient') gradients[call[1]] = context[call[2]](...call[3]);
     else if (call[0] === 'stop') gradients[call[1]].addColorStop(...call[2]);
-    else if (call[0] === 'set')
-      context[call[1]] = call[2]?.gradient === undefined ? call[2] : gradients[call[2].gradient];
+    else if (call[0] === 'set') context[call[1]] = call[2]?.gradient === undefined ? call[2] : gradients[call[2].gradient];
     else context[call[1]](...call[2]);
   }
   const { data } = context.getImageData(0, 0, width, height),

@@ -46,9 +46,8 @@ test('the shader carries the bounded edge-angle term', () => {
 
 test('the owned float32 angle stays accurate across the horizon edge range', () => {
   for (let i = 0; i <= 20000; i++) {
-    const angle = (Math.PI * i) / 20000,
-      x = f(Math.cos(angle)),
-      y = f(Math.sin(angle));
+    const angle = Math.PI * i / 20000,
+      x = f(Math.cos(angle)), y = f(Math.sin(angle));
     assert.ok(Math.abs(shaderAngle(y, x) - Math.atan2(y, x)) < 4e-7, `angle ${angle}`);
   }
 });

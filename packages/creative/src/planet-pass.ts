@@ -6,7 +6,6 @@ import surfaceSource from './shaders/planet_surface.wgsl?raw';
 import atmosphereSource from './shaders/planet_atmosphere.wgsl?raw';
 import { displayShader } from '../../shared/display.js';
 import { linearHdr } from '../../shared/hdr-format.js';
-import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; VERTEX: number; INDEX: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -184,17 +183,10 @@ export class PlanetPass {
   }
 
   private variant(target: GPUTextureFormat, count: number, depthFormat: GPUTextureFormat): Variant {
-    if (
-      (target !== this.format &&
-        target !== 'rgba8unorm' &&
-        target !== 'bgra8unorm' &&
-        target !== 'rgba16float' &&
-        target !== 'rg11b10ufloat') ||
-      (count !== 1 && count !== this.samples)
-    )
+    if ((target !== this.format && target !== 'rgba16float' && target !== 'rg11b10ufloat') || (count !== 1 && count !== this.samples))
       throw new MargoError(
         'unsupported',
-        'Unsupported planet target or device; draw into rgba8unorm, bgra8unorm or rgba16float on the attached device',
+        'Unsupported planet target or device; draw into the canvas format or rgba16float on the attached device',
       );
     const key = target + ':' + count + ':' + depthFormat,
       cached = this.variants.get(key);
@@ -281,7 +273,7 @@ export class PlanetPass {
     if (context.device !== this.device)
       throw new MargoError(
         'unsupported',
-        'Unsupported planet target or device; draw into rgba8unorm, bgra8unorm or rgba16float on the attached device',
+        'Unsupported planet target or device; draw into the canvas format or rgba16float on the attached device',
       );
     const depthFormat = context.descriptor.depthStencil?.format ?? this.depthFormat,
       variant = this.variant(context.format, context.descriptor.multisample?.count ?? 1, depthFormat);
@@ -293,8 +285,6 @@ export class PlanetPass {
     pass.setBindGroup(0, shell ? variant.shellGroup : variant.surfaceGroup);
     pass.setVertexBuffer(0, this.vertex);
     pass.setIndexBuffer(this.index, 'uint32');
-    // Inside the view's rectangle only: a plain full-canvas frame has no view and keeps the whole target.
-    applyView(pass, context);
     pass.drawIndexed(this.indexCount);
     pass.end();
   }

@@ -1,11 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { IfcAPI } from 'web-ifc';
-import {
-  computeVertexNormals,
-  type LoadedGeometry,
-  type LoadedGroup,
-  type ParseLimits,
-} from '@margoengine/loaders/common';
+import { computeVertexNormals, type LoadedGeometry, type LoadedGroup, type ParseLimits } from '@margoengine/loaders/common';
 import { checkAbort, checkModel, fail, native, openIFC, type IFCModel, type IFCOpenOptions } from './open.js';
 
 export { openIFC, type IFCModel, type IFCOpenOptions } from './open.js';
@@ -53,11 +48,7 @@ function checkLimits(options: IFCGeometryOptions) {
   for (const value of [options.maxVertices ?? 0, options.maxTriangles ?? 0, (options as IFCOpenOptions).maxBytes ?? 0])
     if (!Number.isSafeInteger(value) || value < 0) fail('range', 'limits must be non-negative integers');
   const origin = options.origin;
-  if (
-    origin !== undefined &&
-    origin !== 'auto' &&
-    !(Array.isArray(origin) && origin.length === 3 && origin.every(Number.isFinite))
-  )
+  if (origin !== undefined && origin !== 'auto' && !(Array.isArray(origin) && origin.length === 3 && origin.every(Number.isFinite)))
     fail('range', "origin must be 'auto' or three finite numbers");
 }
 
@@ -102,8 +93,7 @@ export function readIFCGeometry(model: IFCModel, options: IFCGeometryOptions = {
             try {
               const vertices = api.GetVertexArray(geometry.GetVertexData(), geometry.GetVertexDataSize()),
                 faces = api.GetIndexArray(geometry.GetIndexData(), geometry.GetIndexDataSize());
-              if (vertices.length % 6 || faces.length % 3)
-                fail('range', 'invalid geometry layout; export the file again');
+              if (vertices.length % 6 || faces.length % 3) fail('range', 'invalid geometry layout; export the file again');
               const count = vertices.length / 6,
                 base = positions.length / 3,
                 start = indices.length,
@@ -126,8 +116,7 @@ export function readIFCGeometry(model: IFCModel, options: IFCGeometryOptions = {
                 const a = faces[f],
                   b = faces[f + 1],
                   c = faces[f + 2];
-                if (a >= count || b >= count || c >= count)
-                  fail('range', 'index outside geometry; export the file again');
+                if (a >= count || b >= count || c >= count) fail('range', 'index outside geometry; export the file again');
                 indices.push(base + a, base + (det < 0 ? c : b), base + (det < 0 ? b : c));
               }
               const color = checkColor(placed.color);
@@ -188,19 +177,8 @@ export function checkPlacement(m: ArrayLike<number>): number {
 }
 
 /** Checks a web-ifc surface colour and returns it as RGBA in 0..1. */
-export function checkColor({
-  x,
-  y,
-  z,
-  w,
-}: {
-  x: number;
-  y: number;
-  z: number;
-  w: number;
-}): [number, number, number, number] {
+export function checkColor({ x, y, z, w }: { x: number; y: number; z: number; w: number }): [number, number, number, number] {
   const color: [number, number, number, number] = [x, y, z, w];
-  if (color.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
-    fail('range', 'invalid surface color; export the file again');
+  if (color.some((v) => !Number.isFinite(v) || v < 0 || v > 1)) fail('range', 'invalid surface color; export the file again');
   return color;
 }

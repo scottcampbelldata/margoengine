@@ -72,10 +72,7 @@ const near = (actual, expected, label, tolerance = 1e-9) => {
   actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < tolerance, `${label}: ${actual} against ${expected}`));
 };
 const code = (fn, format, expected, pattern) =>
-  assert.throws(
-    fn,
-    (e) => e instanceof LoaderError && e.code === expected && e.format === format && pattern.test(e.message),
-  );
+  assert.throws(fn, (e) => e instanceof LoaderError && e.code === expected && e.format === format && pattern.test(e.message));
 
 test('bones become joints at each bone start, parents first, resting unrotated', () => {
   const s = parseASF(ASF);
@@ -202,24 +199,9 @@ test('bad files and limits throw coded errors', () => {
   code(() => parseASF(':root\n order TX QQ\n:bonedata'), 'ASF', 'syntax', /unknown channel/);
   code(() => parseASF(':units\n angle grad\n:root'), 'ASF', 'syntax', /deg or rad/);
   code(() => parseASF(':units\n length 0\n:root'), 'ASF', 'range', /not positive/);
-  code(
-    () => parseASF(':root\n:bonedata\n begin\n name a\n end\n:hierarchy\n begin\n b a\n end'),
-    'ASF',
-    'syntax',
-    /unknown bone "b"/,
-  );
-  code(
-    () => parseASF(':root\n:bonedata\n begin\n name a\n end\n:hierarchy\n begin\n root c\n end'),
-    'ASF',
-    'syntax',
-    /unknown bone "c"/,
-  );
-  code(
-    () => parseASF(':root\n:bonedata\n begin\n name a\n end\n:hierarchy\n begin\n root a\n root a\n end'),
-    'ASF',
-    'syntax',
-    /two parents/,
-  );
+  code(() => parseASF(':root\n:bonedata\n begin\n name a\n end\n:hierarchy\n begin\n b a\n end'), 'ASF', 'syntax', /unknown bone "b"/);
+  code(() => parseASF(':root\n:bonedata\n begin\n name a\n end\n:hierarchy\n begin\n root c\n end'), 'ASF', 'syntax', /unknown bone "c"/);
+  code(() => parseASF(':root\n:bonedata\n begin\n name a\n end\n:hierarchy\n begin\n root a\n root a\n end'), 'ASF', 'syntax', /two parents/);
   code(() => parseASF(':root\n:bonedata\n begin\n name a\n end'), 'ASF', 'syntax', /not in the hierarchy/);
   code(() => parseASF(ASF, { maxJoints: 2 }), 'ASF', 'limit', /bone count/);
   code(() => parseASF(ASF, { scale: 0 }), 'ASF', 'range', /scale/);

@@ -270,9 +270,7 @@ test('Sublayer and Reference Time Offsets: a scale at or below 0 is a compositio
     const stage = await compose(timed('timeCodesPerSecond = 24', `@./ref.usda@</Ref> (offset = 5; scale = ${scale})`));
     assert.deepEqual(stage.specs['/Root.v'].fields.timeSamples.times, [10]);
     assert.ok(stage.issues.some((i) => i.code === 'invalid-offset'));
-    const sub = await compose(
-      timed(`timeCodesPerSecond = 24\n    subLayers = [@./sub.usda@ (offset = 5; scale = ${scale})]`),
-    );
+    const sub = await compose(timed(`timeCodesPerSecond = 24\n    subLayers = [@./sub.usda@ (offset = 5; scale = ${scale})]`));
     assert.deepEqual(sub.specs['/Root.w'].fields.timeSamples.times, [10]);
     assert.ok(sub.issues.some((i) => i.code === 'invalid-offset'));
   }

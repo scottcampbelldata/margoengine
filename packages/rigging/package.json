@@ -37,18 +37,6 @@
       "types": "./dist/ik.d.ts",
       "import": "./dist/ik.js"
     },
-    "./contact": {
-      "types": "./dist/contact.d.ts",
-      "import": "./dist/contact.js"
-    },
-    "./joint-limits": {
-      "types": "./dist/joint-limits.d.ts",
-      "import": "./dist/joint-limits.js"
-    },
-    "./swim": {
-      "types": "./dist/swim.d.ts",
-      "import": "./dist/swim.js"
-    },
     "./retarget": {
       "types": "./dist/retarget.d.ts",
       "import": "./dist/retarget.js"

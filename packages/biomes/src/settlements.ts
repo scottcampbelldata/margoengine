@@ -258,9 +258,7 @@ function check(world: SettlementWorld, o: SettlementOptions) {
           (e.kind === 'line' || e.kind === 'polygon') &&
           Array.isArray(e.points) &&
           e.points.length >= (e.kind === 'line' ? 2 : 3) &&
-          e.points.every(
-            (p: readonly [number, number]) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]),
-          ) &&
+          e.points.every((p: readonly [number, number]) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) &&
           (e.kind !== 'line' || (Number.isFinite(e.width) && e.width >= 0)) &&
           (e.verge === undefined || (Number.isFinite(e.verge) && e.verge >= 0)),
       ))
@@ -297,8 +295,7 @@ function check(world: SettlementWorld, o: SettlementOptions) {
   if (o.bridge !== undefined && !inRange(o.bridge, 1, 1000)) throw bad('bridge cost', 'a multiple 1..1,000');
   if (o.detour !== undefined && !inRange(o.detour, 1, 100)) throw bad('detour', 'a ratio 1..100');
   if (o.yard !== undefined && !inRange(o.yard, 0, 100)) throw bad('yard', 'a number of metres, 0..100');
-  if (o.pattern !== undefined && o.pattern !== 'lanes' && o.pattern !== 'grid')
-    throw bad('pattern', "'lanes' or 'grid'");
+  if (o.pattern !== undefined && o.pattern !== 'lanes' && o.pattern !== 'grid') throw bad('pattern', "'lanes' or 'grid'");
   if (o.pads !== undefined && typeof o.pads !== 'boolean') throw bad('pads setting', 'true or false');
   if (o.drives !== undefined && typeof o.drives !== 'boolean') throw bad('drives setting', 'true or false');
   if (o.grid !== undefined) {
@@ -504,9 +501,7 @@ function gridVillage(
     lw = bw / M, // float division: lot frontage
     [x0, z0, x1, z1] = o.world.bounds;
   // Direction u: toward the nearest water, as asked, or at a seeded angle on a land with none.
-  let ux: number,
-    uz: number,
-    reach = 600;
+  let ux: number, uz: number, reach = 600;
   const near = o.toward ? null : o.nearest(cx, cz);
   if (o.toward || near) {
     const [dx, dz] = o.toward ?? near!,
@@ -649,7 +644,8 @@ function gridVillage(
     if (o.avoid.length && footprint(corners).some(([x, z]) => avoided(o.avoid, x, z))) continue;
     const reach = Math.sqrt(lot.w * lot.w + lot.d * lot.d) / 2 + 1; // float division: half the diagonal
     const clash = (p: House) =>
-      (p.centre[0] - hx) ** 2 + (p.centre[1] - hz) ** 2 < (reach + Math.sqrt(p.size[0] ** 2 + p.size[1] ** 2) / 2) ** 2; // float division: half the diagonal
+      (p.centre[0] - hx) ** 2 + (p.centre[1] - hz) ** 2 <
+      (reach + Math.sqrt(p.size[0] ** 2 + p.size[1] ** 2) / 2) ** 2; // float division: half the diagonal
     if (o.houses.some(clash) || taken.some(clash)) continue;
     const f: [number, number] = lot.row === 0 ? [-ux, -uz] : [ux, uz];
     const dw = dwelling(o, hx, hz, vx, vz, lot.w, lot.d, f[0], f[1], o.setback, ys[0]);
@@ -671,13 +667,7 @@ function gridVillage(
   }
   used.add(main);
   // Streets: the main one first, then by direction, line and place; houses learn the index of theirs.
-  const order = [...used].sort(
-    (p, q) =>
-      (p === main ? -1 : q === main ? 1 : 0) ||
-      runs[p].axis - runs[q].axis ||
-      runs[p].line - runs[q].line ||
-      runs[p].lo - runs[q].lo,
-  );
+  const order = [...used].sort((p, q) => (p === main ? -1 : q === main ? 1 : 0) || runs[p].axis - runs[q].axis || runs[p].line - runs[q].line || runs[p].lo - runs[q].lo);
   const streets = order.map((i): PathOptions => {
     const s = runs[i],
       fixed = s.line * (s.axis === 0 ? pitchV : pitchU);
@@ -698,10 +688,7 @@ function gridVillage(
   const final = houses.map((h, n) => ({ ...h, street: order.indexOf(chosen[n].run) }));
   let radius = 14;
   for (const h of final)
-    radius = Math.max(
-      radius,
-      Math.sqrt((h.centre[0] - cx) ** 2 + (h.centre[1] - cz) ** 2) + Math.sqrt(h.size[0] ** 2 + h.size[1] ** 2) / 2 + 4,
-    ); // float division: half the diagonal
+    radius = Math.max(radius, Math.sqrt((h.centre[0] - cx) ** 2 + (h.centre[1] - cz) ** 2) + Math.sqrt(h.size[0] ** 2 + h.size[1] ** 2) / 2 + 4); // float division: half the diagonal
   return { houses: final, streets, pads, drives, radius };
 }
 
@@ -1033,13 +1020,7 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
       lanes.push(...town.streets);
       padList.push(...town.pads);
       driveList.push(...town.drives);
-      villages.push({
-        centre: [cx, cz],
-        height: h[c],
-        radius: town.radius,
-        houses: town.houses,
-        streets: town.streets,
-      });
+      villages.push({ centre: [cx, cz], height: h[c], radius: town.radius, houses: town.houses, streets: town.streets });
       return;
     }
     for (const line of roadLines) {

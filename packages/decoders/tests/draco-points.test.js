@@ -19,9 +19,7 @@ const fixture = (name) => new Uint8Array(readFileSync(new URL(`./fixtures/draco-
     (0, eval)(readFileSync(new URL(`../dist/${folder}/draco_wasm_wrapper.js`, import.meta.url), 'utf8'));
     return new Promise((resolve, reject) => {
       globalThis
-        .DracoDecoderModule({
-          wasmBinary: readFileSync(new URL(`../dist/${folder}/draco_decoder.wasm`, import.meta.url)),
-        })
+        .DracoDecoderModule({ wasmBinary: readFileSync(new URL(`../dist/${folder}/draco_decoder.wasm`, import.meta.url)) })
         .then((module) => resolve({ module }), reject);
     });
   },
@@ -33,11 +31,7 @@ test('real point clouds decode whole, with indices and every attribute', () => {
     const cloud = decodeDracoPoints(full, fixture(name));
     assert.equal(cloud.pointCount, record.pointCount, name);
     assert.ok(cloud.indices instanceof Uint16Array, name);
-    assert.deepEqual(
-      [...cloud.indices],
-      Array.from({ length: cloud.pointCount }, (_, i) => i),
-      name,
-    );
+    assert.deepEqual([...cloud.indices], Array.from({ length: cloud.pointCount }, (_, i) => i), name);
     assert.deepEqual(
       cloud.attributes.map(({ name, semantic, uniqueId, itemSize, normalized, array }) => [
         name,
@@ -61,38 +55,19 @@ test('generic attributes keep their types, names and values', () => {
     byName = Object.fromEntries(cloud.attributes.map((attribute) => [attribute.name, attribute])),
     values = (make) => Array.from({ length: count }, (_, i) => make(i));
   assert.equal(cloud.pointCount, count);
-  assert.deepEqual(Object.keys(byName), [
-    'POSITION',
-    'intensity',
-    'classification',
-    'GENERIC_2',
-    'GENERIC_3',
-    'COLOR_0',
-  ]);
+  assert.deepEqual(Object.keys(byName), ['POSITION', 'intensity', 'classification', 'GENERIC_2', 'GENERIC_3', 'COLOR_0']);
   assert.deepEqual(
     [...byName.POSITION.array],
     values((i) => [i % 10, Math.floor(i / 10) % 10, Math.floor(i / 100)]).flat(),
   );
   assert.ok(byName.intensity.array instanceof Float32Array);
-  assert.deepEqual(
-    [...byName.intensity.array],
-    values((i) => i / 4),
-  );
+  assert.deepEqual([...byName.intensity.array], values((i) => i / 4));
   assert.ok(byName.classification.array instanceof Uint8Array);
-  assert.deepEqual(
-    [...byName.classification.array],
-    values((i) => i % 7),
-  );
+  assert.deepEqual([...byName.classification.array], values((i) => i % 7));
   assert.ok(byName.GENERIC_2.array instanceof Uint16Array);
-  assert.deepEqual(
-    [...byName.GENERIC_2.array],
-    values((i) => 40000 + i),
-  );
+  assert.deepEqual([...byName.GENERIC_2.array], values((i) => 40000 + i));
   assert.ok(byName.GENERIC_3.array instanceof Int32Array);
-  assert.deepEqual(
-    [...byName.GENERIC_3.array],
-    values((i) => i - 500),
-  );
+  assert.deepEqual([...byName.GENERIC_3.array], values((i) => i - 500));
   assert.equal(byName.intensity.semantic, 'GENERIC');
   assert.equal(byName.COLOR_0.semantic, 'COLOR');
   assert.equal(byName.COLOR_0.itemSize, 3);
@@ -114,15 +89,9 @@ test('limits apply before any output, and a mesh or a damaged file is refused', 
   assert.throws(() => decodeDracoPoints(full, bytes, { limits: { maxVertices: 999 } }), /raise maxVertices/);
   assert.throws(() => decodeDracoPoints(full, bytes, { limits: { maxDecodedBytes: 2000 } }), /raise maxDecodedBytes/);
   assert.throws(() => decodeDracoPoints(full, bytes.subarray(0, 5)), TypeError);
-  assert.throws(
-    () => decodeDracoPoints(full, bytes.subarray(0, 40)),
-    (error) => error.code === 'failed' && /re-export/.test(error.message),
-  );
+  assert.throws(() => decodeDracoPoints(full, bytes.subarray(0, 40)), (error) => error.code === 'failed' && /re-export/.test(error.message));
   const mesh = new Uint8Array(readFileSync(new URL('./fixtures/Box.bin', import.meta.url)));
-  assert.throws(
-    () => decodeDracoPoints(full, mesh.subarray(mesh.indexOf(0x44))),
-    /a mesh, not a point cloud; decode it with DracoDecoder/,
-  );
+  assert.throws(() => decodeDracoPoints(full, mesh.subarray(mesh.indexOf(0x44))), /a mesh, not a point cloud; decode it with DracoDecoder/);
 });
 
 test('regression: the glTF build says where point clouds go, and no longer calls a good file damaged', () => {

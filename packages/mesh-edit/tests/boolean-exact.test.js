@@ -216,10 +216,7 @@ test('regression: only the overlap box goes through the trees, and the answer st
     assertClosed(d.mesh);
     assert.ok(Math.abs(volume(u.mesh) - union) < 1e-12);
     assert.ok(Math.abs(volume(d.mesh) - difference) < 1e-12);
-    if (intersection)
-      assert.ok(
-        Math.abs(volume(booleanMeshesExact(box, other, 'intersection', { createId }).mesh) - intersection) < 1e-12,
-      );
+    if (intersection) assert.ok(Math.abs(volume(booleanMeshesExact(box, other, 'intersection', { createId }).mesh) - intersection) < 1e-12);
     else assert.equal(booleanMeshesExact(box, other, 'intersection', { createId }).mesh.faces.length, 0);
   }
 });
@@ -264,10 +261,7 @@ test('regression: overlapping shells of one input are joined first', () => {
     // One mesh of two boxes that overlap by half: a real asset of parts pushed into each other.
     both = {
       vertices: [...box.vertices, ...side.vertices],
-      faces: [
-        ...box.faces,
-        ...side.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + box.vertices.length) })),
-      ],
+      faces: [...box.faces, ...side.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + box.vertices.length) }))],
     },
     cutter = shifted(createPrimitiveMesh('cube', 'c'), 'd', [0, 0, 0.5]),
     size = volume(box),
@@ -281,25 +275,15 @@ test('regression: overlapping shells of one input are joined first', () => {
   for (const [id, { input, face }] of Object.entries(result.sources))
     if (input === 'a') assert.ok(inputs.has(face), `${id} names input face ${face}`);
   assert.ok(Object.keys(result.faceMap.a).every((id) => inputs.has(id)));
-  assert.equal(
-    Object.values(result.faceMap.a).flat().length + Object.values(result.faceMap.b).flat().length,
-    result.mesh.faces.length,
-  );
+  assert.equal(Object.values(result.faceMap.a).flat().length + Object.values(result.faceMap.b).flat().length, result.mesh.faces.length);
   assert.ok(result.diagnostics.some((line) => line.includes('shells of input a')));
   // Apart, nothing is joined, so a mesh of parts that do not meet keeps its own faces.
   const apart = shifted(box, 'r', [5, 0, 0]),
     parts = {
       vertices: [...box.vertices, ...apart.vertices],
-      faces: [
-        ...box.faces,
-        ...apart.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + box.vertices.length) })),
-      ],
+      faces: [...box.faces, ...apart.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + box.vertices.length) }))],
     };
-  assert.ok(
-    !booleanMeshesExact(parts, cutter, 'union', { createId: ids() }).diagnostics.some((line) =>
-      line.includes('shells'),
-    ),
-  );
+  assert.ok(!booleanMeshesExact(parts, cutter, 'union', { createId: ids() }).diagnostics.some((line) => line.includes('shells')));
 });
 
 test('regression: a keeps its face IDs when b uses the same ones, whatever order the pieces come in', () => {

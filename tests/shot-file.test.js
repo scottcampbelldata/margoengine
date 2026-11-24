@@ -4,12 +4,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   SHOT_DEFAULTS,
   SHOT_KINDS,
+  cameraFrames,
   compareRenders,
   firstSeconds,
   frameName,
@@ -590,4 +591,97 @@ test('an entry with several settings tables gives the one named after its packag
       message: /name one as @margoengine\/weather\/settings#NAME/,
     },
   );
+});
+
+test('a shot subject is a target and a size in metres, or null; anything else is refused', () => {
+  assert.equal(parseShot(shot()).shot.subject, null);
+  assert.deepEqual(validateShot(shot({ subject: { target: [1, 2, 3], size: 4 } })), []);
+  assert.deepEqual(parseShot(shot({ subject: { target: [1, 2, 3], size: 4 } })).shot.subject, {
+    target: [1, 2, 3],
+    size: 4,
+  });
+  assert.deepEqual(paths(shot({ subject: [1, 2, 3] })), ['shot.subject']);
+  assert.deepEqual(paths(shot({ subject: { target: [1, 2], size: 4 } })), ['shot.subject.target']);
+  assert.deepEqual(paths(shot({ subject: { target: [1, 2, 3], size: 0 } })), ['shot.subject.size']);
+  assert.deepEqual(paths(shot({ subject: { target: [1, 2, 3] } })), ['shot.subject.size']);
+});
+
+test('cameraFrames gives the camera of every kept frame from the camera track, pre-roll skipped, no browser', () => {
+  const tracks = [
+    {
+      type: 'camera',
+      id: 'c',
+      path: 'linear',
+      keys: [
+        { time: 0, position: [0, 1, 10], target: [0, 1, 0], fov: 40 },
+        { time: 4, position: [8, 1, 10], target: [0, 1, 0], fov: 60, roll: 0.2 },
+      ],
+    },
+  ];
+  const file = parseShot(shot({ fps: 2, from: 1, seconds: 2, subject: { target: [0, 1, 0], size: 2 } }, { tracks }));
+  const out = cameraFrames(file);
+  assert.equal(out.id, 'test-shot');
+  assert.equal(out.fps, 2);
+  assert.equal(out.frames, 4);
+  assert.deepEqual(out.subject, { target: [0, 1, 0], size: 2 });
+  assert.deepEqual(
+    out.cameras.map((c) => c.frame),
+    [0, 1, 2, 3],
+  );
+  assert.deepEqual(
+    out.cameras.map((c) => c.time),
+    [0, 0.5, 1, 1.5],
+    'time from the first kept frame',
+  );
+  // Kept frame 0 is clock time 1 s (one second of pre-roll): a quarter of the way along the 4 s move.
+  assert.ok(Math.abs(out.cameras[0].position[0] - 2) < 1e-9);
+  assert.ok(Math.abs(out.cameras[0].fov - 45) < 1e-9);
+  assert.ok(Math.abs(out.cameras[3].position[0] - 5) < 1e-9);
+  assert.deepEqual(out.cameras[0].target, [0, 1, 0]);
+  assert.equal(typeof out.cameras[0].roll, 'number');
+  assert.throws(() => cameraFrames(parseShot(shot({ fps: 2 }))), /has no camera at kept frame 0/);
+});
+
+test('cli --cameras prints the camera frames as JSON; --stills and --cameras each refuse another mode', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-shot-cameras-'));
+  try {
+    const tracks = [{ type: 'camera', id: 'c', keys: [{ time: 0, position: [0, 1, 5], target: [0, 0, 0] }] }];
+    const path = join(dir, 'cam.json');
+    writeFileSync(path, JSON.stringify(shot({ fps: 2, seconds: 1 }, { tracks })));
+    const cli = join(root, 'tools/shot/cli.mjs');
+    const printed = JSON.parse(
+      execFileSync(process.execPath, [cli, path, '--cameras'], { cwd: root, encoding: 'utf8', timeout: 60_000 }),
+    );
+    assert.equal(printed.frames, 2);
+    assert.deepEqual(printed.cameras[0].position, [0, 1, 5]);
+    for (const extra of [
+      ['--cameras', '--once'],
+      ['--stills', '--production'],
+      ['--stills', '--cameras'],
+    ]) {
+      assert.throws(
+        () =>
+          execFileSync(process.execPath, [cli, path, ...extra], {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: 60_000,
+            stdio: 'pipe',
+          }),
+        (error) => error.status === 2 && /each stand alone/.test(String(error.stderr)),
+        extra.join(' '),
+      );
+    }
+    assert.throws(
+      () =>
+        execFileSync(process.execPath, [cli, path, '--stills'], {
+          cwd: root,
+          encoding: 'utf8',
+          timeout: 60_000,
+          stdio: 'pipe',
+        }),
+      (error) => error.status === 2 && /name some in shot\.probes/.test(String(error.stderr)),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

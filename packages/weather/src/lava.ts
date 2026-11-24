@@ -350,14 +350,9 @@ export function validateLava(o: LavaOptions): void {
   if (o.seed !== undefined && !Number.isInteger(o.seed)) throw new RangeError('Lava seed must be an integer');
   if (o.vent !== undefined && !(Array.isArray(o.vent) && o.vent.length === 3 && o.vent.every(Number.isFinite)))
     throw new RangeError('Lava vent must be an [x, y, z] point');
-  if (
-    o.ground !== undefined &&
-    typeof o.ground !== 'function' &&
-    typeof (o.ground as { height?: unknown })?.height !== 'function'
-  )
+  if (o.ground !== undefined && typeof o.ground !== 'function' && typeof (o.ground as { height?: unknown })?.height !== 'function')
     throw new TypeError('Lava ground must be a height function (x, z) or an object with height(x, z)');
-  if ((o.solidus ?? 1253) >= (o.temperature ?? 1423))
-    throw new RangeError('Lava solidus must be below its temperature');
+  if ((o.solidus ?? 1253) >= (o.temperature ?? 1423)) throw new RangeError('Lava solidus must be below its temperature');
   if ((o.crustTemperature ?? 1343) >= (o.temperature ?? 1423))
     throw new RangeError('Lava crustTemperature must be below its temperature');
 }
@@ -367,8 +362,7 @@ const lobe = (l: number, mu: number, s1: number, s2: number) => {
   const d = (l - mu) / (l < mu ? s1 : s2);
   return Math.exp(-0.5 * d * d);
 };
-const xBar = (l: number) =>
-  1.056 * lobe(l, 599.8, 37.9, 31.0) + 0.362 * lobe(l, 442.0, 16.0, 26.7) - 0.065 * lobe(l, 501.1, 20.4, 26.2);
+const xBar = (l: number) => 1.056 * lobe(l, 599.8, 37.9, 31.0) + 0.362 * lobe(l, 442.0, 16.0, 26.7) - 0.065 * lobe(l, 501.1, 20.4, 26.2);
 const yBar = (l: number) => 0.821 * lobe(l, 568.8, 46.9, 40.5) + 0.286 * lobe(l, 530.9, 16.3, 31.1);
 const zBar = (l: number) => 1.217 * lobe(l, 437.0, 11.8, 36.0) + 0.681 * lobe(l, 459.0, 26.0, 13.8);
 
@@ -415,31 +409,19 @@ export function lavaGlow(kelvin: number): readonly [number, number, number, numb
 /** Air density at `z` metres above sea level through the ICAO troposphere (isothermal above 11 km), kg/m^3. */
 export function airDensity(z: number): number {
   const h = Math.max(0, z);
-  if (h <= 11000) return 1.225 * Math.pow(1 - (0.0065 * h) / 288.15, G / (287.05287 * 0.0065) - 1);
+  if (h <= 11000) return 1.225 * Math.pow(1 - 0.0065 * h / 288.15, G / (287.05287 * 0.0065) - 1);
   return 0.36392 * Math.exp((-G * (h - 11000)) / (287.05287 * 216.65));
 }
 
 /** Mean speed of a Bingham sheet of thickness `h` (Jeffreys 1925 with Hulme 1974's plug correction), m/s. */
-export function binghamSpeed(
-  h: number,
-  sinSlope: number,
-  density: number,
-  viscosity: number,
-  yieldStrength: number,
-): number {
+export function binghamSpeed(h: number, sinSlope: number, density: number, viscosity: number, yieldStrength: number): number {
   const hy = yieldStrength / (density * G * sinSlope);
   if (!(h > hy)) return 0;
   const x = hy / h;
   return ((density * G * sinSlope * h * h) / (3 * viscosity)) * (1 - 1.5 * x + 0.5 * x * x * x);
 }
 /** Sheet thickness carrying `q` m^2/s (flux per width) down a slope: the inverse of {@link binghamSpeed} times h. */
-export function binghamThickness(
-  q: number,
-  sinSlope: number,
-  density: number,
-  viscosity: number,
-  yieldStrength: number,
-): number {
+export function binghamThickness(q: number, sinSlope: number, density: number, viscosity: number, yieldStrength: number): number {
   const hy = yieldStrength / (density * G * sinSlope);
   let lo = hy,
     hi = Math.max(hy * 2, 1e-3);
@@ -679,14 +661,7 @@ interface SolvedArm {
  * overlap, Infinity when that arm is not near.
  */
 interface Joiner {
-  hit(
-    x: number,
-    z: number,
-    width: number,
-    dirX: number,
-    dirZ: number,
-    top: number,
-  ): { arm: number; at: number; beside: boolean } | undefined;
+  hit(x: number, z: number, width: number, dirX: number, dirZ: number, top: number): { arm: number; at: number; beside: boolean } | undefined;
   gap(arm: number, x: number, z: number, width: number): number;
 }
 interface ArmLeg {
@@ -871,8 +846,7 @@ export class LavaFlow {
   }
   /** Moves film time on by `delta` real seconds times `timeScale`, and writes the glow lights into `lights`. */
   update(delta: number): void {
-    if (!(delta >= 0) || !Number.isFinite(delta))
-      throw new RangeError('LavaFlow update needs a finite delta, 0 or more');
+    if (!(delta >= 0) || !Number.isFinite(delta)) throw new RangeError('LavaFlow update needs a finite delta, 0 or more');
     this.seek(this.film + delta * (this.options.timeScale ?? 1));
   }
   /** Goes to film second `t` (and writes the glow lights into `lights`). */
@@ -966,10 +940,7 @@ export class LavaFlow {
   rheology(kelvin: number): [number, number] {
     const o = this.options,
       dT = Math.max(0, (o.temperature ?? 1423) - kelvin);
-    return [
-      (o.viscosity ?? 300) * Math.exp((o.viscosityRise ?? 0.04) * dT),
-      (o.yieldStrength ?? 0.01) * Math.expm1((o.yieldRise ?? 0.08) * dT),
-    ];
+    return [(o.viscosity ?? 300) * Math.exp((o.viscosityRise ?? 0.04) * dT), (o.yieldStrength ?? 0.01) * Math.expm1((o.yieldRise ?? 0.08) * dT)];
   }
 
   /**
@@ -979,15 +950,7 @@ export class LavaFlow {
   path(): readonly LavaPathPoint[] {
     const o = this.options,
       wind = Math.hypot(...this.windNow()),
-      key = JSON.stringify({
-        ...o,
-        ground: undefined,
-        lights: undefined,
-        weather: undefined,
-        timeScale: 0,
-        glow: 0,
-        wind,
-      });
+      key = JSON.stringify({ ...o, ground: undefined, lights: undefined, weather: undefined, timeScale: 0, glow: 0, wind });
     if (key === this.profileKey && this.profileGround === o.ground && this.profile.length) return this.profile;
     this.profileGround = o.ground;
     this.profileKey = key;
@@ -1015,11 +978,7 @@ export class LavaFlow {
           v = fz - j,
           su = u * u * (3 - 2 * u),
           sv = v * v * (3 - 2 * v);
-        return (
-          wander *
-          ((corner(i, j) * (1 - su) + corner(i + 1, j) * su) * (1 - sv) +
-            (corner(i, j + 1) * (1 - su) + corner(i + 1, j + 1) * su) * sv)
-        );
+        return wander * ((corner(i, j) * (1 - su) + corner(i + 1, j) * su) * (1 - sv) + (corner(i, j + 1) * (1 - su) + corner(i + 1, j + 1) * su) * sv);
       };
     const height = (x: number, z: number) => this.groundAt(x, z) + jitter(x, z),
       reach = o.joinDistance ?? 1,
@@ -1081,15 +1040,12 @@ export class LavaFlow {
           (f, a, i) =>
             a.gone
               ? f
-              : f -
-                (a.start.parent === k && a.start.at < before ? a.flux : 0) +
-                (a.joins?.arm === k && a.joins.at < before ? endFlux(i) : 0),
+              : f - (a.start.parent === k && a.start.at < before ? a.flux : 0) + (a.joins?.arm === k && a.joins.at < before ? endFlux(i) : 0),
           live[k]!.flux,
         ),
       // True when arm i's lava runs (through joins) into arm k.
       feeds = (i: number, k: number): boolean => {
-        for (let j: number | undefined = i, n = 0; j !== undefined && n <= live.length; j = live[j]!.joins?.arm, n++)
-          if (j === k) return true;
+        for (let j: number | undefined = i, n = 0; j !== undefined && n <= live.length; j = live[j]!.joins?.arm, n++) if (j === k) return true;
         return false;
       };
     // Solves arm r again from its point q on, carrying arm k's lava too when k ran into it there: r carries both from
@@ -1299,26 +1255,7 @@ export class LavaFlow {
       const sin = best > 0 ? best / Math.hypot(best, reachStep) : 0;
       if (sin <= 0) {
         stop = 'ponded';
-        if (!out.length)
-          out.push(
-            this.point(
-              x,
-              y,
-              z,
-              s,
-              travel,
-              0,
-              binghamThickness(Q / w, 0.001, rho, eta, tau),
-              w,
-              T,
-              eta,
-              tau,
-              Infinity,
-              0,
-              wait,
-              opened,
-            ),
-          );
+        if (!out.length) out.push(this.point(x, y, z, s, travel, 0, binghamThickness(Q / w, 0.001, rho, eta, tau), w, T, eta, tau, Infinity, 0, wait, opened));
         break;
       }
       // Mass conservation at the vent's depth (Harris and Rowland 2001, eq. 1): Q = w d u, so a sheet that slows widens.
@@ -1345,7 +1282,8 @@ export class LavaFlow {
       if (met?.beside) {
         if (beside !== met.arm) edge = Math.min(0, join!.gap(met.arm, x, z, width));
         beside = met.arm;
-      } else if (met) {
+      }
+      else if (met) {
         joins = { arm: met.arm, at: met.at };
         stop = 'joined';
         break;
@@ -1376,23 +1314,7 @@ export class LavaFlow {
           const dj = drops[jb]!,
             part = (Q * dj) / (best + dj),
             ang = (jb / 32) * 2 * Math.PI;
-          if (
-            branch({
-              at: out.length - 1,
-              x,
-              z,
-              T,
-              s,
-              travel,
-              dirX: Math.sin(ang),
-              dirZ: Math.cos(ang),
-              depth,
-              flux: part,
-              wait,
-              opened,
-              openS,
-            })
-          ) {
+          if (branch({ at: out.length - 1, x, z, T, s, travel, dirX: Math.sin(ang), dirZ: Math.cos(ang), depth, flux: part, wait, opened, openS })) {
             Q -= part;
             lastSplit = s;
           }
@@ -1432,12 +1354,7 @@ export class LavaFlow {
    * 45 degrees of its way and with its top below the other's levee crest (`leveeMax` over its sheet), runs beside it
    * instead: braided channels kept apart by the levee between them (Dietterich and Cashman 2014).
    */
-  private joiner(
-    live: readonly SolvedArm[],
-    k: number,
-    reach: number,
-    feeds: (i: number, k: number) => boolean,
-  ): Joiner {
+  private joiner(live: readonly SolvedArm[], k: number, reach: number, feeds: (i: number, k: number) => boolean): Joiner {
     const cells = new Map<string, number[]>(),
       lev = this.options.leveeMax ?? 0.35;
     let wide = 0;
@@ -1448,8 +1365,8 @@ export class LavaFlow {
     for (const i of others) for (const p of live[i]!.path) wide = Math.max(wide, p.width);
     const cell = Math.max(8 * (this.options.step ?? 5), reach * wide),
       key = (cx: number, cz: number) => cx + ',' + cz;
-    // Never at an arm's first point: a join solves that arm again from the point before.
     for (const i of others)
+      // Never at an arm's first point: a join solves that arm again from the point before.
       live[i]!.path.forEach((p, j) => {
         if (!j || dead(i, j)) return;
         const id = key(Math.floor(p.position[0] / cell), Math.floor(p.position[2] / cell)),
@@ -1459,12 +1376,7 @@ export class LavaFlow {
       });
     // The nearest point of another arm (or of arm `only`) whose edge overlaps a sheet `width` wide at (x, z), and by
     // how much its edge stands clear (negative: overlapping).
-    const nearest = (
-      x: number,
-      z: number,
-      width: number,
-      only = -1,
-    ): { arm: number; at: number; gap: number } | undefined => {
+    const nearest = (x: number, z: number, width: number, only = -1): { arm: number; at: number; gap: number } | undefined => {
       const r = (reach * (width + wide)) / 2,
         cx = Math.floor(x / cell),
         cz = Math.floor(z / cell),
@@ -1505,11 +1417,7 @@ export class LavaFlow {
           tz = r.position[2] - q.position[2],
           len = Math.hypot(tx, tz),
           along = len > 0 && (dirX * tx + dirZ * tz) / len > Math.SQRT1_2;
-        return {
-          arm: best.arm,
-          at: best.at,
-          beside: along && lev > 0 && top <= p.position[1] + p.thickness * (1 + lev),
-        };
+        return { arm: best.arm, at: best.at, beside: along && lev > 0 && top <= p.position[1] + p.thickness * (1 + lev) };
       },
       gap: (arm, x, z, width) => nearest(x, z, width, arm)?.gap ?? Infinity,
     };
@@ -1539,8 +1447,7 @@ export class LavaFlow {
     let m = n - 1;
     while (m > from && points[m - 1]!.graetz < slow) m--;
     let area = 0;
-    for (let i = m; i + 1 < n; i++)
-      area += 0.5 * (points[i]!.width + points[i + 1]!.width) * (points[i + 1]!.distance - points[i]!.distance);
+    for (let i = m; i + 1 < n; i++) area += 0.5 * (points[i]!.width + points[i + 1]!.width) * (points[i + 1]!.distance - points[i]!.distance);
     const levee = end.travel + (rise * Math.max(area, end.width * end.width)) / leg.Q,
       roof = this.roofBurst(points, Math.max(area, end.width * end.width), leg.Q),
       tube = !!roof && roof.opened < levee,
@@ -1579,15 +1486,7 @@ export class LavaFlow {
     // through the crust grown since the front passed (Hon et al. 1994; Keszthelyi 1995), not the stalled lava's. Out of
     // a burst roof it is the tube's own lava.
     let T = tube ? this.tubeProfile(points)[at]! : points[m]!.temperature;
-    if (!tube)
-      for (let i = m; i < at; i++)
-        T = this.covered(
-          T,
-          points[i]!.width,
-          points[i + 1]!.distance - points[i]!.distance,
-          leg.Q,
-          opened - points[i]!.travel,
-        );
+    if (!tube) for (let i = m; i < at; i++) T = this.covered(T, points[i]!.width, points[i + 1]!.distance - points[i]!.distance, leg.Q, opened - points[i]!.travel);
     if (!(T > (o.solidus ?? 1253))) return undefined;
     return {
       breakout: true,
@@ -1615,11 +1514,7 @@ export class LavaFlow {
    * a w wide tube holds rho g d + 2 sigma d^2 / w^2 (a beam clamped at both sides, Turcotte and Schubert 2002, chapter
    * 3). The first roof, closed by then, whose hold the level passes bursts.
    */
-  private roofBurst(
-    points: readonly LavaPathPoint[],
-    area: number,
-    Q: number,
-  ): { at: number; opened: number } | undefined {
+  private roofBurst(points: readonly LavaPathPoint[], area: number, Q: number): { at: number; opened: number } | undefined {
     const o = this.options,
       rho = o.density ?? 2600,
       sigma = o.roofStrength ?? 1e6,
@@ -1691,21 +1586,7 @@ export class LavaFlow {
     wait: number,
     opened: number,
   ): LavaPathPoint {
-    return {
-      position: [x, y, z],
-      distance: s,
-      travel,
-      speed: u,
-      thickness: h,
-      width: w,
-      temperature: T,
-      viscosity: eta,
-      yieldStrength: tau,
-      graetz: gz,
-      slope: sin,
-      wait,
-      opened,
-    };
+    return { position: [x, y, z], distance: s, travel, speed: u, thickness: h, width: w, temperature: T, viscosity: eta, yieldStrength: tau, graetz: gz, slope: sin, wait, opened };
   }
   /**
    * Forgets the solved path and flights: call after the ground under the same `ground` object changed (a sculpted or
@@ -1759,9 +1640,7 @@ export class LavaFlow {
       flowing = !!b && !waiting && this.envelope(t) > 0 && t >= (this.options.start ?? 0);
     return {
       distance: b ? lerp(a.distance, b.distance) : a.distance,
-      position: b
-        ? [lerp(a.position[0], b.position[0]), lerp(a.position[1], b.position[1]), lerp(a.position[2], b.position[2])]
-        : a.position,
+      position: b ? [lerp(a.position[0], b.position[0]), lerp(a.position[1], b.position[1]), lerp(a.position[2], b.position[2])] : a.position,
       // A sheet carrying a share e of the flux runs at e^(2/3) of its speed (Jeffreys: h goes as q^(1/3), u as h^2).
       speed: flowing ? a.speed * this.envelope(t) ** (2 / 3) : 0,
       stop: b ? (t >= this.end ? 'supply' : waiting ? 'cooled' : 'flowing') : this.stop,
@@ -1774,9 +1653,7 @@ export class LavaFlow {
     const p = this.path(),
       last = p[p.length - 1]!,
       after = this.supplied(t) - last.travel;
-    return after > 0
-      ? pondRadius(this.options.effusionRate ?? 20, after, this.options.density ?? 2600, last.viscosity)
-      : 0;
+    return after > 0 ? pondRadius(this.options.effusionRate ?? 20, after, this.options.density ?? 2600, last.viscosity) : 0;
   }
 
   /** Seconds the surface at path point `i` has been open to the air at film time `t` (its crust's age). */
@@ -1883,8 +1760,7 @@ export class LavaFlow {
         T = out[i - 1]!;
       // A tube's mouth: the front that waited here goes on with the tube's lava.
       if (b.wait > a.wait) out[i] = T;
-      else if (a.slope > 0 && a.slope < limit)
-        out[i] = this.covered(T, a.width, b.distance - a.distance, a.width * a.thickness * a.speed, age);
+      else if (a.slope > 0 && a.slope < limit) out[i] = this.covered(T, a.width, b.distance - a.distance, a.width * a.thickness * a.speed, age);
       else out[i] = Math.max(Ta, T - (a.temperature - b.temperature));
     }
     this.tubeCache.set(p, out);
@@ -1947,20 +1823,7 @@ export class LavaFlow {
     if (!branch) throw new RangeError(`LavaFlow has no arm ${arm}; branches() lists ${arms.length}`);
     const p = branch.path,
       vent = lavaGlow(this.options.temperature ?? 1423)[3],
-      out: LavaGroundEvent = {
-        kind: 'lava',
-        path: [],
-        arrival: [],
-        widths: [],
-        thicknesses: [],
-        glows: [],
-        levees: [],
-        roofs: [],
-        drains: [],
-        skylights: this.options.skylightSpacing ?? 200,
-        cooling: 1,
-        seed: this.options.seed ?? 1,
-      },
+      out: LavaGroundEvent = { kind: 'lava', path: [], arrival: [], widths: [], thicknesses: [], glows: [], levees: [], roofs: [], drains: [], skylights: this.options.skylightSpacing ?? 200, cooling: 1, seed: this.options.seed ?? 1 },
       total = this.supplied(Infinity);
     // The points the supply ever brings the front to, plus the first it does not (cut off below).
     let reach = 1;
@@ -1987,8 +1850,7 @@ export class LavaFlow {
     if (n === 0) n = 1;
     if (n > 0) {
       const last = Math.max(out.arrival[n - 1]!, 0);
-      for (const key of ['path', 'arrival', 'widths', 'thicknesses', 'glows', 'levees', 'roofs', 'drains'] as const)
-        out[key].length = Math.max(n, 2);
+      for (const key of ['path', 'arrival', 'widths', 'thicknesses', 'glows', 'levees', 'roofs', 'drains'] as const) out[key].length = Math.max(n, 2);
       for (let i = 0; i < out.arrival.length; i++) if (!Number.isFinite(out.arrival[i]!)) out.arrival[i] = last;
     }
     // A flow that ponded fills a pond at its end with what the supply brings past it: the full rate from the front's
@@ -2027,14 +1889,7 @@ export class LavaFlow {
   lavaEvents(points = 256, t = this.film): LavaGroundEvent[] {
     return this.branches().map((_, k) => this.lavaEvent(points, t, k));
   }
-  private eventPoint(
-    out: LavaGroundEvent,
-    p: readonly LavaPathPoint[],
-    i: number,
-    vent: number,
-    t: number,
-    arm: number,
-  ): void {
+  private eventPoint(out: LavaGroundEvent, p: readonly LavaPathPoint[], i: number, vent: number, t: number, arm: number): void {
     const a = p[i]!;
     out.path.push([a.position[0], a.position[2]]);
     out.arrival.push(this.supplyTime(a.travel));
@@ -2111,12 +1966,7 @@ export class LavaFlow {
           herm = (i: number, f: number) => {
             const f2 = f * f,
               f3 = f2 * f;
-            return (
-              (2 * f3 - 3 * f2 + 1) * p[i] +
-              (f3 - 2 * f2 + f) * dt * p[i + 3] +
-              (-2 * f3 + 3 * f2) * next[i] +
-              (f3 - f2) * dt * next[i + 3]
-            );
+            return (2 * f3 - 3 * f2 + 1) * p[i] + (f3 - 2 * f2 + f) * dt * p[i + 3] + (-2 * f3 + 3 * f2) * next[i] + (f3 - f2) * dt * next[i + 3];
           },
           above = (f: number) => herm(1, f) - (g0 + (g - g0) * f);
         let lo = 0,
@@ -2174,7 +2024,7 @@ export class LavaFlow {
     const U = Math.sqrt(2 * G * H),
       spread = ((o.fountainSpread ?? 8) * Math.PI) / 180,
       seed = o.seed ?? 1,
-      window = (2 * U) / G + 2,
+      window = 2 * U / G + 2,
       first = Math.max(0, Math.floor((t - window) * rate)),
       last = Math.floor(t * rate);
     for (let n = first; n <= last; n++) {
@@ -2187,13 +2037,7 @@ export class LavaFlow {
         tilt = spread * Math.sqrt(unit(n, seed, 19)),
         az = 2 * Math.PI * unit(n, seed, 23),
         size = (o.clotSize ?? 0.08) * Math.exp(0.5 * normal(n, seed, 29)),
-        f = this.fly(
-          `c${n}`,
-          launch,
-          [speed * Math.sin(tilt) * Math.sin(az), speed * Math.cos(tilt), speed * Math.sin(tilt) * Math.cos(az)],
-          size,
-          (o.density ?? 2600) * 0.4,
-        ),
+        f = this.fly(`c${n}`, launch, [speed * Math.sin(tilt) * Math.sin(az), speed * Math.cos(tilt), speed * Math.sin(tilt) * Math.cos(az)], size, (o.density ?? 2600) * 0.4),
         age = t - launch;
       if (age > f.flight) continue;
       out.push(this.blob(f, age, false));
@@ -2204,13 +2048,7 @@ export class LavaFlow {
     const T = this.surfaceTemperature(age),
       g = lavaGlow(T),
       scale = (this.options.glow ?? 1) / SUN_LUMINANCE;
-    return {
-      position: this.where(f, age),
-      size: f.size,
-      temperature: T,
-      color: [g[0] * scale, g[1] * scale, g[2] * scale],
-      landed,
-    };
+    return { position: this.where(f, age), size: f.size, temperature: T, color: [g[0] * scale, g[1] * scale, g[2] * scale], landed };
   }
 
   private burst(b: number, k: number): { id: string; launch: number; v: [number, number, number]; size: number } {
@@ -2276,15 +2114,7 @@ export class LavaFlow {
         if (s.launch > to || !this.bombLive(b, s.launch)) continue;
         const f = this.fly(s.id, s.launch, s.v, s.size, o.bombDensity ?? 2500),
           at = s.launch + f.flight;
-        if (at > from && at <= to && f.impact > 0)
-          out.push({
-            time: at,
-            position: this.where(f, f.flight),
-            speed: f.impact,
-            mass: f.mass,
-            launch: s.launch,
-            launchSpeed: f.speed,
-          });
+        if (at > from && at <= to && f.impact > 0) out.push({ time: at, position: this.where(f, f.flight), speed: f.impact, mass: f.mass, launch: s.launch, launchSpeed: f.speed });
       }
     return out.sort((a, b) => a.time - b.time);
   }
@@ -2337,13 +2167,7 @@ export class LavaFlow {
       push = (x: number, y: number, z: number, rgb: number[], cd: number) => {
         const peak = Math.max(rgb[0]!, rgb[1]!, rgb[2]!);
         if (peak > 0 && cd * scale > 1e-9)
-          out.push({
-            position: [x, y, z],
-            color: [rgb[0]! / peak, rgb[1]! / peak, rgb[2]! / peak],
-            intensity: cd * scale,
-            range,
-            decay: 2,
-          });
+          out.push({ position: [x, y, z], color: [rgb[0]! / peak, rgb[1]! / peak, rgb[2]! / peak], intensity: cd * scale, range, decay: 2 });
       };
     const H = this.fountain(t);
     if (H > 0) {

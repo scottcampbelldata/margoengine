@@ -1618,9 +1618,7 @@ export class VoxelRenderer implements EnginePlugin {
     if (split) {
       this.#releaseBevel(chunk);
       const border = borderFaces(mesh.border),
-        bevel = split.map(([, faces], l) =>
-          faces.length ? this.#bevelLayer(gpu, chunk, faces, border[l], l) : undefined,
-        );
+        bevel = split.map(([, faces], l) => (faces.length ? this.#bevelLayer(gpu, chunk, faces, border[l], l) : undefined));
       chunk.bevel = bevel.some(Boolean) ? bevel : undefined;
       chunk.centers = chunk.translucent && quadCenters(chunk.translucent);
       this.#sortBevel(gpu, chunk, eye);
@@ -1747,10 +1745,7 @@ export class VoxelRenderer implements EnginePlugin {
       rebased = false;
     for (let a = 0; a < 3; a++) {
       const v = o ? +o[a] * k : 0;
-      if (!Number.isFinite(v))
-        throw new RangeError(
-          `VoxelRenderer origin[${a}] ${o![a]} is not a finite number; use finite world coordinates`,
-        );
+      if (!Number.isFinite(v)) throw new RangeError(`VoxelRenderer origin[${a}] ${o![a]} is not a finite number; use finite world coordinates`);
       if (v !== oc[a]) (oc[a] = v), (moved = true);
       const b = Math.round(v / 1024) * 1024;
       if (b !== base[a]) (base[a] = b), (rebased = true);

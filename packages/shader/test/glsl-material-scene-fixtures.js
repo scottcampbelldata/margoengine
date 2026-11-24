@@ -58,15 +58,7 @@ const first = {
     intensityScale: 0.8,
     list: [
       { position: [-2, 1, 2], range: 8, color: [1, 0.5, 0.2], intensity: 2 },
-      {
-        position: [0, 3, 3],
-        range: 12,
-        direction: [0, -1, -1],
-        angle: 0.7,
-        penumbra: 0.4,
-        color: [0.2, 1, 0.4],
-        intensity: 3,
-      },
+      { position: [0, 3, 3], range: 12, direction: [0, -1, -1], angle: 0.7, penumbra: 0.4, color: [0.2, 1, 0.4], intensity: 3 },
       { position: [2, -1, 1.5], range: 0, decay: 1 },
       { position: [1, 2, 2.5], range: 6, color: [0.3, 0.3, 1] },
       // A fourth point light: the program's list holds three.
@@ -80,15 +72,7 @@ const second = {
   lights: {
     intensityScale: () => 1.2,
     list: [
-      {
-        position: [3, 0, 2],
-        direction: [-1, 0, -1],
-        outerAngle: 0.9,
-        innerAngle: 0.3,
-        range: 10,
-        decay: 1.5,
-        color: [1, 0.8, 0.2],
-      },
+      { position: [3, 0, 2], direction: [-1, 0, -1], outerAngle: 0.9, innerAngle: 0.3, range: 10, decay: 1.5, color: [1, 0.8, 0.2] },
       { position: [-2, 2, 2], range: 7, color: [0.4, 0.6, 1], intensity: 2 },
     ],
   },

@@ -3,60 +3,24 @@
 // Classes come in as arguments so each side passes its own build.
 
 /** The strings the scene draws, also the glyph set whose field bytes the two sides hash. */
-export const SCENE_TEXTS = [
-  'When It Forms',
-  'Captions: AVATAR, To, Ta, Wave.',
-  'small text keeps its counters 0123456789',
-];
+export const SCENE_TEXTS = ['When It Forms', 'Captions: AVATAR, To, Ta, Wave.', 'small text keeps its counters 0123456789'];
 export const SCENE_SIZE = [640, 360];
 
 /** Adds the scene to `engine` and returns its camera. */
 export function buildScene(engine, { TextRenderer, Text, Camera }, font) {
   engine.scene.background = '#1d2733';
   const renderer = TextRenderer.attach(engine);
-  renderer.add(
-    new Text({
-      text: SCENE_TEXTS[0],
-      font,
-      fontSize: 0.62,
-      anchorX: 'center',
-      anchorY: 'middle',
-      position: [0, 0.55, 0],
-      color: '#ffd84a',
-      outlineWidth: 0.035,
-      outlineColor: '#101010',
-      shadowOpacity: 0.7,
-      shadowBlur: 0.04,
-      shadowOffset: [0.03, -0.03],
-    }),
-  );
-  renderer.add(
-    new Text({
-      text: SCENE_TEXTS[1],
-      font,
-      fontSize: 0.17,
-      anchorX: 'center',
-      anchorY: 'middle',
-      position: [0, -0.35, 0],
-      color: '#ffffff',
-      outlineWidth: 0.012,
-      outlineColor: '#000000',
-      shadowOpacity: 0.5,
-      shadowBlur: 0.01,
-      shadowOffset: [0.01, -0.01],
-    }),
-  );
-  renderer.add(
-    new Text({
-      text: SCENE_TEXTS[2],
-      font,
-      fontSize: 0.075,
-      anchorX: 'center',
-      anchorY: 'middle',
-      position: [0, -0.75, 0],
-      color: '#c8d4dc',
-    }),
-  );
+  renderer.add(new Text({
+    text: SCENE_TEXTS[0], font, fontSize: 0.62, anchorX: 'center', anchorY: 'middle', position: [0, 0.55, 0],
+    color: '#ffd84a', outlineWidth: 0.035, outlineColor: '#101010', shadowOpacity: 0.7, shadowBlur: 0.04, shadowOffset: [0.03, -0.03],
+  }));
+  renderer.add(new Text({
+    text: SCENE_TEXTS[1], font, fontSize: 0.17, anchorX: 'center', anchorY: 'middle', position: [0, -0.35, 0],
+    color: '#ffffff', outlineWidth: 0.012, outlineColor: '#000000', shadowOpacity: 0.5, shadowBlur: 0.01, shadowOffset: [0.01, -0.01],
+  }));
+  renderer.add(new Text({
+    text: SCENE_TEXTS[2], font, fontSize: 0.075, anchorX: 'center', anchorY: 'middle', position: [0, -0.75, 0], color: '#c8d4dc',
+  }));
   return new Camera({ position: [0, 0, 3.2], target: [0, 0, 0] });
 }
 

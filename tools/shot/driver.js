@@ -176,10 +176,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     const { device, format, texture } = record,
       { width, height } = texture,
       texel = { bgra8unorm: 4, rgba8unorm: 4, rgba16float: 8 }[format];
-    if (!texel)
-      throw new Error(
-        `the canvas format ${format} is not one the shot tool reads; use bgra8unorm, rgba8unorm or rgba16float`,
-      );
+    if (!texel) throw new Error(`the canvas format ${format} is not one the shot tool reads; use bgra8unorm, rgba8unorm or rgba16float`);
     const bytesPerRow = Math.ceil((width * texel) / 256) * 256,
       buffer = device.createBuffer({ size: bytesPerRow * height, usage: 0x01 | 0x08 }),
       encoder = device.createCommandEncoder();
@@ -219,9 +216,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     let found = readers.get(device);
     if (found) return found;
     const make = (sampleType, type, load) => {
-      const layout = device.createBindGroupLayout({
-          entries: [{ binding: 0, visibility: 2, texture: { sampleType } }],
-        }),
+      const layout = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: 2, texture: { sampleType } }] }),
         module = device.createShaderModule({
           code: `@group(0) @binding(0) var source:${type};
 @vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{let p=vec2f(f32((i<<1u)&2u),f32(i&2u));return vec4f(p*2.0-1.0,0.0,1.0);}
@@ -244,12 +239,9 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
   };
   /** A texture's first channel as 8-bit grey, row 0 at the top: 0 to 1 maps to 0 to 255, NaN and below 0 to 0. */
   const readMask = async (device, name, texture) => {
-    if (!texture || typeof texture.createView !== 'function')
-      throw new Error(`the page gave no texture for the ${name} mask`);
+    if (!texture || typeof texture.createView !== 'function') throw new Error(`the page gave no texture for the ${name} mask`);
     if (texture.sampleCount > 1 || texture.dimension !== '2d')
-      throw new Error(
-        `the ${name} mask must be a single-sample 2D texture (it is ${texture.sampleCount}x ${texture.dimension})`,
-      );
+      throw new Error(`the ${name} mask must be a single-sample 2D texture (it is ${texture.sampleCount}x ${texture.dimension})`);
     if (!(texture.usage & 4)) throw new Error(`the ${name} mask texture needs TEXTURE_BINDING usage to be read`);
     const depth = texture.format.startsWith('depth'),
       { layout, pipeline } = reader(device)[depth ? 'depth' : 'color'],
@@ -258,17 +250,10 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     device.pushErrorScope('validation');
     const target = device.createTexture({ size: [width, height], format: 'r32float', usage: 0x10 | 0x01 }),
       buffer = device.createBuffer({ size: bytesPerRow * height, usage: 0x01 | 0x08 }),
-      view = texture.createView({
-        dimension: '2d',
-        mipLevelCount: 1,
-        arrayLayerCount: 1,
-        ...(depth ? { aspect: 'depth-only' } : {}),
-      }),
+      view = texture.createView({ dimension: '2d', mipLevelCount: 1, arrayLayerCount: 1, ...(depth ? { aspect: 'depth-only' } : {}) }),
       encoder = device.createCommandEncoder(),
       pass = encoder.beginRenderPass({
-        colorAttachments: [
-          { view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
-        ],
+        colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
       });
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, device.createBindGroup({ layout, entries: [{ binding: 0, resource: view }] }));
@@ -329,9 +314,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
   };
   const maskCanvas = document.createElement('canvas');
   const hex = async (bytes) =>
-    Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
-      byte.toString(16).padStart(2, '0'),
-    ).join('');
+    Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) => byte.toString(16).padStart(2, '0')).join('');
   // The masks after a frame, name to {width, height, grey} at the canvas size, taken to the frame's size: a
   // supersampled render's masks are area filtered, so an edge pixel holds the share of it each mask covers. Resolves
   // name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`}.
@@ -364,8 +347,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
   // The engine's sky that records its coverage (`@margoengine/sky`): the plugin of its scene with a coverageTexture.
   const skyOf = (engine) => {
     const plugins = get(engine)?.scene?.plugins;
-    if (plugins)
-      for (const plugin of plugins.values()) if (plugin && 'coverageTexture' in plugin && plugin.options) return plugin;
+    if (plugins) for (const plugin of plugins.values()) if (plugin && 'coverageTexture' in plugin && plugin.options) return plugin;
   };
   globalThis.__margoShot = {
     get time() {
@@ -396,8 +378,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
       // wall-clock: a bound on a wait that normally ends in milliseconds; it fails the shot naming what hung.
       const stuck = new Promise((_, reject) => {
           timer = realTimeout(
-            () =>
-              reject(new Error(`${pending.size} GPU or network operations were still in flight after ${limitMs} ms`)),
+            () => reject(new Error(`${pending.size} GPU or network operations were still in flight after ${limitMs} ms`)),
             limitMs,
           );
         }),
@@ -461,22 +442,12 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         sum = new Float32Array(width * height * 3);
         summed = 0;
       }
-      if (!sum || sum.length !== width * height * 3)
-        throw new Error(`sub-frame ${sub} of ${subs} changed the canvas size to ${width} x ${height}`);
+      if (!sum || sum.length !== width * height * 3) throw new Error(`sub-frame ${sub} of ${subs} changed the canvas size to ${width} x ${height}`);
       P.addSubframe(sum, pixels);
       summed++;
       if (sub < subs - 1) return result(false);
       if (summed !== subs) throw new Error(`the frame summed ${summed} sub-frames, not ${subs}`);
-      const rgba = P.resolveFrame({
-        sum,
-        width,
-        height,
-        count: subs,
-        outWidth: out[0],
-        outHeight: out[1],
-        noise,
-        noiseSize,
-      });
+      const rgba = P.resolveFrame({ sum, width, height, count: subs, outWidth: out[0], outHeight: out[1], noise, noiseSize });
       frameContext.putImageData(new ImageData(rgba, out[0], out[1]), 0, 0);
       sum = null;
       return result(true);
@@ -502,11 +473,9 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
       const give = get(hook);
       if (typeof give !== 'function') throw new Error(`${hook} is not a function in the page`);
       const given = await give({ names: names.filter((name) => !derived.includes(name)) });
-      if (!given?.device || !given.textures)
-        throw new Error(`${hook} must return {device, textures: {name: GPUTexture}}`);
+      if (!given?.device || !given.textures) throw new Error(`${hook} must return {device, textures: {name: GPUTexture}}`);
       const read = {};
-      for (const name of names)
-        if (!derived.includes(name)) read[name] = await readMask(given.device, name, given.textures[name]);
+      for (const name of names) if (!derived.includes(name)) read[name] = await readMask(given.device, name, given.textures[name]);
       if (derived.length) {
         const camera = get(engine)?.camera;
         if (!camera) throw new Error(`no engine camera at ${engine} for the sky and water masks`);
@@ -546,13 +515,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         sheetContext.fillRect(0, 0, sheet.width, sheet.height);
         sheetContext.imageSmoothingQuality = 'high';
       }
-      sheetContext.drawImage(
-        frame,
-        (index % columns) * cell[0],
-        Math.floor(index / columns) * cell[1],
-        cell[0],
-        cell[1],
-      );
+      sheetContext.drawImage(frame, (index % columns) * cell[0], Math.floor(index / columns) * cell[1], cell[0], cell[1]);
     },
     /** The contact sheet as PNG bytes in base64, or null when no thumbnail was drawn. */
     sheet: () => (sheetContext ? encode(sheet) : null),

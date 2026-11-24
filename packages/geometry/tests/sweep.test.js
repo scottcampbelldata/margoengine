@@ -5,15 +5,7 @@ import assert from 'node:assert/strict';
 import { CatmullRomCurve3, EllipseCurve, LineCurve3, Path, Shape, tubeGeometry } from '../dist/index.js';
 import { Curve } from '../dist/index.js';
 import { loftGeometry, sweepGeometry } from '../dist/sweep.js';
-import {
-  assertValid,
-  close,
-  point,
-  signedVolume,
-  surfaceArea,
-  vertexCount,
-  watertight,
-} from './support/mesh-checks.js';
+import { assertValid, close, point, signedVolume, surfaceArea, vertexCount, watertight } from './support/mesh-checks.js';
 
 const line = (length = 10) => new LineCurve3([0, 0, 0], [0, 0, length]);
 const square = (size = 1) => [
@@ -185,15 +177,7 @@ test('a Shape with a hole keeps its hole; an open Path is a ribbon', () => {
   const round = new Shape();
   round.absarc(0, 0, 1, 0, Math.PI * 2, false);
   solid(sweepGeometry(round, line(3), { steps: 2, curveSegments: 32 }), 'curved shape');
-  const ribbon = sweepGeometry(
-    new Path([
-      [-1, 0],
-      [0, 0.5],
-      [1, 0],
-    ]),
-    line(4),
-    { steps: 4, closedProfile: false },
-  );
+  const ribbon = sweepGeometry(new Path([[-1, 0], [0, 0.5], [1, 0]]), line(4), { steps: 4, closedProfile: false });
   assert.equal(ribbon.groups, undefined);
   assert.equal(ribbon.indices.length / 3, 2 * 2 * 4);
   assertValid(ribbon, 'ribbon');
@@ -214,29 +198,8 @@ test('creaseAngle decides hard edges', () => {
 });
 
 test('sweep rejects what it cannot build', () => {
-  assert.throws(
-    () =>
-      sweepGeometry(
-        [
-          [0, 0],
-          [1, 0],
-        ],
-        line(),
-      ),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      sweepGeometry(
-        [
-          [0, 0],
-          [1, NaN],
-          [1, 1],
-        ],
-        line(),
-      ),
-    RangeError,
-  );
+  assert.throws(() => sweepGeometry([[0, 0], [1, 0]], line()), RangeError);
+  assert.throws(() => sweepGeometry([[0, 0], [1, NaN], [1, 1]], line()), RangeError);
   assert.throws(() => sweepGeometry({}, line()), TypeError);
   assert.throws(() => sweepGeometry(square(), line(), { steps: 0 }), RangeError);
   assert.throws(() => sweepGeometry(square(), line(), { scale: -1 }), RangeError);
@@ -303,8 +266,7 @@ test('smooth lofts pass through every section', () => {
   solid(bottle, 'bottle');
   radii.forEach((r, i) => {
     const row = [];
-    for (let v = 0; v < vertexCount(bottle); v++)
-      if (Math.abs(point(bottle, v)[2] - i * 2) < 1e-5) row.push(point(bottle, v));
+    for (let v = 0; v < vertexCount(bottle); v++) if (Math.abs(point(bottle, v)[2] - i * 2) < 1e-5) row.push(point(bottle, v));
     assert.ok(row.length >= 32, `section ${i} is a row`);
     for (const p of row) assert.ok(Math.hypot(p[0], p[1]) <= r + 1e-5, `section ${i} stays inside its ring`);
     assert.ok(
@@ -385,8 +347,7 @@ test('a loft of sections with holes is a closed tube: walls in and out, and caps
   for (let t = 0; t < indices.length; t += 3) {
     const [a, b, c] = [0, 1, 2].map((k) => Array.from(positions.subarray(indices[t + k] * 3, indices[t + k] * 3 + 3)));
     volume +=
-      (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
-      6;
+      (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
   }
   assert.ok(Math.abs(volume - 36) < 1e-4, `volume ${volume}`);
   assert.equal(geometry.groups.length, 2);

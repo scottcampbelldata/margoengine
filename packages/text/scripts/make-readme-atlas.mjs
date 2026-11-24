@@ -15,7 +15,7 @@ const server = await createServer({
   configFile: false,
   logLevel: 'error',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
+  server: { host: '127.0.0.1', port: 0 },
 });
 let browser;
 try {

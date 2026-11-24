@@ -850,12 +850,7 @@ test('bidi levels are resolved across wrapped lines, and a tab takes the paragra
   // W7 looks back across the wrap: the number follows Hebrew, stays EN and joins the right-to-left run (N1).
   assert.deepEqual(lines(layout('x אב 12 גד', { maxWidth: 2.5 })), ['x בא ', 'דג 12']);
   // L1: a tab and the whitespace before it sit at the paragraph level, so the Hebrew either side is not one run.
-  assert.equal(
-    layout('א \tב', { direction: 'ltr' })
-      .glyphs.map((g) => g.cluster)
-      .join(''),
-    'א \tב',
-  );
+  assert.equal(layout('א \tב', { direction: 'ltr' }).glyphs.map((g) => g.cluster).join(''), 'א \tב');
 });
 
 test('KB4990b: release drops one bitmap slot and frees its page once the page holds no other slot', () => {
@@ -867,15 +862,7 @@ test('KB4990b: release drops one bitmap slot and frees its page once the page ho
     limits: { maxTextureDimension2D: 8192 },
   };
   const atlas = new GlyphAtlas(device, 'rgba8unorm', 32, 1),
-    bitmap = (i) => ({
-      cluster: `i${i}`,
-      width: 15,
-      height: 15,
-      left: 0,
-      top: 0,
-      color: true,
-      data: new Uint8Array(900),
-    }),
+    bitmap = (i) => ({ cluster: `i${i}`, width: 15, height: 15, left: 0, top: 0, color: true, data: new Uint8Array(900) }),
     a = bitmap(0),
     b = bitmap(1);
   atlas.place(a);

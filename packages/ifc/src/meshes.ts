@@ -60,8 +60,7 @@ export interface IFCMeshChunk extends IFCMeshes {
 }
 
 const SHELL = /^IFC(WALL|SLAB|ROOF|CURTAINWALL)/,
-  BUILT =
-    /^IFC(COLUMN|BEAM|MEMBER|PLATE|WINDOW|DOOR|STAIR|RAMP|RAILING|COVERING|FOOTING|PILE|CHIMNEY|SHADINGDEVICE|BUILDINGELEMENTPART|BUILTELEMENT|BUILDINGELEMENT$)/;
+  BUILT = /^IFC(COLUMN|BEAM|MEMBER|PLATE|WINDOW|DOOR|STAIR|RAMP|RAILING|COVERING|FOOTING|PILE|CHIMNEY|SHADINGDEVICE|BUILDINGELEMENTPART|BUILTELEMENT|BUILDINGELEMENT$)/;
 const ids = (vector: { size(): number; get(i: number): number }) => {
   const out: number[] = [];
   for (let i = 0; i < vector.size(); i++) out.push(vector.get(i));
@@ -113,8 +112,7 @@ function originOf(origin: IFCMeshOptions['origin']): [number, number, number] | 
 export function* meshChunks(model: IFCModel, options: IFCStreamOptions = {}): Generator<IFCMeshChunk> {
   checkModel(model);
   const size = options.chunk ?? 256;
-  if (!Number.isSafeInteger(size) || size < 1 || size > 1_000_000)
-    fail('range', 'chunk must be an integer from 1 to 1,000,000');
+  if (!Number.isSafeInteger(size) || size < 1 || size > 1_000_000) fail('range', 'chunk must be an integer from 1 to 1,000,000');
   let origin = originOf(options.origin);
   checkAbort(options.signal);
   const { api, id } = model,
@@ -182,10 +180,7 @@ export function readIFCMeshes(model: IFCModel, options: IFCMeshOptions = {}): IF
  * next step with LoaderError code `aborted`; the model stays open (it is the caller's). Every chunk structured-clones,
  * so streamIFCInWorker (`/worker`) yields the same chunks from a worker.
  */
-export async function* streamIFCMeshes(
-  model: IFCModel,
-  options: IFCStreamOptions = {},
-): AsyncGenerator<IFCMeshChunk, void, undefined> {
+export async function* streamIFCMeshes(model: IFCModel, options: IFCStreamOptions = {}): AsyncGenerator<IFCMeshChunk, void, undefined> {
   for (const c of meshChunks(model, options)) {
     yield c;
     if (c.loaded < c.total) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -209,8 +204,7 @@ export function readGeometry(model: IFCModel, geometryId: number): IFCMeshGeomet
         positions[v * 3 + k] = vertices[v * 6 + k];
         normals[v * 3 + k] = vertices[v * 6 + 3 + k];
       }
-    if (!positions.every(Number.isFinite) || !normals.every(Number.isFinite))
-      fail('range', 'non-finite vertex; export the file again');
+    if (!positions.every(Number.isFinite) || !normals.every(Number.isFinite)) fail('range', 'non-finite vertex; export the file again');
     const indices = Uint32Array.from(faces);
     for (const i of indices) if (i >= count) fail('range', 'index outside geometry; export the file again');
     return { positions, normals, indices };

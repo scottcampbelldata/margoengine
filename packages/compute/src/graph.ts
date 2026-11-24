@@ -140,14 +140,7 @@ async function settle(
 }
 
 // Each vertex's smallest neighbour along `on` edges, or -1: the tree a search grew.
-function parents(
-  gpu: ComputeContext,
-  from: GpuArray,
-  to: GpuArray,
-  on: GpuArray,
-  n: number,
-  starts: readonly number[],
-) {
+function parents(gpu: ComputeContext, from: GpuArray, to: GpuArray, on: GpuArray, n: number, starts: readonly number[]) {
   const tree = gpu.array(new Int32Array(n).fill(UNSEEN));
   gpu.scatter(tree, to, where(on, from, UNSEEN), { op: 'min' });
   const out = where(tree.eq(UNSEEN), -1, tree).eval() as GpuArray<'i32'>;

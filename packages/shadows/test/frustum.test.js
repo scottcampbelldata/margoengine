@@ -7,12 +7,7 @@ const shader = 'let linear=direct*vec3f(1);';
 const frustum = () => ({ position: [1, 5, 2], left: -2, right: 3, bottom: -1, top: 4, near: 0.5, far: 9 });
 function rig(options, direction = [1, 2, 0.5]) {
   const gpu = mockGPU(),
-    engine = {
-      gpu: gpu.device,
-      lighting: { direction: new Float32Array([...direction, 4]) },
-      removePlugin() {},
-      sceneOf() {},
-    },
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([...direction, 4]) }, removePlugin() {}, sceneOf() {} },
     shadows = new Shadows(options),
     view = context(gpu, { shader }),
     run = passes(shadows);

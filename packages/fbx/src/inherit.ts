@@ -83,13 +83,7 @@ export function place(
         },
         own = { rotation: parts.rotation, scale: parts.scale };
       out = {
-        world: multiply(
-          up.world,
-          multiply(
-            composeTRS(helper.translation, [0, 0, 0, 1], helper.scale),
-            composeTRS([0, 0, 0], own.rotation, own.scale),
-          ),
-        ),
+        world: multiply(up.world, multiply(composeTRS(helper.translation, [0, 0, 0, 1], helper.scale), composeTRS([0, 0, 0], own.rotation, own.scale))),
         localScale: lcl,
         helper,
         own,

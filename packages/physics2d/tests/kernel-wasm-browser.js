@@ -25,10 +25,7 @@ function rapierPyramid(R, rows) {
   const w = new R.World({ x: 0, y: -9.81 }),
     avg = R.CoefficientCombineRule.Average;
   w.timestep = DT;
-  w.createCollider(
-    R.ColliderDesc.cuboid(500, 0.5).setTranslation(0, -0.5).setFriction(0.6).setFrictionCombineRule(avg),
-    w.createRigidBody(R.RigidBodyDesc.fixed()),
-  );
+  w.createCollider(R.ColliderDesc.cuboid(500, 0.5).setTranslation(0, -0.5).setFriction(0.6).setFrictionCombineRule(avg), w.createRigidBody(R.RigidBodyDesc.fixed()));
   for (let r = 0; r < rows; r++)
     for (let i = 0; i < rows - r; i++) {
       const b = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(i - (rows - r - 1) / 2, 0.5 + r));
@@ -40,21 +37,14 @@ function rapierPyramid(R, rows) {
 window.runKernel = async ({ backend, module, rapier, box2d, rounds }) => {
   const canvas = document.querySelector('canvas');
   const engine = await Engine.create(canvas, { backend, fallback: webglRenderer });
-  engine
-    .createMesh()
-    .setGeometry(box())
-    .setMaterial(new PbrMaterial({ color: [1, 0.5, 0] }));
+  engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: [1, 0.5, 0] }));
   const { instance } = await WebAssembly.instantiateStreaming(fetch(module));
   const k = instance.exports,
     checks = [];
   for (let i = 0; i < k.checks(); i++) {
     engine.render();
     const code = k.check(i);
-    checks.push({
-      check: i,
-      pass: code === 0,
-      ...(code === 0 ? {} : { bits: BigInt.asUintN(64, k.bits(i)).toString(16) }),
-    });
+    checks.push({ check: i, pass: code === 0, ...(code === 0 ? {} : { bits: BigInt.asUintN(64, k.bits(i)).toString(16) }) });
   }
   engine.render();
   const used = engine.backend;

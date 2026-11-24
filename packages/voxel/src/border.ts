@@ -99,8 +99,7 @@ export function meshBorder({ chunk, shell, blocks }: MeshInput): Uint32Array {
           const q = states[p + STEP[d]],
             front = q & 0xffff,
             cover = (opaque[front] ? octants(q) : 0) | (front === id ? octants(q) : 0);
-          if (!(cover & FACING[d]))
-            out.push((x + 1) | ((y + 1) << 6) | ((z + 1) << 12) | (d << 18) | ((layer[id] - 1) << 21));
+          if (!(cover & FACING[d])) out.push((x + 1) | ((y + 1) << 6) | ((z + 1) << 12) | (d << 18) | ((layer[id] - 1) << 21));
         }
       }
   return Uint32Array.from(out);

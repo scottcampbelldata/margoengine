@@ -1,87 +1,5 @@
 # Clean room
 
-### Short wind waves and open-water reflection (2026-11-24)
-
-Eric Bruneton, Fabrice Neyret and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless
-Transitions from Geometry to BRDF](https://doi.org/10.1111/j.1467-8659.2009.01618.x), 2010, separate
-resolved displacement, normal-scale detail and filtered reflection as the projected footprint grows. Fabrice
-Veron and W. Kendall Melville, [Experiments on the stability and transition of wind-driven water
-surfaces](https://www.cambridge.org/core/product/D92FEDDAD93AB36787C4EE22469873E1), 2001, observe rough
-patches forming and moving under wind gusts. Eric Heitz, [Understanding the Masking-Shadowing Function
-in Microfacet-Based BRDFs](https://jcgt.org/published/0003/02/03/), 2014, explains the directional
-loss of visible facets that plain normal mapping omits.
-
-Water projects each screen derivative into the ripple's rotated lattice, then fades that band over its
-own footprint. Two additional short gravity-wave bands use the deep-water law `omega = sqrt(g k)`
-and a low-frequency travelling phase warp. The shader includes the warp's spatial derivative when
-filtering and shading the wave. The scale, strength and direction of the authored bands and the rough
-patch field are procedural parameters. They affect normals. Mesh displacement, depth and buoyancy
-continue to use the swell trains.
-
-Both environment paths sample an angular lobe in azimuth and elevation. Down-going rays on the open
-surface contribute progressively less sky reflection. The soft reduction is capped at 34% as an
-approximation of light returned by other facets. This model traces no secondary water hits and uses no
-measured lake roughness field. The regional sky lighting and shoreline blend retain their existing
-paths. See the [limits](limits.md#short-wind-waves-and-sky-reflection).
-
-### Colour in the stern wake (2026-11-23)
-
-Amanda T. Nylund, Lars Arneborg, Anders Tengberg, Ulf Mallast and Ida-Maja Hassellöv, [In situ observations of turbulent ship wakes and their spatiotemporal extent](https://doi.org/10.5194/os-17-1285-2021), 2021, characterize the trail of mixed water and its relation to the bubble wake. Yingfei Liu and Ruru Deng, [Ship Wakes in Optical Images](https://doi.org/10.1175/JTECH-D-18-0021.1), 2018, identify the surface trail separately from the divergent waves. Morgan F. Gelinas, Henry Bokuniewicz, John G. Rapaglia and Kamazima M. M. Lwiza, [Sediment Resuspension by Ship Wakes in the Venice Lagoon](https://digitalcommons.sacredheart.edu/bio_fac/28/), 2013, measure suspended material associated with ship passages in shallow water.
-
-Margo applies an authored linear reflectance to the near-surface water and foam. The existing stern trail supplies
-the amount, width and age envelope. The strongest coloured parcel supplies the reflectance where two trails
-overlap. This is a surface appearance model. It does not compute sediment mass, wavelength-dependent transport or
-the location or mechanism that released the material.
-
-### Kelvin wake crest phase (2026-11-23)
-
-Fritz Ursell, [On Kelvin's ship-wave pattern](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/volume/840945DCC46FC5078D12D1BB82B7E65D?pageNum=2), 1960, derives the two stationary points and their coalescence. Marc Rabaud and Frédéric Moisy, [Ship Wakes: Kelvin or Mach Angle?](https://doi.org/10.1103/PhysRevLett.110.214503), 2013, give the deep-water dispersion and the angle constraints. Ravindra Pethiyagoda, Timothy J. Moroney, Christopher J. Lustri and Scott W. McCue, [Kelvin wake pattern at small Froude numbers](https://doi.org/10.1017/jfm.2021.193), 2021, distinguish the transverse and diverging branches. Michael V. Berry and Christopher J. Howls, [NIST DLMF §36.13](https://dlmf.nist.gov/36.13), 2010, give an independent caustic formulation.
-
-For aft distance `x > 0` and absolute side distance `y`, the wave vector's longitudinal and lateral projections
-have opposite signs. With `T = tan(theta)` and `tau = y / x`, the phase up to sign is
-`k_g x sqrt(1 + T²) (1 − tau T)`. Its derivative vanishes at `tau = T / (1 + 2 T²)`. The previous plus
-sign paired the existing roots with a phase that is nonstationary at those roots. The CPU and WGSL use the same
-corrected projection. The cusp regression evaluates the coalesced phase directly. The amplitude envelope, hull filter,
-and near-hull waterline and stern foam are independent of this correction.
-
-### Animated flow paths in Lines (2026-11-22)
-
-Bruno Jobard and Wilfrid Lefer, [Unsteady Flow Visualization by Animating Evenly-Spaced Streamlines](https://doi.org/10.1111/1467-8659.00395), 2000, show how a cyclic pattern moving along a streamline conveys direction. Greg Turk and David Banks, [Image-Guided Streamline Placement](https://doi.org/10.1145/237170.237285), 1996, describe using line density and visual contrast to make trajectories readable. Jobard and Lefer, [Creating Evenly-Spaced Streamlines of Arbitrary Density](https://web.cs.ucdavis.edu/~ma/SIGGRAPH02/course23/notes/papers/Jobard.pdf), 1997, discuss regular spacing by distance.
-
-Margo takes an authored 3D polyline, scrolls its existing world-distance dash pattern from absolute time, and places a quieter line under it to keep the route readable. Endpoint opacity is based on local arc length with intermediate samples inside the fades. The implementation uses Margo's existing depth, draw and disposal paths and introduces no field solver.
-
-### Ship wakes at harbor speed (2026-11-21)
-
-Francis Noblesse, Gérard Delhommeau, Michel Guilbaud, Dane Hendrix and Chi Yang, [Simple analytical relations for ship bow waves](https://doi.org/10.1017/S0022112008000220), 2008, supply the existing speed law and crest location. Ravindra Pethiyagoda, Timothy J. Moroney, Christopher J. Lustri and Scott W. McCue, [Kelvin wake pattern at small Froude numbers](https://doi.org/10.1017/jfm.2021.193), 2021, describe why slow flow need not show a strong diverging wave. Donald C. Wyatt, Thomas C. Fu, Genevieve L. Taylor, Eric J. Terrill, Tao Xing, Shanti Bhushan, Thomas T. O'Shea and Douglas G. Dommermuth, [A Comparison of Full-Scale Experimental Measurements and Computational Predictions of the Transom-Stern Wave of the R/V Athena I](https://arxiv.org/abs/1410.1810), 2008, distinguish the near stern elevation and the spatially uneven bubble signature. Their example is at 5.4 m/s.
-
-The minimum modelled bow span `min(0.75 m, 0.065 beam)`, low-speed side-width blend, stern foam's `0.5..2.2 m/s` ramp,
-and a shader mask that concentrates thin foam into patches are Margo's rendering approximations. The wider profile retains
-the analytic crest location and height. The shoreline contact band, the Kelvin-wave law and the stern age decay keep their
-separate inputs. The visual coefficients were checked on calm GPU fixtures and the existing First Wake camera tracks.
-
-### Ship side wash in Water (2026-11-21)
-
-Gabriel D. Weymouth and Dick K. P. Yue, [Physics-Based Learning Models for Ship Hydrodynamics](https://doi.org/10.5957/JOSR.57.1.120005), 2013, compare at-speed waterline elevation along a Wigley hull using tank measurements and potential flow. Douglas G. Dommermuth, Thomas T. O'Shea, Donald C. Wyatt, Mark Sussman, Gabriel D. Weymouth, Dick K. P. Yue, Paul Adams and Randall Hand, [The Numerical Simulation of Ship Waves Using Cartesian-Grid and Volume-of-Fluid Methods](https://arxiv.org/abs/1410.1937), 2006, resolve run-up and local breaking from the body boundary. Donald C. Wyatt, Thomas C. Fu, Genevieve L. Taylor, Eric J. Terrill, Tao Xing, Shanti Bhushan, Thomas T. O'Shea and Douglas G. Dommermuth, [A Comparison of Full-Scale Experimental Measurements and Computational Predictions of the Transom-Stern Wave of the R/V Athena I](https://arxiv.org/abs/1410.1810), 2008, document whole-vessel effects that extend into the stern wake.
-
-Margo uses a compact approximation alongside the waterplane. The transverse section `(1-q)²(1-4q)` for normalized
-distance `q ∈ [0,1]` integrates to zero. Its width is `min(0.30 beam, max(0.17 beam, 2 crest))`. The section reaches at most
-45% of the bow height at contact. It ramps in behind the bow crest and decays toward the transom. The profile, width and
-coefficients are Margo's. The two full-flow studies establish the role of hull shape and wave breaking, which the reduced
-heightfield cannot resolve. The drawdown depth and longitudinal profile are approximations and have not been fit to a specific hull.
-
-### Swept bow crest in Water (2026-11-21)
-
-Francis Noblesse, Gérard Delhommeau, Michel Guilbaud, Dane Hendrix and Chi Yang, [Simple analytical relations for ship bow waves](https://doi.org/10.1017/S0022112008000220), 2008, give the contact-curve crest height and location used here. Francis Noblesse, Gérard Delhommeau, Hua Liu, De-cheng Wan and Chi Yang, [Ship bow waves](https://dcwan.sjtu.edu.cn/userfiles/2013-4%20Shipbowwaves.pdf), 2013, compare the longitudinal profile and present examples of how the bow wave develops alongside the hull. Clément Caplier, Germain Rousseaux, Damien Calluaud and Laurent David, [Energy distribution in shallow water ship wakes from a spectral analysis of the wave field](https://doi.org/10.1063/1.4964923), 2016, measure the hull-bound bow rise separately from the trailing wave system.
-
-Extruding the contact profile transversely produces a horizontal stripe. In Margo's planform approximation the profile starts at its measured along-hull crest location. From the current hull frame, its offset is `2 d² / w` aft at distance `d` outside the waterline and its amplitude fades over width `w = max(crest, min(0.35 beam, sqrt(beam crest)))`. These planform coefficients are Margo's model. The height and breaking foam use the same phase and envelope. Kelvin waves continue to use the path history.
-
-
-### Stern foam history in Water (2026-11-21)
-
-Yingfei Liu and Ruru Deng, [Ship Wakes in Optical Images](https://doi.org/10.1175/JTECH-D-18-0021.1), 2018, distinguish the bright turbulent region behind a vessel from the Kelvin wave pattern. Vincent G. Johnston and David T. Walker, [Experimentally Observed Features of the Turbulent Near-Wake of a Model Ship](https://deepblue.lib.umich.edu/bitstream/handle/2027.42/116057/39015075172091.pdf?isAllowed=y&sequence=1), 1991, observed a rapidly spreading surface layer and irregular free-surface disturbances aft. Antonio Posa, Riccardo Broglia and Elias Balaras, [The wake flow downstream of a propeller-rudder system](https://doi.org/10.1016/j.ijheatfluidflow.2020.108765), 2021, characterize turbulence and shear downstream of the propeller and rudder.
-
-The observations support a turbulent surface trail that starts at the stern. A single bow trajectory with a time offset equal to hull length divided by current speed approximates straight, steady motion. Sampling the actual stern trajectory also follows the time and position of a turn or acceleration. Margo records both end positions at each station. It uses a laterally spreading envelope and exponential decay as artistic approximations. CPU and WGSL are authored here from these observations. No other engine's implementation was used.
-
 ### Spruce crown top and leader (procedural, KB-CABIN-LEADER1, 2026-11-16)
 
 The crown top in `generateTreeMesh` (`packages/procedural/src/foliage.ts`: the youngest whorl, the upright leader blades
@@ -11040,12 +10958,29 @@ Written from the papers, tables and archive records below; no other engine's or 
   2 inch brim and a crown rounding over from 0.6 of its height (`GarmentSpec.dome`) are read from it and from the
   Library of Congress photographs of the Wrights in town.
 
-### Above-water refraction depth (2026-11-21)
-- Tiago Sousa, [Generic Refraction Simulation](https://developer.nvidia.com/gpugems/gpugems2/part-ii-shading-lighting-and-shadows/chapter-19-generic-refraction-simulation), 2005. Validate a sample in the displaced scene image to avoid foreground silhouette bleed.
-- Morgan McGuire and Michael Mara, [Efficient GPU Screen-Space Ray Tracing](https://jcgt.org/published/0003/04/04/), 2014. Compare projected ray depth to the framebuffer and bound the ray search.
-- Chris Wyman, [An Approximate Image-Space Approach for Interactive Refraction](https://cwyman.org/papers/sig05_approxISRefr.pdf), 2005. Follow the direction changed by the refractive interface to find the color received by the eye.
-Margo intersects a homogeneous ray with each candidate depth plane and
-checks the resulting texel. The wide-step crossing search supplies fallback
-seeds where a depth discontinuity defeats the first estimate. It uses the
-existing Water snapshots, depth convention and Snell normal. The shader and
-regression were written from these descriptions and analytic geometry.
+## Blast thermal: weather/eruption BlastCloud (2026-11-24)
+
+Written from the papers' text and equations only; no other engine's or tool's code was read. Sources: B. R. Morton,
+G. I. Taylor and J. S. Turner, Proc. R. Soc. Lond. A 234, 1-23, 1956, https://doi.org/10.1098/rspa.1956.0011 (the
+instantaneous source's entrainment equations and the B^(1/4) N^(-1/2) height scale); R. S. Scorer, J. Fluid Mech. 2,
+583-594, 1957, https://doi.org/10.1017/S0022112057000397 (thermal spread b / z near 0.25, rise as (B t^2)^(1/4)); J. S.
+Turner, Proc. R. Soc. Lond. A 239, 61-75, 1957, https://doi.org/10.1098/rspa.1957.0023 (the buoyant vortex ring as the
+cap); M. P. Escudier and T. Maxworthy, J. Fluid Mech. 61, 541-552, 1973, https://doi.org/10.1017/S0022112073000856
+(added mass); J. S. Turner, Annu. Rev. Fluid Mech. 1, 29-44, 1969, https://doi.org/10.1146/annurev.fl.01.010169.000333
+(review); S. Glasstone and P. J. Dolan, The Effects of Nuclear Weapons, 3rd ed., 1977, ch. 2 (buried bursts: the
+earth column, dust cloud and base surge, described only); W. E. Baker et al., Explosion Hazards and Evaluation,
+Elsevier, 1983 (cube-root scaling and the TNT heat of detonation). Model choices, stated in the source: the initial
+radius tnt^(1/3) m, `heatShare` 0.4, the cap's ring proportions and the base surge's growth. Tests check the laws:
+b - b0 = alpha z and z^2 growing at 2 B / ((1 + k) alpha^3) in uniform air, the stopping height doubling for 16 times
+the buoyancy or a quarter of N, and the ICAO N^2.
+
+## Explosion crater: terrain/ground-change 'crater' event (2026-11-24)
+
+Written from the sources' text only; no other engine's or tool's code was read. S. Glasstone and P. J. Dolan, The
+Effects of Nuclear Weapons, 3rd ed., US DoD and ERDA, 1977, ch. 2 and 6 (a buried burst lifts a mound that vents, then
+leaves an apparent crater with a lip and ejecta); T. R. McGetchin, M. Settle and J. W. Head, "Radial thickness
+variation in impact crater ejecta", Earth Planet. Sci. Lett. 20, 226-236, 1973,
+https://doi.org/10.1016/0012-821X(73)90162-3 (the blanket thinning as (r / R)^-3). The dome's rise is a surface
+thrown up at sqrt(2 g H) and slowed by gravity, h = H (1 - (1 - t / T)^2), T = sqrt(2 H / g). Model choices: the
+dome's shape (1 - (r / 1.3 R)^2)^2, the paraboloid bowl, the crater's growth under constant deceleration from half
+its radius, the lip ramp over the last 15 percent of the radius and the blanket's cut at 5 R. Tests: test/crater.test.js.

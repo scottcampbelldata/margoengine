@@ -15,10 +15,7 @@ const stage = (signal = new AbortController().signal) => ({
 });
 
 test('addCAD checks its arguments before it loads anything', async () => {
-  await assert.rejects(addCAD(stage(), url('step'), { fit: 'yes' }), {
-    name: 'TypeError',
-    message: /^Invalid fit: expected a boolean/,
-  });
+  await assert.rejects(addCAD(stage(), url('step'), { fit: 'yes' }), { name: 'TypeError', message: /^Invalid fit: expected a boolean/ });
   await assert.rejects(addCAD(stage(), url('unknown')), { name: 'TypeError', message: /^Specify format/ });
 });
 

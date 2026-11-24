@@ -16,12 +16,8 @@ test('every locked dependency with an install script is reviewed in allowScripts
     lock = read('package-lock.json');
   const scripted = Object.entries(lock.packages)
     .filter(([path, entry]) => path.includes('node_modules/') && entry.hasInstallScript)
-    .map(
-      ([path, entry]) => `${path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length)}@${entry.version}`,
-    );
+    .map(([path, entry]) => `${path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length)}@${entry.version}`);
   assert.ok(scripted.length > 0, 'the lock file still marks install scripts');
-  for (const id of scripted)
-    assert.equal(typeof allow[id], 'boolean', `${id} is reviewed in package.json allowScripts`);
-  for (const id of Object.keys(allow))
-    assert.ok(scripted.includes(id), `allowScripts entry ${id} matches a locked package`);
+  for (const id of scripted) assert.equal(typeof allow[id], 'boolean', `${id} is reviewed in package.json allowScripts`);
+  for (const id of Object.keys(allow)) assert.ok(scripted.includes(id), `allowScripts entry ${id} matches a locked package`);
 });

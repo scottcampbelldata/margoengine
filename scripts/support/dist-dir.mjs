@@ -70,10 +70,7 @@ export function tsconfigFor(root, dist = distDir(root)) {
   }
   const file = resolve(root, '../../test-results/package-tsc', `${basename(root)}.json`);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(
-    file,
-    `${JSON.stringify({ extends: own, compilerOptions: { outDir: resolve(dist), paths } }, null, 2)}\n`,
-  );
+  writeFileSync(file, `${JSON.stringify({ extends: own, compilerOptions: { outDir: resolve(dist), paths } }, null, 2)}\n`);
   return file;
 }
 
@@ -162,10 +159,7 @@ export async function swapDist(root, { limitMs = SHARED_FILE_LIMIT_MS } = {}) {
       await whenReleased(() => rm(join(dist, file), { recursive: true, force: true }), join(dist, file), limitMs);
   await mkdir(dist, { recursive: true });
   for (const folder of fresh.folders) await mkdir(join(dist, folder), { recursive: true });
-  const order = [
-    ...fresh.files.filter((file) => !entries.has(file)),
-    ...fresh.files.filter((file) => entries.has(file)),
-  ];
+  const order = [...fresh.files.filter((file) => !entries.has(file)), ...fresh.files.filter((file) => entries.has(file))];
   let moved = 0,
     unchanged = 0,
     removed = 0;
@@ -185,9 +179,9 @@ export async function swapDist(root, { limitMs = SHARED_FILE_LIMIT_MS } = {}) {
       removed++;
     }
   // Folders the new build no longer has, deepest first, once their files are gone.
-  for (const folder of old.folders
-    .filter((folder) => !freshFolders.has(folder) && !freshFiles.has(folder))
-    .sort((a, b) => b.length - a.length))
+  for (const folder of old.folders.filter((folder) => !freshFolders.has(folder) && !freshFiles.has(folder)).sort(
+    (a, b) => b.length - a.length,
+  ))
     if (existsSync(join(dist, folder)) && readdirSync(join(dist, folder)).length === 0)
       await whenReleased(() => rmdir(join(dist, folder)), join(dist, folder), limitMs);
   await rm(next, { recursive: true, force: true });

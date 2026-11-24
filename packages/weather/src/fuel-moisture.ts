@@ -60,10 +60,7 @@ export function equilibriumMoisture(humidity: number, temperature: number): numb
  * clear, scattered, broken and overcast skies, the sky covers of Bradshaw et al. 1983 table 6). At night (`day` false)
  * the fuel sees the air as it is.
  */
-export function fuelLevelAir(
-  state: Pick<WeatherState, 'humidity' | 'temperature' | 'cloud'>,
-  day = true,
-): { humidity: number; temperature: number } {
+export function fuelLevelAir(state: Pick<WeatherState, 'humidity' | 'temperature' | 'cloud'>, day = true): { humidity: number; temperature: number } {
   if (!day) return { humidity: state.humidity, temperature: state.temperature };
   const c = state.cloud,
     [addF, times] = c <= 0.1 ? [25, 0.75] : c <= 0.5 ? [19, 0.83] : c <= 0.9 ? [12, 0.92] : [5, 1];
@@ -127,11 +124,7 @@ export class FuelMoistureModel {
   }
 
   /** Steps `seconds` of weather time in `state` (in daylight unless `day` is false); returns the moisture now. */
-  step(
-    state: Pick<WeatherState, 'humidity' | 'temperature' | 'cloud' | 'rain'>,
-    seconds: number,
-    day = true,
-  ): DeadFuelMoisture {
+  step(state: Pick<WeatherState, 'humidity' | 'temperature' | 'cloud' | 'rain'>, seconds: number, day = true): DeadFuelMoisture {
     if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0)
       throw new RangeError('Invalid fuel moisture step; pass a finite number of seconds of 0 or more.');
     const hours = (seconds * checkScale(this.timeScale)) / 3600;

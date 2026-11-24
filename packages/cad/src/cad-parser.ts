@@ -10,10 +10,7 @@ export const maxBytes = 64 * 1024 * 1024,
  * @margoengine/gltf/pbr loads without these caps (a B-rep file is tessellated offline with @margoengine/brep and written as GLB with
  * @margoengine/exporters). */
 export function capError(limit: string, format: string): RangeError {
-  const way =
-    format === 'stl' || format === 'obj'
-      ? 'export it as GLB'
-      : 'tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters';
+  const way = format === 'stl' || format === 'obj' ? 'export it as GLB' : 'tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters';
   return new RangeError(`${limit}; ${way} and load it with @margoengine/gltf/pbr`);
 }
 // A corner welds only with the same Float32 point, the value Geometry stores: its key is the Float32 bit pattern, with

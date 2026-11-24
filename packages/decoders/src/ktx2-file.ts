@@ -93,12 +93,7 @@ export function readKTX2Index(bytes: Uint8Array, fileLength = bytes.length): KTX
 }
 
 /** A level's bytes with zlib or Zstandard undone; the code for either loads on first use. */
-export async function levelData(
-  bytes: Uint8Array,
-  index: KTX2Index,
-  level: number,
-  signal?: AbortSignal,
-): Promise<Uint8Array> {
+export async function levelData(bytes: Uint8Array, index: KTX2Index, level: number, signal?: AbortSignal): Promise<Uint8Array> {
   const { offset, length, uncompressedLength } = index.levels[level],
     stored = bytes.subarray(offset, offset + length);
   if (index.supercompression === 0) return stored;
@@ -106,14 +101,9 @@ export async function levelData(
     const { inflateZlib } = await import('./ktx2-inflate.js');
     // The declared size is the file's word: grow toward it as the stream really inflates, rather than allocate it up
     // front (a 2 KB file declaring 4 GiB failed with an uncoded allocation error), then hold the stream to it.
-    const data = inflateZlib(stored, {
-      limit: uncompressedLength,
-      limitHint: 'the level is larger than its declared size',
-    });
+    const data = inflateZlib(stored, { limit: uncompressedLength, limitHint: 'the level is larger than its declared size' });
     if (data.length !== uncompressedLength)
-      throw decodeFailed(
-        `KTX2: level ${level} inflates to ${data.length} bytes, not the ${uncompressedLength} it declares`,
-      );
+      throw decodeFailed(`KTX2: level ${level} inflates to ${data.length} bytes, not the ${uncompressedLength} it declares`);
     return data;
   }
   if (index.supercompression === 2) {
@@ -121,9 +111,7 @@ export async function levelData(
     // Held to the declared size like the zlib path: a short level reached the transcoder short.
     const data = await decompressZstd(stored, { signal, maxOutputSize: uncompressedLength });
     if (data.length !== uncompressedLength)
-      throw decodeFailed(
-        `KTX2: level ${level} decompresses to ${data.length} bytes, not the ${uncompressedLength} it declares`,
-      );
+      throw decodeFailed(`KTX2: level ${level} decompresses to ${data.length} bytes, not the ${uncompressedLength} it declares`);
     return data;
   }
   throw decodeFailed(`KTX2: supercompression scheme ${index.supercompression} on a vkFormat file; re-encode the file`);

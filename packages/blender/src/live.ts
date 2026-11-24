@@ -2,12 +2,12 @@
 // "Start live link") serves the newest export at <url>/scene.margo and announces each version on <url>/events as
 // Server-Sent Events; margoLive fetches every announced version, attaches it, disposes the one before and yields it,
 // so artists see the engine's result as they work.
-import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf/pbr-model';
-import { fault } from '../../shared/errors.js';
-import { readResponse } from '../../shared/loading.js';
-import { maxBytes } from './container.js';
-import { parseMargo, type MargoOptions } from './index.js';
+import type { EngineKernel } from "@margoengine/core";
+import type { PBRModel } from "@margoengine/gltf/pbr-model";
+import { fault } from "../../shared/errors.js";
+import { readResponse } from "../../shared/loading.js";
+import { maxBytes } from "./container.js";
+import { parseMargo, type MargoOptions } from "./index.js";
 
 /** Options of margoLive. */
 export interface MargoLiveOptions extends MargoOptions {
@@ -54,10 +54,10 @@ export async function* margoLive(
 ): AsyncGenerator<PBRModel, void, undefined> {
   signal?.throwIfAborted();
   const base = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(base.protocol))
+  if (!["http:", "https:"].includes(base.protocol))
     throw new TypeError("Live link URL must use HTTP(S); pass the address the Blender add-on's Margo panel shows");
-  if (typeof Source !== 'function')
-    throw fault('unsupported', 'Live link needs EventSource; pass it in the EventSource option outside a browser');
+  if (typeof Source !== "function")
+    throw fault("unsupported", "Live link needs EventSource; pass it in the EventSource option outside a browser");
   // `latest` is the newest version announced on the current connection and `pending` says it is not attached yet.
   // Each new connection's first event is always taken: a live link started again (Blender reopened) counts from 1,
   // so its numbers say nothing about the versions of the connection before it.
@@ -70,11 +70,11 @@ export async function* margoLive(
     wake?.();
     wake = undefined;
   };
-  const source = new Source(new URL('events', base).href);
-  source.addEventListener('open', () => {
+  const source = new Source(new URL("events", base).href);
+  source.addEventListener("open", () => {
     fresh = true;
   });
-  source.addEventListener('scene', (event) => {
+  source.addEventListener("scene", (event) => {
     const version = Number((event as MessageEvent).data);
     if (!Number.isSafeInteger(version) || version < 1 || (!fresh && version <= latest)) return;
     fresh = false;
@@ -82,15 +82,15 @@ export async function* margoLive(
     pending = true;
     notify();
   });
-  source.addEventListener('error', () => {
+  source.addEventListener("error", () => {
     // EventSource reconnects by itself unless the server ended the stream for good (CLOSED).
     if (source.readyState === Source.CLOSED) {
-      failure = fault('failed', `Live link at ${base.href} closed; start the live link in Blender again`);
+      failure = fault("failed", `Live link at ${base.href} closed; start the live link in Blender again`);
       notify();
     }
   });
   const aborted = () => notify();
-  signal?.addEventListener('abort', aborted);
+  signal?.addEventListener("abort", aborted);
   let model: PBRModel | undefined;
   try {
     for (;;) {
@@ -99,14 +99,14 @@ export async function* margoLive(
       if (failure) throw failure;
       pending = false;
       const version = latest,
-        target = new URL('scene.margo', base);
-      target.searchParams.set('v', String(version));
+        target = new URL("scene.margo", base);
+      target.searchParams.set("v", String(version));
       let next: PBRModel;
       try {
-        const bytes = await readResponse(await get(target, { signal, cache: 'no-store' }), {
+        const bytes = await readResponse(await get(target, { signal, cache: "no-store" }), {
           maxBytes,
           signal,
-          label: 'Live .margo download',
+          label: "Live .margo download",
         });
         next = await parse(engine, bytes, { signal, maxNodes });
       } catch (error) {
@@ -118,7 +118,7 @@ export async function* margoLive(
       yield model;
     }
   } finally {
-    signal?.removeEventListener('abort', aborted);
+    signal?.removeEventListener("abort", aborted);
     source.close();
     model?.dispose();
   }

@@ -71,10 +71,7 @@ test('only a medium that light enters scatters', () => {
   const on = (e) => !!extendedMaterials.parse(e)?.features.scatter;
   assert.equal(on(dense()), true);
   assert.equal(
-    on({
-      ...dense({ KHR_materials_transmission: { transmissionFactor: 0.5 } }),
-      KHR_materials_diffuse_transmission: undefined,
-    }),
+    on({ ...dense({ KHR_materials_transmission: { transmissionFactor: 0.5 } }), KHR_materials_diffuse_transmission: undefined }),
     true,
   );
   assert.equal(on({ ...dense(), KHR_materials_diffuse_transmission: undefined }), false, 'nothing enters');
@@ -83,26 +80,14 @@ test('only a medium that light enters scatters', () => {
   assert.equal(on(volume({ thicknessFactor: 0 })), false, 'thin walled');
   assert.equal(on(volume({ attenuationDistance: undefined })), false, 'no extinction');
   assert.equal(on(dense({ KHR_materials_volume_scatter: {} })), false, 'default colour is black');
-  assert.equal(
-    extendedMaterials.parse({ KHR_materials_volume_scatter: { multiscatterColorFactor: [1, 1, 1] } }),
-    undefined,
-  );
+  assert.equal(extendedMaterials.parse({ KHR_materials_volume_scatter: { multiscatterColorFactor: [1, 1, 1] } }), undefined);
 });
 
 test('a bad value is refused with its fix', () => {
+  assert.throws(() => extendedMaterials.parse(dense({ KHR_materials_volume_scatter: { multiscatterColorFactor: [2, 0, 0] } })), /multi-scatter color/);
+  assert.throws(() => extendedMaterials.parse(dense({ KHR_materials_volume_scatter: { multiscatterColorFactor: [1, 0] } })), /multi-scatter color/);
   assert.throws(
-    () => extendedMaterials.parse(dense({ KHR_materials_volume_scatter: { multiscatterColorFactor: [2, 0, 0] } })),
-    /multi-scatter color/,
-  );
-  assert.throws(
-    () => extendedMaterials.parse(dense({ KHR_materials_volume_scatter: { multiscatterColorFactor: [1, 0] } })),
-    /multi-scatter color/,
-  );
-  assert.throws(
-    () =>
-      extendedMaterials.parse(
-        dense({ KHR_materials_volume_scatter: { multiscatterColorFactor: [1, 0, 0], scatterAnisotropy: 1.5 } }),
-      ),
+    () => extendedMaterials.parse(dense({ KHR_materials_volume_scatter: { multiscatterColorFactor: [1, 0, 0], scatterAnisotropy: 1.5 } })),
     /scatter anisotropy/,
   );
 });

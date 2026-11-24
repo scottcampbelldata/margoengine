@@ -83,10 +83,9 @@ export interface FXStage extends Disposable {
 }
 
 function colour(context: BaseAudioContext, spec: ColourSpec): FXStage {
-  const mix = bounded(spec.mix ?? 1, 0, 1, 'FX mix'),
-    amount = bounded(spec.amount ?? 0.4, 0, 1, 'Distortion amount');
+  const mix = bounded(spec.mix ?? 1, 0, 1, 'FX mix'), amount = bounded(spec.amount ?? 0.4, 0, 1, 'Distortion amount');
   const oversample = spec.oversample ?? 'none';
-  if (!['none', '2x', '4x'].includes(oversample)) throw new TypeError('Unknown oversampling; choose none, 2x or 4x');
+  if (!['none','2x','4x'].includes(oversample)) throw new TypeError('Unknown oversampling; choose none, 2x or 4x');
   let curve: Float32Array<ArrayBuffer>;
   if (spec.type === 'waveshaper') {
     if (!Array.isArray(spec.curve) || spec.curve.length < 2 || spec.curve.length > 65537)
@@ -96,42 +95,20 @@ function colour(context: BaseAudioContext, spec: ColourSpec): FXStage {
   } else {
     const k = amount * 100;
     curve = Float32Array.from({ length: 8193 }, (_, i) => {
-      const x = i / 4096 - 1;
-      return ((1 + k) * x) / (1 + k * Math.abs(x));
+      const x = i / 4096 - 1; return (1 + k) * x / (1 + k * Math.abs(x));
     });
   }
-  const input = context.createGain(),
-    output = context.createGain(),
-    dry = context.createGain(),
-    wet = context.createGain();
-  const shape = context.createWaveShaper(),
-    control = context.createConstantSource(),
-    invert = context.createGain();
-  shape.curve = curve;
-  shape.oversample = oversample;
-  control.offset.value = mix;
-  dry.gain.value = 1;
-  wet.gain.value = 0;
-  invert.gain.value = -1;
-  control.connect(wet.gain);
-  control.connect(invert).connect(dry.gain);
-  control.start();
-  input.connect(dry).connect(output);
-  input.connect(shape).connect(wet).connect(output);
+  const input = context.createGain(), output = context.createGain(), dry = context.createGain(), wet = context.createGain();
+  const shape = context.createWaveShaper(), control = context.createConstantSource(), invert = context.createGain();
+  shape.curve = curve; shape.oversample = oversample; control.offset.value = mix;
+  dry.gain.value = 1; wet.gain.value = 0; invert.gain.value = -1;
+  control.connect(wet.gain); control.connect(invert).connect(dry.gain); control.start();
+  input.connect(dry).connect(output); input.connect(shape).connect(wet).connect(output);
   let disposed = false;
-  const stage: FXStage = {
-    input,
-    output,
-    params: { mix: control.offset },
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      control.stop();
-      for (const n of [input, output, dry, wet, shape, control, invert]) n.disconnect();
-    },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+  const stage: FXStage = { input, output, params: { mix: control.offset },
+    dispose() { if (disposed) return; disposed = true; control.stop();
+      for (const n of [input, output, dry, wet, shape, control, invert]) n.disconnect(); },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }
@@ -141,124 +118,61 @@ export async function createFX(context: BaseAudioContext, spec: FXSpec, options:
   options.signal?.throwIfAborted();
   if (!spec || typeof spec !== 'object') throw new TypeError('FX needs a JSON effect object; pass a spec with type');
   if (spec.type === 'distortion' || spec.type === 'waveshaper') return colour(context, spec);
-  if (
-    !['chorus', 'flanger', 'vibrato', 'phaser', 'tremolo', 'auto-filter', 'auto-pan', 'bitcrusher'].includes(spec.type)
-  )
+  if (!['chorus','flanger','vibrato','phaser','tremolo','auto-filter','auto-pan','bitcrusher'].includes(spec.type))
     throw new TypeError('Unknown FX type; choose a documented modulation or colour effect');
   const channels = bounded(options.channels ?? 2, 1, 32, 'FX channels');
   if (!Number.isInteger(channels) || (spec.type === 'auto-pan' && channels !== 2))
     throw new RangeError('FX needs integer channels and auto-pan needs stereo; pass channels 2');
-  const mod = spec as ModulationSpec,
-    bits = spec as BitcrusherSpec;
+  const mod = spec as ModulationSpec, bits = spec as BitcrusherSpec;
   const waveform = mod.waveform ?? 'sine';
-  if (!['sine', 'triangle', 'square', 'sawtooth'].includes(waveform))
+  if (!['sine','triangle','square','sawtooth'].includes(waveform))
     throw new TypeError('Unknown LFO waveform; use sine, triangle, square or sawtooth');
   const stages = bounded(mod.stages ?? 6, 1, 32, 'Phaser stages');
   const parameterData = {
-    rate: bounded(mod.rate ?? 1, 0, 20, 'LFO rate'),
-    depth: bounded(mod.depth ?? 0.5, 0, 1, 'FX depth'),
-    mix: bounded(spec.mix ?? (['chorus', 'flanger', 'phaser'].includes(spec.type) ? 0.5 : 1), 0, 1, 'FX mix'),
-    time: bounded(
-      mod.time ?? (spec.type === 'flanger' ? 0.003 : spec.type === 'vibrato' ? 0.005 : 0.02),
-      0,
-      0.1,
-      'FX time',
-    ),
+    rate: bounded(mod.rate ?? 1, 0, 20, 'LFO rate'), depth: bounded(mod.depth ?? 0.5, 0, 1, 'FX depth'),
+    mix: bounded(spec.mix ?? (['chorus','flanger','phaser'].includes(spec.type) ? 0.5 : 1), 0, 1, 'FX mix'),
+    time: bounded(mod.time ?? (spec.type === 'flanger' ? 0.003 : spec.type === 'vibrato' ? 0.005 : 0.02), 0, 0.1, 'FX time'),
     feedback: bounded(mod.feedback ?? 0, -0.95, 0.95, 'FX feedback'),
     frequency: bounded(mod.frequency ?? 400, 10, context.sampleRate * 0.45, 'FX frequency'),
-    octaves: bounded(mod.octaves ?? 3, 0, 8, 'FX octaves'),
-    q: bounded(mod.q ?? 1, 0.1, 40, 'FX q'),
-    bits: bounded(bits.bits ?? 4, 1, 24, 'FX bits'),
-    reduction: bounded(bits.reduction ?? 1, 1, 128, 'FX reduction'),
+    octaves: bounded(mod.octaves ?? 3, 0, 8, 'FX octaves'), q: bounded(mod.q ?? 1, 0.1, 40, 'FX q'),
+    bits: bounded(bits.bits ?? 4, 1, 24, 'FX bits'), reduction: bounded(bits.reduction ?? 1, 1, 128, 'FX reduction'),
   };
   if (![stages, parameterData.bits, parameterData.reduction].every(Number.isInteger))
     throw new RangeError('FX stages, bits and reduction need integers; pass whole numbers within their bounds');
   const phase = bounded(mod.phase ?? 0, 0, 360, 'FX phase');
-  const spread = bounded(mod.spread ?? (['chorus', 'tremolo'].includes(spec.type) ? 180 : 0), 0, 360, 'FX spread');
-  await loadProcessor(context, 'margo-fx-v1', fxProcessor, options.signal);
-  options.signal?.throwIfAborted();
-  const output = new AudioWorkletNode(context, 'margo-fx-v1', {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    outputChannelCount: [channels],
-    channelCount: channels,
-    channelCountMode: 'explicit',
-    parameterData,
-    processorOptions: {
-      type: spec.type,
-      channels,
-      stages,
-      phase,
-      spread: spec.type === 'auto-pan' ? 0 : spread,
-      waveform,
-    },
+  const spread = bounded(mod.spread ?? (['chorus','tremolo'].includes(spec.type) ? 180 : 0), 0, 360, 'FX spread');
+  await loadProcessor(context, 'margo-fx-v1', fxProcessor, options.signal); options.signal?.throwIfAborted();
+  const output = new AudioWorkletNode(context, 'margo-fx-v1', { numberOfInputs: 1, numberOfOutputs: 1,
+    outputChannelCount: [channels], channelCount: channels, channelCountMode: 'explicit', parameterData,
+    processorOptions: { type: spec.type, channels, stages, phase, spread: spec.type === 'auto-pan' ? 0 : spread, waveform },
   });
-  const input = context.createGain();
-  input.connect(output);
-  const params = Object.fromEntries(Object.keys(parameterData).map((k) => [k, output.parameters.get(k)!]));
+  const input = context.createGain(); input.connect(output);
+  const params = Object.fromEntries(Object.keys(parameterData).map(k => [k, output.parameters.get(k)!]));
   let disposed = false;
-  const stage: FXStage = {
-    input,
-    output,
-    params,
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      input.disconnect();
-      output.disconnect();
-      output.port.postMessage('dispose');
-      output.port.close();
-    },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+  const stage: FXStage = { input, output, params,
+    dispose() { if (disposed) return; disposed = true; input.disconnect(); output.disconnect();
+      output.port.postMessage('dispose'); output.port.close(); },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }
 
 /** Build a JSON chain transactionally. Failure/abort disposes earlier effects, leaving caller routing untouched. */
-export async function createFXChain(
-  context: BaseAudioContext,
-  specs: readonly FXSpec[],
-  options: FXOptions = {},
-): Promise<FXStage> {
+export async function createFXChain(context: BaseAudioContext, specs: readonly FXSpec[], options: FXOptions = {}): Promise<FXStage> {
   options.signal?.throwIfAborted();
   if (!Array.isArray(specs)) throw new TypeError('FX chain needs an array; pass JSON effect specs in processing order');
   const stages: FXStage[] = [];
-  try {
-    for (const spec of specs) {
-      stages.push(await createFX(context, spec, options));
-      options.signal?.throwIfAborted();
-    }
-  } catch (error) {
-    for (const s of stages) s.dispose();
-    throw error;
-  }
-  const input = context.createGain(),
-    output = context.createGain();
+  try { for (const spec of specs) { stages.push(await createFX(context, spec, options)); options.signal?.throwIfAborted(); } }
+  catch (error) { for (const s of stages) s.dispose(); throw error; }
+  const input = context.createGain(), output = context.createGain();
   let tail: AudioNode = input;
   const params: Record<string, AudioParam> = {};
-  stages.forEach((s, i) => {
-    tail.connect(s.input);
-    tail = s.output;
-    for (const [name, p] of Object.entries(s.params)) params[`${i}.${name}`] = p;
-  });
-  tail.connect(output);
-  let disposed = false;
-  const chain: FXStage = {
-    input,
-    output,
-    params,
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      input.disconnect();
-      output.disconnect();
-      for (const s of stages) s.dispose();
-    },
-    [Symbol.dispose]() {
-      chain.dispose();
-    },
+  stages.forEach((s, i) => { tail.connect(s.input); tail = s.output;
+    for (const [name, p] of Object.entries(s.params)) params[`${i}.${name}`] = p; });
+  tail.connect(output); let disposed = false;
+  const chain: FXStage = { input, output, params,
+    dispose() { if (disposed) return; disposed = true; input.disconnect(); output.disconnect(); for (const s of stages) s.dispose(); },
+    [Symbol.dispose]() { chain.dispose(); },
   };
   return chain;
 }
@@ -266,18 +180,8 @@ export async function createFXChain(
 /** Build and insert a caller-owned JSON chain on any bus. Its disposal restores the bus; bus teardown also disposes it. */
 export async function createBusFX(bus: Bus, specs: readonly FXSpec[], options: FXOptions = {}): Promise<FXStage> {
   const stage = await createFXChain(bus.input.context, specs, options);
-  let detach: (() => void) | undefined;
-  const dispose = stage.dispose;
-  stage.dispose = () => {
-    detach?.();
-    dispose();
-  };
-  try {
-    options.signal?.throwIfAborted();
-    detach = bus.insert(stage);
-  } catch (error) {
-    dispose();
-    throw error;
-  }
+  let detach: (() => void) | undefined; const dispose = stage.dispose;
+  stage.dispose = () => { detach?.(); dispose(); };
+  try { options.signal?.throwIfAborted(); detach = bus.insert(stage); } catch (error) { dispose(); throw error; }
   return stage;
 }

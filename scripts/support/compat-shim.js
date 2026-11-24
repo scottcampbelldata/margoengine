@@ -98,16 +98,11 @@ export function compatShim(url = '/packages/webgl2-compat/dist/device.js') {
       for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
         const original = proto[name];
         proto[name] = function (...args) {
-          const state = (globalThis.__margoPipelines ??= { pending: 0, created: 0, names: [] });
-          const promise = original.apply(this, args),
-            label = args[0]?.label || `unlabelled ${name}`;
+          const state = (globalThis.__margoPipelines ??= { pending: 0, created: 0 });
+          const promise = original.apply(this, args);
           state.pending++;
           state.created++;
-          state.names?.push(label);
-          const settle = () => {
-            state.pending--;
-            state.names?.splice(state.names.indexOf(label), 1);
-          };
+          const settle = () => state.pending--;
           promise.then(settle, settle);
           return promise;
         };

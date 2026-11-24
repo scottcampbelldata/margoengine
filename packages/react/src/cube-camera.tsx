@@ -2,11 +2,10 @@ import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, FrameCallback } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { CubeCamera as NativeCubeCamera } from '@margoengine/environment/cube-camera';
-import type * as EnvironmentModule from '@margoengine/environment/main';
-import type { EnvironmentBackground, Fog as FogPlugin, FogOptions } from '@margoengine/environment/main';
+import type * as EnvironmentModule from '@margoengine/environment';
+import type { EnvironmentBackground, Fog as FogPlugin, FogOptions } from '@margoengine/environment';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { live, report, useMesh, useResourceEffect, useScene, type Scene } from './internal.js';
-import { sceneOwner } from './scene-owner.js';
 import { retainAsset } from './assets.js';
 import { environmentAsset } from './environment-asset.js';
 import { optionalPeer } from './optional.js';
@@ -66,20 +65,19 @@ function dropFog(scene: Scene, own: OwnFog): void {
   if (!own.fog) return;
   for (const remove of own.models.values()) remove();
   own.models.clear();
-  if (!scene.engine.disposed && sceneOwner(scene).plugins.has(own.fog.name)) sceneOwner(scene).removePlugin(own.fog.name);
+  if (!scene.engine.disposed && scene.engine.hasPlugin(own.fog.name)) scene.engine.removePlugin(own.fog.name);
   own.fog.dispose();
   own.fog = undefined;
 }
 function withFog(scene: Scene, api: typeof EnvironmentModule, own: OwnFog, options: CubeCameraFog | false, capture: () => void): void {
   let fog: FogPlugin | undefined;
-  for (const plugin of sceneOwner(scene).plugins.values()) if (plugin instanceof api.Fog && plugin !== own.fog) fog = plugin;
+  for (const plugin of scene.engine.plugins.values()) if (plugin instanceof api.Fog && plugin !== own.fog) fog = plugin;
   if (fog) dropFog(scene, own);
   else if (options) {
-    if (!own.fog) sceneOwner(scene).use((own.fog = new api.Fog({ name: `cube-camera-fog:${fogs++}` })));
+    own.fog ??= api.Fog.attach(scene.engine as unknown as EngineKernel, { name: `cube-camera-fog:${fogs++}` });
     own.fog.enabled = false;
     // Core meshes take the fog through the plugin; glTF PBR models (every material component) are added one by one.
-    // The Canvas's models stay in the default scene, so a named Scene's faces leave them alone.
-    const models = (scene.world ? new Set() : scene.resources.models) as Set<{ disposed?: boolean }>;
+    const models = scene.resources.models as Set<{ disposed?: boolean }>;
     for (const [model, remove] of own.models)
       if (!models.has(model) || model.disposed) {
         remove();
@@ -138,7 +136,7 @@ function CubeBinding({ settings, publish }: { settings: Settings; publish: (text
         });
         if (!lease.active || engine.disposed) return loaded.dispose();
         environment = loaded;
-        sceneOwner(scene).use(loaded as unknown as Parameters<EngineKernel['use']>[0]);
+        engine.use(loaded as unknown as Parameters<EngineKernel['use']>[0]);
         backdrop = new api.EnvironmentBackground(loaded, { name: `${loaded.name}:pass` });
         background.current = backdrop;
       })().catch((error) => {
@@ -148,7 +146,7 @@ function CubeBinding({ settings, publish }: { settings: Settings; publish: (text
         if (background.current === backdrop) background.current = null;
         backdrop?.dispose();
         if (environment) {
-          if (!engine.disposed && sceneOwner(scene).plugins.has(environment.name)) sceneOwner(scene).removePlugin(environment.name);
+          if (!engine.disposed && engine.hasPlugin(environment.name)) engine.removePlugin(environment.name);
           environment.dispose();
         }
         releaseAsset();
@@ -159,7 +157,7 @@ function CubeBinding({ settings, publish }: { settings: Settings; publish: (text
   useEffect(() => {
     if (!wantsFog) return;
     let active = true;
-    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment/main'))
+    void optionalPeer('@margoengine/environment', () => import('@margoengine/environment'))
       .then((api) => {
         if (active) fogApi.current = api;
       })

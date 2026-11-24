@@ -2,15 +2,14 @@ import { Children, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import type { EngineKernel } from '@margoengine/core';
 import type { EnginePlugin } from '@margoengine/core/extension';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf/pbr';
-import type * as EnvironmentModule from '@margoengine/environment/main';
-import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment/main';
+import type * as EnvironmentModule from '@margoengine/environment';
+import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
 import { preloadAsset, retainAsset } from './assets.js';
 import { environmentAsset } from './environment-asset.js';
 import { Mesh } from './components.js';
 import type { Captured, EnvironmentCapture as CaptureComponent } from './environment-capture.js';
 import { LightformerPending } from './lightformer.js';
 import { report, useCommit, useResourceEffect, useScene } from './internal.js';
-import { sceneOwner } from './scene-owner.js';
 import { rangeError } from '../../shared/errors.js';
 
 export * from './lights.js';
@@ -71,7 +70,6 @@ function EnvironmentComponent({
 }: EnvironmentProps) {
   const scene = useScene(),
     { engine, resources, assetCache } = scene,
-    owner = sceneOwner(scene),
     [source, setSource] = useState<IBLEnvironment | null>(null),
     [captured, setCaptured] = useState<Captured | null>(null),
     [pending] = useState(() => ({ count: 0 })),
@@ -105,25 +103,25 @@ function EnvironmentComponent({
   const previous = useRef<{ direction: Float32Array; radiance: Float32Array } | null>(null);
   const backdrop = useRef<EnvironmentBackground | null>(null);
   useCommit(() => {
-    const saved = { direction: owner.lighting.direction.slice(), radiance: owner.lighting.radiance.slice() };
+    const saved = { direction: engine.lighting.direction.slice(), radiance: engine.lighting.radiance.slice() };
     previous.current = saved;
     return () => {
-      owner.lighting.direction.set(saved.direction);
-      owner.lighting.radiance.set(saved.radiance);
+      engine.lighting.direction.set(saved.direction);
+      engine.lighting.radiance.set(saved.radiance);
     };
-  }, [owner]);
+  }, [engine]);
   useCommit(() => {
     values([exposure], 1, 'exposure', 0, Infinity);
     if (!src && !capturing) {
-      owner.lighting.direction.set([3, 5, 4, 3]);
-      owner.lighting.radiance.set([exposure, exposure, exposure, 0.15 * exposure]);
+      engine.lighting.direction.set([3, 5, 4, 3]);
+      engine.lighting.radiance.set([exposure, exposure, exposure, 0.15 * exposure]);
     } else if (previous.current) {
-      owner.lighting.direction.set(previous.current.direction);
-      owner.lighting.radiance.set(previous.current.radiance);
-      for (let i = 0; i < 4; i++) owner.lighting.radiance[i] *= exposure;
+      engine.lighting.direction.set(previous.current.direction);
+      engine.lighting.radiance.set(previous.current.radiance);
+      for (let i = 0; i < 4; i++) engine.lighting.radiance[i] *= exposure;
     }
     if (environment && !environment.disposed) environment.intensity = exposure;
-  }, [owner, src, capturing, exposure, environment]);
+  }, [engine, src, capturing, exposure, environment]);
   useResourceEffect(
     (lease) => {
       setSource(null);
@@ -134,7 +132,7 @@ function EnvironmentComponent({
         releaseAsset = retainAsset(assetCache, src, asset, assetCache.environments);
       const release = () => {
         if (current) {
-          owner.removePlugin(current.name);
+          engine.removePlugin(current.name);
           current.dispose();
           current = undefined;
         }
@@ -151,7 +149,7 @@ function EnvironmentComponent({
           return;
         }
         current = loaded;
-        owner.use(loaded as unknown as EnginePlugin);
+        engine.use(loaded as unknown as EnginePlugin);
         setModule(api);
         setSource(loaded);
       })()
@@ -174,7 +172,7 @@ function EnvironmentComponent({
         release();
       };
     },
-    [engine, owner, src, assetCache],
+    [engine, src, assetCache],
   );
   useCommit(() => {
     if (!environment || environment.disposed || !module) return;
@@ -183,36 +181,35 @@ function EnvironmentComponent({
     // storage buffer and `<Environment>` stopped compiling on gltf/pbr models).
     const lighting = new module.EnvironmentLighting(environment),
       effect = lighting as unknown as LightingEffect;
-    owner.use(lighting);
+    engine.use(lighting);
     const models = new Map<PBRModel, () => void>();
-    // The Canvas's glTF models stay in the default scene: a named Scene's environment leaves them alone.
-    if (!scene.world) resources.lighting.set(effect, models);
+    resources.lighting.set(effect, models);
     const release = () => {
       resources.lighting.delete(effect);
       for (const remove of models.values()) remove();
       models.clear();
-      if (!engine.disposed && owner.plugins.has(lighting.name)) owner.removePlugin(lighting.name);
+      if (!engine.disposed && engine.hasPlugin(lighting.name)) engine.removePlugin(lighting.name);
       lighting.dispose();
     };
     try {
-      if (!scene.world) for (const model of resources.models) models.set(model, model.addLighting(effect));
+      for (const model of resources.models) models.set(model, model.addLighting(effect));
     } catch (error) {
       release();
       throw error;
     }
     return release;
-  }, [engine, owner, scene.world, resources, environment, module]);
+  }, [engine, resources, environment, module]);
   useCommit(() => {
     if (!environment || environment.disposed || !module || !background) return;
     const effect = new module.EnvironmentBackground(environment);
-    owner.use(effect as unknown as EnginePlugin);
+    engine.use(effect as unknown as EnginePlugin);
     backdrop.current = effect;
     return () => {
       backdrop.current = null;
-      owner.removePlugin(effect.name);
+      engine.removePlugin(effect.name);
       effect.dispose();
     };
-  }, [owner, environment, module, background]);
+  }, [engine, environment, module, background]);
   useCommit(() => {
     if (backdrop.current) {
       backdrop.current.exposure = exposure;

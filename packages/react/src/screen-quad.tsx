@@ -87,93 +87,88 @@ export interface ScreenQuadProps extends Partial<Omit<ShaderMaterialOptions, 'un
  * every ScreenQuad of the scene, never frustum culled. The ref is the RawMesh; its `material.uniforms` are live.
  * Depth and blending are the material's (`depthTest`, `depthWrite`, `transparent`, `blending`).
  */
-export const ScreenQuad = /* @__PURE__ */ forwardRef<RawMesh<ShaderMaterial>, ScreenQuadProps>(
-  function ScreenQuad(props, ref) {
-    const scene = useScene(),
-      [mesh, setMesh] = useState<RawMesh<ShaderMaterial> | null>(null),
-      latest = useRef(props),
-      handle = useRef(ref);
-    latest.current = props;
-    handle.current = ref;
-    const { material, uniforms, renderOrder = 0, visible = true, onError: _onError, ...options } = props,
-      // The built material's options count by value; functions and objects other than plain data by identity.
-      key = material ? null : JSON.stringify(options);
-    useEffect(() => {
-      let active = true,
-        current: RawMesh<ShaderMaterial> | undefined,
-        owned: ShaderMaterial | undefined,
-        raw: RawShaders | undefined;
-      const lease = acquire(scene);
-      Promise.all([
-        lease.promise,
-        optionalPeer('@margoengine/shader', () => import('@margoengine/shader/glsl-material')),
-      ])
-        .then(([plugin, api]) => {
-          if (!active || scene.engine.disposed) return;
-          raw = plugin;
-          const {
-            material: given,
+export const ScreenQuad = /* @__PURE__ */ forwardRef<RawMesh<ShaderMaterial>, ScreenQuadProps>(function ScreenQuad(props, ref) {
+  const scene = useScene(),
+    [mesh, setMesh] = useState<RawMesh<ShaderMaterial> | null>(null),
+    latest = useRef(props),
+    handle = useRef(ref);
+  latest.current = props;
+  handle.current = ref;
+  const { material, uniforms, renderOrder = 0, visible = true, onError: _onError, ...options } = props,
+    // The built material's options count by value; functions and objects other than plain data by identity.
+    key = material ? null : JSON.stringify(options);
+  useEffect(() => {
+    let active = true,
+      current: RawMesh<ShaderMaterial> | undefined,
+      owned: ShaderMaterial | undefined,
+      raw: RawShaders | undefined;
+    const lease = acquire(scene);
+    Promise.all([lease.promise, optionalPeer('@margoengine/shader', () => import('@margoengine/shader/glsl-material'))])
+      .then(([plugin, api]) => {
+        if (!active || scene.engine.disposed) return;
+        raw = plugin;
+        const {
+          material: given,
+          uniforms: values,
+          renderOrder: order = 0,
+          visible: shown = true,
+          onError: _,
+          ...built
+        } = latest.current;
+        if (!given && !built.fragmentShader)
+          throw typeError('ScreenQuad needs a material or a fragmentShader; pass one of them', 'react-arguments');
+        const surface =
+          given ??
+          (owned = new api.ShaderMaterial({
+            vertexShader: screenQuadVertexShader,
+            ...built,
+            fragmentShader: built.fragmentShader!,
             uniforms: values,
-            renderOrder: order = 0,
-            visible: shown = true,
-            onError: _,
-            ...built
-          } = latest.current;
-          if (!given && !built.fragmentShader)
-            throw typeError('ScreenQuad needs a material or a fragmentShader; pass one of them', 'react-arguments');
-          const surface =
-            given ??
-            (owned = new api.ShaderMaterial({
-              vertexShader: screenQuadVertexShader,
-              ...built,
-              fragmentShader: built.fragmentShader!,
-              uniforms: values,
-            }));
-          current = api.shaderMesh({ positions, uvs }, surface, {
-            frustumCulled: false,
-            renderOrder: order,
-            visible: shown,
-          });
-          raw.add(current);
-          assignRef(handle.current, current);
-          setMesh(current);
-        })
-        .catch((error) => {
-          if (active && !scene.engine.disposed) report(scene, error, latest.current.onError);
+          }));
+        current = api.shaderMesh({ positions, uvs }, surface, {
+          frustumCulled: false,
+          renderOrder: order,
+          visible: shown,
         });
-      return () => {
-        active = false;
-        if (current) {
-          const made = current;
-          assignRef(handle.current, null);
-          setMesh((state) => (state === made ? null : state));
-          raw?.remove(made);
-          made.dispose();
-        }
-        owned?.dispose();
-        release(scene, lease);
-      };
-    }, [scene.engine, scene.world, material, key]);
-    // A uniform's value is copied in when the prop's value changes, so a value the ref's live uniforms moved on (a clock
-    // advanced in useFrame) is not put back by an unrelated render. Arrays count by their numbers.
-    const copied = useRef(new Map<string, unknown>());
-    useCommit(() => {
-      if (!mesh) return;
-      mesh.renderOrder = renderOrder;
-      mesh.visible = visible;
-      if (material || !uniforms) return;
-      for (const [name, { value }] of Object.entries(uniforms)) {
-        const target = mesh.material.uniforms[name],
-          last = copied.current.get(name);
-        if (!target || same(last, value)) continue;
-        target.value = value;
-        copied.current.set(
-          name,
-          Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value as ArrayLike<number>) : value,
-        );
+        raw.add(current);
+        assignRef(handle.current, current);
+        setMesh(current);
+      })
+      .catch((error) => {
+        if (active && !scene.engine.disposed) report(scene, error, latest.current.onError);
+      });
+    return () => {
+      active = false;
+      if (current) {
+        const made = current;
+        assignRef(handle.current, null);
+        setMesh((state) => (state === made ? null : state));
+        raw?.remove(made);
+        made.dispose();
       }
-    });
-    useEffect(() => () => copied.current.clear(), [mesh]);
-    return null;
-  },
-);
+      owned?.dispose();
+      release(scene, lease);
+    };
+  }, [scene.engine, scene.world, material, key]);
+  // A uniform's value is copied in when the prop's value changes, so a value the ref's live uniforms moved on (a clock
+  // advanced in useFrame) is not put back by an unrelated render. Arrays count by their numbers.
+  const copied = useRef(new Map<string, unknown>());
+  useCommit(() => {
+    if (!mesh) return;
+    mesh.renderOrder = renderOrder;
+    mesh.visible = visible;
+    if (material || !uniforms) return;
+    for (const [name, { value }] of Object.entries(uniforms)) {
+      const target = mesh.material.uniforms[name],
+        last = copied.current.get(name);
+      if (!target || same(last, value)) continue;
+      target.value = value;
+      copied.current.set(
+        name,
+        Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value as ArrayLike<number>) : value,
+      );
+    }
+  });
+  useEffect(() => () => copied.current.clear(), [mesh]);
+  return null;
+});

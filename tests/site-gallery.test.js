@@ -17,21 +17,13 @@ test('the gallery check builds every gallery page and the voxel sandbox itself, 
     await buildGallery(out);
     await buildVoxel(out);
     const pages = readdirSync(join(root, 'examples/gallery')).filter((name) => name.endsWith('.html'));
-    assert.deepEqual(
-      readdirSync(join(out, 'gallery'))
-        .filter((name) => name.endsWith('.html'))
-        .sort(),
-      pages.sort(),
-    );
+    assert.deepEqual(readdirSync(join(out, 'gallery')).filter((name) => name.endsWith('.html')).sort(), pages.sort());
     assert.ok(existsSync(join(out, 'gallery/models/manifest.json')) && existsSync(join(out, 'voxel/index.html')));
     const check = readFileSync(join(root, 'scripts/test-gallery-browser.mjs'), 'utf8'),
       site = readFileSync(join(root, 'scripts/build-site.js'), 'utf8');
     assert.ok(/await buildGallery\(dist\)/.test(check) && /await buildVoxel\(dist\)/.test(check), 'the check builds');
     assert.doesNotMatch(check, /site\/dist/, 'the check reads no site build');
-    assert.ok(
-      /await buildGallery\(out\)/.test(site) && /await buildVoxel\(out\)/.test(site),
-      'the site builds the same',
-    );
+    assert.ok(/await buildGallery\(out\)/.test(site) && /await buildVoxel\(out\)/.test(site), 'the site builds the same');
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

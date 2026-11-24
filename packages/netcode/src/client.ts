@@ -146,9 +146,7 @@ export class GameClient<State, Input> {
     const view = options.interpolationDelay;
     if (typeof view === 'object') {
       if (typeof view?.observe !== 'function' || typeof view.renderTime !== 'function')
-        throw new TypeError(
-          'GameClient interpolationDelay needs a number of ticks or an AdaptiveDelay; fix the option',
-        );
+        throw new TypeError('GameClient interpolationDelay needs a number of ticks or an AdaptiveDelay; fix the option');
       view.reset();
       this.viewClock = view;
     }

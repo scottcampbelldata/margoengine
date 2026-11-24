@@ -40,9 +40,6 @@ export async function writeMoving({ out, name, nextFile, eye, viewProjection, ne
     }),
     motion = reprojectionMotion(ndc, viewProjection, nextViewProjection, depth.width, depth.height);
   copyFileSync(join(out, nextFile), join(out, 'probes', `${name}.next.png`));
-  writeFileSync(
-    join(out, 'probes', `${name}.motion.f32`),
-    Buffer.from(motion.data.buffer, motion.data.byteOffset, motion.data.byteLength),
-  );
+  writeFileSync(join(out, 'probes', `${name}.motion.f32`), Buffer.from(motion.data.buffer, motion.data.byteOffset, motion.data.byteLength));
   return { next: `probes/${name}.next.png`, motion: `probes/${name}.motion.f32` };
 }

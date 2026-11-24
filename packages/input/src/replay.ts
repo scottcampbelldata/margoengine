@@ -111,7 +111,12 @@ function parse(clip: InputClip | string): InputClip {
   if (!Array.isArray(channels) || !Array.isArray(times) || !Array.isArray(events) || events.length % 3)
     throw invalid('missing lists');
   for (const channel of channels)
-    if (!Array.isArray(channel) || typeof channel[0] !== 'string' || !Number.isInteger(channel[1]) || channel[1] < 0)
+    if (
+      !Array.isArray(channel) ||
+      typeof channel[0] !== 'string' ||
+      !Number.isInteger(channel[1]) ||
+      channel[1] < 0
+    )
       throw invalid('bad channel');
   for (let i = 0; i < times.length; i++)
     if (!Number.isFinite(times[i]) || (i > 0 && times[i] < times[i - 1])) throw invalid('times out of order');

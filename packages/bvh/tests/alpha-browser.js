@@ -47,8 +47,6 @@ export async function alphaChecks(report) {
   model.dispose();
   engine.dispose();
   canvas.remove();
-  report.checks.push(
-    `alpha: AlphaBlendModeTest.glb, ${agreed} of ${compared} pixels agree with the GPU pick, ${holes} through holes`,
-  );
+  report.checks.push(`alpha: AlphaBlendModeTest.glb, ${agreed} of ${compared} pixels agree with the GPU pick, ${holes} through holes`);
   return true;
 }

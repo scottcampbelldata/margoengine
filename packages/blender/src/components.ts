@@ -3,18 +3,21 @@
 // objects. The tags become KHR_implicit_shapes, KHR_physics_rigid_bodies, KHR_lights_punctual and glTF cameras in the
 // decoded document, so glTF PBR's own readers (`applyGLTFPhysics`, `applyGLTFLights`, `viewGLTFCamera`) do the rest.
 // The add-on writes the tags itself for Blender's lights and cameras, so a lit, framed scene opens as authored.
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel } from "@margoengine/core";
 import {
   parsePreparedPBR,
   type GLTFDocument,
   type GLTFLightReceiver,
   type PBRModel,
-} from '@margoengine/gltf/pbr-model';
-import type { GLTFPhysics, GLTFPhysicsOptions } from '@margoengine/gltf/physics';
-import { readResponse } from '../../shared/loading.js';
-import { captureScene } from '../../shared/scene-scope.js';
-import { decodeImages, maxBytes } from './container.js';
-import { decodeMargo, type MargoAsset, type MargoOptions } from './index.js';
+} from "@margoengine/gltf/pbr-model";
+import type {
+  GLTFPhysics,
+  GLTFPhysicsOptions,
+} from "@margoengine/gltf/physics";
+import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
+import { decodeImages, maxBytes } from "./container.js";
+import { decodeMargo, type MargoAsset, type MargoOptions } from "./index.js";
 
 type Json = Record<string, unknown>;
 type Vec3 = [number, number, number];
@@ -23,7 +26,7 @@ type Properties = Readonly<Record<string, string | number | boolean | readonly n
 /** What a script is given for one tagged object. */
 export interface MargoScriptContext {
   /** The object's scene node in the model. */
-  readonly node: PBRModel['nodes'][number];
+  readonly node: PBRModel["nodes"][number];
   /** Its index in `model.asset.doc.nodes`. */
   readonly nodeIndex: number;
   /** Every `margo:` property of the object, as exported. */
@@ -59,7 +62,7 @@ export interface MargoComponentsOptions extends MargoOptions {
   /** Scripts by the names `margo:script` uses. A name not here is an error. */
   scripts?: Readonly<Record<string, MargoScript>>;
   /** Passed to `applyGLTFPhysics`: the world to add to (default a new one on the engine). */
-  physics?: GLTFPhysicsOptions['physics'];
+  physics?: GLTFPhysicsOptions["physics"];
   /** Passed to `applyGLTFLights`: the @margoengine/clustered instance for point and spot lights, and the exposure. */
   clustered?: GLTFLightReceiver;
   exposure?: number;
@@ -75,32 +78,32 @@ export interface MargoScene {
   dispose(): void;
 }
 
-const bodies = new Set(['static', 'dynamic', 'kinematic']),
-  shapes = new Set(['box', 'sphere', 'capsule', 'cylinder']),
-  lights = new Set(['point', 'spot', 'directional']),
-  cameraTypes = new Set(['perspective', 'orthographic']),
+const bodies = new Set(["static", "dynamic", "kinematic"]),
+  shapes = new Set(["box", "sphere", "capsule", "cylinder"]),
+  lights = new Set(["point", "spot", "directional"]),
+  cameraTypes = new Set(["perspective", "orthographic"]),
   known = new Set([
-    'margo:collider',
-    'margo:body',
-    'margo:trigger',
-    'margo:mass',
-    'margo:friction',
-    'margo:restitution',
-    'margo:size',
-    'margo:light',
-    'margo:color',
-    'margo:intensity',
-    'margo:range',
-    'margo:inner_cone',
-    'margo:outer_cone',
-    'margo:script',
-    'margo:camera',
-    'margo:yfov',
-    'margo:ymag',
-    'margo:aspect',
-    'margo:znear',
-    'margo:zfar',
-    'margo:active',
+    "margo:collider",
+    "margo:body",
+    "margo:trigger",
+    "margo:mass",
+    "margo:friction",
+    "margo:restitution",
+    "margo:size",
+    "margo:light",
+    "margo:color",
+    "margo:intensity",
+    "margo:range",
+    "margo:inner_cone",
+    "margo:outer_cone",
+    "margo:script",
+    "margo:camera",
+    "margo:yfov",
+    "margo:ymag",
+    "margo:aspect",
+    "margo:znear",
+    "margo:zfar",
+    "margo:active",
   ]);
 /** Edit distance, to catch a misspelt tag (`margo:colider`) that would otherwise stay a plain property. */
 function distance(a: string, b: string): number {
@@ -113,10 +116,11 @@ function distance(a: string, b: string): number {
   }
   return row[b.length];
 }
-const record = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
+const record = (value: unknown): value is Json =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The local box of a mesh's decoded vertices (80-byte layout: position at float 0). */
-function meshBounds(geometry: MargoAsset['geometry'][number]): [Vec3, Vec3] {
+function meshBounds(geometry: MargoAsset["geometry"][number]): [Vec3, Vec3] {
   const min: Vec3 = [Infinity, Infinity, Infinity],
     max: Vec3 = [-Infinity, -Infinity, -Infinity];
   for (const { vertices } of geometry)
@@ -152,22 +156,20 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
     const node = nodes[i],
       margo = record(node.extras) && record(node.extras.margo) ? node.extras.margo : undefined,
       props = (record(margo?.properties) ? margo.properties : {}) as Properties,
-      name = typeof node.name === 'string' ? node.name : `node ${i}`,
+      name = typeof node.name === "string" ? node.name : `node ${i}`,
       bad = (key: string, need: string): never => {
-        throw new TypeError(
-          `Object '${name}': '${key}' must be ${need}; fix the custom property in Blender and re-export`,
-        );
+        throw new TypeError(`Object '${name}': '${key}' must be ${need}; fix the custom property in Blender and re-export`);
       },
       text = (key: string, allowed: Set<string>) => {
         const v = props[key];
         if (v === undefined) return undefined;
-        if (typeof v !== 'string' || !allowed.has(v)) bad(key, `one of ${[...allowed].join(', ')}`);
+        if (typeof v !== "string" || !allowed.has(v)) bad(key, `one of ${[...allowed].join(", ")}`);
         return v as string;
       },
       number = (key: string, min: number, fallback?: number) => {
         const v = props[key];
         if (v === undefined) return fallback;
-        if (typeof v !== 'number' || !Number.isFinite(v) || v < min) bad(key, `a number of at least ${min}`);
+        if (typeof v !== "number" || !Number.isFinite(v) || v < min) bad(key, `a number of at least ${min}`);
         return v as number;
       },
       list = (key: string, length: number) => {
@@ -183,29 +185,29 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
           if (distance(key, tag) <= 2) bad(key, `spelt as a component tag (did you mean '${tag}'?)`);
     const extensions: Json = record(node.extensions) ? { ...node.extensions } : {};
     // Physics: a body without a collider gets a box; a trigger is a collider that only reports.
-    const body = text('margo:body', bodies),
-      trigger = props['margo:trigger'];
-    if (trigger !== undefined && typeof trigger !== 'boolean') bad('margo:trigger', 'true or false');
-    let shape = text('margo:collider', shapes);
-    if (!shape && (body || trigger)) shape = 'box';
+    const body = text("margo:body", bodies),
+      trigger = props["margo:trigger"];
+    if (trigger !== undefined && typeof trigger !== "boolean") bad("margo:trigger", "true or false");
+    let shape = text("margo:collider", shapes);
+    if (!shape && (body || trigger)) shape = "box";
     if (shape) {
-      if (typeof node.mesh !== 'number') bad('margo:collider', 'on a mesh object (the collider is sized by the mesh)');
+      if (typeof node.mesh !== "number") bad("margo:collider", "on a mesh object (the collider is sized by the mesh)");
       const [min, max] = meshBounds(asset.geometry[node.mesh as number]),
         extent = [0, 1, 2].map((a) => max[a] - min[a]) as Vec3,
         center = [0, 1, 2].map((a) => (max[a] + min[a]) / 2) as Vec3,
-        size = list('margo:size', shape === 'box' ? 3 : shape === 'sphere' ? 1 : 2);
+        size = list("margo:size", shape === "box" ? 3 : shape === "sphere" ? 1 : 2);
       let implicit: Json;
-      if (shape === 'box') implicit = { size: size ?? extent };
-      else if (shape === 'sphere') implicit = { radius: size?.[0] ?? Math.max(...extent) / 2 };
+      if (shape === "box") implicit = { size: size ?? extent };
+      else if (shape === "sphere") implicit = { radius: size?.[0] ?? Math.max(...extent) / 2 };
       else {
         const radius = size?.[0] ?? Math.max(extent[0], extent[2]) / 2,
-          height = size?.[1] ?? (shape === 'capsule' ? Math.max(extent[1] - 2 * radius, 0) : extent[1]);
+          height = size?.[1] ?? (shape === "capsule" ? Math.max(extent[1] - 2 * radius, 0) : extent[1]);
         implicit = { radiusTop: radius, radiusBottom: radius, height };
       }
       const shapeIndex = shapeList.push({ type: shape, [shape]: implicit }) - 1,
         physicsData: Json = {};
-      const friction = number('margo:friction', 0),
-        restitution = number('margo:restitution', 0);
+      const friction = number("margo:friction", 0),
+        restitution = number("margo:restitution", 0);
       let material: number | undefined;
       if (friction !== undefined || restitution !== undefined)
         material =
@@ -227,89 +229,76 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
         node.children = [...((node.children as number[] | undefined) ?? []), nodes.push(child) - 1];
         holder = childData;
       }
-      holder[trigger ? 'trigger' : 'collider'] = part;
-      if (body === 'dynamic' || body === 'kinematic') {
-        const mass = number('margo:mass', Number.MIN_VALUE);
-        physicsData.motion = body === 'kinematic' ? { isKinematic: true } : mass === undefined ? {} : { mass };
-      } else if (props['margo:mass'] !== undefined) bad('margo:mass', 'on a dynamic body (margo:body = dynamic)');
+      holder[trigger ? "trigger" : "collider"] = part;
+      if (body === "dynamic" || body === "kinematic") {
+        const mass = number("margo:mass", Number.MIN_VALUE);
+        physicsData.motion = body === "kinematic" ? { isKinematic: true } : mass === undefined ? {} : { mass };
+      } else if (props["margo:mass"] !== undefined) bad("margo:mass", "on a dynamic body (margo:body = dynamic)");
       if (Object.keys(physicsData).length) extensions.KHR_physics_rigid_bodies = physicsData;
     } else
-      for (const key of ['margo:mass', 'margo:friction', 'margo:restitution', 'margo:size'])
-        if (props[key] !== undefined) bad(key, 'on an object with margo:collider or margo:body');
+      for (const key of ["margo:mass", "margo:friction", "margo:restitution", "margo:size"])
+        if (props[key] !== undefined) bad(key, "on an object with margo:collider or margo:body");
     // Lights: the object's node carries it, pointing down its -Z (Blender's -Z of the object, after Y-up).
-    const light = text('margo:light', lights);
+    const light = text("margo:light", lights);
     if (light) {
-      const color = props['margo:color'];
-      if (
-        color !== undefined &&
-        (!Array.isArray(color) || color.length !== 3 || color.some((c) => !(c >= 0 && Number.isFinite(c))))
-      )
-        bad('margo:color', '3 numbers of at least 0 (linear RGB)');
+      const color = props["margo:color"];
+      if (color !== undefined && (!Array.isArray(color) || color.length !== 3 || color.some((c) => !(c >= 0 && Number.isFinite(c)))))
+        bad("margo:color", "3 numbers of at least 0 (linear RGB)");
       const def: Json = {
         type: light,
-        intensity: number('margo:intensity', 0, 1),
+        intensity: number("margo:intensity", 0, 1),
         ...(color ? { color: [...(color as number[])] } : {}),
       };
-      const range = number('margo:range', Number.MIN_VALUE);
+      const range = number("margo:range", Number.MIN_VALUE);
       if (range !== undefined) {
-        if (light === 'directional') bad('margo:range', 'on a point or spot light');
+        if (light === "directional") bad("margo:range", "on a point or spot light");
         def.range = range;
       }
-      if (light === 'spot') {
-        const outer = number('margo:outer_cone', 0, Math.PI / 4)!,
-          inner = number('margo:inner_cone', 0, 0)!;
-        if (outer > Math.PI / 2 || inner >= outer)
-          bad('margo:outer_cone', 'above margo:inner_cone and at most pi/2 radians');
+      if (light === "spot") {
+        const outer = number("margo:outer_cone", 0, Math.PI / 4)!,
+          inner = number("margo:inner_cone", 0, 0)!;
+        if (outer > Math.PI / 2 || inner >= outer) bad("margo:outer_cone", "above margo:inner_cone and at most pi/2 radians");
         def.spot = { innerConeAngle: inner, outerConeAngle: outer };
       } else
-        for (const key of ['margo:inner_cone', 'margo:outer_cone'])
-          if (props[key] !== undefined) bad(key, 'on a spot light');
+        for (const key of ["margo:inner_cone", "margo:outer_cone"])
+          if (props[key] !== undefined) bad(key, "on a spot light");
       extensions.KHR_lights_punctual = { light: lightList.push(def) - 1 };
     } else
-      for (const key of ['margo:color', 'margo:intensity', 'margo:range', 'margo:inner_cone', 'margo:outer_cone'])
-        if (props[key] !== undefined) bad(key, 'on an object with margo:light');
+      for (const key of ["margo:color", "margo:intensity", "margo:range", "margo:inner_cone", "margo:outer_cone"])
+        if (props[key] !== undefined) bad(key, "on an object with margo:light");
     // Cameras: the node carries a glTF camera looking down its -Z; the scene's active camera comes first.
-    const camera = text('margo:camera', cameraTypes);
+    const camera = text("margo:camera", cameraTypes);
     if (camera) {
-      if (light) bad('margo:camera', 'on an object without margo:light');
+      if (light) bad("margo:camera", "on an object without margo:light");
       // glTF 2.0 (5.13): a perspective znear is above 0, an orthographic one at least 0.
-      const znear = number('margo:znear', camera === 'orthographic' ? 0 : Number.MIN_VALUE, 0.1)!,
-        zfar = number('margo:zfar', Number.MIN_VALUE),
-        aspect = number('margo:aspect', Number.MIN_VALUE);
-      if (zfar !== undefined && zfar <= znear) bad('margo:zfar', 'above margo:znear');
+      const znear = number("margo:znear", camera === "orthographic" ? 0 : Number.MIN_VALUE, 0.1)!,
+        zfar = number("margo:zfar", Number.MIN_VALUE),
+        aspect = number("margo:aspect", Number.MIN_VALUE);
+      if (zfar !== undefined && zfar <= znear) bad("margo:zfar", "above margo:znear");
       let def: Json;
-      if (camera === 'perspective') {
-        const yfov = number('margo:yfov', Number.MIN_VALUE, Math.PI / 3)!;
-        if (yfov >= Math.PI) bad('margo:yfov', 'below pi radians');
-        def = {
-          type: camera,
-          perspective: {
-            yfov,
-            znear,
-            ...(zfar !== undefined ? { zfar } : {}),
-            ...(aspect ? { aspectRatio: aspect } : {}),
-          },
-        };
-        if (props['margo:ymag'] !== undefined) bad('margo:ymag', 'on an orthographic camera');
+      if (camera === "perspective") {
+        const yfov = number("margo:yfov", Number.MIN_VALUE, Math.PI / 3)!;
+        if (yfov >= Math.PI) bad("margo:yfov", "below pi radians");
+        def = { type: camera, perspective: { yfov, znear, ...(zfar !== undefined ? { zfar } : {}), ...(aspect ? { aspectRatio: aspect } : {}) } };
+        if (props["margo:ymag"] !== undefined) bad("margo:ymag", "on an orthographic camera");
       } else {
-        const ymag = number('margo:ymag', Number.MIN_VALUE, 1)!;
-        if (zfar === undefined) bad('margo:zfar', 'set on an orthographic camera');
+        const ymag = number("margo:ymag", Number.MIN_VALUE, 1)!;
+        if (zfar === undefined) bad("margo:zfar", "set on an orthographic camera");
         def = { type: camera, orthographic: { xmag: ymag * (aspect ?? 1), ymag, znear, zfar } };
-        if (props['margo:yfov'] !== undefined) bad('margo:yfov', 'on a perspective camera');
+        if (props["margo:yfov"] !== undefined) bad("margo:yfov", "on a perspective camera");
       }
-      const active = props['margo:active'];
-      if (active !== undefined && typeof active !== 'boolean') bad('margo:active', 'true or false');
+      const active = props["margo:active"];
+      if (active !== undefined && typeof active !== "boolean") bad("margo:active", "true or false");
       if (active && activeCamera === undefined) activeCamera = i;
       firstCamera ??= i;
       node.camera = cameraBase + cameraList.push(def) - 1;
     } else
-      for (const key of ['margo:znear', 'margo:zfar', 'margo:aspect', 'margo:yfov', 'margo:ymag', 'margo:active'])
-        if (props[key] !== undefined) bad(key, 'on an object with margo:camera');
-    const script = props['margo:script'];
+      for (const key of ["margo:znear", "margo:zfar", "margo:aspect", "margo:yfov", "margo:ymag", "margo:active"])
+        if (props[key] !== undefined) bad(key, "on an object with margo:camera");
+    const script = props["margo:script"];
     if (script !== undefined) {
-      if (typeof script !== 'string' || !script.trim())
-        bad('margo:script', 'a script name, or names separated by commas');
-      for (const one of (script as string).split(','))
+      if (typeof script !== "string" || !script.trim()) bad("margo:script", "a script name, or names separated by commas");
+      for (const one of (script as string).split(","))
         if (one.trim()) scripts.push({ name: one.trim(), nodeIndex: i, properties: props });
     }
     if (Object.keys(extensions).length) node.extensions = extensions;
@@ -319,14 +308,13 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
   if (shapeList.length) {
     root.KHR_implicit_shapes = { shapes: shapeList };
     root.KHR_physics_rigid_bodies = materialList.length ? { physicsMaterials: materialList } : {};
-    used.push('KHR_implicit_shapes', 'KHR_physics_rigid_bodies');
+    used.push("KHR_implicit_shapes", "KHR_physics_rigid_bodies");
   }
   if (lightList.length) {
     root.KHR_lights_punctual = { lights: lightList };
-    used.push('KHR_lights_punctual');
+    used.push("KHR_lights_punctual");
   }
-  if (cameraList.length)
-    doc.cameras = [...((doc.cameras as Json[] | undefined) ?? []), ...cameraList] as GLTFDocument['cameras'];
+  if (cameraList.length) doc.cameras = [...((doc.cameras as Json[] | undefined) ?? []), ...cameraList] as GLTFDocument["cameras"];
   if (used.length) {
     doc.extensions = root;
     doc.extensionsUsed = [...new Set([...((doc.extensionsUsed as string[] | undefined) ?? []), ...used])];
@@ -362,7 +350,7 @@ export async function parseMargoComponents(
     asset = decodeMargo(input, { maxNodes }),
     parts = margoComponents(asset);
   for (const use of parts.scripts)
-    if (typeof scripts[use.name] !== 'function')
+    if (typeof scripts[use.name] !== "function")
       throw new TypeError(
         `Object '${(parts.document.nodes![use.nodeIndex] as Json).name}': script '${use.name}' is not registered; pass it in the scripts option`,
       );
@@ -383,18 +371,18 @@ export async function parseMargoComponents(
       throw error;
     }
     if (parts.hasPhysics) {
-      const { applyGLTFPhysics } = await import('@margoengine/gltf/physics');
+      const { applyGLTFPhysics } = await import("@margoengine/gltf/physics");
       world = await applyGLTFPhysics(model, { physics });
       signal?.throwIfAborted();
     }
     if (parts.hasLights) {
-      const { applyGLTFLights } = await import('@margoengine/gltf/pbr');
+      const { applyGLTFLights } = await import("@margoengine/gltf/pbr");
       const lit = model;
       cleanups.push(scope.run(() => applyGLTFLights(lit, { clustered, exposure })));
       signal?.throwIfAborted();
     }
     if (view && parts.camera !== undefined) {
-      const { viewGLTFCamera } = await import('@margoengine/gltf/pbr');
+      const { viewGLTFCamera } = await import("@margoengine/gltf/pbr");
       signal?.throwIfAborted();
       viewGLTFCamera(model, model.cameras.find((camera) => camera.nodeIndex === parts.camera)!);
     }
@@ -409,7 +397,7 @@ export async function parseMargoComponents(
           physics: world,
         }),
       );
-      if (typeof cleanup === 'function') cleanups.push(cleanup);
+      if (typeof cleanup === "function") cleanups.push(cleanup);
     }
   } catch (error) {
     dispose();
@@ -433,14 +421,14 @@ export async function loadMargoComponents(
   options.signal?.throwIfAborted();
   const scope = captureScene(engine),
     target = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(target.protocol))
+  if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
-      '.margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoComponents',
+      ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoComponents",
     );
   const bytes = await readResponse(await get(target, { signal: options.signal }), {
     maxBytes,
     signal: options.signal,
-    label: '.margo download',
+    label: ".margo download",
   });
   // Parsed in the scene this call started in, not the one active once the download is done.
   return scope.run(() => parseMargoComponents(engine, bytes, options));

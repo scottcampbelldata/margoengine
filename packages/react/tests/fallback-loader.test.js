@@ -9,8 +9,7 @@ import React from 'react';
 const created = [];
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore,
-    coreRequirement,
+    assertCore, coreRequirement,
     // Like core: WebGPU needs `navigator.gpu`; otherwise the fallback factory, or a coded 'unsupported' error.
     Engine: {
       async create(canvas, options) {
@@ -121,11 +120,7 @@ test('loadCompat does nothing with WebGPU there, or when the app asks for the pr
 test('a refused layer falls to loadFallback, and with none the refusal reaches onError', async () => {
   gpu(undefined);
   const refusal = Object.assign(new Error('WebGL2 is too old'), { code: 'unsupported' }),
-    compat = async () => ({
-      install: async () => {
-        throw refusal;
-      },
-    }),
+    compat = async () => ({ install: async () => { throw refusal; } }),
     errors = [];
   render(h(Canvas, { loadCompat: compat, loadFallback: async () => webglRenderer }));
   await flush();

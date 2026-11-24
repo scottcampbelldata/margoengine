@@ -173,7 +173,12 @@ const lerpUV = (p: readonly number[], q: readonly number[], t: number): MutableV
 ];
 
 /** Split every edge longer than `limit` at its middle, longest first. Returns how many were split. */
-export function splitLongEdges(surface: TriSurface, limit: number, allow?: EdgeFilter, watch?: SurfaceWatch): number {
+export function splitLongEdges(
+  surface: TriSurface,
+  limit: number,
+  allow?: EdgeFilter,
+  watch?: SurfaceWatch,
+): number {
   const { points, tris, sharp } = surface,
     faces = edgeFaces(tris, watch?.faces),
     used = new Set<number>(),

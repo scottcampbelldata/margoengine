@@ -33,48 +33,25 @@ import {
 import { asyncScript, command, ELEMENT_KEY, openSession, revive, WebDriverError } from '../scripts/webdriver.mjs';
 
 test('a coded error with the help link is a refusal; anything else is a bug', () => {
-  assert.deepEqual(
-    classifyError({
-      name: 'MargoError',
-      code: 'unsupported',
-      message: 'x needs WebGPU; see https://margoengine.com/errors#webgpu',
-    }),
-    {
-      status: 'refusal',
-      code: 'unsupported',
-      message: 'x needs WebGPU; see https://margoengine.com/errors#webgpu',
-    },
-  );
+  assert.deepEqual(classifyError({ name: 'MargoError', code: 'unsupported', message: 'x needs WebGPU; see https://margoengine.com/errors#webgpu' }), {
+    status: 'refusal',
+    code: 'unsupported',
+    message: 'x needs WebGPU; see https://margoengine.com/errors#webgpu',
+  });
   // A code without the help link, a link without a code and a plain crash are all bugs.
   assert.equal(classifyError({ name: 'MargoError', code: 'unsupported', message: 'no link' }).status, 'bug');
-  assert.equal(
-    classifyError({ name: 'Error', code: null, message: 'see https://margoengine.com/errors#x' }).status,
-    'bug',
-  );
-  assert.equal(
-    classifyError({ name: 'TypeError', message: 'undefined is not an object' }).message,
-    'TypeError: undefined is not an object',
-  );
+  assert.equal(classifyError({ name: 'Error', code: null, message: 'see https://margoengine.com/errors#x' }).status, 'bug');
+  assert.equal(classifyError({ name: 'TypeError', message: 'undefined is not an object' }).message, 'TypeError: undefined is not an object');
 });
 
-const image = (width, height, fill) => ({
-  width,
-  height,
-  data: Uint8Array.from({ length: width * height * 4 }, (_, i) => fill(i >> 2, i & 3)),
-});
+const image = (width, height, fill) => ({ width, height, data: Uint8Array.from({ length: width * height * 4 }, (_, i) => fill(i >> 2, i & 3)) });
 
 test('images compare by the largest RGB difference per pixel, as the compatibility check measures', () => {
   const a = image(10, 10, () => 100),
     b = image(10, 10, (p, c) => (p === 0 && c === 1 ? 110 : p === 1 && c === 3 ? 0 : 100));
   // One pixel 10 apart in green; alpha is not compared.
   assert.deepEqual(compareImages(a, b), { share: 0.01, mean: 0.1, max: 10 });
-  assert.deepEqual(
-    compareImages(
-      a,
-      image(5, 5, () => 0),
-    ),
-    { size: '10x10 vs 5x5' },
-  );
+  assert.deepEqual(compareImages(a, image(5, 5, () => 0)), { size: '10x10 vs 5x5' });
   assert.equal(litPixels(image(4, 1, (p) => (p < 3 ? 41 : 40))), 3);
   assert.deepEqual(pixelAt(image(2, 2, (p, c) => p * 10 + c)), [30, 31, 32]);
 });
@@ -85,10 +62,7 @@ test('a features probe thrown as text keeps the code its help link names', () =>
     code: 'compatibility-layer',
     message: 'no stencil; see https://margoengine.com/errors#compatibility-layer',
   });
-  assert.equal(
-    classifyError(thrownOf('MargoError: no stencil; see https://margoengine.com/errors#compatibility-layer')).status,
-    'refusal',
-  );
+  assert.equal(classifyError(thrownOf('MargoError: no stencil; see https://margoengine.com/errors#compatibility-layer')).status, 'refusal');
   assert.equal(classifyError(thrownOf('TypeError: x is undefined')).status, 'bug');
 });
 
@@ -114,10 +88,7 @@ test('crop cuts a CSS-pixel rectangle out of a device-pixel page shot, clamped t
   const part = crop(page, { x: 1, y: 1, width: 2, height: 1 }, 2);
   assert.equal(part.width, 4);
   assert.equal(part.height, 2);
-  assert.deepEqual(
-    [...part.data].filter((_, i) => i % 4 === 0),
-    [18, 19, 20, 21, 26, 27, 28, 29],
-  );
+  assert.deepEqual([...part.data].filter((_, i) => i % 4 === 0), [18, 19, 20, 21, 26, 27, 28, 29]);
   const edge = crop(page, { x: 3, y: 2, width: 5, height: 5 }, 2);
   assert.deepEqual([edge.width, edge.height], [2, 2]);
 });
@@ -140,10 +111,7 @@ function runPrelude(search) {
     addEventListener: (type, fn) => (listeners[type] = fn),
   };
   window.window = window;
-  vm.runInNewContext(
-    prelude(() => (globalThis.shimmed = (globalThis.shimmed ?? 0) + 1)),
-    window,
-  );
+  vm.runInNewContext(prelude(() => (globalThis.shimmed = (globalThis.shimmed ?? 0) + 1)), window);
   return { window, listeners, shimmed: () => window.shimmed ?? 0 };
 }
 
@@ -196,8 +164,7 @@ function fakeDriver(routes) {
       key = `${init.method} ${path}`;
     calls.push({ key, body, signal: init.signal });
     const route = routes[key];
-    if (route === undefined)
-      return new Response(JSON.stringify({ value: { error: 'unknown command', message: key } }), { status: 404 });
+    if (route === undefined) return new Response(JSON.stringify({ value: { error: 'unknown command', message: key } }), { status: 404 });
     return new Response(JSON.stringify({ value: typeof route === 'function' ? route(body) : route }), { status: 200 });
   };
   return { calls, fetchImpl };
@@ -223,10 +190,7 @@ test('the WebDriver client opens a session, runs scripts, takes element shots an
   assert.deepEqual(await session.run('() => 42'), { ok: 42 });
   assert.match(calls.at(-1).body.script, /\(\(\) => 42\)\(null\)/);
   assert.deepEqual(await session.screenshot('canvas'), png);
-  assert.deepEqual(calls.find((c) => c.key === 'POST /session/s1/element').body, {
-    using: 'css selector',
-    value: 'canvas',
-  });
+  assert.deepEqual(calls.find((c) => c.key === 'POST /session/s1/element').body, { using: 'css selector', value: 'canvas' });
   await session.close();
   await session.close();
   assert.equal(calls.filter((c) => c.key === 'DELETE /session/s1').length, 1);
@@ -247,43 +211,28 @@ test('a WebDriver protocol error rejects with its code', async () => {
 test('the async script wrapper returns a value or the thrown error with its code', async () => {
   const run = (source, arg) =>
     new Promise((resolve) =>
-      vm.runInNewContext(`(function () { ${asyncScript(source, arg)} })(done)`, {
-        done: (v) => resolve(JSON.parse(JSON.stringify(v))),
-      }),
+      vm.runInNewContext(`(function () { ${asyncScript(source, arg)} })(done)`, { done: (v) => resolve(JSON.parse(JSON.stringify(v))) }),
     );
   assert.deepEqual(await run('async (x) => x * 2', 21), { ok: 42 });
   assert.deepEqual(await run('() => undefined'), { ok: null });
   // JSON would turn -0 into 0 and NaN or an infinity into null: the inverse trig probe's signed zeros must survive.
-  const special = revive(
-    await run('() => ({ a: [-0, 0, NaN, Infinity, -Infinity, 1.5], t: new Float32Array([-0, 2]) })'),
-  );
+  const special = revive(await run('() => ({ a: [-0, 0, NaN, Infinity, -Infinity, 1.5], t: new Float32Array([-0, 2]) })'));
   assert.ok(Object.is(special.ok.a[0], -0) && Object.is(special.ok.a[1], 0));
   assert.deepEqual(special.ok.a.slice(2), [NaN, Infinity, -Infinity, 1.5]);
   assert.ok(Object.is(special.ok.t[0], -0));
   assert.equal(special.ok.t[1], 2);
-  assert.deepEqual(
-    await run("() => { throw Object.assign(new Error('no'), { name: 'MargoError', code: 'unsupported' }); }"),
-    {
-      thrown: { name: 'MargoError', code: 'unsupported', message: 'no' },
-    },
-  );
+  assert.deepEqual(await run("() => { throw Object.assign(new Error('no'), { name: 'MargoError', code: 'unsupported' }); }"), {
+    thrown: { name: 'MargoError', code: 'unsupported', message: 'no' },
+  });
 });
 
 // Regression (2026-11-15): on the Pixel_8 emulator (Android 15, user build) Chrome stayed on its first-run screen and
 // launchBrowser never returned, so the matrix hung until the outer timeout with no reason. It now fails in 180 s with one.
 test('an Android launch that never opens its DevTools socket fails in time, naming the first-run screen', async () => {
-  const focus =
-    '  mCurrentFocus=Window{b177f68 u0 com.android.chrome/org.chromium.chrome.browser.firstrun.FirstRunActivity}';
+  const focus = '  mCurrentFocus=Window{b177f68 u0 com.android.chrome/org.chromium.chrome.browser.firstrun.FirstRunActivity}';
   assert.match(androidLaunchHint('0\n', focus), /first-run screen is open.*ro\.debuggable=0/);
-  assert.equal(
-    androidLaunchHint('1\n', focus),
-    null,
-    'a debuggable image reads the command line, so something else is wrong',
-  );
-  assert.equal(
-    androidLaunchHint('0', 'mCurrentFocus=Window{1 u0 com.android.chrome/com.google.android.apps.chrome.Main}'),
-    null,
-  );
+  assert.equal(androidLaunchHint('1\n', focus), null, 'a debuggable image reads the command line, so something else is wrong');
+  assert.equal(androidLaunchHint('0', 'mCurrentFocus=Window{1 u0 com.android.chrome/com.google.android.apps.chrome.Main}'), null);
   await assert.rejects(
     within(new Promise(() => {}), 20, () => new Error('no socket')),
     /no socket/,
@@ -297,10 +246,7 @@ test('an Android launch that never opens its DevTools socket fails in time, nami
 test('a browser that fires no animation frames is refused before any case runs, naming a locked screen', async () => {
   const driver = (answer) => ({ name: 'safari', run: async (source) => (assert.equal(source, FRAME_PROBE), answer) });
   await requireFrames(driver({ ok: true }));
-  await assert.rejects(
-    requireFrames(driver({ ok: false })),
-    /safari fires no animation frames \(none in 5 s\).*locked or sleeping screen/,
-  );
+  await assert.rejects(requireFrames(driver({ ok: false })), /safari fires no animation frames \(none in 5 s\).*locked or sleeping screen/);
   await assert.rejects(requireFrames(driver({ thrown: { message: 'boom' } })), /\(boom\)/);
 });
 
@@ -308,26 +254,10 @@ test('a browser that fires no animation frames is refused before any case runs, 
 // run's `adb reverse` port mapping on the emulator; only a clean close removed it.
 test('a failed Android start removes its adb reverse mapping, with the reason in the error', async () => {
   const calls = [],
-    spawn = (cmd, args) => (
-      calls.push(args.join(' ')),
-      {
-        status: 0,
-        stdout: args.includes('ro.debuggable')
-          ? '0\n'
-          : 'mCurrentFocus=Window{1 u0 com.android.chrome/org.chromium.chrome.browser.firstrun.FirstRunActivity}',
-      }
-    ),
-    device = {
-      launchBrowser: () => new Promise(() => {}),
-      close: async () => calls.push('close'),
-      model: () => 'sdk_gphone64_arm64',
-      serial: () => 'emulator-5554',
-    },
+    spawn = (cmd, args) => (calls.push(args.join(' ')), { status: 0, stdout: args.includes('ro.debuggable') ? '0\n' : 'mCurrentFocus=Window{1 u0 com.android.chrome/org.chromium.chrome.browser.firstrun.FirstRunActivity}' }),
+    device = { launchBrowser: () => new Promise(() => {}), close: async () => calls.push('close'), model: () => 'sdk_gphone64_arm64', serial: () => 'emulator-5554' },
     android = { devices: async () => [device] };
-  await assert.rejects(
-    androidDriver(4321, { android, spawn, launchMs: 20 }),
-    /sdk_gphone64_arm64 cannot be driven: Chrome's first-run screen/,
-  );
+  await assert.rejects(androidDriver(4321, { android, spawn, launchMs: 20 }), /sdk_gphone64_arm64 cannot be driven: Chrome's first-run screen/);
   assert.equal(calls[0], 'reverse tcp:4321 tcp:4321');
   assert.deepEqual(calls.slice(-2), ['close', 'reverse --remove tcp:4321']);
   calls.length = 0;
@@ -343,14 +273,7 @@ test('Chrome on a user-build Android image is driven over its own DevTools socke
   const calls = [],
     spawn = (cmd, args) => (
       calls.push(args.join(' ')),
-      {
-        status: 0,
-        stdout: args.includes('ro.debuggable')
-          ? '0\n'
-          : args.includes('dumpsys')
-            ? 'mCurrentFocus=Window{1 u0 com.android.chrome/org.chromium.chrome.browser.ChromeTabbedActivity}'
-            : '',
-      }
+      { status: 0, stdout: args.includes('ro.debuggable') ? '0\n' : args.includes('dumpsys') ? 'mCurrentFocus=Window{1 u0 com.android.chrome/org.chromium.chrome.browser.ChromeTabbedActivity}' : '' }
     ),
     device = {
       launchBrowser: () => assert.fail('a user build ignores the command line launchBrowser writes'),
@@ -365,60 +288,27 @@ test('Chrome on a user-build Android image is driven over its own DevTools socke
         { contexts: () => [{ newPage: async () => page }], close: async () => calls.push('browser close') }
       ),
     },
-    fetch = async (url) => (
-      calls.push(`get ${url}`), { ok: true, json: async () => ({ Browser: 'Chrome/124.0.6367.219' }) }
-    );
-  const driver = await androidDriver(4321, {
-    android: { devices: async () => [device] },
-    chromium,
-    spawn,
-    fetch,
-    localPort: async () => 9333,
-  });
+    fetch = async (url) => (calls.push(`get ${url}`), { ok: true, json: async () => ({ Browser: 'Chrome/124.0.6367.219' }) });
+  const driver = await androidDriver(4321, { android: { devices: async () => [device] }, chromium, spawn, fetch, localPort: async () => 9333 });
   assert.equal(driver.version, '124.0.6367.219', 'the full build from /json/version, not the reduced user agent');
   assert.equal(driver.platform, 'sdk_gphone64_arm64 (serial emulator-5554)');
   assert.ok(calls.includes(`-s emulator-5554 forward tcp:9333 localabstract:${CHROME_ANDROID_SOCKET}`));
   assert.ok(calls.includes('cdp http://127.0.0.1:9333'));
   calls.length = 0;
   await driver.close();
-  assert.deepEqual(calls, [
-    'page close',
-    'browser close',
-    '-s emulator-5554 forward --remove tcp:9333',
-    'close',
-    'reverse --remove tcp:4321',
-  ]);
+  assert.deepEqual(calls, ['page close', 'browser close', '-s emulator-5554 forward --remove tcp:9333', 'close', 'reverse --remove tcp:4321']);
 });
 
 test('a DevTools socket that never answers fails in time with the last error, and the forward is removed', async () => {
   await assert.rejects(
-    devtoolsVersion(
-      'http://127.0.0.1:1/json/version',
-      async () => Promise.reject(new Error('ECONNRESET')),
-      20,
-      'Chrome on x',
-    ),
+    devtoolsVersion('http://127.0.0.1:1/json/version', async () => Promise.reject(new Error('ECONNRESET')), 20, 'Chrome on x'),
     /Chrome on x opened no DevTools socket \(chrome_devtools_remote\) in 0.02 s \(ECONNRESET\)/,
   );
   const calls = [],
-    spawn = (cmd, args) => (
-      calls.push(args.join(' ')),
-      {
-        status: 0,
-        stdout: args.includes('ro.debuggable')
-          ? '0'
-          : 'mCurrentFocus=Window{1 u0 com.android.chrome/x.ChromeTabbedActivity}',
-      }
-    ),
+    spawn = (cmd, args) => (calls.push(args.join(' ')), { status: 0, stdout: args.includes('ro.debuggable') ? '0' : 'mCurrentFocus=Window{1 u0 com.android.chrome/x.ChromeTabbedActivity}' }),
     device = { close: async () => calls.push('close'), model: () => 'm', serial: () => 's' };
   await assert.rejects(
-    androidDriver(4321, {
-      android: { devices: async () => [device] },
-      spawn,
-      fetch: async () => ({ ok: false, status: 404 }),
-      launchMs: 20,
-      localPort: async () => 9333,
-    }),
+    androidDriver(4321, { android: { devices: async () => [device] }, spawn, fetch: async () => ({ ok: false, status: 404 }), launchMs: 20, localPort: async () => 9333 }),
     /HTTP 404/,
   );
   assert.deepEqual(calls.slice(-3), ['-s s forward --remove tcp:9333', 'close', 'reverse --remove tcp:4321']);
@@ -428,9 +318,7 @@ test('a DevTools socket that never answers fails in time with the last error, an
 // recorded 46 bug rows: the engine's coded refusal plus an empty screenshot as a bug, the features page's native leg
 // throwing on a null adapter for every layer probe, and every layer picture as wrong colours.
 test('a coded start-up refusal is a refusal, and a browser that shows no WebGL2 canvas leaves picture rows unmeasured', async () => {
-  const refusal = refusalOf([
-    'MargoError: WebGPU adapter unavailable; see https://margoengine.com/errors#webgpu\n    at e (x.js:1:28)',
-  ]);
+  const refusal = refusalOf(['MargoError: WebGPU adapter unavailable; see https://margoengine.com/errors#webgpu\n    at e (x.js:1:28)']);
   assert.equal(refusal.status, 'refusal');
   assert.equal(refusal.code, 'webgpu');
   assert.equal(refusalOf(['TypeError: boom']), null);
@@ -450,23 +338,13 @@ test('a coded start-up refusal is a refusal, and a browser that shows no WebGL2 
     load: async (path, params) => ((mode = params.mode), {}),
     call: async (source) =>
       /info/.test(source)
-        ? {
-            ok: {
-              vendor: mode === 'native' ? '' : 'margo-webgl2',
-              errors:
-                mode === 'native'
-                  ? ['MargoError: WebGPU adapter unavailable; see https://margoengine.com/errors#webgpu']
-                  : [],
-            },
-          }
+        ? { ok: { vendor: mode === 'native' ? '' : 'margo-webgl2', errors: mode === 'native' ? ['MargoError: WebGPU adapter unavailable; see https://margoengine.com/errors#webgpu'] : [] } }
         : { ok: 0 },
     shot: async () => assert.fail('no screenshot is judged when shots show nothing'),
   });
   assert.equal(rows.length, 6);
   assert.ok(rows.filter((r) => r.mode === 'native').every((r) => r.status === 'refusal' && r.code === 'webgpu'));
-  assert.ok(
-    rows.filter((r) => r.mode === 'layer').every((r) => r.status === 'unmeasured' && r.message === UNSHOT.message),
-  );
+  assert.ok(rows.filter((r) => r.mode === 'layer').every((r) => r.status === 'unmeasured' && r.message === UNSHOT.message));
 });
 
 test('without a native adapter the layer feature probes run alone, judged by their own bars', async () => {
@@ -480,10 +358,7 @@ test('without a native adapter the layer feature probes run alone, judged by the
     bundles: { result: [1] },
   };
   assert.equal(copyRules(results.bitmapCopies), true);
-  assert.equal(
-    copyRules({ result: { 'none/1/whole/up/straight': blank, 'none/1/whole/up/premultiplied': blank } }),
-    false,
-  );
+  assert.equal(copyRules({ result: { 'none/1/whole/up/straight': blank, 'none/1/whole/up/premultiplied': blank } }), false);
   await CASES.features({
     nativeAdapter: false,
     shotsWork: true,

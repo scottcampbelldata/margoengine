@@ -162,10 +162,7 @@ test('a Draco primitive over 256 MiB declared decodes within the default and a r
   ]) {
     const { engine } = await scene();
     try {
-      await assert.rejects(
-        parseGLTFAsync(engine, structuredClone(doc), [source], [], { draco, maxDownloadBytes }),
-        expected,
-      );
+      await assert.rejects(parseGLTFAsync(engine, structuredClone(doc), [source], [], { draco, maxDownloadBytes }), expected);
     } finally {
       engine.dispose();
     }

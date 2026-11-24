@@ -29,9 +29,7 @@ try {
   for (const [label, position, target] of views) {
     const r = await page.evaluate(([p, t]) => window.check.step(p, t), [position, target]),
       { differing, at, mode } = await frameDiff(page, shot);
-    console.log(
-      `${label}${compat ? ' (compat)' : ''}: ${differing} ${mode} differ of ${r.total} sorted, wall ${r.wallMs.toFixed(1)} ms`,
-    );
+    console.log(`${label}${compat ? ' (compat)' : ''}: ${differing} ${mode} differ of ${r.total} sorted, wall ${r.wallMs.toFixed(1)} ms`);
     assert.equal(differing, 0, `${label}: sorted frame differs from core ${JSON.stringify(at)}`);
   }
   assert.ok(setup.binding <= 128 * 1024 * 1024, `binding held to 128 MiB (${setup.binding})`);

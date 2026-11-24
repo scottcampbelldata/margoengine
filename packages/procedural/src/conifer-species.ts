@@ -191,16 +191,9 @@ export const CONIFER_SPECIES: Readonly<Record<ConiferSpecies, ConiferSpeciesData
 });
 
 /** The species, in a fixed order. */
-export const CONIFER_SPECIES_IDS: readonly ConiferSpecies[] = Object.freeze(
-  Object.keys(CONIFER_SPECIES) as ConiferSpecies[],
-);
+export const CONIFER_SPECIES_IDS: readonly ConiferSpecies[] = Object.freeze(Object.keys(CONIFER_SPECIES) as ConiferSpecies[]);
 /** Years of each named age. */
-export const CONIFER_AGES: Readonly<Record<ConiferAge, number>> = Object.freeze({
-  sapling: 15,
-  pole: 40,
-  mature: 100,
-  old: 250,
-});
+export const CONIFER_AGES: Readonly<Record<ConiferAge, number>> = Object.freeze({ sapling: 15, pole: 40, mature: 100, old: 250 });
 
 /** Options of {@link coniferForm}. */
 export interface ConiferFormOptions {
@@ -241,10 +234,7 @@ const FT = 0.3048,
 
 const speciesData = (species: ConiferSpecies): ConiferSpeciesData => {
   const s = Object.hasOwn(CONIFER_SPECIES, species) ? CONIFER_SPECIES[species] : undefined;
-  if (!s)
-    throw new RangeError(
-      `Unknown conifer species '${String(species)}'; pass one of ${CONIFER_SPECIES_IDS.join(', ')}.`,
-    );
+  if (!s) throw new RangeError(`Unknown conifer species '${String(species)}'; pass one of ${CONIFER_SPECIES_IDS.join(', ')}.`);
   return s;
 };
 
@@ -264,8 +254,7 @@ export function coniferHeightGrowth(species: ConiferSpecies, age: number): numbe
 /** Age in years at which the species reaches `height` metres (the inverse of {@link coniferHeightAt}). */
 export function coniferAgeAt(species: ConiferSpecies, height: number): number {
   const [a, k, p] = speciesData(species).growth;
-  if (!(height > BH && height < a))
-    throw new RangeError(`Height must be above 1.37 m and below ${a} m for ${species}.`);
+  if (!(height > BH && height < a)) throw new RangeError(`Height must be above 1.37 m and below ${a} m for ${species}.`);
   return -Math.log(1 - ((height - BH) / (a - BH)) ** (1 / p)) / k;
 }
 
@@ -275,8 +264,7 @@ export function coniferDiameter(species: ConiferSpecies, height: number): number
     ft = height / FT;
   if (ft <= 4.5 + 1e-6) return 0;
   const d = b2 / (Math.log(ft - 4.5) - b1) - 1;
-  if (!(d > -1))
-    throw new RangeError(`Height ${height} m is past the ${species} height-diameter asymptote; pass a lower height.`);
+  if (!(d > -1)) throw new RangeError(`Height ${height} m is past the ${species} height-diameter asymptote; pass a lower height.`);
   // Below an inch the equation runs below breast height's own stem: a sapling a little over 1.37 m keeps a thin stem.
   return Math.max(0.005, d * IN);
 }
@@ -304,11 +292,7 @@ export function coniferCrownWidth(
     at = (di: number) =>
       a1 *
       Math.exp(
-        a2 +
-          a3 * Math.log(Math.max(1, crownLength / FT)) +
-          a4 * Math.log(di) +
-          a5 * Math.log(height / FT) +
-          a6 * Math.log(ba),
+        a2 + a3 * Math.log(Math.max(1, crownLength / FT)) + a4 * Math.log(di) + a5 * Math.log(height / FT) + a6 * Math.log(ba),
       ) *
       FT;
   return d >= 1 ? at(d) : at(1) * Math.max(d, 0.2);
@@ -380,9 +364,7 @@ export function parseConiferKey(key: string): ConiferKey | undefined {
   const [species, rest, extra] = name.split('/');
   if (extra !== undefined || !Object.hasOwn(CONIFER_SPECIES, species)) return undefined;
   if (rest === undefined) return { species: species as ConiferSpecies, age: 'mature', condition: 'live' };
-  if (rest === 'snag' || rest === 'burnt')
-    return { species: species as ConiferSpecies, age: 'mature', condition: rest };
-  if (Object.hasOwn(CONIFER_AGES, rest))
-    return { species: species as ConiferSpecies, age: rest as ConiferAge, condition: 'live' };
+  if (rest === 'snag' || rest === 'burnt') return { species: species as ConiferSpecies, age: 'mature', condition: rest };
+  if (Object.hasOwn(CONIFER_AGES, rest)) return { species: species as ConiferSpecies, age: rest as ConiferAge, condition: 'live' };
   return undefined;
 }

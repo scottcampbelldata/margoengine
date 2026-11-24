@@ -417,12 +417,6 @@ test('GrassField builds only its initial variant, warms changed targets once, an
       .slice(-3)
       .every((p) => p.depthStencil.format === 'depth32float' && p.multisample.count === 1),
   );
-  // Both 8-bit canvas formats draw, whichever one the platform prefers (an offscreen target is rgba8unorm on a device
-  // whose canvas is bgra8unorm, and the other way round).
-  for (const format of ['rgba8unorm', 'bgra8unorm']) {
-    context.format = format;
-    graph.execute(context);
-  }
   context.format = 'r32uint';
   assert.throws(() => graph.execute(context), /Unsupported grass/);
   context.format = 'rgba8unorm';
@@ -444,18 +438,12 @@ test('GrassField live look setters write the frame uniform every frame, and the 
   };
   const first = frame();
   assert.equal(first.length, 88);
-  assert.deepEqual(
-    first.slice(72, 88),
-    [0.025, 0.065, 0.012, 0, 0.25, 0.46, 0.045, 0, 0.38, 0.57, 0.085, 0, 0.34, 0.5, 0.09, 0.4].map(Math.fround),
-  );
+  assert.deepEqual(first.slice(72, 88), [0.025, 0.065, 0.012, 0, 0.25, 0.46, 0.045, 0, 0.38, 0.57, 0.085, 0, 0.34, 0.5, 0.09, 0.4].map(Math.fround));
   assert.equal(first[63], 1, 'every blade kept');
   // The defaults of every row written leave every uniform value as the constructor made it.
   applyGrassSettings(field, grassSettingDefaults());
   assert.deepEqual(frame().slice(40, 58), first.slice(40, 58));
-  assert.deepEqual(
-    frame().slice(60),
-    first.slice(60).map((x, i) => (i === 2 ? frame()[62] : x)),
-  );
+  assert.deepEqual(frame().slice(60), first.slice(60).map((x, i) => (i === 2 ? frame()[62] : x)));
   assert.deepEqual(
     GRASS_SETTINGS.map((r) => r.live),
     GRASS_SETTINGS.map(() => true),
@@ -467,10 +455,7 @@ test('GrassField live look setters write the frame uniform every frame, and the 
   assert.equal(dry[63], 0.25);
   assert.deepEqual(dry.slice(72, 75), [0.08, 0.06, 0.02].map(Math.fround));
   assert.equal(field.translucency, Math.fround(0.4));
-  assert.throws(() => applyGrassSettings(field, { 'field.density': 1.5 }), {
-    name: 'RangeError',
-    message: /field.density/,
-  });
+  assert.throws(() => applyGrassSettings(field, { 'field.density': 1.5 }), { name: 'RangeError', message: /field.density/ });
   assert.throws(() => applyGrassSettings(field, { 'wind.directionX': 0, 'wind.directionZ': 0 }), RangeError);
   assert.throws(() => applyGrassSettings(field, { nope: 1 }), TypeError);
   assert.throws(() => (field.bladeHeight = 0), RangeError);

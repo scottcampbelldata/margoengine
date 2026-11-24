@@ -75,11 +75,7 @@ export function wgslCallGraph(code, { unrollLimit = UNROLL_LIMIT } = {}) {
       const open = m.index + m[0].length - 1,
         close = closing(body, open),
         brace = body.indexOf('{', close);
-      loops.push({
-        from: brace,
-        to: closing(body, brace),
-        trips: trips(body.slice(open + 1, close), known, unrollLimit),
-      });
+      loops.push({ from: brace, to: closing(body, brace), trips: trips(body.slice(open + 1, close), known, unrollLimit) });
     }
     const sites = new Map();
     for (const callee of bodies.keys()) {

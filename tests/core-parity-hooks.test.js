@@ -137,11 +137,7 @@ test('the counts after an alternate camera are that frame, package draws include
     engine.render({ camera: twin });
     assert.deepEqual(engine.stats, { visible: 3, drawCalls: 2 }, 'restoring the primary view collected nothing');
     engine.render({ camera: other, culling: false });
-    assert.deepEqual(
-      engine.stats,
-      { visible: 4, drawCalls: 2 },
-      'both meshes were drawn, not the one the primary sees',
-    );
+    assert.deepEqual(engine.stats, { visible: 4, drawCalls: 2 }, 'both meshes were drawn, not the one the primary sees');
     engine.render();
     assert.deepEqual(engine.stats, { visible: 3, drawCalls: 2 }, 'the next frame starts again');
   } finally {

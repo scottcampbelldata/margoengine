@@ -241,8 +241,7 @@ test('a negative scale samples the original backwards over every held interval',
   const original = new StringKeyframeTrack('s', [0, 1, 2], ['a', 'b', 'c']);
   const mirrored = new StringKeyframeTrack('s', [0, 1, 2], ['a', 'b', 'c']).scale(-1);
   assert.deepEqual([...mirrored.times], [-2, -1, 0]);
-  for (const t of [-1.75, -1.5, -1.25, -0.75, -0.5, -0.25, 0, 0.5])
-    assert.equal(mirrored.sample(t), original.sample(-t), `${t}`);
+  for (const t of [-1.75, -1.5, -1.25, -0.75, -0.5, -0.25, 0, 0.5]) assert.equal(mirrored.sample(t), original.sample(-t), `${t}`);
   const flags = new BooleanKeyframeTrack('v', [0, 2, 3], [false, true, false]).scale(-2);
   assert.deepEqual([...flags.times], [-6, -4, 0]);
   assert.equal(flags.sample(-5), true);

@@ -147,15 +147,11 @@ export function glslToWGSL(
   };
   const defined = program!.functions.filter((f) => f.body && (name === undefined || f.name === name));
   const entry: FunctionDeclaration =
-    defined.at(-1) ??
-    refuse(name === undefined ? 'the source defines no function' : `the source defines no function ${name}`, start);
+    defined.at(-1) ?? refuse(name === undefined ? 'the source defines no function' : `the source defines no function ${name}`, start);
   const at = find(String.raw`\b${entry.name}\s*\(`);
   const params = entry.params.map((p): GLSLParameter => {
     if (/\b(out|inout)\b/.test(p.qualifier))
-      return refuse(
-        `parameter ${p.name} of ${entry.name} is ${p.qualifier}; the called function takes inputs only`,
-        at,
-      );
+      return refuse(`parameter ${p.name} of ${entry.name} is ${p.qualifier}; the called function takes inputs only`, at);
     const type = dimensions[p.type] ?? nodeType(p.type);
     return type
       ? { name: p.name, glsl: p.type, type }
@@ -234,9 +230,7 @@ export function glslFn<R extends Type = Type>(
         label = `glslFn argument ${i + 1} (${p.name})`;
       if (p.glsl in dimensions) textures.push(textureResource(a as BindableTexture, p.type as GLSLSamplerDimension));
       else if (!(a instanceof Node) && (typeof a !== (p.type === 'bool' ? 'boolean' : 'number') || /^mat/.test(p.type)))
-        throw new TypeError(
-          `${label} must be a node${/^mat/.test(p.type) ? '' : ' or a ' + (p.type === 'bool' ? 'boolean' : 'number')}`,
-        );
+        throw new TypeError(`${label} must be a node${/^mat/.test(p.type) ? '' : ' or a ' + (p.type === 'bool' ? 'boolean' : 'number')}`);
       else nodes.push(cast(a as NodeInput, p.type as Type, label));
     });
     // The key names the textures: equal sources with other textures are other expressions.

@@ -49,10 +49,7 @@ export function tracedGPU() {
   ]);
   wrap(d, 'createRenderPipeline', (x) => {
     const state = JSON.stringify([x.fragment?.targets, x.multisample, x.depthStencil]);
-    return [
-      `render(${stage(x.vertex)},${stage(x.fragment)},${state})`,
-      `render(${x.fragment?.entryPoint ?? x.vertex.entryPoint},${state})`,
-    ];
+    return [`render(${stage(x.vertex)},${stage(x.fragment)},${state})`, `render(${x.fragment?.entryPoint ?? x.vertex.entryPoint},${state})`];
   });
   const entries = (x, key) =>
     x.entries.map((e) => e.binding + '=' + of(e.resource.buffer ?? e.resource.texture ?? e.resource, key)).join(',');

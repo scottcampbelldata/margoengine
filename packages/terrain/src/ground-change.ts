@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Ground that changes on screen (entry `@margoengine/terrain/ground-change`): gullies cutting back, banks retreating,
-// scour holes, slide scars with their runout, a flood's mud, ash fall, lava flows and burn scars, drawn as a height and
+// scour holes, explosion craters with their heave and ejecta, slide scars with their runout, a flood's mud, ash fall, lava flows and burn scars, drawn as a height and
 // colour change of a heightfield mesh or a clipmap `Terrain` each frame. The change is a closed form of film time (./ground-model.ts holds the
 // laws and their sources), so a seek, a re-render or a frame rendered out of order shows the same ground. Each frame
 // whose time moved recomputes only the vertices the events active since the last frame can touch: their heights (base
@@ -188,7 +188,7 @@ function checkLook(look: GroundLook): void {
 
 let nextId = 0;
 /**
- * Ground that changes over film time: events (gully, bank, scour, slide, mud, ash, lava, burn) change a heightfield
+ * Ground that changes over film time: events (gully, bank, scour, slide, mud, ash, lava, burn, crater) change a heightfield
  * mesh's or a clipmap terrain's heights and colours each frame, the same at any time however it is reached.
  * `GroundChange.attach(engine, mesh, options)` for a mesh made by `heightfieldGeometry` on the same grid;
  * `GroundChange.attach(engine, terrain, options)` for an attached `Terrain` (an `r32float` heightmap with COPY_SRC and

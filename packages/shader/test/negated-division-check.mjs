@@ -14,9 +14,7 @@ try {
   const result = await page.evaluate(() => window.result);
   assert.deepEqual(errors, []);
   const fault = ['faultAtan2', 'faultDivide'].filter((k) => result[k].worst > 1e-4);
-  console.log(
-    `negated division on ${result.adapter}: driver fault ${fault.length ? `present (${fault.join(', ')}; ${JSON.stringify(result.faultAtan2.where)})` : 'absent'}`,
-  );
+  console.log(`negated division on ${result.adapter}: driver fault ${fault.length ? `present (${fault.join(', ')}; ${JSON.stringify(result.faultAtan2.where)})` : 'absent'}`);
   for (const [name, { used, worst, where }] of Object.entries(result)) {
     if (!used) continue;
     assert.ok(worst < 1e-4, `${name}: ${worst} off at ${JSON.stringify(where)}`);

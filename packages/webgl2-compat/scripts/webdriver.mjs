@@ -33,13 +33,9 @@ export async function command(base, method, path, body, { timeoutMs = 60_000, fe
   try {
     parsed = text ? JSON.parse(text) : {};
   } catch {
-    throw new WebDriverError(`${method} ${path}`, response.status, {
-      error: 'invalid response',
-      message: text.slice(0, 200),
-    });
+    throw new WebDriverError(`${method} ${path}`, response.status, { error: 'invalid response', message: text.slice(0, 200) });
   }
-  if (!response.ok || parsed?.value?.error)
-    throw new WebDriverError(`${method} ${path}`, response.status, parsed.value);
+  if (!response.ok || parsed?.value?.error) throw new WebDriverError(`${method} ${path}`, response.status, parsed.value);
   return parsed.value;
 }
 
@@ -59,24 +55,15 @@ export function asyncScript(source, arg) {
 
 /** Undoes the page side's tagging of -0, NaN and the infinities in a script's result. */
 export function revive(value) {
-  return JSON.parse(JSON.stringify(value), (k, x) =>
-    x && typeof x === 'object' && Object.keys(x).length === 1 && typeof x['~n'] === 'string' ? Number(x['~n']) : x,
-  );
+  return JSON.parse(JSON.stringify(value), (k, x) => (x && typeof x === 'object' && Object.keys(x).length === 1 && typeof x['~n'] === 'string' ? Number(x['~n']) : x));
 }
 
 /** A WebDriver session at `base` (for example http://127.0.0.1:4444) asking for `capabilities`. */
 export async function openSession(base, capabilities, { timeoutMs = 120_000, fetchImpl } = {}) {
-  const value = await command(
-    base,
-    'POST',
-    '/session',
-    { capabilities: { alwaysMatch: capabilities } },
-    { timeoutMs, fetchImpl },
-  );
+  const value = await command(base, 'POST', '/session', { capabilities: { alwaysMatch: capabilities } }, { timeoutMs, fetchImpl });
   const id = value.sessionId,
     at = `/session/${id}`,
-    send = (method, path, body, limit = 60_000) =>
-      command(base, method, at + path, body, { timeoutMs: limit, fetchImpl });
+    send = (method, path, body, limit = 60_000) => command(base, method, at + path, body, { timeoutMs: limit, fetchImpl });
   let closed = false;
   return {
     id,
@@ -85,8 +72,7 @@ export async function openSession(base, capabilities, { timeoutMs = 120_000, fet
     timeouts: (script, pageLoad) => send('POST', '/timeouts', { script, pageLoad }),
     goto: (url, limit = 180_000) => send('POST', '/url', { url }, limit),
     /** Runs `source` (an expression giving a function, sync or async) with `arg`: `{ok}` or `{thrown}`. */
-    run: async (source, arg, limit = 15 * 60_000) =>
-      revive(await send('POST', '/execute/async', { script: asyncScript(source, arg), args: [] }, limit)),
+    run: async (source, arg, limit = 15 * 60_000) => revive(await send('POST', '/execute/async', { script: asyncScript(source, arg), args: [] }, limit)),
     /** PNG bytes of the viewport, as the browser shows it. */
     pageScreenshot: async () => Buffer.from(await send('GET', '/screenshot', undefined, 120_000), 'base64'),
     /**

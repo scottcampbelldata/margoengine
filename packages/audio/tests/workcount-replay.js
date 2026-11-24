@@ -13,22 +13,14 @@ const circle = (a) => {
 
 export function audioReplay() {
   const hash = createHash('sha256');
-  let iterators = 0,
-    events = 0;
-  for (const [state, smoothing] of [
-    ['suspended', 0.015],
-    ['running', 0.015],
-    ['running', 0],
-  ]) {
+  let iterators = 0, events = 0;
+  for (const [state, smoothing] of [['suspended', 0.015], ['running', 0.015], ['running', 0]]) {
     const context = new FakeAudioContext({ state });
     const listener = new AudioListener({ context, smoothing, autoResume: false });
     const sources = Array.from({ length: 128 }, () => new PositionalAudio(listener));
     const count = (array) => {
       const iterate = array[Symbol.iterator];
-      array[Symbol.iterator] = function () {
-        iterators++;
-        return iterate.call(this);
-      };
+      array[Symbol.iterator] = function () { iterators++; return iterate.call(this); };
     };
     for (const array of [listener.position, listener.forward, listener.up]) count(array);
     for (const source of sources) for (const array of [source.worldPosition, source.worldDirection]) count(array);
@@ -36,17 +28,16 @@ export function audioReplay() {
     let time = 0;
     Object.defineProperty(context, 'currentTime', { get: () => (time += 1 / 48000) });
     const flush = (node) => {
-      for (const value of Object.values(node))
-        if (value instanceof FakeParam) {
-          for (const event of value.events) {
-            hash.update(event[0]);
-            const numbers = new Float64Array(event.slice(1));
-            hash.update(Buffer.from(numbers.buffer));
-            events++;
-          }
-          value.events.length = 0;
-          hash.update(Buffer.from(new Float64Array([value.value, value.target ?? 0]).buffer));
+      for (const value of Object.values(node)) if (value instanceof FakeParam) {
+        for (const event of value.events) {
+          hash.update(event[0]);
+          const numbers = new Float64Array(event.slice(1));
+          hash.update(Buffer.from(numbers.buffer));
+          events++;
         }
+        value.events.length = 0;
+        hash.update(Buffer.from(new Float64Array([value.value, value.target ?? 0]).buffer));
+      }
     };
     for (let k = 0; k < 100; k++) {
       const angle = k * 0.005;
@@ -56,7 +47,7 @@ export function audioReplay() {
       for (let j = 0; j < sources.length; j++) {
         const a = j * 0.098 + k * 0.01;
         const [ca, sa] = circle(a);
-        sources[j].setPosition(ca * (5 + (j % 8)), 1 + (j % 4) * 0.5, sa * (5 + (j % 8)));
+        sources[j].setPosition(ca * (5 + j % 8), 1 + j % 4 * 0.5, sa * (5 + j % 8));
         sources[j].setDirection([-sa, 0, ca]);
         flush(sources[j].panner);
         hash.update(Buffer.from(sources[j].worldPosition.buffer));

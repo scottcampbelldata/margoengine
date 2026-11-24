@@ -11,36 +11,12 @@ const norm = (a) => {
 };
 // The inverse of cubeSphere: the face and (s, t) of a unit direction (face axes as in src/planet.ts).
 const FACES = [
-  [
-    [1, 0, 0],
-    [0, 0, -1],
-    [0, 1, 0],
-  ],
-  [
-    [-1, 0, 0],
-    [0, 0, 1],
-    [0, 1, 0],
-  ],
-  [
-    [0, 1, 0],
-    [1, 0, 0],
-    [0, 0, -1],
-  ],
-  [
-    [0, -1, 0],
-    [1, 0, 0],
-    [0, 0, 1],
-  ],
-  [
-    [0, 0, 1],
-    [1, 0, 0],
-    [0, 1, 0],
-  ],
-  [
-    [0, 0, -1],
-    [-1, 0, 0],
-    [0, 1, 0],
-  ],
+  [[1, 0, 0], [0, 0, -1], [0, 1, 0]],
+  [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
+  [[0, 1, 0], [1, 0, 0], [0, 0, -1]],
+  [[0, -1, 0], [1, 0, 0], [0, 0, 1]],
+  [[0, 0, 1], [1, 0, 0], [0, 1, 0]],
+  [[0, 0, -1], [-1, 0, 0], [0, 1, 0]],
 ];
 function faceOf(d) {
   let face = 0;
@@ -68,13 +44,7 @@ test('cubeSphere: unit directions, faces meet edge to edge, and cells within a f
   for (let face = 0; face < 6; face++)
     for (let k = 0; k <= 16; k++) {
       const q = -1 + k / 8;
-      for (const [s, t] of [
-        [q, -1],
-        [q, 1],
-        [-1, q],
-        [1, q],
-      ])
-        edges.push({ face, p: cubeSphere(face, s, t) });
+      for (const [s, t] of [[q, -1], [q, 1], [-1, q], [1, q]]) edges.push({ face, p: cubeSphere(face, s, t) });
     }
   for (const { face, p } of edges) {
     assert.ok(Math.abs(Math.hypot(...p) - 1) < 1e-15);
@@ -91,9 +61,7 @@ test('cubeSphere: unit directions, faces meet edge to edge, and cells within a f
         c = cubeSphere(0, -1 + (2 * i) / n, -1 + (2 * (j + 1)) / n),
         ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
         ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-      areas.push(
-        Math.hypot(ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]),
-      );
+      areas.push(Math.hypot(ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]));
     }
   assert.ok(Math.max(...areas) / Math.min(...areas) < 1.5, `area ratio ${Math.max(...areas) / Math.min(...areas)}`);
   assert.throws(() => cubeSphere(6, 0, 0), RangeError);
@@ -189,13 +157,10 @@ test('progressive refinement with no budget never leaves a hole in the visible c
     assert.ok(stats.built <= (frame ? 1 : 7), JSON.stringify(stats));
     for (let k = 0; k < 400; k++) {
       // A spiral of directions over the cap facing the camera.
-      const a = cap * Math.sqrt((k + 0.5) / 400),
+      const a = (cap * Math.sqrt((k + 0.5) / 400)),
         b = k * 2.39996,
         dir = [Math.sin(a) * Math.cos(b), Math.sin(a) * Math.sin(b), Math.cos(a)];
-      assert.ok(
-        p.patches.some((patch) => inside(patch, dir)),
-        `frame ${frame}: hole at ${dir}`,
-      );
+      assert.ok(p.patches.some((patch) => inside(patch, dir)), `frame ${frame}: hole at ${dir}`);
     }
     previous = Math.max(previous, stats.level);
   }
@@ -210,10 +175,7 @@ test('a flight from orbit to the ground keeps within maxPatches, evicting the pa
     const ground = R + p.heightAt(up),
       altitude = 2 * R * 0.6 ** i + 2,
       eye = up.map((v) => v * (ground + altitude)),
-      camera = look(
-        eye,
-        [0, 0, 0].map((_, k) => eye[k] + [0, 1, 0][k] * 1000 - up[k] * Math.max(altitude, 10)),
-      );
+      camera = look(eye, [0, 0, 0].map((_, k) => eye[k] + [0, 1, 0][k] * 1000 - up[k] * Math.max(altitude, 10)));
     const stats = p.update(camera, [640, 360]);
     assert.ok(stats.resident <= 256 && stats.drawn <= 256 && stats.drawn > 0, JSON.stringify(stats));
     deepest = Math.max(deepest, stats.level);
@@ -244,8 +206,7 @@ test('sea level: ground under the sea reads as the sea surface; seaLevel false k
 });
 
 test('a floating origin moves the planet with each rebase', () => {
-  let listener,
-    unsubscribed = 0;
+  let listener, unsubscribed = 0;
   const origin = {
       origin: [0, 0, 0],
       onRebase(l) {

@@ -4,15 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  applyMutant,
-  markEquivalent,
-  mutantsOf,
-  pickMutants,
-  scoreOf,
-  testDirOf,
-  TARGETS,
-} from '../scripts/mutation.mjs';
+import { applyMutant, markEquivalent, mutantsOf, pickMutants, scoreOf, testDirOf, TARGETS } from '../scripts/mutation.mjs';
 
 const source = [
   'type T = 1 | 2;',

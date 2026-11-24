@@ -31,11 +31,7 @@ try {
   console.log(`ok smoke repeat: ${repeat.floats} floats the same`);
   const live = await page.evaluate(() => window.check.live());
   assert.deepEqual(live.errors, []);
-  assert.deepEqual(
-    live.made,
-    { pipelines: 0, buffers: 0, textures: 0 },
-    `60 frames of every live row made GPU objects: ${JSON.stringify(live)}`,
-  );
+  assert.deepEqual(live.made, { pipelines: 0, buffers: 0, textures: 0 }, `60 frames of every live row made GPU objects: ${JSON.stringify(live)}`);
   console.log(`ok smoke settings: ${live.rows} live rows for 60 frames made no pipeline, buffer or texture`);
   const d = await page.evaluate(() => window.check.defaults());
   assert.equal(d.differing, 0, `the default rows change the frame: ${JSON.stringify(d)}`);
@@ -50,13 +46,8 @@ try {
     last = p;
   }
   outline *= (192 / (2 * 220 * Math.tan(Math.PI / 6))) ** 2;
-  assert.ok(
-    d.lit >= 0.5 * outline && d.lit <= 1.5 * outline,
-    `the column shows over an empty scene, within half to one and a half times its plume's outline of ${outline.toFixed(0)} px: ${JSON.stringify(d)}`,
-  );
-  console.log(
-    `ok smoke defaults frame exact; the column covers ${d.lit} pixels against its plume's outline of ${outline.toFixed(0)}`,
-  );
+  assert.ok(d.lit >= 0.5 * outline && d.lit <= 1.5 * outline, `the column shows over an empty scene, within half to one and a half times its plume's outline of ${outline.toFixed(0)} px: ${JSON.stringify(d)}`);
+  console.log(`ok smoke defaults frame exact; the column covers ${d.lit} pixels against its plume's outline of ${outline.toFixed(0)}`);
   assert.deepEqual(pageErrors, []);
   console.log('smoke check passed');
 } finally {

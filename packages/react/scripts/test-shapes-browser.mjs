@@ -34,10 +34,7 @@ const count = (image, channel) => {
   return { n, x: n ? x / n : 0, y: n ? y / n : 0 };
 };
 const near = (actual, expected, label) =>
-  assert.ok(
-    actual.every((v, c) => Math.abs(v - expected[c]) <= 24),
-    `${label}: ${actual} near ${expected}`,
-  );
+  assert.ok(actual.every((v, c) => Math.abs(v - expected[c]) <= 24), `${label}: ${actual} near ${expected}`);
 try {
   await page.waitForFunction(() => window.shapes);
   // The small WebGL2 preview (backend 'webgl2') draws Svg's parts as lit, opaque core meshes.
@@ -62,11 +59,7 @@ try {
         assert.equal(strokeA.n, 0, `${label}: skipStrokes draws no stroke`);
         assert.ok(strokeB.n > 500 && strokeB.x > 0.5, `${label}: blue stroke ${JSON.stringify(strokeB)}`);
         // The stroke's centroid is the middle of its unfilled square.
-        near(
-          pixel(right, strokeB.x, strokeB.y),
-          pixel(right, 0.02, 0.02),
-          `${label}: an unfilled path shows the background`,
-        );
+        near(pixel(right, strokeB.x, strokeB.y), pixel(right, 0.02, 0.02), `${label}: an unfilled path shows the background`);
       } else if (mode === 'screenquad') {
         // vUv runs 0 to 1 across the screen with y up: red grows to the right, green to the top.
         near(pixel(right, 0.02, 0.98), [5, 5, 0], `${label}: bottom left`);

@@ -94,10 +94,7 @@ await postBrowser(
     for (let i = 0; i < p0.length; i++)
       for (let c = 0; c < 3; c++) {
         resetDiff = Math.max(resetDiff, Math.abs(reset.data[4 * i + c] - identity.data[4 * i + c]));
-        desaturatedDiff = Math.max(
-          desaturatedDiff,
-          Math.abs(desaturated.data[4 * i + c] - desaturated.data[4 * i + 1]),
-        );
+        desaturatedDiff = Math.max(desaturatedDiff, Math.abs(desaturated.data[4 * i + c] - desaturated.data[4 * i + 1]));
       }
     const redBox = p0.map((p, i) => (p[0] > 120 && p[1] < 90 ? i : -1)).filter((i) => i >= 0),
       chroma = (img, set) => set.reduce((s, i) => s + img.data[4 * i] - img.data[4 * i + 2], 0) / set.length;
@@ -143,10 +140,7 @@ await postBrowser(
     assert.ok(r.redBox > 500, 'the red box on screen');
     // Lift weighs on the darks (1 - x), gain on the brights (x): each moves its end at least twice as far as the other.
     assert.ok(r.liftDark > 20 && r.liftDark > 2 * r.liftBright, `lift raises the darks most: ${JSON.stringify(r)}`);
-    assert.ok(
-      r.gainBright < -40 && 2 * Math.abs(r.gainDark) < -r.gainBright,
-      `gain lowers the brights most: ${JSON.stringify(r)}`,
-    );
+    assert.ok(r.gainBright < -40 && 2 * Math.abs(r.gainDark) < -r.gainBright, `gain lowers the brights most: ${JSON.stringify(r)}`);
     assert.ok(r.gammaRedGreen > 10, `gamma 2 brightens the midtones: ${r.gammaRedGreen}`);
     assert.ok(r.desaturatedDiff <= 1, `saturation 0 greys every pixel: ${r.desaturatedDiff}`);
     assert.ok(r.saturatedChroma > r.redChroma + 5, `saturation 2 deepens the red: ${JSON.stringify(r)}`);

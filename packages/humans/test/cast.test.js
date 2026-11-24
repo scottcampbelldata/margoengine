@@ -38,7 +38,7 @@ test('the measured fabrics carry Table 2 and Table 3 of Sadeghi et al. 2013 as p
 
 test('the fabric BRDF is reciprocal and an isolated thread reflects into its specular cone (Eq. 2 to 13)', () => {
   let seed = 7;
-  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (const fabric of Object.values(C.MEASURED_FABRICS))
     for (let k = 0; k < 40; k++) {
       const i = dir(rand() * 1.4, rand() * 6.28),
@@ -53,18 +53,11 @@ test('the fabric BRDF is reciprocal and an isolated thread reflects into its spe
     // Surface reflection alone (A = 0): the cone of Eq. 2.
     th = { ...C.MEASURED_FABRICS.silkCrepeDeChine.threads[0], albedo: [0, 0, 0] };
   // The cone: the light at -theta_i stands far above the light 40 degrees either side (20 degrees of theta_h).
-  const at = (wi, tr) =>
-    C.threadScattering(th, 1.345, t, n, wi, [
-      Math.sin(tr * R),
-      Math.sin(0.3) * Math.cos(tr * R),
-      Math.cos(0.3) * Math.cos(tr * R),
-    ])[0];
+  const at = (wi, tr) => C.threadScattering(th, 1.345, t, n, wi, [Math.sin(tr * R), Math.sin(0.3) * Math.cos(tr * R), Math.cos(0.3) * Math.cos(tr * R)])[0];
   for (const ti of [-40, -10, 25, 50]) {
     const wi = [Math.sin(ti * R), 0, Math.cos(ti * R)],
       on = at(wi, -ti);
-    for (const off of [-40, 40])
-      if (Math.abs(-ti + off) < 85)
-        assert.ok(on > 100 * at(wi, -ti + off), `cone at theta_i ${ti}: ${on} against ${at(wi, -ti + off)} at ${off}`);
+    for (const off of [-40, 40]) if (Math.abs(-ti + off) < 85) assert.ok(on > 100 * at(wi, -ti + off), `cone at theta_i ${ti}: ${on} against ${at(wi, -ti + off)} at ${off}`);
   }
 });
 
@@ -87,8 +80,7 @@ test('linen is orthogonally symmetric and smooth; satin has the sharp highlight 
   // light 30 degrees off the normal along the warp.
   const peakiness = (f) => {
     const v = [];
-    for (let tr = -80; tr <= 80; tr += 2)
-      v.push(C.fabricBRDF(f, dir(30 * R), dir(Math.abs(tr) * R, tr < 0 ? 0 : Math.PI))[1]);
+    for (let tr = -80; tr <= 80; tr += 2) v.push(C.fabricBRDF(f, dir(30 * R), dir(Math.abs(tr) * R, tr < 0 ? 0 : Math.PI))[1]);
     return Math.max(...v) / (v.reduce((s, x) => s + x, 0) / v.length);
   };
   const pl = peakiness(linen),
@@ -115,8 +107,7 @@ test('a period fabric reflects its dye colour at normal incidence and the GPU lo
       scale = 1 - Math.max(...l.sheenColor) * e0;
     // Drawn albedo at normal incidence: scale (base + dielectric) + sheen e0, the dielectric part read off the fit.
     const drawn = [0, 1, 2].map((c) => scale * l.baseColor[c] + l.sheenColor[c] * e0);
-    for (let c = 0; c < 3; c++)
-      assert.ok(Math.abs(drawn[c] - color[c]) < 0.06, `${kind} drawn ${drawn} against ${color}`);
+    for (let c = 0; c < 3; c++) assert.ok(Math.abs(drawn[c] - color[c]) < 0.06, `${kind} drawn ${drawn} against ${color}`);
     // The shape the lobes cannot follow (thread masking darkens grazing light) stays bounded: measured 0.22 to 0.47.
     assert.ok(l.fitError < 0.5, `${kind} fit error ${l.fitError}`);
   }
@@ -130,21 +121,10 @@ test('bodies carry the AIST 2003 and Army Anthropology 1921 values and their sec
     us = C.BODIES.us1919Man;
   // AIST/HQL 2003 young male and female means (mm) and AIST head database 2001 (head girth).
   const same = (a, b, what) => a.forEach((v, i) => near(v, b[i], 1e-12, what));
-  same(
-    [m.stature, m.chestGirth, m.waistGirth, m.hipGirth, m.crotchHeight, m.headGirth],
-    [1.6967, 0.8885, 0.7463, 0.9076, 0.7549, 0.5759],
-    'AIST man',
-  );
-  same(
-    [w.stature, w.chestGirth, w.waistGirth, w.hipGirth, w.crotchHeight, w.headGirth],
-    [1.5783, 0.8687, 0.6727, 0.9002, 0.7012, 0.5511],
-    'AIST woman',
-  );
+  same([m.stature, m.chestGirth, m.waistGirth, m.hipGirth, m.crotchHeight, m.headGirth], [1.6967, 0.8885, 0.7463, 0.9076, 0.7549, 0.5759], 'AIST man');
+  same([w.stature, w.chestGirth, w.waistGirth, w.hipGirth, w.crotchHeight, w.headGirth], [1.5783, 0.8687, 0.6727, 0.9002, 0.7012, 0.5511], 'AIST woman');
   // Army Anthropology Table 117 group 4m and Table 119 group 5m (cm); crotch = stature - sitting height 90.5.
-  assert.deepEqual(
-    [us.stature, us.chestGirth, us.neckGirth, us.shoulderBreadth, us.waistGirth, us.thighGirth, us.kneeHeight],
-    [1.72, 0.876, 0.357, 0.415, 0.77, 0.525, 0.469],
-  );
+  assert.deepEqual([us.stature, us.chestGirth, us.neckGirth, us.shoulderBreadth, us.waistGirth, us.thighGirth, us.kneeHeight], [1.72, 0.876, 0.357, 0.415, 0.77, 0.525, 0.469]);
   near(us.crotchHeight, 0.815, 1e-12, 'crotch');
   for (const body of Object.values(C.BODIES)) {
     const s = C.trunkSections(body);
@@ -173,9 +153,7 @@ test('garment sizes match the period dimensions they are cut to', () => {
   // Army Anthropology: blouse group 4 is cut for chests of 86 to 89 cm and breeches group 5 for waists of 76 to 79 cm;
   // the garment's inner girth must take the largest body of its group.
   const girth = (g, y) => {
-    const ring = g.rings
-      .filter((r) => r.part === 'trunk')
-      .reduce((a, b) => (Math.abs(b.at - y) < Math.abs(a.at - y) ? b : a));
+    const ring = g.rings.filter((r) => r.part === 'trunk').reduce((a, b) => (Math.abs(b.at - y) < Math.abs(a.at - y) ? b : a));
     let s = 0;
     for (let k = 0; k < C.RING_STEPS; k++) {
       const a = (k / C.RING_STEPS) * 2 * Math.PI,
@@ -214,9 +192,7 @@ test('layers never pass through each other or the body at rest, and the meshes s
       garments = C.dress(body, outfit);
     for (const g of garments) {
       // On the body: the first trunk layer stays outside the skin by its ease.
-      for (const ring of g.rings.filter(
-        (r) => r.part === 'trunk' && r.at >= body.crotchHeight && r.at <= body.neckHeight,
-      )) {
+      for (const ring of g.rings.filter((r) => r.part === 'trunk' && r.at >= body.crotchHeight && r.at <= body.neckHeight)) {
         const t = C.trunkAt(sections, ring.at);
         for (let k = 0; k < C.RING_STEPS; k++) {
           const skin = C.superellipseRadius(t.a, t.b, t.n, (k / C.RING_STEPS) * 2 * Math.PI);
@@ -233,11 +209,7 @@ test('layers never pass through each other or the body at rest, and the meshes s
         let seen = 0;
         for (let i = 0; i < p.length; i += 3)
           // Trunk vertices have radial normals about the trunk's axis (sleeve and leg tubes have their own axes).
-          if (
-            Math.abs(p[i + 1] - ring.at) < 1e-6 &&
-            Math.abs(p[i] * nrm[i + 2] - p[i + 2] * nrm[i]) < 1e-4 * Math.hypot(p[i], p[i + 2]) &&
-            Math.abs(nrm[i + 1]) < 1e-6
-          ) {
+          if (Math.abs(p[i + 1] - ring.at) < 1e-6 && Math.abs(p[i] * nrm[i + 2] - p[i + 2] * nrm[i]) < 1e-4 * Math.hypot(p[i], p[i + 2]) && Math.abs(nrm[i + 1]) < 1e-6) {
             const r = Math.hypot(p[i], p[i + 2]);
             assert.ok(r >= lo && r <= hi, `${name} ${g.spec.name} vertex ${r} off its ring ${lo}..${hi}`);
             seen++;
@@ -247,11 +219,7 @@ test('layers never pass through each other or the body at rest, and the meshes s
     }
     for (const inner of garments)
       for (const outer of garments) {
-        if (
-          outer.spec.layer <= inner.spec.layer &&
-          !(outer.spec.layer === inner.spec.layer && garments.indexOf(outer) > garments.indexOf(inner))
-        )
-          continue;
+        if (outer.spec.layer <= inner.spec.layer && !(outer.spec.layer === inner.spec.layer && garments.indexOf(outer) > garments.indexOf(inner))) continue;
         for (const part of ['trunk', 'armL', 'armR', 'legL', 'legR']) {
           const a = inner.rings.filter((r) => r.part === part),
             b = outer.rings.filter((r) => r.part === part);
@@ -261,10 +229,7 @@ test('layers never pass through each other or the body at rest, and the meshes s
               const under = interp(a, ring.at, k, 'outer');
               if (under === undefined) continue;
               pairs++;
-              assert.ok(
-                ring.inner[k] >= under - 1e-6,
-                `${name}: ${outer.spec.name} passes through ${inner.spec.name} (${part} at ${ring.at.toFixed(3)}, ${ring.inner[k]} < ${under})`,
-              );
+              assert.ok(ring.inner[k] >= under - 1e-6, `${name}: ${outer.spec.name} passes through ${inner.spec.name} (${part} at ${ring.at.toFixed(3)}, ${ring.inner[k]} < ${under})`);
             }
         }
       }
@@ -307,16 +272,10 @@ test('castCrowd follows the role shares, the life jacket chance and the dye spre
 
 test('the slider rows share the settings shape and drive the outfit', () => {
   for (const row of C.CAST_SETTINGS)
-    for (const key of ['name', 'group', 'kind', 'default', 'unit', 'about', 'live'])
-      assert.ok(key in row, `${row.name} has ${key}`);
+    for (const key of ['name', 'group', 'kind', 'default', 'unit', 'about', 'live']) assert.ok(key in row, `${row.name} has ${key}`);
   const plain = C.applyCastSettings({});
   assert.deepEqual(plain.outfit, C.OUTFITS[C.CAST_SETTINGS[0].default]);
-  const red = C.applyCastSettings({
-    outfit: 'miner-1910',
-    garment: 1,
-    color: [0.4, 0.05, 0.03],
-    fabric: 'cotton-duck',
-  });
+  const red = C.applyCastSettings({ outfit: 'miner-1910', garment: 1, color: [0.4, 0.05, 0.03], fabric: 'cotton-duck' });
   assert.deepEqual(red.outfit.garments[1].color, [0.4, 0.05, 0.03]);
   assert.equal(red.outfit.garments[1].fabric, 'cotton-duck');
   assert.equal(red.body, C.BODIES.us1919Man);
@@ -337,10 +296,7 @@ test('outfitGLB writes a glTF 2.0 binary with a mesh per garment and the cloth s
     doc.meshes.map((m) => m.name),
     ['shirt', 'boots', 'hat', 'trousers', 'tie', 'vest', 'coat'],
   );
-  assert.ok(
-    doc.materials.find((m) => m.name === 'hat').extensions.KHR_materials_sheen.sheenColorFactor[0] > 0,
-    'felt sheen',
-  );
+  assert.ok(doc.materials.find((m) => m.name === 'hat').extensions.KHR_materials_sheen.sheenColorFactor[0] > 0, 'felt sheen');
   for (const a of doc.accessors) assert.ok(a.count > 0);
 });
 
@@ -352,10 +308,7 @@ test('wool and cotton get a grazing sheen from their fibre ends; filament cloth 
   const sheen = (kind, g) => Math.max(...C.periodLobes(kind, [g, g, g]).sheenColor);
   for (const g of [0.1, 0.3]) {
     assert.ok(sheen('wool-worsted', g) > 0.05, `worsted ${g}: sheen ${sheen('wool-worsted', g)}`);
-    assert.ok(
-      sheen('wool-flannel', g) > sheen('wool-worsted', g),
-      `flannel ${sheen('wool-flannel', g)} over worsted ${sheen('wool-worsted', g)}`,
-    );
+    assert.ok(sheen('wool-flannel', g) > sheen('wool-worsted', g), `flannel ${sheen('wool-flannel', g)} over worsted ${sheen('wool-worsted', g)}`);
     assert.ok(sheen('cotton-duck', g) > 0, `duck ${g}: sheen ${sheen('cotton-duck', g)}`);
     assert.equal(sheen('silk', g), 0);
     assert.equal(sheen('polyester-blend', g), 0);
@@ -368,8 +321,5 @@ test('wool and cotton get a grazing sheen from their fibre ends; filament cloth 
     worsted = C.periodFabric('wool-worsted', [0.1, 0.1, 0.1]),
     { fuzz, ...bare } = worsted;
   assert.ok(fuzz && fuzz.depth > 0, 'worsted has fibre ends');
-  assert.ok(
-    C.fabricBRDF(worsted, wi, wr)[0] > 1.2 * C.fabricBRDF(bare, wi, wr)[0],
-    `grazing ${C.fabricBRDF(worsted, wi, wr)[0]} against ${C.fabricBRDF(bare, wi, wr)[0]}`,
-  );
+  assert.ok(C.fabricBRDF(worsted, wi, wr)[0] > 1.2 * C.fabricBRDF(bare, wi, wr)[0], `grazing ${C.fabricBRDF(worsted, wi, wr)[0]} against ${C.fabricBRDF(bare, wi, wr)[0]}`);
 });

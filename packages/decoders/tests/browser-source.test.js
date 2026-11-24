@@ -10,15 +10,9 @@ for (const file of readdirSync(folder, { recursive: true }).filter(
   (name) => /\.[cm]?js$/.test(name) && !/\.test\.[cm]?js$/.test(name),
 )) {
   test(`browser/support module parses before GPU execution: ${file}`, { timeout: 15_000 }, () => {
-    const result = spawnSync(
-      process.execPath,
-      ['--check', fileURLToPath(new URL(file.replaceAll('\\', '/'), folder))],
-      {
-        encoding: 'utf8',
-        timeout: 10_000,
-        windowsHide: true,
-      },
-    );
+    const result = spawnSync(process.execPath, ['--check', fileURLToPath(new URL(file.replaceAll('\\', '/'), folder))], {
+      encoding: 'utf8', timeout: 10_000, windowsHide: true,
+    });
     assert.equal(result.status, 0, result.error?.message ?? result.stderr);
   });
   test(`browser/support asset URLs are statically resolvable by Vite: ${file}`, () => {

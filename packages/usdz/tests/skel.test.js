@@ -14,14 +14,10 @@ const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'),
 const open = (file) => {
   const path = join(fixtures, ...file.split('/')),
     folder = dirname(path);
-  return parseUSDFiles(
-    path.split(sep).at(-1),
-    (id) => {
-      const at = resolve(folder, id);
-      return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
-    },
-    { extensions: [skeletons()] },
-  );
+  return parseUSDFiles(path.split(sep).at(-1), (id) => {
+    const at = resolve(folder, id);
+    return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
+  }, { extensions: [skeletons()] });
 };
 
 for (const [file, want] of Object.entries(truth))
@@ -48,9 +44,7 @@ for (const [file, want] of Object.entries(truth))
         const posed = vertices(asset, id, pose(asset, (time - want.start) / want.tcps));
         posed.forEach((p, v) => {
           // float32 joints and offsets over a figure a few units tall, and truth stored to five places.
-          const gap = Math.min(
-            ...behind[v].map((i) => Math.hypot(...transform(base, mesh.frames[k][i]).map((x, d) => x - p[d]))),
-          );
+          const gap = Math.min(...behind[v].map((i) => Math.hypot(...transform(base, mesh.frames[k][i]).map((x, d) => x - p[d]))));
           assert.ok(gap < 1e-3 * want.meters, `${path} vertex ${v} at ${time} is ${gap} off`);
         });
       });
@@ -102,15 +96,12 @@ def SkelRoot "Rig" {
   }
 }`;
 const stage = (text) =>
-  parseUSDFiles('root.usda', (id) => (id === 'root.usda' ? new TextEncoder().encode(text) : undefined), {
-    extensions: [skeletons()],
-  });
+  parseUSDFiles('root.usda', (id) => (id === 'root.usda' ? new TextEncoder().encode(text) : undefined), { extensions: [skeletons()] });
 
 test('past eight influences the strongest stay, keep the total, and the import says so', async () => {
   const asset = await stage(influences(10)),
     { attributes } = asset.document.meshes[0].primitives[0],
-    read = (accessor) =>
-      asset.buffers[asset.document.bufferViews[asset.document.accessors[accessor].bufferView].buffer];
+    read = (accessor) => asset.buffers[asset.document.bufferViews[asset.document.accessors[accessor].bufferView].buffer];
   assert.ok(asset.issues.some((i) => /more than 8 influences/.test(i.message)));
   const total = [...read(attributes.WEIGHTS_0).subarray(0, 4), ...read(attributes.WEIGHTS_1).subarray(0, 4)];
   assert.equal(Math.round(total.reduce((a, b) => a + b, 0) * 1e4) / 1e4, 55);

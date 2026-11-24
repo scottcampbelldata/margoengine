@@ -109,13 +109,7 @@ test('the air block, the sun through it and the engine light', () => {
   // Ozone takes red and green at a low sun; thick Rayleigh reddens it.
   const low = sunlight(0.05, 0.001, 2),
     ozone = sunlight(0.05, 0.001, 2, new Float32Array(3), look.air({ atmosphere: { ozone: 5 } }, new Float32Array(9))),
-    thick = sunlight(
-      0.05,
-      0.001,
-      2,
-      new Float32Array(3),
-      look.air({ atmosphere: { rayleigh: 3 } }, new Float32Array(9)),
-    );
+    thick = sunlight(0.05, 0.001, 2, new Float32Array(3), look.air({ atmosphere: { rayleigh: 3 } }, new Float32Array(9)));
   // Ozone's Chappuis band: green loses the most, blue the least.
   const kept = ozone.map((v, i) => v / low[i]);
   assert.ok(kept[1] < 0.5 && kept[2] > kept[0] && kept[0] > kept[1], `ozone ${ozone} against ${low}`);
@@ -183,10 +177,7 @@ test('the sun disc softness is in the look block and the sun profile reads it; t
   h.engine.use(sky);
   h.frame();
   const main = h.codes.find((c) => c.includes('fn lookSky('));
-  assert.ok(
-    main.includes('max(footprint,2.0*SUN_RADIUS*frame.lookSun.w*frame.lookShape.w)'),
-    'the sun edge widens with the softness',
-  );
+  assert.ok(main.includes('max(footprint,2.0*SUN_RADIUS*frame.lookSun.w*frame.lookShape.w)'), 'the sun edge widens with the softness');
   sky.dispose();
   h.cleanup();
   const { VolumetricClouds, writeLayer } = await import('../dist/volumetric-clouds.js');
@@ -207,10 +198,7 @@ test('the haze layer light rides the look block and the day sky adds it', () => 
   const air = look.air({}, new Float32Array(9)),
     block = new Float32Array(LOOK_FLOATS);
   look.write(block, { atmosphere: { scatteredLight: [0.1, 0.2, 0.3], sunIntensity: 2 } }, air, 5);
-  assert.deepEqual(
-    [...block.subarray(72, 75)],
-    [0.1, 0.2, 0.3].map((v) => Math.fround((v * 2 * 5) / Math.PI)),
-  );
+  assert.deepEqual([...block.subarray(72, 75)], [0.1, 0.2, 0.3].map((v) => Math.fround((v * 2 * 5) / Math.PI)));
   look.write(block, {}, air, 5);
   assert.deepEqual([...block.subarray(72, 76)], [0, 0, 0, 0], 'no layer: no light');
   assert.throws(() => look.validate({ atmosphere: { scatteredLight: [5, 0, 0] } }), /scatteredLight/);
@@ -221,16 +209,10 @@ test('the haze layer light rides the look block and the day sky adds it', () => 
   const u = uniform(h);
   assert.ok(u, `the sky's uniform is 256 bytes and the ${LOOK_FLOATS} floats of the block`);
   const main = h.codes.find((c) => c.includes('fn lookSky('));
-  assert.ok(
-    main.includes('physicalDaySky(direction)*frame.air2.rgb+frame.air3.rgb'),
-    'the day sky adds the layer light',
-  );
+  assert.ok(main.includes('physicalDaySky(direction)*frame.air2.rgb+frame.air3.rgb'), 'the day sky adds the layer light');
   assert.ok(main.includes('lookStops:array<vec4f,8>,air3:vec4f}'), 'the Frame struct ends with the layer light');
   const written = new Float32Array(u.data, 256 + 72 * 4, 3);
-  assert.ok(
-    written[0] > 0 && written[0] === written[2],
-    `the frame writes the layer light from the zenith sun: ${[...written]}`,
-  );
+  assert.ok(written[0] > 0 && written[0] === written[2], `the frame writes the layer light from the zenith sun: ${[...written]}`);
   sky.dispose();
   h.cleanup();
 });

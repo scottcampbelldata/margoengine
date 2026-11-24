@@ -31,8 +31,7 @@ class Huffman {
     let last = this.lengths.length;
     while (last && this.lengths[last - 1] === 0) last--;
     this.lengths = this.lengths.slice(0, last);
-    if (this.lengths.length >= 16384)
-      throw new RangeError('BasisLZ Huffman alphabet exceeds 16383 symbols; reduce quality or split the image');
+    if (this.lengths.length >= 16384) throw new RangeError('BasisLZ Huffman alphabet exceeds 16383 symbols; reduce quality or split the image');
     this.codes = canonicalCodes(this.lengths);
   }
   symbol(bits: Bits, symbol: number): void {
@@ -160,21 +159,15 @@ export function packKTX2(
 // Evaluate the complete context-coded payload, including books and model headers.
 // Index relabelling changes no endpoint, selector or decoded pixel.
 export function encodeBasisLZ(
-  fitted: Uint8Array[],
-  dimensions: [number, number][],
-  alpha: boolean,
+  fitted: Uint8Array[], dimensions: [number, number][], alpha: boolean,
 ): { levels: EncodedLevel[]; global: Uint8Array } {
   let best = encodeBasisLZOrder(fitted, dimensions, alpha, 0);
-  const size = (candidate: typeof best): number =>
-    candidate.global.length + candidate.levels.reduce((n, level) => n + level.data.length, 0);
+  const size = (candidate: typeof best): number => candidate.global.length +
+    candidate.levels.reduce((n, level) => n + level.data.length, 0);
   let bytes = size(best);
   for (let order = 1; order <= 5; order++) {
-    const candidate = encodeBasisLZOrder(fitted, dimensions, alpha, order),
-      next = size(candidate);
-    if (next < bytes) {
-      best = candidate;
-      bytes = next;
-    }
+    const candidate = encodeBasisLZOrder(fitted, dimensions, alpha, order), next = size(candidate);
+    if (next < bytes) { best = candidate; bytes = next; }
   }
   return best;
 }
@@ -224,21 +217,13 @@ function encodeBasisLZOrder(
         return value;
       },
       key = (e: number): number => {
-        const r = e & 255,
-          g = (e >>> 8) & 255,
-          b = (e >>> 16) & 255,
-          table = e >>> 24;
+        const r = e & 255, g = (e >>> 8) & 255, b = (e >>> 16) & 255, table = e >>> 24;
         switch (endpointOrder) {
-          case 1:
-            return table * 32768 + morton(e);
-          case 2:
-            return morton(e) * 8 + table;
-          case 3:
-            return (r * 1024 + g * 32 + b) * 8 + table;
-          case 4:
-            return (g * 1024 + r * 32 + b) * 8 + table;
-          default:
-            return e;
+          case 1: return table * 32768 + morton(e);
+          case 2: return morton(e) * 8 + table;
+          case 3: return (r * 1024 + g * 32 + b) * 8 + table;
+          case 4: return (g * 1024 + r * 32 + b) * 8 + table;
+          default: return e;
         }
       };
     endpoints.sort((a, b) => key(a) - key(b));

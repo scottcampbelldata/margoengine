@@ -40,8 +40,7 @@ export interface AMFModel extends LoadedGeometry {
 
 type Color = [number, number, number, number];
 const kids = (element: XMLElement, name: string): XMLElement[] => element.children.filter((c) => c.name === name);
-const kid = (element: XMLElement, name: string): XMLElement | undefined =>
-  element.children.find((c) => c.name === name);
+const kid = (element: XMLElement, name: string): XMLElement | undefined => element.children.find((c) => c.name === name);
 
 function number(element: XMLElement | undefined, fallback: number | undefined, what: string): number {
   if (!element) {
@@ -238,9 +237,7 @@ export async function parseAMF(input: BinaryInput, options: AMFOptions = {}): Pr
       }
       if (indices.length === start) continue;
       const group: LoadedGroup = { start, count: indices.length - start, objectId: object.attributes.id },
-        name = kids(object, 'metadata')
-          .find((entry) => entry.attributes.type === 'name')
-          ?.text.trim();
+        name = kids(object, 'metadata').find((entry) => entry.attributes.type === 'name')?.text.trim();
       if (name) group.name = name;
       if (color) group.color = [...color];
       groups.push(group);

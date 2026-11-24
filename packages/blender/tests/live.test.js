@@ -44,13 +44,7 @@ function harness() {
     log.push(`attach ${version}`);
     return { version, dispose: () => log.push(`dispose ${version}`) };
   };
-  return {
-    log,
-    fetched,
-    ...s,
-    fetch,
-    parse,
-    hold: () => (release = () => {}),
+  return { log, fetched, ...s, fetch, parse, hold: () => (release = () => {}),
     go: () => {
       const resume = release;
       release = undefined;
@@ -116,16 +110,11 @@ test('a stream that cannot be opened rejects with a coded error', async () => {
   const live = margoLive({}, 'http://127.0.0.1:8765/', { EventSource: h.Source, fetch: h.fetch, parse: h.parse });
   const first = live.next();
   h.fail();
-  await assert.rejects(
-    first,
-    (e) => e.name === 'MargoError' && e.code === 'failed' && /start the live link/.test(e.message),
-  );
+  await assert.rejects(first, (e) => e.name === 'MargoError' && e.code === 'failed' && /start the live link/.test(e.message));
   await assert.rejects(margoLive({}, 'file:///scene', { EventSource: h.Source }).next(), TypeError);
 });
 
-test('a live link started again counts from 1, and its first version is still loaded (KB-P3a)', {
-  timeout: 5000,
-}, async () => {
+test('a live link started again counts from 1, and its first version is still loaded (KB-P3a)', { timeout: 5000 }, async () => {
   const h = harness();
   const live = margoLive({}, 'http://127.0.0.1:8765/', { EventSource: h.Source, fetch: h.fetch, parse: h.parse });
   const first = live.next();

@@ -168,13 +168,9 @@ const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 test('the wheel binding sums deltaY in pixels whatever the event deltaMode', async (t) => {
   const dom = new JSDOM('<!doctype html><body></body>');
   t.after(() => dom.window.close());
-  const input = new Input(
-    { zoom: [{ type: 'pointer', axis: 'wheel', scale: 0.001 }] },
-    { target: dom.window, gamepads: () => [] },
-  );
+  const input = new Input({ zoom: [{ type: 'pointer', axis: 'wheel', scale: 0.001 }] }, { target: dom.window, gamepads: () => [] });
   t.after(() => input.dispose());
-  const wheel = (deltaY, deltaMode) =>
-    dom.window.dispatchEvent(new dom.window.WheelEvent('wheel', { deltaY, deltaMode }));
+  const wheel = (deltaY, deltaMode) => dom.window.dispatchEvent(new dom.window.WheelEvent('wheel', { deltaY, deltaMode }));
   wheel(100, 0);
   input.update();
   near(input.state('zoom').value, 0.1);

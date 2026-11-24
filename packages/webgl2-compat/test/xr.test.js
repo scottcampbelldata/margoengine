@@ -86,10 +86,7 @@ test('a view outside the layer and a colour format it cannot take are refused', 
 
 test('a frame still waiting for the compute runtime is not shown', () => {
   const { binding: b } = binding({ queue: { waiting: Promise.resolve() } });
-  const layer = new CompatXRProjectionLayer({
-    framebuffer: null,
-    getViewport: () => ({ x: 0, y: 0, width: 4, height: 4 }),
-  });
+  const layer = new CompatXRProjectionLayer({ framebuffer: null, getViewport: () => ({ x: 0, y: 0, width: 4, height: 4 }) });
   b.getViewSubImage(layer, {});
   b.present(layer); // reaching for GL here would throw: the stand-in device has none
   assert.equal(layer.drawn.size, 0);
@@ -114,14 +111,7 @@ test('the session gets an XRWebGLLayer on the device context, without multisampl
   assert.equal(made[0].gl, gl);
   assert.deepEqual(
     { ...made[0].init },
-    {
-      antialias: false,
-      depth: false,
-      stencil: false,
-      alpha: true,
-      ignoreDepthValues: true,
-      framebufferScaleFactor: 0.75,
-    },
+    { antialias: false, depth: false, stencil: false, alpha: true, ignoreDepthValues: true, framebufferScaleFactor: 0.75 },
   );
 });
 
@@ -156,29 +146,5 @@ test('installXR refuses a browser without WebXR and a page where the layer is no
   delete globalThis.XRWebGLLayer;
   assert.throws(() => installXR(), { code: 'unsupported' });
 });
-test('per-session projection scale overrides install defaults without changing later defaults', (t) => {
-  const made = [];
-  stage(t, {
-    layer: class {
-      constructor(session, gl, init) {
-        made.push(init);
-      }
-    },
-  });
-  const handle = installXR({ framebufferScale: 0.75 });
-  t.after(() => handle.dispose());
-  const device = Object.assign(Object.create(CompatDevice.prototype), { gl: {} }),
-    b = new globalThis.XRGPUBinding({}, device);
-  b.createProjectionLayer({ colorFormat: 'rgba8unorm', scaleFactor: 0.5 });
-  b.createProjectionLayer({ colorFormat: 'rgba8unorm' });
-  assert.equal(made[0].framebufferScaleFactor, 0.5);
-  assert.equal(made[1].framebufferScaleFactor, 0.75);
-  for (const scaleFactor of [0, -1, NaN, Infinity, 1e308, 1e-100])
-    assert.throws(() => b.createProjectionLayer({ colorFormat: 'rgba8unorm', scaleFactor }), RangeError);
-});
-test('invalid install scales fail before changing the global XR binding', (t) => {
-  stage(t);
-  for (const framebufferScale of [0, -1, NaN, Infinity, 1e308, 1e-100])
-    assert.throws(() => installXR({ framebufferScale }), RangeError);
-  assert.equal(globalThis.XRGPUBinding, undefined);
-});
+test('per-session projection scale overrides install defaults without changing later defaults',t=>{const made=[];stage(t,{layer:class{constructor(session,gl,init){made.push(init);}}});const handle=installXR({framebufferScale:.75});t.after(()=>handle.dispose());const device=Object.assign(Object.create(CompatDevice.prototype),{gl:{}}),b=new globalThis.XRGPUBinding({},device);b.createProjectionLayer({colorFormat:'rgba8unorm',scaleFactor:.5});b.createProjectionLayer({colorFormat:'rgba8unorm'});assert.equal(made[0].framebufferScaleFactor,.5);assert.equal(made[1].framebufferScaleFactor,.75);for(const scaleFactor of [0,-1,NaN,Infinity,1e308,1e-100])assert.throws(()=>b.createProjectionLayer({colorFormat:'rgba8unorm',scaleFactor}),RangeError);});
+test('invalid install scales fail before changing the global XR binding',t=>{stage(t);for(const framebufferScale of [0,-1,NaN,Infinity,1e308,1e-100])assert.throws(()=>installXR({framebufferScale}),RangeError);assert.equal(globalThis.XRGPUBinding,undefined);});

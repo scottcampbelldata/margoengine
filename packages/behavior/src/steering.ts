@@ -280,7 +280,7 @@ export function avoidObstacles(
   // overlap of the obstacle's radius past the path's axis (r - off, here as a fraction of r) and with nearness along
   // the detection box (1 + (length - along) / length). Speeds stand in for his unscaled world units (KB6027b).
   const urgency = 1 + (reach - Math.max(0, nearest)) / reach,
-    magnitude = (Math.max(max, 1e-6) * urgency * clearance) / combined;
+    magnitude = Math.max(max, 1e-6) * urgency * clearance / combined;
   return set(out, lx * magnitude, ly * magnitude, lz * magnitude);
 }
 
@@ -386,14 +386,7 @@ function pointAt(
  * reordering of identical boids gives the same set of boids.
  */
 function apart(
-  avx: number,
-  avy: number,
-  avz: number,
-  bvx: number,
-  bvy: number,
-  bvz: number,
-  first: boolean,
-  out: number[],
+  avx: number, avy: number, avz: number, bvx: number, bvy: number, bvz: number, first: boolean, out: number[],
 ): void {
   const dx = avx - bvx,
     dy = avy - bvy,

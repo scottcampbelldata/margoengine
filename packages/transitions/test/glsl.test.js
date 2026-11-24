@@ -25,11 +25,7 @@ test('equality rejects types excluded by GLSL ES 1.00', () => {
     'struct S{float a[2];};vec4 transition(vec2 uv){S a;S b;if(a!=b){return vec4(1.0);}return vec4(0.0);}',
     'vec4 transition(vec2 uv){if(from==to){return vec4(1.0);}return vec4(0.0);}',
     'vec4 transition(vec2 uv){if(uv==1.0){return vec4(1.0);}return vec4(0.0);}',
-  ])
-    assert.throws(
-      () => translateGLSLTransition(source),
-      (e) => e.code === 'failed',
-    );
+  ]) assert.throws(() => translateGLSLTransition(source), (e) => e.code === 'failed');
 });
 
 test('invalid GLSL and parameters reject without GPU access; translation has no host execution', async () => {
@@ -76,16 +72,10 @@ test('constant-expression array lengths fold and unnamed helper parameters are a
   check('const int N=2;uniform float weights[N*2-(1-1)];' + sum, { weights: [0.1, 0.2, 0.3, 0.4] });
   check('const int N=3;const int M=N+1;uniform float weights[M];' + sum, { weights: [0.1, 0.2, 0.3, 0.4] });
   // The folded length is checked against the supplied values like a literal one.
-  assert.throws(
-    () => check('uniform float weights[2+2];' + sum, { weights: [0.1, 0.2] }),
-    (e) => e.code === 'failed',
-  );
+  assert.throws(() => check('uniform float weights[2+2];' + sum, { weights: [0.1, 0.2] }), (e) => e.code === 'failed');
   for (const length of ['1/0', 'progress', '2.5', 'N+0', 'K+1'])
     assert.throws(
-      () =>
-        translateGLSLTransition(`float N=2.0;uniform float weights[${length}];` + sum, {
-          uniforms: { weights: [1, 2] },
-        }),
+      () => translateGLSLTransition(`float N=2.0;uniform float weights[${length}];` + sum, { uniforms: { weights: [1, 2] } }),
       (e) => e.code === 'failed',
     );
   check(
@@ -101,10 +91,7 @@ test('the GLSL oracle reads texels by the product rule, not through a sampler', 
   const oracle = readFileSync(new URL('./glsl-browser.js', import.meta.url), 'utf8');
   const product = readFileSync(new URL('../src/builtin.ts', import.meta.url), 'utf8');
   assert.match(product, /return textureLoad\(t,clamp\(vec2i\(uv\*vec2f\(size\)\),vec2i\(0\),size-1\),0\);/);
-  assert.match(
-    oracle,
-    /ivec2 c=clamp\(ivec2\(vec2\(uv\.x,1\.0-uv\.y\)\*vec2\(s\)\),ivec2\(0\),s-1\);return texelFetch\(t,ivec2\(c\.x,s\.y-1-c\.y\),0\);/,
-  );
+  assert.match(oracle, /ivec2 c=clamp\(ivec2\(vec2\(uv\.x,1\.0-uv\.y\)\*vec2\(s\)\),ivec2\(0\),s-1\);return texelFetch\(t,ivec2\(c\.x,s\.y-1-c\.y\),0\);/);
   assert.match(oracle, /#define texture2D margoFetch/);
   assert.doesNotMatch(oracle, /return texture\((from|to),uv\)/);
   assert.ok(glslFixtures.some((f) => f.name === 'texel edge'));

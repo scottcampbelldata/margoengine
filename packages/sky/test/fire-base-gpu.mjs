@@ -26,18 +26,9 @@ try {
   const r = await ctx.page.evaluate(() => window.check.run());
   // The last frame, to look at when the rise fails.
   mkdirSync('test-results', { recursive: true });
-  writeFileSync(
-    `test-results/fire-base-${process.env.MARGO_COMPAT === '1' ? 'compat' : 'native'}.png`,
-    Buffer.from(r.image, 'base64'),
-  );
+  writeFileSync(`test-results/fire-base-${process.env.MARGO_COMPAT === '1' ? 'compat' : 'native'}.png`, Buffer.from(r.image, 'base64'));
   const mean = r.lines.reduce((s, l) => s + l.rise, 0) / r.lines.length;
-  console.log(
-    JSON.stringify({
-      mean,
-      lines: r.lines.map((l) => [l.rise, +l.gradient.toFixed(1), +l.peak.toFixed(1)]),
-      shape: r.shape,
-    }),
-  );
+  console.log(JSON.stringify({ mean, lines: r.lines.map((l) => [l.rise, +l.gradient.toFixed(1), +l.peak.toFixed(1)]), shape: r.shape }));
   assert.equal(r.error, null);
   assert.deepEqual(r.errors, []);
   assert.deepEqual(errors, []);
@@ -53,14 +44,8 @@ try {
   // gave 1.00, no white and 18; ten times the kit's (585) gives 0.85 orange and white 1 px from the edge, and fails.
   const { shape } = r;
   assert.ok(shape.edges >= 1000, `the flames have a silhouette above the logs (${shape.edges} px)`);
-  assert.ok(
-    shape.orange >= 0.9,
-    `the flames' edges stay orange (${(shape.orange * 100).toFixed(1)}% of ${shape.edges} px)`,
-  );
-  assert.ok(
-    shape.whiteFromEdge === null || shape.whiteFromEdge >= 3,
-    `white only in the cores (${shape.whiteFromEdge} px from the edge)`,
-  );
+  assert.ok(shape.orange >= 0.9, `the flames' edges stay orange (${(shape.orange * 100).toFixed(1)}% of ${shape.edges} px)`);
+  assert.ok(shape.whiteFromEdge === null || shape.whiteFromEdge >= 3, `white only in the cores (${shape.whiteFromEdge} px from the edge)`);
   assert.ok(shape.runs >= 4, `separate tongues (${shape.runs} on the fullest row)`);
 } finally {
   await ctx.close();

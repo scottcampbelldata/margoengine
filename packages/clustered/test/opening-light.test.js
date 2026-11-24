@@ -34,8 +34,7 @@ test('the window radiance carries out the light the room reflects, bounce by bou
       strike *= rho * (1 - f);
     }
     const throughThis = (escaped * (w * h)) / (w * h + other);
-    for (const c of light.color)
-      assert.ok(Math.abs(Math.PI * c * w * h - throughThis) < 1e-9 * throughThis, `${c} for rho ${rho}`);
+    for (const c of light.color) assert.ok(Math.abs(Math.PI * c * w * h - throughThis) < 1e-9 * throughThis, `${c} for rho ${rho}`);
     assert.deepEqual([light.width, light.height, light.intensity, light.castShadow], [w, h, 1, undefined]);
   }
 });
@@ -43,26 +42,11 @@ test('the window radiance carries out the light the room reflects, bounce by bou
 test('the room is weighed by area and channel, and a flame counts at its flicker mean', () => {
   const lantern = hurricaneLantern(),
     base = { position: [0, 0, 0], direction: [1, 0, 0], width: 1, height: 1 },
-    mixed = openingLight({
-      ...base,
-      room: [
-        { area: 30, reflectance: [0.6, 0.3, 0.1] },
-        { area: 10, reflectance: 0.2 },
-      ],
-      lights: [{ color: [1, 1, 1], intensity: 2 }],
-    }),
-    even = openingLight({
-      ...base,
-      room: [{ area: 40, reflectance: [0.5, 0.275, 0.125] }],
-      lights: [{ color: [1, 1, 1], intensity: 2 }],
-    });
+    mixed = openingLight({ ...base, room: [{ area: 30, reflectance: [0.6, 0.3, 0.1] }, { area: 10, reflectance: 0.2 }], lights: [{ color: [1, 1, 1], intensity: 2 }] }),
+    even = openingLight({ ...base, room: [{ area: 40, reflectance: [0.5, 0.275, 0.125] }], lights: [{ color: [1, 1, 1], intensity: 2 }] });
   for (let k = 0; k < 3; k++) assert.ok(Math.abs(mixed.color[k] - even.color[k]) < 1e-12);
   const flame = openingLight({ ...base, room: room(0.3, 50), lights: [lantern] }),
-    steady = openingLight({
-      ...base,
-      room: room(0.3, 50),
-      lights: [{ color: lantern.color, intensity: lantern.intensity * 0.9 }],
-    });
+    steady = openingLight({ ...base, room: room(0.3, 50), lights: [{ color: lantern.color, intensity: lantern.intensity * 0.9 }] });
   for (let k = 0; k < 3; k++) assert.ok(Math.abs(flame.color[k] - steady.color[k]) < 1e-12, 'candle mean 0.9');
   assert.equal(flame.color[2], 0, 'a 1,900 K flame has no blue to reflect');
 });
@@ -103,7 +87,7 @@ const paneIrradiance = (light, centre, w, h, steps = 400) => {
   return sum / steps ** 2;
 };
 const frostAt = (p, thickness = 0.004) => [p[0], p[1], p[2] - thickness];
-test("a frosted pane sends out tau_d E / pi: the lamps' direct light on it and the room's, diffused", () => {
+test('a frosted pane sends out tau_d E / pi: the lamps\' direct light on it and the room\'s, diffused', () => {
   const lamps = [
       { position: [1.2, 1.875, 1.95], intensity: 6.5, color: [1, 0.5, 0.1] },
       { position: [0.95, 0.5, -2.15], intensity: 2, color: [1, 0.6, 0.2] },
@@ -113,10 +97,7 @@ test("a frosted pane sends out tau_d E / pi: the lamps' direct light on it and t
       direction: [0, 0, 1],
       width: 1.2,
       height: 1.1,
-      room: [
-        { area: 50, reflectance: [0.26, 0.2, 0.15] },
-        { area: 30, reflectance: 0.4 },
-      ],
+      room: [{ area: 50, reflectance: [0.26, 0.2, 0.15] }, { area: 30, reflectance: 0.4 }],
       lights: lamps,
     },
     clear = openingLight(opening),
@@ -126,10 +107,7 @@ test("a frosted pane sends out tau_d E / pi: the lamps' direct light on it and t
   for (let k = 0; k < 3; k++) {
     const direct = E.reduce((a, e, i) => a + e * lamps[i].color[k], 0),
       expected = (FROSTED_GLAZING.transmittance * (direct + Math.PI * clear.color[k])) / Math.PI;
-    assert.ok(
-      Math.abs(frosted.color[k] - expected) < 2e-5 * expected,
-      `channel ${k}: ${frosted.color[k]} against ${expected}`,
-    );
+    assert.ok(Math.abs(frosted.color[k] - expected) < 2e-5 * expected, `channel ${k}: ${frosted.color[k]} against ${expected}`);
   }
   // The direct light dominates: the lantern 0.55 m behind the pane puts about 10 lux on it, ten times the room's pi L.
   assert.ok(frosted.color[0] > 5 * clear.color[0], `${frosted.color[0]} against the room's ${clear.color[0]}`);
@@ -142,10 +120,7 @@ test("a frosted pane sends out tau_d E / pi: the lamps' direct light on it and t
     moreClear = openingLight(more).color,
     tau = FROSTED_GLAZING.transmittance;
   for (let k = 0; k < 3; k++)
-    assert.ok(
-      Math.abs(moreFrosted[k] - tau * moreClear[k] - (frosted.color[k] - tau * clear.color[k])) <
-        1e-12 * frosted.color[0],
-    );
+    assert.ok(Math.abs(moreFrosted[k] - tau * moreClear[k] - (frosted.color[k] - tau * clear.color[k])) < 1e-12 * frosted.color[0]);
 });
 
 // KB-CABIN-FROST2: frost grown part way in carries the lamp's light where the frost is, not the pane's mean; until
@@ -161,9 +136,7 @@ test('frost grown part way in from the edges sends out the light that falls on t
       mw = 1.2 - 2 * t,
       mh = 0.8 - 2 * t,
       middle = mw > 0 && mh > 0 ? mw * mh : 0,
-      ring =
-        A * paneIrradiance(lamp, frostAt(base.position), 1.2, 0.8, 600) -
-        (middle ? middle * paneIrradiance(lamp, frostAt(base.position), mw, mh, 600) : 0),
+      ring = A * paneIrradiance(lamp, frostAt(base.position), 1.2, 0.8, 600) - (middle ? middle * paneIrradiance(lamp, frostAt(base.position), mw, mh, 600) : 0),
       expected = (tau * (ring / Math.PI + L * (A - middle)) + L * middle) / A,
       got = openingLight({ ...base, glazing: 'frosted', frost }).color[0];
     assert.ok(Math.abs(got - expected) < 2e-5 * expected, `frost ${frost}: ${got} against ${expected}`);
@@ -184,14 +157,8 @@ const scene = {
   barWidth: 0.045,
   barDepth: 0.05,
   reveal: 0.118,
-  room: [
-    { area: 70, reflectance: [0.26, 0.21, 0.15] },
-    { area: 40, reflectance: 0.3 },
-  ],
-  lights: [
-    { position: [1.2, 1.875, 1.95], ...hurricaneLantern() },
-    { position: [0.4, 0.6, -1.9], intensity: 30, color: [1, 0.45, 0.12] },
-  ],
+  room: [{ area: 70, reflectance: [0.26, 0.21, 0.15] }, { area: 40, reflectance: 0.3 }],
+  lights: [{ position: [1.2, 1.875, 1.95], ...hurricaneLantern() }, { position: [0.4, 0.6, -1.9], intensity: 30, color: [1, 0.45, 0.12] }],
 };
 function bruteRadiance(o, x, y) {
   const w = o.width / 2,
@@ -206,17 +173,11 @@ function bruteRadiance(o, x, y) {
     boxes = [];
   for (let i = 1; i < nx; i++) {
     const a = o.position[0] - w + i * liteW + (i - 1) * bw;
-    boxes.push([
-      [a, o.position[1] - h, zc - bd / 2],
-      [a + bw, o.position[1] + h, zc + bd / 2],
-    ]);
+    boxes.push([[a, o.position[1] - h, zc - bd / 2], [a + bw, o.position[1] + h, zc + bd / 2]]);
   }
   for (let j = 1; j < ny; j++) {
     const a = o.position[1] - h + j * liteH + (j - 1) * bw;
-    boxes.push([
-      [o.position[0] - w, a, zc - bd / 2],
-      [o.position[0] + w, a + bw, zc + bd / 2],
-    ]);
+    boxes.push([[o.position[0] - w, a, zc - bd / 2], [o.position[0] + w, a + bw, zc + bd / 2]]);
   }
   const p = [o.position[0] + x, o.position[1] + y, o.position[2] - t];
   if (boxes.some(([lo, hi]) => p[0] > lo[0] && p[0] < hi[0] && p[1] > lo[1] && p[1] < hi[1])) return null;
@@ -269,7 +230,7 @@ test('the frosted pane is brightest nearest the lamp: its peak radiance is tau_d
   const mean = openingLight(scene).color[0];
   assert.ok(peak > 2 * mean, `peak ${peak} against the mean ${mean}`);
 });
-test("the pane falls off from the centre to its corner as the lamp's cosine over the squared distance says", () => {
+test('the pane falls off from the centre to its corner as the lamp\'s cosine over the squared distance says', () => {
   const look = glazingSurface({ ...scene, lites: [1, 1] }),
     { data, width, height } = look.emissiveMap,
     at = (i, j) => [0, 1, 2].map((k) => decode(data[(j * width + i) * 4 + k]) * look.outside.emissiveIntensity),
@@ -285,15 +246,11 @@ test("the pane falls off from the centre to its corner as the lamp's cosine over
   // Each texel holds its radiance to half an 8-bit sRGB code, a share 2.4 x (0.5 / 255) / (code / 255 + 0.055) of it
   // (the sRGB curve's slope); the ratio is good to the sum of the two texels' shares.
   const share = (i, j) => (2.4 * (0.5 / 255)) / (data[(j * width + i) * 4] / 255 + 0.055),
-    tolerance =
-      Math.max(...centre(width).flatMap((i) => centre(height).map((j) => share(i, j)))) + share(0, height - 1);
-  assert.ok(
-    Math.abs(measured / predicted - 1) < tolerance,
-    `centre over bottom-left corner ${measured} against ${predicted} (${tolerance})`,
-  );
+    tolerance = Math.max(...centre(width).flatMap((i) => centre(height).map((j) => share(i, j)))) + share(0, height - 1);
+  assert.ok(Math.abs(measured / predicted - 1) < tolerance, `centre over bottom-left corner ${measured} against ${predicted} (${tolerance})`);
   assert.ok(predicted > 2, `the centre is ${predicted} times the corner`);
 });
-test("the bars shade the frost behind them and send no light out, and the opening carries the pane's flux", () => {
+test('the bars shade the frost behind them and send no light out, and the opening carries the pane\'s flux', () => {
   const light = openingLight(scene),
     steps = [1200, 1100],
     sum = [0, 0, 0];
@@ -304,29 +261,23 @@ test("the bars shade the frost behind them and send no light out, and the openin
     }
   // The area light's flux is pi x its radiance x the opening's area: the same as the pane's radiance integrated over its
   // glass. The grid's 1 mm cells cut the bars' and shadows' edges; at most a cell's width of each edge is wrong.
-  for (let k = 0; k < 3; k++)
-    assert.ok(Math.abs(light.color[k] - sum[k]) < 2e-3 * sum[k], `channel ${k}: ${light.color[k]} against ${sum[k]}`);
+  for (let k = 0; k < 3; k++) assert.ok(Math.abs(light.color[k] - sum[k]) < 2e-3 * sum[k], `channel ${k}: ${light.color[k]} against ${sum[k]}`);
   // The map: the frost just below the cross bar is in the bar's shadow (the lantern is above it, so the bar's room-side
   // 23 mm throws a shadow 12 mm deep below it); a little lower it is lit.
   const look = glazingSurface({ ...scene, mapSize: 1200 }),
     { data, width } = look.emissiveMap,
-    read = (x, y) =>
-      decode(data[(Math.floor((0.55 - y) * 1000) * width + Math.floor((x + 0.6) * 1000)) * 4]) *
-      look.outside.emissiveIntensity,
+    read = (x, y) => decode(data[(Math.floor((0.55 - y) * 1000) * width + Math.floor((x + 0.6) * 1000)) * 4]) * look.outside.emissiveIntensity,
     shaded = read(0.3, -0.0225 - 0.006),
     lit = read(0.3, -0.0225 - 0.03),
     room = FROSTED_GLAZING.transmittance * openingLight({ ...scene, glazing: 'clear', lites: [1, 1] }).color[0];
   assert.ok(Math.abs(shaded - bruteRadiance(scene, 0.3, -0.0285)[0]) < 0.01 * lit, `shaded ${shaded}`);
-  assert.ok(
-    shaded < 1.6 * room + 0.05 * lit && lit > 3 * shaded,
-    `the bar's shadow ${shaded} against the frost below it ${lit}`,
-  );
+  assert.ok(shaded < 1.6 * room + 0.05 * lit && lit > 3 * shaded, `the bar's shadow ${shaded} against the frost below it ${lit}`);
   // Without bars or reveal the frost is lit everywhere the lamp sees it.
   const bare = { ...scene, lites: [1, 1], reveal: 0 };
   assert.ok(openingLight(bare).color[0] > light.color[0]);
 });
 
-test("glazingSurface gives the frosted pane its radiance outside and the frost's reflectance on both faces", () => {
+test('glazingSurface gives the frosted pane its radiance outside and the frost\'s reflectance on both faces', () => {
   const opening = {
       position: [0, 1.5, 0],
       direction: [0, 0, 1],
@@ -344,18 +295,12 @@ test("glazingSurface gives the frosted pane its radiance outside and the frost's
     let sum = 0;
     for (let p = 0; p < width * height; p++) sum += decode(data[p * 4 + k]);
     const mean = (sum / (width * height)) * look.outside.emissiveIntensity;
-    assert.ok(
-      Math.abs(mean - light.color[k]) < 0.01 * light.color[0] + 1e-9,
-      `channel ${k}: ${mean} against ${light.color[k]}`,
-    );
+    assert.ok(Math.abs(mean - light.color[k]) < 0.01 * light.color[0] + 1e-9, `channel ${k}: ${mean} against ${light.color[k]}`);
   }
   assert.deepEqual([width, height], [256, 235]);
   assert.equal(data.length, width * height * 4);
   assert.deepEqual(look.inside.color, look.outside.color);
-  assert.ok(
-    Math.abs(FROSTED_GLAZING.transmittance - 0.9 / 1.4125) < 1e-12 &&
-      Math.abs(FROSTED_GLAZING.reflectance - (1 - 1 / 1.4125)) < 1e-12,
-  );
+  assert.ok(Math.abs(FROSTED_GLAZING.transmittance - 0.9 / 1.4125) < 1e-12 && Math.abs(FROSTED_GLAZING.reflectance - (1 - 1 / 1.4125)) < 1e-12);
   assert.throws(() => glazingSurface({ ...opening, glazing: 'clear' }), RangeError);
   for (const mapSize of [1, 2.5, 4096]) assert.throws(() => glazingSurface({ ...opening, mapSize }), RangeError);
   for (const bad of [
@@ -380,14 +325,7 @@ test("glazingSurface gives the frosted pane its radiance outside and the frost's
 // KB-BOUNCE-REVEAL1: an opening set back in a thick wall hands its reveal and sill to the light, which AreaLights and
 // LightBounce clip the rectangle to (packages/clustered/test/area.test.js, test/bounce.test.js).
 test('openingLight passes the wall face it is set back from and its sill to the light', () => {
-  const opening = {
-      position: [0, 1.5, 0],
-      direction: [0, 0, 1],
-      width: 1.2,
-      height: 1.1,
-      room: room(0.3, 60),
-      lights: [{ intensity: 6.5 }],
-    },
+  const opening = { position: [0, 1.5, 0], direction: [0, 0, 1], width: 1.2, height: 1.1, room: room(0.3, 60), lights: [{ intensity: 6.5 }] },
     plain = openingLight(opening),
     set = openingLight({ ...opening, recess: 0.216, sill: 0.09 });
   assert.deepEqual([plain.recess, plain.sill], [undefined, undefined]);

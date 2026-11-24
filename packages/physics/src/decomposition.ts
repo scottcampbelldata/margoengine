@@ -53,8 +53,7 @@ const DENSITY = 3000;
 
 function count(value: number | undefined, fallback: number, name: string, low: number): number {
   const n = value ?? fallback;
-  if (!Number.isInteger(n) || n < low)
-    throw new RangeError(`${name} must be a whole number of at least ${low} (got ${value}).`);
+  if (!Number.isInteger(n) || n < low) throw new RangeError(`${name} must be a whole number of at least ${low} (got ${value}).`);
   return n;
 }
 
@@ -66,14 +65,11 @@ function solidOf(source: ColliderGeometry): { solid: Solid; center: number[]; si
   const positions = geometryPositions(source),
     raw = source.indices;
   if (!raw) throw new TypeError('A convex decomposition needs indices; pass indices or an indexed geometry.');
-  if (!raw.length || raw.length % 3)
-    throw new RangeError('A convex decomposition needs whole triangles: three indices each.');
+  if (!raw.length || raw.length % 3) throw new RangeError('A convex decomposition needs whole triangles: three indices each.');
   const vertexCount = positions.length / 3;
   for (let i = 0; i < raw.length; i++)
     if (!Number.isInteger(raw[i]) || raw[i] < 0 || raw[i] >= vertexCount)
-      throw new RangeError(
-        `Index ${raw[i]} at ${i} is outside the ${vertexCount} vertices; pass indices of existing vertices.`,
-      );
+      throw new RangeError(`Index ${raw[i]} at ${i} is outside the ${vertexCount} vertices; pass indices of existing vertices.`);
   for (let i = 0; i < positions.length; i++)
     if (!Number.isFinite(positions[i])) throw new RangeError('Convex decomposition vertices must be finite numbers.');
   const min = [Infinity, Infinity, Infinity],
@@ -99,19 +95,16 @@ function solidOf(source: ColliderGeometry): { solid: Solid; center: number[]; si
   let solid = new Solid(scaled, triangles, new Int32Array(triangles.length / 3).fill(-1));
   // A mesh wound inside out (every triangle facing in) is turned the right way.
   if (solid.volume < 0) {
-    for (let i = 0; i < triangles.length; i += 3)
-      [triangles[i + 1], triangles[i + 2]] = [triangles[i + 2], triangles[i + 1]];
+    for (let i = 0; i < triangles.length; i += 3) [triangles[i + 1], triangles[i + 2]] = [triangles[i + 2], triangles[i + 1]];
     solid = new Solid(scaled, triangles, solid.cap);
   }
-  if (!(solid.volume > 0))
-    throw new RangeError('A convex decomposition needs a closed mesh that holds a volume; this one holds none.');
+  if (!(solid.volume > 0)) throw new RangeError('A convex decomposition needs a closed mesh that holds a volume; this one holds none.');
   return { solid, center, size };
 }
 
 function dropDegenerate(t: Uint32Array): Uint32Array {
   const kept: number[] = [];
-  for (let i = 0; i < t.length; i += 3)
-    if (t[i] !== t[i + 1] && t[i + 1] !== t[i + 2] && t[i] !== t[i + 2]) kept.push(t[i], t[i + 1], t[i + 2]);
+  for (let i = 0; i < t.length; i += 3) if (t[i] !== t[i + 1] && t[i + 1] !== t[i + 2] && t[i] !== t[i + 2]) kept.push(t[i], t[i + 1], t[i + 2]);
   return Uint32Array.from(kept);
 }
 
@@ -165,19 +158,13 @@ interface Entry {
  * @throws RangeError for a mesh that is open, flat or not a whole number of triangles, or for options out of range.
  * @throws MargoError `timeout` past `timeLimit`.
  */
-export function convexDecomposition(
-  mesh: ColliderGeometry,
-  options: ConvexDecompositionOptions = {},
-): ConvexDecomposition {
+export function convexDecomposition(mesh: ColliderGeometry, options: ConvexDecompositionOptions = {}): ConvexDecomposition {
   const threshold = options.concavity ?? 0.05;
   if (!(threshold > 0) || !Number.isFinite(threshold))
-    throw new RangeError(
-      `concavity must be a positive share of the mesh size, such as 0.05 (got ${options.concavity}).`,
-    );
+    throw new RangeError(`concavity must be a positive share of the mesh size, such as 0.05 (got ${options.concavity}).`);
   const maxParts = count(options.maxConvexHulls, 64, 'maxConvexHulls', 1),
     timeLimit = options.timeLimit ?? 60000;
-  if (!(timeLimit > 0))
-    throw new RangeError(`timeLimit must be a positive number of milliseconds (got ${options.timeLimit}).`);
+  if (!(timeLimit > 0)) throw new RangeError(`timeLimit must be a positive number of milliseconds (got ${options.timeLimit}).`);
   const start = Date.now(),
     random: Random = createRandom(options.seed ?? 0),
     settings: SearchSettings = {
@@ -247,19 +234,11 @@ export function decompositionConcavity(
     if (!hull) continue;
     let piece: Solid | null = solid;
     for (let f = 0; f < hull.planes.length && piece; f += 4) {
-      const plane: Plane = {
-          normal: [hull.planes[f], hull.planes[f + 1], hull.planes[f + 2]],
-          offset: hull.planes[f + 3],
-        },
+      const plane: Plane = { normal: [hull.planes[f], hull.planes[f + 1], hull.planes[f + 2]], offset: hull.planes[f + 3] },
         halves = cut(piece, plane, CLIP);
       // No split: the piece lies wholly inside this face's plane, or wholly outside it, by its first vertex.
       if (halves) piece = halves[0];
-      else if (
-        plane.normal[0] * piece.positions[0] +
-          plane.normal[1] * piece.positions[1] +
-          plane.normal[2] * piece.positions[2] >=
-        plane.offset
-      )
+      else if (plane.normal[0] * piece.positions[0] + plane.normal[1] * piece.positions[1] + plane.normal[2] * piece.positions[2] >= plane.offset)
         piece = null;
     }
     if (piece && piece.volume > 0) {
@@ -342,11 +321,7 @@ function joined(a: Solid, b: Solid, plane: number): Solid {
   ] as const)
     for (let f = 0; f < solid.cap.length; f++) {
       if (solid.cap[f] >= 0 && solid.cap[f] >> 1 === plane) continue;
-      triangles.push(
-        solid.triangles[f * 3] + base,
-        solid.triangles[f * 3 + 1] + base,
-        solid.triangles[f * 3 + 2] + base,
-      );
+      triangles.push(solid.triangles[f * 3] + base, solid.triangles[f * 3 + 1] + base, solid.triangles[f * 3 + 2] + base);
       cap.push(solid.cap[f]);
     }
   return new Solid(positions, Uint32Array.from(triangles), Int32Array.from(cap), a.volume + b.volume);
@@ -373,8 +348,7 @@ function merge(parts: Entry[], threshold: number, random: Random, check: () => v
           row.set(list[j], entry);
         }
         const entry = row.get(list[j]);
-        if (entry && entry.concavity < threshold && (!best || entry.concavity < best[2].concavity))
-          best = [i, j, entry];
+        if (entry && entry.concavity < threshold && (!best || entry.concavity < best[2].concavity)) best = [i, j, entry];
       }
     if (!best) return list;
     const [i, j, entry] = best;

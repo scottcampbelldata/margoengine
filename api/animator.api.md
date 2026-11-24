@@ -193,12 +193,6 @@ export interface CCDHingeLimit {
     axis: Vec3;
     min?: number;
     max?: number;
-    twist?: CCDHingeTwist;
-}
-
-export interface CCDHingeTwist {
-    axis: Vec3;
-    range: readonly [number, number];
 }
 
 export type CCDJointLimit = CCDEulerLimit | CCDHingeLimit | CCDConeLimit;
@@ -230,7 +224,6 @@ export class CCDSolver {
     constructor(offsets: readonly Vec3[], tip?: Vec3);
     setLimit(index: number, limit: CCDJointLimit | null): void;
     captureRest(): void;
-    projectRotations(): void;
     setParentMatrix(m: ArrayLike<number>): void;
     update(): void;
     solve(target: Vec3, rotation?: ArrayLike<number> | null, pole?: Vec3 | null): CCDResult;

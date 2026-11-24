@@ -244,8 +244,7 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       area: 'renderer',
       rows: ['2.2'],
       title: 'WebGL2 fallback',
-      draws:
-        '10,000 catalog boxes through the WebGL2 path (Margo: @margoengine/webgl2-compat/preview; three: WebGLRenderer).',
+      draws: '10,000 catalog boxes through the WebGL2 path (Margo: @margoengine/webgl2-compat/preview; three: WebGLRenderer).',
       params: {},
       data: () => boxes(10_000),
     },
@@ -1159,8 +1158,7 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       area: 'animation',
       rows: ['12.5'],
       title: 'Morph targets, pipeline compiled during the build',
-      draws:
-        'p-morph with PBRModel.compile() called during the build. Margo only: read build and first frame together.',
+      draws: 'p-morph with PBRModel.compile() called during the build. Margo only: read build and first frame together.',
       params: {},
       data: (p, { assets }) => ({
         url: `${assets}khronos/MorphStressTest/MorphStressTest.glb`,
@@ -1340,8 +1338,7 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       area: 'post',
       rows: ['13.17'],
       title: 'Motion blur, velocity only',
-      draws:
-        'The blur of p-motion-blur with TAA velocityOnly: motion vectors without anti-aliasing, as three draws it.',
+      draws: 'The blur of p-motion-blur with TAA velocityOnly: motion vectors without anti-aliasing, as three draws it.',
       params: {},
       data: () => yardEffect({ name: 'motionblur', samples: 16 }),
     },
@@ -1688,9 +1685,7 @@ export const ROWS = {
   '9.1': { scenes: ['p-hdr-load'] },
   '9.2': { scenes: ['p-exr-load'] },
   // helmet with Margo's default shadows (4 PCSS cascades), and with the setup closest to three's one PCFSoftShadowMap.
-  '9.3': {
-    scenes: ['p-pmrem', 'p-pmrem-refresh', 'helmet', { scene: 'helmet', params: { filter: 'pcf', cascades: 1 } }],
-  },
+  '9.3': { scenes: ['p-pmrem', 'p-pmrem-refresh', 'helmet', { scene: 'helmet', params: { filter: 'pcf', cascades: 1 } }] },
   '9.4': { scenes: ['p-fog'] },
   '9.5': { scenes: ['p-volumetric'] },
   '9.6': { scenes: ['p-sky'] },

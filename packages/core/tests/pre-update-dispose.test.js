@@ -18,8 +18,7 @@ function recorder() {
     draws: [],
     add() {},
     remove() {},
-    render: (camera, lighting, batches, graph, delta, view) =>
-      renderer.draws.push({ view, disposed: renderer.disposed }),
+    render: (camera, lighting, batches, graph, delta, view) => renderer.draws.push({ view, disposed: renderer.disposed }),
     dispose: () => (renderer.disposed = true),
   };
   return renderer;
@@ -93,10 +92,7 @@ test('an error a plugin throws after dispose() in onPreUpdate is still reported'
         throw mine;
       },
     });
-    assert.throws(
-      () => engine.render(),
-      (error) => error === mine,
-    );
+    assert.throws(() => engine.render(), (error) => error === mine);
   } finally {
     gpu.uninstall();
   }

@@ -89,9 +89,6 @@ test('a steady draw, pass and buffer write replay without allocating', () => {
               : kind === 'view'
                 ? VIEW_BOUND
                 : 1;
-    assert.ok(
-      median < most,
-      `a ${kind} allocated ${median} B, over ${most} B (Node ${process.version}, V8 ${process.versions.v8})`,
-    );
+    assert.ok(median < most, `a ${kind} allocated ${median} B, over ${most} B (Node ${process.version}, V8 ${process.versions.v8})`);
   }
 });

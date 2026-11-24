@@ -41,14 +41,10 @@ test('a cycle is reported on its members only; a state hanging below it is not i
 });
 
 test('a cross-fade of 0 is valid; a region nested in a state takes no version key', () => {
-  assert.deepEqual(
-    validateMachine(doc({ a: {}, b: {} }, 'a', { transitions: [{ from: 'a', to: 'b', event: 'go', duration: 0 }] })),
-    [],
-  );
-  assert.deepEqual(
-    validateMachine(doc({ a: {}, b: {} }, 'a', { transitions: [{ from: 'a', to: 'b', event: 'go', duration: -1 }] })),
-    [{ path: 'transitions[0].duration', message: 'A cross-fade is a number of seconds, 0 or more' }],
-  );
+  assert.deepEqual(validateMachine(doc({ a: {}, b: {} }, 'a', { transitions: [{ from: 'a', to: 'b', event: 'go', duration: 0 }] })), []);
+  assert.deepEqual(validateMachine(doc({ a: {}, b: {} }, 'a', { transitions: [{ from: 'a', to: 'b', event: 'go', duration: -1 }] })), [
+    { path: 'transitions[0].duration', message: 'A cross-fade is a number of seconds, 0 or more' },
+  ]);
   const region = { states: { r: {} }, initial: 'r' };
   assert.deepEqual(validateMachine(doc({ p: { regions: { one: region } } })), []);
   assert.deepEqual(validateMachine(doc({ p: { regions: { one: { ...region, version: 1 } } } })), [

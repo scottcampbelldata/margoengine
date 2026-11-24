@@ -11,15 +11,7 @@ const fixes = (pattern) => (error) => {
   assert.match(error.message, /;/);
   return true;
 };
-const straight = () =>
-  new Spline(
-    [
-      [0, 0, 0],
-      [50, 0, 0],
-      [100, 0, 0],
-    ],
-    { kind: 'catmull-rom', divisions: 2000 },
-  );
+const straight = () => new Spline([[0, 0, 0], [50, 0, 0], [100, 0, 0]], { kind: 'catmull-rom', divisions: 2000 });
 const step = (stage, delta) => {
   const pose = createPose();
   stage.update(pose, delta);
@@ -28,8 +20,7 @@ const step = (stage, delta) => {
 /** A circle of radius 10 in the XZ plane. */
 const ring = () => {
   const points = [];
-  for (let i = 0; i < 64; i++)
-    points.push([10 * Math.cos((i / 64) * 2 * Math.PI), 0, 10 * Math.sin((i / 64) * 2 * Math.PI)]);
+  for (let i = 0; i < 64; i++) points.push([10 * Math.cos((i / 64) * 2 * Math.PI), 0, 10 * Math.sin((i / 64) * 2 * Math.PI)]);
   return new Spline(points, { closed: true, divisions: 4096 });
 };
 
@@ -88,24 +79,13 @@ test('on a closed track the cart takes the short way round past the seam', () =>
     seen.push(dolly.position);
   }
   assert.ok(dolly.position < length * 0.1, `past the seam: ${dolly.position}`);
-  assert.ok(
-    seen.every((p) => p < length * 0.1 || p > length * 0.9),
-    'never the long way round',
-  );
+  assert.ok(seen.every((p) => p < length * 0.1 || p > length * 0.9), 'never the long way round');
 });
 
 test('a window keeps the cart on its own leg of a hairpin; without it the cart jumps across', () => {
   const hairpin = () =>
     new Spline(
-      [
-        [0, 0, 0],
-        [50, 0, 0],
-        [100, 0, 0],
-        [102, 0, 1],
-        [100, 0, 2],
-        [50, 0, 2],
-        [0, 0, 2],
-      ],
+      [[0, 0, 0], [50, 0, 0], [100, 0, 0], [102, 0, 1], [100, 0, 2], [50, 0, 2], [0, 0, 2]],
       { divisions: 4000 },
     );
   const run = (window) => {
@@ -177,16 +157,7 @@ test('errors say what to pass', () => {
   assert.throws(() => new DollyTrack(track, { lead: NaN }), fixes(/lead/));
   assert.throws(() => new DollyTrack(track, { damping: 0 }), fixes(/damping/));
   assert.throws(() => new DollyTrack(track, { window: 0 }), fixes(/window/));
-  assert.throws(
-    () =>
-      new DollyTrack(
-        new Spline([
-          [0, 0, 0],
-          [0, 0, 0],
-        ]),
-      ),
-    fixes(/track/),
-  );
+  assert.throws(() => new DollyTrack(new Spline([[0, 0, 0], [0, 0, 0]])), fixes(/track/));
   const dolly = new DollyTrack(track);
   dolly.position = NaN;
   assert.throws(() => step(dolly, 0), fixes(/position/));

@@ -23,7 +23,7 @@ const values = new Map(COMPAT_LIMITS.map((name, i) => [0x1000 + i, 4096])),
     getProgramParameter: () => true,
     getShaderParameter: () => true,
     getActiveUniformBlockParameter: () => 0,
-    getUniformBlockIndex: (_p, name) => name.length & 7,
+    getUniformBlockIndex: (_p, name) => (name.length & 7),
     getAttribLocation: () => 0,
   },
   // Every other GL enum is a distinct number and every other GL call one function per name, made once; create* and
@@ -78,12 +78,7 @@ struct V { @builtin(position) p: vec4f, @location(0) uv: vec2f };
     fragment: {
       module,
       entryPoint: 'fs',
-      targets: [
-        {
-          format: 'rgba8unorm',
-          blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: {} },
-        },
-      ],
+      targets: [{ format: 'rgba8unorm', blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: {} } }],
     },
     primitive: { cullMode: 'back' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
@@ -152,10 +147,7 @@ struct V { @builtin(position) p: vec4f, @location(0) uv: vec2f };
 @group(0) @binding(0) var t: texture_storage_2d<rgba8unorm, write>;
 @compute @workgroup_size(4, 4) fn tex(@builtin(global_invocation_id) id: vec3u) { textureStore(t, vec2i(id.xy), vec4f(1)); }
 @group(0) @binding(0) var<storage, read_write> out: array<u32>;
-@compute @workgroup_size(4) fn buf(@builtin(global_invocation_id) id: vec3u) { out[id.x] = id.x; }`.replace(
-      '@group(0) @binding(0) var<storage',
-      '@group(1) @binding(0) var<storage',
-    ),
+@compute @workgroup_size(4) fn buf(@builtin(global_invocation_id) id: vec3u) { out[id.x] = id.x; }`.replace('@group(0) @binding(0) var<storage', '@group(1) @binding(0) var<storage'),
   }),
   computeTexture = device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: 0x8 }),
   computeBuffer = device.createBuffer({ size: 64, usage: 0x80 | 0x4 }),
@@ -174,14 +166,8 @@ struct V { @builtin(position) p: vec4f, @location(0) uv: vec2f };
   layered = device.createTexture({ size: [4, 4, 2], format: 'rgba8unorm', usage: 0x04 | 0x10 }),
   layerView = layered.createView({ dimension: '2d', baseArrayLayer: 1, arrayLayerCount: 1 }),
   kept = [null],
-  texGroup = device.createBindGroup({
-    layout: texPipeline.getBindGroupLayout(0),
-    entries: [{ binding: 0, resource: computeTexture.createView() }],
-  }),
-  bufGroup = device.createBindGroup({
-    layout: bufPipeline.getBindGroupLayout(1),
-    entries: [{ binding: 0, resource: { buffer: computeBuffer } }],
-  });
+  texGroup = device.createBindGroup({ layout: texPipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: computeTexture.createView() }] }),
+  bufGroup = device.createBindGroup({ layout: bufPipeline.getBindGroupLayout(1), entries: [{ binding: 0, resource: { buffer: computeBuffer } }] });
 await device.loadCompute();
 
 /** An open pass with the pipeline's state set, as the replay holds it between a frame's draws. */
@@ -193,10 +179,7 @@ function open() {
   r.setIndexBuffer(indices, 'uint16', 0);
 }
 const refused = [];
-device.addEventListener(
-  'uncapturederror',
-  (e) => (e.preventDefault(), refused.length < 4 && refused.push(e.error.message)),
-);
+device.addEventListener('uncapturederror', (e) => (e.preventDefault(), refused.length < 4 && refused.push(e.error.message)));
 open();
 device.queue.writeBuffer(indirectArgs, 0, new Uint32Array([3, 1, 0, 0, 0, 0, 0, 0]));
 

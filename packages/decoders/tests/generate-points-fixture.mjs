@@ -43,38 +43,16 @@ const fill = (Array, width, count, value) => {
 const survey = new module.PointCloud(),
   builder = new module.PointCloudBuilder();
 builder.AddFloatAttribute(survey, module.POSITION, SURVEY, 3, fill(Float32Array, 3, SURVEY, position));
-named(
-  builder,
-  survey,
-  builder.AddFloatAttribute(survey, module.GENERIC, SURVEY, 1, fill(Float32Array, 1, SURVEY, intensity)),
-  'intensity',
-);
-named(
-  builder,
-  survey,
-  builder.AddUInt8Attribute(survey, module.GENERIC, SURVEY, 1, fill(Uint8Array, 1, SURVEY, classification)),
-  'classification',
-);
+named(builder, survey, builder.AddFloatAttribute(survey, module.GENERIC, SURVEY, 1, fill(Float32Array, 1, SURVEY, intensity)), 'intensity');
+named(builder, survey, builder.AddUInt8Attribute(survey, module.GENERIC, SURVEY, 1, fill(Uint8Array, 1, SURVEY, classification)), 'classification');
 builder.AddUInt16Attribute(survey, module.GENERIC, SURVEY, 1, fill(Uint16Array, 1, SURVEY, returns));
 builder.AddInt32Attribute(survey, module.GENERIC, SURVEY, 1, fill(Int32Array, 1, SURVEY, depth));
-const colours = builder.AddUInt8Attribute(
-  survey,
-  module.COLOR,
-  SURVEY,
-  3,
-  fill(Uint8Array, 3, SURVEY, (i) => [i & 255, 0, 255]),
-);
+const colours = builder.AddUInt8Attribute(survey, module.COLOR, SURVEY, 3, fill(Uint8Array, 3, SURVEY, (i) => [i & 255, 0, 255]));
 builder.SetNormalizedFlagForAttribute(survey, colours, true);
 await writeFile(new URL('./fixtures/draco-points/survey.drc', import.meta.url), encode(survey, new module.Encoder()));
 
 // More points than 16-bit indices reach, on a line, so the file stays small.
 const WIDE = 70000,
   wide = new module.PointCloud();
-builder.AddUInt32Attribute(
-  wide,
-  module.POSITION,
-  WIDE,
-  1,
-  fill(Uint32Array, 1, WIDE, (i) => i),
-);
+builder.AddUInt32Attribute(wide, module.POSITION, WIDE, 1, fill(Uint32Array, 1, WIDE, (i) => i));
 await writeFile(new URL('./fixtures/draco-points/wide.drc', import.meta.url), encode(wide, new module.Encoder()));

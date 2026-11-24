@@ -95,19 +95,7 @@ test('a cut bank retreats steadily (Ikeda et al. 1981) with its face at the give
     grid: grid(80, 320),
     base: () => 3,
     events: [
-      {
-        kind: 'bank',
-        path: [
-          [-40, 0],
-          [40, 0],
-        ],
-        river: 'left',
-        retreat: 10,
-        bed: 0,
-        face: 45,
-        duration: 100,
-        roughness: 0,
-      },
+      { kind: 'bank', path: [[-40, 0], [40, 0]], river: 'left', retreat: 10, bed: 0, face: 45, duration: 100, roughness: 0 },
     ],
   });
   // Travel along +x: the left is -z (river), the land is +z.
@@ -123,17 +111,7 @@ test('a cut bank retreats steadily (Ikeda et al. 1981) with its face at the give
 });
 
 test('a slide fails, runs out as a block under friction and lays down its volume times its bulking', () => {
-  const ev = {
-      kind: 'slide',
-      from: [-30, 0],
-      to: [30, 0],
-      width: 16,
-      depth: 3,
-      length: 20,
-      bulking: 1.2,
-      duration: 12,
-      roughness: 0,
-    },
+  const ev = { kind: 'slide', from: [-30, 0], to: [30, 0], width: 16, depth: 3, length: 20, bulking: 1.2, duration: 12, roughness: 0 },
     change = new GroundChange({ grid: grid(90, 450), events: [ev] });
   assert.ok(Math.abs(runoutProgress(0.5) - 0.75) < 1e-12);
   at(change, 12);
@@ -154,20 +132,7 @@ test('flood mud thins landward exponentially (Goto 2011; Abe et al. 2012) and dr
   const change = new GroundChange({
     grid: grid(400, 200),
     events: [
-      {
-        kind: 'mud',
-        shore: [
-          [-200, -150],
-          [200, -150],
-        ],
-        land: 'right',
-        reach: 300,
-        thickness: 0.3,
-        decay: 100,
-        duration: 90,
-        drying: 600,
-        roughness: 0,
-      },
+      { kind: 'mud', shore: [[-200, -150], [200, -150]], land: 'right', reach: 300, thickness: 0.3, decay: 100, duration: 90, drying: 600, roughness: 0 },
     ],
   });
   // Travel along +x: right is +z, the land.
@@ -177,11 +142,7 @@ test('flood mud thins landward exponentially (Goto 2011; Abe et al. 2012) and dr
     assert.ok(Math.abs(got - want) < 1e-9, `thickness ${d} m inland: ${got} against ${want}`);
   }
   assert.equal(change.sample(0, -150 - 10, 90).change, 0, 'the sea side gets no mud');
-  assert.equal(
-    change.sample(0, -150 + 299, 30).change,
-    0,
-    'the front has not reached far inland a third of the way in',
-  );
+  assert.equal(change.sample(0, -150 + 299, 30).change, 0, 'the front has not reached far inland a third of the way in');
   assert.equal(change.sample(0, -100, 90).wet, 1);
   assert.ok(Math.abs(change.sample(0, -100, 690).wet - Math.exp(-1)) < 0.002, 'dries by e in `drying` seconds');
   assert.ok(change.sample(0, -100, 90).mud > 0.99);
@@ -190,18 +151,7 @@ test('flood mud thins landward exponentially (Goto 2011; Abe et al. 2012) and dr
 test('ash thins as Pyle (1989): halving every `half` metres crosswind, stretched downwind, falling steadily', () => {
   const change = new GroundChange({
     grid: grid(4000, 100),
-    events: [
-      {
-        kind: 'ash',
-        vent: [0, 0],
-        thickness: 0.2,
-        half: 300,
-        wind: [10, 0],
-        elongation: 3,
-        duration: 100,
-        roughness: 0,
-      },
-    ],
+    events: [{ kind: 'ash', vent: [0, 0], thickness: 0.2, half: 300, wind: [10, 0], elongation: 3, duration: 100, roughness: 0 }],
   });
   // Through each isopach's centre, (e - 1) b downwind of the vent, its crosswind half width is b.
   for (const b of [0, 300, 600]) {
@@ -220,20 +170,7 @@ test('a lava flow advances, stands between levees and loses its glow as its crus
   const change = new GroundChange({
     grid: grid(200, 400),
     events: [
-      {
-        kind: 'lava',
-        path: [
-          [-90, 0],
-          [90, 0],
-        ],
-        width: 12,
-        thickness: 2,
-        levee: 0.35,
-        duration: 100,
-        cooling: 60,
-        glowCrust: 0.03,
-        roughness: 0,
-      },
+      { kind: 'lava', path: [[-90, 0], [90, 0]], width: 12, thickness: 2, levee: 0.35, duration: 100, cooling: 60, glowCrust: 0.03, roughness: 0 },
     ],
   });
   assert.ok(Math.abs(change.sample(0, 0, 100).change - 2) < 1e-6, 'the sheet is the given thickness');
@@ -258,9 +195,7 @@ test('a burn scar spreads as a wind ellipse with Alexander (1985) length to brea
     change = at(
       new GroundChange({
         grid: grid(600, 600),
-        events: [
-          { kind: 'burn', ignition: [-200, 0], wind: [30 / 3.6, 0], rate: 1, duration: 300, ashing: 900, roughness: 0 },
-        ],
+        events: [{ kind: 'burn', ignition: [-200, 0], wind: [30 / 3.6, 0], rate: 1, duration: 300, ashing: 900, roughness: 0 }],
       }),
       300,
     );
@@ -293,39 +228,11 @@ test('a burn scar spreads as a wind ellipse with Alexander (1985) length to brea
 
 test('the ground at a time is the same however it is reached, and a partial update equals a full one', () => {
   const events = [
-      {
-        kind: 'gully',
-        path: [
-          [-20, -10],
-          [10, 15],
-        ],
-        width: 3,
-        depth: 1,
-        duration: 40,
-      },
-      {
-        kind: 'lava',
-        path: [
-          [20, -20],
-          [-10, 20],
-        ],
-        start: 10,
-        duration: 50,
-        cooling: 30,
-      },
+      { kind: 'gully', path: [[-20, -10], [10, 15]], width: 3, depth: 1, duration: 40 },
+      { kind: 'lava', path: [[20, -20], [-10, 20]], start: 10, duration: 50, cooling: 30 },
       { kind: 'ash', vent: [0, 0], half: 20, wind: [3, 2], start: 5, duration: 30 },
       { kind: 'burn', ignition: [-15, 15], wind: [4, -1], rate: 0.5, start: 20, duration: 40, ashing: 30 },
-      {
-        kind: 'mud',
-        shore: [
-          [-25, -25],
-          [25, -25],
-        ],
-        land: 'right',
-        reach: 30,
-        duration: 20,
-        drying: 20,
-      },
+      { kind: 'mud', shore: [[-25, -25], [25, -25]], land: 'right', reach: 30, duration: 20, drying: 20 },
       { kind: 'scour', center: [10, -10], flow: [0, 1], duration: 20 },
       { kind: 'slide', from: [-20, 20], to: [-5, 5], width: 8, depth: 2, start: 30 },
     ],
@@ -339,11 +246,7 @@ test('the ground at a time is the same however it is reached, and a partial upda
   assert.deepEqual(stepped.covers.surface, jumped.covers.surface);
   assert.deepEqual(stepped.covers.state, jumped.covers.state);
   // The grid agrees with the exact sample at its vertices.
-  for (const [i, j] of [
-    [30, 40],
-    [80, 60],
-    [100, 20],
-  ]) {
+  for (const [i, j] of [[30, 40], [80, 60], [100, 20]]) {
     const x = -30 + i * 0.5,
       z = -30 + j * 0.5;
     assert.ok(Math.abs(jumped.change[j * 121 + i] - jumped.sample(x, z).change) < 1e-6);
@@ -368,17 +271,7 @@ test('removing an event gives its ground back; options and events are checked', 
   assert.throws(() => new GroundChange({ grid: grid(10, 10), base: new Float32Array(3) }), RangeError);
   assert.throws(() => change.add({ kind: 'quake' }), TypeError);
   assert.throws(() => change.add({ kind: 'gully', path: [[0, 0]] }), RangeError);
-  assert.throws(
-    () =>
-      change.add({
-        kind: 'bank',
-        path: [
-          [0, 0],
-          [1, 0],
-        ],
-      }),
-    /bed/,
-  );
+  assert.throws(() => change.add({ kind: 'bank', path: [[0, 0], [1, 0]] }), /bed/);
   assert.throws(() => change.add({ kind: 'scour', center: [0, 0], depth: -1 }), RangeError);
   assert.throws(() => change.add({ kind: 'burn', ignition: [0, 0], severity: 2 }), RangeError);
   assert.throws(() => change.setTime(-1), RangeError);
@@ -414,26 +307,8 @@ test('settings rows: the shared shape, every row live, rain follows the weather 
 test('GAP-FILM-TIME: a ground change seeked by @margoengine/cutscene/seek equals a continuous run, bit for bit', async () => {
   const { seekSync } = await import('../../cutscene/dist/seek.js'),
     events = [
-      {
-        kind: 'gully',
-        path: [
-          [-20, -10],
-          [10, 15],
-        ],
-        width: 3,
-        depth: 1,
-        duration: 40,
-      },
-      {
-        kind: 'lava',
-        path: [
-          [20, -20],
-          [-10, 20],
-        ],
-        start: 10,
-        duration: 50,
-        cooling: 30,
-      },
+      { kind: 'gully', path: [[-20, -10], [10, 15]], width: 3, depth: 1, duration: 40 },
+      { kind: 'lava', path: [[20, -20], [-10, 20]], start: 10, duration: 50, cooling: 30 },
       { kind: 'burn', ignition: [-15, 15], wind: [4, -1], rate: 0.5, start: 20, duration: 40, ashing: 30 },
       { kind: 'slide', from: [-20, 20], to: [-5, 5], width: 8, depth: 2, start: 30 },
     ],
@@ -462,11 +337,7 @@ test('a lava flow driven by arrival times stops where they stop, with its width,
     events: [
       {
         kind: 'lava',
-        path: [
-          [-90, 0],
-          [0, 0],
-          [60, 0],
-        ],
+        path: [[-90, 0], [0, 0], [60, 0]],
         arrival: [10, 40, 100],
         widths: [10, 20, 20],
         thicknesses: [1, 3, 3],
@@ -479,50 +350,15 @@ test('a lava flow driven by arrival times stops where they stop, with its width,
   });
   assert.equal(change.sample(-80, 0, 9).change, 0, 'nothing before the first arrival');
   // At 25 s the front is half way from -90 to 0.
-  assert.ok(
-    change.sample(-50, 0, 25).change > 0.9 && change.sample(-35, 0, 25).change === 0,
-    'the front follows the arrival times',
-  );
+  assert.ok(change.sample(-50, 0, 25).change > 0.9 && change.sample(-35, 0, 25).change === 0, 'the front follows the arrival times');
   assert.ok(Math.abs(change.sample(0, 0, 200).change - 3) < 1e-6, 'the thickness per point');
   assert.ok(change.sample(0, 9.5, 200).change > 0 && change.sample(-90, 7, 200).change === 0, 'the width per point');
   assert.equal(change.sample(70, 0, 1e6).change, 0, 'the flow stops at the end of its path');
   const cooled = change.sample(0, 0, 400).heat,
     want = 0.5 * Math.exp(-crustThickness((400 - 40) * 60) / 0.03);
   assert.ok(Math.abs(cooled - want) < 1e-9, `heat from the arrival time and the glow: ${cooled} against ${want}`);
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            arrival: [5, 2],
-          },
-        ],
-      }),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            widths: [5],
-          },
-        ],
-      }),
-    RangeError,
-  );
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], arrival: [5, 2] }] }), RangeError);
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], widths: [5] }] }), RangeError);
 });
 
 test('a lava pond spreads as Huppert (1982), keeps the volume fed into it to 1 percent, holds after its feed and glows by age', () => {
@@ -530,105 +366,40 @@ test('a lava pond spreads as Huppert (1982), keeps the volume fed into it to 1 p
     pond = { center: [0, 0], start: 100, end: 700, flux: 10, viscosity: 1000, density: 2600 },
     change = new GroundChange({
       grid: grid(200, 200),
-      events: [
-        {
-          kind: 'lava',
-          path: [
-            [-90, -90],
-            [-89, -90],
-          ],
-          arrival: [0, 1],
-          cooling: 60,
-          glowCrust: 0.03,
-          roughness: 0,
-          pond,
-        },
-      ],
+      events: [{ kind: 'lava', path: [[-90, -90], [-89, -90]], arrival: [0, 1], cooling: 60, glowCrust: 0.03, roughness: 0, pond }],
     }),
     K = 0.715 * Math.pow((G * 1000) / (3 * (1000 / 2600)), 1 / 8),
     volume = (t, step = 0.5) => {
       const R = K * Math.sqrt(Math.min(t, pond.end) - pond.start) + 1;
       let v = 0;
-      for (let x = -R + step / 2; x < R; x += step)
-        for (let z = -R + step / 2; z < R; z += step) v += change.sample(x, z, t).change;
+      for (let x = -R + step / 2; x < R; x += step) for (let z = -R + step / 2; z < R; z += step) v += change.sample(x, z, t).change;
       return v * step * step;
     };
   assert.equal(change.sample(0, 0, 100).change, 0, 'nothing before the pond starts');
   for (const t of [400, 700]) {
     const R = K * Math.sqrt(t - 100),
       v = volume(t);
-    assert.ok(
-      Math.abs(v - 10 * (t - 100)) / (10 * (t - 100)) < 0.01,
-      `volume ${v} against ${10 * (t - 100)} at ${t} s`,
-    );
-    assert.ok(
-      change.sample(R * 0.99, 0, t).change > 0 && change.sample(R * 1.01, 0, t).change === 0,
-      `edge at R = ${R} at ${t} s`,
-    );
+    assert.ok(Math.abs(v - 10 * (t - 100)) / (10 * (t - 100)) < 0.01, `volume ${v} against ${10 * (t - 100)} at ${t} s`);
+    assert.ok(change.sample(R * 0.99, 0, t).change > 0 && change.sample(R * 1.01, 0, t).change === 0, `edge at R = ${R} at ${t} s`);
     const H = (10 * (t - 100)) / (0.75 * Math.PI * R * R);
     assert.ok(Math.abs(change.sample(0, 0, t).change - H) < 1e-9 * H, 'the centre is H');
-    assert.ok(
-      Math.abs(change.sample(R / 2, 0, t).change - H * Math.cbrt(0.75)) < 1e-9 * H,
-      'the cap (1 - (r/R)^2)^(1/3)',
-    );
+    assert.ok(Math.abs(change.sample(R / 2, 0, t).change - H * Math.cbrt(0.75)) < 1e-9 * H, 'the cap (1 - (r/R)^2)^(1/3)');
   }
   assert.equal(change.sample(0, 0, 5000).change, change.sample(0, 0, 700).change, 'the pond holds after its feed');
   // The surface at r was reached at start + (r / K)^2; its glow fades with the crust grown since.
   const r = 30,
     passed = 100 + (r / K) ** 2,
     want = Math.exp(-crustThickness((700 - passed) * 60) / 0.03);
-  assert.ok(
-    Math.abs(change.sample(r, 0, 700).heat - want) < 1e-9,
-    `pond heat ${change.sample(r, 0, 700).heat} against ${want}`,
-  );
-  assert.ok(
-    change.sample(K * Math.sqrt(599) - 0.5, 0, 700).heat > change.sample(5, 0, 700).heat,
-    'the fresh edge glows brighter than the old middle',
-  );
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            pond: { center: [0, 0], start: 5, end: 2, flux: 1, viscosity: 1 },
-          },
-        ],
-      }),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            pond: { center: [0], start: 0, end: 2, flux: 1, viscosity: 1 },
-          },
-        ],
-      }),
-    RangeError,
-  );
+  assert.ok(Math.abs(change.sample(r, 0, 700).heat - want) < 1e-9, `pond heat ${change.sample(r, 0, 700).heat} against ${want}`);
+  assert.ok(change.sample(K * Math.sqrt(599) - 0.5, 0, 700).heat > change.sample(5, 0, 700).heat, 'the fresh edge glows brighter than the old middle');
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], pond: { center: [0, 0], start: 5, end: 2, flux: 1, viscosity: 1 } }] }), RangeError);
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], pond: { center: [0], start: 0, end: 2, flux: 1, viscosity: 1 } }] }), RangeError);
 });
 
 test('a lava tube roofs over: a crust grows in from the levees to their crests and hides the glow (Peterson et al. 1994)', () => {
   const event = (roofs) => ({
       kind: 'lava',
-      path: [
-        [-90, 0],
-        [0, 0],
-        [60, 0],
-      ],
+      path: [[-90, 0], [0, 0], [60, 0]],
       arrival: [0, 100, 200],
       widths: [20, 20, 20],
       thicknesses: [2, 2, 2],
@@ -642,112 +413,29 @@ test('a lava tube roofs over: a crust grows in from the levees to their crests a
     open = new GroundChange({ grid: grid(200, 400), events: [event()] }),
     tube = new GroundChange({ grid: grid(200, 400), events: [event([1000, 1e9, 1e9])] });
   // Before the front and away from the roofed segment, nothing changes.
-  for (const [x, z, t] of [
-    [-45, 0, 40],
-    [-45, 5, 40],
-    [30, 0, 1500],
-    [30, 9, 1500],
-    [-45, 0, 50],
-  ])
+  for (const [x, z, t] of [[-45, 0, 40], [-45, 5, 40], [30, 0, 1500], [30, 9, 1500], [-45, 0, 50]])
     assert.deepEqual(tube.sample(x, z, t), open.sample(x, z, t), `(${x}, ${z}) at ${t}`);
   // Closed: the channel is level with the levee crests (2 (1 + 0.3) m) and dark; the margins keep their levees.
   const closed = tube.sample(-45, 0, 1000);
   assert.ok(Math.abs(closed.change - 2.6) < 1e-6 && closed.heat === 0 && closed.lava > 0.99, JSON.stringify(closed));
-  assert.ok(
-    open.sample(-45, 0, 1000).heat > 0.5 && Math.abs(open.sample(-45, 0, 1000).change - 2) < 1e-6,
-    'the open channel still glows',
-  );
-  assert.equal(
-    tube.sample(-45, 9.5, 1000).change,
-    open.sample(-45, 9.5, 1000).change,
-    'outside the crest the shape is the levee',
-  );
+  assert.ok(open.sample(-45, 0, 1000).heat > 0.5 && Math.abs(open.sample(-45, 0, 1000).change - 2) < 1e-6, 'the open channel still glows');
+  assert.equal(tube.sample(-45, 9.5, 1000).change, open.sample(-45, 9.5, 1000).change, 'outside the crest the shape is the levee');
   assert.equal(tube.sample(-45, 9.5, 1000).heat, 0, 'and the roofed flow shows no glow');
   // Half way the crust has grown in from the margins over part of the channel; the middle still glows.
   const mid = (1000 + 50) / 2,
     middle = tube.sample(-45, 0, mid),
     margin = tube.sample(-45, 7.5, mid);
-  assert.ok(
-    middle.heat > 0.5 && margin.heat === 0,
-    `the crust closes from the margins: ${middle.heat} in the middle, ${margin.heat} at 7.5 m`,
-  );
+  assert.ok(middle.heat > 0.5 && margin.heat === 0, `the crust closes from the margins: ${middle.heat} in the middle, ${margin.heat} at 7.5 m`);
   // Roof times are checked like the other per-point lists.
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            roofs: [5],
-          },
-        ],
-      }),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            roofs: [-1, 5],
-          },
-        ],
-      }),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            drains: [5],
-          },
-        ],
-      }),
-    RangeError,
-  );
-  assert.throws(
-    () =>
-      new GroundChange({
-        grid: grid(50, 50),
-        events: [
-          {
-            kind: 'lava',
-            path: [
-              [0, 0],
-              [9, 0],
-            ],
-            skylights: -1,
-          },
-        ],
-      }),
-    RangeError,
-  );
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], roofs: [5] }] }), RangeError);
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], roofs: [-1, 5] }] }), RangeError);
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], drains: [5] }] }), RangeError);
+  assert.throws(() => new GroundChange({ grid: grid(50, 50), events: [{ kind: 'lava', path: [[0, 0], [9, 0]], skylights: -1 }] }), RangeError);
 });
 test('a roofed tube has skylights: holes showing the fresh stream until the tube drains (Kauahikaua et al. 1998)', () => {
   const event = (skylights) => ({
       kind: 'lava',
-      path: [
-        [0, 0],
-        [2000, 0],
-      ],
+      path: [[0, 0], [2000, 0]],
       arrival: [0, 200],
       widths: [20, 20],
       thicknesses: [2, 2],
@@ -781,15 +469,8 @@ test('a roofed tube has skylights: holes showing the fresh stream until the tube
     const mid = (a + b) / 2;
     assert.ok(Math.abs(sky.sample(mid, 0, 2000).change - 2 * 0.5) < 1e-6, 'the stream shows half a sheet down');
     assert.equal(sky.sample(mid, 7.5, 2000).heat, 0, 'the roof spans the channel beside the hole');
-    assert.ok(
-      sky.sample(mid, 0, 5300).heat < 0.1,
-      `once the tube drains the stream crusts over: ${sky.sample(mid, 0, 5300).heat}`,
-    );
-    assert.equal(
-      sky.sample(mid, 0, 900).heat < 0.9,
-      true,
-      'before the roof closes the hole is open channel, crusting with age',
-    );
+    assert.ok(sky.sample(mid, 0, 5300).heat < 0.1, `once the tube drains the stream crusts over: ${sky.sample(mid, 0, 5300).heat}`);
+    assert.equal(sky.sample(mid, 0, 900).heat < 0.9, true, 'before the roof closes the hole is open channel, crusting with age');
   }
   // Seeded: another seed puts them elsewhere; the same seed in the same place.
   const again = holes(new GroundChange({ grid: grid(200, 400), events: [event()] }), 2000),

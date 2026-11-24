@@ -12,19 +12,13 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { redrawAfterRestore } = await load('../dist/index.js');
   const { renderOnDemand } = await load('../dist/demand.js');
   return [
-    {
-      name: 'redrawAfterRestore',
-      create({ engine, scene }) {
-        const { plugin, stop } = added(scene, () => redrawAfterRestore(engine, () => {}, inert.request));
-        return { plugin, dispose: stop };
-      },
-    },
-    {
-      name: 'renderOnDemand',
-      create({ engine, scene }) {
-        const { plugin, stop: loop } = added(scene, () => renderOnDemand(engine, { update() {}, ...inert }));
-        return { plugin, dispose: () => loop.dispose() };
-      },
-    },
+    { name: 'redrawAfterRestore', create({ engine, scene }) {
+      const { plugin, stop } = added(scene, () => redrawAfterRestore(engine, () => {}, inert.request));
+      return { plugin, dispose: stop };
+    } },
+    { name: 'renderOnDemand', create({ engine, scene }) {
+      const { plugin, stop: loop } = added(scene, () => renderOnDemand(engine, { update() {}, ...inert }));
+      return { plugin, dispose: () => loop.dispose() };
+    } },
   ];
 }

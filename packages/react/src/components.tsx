@@ -32,7 +32,6 @@ import {
   Context,
   useScene,
   useMesh,
-  ModelContext,
   live,
   colorKey,
   setGeometry,
@@ -166,11 +165,7 @@ async function resolveFallback(load: NonNullable<CanvasProps['loadFallback']>, s
     loaded = await load(signal);
   } catch (cause) {
     throw Object.assign(
-      fault(
-        'unsupported',
-        `loadFallback failed (${String(cause)}); check the import path or the network`,
-        'react-usage',
-      ),
+      fault('unsupported', `loadFallback failed (${String(cause)}); check the import path or the network`, 'react-usage'),
       { cause },
     );
   }
@@ -245,10 +240,7 @@ export function MargoCanvas({
     watch.observe(parent, { childList: true, subtree: true });
     return () => watch.disconnect();
   }, [engine]);
-  const frames = useMemo<Frames>(
-    () => ({ elapsed: 0, last: null, mode: frameloop, callbacks: new FrameCallbacks() }),
-    [],
-  );
+  const frames = useMemo<Frames>(() => ({ elapsed: 0, last: null, mode: frameloop, callbacks: new FrameCallbacks() }), []);
   frames.mode = frameloop;
   const assetCache = useMemo(() => createAssetCache(engine as unknown as EngineKernel | null), [engine]);
   const resources = useMemo<Resources>(() => ({ models: new Set(), lighting: new Map() }), [engine]);
@@ -270,9 +262,7 @@ export function MargoCanvas({
   powerOption.current = powerPreference;
   frameloopOptions.current = frameloop;
   const advance = useMemo(
-    () =>
-      (delta: number, desktop = false) =>
-        advanceFrames(frames, engine!, delta, desktop),
+    () => (delta: number, desktop = false) => advanceFrames(frames, engine!, delta, desktop),
     [engine, frames],
   );
   const invalidate = useMemo(
@@ -316,8 +306,7 @@ export function MargoCanvas({
         errorHandler.current?.(error);
       }
     };
-    let releasePixelRatio = () => {},
-      releaseFrames = () => {};
+    let releasePixelRatio = () => {}, releaseFrames = () => {};
     queue.current = queue.current
       .catch(() => {})
       .then(async () => {
@@ -607,7 +596,6 @@ export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh
   } = props;
   const parentScene = useScene(),
     { engine, registry: parent, pointerHandlers, world } = parentScene;
-  const model = useContext(ModelContext);
   const [node, setNode] = useState<EngineMesh | null>(null);
   // Once per mount, while rendering, the only time React gives the owner stack.
   const [owner] = useState(() => ownerHook.capture?.());
@@ -628,7 +616,6 @@ export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh
     }),
     [engine],
   );
-  registry.model = model; // follows a model that finishes loading after this mesh mounted
   useCommit(() => {
     // In the enclosing <Scene>'s engine scene, else the default one.
     const mesh = (world ?? engine).createMesh() as EngineMesh;
@@ -722,19 +709,16 @@ export function BoxGeometry({ args = one }: { args?: Vec3 }) {
         setGeometry(registry, mesh, geometry);
       };
     geometrySources.set(geometry, () => {
-      const positions = [],
-        normals = [],
-        uvs = [];
-      for (let i = 0; i < geometry.vertices.length; i += 6) {
-        const v = geometry.vertices;
-        positions.push(v[i], v[i + 1], v[i + 2]);
-        normals.push(v[i + 3], v[i + 4], v[i + 5]);
-        const axis = Math.abs(v[i + 3]) > 0.5 ? 0 : Math.abs(v[i + 4]) > 0.5 ? 1 : 2;
-        const u = axis === 0 ? 2 : 0,
-          w = axis === 1 ? 2 : 1;
-        uvs.push(v[i + u] / (args[u] || 1) + 0.5, v[i + w] / (args[w] || 1) + 0.5);
-      }
-      return { positions, normals, uvs, indices: geometry.indices };
+    const positions = [], normals = [], uvs = [];
+    for (let i = 0; i < geometry.vertices.length; i += 6) {
+      const v = geometry.vertices;
+      positions.push(v[i], v[i + 1], v[i + 2]);
+      normals.push(v[i + 3], v[i + 4], v[i + 5]);
+      const axis = Math.abs(v[i + 3]) > 0.5 ? 0 : Math.abs(v[i + 4]) > 0.5 ? 1 : 2;
+      const u = axis === 0 ? 2 : 0, w = axis === 1 ? 2 : 1;
+      uvs.push(v[i + u] / (args[u] || 1) + 0.5, v[i + w] / (args[w] || 1) + 0.5);
+    }
+    return { positions, normals, uvs, indices: geometry.indices };
     });
     registry.attachments.add(attach);
     try {
@@ -796,28 +780,9 @@ export interface PbrMaterialProps {
 /** The pbr material component. */
 export function PbrMaterial(props: PbrMaterialProps) {
   const Binding = useScene().mappedMaterial;
-  const mapped = !!(
-    props.map ||
-    props.normalMap ||
-    props.roughnessMap ||
-    props.metalRoughnessMap ||
-    props.emissiveMap ||
-    props.emissive ||
-    props.envMap
-  );
-  if (mapped && !Binding)
-    throw fault(
-      'state',
-      "Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry's MappedPbrMaterial",
-      'react-usage',
-    );
-  return mapped && Binding ? (
-    <Suspense fallback={null}>
-      <Binding {...props} />
-    </Suspense>
-  ) : (
-    <PlainMaterial {...props} />
-  );
+  const mapped = !!(props.map || props.normalMap || props.roughnessMap || props.metalRoughnessMap || props.emissiveMap || props.emissive || props.envMap);
+  if (mapped && !Binding) throw fault('state', 'Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry\'s MappedPbrMaterial', 'react-usage');
+  return mapped && Binding ? <Suspense fallback={null}><Binding {...props} /></Suspense> : <PlainMaterial {...props} />;
 }
 function PlainMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 }: PbrMaterialProps) {
   const registry = useMesh(),

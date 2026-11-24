@@ -16,33 +16,22 @@ export async function fixtures(load = (entry) => import(entry)) {
   const entries = [];
   for (const factory of [false, true]) {
     const suffix = factory ? '.attach' : '';
-    entries.push({
-      name: 'UiRenderer' + suffix,
-      create({ engine }) {
-        const plugin = factory
-          ? UiRenderer.attach(engine, ui(), { mirror: false })
-          : new UiRenderer(ui(), { mirror: false });
-        return { plugin, dispose: () => plugin.dispose() };
-      },
-    });
+    entries.push({ name: 'UiRenderer' + suffix, create({ engine }) {
+      const plugin = factory ? UiRenderer.attach(engine, ui(), { mirror: false }) : new UiRenderer(ui(), { mirror: false });
+      return { plugin, dispose: () => plugin.dispose() };
+    } });
     for (const [name, Plugin] of Object.entries({ WorldPanels, GlWorldPanels })) {
-      entries.push({
-        name: name + suffix,
-        create({ engine }) {
-          const plugin = factory ? Plugin.attach(engine) : new Plugin();
-          plugin.add(new WorldPanel(ui(), { width: 1, height: 0.5, position: [0, 0, -2] }));
-          return { plugin, dispose: () => plugin.dispose() };
-        },
-      });
+      entries.push({ name: name + suffix, create({ engine }) {
+        const plugin = factory ? Plugin.attach(engine) : new Plugin();
+        plugin.add(new WorldPanel(ui(), { width: 1, height: 0.5, position: [0, 0, -2] }));
+        return { plugin, dispose: () => plugin.dispose() };
+      } });
     }
   }
-  entries.push({
-    name: 'WorldPanels.curved',
-    create({ engine }) {
-      const plugin = WorldPanels.attach(engine);
-      plugin.add(new CurvedPanel(ui(), { width: 1, height: 0.5, position: [0, 0, -2] }));
-      return { plugin, dispose: () => plugin.dispose() };
-    },
-  });
+  entries.push({ name: 'WorldPanels.curved', create({ engine }) {
+    const plugin = WorldPanels.attach(engine);
+    plugin.add(new CurvedPanel(ui(), { width: 1, height: 0.5, position: [0, 0, -2] }));
+    return { plugin, dispose: () => plugin.dispose() };
+  } });
   return entries;
 }

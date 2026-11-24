@@ -1,10 +1,15 @@
-import { decodeImages, maxBytes, readContainer } from './container.js';
-import { countLimit } from '../../shared/limits.js';
-import { decodeScene } from './scene.js';
-import type { EngineKernel } from '@margoengine/core';
-import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf/pbr-model';
-import { readResponse } from '../../shared/loading.js';
-import { captureScene } from '../../shared/scene-scope.js';
+import { decodeImages, maxBytes, readContainer } from "./container.js";
+import { countLimit } from "../../shared/limits.js";
+import { decodeScene } from "./scene.js";
+import type { EngineKernel } from "@margoengine/core";
+import {
+  parsePreparedPBR,
+  type GLTFDocument,
+  type PBRModel,
+  type PreparedGeometry,
+} from "@margoengine/gltf/pbr-model";
+import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
 
 /** A decoded `.margo` file before any GPU work: the validated scene document, geometry views and embedded PNG bytes. */
 export interface MargoAsset {
@@ -33,7 +38,7 @@ export function decodeMargo(
   input: ArrayBuffer | ArrayBufferView,
   { maxNodes = 100_000 }: MargoOptions = {},
 ): MargoAsset {
-  countLimit('maxNodes', maxNodes);
+  countLimit("maxNodes", maxNodes);
   const { buffer, sections, manifest } = readContainer(input, 0);
   return decodeScene(buffer, sections, manifest, maxNodes);
 }
@@ -82,14 +87,14 @@ export async function loadMargo(
   signal?.throwIfAborted();
   const scope = captureScene(engine),
     target = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(target.protocol))
+  if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
-      '.margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargo',
+      ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargo",
     );
   const bytes = await readResponse(await get(target, { signal }), {
     maxBytes,
     signal,
-    label: '.margo download',
+    label: ".margo download",
   });
   // Parsed in the scene this call started in, not the one active once the download is done.
   return scope.run(() => parseMargo(engine, bytes, { signal, maxNodes }));

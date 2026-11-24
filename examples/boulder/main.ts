@@ -18,17 +18,7 @@ import { Climber } from './climber.ts';
 import { buildGym, EGG, PLAQUE, ROOM, SUN } from './gym.ts';
 import { CHARACTER } from './rig.ts';
 import { TIERS } from './tiers.ts';
-import {
-  buildWall,
-  LEFT_FOOT,
-  MAT_TOP,
-  RIGHT_FOOT,
-  pickHold,
-  type Point,
-  type Route,
-  type RouteName,
-  type Vec,
-} from './wall.ts';
+import { buildWall, LEFT_FOOT, MAT_TOP, RIGHT_FOOT, pickHold, type Point, type Route, type RouteName, type Vec } from './wall.ts';
 import type { GymSound, SoundName } from './sound.ts';
 
 const tier = applyQualityTier() as keyof typeof TIERS,

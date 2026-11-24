@@ -14,7 +14,6 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
-import { type BorrowSlot, borrow, fix, relend, lend } from '../../shared/borrowed.js';
 import { acquireDepth } from '../../shared/gpu.js';
 import type { Clustered, ClusteredLightTerm } from './index.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number };
@@ -25,10 +24,7 @@ export interface ContactLightOptions {
   lights: Clustered;
   /**
    * The scene's single-sample depth texture (a `PostStack.depthTexture`, for example), or a callback giving it each
-   * frame (read live, so it also gives the new texture after a device restore). A plain texture belongs to the device it
-   * was given on: after a device restore it is dropped, `engine.onError` hears of it once
-   * (margoengine.com/errors#borrowed-lost) and the march stays off until `options.depth` is set to a new texture or
-   * a callback. Omitted: a shared scene-depth capture (the one water and HTML panels use), which another effect that owns
+   * frame. Omitted: a shared scene-depth capture (the one water and HTML panels use), which another effect that owns
    * scene capture (SSAO, depth of field) refuses; pass that stack's depth then.
    */
   depth?: GPUTexture | (() => GPUTexture | undefined);
@@ -120,10 +116,6 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
   private pipeline?: GPUComputePipeline;
   private group?: GPUBindGroup;
   private source?: GPUTexture;
-  // The plain texture of `options.depth` (shared/borrowed.js): it belongs to the device it was given on, so after a device
-  // restore it is dropped and reported once. `seen` is the texture the slot holds, to notice `options.depth = texture`.
-  private depthSlot?: BorrowSlot<GPUTexture, GPUTexture>;
-  private seen?: GPUTexture;
   private shared?: ReturnType<typeof acquireDepth>;
   private entries: GPUBindGroupEntry[] = [];
   private readonly header = new Float32Array(HEADER);
@@ -196,7 +188,6 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
       );
     this.engine = engine;
     this.device = engine.gpu;
-    this.depthOf(engine.gpu);
     if (this.options.depth === undefined) this.shared = acquireDepth(engine);
     this.staging = this.device.createBuffer({
       size: HEADER_BYTES,
@@ -205,19 +196,6 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
     this.allocate(0, 0);
     this.lights.contact = this;
   }
-  /** The slot for a plain `options.depth` texture, made again when the option is set to another texture. */
-  private depthOf(device: GPUDevice): BorrowSlot<GPUTexture, GPUTexture> | undefined {
-    const depth = this.options.depth,
-      plain = typeof depth === 'function' ? undefined : depth;
-    if (plain !== this.seen) {
-      this.seen = plain;
-      this.depthSlot = plain
-        ? relend(this.depthSlot ?? borrow(plain, 'ContactLights depth', 'set options.depth'), plain, device)
-        : undefined;
-    } else if (this.depthSlot) fix(this.depthSlot, device);
-    return this.depthSlot;
-  }
-
   /** A buffer for the header and width x height depths: created zeroed, so the march stays off until the first copy. */
   private allocate(width: number, height: number): void {
     // A struct holding a runtime array binds at least its size rounded up to its 16-byte alignment (the mat4x4f).
@@ -268,10 +246,7 @@ export class ContactLights implements EnginePlugin, ClusteredLightTerm {
         for (const old of this.retired.splice(0)) old.destroy();
         this.validate();
         const depth = this.options.depth,
-          slot = this.depthOf(c.device),
-          // A callback is read live each frame. A plain texture lost with the device gives none: the march stays off.
-          texture =
-            typeof depth === 'function' ? depth() : slot ? lend(slot, c.device, this.engine) : this.shared?.texture();
+          texture = typeof depth === 'function' ? depth() : (depth ?? this.shared?.texture());
         if (texture && texture.sampleCount > 1)
           throw new RangeError('ContactLights needs a single-sample depth texture; pass the resolved scene depth');
         const width = texture?.width ?? 0,

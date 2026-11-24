@@ -11,7 +11,7 @@ const rotationAngle = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a.reduce((sum
 const yaw = (angle) => [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)];
 
 /** A repeatable wobble, so a path is not a smooth curve a thinner could get right by luck. */
-const noise = (i) => (Math.sin(i * 12.9898) * 43758.5453) % 1;
+const noise = (i) => Math.sin(i * 12.9898) * 43758.5453 % 1;
 
 test('every sample of a take stays within the tolerance of what the tracks play', () => {
   const recorder = new TakeRecorder({ tolerance: { position: 0.01, rotation: 0.005, scale: 0.02 } });
@@ -60,10 +60,7 @@ test('tolerance 0 keeps a change the line does not explain', () => {
   let i = 0;
   recorder.property('light', 'intensity', () => values[i]);
   for (; i < values.length; i++) recorder.capture(i);
-  assert.deepEqual(
-    recorder.stop().tracks[0].keys.map((key) => key.value),
-    [0, 1, 1.5, 0],
-  );
+  assert.deepEqual(recorder.stop().tracks[0].keys.map((key) => key.value), [0, 1, 1.5, 0]);
 });
 
 test('a quaternion that flips sign between ticks still turns the short way', () => {
@@ -123,10 +120,7 @@ test('properties record numbers and arrays', () => {
   for (t = 0; t <= 1; t += 0.25) recorder.capture(t);
   const { tracks } = recorder.stop();
   assert.equal(tracks[0].target, 'door');
-  assert.deepEqual(
-    tracks[0].keys.map((key) => key.value),
-    [0, 1],
-  );
+  assert.deepEqual(tracks[0].keys.map((key) => key.value), [0, 1]);
   assert.deepEqual(tracks[1].keys.at(-1).value, [1, 0, 0]);
 });
 
@@ -173,12 +167,7 @@ test('input becomes stepped tracks that give back the value of every tick, and p
   const events = take.tracks.find((track) => track.type === 'event').events;
   assert.deepEqual(
     events.filter((event) => event.name.startsWith('jump')).map((event) => [event.name, event.time]),
-    [
-      ['jump', 0.5],
-      ['jump:up', 1.5],
-      ['jump', 2.5],
-      ['jump:up', 3],
-    ],
+    [['jump', 0.5], ['jump:up', 1.5], ['jump', 2.5], ['jump:up', 3]],
   );
   // A held axis that changes value is one press, not many.
   assert.deepEqual(
@@ -196,13 +185,7 @@ test('input started part way through a take lands at its own time, and inputTrac
   input.values.jump[0] = 1;
   recorder.capture(3);
   const { tracks } = recorder.stop();
-  assert.deepEqual(
-    tracks.find((track) => track.id === 'input-jump').keys.map((key) => [key.time, key.value]),
-    [
-      [2, 0],
-      [3, 1],
-    ],
-  );
+  assert.deepEqual(tracks.find((track) => track.id === 'input-jump').keys.map((key) => [key.time, key.value]), [[2, 0], [3, 1]]);
   const saved = { version: 1, channels: [['fire', 0]], times: [0, 100], events: [1, 0, 1] };
   const [property, events] = inputTracks(saved, { at: 1, target: 'p2' });
   assert.equal(property.target, 'p2');
@@ -213,17 +196,8 @@ test('input started part way through a take lands at its own time, and inputTrac
 test('a value held from the very first tick presses at time 0', () => {
   const clip = { version: 1, channels: [['fire', 0]], times: [0, 100], events: [0, 0, 1, 1, 0, 0] };
   const [property, events] = inputTracks(clip);
-  assert.deepEqual(
-    property.keys.map((key) => key.value),
-    [1, 0],
-  );
-  assert.deepEqual(
-    events.events.map((event) => [event.name, event.time]),
-    [
-      ['fire', 0],
-      ['fire:up', 0.1],
-    ],
-  );
+  assert.deepEqual(property.keys.map((key) => key.value), [1, 0]);
+  assert.deepEqual(events.events.map((event) => [event.name, event.time]), [['fire', 0], ['fire:up', 0.1]]);
 });
 
 test('the clock, events and markers', () => {
@@ -245,10 +219,7 @@ test('the clock, events and markers', () => {
 test('the recorder refuses what it cannot keep', () => {
   assert.throws(() => new TakeRecorder({ tolerance: { position: -1 } }), /tolerance position/);
   const recorder = new TakeRecorder();
-  assert.throws(
-    () => recorder.stop(),
-    (error) => error.code === 'state' && /no samples/.test(error.message),
-  );
+  assert.throws(() => recorder.stop(), (error) => error.code === 'state' && /no samples/.test(error.message));
   recorder.transform('a', () => ({ position: [0, 0, 0] }));
   assert.throws(() => recorder.transform('a', {}), /already records 'a'/);
   recorder.camera(() => ({ position: [0, 0, 1], target: [0, 0, 0] }));
@@ -256,14 +227,8 @@ test('the recorder refuses what it cannot keep', () => {
   recorder.capture(1);
   assert.throws(() => recorder.capture(0.5) && recorder.capture(0), /went backwards/);
   recorder.stop();
-  assert.throws(
-    () => recorder.capture(),
-    (error) => error.code === 'state',
-  );
-  assert.throws(
-    () => recorder.stop(),
-    (error) => error.code === 'state',
-  );
+  assert.throws(() => recorder.capture(), (error) => error.code === 'state');
+  assert.throws(() => recorder.stop(), (error) => error.code === 'state');
   const bad = new TakeRecorder();
   bad.transform('x', () => ({ position: [Number.NaN, 0, 0] }));
   assert.throws(() => bad.capture(0), /finite/);
@@ -290,18 +255,12 @@ test('a take is a valid document, and appending shifts it and leaves the origina
   assert.equal(first.duration, 5);
   assert.deepEqual(first.tracks[0].keys[0].time, 3);
   assert.deepEqual(first.tracks[1].events[0].time, 5);
-  assert.deepEqual(first.markers, [
-    { time: 1, name: 'a' },
-    { time: 5, name: 'end' },
-  ]);
+  assert.deepEqual(first.markers, [{ time: 1, name: 'a' }, { time: 5, name: 'end' }]);
   assert.deepEqual(validateCutscene(first), []);
   assert.throws(() => appendTake(first, take), /Track id 'transform-hero' is taken/);
   const second = appendTake(first, take, { at: 1, prefix: 'b-' });
   assert.equal(second.duration, 5);
-  assert.deepEqual(
-    second.tracks.map((track) => track.id),
-    ['transform-hero', 'events', 'b-transform-hero', 'b-events'],
-  );
+  assert.deepEqual(second.tracks.map((track) => track.id), ['transform-hero', 'events', 'b-transform-hero', 'b-events']);
   assert.deepEqual(validateCutscene(second), []);
   assert.throws(() => appendTake(base, take, { at: -1 }), /time of 0 or more/);
 });
@@ -373,10 +332,7 @@ test('a real Input on real key and pointer events comes out of the tracks tick f
     input = new Input(
       {
         jump: [{ type: 'key', code: 'Space' }],
-        walk: [
-          { type: 'key', code: 'KeyW' },
-          { type: 'key', code: 'KeyS', scale: -1 },
-        ],
+        walk: [{ type: 'key', code: 'KeyW' }, { type: 'key', code: 'KeyS', scale: -1 }],
         look: [{ type: 'pointer', axis: 'x', scale: 0.5 }],
       },
       { target, gamepads: () => [] },
@@ -405,16 +361,8 @@ test('a real Input on real key and pointer events comes out of the tracks tick f
     live.push([input.state('jump').value, input.state('walk').value, input.bindingValue('look', 0)]);
     recorder.capture(tick / 10);
   });
-  assert.deepEqual(
-    live.map((row) => row[0]),
-    [0, 1, 1, 0, 0, 0],
-    'the real device did press',
-  );
-  assert.deepEqual(
-    live.map((row) => row[2]),
-    [0, 0, 0, 4, 0, 0],
-    'the real pointer did move',
-  );
+  assert.deepEqual(live.map((row) => row[0]), [0, 1, 1, 0, 0, 0], 'the real device did press');
+  assert.deepEqual(live.map((row) => row[2]), [0, 0, 0, 4, 0, 0], 'the real pointer did move');
   const take = recorder.stop(),
     cutscene = new Cutscene(takeDocument(take));
   live.forEach(([jump, walk, look], tick) => {

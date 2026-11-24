@@ -33,12 +33,7 @@ for (const samples of [1, 4])
     assert.equal(calls(baseline, 'pass.draw').length - calls(optimized, 'pass.draw').length, removed);
     // Drop the historical depth-only pass (begin, pipeline, group, draw, end) and compare the rest call for call.
     const depthView = target.resolvedDepthView,
-      start =
-        samples === 1
-          ? -1
-          : baseline.findIndex(
-              (e) => e[0] === 'beginRenderPass' && e[1].depthStencilAttachment?.view === h.gpu.snap(depthView),
-            );
+      start = samples === 1 ? -1 : baseline.findIndex((e) => e[0] === 'beginRenderPass' && e[1].depthStencilAttachment?.view === h.gpu.snap(depthView));
     assert.equal(start >= 0, samples === 4, 'the historical frame copies depth into the private 1x texture');
     const rest = start < 0 ? baseline : [...baseline.slice(0, start), ...baseline.slice(start + 5)];
     if (start >= 0) assert.equal(baseline[start + 4][0], 'pass.end');

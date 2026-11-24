@@ -174,8 +174,7 @@ export function gridCell(
   }
   if (Object.hasOwn(QUADRATIC, type) || CURVES.has(type)) {
     const keep = CURVES.has(type) ? 2 : QUADRATIC[type];
-    if (corners.length < keep)
-      throw new LoaderError(F, 'range', `cell ${cell} of type ${type} has ${corners.length} points`);
+    if (corners.length < keep) throw new LoaderError(F, 'range', `cell ${cell} of type ${type} has ${corners.length} points`);
     builder.warnings.add('second-order cells are drawn from their corner points');
     if (CURVES.has(type)) builder.polyline(corners.slice(0, 2));
     else builder.polygon(corners.slice(0, keep), cell);

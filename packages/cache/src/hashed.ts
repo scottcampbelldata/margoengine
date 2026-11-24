@@ -46,9 +46,7 @@ interface RuntimeHash {
 function runtimeHash(): RuntimeHash | undefined {
   // getBuiltinModule loads a built-in without an import, so bundlers for the browser see nothing to resolve.
   const runtime = (globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }).process,
-    crypto = runtime?.getBuiltinModule?.('node:crypto') as
-      | { createHash?: (algorithm: string) => RuntimeHash }
-      | undefined;
+    crypto = runtime?.getBuiltinModule?.('node:crypto') as { createHash?: (algorithm: string) => RuntimeHash } | undefined;
   return typeof crypto?.createHash === 'function' ? crypto.createHash('sha256') : undefined;
 }
 
@@ -76,8 +74,7 @@ export class SHA256 {
   /** Adds the next bytes. Returns this. */
   update(bytes: Uint8Array): this {
     if (this.done) throw fault('state', 'This SHA256 has given its digest; start a new one for more bytes', 'cache');
-    if (!(bytes instanceof Uint8Array))
-      throw typeError('SHA256.update takes a Uint8Array; wrap other views first', 'cache');
+    if (!(bytes instanceof Uint8Array)) throw typeError('SHA256.update takes a Uint8Array; wrap other views first', 'cache');
     this.length += bytes.length;
     if (this.runtime) {
       this.runtime.update(bytes);
@@ -186,20 +183,14 @@ export async function hashStream(
 ): Promise<string> {
   signal?.throwIfAborted();
   if (chunks === null || typeof chunks !== 'object')
-    throw typeError(
-      'hashStream takes an iterable of Uint8Array chunks or a ReadableStream; pass a file stream',
-      'cache',
-    );
+    throw typeError('hashStream takes an iterable of Uint8Array chunks or a ReadableStream; pass a file stream', 'cache');
   const hash = new SHA256({ native }),
     source =
       typeof (chunks as { getReader?: unknown }).getReader === 'function' && !(Symbol.asyncIterator in chunks)
         ? readerChunks(chunks as unknown as ReadableStream<Uint8Array>)
         : (chunks as AsyncIterable<Uint8Array> | Iterable<Uint8Array>);
   if (!(Symbol.asyncIterator in source || Symbol.iterator in source))
-    throw typeError(
-      'hashStream takes an iterable of Uint8Array chunks or a ReadableStream; pass a file stream',
-      'cache',
-    );
+    throw typeError('hashStream takes an iterable of Uint8Array chunks or a ReadableStream; pass a file stream', 'cache');
   for await (const chunk of source) {
     signal?.throwIfAborted();
     hash.update(chunk);

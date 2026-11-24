@@ -6,9 +6,7 @@ import { documentOf, headlessEngine } from './helpers.js';
 
 const NAME = 'EXT_mesh_gpu_instancing';
 const close = (actual, expected) =>
-  [...actual].forEach((value, i) =>
-    assert.ok(Math.abs(value - expected[i]) < 1e-5, `${i}: ${value} vs ${expected[i]}`),
-  );
+  [...actual].forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-5, `${i}: ${value} vs ${expected[i]}`));
 function file(attributes = { TRANSLATION: 2, ROTATION: 3, SCALE: 4 }, node = {}) {
   const half = Math.SQRT1_2;
   const { doc, bytes } = documentOf(

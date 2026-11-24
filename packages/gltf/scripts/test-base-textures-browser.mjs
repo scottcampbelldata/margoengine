@@ -76,7 +76,12 @@ await runSuite(
         const uv = [((x + 0.5) / 32) * scale - 0.37, ((y + 0.5) / 32) * scale - 0.19],
           sam = input.sampler;
         const lod = Math.log2((Math.max(input.width, input.height) * scale) / 32);
-        const linear = (lod <= 0 ? sam.magFilter : [9728, 9984, 9986].includes(sam.minFilter) ? 9728 : 9729) === 9729;
+        const linear =
+          (lod <= 0
+            ? sam.magFilter
+            : [9728, 9984, 9986].includes(sam.minFilter)
+              ? 9728
+              : 9729) === 9729;
         const l = [9728, 9729].includes(sam.minFilter) ? 0 : Math.max(0, Math.min(input.levels - 1, lod));
         const wrap = (q, n, mode) =>
           mode === 33071
@@ -194,13 +199,8 @@ await runSuite(
                       throw new Error(JSON.stringify({ minFilter, magFilter, wrapS, slot, scale, error, nativeError }));
                     // Nearest mode has no implementation-defined interpolation weights; this also checks the
                     // native sampler selects minFilter at positive footprint LOD when mip selection is disabled.
-                    const nearest =
-                      Math.max(input.width, input.height) * scale <= 32 ? magFilter === 9728 : minFilter === 9728;
-                    if (
-                      [9728, 9729].includes(minFilter) &&
-                      nearest &&
-                      (!Number.isFinite(nativeTruthError) || nativeTruthError > 0.005)
-                    )
+                    const nearest = Math.max(input.width, input.height) * scale <= 32 ? magFilter === 9728 : minFilter === 9728;
+                    if ([9728, 9729].includes(minFilter) && nearest && (!Number.isFinite(nativeTruthError) || nativeTruthError > 0.005))
                       throw new Error(JSON.stringify({ minFilter, magFilter, wrapS, slot, scale, nativeTruthError }));
                     maxError = Math.max(maxError, error);
                     if (nativeError > maxNativeError) {

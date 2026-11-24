@@ -72,17 +72,7 @@ const frames = async (s, n = 3) => {
 };
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const light = (o = {}) => ({
-  position: [5, 5, -10],
-  radius: 5,
-  amount: 8,
-  intensity: 1,
-  ambient: 0.5,
-  bias: 0,
-  mapSize: 512,
-  size: 10,
-  near: 0.5,
-  far: 500,
-  ...o,
+  position: [5, 5, -10], radius: 5, amount: 8, intensity: 1, ambient: 0.5, bias: 0, mapSize: 512, size: 10, near: 0.5, far: 500, ...o,
 });
 
 test('drei props map onto the studio catcher: directional lights far along their direction, frames times amount', () => {
@@ -95,26 +85,13 @@ test('drei props map onto the studio catcher: directional lights far along their
   assert.equal(o.size, 6);
   const reach = 999 * Math.hypot(5, 5, -10);
   assert.deepEqual(o.lights, [
-    {
-      position: [5001, 5000, -9998],
-      radius: 5000,
-      intensity: 1,
-      bias: 0,
-      size: 10,
-      mapSize: 512,
-      near: 0.5 + reach,
-      far: 500 + reach,
-    },
+    { position: [5001, 5000, -9998], radius: 5000, intensity: 1, bias: 0, size: 10, mapSize: 512, near: 0.5 + reach, far: 500 + reach },
   ]);
   assert.equal(o.samples, 8, 'drei takes every light sample of a frame in one rendered frame');
   assert.equal(o.alphaTest, 0.65);
   assert.equal(o.colorBlend, 2);
   assert.equal(o.toneMapped, true);
-  const tuned = accumulativeOptions(identity, [light({ bias: 0.001, near: 1, far: 11 })], {
-    alphaTest: 0.2,
-    colorBlend: 0,
-    toneMapped: false,
-  });
+  const tuned = accumulativeOptions(identity, [light({ bias: 0.001, near: 1, far: 11 })], { alphaTest: 0.2, colorBlend: 0, toneMapped: false });
   assert(Math.abs(tuned.lights[0].bias - 0.01) < 1e-12, 'bias in normalized depth: 0.001 x (11 - 1)');
   assert.deepEqual([tuned.alphaTest, tuned.colorBlend, tuned.toneMapped], [0.2, 0, false]);
   assert.equal(o.height, 0.999 * 5000, 'the caster slab reaches just under the lowest light');
@@ -155,22 +132,13 @@ test('AccumulativeShadows adds every castShadow mesh, follows props and lights a
   const s = await scene(),
     ref = createRef(),
     ready = [];
-  const ui = ({
-    opacity = 1,
-    cast = true,
-    frames: count,
-    lights = [h(RandomizedLight, { key: 'a', position: [0, 4, 0] })],
-  } = {}) =>
+  const ui = ({ opacity = 1, cast = true, frames: count, lights = [h(RandomizedLight, { key: 'a', position: [0, 4, 0] })] } = {}) =>
     tree(
       s,
       h(
         React.Fragment,
         null,
-        h(
-          AccumulativeShadows,
-          { ref, position: [0, -1, 0], opacity, frames: count, onReady: (c) => ready.push(c) },
-          ...lights,
-        ),
+        h(AccumulativeShadows, { ref, position: [0, -1, 0], opacity, frames: count, onReady: (c) => ready.push(c) }, ...lights),
         h(Mesh, { castShadow: cast, position: [0, 0.5, 0] }, h(BoxGeometry)),
         h(Mesh, { position: [3, 0.5, 0] }, h(BoxGeometry)),
       ),
@@ -225,7 +193,7 @@ test('AccumulativeShadows adds every castShadow mesh, follows props and lights a
   await frames(s);
   assert.equal(shadows.options.frames, 30, 'the frames prop counts: 3 frames of 8 + 2 samples');
   assert.equal(shadows.options.samples, 10, 'every light sample of a frame in one rendered frame');
-  assert.equal(shadows.options.height, 0.999 * 2000, 'the lowest light bounds the caster slab');
+  assert.equal(shadows.options.height, 0.999 * 2000, "the lowest light bounds the caster slab");
 
   view.rerender(ui({ lights: [] }));
   await frames(s);
@@ -238,7 +206,10 @@ test('a RandomizedLight under the plane is reported, not drawn', async () => {
     errors = [];
   s.engine.onError = () => {};
   render(
-    tree(s, h(AccumulativeShadows, { onError: (e) => errors.push(e) }, h(RandomizedLight, { position: [0, -2, 0] }))),
+    tree(
+      s,
+      h(AccumulativeShadows, { onError: (e) => errors.push(e) }, h(RandomizedLight, { position: [0, -2, 0] })),
+    ),
   );
   await frames(s, 1);
   assert.equal(made.length, 0);

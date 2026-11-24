@@ -85,12 +85,8 @@ export class HueGrade extends Grade {
       patched.slice(0, at) +
       patched
         .slice(at)
-        .replace(
-          /(curve:array<vec4f,33>(?:,lift:vec4f,gamma:vec4f,gain:vec4f)?)\}/,
-          '$1,hueControl:vec4f,huePoints:array<vec4f,64>}',
-        )
-        .replace('return c+extra;', `return shiftGradeHue${binding}(c)+extra;`) +
-      hueCode(binding)
+        .replace(/(curve:array<vec4f,33>(?:,lift:vec4f,gamma:vec4f,gain:vec4f)?)\}/, '$1,hueControl:vec4f,huePoints:array<vec4f,64>}')
+        .replace('return c+extra;', `return shiftGradeHue${binding}(c)+extra;`) + hueCode(binding)
     );
   }
   override values(): Float32Array {

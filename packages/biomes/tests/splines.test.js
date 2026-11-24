@@ -258,22 +258,9 @@ test('carving: no paths changes nothing; flatten levels the ground across a path
 
 test('level: a path levels the ground to its top, raising or lowering it, and sides slope across its edge (a sea wall)', async () => {
   const plain = await BiomeWorld.create(base),
-    straight = {
-      points: [
-        [-250, 10],
-        [250, 10],
-      ],
-      width: 8,
-      edge: 6,
-    },
-    wall = await BiomeWorld.create({
-      ...base,
-      height: carvePaths([{ ...straight, carve: { mode: 'level', top: 40 } }]),
-    }),
-    pit = await BiomeWorld.create({
-      ...base,
-      height: carvePaths([{ ...straight, carve: { mode: 'level', top: -5 } }]),
-    });
+    straight = { points: [[-250, 10], [250, 10]], width: 8, edge: 6 },
+    wall = await BiomeWorld.create({ ...base, height: carvePaths([{ ...straight, carve: { mode: 'level', top: 40 } }]) }),
+    pit = await BiomeWorld.create({ ...base, height: carvePaths([{ ...straight, carve: { mode: 'level', top: -5 } }]) });
   const h = async (w, x, z) =>
     (await w.tile(x >= 256 ? 1 : 0, z >= 256 ? 1 : 0)).layer('height').data[(z & 255) * 256 + (x & 255)];
   for (const i of [20, 200, 300, 480]) {
@@ -306,10 +293,7 @@ test('nested carves: a carve over a carved relief loads the relief entry by itse
     const wall = { points: [[-100, 30], [100, 30]], width: 4, carve: { mode: 'level', top: 50 } };
     const w = await BiomeWorld.create({ size: [512, 512], workers: false, height: carvePaths([wall], carvePaths([lane], { relief: { relief: 80 } })) });
     console.log(w.heightAt(0, 30));`;
-  const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
-    cwd: new URL('..', import.meta.url),
-    encoding: 'utf8',
-  });
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
   assert.equal(Number(out.trim()), 50);
 });
 

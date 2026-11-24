@@ -129,13 +129,7 @@ test('the sill is a log hewn flat on the ground: nothing below y = 0, the stagge
   const facet = (log / 2) * Math.cos(Math.PI / 14);
   assert.ok(Math.abs(lowest - (log - facet)) < 1e-6, `sill: false starts at the bottom course (${lowest})`);
   // A gable piece set high on another wall (bottom more than a log up) gets no sill.
-  const high = generateLogWall({
-    courses: [
-      [-2.75, 2.75],
-      [-2.2, 2.2],
-    ],
-    bottom: 2.85,
-  });
+  const high = generateLogWall({ courses: [[-2.75, 2.75], [-2.2, 2.2]], bottom: 2.85 });
   let low = Infinity;
   for (let i = 1; i < high.positions.length; i += 3) low = Math.min(low, high.positions[i]);
   assert.ok(Math.abs(low - (2.85 - facet)) < 1e-6, `a raised gable piece starts at its own bottom course (${low})`);

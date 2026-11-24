@@ -26,13 +26,7 @@ test('the ETC1S reader turns a real file into codebook indices in range', async 
     blocks = 16 * 16,
     out = new Uint32Array(blocks);
   assert.equal(tables.images.length, images);
-  readETC1SSlice(
-    tables,
-    bytes.subarray(offset, offset + length).subarray(image.rgbAt, image.rgbAt + image.rgbLength),
-    16,
-    16,
-    out,
-  );
+  readETC1SSlice(tables, bytes.subarray(offset, offset + length).subarray(image.rgbAt, image.rgbAt + image.rgbLength), 16, 16, out);
   assert.ok(new Set(out).size > 8, 'the blocks of a real picture differ');
   assert.ok(tables.endpoints.length > 0 && tables.selectors.length > 0);
 });
@@ -68,7 +62,10 @@ test('a file that holds no Basis data, and a call with no device', async () => {
   await assert.rejects(decoder.createTexture(new Uint8Array(10)), /truncated header/);
   const controller = new AbortController();
   controller.abort(new Error('stop'));
-  await assert.rejects(decoder.createTexture(await fixture('cube-etc1s.ktx2'), { signal: controller.signal }), /stop/);
+  await assert.rejects(
+    decoder.createTexture(await fixture('cube-etc1s.ktx2'), { signal: controller.signal }),
+    /stop/,
+  );
 });
 
 test('a file with more layers than the device allows is refused before any texture is made', async () => {

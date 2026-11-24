@@ -158,10 +158,7 @@ test('lift, gamma and gain each hold one end of the range; saturation moves colo
   assert.deepEqual(primaries([1, 1, 1], { gamma: [2, 2, 2] }), [1, 1, 1]);
   const red = [0.6, 0.3, 0.2],
     flat = primaries(red, { saturation: 0 });
-  assert.ok(
-    flat.every((v) => Math.abs(v - flat[0]) < 1e-12),
-    'saturation 0 is grey',
-  );
+  assert.ok(flat.every((v) => Math.abs(v - flat[0]) < 1e-12), 'saturation 0 is grey');
   assert.ok(primaries(red, { saturation: 2 })[0] - primaries(red, { saturation: 2 })[2] > red[0] - red[2]);
   // The shader is the same formula, with the values where it reads them.
   const grade = new Grade({ lift: [0.1, 0, -0.1], gamma: [1.2, 1, 0.8], gain: [1.1, 1, 0.9], saturation: 1.5 }),
@@ -202,13 +199,7 @@ test('Tonemap recompiles once when a primary is set and once when it is cleared,
   h.frame();
   assert.equal(h.pipelines.length, before + 2);
   assert.ok(size().includes(4 * (20 + 4 * 33)));
-  for (const bad of [
-    { lift: [0, 2, 0] },
-    { gamma: [0, 1, 1] },
-    { gain: [1, 5, 1] },
-    { saturation: -1 },
-    { gain: [1, 1] },
-  ])
+  for (const bad of [{ lift: [0, 2, 0] }, { gamma: [0, 1, 1] }, { gain: [1, 5, 1] }, { saturation: -1 }, { gain: [1, 1] }])
     assert.throws(() => new Grade(bad), /lift is three numbers -1 to 1, gamma three from 0.1 to 10/);
   effect.dispose();
 });

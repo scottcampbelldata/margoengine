@@ -12,14 +12,8 @@ test('summarizeTiming takes nearest-rank medians per round and pairs the arms', 
     [frames([1, 1, 1], [1, 1, 1]), frames([1, 3, 3], [1, 1, 1])],
   ];
   const { summary, blocks: perRound } = summarizeTiming(blocks, 2);
-  assert.deepEqual(perRound[0], [
-    { compute: 2, draw: 1, total: 3 },
-    { compute: 2, draw: 2, total: 4 },
-  ]);
-  assert.deepEqual(perRound[1], [
-    { compute: 1, draw: 1, total: 2 },
-    { compute: 3, draw: 1, total: 4 },
-  ]);
+  assert.deepEqual(perRound[0], [{ compute: 2, draw: 1, total: 3 }, { compute: 2, draw: 2, total: 4 }]);
+  assert.deepEqual(perRound[1], [{ compute: 1, draw: 1, total: 2 }, { compute: 3, draw: 1, total: 4 }]);
   assert.deepEqual(summary.compute.A, { median: 2, min: 2, max: 2 });
   assert.equal(summary.compute.pairedSavingMs, -1);
   assert.equal(summary.total.bFasterRounds, 1);

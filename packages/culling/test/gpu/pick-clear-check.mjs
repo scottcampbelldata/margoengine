@@ -18,20 +18,12 @@ try {
       { DynamicInstances } = await import('/packages/culling/dist/dynamic.js');
     const canvas = document.body.appendChild(document.createElement('canvas'));
     canvas.style.cssText = 'display:block;width:64px;height:64px';
-    const engine = await Engine.create(canvas, {
-        backend: 'webgpu',
-        camera: { position: [0, 0, 3], target: [0, 0, 0] },
-      }),
+    const engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0] } }),
       errors = [];
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
     const at = (x) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1];
     const parts = CulledParts.attach(engine, [
-      {
-        geometry: box(),
-        material: new PbrMaterial({ color: '#8d99a6' }),
-        transforms: new Float32Array([...at(0), ...at(40)]),
-        capacity: 4,
-      },
+      { geometry: box(), material: new PbrMaterial({ color: '#8d99a6' }), transforms: new Float32Array([...at(0), ...at(40)]), capacity: 4 },
     ]);
     engine.render({ delta: 0 });
     await engine.gpu.queue.onSubmittedWorkDone();
@@ -43,16 +35,9 @@ try {
     // DynamicInstances on an engine of its own: one instance at the centre, one far off.
     const canvas2 = document.body.appendChild(document.createElement('canvas'));
     canvas2.style.cssText = 'display:block;width:64px;height:64px';
-    const engine2 = await Engine.create(canvas2, {
-      backend: 'webgpu',
-      camera: { position: [0, 0, 3], target: [0, 0, 0] },
-    });
+    const engine2 = await Engine.create(canvas2, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0] } });
     engine2.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
-    const crowd = DynamicInstances.attach(engine2, {
-      geometry: box(),
-      material: new PbrMaterial({ color: '#ffffff' }),
-      capacity: 8,
-    });
+    const crowd = DynamicInstances.attach(engine2, { geometry: box(), material: new PbrMaterial({ color: '#ffffff' }), capacity: 8 });
     crowd.addInstance(at(0));
     crowd.addInstance(at(40));
     engine2.render({ delta: 0 });

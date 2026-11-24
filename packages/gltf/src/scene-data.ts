@@ -8,9 +8,7 @@ import type { GLTFExtension, Model } from './index.js';
 
 const LIGHTS = 'KHR_lights_punctual',
   invalid = (what: string) =>
-    new TypeError(
-      `Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-    );
+    new TypeError(`Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`);
 
 /** Where a camera or light sits: world space at load, with the model at its origin. */
 export interface ScenePlacement {
@@ -113,12 +111,7 @@ function lightValues(light: GLTFLightDefinition) {
   return { ...values, innerConeAngle: inner, outerConeAngle: outer };
 }
 /** World matrices of the document's nodes, with parents before children. */
-function worldMatrix(
-  doc: GLTFDocument,
-  id: number,
-  parents: Int32Array,
-  cache: Map<number, Float64Array>,
-): Float64Array {
+function worldMatrix(doc: GLTFDocument, id: number, parents: Int32Array, cache: Map<number, Float64Array>): Float64Array {
   const known = cache.get(id);
   if (known) return known;
   const node = doc.nodes![id],

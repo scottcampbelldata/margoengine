@@ -26,10 +26,7 @@ test('in-between shapes: all four frames Maya wrote', async () => {
 });
 
 test('the base reader names the entry for a progressive channel', async () => {
-  await assert.rejects(
-    convertFBX(real('maya_blend_inbetween_7500_binary.fbx'), { extensions: [animationLayers] }),
-    /deformers/,
-  );
+  await assert.rejects(convertFBX(real('maya_blend_inbetween_7500_binary.fbx'), { extensions: [animationLayers] }), /deformers/);
 });
 
 test('between stops a channel walks in straight lines, with the base shape a stop at 0', () => {
@@ -76,14 +73,8 @@ test('total one clusters read as weights, and an additive vertex keeps its unwei
     bytes = (text) => new TextEncoder().encode(text),
     plain = readGLB(await convertFBX(bytes(rigFixture({ morph: false, animation: false })))).doc;
   await assert.rejects(convertFBX(bytes(total)), /cluster mode/);
-  assert.equal(
-    readGLB(await convertFBX(bytes(total), { extensions })).doc.skins[0].joints.length,
-    plain.skins[0].joints.length,
-  );
-  const additive = rigFixture({ mode: 'Additive', morph: false, animation: false }).replaceAll(
-      'a: 0.5,0.5,0.5',
-      'a: 0.25,0.25,0.25',
-    ),
+  assert.equal(readGLB(await convertFBX(bytes(total), { extensions })).doc.skins[0].joints.length, plain.skins[0].joints.length);
+  const additive = rigFixture({ mode: 'Additive', morph: false, animation: false }).replaceAll('a: 0.5,0.5,0.5', 'a: 0.25,0.25,0.25'),
     glb = await convertFBX(bytes(additive), { extensions }),
     { doc } = readGLB(glb);
   assert.equal(doc.skins[0].joints.length, 3);
@@ -116,13 +107,10 @@ test('two additive skins on one skeleton both keep their joint that stays in the
  ${cluster(112, 'SecondTip', move(1), move(1))}`;
   const extraConnections =
     'C: "OO",101,102\n C: "OO",102,0\n C: "OO",110,101\n C: "OO",111,110\n C: "OO",112,110\n C: "OO",3,111\n C: "OO",4,112';
-  const text = rigFixture({
-      mode: 'Additive',
-      morph: false,
-      animation: false,
-      extraModel,
-      extraConnections,
-    }).replaceAll('a: 0.5,0.5,0.5', 'a: 0.25,0.25,0.25'),
+  const text = rigFixture({ mode: 'Additive', morph: false, animation: false, extraModel, extraConnections }).replaceAll(
+      'a: 0.5,0.5,0.5',
+      'a: 0.25,0.25,0.25',
+    ),
     { doc } = readGLB(await convertFBX(new TextEncoder().encode(text), { extensions }));
   assert.equal(doc.skins.length, 2);
   const reached = new Set(),
@@ -134,8 +122,7 @@ test('two additive skins on one skeleton both keep their joint that stays in the
   for (const skin of doc.skins) {
     assert.equal(skin.joints.length, 3);
     // glTF 2.0 3.7.3: every joint is a node of the scene, so the joint that stays must be reachable from a root.
-    for (const joint of skin.joints)
-      assert.ok(reached.has(joint), `joint ${doc.nodes[joint].name} is not in the scene`);
+    for (const joint of skin.joints) assert.ok(reached.has(joint), `joint ${doc.nodes[joint].name} is not in the scene`);
   }
   assert.notEqual(doc.skins[0].joints[2], doc.skins[1].joints[2]);
 });

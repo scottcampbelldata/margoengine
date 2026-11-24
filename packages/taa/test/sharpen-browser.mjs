@@ -22,7 +22,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-sharpen/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5376, strictPort: true, watch: null, hmr: false },
+  server: { host: '127.0.0.1', port: 5376, strictPort: true, watch: null },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5376 });
@@ -59,13 +59,7 @@ try {
   const rows = { plain: { spread: 0, mean: 0 }, sharp: { spread: 0, mean: 0 } };
   for (let y = 40; y < 200; y++) {
     for (let x = 1; x < plain.width - 1; x++) {
-      const near = [
-          at(plain, x, y),
-          at(plain, x - 1, y),
-          at(plain, x + 1, y),
-          at(plain, x, y - 1),
-          at(plain, x, y + 1),
-        ],
+      const near = [at(plain, x, y), at(plain, x - 1, y), at(plain, x + 1, y), at(plain, x, y - 1), at(plain, x, y + 1)],
         v = at(sharp, x, y),
         over = Math.max(Math.min(...near) - v, v - Math.max(...near), 0);
       worst = Math.max(worst, over);

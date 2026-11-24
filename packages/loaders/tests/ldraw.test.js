@@ -12,13 +12,11 @@ const near = (actual, expected) => {
 const refuses = (promise, code) =>
   assert.rejects(promise, (error) => error instanceof LoaderError && error.format === 'LDraw' && error.code === code);
 /** A resolver over a table of library paths; every other path rejects, as a failed fetch does. */
-const library =
-  (files, asked = []) =>
-  async (path) => {
-    asked.push(path);
-    if (path in files) return files[path];
-    throw new Error(`no ${path}`);
-  };
+const library = (files, asked = []) => async (path) => {
+  asked.push(path);
+  if (path in files) return files[path];
+  throw new Error(`no ${path}`);
+};
 const normal = (model, t) => {
   const p = (k) => [...model.positions.subarray(model.indices[t * 3 + k] * 3, model.indices[t * 3 + k] * 3 + 3)],
     [a, b, c] = [p(0), p(1), p(2)],
@@ -42,10 +40,7 @@ test('triangles and quads make a mesh with a group per colour', async () => {
     ],
   );
   near(model.groups[0].color, [0xc9 / 255, 0x1a / 255, 9 / 255, 1]);
-  assert.deepEqual(
-    model.palette.map((c) => c.code),
-    [4, 1],
-  );
+  assert.deepEqual(model.palette.map((c) => c.code), [4, 1]);
 });
 
 test('edge and conditional lines come back apart, and edges: false drops them', async () => {
@@ -137,11 +132,7 @@ test('resolveFromURL reads a hosted library: search paths, a 404, the base with 
       const body = library[String(url)];
       return new Response(body ?? 'gone', { status: body === undefined ? 404 : 200 });
     };
-  for (const base of [
-    'https://cdn.example.test/ldraw',
-    'https://cdn.example.test/ldraw/',
-    new URL('https://cdn.example.test/ldraw/'),
-  ]) {
+  for (const base of ['https://cdn.example.test/ldraw', 'https://cdn.example.test/ldraw/', new URL('https://cdn.example.test/ldraw/')]) {
     asked.length = 0;
     const model = await parseLDraw('1 4 0 0 0 1 0 0 0 1 0 0 0 1 plate.dat\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 absent.dat\n', {
       resolve: resolveFromURL(base, { fetch, signal }),
@@ -189,10 +180,7 @@ test('an MPD pack finds its own files first and draws the first one', async () =
     { ...file, resolve: library({}, asked) },
   );
   assert.equal(model.name, 'Main model');
-  assert.deepEqual(
-    model.groups.map((g) => g.objectId),
-    ['4'],
-  );
+  assert.deepEqual(model.groups.map((g) => g.objectId), ['4']);
   assert.equal(model.indices.length, 3);
   assert.ok(!asked.some((path) => path.includes('sub.ldr')));
 });
@@ -226,10 +214,7 @@ test('by default the model is in metres with Y up, and the winding survives the 
 });
 
 test('a loop, a deep chain and a doubling chain stop with named errors', async () => {
-  const loop = library({
-    'a.dat': '1 4 0 0 0 1 0 0 0 1 0 0 0 1 b.dat\n',
-    'b.dat': '1 4 0 0 0 1 0 0 0 1 0 0 0 1 a.dat\n',
-  });
+  const loop = library({ 'a.dat': '1 4 0 0 0 1 0 0 0 1 0 0 0 1 b.dat\n', 'b.dat': '1 4 0 0 0 1 0 0 0 1 0 0 0 1 a.dat\n' });
   await refuses(parseLDraw('1 4 0 0 0 1 0 0 0 1 0 0 0 1 a.dat\n', { resolve: loop }), 'syntax');
   const twice = (next) => `1 4 0 0 0 1 0 0 0 1 0 0 0 1 ${next}\n`.repeat(2);
   const files = {};
@@ -269,10 +254,7 @@ test('an abort during loading stops the search', async () => {
 });
 
 test('other line types warn and texture maps are named once', async () => {
-  const model = await parseLDraw(
-    '7 what\n0 !TEXMAP START PLANAR\n0 !: 3 4 0 0 0 1 0 0 0 1 0\n3 4 0 0 0 1 0 0 0 1 0\n',
-    file,
-  );
+  const model = await parseLDraw('7 what\n0 !TEXMAP START PLANAR\n0 !: 3 4 0 0 0 1 0 0 0 1 0\n3 4 0 0 0 1 0 0 0 1 0\n', file);
   assert.equal(model.indices.length, 6);
   assert.deepEqual(model.warnings, ['line type 7 is not part of LDraw', 'texture maps are not read']);
 });
@@ -297,11 +279,7 @@ const soup = (positions, indices, matrix) => {
   };
   const out = [];
   for (let t = 0; t < indices.length; t += 3) {
-    const corners = [0, 1, 2].map((k) =>
-        at(indices[t + k])
-          .map((v) => v.toFixed(3))
-          .join(' '),
-      ),
+    const corners = [0, 1, 2].map((k) => at(indices[t + k]).map((v) => v.toFixed(3)).join(' ')),
       first = corners.indexOf([...corners].sort()[0]);
     // Rotated to a fixed corner, not sorted: the winding has to match too.
     out.push([0, 1, 2].map((k) => corners[(first + k) % 3]).join(' | '));
@@ -320,11 +298,7 @@ test('instanced draws the same triangles and lines as expanding, each part store
   assert.deepEqual(triangles.sort(), soup(flat.positions, flat.indices).sort());
   assert.deepEqual(flat.instances, []);
   // Red with its winding kept, red turned over, and the four-placement yellow would be three parts; the mirror is none.
-  assert.deepEqual(model.instances.map((p) => [p.code, p.matrices.length / 16]).sort(), [
-    [1, 1],
-    [1, 1],
-    [4, 3],
-  ]);
+  assert.deepEqual(model.instances.map((p) => [p.code, p.matrices.length / 16]).sort(), [[1, 1], [1, 1], [4, 3]]);
   assert.equal(model.instances[0].file, 'brick.dat');
   assert.ok(model.instances[0].lines.length > 0 && model.instances[0].lineColors.length > 0);
   const stored = model.instances.reduce((n, p) => n + p.indices.length, 0) + model.indices.length;
@@ -342,12 +316,11 @@ test('a part that repeats holds one geometry, and colours inside a part stay gro
   assert.equal(part.matrices.length, 500 * 16);
   assert.deepEqual(part.groups.map((g) => g.objectId).sort(), ['14', '4']);
   assert.equal(model.positions.length, 0);
-  assert.equal(part.matrices[16 * 499 + 12].toFixed(3), (499 * 20 * 0.0004).toFixed(3), "in the model's metres");
+  assert.equal(part.matrices[16 * 499 + 12].toFixed(3), (499 * 20 * 0.0004).toFixed(3), 'in the model\'s metres');
 });
 
 test('a sub-model of an MPD is walked through, and the parts inside it instance', async () => {
-  const mpd =
-      '0 FILE main.ldr\n1 16 0 0 0 1 0 0 0 1 0 0 0 1 wing.ldr\n1 16 50 0 0 1 0 0 0 1 0 0 0 1 wing.ldr\n0 FILE wing.ldr\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 brick.dat\n',
+  const mpd = '0 FILE main.ldr\n1 16 0 0 0 1 0 0 0 1 0 0 0 1 wing.ldr\n1 16 50 0 0 1 0 0 0 1 0 0 0 1 wing.ldr\n0 FILE wing.ldr\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 brick.dat\n',
     model = await parseLDraw(mpd, { instanced: true, resolve: library({ 'parts/brick.dat': brick }) });
   assert.equal(model.instances.length, 1);
   assert.equal(model.instances[0].matrices.length, 32);

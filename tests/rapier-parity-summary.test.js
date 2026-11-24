@@ -44,8 +44,7 @@ test('the parity file summary equals the count of its rows', () => {
 });
 
 test('rows count by their Status, Part 2 by a status in its Batch cell, and tables with neither are left out', () => {
-  const good =
-    '| 1, Rapier parity | 3 | 1 | 1 | 0 | 0 | 1 | 0 |\n| 2, beyond Rapier | 2 | 0 | 0 | 0 | 1 (extended later) | 1 | 0 |';
+  const good = '| 1, Rapier parity | 3 | 1 | 1 | 0 | 0 | 1 | 0 |\n| 2, beyond Rapier | 2 | 0 | 0 | 0 | 1 (extended later) | 1 | 0 |';
   assert.deepEqual(checkParity(doc(good)), []);
   const stale = good.replace('| 3 | 1 | 1 |', '| 3 | 2 | 0 |');
   assert.deepEqual(checkParity(doc(stale)), [

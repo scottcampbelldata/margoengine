@@ -22,19 +22,7 @@ const flat = (vertices, faces) => ({
     uv: corners.map((v) => [vertices[v][0], vertices[v][1]]),
   })),
 });
-const square = () =>
-  flat(
-    [
-      [0, 0, 0],
-      [1, 0, 0],
-      [1, 1, 0],
-      [0, 1, 0],
-    ],
-    [
-      [0, 1, 2],
-      [0, 2, 3],
-    ],
-  );
+const square = () => flat([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], [[0, 1, 2], [0, 2, 3]]);
 
 test('a target larger than an open patch leaves the patch whole', () => {
   for (const targetLength of [2, 5, 100]) {
@@ -49,14 +37,7 @@ test('the corners of an open border stay where they are', () => {
 });
 
 test('a lone triangle survives, needle or not', () => {
-  const needle = flat(
-    [
-      [0, 0, 0],
-      [1, 0, 0],
-      [0.5, 1e-3, 0],
-    ],
-    [[0, 1, 2]],
-  );
+  const needle = flat([[0, 0, 0], [1, 0, 0], [0.5, 1e-3, 0]], [[0, 1, 2]]);
   assert.equal(remeshMesh(needle, { targetLength: 4, createId }).mesh.faces.length, 1);
 });
 

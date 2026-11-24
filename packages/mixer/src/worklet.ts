@@ -107,8 +107,7 @@ export async function createDynamics(context: BaseAudioContext, options: Dynamic
   const channels = bounded(options.channels ?? 2, 1, 32, 'Dynamics channels');
   if (!Number.isInteger(channels)) throw new RangeError('Dynamics channels needs an integer; pass 1 through 32');
   const settings = {
-    mode,
-    channels,
+    mode, channels,
     ceiling: bounded(options.ceiling ?? -1, -96, 0, 'Dynamics ceiling'),
     threshold: bounded(options.threshold ?? -24, -96, 0, 'Dynamics threshold'),
     knee: bounded(options.knee ?? 6, 0, 40, 'Dynamics knee'),
@@ -120,32 +119,21 @@ export async function createDynamics(context: BaseAudioContext, options: Dynamic
   await loadProcessor(context, 'margo-dynamics-v1', processor, options.signal);
   options.signal?.throwIfAborted();
   const output = new AudioWorkletNode(context, 'margo-dynamics-v1', {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    outputChannelCount: [channels],
-    channelCount: channels,
-    channelCountMode: 'explicit',
-    processorOptions: settings,
+    numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [channels],
+    channelCount: channels, channelCountMode: 'explicit', processorOptions: settings,
   });
   const input = context.createGain();
   input.connect(output);
   let disposed = false;
   const stage: DynamicsStage = {
-    input,
-    output,
-    latencyFrames: 11,
-    latency: 11 / context.sampleRate,
+    input, output, latencyFrames: 11, latency: 11 / context.sampleRate,
     dispose() {
       if (disposed) return;
       disposed = true;
-      input.disconnect();
-      output.disconnect();
-      output.port.postMessage('dispose');
-      output.port.close();
+      input.disconnect(); output.disconnect();
+      output.port.postMessage('dispose'); output.port.close();
     },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }

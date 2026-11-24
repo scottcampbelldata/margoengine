@@ -44,12 +44,7 @@ function frustum(r0, r1, h) {
     izz = (Math.PI * h * s4) / 10,
     ixxBase = izz / 2 + Math.PI * ((r0 * r0 * h ** 3) / 3 + (r0 * a * h ** 4) / 2 + (a * a * h ** 5) / 5),
     ixx = ixxBase - V * zc * zc;
-  return {
-    volume: V,
-    area: side + Math.PI * (r0 * r0 + r1 * r1),
-    centroid: [0, 0, zc],
-    inertia: [ixx, ixx, izz, 0, 0, 0],
-  };
+  return { volume: V, area: side + Math.PI * (r0 * r0 + r1 * r1), centroid: [0, 0, zc], inertia: [ixx, ixx, izz, 0, 0, 0] };
 }
 
 /** Mass properties (mm in) against expected values, relative to `tolerance`; products against the trace. */
@@ -195,12 +190,7 @@ test('cone: revolve closes a profile touching the axis with an apex, a pole or a
       center: [cx * mm, 0, cz * mm],
       clockwise,
     }),
-    p = (start, segments, normal = [0, 1, 0]) => ({
-      name: 'p',
-      start: [start[0] * mm, 0, start[1] * mm],
-      normal,
-      segments,
-    });
+    p = (start, segments, normal = [0, 1, 0]) => ({ name: 'p', start: [start[0] * mm, 0, start[1] * mm], normal, segments });
   // The harness's cone profile: from the axis out, up to the apex, down the axis.
   const c = revolve('c', p([0, 0], [line(5, 0), line(0, 12), line(0, 0)]), axis);
   clean(c);
@@ -224,12 +214,7 @@ test('cone: revolve closes a profile touching the axis with an apex, a pole or a
   assert.equal(ball.faces.length, 1);
   assert.equal(ball.edges.length, 0);
   const I = (2 / 5) * ((4 / 3) * Math.PI * r ** 3) * r * r;
-  expectMass(ball, {
-    volume: (4 / 3) * Math.PI * r ** 3,
-    area: 4 * Math.PI * r * r,
-    centroid: [0, 0, 0],
-    inertia: [I, I, I, 0, 0, 0],
-  });
+  expectMass(ball, { volume: (4 / 3) * Math.PI * r ** 3, area: 4 * Math.PI * r * r, centroid: [0, 0, 0], inertia: [I, I, I, 0, 0, 0] });
   const primitive = massProperties(sphere('q', r * mm));
   close(massProperties(ball).volume, primitive.volume, 'as the primitive', 1e-14);
   // A quarter circle, a disc and the axis: a hemisphere over its pole. Centroid 3r/8 up; about the base Ixx = 2/5 m r^2.
@@ -238,36 +223,21 @@ test('cone: revolve closes a profile touching the axis with an apex, a pole or a
     zc = (3 * r) / 8,
     Ib = (2 / 5) * Vh * r * r;
   clean(hemi);
-  expectMass(hemi, {
-    volume: Vh,
-    area: 3 * Math.PI * r * r,
-    centroid: [0, 0, zc],
-    inertia: [Ib - Vh * zc * zc, Ib - Vh * zc * zc, Ib, 0, 0, 0],
-  });
+  expectMass(hemi, { volume: Vh, area: 3 * Math.PI * r * r, centroid: [0, 0, zc], inertia: [Ib - Vh * zc * zc, Ib - Vh * zc * zc, Ib, 0, 0, 0] });
   // A sphere cap under a cone (an ice-cream cone): apex at the bottom, the cap's pole at the top.
   const R = 3,
     H = 4,
     cream = revolve('i', p([0, 0], [line(R, H), arc(0, H + R, 0, H, true), line(0, 0)]), axis);
   clean(cream);
   // Cone R, H plus a hemisphere of R on top; areas pi R s and 2 pi R^2.
-  close(
-    massProperties(cream).volume,
-    ((Math.PI * R * R * H) / 3 + (2 / 3) * Math.PI * R ** 3) * mm ** 3,
-    'volume',
-    1e-12,
-  );
+  close(massProperties(cream).volume, ((Math.PI * R * R * H) / 3 + (2 / 3) * Math.PI * R ** 3) * mm ** 3, 'volume', 1e-12);
   close(massProperties(cream).area, (Math.PI * R * Math.hypot(R, H) + 2 * Math.PI * R * R) * mm ** 2, 'area', 1e-12);
 });
 
 test('cone: revolve refuses profiles that cross the axis or pinch on it', () => {
   const axis = { origin: [0, 0, 0], direction: [0, 0, 1] },
     line = (x, z) => ({ kind: 'line', to: [x * mm, 0, z * mm] }),
-    arc = (x, z, cx, cz, clockwise) => ({
-      kind: 'arc',
-      to: [x * mm, 0, z * mm],
-      center: [cx * mm, 0, cz * mm],
-      clockwise,
-    }),
+    arc = (x, z, cx, cz, clockwise) => ({ kind: 'arc', to: [x * mm, 0, z * mm], center: [cx * mm, 0, cz * mm], clockwise }),
     p = (start, segments) => ({ name: 'p', start: [start[0] * mm, 0, start[1] * mm], normal: [0, 1, 0], segments });
   // Across the axis.
   assert.throws(() => revolve('x', p([-2, 0], [line(5, 0), line(5, 3), line(-2, 3), line(-2, 0)]), axis), {
@@ -316,11 +286,7 @@ test('cone: cut by planes in an ellipse, a parabola and a hyperbola, to closed f
     c = () => cone('c', R * mm, 0, H * mm),
     /** A 60 mm box with its -z face on the plane through `o` (mm) with unit normal `n`, standing on the n side. */
     halfSpace = (o, n, x) => {
-      const f = frameOf(
-          o.map((v) => v * mm),
-          n,
-          x,
-        ),
+      const f = frameOf(o.map((v) => v * mm), n, x),
         corner = [0, 1, 2].map((i) => o[i] * mm - 30 * mm * (f.x[i] + f.y[i]));
       return box('h', [60 * mm, 60 * mm, 60 * mm], frameOf(corner, f.z, f.x));
     },
@@ -328,10 +294,7 @@ test('cone: cut by planes in an ellipse, a parabola and a hyperbola, to closed f
       assert.deepEqual(validateBody(body), []);
       assert.deepEqual(checkBody(body), []);
       close(massProperties(body).volume, volume * mm ** 3, 'volume', 1e-10);
-      assert.ok(
-        body.edges.some((e) => e.curve.kind === curve),
-        `a ${curve} edge`,
-      );
+      assert.ok(body.edges.some((e) => e.curve.kind === curve), `a ${curve} edge`);
     };
   // Ellipse: the plane z' = m x + c0 below the apex; the apex side is a cone on an elliptical base:
   // V = (1/3) A d with the base A = pi k^2 c0^2 sqrt(1 + m^2) / (1 - k^2 m^2)^(3/2), d = c0 / sqrt(1 + m^2).

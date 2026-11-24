@@ -30,10 +30,7 @@ const moved = (m, x) => {
 
 test('distanceFromNearness turns exp(-distance / scale) back into metres, 0 where nothing is drawn', () => {
   const near = Math.round(255 * Math.exp(-20 / 200)),
-    distance = distanceFromNearness(
-      grey(2, 1, (i) => (i === 0 ? near : 0)),
-      200,
-    );
+    distance = distanceFromNearness(grey(2, 1, (i) => (i === 0 ? near : 0)), 200);
   assert.ok(Math.abs(distance[0] - 20) < 1, `distance ${distance[0]}`);
   assert.equal(distance[1], 0);
 });

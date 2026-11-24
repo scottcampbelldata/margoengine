@@ -15,7 +15,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-upscale-velocity/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5392, strictPort: true, watch: null, hmr: false },
+  server: { host: '127.0.0.1', port: 5392, strictPort: true, watch: null },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5392 });

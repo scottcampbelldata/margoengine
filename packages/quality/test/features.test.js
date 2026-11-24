@@ -112,11 +112,7 @@ test('a feature comes back only when its measured cost fits, most visible first'
   assert.deepEqual(s.run(scaler, 400), []);
   s.state.base = 6;
   s.run(scaler, 400);
-  assert.deepEqual(
-    scaler.levels,
-    { quiet: 1, loud: 0 },
-    'one fits; the other would leave the frame at 83%, not under 70%',
-  );
+  assert.deepEqual(scaler.levels, { quiet: 1, loud: 0 }, 'one fits; the other would leave the frame at 83%, not under 70%');
 });
 
 test('a rise that had to be undone waits longer, so it settles', () => {

@@ -19,10 +19,7 @@ function world() {
   // A live frame: the engine's update with the frame's delta, then the draw.
   const frame = () => {
     haze.onPreUpdate(1 / FPS);
-    return written(
-      h.gpu.record(() => h.frame()),
-      BYTES,
-    ).slice(HEAD);
+    return written(h.gpu.record(() => h.frame()), BYTES).slice(HEAD);
   };
   return { h, haze, frame };
 }

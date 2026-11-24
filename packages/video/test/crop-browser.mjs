@@ -61,8 +61,7 @@ try {
     untouched = 0;
   for (let y = 0; y < 32; y++) {
     for (let x = 34; x < 64; x++) blue += is(colour(right, x, y), [0, 0, 255]);
-    for (let x = 0; x < 32; x++)
-      untouched += !is(colour(right, x, y), [255, 0, 0]) && !is(colour(right, x, y), [0, 0, 255]);
+    for (let x = 0; x < 32; x++) untouched += !is(colour(right, x, y), [255, 0, 0]) && !is(colour(right, x, y), [0, 0, 255]);
   }
   assert.equal(blue, 30 * 32, `the right half of the picture fills the right half (${blue} of ${30 * 32})`);
   assert.equal(untouched, 32 * 32, 'the left half keeps the background');

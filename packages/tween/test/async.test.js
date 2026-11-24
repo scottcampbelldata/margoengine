@@ -149,17 +149,10 @@ test('timeline abort removes playback and empty timeline resolves after update',
 });
 
 test('abort inside repeat stops the current write and cancellation suppresses completion', async () => {
-  const controller = new AbortController(),
-    target = { x: 0 },
-    tween = new AsyncTween();
+  const controller = new AbortController(), target = { x: 0 }, tween = new AsyncTween();
   let completed = 0;
-  const task = tween.to(target, 'x', 10, {
-    duration: 1,
-    repeat: 1,
-    signal: controller.signal,
-    onRepeat: () => controller.abort(),
-    onComplete: () => completed++,
-  });
+  const task = tween.to(target, 'x', 10, { duration: 1, repeat: 1, signal: controller.signal,
+    onRepeat: () => controller.abort(), onComplete: () => completed++ });
   const rejected = assert.rejects(task.finished, { name: 'AbortError' });
   tween.update(0.5);
   tween.update(1.25);
@@ -169,11 +162,7 @@ test('abort inside repeat stops the current write and cancellation suppresses co
   const timeline = new AsyncTimeline({ onComplete: () => completed++ });
   const stopped = assert.rejects(timeline.finished, { name: 'AbortError' });
   let later = 0;
-  timeline
-    .call(() => timeline.cancel(), 0)
-    .call(() => later++, 0)
-    .play()
-    .update(0);
+  timeline.call(() => timeline.cancel(), 0).call(() => later++, 0).play().update(0);
   await stopped;
   assert.equal(later, 0);
   assert.equal(completed, 0);

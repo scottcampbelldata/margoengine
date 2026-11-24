@@ -54,13 +54,7 @@ class Scanner {
       if (end < 0) fail('unterminated semicolon text field');
       this.#at = end + 2;
       if (this.#at < s.length && !/\s/.test(s[this.#at])) fail('text-field delimiter must end its line');
-      return {
-        value: s
-          .slice(start + 1, end)
-          .replace(/\r\n/g, '\n')
-          .replace(/\r$/, ''),
-        bare: false,
-      };
+      return { value: s.slice(start + 1, end).replace(/\r\n/g, '\n').replace(/\r$/, ''), bare: false };
     }
     if (first === "'" || first === '"') {
       while (this.#at < s.length) {

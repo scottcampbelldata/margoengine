@@ -349,18 +349,16 @@ function setLights() {
       shadow: { near: 2.4, far: 600 },
     };
   });
-  groups
-    .group('scene')
-    .setLights([
-      ...beams,
-      { position: [lamp[0], lamp[1] + 0.2, lamp[2]], range: 16, color: beamColor, intensity: 260 },
-      ...windows,
-      post,
-      mast,
-      cabin,
-      fill,
-      skyFill,
-    ]);
+  groups.group('scene').setLights([
+    ...beams,
+    { position: [lamp[0], lamp[1] + 0.2, lamp[2]], range: 16, color: beamColor, intensity: 260 },
+    ...windows,
+    post,
+    mast,
+    cabin,
+    fill,
+    skyFill,
+  ]);
 }
 
 // The lens as the eye sees it: a soft core round the lamp, and a flare when one of the beams swings toward the camera.

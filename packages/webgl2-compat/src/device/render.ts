@@ -32,6 +32,7 @@ import {
   type Uses,
 } from './resources.js';
 
+
 const BLEND_FACTORS: Record<string, string> = {
   zero: 'ZERO',
   one: 'ONE',
@@ -229,25 +230,28 @@ export class LinkedProgram {
 
   /**
    * True once the program can draw into `targets` without compiling again. ANGLE's Direct3D back end compiles a
-   * program's pixel shader for the colour targets bound at its first draw, synchronously on the browser's one GPU
-   * thread (Edge 157, RTX A6000: a 4-output program linked in 64 ms and its first draw took 67 ms more; the 26 programs
-   * of the staged voxel path tracer linked in 65 s and their first 8 x 8 image then took 206 s, KB-VPT-LOBES-COMPAT).
-   * A 1-output program pays it too: on an Intel Arc 140V a 1-output program reported its link complete after 58 to
-   * 74 ms and its first draw took 194 to 346 ms more (KB6016e), where the RTX A6000 had shown 2 ms; and so does a
-   * program with no colour output (a depth-only pass whose fragment stage discards or writes depth: link 45 to 53 ms,
-   * first draw 128 to 174 ms more). A draw with rasterizer discard on does not compile it there (a warmed 1-output
-   * program still took 131 to 152 ms at its first real draw; drawn rasterizing, its first draw took 1 to 2 ms). So
-   * every program there draws once, rasterizing, into 1 x 1 throwaway targets bound at the same attachment points its
-   * passes use (a 1 x 1 depth-stencil buffer when it has no colour target), so that compile happens before an async
-   * pipeline resolves (WebGPU, createRenderPipelineAsync: the pipeline is ready to use without a stall). Only those
-   * targets are written, no resource is read, and the targets are deleted at once. Any other backend: true at once.
+   * program's pixel shader at link for its first colour output only, and compiles it again, synchronously on the
+   * browser's one GPU thread, at the first draw into a framebuffer with more colour targets bound (Edge 157, RTX A6000:
+   * a 4-output program linked in 64 ms and its first draw took 67 ms more, a 1-output one 2 ms; the 26 programs of the
+   * staged voxel path tracer linked in 65 s and its first 8 x 8 image then took 206 s, KB-VPT-LOBES-COMPAT). A program
+   * with more than one colour target there draws once, rasterizer discard on, into 1 x 1 targets bound at the same
+   * attachment points its passes use, so that compile happens before an async pipeline resolves (WebGPU,
+   * createRenderPipelineAsync: the pipeline is ready to use without a stall). Nothing is rasterized, so no output or
+   * resource is read; the targets are deleted at once. Any other backend or program: true at once.
    */
   warmed(targets: readonly (TargetState | null)[]): boolean {
     const device = this.device,
       gl = device.gl;
     if (this.warmFence === undefined) {
-      const colours = targets.flatMap((t, i) => (t ? [i] : []));
-      if (this.refusal !== '' || device.destroyed || !/Direct3D|D3D11/.test(device.adapter.capabilities.renderer)) {
+      const colours = targets.flatMap((t, i) => (t ? [i] : [])),
+        outputs = this.glsl.fragment.outputs;
+      if (
+        this.refusal !== '' ||
+        device.destroyed ||
+        colours.length < 2 ||
+        outputs.length < 2 ||
+        !/Direct3D|D3D11/.test(device.adapter.capabilities.renderer)
+      ) {
         this.warmFence = null;
         return true;
       }
@@ -278,16 +282,9 @@ export class LinkedProgram {
       gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, texture, 0);
       textures.push(texture);
     }
-    // With no colour target the framebuffer needs another attachment to be complete (WebGL 2.0, 4.4.4).
-    const depth = colours.length ? null : (gl.createRenderbuffer() as WebGLRenderbuffer);
-    if (depth) {
-      gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
-      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, 1, 1);
-      gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, depth);
-    }
     const buffers: number[] = [];
     for (let i = 0; i < count; i++) buffers.push(colours.includes(i) ? gl.COLOR_ATTACHMENT0 + i : gl.NONE);
-    gl.drawBuffers(buffers.length ? buffers : [gl.NONE]);
+    gl.drawBuffers(buffers);
     // Every uniform block gets a buffer of its size and every texture unit nothing (an incomplete texture reads 0), as
     // the draw validation of WebGL 2.0 requires; a disabled attribute reads a constant of its own base type.
     const size = this.uniforms.reduce((n, u) => Math.max(n, u.size), 0),
@@ -306,13 +303,9 @@ export class LinkedProgram {
       else gl.vertexAttribI4i(a.location, 0, 0, 0, 0);
     }
     s.useProgram(this.program);
-    // Rasterizing, over the whole 1 x 1 target, with every colour channel written: the compile happens at such a draw.
-    s.enable(gl.RASTERIZER_DISCARD, false);
-    s.enable(gl.SCISSOR_TEST, false);
-    s.viewport(0, 0, 1, 1);
-    if (s.changed(S.colorMask, 1, 15)) gl.colorMask(true, true, true, true);
-    s.forget(S.colorMaskAt, 8);
+    s.enable(gl.RASTERIZER_DISCARD, true);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    s.enable(gl.RASTERIZER_DISCARD, false);
     const sync = fence(gl);
     s.bindVertexArray(null);
     s.bindDrawFramebuffer(null);
@@ -322,7 +315,6 @@ export class LinkedProgram {
       s.forgetTexture(texture);
       gl.deleteTexture(texture);
     }
-    if (depth) gl.deleteRenderbuffer(depth);
     if (ubo) gl.deleteBuffer(ubo);
     return sync;
   }
@@ -513,7 +505,9 @@ export class CompatRenderPipeline {
         alphaDst: b ? e(BLEND_FACTORS[b.alpha.dstFactor ?? 'zero'] ?? 'ONE') : 0,
       };
     });
-    this.sameTargets = this.targetGL.every((x) => x.key === this.targetGL[0].key && x.mask === this.targetGL[0].mask);
+    this.sameTargets = this.targetGL.every(
+      (x) => x.key === this.targetGL[0].key && x.mask === this.targetGL[0].mask,
+    );
     if (!device.ext.indexed) {
       const groups = new Map<string, number[]>();
       this.targets.forEach((t, i) => {
@@ -1142,12 +1136,7 @@ export class CompatCommandEncoder {
       return new CompatCommandBuffer(new Tape(), descriptor.label ?? this.label);
     }
     this.flags |= 1;
-    return new CompatCommandBuffer(
-      this.tape,
-      descriptor.label ?? this.label,
-      (this.flags & 2) !== 0,
-      (this.flags & 4) !== 0,
-    );
+    return new CompatCommandBuffer(this.tape, descriptor.label ?? this.label, (this.flags & 2) !== 0, (this.flags & 4) !== 0);
   }
 }
 CompatCommandEncoder.prototype.label = '';
@@ -1570,13 +1559,7 @@ export class Replayer {
   }
 
   /** Binds `group` for the compute pass's dispatches (null, or an invalid group, binds nothing). */
-  private bindCompute(
-    index: number,
-    group: CompatBindGroup | null,
-    offsets: ArrayLike<number>,
-    from: number,
-    count: number,
-  ): void {
+  private bindCompute(index: number, group: CompatBindGroup | null, offsets: ArrayLike<number>, from: number, count: number): void {
     if (!group || group.invalid) {
       this.computeGroups[index] = null;
       return;
@@ -1596,13 +1579,7 @@ export class Replayer {
   }
   private drawIndexedIndirect(buffer: CompatBuffer, offset: number): void {
     const bytes = buffer.bytes();
-    this.drawIndexed(
-      word(bytes, offset),
-      word(bytes, offset + 4),
-      word(bytes, offset + 8),
-      word(bytes, offset + 12) | 0,
-      word(bytes, offset + 16),
-    );
+    this.drawIndexed(word(bytes, offset), word(bytes, offset + 4), word(bytes, offset + 8), word(bytes, offset + 12) | 0, word(bytes, offset + 16));
   }
 
   // ------------------------------------------------ new textures
@@ -1659,9 +1636,7 @@ export class Replayer {
   }
 
   private clearable(info: FormatInfo): boolean {
-    return (
-      info.renderable && (info.kind !== 'float' || !info.name.includes('float') || this.device.ext.colorBufferFloat)
-    );
+    return info.renderable && (info.kind !== 'float' || !info.name.includes('float') || this.device.ext.colorBufferFloat);
   }
 
   /** zero() by framebuffer clears; false (nothing cleared) when GL does not take the texture as an attachment. */
@@ -1735,10 +1710,7 @@ export class Replayer {
    */
   private drawClear(i: number, value: ArrayLike<number>, w: number, h: number, buffers: readonly number[]): void {
     const gl = this.gl,
-      helper = this.helper(
-        `clear${i}`,
-        `uniform highp vec4 v;\nlayout(location = ${i}) out highp vec4 c;\nvoid main() { c = v; }`,
-      );
+      helper = this.helper(`clear${i}`, `uniform highp vec4 v;\nlayout(location = ${i}) out highp vec4 c;\nvoid main() { c = v; }`);
     this.helperState(helper, w, h);
     gl.uniform4f(helper.value, value[0], value[1], value[2], value[3]);
     gl.drawBuffers(buffers.map((b, k) => (k === i ? b : gl.NONE)));
@@ -1917,12 +1889,7 @@ export class Replayer {
    * method of its own: its attach function captures the attachments, and a function that makes a closure allocates
    * the closure's context on every call, the steady ones included.
    */
-  private makeFramebuffer(
-    colors: readonly (Sub | null)[],
-    count: number,
-    depth: Sub | null,
-    lead: Sub | null,
-  ): WebGLFramebuffer {
+  private makeFramebuffer(colors: readonly (Sub | null)[], count: number, depth: Sub | null, lead: Sub | null): WebGLFramebuffer {
     const list = lead?.fbs;
     if (list) for (let k = list.length - 1; k >= 0; k--) if (list[k].record.dead) list.splice(k, 1);
     const own = colors.slice(0, count),
@@ -2014,8 +1981,7 @@ export class Replayer {
   ): void {
     const gl = this.gl,
       state = this.device.state;
-    const canvas =
-      typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
+    const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
     const context = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
@@ -2346,9 +2312,7 @@ export class Replayer {
     for (let i = 0; i < n; i++) {
       const c = cs[i];
       standIns[i] =
-        c && desc.depth && c.view.texture.dimension === '3d'
-          ? [this.prepare(c.view, c.depthSlice), this.standIn(c.view)]
-          : null;
+        c && desc.depth && c.view.texture.dimension === '3d' ? [this.prepare(c.view, c.depthSlice), this.standIn(c.view)] : null;
     }
     for (let i = 0; i < n; i++) {
       const c = cs[i],
@@ -2525,13 +2489,7 @@ export class Replayer {
     if (this.pass) this.pass.pipeline = p;
   }
   /** Binds `group` at `index` with the `count` dynamic offsets at `offsets[from]` (copied into the slot's own list). */
-  setBindGroup(
-    index: number,
-    group: CompatBindGroup | null,
-    offsets: ArrayLike<number>,
-    from = 0,
-    count = offsets.length,
-  ): void {
+  setBindGroup(index: number, group: CompatBindGroup | null, offsets: ArrayLike<number>, from = 0, count = offsets.length): void {
     const pass = this.pass;
     if (!pass) return;
     // An invalid group (its error was reported at createBindGroup) binds nothing, so its draws are skipped.
@@ -2698,26 +2656,8 @@ export class Replayer {
       const ref = pass.stencilReference & 0xff,
         read = ds.stencilReadMask ?? 0xffffffff,
         write = d?.stencilReadOnly ? 0 : (ds.stencilWriteMask ?? 0xffffffff);
-      this.stencilFace(
-        gl.FRONT,
-        ds.stencilFront,
-        ref,
-        read,
-        write,
-        S.stencilFuncFront,
-        S.stencilOpFront,
-        S.stencilMaskFront,
-      );
-      this.stencilFace(
-        gl.BACK,
-        ds.stencilBack,
-        ref,
-        read,
-        write,
-        S.stencilFuncBack,
-        S.stencilOpBack,
-        S.stencilMaskBack,
-      );
+      this.stencilFace(gl.FRONT, ds.stencilFront, ref, read, write, S.stencilFuncFront, S.stencilOpFront, S.stencilMaskFront);
+      this.stencilFace(gl.BACK, ds.stencilBack, ref, read, write, S.stencilFuncBack, S.stencilOpBack, S.stencilMaskBack);
       s.forget(S.stencilMask);
     }
     s.enable(gl.SAMPLE_ALPHA_TO_COVERAGE, p.alphaToCoverage);
@@ -3045,13 +2985,7 @@ export class Replayer {
   }
 
   /** Sets a storage buffer's row, size and shift uniform when they changed. */
-  private storageInfo(
-    p: CompatRenderPipeline,
-    location: WebGLUniformLocation,
-    row: number,
-    size: number,
-    shift: number,
-  ): void {
+  private storageInfo(p: CompatRenderPipeline, location: WebGLUniformLocation, row: number, size: number, shift: number): void {
     let held = p.cache.info.get(location);
     if (held && held[0] === row && held[1] === size && held[2] === shift) return;
     if (!held) p.cache.info.set(location, (held = new Float64Array(3)));
@@ -3136,8 +3070,7 @@ export class Replayer {
       colors = pass.desc.colors,
       buffers = this.drawList;
     buffers.length = colors.length;
-    for (let i = 0; i < colors.length; i++)
-      buffers[i] = colors[i] && group.includes(i) ? gl.COLOR_ATTACHMENT0 + i : gl.NONE;
+    for (let i = 0; i < colors.length; i++) buffers[i] = colors[i] && group.includes(i) ? gl.COLOR_ATTACHMENT0 + i : gl.NONE;
     gl.drawBuffers(buffers);
     this.applyTargets(p, group[0]);
   }
@@ -3254,13 +3187,7 @@ export class Replayer {
    * copyBuffer() while a buffer still waits for query results: the copy lands after them, in order with the other
    * writes. A method of its own, since a function that makes a closure allocates the closure's context on every call.
    */
-  private copyBufferLater(
-    src: CompatBuffer,
-    srcOffset: number,
-    dst: CompatBuffer,
-    dstOffset: number,
-    size: number,
-  ): void {
+  private copyBufferLater(src: CompatBuffer, srcOffset: number, dst: CompatBuffer, dstOffset: number, size: number): void {
     if (src.readbacks.length && !src.settle()) {
       // The source still waits for query results: the copy lands after them, in order with dst's other writes.
       dst.readbacks.push({
@@ -3521,7 +3448,8 @@ function writeBlocks(
   layout: GPUTexelCopyBufferLayout,
   size: GPUExtent3D,
 ): void {
-  const block = t.info.block as NonNullable<FormatInfo['block']>;
+  const gl = device.gl,
+    block = t.info.block as NonNullable<FormatInfo['block']>;
   const [w, h, depth] = extent(size),
     [x, y, z] = origin(destination.origin);
   const level = destination.mipLevel ?? 0;
@@ -3584,15 +3512,7 @@ export function copyExternalImage(
       throw device.unsupported(`copying an ImageBitmap into a ${info.name} texture (it cannot be drawn into here)`);
     const level = destination.mipLevel ?? 0;
     beforeUpload(device, t, level, z, 1);
-    device.replayer.copyBitmap(
-      image,
-      [sx, sy, w, h],
-      !!source.flipY,
-      t,
-      level,
-      [x, y, z],
-      !!destination.premultipliedAlpha,
-    );
+    device.replayer.copyBitmap(image, [sx, sy, w, h], !!source.flipY, t, level, [x, y, z], !!destination.premultipliedAlpha);
     afterUpload(t, level, z, 1);
     return;
   }

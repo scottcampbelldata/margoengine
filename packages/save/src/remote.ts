@@ -85,7 +85,8 @@ export function remoteStorage(options: RemoteStorageOptions): SaveStorage {
     // What a weak tag stood for: such a tag can go strong later (a server not yet sure of a file just changed).
     weak = new Map<string, Uint8Array>(),
     turn = keyQueue();
-  if (typeof send !== 'function') throw new MargoError('unsupported', 'There is no fetch here; pass options.fetch');
+  if (typeof send !== 'function')
+    throw new MargoError('unsupported', 'There is no fetch here; pass options.fetch');
   if (typeof conflict !== 'function' && !['error', 'local', 'remote'].includes(conflict))
     throw new TypeError("conflict must be 'error', 'local', 'remote' or a function");
   if (!(timeout > 0)) throw new RangeError('timeout must be above 0 milliseconds');
@@ -120,10 +121,7 @@ export function remoteStorage(options: RemoteStorageOptions): SaveStorage {
           }),
           body = new Uint8Array(await response.arrayBuffer());
         if (!RETRY.has(response.status)) return { status: response.status, etag: response.headers.get('etag'), body };
-        problem = new MargoError(
-          'failed',
-          `The save server answered ${response.status} for ${target}; try again later`,
-        );
+        problem = new MargoError('failed', `The save server answered ${response.status} for ${target}; try again later`);
         wait = retryAfter(response.headers.get('retry-after'));
       } catch (error) {
         signal?.throwIfAborted();
@@ -170,10 +168,7 @@ export function remoteStorage(options: RemoteStorageOptions): SaveStorage {
   const condition = (key: string, write: boolean): Record<string, string> => {
     const tag = tags.get(key);
     if (tag === '')
-      throw new MargoError(
-        'unsupported',
-        `The save server sent no ETag for '${key}'; conflicts need one, so turn on ETags on that server`,
-      );
+      throw new MargoError('unsupported', `The save server sent no ETag for '${key}'; conflicts need one, so turn on ETags on that server`);
     if (tag?.startsWith('W/'))
       throw new MargoError(
         'unsupported',
@@ -238,10 +233,7 @@ export function remoteStorage(options: RemoteStorageOptions): SaveStorage {
         if (wanted === null ? remote === null : remote !== null && same(wanted, remote)) return remote !== null;
       }
     }
-    throw new MargoError(
-      'state',
-      `Save '${key}' kept changing on the server while this client wrote it; save again later`,
-    );
+    throw new MargoError('state', `Save '${key}' kept changing on the server while this client wrote it; save again later`);
   };
 
   return {
@@ -266,9 +258,7 @@ export function remoteStorage(options: RemoteStorageOptions): SaveStorage {
       try {
         names = JSON.parse(new TextDecoder().decode(body));
       } catch (error) {
-        throw Object.assign(new TypeError(`The list at ${url} is not JSON; serve an array of keys there`), {
-          cause: error,
-        });
+        throw Object.assign(new TypeError(`The list at ${url} is not JSON; serve an array of keys there`), { cause: error });
       }
       if (!Array.isArray(names) || names.some((name) => typeof name !== 'string'))
         throw new TypeError(`The list at ${url} is not an array of strings; serve an array of keys there`);
@@ -291,8 +281,7 @@ export interface RemoteHandlerOptions {
   authorize?(request: Request): boolean | Promise<boolean>;
 }
 
-const hex = (bytes: ArrayBuffer): string =>
-  [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
 /** The ETag of some bytes: a strong tag, the same for the same bytes on any server. */
 const entityTag = async (bytes: Uint8Array): Promise<string> =>
@@ -328,12 +317,7 @@ async function bounded(request: Request, maxBytes: number): Promise<Uint8Array |
 
 /** The tags a list header names; the whole of `*` is the string '*'. */
 const listed = (value: string): string[] | '*' =>
-  value.trim() === '*'
-    ? '*'
-    : value
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean);
+  value.trim() === '*' ? '*' : value.split(',').map((tag) => tag.trim()).filter(Boolean);
 
 /**
  * A save server over any storage: takes a fetch `Request` and gives a `Response`, so it runs in a service worker,
@@ -342,12 +326,8 @@ const listed = (value: string): string[] | '*' =>
  * @example
  * const handle = remoteHandler(fileStorage('./saves'), { base: '/saves', authorize: (request) => signedIn(request) });
  */
-export function remoteHandler(
-  storage: SaveStorage,
-  options: RemoteHandlerOptions = {},
-): (request: Request) => Promise<Response> {
-  if (typeof storage?.read !== 'function')
-    throw new TypeError('remoteHandler needs a storage, e.g. fileStorage(folder)');
+export function remoteHandler(storage: SaveStorage, options: RemoteHandlerOptions = {}): (request: Request) => Promise<Response> {
+  if (typeof storage?.read !== 'function') throw new TypeError('remoteHandler needs a storage, e.g. fileStorage(folder)');
   const { origin, allowHeaders = ['authorization', 'content-type'], maxBytes = 64 * 1024 * 1024, authorize } = options,
     base = (options.base ?? '/').replace(/\/+$/, ''),
     turn = keyQueue();
@@ -414,9 +394,7 @@ export function remoteHandler(
     const name = path.slice(base.length + 1);
     if (!name) {
       if (request.method !== 'GET') return answer(405, null, { allow: 'GET, OPTIONS' });
-      return answer(200, JSON.stringify(await storage.keys({ signal: request.signal })), {
-        'content-type': 'application/json',
-      });
+      return answer(200, JSON.stringify(await storage.keys({ signal: request.signal })), { 'content-type': 'application/json' });
     }
     if (!['GET', 'PUT', 'DELETE'].includes(request.method)) return answer(405, null, { allow: methods });
     let key: string;

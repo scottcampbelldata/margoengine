@@ -286,8 +286,7 @@ test('all or nothing: a bad model, a bad component or a throwing onEntity leaves
   await assert.rejects(addScene(stage, { format: 'other' }), TypeError);
   await assert.rejects(addScene(stage, level, { fit: 1 }), {
     name: 'TypeError',
-    message:
-      /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
+    message: /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
   });
   stage.dispose();
 });
@@ -317,20 +316,14 @@ test('after the stage is disposed the engine owns the teardown, so dispose touch
 });
 
 const near = (actual, expected) =>
-  [...actual].forEach((value, i) =>
-    assert.ok(Math.abs(value - expected[i]) < 1e-6, `${[...actual]} against ${expected}`),
-  );
+  [...actual].forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-6, `${[...actual]} against ${expected}`));
 // A quarter turn about y, so the entity's -Z looks down world -X.
 const quarter = [0, Math.SQRT1_2, 0, Math.SQRT1_2];
 
 test('one load per URL: the other entities on it are copies, each under its own mesh', async () => {
   const stage = await fixture(),
     tree = (id) => ({ id, components: { mesh: 'tree.glb' } }),
-    scene = await addScene(
-      stage,
-      saved([tree('a'), tree('b'), tree('c'), { id: 'd', components: { mesh: 'rock.glb' } }]),
-      { base, fit: false },
-    );
+    scene = await addScene(stage, saved([tree('a'), tree('b'), tree('c'), { id: 'd', components: { mesh: 'rock.glb' } }]), { base, fit: false });
   assert.deepEqual(world.loads.map((load) => load.url).sort(), [`${base}rock.glb`, `${base}tree.glb`]);
   assert.equal(world.clones, 2);
   assert.equal(new Set(scene.models.values()).size, 4);
@@ -383,17 +376,8 @@ test('a camera takes the world pose, sets the view instead of fit, and every cam
       saved([
         box,
         { id: 'rig', transform: { position: [1, 2, 3], rotation: quarter } },
-        {
-          id: 'free',
-          parent: 'rig',
-          transform: { position: [0, 0, 2] },
-          components: { camera: { fov: 40, near: 0.5, far: 50 } },
-        },
-        {
-          id: 'fixed',
-          transform: { position: [0, 1, 5] },
-          components: { camera: { target: [0, 1, 0], active: true } },
-        },
+        { id: 'free', parent: 'rig', transform: { position: [0, 0, 2] }, components: { camera: { fov: 40, near: 0.5, far: 50 } } },
+        { id: 'fixed', transform: { position: [0, 1, 5] }, components: { camera: { target: [0, 1, 0], active: true } } },
       ]),
     ),
     camera = stage.engine.camera;
@@ -451,16 +435,8 @@ test('point and spot lights go to one Clustered, models receive them, and two sc
       stage,
       saved([
         { id: 'tree', components: { mesh: 'tree.glb' } },
-        {
-          id: 'lamp',
-          transform: { position: [1, 2, 3] },
-          components: { light: { type: 'point', color: [1, 0, 0], intensity: 4, range: 9 } },
-        },
-        {
-          id: 'spot',
-          transform: { rotation: quarter },
-          components: { light: { type: 'spot', innerConeAngle: 0.2, outerConeAngle: 0.5 } },
-        },
+        { id: 'lamp', transform: { position: [1, 2, 3] }, components: { light: { type: 'point', color: [1, 0, 0], intensity: 4, range: 9 } } },
+        { id: 'spot', transform: { rotation: quarter }, components: { light: { type: 'spot', innerConeAngle: 0.2, outerConeAngle: 0.5 } } },
       ]),
       { base, fit: false },
     );
@@ -470,9 +446,7 @@ test('point and spot lights go to one Clustered, models receive them, and two sc
   near(list[1].direction, [-1, 0, 0]);
   assert.deepEqual([list[1].innerAngle, list[1].outerAngle], [0.2, 0.5]);
   assert.deepEqual(world.receivers, [first.models.get('tree')]);
-  const second = await addScene(stage, saved([{ id: 'lamp', components: { light: { type: 'point' } } }]), {
-    fit: false,
-  });
+  const second = await addScene(stage, saved([{ id: 'lamp', components: { light: { type: 'point' } } }]), { fit: false });
   assert.equal(second.lights, first.lights);
   assert.equal(world.lists.at(-1).length, 3);
   first.dispose();
@@ -495,8 +469,7 @@ test('a second directional light goes beside the sun', async () => {
 
 test('a bad light or camera names the entity, before anything loads', async () => {
   const stage = await fixture(),
-    bad = (components) =>
-      addScene(stage, saved([{ id: 'x', components: { mesh: 'tree.glb', ...components } }]), { base, fit: false });
+    bad = (components) => addScene(stage, saved([{ id: 'x', components: { mesh: 'tree.glb', ...components } }]), { base, fit: false });
   await assert.rejects(bad({ light: 1 }), /Entity 'x' light/);
   await assert.rejects(bad({ light: { type: 'area' } }), /type: 'directional', 'point' or 'spot'/);
   await assert.rejects(bad({ light: { color: '#fff' } }), /color: \[r, g, b\]/);

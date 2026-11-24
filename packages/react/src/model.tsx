@@ -4,16 +4,7 @@ import type { Vec3 } from '@margoengine/core/extension';
 import type { PBRModel, PBRMaterial } from '@margoengine/gltf/pbr';
 import { useBakedShadows } from './bake-shadows.js';
 import { casters } from './casters.js';
-import {
-  useScene,
-  useCommit,
-  useResourceEffect,
-  zero,
-  one,
-  ModelContext,
-  type PointerHandlers,
-  type Listeners,
-} from './internal.js';
+import { useScene, useCommit, useResourceEffect, zero, one, ModelContext, type PointerHandlers, type Listeners } from './internal.js';
 import { liveHandlers } from './events.js';
 import { retainAsset, type ModelFormat } from './assets.js';
 import { instantiateModel, modelAsset, preloadModel, type FormatLoader } from './model-assets.js';
@@ -54,10 +45,7 @@ function values(value: readonly number[], size: number, label: string, min = 0, 
     value.length !== size ||
     value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
   )
-    throw rangeError(
-      `Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}`,
-      'react-arguments',
-    );
+    throw rangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}`, 'react-arguments');
 }
 function applyMaterials(originals: Map<PBRMaterial, PBRMaterial>, overrides: ModelProps['materials']): void {
   for (const [material, original] of originals) {
@@ -110,7 +98,7 @@ export function ModelResource({
   load,
   ...props
 }: ModelProps & { format?: ModelFormat; load?: FormatLoader }) {
-  const { engine, registry, resources, shadows, assetCache, pointerHandlers, world } = useScene(),
+  const { engine, registry, resources, shadows, assetCache, pointerHandlers } = useScene(),
     baked = useBakedShadows(),
     [model, setModel] = useState<PBRModel | null>(null);
   const [loading, setLoading] = useState<Loading | null>(null);
@@ -144,7 +132,7 @@ export function ModelResource({
         await asset.promise;
         if (!lease.active || engine.disposed) return;
         if (asset.status === 'rejected') throw asset.error;
-        const loaded = await instantiateModel(asset.value!, engine as unknown as EngineKernel, world);
+        const loaded = await instantiateModel(asset.value!, engine as unknown as EngineKernel);
         if (!lease.active || engine.disposed) {
           loaded.dispose();
           return;
@@ -203,7 +191,7 @@ export function ModelResource({
         }
       };
     },
-    [engine, world, registry, resources, assetCache, pointerHandlers, props.src, format],
+    [engine, registry, resources, assetCache, pointerHandlers, props.src, format],
   );
   useCommit(() => {
     if (model && !model.disposed) {
@@ -243,12 +231,12 @@ export function ModelResource({
     const removeCaster = castShadow
       ? shadows.add(
           {
-            get shadowPrimitives() {
-              return model.shadowPrimitives;
-            },
-            get disposed() {
-              return model.disposed;
-            },
+          get shadowPrimitives() {
+            return model.shadowPrimitives;
+          },
+          get disposed() {
+            return model.disposed;
+          },
           },
           { static: baked },
         )

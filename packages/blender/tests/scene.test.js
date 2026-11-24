@@ -15,16 +15,10 @@ const node = (name) => document.nodes.find((n) => n.name === name);
 /** The quaternion [x, y, z, w] applied to v. */
 function rotate([x, y, z, w], v) {
   const t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])];
-  return [
-    v[0] + w * t[0] + y * t[2] - z * t[1],
-    v[1] + w * t[1] + z * t[0] - x * t[2],
-    v[2] + w * t[2] + x * t[1] - y * t[0],
-  ];
+  return [v[0] + w * t[0] + y * t[2] - z * t[1], v[1] + w * t[1] + z * t[0] - x * t[2], v[2] + w * t[2] + x * t[1] - y * t[0]];
 }
 const close = (actual, expected, tolerance, what) =>
-  actual.forEach((v, i) =>
-    assert.ok(Math.abs(v - expected[i]) <= tolerance, `${what}: ${actual} against Blender's ${expected}`),
-  );
+  actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) <= tolerance, `${what}: ${actual} against Blender's ${expected}`));
 
 test('each Blender light is a punctual light at its place, pointing where Blender points it', () => {
   assert.ok(hasLights);
@@ -61,10 +55,7 @@ test('each camera projects as Blender projects it, and the scene camera is the o
     if (def.type === 'perspective') {
       assert.ok(Math.abs(def.perspective.yfov - 2 * Math.atan(1 / projection[1][1])) < 1e-6, `${name} yfov`);
       assert.ok(Math.abs(def.perspective.aspectRatio - projection[1][1] / projection[0][0]) < 1e-6, `${name} aspect`);
-      assert.deepEqual(
-        [def.perspective.znear, def.perspective.zfar].map((v) => +v.toFixed(5)),
-        [0.05, 60],
-      );
+      assert.deepEqual([def.perspective.znear, def.perspective.zfar].map((v) => +v.toFixed(5)), [0.05, 60]);
     } else {
       assert.ok(Math.abs(def.orthographic.ymag - 1 / projection[1][1]) < 1e-6, `${name} ymag`);
       assert.ok(Math.abs(def.orthographic.xmag - 1 / projection[0][0]) < 1e-6, `${name} xmag`);
@@ -79,10 +70,7 @@ test('camera tags it cannot read fail by object name', () => {
     return { ...asset, document: doc };
   };
   const rejects = (properties, message) =>
-    assert.throws(
-      () => margoComponents(tagged(properties)),
-      (e) => e.name === 'TypeError' && e.message.includes("Object 'View'") && e.message.includes(message),
-    );
+    assert.throws(() => margoComponents(tagged(properties)), (e) => e.name === 'TypeError' && e.message.includes("Object 'View'") && e.message.includes(message));
   rejects({ 'margo:camera': 'fisheye' }, 'one of perspective, orthographic');
   rejects({ 'margo:camera': 'perspective', 'margo:yfov': 4 }, 'below pi');
   rejects({ 'margo:camera': 'perspective', 'margo:znear': 2, 'margo:zfar': 1 }, 'above margo:znear');
@@ -93,19 +81,9 @@ test('camera tags it cannot read fail by object name', () => {
   rejects({ 'margo:camera': 'perspective', 'margo:light': 'point' }, 'without margo:light');
   rejects({ 'margo:camera': 'perspective', 'margo:znear': 0 }, 'at least 5e-324');
   // glTF 2.0 section 5.13: an orthographic znear may be 0 (KB-P3b).
-  const ortho = margoComponents(
-    tagged({ 'margo:camera': 'orthographic', 'margo:znear': 0, 'margo:zfar': 10 }),
-  ).document;
-  assert.deepEqual(ortho.cameras[ortho.nodes.find((n) => n.name === 'View').camera].orthographic, {
-    xmag: 1,
-    ymag: 1,
-    znear: 0,
-    zfar: 10,
-  });
-  rejects(
-    { 'margo:camera': 'orthographic', 'margo:znear': -1, 'margo:zfar': 10 },
-    "'margo:znear' must be a number of at least 0",
-  );
+  const ortho = margoComponents(tagged({ 'margo:camera': 'orthographic', 'margo:znear': 0, 'margo:zfar': 10 })).document;
+  assert.deepEqual(ortho.cameras[ortho.nodes.find((n) => n.name === 'View').camera].orthographic, { xmag: 1, ymag: 1, znear: 0, zfar: 10 });
+  rejects({ 'margo:camera': 'orthographic', 'margo:znear': -1, 'margo:zfar': 10 }, "'margo:znear' must be a number of at least 0");
 });
 
 test('a scene without cameras names none', () => {

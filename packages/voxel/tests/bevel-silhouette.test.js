@@ -72,9 +72,7 @@ const measure = (mesh) => {
       n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
       stored = [0, 1, 2].map((k) => mesh.normals[v[0] * 3 + k]);
     area += Math.hypot(...n) / 2;
-    volume +=
-      (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
-      6;
+    volume += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
     if (Math.hypot(...n) > 1e-9 && n[0] * stored[0] + n[1] * stored[1] + n[2] * stored[2] <= 0) inward++;
     for (let k = 0; k < 3; k++) {
       const from = weld(v[k]),
@@ -111,16 +109,7 @@ test('bevel: a merged top over a side the mesher split stays closed (no crack at
     { x: 2, y: 0, z: 0, face: 0, w: 1, h: 1 },
   ];
   const split = measure(bevelQuads(bar, 0.15)),
-    unit = measure(
-      bevelQuads(
-        exposed([
-          [0, 0, 0],
-          [1, 0, 0],
-          [2, 0, 0],
-        ]),
-        0.15,
-      ),
-    );
+    unit = measure(bevelQuads(exposed([[0, 0, 0], [1, 0, 0], [2, 0, 0]]), 0.15));
   assert.equal(split.open, 0, 'open edges: the chamfer cracks where the side was split');
   assert.equal(split.inward, 0);
   assert.ok(Math.abs(split.area - unit.area) < 1e-6, `area ${split.area} != ${unit.area}`);
@@ -129,18 +118,12 @@ test('bevel: a merged top over a side the mesher split stays closed (no crack at
   const b = 0.15,
     cube = measure(bevelQuads(exposed([[0, 0, 0]]), b));
   assert.equal(cube.open, 0);
-  assert.ok(
-    Math.abs(cube.volume - (1 - 6 * b * b * (1 - 2 * b) - (20 / 3) * b ** 3)) < 1e-5,
-    `cube volume ${cube.volume}`,
-  );
+  assert.ok(Math.abs(cube.volume - (1 - 6 * b * b * (1 - 2 * b) - (20 / 3) * b ** 3)) < 1e-5, `cube volume ${cube.volume}`);
 });
 
 test('bevel: coplanar quads meet flat, with no groove between them', () => {
   // A 2 x 1 x 1 slab whose top is one quad, or two of different materials (a chunk seam or a material change).
-  const slab = exposed([
-      [0, 0, 0],
-      [1, 0, 0],
-    ]),
+  const slab = exposed([[0, 0, 0], [1, 0, 0]]),
     merged = [...slab.filter((f) => f.face !== 2), { x: 0, y: 0, z: 0, face: 2, w: 2, h: 1, material: 3 }],
     one = bevelQuads(merged, 0.2),
     two = bevelQuads(slab, 0.2);
@@ -155,10 +138,7 @@ test('bevel: coplanar quads meet flat, with no groove between them', () => {
   const floor = [];
   for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) floor.push({ x, y: 0, z, face: 2, w: 1, h: 1 });
   const flat = bevelQuads(floor, 0.2);
-  assert.ok(
-    flat.positions.every((v, i) => i % 3 !== 1 || v === 1),
-    'a coplanar floor stays at y = 1',
-  );
+  assert.ok(flat.positions.every((v, i) => i % 3 !== 1 || v === 1), 'a coplanar floor stays at y = 1');
 });
 
 test('bevel: any merge of the same cells gives the same closed surface', () => {
@@ -172,10 +152,7 @@ test('bevel: any merge of the same cells gives the same closed surface', () => {
       const result = measure(bevelQuads(merge(unit, split), 0.15));
       assert.equal(result.open, 0, `round ${round}: merged faces leave open edges`);
       assert.equal(result.inward, 0);
-      assert.ok(
-        Math.abs(result.area - reference.area) < 1e-5,
-        `round ${round}: area ${result.area} != ${reference.area}`,
-      );
+      assert.ok(Math.abs(result.area - reference.area) < 1e-5, `round ${round}: area ${result.area} != ${reference.area}`);
       assert.ok(Math.abs(result.volume - reference.volume) < 1e-5, `round ${round}: volume differs`);
     }
   }
@@ -227,18 +204,8 @@ test('bevel: chunks that merge their own faces their own way meet exactly at sea
         hi = lo.map((v) => v + 3),
         inside = (f) => [f.x, f.y, f.z].every((v, a) => v >= lo[a] && v < hi[a]),
         own = faces.filter(inside),
-        context = touching(
-          faces.filter((f) => !inside(f)),
-          lo,
-          hi,
-        );
-      parts.push(
-        bevelQuads(
-          merge(own, () => random() < 0.35),
-          0.15,
-          context,
-        ),
-      );
+        context = touching(faces.filter((f) => !inside(f)), lo, hi);
+      parts.push(bevelQuads(merge(own, () => random() < 0.35), 0.15, context));
     }
     let offset = 0;
     const joined = { positions: [], normals: [], indices: [] };
@@ -276,11 +243,7 @@ test('bevel: each triangle takes its own face material, texture and light', () =
   }
   // The +y panel's corner nearest (0, 1, 0) reads the face's (0, 0) corner AO bilinearly, inset by the bevel.
   const top = [...Array(mesh.materials.length).keys()].find(
-    (v) =>
-      mesh.materials[v] === 3 &&
-      Math.abs(mesh.positions[v * 3] - 0.2) < 1e-6 &&
-      Math.abs(mesh.positions[v * 3 + 2] - 0.2) < 1e-6 &&
-      mesh.normals[v * 3 + 1] === 1,
+    (v) => mesh.materials[v] === 3 && Math.abs(mesh.positions[v * 3] - 0.2) < 1e-6 && Math.abs(mesh.positions[v * 3 + 2] - 0.2) < 1e-6 && mesh.normals[v * 3 + 1] === 1,
   );
   assert.ok(top !== undefined);
   assert.ok(Math.abs(mesh.lighting[top * 3] - (0 * 0.64 + 1 * 0.16 + 3 * 0.16 + 2 * 0.04)) < 1e-5);

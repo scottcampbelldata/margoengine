@@ -16,9 +16,7 @@ async function bundled(code) {
     publicDir: false,
     logLevel: 'silent',
     build: { write: false, target: 'es2022', minify: true, rollupOptions: { input: 'app' } },
-    plugins: [
-      { name: 'app', resolveId: (id) => (id === 'app' ? id : null), load: (id) => (id === 'app' ? code : null) },
-    ],
+    plugins: [{ name: 'app', resolveId: (id) => (id === 'app' ? id : null), load: (id) => (id === 'app' ? code : null) }],
   });
   // Every chunk counts, lazy ones included: the cost is what the app downloads at all.
   return out.output
@@ -35,17 +33,13 @@ import { ContactShadows } from '@margoengine/studio';
 import { PbrMaterial, createMesh } from '@margoengine/materials';
 console.log(Shadows, VirtualShadows, Clustered, LocalShadows, ContactShadows, PbrMaterial, createMesh);`;
 
-test('shadows, local and contact shadows and materials without alphaHash bundle no alpha hash', {
-  timeout: 180000,
-}, async () => {
+test('shadows, local and contact shadows and materials without alphaHash bundle no alpha hash', { timeout: 180000 }, async () => {
   const code = await bundled(shadows);
   assert.ok(!code.includes(HASH), 'the alpha hash WGSL was bundled');
   assert.ok(!code.includes(EDIT), 'the hashed caster edit was bundled');
 });
 
-test('importing alphaHash bundles the hash and its caster edit, so the markers above are live', {
-  timeout: 180000,
-}, async () => {
+test('importing alphaHash bundles the hash and its caster edit, so the markers above are live', { timeout: 180000 }, async () => {
   const code = await bundled(
     `${shadows}\nimport { alphaHash } from '@margoengine/materials/alpha-hash';\nconsole.log(alphaHash);`,
   );

@@ -141,6 +141,7 @@ export function cubeSphere(
   return out;
 }
 
+
 /**
  * The default ground: fractal value noise over the sphere, about -`relief` to `relief` metres. Octave k has a
  * wavelength of `radius / 2^(k+1)` and an amplitude of `relief / 2^(k+1)`; octaves shorter than twice the `detail` asked
@@ -344,8 +345,7 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     if (!(screenError > 0) || !Number.isFinite(screenError))
       throw new RangeError('Invalid screenError; pass pixels above 0');
     if (!(budget >= 0)) throw new RangeError('Invalid budget; pass milliseconds, 0 or more');
-    if (maxBuilds !== undefined && !(maxBuilds >= 1))
-      throw new RangeError('Invalid maxBuilds; pass a count, 1 or more');
+    if (maxBuilds !== undefined && !(maxBuilds >= 1)) throw new RangeError('Invalid maxBuilds; pass a count, 1 or more');
     if (typeof clock !== 'function') throw new TypeError('Invalid clock; pass a function returning milliseconds');
     if (!Number.isInteger(maxPatches) || maxPatches < 6 || maxPatches > 16384)
       throw new RangeError('Invalid maxPatches; pass an integer 6 to 16384');
@@ -589,7 +589,9 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     const wants: { node: Node; error: number }[] = [];
     const limit = this.maxBuilds;
     const budget =
-      limit === undefined ? () => builds === 0 || this.#clock() - start < this.budget : () => builds < limit;
+      limit === undefined
+        ? () => builds === 0 || this.#clock() - start < this.budget
+        : () => builds < limit;
     const visible = (node: Node): boolean => {
       // Centre relative to the eye.
       const qx = node.center[0] - ex,
@@ -802,7 +804,12 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     unitLight(u, 20, e.lighting.direction);
     u.set(e.lighting.radiance, 24);
     u.set(
-      [this.seaLevel === false ? 0 : this.seaLevel, +linearHdr(c.format), this.relief, +(this.seaLevel !== false)],
+      [
+        this.seaLevel === false ? 0 : this.seaLevel,
+        +linearHdr(c.format),
+        this.relief,
+        +(this.seaLevel !== false),
+      ],
       28,
     );
     c.device.queue.writeBuffer(this.#uniformBuffer!, 0, u as Float32Array<ArrayBuffer>);

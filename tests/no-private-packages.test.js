@@ -38,9 +38,7 @@ const manifests = readdirSync(join(root, 'packages')).flatMap((dir) => {
     return [];
   }
 });
-const publicPackages = new Set(
-  manifests.filter(({ manifest }) => !manifest.private).map(({ manifest }) => manifest.name),
-);
+const publicPackages = new Set(manifests.filter(({ manifest }) => !manifest.private).map(({ manifest }) => manifest.name));
 const packageOf = (spec) => (spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]);
 
 test('the import detector finds static, dynamic and type-only bare imports', () => {
@@ -60,11 +58,7 @@ test('no package is private or unlicensed, and every package is in the @margoeng
 
 test('no tracked file names the kernel repository npm scope', () => {
   // git grep exits 1 when nothing matches.
-  const run = spawnSync('git', ['grep', '-I', '-i', '-l', '-F', scope], {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
+  const run = spawnSync('git', ['grep', '-I', '-i', '-l', '-F', scope], { cwd: root, encoding: 'utf8', timeout: 60_000 });
   assert.equal(run.stdout.trim(), '');
   assert.equal(run.status, 1, run.stderr);
 });
@@ -87,10 +81,7 @@ for (const pkg of RETURNED) {
 
   test(`@margoengine/${pkg} sources import only node built-ins and the packages it declares`, () => {
     // A package's own name is declared by definition: the build keeps it an import, so one entry can load another.
-    const declared = new Set([
-      manifest.name,
-      ...Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies }),
-    ]);
+    const declared = new Set([manifest.name, ...Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies })]);
     for (const file of files(join(dir, 'src')).filter((f) => /\.(ts|tsx|js|mjs)$/.test(f)))
       for (const spec of bareImports(readFileSync(file, 'utf8'))) {
         if (spec.startsWith('node:')) continue;

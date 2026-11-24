@@ -53,10 +53,7 @@ export function readAlpha(program, file, decoder) {
       // Colour under full transparency is not shown, so only the visible regions are checked.
       if (alpha)
         for (let k = 0; k < 3; k++)
-          assert.ok(
-            Math.abs(decoded.stdout[at + k] - red[k]) <= 8,
-            `${file}: frame ${n} colour ${decoded.stdout[at + k]}`,
-          );
+          assert.ok(Math.abs(decoded.stdout[at + k] - red[k]) <= 8, `${file}: frame ${n} colour ${decoded.stdout[at + k]}`);
     }
   return worst;
 }

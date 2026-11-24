@@ -86,21 +86,15 @@ test('assembly copies each node quaternion, not its Float32 Euler lanes, so pose
     const p = Math.PI / 2 - 10 ** (-1 - k / 50),
       x = 0.3 + k * 0.01,
       z = 0.7 - k * 0.003,
-      q = mul(mul([Math.sin(x / 2), 0, 0, Math.cos(x / 2)], [0, Math.sin(p / 2), 0, Math.cos(p / 2)]), [
-        0,
-        0,
-        Math.sin(z / 2),
-        Math.cos(z / 2),
-      ]),
+      q = mul(
+        mul([Math.sin(x / 2), 0, 0, Math.cos(x / 2)], [0, Math.sin(p / 2), 0, Math.cos(p / 2)]),
+        [0, 0, Math.sin(z / 2), Math.cos(z / 2)],
+      ),
       root = e.createMesh(),
       node = e.createMesh(root).setQuaternion(q).setGeometry(box());
-    using a = assembleWFC(
-      e,
-      [1, 1, 1],
-      [0],
-      [{ source: 0, rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1] }],
-      [{ root, meshes: [node] }],
-    );
+    using a = assembleWFC(e, [1, 1, 1], [0], [{ source: 0, rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1] }], [
+      { root, meshes: [node] },
+    ]);
     const copy = a.meshes[1];
     for (const lane of ['qx', 'qy', 'qz', 'qw']) worst = Math.max(worst, Math.abs(t[lane][copy.id] - t[lane][node.id]));
     node.dispose();

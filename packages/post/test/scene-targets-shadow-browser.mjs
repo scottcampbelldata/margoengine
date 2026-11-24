@@ -41,31 +41,16 @@ await postBrowser(
           const heightmap = gpu.createTexture({ size: [4, 4], format: 'r32float', usage: 6 });
           gpu.queue.writeTexture({ texture: heightmap }, new Float32Array(16), { bytesPerRow: 16 }, [4, 4]);
           const layers = gpu.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
-          gpu.queue.writeTexture(
-            { texture: layers },
-            new Uint8Array(16).fill(170),
-            { bytesPerRow: 4, rowsPerImage: 1 },
-            [1, 1, 4],
-          );
+          gpu.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(170), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
           return { heightmap, layers };
         },
       });
       const grey = new PbrMaterial({ color: '#b0b0a8', roughness: 1 }),
-        floor = engine
-          .createMesh()
-          .setGeometry(box(12, 0.2, 16))
-          .setPosition([6, -0.1, 0])
-          .setMaterial(grey),
+        floor = engine.createMesh().setGeometry(box(12, 0.2, 16)).setPosition([6, -0.1, 0]).setMaterial(grey),
         casters = [
           [-5, 2.2, 0],
           [5, 2.2, 0],
-        ].map((position) =>
-          engine
-            .createMesh()
-            .setGeometry(box(2, 0.4, 2))
-            .setPosition(position)
-            .setMaterial(grey),
-        );
+        ].map((position) => engine.createMesh().setGeometry(box(2, 0.4, 2)).setPosition(position).setMaterial(grey));
       const subject = await loadGLTF(engine, '/packages/exporters/tests/fixtures/Box.glb');
       subject.root.setPosition([0, 0.5, 4]);
       let shadows = Shadows.attach(engine, { resolution: 2048, bounds: { min: [-12, -1, -8], max: [12, 4, 8] } });
@@ -149,7 +134,7 @@ await postBrowser(
         sun = 0,
         y = 0;
       for (let i = 0; i < width * height; i++)
-        if (m[i] > 0.5 && (half === undefined || i % width < width / 2 === (half === 'left'))) {
+        if (m[i] > 0.5 && (half === undefined || (i % width < width / 2) === (half === 'left'))) {
           n++;
           sun += masks.sun[i];
           y += luma(i);
@@ -158,11 +143,7 @@ await postBrowser(
     };
     const result = {};
     for (const half of ['left', 'right'])
-      result[half] = {
-        lit: stats(masks.lit, half),
-        shade: stats(masks.shade, half),
-        penumbra: stats(masks.penumbra, half),
-      };
+      result[half] = { lit: stats(masks.lit, half), shade: stats(masks.shade, half), penumbra: stats(masks.penumbra, half) };
     result.subject = stats(masks.subject);
     // The gltf box sits on the centre line, in front of the casters: low in the middle of the frame.
     let cx = 0,
@@ -188,21 +169,12 @@ await postBrowser(
       assert.ok(penumbra.n > 20, `${ground}: a soft edge around it (${penumbra.n} px)`);
       assert.ok(lit.sun >= 0.98 && shade.sun <= 0.02, `${ground}: visibility ${lit.sun} lit, ${shade.sun} shaded`);
       assert.ok(penumbra.sun > 0.02 && penumbra.sun < 0.98, `${ground}: penumbra visibility ${penumbra.sun}`);
-      assert.ok(
-        shade.luma < 0.6 * lit.luma,
-        `${ground}: the frame is darker where the mask says shaded (${shade.luma} against ${lit.luma})`,
-      );
+      assert.ok(shade.luma < 0.6 * lit.luma, `${ground}: the frame is darker where the mask says shaded (${shade.luma} against ${lit.luma})`);
     }
     assert.ok(result.subject.n > 150, `the subject mask covers the gltf box (${result.subject.n} px)`);
-    assert.ok(
-      Math.abs(cx - width / 2) < 20 && cy > height / 2,
-      `the subject mask is where the gltf box is (${cx}, ${cy})`,
-    );
+    assert.ok(Math.abs(cx - width / 2) < 20 && cy > height / 2, `the subject mask is where the gltf box is (${cx}, ${cy})`);
     assert.equal(result.open.shade, 0, 'with no shadow plugin nothing is shaded');
     assert.equal(result.open.penumbra, 0, 'and nothing is partial');
-    assert.ok(
-      result.open.lit > result.left.lit.n + result.right.lit.n && result.open.sunMin === 1,
-      'all ground reads visibility 1',
-    );
+    assert.ok(result.open.lit > result.left.lit.n + result.right.lit.n && result.open.sunMin === 1, 'all ground reads visibility 1');
   },
 );

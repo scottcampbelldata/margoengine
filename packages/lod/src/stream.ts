@@ -121,9 +121,7 @@ export class LevelStream implements EnginePlugin {
   }
   constructor({ maxBytes = 256 * 1024 * 1024, concurrency = 4 }: LevelStreamOptions = {}) {
     if (!(maxBytes >= 0 && maxBytes < Infinity) || !Number.isInteger(concurrency) || concurrency < 1)
-      throw new RangeError(
-        'Invalid LevelStream options; give maxBytes of 0 or more and a whole concurrency of 1 or more',
-      );
+      throw new RangeError('Invalid LevelStream options; give maxBytes of 0 or more and a whole concurrency of 1 or more');
     this.maxBytes = maxBytes;
     this.concurrency = concurrency;
     this.name = 'lod-stream:' + LevelStream.serial++;

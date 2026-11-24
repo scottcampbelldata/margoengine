@@ -224,21 +224,12 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
 const fakeDevice = () => {
   const device = {
     limits: { maxTextureDimension2D: 8192 },
-    createTexture: (d) => ({
-      device,
-      format: d.format,
-      usage: d.usage,
-      destroyed: false,
-      destroy() {
-        this.destroyed = true;
-      },
-    }),
-    queue: {
-      writes: 0,
-      writeTexture() {
-        this.writes++;
-      },
-    },
+    createTexture: (d) => ({ device, format: d.format, usage: d.usage, destroyed: false, destroy() {
+      this.destroyed = true;
+    } }),
+    queue: { writes: 0, writeTexture() {
+      this.writes++;
+    } },
   };
   return device;
 };
@@ -306,11 +297,7 @@ test('meshes draws a registry mesh by key in place of the procedural one, snags 
       'procedural:snag': [{ geometry: quad(6), color: [0.25, 0.2, 0.18], kind: 'bark' }],
       'library:grass': [{ geometry: quad(0.3), color: [0.3, 0.3, 0.1], kind: 'foliage' }],
     },
-    objects = await BiomeObjects.attach(engine, placement, {
-      heightmap: () => undefined,
-      bounds: [0, 0, 512, 512],
-      meshes,
-    }),
+    objects = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 512, 512], meshes }),
     tops = (scatter) => scatter.geometries.map((g) => +(g.bounds[1] * 2).toFixed(3));
   // fir bark (three rings), fir foliage, rock and snag (the grass detail is not a caster).
   assert.equal(objects.casters.length, 4);
@@ -319,11 +306,7 @@ test('meshes draws a registry mesh by key in place of the procedural one, snags 
   assert.deepEqual(tops(foliage), [4, 4, 4], 'one mesh serves every ring');
   assert.deepEqual(tops(rock), [0.5, 0.5, 0.5], 'procedural:rock is replaced by the library rock');
   assert.deepEqual(tops(snag), [6, 6, 6], 'the snag is replaced too');
-  assert.deepEqual(
-    Array.from(bark.options.material.data.slice(0, 3), (v) => +v.toFixed(3)),
-    [0.2, 0.15, 0.1],
-    'the part colour',
-  );
+  assert.deepEqual(Array.from(bark.options.material.data.slice(0, 3), (v) => +v.toFixed(3)), [0.2, 0.15, 0.1], 'the part colour');
   assert.equal(foliage.options.clusters, 0.6, 'foliage takes the foliage look');
   assert.equal(rock.options.wind, undefined, 'stone does not sway');
   objects.dispose();
@@ -332,43 +315,28 @@ test('meshes draws a registry mesh by key in place of the procedural one, snags 
 test('meshes is checked before anything is built', async () => {
   const engine = { camera: { position: [0, 0, 0] }, use() {} },
     placement = { tile() {}, species: [], details: [], tileSize: 256 },
-    at = (meshes) =>
-      BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 1, 1], meshes }),
+    at = (meshes) => BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 1, 1], meshes }),
     tri = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 1, 0, 0, 1, 0, 0, 1, 0], indices: [0, 1, 2] };
   await assert.rejects(at([]), TypeError);
   await assert.rejects(at({ a: [] }), TypeError);
   await assert.rejects(at({ a: [{ geometry: tri, color: [0, 0, 0], kind: 'leaf' }] }), TypeError);
   await assert.rejects(at({ a: [{ geometry: tri, color: [0, 2, 0], kind: 'stone' }] }), RangeError);
   await assert.rejects(at({ a: [{ geometry: [tri, tri], color: [0, 0, 0], kind: 'stone' }] }), TypeError);
-  await assert.rejects(
-    at({ a: [{ geometry: { ...tri, indices: [0, 1, 3] }, color: [0, 0, 0], kind: 'stone' }] }),
-    RangeError,
-  );
-  await assert.rejects(
-    at({ a: [{ geometry: { ...tri, normals: [0, 1, 0] }, color: [0, 0, 0], kind: 'stone' }] }),
-    RangeError,
-  );
+  await assert.rejects(at({ a: [{ geometry: { ...tri, indices: [0, 1, 3] }, color: [0, 0, 0], kind: 'stone' }] }), RangeError);
+  await assert.rejects(at({ a: [{ geometry: { ...tri, normals: [0, 1, 0] }, color: [0, 0, 0], kind: 'stone' }] }), RangeError);
 });
 
 // KB-SCATTER-TEX1: a registry part with texture maps (a scanned fir's needle cards) draws them: its uvs and maps reach
 // the part's ScatterTiles, and a malformed one is refused. Before, a part was one flat colour and its maps were dropped.
 test('meshes parts carry their texture maps to the scatter', async () => {
-  const quad = {
-      positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0],
-      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-      indices: [0, 1, 2, 2, 1, 3],
-    },
+  const quad = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2, 2, 1, 3] },
     attached = [],
     engine = { camera: { position: [0, 0, 0] }, use: (effect) => attached.push(effect) },
     placement = { tile() {}, species: [{ key: 'fir', mesh: 'library:fir', layer: 1 }], details: [], tileSize: 256 },
     baseColor = { width: 1, height: 1, data: new Uint8Array([40, 90, 40, 255]) },
     textures = { uvs: [0, 1, 1, 1, 0, 0, 1, 0], baseColor, alphaCutoff: 0.4 },
     meshes = { 'library:fir': [{ geometry: quad, color: [1, 1, 1], kind: 'foliage', textures }] },
-    objects = await BiomeObjects.attach(engine, placement, {
-      heightmap: () => undefined,
-      bounds: [0, 0, 512, 512],
-      meshes,
-    });
+    objects = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 512, 512], meshes });
   const [needles] = objects.casters;
   assert.equal(needles.options.textures, textures, 'the maps reach the scatter');
   objects.dispose();
@@ -396,12 +364,7 @@ test('states hands each part its plant state response, by mesh key and kind, and
       { key: 'conifer', mesh: 'procedural:conifer', layer: 1 },
       { key: 'rock', mesh: 'procedural:rock', layer: 0 },
     ],
-    placement = {
-      tile() {},
-      species,
-      details: [{ id: 'grass', mesh: 'procedural:grass', density: 10 }],
-      tileSize: 256,
-    },
+    placement = { tile() {}, species, details: [{ id: 'grass', mesh: 'procedural:grass', density: 10 }], tileSize: 256 },
     objects = await BiomeObjects.attach(engine, placement, {
       heightmap: () => undefined,
       bounds: [0, 0, 512, 512],
@@ -414,10 +377,7 @@ test('states hands each part its plant state response, by mesh key and kind, and
   assert.equal(bark.options.states, trunks, 'the conifer trunk takes the bark response');
   assert.equal(foliage.options.states, crowns, 'its canopy the foliage response');
   assert.equal(rock.options.states, undefined, 'stone is left as it is');
-  assert.ok(
-    attached.some((e) => e.options?.states === grass),
-    'the grass detail takes its own',
-  );
+  assert.ok(attached.some((e) => e.options?.states === grass), 'the grass detail takes its own');
   assert.ok(asked.includes('procedural:conifer:bark') && asked.includes('procedural:rock:stone'), asked.join());
   objects.dispose();
   await assert.rejects(
@@ -445,23 +405,12 @@ test('conifer species keys draw their species meshes, imposters in the far ring,
     [firBark, firNeedles, larchBark, larchNeedles, deadBark, snag] = objects.casters;
   assert.equal(objects.casters.length, 6, 'two parts per live tree, one for the burnt tree, then the snags');
   const fir = conifers.coniferLevels('douglas-fir', { age: 'pole' });
-  assert.deepEqual(
-    tris(firNeedles),
-    fir.canopy.map((g) => g.indices.length / 3),
-    'near, middle and imposter cards',
-  );
-  assert.deepEqual(
-    tris(firBark).slice(0, 2),
-    fir.trunk.slice(0, 2).map((g) => g.indices.length / 3),
-  );
+  assert.deepEqual(tris(firNeedles), fir.canopy.map((g) => g.indices.length / 3), 'near, middle and imposter cards');
+  assert.deepEqual(tris(firBark).slice(0, 2), fir.trunk.slice(0, 2).map((g) => g.indices.length / 3));
   assert.equal(tris(firBark)[2], 1, 'the far stem is in the imposter');
   assert.equal(firNeedles.options.textures.baseColor.width, 256, 'the needles draw the baked image');
   assert.equal(firNeedles.options.textures.uvs.length, 3);
-  assert.deepEqual(
-    Array.from(firNeedles.options.material.data.slice(0, 3)),
-    [1, 1, 1],
-    'needle colour comes from the image',
-  );
+  assert.deepEqual(Array.from(firNeedles.options.material.data.slice(0, 3)), [1, 1, 1], 'needle colour comes from the image');
   assert.deepEqual(
     Array.from(firBark.options.material.data.slice(0, 3), (v) => +v.toFixed(3)),
     conifers.CONIFER_SPECIES['douglas-fir'].bark.map((v) => +v.toFixed(3)),
@@ -469,10 +418,7 @@ test('conifer species keys draw their species meshes, imposters in the far ring,
   assert.ok(firNeedles.options.wind && firBark.options.wind, 'needles and stems take the wind');
   assert.ok(larchNeedles.options.textures && larchBark.options.wind);
   assert.equal(deadBark.options.textures, undefined, 'a burnt tree is a bare stem');
-  assert.ok(
-    Array.from(deadBark.options.material.data.slice(0, 3)).every((v) => v < 0.05),
-    'charred bark',
-  );
+  assert.ok(Array.from(deadBark.options.material.data.slice(0, 3)).every((v) => v < 0.05), 'charred bark');
   assert.ok(snag);
   objects.dispose();
 });

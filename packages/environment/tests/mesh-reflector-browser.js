@@ -15,23 +15,12 @@ async function drawPass(engine, device, floor, under) {
     format: 'rgba16float',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
-  const depth = device.createTexture({
-    size: [96, 96],
-    format: 'depth32float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
-  });
+  const depth = device.createTexture({ size: [96, 96], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
   const encoder = device.createCommandEncoder();
   encoder
     .beginRenderPass({
-      colorAttachments: [
-        { view: target.createView(), loadOp: 'clear', clearValue: [under, under, under, 1], storeOp: 'store' },
-      ],
-      depthStencilAttachment: {
-        view: depth.createView(),
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-        depthClearValue: 0,
-      },
+      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [under, under, under, 1], storeOp: 'store' }],
+      depthStencilAttachment: { view: depth.createView(), depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: 0 },
     })
     .end();
   const passes = [];
@@ -73,10 +62,7 @@ async function numbers(report) {
       one = floatToHalf(1),
       pixels = new Uint16Array(t.width * t.height * 4);
     for (let i = 0; i < pixels.length; i += 4) pixels.set([one, one, one, floatToHalf(1)], i);
-    device.queue.writeTexture({ texture: t }, pixels, { bytesPerRow: t.width * 8, rowsPerImage: t.height }, [
-      t.width,
-      t.height,
-    ]);
+    device.queue.writeTexture({ texture: t }, pixels, { bytesPerRow: t.width * 8, rowsPerImage: t.height }, [t.width, t.height]);
   };
   let worst = 0;
   for (const [strength, mirror] of [
@@ -100,9 +86,7 @@ async function numbers(report) {
     }
   }
   report.fresnelWorst = worst;
-  report.checks.push(
-    'blend over the surface: 0.5 (1 - w) + w with w = strength x Schlick, mirror and strength 0 exact',
-  );
+  report.checks.push('blend over the surface: 0.5 (1 - w) + w with w = strength x Schlick, mirror and strength 0 exact');
   // Contrast about 0.5 on a constant capture of 0.75: (0.75 - 0.5) x 2 + 0.5 = 1, seen at mirror 1.
   floor.mixStrength = 1;
   floor.mirror = 1;
@@ -111,10 +95,7 @@ async function numbers(report) {
     v = floatToHalf(0.75),
     pixels = new Uint16Array(t.width * t.height * 4);
   for (let i = 0; i < pixels.length; i += 4) pixels.set([v, v, v, floatToHalf(1)], i);
-  device.queue.writeTexture({ texture: t }, pixels, { bytesPerRow: t.width * 8, rowsPerImage: t.height }, [
-    t.width,
-    t.height,
-  ]);
+  device.queue.writeTexture({ texture: t }, pixels, { bytesPerRow: t.width * 8, rowsPerImage: t.height }, [t.width, t.height]);
   const contrast = (await drawPass(engine, device, floor, 0)).at(0, 48, 48)[0];
   assert(Math.abs(contrast - 1) < 0.001, `contrast 2 maps 0.75 to 1: ${contrast}`);
   report.checks.push('mixContrast about 0.5');
@@ -160,11 +141,7 @@ async function scene(report) {
   engine.lighting.radiance.set([2, 2, 2, 1]);
   engine.lighting.ambient.set([0.3, 0.3, 0.3]);
   // The floor: a 10 x 10 quad in its local XY plane facing +Z, turned to face +Y; a red unit box stands on it.
-  const quad = new Geometry(
-    [-5, -5, 0, 5, -5, 0, 5, 5, 0, -5, 5, 0],
-    [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-    [0, 1, 2, 0, 2, 3],
-  );
+  const quad = new Geometry([-5, -5, 0, 5, -5, 0, 5, 5, 0, -5, 5, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2, 0, 2, 3]);
   const floor = engine
     .createMesh()
     .setGeometry(quad)
@@ -215,10 +192,7 @@ async function scene(report) {
   const blurredStep = step(frame(engine, canvas));
   report.sharpStep = sharpStep;
   report.blurredStep = blurredStep;
-  assert(
-    sharpStep > 60 && blurredStep < sharpStep / 2,
-    `blur softens the reflection's edge: ${sharpStep} to ${blurredStep}`,
-  );
+  assert(sharpStep > 60 && blurredStep < sharpStep / 2, `blur softens the reflection's edge: ${sharpStep} to ${blurredStep}`);
   reflector.mixBlur = 0;
   assert(step(frame(engine, canvas)) === sharpStep, 'mixBlur 0 keeps the sharp image');
   reflector.mixBlur = 1;
@@ -285,13 +259,7 @@ async function grazing(report) {
     .setMaterial(new PbrMaterial({ color: [0.9, 0.9, 0.1], roughness: 1 }))
     .setRotation([-Math.PI / 2, 0, 0]);
   const plain = frame(engine, canvas);
-  const reflector = MeshReflector.attach(engine, {
-    parent: floor,
-    width: 2 * half,
-    height: 2 * half,
-    exclude: [floor],
-    mirror: 1,
-  });
+  const reflector = MeshReflector.attach(engine, { parent: floor, width: 2 * half, height: 2 * half, exclude: [floor], mirror: 1 });
   surface = reflector;
   const mirrored = frame(engine, canvas);
   let floorPixels = 0,

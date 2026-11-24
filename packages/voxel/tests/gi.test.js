@@ -128,19 +128,14 @@ test('origin: a fractional origin far out writes the corner in engine cells and 
   assert.throws(() => run(floorWorld(0, 0, 0), [0, 0, 0], { origin: [Number.NaN, 0, 0] }), RangeError);
 });
 
-test("a restored device: update remakes the volumes on the engine's new device and frees the old ones", () => {
+test('a restored device: update remakes the volumes on the engine\'s new device and frees the old ones', () => {
   const world = floorWorld(0, 0, 0),
     first = fakeEngine([16, 16, 16]),
     second = fakeEngine([16, 16, 16]),
     gi = VoxelGI.attach(first.engine, { world }),
     destroyed = new Set(),
     make = first.device.createBuffer;
-  first.device.createBuffer = (d) =>
-    Object.assign(make(d), {
-      destroy() {
-        destroyed.add(this);
-      },
-    });
+  first.device.createBuffer = (d) => Object.assign(make(d), { destroy() { destroyed.add(this); } });
   gi.update();
   assert.ok(gi.bindings().length && gi.pbr(1));
   first.engine.gpu = second.device; // the engine restored its device after a loss

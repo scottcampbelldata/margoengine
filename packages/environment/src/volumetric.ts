@@ -392,12 +392,8 @@ fn areaFog(p:vec3f,v:vec3f,g:f32,extinction:f32)->vec3f {
   let foot=0.5*max(length(n2+d2*(at/dot(d2,volume.plane.xyz))-p),length(n3+d3*(at/dot(d3,volume.plane.xyz))-p));
   let ray=normalize(d);let stretch=length(d)/dot(d,volume.plane.xyz);let front=sliceDepth(f32(id.z));let back=sliceDepth(f32(id.z)+1.0);
   let part=0.25*(back-front)*stretch;
-  if(part>0.0){for(var k=0u;k<4u;k++){light+=localLight(pixel,n+ray*((front+0.25*f32(k)*(back-front))*stretch),ray,part,v,volume.scatter.w,foot,sigma${medium ? '+local.a' : ''},volume.jitter.z)/(4.0*part);}}${
-    area(lights)
-      ? `
-  light+=areaFog(p,v,volume.scatter.w,sigma${medium ? '+local.a' : ''});`
-      : ''
-  }`
+  if(part>0.0){for(var k=0u;k<4u;k++){light+=localLight(pixel,n+ray*((front+0.25*f32(k)*(back-front))*stretch),ray,part,v,volume.scatter.w,foot,sigma${medium ? '+local.a' : ''},volume.jitter.z)/(4.0*part);}}${area(lights) ? `
+  light+=areaFog(p,v,volume.scatter.w,sigma${medium ? '+local.a' : ''});` : ''}`
       : ''
   }
   ${medium ? (lights ? '' : 'let local=fogMedium(p);') + 'var value=vec4f((sigma*volume.scatter.rgb+local.rgb)*light,sigma+local.a);' : 'var value=vec4f(sigma*volume.scatter.rgb*light,sigma);'}
@@ -695,8 +691,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       [o.shadows, o.lights].some(
         (s) => s !== undefined && (typeof s?.pbr !== 'function' || typeof s.bindings !== 'function'),
       ) ||
-      (o.volumes !== undefined &&
-        (typeof o.volumes?.medium !== 'function' || typeof o.volumes.bindings !== 'function')) ||
+      (o.volumes !== undefined && (typeof o.volumes?.medium !== 'function' || typeof o.volumes.bindings !== 'function')) ||
       (o.lightning !== undefined &&
         (typeof o.lightning !== 'object' ||
           o.lightning === null ||
@@ -975,8 +970,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       deck =
         bolt && bolt.intensity > 0
           ? ((flash!.albedo ?? CLOUD_ALBEDO) * bolt.intensity) /
-            (2 *
-              Math.PI *
+            (2 * Math.PI *
               Math.max(
                 1,
                 (bolt.position[0] - c.camera.position[0]) ** 2 +
@@ -1038,15 +1032,15 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       pipelines = (multisampled ? perSample(device, samples) : [null]).map((sample) => {
         const shader = composite(!!sky),
           code = !multisampled
+          ? shader
+          : sample !== null
             ? shader
-            : sample !== null
-              ? shader
-                  .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
-                  .replace('vec2i(position.xy),0)', `vec2i(position.xy),${sample})`)
-              : shader
-                  .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
-                  .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
-                  .replace('vec2i(position.xy),0)', 'vec2i(position.xy),i32(sample))');
+                .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+                .replace('vec2i(position.xy),0)', `vec2i(position.xy),${sample})`)
+            : shader
+                .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+                .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
+                .replace('vec2i(position.xy),0)', 'vec2i(position.xy),i32(sample))');
         const module = device.createShaderModule({ code }),
           blend: GPUBlendComponent = { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' };
         return device.createRenderPipeline({
@@ -1153,13 +1147,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
   bindings(): GPUBindGroupEntry[] {
     const view = this.activeView ?? this,
       device = this.device!,
-      sky =
-        view.injectSky ??
-        (this.blankSky ??= device.createTexture({
-          size: [1, 1],
-          format: 'rgba8unorm',
-          usage: GPUTextureUsage.TEXTURE_BINDING,
-        }));
+      sky = view.injectSky ?? (this.blankSky ??= device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING }));
     if (view.entries && view.entriesSky !== sky) view.entries = undefined;
     view.entriesSky = sky;
     view.skySampler ??= device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat' });
@@ -1216,15 +1204,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     this.uniform?.destroy();
     this.textures = [];
     this.blankSky?.destroy();
-    this.uniform =
-      this.sampler =
-      this.skySampler =
-      this.inject =
-      this.integrateStep =
-      this.injectSky =
-      this.entriesSky =
-      this.blankSky =
-        undefined;
+    this.uniform = this.sampler = this.skySampler = this.inject = this.integrateStep = this.injectSky = this.entriesSky = this.blankSky = undefined;
     this.gridSize = [];
     this.computeKey = '';
     this.injectGroups = [];

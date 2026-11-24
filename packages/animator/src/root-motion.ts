@@ -73,8 +73,7 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
   if (axes !== 'xz' && axes !== 'xyz') throw new RangeError("Root motion axes must be 'xz' or 'xyz'");
   if (typeof turn !== 'boolean' || typeof apply !== 'boolean')
     throw new TypeError('Root motion rotation and apply must be booleans');
-  if (!(smoothing >= 0 && smoothing < Infinity))
-    throw new RangeError('Root motion smoothing must be 0 seconds or more');
+  if (!(smoothing >= 0 && smoothing < Infinity)) throw new RangeError('Root motion smoothing must be 0 seconds or more');
   // Each clip's root translation and rotation tracks, found once.
   const tracks = new Map<Clip, { translation?: Track; rotation?: Track }>();
   for (const clip of animator.animation.clips) {

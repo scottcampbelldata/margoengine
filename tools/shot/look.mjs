@@ -24,11 +24,6 @@ export async function lookShot(out, manifest, { signal } = {}) {
 /** One line per failing check, `probe check: value unit, bound low to high`, for the console. */
 export function lookFailures(report) {
   return report.json.probes.flatMap((probe) =>
-    probe.results
-      .filter((row) => !row.pass)
-      .map(
-        (row) =>
-          `${probe.name} ${row.check}: ${row.missing ? `needs ${row.missing}` : `${row.value} ${row.unit}`}, bound ${row.bound.join(' to ')}`,
-      ),
+    probe.results.filter((row) => !row.pass).map((row) => `${probe.name} ${row.check}: ${row.missing ? `needs ${row.missing}` : `${row.value} ${row.unit}`}, bound ${row.bound.join(' to ')}`),
   );
 }

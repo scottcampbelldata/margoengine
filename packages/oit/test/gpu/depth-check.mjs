@@ -12,11 +12,9 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error') pageErrors.push(m.text());
   });
-  await page
-    .waitForFunction(() => window.ready, null, { timeout: 30000 })
-    .catch((error) => {
-      throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
-    });
+  await page.waitForFunction(() => window.ready, null, { timeout: 30000 }).catch((error) => {
+    throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
+  });
   const build = (o) => page.evaluate((options) => window.check.build(options), o),
     depth = () => page.evaluate(() => window.check.depth());
   const report = {};

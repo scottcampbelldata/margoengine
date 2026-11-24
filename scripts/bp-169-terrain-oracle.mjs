@@ -43,13 +43,5 @@ for (let level = 0; level <= 4; level++) {
           n++;
         }
     }
-  console.log(
-    JSON.stringify({
-      case: `ring-level-${level}`,
-      spacingCells: s,
-      maxError: max,
-      rmsError: Math.sqrt(sum / n),
-      heightRange: scale,
-    }),
-  );
+  console.log(JSON.stringify({ case: `ring-level-${level}`, spacingCells: s, maxError: max, rmsError: Math.sqrt(sum / n), heightRange: scale }));
 }

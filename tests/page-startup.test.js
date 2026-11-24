@@ -22,9 +22,7 @@ function fakePage() {
     },
     // Never settles on its own before its timeout, like a page that never becomes ready.
     waitForFunction(_predicate, _arg, { timeout = 30_000 } = {}) {
-      return new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout ${timeout}ms exceeded.`)), timeout).unref(),
-      );
+      return new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${timeout}ms exceeded.`)), timeout).unref());
     },
   };
   return page;
@@ -71,25 +69,13 @@ test('a crash before ready fails the wait; errors once ready, and other waits, a
   ready.emit('pageerror', new Error('provoked by the suite'));
   await tick();
   assert.equal(errors.length, 0);
-  await assert.rejects(
-    ready.waitForFunction(() => window.ready, null, { timeout: 50 }),
-    /Timeout 50ms/,
-  );
+  await assert.rejects(ready.waitForFunction(() => window.ready, null, { timeout: 50 }), /Timeout 50ms/);
 
   const other = fakePage();
   watchStartupErrors(other);
   other.emit('pageerror', new Error('not about readiness'));
   await tick();
-  await assert.rejects(
-    other.waitForFunction(() => window.done, null, { timeout: 50 }),
-    /Timeout 50ms/,
-  );
-  assert.equal(
-    waitsForReady(() => window.ready),
-    true,
-  );
-  assert.equal(
-    waitsForReady(() => window.readyState),
-    false,
-  );
+  await assert.rejects(other.waitForFunction(() => window.done, null, { timeout: 50 }), /Timeout 50ms/);
+  assert.equal(waitsForReady(() => window.ready), true);
+  assert.equal(waitsForReady(() => window.readyState), false);
 });

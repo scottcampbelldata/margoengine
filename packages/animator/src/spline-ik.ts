@@ -57,13 +57,7 @@ function frameRotation(tangent: number[], normal: ArrayLike<number>): number[] {
     z = unit([normal[0] - along * tangent[0], normal[1] - along * tangent[1], normal[2] - along * tangent[2]]),
     x = cross(tangent, z);
   return normalizeQuaternion(
-    rotationToQuaternion(
-      [x[0], x[1], x[2], 0, tangent[0], tangent[1], tangent[2], 0, z[0], z[1], z[2], 0, 0, 0, 0, 1],
-      [0, 0, 0, 0],
-      1,
-      1,
-      1,
-    ),
+    rotationToQuaternion([x[0], x[1], x[2], 0, tangent[0], tangent[1], tangent[2], 0, z[0], z[1], z[2], 0, 0, 0, 0, 1], [0, 0, 0, 0], 1, 1, 1),
   );
 }
 
@@ -242,12 +236,7 @@ export function addSplineIK(animator: Animator, chain: SplineIKChain): SplineIKH
       }
     }
     bent[count - 1] = multiplyQuaternions(
-      multiplyQuaternions(bent[count - 2], [
-        -worlds[count - 2][0],
-        -worlds[count - 2][1],
-        -worlds[count - 2][2],
-        worlds[count - 2][3],
-      ]),
+      multiplyQuaternions(bent[count - 2], [-worlds[count - 2][0], -worlds[count - 2][1], -worlds[count - 2][2], worlds[count - 2][3]]),
       worlds[count - 1],
     );
     // Write from the first joint out, blended by weight.

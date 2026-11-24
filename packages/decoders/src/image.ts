@@ -148,8 +148,6 @@ export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions
       return { width: image.width, height: image.height, data: image.data as Uint8Array };
     }
     default:
-      throw decodeFailed(
-        'This file is not an image decodeImage reads; pass a PNG, JPEG, WebP, AVIF, DDS, KTX or KTX2 file',
-      );
+      throw decodeFailed('This file is not an image decodeImage reads; pass a PNG, JPEG, WebP, AVIF, DDS, KTX or KTX2 file');
   }
 }

@@ -1,4 +1,3 @@
-import type { Borrowable } from '../../shared/borrowed.js';
 import type { TransmissionPassOptions } from './transmission-pass.js';
 export { Transmission, type TransmissionPassOptions } from './transmission-pass.js';
 import type { MaterialExtension } from '@margoengine/gltf/pbr';
@@ -28,8 +27,7 @@ export interface TransmissionOptions extends TransmissionPassOptions {
   ior?: number;
   /** Nonnegative chromatic dispersion strength (20 / Abbe number), default zero. */
   dispersion?: number;
-  /** The scene behind the surface: a view or `(device) => view` (called per device, again after a restore); a plain view is dropped after a restore, reported once through `engine.onError`, and reads white. */
-  opaqueColor?: Borrowable<GPUTextureView>;
+  opaqueColor?: GPUTextureView;
   transmissionTexture?: ClearcoatTexture;
   volume?: VolumeOptions;
 }

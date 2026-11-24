@@ -26,20 +26,7 @@ function shell(n = 9) {
   return { positions: new Float32Array(positions), uvs: new Float32Array(uvs), indices: new Uint32Array(indices) };
 }
 const lid = {
-  positions: new Float32Array([
-    -0.5,
-    1 - margin(-0.5),
-    0.05,
-    1.5,
-    1 - margin(1.5),
-    0.05,
-    1.5,
-    1.6,
-    0.05,
-    -0.5,
-    1.6,
-    0.05,
-  ]),
+  positions: new Float32Array([-0.5, 1 - margin(-0.5), 0.05, 1.5, 1 - margin(1.5), 0.05, 1.5, 1.6, 0.05, -0.5, 1.6, 0.05]),
   indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
 };
 // Character Creator's eye occlusion numbers on Wilbur (CC4 json), as the reader reads them.

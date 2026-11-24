@@ -201,11 +201,7 @@ test('Lambert, Phong and basic envMap combine the reflection with their colour',
 test('standard envMap reads its mips by GGX alpha: lod k + (x^2 - k^2) / (2k + 1)', () => {
   const source = readFileSync(new URL('../src/env-map.ts', import.meta.url), 'utf8');
   assert.ok(source.includes('fn margoEnvLod(roughness:f32)->f32 {'));
-  assert.ok(
-    source.includes(
-      'let x=clamp(roughness,0.0,1.0)*margoEnv.params.z; let k=min(floor(x),max(margoEnv.params.z-1.0,0.0)); return k+(x*x-k*k)/(2.0*k+1.0);',
-    ),
-  );
+  assert.ok(source.includes('let x=clamp(roughness,0.0,1.0)*margoEnv.params.z; let k=min(floor(x),max(margoEnv.params.z-1.0,0.0)); return k+(x*x-k*k)/(2.0*k+1.0);'));
   assert.ok(source.includes('margoEnvRadiance(margoEnvRay(s.n,v),margoEnvLod(s.roughness))'));
   assert.ok(source.includes('margoEnvRadiance(reflect(-v,s.cn),margoEnvLod(s.cr))'));
   assert.ok(!source.includes('*margoEnv.params.z)'), 'no lookup is linear in roughness');

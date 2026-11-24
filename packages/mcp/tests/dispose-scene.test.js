@@ -70,18 +70,14 @@ async function rig(t, respond) {
     popErrorScope: async () => null,
     createCommandEncoder: () => new Proxy({ finish: () => ({}) }, { get: (o, k) => o[k] ?? (() => pass) }),
   });
-  const engine = new Engine(
-      { width: 16, height: 16, clientWidth: 16, clientHeight: 16 },
-      await TransformStore.create(64),
-      {
-        backend: 'webgpu',
-        gpu: h.engine.gpu,
-        add() {},
-        remove() {},
-        render() {},
-        dispose() {},
-      },
-    ),
+  const engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(64), {
+      backend: 'webgpu',
+      gpu: h.engine.gpu,
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    }),
     fetch = globalThis.fetch;
   globalThis.fetch = async () => respond();
   t.after(() => {
@@ -92,7 +88,8 @@ async function rig(t, respond) {
   return engine;
 }
 const owned = (scene) => [...scene.plugins.keys()].filter((name) => name !== 'probe');
-const model = () => new Response(JSON.stringify(triangle()), { headers: { 'content-type': 'model/gltf+json' } });
+const model = () =>
+  new Response(JSON.stringify(triangle()), { headers: { 'content-type': 'model/gltf+json' } });
 const hdr = () => {
   const head = new TextEncoder().encode('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 2 +X 2\n'),
     bytes = new Uint8Array(head.length + 16);

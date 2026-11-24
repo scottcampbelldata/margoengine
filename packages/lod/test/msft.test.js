@@ -203,7 +203,7 @@ test('material LOD follows the selected KHR_materials_variants material and rest
     assert.deepEqual(controller.levels, [0, 2]);
     model.selectVariant('yellow');
     controller.update();
-    assert.deepEqual(controller.levels, [0, 1], "the far primitive takes the variant chain's coarse level");
+    assert.deepEqual(controller.levels, [0, 1], 'the far primitive takes the variant chain\'s coarse level');
     assert.deepEqual(base(0), [1, 1, 0, 1]);
     assert.deepEqual(base(1), [0, 1, 1, 1]);
     model.selectVariant('yellow');
@@ -211,22 +211,9 @@ test('material LOD follows the selected KHR_materials_variants material and rest
     controller.update();
     assert.deepEqual(base(1), [0, 1, 1, 1], 'the next update brings the coarse level back');
     controller.dispose();
-    assert.deepEqual(
-      [base(0), base(1)],
-      [
-        [1, 1, 0, 1],
-        [1, 1, 0, 1],
-      ],
-      'dispose keeps the selected variant',
-    );
+    assert.deepEqual([base(0), base(1)], [[1, 1, 0, 1], [1, 1, 0, 1]], 'dispose keeps the selected variant');
     model.selectVariant(undefined);
-    assert.deepEqual(
-      [base(0), base(1)],
-      [
-        [1, 0, 0, 1],
-        [1, 0, 0, 1],
-      ],
-    );
+    assert.deepEqual([base(0), base(1)], [[1, 0, 0, 1], [1, 0, 0, 1]]);
   } finally {
     e.dispose();
   }

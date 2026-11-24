@@ -485,16 +485,9 @@ export function blackbodyChromaticity(kelvin: number): [number, number] {
  * colour's luminance until it is 0). For light colours, whose strength is set apart from their colour.
  * @throws RangeError for a chromaticity with y not above 0 or x + y above 1.
  */
-export function chromaticityToLinearSRGB<T extends NumberArray = number[]>(
-  x: number,
-  y: number,
-  out?: T,
-  offset = 0,
-): T {
+export function chromaticityToLinearSRGB<T extends NumberArray = number[]>(x: number, y: number, out?: T, offset = 0): T {
   if (!(y > 0 && x >= 0 && x + y <= 1))
-    throw new RangeError(
-      `Invalid chromaticity (${String(x)}, ${String(y)}); use x of 0 or more, y above 0 and x + y up to 1.`,
-    );
+    throw new RangeError(`Invalid chromaticity (${String(x)}, ${String(y)}); use x of 0 or more, y above 0 and x + y up to 1.`);
   const X = x / y,
     Z = (1 - x - y) / y,
     rgb = [

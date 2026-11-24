@@ -212,10 +212,7 @@ test('an ANGLE Vulkan launch needs a hardware WebGL renderer, not a WebGPU adapt
   const session = await openBrowser({ args: ['--use-angle=vulkan'] });
   assert.equal(session.hardware.webgpu, null);
   await session.close();
-  for (const webglRenderer of [
-    null,
-    'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)',
-  ]) {
+  for (const webglRenderer of [null, 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)']) {
     const state = fixture([], { webgpu: null, webglRenderer });
     await assert.rejects(openBrowser({ args: ['--use-angle=vulkan'] }), (error) => error.code === 'no-webgpu-adapter');
     assert.equal(state.browserCloses, 1);

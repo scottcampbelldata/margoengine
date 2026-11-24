@@ -6,16 +6,7 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import {
-  compareKnown,
-  compile,
-  packageMarkdown,
-  parseErrors,
-  standIns,
-  tally,
-  unclosedFences,
-  writeExamples,
-} from './support/readme-types.mjs';
+import { compareKnown, compile, packageMarkdown, parseErrors, standIns, tally, unclosedFences, writeExamples } from './support/readme-types.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   knownFile = join(root, 'scripts/support/readme-types-known.json');
@@ -50,15 +41,11 @@ export function readmeTypeProblems(dir = root) {
     packageMarkdown(folder).flatMap(({ markdown }) => standIns(markdown).map((line) => `${name}: ${line}`)),
   );
   const unclosed = packages.flatMap(({ name, folder }) =>
-    packageMarkdown(folder).flatMap(({ document, markdown }) =>
-      unclosedFences(markdown).map((line) => `${name} ${document} ${line}`),
-    ),
+    packageMarkdown(folder).flatMap(({ document, markdown }) => unclosedFences(markdown).map((line) => `${name} ${document} ${line}`)),
   );
   const problems = [
     ...declared.map((line) => `Runs as pasted, so give it a real value: ${line}`),
-    ...unclosed.map(
-      (line) => `Text after a closing code fence leaves the block open; move it to the next line: ${line}`,
-    ),
+    ...unclosed.map((line) => `Text after a closing code fence leaves the block open; move it to the next line: ${line}`),
     ...fresh.map(({ line }) => line),
     ...gone.map(({ name, key, count: left }) => `${name}: fixed ${left} time(s), still on the known list: ${key}`),
   ];
@@ -68,11 +55,8 @@ export function readmeTypeProblems(dir = root) {
 function main() {
   const { count, packages, errors, fresh, gone, problems } = readmeTypeProblems();
   if (process.argv.includes('--shrink') && !fresh.length) {
-    writeFileSync(
-      knownFile,
-      `${JSON.stringify(tally(errors), null, 2)}
-`,
-    );
+    writeFileSync(knownFile, `${JSON.stringify(tally(errors), null, 2)}
+`);
     console.log(`known list: ${gone.reduce((sum, g) => sum + g.count, 0)} removed, ${errors.length} left`);
     return;
   }

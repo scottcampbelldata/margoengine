@@ -15,9 +15,7 @@ async function device() {
       getExtension: (name) => (name === 'EXT_color_buffer_float' ? {} : null),
       getParameter: (p) => values.get(p) ?? '',
       getShaderPrecisionFormat: (_s, type) =>
-        type === 0x8df2
-          ? { precision: 23, rangeMin: 127, rangeMax: 127 }
-          : { precision: 0, rangeMin: 31, rangeMax: 30 },
+        type === 0x8df2 ? { precision: 23, rangeMin: 127, rangeMax: 127 } : { precision: 0, rangeMin: 31, rangeMax: 30 },
       getProgramParameter: () => true,
       getShaderParameter: () => true,
       getActiveUniformBlockParameter: () => 0,
@@ -29,8 +27,7 @@ async function device() {
     gl = new Proxy(context, {
       get: (t, k) => {
         if (k in t) return t[k];
-        if (!made.has(k))
-          made.set(k, typeof k === 'string' && /^[A-Z0-9_]+$/.test(k) ? 0x9000 + made.size : () => ({}));
+        if (!made.has(k)) made.set(k, typeof k === 'string' && /^[A-Z0-9_]+$/.test(k) ? 0x9000 + made.size : () => ({}));
         return made.get(k);
       },
     });
@@ -81,9 +78,7 @@ test('a recorded pass replays every command in order with its numbers', async ()
     group = d.createBindGroup({ layout, entries: [] }),
     encoder = d.createCommandEncoder(),
     pass = encoder.beginRenderPass({
-      colorAttachments: [
-        { view: color.createView(), clearValue: { r: 1, g: 0.5, b: 0.25, a: 0 }, loadOp: 'clear', storeOp: 'store' },
-      ],
+      colorAttachments: [{ view: color.createView(), clearValue: { r: 1, g: 0.5, b: 0.25, a: 0 }, loadOp: 'clear', storeOp: 'store' }],
       depthStencilAttachment: { view: depth.createView(), depthClearValue: 0.5, depthReadOnly: false },
     });
   pass.setBindGroup(0, group);
@@ -131,9 +126,7 @@ async function scene() {
     color = d.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: 0x10 }),
     layout = d.createBindGroupLayout({ entries: [] }),
     group = d.createBindGroup({ layout, entries: [] }),
-    desc = {
-      colorAttachments: [{ view: color.createView(), clearValue: [0, 0, 0, 1], loadOp: 'clear', storeOp: 'store' }],
-    };
+    desc = { colorAttachments: [{ view: color.createView(), clearValue: [0, 0, 0, 1], loadOp: 'clear', storeOp: 'store' }] };
   return { d, log, color, group, desc };
 }
 
@@ -148,7 +141,7 @@ test('the pass descriptor is copied when the pass begins: a caller may change th
   assert.deepEqual(log[0], ['beginPass', 1, [[0, [0, 0, 0, 1], 'clear', 'store']], undefined]);
 });
 
-test("a command buffer's tape goes to the next encoder once the buffer has replayed, and replays the next frame afresh", async () => {
+test('a command buffer\'s tape goes to the next encoder once the buffer has replayed, and replays the next frame afresh', async () => {
   const { d, log, group, desc } = await scene(),
     frame = (draws) => {
       const encoder = d.createCommandEncoder(),
@@ -175,10 +168,7 @@ test("a command buffer's tape goes to the next encoder once the buffer has repla
     ['endPass'],
   ]);
   assert.equal(tape.ol, 0);
-  assert.ok(
-    tape.objs.every((o) => o === undefined),
-    'a pooled tape keeps no object alive',
-  );
+  assert.ok(tape.objs.every((o) => o === undefined), 'a pooled tape keeps no object alive');
 });
 
 test('a long frame grows its tape and replays every command', async () => {
@@ -229,11 +219,7 @@ test('a command encoder finished twice reports it and the second command buffer 
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(errors.length, 1);
   assert.match(errors[0], /already called/);
-  assert.deepEqual(
-    log.map(([name]) => name),
-    ['beginPass', 'draw', 'endPass'],
-    'only the first buffer drew',
-  );
+  assert.deepEqual(log.map(([name]) => name), ['beginPass', 'draw', 'endPass'], 'only the first buffer drew');
   // The pool holds the tape once, not twice: two encoders never share one.
   const a = d.createCommandEncoder(),
     b = d.createCommandEncoder();
@@ -244,10 +230,7 @@ test('an attachment list with a hole replays with its count', async () => {
   const { d, log, color } = await scene(),
     encoder = d.createCommandEncoder(),
     pass = encoder.beginRenderPass({
-      colorAttachments: [
-        null,
-        { view: color.createView(), clearValue: [1, 1, 1, 1], loadOp: 'clear', storeOp: 'discard' },
-      ],
+      colorAttachments: [null, { view: color.createView(), clearValue: [1, 1, 1, 1], loadOp: 'clear', storeOp: 'discard' }],
     });
   pass.end();
   d.queue.submit([encoder.finish()]);
@@ -292,22 +275,8 @@ test('compute passes replay with the bind groups, offsets and counts current at 
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(calls, [
     ['p', [['one', []]], [2, 3, 4]],
-    [
-      'p',
-      [
-        ['one', [64]],
-        ['two', [16, 32]],
-      ],
-      [5, 1, 1],
-    ],
-    [
-      'q',
-      [
-        ['one', [64]],
-        ['two', [16, 32]],
-      ],
-      [7, 8, 9],
-    ],
+    ['p', [['one', [64]], ['two', [16, 32]]], [5, 1, 1]],
+    ['q', [['one', [64]], ['two', [16, 32]]], [7, 8, 9]],
     ['p', [null, null, ['two', []]], [1, 1, 1]],
   ]);
   assert.equal(errors.length, 1);

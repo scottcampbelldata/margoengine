@@ -304,11 +304,7 @@ export async function loadPortingGuides(file?: string | URL, signal?: AbortSigna
   try {
     return JSON.parse(text) as PortingGuide[];
   } catch {
-    throw fault(
-      'failed',
-      `The porting guides ${String(target)} are not JSON; rebuild or reinstall @margoengine/mcp`,
-      'mcp',
-    );
+    throw fault('failed', `The porting guides ${String(target)} are not JSON; rebuild or reinstall @margoengine/mcp`, 'mcp');
   }
 }
 
@@ -320,11 +316,7 @@ export function createPortingTool(guides: readonly PortingGuide[]): ToolDefiniti
     if (from === undefined) return guides[0];
     const wanted = from.toLowerCase();
     const found = guides.find((guide) => guide.library.toLowerCase().includes(wanted));
-    if (!found)
-      throw rangeError(
-        `No porting guide for ${JSON.stringify(from)}; there are guides for ${libraries.join(', ')}`,
-        'mcp',
-      );
+    if (!found) throw rangeError(`No porting guide for ${JSON.stringify(from)}; there are guides for ${libraries.join(', ')}`, 'mcp');
     return found;
   };
   return {
@@ -334,10 +326,7 @@ export function createPortingTool(guides: readonly PortingGuide[]): ToolDefiniti
     inputSchema: {
       type: 'object',
       properties: {
-        name: {
-          type: 'string',
-          description: 'A class or function name (NS.OrbitControls or OrbitControls) or a task.',
-        },
+        name: { type: 'string', description: 'A class or function name (NS.OrbitControls or OrbitControls) or a task.' },
         from: {
           type: 'string',
           enum: libraries,
@@ -351,8 +340,7 @@ export function createPortingTool(guides: readonly PortingGuide[]): ToolDefiniti
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     run(args): ToolResult {
       const name = args.name;
-      if (typeof name !== 'string' || !name.trim())
-        throw typeError('name is required and must be a non-empty string', 'mcp');
+      if (typeof name !== 'string' || !name.trim()) throw typeError('name is required and must be a non-empty string', 'mcp');
       if (args.from !== undefined && typeof args.from !== 'string') throw typeError('from must be a string', 'mcp');
       const limit = args.limit;
       if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit)))

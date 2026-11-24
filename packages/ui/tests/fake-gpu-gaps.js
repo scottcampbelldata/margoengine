@@ -6,21 +6,13 @@ export const fillGaps = (Plugin) => {
     if (!original) continue;
     Plugin.prototype[hook] = function (engine, ...rest) {
       globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
-      globalThis.GPUTextureUsage ??= {
-        COPY_SRC: 1,
-        COPY_DST: 2,
-        TEXTURE_BINDING: 4,
-        STORAGE_BINDING: 8,
-        RENDER_ATTACHMENT: 16,
-      };
-      const canvas = engine.canvas,
-        attributes = new Map();
-      if (canvas && !canvas.hasAttribute)
-        Object.assign(canvas, {
-          hasAttribute: (name) => attributes.has(name),
-          setAttribute: (name, value) => attributes.set(name, String(value)),
-          removeAttribute: (name) => attributes.delete(name),
-        });
+      globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+      const canvas = engine.canvas, attributes = new Map();
+      if (canvas && !canvas.hasAttribute) Object.assign(canvas, {
+        hasAttribute: (name) => attributes.has(name),
+        setAttribute: (name, value) => attributes.set(name, String(value)),
+        removeAttribute: (name) => attributes.delete(name),
+      });
       if (engine.gpu) {
         engine.gpu.createPipelineLayout ??= () => ({});
         engine.gpu.queue.writeTexture ??= () => {};

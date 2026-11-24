@@ -312,9 +312,7 @@ function splineCurve(file: STEPFile, id: number): Curve {
       list(knotted[0]).map((m) => num(m)),
     );
   if (knots.length !== controls.length + degree + 1 || degree < 1)
-    throw new TypeError(
-      `Invalid STEP file: #${id} B-spline knots do not match its control points and degree; export it again from the CAD tool`,
-    );
+    throw new TypeError(`Invalid STEP file: #${id} B-spline knots do not match its control points and degree; export it again from the CAD tool`);
   const points = new Float64Array(controls.length * 4);
   controls.forEach((c, i) => {
     const w = weights?.[i] ?? 1;

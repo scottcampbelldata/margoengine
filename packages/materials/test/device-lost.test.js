@@ -112,9 +112,9 @@ test('material uniforms make one device.lost reaction per device, and a live one
     }
     assert.equal(device.reactions(), after, 'released material states add no reaction to the live device');
     const live = draw();
-    const phong = made
-      .filter(({ descriptor }) => descriptor.size === 16 && descriptor.usage & GPUBufferUsage.UNIFORM)
-      .at(-1).buffer;
+    const phong = made.filter(
+      ({ descriptor }) => descriptor.size === 16 && descriptor.usage & GPUBufferUsage.UNIFORM,
+    ).at(-1).buffer;
     assert.equal(phong.destroyed, undefined);
     device.lose();
     await setImmediate();

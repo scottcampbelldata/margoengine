@@ -56,13 +56,7 @@ test('openShotPage loads no copy of the shot page: renderOnce navigates to it on
     version: 1,
     duration: 1,
     tracks: [],
-    shot: {
-      format: 'margo-shot',
-      version: 1,
-      id: 'one-load',
-      seconds: 1,
-      page: { path: 'tools/shot/test/scene.html', engine: 'shotScene.engine' },
-    },
+    shot: { format: 'margo-shot', version: 1, id: 'one-load', seconds: 1, page: { path: 'tools/shot/test/scene.html', engine: 'shotScene.engine' } },
   });
   const opened = await openShotPage(file);
   try {

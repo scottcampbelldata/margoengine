@@ -34,11 +34,7 @@ await postBrowser(
         [[0.6, 0.6, 0.6], [1.6, 0.3, 1.2], '#d02020'],
         [[12, 0.2, 12], [0, -0.1, 0], '#8a8f70'],
       ])
-        engine
-          .createMesh()
-          .setGeometry(box(...size))
-          .setPosition(position)
-          .setMaterial(new PbrMaterial({ color, roughness: 0.4 }));
+        engine.createMesh().setGeometry(box(...size)).setPosition(position).setMaterial(new PbrMaterial({ color, roughness: 0.4 }));
       const device = engine.gpu;
       device.pushErrorScope('validation');
       const made = { pipelines: 0, buffers: 0, textures: 0 };
@@ -236,20 +232,14 @@ await postBrowser(
     console.log(JSON.stringify({ result, free, rebuilt, validation }));
     assert.equal(validation, undefined, `validation error: ${validation}`);
     for (const [group, r] of Object.entries(result)) {
-      assert.deepEqual(
-        r.counts.after,
-        r.counts.before,
-        `${group}: 60 frames of every live row made GPU objects: ${JSON.stringify(r.counts)}`,
-      );
+      assert.deepEqual(r.counts.after, r.counts.before, `${group}: 60 frames of every live row made GPU objects: ${JSON.stringify(r.counts)}`);
       assert.ok(r.changed > 100, `${group}: the swept rows change the frame (${r.changed})`);
       if (group === 'autoExposure') continue;
       assert.equal(r.defaultsDiffer, 0, `${group}: the defaults written leave the frame exact`);
       assert.equal(r.onceDiffers, 0, `${group}: the sweep's last frame is what writing its values once draws`);
     }
-    for (const [curve, count] of Object.entries(free))
-      assert.equal(count, 0, `curve ${curve} among the first three makes ${count} objects`);
-    for (const [name, count] of Object.entries(rebuilt))
-      assert.ok(count > 0, `${name} is live: false because it makes GPU objects`);
+    for (const [curve, count] of Object.entries(free)) assert.equal(count, 0, `curve ${curve} among the first three makes ${count} objects`);
+    for (const [name, count] of Object.entries(rebuilt)) assert.ok(count > 0, `${name} is live: false because it makes GPU objects`);
   },
   { seconds: 540 },
 );

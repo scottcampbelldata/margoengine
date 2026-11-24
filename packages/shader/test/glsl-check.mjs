@@ -43,10 +43,7 @@ try {
         d = compare(got, want);
       assert.equal(got.length, want.length, 'pixel counts');
       rows.push(`${glslFixtures[i].name} t=${t}: max ${d.max}, mean ${d.mean.toFixed(4)}`);
-      assert.ok(
-        d.max <= 1,
-        `${glslFixtures[i].name} at t=${t} differs from the native WebGL2 oracle by ${d.max} levels`,
-      );
+      assert.ok(d.max <= 1, `${glslFixtures[i].name} at t=${t} differs from the native WebGL2 oracle by ${d.max} levels`);
     }
   for (const kind of ['tint', 'pick']) {
     assert.deepEqual(await page.evaluate(([k]) => window.check.material(k, false), [kind]), []);
@@ -55,17 +52,13 @@ try {
     const d = compare(await rgb(), twin);
     rows.push(`NodeMaterial ${kind}: max ${d.max}, mean ${d.mean.toFixed(4)}`);
     assert.ok(d.max <= 1, `NodeMaterial ${kind} from GLSL differs from its WGSL twin by ${d.max} levels`);
-    assert.ok(
-      twin.some((v) => v > 0),
-      'the material draws',
-    );
+    assert.ok(twin.some((v) => v > 0), 'the material draws');
   }
   const compiled = await page.evaluate(() => window.check.compile());
   assert.deepEqual(compiled.failed, [], 'every toGLSL program compiles and links in WebGL2');
   // The layer translates WGSL without WebGPU's uniformity analysis, so only native WebGPU can refuse strict code.
   assert.equal(await page.evaluate(() => window.check.strict(false)), 0);
-  if (!compat)
-    assert.ok((await page.evaluate(() => window.check.strict(true))) > 0, 'strict keeps the uniformity rule');
+  if (!compat) assert.ok((await page.evaluate(() => window.check.strict(true))) > 0, 'strict keeps the uniformity rule');
   assert.deepEqual(await page.evaluate(() => window.check.close()), []);
   assert.deepEqual(errors, []);
   console.log(rows.join('\n'));

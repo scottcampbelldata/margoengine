@@ -72,10 +72,7 @@ test('the state says what runs and what shows at any time', () => {
 });
 
 test('applyActivation sets visible on the objects you pass and no others', () => {
-  const cutscene = build([
-    door([{ start: 0, duration: 1 }]),
-    door([{ start: 0, duration: 1 }], { id: 'x', target: 'other' }),
-  ]);
+  const cutscene = build([door([{ start: 0, duration: 1 }]), door([{ start: 0, duration: 1 }], { id: 'x', target: 'other' })]);
   const mesh = { visible: false };
   applyActivation(cutscene.evaluate(0.5), { door: mesh });
   assert.equal(mesh.visible, true);
@@ -105,9 +102,7 @@ test('the player fires a clip start and end and each burst, in order, and skip f
 
 test('a nested timeline runs its effects on its own time', () => {
   const timelines = { fight: { duration: 2, tracks: [sparks([{ start: 1, duration: 1 }])] } };
-  const cutscene = build([{ type: 'timeline', id: 't', clips: [{ start: 3, duration: 2, timeline: 'fight' }] }], {
-    timelines,
-  });
+  const cutscene = build([{ type: 'timeline', id: 't', clips: [{ start: 3, duration: 2, timeline: 'fight' }] }], { timelines });
   assert.equal(effectsOf(cutscene.evaluate(3.5)).sparks.running, false);
   assert.equal(effectsOf(cutscene.evaluate(4.5)).sparks.running, true);
   assert.equal(effectsOf(cutscene.evaluate(4.5)).sparks.time, 0.5);
@@ -124,11 +119,7 @@ test('playing starts, stops and bursts the effect on time', () => {
   assert.equal(rates[0], 30, 'frame 60 is the first since the fresh start');
   assert.equal(rates[59], 30);
   assert.equal(rates[60], 0, 'stopped at the end of the clip; live particles finish by themselves');
-  assert.equal(
-    effect.log.reduce((sum, [, bursts]) => sum + bursts, 0),
-    7,
-    'the burst fired once',
-  );
+  assert.equal(effect.log.reduce((sum, [, bursts]) => sum + bursts, 0), 7, 'the burst fired once');
   assert.equal(effect.log[30][1], 7, 'at its frame');
 });
 
@@ -159,35 +150,14 @@ function sameAsPlaying(cutscene, frames, makeEffect = () => fakeEffect()) {
 }
 
 test('a seek replays to the same frames as playing there', () => {
-  const clips = [
-    {
-      start: 1,
-      duration: 3,
-      rate: 30,
-      bursts: [
-        { time: 0.25, count: 5 },
-        { time: 0.5, count: 9 },
-        { time: 2, count: 3 },
-      ],
-    },
-  ];
+  const clips = [{ start: 1, duration: 3, rate: 30, bursts: [{ time: 0.25, count: 5 }, { time: 0.5, count: 9 }, { time: 2, count: 3 }] }];
   const sought = sameAsPlaying(build([sparks(clips)]), 150);
   assert.equal(sought.resets, 2, 'the seek wiped it, and the clip started it fresh');
 });
 
 test('a burst or clip between two frames lands on the same frame in a seek as in play', () => {
   // A quarter and three quarters of a frame past frame 15 of the clip: a replay rounding to the nearest tick would differ.
-  const clips = [
-    {
-      start: 1.004,
-      duration: 3,
-      rate: 30,
-      bursts: [
-        { time: 0.2542, count: 5 },
-        { time: 0.2625, count: 9 },
-      ],
-    },
-  ];
+  const clips = [{ start: 1.004, duration: 3, rate: 30, bursts: [{ time: 0.2542, count: 5 }, { time: 0.2625, count: 9 }] }];
   sameAsPlaying(build([sparks(clips)]), 120);
 });
 
@@ -201,10 +171,7 @@ test('a seek brings back what lingers: after the clip, and from an earlier clip 
   sameAsPlaying(build([sparks(clips)]), 150, lives);
   // In the second clip: the gap is shorter than a life, so the replay reaches back through the first.
   const through = sameAsPlaying(build([sparks(clips)]), 180, lives);
-  assert.ok(
-    through.log.some(([, bursts]) => bursts === 5),
-    'the first clip ran again',
-  );
+  assert.ok(through.log.some(([, bursts]) => bursts === 5), 'the first clip ran again');
   // A gap longer than a life is a fresh start: the replay leaves the first clip out, as nothing of it is left.
   const apart = [clips[0], { start: 4, duration: 1, rate: 60 }];
   const fresh = sameAsPlaying(build([sparks(apart)]), 270, lives);
@@ -226,26 +193,11 @@ test('seeking backward replays, and forward by a frame or two does not', () => {
 
 test('a seek to where nothing is left wipes the effect, and a replay is capped at longest', () => {
   const effect = fakeEffect(),
-    cutscene = build([
-      sparks([
-        {
-          start: 0,
-          duration: 5,
-          bursts: [
-            { time: 0.1, count: 2 },
-            { time: 4.5, count: 3 },
-          ],
-        },
-      ]),
-    ]),
+    cutscene = build([sparks([{ start: 0, duration: 5, bursts: [{ time: 0.1, count: 2 }, { time: 4.5, count: 3 }] }])]),
     run = director(cutscene, effect, { longest: 1 });
   run.apply(cutscene.evaluate(4.75));
   assert.equal(effect.log.length, 60, 'one second of steps');
-  assert.equal(
-    effect.log.reduce((sum, [, bursts]) => sum + bursts, 0),
-    3,
-    'only bursts inside what ran',
-  );
+  assert.equal(effect.log.reduce((sum, [, bursts]) => sum + bursts, 0), 3, 'only bursts inside what ran');
   effect.options.lifetime = [1, 1];
   run.apply(cutscene.evaluate(7));
   assert.deepEqual(effect.log, [], 'two seconds past the end of the clip, a life of 1 s has left nothing');
@@ -265,17 +217,13 @@ test('two effects seek together, one step drawing both', () => {
     track = (target, id, start) => ({ type: 'vfx', id, target, clips: [{ start, duration: 5, rate: 10 }] }),
     cutscene = build([track('a', 'one', 0), track('b', 'two', 1)]);
   let steps = 0;
-  const run = new VfxDirector(
-    cutscene,
-    { a, b },
-    {
-      step() {
-        steps++;
-        a.frame();
-        b.frame();
-      },
+  const run = new VfxDirector(cutscene, { a, b }, {
+    step() {
+      steps++;
+      a.frame();
+      b.frame();
     },
-  );
+  });
   run.apply(cutscene.evaluate(2));
   assert.equal(steps, 120);
   assert.equal(a.log.length, 120);
@@ -286,12 +234,8 @@ test('two effects seek together, one step drawing both', () => {
 });
 
 test('a nested timeline fires its bursts at their place on the top timeline', () => {
-  const timelines = {
-      fx: { duration: 2, tracks: [sparks([{ start: 0.5, duration: 1, bursts: [{ time: 0.25, count: 4 }] }])] },
-    },
-    cutscene = build([{ type: 'timeline', id: 'act', clips: [{ start: 1, duration: 2, timeline: 'fx' }] }], {
-      timelines,
-    }),
+  const timelines = { fx: { duration: 2, tracks: [sparks([{ start: 0.5, duration: 1, bursts: [{ time: 0.25, count: 4 }] }])] } },
+    cutscene = build([{ type: 'timeline', id: 'act', clips: [{ start: 1, duration: 2, timeline: 'fx' }] }], { timelines }),
     effect = fakeEffect(),
     run = director(cutscene, effect);
   play(cutscene, run, effect, 0, 180);
@@ -300,9 +244,7 @@ test('a nested timeline fires its bursts at their place on the top timeline', ()
 
 test('effects the director does not hold are ignored', () => {
   const effect = fakeEffect(),
-    cutscene = build([
-      { type: 'vfx', id: 'x', target: 'unknown', clips: [{ start: 0, duration: 1, bursts: [{ time: 0, count: 1 }] }] },
-    ]),
+    cutscene = build([{ type: 'vfx', id: 'x', target: 'unknown', clips: [{ start: 0, duration: 1, bursts: [{ time: 0, count: 1 }] }] }]),
     run = director(cutscene, effect);
   assert.doesNotThrow(() => run.apply(cutscene.evaluate(0.5)));
 });
@@ -314,15 +256,10 @@ test('options and tracks are checked', () => {
   assert.throws(() => new VfxDirector(scene, {}, { step() {}, stepSize: 0 }), /stepSize/);
   assert.throws(() => new VfxDirector(scene, {}, { step() {}, longest: -1 }), /longest/);
   const issues = (bad) =>
-    validateCutscene(doc([bad]), new Set(), new Map(types.map((type) => [type.type, type]))).map(
-      (issue) => `${issue.path}: ${issue.message}`,
-    );
+    validateCutscene(doc([bad]), new Set(), new Map(types.map((type) => [type.type, type]))).map((issue) => `${issue.path}: ${issue.message}`);
   const expect = (bad, pattern) => {
     const found = issues(bad);
-    assert.ok(
-      found.some((row) => pattern.test(row)),
-      `${pattern} in ${found.join(' | ')}`,
-    );
+    assert.ok(found.some((row) => pattern.test(row)), `${pattern} in ${found.join(' | ')}`);
   };
   assert.deepEqual(issues(sparks([{ start: 0, duration: 1, bursts: [{ time: 0, count: 1 }] }])), []);
   assert.deepEqual(issues(door([{ start: 0, duration: 1 }])), []);
@@ -331,19 +268,7 @@ test('options and tracks are checked', () => {
   expect(sparks([{ start: 0, duration: 1, bursts: 3 }]), /bursts: must be an array/);
   expect(sparks([{ start: 0, duration: 1, bursts: [{ time: 2, count: 1 }] }]), /bursts\[0\]\.time/);
   expect(sparks([{ start: 0, duration: 1, bursts: [{ time: 0, count: 0.5 }] }]), /bursts\[0\]\.count/);
-  expect(
-    sparks([
-      {
-        start: 0,
-        duration: 1,
-        bursts: [
-          { time: 1, count: 1 },
-          { time: 0, count: 1 },
-        ],
-      },
-    ]),
-    /is earlier/,
-  );
+  expect(sparks([{ start: 0, duration: 1, bursts: [{ time: 1, count: 1 }, { time: 0, count: 1 }] }]), /is earlier/);
   expect({ ...door([]), target: 3 }, /target/);
   expect(door([], { invert: 'yes' }), /invert: must be true or false/);
   expect(door([{ start: 0, duration: -1 }]), /duration/);

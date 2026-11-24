@@ -1,14 +1,5 @@
 // STL writer: world-space triangles with face normals.
-import {
-  collect,
-  drawables,
-  num,
-  standZUp,
-  toWorld,
-  turnsToZUp,
-  type ExportSource,
-  type SceneOptions,
-} from './scene.js';
+import { collect, drawables, num, standZUp, toWorld, turnsToZUp, type ExportSource, type SceneOptions } from './scene.js';
 
 /** Options of exportSTL: binary or ASCII output and the solid name. */
 export interface STLOptions extends SceneOptions {

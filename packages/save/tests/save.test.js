@@ -629,29 +629,14 @@ test('fileStorage keys skip names it never wrote, so every listed key reads (KB-
 });
 
 test('indexedDBStorage: close() ends the database connection, is safe twice and the storage opens again on use', async () => {
-  const idb = fakeIndexedDB(),
-    opened = [],
-    open = idb.open.bind(idb);
+  const idb = fakeIndexedDB(), opened = [], open = idb.open.bind(idb);
   idb.open = (...args) => {
     const request = open(...args);
     let result;
-    Object.defineProperty(request, 'result', {
-      get: () => result,
-      set: (db) => {
-        result = db;
-        opened.push(db);
-      },
-    });
+    Object.defineProperty(request, 'result', { get: () => result, set: (db) => { result = db; opened.push(db); } });
     return request;
   };
-  const isOpen = (db) => {
-    try {
-      db.transaction('saves', 'readonly');
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  const isOpen = (db) => { try { db.transaction('saves', 'readonly'); return true; } catch { return false; } };
   const saves = indexedDBStorage({ factory: idb });
   await saves.close();
   assert.equal(opened.length, 0, 'closing before first use opens nothing');

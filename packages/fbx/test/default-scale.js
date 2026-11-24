@@ -40,15 +40,7 @@ export function defaultScaleMesh(n = 499, { tangents = true } = {}) {
   if (tangents)
     layers.push(
       layer('LayerElementTangent', 'ByPolygonVertex', 'Direct', [
-        [
-          'Tangents',
-          [
-            A(
-              'd',
-              normals.map((_, i) => (i % 3 === 0 ? 1 : 0)),
-            ),
-          ],
-        ],
+        ['Tangents', [A('d', normals.map((_, i) => (i % 3 === 0 ? 1 : 0)))]],
       ]),
     );
   const bytes = binary(

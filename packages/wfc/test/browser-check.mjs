@@ -12,8 +12,7 @@ const server = await createServer({
   configFile: false,
   // This suite serves only its middleware page, not the repository's unrelated HTML entries.
   optimizeDeps: { entries: [], noDiscovery: true, include: [] },
-  plugins: [
-    noFileWatcher(),
+  plugins: [noFileWatcher(),
     {
       name: 'wfc-test-page',
       configureServer(server) {

@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EmissiveSprite2D, checkEmissiveSprite, emissiveLightAt, EmissiveLighting2D } from '../dist/emissive.js';
+import {
+  EmissiveSprite2D,
+  checkEmissiveSprite,
+  emissiveLightAt,
+  EmissiveLighting2D,
+} from '../dist/emissive.js';
 
 test('checkEmissiveSprite validates shape, radius, dimensions and intensity', () => {
   const circle = new EmissiveSprite2D({
@@ -136,10 +141,10 @@ test('EmissiveLighting2D lifecycle, bloom hookup, and WebGL2 refusal', () => {
 
 test('F10 local extraction uses RGB brightness and removes threshold proportionally', () => {
   const sprite = { radius: 10, glowRadius: 10, color: '#404040', intensity: 2, bloomThreshold: 0.8 };
-  const peak = (2 * 64) / 255;
+  const peak = 2 * 64 / 255;
   assert.deepEqual(emissiveLightAt(sprite, 0, 0), [peak, peak, peak]);
   const above = { ...sprite, intensity: 4 };
-  const direct = (4 * 64) / 255;
+  const direct = 4 * 64 / 255;
   const expected = direct + direct - 0.8;
   for (const v of emissiveLightAt(above, 0, 0)) assert.ok(Math.abs(v - expected) < 1e-12);
 });

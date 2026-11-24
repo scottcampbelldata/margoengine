@@ -533,9 +533,6 @@ export class Eruption {
       beta = o.windEntrainment ?? 0.5,
       front = o.frontSpeed ?? 0.5,
       Q0 = rate / Math.PI,
-      [, P0] = standardAtmosphere(ground, sea, tropo),
-      rho0 = 1 / ((n0 * R_VAPOUR * T0) / P0 + (1 - n0) / MAGMA),
-      b0 = Math.sqrt(Q0 / (rho0 * u0)),
       solids = (1 - n0) * Q0,
       vapour = n0 * Q0;
     // State along the axis: mass flux Q, horizontal and vertical momentum fluxes, energy flux, x and z (per pi).
@@ -1123,3 +1120,14 @@ export class Eruption {
     this.puffs.clear();
   }
 }
+
+export {
+  BlastCloud,
+  airStability,
+  thermalTop,
+  type BlastCloudOptions,
+  type BlastCloudTarget,
+  type BlastDrawOptions,
+  type BlastSource,
+  type BlastThermal,
+} from './thermal.js';

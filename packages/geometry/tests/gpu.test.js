@@ -23,7 +23,6 @@ function fakeEngine(gpu = true) {
     plugins = [],
     engine = {
       gpu: gpu ? device : null,
-      sceneOf: () => undefined,
       use(plugin) {
         plugin.setup(engine);
         plugins.push(plugin);
@@ -83,11 +82,7 @@ test('each kind gets the size and params it was asked for', () => {
   assert.equal(rope.geometry.indices.length, 6 * 10 * 6);
   assert.equal(generator.tube({ points: 4 }).rows, 64, 'segments default to 16 per point');
   assert.equal(generator.ribbon({ points: 3, segments: 5 }).vertexCount, 2 * 6);
-  const custom = generator.surface({
-    code: 'fn surface(u: f32, v: f32, time: f32, p: vec4f) -> vec3f { return vec3f(u); }',
-    columns: 2,
-    rows: 3,
-  });
+  const custom = generator.surface({ code: 'fn surface(u: f32, v: f32, time: f32, p: vec4f) -> vec3f { return vec3f(u); }', columns: 2, rows: 3 });
   assert.equal(custom.vertexCount, 3 * 4);
   assert.equal(custom.geometry.indices.length, 2 * 3 * 6);
 });
@@ -198,18 +193,6 @@ test('dispose stops generating and frees what the item owns', () => {
   assert.equal(log.destroyed, 5);
   assert.throws(() => generator.sphere(), /not attached/);
   assert.ok(other);
-});
-
-test('disposing the generator takes its plugin out of the scene, once (KB-GEOMETRY-GENDISPOSE1)', () => {
-  const { engine } = fakeEngine(),
-    generator = GeometryGenerator.attach(engine),
-    removed = [],
-    scene = { removePlugin: (name) => (removed.push(name), generator.dispose()) };
-  engine.sceneOf = (plugin) => (plugin === generator ? scene : undefined);
-  generator.sphere();
-  generator.dispose();
-  generator.dispose();
-  assert.deepEqual(removed, [generator.name]);
 });
 
 test('setPoints takes arrays or flat values and refuses the wrong size', () => {

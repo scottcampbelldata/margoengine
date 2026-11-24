@@ -11,10 +11,7 @@ const DT = 1 / 120;
 const CLIPS = {
   Walk: bipedWalk({ duration: 1, speed: 1 }),
   // In place: the feet step but the hips do not travel.
-  March: {
-    ...bipedWalk({ duration: 1, speed: 1 }),
-    tracks: withoutTravel(bipedWalk({ duration: 1, speed: 1 }).tracks),
-  },
+  March: { ...bipedWalk({ duration: 1, speed: 1 }), tracks: withoutTravel(bipedWalk({ duration: 1, speed: 1 }).tracks) },
   // Covers 1.5 m in 1 s, slowing to a stop.
   Stop: { duration: 1, tracks: { 'Hips.translation': (t) => [0, 1, 1.5 * (1 - (1 - t) ** 2)] } },
   Start: { duration: 1, tracks: { 'Hips.translation': (t) => [0, 1, 2 * t * t] } },
@@ -84,18 +81,11 @@ for (const speed of [0.7, 1, 1.4]) {
 test('a clip that starts away from the origin warps about the hips, as a real take does', async (t) => {
   const walkAt = bipedWalk({ duration: 1, speed: 1 }),
     tracks = { ...walkAt.tracks, 'Hips.translation': (time) => [0.5, 1, time - 3] },
-    f = await animatorRun(animatorDocument(BIPED, { Walk: { ...walkAt, tracks } }), {
-      initial: 'walk',
-      states: { walk: 'Walk' },
-    }),
+    f = await animatorRun(animatorDocument(BIPED, { Walk: { ...walkAt, tracks } }), { initial: 'walk', states: { walk: 'Walk' } }),
     i = (name) => f.index.get(name);
   t.after(() => f.release());
   f.pelvis = i('Hips');
-  f.legs = ['Left', 'Right'].map((side) => ({
-    hip: i(`${side}UpLeg`),
-    knee: i(`${side}Leg`),
-    ankle: i(`${side}Foot`),
-  }));
+  f.legs = ['Left', 'Right'].map((side) => ({ hip: i(`${side}UpLeg`), knee: i(`${side}Leg`), ankle: i(`${side}Foot`) }));
   addRootMotion(f.animator, { joint: f.pelvis, apply: false });
   addWarping(f.animator, { pelvis: f.pelvis, legs: f.legs, velocity: [0, 0, 0.7] });
   const slid = slide(f, [0, 0, 0.7]);
@@ -236,16 +226,12 @@ test('bad settings name the fix', async (t) => {
   assert.throws(() => addWarping(f.animator, { ...ok, pelvis: 99 }), /not one of/);
   assert.throws(() => addWarping(f.animator, { ...ok, legs: [] }), /1-8 legs/);
   assert.throws(
-    () =>
-      addWarping(f.animator, { ...ok, legs: [{ hip: f.legs[0].hip, knee: f.legs[1].knee, ankle: f.legs[0].ankle }] }),
+    () => addWarping(f.animator, { ...ok, legs: [{ hip: f.legs[0].hip, knee: f.legs[1].knee, ankle: f.legs[0].ankle }] }),
     /not a direct chain/,
   );
   assert.throws(() => addWarping(f.animator, { ...ok, velocity: [0, 0] }), TypeError);
   assert.throws(() => addWarping(f.animator, { ...ok, minStride: 0 }), /minStride/);
-  assert.throws(
-    () => addWarping(f.animator, { ...ok, spine: [f.index.get('LeftHand'), f.index.get('Head')] }),
-    /spine 1/,
-  );
+  assert.throws(() => addWarping(f.animator, { ...ok, spine: [f.index.get('LeftHand'), f.index.get('Head')] }), /spine 1/);
   assert.throws(() => addDistanceWarp(f.animator, { state: 'nope', joint: f.pelvis, distance: 1 }), /not one of/);
   assert.throws(() => addDistanceWarp(f.animator, { state: 'march', joint: f.pelvis, distance: 1 }), /no translation/);
   addDistanceWarp(f.animator, { state: 'stop', joint: f.pelvis, distance: 1 });

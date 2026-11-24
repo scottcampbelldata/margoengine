@@ -78,13 +78,10 @@ export function biomeMaterials(
   look: BiomeLookName | BiomeLookValues,
   base: Readonly<Record<string, MaterialLook>> = MATERIALS,
 ): Record<string, Required<MaterialLook>> {
-  const v: BiomeLookValues | undefined =
-    typeof look === 'string' ? (BIOME_LOOKS as Record<string, BiomeLookValues>)[look] : look;
-  if (!v)
-    throw rangeError(`Unknown biome look ${String(look)}; use one of ${Object.keys(BIOME_LOOKS).join(', ')}`, 'biomes');
+  const v: BiomeLookValues | undefined = typeof look === 'string' ? (BIOME_LOOKS as Record<string, BiomeLookValues>)[look] : look;
+  if (!v) throw rangeError(`Unknown biome look ${String(look)}; use one of ${Object.keys(BIOME_LOOKS).join(', ')}`, 'biomes');
   for (const key of ['saturation', 'detail', 'bump', 'macro'] as const)
-    if (!(v[key] >= 0 && Number.isFinite(v[key])))
-      throw rangeError(`Invalid biome look ${key}; use a finite number of 0 or more`, 'biomes');
+    if (!(v[key] >= 0 && Number.isFinite(v[key]))) throw rangeError(`Invalid biome look ${key}; use a finite number of 0 or more`, 'biomes');
   const out: Record<string, Required<MaterialLook>> = {};
   for (const [key, m] of Object.entries(base)) {
     const luma = 0.2126 * m.color[0] + 0.7152 * m.color[1] + 0.0722 * m.color[2];
@@ -97,3 +94,4 @@ export function biomeMaterials(
   }
   return out;
 }
+

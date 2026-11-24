@@ -11,10 +11,7 @@ const other = { wgsl: () => '', call: 'vec3f(0.5)' };
 const floor = (options) => {
   const style = shadowStyle(options);
   let sent;
-  const device = {
-    createBuffer: () => ({ destroy() {} }),
-    queue: { writeBuffer: (_, __, values) => (sent = [...values]) },
-  };
+  const device = { createBuffer: () => ({ destroy() {} }), queue: { writeBuffer: (_, __, values) => (sent = [...values]) } };
   style.setup(device);
   style.update({ context: { device } });
   return sent.slice(0, 3);
@@ -23,11 +20,7 @@ const floor = (options) => {
 test('a style takes the whole shadow of the light in both shadow classes', () => {
   const name = `shadowFxStyle${EFFECT_BINDING}`;
   const plain = shadowSampling(1, 'hard', false, true, false, [shadowStyle(), other]);
-  assert.ok(
-    plain.includes(
-      `return direct*${name}(vec3f(1)*shadowVisibility(position,normal)*shadowTint(position,normal)*vec3f(0.5));}`,
-    ),
-  );
+  assert.ok(plain.includes(`return direct*${name}(vec3f(1)*shadowVisibility(position,normal)*shadowTint(position,normal)*vec3f(0.5));}`));
   const virtual = new VirtualShadows({ filter: 'hard', effects: [shadowStyle()] }).pbr(1).declarations;
   assert.ok(virtual.includes(`return direct*${name}(vec3f(1)*shadowVisibility(position,normal));}`));
 });

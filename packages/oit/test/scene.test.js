@@ -16,10 +16,7 @@ test('addMesh makes its see-through copy in the scene of the mesh it follows, no
     const remove = addMesh(oit, engine, mesh, { opacity: 0.5 });
     assert.equal(mesh.geometry, null, 'the core mesh gives up its geometry');
     assert.deepEqual([...engine.scene.plugins.keys()], before, 'nothing joins the default scene');
-    assert.ok(
-      [...scene.plugins.keys()].some((name) => name.startsWith('materials:')),
-      'the draw queue joins the mesh scene',
-    );
+    assert.ok([...scene.plugins.keys()].some((name) => name.startsWith('materials:')), 'the draw queue joins the mesh scene');
     remove();
     assert.ok(mesh.geometry, 'the returned function restores the geometry');
     assert.deepEqual([...scene.plugins.keys()], [oit.name], 'the copy and its queue leave the mesh scene');

@@ -90,7 +90,8 @@ export function jsonProblems(text) {
 // files: tracked paths; read: path -> text. Returns "file:line message" findings.
 export function manifestProblems(files, read) {
   const out = [];
-  for (const file of files.filter(isManifest)) for (const p of jsonProblems(read(file))) out.push(`${file}: ${p}`);
+  for (const file of files.filter(isManifest))
+    for (const p of jsonProblems(read(file))) out.push(`${file}: ${p}`);
   return out;
 }
 
@@ -101,12 +102,7 @@ export function assertValidManifests(files, read) {
 }
 
 export function assertValidTrackedManifests(root) {
-  const files = execFileSync('git', ['ls-files', '-z'], {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 30_000,
-    maxBuffer: 32 << 20,
-  })
+  const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', timeout: 30_000, maxBuffer: 32 << 20 })
     .split('\0')
     .filter((f) => f && existsSync(join(root, f)));
   assertValidManifests(files, (f) => readFileSync(join(root, f), 'utf8'));

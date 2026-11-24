@@ -25,7 +25,11 @@ export interface AddBodyOptions extends BodyOptions {
 const worlds = new WeakMap<Stage, Promise<Physics>>();
 
 async function createWorld(stage: Stage, options: PhysicsOptions): Promise<Physics> {
-  const { Physics } = await optionalPackage('@margoengine/physics', () => import('@margoengine/physics'), stage.signal);
+  const { Physics } = await optionalPackage(
+    '@margoengine/physics',
+    () => import('@margoengine/physics'),
+    stage.signal,
+  );
   await Physics.load({ signal: stage.signal });
   return Physics.attach(stage.engine, options);
 }

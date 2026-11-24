@@ -10,10 +10,7 @@ const CAP = 11_184_810,
 test('Geometry takes up to 11,184,810 vertices, the most a default 256 MiB vertex buffer holds', () => {
   assert.ok(CAP * 24 <= DEFAULT_MAX_BUFFER && (CAP + 1) * 24 > DEFAULT_MAX_BUFFER);
   const triangle = [0, 1, 2];
-  assert.equal(
-    new Geometry(new Float32Array(1_000_001 * 3), new Float32Array(1_000_001 * 3), triangle).vertices.length,
-    6_000_006,
-  );
+  assert.equal(new Geometry(new Float32Array(1_000_001 * 3), new Float32Array(1_000_001 * 3), triangle).vertices.length, 6_000_006);
   const at = new Geometry(new Float32Array(CAP * 3), new Float32Array(CAP * 3), triangle);
   assert.equal(at.vertices.byteLength, CAP * 24);
   assert.ok(at.vertices.byteLength <= DEFAULT_MAX_BUFFER);

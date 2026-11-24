@@ -255,10 +255,7 @@ test('turning the pack off restores one draw per part', async () => {
 // 49182025b: PartInstancer took the preview and drew nothing there (its passes are WebGPU only); it refuses it in setup.
 test('PartInstancer refuses the WebGL2 preview in setup', () => {
   const instancer = new PartInstancer();
-  assert.throws(
-    () => instancer.setup({ backend: 'webgl2', gpu: null, meshes: new Map() }),
-    /PartInstancer needs WebGPU/,
-  );
+  assert.throws(() => instancer.setup({ backend: 'webgl2', gpu: null, meshes: new Map() }), /PartInstancer needs WebGPU/);
 });
 
 test('disposing a PartInstancer takes it out of its scene, and its parts go back to their own draws', async () => {
@@ -285,19 +282,12 @@ test('loadCAD builds its model in the scene it was called for, not the one activ
       second = runtime.createScene('cad-room'),
       text = assemblyOBJ();
     let pending;
-    second.use({
-      name: 'probe',
-      setup: () =>
-        (pending = loadCAD(engine, 'https://assets.example/a.obj', {
-          fetch: async () => new Response(text),
-        })),
-    });
+    second.use({ name: 'probe', setup: () => (pending = loadCAD(engine, 'https://assets.example/a.obj', {
+      fetch: async () => new Response(text),
+    })) });
     second.removePlugin('probe');
     const loaded = await pending;
-    assert.ok(
-      [loaded.root, ...loaded.meshes].every((m) => m.scene === second),
-      'every part is in the calling scene',
-    );
+    assert.ok([loaded.root, ...loaded.meshes].every((m) => m.scene === second), 'every part is in the calling scene');
     assert.equal(runtime.scene.meshes.size, 0, 'the active scene gains nothing');
   } finally {
     engine.dispose();
@@ -327,10 +317,7 @@ test('parseCADAsync builds the parts its worker sends in the scene it was called
     second.removePlugin('probe');
     const loaded = await pending;
     assert.equal(loaded.meshes.length, 1);
-    assert.ok(
-      [loaded.root, ...loaded.meshes].every((m) => m.scene === second),
-      'root and part are in the calling scene',
-    );
+    assert.ok([loaded.root, ...loaded.meshes].every((m) => m.scene === second), 'root and part are in the calling scene');
     assert.equal(runtime.scene.meshes.size, 0, 'the active scene gains nothing');
   } finally {
     if (saved) Object.defineProperty(globalThis, 'Worker', saved);
@@ -349,27 +336,13 @@ test('the pack draw keeps to the view it is drawn in: its viewport and scissor a
     engine.render({ culling: false, views: [view] });
     rects.length = calls.length = 0;
     engine.render({ culling: false, views: [view] });
-    assert.ok(
-      calls.some((c) => c[0] === 'draw' && c[1] === 36_000),
-      'the pack drew',
-    );
+    assert.ok(calls.some((c) => c[0] === 'draw' && c[1] === 36_000), 'the pack drew');
     // Every pass of the frame, the pack's own included, is held to the view: each sets the view scissor.
-    const passes = rects
-      .map((r) => r[0])
-      .join(' ')
-      .split('begin')
-      .slice(1)
-      .filter((p) => p.includes('draws'));
+    const passes = rects.map((r) => r[0]).join(' ').split('begin').slice(1).filter((p) => p.includes('draws'));
     assert.ok(passes.length >= 1, 'the pack draw pass');
-    assert.ok(
-      passes.every((p) => p.includes('scissor') && p.includes('viewport')),
-      `every pass sets both: ${passes.join('|')}`,
-    );
+    assert.ok(passes.every((p) => p.includes('scissor') && p.includes('viewport')), `every pass sets both: ${passes.join('|')}`);
     const scissors = rects.filter((r) => r[0] === 'scissor');
-    assert.ok(
-      scissors.every((r) => r[1] === half + 2 && r[3] === 4),
-      `every scissor is the view scissor: ${JSON.stringify(scissors)}`,
-    );
+    assert.ok(scissors.every((r) => r[1] === half + 2 && r[3] === 4), `every scissor is the view scissor: ${JSON.stringify(scissors)}`);
     assert.equal(rects.filter((r) => r[0] === 'viewport').length, scissors.length, 'a viewport with every scissor');
   } finally {
     engine.dispose();

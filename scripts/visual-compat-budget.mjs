@@ -14,11 +14,10 @@
 // `--write` records the frame column of docs/webgl2-compat-demos.md's table; the pixel columns are visual:compat's.
 import { deferSpeedEntry } from './support/speed-phase.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { rewriteTable, stampFrames } from './support/visual-compat-doc.js';
+import { rewriteTable } from './support/visual-compat-doc.js';
 import { frameCost, openCase, selectCases, startServers } from './support/visual-compat-pages.js';
 import { frameProblems, noFrameProblems } from './support/visual-compat-status.js';
 
@@ -73,7 +72,7 @@ if (!deferSpeedEntry(import.meta.url, 'scripts/visual-compat-budget.mjs')) {
       }
       if (rows.some((r) => r.problems.length)) exitCode = 1;
       await writeFile(resolve(out, 'frames.json'), JSON.stringify({ budget, rows }, null, 1) + '\n');
-      if (write) await writeDoc(rows, `${browserLabel()} ${browser.version()}`);
+      if (write) await writeDoc(rows);
       console.log(
         `visual:compat:budget: ${rows.length} demos, ${rows.filter((r) => r.problems.length).length} failing, ${((Date.now() - begun) / 60_000).toFixed(1)} min`,
       );
@@ -93,13 +92,7 @@ if (!deferSpeedEntry(import.meta.url, 'scripts/visual-compat-budget.mjs')) {
         try {
           opened = await openCase(browser, c, { compat, timed: true, ...origins });
           if (opened.refused || opened.off) return { skipped: opened.refused ? 'refused' : 'webgpu only' };
-          const cost = await frameCost(opened.page);
-          if (!compat)
-            row.gpu = await opened.page.evaluate(async () => {
-              const i = (await navigator.gpu.requestAdapter())?.info ?? {};
-              return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');
-            });
-          return { cost };
+          return { cost: await frameCost(opened.page) };
         } catch (error) {
           opened ??= error;
           row.errors.push(`${compat ? 'layer' : 'native'}: ${String(error.message ?? error).split('\n')[0]}`);
@@ -122,7 +115,7 @@ if (!deferSpeedEntry(import.meta.url, 'scripts/visual-compat-budget.mjs')) {
     }
 
     /** Records the frame column of the demos measured; the other columns and rows stay as they are. */
-    async function writeDoc(measured, browserName) {
+    async function writeDoc(measured) {
       const ms = (v) => (Number.isFinite(v) ? `${v.toFixed(1)} ms` : '-');
       await rewriteTable((rows) => {
         for (const r of measured) {
@@ -132,17 +125,7 @@ if (!deferSpeedEntry(import.meta.url, 'scripts/visual-compat-budget.mjs')) {
             ? `${ms(r.frame.native.work)} / ${ms(r.frame.compat.work)}; ${ms(r.frame.native.interval)} / ${ms(r.frame.compat.interval)}`
             : '-';
         }
-        const gpu = measured.find((r) => r.gpu)?.gpu ?? 'unknown gpu',
-          commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-        // A partial run (--only) stamps only the rows it wrote and a full run clears the stamps; a full run writes its own "Frames last recorded" line.
-        return stampFrames(
-          rows,
-          measured.map((r) => r.id),
-          only.length > 0,
-          `Frames last recorded ${new Date().toISOString().slice(0, 10)} at ${commit} on ${gpu} (${browserName})`,
-          `${new Date().toISOString().slice(0, 10)}, ${commit}, ${gpu}, ${browserName}`,
-        );
-      }, 'framesRecorded');
+      });
     }
   }
 }

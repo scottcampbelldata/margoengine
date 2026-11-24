@@ -72,27 +72,11 @@ test('set, copy, clone, equals, center, translate; the constructor copies its in
   start.x = 9;
   assert.equal(c.start.x, 0);
   assert.ok(c.clone().equals(c));
-  assert.ok(
-    !new Capsule()
-      .copy(c)
-      .translate(new Vector3(1, 0, 0))
-      .equals(c),
-  );
-  assert.ok(
-    new Capsule()
-      .copy(c)
-      .translate(new Vector3(1, 0, 0))
-      .equals(c, 1),
-  );
+  assert.ok(!new Capsule().copy(c).translate(new Vector3(1, 0, 0)).equals(c));
+  assert.ok(new Capsule().copy(c).translate(new Vector3(1, 0, 0)).equals(c, 1));
   assert.deepEqual(c.getCenter(new Vector3()).toArray(), [0, 2, 0]);
   assert.equal(c.axis.distance(), 4);
-  assert.deepEqual(
-    c
-      .clone()
-      .translate(new Vector3(1, 2, 3))
-      .end.toArray(),
-    [1, 6, 3],
-  );
+  assert.deepEqual(c.clone().translate(new Vector3(1, 2, 3)).end.toArray(), [1, 6, 3]);
 });
 
 test('a negative or non-finite radius throws with the fix', () => {
@@ -207,7 +191,10 @@ test('intersectsBox matches the point distance along the axis (2,000 seeded pair
   let hits = 0;
   for (let n = 0; n < 2000; n++) {
     const c = randomCapsule(random),
-      box = new Box3().setFromCenterAndSize(randomPoint(random), new Vector3(random() * 3, random() * 3, random() * 3)),
+      box = new Box3().setFromCenterAndSize(
+        randomPoint(random),
+        new Vector3(random() * 3, random() * 3, random() * 3),
+      ),
       gap = minimumAlong(c.axis, (p) => box.distanceToPoint(p)) - c.radius;
     if (Math.abs(gap) <= CLOSE_CALL) continue;
     assert.equal(c.intersectsBox(box), gap < 0, `pair ${n}`);
@@ -320,7 +307,10 @@ test('intersectRay: wall, cap, inside, miss, away, along the axis', () => {
     out = new Vector3(7, 8, 9),
     x = new Vector3(1, 0, 0);
   nearVector(c.intersectRay(new Ray(new Vector3(-5, 1, 0), x), new Vector3()), new Vector3(-1, 1, 0));
-  nearVector(c.intersectRay(new Ray(new Vector3(0, 9, 0), new Vector3(0, -1, 0)), new Vector3()), new Vector3(0, 3, 0));
+  nearVector(
+    c.intersectRay(new Ray(new Vector3(0, 9, 0), new Vector3(0, -1, 0)), new Vector3()),
+    new Vector3(0, 3, 0),
+  );
   nearVector(c.intersectRay(new Ray(new Vector3(0, 1, 0), x), new Vector3()), new Vector3(0, 1, 0));
   nearVector(c.intersectRay(new Ray(new Vector3(-5, 2.5, 0), x), new Vector3()), new Vector3(-Math.sqrt(0.75), 2.5, 0));
   assert.equal(c.intersectRay(new Ray(new Vector3(-5, 3.5, 0), x), out), null);
@@ -353,9 +343,7 @@ test('intersectRay agrees with marching the ray (2,000 seeded rays)', () => {
     }
     const answer = c.intersectRay(ray, out);
     // Grazing rays converge slowly; a marcher that ran out of steps close to the surface settles nothing.
-    const grazing = minimumAlong(new Line3(ray.origin.clone(), ray.at(40, new Vector3())), (p) =>
-      c.axis.distanceToPoint(p),
-    );
+    const grazing = minimumAlong(new Line3(ray.origin.clone(), ray.at(40, new Vector3())), (p) => c.axis.distanceToPoint(p));
     if (Math.abs(grazing - c.radius) < 1e-6) continue;
     assert.equal(answer !== null, reached, `ray ${n}`);
     if (answer) {

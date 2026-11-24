@@ -27,14 +27,7 @@ class FakeCube {
     this.updates.push({
       faces,
       background: this.background,
-      fogs: fogs.map((f) => ({
-        name: f.name,
-        enabled: f.enabled,
-        color: f.color,
-        near: f.near,
-        far: f.far,
-        density: f.density,
-      })),
+      fogs: fogs.map((f) => ({ name: f.name, enabled: f.enabled, color: f.color, near: f.near, far: f.far, density: f.density })),
     });
     return faces;
   }
@@ -47,15 +40,7 @@ mock.module('@margoengine/environment/cube-camera', { namedExports: { CubeCamera
 class FakeFog {
   constructor(options = {}) {
     this.name = options.name ?? 'fog';
-    Object.assign(this, {
-      color: '#ffffff',
-      near: 1,
-      far: 1000,
-      density: 0,
-      heightFalloff: 0,
-      height: 0,
-      enabled: true,
-    });
+    Object.assign(this, { color: '#ffffff', near: 1, far: 1000, density: 0, heightFalloff: 0, height: 0, enabled: true });
   }
   static attach(engine, options) {
     const fog = new FakeFog(options);
@@ -81,35 +66,21 @@ class FakeBackground {
     this.disposed = true;
   }
 }
-const environmentMock = {
+mock.module('@margoengine/environment', {
   namedExports: {
     Fog: FakeFog,
     EnvironmentBackground: FakeBackground,
     loadEnvironmentImage: async (src) => (loads.push(src), { src }),
     Environment: {
-      create: async (engine, image, options) => ({
-        name: options.name,
-        image,
-        setup() {},
-        dispose() {
-          this.disposed = true;
-        },
-      }),
+      create: async (engine, image, options) => ({ name: options.name, image, setup() {}, dispose() { this.disposed = true; } }),
     },
   },
-};
-// The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
-for (const id of [
-  '@margoengine/environment',
-  '@margoengine/environment/main',
-  '@margoengine/environment/loaders',
-  '@margoengine/environment/load',
-])
-  mock.module(id, environmentMock);
+});
 
 const { render, act, cleanup } = await import('@testing-library/react');
 const { Engine, TransformStore } = await import('@margoengine/core/extension');
 const { Context } = await import('../dist/internal.js');
+const { Mesh, BoxGeometry } = await import('../dist/index.js');
 const { CubeCamera, Fog } = await import('../dist/environment.js');
 const { advanceFrames } = await import('../dist/frame-priority.js');
 const h = React.createElement;
@@ -156,14 +127,7 @@ test('CubeCamera fog sets the scene fog for the faces only, and fog={false} turn
   const { scene, engine, errors, tree } = await context();
   scene_ = scene;
   const view = render(
-    tree(
-      h(
-        React.Fragment,
-        null,
-        h(Fog, { color: '#ff0000', near: 2, far: 20 }),
-        h(CubeCamera, { fog: { color: '#0000ff', far: 5 } }),
-      ),
-    ),
+    tree(h(React.Fragment, null, h(Fog, { color: '#ff0000', near: 2, far: 20 }), h(CubeCamera, { fog: { color: '#0000ff', far: 5 } }))),
   );
   await settle();
   await settle();
@@ -171,19 +135,11 @@ test('CubeCamera fog sets the scene fog for the faces only, and fog={false} turn
   assert.deepEqual(errors, []);
   const native = made.find((c) => !c.disposed),
     fog = [...engine.plugins.values()].find((p) => p instanceof FakeFog);
-  assert.deepEqual(
-    native.updates.at(-1).fogs,
-    [{ name: 'fog', enabled: true, color: '#0000ff', near: 1, far: 5, density: 0 }],
-    'the faces see the CubeCamera fog, its left-out options at their defaults',
-  );
-  assert.deepEqual(
-    [fog.color, fog.near, fog.far, fog.enabled],
-    ['#ff0000', 2, 20, true],
-    'the main view keeps its own',
-  );
-  view.rerender(
-    tree(h(React.Fragment, null, h(Fog, { color: '#ff0000', near: 2, far: 20 }), h(CubeCamera, { fog: false }))),
-  );
+  assert.deepEqual(native.updates.at(-1).fogs, [
+    { name: 'fog', enabled: true, color: '#0000ff', near: 1, far: 5, density: 0 },
+  ], 'the faces see the CubeCamera fog, its left-out options at their defaults');
+  assert.deepEqual([fog.color, fog.near, fog.far, fog.enabled], ['#ff0000', 2, 20, true], 'the main view keeps its own');
+  view.rerender(tree(h(React.Fragment, null, h(Fog, { color: '#ff0000', near: 2, far: 20 }), h(CubeCamera, { fog: false }))));
   await settle();
   await frame();
   assert.equal(native.updates.at(-1).fogs[0].enabled, false);

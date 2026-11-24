@@ -39,9 +39,7 @@ for (let y = 0, i = 0; y < side - 1; y++)
 const exporters = here('../../exporters/dist/');
 const { loadNativeEncoder, encodeNativeMesh } = await import(pathToFileURL(exporters + 'draco-native-encode.js').href);
 const encoder = await loadNativeEncoder(pathToFileURL(exporters + 'draco-native-encoder.wasm').href);
-const attributes = [
-  { semantic: 'POSITION', kind: 'POSITION', values: position, width: 3, normalized: false, bits: 14 },
-];
+const attributes = [{ semantic: 'POSITION', kind: 'POSITION', values: position, width: 3, normalized: false, bits: 14 }];
 if (!positionsOnly)
   attributes.push(
     { semantic: 'NORMAL', kind: 'NORMAL', values: normal, width: 3, normalized: false, bits: 10 },
@@ -53,9 +51,7 @@ const bytes = (g) => [g.positions, g.indices, g.normals, g.uvs, g.colors].reduce
 globalThis.require = createRequire(import.meta.url);
 globalThis.__dirname = here('../dist/draco/');
 runInThisContext(readFileSync(here('../dist/draco/draco_wasm_wrapper.js'), 'utf8'));
-const prebuilt = await globalThis.DracoDecoderModule({
-  wasmBinary: readFileSync(here('../dist/draco/draco_decoder.wasm')),
-});
+const prebuilt = await globalThis.DracoDecoderModule({ wasmBinary: readFileSync(here('../dist/draco/draco_decoder.wasm')) });
 const { decodeDraco } = await import(pathToFileURL(here('../dist/codec.js')).href);
 const { decodeNativeDraco } = await import(pathToFileURL(here('../dist/draco-native-codec.js')).href);
 const native = (await WebAssembly.instantiate(readFileSync(here('../dist/draco-native.wasm')))).instance.exports;

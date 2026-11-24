@@ -40,15 +40,11 @@ test('a corpus or porting file that is not JSON rejects with a coded failed erro
   }
 });
 
-test('the live relay decodes a result whose UTF-8 character straddles two body chunks', {
-  timeout: 10000,
-}, async () => {
+test('the live relay decodes a result whose UTF-8 character straddles two body chunks', { timeout: 10000 }, async () => {
   const host = await createLiveHost({ origins: [], timeoutMs: 5000 });
   try {
     const answer = host.request('scene', {});
-    const command = await (
-      await fetch(`${host.endpoint}/poll`, { headers: { Authorization: `Bearer ${host.token}` } })
-    ).json();
+    const command = await (await fetch(`${host.endpoint}/poll`, { headers: { Authorization: `Bearer ${host.token}` } })).json();
     const body = Buffer.from(JSON.stringify({ id: command.id, value: 'café 世界' }));
     // Cut inside the two bytes of the e with an acute accent.
     const cut = body.indexOf(0xc3) + 1;
@@ -77,9 +73,7 @@ const DL = 'https://dl.polyhaven.org/';
 const pixel = new Uint8Array([7, 7, 7, 7]);
 const respond = (data) => new Response(JSON.stringify(data));
 
-test('a glTF dependency URI with percent escapes is saved under its decoded file name', {
-  timeout: 10000,
-}, async () => {
+test('a glTF dependency URI with percent escapes is saved under its decoded file name', { timeout: 10000 }, async () => {
   const fetched = [];
   const fetcher = async (url) => {
     const href = new URL(url).href;
@@ -126,9 +120,7 @@ test('a glTF dependency URI that decodes to a parent path is refused', { timeout
   }
 });
 
-test('an ambientCG download without a size in its record is not refused as a size mismatch', {
-  timeout: 10000,
-}, async () => {
+test('an ambientCG download without a size in its record is not refused as a size mismatch', { timeout: 10000 }, async () => {
   const fetcher = async (url) => {
     const href = new URL(url).href;
     if (href.startsWith('https://ambientcg.com/api/v3/assets'))

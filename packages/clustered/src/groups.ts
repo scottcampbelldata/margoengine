@@ -163,8 +163,7 @@ class Group implements LightGroup {
     return this.gone || this.removed || this.owner.isDisposed || this.owner.clustered.isDisposed;
   }
   setLights(lights: readonly Light[]): this {
-    if (this.gone)
-      throw new MargoError('disposed', `Light group ${this.name} is disposed; ask LightGroups.group for it again`);
+    if (this.gone) throw new MargoError('disposed', `Light group ${this.name} is disposed; ask LightGroups.group for it again`);
     if (this.owner.clustered.isDisposed)
       throw new MargoError('disposed', `Light group ${this.name} lights a disposed Clustered; attach a new Clustered`);
     if (!Array.isArray(lights)) throw new TypeError('Invalid light group list; pass an array of point and spot lights');

@@ -24,11 +24,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { classifyBlend, compressedFailures } from './blend-check.mjs';
 
-const context = await openBrowser({
-  startPath: '/packages/webgl2-compat/test/features.html',
-  port: 'free',
-  compat: false,
-});
+const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/features.html', port: 'free', compat: false });
 const { page } = context;
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -91,9 +87,7 @@ const SCOPE = {
     sweeps: ['sweep/oblique', 'sweep/near'],
   }),
   mipFiltering: () => ({
-    rows: Object.fromEntries(
-      ['nearest', 'linear'].flatMap((f) => ['grad', 'bias', 'implicit'].map((m) => [`${f}/${m}`, `mip-${f}`])),
-    ),
+    rows: Object.fromEntries(['nearest', 'linear'].flatMap((f) => ['grad', 'bias', 'implicit'].map((m) => [`${f}/${m}`, `mip-${f}`]))),
     sweeps: ['sweep/bias', 'sweep/grad'],
     floats: true,
   }),
@@ -106,9 +100,7 @@ try {
   const whiteBlack = await probe([255, 0, 255, 0, 255], 'linear');
   const { blend, worst } = classifyBlend(whiteBlack.gl, whiteBlack.native);
   const compressed = blend === 'compressed';
-  lines.push(
-    `mip blend: WebGL2 ${blend === 'native' ? 'equal to native' : blend} (largest weight error ${worst.error.toFixed(5)} at LOD ${worst.k}/256)`,
-  );
+  lines.push(`mip blend: WebGL2 ${blend === 'native' ? 'equal to native' : blend} (largest weight error ${worst.error.toFixed(5)} at LOD ${worst.k}/256)`);
   const probes = compressed
     ? {
         footprint: await probe([0, 255, 64, 0, 255], 'linear'),
@@ -132,21 +124,10 @@ try {
     if (name === 'implicitFootprint') footprintNative = native.result;
     const scope = scopeOf(name, native.result);
     if (scope) {
-      const rest = (o) =>
-        Object.fromEntries(Object.entries(o).filter(([k]) => !scope.rows[k] && !scope.sweeps.includes(k)));
-      assert.deepEqual(
-        differences(rest(native.result), rest(compat.result)),
-        [],
-        `${name}: compat differs from native`,
-      );
-      assert.deepEqual(
-        compressedFailures(native.result, compat.result, scope),
-        [],
-        `${name}: compressed mip blend: not native's LOD through the driver's blend`,
-      );
-      lines.push(
-        `${name}: same LOD as native (nearest-mip sweeps), each blended texel the driver's own blend at it, the rest same as native`,
-      );
+      const rest = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !scope.rows[k] && !scope.sweeps.includes(k)));
+      assert.deepEqual(differences(rest(native.result), rest(compat.result)), [], `${name}: compat differs from native`);
+      assert.deepEqual(compressedFailures(native.result, compat.result, scope), [], `${name}: compressed mip blend: not native's LOD through the driver's blend`);
+      lines.push(`${name}: same LOD as native (nearest-mip sweeps), each blended texel the driver's own blend at it, the rest same as native`);
     } else if (name === 'inverseTrig') {
       // The layer's acos, asin, atan2 and atan within 1e-5 of float64 over the whole domain on every GPU (Scott's ruling,
       // 2026-11-11: the layer emits its own where the driver's miss it, as on ANGLE D3D11). Native is reported.
@@ -174,13 +155,8 @@ try {
       };
       assert.equal(compat.result.length, 2048 * 10 * 4, 'inverseTrig values');
       const layer = worst(compat.result);
-      assert.ok(
-        layer.max <= 1e-5,
-        `inverseTrig: the layer's acos, asin, atan2 or atan is ${layer.max} off at ${JSON.stringify(layer.at)}`,
-      );
-      lines.push(
-        `${name}: the layer within ${layer.max.toExponential(2)} of float64 over the whole domain, native ${worst(native.result).max.toExponential(2)}`,
-      );
+      assert.ok(layer.max <= 1e-5, `inverseTrig: the layer's acos, asin, atan2 or atan is ${layer.max} off at ${JSON.stringify(layer.at)}`);
+      lines.push(`${name}: the layer within ${layer.max.toExponential(2)} of float64 over the whole domain, native ${worst(native.result).max.toExponential(2)}`);
     } else if (name === 'halfExport') {
       // WGSL leaves an inexact narrowing to either neighbour, so native may store either half; the layer stores what
       // native stores on the same GPU. The Radeon 680M truncates under native Direct3D 12 and ANGLE Direct3D 11 alike,
@@ -190,11 +166,7 @@ try {
       native.result.halves.forEach((h, i) =>
         assert.ok(halfNeighbours(values[i]).includes(h), `halfExport native ${values[i]}: ${h} is neither neighbour`),
       );
-      assert.deepEqual(
-        compat.result.halves,
-        native.result.halves,
-        'halfExport: the layer stores the halves native stores',
-      );
+      assert.deepEqual(compat.result.halves, native.result.halves, 'halfExport: the layer stores the halves native stores');
       const nearest = values.filter((v, i) => native.result.halves[i] === nearestHalf(v)).length;
       lines.push(`${name}: the layer stores native's half of each value (native: ${nearest} of 32 the nearest)`);
     } else {
@@ -207,29 +179,15 @@ try {
     if (name === 'mipArguments') {
       for (const filter of ['nearest', 'linear'])
         for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazyAnd', 'lazyOr', 'discard'])
-          assert.deepEqual(
-            r[`${filter}/${mode}`],
-            [1, mode.startsWith('lazy') ? 0 : mode === 'implicit' ? 1 : mode === 'grad' ? 1101 : 11, 0, 1],
-            `${filter}/${mode}: each argument evaluated once`,
-          );
+          assert.deepEqual(r[`${filter}/${mode}`], [1, mode.startsWith('lazy') ? 0 : mode === 'implicit' ? 1 : mode === 'grad' ? 1101 : 11, 0, 1], `${filter}/${mode}: each argument evaluated once`);
     }
     if (name === 'freshClears')
       for (const kind of ['cube', 'array'])
-        for (const [round, want] of [
-          [0, 0, 0, 255],
-          [0, 0, 255, 255],
-        ].entries())
-          assert.deepEqual(
-            r[`${kind} round ${round} 2/4`],
-            want,
-            `freshClears: ${kind} level 2 layer 4 keeps its round ${round} clear`,
-          );
+        for (const [round, want] of [[0, 0, 0, 255], [0, 0, 255, 255]].entries())
+          assert.deepEqual(r[`${kind} round ${round} 2/4`], want, `freshClears: ${kind} level 2 layer 4 keeps its round ${round} clear`);
     if (name === 'foldedExports') {
       assert.deepEqual(r.counts, Array(12).fill(256 * 256 * 4), 'foldedExports: twelve whole targets read');
-      assert.ok(
-        r.first.every((h) => h > 0 && h < 0x3c01),
-        'foldedExports: each target holds the products',
-      );
+      assert.ok(r.first.every((h) => h > 0 && h < 0x3c01), 'foldedExports: each target holds the products');
     }
     if (name === 'msaaAspects')
       assert.deepEqual(
@@ -242,81 +200,23 @@ try {
       assert.deepEqual(r.cubeArray0.slice(0, 4), [1, 0, 0, 1], 'compressedViews: texel (0, 0) of face 0 is colour 0');
       const faces = [0, 1, 2, 3, 4, 5].map((n) => r.cubeArray0.slice(n * 256, n * 256 + 256).join());
       assert.equal(new Set(faces).size, 6, 'compressedViews: the six faces differ');
-      assert.deepEqual(
-        r.cubeFace3,
-        r.cubeArray0.slice(3 * 256, 4 * 256),
-        'compressedViews: the 2d view of face 3 is layer 3',
-      );
-      assert.deepEqual(
-        r.stackCube.slice(0, 6 * 256),
-        r.cubeArray0,
-        'compressedViews: a cube view of array storage reads its layers',
-      );
+      assert.deepEqual(r.cubeFace3, r.cubeArray0.slice(3 * 256, 4 * 256), 'compressedViews: the 2d view of face 3 is layer 3');
+      assert.deepEqual(r.stackCube.slice(0, 6 * 256), r.cubeArray0, 'compressedViews: a cube view of array storage reads its layers');
       assert.notDeepEqual(r.cubeArrayAfter, r.cubeArray0, 'compressedViews: a later write reaches the 2d-array view');
-      assert.notDeepEqual(
-        r.flatArrayAfter,
-        r.flatArray,
-        'compressedViews: a later write reaches a 1-layer 2d-array view',
-      );
+      assert.notDeepEqual(r.flatArrayAfter, r.flatArray, 'compressedViews: a later write reaches a 1-layer 2d-array view');
       assert.notDeepEqual(r.stackCubeAfter, r.stackCube, 'compressedViews: a later write reaches the cube view');
     }
     if (name === 'compressedCopies' && !r.missing) {
       // Block bytes read back as written: layer 1's second block (texel row 0, x 4) at the padded row and image pitch.
-      const second = (layer) => [
-        (0xf800 | (layer << 6) | 1) & 255,
-        (0xf800 | (layer << 6) | 1) >> 8,
-        (0x001f | (1 << 11)) & 255,
-        (0x001f | (1 << 11)) >> 8,
-        0xe5,
-        0xe5 ^ 0x5a,
-        0xe5,
-        0xe5 ^ 0xa5,
-      ];
-      assert.deepEqual(
-        r.srcLevel0.slice(256 * 3 + 8, 256 * 3 + 16),
-        second(1),
-        'compressedCopies: copyTextureToBuffer writes the blocks at bytesPerRow and rowsPerImage',
-      );
-      assert.deepEqual(
-        r.srcLevel0.slice(16, 256),
-        Array(240).fill(0xcd),
-        'compressedCopies: the row padding keeps the buffer',
-      );
-      assert.deepEqual(
-        r.srcLevel2.slice(0, 2),
-        [0x1f, 0x00],
-        'compressedCopies: a level smaller than one block reads as its one block',
-      );
+      const second = (layer) => [(0xf800 | (layer << 6) | 1) & 255, (0xf800 | (layer << 6) | 1) >> 8, (0x001f | (1 << 11)) & 255, (0x001f | (1 << 11)) >> 8, 0xe5, 0xe5 ^ 0x5a, 0xe5, 0xe5 ^ 0xa5];
+      assert.deepEqual(r.srcLevel0.slice(256 * 3 + 8, 256 * 3 + 16), second(1), 'compressedCopies: copyTextureToBuffer writes the blocks at bytesPerRow and rowsPerImage');
+      assert.deepEqual(r.srcLevel0.slice(16, 256), Array(240).fill(0xcd), 'compressedCopies: the row padding keeps the buffer');
+      assert.deepEqual(r.srcLevel2.slice(0, 2), [0x1f, 0x00], 'compressedCopies: a level smaller than one block reads as its one block');
       // Face 2's bottom-left block is layer 1's top-right block; faces 0, 1 and the rest of 2 stay zero.
-      assert.deepEqual(
-        r.dstLevel0.slice(2 * 512 + 256, 2 * 512 + 264),
-        second(1),
-        'compressedCopies: copyTextureToTexture moves the block',
-      );
-      assert.deepEqual(
-        r.dstLevel0.slice(2 * 512, 2 * 512 + 16),
-        Array(16).fill(0),
-        'compressedCopies: untouched blocks stay zero',
-      );
-      assert.deepEqual(
-        [3, 4, 5].flatMap((face) => r.dstLevel1.slice(face * 256, face * 256 + 8)),
-        [0, 1, 2].flatMap((layer) => [
-          (0x07e0 | (layer << 1)) & 255,
-          (0x07e0 | (layer << 1)) >> 8,
-          0x10,
-          0,
-          0x1b,
-          0x1b ^ 0x5a,
-          0x1b,
-          0x1b ^ 0xa5,
-        ]),
-        'compressedCopies: a whole level copies into three faces',
-      );
-      assert.notDeepEqual(
-        r.dstSampled0.slice(2 * 256 + 128, 2 * 256 + 144),
-        Array(16).fill(0),
-        'compressedCopies: the copied block samples',
-      );
+      assert.deepEqual(r.dstLevel0.slice(2 * 512 + 256, 2 * 512 + 264), second(1), 'compressedCopies: copyTextureToTexture moves the block');
+      assert.deepEqual(r.dstLevel0.slice(2 * 512, 2 * 512 + 16), Array(16).fill(0), 'compressedCopies: untouched blocks stay zero');
+      assert.deepEqual([3, 4, 5].flatMap((face) => r.dstLevel1.slice(face * 256, face * 256 + 8)), [0, 1, 2].flatMap((layer) => [(0x07e0 | (layer << 1)) & 255, (0x07e0 | (layer << 1)) >> 8, 0x10, 0, 0x1b, 0x1b ^ 0x5a, 0x1b, 0x1b ^ 0xa5]), 'compressedCopies: a whole level copies into three faces');
+      assert.notDeepEqual(r.dstSampled0.slice(2 * 256 + 128, 2 * 256 + 144), Array(16).fill(0), 'compressedCopies: the copied block samples');
       assert.equal(r.unaligned, 'validation error', 'compressedCopies: an encoder copy with bytesPerRow 8 is invalid');
     }
     if (name === 'compressedSrgbView' && !r.missing) {
@@ -326,79 +226,35 @@ try {
     if (name === 'nestedSampling') {
       // Every form reads texture a (255, 0, 0, 64), never b (white), whatever samples inside its coordinates.
       for (const form of ['throughFunction', 'direct', 'afterSibling', 'load', 'twoDeep'])
-        assert.deepEqual(
-          r[form].map((v) => Math.round(v * 255)),
-          [255, 0, 0, 64],
-          `nestedSampling ${form}: the outer call reads its own texture`,
-        );
+        assert.deepEqual(r[form].map((v) => Math.round(v * 255)), [255, 0, 0, 64], `nestedSampling ${form}: the outer call reads its own texture`);
     }
     if (name === 'volumeSliceDepth') {
       // Rows top first: the wedge covers one texel of the top row and two of the bottom; slice 1 is only cleared.
-      const [G, Bl, Y] = [
-        [0, 255, 0, 255],
-        [0, 0, 255, 255],
-        [255, 255, 0, 255],
-      ];
+      const [G, Bl, Y] = [[0, 255, 0, 255], [0, 0, 255, 255], [255, 255, 0, 255]];
       const drawn = [Bl, G, G, G, Bl, Bl, G, G].flat();
-      assert.deepEqual(
-        r,
-        [drawn, Array(8).fill(Y).flat(), drawn],
-        'volumeSliceDepth: draws reach 3D slices with depth',
-      );
+      assert.deepEqual(r, [drawn, Array(8).fill(Y).flat(), drawn], 'volumeSliceDepth: draws reach 3D slices with depth');
     }
     if (name === 'mipFiltering') {
       for (const filter of ['nearest', 'linear'])
         for (const mode of ['level'])
-          assert.deepEqual(
-            r[`${filter}/${mode}`],
-            Array.from({ length: 72 }, (_, i) => 1 - (Math.floor(i / 4) % 9) * 0.125),
-            `${filter}/${mode}: exact linear mip weights`,
-          );
+          assert.deepEqual(r[`${filter}/${mode}`], Array.from({ length: 72 }, (_, i) => 1 - (Math.floor(i / 4) % 9) * 0.125), `${filter}/${mode}: exact linear mip weights`);
       if (!scope) {
         for (const filter of ['nearest', 'linear'])
-          assert.deepEqual(
-            r[`${filter}/grad`],
-            native.result[`${filter}/grad`],
-            'explicit-gradient hardware footprint matches native exactly',
-          );
-        assert.deepEqual(
-          r['linear/implicit'],
-          native.result['linear/implicit'],
-          'implicit hardware footprint matches native exactly',
-        );
+          assert.deepEqual(r[`${filter}/grad`], native.result[`${filter}/grad`], 'explicit-gradient hardware footprint matches native exactly');
+        assert.deepEqual(r['linear/implicit'], native.result['linear/implicit'], 'implicit hardware footprint matches native exactly');
         for (const filter of ['nearest', 'linear'])
-          assert.deepEqual(
-            r[`${filter}/bias`],
-            native.result[`${filter}/bias`],
-            'biased hardware footprint matches native exactly',
-          );
+          assert.deepEqual(r[`${filter}/bias`], native.result[`${filter}/bias`], 'biased hardware footprint matches native exactly');
       }
     }
     if (name === 'implicitFootprint') {
       if (!scope) assert.deepEqual(r, native.result, 'implicit and biased hardware sampling matches native bits');
-      for (const filter of ['nearest', 'linear'])
-        for (const offset of [false, true]) {
-          assert.deepEqual(
-            r[`${filter}/0/${offset}`],
-            r[`${filter}/implicit/${offset}`],
-            'zero bias matches textureSample bits',
-          );
-          assert.notDeepEqual(
-            r[`${filter}/-1.25/${offset}`],
-            r[`${filter}/1.25/${offset}`],
-            'nonzero bias changes selected mips',
-          );
-          assert.ok(
-            r[`${filter}/0/${offset}`].some((value) => value > 0),
-            'footprint probe produces data',
-          );
-          for (const map of ['oblique', 'near'])
-            assert.deepEqual(
-              r[`${filter}/${map}-grad/${offset}`],
-              r[`${filter}/${map}-implicit/${offset}`],
-              `${filter}/${map}: dpdx and dpdy gradients match textureSample bits`,
-            );
-        }
+      for (const filter of ['nearest', 'linear']) for (const offset of [false, true]) {
+        assert.deepEqual(r[`${filter}/0/${offset}`], r[`${filter}/implicit/${offset}`], 'zero bias matches textureSample bits');
+        assert.notDeepEqual(r[`${filter}/-1.25/${offset}`], r[`${filter}/1.25/${offset}`], 'nonzero bias changes selected mips');
+        assert.ok(r[`${filter}/0/${offset}`].some(value => value > 0), 'footprint probe produces data');
+        for (const map of ['oblique', 'near'])
+          assert.deepEqual(r[`${filter}/${map}-grad/${offset}`], r[`${filter}/${map}-implicit/${offset}`], `${filter}/${map}: dpdx and dpdy gradients match textureSample bits`);
+      }
     }
     // Bug 66: these sanity values are near, not equal to, the ideal bytes: GPUs round a half differently (an Intel Arc
     // 140V gives 192 and 128 where this NVIDIA GPU gives 191 and 127, natively and on the layer alike). The exact
@@ -480,13 +336,8 @@ try {
   const wrong = await page.evaluate(() => window.check.runCompat('implicitFootprint', { lodScale: 1.01 }));
   assert.equal(wrong.thrown, null, 'wrong-LOD self-test threw');
   const scope = scopeOf('implicitFootprint', footprintNative);
-  const caught = scope
-    ? compressedFailures(footprintNative, wrong.result, scope)
-    : differences(footprintNative, wrong.result);
-  assert.ok(
-    scope ? caught.some((line) => line.startsWith('sweep/')) : caught.length > 0,
-    `a wrong LOD on the layer passes: ${caught.join('; ')}`,
-  );
+  const caught = scope ? compressedFailures(footprintNative, wrong.result, scope) : differences(footprintNative, wrong.result);
+  assert.ok(scope ? caught.some((line) => line.startsWith('sweep/')) : caught.length > 0, `a wrong LOD on the layer passes: ${caught.join('; ')}`);
   lines.push(`self-test: a LOD 3.7/256 too high on the layer fails (${caught[0]})`);
   const refusal = await page.evaluate(() => window.check.blendRefusal());
   assert.match(

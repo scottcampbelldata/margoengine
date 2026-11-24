@@ -146,14 +146,14 @@ export async function parseLAS(input: BinaryInput, options: LASOptions = {}): Pr
       kept = Math.ceil(file.pointCount / step);
     if (kept > maxVertices) throw new LoaderError(F, 'limit', `${kept} points exceed the limit of ${maxVertices}`);
     const points = await readPoints(bytes, {
-      origin: 'min',
-      stride: step,
-      signal,
-      laz: decompress
-        ? (_file, _header, records) =>
-            decompress({ bytes, header, pointOffset: file.pointDataOffset, records: [...records] })
-        : undefined,
-    });
+        origin: 'min',
+        stride: step,
+        signal,
+        laz: decompress
+          ? (_file, _header, records) =>
+              decompress({ bytes, header, pointOffset: file.pointDataOffset, records: [...records] })
+          : undefined,
+      });
     const { rgb, intensity, classification, returnNumber, numberOfReturns, gpsTime, extra, crs, records } = points,
       origin: [number, number, number] = [...points.origin];
     const cloud: LASCloud = {

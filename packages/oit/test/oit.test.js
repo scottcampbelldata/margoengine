@@ -768,10 +768,7 @@ test("KB3148e: ExactOIT, MomentOIT, PeelOIT and PreciseOIT take blendSpace 'line
       assert.equal(at.length, per, `${name}: composite passes`);
       for (const i of at) assert.equal(labels[i - 1], 'native-glass:copy', `${name}: a snapshot right before each`);
       const start = next.findIndex((e) => e[0] === 'beginRenderPass' && e[1].label === label),
-        inside = next.slice(
-          start + 1,
-          next.findIndex((e, i) => i > start && e[0] === 'pass.end'),
-        );
+        inside = next.slice(start + 1, next.findIndex((e, i) => i > start && e[0] === 'pass.end'));
       assert.equal(inside.filter((e) => e[0] === 'pass.draw').length, drawn, `${name}: display then linear draw`);
       const code = [...of(first, 'module'), ...of(next, 'module')].map((e) => e[2].code).join('\n');
       assert.ok(code.includes('fn overLinear('), `${name}: the over operator on decoded values`);

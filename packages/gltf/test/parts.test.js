@@ -321,10 +321,7 @@ test('a skinned, morphed primitive over the default part size splits and draws a
     assert.deepEqual(fingerprint(allTriangles(auto.primitives)), file);
     const held = new Uint8Array(grid.count);
     for (const p of auto.primitives) for (const v of p.part.vertexMap) held[v] = 1;
-    assert.equal(
-      held.reduce((n, v) => n + v, 0),
-      grid.count,
-    );
+    assert.equal(held.reduce((n, v) => n + v, 0), grid.count);
     // Split by hand: one primitive per part, its own accessors gathered from the grid's. Same vertices, same draws.
     const hand = await parseGLTFAsync(engine, ...Object.values(handSplit(grid, partsOf(auto))), []);
     assert.equal(hand.primitives.length, auto.primitives.length);
@@ -378,10 +375,7 @@ test('each part culls on its own against the camera frustum, without CulledModel
       for (let i = 0; i < p.vertices.length; i += 20) low = Math.min(low, p.vertices[i]);
       return low <= 100;
     }).length;
-  assert.ok(
-    model.primitives.length >= 3 && inside < model.primitives.length,
-    `${inside} of ${model.primitives.length}`,
-  );
+  assert.ok(model.primitives.length >= 3 && inside < model.primitives.length, `${inside} of ${model.primitives.length}`);
   h.counts.indexed = 0;
   model.draw(c, 'beauty', c.color, c.depth);
   assert.equal(h.counts.indexed, inside, 'a part wholly past x = 100 is not drawn');

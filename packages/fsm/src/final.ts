@@ -27,47 +27,26 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
   /** True after a top-level final state is entered. It accepts no more events or updates. */
   done = false;
   /** Authored transitions in definition order, with public event, after and always triggers for inspection. */
-  get transitionDefinitions(): readonly FinalTransition<C, D>[] {
-    return this.definition;
-  }
+  get transitionDefinitions(): readonly FinalTransition<C, D>[] { return this.definition; }
   /** Build and settle initial eventless transitions and completion events before returning. */
-  constructor(
-    states: Readonly<Record<string, FinalState<C, D>>>,
-    initial: string,
-    context: C,
-    transitions: readonly FinalTransition<C, D>[] = [],
-  ) {
+  constructor(states: Readonly<Record<string, FinalState<C, D>>>, initial: string, context: C,
+    transitions: readonly FinalTransition<C, D>[] = []) {
     for (const [name, state] of Object.entries(states)) {
       if (state.final !== undefined && typeof state.final !== 'boolean')
         throw new TypeError('Invalid final flag; use true or false');
-      if (
-        state.final &&
-        (state.initial !== undefined ||
-          state.regions ||
-          Object.values(states).some((s) => s.parent === name) ||
-          transitions.some((t) => t.from === name))
-      )
+      if (state.final && (state.initial !== undefined || state.regions ||
+        Object.values(states).some(s => s.parent === name) || transitions.some(t => t.from === name)))
         throw new TypeError('Invalid final state; use a leaf with no outgoing transitions or regions');
     }
     for (const t of transitions) {
-      if (
-        Number(t.always === true) + Number(t.event !== undefined) + Number(t.after !== undefined) !== 1 ||
-        (t.always !== undefined && t.always !== true) ||
-        t.event?.startsWith(INTERNAL) ||
-        (t.after !== undefined && (!Number.isFinite(t.after) || t.after <= 0))
-      )
+      if (Number(t.always === true) + Number(t.event !== undefined) + Number(t.after !== undefined) !== 1 ||
+        (t.always !== undefined && t.always !== true) || t.event?.startsWith(INTERNAL) ||
+        (t.after !== undefined && (!Number.isFinite(t.after) || t.after <= 0)))
         throw new TypeError('Invalid transition trigger; give event, positive after or always:true');
     }
-    super(
-      states,
-      initial,
-      context,
-      transitions.map((t, i) => ({
-        ...t,
-        after: undefined,
-        event: t.always ? ALWAYS : t.after !== undefined ? `${INTERNAL}${i}` : t.event,
-      })),
-    );
+    super(states, initial, context, transitions.map((t, i) => ({ ...t, after: undefined,
+      event: t.always ? ALWAYS : t.after !== undefined ? `${INTERNAL}${i}` : t.event,
+    })));
     this.definition = transitions;
     this.finalStates = states;
     this.stabilize(undefined);
@@ -77,23 +56,17 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
     if (event.startsWith(INTERNAL)) throw new TypeError('Reserved event name; use a name without a NUL prefix');
     if (this.done) return null;
     const action = super.plan(event, data);
-    return (
-      action &&
-      (() => {
-        action();
-        this.stabilize(data);
-        this.onStable(data);
-      })
-    );
+    return action && (() => {
+      action();
+      this.stabilize(data);
+      this.onStable(data);
+    });
   }
   /** Deliver an event, then reconsider eventless guards even when no event transition accepts it. */
   override send(event: string, data?: D): boolean {
     const action = this.plan(event, data);
     action?.();
-    if (!action && !this.done) {
-      this.stabilize(data);
-      this.onStable(data);
-    }
+    if (!action && !this.done) { this.stabilize(data); this.onStable(data); }
     return action !== null;
   }
   /** Directly enter a state and settle its eventless and completion transitions. */
@@ -109,8 +82,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
       throw new RangeError('Invalid state delta; pass finite non-negative seconds');
     if (this.done) return;
     this.stabilize(undefined);
-    let left = delta,
-      fired = 0;
+    let left = delta, fired = 0;
     for (;;) {
       let taken = false;
       // Leaf priority and definition order, matching ordinary event selection.
@@ -119,8 +91,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
           const t = this.definition[i];
           if (t.from !== name || t.after === undefined || this.clock < this.waitStart(i)! + t.after) continue;
           if (this.microstep(`${INTERNAL}${i}`, undefined)) {
-            if (++fired > 100000)
-              throw new MargoError('state', 'Too many delayed transitions; use longer delays or a shorter delta');
+            if (++fired > 100000) throw new MargoError('state', 'Too many delayed transitions; use longer delays or a shorter delta');
             if (this.entered.has(name)) this.waits.set(i, this.clock);
             this.stabilize(undefined);
             this.onStable();
@@ -135,8 +106,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
       if (left === 0) break;
       let step = left;
       for (let i = 0; i < this.definition.length; i++) {
-        const t = this.definition[i],
-          start = this.waitStart(i);
+        const t = this.definition[i], start = this.waitStart(i);
         if (start === undefined || t.after === undefined) continue;
         const distance = start + t.after - this.clock;
         if (distance > 0) step = Math.min(step, distance);
@@ -151,24 +121,16 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
   protected onStable(_data?: D): void {}
   private activePath(): string[] {
     const path: string[] = [];
-    for (let name: string | undefined = this.state; name !== undefined; name = this.states[name].parent)
-      path.unshift(name);
+    for (let name: string | undefined = this.state; name !== undefined; name = this.states[name].parent) path.unshift(name);
     return path;
   }
   private microstep(event: string, data: D | undefined): boolean {
     const action = super.plan(event, data);
     if (!action) return false;
     // Selection uses private event names; observers receive the public transition metadata.
-    const saved = this.transitions.map((t) => ({ event: t.event, after: t.after }));
-    this.transitions.forEach((t, i) => {
-      t.event = this.definition[i].event;
-      t.after = this.definition[i].after;
-    });
-    try {
-      action();
-    } finally {
-      this.transitions.forEach((t, i) => Object.assign(t, saved[i]));
-    }
+    const saved = this.transitions.map(t => ({ event: t.event, after: t.after }));
+    this.transitions.forEach((t, i) => { t.event = this.definition[i].event; t.after = this.definition[i].after; });
+    try { action(); } finally { this.transitions.forEach((t, i) => Object.assign(t, saved[i])); }
     return true;
   }
   private stabilize(data: D | undefined): void {
@@ -180,11 +142,7 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
         const state = this.finalStates[this.state];
         if (state.final && this.lastFinal !== this.state) {
           this.lastFinal = this.state;
-          if (state.parent === undefined) {
-            this.done = true;
-            this.queue.length = 0;
-            return;
-          }
+          if (state.parent === undefined) { this.done = true; this.queue.length = 0; return; }
           this.queue.push(`done.state.${state.parent}`);
         } else if (!state.final) this.lastFinal = null;
         if (++this.steps > 10000)
@@ -194,9 +152,6 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
         if (event === undefined) return;
         this.microstep(event, data);
       }
-    } finally {
-      this.settling = false;
-      this.queue.length = 0;
-    }
+    } finally { this.settling = false; this.queue.length = 0; }
   }
 }

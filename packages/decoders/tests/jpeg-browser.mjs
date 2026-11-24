@@ -6,12 +6,7 @@ import { compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
 import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 
-const server = await createServer({
-  plugins: [noFileWatcher()],
-  configFile: false,
-  logLevel: 'error',
-  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
-});
+const server = await createServer({ plugins: [noFileWatcher()], configFile: false, logLevel: 'error', server: { port: 0 } });
 await server.listen();
 let browser;
 try {

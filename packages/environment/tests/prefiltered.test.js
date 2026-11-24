@@ -30,11 +30,7 @@ test('KTX2 metadata overflow is rejected from dimensions before reading or alloc
         throw mipAccess;
       },
     };
-    if (size === 4096)
-      assert.throws(
-        () => encodePrefilteredIBL(data),
-        (error) => error === mipAccess,
-      );
+    if (size === 4096) assert.throws(() => encodePrefilteredIBL(data), (error) => error === mipAccess);
     else
       assert.throws(() => encodePrefilteredIBL(data), {
         name: 'RangeError',

@@ -15,21 +15,11 @@ async function snapshot(name, text) {
     await mkdir(snapshots, { recursive: true });
     await writeFile(file, text);
   }
-  assert.equal(
-    text,
-    (await readFile(file, 'utf8')).replaceAll('\r\n', '\n'),
-    name + ' changed (UPDATE_SNAPSHOTS=1 to accept)',
-  );
+  assert.equal(text, (await readFile(file, 'utf8')).replaceAll('\r\n', '\n'), name + ' changed (UPDATE_SNAPSHOTS=1 to accept)');
 }
-const slug = (name) =>
-  name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const attributesOf = (f) =>
-  Object.fromEntries(
-    Object.entries(f.attributes).map(([k, a]) => [k, { data: a.data, type: a.size === 1 ? 'f32' : `vec${a.size}f` }]),
-  );
+  Object.fromEntries(Object.entries(f.attributes).map(([k, a]) => [k, { data: a.data, type: a.size === 1 ? 'f32' : `vec${a.size}f` }]));
 const material = (f, extra = {}) =>
   new ShaderMaterial({
     vertexShader: f.vertex,
@@ -84,10 +74,7 @@ test('the program tables: uniforms by GLSL type, textures, attributes and varyin
     { name: 'vLayer', glsl: 'int', location: 1, interpolation: 'flat' },
   ]);
   assert.equal(w.version, 300);
-  const all = glslProgramToWGSL({
-    vertexShader: programFixtures[0].vertex,
-    fragmentShader: programFixtures[0].fragment,
-  });
+  const all = glslProgramToWGSL({ vertexShader: programFixtures[0].vertex, fragmentShader: programFixtures[0].fragment });
   assert.deepEqual(
     all.uniforms.map((u) => [u.name, u.glsl, u.type]),
     [
@@ -106,36 +93,16 @@ test('the program tables: uniforms by GLSL type, textures, attributes and varyin
       ['m3', 'mat3', 'mat3x3f'],
     ],
   );
-  const tex = glslProgramToWGSL({
-    vertexShader: programFixtures[5].vertex,
-    fragmentShader: programFixtures[5].fragment,
-  });
+  const tex = glslProgramToWGSL({ vertexShader: programFixtures[5].vertex, fragmentShader: programFixtures[5].fragment });
   assert.deepEqual(tex.textures, [{ name: 'map', glsl: 'sampler2D', dimension: '2d', binding: 'user_map' }]);
-  assert.equal(
-    glslProgramToWGSL({ vertexShader: programFixtures[1].vertex, fragmentShader: programFixtures[1].fragment }).version,
-    100,
-  );
+  assert.equal(glslProgramToWGSL({ vertexShader: programFixtures[1].vertex, fragmentShader: programFixtures[1].fragment }).version, 100);
 });
 
 test('uniforms are live by GLSL name, converted for the raw block, and default to zero', () => {
   const f = programFixtures[0],
     m = material(f, { uniforms: { b: { value: true }, b2: { value: [false, 2] }, f: { value: 0.5 } } });
   assert.ok(m instanceof RawShaderMaterial);
-  assert.deepEqual(Object.keys(m.uniforms), [
-    'b',
-    'b2',
-    'f',
-    'lift',
-    'f2',
-    'f3',
-    'f4',
-    'i',
-    'i2',
-    'u',
-    'u3',
-    'm2',
-    'm3',
-  ]);
+  assert.deepEqual(Object.keys(m.uniforms), ['b', 'b2', 'f', 'lift', 'f2', 'f3', 'f4', 'i', 'i2', 'u', 'u3', 'm2', 'm3']);
   assert.equal(m.uniforms.b.value, true, 'the value as assigned');
   assert.equal(m.uniforms.user_b.value, 1, 'the block stores a bool as 1');
   assert.deepEqual(m.uniforms.user_b2.value, [0, 1], 'any non-zero number is true, as GL converts it');
@@ -147,10 +114,7 @@ test('uniforms are live by GLSL name, converted for the raw block, and default t
   m.uniforms.f2.value = { x: 1, y: 2 };
   assert.deepEqual(m.uniforms.user_f2.value, [1, 2], 'an {x, y} object gives its components');
   m.uniforms.b.value = 'yes';
-  assert.throws(() => m.uniforms.user_b.value, {
-    name: 'RangeError',
-    message: /uniform b needs numbers or booleans for bool/,
-  });
+  assert.throws(() => m.uniforms.user_b.value, { name: 'RangeError', message: /uniform b needs numbers or booleans for bool/ });
 });
 
 test('one translation per distinct program and defines; a new defines object or needsUpdate translates again', () => {
@@ -191,18 +155,9 @@ void main() {
 #endif
 }`;
   const m = new ShaderMaterial({ vertexShader: vs, fragmentShader: frag, uniforms: { gain: { value: 2 } } });
-  assert.deepEqual(
-    m.members.map((x) => x.name),
-    ['user_gain'],
-  );
+  assert.deepEqual(m.members.map((x) => x.name), ['user_gain']);
   m.defines = { TINT: 1 };
-  assert.deepEqual(
-    m.members.map((x) => [x.name, x.offset]),
-    [
-      ['user_tint', 0],
-      ['user_gain', 12],
-    ],
-  );
+  assert.deepEqual(m.members.map((x) => [x.name, x.offset]), [['user_tint', 0], ['user_gain', 12]]);
   assert.deepEqual(Object.keys(m.textures), ['user_map']);
   assert.deepEqual(Object.keys(m.uniforms), ['gain', 'tint', 'map']);
   assert.equal(m.uniforms.user_gain.value, 2, 'values carry over');
@@ -212,90 +167,18 @@ void main() {
 });
 
 test('link and syntax errors name the stage, line and column of the GLSL as written', () => {
-  const make = (vertexShader, fragmentShader, extra) => () =>
-    new ShaderMaterial({ vertexShader, fragmentShader, ...extra });
-  refusal(
-    make(vs, fs.replace('in vec2 vUv;', 'in vec3 vUv;')),
-    /varying vUv is vec2 in the vertexShader and vec3 here/,
-    'fragment',
-    3,
-    9,
-  );
-  refusal(
-    make(vs, fs.replace('in vec2 vUv;', 'in vec2 vUv;\nin float vMissing;').replace('vUv, 0.0', 'vUv, vMissing')),
-    /varying vMissing is read but the vertexShader does not write it/,
-    'fragment',
-    4,
-    10,
-  );
-  refusal(
-    make(vs, fs.replace('void main() {', 'void main() {\n  float x = 1.0 +;')),
-    /Unexpected expression token ;.*correct the fragmentShader source/,
-    'fragment',
-    6,
-    18,
-  );
-  refusal(
-    make(vs, fs.replace('out vec4 color;', 'out vec4 color;\nout vec4 extra;')),
-    /2 colour outputs; the scene pass has one colour target/,
-    'fragment',
-    5,
-    10,
-  );
-  refusal(
-    make(
-      vs.replace('out vec2 vUv;', 'out vec2 vUv;\nuniform float g;'),
-      fs.replace('out vec4 color;', 'out vec4 color;\nuniform int g;'),
-    ),
-    /uniform g is float in the vertexShader and int here/,
-    'fragment',
-    5,
-    13,
-  );
-  refusal(
-    make(vs.replace('out vec2 vUv;', 'out vec2 vUv;\nout int k;'), fs),
-    /integer varying k must be flat/,
-    'vertex',
-    4,
-    9,
-  );
-  refusal(
-    make(
-      'attribute vec2 position;\nvoid main() { gl_Position = vec4(position, 0.0, 1.0); }',
-      'precision highp float;\nvoid main() { gl_FragData[1] = vec4(1.0); }',
-    ),
-    /gl_FragData above 0 needs more colour targets/,
-    'fragment',
-    2,
-    15,
-  );
-  refusal(
-    make(vs, 'precision highp float;\nvoid main() { gl_FragColor = vec4(1.0); }'),
-    /vertexShader is GLSL ES 3\.00 and the fragmentShader 1\.00; use one version in both/,
-    'fragment',
-    1,
-    1,
-  );
-  refusal(
-    make(
-      vs,
-      fs
-        .replace('uniform', '')
-        .replace('out vec4 color;', 'out vec4 color;\nstruct Maps { sampler2D map; float k; };\nuniform Maps holder;'),
-    ),
-    /uniform holder holds a sampler in a struct/,
-    'fragment',
-    6,
-    14,
-  );
-  assert.throws(make(vs, fs.replace('void main()', 'void other()')), {
-    name: 'MargoError',
-    message: /fragmentShader: Define void main\(\) in the fragmentShader/,
-  });
-  assert.throws(make(vs, fs, { glslVersion: 100 }), {
-    name: 'MargoError',
-    message: /declares #version 300 but glslVersion is 100/,
-  });
+  const make = (vertexShader, fragmentShader, extra) => () => new ShaderMaterial({ vertexShader, fragmentShader, ...extra });
+  refusal(make(vs, fs.replace('in vec2 vUv;', 'in vec3 vUv;')), /varying vUv is vec2 in the vertexShader and vec3 here/, 'fragment', 3, 9);
+  refusal(make(vs, fs.replace('in vec2 vUv;', 'in vec2 vUv;\nin float vMissing;').replace('vUv, 0.0', 'vUv, vMissing')), /varying vMissing is read but the vertexShader does not write it/, 'fragment', 4, 10);
+  refusal(make(vs, fs.replace('void main() {', 'void main() {\n  float x = 1.0 +;')), /Unexpected expression token ;.*correct the fragmentShader source/, 'fragment', 6, 18);
+  refusal(make(vs, fs.replace('out vec4 color;', 'out vec4 color;\nout vec4 extra;')), /2 colour outputs; the scene pass has one colour target/, 'fragment', 5, 10);
+  refusal(make(vs.replace('out vec2 vUv;', 'out vec2 vUv;\nuniform float g;'), fs.replace('out vec4 color;', 'out vec4 color;\nuniform int g;')), /uniform g is float in the vertexShader and int here/, 'fragment', 5, 13);
+  refusal(make(vs.replace('out vec2 vUv;', 'out vec2 vUv;\nout int k;'), fs), /integer varying k must be flat/, 'vertex', 4, 9);
+  refusal(make('attribute vec2 position;\nvoid main() { gl_Position = vec4(position, 0.0, 1.0); }', 'precision highp float;\nvoid main() { gl_FragData[1] = vec4(1.0); }'), /gl_FragData above 0 needs more colour targets/, 'fragment', 2, 15);
+  refusal(make(vs, 'precision highp float;\nvoid main() { gl_FragColor = vec4(1.0); }'), /vertexShader is GLSL ES 3\.00 and the fragmentShader 1\.00; use one version in both/, 'fragment', 1, 1);
+  refusal(make(vs, fs.replace('uniform', '').replace('out vec4 color;', 'out vec4 color;\nstruct Maps { sampler2D map; float k; };\nuniform Maps holder;')), /uniform holder holds a sampler in a struct/, 'fragment', 6, 14);
+  assert.throws(make(vs, fs.replace('void main()', 'void other()')), { name: 'MargoError', message: /fragmentShader: Define void main\(\) in the fragmentShader/ });
+  assert.throws(make(vs, fs, { glslVersion: 100 }), { name: 'MargoError', message: /declares #version 300 but glslVersion is 100/ });
   assert.throws(make(vs, fs, { clipSpace: 'dx' }), TypeError);
   assert.throws(make(vs, fs, { defines: { 'bad name': 1 } }), TypeError);
   assert.throws(make(vs, fs, { builtins: 'unity' }), TypeError);
@@ -318,17 +201,9 @@ void main() { color = vec4(gl_FragCoord.xy, dFdy(vUv.y), 1.0); }`;
   assert.match(gl.fragment, /-dpdy\(/);
   assert.doesNotMatch(webgpu.fragment, /-dpdy\(/);
   // flipY flips v at a 2D lookup and nothing else.
-  const lookup = fs
-    .replace('in vec2 vUv;', 'in vec2 vUv;\nuniform sampler2D map;')
-    .replace('vec4(vUv, 0.0, 1.0)', 'texture(map, vUv)');
-  assert.match(
-    glslProgramToWGSL({ vertexShader: vs, fragmentShader: lookup }).fragment,
-    /textureSample\(user_map,user_mapSampler,vec2f\(user_vUv\.x,1\.0-user_vUv\.y\)\)/,
-  );
-  assert.match(
-    glslProgramToWGSL({ vertexShader: vs, fragmentShader: lookup, flipY: false }).fragment,
-    /textureSample\(user_map,user_mapSampler,user_vUv\)/,
-  );
+  const lookup = fs.replace('in vec2 vUv;', 'in vec2 vUv;\nuniform sampler2D map;').replace('vec4(vUv, 0.0, 1.0)', 'texture(map, vUv)');
+  assert.match(glslProgramToWGSL({ vertexShader: vs, fragmentShader: lookup }).fragment, /textureSample\(user_map,user_mapSampler,vec2f\(user_vUv\.x,1\.0-user_vUv\.y\)\)/);
+  assert.match(glslProgramToWGSL({ vertexShader: vs, fragmentShader: lookup, flipY: false }).fragment, /textureSample\(user_map,user_mapSampler,user_vUv\)/);
 });
 
 test('unfilterable textures bind as unfilterable-float and filter by texel loads as GL does', () => {
@@ -336,19 +211,11 @@ test('unfilterable textures bind as unfilterable-float and filter by texel loads
     fragmentShader =
       '#version 300 es\nprecision highp float;uniform sampler2D a;uniform sampler2D b;uniform sampler2D c;out vec4 o;\n' +
       'void main(){o=texture(a,vec2(0.5))+textureLod(b,vec2(0.5),2.0)+textureGrad(c,vec2(0.5),vec2(0.1),vec2(0.0))+textureOffset(a,vec2(0.5),ivec2(1,2));}';
-  const unfilterable = {
-    a: { filter: 'linear', wrap: 'clamp' },
-    b: { filter: 'mipmap', wrap: 'repeat' },
-    c: { filter: 'nearest', wrap: 'clamp' },
-  };
+  const unfilterable = { a: { filter: 'linear', wrap: 'clamp' }, b: { filter: 'mipmap', wrap: 'repeat' }, c: { filter: 'nearest', wrap: 'clamp' } };
   const linked = glslProgramToWGSL({ vertexShader, fragmentShader, builtins: false, unfilterable });
   assert.deepEqual(
     linked.textures.map((t) => [t.name, t.sampleType]),
-    [
-      ['a', 'unfilterable-float'],
-      ['b', 'unfilterable-float'],
-      ['c', 'unfilterable-float'],
-    ],
+    [['a', 'unfilterable-float'], ['b', 'unfilterable-float'], ['c', 'unfilterable-float']],
   );
   assert.match(linked.fragment, /margoTapsAuto\(user_a,[^;]*,0\.0,vec2i\(0\),2u\)/);
   assert.match(linked.fragment, /margoTaps\(user_b,[^;]*vec2f\(f32\(2\.0\),1\.0\),vec2i\(0\),5u\)/);
@@ -359,13 +226,10 @@ test('unfilterable textures bind as unfilterable-float and filter by texel loads
   const material = new ShaderMaterial({ vertexShader, fragmentShader, builtins: false, unfilterable });
   assert.equal(material.textures.user_a.sampleType, 'unfilterable-float');
   assert.doesNotThrow(() => checkWGSL(material.code('fragment')));
-  assert.throws(
-    () => glslProgramToWGSL({ vertexShader, fragmentShader, unfilterable: { a: { filter: 'cubic', wrap: 'clamp' } } }),
-    TypeError,
-  );
+  assert.throws(() => glslProgramToWGSL({ vertexShader, fragmentShader, unfilterable: { a: { filter: 'cubic', wrap: 'clamp' } } }), TypeError);
 });
 
-test("a texture or view with its own texture field (the WebGL2 layer's objects) is the texture itself, not a {texture, sampler} pair", () => {
+test('a texture or view with its own texture field (the WebGL2 layer\'s objects) is the texture itself, not a {texture, sampler} pair', () => {
   // The WebGL2 layer's texture keeps its GL texture as `texture` and its views keep their texture there; once such a
   // uniform value was read as a pair and its inner object bound (KB-COMPAT-RAWFIRST1).
   const frag = `#version 300 es

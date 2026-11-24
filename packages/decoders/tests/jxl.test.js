@@ -19,22 +19,8 @@ await init({ module_or_path: readFileSync(new URL('../dist/jxl/jxl_oxide_wasm_bg
 
 test('the header says what jxlinfo says, on bare codestreams and containers', () => {
   const expected = {
-    alpha_premultiplied: {
-      width: 1024,
-      height: 1024,
-      bitsPerSample: 12,
-      hasAlpha: true,
-      alphaPremultiplied: true,
-      srgb: true,
-    },
-    alpha_triangles: {
-      width: 1024,
-      height: 1024,
-      bitsPerSample: 9,
-      hasAlpha: true,
-      alphaPremultiplied: false,
-      srgb: true,
-    },
+    alpha_premultiplied: { width: 1024, height: 1024, bitsPerSample: 12, hasAlpha: true, alphaPremultiplied: true, srgb: true },
+    alpha_triangles: { width: 1024, height: 1024, bitsPerSample: 9, hasAlpha: true, alphaPremultiplied: false, srgb: true },
     animation_spline: { width: 320, height: 320, bitsPerSample: 8, hasAlpha: false, animated: true },
     bench_oriented_brg: { width: 606, height: 500, bitsPerSample: 8, hasAlpha: false, orientation: 5 },
     bicycles: { width: 1024, height: 631, bitsPerSample: 8, hasAlpha: false, animated: false, xyb: true },
@@ -50,8 +36,7 @@ test('the header says what jxlinfo says, on bare codestreams and containers', ()
 });
 
 test('the header reader refuses what is not a complete JPEG XL header', () => {
-  const failed = (error) =>
-    error.name === 'MargoError' && error.code === 'failed' && /; pass the complete bytes/.test(error.message);
+  const failed = (error) => error.name === 'MargoError' && error.code === 'failed' && /; pass the complete bytes/.test(error.message);
   assert.throws(() => readJXLHeader(new Uint8Array(16)), failed);
   assert.throws(() => readJXLHeader(file('grayscale.jxl').subarray(0, 3)), failed);
   assert.throws(() => readJXLHeader(file('alpha_premultiplied.jxl').subarray(0, 40)), failed);
@@ -171,8 +156,7 @@ const gamma = (value) => type('curv', 14, (view) => (view.setUint32(8, 1), view.
 test('a profile that is sRGB leaves every level where it was, and alpha is carried over', () => {
   const read = readICCProfile(profile('RGB ', [...srgbColumns, ...curves(srgbCurve)])),
     samples = new Uint16Array(256 * 4);
-  for (let level = 0; level < 256; level++)
-    samples.set([level * 257, level * 257, level * 257, level * 257], level * 4);
+  for (let level = 0; level < 256; level++) samples.set([level * 257, level * 257, level * 257, level * 257], level * 4);
   const out = profileToSRGB(samples, read);
   for (let level = 0; level < 256; level++)
     for (let channel = 0; channel < 4; channel++) assert.equal(out[level * 4 + channel], level, `level ${level}`);
@@ -219,12 +203,8 @@ test('an animation gives its first frame', () => {
 
 test('a file cut short, a CMYK file and a file over maxPixels are refused with the fix in the message', () => {
   const bytes = file('bicycles.jxl'),
-    failed = (pattern) => (error) =>
-      error.name === 'MargoError' && error.code === 'failed' && pattern.test(error.message);
-  assert.throws(
-    () => renderJXL(glue, bytes.subarray(0, bytes.length - 1)),
-    failed(/cut short; pass the complete bytes/),
-  );
+    failed = (pattern) => (error) => error.name === 'MargoError' && error.code === 'failed' && pattern.test(error.message);
+  assert.throws(() => renderJXL(glue, bytes.subarray(0, bytes.length - 1)), failed(/cut short; pass the complete bytes/));
   assert.throws(() => renderJXL(glue, bytes.subarray(0, 20)), failed(/cut short|ends inside/));
   assert.throws(() => renderJXL(glue, file('cmyk_layers.jxl')), failed(/convert CMYK images to RGB/));
   assert.throws(() => renderJXL(glue, bytes, 1024), /over maxPixels 1024; raise maxPixels/);

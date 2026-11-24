@@ -22,11 +22,7 @@ const parts = [
 
 function drop(PhysicsClass, colliders, steps = 240) {
   const physics = new PhysicsClass(null);
-  physics.addBody(null, {
-    type: 'fixed',
-    position: [0, -0.5, 0],
-    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
-  });
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
   const body = physics.addBody(null, { position: [0, 3, 0], colliders }),
     events = [];
   physics.on('contactstart', (event) => events.push(event));
@@ -83,10 +79,7 @@ test('a dumbbell rests on its two balls where Rapier rests it, as one collider w
   assert.equal(own.body.colliders.length, 1, 'one collider');
   assert.equal(own.events.length, 1, 'one contact pair for the whole compound');
   assert.equal(rapier.events.length, 1);
-  assert.equal(
-    own.events[0].colliderA === own.body.colliders[0] || own.events[0].colliderB === own.body.colliders[0],
-    true,
-  );
+  assert.equal(own.events[0].colliderA === own.body.colliders[0] || own.events[0].colliderB === own.body.colliders[0], true);
   for (let k = 0; k < 3; k++) near(own.body.position[k], rapier.body.position[k], 0.01, `rest ${k}`);
   near(own.body.position[1], 0.5, 0.01, 'on its balls');
   own.physics.dispose();
@@ -97,18 +90,11 @@ test('a compound refuses what Rapier refuses, with a fix in the message', () => 
   const physics = new Physics(null),
     body = physics.addBody(null, {});
   assert.throws(() => body.addCollider({ shape: 'compound', parts: [] }), RangeError);
-  assert.throws(
-    () => body.addCollider({ shape: 'compound', parts: [{ shape: 'trimesh', vertices: [], indices: [] }] }),
-    /not convex/,
-  );
+  assert.throws(() => body.addCollider({ shape: 'compound', parts: [{ shape: 'trimesh', vertices: [], indices: [] }] }), /not convex/);
   assert.throws(() => body.addCollider({ shape: 'compound', parts: [{ shape: 'box' }] }), /halfExtents/);
   assert.throws(() => body.addCollider({ shape: 'compound', parts: [{ shape: 'sphere' }] }), /radius/);
   assert.throws(() => body.addCollider({ shape: 'compound', parts: [{ shape: 'convexHull' }] }), /points/);
-  assert.throws(
-    () =>
-      body.addCollider({ shape: 'compound', parts: [{ shape: 'box', halfExtents: [1, 1, 1], offset: [0, NaN, 0] }] }),
-    /offset/,
-  );
+  assert.throws(() => body.addCollider({ shape: 'compound', parts: [{ shape: 'box', halfExtents: [1, 1, 1], offset: [0, NaN, 0] }] }), /offset/);
   assert.equal(body.colliders.length, 0, 'a refused compound leaves nothing behind');
   assert.ok(physics.supportsShape('compound'));
   physics.dispose();
@@ -116,21 +102,11 @@ test('a compound refuses what Rapier refuses, with a fix in the message', () => 
 
 test('removing a compound takes its parts with it, and the body falls through where it stood', () => {
   const physics = new Physics(null);
-  physics.addBody(null, {
-    type: 'fixed',
-    position: [0, -0.5, 0],
-    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
-  });
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
   const shelf = physics.addBody(null, {
       type: 'fixed',
       position: [0, 2, 0],
-      colliders: {
-        shape: 'compound',
-        parts: [
-          { shape: 'box', halfExtents: [1, 0.1, 1] },
-          { shape: 'box', halfExtents: [0.1, 1, 0.1], offset: [0, -1, 0] },
-        ],
-      },
+      colliders: { shape: 'compound', parts: [{ shape: 'box', halfExtents: [1, 0.1, 1] }, { shape: 'box', halfExtents: [0.1, 1, 0.1], offset: [0, -1, 0] }] },
     }),
     ball = physics.addBody(null, { position: [0.5, 3, 0.5], colliders: { shape: 'sphere', radius: 0.2 } });
   for (let i = 0; i < 120; i++) physics.step();
@@ -144,10 +120,7 @@ test('removing a compound takes its parts with it, and the body falls through wh
 test('a compound and a hull have no bounding radius to read, as on the Rapier entry', () => {
   const own = new Physics(null),
     rapier = new RapierPhysics(null);
-  for (const colliders of [
-    { shape: 'compound', parts },
-    { shape: 'convexHull', points: parts[4].points },
-  ]) {
+  for (const colliders of [{ shape: 'compound', parts }, { shape: 'convexHull', points: parts[4].points }]) {
     const a = own.addBody(null, { colliders }).colliders[0],
       b = rapier.addBody(null, { colliders }).colliders[0];
     assert.equal(a.boundingRadius, null, colliders.shape);

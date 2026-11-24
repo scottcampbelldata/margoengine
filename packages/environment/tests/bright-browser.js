@@ -41,7 +41,8 @@ function projectFaces(size, faces) {
           omega = area(u0, v0) - area(u0, v1) - area(u1, v0) + area(u1, v1),
           b = basis(faceDirection(face, u0 + inv, v0 + inv)),
           i = (y * size + x) * 4;
-        for (let k = 0; k < 9; k++) for (let c = 0; c < 3; c++) out[k * 3 + c] += faces[face][i + c] * omega * b[k];
+        for (let k = 0; k < 9; k++)
+          for (let c = 0; c < 3; c++) out[k * 3 + c] += faces[face][i + c] * omega * b[k];
       }
   return out;
 }
@@ -110,8 +111,7 @@ window.runTests = async () => {
       for (let c = 0; c < 3; c++)
         irradianceError = Math.max(irradianceError, Math.abs(got[c] - want[c]) / Math.abs(want[c]));
     }
-    const finite =
-      (await allFinite(device, environment.cubeTexture)) || (await allFinite(device, environment.specularTexture));
+    const finite = (await allFinite(device, environment.cubeTexture)) || (await allFinite(device, environment.specularTexture));
     assert(!finite, `CubeFaces sun: non-finite texel, ${finite}`);
     // f16 storage rounds each stored texel by at most half a unit in the last place (2^-11 relative); the sums run in
     // f32 over 1,536 texels. Measured 3.6e-7 (SH) and 4.0e-7 (irradiance) on the RTX A6000, native WebGPU
@@ -160,19 +160,13 @@ window.runTests = async () => {
     // multiplied by k with its sky subtracted. Measured on the A6000 at most 1.9e-4 (rgba32float) and 1.3e-4
     // (rgba16float), both backends; main was 1.26 on the rgba32float path (the cube store overflowed).
     assert(error < 2e-3, `${path} equirect sun: SH ${error} off the linear prediction (scale ${scaleOf(lit)})`);
-    report.equirect[path] = {
-      radianceScale: scaleOf(lit),
-      shError: error,
-      keptOfLinear: lightingSH(lit)[0] / predicted[0],
-    };
+    report.equirect[path] = { radianceScale: scaleOf(lit), shError: error, keptOfLinear: lightingSH(lit)[0] / predicted[0] };
     flat.dispose();
     dim.dispose();
     if (bright) lit.dispose();
     else bright = lit;
   }
-  report.checks.push(
-    `equirect with a 1e6 sun (${Object.keys(report.equirect).join(', ')}): SH linear in radiance; texels finite`,
-  );
+  report.checks.push(`equirect with a 1e6 sun (${Object.keys(report.equirect).join(', ')}): SH linear in radiance; texels finite`);
 
   // 3a. Background: the sky behind the camera reads the same radiance from the scaled textures, equirect and cube.
   {
@@ -187,11 +181,7 @@ window.runTests = async () => {
           format: 'rgba16float',
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         }),
-        depth = device.createTexture({
-          size: [size, size],
-          format: 'depth32float',
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        });
+        depth = device.createTexture({ size: [size, size], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
       const encoder = device.createCommandEncoder(),
         colorView = color.createView(),
         depthView = depth.createView();

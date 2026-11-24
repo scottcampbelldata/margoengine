@@ -15,8 +15,7 @@ export type { OpenTypeReaders } from './ttf.js';
 
 const readers: OpenTypeReaderSet = {
   name: 'opentype',
-  cff: (table, cff2, glyphCount, unitsPerEm, coordinates) =>
-    new CFFOutlines(table, cff2, glyphCount, unitsPerEm, coordinates),
+  cff: (table, cff2, glyphCount, unitsPerEm, coordinates) => new CFFOutlines(table, cff2, glyphCount, unitsPerEm, coordinates),
   variations: (tables, glyphCount, values) => new FontVariations(tables, glyphCount, values),
 };
 /**

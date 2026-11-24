@@ -194,7 +194,8 @@ function readValue(
       tag = own(value, '@language');
     return readValue(inner, namespaces, typeof tag === 'string' ? tag : scope, depth + 1);
   }
-  if (isAlternatives(value, namespaces)) return { alternatives: alternativesOf(value, namespaces, scope, depth) };
+  if (isAlternatives(value, namespaces))
+    return { alternatives: alternativesOf(value, namespaces, scope, depth) };
   return { properties: readProperties(value, namespaces, scope, depth + 1) };
 }
 function readItems(
@@ -363,8 +364,7 @@ export function readGLTFMetadata(
     objects,
     fieldsOf(kind, index) {
       const list = lists[kind];
-      if (!list)
-        throw new RangeError(`Unknown glTF object kind ${String(kind)}; pass ${Object.keys(lists).join(', ')}`);
+      if (!list) throw new RangeError(`Unknown glTF object kind ${String(kind)}; pass ${Object.keys(lists).join(', ')}`);
       if (!Number.isInteger(index) || index < 0 || index >= (doc[list]?.length ?? 0))
         throw new RangeError(`No glTF ${kind} ${String(index)}; pass an index below ${doc[list]?.length ?? 0}`);
       return byObject.get(`${kind} ${index}`) ?? asset;

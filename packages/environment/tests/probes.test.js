@@ -283,12 +283,10 @@ test('LightProbes reach gltf/pbr models through the ambient hook and the bake ca
   // KB-PROBES-TAA1: with TAA the main shader draws through its jittered `taaCamera`; the capture must draw from the
   // probe camera. Before, the capture kept TAA's clip transform and drew the main camera's view into every face.
   assert.ok(frame.state.shader.includes('o.clip=frame.camera*p;'), "core's clip transform");
-  const clustered = frame.state.shader
-    .replace('o.clip=frame.camera*p;', 'o.clip=taaCamera*p;')
-    .replace(
-      'fn fogAmount',
-      '\nfn clusterLighting(pixel:vec2f)->vec3f {if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}let count=clusterCounts[cell];for(var j=0u;j<count;j++){let light=clusterLights[clusterIndices[cell*1024u+j]];}}\nfn fogAmount',
-    );
+  const clustered = frame.state.shader.replace('o.clip=frame.camera*p;', 'o.clip=taaCamera*p;').replace(
+    'fn fogAmount',
+    '\nfn clusterLighting(pixel:vec2f)->vec3f {if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}let count=clusterCounts[cell];for(var j=0u;j<count;j++){let light=clusterLights[clusterIndices[cell*1024u+j]];}}\nfn fogAmount',
+  );
   let renders = 0,
     log = [];
   engine.render = () => {
@@ -970,9 +968,7 @@ test('external probe baking renders its owning scene on every bounce', async () 
 // probes own the ambient term and fall back to the sky's own skyIrradiance and skyRadiance outside the volume (the sum
 // is the sky's skyLighting there), bind the sky's resources beside the probe buffer, capture the sky and wait for it.
 test('LightProbes with a sky: the sky lights what the probes do not, captured, bound and validated', () => {
-  const skyWgsl = /const declarations = `([^`]*)`/.exec(
-    readFileSync(new URL('../../sky/src/lighting.ts', import.meta.url), 'utf8'),
-  )[1];
+  const skyWgsl = /const declarations = `([^`]*)`/.exec(readFileSync(new URL('../../sky/src/lighting.ts', import.meta.url), 'utf8'))[1];
   assert.match(skyWgsl, /fn skyRadiance\(r:vec3f,rough:f32\)->vec3f/, 'the sky declares its radiance for the probes');
   const gpu = mockGPU(),
     engine = fakeEngine(gpu);
@@ -1014,10 +1010,7 @@ test('LightProbes with a sky: the sky lights what the probes do not, captured, b
   assert.match(hooks.declarations, /@group\(2\) @binding\(8\) var<uniform> skyLight/);
   assert.match(hooks.ambient, /probeShade\(i\.position,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,vec3f\(0\),/);
   // The sky's passes are replayed into every capture, so the probes see it through doors and windows.
-  const broken = new LightProbes({
-    sky: { ...sky, pbr: () => ({ declarations: 'fn other() {}' }) },
-    volume: { ...room, counts: [2, 2, 2] },
-  });
+  const broken = new LightProbes({ sky: { ...sky, pbr: () => ({ declarations: 'fn other() {}' }) }, volume: { ...room, counts: [2, 2, 2] } });
   broken.setup(engine);
   assert.throws(() => broken.shader(coreShader, 0), /skyIrradiance and skyRadiance/);
   broken.dispose();

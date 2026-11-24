@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Blast cloud browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas id="a"></canvas>
+<script type="module">
+// Real-GPU proof for BlastCloud of @margoengine/weather/eruption: draw puts the caps, stems and fire of two releases
+// 2 s apart into vfx Clouds, the cloud stands darker than the pale overcast behind it, the same frame twice is the
+// same, a seek back draws the earlier cloud again, and clear leaves the picture as it was. `?frames=1` sizes the canvas
+// 1280 x 720 and window.check.frame(t) draws one film frame for review.
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Clouds} from '/packages/vfx/dist/clouds.js';
+import {BlastCloud} from '/packages/weather/dist/eruption.js';
+const q=new URLSearchParams(location.search);
+if(q.get('samples')==='1')globalThis.margoLow=1;
+const errors=[];
+const canvas=document.querySelector('#a');
+if(q.get('frames')==='1'){canvas.width=1280;canvas.height=720;canvas.style.width='1280px';canvas.style.height='720px';}
+const range=Number(q.get('range')??3000);
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-range,40,-range*0.35],target:[0,700,0],near:5,far:200000,fov:40}});engine.stop();
+engine.scene.background='#c9cbcc';
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const S=60000;engine.createMesh().setGeometry(new Geometry([-S,0,-S,S,0,-S,-S,0,S,S,0,S],[0,1,0,0,1,0,0,1,0,0,1,0],[0,2,1,1,2,3])).setMaterial(new PbrMaterial({color:'#5b6347',roughness:0.95}));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const device=engine.gpu;
+async function read(texture){
+ const pipeline=device.createComputePipeline({layout:'auto',compute:{module:device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'}),entryPoint:'main'}});
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const fire=Clouds.attach(engine,{limit:400,shading:'unlit'});
+const smoke=Clouds.attach(engine,{limit:2000,lightDirection:[-0.3,1,-0.2],lightColor:[1,0.98,0.95],ambient:0.6,density:1.4});
+const blast=new BlastCloud({sources:[{at:0,tnt:1.6e6,speed:45},{at:2,tnt:5e5,position:[70,0,15],speed:35}],wind:4,windDirection:60,seed:3});
+async function pixels(){engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const count=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-3)n++;return n;};
+// Mean luminance of the pixels the cloud changed, and of the sky they covered.
+const contrast=(bare,img)=>{let n=0,sky=0,cloud=0;for(let p=0;p<img.length;p+=4){const d=Math.abs(img[p]-bare[p])+Math.abs(img[p+1]-bare[p+1])+Math.abs(img[p+2]-bare[p+2]);if(d>1e-3){n++;sky+=bare[p]+bare[p+1]+bare[p+2];cloud+=img[p]+img[p+1]+img[p+2];}}return n?cloud/sky:1;};
+window.check={samples:sceneSamples,
+ async frame(t){blast.seek(t);blast.draw(smoke,fire);engine.render({delta:0});await device.queue.onSubmittedWorkDone();return blast.thermals().map(x=>[x.height,x.radius]);},
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const bare=await pixels();
+  blast.seek(1);blast.draw(smoke,fire,{cap:60,stem:50,fire:20});const early=await pixels();out.earlyChanged=count(bare,early);
+  blast.seek(30);blast.draw(smoke,fire,{cap:60,stem:50,fire:20});const risen=await pixels();
+  out.risenChanged=count(bare,risen);out.darker=contrast(bare,risen);out.sameTwice=count(risen,await pixels());
+  out.moved=count(early,risen);
+  blast.seek(1);blast.draw(smoke,fire,{cap:60,stem:50,fire:20});out.seekBack=count(early,await pixels());
+  blast.clear();out.cleared=count(bare,await pixels());
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

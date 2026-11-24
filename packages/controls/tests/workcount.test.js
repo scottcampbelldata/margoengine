@@ -12,20 +12,14 @@ import { withExactMath } from '../../../tests/support/exact-math.js';
 // implementation-approximated and differ in the last bit between x64 and arm64, which changed this hash on an arm64
 // Mac with the code unchanged. The parent of the work-count change gives the same hash.
 test('controls preserve every replayed camera and transform byte from the pre-workcount implementation', async () => {
-  assert.equal(
-    await withExactMath(() => controlReplay()),
-    '96c8b474b114c21c95be238b08ba81da54c858d456756ef6c88b7157b89cf062',
-  );
+  assert.equal(await withExactMath(() => controlReplay()), '96c8b474b114c21c95be238b08ba81da54c858d456756ef6c88b7157b89cf062');
 });
 
 test('arcball does not rebuild the screen basis on 10000 idle follow-up updates', () => {
   const control = new ArcballControls(camera(), new FakeElement());
   let bases = 0;
   const screenUp = control.screenUp.bind(control);
-  control.screenUp = () => {
-    bases++;
-    return screenUp();
-  };
+  control.screenUp = () => { bases++; return screenUp(); };
   for (let i = 0; i < 10000; i++) assert.equal(control.update(), false);
   assert.equal(bases, 0);
   // A live limit change must still clamp without pending input.
@@ -37,13 +31,9 @@ test('arcball does not rebuild the screen basis on 10000 idle follow-up updates'
 
 test('drag reuses its carried list for 200 moves, including removal of a disposed group member', async () => {
   const canvas = Object.assign(new FakeElement(), { width: 800, height: 600 });
-  const engine = new Engine(
-    canvas,
-    await TransformStore.create(32),
+  const engine = new Engine(canvas, await TransformStore.create(32),
     { backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {} },
-    { position: [0, 0, 10], target: [0, 0, 0] },
-    null,
-  );
+    { position: [0, 0, 10], target: [0, 0, 0] }, null);
   const objects = [0, 2, 4].map((x) => engine.createMesh().setGeometry(box()).setPosition([x, 0, 0]));
   const control = new DragControls(engine, objects, { group: objects });
   engine.store.tick(false);
@@ -56,10 +46,7 @@ test('drag reuses its carried list for 200 moves, including removal of a dispose
     if (control.drag.carried !== carried) replacements++;
   }
   assert.equal(replacements, 0);
-  assert.deepEqual(
-    carried.map((c) => c.object),
-    [objects[0], objects[2]],
-  );
+  assert.deepEqual(carried.map((c) => c.object), [objects[0], objects[2]]);
   control.dispose();
   engine.dispose();
 });

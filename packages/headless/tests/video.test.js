@@ -510,12 +510,7 @@ test('encodeVideo gives the encoder limited-range BT.709 I420 planes it converte
   await encodeVideo([{ width: 3, height: 3, data }], { format: 'webm', fps: 10, webCodecs });
   const [frame] = log.frames;
   assert.equal(frame.format, 'I420');
-  assert.deepEqual(frame.colorSpace, {
-    primaries: 'bt709',
-    transfer: 'iec61966-2-1',
-    matrix: 'bt709',
-    fullRange: false,
-  });
+  assert.deepEqual(frame.colorSpace, { primaries: 'bt709', transfer: 'iec61966-2-1', matrix: 'bt709', fullRange: false });
   // Y: 16 + 219 E'Y; white 235, black 16, #336699 97.45 (BT.709-6 items 3.2 to 3.5).
   assert.deepEqual([...frame.data.subarray(0, 9)], [235, 97, 97, 97, 97, 97, 97, 97, 16]);
   // Chroma sits where H.264 and H.265 place it when the stream does not say (H.273 chroma_sample_loc_type 0): on the
@@ -533,18 +528,12 @@ test('H.264 and H.265 take an odd size by repeating the last column and row; VP9
   for (let i = 0; i < 9; i++) data.set([(i % 3) * 100, Math.floor(i / 3) * 100, 0, 255], i * 4);
   for (const codec of ['avc1.42001f', 'hvc1.1.6.L93.B0']) {
     const { webCodecs, log } = fakeCodecs({ description: Uint8Array.from(RADEON_AVCC) }),
-      video = await encodeVideo(
-        [
-          { width: 3, height: 3, data },
-          { width: 3, height: 3, data },
-        ],
-        {
-          format: 'mp4',
-          fps: 10,
-          codec,
-          webCodecs,
-        },
-      );
+      video = await encodeVideo([{ width: 3, height: 3, data }, { width: 3, height: 3, data }], {
+        format: 'mp4',
+        fps: 10,
+        codec,
+        webCodecs,
+      });
     assert.deepEqual([log.configs[0].width, log.configs[0].height], [4, 4], codec);
     assert.deepEqual([video.width, video.height], [4, 4], `${codec}: the file states the size it holds`);
     const y = [...log.frames[0].data.subarray(0, 16)],
@@ -586,10 +575,7 @@ test('encodeVideo places chroma on the even luma columns, as H.264, H.265, VP9 a
   for (let i = 0; i < 8; i++) data.set(i % 4 < 2 ? [255, 0, 0, 255] : [0, 0, 255, 255], i * 4);
   await encodeVideo([{ width: 4, height: 2, data }], { format: 'mp4', fps: 10, webCodecs });
   const chroma = [...log.frames[0].data.subarray(8)],
-    red = [
-      Math.round(128 + (224 / 255) * ((0 - 54.213) / 1.8556)),
-      Math.round(128 + (224 / 255) * ((255 - 54.213) / 1.5748)),
-    ],
+    red = [Math.round(128 + (224 / 255) * ((0 - 54.213) / 1.8556)), Math.round(128 + (224 / 255) * ((255 - 54.213) / 1.5748))],
     // Column 2 weighs red 1 of 4 and blue 3 of 4.
     mix = [0.25 * 255, 0, 0.75 * 255],
     e = 0.2126 * mix[0] + 0.0722 * mix[2];
@@ -627,10 +613,7 @@ test('an SPS without VUI stays as given: limited is its default', async () => {
   const rbsp = RADEON_AVCC.slice(9, 40),
     kept = Array.from({ length: 62 }, (_, i) => (rbsp[i >> 3] >> (7 - (i & 7))) & 1),
     all = [...kept, 0, 1, 0],
-    plain = [
-      103,
-      ...Array.from({ length: all.length / 8 }, (_, i) => all.slice(i * 8, i * 8 + 8).reduce((v, b) => v * 2 + b, 0)),
-    ],
+    plain = [103, ...Array.from({ length: all.length / 8 }, (_, i) => all.slice(i * 8, i * 8 + 8).reduce((v, b) => v * 2 + b, 0))],
     record = [...RADEON_AVCC.slice(0, 6), 0, plain.length, ...plain, ...RADEON_AVCC.slice(40)];
   assert.equal(readSps(Uint8Array.from(plain)).head.vui, 0);
   for (const fullRange of [true, false]) {
@@ -838,10 +821,7 @@ test('encodeWithFFmpeg gives H.264 an even size by repeating the last column and
       data = Uint8Array.from({ length: 3 * 3 * 4 }, (_, i) => i);
     await writeFile(script, STAND_IN);
     const mp4 = join(folder, 'odd.mp4'),
-      result = await encodeWithFFmpeg([{ width: 3, height: 3, data }], {
-        output: mp4,
-        ffmpeg: [process.execPath, script],
-      }),
+      result = await encodeWithFFmpeg([{ width: 3, height: 3, data }], { output: mp4, ffmpeg: [process.execPath, script] }),
       written = await readFile(mp4),
       args = JSON.parse(await readFile(mp4 + '.args', 'utf8'));
     assert.deepEqual(result, { output: mp4, width: 4, height: 4, frames: 1 });
@@ -944,39 +924,16 @@ test('encodeWithFFmpeg pipes sound as interleaved f32le on pipe 3 beside the fra
     const sound = await readFile(output + '.sound'),
       samples = new Float32Array(sound.buffer, sound.byteOffset, sound.length / 4);
     assert.equal(samples.length, length * 2);
-    for (const i of [0, 1, 16383, 16384, 99_999])
-      assert.deepEqual([samples[2 * i], samples[2 * i + 1]], [left[i], right[i]]);
+    for (const i of [0, 1, 16383, 16384, 99_999]) assert.deepEqual([samples[2 * i], samples[2 * i + 1]], [left[i], right[i]]);
     const args = JSON.parse(await readFile(output + '.args', 'utf8'));
     assert.deepEqual(args, ffmpegArguments(512, 512, { output, audio }));
     const at = args.indexOf('pipe:3');
-    assert.deepEqual(args.slice(at - 7, at + 5), [
-      '-f',
-      'f32le',
-      '-ar',
-      '48000',
-      '-ac',
-      '2',
-      '-i',
-      'pipe:3',
-      '-map',
-      '0:v:0',
-      '-map',
-      '1:a:0',
-    ]);
+    assert.deepEqual(args.slice(at - 7, at + 5), ['-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', 'pipe:3', '-map', '0:v:0', '-map', '1:a:0']);
     assert.ok(!args.includes('-an'));
     assert.deepEqual(args.slice(-5, -1), ['-c:a', 'aac', '-b:a', '96000']);
-    assert.deepEqual(ffmpegArguments(2, 2, { output: 'a.webm', audio }).slice(-5, -1), [
-      '-c:a',
-      'libopus',
-      '-b:a',
-      '96000',
-    ]);
+    assert.deepEqual(ffmpegArguments(2, 2, { output: 'a.webm', audio }).slice(-5, -1), ['-c:a', 'libopus', '-b:a', '96000']);
     // Custom args: the sound is still input 1 and mapped; its codec is the caller's.
-    assert.deepEqual(ffmpegArguments(2, 2, { output: 'a.mkv', args: ['-c:v', 'ffv1'], audio }).slice(-3), [
-      '-c:v',
-      'ffv1',
-      'a.mkv',
-    ]);
+    assert.deepEqual(ffmpegArguments(2, 2, { output: 'a.mkv', args: ['-c:v', 'ffv1'], audio }).slice(-3), ['-c:v', 'ffv1', 'a.mkv']);
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
@@ -1030,20 +987,10 @@ test('streamVideo writes a fragmented MP4 piece by piece: header, a moof and mda
   // are not all held until the end.
   assert.equal(pieces.length, 5);
   assert.deepEqual(at, [1, 4, 7, 7, 7]);
-  assert.deepEqual(result, {
-    mimeType: 'video/mp4; codecs="vp09.00.10.08"',
-    codec: 'vp09.00.10.08',
-    width: 4,
-    height: 2,
-    frames: 7,
-    duration: 3.5,
-  });
+  assert.deepEqual(result, { mimeType: 'video/mp4; codecs="vp09.00.10.08"', codec: 'vp09.00.10.08', width: 4, height: 2, frames: 7, duration: 3.5 });
   assert.equal(log.closed, true);
   const top = readBoxes(bytes);
-  assert.deepEqual(
-    top.map((box) => box.type),
-    ['ftyp', 'moov', 'moof', 'mdat', 'moof', 'mdat', 'moof', 'mdat', 'mfra'],
-  );
+  assert.deepEqual(top.map((box) => box.type), ['ftyp', 'moov', 'moof', 'mdat', 'moof', 'mdat', 'moof', 'mdat', 'mfra']);
   assert.equal(String.fromCharCode(...bytes.subarray(8, 12)), 'iso6');
   const trex = path(bytes, 'moov', 'mvex', 'trex');
   assert.deepEqual([u32At(bytes, trex.start + 4), u32At(bytes, trex.start + 8)], [1, 1]);
@@ -1068,11 +1015,7 @@ test('streamVideo writes a fragmented MP4 piece by piece: header, a moof and mda
       const row = trun.start + 12 + i * 12;
       assert.deepEqual([u32At(bytes, row), u32At(bytes, row + 4)], [1000, 3], 'duration and size');
       assert.equal(u32At(bytes, row + 8), i === 0 ? 0x02000000 : 0x01010000, 'sync flags');
-      assert.deepEqual(
-        [...bytes.subarray(data, data + 3)],
-        [n * 3 + i, 0xaa, 0xbb],
-        'the data offset finds the sample',
-      );
+      assert.deepEqual([...bytes.subarray(data, data + 3)], [n * 3 + i, 0xaa, 0xbb], 'the data offset finds the sample');
       data += 3;
     }
   });

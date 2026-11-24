@@ -101,13 +101,7 @@ test('hitboxes: boxes and capsules agree with a walk along the ray, on 300 rando
       hit = rewind.raycast(0, origin, direction);
     let first;
     for (let s = 0; s <= 2 && first === undefined; s += 0.0005)
-      if (
-        inside(
-          origin.map((v, k) => v + direction[k] * s),
-          shape,
-        )
-      )
-        first = s;
+      if (inside(origin.map((v, k) => v + direction[k] * s), shape)) first = s;
     if (first === undefined) {
       misses++;
       assert.equal(hit, undefined, `ray ${i} misses`);

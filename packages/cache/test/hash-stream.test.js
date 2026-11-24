@@ -24,10 +24,7 @@ const pieces = (bytes, sizes) => {
 };
 
 test('SHA256 gives the FIPS 180 example digests', () => {
-  assert.equal(
-    new SHA256().update(text('abc')).digest(),
-    'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
-  );
+  assert.equal(new SHA256().update(text('abc')).digest(), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.equal(
     new SHA256().update(text('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).digest(),
     '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
@@ -73,10 +70,7 @@ test('hashStream checks its input and stops on its signal', async () => {
   await assert.rejects(hashStream(endless(), { signal: stop.signal }), /stopped/);
   const used = new SHA256();
   used.digest();
-  assert.throws(
-    () => used.update(new Uint8Array(1)),
-    (e) => e.code === 'state',
-  );
+  assert.throws(() => used.update(new Uint8Array(1)), (e) => e.code === 'state');
 });
 
 // KB-CACHE-HASHSTREAM-SPEED: in Node the hash runs on the runtime's own digest (node:crypto through
@@ -87,26 +81,16 @@ test('the runtime digest and the plain JavaScript give the same hex, and Node us
   assert.equal(new SHA256().engine, 'native');
   assert.equal(new SHA256({ native: false }).engine, 'js');
   for (const native of [true, false]) {
-    assert.equal(
-      new SHA256({ native }).update(text('abc')).digest(),
-      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
-    );
+    assert.equal(new SHA256({ native }).update(text('abc')).digest(), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     for (const length of [0, 1, 55, 56, 63, 64, 65, 127, 128, 129, 1000, 65537]) {
       const bytes = noise(length, length + 3),
         whole = await hashBytes(bytes);
       for (const sizes of [[length || 1], [1], [3, 61, 64, 7], [64], [130], [4096]])
-        assert.equal(
-          await hashStream(pieces(bytes, sizes), { native }),
-          whole,
-          `${native} ${length} bytes in pieces of ${sizes}`,
-        );
+        assert.equal(await hashStream(pieces(bytes, sizes), { native }), whole, `${native} ${length} bytes in pieces of ${sizes}`);
     }
     const used = new SHA256({ native });
     used.digest();
-    assert.throws(
-      () => used.update(new Uint8Array(1)),
-      (e) => e.code === 'state',
-    );
+    assert.throws(() => used.update(new Uint8Array(1)), (e) => e.code === 'state');
     assert.throws(() => new SHA256({ native }).update([1, 2]), /errors#cache/);
   }
   // Without getBuiltinModule (a browser or a worker) the default falls back to the JavaScript.

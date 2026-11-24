@@ -11,46 +11,26 @@ const random = (seed) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 // Object.is equality is bit equality for every double except NaN, whose payload bits ECMAScript leaves to the engine.
-const bits = (values) =>
-  [...values].map((x) => (Number.isNaN(x) ? 'NaN' : [...new Uint8Array(Float64Array.of(x).buffer)].join()));
+const bits = (values) => [...values].map((x) => (Number.isNaN(x) ? 'NaN' : [...new Uint8Array(Float64Array.of(x).buffer)].join()));
 const orders = ['XYZ', 'YXZ', 'ZXY', 'ZYX', 'YZX', 'XZY'];
 
 // The parent setFromEuler, unchanged.
 function parentEuler(x, y, z, order) {
-  const sx = Math.sin(x / 2),
-    cx = Math.cos(x / 2),
-    sy = Math.sin(y / 2),
-    cy = Math.cos(y / 2),
-    sz = Math.sin(z / 2),
-    cz = Math.cos(z / 2);
-  const a = sx * cy * cz,
-    b = cx * sy * sz,
-    c = cx * sy * cz,
-    d = sx * cy * sz,
-    e = cx * cy * sz,
-    f = sx * sy * cz,
-    g = cx * cy * cz,
-    h = sx * sy * sz;
+  const sx = Math.sin(x / 2), cx = Math.cos(x / 2), sy = Math.sin(y / 2), cy = Math.cos(y / 2), sz = Math.sin(z / 2), cz = Math.cos(z / 2);
+  const a = sx * cy * cz, b = cx * sy * sz, c = cx * sy * cz, d = sx * cy * sz, e = cx * cy * sz, f = sx * sy * cz, g = cx * cy * cz, h = sx * sy * sz;
   return {
-    XYZ: [a + b, c - d, e + f, g - h],
-    YXZ: [a + b, c - d, e - f, g + h],
-    ZXY: [a - b, c + d, e + f, g - h],
-    ZYX: [a - b, c + d, e - f, g + h],
-    YZX: [a + b, c + d, e - f, g - h],
-    XZY: [a - b, c - d, e + f, g + h],
+    XYZ: [a + b, c - d, e + f, g - h], YXZ: [a + b, c - d, e - f, g + h], ZXY: [a - b, c + d, e + f, g - h],
+    ZYX: [a - b, c + d, e - f, g + h], YZX: [a + b, c + d, e - f, g - h], XZY: [a - b, c - d, e + f, g + h],
   }[order];
 }
 
 test('setFromEuler matches the parent bit for bit in all six orders', () => {
-  const pick = random(162),
-    angles = [0, -0, 1e-300, -1e-300, Math.PI, -Math.PI, 1e300, -1e300, Infinity, NaN, 2 ** -1074];
+  const pick = random(162), angles = [0, -0, 1e-300, -1e-300, Math.PI, -Math.PI, 1e300, -1e300, Infinity, NaN, 2 ** -1074];
   for (let i = 0; i < 2000; i++) angles.push((pick() - 0.5) * 20);
   const q = new Quaternion();
   for (let i = 0; i < angles.length; i++)
     for (const order of orders) {
-      const x = angles[i],
-        y = angles[(i * 7 + 3) % angles.length],
-        z = angles[(i * 13 + 5) % angles.length];
+      const x = angles[i], y = angles[(i * 7 + 3) % angles.length], z = angles[(i * 13 + 5) % angles.length];
       q.setFromEuler({ x, y, z, order });
       assert.deepEqual(bits([q.x, q.y, q.z, q.w]), bits(parentEuler(x, y, z, order)), `${order} ${x} ${y} ${z}`);
     }

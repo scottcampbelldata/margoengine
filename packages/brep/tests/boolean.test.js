@@ -933,7 +933,10 @@ test('Booleans far from the origin: the tolerance follows the operands, not thei
   }
   // So far out that float64 cannot hold the tolerance at 1e-4 of the operands (10 mm parts 100,000 km out): refused,
   // never a body cut at a tolerance past their features.
-  assert.throws(() => boolean('r', 'union', part(1e11), drillAt(1e11)), /too far from the origin for their size/);
+  assert.throws(
+    () => boolean('r', 'union', part(1e11), drillAt(1e11)),
+    /too far from the origin for their size/,
+  );
 });
 
 test('Booleans: what is not supported yet throws a RangeError', () => {
@@ -972,7 +975,7 @@ test('exact predicates and crossings: orient3d is exact; crossings closer than a
   assert.ok(Math.abs(ts[0] - (0.02 - half)) < 1e-12 && Math.abs(ts[1] - (0.02 + half)) < 1e-12, `${ts}`);
 });
 
-test("Booleans whose cutting plane holds a cylinder's or a cone's seam line: cut along it", () => {
+test('Booleans whose cutting plane holds a cylinder\'s or a cone\'s seam line: cut along it', () => {
   // The plane y = 0 holds the side's seam (x = r, y = 0) and the axis, so it meets each end circle at its start, at
   // its middle and at its end: the circle crosses it at its middle, half a turn round.
   // Whichever way the plane faces, the rounding at the circle's end falls on one side of it or the other.
@@ -1003,9 +1006,6 @@ test("Booleans whose cutting plane holds a cylinder's or a cone's seam line: cut
       for (const op of ['subtract', 'intersect']) {
         const out = boolean('h', op, shape(), cut());
         assert.deepEqual(model.checkBody(out), [], `${kind} ${op} ${side}`);
-        assert.ok(
-          Math.abs(volume(out) - whole / 2) <= 1e-9 * whole,
-          `${kind} ${op} ${side}: ${volume(out)} vs ${whole / 2}`,
-        );
+        assert.ok(Math.abs(volume(out) - whole / 2) <= 1e-9 * whole, `${kind} ${op} ${side}: ${volume(out)} vs ${whole / 2}`);
       }
 });

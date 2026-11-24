@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { exportSCXML, importSCXML } from '../dist/scxml.js';
 
 const MAX = 1048576;
-const fails = (fn, pattern, what) => assert.throws(fn, (e) => e instanceof TypeError && pattern.test(e.message), what);
+const fails = (fn, pattern, what) =>
+  assert.throws(fn, (e) => e instanceof TypeError && pattern.test(e.message), what);
 const ELEMENTS = /output exceeds 10,000 elements/;
 const flat = (n, transitions = 0, extra = {}) => {
   const states = {};
@@ -45,8 +46,7 @@ test('the output count includes hook elements: 3,333 states with an enter hook f
 test('1 MiB of output in characters, or in UTF-8 bytes, is allowed and one more is refused', () => {
   const one = (name) => ({ version: 1, initial: name, states: { [name]: {} } });
   // ASCII names are their own id, written twice (initial and id): length = c + 2 L; a second name fixes the parity.
-  const ascii = (l, m) =>
-    exportSCXML({ version: 1, initial: 'a'.repeat(l), states: { ['a'.repeat(l)]: {}, ['b'.repeat(m)]: {} } });
+  const ascii = (l, m) => exportSCXML({ version: 1, initial: 'a'.repeat(l), states: { ['a'.repeat(l)]: {}, ['b'.repeat(m)]: {} } });
   const base = ascii(1, 1).length - 3;
   const l = Math.floor((MAX - base - 1) / 2);
   const m = MAX - base - 2 * l;
@@ -54,8 +54,7 @@ test('1 MiB of output in characters, or in UTF-8 bytes, is allowed and one more 
   assert.equal(importSCXML(ascii(l, m)).initial, 'a'.repeat(l));
   fails(() => ascii(l, m + 1), /output exceeds 1 MiB/, 'one character over');
   // Two-byte names get a generated id and keep the name in m:name: characters c + L, bytes c + 2 L.
-  const wide = (l, m) =>
-    exportSCXML({ version: 1, initial: 'x', states: { x: {}, ['é'.repeat(l)]: {}, ['b'.repeat(m)]: {} } });
+  const wide = (l, m) => exportSCXML({ version: 1, initial: 'x', states: { x: {}, ['é'.repeat(l)]: {}, ['b'.repeat(m)]: {} } });
   const small = wide(1, 1);
   const cb = bytes(small) - 2 - 1;
   const w = Math.floor((MAX - cb - 1) / 2);
@@ -88,8 +87,7 @@ test('nesting: 126 hierarchy levels and 62 nested regions (41 under a parent) ex
   // A holder one level down in its region's hierarchy: each region level then costs one output level more.
   const under = (n) => {
     let region = { states: { leaf: {} }, initial: 'leaf' };
-    for (let i = 0; i < n; i++)
-      region = { states: { top: { initial: 'h' }, h: { parent: 'top', regions: { r: region } } }, initial: 'top' };
+    for (let i = 0; i < n; i++) region = { states: { top: { initial: 'h' }, h: { parent: 'top', regions: { r: region } } }, initial: 'top' };
     return { version: 1, ...region };
   };
   assert.equal(importSCXML(exportSCXML(under(41))).states.h.parent, 'top');
@@ -122,22 +120,14 @@ test('import: the size refusal names the size, native history takes shallow and 
   const SIZE = /input is over 1 MiB or contains a DTD/;
   fails(() => importSCXML(42), SIZE, 'not a string');
   const base = xml('<state id="a"/>');
-  fails(
-    () => importSCXML(base.replace('</scxml>', ' '.repeat(MAX - base.length + 1) + '</scxml>')),
-    SIZE,
-    'characters',
-  );
+  fails(() => importSCXML(base.replace('</scxml>', ' '.repeat(MAX - base.length + 1) + '</scxml>')), SIZE, 'characters');
   const free = MAX - base.length - 7;
-  const over = base.replace(
-    '</scxml>',
-    `<!--${'é'.repeat(Math.floor(free / 2))}-->${' '.repeat((free % 2) + 1)}</scxml>`,
-  );
+  const over = base.replace('</scxml>', `<!--${'é'.repeat(Math.floor(free / 2))}-->${' '.repeat((free % 2) + 1)}</scxml>`);
   assert.equal(bytes(over), MAX + 1);
   fails(() => importSCXML(over), SIZE, 'bytes');
   for (const kind of ['shallow', 'deep'])
     assert.equal(importSCXML(xml(`<state id="p" m:history="${kind}"><state id="c"/></state>`)).states.p.history, kind);
-  const wrapped = (attrs) =>
-    xml(`<parallel id="q"><state id="r" m:name="r" m:wrapper="true"${attrs}><state id="x"/></state></parallel>`);
+  const wrapped = (attrs) => xml(`<parallel id="q"><state id="r" m:name="r" m:wrapper="true"${attrs}><state id="x"/></state></parallel>`);
   assert.equal(importSCXML(wrapped('')).states.q.regions.r.initial, 'x');
   fails(() => importSCXML(wrapped(' m:history="deep"')), /^Unsupported SCXML/, 'an extension a wrapper does not take');
   fails(() => importSCXML(wrapped(' foo="1"')), /^Unsupported SCXML/, 'a plain attribute a wrapper does not take');

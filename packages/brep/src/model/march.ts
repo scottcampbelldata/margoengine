@@ -696,10 +696,7 @@ function walk(
         continue;
       }
       const on = beyond(a, b, q, t, hmax, scale0);
-      if (!on)
-        throw new RangeError(
-          'the surfaces touch tangentially: Booleans there are not supported yet; move one body so the surfaces cross',
-        );
+      if (!on) throw new RangeError('the surfaces touch tangentially: Booleans there are not supported yet; move one body so the surfaces cross');
       const { x } = leastApart(a, b, p, t, on.q, on.tq);
       if (!contacts.some((c) => length(sub(c, x)) <= 1e-9 * scale0)) contacts.push(x);
       points.push(on.q);
@@ -713,10 +710,7 @@ function walk(
     const turn = tq ? Math.acos(Math.min(1, dot(t, tq))) : Infinity;
     if (!q || !tq || turn > MAX_TURN || dot(sub(q, p), t) <= 0) {
       h /= 2;
-      if (h < 1e-12 * hmax)
-        throw new RangeError(
-          'an intersection curve could not be followed (it turns too sharply); move one body slightly and try again',
-        );
+      if (h < 1e-12 * hmax) throw new RangeError('an intersection curve could not be followed (it turns too sharply); move one body slightly and try again');
       continue;
     }
     // Where the surfaces are nearly tangent, the cubic between two points strays a little off them and lies much
@@ -927,8 +921,7 @@ function isoCurves(s: SurfaceDef, box: Box3, n: number): { curve: CurveDef; t0: 
   const corners: XYZ[] = [];
   for (let i = 0; i < 8; i++)
     corners.push([i & 1 ? box.max[0] : box.min[0], i & 2 ? box.max[1] : box.min[1], i & 4 ? box.max[2] : box.min[2]]);
-  if (s.kind === 'spline')
-    throw new RangeError('Booleans on spline surfaces are not supported yet; use bodies with analytic surfaces');
+  if (s.kind === 'spline') throw new RangeError('Booleans on spline surfaces are not supported yet; use bodies with analytic surfaces');
   const { origin: o, x, y, z } = s.frame,
     range = (axis: XYZ) => {
       const v = corners.map((c) => dot(sub(c, o), axis));

@@ -17,15 +17,9 @@ test('the factors hold the colour, the anisotropy and the extinction after the t
   const extension = createTransmission({ factor: 1, opaqueColor, volume: volume() }),
     rows = Array.from(extension.factors);
   assert.equal(rows.length, 16);
-  assert.deepEqual(
-    rows.slice(8, 12).map((v) => +v.toFixed(6)),
-    [0.6, 0.5, 0.4, 0.25],
-  );
+  assert.deepEqual(rows.slice(8, 12).map((v) => +v.toFixed(6)), [0.6, 0.5, 0.4, 0.25]);
   // -log(c) / d, and none on the white channel.
-  assert.deepEqual(
-    rows.slice(12, 15).map((v) => +v.toFixed(6)),
-    [+(Math.LN2 / 4).toFixed(6), +(Math.LN2 / 2).toFixed(6), 0],
-  );
+  assert.deepEqual(rows.slice(12, 15).map((v) => +v.toFixed(6)), [+(Math.LN2 / 4).toFixed(6), +(Math.LN2 / 2).toFixed(6), 0]);
   assert.match(extension.direct, /materialScatterLobe/);
   assert.match(extension.ambient, /materialScatterLobe/);
   assert.match(extension.declarations, /fn margoScatterShares\(/);
@@ -66,12 +60,6 @@ test('a colour map takes a texture slot, and a lobe of a base extension stays', 
 });
 
 test('bad values are refused', () => {
-  assert.throws(
-    () => validateTransmission({ factor: 1, volume: volume({ multiscatterColorFactor: [1, 2, 0] }) }),
-    /multi-scatter/,
-  );
-  assert.throws(
-    () => validateTransmission({ factor: 1, volume: volume({ scatterAnisotropy: -2 }) }),
-    /scatter anisotropy/,
-  );
+  assert.throws(() => validateTransmission({ factor: 1, volume: volume({ multiscatterColorFactor: [1, 2, 0] }) }), /multi-scatter/);
+  assert.throws(() => validateTransmission({ factor: 1, volume: volume({ scatterAnisotropy: -2 }) }), /scatter anisotropy/);
 });

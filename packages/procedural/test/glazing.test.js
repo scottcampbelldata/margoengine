@@ -47,8 +47,7 @@ test('a frosted pane stops every ray from the lantern through the window, so its
     clear = generateWindowPane({ width: 1.2, height: 1.1 });
   assert.equal(frosted.frostedShare, 1);
   assert.equal(frosted.clear.indices.length, 0, 'frosted over: no clear glass is left');
-  for (const [d, l] of rays)
-    assert.ok(hit(lantern, d, frosted.frosted, centre) < l, `ray ${d.map((v) => v.toFixed(3))} is stopped`);
+  for (const [d, l] of rays) assert.ok(hit(lantern, d, frosted.frosted, centre) < l, `ray ${d.map((v) => v.toFixed(3))} is stopped`);
   // Clear glass (the default) is no frost: nothing frosted to stop the beam, the whole pane clear.
   assert.equal(clear.frostedShare, 0);
   assert.equal(clear.frosted.indices.length, 0);
@@ -88,8 +87,7 @@ test('frost grows in from the edges: a border frost x min(w, h) / 2 wide, the mi
   assert.deepEqual([outdoor.start, outdoor.materialIndex, rest.start, rest.materialIndex], [0, 0, outdoor.count, 1]);
   assert.equal(outdoor.count + rest.count, pane.frosted.indices.length);
   for (let i = 0; i < outdoor.count; i++) assert.equal(pane.frosted.normals[pane.frosted.indices[i] * 3 + 2], 1);
-  for (let i = outdoor.count; i < pane.frosted.indices.length; i++)
-    assert.ok(pane.frosted.normals[pane.frosted.indices[i] * 3 + 2] < 0.5);
+  for (let i = outdoor.count; i < pane.frosted.indices.length; i++) assert.ok(pane.frosted.normals[pane.frosted.indices[i] * 3 + 2] < 0.5);
 });
 
 // KB-CABIN-FROST2: the frosted window lost its cross bars: the scene's bars stood behind a pane that covered them, and
@@ -99,38 +97,16 @@ test('glazing bars divide the pane into lites, in the glass plane, and the glass
     h = 1.1,
     bar = 0.045,
     depth = 0.05,
-    pane = generateWindowPane({
-      width: w,
-      height: h,
-      glazing: 'frosted',
-      lites: [2, 2],
-      barWidth: bar,
-      barDepth: depth,
-    }),
+    pane = generateWindowPane({ width: w, height: h, glazing: 'frosted', lites: [2, 2], barWidth: bar, barDepth: depth }),
     ray = (x, y, g) => hit([x, y, -1], [0, 0, 1], g, [0, 0, 0]);
   assert.ok(pane.bars.indices.length > 0, 'the bars are built');
   // Through the cross and along each bar, the first thing a ray from the room meets is a bar, at its room-side face.
-  for (const [x, y] of [
-    [0, 0],
-    [0, 0.4],
-    [0, -0.4],
-    [0.4, 0],
-    [-0.4, 0],
-    [0.02, 0.5],
-    [-0.5, -0.02],
-  ]) {
+  for (const [x, y] of [[0, 0], [0, 0.4], [0, -0.4], [0.4, 0], [-0.4, 0], [0.02, 0.5], [-0.5, -0.02]]) {
     assert.ok(Math.abs(ray(x, y, pane.bars) - (1 - depth / 2)) < 1e-6, `a bar at [${x}, ${y}]`);
     assert.equal(ray(x, y, pane.frosted), Infinity, `no glass under the bar at [${x}, ${y}]`);
   }
   // Through each lite: glass, frosted over, and no bar.
-  for (const [x, y] of [
-    [0.3, 0.3],
-    [-0.3, 0.3],
-    [0.3, -0.3],
-    [-0.3, -0.3],
-    [0.03, 0.03],
-    [-0.59, 0.54],
-  ]) {
+  for (const [x, y] of [[0.3, 0.3], [-0.3, 0.3], [0.3, -0.3], [-0.3, -0.3], [0.03, 0.03], [-0.59, 0.54]]) {
     assert.equal(ray(x, y, pane.bars), Infinity, `no bar at [${x}, ${y}]`);
     assert.ok(Math.abs(ray(x, y, pane.frosted) - (1 - 0.002)) < 1e-6, `glass at [${x}, ${y}]`);
   }
@@ -154,21 +130,12 @@ test('glazing bars divide the pane into lites, in the glass plane, and the glass
     assert.ok(Math.abs(uvs[v * 2 + 1] - (h / 2 - positions[v * 3 + 1]) / h) < 1e-6);
   }
   // Frost grows in from each lite's edges, the bars' included.
-  const part = generateWindowPane({
-      width: w,
-      height: h,
-      glazing: 'frosted',
-      frost: 0.5,
-      lites: [2, 2],
-      barWidth: bar,
-    }),
+  const part = generateWindowPane({ width: w, height: h, glazing: 'frosted', frost: 0.5, lites: [2, 2], barWidth: bar }),
     lite = (w - bar) / 2,
     liteH = (h - bar) / 2,
     t = (0.5 * Math.min(lite, liteH)) / 2;
   assert.ok(Math.abs(part.frostedShare - (1 - ((lite - 2 * t) * (liteH - 2 * t)) / (lite * liteH))) < 1e-12);
-  assert.ok(
-    ray(bar / 2 + t / 2, 0.3, part.frosted) < Infinity && ray(bar / 2 + lite / 2, 0.3, part.frosted) === Infinity,
-  );
+  assert.ok(ray(bar / 2 + t / 2, 0.3, part.frosted) < Infinity && ray(bar / 2 + lite / 2, 0.3, part.frosted) === Infinity);
   // One lite has no bars.
   assert.equal(generateWindowPane({ width: w, height: h }).bars.indices.length, 0);
 });

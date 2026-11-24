@@ -4,8 +4,7 @@
 // tan^2 theta = alpha^2 xi / (1 - xi) (Walter et al. 2007 eq. 35-36), so with d = (1 - xi) + alpha^2 xi:
 // cosTheta = sqrt((1 - xi) / d) and sinTheta = alpha sqrt(xi / d). Taking sinTheta from sqrt(1 - cos^2) instead
 // cancels in f32: below alpha^2 = 2^-24 cosTheta rounds to 1 and every sample collapses onto the normal.
-export const common =
-  /* wgsl */ `
+export const common = /* wgsl */ `
 const PI = 3.141592653589793;
 fn faceDirection(face: u32, uv: vec2f) -> vec3f {
   var d = vec3f(-uv.x, -uv.y, -1.0);

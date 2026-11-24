@@ -121,110 +121,63 @@ export async function createAnalyser(context: BaseAudioContext, options: Analyse
   const fftSize = bounded(options.fftSize ?? 2048, 32, 32768, 'Analyser fftSize');
   if (!Number.isInteger(Math.log2(fftSize))) throw new RangeError('FFT size needs a power of two; use 2048');
   const channels = options.channels ?? 2;
-  if (![1, 2, 6].includes(channels)) throw new RangeError('Analyser channels needs 1, 2 or 6; choose a speaker layout');
-  if (![32000, 44100, 48000, 88200, 96000, 176400, 192000].includes(context.sampleRate))
+  if (![1,2,6].includes(channels)) throw new RangeError('Analyser channels needs 1, 2 or 6; choose a speaker layout');
+  if (![32000,44100,48000,88200,96000,176400,192000].includes(context.sampleRate))
     throw new RangeError('LUFS sample rate is unsupported; use a standard 32000..192000 Hz context');
   const smoothing = bounded(options.smoothing ?? 0.8, 0, 1, 'FFT smoothing');
   const intervalFrames = Math.round(bounded(options.interval ?? 0.05, 0.01, 1, 'Meter interval') * context.sampleRate);
   await loadProcessor(context, 'margo-meter-v1', processor, options.signal);
   options.signal?.throwIfAborted();
   const output = new AudioWorkletNode(context, 'margo-meter-v1', {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    outputChannelCount: [channels],
-    channelCount: channels,
-    channelCountMode: 'explicit',
-    processorOptions: { channels, intervalFrames, filters: loudnessFilters(context.sampleRate) },
+    numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [channels], channelCount: channels,
+    channelCountMode: 'explicit', processorOptions: { channels, intervalFrames, filters: loudnessFilters(context.sampleRate) },
   });
-  const input = context.createGain(),
-    splitter = context.createChannelSplitter(channels),
-    sink = context.createGain();
-  sink.gain.value = 0;
-  sink.connect(context.destination);
-  input.connect(output);
-  output.connect(splitter);
+  const input = context.createGain(), splitter = context.createChannelSplitter(channels), sink = context.createGain();
+  sink.gain.value = 0; sink.connect(context.destination);
+  input.connect(output); output.connect(splitter);
   const analysers = Array.from({ length: channels }, (_, c) => {
-    const node = context.createAnalyser();
-    node.fftSize = fftSize;
-    node.smoothingTimeConstant = smoothing;
-    splitter.connect(node, c);
-    node.connect(sink);
-    return node;
+    const node = context.createAnalyser(); node.fftSize = fftSize; node.smoothingTimeConstant = smoothing;
+    splitter.connect(node, c); node.connect(sink); return node;
   });
   let disposed = false;
-  const empty = (): MeterReading => ({
-    frames: 0,
-    rms: Array(channels).fill(0),
-    peak: Array(channels).fill(0),
-    db: Array(channels).fill(-Infinity),
-    momentary: -Infinity,
-    shortTerm: -Infinity,
-  });
-  let reading = empty(),
-    generation = 0;
+  const empty = (): MeterReading => ({ frames: 0, rms: Array(channels).fill(0), peak: Array(channels).fill(0),
+    db: Array(channels).fill(-Infinity), momentary: -Infinity, shortTerm: -Infinity });
+  let reading = empty(), generation = 0;
   // Reports carry the count of resets the audio thread had seen; one posted before it received the latest reset()
   // is stale and must not restore the old readings.
-  output.port.onmessage = (event) => {
+  output.port.onmessage = event => {
     if (disposed || event.data.generation !== generation) return;
     const { generation: _, ...report } = event.data as MeterReading & { generation: number };
     reading = report;
   };
-  const alive = () => {
-    if (disposed) throw new MargoError('disposed', 'Analyser is disposed; create a new analyser');
-  };
+  const alive = () => { if (disposed) throw new MargoError('disposed', 'Analyser is disposed; create a new analyser'); };
   const data = (channel: number, target: Float32Array<ArrayBuffer> | undefined, size: number) => {
-    alive();
-    bounded(channel, 0, channels - 1, 'Analyser channel');
+    alive(); bounded(channel, 0, channels - 1, 'Analyser channel');
     if (!Number.isInteger(channel)) throw new RangeError('Analyser channel needs an integer; use 0 for left');
-    if (
-      target !== undefined &&
-      (!(target instanceof Float32Array) || !(target.buffer instanceof ArrayBuffer) || target.length !== size)
-    )
+    if (target !== undefined && (!(target instanceof Float32Array) || !(target.buffer instanceof ArrayBuffer) || target.length !== size))
       throw new TypeError(`Analyser target needs ${size} Float32Array elements; allocate a matching buffer`);
     return target ?? new Float32Array(size);
   };
   const stage: BusAnalyser = {
-    input,
-    output,
-    frequencyBinCount: fftSize / 2,
-    read() {
-      alive();
-      return { ...reading, rms: [...reading.rms], peak: [...reading.peak], db: [...reading.db] };
-    },
-    waveform(channel = 0, target) {
-      const a = data(channel, target, fftSize);
-      analysers[channel].getFloatTimeDomainData(a);
-      return a;
-    },
+    input, output, frequencyBinCount: fftSize / 2,
+    read() { alive(); return { ...reading, rms: [...reading.rms], peak: [...reading.peak], db: [...reading.db] }; },
+    waveform(channel = 0, target) { const a = data(channel, target, fftSize); analysers[channel].getFloatTimeDomainData(a); return a; },
     spectrum(channel = 0, target, linear = false) {
-      const a = data(channel, target, fftSize / 2);
-      analysers[channel].getFloatFrequencyData(a);
+      const a = data(channel, target, fftSize / 2); analysers[channel].getFloatFrequencyData(a);
       if (linear) for (let i = 0; i < a.length; i++) a[i] = 10 ** (a[i] / 20);
       return a;
     },
-    frequency(bin) {
-      alive();
-      bounded(bin, 0, fftSize / 2 - 1, 'FFT bin');
+    frequency(bin) { alive(); bounded(bin, 0, fftSize / 2 - 1, 'FFT bin');
       if (!Number.isInteger(bin)) throw new RangeError('FFT bin needs an integer; use a spectrum index');
-      return (bin * context.sampleRate) / fftSize;
+      return bin * context.sampleRate / fftSize;
     },
-    reset() {
-      alive();
-      generation++;
-      reading = empty();
-      output.port.postMessage('reset');
-    },
+    reset() { alive(); generation++; reading = empty(); output.port.postMessage('reset'); },
     dispose() {
-      if (disposed) return;
-      disposed = true;
+      if (disposed) return; disposed = true;
       for (const n of [input, output, splitter, sink, ...analysers]) n.disconnect();
-      output.port.onmessage = null;
-      output.port.postMessage('dispose');
-      output.port.close();
+      output.port.onmessage = null; output.port.postMessage('dispose'); output.port.close();
     },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }
@@ -234,15 +187,8 @@ export async function createBusAnalyser(bus: Bus, options: AnalyserOptions = {})
   const stage = await createAnalyser(bus.input.context, options);
   let detach: (() => void) | undefined;
   const dispose = stage.dispose;
-  stage.dispose = () => {
-    detach?.();
-    dispose();
-  };
-  try {
-    detach = bus.insert(stage);
-  } catch (error) {
-    dispose();
-    throw error;
-  }
+  stage.dispose = () => { detach?.(); dispose(); };
+  try { detach = bus.insert(stage); }
+  catch (error) { dispose(); throw error; }
   return stage;
 }

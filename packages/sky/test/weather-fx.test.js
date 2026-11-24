@@ -102,7 +102,9 @@ test('every splash slot lands on its own hash key, up to the 100,000 splashes th
   weather.onPreUpdate(0.1);
   h.context.bindings = [];
   h.engine.frameGraph.execute(h.context);
-  const key = [...h.shaders.values()].join('\n').match(/let n=ii\*(\d+)u\+u32\(floor\(clock\)\)%(\d+)u;\s*let xz=/);
+  const key = [...h.shaders.values()]
+    .join('\n')
+    .match(/let n=ii\*(\d+)u\+u32\(floor\(clock\)\)%(\d+)u;\s*let xz=/);
   assert.ok(key, 'the splash shader was compiled');
   const [stride, period] = [Number(key[1]), Number(key[2])];
   assert.ok(stride >= period, 'no two landings of one slot share a key');

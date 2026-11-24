@@ -100,10 +100,7 @@ test('only shader text is rewritten: JavaScript, C#, Rust and prose strings keep
   assert.equal(shaderLanguage('class P extends AudioWorkletProcessor { process() { let a = 1; } } // x'), null);
   assert.equal(shaderLanguage('using System;\nnamespace M { // x\n}'), null);
   assert.equal(shaderLanguage('/// doc\npub const SCHEMA_HASH:u32=1;'), null);
-  assert.equal(
-    shaderLanguage('VFX nodes value is not a finite f32; see https://margoengine.com/errors#vfx-float'),
-    null,
-  );
+  assert.equal(shaderLanguage('VFX nodes value is not a finite f32; see https://margoengine.com/errors#vfx-float'), null);
 });
 
 // Every shader literal in the packages' sources: the text the build ships, piece by piece.
@@ -193,7 +190,5 @@ test('a broken strip is caught on the real shaders', () => {
   const joins = (p, l) => ({ ...stripComments(p, l), text: p.replace(/\/\*.*?\*\//g, '') });
   assert.throws(() => stripShaderLiterals('const s = `fn f() { a/* x */b; // y\n}`;', 'x.js', { strip: joins }));
   const flat = (p, l) => ({ ...stripComments(p, l), text: p.replace(/\/\*[\s\S]*?\*\//g, ' ') });
-  assert.throws(() =>
-    stripShaderLiterals('const s = `fn f() { a /* x /* y */ z */ b; // y\n}`;', 'x.js', { strip: flat }),
-  );
+  assert.throws(() => stripShaderLiterals('const s = `fn f() { a /* x /* y */ z */ b; // y\n}`;', 'x.js', { strip: flat }));
 });

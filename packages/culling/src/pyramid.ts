@@ -86,10 +86,7 @@ export class Pyramid {
     });
     this.width = width;
     this.height = height;
-    const buffer = (this.buffer = d.createBuffer({
-        size: this.plan(width, height) * 4,
-        usage: GPUBufferUsage.STORAGE,
-      })),
+    const buffer = (this.buffer = d.createBuffer({ size: this.plan(width, height) * 4, usage: GPUBufferUsage.STORAGE })),
       view = this.depth.createView(),
       group = (pipeline: GPUComputePipeline, entries: [number, GPUBindingResource][]) =>
         d.createBindGroup({

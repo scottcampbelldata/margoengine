@@ -5,8 +5,7 @@ import { CustomCurve } from '../dist/custom.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 import { checkWGSL } from '../../webgl2-compat/dist/wgsl.js';
 
-const fragment = (h) =>
-  h.pipelines.filter((p) => p.fragment?.module.code.includes('fn sampleLUT')).at(-1).fragment.module.code;
+const fragment = (h) => h.pipelines.filter((p) => p.fragment?.module.code.includes('fn sampleLUT')).at(-1).fragment.module.code;
 
 test('CustomCurve with WGSL calls your function after the built-in curve, before contrast, and binds params', () => {
   const custom = new CustomCurve({
@@ -88,10 +87,7 @@ test('a WGSL CustomCurve that ignores curveParams still uses the binding the Ton
       used = checkWGSL(code)
         .entryPoints.find((e) => e.name === 'fragment')
         .globals.map((g) => g.binding);
-    assert.ok(
-      h.groups.at(-1).entries.some((e) => e.binding === 5),
-      'the Tonemap binds the curve uniform',
-    );
+    assert.ok(h.groups.at(-1).entries.some((e) => e.binding === 5), 'the Tonemap binds the curve uniform');
     assert.ok(used.includes(5), `the fragment stage uses binding 5 (${wgsl}): ${used}`);
     effect.dispose();
   }

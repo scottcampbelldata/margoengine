@@ -20,11 +20,7 @@ test('constructor refuses each kind of bad definition with a TypeError', () => {
   assert.throws(() => new StateMachine({ a: { parent: 'a' } }, 'a', {}), TypeError);
   assert.throws(() => new StateMachine(ok, 'nope', {}), TypeError);
   assert.throws(() => new StateMachine({ a: { initial: 'a' } }, 'a', {}), TypeError, 'initial may not be itself');
-  assert.throws(
-    () => new StateMachine({ a: { initial: 'b' }, b: {} }, 'a', {}),
-    TypeError,
-    'initial must be a descendant',
-  );
+  assert.throws(() => new StateMachine({ a: { initial: 'b' }, b: {} }, 'a', {}), TypeError, 'initial must be a descendant');
   assert.throws(() => new StateMachine({ a: { history: 'x' } }, 'a', {}), TypeError);
   new StateMachine({ a: { history: 'shallow' } }, 'a', {});
   new StateMachine({ a: { history: 'deep' } }, 'a', {});
@@ -139,15 +135,10 @@ test('send picks the innermost matching transition, honours guards, and plan doe
   assert.deepEqual(guards, [1]);
   action();
   assert.equal(m.state, 'y');
-  const n = new StateMachine(
-    { root: { initial: 'leaf' }, leaf: { parent: 'root' }, x: {}, y: {} },
-    'root',
-    { open: false },
-    [
-      { from: 'root', to: 'x', event: 'go' },
-      { from: 'leaf', to: 'y', event: 'go', guard: (c) => c.open },
-    ],
-  );
+  const n = new StateMachine({ root: { initial: 'leaf' }, leaf: { parent: 'root' }, x: {}, y: {} }, 'root', { open: false }, [
+    { from: 'root', to: 'x', event: 'go' },
+    { from: 'leaf', to: 'y', event: 'go', guard: (c) => c.open },
+  ]);
   assert.equal(n.send('go'), true);
   assert.equal(n.state, 'x');
   assert.equal(n.send('go'), false);
@@ -205,16 +196,9 @@ test('update validates delta, runs hooks outermost first with the delta, and sto
     {},
   );
   n.update(0.25);
-  assert.deepEqual(seen, [
-    ['root', 0.25],
-    ['leaf', 0.25],
-  ]);
+  assert.deepEqual(seen, [['root', 0.25], ['leaf', 0.25]]);
   const stop = new StateMachine(
-    {
-      root: { initial: 'leaf', update: () => stop.goto('other') },
-      leaf: { parent: 'root', update: () => seen.push('leaf!') },
-      other: {},
-    },
+    { root: { initial: 'leaf', update: () => stop.goto('other') }, leaf: { parent: 'root', update: () => seen.push('leaf!') }, other: {} },
     'root',
     {},
   );
@@ -227,10 +211,7 @@ test('update validates delta, runs hooks outermost first with the delta, and sto
 test('delayed transitions: boundary, splitting, re-arming, guards, innermost first, and the runaway limit', () => {
   const calls = [];
   const m = new StateMachine(
-    {
-      a: { update: (c, d) => calls.push(['a', +d.toFixed(9)]) },
-      b: { update: (c, d) => calls.push(['b', +d.toFixed(9)]) },
-    },
+    { a: { update: (c, d) => calls.push(['a', +d.toFixed(9)]) }, b: { update: (c, d) => calls.push(['b', +d.toFixed(9)]) } },
     'a',
     {},
     [{ from: 'a', to: 'b', after: 1 }],
@@ -240,20 +221,14 @@ test('delayed transitions: boundary, splitting, re-arming, guards, innermost fir
   m.update(0.5);
   assert.equal(m.state, 'b', 'a delay ending exactly at the end of the step fires');
   const s = new StateMachine(
-    {
-      a: { update: (c, d) => calls.push(['a2', +d.toFixed(9)]) },
-      b: { update: (c, d) => calls.push(['b2', +d.toFixed(9)]) },
-    },
+    { a: { update: (c, d) => calls.push(['a2', +d.toFixed(9)]) }, b: { update: (c, d) => calls.push(['b2', +d.toFixed(9)]) } },
     'a',
     {},
     [{ from: 'a', to: 'b', after: 1 }],
   );
   calls.length = 0;
   s.update(1.75);
-  assert.deepEqual(calls, [
-    ['a2', 1],
-    ['b2', 0.75],
-  ]);
+  assert.deepEqual(calls, [['a2', 1], ['b2', 0.75]]);
   assert.equal(s.elapsed, 0.75);
   // guard that declines is asked again on every update
   let ok = false;
@@ -265,15 +240,10 @@ test('delayed transitions: boundary, splitting, re-arming, guards, innermost fir
   assert.equal(g.state, 'b');
   // a self-loop on a parent re-arms and fires once per wait
   let fired = 0;
-  const loop = new StateMachine(
-    { p: { initial: 'c' }, c: { parent: 'p' }, q: { enter: () => fired++ }, d: {} },
-    'p',
-    {},
-    [
-      { from: 'p', to: 'q', after: 2 },
-      { from: 'q', to: 'p', after: 1 },
-    ],
-  );
+  const loop = new StateMachine({ p: { initial: 'c' }, c: { parent: 'p' }, q: { enter: () => fired++ }, d: {} }, 'p', {}, [
+    { from: 'p', to: 'q', after: 2 },
+    { from: 'q', to: 'p', after: 1 },
+  ]);
   loop.update(2);
   assert.equal(loop.state, 'q');
   loop.update(1);
@@ -315,48 +285,20 @@ test('ParallelRegions: validation, start, stop, history, send, raise, forward an
   assert.throws(() => new ParallelRegions({ r: { states: { a: {} }, initial: 'zzz' } }, {}), TypeError);
   const calls = [];
   const def = {
-    move: {
-      states: {
-        idle: { enter: () => calls.push('idle+'), exit: () => calls.push('idle-') },
-        run: { enter: () => calls.push('run+') },
-      },
-      initial: 'idle',
-      transitions: [
-        { from: 'idle', to: 'run', event: 'go' },
-        { from: 'run', to: 'idle', event: 'stop' },
-      ],
-    },
+    move: { states: { idle: { enter: () => calls.push('idle+'), exit: () => calls.push('idle-') }, run: { enter: () => calls.push('run+') } }, initial: 'idle', transitions: [{ from: 'idle', to: 'run', event: 'go' }, { from: 'run', to: 'idle', event: 'stop' }] },
     aim: { states: { low: {}, high: {} }, initial: 'low', transitions: [{ from: 'low', to: 'high', event: 'go' }] },
   };
   const p = new ParallelRegions(def, {});
   assert.deepEqual(p.active, { move: null, aim: null });
-  assert.throws(
-    () => p.send('go'),
-    (e) => e.code === 'state',
-  );
-  assert.throws(
-    () => p.update(1),
-    (e) => e.code === 'state',
-  );
-  assert.throws(
-    () => p.raise('go'),
-    (e) => e.code === 'state',
-  );
-  assert.throws(
-    () => p.stop(),
-    (e) => e.code === 'state',
-  );
-  assert.throws(
-    () => p.plan('go'),
-    (e) => e.code === 'state',
-  );
+  assert.throws(() => p.send('go'), (e) => e.code === 'state');
+  assert.throws(() => p.update(1), (e) => e.code === 'state');
+  assert.throws(() => p.raise('go'), (e) => e.code === 'state');
+  assert.throws(() => p.stop(), (e) => e.code === 'state');
+  assert.throws(() => p.plan('go'), (e) => e.code === 'state');
   p.start();
   assert.equal(p.running, true);
   assert.deepEqual(p.active, { move: 'idle', aim: 'low' });
-  assert.throws(
-    () => p.start(),
-    (e) => e.code === 'state',
-  );
+  assert.throws(() => p.start(), (e) => e.code === 'state');
   assert.equal(p.send('go'), true);
   assert.deepEqual(p.active, { move: 'run', aim: 'high' });
   assert.equal(p.send('go'), false);
@@ -379,11 +321,7 @@ test('ParallelRegions: validation, start, stop, history, send, raise, forward an
   const sync = new ParallelRegions(
     {
       x: { states: { a: {}, b: {} }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'e' }] },
-      y: {
-        states: { a: {}, b: {} },
-        initial: 'a',
-        transitions: [{ from: 'a', to: 'b', event: 'e', guard: () => (seen.push(sync.active.x), true) }],
-      },
+      y: { states: { a: {}, b: {} }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'e', guard: () => (seen.push(sync.active.x), true) }] },
     },
     {},
   );
@@ -392,49 +330,24 @@ test('ParallelRegions: validation, start, stop, history, send, raise, forward an
   assert.deepEqual(seen, ['a']);
   // raise: delivered in order; an event nobody takes goes to forward; hooks raising for ever is an error
   const forwarded = [];
-  const r = new ParallelRegions(
-    { x: { states: { a: {}, b: {} }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'e' }] } },
-    {},
-    { forward: (e) => forwarded.push(e) },
-  );
+  const r = new ParallelRegions({ x: { states: { a: {}, b: {} }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'e' }] } }, {}, { forward: (e) => forwarded.push(e) });
   r.start();
   r.raise('unknown');
   r.raise('e');
   assert.deepEqual(forwarded, ['unknown']);
   assert.equal(r.active.x, 'b');
   const loop = new ParallelRegions(
-    {
-      x: {
-        states: { a: { enter: () => loop.raise('e') }, b: { enter: () => loop.raise('e') } },
-        initial: 'a',
-        transitions: [
-          { from: 'a', to: 'b', event: 'e' },
-          { from: 'b', to: 'a', event: 'e' },
-        ],
-      },
-    },
+    { x: { states: { a: { enter: () => loop.raise('e') }, b: { enter: () => loop.raise('e') } }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'e' }, { from: 'b', to: 'a', event: 'e' }] } },
     {},
   );
-  assert.throws(
-    () => loop.start(),
-    (e) => e.code === 'state',
-  );
+  assert.throws(() => loop.start(), (e) => e.code === 'state');
   assert.equal(loop.busy, false);
   // sending from a hook is refused
   const inHook = new ParallelRegions({ x: { states: { a: { enter: () => inHook.send('e') } }, initial: 'a' } }, {});
-  assert.throws(
-    () => inHook.start(),
-    (e) => e.code === 'state',
-  );
+  assert.throws(() => inHook.start(), (e) => e.code === 'state');
   // as a state of a machine
-  const inner = new ParallelRegions(
-    { x: { states: { a: {}, b: {} }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'poke' }] } },
-    {},
-  );
-  const outer = new StateMachine({ idle: {}, busy: { ...inner.asState() } }, 'idle', {}, [
-    { from: 'busy', to: 'idle', event: 'poke' },
-    { from: 'idle', to: 'busy', event: 'start' },
-  ]);
+  const inner = new ParallelRegions({ x: { states: { a: {}, b: {} }, initial: 'a', transitions: [{ from: 'a', to: 'b', event: 'poke' }] } }, {});
+  const outer = new StateMachine({ idle: {}, busy: { ...inner.asState() } }, 'idle', {}, [{ from: 'busy', to: 'idle', event: 'poke' }, { from: 'idle', to: 'busy', event: 'start' }]);
   outer.send('start');
   assert.equal(inner.running, true);
   outer.send('poke');
@@ -448,21 +361,12 @@ test('ParallelRegions: validation, start, stop, history, send, raise, forward an
 test('FinalMachine: validation, always transitions, completion events, done and delays', () => {
   assert.throws(() => new FinalMachine({ a: { final: 'yes' } }, 'a', {}), TypeError);
   assert.throws(() => new FinalMachine({ a: { final: true, initial: 'b' }, b: { parent: 'a' } }, 'a', {}), TypeError);
-  assert.throws(
-    () => new FinalMachine({ a: { final: true }, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: 'x' }]),
-    TypeError,
-  );
+  assert.throws(() => new FinalMachine({ a: { final: true }, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: 'x' }]), TypeError);
   assert.throws(() => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b' }]), TypeError);
-  assert.throws(
-    () => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: 'x', always: true }]),
-    TypeError,
-  );
+  assert.throws(() => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: 'x', always: true }]), TypeError);
   assert.throws(() => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', always: false }]), TypeError);
   assert.throws(() => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', after: 0 }]), TypeError);
-  assert.throws(
-    () => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: '\0fsm.x' }]),
-    TypeError,
-  );
+  assert.throws(() => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: '\0fsm.x' }]), TypeError);
   const m = new FinalMachine({ a: {}, b: {} }, 'a', {}, []);
   assert.throws(() => m.send('\0fsm.always'), TypeError);
   assert.throws(() => m.update(-1), RangeError);
@@ -479,11 +383,7 @@ test('FinalMachine: validation, always transitions, completion events, done and 
   assert.equal(chain.state, 'c', 'a rejected event still reconsiders eventless guards');
   // a cycle without a guard is an error
   assert.throws(
-    () =>
-      new FinalMachine({ a: {}, b: {} }, 'a', {}, [
-        { from: 'a', to: 'b', always: true },
-        { from: 'b', to: 'a', always: true },
-      ]),
+    () => new FinalMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', always: true }, { from: 'b', to: 'a', always: true }]),
     (e) => e.code === 'state',
   );
   // completion: entering a final child raises done.state.<parent>
@@ -491,10 +391,7 @@ test('FinalMachine: validation, always transitions, completion events, done and 
     { work: { initial: 'step' }, step: { parent: 'work' }, fin: { parent: 'work', final: true }, after: {} },
     'work',
     {},
-    [
-      { from: 'step', to: 'fin', event: 'finish' },
-      { from: 'work', to: 'after', event: 'done.state.work' },
-    ],
+    [{ from: 'step', to: 'fin', event: 'finish' }, { from: 'work', to: 'after', event: 'done.state.work' }],
   );
   assert.equal(done.state, 'step');
   done.send('finish');
@@ -519,13 +416,7 @@ test('FinalMachine: validation, always transitions, completion events, done and 
   assert.equal(timed.state, 'a');
   timed.update(0.5);
   assert.equal(timed.state, 'c');
-  assert.deepEqual(
-    timed.transitionDefinitions.map((t) => [t.from, t.to, t.after, t.always]),
-    [
-      ['a', 'b', 1, undefined],
-      ['b', 'c', undefined, true],
-    ],
-  );
+  assert.deepEqual(timed.transitionDefinitions.map((t) => [t.from, t.to, t.after, t.always]), [['a', 'b', 1, undefined], ['b', 'c', undefined, true]]);
 });
 
 test('EventMachine delivers the payload to guards and hooks and restores it after', () => {
@@ -539,16 +430,9 @@ test('EventMachine delivers the payload to guards and hooks and restores it afte
   assert.equal(m.data, undefined);
   assert.equal(m.send('go', { ok: false }), false);
   assert.equal(m.send('go', { ok: true }), true);
-  assert.deepEqual(seen, [
-    ['guard', { ok: false }],
-    ['guard', { ok: true }],
-    ['exit', { ok: true }],
-    ['enter', { ok: true }],
-  ]);
+  assert.deepEqual(seen, [['guard', { ok: false }], ['guard', { ok: true }], ['exit', { ok: true }], ['enter', { ok: true }]]);
   assert.equal(m.data, undefined);
-  const n = new EventMachine({ a: {}, b: {} }, 'a', {}, [
-    { from: 'a', to: 'b', event: 'go', guard: (c, d) => d === 7 },
-  ]);
+  const n = new EventMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: 'go', guard: (c, d) => d === 7 }]);
   const action = n.plan('go', 7);
   n.send('other', 1);
   action();

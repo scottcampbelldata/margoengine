@@ -1,12 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
-import {
-  engineRuntime,
-  type Engine,
-  type EnginePlugin,
-  type FrameGraph,
-  type PassContext,
-} from '@margoengine/core/extension';
+import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { finiteVector } from '@margoengine/math/validate';
@@ -238,8 +232,7 @@ const smoothstep = (a: number, b: number, x: number) => {
   const t = clamp01((x - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
-const inRange = (v: unknown, lo: number, hi: number) =>
-  typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+const inRange = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 /** The exponential integral E1(x) for x > 0: its series below 1, a continued fraction above (Abramowitz and Stegun 5.1). */
 export function expIntegral(x: number): number {
   if (!(x > 0)) return x === 0 ? Infinity : NaN;
@@ -282,8 +275,7 @@ function burgersF(x: number): number {
  * @throws TypeError for a bad pair, path or colour; RangeError for a value outside its range (each named in the message).
  */
 export function resolveTornado(o: TornadoOptions = {}): ResolvedTornado {
-  if (typeof o !== 'object' || o === null)
-    throw new TypeError('Tornado options must be an object; pass {} for the defaults.');
+  if (typeof o !== 'object' || o === null) throw new TypeError('Tornado options must be an object; pass {} for the defaults.');
   const pair = (v: readonly [number, number] | undefined, name: string, limit: number): readonly [number, number] => {
     if (v === undefined) return [0, 0];
     if (!Array.isArray(v) || v.length !== 2 || !inRange(v[0], -limit, limit) || !inRange(v[1], -limit, limit))
@@ -305,12 +297,7 @@ export function resolveTornado(o: TornadoOptions = {}): ResolvedTornado {
       throw new TypeError('Invalid Tornado path; pass two or more [seconds, x, z] keys in rising time.');
     for (let i = 0; i < p.length; i++) {
       const k = p[i];
-      if (
-        !Array.isArray(k) ||
-        k.length !== 3 ||
-        !k.every((n) => Number.isFinite(n)) ||
-        (i > 0 && !(k[0] > p[i - 1][0]))
-      )
+      if (!Array.isArray(k) || k.length !== 3 || !k.every((n) => Number.isFinite(n)) || (i > 0 && !(k[0] > p[i - 1][0])))
         throw new TypeError('Invalid Tornado path; pass two or more [seconds, x, z] keys in rising time.');
     }
     path = p;
@@ -450,9 +437,7 @@ export function debrisRadius(s: ResolvedTornado, k = 1): number {
   return lo;
 }
 function catmull(p0: number, p1: number, p2: number, p3: number, u: number): number {
-  return (
-    0.5 * (2 * p1 + (p2 - p0) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (3 * p1 - p0 - 3 * p2 + p3) * u * u * u)
-  );
+  return 0.5 * (2 * p1 + (p2 - p0) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (3 * p1 - p0 - 3 * p2 + p3) * u * u * u);
 }
 /** Where the tornado of `s` stands at film time `t`, world `[x, z]`, into `out`. */
 export function tornadoCenter(s: ResolvedTornado, t: number, out: [number, number] = [0, 0]): [number, number] {
@@ -544,13 +529,7 @@ export class Tornado {
    * The air's velocity at world `(x, y, z)` at `t`, `[vx, vy, vz]` m/s: the vortex's turn, the inflow turned in near
    * the ground (fading over a core radius of height), the core's updraft, plus the storm's motion. For debris.
    */
-  velocityAt(
-    x: number,
-    y: number,
-    z: number,
-    t = 0,
-    out: [number, number, number] = [0, 0, 0],
-  ): [number, number, number] {
+  velocityAt(x: number, y: number, z: number, t = 0, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
     const s = this.resolved,
       k = tornadoStrength(s, t),
       c = tornadoCenter(s, t, scratchCenter),
@@ -560,11 +539,7 @@ export class Tornado {
       motion = this.motionAt(t),
       v = tornadoWind(r, s, k),
       beta = s.inflow * Math.exp(-Math.max(0, y) / s.rc),
-      w =
-        (s.updraft ?? 0.6 * tornadoPeakWind(s, 1)) *
-        k *
-        Math.exp(-((r / s.rc) ** 2)) *
-        -Math.expm1(-Math.max(0, y) / s.rc);
+      w = (s.updraft ?? 0.6 * tornadoPeakWind(s, 1)) * k * Math.exp(-((r / s.rc) ** 2)) * -Math.expm1(-Math.max(0, y) / s.rc);
     out[0] = motion[0];
     out[1] = w;
     out[2] = motion[1];
@@ -606,9 +581,7 @@ export class Tornado {
       bz = speed > 0 ? -m[1] / speed : -Math.SQRT1_2,
       side = r > 0 ? (dx * bx + dz * bz) / r : 0,
       q = (r - 2 * s.wallRadius) / s.wallRadius;
-    return (
-      s.rainMax * Math.exp(-q * q) * (0.15 + 0.85 * clamp01(0.5 + 0.5 * side)) * Math.max(0.15, tornadoStrength(s, t))
-    );
+    return s.rainMax * Math.exp(-q * q) * (0.15 + 0.85 * clamp01(0.5 + 0.5 * side)) * Math.max(0.15, tornadoStrength(s, t));
   }
   /** Which part of the storm `(x, z)` lies in at `t`. */
   regionAt(x: number, z: number, t = 0): TornadoRegion {
@@ -776,17 +749,11 @@ export class TornadoCloud implements EnginePlugin {
   private readonly color = new Float32Array(3);
   private readonly profile = new Float32Array(FUNNEL_SAMPLES);
   constructor(readonly options: TornadoCloudOptions) {
-    if (
-      typeof options !== 'object' ||
-      options === null ||
-      typeof options.tornado !== 'object' ||
-      options.tornado === null
-    )
+    if (typeof options !== 'object' || options === null || typeof options.tornado !== 'object' || options.tornado === null)
       throw new TypeError('TornadoCloud needs a tornado; pass {tornado: new Tornado({...})}');
     this.tornado = toTornado(options.tornado);
     this.name = options.name ?? 'sky:tornado';
-    if (typeof this.name !== 'string' || !this.name)
-      throw new TypeError('TornadoCloud name must be a non-empty string');
+    if (typeof this.name !== 'string' || !this.name) throw new TypeError('TornadoCloud name must be a non-empty string');
     this.validate();
   }
   static attach(engine: EngineKernel, options: TornadoCloudOptions): TornadoCloud {
@@ -810,8 +777,7 @@ export class TornadoCloud implements EnginePlugin {
   }
   /** Moves the clock by `delta` seconds: the CPU part of the frame update, which a seek replays. */
   advanceTime(delta: number): void {
-    if (!Number.isFinite(delta) || delta < 0)
-      throw new RangeError('Invalid TornadoCloud delta; pass finite seconds >= 0.');
+    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid TornadoCloud delta; pass finite seconds >= 0.');
     this.seconds += delta;
   }
   onPreUpdate(delta: number): void {
@@ -822,9 +788,7 @@ export class TornadoCloud implements EnginePlugin {
     const o = this.options;
     resolveTornado(this.tornado.options);
     if (o.sky !== undefined && (typeof o.sky !== 'object' || o.sky === null || !(o.sky.sun?.length >= 3)))
-      throw new TypeError(
-        'TornadoCloud sky must be a Sky (with a sun direction); pass the sky whose sun lights the storm',
-      );
+      throw new TypeError('TornadoCloud sky must be a Sky (with a sun direction); pass the sky whose sun lights the storm');
     if (o.sunDirection) finiteVector(o.sunDirection, 3, 'TornadoCloud sunDirection');
     if (o.sunDirection && !(Math.hypot(...o.sunDirection) > 0))
       throw new RangeError('TornadoCloud sunDirection needs a nonzero length');

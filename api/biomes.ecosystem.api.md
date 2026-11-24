@@ -122,7 +122,6 @@ interface BiomeSample {
     height: number;
     slope: number;
     aspect: number;
-    curvature?: number;
     temperature: number;
     coldest: number;
     warmest: number;
@@ -603,7 +602,6 @@ type SizeDistribution = {
 interface SpeciesRule {
     readonly id: string;
     readonly mesh: string;
-    readonly canopyKind?: 'broadleaf' | 'conifer' | 'palm';
     readonly density: number;
     readonly radius: number;
     readonly size?: SizeDistribution;

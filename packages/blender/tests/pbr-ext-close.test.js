@@ -36,9 +36,5 @@ test('a failed shader import closes every decoded image', async (t) => {
   await assert.rejects(parseMargoPBR({}, bytes), /shader chunk failed to load/);
   assert.equal(hookHits, 1, 'the shader import went through the failing hook');
   assert.equal(opened.length, pngCount, 'every image was decoded before the rejection settled');
-  assert.deepEqual(
-    opened.map((image) => image.closed),
-    opened.map(() => 1),
-    'each decoded image is closed once',
-  );
+  assert.deepEqual(opened.map((image) => image.closed), opened.map(() => 1), 'each decoded image is closed once');
 });

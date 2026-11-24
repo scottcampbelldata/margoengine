@@ -19,8 +19,7 @@ import { WEATHER_LOOKS, WEATHER_SETTINGS, weatherStateOf } from '../dist/setting
 import { weatherFromMetar } from '../dist/data.js';
 import { WeatherDrive } from '../dist/drive.js';
 
-const near = (a, b, tolerance = 1e-12, message = '') =>
-  assert.ok(Math.abs(a - b) <= tolerance, `${message} ${a} vs ${b}`);
+const near = (a, b, tolerance = 1e-12, message = '') => assert.ok(Math.abs(a - b) <= tolerance, `${message} ${a} vs ${b}`);
 const F = (c) => (c * 9) / 5 + 32;
 
 test("the equilibrium moisture is Simard's regression in each of its three humidity bands", () => {
@@ -28,12 +27,7 @@ test("the equilibrium moisture is Simard's regression in each of its three humid
   near(equilibriumMoisture(0.05, 35), (0.03229 + 0.281073 * 5 - 0.000578 * F(35) * 5) / 100, 1e-15, '1a');
   near(equilibriumMoisture(0.3, 30), (2.22749 + 0.160107 * 30 - 0.014784 * F(30)) / 100, 1e-15, '1b');
   near(equilibriumMoisture(0.3, 30), 0.0575928, 1e-7, '1b value');
-  near(
-    equilibriumMoisture(0.8, 15),
-    (21.0606 + 0.005565 * 6400 - 0.00035 * 80 * F(15) - 0.483199 * 80) / 100,
-    1e-15,
-    '1c',
-  );
+  near(equilibriumMoisture(0.8, 15), (21.0606 + 0.005565 * 6400 - 0.00035 * 80 * F(15) - 0.483199 * 80) / 100, 1e-15, '1c');
   near(equilibriumMoisture(0.8, 15), 0.1636868, 1e-7, '1c value');
   // Wetter air holds wetter wood, warmer air drier wood; saturated air about 26 percent (the fibre-saturation side).
   let last = -1;
@@ -55,10 +49,7 @@ test('the fuel bed in the sun: add 25, 19, 12 or 5 F and scale the humidity by c
   near(at(0.7).temperature, 20 + (12 * 5) / 9, 1e-12);
   near(at(0.7).humidity, 0.4 * 0.92, 1e-12);
   assert.deepEqual(at(1), { humidity: 0.4, temperature: 20 + (5 * 5) / 9 });
-  assert.deepEqual(fuelLevelAir({ humidity: 0.4, temperature: 20, cloud: 0 }, false), {
-    humidity: 0.4,
-    temperature: 20,
-  });
+  assert.deepEqual(fuelLevelAir({ humidity: 0.4, temperature: 20, cloud: 0 }, false), { humidity: 0.4, temperature: 20 });
 });
 
 test('rain sets the 1 and 10 hour target to 35 percent and the 100-hour boundary to 0.5 d + 41 percent', () => {
@@ -110,14 +101,9 @@ test('the state holds humidity and temperature: ranges, presets, rows and looks'
   for (const name of ['snow', 'blizzard', 'sleet']) assert.ok(WEATHER_PRESETS[name].temperature <= 1, name);
   for (const name of ['drizzle', 'rain', 'storm']) assert.ok(WEATHER_PRESETS[name].humidity >= 0.95, name);
   const rows = Object.fromEntries(WEATHER_SETTINGS.map((r) => [r.name, r]));
-  for (const name of ['humidity', 'temperature'])
-    assert.ok(rows[name].nullable && rows[name].default === null && rows[name].weather === 'storm', name);
+  for (const name of ['humidity', 'temperature']) assert.ok(rows[name].nullable && rows[name].default === null && rows[name].weather === 'storm', name);
   assert.equal(weatherStateOf().humidity, WEATHER_PRESETS.clear.humidity, 'null follows the storm level');
-  near(
-    weatherStateOf({ storm: 0.25 }).humidity,
-    (WEATHER_PRESETS.clear.humidity + WEATHER_PRESETS.rain.humidity) / 2,
-    1e-12,
-  );
+  near(weatherStateOf({ storm: 0.25 }).humidity, (WEATHER_PRESETS.clear.humidity + WEATHER_PRESETS.rain.humidity) / 2, 1e-12);
   const flag = weatherStateOf(WEATHER_LOOKS.redFlag);
   assert.ok(flag.humidity === 0.15 && flag.temperature === 32);
   near(fuelMoistureTarget(flag).moisture, 0.023345, 1e-5, 'the red-flag look dries fine fuel to about 2 percent');
@@ -135,11 +121,7 @@ test("a METAR's temperature and dew point give the state's temperature and humid
   const frost = weatherFromMetar('UUEE 071200Z 02002MPS CAVOK M05/M08 Q1025');
   assert.equal(frost.temperature, -5);
   assert.ok(frost.humidity > 0.75 && frost.humidity < 0.8);
-  assert.equal(
-    weatherFromMetar('EGLL 071150Z 24015KT 9999 FEW020 Q1003').humidity,
-    0.5,
-    'no temperature group: the clear preset',
-  );
+  assert.equal(weatherFromMetar('EGLL 071150Z 24015KT 9999 FEW020 Q1003').humidity, 0.5, 'no temperature group: the clear preset');
 });
 
 test('a drive with no fire leaves its settings and targets as before; with one it reports the fuel moisture', () => {
@@ -151,11 +133,7 @@ test('a drive with no fire leaves its settings and targets as before; with one i
     drive = new WeatherDrive({ weather, fires: fire, fuelTimeScale: 60 });
   drive.update(1);
   near(fire.options.moisture, fuelMoistureTarget(weather.state).moisture, 0);
-  assert.deepEqual(drive.fuelMoisture, {
-    moisture: fire.options.moisture,
-    moisture10: fire.options.moisture10,
-    moisture100: fire.options.moisture100,
-  });
+  assert.deepEqual(drive.fuelMoisture, { moisture: fire.options.moisture, moisture10: fire.options.moisture10, moisture100: fire.options.moisture100 });
   assert.throws(() => new WeatherDrive({ weather, fuelTimeScale: -1 }), RangeError);
   assert.throws(() => new WeatherDrive({ weather, fuelMoistureFromWeather: 1 }), TypeError);
   // A sky whose sun is down: the fuel sees the air as it is (wetter than in the sun).
@@ -169,13 +147,7 @@ test('a drive with no fire leaves its settings and targets as before; with one i
 // rollFire runs a fire's past) dried with the weather but never got its wind, so the 1910 gale burned in still air.
 test('a fire given as fires spreads in the weather wind; a wind it was given by hand overrides it', () => {
   const weather = new WeatherMachine({ wind: 20, windDirection: Math.PI }),
-    fire = {
-      options: {},
-      smokeEmission: 0,
-      setWind(w) {
-        this.options.wind = w;
-      },
-    },
+    fire = { options: {}, smokeEmission: 0, setWind(w) { this.options.wind = w; } },
     drive = new WeatherDrive({ weather, fires: fire });
   drive.update(1);
   assert.ok(Array.isArray(fire.options.wind), 'the drive wrote the fire a wind');

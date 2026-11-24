@@ -18,32 +18,21 @@ test('classic worker scripts keep Script syntax and CPU attachment helpers', () 
 test('unused object plugins keep their requirement declaration tree-shakable', async () => {
   const plugin = declareCoreRequirement("export const plugin={name:'unused',setup(){}};export const value=1;", '1.0.0');
   const result = await build({
-    configFile: false,
-    publicDir: false,
-    logLevel: 'silent',
-    plugins: [
-      {
-        name: 'guard-shake-fixture',
-        resolveId(id) {
-          if (id.startsWith('fixture/')) return '\0' + id;
-          if (id === '@margoengine/core/extension') return { id, external: true, moduleSideEffects: false };
-        },
-        load(id) {
-          if (id === '\0fixture/entry') return "export {value} from 'fixture/plugin';";
-          if (id === '\0fixture/plugin') return plugin;
-        },
+    configFile: false, publicDir: false, logLevel: 'silent',
+    plugins: [{
+      name: 'guard-shake-fixture',
+      resolveId(id) {
+        if (id.startsWith('fixture/')) return '\0' + id;
+        if (id === '@margoengine/core/extension') return { id, external: true, moduleSideEffects: false };
       },
-    ],
+      load(id) {
+        if (id === '\0fixture/entry') return "export {value} from 'fixture/plugin';";
+        if (id === '\0fixture/plugin') return plugin;
+      },
+    }],
     build: { write: false, target: 'es2022', rollupOptions: { input: 'fixture/entry', output: { format: 'es' } } },
   });
-  assert.doesNotMatch(
-    [result]
-      .flat()
-      .flatMap((item) => item.output)
-      .map((chunk) => chunk.code ?? '')
-      .join('\n'),
-    /margoengine|coreRequirement|unused/,
-  );
+  assert.doesNotMatch([result].flat().flatMap(item => item.output).map(chunk => chunk.code ?? '').join('\n'), /margoengine|coreRequirement|unused/);
 });
 
 test('package declarations freeze the build version at runtime access, attach and direct plugin use', () => {
@@ -102,10 +91,8 @@ test('emitted bindings freeze versions through callbacks and leave local hoisted
     export function dependency(engine){return r(engine,\`0.8.0\`,'dependency')}
     export function local(){if(true){var r=(...values)=>values.length;}return r(1,2)}
     export class Plugin {name='plugin';setup(engine){}static attach(engine){return engine}}`;
-  const transformed = declareCoreRequirement(source, '4.5.6').replaceAll(
-    "'@margoengine/core/extension'",
-    JSON.stringify(url(helpers)),
-  );
+  const transformed = declareCoreRequirement(source, '4.5.6')
+    .replaceAll("'@margoengine/core/extension'", JSON.stringify(url(helpers)));
   const module = await import(url(transformed));
   for (const invoke of [module.callback, module.current]) {
     const result = invoke('engine');

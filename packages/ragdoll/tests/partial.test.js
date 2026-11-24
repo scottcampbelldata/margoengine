@@ -69,10 +69,7 @@ rtest('the spine takes the whole upper body, with the legs still walking', async
   ragdoll.activate(rig.node('spine'));
   const legs = ['hips', 'upperleg.l', 'lowerleg.l', 'foot.l', 'upperleg.r', 'lowerleg.r', 'foot.r'];
   assert.deepEqual(
-    ragdoll.bones
-      .filter((part) => !part.limp)
-      .map((part) => part.node.name)
-      .sort(),
+    ragdoll.bones.filter((part) => !part.limp).map((part) => part.node.name).sort(),
     [...legs].sort(),
   );
   const chest = rig.node('chest');

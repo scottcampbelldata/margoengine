@@ -159,7 +159,8 @@ export function decodeGraph(text: string, codecs: readonly SnapshotValueCodec[] 
     state[id] = 1;
     const next = (v: unknown) => read(v, depth + 1);
     let result: unknown;
-    if (n[0] === 'b' && n.length === 2 && typeof n[1] === 'string') result = base64ToBytes(n[1]).buffer as ArrayBuffer;
+    if (n[0] === 'b' && n.length === 2 && typeof n[1] === 'string')
+      result = base64ToBytes(n[1]).buffer as ArrayBuffer;
     else if (
       n[0] === 'v' &&
       n.length === 5 &&

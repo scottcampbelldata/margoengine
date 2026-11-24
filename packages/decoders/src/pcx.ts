@@ -20,7 +20,7 @@ const HEADER = 128;
 // Version 3 files carry no palette: they mean the standard 16 EGA colours (intensity, red, green, blue; 6 is brown).
 const EGA = Uint8Array.from({ length: 48 }, (_, i) => {
   const index = (i / 3) | 0,
-    level = ((index >> (2 - (i % 3))) & 1) * 170 + ((index >> 3) & 1) * 85;
+    level = (((index >> (2 - (i % 3))) & 1) * 170) + ((index >> 3) & 1) * 85;
   return index === 6 && i % 3 === 1 ? 85 : level;
 });
 const corrupt = (problem: string): Error => decodeFailed(`PCX ${problem}; pass the complete bytes of a valid PCX file`);

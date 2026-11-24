@@ -30,11 +30,7 @@ function file({ material = {}, uv = uvs, attributes, ...rest } = {}) {
     textures: [{ source: 0 }],
     materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } }, ...material }],
     meshes: [
-      {
-        primitives: [
-          { attributes: attributes ?? { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2, TEXCOORD_1: 3 }, material: 0 },
-        ],
-      },
+      { primitives: [{ attributes: attributes ?? { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2, TEXCOORD_1: 3 }, material: 0 }] },
     ],
     nodes: [{ mesh: 0 }],
     ...rest,
@@ -51,12 +47,7 @@ test('textured frames upload the unit light direction while preserving intensity
   const { engine, device } = await gpuEngine(t);
   engine.renderer.geometryBuffers = () => ({ vertex: {}, index: {}, instance: {} });
   const pass = {
-    setPipeline() {},
-    setBindGroup() {},
-    setVertexBuffer() {},
-    setIndexBuffer() {},
-    drawIndexed() {},
-    end() {},
+    setPipeline() {}, setBindGroup() {}, setVertexBuffer() {}, setIndexBuffer() {}, drawIndexed() {}, end() {},
   };
   try {
     const model = await load(engine, file()),
@@ -64,28 +55,16 @@ test('textured frames upload the unit light direction while preserving intensity
       geometry = model.meshes[0].geometry;
     // Isolate the real draw/frame writer from shader compilation in this CPU regression.
     plugin.pipeline = () => ({ getBindGroupLayout: () => ({}) });
-    for (const direction of [
-      [3, 4, 0, 2.5],
-      [3e38, -3e38, 3e38, 1],
-      [0, -1e-30, 0, 0],
-    ]) {
+    for (const direction of [[3, 4, 0, 2.5], [3e38, -3e38, 3e38, 1], [0, -1e-30, 0, 0]]) {
       engine.lighting.direction.set(direction);
-      const input = [...engine.lighting.direction],
-        length = Math.hypot(...input.slice(0, 3));
+      const input = [...engine.lighting.direction], length = Math.hypot(...input.slice(0, 3));
       plugin.draw({
-        device,
-        camera: engine.camera,
-        batches: [{ geometry, count: 1 }],
-        bindings: [],
+        device, camera: engine.camera, batches: [{ geometry, count: 1 }], bindings: [],
         descriptor: { depthStencil: { format: 'depth24plus' } },
-        encoder: { beginRenderPass: () => pass },
-        color: {},
-        depth: {},
+        encoder: { beginRenderPass: () => pass }, color: {}, depth: {},
       });
-      assert.deepEqual(
-        [...device.uniformUploads.at(-1).subarray(20, 24)],
-        [...input.slice(0, 3).map((x) => Math.fround(x / length)), input[3]],
-      );
+      assert.deepEqual([...device.uniformUploads.at(-1).subarray(20, 24)],
+        [...input.slice(0, 3).map((x) => Math.fround(x / length)), input[3]]);
       assert.deepEqual([...engine.lighting.direction], input);
     }
     model.dispose();
@@ -124,10 +103,7 @@ test('textured uploads the UVs of the set the material names, moved by KHR_textu
     };
     const turned = await load(
       engine,
-      file({
-        material: { pbrMetallicRoughness: { baseColorTexture: info } },
-        extensionsRequired: ['KHR_texture_transform'],
-      }),
+      file({ material: { pbrMetallicRoughness: { baseColorTexture: info } }, extensionsRequired: ['KHR_texture_transform'] }),
     );
     // The extension's matrix: x' = cos sx u + sin sy v + ox, y' = -sin sx u + cos sy v + oy.
     close(uploadedUV(device), [0.5, 0.25, 0.5, -1.75, 4.5, 0.25]);
@@ -268,12 +244,7 @@ test('texturedAlphaMasks gives a cut-out its pixels, cutoff, factor and wrap, an
       plain = await load(engine, file()),
       image = { width: 1, height: 1, data: [0, 0, 0, 255] },
       source = await texturedAlphaMasks(cut, { pixels: () => image });
-    assert.deepEqual(source({ mesh: cut.meshes[0] }), {
-      ...image,
-      cutoff: 0.25,
-      factor: 0.5,
-      wrap: ['clamp', 'mirror'],
-    });
+    assert.deepEqual(source({ mesh: cut.meshes[0] }), { ...image, cutoff: 0.25, factor: 0.5, wrap: ['clamp', 'mirror'] });
     assert.equal(source({ mesh: plain.meshes[0] }), null);
     await assert.rejects(texturedAlphaMasks(cut, { signal: AbortSignal.abort(), pixels: () => image }));
     cut.dispose();
@@ -393,9 +364,7 @@ test('images come from data URIs, and from loadGLTF for a URL, inside its allowe
       get = async (url) => {
         asked.push(String(url));
         const path = String(url);
-        return new Response(
-          path.endsWith('.gltf') ? JSON.stringify(external.doc) : path.endsWith('.bin') ? external.bytes : png,
-        );
+        return new Response(path.endsWith('.gltf') ? JSON.stringify(external.doc) : path.endsWith('.bin') ? external.bytes : png);
       };
     const url = 'https://example.test/a/model.gltf',
       loaded = await loadGLTF(engine, url, { fetch: get, extensions: [textured] });
@@ -448,9 +417,7 @@ test('a claimed batch uploads every row first, then only the rows core marked ch
   const { engine } = await gpuEngine(t),
     instance = {},
     writes = [],
-    queue = {
-      writeBuffer: (buffer, byteOffset, _data, start, size) => writes.push([buffer, byteOffset / 4, start, size]),
-    };
+    queue = { writeBuffer: (buffer, byteOffset, _data, start, size) => writes.push([buffer, byteOffset / 4, start, size]) };
   // The stand-in renderer has no GPU buffers; the claim writes core's instance buffer of the geometry.
   engine.renderer.geometryBuffers = () => ({ instance });
   try {

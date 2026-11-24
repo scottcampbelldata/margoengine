@@ -23,13 +23,9 @@ test('the Python package suite passes', () => {
   for (const [output, script] of BUNDLES) {
     if (existsSync(join(root, output))) continue;
     const built = spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8', timeout: 5 * 60_000 });
-    assert.equal(
-      built.status,
-      0,
-      `${script} (needs npm run build:packages first) failed:
+    assert.equal(built.status, 0, `${script} (needs npm run build:packages first) failed:
 ${built.stdout}
-${built.stderr}`,
-    );
+${built.stderr}`);
   }
   let python = process.env.MARGO_PYTHON;
   if (!python) {

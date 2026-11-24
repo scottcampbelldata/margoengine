@@ -221,24 +221,7 @@ location 6 in the standard PBR shader. No core changes are required. Physical
 regression on WebGPU and the WebGL2 layer: `node packages/terrain/test/wetness.browser.mjs`
 from the repository root after building the packages (MARGO_COMPAT=1 for the layer).
 
-Optional geometry clipmaps with vertex texture height and normal sampling and 4 to 16 terrain layers. Fixed grids form a centre and concentric rings. Inner edges align to the finer grid and outer-edge vertices collapse onto the next coarser lattice to close seams. In moving-window mode, [seams.browser.mjs](test/seams.browser.mjs) checks 200 camera offsets for clear pixels through the ground on WebGPU and the WebGL2 layer. Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting and normalized slope and height weights blend an sRGB texture array.
-
-The rings anchor at the main camera's world XZ on the first render. Camera motion then preserves the terrain triangles,
-ridge silhouettes, and static shadow cache. Pass `clipmapAnchor: [x, z]` for a fixed centre you choose. Set `levels`,
-`resolution`, or `cellSize` so the outer ring spans the terrain in view. For a route that exceeds the fixed outer ring,
-pass `clipmapAnchor: 'camera'` to select a moving window on the same world lattice. `TerrainStream` defaults to that mode.
-The fixed ring origin remains in world coordinates with `floatingOrigin` and survives rebases and device restoration.
-[The rendered regression](test/clipmap-anchor.browser.mjs) checks a subpixel camera move across a clipmap boundary.
-The clipmap lattice and seam treatment follow Frank Losasso and Hugues Hoppe,
-[Geometry Clipmaps](https://hhoppe.com/geomclipmap.pdf) (2004), and Arul Asirvatham and Hugues Hoppe,
-[Terrain Rendering Using GPU-Based Geometry Clipmaps](https://hhoppe.com/gpugcm.pdf) (2005).
-
-Set `captureSurfaceHeight: true` when an object-placement pass needs the heights of the triangles on screen.
-`terrain.surfaceHeightTexture` becomes available when the first frame prepares the terrain. The texture shares
-the source heightmap's UVs and stores world metres in R. It refreshes on changes to the clipmap or source heights,
-so call `terrain.invalidate()` after editing samples. The target is capped at 2,049 texels per side. It uses R32F
-on WebGPU and the full compatibility tier, RGBA16F on the half-float tier. The LDR tier cannot render the float target.
-[The height regression](test/surface-height.browser.mjs) checks a fine source peak that the coarse rendered triangles omit.
+Optional geometry clipmaps with vertex texture height/normal sampling and 4 to 16 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams ([seams.browser.mjs](test/seams.browser.mjs): rough ground seen from above at 200 camera offsets that step through fractions of a cell draws 0 clear-colour pixels on WebGPU and the WebGL2 layer). Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
 Each ring's 176-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
 differ from the last upload to that buffer, so a still camera under unchanged light uploads nothing; buffers made
 after a device restore always get their first write.
@@ -1125,6 +1108,13 @@ engine.start();
     rate, cut down to the bed with its face at the angle.
   - `scour` (`center`, `radius` 5, `depth` 2, `flow`, `deposit` 0.5): depth grows as 1 - exp(-t / T) to the full depth
     at the end; with a `flow` the scoured sand forms a mound downstream.
+  - `crater` (`center`, `radius` 30, `depth` 10, `heave` 0.4 depth, `heaveTime` sqrt(2 heave / g), `domeSpread` 1.3,
+    `ejecta` 0.7, `duration` 6 s after the heave): a buried explosion. The ground first heaves into a dome
+    `domeSpread` times the crater's radius, the surface thrown up ballistically to `heave` metres (1.43 s for 10 m);
+    then the dome vents and the crater opens over `duration`, a paraboloid bowl of `radius` and `depth` with a lip at
+    the rim and an ejecta blanket thinning as (r / R)^-3 (McGetchin et al. 1973) out to 5 R, holding `ejecta` of the
+    bowl's volume. Pair it with `BlastCloud` of `margoengine/weather/eruption` for the cloud:
+    `{kind: 'crater', center: [0, 0], radius: 120, depth: 30, heave: 20, start: 2}`.
   - `slide` (`from` crown, `to` toe, `width` 20, `depth` 3, `length` 40% of the way, `bulking` 1.15): the scar fails in
     the first third and the lobe runs out as a block under friction, holding the scar's volume times `bulking`.
   - `mud` (`shore`, `land` side, `reach` 400, `thickness` 0.25, `decay` reach / 3, `drying` 1,800 s): the front slows
@@ -1402,13 +1392,9 @@ engine.start();
   and Gamito and Musgrave 2001.
 - Sea rocks. A lumpy (`lobes` 0.22 of the radius), tapering (`taper` 0.25, a skerry 0.5) column with a wave-cut notch
   `notchDepth` (0.6 m, at most 0.45 of the radius) deep in a band `notchHeight` (1.2 m) high, centred a tenth of it over
-  the still water, so the rock above overhangs it; strata ledges, `joints` (7) around it and a rounded top. Boulders
-  use `facets` (9) bed, joint and corner cuts through a seeded block. The bed face sits under the ground at the
-  default `embed` (0.3). The upper face has a seeded pitch and each side has its own cut, with `rounding` (0.18)
-  controlling edge wear. These cuts draw on [A. Peytavie, E. Galin, J. Grosjean and S. Mérillou,
-  *Procedural Generation of Rock Piles using Aperiodic Tiling* (2009)](https://perso.liris.cnrs.fr/eric.galin/Articles/2009-aperiodic.pdf)
-  and [A. Paris, A. Peytavie, E. Guérin, J.-M. Dischler and E. Galin, *Modeling Rocky Scenery using Implicit Blocks*
-  (2020)](https://perso.liris.cnrs.fr/aparis/public_html/projects/paris2020_Blocks.html).
+  the still water, so the rock above overhangs it; strata ledges, `joints` (7) around it and a rounded top. Boulders are
+  the cell of `facets` (9) fracture planes inside a sphere, edges rounded by `rounding` (rock piles after Peytavie et al.
+  2009), `embed` (0.3) of the radius buried.
 - Meshes. Each piece is a signed distance field polygonized by Marching Cubes (Lorensen and Cline 1987, `marchingCubes`
   of `@margoengine/procedural`) at `cell` spacing (cliffs 0.5 m, sea rocks radius / 12, boulders radius / 10) in blocks
   of up to 127 cells whose shared vertices are welded and whose normals all come from the field's central differences,
@@ -1422,17 +1408,10 @@ engine.start();
   rock type's two bed tones banded by its `strata` with thin bedding lines; broad tone variation; broken joint cracks;
   moss on faces that look up; a wet, algae-dark band up to `tideHeight` over the rock's `seaLevel`; and rain that
   darkens and smooths it (Lekner and Dorf 1988, Jensen et al. 1999). Rock types: `sandstone` (default), `limestone`,
-  `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override).
-  At close range, granite has light quartz and dark mica grains, basalt has subtle dark pits, and shale has thin
-  laminations between beds. Grain color and relief fade when the screen footprint can no longer resolve them.
-  These materials use visual characteristics from the [British Columbia Geological Survey, *Rock Identification
-  Key* (1987)](https://cmscontent.nrs.gov.bc.ca/geoscience/publicationcatalogue/InformationCircular/BCGS_IC1987-05_METC1980.pdf)
-  and [Utah Geological Survey, *Igneous, Sedimentary, & Metamorphic Rocks*](https://geology.utah.gov/map-pub/survey-notes/glad-you-asked/igneous-sedimentary-metamorphic-rocks/).
-  Set `tideHeight: 0` for inland scenes to disable shoreline darkening, including below the assigned sea level. The
+  `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override). The
   look (`RockLook`, defaults in `ROCK_LOOK_DEFAULTS`) is live through `setLook`; `look.rain` null follows a
   `WeatherDrive`, which finds the surface by its name. One group-0 binding (from 40, past any taken); an added mesh's
-  pixels cost about twenty value-noise reads plus three triplanar grain samples in close shots, other meshes one
-  storage read. WebGPU, and WebGPU on the WebGL2 layer.
+  pixels cost about twenty value-noise reads, other meshes one storage read. WebGPU, and WebGPU on the WebGL2 layer.
   Its patch runs after `TerrainBlend`'s, so the blend's fade into the ground is laid over the rock.
 - Sliders: `@margoengine/terrain/rock-settings` holds every control on the shared row shape: the live look rows
   (`detail.*`, `moss.*`, `tide.*`, `wet.*`; `wet.rain` null follows the weather's `rainRate`) for
@@ -1709,65 +1688,3 @@ Checked in `test/planet-recipes.test.js` (an isolated crater's depth and rim ove
 ejecta against McGetchin within 2%, a flat floor within 1e-6, diameters against the power law with a
 Kolmogorov-Smirnov statistic under 0.02, determinism, pruning by detail, bounded reads, validation) and on both GPU backends by
 `test/planet-recipes.browser.mjs` (every preset drawn on `PlanetTerrain`, deterministic, no validation error).
-
-## Terrain relief lighting
-
-Use `@margoengine/terrain/relief-lighting` to shade terrain from its measured or generated heightfield. A ridge can
-block the sun on the floor of a valley, even if the ridge is outside the camera view. The visible sky supplies the
-remaining diffuse light. The bake keeps sunlight visibility and projected sky visibility separate so layer albedo,
-roughness and explicit light sources retain their roles.
-
-```ts
-import { Engine } from '@margoengine/core';
-import { Terrain } from '@margoengine/terrain';
-import { TerrainReliefLighting } from '@margoengine/terrain/relief-lighting';
-
-const canvas = document.body.appendChild(document.createElement('canvas'));
-const engine = await Engine.create(canvas, {
-  backend: 'webgpu',
-  camera: { position: [31, 43, 65], target: [31, 0, 25] },
-});
-engine.lighting.direction.set([1, 0.28, 0, 3]);
-const terrain = Terrain.attach(engine, {
-  size: [64, 64],
-  heightScale: 1,
-  layers: Array.from({ length: 4 }, () => ({ height: [-1, 100], slope: [0, 1], scale: 1 })),
-  textures(device) {
-    const heightmap = device.createTexture({ size: [65, 65], format: 'r32float', usage: 6 });
-    const samples = new Float32Array(65 * 65);
-    for (let z = 0; z < 65; z++) samples[z * 65 + 32] = 18;
-    device.queue.writeTexture({ texture: heightmap }, samples, { bytesPerRow: 260 }, [65, 65]);
-    const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm', usage: 6 });
-    device.queue.writeTexture(
-      { texture: layers }, new Uint8Array(16).fill(140), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4],
-    );
-    return { heightmap, layers };
-  },
-});
-const relief = TerrainReliefLighting.attach(engine, terrain);
-engine.start();
-// After a height or sun change, call relief.rebake(). Call engine.dispose() when leaving the view.
-```
-
-- Attach to a live clipmap terrain. On device restore the effect bakes from the heightmap on the restored device.
-  Disposing the effect releases its texture and detaches it from its actual scene.
-- `direction` defaults to the engine light at the time of the bake. `radius` defaults to one quarter of the
-  shorter extent. The defaults are 12 sky azimuths, 48 samples per ray and a 0.75-degree half-width for the sun.
-  Use 4–32 azimuths, 8–256 samples and a positive half-width of up to 10 degrees.
-- Height samples must be finite and corner aligned. The effect uses the terrain height scale by default. It
-  works with a single sampled 2D `r32float`, `rgba16float` or `rgba8unorm` height texture at least 2×2.
-- For Blender meshes and custom terrain draws, `bakeTerrainReliefLighting(device, heightmap, size, options)`
-  returns an owned filterable `rgba16float` texture. Its R channel is sun visibility and its G channel is
-  projected sky visibility. Call `texture.destroy()` when finished. `terrainReliefLightingWGSL` provides
-  `terrainReliefLight(map, sampler, uv)`, with UV coordinates 0 and 1 at the first and last height samples.
-- Work is bounded by `width × height × (rays + 1) × steps` horizon samples per bake. Draws fetch one texel
-  bilinearly. Radii and sample spacing limit the result. Distant narrow ridges can fall between samples.
-  Overhangs and occluders absent from the heightfield require regular shadow casters.
-
-Terrain horizons follow Nicolas Max, *Horizon Mapping: Shadows for Bump-Mapped Surfaces* (1988), and
-A. James Stewart, *Fast Horizon Computation at All Points of a Terrain with Visibility and Shading Applications*
-(1998). The azimuth-sampled sky view follows Klemen Zakšek, Krištof Oštir and Žiga Kokalj, *Sky-View Factor as
-a Relief Visualization Technique* (2011).
-[Max](https://cir.nii.ac.jp/crid/1573387451457112064)
-[Stewart](https://research.cs.queensu.ca/home/jstewart/papers/tvcg97.html)
-[Zakšek, Oštir and Kokalj](https://doi.org/10.3390/RS3020398)

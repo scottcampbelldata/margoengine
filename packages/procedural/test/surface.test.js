@@ -34,34 +34,6 @@ test('deformed rocks have continuous smooth normals without collapsing their UV 
   assert.equal(generateFernMesh().indices.length, 7 * 5 * 6);
 });
 
-test('seeded fieldstone forms differ in proportions and keep the small scatter mesh budget', () => {
-  const extents = ({ positions }) =>
-    [0, 1, 2].map((axis) => {
-      const coordinates = positions.filter((_, i) => i % 3 === axis);
-      return Math.max(...coordinates) - Math.min(...coordinates);
-    });
-  for (const seed of [1, 17, 27, 0xffffffff]) {
-    const [block, slab, wedge, shard, pebble] = ['block', 'slab', 'wedge', 'shard', 'pebble'].map((form) =>
-      generateRockMesh(seed, form),
-    );
-    const [slabX, slabY] = extents(slab),
-      [shardX, , shardZ] = extents(shard),
-      [pebbleX, , pebbleZ] = extents(pebble);
-    assert.ok(slabY / slabX < 0.28, 'slab is thin across its broad face');
-    assert.ok(shardZ / shardX < 0.48, 'shard is distinctly elongated');
-    assert.ok(pebbleZ / pebbleX > 0.65, 'pebble retains a compact water-worn form');
-    assert.notDeepEqual(wedge.positions, block.positions);
-    for (const rock of [block, slab, wedge, shard, pebble]) {
-      assert.equal(rock.indices.length / 3, 180);
-      assert.ok(rock.positions.every(Number.isFinite));
-    }
-  }
-  assert.deepEqual(generateRockMesh(17), generateRockMesh(17, 'slab'));
-  assert.notDeepEqual(generateRockMesh(17, 'block'), generateRockMesh(27, 'block'));
-  assert.throws(() => generateRockMesh(-1), RangeError);
-  assert.throws(() => generateRockMesh(1, 'constructor'), RangeError);
-});
-
 test('contact and radial occlusion stay bounded and reject invalid sampling data', () => {
   assert.equal(contactAO(-1, 0), 0.2);
   assert.equal(contactAO(0.6, 0), 1);

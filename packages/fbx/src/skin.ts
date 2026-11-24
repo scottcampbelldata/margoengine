@@ -123,7 +123,13 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
         weight = values[i];
       // Writers leave entries for control points the mesh lost after binding; there is nothing to weight.
       if (cp >= cpCount) continue;
-      if (!Number.isInteger(cp) || cp < 0 || used[cp] === jointIndex + 1 || !Number.isFinite(weight) || weight < 0)
+      if (
+        !Number.isInteger(cp) ||
+        cp < 0 ||
+        used[cp] === jointIndex + 1 ||
+        !Number.isFinite(weight) ||
+        weight < 0
+      )
         throw new RangeError(`Invalid FBX cluster weight: ${label}; re-export the file, it looks damaged`);
       used[cp] = jointIndex + 1;
       if (!weight) continue;
@@ -160,15 +166,7 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
     binds.set(meshAtBind!, joints.length * 16);
     joints.push(rest);
   }
-  return {
-    name: objectName(source),
-    cpCount,
-    jointIds,
-    weights,
-    joints,
-    binds: binds.subarray(0, joints.length * 16),
-    source,
-  };
+  return { name: objectName(source), cpCount, jointIds, weights, joints, binds: binds.subarray(0, joints.length * 16), source };
 }
 
 export function attachSkin(ctx: SceneContext, mesh: MeshBinding): void {
@@ -205,7 +203,5 @@ export function attachSkin(ctx: SceneContext, mesh: MeshBinding): void {
   mesh.geometry.joints = ids;
   mesh.geometry.weights = out;
   mesh.node.skin = { name: data.name, joints, inverseBindMatrices: binds };
-  ctx.extensions
-    .find((extension) => extension.skinned)
-    ?.skinned?.({ source: data.source, mesh, cpCount: data.cpCount });
+  ctx.extensions.find((extension) => extension.skinned)?.skinned?.({ source: data.source, mesh, cpCount: data.cpCount });
 }

@@ -74,11 +74,7 @@ class Op {
 function played(a: Parts, b: Parts, f: number): number[] {
   const rotation = [0, 0, 0, 0];
   slerp(a.rotation, b.rotation, f, rotation, 0);
-  return [
-    ...a.translation.map((x, i) => x + (b.translation[i] - x) * f),
-    ...a.scale.map((x, i) => x + (b.scale[i] - x) * f),
-    ...rotation,
-  ];
+  return [...a.translation.map((x, i) => x + (b.translation[i] - x) * f), ...a.scale.map((x, i) => x + (b.scale[i] - x) * f), ...rotation];
 }
 const listed = ({ translation, scale, rotation }: Parts) => [...translation, ...scale, ...rotation];
 const near = (a: number[], b: number[]) => {
@@ -107,9 +103,7 @@ function transforms(read: SceneRead): void {
       if (name.startsWith('xformOp:')) ops.set(name, new Op(read, path, name));
     }
     const list = [...ops.values()],
-      keys = [...new Set(list.flatMap((op) => [...op.times, ...op.jumps.map((t) => t - JUST_BEFORE)]))].sort(
-        (a, b) => a - b,
-      );
+      keys = [...new Set(list.flatMap((op) => [...op.times, ...op.jumps.map((t) => t - JUST_BEFORE)]))].sort((a, b) => a - b);
     if (keys.length < 2) continue;
     const parts = (time: number) => decomposeAffine(read.transform(path, (name) => ops.get(name)?.at(time))) as Parts,
       times: number[] = [];
@@ -127,8 +121,7 @@ function transforms(read: SceneRead): void {
       // What a clip plays between these keys differs from what the stage computes: frames get keys, and wide turns get more.
       const turn = ((next - time) * WIDEST_TURN) / Math.max(sweep, 1e-9),
         step = Math.max(turn < 1 ? 1 / Math.ceil(1 / turn) : 1, (next - time) / MOST_BETWEEN);
-      for (let k = Math.floor(time / step) + 1; k * step < next - step * 1e-6; k++)
-        if (k * step > time) times.push(k * step);
+      for (let k = Math.floor(time / step) + 1; k * step < next - step * 1e-6; k++) if (k * step > time) times.push(k * step);
     });
     const count = times.length,
       all = times.map(parts),
@@ -164,10 +157,7 @@ function transforms(read: SceneRead): void {
       fixedTurn = still(turned, 4),
       fixedSize = still(sized, 3);
     if (fixedMove && fixedTurn && fixedSize) continue;
-    if (sheared)
-      read.soft(
-        `the transform of ${path} shears over time, which a node cannot hold; its nearest rotation and scale play`,
-      );
+    if (sheared) read.soft(`the transform of ${path} shears over time, which a node cannot hold; its nearest rotation and scale play`);
     const node = read.document.nodes![id],
       seconds = secondsOf(times);
     delete node.matrix;
@@ -199,8 +189,7 @@ function visibility(read: SceneRead, secondsOf: (times: number[]) => number[]): 
     const lists = [samplesOf(path)];
     // A reset leaves the transform behind, not the visibility: the node has lost the parents that would hide it.
     if (read.detached.has(path))
-      for (let at = path.lastIndexOf('/'); at > 0; at = path.lastIndexOf('/', at - 1))
-        lists.push(samplesOf(path.slice(0, at)));
+      for (let at = path.lastIndexOf('/'); at > 0; at = path.lastIndexOf('/', at - 1)) lists.push(samplesOf(path.slice(0, at)));
     const heard = lists.filter((list) => list !== undefined);
     if (!heard.length) continue;
     const times = [...new Set(heard.flatMap((list) => [...list.times]))].sort((a, b) => a - b),

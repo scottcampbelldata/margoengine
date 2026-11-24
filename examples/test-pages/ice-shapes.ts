@@ -19,14 +19,9 @@ function noise(x: number, y: number, z: number): number {
   const f = (t: number) => t * t * (3 - 2 * t);
   const lerp = (a: number, b: number, t: number) => a + (b - a) * f(t);
   const c = (a: number, b: number, d: number) => hash(i + a, j + b, k + d);
-  return lerp(
-    lerp(lerp(c(0, 0, 0), c(1, 0, 0), u), lerp(c(0, 1, 0), c(1, 1, 0), u), v),
-    lerp(lerp(c(0, 0, 1), c(1, 0, 1), u), lerp(c(0, 1, 1), c(1, 1, 1), u), v),
-    w,
-  );
+  return lerp(lerp(lerp(c(0, 0, 0), c(1, 0, 0), u), lerp(c(0, 1, 0), c(1, 1, 0), u), v), lerp(lerp(c(0, 0, 1), c(1, 0, 1), u), lerp(c(0, 1, 1), c(1, 1, 1), u), v), w);
 }
-const fbm = (x: number, y: number, z: number) =>
-  noise(x, y, z) * 0.55 + noise(x * 2.1, y * 2.1, z * 2.1) * 0.3 + noise(x * 4.3, y * 4.3, z * 4.3) * 0.15;
+const fbm = (x: number, y: number, z: number) => noise(x, y, z) * 0.55 + noise(x * 2.1, y * 2.1, z * 2.1) * 0.3 + noise(x * 4.3, y * 4.3, z * 4.3) * 0.15;
 /** Area-weighted vertex normals over the triangles, shared by every vertex at the same place (smooth across seams). */
 function renormal(g: Geometry): Geometry {
   const p = g.positions,

@@ -6,7 +6,7 @@
 // from the origin the equal test failed on most of the box, which then kept the camera's motion (none here) and smeared
 // in history (docs/known-bugs.md). The box moves along x with the camera still, so every box pixel must carry x motion.
 // Two cases: Box.glb through gltf/pbr, and a core mesh.
-//   node packages/taa/test/far-velocity-browser.mjs [--compat]
+//   node packages/taa/test/far-velocity-browser.mjs [--compat]  
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
@@ -24,7 +24,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-far-velocity/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5347, strictPort: true, watch: null, hmr: false },
+  server: { host: '127.0.0.1', port: 5347, strictPort: true, watch: null },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5347 });

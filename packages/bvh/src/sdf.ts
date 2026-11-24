@@ -113,9 +113,7 @@ export class MeshSDF {
     const [width, height, depthOrArrayLayers] = this.size,
       limit = device.limits.maxTextureDimension3D;
     if (Math.max(width, height, depthOrArrayLayers) > limit)
-      throw new RangeError(
-        `SDF size ${this.size.join(' x ')} is over this device's ${limit}; bake a lower resolution.`,
-      );
+      throw new RangeError(`SDF size ${this.size.join(' x ')} is over this device's ${limit}; bake a lower resolution.`);
     const texture = device.createTexture({
         label: 'bvh sdf',
         size: { width, height, depthOrArrayLayers },
@@ -171,8 +169,7 @@ interface Grid {
 function grid(bvh: MeshBVH, options: SDFOptions): Grid {
   const { resolution = 32, bounds, padding = 0.1, signed = true } = options,
     accuracy = windingAccuracy(options);
-  if (!(padding >= 0) || !Number.isFinite(padding))
-    throw new RangeError('Invalid padding; pass a finite share of at least 0.');
+  if (!(padding >= 0) || !Number.isFinite(padding)) throw new RangeError('Invalid padding; pass a finite share of at least 0.');
   const box = bvh.getBoundingBox(),
     longest = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1,
     min = [0, 1, 2].map((k) => (bounds ? bounds.min[k] : box.min[k] - padding * longest)) as MutableVec3,
@@ -186,11 +183,7 @@ function grid(bvh: MeshBVH, options: SDFOptions): Grid {
     if (!Number.isInteger(resolution) || resolution < 2 || resolution > 2048)
       throw new RangeError('Invalid SDF resolution; pass whole numbers from 2 to 2048.');
     const cell = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / (resolution - 1);
-    size = [0, 1, 2].map((k) => Math.max(Math.ceil((max[k] - min[k]) / cell - 1e-9) + 1, 2)) as [
-      number,
-      number,
-      number,
-    ];
+    size = [0, 1, 2].map((k) => Math.max(Math.ceil((max[k] - min[k]) / cell - 1e-9) + 1, 2)) as [number, number, number];
   } else size = [resolution[0], resolution[1], resolution[2]];
   if (!size.every((n) => Number.isInteger(n) && n >= 2 && n <= 2048))
     throw new RangeError('Invalid SDF resolution; pass whole numbers from 2 to 2048.');

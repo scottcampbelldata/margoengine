@@ -357,12 +357,7 @@ export interface VFXLit {
    * P / (4 pi (d^2 + r^2)) lights a particle as the sun at intensity pi lights it with 1,000 W/m^2, so smoke over a fire
    * is lit orange from below, by night with no other light. Default none.
    */
-  glow?: {
-    position: readonly [number, number, number];
-    power: number;
-    radius?: number;
-    color?: readonly [number, number, number];
-  };
+  glow?: { position: readonly [number, number, number]; power: number; radius?: number; color?: readonly [number, number, number] };
 }
 /**
  * Sub-emitters: a particle that dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
@@ -798,9 +793,7 @@ export class VFX implements EnginePlugin {
     }
     if (o.wind !== undefined) {
       if (typeof o.wind !== 'object' || o.wind === null || (!('sample' in o.wind) && !Array.isArray(o.wind)))
-        throw new TypeError(
-          'VFX wind must be [x, z] in m/s or an object with sample(x, y, z, t); check the wind option.',
-        );
+        throw new TypeError('VFX wind must be [x, z] in m/s or an object with sample(x, y, z, t); check the wind option.');
       if (!('sample' in o.wind)) windPair(o.wind, defaultPosition, 0);
     }
     finiteVector(o.position ?? defaultPosition, 3, 'Emitter position');
@@ -1061,38 +1054,36 @@ export class VFX implements EnginePlugin {
     // Until the route resolves, the layer runs the WebGPU kernels of every step on its CPU tier (a prewarm of 600 steps
     // took 95 s over the ember effects of one FireFront), so the steps of an effect with a prewarm wait for the route.
     if (loading) this.routeLoading = true;
-    loading
-      ?.then((compat) => {
-        if (this.particles !== particles) return;
-        this.route = {
-          kernels: new compat.SimulationRoute(
-            this.device!,
-            simulation,
-            this.capacity,
-            {
-              uniform: u,
-              particles,
-              alive: this.alive!,
-              indirect: this.indirect!,
-              visible: this.visible!,
-              events: this.runtimes.find((r) => r.eventList)?.eventList,
-            },
-            [
-              ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
-              ...(this.emitterRuntime?.entries ?? []),
-              ...computeEntries,
-            ],
-            this.owned,
-          ),
-          billboard: compat.countedBillboard,
-          binding: compat.COUNT_BINDING,
-        };
-        this.renders.clear();
-        this.renderGroups.clear();
-      })
-      .finally(() => {
-        if (this.particles === particles) this.routeLoading = false;
-      });
+    loading?.then((compat) => {
+      if (this.particles !== particles) return;
+      this.route = {
+        kernels: new compat.SimulationRoute(
+          this.device!,
+          simulation,
+          this.capacity,
+          {
+            uniform: u,
+            particles,
+            alive: this.alive!,
+            indirect: this.indirect!,
+            visible: this.visible!,
+            events: this.runtimes.find((r) => r.eventList)?.eventList,
+          },
+          [
+            ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
+            ...(this.emitterRuntime?.entries ?? []),
+            ...computeEntries,
+          ],
+          this.owned,
+        ),
+        billboard: compat.countedBillboard,
+        binding: compat.COUNT_BINDING,
+      };
+      this.renders.clear();
+      this.renderGroups.clear();
+    }).finally(() => {
+      if (this.particles === particles) this.routeLoading = false;
+    });
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({

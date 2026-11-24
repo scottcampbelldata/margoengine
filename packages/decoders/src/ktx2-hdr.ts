@@ -63,8 +63,7 @@ export class KTX2HDRDecoder extends KTX2Decoder {
     data: ArrayBuffer | ArrayBufferView,
     options: KTX2DecodeOptions & UploadTextureOptions = {},
   ): Promise<GPUTexture> {
-    if (!this.device)
-      throw new TypeError('KTX2HDRDecoder.createTexture needs a device; pass one in KTX2HDROptions.device');
+    if (!this.device) throw new TypeError('KTX2HDRDecoder.createTexture needs a device; pass one in KTX2HDROptions.device');
     if (this.hdrTarget === 'astc-hdr-4x4')
       throw deviceUnsupported('WebGPU has no ASTC HDR texture format; use the bc6h or rgba16float target to upload');
     const file = await this.decode(data, options);
@@ -111,9 +110,7 @@ export function toEnvironmentImage(file: TextureFile): HDREnvironmentImage {
   if (file.format !== 'rgba16float')
     throw new TypeError(`toEnvironmentImage needs rgba16float, not ${file.format}; decode with target: 'rgba16float'`);
   if (file.dimension !== '2d' && file.dimension !== 'cube')
-    throw new TypeError(
-      `toEnvironmentImage takes a 2D or cube file, not ${file.dimension}; re-encode each array layer as its own file`,
-    );
+    throw new TypeError(`toEnvironmentImage takes a 2D or cube file, not ${file.dimension}; re-encode each array layer as its own file`);
   const { data } = file.mipmaps[0],
     table = halfTable(),
     bits = new Uint16Array(data.slice().buffer),

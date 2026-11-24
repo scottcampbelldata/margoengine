@@ -18,9 +18,9 @@ const setup = (options) => {
   const effect = new VFX({ capacity: 32, rate: 0, ...options });
   h.engine.use(effect);
   const wind = () => {
-    const bits = new Uint32Array(h.resources.findLast((r) => r.size === 224 && !r.destroyed).data)[55];
-    return [bits, [half(bits & 0xffff), half(bits >>> 16)]];
-  };
+      const bits = new Uint32Array(h.resources.findLast((r) => r.size === 224 && !r.destroyed).data)[55];
+      return [bits, [half(bits & 0xffff), half(bits >>> 16)]];
+    };
   return { h, effect, wind };
 };
 

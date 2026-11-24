@@ -103,31 +103,16 @@ test('a curve polyline stays inside its tolerance, and a tighter tolerance costs
 });
 
 test('a straight curve needs only its knot points, and a sharp knot is kept', () => {
-  assert.equal(
-    tessellateNurbsCurve({ degree: 3, knots: [0, 0, 0, 0, 1, 1, 1, 1], points: [0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0] })
-      .length,
-    6,
-  );
+  assert.equal(tessellateNurbsCurve({ degree: 3, knots: [0, 0, 0, 0, 1, 1, 1, 1], points: [0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0] }).length, 6);
   const corner = tessellateNurbsCurve({ degree: 1, knots: [0, 0, 1, 2, 2], points: [0, 0, 0, 1, 0, 0, 1, 1, 0] });
   near(corner, [0, 0, 0, 1, 0, 0, 1, 1, 0]);
   // S-shaped on one span: its middle lies on the chord, and the quarter points still force a split.
-  const wave = tessellateNurbsCurve(
-    { degree: 3, knots: [0, 0, 0, 0, 1, 1, 1, 1], points: [0, 0, 0, 1, 2, 0, 2, -2, 0, 3, 0, 0] },
-    { tolerance: 0.01 },
-  );
+  const wave = tessellateNurbsCurve({ degree: 3, knots: [0, 0, 0, 0, 1, 1, 1, 1], points: [0, 0, 0, 1, 2, 0, 2, -2, 0, 3, 0, 0] }, { tolerance: 0.01 });
   assert.ok(wave.length / 3 > 4);
 });
 
 test('a bilinear patch evaluates and tessellates with an upward normal', () => {
-  const patch = {
-    degreeU: 1,
-    degreeV: 1,
-    knotsU: [0, 0, 1, 1],
-    knotsV: [0, 0, 1, 1],
-    countU: 2,
-    countV: 2,
-    points: [0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0],
-  };
+  const patch = { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], countU: 2, countV: 2, points: [0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0] };
   const { position, normal } = evaluateNurbsSurface(patch, 0.25, 0.5);
   near(position, [0.25, 0.5, 0]);
   near(normal, [0, 0, 1]);
@@ -158,10 +143,7 @@ test('a rational sphere is exact, with radial normals, poles included', () => {
   const mesh = tessellateNurbsSurface(s);
   for (let i = 0; i < mesh.positions.length; i += 3) {
     assert.ok(Math.abs(Math.hypot(mesh.positions[i], mesh.positions[i + 1], mesh.positions[i + 2]) - 1) < 1e-5);
-    assert.ok(
-      Math.abs(Math.hypot(mesh.normals[i], mesh.normals[i + 1], mesh.normals[i + 2]) - 1) < 1e-5,
-      'a pole has a normal too',
-    );
+    assert.ok(Math.abs(Math.hypot(mesh.normals[i], mesh.normals[i + 1], mesh.normals[i + 2]) - 1) < 1e-5, 'a pole has a normal too');
   }
 });
 
@@ -193,12 +175,7 @@ test('malformed data and limits are named errors', () => {
 test('the numbers are those of the one evaluator in @margoengine/geometry/nurbs', async () => {
   const { NurbsCurve, NurbsSurface } = await import('@margoengine/geometry/nurbs'),
     knots = [0, 0, 0, 1, 2, 2, 2],
-    net = [
-      [0, 0, 0],
-      [1, 2, 0],
-      [3, 2, 1],
-      [4, 0, 1],
-    ],
+    net = [[0, 0, 0], [1, 2, 0], [3, 2, 1], [4, 0, 1]],
     weights = [1, 2, 0.5, 1],
     curve = new NurbsCurve({ points: net, degree: 2, knots, weights }),
     surface = new NurbsSurface({
@@ -219,10 +196,6 @@ test('the numbers are those of the one evaluator in @margoengine/geometry/nurbs'
     };
   for (const t of [0, 0.3, 1, 1.7, 2])
     assert.deepEqual(evaluateNurbsCurve({ degree: 2, knots, points: net.flat(), weights }, t), curve.evaluate(t));
-  for (const [u, v] of [
-    [0, 0],
-    [0.25, 1.5],
-    [1, 2],
-  ])
+  for (const [u, v] of [[0, 0], [0.25, 1.5], [1, 2]])
     assert.deepEqual(evaluateNurbsSurface(data, u, v).position, surface.evaluate(u, v));
 });

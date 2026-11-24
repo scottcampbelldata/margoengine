@@ -14,8 +14,7 @@ struct Out { @location(0) colour: vec4f, @location(1) id: u32, @location(2) leve
 @fragment fn f(@location(0) c: vec4f) -> Out { return Out(c * 0.5, 7u, c.x + c.y, vec2i(2)); }
 @fragment fn g(@location(0) c: vec4f) -> @location(0) vec4f { return c * 0.5; }`;
 const fragment = (entryPoint) =>
-  translateWGSL({ vertex: { source: SOURCE, entryPoint: 'v' }, fragment: { source: SOURCE, entryPoint } }).fragment
-    .source;
+  translateWGSL({ vertex: { source: SOURCE, entryPoint: 'v' }, fragment: { source: SOURCE, entryPoint } }).fragment.source;
 
 test('every float fragment output is written through a select on gl_FragCoord.w; integer outputs are written straight', () => {
   const struct = fragment('f');

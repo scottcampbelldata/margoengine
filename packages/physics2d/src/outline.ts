@@ -76,21 +76,24 @@ function checkOptions(image: AlphaImage, options: TraceOptions): [number, number
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || !data)
     throw new TypeError('An outline needs an image with a whole width and height and RGBA data: ImageData fits.');
   if (data.length !== width * height * 4)
-    throw new RangeError(
-      `Image data holds ${data.length} values, not 4 per pixel of ${width} by ${height}; pass RGBA8.`,
-    );
+    throw new RangeError(`Image data holds ${data.length} values, not 4 per pixel of ${width} by ${height}; pass RGBA8.`);
   const { threshold = 128, tolerance = 1, minArea = 4, rect = [0, 0, width, height] } = options;
-  if (!(threshold >= 1 && threshold <= 255))
-    throw new RangeError('Outline threshold is out of range; pass an alpha from 1 to 255.');
+  if (!(threshold >= 1 && threshold <= 255)) throw new RangeError('Outline threshold is out of range; pass an alpha from 1 to 255.');
   if (!(tolerance >= 0) || !Number.isFinite(tolerance))
     throw new RangeError('Outline tolerance must be a finite number of pixels of at least 0.');
   if (!(minArea >= 0) || !Number.isFinite(minArea))
     throw new RangeError('Outline minArea must be a finite number of square pixels of at least 0.');
   const [x, y, w, h] = rect;
-  if (![x, y, w, h].every(Number.isInteger) || x < 0 || y < 0 || w < 1 || h < 1 || x + w > width || y + h > height)
-    throw new RangeError(
-      `Outline rect ${rect.join(', ')} is outside the ${width} by ${height} image; pass whole pixels inside it.`,
-    );
+  if (
+    ![x, y, w, h].every(Number.isInteger) ||
+    x < 0 ||
+    y < 0 ||
+    w < 1 ||
+    h < 1 ||
+    x + w > width ||
+    y + h > height
+  )
+    throw new RangeError(`Outline rect ${rect.join(', ')} is outside the ${width} by ${height} image; pass whole pixels inside it.`);
   return [x, y, w, h];
 }
 
@@ -119,8 +122,7 @@ function march(image: AlphaImage, area: readonly number[], threshold: number): V
         b = field[i + 1],
         c = field[i + columns + 1],
         d = field[i + columns],
-        code =
-          (a >= threshold ? 1 : 0) | (b >= threshold ? 2 : 0) | (c >= threshold ? 4 : 0) | (d >= threshold ? 8 : 0);
+        code = (a >= threshold ? 1 : 0) | (b >= threshold ? 2 : 0) | (c >= threshold ? 4 : 0) | (d >= threshold ? 8 : 0);
       if (code === 0 || code === 15) continue;
       const north = 2 * i,
         south = 2 * (i + columns),
@@ -362,8 +364,7 @@ export function outlineColliders(image: AlphaImage, options: OutlineColliderOpti
     if (edges)
       for (const loop of [outline.outer, ...outline.holes])
         out.push({ ...settings, shape: 'polyline', points: [...loop, loop[0]].map(place) });
-    else
-      for (const piece of convexPieces(outline)) out.push({ ...settings, shape: 'polygon', points: piece.map(place) });
+    else for (const piece of convexPieces(outline)) out.push({ ...settings, shape: 'polygon', points: piece.map(place) });
   }
   return out;
 }

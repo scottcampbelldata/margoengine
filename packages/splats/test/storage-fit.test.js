@@ -3,13 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import {
-  DEGREE3_SH_BYTES,
-  STORAGE_BINDING_BYTES,
-  fitDegree3Count,
-  readPlyPrefix,
-  writePlyPrefix,
-} from '../../../scripts/rival-splats-fit.mjs';
+import { DEGREE3_SH_BYTES, STORAGE_BINDING_BYTES, fitDegree3Count, readPlyPrefix, writePlyPrefix } from '../../../scripts/rival-splats-fit.mjs';
 
 test('degree-3 spherical harmonics fit 699050 splats in the WebGPU minimum binding', () => {
   assert.equal(DEGREE3_SH_BYTES, 192);
@@ -22,8 +16,7 @@ test('degree-3 spherical harmonics fit 699050 splats in the WebGPU minimum bindi
 test('a binary PLY prefix keeps the first vertices and rewrites the count', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'margo-splat-fit-'));
   try {
-    const header =
-      'ply\nformat binary_little_endian 1.0\nelement vertex 3\nproperty float x\nproperty float y\nend_header\n';
+    const header = 'ply\nformat binary_little_endian 1.0\nelement vertex 3\nproperty float x\nproperty float y\nend_header\n';
     const body = Buffer.alloc(3 * 8);
     for (let i = 0; i < 6; i++) body.writeFloatLE(i + 1, i * 4);
     const source = join(dir, 'in.ply');

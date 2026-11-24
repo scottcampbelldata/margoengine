@@ -79,10 +79,7 @@ test('a flash exposed over the shutter carries the same light at every frame rat
   // shutter, so the frame records it; sampling the curve at the frame instant would miss most of it.
   const short = 0.005;
   assert.ok(flashExposure(0.05, 1 / 60, short) < 1e-3, 'a frame whose shutter opened after the flash is dark');
-  assert.ok(
-    flashExposure(0.016, 1 / 60, short) > 5 * Math.exp(-0.016 / short),
-    'the shutter catches a flash that a point sample misses',
-  );
+  assert.ok(flashExposure(0.016, 1 / 60, short) > 5 * Math.exp(-0.016 / short), 'the shutter catches a flash that a point sample misses');
   assert.equal(flashExposure(-0.01, 1 / 60), 0);
   near(flashExposure(0.02, 0), Math.exp(-0.02 / FLASH_DURATION), 1e-15, 'a closed shutter samples');
 });
@@ -112,14 +109,7 @@ test('a thermal rises as the closed form s^4 = s0^4 + 3 B t^2 / (2 pi alpha^3)',
 
 test('in stable air the bank levels off at a height that scales as (B / N^2)^(1/4)', () => {
   const peak = (charge, n2) => {
-    const p = new PowderPuff({
-      charge,
-      muzzleVelocity: 490,
-      momentum: 0,
-      stability: n2,
-      duration: 3000,
-      entrainment: 0.25,
-    });
+    const p = new PowderPuff({ charge, muzzleVelocity: 490, momentum: 0, stability: n2, duration: 3000, entrainment: 0.25 });
     let best = 0;
     for (let t = 0; t <= 3000; t += 2) best = Math.max(best, p.at(t).rise + p.startRadius / 0.25);
     return { best, late: p.at(3000).rise, peak: best - p.startRadius / 0.25 };
@@ -174,19 +164,8 @@ const gun = { position: [0, 3, 0], direction: [1, 0, 0] };
 
 test('a battery fires on schedule: the flash, its light, the bank and the shot', () => {
   const { engine } = optionalGPU();
-  const clustered = {
-    maxLights: 64,
-    list: [],
-    setLights(l) {
-      this.list = l;
-    },
-  };
-  const b = Battery.attach(engine, {
-    guns: [gun, { ...gun, position: [0, 3, 10] }],
-    shots: [{ gun: 0, time: 0.5 }],
-    wind: [4, 0],
-    lights: clustered,
-  });
+  const clustered = { maxLights: 64, list: [], setLights(l) { this.list = l; } };
+  const b = Battery.attach(engine, { guns: [gun, { ...gun, position: [0, 3, 10] }], shots: [{ gun: 0, time: 0.5 }], wind: [4, 0], lights: clustered });
   b.broadside(2, 0.5, [1]);
   for (let i = 0; i < 15; i++) b.advanceTime(1 / 30);
   assert.equal(b.fired.length, 0);
@@ -243,11 +222,7 @@ test('the same frames give the same battery (a seek replays the same frame delta
     const b = Battery.attach(engine, { guns: [gun, { ...gun, position: [0, 3, 8] }], wind: [3, 1] });
     b.broadside(0.2, 0.3);
     for (const d of steps) b.advanceTime(d);
-    const out = {
-      fired: b.fired.map((s) => [s.time, ...s.drift]),
-      banks: b.clouds.clouds.map((c) => [...c.matrix, c.options.opacity]),
-      i: b.flashes.map((f) => f.options.intensity),
-    };
+    const out = { fired: b.fired.map((s) => [s.time, ...s.drift]), banks: b.clouds.clouds.map((c) => [...c.matrix, c.options.opacity]), i: b.flashes.map((f) => f.options.intensity) };
     b.dispose();
     return out;
   };
@@ -269,12 +244,7 @@ test('a burning hull grows, flames out of its ports at Law height and rides its 
   assert.ok(fire.heat > 5 * early, 'the fire spreads');
   const port = fire.flames().find((f) => f.kind === 'port');
   near(port.length - 0.7, ventFlameHeight(ventBurningRate(0.56, 0.7), 0.8, 0.7), 1e-9, 'Law height above the port top');
-  near(
-    fire.smokeColumns.reduce((s, c) => s + c.options.heat, 0),
-    0.7 * fire.heat,
-    1e-3 * fire.heat,
-    'smoke takes 0.7 of the heat',
-  );
+  near(fire.smokeColumns.reduce((s, c) => s + c.options.heat, 0), 0.7 * fire.heat, 1e-3 * fire.heat, 'smoke takes 0.7 of the heat');
   assert.deepEqual(fire.smokeColumns[0].options.color, smokeColor(0.35));
   const before = fire.flameVolumes[0].options.position;
   pose[12] = 40;

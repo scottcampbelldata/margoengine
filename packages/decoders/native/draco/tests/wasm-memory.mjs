@@ -4,12 +4,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const wasm =
-  process.argv[2] ?? new URL('../target/wasm32-unknown-unknown/release/margoengine_draco.wasm', import.meta.url);
-const {
-  instance: { exports: m },
-} = await WebAssembly.instantiate(readFileSync(wasm));
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const wasm = process.argv[2] ?? new URL('../target/wasm32-unknown-unknown/release/margoengine_draco.wasm', import.meta.url);
+const { instance: { exports: m } } = await WebAssembly.instantiate(readFileSync(wasm));
 const fixtures = JSON.parse(readFileSync(new URL('./fixtures/memory.json', import.meta.url)));
 for (let round = 0; round < 3; round++) {
   for (const fixture of fixtures) {
@@ -17,8 +14,7 @@ for (let round = 0; round < 3; round++) {
     assert.equal(hash(input), fixture.inputSha256);
     const ptr = m.draco_alloc(input.length);
     assert.ok(ptr);
-    let out = 0,
-      length = 0;
+    let out = 0, length = 0;
     try {
       new Uint8Array(m.memory.buffer, ptr, input.length).set(input);
       out = m.draco_decode(ptr, input.length, 16777216, 134217728, 268435456);

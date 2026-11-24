@@ -75,7 +75,6 @@ export function partsOf(argv) {
   if (!arg) return PARTS;
   const names = arg.slice('--part='.length).split(',');
   for (const name of names)
-    if (!PARTS.includes(name))
-      throw new TypeError(`Unknown corpus draw part '${name}'; the parts are ${PARTS.join(', ')}`);
+    if (!PARTS.includes(name)) throw new TypeError(`Unknown corpus draw part '${name}'; the parts are ${PARTS.join(', ')}`);
   return names;
 }

@@ -13,12 +13,7 @@ import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 async function iorModel(t, ior, values, interpolation) {
   const gpu = mockGPU(),
     engine = new Engine({ width: 64, height: 64, clientWidth: 64, clientHeight: 64 }, await TransformStore.create(64), {
-      backend: 'webgpu',
-      gpu: gpu.device,
-      add() {},
-      remove() {},
-      render() {},
-      dispose() {},
+      backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {},
     });
   t.after(() => engine.dispose());
   const input = animatedTriangle(),
@@ -29,26 +24,14 @@ async function iorModel(t, ior, values, interpolation) {
   input.buffers.push(data, Float32Array.from([0, 1]));
   input.doc.buffers.push({ byteLength: data.byteLength }, { byteLength: 8 });
   input.doc.bufferViews.push({ buffer: index, byteLength: data.byteLength }, { buffer: times, byteLength: 8 });
-  input.doc.accessors.push(
-    { bufferView: index, componentType: 5126, count: values.length, type: 'SCALAR' },
-    { bufferView: times, componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] },
-  );
-  input.doc.animations = [
-    {
-      samplers: [{ input: times, output: index, ...(interpolation ? { interpolation } : {}) }],
-      channels: [
-        {
-          sampler: 0,
-          target: {
-            path: 'pointer',
-            extensions: {
-              KHR_animation_pointer: { pointer: '/materials/0/extensions/KHR_materials_ior/ior' },
-            },
-          },
-        },
-      ],
-    },
-  ];
+  input.doc.accessors.push({ bufferView: index, componentType: 5126, count: values.length, type: 'SCALAR' },
+    { bufferView: times, componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] });
+  input.doc.animations = [{
+    samplers: [{ input: times, output: index, ...(interpolation ? { interpolation } : {}) }],
+    channels: [{ sampler: 0, target: { path: 'pointer', extensions: {
+      KHR_animation_pointer: { pointer: '/materials/0/extensions/KHR_materials_ior/ior' },
+    } } }],
+  }];
   const model = parseGLTF(engine, input.doc, input.buffers, [], { materials: extendedMaterials });
   return { model, material: model.primitives[0].material };
 }
@@ -72,17 +55,11 @@ test('an IOR pointer on a material whose JSON IOR is 0 is skipped; the mode stay
   }
 });
 
-for (const [ior, values] of [
-  [1.5, [1.5, 0]],
-  [1.5, [0.5, 1.5]],
-  [0, [0, 0]],
-])
+for (const [ior, values] of [[1.5, [1.5, 0]], [1.5, [0.5, 1.5]], [0, [0, 0]]])
   test(`an IOR sampler keying ${values} on a JSON IOR of ${ior} is refused`, async (t) => {
     const { model } = await iorModel(t, ior, values);
-    assert.throws(
-      () => new Animation(model, { pointers: pointerChannels, loop: false }),
-      (error) => error instanceof RangeError && /keys an IOR of 0?\.?5?.*1 or more/.test(error.message),
-    );
+    assert.throws(() => new Animation(model, { pointers: pointerChannels, loop: false }),
+      (error) => error instanceof RangeError && /keys an IOR of 0?\.?5?.*1 or more/.test(error.message));
   });
 
 test('a cubic IOR spline that dips below 1 between its keys writes 1, never the 0 mode', async (t) => {

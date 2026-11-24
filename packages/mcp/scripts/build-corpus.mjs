@@ -23,10 +23,6 @@ const porting = portingGuidesFromCorpus(corpus);
 if (!porting.length) throw new Error('mcp porting: no parity matrix page found in the docs corpus');
 await writeFile(resolve(dist, 'porting.json'), JSON.stringify(porting));
 for (const guide of porting)
-  console.log(
-    `mcp porting guide: ${guide.library}, ${guide.rows.length} rows, ${guide.sections.length} guide sections`,
-  );
+  console.log(`mcp porting guide: ${guide.library}, ${guide.rows.length} rows, ${guide.sections.length} guide sections`);
 await writeFile(resolve(dist, 'error-codes.json'), JSON.stringify(entries));
-console.log(
-  `mcp error help: ${entries.length} entries, ${entries.reduce((n, e) => n + e.messages.length, 0)} messages`,
-);
+console.log(`mcp error help: ${entries.length} entries, ${entries.reduce((n, e) => n + e.messages.length, 0)} messages`);

@@ -12,16 +12,7 @@ import { decodePNG } from '../../../tests/support/png.js';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 
-const cases = [
-    'image-srgb',
-    'image-linear',
-    'multiply',
-    'add-subtract',
-    'mix',
-    'weight',
-    'gltf-image',
-    'preview-image',
-  ],
+const cases = ['image-srgb', 'image-linear', 'multiply', 'add-subtract', 'mix', 'weight', 'gltf-image', 'preview-image'],
   compat = compatRun();
 const context = await openBrowser({ startPath: '/packages/loaders/tests/materialx-reference.html', port: 5291 }),
   { page } = context,
@@ -55,9 +46,7 @@ try {
         if (ours.data[k + c] > 8) lit++;
       }
     const mean = sum / count;
-    console.log(
-      `${name}${compat ? ' (compat)' : ''}: max ${max}, mean ${mean.toFixed(4)} of 255, lit ${((lit / count) * 100).toFixed(1)}%`,
-    );
+    console.log(`${name}${compat ? ' (compat)' : ''}: max ${max}, mean ${mean.toFixed(4)} of 255, lit ${(lit / count * 100).toFixed(1)}%`);
     // The picture is drawn (gltf_pbr defaults to metal, so its plane is the darkest: 50% of channels lit), and the
     // bake's picture differs from ours by the 8-bit sRGB rounding of a baked texel only: measured at most 1 code on
     // the A6000, natively and on the WebGL2 layer (2026-11-11).

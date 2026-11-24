@@ -40,31 +40,11 @@ test('Box3.getCenter: 0 on an axis with an infinite bound, the midpoint elsewher
 
 test('Box3.getBoundingSphere: radius Infinity and a finite centre for an unbounded box', () => {
   const cases = [
-    [
-      [-I, -I, -I],
-      [I, I, I],
-      [0, 0, 0],
-    ],
-    [
-      [-I, 10, -2],
-      [I, 20, 4],
-      [0, 15, 1],
-    ],
-    [
-      [1, -I, 3],
-      [3, -5, 5],
-      [2, 0, 4],
-    ],
-    [
-      [I, 0, 0],
-      [I, 2, 2],
-      [0, 1, 1],
-    ],
-    [
-      [0, 0, -I],
-      [2, 2, -I],
-      [1, 1, 0],
-    ],
+    [[-I, -I, -I], [I, I, I], [0, 0, 0]],
+    [[-I, 10, -2], [I, 20, 4], [0, 15, 1]],
+    [[1, -I, 3], [3, -5, 5], [2, 0, 4]],
+    [[I, 0, 0], [I, 2, 2], [0, 1, 1]],
+    [[0, 0, -I], [2, 2, -I], [1, 1, 0]],
   ];
   for (const [lo, hi, centre] of cases) {
     const s = { center: new Vector3(7, 7, 7), radius: 3 };

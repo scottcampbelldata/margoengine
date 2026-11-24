@@ -253,10 +253,7 @@ test('Unity mesh identity and hierarchy policy cannot silently lose or merge sou
     ],
   );
   // The suffix after `_` or `$` counts too, as Godot reads it (Godot 4 manual, node type customization).
-  for (const [name, collider] of [
-    ['Helper_convcol', 'convex'],
-    ['Helper$COL', 'concave'],
-  ]) {
+  for (const [name, collider] of [['Helper_convcol', 'convex'], ['Helper$COL', 'concave']]) {
     const renamed = await createUnityImportBundle(
       modify(glb, (j) => (j.nodes[1].name = name)),
       options(),

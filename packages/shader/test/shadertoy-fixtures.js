@@ -120,10 +120,7 @@ export const multiFixtures = [
 const float decay = 0.75;`,
     buffers: {
       A: {
-        channels: {
-          iChannel0: { kind: 'A', filter: 'linear', wrap: 'repeat' },
-          iChannel1: { kind: 'B', filter: 'nearest' },
-        },
+        channels: { iChannel0: { kind: 'A', filter: 'linear', wrap: 'repeat' }, iChannel1: { kind: 'B', filter: 'nearest' } },
         source: `void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 uv = fragCoord / iResolution.xy;
   vec4 last = texture(iChannel0, uv + vec2(0.25, -0.5) / iResolution.xy);
@@ -138,10 +135,7 @@ const float decay = 0.75;`,
 }`,
       },
       C: {
-        channels: {
-          iChannel0: { kind: 'A', filter: 'mipmap', wrap: 'repeat' },
-          iChannel1: { kind: 'B', filter: 'linear' },
-        },
+        channels: { iChannel0: { kind: 'A', filter: 'mipmap', wrap: 'repeat' }, iChannel1: { kind: 'B', filter: 'linear' } },
         source: `void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 uv = fragCoord / iResolution.xy;
   fragColor = 0.5 * texture(iChannel0, uv * 2.8) + 0.5 * vec4(texture(iChannel1, uv + 0.25 / iResolution.xy).rgb, 1.0);
@@ -157,12 +151,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
       },
     },
     image: {
-      channels: {
-        iChannel0: { kind: 'D', filter: 'linear' },
-        iChannel1: { kind: 'A', filter: 'nearest' },
-        iChannel2: { kind: 'B', filter: 'nearest' },
-        iChannel3: { kind: 'C', filter: 'mipmap' },
-      },
+      channels: { iChannel0: { kind: 'D', filter: 'linear' }, iChannel1: { kind: 'A', filter: 'nearest' }, iChannel2: { kind: 'B', filter: 'nearest' }, iChannel3: { kind: 'C', filter: 'mipmap' } },
       source: `void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 uv = fragCoord / iResolution.xy;
   vec4 c;
@@ -179,12 +168,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     name: 'keyboard, audio and a canvas as video',
     frames: 1,
     image: {
-      channels: {
-        iChannel0: { kind: 'keyboard', filter: 'nearest' },
-        iChannel1: { kind: 'audio', filter: 'linear' },
-        iChannel2: { kind: 'canvas', filter: 'linear' },
-        iChannel3: { kind: 'canvas', filter: 'mipmap' },
-      },
+      channels: { iChannel0: { kind: 'keyboard', filter: 'nearest' }, iChannel1: { kind: 'audio', filter: 'linear' }, iChannel2: { kind: 'canvas', filter: 'linear' }, iChannel3: { kind: 'canvas', filter: 'mipmap' } },
       source: `void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 uv = fragCoord / iResolution.xy;
   int cell = int(floor(uv.x * 4.0)) + 4 * int(floor(uv.y * 4.0));
@@ -268,11 +252,7 @@ export const cubeFixtures = [
 }`,
     },
     image: {
-      channels: {
-        iChannel0: { kind: 'cubeA', filter: 'mipmap' },
-        iChannel1: { kind: 'A', filter: 'linear' },
-        iChannel2: { kind: 'cubeA', filter: 'nearest' },
-      },
+      channels: { iChannel0: { kind: 'cubeA', filter: 'mipmap' }, iChannel1: { kind: 'A', filter: 'linear' }, iChannel2: { kind: 'cubeA', filter: 'nearest' } },
       source: `void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 uv = fragCoord / iResolution.xy;
   vec3 d = fixtureDir(fragCoord);

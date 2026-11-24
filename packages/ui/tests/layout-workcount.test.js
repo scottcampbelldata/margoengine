@@ -33,9 +33,7 @@ test('edits and exceptions cannot leave measurements in the next arrange', () =>
   size = 30;
   arrange(root, box);
   assert.equal(leaf.rect.width, 30);
-  leaf.measure = () => {
-    throw new Error('measure failed');
-  };
+  leaf.measure = () => { throw new Error('measure failed'); };
   assert.throws(() => arrange(root, box), /measure failed/);
   leaf.measure = () => ({ width: 40, height: 9 });
   arrange(root, box);

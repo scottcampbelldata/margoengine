@@ -61,9 +61,7 @@ export function splitSkinGrid(columns, rows) {
     scenes: [{ nodes: [0, 1] }],
     nodes: [{ mesh: 0, skin: 0 }, { children: [2] }, { translation: [1, 0, 0] }],
     meshes: [{ primitives: [primitive], weights: [0] }],
-    materials: [
-      { pbrMetallicRoughness: { baseColorFactor: [0.8, 0.6, 0.4, 1], metallicFactor: 0, roughnessFactor: 0.6 } },
-    ],
+    materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.8, 0.6, 0.4, 1], metallicFactor: 0, roughnessFactor: 0.6 } }],
     skins: [{ joints: [1, 2], inverseBindMatrices: inverseBind }],
     animations: [
       {
@@ -114,7 +112,8 @@ export function handSplit(grid, parts) {
 }
 
 /** The parts of a loaded model's split primitive as `handSplit` takes them. */
-export const partsOf = (model) => model.primitives.map((p) => ({ vertexMap: p.part.vertexMap, indices: p.indices }));
+export const partsOf = (model) =>
+  model.primitives.map((p) => ({ vertexMap: p.part.vertexMap, indices: p.indices }));
 
 /** One buffer per accessor, appended to `doc`'s (when given). */
 function documentBuilder(doc, data) {

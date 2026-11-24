@@ -594,14 +594,14 @@ export class LocalShadowMaps {
       key =
         (displacement?.key ?? '') +
         (p.stride +
-          (hashed ? 256 : 0) +
-          (transform ? 1 : 0) +
-          (inst ? 2 : 0) +
-          (lines ? 4 : 0) +
-          (displacement ? 8 : 0) +
-          (opacity ? 16 : 0) +
-          (solid ? 32 : 0) +
-          (animation ? 64 : 0));
+        (hashed ? 256 : 0) +
+        (transform ? 1 : 0) +
+        (inst ? 2 : 0) +
+        (lines ? 4 : 0) +
+        (displacement ? 8 : 0) +
+        (opacity ? 16 : 0) +
+        (solid ? 32 : 0) +
+        (animation ? 64 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const depth = depthShader(p.stride === 80, !!transform),

@@ -110,13 +110,7 @@ test('bad input is refused before any material changes', () => {
 // KB-OWN-LIGHTMAP1: a device restore gives the engine a new GPUDevice, and WebGPU objects are valid only with the
 // device that made them (W3C WebGPU, section 3.2.1). The model's extension kept the attach-time device's view and
 // sampler, so the model's restore bound them on the new device and failed validation. Each fake object names its device.
-globalThis.GPUTextureUsage ??= {
-  COPY_SRC: 1,
-  COPY_DST: 2,
-  TEXTURE_BINDING: 4,
-  STORAGE_BINDING: 8,
-  RENDER_ATTACHMENT: 16,
-};
+globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
 const fakeDevice = () => {
   const device = {
     limits: { maxTextureDimension2D: 8192 },
@@ -141,10 +135,7 @@ const fakeDevice = () => {
 };
 const fakeModel = (engine) => {
   const primitive = { material: { name: 'grey' } };
-  return {
-    primitive,
-    model: { disposed: false, root: { engine }, primitives: [primitive], onDispose: () => () => {} },
-  };
+  return { primitive, model: { disposed: false, root: { engine }, primitives: [primitive], onDispose: () => () => {} } };
 };
 
 test('a lit glTF PBR model binds its lightmap on the device drawing it, also after a device restore', () => {

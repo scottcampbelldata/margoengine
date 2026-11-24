@@ -264,8 +264,7 @@ export function parseLWO(input: BinaryInput, options: LWOOptions = {}): LWOModel
   if (top.id() !== 'FORM') throw new LoaderError(F, 'header', 'missing the FORM header');
   const end = Math.min(top.u32() + 8, bytes.length),
     form = top.id();
-  if (form !== 'LWO2' && form !== 'LWOB')
-    throw new LoaderError(F, 'header', `form type ${form.slice(0, 4)} is not LWO2 or LWOB`);
+  if (form !== 'LWO2' && form !== 'LWOB') throw new LoaderError(F, 'header', `form type ${form.slice(0, 4)} is not LWO2 or LWOB`);
   const version = form === 'LWO2' ? 2 : 1,
     layers: Layer[] = [],
     tags: string[] = [],

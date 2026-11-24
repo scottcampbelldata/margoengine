@@ -255,9 +255,7 @@ test('blended MToon queues draw across models by renderQueueOffsetNumber, then i
     data.doc.materials = offsets.map((renderQueueOffsetNumber) => ({
       alphaMode: renderQueueOffsetNumber === undefined ? 'OPAQUE' : 'BLEND',
       pbrMetallicRoughness: { baseColorFactor: [0.2, 0.5, 0.8, 0.5] },
-      extensions: {
-        VRMC_materials_mtoon: { specVersion: '1.0', renderQueueOffsetNumber: renderQueueOffsetNumber ?? 0 },
-      },
+      extensions: { VRMC_materials_mtoon: { specVersion: '1.0', renderQueueOffsetNumber: renderQueueOffsetNumber ?? 0 } },
     }));
     data.doc.meshes[0].primitives = offsets.map((_, material) => ({ ...primitive, material }));
     return parseGLTF(engine, data.doc, data.buffers, []);
@@ -360,11 +358,7 @@ test('MToon UV animation keeps 1/60 s steps after a day of running (audit p4 R22
         x: animated(v[24], v[23], 2, 1),
         y: animated(v[25], v[30], 2, 1),
         turns: animated(v[26], v[31], 1, 1),
-        cast: cast && [
-          animated(cast[0], cast[3], 2, 1),
-          animated(cast[1], cast[11], 2, 1),
-          animated(cast[2], cast[19], 1, 1),
-        ],
+        cast: cast && [animated(cast[0], cast[3], 2, 1), animated(cast[1], cast[11], 2, 1), animated(cast[2], cast[19], 1, 1)],
       });
     }
     for (let i = 1; i < frames.length; i++) {
@@ -401,8 +395,5 @@ test('MToon UV animation phases wrap scroll by 2 only where every map samples th
   const half = { index: 0, extensions: { KHR_texture_transform: { scale: [0.5, 2] } } };
   assert.equal(scrollWraps(half, [undefined, undefined], 0), false, 'a half scale');
   assert.equal(scrollWraps(half, [undefined, undefined], 1), true, 'a whole scale');
-  assert.equal(
-    scrollWraps({ index: 0 }, [undefined, undefined], 0, [{ value: 1, scale: [0.5, 1], offset: [0, 0] }]),
-    false,
-  );
+  assert.equal(scrollWraps({ index: 0 }, [undefined, undefined], 0, [{ value: 1, scale: [0.5, 1], offset: [0, 0] }]), false);
 });

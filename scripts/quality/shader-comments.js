@@ -26,8 +26,7 @@ export async function shaderCommentsGate({ root, packages }) {
     for (const file of distFiles(dist)) {
       const { comments, kept } = stripShaderLiterals(readFileSync(file, 'utf8'), file, { anchors });
       count += comments + kept.length;
-      if (comments + kept.length)
-        (where[pkg.name] ??= []).push(`${file.slice(root.length + 1)} (${comments + kept.length})`);
+      if (comments + kept.length) (where[pkg.name] ??= []).push(`${file.slice(root.length + 1)} (${comments + kept.length})`);
     }
     if (count) items[pkg.name] = count;
   }

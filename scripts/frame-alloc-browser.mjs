@@ -165,13 +165,7 @@ async function main() {
     // sources instead of their minified dist (diagnosis only: the check always measures the dist an app installs).
     // MARGO_COMPAT=1: the layer is built beside the page as compat.js and every scene draws on it, against the same
     // floors as native WebGPU (KB-COMPAT-FRAMEALLOC1).
-    build: {
-      outDir: out,
-      emptyOutDir: true,
-      target: 'es2022',
-      minify: !profile,
-      ...compatBuild(join(fixture, 'index.html')),
-    },
+    build: { outDir: out, emptyOutDir: true, target: 'es2022', minify: !profile, ...compatBuild(join(fixture, 'index.html')) },
     plugins: args.includes('--source') ? [sourcePackages()] : [],
   });
   assert.ok(existsSync(join(out, 'index.html')), `built ${page}`);

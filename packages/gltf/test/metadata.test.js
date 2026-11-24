@@ -247,11 +247,7 @@ test('a file requiring the extension loads: metadata never changes what is drawn
 test('structures keep their properties, and null reads as no value as in JSON-LD', () => {
   const { packets } = readGLTFMetadata(
     standIn({
-      '@context': {
-        dc,
-        stRef: 'http://ns.adobe.com/xap/1.0/sType/ResourceRef#',
-        xmpMM: 'http://ns.adobe.com/xap/1.0/mm/',
-      },
+      '@context': { dc, stRef: 'http://ns.adobe.com/xap/1.0/sType/ResourceRef#', xmpMM: 'http://ns.adobe.com/xap/1.0/mm/' },
       'xmpMM:DerivedFrom': { 'stRef:documentID': 'id', 'stRef:partial': null, 'stRef:count': 3, 'stRef:ok': true },
       'dc:creator': { '@list': ['A', null, 'B'] },
       'dc:title': null,

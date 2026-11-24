@@ -311,13 +311,8 @@ test('view shows the totals and the newest hitch in the panel until dispose', (t
 test('trackNext sees compiles made before the tracker joins the engine, and leaves the adapter as it found it', async (t) => {
   const saved = globalThis.GPUAdapter;
   t.after(() => (globalThis.GPUAdapter = saved));
-  const device = {
-    createShaderModule: () => ({}),
-    createRenderPipeline: () => ({}),
-    createComputePipeline: () => ({}),
-    createRenderPipelineAsync: async () => ({}),
-    createComputePipelineAsync: async () => ({}),
-  };
+  const device = { createShaderModule: () => ({}), createRenderPipeline: () => ({}), createComputePipeline: () => ({}),
+    createRenderPipelineAsync: async () => ({}), createComputePipelineAsync: async () => ({}) };
   class Adapter {
     async requestDevice() {
       return device;

@@ -92,8 +92,7 @@ test('a real uncompressed glTF from the godot-gsplat sample reads opacity and li
   assert.equal(data.positions.length, 3);
   // lin_rec709_display: colour is 0.5 + C0 x SH, with no sRGB decode. Float32 of the colour: 2^-24 at 1.
   const sh = attribute('SH_DEGREE_0_COEF_0');
-  for (let c = 0; c < 3; c++)
-    assert.ok(Math.abs(data.colors[c] - Math.min(1, Math.max(0, 0.5 + C0 * sh[c]))) < 2 ** -23);
+  for (let c = 0; c < 3; c++) assert.ok(Math.abs(data.colors[c] - Math.min(1, Math.max(0, 0.5 + C0 * sh[c]))) < 2 ** -23);
   assert.equal(data.colors[3], attribute('OPACITY')[0]);
 });
 

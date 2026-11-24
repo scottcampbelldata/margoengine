@@ -6,16 +6,13 @@ const image = () => ({ width: 16, height: 8, data: new Uint8Array(16 * 8 * 4).fi
 
 export async function fixtures(load = (entry) => import(entry)) {
   const { LayerCompositor } = await load('../dist/index.js');
-  return [false, true].map((factory) => ({
-    name: 'LayerCompositor' + (factory ? '.attach' : ''),
-    create({ engine }) {
-      const options = { camera: { width: 16, height: 8 }, name: 'owner-pixel' };
-      const plugin = factory ? LayerCompositor.attach(engine, options) : new LayerCompositor(options);
-      if (!factory) engine.use(plugin);
-      const layer = plugin.addLayer({ anchor: 'world' });
-      layer.write(image());
-      layer.visible = false;
-      return { plugin, dispose: () => plugin.dispose() };
-    },
-  }));
+  return [false, true].map((factory) => ({ name: 'LayerCompositor' + (factory ? '.attach' : ''), create({ engine }) {
+    const options = { camera: { width: 16, height: 8 }, name: 'owner-pixel' };
+    const plugin = factory ? LayerCompositor.attach(engine, options) : new LayerCompositor(options);
+    if (!factory) engine.use(plugin);
+    const layer = plugin.addLayer({ anchor: 'world' });
+    layer.write(image());
+    layer.visible = false;
+    return { plugin, dispose: () => plugin.dispose() };
+  } }));
 }

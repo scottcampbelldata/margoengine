@@ -193,7 +193,8 @@ fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f3
     declarations,
     ...(scatter
       ? {
-          direct: 'direct+=materialScatterLobe(i,s)*clamp(dot(s.n,l),0.0,1.0)/3.14159265*f.radiance.rgb*f.light.w;',
+          direct:
+            'direct+=materialScatterLobe(i,s)*clamp(dot(s.n,l),0.0,1.0)/3.14159265*f.radiance.rgb*f.light.w;',
           ambient:
             'materialAmbient+=materialScatterLobe(i,s)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;',
         }

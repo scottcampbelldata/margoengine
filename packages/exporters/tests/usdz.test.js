@@ -521,16 +521,10 @@ test('exportUSDZ takes GLB bytes, so a textured file with no clip has a way in',
     archive = exportUSDZ(glb),
     names = readZipDirectory(archive).map(({ name }) => name),
     text = await usda(archive);
-  assert.ok(
-    names.some((name) => /\.(png|jpe?g)$/.test(name)),
-    'the texture travels with the file',
-  );
+  assert.ok(names.some((name) => /\.(png|jpe?g)$/.test(name)), 'the texture travels with the file');
   assert.match(text, /UsdUVTexture/);
   const { size, skipped } = measureUSDZ(glb);
-  assert.deepEqual(
-    size.map((value) => Math.round(value * 1e6) / 1e6),
-    [1, 1, 1],
-  );
+  assert.deepEqual(size.map((value) => Math.round(value * 1e6) / 1e6), [1, 1, 1]);
   assert.deepEqual(skipped, []);
   assert.throws(() => exportUSDZ(new Uint8Array(40)), TypeError);
 });
@@ -547,15 +541,9 @@ test('a paint-only material is left out, so Quick Look draws the vertex colours 
     painted = await usda(exportUSDZ({ nodes: [{ geometry, material: { color: [1, 1, 1, 1] } }] }));
   assert.doesNotMatch(painted, /def Material|material:binding|MaterialBindingAPI|UsdPrimvarReader/);
   assert.match(painted, /def Mesh "Mesh_0" \{/);
-  assert.match(
-    painted,
-    /primvars:displayColor = \[\(1, 0, 0\), \(0, 1, 0\), \(0, 0, 1\)\] \(interpolation = "vertex"\)/,
-  );
+  assert.match(painted, /primvars:displayColor = \[\(1, 0, 0\), \(0, 1, 0\), \(0, 0, 1\)\] \(interpolation = "vertex"\)/);
   const read = await readUSD(exportUSDZ({ nodes: [{ geometry, material: { color: [1, 1, 1, 1] } }] }));
-  assert.deepEqual(
-    [...read.meshes[0].colors].filter((_, i) => i % 4 !== 3),
-    [1, 0, 0, 0, 1, 0, 0, 0, 1],
-  );
+  assert.deepEqual([...read.meshes[0].colors].filter((_, i) => i % 4 !== 3), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
   // A material that says more than the paint keeps its binding and reads the colours through a primvar reader.
   for (const material of [
     { color: [1, 1, 1, 1], roughness: 0.5 },
@@ -569,8 +557,5 @@ test('a paint-only material is left out, so Quick Look draws the vertex colours 
   }
   // Without vertex colours a plain material is still written and bound.
   const { colors, colorSize, ...plain } = geometry;
-  assert.match(
-    await usda(exportUSDZ({ nodes: [{ geometry: plain, material: { color: [1, 1, 1, 1] } }] })),
-    /material:binding/,
-  );
+  assert.match(await usda(exportUSDZ({ nodes: [{ geometry: plain, material: { color: [1, 1, 1, 1] } }] })), /material:binding/);
 });

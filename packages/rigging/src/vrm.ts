@@ -130,10 +130,7 @@ export interface VRMAvatar {
     [field: string]: unknown;
   };
   lookAt?: VRMLookAtData;
-  firstPerson?: {
-    meshAnnotations?: { node: number; type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly' }[];
-    [field: string]: unknown;
-  };
+  firstPerson?: { meshAnnotations?: { node: number; type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly' }[]; [field: string]: unknown };
   /** `VRMC_springBone`. */
   springBone?: VRMSpringBoneData;
   [field: string]: unknown;

@@ -75,8 +75,7 @@ export function renderJXL(module: JXLModule, bytes: Uint8Array, maxPixels = 2 **
     profile = readICCProfile(render.iccProfile);
     png = render.encodeToPng();
   } catch (error) {
-    if ((error instanceof Error && error.name === 'MargoError') || error instanceof WebAssembly.RuntimeError)
-      throw error;
+    if ((error instanceof Error && error.name === 'MargoError') || error instanceof WebAssembly.RuntimeError) throw error;
     throw decodeFailed(`JPEG XL: ${String(error)}; check the file, and convert CMYK images to RGB first`, error);
   } finally {
     image.free();

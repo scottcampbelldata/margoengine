@@ -4,11 +4,7 @@ import type { MountainValley, MountainValleyOptions, MountainValleySettings } fr
 
 /** Set by the valley entry: checks the options and builds the valley with its height function. */
 export const mountainValleyHook: {
-  settings?: (
-    options: MountainValleyOptions,
-    size: readonly [number, number],
-    alone?: boolean,
-  ) => MountainValleySettings;
+  settings?: (options: MountainValleyOptions, size: readonly [number, number], alone?: boolean) => MountainValleySettings;
   build?: (
     settings: MountainValleySettings,
     seed: number,

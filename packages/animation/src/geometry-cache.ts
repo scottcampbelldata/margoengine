@@ -222,16 +222,16 @@ export async function* readGeometryCache(
           indices = h.getUint32(20, true),
           flags = h.getUint32(24, true),
           want =
-            indices * 4 + (flags & HAS_UVS ? vertices * 8 : 0) + frames * vertices * (flags & HAS_NORMALS ? 24 : 12);
+            indices * 4 +
+            (flags & HAS_UVS ? vertices * 8 : 0) +
+            frames * vertices * (flags & HAS_NORMALS ? 24 : 12);
         if (h.getUint32(0, true) !== CHUNK_MAGIC) throw bad('has a damaged chunk header');
         if (!frames || vertices < 3 || vertices > 1_000_000 || indices % 3)
           throw bad('has a chunk with no frames, a broken triangle list, or not 3 to 1,000,000 vertices');
         if (h.getUint32(8, true) !== next) throw bad(`skips from frame ${next} to ${h.getUint32(8, true)}`);
         if (h.getUint32(4, true) !== want) throw bad('has a chunk of the wrong size');
         if (want > maxChunkBytes)
-          throw new RangeError(
-            `Geometry chunk of ${want} bytes is over maxChunkBytes; raise it or export smaller chunks`,
-          );
+          throw new RangeError(`Geometry chunk of ${want} bytes is over maxChunkBytes; raise it or export smaller chunks`);
         header = h;
       }
       const size = header.getUint32(4, true);
@@ -349,8 +349,7 @@ export interface GeometryCacheStats {
 }
 
 let serial = 0;
-const sameArray = (a: Uint32Array, b: Uint32Array) =>
-  a === b || (a.length === b.length && a.every((v, i) => v === b[i]));
+const sameArray = (a: Uint32Array, b: Uint32Array) => a === b || (a.length === b.length && a.every((v, i) => v === b[i]));
 
 /**
  * Plays a geometry cache on a mesh of its own (`player.model`), reading chunks only as far ahead as `ahead`. The clock
@@ -403,25 +402,15 @@ export class GeometryCachePlayer implements EnginePlugin {
   ): Promise<GeometryCachePlayer> {
     const { ahead = 2, speed = 1, signal, maxChunkBytes } = options;
     if (!Number.isInteger(ahead) || ahead < 1 || !Number.isFinite(speed) || speed < 0)
-      throw new RangeError(
-        'Invalid geometry cache options; ahead must be a whole number >= 1 and speed a finite number >= 0',
-      );
+      throw new RangeError('Invalid geometry cache options; ahead must be a whole number >= 1 and speed a finite number >= 0');
     if (!(engine as Engine).gpu)
-      throw new MargoError(
-        'unsupported',
-        'GeometryCachePlayer needs WebGPU; create the engine with the webgpu backend',
-      );
+      throw new MargoError('unsupported', 'GeometryCachePlayer needs WebGPU; create the engine with the webgpu backend');
     const abort = new AbortController(),
       stop = () => abort.abort(signal!.reason);
     const runtime = engine as Engine;
     let scene!: Scene;
     // Snapshot the active registry before reading yields, without adding a core API.
-    const scope: EnginePlugin = {
-      name: 'geometry-cache:load:' + serial++,
-      setup() {
-        scene = runtime.sceneOf(scope)!;
-      },
-    };
+    const scope: EnginePlugin = { name: 'geometry-cache:load:' + serial++, setup() { scene = runtime.sceneOf(scope)!; } };
     while (runtime.plugins.has(scope.name)) scope.name += ':';
     runtime.use(scope);
     scene.removePlugin(scope.name);
@@ -439,17 +428,11 @@ export class GeometryCachePlayer implements EnginePlugin {
         source instanceof URL ||
         source instanceof Uint8Array;
       let player!: GeometryCachePlayer;
-      const create: EnginePlugin = {
-        name: scope.name,
-        setup() {
-          player = new GeometryCachePlayer(runtime, first.value, iterator, open, abort, options, rewinds, unlisten);
-        },
-      };
-      try {
-        scene.use(create);
-      } finally {
-        if (scene.plugins.get(create.name) === create) scene.removePlugin(create.name);
-      }
+      const create: EnginePlugin = { name: scope.name, setup() {
+        player = new GeometryCachePlayer(runtime, first.value, iterator, open, abort, options, rewinds, unlisten);
+      } };
+      try { scene.use(create); }
+      finally { if (scene.plugins.get(create.name) === create) scene.removePlugin(create.name); }
       return player;
     } catch (error) {
       unlisten();

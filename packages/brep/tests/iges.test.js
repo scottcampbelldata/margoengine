@@ -213,7 +213,7 @@ const TU = [0, 1, 3],
 function exactArea() {
   const g = [
       [0.1834346424956498, 0.362683783378362],
-      [0.525532409916329, 0.3137066458778873],
+      [0.5255324099163290, 0.3137066458778873],
       [0.7966664774136267, 0.2223810344533745],
       [0.9602898564975363, 0.1012285362903763],
     ].flatMap(([x, w]) => [
@@ -266,8 +266,7 @@ test('IGES: a parametric spline surface (114) whose patches part on a shared edg
   spline114(m, TU, TV, XYZ, { patch: (i, j, c) => i === 1 && j === 1 && (c[32] += 0.5) });
   assert.throws(() => igesToSTEP(writeIGES(m.list)), {
     name: 'TypeError',
-    message:
-      /entity 1 \(type 114\) left out: entity 1 \(type 114\): neighbouring patches are 0\.5 mm apart on their shared edge/,
+    message: /entity 1 \(type 114\) left out: entity 1 \(type 114\): neighbouring patches are 0\.5 mm apart on their shared edge/,
   });
   const n = model();
   spline114(n, TU, TV, XYZ, { patch: (i, j, c) => i === 1 && j === 1 && (c[32] += 0.5) });

@@ -45,7 +45,5 @@ for (const radius of [0.5, 1, 2]) {
   for (let i = 0; i < positions.length; i += 2)
     for (let j = i + 2; j < positions.length; j += 2)
       min = Math.min(min, Math.hypot(positions[i] - positions[j], positions[i + 1] - positions[j + 1]));
-  console.log(
-    JSON.stringify({ case: `poisson-r${radius}`, points: positions.length / 2, attempts, minSpacing: min, radius }),
-  );
+  console.log(JSON.stringify({ case: `poisson-r${radius}`, points: positions.length / 2, attempts, minSpacing: min, radius }));
 }

@@ -84,12 +84,7 @@ test('IBL furnace residual decomposes into noise, visibility, BSDF model, multip
   assert.equal(d.frozenDirect.linearSha256, b.rows.direct.linearSha256);
   assert.equal(d.frozenDirect.native.absolute, b.rows.direct.metrics.absolute);
   assert.equal(d.compat.hardware.webgpu.vendor, 'margo-webgl2');
-  const names = [
-    'principled-direct-1024',
-    'principled-unoccluded-1024',
-    'gltf-unoccluded-1024',
-    'split-model-unoccluded-1024',
-  ];
+  const names = ['principled-direct-1024', 'principled-unoccluded-1024', 'gltf-unoccluded-1024', 'split-model-unoccluded-1024'];
   assert.deepEqual(Object.keys(d.references), names);
   for (const [i, name] of names.entries()) {
     const meta = d.references[name].meta;

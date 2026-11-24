@@ -420,7 +420,7 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
   };
   out.views = merge(
     ofScript('scripts/test-views-browser.mjs'),
-    ...['split-screen', 'minimap', 'hud-preview'].map((id) => out[`visual/${id}`]),
+    ...['split-screen', 'minimap'].map((id) => out[`visual/${id}`]),
   );
   out.depth = ofScript('scripts/test-depth-browser.mjs');
   out['no-webgpu'] = ofScript('scripts/test-no-webgpu-browser.mjs');

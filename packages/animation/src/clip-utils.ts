@@ -41,11 +41,7 @@ function cut(track: AnyTrack, start: number, end: number, fps: number): Keyframe
     last = times.length - 1,
     keys: Keyframe[] = [];
   const sample = (time: number, interpolation: KeyInterpolation) =>
-    keys.push({
-      time: time - start,
-      value: Array.from(sampleKeyframes(track, time).subarray(0, width)),
-      interpolation,
-    });
+    keys.push({ time: time - start, value: Array.from(sampleKeyframes(track, time).subarray(0, width)), interpolation });
   const copy = (k: number, interpolation = interpolations[k]) => {
     const key: Keyframe = {
       time: times[k] - start,
@@ -209,18 +205,12 @@ export function applyAdditiveClip(clip: KeyframeClip, skeleton: Skeleton, time: 
       pose = skeleton.getPose(bone),
       value = sampleKeyframes(track, time);
     if (track.path === 'translation')
-      skeleton.setPose(bone, {
-        translation: pose.translation.map((v, c) => v + value[c] * weight) as typeof pose.translation,
-      });
+      skeleton.setPose(bone, { translation: pose.translation.map((v, c) => v + value[c] * weight) as typeof pose.translation });
     else if (track.path === 'scale')
-      skeleton.setPose(bone, {
-        scale: pose.scale.map((v, c) => v * (1 + (value[c] - 1) * weight)) as typeof pose.scale,
-      });
+      skeleton.setPose(bone, { scale: pose.scale.map((v, c) => v * (1 + (value[c] - 1) * weight)) as typeof pose.scale });
     else {
       const turn = interpolateQuaternions([0, 0, 0, 1], value, weight, 0.9995);
-      skeleton.setPose(bone, {
-        rotation: Array.from(multiplyQuaternions(pose.rotation, turn)) as typeof pose.rotation,
-      });
+      skeleton.setPose(bone, { rotation: Array.from(multiplyQuaternions(pose.rotation, turn)) as typeof pose.rotation });
     }
   }
 }

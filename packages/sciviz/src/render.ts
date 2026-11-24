@@ -8,7 +8,6 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView, viewRect, viewSize } from '../../shared/view-rect.js';
 import { fault, rangeError } from '../../shared/errors.js';
-import { inSceneOf } from './scene-owner.js';
 import { VolumeDepthCapture, VolumeDepthSnapshot } from './volume-depth.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; VERTEX: number; INDIRECT: number };
@@ -80,15 +79,9 @@ export class SciRenderer implements EnginePlugin {
    */
   exportScale: number | undefined;
   /** @internal Optional CPU extractor, installed only by sciviz/fallback. */
-  cpuIsosurface?: (
-    data: Float32Array,
-    level: number,
-    options: {
-      dims: readonly [number, number, number];
-      maxTriangles: number;
-      signal: AbortSignal;
-    },
-  ) => Promise<{ vertices: Float32Array; triangles: number }>;
+  cpuIsosurface?: (data: Float32Array, level: number, options: {
+    dims: readonly [number, number, number]; maxTriangles: number; signal: AbortSignal;
+  }) => Promise<{ vertices: Float32Array; triangles: number }>;
   /** Plugin name, unique per renderer. */
   readonly name = `sciviz:${serial++}`;
   /** Frame-graph order: after the scene (0), before points (10) and fat lines (20). */
@@ -214,9 +207,7 @@ export class SciRenderer implements EnginePlugin {
   add(drawable: Drawable): void {
     this.#drawables.add(drawable);
     if (drawable.needsSceneDepth && this.#engine && this.device) {
-      this.#depthCapture ??= inSceneOf(this.#engine, this, () =>
-        VolumeDepthCapture.attach(this.#engine as Engine, this),
-      );
+      this.#depthCapture ??= VolumeDepthCapture.attach(this.#engine);
       this.#depthCapture.members.add(drawable);
     }
   }
@@ -335,12 +326,7 @@ export class SciRenderer implements EnginePlugin {
     this.#pipelines.clear();
     const engine = this.#engine;
     this.#engine = undefined;
-    if (engine && this.#depthCapture) VolumeDepthCapture.release(engine, this.#depthCapture);
-    this.#depthCapture = undefined;
-    // Leave the scene the renderer joined, not whichever scene is active now (none, once the scene is disposing it).
-    const scene = engine?.sceneOf(this);
-    if (scene) engine?.removePlugin(this.name, scene);
-    else engine?.removePlugin(this.name);
+    engine?.removePlugin(this.name);
   }
 
   /** Same as `dispose()`, for `using`. */

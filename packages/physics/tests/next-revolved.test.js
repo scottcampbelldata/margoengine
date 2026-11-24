@@ -92,12 +92,7 @@ test('a cylinder and a cone weigh what Rapier says, with the centre and inertia 
       theirs = [...b.principalInertia].sort((x, y) => x - y);
     for (let k = 0; k < 3; k++) near(ours[k], theirs[k], 1e-5 * theirs[2], `${colliders.shape} principal moment ${k}`);
     // A mass given: the density follows from the volume, as on Rapier.
-    near(
-      own.addBody(null, { colliders: { ...colliders, density: undefined, mass: 7 } }).mass,
-      7,
-      7e-6,
-      `${colliders.shape} mass option`,
-    );
+    near(own.addBody(null, { colliders: { ...colliders, density: undefined, mass: 7 } }).mass, 7, 7e-6, `${colliders.shape} mass option`);
   }
   own.dispose();
   rapier.dispose();
@@ -114,25 +109,12 @@ test('a round cylinder or cone weighs its border too, where Rapier weighs only i
   ]) {
     const colliders = { shape, radius, halfHeight, borderRadius },
       rounded = roundedVolume(shape === 'cone', radius, halfHeight, borderRadius),
-      core =
-        shape === 'cone'
-          ? (Math.PI * radius * radius * 2 * halfHeight) / 3
-          : Math.PI * radius * radius * 2 * halfHeight;
-    near(
-      own.addBody(null, { colliders }).mass,
-      rounded,
-      2e-4 * rounded,
-      `${shape} ${borderRadius}: the rounded solid's volume`,
-    );
+      core = shape === 'cone' ? (Math.PI * radius * radius * 2 * halfHeight) / 3 : Math.PI * radius * radius * 2 * halfHeight;
+    near(own.addBody(null, { colliders }).mass, rounded, 2e-4 * rounded, `${shape} ${borderRadius}: the rounded solid's volume`);
     // Rapier's figure, pinned so a change in it shows: the core's alone (docs/rapier-parity.md, S-10).
     near(rapier.addBody(null, { colliders }).mass, core, 1e-5 * core, `${shape} ${borderRadius}: Rapier's mass`);
     // The entry's volume for a given mass is the kernel's to the last bits that matter.
-    near(
-      own.addBody(null, { colliders: { ...colliders, mass: 5 } }).mass,
-      5,
-      5e-6,
-      `${shape} ${borderRadius}: mass option`,
-    );
+    near(own.addBody(null, { colliders: { ...colliders, mass: 5 } }).mass, 5, 5e-6, `${shape} ${borderRadius}: mass option`);
   }
   own.dispose();
   rapier.dispose();
@@ -259,8 +241,7 @@ function closest(s) {
     [a, b, c, d] = s,
     parts = [-volume(b, c, d), volume(a, c, d), -volume(a, b, d), volume(a, b, c)],
     whole = parts[0] + parts[1] + parts[2] + parts[3];
-  if (parts.every((part) => (part > 0 && whole > 0) || (part < 0 && whole < 0)))
-    return { point: [0, 0, 0], kept: [0, 1, 2, 3] };
+  if (parts.every((part) => (part > 0 && whole > 0) || (part < 0 && whole < 0))) return { point: [0, 0, 0], kept: [0, 1, 2, 3] };
   let best = null;
   for (const face of [
     [1, 2, 3],
@@ -269,8 +250,7 @@ function closest(s) {
     [0, 1, 2],
   ]) {
     const found = closest(face.map((k) => s[k]));
-    if (!best || dot(found.point, found.point) < dot(best.point, best.point))
-      best = { point: found.point, kept: found.kept.map((m) => face[m]) };
+    if (!best || dot(found.point, found.point) < dot(best.point, best.point)) best = { point: found.point, kept: found.kept.map((m) => face[m]) };
   }
   return best;
 }
@@ -366,8 +346,7 @@ const scene = (physics) => {
   return bodies;
 };
 /** The support of scene body `index` where the solver put it. */
-const supportOfBody = (bodies, index) =>
-  supportOf(revolvedShapes[index % revolvedShapes.length], bodies[index].position, bodies[index].rotation);
+const supportOfBody = (bodies, index) => supportOf(revolvedShapes[index % revolvedShapes.length], bodies[index].position, bodies[index].rotation);
 
 test('a ray meets a cylinder or cone where the exact surface is, closer than Rapier, on the body Rapier names', () => {
   const own = new Physics(null),
@@ -419,10 +398,7 @@ test('a ray meets a cylinder or cone where the exact surface is, closer than Rap
     }
   }
   assert.ok(hits > 150, `too few hits on cylinders and cones to mean anything: ${hits}`);
-  assert.ok(
-    worst.own[0] <= worst.rapier[0] && worst.own[1] <= worst.rapier[1],
-    `own ${worst.own}, Rapier ${worst.rapier}`,
-  );
+  assert.ok(worst.own[0] <= worst.rapier[0] && worst.own[1] <= worst.rapier[1], `own ${worst.own}, Rapier ${worst.rapier}`);
   own.dispose();
   rapier.dispose();
 });
@@ -433,9 +409,7 @@ test('a cylinder or cone cast stops at the exact first touch, as close as Rapier
     ownBodies = scene(own),
     rapierBodies = scene(rapier),
     next = random(9),
-    queries = revolvedShapes
-      .slice(0, 4)
-      .map((shape) => ({ ...shape, radius: shape.radius * 0.6, halfHeight: shape.halfHeight * 0.6 })),
+    queries = revolvedShapes.slice(0, 4).map((shape) => ({ ...shape, radius: shape.radius * 0.6, halfHeight: shape.halfHeight * 0.6 })),
     worst = { own: 0, rapier: 0 };
   let hits = 0;
   for (let i = 0; i < 600; i++) {
@@ -457,9 +431,7 @@ test('a cylinder or cone cast stops at the exact first touch, as close as Rapier
     const body = supportOfBody(ownBodies, index),
       at = (t) => gap(supportOf(shape, add(from, scale(unit, t)), rotation), body),
       // A time just past either touch where the shapes overlap in f64; none for a graze, where the gap left is the measure.
-      inside = [mine.distance, theirs.distance]
-        .flatMap((t) => Array.from({ length: 30 }, (_, k) => t + 1e-8 * 2 ** k))
-        .find((t) => at(t) === 0),
+      inside = [mine.distance, theirs.distance].flatMap((t) => Array.from({ length: 30 }, (_, k) => t + 1e-8 * 2 ** k)).find((t) => at(t) === 0),
       exact = inside === undefined ? null : touchBefore(at, inside);
     for (const [who, hit] of [
       ['own', mine],
@@ -468,8 +440,7 @@ test('a cylinder or cone cast stops at the exact first touch, as close as Rapier
       // Short of the touch, the gap left; past it, how deep.
       const off = exact === null || hit.distance <= exact ? at(hit.distance) : hit.distance - exact;
       worst[who] = Math.max(worst[who], off);
-      if (who === 'own')
-        assert.ok(off < 1e-5, `cast ${i} on the ${shape.shape}: ${hit.distance}, ${off} off the touch at ${exact}`);
+      if (who === 'own') assert.ok(off < 1e-5, `cast ${i} on the ${shape.shape}: ${hit.distance}, ${off} off the touch at ${exact}`);
     }
   }
   assert.ok(hits > 80, `too few hits to mean anything: ${hits}`);
@@ -490,11 +461,7 @@ test('a cylinder stands on its cap, lies without rolling, and a cone stands on i
   for (const [colliders, rotation, height] of cases) {
     const rest = (PhysicsClass) => {
       const physics = new PhysicsClass(null);
-      physics.addBody(null, {
-        type: 'fixed',
-        position: [0, -0.5, 0],
-        colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
-      });
+      physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
       const body = physics.addBody(null, { position: [1, height + 0.3, -2], rotation, colliders });
       for (let i = 0; i < 240; i++) step(physics);
       const position = [...body.position];
@@ -519,14 +486,8 @@ test('cylinder and cone sizes and borders are checked, and the collider reads th
   near(cone.halfHeight(), 0.6, 1e-7, 'half height');
   near(cone.borderRadius(), 0.1, 1e-7, 'border');
   near(cone.boundingRadius, Math.hypot(0.5, 0.6) + 0.1, 1e-6, 'bounding radius');
-  assert.equal(
-    own.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1 } }).colliders[0].borderRadius(),
-    0,
-  );
-  assert.throws(
-    () => own.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1, borderRadius: -0.1 } }),
-    RangeError,
-  );
+  assert.equal(own.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1 } }).colliders[0].borderRadius(), 0);
+  assert.throws(() => own.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1, borderRadius: -0.1 } }), RangeError);
   assert.throws(() => own.addBody(null, { colliders: { shape: 'cone', radius: 0, halfHeight: 1 } }), RangeError);
   assert.throws(() => own.kernel.addCollider(body.row, 'cylinder', [1, 1]), RangeError);
   own.dispose();

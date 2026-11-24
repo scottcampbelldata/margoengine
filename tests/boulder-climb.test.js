@@ -279,9 +279,7 @@ test('what a frame of Climb writes lives in typed arrays', () => {
   for (const v of written) assert.ok(v instanceof Float64Array);
 });
 
-test('a frame of Climb allocates nothing when V8 optimizes on the main thread', {
-  skip: !!process.env.CLIMB_NESTED,
-}, () => {
+test('a frame of Climb allocates nothing when V8 optimizes on the main thread', { skip: !!process.env.CLIMB_NESTED }, () => {
   const run = spawnSync(
     process.execPath,
     ['--no-concurrent-recompilation', '--experimental-test-module-mocks', fileURLToPath(import.meta.url)],

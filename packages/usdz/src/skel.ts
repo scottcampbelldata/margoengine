@@ -161,9 +161,7 @@ function scene(read: SceneRead): void {
       size = typeof info?.elementSize === 'number' && info.elementSize > 0 ? info.elementSize : 1,
       constant = info?.interpolation === 'constant';
     if (info?.interpolation !== undefined && !constant && info.interpolation !== 'vertex')
-      return read.soft(
-        `joint influences of ${mesh.path} are ${String(info.interpolation)}, which the schema calls an error`,
-      );
+      return read.soft(`joint influences of ${mesh.path} are ${String(info.interpolation)}, which the schema calls an error`);
     // skel:joints is this mesh's own order for its indices.
     const order = tokens(mesh.path, 'skel:joints'),
       remap = order?.map((name) => skeleton.names.indexOf(name));
@@ -185,9 +183,7 @@ function scene(read: SceneRead): void {
         if (!Number.isInteger(joint) || joint < 0 || joint >= skeleton.names.length)
           return read.soft(`a joint index of ${mesh.path} is outside its skeleton's ${skeleton.names.length} joints`);
         if (joint > 65_535)
-          return read.soft(
-            `${mesh.path} uses joint ${joint}; glTF JOINTS hold at most 65,536 joints, so it is not skinned`,
-          );
+          return read.soft(`${mesh.path} uses joint ${joint}; glTF JOINTS hold at most 65,536 joints, so it is not skinned`);
         own.push([joint, w]);
       }
       own.sort((a, b) => b[1] - a[1]);
@@ -203,10 +199,7 @@ function scene(read: SceneRead): void {
         amount[p * sets * 4 + i] = w * scale;
       });
     }
-    if (cut)
-      read.soft(
-        `${mesh.path} has more than ${MOST_INFLUENCES} influences on a point; the strongest are kept and scaled`,
-      );
+    if (cut) read.soft(`${mesh.path} has more than ${MOST_INFLUENCES} influences on a point; the strongest are kept and scaled`);
     // A refined point takes the influences of the points it comes from, in proportion.
     const refined = !constant ? mesh.shape?.influences?.(picked, amount, sets * 4) : undefined,
       finalJoints = refined?.joints ?? picked,
@@ -243,9 +236,7 @@ function scene(read: SceneRead): void {
     if (!names?.length || !prims.length) return;
     if (names.length !== prims.length) return read.soft(`skel:blendShapes of ${mesh.path} do not match its targets`);
     const count = mesh.vertexOf.length,
-      points = mesh.shape
-        ? (value(mesh.path, 'points')?.length ?? 0) / 3
-        : 1 + mesh.vertexOf.reduce((most, p) => Math.max(most, p), 0);
+      points = mesh.shape ? (value(mesh.path, 'points')?.length ?? 0) / 3 : 1 + mesh.vertexOf.reduce((most, p) => Math.max(most, p), 0);
     /** Per-point offsets spread over the mesh's expanded vertices. */
     const spread = (offsets: number[], sparse: number[] | undefined) => {
       const authored = new Float32Array(points * 3),
@@ -257,7 +248,8 @@ function scene(read: SceneRead): void {
       }
       const perPoint = mesh.shape?.spread?.(authored, 3) ?? authored,
         out = new Float32Array(count * 3);
-      for (let v = 0; v < count; v++) for (let d = 0; d < 3; d++) out[v * 3 + d] = perPoint[mesh.vertexOf[v] * 3 + d];
+      for (let v = 0; v < count; v++)
+        for (let d = 0; d < 3; d++) out[v * 3 + d] = perPoint[mesh.vertexOf[v] * 3 + d];
       return out;
     };
     /** Each shape's steps by weight, the implied empty shape at 0 included, as target numbers. */
@@ -350,8 +342,7 @@ function scene(read: SceneRead): void {
       continue;
     }
     // An animation source reaches down to the next skeleton binding; the Skeleton prim may hold one for itself.
-    const animation =
-        inherited(bound!.at, top, 'skel:animationSource')?.target ?? targets(skeleton, 'skel:animationSource')[0],
+    const animation = inherited(bound!.at, top, 'skel:animationSource')?.target ?? targets(skeleton, 'skel:animationSource')[0],
       made = instance(skeleton, animation);
     if (!made) continue;
     skin(mesh, made);

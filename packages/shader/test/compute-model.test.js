@@ -26,10 +26,7 @@ const count = (text, part) => text.split(part).length - 1;
 test('a 1D pass keeps its exact shape', () => {
   const out = storage(10, 'u32'),
     pass = new ComputePass(10, (i) => out.store(i, i));
-  assert.match(
-    pass.code,
-    /@compute @workgroup_size\(64\) fn main\(@builtin\(global_invocation_id\) gid:vec3u\) \{\n {2}if \(gid\.x >= 10u\) \{ return; \}/,
-  );
+  assert.match(pass.code, /@compute @workgroup_size\(64\) fn main\(@builtin\(global_invocation_id\) gid:vec3u\) \{\n {2}if \(gid\.x >= 10u\) \{ return; \}/);
 });
 
 test('2D and 3D passes guard each axis and number invocations row by row', () => {
@@ -42,10 +39,7 @@ test('2D and 3D passes guard each axis and number invocations row by row', () =>
   assert.match(three.code, /@workgroup_size\(4, 4, 4\)/);
   assert.match(three.code, /if \(any\(gid >= vec3u\(2u, 3u, 4u\)\)\) \{ return; \}/);
   assert.match(three.code, /\(\(gid\.z \* 3u \+ gid\.y\) \* 2u \+ gid\.x\)/);
-  assert.match(
-    new ComputePass([8, 8], () => out.store(0, 1), { workgroupSize: [16, 4] }).code,
-    /@workgroup_size\(16, 4\)/,
-  );
+  assert.match(new ComputePass([8, 8], () => out.store(0, 1), { workgroupSize: [16, 4] }).code, /@workgroup_size\(16, 4\)/);
 });
 
 test('a dispatch asks for the right workgroups on each axis', () => {
@@ -89,13 +83,10 @@ test('sizes outside the limits are refused', () => {
 
 test('invocation inputs reach the entry point only when used', () => {
   const out = storage(64, 'u32'),
-    pass = new ComputePass(64, (i) => out.store(i, localId.x.add(localIndex).add(workgroupId.x).add(workgroupCount.x)));
-  for (const part of [
-    'local_invocation_id) lid',
-    'local_invocation_index) lix',
-    'workgroup_id) wid',
-    'num_workgroups) nwg',
-  ])
+    pass = new ComputePass(64, (i) =>
+      out.store(i, localId.x.add(localIndex).add(workgroupId.x).add(workgroupCount.x)),
+    );
+  for (const part of ['local_invocation_id) lid', 'local_invocation_index) lix', 'workgroup_id) wid', 'num_workgroups) nwg'])
     assert.match(pass.code, new RegExp(part.replace(')', '\\)')));
   assert.doesNotMatch(new ComputePass(64, (i) => out.store(i, i)).code, /lid|lix|wid|nwg/);
   assert.throws(() => new NodeMaterial({ roughnessNode: localIndex.toFloat() }), /not available in fragment/);
@@ -212,16 +203,7 @@ test('every atomic operation exists on storage and workgroup memory', () => {
       w.atomicStore(0, 2);
       out.store(0, w.atomicLoad(0).toUint());
     });
-  for (const op of [
-    'atomicSub',
-    'atomicAnd',
-    'atomicOr',
-    'atomicXor',
-    'atomicExchange',
-    'atomicMax',
-    'atomicMin',
-    'atomicAdd',
-  ])
+  for (const op of ['atomicSub', 'atomicAnd', 'atomicOr', 'atomicXor', 'atomicExchange', 'atomicMax', 'atomicMin', 'atomicAdd'])
     assert.equal(count(pass.code, op + '('), 2, op);
   assert.match(pass.code, /var<workgroup> ndg\d+:array<atomic<i32>, 8>;/);
   assert.match(pass.code, /atomicStore\(&ndg\d+\[0u\], 2i\);/);
@@ -308,9 +290,6 @@ test('barriers and workgroup memory stay out of other stages', () => {
       }),
     /only available in ComputePass/,
   );
-  assert.throws(
-    () => new NodeMaterial({ roughnessNode: workgroup(1, 'f32').element(0) }),
-    /only available in ComputePass/,
-  );
+  assert.throws(() => new NodeMaterial({ roughnessNode: workgroup(1, 'f32').element(0) }), /only available in ComputePass/);
   assert.throws(() => textureBarrier(), /textureBarrier runs inside/);
 });

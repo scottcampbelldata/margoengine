@@ -253,9 +253,7 @@ export class CompatComputePassEncoder {
     this.tape.objNum(OP.DISPATCH_INDIRECT, buffer, offset);
   }
   private noPipeline(): void {
-    (this.tape.pool as TapePool).device.validationError(
-      'dispatchWorkgroups without a compute pipeline; call setPipeline first',
-    );
+    (this.tape.pool as TapePool).device.validationError('dispatchWorkgroups without a compute pipeline; call setPipeline first');
   }
   end(): void {}
   pushDebugGroup(): void {}

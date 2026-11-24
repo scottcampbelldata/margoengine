@@ -225,32 +225,24 @@ export function readIFCData(model: IFCModel, options: IFCDataOptions = {}): IFCD
     expressID === undefined
       ? undefined
       : (lines.get(expressID) ??
-        (lines.set(
-          expressID,
-          native('reading a line', () => api.GetLine(id, expressID)),
-        ),
-        lines.get(expressID)));
+        (lines.set(expressID, native('reading a line', () => api.GetLine(id, expressID))), lines.get(expressID)));
   const names = new Map<number, string>();
   const typeName = (l: Raw): string => {
     let name = names.get(l.type);
-    if (name === undefined)
-      names.set(l.type, (name = native('reading a type name', () => api.GetNameFromTypeCode(l.type))));
+    if (name === undefined) names.set(l.type, (name = native('reading a type name', () => api.GetNameFromTypeCode(l.type))));
     return name;
   };
   const upper = (l: Raw) => typeName(l).toUpperCase();
   const deleted = deletedLines(model);
   const ids = (name: string, inherited = false): number[] => {
-    const vector = native(`listing ${name}`, () =>
-      api.GetLineIDsWithType(id, api.GetTypeCodeFromName(name), inherited),
-    );
+    const vector = native(`listing ${name}`, () => api.GetLineIDsWithType(id, api.GetTypeCodeFromName(name), inherited));
     const out: number[] = [];
     for (let i = 0; i < vector.size(); i++) if (!deleted.has(vector.get(i))) out.push(vector.get(i));
     return out.sort((a, b) => a - b);
   };
 
   const units = readUnits(line, upper, ids);
-  const unitFor = (type: string | undefined): IFCUnit | undefined =>
-    type ? (units.byType[type] ?? siUnit(type)) : undefined;
+  const unitFor = (type: string | undefined): IFCUnit | undefined => (type ? (units.byType[type] ?? siUnit(type)) : undefined);
   const elements = new Map<number, IFCElement>(),
     byGlobalId = new Map<string, number>();
   for (const objectId of ids('IFCOBJECTDEFINITION', true)) {
@@ -261,14 +253,7 @@ export function readIFCData(model: IFCModel, options: IFCDataOptions = {}): IFCD
       const value = decode(l[key]);
       if (value !== undefined) attributes[key] = value;
     }
-    const element: IFCElement = {
-      id: objectId,
-      type: typeName(l),
-      attributes,
-      psets: [],
-      materials: [],
-      classifications: [],
-    };
+    const element: IFCElement = { id: objectId, type: typeName(l), attributes, psets: [], materials: [], classifications: [] };
     const set = (key: keyof IFCElement, attribute: string) => {
       const v = text(l[attribute]);
       if (v !== undefined) (element as unknown as Record<string, unknown>)[key] = v;
@@ -293,8 +278,7 @@ export function readIFCData(model: IFCModel, options: IFCDataOptions = {}): IFCD
   const readProperty = (p: Raw): IFCProperty | undefined => {
     const kind = upper(p),
       name = text(p.Name) ?? '';
-    const explicit =
-      p.Unit !== undefined && refOf(p.Unit) !== undefined ? unitOf(line(refOf(p.Unit)), line, upper) : undefined;
+    const explicit = p.Unit !== undefined && refOf(p.Unit) !== undefined ? unitOf(line(refOf(p.Unit)), line, upper) : undefined;
     const convert = (v: Raw): { value: IFCValue; raw: IFCValue; unit?: string; dataType?: string } => {
       const raw = decode(v) ?? null,
         dataType = measureOf(v),
@@ -363,14 +347,7 @@ export function readIFCData(model: IFCModel, options: IFCDataOptions = {}): IFCD
       const raw = key ? (decode(p[key]) ?? null) : null,
         unit = explicit ?? unitFor(QUANTITY_UNIT[kind]);
       if (unit && typeof raw === 'number')
-        return {
-          name,
-          kind: 'quantity',
-          value: raw * unit.scale + unit.shift,
-          raw,
-          dataType: kind,
-          unit: unit.symbol || undefined,
-        };
+        return { name, kind: 'quantity', value: raw * unit.scale + unit.shift, raw, dataType: kind, unit: unit.symbol || undefined };
       return { name, kind: 'quantity', value: raw, raw, dataType: kind };
     }
     return undefined;
@@ -443,13 +420,10 @@ export function readIFCData(model: IFCModel, options: IFCDataOptions = {}): IFCD
   const materialProperties = new Map<number, IFCPropertySet[]>();
   if (options.properties !== false)
     for (const kind of ['IFCMATERIALPROPERTIES', 'IFCEXTENDEDMATERIALPROPERTIES'])
-      for (const setId of model.schema.toUpperCase().startsWith('IFC2X3') === (kind === 'IFCEXTENDEDMATERIALPROPERTIES')
-        ? ids(kind)
-        : []) {
+      for (const setId of model.schema.toUpperCase().startsWith('IFC2X3') === (kind === 'IFCEXTENDEDMATERIALPROPERTIES') ? ids(kind) : []) {
         const material = refOf(line(setId).Material),
           set = readSet(setId);
-        if (material !== undefined && set)
-          (materialProperties.get(material) ?? materialProperties.set(material, []).get(material)!).push(set);
+        if (material !== undefined && set) (materialProperties.get(material) ?? materialProperties.set(material, []).get(material)!).push(set);
       }
   read('IFCRELDEFINESBYTYPE', (l) => {
     const typeId = refOf(l.RelatingType);
@@ -458,12 +432,7 @@ export function readIFCData(model: IFCModel, options: IFCDataOptions = {}): IFCD
       if (element && typeId !== undefined) element.typeId = typeId;
     }
   });
-  const link = (
-    rel: string,
-    whole: string,
-    parts: string,
-    key: 'aggregate' | 'nest' | 'container' | 'voids' | 'fills',
-  ) =>
+  const link = (rel: string, whole: string, parts: string, key: 'aggregate' | 'nest' | 'container' | 'voids' | 'fills') =>
     read(rel, (l) => {
       const owner = refOf(l[whole]);
       for (const part of refsOf(l[parts])) {
@@ -556,20 +525,12 @@ function readInheritance(model: IFCModel, elements: Map<number, IFCElement>): Ma
       const element = elements.get(vector.get(i));
       if (element) classes.add(element.type);
     }
-    inheritance.set(
-      native('reading a type name', () => api.GetNameFromTypeCode(code)).toUpperCase(),
-      [...classes].sort(),
-    );
+    inheritance.set(native('reading a type name', () => api.GetNameFromTypeCode(code)).toUpperCase(), [...classes].sort());
   }
   return inheritance;
 }
 
-function readMaterials(
-  l: Raw,
-  line: (id: number | undefined) => Raw,
-  upper: (l: Raw) => string,
-  length: IFCUnit,
-): IFCMaterial[] {
+function readMaterials(l: Raw, line: (id: number | undefined) => Raw, upper: (l: Raw) => string, length: IFCUnit): IFCMaterial[] {
   if (!l) return [];
   const kind = upper(l),
     out: IFCMaterial[] = [];
@@ -612,11 +573,7 @@ function readMaterials(
   return out;
 }
 
-function readClassification(
-  l: Raw,
-  line: (id: number | undefined) => Raw,
-  upper: (l: Raw) => string,
-): IFCClassification | undefined {
+function readClassification(l: Raw, line: (id: number | undefined) => Raw, upper: (l: Raw) => string): IFCClassification | undefined {
   if (!l) return;
   const result: IFCClassification = {},
     parents: string[] = [];
@@ -643,8 +600,7 @@ function readClassification(
   return result;
 }
 
-const SPATIAL =
-  /^IFC(PROJECT|SITE|BUILDING|BUILDINGSTOREY|SPACE|SPATIALZONE|FACILITY|FACILITYPART|BRIDGE|BRIDGEPART|ROAD|ROADPART|RAILWAY|RAILWAYPART|MARINEFACILITY|MARINEPART|EXTERNALSPATIALELEMENT|SPATIALELEMENT|SPATIALSTRUCTUREELEMENT)$/;
+const SPATIAL = /^IFC(PROJECT|SITE|BUILDING|BUILDINGSTOREY|SPACE|SPATIALZONE|FACILITY|FACILITYPART|BRIDGE|BRIDGEPART|ROAD|ROADPART|RAILWAY|RAILWAYPART|MARINEFACILITY|MARINEPART|EXTERNALSPATIALELEMENT|SPATIALELEMENT|SPATIALSTRUCTUREELEMENT)$/;
 
 function buildTree(elements: Map<number, IFCElement>, length: IFCUnit): IFCSpatialNode | null {
   const project = [...elements.values()].find((e) => e.type.toUpperCase() === 'IFCPROJECT');
@@ -658,8 +614,7 @@ function buildTree(elements: Map<number, IFCElement>, length: IFCUnit): IFCSpati
       const longName = e.attributes.LongName;
       if (typeof longName === 'string') n.longName = longName;
       const elevation = e.attributes.Elevation;
-      if (typeof elevation === 'number' && e.type.toUpperCase() === 'IFCBUILDINGSTOREY')
-        n.elevation = elevation * length.scale;
+      if (typeof elevation === 'number' && e.type.toUpperCase() === 'IFCBUILDINGSTOREY') n.elevation = elevation * length.scale;
       nodes.set(e.id, n);
     }
     return n;
@@ -714,8 +669,7 @@ function readGeoreference(
       lengthUnit: length.scale,
     };
     if (target) geo.crs = crsOf(target, (key) => text(target[key]));
-    if (geo.source === 'IfcMapConversionScaled')
-      geo.factors = [num('FactorX', 1), num('FactorY', 1), num('FactorZ', 1)];
+    if (geo.source === 'IfcMapConversionScaled') geo.factors = [num('FactorX', 1), num('FactorY', 1), num('FactorZ', 1)];
   } else {
     // IFC2x3: the buildingSMART Australia property sets on the project or site.
     let map: IFCPropertySet | undefined, crs: IFCPropertySet | undefined;
@@ -745,8 +699,7 @@ function readGeoreference(
         const get = (key: string) => crs!.properties[key]?.raw;
         geo.crs = crsOf(undefined, get);
         const unit = get('MapUnit');
-        if (typeof unit === 'string' && /FOOT|FEET/i.test(unit))
-          geo.crs.mapUnit = /US/i.test(unit) ? 1200 / 3937 : 0.3048;
+        if (typeof unit === 'string' && /FOOT|FEET/i.test(unit)) geo.crs.mapUnit = /US/i.test(unit) ? 1200 / 3937 : 0.3048;
       }
     }
   }
@@ -792,10 +745,7 @@ function readGeoreference(
  * Converts a point in the model's IFC coordinates (meters, Z up) to map coordinates (map units) by the
  * IfcMapConversion transform: scale, rotate anticlockwise by `rotation` about Z, translate.
  */
-export function modelToMap(
-  geo: IFCGeoreference,
-  [x, y, z]: readonly [number, number, number],
-): [number, number, number] {
+export function modelToMap(geo: IFCGeoreference, [x, y, z]: readonly [number, number, number]): [number, number, number] {
   const k = geo.scale / geo.lengthUnit,
     [fx, fy, fz] = geo.factors ?? [1, 1, 1];
   const ex = x * k * fx,
@@ -807,10 +757,7 @@ export function modelToMap(
 }
 
 /** The inverse of modelToMap: map coordinates (map units) to the model's IFC coordinates (meters, Z up). */
-export function mapToModel(
-  geo: IFCGeoreference,
-  [e, n, h]: readonly [number, number, number],
-): [number, number, number] {
+export function mapToModel(geo: IFCGeoreference, [e, n, h]: readonly [number, number, number]): [number, number, number] {
   const k = geo.scale / geo.lengthUnit,
     [fx, fy, fz] = geo.factors ?? [1, 1, 1];
   const dx = e - geo.eastings,
@@ -821,17 +768,11 @@ export function mapToModel(
 }
 
 /** Engine axes (Y up, as readIFCGeometry writes vertices) to IFC axes (Z up), adding back a rebased origin. */
-export function engineToIFC(
-  [x, y, z]: readonly number[],
-  origin: readonly number[] = [0, 0, 0],
-): [number, number, number] {
+export function engineToIFC([x, y, z]: readonly number[], origin: readonly number[] = [0, 0, 0]): [number, number, number] {
   return [x + origin[0], -(z + origin[2]), y + origin[1]];
 }
 /** IFC axes (Z up, meters) to engine axes (Y up), subtracting a rebased origin. */
-export function ifcToEngine(
-  [x, y, z]: readonly number[],
-  origin: readonly number[] = [0, 0, 0],
-): [number, number, number] {
+export function ifcToEngine([x, y, z]: readonly number[], origin: readonly number[] = [0, 0, 0]): [number, number, number] {
   return [x - origin[0], z - origin[1], -y - origin[2]];
 }
 

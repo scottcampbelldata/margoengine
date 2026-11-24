@@ -139,14 +139,7 @@ export class Fire implements EnginePlugin {
     const kit = options.hearth ?? snowNight().hearth,
       width = options.width ?? (flameLength === undefined ? kit.light.length : Math.max(kit.light.length, flameLength)),
       breadth = options.breadth ?? 0.6 * width,
-      hearth =
-        flameLength === undefined
-          ? kit
-          : {
-              ...kit,
-              embers: scaleHearthEmbers(kit.embers as never, flameLength, [width, breadth]) as typeof kit.embers,
-              emberHeight: kit.emberHeight * Math.max(flameLength / HEARTH_FLAME_LENGTH, 1),
-            },
+      hearth = flameLength === undefined ? kit : { ...kit, embers: scaleHearthEmbers(kit.embers as never, flameLength, [width, breadth]) as typeof kit.embers, emberHeight: kit.emberHeight * Math.max(flameLength / HEARTH_FLAME_LENGTH, 1) },
       { light } = hearth,
       power = options.power ?? 1,
       axis = options.axis ?? [1, 0, 0],
@@ -154,12 +147,9 @@ export class Fire implements EnginePlugin {
     finiteVector(options.position, 3, 'Fire position');
     finiteVector(axis, 3, 'Fire axis');
     if (options.steam) finiteVector(options.steam, 3, 'Fire steam point');
-    if (!(power >= 0 && Number.isFinite(power)))
-      throw new RangeError('Fire power must be a finite number of 0 or more');
-    if (!(width > 0 && Number.isFinite(width)))
-      throw new RangeError('Fire width must be a finite length above 0 (metres)');
-    if (!(breadth > 0 && Number.isFinite(breadth)))
-      throw new RangeError('Fire breadth must be a finite length above 0 (metres)');
+    if (!(power >= 0 && Number.isFinite(power))) throw new RangeError('Fire power must be a finite number of 0 or more');
+    if (!(width > 0 && Number.isFinite(width))) throw new RangeError('Fire width must be a finite length above 0 (metres)');
+    if (!(breadth > 0 && Number.isFinite(breadth))) throw new RangeError('Fire breadth must be a finite length above 0 (metres)');
     const length = Math.hypot(axis[0], axis[1], axis[2]);
     if (!length) throw new RangeError('Fire axis must be nonzero');
     const [x, y, z] = options.position,
@@ -169,26 +159,22 @@ export class Fire implements EnginePlugin {
       // intensity / (pi radius^2)) is at most as bright as the flames themselves (flameRadiance), so the kettle's
       // highlight stays under the fire it mirrors. Power scales both alike, so the size does not depend on it.
       glow = luminance(light.color) / (Math.PI * flameRadiance(hearth.fire));
-    this.lights = Object.freeze(
-      flameLength !== undefined
-        ? []
-        : lineLights({
-            start: [centre[0] - half[0], centre[1] - half[1], centre[2] - half[2]],
-            end: [centre[0] + half[0], centre[1] + half[1], centre[2] + half[2]],
-            range: light.range,
-            intensity: light.intensity * power,
-            color: [...light.color],
-            samples:
-              options.samples ??
-              (flameLength === undefined ? 2 : Math.min(8, Math.max(2, Math.ceil(width / (0.5 * flameLength))))),
-            // The kit's radius belongs to its flame length; a wider or narrower fire scales it.
-            radius: (light.radius * width) / light.length,
-            castShadow,
-            flicker: { ...light.flicker },
-          }).map((point) => ({
-            ...point,
-            radius: Math.max(point.radius ?? 0, Math.sqrt(((point.intensity ?? 0) / power || 0) * glow) || 0),
-          })),
+    this.lights = Object.freeze(flameLength !== undefined ? [] :
+      lineLights({
+        start: [centre[0] - half[0], centre[1] - half[1], centre[2] - half[2]],
+        end: [centre[0] + half[0], centre[1] + half[1], centre[2] + half[2]],
+        range: light.range,
+        intensity: light.intensity * power,
+        color: [...light.color],
+        samples: options.samples ?? (flameLength === undefined ? 2 : Math.min(8, Math.max(2, Math.ceil(width / (0.5 * flameLength))))),
+        // The kit's radius belongs to its flame length; a wider or narrower fire scales it.
+        radius: (light.radius * width) / light.length,
+        castShadow,
+        flicker: { ...light.flicker },
+      }).map((point) => ({
+        ...point,
+        radius: Math.max(point.radius ?? 0, Math.sqrt((((point.intensity ?? 0) / power) || 0) * glow) || 0),
+      })),
     );
     const lights = options.lights,
       groups = lights && 'names' in lights && 'clustered' in lights ? lights : undefined,
@@ -268,8 +254,7 @@ export class Fire implements EnginePlugin {
   }
   /** Lights and particles for a fire at `options.position`; see {@link FireOptions}. */
   static attach(engine: EngineKernel, options: FireOptions): Fire {
-    if (!options || typeof options !== 'object')
-      throw new TypeError('Invalid Fire options; pass an object with a position [x, y, z]');
+    if (!options || typeof options !== 'object') throw new TypeError('Invalid Fire options; pass an object with a position [x, y, z]');
     const fire = new Fire(engine, options);
     engineRuntime(engine).use(fire);
     return fire;

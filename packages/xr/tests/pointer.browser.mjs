@@ -104,25 +104,18 @@ try {
           contact?.model === model && Math.abs(contact.distance - 0.1) < 1e-6,
           'proximity selects the licensed model in world metres',
         );
-        model.dispose();
-        const scene = engine.createScene('spatial-secondary');
-        let scenePicker, sceneMesh;
-        scene.use({
-          name: 'pointer-fixture',
-          setup() {
-            scenePicker = Picking.attach(engine);
-            sceneMesh = engine.createMesh().setGeometry(box());
-          },
-        });
-        scene.removePlugin('pointer-fixture');
-        const sceneSpatial = SpatialPicking.attach(engine, scenePicker, { scene });
-        check(
-          (await sceneSpatial.ray([0, 0, 4], [0, 0, -1]))?.mesh === sceneMesh,
-          'secondary-scene ray uses its registered picker and preserves scene identity',
-        );
-        sceneSpatial.dispose();
-        scenePicker.dispose();
-        scene.dispose();
+      model.dispose();
+      const scene = engine.createScene('spatial-secondary');
+      let scenePicker, sceneMesh;
+      scene.use({ name: 'pointer-fixture', setup() {
+        scenePicker = Picking.attach(engine);
+        sceneMesh = engine.createMesh().setGeometry(box());
+      } });
+      scene.removePlugin('pointer-fixture');
+      const sceneSpatial = SpatialPicking.attach(engine, scenePicker, { scene });
+      check((await sceneSpatial.ray([0, 0, 4], [0, 0, -1]))?.mesh === sceneMesh,
+        'secondary-scene ray uses its registered picker and preserves scene identity');
+      sceneSpatial.dispose(); scenePicker.dispose(); scene.dispose();
         spatial.dispose();
         picking.dispose();
         await engine.gpu.queue.onSubmittedWorkDone();

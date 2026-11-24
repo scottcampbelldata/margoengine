@@ -108,13 +108,7 @@ for (const [name, prefilter] of [
 ]) {
   const f = await frame({ position: [-0.55, 0.95, 11.8], target: [0, -0.05, 0], accretion: 0, stars: 1, prefilter });
   const r = starRatios(f, f.h * 0.3);
-  results[name] = {
-    count: r.length,
-    median: r[r.length >> 1],
-    p75: r[Math.floor(r.length * 0.75)],
-    p90: r[Math.floor(r.length * 0.9)],
-    max: r.at(-1),
-  };
+  results[name] = { count: r.length, median: r[r.length >> 1], p75: r[Math.floor(r.length * 0.75)], p90: r[Math.floor(r.length * 0.9)], max: r.at(-1) };
 }
 
 // Jet side on, disk and stars off: the band above and below the hole stays dark.
@@ -142,8 +136,7 @@ for (const [name, prefilter] of [
   const f = await frame({ position: [2.3, 11.7, 3.4], accretion: 0, jet: 1 });
   let peak = 0;
   for (let y = 0; y < f.h; y++)
-    for (let x = 0; x < f.w; x++)
-      if (Math.hypot(x - f.w / 2, y - f.h / 2) < f.h * 0.1) peak = Math.max(peak, at(f, x, y));
+    for (let x = 0; x < f.w; x++) if (Math.hypot(x - f.w / 2, y - f.h / 2) < f.h * 0.1) peak = Math.max(peak, at(f, x, y));
   results.jetBase = { peak };
 }
 
@@ -151,25 +144,13 @@ console.log(JSON.stringify(results));
 await context.close();
 assert.deepEqual(pageErrors, []);
 if (!report) {
-  assert.ok(
-    results.cameraFrame.middle < 12,
-    `camera frame: the shadow is not in the middle (${results.cameraFrame.middle})`,
-  );
-  assert.ok(
-    results.cameraFrame.diskRow > 120,
-    `camera frame: no disk across the middle row (${results.cameraFrame.diskRow})`,
-  );
+  assert.ok(results.cameraFrame.middle < 12, `camera frame: the shadow is not in the middle (${results.cameraFrame.middle})`);
+  assert.ok(results.cameraFrame.diskRow > 120, `camera frame: no disk across the middle row (${results.cameraFrame.diskRow})`);
   assert.ok(results.stars.count >= 20, `stars: too few to measure (${results.stars.count})`);
   assert.ok(results.stars.median < 1.5, `stars: stretched (median axis ratio ${results.stars.median})`);
   // The control: point sampled (prefilter off), as the march drew stars before, the same measure sees them stretched.
-  assert.ok(
-    results.starsPointSampled.median > 2,
-    `stars: the measure misses stretched stars (${results.starsPointSampled.median})`,
-  );
+  assert.ok(results.starsPointSampled.median > 2, `stars: the measure misses stretched stars (${results.starsPointSampled.median})`);
   assert.ok(results.jet.band < 40, `jet: bright columns side on (${results.jet.band})`);
-  assert.ok(
-    results.disk.ratio < 1.25 && results.disk.ratio > 0.8,
-    `disk: fine detail changed over time (${results.disk.ratio})`,
-  );
+  assert.ok(results.disk.ratio < 1.25 && results.disk.ratio > 0.8, `disk: fine detail changed over time (${results.disk.ratio})`);
   console.log('ok black hole: camera frame, round stars, jet side on, disk detail over time');
 }

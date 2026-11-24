@@ -91,15 +91,7 @@ export interface FabricFuzz {
 }
 const SADEGHI = 'Sadeghi et al. 2013, Tables 2 and 3';
 const scaled = (c: Rgb, s: number): Rgb => [c[0] * s, c[1] * s, c[2] * s];
-const thread = (
-  a: number,
-  albedo: Rgb,
-  kd: number,
-  gammaS: number,
-  gammaV: number,
-  offsets: number[],
-  lengths: number[],
-): ThreadOptics => ({
+const thread = (a: number, albedo: Rgb, kd: number, gammaS: number, gammaV: number, offsets: number[], lengths: number[]): ThreadOptics => ({
   a,
   albedo,
   kd,
@@ -131,15 +123,7 @@ export const MEASURED_FABRICS = {
     name: 'Polyester Satin Charmeuse (front)',
     eta: 1.539,
     threads: [
-      thread(
-        0.9,
-        scaled([1, 0.37, 0.3], 0.035),
-        0.1,
-        2.5,
-        5,
-        [-32, -32, -18, 0, 0, 18, 32, 32],
-        [1.33, 0.66, 2, 2, 2, 0.66, 1.33],
-      ),
+      thread(0.9, scaled([1, 0.37, 0.3], 0.035), 0.1, 2.5, 5, [-32, -32, -18, 0, 0, 18, 32, 32], [1.33, 0.66, 2, 2, 2, 0.66, 1.33]),
       thread(0.1, scaled([1, 0.37, 0.3], 0.2), 0.7, 30, 60, [0, 0], [1]),
     ],
     source: SADEGHI,
@@ -165,15 +149,7 @@ export const MEASURED_FABRICS = {
 } as const satisfies Record<string, FabricOptics>;
 
 /** The cloth kinds period garments are cut from. */
-export type FabricKind =
-  | 'cotton-denim'
-  | 'cotton-duck'
-  | 'cotton-shirting'
-  | 'cotton-corduroy'
-  | 'wool-worsted'
-  | 'wool-flannel'
-  | 'polyester-blend'
-  | 'silk';
+export type FabricKind = 'cotton-denim' | 'cotton-duck' | 'cotton-shirting' | 'cotton-corduroy' | 'wool-worsted' | 'wool-flannel' | 'polyester-blend' | 'silk';
 /** Cotton's mean refractive index, (1.578 + 1.532) / 2 (Burkinshaw 2016, Table 1.5). */
 export const COTTON_ETA = 1.555;
 /** Keratin's refractive index, 1.55 (Marschner et al. 2003, Table 1); wool is a keratin fibre. */
@@ -192,13 +168,7 @@ export function periodFabric(kind: FabricKind, color: Rgb): FabricOptics {
   const base = periodBase(kind),
     { surface, volume } = periodCalibration(kind),
     albedo = [0, 1, 2].map((c) => Math.max(0, (color[c] - surface) / volume)) as unknown as Rgb;
-  return {
-    ...base,
-    threads: [
-      { ...base.threads[0], albedo },
-      { ...base.threads[1], albedo },
-    ],
-  };
+  return { ...base, threads: [{ ...base.threads[0], albedo }, { ...base.threads[1], albedo }] };
 }
 /** Every period fabric kind. */
 export const FABRIC_KINDS: readonly FabricKind[] = [
@@ -230,32 +200,18 @@ const PERIOD_FUZZ: Partial<Record<FabricKind, FabricFuzz>> = {
 const periodBases = new Map<FabricKind, FabricOptics>();
 /** The period fabric's threads with a white albedo A = 1 (see {@link periodFabric}). */
 function periodBase(kind: FabricKind): FabricOptics {
-  if (!FABRIC_KINDS.includes(kind))
-    throw new RangeError(`Unknown fabric ${kind}; use one of ${FABRIC_KINDS.join(', ')}`);
+  if (!FABRIC_KINDS.includes(kind)) throw new RangeError(`Unknown fabric ${kind}; use one of ${FABRIC_KINDS.join(', ')}`);
   let base = periodBases.get(kind);
   if (!base) {
     const m: FabricOptics =
-        kind === 'cotton-corduroy'
-          ? MEASURED_FABRICS.velvet
-          : kind === 'silk'
-            ? MEASURED_FABRICS.silkCrepeDeChine
-            : MEASURED_FABRICS.linenPlain,
-      eta = kind.startsWith('wool')
-        ? WOOL_ETA
-        : kind === 'polyester-blend'
-          ? MEASURED_FABRICS.polyesterSatinCharmeuse.eta
-          : kind === 'silk'
-            ? m.eta
-            : COTTON_ETA,
+        kind === 'cotton-corduroy' ? MEASURED_FABRICS.velvet : kind === 'silk' ? MEASURED_FABRICS.silkCrepeDeChine : MEASURED_FABRICS.linenPlain,
+      eta = kind.startsWith('wool') ? WOOL_ETA : kind === 'polyester-blend' ? MEASURED_FABRICS.polyesterSatinCharmeuse.eta : kind === 'silk' ? m.eta : COTTON_ETA,
       white: Rgb = [1, 1, 1];
     const fuzz = PERIOD_FUZZ[kind];
     base = {
       name: kind,
       eta,
-      threads: [
-        { ...m.threads[0], albedo: white },
-        { ...m.threads[1], albedo: white },
-      ],
+      threads: [{ ...m.threads[0], albedo: white }, { ...m.threads[1], albedo: white }],
       ...(fuzz ? { fuzz } : {}),
       source: `${m.source} (${m.name} threads)${fuzz ? '; fibre ends as PERIOD_FUZZ' : ''}`,
     };
@@ -263,13 +219,7 @@ function periodBase(kind: FabricKind): FabricOptics {
   }
   return base;
 }
-const withAlbedo = (f: FabricOptics, albedo: Rgb): FabricOptics => ({
-  ...f,
-  threads: [
-    { ...f.threads[0], albedo },
-    { ...f.threads[1], albedo },
-  ],
-});
+const withAlbedo = (f: FabricOptics, albedo: Rgb): FabricOptics => ({ ...f, threads: [{ ...f.threads[0], albedo }, { ...f.threads[1], albedo }] });
 const calibrations = new Map<FabricKind, { surface: number; volume: number }>();
 /**
  * The period fabric's directional albedo at normal incidence split into its surface part (A = 0) and its volume part
@@ -330,16 +280,11 @@ export function threadScattering(th: ThreadOptics, eta: number, t: V3, n: V3, wi
     surface = Fr * cd2 * gauss(th.gammaS * RAD, th_),
     volume = (Ft * ((1 - th.kd) * gauss(th.gammaV * RAD, th_) + th.kd)) / Math.max(Math.cos(ti) + Math.cos(tr), 1e-6),
     k = 1 / Math.max(Math.cos(td) ** 2, 1e-6);
-  return [
-    (surface + volume * th.albedo[0]) * k,
-    (surface + volume * th.albedo[1]) * k,
-    (surface + volume * th.albedo[2]) * k,
-  ];
+  return [(surface + volume * th.albedo[0]) * k, (surface + volume * th.albedo[1]) * k, (surface + volume * th.albedo[2]) * k];
 }
 /** `count` tangent offsets (radians) sampled at equal steps along a thread's tangent curve (Table 3, Eq. 6). */
 export function tangentSamples(th: ThreadOptics, count = 16): Float64Array {
-  if (th.offsets.length !== th.lengths.length + 1)
-    throw new RangeError('A tangent curve needs one more offset than segment lengths');
+  if (th.offsets.length !== th.lengths.length + 1) throw new RangeError('A tangent curve needs one more offset than segment lengths');
   const total = th.lengths.reduce((s, l) => s + l, 0),
     out = new Float64Array(count);
   for (let k = 0; k < count; k++) {
@@ -423,8 +368,7 @@ function fuzzArea(exponent: number, mu: number): number {
         const t = (a + 0.5) * dT,
           sn = Math.sin(t),
           d = sn ** exponent / norm;
-        for (let b = 0; b < steps; b++)
-          sum += Math.abs(st * sn * Math.cos((b + 0.5) * dP) + m * Math.cos(t)) * d * sn * dT * dP;
+        for (let b = 0; b < steps; b++) sum += Math.abs(st * sn * Math.cos((b + 0.5) * dP) + m * Math.cos(t)) * d * sn * dT * dP;
       }
       table[j] = sum;
     }
@@ -520,8 +464,7 @@ const sheenLambdaL = (x: number, w: number) => {
     e = -4.32054 + (-4.85967 + 4.32054) * w;
   return a / (1 + b * Math.max(x, 1e-12) ** c) + d * x + e;
 };
-const sheenLambda = (c: number, w: number) =>
-  Math.exp(c < 0.5 ? sheenLambdaL(c, w) : 2 * sheenLambdaL(0.5, w) - sheenLambdaL(1 - c, w));
+const sheenLambda = (c: number, w: number) => Math.exp(c < 0.5 ? sheenLambdaL(c, w) : 2 * sheenLambdaL(0.5, w) - sheenLambdaL(1 - c, w));
 /** The KHR_materials_sheen BRDF without its colour, as packages/shared/sheen.js shades it. */
 export function sheenBRDF(roughness: number, nl: number, nv: number, nh: number): number {
   const alpha = Math.max(roughness, 1e-4) ** 2,
@@ -535,22 +478,20 @@ export function sheenAlbedo(mu: number, roughness: number): number {
   const R = Math.min(1, Math.max(roughness, 1e-4)),
     m = Math.min(1, Math.max(mu, 1e-4)),
     { size, k, p } = sheenAlbedoGrid,
-    u = ((m * (R + k)) / (R + k * m)) ** p * (size - 1),
+    u = (m * (R + k) / (R + k * m)) ** p * (size - 1),
     v = Math.sqrt(Math.min(1, Math.max(roughness, 0))) * (size - 1),
     u0 = Math.min(size - 2, Math.floor(u)),
     v0 = Math.min(size - 2, Math.floor(v)),
     fu = u - u0,
     fv = v - v0,
     at = (x: number, y: number) => sheenAlbedoTable[y * size + x],
-    T =
-      (at(u0, v0) * (1 - fu) + at(u0 + 1, v0) * fu) * (1 - fv) +
-      (at(u0, v0 + 1) * (1 - fu) + at(u0 + 1, v0 + 1) * fu) * fv;
+    T = (at(u0, v0) * (1 - fu) + at(u0 + 1, v0) * fu) * (1 - fv) + (at(u0, v0 + 1) * (1 - fu) + at(u0 + 1, v0 + 1) * fu) * fv;
   return Math.min(1, Math.max(0, Math.exp(T) / R));
 }
 /** glTF's dielectric specular (F0 0.04, GGX, height-correlated Smith) at roughness `r`. */
 function dielectricSpecular(r: number, nl: number, nv: number, nh: number, vh: number): number {
   const a2 = Math.max(r * r, 1e-3) ** 2,
-    d = 1 - nh * nh + a2 * nh * nh, // |n x h|^2 + a2 nh^2, the KB6016c form core uses
+    d = (1 - nh * nh) + a2 * nh * nh, // |n x h|^2 + a2 nh^2, the KB6016c form core uses
     D = a2 / (Math.PI * d * d),
     V = 0.5 / (nl * Math.sqrt(nv * nv * (1 - a2) + a2) + nv * Math.sqrt(nl * nl * (1 - a2) + a2)),
     F = 0.04 + 0.96 * (1 - vh) ** 5;
@@ -669,8 +610,7 @@ function fitLobes(samples: readonly FitSample[], albedo: Rgb): ClothLobes {
         }
       });
       const fitError = Math.sqrt(err / Math.max(norm, 1e-30));
-      if (!best || fitError < best.fitError)
-        best = { baseColor: [...base], roughness, sheenColor: [...sheen], sheenRoughness, fitError };
+      if (!best || fitError < best.fitError) best = { baseColor: [...base], roughness, sheenColor: [...sheen], sheenRoughness, fitError };
     }
   }
   return best!;
@@ -685,14 +625,7 @@ const fitCache = new WeakMap<FabricOptics, ClothLobes>();
  */
 export function clothLobes(fabric: FabricOptics): ClothLobes {
   let lobes = fitCache.get(fabric);
-  if (!lobes)
-    fitCache.set(
-      fabric,
-      (lobes = fitLobes(
-        fitSamples((wi, wr) => fabricBRDF(fabric, wi, wr)),
-        fabricAlbedo(fabric, 0),
-      )),
-    );
+  if (!lobes) fitCache.set(fabric, (lobes = fitLobes(fitSamples((wi, wr) => fabricBRDF(fabric, wi, wr)), fabricAlbedo(fabric, 0))));
   return lobes;
 }
 const periodSamples = new Map<FabricKind, { surface: Float64Array; volume: Float64Array; samples: FitSample[] }>();
@@ -718,14 +651,7 @@ export function periodLobes(kind: FabricKind, color: Rgb): ClothLobes {
   }
   const p = parts;
   return fitLobes(
-    p.samples.map((q, k) => ({
-      ...q,
-      target: [
-        p.surface[k] + A[0] * p.volume[k],
-        p.surface[k] + A[1] * p.volume[k],
-        p.surface[k] + A[2] * p.volume[k],
-      ] as V3,
-    })),
+    p.samples.map((q, k) => ({ ...q, target: [p.surface[k] + A[0] * p.volume[k], p.surface[k] + A[1] * p.volume[k], p.surface[k] + A[2] * p.volume[k]] as V3 })),
     color.map((c) => Math.max(c, periodCalibration(kind).surface)) as unknown as Rgb,
   );
 }
@@ -773,8 +699,7 @@ export interface CastBody {
 const AIST = 'AIST/HQL 3D Anthropometric Database 2003 (young male N 49, young female N 48); AIST head database 2001';
 const mm = (v: number) => v / 1000;
 /** Straight shoulder breadth from the neck root breadth, the side-neck-to-shoulder length and the shoulder slope. */
-const shoulderFrom = (neckRoot: number, slope: number, slopeDeg: number) =>
-  mm(neckRoot + 2 * slope * Math.cos(slopeDeg * RAD));
+const shoulderFrom = (neckRoot: number, slope: number, slopeDeg: number) => mm(neckRoot + 2 * slope * Math.cos(slopeDeg * RAD));
 const japanMan: CastBody = {
   name: 'Japan 2003 young man',
   source: AIST,
@@ -881,10 +806,7 @@ const us1919Man: CastBody = {
   armGirth: (japanMan.armGirth / japanMan.chestGirth) * 0.876,
 };
 /** Measured bodies: the AIST 2003 young adults of Japan and the 1919 US Army demobilisation central sizes. */
-export const BODIES = { japan2003Man: japanMan, japan2003Woman: japanWoman, us1919Man } as const satisfies Record<
-  string,
-  CastBody
->;
+export const BODIES = { japan2003Man: japanMan, japan2003Woman: japanWoman, us1919Man } as const satisfies Record<string, CastBody>;
 
 /** Perimeter of the superellipse |x/a|^n + |y/b|^n = 1. */
 export function superellipsePerimeter(a: number, b: number, n: number, steps = 256): number {
@@ -946,12 +868,7 @@ export function trunkSections(body: CastBody): Section[] {
     section(body.waistHeight, body.waistBreadth, body.waistDepth, body.waistGirth),
     section(body.chestHeight, body.chestBreadth, body.chestDepth, body.chestGirth),
     section(body.axillaHeight, body.chestBreadth, body.chestDepth, body.chestGirth),
-    {
-      y: body.shoulderHeight,
-      a: body.shoulderBreadth / 2,
-      b: body.scyeDepth / 2 + 0.5 * (body.chestDepth / 2 - body.scyeDepth / 2),
-      n: 2.4,
-    },
+    { y: body.shoulderHeight, a: body.shoulderBreadth / 2, b: body.scyeDepth / 2 + 0.5 * (body.chestDepth / 2 - body.scyeDepth / 2), n: 2.4 },
     { y: body.neckHeight, a: neck / 2, b: neck / 2, n: 2 },
   ];
 }
@@ -1110,12 +1027,7 @@ class Builder {
             row.side[1] * Math.cos(phi) + front[1] * Math.sin(phi),
             row.side[2] * Math.cos(phi) + front[2] * Math.sin(phi),
           ];
-        this.vert(
-          [row.centre[0] + d[0] * r, row.centre[1] + d[1] * r, row.centre[2] + d[2] * r],
-          flip ? [-d[0], -d[1], -d[2]] : d,
-          k / RING_STEPS,
-          row.v,
-        );
+        this.vert([row.centre[0] + d[0] * r, row.centre[1] + d[1] * r, row.centre[2] + d[2] * r], flip ? [-d[0], -d[1], -d[2]] : d, k / RING_STEPS, row.v);
       }
     }
     for (let r = 0; r + 1 < rows.length; r++)
@@ -1131,12 +1043,7 @@ class Builder {
     return { first, cols };
   }
   geometry(): GarmentGeometry {
-    return {
-      positions: new Float32Array(this.p),
-      normals: new Float32Array(this.n),
-      uvs: new Float32Array(this.uv),
-      indices: new Uint32Array(this.ix),
-    };
+    return { positions: new Float32Array(this.p), normals: new Float32Array(this.n), uvs: new Float32Array(this.uv), indices: new Uint32Array(this.ix) };
   }
 }
 /**
@@ -1147,8 +1054,7 @@ const seamDip = (phi: number, front: boolean) => {
   const steps = [0, Math.PI, ...(front ? [1.5 * Math.PI] : [])];
   return steps.some((s) => Math.abs(wrap(phi - s)) < 1e-6) ? SEAM_DEPTH : 0;
 };
-const column = (start: number, cols: number, rows: number, k: number) =>
-  Array.from({ length: rows }, (_, r) => start + r * cols + k);
+const column = (start: number, cols: number, rows: number, k: number) => Array.from({ length: rows }, (_, r) => start + r * cols + k);
 /**
  * How far from the trunk's axis, along the direction at angle `phi` (from +x toward -z, the trunk tubes' angle), a
  * garment must reach to clear two legs of radius `r` standing at x = +-`legX`: the far side of either leg's circle.
@@ -1209,21 +1115,15 @@ export function dress(body: CastBody, outfit: Outfit): Garment[] {
   checkOutfit(outfit);
   const sorted = [...outfit.garments].sort((a, b) => a.layer - b.layer),
     covers = (g: GarmentSpec, part: 'trunk' | 'arm' | 'leg') =>
-      part === 'trunk'
-        ? g.cut === 'top' || g.cut === 'skirt' || (g.cut === 'legs' && true)
-        : part === 'arm'
-          ? g.cut === 'top' && (g.sleeves ?? 0) > 0
-          : g.cut === 'legs' || g.cut === 'leggings' || g.cut === 'boots';
-  const total = (part: 'trunk' | 'arm' | 'leg') =>
-    sorted.filter((g) => covers(g, part)).reduce((s, g) => s + g.ease + g.thickness, 0);
+      part === 'trunk' ? g.cut === 'top' || g.cut === 'skirt' || (g.cut === 'legs' && true) : part === 'arm' ? g.cut === 'top' && (g.sleeves ?? 0) > 0 : g.cut === 'legs' || g.cut === 'leggings' || g.cut === 'boots';
+  const total = (part: 'trunk' | 'arm' | 'leg') => sorted.filter((g) => covers(g, part)).reduce((s, g) => s + g.ease + g.thickness, 0);
   const pose = castPose(body, total('trunk'), total('arm'), total('leg')),
     sections = trunkSections(body),
     out: Garment[] = [],
     below = { trunk: 0, arm: 0, leg: 0 };
   for (const spec of sorted) {
     // A tie lies on the shirt front under the waistcoat's own ease: it takes no girth from the layers over it.
-    const part =
-      spec.cut === 'top' || spec.cut === 'skirt' || spec.cut === 'tie' ? 'trunk' : spec.cut === 'hat' ? 'head' : 'leg';
+    const part = spec.cut === 'top' || spec.cut === 'skirt' || spec.cut === 'tie' ? 'trunk' : spec.cut === 'hat' ? 'head' : 'leg';
     let offset: number;
     if (part === 'head') offset = spec.ease;
     else {
@@ -1234,10 +1134,8 @@ export function dress(body: CastBody, outfit: Outfit): Garment[] {
     const armOffset = below.arm + spec.ease;
     const g = build(body, sections, pose, spec, offset, armOffset, below.leg, floorOf(out));
     out.push(g);
-    if ((part === 'trunk' && spec.cut !== 'tie') || spec.cut === 'legs')
-      below.trunk = Math.max(below.trunk, offset + spec.thickness);
-    if (spec.cut === 'legs' || spec.cut === 'leggings' || spec.cut === 'boots')
-      below.leg = Math.max(below.leg, offset + spec.thickness);
+    if ((part === 'trunk' && spec.cut !== 'tie') || spec.cut === 'legs') below.trunk = Math.max(below.trunk, offset + spec.thickness);
+    if (spec.cut === 'legs' || spec.cut === 'leggings' || spec.cut === 'boots') below.leg = Math.max(below.leg, offset + spec.thickness);
     if (spec.cut === 'top' && (spec.sleeves ?? 0) > 0) below.arm = armOffset + spec.thickness;
   }
   return out;
@@ -1295,29 +1193,13 @@ function build(
     // sampled at the same angle steps), so a later layer never passes through an earlier one.
     const stations = given.map((s) => ({
       ...s,
-      inner: (phi: number) =>
-        Math.max(
-          s.inner(phi),
-          floor(part, s.at, Math.round((phi / (2 * Math.PI)) * RING_STEPS) % RING_STEPS) + spec.ease,
-        ),
+      inner: (phi: number) => Math.max(s.inner(phi), floor(part, s.at, Math.round((phi / (2 * Math.PI)) * RING_STEPS) % RING_STEPS) + spec.ease),
     }));
     const outer = b.tube(
-      stations.map((s, r) => ({
-        centre: s.centre,
-        along: s.along,
-        side: s.side,
-        radius: (phi) => s.inner(phi) + th - seamDip(phi, front),
-        v: r / (stations.length - 1),
-      })),
+      stations.map((s, r) => ({ centre: s.centre, along: s.along, side: s.side, radius: (phi) => s.inner(phi) + th - seamDip(phi, front), v: r / (stations.length - 1) })),
     );
     const inner = b.tube(
-      stations.map((s, r) => ({
-        centre: s.centre,
-        along: s.along,
-        side: s.side,
-        radius: (phi) => s.inner(phi),
-        v: r / (stations.length - 1),
-      })),
+      stations.map((s, r) => ({ centre: s.centre, along: s.along, side: s.side, radius: (phi) => s.inner(phi), v: r / (stations.length - 1) })),
       true,
     );
     for (const s of stations) ring(part, s.at, s.inner);
@@ -1330,8 +1212,7 @@ function build(
         else b.ix.push(a, c, a + 1, a + 1, c, c + 1);
       }
     }
-    for (const k of [0, RING_STEPS / 2, ...(front ? [(3 * RING_STEPS) / 4] : [])])
-      seams.push(column(outer.first, RING_STEPS + 1, stations.length, k));
+    for (const k of [0, RING_STEPS / 2, ...(front ? [(3 * RING_STEPS) / 4] : [])]) seams.push(column(outer.first, RING_STEPS + 1, stations.length, k));
   };
   const up: V3 = [0, 1, 0],
     side: V3 = [1, 0, 0],
@@ -1372,7 +1253,7 @@ function build(
           const d = start + ((length - start) * k) / (rows - 1);
           return {
             at: d,
-            centre: [(s * body.shoulderBreadth) / 2 + along[0] * d, body.shoulderHeight + along[1] * d, 0] as V3,
+            centre: [s * body.shoulderBreadth / 2 + along[0] * d, body.shoulderHeight + along[1] * d, 0] as V3,
             along,
             side: [Math.cos(pose.armAngle), s * Math.sin(pose.armAngle), 0] as V3,
             inner: () => r,
@@ -1390,11 +1271,7 @@ function build(
   } else if (spec.cut === 'legs') {
     const hem = spec.hem ?? 0.02,
       top = spec.bib ? body.chestHeight : body.waistHeight;
-    thickTube(
-      'trunk',
-      trunkStations(body.crotchHeight, top, () => 0),
-      false,
-    );
+    thickTube('trunk', trunkStations(body.crotchHeight, top, () => 0), false);
     for (const s of [-1, 1]) {
       const rows = Math.max(2, Math.ceil((body.crotchHeight - hem) / 0.02) + 1);
       let widest = 0;
@@ -1404,13 +1281,7 @@ function build(
         // Cloth hangs straight down from the widest girth above it, unless the cut is fitted below the knee.
         widest = Math.max(widest, leg);
         const r = (spec.fitted && y < body.kneeHeight ? leg : widest) + offset;
-        return {
-          at: y,
-          centre: [s * pose.legX, y, 0] as V3,
-          along: [0, -1, 0] as V3,
-          side: [-1, 0, 0] as V3,
-          inner: () => r,
-        };
+        return { at: y, centre: [s * pose.legX, y, 0] as V3, along: [0, -1, 0] as V3, side: [-1, 0, 0] as V3, inner: () => r };
       });
       thickTube(s < 0 ? 'legR' : 'legL', st, false);
     }
@@ -1461,13 +1332,7 @@ function build(
       const st = Array.from({ length: rows }, (_, k) => {
         const y = topY - (topY * k) / (rows - 1),
           r = legRadius(body, y) + offset;
-        return {
-          at: y,
-          centre: [s * pose.legX, y, 0] as V3,
-          along: [0, -1, 0] as V3,
-          side: [-1, 0, 0] as V3,
-          inner: () => r,
-        };
+        return { at: y, centre: [s * pose.legX, y, 0] as V3, along: [0, -1, 0] as V3, side: [-1, 0, 0] as V3, inner: () => r };
       });
       thickTube(s < 0 ? 'legR' : 'legL', st, false);
       if (spec.cut === 'boots') {
@@ -1484,13 +1349,7 @@ function build(
       brim = spec.brim ?? 0.06,
       base = body.stature - 0.09,
       dome = spec.dome ?? 0,
-      st = crownRows(dome).map((f) => ({
-        at: base + crown * f,
-        centre: [0, base + crown * f, 0] as V3,
-        along: up,
-        side,
-        inner: () => r * crownTaper(f, dome),
-      }));
+      st = crownRows(dome).map((f) => ({ at: base + crown * f, centre: [0, base + crown * f, 0] as V3, along: up, side, inner: () => r * crownTaper(f, dome) }));
     thickTube('head', st, false);
     disc(b, [0, base + crown + th / 2, 0], r * crownTaper(1, dome) + th, th, [0, 1, 0]);
     annulus(b, base, r + th, r + th + brim, th);
@@ -1505,19 +1364,8 @@ function disc(b: Builder, c: V3, r: number, t: number, normal: V3 = [0, 0, 1]) {
     rim: number[] = [];
   for (let k = 0; k < steps; k++) {
     const a = (k / steps) * 2 * Math.PI,
-      d: V3 = [
-        u[0] * Math.cos(a) + v[0] * Math.sin(a),
-        u[1] * Math.cos(a) + v[1] * Math.sin(a),
-        u[2] * Math.cos(a) + v[2] * Math.sin(a),
-      ];
-    rim.push(
-      b.vert(
-        [c[0] + d[0] * r + normal[0] * t, c[1] + d[1] * r + normal[1] * t, c[2] + d[2] * r + normal[2] * t],
-        normal,
-        0.5 + Math.cos(a) / 2,
-        0.5 + Math.sin(a) / 2,
-      ),
-    );
+      d: V3 = [u[0] * Math.cos(a) + v[0] * Math.sin(a), u[1] * Math.cos(a) + v[1] * Math.sin(a), u[2] * Math.cos(a) + v[2] * Math.sin(a)];
+    rim.push(b.vert([c[0] + d[0] * r + normal[0] * t, c[1] + d[1] * r + normal[1] * t, c[2] + d[2] * r + normal[2] * t], normal, 0.5 + Math.cos(a) / 2, 0.5 + Math.sin(a) / 2));
     rim.push(b.vert([c[0] + d[0] * r, c[1] + d[1] * r, c[2] + d[2] * r], d, 0, 0));
   }
   for (let k = 0; k < steps; k++) {
@@ -1615,8 +1463,7 @@ const OLIVE_GREEN: Rgb = [0.07, 0.075, 0.035],
   RUBBER_BLACK: Rgb = [0.02, 0.02, 0.02];
 const g = (spec: GarmentSpec) => spec;
 // Footwear is the first layer on the legs: trousers hang over it, puttees wrap it.
-const boots = (color: Rgb, top: number): GarmentSpec =>
-  g({ name: 'boots', cut: 'boots', fabric: 'leather', color, layer: 0, thickness: 0.003, ease: 0.004, top });
+const boots = (color: Rgb, top: number): GarmentSpec => g({ name: 'boots', cut: 'boots', fabric: 'leather', color, layer: 0, thickness: 0.003, ease: 0.004, top });
 /**
  * The cast: outfits per role. 1910 American West roles are cut for `us1919Man`; 2011 coastal Japan for the AIST bodies.
  * Women of 1910 are not in the kit: no measured body of the period was found.
@@ -1627,62 +1474,12 @@ export const OUTFITS = {
     era: '1910-american-west',
     body: 'us1919Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'wool-flannel',
-        color: GRAY_FLANNEL,
-        layer: 0,
-        thickness: 0.0012,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'breeches',
-        cut: 'legs',
-        fabric: 'wool-worsted',
-        color: OLIVE_GREEN,
-        layer: 1,
-        thickness: 0.0012,
-        ease: 0.004,
-        hem: 0.36,
-        fitted: true,
-      }),
-      g({
-        name: 'coat',
-        cut: 'top',
-        fabric: 'wool-worsted',
-        color: OLIVE_GREEN,
-        layer: 2,
-        thickness: 0.0018,
-        ease: 0.006,
-        hem: -0.6,
-        sleeves: 0.98,
-        buttons: 5,
-      }),
-      g({
-        name: 'puttees',
-        cut: 'leggings',
-        fabric: 'cotton-duck',
-        color: LIGHT_DRAB,
-        layer: 2,
-        thickness: 0.0015,
-        ease: 0.002,
-        top: 0.4,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'wool-flannel', color: GRAY_FLANNEL, layer: 0, thickness: 0.0012, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'breeches', cut: 'legs', fabric: 'wool-worsted', color: OLIVE_GREEN, layer: 1, thickness: 0.0012, ease: 0.004, hem: 0.36, fitted: true }),
+      g({ name: 'coat', cut: 'top', fabric: 'wool-worsted', color: OLIVE_GREEN, layer: 2, thickness: 0.0018, ease: 0.006, hem: -0.6, sleeves: 0.98, buttons: 5 }),
+      g({ name: 'puttees', cut: 'leggings', fabric: 'cotton-duck', color: LIGHT_DRAB, layer: 2, thickness: 0.0015, ease: 0.002, top: 0.4 }),
       boots(LEATHER_BROWN, 0.16),
-      g({
-        name: 'hat',
-        cut: 'hat',
-        fabric: 'felt',
-        color: LIGHT_DRAB,
-        layer: 0,
-        thickness: 0.0025,
-        ease: 0.003,
-        crown: 4 * inch,
-        brim: 3 * inch,
-      }),
+      g({ name: 'hat', cut: 'hat', fabric: 'felt', color: LIGHT_DRAB, layer: 0, thickness: 0.0025, ease: 0.003, crown: 4 * inch, brim: 3 * inch }),
     ],
     source:
       'Harmon, What Should Foresters Wear? (olive green worsted, sack style, 1909; gray flannel shirt; cavalry breeches); Tucker and Fitzpatrick ch. 7 (1910 light drab Stetson, 4 inch crown, 3 inch brim; puttee leggings)',
@@ -1692,133 +1489,26 @@ export const OUTFITS = {
     era: '1910-american-west',
     body: 'us1919Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'wool-flannel',
-        color: BLUE_FLANNEL,
-        layer: 0,
-        thickness: 0.0012,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'trousers',
-        cut: 'legs',
-        fabric: 'cotton-denim',
-        color: INDIGO_DENIM,
-        layer: 1,
-        thickness: 0.0009,
-        ease: 0.006,
-        hem: 0.03,
-      }),
-      g({
-        name: 'coat',
-        cut: 'top',
-        fabric: 'cotton-denim',
-        color: INDIGO_DENIM,
-        layer: 2,
-        thickness: 0.0009,
-        ease: 0.008,
-        hem: 0.1,
-        sleeves: 0.98,
-        buttons: 4,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'wool-flannel', color: BLUE_FLANNEL, layer: 0, thickness: 0.0012, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'trousers', cut: 'legs', fabric: 'cotton-denim', color: INDIGO_DENIM, layer: 1, thickness: 0.0009, ease: 0.006, hem: 0.03 }),
+      g({ name: 'coat', cut: 'top', fabric: 'cotton-denim', color: INDIGO_DENIM, layer: 2, thickness: 0.0009, ease: 0.008, hem: 0.1, sleeves: 0.98, buttons: 4 }),
       boots(LEATHER_BROWN, 0.16),
-      g({
-        name: 'hat',
-        cut: 'hat',
-        fabric: 'felt',
-        color: LIGHT_DRAB,
-        layer: 0,
-        thickness: 0.0025,
-        ease: 0.003,
-        crown: 4 * inch,
-        brim: 3 * inch,
-      }),
+      g({ name: 'hat', cut: 'hat', fabric: 'felt', color: LIGHT_DRAB, layer: 0, thickness: 0.0025, ease: 0.003, crown: 4 * inch, brim: 3 * inch }),
     ],
-    source:
-      'Harmon (dark-denim army-style work uniform; blue flannel shirts of 1905); Tucker and Fitzpatrick ch. 7 (denim coat and trousers in the 1910 catalogue)',
+    source: 'Harmon (dark-denim army-style work uniform; blue flannel shirts of 1905); Tucker and Fitzpatrick ch. 7 (denim coat and trousers in the 1910 catalogue)',
   },
   'townsman-1910': {
     role: 'Townsman in a business sack suit',
     era: '1910-american-west',
     body: 'us1919Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'cotton-shirting',
-        color: WHITE_COTTON,
-        layer: 0,
-        thickness: 0.0005,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-        collar: 2.25 * inch,
-        points: 0.875 * inch,
-      }),
-      g({
-        name: 'trousers',
-        cut: 'legs',
-        fabric: 'wool-worsted',
-        color: DARK_WORSTED,
-        layer: 1,
-        thickness: 0.0011,
-        ease: 0.004,
-        hem: 0.03,
-      }),
-      g({
-        name: 'tie',
-        cut: 'tie',
-        fabric: 'silk',
-        color: BLACK_SILK,
-        layer: 1.5,
-        thickness: 0.0012,
-        ease: 0.0008,
-        knot: 'four-in-hand',
-      }),
-      g({
-        name: 'vest',
-        cut: 'top',
-        fabric: 'wool-worsted',
-        color: DARK_WORSTED,
-        layer: 2,
-        thickness: 0.0011,
-        ease: 0.003,
-        hem: 0.95,
-        buttons: 6,
-        opening: 0.22,
-      }),
-      g({
-        name: 'coat',
-        cut: 'top',
-        fabric: 'wool-worsted',
-        color: DARK_WORSTED,
-        layer: 3,
-        thickness: 0.0016,
-        ease: 0.006,
-        hem: 0,
-        sleeves: 0.97,
-        buttons: 4,
-        opening: 0.42,
-        lapel: 2.25 * inch,
-        collar: 1.25 * inch,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'cotton-shirting', color: WHITE_COTTON, layer: 0, thickness: 0.0005, ease: 0.003, hem: 0.2, sleeves: 1, collar: 2.25 * inch, points: 0.875 * inch }),
+      g({ name: 'trousers', cut: 'legs', fabric: 'wool-worsted', color: DARK_WORSTED, layer: 1, thickness: 0.0011, ease: 0.004, hem: 0.03 }),
+      g({ name: 'tie', cut: 'tie', fabric: 'silk', color: BLACK_SILK, layer: 1.5, thickness: 0.0012, ease: 0.0008, knot: 'four-in-hand' }),
+      g({ name: 'vest', cut: 'top', fabric: 'wool-worsted', color: DARK_WORSTED, layer: 2, thickness: 0.0011, ease: 0.003, hem: 0.95, buttons: 6, opening: 0.22 }),
+      g({ name: 'coat', cut: 'top', fabric: 'wool-worsted', color: DARK_WORSTED, layer: 3, thickness: 0.0016, ease: 0.006, hem: 0, sleeves: 0.97, buttons: 4, opening: 0.42, lapel: 2.25 * inch, collar: 1.25 * inch }),
       boots(BLACK_WOOL, 0.13),
-      g({
-        name: 'hat',
-        cut: 'hat',
-        fabric: 'felt',
-        color: CHARCOAL,
-        layer: 0,
-        thickness: 0.0025,
-        ease: 0.003,
-        crown: 5.25 * inch,
-        brim: 2 * inch,
-        dome: 0.6,
-      }),
+      g({ name: 'hat', cut: 'hat', fabric: 'felt', color: CHARCOAL, layer: 0, thickness: 0.0025, ease: 0.003, crown: 5.25 * inch, brim: 2 * inch, dome: 0.6 }),
     ],
     source:
       'Harmon (the business sack coat the ranger uniform was cut against, 1907); S. S. Gordon, The American Coat, Vest and Trousers System (1895): the single-breasted sack coat cut to a 30 inch length on a 17 inch natural waist (its hem near the crotch), 2 1/4 inch lapels, trousers to its seat-to-knee-to-bottom proportions; a high-cut waistcoat and a 2 1/4 inch standing shirt collar as the Wright brothers wear them in the Library of Congress photographs of 1903 to 1910 (Wilbur about 1905, LOC Prints and Photographs ppprs.00683: a high white collar and a dark tie under the coat lapels); the collar fronts turned into 7/8 inch points over a black silk four-in-hand (the knot of T. Fink and Y. Mao, "Designing tie knots by random walks", Nature 398, 31-32, 1999: Li Ro Li Co T); a stiff felt derby, its crown rounded over, 5 1/4 inches tall on a 2 inch brim (Vintage Dancer, the 1900s and 1910s hat styles of men, from the period catalogues: derby crowns 4 1/2 to 5 1/2 inches, brims about 2 inches), as the Wrights wear in town in the Library of Congress photographs',
@@ -1828,212 +1518,57 @@ export const OUTFITS = {
     era: '1910-american-west',
     body: 'us1919Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'wool-flannel',
-        color: GRAY_FLANNEL,
-        layer: 0,
-        thickness: 0.0012,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'overalls',
-        cut: 'legs',
-        fabric: 'cotton-denim',
-        color: INDIGO_DENIM,
-        layer: 1,
-        thickness: 0.0009,
-        ease: 0.008,
-        hem: 0.03,
-        bib: true,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'wool-flannel', color: GRAY_FLANNEL, layer: 0, thickness: 0.0012, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'overalls', cut: 'legs', fabric: 'cotton-denim', color: INDIGO_DENIM, layer: 1, thickness: 0.0009, ease: 0.008, hem: 0.03, bib: true }),
       boots(LEATHER_BROWN, 0.17),
-      g({
-        name: 'hat',
-        cut: 'hat',
-        fabric: 'felt',
-        color: CHARCOAL,
-        layer: 0,
-        thickness: 0.0025,
-        ease: 0.003,
-        crown: 0.09,
-        brim: 0.035,
-      }),
+      g({ name: 'hat', cut: 'hat', fabric: 'felt', color: CHARCOAL, layer: 0, thickness: 0.0025, ease: 0.003, crown: 0.09, brim: 0.035 }),
     ],
-    source:
-      "Levi Strauss & Co. (9 oz XX denim waist overalls); University of Northern Colorado, Colorado miners' clothing (heavy hobnailed leather boots)",
+    source: "Levi Strauss & Co. (9 oz XX denim waist overalls); University of Northern Colorado, Colorado miners' clothing (heavy hobnailed leather boots)",
   },
   'logger-1910': {
     role: 'Logger',
     era: '1910-american-west',
     body: 'us1919Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'wool-flannel',
-        color: BLUE_FLANNEL,
-        layer: 0,
-        thickness: 0.0014,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'trousers',
-        cut: 'legs',
-        fabric: 'cotton-duck',
-        color: DUCK_TAN,
-        layer: 1,
-        thickness: 0.0012,
-        ease: 0.006,
-        hem: 0.2,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'wool-flannel', color: BLUE_FLANNEL, layer: 0, thickness: 0.0014, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'trousers', cut: 'legs', fabric: 'cotton-duck', color: DUCK_TAN, layer: 1, thickness: 0.0012, ease: 0.006, hem: 0.2 }),
       boots(LEATHER_BROWN, 0.25),
-      g({
-        name: 'hat',
-        cut: 'hat',
-        fabric: 'felt',
-        color: CHARCOAL,
-        layer: 0,
-        thickness: 0.0025,
-        ease: 0.003,
-        crown: 0.1,
-        brim: 0.05,
-      }),
+      g({ name: 'hat', cut: 'hat', fabric: 'felt', color: CHARCOAL, layer: 0, thickness: 0.0025, ease: 0.003, crown: 0.1, brim: 0.05 }),
     ],
-    source:
-      "Filson, a 1925 Forest Service testimony listing logger's boots, water-repellent pants and woollen underwear (a weak secondary source)",
+    source: "Filson, a 1925 Forest Service testimony listing logger's boots, water-repellent pants and woollen underwear (a weak secondary source)",
   },
   'railwayman-1910': {
     role: 'Railwayman',
     era: '1910-american-west',
     body: 'us1919Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'cotton-shirting',
-        color: BLUE_FLANNEL,
-        layer: 0,
-        thickness: 0.0006,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'overalls',
-        cut: 'legs',
-        fabric: 'cotton-denim',
-        color: INDIGO_DENIM,
-        layer: 1,
-        thickness: 0.0009,
-        ease: 0.008,
-        hem: 0.03,
-        bib: true,
-      }),
-      g({
-        name: 'jumper',
-        cut: 'top',
-        fabric: 'cotton-denim',
-        color: INDIGO_DENIM,
-        layer: 2,
-        thickness: 0.0009,
-        ease: 0.006,
-        hem: 0.3,
-        sleeves: 0.97,
-        buttons: 4,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'cotton-shirting', color: BLUE_FLANNEL, layer: 0, thickness: 0.0006, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'overalls', cut: 'legs', fabric: 'cotton-denim', color: INDIGO_DENIM, layer: 1, thickness: 0.0009, ease: 0.008, hem: 0.03, bib: true }),
+      g({ name: 'jumper', cut: 'top', fabric: 'cotton-denim', color: INDIGO_DENIM, layer: 2, thickness: 0.0009, ease: 0.006, hem: 0.3, sleeves: 0.97, buttons: 4 }),
       boots(BLACK_WOOL, 0.15),
     ],
-    source:
-      'Harmon (blue denim overalls and short blue denim jumpers, 1905 working dress); Levi Strauss & Co. (9 oz denim)',
+    source: 'Harmon (blue denim overalls and short blue denim jumpers, 1905 working dress); Levi Strauss & Co. (9 oz denim)',
   },
   'office-worker-2011': {
     role: 'Office worker, March 2011 (before Super Cool Biz began on 1 May)',
     era: '2011-coastal-japan',
     body: 'japan2003Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'cotton-shirting',
-        color: WHITE_COTTON,
-        layer: 0,
-        thickness: 0.0004,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'trousers',
-        cut: 'legs',
-        fabric: 'wool-worsted',
-        color: CHARCOAL,
-        layer: 1,
-        thickness: 0.0008,
-        ease: 0.006,
-        hem: 0.03,
-      }),
-      g({
-        name: 'jacket',
-        cut: 'top',
-        fabric: 'wool-worsted',
-        color: CHARCOAL,
-        layer: 2,
-        thickness: 0.0014,
-        ease: 0.006,
-        hem: -0.5,
-        sleeves: 0.97,
-        buttons: 2,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'cotton-shirting', color: WHITE_COTTON, layer: 0, thickness: 0.0004, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'trousers', cut: 'legs', fabric: 'wool-worsted', color: CHARCOAL, layer: 1, thickness: 0.0008, ease: 0.006, hem: 0.03 }),
+      g({ name: 'jacket', cut: 'top', fabric: 'wool-worsted', color: CHARCOAL, layer: 2, thickness: 0.0014, ease: 0.006, hem: -0.5, sleeves: 0.97, buttons: 2 }),
       boots(BLACK_WOOL, 0.09),
     ],
-    source:
-      'Japan Ministry of the Environment press 13775 (Super Cool Biz 2011 ran 1 May to 31 October, so March dress kept the jacket)',
+    source: 'Japan Ministry of the Environment press 13775 (Super Cool Biz 2011 ran 1 May to 31 October, so March dress kept the jacket)',
   },
   'office-worker-2011-woman': {
     role: 'Office worker, March 2011',
     era: '2011-coastal-japan',
     body: 'japan2003Woman',
     garments: [
-      g({
-        name: 'blouse',
-        cut: 'top',
-        fabric: 'cotton-shirting',
-        color: WHITE_COTTON,
-        layer: 0,
-        thickness: 0.0004,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'skirt',
-        cut: 'skirt',
-        fabric: 'polyester-blend',
-        color: CHARCOAL,
-        layer: 1,
-        thickness: 0.0008,
-        ease: 0.004,
-        hem: 0.42,
-        flare: 0.1,
-      }),
-      g({
-        name: 'jacket',
-        cut: 'top',
-        fabric: 'polyester-blend',
-        color: CHARCOAL,
-        layer: 2,
-        thickness: 0.0012,
-        ease: 0.006,
-        hem: 0.1,
-        sleeves: 0.97,
-        buttons: 2,
-      }),
+      g({ name: 'blouse', cut: 'top', fabric: 'cotton-shirting', color: WHITE_COTTON, layer: 0, thickness: 0.0004, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'skirt', cut: 'skirt', fabric: 'polyester-blend', color: CHARCOAL, layer: 1, thickness: 0.0008, ease: 0.004, hem: 0.42, flare: 0.1 }),
+      g({ name: 'jacket', cut: 'top', fabric: 'polyester-blend', color: CHARCOAL, layer: 2, thickness: 0.0012, ease: 0.006, hem: 0.1, sleeves: 0.97, buttons: 2 }),
       boots(BLACK_WOOL, 0.08),
     ],
     source: 'Japan Ministry of the Environment press 13775',
@@ -2043,71 +1578,20 @@ export const OUTFITS = {
     era: '2011-coastal-japan',
     body: 'japan2003Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'cotton-shirting',
-        color: WHITE_COTTON,
-        layer: 0,
-        thickness: 0.0004,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'trousers',
-        cut: 'legs',
-        fabric: 'polyester-blend',
-        color: BLACK_WOOL,
-        layer: 1,
-        thickness: 0.0009,
-        ease: 0.006,
-        hem: 0.03,
-      }),
-      g({
-        name: 'gakuran',
-        cut: 'top',
-        fabric: 'polyester-blend',
-        color: BLACK_WOOL,
-        layer: 2,
-        thickness: 0.0014,
-        ease: 0.006,
-        hem: 0,
-        sleeves: 0.97,
-        buttons: 5,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'cotton-shirting', color: WHITE_COTTON, layer: 0, thickness: 0.0004, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'trousers', cut: 'legs', fabric: 'polyester-blend', color: BLACK_WOOL, layer: 1, thickness: 0.0009, ease: 0.006, hem: 0.03 }),
+      g({ name: 'gakuran', cut: 'top', fabric: 'polyester-blend', color: BLACK_WOOL, layer: 2, thickness: 0.0014, ease: 0.006, hem: 0, sleeves: 0.97, buttons: 5 }),
       boots(WHITE_COTTON, 0.08),
     ],
-    source:
-      "Boston Children's Museum Japanese House collection (gakuran trousers, wool blend); nippon.com, school uniform column",
+    source: "Boston Children's Museum Japanese House collection (gakuran trousers, wool blend); nippon.com, school uniform column",
   },
   'schoolgirl-2011': {
     role: 'Schoolgirl in a sailor uniform',
     era: '2011-coastal-japan',
     body: 'japan2003Woman',
     garments: [
-      g({
-        name: 'sailor top',
-        cut: 'top',
-        fabric: 'polyester-blend',
-        color: NAVY,
-        layer: 0,
-        thickness: 0.0009,
-        ease: 0.006,
-        hem: 0.3,
-        sleeves: 0.97,
-      }),
-      g({
-        name: 'pleated skirt',
-        cut: 'skirt',
-        fabric: 'polyester-blend',
-        color: NAVY,
-        layer: 1,
-        thickness: 0.0009,
-        ease: 0.004,
-        hem: 0.42,
-        flare: 0.3,
-      }),
+      g({ name: 'sailor top', cut: 'top', fabric: 'polyester-blend', color: NAVY, layer: 0, thickness: 0.0009, ease: 0.006, hem: 0.3, sleeves: 0.97 }),
+      g({ name: 'pleated skirt', cut: 'skirt', fabric: 'polyester-blend', color: NAVY, layer: 1, thickness: 0.0009, ease: 0.004, hem: 0.42, flare: 0.3 }),
       boots(BLACK_WOOL, 0.08),
     ],
     source: "Boston Children's Museum Japanese House collection records; nippon.com, school uniform column",
@@ -2117,65 +1601,23 @@ export const OUTFITS = {
     era: '2011-coastal-japan',
     body: 'japan2003Man',
     garments: [
-      g({
-        name: 'shirt',
-        cut: 'top',
-        fabric: 'cotton-shirting',
-        color: GRAY_FLANNEL,
-        layer: 0,
-        thickness: 0.0006,
-        ease: 0.003,
-        hem: 0.2,
-        sleeves: 1,
-      }),
-      g({
-        name: 'bib overalls',
-        cut: 'legs',
-        fabric: 'coated',
-        color: COATED_NAVY,
-        layer: 1,
-        thickness: 0.0008,
-        ease: 0.01,
-        hem: 0.12,
-        bib: true,
-      }),
-      g({
-        name: 'rain jacket',
-        cut: 'top',
-        fabric: 'coated',
-        color: COATED_ORANGE,
-        layer: 2,
-        thickness: 0.0008,
-        ease: 0.01,
-        hem: -0.2,
-        sleeves: 0.95,
-      }),
-      g({
-        name: 'life jacket',
-        cut: 'top',
-        fabric: 'coated',
-        color: COATED_ORANGE,
-        layer: 3,
-        thickness: 0.02,
-        ease: 0.004,
-        hem: 0.9,
-      }),
+      g({ name: 'shirt', cut: 'top', fabric: 'cotton-shirting', color: GRAY_FLANNEL, layer: 0, thickness: 0.0006, ease: 0.003, hem: 0.2, sleeves: 1 }),
+      g({ name: 'bib overalls', cut: 'legs', fabric: 'coated', color: COATED_NAVY, layer: 1, thickness: 0.0008, ease: 0.01, hem: 0.12, bib: true }),
+      g({ name: 'rain jacket', cut: 'top', fabric: 'coated', color: COATED_ORANGE, layer: 2, thickness: 0.0008, ease: 0.01, hem: -0.2, sleeves: 0.95 }),
+      g({ name: 'life jacket', cut: 'top', fabric: 'coated', color: COATED_ORANGE, layer: 3, thickness: 0.02, ease: 0.004, hem: 0.9 }),
       boots(RUBBER_BLACK, 0.36),
     ],
     optional: { names: ['life jacket'], chance: 0.3 },
-    source:
-      'Fisheries Agency, life jacket guide for fishers (about 3 in 10 fishers wore one); rain gear and boots: no period source found (docs/limits.md)',
+    source: 'Fisheries Agency, life jacket guide for fishers (about 3 in 10 fishers wore one); rain gear and boots: no period source found (docs/limits.md)',
   },
 } as const satisfies Record<string, Outfit>;
 /** An outfit name. */
 export type OutfitName = keyof typeof OUTFITS;
 function checkOutfit(o: Outfit) {
-  if (!o || !Array.isArray(o.garments) || !o.garments.length)
-    throw new TypeError('An outfit needs garments; pass one of OUTFITS');
+  if (!o || !Array.isArray(o.garments) || !o.garments.length) throw new TypeError('An outfit needs garments; pass one of OUTFITS');
   for (const s of o.garments) {
     checkColor(s.color, `garment ${s.name} color`);
-    if (!(s.thickness > 0) || !(s.ease >= 0))
-      throw new RangeError(`garment ${s.name} needs a thickness above 0 and an ease of 0 or more, metres`);
+    if (!(s.thickness > 0) || !(s.ease >= 0)) throw new RangeError(`garment ${s.name} needs a thickness above 0 and an ease of 0 or more, metres`);
   }
 }
 /**
@@ -2183,18 +1625,9 @@ function checkOutfit(o: Outfit) {
  * layers are plain glTF dielectrics with the given roughness (no measured data: the values are look defaults).
  */
 export function garmentMaterial(spec: GarmentSpec): ClothLobes {
-  if (spec.fabric === 'coated')
-    return { baseColor: spec.color, roughness: 0.42, sheenColor: [0, 0, 0], sheenRoughness: 0, fitError: 0 };
-  if (spec.fabric === 'leather')
-    return { baseColor: spec.color, roughness: 0.55, sheenColor: [0, 0, 0], sheenRoughness: 0, fitError: 0 };
-  if (spec.fabric === 'felt')
-    return {
-      baseColor: spec.color,
-      roughness: 1,
-      sheenColor: scaled(spec.color, 0.6),
-      sheenRoughness: 0.8,
-      fitError: 0,
-    };
+  if (spec.fabric === 'coated') return { baseColor: spec.color, roughness: 0.42, sheenColor: [0, 0, 0], sheenRoughness: 0, fitError: 0 };
+  if (spec.fabric === 'leather') return { baseColor: spec.color, roughness: 0.55, sheenColor: [0, 0, 0], sheenRoughness: 0, fitError: 0 };
+  if (spec.fabric === 'felt') return { baseColor: spec.color, roughness: 1, sheenColor: scaled(spec.color, 0.6), sheenRoughness: 0.8, fitError: 0 };
   return periodLobes(spec.fabric, spec.color);
 }
 
@@ -2231,34 +1664,17 @@ export function outfitGLB(outfit: Outfit, body: CastBody = BODIES[outfit.body]):
     }
     const count = positions.length / 3,
       acc = (data: Float32Array | Uint32Array, type: string, target: number, extra = {}) => {
-        accessors.push({
-          bufferView: view(data, target),
-          componentType: data instanceof Float32Array ? 5126 : 5125,
-          count: type === 'SCALAR' ? data.length : count,
-          type,
-          ...extra,
-        });
+        accessors.push({ bufferView: view(data, target), componentType: data instanceof Float32Array ? 5126 : 5125, count: type === 'SCALAR' ? data.length : count, type, ...extra });
         return accessors.length - 1;
       };
     const lobes = garmentMaterial(garment.spec);
     materials.push({
       name: garment.spec.name,
-      pbrMetallicRoughness: {
-        baseColorFactor: [...lobes.baseColor, 1],
-        metallicFactor: 0,
-        roughnessFactor: lobes.roughness,
-      },
+      pbrMetallicRoughness: { baseColorFactor: [...lobes.baseColor, 1], metallicFactor: 0, roughnessFactor: lobes.roughness },
       // Hems show both faces of the cloth band.
       doubleSided: true,
       ...(lobes.sheenColor.some((c) => c > 0)
-        ? {
-            extensions: {
-              KHR_materials_sheen: {
-                sheenColorFactor: [...lobes.sheenColor],
-                sheenRoughnessFactor: lobes.sheenRoughness,
-              },
-            },
-          }
+        ? { extensions: { KHR_materials_sheen: { sheenColorFactor: [...lobes.sheenColor], sheenRoughnessFactor: lobes.sheenRoughness } } }
         : {}),
     });
     meshes.push({
@@ -2343,8 +1759,7 @@ export interface CastMember {
  * const cast = castCrowd(200, { roles: { 'ranger-1910': 1, 'miner-1910': 3, 'logger-1910': 4 } });
  */
 export function castCrowd(count: number, options: CastCrowdOptions): CastMember[] {
-  if (!Number.isInteger(count) || count < 0)
-    throw new RangeError('castCrowd count must be a whole number of people, 0 or more');
+  if (!Number.isInteger(count) || count < 0) throw new RangeError('castCrowd count must be a whole number of people, 0 or more');
   const entries = Object.entries(options?.roles ?? {}) as [OutfitName, number][],
     seed = options.seed ?? 1,
     spread = options.dyeSpread ?? 0.08;
@@ -2383,10 +1798,7 @@ export function castCrowd(count: number, options: CastCrowdOptions): CastMember[
  * const variants = castVariants({ 'ranger-1910': 1, 'miner-1910': 3 });
  * walkCrowd(crowd, people, { stride: 1.4, variants });
  */
-export function castVariants(
-  roles: Readonly<Partial<Record<OutfitName, number>>>,
-  columns?: number,
-): { offset: number[]; scale: number[] }[] {
+export function castVariants(roles: Readonly<Partial<Record<OutfitName, number>>>, columns?: number): { offset: number[]; scale: number[] }[] {
   const entries = Object.entries(roles) as [OutfitName, number][];
   if (!entries.length || entries.some(([name, w]) => !(name in OUTFITS) || !(w > 0) || !Number.isFinite(w)))
     throw new RangeError('castVariants needs outfit names with weights above 0');
@@ -2410,76 +1822,19 @@ export type CastSettingValues = Readonly<Record<string, number | Rgb | string>>;
 /** The cast's slider rows: the outfit, its body, one garment's cloth and colour, and the fit. All rebuild the garments. */
 export const CAST_SETTINGS: readonly SettingRow[] = [
   choiceSetting('outfit', 'outfit', Object.keys(OUTFITS), 'The role and era of the outfit (OUTFITS).', false),
-  choiceSetting(
-    'body',
-    'outfit',
-    ['outfit', ...Object.keys(BODIES)],
-    "The body it is cut for: the outfit's own, or a measured body (BODIES).",
-    false,
-  ),
-  numberSetting(
-    'garment',
-    'garment',
-    0,
-    0,
-    7,
-    1,
-    '',
-    'Which garment of the outfit the rows below change, by its place in the outfit.',
-    false,
-  ),
+  choiceSetting('body', 'outfit', ['outfit', ...Object.keys(BODIES)], 'The body it is cut for: the outfit\'s own, or a measured body (BODIES).', false),
+  numberSetting('garment', 'garment', 0, 0, 7, 1, '', 'Which garment of the outfit the rows below change, by its place in the outfit.', false),
   choiceSetting(
     'fabric',
     'garment',
-    [
-      'outfit',
-      'cotton-denim',
-      'cotton-duck',
-      'cotton-shirting',
-      'cotton-corduroy',
-      'wool-worsted',
-      'wool-flannel',
-      'polyester-blend',
-      'silk',
-      'coated',
-      'leather',
-      'felt',
-    ],
-    "The cloth of that garment: the outfit's own, or a period fabric (periodFabric).",
+    ['outfit', 'cotton-denim', 'cotton-duck', 'cotton-shirting', 'cotton-corduroy', 'wool-worsted', 'wool-flannel', 'polyester-blend', 'silk', 'coated', 'leather', 'felt'],
+    'The cloth of that garment: the outfit\'s own, or a period fabric (periodFabric).',
     false,
   ),
-  colorSetting(
-    'color',
-    'garment',
-    [-1, -1, -1],
-    -1,
-    1,
-    "Dye colour of that garment, linear RGB; -1 keeps the outfit's.",
-    false,
-  ),
-  numberSetting(
-    'thickness',
-    'fit',
-    0,
-    0,
-    0.03,
-    0.0001,
-    'm',
-    "Cloth thickness of that garment; 0 keeps the outfit's.",
-    false,
-  ),
-  numberSetting('ease', 'fit', -1, -1, 0.05, 0.0005, 'm', "Gap to the layer beneath; -1 keeps the outfit's.", false),
-  numberSetting(
-    'dyeSpread',
-    'crowd',
-    0.08,
-    0,
-    0.5,
-    0.01,
-    '',
-    'Largest relative change of each dye between people in castCrowd.',
-    false,
-  ),
+  colorSetting('color', 'garment', [-1, -1, -1], -1, 1, 'Dye colour of that garment, linear RGB; -1 keeps the outfit\'s.', false),
+  numberSetting('thickness', 'fit', 0, 0, 0.03, 0.0001, 'm', 'Cloth thickness of that garment; 0 keeps the outfit\'s.', false),
+  numberSetting('ease', 'fit', -1, -1, 0.05, 0.0005, 'm', 'Gap to the layer beneath; -1 keeps the outfit\'s.', false),
+  numberSetting('dyeSpread', 'crowd', 0.08, 0, 0.5, 0.01, '', 'Largest relative change of each dye between people in castCrowd.', false),
 ];
 /** The row defaults. */
 export const castSettingDefaults = (): Record<string, unknown> => settingDefaults(CAST_SETTINGS);
@@ -2495,10 +1850,7 @@ export function applyCastSettings(values: CastSettingValues): { outfit: Outfit; 
   applySettings(CAST_SETTINGS, values as never, 'humans/cast', (row, value) => (v[row.name] = value));
   const base: Outfit = OUTFITS[v.outfit as OutfitName],
     k = v.garment as number;
-  if (k >= base.garments.length)
-    throw new RangeError(
-      `outfit ${v.outfit} has ${base.garments.length} garments; pass garment 0 to ${base.garments.length - 1}`,
-    );
+  if (k >= base.garments.length) throw new RangeError(`outfit ${v.outfit} has ${base.garments.length} garments; pass garment 0 to ${base.garments.length - 1}`);
   const color = v.color as Rgb;
   const garments = base.garments.map((s, i) =>
     i !== k
@@ -2511,9 +1863,5 @@ export function applyCastSettings(values: CastSettingValues): { outfit: Outfit; 
           ...((v.ease as number) >= 0 ? { ease: v.ease as number } : {}),
         },
   );
-  return {
-    outfit: { ...base, garments },
-    body: BODIES[(v.body === 'outfit' ? base.body : v.body) as keyof typeof BODIES],
-    dyeSpread: v.dyeSpread as number,
-  };
+  return { outfit: { ...base, garments }, body: BODIES[(v.body === 'outfit' ? base.body : v.body) as keyof typeof BODIES], dyeSpread: v.dyeSpread as number };
 }

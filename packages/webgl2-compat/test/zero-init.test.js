@@ -25,12 +25,7 @@ const named = (calls, ...names) => calls.filter((c) => names.includes(c[0]));
 test('a colour-renderable texture has every level and layer cleared to zero when it is made', async () => {
   const { gl, device } = await loggingDevice();
   const { calls } = during(gl, () =>
-    device.createTexture({
-      size: [32, 16],
-      mipLevelCount: 5,
-      format: 'rgba8unorm',
-      usage: U.TEXTURE_BINDING | U.COPY_DST,
-    }),
+    device.createTexture({ size: [32, 16], mipLevelCount: 5, format: 'rgba8unorm', usage: U.TEXTURE_BINDING | U.COPY_DST }),
   );
   const attached = named(calls, 'framebufferTexture2D').filter((c) => c[4] !== null);
   assert.deepEqual(
@@ -78,13 +73,7 @@ test('array layers, cube faces and 3D slices are each cleared; integer formats c
     'every face',
   );
   const volume = during(gl, () =>
-    device.createTexture({
-      size: [8, 8, 4],
-      dimension: '3d',
-      mipLevelCount: 2,
-      format: 'r8unorm',
-      usage: U.TEXTURE_BINDING,
-    }),
+    device.createTexture({ size: [8, 8, 4], dimension: '3d', mipLevelCount: 2, format: 'r8unorm', usage: U.TEXTURE_BINDING }),
   ).calls;
   assert.deepEqual(
     named(volume, 'framebufferTextureLayer')
@@ -100,13 +89,9 @@ test('array layers, cube faces and 3D slices are each cleared; integer formats c
     ],
     'level 1 of a depth-4 volume has 2 slices',
   );
-  const uint = during(gl, () =>
-    device.createTexture({ size: [4, 4], format: 'r32uint', usage: U.TEXTURE_BINDING }),
-  ).calls;
+  const uint = during(gl, () => device.createTexture({ size: [4, 4], format: 'r32uint', usage: U.TEXTURE_BINDING })).calls;
   assert.equal(named(uint, 'clearBufferuiv').length, 1);
-  const sint = during(gl, () =>
-    device.createTexture({ size: [4, 4], format: 'rg16sint', usage: U.TEXTURE_BINDING }),
-  ).calls;
+  const sint = during(gl, () => device.createTexture({ size: [4, 4], format: 'rg16sint', usage: U.TEXTURE_BINDING })).calls;
   assert.equal(named(sint, 'clearBufferiv').length, 1);
   device.destroy();
 });
@@ -116,29 +101,16 @@ test('depth and stencil textures are cleared through their attachment point', as
   const depth = during(gl, () =>
     device.createTexture({ size: [16, 16], format: 'depth32float', usage: U.TEXTURE_BINDING | U.RENDER_ATTACHMENT }),
   ).calls;
-  assert.equal(
-    named(depth, 'framebufferTexture2D').filter((c) => c[2] === gl.DEPTH_ATTACHMENT && c[4] !== null).length,
-    1,
-  );
-  assert.deepEqual(
-    named(depth, 'clearBufferfv').map((c) => [c[1], [...c[3]]]),
-    [[gl.DEPTH, [0]]],
-  );
+  assert.equal(named(depth, 'framebufferTexture2D').filter((c) => c[2] === gl.DEPTH_ATTACHMENT && c[4] !== null).length, 1);
+  assert.deepEqual(named(depth, 'clearBufferfv').map((c) => [c[1], [...c[3]]]), [[gl.DEPTH, [0]]]);
   const both = during(gl, () =>
-    device.createTexture({
-      size: [16, 16],
-      format: 'depth24plus-stencil8',
-      usage: U.TEXTURE_BINDING | U.RENDER_ATTACHMENT,
-    }),
+    device.createTexture({ size: [16, 16], format: 'depth24plus-stencil8', usage: U.TEXTURE_BINDING | U.RENDER_ATTACHMENT }),
   ).calls;
   assert.equal(
     named(both, 'framebufferTexture2D').filter((c) => c[2] === gl.DEPTH_STENCIL_ATTACHMENT && c[4] !== null).length,
     1,
   );
-  assert.deepEqual(
-    named(both, 'clearBufferfi').map((c) => c.slice(1)),
-    [[gl.DEPTH_STENCIL, 0, 0, 0]],
-  );
+  assert.deepEqual(named(both, 'clearBufferfi').map((c) => c.slice(1)), [[gl.DEPTH_STENCIL, 0, 0, 0]]);
   device.destroy();
 });
 
@@ -169,12 +141,7 @@ test('formats that cannot be cleared are uploaded whole, a level per call, from 
 test('compressed textures are left alone: zero blocks are not zero texels', async () => {
   const { gl, device } = await loggingDevice(['texture-compression-bc']);
   const { calls } = during(gl, () =>
-    device.createTexture({
-      size: [8, 8],
-      mipLevelCount: 2,
-      format: 'bc7-rgba-unorm',
-      usage: U.TEXTURE_BINDING | U.COPY_DST,
-    }),
+    device.createTexture({ size: [8, 8], mipLevelCount: 2, format: 'bc7-rgba-unorm', usage: U.TEXTURE_BINDING | U.COPY_DST }),
   );
   assert.equal(named(calls, 'clearBufferfv', 'texSubImage2D', 'compressedTexSubImage2D').length, 0);
   device.destroy();

@@ -11,20 +11,10 @@ function scroller() {
     return { source: element, done: () => element.remove() };
   }
   const frames = new Set();
-  const view = Object.assign(new EventTarget(), {
-    requestAnimationFrame: (fn) => {
-      frames.add(fn);
-      return frames.size;
-    },
-    cancelAnimationFrame: () => frames.clear(),
-  });
-  const source = Object.assign(new EventTarget(), {
-    scrollTop: 0,
-    scrollHeight: 400,
-    clientHeight: 40,
-    ownerDocument: { defaultView: view },
-    getBoundingClientRect: () => ({ top: 0 }),
-  });
+  const view = Object.assign(new EventTarget(), { requestAnimationFrame: (fn) => { frames.add(fn); return frames.size; },
+    cancelAnimationFrame: () => frames.clear() });
+  const source = Object.assign(new EventTarget(), { scrollTop: 0, scrollHeight: 400, clientHeight: 40, ownerDocument: { defaultView: view },
+    getBoundingClientRect: () => ({ top: 0 }) });
   return { source, view, frames, done() {} };
 }
 
@@ -39,61 +29,38 @@ export async function fixtures(load = (entry) => import(entry)) {
   const entries = [];
   const timeline = () => new Timeline().to({ x: 0 }, 'x', 1, { duration: 1 });
   // The app's AbortSignal outlives every one of these: its abort listener goes with the object.
-  const withSignal = (name, make) =>
-    entries.push({
-      name,
-      create({ scene }) {
-        const controller = new AbortController(),
-          made = make(controller.signal);
-        return ownedByEngine(scene, name, made.release, { cleanup: made.cleanup });
-      },
-    });
-  const scrolling = (name, options) =>
-    entries.push({
-      name,
-      create({ scene }) {
-        const { source, view, frames, done } = scroller(),
-          controller = new AbortController();
-        const link = scrollTimeline(timeline(), { source, signal: controller.signal, ...options });
-        source.scrollTop = 120;
-        source.dispatchEvent(new Event('scroll'));
-        return ownedByEngine(scene, name, () => link.dispose(), {
-          cleanup() {
-            done();
-            if (frames?.size) lifetimeFault('a disposed scroll link leaves an animation frame queued');
-          },
-        });
-      },
-    });
+  const withSignal = (name, make) => entries.push({ name, create({ scene }) {
+    const controller = new AbortController(), made = make(controller.signal);
+    return ownedByEngine(scene, name, made.release, { cleanup: made.cleanup });
+  } });
+  const scrolling = (name, options) => entries.push({ name, create({ scene }) {
+    const { source, view, frames, done } = scroller(), controller = new AbortController();
+    const link = scrollTimeline(timeline(), { source, signal: controller.signal, ...options });
+    source.scrollTop = 120;
+    source.dispatchEvent(new Event('scroll'));
+    return ownedByEngine(scene, name, () => link.dispose(), { cleanup() {
+      done();
+      if (frames?.size) lifetimeFault('a disposed scroll link leaves an animation frame queued');
+    } });
+  } });
   scrolling('scrollTimeline', {});
   scrolling('scrollTimeline.scrub', { scrub: 0.2 });
-  if (globalThis.document?.body)
-    entries.push({
-      name: 'pinTimeline',
-      create({ scene }) {
-        const holder = document.createElement('div'),
-          pin = document.createElement('div'),
-          controller = new AbortController();
-        holder.style.cssText = 'height:2000px';
-        pin.style.cssText = 'height:20px';
-        holder.append(pin);
-        document.body.append(holder);
-        const link = pinTimeline(new FullTimeline().to({ x: 0 }, 'x', 1, { duration: 1 }), {
-          pin,
-          signal: controller.signal,
-          scrub: 0.2,
-        });
-        return ownedByEngine(scene, 'pinTimeline', () => link.dispose(), { cleanup: () => holder.remove() });
-      },
-    });
+  if (globalThis.document?.body) entries.push({ name: 'pinTimeline', create({ scene }) {
+    const holder = document.createElement('div'), pin = document.createElement('div'), controller = new AbortController();
+    holder.style.cssText = 'height:2000px';
+    pin.style.cssText = 'height:20px';
+    holder.append(pin);
+    document.body.append(holder);
+    const link = pinTimeline(new FullTimeline().to({ x: 0 }, 'x', 1, { duration: 1 }), { pin, signal: controller.signal, scrub: 0.2 });
+    return ownedByEngine(scene, 'pinTimeline', () => link.dispose(), { cleanup: () => holder.remove() });
+  } });
   withSignal('Timeline', (signal) => {
     const line = new FullTimeline({ signal }).to({ x: 0 }, 'x', 1, { duration: 1 });
     line.finished?.catch?.(() => {});
     return { release: () => line.dispose() };
   });
   withSignal('AsyncTween.to', (signal) => {
-    const tween = new AsyncTween(),
-      task = tween.to({ x: 0 }, 'x', 1, { duration: 1, signal });
+    const tween = new AsyncTween(), task = tween.to({ x: 0 }, 'x', 1, { duration: 1, signal });
     task.finished.catch(() => {});
     return { release: () => task.cancel() };
   });
@@ -103,8 +70,7 @@ export async function fixtures(load = (entry) => import(entry)) {
     return { release: () => line.cancel() };
   });
   withSignal('TweenControl.to', (signal) => {
-    const world = new TweenControl(),
-      tween = world.to({ x: 0 }, { x: 1 }, { duration: 1, signal });
+    const world = new TweenControl(), tween = world.to({ x: 0 }, { x: 1 }, { duration: 1, signal });
     tween.finished.catch(() => {});
     return { release: () => world.dispose() };
   });

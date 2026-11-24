@@ -43,22 +43,11 @@ test('a retained disposed bus releases its owned insert references after bus or 
       const visit = (value) => {
         if (value === stage || value === stage.input || value === stage.output) return true;
         // Context and mixer are borrowed owners; native nodes are leaves, not JavaScript owner containers.
-        if (
-          !value ||
-          typeof value !== 'object' ||
-          value === context ||
-          value === mixer ||
-          value instanceof FakeNode ||
-          seen.has(value)
-        )
+        if (!value || typeof value !== 'object' || value === context || value === mixer || value instanceof FakeNode || seen.has(value))
           return false;
         seen.add(value);
-        const children =
-          value instanceof Map
-            ? [...value.keys(), ...value.values()]
-            : value instanceof Set
-              ? [...value]
-              : Object.values(value);
+        const children = value instanceof Map ? [...value.keys(), ...value.values()]
+          : value instanceof Set ? [...value] : Object.values(value);
         return children.some(visit);
       };
       return visit(bus);
@@ -150,14 +139,7 @@ test('fader: dB to gain, silence at -Infinity, immediate on a context that has n
 });
 
 test('rejected numeric fades preserve bus targets, gates and duck membership', () => {
-  for (const options of [
-    { seconds: -1 },
-    { seconds: NaN },
-    { seconds: Infinity },
-    { at: -1 },
-    { at: NaN },
-    { at: Infinity },
-  ]) {
+  for (const options of [{ seconds: -1 }, { seconds: NaN }, { seconds: Infinity }, { at: -1 }, { at: NaN }, { at: Infinity }]) {
     using mixer = new Mixer(new FakeContext(), { buses: { a: {}, b: {} } });
     const bus = mixer.bus('a');
     assert.throws(() => bus.setGain(-12, options), RangeError);
@@ -182,11 +164,7 @@ test('rejected numeric fades preserve bus targets, gates and duck membership', (
   assert.equal(duck.active, true, 'failed release leaves the handle active and usable');
   duck.release({ seconds: undefined });
   assert.equal(duck.active, false);
-  assert.equal(
-    bus.duckNode.gain.last().constant,
-    0.1,
-    'undefined release duration keeps the documented 0.4 second default',
-  );
+  assert.equal(bus.duckNode.gain.last().constant, 0.1, 'undefined release duration keeps the documented 0.4 second default');
   bus.setMuted(true);
   assert.equal(bus.gate.gain.last().constant, 0.0025, 'the existing default 10 ms mute fade is preserved');
   bus.setMuted(false, { seconds: undefined });
@@ -194,16 +172,10 @@ test('rejected numeric fades preserve bus targets, gates and duck membership', (
 });
 
 test('invalid parameter values and times never cancel existing automation', () => {
-  const context = new FakeContext(),
-    param = new FakeParam();
+  const context = new FakeContext(), param = new FakeParam();
   rampParam(context, param, 0.5, { at: 1, seconds: 0.2 });
   const before = JSON.stringify(param);
-  for (const [value, options] of [
-    [1e100, {}],
-    [1, { at: -1 }],
-    [1, { at: NaN }],
-    [1, { seconds: -1 }],
-  ]) {
+  for (const [value, options] of [[1e100, {}], [1, { at: -1 }], [1, { at: NaN }], [1, { seconds: -1 }]]) {
     assert.throws(() => rampParam(context, param, value, options), RangeError);
     assert.equal(JSON.stringify(param), before);
   }
@@ -683,10 +655,7 @@ test('setListenerPose keeps up at right angles to forward, so the right axis is 
   const context = new FakeContext(),
     up = () => ['upX', 'upY', 'upZ'].map((k) => context.listener[k].last().value),
     close = (actual, expected) =>
-      assert.ok(
-        actual.every((v, i) => Math.abs(v - expected[i]) < 1e-12),
-        `${actual} against ${expected}`,
-      );
+      assert.ok(actual.every((v, i) => Math.abs(v - expected[i]) < 1e-12), `${actual} against ${expected}`);
   setListenerPose(context, { position: [0, 10, 0], forward: [0, -1, 0] });
   close(up(), [0, 0, -1]);
   setListenerPose(context, { position: [0, 0, 0], forward: [0, 3, 0] });
@@ -695,8 +664,5 @@ test('setListenerPose keeps up at right angles to forward, so the right axis is 
   close(up(), [-Math.SQRT1_2, Math.SQRT1_2, 0]);
   setListenerPose(context, { position: [0, 0, 0], forward: [0, 0, -1], up: [0, 2, 0] });
   close(up(), [0, 1, 0]);
-  assert.throws(
-    () => setListenerPose(context, { position: [0, 0, 0], forward: [0, 0, -1], up: [0, 0, 0] }),
-    RangeError,
-  );
+  assert.throws(() => setListenerPose(context, { position: [0, 0, 0], forward: [0, 0, -1], up: [0, 0, 0] }), RangeError);
 });

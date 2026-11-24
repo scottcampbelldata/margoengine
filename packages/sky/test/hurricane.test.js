@@ -10,14 +10,7 @@ import {
   hollandWind,
   resolveHurricane,
 } from '@margoengine/sky/hurricane';
-import {
-  VolumetricClouds,
-  cloudLayerFor,
-  layerOf,
-  loadStormField,
-  writeLayer,
-  CLOUD_FLOATS,
-} from '@margoengine/sky/volumetric-clouds';
+import { VolumetricClouds, cloudLayerFor, layerOf, loadStormField, writeLayer, CLOUD_FLOATS } from '@margoengine/sky/volumetric-clouds';
 import { applySkySettings, SKY_SETTINGS } from '@margoengine/sky/settings';
 import { Sky } from '@margoengine/sky';
 import { WeatherRegions } from '@margoengine/weather/regions';
@@ -35,19 +28,12 @@ const peakOf = (wind, from, to) => {
 };
 
 test('Holland 1980: the gradient wind peaks at the radius of maximum wind at sqrt(B dp / (rho e))', () => {
-  for (const options of [
-    {},
-    { pressureDrop: 100, maxWindRadius: 15000, holland: 2.2 },
-    { pressureDrop: 20, maxWindRadius: 80000, holland: 1 },
-  ]) {
+  for (const options of [{}, { pressureDrop: 100, maxWindRadius: 15000, holland: 2.2 }, { pressureDrop: 20, maxWindRadius: 80000, holland: 1 }]) {
     // Without the Coriolis term (latitude 1 degree, f 2.5e-6) the peak is at R exactly and is the cyclostrophic maximum.
     const near = resolveHurricane({ ...options, latitude: 1 }),
       peak = peakOf((r) => hollandWind(r, near), 1000, 300000);
     assert.ok(Math.abs(peak.radius / near.rmax - 1) < 0.01, `peak at ${peak.radius} m, R ${near.rmax}`);
-    assert.ok(
-      Math.abs(peak.speed / hollandMaxWind(near) - 1) < 0.01,
-      `peak ${peak.speed} against ${hollandMaxWind(near)}`,
-    );
+    assert.ok(Math.abs(peak.speed / hollandMaxWind(near) - 1) < 0.01, `peak ${peak.speed} against ${hollandMaxWind(near)}`);
     // At 20 degrees the Coriolis term moves the peak just inside R and lowers it a little.
     const s = resolveHurricane(options),
       p20 = peakOf((r) => hollandWind(r, s), 1000, 300000);
@@ -66,11 +52,7 @@ test('Holland 1980: the gradient wind peaks at the radius of maximum wind at sqr
 
 test('the bands are logarithmic spirals crossing a circle at the band pitch (Senn and Hiser: 10 to 25 degrees)', () => {
   assert.equal(resolveHurricane().pitch, (15 * Math.PI) / 180, 'the default pitch, 15 degrees, lies in 10 to 25');
-  for (const [pitch, latitude] of [
-    [15, 20],
-    [22, 20],
-    [10, -25],
-  ]) {
+  for (const [pitch, latitude] of [[15, 20], [22, 20], [10, -25]]) {
     const storm = new Hurricane({ bandPitch: pitch, latitude, bands: 4, principalBand: 0 }),
       k = Math.tan((pitch * Math.PI) / 180),
       step = (2 * Math.PI * k) / 4,
@@ -92,8 +74,7 @@ test('the bands are logarithmic spirals crossing a circle at the band pitch (Sen
     const n = points.length,
       mx = points.reduce((a, p) => a + p[0], 0) / n,
       my = points.reduce((a, p) => a + p[1], 0) / n,
-      slope =
-        points.reduce((a, p) => a + (p[0] - mx) * (p[1] - my), 0) / points.reduce((a, p) => a + (p[0] - mx) ** 2, 0),
+      slope = points.reduce((a, p) => a + (p[0] - mx) * (p[1] - my), 0) / points.reduce((a, p) => a + (p[0] - mx) ** 2, 0),
       measured = (Math.atan(Math.abs(slope)) * 180) / Math.PI;
     assert.ok(Math.abs(measured - pitch) < 0.5, `pitch ${measured} against ${pitch}`);
     assert.equal(Math.sign(slope), -Math.sign(latitude), 'the bands turn the way the storm turns');
@@ -156,10 +137,7 @@ test('calm in the eye, gusts in the eyewall and bands, rain following the bands 
     rm = s.eye + 0.5 * s.wall;
   assert.ok(Math.abs(storm.rainAt(rm, 0) - 50) < 1e-9);
   // The surface wind turns in toward the centre by the inflow angle, anticlockwise in the north and clockwise south.
-  for (const [latitude, turn] of [
-    [20, -1],
-    [-20, 1],
-  ]) {
+  for (const [latitude, turn] of [[20, -1], [-20, 1]]) {
     const w = new Hurricane({ latitude }).windAt(30000, 0),
       radial = w.velocity[0] / w.speed,
       tangential = w.velocity[1] / w.speed;
@@ -175,21 +153,10 @@ test('the storm moves, has an outer eyewall when asked, and clamps its weather t
   assert.equal(storm.regionAt(120000, 0), 'outerEyewall');
   // A secondary wind maximum under the outer eyewall (Willoughby, Clos and Shoreibah 1982).
   assert.ok(storm.windAt(120000, 0).speed > storm.windAt(95000, 0).speed);
-  assert.ok(
-    storm.windAt(30000, 0).speed > 60 && storm.weatherAt(30000, 0).wind === 60,
-    'the weather caps the wind at 60 m/s',
-  );
+  assert.ok(storm.windAt(30000, 0).speed > 60 && storm.weatherAt(30000, 0).wind === 60, 'the weather caps the wind at 60 m/s');
   assert.equal(storm.weatherAt(1e6, 0).weight, 0);
   assert.equal(storm.weatherAt(100000, 0).weight, 1);
-  for (const bad of [
-    { bands: 2.5 },
-    { latitude: 0 },
-    { bandPitch: 50 },
-    { pressureDrop: 200 },
-    { center: [0] },
-    { bandStart: 1000 },
-    { extent: 30000 },
-  ])
+  for (const bad of [{ bands: 2.5 }, { latitude: 0 }, { bandPitch: 50 }, { pressureDrop: 200 }, { center: [0] }, { bandStart: 1000 }, { extent: 30000 }])
     assert.throws(() => new Hurricane(bad), Error, JSON.stringify(bad));
 });
 
@@ -218,18 +185,11 @@ function frames(options) {
 
 test('the clouds draw the storm: the hurricane layer, its fields in the uniform, moving with the storm', async () => {
   const field = await loadStormField();
-  assert.deepEqual(cloudLayerFor({ cloud: 0.2 }, undefined, 'hurricane'), {
-    coverage: 1,
-    bottom: 500,
-    top: 15000,
-    density: 0.1,
-  });
+  assert.deepEqual(cloudLayerFor({ cloud: 0.2 }, undefined, 'hurricane'), { coverage: 1, bottom: 500, top: 15000, density: 0.1 });
   assert.deepEqual(layerOf({ hurricane: {} }), { coverage: 1, bottom: 500, top: 15000, density: 0.1 });
   assert.equal(layerOf({ hurricane: {}, type: 'stratus' }).top, 900, 'a type set still wins');
   assert.ok(field.of({ type: 'hurricane' }) && !field.of({}), "'hurricane' alone draws the default storm");
-  const { h, frame, clouds } = frames({
-    hurricane: new Hurricane({ velocity: [4, -2], bands: 5, outerEyewall: 90000 }),
-  });
+  const { h, frame, clouds } = frames({ hurricane: new Hurricane({ velocity: [4, -2], bands: 5, outerEyewall: 90000 }) });
   await clouds.ready;
   let v = frame(10);
   assert.deepEqual([v[28], v[29], v[30], v[31]], [500, 15000, 1, Math.fround(0.1)]);
@@ -254,7 +214,7 @@ test('the clouds draw the storm: the hurricane layer, its fields in the uniform,
   await assert.doesNotReject(new VolumetricClouds({}).ready, 'no storm, nothing to load');
 });
 
-test('the sun shines into the eye: the deck passes what the cloud over the camera passes', async () => {
+test("the sun shines into the eye: the deck passes what the cloud over the camera passes", async () => {
   const h = tracedGPU(),
     sky = new Sky({ hours: 12, timeScale: 0, lighting: {} }),
     clouds = new VolumetricClouds({ sky, hurricane: {} });
@@ -276,10 +236,7 @@ test('the sun shines into the eye: the deck passes what the cloud over the camer
 test('the hurricane rows write the storm while the type is hurricane, and take it back after', () => {
   const rows = SKY_SETTINGS.filter((s) => s.group === 'hurricane');
   assert.equal(rows.length, 34);
-  assert.ok(
-    rows.every((s) => s.live),
-    'every hurricane row is live',
-  );
+  assert.ok(rows.every((s) => s.live), 'every hurricane row is live');
   const sky = new Sky({ timeScale: 0 }),
     clouds = { options: {} };
   applySkySettings({ sky, clouds }, { 'volumetric.type': 'hurricane' });
@@ -287,15 +244,7 @@ test('the hurricane rows write the storm while the type is hurricane, and take i
   assert.equal(clouds.options.type, 'hurricane');
   applySkySettings(
     { sky, clouds },
-    {
-      'volumetric.type': 'hurricane',
-      'hurricane.bands': 4.6,
-      'hurricane.hemisphere': 'south',
-      'hurricane.speed': 5,
-      'hurricane.heading': 90,
-      'hurricane.bandRotation': 180,
-      'hurricane.eyeRadius': 15000,
-    },
+    { 'volumetric.type': 'hurricane', 'hurricane.bands': 4.6, 'hurricane.hemisphere': 'south', 'hurricane.speed': 5, 'hurricane.heading': 90, 'hurricane.bandRotation': 180, 'hurricane.eyeRadius': 15000 },
   );
   const o = clouds.options.hurricane;
   assert.equal(o.bands, 5);

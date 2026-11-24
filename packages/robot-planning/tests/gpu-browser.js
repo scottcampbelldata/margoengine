@@ -69,8 +69,7 @@ function compare(label, robot, poses, gaps, colliders, selfCollision, allowed) {
 
 function box(min, max) {
   const points = [];
-  for (const x of [min[0], max[0]])
-    for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) points.push(x, y, z);
+  for (const x of [min[0], max[0]]) for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) points.push(x, y, z);
   return points;
 }
 
@@ -85,12 +84,7 @@ function mixedRobot() {
       { name: 'turn', axis: [0, 0, 1], lower: -3, upper: 3 },
       { name: 'slide', type: 'prismatic', axis: [1, 0, 0], lower: -0.3, upper: 0.6, origin: along(0, 0, 0.4) },
       { name: 'bend', axis: [0, 1, 1], lower: -2, upper: 2, origin: along(0.5, 0, 0) },
-      {
-        name: 'copy',
-        axis: [1, 0, 0],
-        origin: along(0, 0, 0.5),
-        mimic: { joint: 'bend', multiplier: -0.5, offset: 0.2 },
-      },
+      { name: 'copy', axis: [1, 0, 0], origin: along(0, 0, 0.5), mimic: { joint: 'bend', multiplier: -0.5, offset: 0.2 } },
       { name: 'grip', type: 'fixed', origin: along(0.3, 0, 0) },
     ],
     shapes: [
@@ -156,9 +150,7 @@ export async function gpuChecks() {
     poses = randomPoses(mixed, 4096, 85),
     gaps = await new GPUClearance(device, mixed, colliders).evaluate(poses);
   const first = compare('mixed', mixed, poses, gaps, colliders, false, (d) => bound(d, 4, 2, 3));
-  report.push(
-    `mixed: ${first.clear} clear, ${first.overlaps} overlapping, worst error ${first.worst.toExponential(2)}`,
-  );
+  report.push(`mixed: ${first.clear} clear, ${first.overlaps} overlapping, worst error ${first.worst.toExponential(2)}`);
   const selfGaps = await new GPUClearance(device, mixed, colliders, { selfCollision: true }).evaluate(poses),
     self = compare('mixed self', mixed, poses, selfGaps, colliders, true, (d) => bound(d, 4, 2, 3));
   report.push(`mixed with a self check: worst error ${self.worst.toExponential(2)}`);
@@ -190,10 +182,7 @@ export async function gpuChecks() {
 
   // Nothing to test reads Infinity, as on the CPU.
   const none = await new GPUClearance(device, mixed, []).evaluate(poses.subarray(0, mixed.dof * 3));
-  assert(
-    none.every((gap) => gap === Infinity),
-    'no collider must read Infinity',
-  );
+  assert(none.every((gap) => gap === Infinity), 'no collider must read Infinity');
 
   // A real arm: the Panda's hulls from its own STL files, with its self check.
   const { robot: panda, home } = await loadPanda(),
@@ -209,25 +198,11 @@ export async function gpuChecks() {
 
   // A baked field, read by the same branch and bound. CPU and GPU each stop within `precision` of the lowest reading.
   const field = bakeSDF(MeshBVH.build(sphereMesh(48, 32, 0.5)), { resolution: 40 }),
-    volume = new SDFVolume({
-      field,
-      matrix: [0.8, 0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0.8, 0, 0.8, 0.5, 0.8, 1],
-      maxCells: 1 << 20,
-    }),
+    volume = new SDFVolume({ field, matrix: [0.8, 0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0.8, 0, 0.8, 0.5, 0.8, 1], maxCells: 1 << 20 }),
     fieldPoses = randomPoses(mixed, 512, 7),
     fieldGaps = await new GPUClearance(device, mixed, [volume]).evaluate(fieldPoses),
-    fieldCheck = compare(
-      'field',
-      mixed,
-      fieldPoses,
-      fieldGaps,
-      [volume],
-      false,
-      (d) => 2 * volume.precision + bound(d, 4, 2, 3),
-    );
-  report.push(
-    `field: ${fieldCheck.clear} clear, worst error ${fieldCheck.worst.toExponential(2)}, precision ${volume.precision.toFixed(4)}`,
-  );
+    fieldCheck = compare('field', mixed, fieldPoses, fieldGaps, [volume], false, (d) => 2 * volume.precision + bound(d, 4, 2, 3));
+  report.push(`field: ${fieldCheck.clear} clear, worst error ${fieldCheck.worst.toExponential(2)}, precision ${volume.precision.toFixed(4)}`);
 
   // The README's scene, as written there.
   const small = new Robot({

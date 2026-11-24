@@ -122,9 +122,7 @@ test('optional CPU isosurfaces publish atomically, without compute dispatch, and
   assert.deepEqual(calls[0].options.dims, [2, 2, 2]);
   assert.equal(calls[0].options.maxTriangles, Math.floor((1 << 24) / 96));
   const previous = f.draw(iso).buffer;
-  f.renderer.cpuIsosurface = async () => {
-    throw new Error('extraction failed');
-  };
+  f.renderer.cpuIsosurface = async () => { throw new Error('extraction failed'); };
   await assert.rejects(iso.update(3), /extraction failed/);
   assert.equal(f.draw(iso).buffer, previous);
   assert.equal(iso.level, 2);
@@ -133,7 +131,7 @@ test('optional CPU isosurfaces publish atomically, without compute dispatch, and
     abort.abort('exact reason');
     return { triangles: 3, vertices: new Float32Array(72) };
   };
-  await assert.rejects(iso.update(3, { signal: abort.signal }), (e) => e === 'exact reason');
+  await assert.rejects(iso.update(3, { signal: abort.signal }), e => e === 'exact reason');
   assert.equal(f.draw(iso).buffer, previous);
   assert.equal(previous.destroyed, false);
   iso.dispose();
@@ -465,7 +463,6 @@ test('replace validates ownership, preserves layer order, refits bounds and free
       plugin.setup(this);
     },
     removePlugin() {},
-    sceneOf() {},
   };
   const figure = new Figure(engine, { axes: false });
   const make = (x) =>
@@ -503,7 +500,6 @@ test('disposing a figure during isosurface creation cannot register a late layer
       plugin.setup(this);
     },
     removePlugin() {},
-    sceneOf() {},
   };
   const started = deferred(),
     finish = deferred();
@@ -536,7 +532,6 @@ test('removing and disposing figure traces detaches their resources synchronousl
       plugin.setup(this);
     },
     removePlugin() {},
-    sceneOf() {},
   };
   const figure = new Figure(engine, { axes: false });
   const calls = [];

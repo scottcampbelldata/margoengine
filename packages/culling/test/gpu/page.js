@@ -184,9 +184,7 @@ async function bulk() {
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'width:256px;height:256px';
   document.body.append(canvas);
-  const c = await Engine.create(canvas, {
-    camera: { fov: 50, near: 0.1, far: 400, position: [0, 30, 60], target: [0, 0, 0] },
-  });
+  const c = await Engine.create(canvas, { camera: { fov: 50, near: 0.1, far: 400, position: [0, 30, 60], target: [0, 0, 0] } });
   c.gpu.addEventListener('uncapturederror', (ev) => errors.push(ev.error.message));
   const n = 200_000,
     lists = [0, 1].map(() => DynamicInstances.attach(c, { geometry, material: white, capacity: n }));
@@ -201,25 +199,7 @@ async function bulk() {
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
   for (const list of lists) {
-    for (let r = 0; r < n; r++)
-      list.addInstance([
-        0.2,
-        0,
-        0,
-        0,
-        0,
-        0.2,
-        0,
-        0,
-        0,
-        0,
-        0.2,
-        0,
-        (r % 500) * 0.5 - 125,
-        0,
-        Math.floor(r / 500) * 0.5 - 100,
-        1,
-      ]);
+    for (let r = 0; r < n; r++) list.addInstance([0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0.2, 0, (r % 500) * 0.5 - 125, 0, Math.floor(r / 500) * 0.5 - 100, 1]);
     for (let r = 0; r < n; r += 7) list.setVisibleAt(r, false);
     for (let r = 3; r < n; r += 17) list.deleteInstance(r);
     for (let r = 5; r < n; r += 13) list.matrices[r * 12 + 9] = Number.NaN;
@@ -235,8 +215,7 @@ async function bulk() {
   // Rows kept in increasing row order, each shown, alive and finite.
   const f = new Float32Array(new Uint8Array(out[0].records).buffer),
     kept = [];
-  for (let k = 0; k < out[0].count; k++)
-    kept.push(Math.round((f[k * 24 + 14] + 100) / 0.5) * 500 + Math.round((f[k * 24 + 12] + 125) / 0.5));
+  for (let k = 0; k < out[0].count; k++) kept.push(Math.round((f[k * 24 + 14] + 100) / 0.5) * 500 + Math.round((f[k * 24 + 12] + 125) / 0.5));
   const ordered = kept.every((r, k) => k === 0 || r > kept[k - 1]),
     shown = kept.every((r) => r % 7 !== 0 && (r - 3) % 17 !== 0 && (r - 5) % 13 !== 0);
   for (const list of lists) list.dispose();

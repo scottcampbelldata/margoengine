@@ -44,14 +44,7 @@ export {
   type GrassWindSetting,
   type ScatterWindSetting,
 } from './wind-settings.js';
-export {
-  fogDensity,
-  hailSettings,
-  skyWeather,
-  windAt,
-  type HailSettings,
-  type SkyWeatherSettings,
-} from './sky-settings.js';
+export { fogDensity, hailSettings, skyWeather, windAt, type HailSettings, type SkyWeatherSettings } from './sky-settings.js';
 export {
   CLEAR_AIR_EXTINCTION,
   DUST_AT_FULL,

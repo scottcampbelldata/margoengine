@@ -63,9 +63,7 @@ function charlie(r, nl, nv, nh) {
   const alpha = r * r,
     sin2 = 1 - nh * nh;
   return (
-    ((2 + 1 / alpha) * sin2 ** (1 / (2 * alpha))) /
-    (2 * Math.PI) /
-    ((1 + lambda(nv, alpha) + lambda(nl, alpha)) * 4 * nl * nv)
+    ((2 + 1 / alpha) * sin2 ** (1 / (2 * alpha))) / (2 * Math.PI) / ((1 + lambda(nv, alpha) + lambda(nl, alpha)) * 4 * nl * nv)
   );
 }
 
@@ -157,7 +155,10 @@ test('the default sheen ambient is E(n.v) times the sky at the base normal, not 
 
 test('factor-only physical materials keep the sheen terms with neutral maps', () => {
   const factors = factorPhysicalShader();
-  assert.match(factors, /s\.sh=vec4f\(f\.sheen\.rgb\*vec4f\(1\)\.rgb,clamp\(f\.sheen\.w\*vec4f\(1\)\.a,0\.0,1\.0\)\);/);
+  assert.match(
+    factors,
+    /s\.sh=vec4f\(f\.sheen\.rgb\*vec4f\(1\)\.rgb,clamp\(f\.sheen\.w\*vec4f\(1\)\.a,0\.0,1\.0\)\);/,
+  );
   for (const name of ['margoSheenBRDF', 'margoSheenHalf', 'margoSheenAlbedo', 'margoSheenAmbient'])
     assert.ok(factors.includes(`fn ${name}(`));
   assert.ok(!/0\.157/.test(code), 'no constant albedo remains');
@@ -167,10 +168,7 @@ test('factor-only physical materials keep the sheen terms with neutral maps', ()
 // min(1 - max3(sheen) E(n.v), 1 - max3(sheen) E(n.l)) and the rest by its ambient form 1 - max3(sheen) E(n.v), as
 // @margoengine/materials' lobe shader does for its direct light. The sun's part of the layer underneath is margoSheenSun.
 test('the sun under the sheen takes the punctual albedo scaling, the rest the ambient form', () => {
-  assert.ok(
-    code.includes('margoSheenSun=direct;\n  color=layers(s,v,l,color);'),
-    'the fragment hands layers its sun light',
-  );
+  assert.ok(code.includes('margoSheenSun=direct;\n  color=layers(s,v,l,color);'), 'the fragment hands layers its sun light');
   const sun = [0.4, 0.3, 0.2],
     rest = [0.1, 0.2, 0.05],
     s = surface(),
@@ -204,11 +202,7 @@ test('sheen roughness 0 is not raised, so the spike at the terminator on the sil
     const line = shader.match(/s\.sh=vec4f\([^;]*\);/)[0];
     assert.match(line, /,0\.0,1\.0\)\);$/, `no floor in ${line}`);
   }
-  assert.match(
-    transmissiveShader(),
-    /margoSheenAlbedo\(nv,clamp\(f\.sheen\.w,0\.0,1\.0\)\)/,
-    'the tint share has no floor',
-  );
+  assert.match(transmissiveShader(), /margoSheenAlbedo\(nv,clamp\(f\.sheen\.w,0\.0,1\.0\)\)/, 'the tint share has no floor');
   const vl = Math.hypot(...unit([0.4, 0.7, 0.6]).map((x, c) => x + [0, 0, 1][c]));
   for (const [nv, nl] of [
     [0.083, 0.05],
@@ -226,11 +220,7 @@ test('sheen roughness 0 is not raised, so the spike at the terminator on the sil
 // margoSheenHalf takes n.h from the clamped cosines, the configuration they describe. The sun alone lights the surface
 // here (no sky), so the difference is the direct sheen lobe.
 test('a shading normal facing away from the viewer does not hit the Charlie peak', () => {
-  const sun = wgslModule(source, {
-      f: { ...frame, radiance: [1, 1, 1, 0] },
-      margoDirectVisible: [1, 1, 1],
-      margoSheenSun: [0, 0, 0],
-    }),
+  const sun = wgslModule(source, { f: { ...frame, radiance: [1, 1, 1, 0] }, margoDirectVisible: [1, 1, 1], margoSheenSun: [0, 0, 0] }),
     v = [0, 0, 1],
     l = unit([0.4, 0.7, 0.6]),
     vl = l[2],
@@ -248,36 +238,19 @@ test('a shading normal facing away from the viewer does not hit the Charlie peak
       lit = sun.call('layers', surface({ n, cn: n, sh: [1, 1, 1, 0] }), v, l, [0, 0, 0]),
       black = sun.call('layers', surface({ n, cn: n, sh: [0, 0, 0, 0] }), v, l, [0, 0, 0]);
     for (let c = 0; c < 3; c++)
-      assert.ok(
-        Math.abs(lit[c] - black[c]) < 1e-6,
-        `(${rawNV}, ${rawNL}) channel ${c}: sheen adds ${lit[c] - black[c]}`,
-      );
+      assert.ok(Math.abs(lit[c] - black[c]) < 1e-6, `(${rawNV}, ${rawNL}) channel ${c}: sheen adds ${lit[c] - black[c]}`);
   }
   // Wherever the normal faces the viewer it is dot(n, h) itself.
   const d = (x, y) => x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
   for (const [n, vv, ll] of [
-    [
-      [0, 1, 0],
-      [0.3, 0.8, 0.2],
-      [-0.5, 0.6, 0.1],
-    ],
-    [
-      [0, 0, 1],
-      [0.6, 0.1, 0.4],
-      [0.1, -0.3, 0.9],
-    ],
+    [[0, 1, 0], [0.3, 0.8, 0.2], [-0.5, 0.6, 0.1]],
+    [[0, 0, 1], [0.6, 0.1, 0.4], [0.1, -0.3, 0.9]],
     [unit([0.2, 0.9, 0.1]), [0.9, 0.05, 0], [-0.7, 0.2, 0.2]],
   ]) {
     const u = unit(vv),
       k = unit(ll),
       h = unit(u.map((x, c) => x + k[c])),
-      got = shader.call(
-        'margoSheenHalf',
-        Math.min(Math.max(d(n, u), 1e-4), 1),
-        Math.min(Math.max(d(n, k), 0), 1),
-        u,
-        k,
-      );
+      got = shader.call('margoSheenHalf', Math.min(Math.max(d(n, u), 1e-4), 1), Math.min(Math.max(d(n, k), 0), 1), u, k);
     assert.ok(Math.abs(got - d(n, h)) < 1e-12, `${got} against ${d(n, h)}`);
   }
 });

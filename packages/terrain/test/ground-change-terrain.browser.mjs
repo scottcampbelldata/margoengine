@@ -34,8 +34,7 @@ await runSuite(
         slope = (x, z) => 0.08 * z + 0.6 * Math.sin(x * 0.15) * Math.cos(z * 0.11),
         grid = (field) => {
           const h = new Float32Array(n * n);
-          for (let j = 0; j < n; j++)
-            for (let i = 0; i < n; i++) h[j * n + i] = field(-32 + i * spacing, -32 + j * spacing);
+          for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) h[j * n + i] = field(-32 + i * spacing, -32 + j * spacing);
           return h;
         },
         normals = (h) => {
@@ -47,30 +46,14 @@ await runSuite(
                 gz = (at(i, j + 1) - at(i, j - 1)) / (2 * spacing),
                 l = Math.hypot(gx, 1, gz),
                 k = (j * n + i) * 4;
-              out.set(
-                [((-gx / l) * 0.5 + 0.5) * 255, ((1 / l) * 0.5 + 0.5) * 255, ((-gz / l) * 0.5 + 0.5) * 255, 255].map(
-                  Math.round,
-                ),
-                k,
-              );
+              out.set([((-gx / l) * 0.5 + 0.5) * 255, ((1 / l) * 0.5 + 0.5) * 255, ((-gz / l) * 0.5 + 0.5) * 255, 255].map(Math.round), k);
             }
           return out;
         },
         // The layers' colour as linear RGB: fresh soil drawn in it, so a cut differs from its truth by shape alone.
         dirt = [150, 115, 85].map((v) => ((v / 255 + 0.055) / 1.055) ** 2.4),
         cuts = [
-          {
-            kind: 'gully',
-            path: [
-              [-20, -24],
-              [-6, 0],
-              [-14, 22],
-            ],
-            width: 5,
-            depth: 2,
-            roughness: 0.3,
-            duration: 30,
-          },
+          { kind: 'gully', path: [[-20, -24], [-6, 0], [-14, 22]], width: 5, depth: 2, roughness: 0.3, duration: 30 },
           { kind: 'scour', center: [14, -8], radius: 6, depth: 2.5, flow: [0, 1], duration: 30 },
         ];
       async function read(engine, texture) {
@@ -110,12 +93,7 @@ await runSuite(
             const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 15 }),
               layers = gpu.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
             gpu.queue.writeTexture({ texture: heightmap }, heights, { bytesPerRow: n * 4 }, [n, n]);
-            gpu.queue.writeTexture(
-              { texture: layers },
-              new Uint8Array(16).fill(140).map((v, k) => (k % 4 === 3 ? 255 : [150, 115, 85][k % 4])),
-              { bytesPerRow: 4, rowsPerImage: 1 },
-              [1, 1, 4],
-            );
+            gpu.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(140).map((v, k) => (k % 4 === 3 ? 255 : [150, 115, 85][k % 4])), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
             let normalTexture;
             if (normalmap) {
               normalTexture = gpu.createTexture({ size: [n, n], format: 'rgba8unorm', usage: 6 });
@@ -192,30 +170,11 @@ await runSuite(
       out.truth = diff(cut.pixels, truth.pixels);
       out.plain = diff(cut.pixels, plain.pixels);
       // 3. Covers.
-      const lava = [
-          {
-            kind: 'lava',
-            path: [
-              [-28, 4],
-              [28, 4],
-            ],
-            width: 14,
-            thickness: 1,
-            duration: 20,
-            cooling: 30,
-            roughness: 0,
-          },
-        ],
+      const lava = [{ kind: 'lava', path: [[-28, 4], [28, 4]], width: 14, thickness: 1, duration: 20, cooling: 30, roughness: 0 }],
         hot = await frame({ events: lava, times: [20] }),
         cold = await frame({ events: lava, times: [5000] }),
-        ash = await frame({
-          events: [{ kind: 'ash', vent: [0, 0], thickness: 0.05, half: 60, duration: 10 }],
-          times: [10],
-        }),
-        burn = await frame({
-          events: [{ kind: 'burn', ignition: [0, 0], rate: 2, duration: 30, roughness: 0 }],
-          times: [30],
-        });
+        ash = await frame({ events: [{ kind: 'ash', vent: [0, 0], thickness: 0.05, half: 60, duration: 10 }], times: [10] }),
+        burn = await frame({ events: [{ kind: 'burn', ignition: [0, 0], rate: 2, duration: 30, roughness: 0 }], times: [30] });
       const centre = [size / 2, size / 2 + 8];
       out.hot = average(hot.pixels, ...centre);
       out.cold = average(cold.pixels, ...centre);
@@ -225,13 +184,7 @@ await runSuite(
       out.plainMiddle = average(plain.pixels, size / 2, size / 2);
       // 4. Normal-mapped terrain: the cut against a normal map of the cut ground.
       // One ring of 128 cells 0.5 m apart covers the whole map: the truth's normals are then per texel, as the tilt's.
-      const mapped = await frame({
-          events: cuts,
-          times: [30],
-          normalmap: normals(base),
-          rings: 128,
-          look: { soil: dirt },
-        }),
+      const mapped = await frame({ events: cuts, times: [30], normalmap: normals(base), rings: 128, look: { soil: dirt } }),
         mappedTruth = await frame({ heights: cut.model.heights, normalmap: normals(cut.model.heights), rings: 128 }),
         mappedPlain = await frame({ normalmap: normals(base), rings: 128 });
       out.mappedTruth = diff(mapped.pixels, mappedTruth.pixels);
@@ -243,11 +196,7 @@ await runSuite(
         return worst;
       };
       const disposed = await frame({ events: cuts, times: [30], keep: async (change) => change.dispose() }),
-        removed = await frame({
-          events: cuts,
-          times: [30],
-          keep: async (change, engine) => engine.removePlugin(change.name),
-        });
+        removed = await frame({ events: cuts, times: [30], keep: async (change, engine) => engine.removePlugin(change.name) });
       out.disposed = { texels: back(disposed), picture: diff(disposed.pixels, plain.pixels) };
       out.removed = { texels: back(removed), picture: diff(removed.pixels, plain.pixels) };
       out.errors = errors;
@@ -265,15 +214,9 @@ await runSuite(
       [cr, cg, cb] = result.cold;
     assert.ok(hr > 200 && hr > hg * 1.3 && hg > hb, `fresh lava glows orange: ${result.hot}`);
     assert.ok(cr < 60 && cg < 60 && cb < 60, `cooled lava is dark rock: ${result.cold}`);
-    assert.ok(
-      cr < result.plainCentre[0] * 0.6,
-      `cooled lava is darker than the dirt: ${result.cold} vs ${result.plainCentre}`,
-    );
+    assert.ok(cr < result.plainCentre[0] * 0.6, `cooled lava is darker than the dirt: ${result.cold} vs ${result.plainCentre}`);
     const grey = (c) => Math.max(...c) - Math.min(...c);
-    assert.ok(
-      grey(result.ash) < grey(result.plainMiddle) * 0.6,
-      `ash greys the ground: ${result.ash} vs ${result.plainMiddle}`,
-    );
+    assert.ok(grey(result.ash) < grey(result.plainMiddle) * 0.6, `ash greys the ground: ${result.ash} vs ${result.plainMiddle}`);
     assert.ok(Math.max(...result.burn) < 40, `char blackens it: ${result.burn}`);
     assert.ok(
       result.mappedTruth.mean < result.mappedPlain.mean * 0.15,
@@ -284,10 +227,7 @@ await runSuite(
       assert.equal(result[key].picture.worst, 0, `${key}: the uncut picture: ${JSON.stringify(result[key])}`);
     }
     const tag = process.env.MARGO_COMPAT === '1' ? 'compat' : 'native';
-    await writeFile(
-      `test-results/terrain-ground-change-terrain-${tag}.json`,
-      JSON.stringify({ hardware, result }, null, 1),
-    );
+    await writeFile(`test-results/terrain-ground-change-terrain-${tag}.json`, JSON.stringify({ hardware, result }, null, 1));
     console.log(`ok terrain ground change on a clipmap terrain (${tag})`);
   },
   () => context.close(),

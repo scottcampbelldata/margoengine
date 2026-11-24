@@ -26,9 +26,7 @@ try {
       const { install } = await import('/packages/materials/dist/index.js');
       const { outfitGLB, OUTFITS } = await import('/packages/humans/dist/cast.js');
       const canvas = document.querySelector('canvas');
-      const engine = await Engine.create(canvas, {
-        camera: { position: [0.9, 1.25, 3.2], target: [0, 0.95, 0], fov: 38, near: 0.05, far: 100 },
-      });
+      const engine = await Engine.create(canvas, { camera: { position: [0.9, 1.25, 3.2], target: [0, 0.95, 0], fov: 38, near: 0.05, far: 100 } });
       engine.stop();
       const errors = [];
       engine.gpu?.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
@@ -75,22 +73,10 @@ try {
     changed = 0;
   for (let i = 0; i < b.data.length; i += channels) {
     if (Math.abs(b.data[i] - 0x30) + Math.abs(b.data[i + 1] - 0x33) + Math.abs(b.data[i + 2] - 0x3a) > 30) covered++;
-    if (
-      Math.abs(a.data[i] - b.data[i]) +
-        Math.abs(a.data[i + 1] - b.data[i + 1]) +
-        Math.abs(a.data[i + 2] - b.data[i + 2]) >
-      3
-    )
-      changed++;
+    if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]) > 3) changed++;
   }
   const pixels = b.width * b.height;
-  console.log(
-    'garments cover',
-    ((100 * covered) / pixels).toFixed(1),
-    'percent; the sheen changes',
-    ((100 * changed) / pixels).toFixed(2),
-    'percent',
-  );
+  console.log('garments cover', ((100 * covered) / pixels).toFixed(1), 'percent; the sheen changes', ((100 * changed) / pixels).toFixed(2), 'percent');
   assert.ok(covered > pixels * 0.08, 'the outfit fills the frame');
   assert.ok(changed > pixels * 0.002, 'the cloth sheen shows (the felt hat and the fitted lobes)');
   assert.deepEqual(pageErrors, []);

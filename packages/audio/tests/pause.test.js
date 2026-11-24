@@ -284,11 +284,7 @@ for (const { label, options, duration, log } of runs)
       else assert.ok(close(node.started.duration, length), `${at}: start duration`);
       // A loopEnd of 0 (the buffer end) reaches the node as the buffer's duration: a node loops its whole buffer
       // whenever its own loopEnd is 0, whatever loopStart says. A spent node plays one silent frame with no loop.
-      assert.deepEqual(
-        [node.loop, node.loopStart, node.loopEnd],
-        [loop, loopStart, spent ? loopEnd : loopEnd || duration],
-        `${at}: loop fields`,
-      );
+      assert.deepEqual([node.loop, node.loopStart, node.loopEnd], [loop, loopStart, spent ? loopEnd : loopEnd || duration], `${at}: loop fields`);
       assert.ok(close(node.playbackRate.value, rate), `${at}: rate`);
       assert.equal(node.outputs.size, 1, `${at}: live node connected`);
     });

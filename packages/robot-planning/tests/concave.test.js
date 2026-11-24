@@ -41,8 +41,7 @@ test('a link passes through the hole of a ring; its convex proxy blocks the same
   const ring = torus(1, 0.2),
     bvh = MeshBVH.build(ring),
     points = [];
-  for (let i = 0; i < ring.positions.length; i += 3 * 37)
-    points.push(ring.positions[i], ring.positions[i + 1], ring.positions[i + 2]);
+  for (let i = 0; i < ring.positions.length; i += 3 * 37) points.push(ring.positions[i], ring.positions[i + 1], ring.positions[i + 2]);
   const proxy = new ConvexHullVolume({ points, maxPoints: points.length }),
     slider = new Robot({
       joints: [{ type: 'prismatic', axis: [0, 0, 1], lower: -5, upper: 5 }],
@@ -121,11 +120,7 @@ test('gridData reads an SDFVolume grid with that volume settings, corner for cor
   assert.equal(grid.samples.length, nx * ny * nz);
   assert.equal(nx, Math.round((field.max[0] - field.min[0]) / field.spacing[0]) + 1);
   const corner = new Float64Array(3);
-  for (const [x, y, z] of [
-    [0, 0, 0],
-    [nx - 1, ny - 1, nz - 1],
-    [1, 2, 3],
-  ]) {
+  for (const [x, y, z] of [[0, 0, 0], [nx - 1, ny - 1, nz - 1], [1, 2, 3]]) {
     for (let k = 0; k < 3; k++) corner[k] = Math.min(field.min[k] + [x, y, z][k] * field.spacing[k], field.max[k]);
     assert.equal(grid.samples[(z * ny + y) * nx + x], Math.fround(field.distance(corner)));
   }
@@ -134,10 +129,7 @@ test('gridData reads an SDFVolume grid with that volume settings, corner for cor
     [0.01, 2, 77, 1, volume.precision],
   );
   // The inverse placement takes the volume's move back off.
-  assert.deepEqual(
-    Array.from(grid.inverse.subarray(9, 12), (v) => v + 0),
-    [-0.5, 0, 0],
-  );
+  assert.deepEqual(Array.from(grid.inverse.subarray(9, 12), (v) => v + 0), [-0.5, 0, 0]);
   assert.equal(gridData(new SphereVolume({ center: [0, 0, 0], radius: 1 })), null);
   assert.equal(gridData(new SDFVolume({ field: { distance: (p) => p[0] } })), null);
   // A volume of the caller's own may give its grid.

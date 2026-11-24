@@ -115,13 +115,7 @@ export function coniferStemRadius(z: number, height: number, dbh: number, flare:
 }
 
 // A closed tapered tube along a polyline (limbs and stubs), `sides` faces.
-function tube(
-  m: Mesh,
-  path: readonly (readonly [number, number, number])[],
-  r0: number,
-  r1: number,
-  sides: number,
-): void {
+function tube(m: Mesh, path: readonly (readonly [number, number, number])[], r0: number, r1: number, sides: number): void {
   const first = m.p.length / 3;
   for (let k = 0; k < path.length; k++) {
     const a = path[Math.max(0, k - 1)],
@@ -147,13 +141,7 @@ function tube(
       const t = (j / sides) * Math.PI * 2,
         c = Math.cos(t) * r,
         s = Math.sin(t) * r;
-      m.vertex(
-        path[k][0] + ex * c + fx * s,
-        path[k][1] + fy * s,
-        path[k][2] + ez * c + fz * s,
-        j / sides,
-        k / (path.length - 1),
-      );
+      m.vertex(path[k][0] + ex * c + fx * s, path[k][1] + fy * s, path[k][2] + ez * c + fz * s, j / sides, k / (path.length - 1));
     }
   }
   for (let k = 0; k + 1 < path.length; k++)
@@ -216,13 +204,7 @@ function stem(
     }
   const last = first + (rings.length - 1) * (radial + 1),
     zTop = rings[rings.length - 1],
-    cap = m.vertex(
-      0,
-      condition === 'snag' ? zTop - coniferStemRadius(zTop, H, form.dbh, s.flare) * 2 : zTop,
-      0,
-      0.5,
-      1,
-    );
+    cap = m.vertex(0, condition === 'snag' ? zTop - coniferStemRadius(zTop, H, form.dbh, s.flare) * 2 : zTop, 0, 0.5, 1);
   for (let j = 0; j < radial; j++) m.i.push(cap, last + j, last + j + 1);
   return top;
 }
@@ -231,8 +213,7 @@ function stem(
 function profile(s: (typeof CONIFER_SPECIES)[ConiferSpecies], age: number): (z: number) => number {
   const old = Math.min(1, Math.max(0, (age - 40) / 160)),
     q = 1 + (s.oldTop - 1) * old,
-    raw = (z: number) =>
-      (1 - Math.min(1, z) ** q) ** s.profile * (old > 0 ? 1 - 0.3 * old * Math.max(0, 1 - z / 0.15) : 1);
+    raw = (z: number) => (1 - Math.min(1, z) ** q) ** s.profile * (old > 0 ? 1 - 0.3 * old * Math.max(0, 1 - z / 0.15) : 1);
   let max = 0;
   for (let k = 0; k <= 64; k++) max = Math.max(max, raw(k / 64));
   return (z) => raw(z) / max;
@@ -257,10 +238,7 @@ function spray(
       const first = m.p.length / 3;
       for (let i = 0; i <= rows; i++) {
         const t = 0.12 + (0.88 * i) / rows,
-          w =
-            width *
-            Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * ((t - 0.12) / 0.88))) ** 0.7 *
-            Math.min(1, 0.3 + 2 * t),
+          w = width * Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * ((t - 0.12) / 0.88))) ** 0.7 * Math.min(1, 0.3 + 2 * t),
           [px, py, pz] = at(t);
         for (let j = 0; j <= cols; j++) {
           const u = (j / cols) * 2 - 1,
@@ -294,16 +272,14 @@ function spray(
  */
 export function generateConiferMesh(species: ConiferSpecies, options: ConiferMeshOptions = {}): ConiferMesh {
   const s = CONIFER_SPECIES[species];
-  if (!s || !Object.hasOwn(CONIFER_SPECIES, species))
-    throw new RangeError(`Unknown conifer species '${String(species)}'; pass one of CONIFER_SPECIES_IDS.`);
+  if (!s || !Object.hasOwn(CONIFER_SPECIES, species)) throw new RangeError(`Unknown conifer species '${String(species)}'; pass one of CONIFER_SPECIES_IDS.`);
   const detail = options.detail ?? 2,
     condition = options.condition ?? 'live',
     seed = options.seed ?? 1;
   if (detail !== 0 && detail !== 1 && detail !== 2) throw new RangeError('detail must be 0, 1 or 2.');
   if (condition !== 'live' && condition !== 'snag' && condition !== 'burnt')
     throw new RangeError("condition must be 'live', 'snag' or 'burnt'.");
-  if (!(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff))
-    throw new RangeError('seed must be an unsigned 32-bit integer.');
+  if (!(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff)) throw new RangeError('seed must be an unsigned 32-bit integer.');
   const form = coniferForm(species, options),
     rand = random(seed * 2654435761 + 97),
     trunk = new Mesh(),
@@ -323,10 +299,7 @@ export function generateConiferMesh(species: ConiferSpecies, options: ConiferMes
   if (!annual.length || annual[0] - form.crownBase > 0.02) annual.unshift(form.crownBase);
   // Fewer whorls at lower detail: an even pick by index keeps the pattern of growth (wide low, close at the top).
   const most = [6, 12, 24][detail],
-    whorls =
-      annual.length <= most
-        ? annual
-        : Array.from({ length: most }, (_, k) => annual[Math.round((k * (annual.length - 1)) / (most - 1))]),
+    whorls = annual.length <= most ? annual : Array.from({ length: most }, (_, k) => annual[Math.round((k * (annual.length - 1)) / (most - 1))]),
     merged = annual.length / Math.max(1, whorls.length),
     golden = Math.PI * (3 - Math.sqrt(5)),
     halfWidth = form.crownWidth / 2,
@@ -356,9 +329,7 @@ export function generateConiferMesh(species: ConiferSpecies, options: ConiferMes
         count = s.whorled ? s.branchesPerWhorl : Math.min(6, Math.max(1, Math.round(s.branchesPerWhorl * merged))),
         phase = s.whorled ? k * golden + rand() * 0.6 : 0;
       for (let b = 0; b < count; b++) {
-        const yaw = s.whorled
-            ? phase + (b / count) * Math.PI * 2 + (rand() - 0.5) * 0.4
-            : (k * count + b) * golden + rand() * 0.3,
+        const yaw = s.whorled ? phase + (b / count) * Math.PI * 2 + (rand() - 0.5) * 0.4 : (k * count + b) * golden + rand() * 0.3,
           dx = Math.cos(yaw),
           dz = Math.sin(yaw),
           // Upper branches angle up, lower ones out and down.
@@ -378,8 +349,7 @@ export function generateConiferMesh(species: ConiferSpecies, options: ConiferMes
         }
         if (detail === 2 || condition === 'burnt') {
           // Limbs: full and thinning outward (live, burnt with its fine twigs gone), or stubs on a snag.
-          const reachOf =
-              condition === 'snag' ? Math.min(0.8, 0.2 + rand() * 0.6) / length : condition === 'burnt' ? 0.6 : 0.85,
+          const reachOf = condition === 'snag' ? Math.min(0.8, 0.2 + rand() * 0.6) / length : condition === 'burnt' ? 0.6 : 0.85,
             steps = 2,
             path = Array.from({ length: steps + 1 }, (_, i) => at((reachOf * i) / steps)),
             rb = Math.max(0.006, Math.min(r0 * 0.35, 0.012 + length * 0.012));
@@ -395,18 +365,7 @@ export function generateConiferMesh(species: ConiferSpecies, options: ConiferMes
       for (const yaw of [0, Math.PI / 2]) {
         const dx = Math.cos(yaw),
           dz = Math.sin(yaw);
-        spray(
-          canopy,
-          (t) => [nod * len * t * t, h0 + len * t, 0],
-          dx,
-          dz,
-          len,
-          Math.min(0.25, len * 0.12) + 0.04,
-          detail === 2 ? 1 : detail,
-          0,
-          h0,
-          0,
-        );
+        spray(canopy, (t) => [nod * len * t * t, h0 + len * t, 0], dx, dz, len, Math.min(0.25, len * 0.12) + 0.04, detail === 2 ? 1 : detail, 0, h0, 0);
       }
     }
   }
@@ -467,8 +426,7 @@ export function generateConiferImposter(
 ): ConiferImposter {
   const size = options.size ?? 256,
     cards = options.cards ?? 3;
-  if (!(Number.isInteger(Math.log2(size)) && size >= 32 && size <= 1024))
-    throw new RangeError('size must be a power of two from 32 to 1024.');
+  if (!(Number.isInteger(Math.log2(size)) && size >= 32 && size <= 1024)) throw new RangeError('size must be a power of two from 32 to 1024.');
   if (!(Number.isInteger(cards) && cards >= 2 && cards <= 6)) throw new RangeError('cards must be 2 to 6.');
   const species = mesh.form ? CONIFER_SPECIES[mesh.form.species] : undefined,
     needles = options.needles ?? species?.needles ?? [0.04, 0.13, 0.06],
@@ -590,12 +548,7 @@ export function generateConiferImposter(
     quad.normals[k + 1] = (0.45 * R) / l;
     quad.normals[k + 2] = z / l;
   }
-  return {
-    geometry: quad,
-    image: { width: size, height: size, data },
-    solidUv: [0.75, 0.5],
-    coverage: covered / (W * Hh),
-  };
+  return { geometry: quad, image: { width: size, height: size, data }, solidUv: [0.75, 0.5], coverage: covered / (W * Hh) };
 }
 
 /** Options of {@link coniferLevels}. */
@@ -630,11 +583,7 @@ export function coniferLevels(species: ConiferSpecies, options: ConiferLevelsOpt
     middle = generateConiferMesh(species, { ...rest, detail: 1 });
   if (near.canopy.indices.length === 0) {
     const far = generateConiferMesh(species, { ...rest, detail: 0 });
-    return {
-      form: near.form,
-      trunk: [near.trunk, middle.trunk, far.trunk],
-      canopy: [near.canopy, middle.canopy, far.canopy],
-    };
+    return { form: near.form, trunk: [near.trunk, middle.trunk, far.trunk], canopy: [near.canopy, middle.canopy, far.canopy] };
   }
   const imp = generateConiferImposter(near, imposterSize === undefined ? {} : { size: imposterSize }),
     solid = (g: GeometryData) => {
@@ -645,20 +594,11 @@ export function coniferLevels(species: ConiferSpecies, options: ConiferLevelsOpt
       }
       return u;
     },
-    none = geometryData(
-      [0, 0, 0, 0, 0.001, 0, 0.001, 0, 0],
-      [0, 1, 0, 0, 1, 0, 0, 1, 0],
-      [0, 0, 0, 0, 0, 0],
-      [0, 1, 2],
-    );
+    none = geometryData([0, 0, 0, 0, 0.001, 0, 0.001, 0, 0], [0, 1, 0, 0, 1, 0, 0, 1, 0], [0, 0, 0, 0, 0, 0], [0, 1, 2]);
   return {
     form: near.form,
     trunk: [near.trunk, middle.trunk, none],
     canopy: [near.canopy, middle.canopy, imp.geometry],
-    textures: {
-      uvs: [solid(near.canopy), solid(middle.canopy), imp.geometry.uvs],
-      baseColor: imp.image,
-      alphaCutoff: 0.5,
-    },
+    textures: { uvs: [solid(near.canopy), solid(middle.canopy), imp.geometry.uvs], baseColor: imp.image, alphaCutoff: 0.5 },
   };
 }

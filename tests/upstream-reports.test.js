@@ -23,8 +23,7 @@ test('every upstream report folder has a report.md draft', () => {
 
 test('the README table lists exactly the report folders', () => {
   const readme = readFileSync(new URL('README.md', root), 'utf8');
-  // Ids are KB1042f-style or KB-AREA-NAME1-style (docs/known-bugs.md uses both), so a hyphen is part of the id.
-  const listed = [...readme.matchAll(/^\| (KB[\w-]+) \| `(KB[\w-]+)` \|/gm)].map(([, row, folder]) => {
+  const listed = [...readme.matchAll(/^\| (KB\w+) \| `(KB\w+)` \|/gm)].map(([, row, folder]) => {
     assert.equal(row, folder);
     return folder;
   });

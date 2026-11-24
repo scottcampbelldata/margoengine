@@ -58,11 +58,7 @@ test('on the WebGL2 layer an effect with no prewarm is simulated in every frame 
   assert.ok(!effect.route, 'the route is still loading');
   h.frame();
   h.frame();
-  assert.deepEqual(
-    budgets,
-    [40, 0],
-    'one step a frame on the WebGPU kernels, as the frames before the route always were',
-  );
+  assert.deepEqual(budgets, [40, 0], 'one step a frame on the WebGPU kernels, as the frames before the route always were');
   effect.dispose();
 });
 
@@ -98,15 +94,7 @@ for (const [name, options] of [
   ['over-life with local space', { overLife: { size: [1, 2] }, space: { mode: 'local' } }],
   ['death events', { events: { on: 'death', count: 4 } }],
   ['collision events with over-life', { events: { on: 'collision' }, overLife: { size: [1, 2] } }],
-  [
-    'over-life, stretch, curves and a schedule',
-    {
-      overLife: { size: [1, 2], spin: [0, 1] },
-      stretch: { factor: 0.2 },
-      curves: { size: [1, 0.5] },
-      schedule: { prewarm: 1 },
-    },
-  ],
+  ['over-life, stretch, curves and a schedule', { overLife: { size: [1, 2], spin: [0, 1] }, stretch: { factor: 0.2 }, curves: { size: [1, 0.5] }, schedule: { prewarm: 1 } }],
 ]) {
   test(`no route kernel runs on the layer's CPU tier: ${name}`, () => {
     const h = optionalGPU();
@@ -154,9 +142,7 @@ for (const on of ['death', 'collision']) {
     h.frame();
     dispatched.length = 0;
     h.frame();
-    const tiers = dispatched.map((p) =>
-      planCompute({ source: p.compute.module.code, entryPoint: p.compute.entryPoint }),
-    );
+    const tiers = dispatched.map((p) => planCompute({ source: p.compute.module.code, entryPoint: p.compute.entryPoint }));
     assert.ok(tiers.length >= 10, `${tiers.length} dispatches a frame`);
     const cpu = tiers.filter((plan) => plan.tier === 'cpu');
     assert.equal(cpu.length, 0, `CPU-tier dispatches a frame: ${cpu.map((plan) => plan.reason).join('; ')}`);

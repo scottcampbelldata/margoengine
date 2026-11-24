@@ -193,42 +193,26 @@ test('attach creates a disposable asset owner whose callback rejects after dispo
   assert.ok(installer instanceof AssetInstaller);
   installer[Symbol.dispose]();
   installer.dispose();
-  await assert.rejects(
-    installer.load({ kind: 'model', url: 'https://example.invalid/model.glb' }, new AbortController().signal),
-    { name: 'AbortError' },
-  );
+  await assert.rejects(installer.load({ kind: 'model', url: 'https://example.invalid/model.glb' }, new AbortController().signal), { name: 'AbortError' });
 });
 
-test('every catalogue and download request names the app with its userAgent option (GAP-FILM-ASSETLIB-UA)', {
-  timeout: 10000,
-}, async () => {
+test('every catalogue and download request names the app with its userAgent option (GAP-FILM-ASSETLIB-UA)', { timeout: 10000 }, async () => {
   const agents = [],
     recording = (url, init) => {
       agents.push(new Headers(init?.headers).get('user-agent'));
       // The shared stand-in checks for the default agent; it answers the same either way.
       return fetcher(url, { ...init, headers: { 'User-Agent': 'MargoEngine-MCP/1.0 asset-tools' } });
     };
-  await new AssetLibrary({
-    directory: 'test-results',
-    fetch: recording,
-    userAgent: 'FilmStudio/2.1 (+https://example.com)',
-  }).search({
+  await new AssetLibrary({ directory: 'test-results', fetch: recording, userAgent: 'FilmStudio/2.1 (+https://example.com)' }).search({
     query: 'stone',
     provider: 'polyhaven',
   });
-  await new AssetLibrary({ directory: 'test-results', fetch: recording }).search({
-    query: 'stone',
-    provider: 'polyhaven',
-  });
+  await new AssetLibrary({ directory: 'test-results', fetch: recording }).search({ query: 'stone', provider: 'polyhaven' });
   assert.ok(agents.length >= 2);
   assert.equal(agents[0], 'FilmStudio/2.1 (+https://example.com)');
   assert.equal(agents.at(-1), 'MargoEngine-MCP/1.0 asset-tools', 'the default names the engine');
   for (const userAgent of ['', ' Padded', 'Bad\nAgent', 'é/1', 'x'.repeat(257), 7])
-    assert.throws(
-      () => new AssetLibrary({ directory: 'test-results', fetch: recording, userAgent }),
-      RangeError,
-      String(userAgent),
-    );
+    assert.throws(() => new AssetLibrary({ directory: 'test-results', fetch: recording, userAgent }), RangeError, String(userAgent));
 });
 
 // GAP-FILM-ASSETLIB: a stable folder per asset and variant with reuse, a reference without a search, a licence per item,
@@ -292,9 +276,7 @@ test('download keeps one folder per asset and variant, reuses it when complete a
   }
 });
 
-test('each item carries its own licence; licenses accepts more, and a refused one is named', {
-  timeout: 10000,
-}, async () => {
+test('each item carries its own licence; licenses accepts more, and a refused one is named', { timeout: 10000 }, async () => {
   const get = (url, options) => {
     const path = String(url);
     if (path === KHR + 'model-index.json')
@@ -380,10 +362,7 @@ test('an AssetSource adds a catalogue: its hosts bound every request and its ite
     const saved = await library.download('museum:plate', 'image');
     assert.equal(saved.entry, 'plate.png');
     assert.deepEqual([...(await readFile(join(saved.directory, 'plate.png')))], [...payload]);
-    assert.ok(
-      seen.every(([, key]) => key === 'k1'),
-      'the source headers go with its requests',
-    );
+    assert.ok(seen.every(([, key]) => key === 'k1'), 'the source headers go with its requests');
     const manifest = await readFile(saved.manifest, 'utf8');
     assert.doesNotMatch(manifest, /k1/, 'headers never reach the manifest');
     await assert.rejects(library.download('museum:plate', 'elsewhere'), /allow list/);
@@ -410,9 +389,7 @@ test('an AssetSource adds a catalogue: its hosts bound every request and its ite
   }
 });
 
-test('smithsonianSource finds CC0 images and GLB models and keeps its key out of URLs', {
-  timeout: 10000,
-}, async () => {
+test('smithsonianSource finds CC0 images and GLB models and keeps its key out of URLs', { timeout: 10000 }, async () => {
   const directory = await scratch();
   const SI = 'https://api.si.edu/openaccess/api/v1.0/';
   const record = {
@@ -425,19 +402,12 @@ test('smithsonianSource finds CC0 images and GLB models and keeps its key out of
         online_media: {
           media: [
             { type: 'Images', content: 'https://ids.si.edu/ids/deliveryService?id=NASM-1', usage: { access: 'CC0' } },
-            {
-              type: 'Images',
-              content: 'https://ids.si.edu/ids/deliveryService?id=NASM-2',
-              usage: { access: 'Usage conditions apply' },
-            },
+            { type: 'Images', content: 'https://ids.si.edu/ids/deliveryService?id=NASM-2', usage: { access: 'Usage conditions apply' } },
             {
               type: '3d_package',
               usage: { access: 'CC0' },
               resources: [
-                {
-                  label: 'Full resolution glb',
-                  url: 'https://3d-api.si.edu/content/document/3d_package:1/lm-full.glb',
-                },
+                { label: 'Full resolution glb', url: 'https://3d-api.si.edu/content/document/3d_package:1/lm-full.glb' },
                 { label: 'Full resolution obj', url: 'https://3d-api.si.edu/content/document/3d_package:1/lm.obj' },
               ],
             },
@@ -482,10 +452,7 @@ test('smithsonianSource finds CC0 images and GLB models and keeps its key out of
     const image = await fresh.download('smithsonian:edanmdm-nasm_A1~0', 'image');
     assert.equal(image.entry, 'edanmdm-nasm_A1-0.jpg');
     await assert.rejects(fresh.lookup('smithsonian:edanmdm-nasm_A1~1'), /licence/);
-    assert.ok(
-      urls.every((u) => !u.includes('TEST_KEY')),
-      'the key goes in a header, never a URL',
-    );
+    assert.ok(urls.every((u) => !u.includes('TEST_KEY')), 'the key goes in a header, never a URL');
     assert.throws(() => smithsonianSource({ apiKey: 'a b' }), /api.data.gov key/);
   } finally {
     await rm(directory, { recursive: true, force: true });

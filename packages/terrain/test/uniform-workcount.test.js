@@ -15,7 +15,6 @@ function rig() {
   const terrain = new Terrain({
     resolution: 8,
     levels: 3,
-    clipmapAnchor: 'camera',
     size: [32, 32],
     layers: Array.from({ length: 4 }, () => ({ height: [-10, 10], slope: [0, 1], scale: 1 })),
     textures: (device) => {
@@ -81,7 +80,7 @@ test('unchanged ring and shadow uniforms are not uploaded again', () => {
   assert.deepEqual(writes, [12, 0, 0, 12, 0, 12, 9, 0]);
 });
 
-test('camera-following terrain keeps the reference uniform bytes at every frame', () => {
+test('every uniform holds the parent bytes at every frame', () => {
   const { digest, buffers } = replay();
   assert.equal(buffers, 12);
   assert.equal(digest, '653e78b09281c96ea35d464ddb70c6a50d61b98c0ba937ef307e3a6ee10a3982');

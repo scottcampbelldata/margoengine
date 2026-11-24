@@ -36,9 +36,7 @@ test('only keeps the listed specifiers and the subpaths under a prefix', async (
   assert.deepEqual(Object.keys(one.imports), ['margoengine', 'margoengine/shadows']);
   const core = await localImportMap('/m/', { only: ['@margoengine/core/'] });
   assert.ok('@margoengine/core' in core.imports && Object.keys(core.imports).length > 1);
-  assert.ok(
-    Object.keys(core.imports).every((key) => key === '@margoengine/core' || key.startsWith('@margoengine/core/')),
-  );
+  assert.ok(Object.keys(core.imports).every((key) => key === '@margoengine/core' || key.startsWith('@margoengine/core/')));
 });
 
 test('rebaseImportMap leaves a URL that is not a CDN file alone and rejects bad input with a help link', () => {
@@ -46,8 +44,5 @@ test('rebaseImportMap leaves a URL that is not a CDN file alone and rejects bad 
   assert.deepEqual(rebaseImportMap(map, '/n').imports, { a: '/n/@x/y/dist/a.js', b: '/already/local.js' });
   assert.throws(() => rebaseImportMap(map, ''), { name: 'TypeError', message: /errors#import-map/ });
   assert.throws(() => rebaseImportMap({}, '/n'), { name: 'TypeError', message: /errors#import-map/ });
-  assert.throws(() => rebaseImportMap(map, '/n', { only: ['nope'] }), {
-    name: 'RangeError',
-    message: /nope.*errors#import-map/,
-  });
+  assert.throws(() => rebaseImportMap(map, '/n', { only: ['nope'] }), { name: 'RangeError', message: /nope.*errors#import-map/ });
 });

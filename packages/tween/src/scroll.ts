@@ -89,10 +89,7 @@ export function scrollTimeline(timeline: Timeline, options: ScrollTimelineOption
   if (!Number.isFinite(scrub) || scrub < 0) throw new TypeError('scrub must be finite seconds >= 0');
   if (range !== 'cover' && range !== 'contain') throw new TypeError("range must be 'cover' or 'contain'");
   // The clock of the animation frames: the page's own, which a scrolling element shares.
-  const view = (isWindow(source) ? source : (source as Element).ownerDocument?.defaultView) as
-      | Window
-      | null
-      | undefined,
+  const view = (isWindow(source) ? source : (source as Element).ownerDocument?.defaultView) as Window | null | undefined,
     frames = view ?? (globalThis as unknown as Window);
   let target = 0,
     progress = 0,

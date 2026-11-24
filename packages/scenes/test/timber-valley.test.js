@@ -65,8 +65,7 @@ test('the valley: creek and rail fall to the outlet, the town sits on the floor 
     assert.ok(plan.creek.length > 100 && plan.rail.length > 100);
     assert.ok(plan.creek[0][0] < -1900, 'the creek leaves the west edge');
     for (const line of [plan.creek, plan.rail])
-      for (let i = 16; i < line.length; i += 16)
-        assert.ok(h(line[i]) >= h(line[i - 16]) - 0.5, `rises up the valley at ${i}`);
+      for (let i = 16; i < line.length; i += 16) assert.ok(h(line[i]) >= h(line[i - 16]) - 0.5, `rises up the valley at ${i}`);
     // The town: lots near the requested count, each on gentle ground near the floor and clear of the rail and creek.
     assert.ok(plan.structures.length >= 24 && plan.structures.length <= 48, `${plan.structures.length} lots`);
     const floor = (p) => {
@@ -77,10 +76,7 @@ test('the valley: creek and rail fall to the outlet, the town sits on the floor 
     const near = (line, p) => Math.min(...line.map((q) => Math.hypot(q[0] - p[0], q[1] - p[1])));
     for (const lot of plan.structures) {
       assert.ok(floor(lot.at) < 260, `lot ${lot.at} is on the valley floor`);
-      assert.ok(
-        near(plan.rail, lot.at) > 6 && near(plan.creek, lot.at) > 8,
-        `lot ${lot.at} is off the rail and the creek`,
-      );
+      assert.ok(near(plan.rail, lot.at) > 6 && near(plan.creek, lot.at) > 8, `lot ${lot.at} is off the rail and the creek`);
     }
     // Fuel: timber models on the walls, none on the rail or the creek, the start in fuel.
     const fuel = fuelMap(w, { step: 8, bare: plan.town.exclusions });
@@ -113,10 +109,7 @@ test('libraryMesh merges a glTF under its node transforms, base on the ground, a
   const doc = {
       asset: { version: '2.0' },
       buffers: [{ uri: 'a.bin', byteLength: 78 }],
-      bufferViews: [
-        { buffer: 0, byteOffset: 0, byteLength: 72 },
-        { buffer: 0, byteOffset: 72, byteLength: 6 },
-      ],
+      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 72 }, { buffer: 0, byteOffset: 72, byteLength: 6 }],
       accessors: [
         { bufferView: 0, byteOffset: 0, componentType: 5126, count: 3, type: 'VEC3' },
         { bufferView: 0, byteOffset: 36, componentType: 5126, count: 3, type: 'VEC3' },
@@ -124,10 +117,7 @@ test('libraryMesh merges a glTF under its node transforms, base on the ground, a
       ],
       meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
       materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.4, 0.3, 0.2, 1] } }],
-      nodes: [
-        { children: [1], translation: [10, 5, 0] },
-        { mesh: 0, scale: [2, 2, 2] },
-      ],
+      nodes: [{ children: [1], translation: [10, 5, 0] }, { mesh: 0, scale: [2, 2, 2] }],
       scenes: [{ nodes: [0] }],
     },
     fetch = async (url) =>
@@ -137,22 +127,12 @@ test('libraryMesh merges a glTF under its node transforms, base on the ground, a
           ? { ok: true, status: 200, arrayBuffer: async () => bin }
           : { ok: false, status: 404 },
     part = await libraryMesh('/lib/rock/rock.gltf', { fetch });
-  assert.deepEqual(
-    Array.from(part.geometry.positions),
-    [-2, 0, 0, 2, 0, 0, -2, 6, 0],
-    'scaled by its node, base at 0, centred',
-  );
+  assert.deepEqual(Array.from(part.geometry.positions), [-2, 0, 0, 2, 0, 0, -2, 6, 0], 'scaled by its node, base at 0, centred');
   assert.deepEqual(Array.from(part.geometry.indices), [0, 1, 2]);
-  assert.deepEqual(
-    part.color.map((c) => +c.toFixed(3)),
-    [0.4, 0.3, 0.2],
-  );
+  assert.deepEqual(part.color.map((c) => +c.toFixed(3)), [0.4, 0.3, 0.2]);
   assert.equal(part.kind, 'stone');
   await assert.rejects(libraryMesh('/lib/rock/rock.gltf', { fetch, maxTriangles: 0 }), RangeError);
-  await assert.rejects(libraryMesh('/lib/none.gltf', { fetch: async () => ({ ok: false, status: 404 }) }), {
-    name: 'TypeError',
-    message: /404; check the URL/,
-  });
+  await assert.rejects(libraryMesh('/lib/none.gltf', { fetch: async () => ({ ok: false, status: 404 }) }), { name: 'TypeError', message: /404; check the URL/ });
 });
 
 // The fire's past runs in the weather (the first frames of 2026-11-17: attach stepped the front through its 1,800 s
@@ -180,8 +160,7 @@ test('rollFire burns the past in the weather: far more ground under the gale tha
       if (withDrive) rollFire(drive, fire, 1800);
       else fire.advanceTime(1800);
       let n = 0;
-      for (let z = -2044; z < 2048; z += 8)
-        for (let x = -2044; x < 2048; x += 8) if (fire.state(x, z) === 1 || fire.state(x, z) === 2) n++;
+      for (let z = -2044; z < 2048; z += 8) for (let x = -2044; x < 2048; x += 8) if (fire.state(x, z) === 1 || fire.state(x, z) === 2) n++;
       return n * 64;
     };
   try {

@@ -1202,50 +1202,27 @@ test('TAA velocity draws only opaque meshes with velocityEntry, with last frame 
 test('depthCompare, depthBias, depthBiasSlopeScale, alphaToCoverage and subtractive blending reach the pipeline; live', () => {
   const h = harness({ samples: 4 }),
     raw = RawShaders.attach(h.engine),
-    m = material({
-      depthCompare: 'greater',
-      depthBias: 2,
-      depthBiasSlopeScale: 1.5,
-      alphaToCoverage: true,
-      blending: 'subtractive',
-      transparent: true,
-    });
+    m = material({ depthCompare: 'greater', depthBias: 2, depthBiasSlopeScale: 1.5, alphaToCoverage: true, blending: 'subtractive', transparent: true });
   raw.add(new RawMesh({ material: m, attributes: quad(), index: [0, 1, 2, 0, 2, 3] }));
-  const d = named(
-    h.gpu.record(() => h.frame()),
-    'renderPipeline',
-  )[0][2];
+  const d = named(h.gpu.record(() => h.frame()), 'renderPipeline')[0][2];
   assert.equal(d.depthStencil.depthCompare, 'greater');
   assert.equal(d.depthStencil.depthBias, 2);
   assert.equal(d.depthStencil.depthBiasSlopeScale, 1.5);
   assert.equal(d.multisample.alphaToCoverageEnabled, true);
-  assert.deepEqual(d.fragment.targets[0].blend.color, {
-    srcFactor: 'src-alpha',
-    dstFactor: 'one',
-    operation: 'reverse-subtract',
-  });
+  assert.deepEqual(d.fragment.targets[0].blend.color, { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'reverse-subtract' });
   // A change of any of them builds a new pipeline on the next frame.
   m.depthCompare = 'always';
   m.depthBias = 0;
   m.depthBiasSlopeScale = 0;
   m.alphaToCoverage = false;
-  const e = named(
-    h.gpu.record(() => h.frame()),
-    'renderPipeline',
-  )[0][2];
+  const e = named(h.gpu.record(() => h.frame()), 'renderPipeline')[0][2];
   assert.equal(e.depthStencil.depthCompare, 'always');
   assert.equal(e.depthStencil.depthBias, undefined);
   assert.equal(e.multisample.alphaToCoverageEnabled, undefined);
   // depthTest false still means always.
   m.depthCompare = 'less';
   m.depthTest = false;
-  assert.equal(
-    named(
-      h.gpu.record(() => h.frame()),
-      'renderPipeline',
-    )[0][2].depthStencil.depthCompare,
-    'always',
-  );
+  assert.equal(named(h.gpu.record(() => h.frame()), 'renderPipeline')[0][2].depthStencil.depthCompare, 'always');
 });
 
 test('depth bias is left out of line and point pipelines, and alpha to coverage of single-sampled targets', () => {
@@ -1253,10 +1230,7 @@ test('depth bias is left out of line and point pipelines, and alpha to coverage 
     raw = RawShaders.attach(h.engine),
     m = material({ depthBias: 3, alphaToCoverage: true });
   raw.add(new RawMesh({ material: m, attributes: quad(), topology: 'line-list' }));
-  const d = named(
-    h.gpu.record(() => h.frame()),
-    'renderPipeline',
-  )[0][2];
+  const d = named(h.gpu.record(() => h.frame()), 'renderPipeline')[0][2];
   assert.equal(d.depthStencil.depthBias, 0);
   assert.equal(d.depthStencil.depthBiasSlopeScale, 0);
   assert.equal(d.multisample.alphaToCoverageEnabled, undefined);
@@ -1271,15 +1245,9 @@ test("a 'depth' texture binds texture_depth_* with a comparison sampler; a missi
         'return vec4f(textureSampleCompare(shadow, shadowSampler, i.tint.xy, 0.5) + textureSampleCompare(cubeShadow, cubeShadowSampler, i.tint, 0.5));',
       ),
       uniforms: { gain: { value: 1 } },
-      textures: {
-        shadow: { texture: null, sampleType: 'depth' },
-        cubeShadow: { texture: null, sampleType: 'depth', dimension: 'cube', sampler: { compare: 'greater' } },
-      },
+      textures: { shadow: { texture: null, sampleType: 'depth' }, cubeShadow: { texture: null, sampleType: 'depth', dimension: 'cube', sampler: { compare: 'greater' } } },
     });
-  assert.match(
-    m.prelude(),
-    /var shadow:texture_depth_2d;\n@group\(1\) @binding\(2\) var shadowSampler:sampler_comparison;/,
-  );
+  assert.match(m.prelude(), /var shadow:texture_depth_2d;\n@group\(1\) @binding\(2\) var shadowSampler:sampler_comparison;/);
   assert.match(m.prelude(), /var cubeShadow:texture_depth_cube;/);
   raw.add(new RawMesh({ material: m, attributes: quad(), index: [0, 1, 2, 0, 2, 3] }));
   const log = h.gpu.record(() => h.frame());
@@ -1288,30 +1256,13 @@ test("a 'depth' texture binds texture_depth_* with a comparison sampler; a missi
   assert.deepEqual(layout.entries[2].sampler, { type: 'comparison' });
   assert.deepEqual(layout.entries[3].texture, { sampleType: 'depth', viewDimension: 'cube' });
   const samplers = named(log, 'sampler').map((c) => c[2]);
-  assert.ok(
-    samplers.some((s) => s.compare === 'less-equal'),
-    'default comparison',
-  );
-  assert.ok(
-    samplers.some((s) => s.compare === 'greater'),
-    'own comparison',
-  );
-  const fallbacks = named(log, 'texture')
-    .map((c) => c[2])
-    .filter((t) => t.format === 'depth32float');
+  assert.ok(samplers.some((s) => s.compare === 'less-equal'), 'default comparison');
+  assert.ok(samplers.some((s) => s.compare === 'greater'), 'own comparison');
+  const fallbacks = named(log, 'texture').map((c) => c[2]).filter((t) => t.format === 'depth32float');
   assert.equal(fallbacks.length, 2, 'one 1 x 1 depth texture each for 2d and cube');
-  const clears = named(log, 'beginRenderPass').filter(
-    (c) => c[1]?.depthStencilAttachment?.depthClearValue === 1 && !c[1].colorAttachments.length,
-  );
+  const clears = named(log, 'beginRenderPass').filter((c) => c[1]?.depthStencilAttachment?.depthClearValue === 1 && !c[1].colorAttachments.length);
   assert.equal(clears.length, 1 + 6, 'cleared to 1, one pass per layer');
-  assert.throws(
-    () =>
-      new RawShaderMaterial({
-        vertexShader: shader,
-        textures: { v: { texture: null, sampleType: 'depth', dimension: '3d' } },
-      }),
-    /depth textures are 2d, 2d-array or cube/,
-  );
+  assert.throws(() => new RawShaderMaterial({ vertexShader: shader, textures: { v: { texture: null, sampleType: 'depth', dimension: '3d' } } }), /depth textures are 2d, 2d-array or cube/);
 });
 
 test('mesh.material keeps the type of the material it was made with (the compile-time half is the typed shaderMesh example in the README)', () => {
@@ -1362,7 +1313,7 @@ test('raw textures and storage across a device restore: plain ones are dropped a
     lost = () => errors.filter((e) => /borrowed-lost/.test(e.message));
   let log = h.gpu.record(() => h.frame());
   assert.deepEqual(viewed, ['plain']);
-  assert.equal(typeof bound(log)[2].resource, 'object', "the buffer is the caller's");
+  assert.equal(typeof bound(log)[2].resource, 'object', 'the buffer is the caller\'s');
   h.swap();
   log = h.gpu.record(() => h.frame());
   assert.deepEqual(viewed, ['plain'], 'nothing of the lost texture is bound on the new device');
@@ -1384,8 +1335,7 @@ test('raw textures and storage across a device restore: plain ones are dropped a
   const made = [];
   m.textures.map.texture = (device) => (made.push(device), watched(device, 'made' + made.length));
   const buffers = new Map();
-  m.storage.items.buffer = (device) =>
-    buffers.get(device) ?? buffers.set(device, device.createBuffer({ size: 64, usage: 128 })).get(device);
+  m.storage.items.buffer = (device) => buffers.get(device) ?? buffers.set(device, device.createBuffer({ size: 64, usage: 128 })).get(device);
   h.frame();
   h.frame();
   assert.equal(made.length, 1, 'made once per device');
@@ -1397,7 +1347,7 @@ test('raw textures and storage across a device restore: plain ones are dropped a
   assert.equal(lost().length, 2, 'no report for the function form');
 });
 
-test("a texture or view given at construction is bound as itself even when it has its own texture field (the WebGL2 layer's objects do)", () => {
+test('a texture or view given at construction is bound as itself even when it has its own texture field (the WebGL2 layer\'s objects do)', () => {
   // The WebGL2 layer's texture keeps its GL texture as `texture`, and its views keep their texture there; once such an
   // object was taken for a {texture} option and its inner object bound, which threw on every frame (KB-COMPAT-RAWFIRST1).
   const h = harness(),
@@ -1427,13 +1377,11 @@ test("a texture or view given at construction is bound as itself even when it ha
   assert.equal(m.textures.mask.texture, view, 'the view itself');
   raw.add(new RawMesh({ material: m, attributes: quad() }));
   const log = h.gpu.record(() => h.frame()),
-    entries = named(log, 'group')
-      .at(-1)[2]
-      .entries.map((e) => e.resource);
+    entries = named(log, 'group').at(-1)[2].entries.map((e) => e.resource);
   assert.equal(texture.views.length, 1, 'a view of the given texture');
   assert.deepEqual(entries[0], texture.views[0], 'the given texture is bound');
   assert.deepEqual(entries[2], JSON.parse(JSON.stringify(view)), 'the given view is bound (the recorder logs a copy)');
-  assert.equal(holder.views.length, 0, "not a view of the view's texture field");
+  assert.equal(holder.views.length, 0, 'not a view of the view\'s texture field');
   // A plain {texture} object is still the option form.
   const option = { texture };
   assert.equal(new RawShaderMaterial({ vertexShader: shader, textures: { map: option } }).textures.map, option);

@@ -60,10 +60,7 @@ const text = (view: DataView, at: number) =>
 function bytesOf(data: ArrayBuffer | ArrayBufferView): Uint8Array {
   if (data instanceof ArrayBuffer) return new Uint8Array(data);
   if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-  throw typeError(
-    'decodeWav needs an ArrayBuffer or a typed array holding the file; read the file into bytes first',
-    'wav',
-  );
+  throw typeError('decodeWav needs an ArrayBuffer or a typed array holding the file; read the file into bytes first', 'wav');
 }
 
 function sampleFormat(tag: number, bits: number): WavSampleFormat {
@@ -99,10 +96,7 @@ export function decodeWav(data: ArrayBuffer | ArrayBufferView): WavAudio {
   if (bytes.length < 12) throw wavFault('failed', 'Not a WAV file: shorter than the 12-byte RIFF header');
   const magic = text(view, 0);
   if (magic === 'RF64' || magic === 'BW64')
-    throw wavFault(
-      'unsupported',
-      'RF64 and BW64 files (over 4 GiB) are not supported; split the audio into files under 4 GiB',
-    );
+    throw wavFault('unsupported', 'RF64 and BW64 files (over 4 GiB) are not supported; split the audio into files under 4 GiB');
   if (magic !== 'RIFF' || text(view, 8) !== 'WAVE')
     throw wavFault('failed', 'Not a WAV file: it must start with RIFF and form type WAVE');
   let format: { tag: number; channels: number; rate: number; bits: number; mask: number } | undefined,
@@ -113,34 +107,26 @@ export function decodeWav(data: ArrayBuffer | ArrayBufferView): WavAudio {
     let length = view.getUint32(at + 4, true);
     const body = at + 8;
     if (id === 'fmt ') {
-      if (length < 16 || body + 16 > bytes.length)
-        throw wavFault('failed', 'The WAV fmt chunk is shorter than 16 bytes');
+      if (length < 16 || body + 16 > bytes.length) throw wavFault('failed', 'The WAV fmt chunk is shorter than 16 bytes');
       let tag = view.getUint16(body, true),
         mask = 0;
       const bits = view.getUint16(body + 14, true);
       if (tag === EXTENSIBLE) {
         if (length < 40 || body + 40 > bytes.length)
           throw wavFault('failed', 'The WAV extensible fmt chunk is shorter than 40 bytes');
-        if (view.getUint16(body + 16, true) < 22)
-          throw wavFault('failed', 'The WAV extensible fmt chunk has no 22-byte extension');
+        if (view.getUint16(body + 16, true) < 22) throw wavFault('failed', 'The WAV extensible fmt chunk has no 22-byte extension');
         mask = view.getUint32(body + 20, true);
         tag = view.getUint16(body + 24, true);
         for (let i = 0; i < GUID_TAIL.length; i++)
           if (view.getUint8(body + 26 + i) !== GUID_TAIL[i])
-            throw wavFault(
-              'unsupported',
-              'The WAV extensible SubFormat is not PCM or IEEE float; convert the file first',
-            );
+            throw wavFault('unsupported', 'The WAV extensible SubFormat is not PCM or IEEE float; convert the file first');
       }
       format = { tag, channels: view.getUint16(body + 2, true), rate: view.getUint32(body + 4, true), bits, mask };
       const align = view.getUint16(body + 12, true);
       if (format.channels < 1 || format.rate < 1)
         throw wavFault('failed', 'The WAV fmt chunk has no channels or a zero sample rate');
       if (bits === 0 || bits % 8 || align !== (format.channels * bits) / 8)
-        throw wavFault(
-          'failed',
-          `The WAV fmt chunk is inconsistent: ${bits} bits per sample, ${format.channels} channels, block align ${align}`,
-        );
+        throw wavFault('failed', `The WAV fmt chunk is inconsistent: ${bits} bits per sample, ${format.channels} channels, block align ${align}`);
     } else if (id === 'data' && start < 0) {
       start = body;
       size = length === 0xffffffff || body + length > bytes.length ? bytes.length - body : length;
@@ -166,7 +152,7 @@ export function decodeWav(data: ArrayBuffer | ArrayBufferView): WavAudio {
           v = view.getInt16(at, true) / 32768;
           break;
         case 'pcm24':
-          v = (view.getUint8(at) | (view.getUint8(at + 1) << 8) | (view.getInt8(at + 2) << 16)) / 8388608;
+          v = ((view.getUint8(at) | (view.getUint8(at + 1) << 8) | (view.getInt8(at + 2) << 16)) / 8388608);
           break;
         case 'pcm32':
           v = view.getInt32(at, true) / 2147483648;
@@ -194,8 +180,7 @@ export function decodeWav(data: ArrayBuffer | ArrayBufferView): WavAudio {
  */
 export function encodeWav(audio: WavInput, options: EncodeWavOptions = {}): Uint8Array {
   const kind = options.format ?? 'pcm16';
-  if (!(kind in BITS))
-    throw rangeError(`Unknown WAV format ${String(kind)}; use pcm8, pcm16, pcm24, pcm32, float32 or float64`, 'wav');
+  if (!(kind in BITS)) throw rangeError(`Unknown WAV format ${String(kind)}; use pcm8, pcm16, pcm24, pcm32, float32 or float64`, 'wav');
   const { sampleRate, channels } = audio;
   if (!Number.isInteger(sampleRate) || sampleRate < 1 || sampleRate > 0xffffffff)
     throw rangeError('encodeWav needs an integer sampleRate from 1 to 4294967295', 'wav');

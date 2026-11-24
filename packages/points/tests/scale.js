@@ -24,7 +24,7 @@ async function run(count, floatColors, pointBudget) {
   const positions = new Float32Array(count * 3),
     colors = floatColors ? new Float32Array(count * 4) : new Uint8Array(count * 3);
   let seed = 777;
-  const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
   for (let i = 0; i < count; i++) {
     positions[i * 3] = random() * 2 - 1;
     positions[i * 3 + 1] = random() * 2 - 1;

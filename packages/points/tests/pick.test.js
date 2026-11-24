@@ -92,7 +92,10 @@ test('a pick draws what the view drew, with an ID range per cloud, and hits map 
   const first = overlay.pickHit(1);
   assert.equal(first.cloud, a);
   assert.equal(first.point, a.blocks.order[1]);
-  assert.deepEqual([...first.position], [...a.positions.slice(first.point * 3, first.point * 3 + 3)]);
+  assert.deepEqual(
+    [...first.position],
+    [...a.positions.slice(first.point * 3, first.point * 3 + 3)],
+  );
   const second = overlay.pickHit(4);
   assert.equal(second.cloud, b);
   assert.equal(second.point, 1, 'a reordered cloud reads slots directly');

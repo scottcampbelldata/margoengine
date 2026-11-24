@@ -291,8 +291,7 @@ export class GLSLParser {
       const init = this.match('=') ? this.expression(2) : undefined;
       if (t.endsWith('[]')) {
         const sized = init?.op === 'call' && init.args[0]!.op === 'name' ? init.args[0]!.value : '';
-        if (!init || sized.replace(/\[\d+\]$/, '[]') !== t)
-          this.fail(`Unsized array ${n} needs an array constructor of its type`);
+        if (!init || sized.replace(/\[\d+\]$/, '[]') !== t) this.fail(`Unsized array ${n} needs an array constructor of its type`);
         t = sized;
       }
       if (scoped) this.constants.at(-1)!.set(n, /\bconst\b/.test(qualifier) && init ? init : null);
@@ -323,8 +322,7 @@ export class GLSLParser {
       if (/sampler/.test(q.type)) this.fail('A uniform block holds no samplers');
       fields.push(...this.declarations(q.type, q.qualifier, undefined, false));
     }
-    if (this.match(';'))
-      result.globals.push(...fields.map((f) => ({ ...f, qualifier: `uniform ${f.qualifier}`.trim() })));
+    if (this.match(';')) result.globals.push(...fields.map((f) => ({ ...f, qualifier: `uniform ${f.qualifier}`.trim() })));
     else {
       this.known.add(name);
       result.structs.set(name, fields);
@@ -345,11 +343,7 @@ export class GLSLParser {
       if (this.uniformBlock(result)) continue;
       // `invariant gl_Position;` redeclares names as invariant (4.6.1); one translation of each stage computes them
       // one way, so it lowers to nothing.
-      if (
-        this.peek() === 'invariant' &&
-        !this.known.has(this.tokens[this.i + 1]!) &&
-        !qualifiers.has(this.tokens[this.i + 1]!)
-      ) {
+      if (this.peek() === 'invariant' && !this.known.has(this.tokens[this.i + 1]!) && !qualifiers.has(this.tokens[this.i + 1]!)) {
         this.take();
         do this.identifier();
         while (this.match(','));
@@ -493,11 +487,7 @@ export class GLSLParser {
   private simple(): Statement {
     // A type followed by `[` and `(` is an array constructor in an expression statement, not a declaration.
     const t = this.peek();
-    if (
-      qualifiers.has(t) ||
-      t === 'layout' ||
-      ((this.known.has(t) || Object.hasOwn(square, t)) && !this.constructs())
-    ) {
+    if (qualifiers.has(t) || t === 'layout' || ((this.known.has(t) || Object.hasOwn(square, t)) && !this.constructs())) {
       const q = this.qualified();
       return { kind: 'decl', decls: this.declarations(q.type, q.qualifier) };
     }

@@ -14,7 +14,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { alphaBlend } from '../../shared/pass.js';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
-import { compatibilityLevel, compatTier, requireCompatTier } from '../../shared/compat.js';
+import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
 import { roundsFloatTargets } from './tier.js';
 import { PointCloud } from './cloud.js';
 import { checkStorage } from './storage-limit.js';
@@ -36,12 +36,9 @@ const NORMALS = 512,
   /** Front depth of a pixel no surfel covers. */
   NOTHING = 3e38,
   /** NOTHING as the four unorm bytes of its float, the clear of the packed front target at the compatibility level. */
-  NOTHING_PACKED = ((bytes: Uint8Array) => ({
-    r: bytes[0] / 255,
-    g: bytes[1] / 255,
-    b: bytes[2] / 255,
-    a: bytes[3] / 255,
-  }))(new Uint8Array(new Float32Array([NOTHING]).buffer));
+  NOTHING_PACKED = ((bytes: Uint8Array) => ({ r: bytes[0] / 255, g: bytes[1] / 255, b: bytes[2] / 255, a: bytes[3] / 255 }))(
+    new Uint8Array(new Float32Array([NOTHING]).buffer),
+  );
 
 /**
  * The surfel shader. `packed`: the front depth goes out as the four bytes of its float into rgba8unorm (exact, as no
@@ -137,21 +134,21 @@ ${split ? 'struct Sums{@location(0) rg:vec4f,@location(1) ba:vec4f}' : ''}
 export const surfelShader: string = surfelCode(false);
 
 /**
- * The resolve shader; with a `sample`, the resolve of that sample alone (a masked draw per sample), with `split` reading
- * (r, g) and (b, weight) from the two sum targets of the compatibility level at 4x.
+ * The resolve shader; with a `sample`, the resolve of that sample at the compatibility level at 4x, reading (r, g) and
+ * (b, weight) from the two sum targets.
  */
-const resolveCode = (sample?: number, split = false): string =>
+const resolveCode = (sample?: number): string =>
   frameWgsl +
   /* wgsl */ `
 @group(1) @binding(0) var sums:texture_2d<f32>;
-${split ? '@group(1) @binding(1) var rest:texture_2d<f32>;' : ''}
+${sample === undefined ? '' : '@group(1) @binding(1) var rest:texture_2d<f32>;'}
 const EDGE=0.25;
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
   return vec4f(f32(i&1u)*4.0-1.0,f32(i>>1u)*4.0-1.0,0.0,1.0);
 }
 @fragment fn fragment(@builtin(position) position:vec4f)->@location(0) vec4f{
   let q=vec2i(position.xy);
-  let sum=${sample === undefined ? 'textureLoad(sums,q,0)' : split ? `vec4f(textureLoad(sums,q,${sample}).rg,textureLoad(rest,q,${sample}).rg)` : `textureLoad(sums,q,${sample})`};
+  let sum=${sample === undefined ? 'textureLoad(sums,q,0)' : `vec4f(textureLoad(sums,q,${sample}).rg,textureLoad(rest,q,${sample}).rg)`};
   if(sum.a<=0.0){discard;}
   return encode(vec4f(sum.rgb/sum.a,clamp(sum.a/EDGE,0.0,1.0)));
 }
@@ -198,11 +195,6 @@ interface Targets {
   samples: number;
   /** The compatibility level at 4x: sums in two rg16float targets, resolved by a masked draw per sample. */
   split: boolean;
-  /**
-   * Native WebGPU multisampled: the resolve is a masked draw per sample, at the full level too (KB2481: on the Intel Arc
-   * 140V the one `sample_index` draw over 4x additive sums does not repeat itself). The WebGL2 layer ignores masks.
-   */
-  masked: boolean;
   /** Front depth packed into rgba8unorm: when `split`, and on the WebGL2 layer below its full tier. */
   packed: boolean;
   textures: GPUTexture[];
@@ -492,7 +484,6 @@ export class SurfelPlugin implements EnginePlugin {
     const device = this.device!,
       // The level multisamples neither r32float nor rgba16float, but does rgba8unorm and rg16float.
       split = samples > 1 && compatibilityLevel(device),
-      masked = samples > 1 && compatTier(device) === 'native',
       packed = split || roundsFloatTargets(device);
     this.releaseTargets();
     const layout = this.textureLayout(samples),
@@ -519,7 +510,6 @@ export class SurfelPlugin implements EnginePlugin {
       height,
       samples,
       split,
-      masked,
       packed,
       textures,
       frontView,
@@ -530,11 +520,11 @@ export class SurfelPlugin implements EnginePlugin {
     });
   }
 
-  /** The depth, blend and resolve pipelines of one target setup; on native WebGPU at 4x, one resolve per sample. */
+  /** The depth, blend and resolve pipelines of one target setup; at the level, one resolve per sample. */
   private passes(context: GpuContext, targets: Targets): [GPURenderPipeline, GPURenderPipeline, GPURenderPipeline[]] {
-    const { samples, split, masked, packed } = targets,
+    const { samples, split, packed } = targets,
       depthFormat = context.descriptor.depthStencil!.format,
-      key = `${samples}|${+split}|${+masked}|${+packed}|${context.format}|${depthFormat}`,
+      key = `${samples}|${+split}|${+packed}|${context.format}|${depthFormat}`,
       found = this.resolves.get(key);
     if (found) return [this.pipelines.get(`d${key}`)!, this.pipelines.get(`b${key}`)!, found];
     const device = this.device!,
@@ -583,11 +573,10 @@ export class SurfelPlugin implements EnginePlugin {
           multisample,
         });
       },
-      // One draw per sample, its mask writing that sample alone: the level has no sample_index, and on the Intel Arc 140V
-      // the one sample_index draw over 4x additive sums does not repeat itself (KB2481). The WebGL2 layer keeps that draw.
-      resolves = masked
-        ? Array.from({ length: samples }, (_, sample) =>
-            resolve(multisampled(resolveCode(sample, split), samples, false), {
+      // The level has no sample_index: one draw per sample, its mask writing that sample alone.
+      resolves = split
+        ? [0, 1, 2, 3].map((sample) =>
+            resolve(multisampled(resolveCode(sample), samples, false), {
               count: samples,
               mask: 1 << sample,
             }),
@@ -761,3 +750,4 @@ function multisampled(code: string, samples: number, perSample: boolean): string
         .replace('sums,q,0)', 'sums,q,i32(sample))')
     : out;
 }
+

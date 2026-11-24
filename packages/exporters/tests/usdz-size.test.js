@@ -41,22 +41,13 @@ test('the result says the Fox is 79 metres tall, so nobody finds out on a phone'
     text = await usda(usdz);
   nearAll(size, [25.185, 79.029, 154.72], 0.01, 'rest size');
   const held = boxOfPoints(text);
-  nearAll(
-    held.max.map((value, i) => value - held.min[i]),
-    size,
-    0.01,
-    "the file's own points say the size the result says",
-  );
+  nearAll(held.max.map((value, i) => value - held.min[i]), size, 0.01, 'the file\'s own points say the size the result says');
   // Run reaches past the rest pose: the feet go below the floor and the body stretches.
   nearAll(bounds.min, [-17.5, -3.722, -98.26], 0.05, 'clip min');
   nearAll(bounds.max, [17.02, 77.13, 75.19], 0.05, 'clip max');
   assert.equal(scale, 1);
   assert.match(text, /metersPerUnit = 1\b/);
-  assert.doesNotMatch(
-    text,
-    /def Xform "Margo" \{\r?\n\s+matrix4d/,
-    'true size is the default: no transform on the root',
-  );
+  assert.doesNotMatch(text, /def Xform "Margo" \{\r?\n\s+matrix4d/, 'true size is the default: no transform on the root');
 });
 
 test('height sets the size in metres, keeps the proportions and leaves the animation alone', async () => {
@@ -67,12 +58,7 @@ test('height sets the size in metres, keeps the proportions and leaves the anima
     scale = 0.45 / plain.size[1];
   near(small.size[1], 0.45, 1e-9, 'height');
   near(small.scale, scale, 1e-12, 'scale');
-  nearAll(
-    small.size,
-    plain.size.map((v) => v * scale),
-    1e-9,
-    'proportions',
-  );
+  nearAll(small.size, plain.size.map((v) => v * scale), 1e-9, 'proportions');
   near(small.bounds.min[1], (plain.bounds.min[1] + 0.12174) * scale, 1e-5, 'the rest pose stands on the floor');
   const root = /def Xform "Margo" \{\r?\n\s+matrix4d xformOp:transform = (.*)/.exec(after)[1],
     m = numbers(root);
@@ -95,12 +81,7 @@ test('every frame of a skin says how far it reaches, past the rest pose', async 
   assert.equal(skin.length, frames);
   const union = [0, 1, 2].map((k) => Math.min(...skin.map((box) => box[k])));
   nearAll(union, bounds.min, 1e-3, 'lowest reach');
-  nearAll(
-    [0, 1, 2].map((k) => Math.max(...skin.map((box) => box[3 + k]))),
-    bounds.max,
-    1e-3,
-    'highest reach',
-  );
+  nearAll([0, 1, 2].map((k) => Math.max(...skin.map((box) => box[3 + k]))), bounds.max, 1e-3, 'highest reach');
   assert.ok(new Set(skin.map(String)).size > 1, 'the box moves with the clip');
 });
 
@@ -138,12 +119,7 @@ test('the static writer takes the same size, and measureUSDZ reads it first', as
   near(set.bounds.min[1], 0, 1e-9, 'on the floor');
   near(set.scale, 0.45 / measured.size[1], 1e-12, 'scale');
   assert.doesNotMatch(plain, /def Xform "Margo" \{\r?\n\s+matrix4d/);
-  near(
-    numbers(/def Xform "Margo" \{\r?\n\s+matrix4d xformOp:transform = (.*)/.exec(small)[1])[5],
-    set.scale,
-    1e-6,
-    'root',
-  );
+  near(numbers(/def Xform "Margo" \{\r?\n\s+matrix4d xformOp:transform = (.*)/.exec(small)[1])[5], set.scale, 1e-6, 'root');
 });
 
 test('a size that cannot be met is refused with what to do', async () => {

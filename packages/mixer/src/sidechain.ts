@@ -79,22 +79,15 @@ export async function createSidechain(context: BaseAudioContext, options: Sidech
   await loadProcessor(context, 'margo-sidechain-v1', processor, options.signal);
   options.signal?.throwIfAborted();
   const output = new AudioWorkletNode(context, 'margo-sidechain-v1', {
-    numberOfInputs: 2,
-    numberOfOutputs: 1,
-    outputChannelCount: [channels],
-    channelCount: channels,
-    channelCountMode: 'explicit',
-    processorOptions: settings,
+    numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [channels],
+    channelCount: channels, channelCountMode: 'explicit', processorOptions: settings,
   });
-  const input = context.createGain(),
-    sidechain = context.createGain();
+  const input = context.createGain(), sidechain = context.createGain();
   input.connect(output, 0, 0);
   sidechain.connect(output, 0, 1);
   let disposed = false;
   const stage: Sidechain = {
-    input,
-    sidechain,
-    output,
+    input, sidechain, output,
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -104,9 +97,7 @@ export async function createSidechain(context: BaseAudioContext, options: Sidech
       output.port.postMessage('dispose');
       output.port.close();
     },
-    [Symbol.dispose]() {
-      stage.dispose();
-    },
+    [Symbol.dispose]() { stage.dispose(); },
   };
   return stage;
 }

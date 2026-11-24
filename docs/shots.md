@@ -38,6 +38,7 @@ evaluated state goes to the page's `apply` hook when it has one.
 | `aovs` | `[]` | Masks written beside every frame (see Masks): names the page gives through `page.aovs`, and `sky` and `water`, which the tool works out |
 | `horizon` | `null` | `{y}`: the world height of the water plane that splits `sky` from `water`; needed for either |
 | `moving` | `null` | `{depthScale}`: each probe also writes the frame after it and the camera's motion to it (see Moving evidence); `depthScale` is the metres of the page's `depth` mask, which holds exp(-distance / depthScale); needs `depth` in `aovs`, a camera track and probes before the last frame |
+| `subject` | `null` | `{target: [x, y, z], size}` in world metres: the point the shot is about and how big it is across, for a film pipeline's camera checks (framing, focus, the subject at a cut); `cameraFrames` and `--cameras` hand it on |
 | `kit`, `grade`, `endCard` | `null` | Carried in the manifest for the steps that use them: scene kits (P5), the grade (P3) and the end card (P6) |
 | `page.path` | required | The page to render, from the top of the repository (served by the repository's Vite dev server) |
 | `page.query` | `{}` | URL options for the page (`quality` comes from `tier`) |
@@ -173,6 +174,22 @@ and is what tests and new shots use: a page that goes wrong only between probes 
 `npm run test:shot` (case 6) checks a production render of the test scene: probes 0 and 24 identical, the second
 render drawing the warm-up and frames 0 to 24 only, and a page reading `crypto.getRandomValues` still failing on a
 probe frame.
+
+## Stills and cameras
+
+`node tools/shot/cli.mjs <shot> --stills [--out <dir>]` renders a shot's stills: its probe frames only, as
+`<out>/<probe>.png` with `<out>/stills.json` (format `margo-shot-stills`: the shot's sha256, each probe's kept frame,
+file and frame sha256, the adapter). It is one render with the probes as its only captured frames (`shootStills` in
+`tools/shot/stills.mjs`), so every frame up to the last probe is still drawn with its sub-frames and each still is
+the frame a full render keeps there; nothing else is written, so a stills run is never footage. A film's storyboard
+is these stills, judged and approved before any motion render (the channel-films stills gate fingerprints the shot
+file and holds the motion capture until every still is approved). It needs probes.
+
+`--cameras` prints, as one JSON line and with no browser, the camera of every kept frame (`cameraFrames` in
+`tools/shot/shot-file.mjs`): `{id, fps, frames, size, subject, cameras: [{frame, time, position, target, fov,
+roll}]}`, the camera track read at each frame's clock time as a render reads it, pre-roll skipped, `time` from the
+first kept frame, `fov` in degrees and `roll` in radians. A film pipeline's camera checks read it instead of a
+render. `--stills` and `--cameras` each stand alone: with another mode (or each other) the tool exits 2.
 
 ## Masks (AOVs)
 

@@ -14,20 +14,8 @@ import {
   windProfile,
 } from '../dist/index.js';
 
-test("beaufort follows the WMO table and Beaufort's law within half a force", () => {
-  for (const [speed, force] of [
-    [0, 0],
-    [0.2, 0],
-    [0.3, 1],
-    [1.5, 2],
-    [5.4, 4],
-    [10.6, 5],
-    [10.7, 6],
-    [17.2, 8],
-    [24.4, 10],
-    [32.6, 12],
-    [60, 12],
-  ])
+test('beaufort follows the WMO table and Beaufort\'s law within half a force', () => {
+  for (const [speed, force] of [[0, 0], [0.2, 0], [0.3, 1], [1.5, 2], [5.4, 4], [10.6, 5], [10.7, 6], [17.2, 8], [24.4, 10], [32.6, 12], [60, 12]])
     assert.equal(beaufort(speed), force, `${speed} m/s`);
   for (let b = 1; b <= 12; b++) {
     const v = 0.836 * b ** 1.5; // Beaufort's law at the centre of force b
@@ -76,11 +64,7 @@ test('visibility: 23 km clear, 200 m in dense fog, Koschmieder 2 percent contras
 
 // A scene: an engine whose `plugins` hold the plugins by name, as `engine.plugins` does.
 const sceneWith = (...plugins) => {
-  const engine = {
-    plugins: new Map(plugins.map((p) => [p.name, p])),
-    use: (p) => (engine.plugins.set(p.name, p), p.setup(engine)),
-    removePlugin: () => {},
-  };
+  const engine = { plugins: new Map(plugins.map((p) => [p.name, p])), use: (p) => (engine.plugins.set(p.name, p), p.setup(engine)), removePlugin: () => {} };
   return engine;
 };
 

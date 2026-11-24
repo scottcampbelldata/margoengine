@@ -27,10 +27,8 @@ try {
       const element = document.querySelector('[data-side="1"] canvas');
       return [element.width, element.height];
     });
-    for (const side of [0, 1])
-      assert.deepEqual(sizes[side], mode === 'canvas' ? canvas : [64, 64], `${mode}: target size`);
-    if (mode === 'depth')
-      assert.match(depth[1], /^depth[\w-]+x[14]$/, `${mode}: a depth texture in the scene's format`);
+    for (const side of [0, 1]) assert.deepEqual(sizes[side], mode === 'canvas' ? canvas : [64, 64], `${mode}: target size`);
+    if (mode === 'depth') assert.match(depth[1], /^depth[\w-]+x[14]$/, `${mode}: a depth texture in the scene's format`);
     else assert.equal(depth[1], '', `${mode}: no depth texture`);
     const [left, right] = await Promise.all(
       [0, 1].map(async (side) => decodePNG(await page.locator(`[data-side="${side}"] canvas`).screenshot())),

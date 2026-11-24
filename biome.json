@@ -87,7 +87,6 @@
     },
     {
       "includes": [
-        "examples/all-entries/entries.ts",
         "packages/exporters/scripts/generate-unity-support.js",
         "packages/exporters/src/unity-support.generated.ts"
       ],

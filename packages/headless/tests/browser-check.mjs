@@ -56,10 +56,7 @@ try {
   console.log(`ok stage: changed ${stageMetrics.changed}, hot ${stageMetrics.hot}, mean ${stageMetrics.mean}`);
   // The same scene in Node on the `webgpu` binding, with no browser: the picture a server makes is the page's.
   const nodeFile = join(tmpdir(), `margo-node-scene-${process.pid}.png`);
-  execFileSync(process.execPath, ['packages/headless/tests/node-scene.mts', nodeFile], {
-    stdio: 'inherit',
-    timeout: 120_000,
-  });
+  execFileSync(process.execPath, ['packages/headless/tests/node-scene.mts', nodeFile], { stdio: 'inherit', timeout: 120_000 });
   const nodeMetrics = compare(stageSeen, await decodePNG(new Uint8Array(await readFile(nodeFile))));
   await rm(nodeFile);
   assert.ok(nodeMetrics.changed <= LIMITS.changed, `node changed ${nodeMetrics.changed}`);
@@ -76,11 +73,7 @@ try {
     assert.deepEqual([result.width, result.height], [256, 192]);
     // A streamed WebM's header was written before its end was known, so the joined file states no duration and the
     // element reports none (Infinity) until it has read to the end; its frames still play at their times.
-    if (name === 'webm-stream')
-      assert.ok(
-        result.duration === Number.POSITIVE_INFINITY || Math.abs(result.duration - result.expected) < 1 / 30,
-        `duration ${result.duration}`,
-      );
+    if (name === 'webm-stream') assert.ok(result.duration === Number.POSITIVE_INFINITY || Math.abs(result.duration - result.expected) < 1 / 30, `duration ${result.duration}`);
     else assert.ok(Math.abs(result.duration - result.expected) < 1 / 30, `duration ${result.duration}`);
     for (const value of result.same) assert.ok(value < MOST_DIFFERENCE, `${name} shows its frames: ${result.same}`);
     assert.ok(result.other > Math.max(...result.same), `${name} frames differ: ${result.other}`);
@@ -91,14 +84,11 @@ try {
       if (result.streamed) {
         assert.equal(result.streamed.ranges, 1, 'the fragments join with no gap');
         assert.ok(Math.abs(result.streamed.end - result.expected) < 1 / 30, `streamed to ${result.streamed.end}`);
-        for (const value of result.streamed.same)
-          assert.ok(value < MOST_DIFFERENCE, `${name} plays from MSE: ${result.streamed.same}`);
+        for (const value of result.streamed.same) assert.ok(value < MOST_DIFFERENCE, `${name} plays from MSE: ${result.streamed.same}`);
       }
     }
     const errors = result.same.map((value) => value.toFixed(2)).join(' ');
-    console.log(
-      `ok video ${name}: ${result.codec}, ${result.bytes} B${result.streamed ? `, MSE to ${result.streamed.end.toFixed(3)} s` : ''}, frame error ${errors}, wrong ${result.other.toFixed(2)}`,
-    );
+    console.log(`ok video ${name}: ${result.codec}, ${result.bytes} B${result.streamed ? `, MSE to ${result.streamed.end.toFixed(3)} s` : ''}, frame error ${errors}, wrong ${result.other.toFixed(2)}`);
   }
   // Alpha video in a <video> element: drawn over blue, the clear third shows blue, the half third the even mix, the solid
   // third and the frame's square red; drawn over nothing, the element's alpha is the frames' (0, 128, 255). The
@@ -116,16 +106,9 @@ try {
     ['vp09.00.51.08', 'libvpx-vp9', 'mse'],
     ['vp8', 'libvpx', 'mse'],
   ]) {
-    const { file, picks, ...result } = await page.evaluate(
-        ([name, how]) => window.check.alphaVideo(name, how),
-        [codec, streamed],
-      ),
+    const { file, picks, ...result } = await page.evaluate(([name, how]) => window.check.alphaVideo(name, how), [codec, streamed]),
       label = `${codec}${streamed ? ` streamed (${streamed})` : ''}`;
-    if (process.env.MARGO_KEEP_VIDEO)
-      await writeFile(
-        `${process.env.MARGO_KEEP_VIDEO}.alpha-${codec}${streamed ? `-${streamed}` : ''}.webm`,
-        Uint8Array.from(file),
-      );
+    if (process.env.MARGO_KEEP_VIDEO) await writeFile(`${process.env.MARGO_KEEP_VIDEO}.alpha-${codec}${streamed ? `-${streamed}` : ''}.webm`, Uint8Array.from(file));
     // ffmpeg reads the same file's alpha back with its libvpx decoders (ffmpeg is needed here already: node-check.mjs
     // runs the README's ffmpeg example). FFMPEG names another program.
     const kept = join(tmpdir(), `margo-alpha-${process.pid}-${codec}-${streamed ?? 'whole'}.webm`);
@@ -148,9 +131,7 @@ try {
         worst = Math.max(worst, off);
         assert.ok(off <= ALPHA_LEVELS, `${label} frame ${pick.index} ${name}: over blue ${over}, alpha ${seen}`);
       }
-    console.log(
-      `ok alpha video ${label}: ${result.bytes} B, drawn over blue and bare within ${worst} levels; ${decoder} in ffmpeg reads alpha within ${read}`,
-    );
+    console.log(`ok alpha video ${label}: ${result.bytes} B, drawn over blue and bare within ${worst} levels; ${decoder} in ffmpeg reads alpha within ${read}`);
   }
   // Formats: the browser's decoders against the encoders.
   const f = await page.evaluate(() => window.check.formats());

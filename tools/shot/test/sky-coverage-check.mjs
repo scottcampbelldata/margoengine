@@ -57,9 +57,7 @@ const row = (rows, check) => rows.find((r) => r.check === check);
     assert.equal(clip.pass, true, `${name}: ${JSON.stringify(clip)}`);
   }
   console.log(
-    `ok kettle: whole frame clips ${Object.entries(probes)
-      .map(([n, p]) => `${n} ${p.whole.value.toFixed(2)} %`)
-      .join(', ')}; 0 sky pixels counted`,
+    `ok kettle: whole frame clips ${Object.entries(probes).map(([n, p]) => `${n} ${p.whole.value.toFixed(2)} %`).join(', ')}; 0 sky pixels counted`,
   );
 }
 {
@@ -71,11 +69,7 @@ const row = (rows, check) => rows.find((r) => r.check === check);
     assert.equal(clip.mask, 'sky-coverage', name);
     assert.ok(clip.detail.pixels > 0 && clip.pass, `${name}: ${JSON.stringify(clip)}`);
   }
-  console.log(
-    `ok window-snow: sky share ${Object.entries(probes)
-      .map(([n, p]) => `${n} ${(100 * p.share).toFixed(1)} %`)
-      .join(', ')}`,
-  );
+  console.log(`ok window-snow: sky share ${Object.entries(probes).map(([n, p]) => `${n} ${(100 * p.share).toFixed(1)} %`).join(', ')}`);
 }
 {
   const { manifest, probes } = await render('orrery-dolly');
@@ -91,10 +85,6 @@ const row = (rows, check) => rows.find((r) => r.check === check);
     }
     assert.equal(row(p.rows, 'skyClip').mask, 'frame', name);
   }
-  console.log(
-    `ok orrery: no sky coverage; lights ${Object.values(probes)
-      .map((p) => row(p.rows, 'lights').value)
-      .join(', ')}`,
-  );
+  console.log(`ok orrery: no sky coverage; lights ${Object.values(probes).map((p) => row(p.rows, 'lights').value).join(', ')}`);
 }
 console.log('shot tool sky coverage check passed');

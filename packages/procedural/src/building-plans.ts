@@ -205,25 +205,12 @@ function blockSolids(b: Building, planes: Plane[]): Solid[] {
     D = o.depth / 2,
     ov = o.roof === 'flat' && o.parapet > 0 ? 0 : o.overhang,
     top = b.top,
-    under: Half[] = [
-      [1, 0, 0, W],
-      [-1, 0, 0, W],
-      [0, 0, 1, D],
-      [0, 0, -1, D],
-      [0, -1, 0, 0.35],
-    ];
+    under: Half[] = [[1, 0, 0, W], [-1, 0, 0, W], [0, 0, 1, D], [0, 0, -1, D], [0, -1, 0, 0.35]];
   for (const p of planes) under.push([-p.a, 1, -p.g, p.d]);
   const out: Solid[] = [{ halves: under, lo: [-W, -0.35, -D], hi: [W, top, D] }];
   if (ov > 0)
     planes.forEach((p, i) => {
-      const h: Half[] = [
-        [1, 0, 0, W + ov],
-        [-1, 0, 0, W + ov],
-        [0, 0, 1, D + ov],
-        [0, 0, -1, D + ov],
-        [-p.a, 1, -p.g, p.d],
-        [p.a, -1, p.g, 0.15 - p.d],
-      ];
+      const h: Half[] = [[1, 0, 0, W + ov], [-1, 0, 0, W + ov], [0, 0, 1, D + ov], [0, 0, -1, D + ov], [-p.a, 1, -p.g, p.d], [p.a, -1, p.g, 0.15 - p.d]];
       planes.forEach((q, j) => {
         if (j !== i) h.push([p.a - q.a, 0, p.g - q.g, q.d - p.d]);
       });
@@ -264,20 +251,7 @@ function subtract(g: GeometryData, solids: readonly { s: Solid; eps: number }[])
     U = g.uvs!,
     T = g.tangents!,
     I = g.indices!,
-    vert = (i: number) => [
-      P[3 * i],
-      P[3 * i + 1],
-      P[3 * i + 2],
-      N[3 * i],
-      N[3 * i + 1],
-      N[3 * i + 2],
-      U[2 * i],
-      U[2 * i + 1],
-      T[4 * i],
-      T[4 * i + 1],
-      T[4 * i + 2],
-      T[4 * i + 3],
-    ];
+    vert = (i: number) => [P[3 * i], P[3 * i + 1], P[3 * i + 2], N[3 * i], N[3 * i + 1], N[3 * i + 2], U[2 * i], U[2 * i + 1], T[4 * i], T[4 * i + 1], T[4 * i + 2], T[4 * i + 3]];
   const op: number[] = [],
     on: number[] = [],
     ou: number[] = [],
@@ -304,7 +278,7 @@ function subtract(g: GeometryData, solids: readonly { s: Solid; eps: number }[])
         fa = side * vals[k],
         fb = side * vals[(k + 1) % poly.length];
       if (fa >= 0) out.push(a);
-      if (fa >= 0 !== fb >= 0) {
+      if ((fa >= 0) !== (fb >= 0)) {
         const t = fa / (fa - fb);
         out.push(a.map((x, j) => x + (b[j] - x) * t));
       }
@@ -442,13 +416,7 @@ function buildDormer(
   swap: boolean,
   flip: boolean,
   palette: Set<BuildingPart>,
-): {
-  parts: Partial<Record<BuildingPart, GeometryData>>;
-  solid: Solid;
-  roof: (x: number, z: number) => number;
-  window: BuildingOpening;
-  roofAtFace: number;
-} | null {
+): { parts: Partial<Record<BuildingPart, GeometryData>>; solid: Solid; roof: (x: number, z: number) => number; window: BuildingOpening; roofAtFace: number } | null {
   // Canonical (X, y, Z) to plan-local; `flip` mirrors Z for the back slope.
   const P = (X: number, y: number, Z: number): V3 => {
     const z = flip ? -Z : Z;
@@ -494,22 +462,10 @@ function buildDormer(
   wallPiece(xc + ww / 2, xc + hw, sill, head);
   // Reveals through the wall.
   const zi = zFace - tw;
-  m.walls.poly(
-    [P(xc - ww / 2, sill, zFace), P(xc + ww / 2, sill, zFace), P(xc + ww / 2, sill, zi), P(xc - ww / 2, sill, zi)],
-    up,
-  );
-  m.walls.poly(
-    [P(xc - ww / 2, head, zFace), P(xc + ww / 2, head, zFace), P(xc + ww / 2, head, zi), P(xc - ww / 2, head, zi)],
-    [0, -1, 0],
-  );
-  m.walls.poly(
-    [P(xc - ww / 2, sill, zFace), P(xc - ww / 2, head, zFace), P(xc - ww / 2, head, zi), P(xc - ww / 2, sill, zi)],
-    dir(1, 0, 0),
-  );
-  m.walls.poly(
-    [P(xc + ww / 2, sill, zFace), P(xc + ww / 2, head, zFace), P(xc + ww / 2, head, zi), P(xc + ww / 2, sill, zi)],
-    dir(-1, 0, 0),
-  );
+  m.walls.poly([P(xc - ww / 2, sill, zFace), P(xc + ww / 2, sill, zFace), P(xc + ww / 2, sill, zi), P(xc - ww / 2, sill, zi)], up);
+  m.walls.poly([P(xc - ww / 2, head, zFace), P(xc + ww / 2, head, zFace), P(xc + ww / 2, head, zi), P(xc - ww / 2, head, zi)], [0, -1, 0]);
+  m.walls.poly([P(xc - ww / 2, sill, zFace), P(xc - ww / 2, head, zFace), P(xc - ww / 2, head, zi), P(xc - ww / 2, sill, zi)], dir(1, 0, 0));
+  m.walls.poly([P(xc + ww / 2, sill, zFace), P(xc + ww / 2, head, zFace), P(xc + ww / 2, head, zi), P(xc + ww / 2, sill, zi)], dir(-1, 0, 0));
   // Cheeks, run back into the main roof (the main roof's solid cuts what is under it).
   for (const sx of [-1, 1])
     m.walls.slab(
@@ -519,38 +475,21 @@ function buildDormer(
     );
   // Glass set back 6 cm, a frame round it and a sill under it.
   const zg = zFace - 0.06;
-  m.glass.poly(
-    [P(xc - ww / 2, sill, zg), P(xc + ww / 2, sill, zg), P(xc + ww / 2, head, zg), P(xc - ww / 2, head, zg)],
-    front,
-  );
+  m.glass.poly([P(xc - ww / 2, sill, zg), P(xc + ww / 2, sill, zg), P(xc + ww / 2, head, zg), P(xc - ww / 2, head, zg)], front);
   const fr = 0.05;
   m.frames.beam(P(xc - ww / 2, sill + fr / 2, zg), P(xc + ww / 2, sill + fr / 2, zg), 0.05, fr);
   m.frames.beam(P(xc - ww / 2, head - fr / 2, zg), P(xc + ww / 2, head - fr / 2, zg), 0.05, fr);
   m.frames.beam(P(xc - ww / 2 + fr / 2, sill, zg), P(xc - ww / 2 + fr / 2, head, zg), 0.05, fr, dir(0, 0, 1));
   m.frames.beam(P(xc + ww / 2 - fr / 2, sill, zg), P(xc + ww / 2 - fr / 2, head, zg), 0.05, fr, dir(0, 0, 1));
   m.frames.beam(P(xc, sill, zg), P(xc, head, zg), 0.04, 0.04, dir(0, 0, 1));
-  m.trim.beam(
-    P(xc - ww / 2 - 0.06, sill - 0.025, zFace + 0.03),
-    P(xc + ww / 2 + 0.06, sill - 0.025, zFace + 0.03),
-    0.08,
-    0.05,
-  );
+  m.trim.beam(P(xc - ww / 2 - 0.06, sill - 0.025, zFace + 0.03), P(xc + ww / 2 + 0.06, sill - 0.025, zFace + 0.03), 0.08, 0.05);
   // Roof and its top planes (canonical): y = aX X + aZ Z + c.
   const eaveY = ye + slabT - ov * td,
     zf = zFace + ov,
     planes: { aX: number; aZ: number; c: number }[] = [];
   if (kind === 'shed') {
     const y0 = ye + slabT - ov * ts;
-    m.roof.slab(
-      [
-        P(xc - hw - ov, y0, zf),
-        P(xc + hw + ov, y0, zf),
-        P(xc + hw + ov, y0 + (zf - zBack) * ts, zBack),
-        P(xc - hw - ov, y0 + (zf - zBack) * ts, zBack),
-      ],
-      slabT,
-      up,
-    );
+    m.roof.slab([P(xc - hw - ov, y0, zf), P(xc + hw + ov, y0, zf), P(xc + hw + ov, y0 + (zf - zBack) * ts, zBack), P(xc - hw - ov, y0 + (zf - zBack) * ts, zBack)], slabT, up);
     planes.push({ aX: 0, aZ: -ts, c: ye + slabT + zFace * ts });
     m.trim.beam(P(xc - hw - ov, y0 - 0.06, zf), P(xc + hw + ov, y0 - 0.06, zf), 0.03, 0.14);
   } else {
@@ -622,8 +561,7 @@ function buildDormer(
  * @throws TypeError or RangeError for an invalid option, as `generateBuilding` and for the plan options above.
  */
 export function generateBuildingPlan(options: BuildingPlanOptions = {}): PlannedBuilding {
-  if (typeof options !== 'object' || options === null)
-    throw new TypeError('Invalid building plan options; pass an object.');
+  if (typeof options !== 'object' || options === null) throw new TypeError('Invalid building plan options; pass an object.');
   const raw = options as Record<string, unknown>,
     base: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(raw)) if (!PLAN_KEYS.includes(k)) base[k] = v;
@@ -644,8 +582,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     towerPitch = num(raw, 'towerPitch', 20, 70, 50),
     origin = (o.origin ?? [0, 0, 0]) as V3,
     yaw = o.yaw;
-  if (raw.wings !== undefined && !Array.isArray(raw.wings))
-    throw new TypeError('Invalid building plan wings; pass an array.');
+  if (raw.wings !== undefined && !Array.isArray(raw.wings)) throw new TypeError('Invalid building plan wings; pass an array.');
   // Block options in plan-local terms: the main block at the plan origin, unturned.
   const shared = { ...base };
   delete shared.origin;
@@ -672,12 +609,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
       const rest: Record<string, unknown> = { ...w };
       delete rest.at;
       delete rest.turn;
-      specs.push({
-        kind: 'wing',
-        opts: { ...shared, chimney: false, ...rest } as BuildingRuleOptions,
-        at: [at[0], 0, at[1]],
-        turn,
-      });
+      specs.push({ kind: 'wing', opts: { ...shared, chimney: false, ...rest } as BuildingRuleOptions, at: [at[0], 0, at[1]], turn });
     }
   } else {
     const back = wingSide === 'back',
@@ -775,29 +707,11 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         // No dormer where a wing or the tower already stands over that part of the slope.
         const Zs = flip ? -zFace : zFace,
           at: V3 = swap ? [Zs, roofAt(zFace) + 0.5, xc] : [xc, roofAt(zFace) + 0.5, Zs],
-          covered = blocks
-            .slice(1)
-            .some((blk) =>
-              blk.solids.some((sd) =>
-                [-dormerWidth / 2, 0, dormerWidth / 2].some((dx) =>
-                  inside(sd, swap ? [at[0], at[1], at[2] + dx] : [at[0] + dx, at[1], at[2]], 0.3),
-                ),
-              ),
-            );
+          covered = blocks.slice(1).some((blk) =>
+            blk.solids.some((sd) => [-dormerWidth / 2, 0, dormerWidth / 2].some((dx) => inside(sd, swap ? [at[0], at[1], at[2] + dx] : [at[0] + dx, at[1], at[2]], 0.3))),
+          );
         if (covered) continue;
-        const dm = buildDormer(
-          dormerKind,
-          xc,
-          dormerWidth,
-          zFace,
-          roofAt,
-          ridgeTop,
-          mo.pitch,
-          minPitch,
-          swap,
-          flip,
-          used,
-        );
+        const dm = buildDormer(dormerKind, xc, dormerWidth, zFace, roofAt, ridgeTop, mo.pitch, minPitch, swap, flip, used);
         if (!dm) break;
         dormerList.push({ window: dm.window, roofAtFace: dm.roofAtFace });
         const hiB = dm.solid.hi,
@@ -809,12 +723,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
           roof: dm.roof,
           info: {
             kind: 'dormer',
-            footprint: [
-              [loB[0], hiB[2]],
-              [hiB[0], hiB[2]],
-              [hiB[0], loB[2]],
-              [loB[0], loB[2]],
-            ],
+            footprint: [[loB[0], hiB[2]], [hiB[0], hiB[2]], [hiB[0], loB[2]], [loB[0], loB[2]]],
             eaves: dm.roofAtFace,
             top: hiB[1] - 0.2,
             pitch: dormerKind === 'shed' ? Math.max(minPitch, mo.pitch * 0.35) : mo.pitch,
@@ -839,8 +748,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     }
   });
   const parts: Partial<Record<BuildingPart, GeometryData>> = {};
-  for (const [name, list] of Object.entries(merged) as [BuildingPart, GeometryData[]][])
-    parts[name] = concat(list, origin, yaw);
+  for (const [name, list] of Object.entries(merged) as [BuildingPart, GeometryData[]][]) parts[name] = concat(list, origin, yaw);
   // Results back in world terms.
   const c = Math.cos(yaw),
     sn = Math.sin(yaw),
@@ -852,8 +760,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     },
     insideBlock = (index: number, x: number, y: number, z: number, eps = 0) =>
       blocks[index].solids.some((s) => inside(s, [x, y, z], eps));
-  const hiddenBy = (j: number, p: V3) =>
-    blocks.some((_, i) => i !== j && insideBlock(i, p[0], p[1], p[2], i < j ? EPS : -EPS));
+  const hiddenBy = (j: number, p: V3) => blocks.some((_, i) => i !== j && insideBlock(i, p[0], p[1], p[2], i < j ? EPS : -EPS));
   const openings: BuildingOpening[] = [];
   blocks.forEach((blk, j) => {
     for (const op of blk.building?.openings ?? []) {
@@ -900,11 +807,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     for (const d of b.doorways) {
       const [x, z] = plan2(d.centre[0], d.centre[2]);
       if (earlier(j, [x, d.centre[1], z])) continue;
-      doorways.push({
-        ...d,
-        centre: [x, d.centre[1], z],
-        normal: sp.turn % 2 ? (d.normal === 'x' ? 'z' : 'x') : d.normal,
-      });
+      doorways.push({ ...d, centre: [x, d.centre[1], z], normal: sp.turn % 2 ? (d.normal === 'x' ? 'z' : 'x') : d.normal });
     }
   });
   const infos = blocks.map((blk) => ({

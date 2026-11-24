@@ -20,37 +20,23 @@ try {
 
   assert.equal(await run('trimmed'), 0, 'trimmed surface faces its normals');
   const trimmedImage = await decodePNG(await page.locator('canvas').screenshot()),
-    trimmedPixel = (x, y) => [
-      ...trimmedImage.data.slice((y * trimmedImage.width + x) * 4, (y * trimmedImage.width + x) * 4 + 3),
-    ],
-    hole = trimmedPixel(200, 200),
-    panel = trimmedPixel(270, 200);
+    trimmedPixel = (x,y) => [...trimmedImage.data.slice((y * trimmedImage.width + x) * 4, (y * trimmedImage.width + x) * 4 + 3)],
+    hole = trimmedPixel(200,200), panel = trimmedPixel(270,200);
   assert.ok(panel[0] > 60 && panel[0] > panel[2] * 2, `trimmed panel is visible: ${panel}`);
   assert.ok(hole[0] < panel[0] / 2, `trim hole exposes background: ${hole}`);
   await run('clear');
   console.log('ok trimmed CPU surface upload and hole');
 
-  assert.deepEqual(
-    await run('extras'),
-    { wrong: 0, count: 5 },
-    'all optional primitive meshes upload with outward winding',
-  );
-  const extraImage = await decodePNG(await page.locator('canvas').screenshot()),
-    extraMiddle = [...extraImage.data.slice((200 * 400 + 200) * 4, (200 * 400 + 200) * 4 + 3)];
-  assert.ok(extraMiddle[0] > 60 && extraMiddle[0] > extraMiddle[2] * 2, `Goldberg mesh drawn: ${extraMiddle}`);
+  assert.deepEqual(await run('extras'), {wrong:0,count:5}, 'all optional primitive meshes upload with outward winding');
+  const extraImage = await decodePNG(await page.locator('canvas').screenshot()), extraMiddle = [...extraImage.data.slice((200*400+200)*4,(200*400+200)*4+3)];
+  assert.ok(extraMiddle[0]>60 && extraMiddle[0]>extraMiddle[2]*2, `Goldberg mesh drawn: ${extraMiddle}`);
   await run('clear');
   console.log('ok optional primitive uploads and Goldberg picture');
 
-  assert.deepEqual(
-    await run('teapot'),
-    { wrong: 0, triangles: 9120 },
-    'standard Utah Teapot uploads with outward analytic normals',
-  );
-  const teapotImage = await decodePNG(await page.locator('canvas').screenshot()),
-    teapotMiddle = [...teapotImage.data.slice((200 * 400 + 200) * 4, (200 * 400 + 200) * 4 + 3)];
-  assert.ok(teapotMiddle[0] > 60 && teapotMiddle[0] > teapotMiddle[2] * 2, `Utah Teapot drawn: ${teapotMiddle}`);
-  await run('clear');
-  console.log('ok standard Utah Teapot upload and picture');
+  assert.deepEqual(await run('teapot'),{wrong:0,triangles:9120},'standard Utah Teapot uploads with outward analytic normals');
+  const teapotImage=await decodePNG(await page.locator('canvas').screenshot()),teapotMiddle=[...teapotImage.data.slice((200*400+200)*4,(200*400+200)*4+3)];
+  assert.ok(teapotMiddle[0]>60 && teapotMiddle[0]>teapotMiddle[2]*2,`Utah Teapot drawn: ${teapotMiddle}`);
+  await run('clear');console.log('ok standard Utah Teapot upload and picture');
 
   const sphere = await run('sphere');
   assert.ok(sphere.worstRadius < 1e-5, `sphere radius off by ${sphere.worstRadius}`);

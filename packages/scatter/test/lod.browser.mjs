@@ -164,23 +164,11 @@ try {
           center,
           scale: [scale, scale],
           exclusions: [[50, 50, 60, 60]],
-          paths: [
-            {
-              points: [
-                [-10, 0],
-                [0, 0],
-                [10, 0],
-              ],
-              width: 4,
-            },
-          ],
+          paths: [{ points: [[-10, 0], [0, 0], [10, 0]], width: 4 }],
         });
         await frame();
         const command = new Uint32Array(await read(effect.commands));
-        check(
-          command[1] + command[6] + command[11] === expected,
-          `Footprint at ${center} scale ${scale} against the path`,
-        );
+        check(command[1] + command[6] + command[11] === expected, `Footprint at ${center} scale ${scale} against the path`);
         pathSteps.push({ center, scale, expected });
         effect.dispose();
       }

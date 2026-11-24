@@ -31,8 +31,7 @@ const ON_PURPOSE = /\/\/\s*scene-owner: active scene on purpose, \S/;
 function receiverName(node) {
   if (node?.type === 'ChainExpression') return receiverName(node.expression);
   if (node?.type === 'ParenthesizedExpression') return receiverName(node.expression);
-  if (['TSNonNullExpression', 'TSAsExpression', 'TSSatisfiesExpression'].includes(node?.type))
-    return receiverName(node.expression);
+  if (['TSNonNullExpression', 'TSAsExpression', 'TSSatisfiesExpression'].includes(node?.type)) return receiverName(node.expression);
   if (node?.type === 'Identifier') return node.name;
   if (node?.type === 'MemberExpression' || node?.type === 'StaticMemberExpression') return node.property?.name;
   if (node?.type === 'PrivateFieldExpression') return node.field?.name;

@@ -24,9 +24,7 @@ const rapierDir = dirname(createRequire(import.meta.url).resolve('@dimforge/rapi
 const rapierGlue = resolve(rapierDir, 'rapier_wasm3d.js');
 const rapierVersion = JSON.parse(await readFile(resolve(rapierDir, 'package.json'), 'utf8')).version;
 // The same hash src/rapier-solver.ts takes of a Wasm it is given, so it can tell this build from any other.
-const rapierInterface = interfaceHash(
-  new WebAssembly.Module(readFileSync(resolve(rapierDir, 'rapier_wasm3d_bg.wasm'))),
-);
+const rapierInterface = interfaceHash(new WebAssembly.Module(readFileSync(resolve(rapierDir, 'rapier_wasm3d_bg.wasm'))));
 const wasmStub = '\0rapier-wasm-stub';
 const rapierWasm = {
   name: 'rapier-wasm',

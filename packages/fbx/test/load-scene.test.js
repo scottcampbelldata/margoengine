@@ -97,9 +97,6 @@ test('parseFBXInWorker and loadFBXInWorker without Workers build in the scene th
 test('parseFBXInWorker and loadFBXInWorker with a worker build in the scene they started in', () =>
   withEngine((engine) =>
     withWorker(() =>
-      each(engine, [
-        () => parseFBXInWorker(engine, bytes()),
-        () => loadFBXInWorker(engine, 'http://localhost/grid.fbx'),
-      ]),
+      each(engine, [() => parseFBXInWorker(engine, bytes()), () => loadFBXInWorker(engine, 'http://localhost/grid.fbx')]),
     ),
   ));

@@ -33,11 +33,7 @@ test('a leg names the device that drew it, the layer under a forced-compatibilit
   assert.equal(legDevice(true, { webglRenderer: vulkan }), 'webgl2-layer on ANGLE Vulkan');
   assert.equal(legDevice(true, { compat: true, webglRenderer: vulkan }), 'webgl2-layer on ANGLE Vulkan');
   assert.equal(
-    legDevices([
-      { device: 'webgl2-layer on ANGLE D3D11' },
-      { device: 'webgl2-layer on ANGLE Vulkan' },
-      { lifecycle: {} },
-    ]),
+    legDevices([{ device: 'webgl2-layer on ANGLE D3D11' }, { device: 'webgl2-layer on ANGLE Vulkan' }, { lifecycle: {} }]),
     'webgl2-layer on ANGLE D3D11 and webgl2-layer on ANGLE Vulkan',
   );
 });
@@ -52,10 +48,7 @@ test('every voxel-pathtracer script with its own layer leg labels its legs by de
     if (!source.includes('--use-angle=vulkan')) continue;
     // A leg opened with openBrowser's `compat` option set from its flag runs natively in any run; only a call without
     // it is put on the layer by MARGO_COMPAT=1.
-    const calls = source
-      .split('openBrowser(')
-      .slice(1)
-      .map((call) => call.slice(0, call.indexOf(')')));
+    const calls = source.split('openBrowser(').slice(1).map((call) => call.slice(0, call.indexOf(')')));
     if (calls.every((call) => /\bcompat\s*[,:]/.test(call))) continue;
     checked++;
     assert.match(source, /legDevice\(compat, ?context\.hardware\)/, `${name} names the device of each leg`);

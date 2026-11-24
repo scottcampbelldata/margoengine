@@ -37,13 +37,7 @@ export function metalMixReference({ base, metal, roughness, n, v, l }) {
  * ((1 - metal) 0.96 base + F0 / 4) / pi per channel. At base 0.5, metal 0.5: (0.24 + 0.0675) / pi = 0.0978817...,
  * where the old metal-mixed weight (1 - F0) gives (0.1825 + 0.0675) / pi = 0.0795775 (KB3240b).
  */
-export const headOn = {
-  base: [0.5, 0.5, 0.5],
-  metal: 0.5,
-  roughness: 1,
-  expected: 0.3075 / Math.PI,
-  old: 0.25 / Math.PI,
-};
+export const headOn = { base: [0.5, 0.5, 0.5], metal: 0.5, roughness: 1, expected: 0.3075 / Math.PI, old: 0.25 / Math.PI };
 
 /** Part-metal cases off the head-on axis: every metal value, three roughnesses, one oblique light and view. */
 export function* metalMixCases() {

@@ -4,15 +4,11 @@ Import `margoengine/animator` from the `margoengine` package, or `@margoengine/a
 
 Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade the state they leave, which keeps playing until its weight reaches 0, into the destination; a transition taken during a crossfade fades from the blended pose it cut in on, held still. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
 
-Import `margoengine/animator/ccd` for the standalone CPU solver. `projectRotations()` applies just the
-calibrated limits to the current local rotations. Call `update()` afterward if you need the resulting world frames.
-
 ```ts
 import {EngineKernel} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator, addCCDChain, type CCDChain} from 'margoengine/animator';
-import {CCDSolver} from 'margoengine/animator/ccd';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
 const animation = Animation.attach(model);
@@ -26,12 +22,6 @@ const animator = Animator.attach(animation, {
 });
 animator.parameters.speed = 2;
 engine.start();
-
-// This standalone chain can also run in a worker without the engine.
-const chain = new CCDSolver([[0, 0, 0], [0, 0.4, 0]]);
-chain.setLimit(1, { type: 'hinge', axis: [1, 0, 0], min: 0, max: 1.9 });
-chain.projectRotations();
-chain.update();
 ```
 
 For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:'Idle'},...]}` with unique coordinates. Parameters default to zero. 1D samples must be strictly increasing. Clips loop independently in seconds (`Animation.options.loop` false holds the last frame). `playing = false` pauses state time and crossfades; `Animation.options.speed` scales them, as for Animation playback. `transition(state,duration)` switches states explicitly; predicates are evaluated in declaration order, at most once per frame. Add a layer with `addLayer({clip:'Aim',weight:0.5,mask:[upperBodyNodeIndex,...]})`. Masks use glTF node indices. The returned function removes the layer; mutable weights are validated each frame. `referenceTime` defaults to zero.
@@ -68,7 +58,7 @@ const reach: CCDChain = {
 const remove = addCCDChain(animator, reach);
 ```
 
-- **Limits** are measured from each joint's rest (bind) rotation in radians. `euler` clamps the qX·qY·qZ angles per axis (equal bounds lock an axis). `hinge` turns about one rest-frame axis and optionally rolls about a perpendicular longitudinal axis with `twist: { axis: [1, 0, 0], range: [-1.25, 1.25] }` for a forearm pointing along +X with a perpendicular flexion axis. `cone` keeps the bone within `angle` of its rest direction (the bone axis defaults to the direction of the next joint) with an optional `twist` range. Joints start each solve inside their limits. The compound hinge separates roll from bend by quaternion swing–twist projection. [*Swing-twist Decomposition in Clifford Algebra*, Dobrowolski (2015)](https://arxiv.org/abs/1506.05481).
+- **Limits** are measured from each joint's rest (bind) rotation, in radians: `euler` clamps the qX·qY·qZ angles per axis (equal bounds lock an axis), `hinge` turns about one rest-frame axis, `cone` keeps the bone within `angle` of its rest direction (the bone axis defaults to the direction of the next joint) with an optional `twist` range. Joints start each solve inside their limits.
 - **Reach step** (`reach`, default true). Plain CCD straightens a chain slowly: near full reach every joint's best single turn barely changes the chain's length, so the effector stays short for hundreds of sweeps. After each sweep the solver therefore scales every joint's bend by one factor (keeping the chain's shape and twists), found by bisection so the root-to-effector distance equals the target's, and re-aims the first joint. A step that ends farther from the target (limits in the way) is undone; after two in a row the solve continues as plain CCD. `reach: false` runs plain CCD.
 - **Unreachable targets** straighten the chain toward them; the result reports how far it stopped.
 - **`rotation`** turns the last joint to that world rotation. Each other joint also turns about its own joint-to-effector line (which leaves the effector where it is) to remove what it can of the orientation error.

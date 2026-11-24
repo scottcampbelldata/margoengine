@@ -18,9 +18,7 @@ const root = resolve(import.meta.dirname, '..');
 // gave server n the fixed port 5400 + n, and other work on the workstation (GPU suites such as packages/toon on 5400 and
 // 5401, another lane's dev servers) held those ports. The check now asks the operating system for a free port per
 // server, so it passes while its old first port is held by another process.
-test('the root dev server starts without a dependency scan failure, while port 5400 is held by another process', {
-  timeout: 150_000,
-}, async () => {
+test('the root dev server starts without a dependency scan failure, while port 5400 is held by another process', { timeout: 150_000 }, async () => {
   const holder = createNetServer();
   // Already held by someone else serves the test just as well.
   const held = await new Promise((done, fail) => {
@@ -29,11 +27,7 @@ test('the root dev server starts without a dependency scan failure, while port 5
   });
   try {
     const run = await new Promise((done) => {
-      const child = spawn(
-        process.execPath,
-        [join(root, 'scripts/check-dev-servers.mjs'), '--only=package.json modern:dev:extensions'],
-        { cwd: root },
-      );
+      const child = spawn(process.execPath, [join(root, 'scripts/check-dev-servers.mjs'), '--only=package.json modern:dev:extensions'], { cwd: root });
       let stdout = '',
         stderr = '';
       child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -87,8 +81,7 @@ test('a git that cannot start stops the root Vite config with a coded message (K
   );
   assert.throws(
     () => ignoredRootFolders(failing({ status: 128, stderr: 'fatal: not a git repository\n' })),
-    (error) =>
-      error.code === 'ERR_DEV_SERVER_GIT_LIST' && /status 128: fatal: not a git repository\./.test(error.message),
+    (error) => error.code === 'ERR_DEV_SERVER_GIT_LIST' && /status 128: fatal: not a git repository\./.test(error.message),
   );
 });
 
@@ -99,17 +92,14 @@ test('a git that cannot start stops the root Vite config with a coded message (K
 // paths, after three demo tabs load at once it holds exactly the files they were served, and a served file still
 // reports its edit (which is what reloads the page).
 const SCIVIZ_TABS = ['/examples/sciviz-volume.html', '/examples/sciviz-surface.html', '/examples/sciviz-points.html'];
-const IMPORTS =
-  /(?:\bimport\s*(?:[\w*{}\s,$]+\s*from\s*)?|\bexport\s*[\w*{}\s,$]*\s*from\s*)["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
+const IMPORTS = /(?:\bimport\s*(?:[\w*{}\s,$]+\s*from\s*)?|\bexport\s*[\w*{}\s,$]*\s*from\s*)["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
 
 /** Load a page like a browser tab: its html, its module scripts and every static and dynamic import they make. */
 async function loadTab(base, page, seen) {
   const html = await fetch(new URL(page, base));
   assert.equal(html.status, 200, page);
   const text = await html.text(),
-    queue = [...text.matchAll(/<script[^>]*type="module"[^>]*src="([^"]+)"/g)].map(
-      (m) => new URL(m[1], new URL(page, base)).href,
-    );
+    queue = [...text.matchAll(/<script[^>]*type="module"[^>]*src="([^"]+)"/g)].map((m) => new URL(m[1], new URL(page, base)).href);
   while (queue.length) {
     const batch = queue.splice(0).filter((url) => !seen.has(url));
     for (const url of batch) seen.add(url);
@@ -130,9 +120,7 @@ async function loadTab(base, page, seen) {
 const watchedCount = (watcher) => Object.values(watcher.getWatched()).reduce((n, names) => n + names.length, 0);
 const key = (path) => (process.platform === 'win32' ? path.replace(/\\/g, '/').toLowerCase() : path);
 
-test('the root dev server watches only what it serves, so three demo tabs open at the start load at once', {
-  timeout: 300_000,
-}, async () => {
+test('the root dev server watches only what it serves, so three demo tabs open at the start load at once', { timeout: 300_000 }, async () => {
   const { createServer } = await import('vite'),
     cacheDir = mkdtempSync(join(tmpdir(), 'margo-watch-'));
   const server = await createServer({
@@ -157,13 +145,9 @@ test('the root dev server watches only what it serves, so three demo tabs open a
     const graph = server.environments.client.moduleGraph,
       inRoot = (file) => key(file).startsWith(key(root).replace(/\/?$/, '/')),
       // Vite never watches node_modules (its own default ignore), the pre-bundled dependencies and its own client.
-      served = new Set(
-        [...graph.fileToModulesMap.keys()].filter((file) => inRoot(file) && !file.includes('/node_modules/')).map(key),
-      );
+      served = new Set([...graph.fileToModulesMap.keys()].filter((file) => inRoot(file) && !file.includes('/node_modules/')).map(key));
     for (const page of SCIVIZ_TABS) served.add(key(join(root, page)));
-    const watched = new Set(
-      Object.entries(watcher.getWatched()).flatMap(([dir, names]) => names.map((name) => key(join(dir, name)))),
-    );
+    const watched = new Set(Object.entries(watcher.getWatched()).flatMap(([dir, names]) => names.map((name) => key(join(dir, name)))));
     assert.ok(served.size > 100, `${served.size} files served to the three tabs`);
     const missing = [...served].filter((file) => !watched.has(file));
     assert.deepEqual(missing, [], 'every served file is watched, so editing it reloads the page');
@@ -174,16 +158,9 @@ test('the root dev server watches only what it serves, so three demo tabs open a
     const page = join(root, 'examples/sciviz-volume.ts'),
       before = statSync(page);
     try {
-      const changed = new Promise((resolve) =>
-        watcher.on('change', (path) => key(path) === key(page) && resolve(path)),
-      );
+      const changed = new Promise((resolve) => watcher.on('change', (path) => key(path) === key(page) && resolve(path)));
       utimesSync(page, before.atime, new Date(before.mtimeMs + 2000));
-      await Promise.race([
-        changed,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('no change event for a served file in 30 s')), 30_000),
-        ),
-      ]);
+      await Promise.race([changed, new Promise((_, reject) => setTimeout(() => reject(new Error('no change event for a served file in 30 s')), 30_000))]);
     } finally {
       utimesSync(page, before.atime, before.mtime);
     }
@@ -220,15 +197,7 @@ async function run(source) {
   const dir = fixture(source),
     port = await freePort();
   try {
-    return await probe({
-      command: process.execPath,
-      args: ['server.mjs', String(port)],
-      cwd: dir,
-      page: `http://127.0.0.1:${port}/`,
-      settleMs: 200,
-      listenLimitMs: 10_000,
-      limitMs: 30_000,
-    });
+    return await probe({ command: process.execPath, args: ['server.mjs', String(port)], cwd: dir, page: `http://127.0.0.1:${port}/`, settleMs: 200, listenLimitMs: 10_000, limitMs: 30_000 });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -241,27 +210,18 @@ test('the probe passes a clean server and follows the modules a page loads', asy
 
 test('the probe fails on a warning line in the server output', async () => {
   const { problems } = await run(serverSource("console.warn('(!) Failed to run dependency scan.');"));
-  assert.ok(
-    problems.some((p) => p.startsWith('output:')),
-    problems.join('\n'),
-  );
+  assert.ok(problems.some((p) => p.startsWith('output:')), problems.join('\n'));
 });
 
 test('the probe fails on a module the page loads that does not exist', async () => {
   const source = serverSource('', 'import "/missing.js";');
   const { problems } = await run(source);
-  assert.ok(
-    problems.some((p) => /missing\.js answered 404/.test(p)),
-    problems.join('\n'),
-  );
+  assert.ok(problems.some((p) => /missing\.js answered 404/.test(p)), problems.join('\n'));
 });
 
 test('the probe fails on a server that exits before it answers', async () => {
   const { problems } = await run('process.exit(3);');
-  assert.ok(
-    problems.some((p) => /exited 3/.test(p)),
-    problems.join('\n'),
-  );
+  assert.ok(problems.some((p) => /exited 3/.test(p)), problems.join('\n'));
 });
 
 // A server whose page loads module /m<n>.js, which imports /m<n+1>.js, up to `last` (Infinity: a server that keeps
@@ -281,15 +241,7 @@ async function runChain(source, limitMs) {
   const dir = fixture(source),
     port = await freePort();
   try {
-    return await probe({
-      command: process.execPath,
-      args: ['server.mjs', String(port)],
-      cwd: dir,
-      page: `http://127.0.0.1:${port}/`,
-      settleMs: 200,
-      listenLimitMs: 10_000,
-      limitMs,
-    });
+    return await probe({ command: process.execPath, args: ['server.mjs', String(port)], cwd: dir, page: `http://127.0.0.1:${port}/`, settleMs: 200, listenLimitMs: 10_000, limitMs });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -299,35 +251,21 @@ async function runChain(source, limitMs) {
 // with "more than 200 URLs reachable; the crawl stopped". The probe stopped at a fixed 200 URLs, and the sandbox loads
 // 204 real modules (FirstPersonControls became its own controls entry, the sky gained its moon and twilight modules).
 // The probe now follows the whole graph, checks every module in it, and catches a runaway server by its hard limit.
-test('the probe follows a module graph larger than 200 URLs to the end and checks every module in it', {
-  timeout: 60_000,
-}, async () => {
+test('the probe follows a module graph larger than 200 URLs to the end and checks every module in it', { timeout: 60_000 }, async () => {
   assert.deepEqual((await runChain(chainSource(300), 30_000)).problems, []);
   const { problems } = await runChain(chainSource(300, 260), 30_000);
-  assert.ok(
-    problems.some((p) => /m260\.js answered 404/.test(p)),
-    problems.join('\n'),
-  );
+  assert.ok(problems.some((p) => /m260\.js answered 404/.test(p)), problems.join('\n'));
 });
 
-test('the probe reports a server that keeps naming new URLs once its hard limit passes', {
-  timeout: 60_000,
-}, async () => {
+test('the probe reports a server that keeps naming new URLs once its hard limit passes', { timeout: 60_000 }, async () => {
   const { problems } = await runChain(chainSource('Infinity'), 4_000);
-  assert.ok(
-    problems.some((p) => /the crawl from .* did not finish within 4 s \(\d+ URLs reached/.test(p)),
-    problems.join('\n'),
-  );
+  assert.ok(problems.some((p) => /the crawl from .* did not finish within 4 s \(\d+ URLs reached/.test(p)), problems.join('\n'));
 });
 
 // A server that loses its port exits while another process on that port answers the probe's requests. The probe used
 // to pass on those answers; it now fails a server that is no longer running when the probe ends.
-test('the probe fails a server that exited while another process answered on its port', {
-  timeout: 60_000,
-}, async () => {
-  const other = createHttpServer(
-    (request, response) => (response.writeHead(200, { 'content-type': 'text/plain' }), response.end('someone else')),
-  );
+test('the probe fails a server that exited while another process answered on its port', { timeout: 60_000 }, async () => {
+  const other = createHttpServer((request, response) => (response.writeHead(200, { 'content-type': 'text/plain' }), response.end('someone else')));
   await new Promise((done) => other.listen(0, '127.0.0.1', done));
   try {
     const { problems } = await probe({
@@ -338,10 +276,7 @@ test('the probe fails a server that exited while another process answered on its
       settleMs: 1_500,
       limitMs: 30_000,
     });
-    assert.ok(
-      problems.some((p) => /exited 1 during the probe, so another process answered/.test(p)),
-      problems.join('\n'),
-    );
+    assert.ok(problems.some((p) => /exited 1 during the probe, so another process answered/.test(p)), problems.join('\n'));
   } finally {
     await new Promise((done) => other.close(done));
   }
@@ -351,9 +286,7 @@ test('the probe fails a server that exited while another process answered on its
 // server's folder. The probe ended the server with taskkill and returned at once, but taskkill returns while the
 // process is still dying and holding the folder it ran in. The probe now waits for its `end` (endTree, which waits
 // until the tree is gone). The end of the kill is held back here, so the order is the same every run.
-test('the probe returns only after the server tree has been ended, not when taskkill returns', {
-  timeout: 60_000,
-}, async () => {
+test('the probe returns only after the server tree has been ended, not when taskkill returns', { timeout: 60_000 }, async () => {
   const dir = fixture(serverSource("console.log('Local: ready');")),
     port = await freePort(),
     killStarted = Promise.withResolvers(),
@@ -402,10 +335,7 @@ test('a server tree the probe could not end is a problem', { timeout: 60_000 }, 
       limitMs: 30_000,
       end: async (server) => ((pid = server), [server]),
     });
-    assert.ok(
-      problems.some((p) => p === `processes ${pid} still running after the kill`),
-      problems.join('\n'),
-    );
+    assert.ok(problems.some((p) => p === `processes ${pid} still running after the kill`), problems.join('\n'));
   } finally {
     if (pid) await endTree(pid);
     rmSync(dir, { recursive: true, force: true });
@@ -421,10 +351,6 @@ test('freePort gives a port that can be listened on at once', async () => {
 });
 
 test('every start command in the documentation maps to a checked server', { timeout: 60_000 }, () => {
-  const run = spawnSync(process.execPath, [join(root, 'scripts/check-dev-servers.mjs'), '--docs-only'], {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 50_000,
-  });
+  const run = spawnSync(process.execPath, [join(root, 'scripts/check-dev-servers.mjs'), '--docs-only'], { cwd: root, encoding: 'utf8', timeout: 50_000 });
   assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
 });

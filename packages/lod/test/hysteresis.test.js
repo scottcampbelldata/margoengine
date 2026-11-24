@@ -233,10 +233,7 @@ test('an object exactly at an authored switch distance takes the coarser level',
   // sqrt(5) rounds up to float32, above the distance an object at exactly sqrt(5) has.
   e.camera.position = [0, 0, 0];
   e.camera.target = [0, 0, -1];
-  const far = lods.add(e.createMesh().setPosition([1, 2, 0]), [
-    { object: null },
-    { object: null, distance: Math.sqrt(5) },
-  ]);
+  const far = lods.add(e.createMesh().setPosition([1, 2, 0]), [{ object: null }, { object: null, distance: Math.sqrt(5) }]);
   lods.update();
   assert.equal(far.level, 1, 'distance sqrt(5): equality counts');
   assert.ok(Math.fround(Math.sqrt(5)) > Math.sqrt(5));

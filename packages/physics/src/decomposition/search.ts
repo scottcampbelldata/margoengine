@@ -24,8 +24,7 @@ export interface SearchSettings {
 /** A cut into two parts that both have a hull, or null. */
 function split(part: Solid, plane: Plane): [Solid, Solid] | null {
   const parts = cut(part, plane, TRIAL);
-  if (!parts || parts[0].volume <= SLIVER || parts[1].volume <= SLIVER || !parts[0].hull() || !parts[1].hull())
-    return null;
+  if (!parts || parts[0].volume <= SLIVER || parts[1].volume <= SLIVER || !parts[0].hull() || !parts[1].hull()) return null;
   return parts;
 }
 
@@ -79,8 +78,7 @@ function quality(maxima: readonly number[], depth: number): number {
 function candidates(part: Solid, m: number): Plane[] {
   const out: Plane[] = [];
   for (let axis = 0; axis < 3; axis++)
-    for (let j = 1; j <= m; j++)
-      out.push(axisPlane(axis, part.min[axis] + (j / (m + 1)) * (part.max[axis] - part.min[axis])));
+    for (let j = 1; j <= m; j++) out.push(axisPlane(axis, part.min[axis] + (j / (m + 1)) * (part.max[axis] - part.min[axis])));
   return out;
 }
 

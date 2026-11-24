@@ -12,13 +12,9 @@ import { SCENE_SIZE, buildScene, fieldHash } from './outline-scene.js';
 const [fontFile, pngFile, jsonFile] = process.argv.slice(2);
 const font = new GlyphFieldFont(await readFile(fontFile));
 using installed = installGPU({ gpu: create([]) });
-const engine = await Engine.create(createHeadlessCanvas({ width: SCENE_SIZE[0], height: SCENE_SIZE[1] }), {
-  backend: 'webgpu',
-});
+const engine = await Engine.create(createHeadlessCanvas({ width: SCENE_SIZE[0], height: SCENE_SIZE[1] }), { backend: 'webgpu' });
 const errors: string[] = [];
-engine.gpu.addEventListener('uncapturederror', (event) =>
-  errors.push((event as GPUUncapturedErrorEvent).error.message),
-);
+engine.gpu.addEventListener('uncapturederror', (event) => errors.push((event as GPUUncapturedErrorEvent).error.message));
 const camera = buildScene(engine, { TextRenderer, Text, Camera }, font);
 engine.render({ camera });
 await writeFile(pngFile, await toPNG(engine));
@@ -27,29 +23,16 @@ await writeFile(pngFile, await toPNG(engine));
 // README attaches it, then with input off, then with input and the accessibility mirror off, so the report says which
 // part fails. Reported, not asserted (bug-sweep KB-FILM-UI-NODE).
 const ui: { drawn?: number; error?: string; withoutInput?: number | string; bare?: number | string } = {};
-const short = (error: unknown) =>
-  String((error as Error)?.stack ?? error)
-    .split('\n')
-    .slice(0, 3)
-    .join(' | ');
+const short = (error: unknown) => String((error as Error)?.stack ?? error).split('\n').slice(0, 3).join(' | ');
 const inkOf = async () => {
   const { data } = await readPixels(engine);
   let n = 0;
-  for (let i = 0; i < data.length; i += 4)
-    if (Math.abs(data[i] - 0x1d) + Math.abs(data[i + 1] - 0x27) + Math.abs(data[i + 2] - 0x33) > 24) n++;
+  for (let i = 0; i < data.length; i += 4) if (Math.abs(data[i] - 0x1d) + Math.abs(data[i + 1] - 0x27) + Math.abs(data[i + 2] - 0x33) > 24) n++;
   return n;
 };
 const lowerThird = (name: string) => {
   const lower = new Ui({ width: SCENE_SIZE[0], height: SCENE_SIZE[1], font, reducedMotion: true });
-  lower.add(
-    new Panel({
-      anchor: 'bottom-left',
-      margin: 24,
-      padding: 12,
-      background: 'surface',
-      children: [new Label({ text: name })],
-    }),
-  );
+  lower.add(new Panel({ anchor: 'bottom-left', margin: 24, padding: 12, background: 'surface', children: [new Label({ text: name })] }));
   return lower;
 };
 const before = await inkOf();

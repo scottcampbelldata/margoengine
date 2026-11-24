@@ -17,11 +17,7 @@ function shed(engine) {
   const wood = new PbrMaterial({ color: '#8a6a48', roughness: 0.9, doubleSided: false }),
     sand = new PbrMaterial({ color: '#b8a888', roughness: 1, doubleSided: false });
   const add = (size, at, material = wood) =>
-    engine
-      .createMesh()
-      .setGeometry(box(...size))
-      .setMaterial(material)
-      .setPosition(at);
+    engine.createMesh().setGeometry(box(...size)).setMaterial(material).setPosition(at);
   add([80, 0.2, 80], [0, -0.1, 0], sand);
   add([4.2, 2.5, 0.1], [0, 1.25, -2.05]);
   add([1.5, 2.5, 0.1], [-1.35, 1.25, 2.05]);
@@ -108,8 +104,7 @@ window.runTests = async () => {
   for (const mesh of closers) mesh.visible = false;
   const after = await measure('sky alone after dispose');
   assert(
-    Math.abs(after.outside - open.outside) <= 0.01 * open.outside &&
-      Math.abs(after.inside - open.inside) <= 0.01 * open.inside,
+    Math.abs(after.outside - open.outside) <= 0.01 * open.outside && Math.abs(after.inside - open.inside) <= 0.01 * open.inside,
     `disposing the probes gives the sky its light back: ${after.inside}, ${after.outside}`,
   );
   engine.dispose();

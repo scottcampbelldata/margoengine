@@ -34,12 +34,7 @@ test('a model disposed outside its named Scene removes the owning plugin and pas
   const engine = initial.root.engine;
   const named = engine.createScene('textures');
   let model;
-  named.use({
-    name: 'named-setup',
-    setup() {
-      model = parseGLTF(engine, doc, [positions]);
-    },
-  });
+  named.use({ name: 'named-setup', setup() { model = parseGLTF(engine, doc, [positions]); } });
   assert.equal(engine.sceneOf(model), named);
   assert.equal(named.plugins.has(model.name), true);
   model.dispose();

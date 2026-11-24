@@ -108,7 +108,7 @@ for (const [entry, Name, frames] of [
     first.dispose();
     assert(!e.sceneOf(first));
     assert(!owner.plugins.has('floor'));
-    assert.equal(owner.meshes.size, 0, 'disposing the surface releases its owning-scene transform node');
+    assert.equal(owner.meshes.size,0,'disposing the surface releases its owning-scene transform node');
     assert.equal(e.scene.plugins.get('floor'), unrelated, 'another scene keeps its same-name plugin');
     const replacement = new Type({ name: 'floor', autoUpdate: false, size: 16 });
     owner.use(replacement);

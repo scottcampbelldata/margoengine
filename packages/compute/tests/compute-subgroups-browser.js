@@ -209,10 +209,7 @@ window.runSubgroupTests = async () => {
     });
     await check('f16 arrays keep the default kernels and still work', async () => {
       if (!fast.f16) return;
-      const a = await fast
-        .array(new Float32Array([1, 2, 3, 4]), 'f16')
-        .sum()
-        .item();
+      const a = await fast.array(new Float32Array([1, 2, 3, 4]), 'f16').sum().item();
       assert(a === 10, `f16 sum is ${a}`);
     });
     return { checks, subgroups: { min: info?.subgroupMinSize, max: info?.subgroupMaxSize } };

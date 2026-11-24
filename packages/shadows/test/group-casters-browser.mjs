@@ -53,9 +53,7 @@ const judge = async (label, image, want) => {
   for (const [name, point] of Object.entries(points)) {
     const ratio = (row[name] = +((await patch(image, point)) / lit[name]).toFixed(3));
     if (want.includes(name) ? ratio > SHADED : ratio < LIT)
-      failures.push(
-        `${label} ${name}: ${ratio} of its open light, expected ${want.includes(name) ? 'shadow' : 'clear'}`,
-      );
+      failures.push(`${label} ${name}: ${ratio} of its open light, expected ${want.includes(name) ? 'shadow' : 'clear'}`);
   }
   rows.push(row);
   console.log(JSON.stringify(row));

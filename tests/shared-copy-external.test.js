@@ -81,8 +81,5 @@ test('a browser that takes videos copies them directly; other errors are thrown'
         },
       },
     };
-    assert.throws(
-      () => copyExternal(typeError, { source: { width: 2, height: 2 } }, { texture: 't' }, [2, 2]),
-      TypeError,
-    );
+    assert.throws(() => copyExternal(typeError, { source: { width: 2, height: 2 } }, { texture: 't' }, [2, 2]), TypeError);
   }));

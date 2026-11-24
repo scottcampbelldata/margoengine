@@ -7,15 +7,7 @@ import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  addSubframe,
-  areaWeights,
-  blueNoise,
-  linearToSrgb,
-  resampleMask,
-  resolveFrame,
-  srgbToLinear,
-} from '../tools/shot/pixels.js';
+import { addSubframe, areaWeights, blueNoise, linearToSrgb, resampleMask, resolveFrame, srgbToLinear } from '../tools/shot/pixels.js';
 import { PIXEL_FUNCTIONS, pixelScript } from '../tools/shot/pixel-script.mjs';
 import { parseShot, renderSize, subframeOffsets, validateShot } from '../tools/shot/shot-file.mjs';
 
@@ -60,11 +52,7 @@ test("capture defaults: 1.5x supersampling (1620 x 2880 for a vertical short), t
 
 test('sub-frames spread over the open shutter, each at the middle of its slice', () => {
   assert.deepEqual(subframeOffsets({ fps: 60, subframes: 1, shutter: 180 }), [0]);
-  assert.deepEqual(
-    subframeOffsets({ fps: 60, subframes: 4, shutter: 0 }),
-    [0, 0, 0, 0],
-    'a closed shutter: anti-aliasing only',
-  );
+  assert.deepEqual(subframeOffsets({ fps: 60, subframes: 4, shutter: 0 }), [0, 0, 0, 0], 'a closed shutter: anti-aliasing only');
   const offsets = subframeOffsets({ fps: 60, subframes: 4, shutter: 180 });
   [0.5, 1.5, 2.5, 3.5].forEach((k, i) => assert.ok(Math.abs(offsets[i] - k / 4 / 120) < 1e-15, `sub-frame ${i}`));
   assert.ok(subframeOffsets({ fps: 60, subframes: 16, shutter: 360 }).at(-1) < 1 / 60, 'inside the frame interval');
@@ -141,8 +129,7 @@ test("the dither keeps a slow gradient's mean and leaves no band: a ramp across 
     height = 64,
     sum = new Float32Array(width * height * 3);
   for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++)
-      sum.fill(srgbToLinear((100 + (2 * x) / width) / 255), (y * width + x) * 3, (y * width + x) * 3 + 3);
+    for (let x = 0; x < width; x++) sum.fill(srgbToLinear((100 + (2 * x) / width) / 255), (y * width + x) * 3, (y * width + x) * 3 + 3);
   const out = frame(sum, width, height);
   for (let x0 = 0; x0 < width; x0 += 32) {
     let mean = 0;

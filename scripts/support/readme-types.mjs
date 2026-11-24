@@ -77,12 +77,7 @@ function lastHeading(text) {
 export function exampleIds(name, document, entries) {
   const seen = new Map();
   return entries.map(({ code, heading }) => {
-    const words = heading
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 32)
-        .replace(/-$/, ''),
+    const words = heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32).replace(/-$/, ''),
       hash = createHash('sha256').update(code.replace(/\r\n/g, '\n').trim()).digest('hex').slice(0, 6),
       id = `${name}/${document}-${words ? `${words}-` : ''}${hash}`,
       count = (seen.get(id) ?? 0) + 1;

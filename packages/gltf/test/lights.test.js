@@ -138,15 +138,7 @@ test('KB6284a: the real EnvironmentTest cube, rows swapped, has the signs of the
       nodes: [],
     }),
     { size, faces } = light.faces;
-  const direction = (f, u, v) =>
-    [
-      [1, -v, -u],
-      [-1, -v, u],
-      [u, 1, v],
-      [u, -1, -v],
-      [u, -v, 1],
-      [-u, -v, -1],
-    ][f];
+  const direction = (f, u, v) => [[1, -v, -u], [-1, -v, u], [u, 1, v], [u, -1, -v], [u, -v, 1], [-u, -v, -1]][f];
   const basis = ([x, y, z]) => [y, z, x, x * y, y * z, x * z];
   /** The l = 1 and l = 2 (off-diagonal) projections, per channel, with the read rows or columns mirrored back. */
   const project = (rows, columns) => {
@@ -164,20 +156,10 @@ test('KB6284a: the real EnvironmentTest cube, rows swapped, has the signs of the
   };
   // The file's rows 1 to 3 (Y1-1 ~ y, Y10 ~ z, Y11 ~ x) and 4, 5, 7 (xy, yz, xz); 6 and 8 do not change with a mirror.
   const stated = [1, 2, 3, 4, 5, 7].map((row) => def.irradianceCoefficients[row]);
-  const wrong = (c) =>
-    c.flatMap((row, j) =>
-      row.filter((e, k) => Math.abs(stated[j][k]) > 0.01 && Math.sign(e) !== Math.sign(stated[j][k])),
-    );
+  const wrong = (c) => c.flatMap((row, j) => row.filter((e, k) => Math.abs(stated[j][k]) > 0.01 && Math.sign(e) !== Math.sign(stated[j][k])));
   assert.equal(wrong(project(false, false)).length, 0, 'rows swapped: every sign agrees');
-  for (const [rows, columns, reading] of [
-    [true, false, 'as saved'],
-    [true, true, 'columns swapped'],
-    [false, true, 'both swapped'],
-  ])
-    assert.ok(
-      wrong(project(rows, columns)).length >= 6,
-      `${reading}: ${wrong(project(rows, columns)).length} signs wrong`,
-    );
+  for (const [rows, columns, reading] of [[true, false, 'as saved'], [true, true, 'columns swapped'], [false, true, 'both swapped']])
+    assert.ok(wrong(project(rows, columns)).length >= 6, `${reading}: ${wrong(project(rows, columns)).length} signs wrong`);
 });
 
 test('the light carries its intensity and rotation, and the cube already turned', async () => {
@@ -204,30 +186,12 @@ test('what a file gets wrong is refused', async () => {
   };
   const node = (doc) => doc.nodes[2].extensions.EXT_lights_ies,
     example = () => modelOf(json('Example.gltf'), 'https://example.test/');
-  await assert.rejects(
-    ies((doc) => (node(doc).light = 4)),
-    /light index/,
-  );
-  await assert.rejects(
-    ies((doc) => delete node(doc).light),
-    /light index/,
-  );
-  await assert.rejects(
-    ies((doc) => (node(doc).multiplier = -1)),
-    /multiplier/,
-  );
-  await assert.rejects(
-    ies((doc) => (node(doc).color = [1, 1])),
-    /color/,
-  );
-  await assert.rejects(
-    ies((doc) => delete doc.extensions.EXT_lights_ies.lights[0].mimeType),
-    /mimeType/,
-  );
-  await assert.rejects(
-    ies((doc) => delete doc.extensions.EXT_lights_ies),
-    /no lights/,
-  );
+  await assert.rejects(ies((doc) => (node(doc).light = 4)), /light index/);
+  await assert.rejects(ies((doc) => delete node(doc).light), /light index/);
+  await assert.rejects(ies((doc) => (node(doc).multiplier = -1)), /multiplier/);
+  await assert.rejects(ies((doc) => (node(doc).color = [1, 1])), /color/);
+  await assert.rejects(ies((doc) => delete doc.extensions.EXT_lights_ies.lights[0].mimeType), /mimeType/);
+  await assert.rejects(ies((doc) => delete doc.extensions.EXT_lights_ies), /no lights/);
   await assert.rejects(gltfIESLights(modelOf(json('Example.gltf'))), /no base URL; pass baseURL/);
   const missing = async () => new Response('', { status: 404 });
   await assert.rejects(gltfIESLights(example(), { fetch: missing }), /answered 404/);
@@ -238,34 +202,13 @@ test('what a file gets wrong is refused', async () => {
     edit(cube.light, cube);
     return gltfImageLight(modelOf(docOf(cube)));
   };
-  await assert.rejects(
-    image((light) => (light.specularImages = [[0, 1]])),
-    /specular images/,
-  );
-  await assert.rejects(
-    image((light) => (light.specularImageSize = 3)),
-    /specular images/,
-  );
-  await assert.rejects(
-    image((light) => (light.specularImageSize = 8)),
-    /specularImageSize square/,
-  );
-  await assert.rejects(
-    image((light) => (light.irradianceCoefficients = [])),
-    /irradiance/,
-  );
-  await assert.rejects(
-    image((light) => (light.rotation = [0, 0, 0, 2])),
-    /rotation/,
-  );
-  await assert.rejects(
-    image((light) => (light.intensity = -1)),
-    /intensity/,
-  );
-  await assert.rejects(
-    image((light, cube) => (cube.images.length = 2)),
-    /image index/,
-  );
+  await assert.rejects(image((light) => (light.specularImages = [[0, 1]])), /specular images/);
+  await assert.rejects(image((light) => (light.specularImageSize = 3)), /specular images/);
+  await assert.rejects(image((light) => (light.specularImageSize = 8)), /specularImageSize square/);
+  await assert.rejects(image((light) => (light.irradianceCoefficients = [])), /irradiance/);
+  await assert.rejects(image((light) => (light.rotation = [0, 0, 0, 2])), /rotation/);
+  await assert.rejects(image((light) => (light.intensity = -1)), /intensity/);
+  await assert.rejects(image((light, cube) => (cube.images.length = 2)), /image index/);
 });
 
 test('two unnamed profiles of one format aimed alike keep their own candela (batch 132)', () => {

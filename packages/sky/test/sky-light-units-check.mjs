@@ -52,30 +52,14 @@ try {
         s = luminance(linear(sun)),
         b = luminance(linear(both)),
         share = (b - s) / b;
-      console.log(
-        model,
-        'intensity',
-        intensity,
-        'sun',
-        sun.map((v) => v.toFixed(1)),
-        'both',
-        both.map((v) => v.toFixed(1)),
-        'sky share',
-        share.toFixed(4),
-      );
+      console.log(model, 'intensity', intensity, 'sun', sun.map((v) => v.toFixed(1)), 'both', both.map((v) => v.toFixed(1)), 'sky share', share.toFixed(4));
       shares.push(share);
     }
     const [low, high] = model === 'preetham' ? [0.1, 0.2] : [0.04, 0.1];
     process.env.MEASURE ||
-      assert.ok(
-        shares[0] >= low && shares[0] <= high,
-        `${model}: the clear sky's share of the light on level ground, ${shares[0]}`,
-      );
+      assert.ok(shares[0] >= low && shares[0] <= high, `${model}: the clear sky's share of the light on level ground, ${shares[0]}`);
     process.env.MEASURE ||
-      assert.ok(
-        Math.abs(shares[1] - shares[0]) <= 0.02,
-        `${model}: the share holds at 3x intensity (${shares[0]} then ${shares[1]})`,
-      );
+      assert.ok(Math.abs(shares[1] - shares[0]) <= 0.02, `${model}: the share holds at 3x intensity (${shares[0]} then ${shares[1]})`);
   }
   assert.deepEqual(pageErrors, []);
   console.log('sky light units check passed');

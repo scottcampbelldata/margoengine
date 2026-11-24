@@ -49,9 +49,7 @@ for (const shadows of [false, true]) {
     // Control: one box in view dropped from A alone, as a wrong cull would, must show; then it comes back.
     const dropped = await page.evaluate(() => window.check.drop(true)),
       control = await frameDiff(page, shot);
-    console.log(
-      `control: box ${dropped} dropped from the instances only: ${control.differing} pixels differ (${control.mode})`,
-    );
+    console.log(`control: box ${dropped} dropped from the instances only: ${control.differing} pixels differ (${control.mode})`);
     assert.ok(dropped !== null && control.differing > 20, `a dropped box shows (${control.differing} pixels)`);
     await page.evaluate(() => window.check.drop(false));
     assert.equal((await frameDiff(page, shot)).differing, 0, 'the box back: frames equal again');

@@ -24,11 +24,7 @@ export async function checkStreamedSog(page) {
   assert.deepEqual(errors.concat(await page.evaluate(() => window.check.errors)), []);
   console.log(JSON.stringify({ drawn: r.drawn, selected: r.selected, v3: values.slice(0, 4), opacity: values[7] }));
 }
-if (process.argv[1]?.replaceAll('\\', '/').endsWith('/lod-sog-check.mjs')) {
+if (process.argv[1]?.replaceAll('\\','/').endsWith('/lod-sog-check.mjs')) {
   const context = await openBrowser({ startPath: '/packages/splats/test/gpu/splats.html', port: 'free' });
-  try {
-    await checkStreamedSog(context.page);
-  } finally {
-    await context.close();
-  }
+  try { await checkStreamedSog(context.page); } finally { await context.close(); }
 }

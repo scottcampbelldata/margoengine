@@ -296,10 +296,6 @@ test('the near gather draws the same however a sampler blends two mip levels', (
         worst = Math.max(worst, Math.abs(exact[i] - snapped[i]));
       }
     console.log(`near gather, float against ${fraction} level fraction`, JSON.stringify({ differ, worst }));
-    assert.equal(
-      differ,
-      0,
-      `${differ} values differ when the sampler ${fraction}s the level fraction (worst ${worst})`,
-    );
+    assert.equal(differ, 0, `${differ} values differ when the sampler ${fraction}s the level fraction (worst ${worst})`);
   }
 });

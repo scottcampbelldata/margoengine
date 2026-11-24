@@ -236,8 +236,7 @@ export class GrassField implements EnginePlugin {
     return this.frame[87];
   }
   set translucency(value: number) {
-    if (typeof value !== 'number' || !(value >= 0 && value <= 4))
-      throw new RangeError('Grass translucency must be 0..4');
+    if (typeof value !== 'number' || !(value >= 0 && value <= 4)) throw new RangeError('Grass translucency must be 0..4');
     this.frame[87] = value;
   }
   private colour(value: readonly [number, number, number], at: number, name: string): void {
@@ -470,16 +469,12 @@ export class GrassField implements EnginePlugin {
       : 'depth32float',
   ): Variant {
     if (
-      (format !== this.canvasFormat &&
-        format !== 'rgba8unorm' &&
-        format !== 'bgra8unorm' &&
-        format !== 'rgba16float' &&
-        format !== 'rg11b10ufloat') ||
+      (format !== this.canvasFormat && format !== 'rgba16float' && format !== 'rg11b10ufloat') ||
       (count !== 1 && (count !== 4 || sceneSamples() === 1))
     )
       throw new MargoError(
         'unsupported',
-        'Unsupported grass target format; draw into rgba8unorm, bgra8unorm or rgba16float, at 1 or 4 samples',
+        'Unsupported grass target format; draw into the canvas format or rgba16float, at 1 or 4 samples',
       );
     const key = format + ':' + count + ':' + depthFormat;
     let variant = this.variants.get(key);

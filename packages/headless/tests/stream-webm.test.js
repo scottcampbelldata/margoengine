@@ -156,10 +156,7 @@ test('streamVideo webm: an unknown-size Segment, a cluster per key frame interva
   for (const one of log.encoders) assert.equal(one.state, 'closed');
   const top = readElements(bytes),
     segment = top[1];
-  assert.deepEqual(
-    top.map((e) => e.id),
-    [0x1a45dfa3, 0x18538067],
-  );
+  assert.deepEqual(top.map((e) => e.id), [0x1a45dfa3, 0x18538067]);
   assert.ok(segment.unknown, 'the Segment size is unknown');
   assert.equal(segment.sizeLength, 8);
   const children = readElements(bytes, segment.start, segment.end);
@@ -168,18 +165,12 @@ test('streamVideo webm: an unknown-size Segment, a cluster per key frame interva
     [0x1549a966, 0x1654ae6b, 0x1f43b675, 0x1f43b675, 0x1f43b675, 0x1c53bb6b],
     'Info, Tracks, the clusters, Cues; no SeekHead, as nothing after the header is known when it is written',
   );
-  assert.ok(
-    children.slice(2, 5).every((cluster) => !cluster.unknown),
-    'each cluster is whole, so its size is known',
-  );
+  assert.ok(children.slice(2, 5).every((cluster) => !cluster.unknown), 'each cluster is whole, so its size is known');
   assert.equal(inside(bytes, children[0], 0x4489).length, 0, 'no Duration: the end is not known at the start');
   assert.equal(number(bytes, inside(bytes, children[0], 0x2ad7b1)[0]), 1_000_000);
   // The pieces are the header, then whole elements.
   assert.equal(pieces[0].length, children[2].begin);
-  assert.deepEqual(
-    pieces.slice(1).map((piece) => piece.length),
-    children.slice(2).map((e) => e.end - e.begin),
-  );
+  assert.deepEqual(pieces.slice(1).map((piece) => piece.length), children.slice(2).map((e) => e.end - e.begin));
   const [cues] = inside(bytes, segment, 0x1c53bb6b),
     points = inside(bytes, cues, 0xbb).map((point) => {
       const [positions] = inside(bytes, point, 0xb7);
@@ -193,7 +184,7 @@ test('streamVideo webm: an unknown-size Segment, a cluster per key frame interva
   assert.equal(bytes[segment.start + points[1][1]], 0x1f, 'the second cue lands on a Cluster ID');
 });
 
-test("streamVideo webm: joined, its clusters are encodeVideo's byte for byte, with alpha, sound and timed frames", async () => {
+test('streamVideo webm: joined, its clusters are encodeVideo\'s byte for byte, with alpha, sound and timed frames', async () => {
   const sound = { channels: [new Float32Array(48_000 * 2)], sampleRate: 48_000 };
   for (const options of [
     { fps: 10, keyFrameInterval: 0.2 },
@@ -218,10 +209,7 @@ test("streamVideo webm: joined, its clusters are encodeVideo's byte for byte, wi
   }
   // Timed frames: no DefaultDuration, as encodeVideo writes them.
   const timed = frames(3).map((one, n) => ({ ...one, timestamp: [0, 0.05, 0.2][n] })),
-    { bytes } = await drain(
-      streamVideo(timed, { format: 'webm', alpha: true, webCodecs: codecs().webCodecs }),
-      () => 0,
-    ),
+    { bytes } = await drain(streamVideo(timed, { format: 'webm', alpha: true, webCodecs: codecs().webCodecs }), () => 0),
     [tracks] = inside(bytes, segmentOf(bytes), 0x1654ae6b),
     [entry] = inside(bytes, tracks, 0xae);
   assert.equal(inside(bytes, entry, 0x23e383).length, 0);
@@ -230,12 +218,7 @@ test("streamVideo webm: joined, its clusters are encodeVideo's byte for byte, wi
 
 test('streamVideo webm: provenance in the header; stopping early or by signal closes both encoders; refusals', async () => {
   const { webCodecs, log } = codecs();
-  for await (const piece of streamVideo(frames(9), {
-    format: 'webm',
-    alpha: true,
-    provenance: { scene: 'a' },
-    webCodecs,
-  })) {
+  for await (const piece of streamVideo(frames(9), { format: 'webm', alpha: true, provenance: { scene: 'a' }, webCodecs })) {
     const segment = segmentOf(piece),
       [tags] = inside(piece, segment, 0x1254c367);
     assert.ok(new TextDecoder().decode(piece.subarray(tags.start, tags.end)).includes('{"scene":"a"}'));
@@ -253,12 +236,7 @@ test('streamVideo webm: provenance in the header; stopping early or by signal cl
   }
   await assert.rejects(
     (async () => {
-      for await (const piece of streamVideo(slow(), {
-        format: 'webm',
-        alpha: true,
-        signal: stop.signal,
-        webCodecs: second,
-      }))
+      for await (const piece of streamVideo(slow(), { format: 'webm', alpha: true, signal: stop.signal, webCodecs: second }))
         assert.ok(piece.length);
     })(),
     /stop/,
@@ -267,12 +245,9 @@ test('streamVideo webm: provenance in the header; stopping early or by signal cl
 
   const { webCodecs: third } = codecs();
   await assert.rejects(streamVideo(frames(1), { format: 'avi', webCodecs: third }).next(), { name: 'TypeError' });
-  await assert.rejects(
-    streamVideo(frames(1), { format: 'webm', alpha: true, codec: 'av01.0.13M.08', webCodecs: third }).next(),
-    {
-      code: 'unsupported',
-    },
-  );
+  await assert.rejects(streamVideo(frames(1), { format: 'webm', alpha: true, codec: 'av01.0.13M.08', webCodecs: third }).next(), {
+    code: 'unsupported',
+  });
   await assert.rejects(streamVideo(frames(1), { alpha: true, webCodecs: third }).next(), { code: 'unsupported' });
   await assert.rejects(streamVideo([], { format: 'webm', webCodecs: third }).next(), /No frames/);
 });

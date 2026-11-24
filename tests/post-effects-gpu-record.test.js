@@ -28,11 +28,7 @@ const flareArgs = () => {
   const command = JSON.parse(readFileSync(join(root, 'packages/post/package.json'), 'utf8')).scripts['test:gpu:flare'];
   const at = command.indexOf(script);
   assert.ok(at >= 0, `test:gpu:flare runs ${script}: ${command}`);
-  return command
-    .slice(at + script.length)
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  return command.slice(at + script.length).trim().split(/\s+/).filter(Boolean);
 };
 
 test('the script writes no report path of its own: every section report goes through sectionReport', () => {

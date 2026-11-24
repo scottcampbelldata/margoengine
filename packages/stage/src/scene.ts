@@ -84,23 +84,12 @@ function checkLight(entity: ResolvedEntity): void {
   const light = entity.components.light,
     wrong = (text: string) => typeError(`Entity '${entity.id}' light: ${text}`, 'arguments');
   if (!record(light)) throw wrong("{ type: 'directional', 'point' or 'spot', color, intensity }");
-  const {
-      type = 'directional',
-      color,
-      intensity,
-      range,
-      innerConeAngle = 0,
-      outerConeAngle = Math.PI / 4,
-      ambient,
-    } = light,
+  const { type = 'directional', color, intensity, range, innerConeAngle = 0, outerConeAngle = Math.PI / 4, ambient } = light,
     inner = innerConeAngle as number,
     outer = outerConeAngle as number;
-  if (type !== 'directional' && type !== 'point' && type !== 'spot')
-    throw wrong("type: 'directional', 'point' or 'spot'");
-  if (color !== undefined && !(vector(color, 3) && color.every((v) => v >= 0)))
-    throw wrong('color: [r, g, b], linear, 0 or more');
-  if (intensity !== undefined && !(typeof intensity === 'number' && intensity >= 0))
-    throw wrong('intensity: 0 or more');
+  if (type !== 'directional' && type !== 'point' && type !== 'spot') throw wrong("type: 'directional', 'point' or 'spot'");
+  if (color !== undefined && !(vector(color, 3) && color.every((v) => v >= 0))) throw wrong('color: [r, g, b], linear, 0 or more');
+  if (intensity !== undefined && !(typeof intensity === 'number' && intensity >= 0)) throw wrong('intensity: 0 or more');
   if (range !== undefined && !positive(range)) throw wrong('range: more than 0');
   if (ambient !== undefined && !(type === 'directional' && typeof ambient === 'number' && ambient >= 0))
     throw wrong('ambient: 0 or more, on a directional light');
@@ -160,8 +149,7 @@ function build(stage: Stage, entity: ResolvedEntity): Mesh {
     mesh.name = place.name!;
     if (position) mesh.setPosition(position);
     if (scale) mesh.setScale(scale);
-  } else
-    throw typeError(`Entity '${entity.id}' mesh: a model URL, { shape: 'box' } or { shape: 'sphere' }`, 'arguments');
+  } else throw typeError(`Entity '${entity.id}' mesh: a model URL, { shape: 'box' } or { shape: 'sphere' }`, 'arguments');
   if (entity.transform?.rotation) mesh.setQuaternion(entity.transform.rotation);
   return mesh;
 }
@@ -184,10 +172,7 @@ export async function addScene(
   { migrations, prefab, parent, base, fit, onEntity, gltf, signal, ...checks }: AddSceneOptions = {},
 ): Promise<LoadedScene> {
   if (fit !== undefined && typeof fit !== 'boolean')
-    throw typeError(
-      'Invalid fit: expected a boolean; use true to fit the camera or false to keep its view',
-      'arguments',
-    );
+    throw typeError('Invalid fit: expected a boolean; use true to fit the camera or false to keep its view', 'arguments');
   const abort = stageSignal(stage, signal);
   abort.throwIfAborted();
   const save = await optionalPackage('@margoengine/save', () => import('@margoengine/save'), abort);
@@ -201,9 +186,7 @@ export async function addScene(
     input = await save.decodeSave(new Uint8Array(await response.arrayBuffer()), { signal: abort });
   } else if (source instanceof ArrayBuffer) input = await save.decodeSave(new Uint8Array(source), { signal: abort });
   else if (ArrayBuffer.isView(source))
-    input = await save.decodeSave(new Uint8Array(source.buffer, source.byteOffset, source.byteLength), {
-      signal: abort,
-    });
+    input = await save.decodeSave(new Uint8Array(source.buffer, source.byteOffset, source.byteLength), { signal: abort });
   abort.throwIfAborted();
   // Migrate and expand first: every model must be on hand before the synchronous, all-or-nothing load starts.
   let document = migrations ? migrations.migrate(save.parseSave(input, {})) : save.parseSave(input, {});
@@ -309,12 +292,7 @@ export async function addScene(
     if (lit.length || viewed.length) runtime.store.tick(false);
     const camera = stage.engine.camera;
     for (const entity of viewed) {
-      const {
-          fov = camera.fov,
-          near = camera.near,
-          far = camera.far,
-          target,
-        } = entity.components.camera as CameraOptions,
+      const { fov = camera.fov, near = camera.near, far = camera.far, target } = entity.components.camera as CameraOptions,
         { position, forward, up } = pose(meshes.get(entity.id)!),
         look = target ?? (position.map((v, i) => v + forward[i] * 10) as Point),
         view = look.map((v, i) => v - position[i]),
@@ -358,14 +336,7 @@ export async function addScene(
         hold<PointLight | SpotLight>(
           lights,
           local.map((entity) => {
-            const {
-                type,
-                color = [1, 1, 1],
-                intensity = 1,
-                range,
-                innerConeAngle = 0,
-                outerConeAngle = Math.PI / 4,
-              } = lightOf(entity),
+            const { type, color = [1, 1, 1], intensity = 1, range, innerConeAngle = 0, outerConeAngle = Math.PI / 4 } = lightOf(entity),
               { position, forward } = pose(meshes.get(entity.id)!),
               // The range gltf/pbr gives a light with none: where inverse-square light falls under 1/256.
               place = { position, color, intensity, range: range ?? (Math.sqrt(intensity * 256) || 1) };
@@ -379,9 +350,8 @@ export async function addScene(
     if (directional)
       undo.push(
         hold(
-          (runtime.plugins.get('clustered:directional') as
-            | InstanceType<typeof directional.DirectionalLights>
-            | undefined) ?? directional.DirectionalLights.attach(stage.engine, { lights: lights! }),
+          (runtime.plugins.get('clustered:directional') as InstanceType<typeof directional.DirectionalLights> | undefined) ??
+            directional.DirectionalLights.attach(stage.engine, { lights: lights! }),
           more.map((entity) => {
             const { color = [1, 1, 1], intensity = 1 } = lightOf(entity);
             return { direction: pose(meshes.get(entity.id)!).forward, color, intensity };

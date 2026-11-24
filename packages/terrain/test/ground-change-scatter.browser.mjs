@@ -49,17 +49,7 @@ await runSuite(
           grid,
           events: [
             { kind: 'burn', ignition: [-12, 0], rate: 0.25, duration: 30, roughness: 0 },
-            {
-              kind: 'lava',
-              path: [
-                [12, -24],
-                [12, 24],
-              ],
-              width: 6,
-              thickness: 2,
-              duration: 5,
-              roughness: 0,
-            },
+            { kind: 'lava', path: [[12, -24], [12, 24]], width: 6, thickness: 2, duration: 5, roughness: 0 },
           ],
         }),
         plants = Scatter.attach(engine, box(0.2, 0.8, 0.2), {
@@ -113,8 +103,7 @@ await runSuite(
         cleared = 0;
       for (let k = 0; k < n * n; k++) {
         worstHeight = Math.max(worstHeight, Math.abs(heights[k] - want[k]));
-        const kept =
-          255 - Math.max(surface[k * 4], surface[k * 4 + 1], surface[k * 4 + 2], surface[k * 4 + 3], state[k * 4 + 2]);
+        const kept = 255 - Math.max(surface[k * 4], surface[k * 4 + 1], surface[k * 4 + 2], surface[k * 4 + 3], state[k * 4 + 2]);
         if (density[k] !== kept) densityMisses++;
         if (density[k] === 0) cleared++;
       }
@@ -159,28 +148,13 @@ await runSuite(
     assert.deepEqual(result.errors, [], 'no validation errors');
     assert.ok(result.lavaTop > 1.5, `the lava raises the ground: ${result.lavaTop}`);
     assert.equal(result.worstHeight, 0, `the scatter heightmap holds the changed ground: ${result.worstHeight}`);
-    assert.equal(
-      result.densityMisses,
-      0,
-      `the density map clears plants exactly under the covers: ${JSON.stringify(result)}`,
-    );
+    assert.equal(result.densityMisses, 0, `the density map clears plants exactly under the covers: ${JSON.stringify(result)}`);
     assert.equal(result.coverMisses, 0, `the plant covers hold the covers exactly: ${result.coverMisses}`);
-    assert.ok(
-      result.charred > 100 && result.sameBounds,
-      `the burn chars plant cover texels over the scatter rectangle: ${JSON.stringify(result)}`,
-    );
+    assert.ok(result.charred > 100 && result.sameBounds, `the burn chars plant cover texels over the scatter rectangle: ${JSON.stringify(result)}`);
     assert.ok(result.cleared > 200, `the burn and the lava clear texels: ${result.cleared}`);
-    assert.ok(
-      result.grass > 0.3 && result.beside > 0.3,
-      `untouched ground keeps its plants: ${JSON.stringify(result)}`,
-    );
-    assert.ok(
-      result.burn < 0.02 && result.lava < 0.02,
-      `the burn scar and the lava are bare: ${JSON.stringify(result)}`,
-    );
-    console.log(
-      `ok terrain ground change with scatter (${process.env.MARGO_COMPAT === '1' ? 'compat' : 'native'}) ${JSON.stringify(result)}`,
-    );
+    assert.ok(result.grass > 0.3 && result.beside > 0.3, `untouched ground keeps its plants: ${JSON.stringify(result)}`);
+    assert.ok(result.burn < 0.02 && result.lava < 0.02, `the burn scar and the lava are bare: ${JSON.stringify(result)}`);
+    console.log(`ok terrain ground change with scatter (${process.env.MARGO_COMPAT === "1" ? "compat" : "native"}) ${JSON.stringify(result)}`);
   },
   () => context.close(),
 );

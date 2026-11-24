@@ -53,8 +53,7 @@ async function everyPoint(source) {
 function sameAs(points, cloud) {
   const n = cloud.positions.length / 3,
     want = [];
-  for (let i = 0; i < n; i++)
-    want.push([...cloud.positions.slice(i * 3, i * 3 + 3), ...cloud.colors.slice(i * 3, i * 3 + 3)]);
+  for (let i = 0; i < n; i++) want.push([...cloud.positions.slice(i * 3, i * 3 + 3), ...cloud.colors.slice(i * 3, i * 3 + 3)]);
   want.sort((a, b) => a[0] - b[0]);
   assert.equal(points.length, n, 'every point once');
   for (let i = 0; i < n; i++) {
@@ -129,11 +128,7 @@ test('attributes: intensity and classification by default, all on request, and c
   assert.deepEqual(Object.keys(attributes), ['intensity']);
   const none = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/'), attributes: [] });
   assert.deepEqual(Object.keys((await none.load(none.root, signal)).attributes), []);
-  const ramp = await PotreeSource.open('/scan/', {
-      fetch: serve(files, '/scan/'),
-      attributes: [],
-      colorBy: 'intensity',
-    }),
+  const ramp = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/'), attributes: [], colorBy: 'intensity' }),
     drawn = await ramp.load(ramp.root, signal);
   assert.equal(drawn.colorComponents, 4);
   assert.equal(drawn.colors.length, source.root.count * 4);
@@ -198,9 +193,7 @@ test('1.x: hierarchy files every few levels give back every point and colour', a
 
 test('1.x: a leaf whose record says 0 points takes its count from its file, as real folders need', async () => {
   const cloud = scan(),
-    source = await PotreeSource.open('/scan', {
-      fetch: serve(writePotree1(cloud, { step: 2, leafZero: true }), '/scan/'),
-    });
+    source = await PotreeSource.open('/scan', { fetch: serve(writePotree1(cloud, { step: 2, leafZero: true }), '/scan/') });
   sameAs(await everyPoint(source), cloud);
   assert.ok(walk(source.root).every((node) => node.count > 0));
 });
@@ -234,19 +227,7 @@ test('1.4: the hierarchy inside cloud.js and all node files in one folder', asyn
   assert.equal(source.version, '1.4');
   sameAs(await everyPoint(source), cloud);
   const bad = new Map(flat);
-  bad.set(
-    'cloud.js',
-    new TextEncoder().encode(
-      JSON.stringify({
-        ...meta,
-        version: '1.4',
-        hierarchy: [
-          ['r', 1],
-          ['r00', 1],
-        ],
-      }),
-    ),
-  );
+  bad.set('cloud.js', new TextEncoder().encode(JSON.stringify({ ...meta, version: '1.4', hierarchy: [['r', 1], ['r00', 1]] })));
   await assert.rejects(PotreeSource.open('/scan/cloud.js', { fetch: serve(bad, '/scan/') }), RangeError);
 });
 
@@ -293,10 +274,7 @@ test('open and load stop on abort; an empty node makes no request', async () => 
   const files = writePotree2(scan(1000)),
     controller = new AbortController();
   controller.abort(new Error('stop'));
-  await assert.rejects(
-    PotreeSource.open('/scan/metadata.json', { fetch: serve(files), signal: controller.signal }),
-    /stop/,
-  );
+  await assert.rejects(PotreeSource.open('/scan/metadata.json', { fetch: serve(files), signal: controller.signal }), /stop/);
   const log = [],
     source = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/', log) });
   await assert.rejects(source.load(source.root, controller.signal), /stop/);

@@ -208,11 +208,7 @@ test('quads with seams kept still pair most of a curved surface', () => {
 });
 
 test('quads on a cube: flat pairs become single faces, the corners and volume hold, and sources follow', () => {
-  const { mesh, quads, sources } = remeshMesh(createPrimitiveMesh('cube', 'q'), {
-      targetLength: 0.25,
-      quads: true,
-      createId,
-    }),
+  const { mesh, quads, sources } = remeshMesh(createPrimitiveMesh('cube', 'q'), { targetLength: 0.25, quads: true, createId }),
     four = mesh.faces.filter((face) => face.vertices.length === 4);
   assert.ok(four.length * 1.2 >= quads.length && four.length > 0, `${four.length} faces of ${quads.length} quads`);
   assert.ok(Math.abs(Math.abs(volume(mesh)) - 1) < 1e-9);
@@ -221,33 +217,12 @@ test('quads on a cube: flat pairs become single faces, the corners and volume ho
 });
 
 test('a UV seam stays an edge of the quads, unless told otherwise', () => {
-  const vertices = [
-      [0, 0, 0],
-      [1, 0, 0],
-      [1, 1, 0],
-      [0, 1, 0],
-    ],
+  const vertices = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]],
     split = {
       vertices,
       faces: [
-        {
-          id: 'a',
-          vertices: [0, 1, 2],
-          uv: [
-            [0, 0],
-            [0.4, 0],
-            [0.4, 0.4],
-          ],
-        },
-        {
-          id: 'b',
-          vertices: [0, 2, 3],
-          uv: [
-            [0.6, 0.6],
-            [1, 1],
-            [0.6, 1],
-          ],
-        },
+        { id: 'a', vertices: [0, 1, 2], uv: [[0, 0], [0.4, 0], [0.4, 0.4]] },
+        { id: 'b', vertices: [0, 2, 3], uv: [[0.6, 0.6], [1, 1], [0.6, 1]] },
       ],
     },
     options = { targetLength: 2, iterations: 1, quads: true, createId };

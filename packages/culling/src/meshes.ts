@@ -405,13 +405,10 @@ export class CulledMeshes implements EnginePlugin {
     if (s.instance !== instance || s.hiz !== hiz) {
       const used = inUse(instance, slot),
         group = (pipeline: GPUPipelineBase, entries: [number, GPUBuffer][]) =>
-          d.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: entries.map(([binding, buffer]) => ({
-              binding,
-              resource: buffer === instance ? used : { buffer },
-            })),
-          });
+        d.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: entries.map(([binding, buffer]) => ({ binding, resource: buffer === instance ? used : { buffer } })),
+        });
       const shared: [number, GPUBuffer][] = [
         [0, o.uniform],
         [1, this.frameBuffer!],
@@ -478,10 +475,7 @@ export class CulledMeshes implements EnginePlugin {
         throw new RangeError(`CulledMeshes: at most ${most} instances of one geometry here; use several geometries.`);
       for (const b of slot.buffers) b.destroy();
       // Doubling, but never past the binding: a count just over a power of two must still fit.
-      const n = Math.min(
-          Math.max(256, 2 ** Math.ceil(Math.log2(batch.count))),
-          Math.max(batch.count, most - (most % 256)),
-        ),
+      const n = Math.min(Math.max(256, 2 ** Math.ceil(Math.log2(batch.count))), Math.max(batch.count, most - (most % 256))),
         S = GPUBufferUsage.STORAGE,
         make = (size: number, usage: number) => {
           const b = d.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });

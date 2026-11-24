@@ -206,7 +206,14 @@ export class CompatGPU {
       return Promise.resolve(null);
     }
     const formats = caps.tier === 'full' ? undefined : (await import('../tiers.js')).tierFormats(caps.tier);
-    return new CompatAdapter(gl, caps, budget, formats, clearsLost(gl), inverseTrigInaccurate(gl));
+    return new CompatAdapter(
+      gl,
+      caps,
+      budget,
+      formats,
+      clearsLost(gl),
+      inverseTrigInaccurate(gl),
+    );
   }
 
   /** The canvas format the layer renders fastest: WebGL2 stores rgba. */
@@ -408,9 +415,7 @@ export class CompatDevice extends EventTarget {
     const defaultLayers = Math.min(WEBGPU_DEFAULT_LIMITS.maxTextureArrayLayers, adapter.limits.maxTextureArrayLayers),
       layers = Math.max(defaultLayers, descriptor.requiredLimits?.maxTextureArrayLayers ?? defaultLayers);
     if (layers > adapter.limits.maxTextureArrayLayers)
-      throw new RangeError(
-        'Requested array layer limit exceeds the adapter capacity; use adapter.limits.maxTextureArrayLayers or fewer layers',
-      );
+      throw new RangeError('Requested array layer limit exceeds the adapter capacity; use adapter.limits.maxTextureArrayLayers or fewer layers');
     // As in WebGPU, a limit the adapter raises past the default needs requiredLimits (array layers above; storage
     // bindings and buffers, which reach 1 GiB at maxTextureDimension2D 8,192 since KB2604d).
     const raised = (name: 'maxStorageBufferBindingSize' | 'maxBufferSize') => {

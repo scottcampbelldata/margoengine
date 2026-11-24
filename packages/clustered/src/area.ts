@@ -72,12 +72,8 @@ ${ltcPolygonWgsl('area')}fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,n
   for(var j=0u;j<areaLights.count.x;j++){
     let light=areaLights.lights[j];let c=light.center.xyz-position;let r=light.right.xyz;let u=light.up.xyz;
     var side=1.0;if(dot(cross(r,u),c)>0){if(light.center.w<0.5){continue;}side=-1.0;}
-    ${
-      apertures
-        ? `${APERTURE_WGSL}
-    let a=c+r*lo.x+u*lo.y;let b=c+r*lo.x+u*hi.y;let e=c+r*hi.x+u*hi.y;let d=c+r*hi.x+u*lo.y;`
-        : 'let a=c-r-u;let b=c-r+u;let e=c+r+u;let d=c+r-u;'
-    }${shadow ? `let radiance=light.color.rgb${shadow};` : ''}
+    ${apertures ? `${APERTURE_WGSL}
+    let a=c+r*lo.x+u*lo.y;let b=c+r*lo.x+u*hi.y;let e=c+r*hi.x+u*hi.y;let d=c+r*hi.x+u*lo.y;` : 'let a=c-r-u;let b=c-r+u;let e=c+r+u;let d=c+r-u;'}${shadow ? `let radiance=light.color.rgb${shadow};` : ''}
     specular+=${lit('lobe')}*max(side*areaIntegral(lobe,a,b,e,d),0.0);diffuse+=${lit('local')}*max(side*areaIntegral(local,a,b,e,d),0.0);
   }
   let f0=mix(dielectricF0,base,metal);
@@ -183,13 +179,8 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
       if (light.up) finiteVector(light.up, 3, 'Area light up');
       const recess = light.recess ?? 0,
         sill = light.sill ?? 0;
-      if (
-        ![recess, sill].every((v) => typeof v === 'number' && Number.isFinite(Math.fround(v)) && v >= 0) ||
-        ((recess || sill) && light.twoSided)
-      )
-        throw new RangeError(
-          'Invalid area light recess or sill; give finite numbers of 0 or more, on a one-sided light',
-        );
+      if (![recess, sill].every((v) => typeof v === 'number' && Number.isFinite(Math.fround(v)) && v >= 0) || ((recess || sill) && light.twoSided))
+        throw new RangeError('Invalid area light recess or sill; give finite numbers of 0 or more, on a one-sided light');
       const { normal: n, right, up } = rectFrame(f, light.up, 'Area light'),
         color: ArrayLike<number> = light.color ?? [1, 1, 1];
       if (light.castShadow !== undefined && typeof light.castShadow !== 'boolean')
@@ -559,8 +550,7 @@ function solidAngle(p: readonly number[], corners: readonly number[][]): number 
       const la = Math.hypot(a[0], a[1], a[2]),
         lb = Math.hypot(b[0], b[1], b[2]),
         lc = Math.hypot(c[0], c[1], c[2]),
-        det =
-          a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+        det = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
       return 2 * Math.atan2(Math.abs(det), la * lb * lc + dot(a, b) * lc + dot(a, c) * lb + dot(b, c) * la);
     };
   const v = corners.map((c) => [c[0] - p[0], c[1] - p[1], c[2] - p[2]]);
@@ -598,14 +588,7 @@ const clip = (set: readonly Interval[], [a, b]: Interval): Interval[] =>
  * standing `stand` proud of the frost if it stays outside [a, b] for every s up to stand / depth, and the reveal,
  * `reveal` deep, if it is inside the opening at s = reveal / depth.
  */
-function litAlong(
-  size: number,
-  l: number,
-  depth: number,
-  bars: readonly Interval[],
-  stand: number,
-  reveal: number,
-): Interval[] {
+function litAlong(size: number, l: number, depth: number, bars: readonly Interval[], stand: number, reveal: number): Interval[] {
   const half = size / 2,
     through = (edge: number, s: number) => (edge - s * l) / (1 - s);
   let lit: Interval[] = [[-half, half]];
@@ -632,13 +615,8 @@ function openingModel(options: OpeningLightOptions) {
   const { position, direction, width, height, up, room, lights, openings = 0 } = options ?? ({} as OpeningLightOptions),
     bad = (what: string) => new RangeError(`Invalid openingLight ${what}`),
     finite = (v: unknown, low = 0) => typeof v === 'number' && Number.isFinite(v) && v >= low;
-  for (const [name, v] of [
-    ['position', position],
-    ['direction', direction],
-    ['up', up ?? [0, 1, 0]],
-  ] as const)
-    if (!Array.isArray(v) || v.length !== 3 || !v.every((c) => typeof c === 'number' && Number.isFinite(c)))
-      throw bad(`${name}; give [x, y, z]`);
+  for (const [name, v] of [['position', position], ['direction', direction], ['up', up ?? [0, 1, 0]]] as const)
+    if (!Array.isArray(v) || v.length !== 3 || !v.every((c) => typeof c === 'number' && Number.isFinite(c))) throw bad(`${name}; give [x, y, z]`);
   if (!(finite(width) && width > 0 && finite(height) && height > 0)) throw bad('size; give a width and height above 0');
   if (!finite(openings)) throw bad('openings; give an area of 0 or more');
   if (!Array.isArray(room) || !Array.isArray(lights)) throw bad('room or lights; give arrays');
@@ -711,11 +689,7 @@ function openingModel(options: OpeningLightOptions) {
     glass = lites[0] * lites[1] * liteW * liteH,
     base = { across, up: upward, room: color };
   if (glazing === 'clear')
-    return {
-      ...base,
-      mean: color.map((c) => (c * glass) / (width * height)),
-      radiance: (_x: number, _y: number) => color,
-    };
+    return { ...base, mean: color.map((c) => (c * glass) / (width * height)), radiance: (_x: number, _y: number) => color };
   // The frost lies on the glass's room face, `thickness` behind `position`, in the frame u (across), v (up), n (out).
   // Each lamp behind it, in that frame, with the stretches of each side its light reaches: the lit part of the frost is
   // their product, since a column's bar shades the whole height and a row's the whole width.
@@ -777,8 +751,7 @@ function openingModel(options: OpeningLightOptions) {
     ...base,
     // tau_d (E / pi + L_room) integrated over the frosted glass, plus the room's radiance through the clear glass.
     mean: [0, 1, 2].map(
-      (k) =>
-        (transmittance * (frosted[k] / Math.PI + color[k] * frostedArea) + color[k] * clearArea) / (width * height),
+      (k) => (transmittance * (frosted[k] / Math.PI + color[k] * frostedArea) + color[k] * clearArea) / (width * height),
     ),
     radiance(x: number, y: number): number[] {
       const L = [0, 0, 0];

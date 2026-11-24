@@ -24,8 +24,7 @@ test('animatedFeature saturates, softens the fine detail and widens the large-sc
   assert.ok(v.saturation >= 1.1 && v.saturation <= 1.15, 'saturation up 10 to 15 percent');
   for (const [key, m] of Object.entries(MATERIALS)) {
     const o = out[key];
-    if (key !== 'snow' && key !== 'rock')
-      assert.ok(chroma(o.color) >= chroma(m.color) - 1e-12, `${key} is not less saturated`);
+    if (key !== 'snow' && key !== 'rock') assert.ok(chroma(o.color) >= chroma(m.color) - 1e-12, `${key} is not less saturated`);
     assert.ok(Math.abs(luma(o.color) - luma(m.color)) < 0.02, `${key} keeps its luminance (clamping aside)`);
     assert.ok(o.detail < (m.detail ?? 0.25), `${key} softer detail`);
     assert.ok(o.macro >= m.macro && o.macro <= 1, `${key} more macro variation`);

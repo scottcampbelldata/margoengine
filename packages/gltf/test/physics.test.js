@@ -128,10 +128,7 @@ test('the animated drive target of the real DrivenHinge moves the door, on the w
 test('setPointer writes a drive and a motion, and says false for what it does not write', async () => {
   const model = modelOf(fixture('DrivenHinge.gltf'), [], (doc) => (delete doc.animations, doc));
   const { physics, gltf } = await load(model);
-  assert.equal(
-    gltf.setPointer('/extensions/KHR_physics_rigid_bodies/physicsJoints/0/drives/0/positionTarget', -0.5),
-    true,
-  );
+  assert.equal(gltf.setPointer('/extensions/KHR_physics_rigid_bodies/physicsJoints/0/drives/0/positionTarget', -0.5), true);
   steps(physics, 60 * 30);
   const q = quatOf(gltf.bodies.get(1));
   near(2 * Math.atan2(q.y, q.w), 0.5, 2e-3, 'door angle');
@@ -225,17 +222,10 @@ test('restitution bounces to e squared of the drop, and friction stops a slide w
   const file = fileOf(
     [
       physicsNode({ collider: colliderOn(0, { physicsMaterial: 0 }) }, { translation: [0, -0.5, 0] }),
-      physicsNode(
-        { motion: { mass: 1 }, collider: colliderOn(1, { physicsMaterial: 0 }) },
-        { translation: [0, 2.5, 0] },
-      ),
+      physicsNode({ motion: { mass: 1 }, collider: colliderOn(1, { physicsMaterial: 0 }) }, { translation: [0, 2.5, 0] }),
     ],
     [box([40, 1, 40]), { type: 'sphere', sphere: { radius: 0.5 } }],
-    {
-      physicsMaterials: [
-        { restitution: 0.5, restitutionCombine: 'maximum', staticFriction: 0.4, dynamicFriction: 0.4 },
-      ],
-    },
+    { physicsMaterials: [{ restitution: 0.5, restitutionCombine: 'maximum', staticFriction: 0.4, dynamicFriction: 0.4 }] },
   );
   const { physics, gltf } = await load(docModel(file));
   const ball = gltf.bodies.get(1);
@@ -309,13 +299,10 @@ test('mass, inertia, centre of mass and gravity factor take the file; 0 is infin
       ),
       physicsNode({ motion: { mass: 0 }, collider: colliderOn() }, { translation: [10, 0, 0] }),
       physicsNode({ motion: { isKinematic: true, linearVelocity: [1, 0, 0] } }, { translation: [15, 0, 0] }),
-      physicsNode(
-        { motion: { angularVelocity: [0, 0, 1], gravityFactor: 0 }, collider: colliderOn() },
-        {
-          translation: [20, 0, 0],
-          rotation: [0, 0.7071067811865476, 0, 0.7071067811865476],
-        },
-      ),
+      physicsNode({ motion: { angularVelocity: [0, 0, 1], gravityFactor: 0 }, collider: colliderOn() }, {
+        translation: [20, 0, 0],
+        rotation: [0, 0.7071067811865476, 0, 0.7071067811865476],
+      }),
     ],
     [box([1, 1, 1])],
   );
@@ -328,7 +315,10 @@ test('mass, inertia, centre of mass and gravity factor take the file; 0 is infin
   near(inertia[0], 8 / 6, 1e-4, 'inertia follows the shape when only mass is set');
   assert.equal(custom.mass, 2);
   near(custom.centerOfMass[0], 1, 1e-6, 'centre of mass is in node space, scale 2');
-  assert.deepEqual(custom.principalInertia.map((v) => Math.round(v * 1e4) / 1e4).sort(), [1, 2, 3]);
+  assert.deepEqual(
+    custom.principalInertia.map((v) => Math.round(v * 1e4) / 1e4).sort(),
+    [1, 2, 3],
+  );
   assert.equal(custom.gravityScale, 0.5);
   steps(physics, 60);
   near(gltf.bodies.get(2).position[1], 0, 1e-6, 'infinite mass does not fall');
@@ -356,11 +346,7 @@ test('a collider joins the body above it, a child motion is its own body, and sc
     t = collider.translationWrtParent(),
     half = collider.halfExtents();
   near(t.x, 2, 1e-6, 'offset carries the parent scale');
-  assert.deepEqual(
-    [half.x, half.y, half.z].map((v) => +v.toFixed(5)),
-    [1, 0.5, 1],
-    'negative scale is its size',
-  );
+  assert.deepEqual([half.x, half.y, half.z].map((v) => +v.toFixed(5)), [1, 0.5, 1], 'negative scale is its size');
   assert.equal(gltf.bodyOf(1), parent);
   assert.notEqual(gltf.bodyOf(2), parent);
   assert.equal(gltf.bodies.get(3).colliders.length, 0, 'a scale of zero disables the shape');
@@ -378,10 +364,9 @@ test('the implicit shapes map to their exact collider, or a hull with a note', (
     halfHeight: 1,
     radius: 1,
   });
-  assert.deepEqual(
-    make({ type: 'cylinder', cylinder: { height: 2, radiusTop: 1, radiusBottom: 0 } }).collider.rotation,
-    [1, 0, 0, 0],
-  );
+  assert.deepEqual(make({ type: 'cylinder', cylinder: { height: 2, radiusTop: 1, radiusBottom: 0 } }).collider.rotation, [
+    1, 0, 0, 0,
+  ]);
   const count = (made) => made.collider.points.length / 3;
   const uneven = make({ type: 'sphere', sphere: { radius: 1 } }, [1, 2, 1]);
   assert.equal(count(uneven), 194);

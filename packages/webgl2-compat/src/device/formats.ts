@@ -228,13 +228,7 @@ const TYPE_BYTES: Readonly<Record<string, number>> = {
 export function glTexelBytes(info: FormatInfo): number {
   const per = TYPE_BYTES[info.type];
   if (!per) return info.type === 'FLOAT_32_UNSIGNED_INT_24_8_REV' ? 8 : info.type.startsWith('UNSIGNED_SHORT_') ? 2 : 4;
-  const channels = info.format.startsWith('RGBA')
-    ? 4
-    : info.format.startsWith('RGB')
-      ? 3
-      : info.format.startsWith('RG')
-        ? 2
-        : 1;
+  const channels = info.format.startsWith('RGBA') ? 4 : info.format.startsWith('RGB') ? 3 : info.format.startsWith('RG') ? 2 : 1;
   return per * channels;
 }
 

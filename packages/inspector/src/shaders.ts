@@ -539,8 +539,6 @@ export class ShaderEditor implements EnginePlugin {
     this.unlisten();
     this.element.remove();
     this.items = [];
-    // Off the scene that holds it, not the active one.
-    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

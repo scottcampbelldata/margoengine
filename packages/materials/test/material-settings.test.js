@@ -16,8 +16,7 @@ test('skin and eye slider rows share the row shape and build their features', ()
     assert.ok(names.includes(name), name);
   for (const row of MATERIAL_SETTINGS) {
     assert.ok(['number', 'color'].includes(row.kind) && typeof row.about === 'string' && typeof row.live === 'boolean');
-    if (row.kind === 'number' && row.default !== null)
-      assert.ok(row.default >= row.min && row.default <= row.max, row.name);
+    if (row.kind === 'number' && row.default !== null) assert.ok(row.default >= row.min && row.default <= row.max, row.name);
   }
   assert.deepEqual(
     MATERIAL_LIVE_SETTINGS.map((r) => r.name),

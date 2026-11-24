@@ -11,7 +11,7 @@ import { solveTwoBoneIK, rotationBetween } from './ik.js';
 export { blend1D, blend2D } from './blend.js';
 export { solveTwoBoneIK } from './ik.js';
 export { CCDSolver } from './ccd.js';
-export type { CCDConeLimit, CCDEulerLimit, CCDHingeLimit, CCDHingeTwist, CCDJointLimit, CCDResult } from './ccd.js';
+export type { CCDConeLimit, CCDEulerLimit, CCDHingeLimit, CCDJointLimit, CCDResult } from './ccd.js';
 export { addCCDChain } from './ccd-chain.js';
 export type { CCDChain } from './ccd-chain.js';
 export { addRootMotion } from './root-motion.js';

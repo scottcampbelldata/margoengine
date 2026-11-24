@@ -16,7 +16,7 @@ const server = await createServer({
   plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
-  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
+  server: { port: 0 },
 });
 await server.listen();
 let browser;

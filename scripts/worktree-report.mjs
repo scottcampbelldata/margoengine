@@ -20,8 +20,7 @@ export function verdict(row) {
   return 'nothing unlanded: delete it unless an agent is working in it';
 }
 
-const git = (cwd, args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 const tryGit = (cwd, args, fallback) => {
   try {
     return git(cwd, args);
@@ -87,8 +86,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(`Compared with ${base}. ${rows.length} rows.`);
     for (const row of rows) {
       const where = row.path || row.branch;
-      const counts =
-        row.kind === 'folder' ? '' : `: ${row.branch}, ${row.ahead} unlanded commits, ${row.dirty} changed files`;
+      const counts = row.kind === 'folder' ? '' : `: ${row.branch}, ${row.ahead} unlanded commits, ${row.dirty} changed files`;
       console.log(`- [${row.kind}] ${where}${counts}: ${row.verdict}`);
     }
   }

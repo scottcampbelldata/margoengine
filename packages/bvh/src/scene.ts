@@ -256,9 +256,7 @@ export class SceneBVH {
     const meshes: Iterable<RuntimeMesh> = chosen
         ? ([...chosen].filter((object) => !isModel(object)) as unknown as RuntimeMesh[])
         : runtime.meshes.values(),
-      models: ModelLike[] = chosen
-        ? ([...chosen].filter((object) => isModel(object)) as ModelLike[])
-        : engineModels(engine),
+      models: ModelLike[] = chosen ? ([...chosen].filter((object) => isModel(object)) as ModelLike[]) : engineModels(engine),
       modelSet = new Set(models);
     let proxies: PickProxy[] = engineProxies(engine);
     if (chosen) proxies = proxies.filter((p) => chosen.has(p.anchor) || chosen.has(p.model as ModelLike));
@@ -273,17 +271,7 @@ export class SceneBVH {
           if (!modelSet.has(owner))
             for (const primitive of source.source.primitives) {
               const p = primitive as unknown as ModelPrimitiveLike;
-              visit(
-                mesh,
-                owner,
-                p,
-                owner.primitives.indexOf(p),
-                true,
-                null,
-                primitiveEntry(p).sphere,
-                matrices,
-                mesh.id * 16,
-              );
+              visit(mesh, owner, p, owner.primitives.indexOf(p), true, null, primitiveEntry(p).sphere, matrices, mesh.id * 16);
             }
         }
       }

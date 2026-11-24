@@ -168,9 +168,7 @@ export const shaderMaterialCodecs: readonly MaterialValueCodec[] = [
  */
 export function glslMaterialCodec(ShaderMaterial: typeof ShaderMaterialClass): MaterialValueCodec {
   if (typeof ShaderMaterial !== 'function' || !(ShaderMaterial.prototype instanceof RawShaderMaterial))
-    throw new TypeError(
-      'glslMaterialCodec got no ShaderMaterial class; pass ShaderMaterial from @margoengine/shader/glsl-material',
-    );
+    throw new TypeError('glslMaterialCodec got no ShaderMaterial class; pass ShaderMaterial from @margoengine/shader/glsl-material');
   return {
     type: 'shader-glsl-material',
     test: (v) => v instanceof ShaderMaterial,
@@ -200,17 +198,9 @@ export function glslMaterialCodec(ShaderMaterial: typeof ShaderMaterialClass): M
         ]),
       };
     },
-    restore: (data: {
-      source: Record<string, unknown>;
-      uniforms: Record<string, { value: unknown }>;
-      state: Record<string, unknown>;
-    }) => {
+    restore: (data: { source: Record<string, unknown>; uniforms: Record<string, { value: unknown }>; state: Record<string, unknown> }) => {
       const { name, ...state } = data.state,
-        material = new ShaderMaterial({
-          ...(data.source as object),
-          uniforms: data.uniforms,
-          ...(name !== undefined ? { name: name as string } : {}),
-        } as ShaderMaterialOptions);
+        material = new ShaderMaterial({ ...(data.source as object), uniforms: data.uniforms, ...(name !== undefined ? { name: name as string } : {}) } as ShaderMaterialOptions);
       // Polygon offset first: its setters write depthBias, which a saved bias of its own then replaces.
       const order = ['polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits'];
       for (const key of [...order, ...Object.keys(state).filter((k) => !order.includes(k))])

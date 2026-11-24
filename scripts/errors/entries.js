@@ -119,6 +119,15 @@ export const entries = [
     fix: 'Call `seek(engine, seconds)` once, after the plugins are attached and before the first frame. To show another time, start a fresh engine (a film scene renders in its own process) and seek it there. Seeking back in one process waits for a reset of every clock.',
   },
   {
+    id: 'film-titles',
+    title: '@margoengine/cutscene/film-titles: captions, chapter and closing cards',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A film titles spec was refused when it was made: a cue that ends before it starts or holds no text, a time that is not a finite number, chapters out of film order, a fade below 0 or a chapter hold of 0; or `update` ran after `dispose()`.',
+    fix: 'Give cues as `{ start, end, text }`, `[start, end, text]` or captions cues with `end` after `start`, chapters sorted by `start`, fades of 0 or more and holds above 0. Call `checkFilmTitles(spec)` to check a spec without drawing; make a new `FilmTitles` after disposing one.',
+  },
+  {
     id: 'creative-target',
     title: '@margoengine/creative: texture render targets',
     kind: 'family',
@@ -1980,10 +1989,6 @@ export const entries = [
     title: '@margoengine/biomes: biome worlds, climate fields and editing',
     kind: 'family',
     messages: [
-      'Set a valid treeline elevation, width 12..400 m, patchSize 20..2000 m and int32 seed',
-      'Provide at least one selector for both mature and stunted trees',
-      'Treeline cohorts require distinct, nonempty species selectors',
-      'A species canopyKind must be broadleaf, conifer or palm',
       'Biome cells are exact only within 137,000 km',
       'BiomeObjects states must be a function (key, kind) returning a PlantStates.plant() response or undefined',
       'disturbance height must be an Int32Array of nx x nz millimetre values',
@@ -2654,7 +2659,6 @@ export const entries = [
       'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}',
       'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>',
       'AdaptiveDpr requires the WebGPU renderer or WebGL2 compatibility layer; use one of those renderers',
-      "Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry's MappedPbrMaterial",
       'Animation requires a parent <Gltf>, <Model>, or <Fbx>; render it inside one',
       'Animation: this model already has an animation plugin; mount one <Animation> per model',
       'Animation: this model already has an animator plugin; mount one <Animation> per model',

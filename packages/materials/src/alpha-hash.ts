@@ -31,7 +31,9 @@ function hashed(source: string, scale: string): string {
     .replace(place, (line, position: string) => `${line}o.margoObject=${position};`)
     .replace(test, (_, head: string) => `let margoCut=margoAlphaHash(i.margoObject);\n  if(${head}margoCut)`);
   if (!out.includes('o.margoObject=') || !out.includes('margoCut)'))
-    throw new TypeError('alphaHash needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions');
+    throw new TypeError(
+      'alphaHash needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions',
+    );
   out = code(scale) + out;
   if (cached.size >= 64) cached.clear();
   cached.set(id, out);

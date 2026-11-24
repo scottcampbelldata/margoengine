@@ -10,17 +10,16 @@ import type { Scatter } from '@margoengine/scatter';
 import { rangeError } from '../../shared/errors.js';
 import { CANOPY_KINDS, type CanopyCover, canopyCover, COVER_STEP } from './cover.js';
 import type { BiomeWorld } from './world.js';
-import type { PlacementGraph } from './graph.js';
 import { captureScene } from '../../shared/scene-scope.js';
 
 /** Default stand-ins a far forest draws: `BiomeObjects` `far.count`. */
 export const FAR_COUNT = 300000;
 
-/** Crown colours in linear RGB, averaged over the lit needles and the dark interior of the crown. */
+/** Crown colour of each kind (linear RGB, the full meshes' leaves, a touch lighter for the shaded volume they lose). */
 const COLORS = [
-  [0.055, 0.115, 0.035],
-  [0.035, 0.082, 0.038],
-  [0.053, 0.123, 0.041],
+  [0.14, 0.3, 0.05],
+  [0.04, 0.17, 0.07],
+  [0.1, 0.32, 0.07],
 ] as const;
 
 /** Cover cells a side at most: a 65 km world's raster stays 16 MB, a 4 km world's is one cell every 16 m. */
@@ -41,7 +40,6 @@ type Modules = { readonly scatter: typeof ScatterModule; readonly core: typeof C
 export class FarForest implements Disposable {
   readonly #engine: EngineKernel;
   readonly #world: BiomeWorld;
-  readonly #graph?: PlacementGraph;
   readonly #off: () => void;
   readonly #parts: Far[] = [];
   // The newest cover raster: a restored device's textures are made from it.
@@ -50,10 +48,9 @@ export class FarForest implements Disposable {
   #running = false;
   #disposed = false;
 
-  private constructor(engine: EngineKernel, world: BiomeWorld, graph?: PlacementGraph) {
+  private constructor(engine: EngineKernel, world: BiomeWorld) {
     this.#engine = engine;
     this.#world = world;
-    this.#graph = graph;
     // A paint or edit changes the forest: the raster is made again, one at a time, off this thread with workers.
     this.#off = world.onChange(() => {
       this.#stale = true;
@@ -76,8 +73,6 @@ export class FarForest implements Disposable {
       readonly fade: number;
       readonly radius: number;
       readonly count?: number;
-      /** Applies the same species density rules as the placed trees. */
-      readonly graph?: PlacementGraph;
     },
   ): Promise<FarForest> {
     const { world, heightmap, bounds, inner, fade, radius, count = FAR_COUNT } = options;
@@ -88,7 +83,7 @@ export class FarForest implements Disposable {
     // The scene attached from: the stand-ins register there, whichever scene is active once the cover is made.
     const held = captureScene(engine);
     const standin = await import('@margoengine/procedural/standin'),
-      far = new FarForest(engine, world, options.graph),
+      far = new FarForest(engine, world),
       cover = await far.#cover();
     if (far.#disposed) return far;
     far.#latest = cover;
@@ -102,32 +97,31 @@ export class FarForest implements Disposable {
     });
     held.run(() =>
       cover.kinds.forEach((_, kind) => {
-        if (!totals[kind]) return;
-        const shape = standin.generateTreeStandIn(CANOPY_KINDS[kind]),
-          part: Far = { kind };
-        part.scatter = modules.scatter.Scatter.attach(
-          engine,
-          new modules.core.Geometry(shape.positions, shape.normals, shape.indices),
-          {
-            count: Math.max(1, Math.round((count * totals[kind]) / all)), // float division: all is above 0 here
-            area: [2 * radius, 2 * radius],
-            follow: true,
-            bounds,
-            heightmap,
-            densityMap: () => far.#texture(part),
-            lod: [radius * 0.5, radius * 0.75, radius],
-            lodFade: 0,
-            edgeShrink: radius * 0.1,
-            inner,
-            innerFade: fade,
-            scale: [0.8, 1.8],
-            maxSlope: 55,
-            sink: 0.18,
-            material: new modules.core.PbrMaterial({ color: COLORS[kind], roughness: 0.98 }),
-            variation: { hue: 0.025, value: 0.09 },
-          },
-        );
-        far.#parts.push(part);
+      if (!totals[kind]) return;
+      const shape = standin.generateTreeStandIn(CANOPY_KINDS[kind]),
+        part: Far = { kind };
+      part.scatter = modules.scatter.Scatter.attach(
+        engine,
+        new modules.core.Geometry(shape.positions, shape.normals, shape.indices),
+        {
+          count: Math.max(1, Math.round((count * totals[kind]) / all)), // float division: all is above 0 here
+          area: [2 * radius, 2 * radius],
+          follow: true,
+          bounds,
+          heightmap,
+          densityMap: () => far.#texture(part),
+          lod: [radius * 0.5, radius * 0.75, radius],
+          lodFade: 0,
+          edgeShrink: radius * 0.1,
+          inner,
+          innerFade: fade,
+          scale: [0.8, 1.8],
+          maxSlope: 90,
+          material: new modules.core.PbrMaterial({ color: COLORS[kind], roughness: 0.85 }),
+          variation: { hue: 0.06, value: 0.15 },
+        },
+      );
+      far.#parts.push(part);
       }),
     );
     return far;
@@ -137,9 +131,7 @@ export class FarForest implements Disposable {
   #cover(): Promise<CanopyCover> | CanopyCover {
     const step = farStep(this.#world),
       workers = this.#world.workers;
-    return workers
-      ? workers.run<CanopyCover>({ op: 'cover', step, graph: this.#graph })
-      : canopyCover(this.#world, step, this.#graph);
+    return workers ? workers.run<CanopyCover>({ op: 'cover', step }) : canopyCover(this.#world, step);
   }
 
   /**
@@ -162,12 +154,10 @@ export class FarForest implements Disposable {
   #upload(part: Far, cover: CanopyCover): void {
     const { texture, device } = part;
     if (!texture || !device) return;
-    device.queue.writeTexture(
-      { texture },
-      cover.kinds[part.kind] as Uint8Array<ArrayBuffer>,
-      { bytesPerRow: cover.width },
-      [cover.width, cover.depth],
-    );
+    device.queue.writeTexture({ texture }, cover.kinds[part.kind] as Uint8Array<ArrayBuffer>, { bytesPerRow: cover.width }, [
+      cover.width,
+      cover.depth,
+    ]);
   }
 
   async #refresh(): Promise<void> {

@@ -78,9 +78,7 @@ export function decodePVRTC(data: Uint8Array, width: number, height: number, two
   if (width < 1 || height < 1 || width & (width - 1) || height & (height - 1))
     throw new RangeError(`PVRTC needs power-of-two sizes, not ${width}x${height}`);
   if (data.length < pvrtcBytes(width, height, twoBit))
-    throw new RangeError(
-      `PVRTC data of ${data.length} bytes is too short for ${width}x${height}; pass the whole level`,
-    );
+    throw new RangeError(`PVRTC data of ${data.length} bytes is too short for ${width}x${height}; pass the whole level`);
   const blockWidth = twoBit ? 8 : 4,
     blocksX = Math.max(2, width / blockWidth),
     blocksY = Math.max(2, height / 4),
@@ -141,10 +139,8 @@ export function decodePVRTC(data: Uint8Array, width: number, height: number, two
     const px = derived[i + 1],
       py = derived[i + 2],
       kind = derived[i + 3],
-      across =
-        modulation[py * fullWidth + wrap(px - 1, fullWidth)] + modulation[py * fullWidth + wrap(px + 1, fullWidth)],
-      down =
-        modulation[wrap(py - 1, fullHeight) * fullWidth + px] + modulation[wrap(py + 1, fullHeight) * fullWidth + px];
+      across = modulation[py * fullWidth + wrap(px - 1, fullWidth)] + modulation[py * fullWidth + wrap(px + 1, fullWidth)],
+      down = modulation[wrap(py - 1, fullHeight) * fullWidth + px] + modulation[wrap(py + 1, fullHeight) * fullWidth + px];
     modulation[derived[i]] = kind === 0 ? (across + down + 2) >> 2 : kind === 1 ? (across + 1) >> 1 : (down + 1) >> 1;
   }
   const out = new Uint8Array(width * height * 4),
@@ -175,11 +171,9 @@ export function decodePVRTC(data: Uint8Array, width: number, height: number, two
       for (let c = 0; c < 4; c++) {
         // Sixteenths of a 5 bit colour or 4 bit alpha, scaled to 8 bits before the blend.
         const a =
-            (w00 * colourA[i00 + c] + w10 * colourA[i10 + c] + w01 * colourA[i01 + c] + w11 * colourA[i11 + c]) >>
-            shift,
+            (w00 * colourA[i00 + c] + w10 * colourA[i10 + c] + w01 * colourA[i01 + c] + w11 * colourA[i11 + c]) >> shift,
           b =
-            (w00 * colourB[i00 + c] + w10 * colourB[i10 + c] + w01 * colourB[i01 + c] + w11 * colourB[i11 + c]) >>
-            shift,
+            (w00 * colourB[i00 + c] + w10 * colourB[i10 + c] + w01 * colourB[i01 + c] + w11 * colourB[i11 + c]) >> shift,
           a8 = c < 3 ? (a >> 1) + (a >> 6) : a + (a >> 4),
           b8 = c < 3 ? (b >> 1) + (b >> 6) : b + (b >> 4);
         out[at + c] = (a8 * (8 - blend) + b8 * blend) >> 3;
@@ -226,8 +220,7 @@ function readHeader(bytes: Uint8Array): Layout {
       surfaceMajor: false,
     };
   }
-  if (first !== OLD_HEADER || view.getUint32(44, true) !== OLD_TAG)
-    throw decodeFailed('PVR: this is not a PVR file; check the path');
+  if (first !== OLD_HEADER || view.getUint32(44, true) !== OLD_TAG) throw decodeFailed('PVR: this is not a PVR file; check the path');
   const flags = view.getUint32(16, true),
     type = flags & 255,
     twoBit = OLD_PVRTC2.includes(type);

@@ -25,9 +25,7 @@ async function glassEye(format, layers = 1) {
     Array.from({ length: layers }, (_, i) => ({ t: [0, 0, -i * 0.1] })),
     {
       instanced: false,
-      material: {
-        extensions: { KHR_materials_transmission: { transmissionFactor: 1 }, KHR_materials_ior: { ior: 1 } },
-      },
+      material: { extensions: { KHR_materials_transmission: { transmissionFactor: 1 }, KHR_materials_ior: { ior: 1 } } },
     },
   );
   const model = parseGLTF(engine, input.doc, input.buffers, [], { materials: extendedMaterials });

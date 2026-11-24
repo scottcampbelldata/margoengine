@@ -366,30 +366,14 @@ function fallback(device: GPUDevice, t: RawTexture): GPUTextureView {
 function bindStorage(device: GPUDevice, s: RawStorage, engine?: { onError(error: unknown): void }): GPUBuffer {
   if (typeof s.buffer === 'function') return s.buffer(device);
   let slot = buffers.get(s.buffer);
-  if (!slot)
-    buffers.set(
-      s.buffer,
-      (slot = borrow<GPUBuffer>(s.buffer, 'RawShaderMaterial storage buffer', 'assign a new buffer', device)),
-    );
+  if (!slot) buffers.set(s.buffer, (slot = borrow<GPUBuffer>(s.buffer, 'RawShaderMaterial storage buffer', 'assign a new buffer', device)));
   const buffer = lend(slot, device, engine);
   if (buffer) return buffer;
   let standIn = standIns.get(device);
-  if (!standIn)
-    standIns.set(
-      device,
-      (standIn = device.createBuffer({
-        label: 'shader:raw:storage-stand-in',
-        size: 256,
-        usage: GPUBufferUsage.STORAGE,
-      })),
-    );
+  if (!standIn) standIns.set(device, (standIn = device.createBuffer({ label: 'shader:raw:storage-stand-in', size: 256, usage: GPUBufferUsage.STORAGE })));
   return standIn;
 }
-function bindTexture(
-  device: GPUDevice,
-  t: RawTexture,
-  engine?: { onError(error: unknown): void },
-): [GPUTextureView, GPUSampler] {
+function bindTexture(device: GPUDevice, t: RawTexture, engine?: { onError(error: unknown): void }): [GPUTextureView, GPUSampler] {
   const type = t.sampleType ?? 'float',
     filter = type === 'float';
   // Integer and unfilterable textures need a non-filtering sampler whatever the descriptor or the Texture says.
@@ -397,10 +381,10 @@ function bindTexture(
     type === 'depth'
       ? sampler(device, { compare: 'less-equal', ...t.sampler })
       : !filter
-        ? sampler(device, { ...t.sampler, magFilter: 'nearest', minFilter: 'nearest', mipmapFilter: 'nearest' })
-        : t.sampler || !s
-          ? sampler(device, t.sampler)
-          : s;
+      ? sampler(device, { ...t.sampler, magFilter: 'nearest', minFilter: 'nearest', mipmapFilter: 'nearest' })
+      : t.sampler || !s
+        ? sampler(device, t.sampler)
+        : s;
   let source = t.texture;
   if (source && typeof source !== 'function' && typeof (source as BindableTexture).bind === 'function') {
     const bound = (source as BindableTexture).bind(device, true);
@@ -411,15 +395,7 @@ function bindTexture(
   // a plain one reads white and is reported once.
   let slot = slots.get(source);
   if (!slot)
-    slots.set(
-      source,
-      (slot = borrow<GPUTexture | GPUTextureView>(
-        source as GPUTexture,
-        'RawShaderMaterial texture',
-        'assign a new texture',
-        device,
-      )),
-    );
+    slots.set(source, (slot = borrow<GPUTexture | GPUTextureView>(source as GPUTexture, 'RawShaderMaterial texture', 'assign a new texture', device)));
   source = lend(slot, device, engine) ?? null;
   if (!source) return [fallback(device, t), own()];
   let view = source as GPUTextureView;
@@ -615,17 +591,12 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
         throw new TypeError(
           `RawShaderMaterial texture ${name}: a materials Texture is 2d; pass a GPUTexture for ${value.dimension}`,
         );
-      if (
-        value.sampleType !== undefined &&
-        !['float', 'unfilterable-float', 'sint', 'uint', 'depth'].includes(value.sampleType)
-      )
+      if (value.sampleType !== undefined && !['float', 'unfilterable-float', 'sint', 'uint', 'depth'].includes(value.sampleType))
         throw new TypeError(
           `RawShaderMaterial texture ${name} sampleType must be float, unfilterable-float, sint, uint or depth`,
         );
       if (value.sampleType === 'depth' && value.dimension === '3d')
-        throw new TypeError(
-          `RawShaderMaterial texture ${name}: depth textures are 2d, 2d-array or cube; use one of those dimensions`,
-        );
+        throw new TypeError(`RawShaderMaterial texture ${name}: depth textures are 2d, 2d-array or cube; use one of those dimensions`);
       this.textures[name] = value;
     }
     this.storage = {};
@@ -703,9 +674,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
         `struct Uniforms {\n${this.members.map((m) => `  ${m.name}:${m.count === undefined ? m.type : `array<${m.type},${m.count}>`},`).join('\n')}\n}\n@group(1) @binding(0) var<uniform> uniforms:Uniforms;`,
       );
     Object.entries(this.textures).forEach(([name, t], i) => {
-      const s = { float: 'f32', 'unfilterable-float': 'f32', sint: 'i32', uint: 'u32', depth: '' }[
-          t.sampleType ?? 'float'
-        ],
+      const s = { float: 'f32', 'unfilterable-float': 'f32', sint: 'i32', uint: 'u32', depth: '' }[t.sampleType ?? 'float'],
         d = (t.dimension ?? '2d').replace('-', '_');
       out.push(
         `@group(1) @binding(${1 + 2 * i}) var ${name}:texture_${s ? d + '<' + s + '>' : 'depth_' + d};\n@group(1) @binding(${2 + 2 * i}) var ${name}Sampler:sampler${s ? '' : '_comparison'};`,
@@ -939,9 +908,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   }
   // WebGPU takes a depth bias on triangle topologies only (pipeline validation).
   private bias(): Partial<GPUDepthStencilState> {
-    return this.depthBias || this.depthBiasSlopeScale
-      ? { depthBias: this.depthBias, depthBiasSlopeScale: this.depthBiasSlopeScale }
-      : {};
+    return this.depthBias || this.depthBiasSlopeScale ? { depthBias: this.depthBias, depthBiasSlopeScale: this.depthBiasSlopeScale } : {};
   }
   /** @internal The pipeline for `key`, compiling it on first use; undefined while pending or after a failure. */
   pipeline(
@@ -1005,15 +972,8 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
           cullMode: kind === 'shadow' || velocity ? 'none' : this.cull,
           ...(strip ? { stripIndexFormat: strip } : {}),
         },
-        ...(depthStencil && {
-          depthStencil: topology.startsWith('triangle')
-            ? depthStencil
-            : { ...depthStencil, depthBias: 0, depthBiasSlopeScale: 0 },
-        }),
-        multisample: {
-          count: samples,
-          ...(kind === 'color' && samples > 1 && this.alphaToCoverage ? { alphaToCoverageEnabled: true } : {}),
-        },
+        ...(depthStencil && { depthStencil: topology.startsWith('triangle') ? depthStencil : { ...depthStencil, depthBias: 0, depthBiasSlopeScale: 0 } }),
+        multisample: { count: samples, ...(kind === 'color' && samples > 1 && this.alphaToCoverage ? { alphaToCoverageEnabled: true } : {}) },
       };
     const entry = e;
     // A pass without depth compiles at once, as a post stage must draw its first frame.
@@ -1665,9 +1625,7 @@ export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
     g.vertex = this.streams.vertex.upload(device, g.vertex);
     g.instance = this.streams.instance.upload(device, g.instance);
     const wire = this.drawTopology !== this.topology,
-      vertices = this.streams.vertex.attributes.length
-        ? Math.min(this.streams.vertex.count, this.vertexCount ?? Infinity)
-        : (this.vertexCount ?? 0),
+      vertices = this.streams.vertex.attributes.length ? Math.min(this.streams.vertex.count, this.vertexCount ?? Infinity) : (this.vertexCount ?? 0),
       index = wire ? this.edges(vertices) : this.indices;
     if (g.wire !== wire) (g.wire = wire), (this.indexDirty = true);
     if (!index) {

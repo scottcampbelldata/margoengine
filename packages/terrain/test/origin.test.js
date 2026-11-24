@@ -114,16 +114,8 @@ test('planWindows: cache windows, local bake bases and the reader wrap match the
         `${d}: level ${k}`,
       );
       // The bake anchor is the offset's texel and its local corner the zero case's, bit for bit.
-      assert.deepEqual(
-        [bases[k * 4] - t, bases[k * 4 + 1] - t],
-        [bases0[k * 4], bases0[k * 4 + 1]],
-        `${d}: anchor ${k}`,
-      );
-      assert.equal(
-        bits(bases.subarray(k * 4 + 2, k * 4 + 4)),
-        bits(bases0.subarray(k * 4 + 2, k * 4 + 4)),
-        `${d}: base ${k}`,
-      );
+      assert.deepEqual([bases[k * 4] - t, bases[k * 4 + 1] - t], [bases0[k * 4], bases0[k * 4 + 1]], `${d}: anchor ${k}`);
+      assert.equal(bits(bases.subarray(k * 4 + 2, k * 4 + 4)), bits(bases0.subarray(k * 4 + 2, k * 4 + 4)), `${d}: base ${k}`);
     }
   }
   // A general shift: the wrap is the shift modulo the coarsest period, and each base is the anchor texel less it.
@@ -142,10 +134,7 @@ test('planWindows: cache windows, local bake bases and the reader wrap match the
   for (let k = 0; k < levels; k++) {
     const s = texel * 2 ** k;
     assert.equal(bases[k * 4 + 2], bases[k * 4] * s - shift[0]);
-    assert.ok(
-      bases[k * 4 + 2] <= 0 && bases[k * 4 + 2] > -s,
-      `level ${k}: the corner sits within a texel of the shift`,
-    );
+    assert.ok(bases[k * 4 + 2] <= 0 && bases[k * 4 + 2] > -s, `level ${k}: the corner sits within a texel of the shift`);
   }
 });
 

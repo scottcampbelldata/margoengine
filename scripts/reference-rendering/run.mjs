@@ -43,7 +43,9 @@ const sha256 = (b) => createHash('sha256').update(b).digest('hex');
 assert.equal(sha256(source), entry.sourceSha256, 'Standard sample asset changed');
 if (process.argv.includes('--measure'))
   assert.ok(
-    likeForLike ? !JSON.parse(readFileSync(baselinePath, 'utf8')).likeForLike : !existsSync(baselinePath),
+    likeForLike
+      ? !JSON.parse(readFileSync(baselinePath, 'utf8')).likeForLike
+      : !existsSync(baselinePath),
     '--measure cannot replace an established budget',
   );
 const context = await openBrowser({ startPath: '/scripts/reference-rendering/margo.html', port: 'free' });

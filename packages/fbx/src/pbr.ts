@@ -95,7 +95,8 @@ function maxPBR(source: FBXNode): Surface {
 /** 3ds Max Physical Material. Every map has an `_on` switch. */
 function maxPhysical(source: FBXNode): Surface {
   const p = reader(source, '3dsMax|Parameters|'),
-    map = (name: string): string | undefined => (p.number(`${name}_on`, 1) ? `3dsMax|Parameters|${name}` : undefined),
+    map = (name: string): string | undefined =>
+      p.number(`${name}_on`, 1) ? `3dsMax|Parameters|${name}` : undefined,
     iorIn = p.number('trans_ior', 1.52),
     emission = p.number('emission', 0),
     emit = p.color('emit_color', [1, 1, 1]);
@@ -123,7 +124,8 @@ function maxPhysical(source: FBXNode): Surface {
 /** Maya's Stingray PBS shader: a `use_x_map` switch beside each `TEX_x_map`. */
 function stingray(source: FBXNode): Surface {
   const p = reader(source, 'Maya|'),
-    map = (use: string, name: string): string | undefined => (p.number(use, 0) ? `Maya|TEX_${name}` : undefined),
+    map = (use: string, name: string): string | undefined =>
+      p.number(use, 0) ? `Maya|TEX_${name}` : undefined,
     intensity = p.number('emissive_intensity', 1);
   return {
     color: p.color('base_color', [1, 1, 1]),
@@ -263,7 +265,12 @@ function opacityReader(map: Pixels, inverse: boolean): (x: number, y: number, w:
  * Puts an opacity map into the base colour's alpha, where glTF has it, and picks MASK for a map of holes and BLEND for a
  * map with real gradients: at least 95 of 100 texels at the two ends make it holes.
  */
-async function mergeOpacity(out: MaterialData, map: TextureData, inverse: boolean, cutout: boolean): Promise<void> {
+async function mergeOpacity(
+  out: MaterialData,
+  map: TextureData,
+  inverse: boolean,
+  cutout: boolean,
+): Promise<void> {
   const base = out.baseColorTexture,
     same = base !== undefined && sameImage(base, map),
     o = pixels(map),
@@ -279,8 +286,7 @@ async function mergeOpacity(out: MaterialData, map: TextureData, inverse: boolea
       const a = read(x, y, width, height);
       if (a < 16 || a > 239) ends++;
       if (a < 255) solid = false;
-      for (let c = 0; c < 3; c++)
-        data[at + c] = same ? texel(o, x, y, width, height, c) : b ? texel(b, x, y, width, height, c) : 255;
+      for (let c = 0; c < 3; c++) data[at + c] = same ? texel(o, x, y, width, height, c) : b ? texel(b, x, y, width, height, c) : 255;
       data[at + 3] = a;
     }
   // A map with no hole anywhere leaves the material as it was: nothing to cut or blend.

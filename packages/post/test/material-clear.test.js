@@ -22,10 +22,7 @@ function tracked() {
   return Object.assign(h, { clears: () => h.live().filter((r) => tinted.has(r)) });
 }
 
-for (const [name, Effect] of [
-  ['SSR', SSR],
-  ['SSGI', SSGI],
-])
+for (const [name, Effect] of [['SSR', SSR], ['SSGI', SSGI]])
   test(`${name} frees its partial-view clear colour buffer on resize and dispose`, async () => {
     const h = tracked();
     h.engine.use(new PostStack([new Effect()]));
@@ -56,10 +53,7 @@ test('SSR and SSGI free their clear colour buffers on device restore', async () 
   assert.equal(old.length, 1, 'both passes share the cached colour');
   h.engine.restore();
   await null;
-  assert.ok(
-    old.every((b) => b.destroyed),
-    'restore destroys the clear colour buffer',
-  );
+  assert.ok(old.every((b) => b.destroyed), 'restore destroys the clear colour buffer');
   h.frame();
   assert.equal(h.clears().length, 1, 'the next frame makes it again');
   h.engine.removePlugin('post:stack');

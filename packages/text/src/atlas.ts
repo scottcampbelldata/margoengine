@@ -45,11 +45,7 @@ export function glyphAtlases(
  * freed page, -1 when the page still holds other slots, or undefined when the glyph had no slot. Shared by atlases
  * that pack with a ShelfPacker (the WebGPU GlyphAtlas and the UI's WebGL2 atlas).
  */
-export function releaseSlot(
-  slots: Map<GlyphBitmap, AtlasSlot>,
-  packer: ShelfPacker,
-  glyph: GlyphBitmap,
-): number | undefined {
+export function releaseSlot(slots: Map<GlyphBitmap, AtlasSlot>, packer: ShelfPacker, glyph: GlyphBitmap): number | undefined {
   const slot = slots.get(glyph);
   if (!slot) return undefined;
   slots.delete(glyph);
@@ -213,7 +209,7 @@ export class GlyphAtlas {
   private upload(glyph: GlyphBitmap, slot: AtlasSlot): void {
     this.device.queue.writeTexture(
       { texture: this.texture!, origin: [slot.x, slot.y, slot.page] },
-      (this.bytesPerTexel === 4 ? (glyph.msdf ?? glyph.data) : glyph.data) as Uint8Array<ArrayBuffer>,
+      (this.bytesPerTexel === 4 ? glyph.msdf ?? glyph.data : glyph.data) as Uint8Array<ArrayBuffer>,
       { bytesPerRow: glyph.width * this.bytesPerTexel, rowsPerImage: glyph.height },
       [glyph.width, glyph.height, 1],
     );

@@ -96,11 +96,7 @@ export function horizonHeights(source: HorizonSource): HorizonHeights {
     texel = sx / (width - 1); // float division: metres per world texel
   // The ring's step: a power of two of world texels dividing both sides, near the world's size over ACROSS.
   let k = 1;
-  while (
-    k * 2 * ACROSS <= Math.max(width, depth) - 1 &&
-    ((width - 1) & (k * 2 - 1)) === 0 &&
-    ((depth - 1) & (k * 2 - 1)) === 0
-  )
+  while (k * 2 * ACROSS <= Math.max(width, depth) - 1 && ((width - 1) & (k * 2 - 1)) === 0 && ((depth - 1) & (k * 2 - 1)) === 0)
     k *= 2;
   const step = k * texel,
     reach = Math.min(48000, source.reach ?? 3 * Math.max(sx, sz)),

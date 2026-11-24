@@ -27,8 +27,7 @@ await runSuite(
       assert.deepEqual(await page.evaluate(([k, s, f]) => window.check.show(k, s, f), [kind, spec, frames]), []);
       return decodePNG(await page.locator('canvas').screenshot());
     };
-    const feed = async (key, texel) =>
-      assert.deepEqual(await page.evaluate(([k, t]) => window.check.feed(k, t), [key, texel]), []);
+    const feed = async (key, texel) => assert.deepEqual(await page.evaluate(([k, t]) => window.check.feed(k, t), [key, texel]), []);
     const map = () => page.evaluate(() => window.check.map());
     const at = async (png, point) => {
       const [u, v] = await page.evaluate((p) => window.check.pixel(p), point),
@@ -39,8 +38,7 @@ await runSuite(
     const green = (c) => c[1] > c[0] * 1.5 && c[1] > c[2] * 1.5;
     const cell = 8 * 16 + 8,
       layer = (m, l) => m.slice(8 + (l * 256 + cell) * 4, 8 + (l * 256 + cell) * 4 + 4);
-    const close = (a, b, what) =>
-      assert.ok(Math.abs(a - b) <= 1e-3 * Math.max(1, Math.abs(b)), `${what}: ${a} vs ${b}`);
+    const close = (a, b, what) => assert.ok(Math.abs(a - b) <= 1e-3 * Math.max(1, Math.abs(b)), `${what}: ${a} vs ${b}`);
 
     const plain = await show('scatter', null);
     const idle = await show('scatter', {});
@@ -68,10 +66,7 @@ await runSuite(
       kept = await at(surface, crownHigh),
       charred = await at(surface, trunkLow),
       bark = await at(surface, trunkHigh);
-    assert.ok(
-      scorched[0] > scorched[1] && scorched[1] > scorched[2],
-      `crown below the scorch height is scorched ${scorched}`,
-    );
+    assert.ok(scorched[0] > scorched[1] && scorched[1] > scorched[2], `crown below the scorch height is scorched ${scorched}`);
     assert.ok(green(kept), `crown above the scorch height stays green ${kept}`);
     assert.ok(luma(charred) < 12, `trunk below the flame length is charred ${charred}`);
     assert.ok(luma(bark) > luma(charred) * 2 && green(bark), `trunk above the char line is not ${bark}`);
@@ -118,10 +113,7 @@ await runSuite(
     // Laid flat toward +X: nothing stands at 4.2 m, and the shadow leaves the floor at x -3.5.
     const flatPx = await at(flat, [-3.5, 0, 0]),
       uprightPx = await at(plain, [-3.5, 0, 0]);
-    assert.ok(
-      luma(flatPx) > luma(uprightPx) * 1.3,
-      `the flattened tree's shadow left x -3.5: ${flatPx} vs ${uprightPx}`,
-    );
+    assert.ok(luma(flatPx) > luma(uprightPx) * 1.3, `the flattened tree's shadow left x -3.5: ${flatPx} vs ${uprightPx}`);
     const top = await at(flat, [0, 4.2, 0]);
     assert.ok(!green(top), `nothing of the tree stands at 4.2 m once flattened ${top}`);
     const lying = await at(flat, [3, 0.4, 0]);

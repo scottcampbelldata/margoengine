@@ -110,7 +110,7 @@ export function applyModelFeatures(model: PBRModel, features: ModelFeatures | un
   if (features === undefined) return [];
   if (!features || typeof features !== 'object' || Array.isArray(features))
     throw new TypeError(
-      'Invalid model features; pass an object of glTF material names to feature lists, such as { Skin: [skin()] }.',
+      "Invalid model features; pass an object of glTF material names to feature lists, such as { Skin: [skin()] }.",
     );
   const records = [...new Set(model.primitives.map((p) => p.material))],
     names = records.map((r) => r.name).filter((n): n is string => typeof n === 'string');
@@ -131,7 +131,7 @@ export function applyModelFeatures(model: PBRModel, features: ModelFeatures | un
     for (const record of matching) {
       if (Object.hasOwn(record, 'extendedFrame'))
         throw new TypeError(
-          "Model features are for loaded glTF models; list a materials mesh's features in its Material.features.",
+          'Model features are for loaded glTF models; list a materials mesh\'s features in its Material.features.',
         );
       if (record.shading && owned.has(record.shading))
         throw margoError(

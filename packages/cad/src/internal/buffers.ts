@@ -31,12 +31,7 @@ export function meshBuffers(
 ): MeshBuffers {
   const count = positions.length / 3,
     corners = indices.length;
-  if (
-    !Number.isInteger(count) ||
-    count > 11_184_810 ||
-    (count === 0 ? corners !== 0 : count < 3 || !corners) ||
-    corners % 3
-  )
+  if (!Number.isInteger(count) || count > 11_184_810 || (count === 0 ? corners !== 0 : count < 3 || !corners) || corners % 3)
     throw rangeError('Invalid geometry', 'geometry');
   for (const [values, label] of [
     [positions, 'Positions'],
@@ -45,8 +40,7 @@ export function meshBuffers(
     if (values.length !== count * 3) throw typeError(`${label}: ${count * 3} values`, 'transform');
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
-      if (typeof value !== 'number' || !(Math.abs(value) < F32_MAX))
-        throw rangeError(`${label}: finite values`, 'transform');
+      if (typeof value !== 'number' || !(Math.abs(value) < F32_MAX)) throw rangeError(`${label}: finite values`, 'transform');
     }
   }
   const out = new Uint32Array(corners);
@@ -76,7 +70,6 @@ export function meshBuffers(
     );
   bounds[3] = radius;
   if (bounds[3] < radius) new Uint32Array(bounds.buffer)[3]++;
-  for (let i = 0; i < 4; i++)
-    if (!(Math.abs(bounds[i]) < F32_MAX)) throw rangeError('Bounds: finite values', 'transform');
+  for (let i = 0; i < 4; i++) if (!(Math.abs(bounds[i]) < F32_MAX)) throw rangeError('Bounds: finite values', 'transform');
   return { vertices, indices: out, bounds };
 }

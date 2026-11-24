@@ -44,9 +44,7 @@ export function readMp4(bytes) {
     moov = top.find((box) => box.type === 'moov');
   const tracks = [];
   if (moov)
-    for (const trak of boxes(bytes, moov.start + moov.header, moov.start + moov.size).filter(
-      (box) => box.type === 'trak',
-    )) {
+    for (const trak of boxes(bytes, moov.start + moov.header, moov.start + moov.size).filter((box) => box.type === 'trak')) {
       const stsd = findBox(bytes, ['mdia', 'minf', 'stbl', 'stsd'], trak.start + trak.header, trak.start + trak.size);
       if (!stsd) continue;
       // stsd: version and flags (4 bytes), entry count (4), then the sample entries.
@@ -64,13 +62,7 @@ export function readMp4(bytes) {
             kind = String.fromCharCode(...bytes.subarray(at, at + 4));
           colr =
             kind === 'nclx'
-              ? {
-                  type: kind,
-                  primaries: view.getUint16(at + 4),
-                  transfer: view.getUint16(at + 6),
-                  matrix: view.getUint16(at + 8),
-                  fullRange: (bytes[at + 10] & 0x80) !== 0,
-                }
+              ? { type: kind, primaries: view.getUint16(at + 4), transfer: view.getUint16(at + 6), matrix: view.getUint16(at + 8), fullRange: (bytes[at + 10] & 0x80) !== 0 }
               : { type: kind };
         }
         tracks.push({ codec: entry.type, width, height, colr });

@@ -14,10 +14,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..'),
   npm = process.env.npm_execpath;
 if (!npm) throw new Error('run this through npm: npm run test:real-files:runtimes -w @margoengine/loaders');
 await mkdir(folder, { recursive: true });
-await writeFile(
-  join(folder, 'package.json'),
-  `${JSON.stringify({ private: true, dependencies: VERSIONS }, null, 2)}\n`,
-);
+await writeFile(join(folder, 'package.json'), `${JSON.stringify({ private: true, dependencies: VERSIONS }, null, 2)}\n`);
 execFileSync(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit', '--no-fund'], {
   cwd: folder,
   stdio: 'inherit',

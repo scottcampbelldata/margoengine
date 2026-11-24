@@ -246,18 +246,7 @@ export class GLState {
 }
 
 /** The WebGL object kinds a device makes: each has `create<Kind>` and `delete<Kind>` (a Sync: fenceSync, deleteSync). */
-const KINDS = [
-  'Buffer',
-  'Texture',
-  'Framebuffer',
-  'Renderbuffer',
-  'Sampler',
-  'Program',
-  'Shader',
-  'VertexArray',
-  'Query',
-  'Sync',
-];
+const KINDS = ['Buffer', 'Texture', 'Framebuffer', 'Renderbuffer', 'Sampler', 'Program', 'Shader', 'VertexArray', 'Query', 'Sync'];
 
 /** Marks the objects of a device dirty when a resource that owns some of them is collected (see {@link GLObjects.own}). */
 const collected =

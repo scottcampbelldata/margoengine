@@ -41,14 +41,10 @@ export interface LidMargin {
 const BINS = 24,
   STEPS = 20;
 const sub = (a: number[], b: number[]) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: number[], b: number[]) => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
+const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const point = (p: ArrayLike<number>, i: number) => [p[3 * i], p[3 * i + 1], p[3 * i + 2]];
-const triangles = (m: MarginMesh): number => ((m.indices ? m.indices.length : m.positions.length / 3) / 3) | 0;
+const triangles = (m: MarginMesh): number => (m.indices ? m.indices.length : m.positions.length / 3) / 3 | 0;
 const corner = (m: MarginMesh, t: number, k: number) => (m.indices ? m.indices[3 * t + k] : 3 * t + k);
 
 /**
@@ -135,10 +131,7 @@ export function anchorLidShadow(shell: MarginShell, skin: MarginMesh, front: rea
   if (!known.length) return undefined;
   // Columns with no crossing take the parabola fitted to the columns that have one by least squares, or the nearest
   // value when fewer than three have one.
-  const c = parabolaFit(
-    known,
-    known.map((i) => margin[i]),
-  );
+  const c = parabolaFit(known, known.map((i) => margin[i]));
   for (let i = 0; i < BINS; i++) {
     if (margin[i] === margin[i]) continue;
     const nearest = known.reduce((best, j) => (Math.abs(j - i) < Math.abs(best - i) ? j : best), known[0]);

@@ -57,3 +57,4 @@ export function moonPhase(phase: MoonPhase): number {
 export function moonWaning(phase: MoonPhase): boolean {
   return named(phase)?.waning ?? false;
 }
+

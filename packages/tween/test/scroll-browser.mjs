@@ -93,14 +93,8 @@ try {
       }),
     most,
   );
-  assert.ok(
-    trail.some((v) => v > 0.1 && v < 9.9),
-    `scrub went through the middle: ${trail.slice(0, 8)}`,
-  );
-  assert.ok(
-    trail.every((v, i) => !i || v >= trail[i - 1]),
-    'scrub only moves toward the scroll',
-  );
+  assert.ok(trail.some((v) => v > 0.1 && v < 9.9), `scrub went through the middle: ${trail.slice(0, 8)}`);
+  assert.ok(trail.every((v, i) => !i || v >= trail[i - 1]), 'scrub only moves toward the scroll');
   assert.equal(trail.at(-1), 10);
 
   // The page grows with no scroll event: a ResizeObserver reads it. The position stays, so the progress falls.

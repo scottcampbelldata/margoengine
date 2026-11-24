@@ -31,7 +31,7 @@ function device() {
   return { d, made, lose: () => lose({ reason: 'destroyed' }) };
 }
 
-test("a baked texture is made on the baker's device; after a loss a baker on the new device makes its own", async () => {
+test('a baked texture is made on the baker\'s device; after a loss a baker on the new device makes its own', async () => {
   const a = device(),
     b = device();
   using first = await createTextureBaker(a.d);

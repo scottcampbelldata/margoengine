@@ -172,11 +172,7 @@ test('a checkout reached through a Windows short path serves its pages', () => {
   // still alive now names what keeps it open and fails here, with the same bound as the failed-start test above.
   try {
     // wall-clock: a bound on a hang, far from the about 2 s a clean run takes.
-    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-      cwd,
-      encoding: 'utf8',
-      timeout: 60_000,
-    });
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd, encoding: 'utf8', timeout: 60_000 });
     assert.equal(run.status, 0, `the process did not exit by itself: ${run.stdout}${run.stderr}`);
     assert.equal(run.stdout.trim(), '200', `served from ${cwd}: ${run.stdout}${run.stderr}`);
   } finally {

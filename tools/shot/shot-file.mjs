@@ -2,7 +2,7 @@
 // tracks) with a `shot` header beside them, so any cutscene tool opens it and the tracks drive the camera and the
 // scene. This module checks a shot file without rendering it and lists the frames a render makes. Plain data, no
 // browser and no GPU, so the unit test runs it anywhere (tests/shot-file.test.js).
-import { validateCutscene, EASING_NAMES } from '@margoengine/cutscene';
+import { Cutscene, validateCutscene, EASING_NAMES } from '@margoengine/cutscene';
 import { LOOK_CHECKS, LOOK_FAMILY_NAMES } from '@margoengine/headless/look';
 import { scenes } from '@margoengine/scenes';
 
@@ -41,6 +41,7 @@ export const SHOT_DEFAULTS = Object.freeze({
   aovs: Object.freeze([]),
   horizon: null,
   moving: null,
+  subject: null,
 });
 
 /**
@@ -206,6 +207,17 @@ export function validateShot(input) {
   }
   if ('horizon' in shot && shot.horizon !== null && !(isRecord(shot.horizon) && finite(shot.horizon.y)))
     add(at('horizon'), 'must be {y}, the world height of the water plane the sky and water masks split at, or null');
+  // The shot's subject, for the film pipeline's camera checks (framing, depth of field, subject exposure at a cut).
+  if ('subject' in shot && shot.subject !== null) {
+    const subject = shot.subject;
+    if (!isRecord(subject)) add(at('subject'), 'must be {target: [x, y, z] in metres, size: metres across}, or null');
+    else {
+      if (!(Array.isArray(subject.target) && subject.target.length === 3 && subject.target.every(finite)))
+        add(`${at('subject')}.target`, 'must be the point the shot is about, [x, y, z] in world metres');
+      if (!(finite(subject.size) && subject.size > 0))
+        add(`${at('subject')}.size`, 'must be the subject size across, metres above 0');
+    }
+  }
   // The moving look checks (T4 shimmerMoving, T8 motionBlur): each probe also writes the frame after it and its camera motion.
   if ('moving' in shot && shot.moving !== null) {
     if (!(isRecord(shot.moving) && finite(shot.moving.depthScale) && shot.moving.depthScale > 0))
@@ -425,4 +437,32 @@ export function firstSeconds(json, seconds) {
       Object.entries(shot.probeLookBounds).filter(([name]) => Object.hasOwn(shot.probes ?? {}, name)),
     );
   return { ...json, shot };
+}
+
+/**
+ * The camera of every kept frame of a parsed shot, read from its camera track the way a render reads it (each frame at
+ * its own time, pre-roll included in the clock): `{ id, fps, frames, size, subject, cameras: [{ frame, time,
+ * position, target, fov, roll }] }`, fov in degrees, roll in radians, time in seconds from the first kept frame. Plain
+ * data, no browser: the film pipeline's camera checks read it (`cli.mjs --cameras`).
+ * @throws TypeError when a kept frame has no camera (the shot has no camera track).
+ */
+export function cameraFrames(file) {
+  const cutscene = new Cutscene(file),
+    { shot } = file,
+    cameras = [];
+  for (const frame of shotFrames(file)) {
+    if (frame.kept === null) continue;
+    const camera = cutscene.evaluate(frame.time).camera;
+    if (!camera)
+      throw new TypeError(`shot ${shot.id} has no camera at kept frame ${frame.kept}: give it a camera track`);
+    cameras.push({
+      frame: frame.kept,
+      time: frame.time - shot.from,
+      position: [...camera.position],
+      target: [...camera.target],
+      fov: camera.fov,
+      roll: camera.roll,
+    });
+  }
+  return { id: shot.id, fps: shot.fps, frames: cameras.length, size: [...shot.size], subject: shot.subject, cameras };
 }

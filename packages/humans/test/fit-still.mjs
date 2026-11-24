@@ -33,9 +33,7 @@ try {
     const { dualQuaternionSkinning } = await import('/packages/animation/dist/dqs.js');
     const { riggedTestGLB } = await import('/packages/humans/test/rigged-body.js');
     const canvas = document.querySelector('canvas');
-    const engine = await Engine.create(canvas, {
-      camera: { position: [0.6, 1.35, 3.9], target: [0, 0.88, 0], fov: 36, near: 0.05, far: 100 },
-    });
+    const engine = await Engine.create(canvas, { camera: { position: [0.6, 1.35, 3.9], target: [0, 0.88, 0], fov: 36, near: 0.05, far: 100 } });
     engine.stop();
     const errors = [];
     engine.gpu?.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
@@ -56,13 +54,7 @@ try {
         garments: fit.garments.map((g) => {
           const keep = [];
           for (let t = 0; t < g.faces.length; t++) if (g.faces[t] !== FACE.inner) keep.push(t);
-          return {
-            ...g,
-            indices: Uint32Array.from(
-              keep.flatMap((t) => [g.indices[t * 3], g.indices[t * 3 + 1], g.indices[t * 3 + 2]]),
-            ),
-            faces: Uint8Array.from(keep.map((t) => g.faces[t])),
-          };
+          return { ...g, indices: Uint32Array.from(keep.flatMap((t) => [g.indices[t * 3], g.indices[t * 3 + 1], g.indices[t * 3 + 2]])), faces: Uint8Array.from(keep.map((t) => g.faces[t])) };
         }),
       };
     let glb = fittedOutfitGLB(model, outside);
@@ -130,18 +122,14 @@ try {
       cloth = new Uint8Array(width * height);
     for (let i = 0; i < width * height; i++) {
       const o = i * channels;
-      cloth[i] =
-        Math.abs(off.data[o] - back[0]) + Math.abs(off.data[o + 1] - back[1]) + Math.abs(off.data[o + 2] - back[2]) > 24
-          ? 1
-          : 0;
+      cloth[i] = Math.abs(off.data[o] - back[0]) + Math.abs(off.data[o + 1] - back[1]) + Math.abs(off.data[o + 2] - back[2]) > 24 ? 1 : 0;
     }
     // The outfit's silhouette shrunk by 2 pixels: its edge pixels may blend with the body beyond.
     const inner = new Uint8Array(width * height);
     for (let y = 2; y < height - 2; y++)
       for (let x = 2; x < width - 2; x++) {
         let all = 1;
-        for (let dy = -2; dy <= 2 && all; dy++)
-          for (let dx = -2; dx <= 2 && all; dx++) all = cloth[(y + dy) * width + x + dx];
+        for (let dy = -2; dy <= 2 && all; dy++) for (let dx = -2; dx <= 2 && all; dx++) all = cloth[(y + dy) * width + x + dx];
         inner[y * width + x] = all;
       }
     let covered = 0,
@@ -158,16 +146,7 @@ try {
       if (magenta && inner[i]) through++;
     }
     masks[name] = cloth;
-    console.log(
-      name,
-      'outfit covers',
-      covered,
-      'pixels; body shows',
-      body,
-      'pixels; body through the outfit',
-      through,
-      'pixels',
-    );
+    console.log(name, 'outfit covers', covered, 'pixels; body shows', body, 'pixels; body through the outfit', through, 'pixels');
     assert.ok(covered > width * height * 0.06, `${name}: the outfit fills the frame`);
     assert.ok(body > 300, `${name}: the head and hands show`);
     assert.equal(through, 0, `${name}: no body pixel inside the outfit`);

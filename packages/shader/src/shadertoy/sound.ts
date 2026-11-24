@@ -37,12 +37,7 @@ export class SoundJob {
   private over = false;
   private device?: GPUDevice;
   private texture?: GPUTexture;
-  private readonly output: StageOutput = {
-    view: undefined!,
-    format: 'rgba32float',
-    multisample: { count: 1 },
-    hdr: false,
-  };
+  private readonly output: StageOutput = { view: undefined!, format: 'rgba32float', multisample: { count: 1 }, hdr: false };
   private frameContext?: { base: Context; context: Context };
   private readonly submitted: { buffer: GPUBuffer; block: number }[] = [];
   constructor(
@@ -84,20 +79,9 @@ export class SoundJob {
       this.output.view = this.texture.createView();
     }
     if (this.frameContext?.base !== c)
-      this.frameContext = {
-        base: c,
-        context: Object.create(c, {
-          width: { value: EDGE },
-          height: { value: EDGE },
-          view: { value: undefined },
-        }) as Context,
-      };
+      this.frameContext = { base: c, context: Object.create(c, { width: { value: EDGE }, height: { value: EDGE }, view: { value: undefined } }) as Context };
     this.draw(this.frameContext.context, this.next * BLOCK, this.output);
-    const buffer = device.createBuffer({
-      label: 'shader:shadertoy:sound',
-      size: BLOCK * 16,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    });
+    const buffer = device.createBuffer({ label: 'shader:shadertoy:sound', size: BLOCK * 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     c.encoder.copyTextureToBuffer({ texture: this.texture }, { buffer, bytesPerRow: EDGE * 16 }, [EDGE, EDGE]);
     this.submitted.push({ buffer, block: this.next++ });
   }
@@ -119,10 +103,7 @@ export class SoundJob {
       (error: unknown) => {
         buffer.destroy();
         // A lost device rejects its maps; the next frame on the new device starts again.
-        if (device === this.device && !this.over)
-          this.stop(
-            new MargoError('failed', `Shadertoy sound readback failed (${String(error)}); call toy.sound() again`),
-          );
+        if (device === this.device && !this.over) this.stop(new MargoError('failed', `Shadertoy sound readback failed (${String(error)}); call toy.sound() again`));
       },
     );
   }

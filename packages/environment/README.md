@@ -701,13 +701,7 @@ engine.start();
   so the main view keeps its own (drei's CubeCamera `envMap`). `version` changes when a device restore replaces `texture`. Structurally a
   `{texture, view}` cube map. `Environment.create(engine, cube)` copies its level 0 and processes it like `CubeFaces`
   (mips, prefiltered specular, SH, BRDF LUT); `environment.refresh()` reprocesses an updated capture into the same
-  textures, so bind groups stay valid (`version` unchanged). After a device restore a `CubeCamera` source gives the new
-  device's texture and the environment is rebuilt from it. A plain `{ texture }` belongs to the device that made it: it is
-  dropped, `engine.onError` hears of it once ([#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), the
-  environment reads as restoring (`device` is null, so `EnvironmentLighting` binds none) and the frame keeps drawing;
-  `await environment.setSource({ texture: newCube })` (second argument: the device or engine, default the engine it is
-  attached to) processes the new texture. A source object whose `texture` getter returns the current device's texture
-  works the same as a `CubeCamera`.
+  textures, so bind groups stay valid (`version` unchanged).
 - **Layers**: `layers` is a 32-bit mask read from `@margoengine/cameras/layers` (`setRenderLayers`); meshes outside it,
   and `exclude`d meshes, are hidden (`mesh.visible`) for the capture only. Without that module every mesh is on layer 0.
 - **Cost**: each capture is a full scene render (shadow maps included) at the capture size; a cube camera is six.
@@ -1045,22 +1039,6 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `EnvironmentBlend.create(target, from, to, options)` (`/blend`) | `t` (0), `size`, `specularSize`, `specularMips` (the larger source's), `brdfSize` (128), `brdfSamples` (512), `name` (`'environment-blend'`) |
 | `CubeCamera(options)` (`/cube-camera`) | `size` (256, power of two 8..2048), `position` ([0, 0, 0]), `near` (0.05), `far` (1000), `mips` (false), `facesPerFrame` (0), `layers` (all), `exclude`, `passes` (`scenePasses`), `background` (none: the scene's), `name` (`'cube-camera-N'`) |
 | `Lightformer(options)` (`/lightformer`) | `form` (`'rect'`; `'circle'`, `'ring'`, `'box'`), `color` (white), `intensity` (1), `parent` (scene root), `order` (1), `name` (`'lightformer-N'`) |
-
-### Entries without the decoders: `/main` and `/loaders`
-
-The root re-exports two files, so a bundler that takes the root namespace keeps both. `@margoengine/environment/main` is everything the root exports except the image decoders (`Environment`, the backgrounds, `AmbientLight`, `Fog`, the lighting plugins); `@margoengine/environment/loaders` is the decoders alone (`parseHDR`, `parseEXR`, `parseUltraHDR`, `decodeUltraHDR`, `loadEnvironmentImage`). Code that reads no image file imports `/main`, and the 36 KB of decoders stay out of its build. An app that loads files pays for the formats it meets only: `@margoengine/environment/load` is `loadEnvironmentImage` alone, and it picks the decoder from the file's signature and imports it (`dist/hdr.js`, `exr.js` or `ultrahdr.js`) on first use, so an app that loads `.hdr` files never requests the EXR or UltraHDR decoders. `/loaders` and the root export the same function beside the decoders, so a bundler that keeps their static imports keeps every decoder (Vite's bundler does, even for unused ones). `parseEnvironmentImage` is synchronous and holds the HDR and EXR parsers. `@margoengine/react` does this: only `<Environment src>` fetches `/loaders`.
-
-```js
-import { Fog } from '@margoengine/environment/main';
-
-console.log(typeof Fog); // 'function', and no decoder is in the build
-```
-
-```js
-import { loadEnvironmentImage } from '@margoengine/environment/load';
-
-console.log(typeof loadEnvironmentImage); // 'function'; a .hdr file requests the HDR decoder alone
-```
 
 ## Limits
 

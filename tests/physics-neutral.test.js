@@ -65,9 +65,7 @@ test('the game kit exception is narrow: its package.json peer lines only, Rapier
   assert.ok(!allowed('packages/game/src/index.ts', '    "@dimforge/rapier3d-compat": ">=0.14.0 <1",'));
   assert.ok(!allowed('packages/game/README.md', 'npm i @dimforge/rapier3d-compat'));
   assert.ok(!allowed('packages/game/package.json', 'import RAPIER from "@dimforge/rapier3d-compat";'));
-  const gameLines = text('packages/game/package.json')
-    .split(/\r?\n/)
-    .filter((line) => /rapier/i.test(line));
+  const gameLines = text('packages/game/package.json').split(/\r?\n/).filter((line) => /rapier/i.test(line));
   assert.equal(gameLines.length, 2);
   assert.ok(gameLines.every((line) => GAME_PEER.test(line)));
 });

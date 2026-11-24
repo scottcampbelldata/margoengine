@@ -176,8 +176,7 @@ export function stale(dir = root) {
  */
 export function assertLlmsCurrent(dir = root, check = stale) {
   const paths = check(dir);
-  if (paths.length)
-    throw new Error(`${paths.join(' and ')} stale: run node scripts/build-llms.mjs and commit the result`);
+  if (paths.length) throw new Error(`${paths.join(' and ')} stale: run node scripts/build-llms.mjs and commit the result`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

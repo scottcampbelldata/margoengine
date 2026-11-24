@@ -48,15 +48,7 @@ test('every row is well formed and names are unique', () => {
       assert.ok(
         s.nullable === true &&
           (['cloud', 'wind', 'windDirection', 'lightning'].includes(s.weather) ||
-            (s.weather === undefined &&
-              [
-                'hurricane.eyeRadius',
-                'hurricane.bandStart',
-                'tornado.debrisHeight',
-                'tornado.updraft',
-                'tornado.touchdown',
-                'tornado.liftoff',
-              ].includes(s.name))) &&
+            (s.weather === undefined && ['hurricane.eyeRadius', 'hurricane.bandStart', 'tornado.debrisHeight', 'tornado.updraft', 'tornado.touchdown', 'tornado.liftoff'].includes(s.name))) &&
           s.min < s.max &&
           s.step > 0,
         s.name,
@@ -269,53 +261,20 @@ test('the volumetric rows write the clouds options: null and defaults unset them
     rows = SKY_SETTINGS.filter((s) => s.group === 'volumetric');
   assert.deepEqual(
     rows.map((s) => s.name.slice(11)),
-    [
-      'coverage',
-      'bottom',
-      'top',
-      'density',
-      'type',
-      'windSpeed',
-      'windDirection',
-      'steps',
-      'lightSteps',
-      'erosion',
-      'stepCap',
-      'scale',
-      'evolution',
-      'maxDistance',
-      'sunIntensity',
-      'groundAlbedo',
-      'temporal',
-      'dimLight',
-    ],
+    ['coverage', 'bottom', 'top', 'density', 'type', 'windSpeed', 'windDirection', 'steps', 'lightSteps', 'erosion', 'stepCap', 'scale', 'evolution', 'maxDistance', 'sunIntensity', 'groundAlbedo', 'temporal', 'dimLight'],
   );
   // Every row default other than the weather's is the plugin's own default, read from its source.
   const source = await readFile(new URL('../src/volumetric-clouds.ts', import.meta.url), 'utf8'),
     table = source.match(/const defaults = \{([\s\S]*?)\} as const;/)[1],
     plain = Object.fromEntries([...table.matchAll(/(\w+): ([\d.]+),/g)].map((m) => [m[1], Number(m[2])]));
-  for (const key of [
-    'steps',
-    'lightSteps',
-    'stepCap',
-    'scale',
-    'evolution',
-    'maxDistance',
-    'sunIntensity',
-    'groundAlbedo',
-  ])
+  for (const key of ['steps', 'lightSteps', 'stepCap', 'scale', 'evolution', 'maxDistance', 'sunIntensity', 'groundAlbedo'])
     assert.equal(byName.get(`volumetric.${key}`).default, plain[key], key);
   for (const key of ['coverage', 'bottom', 'top', 'density']) assert.ok(plain[key] > 0, key);
   applySkySettings({ sky, clouds }, {});
   assert.deepEqual(Object.keys(clouds.options).sort(), ['sky', 'weather'], 'defaults leave the options unset');
   applySkySettings(
     { sky, clouds },
-    {
-      'volumetric.coverage': 0.8,
-      'volumetric.stepCap': 300,
-      'volumetric.temporal': 'on',
-      'volumetric.dimLight': 'off',
-    },
+    { 'volumetric.coverage': 0.8, 'volumetric.stepCap': 300, 'volumetric.temporal': 'on', 'volumetric.dimLight': 'off' },
   );
   assert.equal(clouds.options.coverage, 0.8);
   assert.equal(clouds.options.stepCap, 300);
@@ -340,18 +299,12 @@ test('the volumetric rows write the clouds options: null and defaults unset them
   assert.throws(() => applySkySettings({ sky, clouds }, { 'volumetric.type': 'cirrus' }), RangeError);
   // The wind rows write options.wind: direction 0 is +Z, 90 is +X; a null part keeps the other's held value.
   applySkySettings({ sky, clouds }, { 'volumetric.windSpeed': 20, 'volumetric.windDirection': 90 });
-  assert.ok(
-    Math.abs(clouds.options.wind[0] - 20) < 1e-9 && Math.abs(clouds.options.wind[1]) < 1e-9,
-    JSON.stringify(clouds.options.wind),
-  );
+  assert.ok(Math.abs(clouds.options.wind[0] - 20) < 1e-9 && Math.abs(clouds.options.wind[1]) < 1e-9, JSON.stringify(clouds.options.wind));
   applySkySettings({ sky, clouds }, { 'volumetric.windSpeed': 5, 'volumetric.windDirection': null });
   assert.ok(Math.abs(clouds.options.wind[0] - 5) < 1e-9, 'a null direction keeps the held direction');
   clouds.options.wind = [0, 8];
   applySkySettings({ sky, clouds }, { 'volumetric.windDirection': 90 });
-  assert.ok(
-    Math.abs(clouds.options.wind[0] - 8) < 1e-9 && Math.abs(clouds.options.wind[1]) < 1e-9,
-    'a null speed keeps the held speed',
-  );
+  assert.ok(Math.abs(clouds.options.wind[0] - 8) < 1e-9 && Math.abs(clouds.options.wind[1]) < 1e-9, 'a null speed keeps the held speed');
   applySkySettings({ sky, clouds }, {});
   assert.equal('wind' in clouds.options, false, 'both null unset the wind: it is the weather drive\x27s again');
   // Without a clouds target the rows write nothing and the sky is unchanged.
@@ -360,43 +313,14 @@ test('the volumetric rows write the clouds options: null and defaults unset them
   sky.dispose();
 });
 
-test("the lightning rows write the weather's lightning option: defaults and null leave it unset, the weather rows are held until handed back", async () => {
+test('the lightning rows write the weather\'s lightning option: defaults and null leave it unset, the weather rows are held until handed back', async () => {
   const { Weather, LIGHTNING_COLOR } = await import('@margoengine/sky/weather'),
     { heldFromWeather } = await import('../../shared/settings.js'),
     sky = new Sky(),
     weather = new Weather({ intensity: 0 }),
     rows = SKY_SETTINGS.filter((s) => s.group === 'lightning'),
     names = rows.map((s) => s.name.slice(10));
-  assert.deepEqual(names, [
-    'rate',
-    'threshold',
-    'minDistance',
-    'maxDistance',
-    'strength',
-    'color',
-    'light.scale',
-    'light.height',
-    'light.color',
-    'light.shadow',
-    'light.line',
-    'light.segments',
-    'bolt.scale',
-    'bolt.width',
-    'bolt.glow',
-    'bolt.fade',
-    'bolt.branching',
-    'bolt.spread',
-    'bolt.detail',
-    'bolt.top',
-    'cloud.scale',
-    'cloud.base',
-    'cloud.radius',
-    'link.clouds',
-    'link.fog',
-    'link.lights',
-    'hold',
-    'seed',
-  ]);
+  assert.deepEqual(names, ['rate', 'threshold', 'minDistance', 'maxDistance', 'strength', 'color', 'light.scale', 'light.height', 'light.color', 'light.shadow', 'light.line', 'light.segments', 'bolt.scale', 'bolt.width', 'bolt.glow', 'bolt.fade', 'bolt.branching', 'bolt.spread', 'bolt.detail', 'bolt.top', 'cloud.scale', 'cloud.base', 'cloud.radius', 'link.clouds', 'link.fog', 'link.lights', 'hold', 'seed']);
   // The weather rows follow the weather (null); every other default is the package's own, read from its source.
   assert.equal(byName.get('lightning.rate').default, null);
   assert.equal(byName.get('lightning.rate').weather, 'lightning');
@@ -407,26 +331,12 @@ test("the lightning rows write the weather's lightning option: defaults and null
     plain = Object.fromEntries([...table.matchAll(/(\w+): ([\d.]+)/g)].map((m) => [m[1], Number(m[2])]));
   for (const key of ['minDistance', 'maxDistance', 'strength', 'seed'])
     assert.equal(byName.get(`lightning.${key}`).default, plain[key], key);
-  assert.equal(plain.rate, 6, "an unset rate is the package's 6 a minute");
-  assert.deepEqual(byName.get('lightning.color').default, [
-    ...source
-      .match(/const flashColor: Vec3 = \[([^\]]+)\]/)[1]
-      .split(',')
-      .map(Number),
-  ]);
+  assert.equal(plain.rate, 6, 'an unset rate is the package\'s 6 a minute');
+  assert.deepEqual(byName.get('lightning.color').default, [...source.match(/const flashColor: Vec3 = \[([^\]]+)\]/)[1].split(',').map(Number)]);
   // Defaults write nothing: a weather with no lightning stays without storms.
   applySkySettings({ sky, weather }, {});
   assert.equal('lightning' in weather.options, false);
-  applySkySettings(
-    { sky, weather },
-    {
-      'lightning.strength': 0.5,
-      'lightning.light.scale': 3,
-      'lightning.cloud.radius': 400,
-      'lightning.link.fog': 'off',
-      'lightning.light.shadow': 'off',
-    },
-  );
+  applySkySettings({ sky, weather }, { 'lightning.strength': 0.5, 'lightning.light.scale': 3, 'lightning.cloud.radius': 400, 'lightning.link.fog': 'off', 'lightning.light.shadow': 'off' });
   assert.deepEqual(JSON.parse(JSON.stringify(weather.options.lightning)), {
     strength: 0.5,
     light: { scale: 3, shadow: false },
@@ -444,19 +354,13 @@ test("the lightning rows write the weather's lightning option: defaults and null
   assert.equal(heldFromWeather(weather.options.lightning, 'rate'), false);
   weather.options.lightning.rate = 4; // what the drive writes
   applySkySettings({ sky, weather }, {});
-  assert.equal(weather.options.lightning.rate, 4, "a null row leaves the drive's value");
+  assert.equal(weather.options.lightning.rate, 4, 'a null row leaves the drive\'s value');
   applySkySettings({ sky, weather }, { 'lightning.hold': 0.5 });
   assert.equal(weather.options.lightning.hold, 0.5);
   applySkySettings({ sky, weather }, {});
   assert.equal('hold' in weather.options.lightning, false, 'null releases the hold');
   weather.onPreUpdate(0.01);
-  for (const bad of [
-    { 'lightning.light.scale': -1 },
-    { 'lightning.cloud.radius': 0 },
-    { 'lightning.link.fog': 'yes' },
-    { 'lightning.light.shadow': true },
-    { 'lightning.light.color': [0, 0, 0] },
-  ])
+  for (const bad of [{ 'lightning.light.scale': -1 }, { 'lightning.cloud.radius': 0 }, { 'lightning.link.fog': 'yes' }, { 'lightning.light.shadow': true }, { 'lightning.light.color': [0, 0, 0] }])
     assert.throws(() => applySkySettings({ sky, weather }, bad), RangeError, JSON.stringify(bad));
   // Without a weather target the rows write nothing.
   applySkySettings({ sky }, { 'lightning.strength': 2 });

@@ -10,10 +10,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 const FRAMES = Number(process.env.FRAMES ?? 90);
 async function draw(name, { load = false, read = 'headless' } = {}) {
-  const context = await openBrowser({
-      startPath: `/packages/sky/test/rain-frames-check.html?read=${read}`,
-      port: 'free',
-    }),
+  const context = await openBrowser({ startPath: `/packages/sky/test/rain-frames-check.html?read=${read}`, port: 'free' }),
     errors = [];
   context.page.on('pageerror', (e) => errors.push(e.message));
   let busy;
@@ -28,8 +25,7 @@ async function draw(name, { load = false, read = 'headless' } = {}) {
     const r = await context.page.evaluate((n) => window.check.run(n), FRAMES);
     assert.deepEqual(r.errors, [], `${name}: GPU errors`);
     assert.deepEqual(errors, [], `${name}: page errors`);
-    if (load)
-      assert.ok((await busy.page.evaluate(() => window.dispatched)) > 4, `${name}: the load ran during the shot`);
+    if (load) assert.ok(await busy.page.evaluate(() => window.dispatched) > 4, `${name}: the load ran during the shot`);
     console.log(`${name}: ${r.frames.length} frames on ${context.hardware?.compat ? 'the WebGL2 layer' : 'WebGPU'}`);
     return { name, frames: r.frames, compat: !!context.hardware?.compat };
   } finally {
@@ -46,10 +42,7 @@ const runs = [
 const [first] = runs;
 assert.equal(first.frames.length, FRAMES);
 assert.equal(new Set(first.frames).size > FRAMES / 2, true, 'the shot moves: most frames differ from each other');
-assert.ok(
-  runs.every((r) => r.compat === first.compat),
-  'every run drew on the same device kind',
-);
+assert.ok(runs.every((r) => r.compat === first.compat), 'every run drew on the same device kind');
 // An all-zero frame (transparent black, nothing shown) as rain-frames-check.html digests it.
 let blank = 2166136261;
 for (let i = 0; i < 1280 * 720 * 4; i++) blank = Math.imul(blank, 16777619) >>> 0;

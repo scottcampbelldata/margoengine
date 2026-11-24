@@ -26,17 +26,9 @@ export type SubgroupBits = Extract<SubgroupValue, 'i32' | 'u32' | `vec${2 | 3 | 
 /** Full-precision float types {@link HalfFloats.half} takes. */
 export type FullFloat = 'f32' | 'vec2f' | 'vec3f' | 'vec4f';
 /** The half-float type of a {@link FullFloat}: `'f16'` for `'f32'`, `'vec3h'` for `'vec3f'`. */
-export type HalfOf<T extends FullFloat> = T extends 'f32'
-  ? 'f16'
-  : T extends `vec${infer K extends 2 | 3 | 4}f`
-    ? `vec${K}h`
-    : never;
+export type HalfOf<T extends FullFloat> = T extends 'f32' ? 'f16' : T extends `vec${infer K extends 2 | 3 | 4}f` ? `vec${K}h` : never;
 /** The full-precision type of a half-float type. */
-export type FullOf<T extends HalfFloat> = T extends 'f16'
-  ? 'f32'
-  : T extends `vec${infer K extends 2 | 3 | 4}h`
-    ? `vec${K}f`
-    : never;
+export type FullOf<T extends HalfFloat> = T extends 'f16' ? 'f32' : T extends `vec${infer K extends 2 | 3 | 4}h` ? `vec${K}f` : never;
 /** Half-float node types. */
 export type HalfFloat = 'f16' | 'vec2h' | 'vec3h' | 'vec4h';
 
@@ -98,8 +90,7 @@ export interface Subgroups {
 }
 
 const compute = (b: Builder, what: string, enable: string): void => {
-  if (b.stage.kind !== 'compute')
-    throw new TypeError(`${what} is only available in ComputePass nodes; move it into a ComputePass`);
+  if (b.stage.kind !== 'compute') throw new TypeError(`${what} is only available in ComputePass nodes; move it into a ComputePass`);
   b.declare(enable, `enable ${enable};`);
 };
 const has = (source: EngineKernel | GPUDevice, feature: GPUFeatureName): boolean =>
@@ -188,8 +179,7 @@ export function subgroups(engine: EngineKernel | GPUDevice): Subgroups {
     exclusiveMul: (x) => constant(1, x.type),
     all: same,
     any: same,
-    ballot: (x) =>
-      new Node('vec4u', 'ballot', [x], (b, n) => `vec4u(select(0u, 1u, ${b.expr(n.args[0])}), 0u, 0u, 0u)`),
+    ballot: (x) => new Node('vec4u', 'ballot', [x], (b, n) => `vec4u(select(0u, 1u, ${b.expr(n.args[0])}), 0u, 0u, 0u)`),
     elect: () => constant(true, 'bool'),
     broadcast: same,
     broadcastFirst: same,

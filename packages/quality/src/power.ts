@@ -152,11 +152,7 @@ export interface PowerOptions extends FrameDriftOptions, FrameTimers {
    * Default none, so the page is never reloaded unasked; pass `() => location.reload()` to change tier at once. */
   reload?: () => void;
   /** Where this tab's lowered tier is kept. Default sessionStorage. */
-  session?: {
-    getItem(key: string): string | null;
-    setItem(key: string, value: string): void;
-    removeItem(key: string): void;
-  };
+  session?: { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void };
   /** Default `navigator.getBattery`. Null for none. */
   battery?: (() => Promise<BatteryLike>) | null;
   /** Makes the pressure observer; the callback gets its records. Default the browser's `PressureObserver`. Null for none. */
@@ -175,9 +171,7 @@ export interface PowerWatch {
 }
 
 declare const PressureObserver:
-  | (new (
-      callback: (records: readonly { state: string }[]) => void,
-    ) => PressureLike)
+  | (new (callback: (records: readonly { state: string }[]) => void) => PressureLike)
   | undefined;
 const session = () => {
   try {

@@ -34,16 +34,9 @@ if (globalThis.GPUDevice && !globalThis.__margoCompat) {
 async function read(device, texture) {
   const { width, height, depthOrArrayLayers: layers } = texture,
     bytesPerRow = Math.ceil((width * 4) / 256) * 256,
-    back = device.createBuffer({
-      size: bytesPerRow * height * layers,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    }),
+    back = device.createBuffer({ size: bytesPerRow * height * layers, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
     encoder = device.createCommandEncoder();
-  encoder.copyTextureToBuffer({ texture, aspect: 'depth-only' }, { buffer: back, bytesPerRow, rowsPerImage: height }, [
-    width,
-    height,
-    layers,
-  ]);
+  encoder.copyTextureToBuffer({ texture, aspect: 'depth-only' }, { buffer: back, bytesPerRow, rowsPerImage: height }, [width, height, layers]);
   device.queue.submit([encoder.finish()]);
   await back.mapAsync(GPUMapMode.READ);
   const all = new Float32Array(back.getMappedRange().slice(0)),
@@ -74,13 +67,7 @@ window.shadowMapDiff = async () => {
     differing++;
     if (at.length < 6) {
       const texel = k % (x.width * x.height);
-      at.push([
-        texel % x.width,
-        Math.floor(texel / x.width),
-        Math.floor(k / (x.width * x.height)),
-        x.data[k],
-        y.data[k],
-      ]);
+      at.push([texel % x.width, Math.floor(texel / x.width), Math.floor(k / (x.width * x.height)), x.data[k], y.data[k]]);
     }
   }
   return { differing, at, texels: x.data.length, covered };

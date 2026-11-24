@@ -5,7 +5,6 @@ import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { fault } from '../../shared/errors.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Figure } from './figure.js';
-import { inSceneOf } from './scene-owner.js';
 import { requireGPU, type Drawable, type GpuContext } from './render.js';
 import { ProgressivePolicy, type ProgressiveOptions, type ProgressiveState } from './progressive-policy.js';
 export type { ProgressiveOptions, ProgressiveState } from './progressive-policy.js';
@@ -62,7 +61,7 @@ export class ProgressiveRendering implements EnginePlugin {
     this.#state = policy.next(true);
     if (figure.engine.hasPlugin(this.name))
       throw fault('state', 'An engine already has progressive rendering; dispose its controller first', 'sciviz');
-    inSceneOf(figure.engine, figure.renderer, () => figure.renderer.engine.use(this));
+    figure.renderer.engine.use(this);
     figure.renderer.add(this.#lifetime);
   }
   /** Most recently rendered view's settings; the snapshot is immutable to callers. */

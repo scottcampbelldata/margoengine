@@ -70,12 +70,7 @@ export function install() {
     clientWidth: 32,
     clientHeight: 32,
     getContext: (type) =>
-      type === 'webgpu'
-        ? stub({
-            configure() {},
-            getCurrentTexture: () => stub({ width: 32, height: 32, format: 'bgra8unorm', sampleCount: 1 }),
-          })
-        : null,
+      type === 'webgpu' ? stub({ configure() {}, getCurrentTexture: () => stub({ width: 32, height: 32, format: 'bgra8unorm', sampleCount: 1 }) }) : null,
   };
   gpu.uninstall = () => {
     for (const [key, descriptor] of Object.entries(saved))

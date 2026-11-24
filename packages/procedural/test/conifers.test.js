@@ -35,11 +35,7 @@ const WYKOFF = {
 const wykoffHeight = (sp, dbh) => (4.5 + Math.exp(WYKOFF[sp][0] + WYKOFF[sp][1] / (dbh / IN + 1))) * FT;
 const crookston = (sp, dbh, ht, cl, ba = 150) => {
   const [a1, a2, a3, a4, a5, a6] = CROOKSTON[sp];
-  return (
-    a1 *
-    Math.exp(a2 + a3 * Math.log(cl / FT) + a4 * Math.log(dbh / IN) + a5 * Math.log(ht / FT) + a6 * Math.log(ba)) *
-    FT
-  );
+  return a1 * Math.exp(a2 + a3 * Math.log(cl / FT) + a4 * Math.log(dbh / IN) + a5 * Math.log(ht / FT) + a6 * Math.log(ba)) * FT;
 };
 
 // Measures a mesh: total height, crown base (lowest needle vertex), crown width (widest needles, twice the largest
@@ -81,10 +77,7 @@ test('height and diameter follow the Wykoff height-diameter equation on the buil
       const slenderness = f.height / f.dbh;
       // Height over diameter (m/m): young stand-grown stems 70 to 130, mature 45 to 80, old growth 20 to 45.
       const [lo, hi] = age === 'old' ? [20, 45] : age === 'mature' ? [45, 80] : [70, 130];
-      assert.ok(
-        slenderness > lo && slenderness < hi,
-        `${sp} ${age}: H/D ${slenderness.toFixed(0)} outside ${lo}..${hi}`,
-      );
+      assert.ok(slenderness > lo && slenderness < hi, `${sp} ${age}: H/D ${slenderness.toFixed(0)} outside ${lo}..${hi}`);
     }
 });
 
@@ -98,10 +91,7 @@ test('crown ratio: the built crown base matches the form, falls with age and fol
         f = mesh.form,
         built = (f.height - m.base) / f.height;
       // The lowest spray droops below its whorl: the built ratio sits at or a little above the form's.
-      assert.ok(
-        built >= f.crownRatio - 0.01 && built < f.crownRatio + 0.08,
-        `${sp} ${age}: crown ratio ${built} vs ${f.crownRatio}`,
-      );
+      assert.ok(built >= f.crownRatio - 0.01 && built < f.crownRatio + 0.08, `${sp} ${age}: crown ratio ${built} vs ${f.crownRatio}`);
       assert.ok(f.crownRatio < last, `${sp}: crown ratio falls with age`);
       last = f.crownRatio;
       if (age === 'mature') mature[sp] = f.crownRatio;
@@ -190,10 +180,7 @@ test('snags and burnt trees: no needles; a snag is broken off below the live hei
       return y;
     };
     assert.ok(top(snag.trunk) < live.form.height * 0.85, `${sp}: snag top ${top(snag.trunk)}`);
-    assert.ok(
-      Math.abs(top(burnt.trunk) - live.form.height) < live.form.height * 0.05,
-      `${sp}: a burnt tree keeps its top`,
-    );
+    assert.ok(Math.abs(top(burnt.trunk) - live.form.height) < live.form.height * 0.05, `${sp}: a burnt tree keeps its top`);
     assert.ok(burnt.trunk.indices.length > snag.trunk.indices.length, `${sp}: burnt limbs outnumber snag stubs`);
     const lv = coniferLevels(sp, { condition: 'burnt' });
     assert.equal(lv.textures, undefined, 'dead trees draw no imposter');
@@ -201,17 +188,9 @@ test('snags and burnt trees: no needles; a snag is broken off below the live hei
 });
 
 test('keys, forms and errors', () => {
-  assert.deepEqual(parseConiferKey('procedural:western-larch/old'), {
-    species: 'western-larch',
-    age: 'old',
-    condition: 'live',
-  });
+  assert.deepEqual(parseConiferKey('procedural:western-larch/old'), { species: 'western-larch', age: 'old', condition: 'live' });
   assert.deepEqual(parseConiferKey('grand-fir'), { species: 'grand-fir', age: 'mature', condition: 'live' });
-  assert.deepEqual(parseConiferKey('procedural:douglas-fir/burnt'), {
-    species: 'douglas-fir',
-    age: 'mature',
-    condition: 'burnt',
-  });
+  assert.deepEqual(parseConiferKey('procedural:douglas-fir/burnt'), { species: 'douglas-fir', age: 'mature', condition: 'burnt' });
   assert.equal(parseConiferKey('procedural:burnt-trunk').condition, 'burnt');
   assert.equal(parseConiferKey('procedural:conifer-snag').condition, 'snag');
   for (const k of ['procedural:conifer', 'douglas-fir/young', 'douglas-fir/old/x', 'toString', 'constructor/old'])
