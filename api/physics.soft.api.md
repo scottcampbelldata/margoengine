@@ -142,6 +142,7 @@ export class SoftBody {
     triangles(): Uint32Array;
     edges(): Uint32Array;
     bendEdges(): Uint32Array;
+    setTensionOnly(on?: boolean): this;
     isEdgeTorn(edge: number): boolean;
     tearEdge(edge: number): this;
     get solver(): SoftSolver;
@@ -181,6 +182,7 @@ export class SoftBody {
     applyImpulse(impulse: Vec3): this;
     applyParticleImpulse(index: number, impulse: Vec3): this;
     applyImpulseAtPoint(impulse: Vec3, point: Vec3, radius: number): this;
+    applyRadialImpulse(center: Vec3, magnitude: number, radius: number): this;
 }
 
 export class SoftBodyDesc {
@@ -200,6 +202,7 @@ export class SoftBodyDesc {
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
+    tension: boolean | number[];
     triangles: number[];
     cells: number[];
     cellMaterial: CellMaterial;
@@ -215,7 +218,8 @@ export class SoftBodyDesc {
     }): SoftBodyDesc;
     static cloth(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
     static clothTube(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
-    static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
+    static clothTube(origin: Vec3, axis: Vec3, radiusStart: number, radiusEnd: number, numAround: number, numAlong: number): SoftBodyDesc;
+    static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number, warp?: SoftSoftness, weft?: SoftSoftness, shear?: SoftSoftness): SoftBodyDesc;
     static trimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, { bending }?: {
         bending?: boolean;
     }): SoftBodyDesc;
@@ -223,10 +227,11 @@ export class SoftBodyDesc {
         friction?: number;
     }): this;
     setCollisionGroups(groups: number): this;
-    static sphere(center: Vec3, radius: number, { detail }?: {
+    static sphere(center: Vec3, radius: number, options?: number | {
         detail?: number;
     }): SoftBodyDesc;
     setVolumeFactor(factor: number | null): this;
+    setTensionOnly(edges?: boolean | readonly number[]): this;
     setShapeMatching(on: boolean): this;
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;

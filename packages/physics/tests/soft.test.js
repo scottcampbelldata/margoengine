@@ -644,9 +644,12 @@ test('an anisotropic cloth stretches along the warp and the weft in the ratio of
         ? SoftBodyDesc.clothAnisotropic([0, 3, 0], [0, -d, 0], [0, 0, d], n, 2)
         : SoftBodyDesc.clothAnisotropic([0, 3, 0], [0, 0, d], [0, -d, 0], 2, n);
     const body = soft.create(
-      desc.setMaterial(material).setParticleMass(0.5).setLinearDamping(2).setParticleRadius(0.005).setPinnedParticles(
-        along === 'warp' ? [0, 1] : [0, n],
-      ),
+      desc
+        .setMaterial(material)
+        .setParticleMass(0.5)
+        .setLinearDamping(2)
+        .setParticleRadius(0.005)
+        .setPinnedParticles(along === 'warp' ? [0, 1] : [0, n]),
     );
     steps(physics, 600);
     const p = body.particlePositions();
@@ -693,4 +696,137 @@ test('a sheared cloth stays within its shear stiffness', async () => {
     soft = await shear(6);
   assert.ok(stiff > 0.001, `it shears: ${stiff}`);
   near(soft / stiff, 4, 1.2, 'half the shear frequency shears four times as far');
+});
+
+test('a tension-only rope does not push when slack and pulls when taut', async () => {
+  const run = async (tensionOnly, softHz, to) => {
+    const { physics, soft } = await create({ gravity: [0, 0, 0] });
+    let desc = new SoftBodyDesc([0, 1, 0, 1, 1, 0]).setEdges([0, 1]).setParticleRadius(0.01);
+    if (softHz) desc = desc.setSoftness(softHz, 1);
+    if (tensionOnly) desc = desc.setTensionOnly();
+    const rope = soft.create(desc);
+    rope.setParticlePosition(1, to);
+    steps(physics, 120);
+    const a = rope.particlePosition(0),
+      b = rope.particlePosition(1);
+    return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  };
+  for (const hz of [0, 8]) {
+    // Squeezed to half its length: a rope that resists both ways pushes back out, a tension-only one stays as it was.
+    assert.ok((await run(false, hz, [0.5, 1, 0])) > 0.9, `an ordinary edge springs back (${hz} Hz)`);
+    near(await run(true, hz, [0.5, 1, 0]), 0.5, 0.02, `a slack tension-only edge does not push (${hz} Hz)`);
+    // Pulled to half again its length: both pull it back.
+    near(await run(true, hz, [1.5, 1, 0]), 1, 0.05, `a taut tension-only edge pulls (${hz} Hz)`);
+  }
+  const { soft } = await create();
+  assert.throws(() => new SoftBodyDesc([0, 0, 0, 1, 0, 0]).setEdges([0, 1]).setTensionOnly([5]), RangeError);
+  void soft;
+});
+
+test('impulses, radial impulses and forces move the particles as documented', async () => {
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  const lone = (x, mass) => soft.create(new SoftBodyDesc([x, 0, 0]).setParticleMass(mass).setParticleRadius(0.01));
+  const a = lone(1, 2),
+    b = lone(0, 1);
+  // A radial impulse of 4 at distance 1 with a radius of 2 and a mass of 2: 4 * (1 - 1/2) / 2 = 1 m/s outward; none at the centre.
+  a.applyRadialImpulse([0, 0, 0], 4, 2);
+  b.applyRadialImpulse([0, 0, 0], 4, 2);
+  near(a.particleVelocity(0)[0], 1, 1e-6, 'a radial impulse falls off linearly and is divided by the mass');
+  near(b.particleVelocity(0)[0], 0, 1e-9, 'the particle at the centre gets nothing');
+  const c = lone(5, 2);
+  c.applyRadialImpulse([0, 0, 0], 4, 2);
+  near(c.particleVelocity(0)[0], 0, 1e-9, 'outside the radius nothing');
+  const d = lone(5, 2);
+  d.applyRadialImpulse([0, 0, 0], 4, 0);
+  near(d.particleVelocity(0)[0], 2, 1e-6, 'a radius of zero pushes every particle fully');
+  const e = lone(0.5, 4);
+  e.applyImpulseAtPoint([8, 0, 0], [0, 0, 0], 1);
+  near(e.particleVelocity(0)[0], 1, 1e-6, 'an impulse at a point falls off linearly: 8 * (1 - 0.5) / 4');
+  const f = lone(9, 4);
+  f.applyImpulseAtPoint([8, 0, 0], [0, 0, 0], 0);
+  near(f.particleVelocity(0)[0], 2, 1e-6, 'a radius of zero gives every particle the whole impulse');
+  // Forces: 4 N on a 4 kg body, shared by mass, is 1 m/s^2; 2 N on one 1 kg particle is 2 m/s^2; reset stops them.
+  const body = soft.create(
+    SoftBodyDesc.rope([0, 3, 0], [3, 3, 0], 4, { bending: false }).setEdges([]).setBendEdges([]).setParticleMass(1),
+  );
+  body.addForce([4, 0, 0]);
+  body.addParticleForce(2, [2, 0, 0]);
+  steps(physics, 60);
+  near(body.particleVelocity(0)[0], 1, 0.02, 'a body force is shared by mass');
+  near(body.particleVelocity(2)[0], 3, 0.04, 'a particle force adds to it: 1 + 2 m/s');
+  body.resetForces();
+  const before = body.particleVelocity(0)[0];
+  steps(physics, 30);
+  near(body.particleVelocity(0)[0], before, 1e-4, 'reset forces stops the push');
+});
+
+test('bend edges resist bending by their spring, and builders sew, merge and place bodies as documented', async () => {
+  const sag = async (bendHz) => {
+    const { physics, soft } = await create();
+    const material = new SoftBodyMaterial();
+    material.bendSoftness = { naturalFrequency: bendHz, dampingRatio: 1 };
+    const rope = soft.create(
+      SoftBodyDesc.rope([0, 3, 0], [2, 3, 0], 21)
+        .setMaterial(material)
+        .setPinnedParticles([0, 1])
+        .setLinearDamping(3)
+        .setParticleMass(0.2),
+    );
+    steps(physics, 300);
+    return 3 - rope.particlePosition(20)[1];
+  };
+  // A bend edge joins a particle to the one two along, so its pull is second order in the angle: the effect is small but it is there.
+  const soft_ = await sag(0.5),
+    stiff = await sag(200);
+  assert.ok(soft_ > stiff + 0.04, `a stiffer bend spring holds the rope end higher: ${soft_} against ${stiff}`);
+  const { soft } = await create({ gravity: [0, 0, 0] });
+  // Two ropes merged, then sewn end to end: the sewn edge's rest length is the gap at that moment.
+  const first = SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 3, { bending: false });
+  const second = SoftBodyDesc.rope([1.5, 0, 0], [2.5, 0, 0], 3, { bending: false });
+  first.append(second).addEdges([2, 3]);
+  const joined = soft.create(first);
+  assert.equal(joined.numParticles(), 6);
+  assert.equal(joined.edges().length / 2, 5);
+  const sewn = joined.edges();
+  assert.deepEqual([...sewn.slice(-2)], [2, 3]);
+  // Masses, gravity scale and translation.
+  const heavy = soft.create(
+    new SoftBodyDesc([0, 0, 0, 2, 0, 0]).setMasses([1, 3]).setTranslation([0, 5, 0]).setGravityScale(0),
+  );
+  near(heavy.mass(), 4, 1e-6, 'setMasses sets each particle');
+  near(heavy.centerOfMass()[0], 1.5, 1e-6, 'the centre of mass follows the masses');
+  near(heavy.particlePosition(0)[1], 5, 1e-6, 'setTranslation moves the particles');
+  assert.throws(() => new SoftBodyDesc([0, 0, 0]).setMasses([1, 2]), RangeError);
+});
+
+test('the builders take Rapier signatures: anisotropic cloth springs, a tube by radii, a sphere by subdivisions', async () => {
+  const { soft } = await create({ gravity: [0, 0, 0] });
+  const spring = { naturalFrequency: 12, dampingRatio: 0.5 };
+  const cloth = soft.create(
+    SoftBodyDesc.clothAnisotropic(
+      [0, 0, 0],
+      [0.1, 0, 0],
+      [0, 0.1, 0],
+      4,
+      3,
+      spring,
+      { naturalFrequency: 6, dampingRatio: 1 },
+      { naturalFrequency: 3, dampingRatio: 1 },
+    ),
+  );
+  near(cloth.getMaterial().warpSoftness.naturalFrequency, 12, 0, 'the warp spring is set by the builder');
+  near(cloth.getMaterial().shearSoftness.naturalFrequency, 3, 0, 'and the shear');
+  // A tube of 6 particles around and 4 rings along it, from radius 0.3 to 0.1 over 2 m along y.
+  const tube = soft.create(SoftBodyDesc.clothTube([0, 0, 0], [0, 2, 0], 0.3, 0.1, 6, 4));
+  assert.equal(tube.numParticles(), 24);
+  const p = tube.particlePositions();
+  for (let ring = 0; ring < 4; ring++)
+    for (let a = 0; a < 6; a++) {
+      const k = (ring * 6 + a) * 3,
+        radius = 0.3 + (0.1 - 0.3) * (ring / 3);
+      near(p[k + 1], (2 * ring) / 3, 1e-5, `ring ${ring} sits at its height`);
+      near(Math.hypot(p[k], p[k + 2]), radius, 1e-5, `ring ${ring} has its radius`);
+    }
+  const ball = soft.create(SoftBodyDesc.sphere([0, 0, 0], 1, 1));
+  assert.equal(ball.numParticles(), 42);
 });

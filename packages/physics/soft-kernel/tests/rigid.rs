@@ -88,3 +88,36 @@ fn a_body_hung_on_a_chain_stretches_it_by_nothing_whatever_the_settings() {
         }
     }
 }
+
+/// Two free particles of one kilogram joined by one rigid edge of rest length 1, tension only when asked, `gap` apart.
+fn pair(tension: bool, gap: f32) -> World {
+    let mut w = World::new();
+    w.reserve(2, 1, 1, 0);
+    w.particles = 2;
+    w.edges = 1;
+    w.bodies = 1;
+    w.x[1] = gap;
+    w.w[0] = 1.0;
+    w.w[1] = 1.0;
+    w.radius[0] = 0.01;
+    w.radius[1] = 0.01;
+    w.ea[0] = 0;
+    w.eb[0] = 1;
+    w.rest[0] = 1.0;
+    if tension {
+        w.eflags[0] = margoengine_soft_kernel::TENSION;
+    }
+    w
+}
+
+#[test]
+fn a_tension_only_edge_does_not_push_and_pulls_when_taut() {
+    for (gap, tension, expect) in [(0.5f32, false, 1.0f32), (0.5, true, 0.5), (1.5, true, 1.0), (1.5, false, 1.0)] {
+        let mut w = pair(tension, gap);
+        for _ in 0..60 {
+            w.step(1.0 / 60.0, 8, 2, [0.0, 0.0, 0.0]);
+        }
+        let d = (w.x[1] - w.x[0]).abs();
+        assert!((d - expect).abs() < 1e-3, "gap {gap}, tension only {tension}: {d} against {expect}");
+    }
+}

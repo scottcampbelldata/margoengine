@@ -12,6 +12,8 @@ pub const PINNED: u32 = 1;
 pub const TARGETED: u32 = 2;
 /// Edge flags.
 pub const TORN: u32 = 1;
+/// An edge that resists stretch and not squeeze (a rope that does not push).
+pub const TENSION: u32 = 2;
 /// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
 pub const NONE: u32 = 0;
 /// Planes held for each particle.
@@ -379,6 +381,9 @@ impl World {
         if self.tear[e] > 0.0 && c > self.tear[e] * rest {
             self.eflags[e] |= TORN;
             self.torn += 1;
+            return;
+        }
+        if self.eflags[e] & TENSION != 0 && c < 0.0 {
             return;
         }
         let (nx, ny, nz) = (dx / len, dy / len, dz / len);

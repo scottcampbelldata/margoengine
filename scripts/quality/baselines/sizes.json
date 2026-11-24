@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17723174,
+  "total": 17724531,
   "history": [
     {
       "date": "2026-10-24",
@@ -11511,6 +11511,12 @@
       "commit": "a3e8fe06d",
       "reason": "physics/soft: the implicit fem solver (co-rotated stiffness, matrix-free conjugate gradient, Neo-Hookean stress): entry 65,512 to 70,127 B gzip budget (kernel blueprint 44,715 to 49,446: implicit.rs with the element product, the preconditioned solve and the polar decompositions it shares with the cells); a separate blueprint would double the shared maths and load for any body with cells",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "35b167f4d",
+      "reason": "soft entry gains tension-only edges, radial impulses and Rapier-signature builders: loader up a little, kernel by the slack test.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12272,7 +12278,7 @@
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/soft": 72231,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 20612,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 21969,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 50930,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,

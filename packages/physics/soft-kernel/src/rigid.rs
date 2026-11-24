@@ -14,7 +14,7 @@
 // All the algebra is in f64, from f32 positions, with only + - * / sqrt and compares, so a result is the same on every run.
 use crate::col::Col;
 use crate::math::sqrt;
-use crate::world::{NONE, TORN, World};
+use crate::world::{NONE, TENSION, TORN, World};
 
 pub struct Rigid {
     nx: Col<f64>,
@@ -40,6 +40,8 @@ pub struct Rigid {
     edges_in: Col<u32>,
     vertices_in: Col<u32>,
     mark: Col<u32>,
+    // Edges that resist stretch only and are slack this pass: left out of the system until they pull.
+    slack: Col<u32>,
 }
 
 impl Rigid {
@@ -66,6 +68,7 @@ impl Rigid {
             edges_in: Col::new(),
             vertices_in: Col::new(),
             mark: Col::new(),
+            slack: Col::new(),
         }
     }
 }
@@ -86,7 +89,7 @@ fn sqrt64(x: f64) -> f64 {
 
 impl World {
     fn rigid_edge(&self, e: usize) -> bool {
-        self.rg.tree[e] != 0 && self.eflags[e] & TORN == 0 && self.w[self.ea[e] as usize] + self.w[self.eb[e] as usize] > 0.0
+        self.rg.tree[e] != 0 && self.rg.slack[e] == 0 && self.eflags[e] & TORN == 0 && self.w[self.ea[e] as usize] + self.w[self.eb[e] as usize] > 0.0
     }
 
     /// Whether the exact solve holds edge `e` this piece (the sweep leaves it alone).
@@ -99,6 +102,7 @@ impl World {
     fn find_trees(&mut self) {
         let (ne, np) = (self.edges, self.particles);
         self.rg.tree.resize(ne);
+        self.rg.slack.resize(ne);
         for c in [&mut self.rg.parent, &mut self.rg.edges_in, &mut self.rg.vertices_in, &mut self.rg.mark] {
             c.resize(np);
         }
@@ -327,6 +331,10 @@ impl World {
         if n == 0 {
             return;
         }
+        // Slack edges are tested afresh each pass.
+        for e in 0..ne {
+            self.rg.slack[e] = 0;
+        }
         let mut any = false;
         for e in 0..ne {
             if self.rigid_edge(e) {
@@ -345,6 +353,9 @@ impl World {
         for _ in 0..NEWTON {
             // The constraints now: each rigid edge's stretch and each attachment's gap.
             let mut worst = 0.0f64;
+            for e in 0..ne {
+                self.rg.slack[e] = 0;
+            }
             for e in 0..ne {
                 if !self.rigid_edge(e) {
                     self.rg.b[e] = 0.0;
@@ -367,6 +378,13 @@ impl World {
                 if self.tear[e] > 0.0 && c > self.tear[e] as f64 * rest {
                     self.eflags[e] |= TORN;
                     self.torn += 1;
+                    self.rg.b[e] = 0.0;
+                    self.rg.d[e] = 1.0;
+                    continue;
+                }
+                if self.eflags[e] & TENSION != 0 && c <= 0.0 {
+                    // A rope that resists stretch only does not push: while slack it is out of the system.
+                    self.rg.slack[e] = 1;
                     self.rg.b[e] = 0.0;
                     self.rg.d[e] = 1.0;
                     continue;

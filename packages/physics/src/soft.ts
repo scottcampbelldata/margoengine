@@ -60,6 +60,8 @@ const THREAD_SHEAR = 3;
 const PINNED = 1;
 const TARGETED = 2;
 const TORN = 1;
+/** An edge that resists stretch and not squeeze. */
+const TENSION = 2;
 const INTEGER_COLUMNS = new Set([
   'pflags',
   'pbody',
@@ -428,6 +430,8 @@ export class SoftBodyDesc {
   /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
+  /** @internal Every edge resists stretch only (true), or just the listed ones (indices of the edges, then the bend edges). */
+  tension: boolean | number[] = false;
   /** @internal */ triangles: number[] = [];
   /** @internal Four particle indices per tetrahedron. */ cells: number[] = [];
   /** @internal */ cellMaterial = new CellMaterial();
@@ -491,9 +495,75 @@ export class SoftBodyDesc {
   }
 
   /** Like {@link SoftBodyDesc.cloth}, closed around its `u` direction into a tube: particle (nu - 1, j) joins particle (0, j). */
-  static clothTube(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc {
-    count(nu, 'A tube has particles around; the count', 3);
-    return SoftBodyDesc.sheet(origin, du, dv, nu, nv, true);
+  static clothTube(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
+  /**
+   * Rapier's `cloth_tube`: `numAlong` rings of `numAround` particles from `origin` to `origin + axis`, the radius going
+   * linearly from `radiusStart` to `radiusEnd`; ring `k` is particles `k * numAround` to `(k + 1) * numAround - 1`.
+   */
+  static clothTube(
+    origin: Vec3,
+    axis: Vec3,
+    radiusStart: number,
+    radiusEnd: number,
+    numAround: number,
+    numAlong: number,
+  ): SoftBodyDesc;
+  static clothTube(origin: Vec3, a: Vec3, b: number | Vec3, c: number, d: number, e?: number): SoftBodyDesc {
+    if (typeof b === 'number') {
+      const axis = a,
+        radiusStart = b,
+        radiusEnd = c,
+        around = d,
+        along = e!;
+      checkVec(origin, 'Tube origin');
+      checkVec(axis, 'Tube axis');
+      if (!(radiusStart >= 0 && radiusEnd >= 0 && Number.isFinite(radiusStart) && Number.isFinite(radiusEnd)))
+        throw new RangeError('Tube radii are 0 or more metres.');
+      count(around, 'A tube has particles around; the count', 3);
+      count(along, 'A tube has rings along it; the count', 2);
+      const length = Math.hypot(axis[0], axis[1], axis[2]);
+      if (!(length > 0)) throw new RangeError('The tube axis has a length.');
+      const k: Vec3 = [axis[0] / length, axis[1] / length, axis[2] / length],
+        // Any unit vector across the axis, then the one across both.
+        helper: Vec3 = Math.abs(k[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0],
+        cross = (p: Vec3, q: Vec3): Vec3 => [
+          p[1] * q[2] - p[2] * q[1],
+          p[2] * q[0] - p[0] * q[2],
+          p[0] * q[1] - p[1] * q[0],
+        ],
+        n1 = cross(k, helper),
+        l1 = Math.hypot(n1[0], n1[1], n1[2]),
+        u: Vec3 = [n1[0] / l1, n1[1] / l1, n1[2] / l1],
+        v = cross(k, u),
+        points: number[] = [];
+      // The weave wraps its `u` direction, which here goes around: particle (a, k) is at index a * along + k.
+      for (let a_ = 0; a_ < around; a_++)
+        for (let ring = 0; ring < along; ring++) {
+          const t = ring / (along - 1),
+            radius = radiusStart + (radiusEnd - radiusStart) * t,
+            angle = (2 * Math.PI * a_) / around;
+          points.push(
+            origin[0] + axis[0] * t + (u[0] * Math.cos(angle) + v[0] * Math.sin(angle)) * radius,
+            origin[1] + axis[1] * t + (u[1] * Math.cos(angle) + v[1] * Math.sin(angle)) * radius,
+            origin[2] + axis[2] * t + (u[2] * Math.cos(angle) + v[2] * Math.sin(angle)) * radius,
+          );
+        }
+      const tube = SoftBodyDesc.woven(points, around, along, true);
+      // Rapier numbers a tube ring by ring: ring k holds particles k * numAround to (k + 1) * numAround - 1.
+      const renumber = (old: number): number => (old % along) * around + Math.floor(old / along);
+      const moved = new Array<number>(points.length);
+      for (let old = 0; old < around * along; old++) {
+        const at = renumber(old);
+        for (let c_ = 0; c_ < 3; c_++) moved[at * 3 + c_] = tube.positions[old * 3 + c_]!;
+      }
+      tube.positions = moved;
+      tube.edgePairs = tube.edgePairs.map(renumber);
+      tube.bendPairs = tube.bendPairs.map(renumber);
+      tube.triangles = tube.triangles.map(renumber);
+      return tube;
+    }
+    count(d, 'A tube has particles around; the count', 3);
+    return SoftBodyDesc.sheet(origin, a, b, c, d, true);
   }
 
   private static sheet(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number, wrap: boolean): SoftBodyDesc {
@@ -510,6 +580,11 @@ export class SoftBodyDesc {
           origin[1] + du[1] * i + dv[1] * j,
           origin[2] + du[2] * i + dv[2] * j,
         );
+    return SoftBodyDesc.woven(points, nu, nv, wrap);
+  }
+
+  /** The edges, triangles and threads of an `nu` by `nv` grid of particles, closed around `u` when `wrap`. */
+  private static woven(points: number[], nu: number, nv: number, wrap: boolean): SoftBodyDesc {
     const desc = new SoftBodyDesc(points);
     const at = (i: number, j: number): number => (((i % nu) + nu) % nu) * nv + j;
     const last = wrap ? nu : nu - 1;
@@ -547,8 +622,26 @@ export class SoftBodyDesc {
    * subdivision finite elements", for the bend, and the separate stretch and shear of Baraff and Witkin, 1998, and Wang, O'Brien and Ramamoorthi, 2011, "Data-driven
    * elastic models for cloth": an orthotropic sheet's stretch along each thread and its shear are separate).
    */
-  static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc {
-    return SoftBodyDesc.cloth(origin, du, dv, nu, nv);
+  static clothAnisotropic(
+    origin: Vec3,
+    du: Vec3,
+    dv: Vec3,
+    nu: number,
+    nv: number,
+    warp?: SoftSoftness,
+    weft?: SoftSoftness,
+    shear?: SoftSoftness,
+  ): SoftBodyDesc {
+    const desc = SoftBodyDesc.cloth(origin, du, dv, nu, nv);
+    // Rapier's `cloth_anisotropic` takes the three springs here; they are the material's thread springs.
+    if (warp || weft || shear) {
+      const material = desc.material.clone();
+      if (warp) material.warpSoftness = { ...warp };
+      if (weft) material.weftSoftness = { ...weft };
+      if (shear) material.shearSoftness = { ...shear };
+      desc.setMaterial(material);
+    }
+    return desc;
   }
 
   /**
@@ -630,7 +723,9 @@ export class SoftBodyDesc {
    * springs back as a rubber ball does. Soften it with `setSoftness` and the material's `volumeSoftness`; inflate it with
    * `setVolumeFactor`.
    */
-  static sphere(center: Vec3, radius: number, { detail = 2 }: { detail?: number } = {}): SoftBodyDesc {
+  static sphere(center: Vec3, radius: number, options: number | { detail?: number } = {}): SoftBodyDesc {
+    // Rapier's `sphere` takes the number of subdivisions third.
+    const detail = typeof options === 'number' ? options : (options.detail ?? 2);
     checkVec(center, 'Sphere centre');
     if (!(radius > 0 && Number.isFinite(radius))) throw new RangeError('Sphere radius is a positive number of metres.');
     count(detail, 'detail', 0);
@@ -703,6 +798,21 @@ export class SoftBodyDesc {
     if (factor !== null && !(factor > 0 && Number.isFinite(factor)))
       throw new RangeError('Volume factor is a positive number.');
     this.volumeFactor = factor;
+    return this;
+  }
+
+  /**
+   * Makes every edge and bend edge resist stretching and not squeezing, as Rapier's `tension_only`: a slack rope does not push,
+   * a taut one pulls. With a list, only those edges (indices into the edges, then the bend edges).
+   */
+  setTensionOnly(edges: boolean | readonly number[] = true): this {
+    if (typeof edges !== 'boolean') {
+      const total = (this.edgePairs.length + this.bendPairs.length) / 2;
+      for (const e of edges)
+        if (!Number.isInteger(e) || e < 0 || e >= total)
+          throw new RangeError(`Edge ${e} is not one of the ${total} edges.`);
+    }
+    this.tension = typeof edges === 'boolean' ? edges : [...edges];
     return this;
   }
 
@@ -1304,6 +1414,16 @@ export class SoftBody {
     }
     return out;
   }
+  /** Makes every edge and bend edge of the body resist stretch only (true) or both (false). */
+  setTensionOnly(on = true): this {
+    this.check();
+    const { eflags } = this.c;
+    for (let e = 0; e < this.edgeTotal; e++) {
+      const row = this.firstEdge + e;
+      eflags[row] = on ? eflags[row]! | TENSION : eflags[row]! & ~TENSION;
+    }
+    return this;
+  }
   /** True once an edge (numbered as {@link SoftBody.edges}) has torn. */
   isEdgeTorn(edge: number): boolean {
     this.check();
@@ -1652,13 +1772,36 @@ export class SoftBody {
     this.check();
     checkVec(impulse, 'Impulse');
     checkVec(point, 'Point');
-    if (!(radius > 0 && Number.isFinite(radius))) throw new RangeError('Radius is a positive number of metres.');
+    if (!Number.isFinite(radius)) throw new RangeError('Radius is a number of metres.');
     const { x, y, z } = this.c;
     for (let i = 0; i < this.particles; i++) {
       const row = this.firstParticle + i,
         d = Math.hypot(x[row]! - point[0], y[row]! - point[1], z[row]! - point[2]),
-        k = d >= radius ? 0 : (1 - d / radius) / this.masses[i]!;
+        // A radius of zero or less gives every particle the whole impulse, as Rapier's does.
+        k = radius <= 0 ? 1 / this.masses[i]! : d >= radius ? 0 : (1 - d / radius) / this.masses[i]!;
       if (k > 0) this.kick(i, impulse[0] * k, impulse[1] * k, impulse[2] * k);
+    }
+    return this;
+  }
+  /**
+   * An impulse of `magnitude` pointing away from `center`, falling linearly to nothing at `radius` metres (a radius of zero or
+   * less pushes every particle fully), divided by each particle's mass; a particle exactly at the centre gets nothing.
+   */
+  applyRadialImpulse(center: Vec3, magnitude: number, radius: number): this {
+    this.check();
+    checkVec(center, 'Centre');
+    if (!Number.isFinite(magnitude) || !Number.isFinite(radius))
+      throw new RangeError('Magnitude and radius are numbers.');
+    const { x, y, z } = this.c;
+    for (let i = 0; i < this.particles; i++) {
+      const row = this.firstParticle + i,
+        dx = x[row]! - center[0],
+        dy = y[row]! - center[1],
+        dz = z[row]! - center[2],
+        d = Math.hypot(dx, dy, dz);
+      if (d === 0 || (radius > 0 && d >= radius)) continue;
+      const k = (magnitude * (radius > 0 ? 1 - d / radius : 1)) / (d * this.masses[i]!);
+      this.kick(i, dx * k, dy * k, dz * k);
     }
     return this;
   }
@@ -1921,6 +2064,9 @@ export class SoftBodies implements PhysicsAttachment {
     };
     writeEdges(desc.edgePairs, 0);
     writeEdges(desc.bendPairs, structural);
+    for (let e = 0; e < edges; e++)
+      if (desc.tension === true || (Array.isArray(desc.tension) && desc.tension.includes(e)))
+        c.eflags[firstEdge + e] = c.eflags[firstEdge + e]! | TENSION;
     {
       const fem = this.cellColumns();
       for (let e = 0; e < edges; e++) fem.e_rest0![firstEdge + e] = c.rest[firstEdge + e]!;
