@@ -1,0 +1,65 @@
+// The exports TypeScript calls for tetrahedra and clusters: rows by id, filled through the columns and `soft_tet_set`.
+use crate::api::world;
+
+macro_rules! fem_columns {
+    ($(($name:ident, $($field:tt)+),)*) => {
+        #[allow(non_camel_case_types)]
+        #[repr(u32)]
+        enum FemColumn { $($name,)* }
+        fn fem_column(id: u32) -> *mut u8 {
+            let f = &mut world().fem;
+            $(if id == FemColumn::$name as u32 { return f.$($field)+.as_mut_ptr() as *mut u8; })*
+            core::ptr::null_mut()
+        }
+    };
+}
+
+fem_columns! {
+    (p0, p[0]), (p1, p[1]), (p2, p[2]), (p3, p[3]),
+    (b0, b[0]), (b1, b[1]), (b2, b[2]), (b3, b[3]), (b4, b[4]), (b5, b[5]), (b6, b[6]), (b7, b[7]), (b8, b[8]),
+    (vol0, vol0), (mu, mu), (lambda, lambda), (model, model), (yield_strain, yield_strain), (creep, creep), (tear, tear),
+    (flags, flags), (cstart, cstart), (ccount, ccount), (comega, comega), (member, member),
+    (rest0, rest[0]), (rest1, rest[1]), (rest2, rest[2]),
+}
+
+/// Makes room for tetrahedra, clusters and cluster members. Views over the memory are stale after it, and so are the soft world's.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_reserve(tets: u32, clusters: u32, members: u32) {
+    world().fem_reserve(tets as usize, clusters as usize, members as usize);
+}
+
+/// Where a tetrahedron or cluster column starts in the memory.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_column(id: u32) -> u32 {
+    fem_column(id) as usize as u32
+}
+
+/// Makes tetrahedron `t` of four particles, with the shape they stand in now as its rest shape; 1 when it is a solid element, 0 when
+/// it is flat.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_tet_set(t: u32, a: u32, b: u32, c: u32, d: u32, mu: f32, lambda: f32, model: u32) -> u32 {
+    world().set_tet(t as usize, [a, b, c, d], mu, lambda, model) as u32
+}
+
+/// Makes cluster `c` of the `count` particles whose ids lie in the member column from `start`, with the shape they stand in now.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_cluster_set(c: u32, start: u32, count: u32, omega: f32) {
+    world().set_cluster_in_place(c as usize, start as usize, count as usize, omega);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_damping(damping: f32) {
+    world().fem.damping = damping;
+}
+
+/// Tetrahedra that have torn so far.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_torn() -> u32 {
+    world().fem.torn
+}
+
+/// The number of tetrahedra in use.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_count() -> u32 {
+    world().fem.count as u32
+}

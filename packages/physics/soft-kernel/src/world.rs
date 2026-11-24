@@ -123,6 +123,8 @@ pub struct World {
     pub kpy: Col<f32>,
     pub kpz: Col<f32>,
     pub kf: Col<f32>,
+    /// Tetrahedra and clusters (src/fem.rs).
+    pub fem: crate::fem::Fem,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -255,11 +257,13 @@ impl World {
             self.lambda[e] = 0.0;
         }
         self.shape_begin();
+        self.fem_begin();
         for _ in 0..iterations {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
             }
             self.solve_shape(h);
+            self.solve_fem(h);
         }
         self.collide(h);
     }
@@ -267,6 +271,7 @@ impl World {
     /// The second half of a piece of a step, after the contacts: the bodies the particles pushed on move on, and the
     /// particles take the velocity they ended with.
     pub fn substep_post(&mut self, h: f32) {
+        self.fem_end(h);
         // A body that the particles pushed on has a new velocity; it carries its collider along for the rest of the step.
         for c in 0..self.colliders {
             if self.wm[c] > 0.0 {
