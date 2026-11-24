@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 // margo-convert: `build` and `optimize` run the asset pipeline (pipeline/cli.js), `thumbnail` renders a model
-// (pipeline/thumbnail.js); anything else prints the usage
+// (pipeline/thumbnail.js), `sequence` writes a mesh sequence as a geometry cache (pipeline/sequence.js); anything else prints the usage
 // (exit 0 for --help, 1 otherwise).
 const mode = process.argv[2];
 const { run, USAGE } = await import('./pipeline/cli.js');
@@ -9,6 +9,9 @@ if (mode === 'build' || mode === 'optimize') process.exitCode = await run(mode, 
 else if (mode === 'thumbnail') {
   const { runThumbnail } = await import('./pipeline/thumbnail.js');
   process.exitCode = await runThumbnail(process.argv.slice(3));
+} else if (mode === 'sequence') {
+  const { runSequence } = await import('./pipeline/sequence.js');
+  process.exitCode = await runSequence(process.argv.slice(3));
 } else if (mode === '--help' || mode === '-h') console.log(USAGE);
 else {
   console.error(USAGE);

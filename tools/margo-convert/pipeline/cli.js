@@ -13,6 +13,7 @@ const presetList = PRESET_NAMES.map((n) => `${n.padEnd(7)} ${PRESETS[n].summary}
 export const USAGE = `Usage:
   margo-convert build <folder|file> [--out dist] [--preset web] [options]
   margo-convert optimize <model.glb|.gltf> [output.glb] [--preset web] [options]
+  margo-convert sequence <folder> [--out sequence.mgc] [--fps 24] (margo-convert sequence --help)
 
 build walks a folder (or takes one file), optimises every model, texture and audio file for the preset, and writes
 the results with margo-manifest.json (hashes and sizes) and margo-size-report.txt to --out (default ./dist).

@@ -703,6 +703,35 @@ const file = encodeGeometryCache(cache.rate, [{frameCount: cache.frameCount, pos
 
 `fps` (default 24) is for PC2, which does not say; an MDD file's own times win. `zUp: true` turns a Z-up file to Y-up as `(x, z, -y)`; Blender's MDD add-on writes Z-up and its PC2 add-on Y-up by default. `maxFloats` (default 2^28) refuses a larger file. A header that asks for more than the file holds is refused as a cut file or no point cache at all, before the limit: MDD has no magic, so any other file reads as an MDD header. Alembic is not read: it has no published file specification to build from. The result fits the player as it is, so the file above goes straight to `GeometryCachePlayer.attach`.
 
+A meshed fluid, a fracture or any bake that writes one whole mesh a frame is a mesh sequence: the triangles change every
+frame. `encodeMeshSequence(rate, frames, {maxChunkFrames})` groups it into chunks for the player, frames with the same
+triangles, vertex count, UVs and normals-or-not sharing one (up to `maxChunkFrames`, default the rate rounded, about a
+second) and a frame whose topology changes starting the next; a chunk with the triangles or UVs of the one before leaves
+them out. `frames` is any iterable or async iterable of `{positions, indices, normals?, uvs?}`, and
+`streamMeshSequence` yields the file a chunk at a time (its header then says 0 total frames), so a long bake read file by
+file never sits in memory whole. A frame with an index past its vertices, a non-finite position, or normals or UVs of the
+wrong size is refused by number. From the command line, `margo-convert sequence <folder>` does the same for a folder of
+per-frame OBJ, PLY or STL files (Blender's OBJ export with Animation on, a fluid add-on's mesh export).
+
+```ts
+import {GeometryCachePlayer, encodeMeshSequence} from 'margoengine/animation/geometry-cache';
+import {createStage} from 'margoengine';
+
+const stage = await createStage('#viewport', {backend: 'webgpu', capacity: 2048});
+// A fan whose triangle count grows each frame, as a fluid surface's does.
+const fan = (sides: number, z: number) => {
+  const positions = new Float32Array((sides + 1) * 3), indices: number[] = [];
+  for (let s = 0; s < sides; s++) {
+    const a = (s / sides) * Math.PI * 2;
+    positions.set([Math.cos(a), Math.sin(a), z], (s + 1) * 3);
+    indices.push(0, s + 1, ((s + 1) % sides) + 1);
+  }
+  return {positions, indices: new Uint32Array(indices)};
+};
+const file = await encodeMeshSequence(24, [fan(6, 0), fan(6, 0.1), fan(9, 0.2), fan(12, 0.3)]);
+const water = await GeometryCachePlayer.attach(stage.engine, file);
+```
+
 The format is little endian. A 16 byte header holds the magic `MGCH`, version 1, frames per second (f32) and the total
 frames (0 if unknown). Chunks follow, each a 64 byte header and its payload.
 

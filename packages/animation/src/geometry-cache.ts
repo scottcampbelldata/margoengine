@@ -222,16 +222,16 @@ export async function* readGeometryCache(
           indices = h.getUint32(20, true),
           flags = h.getUint32(24, true),
           want =
-            indices * 4 +
-            (flags & HAS_UVS ? vertices * 8 : 0) +
-            frames * vertices * (flags & HAS_NORMALS ? 24 : 12);
+            indices * 4 + (flags & HAS_UVS ? vertices * 8 : 0) + frames * vertices * (flags & HAS_NORMALS ? 24 : 12);
         if (h.getUint32(0, true) !== CHUNK_MAGIC) throw bad('has a damaged chunk header');
         if (!frames || vertices < 3 || vertices > 1_000_000 || indices % 3)
           throw bad('has a chunk with no frames, a broken triangle list, or not 3 to 1,000,000 vertices');
         if (h.getUint32(8, true) !== next) throw bad(`skips from frame ${next} to ${h.getUint32(8, true)}`);
         if (h.getUint32(4, true) !== want) throw bad('has a chunk of the wrong size');
         if (want > maxChunkBytes)
-          throw new RangeError(`Geometry chunk of ${want} bytes is over maxChunkBytes; raise it or export smaller chunks`);
+          throw new RangeError(
+            `Geometry chunk of ${want} bytes is over maxChunkBytes; raise it or export smaller chunks`,
+          );
         header = h;
       }
       const size = header.getUint32(4, true);
@@ -317,6 +317,158 @@ export function encodeGeometryCache(rate: number, chunks: readonly GeometryChunk
   return out;
 }
 
+/** One frame of a mesh sequence, as a fluid or destruction bake writes one mesh a frame. */
+export interface MeshSequenceFrame {
+  /** Three floats per vertex. */
+  positions: Float32Array;
+  /** Whole triangles into this frame's vertices. */
+  indices: Uint32Array;
+  /** Three floats per vertex. Default: computed when read. */
+  normals?: Float32Array;
+  /** Two floats per vertex. */
+  uvs?: Float32Array;
+}
+
+/** Options for {@link encodeMeshSequence} and {@link streamMeshSequence}. */
+export interface MeshSequenceOptions {
+  /** Most frames in one chunk, 1..65,536. Default the frame rate rounded (about a second, which streams well). */
+  maxChunkFrames?: number;
+}
+
+const sameFloats = (a: Float32Array | undefined, b: Float32Array | undefined) =>
+  a === b || (!!a && !!b && a.length === b.length && a.every((v, i) => Object.is(v, b[i])));
+
+/**
+ * Groups a sequence of whole meshes into geometry-cache chunks: consecutive frames with the same triangles, vertex
+ * count, UVs and normals-or-not share a chunk (up to `maxChunkFrames`); a frame whose topology changes starts a new
+ * one, and a chunk with its predecessor's triangles or UVs leaves them out (the reader repeats them). Yields each
+ * chunk's bytes, header first, so a long bake never sits in memory whole; the file header says 0 total frames.
+ */
+async function* meshSequenceParts(
+  rate: number,
+  frames: Iterable<MeshSequenceFrame> | AsyncIterable<MeshSequenceFrame>,
+  options: MeshSequenceOptions,
+): AsyncGenerator<Uint8Array, number, undefined> {
+  if (!(rate > 0 && Number.isFinite(rate)))
+    throw new RangeError('Invalid mesh sequence rate; pass frames a second above 0');
+  const most = options?.maxChunkFrames ?? Math.max(1, Math.round(rate));
+  if (!Number.isInteger(most) || most < 1 || most > 65536)
+    throw new RangeError('Invalid maxChunkFrames; pass a whole number from 1 to 65536');
+  const head = new DataView(new ArrayBuffer(FILE_HEADER));
+  head.setUint32(0, FILE_MAGIC, true);
+  head.setUint32(4, VERSION, true);
+  head.setFloat32(8, rate, true);
+  yield new Uint8Array(head.buffer);
+  let run: MeshSequenceFrame[] = [],
+    written = 0,
+    lastIndices: Uint32Array | undefined,
+    lastUvs: Float32Array | undefined;
+  const flush = (): Uint8Array => {
+    const first = run[0],
+      count = first.positions.length,
+      join = (pick: (f: MeshSequenceFrame) => Float32Array) => {
+        const out = new Float32Array(count * run.length);
+        run.forEach((f, i) => out.set(pick(f), i * count));
+        return out;
+      },
+      chunk: GeometryChunkInput = {
+        frameCount: run.length,
+        positions: join((f) => f.positions),
+        normals: first.normals ? join((f) => f.normals!) : undefined,
+        indices: lastIndices && sameArray(lastIndices, first.indices) ? undefined : first.indices,
+        uvs: first.uvs && !sameFloats(lastUvs, first.uvs) ? first.uvs : undefined,
+      },
+      bytes = encodeGeometryCache(rate, [chunk]).subarray(FILE_HEADER);
+    new DataView(bytes.buffer, bytes.byteOffset).setUint32(8, written, true);
+    written += run.length;
+    lastIndices = first.indices;
+    if (first.uvs) lastUvs = first.uvs;
+    run = [];
+    return bytes;
+  };
+  let n = 0;
+  for await (const frame of frames as AsyncIterable<MeshSequenceFrame>) {
+    const { positions, indices, normals, uvs } = frame ?? ({} as MeshSequenceFrame),
+      vertices = positions?.length / 3;
+    if (
+      !(positions instanceof Float32Array) ||
+      !(indices instanceof Uint32Array) ||
+      !Number.isInteger(vertices) ||
+      vertices < 3 ||
+      vertices > 1_000_000 ||
+      indices.length % 3 ||
+      indices.some((i) => i >= vertices) ||
+      (normals !== undefined && (!(normals instanceof Float32Array) || normals.length !== positions.length)) ||
+      (uvs !== undefined && (!(uvs instanceof Float32Array) || uvs.length !== vertices * 2)) ||
+      !positions.every(Number.isFinite)
+    )
+      throw new RangeError(
+        `Invalid mesh sequence frame ${n}; pass 3 to 1,000,000 finite vertices, whole triangles into them, and normals and UVs sized to the vertices`,
+      );
+    const first = run[0];
+    if (
+      first &&
+      (run.length >= most ||
+        first.positions.length !== positions.length ||
+        !sameArray(first.indices, indices) ||
+        !first.normals !== !normals ||
+        !sameFloats(first.uvs, uvs))
+    )
+      yield flush();
+    run.push(frame);
+    n++;
+  }
+  if (!run.length) throw new RangeError('Empty mesh sequence; pass at least one frame');
+  yield flush();
+  return written;
+}
+
+/**
+ * Streams a mesh sequence (one whole mesh a frame, the topology free to change: a meshed fluid, a fracture) as
+ * geometry-cache bytes, chunk by chunk, for {@link GeometryCachePlayer}. Frames may arrive from any iterable or async
+ * iterable (files read one at a time), so a long bake is never in memory whole.
+ * @throws RangeError for a rate not above 0, a bad `maxChunkFrames`, an empty sequence or a malformed frame (named).
+ * @example
+ * ```ts
+ * const parts: Uint8Array[] = [];
+ * const tri = (x: number) => ({positions: new Float32Array([x, 0, 0, 1, 0, 0, 0, 1, 0]), indices: new Uint32Array([0, 1, 2])});
+ * for await (const part of streamMeshSequence(24, [tri(0), tri(0.1)])) parts.push(part);
+ * ```
+ */
+export async function* streamMeshSequence(
+  rate: number,
+  frames: Iterable<MeshSequenceFrame> | AsyncIterable<MeshSequenceFrame>,
+  options: MeshSequenceOptions = {},
+): AsyncGenerator<Uint8Array, void, undefined> {
+  yield* meshSequenceParts(rate, frames, options);
+}
+
+/**
+ * A mesh sequence (one whole mesh a frame) as one geometry-cache file, its total frame count filled in.
+ * @throws RangeError as {@link streamMeshSequence}.
+ */
+export async function encodeMeshSequence(
+  rate: number,
+  frames: Iterable<MeshSequenceFrame> | AsyncIterable<MeshSequenceFrame>,
+  options: MeshSequenceOptions = {},
+): Promise<Uint8Array> {
+  const parts: Uint8Array[] = [],
+    it = meshSequenceParts(rate, frames, options);
+  let step = await it.next();
+  while (!step.done) {
+    parts.push(step.value);
+    step = await it.next();
+  }
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const part of parts) {
+    out.set(part, at);
+    at += part.length;
+  }
+  new DataView(out.buffer).setUint32(12, step.value, true);
+  return out;
+}
+
 /** Where a cache comes from. A URL, an array or a function can start again; a stream cannot, so it keeps what it read. */
 export type GeometryCacheSource = string | URL | GeometryCacheBytes | ((signal: AbortSignal) => GeometryCacheBytes);
 
@@ -349,7 +501,8 @@ export interface GeometryCacheStats {
 }
 
 let serial = 0;
-const sameArray = (a: Uint32Array, b: Uint32Array) => a === b || (a.length === b.length && a.every((v, i) => v === b[i]));
+const sameArray = (a: Uint32Array, b: Uint32Array) =>
+  a === b || (a.length === b.length && a.every((v, i) => v === b[i]));
 
 /**
  * Plays a geometry cache on a mesh of its own (`player.model`), reading chunks only as far ahead as `ahead`. The clock
@@ -402,15 +555,25 @@ export class GeometryCachePlayer implements EnginePlugin {
   ): Promise<GeometryCachePlayer> {
     const { ahead = 2, speed = 1, signal, maxChunkBytes } = options;
     if (!Number.isInteger(ahead) || ahead < 1 || !Number.isFinite(speed) || speed < 0)
-      throw new RangeError('Invalid geometry cache options; ahead must be a whole number >= 1 and speed a finite number >= 0');
+      throw new RangeError(
+        'Invalid geometry cache options; ahead must be a whole number >= 1 and speed a finite number >= 0',
+      );
     if (!(engine as Engine).gpu)
-      throw new MargoError('unsupported', 'GeometryCachePlayer needs WebGPU; create the engine with the webgpu backend');
+      throw new MargoError(
+        'unsupported',
+        'GeometryCachePlayer needs WebGPU; create the engine with the webgpu backend',
+      );
     const abort = new AbortController(),
       stop = () => abort.abort(signal!.reason);
     const runtime = engine as Engine;
     let scene!: Scene;
     // Snapshot the active registry before reading yields, without adding a core API.
-    const scope: EnginePlugin = { name: 'geometry-cache:load:' + serial++, setup() { scene = runtime.sceneOf(scope)!; } };
+    const scope: EnginePlugin = {
+      name: 'geometry-cache:load:' + serial++,
+      setup() {
+        scene = runtime.sceneOf(scope)!;
+      },
+    };
     while (runtime.plugins.has(scope.name)) scope.name += ':';
     runtime.use(scope);
     scene.removePlugin(scope.name);
@@ -428,11 +591,17 @@ export class GeometryCachePlayer implements EnginePlugin {
         source instanceof URL ||
         source instanceof Uint8Array;
       let player!: GeometryCachePlayer;
-      const create: EnginePlugin = { name: scope.name, setup() {
-        player = new GeometryCachePlayer(runtime, first.value, iterator, open, abort, options, rewinds, unlisten);
-      } };
-      try { scene.use(create); }
-      finally { if (scene.plugins.get(create.name) === create) scene.removePlugin(create.name); }
+      const create: EnginePlugin = {
+        name: scope.name,
+        setup() {
+          player = new GeometryCachePlayer(runtime, first.value, iterator, open, abort, options, rewinds, unlisten);
+        },
+      };
+      try {
+        scene.use(create);
+      } finally {
+        if (scene.plugins.get(create.name) === create) scene.removePlugin(create.name);
+      }
       return player;
     } catch (error) {
       unlisten();

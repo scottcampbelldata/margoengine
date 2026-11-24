@@ -77,7 +77,22 @@ export interface GeometryChunkInput {
     uvs?: Float32Array;
 }
 
+export interface MeshSequenceFrame {
+    positions: Float32Array;
+    indices: Uint32Array;
+    normals?: Float32Array;
+    uvs?: Float32Array;
+}
+
+export interface MeshSequenceOptions {
+    maxChunkFrames?: number;
+}
+
 export function encodeGeometryCache(rate: number, chunks: readonly GeometryChunkInput[]): Uint8Array;
 
+export function encodeMeshSequence(rate: number, frames: Iterable<MeshSequenceFrame> | AsyncIterable<MeshSequenceFrame>, options?: MeshSequenceOptions): Promise<Uint8Array>;
+
 export function readGeometryCache(source: GeometryCacheBytes, { signal, maxChunkBytes }?: GeometryCacheReadOptions): AsyncGenerator<GeometryChunk, void, undefined>;
+
+export function streamMeshSequence(rate: number, frames: Iterable<MeshSequenceFrame> | AsyncIterable<MeshSequenceFrame>, options?: MeshSequenceOptions): AsyncGenerator<Uint8Array, void, undefined>;
 ```

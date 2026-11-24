@@ -111,6 +111,22 @@ From code: `import {build} from 'margo-convert/build'`, `import {optimizeModel} 
 - **Audio codecs.** Without an ffmpeg that has `libvorbis`, no Ogg, MP3 or Opus is written; MP3, AAC and Opus inputs
   are never decoded, so only WAV is mixed down and resampled.
 
+## Mesh sequences
+
+`margo-convert sequence <folder>` turns a folder of per-frame meshes (a meshed fluid or fracture bake, one `.obj`, `.ply`
+or `.stl` a frame, such as Blender's OBJ export with Animation on) into one geometry cache for `GeometryCachePlayer` of
+`@margoengine/animation/geometry-cache`. Frames are ordered by the last number in each file name, read one at a time and
+written a chunk at a time. Frames of one topology share a chunk; a frame whose mesh changes starts a new one.
+
+```sh
+margo-convert sequence ./fluid_mesh --out fluid.mgc --fps 24
+```
+
+Options: `--out` (default `<folder>.mgc`), `--fps` (24), `--chunk` (most frames a chunk, default the fps rounded),
+`--no-normals` (the player computes smooth ones), `--no-uvs`, `--quiet`. The same from code: `convertSequence(folder,
+out, {fps})` from `margo-convert/sequence`. A frame with no triangles is refused by file name. Each frame holds at most
+1,000,000 vertices (the cache's chunk limit).
+
 ## Thumbnail
 
 Render one model to a PNG with no page, for server thumbnails and asset checks.

@@ -32,7 +32,8 @@
   "exports": {
     "./build": "./pipeline/build.js",
     "./optimize": "./pipeline/optimize.js",
-    "./presets": "./pipeline/presets.js"
+    "./presets": "./pipeline/presets.js",
+    "./sequence": "./pipeline/sequence.js"
   },
   "sideEffects": false,
   "files": [
@@ -44,12 +45,14 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
+    "@margoengine/animation": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   },
   "publishConfig": {

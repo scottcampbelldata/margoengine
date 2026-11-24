@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17787579,
+  "total": 17787955,
   "history": [
     {
       "date": "2026-10-24",
@@ -11595,6 +11595,12 @@
       "commit": "fee822f89",
       "reason": "physics: DistanceJoint and the preset joints (universal, wheel with steering): root entry base budget 68,783 to 68,871 B gzip",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-11",
+      "reason": "FG-11 animation/geometry-cache 4,929 to 5,305 B gzip for encodeMeshSequence and streamMeshSequence: a per-frame mesh bake (a meshed fluid) grouped into chunks by topology, beside the encoder and reader they reuse (a separate entry would repeat the chunk writer)",
+      "grew": 1
     }
   ],
   "items": {
@@ -11602,7 +11608,7 @@
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 4772,
-    "@margoengine/animation/geometry-cache": 4929,
+    "@margoengine/animation/geometry-cache": 5305,
     "@margoengine/animation/instanced-skin": 10303,
     "@margoengine/animation/interactivity": 28309,
     "@margoengine/animation/lod": 2768,
