@@ -73,9 +73,10 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Collision | collision groups, solver groups, active collision types | `collisionGroups`, `solverGroups`, `activeCollisionTypes` | full |
 | Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |
 | Collision | physics hooks (filter and modify contact pairs, one-way platforms) | `physics.hooks = {filterPair, modifyContact}` for colliders with `hooks` set; `oneWay`, `friction`, `restitution`, `solverActive` per contact | full |
-| Queries | ray cast with normal (solid or not), point, shape intersection, shape cast, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `QueryFilter2D` | full |
+| Queries | ray cast with normal (solid or not), point, shape intersection, shape cast, project point, box intersection, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `projectPoint`, `intersectionsWithBox`, `QueryFilter2D` | full |
+| Queries | contact pairs of a collider | `contactPairs(collider)` | full |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
-| Bodies | damping, gravity scale, locked rotation, can sleep, dominance | `BodyOptions2D` | full |
+| Bodies | damping, gravity scale, locked rotation, can sleep, dominance, body type changes | `BodyOptions2D`, the same names as setters on `Body2D`, `setType` | full |
 | Bodies | forces, torques, impulses (at the centre or a point), velocities, wake and sleep | `Body2D` methods | full |
 | Bodies | additional mass | `additionalMass` | full |
 | Bodies | locked translation axes | `lockTranslation` (an exact joint constraint that follows teleports) | full |

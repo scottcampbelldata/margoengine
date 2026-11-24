@@ -1034,6 +1034,30 @@ impl World {
         self.wake(body)
     }
 
+    /// Changes what kind of body this is: static bodies stop, kinematic ones keep their velocity, and a dynamic body is
+    /// weighed again from its shapes. The body wakes.
+    pub fn set_body_kind(&mut self, body: u32, kind: Kind) -> Result<(), PhysicsError> {
+        let before = self.live_body(body)?.clone();
+        let b = &mut self.bodies[body as usize];
+        b.kind = kind;
+        b.next_target = None;
+        if kind == Kind::Static {
+            b.linear_velocity = V2::ZERO;
+            b.angular_velocity = 0.0;
+            b.awake = false;
+        }
+        if let Err(error) = self.update_mass(body) {
+            self.bodies[body as usize] = before;
+            return Err(error);
+        }
+        // Its boxes follow, so the broad phase treats it as moving or still from now on.
+        self.set_transform(body, self.bodies[body as usize].xf.p, self.bodies[body as usize].xf.q)?;
+        if kind == Kind::Static {
+            self.bodies[body as usize].awake = false;
+        }
+        Ok(())
+    }
+
     /// Adds `mass` kilograms to what the body's shapes weigh (0 takes it away) and works the mass out again.
     pub fn set_additional_mass(&mut self, body: u32, mass: f32) -> Result<(), PhysicsError> {
         if !mass.is_finite() { return Err(PhysicsError::NotFinite); }

@@ -203,3 +203,54 @@ fn random_rays_agree_with_marching() {
         }
     }
 }
+
+#[test]
+fn the_closest_point_of_each_shape_and_boxes_that_meet() {
+    use margoengine_physics2d_kernel::query::project_core;
+    let rect = Core::rect(1.0, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let (p, inside) = project_core(&rect, v2(3.0, 0.2));
+    assert!(!inside && near(p.x, 1.0) && near(p.y, 0.2), "{p:?}");
+    let (p, inside) = project_core(&rect, v2(3.0, 2.0));
+    assert!(!inside && near(p.x, 1.0) && near(p.y, 0.5), "a corner: {p:?}");
+    assert!(project_core(&rect, v2(0.3, 0.1)).1);
+    let ball = Core::circle(v2(1.0, 1.0), 0.5).unwrap();
+    let (p, inside) = project_core(&ball, v2(4.0, 1.0));
+    assert!(!inside && near(p.x, 1.5) && near(p.y, 1.0));
+    let capsule = Core::capsule(v2(0.0, 0.0), v2(2.0, 0.0), 0.5).unwrap();
+    let (p, _) = project_core(&capsule, v2(1.0, 3.0));
+    assert!(near(p.x, 1.0) && near(p.y, 0.5));
+    let mut world = World::default();
+    let a = world.create_body(&at(0.0, 0.0)).unwrap();
+    let s_a = world.create_shape(a, Core::circle(V2::ZERO, 1.0).unwrap(), &ShapeDef::default()).unwrap();
+    let b = world.create_body(&at(10.0, 0.0)).unwrap();
+    let s_b = world.create_shape(b, Core::rect(1.0, 1.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    let f = QueryFilter::default();
+    let all = world.project_point_all(v2(7.0, 0.0), &f).unwrap();
+    assert_eq!(all.iter().map(|h| h.shape).collect::<Vec<_>>(), [s_b, s_a]);
+    assert!(near(all[0].distance, 2.0) && near(all[1].distance, 6.0));
+    let inside = world.project_point(v2(0.2, 0.0), &f).unwrap().unwrap();
+    assert!(inside.inside && inside.distance == 0.0 && inside.shape == s_a);
+    assert_eq!(world.aabb_query(v2(8.0, -5.0), v2(12.0, 5.0), &f).unwrap(), [s_b]);
+    assert_eq!(world.aabb_query(v2(-20.0, -20.0), v2(20.0, 20.0), &f).unwrap(), [s_a, s_b]);
+    assert!(world.aabb_query(v2(3.0, 3.0), v2(4.0, 4.0), &f).unwrap().is_empty());
+}
+
+#[test]
+fn a_body_changes_kind_and_is_weighed_or_stopped() {
+    let mut world = World::default();
+    let b = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+    world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    assert_eq!(world.bodies[b as usize].inv_mass, 0.0);
+    world.set_body_kind(b, Kind::Dynamic).unwrap();
+    assert!(world.bodies[b as usize].mass > 0.9);
+    for _ in 0..30 {
+        world.step(1.0 / 60.0).unwrap();
+    }
+    assert!(world.bodies[b as usize].xf.p.y < -0.5, "it falls once dynamic");
+    world.set_body_kind(b, Kind::Static).unwrap();
+    let y = world.bodies[b as usize].xf.p.y;
+    for _ in 0..30 {
+        world.step(1.0 / 60.0).unwrap();
+    }
+    assert_eq!(world.bodies[b as usize].xf.p.y, y, "and stops once static");
+}

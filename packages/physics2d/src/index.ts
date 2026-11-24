@@ -6,6 +6,8 @@ export type {
   ContactForceEvent2D,
   DebugLines2D,
   Physics2DHooks,
+  ProjectedPoint2D,
+  ContactPair2D,
   ContactChange2D,
   Physics2DEventMap,
   CollisionEvent2D,

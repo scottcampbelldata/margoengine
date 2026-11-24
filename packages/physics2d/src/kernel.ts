@@ -39,6 +39,10 @@ interface Exports {
   body_wake(world: number, body: number): number;
   body_sleep(world: number, body: number): number;
   body_set_additional_mass(world: number, body: number, mass: number): number;
+  body_set_kind(world: number, body: number, kind: number): number;
+  project_point(world: number): number;
+  aabb_query(world: number): number;
+  contacts_of(world: number, shape: number): number;
   world_set_hooks(world: number, on: number): number;
   world_snapshot(world: number): number;
   world_restore(world: number, bytes: number): number;

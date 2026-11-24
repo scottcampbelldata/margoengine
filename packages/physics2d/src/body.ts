@@ -61,6 +61,7 @@ export interface BodyOwner2D {
   removeCollider(collider: Collider2D): void;
   removeBody(body: Body2D): void;
   lockTranslation(body: Body2D, x: boolean, y: boolean): void;
+  retype(body: Body2D, type: BodyType2D): void;
 }
 
 const encode = (value: number, what: string): number => {
@@ -196,7 +197,7 @@ export class Body2D {
     /** The kernel's handle. @internal */
     readonly handle: number,
     readonly sprite: SpriteLike | null,
-    readonly type: BodyType2D,
+    private kind: BodyType2D,
   ) {
     this.snapshot();
     this.pose.copyWithin(0, 3, 6);
@@ -216,6 +217,68 @@ export class Body2D {
     p[3] = x * k;
     p[4] = y * k;
     p[5] = Math.atan2(s, c);
+  }
+  /** How the body moves: `dynamic`, `fixed`, `kinematicPosition` or `kinematicVelocity`. */
+  get type(): BodyType2D {
+    return this.kind;
+  }
+  /**
+   * Changes how the body moves. A dynamic body is weighed again from its colliders; a fixed body stops. A body locked on an
+   * axis keeps its lock only while it is dynamic or kinematic.
+   */
+  setType(type: BodyType2D): this {
+    this.check();
+    this.owner.retype(this, type);
+    this.kind = type;
+    return this;
+  }
+  /** @internal Damping, gravity scale, sleep permission, ccd and dominance as the kernel holds them. */
+  params = { linearDamping: 0, angularDamping: 0, gravityScale: 1, canSleep: true, ccd: false, dominance: 0 };
+  private setParams(change: Partial<Body2D['params']>): void {
+    const { x, h, kernel } = this.k;
+    const next = { ...this.params, ...change };
+    const flags = (next.canSleep ? 1 : 0) | (next.ccd ? 4 : 0);
+    if (!Number.isInteger(next.dominance) || next.dominance < -127 || next.dominance > 127)
+      throw new RangeError(`dominance must be an integer from -127 to 127, got ${next.dominance}.`);
+    kernel.ok(x.body_set_params(h, this.handle, encode(next.linearDamping, 'damping'), encode(next.angularDamping, 'damping'), encode(next.gravityScale, 'gravity scale'), flags, next.dominance));
+    this.params = next;
+  }
+  get linearDamping(): number {
+    return this.params.linearDamping;
+  }
+  set linearDamping(value: number) {
+    this.setParams({ linearDamping: value });
+  }
+  get angularDamping(): number {
+    return this.params.angularDamping;
+  }
+  set angularDamping(value: number) {
+    this.setParams({ angularDamping: value });
+  }
+  get gravityScale(): number {
+    return this.params.gravityScale;
+  }
+  set gravityScale(value: number) {
+    this.setParams({ gravityScale: value });
+  }
+  get canSleep(): boolean {
+    return this.params.canSleep;
+  }
+  set canSleep(value: boolean) {
+    this.setParams({ canSleep: value });
+  }
+  /** Continuous collision for a fast body. */
+  get ccd(): boolean {
+    return this.params.ccd;
+  }
+  set ccd(value: boolean) {
+    this.setParams({ ccd: value });
+  }
+  get dominance(): number {
+    return this.params.dominance;
+  }
+  set dominance(value: number) {
+    this.setParams({ dominance: value });
   }
   private check(): void {
     if (this.removed) throw new MargoError('state', 'Body2D was removed; add a new body with Physics2D.addBody.');

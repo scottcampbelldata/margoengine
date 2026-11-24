@@ -632,3 +632,77 @@ pub extern "C" fn world_set_hooks(handle: i32, on: u32) -> i32 {
         Ok(0)
     })
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_kind(handle: i32, body: u32, kind: u32) -> i32 {
+    with_world!(handle, |w| w.set_body_kind(body, kind_of(kind)?).map(|()| 0))
+}
+
+/// io: the filter (4 words), the point. Writes every accepted shape with its closest point, nearest first, five words each:
+/// shape, point x, point y, distance, inside (u32); returns how many.
+#[unsafe(no_mangle)]
+pub extern "C" fn project_point(handle: i32) -> i32 {
+    with_world!(handle, |w| {
+        let (filter, p) = (filter_at(0), point(4));
+        let all = w.project_point_all(p, &filter)?;
+        ensure(5 * all.len());
+        for (i, hit) in all.iter().enumerate() {
+            io()[5 * i] = hit.shape;
+            put(5 * i + 1, hit.point.x);
+            put(5 * i + 2, hit.point.y);
+            put(5 * i + 3, hit.distance);
+            io()[5 * i + 4] = hit.inside as u32;
+        }
+        Ok(all.len() as i32)
+    })
+}
+
+/// io: the filter, the box (min x, min y, max x, max y). Writes the shape handles.
+#[unsafe(no_mangle)]
+pub extern "C" fn aabb_query(handle: i32) -> i32 {
+    with_world!(handle, |w| {
+        let (filter, lo, hi) = (filter_at(0), point(4), point(6));
+        let found = w.aabb_query(lo, hi, &filter)?;
+        ensure(found.len());
+        io()[..found.len()].copy_from_slice(&found);
+        Ok(found.len() as i32)
+    })
+}
+
+/// Writes the contacts of a shape, eleven words each: the other shape, flags (1 pushes, 2 touching, the point count in
+/// bits 2 and up), the normal from this shape to the other, then two points (x, y, separation) and the step's normal
+/// impulse; returns how many.
+#[unsafe(no_mangle)]
+pub extern "C" fn contacts_of(handle: i32, shape: u32) -> i32 {
+    with_world!(handle, |w| {
+        if w.shapes.get(shape as usize).is_none_or(|s| s.dead) {
+            return Err(PhysicsError::InvalidHandle);
+        }
+        let mut rows: Vec<[u32; 11]> = Vec::new();
+        for c in w.contacts.iter().filter(|c| c.a == shape || c.b == shape) {
+            let first = c.a == shape;
+            let other = if first { c.b } else { c.a };
+            let from = w.bodies[w.shapes[c.a as usize].body as usize].exact_center;
+            let n = if first { c.manifold.normal } else { c.manifold.normal.neg() };
+            let m = &c.manifold;
+            let mut row = [0u32; 11];
+            row[0] = other;
+            row[1] = (c.solved as u32) | ((c.overlap as u32) << 1) | ((m.count as u32) << 2);
+            row[2] = n.x.to_bits();
+            row[3] = n.y.to_bits();
+            for k in 0..m.count.min(2) {
+                let p = &m.points[k];
+                row[4 + 3 * k] = ((from[0] + p.point.x as f64) as f32).to_bits();
+                row[5 + 3 * k] = ((from[1] + p.point.y as f64) as f32).to_bits();
+                row[6 + 3 * k] = p.separation.to_bits();
+            }
+            row[10] = (c.normal_impulse[0] + c.normal_impulse[1]).to_bits();
+            rows.push(row);
+        }
+        ensure(11 * rows.len());
+        for (i, row) in rows.iter().enumerate() {
+            io()[11 * i..11 * i + 11].copy_from_slice(row);
+        }
+        Ok(rows.len() as i32)
+    })
+}

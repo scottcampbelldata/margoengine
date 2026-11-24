@@ -304,3 +304,56 @@ test('hooks: modifyContact sets friction and can turn a contact off for a step',
   assert.ok(falling.position[1] > 200, 'a contact switched off lets it through');
   physics.dispose();
 });
+
+test('body setters, setType, projectPoint, intersectionsWithBox, contactPairs and the character\'s hits', () => {
+  const physics = world();
+  const ground = floor(physics);
+  const ball = physics.addBody(null, { position: [0, 40], colliders: { shape: 'circle', radius: 6 } });
+  // Setters change the body from now on.
+  assert.equal(ball.gravityScale, 1);
+  ball.gravityScale = 0;
+  ball.linearDamping = 0.5;
+  assert.equal(ball.gravityScale, 0);
+  run(physics, 30);
+  assert.ok(Math.abs(ball.position[1] - 40) < 0.5, 'no gravity, no fall');
+  ball.gravityScale = 1;
+  ball.canSleep = false;
+  assert.throws(() => (ball.dominance = 500), RangeError);
+  run(physics, 120);
+  assert.ok(Math.abs(ball.position[1] - 84) < 1, `lands: ${ball.position[1]}`);
+  // Contacts of a collider as the world holds them.
+  const pairs = physics.contactPairs(ball.colliders[0]);
+  assert.equal(pairs.length, 1);
+  assert.equal(pairs[0].other, ground.colliders[0]);
+  assert.ok(pairs[0].touching && pairs[0].solverActive && pairs[0].points.length >= 1);
+  assert.ok(Math.abs(pairs[0].normal[1] - 1) < 0.01, `from the ball down to the floor: ${pairs[0].normal}`);
+  // Points: nearest collider, inside or out.
+  const out = physics.projectPoint([200, 84]);
+  assert.equal(out.inside, false);
+  assert.ok(Math.abs(out.distance - 194) < 1.5 || out.body === ground, `${out.distance}`);
+  const inside = physics.projectPoint([0, 100]);
+  assert.ok(inside.inside && inside.distance === 0 && inside.body === ground);
+  assert.equal(physics.projectPoint([0, 0], { excludeFixed: true, excludeDynamic: true }), null);
+  assert.deepEqual(physics.intersectionsWithBox([-10, 70], [10, 90]).sort((a, b) => a.handle - b.handle), [ground, ball].sort((a, b) => a.handle - b.handle));
+  assert.deepEqual(physics.intersectionsWithBox([-10, -90], [10, -70]), []);
+  // setType: a fixed body becomes dynamic and falls; dynamic back to fixed stops.
+  const block = physics.addBody(null, { type: 'fixed', position: [100, 0], colliders: { shape: 'box', width: 10, height: 10 } });
+  run(physics, 30);
+  assert.equal(block.position[1], 0);
+  block.setType('dynamic');
+  assert.equal(block.type, 'dynamic');
+  run(physics, 30);
+  assert.ok(block.position[1] > 5, 'falls');
+  block.setType('fixed');
+  const y = block.position[1];
+  run(physics, 30);
+  assert.equal(block.position[1], y);
+  assert.throws(() => block.setType('wobbly'), TypeError);
+  // The character reports what it hit.
+  const hero = physics.addBody({ x: 0, y: 70, rotation: 0 }, { type: 'kinematicPosition', colliders: { shape: 'box', width: 10, height: 20 }, position: [-100, 70] });
+  const controller = physics.createCharacterController(hero, { offset: 0.2 });
+  const result = controller.move([0, 40]);
+  assert.ok(result.hits.length >= 1 && result.hits[0].collider === ground.colliders[0], 'hit the floor');
+  assert.ok(Math.abs(result.hits[0].normal[1] + 1) < 0.01, `normal out of the floor (up on screen): ${result.hits[0].normal}`);
+  physics.dispose();
+});

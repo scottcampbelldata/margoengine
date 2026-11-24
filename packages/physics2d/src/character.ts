@@ -31,6 +31,8 @@ export interface CharacterMoveResult2D {
   grounded: boolean;
   /** Number of contacts the move hit. */
   collisions: number;
+  /** What the move hit, in order: the collider, the surface normal pointing out of it and the contact point. */
+  hits: Array<{ collider: import('./body.js').Collider2D; body: Body2D; normal: [number, number]; point: [number, number] }>;
 }
 
 const EPS = 1e-5;
@@ -86,6 +88,7 @@ export class CharacterController2D {
     const desired = remaining;
     let grounded = false,
       collisions = 0;
+    const hits: CharacterMoveResult2D['hits'] = [];
     const up = this.up;
     const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1];
     for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -106,6 +109,7 @@ export class CharacterController2D {
       pos[0] += dir[0] * travelled;
       pos[1] += dir[1] * travelled;
       collisions++;
+      hits.push({ collider: hit.collider, body: hit.body, normal: [o[0], o[1]], point: [hit.point[0], hit.point[1]] });
       const left = dist - travelled;
       const rest: [number, number] = [dir[0] * left, dir[1] * left];
       const cosine = dot(o, up);
@@ -153,7 +157,7 @@ export class CharacterController2D {
     }
     const movement: [number, number] = [(pos[0] - start[0]) * inv, (pos[1] - start[1]) * inv];
     this.body.moveTo([this.body.position[0] + movement[0], this.body.position[1] + movement[1]]);
-    return { movement, grounded, collisions };
+    return { movement, grounded, collisions, hits };
   }
 
   /** Tries to climb a ledge in the way of `rest`: up by at most `maxHeight`, across by at least `minWidth`, down onto ground. */

@@ -8,15 +8,36 @@ import { EngineKernel, EnginePlugin } from "@margoengine/core";
 export class Body2D {
     readonly handle: number;
     readonly sprite: SpriteLike | null;
-    readonly type: BodyType2D;
     readonly colliders: Collider2D[];
     userData: unknown;
     readonly pose: Float64Array<ArrayBuffer>;
     dirty: boolean;
     constructor(owner: BodyOwner2D,
-    handle: number, sprite: SpriteLike | null, type: BodyType2D);
+    handle: number, sprite: SpriteLike | null, kind: BodyType2D);
     snapshot(): void;
     store(x: number, y: number, c: number, s: number, k: number): void;
+    get type(): BodyType2D;
+    setType(type: BodyType2D): this;
+    params: {
+        linearDamping: number;
+        angularDamping: number;
+        gravityScale: number;
+        canSleep: boolean;
+        ccd: boolean;
+        dominance: number;
+    };
+    get linearDamping(): number;
+    set linearDamping(value: number);
+    get angularDamping(): number;
+    set angularDamping(value: number);
+    get gravityScale(): number;
+    set gravityScale(value: number);
+    get canSleep(): boolean;
+    set canSleep(value: boolean);
+    get ccd(): boolean;
+    set ccd(value: boolean);
+    get dominance(): number;
+    set dominance(value: number);
     private get k();
     get isRemoved(): boolean;
     markRemoved(): void;
@@ -87,6 +108,12 @@ export interface CharacterMoveResult2D {
     movement: [number, number];
     grounded: boolean;
     collisions: number;
+    hits: Array<{
+        collider: import('./body.js').Collider2D;
+        body: Body2D;
+        normal: [number, number];
+        point: [number, number];
+    }>;
 }
 
 export interface CharacterOptions2D {
@@ -178,6 +205,19 @@ export interface ContactForceEvent2D {
     colliderB: Collider2D;
     force: number;
     normal: [number, number];
+}
+
+export interface ContactPair2D {
+    collider: Collider2D;
+    other: Collider2D;
+    normal: [number, number];
+    points: Array<{
+        point: [number, number];
+        distance: number;
+    }>;
+    impulse: number;
+    solverActive: boolean;
+    touching: boolean;
 }
 
 export interface DebugLines2D {
@@ -286,6 +326,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     removeBody(body: Body2D): void;
     get hooks(): Physics2DHooks | null;
     set hooks(value: Physics2DHooks | null);
+    retype(body: Body2D, type: BodyType2D): void;
+    projectPoint(point: Vec2D, filter?: QueryFilter2D): ProjectedPoint2D | null;
+    intersectionsWithBox(min: Vec2D, max: Vec2D, filter?: QueryFilter2D): Body2D[];
+    contactPairs(collider: Collider2D): ContactPair2D[];
     lockTranslation(body: Body2D, x: boolean, y: boolean): void;
     addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D;
     removeJoint(joint: Joint2D): void;
@@ -355,6 +399,12 @@ export class PidController2D {
     applyLinear(dt: number, body: Body2D, target: Vec2D, targetVelocity?: Vec2D): this;
     angularCorrection(dt: number, body: Body2D, target: number, targetVelocity?: number): number;
     applyAngular(dt: number, body: Body2D, target: number, targetVelocity?: number): this;
+}
+
+export interface ProjectedPoint2D extends Hit2D {
+    point: [number, number];
+    inside: boolean;
+    distance: number;
 }
 
 export interface QueryFilter2D {
@@ -507,6 +557,7 @@ interface BodyOwner2D {
     removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
     lockTranslation(body: Body2D, x: boolean, y: boolean): void;
+    retype(body: Body2D, type: BodyType2D): void;
 }
 
 type CompoundPart2D = ShapeOptions2D & {
@@ -546,6 +597,10 @@ interface Exports {
     body_wake(world: number, body: number): number;
     body_sleep(world: number, body: number): number;
     body_set_additional_mass(world: number, body: number, mass: number): number;
+    body_set_kind(world: number, body: number, kind: number): number;
+    project_point(world: number): number;
+    aabb_query(world: number): number;
+    contacts_of(world: number, shape: number): number;
     world_set_hooks(world: number, on: number): number;
     world_snapshot(world: number): number;
     world_restore(world: number, bytes: number): number;

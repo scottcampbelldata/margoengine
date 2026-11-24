@@ -157,7 +157,99 @@ pub fn ray_core(core: &Core, o: V2, d: V2, max: f32, solid: bool) -> Option<(f32
     (hit.0 <= max).then_some(hit)
 }
 
+/// The closest point of `core` to `p` (in the core's frame) and whether `p` is inside it.
+pub fn project_core(core: &Core, p: V2) -> (V2, bool) {
+    let r = core.radius;
+    if core.count == 1 {
+        let (dir, d) = p.sub(core.vertices[0]).normalize();
+        let on = core.vertices[0].add(dir.scale(r));
+        return if d <= r { (p, true) } else { (on, false) };
+    }
+    if core.count >= 3 {
+        let mut inside = f32::NEG_INFINITY;
+        for i in 0..core.count {
+            inside = inside.max(core.normals[i].dot(p.sub(core.vertices[i])));
+        }
+        if inside <= 0.0 {
+            return (p, true);
+        }
+    }
+    // The nearest point of the core's boundary, then out by the radius along the way from it to `p`.
+    let mut best = (f32::INFINITY, core.vertices[0]);
+    for i in 0..core.count.min(if core.count == 2 { 1 } else { core.count }) {
+        let (a, b) = core.edge(i);
+        let ab = b.sub(a);
+        let span = ab.length_squared();
+        let t = if span > 0.0 { (p.sub(a).dot(ab) / span).clamp(0.0, 1.0) } else { 0.0 };
+        let q = a.add(ab.scale(t));
+        let d = p.sub(q).length_squared();
+        if d < best.0 {
+            best = (d, q);
+        }
+    }
+    let (dir, d) = p.sub(best.1).normalize();
+    if d <= r { (p, true) } else { (best.1.add(dir.scale(r)), false) }
+}
+
+/// The closest point of a shape to a query point.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Projection {
+    pub shape: u32,
+    pub point: V2,
+    /// The query point is inside the shape (then `point` is the query point).
+    pub inside: bool,
+    pub distance: f32,
+}
+
 impl World {
+    /// Every shape the filter accepts with its closest point to `point`, nearest first (ties by shape id): the closest
+    /// point, whether `point` is inside it, and the distance (0 inside).
+    pub fn project_point_all(&mut self, point: V2, filter: &QueryFilter) -> Result<Vec<Projection>, PhysicsError> {
+        if !point.x.is_finite() || !point.y.is_finite() {
+            return Err(PhysicsError::NotFinite);
+        }
+        let mut all = Vec::new();
+        for id in 0..self.shapes.len() as u32 {
+            if self.shapes[id as usize].dead || !self.accepts(id, filter) {
+                continue;
+            }
+            let shape = &self.shapes[id as usize];
+            let xf = self.bodies[shape.body as usize].xf;
+            let (local, inside) = project_core(&shape.core, xf.apply_inverse(point));
+            let world = if inside { point } else { xf.apply(local) };
+            let distance = if inside { 0.0 } else { point.sub(world).length() };
+            all.push(Projection { shape: id, point: world, inside, distance });
+        }
+        all.sort_by(|a, b| a.distance.total_cmp(&b.distance).then(a.shape.cmp(&b.shape)));
+        Ok(all)
+    }
+
+    /// The nearest of `project_point_all`.
+    pub fn project_point(&mut self, point: V2, filter: &QueryFilter) -> Result<Option<Projection>, PhysicsError> {
+        Ok(self.project_point_all(point, filter)?.first().copied())
+    }
+
+    /// The shapes whose bounds meet the box from `min` to `max`.
+    pub fn aabb_query(&mut self, min: V2, max: V2, filter: &QueryFilter) -> Result<Vec<u32>, PhysicsError> {
+        if ![min.x, min.y, max.x, max.y].into_iter().all(f32::is_finite) {
+            return Err(PhysicsError::NotFinite);
+        }
+        let query = Bounds { min: [min.x.min(max.x), min.y.min(max.y)], max: [min.x.max(max.x), min.y.max(max.y)] };
+        let mut found = Vec::new();
+        self.query_boxes(&query, &mut found);
+        let mut out = Vec::new();
+        for id in found {
+            if !self.accepts(id, filter) {
+                continue;
+            }
+            let shape = &self.shapes[id as usize];
+            if crate::world::bounds_of(&shape.core, self.bodies[shape.body as usize].xf)?.overlaps(&query) {
+                out.push(id);
+            }
+        }
+        Ok(out)
+    }
+
     /// Gives the broad phase every body's current box, so a query sees a body that was moved since the last step.
     fn query_boxes(&mut self, bounds: &Bounds<2>, out: &mut Vec<u32>) {
         self.broad.query(bounds, out);

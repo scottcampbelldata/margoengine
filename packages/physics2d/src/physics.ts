@@ -86,6 +86,26 @@ export interface Physics2DEventMap {
   afterstep: number;
 }
 
+/** A closest point of a collider to a point. */
+export interface ProjectedPoint2D extends Hit2D {
+  /** The closest point of the collider (the query point itself when it is inside). */
+  point: [number, number];
+  inside: boolean;
+  /** World units; 0 inside. */
+  distance: number;
+}
+/** One contact of a collider as the world holds it. */
+export interface ContactPair2D {
+  collider: Collider2D;
+  other: Collider2D;
+  /** From `collider` to `other`. */
+  normal: [number, number];
+  points: Array<{ point: [number, number]; distance: number }>;
+  impulse: number;
+  solverActive: boolean;
+  touching: boolean;
+}
+
 /** What a `modifyContact` hook sees of a touching contact and may change for the step. */
 export interface ContactChange2D {
   readonly colliderA: Collider2D;
@@ -443,6 +463,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const handle = this.kernel.ok(this.kernel.exports.body_create(this.handle, BODY_KIND[type], flags));
     const body = new Body2D(this, handle, sprite, type);
     body.userData = options.userData;
+    body.params = {
+      linearDamping: options.linearDamping ?? 0,
+      angularDamping: options.angularDamping ?? 0,
+      gravityScale: options.gravityScale ?? 1,
+      canSleep: options.canSleep ?? true,
+      ccd: options.ccd === true,
+      dominance,
+    };
     if (options.lockTranslation) {
       const lock = options.lockTranslation === true ? [true, true] : options.lockTranslation;
       try {
@@ -589,6 +617,80 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
           },
         }
       : null;
+  }
+
+  /** @internal */
+  retype(body: Body2D, type: BodyType2D): void {
+    this.live();
+    if (!(type in BODY_KIND))
+      throw new TypeError(`Unknown body type "${type}"; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+    this.kernel.ok(this.kernel.exports.body_set_kind(this.handle, body.handle, BODY_KIND[type]));
+    this.movers = null;
+    body.snapshot();
+    body.pose.copyWithin(0, 3, 6);
+  }
+
+  /** The closest collider to `point`, its closest point and whether `point` is inside it (distance 0), or null. */
+  projectPoint(point: Vec2D, filter?: QueryFilter2D): ProjectedPoint2D | null {
+    this.live();
+    this.checkVec(point, 'Point');
+    const k = this.scale;
+    this.writeFilter(filter);
+    this.kernel.io(8).f.set([point[0] * k, point[1] * k], 4);
+    const count = this.kernel.ok(this.kernel.exports.project_point(this.handle));
+    const out = this.kernel.io(5 * count);
+    for (let i = 0; i < count; i++) {
+      const base = this.hitOf(out.u[5 * i], filter);
+      if (base) return { ...base, point: [out.f[5 * i + 1] / k, out.f[5 * i + 2] / k], inside: out.u[5 * i + 4] !== 0, distance: out.f[5 * i + 3] / k };
+    }
+    return null;
+  }
+
+  /** The bodies with a collider whose bounds meet the box from `min` to `max` (world units). */
+  intersectionsWithBox(min: Vec2D, max: Vec2D, filter?: QueryFilter2D): Body2D[] {
+    this.live();
+    this.checkVec(min, 'Box min');
+    this.checkVec(max, 'Box max');
+    this.writeFilter(filter);
+    const k = this.scale;
+    this.kernel.io(8).f.set([min[0] * k, min[1] * k, max[0] * k, max[1] * k], 4);
+    const count = this.kernel.ok(this.kernel.exports.aabb_query(this.handle));
+    return this.bodiesOf(this.kernel.io(count).u, count, filter);
+  }
+
+  /**
+   * The contacts the world holds for a collider as of the last step: each with the other collider, the contact normal
+   * from `collider` to it, up to two points with their separation (negative: overlapping), the normal impulse of the
+   * last substep and whether it pushes (`solverActive`; false for sensors and ignored solver groups) and touches.
+   */
+  contactPairs(collider: Collider2D): ContactPair2D[] {
+    this.live();
+    if (collider.isRemoved) throw new MargoError('state', 'Collider2D was removed; ask for the contacts of a live collider.');
+    const out: ContactPair2D[] = [];
+    const k = 1 / this.scale;
+    for (const shape of collider.shapes) {
+      const count = this.kernel.ok(this.kernel.exports.contacts_of(this.handle, shape));
+      const { f, u } = this.kernel.io(11 * count);
+      for (let i = 0; i < count; i++) {
+        const other = this.byShape.get(u[11 * i]);
+        if (!other) continue;
+        const flags = u[11 * i + 1],
+          n = flags >> 2;
+        const points: Array<{ point: [number, number]; distance: number }> = [];
+        for (let j = 0; j < n; j++)
+          points.push({ point: [f[11 * i + 4 + 3 * j] * k, f[11 * i + 5 + 3 * j] * k], distance: f[11 * i + 6 + 3 * j] * k });
+        out.push({
+          collider,
+          other,
+          normal: [f[11 * i + 2], f[11 * i + 3]],
+          points,
+          impulse: f[11 * i + 10],
+          solverActive: (flags & 1) !== 0,
+          touching: (flags & 2) !== 0,
+        });
+      }
+    }
+    return out;
   }
 
   /** @internal Holds `body` at its position on the axes picked, with a generic joint to a fixed body no one sees. */
