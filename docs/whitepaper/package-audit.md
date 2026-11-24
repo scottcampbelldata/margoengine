@@ -6,10 +6,11 @@ from memory is listed under "open". Losses stay in. Each row's commit hash is in
 
 ## Where this stands (2026-11-10)
 
-102 package folders. 99 have at least one audit row below; 18 of those (blender, cinematic, decoders, gltf, loaders,
-materials, mixer, netcode, procedural, react, save, text, tiles, toon, video, voxel-edit, wfc, xr) have two rows, from two
-machines or a second pass, and both are kept. Two rows say "partial" and name the files that were not read line by
-line, and those are owed; ifc's gap table is fully matched. The 3 packages with no audit,
+102 package folders. 99 have at least one audit row below; 19 of those (blender, cinematic, decoders, gltf, loaders,
+materials, mixer, netcode, procedural, react, save, text, tiles, toon, video, voxel-edit, voxel-pathtracer,
+wfc, xr) have two rows (voxel-pathtracer three), from two machines or a later pass, and all are kept.
+One row says "partial": voxel-pathtracer's first pass, whose owed files the vpt-b and vpt-c passes below it read
+line by line; ifc's gap table is fully matched. The 3 packages with no audit,
 physics, physics2d and ragdoll, are excluded by Scott's physics hold and listed at
 the end of the table. Every source a row could not read in full (paywall,
 dead link, a PDF with no extractable text, an ISO licence page we did not accept) is named in that row and in

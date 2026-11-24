@@ -65,7 +65,7 @@
   "viewcube": ["./up","./fit","./compass"],
   "voxel-edit": ["./formats-extra"],
   "voxel-net": ["./rooms","./replay","./webrtc","./server-runtimes"],
-  "voxel-pathtracer": ["./mesh-pbr","./denoise-ml"],
+  "voxel-pathtracer": ["./mesh-pbr"],
   "water": ["./ripples","./underwater","./rivers"],
   "weather": ["./gltf"],
   "wfc": ["./assemble","./tileset","./overlapping3d","./hex"],
