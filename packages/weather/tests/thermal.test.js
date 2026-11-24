@@ -202,3 +202,133 @@ test('validation', () => {
   assert.throws(() => c.draw({ add() {}, remove() {} }, undefined, { cap: 2 }), RangeError);
   assert.throws(() => new BlastCloud({ fireTemperature: 100 }), RangeError);
 });
+
+// The puffs a draw lays out, in world units: centre, radius, colour and glow (the Clouds target's distribute, read back
+// through the cloud's box and matrix).
+const drawn = (c, counts = {}) => {
+  const log = { smoke: [], fire: [] },
+    target = (list) => ({
+      add(o) {
+        const one = { options: { ...o }, matrix: new Float32Array(16) };
+        list.push(one);
+        return one;
+      },
+      remove(one) {
+        list.splice(list.indexOf(one), 1);
+        return true;
+      },
+    });
+  c.draw(target(log.smoke), target(log.fire), counts);
+  const read = (one) => {
+    if (!one) return [];
+    const { bounds, volume, segments } = one.options,
+      m = one.matrix,
+      big = volume / 2.4,
+      out = [];
+    for (let i = 0; i < segments; i++) {
+      const p = one.options.distribute(i, Math.random);
+      out.push({
+        at: [
+          m[12] + (p.point[0] * bounds[0]) / 2,
+          m[13] + (p.point[1] * bounds[1]) / 2,
+          m[14] + (p.point[2] * bounds[2]) / 2,
+        ],
+        r: p.volume * big,
+        color: p.color,
+        glow: p.emission,
+      });
+    }
+    return out;
+  };
+  return { smoke: read(log.smoke[0]), fire: read(log.fire[0]) };
+};
+
+test('the cap is lobes all over its face, never one smooth blob showing between them (KB-BLAST-CAPBLUR)', () => {
+  // Cap trees laid on random directions left open patches of the cap's face where the large inner filling puffs showed
+  // as a smooth dark blur; laid on a spiral of even area (Gonzalez 2010) the lobes cover every direction of the face.
+  for (const seed of [1, 2, 5, 1944]) {
+    const c = new BlastCloud({ sources: [{ tnt: 2e6, speed: 100 }], seed });
+    c.seek(40);
+    const [th] = c.thermals(),
+      { smoke } = drawn(c),
+      [cx, cy, cz] = th.centre,
+      norm = (p) => Math.hypot((p[0] - cx) / th.spread, (p[1] - cy) / th.thickness, (p[2] - cz) / th.spread),
+      lobes = smoke.filter((p) => norm(p.at) > 0.6);
+    let open = 0;
+    const N = 400;
+    for (let i = 0; i < N; i++) {
+      // Directions over the face a camera sees: from the top down to 30 degrees under the equator.
+      const ct = 1 - (1.5 * (i + 0.5)) / N,
+        st = Math.sqrt(1 - ct * ct),
+        phi = i * 2.399963,
+        s = [
+          cx + 0.92 * th.spread * st * Math.cos(phi),
+          cy + 0.92 * th.thickness * ct,
+          cz + 0.92 * th.spread * st * Math.sin(phi),
+        ];
+      if (!lobes.some((p) => Math.hypot(p.at[0] - s[0], p.at[1] - s[1], p.at[2] - s[2]) < p.r)) open++;
+    }
+    assert.ok(open <= N * 0.01, `seed ${seed}: ${open} of ${N} directions of the cap's face have no lobe over them`);
+  }
+});
+
+test('the smoke of an ammunition blast is grey-black, not brown (KB-BLAST-BROWN)', () => {
+  // TNT's oxygen balance is -74 percent (Akhavan 2011), so its detonation leaves free carbon: black soot, as in the
+  // Halifax (1917) and ammunition-dump photographs. The default cap and stem are neutral greys, the cap dark.
+  const c = new BlastCloud({ sources: [{ tnt: 2e6, speed: 100 }] });
+  c.seek(30);
+  const { smoke } = drawn(c);
+  for (const p of smoke) {
+    const [r, g, b] = p.color,
+      sum = r + g + b;
+    assert.ok((r - b) / sum < 0.03, `puff colour ${p.color.map((v) => v.toFixed(3))} is brown`);
+    assert.ok(sum / 3 < 0.25, `puff colour ${p.color.map((v) => v.toFixed(3))} is too pale for soot`);
+  }
+});
+
+test('the fireball is white-hot at its base, brighter than display white, and dims as it burns down (KB-BLAST-PEACH)', () => {
+  const c = new BlastCloud({ sources: [{ tnt: 2e6, speed: 100 }], fireDuration: 6 }),
+    bright = (t) => {
+      c.seek(t);
+      const { fire } = drawn(c);
+      return Math.max(0, ...fire.map((p) => p.color[1] + p.glow[1]));
+    };
+  const early = bright(0.3);
+  assert.ok(early >= 3, `the fire's brightest puff is ${early.toFixed(2)} in green, under white-hot`);
+  assert.ok(bright(4) < early, 'cooler later');
+});
+
+test('dark jets of thrown earth shoot out past the fireball in the first second and are gone by fifteen (KB-BLAST-JETS)', () => {
+  const c = new BlastCloud({ sources: [{ tnt: 2e6, speed: 100 }], seed: 3 }),
+    first = c.thermals(0.05)[0],
+    out = (t) => {
+      c.seek(t);
+      const [th] = c.thermals(),
+        { smoke } = drawn(c),
+        cap = c.options.color ?? [0.16, 0.16, 0.165];
+      return smoke.filter(
+        (p) =>
+          p.at[1] > 0.6 * first.radius &&
+          Math.hypot(
+            (p.at[0] - th.centre[0]) / th.spread,
+            (p.at[1] - th.centre[1]) / th.thickness,
+            (p.at[2] - th.centre[2]) / th.spread,
+          ) > 1.15 &&
+          p.color[1] < cap[1],
+      ).length;
+    };
+  assert.ok(out(1) >= 20, `${out(1)} dark puffs out past the fireball at 1 s`);
+  // Gone by fifteen: the draw is puff for puff the draw with no jets. (Counting dark puffs out past the cap, as at 1 s,
+  // also counted the risen stem and the darker-mottled cap lobes, which are not jets.)
+  const without = new BlastCloud({ sources: [{ tnt: 2e6, speed: 100 }], seed: 3, jets: 0 });
+  for (const t of [6, 15]) {
+    c.seek(t);
+    without.seek(t);
+    assert.deepEqual(drawn(c).smoke, drawn(without).smoke, `the jets have settled into the cloud by ${t} s`);
+  }
+  c.seek(1);
+  without.seek(1);
+  assert.notDeepEqual(drawn(c).smoke, drawn(without).smoke, 'the jets show at 1 s');
+  assert.throws(() => new BlastCloud({ jets: 100 }), RangeError);
+  assert.throws(() => new BlastCloud({ jets: 2.5 }), RangeError);
+});

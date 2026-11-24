@@ -30,8 +30,11 @@ export interface BlastCloudOptions {
     fireDuration?: number;
     color?: readonly [number, number, number];
     stemColor?: readonly [number, number, number];
-    fireColor?: readonly [number, number, number];
+    fireColor?: readonly [number, number, number] | null;
+    fireballTemperature?: number;
     fireGlow?: number;
+    jets?: number;
+    jetLife?: number;
     seed?: number;
 }
 

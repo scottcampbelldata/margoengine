@@ -11032,6 +11032,21 @@ hot start at `fireTemperature` 2,000 K, the lightest cloud 0.05 of the air's den
 0.75 b keeping the thermal's top, the merge ramp, the tree's sizes (children 0.42 to 0.58 of the parent, 0.78 and
 0.62 of its radius out), the glow's share by height and level, and the stem's widths.
 
+Third pass (2026-11-24, lane D). Added sources, read as text: J. Akhavan, The Chemistry of Explosives, 3rd ed., RSC,
+2011 (TNT's oxygen balance of -74 percent, so its detonation leaves free carbon: the soot grey-black default colours);
+C. L. Mader, Numerical Modeling of Explosives and Propellants, 3rd ed., CRC Press, 2008 (Chapman-Jouguet temperatures
+of 3,000 to 4,000 K for military explosives; `fireballTemperature` 3,000 K a model choice at the low end); Planck's law
+in its Wien limit and the Stefan-Boltzmann law (textbook physics: the fire's glow at 555 nm against that of its first
+temperature, and power ~ area T^4, so the fire's shrinking outline carries part of its power drop and its temperature
+only the rest); R. Swinbank and R. J. Purser, "Fibonacci grids", Q. J. R. Meteorol. Soc. 132, 1769-1793, 2006,
+https://doi.org/10.1256/qj.05.227, and A. Gonzalez, "Measurement of areas on a sphere using Fibonacci and
+latitude-longitude lattices", Math. Geosci. 42, 49-64, 2010, https://doi.org/10.1007/s11004-009-9257-x (the cap's trees
+on a golden-angle spiral of even area); L. G. Mastin, "A simple calculator of ballistic trajectories for blocks ejected
+during volcanic eruptions", USGS Open-File Report 01-45, 2001 (ballistic paths slowed by drag, for the jets; the linear
+drag of time constant 1.5 s is a model choice). Model choices: trees of three levels (a fourth spent 30 of 51 puffs on
+the smallest lobes and left a quarter of the cap's face open), blobs at 0.78 of the cap's radii, the first lobes in a
+jittered ring 55 degrees off the blob's normal, and the jets' quarter share of the stem's puffs while they show.
+
 ## Explosion crater: terrain/ground-change 'crater' event (2026-11-24)
 
 Written from the sources' text only; no other engine's or tool's code was read. S. Glasstone and P. J. Dolan, The

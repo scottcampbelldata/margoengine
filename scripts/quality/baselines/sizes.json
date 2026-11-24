@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17536971,
+  "total": 17537743,
   "history": [
     {
       "date": "2026-10-24",
@@ -11385,6 +11385,12 @@
       "commit": "dc13aa99d",
       "reason": "new optional entry @margoengine/physics/soft: soft bodies on XPBD distance constraints with two-way contact; 6,698 B entry code plus a 6,777 B lazy Wasm kernel chunk loaded only by SoftBodies.attach. Rapier's soft-bodies page is the bar; the root entry pays nothing.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "a2346873d4",
+      "reason": "weather/eruption 9,802 to 10,574 B: BlastCloud lobed cap, blackbody fire glow, debris jets and soot colours; one entry, the features need the code",
+      "grew": 1
     }
   ],
   "items": {
@@ -12862,7 +12868,7 @@
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 7011,
-    "@margoengine/weather/eruption": 9802,
+    "@margoengine/weather/eruption": 10574,
     "@margoengine/weather/gltf": 5981,
     "@margoengine/weather/hail": 5136,
     "@margoengine/weather/lava": 12346,

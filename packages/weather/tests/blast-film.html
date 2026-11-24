@@ -1,11 +1,13 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Blast cloud film frames</title><style>body{margin:0}canvas{display:block}</style></head><body><canvas id="a" width="1280" height="720" style="width:1280px;height:720px"></canvas>
 <script type="module">
-// Film frames of BlastCloud for judging against photographs: the late-morning Sky with its sun and sky light, rolling
+// Film frames of BlastCloud for judging against photographs: the Sky of the Fauld morning with its sun and sky light, rolling
 // farmland, the cloud in a Clouds of relief 1 lit by the Sky's sun, and bloom for the fire's glow. ?range=3000 sets the
 // camera's distance (metres); ?tnt=, ?share=, ?sources=2 set the release. window.film.frame(t) draws film second t.
 import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
-import {Sky,sunDirection} from '/packages/sky/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {sunPosition} from '/packages/sky/dist/astro.js';
+import {degrees} from '/packages/sky/dist/sun.js';
 import {Clouds} from '/packages/vfx/dist/clouds.js';
 import {BlastCloud} from '/packages/weather/dist/eruption.js';
 const q=new URLSearchParams(location.search),range=Number(q.get('range')??3000),tnt=Number(q.get('tnt')??4e6),share=Number(q.get('share')??0.4);
@@ -14,7 +16,10 @@ const canvas=document.querySelector('#a');
 const aim=Number(q.get('aim')??900),fov=Number(q.get('fov')??40);
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-range*0.94,25,-range*0.34],target:[0,aim,0],near:5,far:200000,fov}});engine.stop();
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
-const sky=Sky.attach(engine,{hours:Number(q.get('hours')??11.2),timeScale:0,lighting:{intensity:3},environment:true});
+// The sun of the Fauld explosion, 11:11 GMT on 27 November 1944 at 52.84 N, 1.73 W (?date= another moment): low in
+// the south, about 16 degrees up, so the cloud is lit from the side as in the photographs of daytime blasts.
+const when=new Date(q.get('date')??'1944-11-27T11:11:00Z'),sun=Array.from(sunPosition(when,{latitude:degrees(52.84),longitude:degrees(-1.73)}).direction);console.log('sun',JSON.stringify(sun));
+const sky=Sky.attach(engine,{sunDirection:sun,timeScale:0,lighting:{intensity:3},environment:true});
 // Rolling farmland: a 40 km grid, heights from three octaves of sines (gentle hills of 10 to 40 m), flat at the source.
 const N=160,S=20000,pos=[],nor=[],idx=[];
 const h=(x,z)=>{const r=Math.hypot(x,z);const f=Math.min(1,Math.max(0,(r-600)/1500));return f*(22*Math.sin(x/1900+1.3)*Math.cos(z/2300)+9*Math.sin(x/610-z/830)+4*Math.cos(x/250+z/310));};
@@ -22,7 +27,6 @@ for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){const x=-S+2*S*i/N,z=-S+2*S*j/N,e=1;p
 for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*(N+1)+i;idx.push(a,a+N+1,a+1,a+1,a+N+1,a+N+2);}
 engine.createMesh().setGeometry(new Geometry(pos,nor,idx)).setMaterial(new PbrMaterial({color:'#4f5a37',roughness:0.95}));
 const post=Bloom.attach(engine,{strength:0.35,threshold:1.2,exposure:0});
-const sun=Array.from(sunDirection(Number(q.get('hours')??11.2)));console.log('sun',JSON.stringify(sun));
 const smoke=Clouds.attach(engine,{limit:20000,relief:Number(q.get('relief')??1),lightDirection:sun,lightColor:[1,0.95,0.88],ambient:Number(q.get('ambient')??0.5),density:Number(q.get('density')??0.35)});
 const two=q.get('sources')!=='1';
 const blast=new BlastCloud({heatShare:share,sources:two?[{at:0,tnt:tnt*0.55,speed:120},{at:0.6,tnt:tnt*0.45,position:[260,0,90],speed:110}]:[{tnt,speed:120}],wind:3,windDirection:70,seed:5});

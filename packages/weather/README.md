@@ -421,10 +421,16 @@ Options (every one optional): `sources` (1 to 8 of `{ at, position, tnt, radius,
 tnt^(1/3) m, `speed` to 0), `altitude` (0), `heatShare` (0.4 of the charge's energy heats the air), `entrainment`
 (0.25), `addedMass` (0.5), `fireTemperature` (2,000 K, the hot start's temperature), `airTemperature` (288.15 K), `tropopause` (11,000 m), `stability` (null follows the ICAO
 atmosphere; a value holds N^2), `wind` (0 m/s at 10 m) and `windDirection` (0 degrees, toward +Z), `horizon` (900 s
-solved), `fireDuration` (4 s), `fireGlow` (6, the glow's brightness inside the smoke), `color` (smoke grey),
-`stemColor` (earth brown), `fireColor` and `seed`. `draw`'s third argument sets the puff counts (`cap` 1,260, `stem`
-504, `fire` 60 per source); the cloud's light is summed over every pair of puffs on the CPU, so 3,500 puffs cost
-about 0.1 s a frame. `airStability(z)` and
+solved), `fireDuration` (4 s), `fireballTemperature` (3,000 K, the fireball's light at the release, 1,000 to
+5,000), `fireGlow` (6, the glow's brightness at that temperature), `color` (soot grey-black [0.16, 0.16, 0.165]: TNT's
+oxygen balance of -74 percent leaves free carbon), `stemColor` ([0.12, 0.117, 0.113]), `fireColor` (null: a
+blackbody at each puff's temperature), `jets` (16 dark trails of thrown earth out of the fireball, 0 to 64) and
+`jetLife` (6 s, 1 to 30), and `seed`. The fire's outline shrinks as it burns down and its temperature carries only
+the rest of the power drop (power ~ area T^4), so a fresh fireball draws white-hot, far over display white.
+`draw`'s third argument sets the puff counts (`cap` 2,040, `stem` 1,020, `fire` 60 per source); while the jets show
+they take a quarter of the stem's puffs, so a draw never goes over its counts. The cap is laid as trees of 21 puffs
+over three sizes on an even spiral over its face, each tree's first lobes in a ring, so the face is lobes all over.
+The cloud's light is summed over every pair of puffs on the CPU, so 3,500 puffs cost about 0.1 s a frame. `airStability(z)` and
 `thermalTop(B, N2)` are exported too.
 
 ## Lava flows, fountains and bombs

@@ -43,12 +43,19 @@
 // - W. E. Baker, P. A. Cox, P. S. Westine, J. J. Kulesz and R. A. Strehlow, "Explosion Hazards and Evaluation",
 //   Elsevier, 1983: the cube-root scaling of an explosion's sizes with its charge mass and the TNT heat of detonation,
 //   4.184 MJ/kg.
+// - M. Planck, "Ueber das Gesetz der Energieverteilung im Normalspectrum", Ann. Phys. 309(3), 553-563, 1901,
+//   https://doi.org/10.1002/andp.19013090310, in its Wien limit (lambda T well under c2 = 14,388 um K): the fire's
+//   brightness at 555 nm, the eye's peak, goes as exp(-c2 / (lambda T)), so a fireball a fifth cooler is a tenth as
+//   bright; the Stefan-Boltzmann law puts the radiating fire's temperature at T0 f^(1/4) for a share f of its power. Its
+//   colour is the blackbody's (`blackbodyColor` of `@margoengine/math/color`, Kim et al. 2002): near-white at the core
+//   of a fresh fireball once exposed for daylight, orange and red as it cools.
 // The buoyancy of the released heat Q in air of density rho, heat capacity c_p and temperature T is B = g Q / (rho c_p T)
 // (the heat-to-buoyancy flux relation of Morton et al. 1956), and for an ideal gas at the air's pressure the same B
 // is g (rho_a - rho) V / rho_a whatever the cloud's temperature, so the hot start holds the heat in the volume at which
 // the cloud is `fireTemperature`; `heatShare` of the charge's energy heats the air (a model choice). The atmosphere is
 // the ICAO standard one (`standardAtmosphere`), whose N^2 = g / T (dT/dz + g / c_p) stops the rise. The wind drifts the
 // cap as the 1/7 power of height to the tropopause, as `Eruption`.
+import { blackbodyColor } from '@margoengine/math/color';
 import { standardAtmosphere } from './eruption.js';
 import { filmTime } from '../../shared/film-time.js';
 
@@ -108,14 +115,37 @@ export interface BlastCloudOptions {
   horizon?: number;
   /** Seconds the fire inside the cloud burns, 0 to 600. Default 4. */
   fireDuration?: number;
-  /** Colour of the cap (smoke and fine dust), linear RGB 0 to 1. Default [0.42, 0.4, 0.37], smoke grey. */
+  /**
+   * Colour of the cap (smoke and fine dust), linear RGB 0 to 1. Default [0.16, 0.16, 0.165], soot grey-black: TNT's
+   * oxygen balance is -74 percent (J. Akhavan, "The Chemistry of Explosives", 3rd ed., RSC, 2011), so its detonation
+   * leaves free carbon, the black smoke of the Halifax (1917) and ammunition-dump photographs.
+   */
   color?: readonly [number, number, number];
-  /** Colour of the stem and base surge (thrown earth), linear RGB 0 to 1. Default [0.3, 0.25, 0.19], earth brown. */
+  /** Colour of the stem and base surge (thrown earth in the soot), linear RGB 0 to 1. Default [0.12, 0.117, 0.113]. */
   stemColor?: readonly [number, number, number];
-  /** Colour of the fire, linear RGB 0 to 1: the glow of the puffs near the fire, and the fire puffs. Default [1, 0.42, 0.1]. */
-  fireColor?: readonly [number, number, number];
-  /** Brightness of the fire's glow inside the smoke, 0 to 100 (above 1 blooms). Default 6. */
+  /**
+   * Colour of the fire, linear RGB 0 to 1: the glow of the puffs near the fire, and the fire puffs. Default null: the
+   * colour of a blackbody at each puff's temperature, near-white in a fresh fireball, orange to red as it cools.
+   */
+  fireColor?: readonly [number, number, number] | null;
+  /**
+   * Temperature of the fireball's light at the moment of the release, kelvin, 1,000 to 5,000: the detonation products
+   * glow at the Chapman-Jouguet temperatures of 3,000 to 4,000 K that C. L. Mader ("Numerical Modeling of Explosives
+   * and Propellants", 3rd ed., CRC Press, 2008) tabulates for military explosives, and cool as the fire burns down.
+   * Default 3,000 (a model choice at the low end, the afterburning cloud being cooler than the detonation front).
+   */
+  fireballTemperature?: number;
+  /** Brightness of the fire's glow at `fireballTemperature`, 0 to 100 (above 1 blooms); cooler fire is dimmer. Default 6. */
   fireGlow?: number;
+  /**
+   * Dark jets of thrown earth shooting out of the fireball in its first seconds, 0 to 64, a whole number: each a trail
+   * of dust puffs behind a clod launched at 250 to 450 m/s and slowed by the air (a linear drag of time constant 1.5 s,
+   * a model choice after the ballistic paths of Mastin 2001), settling into the cloud by `jetLife`. While they show they take a quarter of the stem's puffs (`draw` counts.stem),
+   * up to 14 a jet. Default 16.
+   */
+  jets?: number;
+  /** Seconds the jets show, 1 to 30. Default 6. */
+  jetLife?: number;
   /** Seed of the puff layout, an integer. Default 1. */
   seed?: number;
 }
@@ -156,9 +186,9 @@ export interface BlastCloudTarget {
 
 /** How many puffs {@link BlastCloud.draw} lays out. */
 export interface BlastDrawOptions {
-  /** Puffs of each cap, 32 to 16,384. Default 1,260. */
+  /** Puffs of each cap, 32 to 16,384. Default 2,040. */
   cap?: number;
-  /** Puffs of each stem and its base surge, 32 to 16,384. Default 504. */
+  /** Puffs of each stem and its base surge, 32 to 16,384. Default 1,020. */
   stem?: number;
   /** Puffs of each fire in the `fire` target, 0 to 1,024. Default 60. */
   fire?: number;
@@ -180,6 +210,7 @@ const RANGES: Record<string, readonly [number, number]> = {
   altitude: [0, 8000],
   heatShare: [0.01, 1],
   fireTemperature: [400, 5000],
+  fireballTemperature: [1000, 5000],
   entrainment: [0.1, 0.5],
   addedMass: [0, 2],
   airTemperature: [220, 320],
@@ -190,6 +221,8 @@ const RANGES: Record<string, readonly [number, number]> = {
   stability: [0, 0.01],
   fireDuration: [0, 600],
   fireGlow: [0, 100],
+  jets: [0, 64],
+  jetLife: [1, 30],
 };
 
 const bad = (message: string): never => {
@@ -305,10 +338,31 @@ function solve(
 type Vec = [number, number, number];
 /** A puff in world units: centre, radius, colour, glow. */
 type Puff = [number, number, number, number, number, number, number, number, number, number];
-/** Children of each blob and of each child (Bouthors and Neyret 2004): one tree is 1 + 5 + 5 x 3 = 21 puffs. */
-const CHILDREN = 5;
-const GRANDCHILDREN = 3;
-const TREE = 1 + CHILDREN + CHILDREN * GRANDCHILDREN;
+/**
+ * Lobes on each lobe, level by level (Bouthors and Neyret 2004): a blob, 5 children and 3 on each child, so one tree is
+ * 1 + 5 + 15 = 21 puffs over three sizes, each about half the one before. A fourth level (2 on each grandchild, 51
+ * puffs a tree) spent 30 of every 51 puffs on lobes an eighth of the blob, so a cap's budget laid 36 trees instead of
+ * 87 and left a quarter of its face open, the filling puffs inside showing as one smooth blur (KB-BLAST-CAPBLUR). The
+ * finer billows come from more, smaller trees, not deeper ones.
+ */
+const LOBES = [5, 3] as const;
+/** How far out of its parent a lobe sits, in parent radii, level by level: about half sunk, so the lobes blend. */
+const OUT = [0.78, 0.62] as const;
+const TREE = 1 + 5 + 5 * 3;
+/** Radians the first ring of lobes leans off the blob's normal, before a jitter of plus or minus 15 percent. */
+const RING_TILT = (55 * Math.PI) / 180;
+/** Two unit vectors at right angles to unit `n` and to each other. */
+const tangents = (n: readonly number[]): [Vec, Vec] => {
+  const [x, y, z] = n as [number, number, number],
+    a: Vec = Math.abs(x) < 0.9 ? [0, z, -y] : [-z, 0, x],
+    la = Math.hypot(...a);
+  const t: Vec = [a[0] / la, a[1] / la, a[2] / la];
+  return [t, [y * t[2] - z * t[1], z * t[0] - x * t[2], x * t[1] - y * t[0]]];
+};
+/** c2 / 555 nm, kelvin: Planck's second radiation constant over the wavelength of the eye's peak (Wien limit). */
+const WIEN = 14387.77 / 0.555;
+/** Draper point, kelvin: a body cooler than this gives no visible glow. */
+const DRAPER = 798;
 
 /**
  * The mushroom cloud of one or more instantaneous releases over film time (entry `@margoengine/weather/eruption`):
@@ -334,8 +388,9 @@ export class BlastCloud {
         bad(`${key} must be a number from ${lo} to ${hi}.`);
     colour(o.color, 'color');
     colour(o.stemColor, 'stemColor');
-    colour(o.fireColor, 'fireColor');
+    if (o.fireColor !== null) colour(o.fireColor, 'fireColor');
     if (o.seed !== undefined && !Number.isInteger(o.seed)) bad('seed must be an integer.');
+    if (o.jets !== undefined && !Number.isInteger(o.jets)) bad('jets must be a whole number.');
     const sources = options.sources ?? [{}];
     if (!Array.isArray(sources) || sources.length < 1 || sources.length > 8) bad('sources must hold 1 to 8 releases.');
     this.options = options;
@@ -492,8 +547,8 @@ export class BlastCloud {
     if (this.target && this.target !== clouds) this.clear();
     this.target = clouds;
     if (fire !== undefined) this.fireTarget = fire;
-    const capN = counts.cap ?? 1260,
-      stemN = counts.stem ?? 504,
+    const capN = counts.cap ?? 2040,
+      stemN = counts.stem ?? 1020,
       fireN = counts.fire ?? 60;
     for (const [n, lo, hi, key] of [
       [capN, 32, 16384, 'cap'],
@@ -504,9 +559,10 @@ export class BlastCloud {
         bad(`draw counts.${key} must be a whole number from ${lo} to ${hi}.`);
     const o = this.options,
       seed = o.seed ?? 1,
-      capColour = o.color ?? [0.42, 0.4, 0.37],
-      stemColour = o.stemColor ?? [0.3, 0.25, 0.19],
-      fireColour = o.fireColor ?? [1, 0.42, 0.1],
+      capColour = o.color ?? [0.16, 0.16, 0.165],
+      stemColour = o.stemColor ?? [0.12, 0.117, 0.113],
+      fixedFire = o.fireColor ?? null,
+      hottest = o.fireballTemperature ?? 3000,
       glowAt = o.fireGlow ?? 6,
       all = this.thermals(),
       lit = all.map((th, i) => ({ th, tr: this.tracks[i]! })).filter((x) => this.film >= x.tr.at);
@@ -518,84 +574,109 @@ export class BlastCloud {
         [gx, gy, gz] = tr.position,
         Rh = th.spread,
         Hv = th.thickness,
-        heat = th.fire * th.fire * glowAt;
-      // A cauliflower tree (Bouthors and Neyret 2004): a blob on the surface, CHILDREN on its outward side at about
-      // half its size, and GRANDCHILDREN on each of those. `tint` gives a puff's colour and glow from its height share
-      // and level.
+        // The fire radiating a share `fire` of its first power is at hottest x fire^(1/4) (Stefan-Boltzmann).
+        core = th.fire > 0 ? hottest * th.fire ** 0.25 : 0;
+      // The glow of fire at `cool` (0 at the core, 1 at the cloud's edge, 12 percent cooler): the blackbody's colour,
+      // as bright as its light at 555 nm against that of `fireballTemperature` (Planck's law in its Wien limit).
+      const glow = (cool: number, base = core): Vec => {
+        const T = base * (1 - 0.12 * Math.min(Math.max(cool, 0), 1));
+        if (T <= DRAPER) return [0, 0, 0];
+        const L = glowAt * Math.exp(WIEN * (1 / hottest - 1 / T)),
+          c = fixedFire ?? blackbodyColor(Math.min(Math.max(T, 1667), 25000));
+        return [c[0]! * L, c[1]! * L, c[2]! * L];
+      };
+      // A cauliflower tree (Bouthors and Neyret 2004): a blob on the surface, LOBES[0] on its outward side at about
+      // half its size, LOBES[1] on each of those and LOBES[2] on each of theirs. `tint` gives a puff's colour and glow
+      // from its place.
       let n = 0;
-      const tree = (p: Vec, normal: Vec, r0: number, tint: (y: number, level: number) => [Vec, Vec]): void => {
-        const push = (q: Vec, r: number, level: number): void => {
-          const [c, e] = tint(q[1], level);
+      const tree = (p: Vec, normal: Vec, r0: number, tint: (q: Vec) => [Vec, Vec]): void => {
+        const push = (q: Vec, r: number): void => {
+          const [c, e] = tint(q);
           smoke.push([q[0], q[1], q[2], r, c[0], c[1], c[2], e[0], e[1], e[2]]);
         };
-        const out = (parent: Vec, normal: Vec, r: number, count: number, level: number, k: number): void => {
-          for (let i = 0; i < count; i++, n++) {
-            const a = rnd(n, 20 + k) * 2 * Math.PI,
-              cz2 = rnd(n, 21 + k) * 2 - 1,
-              sz = Math.sqrt(1 - cz2 * cz2);
-            let d: Vec = [
-              normal[0] + 0.95 * sz * Math.cos(a),
-              normal[1] + 0.95 * cz2,
-              normal[2] + 0.95 * sz * Math.sin(a),
-            ];
+        const out = (parent: Vec, normal: Vec, r: number, level: number, k: number): void => {
+          // The first level stands in an even ring round the blob's normal (stratified, jittered within its sector), so
+          // the lobes reach out sideways into the gaps between trees; random directions bunched them and left those
+          // gaps open (KB-BLAST-CAPBLUR). Deeper levels stay random, for the irregular billows.
+          const lobes = LOBES[level - 1]!,
+            [t1, t2] = level === 1 ? tangents(normal) : [normal, normal],
+            spin = rnd(n, 23 + k) * 2 * Math.PI;
+          for (let i = 0; i < lobes; i++, n++) {
+            let d: Vec;
+            if (level === 1) {
+              const a = spin + ((i + 0.3 + 0.4 * rnd(n, 20 + k)) / lobes) * 2 * Math.PI,
+                tilt = RING_TILT * (0.85 + 0.3 * rnd(n, 21 + k)),
+                s = Math.sin(tilt),
+                c = Math.cos(tilt);
+              d = [0, 1, 2].map((j) => normal[j]! * c + s * (t1[j]! * Math.cos(a) + t2[j]! * Math.sin(a))) as Vec;
+            } else {
+              const a = rnd(n, 20 + k) * 2 * Math.PI,
+                cz2 = rnd(n, 21 + k) * 2 - 1,
+                sz = Math.sqrt(1 - cz2 * cz2);
+              d = [normal[0] + 0.95 * sz * Math.cos(a), normal[1] + 0.95 * cz2, normal[2] + 0.95 * sz * Math.sin(a)];
+            }
             const len = Math.hypot(...d) || 1;
             d = [d[0] / len, d[1] / len, d[2] / len];
             const rc = r * (0.42 + 0.16 * rnd(n, 22 + k)),
-              // Children sit 0.78 of the parent's radius out, grandchildren 0.62: half sunk, so the small lobes blend.
-              out_ = level === 1 ? 0.78 : 0.62,
+              out_ = OUT[level - 1]!,
               q: Vec = [parent[0] + d[0] * r * out_, parent[1] + d[1] * r * out_, parent[2] + d[2] * r * out_];
-            push(q, rc, level);
-            if (level === 1) out(q, d, rc, GRANDCHILDREN, 2, k + 3);
+            push(q, rc);
+            if (level < LOBES.length) out(q, d, rc, level + 1, k + 3 * level);
           }
         };
-        push(p, r0, 0);
-        out(p, normal, r0, CHILDREN, 1, 0);
+        // The blob itself is drawn at 0.65 of the radius its lobes sit on, so it fills the tree from inside and the
+        // lobes, not one large soft puff, make the cloud's surface and outline.
+        push(p, 0.65 * r0);
+        out(p, normal, r0, 1, 0);
       };
       const mottle = (i: number) => 0.82 + 0.36 * rnd(i, 30);
       // Cap: an ellipsoid of horizontal radius Rh and half height Hv; blobs over its top and sides down to 120 degrees
-      // from the top, the underside rolled in by the vortex ring (Turner 1957). Glow from the fire fills its base.
+      // from the top, the underside rolled in by the vortex ring (Turner 1957). The fire is hottest at its centre.
       // Merged caps share the cap: each lays out its share, so two fully merged caps draw one cap's puffs.
       const capTrees = Math.max(1, Math.floor((capN * 0.9 * (1 - 0.5 * th.merged)) / TREE)),
         capFill = Math.round(capN * 0.1 * (1 - 0.5 * th.merged));
+      // The trees sit on a spiral of even area over the cap's face (R. Swinbank and R. J. Purser, "Fibonacci grids",
+      // Q. J. R. Meteorol. Soc. 132, 1769-1793, 2006; A. Gonzalez, "Measurement of areas on a sphere using Fibonacci
+      // and latitude-longitude lattices", Math. Geosci. 42, 49-64, 2010), jittered within their band, so no part of the
+      // face is left open to the filling puffs inside (random directions left a third of it open: KB-BLAST-CAPBLUR).
+      const turn = rnd(0, 1) * 2 * Math.PI;
       for (let i = 0; i < capTrees; i++) {
-        const phi = rnd(i, 1) * 2 * Math.PI,
-          ct = 1 - rnd(i, 2) * 1.5,
+        const phi = turn + i * 2.399963 + (rnd(i, 1) - 0.5) * 0.4,
+          ct = 1 - (1.5 * (i + 0.25 + 0.5 * rnd(i, 2))) / capTrees,
           st = Math.sqrt(1 - ct * ct),
           shade = mottle(i),
           normal = [(st * Math.cos(phi)) / Rh, ct / Hv, (st * Math.sin(phi)) / Rh],
           nl = Math.hypot(...normal),
-          r0 = 0.34 * (0.6 * Rh + 0.4 * Hv) * (0.7 + 0.6 * rnd(i, 3));
+          r0 = 0.3 * (0.6 * Rh + 0.4 * Hv) * (0.7 + 0.6 * rnd(i, 3));
+        // Blobs at 0.78 of the cap's radii, so their first ring of lobes reaches its face (at 0.72 a seed in four left
+        // more than 1 percent of the face open).
         tree(
-          [cx + 0.82 * Rh * st * Math.cos(phi), cy + 0.82 * Hv * ct, cz + 0.82 * Rh * st * Math.sin(phi)],
+          [cx + 0.78 * Rh * st * Math.cos(phi), cy + 0.78 * Hv * ct, cz + 0.78 * Rh * st * Math.sin(phi)],
           [normal[0]! / nl, normal[1]! / nl, normal[2]! / nl],
           r0,
-          (y, level) => {
-            const low = Math.min(Math.max(1 - (y - (cy - Hv)) / (2 * Hv), 0), 1),
-              g = heat * low * [1, 0.45, 0.15][level]!;
-            return [
-              [capColour[0] * shade, capColour[1] * shade, capColour[2] * shade],
-              [fireColour[0] * g, fireColour[1] * g, fireColour[2] * g],
-            ];
-          },
+          (q) => [
+            [capColour[0] * shade, capColour[1] * shade, capColour[2] * shade],
+            glow(Math.hypot((q[0] - cx) / Rh, (q[1] - cy) / Hv, (q[2] - cz) / Rh)),
+          ],
         );
       }
       for (let i = 0; i < capFill; i++, n++) {
         const phi = rnd(n, 4) * 2 * Math.PI,
           ct = rnd(n, 5) * 2 - 1,
           st = Math.sqrt(1 - ct * ct),
-          rr = Math.cbrt(rnd(n, 6)) * 0.6,
-          g = heat * 1.4;
+          rr = Math.cbrt(rnd(n, 6)) * 0.42,
+          g = glow(rr);
         smoke.push([
           cx + rr * Rh * st * Math.cos(phi),
           cy + rr * Hv * ct,
           cz + rr * Rh * st * Math.sin(phi),
-          0.55 * Math.min(Rh, 1.6 * Hv),
+          0.22 * Math.min(Rh, 1.6 * Hv),
           capColour[0] * 0.8,
           capColour[1] * 0.8,
           capColour[2] * 0.8,
-          fireColour[0] * g,
-          fireColour[1] * g,
-          fireColour[2] * g,
+          g[0],
+          g[1],
+          g[2],
         ]);
       }
       // Stem: from the ground to under the cap, drawn up by the ring's circulation, broad at the base and narrowing
@@ -605,20 +686,45 @@ export class BlastCloud {
         surge = Math.min(tr.b0 * (1 + 0.6 * Math.sqrt(th.age)), 1.2 * th.radius + tr.b0),
         rTop = 0.45 * Math.min(Rh, 2 * th.radius),
         rBase = Math.max(0.55 * th.radius, 0.8 * tr.b0),
-        stemTrees = Math.max(1, Math.floor((stemN * 0.75) / TREE)),
+        // Jets of thrown earth are stem material: while they show they take a quarter of the stem's puffs from its
+        // trees, so a draw stays inside `counts` (they were added on top of it).
+        jetN = o.jets ?? 16,
+        jetLife = o.jetLife ?? 6,
+        jetBudget = jetN > 0 && th.age > 0 && th.age < jetLife ? Math.floor(stemN * 0.25) : 0,
+        stemTrees = Math.max(1, Math.floor((stemN * 0.65 - jetBudget) / TREE)),
+        stemFill = Math.round(stemN * 0.1),
         surgeTrees = Math.max(1, Math.floor((stemN * 0.25) / TREE)),
-        earth = (y: number, level: number, shade: number, rise: number): [Vec, Vec] => {
-          const f = Math.min(Math.max(rise, 0), 1),
-            g = heat * (1 - f) * [0.8, 0.3, 0.1][level]!;
+        // Thrown earth, the cap's colour toward the top; the fire at the foot, cooler up the stem and out in the surge.
+        earth = (shade: number, rise: number): [Vec, Vec] => {
+          const f = Math.min(Math.max(rise, 0), 1);
           return [
             [0, 1, 2].map((c) => (stemColour[c]! + (capColour[c]! - stemColour[c]!) * f) * shade) as Vec,
-            [fireColour[0] * g, fireColour[1] * g, fireColour[2] * g],
+            glow(0.3 + f),
           ];
         };
-      if (top > 0)
+      if (top > 0) {
+        // Trees spread evenly up the stem (stratified heights, golden-angle turns) so it has no gaps of open sky,
+        // round a core of filling puffs on its axis.
+        for (let i = 0; i < stemFill; i++, n++) {
+          const along = (i + rnd(n, 31)) / stemFill,
+            w = rTop + (rBase - rTop) * (1 - along) ** 2,
+            [c, e] = earth(mottle(n), along);
+          smoke.push([
+            gx + (cx - gx) * along,
+            gy + along * top,
+            gz + (cz - gz) * along,
+            0.75 * w,
+            c[0] * 0.8,
+            c[1] * 0.8,
+            c[2] * 0.8,
+            e[0],
+            e[1],
+            e[2],
+          ]);
+        }
         for (let i = 0; i < stemTrees; i++) {
-          const along = rnd(i, 7),
-            phi = rnd(i, 8) * 2 * Math.PI,
+          const along = (i + rnd(i, 7)) / stemTrees,
+            phi = (i * 2.399963 + rnd(i, 8)) % (2 * Math.PI),
             w = rTop + (rBase - rTop) * (1 - along) ** 2,
             sx = gx + (cx - gx) * along,
             sz = gz + (cz - gz) * along,
@@ -627,9 +733,10 @@ export class BlastCloud {
             [sx + 0.8 * w * Math.cos(phi), gy + along * top, sz + 0.8 * w * Math.sin(phi)],
             [Math.cos(phi), 0.15, Math.sin(phi)],
             0.5 * w * (0.7 + 0.6 * rnd(i, 9)),
-            (y, level) => earth(y, level, shade, (y - gy) / Math.max(top, 1)),
+            (q) => earth(shade, (q[1] - gy) / Math.max(top, 1)),
           );
         }
+      }
       for (let i = 0; i < surgeTrees; i++) {
         const phi = rnd(i, 10) * 2 * Math.PI,
           r = surge * (0.35 + 0.65 * Math.sqrt(rnd(i, 11))),
@@ -640,13 +747,23 @@ export class BlastCloud {
           [gx + r * Math.cos(phi), gy + 0.5 * size, gz + r * Math.sin(phi)],
           [Math.cos(phi) * 0.6, 0.8, Math.sin(phi) * 0.6],
           size,
-          (_y, level) => earth(gy, level, shade, 0),
+          () => earth(shade, 0.4),
         );
       }
+      // The fire puffs' own temperature. The fire's outline, its radiating surface (the puffs overlap into one body),
+      // already shrinks with it, radius (0.7 + 0.5 fire) / 1.2 of the first, so by Stefan-Boltzmann (power ~ area T^4)
+      // the temperature carries only the rest of the power drop; taking it all in the temperature as well (`core`)
+      // dimmed the shrinking fire twice and left it peach in its first second (KB-BLAST-PEACH). `core` still sets the
+      // glow the fire casts into the smoke, whose lit volume does not shrink.
+      const shrink = ((0.7 + 0.5 * th.fire) / 1.2) ** 2,
+        fireCore = th.fire > 0 ? hottest * Math.min(1, th.fire / shrink) ** 0.25 : 0;
       if (th.fire > 0 && fireN > 0)
         for (let m = 0; m < fireN; m++) {
+          // White-hot at the base: each fire puff carries the glow of its temperature, hottest low in the fire (the
+          // Wien-limit brightness of `glow`), far over display white, so a camera exposed for the daylight clips it white.
           // Fire low in the base of the cloud, under the stem: it shrinks and sinks as it burns down.
           const fr = tr.b0 * (0.7 + 0.5 * th.fire),
+            hue = fixedFire ?? blackbodyColor(Math.min(Math.max(fireCore, 1667), 25000)),
             phi = rnd(m, 13) * 2 * Math.PI,
             r = fr * Math.sqrt(rnd(m, 14)),
             y = fr * 0.6 * rnd(m, 15) ** 2 * th.fire;
@@ -655,18 +772,51 @@ export class BlastCloud {
             gy + 0.15 * fr + y,
             gz + r * Math.sin(phi),
             fr * (0.12 + 0.12 * rnd(m, 16)) * (0.4 + 0.6 * th.fire),
-            fireColour[0],
-            fireColour[1],
-            fireColour[2],
-            0,
-            0,
-            0,
+            hue[0]!,
+            hue[1]!,
+            hue[2]!,
+            ...glow(Math.min(1, y / Math.max(fr, 1e-6)), fireCore),
           ]);
         }
+      // Jets: dust trails behind clods thrown out of the fireball, dark against it, gone by `jetLife`. Up to 14 puffs
+      // a trail, as many jets as the budget holds two puffs for.
+      const jetsDrawn = Math.min(jetN, Math.floor(jetBudget / 2));
+      if (jetsDrawn > 0) {
+        const TAU = 1.5,
+          fade = 1 - th.age / jetLife,
+          trail = Math.min(14, Math.floor(jetBudget / jetsDrawn));
+        for (let j = 0; j < jetsDrawn; j++) {
+          const az = rnd(j, 40) * 2 * Math.PI,
+            el = ((30 + 50 * rnd(j, 41)) * Math.PI) / 180,
+            v0 = 250 + 200 * rnd(j, 42),
+            d: Vec = [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+          for (let k = 0; k < trail; k++) {
+            // Puff k marks where the clod was a share k / trail of its age ago; older dust has spread wider.
+            const back = (k / trail) * th.age,
+              a = th.age - back,
+              reach = v0 * TAU * (1 - Math.exp(-a / TAU)),
+              drop = 0.5 * G * a * a * 0.25,
+              r = tr.b0 * (0.035 + 0.05 * back + 0.02 * rnd(j * 31 + k, 43)) * (0.4 + 0.6 * fade),
+              shade = 0.55 + 0.15 * rnd(j * 31 + k, 44);
+            smoke.push([
+              gx + d[0] * reach,
+              Math.max(gy + d[1] * reach - drop, gy + r),
+              gz + d[2] * reach,
+              r,
+              stemColour[0] * shade,
+              stemColour[1] * shade,
+              stemColour[2] * shade,
+              0,
+              0,
+              0,
+            ]);
+          }
+        }
+      }
     });
     this.put(clouds, 'smoke', smoke, null, 1);
     const heat = lit.reduce((m, x) => Math.max(m, x.th.fire), 0);
-    this.put(this.fireTarget, 'fire', fires, fireColour, Math.min(1, heat * 1.5));
+    this.put(this.fireTarget, 'fire', fires, null, Math.min(1, heat * 1.5));
   }
 
   /** Lays `puffs` (world units) into one cloud `id` of `target`; none removes it. */
