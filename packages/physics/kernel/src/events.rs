@@ -10,6 +10,7 @@ use crate::world::{NONE, World};
 #[link(wasm_import_module = "env")]
 unsafe extern "C" {
     fn contact_filter(a: u32, b: u32) -> u32;
+    fn contact_modify(row: u32);
 }
 
 /// True when two packed groups meet: each one's memberships, the high 16 bits, are in the other's filter, the low 16.
@@ -19,7 +20,6 @@ pub fn groups_meet(a: u32, b: u32) -> bool {
 }
 
 impl World {
-    /// True when a pair may touch: neither side is off, the groups meet, no joint keeps them apart, and the filter agrees.
     /// The kind of body pair, as the bit `COLLIDER_TYPES` names it.
     #[inline]
     fn pair_type(&self, body_a: usize, body_b: usize) -> u32 {
@@ -47,6 +47,7 @@ impl World {
         wants(a) && wants(b)
     }
 
+    /// True when a pair may touch: neither side is off, the groups meet, no joint keeps them apart, and the filter agrees.
     /// The filter comes last, as it leaves Wasm.
     #[inline]
     pub fn may_touch(&self, a: usize, b: usize, body_a: usize, body_b: usize) -> bool {
@@ -55,6 +56,19 @@ impl World {
             && groups_meet(self.uu(COLLIDER_GROUPS, a), self.uu(COLLIDER_GROUPS, b))
             && !self.joined(body_a, body_b)
             && (self.header().filtering == 0 || self.filter_says(a as u32, b as u32))
+    }
+
+    /// Shows a pair to the contact modifier, which may change its friction, bounce and normal in the pair's columns, or clear
+    /// its contacts.
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn modify_contacts(&mut self, row: usize) {
+        unsafe { contact_modify(row as u32) }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn modify_contacts(&mut self, row: usize) {
+        if let Some(modifier) = self.modifier {
+            modifier(self, row);
+        }
     }
 
     #[cfg(target_arch = "wasm32")]

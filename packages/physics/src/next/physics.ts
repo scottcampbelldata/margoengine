@@ -5,6 +5,7 @@ import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import type { BodyOptions, BodyType } from '../body.js';
 import {
   COLLIDER_OFF,
+  COLLIDER_MODIFY,
   COLLIDER_SENSOR,
   EVENT_COLLIDER,
   EVENT_SENSOR,
@@ -57,6 +58,85 @@ export interface PhysicsOptions {
   name?: string;
   /** Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet. */
   contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+  /**
+   * Called for each touching pair that has a collider with `modifyContacts` set, after its friction and bounce are set and
+   * before it is solved, each step: change its friction, restitution and normal, or clear its contacts (a one-way platform,
+   * a slippery patch). The object is reused, so keep what you need, not the object.
+   */
+  contactModifier?: (contact: ContactModification) => void;
+}
+
+/** A touching pair shown to `PhysicsOptions.contactModifier`, valid only inside the call. */
+export class ContactModification {
+  /** @internal */
+  row = 0;
+  /** @internal */
+  colliderA!: PhysicsCollider;
+  /** @internal */
+  colliderB!: PhysicsCollider;
+  /** @internal */
+  constructor(private readonly kernel: KernelWorld) {}
+  /** The pair's first collider; normals run from it to {@link ContactModification.colliderB}. */
+  get first(): PhysicsCollider {
+    return this.colliderA;
+  }
+  /** The pair's second collider. */
+  get second(): PhysicsCollider {
+    return this.colliderB;
+  }
+  /** Coulomb friction of the pair, from the colliders' own and their combine rules; set it to override. */
+  get friction(): number {
+    return this.kernel.columns.pairFriction[this.row];
+  }
+  set friction(value: number) {
+    if (!(value >= 0) || !Number.isFinite(value)) throw new RangeError(`Friction must be finite and not negative (got ${value}).`);
+    this.kernel.columns.pairFriction[this.row] = value;
+  }
+  /** Restitution of the pair; set it to override. */
+  get restitution(): number {
+    return this.kernel.columns.pairRestitution[this.row];
+  }
+  set restitution(value: number) {
+    if (!(value >= 0 && value <= 1)) throw new RangeError(`Restitution must be from 0 to 1 (got ${value}).`);
+    this.kernel.columns.pairRestitution[this.row] = value;
+  }
+  /** How many contact points the pair has. */
+  get contactCount(): number {
+    return this.kernel.columns.pairContacts[this.row];
+  }
+  /** The unit contact normal in world space, from the first collider to the second. */
+  get normal(): [number, number, number] {
+    const c = this.kernel.columns;
+    return [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]];
+  }
+  set normal(value: Vec3) {
+    checkVec(value, 'Contact normal');
+    const length = Math.hypot(value[0], value[1], value[2]);
+    if (!(length > 1e-6)) throw new RangeError('A contact normal needs a direction; pass a vector of some length.');
+    const c = this.kernel.columns;
+    [c.pairNormalX[this.row], c.pairNormalY[this.row], c.pairNormalZ[this.row]] = [value[0] / length, value[1] / length, value[2] / length];
+  }
+  /** Drops every contact of the pair for this step: the bodies pass through each other and push nothing. */
+  clear(): void {
+    this.kernel.columns.pairContacts[this.row] = 0;
+  }
+  /**
+   * Makes the collider `platform` a one-way platform: contacts whose normal, taken from the platform to the other collider,
+   * lies within `angle` radians (default a quarter turn: the half space above it) of `direction` stay, and the rest are
+   * dropped. A body rising through the underside meets nothing, and standing on top it rests.
+   * @throws RangeError when `platform` is neither collider of the pair.
+   */
+  oneWay(platform: PhysicsCollider, direction: Vec3, angle = Math.PI / 2): void {
+    checkVec(direction, 'Platform direction');
+    if (platform !== this.colliderA && platform !== this.colliderB)
+      throw new RangeError('That collider is not in this pair; pass colliderA or colliderB of the contact.');
+    const [nx, ny, nz] = this.normal,
+      sign = platform === this.colliderA ? 1 : -1,
+      length = Math.hypot(direction[0], direction[1], direction[2]);
+    if (!(length > 0)) throw new RangeError('A platform direction needs some length.');
+    const along = (sign * (nx * direction[0] + ny * direction[1] + nz * direction[2])) / length;
+    if (along < Math.cos(angle)) this.clear();
+  }
 }
 
 /** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
@@ -220,6 +300,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Fixed steps taken since creation. */
   stepCount = 0;
   private world: KernelWorld | null;
+  private hasModifier = false;
   private engine: EngineKernel | null = null;
   private accumulator = 0;
   private lastAlpha = 1;
@@ -290,6 +371,22 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.world.setGravity(...gravity);
     const filter = options.contactFilter;
     if (filter) this.world.contactFilter = (a, b) => filter(this.byRow.get(a)!.body, this.byRow.get(b)!.body);
+    const modifier = options.contactModifier;
+    if (modifier) {
+      const world = this.world,
+        view = new ContactModification(world);
+      this.hasModifier = true;
+      world.setContactModifier((row) => {
+        const c = world.columns,
+          a = this.byRow.get(c.pairA[row]),
+          b = this.byRow.get(c.pairB[row]);
+        if (!a || !b) return;
+        view.row = row;
+        view.colliderA = a;
+        view.colliderB = b;
+        modifier(view);
+      });
+    }
     const substeps = options.substeps ?? options.solverIterations;
     if (substeps !== undefined) this.world.substeps = substeps;
     if (options.iterations !== undefined) this.world.iterations = options.iterations;
@@ -601,6 +698,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     collider.forceThreshold = options.contactForceThreshold ?? 0;
     if (options.contactForceThreshold !== undefined) collider.setContactForceEventThreshold(options.contactForceThreshold);
     if (options.activeCollisionTypes) collider.setActiveCollisionTypes(options.activeCollisionTypes);
+    if (options.modifyContacts) {
+      if (!this.hasModifier) throw new MargoError('state', 'modifyContacts needs a contactModifier: pass one in the Physics options.');
+      this.kernel.setColliderState(row, this.kernel.columns.colliderFlags[row] | COLLIDER_MODIFY);
+    }
     body.colliders.push(collider);
     this.byRow.set(row, collider);
     return collider;

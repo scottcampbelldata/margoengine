@@ -656,6 +656,10 @@ pub const COLLIDER_OFF: u32 = 2;
 /// fixed; the default is the first three.
 pub const COLLIDER_TYPES_SHIFT: u32 = 2;
 pub const COLLIDER_TYPES: u32 = 63 << COLLIDER_TYPES_SHIFT;
+/// Bit 8 of COLLIDER_FLAGS: a pair this collider is in is shown to the contact modifier (Rapier's `MODIFY_SOLVER_CONTACTS`)
+/// after its friction and bounce are set and before it is solved. The modifier may change the pair's friction, bounce
+/// and normal, or clear its contacts.
+pub const COLLIDER_MODIFY: u32 = 1 << 8;
 pub const TYPES_DEFAULT: u32 = 7;
 
 // Bits of the PAIR_FLAGS column.

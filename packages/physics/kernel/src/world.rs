@@ -93,6 +93,9 @@ pub struct World {
     /// The contact filter of a native build; Wasm asks its import.
     #[cfg(not(target_arch = "wasm32"))]
     pub filter: Option<fn(u32, u32) -> bool>,
+    /// The contact modifier of a native build; Wasm calls its import.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub modifier: Option<fn(&mut World, usize)>,
 }
 
 impl World {
@@ -111,6 +114,8 @@ impl World {
             arena,
             #[cfg(not(target_arch = "wasm32"))]
             filter: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            modifier: None,
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);

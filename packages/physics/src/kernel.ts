@@ -162,6 +162,8 @@ export const COLLIDER_SENSOR = 1;
 export const COLLIDER_OFF = 2;
 /** Bits 2 to 7 of a collider's flags: each flips one kind of body pair from its default (layout.rs COLLIDER_TYPES). */
 export const COLLIDER_TYPES_SHIFT = 2;
+/** Bit 8 of a collider's flags: its pairs are shown to the contact modifier (layout.rs COLLIDER_MODIFY). */
+export const COLLIDER_MODIFY = 1 << 8;
 export const COLLIDER_TYPES = 63 << COLLIDER_TYPES_SHIFT;
 /** Bit of the `flags` column: the body is out of the world. */
 export const BODY_DISABLED = 1 << 11;
@@ -489,7 +491,7 @@ export class KernelWorld {
   constructor(bodies = 1024, colliders = bodies) {
     const module = compiled.value;
     if (!module) throw new MargoError('state', 'The physics kernel is not loaded; call await loadKernel() first.');
-    this.api = new WebAssembly.Instance(module, { env: { contact_filter: (a: number, b: number) => this.ask(a, b) } }).exports as KernelExports;
+    this.api = new WebAssembly.Instance(module, { env: { contact_filter: (a: number, b: number) => this.ask(a, b), contact_modify: (row: number) => this.modifyRow(row) } }).exports as KernelExports;
     if (!Number.isSafeInteger(bodies) || !Number.isSafeInteger(colliders) || !this.api.world_new(bodies, colliders))
       throw new RangeError(
         `Bodies and colliders must be integers from 1 to 4194304; use a smaller world (got ${bodies}, ${colliders}).`,
@@ -497,6 +499,15 @@ export class KernelWorld {
     this.bind();
   }
 
+  private modifier: ((row: number) => void) | null = null;
+  /** Calls `modifier` with a pair's row, after its friction and bounce are set and before it is solved, for each pair with a collider that has `COLLIDER_MODIFY` set; null stops. */
+  setContactModifier(modifier: ((row: number) => void) | null): void {
+    this.modifier = modifier;
+  }
+  private modifyRow(row: number): void {
+    if (this.api.world_layout() !== this.layout) this.bind();
+    this.modifier?.(row);
+  }
   /** The step asks about a pair. Finding pairs can have grown the world, and a filter may read the columns. */
   private ask(a: number, b: number): number {
     if (this.api.world_layout() !== this.layout) this.bind();

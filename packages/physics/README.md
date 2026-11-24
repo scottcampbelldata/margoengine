@@ -595,6 +595,23 @@ ball.enabled = false;
 physics.dispose();
 ```
 
+A `contactModifier` in the `Physics` options is Rapier's contact modification hook: it is called, each step, for every touching pair that has a collider with `modifyContacts: true`, after the pair's friction and bounce are set and before it is solved. It may change `contact.friction`, `contact.restitution` and `contact.normal` (world space, from `contact.first` to `contact.second`), call `contact.clear()` to drop the pair's contacts for the step, or `contact.oneWay(platform, direction, angle)` to keep only the contacts whose normal, taken from the platform to the other collider, is within `angle` (a quarter turn by default) of `direction`. The object is reused: do not keep it. Rapier's JavaScript has no such hook, so the root entry refuses `modifyContacts`. `contactFilter` (above) remains the pair filter for contacts and intersections.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {
+  // Contacts count only from above the platform: a ball rises through it and lands on it.
+  contactModifier: (contact) => contact.oneWay(contact.first.body.type === 'fixed' ? contact.first : contact.second, [0, 1, 0]),
+});
+physics.addBody(null, {type: 'fixed', position: [0, 3, 0], colliders: {shape: 'box', halfExtents: [3, 0.1, 3], modifyContacts: true}});
+const ball = physics.addBody(null, {position: [0, 1, 0], linearVelocity: [0, 12, 0], colliders: {shape: 'sphere', radius: 0.3}});
+for (let i = 0; i < 330; i++) physics.step();
+console.log(ball.position[1].toFixed(2)); // '3.40': back down, resting on the top face
+physics.dispose();
+```
+
 `activeCollisionTypes` on a collider names the kinds of body pair it takes part in, Rapier's `ActiveCollisionTypes`: any of `dynamicDynamic`, `dynamicKinematic`, `dynamicFixed` (the default three), `kinematicKinematic`, `kinematicFixed` and `fixedFixed`. A pair of colliders is made when both name its kind, so two kinematic bodies raise `contactstart` and `contactend` only when both colliders add `kinematicKinematic`, and a floor that leaves out `dynamicFixed` lets a body fall through. A sensor sees every kind. `collider.setActiveCollisionTypes(kinds)` and `activeCollisionTypes()` change and read it. `contactForceEvents` (default true, where Rapier's default is off) and `contactForceThreshold` (newtons, default 0) on a collider choose its contact-force events; a pair speaks when either side asks and its force passes the larger threshold, and `collider.setActiveEvents({collision, contactForce})` and `setContactForceEventThreshold(n)` change them.
 
 `physics.on('contactforce', listener)` says how hard two colliders pressed on each other: after each step with a listener, once a pair, with `bodyA`, `bodyB`, `meshA`, `meshB`, `colliderA`, `colliderB`, `impulse` (the normal impulse of the whole step, N s) and `force` (that over the step's length, N). A box at rest on a floor reads its weight, and the impulses of a landing add up to what stops it. A pair of sleepers is not solved, so it says nothing. Only the own solver has this event.

@@ -160,6 +160,12 @@ export interface ColliderSettings {
    */
   activeCollisionTypes?: readonly CollisionPairKind[];
   /**
+   * Shows the pairs this collider is in to the world's `contactModifier` after their friction and bounce are set and before
+   * they are solved (default false), as Rapier's `MODIFY_SOLVER_CONTACTS` hook. Only the own solver has it; Rapier's
+   * JavaScript does not.
+   */
+  modifyContacts?: boolean;
+  /**
    * Whether this collider asks for contact-force events on the own solver (default true; a pair speaks when either side
    * asks). See `contactForceThreshold`.
    */
@@ -570,6 +576,11 @@ export function configureCollider(
   if (options.massless) desc.setMassProperties(0, ZERO, ZERO, IDENTITY);
   else if (options.mass !== undefined) desc.setMass(options.mass);
   else if (options.density !== undefined) desc.setDensity(options.density);
+  if (options.modifyContacts)
+    throw new MargoError(
+      'unsupported',
+      "modifyContacts needs the own solver: import {Physics} from '@margoengine/physics/next'. Rapier's JavaScript has no contact modification hook.",
+    );
   if (options.activeCollisionTypes) {
     const kinds = R.ActiveCollisionTypes as unknown as Record<string, number>;
     let types = 0;

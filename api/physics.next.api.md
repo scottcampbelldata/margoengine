@@ -87,6 +87,24 @@ export interface ContactManifold {
     }[];
 }
 
+export class ContactModification {
+    row: number;
+    colliderA: PhysicsCollider;
+    colliderB: PhysicsCollider;
+    constructor(kernel: KernelWorld);
+    get first(): PhysicsCollider;
+    get second(): PhysicsCollider;
+    get friction(): number;
+    set friction(value: number);
+    get restitution(): number;
+    set restitution(value: number);
+    get contactCount(): number;
+    get normal(): [number, number, number];
+    set normal(value: Vec3);
+    clear(): void;
+    oneWay(platform: PhysicsCollider, direction: Vec3, angle?: number): void;
+}
+
 export interface HullFaces {
     vertices: [number, number, number][];
     faces: number[][];
@@ -202,6 +220,7 @@ export interface KernelTrimeshOptions {
 export class KernelWorld {
     readonly columns: Record<string, KernelColumn>;
     constructor(bodies?: number, colliders?: number);
+    setContactModifier(modifier: ((row: number) => void) | null): void;
     get capacity(): number;
     get colliderCapacity(): number;
     get pairCount(): number;
@@ -542,6 +561,7 @@ export interface PhysicsOptions {
     solverIterations?: number;
     name?: string;
     contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+    contactModifier?: (contact: ContactModification) => void;
 }
 
 export interface PhysicsRaycastOptions extends QueryFilter {
@@ -720,6 +740,7 @@ interface ColliderSettings {
     solverGroups?: number;
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
+    modifyContacts?: boolean;
     contactForceEvents?: boolean;
     contactForceThreshold?: number;
     enabled?: boolean;

@@ -255,6 +255,14 @@ impl World {
             let bounce = Self::combine(self.s(COLLIDER_RESTITUTION, first), self.s(COLLIDER_RESTITUTION, second), higher(rules_a >> 2 & 3, rules_b >> 2 & 3));
             self.set_s(PAIR_FRICTION, row, friction);
             self.set_s(PAIR_RESTITUTION, row, bounce);
+            if (self.uu(COLLIDER_FLAGS, first) | self.uu(COLLIDER_FLAGS, second)) & COLLIDER_MODIFY != 0 {
+                self.modify_contacts(row);
+            }
+            // The modifier may have cleared the pair's contacts.
+            let count = self.uu(PAIR_CONTACTS, row) as usize;
+            if count == 0 {
+                continue;
+            }
             let normal = self.v(PAIR_NORMAL_X, row);
             let tangent = tangent_of(normal);
             let other = normal.cross(tangent);

@@ -94,6 +94,7 @@ export interface ColliderSettings {
     solverGroups?: number;
     events?: boolean;
     activeCollisionTypes?: readonly CollisionPairKind[];
+    modifyContacts?: boolean;
     contactForceEvents?: boolean;
     contactForceThreshold?: number;
     enabled?: boolean;

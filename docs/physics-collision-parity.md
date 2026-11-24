@@ -75,8 +75,9 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Capability | Status | Notes |
 | --- | --- | --- |
 | Pair filtering (contact pairs and intersection pairs) | full | `contactFilter` |
-| Contact modification: friction, restitution, tangent velocity, normals, remove contact | missing | |
-| One-way platforms (allowed contact normal) | missing | |
+| Contact modification: friction, restitution, normals, remove contact | full | `contactModifier`, `modifyContacts` |
+| Contact modification: tangent (surface) velocity, a conveyor | missing | needs a solver row; with the dynamics side |
+| One-way platforms (allowed contact normal) | full | `contact.oneWay` |
 
 ## Scene queries
 
