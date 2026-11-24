@@ -42,7 +42,7 @@
   "react": ["./html","./sky","./post","./dof","./tonemap","./taa","./jsx-runtime","./jsx-dev-runtime"],
   "rigging": ["./vrm-constraints","./vrma","./pose-tracking"],
   "road": ["./intersections","./lanes","./geojson","./structures"],
-  "save": ["./opfs","./signed","./scene-state","./materials"],
+  "save": ["./scene-state","./materials"],
   "scatter": ["./textured","./surface","./occlusion","./attributes"],
   "scene": ["./graph","./clone","./tags"],
   "sciviz": ["./colormaps","./atmosphere","./pipeline","./contour","./clip","./calc","./probe","./transfer","./labels","./cinematic","./volume-quality","./contour2d","./link","./export-vector","./datasets","./stats","./omezarr","./curvilinear","./geo-lod","./charts-extra","./table","./pdf","./cgns","./xdmf","./exodus","./openfoam","./ensight","./pointcloud","./categorical","./tetvolume","./parcoords","./monitor","./geo-time","./geo-vector","./spec","./export-media","./stream","./fits","./mrc","./ometiff","./query","./pick-gpu","./annotate","./provenance","./amr","./aggregate","./views","./share","./a11y","./progressive","./temporal","./density","./notebook","./graph-gpu","./cf","./projections","./series","./themes","./workers","./tensor","./molecule"],
