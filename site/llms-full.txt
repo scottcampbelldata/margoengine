@@ -13524,12 +13524,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   check on the workstation: the two bundles side by side (`measureCoreStage()` output), to find the differing bytes.
   Until then the public figures are not changed from one machine.
 
-### Open 2026-11-16: `Outlines` draws nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
+### Fixed 2026-11-24: `Outlines` drew nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
 
-- **Repro:** `<Outlines />` inside a node of a skinned `Model`: no line. drei outlines `skinnedMesh` parents.
+- **Repro:** `<Outlines />` inside a skinned `Model`: no line (it threw: it needs a `<Mesh>`). drei outlines
+  `skinnedMesh` parents.
 - **Cause:** `MeshOutline` (`@margoengine/toon/outline`) draws one hull from the core mesh's matrix and CPU geometry;
-  it does not read a deformer's vertices of the frame. `ModelOutlines` (`@margoengine/toon/models`) already does for
-  whole models; the React binding does not route a skinned node to it yet.
+  it does not read a deformer's vertices of the frame, and the React binding only looked for a `<Mesh>` parent. Now
+  `<Outlines>` directly inside a `<Model>` attaches `ModelOutlines` (`@margoengine/toon/models`, which reads the posed,
+  skinned and morphed vertices of each frame) for that model, with a `node` prop for one subtree (the new toon
+  `nodes` option); props it cannot draw yet (`transparent`, `toneMapped={false}`, `polygonOffset`, `renderOrder`, an
+  `angle` other than 0 or pi) are refused through `onError`. Regressions: packages/react/tests/outlines.test.js
+  ("Outlines inside a Model ..."), packages/toon/test/models.test.js and packages/toon/test/models-check.mjs (the
+  skinned Fox under its root draws the full ring; under another node, none).
 
 ### Fixed 2026-11-16: `Outlines` drew nothing inside `<Instances>` (react)
 

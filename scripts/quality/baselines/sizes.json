@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17630911,
+  "total": 17631687,
   "history": [
     {
       "date": "2026-10-24",
@@ -11463,6 +11463,12 @@
       "commit": "7e06065c4",
       "reason": "soft entry gains volume preservation and the sphere builder: base 11,874 to 12,494 B, lazy kernel 28,804 to 30,456 B (balloon constraint, icosphere and volume plumbing).",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "025cdbb347",
+      "reason": "react/outlines routes <Outlines> inside a <Model> to toon ModelOutlines (GAP-OUTLINES-INSTANCED): entry 1,648 to 2,168 B gzip; the model path, its refusals and node lookup are needed for drei parity on skinned parents, and a separate entry would make users pick an import by parent type",
+      "grew": 1
     }
   ],
   "items": {
@@ -12348,7 +12354,7 @@
     "@margoengine/react/marching-cubes": 4743,
     "@margoengine/react/materials": 8741,
     "@margoengine/react/offscreen": 1423,
-    "@margoengine/react/outlines": 1648,
+    "@margoengine/react/outlines": 2424,
     "@margoengine/react/performance": 4787,
     "@margoengine/react/physics": 6462,
     "@margoengine/react/points": 1460,

@@ -33,6 +33,11 @@ export type ShadowsLoader = () => Promise<typeof ShadowsModule>;
 // cache keeps source data only; animation state is never shared between mounts.
 export const ModelContext = /* @__PURE__ */ createContext<PBRModel | null | undefined>(undefined);
 /**
+ * The mesh registry a `<Model>` sits in (null at the top level), so a child can tell whether the model or a `<Mesh>`
+ * inside it is its nearest parent: the model is when `useScene().registry` is still this one.
+ */
+export const ModelScope = /* @__PURE__ */ createContext<Registry | null | undefined>(undefined);
+/**
  * Pointer event passed to React handlers. It goes to the hit mesh first, then to each parent with handlers, as a DOM
  * event bubbles, until a handler calls `stopPropagation()`.
  */

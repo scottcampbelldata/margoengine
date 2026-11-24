@@ -20,11 +20,30 @@ class FakeOutline {
   }
 }
 mock.module('@margoengine/toon/outline', { namedExports: { MeshOutline: FakeOutline } });
+// GAP-OUTLINES-INSTANCED: inside a <Model> the binding attaches ModelOutlines (world units, or pixels with screenspace).
+const hulls = [];
+const fakeModels = (screenspace) =>
+  class FakeModelOutlines {
+    static attach(engine, options) {
+      const outline = new FakeModelOutlines(options);
+      hulls.push(outline);
+      return outline;
+    }
+    constructor(options) {
+      Object.assign(this, options, { screenspace });
+      this.disposed = false;
+    }
+    dispose() {
+      this.disposed = true;
+    }
+  };
+mock.module('@margoengine/toon/models', { namedExports: { ModelOutlines: fakeModels(false) } });
+mock.module('@margoengine/toon/screen-outline', { namedExports: { ModelOutlines: fakeModels(true) } });
 const dom = new JSDOM('<!doctype html><body></body>', { url: 'http://localhost' });
 Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
 const { render, act, cleanup } = await import('@testing-library/react');
 const { Engine } = await import('@margoengine/core/extension');
-const { Context } = await import('../dist/internal.js');
+const { Context, ModelContext, ModelScope } = await import('../dist/internal.js');
 const { Mesh, BoxGeometry } = await import('../dist/index.js');
 const { Outlines, outlineRGB } = await import('../dist/outlines.js');
 const h = React.createElement,
@@ -35,7 +54,14 @@ async function scene() {
       backend: 'webgl2',
       fallback: () => ({ backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} }),
     });
-  const value = { engine, world: null, registry: null, shadows: null, pointerHandlers: new Map(), frames: { callbacks: new Set() } };
+  const value = {
+    engine,
+    world: null,
+    registry: null,
+    shadows: null,
+    pointerHandlers: new Map(),
+    frames: { callbacks: new Set() },
+  };
   scenes.push(value);
   return value;
 }
@@ -45,6 +71,7 @@ afterEach(() => {
   for (const s of scenes) s.engine.dispose();
   scenes.length = 0;
   made.length = 0;
+  hulls.length = 0;
 });
 const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 const live = () => made.filter((o) => !o.disposed);
@@ -118,4 +145,93 @@ test('Outlines inside Instances outlines every drawn instance and follows mounts
   assert.equal(live().length, 1, 'instances past limit draw no outline');
   view.unmount();
   assert.equal(live().length, 0);
+});
+
+// A <Model>'s children see its registry in ModelScope and the model in ModelContext, as model.tsx provides them.
+const inModel = (s, model, children, registry = null) =>
+  h(ModelScope.Provider, { value: registry }, h(ModelContext.Provider, { value: model }, children));
+const fakeModel = () => {
+  const root = { id: 1, name: '' },
+    leg = { id: 2, name: 'Leg' };
+  return { root, nodes: [root, leg], disposed: false };
+};
+const hullsLive = () => hulls.filter((o) => !o.disposed);
+
+test('Outlines inside a Model outlines its skinned primitives with ModelOutlines, live, and releases (GAP-OUTLINES-INSTANCED)', async () => {
+  const s = await scene(),
+    model = fakeModel(),
+    ready = [];
+  const ui = (props) => tree(s, inModel(s, model, h(Outlines, { onModelReady: (o) => ready.push(o), ...props })));
+  const view = render(ui({ thickness: 0.1, color: '#ffffff' }));
+  await settle();
+  assert.equal(made.length, 0, 'no MeshOutline: the model is the parent');
+  assert.equal(hullsLive().length, 1);
+  const hull = hullsLive()[0];
+  assert.equal(ready.at(-1), hull);
+  assert.deepEqual(hull.models, [model]);
+  assert.deepEqual([hull.outline, hull.smooth, hull.nodes, hull.screenspace], [0.1, true, undefined, false]);
+  assert.deepEqual(hull.color, [1, 1, 1]);
+  view.rerender(ui({ thickness: 0.2, color: [0, 1, 0], angle: 0, node: 'Leg' }));
+  await settle();
+  assert.equal(hullsLive().length, 1, 'a prop edit keeps the hull');
+  assert.deepEqual([hull.outline, hull.smooth, hull.nodes], [0.2, false, [model.nodes[1]]]);
+  view.rerender(ui({ thickness: 3, screenspace: true }));
+  await settle();
+  assert.equal(hullsLive().length, 1, 'screenspace re-attaches the pixel variant');
+  assert.equal(hullsLive()[0].screenspace, true);
+  assert.equal(hullsLive()[0].outline, 3);
+  view.unmount();
+  assert.equal(hullsLive().length, 0);
+});
+
+test('Outlines inside a Model refuses props ModelOutlines cannot draw and unknown nodes, never ignoring them', async () => {
+  for (const [props, words] of [
+    [{ transparent: true, opacity: 0.5 }, 'transparent'],
+    [{ toneMapped: false }, 'toneMapped'],
+    [{ polygonOffset: true }, 'polygonOffset'],
+    [{ renderOrder: 2 }, 'renderOrder'],
+    [{ angle: 1 }, 'angle 1'],
+    [{ node: 'Tail' }, "node 'Tail'"],
+  ]) {
+    const s = await scene(),
+      errors = [];
+    s.engine.onError = () => {};
+    render(tree(s, inModel(s, fakeModel(), h(Outlines, { ...props, onError: (e) => errors.push(e) }))));
+    await settle();
+    assert.equal(hullsLive().length, 0, `${words}: nothing attached`);
+    assert.equal(errors.length, 1, words);
+    assert.ok(errors[0] instanceof RangeError && errors[0].message.includes(words), errors[0].message);
+    cleanup();
+  }
+});
+
+test('Outlines in a Mesh inside a Model outlines the mesh; node outside a Model is refused', async () => {
+  const s = await scene(),
+    errors = [];
+  s.engine.onError = () => {};
+  render(tree(s, inModel(s, fakeModel(), h(Mesh, null, h(BoxGeometry), h(Outlines, { thickness: 0.1 })))));
+  await settle();
+  assert.deepEqual([live().length, hullsLive().length], [1, 0], 'the nearer <Mesh> wins');
+  cleanup();
+  render(tree(s, h(Mesh, null, h(BoxGeometry), h(Outlines, { node: 'Leg', onError: (e) => errors.push(e) }))));
+  await settle();
+  // StrictMode mounts effects twice in development, so the refusal may arrive once per mount.
+  assert.ok(
+    errors.length >= 1 && errors.every((e) => e instanceof RangeError && /needs a <Model> parent/.test(e.message)),
+  );
+});
+
+test('Outlines inside a Model waits for the model to load before attaching', async () => {
+  const s = await scene();
+  const ui = (model) => tree(s, inModel(s, model, h(Outlines, { thickness: 0.1 })));
+  const view = render(ui(null));
+  await settle();
+  assert.equal(hullsLive().length, 0);
+  const model = fakeModel();
+  view.rerender(ui(model));
+  await settle();
+  assert.deepEqual(
+    hullsLive().map((o) => o.models[0]),
+    [model],
+  );
 });

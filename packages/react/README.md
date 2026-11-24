@@ -466,12 +466,16 @@ order among outlines) and `angle` (the crease angle, pi: copies of a vertex whos
 so pi closes the hull over hard edges and 0 lets it part at every crease). It follows the mesh's transform, geometry
 and visibility, and a mirrored scale. Inside `<Instances>` (drei's instancedMesh parent) every drawn instance gets its
 own outline, following instances as they mount, unmount, hide or pass `limit`. `onReady` gets each native outline. Needs WebGPU or the WebGL2 compatibility
-layer. Instanced and skinned parents are not outlined yet (docs/known-bugs.md); a loaded model takes
-`ModelOutlines` of `@margoengine/toon/models`.
+layer. Directly inside a `<Model>` (drei's outlined `skinnedMesh`) it outlines the model's posed, skinned and morphed
+vertices of each frame with `ModelOutlines` of `@margoengine/toon/models` (WebGPU only): the whole model, or the glTF
+node named by `node` and its children. `color`, `thickness`, `screenspace` and `angle` 0 (parts at creases) or pi
+(default) apply; `transparent`, `toneMapped={false}`, `polygonOffset`, `renderOrder` and other angles are refused
+through `onError`. `onModelReady` gets the native `ModelOutlines`.
 
 ```tsx
 import { Canvas } from '@margoengine/react';
 import { Box } from '@margoengine/react/geometry';
+import { Model } from '@margoengine/react/gltf';
 import { Outlines } from '@margoengine/react/outlines';
 
 export function Outlined() {
@@ -480,6 +484,16 @@ export function Outlined() {
       <Box args={[1, 1, 1]}>
         <Outlines thickness={4} screenspace color="#1d4ed8" />
       </Box>
+    </Canvas>
+  );
+}
+
+export function OutlinedFox() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Model src="/models/Fox.glb">
+        <Outlines thickness={0.5} color="#111111" />
+      </Model>
     </Canvas>
   );
 }

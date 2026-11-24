@@ -11,6 +11,7 @@ import {
   zero,
   one,
   ModelContext,
+  ModelScope,
   type PointerHandlers,
   type Listeners,
 } from './internal.js';
@@ -269,9 +270,11 @@ export function ModelResource({
   // has a passive unmount cleanup that can abort its outstanding request.
   if (loading?.src === props.src && loading.pending) throw loading.promise;
   return (
-    <ModelContext.Provider value={model && !model.disposed && loading?.src === props.src ? model : null}>
-      {props.children}
-    </ModelContext.Provider>
+    <ModelScope.Provider value={registry}>
+      <ModelContext.Provider value={model && !model.disposed && loading?.src === props.src ? model : null}>
+        {props.children}
+      </ModelContext.Provider>
+    </ModelScope.Provider>
   );
 }
 
