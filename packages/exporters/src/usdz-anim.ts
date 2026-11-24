@@ -228,7 +228,7 @@ function weightsOf(node: Node, count: number, track: Track | undefined, fps: num
     const per = track.interpolation === 'CUBICSPLINE' ? 3 : 1;
     if (track.values.length !== track.times.length * count * per)
       throw new RangeError(
-        `The weights channel of ${node.name ?? 'a node'} holds ${track.values.length} values for ${track.times.length} keys of ${count} targets`,
+        `The weights channel of ${node.name ?? 'a node'} holds ${track.values.length} values for ${track.times.length} keys of ${count} targets; give the channel keys x targets values`,
       );
   }
   return (frame) => {
