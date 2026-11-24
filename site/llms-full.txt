@@ -515,7 +515,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/physics`](packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
-| [`@margoengine/physics2d`](packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
+| [`@margoengine/physics2d`](packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on its own 2D kernel (Rust to Wasm): fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
 | [`@margoengine/ragdoll`](packages/ragdoll/README.md) | Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
 | [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy), debug draw (./debug), voxel worlds (./voxel) and flying agents (./volume). |
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
@@ -3927,7 +3927,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-666). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-667). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -5052,6 +5052,10 @@ The kernel's `World` sets velocities (`set_velocity`), applies impulses at the c
 ## Own 2D continuous collision (2026-11-24)
 
 A body with `ccd` set (`BodyDef::ccd`, `set_body_params`) that travels more than twice the speculative margin (0.04 m) in a step is swept after the solve against the shapes of static and kinematic bodies (sensors, filtered pairs and joint-excluded pairs left out) and set back to its earliest time of impact, with its velocity kept (`packages/physics2d/kernel/src/ccd.rs`, conservative advancement, Mirtich 1996). Accepted limits: dynamic bodies are not swept against each other, a kinematic target is tested at its end pose, a pair that already touches when the step begins is left to the contact solver, so a long thin body that hits a wall with one end at a very high speed and spin can still swing through it on the steps after the hit (a 2 m stick at 150 m/s and 40 rad/s does; a 0.8 m box at 150 m/s and 3 rad/s does not), and a search that has not converged in 32 iterations stops at the safe time reached. Tests: `packages/physics2d/kernel/tests/ccd.rs`.
+
+## Physics2D on the own 2D kernel (2026-11-24)
+
+`@margoengine/physics2d` no longer uses Rapier 2D: `Physics2D.load()` compiles `dist/physics2d.wasm` (the committed blueprint `packages/physics2d/src/physics2d-kernel.wasm`, 311 kB raw), and the Rapier objects (`Body2D.raw`, `Joint2D.raw`, `Physics2D.world`, `Physics2DOptions.rapier`, `RapierModule2D`) are gone; the breaks are recorded in `api/breaks.json`. Accepted differences from the Rapier build, each with its cause: friction defaults to 0.5 and restitution to 0 as before, but the contact solver is the kernel's soft step, so resting poses differ from Rapier's by a fraction of the linear slop (5 mm); a collider's `mass` option sets its density from the shape's area (the kernel has no mass override), which is the same mass for a solid shape and none for an edge; `setEnabled(false)` makes a collider meet nothing and drops it from queries but its mass still counts (Rapier removes it from the body's mass too); `overlapShape` and `castShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points (Rapier also took concave polygons as compounds); a polyline whose last point repeats its first is a closed chain; the character controller is TypeScript over the kernel's shape cast, so its exact corner cases (slope entry, stepping onto a ledge a hair wider than `minWidth`) follow the algorithm in `packages/physics2d/src/character.ts` and not Rapier's; `pushDynamic` applies the character's mass times the speed into the body as an impulse. Tests: `packages/physics2d/tests/physics2d.test.js` and `kernel-features.test.js`.
 
 ## Own 2D sustained contact support
 
@@ -11490,6 +11494,19 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Open 2026-11-24: a long thin body that hits a wall hard and spinning swings through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
+
+- **Repro:** a 2 m by 0.1 m box with `ccd: true`, moving at 150 m/s and turning at 8 rad/s toward a 0.1 m thick wall,
+  in the own 2D kernel (`packages/physics2d/kernel`, the scene of `tests/ccd.rs` with a longer box): `ccd` sets it
+  back to the first touch, but on the next step the contact turns it at about 112 rad/s about the touching end, and the
+  step sweeps the rest of its length through the wall; its centre ends beyond the wall.
+- **Cause:** continuous collision (`kernel/src/ccd.rs`) leaves a pair that already touches when a step begins to the
+  contact solver, so that a body at rest is not pinned at time 0, and the contact solver only sees the closest points of
+  the manifold at the start of the step: a turn of 1.9 rad inside one step is not covered by them. A sweep that tells a
+  body sliding along a face from one swinging into it (a time-of-impact on the turning shapes with the touching pair's
+  closing speed as its bound) is the fix; the shorter and slower cases the tests cover are stopped.
+- **Needs:** a kernel change with a regression test; open until then (limits.md, "Own 2D continuous collision").
 
 ### Open 2026-11-19: ambient occlusion no longer darkens the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter, post, scenes)
 
@@ -26262,12 +26279,11 @@ add them yourself.
 
 ## Third-party libraries
 
-Four entries can use a library you install yourself, only when you use that entry. Everything else is in the one
+Three entries can use a library you install yourself, only when you use that entry. Everything else is in the one
 install.
 
 | Package | Install | Why |
 | --- | --- | --- |
-| `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | Only to pass a Rapier 2D you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | Only to pass a Rapier you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/ifc` | `npm i web-ifc` | You pass an initialized `IfcAPI` to `parseIFC` |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
@@ -26282,6 +26298,9 @@ of them builds with no Wasm of theirs:
 import { Canvas, Mesh, BoxGeometry } from 'margoengine/react';
 import { Model } from 'margoengine/react/gltf'; // only on a page that loads a model
 ```
+
+The kits `margoengine/game`, `/web` and `/viz` include `loadGLTF`, so their builds hold the decoder files; the browser
+fetches them only for a file that uses Draco or KTX2.
 
 [README continues: https://margoengine.com/llms/packages/margoengine.md]
 
@@ -31966,9 +31985,9 @@ physics.addJoint(hook, bob, {type: 'spring', restLength: 1, stiffness: 50, dampi
 
 Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/physics2d` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-2D rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule and polygon colliders, joints, scene queries, collision events, a character controller and tile map colliders in one call. Rapier 2D (`@dimforge/rapier2d` 0.21.0, Apache-2.0) comes with this package, nothing else to install: its JavaScript in a lazy chunk and its WebAssembly as a file of its own, `dist/rapier2d.wasm`.
+2D rigid-body physics for Margo Engine on its own 2D kernel (Rust compiled to Wasm with SIMD): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule, polygon (convex or concave) and polyline colliders, joints, scene queries, collision and contact force events, sensors, collision groups, continuous collision, a character controller and tile map colliders in one call. Nothing else to install: the kernel's WebAssembly is a file of this package, `dist/physics2d.wasm`.
 
-World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to Rapier's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use Rapier's units.
+World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to the kernel's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use kernel units (kilograms, metres, seconds).
 
 ```ts
 import {Physics2D} from 'margoengine/physics2d';
@@ -32001,19 +32020,25 @@ physics.on('beforestep', dt => controller.move([60 * dt, 200 * dt]));
 
 It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interactionGroups` and `tileMapColliders`, the collider list `addTileMap` builds. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
 
-**One load per app.** `await Physics2D.load()` compiles the solver, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The solver is a dynamic import and its Wasm a separate file (`dist/rapier2d.wasm`, 2,404,467 bytes) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm, another Rapier version included, rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded. The `rapier` option still takes a Rapier 2D module you initialized yourself (`@dimforge/rapier2d-compat`, an optional peer).
+**One load per app.** `await Physics2D.load()` compiles the kernel, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The loader is a dynamic import and the Wasm a separate file (`dist/physics2d.wasm`) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded.
 
 ```ts
 import {Physics2D} from '@margoengine/physics2d';
 
 // The package's own copy found through Node's resolver; in a page, pass the URL your server or CDN serves it from.
-const wasm = new URL('rapier2d.wasm', import.meta.resolve('@margoengine/physics2d'));
+const wasm = new URL('physics2d.wasm', import.meta.resolve('@margoengine/physics2d'));
 await Physics2D.load({wasm, signal: AbortSignal.timeout(30_000)});
 const physics = new Physics2D(null, {gravity: [0, 320]});
 physics.dispose();
 ```
 
-Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
+Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step, and a `teleport` or `moveTo` at once. `castShape` and `overlapShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points.
+
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0. The kernel is Margo's own, written from papers (`docs/clean-room.md`); it holds no third-party code.
+
+Build and unit tests: npm test --workspace @margoengine/physics2d
+
+## Parity with Rapier 2D
 
 [README continues: https://margoengine.com/llms/packages/physics2d.md]
 

@@ -8,7 +8,6 @@ test('Physics2D.load readies the solver, and a world then needs nothing else', a
   assert.throws(() => new Physics2D(null), { name: 'MargoError', code: 'state', message: /await Physics2D\.load\(\)/ });
   await assert.rejects(Physics2D.load({ signal: AbortSignal.abort() }), { name: 'AbortError' });
   assert.throws(() => Physics2D.attach(null), { name: 'MargoError', code: 'state' }, 'an aborted call loads nothing');
-  assert.throws(() => new Physics2D(null, { rapier: {} }), { name: 'TypeError', message: /initialized module/ });
 
   await Physics2D.load();
   await Physics2D.load();

@@ -1,4 +1,4 @@
-// Small Wasm modules for the load tests: valid binaries that are not Rapier's build.
+// Small Wasm modules for the load tests: valid binaries that are not the kernel's build.
 
 const bytes = (...parts) => Uint8Array.from(parts.flat());
 const name = (text) => [text.length, ...new TextEncoder().encode(text)];
@@ -8,8 +8,8 @@ const section = (id, ...content) => [id, content.flat().length, ...content.flat(
 export const emptyWasm = bytes([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
 
 /**
- * A module that exports a memory and functions under the names Rapier's glue calls first (`version`,
- * `__wbindgen_add_to_stack_pointer`), so only calling into it shows it is not Rapier.
+ * A module that exports a memory and functions under the names the kernel's glue calls first (`version`,
+ * `__wbindgen_add_to_stack_pointer`), so only calling into it shows it is not the kernel.
  */
 export const lookAlikeWasm = bytes(
   [...emptyWasm],

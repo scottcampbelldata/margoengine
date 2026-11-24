@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-24: a long thin body that hits a wall hard and spinning swings through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
+
+- **Repro:** a 2 m by 0.1 m box with `ccd: true`, moving at 150 m/s and turning at 8 rad/s toward a 0.1 m thick wall,
+  in the own 2D kernel (`packages/physics2d/kernel`, the scene of `tests/ccd.rs` with a longer box): `ccd` sets it
+  back to the first touch, but on the next step the contact turns it at about 112 rad/s about the touching end, and the
+  step sweeps the rest of its length through the wall; its centre ends beyond the wall.
+- **Cause:** continuous collision (`kernel/src/ccd.rs`) leaves a pair that already touches when a step begins to the
+  contact solver, so that a body at rest is not pinned at time 0, and the contact solver only sees the closest points of
+  the manifold at the start of the step: a turn of 1.9 rad inside one step is not covered by them. A sweep that tells a
+  body sliding along a face from one swinging into it (a time-of-impact on the turning shapes with the touching pair's
+  closing speed as its bound) is the fix; the shorter and slower cases the tests cover are stopped.
+- **Needs:** a kernel change with a regression test; open until then (limits.md, "Own 2D continuous collision").
+
 ### Open 2026-11-19: ambient occlusion no longer darkens the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter, post, scenes)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --views=camp-buildings` (WebGPU or `MARGO_COMPAT=1`) fails

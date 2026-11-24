@@ -802,7 +802,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-666). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-667). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1927,6 +1927,10 @@ The kernel's `World` sets velocities (`set_velocity`), applies impulses at the c
 ## Own 2D continuous collision (2026-11-24)
 
 A body with `ccd` set (`BodyDef::ccd`, `set_body_params`) that travels more than twice the speculative margin (0.04 m) in a step is swept after the solve against the shapes of static and kinematic bodies (sensors, filtered pairs and joint-excluded pairs left out) and set back to its earliest time of impact, with its velocity kept (`packages/physics2d/kernel/src/ccd.rs`, conservative advancement, Mirtich 1996). Accepted limits: dynamic bodies are not swept against each other, a kinematic target is tested at its end pose, a pair that already touches when the step begins is left to the contact solver, so a long thin body that hits a wall with one end at a very high speed and spin can still swing through it on the steps after the hit (a 2 m stick at 150 m/s and 40 rad/s does; a 0.8 m box at 150 m/s and 3 rad/s does not), and a search that has not converged in 32 iterations stops at the safe time reached. Tests: `packages/physics2d/kernel/tests/ccd.rs`.
+
+## Physics2D on the own 2D kernel (2026-11-24)
+
+`@margoengine/physics2d` no longer uses Rapier 2D: `Physics2D.load()` compiles `dist/physics2d.wasm` (the committed blueprint `packages/physics2d/src/physics2d-kernel.wasm`, 311 kB raw), and the Rapier objects (`Body2D.raw`, `Joint2D.raw`, `Physics2D.world`, `Physics2DOptions.rapier`, `RapierModule2D`) are gone; the breaks are recorded in `api/breaks.json`. Accepted differences from the Rapier build, each with its cause: friction defaults to 0.5 and restitution to 0 as before, but the contact solver is the kernel's soft step, so resting poses differ from Rapier's by a fraction of the linear slop (5 mm); a collider's `mass` option sets its density from the shape's area (the kernel has no mass override), which is the same mass for a solid shape and none for an edge; `setEnabled(false)` makes a collider meet nothing and drops it from queries but its mass still counts (Rapier removes it from the body's mass too); `overlapShape` and `castShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points (Rapier also took concave polygons as compounds); a polyline whose last point repeats its first is a closed chain; the character controller is TypeScript over the kernel's shape cast, so its exact corner cases (slope entry, stepping onto a ledge a hair wider than `minWidth`) follow the algorithm in `packages/physics2d/src/character.ts` and not Rapier's; `pushDynamic` applies the character's mass times the speed into the body as an impulse. Tests: `packages/physics2d/tests/physics2d.test.js` and `kernel-features.test.js`.
 
 ## Own 2D sustained contact support
 

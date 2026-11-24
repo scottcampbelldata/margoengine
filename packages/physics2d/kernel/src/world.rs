@@ -699,7 +699,7 @@ impl World {
     }
 
     /// Mass, centre and inertia from the shapes. A dynamic body with no area gets a mass of 1 kg and does not turn.
-    fn update_mass(&mut self, id: u32) -> Result<(), PhysicsError> {
+    pub(crate) fn update_mass(&mut self, id: u32) -> Result<(), PhysicsError> {
         let body = self.bodies.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
         validate_collision_pose(body.xf)?;
         validate_body_state(body)?;

@@ -2818,7 +2818,7 @@
     "package": "@margoengine/physics2d",
     "version": "1.0.0",
     "published": false,
-    "description": "2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
+    "description": "2D rigid-body physics for Margo Engine on its own 2D kernel (Rust to Wasm): fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "physics2d",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/physics2d@1.0.0",
@@ -2826,6 +2826,7 @@
     "exports": [
       "Body2D",
       "CharacterController2D",
+      "Collider2D",
       "Joint2D",
       "Physics2D",
       "interactionGroups",

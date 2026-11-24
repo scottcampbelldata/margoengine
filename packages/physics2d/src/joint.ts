@@ -1,4 +1,5 @@
-import type { RapierModule2D, ImpulseJoint2D, JointData2D, UnitImpulseJoint2D, World2D } from './rapier-types.js';
+import type { Kernel } from './kernel.js';
+import { MargoError } from '@margoengine/math/errors';
 import type { Body2D } from './body.js';
 import type { Vec2D } from './shapes.js';
 
@@ -29,67 +30,129 @@ export type JointOptions2D = {
   | { type: 'spring'; restLength: number; stiffness: number; damping?: number }
 );
 
-/** @internal */
-export function createJointData(R: RapierModule2D, o: JointOptions2D, k: number): JointData2D {
+const finite = (value: number, what: string): number => {
+  if (!Number.isFinite(value)) throw new RangeError(`${what} must be a finite number, got ${value}; fix the value.`);
+  return value;
+};
+
+/** @internal Writes a joint's buffer words (kernel/src/api.rs, `joint_create`) and returns the unit of its limits. */
+export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number {
+  const io = kernel.io(24);
+  io.u.fill(0, 0, 24);
   const a = o.anchorA ?? [0, 0],
-    b = o.anchorB ?? [0, 0],
-    pa = { x: a[0] * k, y: a[1] * k },
-    pb = { x: b[0] * k, y: b[1] * k },
-    J = R.JointData;
+    b = o.anchorB ?? [0, 0];
+  io.f.set([finite(a[0], 'anchorA x') * k, finite(a[1], 'anchorA y') * k, finite(b[0], 'anchorB x') * k, finite(b[1], 'anchorB y') * k], 1);
+  const limits = (o as { limits?: readonly [number, number] }).limits;
+  const unit = o.type === 'prismatic' ? k : 1;
+  if (limits) {
+    io.u[5] = 1;
+    io.f[6] = finite(limits[0], 'joint limit') * unit;
+    io.f[7] = finite(limits[1], 'joint limit') * unit;
+  }
+  const motor = (o as { motor?: MotorOptions2D }).motor;
+  if (motor) writeMotor(io.f, io.u, 8, motor, unit);
   switch (o.type) {
     case 'revolute':
-      return J.revolute(pa, pb);
+      io.u[0] = 0;
+      break;
     case 'prismatic':
-      return J.prismatic(pa, pb, { x: o.axis[0], y: o.axis[1] });
-    case 'fixed':
-      return J.fixed(pa, o.angleA ?? 0, pb, o.angleB ?? 0);
+      io.u[0] = 1;
+      io.f[14] = finite(o.axis[0], 'axis x');
+      io.f[15] = finite(o.axis[1], 'axis y');
+      break;
+    case 'fixed': {
+      io.u[0] = 2;
+      const [pa, pb] = [o.angleA ?? 0, o.angleB ?? 0];
+      io.f.set([Math.cos(pa), Math.sin(pa), Math.cos(pb), Math.sin(pb)], 16);
+      break;
+    }
     case 'rope':
-      return J.rope(o.length * k, pa, pb);
+      io.u[0] = 3;
+      io.f[20] = finite(o.length, 'rope length') * k;
+      break;
     case 'spring':
-      return J.spring(o.restLength * k, o.stiffness, o.damping ?? 0, pa, pb);
+      io.u[0] = 4;
+      io.f[20] = finite(o.restLength, 'spring restLength') * k;
+      io.f[21] = finite(o.stiffness, 'spring stiffness');
+      io.f[22] = finite(o.damping ?? 0, 'spring damping');
+      break;
     default:
       throw new TypeError(
         `Unknown joint type "${(o as { type?: string }).type}"; use revolute, prismatic, fixed, rope or spring.`,
       );
   }
+  return unit;
 }
 
-/** A Rapier impulse joint between two bodies. */
+/** The kernel's motor from the options: a velocity motor chases `targetVelocity` with gain `factor`, a position motor is a spring. */
+function writeMotor(f: Float32Array, u: Uint32Array, at: number, m: MotorOptions2D, unit: number): void {
+  u[at] = 1;
+  const velocity = m.targetVelocity !== undefined,
+    position = m.targetPosition !== undefined;
+  f[at + 1] = position ? finite(m.targetPosition as number, 'motor targetPosition') * unit : 0;
+  f[at + 2] = velocity ? finite(m.targetVelocity as number, 'motor targetVelocity') * unit : 0;
+  f[at + 3] = position ? finite(m.stiffness ?? 1, 'motor stiffness') : 0;
+  f[at + 4] = position ? finite(m.damping ?? 0, 'motor damping') : finite(m.factor ?? 1, 'motor factor');
+  if (position && velocity && m.damping === undefined) f[at + 4] = finite(m.factor ?? 1, 'motor factor');
+  f[at + 5] = m.maxForce === undefined ? Infinity : finite(m.maxForce, 'motor maxForce');
+}
+
+/** A joint between two bodies. */
 export class Joint2D {
+  private removed = false;
   /** @internal */
   constructor(
-    private readonly world: World2D,
-    readonly raw: ImpulseJoint2D,
+    private readonly kernel: Kernel,
+    private readonly world: number,
+    /** The kernel's handle. @internal */
+    readonly handle: number,
     readonly bodyA: Body2D,
     readonly bodyB: Body2D,
+    private readonly type: JointOptions2D['type'],
     private readonly unit: number,
     private readonly onRemove: (joint: Joint2D) => void,
   ) {}
-  private get unitJoint(): UnitImpulseJoint2D {
-    const joint = this.raw as UnitImpulseJoint2D;
-    if (typeof joint.setLimits !== 'function')
+  private get limited(): boolean {
+    if (this.type !== 'revolute' && this.type !== 'prismatic')
       throw new TypeError('Only revolute and prismatic joints have limits and motors; use one of those types.');
-    return joint;
+    if (this.removed) throw new MargoError('state', 'Joint2D was removed; add a new joint with Physics2D.addJoint.');
+    return true;
   }
   /** Revolute: radians. Prismatic: world units. */
   setLimits(min: number, max: number): this {
-    this.unitJoint.setLimits(min * this.unit, max * this.unit);
+    void this.limited;
+    const u = this.unit;
+    this.kernel.ok(this.kernel.exports.joint_set_limits(this.world, this.handle, 1, finite(min, 'limit') * u, finite(max, 'limit') * u));
+    return this;
+  }
+  /** Removes the limits. */
+  clearLimits(): this {
+    void this.limited;
+    this.kernel.ok(this.kernel.exports.joint_set_limits(this.world, this.handle, 0, 0, 0));
     return this;
   }
   setMotor(motor: MotorOptions2D): this {
-    const joint = this.unitJoint;
-    if (motor.maxForce !== undefined) joint.setMotorMaxForce(motor.maxForce);
-    if (motor.targetPosition !== undefined)
-      joint.configureMotorPosition(motor.targetPosition * this.unit, motor.stiffness ?? 1, motor.damping ?? 0);
-    if (motor.targetVelocity !== undefined)
-      joint.configureMotorVelocity(motor.targetVelocity * this.unit, motor.factor ?? 1);
+    void this.limited;
+    const io = this.kernel.io(8);
+    writeMotor(io.f, io.u, 0, motor, this.unit);
+    // `writeMotor` puts its flag first; the kernel reads the five numbers from word 0.
+    io.f.copyWithin(0, 1, 6);
+    this.kernel.ok(this.kernel.exports.joint_set_motor(this.world, this.handle, 1));
+    return this;
+  }
+  /** Turns the motor off. */
+  clearMotor(): this {
+    void this.limited;
+    this.kernel.ok(this.kernel.exports.joint_set_motor(this.world, this.handle, 0));
     return this;
   }
   remove(): void {
     this.onRemove(this);
   }
   /** @internal */
-  free(wake = true): void {
-    this.world.removeImpulseJoint(this.raw, wake);
+  free(): void {
+    if (this.removed) return;
+    this.removed = true;
+    this.kernel.exports.joint_remove(this.world, this.handle);
   }
 }

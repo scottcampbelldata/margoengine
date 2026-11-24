@@ -1,4 +1,4 @@
-// Rapier's Wasm is its own file (dist/rapier2d.wasm), fetched and compiled by Physics2D.load(). This file runs in its own
+// the kernel's Wasm is its own file (dist/physics2d.wasm), fetched and compiled by Physics2D.load(). This file runs in its own
 // process, so nothing has loaded when it starts: the failures come first, while every call still has to load.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import { Physics2D } from '../dist/index.js';
 import { emptyWasm, lookAlikeWasm } from './wasm-fixtures.js';
 
-const wasmFile = new URL('../dist/rapier2d.wasm', import.meta.url);
+const wasmFile = new URL('../dist/physics2d.wasm', import.meta.url);
 
 /** A local server; `handle` answers each request. Closed when the test ends. */
 async function serve(t, handle) {
@@ -34,9 +34,9 @@ test('the package ships the Wasm as a file of its own, beside a solver chunk tha
     // The app's bundler emits the file only when it sees a plain `new URL(literal, import.meta.url)`: an ignore
     // comment left in front of it would make Vite skip the asset and the app 404 on the Wasm.
     const code = await readFile(new URL(`../dist/${name}`, import.meta.url), 'utf8');
-    if (!code.includes('rapier2d.wasm?')) continue;
-    assert.match(code, /new URL\("\.\/rapier2d\.wasm\?no-inline", import\.meta\.url\)/, name);
-    assert.doesNotMatch(code, /@vite-ignore[^)]*rapier2d\.wasm/, name);
+    if (!code.includes('physics2d.wasm?')) continue;
+    assert.match(code, /new URL\("\.\/physics2d\.wasm\?no-inline", import\.meta\.url\)/, name);
+    assert.doesNotMatch(code, /@vite-ignore[^)]*physics2d\.wasm/, name);
   }
 });
 
@@ -60,12 +60,12 @@ test('a bad Wasm URL rejects with a coded error naming the URL, and nothing is l
     assert.match(error.message, /could not be read from file:/);
     return true;
   });
-  // Valid Wasm that is not Rapier's instantiates fine; it must still be refused, not handed to the solver.
+  // Valid Wasm that is not the kernel's instantiates fine; it must still be refused, not handed to the solver.
   for (const wasm of [emptyWasm, lookAlikeWasm])
     await assert.rejects(Physics2D.load({ wasm }), (error) => {
       assert.equal(error.name, 'MargoError');
       assert.equal(error.code, 'failed');
-      assert.match(error.message, /not the Rapier build/);
+      assert.match(error.message, /not the Physics2D kernel build/);
       return true;
     });
   await assert.rejects(Physics2D.load({ wasm: 'http://[bad' }), { name: 'TypeError' });

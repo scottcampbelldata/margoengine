@@ -297,7 +297,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "@dimforge/rapier2d-compat": "^0.21.0",
     "@dimforge/rapier3d-compat": "^0.21.0",
     "@playwright/test": "^1.64.0",
     "@testing-library/react": "16.3.3",

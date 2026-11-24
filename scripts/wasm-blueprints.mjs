@@ -47,6 +47,12 @@ export const BLUEPRINTS = [
     own: 'packages/physics/tests/kernel-blueprint.test.js',
   },
   {
+    name: 'physics2d-kernel',
+    crate: 'packages/physics2d/kernel',
+    blueprint: 'packages/physics2d/src/physics2d-kernel.wasm',
+    script: 'packages/physics2d/scripts/build-kernel.mjs',
+  },
+  {
     name: 'erosion',
     crate: 'packages/biomes/kernel',
     blueprint: 'packages/biomes/src/erosion.wasm',

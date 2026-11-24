@@ -2,9 +2,9 @@
 
 Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/physics2d` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-2D rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule and polygon colliders, joints, scene queries, collision events, a character controller and tile map colliders in one call. Rapier 2D (`@dimforge/rapier2d` 0.21.0, Apache-2.0) comes with this package, nothing else to install: its JavaScript in a lazy chunk and its WebAssembly as a file of its own, `dist/rapier2d.wasm`.
+2D rigid-body physics for Margo Engine on its own 2D kernel (Rust compiled to Wasm with SIMD): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule, polygon (convex or concave) and polyline colliders, joints, scene queries, collision and contact force events, sensors, collision groups, continuous collision, a character controller and tile map colliders in one call. Nothing else to install: the kernel's WebAssembly is a file of this package, `dist/physics2d.wasm`.
 
-World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to Rapier's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use Rapier's units.
+World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to the kernel's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use kernel units (kilograms, metres, seconds).
 
 ```ts
 import {Physics2D} from 'margoengine/physics2d';
@@ -37,54 +37,52 @@ physics.on('beforestep', dt => controller.move([60 * dt, 200 * dt]));
 
 It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interactionGroups` and `tileMapColliders`, the collider list `addTileMap` builds. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
 
-**One load per app.** `await Physics2D.load()` compiles the solver, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The solver is a dynamic import and its Wasm a separate file (`dist/rapier2d.wasm`, 2,404,467 bytes) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm, another Rapier version included, rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded. The `rapier` option still takes a Rapier 2D module you initialized yourself (`@dimforge/rapier2d-compat`, an optional peer).
+**One load per app.** `await Physics2D.load()` compiles the kernel, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The loader is a dynamic import and the Wasm a separate file (`dist/physics2d.wasm`) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded.
 
 ```ts
 import {Physics2D} from '@margoengine/physics2d';
 
 // The package's own copy found through Node's resolver; in a page, pass the URL your server or CDN serves it from.
-const wasm = new URL('rapier2d.wasm', import.meta.resolve('@margoengine/physics2d'));
+const wasm = new URL('physics2d.wasm', import.meta.resolve('@margoengine/physics2d'));
 await Physics2D.load({wasm, signal: AbortSignal.timeout(30_000)});
 const physics = new Physics2D(null, {gravity: [0, 320]});
 physics.dispose();
 ```
 
-Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
+Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step, and a `teleport` or `moveTo` at once. `castShape` and `overlapShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier 2D is bundled (`dist/THIRD-PARTY-NOTICE.md` says what was taken, `dist/LICENSE-Apache-2.0.txt` holds its licence); `@dimforge/rapier2d-compat` is an optional peer, only for the `rapier` option.
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0. The kernel is Margo's own, written from papers (`docs/clean-room.md`); it holds no third-party code.
 
 Build and unit tests: npm test --workspace @margoengine/physics2d
 
 ## Parity with Rapier 2D
 
-The package is moving off Rapier onto Margo's own 2D kernel (`kernel/`, Rust to Wasm). Capabilities below are listed from Rapier's public user guide (rapier.rs/docs), never from its source. "Facade" is what `Physics2D` exposes today; "Kernel" is what `kernel/` holds. Status: **full** (done and tested), **partial**, **missing**. A row turns full only when the kernel does it, the facade exposes it and a test covers it. Docs: [limits](../../docs/limits.md), [known bugs](../../docs/known-bugs.md).
+`Physics2D` runs on Margo's own 2D kernel (`kernel/`, Rust to Wasm); it no longer uses Rapier. The capabilities below are listed from Rapier 2D's public user guide (rapier.rs/docs), never from its source. Status: **full** (kernel, facade and a test), **partial** (what is missing is named), **missing**. Docs: [limits](../../docs/limits.md), [known bugs](../../docs/known-bugs.md).
 
-| Area | Rapier 2D capability | Facade | Kernel | Status |
-| --- | --- | --- | --- | --- |
-| Shapes | ball, cuboid, capsule, segment | all four | circle, capsule, segment, rect | partial: facade on Rapier |
-| Shapes | convex polygon (hull), convex decomposition of concave input | yes | convex hull to 8 vertices; no decomposition | partial |
-| Shapes | triangle, round (border-radius) cuboid/convex | no | rounded cores (radius) | partial |
-| Shapes | polyline, trimesh | polyline | chains (one-sided ghosts, smooth) | partial |
-| Shapes | heightfield, voxels, halfspace, compound, shared shapes | no | none | missing |
-| Collision | broad phase, narrow phase, manifolds | yes | box tree broad phase, SAT/clip manifolds, smooth chains | partial |
-| Collision | continuous collision detection (per body) | `ccd` | against static and kinematic shapes | partial: facade on Rapier; dynamic bodies not swept against each other |
-| Collision | sensors | yes | sensors (overlap events, push nothing) | partial: facade on Rapier |
-| Collision | collision groups, solver groups, active collision types | collision groups | all three | partial: facade on Rapier |
-| Collision | collision events, contact-force events | start/end | both (force from the biased pass of each substep) | partial: facade on Rapier |
-| Collision | physics hooks (filter and modify contact pairs, one-way platforms) | no | none | missing |
-| Queries | ray cast (with normal, solid or not), point, shape intersection, shape cast, query filters (groups, kinds, excluded shape and body) | yes | all of them, exact per shape, broad phase culled | partial: facade on Rapier |
-| Bodies | dynamic, fixed, kinematic position, kinematic velocity | all | static, kinematic (velocity), dynamic | partial |
-| Bodies | damping, gravity scale, locked rotation | yes | damping, gravity scale, fixed rotation | partial |
-| Bodies | dominance, forces, torques, impulses at a point, position-driven kinematic bodies | forces, impulses | all of them | partial: facade on Rapier |
-| Bodies | locked translation axes, additional mass, soft CCD, per-collider mass props | no | none | missing |
-| Bodies | sleeping, wake-up, can-sleep | yes | islands and sleep | partial |
-| Joints | fixed, revolute, prismatic, rope, spring, with limits and motors | all | all five, limits, motors | partial: no Wasm binding |
-| Joints | generic (locked axes), joint enable-contacts, reduced-coordinate multibody joints | no | none | missing |
-| Character | kinematic character controller: slide, autostep, snap to ground, slope limits, push dynamic bodies, up vector | yes | none | missing |
-| World | integration parameters, fixed timestep, determinism | step, determinism of the Rapier build | deterministic step, bit-identical native and Wasm | partial |
-| World | snapshots (serialise and restore the world) | no | none | missing |
-| World | debug-render data (lines for shapes, joints, contacts, AABBs) | no | none | missing |
-| Tools | tile map and sprite-outline colliders | yes | built on the facade | partial: moves with the facade |
+| Area | Rapier 2D capability | Where in Margo | Status |
+| --- | --- | --- | --- |
+| Shapes | ball, cuboid, capsule, segment | `box`, `circle`, `capsule`, `segment` colliders | full |
+| Shapes | convex polygon, convex decomposition of concave or large input | `polygon` (convex hull to 8 corners; concave or larger split by ear clipping and Hertel-Mehlhorn) | full |
+| Shapes | polyline | `polyline` (chains with ghost vertices: bodies slide over the joins) | full |
+| Shapes | triangle, round (border radius) cuboid and convex, trimesh | kernel cores carry a radius; the facade has no option for them yet | partial |
+| Shapes | heightfield, voxels, halfspace, compound, shared shapes | none | missing |
+| Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
+| Collision | continuous collision detection | `ccd` against fixed and kinematic bodies; dynamic bodies are not swept against each other | partial |
+| Collision | sensors | `sensor: true` (senses fixed and kinematic bodies too) | full |
+| Collision | collision groups, solver groups, active collision types | `collisionGroups`, `solverGroups`, `activeCollisionTypes` | full |
+| Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |
+| Collision | physics hooks (filter and modify contact pairs, one-way platforms) | none | missing |
+| Queries | ray cast with normal (solid or not), point, shape intersection, shape cast, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `QueryFilter2D` | full |
+| Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
+| Bodies | damping, gravity scale, locked rotation, can sleep, dominance | `BodyOptions2D` | full |
+| Bodies | forces, torques, impulses (at the centre or a point), velocities, wake and sleep | `Body2D` methods | full |
+| Bodies | locked translation axes, additional mass, soft CCD | none | missing |
+| Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
+| Joints | generic joint (locked axes), reduced-coordinate multibody joints | none | missing |
+| Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
+| World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
+| World | snapshots (serialise and restore the world), debug render data | none | missing |
+| Tools | tile map and sprite outline colliders | `addTileMap`, `outlineColliders` | full |
 
 ## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)
 
@@ -121,7 +119,7 @@ Any other collider setting (`friction`, `restitution`, `sensor`, `density` and t
 
 ## Kernel development
 
-The in-repository Rust kernel under `kernel/` is separate from this package's Rapier facade. Its world batches four
+The Rust kernel under `kernel/` is what the TypeScript facade above calls through `dist/physics2d.wasm` (its C interface is `kernel/src/api.rs`; rebuild the committed Wasm with `node scripts/wasm-blueprints.mjs --rebuild --only=physics2d-kernel`). Its world batches four
 awake quad contacts through exact SIMD SAT and clipping. A rectangle certified from its current vertices and normals
 uses support corners for SAT; separated cores can certify the original preferred clipped face from conservative
 distance bounds. Uncertified cases use the complete closest-distance path. The
@@ -143,7 +141,7 @@ WebGL2; Firefox WebGPU has no adapter on the test installation.
 
 The raw Rust world and collision APIs return `Result<_, PhysicsError>`. Handle errors with `?` or inspect
 `error.code()` and `error.help()`; the [input contract](../../docs/limits.md#own-2d-input-validation) lists the
-codes and representability rules. This API belongs to `kernel/`; the Rapier-backed TypeScript facade above
+codes and representability rules. This API belongs to `kernel/`; the TypeScript facade above
 keeps its existing API and units.
 
 ```rust

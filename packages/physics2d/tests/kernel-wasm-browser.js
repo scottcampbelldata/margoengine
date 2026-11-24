@@ -1,7 +1,7 @@
 // The own 2D kernel's shipped Wasm build (simd128) in a page that renders: the pinned-bits scenes of
 // kernel/tests/bits.rs are stepped between frames of an engine on WebGPU or on the WebGL2 fallback, so the physics is
 // shown to give the same bits whichever renderer the page draws with; then the 100-row pyramid is timed in this
-// kernel, in Rapier 2D's Wasm build and, when the run names one, in a Box2D v3 Wasm build (a black box built outside
+// kernel, in Rapier 2D's Wasm build (when the run names one) and, when the run names one, in a Box2D v3 Wasm build (a black box built outside
 // the repository, docs/whitepaper/reproduce.md), side by side in one page. Run by scripts/physics2d-kernel-browsers.mjs.
 import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
 import { webglRenderer } from '/packages/webgl2-compat/dist/preview.js';
@@ -51,18 +51,20 @@ window.runKernel = async ({ backend, module, rapier, box2d, rounds }) => {
   engine.dispose();
   const times = [];
   if (rounds > 0) {
-    const R = (await import(rapier)).default;
-    await R.init();
+    const R = rapier ? (await import(rapier)).default : null;
+    if (R) await R.init();
     // Box2D's harness (physics-refs wasm/box2d3/pyramid.c): bench_pyramid(rows), bench_step(), bench_top_y().
     const B = box2d ? await (await import(box2d)).default() : null;
     // Taking turns, a fresh world each round: 60 steps to settle, then the fastest of the next 40 (as tests/bits.rs).
     for (let r = 0; r < rounds; r++) {
       k.bench_pyramid(100);
       const margo = bestStep(() => k.bench_step(), 60, 40);
-      const w = rapierPyramid(R, 100);
-      const rapier2d = bestStep(() => w.step(), 60, 40);
-      w.free();
-      const round = { margo, rapier2d };
+      const round = { margo };
+      if (R) {
+        const w = rapierPyramid(R, 100);
+        round.rapier2d = bestStep(() => w.step(), 60, 40);
+        w.free();
+      }
       if (B) {
         B._bench_pyramid(100);
         round.box2d = bestStep(() => B._bench_step(), 60, 40);

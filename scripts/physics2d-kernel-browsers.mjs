@@ -5,7 +5,8 @@
 //      packages/physics/scripts/test-replay.js, is the model). Playwright's Firefox has no WebGPU; its WebGPU page is
 //      reported as not run, never as passed, and REPLAY_FIREFOX names a Firefox with WebGPU to run it in.
 //   2. on the WebGPU page of each browser (WebGL2 in a browser without it), the 100-row pyramid is timed in this kernel
-//      and in Rapier 2D's Wasm build (@dimforge/rapier2d-compat), taking turns in one page (--rounds=, default 8): the
+//      and, when RAPIER2D_MODULE names one, in Rapier 2D's Wasm build (a black box installed outside the repository,
+//      its rapier.mjs), taking turns in one page (--rounds=, default 8): the
 //      fastest of 40 steps after 60, per round, compared by per-round minimums (AGENTS.md). The page is cross-origin
 //      isolated so the browsers' timers resolve microseconds. BOX2D_WASM=<path to box2d3-pyramid.mjs> adds Box2D v3's
 //      Wasm build to the turns: a black box built outside the repository with the official emsdk (its own CMake
@@ -13,7 +14,7 @@
 // Writes test-results/physics2d-kernel-browsers.json.
 // `npm run test:physics2d-kernel-browsers` (a ROOT suite of scripts/gpu-package-tests.mjs, so check:merge runs it) is
 // part 1 in the default browser, with no timing; the full run, Firefox and the timing too, is the script itself:
-//   [BOX2D_WASM=...] node scripts/physics2d-kernel-browsers.mjs [--browsers=default,firefox] [--rounds=8]
+//   [BOX2D_WASM=...] [RAPIER2D_MODULE=...] node scripts/physics2d-kernel-browsers.mjs [--browsers=default,firefox] [--rounds=8]
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -34,8 +35,11 @@ if (!(rounds >= 0)) throw new RangeError(`--rounds must be 0 or more, got ${arg(
 
 execFileSync('cargo', wasmBuildArgs(check), { cwd: root, stdio: 'inherit', timeout: 20 * 60_000, env: { ...process.env, RUSTFLAGS: WASM_RUSTFLAGS } });
 const module = `/${wasmModule(check, await readFile(join(root, check), 'utf8'))}`;
-const rapier = '/node_modules/@dimforge/rapier2d-compat/dist/rapier.mjs';
-const rapierVersion = JSON.parse(await readFile(join(root, 'node_modules/@dimforge/rapier2d-compat/package.json'), 'utf8')).version;
+const rapierPath = process.env.RAPIER2D_MODULE ? resolve(process.env.RAPIER2D_MODULE) : undefined;
+const rapier = rapierPath ? `/@fs/${rapierPath.replaceAll('\\', '/')}` : undefined;
+const rapierVersion = rapierPath
+  ? JSON.parse(await readFile(join(dirname(rapierPath), '../package.json'), 'utf8').catch(() => '{"version":"unknown"}')).version
+  : 'not run';
 const box2dPath = process.env.BOX2D_WASM ? resolve(process.env.BOX2D_WASM) : undefined;
 const box2d = box2dPath ? `/@fs/${box2dPath.replaceAll('\\', '/')}` : undefined;
 
@@ -49,7 +53,7 @@ const server = await createServer({
     port: 0,
     hmr: false,
     watch: null,
-    fs: { allow: [root, ...(box2dPath ? [dirname(box2dPath)] : [])] },
+    fs: { allow: [root, ...(box2dPath ? [dirname(box2dPath)] : []), ...(rapierPath ? [dirname(rapierPath)] : [])] },
     headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' },
   },
 });
@@ -94,12 +98,13 @@ try {
           console.log(`${label}: FAIL ${error.message}`);
         }
         if (result.times.length) {
-          const margo = Math.min(...result.times.map((t) => t.margo)),
-            rapier2d = Math.min(...result.times.map((t) => t.rapier2d)),
-            faster = result.times.filter((t) => t.margo < t.rapier2d).length;
-          console.log(
-            `${label}: 100-row pyramid step, best of ${result.times.length} rounds: Margo ${margo.toFixed(2)} ms, Rapier 2D ${rapierVersion} ${rapier2d.toFixed(2)} ms (Margo faster in ${faster} rounds)`,
-          );
+          const margo = Math.min(...result.times.map((t) => t.margo));
+          console.log(`${label}: 100-row pyramid step, best of ${result.times.length} rounds: Margo ${margo.toFixed(2)} ms`);
+          if (rapier) {
+            const rapier2d = Math.min(...result.times.map((t) => t.rapier2d)),
+              faster = result.times.filter((t) => t.margo < t.rapier2d).length;
+            console.log(`${label}: Rapier 2D ${rapierVersion} ${rapier2d.toFixed(2)} ms (Margo faster in ${faster} rounds)`);
+          }
           if (box2d) {
             const box2d3 = Math.min(...result.times.map((t) => t.box2d)),
               ahead = result.times.filter((t) => t.margo < t.box2d).length,

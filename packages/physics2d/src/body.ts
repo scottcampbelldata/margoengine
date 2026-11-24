@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
-import type { Collider2D, RapierModule2D, RigidBody2D, World2D } from './rapier-types.js';
-import type { ColliderOptions2D, Vec2D } from './shapes.js';
+import type { Kernel, Words } from './kernel.js';
+import { describeShape, type ColliderOptions2D, type Described, type Vec2D } from './shapes.js';
 
 /** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType2D = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
@@ -37,23 +37,142 @@ export interface BodyOptions2D {
   ccd?: boolean;
   canSleep?: boolean;
   lockRotation?: boolean;
+  /**
+   * In a contact with a body of lower dominance, this body acts as if it had infinite mass. Integers from -127 to 127,
+   * default 0.
+   */
+  dominance?: number;
   userData?: unknown;
 }
 
 /** @internal What a body needs from its world. */
 export interface BodyOwner2D {
-  readonly rapier: RapierModule2D;
-  readonly world: World2D;
+  readonly kernel: Kernel;
+  readonly handle: number;
   readonly scale: number;
   addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
-  /** @internal Queries must refresh Rapier's broad phase before the next answer. */
-  markStale(): void;
+  removeCollider(collider: Collider2D): void;
   removeBody(body: Body2D): void;
 }
 
-/** A Rapier rigid body bound to an optional sprite. Positions are in world units, y down. */
+const encode = (value: number, what: string): number => {
+  if (!Number.isFinite(value)) throw new RangeError(`${what} must be a finite number, got ${value}; fix the value.`);
+  return value;
+};
+
+/**
+ * A collider: one or more kernel shapes (a concave polygon or a polyline is several) on a body, with the settings that
+ * can change after it exists. Positions are in world units.
+ */
+export class Collider2D {
+  /** The kernel shapes this collider is made of. @internal */
+  readonly shapes: number[];
+  /** The shape as the kernel was given it, for the queries a character controller makes. @internal */
+  described: Described | null = null;
+  private removed = false;
+  private enabled = true;
+  private savedGroups = 0;
+  /** @internal */
+  constructor(
+    private readonly owner: BodyOwner2D,
+    readonly body: Body2D,
+    shapes: number[],
+    private readonly settings: Uint32Array,
+    private readonly offset: readonly [number, number],
+    private readonly turn: number,
+  ) {
+    this.shapes = shapes;
+  }
+  /** The kernel's handle of its first shape: unique among live colliders. */
+  get handle(): number {
+    return this.shapes[0];
+  }
+  /** The body this collider is on. */
+  parent(): Body2D {
+    return this.body;
+  }
+  get isRemoved(): boolean {
+    return this.removed;
+  }
+  /** @internal */
+  markRemoved(): void {
+    this.removed = true;
+  }
+  private push(): void {
+    if (this.removed) throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
+    const { kernel, handle } = this.owner;
+    for (const shape of this.shapes) {
+      const io = kernel.io(8);
+      io.u.set(this.settings);
+      kernel.ok(kernel.exports.shape_set(handle, shape));
+    }
+  }
+  isSensor(): boolean {
+    return (this.settings[5] & (1 << 16)) !== 0;
+  }
+  /** A sensor reports overlaps (`intersectionstart`) and pushes nothing. It also senses fixed and kinematic bodies. */
+  setSensor(sensor: boolean): void {
+    if (sensor === this.isSensor()) return;
+    this.settings[5] = sensor ? this.settings[5] | (1 << 16) : this.settings[5] & ~(1 << 16);
+    this.settings[5] = (this.settings[5] & ~0xff00) | ((sensor ? 63 : 7) << 8);
+    this.push();
+  }
+  setFriction(value: number): void {
+    new Float32Array(this.settings.buffer)[1] = encode(value, 'friction');
+    this.push();
+  }
+  setRestitution(value: number): void {
+    new Float32Array(this.settings.buffer)[2] = encode(value, 'restitution');
+    this.push();
+  }
+  setDensity(value: number): void {
+    new Float32Array(this.settings.buffer)[0] = encode(value, 'density');
+    this.push();
+  }
+  /** Packed interaction groups, see `interactionGroups`. */
+  setCollisionGroups(groups: number): void {
+    if (this.enabled) this.settings[3] = groups >>> 0;
+    else this.savedGroups = groups >>> 0;
+    this.push();
+  }
+  setSolverGroups(groups: number): void {
+    this.settings[4] = groups >>> 0;
+    this.push();
+  }
+  /** A disabled collider meets nothing, reports nothing and is skipped by queries; its mass still counts. */
+  setEnabled(enabled: boolean): void {
+    if (enabled === this.enabled) return;
+    this.enabled = enabled;
+    if (!enabled) {
+      this.savedGroups = this.settings[3];
+      this.settings[3] = 0;
+    } else this.settings[3] = this.savedGroups;
+    this.push();
+  }
+  get isEnabled(): boolean {
+    return this.enabled;
+  }
+  /** The collider's centre in world units, at the body's latest step. */
+  translation(): [number, number] {
+    const [x, y] = this.body.position,
+      a = this.body.rotation,
+      c = Math.cos(a),
+      s = Math.sin(a);
+    return [x + c * this.offset[0] - s * this.offset[1], y + s * this.offset[0] + c * this.offset[1]];
+  }
+  /** The collider's rotation in radians, at the body's latest step. */
+  rotation(): number {
+    return this.body.rotation + this.turn;
+  }
+  /** Removes the collider from its body. */
+  remove(): void {
+    this.owner.removeCollider(this);
+  }
+}
+
+/** A rigid body in the kernel, bound to an optional sprite. Positions are in world units, y down. */
 export class Body2D {
-  /** The Rapier colliders attached to this body. */
+  /** The colliders on this body. */
   readonly colliders: Collider2D[] = [];
   userData: unknown;
   /** @internal previous (0..2) and current (3..5) step poses: x, y, angle. */
@@ -65,7 +184,8 @@ export class Body2D {
   /** @internal */
   constructor(
     private readonly owner: BodyOwner2D,
-    readonly raw: RigidBody2D,
+    /** The kernel's handle. @internal */
+    readonly handle: number,
     readonly sprite: SpriteLike | null,
     readonly type: BodyType2D,
   ) {
@@ -75,16 +195,26 @@ export class Body2D {
 
   /** @internal Stores the current pose as the newest step. */
   snapshot(): void {
-    const p = this.pose,
-      t = this.raw.translation(),
-      k = 1 / this.owner.scale;
+    const { kernel, handle, scale } = this.owner;
+    kernel.ok(kernel.exports.body_read(handle, this.handle));
+    const io = kernel.io(4);
+    this.store(io.f[0], io.f[1], io.f[2], io.f[3], 1 / scale);
+  }
+  /** @internal */
+  store(x: number, y: number, c: number, s: number, k: number): void {
+    const p = this.pose;
     p.copyWithin(0, 3, 6);
-    p[3] = t.x * k;
-    p[4] = t.y * k;
-    p[5] = this.raw.rotation();
+    p[3] = x * k;
+    p[4] = y * k;
+    p[5] = Math.atan2(s, c);
   }
   private check(): void {
     if (this.removed) throw new MargoError('state', 'Body2D was removed; add a new body with Physics2D.addBody.');
+  }
+  private get k(): { x: Kernel['exports']; h: number; kernel: Kernel; scale: number } {
+    this.check();
+    const { kernel, handle, scale } = this.owner;
+    return { x: kernel.exports, h: handle, kernel, scale };
   }
   get isRemoved(): boolean {
     return this.removed;
@@ -105,69 +235,101 @@ export class Body2D {
   }
   /** Moves the body now with no interpolation sweep. For a kinematic position body, use `moveTo`. */
   teleport(position: Vec2D, rotation?: number): this {
-    this.check();
-    const k = this.owner.scale;
-    this.raw.setTranslation({ x: position[0] * k, y: position[1] * k }, true);
-    if (rotation !== undefined) this.raw.setRotation(rotation, true);
+    const { x, h, kernel, scale } = this.k;
+    const a = rotation ?? this.pose[5];
+    encode(position[0], 'position x');
+    encode(position[1], 'position y');
+    encode(a, 'rotation');
+    kernel.ok(x.body_set_transform(h, this.handle, position[0] * scale, position[1] * scale, Math.cos(a), Math.sin(a)));
     this.snapshot();
     this.pose.copyWithin(0, 3, 6);
     this.dirty = true;
-    this.owner.markStale();
     return this;
   }
   /** Sets where a kinematic position body should be after the next step. */
   moveTo(position: Vec2D, rotation?: number): this {
-    this.check();
-    const k = this.owner.scale;
-    this.raw.setNextKinematicTranslation({ x: position[0] * k, y: position[1] * k });
-    if (rotation !== undefined) this.raw.setNextKinematicRotation(rotation);
+    const { x, h, kernel, scale } = this.k;
+    const a = rotation ?? this.pose[5];
+    kernel.ok(x.body_set_next(h, this.handle, position[0] * scale, position[1] * scale, Math.cos(a), Math.sin(a)));
     return this;
+  }
+  private read(): Words {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_read(h, this.handle));
+    return kernel.io(11);
   }
   /** Velocity in world units per second. */
   get linearVelocity(): [number, number] {
-    this.check();
-    const v = this.raw.linvel(),
+    const { f } = this.read(),
       k = 1 / this.owner.scale;
-    return [v.x * k, v.y * k];
+    return [f[4] * k, f[5] * k];
   }
   set linearVelocity(value: Vec2D) {
-    this.check();
-    this.raw.setLinvel({ x: value[0] * this.owner.scale, y: value[1] * this.owner.scale }, true);
+    const { x, h, kernel, scale } = this.k;
+    const av = this.read().f[6];
+    kernel.ok(x.body_set_velocity(h, this.handle, encode(value[0], 'velocity x') * scale, encode(value[1], 'velocity y') * scale, av));
   }
   /** Radians per second. */
   get angularVelocity(): number {
-    this.check();
-    return this.raw.angvel();
+    return this.read().f[6];
   }
   set angularVelocity(value: number) {
-    this.check();
-    this.raw.setAngvel(value, true);
+    const { x, h, kernel } = this.k;
+    const { f } = this.read();
+    kernel.ok(x.body_set_velocity(h, this.handle, f[4], f[5], encode(value, 'angular velocity')));
   }
-  /** Impulse in Rapier units (kilogram metres per second); a body of mass m gains impulse / m metres per second. */
+  /** Impulse in kernel units (kilogram metres per second); a body of mass m gains impulse / m metres per second. */
   applyImpulse(impulse: Vec2D): this {
-    this.check();
-    this.raw.applyImpulse({ x: impulse[0], y: impulse[1] }, true);
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_impulse(h, this.handle, encode(impulse[0], 'impulse x'), encode(impulse[1], 'impulse y'), 0, 0, 0));
+    return this;
+  }
+  /** Impulse applied at a world point (world units), which also spins the body. */
+  applyImpulseAtPoint(impulse: Vec2D, point: Vec2D): this {
+    const { x, h, kernel, scale } = this.k;
+    kernel.ok(
+      x.body_impulse(h, this.handle, encode(impulse[0], 'impulse x'), encode(impulse[1], 'impulse y'), 1, point[0] * scale, point[1] * scale),
+    );
     return this;
   }
   applyTorqueImpulse(torque: number): this {
-    this.check();
-    this.raw.applyTorqueImpulse(torque, true);
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_torque_impulse(h, this.handle, encode(torque, 'torque impulse')));
     return this;
   }
-  /** Force in Rapier units (newtons), held until reset: call it every step you want it applied. */
+  /** Force in kernel units (newtons), held until `resetForces`: it acts every step. */
   applyForce(force: Vec2D): this {
-    this.check();
-    this.raw.addForce({ x: force[0], y: force[1] }, true);
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_add_force(h, this.handle, encode(force[0], 'force x'), encode(force[1], 'force y'), 0));
+    return this;
+  }
+  /** A torque held until `resetForces`. */
+  applyTorque(torque: number): this {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_add_force(h, this.handle, 0, 0, encode(torque, 'torque')));
+    return this;
+  }
+  /** Clears the forces and torques that act every step. */
+  resetForces(): this {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_reset_forces(h, this.handle));
     return this;
   }
   get mass(): number {
-    return this.raw.mass();
+    return this.read().f[7];
   }
   get sleeping(): boolean {
-    return this.raw.isSleeping();
+    return this.read().u[8] === 0;
   }
   wakeUp(): this {
-    this.raw.wakeUp();
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_wake(h, this.handle));
+    return this;
+  }
+  /** Puts the body to sleep now; a contact or a call to `wakeUp` wakes it. */
+  sleep(): this {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_sleep(h, this.handle));
     return this;
   }
   /** Adds a collider. */
@@ -180,3 +342,6 @@ export class Body2D {
     this.owner.removeBody(this);
   }
 }
+
+/** @internal */
+export { describeShape };

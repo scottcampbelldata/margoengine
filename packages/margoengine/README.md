@@ -72,12 +72,11 @@ add them yourself.
 
 ## Third-party libraries
 
-Four entries can use a library you install yourself, only when you use that entry. Everything else is in the one
+Three entries can use a library you install yourself, only when you use that entry. Everything else is in the one
 install.
 
 | Package | Install | Why |
 | --- | --- | --- |
-| `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | Only to pass a Rapier 2D you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | Only to pass a Rapier you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/ifc` | `npm i web-ifc` | You pass an initialized `IfcAPI` to `parseIFC` |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |

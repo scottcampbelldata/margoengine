@@ -44,6 +44,9 @@ interface ColliderSettings2D {
     sensor?: boolean;
     collisionGroups?: number;
     events?: boolean;
+    solverGroups?: number;
+    activeCollisionTypes?: number;
+    contactForceThreshold?: number;
 }
 
 type ShapeOptions2D = {

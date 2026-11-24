@@ -13310,8 +13310,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 224124,
-        "gzip": 44327
+        "raw": 35065,
+        "gzip": 12564
       },
       "./outline": {
         "raw": 4782,
@@ -16758,11 +16758,6 @@
       "gzip": 1176707,
       "brotli": 852125
     },
-    "packages/physics2d/dist/rapier2d.wasm": {
-      "raw": 2404467,
-      "gzip": 912133,
-      "brotli": 673073
-    },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
       "gzip": 3864,
@@ -16787,6 +16782,11 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
+    },
+    "packages/physics2d/dist/physics2d.wasm": {
+      "raw": 311260,
+      "gzip": 116279,
+      "brotli": 93510
     }
   },
   "splits": {
@@ -16924,14 +16924,14 @@
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 22595,
-        "gzip": 8434
+        "raw": 31003,
+        "gzip": 11066
       },
       "lazy": {
-        "name": "Rapier 2D solver JavaScript",
-        "raw": 201528,
-        "gzip": 36014,
-        "loadedBy": "`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, rapier2d.wasm, is a file of its own"
+        "name": "2D physics kernel loader JavaScript",
+        "raw": 4061,
+        "gzip": 1907,
+        "loadedBy": "`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, physics2d.wasm, is a file of its own"
       }
     }
   }

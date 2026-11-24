@@ -10,12 +10,11 @@ the allowed list, or a runtime dependency has an install script, a deprecation o
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-95 of 111 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+96 of 111 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
-| `@dimforge/rapier2d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics2d, margoengine | Rapier 2D rigid-body solver; optional: @margoengine/physics2d bundles Rapier 2D, and an app may pass its own through the rapier option |
 | `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/game, @margoengine/physics, margoengine | Rapier rigid-body solver; optional: @margoengine/physics bundles Rapier, and an app may pass its own through the rapier option |
 | `react` | 19.3.0 | MIT | optional peer | @margoengine/game, @margoengine/kit-react, @margoengine/machinery, @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/kit-react, @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
@@ -39,7 +38,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | @margoengine/sky | Mars magnitude correction tables (Mallama 2007, Icarus 192; Mallama and Hilton 2018, Eq. 6), recovered from JPL Horizons' Mars magnitudes | public-domain facts: JPL Horizons output is United States government work, and the tables were fitted by least squares from 18,786 Horizons magnitudes, not copied; no notice is required | dist/astro.js (src/astro.ts: 72 numbers, thousandths of a magnitude) | derived: least-squares fit, every entry within 0.00004 of a thousandth; checked against the eight values Mallama 2017 (arXiv:1609.05048) prints; origin stated in src/astro.ts |  |
 | @margoengine/ifc | IFC class inheritance (entity names and their SUBTYPE OF parents under IfcObjectDefinition) and the enumeration types of the predefined property sets' attributes, of IFC4 ADD2 TC1 and IFC4X3 ADD2, from the buildingSMART International EXPRESS schemas | buildingSMART technical documentation terms (the IFC4 and IFC4X3 files may be used in software development or translated into another computer language with full attribution); nothing is derived from the IFC2X3 TC1 file, which reserves all rights | dist/query.js (src/schema-tree.ts: class names and parents only) and the readIFCData chunk (src/predefined-enums.ts: attribute and enumeration names only); no definitions, rules or text | derived: packages/ifc/scripts/schema-tree.mjs extracts each SUBTYPE OF link and each enumerated attribute of an IfcPreDefinedPropertySet subtype; the EXPRESS files are not shipped | NOTICE.md |
 | @margoengine/physics | Rapier 3D rigid-body solver (Dimforge) | Apache-2.0 | dist/rapier3d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled) | the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
-| @margoengine/physics2d | Rapier 2D rigid-body solver (Dimforge) | Apache-2.0 | dist/rapier2d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled) | the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 
 ### Licence obligations and how they are met
 
@@ -133,7 +131,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/loaders` | none | none | LICENSE, NOTICE |
 | `@margoengine/lod` | none | none | LICENSE, NOTICE |
 | `@margoengine/machinery` | react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
-| `margoengine` | @dimforge/rapier2d-compat >=0.14.0 <1 (optional peer); @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); web-ifc ^0.0.78 (optional peer) | none | LICENSE, NOTICE |
+| `margoengine` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); web-ifc ^0.0.78 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/materials` | none | none | LICENSE, NOTICE |
 | `@margoengine/math` | none | none | LICENSE, NOTICE |
 | `@margoengine/mcp` | none | none | LICENSE, NOTICE |
@@ -143,7 +141,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/netcode` | none | none | LICENSE, NOTICE |
 | `@margoengine/oit` | none | none | LICENSE, NOTICE |
 | `@margoengine/physics` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer) | Rapier 3D rigid-body solver (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
-| `@margoengine/physics2d` | @dimforge/rapier2d-compat >=0.14.0 <1 (optional peer) | Rapier 2D rigid-body solver (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| `@margoengine/physics2d` | none | none | LICENSE, NOTICE |
 | `@margoengine/pixel` | none | none | LICENSE, NOTICE |
 | `@margoengine/points` | none | none | LICENSE, NOTICE |
 | `@margoengine/post` | none | Colour-transform references: AgX (attribution) | LICENSE, NOTICE, NOTICE.md |
@@ -303,8 +301,8 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 191 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 95, Apache-2.0 48, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-3-Clause 3, BSD-2-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
+`package-lock.json` holds 189 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 95, Apache-2.0 46, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-3-Clause 3, BSD-2-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3, webgpu@0.6.2. Deprecated: whatwg-encoding@3.1.1. `webgpu` is a development dependency only, for the Node proof of `@margoengine/headless`, and is never shipped; its
 install script only clears the macOS quarantine flag on its binary. `rhino3dm` and `laz-perf` are not in the lock: the opt-in
 `test:real-files:runtimes` tool of `@margoengine/loaders` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks

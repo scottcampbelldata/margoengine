@@ -1,13 +1,13 @@
 {
   "name": "@margoengine/physics2d",
   "version": "1.0.0",
-  "description": "2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
+  "description": "2D rigid-body physics for Margo Engine on its own 2D kernel (Rust to Wasm): fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
   "keywords": [
     "margoengine",
     "webgpu",
     "2d",
     "physics",
-    "rapier"
+    "wasm"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -50,16 +50,9 @@
     "@margoengine/geometry": "^1.0.0"
   },
   "peerDependencies": {
-    "@dimforge/rapier2d-compat": ">=0.14.0 <1",
     "@margoengine/core": "^1.0.0"
   },
-  "peerDependenciesMeta": {
-    "@dimforge/rapier2d-compat": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@dimforge/rapier2d": "0.21.0",
     "@margoengine/math": "^1.0.0"
   }
 }

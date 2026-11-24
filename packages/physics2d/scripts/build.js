@@ -4,12 +4,10 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
-import { interfaceHash } from '../../shared/bindgen-wasm.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -19,35 +17,29 @@ const dist = distDir(root);
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 const peers = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies });
 await copyLegal(root);
-// Rapier's JavaScript is bundled from @dimforge/rapier2d into the lazy solver chunk; its Wasm is copied beside it as
-// dist/rapier2d.wasm. Rapier's glue imports the Wasm as an ES module, which needs bundler set-up an app should not
-// need, so that import becomes an empty module and src/rapier-solver.ts instantiates the file itself.
-const rapierDir = dirname(createRequire(import.meta.url).resolve('@dimforge/rapier2d/package.json'));
-const rapierGlue = resolve(rapierDir, 'rapier_wasm2d.js');
-const rapierVersion = JSON.parse(await readFile(resolve(rapierDir, 'package.json'), 'utf8')).version;
-// The same hash src/rapier-solver.ts takes of a Wasm it is given, so it can tell this build from any other.
-const rapierInterface = interfaceHash(new WebAssembly.Module(readFileSync(resolve(rapierDir, 'rapier_wasm2d_bg.wasm'))));
-const wasmStub = '\0rapier-wasm-stub';
-const rapierWasm = {
-  name: 'rapier-wasm',
-  enforce: 'pre',
-  resolveId(source, importer) {
-    if (source === './rapier_wasm2d_bg.wasm' && importer && resolve(importer) === rapierGlue) return wasmStub;
-    return null;
-  },
-  load(id) {
-    return id === wasmStub ? 'export {};' : null;
-  },
+// The kernel's Wasm is the committed blueprint src/physics2d-kernel.wasm (scripts/build-kernel.mjs builds it from
+// kernel/, so this build needs no Rust toolchain). It is copied beside the lazy chunk as dist/physics2d.wasm, and the
+// chunk learns its interface version and a hash of its exports and imports, so it can tell it from any other Wasm.
+const kernelFile = resolve(root, 'src/physics2d-kernel.wasm');
+const kernelBytes = readFileSync(kernelFile);
+const kernelModule = new WebAssembly.Module(kernelBytes);
+// The same hash src/wasm-load.ts takes of a Wasm it is given: FNV-1a over the module's exports and imports.
+const kernelInterface = (() => {
+  const text =
+    WebAssembly.Module.exports(kernelModule).map((entry) => `${entry.kind}:${entry.name}`).join(',') +
+    '|' +
+    WebAssembly.Module.imports(kernelModule).map((entry) => `${entry.kind}:${entry.module}:${entry.name}`).join(',');
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+  return hash >>> 0;
+})();
+const kernelVersion = String(new WebAssembly.Instance(kernelModule, {}).exports.api_version());
+// The source marks the Wasm URL @vite-ignore so this build leaves it alone; the app's bundler must see it.
+const exposeWasmUrl = {
+  name: 'expose-wasm-url',
   renderChunk(code) {
-    if (!code.includes('__RAPIER_VERSION__')) return null;
-    return {
-      code: code
-        .replaceAll('__RAPIER_VERSION__', JSON.stringify(rapierVersion))
-        // The source marks the Wasm URL @vite-ignore so this build leaves it alone; the app's bundler must see it.
-        .replace(/\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/rapier2d\.wasm\?no-inline["'])/, '')
-        .replaceAll('__RAPIER_INTERFACE__', String(rapierInterface)),
-      map: null,
-    };
+    if (!code.includes('physics2d.wasm?')) return null;
+    return { code: code.replace(/\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/physics2d\.wasm\?no-inline["'])/, ''), map: null };
   },
 };
 await build({
@@ -55,7 +47,8 @@ await build({
   configFile: false,
   publicDir: false,
   logLevel: 'warn',
-  plugins: [rapierWasm],
+  plugins: [exposeWasmUrl],
+  define: { __KERNEL_VERSION__: JSON.stringify(kernelVersion), __KERNEL_INTERFACE__: String(kernelInterface) },
   build: {
     outDir: dist,
     emptyOutDir: true,
@@ -68,27 +61,13 @@ await build({
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
     },
-    // Peers and dependencies (core, geometry) stay imports; Rapier's JavaScript is bundled.
+    // Peers and dependencies (core, geometry) stay imports.
     rollupOptions: {
       external: (id) => peers.some((peer) => id === peer || id.startsWith(peer + '/')),
     },
   },
 });
-await copyFile(resolve(rapierDir, 'rapier_wasm2d_bg.wasm'), resolve(dist, 'rapier2d.wasm'));
-// Rapier ships inside this package, so its licence and a notice of what was taken ship beside it.
-await copyFile(resolve(rapierDir, 'LICENSE'), resolve(dist, 'LICENSE-Apache-2.0.txt'));
-await writeFile(
-  resolve(dist, 'THIRD-PARTY-NOTICE.md'),
-  `# Third-party notice
-
-This package bundles Rapier (\`@dimforge/rapier2d\` ${rapierVersion}, https://rapier.rs, by Dimforge),
-licensed under the Apache License 2.0 (\`LICENSE-Apache-2.0.txt\` beside this file).
-
-- \`rapier2d.wasm\` is Rapier's \`rapier_wasm2d_bg.wasm\`, unmodified.
-- \`rapier-solver-*.js\` holds Rapier's JavaScript, bundled and minified. One change: its import of the Wasm as an ES
-  module resolves to an empty module, and this package instantiates \`rapier2d.wasm\` itself.
-`,
-);
+await copyFile(kernelFile, resolve(dist, 'physics2d.wasm'));
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],

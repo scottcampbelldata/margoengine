@@ -649,11 +649,11 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics2d',
-    file: 'packages/physics2d/dist/rapier2d.wasm',
-    label: 'rapier2d.wasm',
-    kind: 'Rapier 2D Wasm (@dimforge/rapier2d, bundled)',
+    file: 'packages/physics2d/dist/physics2d.wasm',
+    label: 'physics2d.wasm',
+    kind: '2D physics kernel Wasm (Rust, SIMD)',
     measure: 'file',
-    when: '`await Physics2D.load()`, once per app, compiled while it downloads; its JavaScript is the lazy rapier-solver chunk of the entry',
+    when: '`await Physics2D.load()`, once per app, compiled while it downloads; its JavaScript is the lazy kernel chunk of the entry',
   },
   {
     package: '@margoengine/ifc',
@@ -823,11 +823,11 @@ export const LAZY_SPLITS = [
     entry: '.',
     specifier: '@margoengine/physics2d',
     dist: 'packages/physics2d/dist/index.js',
-    chunk: /^rapier-solver-/,
-    lazyLabel: 'Rapier 2D solver JavaScript',
-    source: 'packages/physics2d/src/rapier-solver.ts',
+    chunk: /^kernel-/,
+    lazyLabel: '2D physics kernel loader JavaScript',
+    source: 'packages/physics2d/src/kernel.ts',
     baseLabel: 'everything the entry loads before <code>Physics2D.load()</code>',
-    when: '`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, rapier2d.wasm, is a file of its own',
+    when: '`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, physics2d.wasm, is a file of its own',
   },
 ];
 

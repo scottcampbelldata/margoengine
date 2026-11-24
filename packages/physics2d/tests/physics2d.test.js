@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import RAPIER from '@dimforge/rapier2d-compat';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Physics2D, interactionGroups } from '../dist/index.js';
 
-await RAPIER.init();
+await Physics2D.load();
 
 const solid = { id: 0, properties: { solid: true } };
 /** An 8 x 4 map of 16 pixel tiles whose bottom row (y 48..64) is solid. */
@@ -19,7 +18,7 @@ function floorMap(extra = {}) {
     ...extra,
   };
 }
-const world = (options = {}) => new Physics2D(null, { rapier: RAPIER, ...options });
+const world = (options = {}) => new Physics2D(null, options);
 const run = (physics, steps) => {
   for (let i = 0; i < steps; i++) physics.step();
   physics.sync(1);
@@ -31,7 +30,7 @@ test('a falling box lands on a tile floor at the expected pixel', () => {
   const sprite = { x: 64, y: 0, rotation: 0 };
   const box = physics.addBody(sprite, { colliders: { shape: 'box', width: 16, height: 16 } });
   run(physics, 300);
-  // Floor top at y 48, box half height 8: the centre rests at 40, within Rapier's contact tolerance.
+  // Floor top at y 48, box half height 8: the centre rests at 40, within the contact tolerance.
   assert.equal(Math.round(sprite.y), 40);
   assert.ok(Math.abs(sprite.y - 40) < 0.1, `rest y ${sprite.y}`);
   assert.ok(Math.abs(sprite.x - 64) < 1e-3);
@@ -353,7 +352,6 @@ test('600 steps with joints, contacts and a map are bit-for-bit repeatable', () 
 });
 
 test('errors name the fix; removed bodies and disposed worlds are refused', () => {
-  assert.throws(() => new Physics2D(null, { rapier: {} }), TypeError);
   assert.throws(() => world({ fixedTimestep: 0 }), RangeError);
   assert.throws(() => world({ pixelsPerMeter: -1 }), RangeError);
   assert.throws(() => world({ gravity: [0] }), TypeError);
@@ -387,7 +385,7 @@ test('errors name the fix; removed bodies and disposed worlds are refused', () =
   physics.dispose();
   assert.equal(physics.isDisposed, true);
   assert.equal(physics.update(1), 0);
-  assert.throws(() => physics.world, /disposed/);
+  assert.throws(() => physics.addBody(null), /disposed/);
 });
 
 test('gravity changes wake sleeping bodies (regression: they floated in the old field)', () => {
@@ -492,7 +490,7 @@ test('dispose removes the world from its own scene, not the active one', async (
   try {
     const other = engine.createScene('b');
     let physics;
-    other.use({ name: 'loader', setup: () => (physics = new Physics2D(engine, { rapier: RAPIER })) });
+    other.use({ name: 'loader', setup: () => (physics = new Physics2D(engine)) });
     other.removePlugin('loader');
     assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
     const bystander = { name: physics.name, disposed: 0, setup() {}, dispose() { this.disposed++; } };

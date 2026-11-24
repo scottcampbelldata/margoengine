@@ -13777,5 +13777,284 @@
     "reason": "Widened, not narrowed: segment, triangle and polyline colliders join the shape union and the collider factory, so every existing call still type-checks (Scott 2026-11-24 approved all physics API changes while away: \"approve everything\").",
     "date": "2026-11-24",
     "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Body2D.raw",
+    "change": "removed",
+    "was": "7b31ec6b",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Body2D.constructor",
+    "change": "signature",
+    "was": "45768efa",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "CharacterController2D.constructor",
+    "change": "signature",
+    "was": "604b97a3",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Joint2D.raw",
+    "change": "removed",
+    "was": "b30b7649",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Joint2D.constructor",
+    "change": "signature",
+    "was": "ec5137db",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Joint2D.private",
+    "change": "signature",
+    "was": "7915210f",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Joint2D.free",
+    "change": "signature",
+    "was": "8566ed52",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Physics2D.rapier",
+    "change": "removed",
+    "was": "c14ce5f4",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Physics2D.world",
+    "change": "removed",
+    "was": "74590869",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Physics2D.refresh",
+    "change": "removed",
+    "was": "029408c5",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Physics2D.markStale",
+    "change": "removed",
+    "was": "5a65dd69",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Physics2DLoadOptions.wasm",
+    "change": "signature",
+    "was": "81a194ab",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Physics2DOptions.rapier",
+    "change": "removed",
+    "was": "63239dd0",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "RapierModule2D",
+    "change": "removed",
+    "was": "03d40f43",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "RapierWasmSource",
+    "change": "removed",
+    "was": "3307033b",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "BodyOwner2D.rapier",
+    "change": "removed",
+    "was": "c14ce5f4",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "BodyOwner2D.world",
+    "change": "removed",
+    "was": "9d0d06ac",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "BodyOwner2D.markStale",
+    "change": "removed",
+    "was": "5a65dd69",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Collider2D",
+    "change": "removed",
+    "was": "1398e291",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "ColliderDesc2D",
+    "change": "removed",
+    "was": "bd159004",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "EventQueue2D",
+    "change": "removed",
+    "was": "a1de794c",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "ImpulseJoint2D",
+    "change": "removed",
+    "was": "4a8edaef",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "JointData2D",
+    "change": "removed",
+    "was": "c017f64a",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "KinematicCharacterController2D",
+    "change": "removed",
+    "was": "dd1d0d18",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "QueryArgs2D",
+    "change": "removed",
+    "was": "dd923ac1",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Ray2D",
+    "change": "removed",
+    "was": "a190a110",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "RigidBody2D",
+    "change": "removed",
+    "was": "58d25543",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "RigidBodyDesc2D",
+    "change": "removed",
+    "was": "75511f3c",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Shape2D",
+    "change": "removed",
+    "was": "bcb07cbe",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Vector2D",
+    "change": "removed",
+    "was": "a24f2833",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "World2D",
+    "change": "removed",
+    "was": "59d699ae",
+    "reason": "Physics2D moved from Rapier 2D to Margo's own 2D kernel (2026-11-24): the Rapier objects (raw, world, the rapier option, the vendor-shaped Rapier interfaces) are gone, Collider2D is a class, and the load option names the kernel's Wasm. Every documented call (addBody, addCollider, addJoint, queries, events, character controller) keeps its signature. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
   }
 ]

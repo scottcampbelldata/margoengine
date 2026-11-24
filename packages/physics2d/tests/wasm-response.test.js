@@ -1,4 +1,4 @@
-// Physics2D.load({wasm}) with a fetched Response: refused when it is not Rapier's build, compiled when it is, also from a
+// Physics2D.load({wasm}) with a fetched Response: refused when it is not the kernel's build, compiled when it is, also from a
 // server that does not label it application/wasm. Own file: the first load that succeeds is the app's solver.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -6,10 +6,10 @@ import { readFile } from 'node:fs/promises';
 import { Physics2D } from '../dist/index.js';
 import { emptyWasm, lookAlikeWasm } from './wasm-fixtures.js';
 
-const wasm = await readFile(new URL('../dist/rapier2d.wasm', import.meta.url));
+const wasm = await readFile(new URL('../dist/physics2d.wasm', import.meta.url));
 const respond = (body, type) => new Response(body, { headers: { 'content-type': type } });
 
-test('a Response holding foreign Wasm or an error status is refused; Rapier\'s Wasm loads under any content type', async () => {
+test('a Response holding foreign Wasm or an error status is refused; the kernel\'s Wasm loads under any content type', async () => {
   for (const body of [emptyWasm, lookAlikeWasm])
     for (const type of ['application/wasm', 'application/octet-stream'])
       await assert.rejects(Physics2D.load({ wasm: respond(body, type) }), { name: 'MargoError', code: 'failed' });

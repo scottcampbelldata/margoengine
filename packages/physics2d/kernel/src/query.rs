@@ -281,13 +281,15 @@ impl World {
                     continue 'shapes;
                 };
                 let gap = nearest.separation;
-                if gap <= tolerance {
+                let closing = direction.dot(m.normal);
+                // Touching and not closing (sliding along a face, or moving away) is not a hit: the distance of convex
+                // shapes cannot fall from there. Overlapping deeper than the tolerance is.
+                if gap <= tolerance && (closing > 1.0e-6 || gap < -tolerance) {
                     let half = m.normal.scale(0.5 * gap);
                     // `point` lies midway between the surfaces: take the surface points either side of it.
                     hits.push(CastHit { shape: id, t, point_a: nearest.point.sub(half), point_b: nearest.point.add(half), normal: m.normal });
                     continue 'shapes;
                 }
-                let closing = direction.dot(m.normal);
                 if closing <= 0.0 {
                     continue 'shapes;
                 }

@@ -6,15 +6,18 @@
 import { EngineKernel, EnginePlugin } from "@margoengine/core";
 
 export class Body2D {
-    readonly raw: RigidBody2D;
+    readonly handle: number;
     readonly sprite: SpriteLike | null;
     readonly type: BodyType2D;
     readonly colliders: Collider2D[];
     userData: unknown;
     readonly pose: Float64Array<ArrayBuffer>;
     dirty: boolean;
-    constructor(owner: BodyOwner2D, raw: RigidBody2D, sprite: SpriteLike | null, type: BodyType2D);
+    constructor(owner: BodyOwner2D,
+    handle: number, sprite: SpriteLike | null, type: BodyType2D);
     snapshot(): void;
+    store(x: number, y: number, c: number, s: number, k: number): void;
+    private get k();
     get isRemoved(): boolean;
     markRemoved(): void;
     get position(): [number, number];
@@ -26,11 +29,15 @@ export class Body2D {
     get angularVelocity(): number;
     set angularVelocity(value: number);
     applyImpulse(impulse: Vec2D): this;
+    applyImpulseAtPoint(impulse: Vec2D, point: Vec2D): this;
     applyTorqueImpulse(torque: number): this;
     applyForce(force: Vec2D): this;
+    applyTorque(torque: number): this;
+    resetForces(): this;
     get mass(): number;
     get sleeping(): boolean;
     wakeUp(): this;
+    sleep(): this;
     addCollider(options: ColliderOptions2D): Collider2D;
     remove(): void;
 }
@@ -48,6 +55,7 @@ export interface BodyOptions2D {
     ccd?: boolean;
     canSleep?: boolean;
     lockRotation?: boolean;
+    dominance?: number;
     userData?: unknown;
 }
 
@@ -61,7 +69,7 @@ export interface CastHit2D extends Hit2D {
 
 export class CharacterController2D {
     readonly body: Body2D;
-    constructor(world: World2D, raw: KinematicCharacterController2D, body: Body2D, scale: number, onDispose: (controller: CharacterController2D) => void, refresh: () => void);
+    constructor(physics: Physics2D, body: Body2D, options: CharacterOptions2D, onDispose: (controller: CharacterController2D) => void);
     move(delta: Vec2D): CharacterMoveResult2D;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -89,6 +97,29 @@ export interface CharacterOptions2D {
     mass?: number;
 }
 
+export class Collider2D {
+    readonly body: Body2D;
+    readonly shapes: number[];
+    described: Described | null;
+    constructor(owner: BodyOwner2D, body: Body2D, shapes: number[], settings: Uint32Array, offset: readonly [number, number], turn: number);
+    get handle(): number;
+    parent(): Body2D;
+    get isRemoved(): boolean;
+    markRemoved(): void;
+    isSensor(): boolean;
+    setSensor(sensor: boolean): void;
+    setFriction(value: number): void;
+    setRestitution(value: number): void;
+    setDensity(value: number): void;
+    setCollisionGroups(groups: number): void;
+    setSolverGroups(groups: number): void;
+    setEnabled(enabled: boolean): void;
+    get isEnabled(): boolean;
+    translation(): [number, number];
+    rotation(): number;
+    remove(): void;
+}
+
 export type ColliderOptions2D = ShapeOptions2D & ColliderSettings2D;
 
 export interface ColliderSettings2D {
@@ -101,6 +132,9 @@ export interface ColliderSettings2D {
     sensor?: boolean;
     collisionGroups?: number;
     events?: boolean;
+    solverGroups?: number;
+    activeCollisionTypes?: number;
+    contactForceThreshold?: number;
 }
 
 export interface CollisionEvent2D {
@@ -114,6 +148,15 @@ export interface CollisionEvent2D {
 
 export type CollisionEventType2D = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
 
+export interface ContactForceEvent2D {
+    bodyA: Body2D;
+    bodyB: Body2D;
+    colliderA: Collider2D;
+    colliderB: Collider2D;
+    force: number;
+    normal: [number, number];
+}
+
 export interface Hit2D {
     body: Body2D;
     sprite: SpriteLike | null;
@@ -121,15 +164,18 @@ export interface Hit2D {
 }
 
 export class Joint2D {
-    readonly raw: ImpulseJoint2D;
+    readonly handle: number;
     readonly bodyA: Body2D;
     readonly bodyB: Body2D;
-    constructor(world: World2D, raw: ImpulseJoint2D, bodyA: Body2D, bodyB: Body2D, unit: number, onRemove: (joint: Joint2D) => void);
-    private get unitJoint();
+    constructor(kernel: Kernel, world: number,
+    handle: number, bodyA: Body2D, bodyB: Body2D, type: JointOptions2D['type'], unit: number, onRemove: (joint: Joint2D) => void);
+    private get limited();
     setLimits(min: number, max: number): this;
+    clearLimits(): this;
     setMotor(motor: MotorOptions2D): this;
+    clearMotor(): this;
     remove(): void;
-    free(wake?: boolean): void;
+    free(): void;
 }
 
 export type JointOptions2D = {
@@ -159,6 +205,8 @@ export type JointOptions2D = {
     damping?: number;
 });
 
+export type KernelWasmSource = string | URL | Response | ArrayBuffer | ArrayBufferView | WebAssembly.Module;
+
 export interface MotorOptions2D {
     targetVelocity?: number;
     factor?: number;
@@ -170,7 +218,6 @@ export interface MotorOptions2D {
 
 export class Physics2D implements EnginePlugin, BodyOwner2D {
     readonly name: string;
-    readonly rapier: RapierModule2D;
     readonly scale: number;
     fixedTimestep: number;
     maxSubsteps: number;
@@ -178,10 +225,11 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     timeScale: number;
     paused: boolean;
     stepCount: number;
+    readonly kernel: Kernel;
+    handle: number;
     static load({ signal, wasm }?: Physics2DLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: Physics2DOptions): Physics2D;
     constructor(engine: EngineKernel | null, options?: Physics2DOptions);
-    get world(): World2D;
     get isDisposed(): boolean;
     get gravity(): [number, number];
     set gravity(value: Vec2D);
@@ -195,16 +243,17 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     addBody(sprite: SpriteLike | null, options?: BodyOptions2D): Body2D;
     addTileMap(map: TileMapSource, options?: TileMapBodyOptions): Body2D;
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
+    removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
     addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D;
     removeJoint(joint: Joint2D): void;
     createCharacterController(body: Body2D, options?: CharacterOptions2D): CharacterController2D;
-    refresh(): void;
-    markStale(): void;
+    writeFilter(f?: QueryFilter2D): void;
     raycast(origin: Vec2D, direction: Vec2D, options?: RaycastOptions2D): CastHit2D | null;
     overlapPoint(point: Vec2D, filter?: QueryFilter2D): Body2D[];
     overlapShape(shape: ShapeOptions2D, position: Vec2D, rotation?: number, filter?: QueryFilter2D): Body2D[];
-    castShape(shape: ShapeOptions2D, position: Vec2D, direction: Vec2D, maxDistance: number, filter?: QueryFilter2D): CastHit2D | null;
+    castShape(shape: ShapeOptions2D, position: Vec2D, direction: Vec2D, maxDistance: number, filter?: QueryFilter2D, rotation?: number): CastHit2D | null;
+    cast(d: Described, x: number, y: number, angle: number, dx: number, dy: number, max: number, filter?: QueryFilter2D): CastHit2D | null;
     on<K extends keyof Physics2DEventMap>(type: K, listener: (event: Physics2DEventMap[K]) => void): () => void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -215,17 +264,17 @@ export interface Physics2DEventMap {
     contactend: CollisionEvent2D;
     intersectionstart: CollisionEvent2D;
     intersectionend: CollisionEvent2D;
+    contactforce: ContactForceEvent2D;
     beforestep: number;
     afterstep: number;
 }
 
 export interface Physics2DLoadOptions {
     signal?: AbortSignal;
-    wasm?: RapierWasmSource;
+    wasm?: KernelWasmSource;
 }
 
 export interface Physics2DOptions {
-    rapier?: RapierModule2D;
     pixelsPerMeter?: number;
     gravity?: Vec2D;
     fixedTimestep?: number;
@@ -245,43 +294,6 @@ export interface QueryFilter2D {
     excludeDynamic?: boolean;
     predicate?: (body: Body2D, collider: Collider2D) => boolean;
 }
-
-export interface RapierModule2D {
-    World: new (gravity: Vector2D) => World2D;
-    EventQueue: new (autoDrain: boolean) => EventQueue2D;
-    Ray: new (origin: Vector2D, direction: Vector2D) => Ray2D;
-    ColliderDesc: {
-        cuboid(hx: number, hy: number): ColliderDesc2D;
-        ball(radius: number): ColliderDesc2D;
-        capsule(halfHeight: number, radius: number): ColliderDesc2D;
-        segment(a: Vector2D, b: Vector2D): ColliderDesc2D;
-        polyline(vertices: Float32Array, indices?: Uint32Array | null): ColliderDesc2D;
-        convexHull(points: Float32Array): ColliderDesc2D | null;
-        convexDecomposition(vertices: Float32Array, indices: Uint32Array): ColliderDesc2D | null;
-    };
-    RigidBodyDesc: {
-        dynamic(): RigidBodyDesc2D;
-        fixed(): RigidBodyDesc2D;
-        kinematicPositionBased(): RigidBodyDesc2D;
-        kinematicVelocityBased(): RigidBodyDesc2D;
-    };
-    JointData: {
-        fixed(anchorA: Vector2D, frameA: number, anchorB: Vector2D, frameB: number): JointData2D;
-        revolute(anchorA: Vector2D, anchorB: Vector2D): JointData2D;
-        prismatic(anchorA: Vector2D, anchorB: Vector2D, axis: Vector2D): JointData2D;
-        rope(length: number, anchorA: Vector2D, anchorB: Vector2D): JointData2D;
-        spring(restLength: number, stiffness: number, damping: number, anchorA: Vector2D, anchorB: Vector2D): JointData2D;
-    };
-    QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
-    ActiveCollisionTypes: {
-        ALL: number;
-    };
-    ActiveEvents: {
-        COLLISION_EVENTS: number;
-    };
-}
-
-export type RapierWasmSource = string | URL | Response | ArrayBuffer | ArrayBufferView | WebAssembly.Module;
 
 export interface RaycastOptions2D extends QueryFilter2D {
     maxDistance?: number;
@@ -386,122 +398,66 @@ export function tileMapColliders(map: TileMapSource, options?: TileMapBodyOption
 // Not exported from this entry, but used by the exports above:
 
 interface BodyOwner2D {
-    readonly rapier: RapierModule2D;
-    readonly world: World2D;
+    readonly kernel: Kernel;
+    readonly handle: number;
     readonly scale: number;
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
-    markStale(): void;
+    removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
 }
 
-interface Collider2D {
-    readonly handle: number;
-    readonly shape: Shape2D;
-    isSensor(): boolean;
-    parent(): RigidBody2D | null;
-    translation(): Vector2D;
-    rotation(): number;
-    setSensor(sensor: boolean): void;
-    setFriction(value: number): void;
-    setRestitution(value: number): void;
-    setCollisionGroups(groups: number): void;
-    setEnabled(enabled: boolean): void;
+interface Described {
+    kind: number;
+    settings: Uint32Array;
+    geometry: Uint32Array;
+    area: number;
+    convex: boolean;
 }
 
-interface ColliderDesc2D {
-    shape: Shape2D;
-    setTranslation(x: number, y: number): ColliderDesc2D;
-    setRotation(angle: number): ColliderDesc2D;
-    setFriction(value: number): ColliderDesc2D;
-    setRestitution(value: number): ColliderDesc2D;
-    setDensity(density: number): ColliderDesc2D;
-    setMass(mass: number): ColliderDesc2D;
-    setSensor(sensor: boolean): ColliderDesc2D;
-    setActiveCollisionTypes(types: number): ColliderDesc2D;
-    setCollisionGroups(groups: number): ColliderDesc2D;
-    setSolverGroups(groups: number): ColliderDesc2D;
-    setActiveEvents(events: number): ColliderDesc2D;
+interface Exports {
+    memory: WebAssembly.Memory;
+    api_version(): number;
+    io_reserve(words: number): number;
+    world_create(gx: number, gy: number): number;
+    world_destroy(world: number): number;
+    world_set_gravity(world: number, gx: number, gy: number): number;
+    world_step(world: number, dt: number): number;
+    body_create(world: number, kind: number, flags: number): number;
+    body_remove(world: number, body: number): number;
+    body_read(world: number, body: number): number;
+    body_read_poses(world: number, count: number): number;
+    body_set_transform(world: number, body: number, x: number, y: number, c: number, s: number): number;
+    body_set_velocity(world: number, body: number, vx: number, vy: number, av: number): number;
+    body_impulse(world: number, body: number, jx: number, jy: number, has: number, px: number, py: number): number;
+    body_torque_impulse(world: number, body: number, torque: number): number;
+    body_add_force(world: number, body: number, fx: number, fy: number, torque: number): number;
+    body_reset_forces(world: number, body: number): number;
+    body_set_params(world: number, body: number, ld: number, ad: number, gs: number, flags: number, dominance: number): number;
+    body_set_fixed_rotation(world: number, body: number, fixed: number): number;
+    body_set_next(world: number, body: number, x: number, y: number, c: number, s: number): number;
+    body_wake(world: number, body: number): number;
+    body_sleep(world: number, body: number): number;
+    shape_create(world: number, body: number, kind: number): number;
+    shape_remove(world: number, shape: number): number;
+    shape_set(world: number, shape: number): number;
+    shape_read(world: number, shape: number): number;
+    joint_create(world: number, a: number, b: number, collide: number): number;
+    joint_remove(world: number, joint: number): number;
+    joint_set_limits(world: number, joint: number, has: number, lo: number, hi: number): number;
+    joint_set_motor(world: number, joint: number, has: number): number;
+    events_read(world: number): number;
+    force_events_read(world: number): number;
+    ray_cast(world: number): number;
+    point_query(world: number): number;
+    shape_overlap(world: number, kind: number): number;
+    shape_cast(world: number, kind: number): number;
 }
 
-interface EventQueue2D {
-    drainCollisionEvents(callback: (colliderA: number, colliderB: number, started: boolean) => void): void;
-    free(): void;
-}
-
-interface ImpulseJoint2D {
-    readonly handle: number;
-    setContactsEnabled(enabled: boolean): void;
-}
-
-interface JointData2D {
-    jointType: number;
-}
-
-interface KinematicCharacterController2D {
-    computeColliderMovement(collider: Collider2D, desired: Vector2D, flags?: number, groups?: number, predicate?: (collider: Collider2D) => boolean): void;
-    computedMovement(): Vector2D;
-    computedGrounded(): boolean;
-    numComputedCollisions(): number;
-    setUp(up: Vector2D): void;
-    setSlideEnabled(enabled: boolean): void;
-    setMaxSlopeClimbAngle(angle: number): void;
-    setMinSlopeSlideAngle(angle: number): void;
-    enableAutostep(maxHeight: number, minWidth: number, includeDynamicBodies: boolean): void;
-    enableSnapToGround(distance: number): void;
-    setApplyImpulsesToDynamicBodies(enabled: boolean): void;
-    setCharacterMass(mass: number): void;
-}
-
-type QueryArgs2D = [
-    flags?: number,
-    groups?: number,
-    excludeCollider?: Collider2D,
-    excludeBody?: RigidBody2D,
-    predicate?: (collider: Collider2D) => boolean
-];
-
-interface Ray2D {
-    origin: Vector2D;
-    dir: Vector2D;
-}
-
-interface RigidBody2D {
-    readonly handle: number;
-    translation(): Vector2D;
-    rotation(): number;
-    linvel(): Vector2D;
-    angvel(): number;
-    setTranslation(position: Vector2D, wakeUp: boolean): void;
-    setRotation(angle: number, wakeUp: boolean): void;
-    setNextKinematicTranslation(position: Vector2D): void;
-    setNextKinematicRotation(angle: number): void;
-    setLinvel(velocity: Vector2D, wakeUp: boolean): void;
-    setAngvel(velocity: number, wakeUp: boolean): void;
-    addForce(force: Vector2D, wakeUp: boolean): void;
-    addTorque(torque: number, wakeUp: boolean): void;
-    applyImpulse(impulse: Vector2D, wakeUp: boolean): void;
-    applyTorqueImpulse(torque: number, wakeUp: boolean): void;
-    isSleeping(): boolean;
-    wakeUp(): void;
-    mass(): number;
-    setGravityScale(scale: number, wakeUp: boolean): void;
-}
-
-interface RigidBodyDesc2D {
-    setTranslation(x: number, y: number): RigidBodyDesc2D;
-    setRotation(angle: number): RigidBodyDesc2D;
-    setLinvel(x: number, y: number): RigidBodyDesc2D;
-    setAngvel(velocity: number): RigidBodyDesc2D;
-    setLinearDamping(damping: number): RigidBodyDesc2D;
-    setAngularDamping(damping: number): RigidBodyDesc2D;
-    setGravityScale(scale: number): RigidBodyDesc2D;
-    setCcdEnabled(enabled: boolean): RigidBodyDesc2D;
-    setCanSleep(enabled: boolean): RigidBodyDesc2D;
-    lockRotations(): RigidBodyDesc2D;
-}
-
-interface Shape2D {
-    readonly type: number;
+class Kernel {
+    constructor(x: Exports);
+    io(words: number): Words;
+    ok(result: number): number;
+    get exports(): Exports;
 }
 
 interface TileBox {
@@ -519,37 +475,8 @@ interface TilePoints {
     readonly rotation?: number;
 }
 
-interface Vector2D {
-    x: number;
-    y: number;
-}
-
-interface World2D {
-    gravity: Vector2D;
-    timestep: number;
-    step(queue?: EventQueue2D): void;
-    free(): void;
-    createRigidBody(desc: RigidBodyDesc2D): RigidBody2D;
-    createCollider(desc: ColliderDesc2D, body?: RigidBody2D): Collider2D;
-    createImpulseJoint(desc: JointData2D, bodyA: RigidBody2D, bodyB: RigidBody2D, wakeUp: boolean): ImpulseJoint2D;
-    createCharacterController(offset: number): KinematicCharacterController2D;
-    getCollider(handle: number): Collider2D;
-    removeRigidBody(body: RigidBody2D): void;
-    removeCollider(collider: Collider2D, wakeUp: boolean): void;
-    removeImpulseJoint(joint: ImpulseJoint2D, wakeUp: boolean): void;
-    removeCharacterController(controller: KinematicCharacterController2D): void;
-    castRayAndGetNormal(ray: Ray2D, maxDistance: number, solid: boolean, ...filter: QueryArgs2D): {
-        collider: Collider2D;
-        timeOfImpact: number;
-        normal: Vector2D;
-    } | null;
-    castShape(position: Vector2D, rotation: number, velocity: Vector2D, shape: Shape2D, targetDistance: number, maxDistance: number, stopAtPenetration: boolean, ...filter: QueryArgs2D): {
-        collider: Collider2D;
-        time_of_impact: number;
-        witness1: Vector2D;
-        normal1: Vector2D;
-    } | null;
-    intersectionsWithPoint(point: Vector2D, callback: (collider: Collider2D) => boolean, ...filter: QueryArgs2D): void;
-    intersectionsWithShape(position: Vector2D, rotation: number, shape: Shape2D, callback: (collider: Collider2D) => boolean, ...filter: QueryArgs2D): void;
+interface Words {
+    readonly f: Float32Array;
+    readonly u: Uint32Array;
 }
 ```
