@@ -224,6 +224,8 @@ export interface ColliderSettings {
   contactForceThreshold?: number;
   /** Collider enabled (default true). */
   enabled?: boolean;
+  /** Anything you want to find again from an event, a query or a contact, kept on `collider.userData` (default undefined). */
+  userData?: unknown;
 }
 
 /** Options for a collider: shape, material, sensor and filtering. */

@@ -127,6 +127,7 @@ export interface ColliderSettings {
     contactForceEvents?: boolean;
     contactForceThreshold?: number;
     enabled?: boolean;
+    userData?: unknown;
 }
 
 export type ColliderShape = ShapeOptions['shape'];
@@ -471,6 +472,18 @@ export class KernelWorld {
     setCcd(body: number, enabled: boolean): this;
     isCcdActive(body: number): boolean;
     setCanSleep(body: number, canSleep: boolean): this;
+    get timing(): {
+        step: number;
+        begin: number;
+        broad: number;
+        narrow: number;
+        islands: number;
+        solver: number;
+        ccd: number;
+        events: number;
+    };
+    get maxCcdSubsteps(): number;
+    set maxCcdSubsteps(substeps: number);
     get steps(): number;
     get substeps(): number;
     set substeps(substeps: number);
@@ -620,6 +633,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     constructor(engine: EngineKernel | null, options?: PhysicsOptions);
     get kernel(): KernelWorld;
     get isDisposed(): boolean;
+    get lengthUnit(): number;
+    set lengthUnit(unit: number);
     get predictionDistance(): number;
     set predictionDistance(distance: number);
     get gravity(): [number, number, number];
@@ -628,12 +643,16 @@ export class Physics implements EnginePlugin, BodyOwner {
     get pendingTime(): number;
     get substeps(): number;
     set substeps(substeps: number);
+    get timing(): KernelWorld['timing'];
+    get maxCcdSubsteps(): number;
+    set maxCcdSubsteps(substeps: number);
     get solver(): Required<KernelSolverOptions>;
     setSolver(options: KernelSolverOptions): this;
     get iterations(): number;
     set iterations(iterations: number);
     get solverIterations(): number;
     set solverIterations(passes: number);
+    forEachActiveBody(visit: (body: PhysicsBody) => void): void;
     get colliderCount(): number;
     get bodyCount(): number;
     setup(engine: EngineKernel): void;
@@ -788,6 +807,7 @@ export class PhysicsCollider {
     readonly handle: number;
     readonly body: PhysicsBody;
     shape: ColliderShape;
+    userData: unknown;
     emits: boolean;
     forceEvents: boolean;
     forceThreshold: number;
@@ -967,6 +987,7 @@ export interface PhysicsOptions {
     intersectionFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
     contactModifier?: (contact: ContactModification) => void;
     predictionDistance?: number;
+    lengthUnit?: number;
 }
 
 export interface PhysicsRaycastOptions extends QueryFilter {

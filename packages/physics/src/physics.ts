@@ -98,6 +98,13 @@ export interface PhysicsOptions {
   contactModifier?: (contact: ContactModification) => void;
   /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04), Rapier's `predictionDistance`. */
   predictionDistance?: number;
+  /**
+   * How many of your length units make a metre's worth of scale (default 1): 100 for a world in centimetres, 0.001 for one
+   * in kilometres, Rapier's `lengthUnit`. The tolerances of the solver (contact reach, allowed penetration, the fastest a
+   * depth is pushed out, the sleep speed) follow it; gravity, sizes and masses are yours to give in the same unit.
+   * `predictionDistance` and `setSolver` given after it replace what it set.
+   */
+  lengthUnit?: number;
 }
 
 /** A touching pair shown to `PhysicsOptions.contactModifier`, valid only inside the call. */
@@ -438,6 +445,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly parentRotation = [0, 0, 0, 1];
   private readonly meshes: MeshSync;
   private readonly bodies = new Set<PhysicsBody>();
+  private readonly byBodyRow = new Map<number, PhysicsBody>();
   /** Pair rows of one `contactPoints` call, kept between calls. */
   private readonly rowScratch: number[] = [];
   private readonly joints = new Set<PhysicsJoint>();
@@ -512,6 +520,13 @@ export class Physics implements EnginePlugin, BodyOwner {
           decide = (first.isSensor() || second.isSensor() ? sensorFilter : undefined) ?? filter;
         return decide ? decide(first.body, second.body) : true;
       };
+    this.unitBase = {
+      solver: this.world.solver,
+      prediction: this.world.predictionDistance,
+      sleepEnergy: this.world.sleepEnergy,
+      sleepTime: this.world.sleepTime,
+    };
+    if (options.lengthUnit !== undefined) this.lengthUnit = options.lengthUnit;
     if (options.predictionDistance !== undefined) this.world.setPredictionDistance(options.predictionDistance);
     const modifier = options.contactModifier;
     if (modifier) {
@@ -550,6 +565,35 @@ export class Physics implements EnginePlugin, BodyOwner {
   get isDisposed(): boolean {
     return this.disposed;
   }
+  private readonly unitBase: {
+    solver: Required<KernelSolverOptions>;
+    prediction: number;
+    sleepEnergy: number;
+    sleepTime: number;
+  };
+  private unit = 1;
+  /** The length unit the tolerances follow, 1 for metres; see {@link PhysicsOptions.lengthUnit}. */
+  get lengthUnit(): number {
+    return this.unit;
+  }
+  set lengthUnit(unit: number) {
+    if (!(unit > 0) || !Number.isFinite(unit))
+      throw new RangeError(
+        `lengthUnit must be a finite number above 0: 1 for metres, 100 for centimetres (got ${unit}).`,
+      );
+    const kernel = this.kernel,
+      { solver, prediction, sleepEnergy, sleepTime } = this.unitBase;
+    this.unit = unit;
+    kernel.setPredictionDistance(prediction * unit);
+    kernel.setSolver({
+      contactMaxPush: solver.contactMaxPush * unit,
+      allowedPenetration: solver.allowedPenetration * unit,
+      jointMaxPush: solver.jointMaxPush * unit,
+    });
+    // A body sleeps under this kinetic energy per unit of mass, which is a speed squared.
+    kernel.setSleep(sleepEnergy * unit * unit, sleepTime);
+    for (const body of this.bodies) if (body.type === 'dynamic') kernel.wake(body.row);
+  }
   /** How far apart two shapes may be, in metres, and still have contacts made (default 0.04). */
   get predictionDistance(): number {
     return this.kernel.predictionDistance;
@@ -584,6 +628,17 @@ export class Physics implements EnginePlugin, BodyOwner {
   set substeps(substeps: number) {
     this.kernel.substeps = substeps;
   }
+  /** How long the phases of the last step took in milliseconds, Rapier's `timingStep` and the others; see {@link KernelWorld.timing}. */
+  get timing(): KernelWorld['timing'] {
+    return this.kernel.timing;
+  }
+  /** How many continuous-collision passes a step may make, Rapier's `maxCcdSubsteps`: 0 turns CCD off for the world; see {@link KernelWorld.maxCcdSubsteps}. */
+  get maxCcdSubsteps(): number {
+    return this.kernel.maxCcdSubsteps;
+  }
+  set maxCcdSubsteps(substeps: number) {
+    this.kernel.maxCcdSubsteps = substeps;
+  }
   /** The solver settings (contact stiffness, allowed penetration, joint shares); see {@link KernelWorld.setSolver}. */
   get solver(): Required<KernelSolverOptions> {
     return this.kernel.solver;
@@ -607,6 +662,19 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   set solverIterations(passes: number) {
     this.substeps = passes;
+  }
+  /**
+   * Calls `visit` with each body the last step worked on: the dynamic bodies that are awake and the kinematic ones that
+   * moved, in the solver's order. Sleeping and fixed bodies are left out, as Rapier's `forEachActiveRigidBody` leaves them.
+   * The list is taken first, so `visit` may change the world; a body it removes is skipped.
+   */
+  forEachActiveBody(visit: (body: PhysicsBody) => void): void {
+    const kernel = this.kernel,
+      rows = Array.from(kernel.columns.awake.subarray(0, kernel.awakeCount));
+    for (const row of rows) {
+      const body = this.byBodyRow.get(row);
+      if (body?.valid) visit(body);
+    }
   }
   /** How many colliders the world holds. */
   get colliderCount(): number {
@@ -874,6 +942,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     // A pose taken from the mesh is already on the mesh; writing it back would only round a child's transform.
     if (mesh && !options.position && !options.rotation) body.dirty = false;
     this.bodies.add(body);
+    this.byBodyRow.set(row, body);
     if (options.follow) {
       body.follow = true;
       this.followers.add(body);
@@ -944,6 +1013,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       );
     collider.data = data;
     collider.reshape = (next) => this.reshapeCollider(body, collider, next);
+    collider.userData = options.userData;
     collider.emits = options.events ?? true;
     collider.forceEvents = options.contactForceEvents ?? true;
     collider.forceThreshold = options.contactForceThreshold ?? 0;
@@ -1020,6 +1090,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const collider of body.colliders) this.byRow.delete(collider.handle);
     this.bodies.delete(body);
+    this.byBodyRow.delete(body.row);
     this.followers.delete(body);
     this.meshes.remove(body);
     if (body.mesh) this.byMesh.delete(body.mesh);

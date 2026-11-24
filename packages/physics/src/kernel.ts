@@ -1,4 +1,5 @@
 // The Rust kernel from JavaScript: loads the blueprint and reads the world's columns through typed-array views.
+import { clock } from './clock.js';
 import { MargoError } from '@margoengine/math/errors';
 import { LoadOnce } from '../../shared/load-once.js';
 import type { Quat, Vec3 } from './math.js';
@@ -42,6 +43,9 @@ interface KernelExports extends WebAssembly.Exports {
   world_sleep_time(): number;
   world_set_solver(index: number, value: number): number;
   world_solver(index: number): number;
+  world_timing(phase: number): number;
+  world_set_ccd(substeps: number): void;
+  world_ccd(): number;
   body_wake(body: number): void;
   body_wake_touching(body: number): void;
   body_sleep(body: number): void;
@@ -668,6 +672,8 @@ export class KernelWorld {
       env: {
         contact_filter: (a: number, b: number) => this.ask(a, b),
         contact_modify: (row: number) => this.modifyRow(row),
+        // Times the phases of a step. Nothing in the world reads it back, so it is not part of a snapshot or the hash.
+        clock,
       },
     }).exports as KernelExports;
     if (!Number.isSafeInteger(bodies) || !Number.isSafeInteger(colliders) || !this.api.world_new(bodies, colliders))
@@ -934,6 +940,50 @@ export class KernelWorld {
     const { flags } = this.columns;
     flags[body] = canSleep ? flags[body] | CAN_SLEEP : flags[body] & ~CAN_SLEEP;
     return this;
+  }
+  /**
+   * How long the phases of the last step took, in milliseconds, as Rapier's `timingStep` and its siblings do: `step` is the
+   * whole of it, then `begin` (impulses land, kinematic targets are read), `broad` phase, `narrow` phase, `islands`,
+   * `solver` (contact and joint rows and every substep), `ccd` and `events`. The phases add up to `step`, bar the clock's
+   * own calls. All zero before the first step. A reading is not part of the world: a snapshot and the hash leave it out.
+   */
+  get timing(): {
+    step: number;
+    begin: number;
+    broad: number;
+    narrow: number;
+    islands: number;
+    solver: number;
+    ccd: number;
+    events: number;
+  } {
+    const read = (phase: number): number => this.api.world_timing(phase);
+    return {
+      step: read(0),
+      begin: read(1),
+      broad: read(2),
+      narrow: read(3),
+      islands: read(4),
+      solver: read(5),
+      ccd: read(6),
+      events: read(7),
+    };
+  }
+  /**
+   * How many continuous-collision passes a step may make (default 1), Rapier's `maxCcdSubsteps`: 0 turns CCD off for the
+   * whole world, whatever bodies ask for. The kernel resolves a body's whole sweep in the one pass, so a number above 1 finds
+   * nothing more and is the same as 1. Part of a snapshot.
+   * @throws RangeError unless a whole number from 0 to 65535.
+   */
+  get maxCcdSubsteps(): number {
+    return this.api.world_ccd() >>> 0;
+  }
+  set maxCcdSubsteps(substeps: number) {
+    if (!Number.isInteger(substeps) || substeps < 0 || substeps > 65535)
+      throw new RangeError(
+        `maxCcdSubsteps must be a whole number from 0 to 65535; use 0 to turn CCD off (got ${substeps}).`,
+      );
+    this.api.world_set_ccd(substeps);
   }
   /** Steps taken so far. */
   get steps(): number {

@@ -888,6 +888,25 @@ console.log(Math.hypot(...body.linearVelocity).toFixed(2)); // '5.00'
 physics.dispose();
 ```
 
+`lengthUnit` (option and property, default 1) is Rapier's length unit: the number of your units to a metre-scale, 100 for a world in centimetres. The solver's tolerances (the contact reach `predictionDistance`, `allowedPenetration`, the push-out speeds `contactMaxPush` and `jointMaxPush`, and the sleep speed) are scaled by it, so a world built in centimetres with gravity `-981` plays out as the metre world does; give gravity, sizes and masses in the same unit yourself. `maxCcdSubsteps` (default 1) turns continuous collision off for the whole world when 0; the one pass the solver takes resolves a body's whole sweep, so 2 or more is the same as 1. `physics.timing` reads how long the phases of the last step took in milliseconds (`step`, then `begin`, `broad`, `narrow`, `islands`, `solver`, `ccd` and `events`, which add up to `step`); the clock is not part of the world, so a snapshot and the hash do not see it. `physics.forEachActiveBody(visit)` visits the bodies the last step worked on: awake dynamic bodies and moving kinematic ones, never sleepers or fixed bodies. `userData` rides on bodies and colliders (an option and a property), and an event hands the same objects back.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, -981, 0], lengthUnit: 100});
+physics.addBody(null, {type: 'fixed', position: [0, -50, 0], colliders: {shape: 'box', halfExtents: [2000, 50, 2000]}});
+const crate = physics.addBody(null, {
+  position: [0, 500, 0],
+  userData: 'crate',
+  colliders: {shape: 'box', halfExtents: [50, 50, 50], userData: 'lid'},
+});
+for (let i = 0; i < 60; i++) physics.step();
+physics.forEachActiveBody((body) => console.log(body.userData, body.position[1].toFixed(0))); // 'crate' '50'
+console.log(crate.colliders[0].userData, physics.timing.step < 1000); // 'lid' true
+physics.dispose();
+```
+
 ### PID controller
 
 `PidController` drives a body toward a target pose. `linearCorrection(dt, body, target, targetVelocity?)` and `angularCorrection(dt, body, target, targetAngularVelocity?)` return the acceleration it asks for: `kp` times the error, plus `ki` times the error summed over time, plus `kd` times the speed error. `applyLinear` and `applyAngular` land it as an impulse of mass (or world inertia) times acceleration times `dt`, so a heavy body and a light one follow the same path. Call once a step with the step's length. `axes` masks the world axes it works on, `reset()` clears the integral, and gravity is not compensated: the integral takes it up. The angular error is twice the vector part of the short turn to the target, which is the angle in radians to 0.1 percent below 0.1 radian and a little under it beyond. Gains must be finite and at least 0; a step must be above 0.
@@ -992,7 +1011,10 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Islands | island forest, an island sleeps together | full |
 | Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full |
 | Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full |
-| Integration parameters: prediction distance | `predictionDistance` (`tests/next-prediction.test.js`) | full |
+| Integration parameters: prediction distance, length unit, maximum CCD substeps | `predictionDistance` (`tests/next-prediction.test.js`), `lengthUnit`, `maxCcdSubsteps` (`tests/next-parameters.test.js`) | full (a value above 1 of `maxCcdSubsteps` is the same as 1: the one pass resolves a whole sweep) |
+| Step timing counters | `timing` | partial: the step and its seven phases; not Rapier's finer solver and CCD timers |
+| Iterating the active bodies | `forEachActiveBody` | full |
+| User data on bodies and colliders | `userData` | full |
 | Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full |
 | Joint limits, per axis | `setLimits`, `setAxisLimits` | full |
 | Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |

@@ -58,7 +58,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | P-04 | manual stepping with caller-owned structures | `world`, `rapier` | typed-array columns over kernel memory | DONE differently: `kernel-step.test.js` "kinds move as their names say" | Wasm | Wasm |
 | P-05 | insert and remove bodies, colliders, joints | yes | yes | DONE: `kernel-collider.test.js` "freed rows come back last in, first out, and hold nothing of the old row"; `next-joints.test.js` "a joint reaches the kernel: contactsEnabled, wake, removal" | Wasm | Wasm |
 | P-06 | `remove_body_with_colliders(keep)` and standalone colliders (no parent body) | colliders always on a body | same | MISSING, 138.4 | Wasm | Wasm |
-| P-07 | iterate bodies, active bodies, colliders, joints | `bodies` list | rows | PARTIAL: active-body list MISSING, 138.5 | Wasm | Wasm |
+| P-07 | iterate bodies, active bodies, colliders, joints | `bodies` list | `forEachActiveBody`, `bodies`, `colliders` | DONE: `next-parameters.test.js` "forEachActiveBody visits what the last step worked on and leaves out sleepers and fixed bodies" (Rapier's `forEachActiveRigidBody`) | Wasm | Wasm |
 | P-08 | `wake_up(strong)`, `wake_up_all` | `wakeUp` | `wake` | PARTIAL: DONE per body: `kernel-sleep.test.js` "sleep asks, wake reaches the whole island, setCanSleep holds it up"; `wakeAll` MISSING, 138.3 | Wasm | Wasm |
 | P-09 | quarantine (non-finite bodies disabled and reported, world steps on) | Rapier's, not wrapped | stops the world with `MargoError` `failed` | MISSING, 138.4 (both behaviours, chosen by option) | Wasm | Wasm |
 | P-10 | generational handles | `valid` on wrappers | rows reused without generation | MISSING, 138.4 (kernel generations, and an own-solver test that a removed body's handle is refused) | Wasm | Wasm |
@@ -66,23 +66,25 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | P-12 | `BroadPhaseBvh`, build strategies `Binned` and `Ploc`, optimisation strategy, adaptive margin | Rapier's | sweep and prune with pair cache; trimesh BVH building | PARTIAL: SAP DONE: `kernel/tests/broad.rs` `the_pairs_are_what_brute_force_finds_on_every_step_of_random_scenes`; trimesh BVH DONE (126.2, binned SAH, `kernel/tests/bvh.rs` against brute force); broad phase BVH and strategy choice MISSING, 142.3 | Wasm | Wasm |
 | P-13 | `IslandManager` (active bodies, island wake) | Rapier's | union-find islands | DONE: `kernel/tests/sleep.rs` `islands_are_the_connected_groups_of_random_scenes` | Wasm | Wasm |
 | P-14 | `dt` | `fixedTimestep` | same | DONE: `next-physics.test.js` "defaults: density 1, 8 substeps of 2 passes" | Wasm | Wasm |
-| P-15 | `num_solver_iterations` | `solverIterations` | `substeps` (old name kept) | DONE: `next-physics.test.js` "defaults: density 1, 8 substeps of 2 passes" | Wasm | Wasm |
-| P-16 | `num_internal_pgs_iterations` | no | `iterations` | DONE: `kernel/tests/joints.rs` `one_pass_a_substep_still_holds_a_grid` | Wasm | Wasm |
+| P-15 | `num_solver_iterations` | `solverIterations` | `substeps` (old name kept) | DONE: `next-physics.test.js` "defaults: density 1, 8 substeps of 2 passes"; settable: `next-parameters.test.js` "the solver settings do what they say" | Wasm | Wasm |
+| P-16 | `num_internal_pgs_iterations` | no | `iterations` | DONE: `kernel/tests/joints.rs` `one_pass_a_substep_still_holds_a_grid`; settable: `next-parameters.test.js` "the solver settings do what they say" | Wasm | Wasm |
 | P-17 | `num_internal_stabilization_iterations` | no | one relax pass, fixed | MISSING, 138.1 | Wasm | Wasm |
-| P-18 | `contact_softness`, `static_contact_softness` (Hz and damping ratio) | no | soft step coefficients, internal | PARTIAL: coefficients DONE: `kernel/tests/solver.rs` `the_soft_coefficients_are_the_implicit_spring_of_their_definition`; options MISSING, 138.1 | Wasm | Wasm |
-| P-19 | `warmstart_coefficient` | no | warm start always 1 | MISSING, 138.1 | Wasm | Wasm |
+| P-18 | `contact_softness`, `static_contact_softness` (Hz and damping ratio) | no | `setSolver({ contactHertz, contactDamping })` | PARTIAL: `contact_softness` DONE: `kernel/tests/solver.rs` `the_soft_coefficients_are_the_implicit_spring_of_their_definition`, and `next-parameters.test.js` "the solver settings do what they say" (a soft contact sinks further); a separate `static_contact_softness` MISSING (one softness serves both), 138.1 | Wasm | Wasm |
+| P-19 | `warmstart_coefficient` | no | `setSolver({ warmStart })` (0 to 1) | DONE: `next-parameters.test.js` "the solver settings do what they say" (a cold start still settles a box) | Wasm | Wasm |
 | P-20 | `warmstart_joints` | no | joints keep impulses | MISSING (option), 138.1 | Wasm | Wasm |
-| P-21 | `length_unit` (scales every tolerance) | no (2D: `pixelsPerMeter`) | metres only | MISSING, 138.1 | Wasm | Wasm |
-| P-22 | `normalized_allowed_linear_error` (slop) | no | internal | MISSING, 138.1 | Wasm | Wasm |
-| P-23 | `normalized_max_corrective_velocity` | no | internal push-out cap (3 m/s for joints) | MISSING, 138.1 | Wasm | Wasm |
-| P-24 | `normalized_prediction_distance` | no | fat-box margin 0.04 m, internal | MISSING, 138.1 | Wasm | Wasm |
+| P-21 | `length_unit` (scales every tolerance) | no (2D: `pixelsPerMeter`) | `lengthUnit` option and property: scales the contact reach, allowed penetration, push-out speeds and sleep speed | DONE: `next-parameters.test.js` "a world in centimetres with a length unit of 100 plays out as the one in metres does" (positions agree to 1e-4 of a unit where without it they differ by 8e-4) | Wasm | Wasm |
+| P-22 | `normalized_allowed_linear_error` (slop) | no | `setSolver({ allowedPenetration })`, default 0.0002 m | DONE: `next-parameters.test.js` "the solver settings do what they say" | Wasm | Wasm |
+| P-23 | `normalized_max_corrective_velocity` | no | `setSolver({ contactMaxPush, jointMaxPush })`, default 3 m/s | DONE: `next-parameters.test.js` "the solver settings do what they say" (capped at 0.5 and 3 m/s) | Wasm | Wasm |
+| P-24 | `normalized_prediction_distance` | no | `predictionDistance` option and property, default 0.04 m | DONE: `next-parameters.test.js` "a world in centimetres" (scales with the length unit); what it reaches is proved in `next-prediction.test.js` | Wasm | Wasm |
 | P-25 | `normalized_max_linear_velocity` (per-substep cap) | no | refuses past 1e15 | MISSING, 138.1 | Wasm | Wasm |
 | P-26 | `friction_in_bias_pass` | no | fixed | MISSING, 138.1 | Wasm | Wasm |
 | P-27 | `friction_model` `Simplified` and `Coulomb` | no | per-point Coulomb with anchored static friction | MISSING (choice), 138.2 | Wasm | Wasm |
 | P-28 | `contact_clustering` (3D manifolds with near normals merged) | no | one manifold a pair | MISSING, 138.2 | Wasm | Wasm |
 | P-29 | `contact_recycling`, recycle distance | no | warm start by ids, narrow phase every step | MISSING, 138.2 | Wasm | Wasm |
-| P-30 | `min_ccd_dt`, `max_ccd_substeps` (0 turns CCD off) | no | none: CCD (126.8) takes one sweep a step | MISSING, 140.5 | Wasm | Wasm |
-| P-31 | profiling timers (`timingStep`, broad, narrow, solver, CCD, islands, user changes) | no | none | MISSING, 138.6 | Wasm | Wasm |
+| P-30 | `min_ccd_dt`, `max_ccd_substeps` (0 turns CCD off) | no | `maxCcdSubsteps` option-less property on `Physics` and `KernelWorld`: 0 turns CCD off for the world, 1 (default) or more runs the one pass | PARTIAL: `max_ccd_substeps` DONE: `next-parameters.test.js` "maxCcdSubsteps 0 turns continuous collision off for the world" (accepted difference: the own sweep resolves a body's whole step in one pass, so a value above 1 finds nothing more and equals 1); `min_ccd_dt` N/A: the sweep has no time floor to set, it stops within 1 mm of a touch or after 64 advances (`kernel/src/ccd.rs`) | Wasm | Wasm |
+| P-31 | profiling timers (`timingStep`, broad, narrow, solver, CCD, islands, user changes) | no | `timing`: `step`, `begin`, `broad`, `narrow`, `islands`, `solver`, `ccd`, `events`, in milliseconds, from a clock the kernel imports (`env.clock`); kept outside the arena, so a snapshot and the hash leave it out | PARTIAL: DONE: `next-parameters.test.js` "the phases of a step are timed, add up to the step, and stay out of the hash"; Rapier's finer solver timers (velocity assembly, resolution, update, writeback) and CCD's three (TOI, broad phase, solver) MISSING, 138.6 | Wasm | Wasm |
+| P-32 | `num_additional_friction_iterations` (older integration parameters) | no | none: friction is solved in each contact pass | N/A: not in the integration parameters of Rapier's current guide (0.21), which lists `num_solver_iterations`, `num_internal_pgs_iterations` and `num_internal_stabilization_iterations` and a `friction_in_bias_pass` switch (P-26); the soft step solver has no separate friction passes to add to | Wasm | Wasm |
+| P-33 | `min_island_size` (older integration parameters) | no | none | N/A: not in Rapier's current guide; it sizes the islands a parallel solver hands to a thread, and the kernel solves on one thread, where its islands (P-13) are already the connected groups of bodies | Wasm | Wasm |
 
 ## Rigid bodies
 
@@ -107,7 +109,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | RB-17 | `allow_fast_rotation` | no | none | MISSING, 138.3 | Wasm | Wasm |
 | RB-18 | `gyroscopic_forces_enabled` | no | gyroscopic term always on | PARTIAL: term DONE: `kernel/tests/integrate.rs` `a_free_symmetric_top_precesses_at_the_closed_form_rate`; switch MISSING, 138.3 | Wasm | Wasm |
 | RB-19 | `enabled` | `enabled`, `collider.setEnabled` | yes | DONE: `next-events.test.js` "a disabled body leaves the world and comes back; a disabled collider touches nothing"; against Rapier: `next-dynamics.test.js` "switching a body or a collider off" (accepted difference: Rapier works a body's mass out again without a disabled collider, so a body left with none is massless and does not fall; the own solver keeps the mass) | Wasm | Wasm |
-| RB-20 | `user_data` | `userData` | yes | DONE: `next-events.test.js` "a contact filter decides pair by pair" | Wasm | Wasm |
+| RB-20 | `user_data` | `userData` on bodies | `userData` on bodies and on colliders (`ColliderOptions.userData`, `collider.userData`) | DONE: `next-events.test.js` "a contact filter decides pair by pair"; `next-parameters.test.js` "user data rides on bodies and colliders" (an event hands the same collider back) | Wasm | Wasm |
 | RB-21 | `add_force`, `add_torque`, `apply_impulse`, `apply_torque_impulse` | yes | yes | DONE: `kernel/tests/integrate.rs` `a_force_reaches_every_substep_and_an_impulse_lands_once`; against the closed form and Rapier: `next-dynamics.test.js` "an impulse lands once", "a torque impulse spins a body by L / I" | Wasm | Wasm |
 | RB-22 | `add_force_at_point`, `apply_impulse_at_point` | yes (`point`) | `addForceAtPoint`, `applyImpulseAtPoint`, and the `point` argument of `addForce` and `applyImpulse` | DONE: `next-dynamics.test.js` "an impulse lands once", "a force reaches every substep and stays" (the turn is r x F over the inertia, as on Rapier) | Wasm | Wasm |
 | RB-23 | `reset_forces`, `reset_torques`, `user_force`, `user_torque` | `resetForces` (clears both), `resetTorques`, `appliedForce`, `appliedTorque` | same | DONE: `next-dynamics.test.js` "a force reaches every substep and stays; a torque reset keeps the force, and a force reset takes both" | Wasm | Wasm |
@@ -303,6 +305,8 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | D-06 | parallel results equal to sequential | no | none | PLANNED 131 | Wasm threads | Wasm threads |
 
 ## Soft bodies (new in Rapier 0.36)
+
+Checked 2026-11-24 against Rapier's published user guide: its JavaScript guide has a "Soft-bodies" page and the integration parameters link to the soft body settings, so soft bodies are in Rapier and the rows below stand; nothing here is built yet.
 
 The root entry never exposed these, so no Margo user loses them at the switch; they come after it as the optional entry `@margoengine/physics/soft`, still part of the parity floor and before any beyond batch.
 

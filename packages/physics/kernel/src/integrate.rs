@@ -8,6 +8,27 @@ use crate::math::*;
 use crate::solver::soft;
 use crate::world::{NONE, World};
 
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    /// Milliseconds on a clock that only goes forward; it times the phases of a step and nothing reads it back into one.
+    fn clock() -> f64;
+}
+#[cfg(target_arch = "wasm32")]
+#[inline(always)]
+fn now() -> f64 {
+    unsafe { clock() }
+}
+#[cfg(not(target_arch = "wasm32"))]
+#[inline(always)]
+fn now() -> f64 {
+    0.0
+}
+/// What `World::timing` holds: the whole step, then the phases in order. Begin is the start of the step (impulses land,
+/// kinematic targets are read); Solver is the contact and joint rows and every substep; Events lists what pairs began or
+/// ended touching.
+pub const PHASES: [&str; 8] = ["step", "begin", "broad", "narrow", "islands", "solver", "ccd", "events"];
+
 /// A position or speed past this leaves a step nothing to work with: their squares and the rows built from them reach the
 /// end of f32 within the step. A true path can get here, as a bead on a spinning rail flies out exponentially, so a step
 /// refuses it. Nothing bends the value.
@@ -129,10 +150,22 @@ impl World {
         }
         let substeps = self.header().substeps;
         let h = dt / substeps as f32;
+        let mut stamp = now();
+        let begun = stamp;
+        // Closes a phase: the time since the last stamp, in milliseconds, goes in its slot.
+        let mut lap = |world: &mut World, phase: usize| {
+            let at = now();
+            world.timing[phase] = (at - stamp) as f32;
+            stamp = at;
+        };
         self.begin_step(dt);
+        lap(self, 1);
         self.broad_update(dt);
+        lap(self, 2);
         self.narrow_phase(dt);
+        lap(self, 3);
         self.update_islands(dt);
+        lap(self, 4);
         self.prepare_contacts();
         self.prepare_joints();
         // A soft constraint stiffer than a quarter of the substep rate shakes a pile the passes cannot settle (measured).
@@ -180,8 +213,14 @@ impl World {
             self.clamp_speeds();
         }
         self.break_joints(h);
-        self.ccd_pass();
+        lap(self, 5);
+        if self.header().ccd_substeps > 0 {
+            self.ccd_pass();
+        }
+        lap(self, 6);
         self.gather_events();
+        lap(self, 7);
+        self.timing[0] = (stamp - begun) as f32;
         self.header_mut().steps += 1;
         self.check_range();
     }

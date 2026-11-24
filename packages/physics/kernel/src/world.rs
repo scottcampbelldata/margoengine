@@ -93,6 +93,9 @@ pub struct Header {
     pub warm_start: f32,
     /// Visits of the multibody pass, so a tree is taken once a visit.
     pub mb_calls: u32,
+    /// How many continuous-collision passes a step may make: 0 leaves every body's CCD off for the world, any other number
+    /// lets the one pass a step takes run (it resolves a body's whole sweep, so more passes would find nothing more).
+    pub ccd_substeps: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -105,6 +108,9 @@ pub struct World {
     /// The contact modifier of a native build; Wasm calls its import.
     #[cfg(not(target_arch = "wasm32"))]
     pub modifier: Option<fn(&mut World, usize)>,
+    /// Milliseconds the phases of the last step took (see `integrate::PHASES`). Not in the arena: a clock reading is not
+    /// part of the world's state, so it never reaches a snapshot or the hash.
+    pub timing: [f32; 8],
 }
 
 impl World {
@@ -125,6 +131,7 @@ impl World {
             filter: None,
             #[cfg(not(target_arch = "wasm32"))]
             modifier: None,
+            timing: [0.0; 8],
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);
@@ -178,6 +185,7 @@ impl World {
                 stale_parts: 0,
                 warm_start: 1.0,
                 mb_calls: 0,
+                ccd_substeps: 1,
             });
         }
         Some(world)

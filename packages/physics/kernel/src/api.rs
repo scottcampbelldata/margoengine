@@ -56,6 +56,21 @@ pub extern "C" fn world_reserve(bodies: u32, colliders: u32) -> u32 {
 pub extern "C" fn world_ensure(bytes: u32) -> u32 {
     world().arena.ensure(bytes as usize) as u32
 }
+/// Milliseconds a phase of the last step took: 0 the whole step, then begin, broad phase, narrow phase, islands, solver,
+/// continuous collision and events. NaN for another index.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_timing(phase: u32) -> f32 {
+    world().timing.get(phase as usize).copied().unwrap_or(f32::NAN)
+}
+/// How many continuous-collision passes a step may make; 0 turns CCD off for the world.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_ccd(substeps: u32) {
+    world().header_mut().ccd_substeps = substeps;
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_ccd() -> u32 {
+    world().header().ccd_substeps
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn world_hash() -> u32 {
     world().hash()

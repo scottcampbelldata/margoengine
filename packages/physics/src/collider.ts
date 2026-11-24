@@ -52,6 +52,8 @@ export function pairKindBits(kinds: readonly CollisionPairKind[]): number {
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
 export class PhysicsCollider {
   private removed = false;
+  /** Anything you want to find again from an event, a query or a contact: the `userData` option, free to change. */
+  userData: unknown;
   /** @internal Whether this collider asks for contact and intersection events: a pair says so when either side does. */
   emits = true;
   /** @internal Whether this collider asks for contact-force events, and the force in newtons a pair must pass. */
