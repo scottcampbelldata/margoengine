@@ -120,3 +120,47 @@ test('a one-sided polyline is a platform: up through it, then standing on it', (
   assert.ok(Math.abs(ball.position[1] - 95) < 1, `stands on it at ${ball.position[1]}`);
   physics.dispose();
 });
+
+test('generic and slot joints hold only what they lock', () => {
+  const physics = world({ gravity: [0, 320] });
+  const pole = physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: [] });
+  const on = (type) => {
+    const body = physics.addBody(null, { position: [0, 100], linearVelocity: [60, 0], angularVelocity: 3, canSleep: false, colliders: { shape: 'box', width: 16, height: 8, collisionGroups: 0 } });
+    physics.addJoint(pole, body, type);
+    return body;
+  };
+  const slot = on({ type: 'slot', axis: [1, 0] });
+  const pin = on({ type: 'generic', lockX: true, lockY: true });
+  const weld = on({ type: 'generic', lockX: true, lockY: true, lockAngle: true });
+  const hang = on({ type: 'generic', lockAngle: true });
+  run(physics, 120);
+  assert.ok(Math.abs(slot.position[1] - 100) < 0.5 && slot.position[0] > 60, `slot slides: ${slot.position}`);
+  assert.ok(Math.hypot(pin.position[0], pin.position[1] - 100) < 0.5 && Math.abs(pin.angularVelocity) > 1, 'pin spins in place');
+  assert.ok(Math.abs(weld.rotation) < 0.01 && Math.hypot(weld.position[0], weld.position[1] - 100) < 0.5, 'weld holds both');
+  assert.ok(Math.abs(hang.rotation) < 0.01 && hang.position[1] > 200, 'angle lock falls and holds its turn');
+  assert.throws(() => physics.addJoint(pole, slot, { type: 'wobble' }), TypeError);
+  physics.dispose();
+});
+
+test('lockTranslation holds an axis, follows a teleport and can be freed', () => {
+  const physics = world();
+  const bead = physics.addBody(null, { position: [50, 0], lockTranslation: [true, false], colliders: { shape: 'circle', radius: 4 } });
+  bead.linearVelocity = [40, 0];
+  run(physics, 120);
+  assert.ok(Math.abs(bead.position[0] - 50) < 0.5, `x held at ${bead.position[0]}`);
+  assert.ok(bead.position[1] > 100, 'y is free');
+  bead.teleport([200, 0]);
+  run(physics, 60);
+  assert.ok(Math.abs(bead.position[0] - 200) < 0.5, `the lock moved with the teleport: ${bead.position[0]}`);
+  assert.deepEqual(bead.translationLocked, [true, false]);
+  bead.lockTranslation(false);
+  bead.linearVelocity = [60, 0];
+  run(physics, 60);
+  assert.ok(bead.position[0] > 230, 'free again');
+  const both = physics.addBody(null, { position: [0, 0], lockTranslation: true, colliders: { shape: 'box', width: 10, height: 10 } });
+  both.angularVelocity = 2;
+  run(physics, 60);
+  assert.ok(Math.hypot(...both.position) < 0.5 && Math.abs(both.rotation) > 0.5, 'a fully locked body still turns');
+  assert.throws(() => physics.addBody(null, { type: 'fixed', lockTranslation: true }), TypeError);
+  physics.dispose();
+});

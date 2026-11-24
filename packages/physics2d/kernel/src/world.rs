@@ -1495,6 +1495,9 @@ fn validate_joint_def(def: &JointDef) -> Result<(), PhysicsError> {
         JointKind::Fixed { angle_a, angle_b } => {
             if [angle_a.c, angle_a.s, angle_b.c, angle_b.s].into_iter().any(|v| !v.is_finite()) { Err(PhysicsError::NotFinite) } else { Ok(()) }
         }
+        JointKind::Generic { frame_a, frame_b, .. } => {
+            if [frame_a.c, frame_a.s, frame_b.c, frame_b.s].into_iter().any(|v| !v.is_finite()) { Err(PhysicsError::NotFinite) } else { Ok(()) }
+        }
         JointKind::Rope { length } => nonnegative(&[length]),
         JointKind::Spring { rest_length, stiffness, damping } => nonnegative(&[rest_length, stiffness, damping]),
     }

@@ -241,6 +241,12 @@ impl World {
                     w.rot(angle_a);
                     w.rot(angle_b);
                 }
+                JointKind::Generic { lock_x, lock_y, lock_angle, frame_a, frame_b } => {
+                    w.u8(5);
+                    w.u8(lock_x as u8 | (lock_y as u8) << 1 | (lock_angle as u8) << 2);
+                    w.rot(frame_a);
+                    w.rot(frame_b);
+                }
                 JointKind::Rope { length } => {
                     w.u8(3);
                     w.f32(length);
@@ -379,6 +385,10 @@ impl World {
                     JointKind::Prismatic { axis, limits: read_limits(&mut r)?, motor: read_motor(&mut r)? }
                 }
                 2 => JointKind::Fixed { angle_a: r.rot()?, angle_b: r.rot()? },
+                5 => {
+                    let mask = r.u8()?;
+                    JointKind::Generic { lock_x: mask & 1 != 0, lock_y: mask & 2 != 0, lock_angle: mask & 4 != 0, frame_a: r.rot()?, frame_b: r.rot()? }
+                }
                 3 => JointKind::Rope { length: r.f32()? },
                 4 => JointKind::Spring { rest_length: r.f32()?, stiffness: r.f32()?, damping: r.f32()? },
                 _ => return Err(PhysicsError::InvalidParameter),

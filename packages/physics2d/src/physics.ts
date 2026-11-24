@@ -413,6 +413,16 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const handle = this.kernel.ok(this.kernel.exports.body_create(this.handle, BODY_KIND[type], flags));
     const body = new Body2D(this, handle, sprite, type);
     body.userData = options.userData;
+    if (options.lockTranslation) {
+      const lock = options.lockTranslation === true ? [true, true] : options.lockTranslation;
+      try {
+        body.lockTranslation(lock[0], lock[1]);
+      } catch (error) {
+        this.kernel.exports.body_remove(this.handle, handle);
+        this.bodies.delete(body);
+        throw error;
+      }
+    }
     if (options.additionalMass) {
       try {
         body.additionalMass = options.additionalMass;
@@ -502,6 +512,35 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.kernel.exports.body_remove(this.handle, body.handle);
     body.markRemoved();
   }
+
+  /** @internal Holds `body` at its position on the axes picked, with a generic joint to a fixed body no one sees. */
+  lockTranslation(body: Body2D, x: boolean, y: boolean): void {
+    this.live();
+    const { kernel } = this;
+    if (body.lockJoint >= 0) {
+      kernel.exports.joint_remove(this.handle, body.lockJoint);
+      body.lockJoint = -1;
+    }
+    if (!x && !y) return;
+    if (this.anchor < 0) {
+      const io = kernel.io(16);
+      io.u.fill(0, 0, 16);
+      io.f.set([0, 0, 1, 0], 0);
+      io.f[9] = 1;
+      this.anchor = kernel.ok(kernel.exports.body_create(this.handle, 1, 1));
+    }
+    kernel.ok(kernel.exports.body_read(this.handle, body.handle));
+    const at = kernel.io(11).f;
+    const [px, py] = [at[0], at[1]];
+    const io = kernel.io(32);
+    io.u.fill(0, 0, 32);
+    io.u[0] = 5;
+    io.f.set([px, py, 0, 0], 1);
+    io.f.set([1, 0, 1, 0], 16);
+    io.u[24] = (x ? 1 : 0) | (y ? 2 : 0);
+    body.lockJoint = kernel.ok(kernel.exports.joint_create(this.handle, this.anchor, body.handle, 0));
+  }
+  private anchor = -1;
 
   /** Joins two bodies. Anchors are in each body's local space, world units. */
   addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D {

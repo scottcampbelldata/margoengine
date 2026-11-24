@@ -78,9 +78,12 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Bodies | damping, gravity scale, locked rotation, can sleep, dominance | `BodyOptions2D` | full |
 | Bodies | forces, torques, impulses (at the centre or a point), velocities, wake and sleep | `Body2D` methods | full |
 | Bodies | additional mass | `additionalMass` | full |
-| Bodies | locked translation axes, soft CCD | none | missing |
+| Bodies | locked translation axes | `lockTranslation` (an exact joint constraint that follows teleports) | full |
+| Bodies | soft CCD | none | missing |
 | Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
-| Joints | generic joint (locked axes), reduced-coordinate multibody joints | none | missing |
+| Joints | generic joint (any mix of the x, y and angle locks, in turned frames), pin-slot | `type: 'generic'`, `type: 'slot'` | full |
+| Joints | reduced-coordinate multibody joints | `multibody: true` is accepted; every chain of joints already solves exactly (a 50-link chain under a 1000:1 end mass stretches 0.55 percent), but there is no articulation object | partial |
+| Tools | PID controller | `PidController2D` | full |
 | Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
 | World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
 | World | snapshots (serialise and restore the world) | `snapshot()`, `restore()`: a restored world steps bit for bit as the original | full |

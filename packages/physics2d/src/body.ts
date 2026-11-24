@@ -42,6 +42,11 @@ export interface BodyOptions2D {
    * default 0.
    */
   dominance?: number;
+  /**
+   * Holds the body's translation on an axis: `true` locks both, `[x, y]` picks. The body stays where it is on a locked
+   * axis and moves freely on the other (it still turns unless `lockRotation`).
+   */
+  lockTranslation?: boolean | readonly [boolean, boolean];
   /** Mass in kilograms added to what the colliders weigh; the body turns as a heavier body of the same build. Default 0. */
   additionalMass?: number;
   userData?: unknown;
@@ -55,6 +60,7 @@ export interface BodyOwner2D {
   addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
   removeCollider(collider: Collider2D): void;
   removeBody(body: Body2D): void;
+  lockTranslation(body: Body2D, x: boolean, y: boolean): void;
 }
 
 const encode = (value: number, what: string): number => {
@@ -247,6 +253,7 @@ export class Body2D {
     this.snapshot();
     this.pose.copyWithin(0, 3, 6);
     this.dirty = true;
+    if (this.locked[0] || this.locked[1]) this.owner.lockTranslation(this, this.locked[0], this.locked[1]);
     return this;
   }
   /** Sets where a kinematic position body should be after the next step. */
@@ -348,6 +355,25 @@ export class Body2D {
     kernel.ok(x.body_sleep(h, this.handle));
     return this;
   }
+  /**
+   * Locks the body's translation on the x axis, the y axis or both (default both); `lockTranslation(false)` frees it. The
+   * lock holds the body at its position now, with an exact constraint; `teleport` moves the lock with the body.
+   */
+  lockTranslation(x = true, y = x): this {
+    this.check();
+    if (this.type === 'fixed') throw new TypeError('A fixed body does not move; lock the translation of a dynamic or kinematic body.');
+    this.owner.lockTranslation(this, x, y);
+    this.locked = [x, y];
+    return this;
+  }
+  /** Which axes are locked, [x, y]. */
+  get translationLocked(): [boolean, boolean] {
+    return [this.locked[0], this.locked[1]];
+  }
+  /** @internal The kernel handle of the joint that holds the lock, or -1. */
+  lockJoint = -1;
+  private locked: [boolean, boolean] = [false, false];
+
   /** Adds a collider. */
   addCollider(options: ColliderOptions2D): Collider2D {
     this.check();

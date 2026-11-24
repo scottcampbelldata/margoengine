@@ -17,6 +17,7 @@ export { Body2D, Collider2D } from './body.js';
 export type { BodyOptions2D, BodyType2D, SpriteLike } from './body.js';
 export { Joint2D } from './joint.js';
 export type { JointOptions2D, MotorOptions2D } from './joint.js';
+export { PidController2D } from './pid.js';
 export { CharacterController2D } from './character.js';
 export type { CharacterOptions2D, CharacterMoveResult2D } from './character.js';
 export { interactionGroups } from './shapes.js';

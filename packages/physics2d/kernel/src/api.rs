@@ -388,7 +388,7 @@ pub extern "C" fn shape_read(handle: i32, shape: u32) -> i32 {
 /// io: kind code (0 revolute, 1 prismatic, 2 fixed, 3 rope, 4 spring), then the anchors on A and on B (x, y each), a
 /// has-limits word and the low and high limit, a has-motor word and the motor (target position, target speed, stiffness,
 /// damping, most force), the prismatic axis, the fixed angles (cos, sin of A's and of B's), and the rope or rest length,
-/// spring stiffness and damping.
+/// spring stiffness and damping; kind 5 is a generic joint whose locks are the bits of word 24 (1 x, 2 y, 4 angle).
 #[unsafe(no_mangle)]
 pub extern "C" fn joint_create(handle: i32, a: u32, b: u32, collide: u32) -> i32 {
     with_world!(handle, |w| {
@@ -398,6 +398,10 @@ pub extern "C" fn joint_create(handle: i32, a: u32, b: u32, collide: u32) -> i32
             0 => JointKind::Revolute { limits, motor },
             1 => JointKind::Prismatic { axis: point(14), limits, motor },
             2 => JointKind::Fixed { angle_a: Rot::from_pair(f(16), f(17)), angle_b: Rot::from_pair(f(18), f(19)) },
+            5 => {
+                let mask = io()[24];
+                JointKind::Generic { lock_x: mask & 1 != 0, lock_y: mask & 2 != 0, lock_angle: mask & 4 != 0, frame_a: Rot::from_pair(f(16), f(17)), frame_b: Rot::from_pair(f(18), f(19)) }
+            }
             3 => JointKind::Rope { length: f(20) },
             4 => JointKind::Spring { rest_length: f(20), stiffness: f(21), damping: f(22) },
             _ => return Err(PhysicsError::InvalidParameter),

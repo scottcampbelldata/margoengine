@@ -221,3 +221,23 @@ test('debugRender gives lines with colour codes; additionalMass adds to the mass
   assert.ok(top, 'the floor outline is drawn in pixels');
   physics.dispose();
 });
+
+test('a PID controller steers a body to a point and an angle', async () => {
+  const { PidController2D } = await import('../dist/index.js');
+  const physics = world({ gravity: [0, 0] });
+  const body = physics.addBody(null, { canSleep: false, linearDamping: 0, colliders: { shape: 'circle', radius: 4 } });
+  const pid = new PidController2D({ kp: 12, ki: 0.5, kd: 4 });
+  physics.on('beforestep', (dt) => {
+    pid.applyLinear(dt, body, [100, -40]);
+  });
+  run(physics, 600);
+  assert.ok(Math.hypot(body.position[0] - 100, body.position[1] + 40) < 2, `at ${body.position}`);
+  const turner = physics.addBody(null, { position: [0, 300], canSleep: false, colliders: { shape: 'box', width: 20, height: 6 } });
+  const spin = new PidController2D({ kp: 20, kd: 8 });
+  physics.on('beforestep', (dt) => spin.applyAngular(dt, turner, Math.PI * 0.75));
+  run(physics, 600);
+  assert.ok(Math.abs(turner.rotation - Math.PI * 0.75) < 0.05, `turned to ${turner.rotation}`);
+  assert.throws(() => pid.linearCorrection(0, body, [0, 0]), RangeError);
+  assert.throws(() => new PidController2D({ kp: NaN }), RangeError);
+  physics.dispose();
+});

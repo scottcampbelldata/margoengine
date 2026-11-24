@@ -41,6 +41,9 @@ export class Body2D {
     get sleeping(): boolean;
     wakeUp(): this;
     sleep(): this;
+    lockTranslation(x?: boolean, y?: boolean): this;
+    get translationLocked(): [boolean, boolean];
+    lockJoint: number;
     addCollider(options: ColliderOptions2D): Collider2D;
     remove(): void;
 }
@@ -59,6 +62,7 @@ export interface BodyOptions2D {
     canSleep?: boolean;
     lockRotation?: boolean;
     dominance?: number;
+    lockTranslation?: boolean | readonly [boolean, boolean];
     additionalMass?: number;
     userData?: unknown;
 }
@@ -191,6 +195,7 @@ export type JointOptions2D = {
     anchorA?: Vec2D;
     anchorB?: Vec2D;
     collide?: boolean;
+    multibody?: boolean;
 } & ({
     type: 'revolute';
     limits?: readonly [number, number];
@@ -204,6 +209,16 @@ export type JointOptions2D = {
     type: 'fixed';
     angleA?: number;
     angleB?: number;
+} | {
+    type: 'generic';
+    lockX?: boolean;
+    lockY?: boolean;
+    lockAngle?: boolean;
+    frameA?: number;
+    frameB?: number;
+} | {
+    type: 'slot';
+    axis: Vec2D;
 } | {
     type: 'rope';
     length: number;
@@ -254,6 +269,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
     removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
+    lockTranslation(body: Body2D, x: boolean, y: boolean): void;
     addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D;
     removeJoint(joint: Joint2D): void;
     createCharacterController(body: Body2D, options?: CharacterOptions2D): CharacterController2D;
@@ -300,6 +316,23 @@ export interface Physics2DOptions {
     timeScale?: number;
     paused?: boolean;
     name?: string;
+}
+
+export class PidController2D {
+    kp: number;
+    ki: number;
+    kd: number;
+    axes: [boolean, boolean];
+    constructor({ kp, ki, kd }?: {
+        kp?: number;
+        ki?: number;
+        kd?: number;
+    });
+    reset(): this;
+    linearCorrection(dt: number, body: Body2D, target: Vec2D, targetVelocity?: Vec2D): [number, number];
+    applyLinear(dt: number, body: Body2D, target: Vec2D, targetVelocity?: Vec2D): this;
+    angularCorrection(dt: number, body: Body2D, target: number, targetVelocity?: number): number;
+    applyAngular(dt: number, body: Body2D, target: number, targetVelocity?: number): this;
 }
 
 export interface QueryFilter2D {
@@ -451,6 +484,7 @@ interface BodyOwner2D {
     addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
     removeCollider(collider: Collider2D): void;
     removeBody(body: Body2D): void;
+    lockTranslation(body: Body2D, x: boolean, y: boolean): void;
 }
 
 type CompoundPart2D = ShapeOptions2D & {

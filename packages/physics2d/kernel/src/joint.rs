@@ -64,6 +64,10 @@ pub enum JointKind {
     Prismatic { axis: V2, limits: Option<(f32, f32)>, motor: Option<Motor> },
     /// B's frame turned by `angle_b` sits on A's frame turned by `angle_a` (each a rotation pair).
     Fixed { angle_a: Rot, angle_b: Rot },
+    /// Any mix of the three locks of a joint in the plane: A's frame (turned by `frame_a`) has its x axis, its y axis or
+    /// the turn between the frames held, and what is not held is free. `lock_x` and `lock_y` together hold a point; one
+    /// alone is a pin-slot (the anchor slides along the other axis). The frames' turn is `frame_a` less `frame_b`.
+    Generic { lock_x: bool, lock_y: bool, lock_angle: bool, frame_a: Rot, frame_b: Rot },
     Rope { length: f32 },
     Spring { rest_length: f32, stiffness: f32, damping: f32 },
 }
@@ -243,6 +247,36 @@ fn locks(def: &JointDef, pair: &Pair) -> Locks {
             let p = u.left();
             Locks { n: 2, rows: [pair.line(p, d), ANGLE, none], error: [p.dot(d), pair.relative_angle(Rot::IDENTITY), 0.0], point: false }
         }
+        JointKind::Generic { lock_x, lock_y, lock_angle, frame_a, frame_b } => {
+            let reference = frame_a.mul(Rot { c: frame_b.c, s: -frame_b.s });
+            let mut l = Locks { n: 0, rows: [none; 3], error: [0.0; 3], point: false };
+            let mut add = |row: Row, error: f32| {
+                l.rows[l.n] = row;
+                l.error[l.n] = error;
+                l.n += 1;
+            };
+            if lock_x && lock_y {
+                // A held point: its two rows are capped as one vector.
+                let (x, y, c) = point(pair);
+                add(x, c.x);
+                add(y, c.y);
+                l.point = true;
+            } else {
+                let ex = pair.a.q.apply(frame_a.apply(v2(1.0, 0.0)));
+                let d = pair.separation();
+                if lock_x {
+                    add(pair.line(ex, d), ex.dot(d));
+                }
+                if lock_y {
+                    let ey = ex.left();
+                    add(pair.line(ey, d), ey.dot(d));
+                }
+            }
+            if lock_angle {
+                add(ANGLE, pair.relative_angle(reference));
+            }
+            l
+        }
         JointKind::Rope { .. } | JointKind::Spring { .. } => Locks { n: 0, rows: [none; 3], error: [0.0; 3], point: false },
     }
 }
@@ -392,7 +426,7 @@ fn warm_start_rows(joint: &Joint, pair: &mut Pair) {
             let d = pair.separation();
             pair.push(pair.line(u, d), joint.lower - joint.upper + joint.motor);
         }
-        JointKind::Fixed { .. } => {}
+        JointKind::Fixed { .. } | JointKind::Generic { .. } => {}
         JointKind::Rope { .. } => {
             let (u, _) = pair.separation().normalize();
             pair.push(pair.along(u), -joint.upper);
@@ -436,7 +470,7 @@ fn solve_rows(joint: &mut Joint, pair: &mut Pair, pass: &Pass) {
                 inequality(pair, &Coupled::new(pair, row.neg(), &l), hi - u.dot(d), &mut joint.upper, &mut lock, pass);
             }
         }
-        JointKind::Fixed { .. } => {}
+        JointKind::Fixed { .. } | JointKind::Generic { .. } => {}
         JointKind::Rope { length } => {
             let (u, distance) = pair.separation().normalize();
             if distance > 0.0 {
@@ -778,7 +812,7 @@ fn stiffen(world: &World, paths: &mut Paths, h: f32, geometric: bool) {
             }
             // The point's impulse over the substep, times h: h^2 |F| = h |impulse|.
             let pull = h * v2(joint.lock[0], joint.lock[1]).length();
-            if matches!(def.kind, JointKind::Prismatic { .. }) {
+            if matches!(def.kind, JointKind::Prismatic { .. } | JointKind::Generic { lock_x: false, .. } | JointKind::Generic { lock_y: false, .. }) {
                 continue;
             }
             for (id, anchor) in [(def.a, def.anchor_a), (def.b, def.anchor_b)] {

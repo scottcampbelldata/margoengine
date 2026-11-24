@@ -22,10 +22,35 @@ export type JointOptions2D = {
   anchorB?: Vec2D;
   /** Let the two bodies collide with each other (default false). */
   collide?: boolean;
+  /**
+   * Accepted for code written for Rapier's multibody joints and ignored: every chain of joints solves exactly (block
+   * elimination along the chain), so a long chain under a heavy end does not stretch, which is what reduced-coordinate
+   * joints are for.
+   */
+  multibody?: boolean;
 } & (
   | { type: 'revolute'; limits?: readonly [number, number]; motor?: MotorOptions2D }
   | { type: 'prismatic'; axis: Vec2D; limits?: readonly [number, number]; motor?: MotorOptions2D }
   | { type: 'fixed'; angleA?: number; angleB?: number }
+  | {
+      /**
+       * Any mix of the three locks of a plane joint: `lockX` and `lockY` hold the anchors' offset along the first and the
+       * second axis of body A's frame (both together pin a point, one alone is a pin-slot that slides along the other
+       * axis), `lockAngle` holds the turn between the frames. `frameA` and `frameB` (radians, default 0) turn the frames;
+       * the joint holds B's frame turned by `frameB` against A's turned by `frameA`.
+       */
+      type: 'generic';
+      lockX?: boolean;
+      lockY?: boolean;
+      lockAngle?: boolean;
+      frameA?: number;
+      frameB?: number;
+    }
+  | {
+      /** A pin-slot: the anchors slide along `axis` (in body A's frame) and the bodies turn freely. */
+      type: 'slot';
+      axis: Vec2D;
+    }
   | { type: 'rope'; length: number }
   | { type: 'spring'; restLength: number; stiffness: number; damping?: number }
 );
@@ -37,8 +62,8 @@ const finite = (value: number, what: string): number => {
 
 /** @internal Writes a joint's buffer words (kernel/src/api.rs, `joint_create`) and returns the unit of its limits. */
 export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number {
-  const io = kernel.io(24);
-  io.u.fill(0, 0, 24);
+  const io = kernel.io(32);
+  io.u.fill(0, 0, 32);
   const a = o.anchorA ?? [0, 0],
     b = o.anchorB ?? [0, 0];
   io.f.set([finite(a[0], 'anchorA x') * k, finite(a[1], 'anchorA y') * k, finite(b[0], 'anchorB x') * k, finite(b[1], 'anchorB y') * k], 1);
@@ -66,6 +91,21 @@ export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number
       io.f.set([Math.cos(pa), Math.sin(pa), Math.cos(pb), Math.sin(pb)], 16);
       break;
     }
+    case 'generic': {
+      io.u[0] = 5;
+      io.u[24] = (o.lockX ? 1 : 0) | (o.lockY ? 2 : 0) | (o.lockAngle ? 4 : 0);
+      const [pa, pb] = [finite(o.frameA ?? 0, 'frameA'), finite(o.frameB ?? 0, 'frameB')];
+      io.f.set([Math.cos(pa), Math.sin(pa), Math.cos(pb), Math.sin(pb)], 16);
+      break;
+    }
+    case 'slot': {
+      io.u[0] = 5;
+      // Lock the offset across the slot: the second axis of a frame whose first axis is the slot's.
+      io.u[24] = 2;
+      const angle = Math.atan2(finite(o.axis[1], 'axis y'), finite(o.axis[0], 'axis x'));
+      io.f.set([Math.cos(angle), Math.sin(angle), 1, 0], 16);
+      break;
+    }
     case 'rope':
       io.u[0] = 3;
       io.f[20] = finite(o.length, 'rope length') * k;
@@ -78,7 +118,7 @@ export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number
       break;
     default:
       throw new TypeError(
-        `Unknown joint type "${(o as { type?: string }).type}"; use revolute, prismatic, fixed, rope or spring.`,
+        `Unknown joint type "${(o as { type?: string }).type}"; use revolute, prismatic, fixed, generic, slot, rope or spring.`,
       );
   }
   return unit;
