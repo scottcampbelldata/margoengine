@@ -239,6 +239,14 @@ pub extern "C" fn body_add_force(handle: i32, body: u32, fx: f32, fy: f32, torqu
     with_world!(handle, |w| w.add_force(body, v2(fx, fy), torque).map(|()| 0))
 }
 #[unsafe(no_mangle)]
+pub extern "C" fn body_add_force_at(handle: i32, body: u32, fx: f32, fy: f32, px: f32, py: f32) -> i32 {
+    with_world!(handle, |w| w.add_force_at(body, v2(fx, fy), v2(px, py)).map(|()| 0))
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_reset_torques(handle: i32, body: u32) -> i32 {
+    with_world!(handle, |w| w.reset_torques(body).map(|()| 0))
+}
+#[unsafe(no_mangle)]
 pub extern "C" fn body_reset_forces(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| w.reset_forces(body).map(|()| 0))
 }

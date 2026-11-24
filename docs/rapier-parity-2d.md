@@ -4,7 +4,7 @@ Scott, 2026-11-24: "I want this physics engine to be as good or better than Rapi
 
 A row is DONE only when a named test exercises the capability. A row without one is a GAP: it is built, with its test, before it is called done. Statuses: DONE, GAP (nothing built or no test), PARTIAL (part DONE, the rest named). Tests are in `packages/physics2d/tests` unless a path says otherwise. Rapier's names are the guide's own; Margo's are the 2D facade's (`Physics2D`, `Body2D`, `Collider2D`, `Joint2D`).
 
-Found while auditing: the 2D facade has no `Body2D.enabled`, no way to lock rotation after creation, no `resetTorques`, no force at a point, no collider combine rules, no setters for the event, hook, collision-type and contact-force settings of a collider, no all-hits ray, no shape-cast target distance or witness points, no intersection hook or intersection graph query, no query filter for the character controller, and none of the integration parameters. The 2D guide has a Soft-bodies page that covers 2D (ropes, grids, polygons, disks, polylines, trimeshes and volumetric bodies, the constraints solver and the FEM solver): none of it exists yet.
+Found while auditing: the 2D facade had no way to lock rotation after creation, no `resetTorques`, no force at a point, and no setters for the collision-type, event and contact-force settings of a collider (all built and tested since, rows R2-11, R2-13, R2-16, C2-16 and C2-17), and the character controller's slope, autostep, snap and push options had no test (K2-02 to K2-07; a slope past the climb limit was slid up like a ramp, fixed). Still missing: `Body2D.enabled`, collider combine rules and the other collider setters, no all-hits ray, no shape-cast target distance or witness points, no intersection hook or intersection graph query, no query filter for the character controller, and none of the integration parameters. The 2D guide has a Soft-bodies page that covers 2D (ropes, grids, polygons, disks, polylines, trimeshes and volumetric bodies, the constraints solver and the FEM solver): none of it exists yet.
 
 ## Rigid-bodies page
 
@@ -20,12 +20,12 @@ Found while auditing: the 2D facade has no `Body2D.enabled`, no way to lock rota
 | R2-08 | `IntegrationParameters.maxCcdSubsteps` (0 turns CCD off) | none | GAP |
 | R2-09 | `setNextKinematicTranslation`, `setNextKinematicRotation` | `moveTo(position, rotation)` | DONE: `kernel-features.test.js` "body setters, setType, projectPoint, ..." |
 | R2-10 | `addForce`, `addTorque` | `applyForce`, `applyTorque` | DONE: `kernel-features.test.js` "forces act every step until reset; impulses at a point spin; sleep and wake" |
-| R2-11 | `addForceAtPoint` | none | GAP |
+| R2-11 | `addForceAtPoint` | `applyForceAtPoint` | DONE: `dynamics2d.test.js` "a force at a point pushes by F / m and turns by r x F / I, and resetTorques keeps the push"; against Rapier 2D: `oracle-rapier.test.js` "a force at a point, a reset torque and a locked rotation turn a body as Rapier 2D does" |
 | R2-12 | `applyImpulse`, `applyTorqueImpulse`, `applyImpulseAtPoint` | same names | DONE: `kernel-features.test.js` "forces act every step until reset; impulses at a point spin; sleep and wake" |
-| R2-13 | `resetForces`, `resetTorques` | `resetForces` only | PARTIAL: `resetForces` DONE (same test); `resetTorques` GAP |
+| R2-13 | `resetForces`, `resetTorques` | `resetForces`, `resetTorques` | DONE: `dynamics2d.test.js` "a force at a point pushes by F / m ..." (a torque reset keeps the force), and the Rapier 2D comparison above |
 | R2-14 | `setAdditionalMass` | `additionalMass` | DONE: `kernel-features.test.js` "debugRender gives lines with colour codes; additionalMass adds to the mass" |
 | R2-15 | `setAdditionalMassProperties(mass, centre, inertia)` | none | GAP |
-| R2-16 | `lockTranslations(locked)`, `lockRotations(locked)` after creation | `lockTranslation(x, y)`; `lockRotation` only as a creation option | PARTIAL: translation DONE: `shapes-more.test.js` "lockTranslation holds an axis, follows a teleport and can be freed"; `lockRotations` after creation GAP |
+| R2-16 | `lockTranslations(locked)`, `lockRotations(locked)` after creation | `lockTranslation(x, y)`, `lockRotation(locked)`, `rotationLocked`, and the `lockRotation` option | DONE: `shapes-more.test.js` "lockTranslation holds an axis, follows a teleport and can be freed"; `dynamics2d.test.js` "a locked rotation holds the angle against torque and impulse, and frees again"; against Rapier 2D in the comparison above |
 | R2-17 | `setLinearDamping`, `setAngularDamping` | `linearDamping`, `angularDamping` | DONE: `kernel-features.test.js` "body setters, setType, projectPoint, ..." |
 | R2-18 | `setDominanceGroup` (-127 to 127) | `dominance` | DONE: `kernel-features.test.js` "a body of higher dominance is not pushed by a lighter one" |
 | R2-19 | `setAdditionalSolverIterations` | none | GAP |
@@ -53,8 +53,8 @@ Found while auditing: the 2D facade has no `Body2D.enabled`, no way to lock rota
 | C2-13 | `setContactSkin` | none | GAP |
 | C2-14 | `setSensor` | `sensor`, `setSensor` | DONE: `kernel-features.test.js` "a sensor reports entry and exit and pushes nothing; setSensor changes it later" |
 | C2-15 | `setCollisionGroups`, `setSolverGroups` | same | DONE: `kernel-features.test.js` "collision groups let a body fall through a floor it does not meet", "solver groups that do not meet report the contact but push nothing" |
-| C2-16 | `setActiveCollisionTypes` (`DEFAULT`, `KINEMATIC_FIXED`, ...) | `activeCollisionTypes` option | GAP: no test of the option; no setter |
-| C2-17 | `setActiveEvents(COLLISION_EVENTS, CONTACT_FORCE_EVENTS)` | `events`, `contactForceThreshold` options | PARTIAL: `kernel-features.test.js` "contact force events fire past the threshold and carry the force and normal"; setters `setActiveEvents`, `setContactForceEventThreshold` GAP |
+| C2-16 | `setActiveCollisionTypes` (`DEFAULT`, `KINEMATIC_FIXED`, ...) | `activeCollisionTypes` option, `setActiveCollisionTypes`, `activeCollisionTypes()` | DONE: `dynamics2d.test.js` "active collision types decide which pairs a collider meets, and read back" |
+| C2-17 | `setActiveEvents(COLLISION_EVENTS, CONTACT_FORCE_EVENTS)` | `events`, `contactForceThreshold` options; `setActiveEvents`, `activeEvents()`, `setContactForceEventThreshold` | DONE: `dynamics2d.test.js` "active events and the contact force threshold change what a collider reports"; `kernel-features.test.js` "contact force events fire past the threshold and carry the force and normal" |
 | C2-18 | `setActiveHooks(FILTER_CONTACT_PAIRS, FILTER_INTERSECTION_PAIR)` | `hooks: { filterPair, modifyContact }` option | PARTIAL: contact filter DONE: `kernel-features.test.js` "hooks: filterPair vetoes a pair, modifyContact makes a one-way platform and sets friction"; intersection filter and the setter GAP |
 | C2-19 | collider enabled flag | `setEnabled`, `isEnabled` | DONE: `kernel-features.test.js` "a disabled collider meets nothing and is skipped by queries" |
 
@@ -79,12 +79,12 @@ Found while auditing: the 2D facade has no `Body2D.enabled`, no way to lock rota
 | Row | Rapier 2D | Margo 2D | Status |
 | --- | --- | --- | --- |
 | K2-01 | `createCharacterController(offset)`, `computeColliderMovement`, `computedMovement`, `removeCharacterController` | `createCharacterController(body, { offset })`, `move`, `dispose` | DONE: `physics2d.test.js` "a character controller walks, stops at a wall and reports ground" |
-| K2-02 | `setUp`, `setMaxSlopeClimbAngle`, `setMinSlopeSlideAngle` | `up`, `maxSlopeClimbAngle`, `minSlopeSlideAngle` | GAP: options exist, no test climbs or slides a slope |
-| K2-03 | `enableAutostep(maxHeight, minWidth, includeDynamicBodies)`, `disableAutostep` | `autostep` | GAP: option exists, no test steps over a ledge |
-| K2-04 | `enableSnapToGround(distance)`, `disableSnapToGround` | `snapToGround` | PARTIAL: used in `physics2d.test.js` "a character controller walks, stops at a wall and reports ground" without asserting the snap; GAP |
+| K2-02 | `setUp`, `setMaxSlopeClimbAngle`, `setMinSlopeSlideAngle` | `up`, `maxSlopeClimbAngle`, `minSlopeSlideAngle` | PARTIAL: climbing DONE: `dynamics2d.test.js` "a slope is climbed up to maxSlopeClimbAngle and not beyond it" (the audit found a slope past the limit was slid up like a ramp; fixed); `minSlopeSlideAngle` and a non-default `up` GAP |
+| K2-03 | `enableAutostep(maxHeight, minWidth, includeDynamicBodies)`, `disableAutostep` | `autostep` | PARTIAL: DONE: `dynamics2d.test.js` "autostep climbs a ledge that is no higher than its limit, and a taller one stops the character"; `minWidth` and `includeDynamic` GAP |
+| K2-04 | `enableSnapToGround(distance)`, `disableSnapToGround` | `snapToGround` | DONE: `dynamics2d.test.js` "snap to ground keeps the character on a floor that drops away by less than its distance" |
 | K2-05 | slide on or off, `computedGrounded` | `slide`, `grounded` | DONE: `physics2d.test.js` "a character controller walks, stops at a wall and reports ground" |
 | K2-06 | `numComputedCollisions`, `computedCollision(i)` | `collisions`, `hits` | DONE: `kernel-features.test.js` "body setters, setType, projectPoint, intersectionsWithBox, contactPairs and the character's hits" |
-| K2-07 | `setApplyImpulsesToDynamicBodies`, character mass | `pushDynamic`, `mass` | GAP: options exist, no test pushes a crate |
+| K2-07 | `setApplyImpulsesToDynamicBodies`, character mass | `pushDynamic`, `mass` | DONE: `dynamics2d.test.js` "a character pushes a dynamic crate when it is asked to, and is stopped by it when not" |
 | K2-08 | `filterFlags`, `filterGroups`, `filterPredicate` on `computeColliderMovement` | none | GAP |
 | K2-09 | `DynamicRayCastVehicleController` (the guide shows no 2D-specific note) | none | GAP: check against the rapier2d build before building; 3D has it (`rapier-parity.md` V-01 to V-04) |
 | K2-10 | `createPidController`, `PidAxesMask`, `applyLinearCorrection` | `PidController2D` | DONE: `kernel-features.test.js` "a PID controller steers a body to a point and an angle" |

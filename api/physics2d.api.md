@@ -95,6 +95,8 @@ export class Body2D {
     applyTorqueImpulse(torque: number): this;
     applyForce(force: Vec2D): this;
     applyTorque(torque: number): this;
+    applyForceAtPoint(force: Vec2D, point: Vec2D): this;
+    resetTorques(): this;
     resetForces(): this;
     get mass(): number;
     restoreAdditionalMass(value: number): void;
@@ -104,6 +106,9 @@ export class Body2D {
     wakeUp(): this;
     sleep(): this;
     lockTranslation(x?: boolean, y?: boolean): this;
+    lockRotation(locked?: boolean): this;
+    get rotationLocked(): boolean;
+    turnLocked: boolean;
     get translationLocked(): [boolean, boolean];
     lockJoint: number;
     addCollider(options: ColliderOptions2D): Collider2D;
@@ -188,6 +193,17 @@ export class Collider2D {
     setFriction(value: number): void;
     setRestitution(value: number): void;
     setDensity(value: number): void;
+    setActiveCollisionTypes(types: number): void;
+    activeCollisionTypes(): number;
+    setActiveEvents(events: {
+        collision?: boolean;
+        contactForce?: boolean;
+    }): void;
+    activeEvents(): {
+        collision: boolean;
+        contactForce: boolean;
+    };
+    setContactForceEventThreshold(newtons: number): void;
     setCollisionGroups(groups: number): void;
     setSolverGroups(groups: number): void;
     setEnabled(enabled: boolean): void;
@@ -647,6 +663,8 @@ interface Exports {
     body_torque_impulse(world: number, body: number, torque: number): number;
     body_add_force(world: number, body: number, fx: number, fy: number, torque: number): number;
     body_reset_forces(world: number, body: number): number;
+    body_reset_torques(world: number, body: number): number;
+    body_add_force_at(world: number, body: number, fx: number, fy: number, px: number, py: number): number;
     body_set_params(world: number, body: number, ld: number, ad: number, gs: number, flags: number, dominance: number): number;
     body_set_fixed_rotation(world: number, body: number, fixed: number): number;
     body_set_next(world: number, body: number, x: number, y: number, c: number, s: number): number;

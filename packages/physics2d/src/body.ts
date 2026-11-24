@@ -113,7 +113,8 @@ export class Collider2D {
     this.removed = true;
   }
   private push(): void {
-    if (this.removed) throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
+    if (this.removed)
+      throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
     const { kernel, handle } = this.owner;
     for (const shape of this.shapes) {
       const io = kernel.io(8);
@@ -141,6 +142,49 @@ export class Collider2D {
   }
   setDensity(value: number): void {
     new Float32Array(this.settings.buffer)[0] = encode(value, 'density');
+    this.push();
+  }
+  /**
+   * Which kinds of body pair this collider takes part in, as the bits of `activeCollisionTypes` (Rapier's
+   * `setActiveCollisionTypes`): 1 dynamic with dynamic, 2 dynamic with kinematic, 4 dynamic with fixed (the default 7),
+   * 8 kinematic with kinematic, 16 kinematic with fixed, 32 fixed with fixed. A sensor sees all six (63).
+   */
+  setActiveCollisionTypes(types: number): void {
+    if (!Number.isInteger(types) || types < 0 || types > 63)
+      throw new RangeError(
+        `activeCollisionTypes must be a whole number from 0 to 63, the six pair kinds as bits (got ${types}); use 7 for the default.`,
+      );
+    this.settings[5] = (this.settings[5] & ~0xff00) | (types << 8);
+    this.push();
+  }
+  /** The pair kinds this collider takes part in, as {@link Collider2D.setActiveCollisionTypes} reads them. */
+  activeCollisionTypes(): number {
+    return (this.settings[5] >>> 8) & 0xff;
+  }
+  /**
+   * Chooses which events this collider asks for, Rapier's `setActiveEvents`: `collision` for `contactstart`,
+   * `contactend` and the intersection events, `contactForce` for `contactforce` (past `setContactForceEventThreshold`).
+   * What you leave out stays.
+   */
+  setActiveEvents(events: { collision?: boolean; contactForce?: boolean }): void {
+    let word = this.settings[5];
+    if (events.collision !== undefined) word = events.collision ? word | 1 : word & ~1;
+    if (events.contactForce !== undefined) word = events.contactForce ? word | 2 : word & ~2;
+    this.settings[5] = word;
+    this.push();
+  }
+  /** Which events this collider asks for. */
+  activeEvents(): { collision: boolean; contactForce: boolean } {
+    return { collision: (this.settings[5] & 1) !== 0, contactForce: (this.settings[5] & 2) !== 0 };
+  }
+  /** The newtons a contact's force must pass to raise a `contactforce` event (Rapier's `setContactForceEventThreshold`); it also asks for the event. */
+  setContactForceEventThreshold(newtons: number): void {
+    if (!(newtons >= 0) || !Number.isFinite(newtons))
+      throw new RangeError(
+        `The contact force threshold must be a finite number of newtons, 0 or more (got ${newtons}).`,
+      );
+    new Float32Array(this.settings.buffer)[6] = newtons;
+    this.settings[5] |= 2;
     this.push();
   }
   /** Packed interaction groups, see `interactionGroups`. */
@@ -245,7 +289,17 @@ export class Body2D {
     const flags = (next.canSleep ? 1 : 0) | (next.ccd ? 4 : 0);
     if (!Number.isInteger(next.dominance) || next.dominance < -127 || next.dominance > 127)
       throw new RangeError(`dominance must be an integer from -127 to 127, got ${next.dominance}.`);
-    kernel.ok(x.body_set_params(h, this.handle, encode(next.linearDamping, 'damping'), encode(next.angularDamping, 'damping'), encode(next.gravityScale, 'gravity scale'), flags, next.dominance));
+    kernel.ok(
+      x.body_set_params(
+        h,
+        this.handle,
+        encode(next.linearDamping, 'damping'),
+        encode(next.angularDamping, 'damping'),
+        encode(next.gravityScale, 'gravity scale'),
+        flags,
+        next.dominance,
+      ),
+    );
     this.params = next;
   }
   get linearDamping(): number {
@@ -355,7 +409,15 @@ export class Body2D {
   set linearVelocity(value: Vec2D) {
     const { x, h, kernel, scale } = this.k;
     const av = this.read().f[6];
-    kernel.ok(x.body_set_velocity(h, this.handle, encode(value[0], 'velocity x') * scale, encode(value[1], 'velocity y') * scale, av));
+    kernel.ok(
+      x.body_set_velocity(
+        h,
+        this.handle,
+        encode(value[0], 'velocity x') * scale,
+        encode(value[1], 'velocity y') * scale,
+        av,
+      ),
+    );
   }
   /** Radians per second. */
   get angularVelocity(): number {
@@ -369,14 +431,24 @@ export class Body2D {
   /** Impulse in kernel units (kilogram metres per second); a body of mass m gains impulse / m metres per second. */
   applyImpulse(impulse: Vec2D): this {
     const { x, h, kernel } = this.k;
-    kernel.ok(x.body_impulse(h, this.handle, encode(impulse[0], 'impulse x'), encode(impulse[1], 'impulse y'), 0, 0, 0));
+    kernel.ok(
+      x.body_impulse(h, this.handle, encode(impulse[0], 'impulse x'), encode(impulse[1], 'impulse y'), 0, 0, 0),
+    );
     return this;
   }
   /** Impulse applied at a world point (world units), which also spins the body. */
   applyImpulseAtPoint(impulse: Vec2D, point: Vec2D): this {
     const { x, h, kernel, scale } = this.k;
     kernel.ok(
-      x.body_impulse(h, this.handle, encode(impulse[0], 'impulse x'), encode(impulse[1], 'impulse y'), 1, point[0] * scale, point[1] * scale),
+      x.body_impulse(
+        h,
+        this.handle,
+        encode(impulse[0], 'impulse x'),
+        encode(impulse[1], 'impulse y'),
+        1,
+        point[0] * scale,
+        point[1] * scale,
+      ),
     );
     return this;
   }
@@ -395,6 +467,22 @@ export class Body2D {
   applyTorque(torque: number): this {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_add_force(h, this.handle, 0, 0, encode(torque, 'torque')));
+    return this;
+  }
+  /** A force held until `resetForces`, applied at a world point: it pushes the body and turns it by the arm from the centre of mass. */
+  applyForceAtPoint(force: Vec2D, point: Vec2D): this {
+    const { x, h, kernel, scale } = this.k;
+    encode(force[0], 'force x');
+    encode(force[1], 'force y');
+    encode(point[0], 'point x');
+    encode(point[1], 'point y');
+    kernel.ok(x.body_add_force_at(h, this.handle, force[0], force[1], point[0] * scale, point[1] * scale));
+    return this;
+  }
+  /** Clears the torque that acts every step and keeps the force; `resetForces` clears both. */
+  resetTorques(): this {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_reset_torques(h, this.handle));
     return this;
   }
   /** Clears the forces and torques that act every step. */
@@ -439,11 +527,30 @@ export class Body2D {
    */
   lockTranslation(x = true, y = x): this {
     this.check();
-    if (this.type === 'fixed') throw new TypeError('A fixed body does not move; lock the translation of a dynamic or kinematic body.');
+    if (this.type === 'fixed')
+      throw new TypeError('A fixed body does not move; lock the translation of a dynamic or kinematic body.');
     this.owner.lockTranslation(this, x, y);
     this.locked = [x, y];
     return this;
   }
+  /**
+   * Stops the body turning, or lets it turn again: `lockRotation()` holds its angle and takes its spin away. Rapier's
+   * `lockRotations`. The `lockRotation` option of `addBody` does the same at creation.
+   */
+  lockRotation(locked = true): this {
+    const { x, h, kernel } = this.k;
+    if (this.type === 'fixed')
+      throw new TypeError('A fixed body does not turn; lock the rotation of a dynamic or kinematic body.');
+    kernel.ok(x.body_set_fixed_rotation(h, this.handle, locked ? 1 : 0));
+    this.turnLocked = locked;
+    return this;
+  }
+  /** True while the body's rotation is locked. */
+  get rotationLocked(): boolean {
+    return this.turnLocked;
+  }
+  /** @internal */
+  turnLocked = false;
   /** Which axes are locked, [x, y]. */
   get translationLocked(): [boolean, boolean] {
     return [this.locked[0], this.locked[1]];

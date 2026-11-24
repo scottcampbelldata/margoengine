@@ -32,7 +32,12 @@ export interface CharacterMoveResult2D {
   /** Number of contacts the move hit. */
   collisions: number;
   /** What the move hit, in order: the collider, the surface normal pointing out of it and the contact point. */
-  hits: Array<{ collider: import('./body.js').Collider2D; body: Body2D; normal: [number, number]; point: [number, number] }>;
+  hits: Array<{
+    collider: import('./body.js').Collider2D;
+    body: Body2D;
+    normal: [number, number];
+    point: [number, number];
+  }>;
 }
 
 const EPS = 1e-5;
@@ -61,7 +66,8 @@ export class CharacterController2D {
   ) {
     const up = options.up ?? [0, -1],
       length = Math.hypot(up[0], up[1]);
-    if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('The up vector must be finite and not zero; try [0, -1].');
+    if (!(length > 0) || !Number.isFinite(length))
+      throw new RangeError('The up vector must be finite and not zero; try [0, -1].');
     this.up = [up[0] / length, up[1] / length];
     this.offset = (options.offset ?? 0.5) * physics.scale;
     this.climb = Math.cos(options.maxSlopeClimbAngle ?? Math.PI / 4);
@@ -73,13 +79,17 @@ export class CharacterController2D {
     const collider = this.body.colliders[0];
     if (!collider?.described) throw new TypeError('The character body has no collider; add one with body.addCollider.');
     const angle = this.body.rotation;
-    return this.physics.cast(collider.described, at[0], at[1], angle, dir[0], dir[1], max, { exclude: this.body, excludeSensors: true });
+    return this.physics.cast(collider.described, at[0], at[1], angle, dir[0], dir[1], max, {
+      exclude: this.body,
+      excludeSensors: true,
+    });
   }
 
   /** Computes the movement for `delta` (world units) and sets the body's next position. */
   move(delta: Vec2D): CharacterMoveResult2D {
     if (this.disposed) throw new TypeError('This character controller was disposed; create a new one.');
-    if (!Number.isFinite(delta[0]) || !Number.isFinite(delta[1])) throw new TypeError('delta must be two finite numbers [x, y].');
+    if (!Number.isFinite(delta[0]) || !Number.isFinite(delta[1]))
+      throw new TypeError('delta must be two finite numbers [x, y].');
     const k = this.physics.scale,
       inv = 1 / k;
     const start: [number, number] = [this.body.position[0] * k, this.body.position[1] * k];
@@ -141,7 +151,10 @@ export class CharacterController2D {
         // Moving down the slope onto it, not along it, leaves nothing to climb.
         if (dot(rest, up) < 0 && Math.abs(dot(h, h)) < EPS * EPS) remaining = [0, 0];
       } else {
+        // A slope too steep to climb is a wall: sliding along it never takes the character upward.
         remaining = [rest[0] - o[0] * dot(rest, o), rest[1] - o[1] * dot(rest, o)];
+        const rise = dot(remaining, up);
+        if (rise > 0) remaining = [remaining[0] - up[0] * rise, remaining[1] - up[1] * rise];
       }
       if (dot(remaining, remaining) < EPS * EPS) break;
     }
@@ -161,7 +174,10 @@ export class CharacterController2D {
   }
 
   /** Tries to climb a ledge in the way of `rest`: up by at most `maxHeight`, across by at least `minWidth`, down onto ground. */
-  private step(pos: [number, number], rest: [number, number]): { pos: [number, number]; remaining: [number, number] } | null {
+  private step(
+    pos: [number, number],
+    rest: [number, number],
+  ): { pos: [number, number]; remaining: [number, number] } | null {
     const auto = this.options.autostep;
     if (!auto) return null;
     const k = this.physics.scale,

@@ -33,7 +33,17 @@ interface Exports {
   body_torque_impulse(world: number, body: number, torque: number): number;
   body_add_force(world: number, body: number, fx: number, fy: number, torque: number): number;
   body_reset_forces(world: number, body: number): number;
-  body_set_params(world: number, body: number, ld: number, ad: number, gs: number, flags: number, dominance: number): number;
+  body_reset_torques(world: number, body: number): number;
+  body_add_force_at(world: number, body: number, fx: number, fy: number, px: number, py: number): number;
+  body_set_params(
+    world: number,
+    body: number,
+    ld: number,
+    ad: number,
+    gs: number,
+    flags: number,
+    dominance: number,
+  ): number;
   body_set_fixed_rotation(world: number, body: number, fixed: number): number;
   body_set_next(world: number, body: number, x: number, y: number, c: number, s: number): number;
   body_wake(world: number, body: number): number;

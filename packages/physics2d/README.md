@@ -78,9 +78,10 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Queries | contact pairs of a collider | `contactPairs(collider)` | full |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
 | Bodies | damping, gravity scale, locked rotation, can sleep, dominance, body type changes | `BodyOptions2D`, the same names as setters on `Body2D`, `setType` | full |
-| Bodies | forces, torques, impulses (at the centre or a point), velocities, wake and sleep | `Body2D` methods | full |
+| Bodies | forces, torques, impulses (at the centre or a point), forces at a point, resetting the torque or both, velocities, wake and sleep | `applyForce`, `applyForceAtPoint`, `applyTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, and the velocity setters | full |
 | Bodies | additional mass | `additionalMass` | full |
-| Bodies | locked translation axes | `lockTranslation` (an exact joint constraint that follows teleports) | full |
+| Bodies | locked translation axes, locked rotation after creation | `lockTranslation` (an exact joint constraint that follows teleports), `lockRotation(locked)` | full |
+| Colliders | collision types, events and the contact force threshold, changed after creation | `setActiveCollisionTypes`, `setActiveEvents`, `setContactForceEventThreshold` and their readers | full |
 | Bodies | soft CCD | none | missing |
 | Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
 | Joints | generic joint (any mix of the x, y and angle locks, in turned frames), pin-slot | `type: 'generic'`, `type: 'slot'` | full |
@@ -91,6 +92,24 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | World | snapshots (serialise and restore the world) | `snapshot()`, `restore()`: a restored world steps bit for bit as the original | full |
 | World | debug render data | `debugRender()` | full |
 | Tools | tile map and sprite outline colliders | `addTileMap`, `outlineColliders` | full |
+
+## Forces at a point, locked rotation and collider settings
+
+`body.applyForceAtPoint(force, point)` holds a force that acts every step and turns the body by the arm from its centre of mass, as Rapier's `addForceAtPoint` does; `resetTorques()` clears the turning and keeps the push, `resetForces()` clears both. `body.lockRotation(locked = true)` holds the angle and takes the spin away until `lockRotation(false)`. A collider's `setActiveCollisionTypes(bits)` chooses the pairs it meets (1 dynamic with dynamic, 2 dynamic with kinematic, 4 dynamic with fixed, 8 kinematic with kinematic, 16 kinematic with fixed, 32 fixed with fixed; the default is 7), `setActiveEvents({collision, contactForce})` the events it asks for, and `setContactForceEventThreshold(newtons)` how hard a contact must press to raise `contactforce`.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, 0] });
+const disc = physics.addBody(null, { colliders: { shape: 'circle', radius: 1, mass: 2 } });
+disc.applyForceAtPoint([0, 4], [1, 0]); // pushes at 2 m/s^2 and turns at 4 rad/s^2
+physics.step();
+disc.resetTorques(); // the push goes on, nothing turns it any more
+disc.lockRotation(); // and the angle is held whatever pushes at it
+console.log(disc.linearVelocity, disc.angularVelocity);
+physics.dispose();
+```
 
 ## Articulations
 

@@ -7,7 +7,14 @@ import { Body2D, Collider2D, type BodyOptions2D, type BodyOwner2D, type BodyType
 import { Articulation2D, type ArticulationLink2D } from './articulation.js';
 import { CharacterController2D, type CharacterOptions2D } from './character.js';
 import { Joint2D, writeJoint, type JointOptions2D } from './joint.js';
-import { describeShape, describeShapes, type ColliderOptions2D, type Described, type ShapeOptions2D, type Vec2D } from './shapes.js';
+import {
+  describeShape,
+  describeShapes,
+  type ColliderOptions2D,
+  type Described,
+  type ShapeOptions2D,
+  type Vec2D,
+} from './shapes.js';
 import { tileMapColliders, type TileMapBodyOptions, type TileMapSource } from './tilemap.js';
 
 /** Options of {@link Physics2D.load}. */
@@ -247,7 +254,11 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   /** @throws MargoError (`state`) before {@link Physics2D.load} has finished. */
   constructor(engine: EngineKernel | null, options: Physics2DOptions = {}) {
     const kernel = solver.value;
-    if (!kernel) throw new MargoError('state', 'Physics2D is not loaded; call await Physics2D.load() once before new Physics2D().');
+    if (!kernel)
+      throw new MargoError(
+        'state',
+        'Physics2D is not loaded; call await Physics2D.load() once before new Physics2D().',
+      );
     this.kernel = kernel;
     this.name = options.name ?? 'physics2d';
     const ppm = options.pixelsPerMeter ?? 32;
@@ -373,7 +384,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     kernel.ok(kernel.exports.body_read_poses(this.handle, n));
     const out = kernel.io(5 * n).f;
     const k = 1 / this.scale;
-    for (let i = 0; i < n; i++) movers[i].store(out[n + 4 * i], out[n + 4 * i + 1], out[n + 4 * i + 2], out[n + 4 * i + 3], k);
+    for (let i = 0; i < n; i++)
+      movers[i].store(out[n + 4 * i], out[n + 4 * i + 1], out[n + 4 * i + 2], out[n + 4 * i + 3], k);
   }
 
   private collectEvents(into: Array<[keyof Physics2DEventMap, unknown]>): void {
@@ -390,7 +402,20 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
           sensor = (flags & 4) !== 0;
         into.push([
           sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
-          { type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend', bodyA: colliderA.body, bodyB: colliderB.body, colliderA, colliderB, sensor },
+          {
+            type: sensor
+              ? started
+                ? 'intersectionstart'
+                : 'intersectionend'
+              : started
+                ? 'contactstart'
+                : 'contactend',
+            bodyA: colliderA.body,
+            bodyB: colliderB.body,
+            colliderA,
+            colliderB,
+            sensor,
+          },
         ]);
       }
     }
@@ -403,7 +428,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
         if (!colliderA || !colliderB) continue;
         into.push([
           'contactforce',
-          { bodyA: colliderA.body, bodyB: colliderB.body, colliderA, colliderB, force: io.f[5 * i + 2], normal: [io.f[5 * i + 3], io.f[5 * i + 4]] },
+          {
+            bodyA: colliderA.body,
+            bodyB: colliderB.body,
+            colliderA,
+            colliderB,
+            force: io.f[5 * i + 2],
+            normal: [io.f[5 * i + 3], io.f[5 * i + 4]],
+          },
         ]);
       }
     }
@@ -467,10 +499,11 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       0,
     );
     new Int32Array(io.u.buffer, io.u.byteOffset, 16)[10] = dominance;
-    const flags = (options.canSleep ?? true ? 1 : 0) | (options.lockRotation ? 2 : 0) | (options.ccd ? 4 : 0);
+    const flags = ((options.canSleep ?? true) ? 1 : 0) | (options.lockRotation ? 2 : 0) | (options.ccd ? 4 : 0);
     const handle = this.kernel.ok(this.kernel.exports.body_create(this.handle, BODY_KIND[type], flags));
     const body = new Body2D(this, handle, sprite, type);
     body.userData = options.userData;
+    body.turnLocked = options.lockRotation === true;
     body.params = {
       linearDamping: options.linearDamping ?? 0,
       angularDamping: options.angularDamping ?? 0,
@@ -612,7 +645,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
             const ca = this.byShape.get(a),
               cb = this.byShape.get(b);
             if (!ca || !cb || !this.hookSet?.modifyContact) return 0;
-            const change: ContactChange2D = { colliderA: ca, colliderB: cb, normal: [nx, ny], tangent: [ny, -nx], points, solverActive: true };
+            const change: ContactChange2D = {
+              colliderA: ca,
+              colliderB: cb,
+              normal: [nx, ny],
+              tangent: [ny, -nx],
+              points,
+              solverActive: true,
+            };
             this.hookSet.modifyContact(change);
             let bits = change.solverActive ? 0 : 1;
             const io = this.kernel.current(5);
@@ -661,7 +701,13 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const out = this.kernel.io(5 * count);
     for (let i = 0; i < count; i++) {
       const base = this.hitOf(out.u[5 * i], filter);
-      if (base) return { ...base, point: [out.f[5 * i + 1] / k, out.f[5 * i + 2] / k], inside: out.u[5 * i + 4] !== 0, distance: out.f[5 * i + 3] / k };
+      if (base)
+        return {
+          ...base,
+          point: [out.f[5 * i + 1] / k, out.f[5 * i + 2] / k],
+          inside: out.u[5 * i + 4] !== 0,
+          distance: out.f[5 * i + 3] / k,
+        };
     }
     return null;
   }
@@ -685,7 +731,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
    */
   contactPairs(collider: Collider2D): ContactPair2D[] {
     this.live();
-    if (collider.isRemoved) throw new MargoError('state', 'Collider2D was removed; ask for the contacts of a live collider.');
+    if (collider.isRemoved)
+      throw new MargoError('state', 'Collider2D was removed; ask for the contacts of a live collider.');
     const out: ContactPair2D[] = [];
     const k = 1 / this.scale;
     for (const shape of collider.shapes) {
@@ -698,7 +745,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
           n = flags >> 2;
         const points: Array<{ point: [number, number]; distance: number }> = [];
         for (let j = 0; j < n; j++)
-          points.push({ point: [f[11 * i + 4 + 3 * j] * k, f[11 * i + 5 + 3 * j] * k], distance: f[11 * i + 6 + 3 * j] * k });
+          points.push({
+            point: [f[11 * i + 4 + 3 * j] * k, f[11 * i + 5 + 3 * j] * k],
+            distance: f[11 * i + 6 + 3 * j] * k,
+          });
         out.push({
           collider,
           other,
@@ -751,7 +801,9 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const handle = this.kernel.ok(
       this.kernel.exports.joint_create(this.handle, bodyA.handle, bodyB.handle, options.collide === true ? 1 : 0),
     );
-    const joint = new Joint2D(this.kernel, this.handle, handle, bodyA, bodyB, options.type, unit, (j) => this.removeJoint(j));
+    const joint = new Joint2D(this.kernel, this.handle, handle, bodyA, bodyB, options.type, unit, (j) =>
+      this.removeJoint(j),
+    );
     this.joints.add(joint);
     return joint;
   }
@@ -766,9 +818,11 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
    */
   addArticulation(root: Body2D, links: readonly ArticulationLink2D[]): Articulation2D {
     this.live();
-    if (!this.bodies.has(root)) throw new MargoError('state', 'The root must be a body of this Physics2D and not removed.');
+    if (!this.bodies.has(root))
+      throw new MargoError('state', 'The root must be a body of this Physics2D and not removed.');
     for (const link of links)
-      if (!this.bodies.has(link.body)) throw new MargoError('state', 'Every link body must belong to this Physics2D and not be removed.');
+      if (!this.bodies.has(link.body))
+        throw new MargoError('state', 'Every link body must belong to this Physics2D and not be removed.');
     return new Articulation2D(this, root, links);
   }
 
@@ -788,7 +842,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   writeFilter(f: QueryFilter2D = {}): void {
     const io = this.kernel.io(4);
     io.u[0] = f.groups ?? 0xffffffff;
-    io.u[1] = (f.excludeSensors ? 1 : 0) | (f.excludeFixed ? 2 : 0) | (f.excludeKinematic ? 4 : 0) | (f.excludeDynamic ? 8 : 0);
+    io.u[1] =
+      (f.excludeSensors ? 1 : 0) | (f.excludeFixed ? 2 : 0) | (f.excludeKinematic ? 4 : 0) | (f.excludeDynamic ? 8 : 0);
     io.u[2] = NONE;
     io.u[3] = f.exclude && this.bodies.has(f.exclude) ? f.exclude.handle : NONE;
   }
@@ -813,14 +868,19 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.writeFilter(options);
     const io = this.kernel.io(16);
     io.f.set([origin[0] * k, origin[1] * k, dx, dy, Math.min((options.maxDistance ?? 1e9) * k, 3e38)], 4);
-    io.u[9] = options.solid ?? true ? 1 : 0;
+    io.u[9] = (options.solid ?? true) ? 1 : 0;
     const count = this.kernel.ok(this.kernel.exports.ray_cast(this.handle));
     const out = this.kernel.io(4 * count);
     for (let i = 0; i < count; i++) {
       const base = this.hitOf(out.u[4 * i], options);
       if (!base) continue;
       const d = out.f[4 * i + 1] / k;
-      return { ...base, distance: d, point: [origin[0] + dx * d, origin[1] + dy * d], normal: [out.f[4 * i + 2] + 0, out.f[4 * i + 3] + 0] };
+      return {
+        ...base,
+        distance: d,
+        point: [origin[0] + dx * d, origin[1] + dy * d],
+        normal: [out.f[4 * i + 2] + 0, out.f[4 * i + 3] + 0],
+      };
     }
     return null;
   }
@@ -859,7 +919,9 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   private queryShape(shape: ShapeOptions2D): Described {
     const d = describeShape(shape, this.scale);
     if (d.kind > 4 || !d.convex)
-      throw new RangeError('A query shape must be a box, circle, capsule, segment or a convex polygon of at most 8 points.');
+      throw new RangeError(
+        'A query shape must be a box, circle, capsule, segment or a convex polygon of at most 8 points.',
+      );
     return d;
   }
 
@@ -878,11 +940,29 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const length = Math.hypot(direction[0], direction[1]);
     if (!(length > 0)) throw new RangeError('Shape2D direction must not be zero; pass a direction such as [0, 1].');
     const d = this.queryShape(shape);
-    return this.cast(d, position[0] * this.scale, position[1] * this.scale, rotation, direction[0] / length, direction[1] / length, maxDistance * this.scale, filter);
+    return this.cast(
+      d,
+      position[0] * this.scale,
+      position[1] * this.scale,
+      rotation,
+      direction[0] / length,
+      direction[1] / length,
+      maxDistance * this.scale,
+      filter,
+    );
   }
 
   /** @internal A shape cast in metres; the hit is in world units. */
-  cast(d: Described, x: number, y: number, angle: number, dx: number, dy: number, max: number, filter?: QueryFilter2D): CastHit2D | null {
+  cast(
+    d: Described,
+    x: number,
+    y: number,
+    angle: number,
+    dx: number,
+    dy: number,
+    max: number,
+    filter?: QueryFilter2D,
+  ): CastHit2D | null {
     this.writeFilter(filter);
     const io = this.kernel.io(11 + d.geometry.length);
     io.f.set([x, y, Math.cos(angle), Math.sin(angle), dx, dy, Math.min(max, 3e38)], 4);
@@ -894,7 +974,12 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       const base = this.hitOf(out.u[8 * i], filter);
       if (!base) continue;
       const f = out.f;
-      return { ...base, distance: f[8 * i + 1] * k, point: [f[8 * i + 4] * k, f[8 * i + 5] * k], normal: [0 - f[8 * i + 6], 0 - f[8 * i + 7]] };
+      return {
+        ...base,
+        distance: f[8 * i + 1] * k,
+        point: [f[8 * i + 4] * k, f[8 * i + 5] * k],
+        normal: [0 - f[8 * i + 6], 0 - f[8 * i + 7]],
+      };
     }
     return null;
   }
@@ -937,7 +1022,11 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   restore(bytes: Uint8Array): void {
     this.live();
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (bytes.byteLength < 8 || view.getUint32(0, true) !== 0x50443253 || 8 + view.getUint32(4, true) > bytes.byteLength)
+    if (
+      bytes.byteLength < 8 ||
+      view.getUint32(0, true) !== 0x50443253 ||
+      8 + view.getUint32(4, true) > bytes.byteLength
+    )
       throw new RangeError('Physics2D.restore needs the bytes Physics2D.snapshot returned.');
     const headerLength = view.getUint32(4, true);
     const header = JSON.parse(new TextDecoder().decode(bytes.subarray(8, 8 + headerLength))) as {
@@ -947,8 +1036,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       extra: number[];
     };
     const now = JSON.stringify([...this.bodies].map((b) => [b.handle, b.colliders.map((c) => c.shapes)]));
-    if (now !== JSON.stringify(header.bodies) || JSON.stringify([...this.joints].map((j) => j.handle)) !== JSON.stringify(header.joints))
-      throw new MargoError('state', 'Physics2D.restore: bodies, colliders or joints were added or removed since the snapshot; restore it before changing them, or take a new snapshot.');
+    if (
+      now !== JSON.stringify(header.bodies) ||
+      JSON.stringify([...this.joints].map((j) => j.handle)) !== JSON.stringify(header.joints)
+    )
+      throw new MargoError(
+        'state',
+        'Physics2D.restore: bodies, colliders or joints were added or removed since the snapshot; restore it before changing them, or take a new snapshot.',
+      );
     const state = bytes.subarray(8 + headerLength);
     const { kernel } = this;
     const io = kernel.io(Math.ceil(state.length / 4));
@@ -974,7 +1069,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.live();
     const all = Object.keys(options).length === 0;
     const what =
-      (all || options.shapes ? 1 : 0) | (all || options.joints ? 2 : 0) | (all || options.contacts ? 4 : 0) | (all || options.boxes ? 8 : 0);
+      (all || options.shapes ? 1 : 0) |
+      (all || options.joints ? 2 : 0) |
+      (all || options.contacts ? 4 : 0) |
+      (all || options.boxes ? 8 : 0);
     const { kernel } = this;
     const count = kernel.ok(kernel.exports.debug_lines(this.handle, what));
     const f = kernel.io(5 * count).f;

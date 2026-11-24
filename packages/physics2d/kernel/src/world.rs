@@ -1053,6 +1053,23 @@ impl World {
         self.wake(body)
     }
 
+    /// Adds a force that acts every step until reset, applied at a world point: it pushes the body and turns it by the arm
+    /// from the centre of mass.
+    pub fn add_force_at(&mut self, body: u32, force: V2, point: V2) -> Result<(), PhysicsError> {
+        if !finite_vector(force) || !finite_vector(point) { return Err(PhysicsError::NotFinite); }
+        let b = self.live_body(body)?;
+        let center = v2(b.exact_center[0] as f32, b.exact_center[1] as f32);
+        b.force = b.force.add(force);
+        b.torque += point.sub(center).cross(force);
+        self.wake(body)
+    }
+
+    /// Clears the torque that acts every step and keeps the force.
+    pub fn reset_torques(&mut self, body: u32) -> Result<(), PhysicsError> {
+        self.live_body(body)?.torque = 0.0;
+        Ok(())
+    }
+
     pub fn reset_forces(&mut self, body: u32) -> Result<(), PhysicsError> {
         let b = self.live_body(body)?;
         b.force = V2::ZERO;
