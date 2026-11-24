@@ -192,7 +192,7 @@ rtest('compound colliders weld convex parts into one collider with one mass and 
   assert.throws(() => dumbbell.addCollider({ shape: 'compound', parts: [] }), RangeError);
   assert.throws(
     () => dumbbell.addCollider({ shape: 'compound', parts: [{ shape: 'trimesh', vertices: [], indices: [] }] }),
-    /own solver/,
+    /whole triangles/,
   );
   assert.throws(() => dumbbell.addCollider({ shape: 'compound', parts: [{ shape: 'box' }] }), /halfExtents/);
   physics.dispose();
