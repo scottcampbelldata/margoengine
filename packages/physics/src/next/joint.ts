@@ -2,7 +2,7 @@
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
 import type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
-import { JOINT_CONE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
+import { JOINT_BROKEN, JOINT_CONE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
 
@@ -29,6 +29,10 @@ export interface ConeJointOptions {
   twist?: readonly [number, number];
   /** Lets the two bodies collide (default false). */
   contactsEnabled?: boolean;
+  /** The joint breaks when its linear rows carry more than this many newtons (default never). */
+  breakForce?: number;
+  /** The joint breaks when its angular rows carry more than this many newton metres (default never). */
+  breakTorque?: number;
 }
 
 /** What `physics.addJoint` takes on the own solver: the root's joints and the cone. */
@@ -264,6 +268,43 @@ export class PhysicsJoint {
   get contactsEnabled(): boolean {
     return !this.removed && (this.owner.kernel.columns.jointFlags[this.row] & JOINT_CONTACTS) !== 0;
   }
+  /**
+   * The load that breaks the joint: newtons on its linear rows and newton metres on its angular rows, each `Infinity` for
+   * never (the default). The load is what the joint's rows give in a substep over the substep's length, taken at the last
+   * substep of a step. A joint that breaks solves nothing from then on, lets its bodies collide, wakes them and raises a
+   * `jointbreak` event; {@link PhysicsJoint.repair} puts it back.
+   * @throws RangeError unless each limit is above 0 or `Infinity`.
+   */
+  setBreakLimits(force: number, torque: number = Infinity): this {
+    if (!(force > 0) || !(torque > 0)) throw new RangeError('Break limits must be above 0, or Infinity for never; pass newtons and newton metres.');
+    const { columns } = this.owner.kernel;
+    columns.jointBreakForce[this.row] = force === Infinity ? 0 : force;
+    columns.jointBreakTorque[this.row] = torque === Infinity ? 0 : torque;
+    this.watched = force !== Infinity || torque !== Infinity;
+    return this;
+  }
+  /** The break limits as `[force, torque]`, `Infinity` for never. */
+  get breakLimits(): [number, number] {
+    const { jointBreakForce, jointBreakTorque } = this.owner.kernel.columns;
+    return [jointBreakForce[this.row] > 0 ? jointBreakForce[this.row] : Infinity, jointBreakTorque[this.row] > 0 ? jointBreakTorque[this.row] : Infinity];
+  }
+  /** True once the joint has broken, until {@link PhysicsJoint.repair}. */
+  get broken(): boolean {
+    return !this.removed && (this.owner.kernel.columns.jointFlags[this.row] & JOINT_BROKEN) !== 0;
+  }
+  /** Puts a broken joint back to work, with its limits as they were; the bodies wake. */
+  repair(): this {
+    if (this.removed) return this;
+    const { jointFlags } = this.owner.kernel.columns;
+    jointFlags[this.row] &= ~JOINT_BROKEN;
+    this.reported = false;
+    this.wake();
+    return this;
+  }
+  /** @internal Has break limits, so the world looks at it after each step. */
+  watched = false;
+  /** @internal The world has raised its `jointbreak` event. */
+  reported = false;
   remove(): void {
     if (!this.removed) this.owner.removeJoint(this);
   }
@@ -318,6 +359,9 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
   }
   if (frameA) checkFrame(frameA);
   if (frameB) checkFrame(frameB);
+  if (options.breakForce !== undefined || options.breakTorque !== undefined)
+    if (!((options.breakForce ?? Infinity) > 0) || !((options.breakTorque ?? Infinity) > 0))
+      throw new RangeError('Break limits must be above 0, or Infinity for never; pass newtons and newton metres.');
   const { kernel } = owner,
     row = kernel.addJoint(bodyA.row, bodyB.row, locked | (options.contactsEnabled ? JOINT_CONTACTS : 0)),
     columns = kernel.columns,
@@ -335,6 +379,7 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
     if (limits) joint.setLimits(limits[0], limits[1]);
     if (motor) joint.setMotor(motor);
   }
+  if (options.breakForce !== undefined || options.breakTorque !== undefined) joint.setBreakLimits(options.breakForce ?? Infinity, options.breakTorque ?? Infinity);
   if (type === 'rope') {
     columns.jointMin0[row] = -Infinity;
     columns.jointMax0[row] = options.length;

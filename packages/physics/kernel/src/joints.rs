@@ -388,7 +388,7 @@ impl World {
             let row = joint as usize;
             let on_a = self.uu(JOINT_A, row) as usize == a;
             let other = self.uu(if on_a { JOINT_B } else { JOINT_A }, row) as usize;
-            if other == b && self.uu(JOINT_FLAGS, row) & JOINT_CONTACTS == 0 {
+            if other == b && self.uu(JOINT_FLAGS, row) & (JOINT_CONTACTS | JOINT_BROKEN) == 0 {
                 return true;
             }
             joint = self.uu(if on_a { JOINT_NEXT_A } else { JOINT_NEXT_B }, row);
@@ -510,7 +510,7 @@ impl World {
     /// Wakes what a moving body is joined to.
     pub fn wake_across_joints(&mut self) {
         for row in 0..self.header().joint_rows as usize {
-            if self.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_OFF) != JOINT_ALIVE {
+            if self.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_IDLE) != JOINT_ALIVE {
                 continue;
             }
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
@@ -526,7 +526,7 @@ impl World {
     /// Joined bodies are one island; a moving scripted body keeps what it holds awake, as a touch does.
     pub fn unite_joints(&mut self) {
         for row in 0..self.header().joint_rows as usize {
-            if self.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_OFF) != JOINT_ALIVE {
+            if self.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_IDLE) != JOINT_ALIVE {
                 continue;
             }
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
@@ -551,7 +551,7 @@ impl World {
         while at != NONE {
             let row = at as usize;
             let flags = self.uu(JOINT_FLAGS, row);
-            if flags & (JOINT_LOCK * 63) != 0 && flags & JOINT_OFF == 0 {
+            if flags & (JOINT_LOCK * 63) != 0 && flags & JOINT_IDLE == 0 {
                 count += 1;
             }
             at = self.uu(if self.uu(JOINT_A, row) as usize == body { JOINT_NEXT_A } else { JOINT_NEXT_B }, row);
@@ -568,7 +568,8 @@ impl World {
         let mut at = self.uu(FIRST_JOINT, body);
         while at != NONE {
             let row = at as usize;
-            if self.uu(JOINT_FLAGS, row) & (JOINT_LOCK * 63) != 0 {
+            let flags = self.uu(JOINT_FLAGS, row);
+            if flags & (JOINT_LOCK * 63) != 0 && flags & JOINT_IDLE == 0 {
                 count += 1;
                 if at != joint {
                     other = at;
@@ -628,13 +629,43 @@ impl World {
         }
     }
 
+    /// After the last substep: a joint loaded past its break force or torque breaks. The load is the impulse its rows gave in
+    /// the substep over the substep's length, and the force is the three linear rows together, the torque the three
+    /// angular. A broken joint solves nothing, its two bodies may collide, and both wake.
+    pub fn break_joints(&mut self, h: f32) {
+        for row in 0..self.header().joint_rows as usize {
+            let flags = self.uu(JOINT_FLAGS, row);
+            if flags & (JOINT_ALIVE | JOINT_IDLE) != JOINT_ALIVE {
+                continue;
+            }
+            let (limit_force, limit_torque) = (self.s(JOINT_BREAK_FORCE, row), self.s(JOINT_BREAK_TORQUE, row));
+            if !(limit_force > 0.0 || limit_torque > 0.0) {
+                continue;
+            }
+            let load = |w: &World, first: usize| {
+                let (x, y, z) = (w.s(JOINT_IMPULSE_0 + first, row), w.s(JOINT_IMPULSE_0 + first + 1, row), w.s(JOINT_IMPULSE_0 + first + 2, row));
+                sqrt(x * x + y * y + z * z) / h
+            };
+            if (limit_force > 0.0 && load(self, 0) > limit_force) || (limit_torque > 0.0 && load(self, 3) > limit_torque) {
+                self.set_u(JOINT_FLAGS, row, flags | JOINT_BROKEN);
+                for k in 0..6 {
+                    self.set_s(JOINT_IMPULSE_0 + k, row, 0.0);
+                    self.set_s(JOINT_MOTOR_0 + k, row, 0.0);
+                }
+                let (a, b) = (self.uu(JOINT_A, row), self.uu(JOINT_B, row));
+                self.wake(a);
+                self.wake(b);
+            }
+        }
+    }
+
     /// Once a step: lists the joints with a body awake, in paths, and gives their impulses the length of this substep.
     pub fn prepare_joints(&mut self) {
         let ratio = self.header().substep_ratio;
         let stamp = self.header().steps + 1;
         let rows = self.header().joint_rows as usize;
         let live = |w: &World, row: usize| {
-            w.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_OFF) == JOINT_ALIVE && (w.is_awake(w.uu(JOINT_A, row) as usize) || w.is_awake(w.uu(JOINT_B, row) as usize))
+            w.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_IDLE) == JOINT_ALIVE && (w.is_awake(w.uu(JOINT_A, row) as usize) || w.is_awake(w.uu(JOINT_B, row) as usize))
         };
         for row in 0..rows {
             if !live(self, row) {

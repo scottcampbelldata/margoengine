@@ -838,6 +838,24 @@ console.log(body.position[1].toFixed(2)); // '2.00'
 physics.dispose();
 ```
 
+### Breaking joints
+
+A joint takes `breakForce` (newtons) and `breakTorque` (newton metres), or `joint.setBreakLimits(force, torque)`; the default is never. The load is what the joint's linear rows (force) or angular rows (torque) give in a substep over the substep's length, read at the last substep of a step, so a joint that holds a weight at rest reads that weight. A joint past a limit breaks: it solves nothing from then on, its two bodies may collide and both wake, and the world raises one `jointbreak` event with the joint and its bodies. `joint.broken` reads it, `joint.breakLimits` the limits, and `joint.repair()` puts it back at work. A limit must be above 0 or `Infinity`.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+const anchor = physics.addBody(null, {type: 'fixed'});
+const weight = physics.addBody(null, {position: [0, -2, 0], colliders: {shape: 'sphere', radius: 0.25, mass: 10}});
+const rope = physics.addJoint(anchor, weight, {type: 'spherical', anchorB: [0, 2, 0], breakForce: 50}); // 10 kg weighs 98 N
+physics.on('jointbreak', ({joint}) => console.log('snapped', joint === rope));
+for (let i = 0; i < 60; i++) physics.step();
+console.log(rope.broken, weight.position[1] < -2); // true true
+physics.dispose();
+```
+
 ## Parity with Rapier 3D
 
 Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table shows what is left until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
@@ -866,7 +884,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Joint limits, per axis | `setLimits`, `setAxisLimits` | full |
 | Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full |
 | Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full |
-| Joint break on a force or torque threshold | none | missing |
+| Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full |
 | Multibody (reduced-coordinate) joints and inverse kinematics | none | missing |
 | Cross-platform determinism | bit-equal replay in Node, native code, Chromium and Firefox; `world.hash` | partial: no named mode |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |

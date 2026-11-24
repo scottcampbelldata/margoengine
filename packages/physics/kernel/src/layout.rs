@@ -434,6 +434,9 @@ columns! {
     JOINT_MOTOR_5 f32 Joint,
     // The angle of a joint with one free turning axis, counted past a whole turn.
     JOINT_ANGLE f32 Joint,
+    // The load that breaks the joint, in newtons along its linear rows and newton metres about its angular rows; zero never.
+    JOINT_BREAK_FORCE f32 Joint,
+    JOINT_BREAK_TORQUE f32 Joint,
     // The step a joint was last listed in, plus one.
     JOINT_SEEN u32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
@@ -721,3 +724,7 @@ pub const JOINT_CONE: u32 = 1 << 26;
 pub const JOINT_DISTANCE: u32 = 1 << 27;
 /// A body of the joint is out of the world, so nothing solves the joint.
 pub const JOINT_OFF: u32 = 1 << 28;
+/// The joint was loaded past its break force or torque: it solves nothing and keeps its bodies from nothing.
+pub const JOINT_BROKEN: u32 = 1 << 29;
+/// Either reason a joint solves nothing.
+pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN;

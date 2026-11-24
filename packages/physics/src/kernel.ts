@@ -166,6 +166,8 @@ export const JOINT_MOTOR_FORCE = 1 << 18;
 export const JOINT_CONTACTS = 1 << 25;
 export const JOINT_CONE = 1 << 26;
 export const JOINT_DISTANCE = 1 << 27;
+/** The joint broke under its load and solves nothing. */
+export const JOINT_BROKEN = 1 << 29;
 /** Bits of the `colliderFlags` column. */
 export const COLLIDER_SENSOR = 1;
 export const COLLIDER_OFF = 2;

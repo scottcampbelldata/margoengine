@@ -195,6 +195,16 @@ export interface PhysicsEventMap {
   /** Before each fixed step, with the step length. Drive kinematic bodies here. */
   beforestep: number;
   afterstep: number;
+  /** After a step in which a joint with break limits broke: once for that joint, with its bodies. */
+  jointbreak: JointBreakEvent;
+}
+
+/** A joint that broke under its load. */
+export interface JointBreakEvent {
+  type: 'jointbreak';
+  joint: PhysicsJoint;
+  bodyA: PhysicsBody;
+  bodyB: PhysicsBody;
 }
 
 /** Which colliders a scene query sees: the root entry's names, plus Rapier's flags the root does not name. */
@@ -524,7 +534,17 @@ export class Physics implements EnginePlugin, BodyOwner {
     kernel.step(dt);
     this.stepCount++;
     this.dispatch(dt);
+    this.reportBreaks();
     this.emit('afterstep', dt);
+  }
+  private reportBreaks(): void {
+    let found: PhysicsJoint[] | null = null;
+    for (const joint of this.joints)
+      if (joint.watched && !joint.reported && joint.broken) {
+        joint.reported = true;
+        (found ??= []).push(joint);
+      }
+    if (found) for (const joint of found) this.emit('jointbreak', { type: 'jointbreak', joint, bodyA: joint.bodyA, bodyB: joint.bodyB });
   }
   private readonly attachmentStep = (attachment: PhysicsAttachment): void => attachment.beforeStep?.(this.fixedTimestep);
   /** Reads what the step found into events, then calls listeners: one may change the world, so nothing is read after one runs. */

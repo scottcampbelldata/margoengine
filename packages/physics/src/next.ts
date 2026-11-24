@@ -17,6 +17,7 @@ export type {
   CollisionEventType,
   ColliderDistance,
   ContactForceEvent,
+  JointBreakEvent,
   ContactManifold,
   PhysicsEventMap,
   PhysicsOptions,

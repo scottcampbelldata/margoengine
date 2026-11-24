@@ -42,6 +42,10 @@ interface JointBase {
   anchorB?: Vec3;
   /** Let the two bodies collide with each other (default false, as in Rapier). */
   contactsEnabled?: boolean;
+  /** Own solver only: the joint breaks when its linear rows carry more than this many newtons (default never). */
+  breakForce?: number;
+  /** Own solver only: the joint breaks when its angular rows carry more than this many newton metres (default never). */
+  breakTorque?: number;
 }
 /** One degree of freedom of a generic joint: along or about an axis of its frame on body A. */
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';

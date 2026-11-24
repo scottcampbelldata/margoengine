@@ -177,6 +177,7 @@ impl World {
             self.solve_impacts();
             self.clamp_speeds();
         }
+        self.break_joints(h);
         self.ccd_pass();
         self.gather_events();
         self.header_mut().steps += 1;
